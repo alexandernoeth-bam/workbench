@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.22.0</title>
+<title>WorkBench 3.22.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4432,7 +4432,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version">v3.22.0 · Sovereign OS</div>
+      <div id="wb-menu-version">v3.22.1 · Sovereign OS</div>
     </div>
 
     <!-- Welt -->
@@ -4814,21 +4814,23 @@ const WB = {
 
   // ── Status-UI aktualisieren ───────────────────────────
   _idbUpdateStatusUI() {
-    const DOTS = { ok:'ok', warn:'warn', none:'none' };
     ['pro','priv'].forEach(ctx => {
       const dot  = document.getElementById('idb-dot-' + ctx);
       const info = document.getElementById('idb-info-' + ctx);
       const db   = ctx === 'pro' ? this.dataPro : this.dataPriv;
       if (!dot || !info) return;
       if (db) {
-        const s    = this._sync[ctx];
-        dot.className  = 'wb-idb-dot ok';
-        info.textContent = `Rev.${s.revision} · ${s.device||'?'}`;
+        const s = this._sync[ctx] || {};
+        dot.className    = 'wb-idb-dot ok';
+        info.textContent = `Rev.${s.revision||'?'} · ${s.device||'?'}`;
       } else {
-        dot.className  = 'wb-idb-dot none';
+        dot.className    = 'wb-idb-dot none';
         info.textContent = 'nicht geladen';
       }
     });
+    // Gerät-Label
+    const devLbl = document.getElementById('wb-device-label');
+    if (devLbl) devLbl.textContent = this._idbDeviceName(this._idbDevice);
   },
 
   // ── Dev-Modus ─────────────────────────────────────────
@@ -6794,7 +6796,7 @@ const WB = {
       if (this.isDirty) this.idbSaveAll();
     });
 
-    console.log('[WorkBench 3.22.0] IDB-Modus · Gerät:', this._idbDevice);
+    console.log('[WorkBench 3.22.1] IDB-Modus · Gerät:', this._idbDevice);
 
     // Wenn Gerät bekannt: starten (Daten sind bereits geladen)
     if (this._idbDevice) this.start();
@@ -6830,6 +6832,9 @@ const WB = {
 
         this._onFileLoaded(ctx, handle.name);
         this._syncUpdateUI();
+        // Sofort in IDB speichern (F5-Schutz)
+        await this.idbSaveAll();
+        this._idbUpdateStatusUI();
 
       } else {
         // iOS/Safari Fallback
@@ -6857,6 +6862,9 @@ const WB = {
 
           this._onFileLoaded(ctx, file.name);
           this._syncUpdateUI();
+          // Sofort in IDB speichern (F5-Schutz)
+          await this.idbSaveAll();
+          this._idbUpdateStatusUI();
         };
         inp.click();
       }
@@ -6888,6 +6896,9 @@ const WB = {
 
   // ── App starten ─────────────────────────────────────
   start() {
+    // Version im Hamburger anzeigen
+    const vEl = document.getElementById('wb-menu-version');
+    if (vEl) vEl.textContent = 'v' + this.APP_VERSION;
     const startup = document.getElementById('wb-startup');
     if(startup) {
       startup.classList.add('hidden');

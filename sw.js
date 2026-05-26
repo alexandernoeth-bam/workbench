@@ -1,5 +1,5 @@
 // WorkBench Service Worker v3.22.0
-const CACHE = 'workbench-v3221';
+const CACHE = 'workbench-v3221b';
 const FILES = ['./workbench.html', './manifest.json'];
 
 self.addEventListener('install', e => {
