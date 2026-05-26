@@ -1,12 +1,11 @@
-// WorkBench Service Worker v3.23.0 — Minimal, kein aggressives Caching
-const CACHE = 'wb-v3230';
+// WorkBench Service Worker v3.23.1
+// Minimal — nur PWA + Notifications, kein Caching
 
 self.addEventListener('install', () => {
-  self.skipWaiting(); // sofort aktivieren
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
-  // alle alten Caches löschen
   e.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys.map(k => caches.delete(k))))
@@ -14,5 +13,18 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Kein fetch-Handler = Browser holt immer frisch vom Server
-// Service Worker nur für PWA-Installierbarkeit nötig
+// Notification-Click: App öffnen
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(clientList => {
+        // Offenen Tab fokussieren
+        for (const c of clientList) {
+          if (c.url.includes('workbench') && 'focus' in c) return c.focus();
+        }
+        // Neuen Tab öffnen
+        if (clients.openWindow) return clients.openWindow('./workbench.html');
+      })
+  );
+});

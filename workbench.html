@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.23.0</title>
+<title>WorkBench 3.23.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2197,6 +2197,38 @@ html, body {
   font-size: 1.1rem; cursor: pointer;
   padding: 0 4px; flex-shrink: 0;
 }
+
+/* ── Notification Toggle ─────────────────────────────── */
+.wbs-toggle-row {
+  display: flex; align-items: center;
+  padding: 10px 20px; gap: 12px;
+  border-bottom: 1px solid var(--c-border);
+}
+.wbs-toggle {
+  position: relative; width: 44px; height: 24px; flex-shrink: 0;
+}
+.wbs-toggle input { opacity: 0; width: 0; height: 0; }
+.wbs-toggle-slider {
+  position: absolute; inset: 0; border-radius: 24px;
+  background: var(--c-border); cursor: pointer;
+  transition: background var(--t-fast);
+}
+.wbs-toggle-slider::before {
+  content: ''; position: absolute;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; top: 3px; left: 3px;
+  transition: transform var(--t-fast);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.wbs-toggle input:checked + .wbs-toggle-slider { background: var(--c-beruf); }
+.wbs-toggle input:checked + .wbs-toggle-slider::before { transform: translateX(20px); }
+
+/* Notification Badge im Header */
+#wb-notif-badge {
+  font-size: 0.6rem; background: var(--c-beruf);
+  color: #fff; padding: 1px 5px; border-radius: 8px;
+  margin-left: 4px; vertical-align: middle;
+}
 /* ── Sync-Status-Bar (Header) ─────────────────────── */
 #wb-sync-bar {
   display: none;
@@ -4299,6 +4331,63 @@ html, body {
       <div class="wbs-divider"></div>
 
       <!-- Drive-Sync -->
+      <div class="wbs-divider"></div>
+
+      <!-- Benachrichtigungen -->
+      <div class="wbs-section-label">Benachrichtigungen <span id="wb-notif-badge"></span></div>
+      <div class="wbs-toggle-row">
+        <div class="wbs-label">
+          <div class="wbs-label-main">Benachrichtigungen aktiv</div>
+          <div class="wbs-label-sub" id="notif-permission-status">Status wird geladen…</div>
+        </div>
+        <label class="wbs-toggle">
+          <input type="checkbox" id="s-notif-enabled"
+            onchange="WB._saveNotifSetting('notifEnabled', this.checked); WB._notifRequestPermission()">
+          <span class="wbs-toggle-slider"></span>
+        </label>
+      </div>
+      <div id="notif-settings-rows">
+        <div class="wbs-row">
+          <div class="wbs-label"><div class="wbs-label-main">Morgen-Assistent</div></div>
+          <input class="wbs-input" type="time" id="s-notif-morning" value="06:30"
+            onchange="WB._saveNotifSetting('notifMorning', this.value)">
+        </div>
+        <div class="wbs-row">
+          <div class="wbs-label"><div class="wbs-label-main">Abend-Reflexion</div></div>
+          <input class="wbs-input" type="time" id="s-notif-evening" value="20:00"
+            onchange="WB._saveNotifSetting('notifEvening', this.value)">
+        </div>
+        <div class="wbs-row">
+          <div class="wbs-label"><div class="wbs-label-main">Wochenplanung (Sa)</div></div>
+          <input class="wbs-input" type="time" id="s-notif-week" value="09:00"
+            onchange="WB._saveNotifSetting('notifWeek', this.value)">
+        </div>
+        <div class="wbs-row">
+          <div class="wbs-label">
+            <div class="wbs-label-main">Aufgaben heute</div>
+            <div class="wbs-label-sub">Erinnerung um</div>
+          </div>
+          <input class="wbs-input" type="time" id="s-notif-tasks" value="08:00"
+            onchange="WB._saveNotifSetting('notifTasks', this.value)">
+        </div>
+        <div class="wbs-row">
+          <div class="wbs-label">
+            <div class="wbs-label-main">Besprechung vorher</div>
+            <div class="wbs-label-sub">Minuten</div>
+          </div>
+          <input class="wbs-input" type="number" id="s-notif-meeting" value="15" min="5" max="60" step="5"
+            onchange="WB._saveNotifSetting('notifMeetingMin', this.value)">
+        </div>
+        <div class="wbs-row" style="border:none;">
+          <div class="wbs-label"><div class="wbs-label-main">Test-Notification</div></div>
+          <button onclick="WB._notifTest()" style="padding:6px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:0.8rem;">
+            Senden
+          </button>
+        </div>
+      </div>
+
+      <div class="wbs-divider"></div>
+
       <div class="wbs-section-label">Google Drive Sync</div>
       <div class="wbs-row">
         <div class="wbs-label">
@@ -4503,7 +4592,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.23.0 · Build 20260526-0805</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.23.1 · Build 20260526-0823</div>
     </div>
 
     <!-- Welt -->
@@ -4695,7 +4784,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.23.0',
+  APP_VERSION: '3.23.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -4714,6 +4803,193 @@ const WB = {
   _syncPending: null,
 
 
+
+
+  // ══════════════════════════════════════════════════════
+  // NOTIFICATION ENGINE (v3.23.1)
+  // Lokale Notifications via Service Worker
+  // ══════════════════════════════════════════════════════
+
+  _notifTimers: [],   // aktive setTimeout-IDs
+
+  // ── Berechtigung anfragen ─────────────────────────────
+  async _notifRequestPermission() {
+    if (!('Notification' in window)) return 'unsupported';
+    if (Notification.permission === 'granted') return 'granted';
+    if (Notification.permission === 'denied')  return 'denied';
+    const result = await Notification.requestPermission();
+    this._notifUpdateStatus();
+    return result;
+  },
+
+  // ── Status-Anzeige ────────────────────────────────────
+  _notifUpdateStatus() {
+    const el = document.getElementById('notif-permission-status');
+    const badge = document.getElementById('wb-notif-badge');
+    if (!el) return;
+    const s = this._settings;
+    if (!('Notification' in window)) {
+      el.textContent = 'Nicht unterstützt auf diesem Gerät';
+      if (badge) badge.style.display = 'none';
+      return;
+    }
+    const perm = Notification.permission;
+    if (perm === 'granted' && s.notifEnabled) {
+      el.textContent = '✓ Aktiv — Notifications erlaubt';
+      if (badge) { badge.textContent = 'AN'; badge.style.display = ''; }
+    } else if (perm === 'denied') {
+      el.textContent = '✗ Blockiert — in Browser-Einstellungen freischalten';
+      if (badge) badge.style.display = 'none';
+    } else {
+      el.textContent = 'Noch nicht erlaubt — Toggle antippen zum Aktivieren';
+      if (badge) badge.style.display = 'none';
+    }
+  },
+
+  // ── Setting speichern ─────────────────────────────────
+  _saveNotifSetting(key, val) {
+    this._settings[key] = (typeof val === 'boolean') ? val : (parseFloat(val) || val);
+    if (key === 'notifEnabled' && val) {
+      this._notifScheduleAll();
+    } else if (key === 'notifEnabled' && !val) {
+      this._notifClearAll();
+    }
+    this._notifUpdateStatus();
+  },
+
+  // ── Alle Notifications planen ────────────────────────
+  _notifScheduleAll() {
+    this._notifClearAll();
+    if (!this._settings.notifEnabled) return;
+    if (Notification.permission !== 'granted') return;
+
+    const now   = new Date();
+    const today = now.toISOString().split('T')[0];
+    const dow   = now.getDay(); // 0=So, 6=Sa
+    const s     = this._settings;
+    const pT    = str => { const [h,m] = str.split(':').map(Number); return h*60+m; };
+    const nowMin = now.getHours()*60 + now.getMinutes();
+
+    // Helper: Timer setzen
+    const plan = (title, body, timeStr, icon) => {
+      const t = pT(timeStr);
+      const diffMs = (t - nowMin) * 60000;
+      if (diffMs <= 0) return; // bereits vorbei
+      const id = setTimeout(() => {
+        this._notifSend(title, body, icon || '🎯');
+      }, diffMs);
+      this._notifTimers.push(id);
+    };
+
+    // 1. Morgen-Assistent
+    const db       = this.dataPriv;
+    const plan_today = db?.dailyPlans?.[today];
+    if (!plan_today?.morningDone) {
+      plan('Guten Morgen ☀️', 'Tagesplan noch nicht erstellt — jetzt planen!', s.notifMorning, '☀️');
+    }
+
+    // 2. Abend-Reflexion
+    if (!plan_today?.eveningDone) {
+      plan('Abend-Reflexion 🌙', 'Wie war dein Tag? Jetzt reflektieren.', s.notifEvening, '🌙');
+    }
+
+    // 3. Wochenplanung Sa
+    if (dow === 6) {
+      const kw = this._kwStr(now);
+      const weekPlan = db?.weeklyPlans?.[kw];
+      if (!weekPlan?.weekDone) {
+        plan('Wochenplanung 📋', 'Nächste Woche planen & diese Woche abschließen.', s.notifWeek, '📋');
+      }
+    }
+
+    // 4. Aufgaben heute
+    const tasksToday = [];
+    [this.dataPro, this.dataPriv].forEach(dbx => {
+      if (!dbx) return;
+      Object.values(dbx.projects || {}).forEach(p => {
+        (p.tasks || []).forEach(t => {
+          if (!t.done && t.date === today) tasksToday.push(t.text);
+        });
+      });
+    });
+    if (tasksToday.length) {
+      const notifTimeMin = pT(s.notifTasks || '08:00');
+      if (notifTimeMin > nowMin) {
+        plan(
+          `${tasksToday.length} Aufgaben heute 📌`,
+          tasksToday.slice(0, 3).join(', ') + (tasksToday.length > 3 ? ` +${tasksToday.length-3}` : ''),
+          s.notifTasks, '📌'
+        );
+      }
+    }
+
+    // 5. Besprechungen heute (15 Min vorher)
+    const pTMin = str => { const [h,m] = (str||'0:0').split(':').map(Number); return h*60+m; };
+    [['pro', this.dataPro], ['priv', this.dataPriv]].forEach(([ctx, dbx]) => {
+      if (!dbx) return;
+      (dbx.customEvents || [])
+        .filter(e => e.date === today && e.typ === 'besprechung' && e.startTime)
+        .forEach(e => {
+          const startMin = pTMin(e.startTime);
+          const notifMin = startMin - (s.notifMeetingMin ?? 15);
+          if (notifMin > nowMin) {
+            const diffMs = (notifMin - nowMin) * 60000;
+            const id = setTimeout(() => {
+              this._notifSend(
+                `Besprechung in ${s.notifMeetingMin} Min 👥`,
+                `"${e.text}" um ${e.startTime} Uhr`,
+                '👥'
+              );
+            }, diffMs);
+            this._notifTimers.push(id);
+          }
+        });
+    });
+
+    console.log(`[Notif] ${this._notifTimers.length} Notifications geplant`);
+  },
+
+  // ── Notification senden ───────────────────────────────
+  _notifSend(title, body, icon) {
+    if (Notification.permission !== 'granted') return;
+    try {
+      // Via Service Worker (besser für PWA)
+      if (navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.ready.then(reg => {
+          reg.showNotification(title, {
+            body,
+            icon: './icon-192.svg',
+            badge: './icon-192.svg',
+            tag: 'workbench-' + Date.now(),
+            vibrate: [200, 100, 200],
+            data: { url: self?.location?.href || '' },
+          });
+        });
+      } else {
+        // Fallback: direkte Notification
+        new Notification(title, { body, icon: './icon-192.svg' });
+      }
+    } catch(e) {
+      console.warn('[Notif]', e);
+    }
+  },
+
+  // ── Test-Notification ─────────────────────────────────
+  async _notifTest() {
+    const perm = await this._notifRequestPermission();
+    if (perm !== 'granted') {
+      this._toast('Notifications nicht erlaubt — bitte in Browser-Einstellungen freischalten');
+      return;
+    }
+    this._notifSend('WorkBench Test 🎯', 'Notifications funktionieren!', '🎯');
+    this._toast('Test-Notification gesendet');
+  },
+
+  // ── Alle Timer löschen ────────────────────────────────
+  _notifClearAll() {
+    this._notifTimers.forEach(id => clearTimeout(id));
+    this._notifTimers = [];
+  },
 
   // ══════════════════════════════════════════════════════
   // GOOGLE DRIVE SYNC (v3.23.0)
@@ -7154,6 +7430,11 @@ const WB = {
     });
     // Activity-Tracking für Auto-Return starten
     this._ckStartActivityTracking();
+    // Notifications planen (nach kurzem Delay damit Daten geladen)
+    setTimeout(() => {
+      this._notifUpdateStatus();
+      if (this._settings.notifEnabled) this._notifScheduleAll();
+    }, 1500);
   },
 
   _detectWorld() {
@@ -12266,6 +12547,14 @@ const WB = {
     // Assistent-Fenster
     assistMorningStart: 6, assistMorningEnd: 8,
     assistEveningStart: 20, assistEveningEnd: 23,
+    // Notifications
+    notifEnabled:    true,
+    notifMorning:    '06:30',
+    notifEvening:    '20:00',
+    notifWeek:       '09:00',
+    notifTasks:      '08:00',
+    notifChecklists: '09:00',
+    notifMeetingMin: 15,
     // Zeitband (fix)
     dayStart: 5, dayEnd: 23,
     // Abend-Reflexion Fragen (konfigurierbar)
@@ -13177,6 +13466,17 @@ const WB = {
         </div>`
       ).join('');
     }
+    // Notifications
+    const ns = this._settings;
+    const sv2 = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
+    const sc  = (id, v) => { const el = document.getElementById(id); if(el) el.checked = v; };
+    sc('s-notif-enabled',  ns.notifEnabled ?? true);
+    sv2('s-notif-morning', ns.notifMorning  || '06:30');
+    sv2('s-notif-evening', ns.notifEvening  || '20:00');
+    sv2('s-notif-week',    ns.notifWeek     || '09:00');
+    sv2('s-notif-tasks',   ns.notifTasks    || '08:00');
+    sv2('s-notif-meeting', ns.notifMeetingMin ?? 15);
+    this._notifUpdateStatus();
     // Drive File-ID
     const driveInput = document.getElementById('s-drive-file-id');
     if (driveInput) driveInput.value = this._driveFileId || '';
