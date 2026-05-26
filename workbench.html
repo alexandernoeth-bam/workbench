@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.29.0</title>
+<title>WorkBench 3.30.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2289,6 +2289,30 @@ html, body {
 
 
 
+
+/* ── ICS Export Dialog ───────────────────────────────── */
+#wb-ics-export-overlay {
+  display: none; position: fixed; inset: 0; z-index: 450;
+  background: rgba(28,27,24,0.55);
+  align-items: flex-end; justify-content: center;
+}
+#wb-ics-export-overlay.open { display: flex; }
+#wb-ics-export-panel {
+  background: var(--c-surface);
+  border-radius: var(--radius) var(--radius) 0 0;
+  width: 100%; max-width: 480px;
+  padding: 20px 18px 28px;
+  box-shadow: 0 -4px 32px rgba(0,0,0,0.18);
+}
+@media (min-width:600px) {
+  #wb-ics-export-overlay { align-items: center; padding: 24px; }
+  #wb-ics-export-panel { border-radius: var(--radius); }
+}
+.ics-export-header {
+  display: flex; align-items: center;
+  margin-bottom: 16px;
+}
+.ics-export-header h2 { flex:1; margin:0; font-size:1rem; font-weight:700; }
 /* ── Besprechungs-Assistent Modal ────────────────────── */
 #wb-bm-overlay {
   display: none; position: fixed; inset: 0; z-index: 450;
@@ -4965,6 +4989,49 @@ html, body {
 
 
 
+
+<!-- ICS Export Dialog -->
+<div id="wb-ics-export-overlay" onclick="if(event.target===this)WB.icsExportClose()">
+  <div id="wb-ics-export-panel">
+    <div class="ics-export-header">
+      <h2>Kalender exportieren (ICS)</h2>
+      <button class="wb-settings-close" onclick="WB.icsExportClose()">&#215;</button>
+    </div>
+
+    <div class="ics-step">
+      <div class="ics-step-label">Inhalt</div>
+      <div class="ics-world-row" style="margin-bottom:10px;">
+        <button class="ics-world-btn beruf active" id="ics-exp-btn-termine" onclick="WB._icsExpToggle('termine',this)">Termine</button>
+        <button class="ics-world-btn priv active" id="ics-exp-btn-aufgaben" onclick="WB._icsExpToggle('aufgaben',this)">Aufgaben</button>
+      </div>
+    </div>
+
+    <div class="ics-step">
+      <div class="ics-step-label">Quelle</div>
+      <div class="ics-world-row" style="margin-bottom:10px;">
+        <button class="ics-world-btn beruf active" id="ics-exp-btn-pro" onclick="WB._icsExpToggle('pro',this)">Beruf</button>
+        <button class="ics-world-btn priv active" id="ics-exp-btn-priv" onclick="WB._icsExpToggle('priv',this)">Privat</button>
+      </div>
+    </div>
+
+    <div class="ics-step">
+      <div class="ics-step-label">Zeitraum</div>
+      <div class="ics-date-row">
+        <span>Von</span>
+        <input type="date" id="ics-exp-from" onchange="WB._icsExpUpdateCount()">
+        <span>bis</span>
+        <input type="date" id="ics-exp-to" onchange="WB._icsExpUpdateCount()">
+      </div>
+    </div>
+
+    <div class="ics-preview-count" id="ics-exp-count" style="margin:12px 0;">0 Einträge</div>
+
+    <button onclick="WB._icsExpDoExport()" style="width:100%;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;">
+      ↓ ICS-Datei herunterladen
+    </button>
+  </div>
+</div>
+
 <!-- Besprechungs-Assistent Modal -->
 <div id="wb-bm-overlay" onclick="if(event.target===this)WB.bmClose()">
   <div id="wb-bm-panel">
@@ -5132,7 +5199,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.29.0 · Build 20260526-1739</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.30.0 · Build 20260526-1745</div>
     </div>
 
     <!-- Welt -->
@@ -5178,8 +5245,8 @@ html, body {
       </button>
       <button class="wb-menu-item" onclick="WB.exportKalender(); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><circle cx="8" cy="16" r="1" fill="currentColor"/></svg>
-        <span class="label">Kalender-Export</span>
-        <span class="sublabel">Aufgaben mit Datum &#8594; Google</span>
+        <span class="label">Kalender exportieren</span>
+        <span class="sublabel">Termine & Aufgaben als ICS</span>
       </button>
       <button class="wb-menu-item" onclick="WB.icsOpen(); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
@@ -5349,7 +5416,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.29.0',
+  APP_VERSION: '3.30.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -5842,6 +5909,162 @@ const WB = {
     if (backBtn) backBtn.style.display = 'none';
     this._toast(this._wzWeekMode === 'plan' ? '✓ Woche geplant!' : '✓ Woche reflektiert!');
     this._ckRenderAssistantBanner();
+  },
+
+
+  // ══════════════════════════════════════════════════════
+  // ICS EXPORT ENGINE (v3.30.0)
+  // ══════════════════════════════════════════════════════
+
+  _icsExpOpts: { termine: true, aufgaben: true, pro: true, priv: true },
+
+  icsExportOpen() {
+    const now   = new Date();
+    const later = new Date(); later.setMonth(later.getMonth() + 3);
+    const fmt = d => d.toISOString().split('T')[0];
+    const fromEl = document.getElementById('ics-exp-from');
+    const toEl   = document.getElementById('ics-exp-to');
+    if (fromEl) fromEl.value = fmt(now);
+    if (toEl)   toEl.value   = fmt(later);
+    this._icsExpOpts = { termine: true, aufgaben: true, pro: true, priv: true };
+    // Buttons aktualisieren
+    ['termine','aufgaben','pro','priv'].forEach(k => {
+      const btn = document.getElementById('ics-exp-btn-' + k);
+      if (btn) btn.className = 'ics-world-btn ' + (k==='pro'?'beruf':'priv') + ' active';
+    });
+    this._icsExpUpdateCount();
+    document.getElementById('wb-ics-export-overlay').classList.add('open');
+  },
+
+  icsExportClose() {
+    document.getElementById('wb-ics-export-overlay').classList.remove('open');
+  },
+
+  _icsExpToggle(key, btn) {
+    this._icsExpOpts[key] = !this._icsExpOpts[key];
+    const base = (key==='pro') ? 'beruf' : (key==='priv') ? 'priv' : (key==='termine') ? 'beruf' : 'priv';
+    btn.className = 'ics-world-btn ' + base + (this._icsExpOpts[key] ? ' active' : '');
+    this._icsExpUpdateCount();
+  },
+
+  _icsExpGetEntries() {
+    const from = document.getElementById('ics-exp-from')?.value || '';
+    const to   = document.getElementById('ics-exp-to')?.value   || '';
+    const o    = this._icsExpOpts;
+    const entries = [];
+
+    const dbs = [];
+    if (o.pro  && this.dataPro)  dbs.push({ db: this.dataPro,  ctx: 'pro'  });
+    if (o.priv && this.dataPriv) dbs.push({ db: this.dataPriv, ctx: 'priv' });
+
+    dbs.forEach(({ db, ctx }) => {
+      // Termine
+      if (o.termine) {
+        (db.customEvents || []).forEach(ev => {
+          if (!ev.date) return;
+          if (from && ev.date < from) return;
+          if (to   && ev.date > to)   return;
+          entries.push({ type: 'event', ev, ctx });
+        });
+      }
+      // Aufgaben
+      if (o.aufgaben) {
+        Object.values(db.projects || {}).forEach(p => {
+          (p.tasks || []).forEach(t => {
+            if (!t.date || t.done) return;
+            if (from && t.date < from) return;
+            if (to   && t.date > to)   return;
+            entries.push({ type: 'task', t, ctx });
+          });
+        });
+      }
+    });
+
+    return entries;
+  },
+
+  _icsExpUpdateCount() {
+    const entries = this._icsExpGetEntries();
+    const el = document.getElementById('ics-exp-count');
+    if (el) {
+      const evCount = entries.filter(e => e.type === 'event').length;
+      const tCount  = entries.filter(e => e.type === 'task').length;
+      const parts = [];
+      if (evCount) parts.push(evCount + ' Termin' + (evCount>1?'e':''));
+      if (tCount)  parts.push(tCount  + ' Aufgabe' + (tCount>1?'n':''));
+      el.textContent = parts.length ? parts.join(' · ') : 'Keine Einträge im Zeitraum';
+    }
+  },
+
+  _icsExpDoExport() {
+    const entries = this._icsExpGetEntries();
+    if (!entries.length) { this._toast('Keine Einträge zum Exportieren'); return; }
+
+    const fmtDate = str => str.replace(/-/g,'');
+    const fmtTime = (dateStr, timeStr) => {
+      if (!timeStr) return fmtDate(dateStr);
+      return fmtDate(dateStr) + 'T' + timeStr.replace(':','') + '00';
+    };
+    const escape = s => (s||'').replace(/[\n\r]/g,'\n').replace(/,/g,'\,').replace(/;/g,'\;');
+    const uid = () => Date.now() + '-' + Math.random().toString(36).slice(2) + '@workbench';
+    const now = new Date().toISOString().replace(/[-:]/g,'').slice(0,15) + 'Z';
+
+    let ics = 'BEGIN:VCALENDAR\r\n'
+      + 'VERSION:2.0\r\n'
+      + 'PRODID:-//WorkBench//DE\r\n'
+      + 'CALSCALE:GREGORIAN\r\n'
+      + 'METHOD:PUBLISH\r\n';
+
+    entries.forEach(entry => {
+      if (entry.type === 'event') {
+        const ev = entry.ev;
+        const startStr = ev.startTime ? fmtTime(ev.date, ev.startTime) : fmtDate(ev.date);
+        const durMin   = Math.round((parseFloat(ev.duration)||1) * 60);
+        const [sh, sm] = (ev.startTime||'00:00').split(':').map(Number);
+        const endTot   = sh * 60 + sm + durMin;
+        const eh = String(Math.floor(endTot/60)).padStart(2,'0');
+        const em = String(endTot % 60).padStart(2,'0');
+        const endStr = ev.startTime ? fmtTime(ev.date, eh+':'+em) : fmtDate(ev.date);
+
+        ics += 'BEGIN:VEVENT\r\n'
+          + 'UID:' + uid() + '\r\n'
+          + 'DTSTAMP:' + now + '\r\n'
+          + (ev.startTime ? 'DTSTART:' + startStr + '\r\n' : 'DTSTART;VALUE=DATE:' + startStr + '\r\n')
+          + (ev.startTime ? 'DTEND:'   + endStr   + '\r\n' : 'DTEND;VALUE=DATE:'   + endStr   + '\r\n')
+          + 'SUMMARY:' + escape(ev.text) + '\r\n'
+          + (ev.ort ? 'LOCATION:' + escape(ev.ort) + '\r\n' : '')
+          + (ev.notes ? 'DESCRIPTION:' + escape(ev.notes) + '\r\n' : '')
+          + 'CATEGORIES:' + (entry.ctx==='pro'?'Beruf':'Privat') + '\r\n'
+          + 'END:VEVENT\r\n';
+
+      } else if (entry.type === 'task') {
+        const t = entry.t;
+        ics += 'BEGIN:VTODO\r\n'
+          + 'UID:' + uid() + '\r\n'
+          + 'DTSTAMP:' + now + '\r\n'
+          + 'DTSTART;VALUE=DATE:' + fmtDate(t.date) + '\r\n'
+          + 'DUE;VALUE=DATE:'     + fmtDate(t.date) + '\r\n'
+          + 'SUMMARY:' + escape(t.text) + '\r\n'
+          + (t.notes ? 'DESCRIPTION:' + escape(t.notes) + '\r\n' : '')
+          + 'PRIORITY:' + (t.prio ? '1' : '5') + '\r\n'
+          + 'STATUS:NEEDS-ACTION\r\n'
+          + 'CATEGORIES:' + (entry.ctx==='pro'?'Beruf':'Privat') + '\r\n'
+          + 'END:VTODO\r\n';
+      }
+    });
+
+    ics += 'END:VCALENDAR\r\n';
+
+    // Download
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const from = document.getElementById('ics-exp-from')?.value || 'export';
+    a.download = 'workbench_' + from + '.ics';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    this.icsExportClose();
+    this._toast('✓ ' + entries.length + ' Einträge exportiert');
   },
 
   // ══════════════════════════════════════════════════════
@@ -8507,7 +8730,7 @@ const WB = {
     }
   },
 
-  wzOpenWeek()    { this._toast('Wochenplanung — coming soon'); },
+  // wzOpenWeek: siehe WOCHENPLANUNG WIZARD oben
   // wzOpenEvening: siehe Abend-Reflexion Wizard oben
 
 
