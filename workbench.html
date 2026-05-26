@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.25.7</title>
+<title>WorkBench 3.26.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2250,6 +2250,42 @@ html, body {
 .ck-tasks-pill-arrow {
   font-size: 1rem; color: var(--c-faint); flex-shrink: 0;
 }
+
+/* ── Einklappbare Absätze in Notizen ────────────────── */
+#nz-ed-content details,
+.nz-view-content details {
+  border-left: 2px solid var(--c-border);
+  padding: 4px 0 4px 12px;
+  margin: 6px 0;
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+}
+#nz-ed-content details summary,
+.nz-view-content details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--c-text);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+#nz-ed-content details summary::before,
+.nz-view-content details summary::before {
+  content: '▶';
+  font-size: 0.6rem;
+  color: var(--c-muted);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+#nz-ed-content details[open] summary::before,
+.nz-view-content details[open] summary::before {
+  transform: rotate(90deg);
+}
+.nz-tb-collapse {
+  font-size: 0.75rem;
+  padding: 3px 7px;
+}
 /* ── Drive Login Banner ──────────────────────────────── */
 #wb-drive-login-banner {
   display: none;
@@ -4197,6 +4233,8 @@ html, body {
     <button class="nz-tb" onclick="WB.nzCmd('insertOrderedList')">1.</button>
     <button class="nz-tb" onclick="WB.nzInsertCb()">&#9744;</button>
     <div class="nz-tb-sep"></div>
+    <div class="nz-tb-sep"></div>
+    <button class="nz-tb nz-tb-collapse" onclick="WB.nzToggleCollapse()" title="Absatz einklappbar machen / aufheben">⊟</button>
     <button class="nz-tb" onclick="WB.nzCmd('formatBlock','blockquote')">&#10077;</button>
     <button class="nz-tb" onclick="WB.nzInsertHr()">&#8213;</button>
     <div class="nz-tb-sep"></div>
@@ -4753,7 +4791,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.25.7 · Build 20260526-1554</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.26.0 · Build 20260526-1617</div>
     </div>
 
     <!-- Welt -->
@@ -4960,7 +4998,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.25.7',
+  APP_VERSION: '3.26.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -13836,6 +13874,58 @@ const WB = {
     document.getElementById('nz-ed-content')?.focus();
     document.execCommand(cmd, false, val||null);
   },
+
+  // ── Absatz einklappbar machen / Toggle ───────────────
+  nzToggleCollapse() {
+    const ed = document.getElementById('nz-ed-content');
+    if (!ed) return;
+
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+
+    // Aktuellen Block-Container finden
+    let node = sel.getRangeAt(0).startContainer;
+    while (node && node !== ed) {
+      if (node.nodeType === 1 && node.parentNode === ed) break;
+      node = node.parentNode;
+    }
+    if (!node || node === ed) return;
+
+    if (node.tagName === 'DETAILS') {
+      // Bereits einklappbar → aufheben: Inhalt aus details herauslösen
+      const summary = node.querySelector('summary');
+      const summaryText = summary ? summary.innerHTML : '';
+      const rest = Array.from(node.childNodes)
+        .filter(n => n !== summary)
+        .map(n => n.outerHTML || n.textContent)
+        .join('');
+      const p = document.createElement('p');
+      p.innerHTML = summaryText + (rest ? '<br>' + rest : '');
+      ed.replaceChild(p, node);
+      this._toast('Einklappbar aufgehoben');
+    } else {
+      // Noch nicht einklappbar → in details/summary umwandeln
+      const html = node.innerHTML || node.textContent || '';
+      // Erste Zeile als summary, Rest als Content
+      const lines = html.split(/<br\s*\/?>/i);
+      const firstLine = lines[0] || html;
+      const rest = lines.slice(1).join('<br>');
+
+      const details = document.createElement('details');
+      details.setAttribute('open', '');
+      const summary = document.createElement('summary');
+      summary.innerHTML = firstLine;
+      details.appendChild(summary);
+      if (rest) {
+        const div = document.createElement('div');
+        div.innerHTML = rest;
+        details.appendChild(div);
+      }
+      ed.replaceChild(details, node);
+      this._toast('Absatz einklappbar — ⊟ nochmal tippen zum Aufheben');
+    }
+  },
+
   nzH(level) {
     document.getElementById('nz-ed-content')?.focus();
     document.execCommand('formatBlock', false, 'h'+level);
