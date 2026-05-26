@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.24.7</title>
+<title>WorkBench 3.25.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2169,6 +2169,33 @@ html, body {
 
 
 
+
+/* ── Heute-Header Navigation ─────────────────────────── */
+#heute-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--c-border);
+  flex-shrink: 0;
+}
+#zt-date-label {
+  flex: 1;
+  text-align: center;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--c-text);
+}
+#zt-today-btn {
+  background: none;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-xs);
+  padding: 4px 10px;
+  font-family: var(--font);
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: var(--c-muted);
+}
 /* ── Drive Login Banner ──────────────────────────────── */
 #wb-drive-login-banner {
   display: none;
@@ -3887,7 +3914,8 @@ html, body {
         <button class="zt-nav-btn" onclick="WB.shiftDay(-1)" aria-label="Vorheriger Tag">&#8249;</button>
         <div id="zt-date-label">Heute</div>
         <button class="zt-nav-btn" onclick="WB.shiftDay(1)" aria-label="Nächster Tag">&#8250;</button>
-        <button id="zt-today-btn" onclick="WB.goToday()">Heute</button>
+        <button id="zt-today-btn" onclick="WB.goToday()" style="display:none;">Heute</button>
+        <button id="zt-new-ev-btn" onclick="WB._ztNewEvent()" style="background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);padding:5px 12px;font-family:var(--font);font-size:0.8rem;font-weight:600;cursor:pointer;">+ Termin</button>
       </div>
       <div id="zt-daytype-banner"></div>
       <div id="zeitband-scroll"></div>
@@ -4668,7 +4696,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.24.7 · Build 20260526-1358</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.25.0 · Build 20260526-1420</div>
     </div>
 
     <!-- Welt -->
@@ -4875,7 +4903,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.24.7',
+  APP_VERSION: '3.25.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -6128,7 +6156,7 @@ const WB = {
     let totalTermine = 0, totalPrioA = 0, totalOverdue = 0;
     [this.dataPro, this.dataPriv].forEach(db => {
       if (!db) return;
-      totalTermine += (db.customEvents || []).filter(e => e.date === today).length;
+      totalTermine += (db.customEvents || []).filter(e => e.date === today && e.date && !e.allDay).length;
       Object.values(db.projects || {}).forEach(p => {
         (p.tasks || []).forEach(t => {
           if (t && !t.done) {
@@ -7830,18 +7858,29 @@ const WB = {
     });
     // Activity-Tracking für Auto-Return starten
     this._ckStartActivityTracking();
-    // Notifications planen (nach kurzem Delay damit Daten geladen)
+    // Notifications planen
     setTimeout(() => {
       this._notifUpdateStatus();
       if (this._settings.notifEnabled) this._notifScheduleAll();
     }, 1500);
+    // Neu planen wenn App wieder sichtbar wird
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this._settings.notifEnabled) {
+        this._notifClearAll();
+        this._notifScheduleAll();
+      }
+    });
   },
 
   _detectWorld() {
     // Wenn nur eine DB geladen ist, diese nehmen
     if(this.dataPro && !this.dataPriv)  return 'beruf';
     if(this.dataPriv && !this.dataPro)  return 'privat';
-    // Sonst: Uhrzeit/Wochentag
+    // Sondertag prüfen: Urlaub/Feiertag → immer Privat
+    const today = new Date().toISOString().split('T')[0];
+    const dayInfo = this._getDayInfo ? this._getDayInfo(today) : null;
+    if (dayInfo?.proBlocked) return 'privat';
+    // Wochenende → Privat
     const d = new Date(), h = d.getHours(), wd = d.getDay();
     if(wd === 0 || wd === 6) return 'privat';
     return (h >= 7 && h < 16) ? 'beruf' : 'privat';
@@ -8524,7 +8563,12 @@ const WB = {
     const store = this._dutyStore(ctx) || [];
     const kw    = this._kwStr(new Date());
 
-    const relevant = store.filter(d => this._dutyRelevantThisWeek({ ...d, ctx }));
+    const relevant = store.filter(d => {
+      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
+      // Nur zeigen wenn heute fällig (due=true)
+      const dueInfo = this._dutyDueInfo({ ...d, ctx });
+      return dueInfo.due;
+    });
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
@@ -8856,7 +8900,12 @@ const WB = {
     const store = this._dutyStore(ctx) || [];
     const kw    = this._kwStr(new Date());
 
-    const relevant = store.filter(d => this._dutyRelevantThisWeek({ ...d, ctx }));
+    const relevant = store.filter(d => {
+      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
+      // Nur zeigen wenn heute fällig (due=true)
+      const dueInfo = this._dutyDueInfo({ ...d, ctx });
+      return dueInfo.due;
+    });
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
@@ -9180,7 +9229,12 @@ const WB = {
     const store = this._dutyStore(ctx) || [];
     const kw    = this._kwStr(new Date());
 
-    const relevant = store.filter(d => this._dutyRelevantThisWeek({ ...d, ctx }));
+    const relevant = store.filter(d => {
+      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
+      // Nur zeigen wenn heute fällig (due=true)
+      const dueInfo = this._dutyDueInfo({ ...d, ctx });
+      return dueInfo.due;
+    });
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
@@ -9485,7 +9539,12 @@ const WB = {
     const store = this._dutyStore(ctx) || [];
     const kw    = this._kwStr(new Date());
 
-    const relevant = store.filter(d => this._dutyRelevantThisWeek({ ...d, ctx }));
+    const relevant = store.filter(d => {
+      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
+      // Nur zeigen wenn heute fällig (due=true)
+      const dueInfo = this._dutyDueInfo({ ...d, ctx });
+      return dueInfo.due;
+    });
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
@@ -9784,7 +9843,12 @@ const WB = {
     const store = this._dutyStore(ctx) || [];
     const kw    = this._kwStr(new Date());
 
-    const relevant = store.filter(d => this._dutyRelevantThisWeek({ ...d, ctx }));
+    const relevant = store.filter(d => {
+      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
+      // Nur zeigen wenn heute fällig (due=true)
+      const dueInfo = this._dutyDueInfo({ ...d, ctx });
+      return dueInfo.due;
+    });
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
@@ -10047,7 +10111,12 @@ const WB = {
     const store = this._dutyStore(ctx) || [];
     const kw    = this._kwStr(new Date());
 
-    const relevant = store.filter(d => this._dutyRelevantThisWeek({ ...d, ctx }));
+    const relevant = store.filter(d => {
+      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
+      // Nur zeigen wenn heute fällig (due=true)
+      const dueInfo = this._dutyDueInfo({ ...d, ctx });
+      return dueInfo.due;
+    });
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
@@ -10903,7 +10972,12 @@ const WB = {
     const store = this._dutyStore(ctx) || [];
     const kw    = this._kwStr(new Date());
 
-    const relevant = store.filter(d => this._dutyRelevantThisWeek({ ...d, ctx }));
+    const relevant = store.filter(d => {
+      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
+      // Nur zeigen wenn heute fällig (due=true)
+      const dueInfo = this._dutyDueInfo({ ...d, ctx });
+      return dueInfo.due;
+    });
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
@@ -11286,7 +11360,12 @@ const WB = {
     const store = this._dutyStore(ctx) || [];
     const kw    = this._kwStr(new Date());
 
-    const relevant = store.filter(d => this._dutyRelevantThisWeek({ ...d, ctx }));
+    const relevant = store.filter(d => {
+      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
+      // Nur zeigen wenn heute fällig (due=true)
+      const dueInfo = this._dutyDueInfo({ ...d, ctx });
+      return dueInfo.due;
+    });
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
@@ -11658,7 +11737,12 @@ const WB = {
     const store = this._dutyStore(ctx) || [];
     const kw    = this._kwStr(new Date());
 
-    const relevant = store.filter(d => this._dutyRelevantThisWeek({ ...d, ctx }));
+    const relevant = store.filter(d => {
+      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
+      // Nur zeigen wenn heute fällig (due=true)
+      const dueInfo = this._dutyDueInfo({ ...d, ctx });
+      return dueInfo.due;
+    });
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
