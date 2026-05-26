@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.25.0</title>
+<title>WorkBench 3.25.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2196,6 +2196,23 @@ html, body {
   cursor: pointer;
   color: var(--c-muted);
 }
+.zt-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+#zt-new-ev-btn {
+  background: var(--c-beruf);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-xs);
+  padding: 5px 12px;
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
 /* ── Drive Login Banner ──────────────────────────────── */
 #wb-drive-login-banner {
   display: none;
@@ -3914,8 +3931,10 @@ html, body {
         <button class="zt-nav-btn" onclick="WB.shiftDay(-1)" aria-label="Vorheriger Tag">&#8249;</button>
         <div id="zt-date-label">Heute</div>
         <button class="zt-nav-btn" onclick="WB.shiftDay(1)" aria-label="Nächster Tag">&#8250;</button>
-        <button id="zt-today-btn" onclick="WB.goToday()" style="display:none;">Heute</button>
-        <button id="zt-new-ev-btn" onclick="WB._ztNewEvent()" style="background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);padding:5px 12px;font-family:var(--font);font-size:0.8rem;font-weight:600;cursor:pointer;">+ Termin</button>
+        <div class="zt-header-right">
+          <button id="zt-today-btn" onclick="WB.goToday()" style="display:none;">Heute</button>
+          <button id="zt-new-ev-btn" onclick="WB._ztNewEvent()">+ Termin</button>
+        </div>
       </div>
       <div id="zt-daytype-banner"></div>
       <div id="zeitband-scroll"></div>
@@ -4696,7 +4715,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.25.0 · Build 20260526-1420</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.25.1 · Build 20260526-1442</div>
     </div>
 
     <!-- Welt -->
@@ -4903,7 +4922,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.25.0',
+  APP_VERSION: '3.25.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -5402,6 +5421,49 @@ const WB = {
     if (fileIdPriv) this._oauthDriveFileIds.priv = fileIdPriv;
 
     this._oauthUpdateUI();
+  },
+
+
+  // ── Auto-Refresh: Rev-Check alle 60s ─────────────────
+  _autoRefreshTimer: null,
+
+  _startAutoRefresh() {
+    clearInterval(this._autoRefreshTimer);
+    this._autoRefreshTimer = setInterval(async () => {
+      if (!this._oauthTokenValid()) return;
+      try {
+        // Rev aus Drive holen ohne vollen Download
+        const token = this._oauthToken;
+        // Priv prüfen
+        await this._autoRefreshCheck('priv', token);
+        if (this.dataPro) await this._autoRefreshCheck('pro', token);
+      } catch(e) {
+        console.warn('[AutoRefresh]', e);
+      }
+    }, 60000); // alle 60 Sekunden
+  },
+
+  async _autoRefreshCheck(ctx, token) {
+    const fileId = this._oauthDriveFileIds[ctx];
+    if (!fileId) return;
+
+    // Nur Metadaten laden (kein volles JSON)
+    const r = await fetch(
+      this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime',
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+    if (!r.ok) return;
+    const meta = await r.json();
+    const driveModified = new Date(meta.modifiedTime).getTime();
+    const localUpdated  = this._sync[ctx]?.last_updated
+      ? new Date(this._sync[ctx].last_updated).getTime()
+      : 0;
+
+    if (driveModified > localUpdated + 30000) { // 30s Puffer
+      console.log('[AutoRefresh] Neue Version in Drive für', ctx, '— lade...');
+      await this.oauthSyncDownload(ctx);
+      this._toast('✓ ' + (ctx==='pro'?'Beruf':'Privat') + ' automatisch aktualisiert');
+    }
   },
 
   // ══════════════════════════════════════════════════════
@@ -6156,7 +6218,7 @@ const WB = {
     let totalTermine = 0, totalPrioA = 0, totalOverdue = 0;
     [this.dataPro, this.dataPriv].forEach(db => {
       if (!db) return;
-      totalTermine += (db.customEvents || []).filter(e => e.date === today && e.date && !e.allDay).length;
+      totalTermine += (db.customEvents || []).filter(e => e.date === today && e.type !== 'horizon').length;
       Object.values(db.projects || {}).forEach(p => {
         (p.tasks || []).forEach(t => {
           if (t && !t.done) {
@@ -7734,10 +7796,11 @@ const WB = {
     // Wenn Gerät bekannt: starten
     if (this._idbDevice) {
       this.start();
-      // OAuth Init + Auto-Sync
+      // OAuth Init + Auto-Sync + Auto-Refresh starten
       setTimeout(async () => {
         await this._oauthInit();
         await this.oauthAutoSync();
+        this._startAutoRefresh();
       }, 2000);
     }
   },
@@ -14546,6 +14609,16 @@ const WB = {
     this.viewDate = new Date();
     this._updateDateLabel();
     if(this.activeTab === 'heute') this.renderHeute();
+    const btn = document.getElementById('zt-today-btn');
+    if (btn) btn.style.display = 'none';
+  },
+
+  _ztNewEvent() {
+    const dateStr = (this.viewDate instanceof Date ? this.viewDate : new Date()).toISOString().split('T')[0];
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Bitte zuerst Datenbank laden'); return; }
+    this.newEventOpen(dateStr);
   },
 
   _updateDateLabel() {
