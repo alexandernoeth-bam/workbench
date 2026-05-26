@@ -1,34 +1,39 @@
-// WorkBench Service Worker v3.22.0
-const CACHE = 'workbench-v3222';
-const FILES = ['./workbench.html', './manifest.json'];
+// WorkBench Service Worker v3.22.3
+// Network-first Strategie: immer zuerst vom Server laden
+const CACHE = 'workbench-v3223';
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())
-  );
+  // Sofort aktivieren ohne auf alte Clients zu warten
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
+  // Alle alten Caches löschen
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', e => {
-  // Nur eigene Requests cachen
+  // Nur eigene Requests behandeln
   if (!e.request.url.startsWith(self.location.origin)) return;
+  
+  // Network-first: immer zuerst vom Server
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      const fresh = fetch(e.request).then(res => {
+    fetch(e.request)
+      .then(res => {
+        // Erfolgreiche Antwort cachen
         if (res.ok) {
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return res;
-      }).catch(() => cached);
-      return cached || fresh;
-    })
+      })
+      .catch(() =>
+        // Nur bei Netzwerkfehler aus Cache laden (Offline)
+        caches.match(e.request)
+      )
   );
 });
