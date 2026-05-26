@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.30.0</title>
+<title>WorkBench 3.31.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2290,6 +2290,93 @@ html, body {
 
 
 
+
+/* ── Quick Capture ───────────────────────────────────── */
+#wb-qc-overlay {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: rgba(28,27,24,0.5);
+  align-items: flex-end; justify-content: center;
+}
+#wb-qc-overlay.open { display: flex; }
+#wb-qc-panel {
+  background: var(--c-surface);
+  border-radius: var(--radius) var(--radius) 0 0;
+  width: 100%; max-width: 520px;
+  padding: 18px 16px 28px;
+  box-shadow: 0 -4px 32px rgba(0,0,0,0.2);
+}
+@media (min-width:600px) {
+  #wb-qc-overlay { align-items: center; padding: 24px; }
+  #wb-qc-panel { border-radius: var(--radius); }
+}
+.qc-header {
+  display: flex; align-items: center; margin-bottom: 12px;
+}
+.qc-header-title { flex:1; font-size:0.88rem; font-weight:600; color:var(--c-text); }
+.qc-close {
+  background:none; border:none; font-size:1.2rem;
+  color:var(--c-faint); cursor:pointer; padding:0 4px;
+}
+.qc-input-row {
+  display: flex; gap: 8px; align-items: flex-start; margin-bottom: 12px;
+}
+#qc-text {
+  flex: 1; padding: 10px 12px; min-height: 56px;
+  border: 1px solid var(--c-border); border-radius: var(--radius-xs);
+  font-family: var(--font); font-size: 0.9rem; resize: none;
+  background: var(--c-bg); color: var(--c-text); line-height: 1.5;
+}
+#qc-text:focus { outline: none; border-color: var(--c-beruf); }
+#qc-mic-btn {
+  padding: 10px 12px; background: none;
+  border: 1px solid var(--c-border); border-radius: var(--radius-xs);
+  cursor: pointer; color: var(--c-muted); font-size: 1rem;
+  flex-shrink: 0; align-self: stretch;
+  transition: all var(--t-fast);
+}
+#qc-mic-btn.listening {
+  border-color: var(--c-danger); color: var(--c-danger);
+  background: rgba(198,40,40,0.07);
+}
+.qc-welt-row {
+  display: flex; gap: 6px; margin-bottom: 14px;
+}
+.qc-welt-btn {
+  flex: 1; padding: 6px; border-radius: var(--radius-xs);
+  border: 1px solid var(--c-border); background: var(--c-bg);
+  font-family: var(--font); font-size: 0.78rem; cursor: pointer;
+  color: var(--c-muted); transition: all var(--t-fast); text-align: center;
+}
+.qc-welt-btn.active { background: var(--c-beruf); color: #fff; border-color: var(--c-beruf); }
+.qc-welt-btn.active.priv { background: var(--c-privat); border-color: var(--c-privat); }
+.qc-actions {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.qc-action-btn {
+  padding: 11px 8px; border-radius: var(--radius-xs);
+  border: 1px solid var(--c-border); background: var(--c-bg);
+  font-family: var(--font); font-size: 0.85rem; font-weight: 500;
+  cursor: pointer; color: var(--c-text); text-align: center;
+  transition: all var(--t-fast); line-height: 1.3;
+}
+.qc-action-btn:hover { border-color: var(--c-beruf); background: var(--c-beruf-bg); }
+.qc-action-btn .qc-btn-sub {
+  display: block; font-size: 0.68rem; color: var(--c-faint);
+  font-weight: 400; margin-top: 1px;
+}
+/* Cockpit FAB */
+#ck-fab {
+  position: fixed; bottom: 72px; right: 16px;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--c-beruf); color: #fff;
+  border: none; font-size: 1.5rem; cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  display: none; align-items: center; justify-content: center;
+  z-index: 100; transition: transform var(--t-fast);
+}
+#ck-fab:active { transform: scale(0.93); }
+.sec-cockpit-active #ck-fab { display: flex; }
 /* ── ICS Export Dialog ───────────────────────────────── */
 #wb-ics-export-overlay {
   display: none; position: fixed; inset: 0; z-index: 450;
@@ -4225,7 +4312,7 @@ html, body {
   <main id="wb-content" role="main">
 
     <!-- Cockpit Dashboard -->
-    <section class="wb-section" id="sec-cockpit" aria-label="Cockpit">
+    <section class="wb-section sec-cockpit-active" id="sec-cockpit" aria-label="Cockpit">
       <div id="ck-date-header">
         <div id="ck-date-row">
           <div>
@@ -4990,6 +5077,52 @@ html, body {
 
 
 
+
+<!-- Quick Capture Dialog -->
+<div id="wb-qc-overlay" onclick="if(event.target===this)WB.qcClose()">
+  <div id="wb-qc-panel">
+    <div class="qc-header">
+      <div class="qc-header-title">Schnell erfassen</div>
+      <button class="qc-close" onclick="WB.qcClose()">&#215;</button>
+    </div>
+
+    <!-- Eingabe -->
+    <div class="qc-input-row">
+      <textarea id="qc-text" placeholder="Was möchtest du festhalten?" rows="2"></textarea>
+      <button id="qc-mic-btn" onclick="WB._qcMicToggle()" style="display:none;" title="Spracheingabe">&#9679;</button>
+    </div>
+
+    <!-- Welt -->
+    <div class="qc-welt-row">
+      <button class="qc-welt-btn priv active" id="qc-btn-priv" onclick="WB._qcSetWelt('priv')">Privat</button>
+      <button class="qc-welt-btn" id="qc-btn-pro" onclick="WB._qcSetWelt('pro')">Beruf</button>
+    </div>
+
+    <!-- Aktionen -->
+    <div class="qc-actions">
+      <button class="qc-action-btn" onclick="WB._qcSaveNotiz()">
+        Notiz
+        <span class="qc-btn-sub">In Notizen speichern</span>
+      </button>
+      <button class="qc-action-btn" onclick="WB._qcSaveAufgabe()">
+        Aufgabe
+        <span class="qc-btn-sub">In Aufgaben anlegen</span>
+      </button>
+      <button class="qc-action-btn" onclick="WB._qcSaveTermin()">
+        Termin
+        <span class="qc-btn-sub">Im Kalender eintragen</span>
+      </button>
+      <button class="qc-action-btn" onclick="WB._qcSaveSchnell()">
+        Schnell
+        <span class="qc-btn-sub">In Inbox ablegen</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Cockpit FAB -->
+<button id="ck-fab" onclick="WB.qcOpen()" title="Schnell erfassen">+</button>
+
 <!-- ICS Export Dialog -->
 <div id="wb-ics-export-overlay" onclick="if(event.target===this)WB.icsExportClose()">
   <div id="wb-ics-export-panel">
@@ -5199,7 +5332,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.30.0 · Build 20260526-1748</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.31.0 · Build 20260526-1917</div>
     </div>
 
     <!-- Welt -->
@@ -5416,7 +5549,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.30.0',
+  APP_VERSION: '3.31.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -5911,6 +6044,148 @@ const WB = {
     this._ckRenderAssistantBanner();
   },
 
+
+
+  // ══════════════════════════════════════════════════════
+  // QUICK CAPTURE (v3.31.0)
+  // ══════════════════════════════════════════════════════
+
+  _qcWelt:  'priv',
+  _qcRecog: null,
+
+  qcOpen() {
+    this._qcWelt = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    this._qcUpdateWeltBtns();
+    const ta = document.getElementById('qc-text');
+    if (ta) { ta.value = ''; ta.focus(); }
+    // Mikrofon prüfen
+    const micBtn = document.getElementById('qc-mic-btn');
+    if (micBtn) {
+      const hasRecog = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+      micBtn.style.display = hasRecog ? '' : 'none';
+    }
+    document.getElementById('wb-qc-overlay').classList.add('open');
+  },
+
+  qcClose() {
+    this._qcStopMic();
+    document.getElementById('wb-qc-overlay').classList.remove('open');
+  },
+
+  _qcSetWelt(welt) {
+    this._qcWelt = welt;
+    this._qcUpdateWeltBtns();
+  },
+
+  _qcUpdateWeltBtns() {
+    const btnPriv = document.getElementById('qc-btn-priv');
+    const btnPro  = document.getElementById('qc-btn-pro');
+    if (btnPriv) btnPriv.className = 'qc-welt-btn priv' + (this._qcWelt==='priv'?' active':'');
+    if (btnPro)  btnPro.className  = 'qc-welt-btn'      + (this._qcWelt==='pro' ?' active':'');
+  },
+
+  _qcGetText() {
+    return (document.getElementById('qc-text')?.value || '').trim();
+  },
+
+  // ── Mikrofon ─────────────────────────────────────────
+  _qcMicToggle() {
+    if (this._qcRecog) { this._qcStopMic(); return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    const recog = new SR();
+    recog.lang = 'de-DE';
+    recog.continuous = false;
+    recog.interimResults = false;
+    recog.onresult = e => {
+      const transcript = e.results[0][0].transcript;
+      const ta = document.getElementById('qc-text');
+      if (ta) ta.value = (ta.value ? ta.value + ' ' : '') + transcript;
+    };
+    recog.onend = () => this._qcStopMic();
+    recog.onerror = () => this._qcStopMic();
+    this._qcRecog = recog;
+    recog.start();
+    document.getElementById('qc-mic-btn')?.classList.add('listening');
+  },
+
+  _qcStopMic() {
+    if (this._qcRecog) {
+      try { this._qcRecog.stop(); } catch(e) {}
+      this._qcRecog = null;
+    }
+    document.getElementById('qc-mic-btn')?.classList.remove('listening');
+  },
+
+  // ── Speichern als Notiz ───────────────────────────────
+  _qcSaveNotiz() {
+    const text = this._qcGetText();
+    if (!text) { this._toast('Bitte zuerst etwas eingeben'); return; }
+    this.qcClose();
+    // Notiz-Editor öffnen mit vorausgefülltem Text
+    this.nzEdOpen(null, text.slice(0,40), 'allgemein', text);
+  },
+
+  // ── Speichern als Aufgabe ─────────────────────────────
+  _qcSaveAufgabe() {
+    const text = this._qcGetText();
+    if (!text) { this._toast('Bitte zuerst etwas eingeben'); return; }
+    this.qcClose();
+    // Aufgaben-Dialog mit vorausgefülltem Titel
+    const ctx = this._qcWelt;
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Bitte zuerst Datenbank laden'); return; }
+    const projKey = Object.keys(db.projects || {})[0];
+    if (!projKey) { this._toast('Kein Projekt vorhanden'); return; }
+    this.editOpen('task', ctx, projKey, null, text);
+  },
+
+  // ── Speichern als Termin ──────────────────────────────
+  _qcSaveTermin() {
+    const text = this._qcGetText();
+    if (!text) { this._toast('Bitte zuerst etwas eingeben'); return; }
+    this.qcClose();
+    const today = new Date().toISOString().split('T')[0];
+    this.newEventOpen(today);
+    // Titel vorausfüllen nach kurzem Delay
+    setTimeout(() => {
+      const titleEl = document.getElementById('ef-title');
+      if (titleEl) titleEl.value = text;
+    }, 100);
+  },
+
+  // ── Schnell in Inbox ──────────────────────────────────
+  _qcSaveSchnell() {
+    const text = this._qcGetText();
+    if (!text) { this._toast('Bitte zuerst etwas eingeben'); return; }
+    const ctx = this._qcWelt;
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Bitte zuerst Datenbank laden'); return; }
+
+    // Inbox-Notiz suchen oder anlegen
+    if (!db.notes) db.notes = [];
+    let inbox = db.notes.find(n => n.titel === 'Inbox');
+    const ts  = new Date().toLocaleString('de-DE', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'});
+    const line = ts + ': ' + text;
+
+    if (inbox) {
+      inbox.inhalt = (inbox.inhalt || '') + '\n' + line;
+      inbox.updated = Date.now();
+    } else {
+      db.notes.push({
+        id:      'inbox_' + Date.now(),
+        titel:   'Inbox',
+        inhalt:  line,
+        typ:     'allgemein',
+        welt:    ctx,
+        created: Date.now(),
+        updated: Date.now(),
+      });
+    }
+    this.setDirty();
+    this.qcClose();
+    this._toast('✓ In Inbox gespeichert');
+  },
 
   // ══════════════════════════════════════════════════════
   // ICS EXPORT ENGINE (v3.30.0)
