@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.23.3</title>
+<title>WorkBench 3.23.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4592,7 +4592,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.23.3 · Build 20260526-0901</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.23.5 · Build 20260526-0910</div>
     </div>
 
     <!-- Welt -->
@@ -4784,7 +4784,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.23.3',
+  APP_VERSION: '3.23.5',
   APP_BUILD:   '20260526-0723',
 
 
@@ -5015,9 +5015,10 @@ const WB = {
     }
   },
 
-  // ── Drive-URL aufbauen ────────────────────────────────
+  // ── Drive-URL aufbauen (via CORS-Proxy) ─────────────
   _driveDownloadUrl(fileId) {
-    return `https://drive.google.com/uc?export=download&id=${fileId}`;
+    const direct = 'https://drive.google.com/uc?export=download&id=' + fileId;
+    return 'https://corsproxy.io/?' + encodeURIComponent(direct);
   },
 
   // ── Beim Start prüfen ─────────────────────────────────
@@ -13411,10 +13412,17 @@ const WB = {
       ev.date      = document.getElementById('ef-date')?.value||ev.date;
       ev.startTime = document.getElementById('ef-time')?.value||ev.startTime;
       ev.location  = document.getElementById('ef-loc')?.value||'';
-      // Dauer aus Von/Bis berechnen
-      const pS = s=>{ const [h,m]=s.split(':').map(Number); return h+m/60; };
+      // Dauer aus Von/Bis berechnen — Endzeit direkt speichern
+      const pS = s=>{ const [h,m]=(s||'0:0').split(':').map(Number); return h*60+m; };
       const end = document.getElementById('ef-endtime')?.value;
-      if(end && ev.startTime) { const dur = pS(end) - pS(ev.startTime); ev.duration = dur > 0 ? Math.round(dur*4)/4 : 1; }
+      ev.endTime = end || ev.endTime || '';
+      if(end && ev.startTime) {
+        const durMin = pS(end) - pS(ev.startTime);
+        ev.duration = durMin > 0 ? Math.round(durMin/15)*0.25 : 0.25; // min 15 Min
+      } else if (!end && ev.startTime) {
+        // Keine Endzeit → duration beibehalten oder 0.25h default
+        ev.duration = ev.duration || 0.25;
+      }
       // Welt wechseln
       const evNewCtx = document.getElementById('ef-ev-welt')?.value;
       if(evNewCtx && evNewCtx !== ctx) {
