@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.32.0</title>
+<title>WorkBench 3.33.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2378,6 +2378,61 @@ html, body {
 #ck-fab:active { transform: scale(0.93); }
 /* ck-fab wird via JS gesteuert */
 
+
+/* ── Brainstorming-Assistent ─────────────────────────── */
+#wb-bs-overlay {
+  display: none; position: fixed; inset: 0; z-index: 460;
+  background: rgba(28,27,24,0.55);
+  align-items: flex-end; justify-content: center;
+}
+#wb-bs-overlay.open { display: flex; }
+#wb-bs-panel {
+  background: var(--c-surface);
+  border-radius: var(--radius) var(--radius) 0 0;
+  width: 100%; max-width: 560px; max-height: 88vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 -4px 32px rgba(0,0,0,0.2);
+}
+@media (min-width:600px) {
+  #wb-bs-overlay { align-items: center; padding: 24px; }
+  #wb-bs-panel { border-radius: var(--radius); max-height: 82vh; }
+}
+#bs-header {
+  display: flex; align-items: center;
+  padding: 14px 18px 10px; border-bottom: 1px solid var(--c-border); flex-shrink: 0;
+}
+#bs-header h2 { flex:1; margin:0; font-size:1rem; font-weight:700; }
+#bs-body { flex:1; overflow-y:auto; padding:16px 18px 20px; }
+#bs-footer {
+  display: flex; gap: 8px; padding: 12px 18px;
+  border-top: 1px solid var(--c-border); flex-shrink: 0;
+}
+.bs-method-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;
+}
+.bs-method-btn {
+  padding: 12px; border: 1px solid var(--c-border);
+  border-radius: var(--radius-xs); background: var(--c-bg);
+  font-family: var(--font); cursor: pointer; text-align: left;
+  transition: all var(--t-fast);
+}
+.bs-method-btn:hover { border-color: var(--c-beruf); background: var(--c-beruf-bg); }
+.bs-method-btn.selected { border-color: var(--c-beruf); background: var(--c-beruf-bg); }
+.bs-method-name { font-size: 0.88rem; font-weight: 600; color: var(--c-text); }
+.bs-method-desc { font-size: 0.72rem; color: var(--c-muted); margin-top: 2px; }
+.bs-q-label { font-size: 0.78rem; font-weight: 600; color: var(--c-text); margin-bottom: 4px; margin-top: 12px; }
+.bs-q-label:first-child { margin-top: 0; }
+.bs-q-area {
+  width: 100%; box-sizing: border-box;
+  padding: 8px 10px; min-height: 60px;
+  border: 1px solid var(--c-border); border-radius: var(--radius-xs);
+  font-family: var(--font); font-size: 0.85rem; resize: vertical;
+  background: var(--c-bg); color: var(--c-text); line-height: 1.5;
+}
+.bs-q-area:focus { outline: none; border-color: var(--c-beruf); }
+.bs-progress {
+  display: flex; gap: 4px; align-items: center; flex-shrink: 0;
+}
 /* ── Inbox Modal ─────────────────────────────────────── */
 #wb-inbox-overlay {
   display: none; position: fixed; inset: 0; z-index: 460;
@@ -4439,6 +4494,7 @@ html, body {
           <button class="nz-subtab active" id="nz-tab-notizen" onclick="WB.nzSwitchTab('notizen')">Notizen</button>
           <button class="nz-subtab" id="nz-tab-vorlagen" onclick="WB.nzSwitchTab('vorlagen')">Vorlagen</button>
         </div>
+        <button onclick="WB.bsOpen()" style="margin-left:auto;padding:6px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.78rem;cursor:pointer;color:var(--c-muted);white-space:nowrap;">Brainstorming</button>
       </div>
       <div id="notizen-scroll"></div>
     </section>
@@ -5159,6 +5215,23 @@ html, body {
 <button id="ck-fab" onclick="WB.qcOpen()" title="Schnell erfassen">+</button>
 
 
+
+<!-- Brainstorming Assistent Modal -->
+<div id="wb-bs-overlay" onclick="if(event.target===this)WB.bsClose()">
+  <div id="wb-bs-panel">
+    <div id="bs-header">
+      <h2 id="bs-title">Brainstorming</h2>
+      <div class="bs-progress" id="bs-progress"></div>
+      <button class="wb-settings-close" onclick="WB.bsClose()" style="margin-left:10px;">&#215;</button>
+    </div>
+    <div id="bs-body"></div>
+    <div id="bs-footer">
+      <button class="wz-btn-back" id="bs-back-btn" onclick="WB._bsBack()">&#8249; Zurück</button>
+      <button class="wz-btn-next" id="bs-next-btn" onclick="WB._bsNext()">Weiter →</button>
+    </div>
+  </div>
+</div>
+
 <!-- Inbox Modal -->
 <div id="wb-inbox-overlay" onclick="if(event.target===this)WB.inboxClose()">
   <div id="wb-inbox-panel">
@@ -5379,7 +5452,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.32.0 · Build 20260526-1951</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.33.0 · Build 20260526-2002</div>
     </div>
 
     <!-- Welt -->
@@ -5418,11 +5491,7 @@ html, body {
         <span class="label">Inbox</span>
         <span class="sublabel" id="wb-inbox-menu-sub">Leer</span>
       </button>
-      <button class="wb-menu-item" onclick="WB._goTab('notizen'); WB.closeMenu()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-        <span class="label">Notizen</span>
-        <span class="sublabel">Alle Notizen öffnen</span>
-      </button>
+
       <button class="wb-menu-item" onclick="WB.wzOpenEvening(); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <span class="label">Abend-Reflexion</span>
@@ -5606,7 +5675,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.32.0',
+  APP_VERSION: '3.33.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -6104,6 +6173,257 @@ const WB = {
 
 
 
+
+  // ══════════════════════════════════════════════════════
+  // BRAINSTORMING ASSISTENT (v3.33.0)
+  // ══════════════════════════════════════════════════════
+
+  _bsStep:   0,   // 0=thema, 1=methode, 2=fragen, 3=ergebnis
+  _bsThema:  '',
+  _bsMethod: null,
+  _bsAntworten: {},
+
+  _bsMethods: [
+    {
+      id: 'frei',
+      name: 'Freies Brainstorming',
+      desc: 'Alles aufschreiben, keine Bewertung',
+      fragen: [
+        'Was kommt dir spontan zum Thema in den Sinn?',
+        'Welche Ideen klingen verrückt, könnten aber funktionieren?',
+        'Was würdest du tun, wenn du unbegrenzte Ressourcen hättest?',
+        'Welche Lösung würde ein Kind vorschlagen?',
+      ]
+    },
+    {
+      id: '5w',
+      name: '5W-Methode',
+      desc: 'Wer, Was, Wann, Wo, Warum',
+      fragen: [
+        'Wer ist betroffen oder beteiligt?',
+        'Was genau ist das Problem oder die Herausforderung?',
+        'Wann tritt es auf oder soll es erreicht werden?',
+        'Wo findet es statt (Ort, System, Kontext)?',
+        'Warum ist es wichtig — was ist das eigentliche Ziel?',
+      ]
+    },
+    {
+      id: 'mindmap',
+      name: 'Mind-Map',
+      desc: 'Hauptthema → Äste → Details',
+      fragen: [
+        'Welche 3-5 Hauptkategorien oder Aspekte hat das Thema?',
+        'Was fällt dir zu jeder Kategorie als Erstes ein?',
+        'Welche Verbindungen oder Abhängigkeiten siehst du?',
+        'Was fehlt noch — welche Bereiche hast du vergessen?',
+      ]
+    },
+    {
+      id: 'gegensaetze',
+      name: 'Gegensätze',
+      desc: 'Denkmuster durch Umkehrung brechen',
+      fragen: [
+        'Was wäre das genaue Gegenteil deines Ziels?',
+        'Wie könntest du garantiert scheitern?',
+        'Was würde passieren wenn du gar nichts tust?',
+        'Welche Annahmen hältst du für selbstverständlich — und was wenn sie falsch sind?',
+      ]
+    },
+    {
+      id: '6huete',
+      name: '6 Hüte',
+      desc: '6 Perspektiven auf das Thema',
+      fragen: [
+        'Weißer Hut — Fakten: Welche Daten und Fakten kennst du?',
+        'Roter Hut — Gefühle: Was ist dein Bauchgefühl dazu?',
+        'Schwarzer Hut — Risiken: Was könnte schiefgehen?',
+        'Gelber Hut — Chancen: Was sind die Vorteile und Möglichkeiten?',
+        'Grüner Hut — Kreativ: Welche ungewöhnlichen Ideen gibt es?',
+        'Blauer Hut — Prozess: Wie gehst du konkret vor?',
+      ]
+    },
+    {
+      id: 'fishbone',
+      name: 'Fishbone (Ishikawa)',
+      desc: 'Ursachen systematisch analysieren',
+      fragen: [
+        'Mensch: Welche menschlichen Faktoren tragen dazu bei?',
+        'Methode: Welche Prozesse oder Vorgehensweisen sind relevant?',
+        'Material: Welche Ressourcen oder Materialien spielen eine Rolle?',
+        'Maschine: Welche Werkzeuge, Systeme oder Technik ist beteiligt?',
+        'Umwelt: Welche externen Einflüsse oder Rahmenbedingungen gibt es?',
+        'Messung: Wie erkennst du ob das Problem besteht oder gelöst ist?',
+      ]
+    },
+  ],
+
+  bsOpen() {
+    this._bsStep     = 0;
+    this._bsThema    = '';
+    this._bsMethod   = null;
+    this._bsAntworten = {};
+    this._bsRender();
+    document.getElementById('wb-bs-overlay').classList.add('open');
+  },
+
+  bsClose() {
+    document.getElementById('wb-bs-overlay').classList.remove('open');
+  },
+
+  _bsBack() {
+    if (this._bsStep > 0) {
+      this._bsSave();
+      this._bsStep--;
+      this._bsRender();
+    }
+  },
+
+  _bsNext() {
+    this._bsSave();
+    if (this._bsStep < 3) {
+      this._bsStep++;
+      this._bsRender();
+    } else {
+      this._bsFinish();
+    }
+  },
+
+  _bsSave() {
+    if (this._bsStep === 0) {
+      this._bsThema = document.getElementById('bs-thema')?.value?.trim() || '';
+    } else if (this._bsStep === 2 && this._bsMethod) {
+      this._bsMethod.fragen.forEach((_, i) => {
+        const el = document.getElementById('bs-q-' + i);
+        if (el) this._bsAntworten[i] = el.value;
+      });
+    }
+  },
+
+  _bsRender() {
+    const body    = document.getElementById('bs-body');
+    const title   = document.getElementById('bs-title');
+    const backBtn = document.getElementById('bs-back-btn');
+    const nextBtn = document.getElementById('bs-next-btn');
+    const prog    = document.getElementById('bs-progress');
+
+    if (!body) return;
+
+    // Progress dots
+    const steps = ['Thema', 'Methode', 'Fragen', 'Ergebnis'];
+    if (prog) {
+      prog.innerHTML = steps.map((_, i) =>
+        '<div class="wz-prog-dot' +
+        (i < this._bsStep ? ' done' : i === this._bsStep ? ' active' : '') +
+        '"></div>'
+      ).join('');
+    }
+
+    if (backBtn) backBtn.style.display = this._bsStep === 0 ? 'none' : '';
+    if (nextBtn) nextBtn.textContent = this._bsStep === 3 ? 'Als Notiz speichern ✓' : 'Weiter →';
+
+    if (this._bsStep === 0) {
+      // Thema eingeben
+      if (title) title.textContent = 'Brainstorming';
+      body.innerHTML = '<div class="wz-step-title">Schritt 1 · Thema</div>'
+        + '<div class="wz-question">Was möchtest du brainstormen?</div>'
+        + '<input type="text" id="bs-thema" class="wz-focus-input" placeholder="Thema oder Frage eingeben…" value="' + (this._bsThema||'') + '" style="font-size:1rem;padding:12px;">';
+      setTimeout(() => document.getElementById('bs-thema')?.focus(), 100);
+
+    } else if (this._bsStep === 1) {
+      // Methode wählen
+      if (title) title.textContent = this._bsThema || 'Brainstorming';
+      const selId = this._bsMethod?.id || '';
+      body.innerHTML = '<div class="wz-step-title">Schritt 2 · Methode wählen</div><div class="bs-method-grid" id="bs-method-grid"></div>';
+      const grid = document.getElementById('bs-method-grid');
+      this._bsMethods.forEach(m => {
+        const btn = document.createElement('button');
+        btn.className = 'bs-method-btn' + (m.id===selId?' selected':'');
+        btn.innerHTML = '<div class="bs-method-name">' + m.name + '</div><div class="bs-method-desc">' + m.desc + '</div>';
+        const mid = m.id;
+        btn.addEventListener('click', () => this._bsSelectMethod(mid));
+        grid.appendChild(btn);
+      });
+
+    } else if (this._bsStep === 2) {
+      // Fragen beantworten
+      if (!this._bsMethod) { this._bsStep = 1; this._bsRender(); return; }
+      if (title) title.textContent = this._bsMethod.name;
+      body.innerHTML = '<div class="wz-step-title">Schritt 3 · ' + this._bsMethod.name + '</div>'
+        + this._bsMethod.fragen.map((q, i) =>
+            '<div class="bs-q-label">' + q + '</div>'
+            + '<textarea class="bs-q-area" id="bs-q-' + i + '" placeholder="Deine Antwort…">' + (this._bsAntworten[i]||'') + '</textarea>'
+          ).join('');
+
+    } else if (this._bsStep === 3) {
+      // Vorschau
+      if (title) title.textContent = 'Vorschau';
+      let preview = '<strong>' + (this._bsThema||'') + '</strong><br><em>' + (this._bsMethod?.name||'') + '</em><br><br>';
+      if (this._bsMethod) {
+        this._bsMethod.fragen.forEach((q, i) => {
+          const a = this._bsAntworten[i];
+          if (a) preview += '<strong>' + q + '</strong><br>' + a.replace(/\n/g,'<br>') + '<br><br>';
+        });
+      }
+      body.innerHTML = '<div class="wz-step-title">Schritt 4 · Ergebnis</div>'
+        + '<div style="background:var(--c-bg);border-radius:var(--radius-xs);padding:12px 14px;font-size:0.85rem;line-height:1.6;max-height:300px;overflow-y:auto;">'
+        + preview + '</div>';
+    }
+  },
+
+  _bsSelectMethod(id) {
+    this._bsMethod = this._bsMethods.find(m => m.id === id) || null;
+    // Buttons aktualisieren: alle de-selektieren, gewählten selektieren
+    const btns = document.querySelectorAll('.bs-method-btn');
+    btns.forEach((btn, i) => {
+      btn.classList.toggle('selected', this._bsMethods[i]?.id === id);
+    });
+  },
+
+  _bsFinish() {
+    this._bsSave();
+    if (!this._bsThema) { this._toast('Bitte Thema eingeben'); this._bsStep=0; this._bsRender(); return; }
+    if (!this._bsMethod) { this._toast('Bitte Methode wählen'); this._bsStep=1; this._bsRender(); return; }
+
+    const titel = 'Brainstorming: ' + this._bsThema;
+
+    // Notiz-Inhalt aufbauen
+    const parts = ['<h2>' + this._bsThema + '</h2>', '<em>' + this._bsMethod.name + '</em>', ''];
+    this._bsMethod.fragen.forEach((q, i) => {
+      const a = (this._bsAntworten[i] || '').trim();
+      if (a) {
+        parts.push('<h3>' + q + '</h3>');
+        parts.push('<p>' + a + '</p>');
+        parts.push('');
+      }
+    });
+    const inhalt = parts.join('\n');
+
+    // In aktiver Welt speichern
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Bitte zuerst Datenbank laden'); return; }
+    if (!db.settings) db.settings = {};
+    if (!db.settings.cockpitNotizen) db.settings.cockpitNotizen = [];
+
+    const newNote = {
+      id:        'bs_' + Date.now(),
+      titel,
+      inhalt,
+      typ:       'braindump',
+      geaendert: Date.now(),
+      erstellt:  Date.now(),
+    };
+    db.settings.cockpitNotizen.push(newNote);
+    this.setDirty();
+    this.bsClose();
+    this._toast('Brainstorming als Notiz gespeichert');
+    const nid = newNote.id;
+    setTimeout(() => {
+      this._goTab('notizen');
+      this.nzEdOpen(nid);
+    }, 300);
+  },
+
   // ══════════════════════════════════════════════════════
   // INBOX ENGINE (v3.32.0)
   // Eigene Datenstruktur: db.inbox[]
@@ -6391,8 +6711,6 @@ const WB = {
     this.qcClose();
     this._inboxUpdateMenuSub();
     this._toast('✓ In Inbox gespeichert');
-    // Inbox direkt öffnen
-    setTimeout(() => this.inboxOpen(), 300);
   },
 
   // ── Inbox-Assistent ──────────────────────────────────
