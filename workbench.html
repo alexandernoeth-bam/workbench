@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.31.1</title>
+<title>WorkBench 3.31.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5092,30 +5092,12 @@ html, body {
       <button id="qc-mic-btn" onclick="WB._qcMicToggle()" style="display:none;" title="Spracheingabe">&#9679;</button>
     </div>
 
-    <!-- Welt -->
-    <div class="qc-welt-row">
-      <button class="qc-welt-btn priv active" id="qc-btn-priv" onclick="WB._qcSetWelt('priv')">Privat</button>
-      <button class="qc-welt-btn" id="qc-btn-pro" onclick="WB._qcSetWelt('pro')">Beruf</button>
-    </div>
-
-    <!-- Aktionen -->
-    <div class="qc-actions">
-      <button class="qc-action-btn" onclick="WB._qcSaveNotiz()">
-        Notiz
-        <span class="qc-btn-sub">In Notizen speichern</span>
-      </button>
-      <button class="qc-action-btn" onclick="WB._qcSaveAufgabe()">
-        Aufgabe
-        <span class="qc-btn-sub">In Aufgaben anlegen</span>
-      </button>
-      <button class="qc-action-btn" onclick="WB._qcSaveTermin()">
-        Termin
-        <span class="qc-btn-sub">Im Kalender eintragen</span>
-      </button>
-      <button class="qc-action-btn" onclick="WB._qcSaveSchnell()">
-        Schnell
-        <span class="qc-btn-sub">In Inbox ablegen</span>
-      </button>
+    <!-- Speichern -->
+    <button onclick="WB._qcSaveSchnell()" style="width:100%;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;margin-top:4px;">
+      In Inbox speichern
+    </button>
+    <div style="font-size:0.72rem;color:var(--c-faint);text-align:center;margin-top:8px;">
+      Aus der Inbox weiterverarbeiten → Termin, Aufgabe, Notiz, Checkliste
     </div>
   </div>
 </div>
@@ -5332,7 +5314,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.31.1 · Build 20260526-1922</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.31.2 · Build 20260526-1931</div>
     </div>
 
     <!-- Welt -->
@@ -5549,7 +5531,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.31.1',
+  APP_VERSION: '3.31.2',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8048,6 +8030,20 @@ const WB = {
 
       const goTasksToday = "WB.setTaskFilter('today');WB._goTab('aufgaben')";
 
+      // Inbox-Pill (nur Privat)
+      let inboxPill = '';
+      if (ctx === 'priv') {
+        const inboxNote = (db.notes || []).find(n => n.titel === 'Inbox');
+        const inboxCount = inboxNote
+          ? (inboxNote.inhalt || '').split('\n').filter(l => l.trim()).length
+          : 0;
+        if (inboxCount > 0) {
+          const inboxId = inboxNote.id;
+          const goInbox = "WB.nzEdOpen('" + inboxId + "')";
+          inboxPill = row(inboxCount, 'Inbox', goInbox);
+        }
+      }
+
       return `<div class="ck-world-card ${worldCls}">
         <div class="ck-world-header">
           <span class="ck-world-title">${worldLabel}</span>
@@ -8057,6 +8053,7 @@ const WB = {
         ${row(urgentCount,     'Prio A & Überfällig',  goAufgaben)}
         ${row(evCount,         'Termine heute',         goHeute)}
         ${row(clCount,         'Checklisten aktiv',     goCl)}
+        ${inboxPill}
         ${dutyPills}
       </div>`;
     };
