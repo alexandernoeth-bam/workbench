@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.31.2</title>
+<title>WorkBench 3.31.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5314,7 +5314,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.31.2 · Build 20260526-1931</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.31.3 · Build 20260526-1942</div>
     </div>
 
     <!-- Welt -->
@@ -5347,6 +5347,11 @@ html, body {
       <button class="wb-menu-item" onclick="WB.saveAll(); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         <span class="label">Speichern</span>
+      </button>
+      <button class="wb-menu-item" onclick="WB._goTab('notizen'); WB.closeMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span class="label">Notizen</span>
+        <span class="sublabel">Alle Notizen öffnen</span>
       </button>
       <button class="wb-menu-item" onclick="WB.wzOpenEvening(); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -5531,7 +5536,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.31.2',
+  APP_VERSION: '3.31.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -6144,29 +6149,117 @@ const WB = {
     const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
     if (!db) { this._toast('Bitte zuerst Datenbank laden'); return; }
 
-    // Inbox-Notiz suchen oder anlegen
-    if (!db.notes) db.notes = [];
-    let inbox = db.notes.find(n => n.titel === 'Inbox');
-    const ts  = new Date().toLocaleString('de-DE', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'});
+    // Notizen-Store korrekt nutzen (cockpitNotizen)
+    if (!db.settings) db.settings = {};
+    if (!db.settings.cockpitNotizen) db.settings.cockpitNotizen = [];
+    const store = db.settings.cockpitNotizen;
+
+    const ts   = new Date().toLocaleString('de-DE', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'});
     const line = ts + ': ' + text;
 
+    let inbox = store.find(n => n.titel === 'Inbox');
     if (inbox) {
-      inbox.inhalt = (inbox.inhalt || '') + '\n' + line;
-      inbox.updated = Date.now();
+      inbox.inhalt  = (inbox.inhalt || '') + '\n' + line;
+      inbox.geaendert = Date.now();
     } else {
-      db.notes.push({
-        id:      'inbox_' + Date.now(),
-        titel:   'Inbox',
-        inhalt:  line,
-        typ:     'allgemein',
-        welt:    ctx,
-        created: Date.now(),
-        updated: Date.now(),
+      store.push({
+        id:        'inbox_' + Date.now(),
+        titel:     'Inbox',
+        inhalt:    line,
+        typ:       'allgemein',
+        geaendert: Date.now(),
+        erstellt:  Date.now(),
       });
+      inbox = store[store.length - 1];
     }
     this.setDirty();
     this.qcClose();
     this._toast('✓ In Inbox gespeichert');
+    // Inbox-Assistent öffnen
+    setTimeout(() => this._inboxAssistOpen(inbox.id, ctx), 300);
+  },
+
+  // ── Inbox-Assistent ──────────────────────────────────
+  _inboxAssistOpen(inboxId, ctx) {
+    const db    = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const store = db?.settings?.cockpitNotizen || [];
+    const inbox = store.find(n => n.id === inboxId);
+    if (!inbox) return;
+
+    // Letzten Eintrag aus Inbox extrahieren
+    const lines  = (inbox.inhalt || '').split('\n').filter(l => l.trim());
+    const last   = lines[lines.length - 1] || '';
+    const text   = last.replace(/^\d{2}:\d{2}, \d{2}\.\d{2}: /, '').trim();
+
+    // Mini-Dialog: was soll daraus werden?
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:600;background:rgba(28,27,24,0.5);display:flex;align-items:flex-end;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:var(--c-surface);border-radius:var(--radius) var(--radius) 0 0;width:100%;max-width:480px;padding:18px 16px 32px;box-shadow:0 -4px 32px rgba(0,0,0,0.2);">
+        <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--c-faint);margin-bottom:6px;">Inbox-Eintrag</div>
+        <div style="font-size:0.9rem;color:var(--c-text);padding:10px 12px;background:var(--c-bg);border-radius:var(--radius-xs);margin-bottom:14px;line-height:1.5;">\${text}</div>
+        <div style="font-size:0.78rem;color:var(--c-muted);margin-bottom:10px;">Was soll daraus werden?</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button onclick="WB._inboxWeiter('notiz','${inboxId}','${ctx}','${text.replace(/'/g,"\'")}');this.closest('[data-ia]').remove()" style="padding:10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:var(--c-bg);font-family:var(--font);font-size:0.85rem;cursor:pointer;">Notiz</button>
+          <button onclick="WB._inboxWeiter('aufgabe','${inboxId}','${ctx}','${text.replace(/'/g,"\'")}');this.closest('[data-ia]').remove()" style="padding:10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:var(--c-bg);font-family:var(--font);font-size:0.85rem;cursor:pointer;">Aufgabe</button>
+          <button onclick="WB._inboxWeiter('termin','${inboxId}','${ctx}','${text.replace(/'/g,"\'")}');this.closest('[data-ia]').remove()" style="padding:10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:var(--c-bg);font-family:var(--font);font-size:0.85rem;cursor:pointer;">Termin</button>
+          <button onclick="WB._inboxWeiter('verwerfen','${inboxId}','${ctx}','');this.closest('[data-ia]').remove()" style="padding:10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:var(--c-bg);font-family:var(--font);font-size:0.85rem;cursor:pointer;color:var(--c-muted);">Verwerfen</button>
+        </div>
+      </div>`;
+    overlay.setAttribute('data-ia','1');
+    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+    document.body.appendChild(overlay);
+  },
+
+  _inboxWeiter(ziel, inboxId, ctx, text) {
+    const db    = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const store = db?.settings?.cockpitNotizen || [];
+    const inbox = store.find(n => n.id === inboxId);
+
+    if (ziel === 'verwerfen') {
+      // Letzten Eintrag aus Inbox löschen
+      if (inbox) {
+        const lines = (inbox.inhalt||'').split('\n').filter(l=>l.trim());
+        lines.pop();
+        inbox.inhalt = lines.join('\n');
+        if (!inbox.inhalt.trim()) {
+          // Inbox leer → Notiz löschen
+          const idx = store.indexOf(inbox);
+          if (idx >= 0) store.splice(idx, 1);
+        }
+        this.setDirty();
+        this.renderCockpit();
+        this._toast('Eintrag verworfen');
+      }
+      return;
+    }
+
+    if (ziel === 'notiz') {
+      this.nzEdOpen(null, text.slice(0,40), 'allgemein', text);
+    } else if (ziel === 'aufgabe') {
+      const projKey = Object.keys(db?.projects || {})[0];
+      if (projKey) this.editOpen('task', ctx, projKey, null, text);
+      else this._toast('Kein Projekt vorhanden');
+    } else if (ziel === 'termin') {
+      const today = new Date().toISOString().split('T')[0];
+      this.newEventOpen(today);
+      setTimeout(() => {
+        const el = document.getElementById('ef-title');
+        if (el) el.value = text;
+      }, 100);
+    }
+
+    // Eintrag aus Inbox entfernen nach Weiterleitung
+    if (inbox) {
+      const lines = (inbox.inhalt||'').split('\n').filter(l=>l.trim());
+      lines.pop();
+      inbox.inhalt = lines.join('\n');
+      if (!inbox.inhalt.trim()) {
+        const idx = store.indexOf(inbox);
+        if (idx >= 0) store.splice(idx, 1);
+      }
+      this.setDirty();
+    }
   },
 
   // ══════════════════════════════════════════════════════
@@ -8030,10 +8123,11 @@ const WB = {
 
       const goTasksToday = "WB.setTaskFilter('today');WB._goTab('aufgaben')";
 
-      // Inbox-Pill (nur Privat)
+      // Inbox-Pill (nur Privat/Pro je nach ctx)
       let inboxPill = '';
-      if (ctx === 'priv') {
-        const inboxNote = (db.notes || []).find(n => n.titel === 'Inbox');
+      {
+        const nzStore = db?.settings?.cockpitNotizen || [];
+        const inboxNote = nzStore.find(n => n.titel === 'Inbox');
         const inboxCount = inboxNote
           ? (inboxNote.inhalt || '').split('\n').filter(l => l.trim()).length
           : 0;
