@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.26.0</title>
+<title>WorkBench 3.26.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4232,7 +4232,8 @@ html, body {
     <button class="nz-tb" onclick="WB.nzCmd('insertUnorderedList')">&#8226;</button>
     <button class="nz-tb" onclick="WB.nzCmd('insertOrderedList')">1.</button>
     <button class="nz-tb" onclick="WB.nzInsertCb()">&#9744;</button>
-    <div class="nz-tb-sep"></div>
+    <button class="nz-tb" onclick="WB.nzCmd('indent')" title="Einrücken">&#8677;</button>
+    <button class="nz-tb" onclick="WB.nzCmd('outdent')" title="Ausrücken">&#8676;</button>
     <div class="nz-tb-sep"></div>
     <button class="nz-tb nz-tb-collapse" onclick="WB.nzToggleCollapse()" title="Absatz einklappbar machen / aufheben">⊟</button>
     <button class="nz-tb" onclick="WB.nzCmd('formatBlock','blockquote')">&#10077;</button>
@@ -4791,7 +4792,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.26.0 · Build 20260526-1617</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.26.1 · Build 20260526-1634</div>
     </div>
 
     <!-- Welt -->
@@ -4998,7 +4999,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.26.0',
+  APP_VERSION: '3.26.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -13875,55 +13876,79 @@ const WB = {
     document.execCommand(cmd, false, val||null);
   },
 
-  // ── Absatz einklappbar machen / Toggle ───────────────
+  // ── Markierung einklappbar machen / Toggle ──────────
   nzToggleCollapse() {
     const ed = document.getElementById('nz-ed-content');
     if (!ed) return;
 
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
+    if (!sel || sel.rangeCount === 0) { this._toast('Bitte zuerst Zeilen markieren'); return; }
 
-    // Aktuellen Block-Container finden
-    let node = sel.getRangeAt(0).startContainer;
-    while (node && node !== ed) {
-      if (node.nodeType === 1 && node.parentNode === ed) break;
-      node = node.parentNode;
-    }
-    if (!node || node === ed) return;
+    const range = sel.getRangeAt(0);
 
-    if (node.tagName === 'DETAILS') {
-      // Bereits einklappbar → aufheben: Inhalt aus details herauslösen
-      const summary = node.querySelector('summary');
-      const summaryText = summary ? summary.innerHTML : '';
-      const rest = Array.from(node.childNodes)
-        .filter(n => n !== summary)
-        .map(n => n.outerHTML || n.textContent)
-        .join('');
-      const p = document.createElement('p');
-      p.innerHTML = summaryText + (rest ? '<br>' + rest : '');
-      ed.replaceChild(p, node);
-      this._toast('Einklappbar aufgehoben');
-    } else {
-      // Noch nicht einklappbar → in details/summary umwandeln
-      const html = node.innerHTML || node.textContent || '';
-      // Erste Zeile als summary, Rest als Content
-      const lines = html.split(/<br\s*\/?>/i);
-      const firstLine = lines[0] || html;
-      const rest = lines.slice(1).join('<br>');
-
-      const details = document.createElement('details');
-      details.setAttribute('open', '');
-      const summary = document.createElement('summary');
-      summary.innerHTML = firstLine;
-      details.appendChild(summary);
-      if (rest) {
-        const div = document.createElement('div');
-        div.innerHTML = rest;
-        details.appendChild(div);
+    // Prüfen ob bereits in einem details-Element
+    let checkNode = range.startContainer;
+    while (checkNode && checkNode !== ed) {
+      if (checkNode.tagName === 'DETAILS') {
+        // Aufheben: details durch Inhalt ersetzen
+        const summary = checkNode.querySelector('summary');
+        const frag = document.createDocumentFragment();
+        const titleP = document.createElement('p');
+        titleP.innerHTML = summary ? summary.innerHTML : '';
+        frag.appendChild(titleP);
+        Array.from(checkNode.childNodes).forEach(n => {
+          if (n !== summary) frag.appendChild(n.cloneNode(true));
+        });
+        checkNode.parentNode.replaceChild(frag, checkNode);
+        sel.removeAllRanges();
+        this._toast('Einklappbar aufgehoben');
+        return;
       }
-      ed.replaceChild(details, node);
-      this._toast('Absatz einklappbar — ⊟ nochmal tippen zum Aufheben');
+      checkNode = checkNode.parentNode;
     }
+
+    // Selektion: alle Nodes im markierten Bereich sammeln
+    // Ersten markierten Block = Anker/Titel
+    // Alle weiteren = einklappbarer Inhalt
+
+    // HTML der Selektion extrahieren
+    const div = document.createElement('div');
+    div.appendChild(range.cloneContents());
+    const selectedHtml = div.innerHTML;
+
+    // details Element bauen
+    const details = document.createElement('details');
+    details.setAttribute('open', '');
+    details.style.cssText = 'border-left:2px solid var(--c-border);padding:4px 0 4px 12px;margin:4px 0;';
+
+    // Erste Zeile = summary (Anker)
+    const summary = document.createElement('summary');
+    summary.style.cssText = 'cursor:pointer;font-weight:600;list-style:none;';
+
+    // HTML aufteilen: erste Block-Zeile vs. Rest
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = selectedHtml;
+    const allNodes = Array.from(tempDiv.childNodes);
+
+    if (allNodes.length === 0) { this._toast('Bitte Zeilen markieren'); return; }
+
+    // Ersten Block als Summary
+    const firstNode = allNodes[0];
+    summary.innerHTML = firstNode.innerHTML || firstNode.textContent || '';
+    details.appendChild(summary);
+
+    // Rest als Content
+    if (allNodes.length > 1) {
+      const content = document.createElement('div');
+      allNodes.slice(1).forEach(n => content.appendChild(n.cloneNode(true)));
+      details.appendChild(content);
+    }
+
+    // Selektion durch details ersetzen
+    range.deleteContents();
+    range.insertNode(details);
+    sel.removeAllRanges();
+    this._toast('✓ Einklappbar — ⊟ nochmal tippen zum Aufheben');
   },
 
   nzH(level) {
