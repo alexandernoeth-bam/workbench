@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.25.3</title>
+<title>WorkBench 3.25.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2214,7 +2214,7 @@ html, body {
   cursor: pointer;
 }
 
-/* ── Aufgaben-Heute Pill im Cockpit ──────────────────── */
+
 #ck-tasks-today-pill {
   width: 100%; max-width: 420px;
   margin: 10px auto 0;
@@ -3960,16 +3960,7 @@ html, body {
         <button class="ck-meeting-btn" id="ck-meeting-btn">Öffnen</button>
       </div>
       <div id="ck-grid"></div>
-    <div id="ck-tasks-today-pill" onclick="WB._goTab('aufgaben');WB.setTaskFilter('today')">
-      <div class="ck-tasks-pill green" id="ck-tasks-pill-inner">
-        <div class="ck-tasks-pill-count" id="ck-tasks-pill-count">0</div>
-        <div class="ck-tasks-pill-info">
-          <div class="ck-tasks-pill-label">Aufgaben heute</div>
-          <div class="ck-tasks-pill-sub" id="ck-tasks-pill-sub">Keine offenen Aufgaben</div>
-        </div>
-        <div class="ck-tasks-pill-arrow">→</div>
-      </div>
-    </div>
+
     </section>
 
     <!-- Heute -->
@@ -4762,7 +4753,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.25.3 · Build 20260526-1502</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.25.4 · Build 20260526-1522</div>
     </div>
 
     <!-- Welt -->
@@ -4969,7 +4960,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.25.3',
+  APP_VERSION: '3.25.4',
   APP_BUILD:   '20260526-0723',
 
 
@@ -6403,13 +6394,33 @@ const WB = {
       const goCl       = `WB._ckGoChecklisten('${ctx}')`;
       const goWoche    = `WB._goTab('woche')`;
 
-      // Pill-Zeile bauen
+      // Aufgaben heute zählen
+      let tasksTodayCount = 0;
+      Object.values(db.projects || {}).forEach(p => {
+        (p.tasks || []).forEach(t => {
+          if (!t.done && t.date === today) tasksTodayCount++;
+        });
+      });
+      // Wochenpflichten heute fällig (für diese Welt)
+      const kw = this._kwStr(now);
+      (this._dutyStore(ctx) || []).forEach(d => {
+        const dueInfo = this._dutyDueInfo({...d, ctx});
+        if (dueInfo.due && !d.doneWeeks?.[kw]) tasksTodayCount++;
+      });
+
+      // Pill-Zeile bauen — mit Farblogik
       const row = (count, label, onclick) => {
         const zeroClass = count === 0 ? ' zero' : '';
         const display   = count === 0 ? '–' : String(count);
+        // Farbklassen: orange >5, rot >10
+        const colorStyle = count > 10
+          ? 'background:rgba(198,40,40,0.15);border-radius:var(--radius-xs);'
+          : count > 5
+            ? 'background:rgba(212,137,10,0.12);border-radius:var(--radius-xs);'
+            : '';
         return `
           <div class="ck-pill-divider"></div>
-          <div class="ck-pill-row">
+          <div class="ck-pill-row" style="${colorStyle}">
             <button class="ck-num-pill${zeroClass}" onclick="${onclick}">${display}</button>
             <span class="ck-pill-label">${label}</span>
           </div>`;
@@ -6419,14 +6430,17 @@ const WB = {
       const dutyPills = this._ckDutyPillsHtml(ctx);
       const goalPills = ctx === 'priv' ? this._ckGoalPillsHtml() : '';
 
+      const goTasksToday = "WB.setTaskFilter('today');WB._goTab('aufgaben')";
+
       return `<div class="ck-world-card ${worldCls}">
         <div class="ck-world-header">
           <span class="ck-world-title">${worldLabel}</span>
           <span class="ck-world-cap">${bookedH > 0 ? bookedH + 'h Fokus' : 'kein Fokus'}</span>
         </div>
-        ${row(evCount,    'Termine heute',        goHeute)}
-        ${row(urgentCount,'Prio A & Überfällig',  goAufgaben)}
-        ${row(clCount,    'Checklisten aktiv',     goCl)}
+        ${row(tasksTodayCount, 'Aufgaben heute',       goTasksToday)}
+        ${row(urgentCount,     'Prio A & Überfällig',  goAufgaben)}
+        ${row(evCount,         'Termine heute',         goHeute)}
+        ${row(clCount,         'Checklisten aktiv',     goCl)}
         ${dutyPills}
       </div>`;
     };
