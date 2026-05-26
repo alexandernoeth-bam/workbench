@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.31.3</title>
+<title>WorkBench 3.32.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2377,6 +2377,59 @@ html, body {
 }
 #ck-fab:active { transform: scale(0.93); }
 /* ck-fab wird via JS gesteuert */
+
+/* ── Inbox Modal ─────────────────────────────────────── */
+#wb-inbox-overlay {
+  display: none; position: fixed; inset: 0; z-index: 460;
+  background: rgba(28,27,24,0.55);
+  align-items: flex-end; justify-content: center;
+}
+#wb-inbox-overlay.open { display: flex; }
+#wb-inbox-panel {
+  background: var(--c-surface);
+  border-radius: var(--radius) var(--radius) 0 0;
+  width: 100%; max-width: 520px; max-height: 85vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 -4px 32px rgba(0,0,0,0.18);
+}
+@media (min-width:600px) {
+  #wb-inbox-overlay { align-items: center; padding: 24px; }
+  #wb-inbox-panel { border-radius: var(--radius); max-height: 80vh; }
+}
+#wb-inbox-header {
+  display: flex; align-items: center;
+  padding: 14px 18px; border-bottom: 1px solid var(--c-border); flex-shrink: 0;
+}
+#wb-inbox-header h2 { flex:1; margin:0; font-size:1rem; font-weight:700; }
+#wb-inbox-list { flex:1; overflow-y:auto; }
+
+.inbox-item {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--c-border);
+}
+.inbox-item-ts {
+  font-size: 0.68rem; color: var(--c-faint);
+  font-family: var(--font-mono); margin-bottom: 4px;
+}
+.inbox-item-text {
+  font-size: 0.9rem; color: var(--c-text);
+  line-height: 1.4; margin-bottom: 10px;
+}
+.inbox-item-actions {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.inbox-act-btn {
+  padding: 5px 12px; border-radius: 20px;
+  border: 1px solid var(--c-border); background: var(--c-bg);
+  font-family: var(--font); font-size: 0.78rem; cursor: pointer;
+  color: var(--c-text); transition: all var(--t-fast);
+}
+.inbox-act-btn:hover { border-color: var(--c-beruf); color: var(--c-beruf); }
+.inbox-act-btn.verwerfen { color: var(--c-faint); }
+.inbox-empty {
+  padding: 40px 18px; text-align: center;
+  font-size: 0.88rem; color: var(--c-muted);
+}
 /* ── ICS Export Dialog ───────────────────────────────── */
 #wb-ics-export-overlay {
   display: none; position: fixed; inset: 0; z-index: 450;
@@ -5105,6 +5158,18 @@ html, body {
 <!-- Cockpit FAB -->
 <button id="ck-fab" onclick="WB.qcOpen()" title="Schnell erfassen">+</button>
 
+
+<!-- Inbox Modal -->
+<div id="wb-inbox-overlay" onclick="if(event.target===this)WB.inboxClose()">
+  <div id="wb-inbox-panel">
+    <div id="wb-inbox-header">
+      <h2>Inbox <span id="wb-inbox-count" style="font-size:0.8rem;color:var(--c-faint);font-weight:400;"></span></h2>
+      <button class="wb-settings-close" onclick="WB.inboxClose()">&#215;</button>
+    </div>
+    <div id="wb-inbox-list"></div>
+  </div>
+</div>
+
 <!-- ICS Export Dialog -->
 <div id="wb-ics-export-overlay" onclick="if(event.target===this)WB.icsExportClose()">
   <div id="wb-ics-export-panel">
@@ -5314,7 +5379,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.31.3 · Build 20260526-1942</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.32.0 · Build 20260526-1951</div>
     </div>
 
     <!-- Welt -->
@@ -5347,6 +5412,11 @@ html, body {
       <button class="wb-menu-item" onclick="WB.saveAll(); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         <span class="label">Speichern</span>
+      </button>
+      <button class="wb-menu-item" onclick="WB.inboxOpen(); WB.closeMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+        <span class="label">Inbox</span>
+        <span class="sublabel" id="wb-inbox-menu-sub">Leer</span>
       </button>
       <button class="wb-menu-item" onclick="WB._goTab('notizen'); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -5536,7 +5606,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.31.3',
+  APP_VERSION: '3.32.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -6033,6 +6103,165 @@ const WB = {
 
 
 
+
+  // ══════════════════════════════════════════════════════
+  // INBOX ENGINE (v3.32.0)
+  // Eigene Datenstruktur: db.inbox[]
+  // ══════════════════════════════════════════════════════
+
+  // ── Inbox Store ───────────────────────────────────────
+  _inboxStore(ctx) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return [];
+    if (!db.inbox) db.inbox = [];
+    return db.inbox;
+  },
+
+  _inboxCount() {
+    const priv = (this.dataPriv?.inbox || []).length;
+    const pro  = (this.dataPro?.inbox  || []).length;
+    return priv + pro;
+  },
+
+  // ── Inbox öffnen ──────────────────────────────────────
+  inboxOpen() {
+    this._inboxRender();
+    document.getElementById('wb-inbox-overlay').classList.add('open');
+  },
+
+  inboxClose() {
+    document.getElementById('wb-inbox-overlay').classList.remove('open');
+    this.renderCockpit();
+  },
+
+  _inboxRender() {
+    const list    = document.getElementById('wb-inbox-list');
+    const countEl = document.getElementById('wb-inbox-count');
+    if (!list) return;
+
+    const items = [];
+    ['priv','pro'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      (db?.inbox || []).forEach(item => items.push({ ...item, ctx }));
+    });
+    items.sort((a,b) => b.ts - a.ts);
+
+    if (countEl) countEl.textContent = items.length ? '(' + items.length + ')' : '';
+
+    list.innerHTML = '';
+    if (!items.length) {
+      list.innerHTML = '<div class="inbox-empty">Inbox ist leer</div>';
+      return;
+    }
+
+    items.forEach(item => {
+      const date = new Date(item.ts).toLocaleString('de-DE',{
+        day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'
+      });
+      const wrap = document.createElement('div');
+      wrap.className = 'inbox-item';
+      wrap.id = 'inbox-item-' + item.id;
+
+      const tsEl = document.createElement('div');
+      tsEl.className = 'inbox-item-ts';
+      tsEl.textContent = date + ' · ' + (item.ctx==='pro'?'Beruf':'Privat');
+
+      const txtEl = document.createElement('div');
+      txtEl.className = 'inbox-item-text';
+      txtEl.textContent = item.text || '';
+
+      const actsEl = document.createElement('div');
+      actsEl.className = 'inbox-item-actions';
+
+      const aktionen = [
+        ['notiz','Notiz'], ['aufgabe','Aufgabe'], ['termin','Termin'],
+        ['checkliste','Checkliste'], ['ziel','Ziel'], ['verwerfen','Verwerfen']
+      ];
+      aktionen.forEach(([ziel, label]) => {
+        const btn = document.createElement('button');
+        btn.className = 'inbox-act-btn' + (ziel==='verwerfen' ? ' verwerfen' : '');
+        btn.textContent = label;
+        const iid = item.id, ictx = item.ctx;
+        btn.addEventListener('click', () => this._inboxProcess(iid, ictx, ziel));
+        actsEl.appendChild(btn);
+      });
+
+      wrap.appendChild(tsEl);
+      wrap.appendChild(txtEl);
+      wrap.appendChild(actsEl);
+      list.appendChild(wrap);
+    });
+  },
+
+  // ── Eintrag verarbeiten ───────────────────────────────
+  _inboxProcess(id, ctx, ziel) {
+    const db    = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const store = db?.inbox || [];
+    const idx   = store.findIndex(i => i.id === id);
+    if (idx < 0) return;
+    const item  = store[idx];
+    const text  = item.text || '';
+
+    // Eintrag entfernen
+    store.splice(idx, 1);
+    this.setDirty();
+
+    // Item aus DOM entfernen
+    document.getElementById('inbox-item-' + id)?.remove();
+    const countEl = document.getElementById('wb-inbox-count');
+    const remaining = document.querySelectorAll('.inbox-item').length;
+    if (countEl) countEl.textContent = remaining ? '(' + remaining + ')' : '';
+    if (!remaining) {
+      const list = document.getElementById('wb-inbox-list');
+      if (list) list.innerHTML = '<div class="inbox-empty">Inbox ist leer</div>';
+    }
+    // Hamburger Sub-Label
+    this._inboxUpdateMenuSub();
+
+    if (ziel === 'verwerfen') {
+      this._toast('Eintrag verworfen');
+      return;
+    }
+
+    this.inboxClose();
+
+    if (ziel === 'notiz') {
+      this.nzEdOpen(null, text.slice(0,40), 'allgemein', text);
+    } else if (ziel === 'aufgabe') {
+      const projKey = Object.keys(db?.projects || {})[0];
+      if (projKey) {
+        this.editOpen('task', ctx, projKey, null);
+        setTimeout(() => {
+          const el = document.getElementById('ef-title');
+          if (el) el.value = text;
+        }, 100);
+      } else { this._toast('Kein Projekt vorhanden'); }
+    } else if (ziel === 'termin') {
+      const today = new Date().toISOString().split('T')[0];
+      this.newEventOpen(today);
+      setTimeout(() => {
+        const el = document.getElementById('ef-title');
+        if (el) el.value = text;
+      }, 100);
+    } else if (ziel === 'checkliste') {
+      this._goTab('checklisten');
+      this._toast('Neue Checkliste anlegen und Titel einfügen: ' + text.slice(0,30));
+    } else if (ziel === 'ziel') {
+      this.goalNew();
+      setTimeout(() => {
+        const el = document.getElementById('gf-title');
+        if (el) el.value = text;
+      }, 100);
+    }
+  },
+
+  // ── Hamburger Sub-Label aktualisieren ─────────────────
+  _inboxUpdateMenuSub() {
+    const count = this._inboxCount();
+    const el = document.getElementById('wb-inbox-menu-sub');
+    if (el) el.textContent = count ? count + ' Eintrag' + (count>1?'e':'') : 'Leer';
+  },
+
   // ══════════════════════════════════════════════════════
   // QUICK CAPTURE (v3.31.0)
   // ══════════════════════════════════════════════════════
@@ -6149,34 +6378,21 @@ const WB = {
     const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
     if (!db) { this._toast('Bitte zuerst Datenbank laden'); return; }
 
-    // Notizen-Store korrekt nutzen (cockpitNotizen)
-    if (!db.settings) db.settings = {};
-    if (!db.settings.cockpitNotizen) db.settings.cockpitNotizen = [];
-    const store = db.settings.cockpitNotizen;
-
-    const ts   = new Date().toLocaleString('de-DE', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'});
-    const line = ts + ': ' + text;
-
-    let inbox = store.find(n => n.titel === 'Inbox');
-    if (inbox) {
-      inbox.inhalt  = (inbox.inhalt || '') + '\n' + line;
-      inbox.geaendert = Date.now();
-    } else {
-      store.push({
-        id:        'inbox_' + Date.now(),
-        titel:     'Inbox',
-        inhalt:    line,
-        typ:       'allgemein',
-        geaendert: Date.now(),
-        erstellt:  Date.now(),
-      });
-      inbox = store[store.length - 1];
-    }
+    // Inbox-Eintrag anlegen
+    if (!db.inbox) db.inbox = [];
+    const entry = {
+      id:  'inbox_' + Date.now() + '_' + Math.random().toString(36).slice(2),
+      text,
+      ts:  Date.now(),
+      ctx,
+    };
+    db.inbox.push(entry);
     this.setDirty();
     this.qcClose();
+    this._inboxUpdateMenuSub();
     this._toast('✓ In Inbox gespeichert');
-    // Inbox-Assistent öffnen
-    setTimeout(() => this._inboxAssistOpen(inbox.id, ctx), 300);
+    // Inbox direkt öffnen
+    setTimeout(() => this.inboxOpen(), 300);
   },
 
   // ── Inbox-Assistent ──────────────────────────────────
@@ -7040,6 +7256,7 @@ const WB = {
       await this.idbSaveAll();
       this._syncUpdateUI();
       this._idbUpdateStatusUI();
+      setTimeout(() => this._inboxUpdateMenuSub(), 500);
       this._toast('✓ ' + (ctx==='pro'?'Beruf':'Privat') + ' in Drive gespeichert');
       this._oauthUpdateUI();
     } catch(e) {
@@ -7934,6 +8151,7 @@ const WB = {
     const ztFab = document.getElementById('zt-fab');
     if (ckFab) ckFab.style.display = 'flex';
     if (ztFab) ztFab.classList.remove('visible');
+    this._inboxUpdateMenuSub();
     this._ckRenderDateHeader();
     this._ckRenderFocusBanner();
     this._ckRenderAssistantBanner();
@@ -8123,18 +8341,12 @@ const WB = {
 
       const goTasksToday = "WB.setTaskFilter('today');WB._goTab('aufgaben')";
 
-      // Inbox-Pill (nur Privat/Pro je nach ctx)
+      // Inbox-Pill
       let inboxPill = '';
       {
-        const nzStore = db?.settings?.cockpitNotizen || [];
-        const inboxNote = nzStore.find(n => n.titel === 'Inbox');
-        const inboxCount = inboxNote
-          ? (inboxNote.inhalt || '').split('\n').filter(l => l.trim()).length
-          : 0;
+        const inboxCount = (db.inbox || []).length;
         if (inboxCount > 0) {
-          const inboxId = inboxNote.id;
-          const goInbox = "WB.nzEdOpen('" + inboxId + "')";
-          inboxPill = row(inboxCount, 'Inbox', goInbox);
+          inboxPill = row(inboxCount, 'Inbox', 'WB.inboxOpen()');
         }
       }
 
