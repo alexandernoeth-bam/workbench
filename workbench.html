@@ -14486,8 +14486,27 @@ document.head.appendChild(toastStyle);
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
-      .then(r => console.log('[SW] registriert:', r.scope))
+      .then(r => {
+        console.log('[SW] registriert:', r.scope);
+        // Auf Updates prüfen
+        r.addEventListener('updatefound', () => {
+          const newSW = r.installing;
+          newSW.addEventListener('statechange', () => {
+            if (newSW.state === 'activated') {
+              console.log('[SW] Update aktiv — lade neu');
+              window.location.reload();
+            }
+          });
+        });
+      })
       .catch(e => console.log('[SW] Fehler:', e));
+  });
+  // SW sendet SW_UPDATED → sofort neu laden
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (e.data?.type === 'SW_UPDATED') {
+      console.log('[SW] Update Build:', e.data.build, '— lade neu');
+      window.location.reload();
+    }
   });
 }
 

@@ -1,8 +1,10 @@
-// WorkBench Service Worker v3.23.1
-// Minimal — nur PWA + Notifications, kein Caching
+// WorkBench Service Worker v3.23.1 · Build 20260526-0829
+// Beim Aktivieren sofort alle Clients zur Aktualisierung zwingen
 
-self.addEventListener('install', () => {
-  self.skipWaiting();
+const BUILD = '20260526-0829';
+
+self.addEventListener('install', e => {
+  self.skipWaiting(); // sofort installieren
 });
 
 self.addEventListener('activate', e => {
@@ -10,6 +12,16 @@ self.addEventListener('activate', e => {
     caches.keys()
       .then(keys => Promise.all(keys.map(k => caches.delete(k))))
       .then(() => self.clients.claim())
+      .then(() => {
+        // Alle offenen Clients zur Aktualisierung zwingen
+        return self.clients.matchAll({ type: 'window' });
+      })
+      .then(clients => {
+        clients.forEach(client => {
+          // Client sagen: bitte neu laden
+          client.postMessage({ type: 'SW_UPDATED', build: BUILD });
+        });
+      })
   );
 });
 
@@ -17,14 +29,12 @@ self.addEventListener('activate', e => {
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   e.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true })
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then(clientList => {
-        // Offenen Tab fokussieren
         for (const c of clientList) {
           if (c.url.includes('workbench') && 'focus' in c) return c.focus();
         }
-        // Neuen Tab öffnen
-        if (clients.openWindow) return clients.openWindow('./workbench.html');
+        if (self.clients.openWindow) return self.clients.openWindow('./workbench.html');
       })
   );
 });
