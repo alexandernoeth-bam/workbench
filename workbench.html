@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.25.1</title>
+<title>WorkBench 3.25.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2213,6 +2213,43 @@ html, body {
   font-weight: 600;
   cursor: pointer;
 }
+
+/* ── Aufgaben-Heute Pill im Cockpit ──────────────────── */
+#ck-tasks-today-pill {
+  width: 100%; max-width: 420px;
+  margin: 10px auto 0;
+  display: none;
+}
+#ck-tasks-today-pill.visible { display: block; }
+.ck-tasks-pill {
+  display: flex; align-items: center;
+  padding: 10px 16px; border-radius: var(--radius);
+  cursor: pointer; gap: 12px;
+  transition: opacity var(--t-fast);
+  border: 1px solid transparent;
+}
+.ck-tasks-pill:active { opacity: 0.8; }
+.ck-tasks-pill.green  { background: rgba(39,174,96,0.10); border-color: rgba(39,174,96,0.25); }
+.ck-tasks-pill.orange { background: rgba(212,137,10,0.10); border-color: rgba(212,137,10,0.35); }
+.ck-tasks-pill.red    { background: rgba(198,40,40,0.10);  border-color: rgba(198,40,40,0.35); }
+.ck-tasks-pill-count {
+  font-size: 1.4rem; font-weight: 800;
+  font-family: var(--font-mono); flex-shrink: 0;
+  min-width: 36px; text-align: center;
+}
+.ck-tasks-pill.green  .ck-tasks-pill-count { color: #27AE60; }
+.ck-tasks-pill.orange .ck-tasks-pill-count { color: var(--c-warn); }
+.ck-tasks-pill.red    .ck-tasks-pill-count { color: var(--c-danger); }
+.ck-tasks-pill-info { flex: 1; }
+.ck-tasks-pill-label {
+  font-size: 0.88rem; font-weight: 600; color: var(--c-text);
+}
+.ck-tasks-pill-sub {
+  font-size: 0.72rem; color: var(--c-muted); margin-top: 1px;
+}
+.ck-tasks-pill-arrow {
+  font-size: 1rem; color: var(--c-faint); flex-shrink: 0;
+}
 /* ── Drive Login Banner ──────────────────────────────── */
 #wb-drive-login-banner {
   display: none;
@@ -3923,6 +3960,16 @@ html, body {
         <button class="ck-meeting-btn" id="ck-meeting-btn">Öffnen</button>
       </div>
       <div id="ck-grid"></div>
+    <div id="ck-tasks-today-pill" onclick="WB._goTab('aufgaben');WB.setTaskFilter('today')">
+      <div class="ck-tasks-pill green" id="ck-tasks-pill-inner">
+        <div class="ck-tasks-pill-count" id="ck-tasks-pill-count">0</div>
+        <div class="ck-tasks-pill-info">
+          <div class="ck-tasks-pill-label">Aufgaben heute</div>
+          <div class="ck-tasks-pill-sub" id="ck-tasks-pill-sub">Keine offenen Aufgaben</div>
+        </div>
+        <div class="ck-tasks-pill-arrow">→</div>
+      </div>
+    </div>
     </section>
 
     <!-- Heute -->
@@ -4715,7 +4762,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.25.1 · Build 20260526-1442</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.25.3 · Build 20260526-1502</div>
     </div>
 
     <!-- Welt -->
@@ -4922,7 +4969,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.25.1',
+  APP_VERSION: '3.25.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -5986,24 +6033,11 @@ const WB = {
       });
     }
 
-    // ── FALL 4: Ältere oder gleiche Revision ──────────────
+    // ── FALL 4: Ältere oder gleiche Revision → still überspringen
     if (incomingRev <= curState.revision) {
-      return new Promise(resolve => {
-        const sameRev = incomingRev === curState.revision;
-        this.syncDialogOpen({
-          icon: sameRev ? 'ℹ️' : '⚠️',
-          title: sameRev ? 'Identische Version' : 'Ältere Datei!',
-          body: sameRev
-            ? 'Diese Datei hat die gleiche Revisionsnummer wie dein aktueller Stand.'
-            : 'Du versuchst eine <strong>ältere Version</strong> zu laden. Dein aktueller Stand ist neuer.',
-          bodyClass: sameRev ? '' : 'warn',
-          meta: { curRev: 'Rev.' + curState.revision, curDev: curState.device || '?', newRev: 'Rev.' + incomingRev, newDev: incomingDev },
-          actions: [
-            { label: sameRev ? 'Trotzdem laden' : '⚠ Ältere Version laden', cls: 'danger',    cb: () => resolve({ ok: true, data, revision: incomingRev, isLegacy: false }) },
-            { label: 'Abbrechen',                                             cls: 'secondary', cb: () => resolve({ ok: false }) },
-          ]
-        });
-      });
+      // Keine Aktion nötig — lokale Version ist aktueller oder gleich
+      console.log('[Sync] Drive Rev.' + incomingRev + ' ≤ lokal Rev.' + curState.revision + ' — übersprungen');
+      return { ok: false, silent: true };
     }
 
     return { ok: true, data, revision: incomingRev, isLegacy: false };
@@ -6165,6 +6199,57 @@ const WB = {
     this._ckResetReturnTimer();
   },
 
+
+  // ── Aufgaben-Heute Pill rendern ───────────────────────
+  _ckRenderTasksTodayPill() {
+    const pill    = document.getElementById('ck-tasks-today-pill');
+    const inner   = document.getElementById('ck-tasks-pill-inner');
+    const countEl = document.getElementById('ck-tasks-pill-count');
+    const subEl   = document.getElementById('ck-tasks-pill-sub');
+    if (!pill) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const kw    = this._kwStr(new Date());
+    let taskCount = 0, dutyCount = 0;
+
+    // Aufgaben mit Datum heute
+    [this.dataPro, this.dataPriv].forEach(db => {
+      if (!db) return;
+      Object.values(db.projects || {}).forEach(p => {
+        (p.tasks || []).forEach(t => {
+          if (!t.done && t.date === today) taskCount++;
+        });
+      });
+    });
+
+    // Wochenpflichten heute fällig
+    ['pro','priv'].forEach(ctx => {
+      (this._dutyStore(ctx) || []).forEach(d => {
+        const dueInfo = this._dutyDueInfo({...d, ctx});
+        if (dueInfo.due && !d.doneWeeks?.[kw]) dutyCount++;
+      });
+    });
+
+    const total = taskCount + dutyCount;
+
+    if (total === 0) {
+      pill.classList.remove('visible');
+      return;
+    }
+
+    pill.classList.add('visible');
+    countEl.textContent = total;
+
+    // Farbe
+    inner.className = 'ck-tasks-pill ' + (total > 10 ? 'red' : total > 5 ? 'orange' : 'green');
+
+    // Subtitle
+    const parts = [];
+    if (taskCount > 0) parts.push(taskCount + ' Aufgabe' + (taskCount>1?'n':''));
+    if (dutyCount > 0) parts.push(dutyCount + ' Pflicht' + (dutyCount>1?'en':''));
+    subEl.textContent = parts.join(' · ');
+  },
+
   // ── Cockpit rendern ────────────────────────────────────
   renderCockpit() {
     this._ckRenderDateHeader();
@@ -6172,12 +6257,14 @@ const WB = {
     this._ckRenderAssistantBanner();
     this._ckRenderMeetingBanner();
     this._ckRenderGrid();
+    this._ckRenderTasksTodayPill();
     this._ckRenderDuties();
     clearInterval(this._ckCountdownTimer);
     this._ckCountdownTimer = setInterval(() => {
       if (this.activeTab === 'cockpit') {
         this._ckRenderDateHeader();
         this._ckRenderGrid();
+        this._ckRenderTasksTodayPill();
         this._ckRenderMeetingBanner();
       }
     }, 60000);
