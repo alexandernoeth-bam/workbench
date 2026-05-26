@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.26.1</title>
+<title>WorkBench 3.27.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2285,6 +2285,90 @@ html, body {
 .nz-tb-collapse {
   font-size: 0.75rem;
   padding: 3px 7px;
+}
+
+/* ── ICS Import Modal ────────────────────────────────── */
+#wb-ics-overlay {
+  display: none; position: fixed; inset: 0; z-index: 450;
+  background: rgba(28,27,24,0.55);
+  align-items: flex-end; justify-content: center;
+}
+#wb-ics-overlay.open { display: flex; }
+#wb-ics-panel {
+  background: var(--c-surface);
+  border-radius: var(--radius) var(--radius) 0 0;
+  width: 100%; max-width: 520px; max-height: 90vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 -4px 32px rgba(0,0,0,0.18);
+}
+@media (min-width:600px) {
+  #wb-ics-overlay { align-items: center; padding: 24px; }
+  #wb-ics-panel { border-radius: var(--radius); max-height: 80vh; }
+}
+#wb-ics-header {
+  display: flex; align-items: center;
+  padding: 14px 18px; border-bottom: 1px solid var(--c-border); flex-shrink: 0;
+}
+#wb-ics-header h2 { flex:1; margin:0; font-size:1rem; font-weight:700; }
+#wb-ics-body { flex:1; overflow-y:auto; padding:14px 18px 20px; }
+
+.ics-step { margin-bottom:16px; }
+.ics-step-label {
+  font-size:0.65rem; font-weight:700; letter-spacing:0.08em;
+  text-transform:uppercase; color:var(--c-faint); margin-bottom:8px;
+}
+.ics-file-drop {
+  border: 2px dashed var(--c-border); border-radius: var(--radius);
+  padding: 24px; text-align: center; cursor: pointer;
+  color: var(--c-muted); font-size:0.88rem;
+  transition: all var(--t-fast);
+}
+.ics-file-drop:hover { border-color: var(--c-beruf); color: var(--c-beruf); }
+.ics-file-drop.has-files { border-color: #27AE60; color: #27AE60; }
+
+.ics-cal-list { display:flex; flex-direction:column; gap:6px; }
+.ics-cal-item {
+  display:flex; align-items:center; gap:10px;
+  padding:8px 12px; border-radius:var(--radius-xs);
+  border:1px solid var(--c-border); cursor:pointer;
+  transition: all var(--t-fast);
+}
+.ics-cal-item.selected { background:var(--c-beruf-bg); border-color:var(--c-beruf); }
+.ics-cal-check {
+  width:18px; height:18px; border-radius:4px;
+  border:2px solid var(--c-border); flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+.ics-cal-item.selected .ics-cal-check {
+  background:var(--c-beruf); border-color:var(--c-beruf);
+}
+.ics-cal-item.selected .ics-cal-check::after { content:'✓'; color:#fff; font-size:0.7rem; }
+.ics-cal-name { flex:1; font-size:0.88rem; font-weight:500; }
+.ics-cal-count { font-size:0.72rem; color:var(--c-faint); font-family:var(--font-mono); }
+
+.ics-date-row {
+  display:flex; gap:10px; align-items:center;
+  font-size:0.85rem; color:var(--c-muted);
+}
+.ics-date-row input {
+  flex:1; padding:7px 10px;
+  border:1px solid var(--c-border); border-radius:var(--radius-xs);
+  font-family:var(--font); font-size:0.85rem; background:var(--c-bg);
+}
+.ics-world-row { display:flex; gap:8px; }
+.ics-world-btn {
+  flex:1; padding:8px; border-radius:var(--radius-xs);
+  border:1px solid var(--c-border); background:var(--c-bg);
+  font-family:var(--font); font-size:0.85rem; cursor:pointer;
+  transition: all var(--t-fast); text-align:center;
+}
+.ics-world-btn.active.beruf { background:var(--c-beruf); color:#fff; border-color:var(--c-beruf); }
+.ics-world-btn.active.priv  { background:var(--c-privat); color:#fff; border-color:var(--c-privat); }
+
+.ics-preview-count {
+  padding:10px 14px; background:var(--c-bg);
+  border-radius:var(--radius-xs); border:1px solid var(--c-border);
+  font-size:0.85rem; color:var(--c-text); text-align:center;
 }
 /* ── Drive Login Banner ──────────────────────────────── */
 #wb-drive-login-banner {
@@ -4719,6 +4803,62 @@ html, body {
   <button class="wb-drive-login-dismiss" onclick="WB._driveLoginBannerDismiss()">&#215;</button>
 </div>
 
+
+<!-- ICS Import Modal -->
+<div id="wb-ics-overlay" onclick="if(event.target===this)WB.icsClose()">
+  <div id="wb-ics-panel">
+    <div id="wb-ics-header">
+      <h2>Kalender importieren (ICS)</h2>
+      <button class="wb-settings-close" onclick="WB.icsClose()">&#215;</button>
+    </div>
+    <div id="wb-ics-body">
+      <!-- Schritt 1: Dateien -->
+      <div class="ics-step">
+        <div class="ics-step-label">1. ICS-Dateien wählen (mehrere möglich)</div>
+        <div class="ics-file-drop" id="ics-drop-zone" onclick="document.getElementById('ics-file-input').click()">
+          📅 Tippen zum Auswählen oder ICS-Dateien hierher ziehen
+        </div>
+        <input type="file" id="ics-file-input" accept=".ics" multiple style="display:none"
+          onchange="WB._icsFilesLoaded(this.files)">
+      </div>
+
+      <!-- Schritt 2: Kalender auswählen -->
+      <div class="ics-step" id="ics-cal-step" style="display:none">
+        <div class="ics-step-label">2. Kalender auswählen</div>
+        <div class="ics-cal-list" id="ics-cal-list"></div>
+      </div>
+
+      <!-- Schritt 3: Zeitraum -->
+      <div class="ics-step" id="ics-date-step" style="display:none">
+        <div class="ics-step-label">3. Zeitraum</div>
+        <div class="ics-date-row">
+          <span>Von</span>
+          <input type="date" id="ics-date-from">
+          <span>bis</span>
+          <input type="date" id="ics-date-to">
+        </div>
+      </div>
+
+      <!-- Schritt 4: Ziel -->
+      <div class="ics-step" id="ics-world-step" style="display:none">
+        <div class="ics-step-label">4. Importieren nach</div>
+        <div class="ics-world-row">
+          <button class="ics-world-btn beruf" id="ics-btn-beruf" onclick="WB._icsSetWorld('pro')">Beruf</button>
+          <button class="ics-world-btn priv active" id="ics-btn-priv" onclick="WB._icsSetWorld('priv')">Privat</button>
+        </div>
+      </div>
+
+      <!-- Vorschau + Import -->
+      <div id="ics-preview-step" style="display:none">
+        <div class="ics-preview-count" id="ics-preview-count">0 Termine werden importiert</div>
+        <button onclick="WB._icsDoImport()" style="width:100%;margin-top:10px;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;">
+          Importieren ✓
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Drive-Sync Banner -->
 <div id="wb-drive-sync-banner">
   <span class="wb-drive-sync-text" id="wb-drive-sync-text">Neuere Version in Drive verfügbar</span>
@@ -4792,7 +4932,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.26.1 · Build 20260526-1634</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.27.0 · Build 20260526-1644</div>
     </div>
 
     <!-- Welt -->
@@ -4835,6 +4975,11 @@ html, body {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><circle cx="8" cy="16" r="1" fill="currentColor"/></svg>
         <span class="label">Kalender-Export</span>
         <span class="sublabel">Aufgaben mit Datum &#8594; Google</span>
+      </button>
+      <button class="wb-menu-item" onclick="WB.icsOpen(); WB.closeMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+        <span class="label">Kalender importieren</span>
+        <span class="sublabel">ICS-Dateien → Termine</span>
       </button>
       </div>
 
@@ -4999,7 +5144,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.26.1',
+  APP_VERSION: '3.27.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -5019,6 +5164,250 @@ const WB = {
 
 
 
+
+
+  // ══════════════════════════════════════════════════════
+  // ICS IMPORT ENGINE (v3.27.0)
+  // ══════════════════════════════════════════════════════
+
+  _icsParsed: [],    // { calName, events[] }
+  _icsWorld:  'priv',
+
+  icsOpen() {
+    // Felder zurücksetzen
+    this._icsParsed = [];
+    this._icsWorld  = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    document.getElementById('ics-file-input').value = '';
+    document.getElementById('ics-drop-zone').className = 'ics-file-drop';
+    document.getElementById('ics-drop-zone').textContent = '📅 Tippen zum Auswählen oder ICS-Dateien hierher ziehen';
+    ['ics-cal-step','ics-date-step','ics-world-step','ics-preview-step'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    // Datum: heute bis +4 Wochen
+    const now = new Date();
+    const later = new Date(); later.setDate(later.getDate() + 28);
+    const fmt = d => d.toISOString().split('T')[0];
+    const fromEl = document.getElementById('ics-date-from');
+    const toEl   = document.getElementById('ics-date-to');
+    if (fromEl) fromEl.value = fmt(now);
+    if (toEl)   toEl.value   = fmt(later);
+    // Welt-Button
+    this._icsUpdateWorldBtns();
+    document.getElementById('wb-ics-overlay').classList.add('open');
+  },
+
+  icsClose() {
+    document.getElementById('wb-ics-overlay').classList.remove('open');
+  },
+
+  _icsSetWorld(world) {
+    this._icsWorld = world;
+    this._icsUpdateWorldBtns();
+    this._icsUpdatePreview();
+  },
+
+  _icsUpdateWorldBtns() {
+    ['pro','priv'].forEach(w => {
+      const btn = document.getElementById('ics-btn-' + (w==='pro'?'beruf':'priv'));
+      if (!btn) return;
+      btn.className = 'ics-world-btn ' + (w==='pro'?'beruf':'priv') + (this._icsWorld===w?' active':'');
+    });
+  },
+
+  async _icsFilesLoaded(files) {
+    if (!files || !files.length) return;
+    this._icsParsed = [];
+
+    for (const file of Array.from(files)) {
+      const text = await file.text();
+      const parsed = this._icsParseFile(text, file.name);
+      if (parsed) this._icsParsed.push(parsed);
+    }
+
+    if (!this._icsParsed.length) { this._toast('Keine gültigen ICS-Dateien'); return; }
+
+    // Drop-Zone aktualisieren
+    const zone = document.getElementById('ics-drop-zone');
+    zone.className = 'ics-file-drop has-files';
+    zone.textContent = '✓ ' + files.length + ' Datei(en) geladen';
+
+    // Kalender-Liste aufbauen
+    this._icsRenderCalList();
+    ['ics-cal-step','ics-date-step','ics-world-step','ics-preview-step'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = '';
+    });
+    this._icsUpdatePreview();
+  },
+
+  _icsParseFile(text, filename) {
+    // Zeilenenden normalisieren
+    const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    // Zeilenfortsetzungen zusammenführen (RFC 5545)
+    const unfolded = normalized.replace(/\n[ \t]/g, '');
+    const rows = unfolded.split('\n');
+
+    let calName = filename.replace('.ics','');
+    let inEvent = false;
+    let current = {};
+    const events = [];
+
+    rows.forEach(row => {
+      if (row.startsWith('X-WR-CALNAME:')) calName = row.slice(13).trim();
+      if (row === 'BEGIN:VEVENT') { inEvent = true; current = {}; }
+      if (row === 'END:VEVENT' && inEvent) {
+        inEvent = false;
+        const ev = this._icsParseEvent(current);
+        if (ev) events.push(ev);
+      }
+      if (inEvent && row.includes(':')) {
+        const sep = row.indexOf(':');
+        const key = row.slice(0, sep).split(';')[0].trim();
+        const val = row.slice(sep + 1).trim();
+        current[key] = val;
+      }
+    });
+
+    return { calName, filename, events, selected: true };
+  },
+
+  _icsParseEvent(raw) {
+    const summary = raw['SUMMARY'] || '';
+    const dtstart = raw['DTSTART'] || raw['DTSTART;VALUE=DATE'] || '';
+    const dtend   = raw['DTEND']   || raw['DTEND;VALUE=DATE']   || '';
+    const loc     = raw['LOCATION'] || '';
+    const desc    = raw['DESCRIPTION'] || '';
+    const uid     = raw['UID'] || String(Date.now() + Math.random());
+
+    if (!dtstart) return null;
+
+    // Datum parsen
+    const parseIcsDate = str => {
+      const s = str.replace(/[TZ]/g, '');
+      if (s.length >= 8) {
+        const y = s.slice(0,4), mo = s.slice(4,6), d = s.slice(6,8);
+        const h = s.slice(8,10)||'00', mi = s.slice(10,12)||'00';
+        return { date: y+'-'+mo+'-'+d, time: h+':'+mi, allDay: s.length <= 8 };
+      }
+      return null;
+    };
+
+    const start = parseIcsDate(dtstart);
+    const end   = parseIcsDate(dtend);
+    if (!start) return null;
+
+    let duration = 1; // Default 1h
+    if (end && end.date === start.date && !start.allDay) {
+      const sh = parseInt(start.time.split(':')[0])*60 + parseInt(start.time.split(':')[1]);
+      const eh = parseInt(end.time.split(':')[0])*60   + parseInt(end.time.split(':')[1]);
+      duration = Math.max(0.25, (eh - sh) / 60);
+    } else if (end && end.date !== start.date) {
+      duration = 8; // Mehrtägig
+    }
+
+    return {
+      uid,
+      text:      summary,
+      date:      start.date,
+      startTime: start.allDay ? '' : start.time,
+      duration:  Math.round(duration * 100) / 100,
+      ort:       loc,
+      notes:     desc,
+      typ:       'sonstiges',
+      _icsImport: true,
+    };
+  },
+
+  _icsRenderCalList() {
+    const list = document.getElementById('ics-cal-list');
+    if (!list) return;
+    list.innerHTML = this._icsParsed.map((cal, i) => `
+      <div class="ics-cal-item${cal.selected?' selected':''}" onclick="WB._icsToggleCal(${i})">
+        <div class="ics-cal-check"></div>
+        <span class="ics-cal-name">${cal.calName}</span>
+        <span class="ics-cal-count">${cal.events.length} Termine</span>
+      </div>`
+    ).join('');
+  },
+
+  _icsToggleCal(idx) {
+    if (this._icsParsed[idx]) {
+      this._icsParsed[idx].selected = !this._icsParsed[idx].selected;
+      this._icsRenderCalList();
+      this._icsUpdatePreview();
+    }
+  },
+
+  _icsUpdatePreview() {
+    const fromEl = document.getElementById('ics-date-from');
+    const toEl   = document.getElementById('ics-date-to');
+    const from   = fromEl?.value || '';
+    const to     = toEl?.value   || '';
+
+    let count = 0, dupes = 0;
+    const db = this._icsWorld === 'pro' ? this.dataPro : this.dataPriv;
+    const existing = (db?.customEvents || []).map(e => e.date + '|' + e.text);
+
+    this._icsParsed.forEach(cal => {
+      if (!cal.selected) return;
+      cal.events.forEach(ev => {
+        if (from && ev.date < from) return;
+        if (to   && ev.date > to)   return;
+        const key = ev.date + '|' + ev.text;
+        if (existing.includes(key)) { dupes++; return; }
+        count++;
+      });
+    });
+
+    const el = document.getElementById('ics-preview-count');
+    if (el) el.textContent = count + ' Termine werden importiert' + (dupes ? ' · ' + dupes + ' Duplikate übersprungen' : '');
+  },
+
+  _icsDoImport() {
+    const fromEl = document.getElementById('ics-date-from');
+    const toEl   = document.getElementById('ics-date-to');
+    const from   = fromEl?.value || '';
+    const to     = toEl?.value   || '';
+
+    const db = this._icsWorld === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Bitte zuerst Datenbank laden'); return; }
+    if (!db.customEvents) db.customEvents = [];
+
+    const existing = db.customEvents.map(e => e.date + '|' + e.text);
+    let count = 0;
+
+    this._icsParsed.forEach(cal => {
+      if (!cal.selected) return;
+      cal.events.forEach(ev => {
+        if (from && ev.date < from) return;
+        if (to   && ev.date > to)   return;
+        const key = ev.date + '|' + ev.text;
+        if (existing.includes(key)) return;
+        db.customEvents.push({
+          id:        'ics_' + Date.now() + '_' + Math.random().toString(36).slice(2),
+          text:      ev.text,
+          date:      ev.date,
+          startTime: ev.startTime,
+          duration:  ev.duration,
+          ort:       ev.ort,
+          notes:     ev.notes,
+          typ:       ev.typ,
+          welt:      this._icsWorld,
+          _source:   'ics',
+        });
+        existing.push(key);
+        count++;
+      });
+    });
+
+    this.setDirty();
+    this.icsClose();
+    this._toast('✓ ' + count + ' Termine importiert');
+    if (this.activeTab === 'woche' || this.activeTab === 'heute') {
+      this._renderSection(this.activeTab);
+    }
+  },
 
   // ══════════════════════════════════════════════════════
   // NOTIFICATION ENGINE (v3.23.1)
