@@ -1,14 +1,12 @@
-// WorkBench Service Worker v3.22.3
-// Network-first Strategie: immer zuerst vom Server laden
-const CACHE = 'workbench-v3223';
+// WorkBench Service Worker v3.23.0 — Minimal, kein aggressives Caching
+const CACHE = 'wb-v3230';
 
-self.addEventListener('install', e => {
-  // Sofort aktivieren ohne auf alte Clients zu warten
-  self.skipWaiting();
+self.addEventListener('install', () => {
+  self.skipWaiting(); // sofort aktivieren
 });
 
 self.addEventListener('activate', e => {
-  // Alle alten Caches löschen
+  // alle alten Caches löschen
   e.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys.map(k => caches.delete(k))))
@@ -16,24 +14,5 @@ self.addEventListener('activate', e => {
   );
 });
 
-self.addEventListener('fetch', e => {
-  // Nur eigene Requests behandeln
-  if (!e.request.url.startsWith(self.location.origin)) return;
-  
-  // Network-first: immer zuerst vom Server
-  e.respondWith(
-    fetch(e.request)
-      .then(res => {
-        // Erfolgreiche Antwort cachen
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      })
-      .catch(() =>
-        // Nur bei Netzwerkfehler aus Cache laden (Offline)
-        caches.match(e.request)
-      )
-  );
-});
+// Kein fetch-Handler = Browser holt immer frisch vom Server
+// Service Worker nur für PWA-Installierbarkeit nötig
