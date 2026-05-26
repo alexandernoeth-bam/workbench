@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.23.1</title>
+<title>WorkBench 3.23.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4372,10 +4372,10 @@ html, body {
         </div>
         <div class="wbs-row">
           <div class="wbs-label">
-            <div class="wbs-label-main">Besprechung vorher</div>
+            <div class="wbs-label-main">Termin-Erinnerung vorher</div>
             <div class="wbs-label-sub">Minuten</div>
           </div>
-          <input class="wbs-input" type="number" id="s-notif-meeting" value="15" min="5" max="60" step="5"
+          <input class="wbs-input" type="number" id="s-notif-meeting" value="5" min="1" max="60" step="5"
             onchange="WB._saveNotifSetting('notifMeetingMin', this.value)">
         </div>
         <div class="wbs-row" style="border:none;">
@@ -4592,7 +4592,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.23.1 · Build 20260526-0823</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.23.2 · Build 20260526-0850</div>
     </div>
 
     <!-- Welt -->
@@ -4784,7 +4784,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.23.1',
+  APP_VERSION: '3.23.2',
   APP_BUILD:   '20260526-0723',
 
 
@@ -4923,22 +4923,23 @@ const WB = {
       }
     }
 
-    // 5. Besprechungen heute (15 Min vorher)
-    const pTMin = str => { const [h,m] = (str||'0:0').split(':').map(Number); return h*60+m; };
-    [['pro', this.dataPro], ['priv', this.dataPriv]].forEach(([ctx, dbx]) => {
+    // 5. Alle Termine heute — X Min vorher
+    const pTMin = t => { const [h,m]=(t||'0:0').split(':').map(Number); return h*60+m; };
+    const minBefore = s.notifMeetingMin ?? 5;
+    [this.dataPro, this.dataPriv].forEach(dbx => {
       if (!dbx) return;
       (dbx.customEvents || [])
-        .filter(e => e.date === today && e.typ === 'besprechung' && e.startTime)
+        .filter(e => e.date === today && e.startTime)
         .forEach(e => {
           const startMin = pTMin(e.startTime);
-          const notifMin = startMin - (s.notifMeetingMin ?? 15);
+          const notifMin = startMin - minBefore;
           if (notifMin > nowMin) {
             const diffMs = (notifMin - nowMin) * 60000;
             const id = setTimeout(() => {
               this._notifSend(
-                `Besprechung in ${s.notifMeetingMin} Min 👥`,
-                `"${e.text}" um ${e.startTime} Uhr`,
-                '👥'
+                'Termin in ' + minBefore + ' Min',
+                '"' + e.text + '" um ' + e.startTime + ' Uhr',
+                '📅'
               );
             }, diffMs);
             this._notifTimers.push(id);
@@ -12554,7 +12555,7 @@ const WB = {
     notifWeek:       '09:00',
     notifTasks:      '08:00',
     notifChecklists: '09:00',
-    notifMeetingMin: 15,
+    notifMeetingMin: 5,
     // Zeitband (fix)
     dayStart: 5, dayEnd: 23,
     // Abend-Reflexion Fragen (konfigurierbar)
