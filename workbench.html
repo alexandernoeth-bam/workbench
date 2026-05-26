@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.25.6</title>
+<title>WorkBench 3.25.7</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4753,7 +4753,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.25.6 · Build 20260526-1549</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.25.7 · Build 20260526-1554</div>
     </div>
 
     <!-- Welt -->
@@ -4960,7 +4960,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.25.6',
+  APP_VERSION: '3.25.7',
   APP_BUILD:   '20260526-0723',
 
 
@@ -5386,7 +5386,8 @@ const WB = {
       if (!dl.ok) throw new Error('Download HTTP ' + dl.status);
 
       const rawJson = await dl.json();
-      const result  = await this._syncValidateImport(ctx, rawJson);
+      // force=true: manueller Download lädt immer (kein Rev-Check)
+      const result  = await this._syncValidateImport(ctx, rawJson, true);
       if (!result.ok) return;
 
       if (ctx === 'pro') this.dataPro  = result.data;
@@ -5949,7 +5950,7 @@ const WB = {
   },
 
   // ── Import validieren (beim Datei-Laden) ───────────────
-  async _syncValidateImport(ctx, incomingJson) {
+  async _syncValidateImport(ctx, incomingJson, force) {
     const { hasMeta, meta, data } = this._syncExtractMeta(incomingJson);
     const curState = this._sync[ctx];
     const curHasData = ctx === 'pro' ? !!this.dataPro : !!this.dataPriv;
@@ -6025,9 +6026,14 @@ const WB = {
       });
     }
 
-    // ── FALL 4: Ältere oder gleiche Revision → still überspringen
+    // ── FALL 4: Ältere oder gleiche Revision
     if (incomingRev <= curState.revision) {
-      // Keine Aktion nötig — lokale Version ist aktueller oder gleich
+      if (force) {
+        // Manueller Load: immer laden ohne Dialog
+        console.log('[Sync] Force-Load: Drive Rev.' + incomingRev + ' ≤ lokal Rev.' + curState.revision);
+        return { ok: true, data, revision: incomingRev, isLegacy: false };
+      }
+      // Auto-Sync: still überspringen
       console.log('[Sync] Drive Rev.' + incomingRev + ' ≤ lokal Rev.' + curState.revision + ' — übersprungen');
       return { ok: false, silent: true };
     }
