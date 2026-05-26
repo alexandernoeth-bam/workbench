@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.24.5</title>
+<title>WorkBench 3.24.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4668,7 +4668,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.24.5 · Build 20260526-1345</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.24.6 · Build 20260526-1350</div>
     </div>
 
     <!-- Welt -->
@@ -4875,7 +4875,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.24.5',
+  APP_VERSION: '3.24.6',
   APP_BUILD:   '20260526-0723',
 
 
@@ -5211,38 +5211,44 @@ const WB = {
     const filename = this._sync[ctx]?.importFilename ||
       (ctx === 'pro' ? 'PROD_ARBEIT.json' : 'PROD_PRIVAT.json');
 
-    // Immer nach Name suchen — gecachte ID nur als Hint
-    const q = "name='" + filename + "' and trashed=false";
+    // Gecachte File-ID aus IDB nutzen falls vorhanden
+    const cachedId = this._oauthDriveFileIds[ctx];
+    if (cachedId) {
+      try {
+        const r = await fetch(this.DRIVE_API + '/files/' + cachedId + '?fields=id,name,size', {
+          headers: { Authorization: 'Bearer ' + token }
+        });
+        if (r.ok) {
+          const f = await r.json();
+          // Nur nutzen wenn Datei Inhalt hat (size > 100 bytes)
+          if (parseInt(f.size || 0) > 100) return cachedId;
+        }
+      } catch(e) {}
+    }
+
+    // Nach Name suchen — alle Felder für Debug
+    console.log('[Drive] Suche nach:', filename);
+    const q = "name = '" + filename + "' and trashed = false";
     const search = await fetch(
-      this.DRIVE_API + '/files?q=' + encodeURIComponent(q) + '&fields=files(id,name,size)&orderBy=modifiedTime desc',
+      this.DRIVE_API + '/files?q=' + encodeURIComponent(q) + '&fields=files(id,name,size)',
       { headers: { Authorization: 'Bearer ' + token } }
     );
     const result = await search.json();
+    console.log('[Drive] Suchergebnis:', JSON.stringify(result));
 
     if (result.files?.length) {
-      // Größte Datei nehmen (nicht die leere)
-      const files = result.files.sort((a,b) => parseInt(b.size||0) - parseInt(a.size||0));
+      // Größte Datei nehmen
+      const files = [...result.files].sort((a,b) => parseInt(b.size||0) - parseInt(a.size||0));
       const fileId = files[0].id;
+      console.log('[Drive] Gefunden:', files[0].name, 'Size:', files[0].size);
       this._oauthDriveFileIds[ctx] = fileId;
       await this.idbSet('meta', idbKey, fileId);
       return fileId;
     }
 
-    // Datei neu anlegen
-    const create = await fetch(this.UPLOAD_API + '/files?uploadType=multipart', {
-      method: 'POST',
-      headers: {
-        Authorization: 'Bearer ' + token,
-        'Content-Type': 'multipart/related; boundary=wb_boundary',
-      },
-      body: '--wb_boundary\r\nContent-Type: application/json\r\n\r\n' +
-        JSON.stringify({ name: filename, mimeType: 'application/json' }) +
-        '\r\n--wb_boundary\r\nContent-Type: application/json\r\n\r\n{}\r\n--wb_boundary--',
-    });
-    const created = await create.json();
-    this._oauthDriveFileIds[ctx] = created.id;
-    await this.idbSet('meta', idbKey, created.id);
-    return created.id;
+    // NICHT automatisch anlegen — Fehlermeldung
+    console.error('[Drive] Datei nicht gefunden:', filename, 'Ergebnis:', result);
+    throw new Error('Datei "' + filename + '" nicht in Drive gefunden. Bitte einmalig manuell importieren.');
   },
 
   // ── Drive: Hochladen (Upload) ─────────────────────────
