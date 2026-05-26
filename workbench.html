@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.24.1</title>
+<title>WorkBench 3.24.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2168,6 +2168,37 @@ html, body {
 .wb-idb-dot.none { background: var(--c-border); }
 
 
+
+/* ── Drive Login Banner ──────────────────────────────── */
+#wb-drive-login-banner {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  background: #1565C0;
+  color: #fff;
+  padding: 10px 16px;
+  z-index: 300;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+#wb-drive-login-banner.visible { display: flex; }
+.wb-drive-login-text { flex: 1; }
+.wb-drive-login-btn {
+  background: rgba(255,255,255,0.25);
+  border: 1px solid rgba(255,255,255,0.4);
+  color: #fff; border-radius: 12px;
+  padding: 5px 12px; font-family: var(--font);
+  font-size: 0.78rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.wb-drive-login-dismiss {
+  background: none; border: none;
+  color: rgba(255,255,255,0.7);
+  font-size: 1.1rem; cursor: pointer;
+  padding: 0 4px; flex-shrink: 0;
+}
 /* ── Google OAuth ────────────────────────────────────── */
 .wb-google-btn {
   display: flex; align-items: center; gap: 10px;
@@ -4557,6 +4588,13 @@ html, body {
 <div id="wb-dev-badge">DEV</div>
 
 
+<!-- Drive Login Banner (Token abgelaufen) -->
+<div id="wb-drive-login-banner">
+  <span class="wb-drive-login-text">Drive-Sync: Bitte neu anmelden</span>
+  <button class="wb-drive-login-btn" onclick="WB._oauthRelogin()">Anmelden</button>
+  <button class="wb-drive-login-dismiss" onclick="WB._driveLoginBannerDismiss()">&#215;</button>
+</div>
+
 <!-- Drive-Sync Banner -->
 <div id="wb-drive-sync-banner">
   <span class="wb-drive-sync-text" id="wb-drive-sync-text">Neuere Version in Drive verfügbar</span>
@@ -4630,7 +4668,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.24.1 · Build 20260526-0959</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.24.2 · Build 20260526-1058</div>
     </div>
 
     <!-- Welt -->
@@ -4837,7 +4875,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.24.1',
+  APP_VERSION: '3.24.2',
   APP_BUILD:   '20260526-0723',
 
 
@@ -5105,6 +5143,8 @@ const WB = {
     }
     try {
       await this._oauthInitClient();
+      this._driveLoginBannerDismiss();
+      this._oauthUpdateUI();
       this._toast('✓ Mit Google angemeldet');
     } catch(e) {
       this._toast('Fehler: ' + e.message);
@@ -5130,11 +5170,38 @@ const WB = {
     return !!(this._oauthToken && this._oauthTokenExp && Date.now() < this._oauthTokenExp);
   },
 
-  // ── Token holen (neu anmelden wenn abgelaufen) ────────
-  async _oauthGetToken() {
+  // ── Token holen (Banner wenn abgelaufen) ──────────────
+  async _oauthGetToken(silent) {
     if (this._oauthTokenValid()) return this._oauthToken;
-    // Token abgelaufen → neu anmelden
+    if (silent) {
+      // Kein Dialog — Banner zeigen
+      this._driveLoginBannerShow();
+      throw new Error('Token abgelaufen — bitte neu anmelden');
+    }
     return await this._oauthInitClient();
+  },
+
+  // ── Login-Banner anzeigen/verbergen ──────────────────
+  _driveLoginBannerShow() {
+    document.getElementById('wb-drive-login-banner')?.classList.add('visible');
+  },
+
+  _driveLoginBannerDismiss() {
+    document.getElementById('wb-drive-login-banner')?.classList.remove('visible');
+  },
+
+  // ── Neu anmelden + danach Auto-Sync ──────────────────
+  async _oauthRelogin() {
+    this._driveLoginBannerDismiss();
+    try {
+      await this.oauthSignIn();
+      // Nach Login: beide DBs aus Drive laden
+      this._toast('Lade Daten aus Drive…');
+      await this.oauthSyncDownload('priv');
+      if (this.dataPro) await this.oauthSyncDownload('pro');
+    } catch(e) {
+      this._toast('Anmeldung fehlgeschlagen: ' + e.message);
+    }
   },
 
   // ── Drive: Datei suchen oder anlegen (ctx: pro|priv) ──
@@ -5190,7 +5257,8 @@ const WB = {
   async oauthSyncUpload(ctx) {
     ctx = ctx || 'priv';
     if (!this._oauthTokenValid()) {
-      try { await this.oauthSignIn(); } catch(e) { return; }
+      this._driveLoginBannerShow();
+      return;
     }
     try {
       const token  = this._oauthToken;
@@ -5208,6 +5276,8 @@ const WB = {
       );
       if (!upload.ok) throw new Error('Upload HTTP ' + upload.status);
       await this.idbSaveAll();
+      this._syncUpdateUI();
+      this._idbUpdateStatusUI();
       this._toast('✓ ' + (ctx==='pro'?'Beruf':'Privat') + ' in Drive gespeichert');
       this._oauthUpdateUI();
     } catch(e) {
@@ -5220,7 +5290,8 @@ const WB = {
   async oauthSyncDownload(ctx) {
     ctx = ctx || 'priv';
     if (!this._oauthTokenValid()) {
-      try { await this.oauthSignIn(); } catch(e) { return; }
+      this._driveLoginBannerShow();
+      return;
     }
     try {
       const token  = this._oauthToken;
@@ -5250,8 +5321,12 @@ const WB = {
       this._onFileLoaded(ctx, 'Google Drive');
       this._syncUpdateUI();
       this._idbUpdateStatusUI();
+      this._oauthUpdateUI();
+      this._driveLoginBannerDismiss();
       this._toast('✓ ' + (ctx==='pro'?'Beruf':'Privat') + ' von Drive geladen');
-      if (this.activeTab === 'cockpit') this.renderCockpit();
+      // Vollständiger UI-Refresh
+      this.renderCockpit();
+      if (this.activeTab !== 'cockpit') this._renderSection(this.activeTab);
     } catch(e) {
       this._toast('Download-Fehler: ' + e.message);
       console.error('[Drive Download]', e);
