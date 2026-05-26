@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.25.4</title>
+<title>WorkBench 3.25.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4753,7 +4753,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.25.4 · Build 20260526-1522</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.25.5 · Build 20260526-1538</div>
     </div>
 
     <!-- Welt -->
@@ -4960,7 +4960,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.25.4',
+  APP_VERSION: '3.25.5',
   APP_BUILD:   '20260526-0723',
 
 
@@ -5772,11 +5772,11 @@ const WB = {
     try {
       if (this.dataPro)  {
         await this.idbSet('data', 'dataPro',  this.dataPro);
-        await this.idbSet('meta', 'syncPro',  this._sync.pro);
+        await this.idbSet('meta', 'syncPro',  { ...this._sync.pro });
       }
       if (this.dataPriv) {
         await this.idbSet('data', 'dataPriv', this.dataPriv);
-        await this.idbSet('meta', 'syncPriv', this._sync.priv);
+        await this.idbSet('meta', 'syncPriv', { ...this._sync.priv });
       }
       await this.idbSet('meta', 'lastSaved', Date.now());
       this.isDirty = false;
@@ -14010,6 +14010,7 @@ const WB = {
         t.dateHistory.push({ from: t.date, to: date, ts: Date.now() });
       }
       t.date   = date||'';
+      t.time   = document.getElementById('ef-time-task')?.value||'';
       t.isToday= date === new Date().toISOString().split('T')[0];
       t.prio   = prio==='A';
       t.prioLvl= prio;
@@ -14487,7 +14488,9 @@ const WB = {
       if(f.sep) { pillHtml += '<div class="af-pill-sep"></div>'; return; }
       // Routinen-Pill: zeige nur wenn Pflichten vorhanden
       if(f.id === 'routine') {
-        if(!relevantDuties.length) return;
+        if(!allDuties.length) return;
+        const totalDuties = allDuties.filter(d => this._dutyBelongsToThisWeek({...d, ctx}));
+        if(!totalDuties.length) return;
         const isA = f.id === this.taskFilter;
         const label = doneDuties.length + '/' + relevantDuties.length + ' Routinen';
         pillHtml += `<button class="af-pill${isA?' active':''} af-pill-right"
@@ -15083,6 +15086,9 @@ const WB = {
       if (this._oauthTokenValid()) {
         if (this.dataPriv) this.oauthSyncUpload('priv').catch(e => console.warn('[AutoUpload priv]', e));
         if (this.dataPro)  this.oauthSyncUpload('pro').catch(e => console.warn('[AutoUpload pro]', e));
+      } else if (this._oauthClientId) {
+        // OAuth konfiguriert aber Token abgelaufen → Banner zeigen
+        this._driveLoginBannerShow();
       }
     }, 5000);
   },
