@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.27.0</title>
+<title>WorkBench 3.27.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4249,6 +4249,7 @@ html, body {
     <div id="edit-body"></div>
     <div class="edit-actions">
       <button class="edit-btn cancel" onclick="WB.editClose()">Abbrechen</button>
+      <button class="edit-btn delete" id="edit-delete-btn" onclick="WB.editDelete()" style="display:none;background:var(--c-danger);color:#fff;border-color:var(--c-danger);">Löschen</button>
       <button class="edit-btn save" onclick="WB.editSave()">Speichern</button>
     </div>
   </div>
@@ -4932,7 +4933,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.27.0 · Build 20260526-1644</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.27.1 · Build 20260526-1702</div>
     </div>
 
     <!-- Welt -->
@@ -5144,7 +5145,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.27.0',
+  APP_VERSION: '3.27.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -14432,6 +14433,9 @@ const WB = {
       const ev = (db.customEvents||[]).find(x => String(x.id)===String(id));
       if(!ev) return;
       if(title) title.childNodes[0].textContent = 'Termin bearbeiten ';
+      // Löschen-Button einblenden
+      const delBtn = document.getElementById('edit-delete-btn');
+      if (delBtn) delBtn.style.display = '';
       const pTEv = s => { if(!s) return 9; const [h,m]=s.split(':').map(Number); return h+m/60; };
       const fTEv = h => { const hr=Math.floor(h),m=Math.round((h-hr)*60); return String(hr).padStart(2,'0')+':'+String(m>=60?0:m).padStart(2,'0'); };
       const evEnd = fTEv(pTEv(ev.startTime||'09:00') + parseFloat(ev.duration||1));
@@ -14455,11 +14459,47 @@ const WB = {
     setTimeout(() => document.getElementById('ef-title')?.focus(), 100);
   },
 
+
+  // ── Event löschen ────────────────────────────────────
+  editDelete() {
+    if (this._editType !== 'event') return;
+    const ctx = this._editCtx;
+    const id  = this._editId;
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    const idx = (db.customEvents || []).findIndex(e => String(e.id) === String(id));
+    if (idx < 0) { this._toast('Termin nicht gefunden'); return; }
+    db.customEvents.splice(idx, 1);
+    this.setDirty();
+    this.editClose();
+    this._toast('Termin gelöscht');
+    if (this.activeTab === 'heute') this.renderHeute();
+    else if (this.activeTab === 'woche') this.renderWoche();
+    else if (this.activeTab === 'cockpit') this.renderCockpit();
+  },
+
+
+  editDelete() {
+    if (this._editType !== 'event') return;
+    const ctx = this._editCtx;
+    const id  = this._editId;
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    const evIdx = (db.customEvents || []).findIndex(e => String(e.id) === String(id));
+    if (evIdx < 0) { this._toast('Termin nicht gefunden'); return; }
+    db.customEvents.splice(evIdx, 1);
+    this.setDirty();
+    this.editClose();
+    this._toast('Termin gelöscht');
+    if (this.activeTab === 'heute') this.renderHeute();
+    else if (this.activeTab === 'woche') this.renderWoche();
+    else if (this.activeTab === 'cockpit') this.renderCockpit();
+  },
+
   editClose() {
     document.getElementById('edit-overlay')?.classList.remove('open');
-    // Löschen-Button entfernen für nächstes Mal
-    const del = document.querySelector('.edit-actions .danger');
-    if(del) del.remove();
+    const delBtn2 = document.getElementById('edit-delete-btn');
+    if (delBtn2) delBtn2.style.display = 'none';
     this._editType = null;
   },
 
@@ -14858,7 +14898,8 @@ const WB = {
     const db = ctx==='pro' ? this.dataPro : this.dataPriv; if(!db) return;
     const ev = (db.customEvents||[]).find(e => String(e.id)===String(evId));
     if(!ev) return;
-    this.openEventDetail(evId, ctx);
+    // Direkt Bearbeitungs-Dialog öffnen
+    this.editOpen('event', ctx, '', evId);
   },
 
   openEventDetail(evId, ctx) {
