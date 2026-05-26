@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.23.2</title>
+<title>WorkBench 3.23.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4592,7 +4592,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.23.2 · Build 20260526-0850</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.23.3 · Build 20260526-0901</div>
     </div>
 
     <!-- Welt -->
@@ -4784,7 +4784,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.23.2',
+  APP_VERSION: '3.23.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -4795,8 +4795,8 @@ const WB = {
 
   // Interner Sync-State (nicht in JSON gespeichert)
   _sync: {
-    pro:  { revision: 0, last_updated: null, device: null, is_saved: true },
-    priv: { revision: 0, last_updated: null, device: null, is_saved: true },
+    pro:  { revision: 0, last_updated: null, device: null, is_saved: true, importFilename: null },
+    priv: { revision: 0, last_updated: null, device: null, is_saved: true, importFilename: null },
   },
 
   // Pending-Callback für den Dialog
@@ -5245,6 +5245,9 @@ const WB = {
         if (syncPriv) this._sync.priv = syncPriv;
         this._onFileLoaded('priv', 'IndexedDB');
       }
+      // Drive File-ID laden (wurde bisher vergessen)
+      const driveId = await this.idbGet('meta', 'driveFileId');
+      if (driveId) this._driveFileId = driveId;
       this._idbUpdateStatusUI();
     } catch(e) {
       console.error('IDB load error:', e);
@@ -5563,8 +5566,12 @@ const WB = {
 
   // ── Dateiname generieren ───────────────────────────────
   _syncFilename(ctx, rev) {
+    // Originalen Import-Dateinamen verwenden falls vorhanden
+    const imported = this._sync[ctx]?.importFilename;
+    if (imported) return imported;
+    // Fallback
     const prefix = ctx === 'pro' ? 'wb_pro' : 'wb_privat';
-    return `${prefix}_rev${rev}.json`;
+    return `${prefix}.json`;
   },
 
   // ── Sync-Download ausführen ────────────────────────────
@@ -7347,6 +7354,8 @@ const WB = {
           is_saved:     true,
         };
 
+        // Originalen Dateinamen merken
+        this._sync[ctx].importFilename = handle.name;
         this._onFileLoaded(ctx, handle.name);
         this._syncUpdateUI();
         await this.idbSaveAll();
@@ -7377,6 +7386,8 @@ const WB = {
             is_saved:     true,
           };
 
+          // Originalen Dateinamen merken
+          this._sync[ctx].importFilename = file.name;
           this._onFileLoaded(ctx, file.name);
           this._syncUpdateUI();
           await this.idbSaveAll();
