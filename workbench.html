@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.40.0</title>
+<title>WorkBench 3.41.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -1367,6 +1367,19 @@ html, body {
 }
 .wd-world-dot.beruf { background: var(--c-beruf); }
 .wd-world-dot.priv  { background: var(--c-privat); }
+.wd-edit-btn {
+  background: none;
+  border: none;
+  color: var(--c-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 4px 6px;
+  border-radius: var(--radius-xs);
+  transition: color var(--t-fast);
+  flex-shrink: 0;
+}
+.wd-edit-btn:hover { color: var(--c-beruf); }
+
 .wd-del-btn {
   background: none; border: none; cursor: pointer;
   color: var(--c-faint); font-size: 1.1rem; padding: 2px 4px;
@@ -1375,6 +1388,16 @@ html, body {
 .wd-del-btn:hover { color: var(--c-danger); }
 
 /* Neue Pflicht Form */
+.wd-edit-overlay {
+  margin-top: 8px;
+  border-top: 1px solid var(--c-border);
+  padding-top: 10px;
+}
+.wd-edit-form {
+  display: flex;
+  flex-direction: column;
+}
+
 .wd-form {
   padding: 14px 18px; border-top: 1px solid var(--c-border);
   background: var(--c-bg); flex-shrink: 0;
@@ -3268,6 +3291,28 @@ html, body {
   }
   #zt-fab:active { transform: scale(0.92); }
   #zt-fab.visible { display: flex; }
+
+  /* Aufgaben-FAB */
+  #af-fab {
+    position: fixed;
+    bottom: calc(var(--safe-b) + 14px);
+    right: 16px;
+    width: 48px; height: 48px;
+    background: var(--c-beruf);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 12px rgba(13,122,107,0.35);
+    z-index: 50;
+    transition: transform var(--t-fast);
+  }
+  #af-fab:active { transform: scale(0.92); }
+  #af-fab.visible { display: flex; }
 
   /* Quick-Add Sheet */
   #zt-qa-overlay {
@@ -5455,6 +5500,7 @@ html, body {
 
 <!-- FAB Quick-Add -->
 <button id="zt-fab" onclick="WB.openQA()" aria-label="Schnell hinzufügen">+</button>
+<button id="af-fab" onclick="WB.afNewTask()" aria-label="Neue Aufgabe" title="Neue Aufgabe">+</button>
 
 <!-- Quick-Add Sheet -->
 <div id="zt-qa-overlay" onclick="if(event.target===this)WB.closeQA()">
@@ -5519,7 +5565,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.40.0 · Build 20260527-1830</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.41.0 · Build 20260527-1930</div>
     </div>
 
     <!-- Welt -->
@@ -5742,7 +5788,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.40.0',
+  APP_VERSION: '3.41.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8537,6 +8583,8 @@ const WB = {
     const ztFab = document.getElementById('zt-fab');
     if (ckFab) ckFab.style.display = 'flex';
     if (ztFab) ztFab.classList.remove('visible');
+    const afFab0 = document.getElementById('af-fab');
+    if (afFab0) afFab0.classList.remove('visible');
     this._inboxUpdateMenuSub();
     this._ckRenderDateHeader();
     this._ckRenderFocusBanner();
@@ -12831,9 +12879,10 @@ const WB = {
             : (duty.days||[]).map(d=>DAY_NAMES_L[d]).join(', ');
         }
         if (duty.reminderTime) when += ` · 🔔 ${duty.reminderTime}`;
-        return `<div class="wd-item">
+        return `<div class="wd-item" id="wd-item-${duty.id}">
           <div class="wd-item-name">${duty.title}</div>
           <div class="wd-item-meta">${when}</div>
+          <button class="wd-edit-btn" onclick="WB.dutyEditOpen('${ctx}','${duty.id}')" title="Bearbeiten">✎</button>
           <button class="wd-del-btn" onclick="WB.dutyDelete('${ctx}','${duty.id}')">&#215;</button>
         </div>`;
       }).join('');
@@ -12851,6 +12900,136 @@ const WB = {
   },
 
   // ── Welt-Tab im Formular umschalten ───────────────────
+  // ── Duty bearbeiten: Inline-Overlay im wd-item ───────
+  dutyEditOpen(ctx, dutyId) {
+    const store = this._dutyStore(ctx); if (!store) return;
+    const duty  = store.find(d => d.id === dutyId); if (!duty) return;
+    const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+    const ruleLabels = {
+      'first-mo':'Erster Mo','first-fr':'Erster Fr','last-sa':'Letzter Sa',
+      'last-so':'Letzter So','last-fr':'Letzter Fr',
+      'day-1':'1. d. Monats','day-15':'15. d. Monats','day-28':'28. d. Monats',
+    };
+
+    const repeat = duty.repeat || 'weekly';
+    const allDays = duty.type === 'fixed' ? [parseInt(duty.dayFixed)] : (duty.days || []);
+
+    // Bestehende Edit-Overlays schließen
+    document.querySelectorAll('.wd-edit-overlay').forEach(el => el.remove());
+
+    const container = document.getElementById('wd-item-' + dutyId);
+    if (!container) return;
+
+    const dayBtns = DAY_NAMES.map((name, dow) =>
+      `<button class="wd-day-btn${allDays.includes(dow)?' selected':''}"
+        data-dow="${dow}"
+        onclick="this.classList.toggle('selected')">${name}</button>`
+    ).join('');
+
+    const repeatOpts = [
+      {v:'weekly',      l:'Wöchentlich'},
+      {v:'every-n-weeks',l:'Alle N Wochen'},
+      {v:'monthly',     l:'Monatlich'},
+    ].map(o => `<option value="${o.v}"${repeat===o.v?' selected':''}>${o.l}</option>`).join('');
+
+    const monthlyOpts = Object.entries(ruleLabels)
+      .map(([v,l]) => `<option value="${v}"${duty.monthlyRule===v?' selected':''}>${l}</option>`).join('');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'wd-edit-overlay';
+    overlay.innerHTML = `
+      <div class="wd-edit-form">
+        <input class="wd-input" id="wde-title-${dutyId}" type="text"
+          value="${duty.title.replace(/"/g,'&quot;')}"
+          style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+        <select id="wde-repeat-${dutyId}" style="width:100%;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.83rem;background:var(--c-bg);color:var(--c-text);margin-bottom:8px;"
+          onchange="WB._dutyEditRepeatChange('${dutyId}',this.value)">
+          ${repeatOpts}
+        </select>
+        <div id="wde-n-row-${dutyId}" style="display:${repeat==='every-n-weeks'?'flex':'none'};align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="font-size:0.82rem;color:var(--c-muted);">Alle</span>
+          <input type="number" id="wde-n-${dutyId}" min="2" max="12" value="${duty.repeatEvery||2}"
+            style="width:56px;padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;text-align:center;">
+          <span style="font-size:0.82rem;color:var(--c-muted);">Wochen</span>
+        </div>
+        <div id="wde-monthly-row-${dutyId}" style="display:${repeat==='monthly'?'':'none'};margin-bottom:8px;">
+          <select id="wde-monthly-${dutyId}" style="width:100%;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.83rem;background:var(--c-bg);color:var(--c-text);">
+            ${monthlyOpts}
+          </select>
+        </div>
+        <div id="wde-days-${dutyId}" class="wd-day-grid" style="${repeat==='monthly'?'display:none;':''}">
+          ${dayBtns}
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin:8px 0;">
+          <span style="font-size:0.82rem;color:var(--c-muted);flex:1;">Erinnerung</span>
+          <input type="time" id="wde-rem-${dutyId}" value="${duty.reminderTime||''}"
+            style="padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button onclick="WB.dutyEditSave('${ctx}','${dutyId}')"
+            style="flex:1;padding:9px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;">
+            Speichern
+          </button>
+          <button onclick="document.getElementById('wd-item-${dutyId}').querySelector('.wd-edit-overlay').remove()"
+            style="padding:9px 14px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;cursor:pointer;color:var(--c-muted);">
+            Abbrechen
+          </button>
+        </div>
+      </div>`;
+    container.appendChild(overlay);
+  },
+
+  _dutyEditRepeatChange(dutyId, repeat) {
+    const nRow      = document.getElementById('wde-n-row-' + dutyId);
+    const mRow      = document.getElementById('wde-monthly-row-' + dutyId);
+    const daysGrid  = document.getElementById('wde-days-' + dutyId);
+    if (nRow)     nRow.style.display     = repeat === 'every-n-weeks' ? 'flex'  : 'none';
+    if (mRow)     mRow.style.display     = repeat === 'monthly'       ? ''      : 'none';
+    if (daysGrid) daysGrid.style.display = repeat === 'monthly'       ? 'none'  : '';
+  },
+
+  dutyEditSave(ctx, dutyId) {
+    const store = this._dutyStore(ctx); if (!store) return;
+    const duty  = store.find(d => d.id === dutyId); if (!duty) return;
+
+    const title = document.getElementById('wde-title-' + dutyId)?.value.trim();
+    if (!title) { this._toast('Bitte Bezeichnung eingeben'); return; }
+
+    const repeat = document.getElementById('wde-repeat-' + dutyId)?.value || 'weekly';
+    const rem    = document.getElementById('wde-rem-' + dutyId)?.value || '';
+
+    duty.title  = title;
+    duty.repeat = repeat;
+    duty.startDate = duty.startDate || new Date().toISOString().split('T')[0];
+
+    if (repeat === 'every-n-weeks') {
+      duty.repeatEvery = parseInt(document.getElementById('wde-n-' + dutyId)?.value) || 2;
+    }
+    if (repeat === 'monthly') {
+      duty.monthlyRule = document.getElementById('wde-monthly-' + dutyId)?.value || 'day-1';
+      duty.days = [];
+      duty.dayFixed = null;
+    } else {
+      // Tage aus Day-Buttons lesen
+      const container = document.getElementById('wd-item-' + dutyId);
+      const selBtns = container?.querySelectorAll('.wd-day-btn.selected') || [];
+      const selDays = [...selBtns].map(b => parseInt(b.dataset.dow));
+      if (!selDays.length) { this._toast('Bitte mindestens einen Tag wählen'); return; }
+      if (selDays.length === 1) {
+        duty.type = 'fixed'; duty.dayFixed = selDays[0]; duty.days = [];
+      } else {
+        duty.type = 'multi'; duty.days = selDays; duty.dayFixed = null;
+      }
+    }
+    if (rem) duty.reminderTime = rem;
+    else delete duty.reminderTime;
+
+    this.setDirty();
+    this._dutiesRender();
+    this._toast('Pflicht gespeichert');
+  },
+
   _dutyFormCurrentWorld: 'priv',
 
   _dutyFormWorld(world) {
@@ -16567,6 +16746,62 @@ const WB = {
 
 
   // ── Aufgabe / Termin bearbeiten ──────────────────────
+  // ── Neue Aufgabe aus Aufgaben-Tab ─────────────────────
+  afNewTask() {
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Bitte zuerst Datenbank laden'); return; }
+
+    this._editType = 'task-new';
+    this._editCtx  = ctx;
+    this._editPKey = null;
+    this._editId   = null;
+
+    const title = document.getElementById('edit-title');
+    const body  = document.getElementById('edit-body');
+    if (title) title.childNodes[0].textContent = 'Neue Aufgabe ';
+
+    const today = new Date().toISOString().split('T')[0];
+    const projOptions = Object.keys(db.projects || {})
+      .filter(k => !(db.projects[k].isArea || db.projects[k].desc === 'Bereich'))
+      .map(k => `<option value="${k.replace(/"/g,'&quot;')}">${k}</option>`)
+      .join('');
+
+    body.innerHTML =
+      '<div class="edit-field"><label>Titel</label>'
+      + '<input id="ef-title" type="text" placeholder="Aufgabe beschreiben..."></div>'
+      + '<div class="edit-row">'
+      + '<div class="edit-field"><label>Datum</label><input id="ef-date" type="date" value="'+today+'"></div>'
+      + '<div class="edit-field"><label>Prio</label><select id="ef-prio">'
+      + '<option value="C" selected>C — Normal</option>'
+      + '<option value="B">B — Hoch</option>'
+      + '<option value="A">A — Kritisch</option>'
+      + '</select></div></div>'
+      + '<div class="edit-row">'
+      + '<div class="edit-field"><label>Größe</label><select id="ef-size">'
+      + ['XS','S','M','L','XL','XXL'].map(s => `<option${s==='M'?' selected':''}>${s}</option>`).join('')
+      + '</select></div>'
+      + '<div class="edit-field"><label>Welt</label><select id="ef-welt">'
+      + `<option value="pro"${ctx==='pro'?' selected':''}>Beruf</option>`
+      + `<option value="priv"${ctx==='priv'?' selected':''}>Privat</option>`
+      + '</select></div></div>'
+      + '<div class="edit-field"><label>Projekt</label><select id="ef-proj">'
+      + (projOptions || '<option value="">— kein Projekt —</option>')
+      + '</select></div>'
+      + '<div class="edit-field"><label>Notiz</label>'
+      + '<textarea id="ef-notes" rows="3" style="resize:none;"></textarea></div>';
+
+    // Löschen-Button ausblenden (neue Aufgabe)
+    const actions = document.querySelector('.edit-actions');
+    if (actions) {
+      const del = actions.querySelector('.danger');
+      if (del) del.remove();
+    }
+
+    const overlay = document.getElementById('edit-overlay');
+    if (overlay) overlay.classList.add('open');
+  },
+
   editOpen(type, ctx, pKey, id) {
     this._editType = type;
     this._editCtx  = ctx;
@@ -16577,6 +16812,39 @@ const WB = {
 
     const title = document.getElementById('edit-title');
     const body  = document.getElementById('edit-body');
+
+    // ── Neue Aufgabe (aus af-fab) ────────────────────────
+    if(type === 'task-new') {
+      const targetCtx = document.getElementById('ef-welt')?.value || ctx;
+      const targetDb  = targetCtx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!targetDb) { this._toast('Datenbank nicht geladen'); return; }
+      const projKey = document.getElementById('ef-proj')?.value;
+      if (!projKey) { this._toast('Bitte Projekt auswählen'); return; }
+      targetDb.projects[projKey] = targetDb.projects[projKey] || {status:'aktiv',tasks:[],desc:''};
+      const prio = document.getElementById('ef-prio')?.value || 'C';
+      const size = document.getElementById('ef-size')?.value || 'M';
+      const dateV = document.getElementById('ef-date')?.value || '';
+      const newTask = {
+        id:       String(Date.now()),
+        text:     title,
+        done:     false,
+        prio:     prio === 'A',
+        prioLvl:  prio,
+        date:     dateV,
+        isToday:  dateV === new Date().toISOString().split('T')[0],
+        size,
+        notes:    document.getElementById('ef-notes')?.value || '',
+        status:   'aktiv',
+        checklist: [],
+        remainingMinutes: ({XS:5,S:15,M:30,L:60,XL:120,XXL:240}[size] || 30),
+      };
+      targetDb.projects[projKey].tasks.push(newTask);
+      this.setDirty();
+      this.editClose();
+      this._renderSection(this.activeTab);
+      this._toast('Aufgabe angelegt');
+      return;
+    }
 
     if(type === 'task') {
       const t = (db.projects[pKey]?.tasks||[]).find(x => String(x.id)===String(id));
@@ -17170,6 +17438,14 @@ const WB = {
     const scroll = document.getElementById('aufgaben-scroll');
     if(!hdr || !scroll) return;
 
+    // v3.41.0: FAB-Reset — beide globalen FABs verstecken, eigenen zeigen
+    const ckFab = document.getElementById('ck-fab');
+    const ztFab = document.getElementById('zt-fab');
+    const afFab = document.getElementById('af-fab');
+    if (ckFab) ckFab.style.display = 'none';
+    if (ztFab) ztFab.classList.remove('visible');
+    if (afFab) afFab.classList.add('visible');
+
     const viewStr = this.getViewDateStr();
     // Woche = immer Mo–So der AKTUELLEN Woche (nicht viewDate)
     const _now = new Date();
@@ -17584,6 +17860,8 @@ const WB = {
     if(fab) fab.classList.add('visible');
     const ckFab2 = document.getElementById('ck-fab');
     if(ckFab2) ckFab2.style.display = 'none';
+    const afFab1 = document.getElementById('af-fab');
+    if (afFab1) afFab1.classList.remove('visible');
 
     const pT = s => { if(!s) return 8; const p = s.split(':').map(Number); return p[0] + p[1]/60; };
     const fT = h => { const hr=Math.floor(h), m=Math.round((h-hr)*60); return `${String(hr).padStart(2,'0')}:${String(m>=60?0:m).padStart(2,'0')}`; };
