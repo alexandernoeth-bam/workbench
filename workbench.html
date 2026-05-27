@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.39.0</title>
+<title>WorkBench 3.40.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5128,30 +5128,64 @@ html, body {
       </div>
       <input class="wd-input" type="text" id="wd-new-title"
         placeholder="Bezeichnung (z.B. Wäsche waschen)" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
-      <!-- Typ -->
-      <div class="wd-type-row">
-        <button class="wd-type-btn active" id="wd-type-multi" onclick="WB._dutyFormType('multi')">Mehrere Tage</button>
-        <button class="wd-type-btn" id="wd-type-fixed" onclick="WB._dutyFormType('fixed')">Fester Tag</button>
+      <!-- Wiederholung -->
+      <div class="wd-type-row" style="flex-wrap:wrap;gap:6px;">
+        <button class="wd-type-btn active" id="wd-rep-weekly"    onclick="WB._dutyFormRepeat('weekly')">Wöchentlich</button>
+        <button class="wd-type-btn"        id="wd-rep-everyN"    onclick="WB._dutyFormRepeat('every-n-weeks')">Alle N Wochen</button>
+        <button class="wd-type-btn"        id="wd-rep-monthly"   onclick="WB._dutyFormRepeat('monthly')">Monatlich</button>
       </div>
-      <!-- Multi: Wochentage -->
-      <div class="wd-day-grid" id="wd-day-grid">
-        <button class="wd-day-btn" data-dow="1" onclick="WB._dutyDayToggle(this)">Mo</button>
-        <button class="wd-day-btn" data-dow="2" onclick="WB._dutyDayToggle(this)">Di</button>
-        <button class="wd-day-btn" data-dow="3" onclick="WB._dutyDayToggle(this)">Mi</button>
-        <button class="wd-day-btn" data-dow="4" onclick="WB._dutyDayToggle(this)">Do</button>
-        <button class="wd-day-btn" data-dow="5" onclick="WB._dutyDayToggle(this)">Fr</button>
-        <button class="wd-day-btn" data-dow="6" onclick="WB._dutyDayToggle(this)">Sa</button>
-        <button class="wd-day-btn" data-dow="0" onclick="WB._dutyDayToggle(this)">So</button>
+      <!-- every-n-weeks: N einstellen -->
+      <div id="wd-everyN-row" style="display:none;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:0.82rem;color:var(--c-muted);">Alle</span>
+        <input type="number" id="wd-repeat-n" min="2" max="12" value="2"
+          style="width:56px;padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;text-align:center;">
+        <span style="font-size:0.82rem;color:var(--c-muted);">Wochen</span>
       </div>
-      <!-- Fixed: ein Tag -->
-      <div class="wd-day-grid" id="wd-fixed-grid" style="display:none;">
-        <button class="wd-day-btn" data-dow="1" onclick="WB._dutyFixedDay(this)">Mo</button>
-        <button class="wd-day-btn" data-dow="2" onclick="WB._dutyFixedDay(this)">Di</button>
-        <button class="wd-day-btn" data-dow="3" onclick="WB._dutyFixedDay(this)">Mi</button>
-        <button class="wd-day-btn" data-dow="4" onclick="WB._dutyFixedDay(this)">Do</button>
-        <button class="wd-day-btn" data-dow="5" onclick="WB._dutyFixedDay(this)">Fr</button>
-        <button class="wd-day-btn" data-dow="6" onclick="WB._dutyFixedDay(this)">Sa</button>
-        <button class="wd-day-btn" data-dow="0" onclick="WB._dutyFixedDay(this)">So</button>
+      <!-- monthly: Regel -->
+      <div id="wd-monthly-row" style="display:none;margin-bottom:8px;">
+        <select id="wd-monthly-rule" style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
+          <option value="first-mo">Erster Montag</option>
+          <option value="first-fr">Erster Freitag</option>
+          <option value="last-sa">Letzter Samstag</option>
+          <option value="last-so">Letzter Sonntag</option>
+          <option value="last-fr">Letzter Freitag</option>
+          <option value="day-1">1. des Monats</option>
+          <option value="day-15">15. des Monats</option>
+          <option value="day-28">28. des Monats</option>
+        </select>
+      </div>
+      <!-- Typ (nur bei wöchentlich) -->
+      <div id="wd-type-section">
+        <div class="wd-type-row">
+          <button class="wd-type-btn active" id="wd-type-multi" onclick="WB._dutyFormType('multi')">Mehrere Tage</button>
+          <button class="wd-type-btn"        id="wd-type-fixed" onclick="WB._dutyFormType('fixed')">Fester Tag</button>
+        </div>
+        <!-- Multi: Wochentage -->
+        <div class="wd-day-grid" id="wd-day-grid">
+          <button class="wd-day-btn" data-dow="1" onclick="WB._dutyDayToggle(this)">Mo</button>
+          <button class="wd-day-btn" data-dow="2" onclick="WB._dutyDayToggle(this)">Di</button>
+          <button class="wd-day-btn" data-dow="3" onclick="WB._dutyDayToggle(this)">Mi</button>
+          <button class="wd-day-btn" data-dow="4" onclick="WB._dutyDayToggle(this)">Do</button>
+          <button class="wd-day-btn" data-dow="5" onclick="WB._dutyDayToggle(this)">Fr</button>
+          <button class="wd-day-btn" data-dow="6" onclick="WB._dutyDayToggle(this)">Sa</button>
+          <button class="wd-day-btn" data-dow="0" onclick="WB._dutyDayToggle(this)">So</button>
+        </div>
+        <!-- Fixed: ein Tag -->
+        <div class="wd-day-grid" id="wd-fixed-grid" style="display:none;">
+          <button class="wd-day-btn" data-dow="1" onclick="WB._dutyFixedDay(this)">Mo</button>
+          <button class="wd-day-btn" data-dow="2" onclick="WB._dutyFixedDay(this)">Di</button>
+          <button class="wd-day-btn" data-dow="3" onclick="WB._dutyFixedDay(this)">Mi</button>
+          <button class="wd-day-btn" data-dow="4" onclick="WB._dutyFixedDay(this)">Do</button>
+          <button class="wd-day-btn" data-dow="5" onclick="WB._dutyFixedDay(this)">Fr</button>
+          <button class="wd-day-btn" data-dow="6" onclick="WB._dutyFixedDay(this)">Sa</button>
+          <button class="wd-day-btn" data-dow="0" onclick="WB._dutyFixedDay(this)">So</button>
+        </div>
+      </div>
+      <!-- Erinnerung -->
+      <div style="display:flex;align-items:center;gap:10px;margin:10px 0 4px;">
+        <span style="font-size:0.82rem;color:var(--c-muted);flex:1;">Erinnerung (optional)</span>
+        <input type="time" id="wd-reminder-time"
+          style="padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
       </div>
       <button class="wd-add-btn" onclick="WB.dutyAdd()">+ Pflicht hinzufügen</button>
     </div>
@@ -5485,7 +5519,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.39.0 · Build 20260527-1700</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.40.0 · Build 20260527-1830</div>
     </div>
 
     <!-- Welt -->
@@ -5708,7 +5742,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.39.0',
+  APP_VERSION: '3.40.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -10313,6 +10347,9 @@ const WB = {
     });
     // Activity-Tracking für Auto-Return starten
     this._ckStartActivityTracking();
+    // v3.40.0: Duty-Erinnerungen beim Start prüfen
+    setTimeout(() => { try { this._dutyCheckReminders(); } catch(e){} }, 2000);
+
     // Notifications planen
     setTimeout(() => {
       this._notifUpdateStatus();
@@ -12774,9 +12811,26 @@ const WB = {
       if (!duties.length) return '';
       let html = `<div class="wd-section-label ${cls}">${label}</div>`;
       html += duties.map(duty => {
-        const when = duty.type === 'fixed'
-          ? `Jeden ${DAY_NAMES[duty.dayFixed]}`
-          : (duty.days||[]).map(d=>DAY_NAMES[d]).join(', ');
+        const DAY_NAMES_L = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+        let when;
+        if (duty.repeat === 'monthly') {
+          const ruleLabels = {
+            'first-mo':'1. Mo','first-fr':'1. Fr','last-sa':'Letzter Sa',
+            'last-so':'Letzter So','last-fr':'Letzter Fr',
+            'day-1':'1. d. Monats','day-15':'15. d. Monats','day-28':'28. d. Monats',
+          };
+          when = ruleLabels[duty.monthlyRule] || duty.monthlyRule || 'Monatlich';
+        } else if (duty.repeat === 'every-n-weeks') {
+          const days = duty.type === 'fixed'
+            ? DAY_NAMES_L[duty.dayFixed]
+            : (duty.days||[]).map(d=>DAY_NAMES_L[d]).join(', ');
+          when = `Alle ${duty.repeatEvery||2} Wo · ${days}`;
+        } else {
+          when = duty.type === 'fixed'
+            ? `Jeden ${DAY_NAMES_L[duty.dayFixed]}`
+            : (duty.days||[]).map(d=>DAY_NAMES_L[d]).join(', ');
+        }
+        if (duty.reminderTime) when += ` · 🔔 ${duty.reminderTime}`;
         return `<div class="wd-item">
           <div class="wd-item-name">${duty.title}</div>
           <div class="wd-item-meta">${when}</div>
@@ -12823,14 +12877,32 @@ const WB = {
     this._dutyFormCurrentType = type;
   },
 
-  _dutyFormCurrentType: 'multi',
+  _dutyFormCurrentType:   'multi',
+  _dutyFormCurrentRepeat: 'weekly',
+
+  _dutyFormRepeat(repeat) {
+    this._dutyFormCurrentRepeat = repeat;
+    ['weekly','every-n-weeks','monthly'].forEach(r => {
+      const id = 'wd-rep-' + r.replace(/-/g, '');
+      // normalize ids
+      const map = {'wd-rep-weekly':'wd-rep-weekly','wd-rep-everynweeks':'wd-rep-everyN','wd-rep-monthly':'wd-rep-monthly'};
+      const btn = document.getElementById(map['wd-rep-'+r.replace(/-/g,'')]);
+      if (btn) btn.classList.toggle('active', r === repeat);
+    });
+    // Zeige/verstecke Sektionen
+    const everyN   = document.getElementById('wd-everyN-row');
+    const monthly  = document.getElementById('wd-monthly-row');
+    const typeSection = document.getElementById('wd-type-section');
+    if (everyN)      everyN.style.display      = repeat === 'every-n-weeks' ? 'flex' : 'none';
+    if (monthly)     monthly.style.display     = repeat === 'monthly'       ? ''     : 'none';
+    if (typeSection) typeSection.style.display = repeat === 'monthly'       ? 'none' : '';
+  },
 
   _dutyDayToggle(btn) {
     btn.classList.toggle('selected');
   },
 
   _dutyFixedDay(btn) {
-    // Nur einer kann selected sein
     btn.closest('.wd-day-grid').querySelectorAll('.wd-day-btn').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
   },
@@ -12853,16 +12925,32 @@ const WB = {
       if (!days.length) { this._toast('Bitte mindestens einen Tag auswählen'); return; }
     }
 
-    store.push({
+    const repeat       = this._dutyFormCurrentRepeat || 'weekly';
+    const repeatEvery  = parseInt(document.getElementById('wd-repeat-n')?.value) || 2;
+    const monthlyRule  = document.getElementById('wd-monthly-rule')?.value || 'day-1';
+    const reminderTime = document.getElementById('wd-reminder-time')?.value || '';
+    const startDate    = new Date().toISOString().split('T')[0];
+
+    const entry = {
       id: 'duty_' + Date.now(),
       title, world, type,
-      dayFixed, days,
-      doneWeeks: {},
-    });
+      repeat, startDate,
+      dayFixed: repeat === 'monthly' ? null : dayFixed,
+      days:     repeat === 'monthly' ? [] : days,
+      instances: {},
+    };
+    if (repeat === 'every-n-weeks') entry.repeatEvery = repeatEvery;
+    if (repeat === 'monthly')       entry.monthlyRule  = monthlyRule;
+    if (reminderTime)               entry.reminderTime = reminderTime;
+
+    store.push(entry);
     this.setDirty();
     // Form zurücksetzen
     document.getElementById('wd-new-title').value = '';
+    if (document.getElementById('wd-reminder-time'))
+      document.getElementById('wd-reminder-time').value = '';
     document.querySelectorAll('.wd-day-btn').forEach(b => b.classList.remove('selected'));
+    this._dutyFormRepeat('weekly');
     this._dutiesRender();
     this._toast('Pflicht hinzugefügt');
   },
@@ -14001,30 +14089,185 @@ const WB = {
     monday.setDate(now.getDate() + mondayOffset);
     monday.setHours(0,0,0,0);
 
-    const allDays = duty.type === 'fixed'
-      ? [parseInt(duty.dayFixed)]
-      : (duty.days || []);
+    // v3.40.0: Tage je nach repeat-Typ ermitteln
+    let allDays;
+    if (duty.repeat === 'monthly') {
+      allDays = this._dutyMonthlyDaysThisWeek(duty);
+    } else if (duty.type === 'fixed') {
+      allDays = [parseInt(duty.dayFixed)];
+    } else {
+      allDays = duty.days || [];
+    }
 
     const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
     const normalize = d => d === 0 ? 7 : d;
+    const today = new Date(); today.setHours(0,0,0,0);
 
     return allDays
       .sort((a,b) => normalize(a) - normalize(b))
       .map(dayDow => {
-        // Datum dieses Wochentags in der aktuellen Woche
-        const offset = (normalize(dayDow) - 1); // Mo=0, Di=1 ... So=6
+        const offset = (normalize(dayDow) - 1);
         const date = new Date(monday);
         date.setDate(monday.getDate() + offset);
-        const today = new Date(); today.setHours(0,0,0,0);
-        const isPast = date < today;
-        const isToday = date.toDateString() === today.toDateString();
-        const done = this._dutyIsDone(duty, date);
+        const isPast   = date < today;
+        const isToday  = date.toDateString() === today.toDateString();
+        const done     = this._dutyIsDone(duty, date);
         return { dow: dayDow, date, label: DAY_NAMES[dayDow], isPast, isToday, done };
       });
   },
 
 
 
+  // ── every-n-weeks: Ist diese Woche eine Fälligkeitswoche? ───────────────
+  _dutyIsActiveWeek(duty) {
+    // Für repeat='weekly' immer true (Standard)
+    if (!duty.repeat || duty.repeat === 'weekly') return true;
+
+    if (duty.repeat === 'every-n-weeks') {
+      const n = parseInt(duty.repeatEvery) || 2;
+      const start = duty.startDate ? new Date(duty.startDate + 'T12:00:00') : new Date();
+      const startKwNum = this._kwNum(start);
+      const nowKwNum   = this._kwNum(new Date());
+      return ((nowKwNum - startKwNum) % n) === 0;
+    }
+
+    if (duty.repeat === 'monthly') {
+      return this._dutyMonthlyMatchesThisWeek(duty);
+    }
+    return true;
+  },
+
+  // ── KW als fortlaufende Zahl (für Modulo-Rechnung) ───────────────────
+  _kwNum(date) {
+    // Wochen seit einem fixen Anker (2024-W01)
+    const anchor = new Date('2024-01-01T12:00:00');
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const a = new Date(Date.UTC(anchor.getFullYear(), anchor.getMonth(), anchor.getDate()));
+    a.setUTCDate(a.getUTCDate() + 4 - (a.getUTCDay() || 7));
+    return Math.round((d - a) / msPerWeek);
+  },
+
+  // ── Monatliche Regel: Stimmt der Fälligkeitstag in diese Woche? ───────
+  _dutyMonthlyMatchesThisWeek(duty) {
+    const rule = duty.monthlyRule || 'day-1'; // z.B. 'last-sat', 'first-mon', 'day-15'
+    const now  = new Date();
+    const pad  = n => String(n).padStart(2,'0');
+
+    // Montag dieser Woche
+    const dow = now.getDay();
+    const mondayOffset = dow === 0 ? -6 : 1 - dow;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + mondayOffset);
+    monday.setHours(0,0,0,0);
+
+    // Alle Tage dieser Woche
+    const weekDates = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      weekDates.push(d);
+    }
+
+    // Berechne Fälligkeitstag für diesen Monat
+    const targetDate = this._dutyMonthlyTargetDate(rule, now);
+    if (!targetDate) return false;
+
+    // Liegt targetDate in dieser Woche?
+    return weekDates.some(d =>
+      d.getFullYear() === targetDate.getFullYear() &&
+      d.getMonth()    === targetDate.getMonth()    &&
+      d.getDate()     === targetDate.getDate()
+    );
+  },
+
+  // ── Berechnet konkretes Datum für monatliche Regel ────────────────────
+  _dutyMonthlyTargetDate(rule, refDate) {
+    const year  = refDate.getFullYear();
+    const month = refDate.getMonth();
+
+    // 'day-N': N-ter des Monats
+    const dayMatch = rule.match(/^day-(\d+)$/);
+    if (dayMatch) {
+      const day = parseInt(dayMatch[1]);
+      const d = new Date(year, month, day);
+      return d.getMonth() === month ? d : null; // Safeguard für Feb
+    }
+
+    // 'first-X' oder 'last-X': X = 0=So,1=Mo,...,6=Sa
+    const ordMatch = rule.match(/^(first|last|second|third)-(mo|di|mi|do|fr|sa|so)$/);
+    if (ordMatch) {
+      const ord = ordMatch[1];
+      const dayNames = ['so','mo','di','mi','do','fr','sa'];
+      const targetDow = dayNames.indexOf(ordMatch[2]);
+      if (targetDow === -1) return null;
+
+      if (ord === 'last') {
+        // Letzter Wochentag im Monat: vom Ende suchen
+        const lastDay = new Date(year, month + 1, 0); // letzter Tag des Monats
+        let d = new Date(lastDay);
+        while (d.getDay() !== targetDow) d.setDate(d.getDate() - 1);
+        return d;
+      }
+      // first/second/third
+      const occMap = { first: 1, second: 2, third: 3 };
+      const occ = occMap[ord] || 1;
+      let count = 0;
+      let d = new Date(year, month, 1);
+      while (d.getMonth() === month) {
+        if (d.getDay() === targetDow) {
+          count++;
+          if (count === occ) return d;
+        }
+        d.setDate(d.getDate() + 1);
+      }
+    }
+    return null;
+  },
+
+  // ── Fälligkeitstag(e) für monthly in dieser Woche ────────────────────
+  _dutyMonthlyDaysThisWeek(duty) {
+    const rule = duty.monthlyRule || 'day-1';
+    const now  = new Date();
+    const target = this._dutyMonthlyTargetDate(rule, now);
+    if (!target) return [];
+    return [target.getDay()]; // DOW des Fälligkeitstags
+  },
+
+  // ── Erinnerung: beim App-Start fällige Pflichten prüfen ──────────────
+  _dutyCheckReminders() {
+    const now   = new Date();
+    const nowH  = now.getHours() + now.getMinutes() / 60;
+    const today = now.toISOString().split('T')[0];
+    const kw    = this._kwStr(now);
+
+    ['pro','priv'].forEach(ctx => {
+      (this._dutyStore(ctx) || []).forEach(duty => {
+        if (!duty.reminderTime) return;
+        const [rH, rM] = duty.reminderTime.split(':').map(Number);
+        const remH = rH + rM / 60;
+        // Nur wenn wir in der Nähe der Erinnerungszeit sind (±30 Min) und noch nicht erledigt
+        if (Math.abs(nowH - remH) > 0.5) return;
+        const inst = this._dutyWeekInstances(duty).find(i => i.isToday);
+        if (!inst || inst.done) return;
+        // Bereits erinnert heute?
+        const remKey = 'wb_rem_' + duty.id + '_' + today;
+        try { if (localStorage.getItem(remKey)) return; } catch(e){}
+        // Notification senden
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('WorkBench · Routine', {
+            body: duty.title + ' — heute fällig',
+            icon: '/icon-192.svg',
+            tag:  'duty_' + duty.id,
+          });
+        }
+        try { localStorage.setItem(remKey, '1'); } catch(e){}
+      });
+    });
+  },
+
+  // ── Pflicht-Pills für eine Welt rendern ───────────────
   // ── Pflicht abhaken ────────────────────────────────────
   dutyToggle(ctx, dutyId, date) {
     // v3.38.0: Toggle pro Tag — date: Date-Objekt oder null (=heute)
@@ -14045,11 +14288,13 @@ const WB = {
   // Wie _dutyRelevantThisWeek, aber zeigt auch zukünftige Tage dieser Woche
   // Blockiert nur wenn: keine Berufstage mehr / Sondertag belegt den einzigen Tag
   _dutyBelongsToThisWeek(duty) {
+    // v3.40.0: every-n-weeks + monthly
+    if (!this._dutyIsActiveWeek(duty)) return false;
+
     const now   = new Date();
     const today = now.toISOString().split('T')[0];
     const dow   = now.getDay();
     const pad   = n => String(n).padStart(2,'0');
-    const kw    = this._kwStr(now);
 
     const mondayOffset = dow === 0 ? -6 : 1 - dow;
     const monday = new Date(now);
@@ -14061,49 +14306,43 @@ const WB = {
       d.setDate(monday.getDate() + i);
       weekDays.push({
         str:     d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()),
-        dow:     (i + 1) % 7,  // 0=So,1=Mo...6=Sa
-        isoDay:  i + 1,        // 1=Mo...7=So
+        dow:     (i + 1) % 7,
+        isoDay:  i + 1,
         past:    d < new Date(today),
         isToday: d.toISOString().split('T')[0] === today,
       });
     }
 
-    // Berufspflicht: mind. ein verfügbarer Berufstag diese Woche
     const isProDuty = duty.world === 'pro' || duty.ctx === 'pro';
     if (isProDuty) {
       const workdays = weekDays.filter(d => {
-        if (d.isoDay < 1 || d.isoDay > 5) return false;  // nur Mo–Fr
-        const info = this._getDayInfo(d.str);
-        if (info.proBlocked) return false;
-        return true;
+        if (d.isoDay < 1 || d.isoDay > 5) return false;
+        return !this._getDayInfo(d.str).proBlocked;
       });
       if (workdays.length === 0) return false;
     }
 
-    // Fester Tag: Tag muss in dieser Woche liegen und kein Sondertag sein
+    // monthly: Fälligkeitstag dieser Woche ermitteln
+    if (duty.repeat === 'monthly') {
+      const mDays = this._dutyMonthlyDaysThisWeek(duty);
+      return mDays.length > 0;
+    }
+
     if (duty.type === 'fixed') {
       const fixed = parseInt(duty.dayFixed);
       const targetDay = weekDays.find(d => d.dow === fixed);
       if (!targetDay) return false;
-      if (isProDuty) {
-        const info = this._getDayInfo(targetDay.str);
-        if (info.proBlocked) return false;
-      }
-      return true;  // ← kein past-Check hier (zeige auch zukünftige)
+      if (isProDuty && this._getDayInfo(targetDay.str).proBlocked) return false;
+      return true;
     }
 
-    // Multi: mind. ein Tag in dieser Woche (unabhängig ob past)
     const bDays = duty.days || [];
-    const validBDays = bDays.filter(dow => {
-      const wd = weekDays.find(d => d.dow === dow);
+    return bDays.some(d => {
+      const wd = weekDays.find(w => w.dow === d);
       if (!wd) return false;
-      if (isProDuty) {
-        const info = this._getDayInfo(wd.str);
-        if (info.proBlocked) return false;
-      }
+      if (isProDuty && this._getDayInfo(wd.str).proBlocked) return false;
       return true;
     });
-    return validBDays.length > 0;
   },
 
   // ── Ist Pflicht diese Woche noch relevant? ────────────
@@ -16999,8 +17238,8 @@ const WB = {
     const doneDuties = relevantDuties.filter(d =>
       this._dutyWeekInstances(d).every(i => i.done));
     cnt.routine = allWeekInstances.length;
-    // v3.39.0: Heute-Pill zählt auch heutige Routinen-Instanzen
-    const todayInstCountForPill = allWeekInstances.filter(x => x.inst.isToday).length;
+    // v3.40.0: Heute-Pill zählt heutige OFFENE Routinen-Instanzen
+    const todayInstCountForPill = allWeekInstances.filter(x => x.inst.isToday && !x.inst.done).length;
     cnt.today += todayInstCountForPill;
 
     let pillHtml = '<div class="af-filter-row">';
