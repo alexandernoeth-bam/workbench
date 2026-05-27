@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.43.5</title>
+<title>WorkBench 3.43.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5580,7 +5580,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.43.5 · Build 20260527-2250</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.43.6 · Build 20260527-2300</div>
     </div>
 
     <!-- Welt -->
@@ -5803,7 +5803,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.43.5',
+  APP_VERSION: '3.43.6',
   APP_BUILD:   '20260526-0723',
 
 
@@ -17189,6 +17189,51 @@ const WB = {
       if (typV !== 'besprechung') this._toast('Termin angelegt');
       if(this.activeTab==='heute') this.renderHeute();
       if(this.activeTab==='woche') this.renderWoche();
+      return;
+    }
+
+    // ── Neue Aufgabe ─────────────────────────────────────
+    if(type === 'task-new') {
+      const targetCtx = document.getElementById('ef-welt')?.value || ctx;
+      const targetDb  = targetCtx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!targetDb) { this._toast('Datenbank nicht geladen'); return; }
+      const projEl  = document.getElementById('ef-proj');
+      const projKey = projEl?.options[projEl?.selectedIndex]?.value || projEl?.value || '';
+      if (!projKey) { this._toast('Bitte Projekt / Bereich auswählen'); return; }
+      targetDb.projects[projKey] = targetDb.projects[projKey] || {status:'aktiv',tasks:[],desc:''};
+      const prio  = document.getElementById('ef-prio')?.value || 'C';
+      const size  = document.getElementById('ef-size')?.value || 'M';
+      const dateV = document.getElementById('ef-date')?.value || '';
+      const timeV = document.getElementById('ef-time-task')?.value || '';
+      const recurOn   = document.getElementById('ef-recur-on')?.checked;
+      const intervalU = document.getElementById('ef-interval-unit')?.value || 'täglich';
+      const intervalN = parseInt(document.getElementById('ef-interval-n')?.value)||1;
+      const intervalS = document.getElementById('ef-interval-start')?.value || dateV;
+      const newTask = {
+        id:       String(Date.now()),
+        text:     title,
+        done:     false,
+        prio:     prio === 'A',
+        prioLvl:  prio,
+        date:     dateV,
+        time:     timeV,
+        isToday:  dateV === new Date().toISOString().split('T')[0],
+        size,
+        notes:    document.getElementById('ef-notes')?.value || '',
+        status:   'aktiv',
+        checklist: this._efChkGetList(),
+        remainingMinutes: ({XS:5,S:15,M:30,L:60,XL:120,XXL:240}[size] || 30),
+      };
+      if (recurOn) {
+        newTask.interval      = intervalU === 'alle N Tage' ? intervalN : 1;
+        newTask.intervalUnit  = intervalU;
+        newTask.intervalStart = intervalS;
+      }
+      targetDb.projects[projKey].tasks.push(newTask);
+      this.setDirty();
+      this.editClose();
+      this._renderSection(this.activeTab);
+      this._toast('Aufgabe angelegt');
       return;
     }
 
