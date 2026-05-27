@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.56.4-D</title>
+<title>WorkBench 3.56.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5988,7 +5988,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.56.4-D · Build 20260528-2100</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.56.4 · Build 20260528-2115</div>
     </div>
 
     <!-- Welt -->
@@ -6139,7 +6139,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.56.4-D',
+  APP_VERSION: '3.56.4',
   APP_BUILD:   '20260526-0723',
 
 
@@ -16516,7 +16516,10 @@ const WB = {
     }
     const dateStr = this._planerDate;
     const d = new Date(dateStr + 'T00:00:00');
-    const isToday = dateStr === new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const pad2 = x => String(x).padStart(2,'0');
+    const todayStr = now.getFullYear() + '-' + pad2(now.getMonth()+1) + '-' + pad2(now.getDate());
+    const isToday = dateStr === todayStr;
 
     const dayNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
     const months   = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
@@ -16568,11 +16571,11 @@ const WB = {
 
   _planerShift(n) {
     if (!this._planerDate) this._planerDate = new Date().toISOString().split('T')[0];
-    console.log('[Planer] shift vorher:', this._planerDate, 'n=', n);
-    const d = new Date(this._planerDate + 'T00:00:00');
-    d.setDate(d.getDate() + n);
-    this._planerDate = d.toISOString().split('T')[0];
-    console.log('[Planer] shift nachher:', this._planerDate);
+    // Timezone-sicheres Datum addieren: split in Teile, kein Date-Objekt
+    const [y, m, day] = this._planerDate.split('-').map(Number);
+    const d = new Date(y, m - 1, day + n); // lokale Zeitzone, kein UTC-Problem
+    const pad = x => String(x).padStart(2, '0');
+    this._planerDate = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
     this.renderPlaner();
   },
 
