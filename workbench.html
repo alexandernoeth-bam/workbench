@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.56.2</title>
+<title>WorkBench 3.56.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5988,7 +5988,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.56.2 · Build 20260528-2030</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.56.3 · Build 20260528-2045</div>
     </div>
 
     <!-- Welt -->
@@ -6139,7 +6139,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.56.2',
+  APP_VERSION: '3.56.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -16582,24 +16582,21 @@ const WB = {
   _planerRenderZeitband(dateStr) {
     const el = document.getElementById('planer-zt');
     if (!el) return;
-    // Zeitband-HTML aus renderHeute wiederverwenden
-    // Wir setzen kurz viewDate und rendern in planer-zt
-    const oldDate = this._viewDate;
-    this._viewDate = dateStr;
-    // Zeitband-Inhalt generieren (gleiche Logik wie renderHeute aber in el)
+    // viewDate korrekt setzen (this.viewDate ist ein Date-Objekt)
+    const oldViewDate = this.viewDate;
+    this.viewDate = new Date(dateStr + 'T12:00:00');
+    // Zeitband in temp-Element rendern
     const tempScroll = document.createElement('div');
-    tempScroll.id = 'zeitband-scroll-temp';
     document.body.appendChild(tempScroll);
     const realScroll = document.getElementById('zeitband-scroll');
-    // Swap: render in temp
     if (realScroll) realScroll.id = 'zeitband-scroll-bak';
     tempScroll.id = 'zeitband-scroll';
-    try { this.renderHeute(); } catch(e) {}
+    try { this.renderHeute(); } catch(e) { console.warn('Planer ZB:', e); }
     el.innerHTML = tempScroll.innerHTML;
-    tempScroll.id = 'zeitband-scroll-temp';
     document.body.removeChild(tempScroll);
     if (realScroll) realScroll.id = 'zeitband-scroll';
-    this._viewDate = oldDate;
+    // viewDate wiederherstellen
+    this.viewDate = oldViewDate;
   },
 
   _planerRenderPool(dateStr) {
