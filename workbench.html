@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.58.1</title>
+<title>WorkBench 3.58.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5990,7 +5990,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.58.1 · Build 20260529-0045</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.58.2 · Build 20260529-0100</div>
     </div>
 
     <!-- Welt -->
@@ -6141,7 +6141,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.58.1',
+  APP_VERSION: '3.58.2',
   APP_BUILD:   '20260526-0723',
 
 
@@ -16740,7 +16740,50 @@ const WB = {
         + '<div style="height:1px;background:var(--c-border);margin:6px 0;"></div>'
       : '';
 
-    el.innerHTML = plannedHtml + dutyHtml + html;
+    // Backlog: alle anderen Aufgaben (nicht heute fällig, nicht erledigt, keine Uhrzeit)
+    const backlog = [];
+    ['pro','priv'].forEach(bCtx => {
+      if (bCtx === 'pro' && noWork) return;
+      const bDb = bCtx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!bDb) return;
+      Object.entries(bDb.projects||{}).forEach(([bPKey, proj]) => {
+        (proj.tasks||[]).forEach(t => {
+          if (t.done) return;
+          if (t.time) return;
+          if (t.date && t.date <= dateStr) return; // schon im Pool
+          backlog.push({t, pKey: bPKey, ctx: bCtx});
+        });
+      });
+    });
+    backlog.sort((a,b) => {
+      const po = {A:0,B:1,C:2};
+      return (po[a.t.prioLvl||'C']||2) - (po[b.t.prioLvl||'C']||2);
+    });
+
+    const backlogHtml = backlog.length ? `
+      <details style="margin-top:8px;">
+        <summary style="padding:8px 12px;font-size:0.75rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;border-top:1px solid var(--c-border);">
+          <svg style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          Backlog (${backlog.length})
+        </summary>
+        ${backlog.map(({t,pKey,ctx}) => {
+          const prio = t.prioLvl||(t.prio?'A':'C');
+          const pid  = pKey.replace(/'/g,"\'");
+          return `<div class="planer-pool-item" style="opacity:0.75;">
+            <span class="planer-prio-badge ${prio}">${prio}</span>
+            <div class="planer-pool-text">
+              <div>${t.text}</div>
+              <div class="sub">${ctx==='pro'?'Beruf':'Privat'} · ${sizeMin[t.size]||30} Min${t.date?' · '+t.date:''}</div>
+            </div>
+            <button class="planer-plan-btn"
+              onclick="WB._planerPlanTask('${pid}','${t.id}','${ctx}','${dateStr}')">
+              Einplanen →
+            </button>
+          </div>`;
+        }).join('')}
+      </details>` : '';
+
+    el.innerHTML = plannedHtml + dutyHtml + html + backlogHtml;
   },
 
   _planerUnplan(pKey, taskId, ctx) {
@@ -19212,16 +19255,14 @@ const WB = {
         }
       });
       // Feste Aufgaben mit Uhrzeit
-      Object.values(db.projects||{}).forEach(p => {
-        Object.entries(db.projects||{}).forEach(([pKey2, p]) => {
-          (p.tasks||[]).forEach(t => {
-            if(!t.done && (t.isToday||t.date===viewStr) && t.time) {
-              const s = pT(t.time), rem = defW[t.size]||30;
-              blocks.push({start:s, end:s+rem/60, title:t.text, type:'task-fixed',
-                ctx, done:!!t.done, prio:t.prio, taskId:String(t.id), pKey:pKey2});
-              t._fixed = true;
-            }
-          });
+      Object.entries(db.projects||{}).forEach(([pKey2, p]) => {
+        (p.tasks||[]).forEach(t => {
+          if(!t.done && (t.isToday||t.date===viewStr) && t.time) {
+            const s = pT(t.time), rem = defW[t.size]||30;
+            blocks.push({start:s, end:s+rem/60, title:t.text, type:'task-fixed',
+              ctx, done:!!t.done, prio:t.prio, taskId:String(t.id), pKey:pKey2});
+            t._fixed = true;
+          }
         });
       });
     });
