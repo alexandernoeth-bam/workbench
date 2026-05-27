@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.46.8</title>
+<title>WorkBench 3.46.9</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5641,7 +5641,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.8 · Build 20260528-0600</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.9 · Build 20260528-0630</div>
     </div>
 
     <!-- Welt -->
@@ -5792,7 +5792,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.46.8',
+  APP_VERSION: '3.46.9',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8835,9 +8835,9 @@ const WB = {
       const bookedH  = Math.round(focusMin / 60 * 10) / 10;
 
       // Navigation — über _goTab (sicher, kein querySelector nötig)
-      const goHeute    = `WB._goTab('cockpit')`;
-      const goAufgaben = `WB._goTab('aufgaben')`;
-      const goCl       = `WB._ckGoChecklisten('${ctx}')`;
+      const goHeute    = 'termine';
+      const goAufgaben = 'prio-uberfaellig';
+      const goCl       = 'checklisten';
       const goWoche    = `WB._goTab('woche')`;
 
       // Aufgaben heute zählen — bei Urlaub/Feiertag keine beruflichen Tasks (v3.37.1)
@@ -8860,11 +8860,11 @@ const WB = {
         });
       }
 
-      // Pill-Zeile bauen — data-onclick wegen Quote-Konflikt
-      const row = (count, label, fn) => {
+      // Pill-Zeile — data-action für sicheres Klick-Handling
+      const row = (count, label, action) => {
         const zeroClass = count === 0 ? ' zero' : '';
         const display   = count === 0 ? '\u2013' : String(count);
-        return '<div class="ck-pill-row" data-fn="' + fn + '" style="cursor:pointer;">'
+        return '<div class="ck-pill-row" data-action="' + action + '" style="cursor:pointer;">'
           + '<div class="ck-num-pill' + zeroClass + '">' + display + '</div>'
           + '<span class="ck-pill-label">' + label + '</span>'
           + '</div>';
@@ -8874,41 +8874,65 @@ const WB = {
       const dutyPills = this._ckDutyPillsHtml(ctx);
       const goalPills = ctx === 'priv' ? this._ckGoalPillsHtml() : '';
 
-      const goTasksToday = "WB.setTaskFilter('today');WB._goTab('aufgaben')";
+      const goTasksToday = 'aufgaben-heute';
 
       // Inbox-Pill
       let inboxPill = '';
       {
         const inboxCount = (db.inbox || []).length;
         if (inboxCount > 0) {
-          inboxPill = row(inboxCount, 'Inbox', 'WB.inboxOpen()');
+          inboxPill = row(inboxCount, 'Inbox', 'inbox');
         }
       }
 
-      return `<div class="ck-world-card ${worldCls}">
-        <div class="ck-world-header">
-          <span class="ck-world-title">${worldLabel}</span>
-          <span class="ck-world-cap">${bookedH > 0 ? bookedH + 'h Fokus' : 'kein Fokus'}</span>
-        </div>
-        ${row(tasksTodayCount, 'Aufgaben heute',       goTasksToday)}
-        ${row(urgentCount,     'Prio A & Überfällig',  goAufgaben)}
-        ${row(evCount, 'Termine heute', 'WB._ckToggleZeitband()')}
-        ${row(clCount,         'Checklisten aktiv',     goCl)}
-        ${inboxPill}
-        ${dutyPills}
-      </div>`;
+      // evCount für Termin-Pill nach außen reichen
+      renderWorldCard._evCount = evCount;
+
+      return '<div class="ck-world-card ' + worldCls + '">'
+        + '<div class="ck-world-header">'
+        + '<span class="ck-world-title">' + worldLabel + '</span>'
+        + '<span class="ck-world-cap">' + (bookedH > 0 ? bookedH + 'h Fokus' : 'kein Fokus') + '</span>'
+        + '</div>'
+        + row(tasksTodayCount, 'Aufgaben heute',      goTasksToday)
+        + row(urgentCount,     'Prio A & Überfällig', goAufgaben)
+        + row(clCount,         'Checklisten aktiv',   goCl)
+        + inboxPill
+        + dutyPills
+        + '</div>';
     };
 
-    // v3.35.0: Nur aktive Welt anzeigen (Wechsel über Hamburger-Menü)
-    if (this.activeWorld === 'beruf') {
-      grid.innerHTML = renderWorldCard('pro',  this.dataPro,  'beruf', 'Beruf');
-    } else {
-      grid.innerHTML = renderWorldCard('priv', this.dataPriv, 'priv',  'Privat');
-    }
-    // Event-Delegation: data-fn auf alle Pill-Rows
-    grid.querySelectorAll('[data-fn]').forEach(el => {
-      el.onclick = () => { try { eval(el.dataset.fn); } catch(e) { console.warn(e); } };
+    // Nur aktive Welt anzeigen
+    const ctx  = this.activeWorld === 'beruf' ? 'pro'  : 'priv';
+    const db   = this.activeWorld === 'beruf' ? this.dataPro : this.dataPriv;
+    const wcls = this.activeWorld === 'beruf' ? 'beruf' : 'priv';
+    const wlbl = this.activeWorld === 'beruf' ? 'Beruf' : 'Privat';
+    grid.innerHTML = renderWorldCard(ctx, db, wcls, wlbl);
+
+    // Klick-Handler direkt per addEventListener (kein eval, kein onclick-Attribut)
+    const actions = {
+      'aufgaben-heute':   () => { WB.setTaskFilter('today'); WB._goTab('aufgaben'); },
+      'prio-uberfaellig': () => WB._goTab('aufgaben'),
+      'checklisten':      () => WB._ckGoChecklisten(ctx),
+      'inbox':            () => WB.inboxOpen(),
+      'termine':          () => WB._ckToggleZeitband(),
+    };
+    grid.querySelectorAll('.ck-pill-row[data-action]').forEach(el => {
+      el.addEventListener('click', () => {
+        const fn = actions[el.dataset.action];
+        if (fn) fn();
+      });
     });
+
+    // Termin-Pill: eigene Zeile UNTERHALB der World-Card, außerhalb der Card
+    const evCount2 = renderWorldCard._evCount || 0;
+    const tRow = document.createElement('div');
+    tRow.className = 'ck-pill-row ck-termin-standalone';
+    tRow.style.cssText = 'cursor:pointer;max-width:420px;width:100%;box-sizing:border-box;';
+    tRow.innerHTML = '<div class="ck-num-pill' + (evCount2===0?' zero':'') + '" id="ck-termin-num">'
+      + (evCount2===0?'\u2013':evCount2) + '</div>'
+      + '<span class="ck-pill-label">Termine heute</span>';
+    tRow.addEventListener('click', () => WB._ckToggleZeitband());
+    grid.appendChild(tRow);
   },
 
   // Welt setzen + Checklisten-Tab öffnen
