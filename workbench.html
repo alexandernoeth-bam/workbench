@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.46.0</title>
+<title>WorkBench 3.46.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -147,11 +147,9 @@ html, body {
 /* ── Content-Bereich ───────────────────────────────── */
 #wb-content {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
+  overflow: hidden;
   background: var(--c-bg);
+  position: relative;
 }
 
 /* ── Tab-Bar ───────────────────────────────────────── */
@@ -462,27 +460,37 @@ html, body {
   overscroll-behavior: contain;
 }
 
-/* Termin-Toggle Zeile */
+/* Termin-Toggle — gleicher Stil wie ck-pill-row, grün hinterlegt */
 #ck-termin-toggle {
-  padding: 0 16px;
-  margin-top: 6px;
-}
-#ck-termin-toggle-inner {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 9px 12px;
-  border-radius: var(--radius-sm);
-  background: rgba(13,122,107,0.08);
-  border: 1px solid rgba(13,122,107,0.18);
+  padding: 7px 16px;
+  background: rgba(13,122,107,0.07);
+  border-top: 1px solid rgba(13,122,107,0.12);
+  border-bottom: 1px solid rgba(13,122,107,0.12);
+  cursor: pointer;
   transition: background var(--t-fast);
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
 }
-#ck-termin-toggle:hover #ck-termin-toggle-inner {
-  background: rgba(13,122,107,0.14);
+#ck-termin-toggle:hover { background: rgba(13,122,107,0.12); }
+#ck-termin-toggle.open  { background: rgba(13,122,107,0.13); }
+#ck-termin-toggle .ck-num-pill {
+  background: var(--c-beruf);
+  color: #fff;
 }
-#ck-termin-toggle.open #ck-termin-toggle-inner {
+#ck-termin-toggle .ck-num-pill.zero {
   background: rgba(13,122,107,0.15);
-  border-color: var(--c-beruf);
+  color: var(--c-beruf);
+}
+#ck-termin-toggle .ck-pill-label { color: rgba(13,80,65,0.8); }
+.ck-termin-arrow-icon {
+  font-size: 0.65rem;
+  color: var(--c-beruf);
+  margin-left: auto;
+  opacity: 0.6;
 }
 
 /* Zeitband Panel */
@@ -579,7 +587,7 @@ html, body {
 
 /* Grid-Container — zentriert, schmäler */
 #ck-grid {
-  padding: 12px 14px 24px;
+  padding: 12px 14px 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -590,7 +598,7 @@ html, body {
   max-width: 420px;
 }
 @media (min-width: 900px) {
-  #ck-grid { padding: 16px 20px 32px; gap: 16px; }
+  #ck-grid { padding: 16px 20px 0; gap: 16px; }
 }
 
 /* Weltkachel — farbiger Hintergrund */
@@ -3114,18 +3122,19 @@ html, body {
 /* ── Section-Placeholder ───────────────────────────── */
 .wb-section {
   display: none;
-  height: 100%;
-  padding: 16px;
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 0;
 }
 .wb-section.active {
-  display: flex;
-  flex-direction: column;
+  display: block;
 }
 #sec-cockpit.active {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  min-height: 0;
+  display: block;
 }
 
 .wb-placeholder {
@@ -4642,22 +4651,21 @@ html, body {
       </div>
       <!-- World-Card -->
       <div id="ck-grid"></div>
-      <!-- Termin-Toggle Zeile (außerhalb Card, gleicher Stil) -->
-      <div id="ck-termin-toggle" onclick="WB._ckToggleZeitband()" style="cursor:pointer;">
-        <div id="ck-termin-toggle-inner">
-          <div id="ck-termin-num" class="ck-num-pill zero">–</div>
-          <span class="ck-pill-label">Termine heute</span>
-          <span id="ck-termin-arrow" style="font-size:0.7rem;color:var(--c-muted);margin-left:auto;">▶</span>
-        </div>
+      <!-- Termin-Toggle: gleiche Optik wie Inbox-Pill, direkt unter World-Card -->
+      <div id="ck-termin-toggle" onclick="WB._ckToggleZeitband()">
+        <div id="ck-termin-num" class="ck-num-pill">–</div>
+        <span class="ck-pill-label">Termine heute</span>
+        <span id="ck-termin-arrow" class="ck-termin-arrow-icon">▶</span>
       </div>
       <!-- Zeitband eingeklappt (Standard) -->
       <div id="ck-zeitband-panel" style="display:none;">
         <div id="ck-zeitband-toolbar">
-          <div id="zt-daytype-banner" style="flex:1;font-size:0.78rem;"></div>
           <button onclick="WB._ztNewEvent()" id="ck-zt-new-btn">+ Termin</button>
         </div>
         <div id="zeitband-scroll"></div>
       </div>
+      <!-- zt-daytype-banner versteckt (nur noch im Zeitband intern) -->
+      <div id="zt-daytype-banner" style="display:none;"></div>
 
     </section>
 
@@ -5670,7 +5678,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.0 · Build 20260528-0215</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.1 · Build 20260528-0300</div>
     </div>
 
     <!-- Welt -->
@@ -5821,7 +5829,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.46.0',
+  APP_VERSION: '3.46.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -14739,50 +14747,7 @@ const WB = {
   // ── Cockpit: Wochenpflichten-Block rendern ─────────────
   // (Pflichten werden jetzt als Pills in renderWorldCard eingebaut)
   _ckRenderDuties() {
-    const container = document.getElementById('ck-duties-container');
-    if (!container) return; // Container entfernt in 3.18.1
-
-    const allDuties = [];
-    ['pro','priv'].forEach(ctx => {
-      const store = this._dutyStore(ctx) || [];
-      store.forEach(d => allDuties.push({ ...d, ctx }));
-    });
-
-    if (!allDuties.length) { container.innerHTML = ''; return; }
-
-    const kw      = this._kwStr(new Date());
-    const done    = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
-    const total   = allDuties.length;
-    const pct     = total ? Math.round(done / total * 100) : 0;
-    const barCls  = pct === 100 ? 'full' : '';
-
-    let rows = '';
-    allDuties.forEach(duty => {
-      const isDone   = this._dutyIsDone(duty, new Date());
-      const dueInfo  = this._dutyDueInfo(duty);
-      const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
-      const checkCls = isDone ? 'done' : worldCls;
-      const labelCls = isDone ? 'done' : '';
-      const metaCls  = dueInfo.late && !isDone ? 'ck-duty-late' : '';
-      rows += `<div class="ck-duty-row" onclick="WB.dutyToggle('${duty.ctx}','${duty.id}')">
-        <div class="ck-duty-check ${checkCls}"></div>
-        <span class="ck-duty-label ${labelCls}">${duty.title}</span>
-        <span class="ck-duty-meta ${metaCls}">${dueInfo.label}</span>
-      </div>`;
-    });
-
-    container.innerHTML = `<div class="ck-duties-block">
-      <div class="ck-duties-header">
-        <span class="ck-duties-title">Wochenpflichten KW ${kw.split('-W')[1]}</span>
-        <span class="ck-duties-progress">${done}/${total}</span>
-      </div>
-      <div style="padding:6px 14px 2px;">
-        <div class="ck-duties-bar">
-          <div class="ck-duties-bar-fill ${barCls}" style="width:${pct}%"></div>
-        </div>
-      </div>
-      ${rows}
-    </div>`;
+    return; // v3.46.0: Duty-Details nicht mehr im Cockpit
   },
 
   // ── Checklisten-Tab: Wochenpflichten-Sektion ───────────
