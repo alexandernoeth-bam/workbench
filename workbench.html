@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.58.0</title>
+<title>WorkBench 3.58.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5990,7 +5990,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.58.0 · Build 20260529-0030</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.58.1 · Build 20260529-0045</div>
     </div>
 
     <!-- Welt -->
@@ -6141,7 +6141,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.58.0',
+  APP_VERSION: '3.58.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -18027,6 +18027,12 @@ const WB = {
         + '</div>';
     }
 
+    if (type === 'task-new') {
+      if (titleEl) titleEl.childNodes[0].textContent = 'Neue Aufgabe ';
+      if (delBtn)  delBtn.style.display = 'none';
+      body.innerHTML = this._taskFormHtml(null, ctx, pKey, db, true);
+    }
+
     document.getElementById('edit-overlay').classList.add('open');
     setTimeout(() => document.getElementById('ef-title')?.focus(), 100);
   },
@@ -19207,12 +19213,15 @@ const WB = {
       });
       // Feste Aufgaben mit Uhrzeit
       Object.values(db.projects||{}).forEach(p => {
-        (p.tasks||[]).forEach(t => {
-          if(!t.done && (t.isToday||t.date===viewStr) && t.time) {
-            const s = pT(t.time), rem = t.remainingMinutes||defW[t.size]||30;
-            blocks.push({start:s, end:s+rem/60, title:t.text, type:'task-fixed', ctx, done:!!t.done, prio:t.prio});
-            t._fixed = true;
-          }
+        Object.entries(db.projects||{}).forEach(([pKey2, p]) => {
+          (p.tasks||[]).forEach(t => {
+            if(!t.done && (t.isToday||t.date===viewStr) && t.time) {
+              const s = pT(t.time), rem = defW[t.size]||30;
+              blocks.push({start:s, end:s+rem/60, title:t.text, type:'task-fixed',
+                ctx, done:!!t.done, prio:t.prio, taskId:String(t.id), pKey:pKey2});
+              t._fixed = true;
+            }
+          });
         });
       });
     });
@@ -19300,9 +19309,10 @@ const WB = {
         const evObj = (evDb?.customEvents||[]).find(e => String(e.id)===String(block.evId));
         if (evObj?.checklist?.length) block.checklist = evObj.checklist;
       }
-      const clickable = block.type==='event' || block.type==='task-fixed';
       const clickAttr = block.evId
         ? `onclick="WB._openEvent('${block.evId}','${block.ctx||''}')"`
+        : block.taskId
+        ? `onclick="WB.openTaskDetail('${(block.pKey||'').replace(/'/g,"\'")}','${block.taskId}','${block.ctx||''}')"`
         : '';
 
       // Checkliste für Event aufbauen
