@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.52.2</title>
+<title>WorkBench 3.53.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5852,7 +5852,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.52.2 · Build 20260528-1720</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.53.0 · Build 20260528-1800</div>
     </div>
 
     <!-- Welt -->
@@ -6003,7 +6003,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.52.2',
+  APP_VERSION: '3.53.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -10664,6 +10664,7 @@ const WB = {
         await this._oauthInit();
         await this.oauthAutoSync();
         this._startAutoRefresh();
+    setTimeout(() => this._recurCheck(), 500);
       }, 2000);
     }
   },
@@ -10788,6 +10789,62 @@ const WB = {
       if (dx < 0 && cur < tabs.length - 1) this._goTab(tabs[cur + 1]); // links → nächster
       if (dx > 0 && cur > 0)               this._goTab(tabs[cur - 1]); // rechts → vorheriger
     }, { passive: true });
+  },
+
+  // ── Wiederkehrende Aufgaben: Datum-Reset (v3.53.0) ──
+  _recurCheck() {
+    const today = new Date().toISOString().split('T')[0];
+    // Nur einmal pro Tag laufen
+    if (this._recurLastCheck === today) return;
+    this._recurLastCheck = today;
+
+    const addDays = (dateStr, n) => {
+      const d = new Date(dateStr);
+      d.setDate(d.getDate() + n);
+      return d.toISOString().split('T')[0];
+    };
+
+    const nextDate = (t) => {
+      const base = t.date || t.intervalStart || today;
+      const unit = t.intervalUnit || 'täglich';
+      const n    = parseInt(t.interval) || 1;
+      if (unit === 'täglich' || unit === 'alle N Tage') return addDays(base, n);
+      if (unit === 'wöchentlich') return addDays(base, 7);
+      return addDays(base, 1);
+    };
+
+    let changed = false;
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      Object.values(db.projects || {}).forEach(proj => {
+        (proj.tasks || []).forEach(t => {
+          if (!t.interval) return; // keine wiederkehrende Aufgabe
+          if (!t.date || t.date > today) return; // noch nicht fällig
+
+          if (t.done) {
+            // Erledigt → nächste Instanz anlegen
+            t.date    = nextDate(t);
+            t.done    = false;
+            t.isToday = t.date === today;
+            // Checkliste nullen
+            if (t.checklist?.length) t.checklist.forEach(c => c.done = false);
+            changed = true;
+          } else if (t.date < today) {
+            // Nicht erledigt, überfällig → Datum auf heute setzen
+            t.date    = today;
+            t.isToday = true;
+            // Checkliste NICHT nullen — noch offen
+            changed = true;
+          }
+        });
+      });
+    });
+
+    if (changed) {
+      this.setDirty();
+      console.log('[Recur] Wiederkehrende Aufgaben aktualisiert');
+    }
   },
 
   start() {
@@ -18066,6 +18123,7 @@ const WB = {
 
   // ── Aufgaben Rendering ──────────────────────────────
   renderAufgaben() {
+    this._recurCheck(); // Täglich prüfen
     const hdr    = document.getElementById('aufgaben-header');
     const scroll = document.getElementById('aufgaben-scroll');
     if(!hdr || !scroll) return;
