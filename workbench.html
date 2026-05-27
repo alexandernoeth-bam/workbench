@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.33.0</title>
+<title>WorkBench 3.34.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5452,7 +5452,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.33.0 · Build 20260526-2002</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.34.0 · Build 20260527-1130</div>
     </div>
 
     <!-- Welt -->
@@ -5675,7 +5675,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.33.0',
+  APP_VERSION: '3.34.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8424,9 +8424,14 @@ const WB = {
     const kw    = this._kwStr(new Date());
     let taskCount = 0, dutyCount = 0;
 
+    // BUG-FIX v3.34.0: Urlaubs-Check — bei proBlocked keine beruflichen Zählungen
+    const todayDayInfo2 = this._getDayInfo(today);
+    const proBlockedToday = todayDayInfo2.proBlocked;
+
     // Aufgaben mit Datum heute
-    [this.dataPro, this.dataPriv].forEach(db => {
+    [['pro', this.dataPro], ['priv', this.dataPriv]].forEach(([ctx, db]) => {
       if (!db) return;
+      if (ctx === 'pro' && proBlockedToday) return; // kein Beruf an Urlaubstagen
       Object.values(db.projects || {}).forEach(p => {
         (p.tasks || []).forEach(t => {
           if (!t.done && t.date === today) taskCount++;
@@ -8436,6 +8441,7 @@ const WB = {
 
     // Wochenpflichten heute fällig
     ['pro','priv'].forEach(ctx => {
+      if (ctx === 'pro' && proBlockedToday) return; // kein Beruf an Urlaubstagen
       (this._dutyStore(ctx) || []).forEach(d => {
         const dueInfo = this._dutyDueInfo({...d, ctx});
         if (dueInfo.due && !d.doneWeeks?.[kw]) dutyCount++;
@@ -8622,18 +8628,25 @@ const WB = {
       const goWoche    = `WB._goTab('woche')`;
 
       // Aufgaben heute zählen
+      // BUG-FIX v3.34.0: Bei Urlaub/Feiertag keine beruflichen Aufgaben zählen
+      const todayDayInfo = this._getDayInfo(today);
+      const isProBlocked = ctx === 'pro' && todayDayInfo.proBlocked;
       let tasksTodayCount = 0;
-      Object.values(db.projects || {}).forEach(p => {
-        (p.tasks || []).forEach(t => {
-          if (!t.done && t.date === today) tasksTodayCount++;
+      if (!isProBlocked) {
+        Object.values(db.projects || {}).forEach(p => {
+          (p.tasks || []).forEach(t => {
+            if (!t.done && t.date === today) tasksTodayCount++;
+          });
         });
-      });
-      // Wochenpflichten heute fällig (für diese Welt)
+      }
+      // Wochenpflichten heute fällig (für diese Welt) — ebenfalls bei Urlaub ausblenden
       const kw = this._kwStr(now);
-      (this._dutyStore(ctx) || []).forEach(d => {
-        const dueInfo = this._dutyDueInfo({...d, ctx});
-        if (dueInfo.due && !d.doneWeeks?.[kw]) tasksTodayCount++;
-      });
+      if (!isProBlocked) {
+        (this._dutyStore(ctx) || []).forEach(d => {
+          const dueInfo = this._dutyDueInfo({...d, ctx});
+          if (dueInfo.due && !d.doneWeeks?.[kw]) tasksTodayCount++;
+        });
+      }
 
       // Pill-Zeile bauen — mit Farblogik
       const row = (count, label, onclick) => {
@@ -16993,25 +17006,55 @@ const WB = {
       }
     });
 
-    // Routine-Ansicht: Wochenpflichten als Liste
+    // Routine-Ansicht: Wochenpflichten als Liste (v3.34.0)
+    // Offene nach Wochentag aufsteigend oben, Erledigte unten
     if(this.taskFilter === 'routine') {
       let rHtml = '<div style="padding:12px 14px;">';
       if(!relevantDuties.length) {
         rHtml += '<div class="zt-empty">Keine fälligen Routinen diese Woche.</div>';
       } else {
-        relevantDuties.forEach(duty => {
-          const done    = !!(duty.doneWeeks?.[kw]);
-          const dueInfo = this._dutyDueInfo(duty);
-          const wCls    = ctx === 'pro' ? 'beruf' : 'priv';
-          const chkCls  = done ? 'done' : wCls;
-          rHtml += `<div class="cl-duty-item" onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderAufgaben();">
-            <div class="cl-duty-checkbox ${chkCls}"></div>
-            <div class="cl-duty-info">
-              <div class="cl-duty-name${done?' done':''}">${duty.title}</div>
-              <div class="cl-duty-when${dueInfo.late&&!done?' late':''}">${dueInfo.label}</div>
-            </div>
-          </div>`;
-        });
+        const wCls = ctx === 'pro' ? 'beruf' : 'priv';
+        // Sortier-Hilfsfunktion: frühester fälliger Wochentag (Mo=1..So=7)
+        const normalize = d => d === 0 ? 7 : d;
+        const dutyDay = duty => {
+          if (duty.type === 'fixed') return normalize(parseInt(duty.dayFixed) || 1);
+          const days = duty.days || [];
+          if (!days.length) return 8;
+          return Math.min(...days.map(normalize));
+        };
+        const openDutiesSorted = [...openDuties].sort((a,b) => dutyDay(a) - dutyDay(b));
+        const doneDutiesSorted = [...doneDuties].sort((a,b) => dutyDay(a) - dutyDay(b));
+
+        // Offene Routinen — abhakbar + Edit-Link
+        if (openDutiesSorted.length) {
+          rHtml += '<div class="af-section-label" style="padding-top:4px;">Offen</div>';
+          openDutiesSorted.forEach(duty => {
+            const dueInfo = this._dutyDueInfo(duty);
+            rHtml += `<div class="cl-duty-item">
+              <div class="cl-duty-checkbox ${wCls}" onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderAufgaben();"></div>
+              <div class="cl-duty-info" style="flex:1;">
+                <div class="cl-duty-name">${duty.title}</div>
+                <div class="cl-duty-when${dueInfo.late?' late':''}">${dueInfo.label}</div>
+              </div>
+              <button onclick="WB.dutiesOpen()" style="flex-shrink:0;padding:4px 10px;font-size:0.75rem;font-family:var(--font);border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;color:var(--c-muted);cursor:pointer;">Bearbeiten</button>
+            </div>`;
+          });
+        }
+
+        // Erledigte Routinen — unten, durchgestrichen
+        if (doneDutiesSorted.length) {
+          rHtml += '<div class="af-section-label" style="padding-top:12px;">Erledigt</div>';
+          doneDutiesSorted.forEach(duty => {
+            const dueInfo = this._dutyDueInfo(duty);
+            rHtml += `<div class="cl-duty-item">
+              <div class="cl-duty-checkbox done" onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderAufgaben();"></div>
+              <div class="cl-duty-info">
+                <div class="cl-duty-name done">${duty.title}</div>
+                <div class="cl-duty-when">${dueInfo.label}</div>
+              </div>
+            </div>`;
+          });
+        }
       }
       rHtml += '</div>';
       scroll.innerHTML = rHtml;
