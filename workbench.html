@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.46.1</title>
+<title>WorkBench 3.46.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -460,37 +460,38 @@ html, body {
   overscroll-behavior: contain;
 }
 
-/* Termin-Toggle — gleicher Stil wie ck-pill-row, grün hinterlegt */
+/* Termin-Toggle — Pill-Zeile direkt unter World-Card, volle Card-Breite */
 #ck-termin-toggle {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 7px 16px;
+  padding: 8px 16px;
   background: rgba(13,122,107,0.07);
-  border-top: 1px solid rgba(13,122,107,0.12);
-  border-bottom: 1px solid rgba(13,122,107,0.12);
+  border-radius: var(--radius);
+  border: 1px solid rgba(13,122,107,0.18);
   cursor: pointer;
   transition: background var(--t-fast);
   width: 100%;
   max-width: 420px;
   box-sizing: border-box;
+  margin-top: 4px;
 }
 #ck-termin-toggle:hover { background: rgba(13,122,107,0.12); }
-#ck-termin-toggle.open  { background: rgba(13,122,107,0.13); }
+#ck-termin-toggle.open  { background: rgba(13,122,107,0.14); border-color: rgba(13,122,107,0.35); }
 #ck-termin-toggle .ck-num-pill {
   background: var(--c-beruf);
   color: #fff;
+  min-width: 44px;
 }
 #ck-termin-toggle .ck-num-pill.zero {
-  background: rgba(13,122,107,0.15);
+  background: rgba(13,122,107,0.18);
   color: var(--c-beruf);
 }
-#ck-termin-toggle .ck-pill-label { color: rgba(13,80,65,0.8); }
+#ck-termin-toggle .ck-pill-label { color: rgba(13,80,65,0.85); flex: 1; }
 .ck-termin-arrow-icon {
   font-size: 0.65rem;
   color: var(--c-beruf);
-  margin-left: auto;
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
 /* Zeitband Panel */
@@ -4651,12 +4652,8 @@ html, body {
       </div>
       <!-- World-Card -->
       <div id="ck-grid"></div>
-      <!-- Termin-Toggle: gleiche Optik wie Inbox-Pill, direkt unter World-Card -->
-      <div id="ck-termin-toggle" onclick="WB._ckToggleZeitband()">
-        <div id="ck-termin-num" class="ck-num-pill">–</div>
-        <span class="ck-pill-label">Termine heute</span>
-        <span id="ck-termin-arrow" class="ck-termin-arrow-icon">▶</span>
-      </div>
+      <!-- zt-daytype-banner versteckt -->
+      <div id="zt-daytype-banner" style="display:none;"></div>
       <!-- Zeitband eingeklappt (Standard) -->
       <div id="ck-zeitband-panel" style="display:none;">
         <div id="ck-zeitband-toolbar">
@@ -4664,8 +4661,6 @@ html, body {
         </div>
         <div id="zeitband-scroll"></div>
       </div>
-      <!-- zt-daytype-banner versteckt (nur noch im Zeitband intern) -->
-      <div id="zt-daytype-banner" style="display:none;"></div>
 
     </section>
 
@@ -5678,7 +5673,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.1 · Build 20260528-0300</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.2 · Build 20260528-0400</div>
     </div>
 
     <!-- Welt -->
@@ -5829,7 +5824,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.46.1',
+  APP_VERSION: '3.46.2',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8950,6 +8945,18 @@ const WB = {
     } else {
       grid.innerHTML = renderWorldCard('priv', this.dataPriv, 'priv',  'Privat');
     }
+
+    // v3.46.2: Termin-Toggle direkt in ck-grid anhängen
+    const toggleEl = document.createElement('div');
+    toggleEl.id = 'ck-termin-toggle';
+    toggleEl.onclick = () => this._ckToggleZeitband();
+    toggleEl.innerHTML = `
+      <div id="ck-termin-num" class="ck-num-pill${this._ckUpdateTerminToggle._lastCount === 0 ? ' zero' : ''}">–</div>
+      <span class="ck-pill-label">Termine heute</span>
+      <span id="ck-termin-arrow" class="ck-termin-arrow-icon">${this._ckZeitbandOpen ? '▼' : '▶'}</span>`;
+    if (this._ckZeitbandOpen) toggleEl.classList.add('open');
+    grid.appendChild(toggleEl);
+    this._ckUpdateTerminToggle();
   },
 
   // Welt setzen + Checklisten-Tab öffnen
@@ -11546,30 +11553,7 @@ const WB = {
 
   // ── Pflicht-Pills für eine Welt rendern ───────────────
   _ckDutyPillsHtml(ctx) {
-    const store = this._dutyStore(ctx) || [];
-    const kw    = this._kwStr(new Date());
-
-    const relevant = store.filter(d => {
-      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
-      // Nur zeigen wenn heute fällig (due=true)
-      const dueInfo = this._dutyDueInfo({ ...d, ctx });
-      return dueInfo.due;
-    });
-    if (!relevant.length) return '';
-
-    const pills = relevant.map(duty => {
-      const done    = this._dutyIsDone(duty, new Date());
-      const dueInfo = this._dutyDueInfo(duty);
-      const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
-      const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
-      return `<span class="ck-duty-pill ${cls}"
-        onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderCockpit()"
-        title="${dueInfo.label}">
-        <span class="ck-duty-pill-check">${icon}</span>${duty.title}
-      </span>`;
-    }).join('');
-
-    return `<div class="ck-duty-pills-row">${pills}</div>`;
+    return ''; // v3.46.1: Duty-Details nicht mehr im Cockpit
   },
 
   // ── Cockpit: Wochenpflichten-Block rendern ─────────────
@@ -15318,11 +15302,15 @@ const WB = {
         if (endMin > nowMin) count++;
       });
     });
+    this._ckUpdateTerminToggle._lastCount = count;
     const numEl = document.getElementById('ck-termin-num');
     if (numEl) {
       numEl.textContent = count === 0 ? '–' : String(count);
       numEl.className = 'ck-num-pill' + (count === 0 ? ' zero' : '');
     }
+    // Toggle-Klickbarkeit sicherstellen
+    const toggle = document.getElementById('ck-termin-toggle');
+    if (toggle) toggle.style.pointerEvents = 'auto';
   },
 
   // ── Laufender Block Banner (v3.44.0) ──────────────────
