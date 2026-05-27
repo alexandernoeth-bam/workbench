@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.52.0</title>
+<title>WorkBench 3.52.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5852,7 +5852,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.52.0 · Build 20260528-1630</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.52.1 · Build 20260528-1700</div>
     </div>
 
     <!-- Welt -->
@@ -6003,7 +6003,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.52.0',
+  APP_VERSION: '3.52.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -15753,16 +15753,19 @@ const WB = {
           <input type="checkbox" class="cl-item-chk" ${item.done?'checked':''}
             onchange="WB.clToggleItem('${instId}','${item.id}',this)">
           <span class="cl-item-text${item.done?' done':''}">${item.text}</span>
-          <button class="cl-item-to-task${linked?' linked':''}"
-            onclick="WB.clItemToTask('${instId}','${item.id}')"
-            title="${linked?'Bereits verknüpft':'Als Aufgabe anlegen'}">
-            ${linked ? '✓ Aufgabe' : '+ Aufgabe'}
-          </button>
         </div>`;
       });
+      // "Als Aufgabe anlegen" Button immer oben
+      html += `<div style="padding:10px 16px 4px;">
+        <button onclick="WB._clToTask('${instId}')"
+          style="width:100%;padding:10px;border:1px solid var(--c-beruf);background:none;border-radius:var(--radius-sm);font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;color:var(--c-beruf);display:flex;align-items:center;justify-content:center;gap:8px;">
+          <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Als Aufgabe anlegen
+        </button>
+      </div>`;
       if(done===total && total>0) {
-        html += `<div style="margin:16px 12px;">
-          <button onclick="WB.clFinishInstanz('${instId}')" style="width:100%;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-sm);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;">&#10003; Checkliste abschließen</button>
+        html += `<div style="padding:4px 16px 12px;">
+          <button onclick="WB.clFinishInstanz('${instId}')" style="width:100%;padding:10px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-sm);font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;">&#10003; Checkliste abschließen</button>
         </div>`;
       }
     } else {
@@ -15924,6 +15927,59 @@ const WB = {
   },
 
 
+
+  // ── Checkliste als Aufgabe anlegen (v3.52.1) ─────────
+  _clToTask(instId) {
+    const store = this._clInstanzStore(); if (!store) return;
+    const inst  = store.find(x => x.id === instId); if (!inst) return;
+
+    // Checklisten-Items als Aufgaben-Checklist vorbereiten
+    const checklist = inst.items.map(i => ({ text: i.text, done: i.done }));
+
+    // _editType + Kontext setzen
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Keine Datenbank geladen'); return; }
+
+    // Erstes Projekt als Default
+    const projKey = Object.keys(db.projects || {})[0] || 'Einzelaufgaben (Ohne Projekt)';
+
+    this._editType = 'task-new';
+    this._editCtx  = ctx;
+    this._editPKey = projKey;
+    this._editId   = null;
+
+    // Dialog öffnen
+    const titleEl = document.getElementById('edit-title');
+    if (titleEl) titleEl.childNodes[0].textContent = 'Neue Aufgabe ';
+    const delBtn = document.getElementById('edit-delete-btn');
+    if (delBtn) delBtn.style.display = 'none';
+
+    const body = document.getElementById('edit-body');
+    if (body) {
+      body.innerHTML = this._taskFormHtml(null, ctx, projKey, db, true);
+      // Titel vorbelegen
+      setTimeout(() => {
+        const tfTitle = document.getElementById('ef-title');
+        if (tfTitle) tfTitle.value = inst.name;
+        // Checklisten-Items einfügen
+        const list = document.getElementById('ef-chk-list');
+        if (list) {
+          list.innerHTML = checklist.map((item, i) =>
+            `<div class="ef-chk-row" data-idx="${i}" style="display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" ${item.done?'checked':''} onchange="WB._efChkToggle(${i})" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
+              <span style="flex:1;font-size:0.9rem;${item.done?'text-decoration:line-through;color:var(--c-faint);':''}" id="ef-chk-text-${i}">${item.text}</span>
+              <button onclick="WB._efChkDelete(${i})" style="background:none;border:none;color:var(--c-faint);cursor:pointer;font-size:1rem;padding:0 4px;">×</button>
+            </div>`
+          ).join('');
+        }
+      }, 50);
+    }
+
+    document.getElementById('edit-overlay').classList.add('open');
+    // Checklisten-Dialog schließen
+    this.clDetailClose();
+  },
 
   clDetailClose() {
     document.getElementById('cl-detail-overlay')?.classList.remove('open');
