@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.57.6</title>
+<title>WorkBench 3.57.7</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -3335,10 +3335,12 @@ html, body {
   .zt-block.task {
     background: var(--c-surface);
     border: 1px solid var(--c-border);
+    border-left: 3px solid var(--c-beruf);
     color: var(--c-text);
     cursor: pointer;
   }
-  .zt-block.task:hover { border-color: var(--c-border2); }
+  .zt-block.task:hover { background: var(--c-bg); border-color: var(--c-beruf); }
+  .zt-block.task .zt-block-text { font-weight: 500; }
   .zt-block.system {
     background: var(--c-bg);
     border: 1px solid var(--c-border);
@@ -5988,7 +5990,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.57.6 · Build 20260528-2340</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.57.7 · Build 20260528-2355</div>
     </div>
 
     <!-- Welt -->
@@ -6139,7 +6141,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.57.6',
+  APP_VERSION: '3.57.7',
   APP_BUILD:   '20260526-0723',
 
 
@@ -16600,6 +16602,10 @@ const WB = {
     if (realScroll) realScroll.id = 'zeitband-scroll';
     // viewDate wiederherstellen
     this.viewDate = oldViewDate;
+    // Klick-Handler für Aufgaben-Blöcke neu verdrahten
+    el.querySelectorAll('.zt-block.task').forEach(block => {
+      block.onclick = () => WB._openTask(block);
+    });
   },
 
   _planerRenderPool(dateStr) {
@@ -16621,7 +16627,7 @@ const WB = {
       Object.entries(db.projects || {}).forEach(([pKey, proj]) => {
         (proj.tasks || []).forEach(t => {
           if (t.done) return;
-          if (t.time && t.date === dateStr) return; // hat Uhrzeit für diesen Tag → im Zeitband
+          if (t.time && t.date && t.date <= dateStr) return; // hat Uhrzeit → eingeplant, nicht im Pool
           if (!t.date || t.date > dateStr) return; // noch nicht fällig
           tasks.push({ t, pKey, ctx });
         });
@@ -16637,7 +16643,9 @@ const WB = {
       Object.entries(db.projects || {}).forEach(([pKey, proj]) => {
         (proj.tasks || []).forEach(t => {
           if (t.done) return;
-          if (!t.time || t.date !== dateStr) return;
+          // Eingeplant = hat Uhrzeit UND Datum ist dieser Tag oder früher (überfällig eingeplant)
+          if (!t.time) return;
+          if (!t.date || t.date > dateStr) return;
           planned.push({ t, pKey, ctx });
         });
       });
