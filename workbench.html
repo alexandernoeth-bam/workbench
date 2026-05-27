@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.55.0</title>
+<title>WorkBench 3.56.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4718,6 +4718,129 @@ html, body {
   margin: 4px 0;
 }
 
+
+/* ── Tagesplaner ─────────────────────────────────── */
+#sec-planer {
+  overflow: hidden;
+}
+#planer-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+  flex-shrink: 0;
+}
+#planer-date-label {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: center;
+}
+.planer-nav-btn {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  color: var(--c-muted);
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+}
+.planer-nav-btn:hover { color: var(--c-text); background: var(--c-bg); }
+#planer-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+#planer-left {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border-right: 2px solid var(--c-border);
+  min-width: 0;
+}
+#planer-right {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+#planer-left-title,
+#planer-right-title {
+  padding: 8px 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+/* Pool-Items */
+.planer-pool-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface);
+}
+.planer-pool-item.must {
+  background: #FFF5F5;
+  border-left: 3px solid #C62828;
+}
+.planer-pool-item.must-done {
+  opacity: 0.45;
+}
+.planer-prio-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.planer-prio-badge.A { background: #FDECEA; color: #C62828; }
+.planer-prio-badge.B { background: #FFF8E1; color: #E65100; }
+.planer-prio-badge.C { background: var(--c-bg); color: var(--c-muted); }
+.planer-pool-text {
+  flex: 1;
+  font-size: 0.88rem;
+  line-height: 1.3;
+  min-width: 0;
+}
+.planer-pool-text .sub {
+  font-size: 0.74rem;
+  color: var(--c-muted);
+  margin-top: 2px;
+}
+.planer-plan-btn {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--c-beruf);
+  border-radius: var(--radius-xs);
+  color: var(--c-beruf);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 9px;
+  cursor: pointer;
+  font-family: var(--font);
+  white-space: nowrap;
+}
+.planer-plan-btn:hover { background: var(--c-beruf); color: #fff; }
+.planer-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--c-faint);
+  font-size: 0.85rem;
+}
+
 </style>
 </head>
 <body>
@@ -4887,6 +5010,9 @@ html, body {
     </section>
 
     <!-- Ziele -->
+    <section class="wb-section" id="sec-planer" aria-label="Planer">
+    </section>
+
     <section class="wb-section" id="sec-ziele" aria-label="Ziele">
     </section>
 
@@ -4957,6 +5083,16 @@ html, body {
         <line x1="16" y1="4" x2="16" y2="10"/>
       </svg>
       Woche
+    </button>
+    <button class="wb-tab" role="tab" aria-selected="false" aria-controls="sec-planer"
+            onclick="WB.switchTab('planer', this)" data-label="Planer" id="tab-planer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+        <line x1="7" y1="14" x2="17" y2="14"/>
+        <line x1="7" y1="17" x2="13" y2="17"/>
+      </svg>
+      Planer
     </button>
 
   </nav>
@@ -5852,7 +5988,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.55.0 · Build 20260528-1900</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.56.0 · Build 20260528-2000</div>
     </div>
 
     <!-- Welt -->
@@ -6003,7 +6139,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.55.0',
+  APP_VERSION: '3.56.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -16367,6 +16503,168 @@ const WB = {
     return Math.ceil((((d-y)/86400000)+1)/7);
   },
 
+  // ── Tagesplaner (v3.56.0) ──────────────────────────
+  _planerDate: null, // aktuell angezeigter Tag
+
+  renderPlaner() {
+    const sec = document.getElementById('sec-planer');
+    if (!sec) return;
+
+    // Datum init
+    if (!this._planerDate) {
+      this._planerDate = new Date().toISOString().split('T')[0];
+    }
+    const dateStr = this._planerDate;
+    const d = new Date(dateStr + 'T00:00:00');
+    const isToday = dateStr === new Date().toISOString().split('T')[0];
+
+    const dayNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+    const months   = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+    const dateLabel = `${dayNames[d.getDay()]}, ${d.getDate()}. ${months[d.getMonth()]} ${d.getFullYear()}${isToday?' · Heute':''}`;
+
+    // Header
+    sec.innerHTML = `
+      <div id="planer-header">
+        <button class="planer-nav-btn" onclick="WB._planerShift(-1)">&#8249;</button>
+        <div id="planer-date-label">${dateLabel}</div>
+        <button class="planer-nav-btn" onclick="WB._planerShift(1)">&#8250;</button>
+        ${!isToday ? `<button onclick="WB._planerToday()" style="font-size:0.72rem;padding:3px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;cursor:pointer;font-family:var(--font);color:var(--c-muted);">Heute</button>` : ''}
+      </div>
+      <div id="planer-body">
+        <div id="planer-left">
+          <div id="planer-left-title">Zeitband</div>
+          <div id="planer-zt"></div>
+        </div>
+        <div id="planer-right">
+          <div id="planer-right-title">Aufgaben-Pool</div>
+          <div id="planer-pool"></div>
+        </div>
+      </div>`;
+
+    this._planerRenderZeitband(dateStr);
+    this._planerRenderPool(dateStr);
+  },
+
+  _planerShift(n) {
+    const d = new Date((this._planerDate || new Date().toISOString().split('T')[0]) + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    this._planerDate = d.toISOString().split('T')[0];
+    this.renderPlaner();
+  },
+
+  _planerToday() {
+    this._planerDate = new Date().toISOString().split('T')[0];
+    this.renderPlaner();
+  },
+
+  _planerRenderZeitband(dateStr) {
+    const el = document.getElementById('planer-zt');
+    if (!el) return;
+    // Zeitband-HTML aus renderHeute wiederverwenden
+    // Wir setzen kurz viewDate und rendern in planer-zt
+    const oldDate = this._viewDate;
+    this._viewDate = dateStr;
+    // Zeitband-Inhalt generieren (gleiche Logik wie renderHeute aber in el)
+    const tempScroll = document.createElement('div');
+    tempScroll.id = 'zeitband-scroll-temp';
+    document.body.appendChild(tempScroll);
+    const realScroll = document.getElementById('zeitband-scroll');
+    // Swap: render in temp
+    if (realScroll) realScroll.id = 'zeitband-scroll-bak';
+    tempScroll.id = 'zeitband-scroll';
+    try { this.renderHeute(); } catch(e) {}
+    el.innerHTML = tempScroll.innerHTML;
+    tempScroll.id = 'zeitband-scroll-temp';
+    document.body.removeChild(tempScroll);
+    if (realScroll) realScroll.id = 'zeitband-scroll';
+    this._viewDate = oldDate;
+  },
+
+  _planerRenderPool(dateStr) {
+    const el = document.getElementById('planer-pool');
+    if (!el) return;
+
+    // Alle Aufgaben beider Welten sammeln die für diesen Tag relevant sind
+    const tasks = [];
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      Object.entries(db.projects || {}).forEach(([pKey, proj]) => {
+        (proj.tasks || []).forEach(t => {
+          if (t.done) return;
+          if (t.time) return; // hat feste Uhrzeit → schon im Zeitband
+          if (!t.date || t.date > dateStr) return; // noch nicht fällig
+          tasks.push({ t, pKey, ctx });
+        });
+      });
+    });
+
+    if (!tasks.length) {
+      el.innerHTML = '<div class="planer-empty">Keine offenen Aufgaben für diesen Tag</div>';
+      return;
+    }
+
+    // Sortierung: mustToday zuerst, dann Prio A→B→C, dann Datum
+    const prioOrder = { A: 0, B: 1, C: 2 };
+    tasks.sort((a, b) => {
+      const aM = a.t.mustToday ? -1 : 0;
+      const bM = b.t.mustToday ? -1 : 0;
+      if (aM !== bM) return aM - bM;
+      const aP = prioOrder[a.t.prioLvl||'C'] ?? 2;
+      const bP = prioOrder[b.t.prioLvl||'C'] ?? 2;
+      return aP - bP;
+    });
+
+    const sizeMin = { XS:5, S:15, M:30, L:60, XL:120, XXL:240 };
+
+    const html = tasks.map(({t, pKey, ctx}) => {
+      const prio    = t.prioLvl || (t.prio ? 'A' : 'C');
+      const min     = sizeMin[t.size] || 30;
+      const must    = t.mustToday;
+      const worldLbl = ctx === 'pro' ? 'Beruf' : 'Privat';
+      const pid = pKey.replace(/'/g,"\'");
+      return `<div class="planer-pool-item${must?' must':''}">
+        <span class="planer-prio-badge ${prio}">${prio}</span>
+        <div class="planer-pool-text">
+          <div>${t.text}</div>
+          <div class="sub">${worldLbl} · ${min} Min${t.date && t.date < dateStr ? ' · <span style="color:#C62828;">überfällig</span>' : ''}</div>
+        </div>
+        <button class="planer-plan-btn"
+          onclick="WB._planerPlanTask('${pid}','${t.id}','${ctx}','${dateStr}')">
+          Einplanen →
+        </button>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = html;
+  },
+
+  _planerPlanTask(pKey, taskId, ctx, dateStr) {
+    // Uhrzeit-Picker öffnen
+    const input = document.createElement('input');
+    input.type = 'time';
+    input.style.cssText = 'position:fixed;opacity:0;top:50%;left:50%;';
+    document.body.appendChild(input);
+    input.addEventListener('change', () => {
+      if (input.value) {
+        const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+        const t  = (db?.projects[pKey]?.tasks || []).find(x => String(x.id) === String(taskId));
+        if (t) {
+          t.time   = input.value;
+          t.date   = dateStr;
+          t.isToday = dateStr === new Date().toISOString().split('T')[0];
+          this.setDirty();
+          this._toast('Eingeplant um ' + input.value);
+          this.renderPlaner();
+        }
+      }
+      input.remove();
+    });
+    input.addEventListener('blur', () => setTimeout(() => input.remove(), 200));
+    input.click();
+    input.focus();
+  },
+
   renderWoche() {
     const grid  = document.getElementById('woche-grid'); if(!grid) return;
     const fab   = document.getElementById('zt-fab'); if(fab) fab.classList.remove('visible');
@@ -19093,6 +19391,7 @@ const WB = {
     if(id === 'notizen')      this.renderNotizen();
     if(id === 'checklisten')  this.renderChecklisten();
     if(id === 'woche')        this.renderWoche();
+    if(id === 'planer')       this.renderPlaner();
     if(id === 'ziele')        this.renderZiele();
     this._updateDateLabel();
   },
