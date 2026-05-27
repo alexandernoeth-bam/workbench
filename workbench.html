@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.37.0</title>
+<title>WorkBench 3.37.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5452,7 +5452,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.37.0 · Build 20260527-1430</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.37.1 · Build 20260527-1500</div>
     </div>
 
     <!-- Welt -->
@@ -5675,7 +5675,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.37.0',
+  APP_VERSION: '3.37.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8638,19 +8638,25 @@ const WB = {
       const goCl       = `WB._ckGoChecklisten('${ctx}')`;
       const goWoche    = `WB._goTab('woche')`;
 
-      // Aufgaben heute zählen
+      // Aufgaben heute zählen — bei Urlaub/Feiertag keine beruflichen Tasks (v3.37.1)
+      const todayDayInfo = this._getDayInfo(today);
+      const isProBlocked = ctx === 'pro' && todayDayInfo.proBlocked;
       let tasksTodayCount = 0;
-      Object.values(db.projects || {}).forEach(p => {
-        (p.tasks || []).forEach(t => {
-          if (!t.done && t.date === today) tasksTodayCount++;
+      if (!isProBlocked) {
+        Object.values(db.projects || {}).forEach(p => {
+          (p.tasks || []).forEach(t => {
+            if (!t.done && t.date === today) tasksTodayCount++;
+          });
         });
-      });
-      // Wochenpflichten heute fällig (für diese Welt)
+      }
+      // Wochenpflichten heute fällig — ebenfalls bei Urlaub ausblenden
       const kw = this._kwStr(now);
-      (this._dutyStore(ctx) || []).forEach(d => {
-        const dueInfo = this._dutyDueInfo({...d, ctx});
-        if (dueInfo.due && !d.doneWeeks?.[kw]) tasksTodayCount++;
-      });
+      if (!isProBlocked) {
+        (this._dutyStore(ctx) || []).forEach(d => {
+          const dueInfo = this._dutyDueInfo({...d, ctx});
+          if (dueInfo.due && !d.doneWeeks?.[kw]) tasksTodayCount++;
+        });
+      }
 
       // Pill-Zeile bauen — mit Farblogik
       const row = (count, label, onclick) => {
