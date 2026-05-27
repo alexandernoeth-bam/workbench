@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.53.0</title>
+<title>WorkBench 3.54.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5852,7 +5852,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.53.0 · Build 20260528-1800</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.54.0 · Build 20260528-1830</div>
     </div>
 
     <!-- Welt -->
@@ -6003,7 +6003,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.53.0',
+  APP_VERSION: '3.54.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -17526,7 +17526,22 @@ const WB = {
         + '<div class="edit-field"><label>Von</label><input id="ef-time" type="time" value="'+(ev.startTime||'09:00')+'" onchange="WB._evRecalcDur()">'+'</div>'
         + '<div class="edit-field"><label>Bis</label><input id="ef-endtime" type="time" value="'+evEnd+'" onchange="WB._evRecalcDur()">'+'</div>'
         + '</div>'
-        + '<div class="edit-field"><label>Ort</label><input id="ef-loc" type="text" value="'+(ev.location||'')+'">'+'</div>';
+        + '<div class="edit-field"><label>Ort</label><input id="ef-loc" type="text" value="'+(ev.location||'')+'">'+'</div>'
+        + '<div class="edit-field"><label>Checkliste</label>'
+        + '<div id="ef-chk-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">'
+        + (ev.checklist||[]).map((item,i) =>
+            `<div class="ef-chk-row" data-idx="${i}" style="display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" ${item.done?'checked':''} onchange="WB._efChkToggle(${i})" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
+              <span style="flex:1;font-size:0.9rem;${item.done?'text-decoration:line-through;color:var(--c-faint);':''}" id="ef-chk-text-${i}">${item.text}</span>
+              <button onclick="WB._efChkDelete(${i})" style="background:none;border:none;color:var(--c-faint);cursor:pointer;font-size:1rem;padding:0 4px;">×</button>
+            </div>`
+          ).join('')
+        + '</div>'
+        + '<div style="display:flex;gap:6px;">'
+        + '<input id="ef-chk-new" type="text" placeholder="Neuer Schritt…" style="flex:1;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);" onkeydown="WB._efChkKey(event)">'
+        + '<button onclick="WB._efChkAdd()" style="padding:7px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;cursor:pointer;">+</button>'
+        + '</div>'
+        + '</div>';
     }
 
     document.getElementById('edit-overlay').classList.add('open');
@@ -17611,6 +17626,7 @@ const WB = {
         welt:      world,
         typ:       typV,
       };
+      newEv.checklist = this._efChkGetList();
       if (!targetDb.customEvents) targetDb.customEvents = [];
       targetDb.customEvents.push(newEv);
       // Besprechungs-Prozess
@@ -17750,6 +17766,7 @@ const WB = {
       ev.date      = document.getElementById('ef-date')?.value||ev.date;
       ev.startTime = document.getElementById('ef-time')?.value||ev.startTime;
       ev.location  = document.getElementById('ef-loc')?.value||'';
+      ev.checklist = this._efChkGetList();
       // Dauer aus Von/Bis berechnen — Endzeit direkt speichern
       const pS = s=>{ const [h,m]=(s||'0:0').split(':').map(Number); return h*60+m; };
       const end = document.getElementById('ef-endtime')?.value;
@@ -18770,16 +18787,38 @@ const WB = {
 
       insertNow(block.start);
 
+      // Checkliste aus Event laden
+      if (block.type === 'event' && block.evId) {
+        const evDb = (block.ctx==='pro' ? this.dataPro : this.dataPriv);
+        const evObj = (evDb?.customEvents||[]).find(e => String(e.id)===String(block.evId));
+        if (evObj?.checklist?.length) block.checklist = evObj.checklist;
+      }
       const clickable = block.type==='event' || block.type==='task-fixed';
       const clickAttr = block.evId
         ? `onclick="WB._openEvent('${block.evId}','${block.ctx||''}')"`
         : '';
 
+      // Checkliste für Event aufbauen
+      const evChecklist = block.checklist || [];
+      const evChkDone   = evChecklist.filter(c => c.done).length;
+      const evChkBadge  = evChecklist.length > 0
+        ? `<span style="font-size:0.7rem;opacity:0.8;margin-left:6px;">${evChkDone}/${evChecklist.length}</span>` : '';
+      const evChkHtml   = evChecklist.length > 0 && block.type === 'event'
+        ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:3px;">'
+          + evChecklist.map((c,i) =>
+            `<div style="display:flex;align-items:center;gap:5px;font-size:0.78rem;opacity:0.9;">
+              <input type="checkbox" ${c.done?'checked':''} onclick="event.stopPropagation();WB._toggleEvChk('${block.evId}','${block.ctx}',${i},this)"
+                style="width:14px;height:14px;cursor:pointer;accent-color:#fff;flex-shrink:0;">
+              <span style="${c.done?'text-decoration:line-through;opacity:0.55;':''}">${c.text}</span>
+            </div>`).join('')
+          + '</div>'
+        : '';
       html += `<div class="zt-row">
         <div class="zt-time">${fT(block.start)}<span class="end">${fT(block.end)}</span></div>
         <div class="zt-block ${cls}${isDone?' erledigt':''}" style="min-height:${hpx}px;" ${clickAttr}>
-          <div class="zt-block-text">${block.title}
+          <div class="zt-block-text">${block.title}${evChkBadge}
             ${block.ctx ? `<div class="zt-block-sub">${block.ctx==='pro'?'Beruf':'Privat'}</div>` : ''}
+            ${evChkHtml}
           </div>
           ${block.type!=='system' ? `<input type="checkbox" class="zt-chk" ${isDone?'checked':''} onclick="event.stopPropagation();WB._toggleBlock('${block.evId||''}','${block.type}','${block.ctx||''}',this)">` : ''}
         </div>
@@ -18800,6 +18839,31 @@ const WB = {
     // Jetzt-Linie jede Minute aktualisieren
     clearInterval(this._ztNowTimer);
     this._ztNowTimer = setInterval(() => this.renderHeute(), 60000);
+  },
+
+  // ── Termin-Checkliste abhaken (v3.54.0) ─────────────
+  _toggleEvChk(evId, ctx, idx, chk) {
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    const ev = (db.customEvents||[]).find(e => String(e.id)===String(evId));
+    if (!ev?.checklist?.[idx]) return;
+    ev.checklist[idx].done = chk.checked;
+    // Visuelle Reaktion
+    const span = chk.nextElementSibling;
+    if (span) {
+      span.style.textDecoration = chk.checked ? 'line-through' : '';
+      span.style.opacity = chk.checked ? '0.55' : '';
+    }
+    // Badge aktualisieren
+    const block = chk.closest('.zt-block');
+    if (block) {
+      const badge = block.querySelector('.zt-block-text > span');
+      if (badge) {
+        const done = ev.checklist.filter(c=>c.done).length;
+        badge.textContent = `${done}/${ev.checklist.length}`;
+      }
+    }
+    this.setDirty();
   },
 
   _toggleBlock(evId, type, ctx, chk) {
