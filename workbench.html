@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.58.3</title>
+<title>WorkBench 3.58.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5991,7 +5991,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.58.3 · Build 20260529-0115</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.58.4 · Build 20260529-0130</div>
     </div>
 
     <!-- Welt -->
@@ -6142,7 +6142,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.58.3',
+  APP_VERSION: '3.58.4',
   APP_BUILD:   '20260526-0723',
 
 
@@ -16603,13 +16603,13 @@ const WB = {
     if (realScroll) realScroll.id = 'zeitband-scroll';
     // viewDate wiederherstellen
     this.viewDate = oldViewDate;
-    // Klick-Handler für Aufgaben-Blöcke neu verdrahten
-    el.querySelectorAll('.zt-block.task').forEach(block => {
-      block.onclick = (e) => {
-        if (e.target.type === 'checkbox') return;
-        const {taskid, ctx, pkey} = block.dataset;
-        if (taskid && ctx && pkey) WB.openTaskDetail(pkey, taskid, ctx);
-      };
+    // Event-Delegation auf Container-Ebene (überwindet Bubbling-Probleme)
+    el.addEventListener('click', (e) => {
+      if (e.target.type === 'checkbox') return;
+      const block = e.target.closest('.zt-block.task');
+      if (!block) return;
+      const {taskid, ctx, pkey} = block.dataset;
+      if (taskid && ctx && pkey) WB.openTaskDetail(pkey, taskid, ctx);
     });
   },
 
@@ -19373,10 +19373,13 @@ const WB = {
             </div>`).join('')
           + '</div>'
         : '';
-      const blockStyle = `min-height:${hpx}px;${block.taskId?'cursor:pointer;':''}`;
+      const blockStyle = `min-height:${hpx}px;${block.taskId||block.evId?'cursor:pointer;':''}`;
+      const dataAttrs = block.taskId
+        ? `data-taskid="${block.taskId}" data-ctx="${block.ctx||''}" data-pkey="${(block.pKey||'').replace(/"/g,'&quot;')}"`
+        : '';
       html += `<div class="zt-row">
         <div class="zt-time">${fT(block.start)}<span class="end">${fT(block.end)}</span></div>
-        <div class="zt-block ${cls}${isDone?' erledigt':''}" style="${blockStyle}" ${clickAttr}>
+        <div class="zt-block ${cls}${isDone?' erledigt':''}" style="${blockStyle}" ${clickAttr} ${dataAttrs}>
           <div class="zt-block-text">${block.title}${evChkBadge}
             ${block.ctx ? `<div class="zt-block-sub">${block.ctx==='pro'?'Beruf':'Privat'}</div>` : ''}
             ${evChkHtml}
