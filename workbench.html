@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.48.1</title>
+<title>WorkBench 3.48.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -71,7 +71,8 @@ html, body {
 #wb-app {
   display: flex;
   flex-direction: column;
-  height: 100dvh;           /* dynamic viewport height — iOS safe */
+  height: 100dvh;
+  height: 100vh; /* Fallback für Android Chrome */
   max-width: 1200px;
   margin: 0 auto;
   position: relative;
@@ -152,7 +153,6 @@ html, body {
   overflow: hidden;
   background: var(--c-bg);
   min-height: 0;
-  height: 0; /* Zwingt flex-child zur korrekten Höhe auf Android */
 }
 
 /* ── Tab-Bar ───────────────────────────────────────── */
@@ -3102,7 +3102,6 @@ html, body {
   overscroll-behavior: contain;
   padding: 0;
   min-height: 0;
-  height: 0; /* Android-Fix */
 }
 .wb-section.active {
   display: flex;
@@ -4207,10 +4206,11 @@ html, body {
 
   /* ── Wochensicht ────────────────────────────────────── */
   #woche-container {
-    flex: 1;
+    flex: 1 1 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-height: 0;
   }
   #woche-nav {
     display: flex;
@@ -4230,11 +4230,12 @@ html, body {
     text-align: center;
   }
   #woche-scroll-x {
-    flex: 1;
+    flex: 1 1 0;
     overflow-x: auto;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    min-height: 0;
   }
   #woche-grid {
     display: flex;
@@ -5697,7 +5698,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.48.1 · Build 20260528-0830</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.48.2 · Build 20260528-0900</div>
     </div>
 
     <!-- Welt -->
@@ -5848,7 +5849,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.48.1',
+  APP_VERSION: '3.48.2',
   APP_BUILD:   '20260526-0723',
 
 
@@ -10499,7 +10500,8 @@ const WB = {
 
     // Wenn Gerät bekannt: starten
     if (this._idbDevice) {
-      this.start();
+      this._fixViewportHeight();
+    this.start();
       // OAuth Init + Auto-Sync + Auto-Refresh starten
       setTimeout(async () => {
         await this._oauthInit();
@@ -10606,6 +10608,17 @@ const WB = {
   },
 
   // ── App starten ─────────────────────────────────────
+  _fixViewportHeight() {
+    // Android Chrome: 100vh berücksichtigt Adressleiste nicht korrekt
+    const setH = () => {
+      document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+      document.getElementById('wb-app').style.height = window.innerHeight + 'px';
+    };
+    setH();
+    window.addEventListener('resize', setH);
+    window.addEventListener('orientationchange', () => setTimeout(setH, 100));
+  },
+
   start() {
     // Version ist statisch im HTML
     const startup = document.getElementById('wb-startup');
