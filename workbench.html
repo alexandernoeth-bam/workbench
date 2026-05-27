@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.47.1</title>
+<title>WorkBench 3.48.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -146,12 +146,13 @@ html, body {
 
 /* ── Content-Bereich ───────────────────────────────── */
 #wb-content {
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--c-bg);
   min-height: 0;
+  height: 0; /* Zwingt flex-child zur korrekten Höhe auf Android */
 }
 
 /* ── Tab-Bar ───────────────────────────────────────── */
@@ -3094,13 +3095,14 @@ html, body {
 .wb-section {
   display: none;
   flex-direction: column;
-  flex: 1;
+  flex: 1 1 0;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   padding: 0;
   min-height: 0;
+  height: 0; /* Android-Fix */
 }
 .wb-section.active {
   display: flex;
@@ -4518,6 +4520,51 @@ html, body {
 
 /* ── Utility ────────────────────────────────────────── */
 .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+
+/* Snooze-Button in Aufgaben-Zeile */
+.af-snooze-btn {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 4px;
+  opacity: 0.35;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: opacity var(--t-fast);
+}
+.af-snooze-btn:hover { opacity: 0.8; }
+
+/* Snooze-Picker Popup */
+#af-snooze-picker {
+  position: fixed;
+  z-index: 300;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  padding: 6px 0;
+  min-width: 160px;
+}
+.af-snooze-option {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: var(--font);
+  font-size: 0.88rem;
+  color: var(--c-text);
+  cursor: pointer;
+}
+.af-snooze-option:hover { background: var(--c-bg); }
+.af-snooze-sep {
+  height: 1px;
+  background: var(--c-border);
+  margin: 4px 0;
+}
+
 </style>
 </head>
 <body>
@@ -4860,6 +4907,7 @@ html, body {
     <div class="nz-tb-sep"></div>
     <button class="nz-tb" onclick="WB.nzCmd('removeFormat')">&#10006;</button>
     <button class="nz-tb" onclick="WB.nzTocOpen()" title="Inhaltsverzeichnis">&#9776;</button>
+    <button class="nz-tb" onclick="WB._nzPaste()" title="Zwischenablage einfügen">&#128203;</button>
     <button class="nz-tb" style="margin-left:auto;" onclick="WB.nzToggleFullscreen()">&#x26F6;</button>
   </div>
   <div id="nz-verkn-sektion" style="padding:0 14px;flex-shrink:0;"></div>
@@ -4904,6 +4952,7 @@ html, body {
     <button class="nz-tb" onclick="WB.nzInsertHr()">&#8213;</button>
     <div class="nz-tb-sep"></div>
     <button class="nz-tb" onclick="WB.nzCmd('removeFormat')">&#10006;</button>
+    <button class="nz-tb" onclick="WB._nzPaste()" title="Zwischenablage einfügen">&#128203;</button>
     <button class="nz-tb" style="margin-left:auto;" onclick="WB.nzToggleFullscreen()">&#x26F6;</button>
   </div>
   <div id="nz-ed-content" contenteditable="true" oninput="WB.nzAutoSave()"></div>
@@ -5392,6 +5441,9 @@ html, body {
       <textarea id="qc-text" placeholder="Was möchtest du festhalten?" rows="2"></textarea>
       <button id="qc-mic-btn" onclick="WB._qcMicToggle()" style="display:none;" title="Spracheingabe">&#9679;</button>
     </div>
+    <button onclick="WB._qcPaste()" style="width:100%;padding:8px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;color:var(--c-muted);cursor:pointer;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;">
+      <span>&#128203;</span> Aus Zwischenablage einfügen
+    </button>
 
     <!-- Speichern -->
     <button onclick="WB._qcSaveSchnell()" style="width:100%;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;margin-top:4px;">
@@ -5645,7 +5697,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.47.1 · Build 20260528-0715</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.48.1 · Build 20260528-0830</div>
     </div>
 
     <!-- Welt -->
@@ -5796,7 +5848,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.47.1',
+  APP_VERSION: '3.48.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -6709,6 +6761,74 @@ const WB = {
 
   _qcWelt:  'priv',
   _qcRecog: null,
+
+  // ── Clipboard-Import (v3.48.0) ─────────────────────
+  async _qcPaste() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) { this._toast('Zwischenablage leer'); return; }
+      const ta = document.getElementById('qc-text');
+      if (ta) {
+        ta.value = (ta.value ? ta.value + '\n' : '') + text.trim();
+        ta.focus();
+        this._toast('Eingefügt');
+      }
+    } catch(e) {
+      this._toast('Zugriff auf Zwischenablage nicht möglich');
+    }
+  },
+
+  async _nzPaste() {
+    const ed = document.getElementById('nz-ed-content');
+    if (!ed) return;
+    try {
+      // Versuche zuerst Bild (Screenshot) zu lesen
+      if (navigator.clipboard?.read) {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imgType = item.types.find(t => t.startsWith('image/'));
+          if (imgType) {
+            const blob = await item.getType(imgType);
+            const reader = new FileReader();
+            reader.onload = e => {
+              ed.focus();
+              document.execCommand('insertHTML', false,
+                `<img src="${e.target.result}" style="max-width:100%;border-radius:4px;margin:4px 0;" alt="Screenshot">`);
+              this.nzAutoSave();
+            };
+            reader.readAsDataURL(blob);
+            this._toast('Bild eingefügt');
+            return;
+          }
+        }
+      }
+      // Fallback: Text
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) { this._toast('Zwischenablage leer'); return; }
+      ed.focus();
+      const sel = window.getSelection();
+      if (sel.rangeCount) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const lines = text.split('\n');
+        const frag = document.createDocumentFragment();
+        lines.forEach((line, i) => {
+          if (i > 0) frag.appendChild(document.createElement('br'));
+          frag.appendChild(document.createTextNode(line));
+        });
+        range.insertNode(frag);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } else {
+        ed.innerText += text;
+      }
+      this.nzAutoSave();
+      this._toast('Eingefügt');
+    } catch(e) {
+      this._toast('Zugriff verweigert — bitte Berechtigung erlauben');
+    }
+  },
 
   qcOpen() {
     this._qcWelt = this.activeWorld === 'beruf' ? 'pro' : 'priv';
@@ -17893,16 +18013,106 @@ const WB = {
       t.remainingMinutes ? t.remainingMinutes+'m' : '',
     ].filter(Boolean).join(' · ');
     const indCss = indented ? `margin-left:10px;border-left:3px solid ${accentClr||'var(--c-beruf)'};` : '';
+    const pid = pKey.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const tid = String(t.id);
     return `<div class="af-task${t.prio?' prio':''}" style="${indCss}"
-        data-taskid="${t.id}" data-ctx="${ctx}" data-pkey="${pKey.replace(/"/g,'&quot;')}"
-        onclick="WB.openTaskDetail('${pKey.replace(/'/g,"\'")}','${t.id}','${ctx}')">
+        data-taskid="${tid}" data-ctx="${ctx}" data-pkey="${pKey.replace(/"/g,'&quot;')}"
+        onclick="WB.openTaskDetail('${pid}','${tid}','${ctx}')">
       <div class="af-world-dot ${ctx}" style="margin-top:4px;"></div>
       <div style="flex:1;min-width:0;">
         <div class="af-task-text">${prioB}${recur}${t.text}</div>
         <div class="af-task-meta">${meta}${chkB?'<span>'+chkB+'</span>':''}</div>
       </div>
-      <input type="checkbox" class="af-task-chk" onclick="event.stopPropagation();WB._doneTask('${pKey.replace(/'/g,"\'")}','${t.id}','${ctx}',this)">
+      <button class="af-snooze-btn" title="Snoozen"
+        onclick="event.stopPropagation();WB._snoozeOpen('${pid}','${tid}','${ctx}',this)">&#x23F0;</button>
+      <input type="checkbox" class="af-task-chk"
+        onclick="event.stopPropagation();WB._doneTask('${pid}','${tid}','${ctx}',this)">
     </div>`;
+  },
+
+  // ── Aufgabe snoozen (v3.48.0) ──────────────────────
+  _snoozeOpen(pKey, taskId, ctx, btn) {
+    // Alten Picker entfernen
+    document.getElementById('af-snooze-picker')?.remove();
+
+    const now   = new Date();
+    const today = now.toISOString().split('T')[0];
+    const tom   = new Date(now); tom.setDate(tom.getDate()+1);
+    const tomStr = tom.toISOString().split('T')[0];
+    const nextMon = new Date(now);
+    const dow = now.getDay();
+    const daysToMon = (8 - dow) % 7 || 7;
+    nextMon.setDate(now.getDate() + daysToMon);
+    const monStr = nextMon.toISOString().split('T')[0];
+
+    const fmt = d => {
+      const [y,m,day] = d.split('-');
+      return day + '.' + m + '.' + y.slice(2);
+    };
+
+    const picker = document.createElement('div');
+    picker.id = 'af-snooze-picker';
+
+    const opt = (label, date) => {
+      const b = document.createElement('button');
+      b.className = 'af-snooze-option';
+      b.textContent = label + (date ? '  ' + fmt(date) : '');
+      b.addEventListener('click', () => {
+        if (date) this._snoozeSet(pKey, taskId, ctx, date);
+        else      this._snoozePickDate(pKey, taskId, ctx);
+        picker.remove();
+      });
+      return b;
+    };
+
+    picker.appendChild(opt('Heute Abend', today + 'T20:00'  ? today : today));
+    picker.appendChild(opt('Morgen',       tomStr));
+    picker.appendChild(opt('Nächste Woche', monStr));
+    const sep = document.createElement('div'); sep.className = 'af-snooze-sep';
+    picker.appendChild(sep);
+    picker.appendChild(opt('Datum wählen…', null));
+
+    // Positionieren
+    const r = btn.getBoundingClientRect();
+    picker.style.top  = (r.bottom + 4) + 'px';
+    picker.style.right = (window.innerWidth - r.right) + 'px';
+    document.body.appendChild(picker);
+
+    // Klick außerhalb schließt
+    setTimeout(() => {
+      const close = e => { if (!picker.contains(e.target)) { picker.remove(); document.removeEventListener('click', close); } };
+      document.addEventListener('click', close);
+    }, 50);
+  },
+
+  _snoozeSet(pKey, taskId, ctx, newDate) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    const t = (db.projects[pKey]?.tasks || []).find(x => String(x.id) === String(taskId));
+    if (!t) return;
+    if (!t.snoozeHistory) t.snoozeHistory = [];
+    t.snoozeHistory.push({ from: t.date, to: newDate, ts: Date.now() });
+    t.date = newDate;
+    t.isToday = newDate === new Date().toISOString().split('T')[0];
+    this.setDirty();
+    this._toast('Verschoben auf ' + newDate.split('-').reverse().join('.'));
+    this.renderAufgaben();
+  },
+
+  _snoozePickDate(pKey, taskId, ctx) {
+    const input = document.createElement('input');
+    input.type = 'date';
+    input.style.position = 'fixed';
+    input.style.opacity = '0';
+    input.style.top = '50%';
+    document.body.appendChild(input);
+    input.addEventListener('change', () => {
+      if (input.value) this._snoozeSet(pKey, taskId, ctx, input.value);
+      input.remove();
+    });
+    input.addEventListener('blur', () => setTimeout(() => input.remove(), 200));
+    input.click();
+    input.focus();
   },
 
   setTaskFilter(f) { this.taskFilter = f; this.renderAufgaben(); },
