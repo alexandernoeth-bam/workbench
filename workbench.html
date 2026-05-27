@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.45.0</title>
+<title>WorkBench 3.46.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -462,29 +462,46 @@ html, body {
   overscroll-behavior: contain;
 }
 
-/* Zeitband-Trenner im Cockpit */
-#ck-zeitband-divider {
+/* Termin-Toggle Zeile */
+#ck-termin-toggle {
+  padding: 0 var(--ck-pad, 16px);
+  margin-top: 6px;
+}
+#ck-termin-toggle-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--c-border);
+}
+#ck-termin-toggle:hover #ck-termin-toggle-inner {
+  opacity: 0.75;
+}
+
+/* Zeitband Panel */
+#ck-zeitband-panel {
+  margin-top: 4px;
+}
+#ck-zeitband-toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px 6px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--c-muted);
-  background: var(--c-bg);
-  position: sticky;
-  top: 0;
-  z-index: 5;
+  padding: 8px 16px;
+  background: var(--c-surface);
+  border-top: 1px solid var(--c-border);
   border-bottom: 1px solid var(--c-border);
 }
-#ck-zeitband-divider::before,
-#ck-zeitband-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--c-border);
+#ck-zt-new-btn {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border: 1px solid var(--c-beruf);
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--c-beruf);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 /* Datum-Header */
@@ -4581,19 +4598,11 @@ html, body {
       <!-- Cockpit-Header: Datum + Nav -->
       <div id="ck-date-header">
         <div id="ck-date-row">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <button class="zt-nav-btn" onclick="WB.shiftDay(-1)" aria-label="Vorheriger Tag" style="flex-shrink:0;">&#8249;</button>
-            <div>
-              <div id="ck-date-big">–</div>
-              <div id="ck-date-sub">–</div>
-            </div>
-            <button class="zt-nav-btn" onclick="WB.shiftDay(1)" aria-label="Nächster Tag" style="flex-shrink:0;">&#8250;</button>
+          <div>
+            <div id="ck-date-big">–</div>
+            <div id="ck-date-sub">–</div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <button id="zt-today-btn" onclick="WB.goToday()" style="display:none;font-size:0.75rem;padding:4px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;font-family:var(--font);cursor:pointer;color:var(--c-muted);">Heute</button>
-            <button id="zt-new-ev-btn" onclick="WB._ztNewEvent()" style="font-size:0.75rem;padding:4px 8px;border:1px solid var(--c-beruf);border-radius:var(--radius-xs);background:none;font-family:var(--font);cursor:pointer;color:var(--c-beruf);">+ Termin</button>
-            <div id="ck-sync-dots"></div>
-          </div>
+          <div id="ck-sync-dots"></div>
         </div>
       </div>
       <!-- Banners -->
@@ -4601,7 +4610,7 @@ html, body {
         <span class="ck-focus-icon">📊</span>
         <span class="ck-focus-text"></span>
       </div>
-      <div id="ck-block-banner" style="display:none;"></div>
+      <div id="ck-block-banner"></div>
       <div id="ck-assistant-banner">
         <svg class="ck-asst-icon" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/>
@@ -4626,13 +4635,22 @@ html, body {
       </div>
       <!-- World-Card -->
       <div id="ck-grid"></div>
-      <!-- Zeitband-Trenner -->
-      <div id="ck-zeitband-divider">
-        <span>Zeitband</span>
-        <div id="zt-daytype-banner" style="display:inline;"></div>
+      <!-- Termin-Toggle Zeile (außerhalb Card, gleicher Stil) -->
+      <div id="ck-termin-toggle" onclick="WB._ckToggleZeitband()" style="cursor:pointer;">
+        <div id="ck-termin-toggle-inner">
+          <div id="ck-termin-num" class="ck-num-pill zero">–</div>
+          <span class="ck-pill-label">Termine heute</span>
+          <span id="ck-termin-arrow" style="font-size:0.7rem;color:var(--c-muted);margin-left:auto;">▶</span>
+        </div>
       </div>
-      <!-- Zeitband eingebettet -->
-      <div id="zeitband-scroll"></div>
+      <!-- Zeitband eingeklappt (Standard) -->
+      <div id="ck-zeitband-panel" style="display:none;">
+        <div id="ck-zeitband-toolbar">
+          <div id="zt-daytype-banner" style="flex:1;font-size:0.78rem;"></div>
+          <button onclick="WB._ztNewEvent()" id="ck-zt-new-btn">+ Termin</button>
+        </div>
+        <div id="zeitband-scroll"></div>
+      </div>
 
     </section>
 
@@ -5645,7 +5663,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.45.0 · Build 20260528-0100</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.0 · Build 20260528-0200</div>
     </div>
 
     <!-- Welt -->
@@ -5868,7 +5886,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.45.0',
+  APP_VERSION: '3.46.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8679,7 +8697,7 @@ const WB = {
     const ckFab = document.getElementById('ck-fab');
     const ztFab = document.getElementById('zt-fab');
     if (ckFab) ckFab.style.display = 'flex';
-    if (ztFab) ztFab.classList.remove('visible');
+    if (ztFab && !this._ckZeitbandOpen) { ztFab.classList.remove('visible'); ztFab.style.display = 'none'; }
     const afFab0 = document.getElementById('af-fab');
     if (afFab0) { afFab0.classList.remove('visible'); afFab0.style.display = 'none'; }
     this._inboxUpdateMenuSub();
@@ -8691,8 +8709,9 @@ const WB = {
     this._ckRenderGrid();
     this._ckRenderTasksTodayPill();
     this._ckRenderDuties();
-    // v3.45.0: Zeitband direkt im Cockpit rendern
-    this.renderHeute();
+    this._ckUpdateTerminToggle();
+    // v3.46.0: Zeitband nur rendern wenn aufgeklappt
+    if (this._ckZeitbandOpen) this.renderHeute();
     clearInterval(this._ckCountdownTimer);
     this._ckCountdownTimer = setInterval(() => {
       if (this.activeTab === 'cockpit') {
@@ -8701,6 +8720,7 @@ const WB = {
         this._ckRenderGrid();
         this._ckRenderTasksTodayPill();
         this._ckRenderMeetingBanner();
+        this._ckUpdateTerminToggle();
       }
     }, 60000);
   },
@@ -11198,8 +11218,9 @@ const WB = {
     return validDays.length > 0;
   },
 
-  // ── Pflicht-Pills für eine Welt rendern ───────────────
+  // ── Pflicht-Pills für eine Welt rendern (v3.46.0: deaktiviert) ──────────
   _ckDutyPillsHtml(ctx) {
+    return ''; // Duties nicht mehr in World-Card anzeigen
     const store = this._dutyStore(ctx) || [];
     const kw    = this._kwStr(new Date());
 
@@ -15304,6 +15325,47 @@ const WB = {
   _ztNowTimer: null,
   _ztConfig: { dayStart: 5, dayEnd: 23, lunchH: 12, lunchDur: 0.75 },
 
+  // ── Zeitband Toggle im Cockpit (v3.46.0) ──────────────
+  _ckZeitbandOpen: false,
+
+  _ckToggleZeitband() {
+    this._ckZeitbandOpen = !this._ckZeitbandOpen;
+    const panel  = document.getElementById('ck-zeitband-panel');
+    const arrow  = document.getElementById('ck-termin-arrow');
+    if (panel) panel.style.display = this._ckZeitbandOpen ? '' : 'none';
+    if (arrow) arrow.textContent = this._ckZeitbandOpen ? '▼' : '▶';
+    if (this._ckZeitbandOpen) {
+      // Zeitband erst rendern wenn aufgeklappt
+      this.renderHeute();
+      // Zu Zeitband scrollen
+      setTimeout(() => {
+        panel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+    }
+  },
+
+  // ── Termin-Anzahl in Toggle-Zeile aktualisieren ────────
+  _ckUpdateTerminToggle() {
+    const today  = new Date().toISOString().split('T')[0];
+    const now    = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const pT     = s => { const [h,m]=(s||'0:0').split(':').map(Number); return h*60+m; };
+    let count = 0;
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      (db?.customEvents || []).filter(e => (e.date === today || e.isToday)
+        && e.startTime && e.typ !== 'horizon').forEach(e => {
+        const endMin = pT(e.startTime) + Math.round((parseFloat(e.duration)||1)*60);
+        if (endMin > nowMin) count++;
+      });
+    });
+    const numEl = document.getElementById('ck-termin-num');
+    if (numEl) {
+      numEl.textContent = count === 0 ? '–' : String(count);
+      numEl.className = 'ck-num-pill' + (count === 0 ? ' zero' : '');
+    }
+  },
+
   // ── Laufender Block Banner (v3.44.0) ──────────────────
   _ckRenderBlockBanner() {
     const banner = document.getElementById('ck-block-banner');
@@ -15352,7 +15414,7 @@ const WB = {
     }
 
     if (!activeBlock) {
-      banner.classList.remove('visible');
+      banner.style.display = 'none';
       return;
     }
 
@@ -15378,7 +15440,7 @@ const WB = {
     }
 
     banner.innerHTML = `${clockSvg}<div class="ck-block-info"><div class="ck-block-title">${title}</div><div class="ck-block-sub">${subLabel}</div></div>${btnHtml}`;
-    banner.classList.add('visible');
+    banner.style.display = 'flex';
   },
 
   _ckRenderMeetingBanner() {
