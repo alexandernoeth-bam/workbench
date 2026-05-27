@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.37.1</title>
+<title>WorkBench 3.38.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5452,7 +5452,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.37.1 · Build 20260527-1500</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.38.0 · Build 20260527-1600</div>
     </div>
 
     <!-- Welt -->
@@ -5675,7 +5675,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.37.1',
+  APP_VERSION: '3.38.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -6107,7 +6107,7 @@ const WB = {
       const allDuties = [];
       ['pro','priv'].forEach(ctx => {
         (this._dutyStore(ctx)||[]).forEach(duty => {
-          allDuties.push({ ...duty, ctx, done: !!(duty.doneWeeks?.[kw]) });
+          allDuties.push({ ...duty, ctx, done: this._dutyIsDone(duty, new Date()) });
         });
       });
       html = '<div class="wz-step-title">Schritt 1 · Was hast du diese Woche erledigt?</div>';
@@ -8434,11 +8434,12 @@ const WB = {
       });
     });
 
-    // Wochenpflichten heute fällig
+    // Wochenpflichten heute fällig (v3.38.0: pro Instanz)
     ['pro','priv'].forEach(ctx => {
+      if (ctx === 'pro' && proBlockedToday) return;
       (this._dutyStore(ctx) || []).forEach(d => {
-        const dueInfo = this._dutyDueInfo({...d, ctx});
-        if (dueInfo.due && !d.doneWeeks?.[kw]) dutyCount++;
+        const inst = this._dutyWeekInstances(d).find(i => i.isToday);
+        if (inst && !inst.done) dutyCount++;
       });
     });
 
@@ -8649,12 +8650,12 @@ const WB = {
           });
         });
       }
-      // Wochenpflichten heute fällig — ebenfalls bei Urlaub ausblenden
+      // Wochenpflichten heute fällig — ebenfalls bei Urlaub ausblenden (v3.38.0)
       const kw = this._kwStr(now);
       if (!isProBlocked) {
         (this._dutyStore(ctx) || []).forEach(d => {
-          const dueInfo = this._dutyDueInfo({...d, ctx});
-          if (dueInfo.due && !d.doneWeeks?.[kw]) tasksTodayCount++;
+          const inst = this._dutyWeekInstances(d).find(i => i.isToday);
+          if (inst && !inst.done) tasksTodayCount++;
         });
       }
 
@@ -8945,7 +8946,7 @@ const WB = {
     if (!relevant.length) return '<p style="color:var(--c-faint);text-align:center;padding:24px 0;">Keine Wochenpflichten diese Woche.</p>';
     return '<div style="margin-bottom:6px;font-size:0.78rem;color:var(--c-muted);">Noch nicht erledigt? Jetzt abhaken.</div>' +
       relevant.map(duty => {
-        const done = !!(duty.doneWeeks?.[kw]);
+        const done = this._dutyIsDone(duty, new Date());
         const wCls = duty.ctx==='pro' ? 'beruf' : 'priv';
         return `<div class="wz-pfl-row" onclick="WB.dutyToggle('${duty.ctx}','${duty.id}');this.querySelector('.wz-duty-check').className='wz-duty-check done'">
           <div class="wz-duty-check ${done?'done':wCls}"></div>
@@ -9930,7 +9931,7 @@ const WB = {
     const kw = this._kwStr(new Date());
     return '<div style="margin-bottom:4px;">' +
       allDuties.map(duty => {
-        const done    = !!(duty.doneWeeks?.[kw]);
+        const done    = this._dutyIsDone(duty, new Date());
         const dueInfo = this._dutyDueInfo(duty);
         const wCls    = duty.ctx === 'pro' ? 'beruf' : 'priv';
         const chkCls  = done ? 'done' : wCls;
@@ -9951,7 +9952,7 @@ const WB = {
     const kw   = this._kwStr(new Date());
     const store = this._dutyStore(ctx) || [];
     const duty  = store.find(d => d.id === dutyId);
-    const done  = !!(duty?.doneWeeks?.[kw]);
+    const done  = this._dutyIsDone(duty, new Date());
     const chk   = document.getElementById('wz-dc-' + dutyId);
     const lbl   = document.getElementById('wz-dl-' + dutyId);
     const wCls  = ctx === 'pro' ? 'beruf' : 'priv';
@@ -10054,8 +10055,8 @@ const WB = {
     const allDuties = [];
     ['pro','priv'].forEach(ctx => (this._dutyStore(ctx)||[]).forEach(d => allDuties.push({...d,ctx})));
     const kw      = this._kwStr(new Date());
-    const openD   = allDuties.filter(d => !d.doneWeeks?.[kw]);
-    const doneD   = allDuties.filter(d => !!(d.doneWeeks?.[kw]));
+    const openD   = allDuties.filter(d => !this._dutyIsDone(d, new Date()));
+    const doneD   = allDuties.filter(d => this._dutyIsDone(d, new Date()));
 
     let html = `
       <div class="wz-summary-block">
@@ -10789,7 +10790,7 @@ const WB = {
   // ── Ist Pflicht diese Woche erledigt? ─────────────────
   _dutyDoneThisWeek(duty) {
     const kw = this._kwStr(new Date());
-    return !!(duty.doneWeeks?.[kw]);
+    return this._dutyIsDone(duty, new Date());
   },
 
   // ── Ist Pflicht heute fällig / überfällig? ────────────
@@ -10829,21 +10830,7 @@ const WB = {
   },
 
   // ── Pflicht abhaken ────────────────────────────────────
-  dutyToggle(ctx, dutyId) {
-    const store = this._dutyStore(ctx); if (!store) return;
-    const duty  = store.find(d => d.id === dutyId); if (!duty) return;
-    const kw    = this._kwStr(new Date());
-    if (!duty.doneWeeks) duty.doneWeeks = {};
-    if (duty.doneWeeks[kw]) {
-      delete duty.doneWeeks[kw];
-    } else {
-      duty.doneWeeks[kw] = true;
-    }
-    this.setDirty();
-    // Sofort re-rendern
-    if (this.activeTab === 'cockpit')     this.renderCockpit();
-    if (this.activeTab === 'checklisten') this.renderChecklisten();
-  },
+  dutyToggle(ctx, dutyId) { /* v3.38.0: überschrieben — letzte Def. gilt */ },
 
 
 
@@ -10996,7 +10983,7 @@ const WB = {
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
-      const done    = !!(duty.doneWeeks?.[kw]);
+      const done    = this._dutyIsDone(duty, new Date());
       const dueInfo = this._dutyDueInfo(duty);
       const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
       const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
@@ -11025,14 +11012,14 @@ const WB = {
     if (!allDuties.length) { container.innerHTML = ''; return; }
 
     const kw      = this._kwStr(new Date());
-    const done    = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done    = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total   = allDuties.length;
     const pct     = total ? Math.round(done / total * 100) : 0;
     const barCls  = pct === 100 ? 'full' : '';
 
     let rows = '';
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -11069,7 +11056,7 @@ const WB = {
     if (!allDuties.length) return;
 
     const kw   = this._kwStr(new Date());
-    const done = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total= allDuties.length;
     const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
@@ -11080,7 +11067,7 @@ const WB = {
       </div>`;
 
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -11138,7 +11125,7 @@ const WB = {
   // ── Ist Pflicht diese Woche erledigt? ─────────────────
   _dutyDoneThisWeek(duty) {
     const kw = this._kwStr(new Date());
-    return !!(duty.doneWeeks?.[kw]);
+    return this._dutyIsDone(duty, new Date());
   },
 
   // ── Ist Pflicht heute fällig / überfällig? ────────────
@@ -11178,21 +11165,7 @@ const WB = {
   },
 
   // ── Pflicht abhaken ────────────────────────────────────
-  dutyToggle(ctx, dutyId) {
-    const store = this._dutyStore(ctx); if (!store) return;
-    const duty  = store.find(d => d.id === dutyId); if (!duty) return;
-    const kw    = this._kwStr(new Date());
-    if (!duty.doneWeeks) duty.doneWeeks = {};
-    if (duty.doneWeeks[kw]) {
-      delete duty.doneWeeks[kw];
-    } else {
-      duty.doneWeeks[kw] = true;
-    }
-    this.setDirty();
-    // Sofort re-rendern
-    if (this.activeTab === 'cockpit')     this.renderCockpit();
-    if (this.activeTab === 'checklisten') this.renderChecklisten();
-  },
+  dutyToggle(ctx, dutyId) { /* v3.38.0: überschrieben — letzte Def. gilt */ },
 
 
 
@@ -11333,7 +11306,7 @@ const WB = {
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
-      const done    = !!(duty.doneWeeks?.[kw]);
+      const done    = this._dutyIsDone(duty, new Date());
       const dueInfo = this._dutyDueInfo(duty);
       const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
       const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
@@ -11362,14 +11335,14 @@ const WB = {
     if (!allDuties.length) { container.innerHTML = ''; return; }
 
     const kw      = this._kwStr(new Date());
-    const done    = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done    = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total   = allDuties.length;
     const pct     = total ? Math.round(done / total * 100) : 0;
     const barCls  = pct === 100 ? 'full' : '';
 
     let rows = '';
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -11406,7 +11379,7 @@ const WB = {
     if (!allDuties.length) return;
 
     const kw   = this._kwStr(new Date());
-    const done = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total= allDuties.length;
     const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
@@ -11417,7 +11390,7 @@ const WB = {
       </div>`;
 
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -11467,7 +11440,7 @@ const WB = {
   // ── Ist Pflicht diese Woche erledigt? ─────────────────
   _dutyDoneThisWeek(duty) {
     const kw = this._kwStr(new Date());
-    return !!(duty.doneWeeks?.[kw]);
+    return this._dutyIsDone(duty, new Date());
   },
 
   // ── Ist Pflicht heute fällig / überfällig? ────────────
@@ -11507,21 +11480,7 @@ const WB = {
   },
 
   // ── Pflicht abhaken ────────────────────────────────────
-  dutyToggle(ctx, dutyId) {
-    const store = this._dutyStore(ctx); if (!store) return;
-    const duty  = store.find(d => d.id === dutyId); if (!duty) return;
-    const kw    = this._kwStr(new Date());
-    if (!duty.doneWeeks) duty.doneWeeks = {};
-    if (duty.doneWeeks[kw]) {
-      delete duty.doneWeeks[kw];
-    } else {
-      duty.doneWeeks[kw] = true;
-    }
-    this.setDirty();
-    // Sofort re-rendern
-    if (this.activeTab === 'cockpit')     this.renderCockpit();
-    if (this.activeTab === 'checklisten') this.renderChecklisten();
-  },
+  dutyToggle(ctx, dutyId) { /* v3.38.0: überschrieben — letzte Def. gilt */ },
 
 
 
@@ -11662,7 +11621,7 @@ const WB = {
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
-      const done    = !!(duty.doneWeeks?.[kw]);
+      const done    = this._dutyIsDone(duty, new Date());
       const dueInfo = this._dutyDueInfo(duty);
       const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
       const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
@@ -11691,14 +11650,14 @@ const WB = {
     if (!allDuties.length) { container.innerHTML = ''; return; }
 
     const kw      = this._kwStr(new Date());
-    const done    = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done    = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total   = allDuties.length;
     const pct     = total ? Math.round(done / total * 100) : 0;
     const barCls  = pct === 100 ? 'full' : '';
 
     let rows = '';
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -11735,7 +11694,7 @@ const WB = {
     if (!allDuties.length) return;
 
     const kw   = this._kwStr(new Date());
-    const done = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total= allDuties.length;
     const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
@@ -11746,7 +11705,7 @@ const WB = {
       </div>`;
 
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -11777,7 +11736,7 @@ const WB = {
 
   _dutyDoneThisWeek(duty) {
     const kw = this._kwStr(new Date());
-    return !!(duty.doneWeeks?.[kw]);
+    return this._dutyIsDone(duty, new Date());
   },
 
   // ── Ist Pflicht heute fällig / überfällig? ────────────
@@ -11817,21 +11776,7 @@ const WB = {
   },
 
   // ── Pflicht abhaken ────────────────────────────────────
-  dutyToggle(ctx, dutyId) {
-    const store = this._dutyStore(ctx); if (!store) return;
-    const duty  = store.find(d => d.id === dutyId); if (!duty) return;
-    const kw    = this._kwStr(new Date());
-    if (!duty.doneWeeks) duty.doneWeeks = {};
-    if (duty.doneWeeks[kw]) {
-      delete duty.doneWeeks[kw];
-    } else {
-      duty.doneWeeks[kw] = true;
-    }
-    this.setDirty();
-    // Sofort re-rendern
-    if (this.activeTab === 'cockpit')     this.renderCockpit();
-    if (this.activeTab === 'checklisten') this.renderChecklisten();
-  },
+  dutyToggle(ctx, dutyId) { /* v3.38.0: überschrieben — letzte Def. gilt */ },
 
 
 
@@ -11972,7 +11917,7 @@ const WB = {
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
-      const done    = !!(duty.doneWeeks?.[kw]);
+      const done    = this._dutyIsDone(duty, new Date());
       const dueInfo = this._dutyDueInfo(duty);
       const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
       const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
@@ -12001,14 +11946,14 @@ const WB = {
     if (!allDuties.length) { container.innerHTML = ''; return; }
 
     const kw      = this._kwStr(new Date());
-    const done    = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done    = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total   = allDuties.length;
     const pct     = total ? Math.round(done / total * 100) : 0;
     const barCls  = pct === 100 ? 'full' : '';
 
     let rows = '';
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -12045,7 +11990,7 @@ const WB = {
     if (!allDuties.length) return;
 
     const kw   = this._kwStr(new Date());
-    const done = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total= allDuties.length;
     const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
@@ -12056,7 +12001,7 @@ const WB = {
       </div>`;
 
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -12121,21 +12066,7 @@ const WB = {
   },
 
   // ── Pflicht abhaken ────────────────────────────────────
-  dutyToggle(ctx, dutyId) {
-    const store = this._dutyStore(ctx); if (!store) return;
-    const duty  = store.find(d => d.id === dutyId); if (!duty) return;
-    const kw    = this._kwStr(new Date());
-    if (!duty.doneWeeks) duty.doneWeeks = {};
-    if (duty.doneWeeks[kw]) {
-      delete duty.doneWeeks[kw];
-    } else {
-      duty.doneWeeks[kw] = true;
-    }
-    this.setDirty();
-    // Sofort re-rendern
-    if (this.activeTab === 'cockpit')     this.renderCockpit();
-    if (this.activeTab === 'checklisten') this.renderChecklisten();
-  },
+  dutyToggle(ctx, dutyId) { /* v3.38.0: überschrieben — letzte Def. gilt */ },
 
 
 
@@ -12276,7 +12207,7 @@ const WB = {
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
-      const done    = !!(duty.doneWeeks?.[kw]);
+      const done    = this._dutyIsDone(duty, new Date());
       const dueInfo = this._dutyDueInfo(duty);
       const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
       const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
@@ -12305,14 +12236,14 @@ const WB = {
     if (!allDuties.length) { container.innerHTML = ''; return; }
 
     const kw      = this._kwStr(new Date());
-    const done    = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done    = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total   = allDuties.length;
     const pct     = total ? Math.round(done / total * 100) : 0;
     const barCls  = pct === 100 ? 'full' : '';
 
     let rows = '';
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -12349,7 +12280,7 @@ const WB = {
     if (!allDuties.length) return;
 
     const kw   = this._kwStr(new Date());
-    const done = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total= allDuties.length;
     const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
@@ -12360,7 +12291,7 @@ const WB = {
       </div>`;
 
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -12389,21 +12320,7 @@ const WB = {
     this._dutiesRender();
   },
 
-  dutyToggle(ctx, dutyId) {
-    const store = this._dutyStore(ctx); if (!store) return;
-    const duty  = store.find(d => d.id === dutyId); if (!duty) return;
-    const kw    = this._kwStr(new Date());
-    if (!duty.doneWeeks) duty.doneWeeks = {};
-    if (duty.doneWeeks[kw]) {
-      delete duty.doneWeeks[kw];
-    } else {
-      duty.doneWeeks[kw] = true;
-    }
-    this.setDirty();
-    // Sofort re-rendern
-    if (this.activeTab === 'cockpit')     this.renderCockpit();
-    if (this.activeTab === 'checklisten') this.renderChecklisten();
-  },
+  dutyToggle(ctx, dutyId) { /* v3.38.0: überschrieben — letzte Def. gilt */ },
 
 
 
@@ -12544,7 +12461,7 @@ const WB = {
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
-      const done    = !!(duty.doneWeeks?.[kw]);
+      const done    = this._dutyIsDone(duty, new Date());
       const dueInfo = this._dutyDueInfo(duty);
       const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
       const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
@@ -12573,14 +12490,14 @@ const WB = {
     if (!allDuties.length) { container.innerHTML = ''; return; }
 
     const kw      = this._kwStr(new Date());
-    const done    = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done    = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total   = allDuties.length;
     const pct     = total ? Math.round(done / total * 100) : 0;
     const barCls  = pct === 100 ? 'full' : '';
 
     let rows = '';
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -12617,7 +12534,7 @@ const WB = {
     if (!allDuties.length) return;
 
     const kw   = this._kwStr(new Date());
-    const done = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total= allDuties.length;
     const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
@@ -12628,7 +12545,7 @@ const WB = {
       </div>`;
 
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -12670,14 +12587,14 @@ const WB = {
     if (!allDuties.length) { container.innerHTML = ''; return; }
 
     const kw      = this._kwStr(new Date());
-    const done    = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done    = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total   = allDuties.length;
     const pct     = total ? Math.round(done / total * 100) : 0;
     const barCls  = pct === 100 ? 'full' : '';
 
     let rows = '';
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -12714,7 +12631,7 @@ const WB = {
     if (!allDuties.length) return;
 
     const kw   = this._kwStr(new Date());
-    const done = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total= allDuties.length;
     const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
@@ -12725,7 +12642,7 @@ const WB = {
       </div>`;
 
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -12763,7 +12680,7 @@ const WB = {
     if (!allDuties.length) return;
 
     const kw   = this._kwStr(new Date());
-    const done = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total= allDuties.length;
     const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
@@ -12774,7 +12691,7 @@ const WB = {
       </div>`;
 
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -13210,7 +13127,7 @@ const WB = {
   // ── Ist Pflicht diese Woche erledigt? ─────────────────
   _dutyDoneThisWeek(duty) {
     const kw = this._kwStr(new Date());
-    return !!(duty.doneWeeks?.[kw]);
+    return this._dutyIsDone(duty, new Date());
   },
 
   // ── Ist Pflicht heute fällig / überfällig? ────────────
@@ -13250,21 +13167,7 @@ const WB = {
   },
 
   // ── Pflicht abhaken ────────────────────────────────────
-  dutyToggle(ctx, dutyId) {
-    const store = this._dutyStore(ctx); if (!store) return;
-    const duty  = store.find(d => d.id === dutyId); if (!duty) return;
-    const kw    = this._kwStr(new Date());
-    if (!duty.doneWeeks) duty.doneWeeks = {};
-    if (duty.doneWeeks[kw]) {
-      delete duty.doneWeeks[kw];
-    } else {
-      duty.doneWeeks[kw] = true;
-    }
-    this.setDirty();
-    // Sofort re-rendern
-    if (this.activeTab === 'cockpit')     this.renderCockpit();
-    if (this.activeTab === 'checklisten') this.renderChecklisten();
-  },
+  dutyToggle(ctx, dutyId) { /* v3.38.0: überschrieben — letzte Def. gilt */ },
 
 
 
@@ -13405,7 +13308,7 @@ const WB = {
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
-      const done    = !!(duty.doneWeeks?.[kw]);
+      const done    = this._dutyIsDone(duty, new Date());
       const dueInfo = this._dutyDueInfo(duty);
       const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
       const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
@@ -13434,14 +13337,14 @@ const WB = {
     if (!allDuties.length) { container.innerHTML = ''; return; }
 
     const kw      = this._kwStr(new Date());
-    const done    = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done    = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total   = allDuties.length;
     const pct     = total ? Math.round(done / total * 100) : 0;
     const barCls  = pct === 100 ? 'full' : '';
 
     let rows = '';
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -13478,7 +13381,7 @@ const WB = {
     if (!allDuties.length) return;
 
     const kw   = this._kwStr(new Date());
-    const done = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total= allDuties.length;
     const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
@@ -13489,7 +13392,7 @@ const WB = {
       </div>`;
 
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -13598,7 +13501,7 @@ const WB = {
   // ── Ist Pflicht diese Woche erledigt? ─────────────────
   _dutyDoneThisWeek(duty) {
     const kw = this._kwStr(new Date());
-    return !!(duty.doneWeeks?.[kw]);
+    return this._dutyIsDone(duty, new Date());
   },
 
   // ── Ist Pflicht heute fällig / überfällig? ────────────
@@ -13638,21 +13541,7 @@ const WB = {
   },
 
   // ── Pflicht abhaken ────────────────────────────────────
-  dutyToggle(ctx, dutyId) {
-    const store = this._dutyStore(ctx); if (!store) return;
-    const duty  = store.find(d => d.id === dutyId); if (!duty) return;
-    const kw    = this._kwStr(new Date());
-    if (!duty.doneWeeks) duty.doneWeeks = {};
-    if (duty.doneWeeks[kw]) {
-      delete duty.doneWeeks[kw];
-    } else {
-      duty.doneWeeks[kw] = true;
-    }
-    this.setDirty();
-    // Sofort re-rendern
-    if (this.activeTab === 'cockpit')     this.renderCockpit();
-    if (this.activeTab === 'checklisten') this.renderChecklisten();
-  },
+  dutyToggle(ctx, dutyId) { /* v3.38.0: überschrieben — letzte Def. gilt */ },
 
 
 
@@ -13793,7 +13682,7 @@ const WB = {
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
-      const done    = !!(duty.doneWeeks?.[kw]);
+      const done    = this._dutyIsDone(duty, new Date());
       const dueInfo = this._dutyDueInfo(duty);
       const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
       const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
@@ -13822,14 +13711,14 @@ const WB = {
     if (!allDuties.length) { container.innerHTML = ''; return; }
 
     const kw      = this._kwStr(new Date());
-    const done    = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done    = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total   = allDuties.length;
     const pct     = total ? Math.round(done / total * 100) : 0;
     const barCls  = pct === 100 ? 'full' : '';
 
     let rows = '';
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -13866,7 +13755,7 @@ const WB = {
     if (!allDuties.length) return;
 
     const kw   = this._kwStr(new Date());
-    const done = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total= allDuties.length;
     const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
@@ -13877,7 +13766,7 @@ const WB = {
       </div>`;
 
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -13950,7 +13839,48 @@ const WB = {
     const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     if (!db) return null;
     if (!db.weeklyDuties) db.weeklyDuties = [];
+    // v3.38.0: Migration doneWeeks → instances (einmalig pro Duty)
+    db.weeklyDuties.forEach(duty => {
+      if (!duty.instances) duty.instances = {};
+      if (duty.doneWeeks && Object.keys(duty.doneWeeks).length) {
+        // Migriere alte KW-Keys → KW-DOW Keys für alle konfigurierten Tage
+        const allDays = duty.type === 'fixed'
+          ? [parseInt(duty.dayFixed)]
+          : (duty.days || []);
+        Object.keys(duty.doneWeeks).forEach(kw => {
+          if (duty.doneWeeks[kw]) {
+            allDays.forEach(dow => {
+              const key = kw + '-' + dow;
+              if (!duty.instances[key]) duty.instances[key] = { done: true, checklistDone: {} };
+            });
+          }
+        });
+        delete duty.doneWeeks;
+      }
+    });
     return db.weeklyDuties;
+  },
+
+  // ── Instanz-Key für Datum + Wochentag ─────────────────
+  _dutyInstKey(date) {
+    // date: Date-Objekt oder null (= heute)
+    const d = date || new Date();
+    const kw = this._kwStr(d);
+    return kw + '-' + d.getDay();
+  },
+
+  // ── Ist Pflicht an diesem Tag erledigt? ───────────────
+  _dutyIsDone(duty, date) {
+    const key = this._dutyInstKey(date);
+    return !!(duty.instances?.[key]?.done);
+  },
+
+  // ── Setze Erledigt-Status ─────────────────────────────
+  _dutySetDone(duty, date, val) {
+    if (!duty.instances) duty.instances = {};
+    const key = this._dutyInstKey(date);
+    if (!duty.instances[key]) duty.instances[key] = { done: false, checklistDone: {} };
+    duty.instances[key].done = val;
   },
 
   // ── Auto-Reset Montag ──────────────────────────────────
@@ -13975,59 +13905,89 @@ const WB = {
   // ── Ist Pflicht diese Woche erledigt? ─────────────────
   _dutyDoneThisWeek(duty) {
     const kw = this._kwStr(new Date());
-    return !!(duty.doneWeeks?.[kw]);
+    return this._dutyIsDone(duty, new Date());
   },
 
   // ── Ist Pflicht heute fällig / überfällig? ────────────
   _dutyDueInfo(duty) {
-    const now   = new Date();
-    const today = now.getDay(); // 0=So,1=Mo,...
-    const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
-
-    if (duty.type === 'fixed') {
-      const fixed = parseInt(duty.dayFixed);
-      if (today === fixed) return { due: true, late: false, label: 'Heute' };
-      const diff = (today - fixed + 7) % 7;
-      if (diff > 0 && diff < 7) return { due: true, late: true, label: `seit ${DAY_NAMES[fixed]}` };
-      return { due: false, late: false, label: `jeden ${DAY_NAMES[fixed]}` };
-    }
-
-    // Multi: mehrere Tage
-    const days = duty.days || (duty.dayFrom !== undefined
-      ? (() => { // Legacy window → alle Tage im Fenster
-          const r = []; for(let d=duty.dayFrom;d<=duty.dayTo;d++) r.push(d); return r;
-        })()
-      : []);
-    if (!days.length) return { due: false, late: false, label: '?' };
-
-    const dayNames = days.map(d => DAY_NAMES[d]).join(', ');
-    if (days.includes(today)) return { due: true, late: false, label: 'Heute · ' + dayNames };
-
-    // Liegt ein Tag aus days bereits hinter uns diese Woche?
-    const normalize = d => d === 0 ? 7 : d;
-    const todayN = normalize(today);
-    const pastDays = days.filter(d => normalize(d) < todayN);
-    if (pastDays.length) {
-      const lastPast = pastDays.sort((a,b) => normalize(b)-normalize(a))[0];
-      return { due: true, late: true, label: `seit ${DAY_NAMES[lastPast]} · ${dayNames}` };
-    }
-    return { due: false, late: false, label: dayNames };
+    // v3.38.0: Gibt Info für HEUTE zurück (backward-compat)
+    return this._dutyDayInfo(duty, new Date());
   },
 
+  // ── Info für einen konkreten Tag ──────────────────────
+  _dutyDayInfo(duty, date) {
+    const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+    const dow = date.getDay();
+
+    const allDays = duty.type === 'fixed'
+      ? [parseInt(duty.dayFixed)]
+      : (duty.days || []);
+
+    if (!allDays.length) return { due: false, late: false, label: '?', done: false };
+
+    const normalize = d => d === 0 ? 7 : d;
+    const dowN = normalize(dow);
+    const isDue = allDays.includes(dow);
+    const pastDays = allDays.filter(d => normalize(d) < dowN);
+    const donToday = this._dutyIsDone(duty, date);
+
+    if (isDue) {
+      return { due: true, late: false, label: 'Heute', done: donToday, dow };
+    }
+    if (pastDays.length) {
+      const lastPast = pastDays.sort((a,b) => normalize(b)-normalize(a))[0];
+      return { due: true, late: true, label: `seit ${DAY_NAMES[lastPast]}`, done: donToday, dow };
+    }
+    const nextDay = allDays.find(d => normalize(d) > dowN);
+    const label = nextDay !== undefined ? DAY_NAMES[nextDay] : DAY_NAMES[allDays[0]];
+    return { due: false, late: false, label, done: donToday, dow };
+  },
+
+  // ── Alle Tages-Instanzen dieser Woche ─────────────────
+  // Gibt für Mo+Mi+Fr = 3 eigenständige Objekte zurück
+  _dutyWeekInstances(duty) {
+    const now = new Date();
+    const dow = now.getDay();
+    const mondayOffset = dow === 0 ? -6 : 1 - dow;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + mondayOffset);
+    monday.setHours(0,0,0,0);
+
+    const allDays = duty.type === 'fixed'
+      ? [parseInt(duty.dayFixed)]
+      : (duty.days || []);
+
+    const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+    const normalize = d => d === 0 ? 7 : d;
+
+    return allDays
+      .sort((a,b) => normalize(a) - normalize(b))
+      .map(dayDow => {
+        // Datum dieses Wochentags in der aktuellen Woche
+        const offset = (normalize(dayDow) - 1); // Mo=0, Di=1 ... So=6
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + offset);
+        const today = new Date(); today.setHours(0,0,0,0);
+        const isPast = date < today;
+        const isToday = date.toDateString() === today.toDateString();
+        const done = this._dutyIsDone(duty, date);
+        return { dow: dayDow, date, label: DAY_NAMES[dayDow], isPast, isToday, done };
+      });
+  },
+
+
+
   // ── Pflicht abhaken ────────────────────────────────────
-  dutyToggle(ctx, dutyId) {
+  dutyToggle(ctx, dutyId, date) {
+    // v3.38.0: Toggle pro Tag — date: Date-Objekt oder null (=heute)
     const store = this._dutyStore(ctx); if (!store) return;
     const duty  = store.find(d => d.id === dutyId); if (!duty) return;
-    const kw    = this._kwStr(new Date());
-    if (!duty.doneWeeks) duty.doneWeeks = {};
-    if (duty.doneWeeks[kw]) {
-      delete duty.doneWeeks[kw];
-    } else {
-      duty.doneWeeks[kw] = true;
-    }
+    const d     = date || new Date();
+    const isDone = this._dutyIsDone(duty, d);
+    this._dutySetDone(duty, d, !isDone);
     this.setDirty();
-    // Sofort re-rendern
     if (this.activeTab === 'cockpit')     this.renderCockpit();
+    if (this.activeTab === 'aufgaben')    this.renderAufgaben();
     if (this.activeTab === 'checklisten') this.renderChecklisten();
   },
 
@@ -14170,7 +14130,7 @@ const WB = {
     if (!relevant.length) return '';
 
     const pills = relevant.map(duty => {
-      const done    = !!(duty.doneWeeks?.[kw]);
+      const done    = this._dutyIsDone(duty, new Date());
       const dueInfo = this._dutyDueInfo(duty);
       const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
       const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
@@ -14199,14 +14159,14 @@ const WB = {
     if (!allDuties.length) { container.innerHTML = ''; return; }
 
     const kw      = this._kwStr(new Date());
-    const done    = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done    = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total   = allDuties.length;
     const pct     = total ? Math.round(done / total * 100) : 0;
     const barCls  = pct === 100 ? 'full' : '';
 
     let rows = '';
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -14243,7 +14203,7 @@ const WB = {
     if (!allDuties.length) return;
 
     const kw   = this._kwStr(new Date());
-    const done = allDuties.filter(d => d.doneWeeks?.[kw]).length;
+    const done = allDuties.filter(d => this._dutyIsDone(d, new Date())).length;
     const total= allDuties.length;
     const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
@@ -14254,7 +14214,7 @@ const WB = {
       </div>`;
 
     allDuties.forEach(duty => {
-      const isDone   = !!(duty.doneWeeks?.[kw]);
+      const isDone   = this._dutyIsDone(duty, new Date());
       const dueInfo  = this._dutyDueInfo(duty);
       const worldCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
       const checkCls = isDone ? 'done' : worldCls;
@@ -16973,14 +16933,23 @@ const WB = {
     ];
 
     // Filter-Leiste
-    // Wochenroutinen zählen (fällige Pflichten dieser Woche)
+    // v3.38.0: Wochenroutinen — pro Tag eine Instanz zählen
     const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
     const allDuties = (this._dutyStore(ctx) || []);
-    const kw = this._kwStr(new Date());
     const relevantDuties = allDuties.filter(d => this._dutyBelongsToThisWeek({...d, ctx}));
-    const doneDuties  = relevantDuties.filter(d => !!(d.doneWeeks?.[kw]));
-    const openDuties  = relevantDuties.filter(d => !(d.doneWeeks?.[kw]));
-    cnt.routine = relevantDuties.length;
+    // Alle Tages-Instanzen dieser Woche aufbauen
+    const allWeekInstances = [];
+    relevantDuties.forEach(duty => {
+      this._dutyWeekInstances(duty).forEach(inst => allWeekInstances.push({duty, inst}));
+    });
+    const openDutyInstances = allWeekInstances.filter(x => !x.inst.done);
+    const doneDutyInstances = allWeekInstances.filter(x => x.inst.done);
+    // Legacy-Variablen für bestehende Code-Stellen
+    const openDuties = relevantDuties.filter(d =>
+      this._dutyWeekInstances(d).some(i => !i.done));
+    const doneDuties = relevantDuties.filter(d =>
+      this._dutyWeekInstances(d).every(i => i.done));
+    cnt.routine = allWeekInstances.length;
 
     let pillHtml = '<div class="af-filter-row">';
     FILTERS.forEach(f => {
@@ -16991,7 +16960,9 @@ const WB = {
         const totalDuties = allDuties.filter(d => this._dutyBelongsToThisWeek({...d, ctx}));
         if(!totalDuties.length) return;
         const isA = f.id === this.taskFilter;
-        const label = doneDuties.length + '/' + relevantDuties.length + ' Routinen';
+        const doneInstCount = doneDutyInstances.length;
+        const totalInstCount = allWeekInstances.length;
+        const label = doneInstCount + '/' + totalInstCount + ' Routinen';
         pillHtml += `<button class="af-pill${isA?' active':''} af-pill-right"
           onclick="WB.setTaskFilter('routine')">${label}</button>`;
         return;
@@ -17015,15 +16986,13 @@ const WB = {
       }
     });
 
-    // Heute-Ansicht: Aufgaben + fällige Routinen getrennt (v3.36.0)
+    // Heute-Ansicht: Aufgaben + fällige Routinen getrennt (v3.38.0)
     if(this.taskFilter === 'today') {
       const wCls = ctx === 'pro' ? 'beruf' : 'priv';
-      const todayDuties = relevantDuties.filter(d => {
-        const dueInfo = this._dutyDueInfo({...d, ctx});
-        return dueInfo.due;
-      });
-      const todayDutiesOpen = todayDuties.filter(d => !(d.doneWeeks?.[kw]));
-      const todayDutiesDone = todayDuties.filter(d => !!(d.doneWeeks?.[kw]));
+      const now2 = new Date();
+      const todayInstances = allWeekInstances.filter(x => x.inst.isToday);
+      const todayDutiesOpen = todayInstances.filter(x => !x.inst.done);
+      const todayDutiesDone = todayInstances.filter(x => x.inst.done);
 
       let tHtml = '';
       // Aufgaben-Block
@@ -17032,74 +17001,79 @@ const WB = {
         filtered.sort((a,b) => (a.t.prio?0:1)-(b.t.prio?0:1));
         tHtml += filtered.map(({t,pKey,ctx}) => this._afTaskHtml(t,pKey,ctx,false)).join('');
       }
-      // Routinen-Block (nur wenn heute fällig)
-      if(todayDuties.length) {
+      // Routinen heute — pro Instanz (v3.38.0)
+      if(todayInstances.length) {
         tHtml += '<div class="af-section-label" style="padding-top:12px;">Routinen heute</div>';
-        todayDutiesOpen.forEach(duty => {
-          const dueInfo = this._dutyDueInfo(duty);
+        todayDutiesOpen.forEach(({duty, inst}) => {
+          const dateArg = inst.date.toISOString();
           tHtml += `<div class="cl-duty-item">
-            <div class="cl-duty-checkbox ${wCls}" onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderAufgaben();"></div>
-            <div class="cl-duty-info" style="flex:1;">
+            <div class="cl-duty-checkbox ${wCls}" onclick="WB.dutyToggle('${ctx}','${duty.id}',new Date('${dateArg}'));"></div>
+            <div class="cl-duty-info">
               <div class="cl-duty-name">${duty.title}</div>
-              <div class="cl-duty-when${dueInfo.late?' late':''}">${dueInfo.label}</div>
             </div>
           </div>`;
         });
-        todayDutiesDone.forEach(duty => {
+        todayDutiesDone.forEach(({duty, inst}) => {
+          const dateArg = inst.date.toISOString();
           tHtml += `<div class="cl-duty-item">
-            <div class="cl-duty-checkbox done" onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderAufgaben();"></div>
+            <div class="cl-duty-checkbox done" onclick="WB.dutyToggle('${ctx}','${duty.id}',new Date('${dateArg}'));"></div>
             <div class="cl-duty-info">
               <div class="cl-duty-name done">${duty.title}</div>
             </div>
           </div>`;
         });
       }
-      if(!filtered.length && !todayDuties.length) {
+      if(!filtered.length && !todayInstances.length) {
         tHtml = '<div class="zt-empty">Keine Aufgaben oder Routinen für heute.</div>';
       }
       scroll.innerHTML = '<div style="padding:0 0 16px;">' + tHtml + '</div>';
       return;
     }
 
-    // Routine-Ansicht: Wochenpflichten — offen nach Wochentag, erledigt unten (v3.36.0)
+    // Routine-Ansicht: pro Tag eine eigenständige Instanz (v3.38.0)
     if(this.taskFilter === 'routine') {
       let rHtml = '<div style="padding:12px 14px;">';
       if(!relevantDuties.length) {
         rHtml += '<div class="zt-empty">Keine fälligen Routinen diese Woche.</div>';
       } else {
         const wCls = ctx === 'pro' ? 'beruf' : 'priv';
+        // Alle Tages-Instanzen aller Duties aufbauen
+        const allInstances = [];
+        relevantDuties.forEach(duty => {
+          this._dutyWeekInstances(duty).forEach(inst => {
+            allInstances.push({ duty, inst });
+          });
+        });
+        // Sortierung: nach Wochentag aufsteigend
         const normalize = d => d === 0 ? 7 : d;
-        const dutyDay = duty => {
-          if (duty.type === 'fixed') return normalize(parseInt(duty.dayFixed) || 1);
-          const days = duty.days || [];
-          return days.length ? Math.min(...days.map(normalize)) : 8;
-        };
-        const openSorted = [...openDuties].sort((a,b) => dutyDay(a) - dutyDay(b));
-        const doneSorted = [...doneDuties].sort((a,b) => dutyDay(a) - dutyDay(b));
+        allInstances.sort((a,b) => normalize(a.inst.dow) - normalize(b.inst.dow));
 
-        if (openSorted.length) {
+        const openInst = allInstances.filter(x => !x.inst.done);
+        const doneInst = allInstances.filter(x => x.inst.done);
+
+        if (openInst.length) {
           rHtml += '<div class="af-section-label" style="padding-top:4px;">Offen</div>';
-          openSorted.forEach(duty => {
-            const dueInfo = this._dutyDueInfo(duty);
+          openInst.forEach(({duty, inst}) => {
+            const dateArg = inst.date.toISOString();
             rHtml += `<div class="cl-duty-item">
-              <div class="cl-duty-checkbox ${wCls}" onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderAufgaben();"></div>
+              <div class="cl-duty-checkbox ${wCls}" onclick="WB.dutyToggle('${ctx}','${duty.id}',new Date('${dateArg}'));"></div>
               <div class="cl-duty-info" style="flex:1;">
                 <div class="cl-duty-name">${duty.title}</div>
-                <div class="cl-duty-when${dueInfo.late?' late':''}">${dueInfo.label}</div>
+                <div class="cl-duty-when${inst.isPast&&!inst.isToday?' late':''}">${inst.isToday?'Heute':inst.label}</div>
               </div>
-              <button onclick="WB.dutiesOpen()" style="flex-shrink:0;padding:4px 10px;font-size:0.75rem;font-family:var(--font);border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;color:var(--c-muted);cursor:pointer;">Bearbeiten</button>
+              <button onclick="WB.dutiesOpen()" style="flex-shrink:0;padding:4px 10px;font-size:0.75rem;font-family:var(--font);border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;color:var(--c-muted);cursor:pointer;">Bearb.</button>
             </div>`;
           });
         }
-        if (doneSorted.length) {
+        if (doneInst.length) {
           rHtml += '<div class="af-section-label" style="padding-top:12px;">Erledigt</div>';
-          doneSorted.forEach(duty => {
-            const dueInfo = this._dutyDueInfo(duty);
+          doneInst.forEach(({duty, inst}) => {
+            const dateArg = inst.date.toISOString();
             rHtml += `<div class="cl-duty-item">
-              <div class="cl-duty-checkbox done" onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderAufgaben();"></div>
+              <div class="cl-duty-checkbox done" onclick="WB.dutyToggle('${ctx}','${duty.id}',new Date('${dateArg}'));"></div>
               <div class="cl-duty-info">
                 <div class="cl-duty-name done">${duty.title}</div>
-                <div class="cl-duty-when">${dueInfo.label}</div>
+                <div class="cl-duty-when">${inst.isToday?'Heute':inst.label}</div>
               </div>
             </div>`;
           });
