@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.44.4</title>
+<title>WorkBench 3.45.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -459,7 +459,32 @@ html, body {
   padding: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  /* display wird von .wb-section / .wb-section.active gesteuert */
+  overscroll-behavior: contain;
+}
+
+/* Zeitband-Trenner im Cockpit */
+#ck-zeitband-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  background: var(--c-bg);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  border-bottom: 1px solid var(--c-border);
+}
+#ck-zeitband-divider::before,
+#ck-zeitband-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--c-border);
 }
 
 /* Datum-Header */
@@ -4553,15 +4578,25 @@ html, body {
 
     <!-- Cockpit Dashboard -->
     <section class="wb-section" id="sec-cockpit" aria-label="Cockpit">
+      <!-- Cockpit-Header: Datum + Nav -->
       <div id="ck-date-header">
         <div id="ck-date-row">
-          <div>
-            <div id="ck-date-big">–</div>
-            <div id="ck-date-sub">–</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="zt-nav-btn" onclick="WB.shiftDay(-1)" aria-label="Vorheriger Tag" style="flex-shrink:0;">&#8249;</button>
+            <div>
+              <div id="ck-date-big">–</div>
+              <div id="ck-date-sub">–</div>
+            </div>
+            <button class="zt-nav-btn" onclick="WB.shiftDay(1)" aria-label="Nächster Tag" style="flex-shrink:0;">&#8250;</button>
           </div>
-          <div id="ck-sync-dots"></div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button id="zt-today-btn" onclick="WB.goToday()" style="display:none;font-size:0.75rem;padding:4px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;font-family:var(--font);cursor:pointer;color:var(--c-muted);">Heute</button>
+            <button id="zt-new-ev-btn" onclick="WB._ztNewEvent()" style="font-size:0.75rem;padding:4px 8px;border:1px solid var(--c-beruf);border-radius:var(--radius-xs);background:none;font-family:var(--font);cursor:pointer;color:var(--c-beruf);">+ Termin</button>
+            <div id="ck-sync-dots"></div>
+          </div>
         </div>
       </div>
+      <!-- Banners -->
       <div id="ck-focus-banner" class="ok" style="display:none;">
         <span class="ck-focus-icon">📊</span>
         <span class="ck-focus-text"></span>
@@ -4589,23 +4624,20 @@ html, body {
         </div>
         <button class="ck-meeting-btn" id="ck-meeting-btn">Öffnen</button>
       </div>
+      <!-- World-Card -->
       <div id="ck-grid"></div>
+      <!-- Zeitband-Trenner -->
+      <div id="ck-zeitband-divider">
+        <span>Zeitband</span>
+        <div id="zt-daytype-banner" style="display:inline;"></div>
+      </div>
+      <!-- Zeitband eingebettet -->
+      <div id="zeitband-scroll"></div>
 
     </section>
 
-    <!-- Heute -->
-    <section class="wb-section" id="sec-heute" aria-label="Heute">
-      <div id="heute-header">
-        <button class="zt-nav-btn" onclick="WB.shiftDay(-1)" aria-label="Vorheriger Tag">&#8249;</button>
-        <div id="zt-date-label">Heute</div>
-        <button class="zt-nav-btn" onclick="WB.shiftDay(1)" aria-label="Nächster Tag">&#8250;</button>
-        <div class="zt-header-right">
-          <button id="zt-today-btn" onclick="WB.goToday()" style="display:none;">Heute</button>
-          <button id="zt-new-ev-btn" onclick="WB._ztNewEvent()">+ Termin</button>
-        </div>
-      </div>
-      <div id="zt-daytype-banner"></div>
-      <div id="zeitband-scroll"></div>
+    <!-- Heute: leer, nur noch als Fallback für interne Referenzen -->
+    <section class="wb-section" id="sec-heute" aria-label="Heute" style="display:none!important;">
     </section>
 
     <!-- Aufgaben -->
@@ -4674,16 +4706,7 @@ html, body {
       Cockpit
     </button>
 
-    <button class="wb-tab" role="tab" aria-selected="false" aria-controls="sec-heute"
-            onclick="WB.switchTab('heute', this)" data-label="Heute" id="tab-heute">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-        <line x1="3" y1="10" x2="21" y2="10"/>
-        <circle cx="12" cy="16" r="1.5" fill="currentColor" stroke="none"/>
-      </svg>
-      Heute
-    </button>
+
 
     <button class="wb-tab" role="tab" aria-selected="false" aria-controls="sec-aufgaben"
             onclick="WB.switchTab('aufgaben', this)" data-label="Aufgaben" id="tab-aufgaben">
@@ -5622,7 +5645,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.44.4 · Build 20260528-0010</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.45.0 · Build 20260528-0100</div>
     </div>
 
     <!-- Welt -->
@@ -5845,7 +5868,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.44.4',
+  APP_VERSION: '3.45.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8668,6 +8691,8 @@ const WB = {
     this._ckRenderGrid();
     this._ckRenderTasksTodayPill();
     this._ckRenderDuties();
+    // v3.45.0: Zeitband direkt im Cockpit rendern
+    this.renderHeute();
     clearInterval(this._ckCountdownTimer);
     this._ckCountdownTimer = setInterval(() => {
       if (this.activeTab === 'cockpit') {
@@ -8825,7 +8850,7 @@ const WB = {
       const bookedH  = Math.round(focusMin / 60 * 10) / 10;
 
       // Navigation — über _goTab (sicher, kein querySelector nötig)
-      const goHeute    = `WB._goTab('heute')`;
+      const goHeute    = `WB._goTab('cockpit')`;
       const goAufgaben = `WB._goTab('aufgaben')`;
       const goCl       = `WB._ckGoChecklisten('${ctx}')`;
       const goWoche    = `WB._goTab('woche')`;
@@ -15349,7 +15374,7 @@ const WB = {
     if (!activeBlock.system && activeBlock.e) {
       const evId = activeBlock.e.id;
       const ctx  = activeBlock.ctx;
-      btnHtml = `<button class="ck-block-btn" onclick="WB._goTab('heute')">Heute →</button>`;
+      btnHtml = `<button class="ck-block-btn" onclick="WB._goTab('cockpit')">Heute →</button>`;
     }
 
     banner.innerHTML = `${clockSvg}<div class="ck-block-info"><div class="ck-block-title">${title}</div><div class="ck-block-sub">${subLabel}</div></div>${btnHtml}`;
@@ -17236,7 +17261,7 @@ const WB = {
     this.setDirty();
     this.editClose();
     this._toast('Termin gelöscht');
-    if (this.activeTab === 'heute') this.renderHeute();
+    if (this.activeTab === 'cockpit') this.renderCockpit();
     else if (this.activeTab === 'woche') this.renderWoche();
     else if (this.activeTab === 'cockpit') this.renderCockpit();
   },
@@ -17254,7 +17279,7 @@ const WB = {
     this.setDirty();
     this.editClose();
     this._toast('Termin gelöscht');
-    if (this.activeTab === 'heute') this.renderHeute();
+    if (this.activeTab === 'cockpit') this.renderCockpit();
     else if (this.activeTab === 'woche') this.renderWoche();
     else if (this.activeTab === 'cockpit') this.renderCockpit();
   },
@@ -17308,7 +17333,7 @@ const WB = {
       this.setDirty();
       this.editClose();
       if (typV !== 'besprechung') this._toast('Termin angelegt');
-      if(this.activeTab==='heute') this.renderHeute();
+      if(this.activeTab==='cockpit') this.renderCockpit();
       if(this.activeTab==='woche') this.renderWoche();
       return;
     }
@@ -17529,7 +17554,7 @@ const WB = {
                       'privDayStart','privDayEnd'];
     this._settings[key] = timeKeys.includes(key) ? value : (parseFloat(value) || value);
     // Zeitband ist jetzt fix 05-23, kein Update nötig
-    if(this.activeTab==='heute') this.renderHeute();
+    if(this.activeTab==='cockpit') this.renderCockpit();
     if(this.activeTab==='woche') this.renderWoche();
     if(this.activeTab==='cockpit') this.renderCockpit();
   },
@@ -18209,6 +18234,14 @@ const WB = {
     // Today-Btn ausblenden wenn schon heute
     const tb = document.getElementById('zt-today-btn');
     if(tb) tb.style.display = isT ? 'none' : '';
+    // v3.45.0: ck-date-big zeigt Datum aus viewDate (nicht immer heute)
+    if(!isT) {
+      const el = document.getElementById('ck-date-big');
+      if(el) el.style.color = 'var(--c-muted)';
+    } else {
+      const el = document.getElementById('ck-date-big');
+      if(el) el.style.color = '';
+    }
   },
 
   renderHeute() {
@@ -18217,10 +18250,11 @@ const WB = {
     // Tagestyp-Banner
     const _todayStr = (() => { const d=new Date(); const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); })();
     this._ztRenderDayTypeBanner(_todayStr);
+    // v3.45.0: zt-fab auch im Cockpit sichtbar (Zeitband ist eingebettet)
     const fab = document.getElementById('zt-fab');
     if(fab) { fab.style.display = ''; fab.classList.add('visible'); }
     const ckFab2 = document.getElementById('ck-fab');
-    if(ckFab2) ckFab2.style.display = 'none';
+    if(ckFab2) ckFab2.style.display = 'flex'; // Cockpit-FAB bleibt
     const afFab1 = document.getElementById('af-fab');
     if (afFab1) { afFab1.classList.remove('visible'); afFab1.style.display = 'none'; }
 
@@ -18508,7 +18542,7 @@ const WB = {
 
   _renderSection(id) {
     if(id === 'cockpit')  this.renderCockpit();
-    if(id === 'heute')    this.renderHeute();
+    if(id === 'heute')    this.renderCockpit(); // v3.45.0: heute = cockpit
     if(id === 'aufgaben') this.renderAufgaben();
     if(id === 'projekte') this.renderProjekte();
     if(id === 'notizen')      this.renderNotizen();
