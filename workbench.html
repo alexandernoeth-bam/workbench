@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.46.3</title>
+<title>WorkBench 3.46.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -460,39 +460,7 @@ html, body {
   overscroll-behavior: contain;
 }
 
-/* Termin-Toggle — Pill-Zeile direkt unter World-Card, volle Card-Breite */
-#ck-termin-toggle {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
-  background: rgba(13,122,107,0.07);
-  border-radius: var(--radius);
-  border: 1px solid rgba(13,122,107,0.18);
-  cursor: pointer;
-  transition: background var(--t-fast);
-  width: 100%;
-  max-width: 420px;
-  box-sizing: border-box;
-  margin-top: 4px;
-}
-#ck-termin-toggle:hover { background: rgba(13,122,107,0.12); }
-#ck-termin-toggle.open  { background: rgba(13,122,107,0.14); border-color: rgba(13,122,107,0.35); }
-#ck-termin-toggle .ck-num-pill {
-  background: var(--c-beruf);
-  color: #fff;
-  min-width: 44px;
-}
-#ck-termin-toggle .ck-num-pill.zero {
-  background: rgba(13,122,107,0.18);
-  color: var(--c-beruf);
-}
-#ck-termin-toggle .ck-pill-label { color: rgba(13,80,65,0.85); flex: 1; }
-.ck-termin-arrow-icon {
-  font-size: 0.65rem;
-  color: var(--c-beruf);
-  opacity: 0.7;
-}
+/* Termin-Toggle CSS entfernt v3.46.4 */
 
 /* Zeitband Panel */
 #ck-zeitband-panel {
@@ -5673,7 +5641,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.3 · Build 20260528-0430</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.4 · Build 20260528-0500</div>
     </div>
 
     <!-- Welt -->
@@ -5824,7 +5792,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.46.3',
+  APP_VERSION: '3.46.4',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8932,7 +8900,7 @@ const WB = {
         </div>
         ${row(tasksTodayCount, 'Aufgaben heute',       goTasksToday)}
         ${row(urgentCount,     'Prio A & Überfällig',  goAufgaben)}
-        ${row(evCount,         'Termine heute',         goHeute)}
+        ${row(evCount,         'Termine heute',         'WB._ckToggleZeitband()')}
         ${row(clCount,         'Checklisten aktiv',     goCl)}
         ${inboxPill}
         ${dutyPills}
@@ -8946,16 +8914,7 @@ const WB = {
       grid.innerHTML = renderWorldCard('priv', this.dataPriv, 'priv',  'Privat');
     }
 
-    // v3.46.3: Termin-Toggle direkt in grid.innerHTML — bleibt beim Re-render
-    const arrowIcon = this._ckZeitbandOpen ? '&#9660;' : '&#9658;';
-    const openCls   = this._ckZeitbandOpen ? ' open' : '';
-    const toggleHtml = `<div id="ck-termin-toggle" class="${openCls}" onclick="WB._ckToggleZeitband()">
-      <div id="ck-termin-num" class="ck-num-pill zero">&#8211;</div>
-      <span class="ck-pill-label">Termine heute</span>
-      <span id="ck-termin-arrow" class="ck-termin-arrow-icon">${arrowIcon}</span>
-    </div>`;
-    grid.innerHTML += toggleHtml;
-    this._ckUpdateTerminToggle();
+
   },
 
   // Welt setzen + Checklisten-Tab öffnen
@@ -15079,17 +15038,11 @@ const WB = {
 
   _ckToggleZeitband() {
     this._ckZeitbandOpen = !this._ckZeitbandOpen;
-    const panel  = document.getElementById('ck-zeitband-panel');
-    const arrow  = document.getElementById('ck-termin-arrow');
+    const panel = document.getElementById('ck-zeitband-panel');
     if (panel) panel.style.display = this._ckZeitbandOpen ? '' : 'none';
-    if (arrow) arrow.textContent = this._ckZeitbandOpen ? '▼' : '▶';
     if (this._ckZeitbandOpen) {
-      // Zeitband erst rendern wenn aufgeklappt
       this.renderHeute();
-      // Zu Zeitband scrollen
-      setTimeout(() => {
-        panel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 50);
+      setTimeout(() => panel?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
     }
   },
 
