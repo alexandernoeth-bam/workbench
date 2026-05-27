@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.46.2</title>
+<title>WorkBench 3.46.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5673,7 +5673,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.2 · Build 20260528-0400</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.3 · Build 20260528-0430</div>
     </div>
 
     <!-- Welt -->
@@ -5824,7 +5824,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.46.2',
+  APP_VERSION: '3.46.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8946,16 +8946,15 @@ const WB = {
       grid.innerHTML = renderWorldCard('priv', this.dataPriv, 'priv',  'Privat');
     }
 
-    // v3.46.2: Termin-Toggle direkt in ck-grid anhängen
-    const toggleEl = document.createElement('div');
-    toggleEl.id = 'ck-termin-toggle';
-    toggleEl.onclick = () => this._ckToggleZeitband();
-    toggleEl.innerHTML = `
-      <div id="ck-termin-num" class="ck-num-pill${this._ckUpdateTerminToggle._lastCount === 0 ? ' zero' : ''}">–</div>
+    // v3.46.3: Termin-Toggle direkt in grid.innerHTML — bleibt beim Re-render
+    const arrowIcon = this._ckZeitbandOpen ? '&#9660;' : '&#9658;';
+    const openCls   = this._ckZeitbandOpen ? ' open' : '';
+    const toggleHtml = `<div id="ck-termin-toggle" class="${openCls}" onclick="WB._ckToggleZeitband()">
+      <div id="ck-termin-num" class="ck-num-pill zero">&#8211;</div>
       <span class="ck-pill-label">Termine heute</span>
-      <span id="ck-termin-arrow" class="ck-termin-arrow-icon">${this._ckZeitbandOpen ? '▼' : '▶'}</span>`;
-    if (this._ckZeitbandOpen) toggleEl.classList.add('open');
-    grid.appendChild(toggleEl);
+      <span id="ck-termin-arrow" class="ck-termin-arrow-icon">${arrowIcon}</span>
+    </div>`;
+    grid.innerHTML += toggleHtml;
     this._ckUpdateTerminToggle();
   },
 
@@ -11229,33 +11228,8 @@ const WB = {
 
   // ── Pflicht-Pills für eine Welt rendern (v3.46.0: deaktiviert) ──────────
   _ckDutyPillsHtml(ctx) {
-    return ''; // Duties nicht mehr in World-Card anzeigen
-    const store = this._dutyStore(ctx) || [];
-    const kw    = this._kwStr(new Date());
-
-    const relevant = store.filter(d => {
-      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
-      // Nur zeigen wenn heute fällig (due=true)
-      const dueInfo = this._dutyDueInfo({ ...d, ctx });
-      return dueInfo.due;
-    });
-    if (!relevant.length) return '';
-
-    const pills = relevant.map(duty => {
-      const done    = this._dutyIsDone(duty, new Date());
-      const dueInfo = this._dutyDueInfo(duty);
-      const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
-      const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
-      return `<span class="ck-duty-pill ${cls}"
-        onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderCockpit()"
-        title="${dueInfo.label}">
-        <span class="ck-duty-pill-check">${icon}</span>${duty.title}
-      </span>`;
-    }).join('');
-
-    return `<div class="ck-duty-pills-row">${pills}</div>`;
+    return ''; // v3.46.2: keine Duties im Cockpit
   },
-
   // ── Cockpit: Wochenpflichten-Block rendern ─────────────
   // (Pflichten werden jetzt als Pills in renderWorldCard eingebaut)
   _ckRenderDuties() {
@@ -11845,32 +11819,8 @@ const WB = {
 
   // ── Pflicht-Pills für eine Welt rendern ───────────────
   _ckDutyPillsHtml(ctx) {
-    const store = this._dutyStore(ctx) || [];
-    const kw    = this._kwStr(new Date());
-
-    const relevant = store.filter(d => {
-      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
-      // Nur zeigen wenn heute fällig (due=true)
-      const dueInfo = this._dutyDueInfo({ ...d, ctx });
-      return dueInfo.due;
-    });
-    if (!relevant.length) return '';
-
-    const pills = relevant.map(duty => {
-      const done    = this._dutyIsDone(duty, new Date());
-      const dueInfo = this._dutyDueInfo(duty);
-      const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
-      const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
-      return `<span class="ck-duty-pill ${cls}"
-        onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderCockpit()"
-        title="${dueInfo.label}">
-        <span class="ck-duty-pill-check">${icon}</span>${duty.title}
-      </span>`;
-    }).join('');
-
-    return `<div class="ck-duty-pills-row">${pills}</div>`;
+    return ''; // v3.46.2: keine Duties im Cockpit
   },
-
   // ── Cockpit: Wochenpflichten-Block rendern ─────────────
   // (Pflichten werden jetzt als Pills in renderWorldCard eingebaut)
   _ckRenderDuties() {
@@ -12141,32 +12091,8 @@ const WB = {
 
   // ── Pflicht-Pills für eine Welt rendern ───────────────
   _ckDutyPillsHtml(ctx) {
-    const store = this._dutyStore(ctx) || [];
-    const kw    = this._kwStr(new Date());
-
-    const relevant = store.filter(d => {
-      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
-      // Nur zeigen wenn heute fällig (due=true)
-      const dueInfo = this._dutyDueInfo({ ...d, ctx });
-      return dueInfo.due;
-    });
-    if (!relevant.length) return '';
-
-    const pills = relevant.map(duty => {
-      const done    = this._dutyIsDone(duty, new Date());
-      const dueInfo = this._dutyDueInfo(duty);
-      const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
-      const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
-      return `<span class="ck-duty-pill ${cls}"
-        onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderCockpit()"
-        title="${dueInfo.label}">
-        <span class="ck-duty-pill-check">${icon}</span>${duty.title}
-      </span>`;
-    }).join('');
-
-    return `<div class="ck-duty-pills-row">${pills}</div>`;
+    return ''; // v3.46.2: keine Duties im Cockpit
   },
-
   // ── Cockpit: Wochenpflichten-Block rendern ─────────────
   // (Pflichten werden jetzt als Pills in renderWorldCard eingebaut)
   _ckRenderDuties() {
@@ -12431,32 +12357,8 @@ const WB = {
 
   // ── Pflicht-Pills für eine Welt rendern ───────────────
   _ckDutyPillsHtml(ctx) {
-    const store = this._dutyStore(ctx) || [];
-    const kw    = this._kwStr(new Date());
-
-    const relevant = store.filter(d => {
-      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
-      // Nur zeigen wenn heute fällig (due=true)
-      const dueInfo = this._dutyDueInfo({ ...d, ctx });
-      return dueInfo.due;
-    });
-    if (!relevant.length) return '';
-
-    const pills = relevant.map(duty => {
-      const done    = this._dutyIsDone(duty, new Date());
-      const dueInfo = this._dutyDueInfo(duty);
-      const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
-      const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
-      return `<span class="ck-duty-pill ${cls}"
-        onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderCockpit()"
-        title="${dueInfo.label}">
-        <span class="ck-duty-pill-check">${icon}</span>${duty.title}
-      </span>`;
-    }).join('');
-
-    return `<div class="ck-duty-pills-row">${pills}</div>`;
+    return ''; // v3.46.2: keine Duties im Cockpit
   },
-
   // ── Cockpit: Wochenpflichten-Block rendern ─────────────
   // (Pflichten werden jetzt als Pills in renderWorldCard eingebaut)
   _ckRenderDuties() {
@@ -12685,32 +12587,8 @@ const WB = {
 
   // ── Pflicht-Pills für eine Welt rendern ───────────────
   _ckDutyPillsHtml(ctx) {
-    const store = this._dutyStore(ctx) || [];
-    const kw    = this._kwStr(new Date());
-
-    const relevant = store.filter(d => {
-      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
-      // Nur zeigen wenn heute fällig (due=true)
-      const dueInfo = this._dutyDueInfo({ ...d, ctx });
-      return dueInfo.due;
-    });
-    if (!relevant.length) return '';
-
-    const pills = relevant.map(duty => {
-      const done    = this._dutyIsDone(duty, new Date());
-      const dueInfo = this._dutyDueInfo(duty);
-      const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
-      const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
-      return `<span class="ck-duty-pill ${cls}"
-        onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderCockpit()"
-        title="${dueInfo.label}">
-        <span class="ck-duty-pill-check">${icon}</span>${duty.title}
-      </span>`;
-    }).join('');
-
-    return `<div class="ck-duty-pills-row">${pills}</div>`;
+    return ''; // v3.46.2: keine Duties im Cockpit
   },
-
   // ── Cockpit: Wochenpflichten-Block rendern ─────────────
   // (Pflichten werden jetzt als Pills in renderWorldCard eingebaut)
   _ckRenderDuties() {
@@ -13729,32 +13607,8 @@ const WB = {
 
   // ── Pflicht-Pills für eine Welt rendern ───────────────
   _ckDutyPillsHtml(ctx) {
-    const store = this._dutyStore(ctx) || [];
-    const kw    = this._kwStr(new Date());
-
-    const relevant = store.filter(d => {
-      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
-      // Nur zeigen wenn heute fällig (due=true)
-      const dueInfo = this._dutyDueInfo({ ...d, ctx });
-      return dueInfo.due;
-    });
-    if (!relevant.length) return '';
-
-    const pills = relevant.map(duty => {
-      const done    = this._dutyIsDone(duty, new Date());
-      const dueInfo = this._dutyDueInfo(duty);
-      const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
-      const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
-      return `<span class="ck-duty-pill ${cls}"
-        onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderCockpit()"
-        title="${dueInfo.label}">
-        <span class="ck-duty-pill-check">${icon}</span>${duty.title}
-      </span>`;
-    }).join('');
-
-    return `<div class="ck-duty-pills-row">${pills}</div>`;
+    return ''; // v3.46.2: keine Duties im Cockpit
   },
-
   // ── Cockpit: Wochenpflichten-Block rendern ─────────────
   // (Pflichten werden jetzt als Pills in renderWorldCard eingebaut)
   _ckRenderDuties() {
@@ -14103,32 +13957,8 @@ const WB = {
 
   // ── Pflicht-Pills für eine Welt rendern ───────────────
   _ckDutyPillsHtml(ctx) {
-    const store = this._dutyStore(ctx) || [];
-    const kw    = this._kwStr(new Date());
-
-    const relevant = store.filter(d => {
-      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
-      // Nur zeigen wenn heute fällig (due=true)
-      const dueInfo = this._dutyDueInfo({ ...d, ctx });
-      return dueInfo.due;
-    });
-    if (!relevant.length) return '';
-
-    const pills = relevant.map(duty => {
-      const done    = this._dutyIsDone(duty, new Date());
-      const dueInfo = this._dutyDueInfo(duty);
-      const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
-      const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
-      return `<span class="ck-duty-pill ${cls}"
-        onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderCockpit()"
-        title="${dueInfo.label}">
-        <span class="ck-duty-pill-check">${icon}</span>${duty.title}
-      </span>`;
-    }).join('');
-
-    return `<div class="ck-duty-pills-row">${pills}</div>`;
+    return ''; // v3.46.2: keine Duties im Cockpit
   },
-
   // ── Cockpit: Wochenpflichten-Block rendern ─────────────
   // (Pflichten werden jetzt als Pills in renderWorldCard eingebaut)
   _ckRenderDuties() {
@@ -14702,32 +14532,8 @@ const WB = {
 
   // ── Pflicht-Pills für eine Welt rendern ───────────────
   _ckDutyPillsHtml(ctx) {
-    const store = this._dutyStore(ctx) || [];
-    const kw    = this._kwStr(new Date());
-
-    const relevant = store.filter(d => {
-      if (!this._dutyRelevantThisWeek({ ...d, ctx })) return false;
-      // Nur zeigen wenn heute fällig (due=true)
-      const dueInfo = this._dutyDueInfo({ ...d, ctx });
-      return dueInfo.due;
-    });
-    if (!relevant.length) return '';
-
-    const pills = relevant.map(duty => {
-      const done    = this._dutyIsDone(duty, new Date());
-      const dueInfo = this._dutyDueInfo(duty);
-      const cls     = done ? 'done' : (dueInfo.late ? 'late' : 'open');
-      const icon    = done ? '✓' : (dueInfo.late ? '!' : '○');
-      return `<span class="ck-duty-pill ${cls}"
-        onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderCockpit()"
-        title="${dueInfo.label}">
-        <span class="ck-duty-pill-check">${icon}</span>${duty.title}
-      </span>`;
-    }).join('');
-
-    return `<div class="ck-duty-pills-row">${pills}</div>`;
+    return ''; // v3.46.2: keine Duties im Cockpit
   },
-
   // ── Cockpit: Wochenpflichten-Block rendern ─────────────
   // (Pflichten werden jetzt als Pills in renderWorldCard eingebaut)
   _ckRenderDuties() {
