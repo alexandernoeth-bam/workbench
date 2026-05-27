@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.49.5</title>
+<title>WorkBench 3.50.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5713,7 +5713,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.49.5 · Build 20260528-1400</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.50.0 · Build 20260528-1430</div>
     </div>
 
     <!-- Welt -->
@@ -5864,7 +5864,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.49.5',
+  APP_VERSION: '3.50.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -10516,6 +10516,7 @@ const WB = {
     // Wenn Gerät bekannt: starten
     if (this._idbDevice) {
       this._fixViewportHeight();
+    this._swipeInit();
     this.start();
       // OAuth Init + Auto-Sync + Auto-Refresh starten
       setTimeout(async () => {
@@ -10625,6 +10626,27 @@ const WB = {
   // ── App starten ─────────────────────────────────────
   _fixViewportHeight() {
     // Kein JS-Höhen-Hack nötig — html/body height:100% reicht
+  },
+
+  // ── Swipe-Navigation (v3.50.0) ──────────────────────
+  _swipeInit() {
+    const el = document.getElementById('wb-content');
+    if (!el) return;
+    let startX = 0, startY = 0;
+    el.addEventListener('touchstart', e => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+    el.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - startX;
+      const dy = e.changedTouches[0].clientY - startY;
+      if (Math.abs(dx) < 50 || Math.abs(dy) > 40) return; // zu kurz oder zu vertikal
+      const tabs = ['cockpit','aufgaben','projekte','notizen','checklisten','woche'];
+      const cur  = tabs.indexOf(this.activeTab);
+      if (cur === -1) return;
+      if (dx < 0 && cur < tabs.length - 1) this._goTab(tabs[cur + 1]); // links → nächster
+      if (dx > 0 && cur > 0)               this._goTab(tabs[cur - 1]); // rechts → vorheriger
+    }, { passive: true });
   },
 
   start() {
