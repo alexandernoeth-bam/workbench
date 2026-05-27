@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.44.0</title>
+<title>WorkBench 3.44.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2837,16 +2837,22 @@ html, body {
   font-size:0.85rem; color:var(--c-text); text-align:center;
 }
 /* ── Drive Login Banner ──────────────────────────────── */
+@keyframes wb-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.85; }
+}
 #wb-drive-login-banner {
   display: none;
   position: fixed;
   top: 0; left: 0; right: 0;
-  background: #1565C0;
+  background: #B71C1C;
   color: #fff;
-  padding: 10px 16px;
-  z-index: 300;
+  padding: 12px 16px;
+  z-index: 400;
   align-items: center;
   gap: 10px;
+  animation: wb-pulse 2s ease-in-out infinite;
+  box-shadow: 0 2px 8px rgba(183,28,28,0.4);
   font-size: 0.82rem;
   font-weight: 500;
 }
@@ -5339,8 +5345,9 @@ html, body {
 
 <!-- Drive Login Banner (Token abgelaufen) -->
 <div id="wb-drive-login-banner">
-  <span class="wb-drive-login-text">Drive-Sync: Bitte neu anmelden</span>
-  <button class="wb-drive-login-btn" onclick="WB._oauthRelogin()">Anmelden</button>
+  <svg style="width:16px;height:16px;stroke:#fff;fill:none;flex-shrink:0;" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  <span class="wb-drive-login-text">Google Drive: Verbindung unterbrochen — Daten werden nicht synchronisiert</span>
+  <button class="wb-drive-login-btn" onclick="WB._oauthRelogin()">Neu anmelden</button>
   <button class="wb-drive-login-dismiss" onclick="WB._driveLoginBannerDismiss()">&#215;</button>
 </div>
 
@@ -5615,7 +5622,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.44.0 · Build 20260527-2315</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.44.1 · Build 20260527-2330</div>
     </div>
 
     <!-- Welt -->
@@ -5838,7 +5845,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.44.0',
+  APP_VERSION: '3.44.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -7837,6 +7844,15 @@ const WB = {
     if (fileIdPriv) this._oauthDriveFileIds.priv = fileIdPriv;
 
     this._oauthUpdateUI();
+
+    // v3.44.1: Token-Status beim Start prüfen
+    const hasFileIds = this._oauthDriveFileIds.pro || this._oauthDriveFileIds.priv;
+    if (hasFileIds) {
+      if (!this._oauthTokenValid()) {
+        // Token fehlt oder abgelaufen → Banner sofort zeigen
+        setTimeout(() => this._driveLoginBannerShow(), 500);
+      }
+    }
   },
 
 
@@ -7846,17 +7862,25 @@ const WB = {
   _startAutoRefresh() {
     clearInterval(this._autoRefreshTimer);
     this._autoRefreshTimer = setInterval(async () => {
+      // v3.44.1: Token-Ablauf aktiv prüfen + Banner zeigen
+      const hasFileIds = this._oauthDriveFileIds.pro || this._oauthDriveFileIds.priv;
+      if (hasFileIds && !this._oauthTokenValid()) {
+        this._driveLoginBannerShow();
+        return;
+      }
       if (!this._oauthTokenValid()) return;
       try {
-        // Rev aus Drive holen ohne vollen Download
         const token = this._oauthToken;
-        // Priv prüfen
         await this._autoRefreshCheck('priv', token);
         if (this.dataPro) await this._autoRefreshCheck('pro', token);
       } catch(e) {
+        // Bei 401 → Token ungültig → Banner
+        if (e.message && (e.message.includes('401') || e.message.includes('403'))) {
+          this._driveLoginBannerShow();
+        }
         console.warn('[AutoRefresh]', e);
       }
-    }, 60000); // alle 60 Sekunden
+    }, 60000);
   },
 
   async _autoRefreshCheck(ctx, token) {
@@ -10449,6 +10473,16 @@ const WB = {
     this._ckStartActivityTracking();
     // v3.40.0: Duty-Erinnerungen beim Start prüfen
     setTimeout(() => { try { this._dutyCheckReminders(); } catch(e){} }, 2000);
+
+    // v3.44.1: Token prüfen wenn App wieder sichtbar wird (z.B. nach Nacht)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        const hasFileIds = this._oauthDriveFileIds?.pro || this._oauthDriveFileIds?.priv;
+        if (hasFileIds && !this._oauthTokenValid()) {
+          this._driveLoginBannerShow();
+        }
+      }
+    });
 
     // Notifications planen
     setTimeout(() => {
