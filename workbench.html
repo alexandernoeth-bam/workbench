@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.44.1</title>
+<title>WorkBench 3.44.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5622,7 +5622,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.44.1 · Build 20260527-2330</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.44.2 · Build 20260527-2345</div>
     </div>
 
     <!-- Welt -->
@@ -5845,7 +5845,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.44.1',
+  APP_VERSION: '3.44.2',
   APP_BUILD:   '20260526-0723',
 
 
@@ -17167,60 +17167,33 @@ const WB = {
     const db = ctx==='pro' ? this.dataPro : this.dataPriv;
     if(!db) return;
 
-    const title = document.getElementById('edit-title');
-    const body  = document.getElementById('edit-body');
+    const titleEl = document.getElementById('edit-title');
+    const body    = document.getElementById('edit-body');
+    const delBtn  = document.getElementById('edit-delete-btn');
+    // Reset: Löschen-Button ausblenden, Body leeren
+    if (delBtn) delBtn.style.display = 'none';
+    const existingDanger = document.querySelector('.edit-actions .danger');
+    if (existingDanger) existingDanger.remove();
 
-    // ── Neue Aufgabe (aus af-fab) ────────────────────────
-    if(type === 'task-new') {
-      const targetCtx = document.getElementById('ef-welt')?.value || ctx;
-      const targetDb  = targetCtx === 'pro' ? this.dataPro : this.dataPriv;
-      if (!targetDb) { this._toast('Datenbank nicht geladen'); return; }
-      const projEl = document.getElementById('ef-proj');
-      const projKey = projEl?.options[projEl?.selectedIndex]?.value || projEl?.value || '';
-      if (!projKey) { this._toast('Bitte Projekt / Bereich auswählen'); return; }
-      targetDb.projects[projKey] = targetDb.projects[projKey] || {status:'aktiv',tasks:[],desc:''};
-      const prio  = document.getElementById('ef-prio')?.value || 'C';
-      const size  = document.getElementById('ef-size')?.value || 'M';
-      const dateV = document.getElementById('ef-date')?.value || '';
-      const timeV = document.getElementById('ef-time-task')?.value || '';
-      const recurOn   = document.getElementById('ef-recur-on')?.checked;
-      const intervalU = document.getElementById('ef-interval-unit')?.value || 'täglich';
-      const intervalN = parseInt(document.getElementById('ef-interval-n')?.value)||1;
-      const intervalS = document.getElementById('ef-interval-start')?.value || dateV;
-      const newTask = {
-        id:       String(Date.now()),
-        text:     title,
-        done:     false,
-        prio:     prio === 'A',
-        prioLvl:  prio,
-        date:     dateV,
-        time:     timeV,
-        isToday:  dateV === new Date().toISOString().split('T')[0],
-        size,
-        notes:    document.getElementById('ef-notes')?.value || '',
-        status:   'aktiv',
-        checklist: this._efChkGetList(),
-        remainingMinutes: ({XS:5,S:15,M:30,L:60,XL:120,XXL:240}[size] || 30),
-      };
-      if (recurOn) {
-        newTask.interval      = intervalU === 'alle N Tage' ? intervalN : 1;
-        newTask.intervalUnit  = intervalU;
-        newTask.intervalStart = intervalS;
+    if(type === 'task') {
+      const t = (db.projects[pKey]?.tasks||[]).find(x => String(x.id)===String(id));
+      if(!t) return;
+      if(titleEl) titleEl.childNodes[0].textContent = 'Aufgabe bearbeiten ';
+      body.innerHTML = this._taskFormHtml(t, ctx, pKey, db, false);
+      // Löschen-Button
+      const actions = document.querySelector('.edit-actions');
+      if(actions) {
+        const del = document.createElement('button');
+        del.className = 'edit-btn danger';
+        del.textContent = 'Löschen';
+        del.onclick = () => this._deleteTask(pKey, id, ctx);
+        actions.prepend(del);
       }
-      targetDb.projects[projKey].tasks.push(newTask);
-      this.setDirty();
-      this.editClose();
-      this._renderSection(this.activeTab);
-      this._toast('Aufgabe angelegt');
-      return;
-    }
 
-    if(type === 'event') {
+    } else if(type === 'event') {
       const ev = (db.customEvents||[]).find(x => String(x.id)===String(id));
       if(!ev) return;
-      if(title) title.childNodes[0].textContent = 'Termin bearbeiten ';
-      // Löschen-Button einblenden
-      const delBtn = document.getElementById('edit-delete-btn');
+      if(titleEl) titleEl.childNodes[0].textContent = 'Termin bearbeiten ';
       if (delBtn) delBtn.style.display = '';
       const pTEv = s => { if(!s) return 9; const [h,m]=s.split(':').map(Number); return h+m/60; };
       const fTEv = h => { const hr=Math.floor(h),m=Math.round((h-hr)*60); return String(hr).padStart(2,'0')+':'+String(m>=60?0:m).padStart(2,'0'); };
