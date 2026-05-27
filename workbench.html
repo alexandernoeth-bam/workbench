@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.36.0</title>
+<title>WorkBench 3.37.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5452,7 +5452,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.36.0 · Build 20260527-1300</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.37.0 · Build 20260527-1430</div>
     </div>
 
     <!-- Welt -->
@@ -5675,7 +5675,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.36.0',
+  APP_VERSION: '3.37.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8520,6 +8520,24 @@ const WB = {
     const banner = document.getElementById('ck-focus-banner');
     if (!banner) return;
     const today = new Date().toISOString().split('T')[0];
+    const dow   = new Date().getDay();
+
+    // v3.37.0: Sondertag-Check zuerst — Urlaub / Feiertag / Wochenende
+    const dayInfo  = this._getDayInfo(today);
+    const isWeekend = dow === 0 || dow === 6;
+    if (dayInfo.proBlocked || isWeekend) {
+      const typeLabel = {
+        vacation:  'Urlaubstag',
+        holiday:   'Feiertag',
+        protected: 'Geschützter Tag',
+      }[dayInfo.type] || (isWeekend ? 'Wochenende' : 'Freier Tag');
+      banner.style.display = '';
+      banner.className = 'ck-focus-banner ok';
+      const sunSvg = '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;flex-shrink:0;" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+      banner.innerHTML = `${sunSvg}<span>${typeLabel} · kein beruflicher Fokus</span>`;
+      return;
+    }
+
     let totalTermine = 0, totalPrioA = 0, totalOverdue = 0;
     [this.dataPro, this.dataPriv].forEach(db => {
       if (!db) return;
@@ -8534,22 +8552,21 @@ const WB = {
       });
     });
     const total = totalTermine + totalPrioA;
-    let cls = 'ok', icon = '🟢', msg = '';
+    let cls = 'ok', msg = '';
     if (total === 0 && totalOverdue === 0) {
       msg = 'Leichter Tag — keine dringenden Aufgaben oder Termine.';
     } else if (total <= 4 && totalOverdue === 0) {
-      cls = 'ok'; icon = '🟢';
+      cls = 'ok';
       msg = `${totalTermine} Termin${totalTermine !== 1 ? 'e' : ''}, ${totalPrioA} Prio-A — guter Fokus möglich.`;
     } else if (total <= 7 || totalOverdue > 0) {
-      cls = 'medium'; icon = '🟡';
+      cls = 'medium';
       msg = `${totalTermine} Termine, ${totalPrioA} Prio-A${totalOverdue > 0 ? ', ' + totalOverdue + ' überfällig' : ''} — priorisieren!`;
     } else {
-      cls = 'heavy'; icon = '🔴';
+      cls = 'heavy';
       msg = `${totalTermine} Termine + ${totalPrioA} Prio-A = voller Tag. Delegieren oder verschieben?`;
     }
     banner.style.display = '';
     banner.className = `ck-focus-banner ${cls}`;
-    // Monochrome SVG statt Emoji
     const iconSvg = {
       ok:     '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;flex-shrink:0;" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
       medium: '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;flex-shrink:0;" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
@@ -10642,10 +10659,6 @@ const WB = {
 
   // ── Sondertag lesen ────────────────────────────────────
   // Sondertage werden in dataPro gespeichert (gemeinsamer Kalender)
-  _getSpecialDays() {
-    return this.dataPro?.specialDays || this.dataPriv?.specialDays || {};
-  },
-
   _getSpecialDays() {
     return this.dataPro?.specialDays || this.dataPriv?.specialDays || {};
   },
