@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.46.4</title>
+<title>WorkBench 3.46.7</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4624,8 +4624,8 @@ html, body {
       <div id="zt-daytype-banner" style="display:none;"></div>
       <!-- Zeitband eingeklappt (Standard) -->
       <div id="ck-zeitband-panel" style="display:none;">
-        <div id="ck-zeitband-toolbar">
-          <button onclick="WB._ztNewEvent()" id="ck-zt-new-btn">+ Termin</button>
+        <div style="padding:8px 16px 4px;display:flex;justify-content:flex-end;">
+          <button onclick="WB._ztNewEvent()" style="padding:6px 14px;border:1px solid var(--c-beruf);border-radius:var(--radius-xs);background:none;color:var(--c-beruf);font-family:var(--font);font-size:0.82rem;font-weight:600;cursor:pointer;">+ Termin</button>
         </div>
         <div id="zeitband-scroll"></div>
       </div>
@@ -5641,7 +5641,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.4 · Build 20260528-0500</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.7 · Build 20260528-0545</div>
     </div>
 
     <!-- Welt -->
@@ -5792,7 +5792,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.46.4',
+  APP_VERSION: '3.46.7',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8860,20 +8860,13 @@ const WB = {
         });
       }
 
-      // Pill-Zeile bauen — mit Farblogik
+      // Pill-Zeile bauen — ganze Zeile klickbar
       const row = (count, label, onclick) => {
         const zeroClass = count === 0 ? ' zero' : '';
         const display   = count === 0 ? '–' : String(count);
-        // Farbklassen: orange >5, rot >10
-        const colorStyle = count > 10
-          ? 'background:rgba(198,40,40,0.15);border-radius:var(--radius-xs);'
-          : count > 5
-            ? 'background:rgba(212,137,10,0.12);border-radius:var(--radius-xs);'
-            : '';
         return `
-          <div class="ck-pill-divider"></div>
-          <div class="ck-pill-row" style="${colorStyle}">
-            <button class="ck-num-pill${zeroClass}" onclick="${onclick}">${display}</button>
+          <div class="ck-pill-row" onclick="${onclick}" style="cursor:pointer;">
+            <div class="ck-num-pill${zeroClass}">${display}</div>
             <span class="ck-pill-label">${label}</span>
           </div>`;
       };
@@ -8900,7 +8893,11 @@ const WB = {
         </div>
         ${row(tasksTodayCount, 'Aufgaben heute',       goTasksToday)}
         ${row(urgentCount,     'Prio A & Überfällig',  goAufgaben)}
-        ${row(evCount,         'Termine heute',         'WB._ckToggleZeitband()')}
+        <div class="ck-pill-row ck-termine-row" onclick="WB._ckToggleZeitband()" style="cursor:pointer;" id="ck-termine-pill-row">
+            <div class="ck-num-pill${evCount===0?' zero':''}" id="ck-termin-num">${evCount===0?'–':evCount}</div>
+            <span class="ck-pill-label">Termine heute</span>
+            <span style="margin-left:auto;font-size:0.65rem;color:var(--c-beruf);opacity:0.7;" id="ck-termin-arrow">&#9658;</span>
+          </div>
         ${row(clCount,         'Checklisten aktiv',     goCl)}
         ${inboxPill}
         ${dutyPills}
@@ -8913,8 +8910,9 @@ const WB = {
     } else {
       grid.innerHTML = renderWorldCard('priv', this.dataPriv, 'priv',  'Privat');
     }
-
-
+    // Pfeil-Status aktualisieren
+    const arrow = document.getElementById('ck-termin-arrow');
+    if (arrow) arrow.innerHTML = this._ckZeitbandOpen ? '&#9660;' : '&#9658;';
   },
 
   // Welt setzen + Checklisten-Tab öffnen
@@ -15040,6 +15038,9 @@ const WB = {
     this._ckZeitbandOpen = !this._ckZeitbandOpen;
     const panel = document.getElementById('ck-zeitband-panel');
     if (panel) panel.style.display = this._ckZeitbandOpen ? '' : 'none';
+    // Pfeil aktualisieren ohne ganzes Grid neu zu rendern
+    const arrow = document.getElementById('ck-termin-arrow');
+    if (arrow) arrow.innerHTML = this._ckZeitbandOpen ? '&#9660;' : '&#9658;';
     if (this._ckZeitbandOpen) {
       this.renderHeute();
       setTimeout(() => panel?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
