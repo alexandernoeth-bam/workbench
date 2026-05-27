@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.57.4</title>
+<title>WorkBench 3.57.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5988,7 +5988,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.57.4 · Build 20260528-2310</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.57.6 · Build 20260528-2340</div>
     </div>
 
     <!-- Welt -->
@@ -6139,7 +6139,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.57.4',
+  APP_VERSION: '3.57.6',
   APP_BUILD:   '20260526-0723',
 
 
@@ -7012,14 +7012,12 @@ const WB = {
     if (ziel === 'notiz') {
       this.nzEdOpen(null, text.slice(0,40), 'allgemein', text);
     } else if (ziel === 'aufgabe') {
-      const projKey = Object.keys(db?.projects || {})[0];
-      if (projKey) {
-        this.editOpen('task', ctx, projKey, null);
-        setTimeout(() => {
-          const el = document.getElementById('ef-title');
-          if (el) el.value = text;
-        }, 100);
-      } else { this._toast('Kein Projekt vorhanden'); }
+      const projKey = Object.keys(db?.projects || {})[0] || 'Einzelaufgaben (Ohne Projekt)';
+      this.editOpen('task-new', ctx, projKey, null);
+      setTimeout(() => {
+        const el = document.getElementById('ef-title');
+        if (el) { el.value = text; el.focus(); }
+      }, 150);
     } else if (ziel === 'termin') {
       const today = new Date().toISOString().split('T')[0];
       this.newEventOpen(today);
@@ -16664,12 +16662,16 @@ const WB = {
     const duties = [];
     if (!noWork) {
       const proStore = this._dutyStore('pro') || [];
-      proStore.filter(d => this._dutyDayInfo({...d, ctx:'pro'}, planerDate).due && !this._dutyIsDone(d, planerDate))
-        .forEach(d => duties.push({d, ctx:'pro'}));
+      proStore.filter(d => {
+        const info = this._dutyDayInfo({...d, ctx:'pro'}, planerDate);
+        return info.due && !info.late && !this._dutyIsDone(d, planerDate); // nur genau an diesem Tag
+      }).forEach(d => duties.push({d, ctx:'pro'}));
     }
     const privStore = this._dutyStore('priv') || [];
-    privStore.filter(d => this._dutyDayInfo({...d, ctx:'priv'}, planerDate).due && !this._dutyIsDone(d, planerDate))
-      .forEach(d => duties.push({d, ctx:'priv'}));
+    privStore.filter(d => {
+      const info = this._dutyDayInfo({...d, ctx:'priv'}, planerDate);
+      return info.due && !info.late && !this._dutyIsDone(d, planerDate); // nur genau an diesem Tag
+    }).forEach(d => duties.push({d, ctx:'priv'}));
 
     if (!tasks.length && !duties.length && !planned.length) {
       el.innerHTML = '<div class="planer-empty">Keine offenen Aufgaben für diesen Tag</div>';
