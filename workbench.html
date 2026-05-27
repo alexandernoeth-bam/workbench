@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.43.6</title>
+<title>WorkBench 3.44.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -680,6 +680,40 @@ html, body {
 ══════════════════════════════════════════════════════ */
 
 /* Assistent-Banner im Cockpit */
+#ck-block-banner {
+  margin: 8px auto 0;
+  padding: 10px 13px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+  width: calc(100% - 28px);
+  max-width: 420px;
+  background: #FDECEA;
+  color: #C62828;
+  border: 1px solid rgba(198,40,40,0.2);
+  flex-shrink: 0;
+  align-items: center;
+  gap: 9px;
+}
+#ck-block-banner.visible { display: flex; }
+.ck-block-icon { flex-shrink: 0; width: 16px; height: 16px; stroke: currentColor; fill: none; }
+.ck-block-info { flex: 1; min-width: 0; }
+.ck-block-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ck-block-sub { font-size: 0.75rem; opacity: 0.75; margin-top: 1px; }
+.ck-block-btn {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  background: #C62828;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-xs);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 #ck-assistant-banner {
   display: none;
   margin: 10px auto 0;
@@ -4526,6 +4560,7 @@ html, body {
         <span class="ck-focus-icon">📊</span>
         <span class="ck-focus-text"></span>
       </div>
+      <div id="ck-block-banner" style="display:none;"></div>
       <div id="ck-assistant-banner">
         <svg class="ck-asst-icon" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/>
@@ -5580,7 +5615,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.43.6 · Build 20260527-2300</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.44.0 · Build 20260527-2315</div>
     </div>
 
     <!-- Welt -->
@@ -5803,7 +5838,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.43.6',
+  APP_VERSION: '3.44.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8605,6 +8640,7 @@ const WB = {
     this._ckRenderFocusBanner();
     this._ckRenderAssistantBanner();
     this._ckRenderMeetingBanner();
+    this._ckRenderBlockBanner();
     this._ckRenderGrid();
     this._ckRenderTasksTodayPill();
     this._ckRenderDuties();
@@ -8612,6 +8648,7 @@ const WB = {
     this._ckCountdownTimer = setInterval(() => {
       if (this.activeTab === 'cockpit') {
         this._ckRenderDateHeader();
+        this._ckRenderBlockBanner();
         this._ckRenderGrid();
         this._ckRenderTasksTodayPill();
         this._ckRenderMeetingBanner();
@@ -15207,6 +15244,82 @@ const WB = {
   viewDate: new Date(),
   _ztNowTimer: null,
   _ztConfig: { dayStart: 5, dayEnd: 23, lunchH: 12, lunchDur: 0.75 },
+
+  // ── Laufender Block Banner (v3.44.0) ──────────────────
+  _ckRenderBlockBanner() {
+    const banner = document.getElementById('ck-block-banner');
+    if (!banner) return;
+
+    const now    = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const today  = now.toISOString().split('T')[0];
+    const pT     = s => { const [h,m]=(s||'0:0').split(':').map(Number); return h*60+m; };
+
+    // Alle laufenden Events von heute (nicht Besprechungen — die hat Meeting-Banner)
+    let activeBlock = null;
+
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      (db?.customEvents || [])
+        .filter(e => e.date === today && e.startTime && e.typ !== 'besprechung' && e.type !== 'horizon')
+        .forEach(e => {
+          const startMin = pT(e.startTime);
+          const durMin   = Math.round((parseFloat(e.duration)||1)*60);
+          const endMin   = startMin + durMin;
+          if (nowMin >= startMin && nowMin < endMin) {
+            const remaining = endMin - nowMin;
+            if (!activeBlock || remaining < activeBlock.remaining) {
+              activeBlock = { e, ctx, startMin, endMin, remaining };
+            }
+          }
+        });
+    });
+
+    // Auch Zeitband-Systemblöcke prüfen (Tagesplanung, Mittagspause, Tagesabschluss)
+    if (!activeBlock) {
+      const {dayStart, lunchH, lunchDur, dayEnd} = this._ztConfig;
+      const systemBlocks = [
+        { title: 'Tagesplanung',           start: dayStart * 60,         end: dayStart * 60 + 10 },
+        { title: 'Mittagspause',            start: lunchH * 60,           end: (lunchH + lunchDur) * 60 },
+        { title: 'Tagesabschluss & Reflexion', start: (dayEnd - 10/60) * 60, end: dayEnd * 60 },
+      ];
+      systemBlocks.forEach(b => {
+        if (nowMin >= b.start && nowMin < b.end) {
+          const remaining = b.end - nowMin;
+          activeBlock = { system: true, title: b.title, remaining };
+        }
+      });
+    }
+
+    if (!activeBlock) {
+      banner.classList.remove('visible');
+      return;
+    }
+
+    const remLabel = activeBlock.remaining <= 1
+      ? 'endet gleich'
+      : 'noch ' + activeBlock.remaining + ' Min';
+
+    const title = activeBlock.system
+      ? activeBlock.title
+      : (activeBlock.e.text || '').replace(/[🗓️🔒🚩]/g,'').trim();
+
+    const subLabel = activeBlock.system
+      ? remLabel
+      : `${activeBlock.e.startTime} – ${String(Math.floor(activeBlock.endMin/60)).padStart(2,'0')}:${String(activeBlock.endMin%60).padStart(2,'0')} · ${remLabel}`;
+
+    const clockSvg = `<svg class="ck-block-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+
+    let btnHtml = '';
+    if (!activeBlock.system && activeBlock.e) {
+      const evId = activeBlock.e.id;
+      const ctx  = activeBlock.ctx;
+      btnHtml = `<button class="ck-block-btn" onclick="WB._goTab('heute')">Heute →</button>`;
+    }
+
+    banner.innerHTML = `${clockSvg}<div class="ck-block-info"><div class="ck-block-title">${title}</div><div class="ck-block-sub">${subLabel}</div></div>${btnHtml}`;
+    banner.classList.add('visible');
+  },
 
   _ckRenderMeetingBanner() {
     const banner = document.getElementById('ck-meeting-banner');
