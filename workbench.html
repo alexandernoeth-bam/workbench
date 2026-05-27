@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.46.7</title>
+<title>WorkBench 3.46.8</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5641,7 +5641,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.7 · Build 20260528-0545</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.46.8 · Build 20260528-0600</div>
     </div>
 
     <!-- Welt -->
@@ -5792,7 +5792,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.46.7',
+  APP_VERSION: '3.46.8',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8860,15 +8860,14 @@ const WB = {
         });
       }
 
-      // Pill-Zeile bauen — ganze Zeile klickbar
-      const row = (count, label, onclick) => {
+      // Pill-Zeile bauen — data-onclick wegen Quote-Konflikt
+      const row = (count, label, fn) => {
         const zeroClass = count === 0 ? ' zero' : '';
-        const display   = count === 0 ? '–' : String(count);
-        return `
-          <div class="ck-pill-row" onclick="${onclick}" style="cursor:pointer;">
-            <div class="ck-num-pill${zeroClass}">${display}</div>
-            <span class="ck-pill-label">${label}</span>
-          </div>`;
+        const display   = count === 0 ? '\u2013' : String(count);
+        return '<div class="ck-pill-row" data-fn="' + fn + '" style="cursor:pointer;">'
+          + '<div class="ck-num-pill' + zeroClass + '">' + display + '</div>'
+          + '<span class="ck-pill-label">' + label + '</span>'
+          + '</div>';
       };
 
       // Pflicht-Pills + Ziel-Pills (nur Privat)
@@ -8893,11 +8892,7 @@ const WB = {
         </div>
         ${row(tasksTodayCount, 'Aufgaben heute',       goTasksToday)}
         ${row(urgentCount,     'Prio A & Überfällig',  goAufgaben)}
-        <div class="ck-pill-row ck-termine-row" onclick="WB._ckToggleZeitband()" style="cursor:pointer;" id="ck-termine-pill-row">
-            <div class="ck-num-pill${evCount===0?' zero':''}" id="ck-termin-num">${evCount===0?'–':evCount}</div>
-            <span class="ck-pill-label">Termine heute</span>
-            <span style="margin-left:auto;font-size:0.65rem;color:var(--c-beruf);opacity:0.7;" id="ck-termin-arrow">&#9658;</span>
-          </div>
+        ${row(evCount, 'Termine heute', 'WB._ckToggleZeitband()')}
         ${row(clCount,         'Checklisten aktiv',     goCl)}
         ${inboxPill}
         ${dutyPills}
@@ -8910,9 +8905,10 @@ const WB = {
     } else {
       grid.innerHTML = renderWorldCard('priv', this.dataPriv, 'priv',  'Privat');
     }
-    // Pfeil-Status aktualisieren
-    const arrow = document.getElementById('ck-termin-arrow');
-    if (arrow) arrow.innerHTML = this._ckZeitbandOpen ? '&#9660;' : '&#9658;';
+    // Event-Delegation: data-fn auf alle Pill-Rows
+    grid.querySelectorAll('[data-fn]').forEach(el => {
+      el.onclick = () => { try { eval(el.dataset.fn); } catch(e) { console.warn(e); } };
+    });
   },
 
   // Welt setzen + Checklisten-Tab öffnen
