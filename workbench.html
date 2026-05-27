@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.58.2</title>
+<title>WorkBench 3.58.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4797,6 +4797,7 @@ html, body {
 .planer-pool-item.must {
   background: #FFF5F5;
   border-left: 3px solid #C62828;
+  outline: 1px solid rgba(198,40,40,0.2);
 }
 .planer-pool-item.must-done {
   opacity: 0.45;
@@ -5990,7 +5991,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.58.2 · Build 20260529-0100</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.58.3 · Build 20260529-0115</div>
     </div>
 
     <!-- Welt -->
@@ -6141,7 +6142,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.58.2',
+  APP_VERSION: '3.58.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -16693,11 +16694,12 @@ const WB = {
     // Pflicht-Items HTML
     const dutyHtml = duties.map(({d, ctx}) => {
       const worldLbl = ctx === 'pro' ? 'Beruf' : 'Privat';
-      return `<div class="planer-pool-item">
+      const must = d.mustToday;
+      return `<div class="planer-pool-item${must?' must':''}">
         <span class="planer-prio-badge" style="background:rgba(13,122,107,0.12);color:var(--c-beruf);">↻</span>
         <div class="planer-pool-text">
-          <div>${d.title}</div>
-          <div class="sub">${worldLbl} · Pflicht</div>
+          <div>${must?'⚠ ':''}${d.title}</div>
+          <div class="sub">${worldLbl} · Pflicht${must?' · <span style="color:#C62828;font-weight:600;">Muss heute!</span>':''}</div>
         </div>
         <button class="planer-plan-btn" onclick="WB.dutiesOpen()">Öffnen →</button>
       </div>`;
@@ -19371,9 +19373,10 @@ const WB = {
             </div>`).join('')
           + '</div>'
         : '';
+      const blockStyle = `min-height:${hpx}px;${block.taskId?'cursor:pointer;':''}`;
       html += `<div class="zt-row">
         <div class="zt-time">${fT(block.start)}<span class="end">${fT(block.end)}</span></div>
-        <div class="zt-block ${cls}${isDone?' erledigt':''}" style="min-height:${hpx}px;" ${clickAttr}>
+        <div class="zt-block ${cls}${isDone?' erledigt':''}" style="${blockStyle}" ${clickAttr}>
           <div class="zt-block-text">${block.title}${evChkBadge}
             ${block.ctx ? `<div class="zt-block-sub">${block.ctx==='pro'?'Beruf':'Privat'}</div>` : ''}
             ${evChkHtml}
