@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.56.0</title>
+<title>WorkBench 3.56.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5988,7 +5988,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.56.0 · Build 20260528-2000</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.56.1 · Build 20260528-2015</div>
     </div>
 
     <!-- Welt -->
@@ -6139,7 +6139,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.56.0',
+  APP_VERSION: '3.56.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -16520,33 +16520,52 @@ const WB = {
 
     const dayNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
     const months   = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
-    const dateLabel = `${dayNames[d.getDay()]}, ${d.getDate()}. ${months[d.getMonth()]} ${d.getFullYear()}${isToday?' · Heute':''}`;
 
-    // Header
-    sec.innerHTML = `
-      <div id="planer-header">
-        <button class="planer-nav-btn" onclick="WB._planerShift(-1)">&#8249;</button>
-        <div id="planer-date-label">${dateLabel}</div>
-        <button class="planer-nav-btn" onclick="WB._planerShift(1)">&#8250;</button>
-        ${!isToday ? `<button onclick="WB._planerToday()" style="font-size:0.72rem;padding:3px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;cursor:pointer;font-family:var(--font);color:var(--c-muted);">Heute</button>` : ''}
-      </div>
-      <div id="planer-body">
-        <div id="planer-left">
-          <div id="planer-left-title">Zeitband</div>
-          <div id="planer-zt"></div>
-        </div>
-        <div id="planer-right">
-          <div id="planer-right-title">Aufgaben-Pool</div>
-          <div id="planer-pool"></div>
-        </div>
-      </div>`;
+    // Tagestyp ermitteln (Urlaub, Feiertag, Wochenende, Beruf, Privat)
+    const dayType  = this._ztGetDayType ? this._ztGetDayType(dateStr) : null;
+    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+    let tagTypLabel = '';
+    let tagTypColor = '';
+    if (dayType?.typ === 'urlaub') { tagTypLabel = 'Urlaub'; tagTypColor = '#E65100'; }
+    else if (dayType?.typ === 'feiertag') { tagTypLabel = 'Feiertag'; tagTypColor = '#1565C0'; }
+    else if (isWeekend) { tagTypLabel = 'Wochenende'; tagTypColor = 'var(--c-muted)'; }
+    else { tagTypLabel = 'Arbeitstag'; tagTypColor = 'var(--c-beruf)'; }
+
+    const tagTypBadge = tagTypLabel
+      ? '<span style="font-size:0.72rem;font-weight:600;color:' + tagTypColor + ';margin-left:8px;opacity:0.85;">' + tagTypLabel + '</span>'
+      : '';
+    const todayBtn = !isToday
+      ? '<button onclick="WB._planerToday()" style="font-size:0.72rem;padding:3px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;cursor:pointer;font-family:var(--font);color:var(--c-muted);">Heute</button>'
+      : '';
+
+    // Struktur nur beim ersten Mal aufbauen
+    if (!document.getElementById('planer-header')) {
+      sec.innerHTML =
+        '<div id="planer-header">'
+        + '<button class="planer-nav-btn" id="planer-prev" onclick="WB._planerShift(-1)">&#8249;</button>'
+        + '<div id="planer-date-label"></div>'
+        + '<button class="planer-nav-btn" id="planer-next" onclick="WB._planerShift(1)">&#8250;</button>'
+        + '<span id="planer-today-btn"></span>'
+        + '</div>'
+        + '<div id="planer-body">'
+        + '<div id="planer-left"><div id="planer-left-title">Zeitband</div><div id="planer-zt"></div></div>'
+        + '<div id="planer-right"><div id="planer-right-title">Aufgaben-Pool</div><div id="planer-pool"></div></div>'
+        + '</div>';
+    }
+
+    // Nur Label + Badge aktualisieren
+    const lbl = document.getElementById('planer-date-label');
+    if (lbl) lbl.innerHTML = dayNames[d.getDay()] + ', ' + d.getDate() + '. ' + months[d.getMonth()] + ' ' + d.getFullYear() + (isToday ? ' &middot; Heute' : '') + tagTypBadge;
+    const todayBtnEl = document.getElementById('planer-today-btn');
+    if (todayBtnEl) todayBtnEl.innerHTML = todayBtn;
 
     this._planerRenderZeitband(dateStr);
     this._planerRenderPool(dateStr);
   },
 
   _planerShift(n) {
-    const d = new Date((this._planerDate || new Date().toISOString().split('T')[0]) + 'T00:00:00');
+    if (!this._planerDate) this._planerDate = new Date().toISOString().split('T')[0];
+    const d = new Date(this._planerDate + 'T00:00:00');
     d.setDate(d.getDate() + n);
     this._planerDate = d.toISOString().split('T')[0];
     this.renderPlaner();
