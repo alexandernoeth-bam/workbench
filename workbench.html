@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.38.0</title>
+<title>WorkBench 3.39.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -1400,6 +1400,38 @@ html, body {
   font-size: 0.85rem; color: var(--c-text); background: var(--c-surface);
   cursor: pointer;
 }
+.wd-world-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.wd-world-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--c-border);
+  background: none;
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--c-muted);
+  transition: all var(--t-fast);
+}
+.wd-world-tab.priv.active { background: var(--c-privat); border-color: var(--c-privat); color: #fff; }
+.wd-world-tab.pro.active  { background: var(--c-beruf);  border-color: var(--c-beruf);  color: #fff; }
+
+.wd-section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  padding: 12px 16px 6px;
+}
+.wd-section-label.beruf { color: var(--c-beruf); }
+.wd-section-label.priv  { color: var(--c-privat); }
+
 .wd-add-btn {
   width: 100%; padding: 10px; background: var(--c-beruf);
   color: #fff; border: none; border-radius: var(--radius-xs);
@@ -5084,17 +5116,18 @@ html, body {
       <h2>Wochenpflichten</h2>
       <button class="wb-settings-close" onclick="WB.dutiesClose()">&#215;</button>
     </div>
+    <!-- Liste nach Welt gegliedert -->
     <div id="wb-duties-body"></div>
+    <!-- Formular: Neue Pflicht -->
     <div class="wd-form">
       <div class="wd-form-title">Neue Pflicht</div>
-      <div class="wd-form-row">
-        <input class="wd-input grow" type="text" id="wd-new-title"
-          placeholder="Bezeichnung (z.B. Wäsche waschen)">
-        <select class="wd-select" id="wd-new-world">
-          <option value="priv">Privat</option>
-          <option value="pro">Beruf</option>
-        </select>
+      <!-- Welt-Tabs -->
+      <div class="wd-world-tabs">
+        <button class="wd-world-tab priv active" id="wd-tab-priv" onclick="WB._dutyFormWorld('priv')">Privat</button>
+        <button class="wd-world-tab pro"          id="wd-tab-pro"  onclick="WB._dutyFormWorld('pro')">Beruf</button>
       </div>
+      <input class="wd-input" type="text" id="wd-new-title"
+        placeholder="Bezeichnung (z.B. Wäsche waschen)" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
       <!-- Typ -->
       <div class="wd-type-row">
         <button class="wd-type-btn active" id="wd-type-multi" onclick="WB._dutyFormType('multi')">Mehrere Tage</button>
@@ -5452,7 +5485,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.38.0 · Build 20260527-1600</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.39.0 · Build 20260527-1700</div>
     </div>
 
     <!-- Welt -->
@@ -5675,7 +5708,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.38.0',
+  APP_VERSION: '3.39.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -12734,29 +12767,44 @@ const WB = {
   _dutiesRender() {
     const body = document.getElementById('wb-duties-body');
     if (!body) return;
-    const allDuties = [];
-    ['pro','priv'].forEach(ctx => {
-      (this._dutyStore(ctx) || []).forEach(d => allDuties.push({ ...d, ctx }));
-    });
+    const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
-    if (!allDuties.length) {
+    const renderSection = (ctx, label, cls) => {
+      const duties = (this._dutyStore(ctx) || []);
+      if (!duties.length) return '';
+      let html = `<div class="wd-section-label ${cls}">${label}</div>`;
+      html += duties.map(duty => {
+        const when = duty.type === 'fixed'
+          ? `Jeden ${DAY_NAMES[duty.dayFixed]}`
+          : (duty.days||[]).map(d=>DAY_NAMES[d]).join(', ');
+        return `<div class="wd-item">
+          <div class="wd-item-name">${duty.title}</div>
+          <div class="wd-item-meta">${when}</div>
+          <button class="wd-del-btn" onclick="WB.dutyDelete('${ctx}','${duty.id}')">&#215;</button>
+        </div>`;
+      }).join('');
+      return html;
+    };
+
+    const proHtml  = renderSection('pro',  'Beruf',  'beruf');
+    const privHtml = renderSection('priv', 'Privat', 'priv');
+
+    if (!proHtml && !privHtml) {
       body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--c-faint);font-size:0.85rem;">Noch keine Wochenpflichten — unten anlegen.</div>';
       return;
     }
+    body.innerHTML = proHtml + privHtml;
+  },
 
-    const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
-    body.innerHTML = allDuties.map(duty => {
-      const DAY_NAMES2 = ['So','Mo','Di','Mi','Do','Fr','Sa'];
-      const when = duty.type === 'fixed'
-        ? `Jeden ${DAY_NAMES2[duty.dayFixed]}`
-        : (duty.days||[]).map(d=>DAY_NAMES2[d]).join(', ');
-      return `<div class="wd-item">
-        <div class="wd-world-dot ${duty.ctx === 'pro' ? 'beruf' : 'priv'}"></div>
-        <div class="wd-item-name">${duty.title}</div>
-        <div class="wd-item-meta">${when}</div>
-        <button class="wd-del-btn" onclick="WB.dutyDelete('${duty.ctx}','${duty.id}')">&#215;</button>
-      </div>`;
-    }).join('');
+  // ── Welt-Tab im Formular umschalten ───────────────────
+  _dutyFormCurrentWorld: 'priv',
+
+  _dutyFormWorld(world) {
+    this._dutyFormCurrentWorld = world;
+    ['priv','pro'].forEach(w => {
+      const btn = document.getElementById('wd-tab-' + w);
+      if (btn) btn.classList.toggle('active', w === world);
+    });
   },
 
   // Formular-Typ umschalten
@@ -12790,7 +12838,7 @@ const WB = {
   dutyAdd() {
     const title = document.getElementById('wd-new-title')?.value.trim();
     if (!title) { this._toast('Bitte Bezeichnung eingeben'); return; }
-    const world = document.getElementById('wd-new-world')?.value || 'priv';
+    const world = this._dutyFormCurrentWorld || 'priv';
     const type  = this._dutyFormCurrentType || 'multi';
     const store = this._dutyStore(world); if (!store) return;
 
@@ -16914,7 +16962,7 @@ const WB = {
     // Überfällig/Backlog = kein Datum ODER Datum < heute
     const cnt = {
       prioa:   all.filter(({t}) => t.prio===true||t.prio==='A').length,
-      today:   all.filter(({t}) => t.date===today).length,
+      today:   all.filter(({t}) => t.date===today).length, // Routinen werden unten addiert
       week:    all.filter(({t}) => t.date && t.date >= wS && t.date <= wE && t.date >= today).length,
       overdue: all.filter(({t}) => t.date && t.date < today).length,
       backlog: all.filter(({t}) => !t.date).length,
@@ -16929,7 +16977,8 @@ const WB = {
       {sep:true},
       {id:'backlog',label:'Backlog'},
       {id:'all',    label:'Alle'},
-      {id:'routine',label:'Routinen', right:true},
+      {sep:true},
+      {id:'routine',label:'Routinen'},
     ];
 
     // Filter-Leiste
@@ -16950,6 +16999,9 @@ const WB = {
     const doneDuties = relevantDuties.filter(d =>
       this._dutyWeekInstances(d).every(i => i.done));
     cnt.routine = allWeekInstances.length;
+    // v3.39.0: Heute-Pill zählt auch heutige Routinen-Instanzen
+    const todayInstCountForPill = allWeekInstances.filter(x => x.inst.isToday).length;
+    cnt.today += todayInstCountForPill;
 
     let pillHtml = '<div class="af-filter-row">';
     FILTERS.forEach(f => {
@@ -16963,7 +17015,7 @@ const WB = {
         const doneInstCount = doneDutyInstances.length;
         const totalInstCount = allWeekInstances.length;
         const label = doneInstCount + '/' + totalInstCount + ' Routinen';
-        pillHtml += `<button class="af-pill${isA?' active':''} af-pill-right"
+        pillHtml += `<button class="af-pill${isA?' active':''}"
           onclick="WB.setTaskFilter('routine')">${label}</button>`;
         return;
       }
