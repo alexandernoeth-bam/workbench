@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.52.1</title>
+<title>WorkBench 3.52.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5852,7 +5852,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.52.1 · Build 20260528-1700</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.52.2 · Build 20260528-1720</div>
     </div>
 
     <!-- Welt -->
@@ -6003,7 +6003,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.52.1',
+  APP_VERSION: '3.52.2',
   APP_BUILD:   '20260526-0723',
 
 
@@ -15948,6 +15948,7 @@ const WB = {
     this._editCtx  = ctx;
     this._editPKey = projKey;
     this._editId   = null;
+    this._editFromClInstId = instId; // Merken für Auto-Abschluss
 
     // Dialog öffnen
     const titleEl = document.getElementById('edit-title');
@@ -17517,6 +17518,7 @@ const WB = {
     const delBtn2 = document.getElementById('edit-delete-btn');
     if (delBtn2) delBtn2.style.display = 'none';
     this._editType = null;
+    this._editFromClInstId = null;
   },
 
   editSave() {
@@ -17607,8 +17609,22 @@ const WB = {
       targetDb.projects[projKey].tasks.push(newTask);
       this.setDirty();
       this.editClose();
+      // Wenn aus Checkliste erstellt → Instanz abschließen
+      if (this._editFromClInstId) {
+        const clStore = this._clInstanzStore();
+        const clInst  = clStore?.find(x => x.id === this._editFromClInstId);
+        if (clInst) {
+          clInst.items.forEach(i => i.done = true);
+          clInst.abgeschlossen = true;
+          clInst.abgeschlossenAt = Date.now();
+          this.setDirty();
+          this._toast('Aufgabe angelegt · Checkliste abgeschlossen');
+        }
+        this._editFromClInstId = null;
+      } else {
+        this._toast('Aufgabe angelegt');
+      }
       this._renderSection(this.activeTab);
-      this._toast('Aufgabe angelegt');
       return;
     }
 
