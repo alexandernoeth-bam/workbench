@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.41.0</title>
+<title>WorkBench 3.43.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -3295,7 +3295,7 @@ html, body {
   /* Aufgaben-FAB */
   #af-fab {
     position: fixed;
-    bottom: calc(var(--safe-b) + 14px);
+    bottom: calc(var(--tab-h) + var(--safe-b) + 14px);
     right: 16px;
     width: 48px; height: 48px;
     background: var(--c-beruf);
@@ -5565,7 +5565,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.41.0 · Build 20260527-1930</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.43.1 · Build 20260527-2145</div>
     </div>
 
     <!-- Welt -->
@@ -5788,7 +5788,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.41.0',
+  APP_VERSION: '3.43.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8584,7 +8584,7 @@ const WB = {
     if (ckFab) ckFab.style.display = 'flex';
     if (ztFab) ztFab.classList.remove('visible');
     const afFab0 = document.getElementById('af-fab');
-    if (afFab0) afFab0.classList.remove('visible');
+    if (afFab0) { afFab0.classList.remove('visible'); afFab0.style.display = 'none'; }
     this._inboxUpdateMenuSub();
     this._ckRenderDateHeader();
     this._ckRenderFocusBanner();
@@ -16746,6 +16746,233 @@ const WB = {
 
 
   // ── Aufgabe / Termin bearbeiten ──────────────────────
+
+  // ── Einheitliches Aufgaben-Formular (v3.42.0) ─────────
+  _taskFormHtml(t, ctx, pKey, db, isNew) {
+    const today = new Date().toISOString().split('T')[0];
+    const prioVal = t ? (t.prio === true || t.prioLvl === 'A' ? 'A' : t.prioLvl === 'B' ? 'B' : 'C') : 'C';
+
+    // Projekt + Bereiche in <optgroup> aufteilen
+    const allKeys = Object.keys(db.projects || {});
+    const projKeys = allKeys.filter(k => !(db.projects[k].isArea || db.projects[k].desc === 'Bereich'));
+    const areaKeys = allKeys.filter(k =>  !!(db.projects[k].isArea || db.projects[k].desc === 'Bereich'));
+
+    const projOpts = projKeys.map(k =>
+      `<option value="${k.replace(/"/g,'&quot;')}"${k===pKey?' selected':''}>${k}</option>`).join('');
+    const areaOpts = areaKeys.map(k =>
+      `<option value="${k.replace(/"/g,'&quot;')}"${k===pKey?' selected':''}>${k}</option>`).join('');
+    const projSelect = `<select id="ef-proj">
+      ${projOpts ? `<optgroup label="Projekte">${projOpts}</optgroup>` : ''}
+      ${areaOpts ? `<optgroup label="Bereiche">${areaOpts}</optgroup>` : ''}
+    </select>`;
+
+    // Wiederkehrend
+    const hasRecur = !!(t?.interval);
+    const intervalVal = t?.interval || 1;
+    const intervalUnit = t?.intervalUnit || 'täglich';
+    const intervalStart = t?.intervalStart || today;
+
+    // Verschieben: andere Welt + Projekt (nur bei Bearbeiten)
+    const movePanelHtml = isNew ? '' : `
+      <div id="ef-move-panel" style="display:none;background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:12px;margin-top:4px;">
+        <div style="font-size:0.75rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--c-muted);margin-bottom:8px;">In andere Welt / Projekt verschieben</div>
+        <div class="edit-row">
+          <div class="edit-field"><label>Welt</label>
+            <select id="ef-move-welt" onchange="WB._taskMoveWeltChange(this.value)">
+              <option value="pro"${ctx==='pro'?' selected':''}>Beruf</option>
+              <option value="priv"${ctx==='priv'?' selected':''}>Privat</option>
+            </select>
+          </div>
+          <div class="edit-field"><label>Projekt / Bereich</label>
+            <select id="ef-move-proj">
+              ${projOpts}${areaOpts}
+            </select>
+          </div>
+        </div>
+        <button onclick="WB._taskMove()" style="width:100%;padding:9px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;margin-top:8px;">Jetzt verschieben</button>
+      </div>`;
+
+    return ''
+      + '<div class="edit-field"><label>Titel</label>'
+      + `<input id="ef-title" type="text" value="${(t?.text||'').replace(/"/g,'&quot;')}" placeholder="Aufgabe beschreiben..."></div>`
+
+      // Zeile: Datum + Startzeit
+      + '<div class="edit-row">'
+      + `<div class="edit-field"><label>Datum</label><input id="ef-date" type="date" value="${t?.date||today}"></div>`
+      + `<div class="edit-field"><label>Startzeit (opt.)</label><input id="ef-time-task" type="time" value="${t?.time||''}"></div>`
+      + '</div>'
+
+      // Zeile: Prio + Größe
+      + '<div class="edit-row">'
+      + '<div class="edit-field"><label>Prio</label><select id="ef-prio">'
+      + `<option value="C"${prioVal==='C'?' selected':''}>C — Normal</option>`
+      + `<option value="B"${prioVal==='B'?' selected':''}>B — Hoch</option>`
+      + `<option value="A"${prioVal==='A'?' selected':''}>A — Kritisch</option>`
+      + '</select></div>'
+      + '<div class="edit-field"><label>Größe</label><select id="ef-size">'
+      + ['XS','S','M','L','XL','XXL'].map(s=>`<option${(t?.size||'M')===s?' selected':''}>${s}</option>`).join('')
+      + '</select></div>'
+      + '</div>'
+
+      // Zeile: Welt + Status
+      + '<div class="edit-row">'
+      + '<div class="edit-field"><label>Welt</label><select id="ef-welt">'
+      + `<option value="pro"${ctx==='pro'?' selected':''}>Beruf</option>`
+      + `<option value="priv"${ctx==='priv'?' selected':''}>Privat</option>`
+      + '</select></div>'
+      + '<div class="edit-field"><label>Status</label><select id="ef-status">'
+      + ['aktiv','wartend','delegiert'].map(s=>`<option${(t?.status||'aktiv')===s?' selected':''}>${s}</option>`).join('')
+      + '</select></div>'
+      + '</div>'
+
+      // Projekt / Bereich
+      + `<div class="edit-field"><label>Projekt / Bereich</label>${projSelect}</div>`
+
+      // Wiederkehrend
+      + `<div class="edit-field" style="display:flex;align-items:center;gap:10px;">`
+      + `<label style="flex:1;margin:0;">Wiederkehrend</label>`
+      + `<label style="display:flex;align-items:center;gap:6px;font-weight:400;">`
+      + `<input type="checkbox" id="ef-recur-on" ${hasRecur?'checked':''} onchange="WB._taskFormRecurToggle()">`
+      + `<span style="font-size:0.85rem;">aktiv</span></label>`
+      + `</div>`
+      + `<div id="ef-recur-panel" style="display:${hasRecur?'':'none'};background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:10px;margin-top:-4px;">`
+      + `<div class="edit-row">`
+      + `<div class="edit-field"><label>Frequenz</label>`
+      + `<select id="ef-interval-unit" onchange="document.getElementById('ef-n-wrap').style.display=this.value==='alle N Tage'?'':'none'">`
+      + ['täglich','wöchentlich','alle N Tage'].map(u=>`<option${intervalUnit===u?' selected':''}>${u}</option>`).join('')
+      + `</select></div>`
+      + `<div class="edit-field" id="ef-n-wrap" style="${intervalUnit==='alle N Tage'?'':'display:none'}">`
+      + `<label>Alle N Tage</label><input type="number" id="ef-interval-n" min="2" max="365" value="${intervalVal}" style="width:100%;padding:8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;"></div>`
+      + `</div>`
+      + `<div class="edit-field"><label>Startdatum</label><input id="ef-interval-start" type="date" value="${intervalStart}"></div>`
+      + `</div>`
+
+      // Notiz
+      + '<div class="edit-field"><label>Notiz</label>'
+      + `<textarea id="ef-notes" rows="3" style="resize:none;">${t?.notes||''}</textarea></div>`
+
+      // Checkliste
+      + '<div class="edit-field"><label>Checkliste</label>'
+      + '<div id="ef-chk-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">'
+      + (t?.checklist||[]).map((item,i) =>
+          `<div class="ef-chk-row" data-idx="${i}" style="display:flex;align-items:center;gap:6px;">
+            <input type="checkbox" ${item.done?'checked':''} onchange="WB._efChkToggle(${i})" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
+            <span style="flex:1;font-size:0.9rem;${item.done?'text-decoration:line-through;color:var(--c-faint);':''}" id="ef-chk-text-${i}">${item.text}</span>
+            <button onclick="WB._efChkDelete(${i})" style="background:none;border:none;color:var(--c-faint);cursor:pointer;font-size:1rem;padding:0 4px;line-height:1;" title="Entfernen">×</button>
+          </div>`
+        ).join('')
+      + '</div>'
+      + '<div style="display:flex;gap:6px;">'
+      + '<input id="ef-chk-new" type="text" placeholder="Neuer Eintrag\u2026" style="flex:1;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);" onkeydown="WB._efChkKey(event)">'
+      + '<button onclick="WB._efChkAdd()" style="padding:7px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;cursor:pointer;">+</button>'
+      + '</div>'
+      + '</div>'
+
+      // Verschieben (nur Bearbeiten)
+      + (isNew ? '' : `<div style="margin-top:4px;"><button onclick="document.getElementById('ef-move-panel').style.display=document.getElementById('ef-move-panel').style.display==='none'?'':'none'" style="background:none;border:none;color:var(--c-muted);font-family:var(--font);font-size:0.8rem;cursor:pointer;padding:0;">▸ In anderes Projekt / andere Welt verschieben</button>${movePanelHtml}</div>`);
+  },
+
+  // ── Aufgabe in anderes Projekt / andere Welt verschieben ──
+  _taskMove() {
+    const {_editCtx: ctx, _editPKey: pKey, _editId: id} = this;
+    const srcDb = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!srcDb || !pKey || !id) return;
+
+    const t = (srcDb.projects[pKey]?.tasks || []).find(x => String(x.id) === String(id));
+    if (!t) { this._toast('Aufgabe nicht gefunden'); return; }
+
+    const targetCtx  = document.getElementById('ef-move-welt')?.value || ctx;
+    const targetPKey = document.getElementById('ef-move-proj')?.value || pKey;
+    const targetDb   = targetCtx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!targetDb) { this._toast('Ziel-Datenbank nicht geladen'); return; }
+
+    // Ziel-Projekt anlegen falls nötig
+    targetDb.projects[targetPKey] = targetDb.projects[targetPKey] || {status:'aktiv',tasks:[],desc:''};
+    targetDb.projects[targetPKey].tasks.push({...t});
+
+    // Aus Quelle entfernen
+    const srcTasks = srcDb.projects[pKey]?.tasks || [];
+    const idx = srcTasks.findIndex(x => String(x.id) === String(id));
+    if (idx !== -1) srcTasks.splice(idx, 1);
+
+    this.setDirty();
+    this.editClose();
+    this._renderSection(this.activeTab);
+    this._toast(`Verschoben nach ${targetCtx === 'pro' ? 'Beruf' : 'Privat'} · ${targetPKey}`);
+  },
+
+  // ── Verschieben: Projekte der Zielwelt nachladen ─────────
+  _taskMoveWeltChange(welt) {
+    const db = welt === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    const sel = document.getElementById('ef-move-proj');
+    if (!sel) return;
+    const allKeys = Object.keys(db.projects || {});
+    sel.innerHTML = allKeys.map(k =>
+      `<option value="${k.replace(/"/g,'&quot;')}">${k}</option>`).join('');
+  },
+
+  // ── Checkliste im Edit-Dialog ─────────────────────────
+  // Arbeitet auf einem temporären Array das beim Speichern übernommen wird
+  _efChkGetList() {
+    // Items aus dem DOM auslesen (aktueller Stand)
+    const rows = document.querySelectorAll('#ef-chk-list .ef-chk-row');
+    const items = [];
+    rows.forEach(row => {
+      const chk  = row.querySelector('input[type="checkbox"]');
+      const span = row.querySelector('span[id^="ef-chk-text-"]');
+      if (span) items.push({ text: span.textContent, done: chk?.checked || false });
+    });
+    return items;
+  },
+
+  _efChkToggle(idx) {
+    const row  = document.querySelector(`#ef-chk-list .ef-chk-row[data-idx="${idx}"]`);
+    if (!row) return;
+    const chk  = row.querySelector('input[type="checkbox"]');
+    const span = row.querySelector('span');
+    if (span) {
+      span.style.textDecoration = chk?.checked ? 'line-through' : '';
+      span.style.color = chk?.checked ? 'var(--c-faint)' : '';
+    }
+  },
+
+  _efChkDelete(idx) {
+    const row = document.querySelector(`#ef-chk-list .ef-chk-row[data-idx="${idx}"]`);
+    if (row) row.remove();
+  },
+
+  _efChkKey(event) {
+    if (event.key === 'Enter') { event.preventDefault(); this._efChkAdd(); }
+  },
+
+  _efChkAdd() {
+    const input = document.getElementById('ef-chk-new');
+    const text  = input?.value.trim();
+    if (!text) return;
+    const list  = document.getElementById('ef-chk-list');
+    if (!list) return;
+    const existing = list.querySelectorAll('.ef-chk-row');
+    const newIdx   = existing.length;
+    const div = document.createElement('div');
+    div.className  = 'ef-chk-row';
+    div.dataset.idx = String(newIdx);
+    div.style.cssText = 'display:flex;align-items:center;gap:6px;';
+    div.innerHTML = `
+      <input type="checkbox" onchange="WB._efChkToggle(${newIdx})" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
+      <span style="flex:1;font-size:0.9rem;" id="ef-chk-text-${newIdx}">${text}</span>
+      <button onclick="WB._efChkDelete(${newIdx})" style="background:none;border:none;color:var(--c-faint);cursor:pointer;font-size:1rem;padding:0 4px;line-height:1;">×</button>`;
+    list.appendChild(div);
+    input.value = '';
+    input.focus();
+  },
+
+  _taskFormRecurToggle() {
+    const on = document.getElementById('ef-recur-on')?.checked;
+    const panel = document.getElementById('ef-recur-panel');
+    if (panel) panel.style.display = on ? '' : 'none';
+  },
+
   // ── Neue Aufgabe aus Aufgaben-Tab ─────────────────────
   afNewTask() {
     const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
@@ -16757,50 +16984,18 @@ const WB = {
     this._editPKey = null;
     this._editId   = null;
 
-    const title = document.getElementById('edit-title');
-    const body  = document.getElementById('edit-body');
-    if (title) title.childNodes[0].textContent = 'Neue Aufgabe ';
+    const titleEl = document.getElementById('edit-title');
+    const body    = document.getElementById('edit-body');
+    if (titleEl) titleEl.childNodes[0].textContent = 'Neue Aufgabe ';
+    body.innerHTML = this._taskFormHtml(null, ctx, null, db, true);
 
-    const today = new Date().toISOString().split('T')[0];
-    const projOptions = Object.keys(db.projects || {})
-      .filter(k => !(db.projects[k].isArea || db.projects[k].desc === 'Bereich'))
-      .map(k => `<option value="${k.replace(/"/g,'&quot;')}">${k}</option>`)
-      .join('');
-
-    body.innerHTML =
-      '<div class="edit-field"><label>Titel</label>'
-      + '<input id="ef-title" type="text" placeholder="Aufgabe beschreiben..."></div>'
-      + '<div class="edit-row">'
-      + '<div class="edit-field"><label>Datum</label><input id="ef-date" type="date" value="'+today+'"></div>'
-      + '<div class="edit-field"><label>Prio</label><select id="ef-prio">'
-      + '<option value="C" selected>C — Normal</option>'
-      + '<option value="B">B — Hoch</option>'
-      + '<option value="A">A — Kritisch</option>'
-      + '</select></div></div>'
-      + '<div class="edit-row">'
-      + '<div class="edit-field"><label>Größe</label><select id="ef-size">'
-      + ['XS','S','M','L','XL','XXL'].map(s => `<option${s==='M'?' selected':''}>${s}</option>`).join('')
-      + '</select></div>'
-      + '<div class="edit-field"><label>Welt</label><select id="ef-welt">'
-      + `<option value="pro"${ctx==='pro'?' selected':''}>Beruf</option>`
-      + `<option value="priv"${ctx==='priv'?' selected':''}>Privat</option>`
-      + '</select></div></div>'
-      + '<div class="edit-field"><label>Projekt</label><select id="ef-proj">'
-      + (projOptions || '<option value="">— kein Projekt —</option>')
-      + '</select></div>'
-      + '<div class="edit-field"><label>Notiz</label>'
-      + '<textarea id="ef-notes" rows="3" style="resize:none;"></textarea></div>';
-
-    // Löschen-Button ausblenden (neue Aufgabe)
     const actions = document.querySelector('.edit-actions');
-    if (actions) {
-      const del = actions.querySelector('.danger');
-      if (del) del.remove();
-    }
+    if (actions) { const del = actions.querySelector('.danger'); if (del) del.remove(); }
 
     const overlay = document.getElementById('edit-overlay');
     if (overlay) overlay.classList.add('open');
   },
+
 
   editOpen(type, ctx, pKey, id) {
     this._editType = type;
@@ -16819,11 +17014,16 @@ const WB = {
       const targetDb  = targetCtx === 'pro' ? this.dataPro : this.dataPriv;
       if (!targetDb) { this._toast('Datenbank nicht geladen'); return; }
       const projKey = document.getElementById('ef-proj')?.value;
-      if (!projKey) { this._toast('Bitte Projekt auswählen'); return; }
+      if (!projKey) { this._toast('Bitte Projekt / Bereich auswählen'); return; }
       targetDb.projects[projKey] = targetDb.projects[projKey] || {status:'aktiv',tasks:[],desc:''};
-      const prio = document.getElementById('ef-prio')?.value || 'C';
-      const size = document.getElementById('ef-size')?.value || 'M';
+      const prio  = document.getElementById('ef-prio')?.value || 'C';
+      const size  = document.getElementById('ef-size')?.value || 'M';
       const dateV = document.getElementById('ef-date')?.value || '';
+      const timeV = document.getElementById('ef-time-task')?.value || '';
+      const recurOn   = document.getElementById('ef-recur-on')?.checked;
+      const intervalU = document.getElementById('ef-interval-unit')?.value || 'täglich';
+      const intervalN = parseInt(document.getElementById('ef-interval-n')?.value)||1;
+      const intervalS = document.getElementById('ef-interval-start')?.value || dateV;
       const newTask = {
         id:       String(Date.now()),
         text:     title,
@@ -16831,13 +17031,19 @@ const WB = {
         prio:     prio === 'A',
         prioLvl:  prio,
         date:     dateV,
+        time:     timeV,
         isToday:  dateV === new Date().toISOString().split('T')[0],
         size,
         notes:    document.getElementById('ef-notes')?.value || '',
         status:   'aktiv',
-        checklist: [],
+        checklist: this._efChkGetList(),
         remainingMinutes: ({XS:5,S:15,M:30,L:60,XL:120,XXL:240}[size] || 30),
       };
+      if (recurOn) {
+        newTask.interval      = intervalU === 'alle N Tage' ? intervalN : 1;
+        newTask.intervalUnit  = intervalU;
+        newTask.intervalStart = intervalS;
+      }
       targetDb.projects[projKey].tasks.push(newTask);
       this.setDirty();
       this.editClose();
@@ -16850,33 +17056,7 @@ const WB = {
       const t = (db.projects[pKey]?.tasks||[]).find(x => String(x.id)===String(id));
       if(!t) return;
       if(title) title.childNodes[0].textContent = 'Aufgabe bearbeiten ';
-      body.innerHTML =
-        '<div class="edit-field"><label>Titel</label>'
-        + '<input id="ef-title" type="text" value="'+t.text.replace(/"/g,'&quot;')+'"></div>'
-        + '<div class="edit-row">'
-        + '<div class="edit-field"><label>Datum</label><input id="ef-date" type="date" value="'+(t.date||'')+'"></div>'
-        + '<div class="edit-field"><label>Prio</label><select id="ef-prio">'
-        + '<option value="C"'+((!t.prio && t.prioLvl!=='B')?' selected':'')+'>C — Normal</option>'
-        + '<option value="B"'+(t.prioLvl==='B'?' selected':'')+'>B — Hoch</option>'
-        + '<option value="A"'+((t.prio===true||t.prioLvl==='A')?' selected':'')+'>A — Kritisch</option>'
-        + '</select></div></div>'
-        + '<div class="edit-row">'
-        + '<div class="edit-field"><label>Gr&#246;&#223;e</label><select id="ef-size">'
-        + ['XS','S','M','L','XL','XXL'].map(s=>'<option'+(t.size===s?' selected':'')+'>'+s+'</option>').join('')
-        + '</select></div>'
-        + '<div class="edit-field"><label>Welt</label><select id="ef-welt">'
-        + '<option value="pro"'+(ctx==='pro'?' selected':'')+'>Beruf</option>'
-        + '<option value="priv"'+(ctx==='priv'?' selected':'')+'>Privat</option>'
-        + '</select></div></div>'
-        + '<div class="edit-row">'
-        + '<div class="edit-field"><label>Projekt</label><select id="ef-proj">'
-        + Object.keys(db.projects||{}).filter(k=>!(db.projects[k].isArea||db.projects[k].desc==='Bereich')).map(k=>'<option value="'+k.replace(/"/g,'&quot;')+'"'+(k===pKey?' selected':'')+'>'+k+'</option>').join('')
-        + '</select></div>'
-        + '<div class="edit-field"><label>Status</label><select id="ef-status">'
-        + ['aktiv','wartend','delegiert'].map(s=>'<option'+(t.status===s?' selected':'')+'>'+s+'</option>').join('')
-        + '</select></div></div>'
-        + '<div class="edit-field"><label>Notiz</label>'
-        + '<textarea id="ef-notes" rows="3" style="resize:none;">'+(t.notes||'')+'</textarea></div>';
+      body.innerHTML = this._taskFormHtml(t, ctx, pKey, db, false);
 
       // Löschen-Button
       const actions = document.querySelector('.edit-actions');
@@ -16887,7 +17067,6 @@ const WB = {
         del.onclick = () => this._deleteTask(pKey, id, ctx);
         actions.prepend(del);
       }
-
     } else if(type === 'event') {
       const ev = (db.customEvents||[]).find(x => String(x.id)===String(id));
       if(!ev) return;
@@ -17011,19 +17190,19 @@ const WB = {
     if(type === 'task') {
       const t = (db.projects[pKey]?.tasks||[]).find(x => String(x.id)===String(id));
       if(!t) return;
-      const prio = document.getElementById('ef-prio')?.value;
-      const date = document.getElementById('ef-date')?.value;
-      const size = document.getElementById('ef-size')?.value;
-      const notes= document.getElementById('ef-notes')?.value;
-      const newCtx = document.getElementById('ef-welt')?.value;
+      const prio    = document.getElementById('ef-prio')?.value;
+      const date    = document.getElementById('ef-date')?.value;
+      const size    = document.getElementById('ef-size')?.value;
+      const notes   = document.getElementById('ef-notes')?.value;
+      const newCtx  = document.getElementById('ef-welt')?.value;
+      const timeVal = document.getElementById('ef-time-task')?.value || '';
       t.text   = title;
-      // dateHistory tracken für Aufgaben-Wächter
       if (t.date && date && t.date !== date) {
         if (!t.dateHistory) t.dateHistory = [];
         t.dateHistory.push({ from: t.date, to: date, ts: Date.now() });
       }
       t.date   = date||'';
-      t.time   = document.getElementById('ef-time-task')?.value||'';
+      t.time   = timeVal;
       t.isToday= date === new Date().toISOString().split('T')[0];
       t.prio   = prio==='A';
       t.prioLvl= prio;
@@ -17031,7 +17210,19 @@ const WB = {
       t.notes  = notes||'';
       t.status = document.getElementById('ef-status')?.value||'aktiv';
       t.remainingMinutes = t.remainingMinutes ?? ({XS:5,S:15,M:30,L:60,XL:120,XXL:240}[size]||30);
-      // Projekt wechseln?
+      // Checkliste aus Dialog übernehmen
+      t.checklist = this._efChkGetList();
+      // Wiederkehrend
+      const recurOn = document.getElementById('ef-recur-on')?.checked;
+      if (recurOn) {
+        t.intervalUnit  = document.getElementById('ef-interval-unit')?.value || 'täglich';
+        t.interval      = t.intervalUnit === 'alle N Tage'
+          ? (parseInt(document.getElementById('ef-interval-n')?.value)||1) : 1;
+        t.intervalStart = document.getElementById('ef-interval-start')?.value || date;
+      } else {
+        delete t.interval; delete t.intervalUnit; delete t.intervalStart;
+      }
+      // Projekt / Bereich wechseln (gleiche Welt)
       const newPKey = document.getElementById('ef-proj')?.value;
       if(newPKey && newPKey !== pKey) {
         db.projects[newPKey] = db.projects[newPKey]||{status:'aktiv',tasks:[],desc:''};
@@ -17045,10 +17236,9 @@ const WB = {
       if(newCtx && newCtx !== ctx) {
         const newDb = newCtx==='pro' ? this.dataPro : this.dataPriv;
         if(newDb) {
-          const projKey = pKey;
           newDb.projects = newDb.projects||{};
-          newDb.projects[projKey] = newDb.projects[projKey]||{status:'aktiv',tasks:[],desc:''};
-          newDb.projects[projKey].tasks.push({...t});
+          newDb.projects[pKey] = newDb.projects[pKey]||{status:'aktiv',tasks:[],desc:''};
+          newDb.projects[pKey].tasks.push({...t});
           const tasks = db.projects[pKey]?.tasks||[];
           const idx = tasks.findIndex(x=>String(x.id)===String(id));
           if(idx!==-1) tasks.splice(idx,1);
@@ -17438,13 +17628,13 @@ const WB = {
     const scroll = document.getElementById('aufgaben-scroll');
     if(!hdr || !scroll) return;
 
-    // v3.41.0: FAB-Reset — beide globalen FABs verstecken, eigenen zeigen
+    // v3.41.1: FAB-Reset — alle globalen FABs force-hidden, eigenen zeigen
     const ckFab = document.getElementById('ck-fab');
     const ztFab = document.getElementById('zt-fab');
     const afFab = document.getElementById('af-fab');
     if (ckFab) ckFab.style.display = 'none';
-    if (ztFab) ztFab.classList.remove('visible');
-    if (afFab) afFab.classList.add('visible');
+    if (ztFab) { ztFab.classList.remove('visible'); ztFab.style.display = 'none'; }
+    if (afFab) { afFab.style.display = ''; afFab.classList.add('visible'); }
 
     const viewStr = this.getViewDateStr();
     // Woche = immer Mo–So der AKTUELLEN Woche (nicht viewDate)
@@ -17857,11 +18047,11 @@ const WB = {
     const _todayStr = (() => { const d=new Date(); const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); })();
     this._ztRenderDayTypeBanner(_todayStr);
     const fab = document.getElementById('zt-fab');
-    if(fab) fab.classList.add('visible');
+    if(fab) { fab.style.display = ''; fab.classList.add('visible'); }
     const ckFab2 = document.getElementById('ck-fab');
     if(ckFab2) ckFab2.style.display = 'none';
     const afFab1 = document.getElementById('af-fab');
-    if (afFab1) afFab1.classList.remove('visible');
+    if (afFab1) { afFab1.classList.remove('visible'); afFab1.style.display = 'none'; }
 
     const pT = s => { if(!s) return 8; const p = s.split(':').map(Number); return p[0] + p[1]/60; };
     const fT = h => { const hr=Math.floor(h), m=Math.round((h-hr)*60); return `${String(hr).padStart(2,'0')}:${String(m>=60?0:m).padStart(2,'0')}`; };
