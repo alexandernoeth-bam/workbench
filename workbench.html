@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.35.0</title>
+<title>WorkBench 3.36.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5452,7 +5452,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.35.0 · Build 20260527-1200</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.36.0 · Build 20260527-1300</div>
     </div>
 
     <!-- Welt -->
@@ -5675,7 +5675,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.35.0',
+  APP_VERSION: '3.36.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -16996,25 +16996,95 @@ const WB = {
       }
     });
 
-    // Routine-Ansicht: Wochenpflichten als Liste
+    // Heute-Ansicht: Aufgaben + fällige Routinen getrennt (v3.36.0)
+    if(this.taskFilter === 'today') {
+      const wCls = ctx === 'pro' ? 'beruf' : 'priv';
+      const todayDuties = relevantDuties.filter(d => {
+        const dueInfo = this._dutyDueInfo({...d, ctx});
+        return dueInfo.due;
+      });
+      const todayDutiesOpen = todayDuties.filter(d => !(d.doneWeeks?.[kw]));
+      const todayDutiesDone = todayDuties.filter(d => !!(d.doneWeeks?.[kw]));
+
+      let tHtml = '';
+      // Aufgaben-Block
+      if(filtered.length) {
+        tHtml += '<div class="af-section-label" style="padding-top:4px;">Aufgaben</div>';
+        filtered.sort((a,b) => (a.t.prio?0:1)-(b.t.prio?0:1));
+        tHtml += filtered.map(({t,pKey,ctx}) => this._afTaskHtml(t,pKey,ctx,false)).join('');
+      }
+      // Routinen-Block (nur wenn heute fällig)
+      if(todayDuties.length) {
+        tHtml += '<div class="af-section-label" style="padding-top:12px;">Routinen heute</div>';
+        todayDutiesOpen.forEach(duty => {
+          const dueInfo = this._dutyDueInfo(duty);
+          tHtml += `<div class="cl-duty-item">
+            <div class="cl-duty-checkbox ${wCls}" onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderAufgaben();"></div>
+            <div class="cl-duty-info" style="flex:1;">
+              <div class="cl-duty-name">${duty.title}</div>
+              <div class="cl-duty-when${dueInfo.late?' late':''}">${dueInfo.label}</div>
+            </div>
+          </div>`;
+        });
+        todayDutiesDone.forEach(duty => {
+          tHtml += `<div class="cl-duty-item">
+            <div class="cl-duty-checkbox done" onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderAufgaben();"></div>
+            <div class="cl-duty-info">
+              <div class="cl-duty-name done">${duty.title}</div>
+            </div>
+          </div>`;
+        });
+      }
+      if(!filtered.length && !todayDuties.length) {
+        tHtml = '<div class="zt-empty">Keine Aufgaben oder Routinen für heute.</div>';
+      }
+      scroll.innerHTML = '<div style="padding:0 0 16px;">' + tHtml + '</div>';
+      return;
+    }
+
+    // Routine-Ansicht: Wochenpflichten — offen nach Wochentag, erledigt unten (v3.36.0)
     if(this.taskFilter === 'routine') {
       let rHtml = '<div style="padding:12px 14px;">';
       if(!relevantDuties.length) {
         rHtml += '<div class="zt-empty">Keine fälligen Routinen diese Woche.</div>';
       } else {
-        relevantDuties.forEach(duty => {
-          const done    = !!(duty.doneWeeks?.[kw]);
-          const dueInfo = this._dutyDueInfo(duty);
-          const wCls    = ctx === 'pro' ? 'beruf' : 'priv';
-          const chkCls  = done ? 'done' : wCls;
-          rHtml += `<div class="cl-duty-item" onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderAufgaben();">
-            <div class="cl-duty-checkbox ${chkCls}"></div>
-            <div class="cl-duty-info">
-              <div class="cl-duty-name${done?' done':''}">${duty.title}</div>
-              <div class="cl-duty-when${dueInfo.late&&!done?' late':''}">${dueInfo.label}</div>
-            </div>
-          </div>`;
-        });
+        const wCls = ctx === 'pro' ? 'beruf' : 'priv';
+        const normalize = d => d === 0 ? 7 : d;
+        const dutyDay = duty => {
+          if (duty.type === 'fixed') return normalize(parseInt(duty.dayFixed) || 1);
+          const days = duty.days || [];
+          return days.length ? Math.min(...days.map(normalize)) : 8;
+        };
+        const openSorted = [...openDuties].sort((a,b) => dutyDay(a) - dutyDay(b));
+        const doneSorted = [...doneDuties].sort((a,b) => dutyDay(a) - dutyDay(b));
+
+        if (openSorted.length) {
+          rHtml += '<div class="af-section-label" style="padding-top:4px;">Offen</div>';
+          openSorted.forEach(duty => {
+            const dueInfo = this._dutyDueInfo(duty);
+            rHtml += `<div class="cl-duty-item">
+              <div class="cl-duty-checkbox ${wCls}" onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderAufgaben();"></div>
+              <div class="cl-duty-info" style="flex:1;">
+                <div class="cl-duty-name">${duty.title}</div>
+                <div class="cl-duty-when${dueInfo.late?' late':''}">${dueInfo.label}</div>
+              </div>
+              <button onclick="WB.dutiesOpen()" style="flex-shrink:0;padding:4px 10px;font-size:0.75rem;font-family:var(--font);border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;color:var(--c-muted);cursor:pointer;">Bearbeiten</button>
+            </div>`;
+          });
+        }
+        if (doneSorted.length) {
+          rHtml += '<div class="af-section-label" style="padding-top:12px;">Erledigt</div>';
+          doneSorted.forEach(duty => {
+            const dueInfo = this._dutyDueInfo(duty);
+            rHtml += `<div class="cl-duty-item">
+              <div class="cl-duty-checkbox done" onclick="WB.dutyToggle('${ctx}','${duty.id}');WB.renderAufgaben();"></div>
+              <div class="cl-duty-info">
+                <div class="cl-duty-name done">${duty.title}</div>
+                <div class="cl-duty-when">${dueInfo.label}</div>
+              </div>
+            </div>`;
+          });
+        }
       }
       rHtml += '</div>';
       scroll.innerHTML = rHtml;
