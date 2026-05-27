@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.54.0</title>
+<title>WorkBench 3.55.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5852,7 +5852,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.54.0 · Build 20260528-1830</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.55.0 · Build 20260528-1900</div>
     </div>
 
     <!-- Welt -->
@@ -6003,7 +6003,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.54.0',
+  APP_VERSION: '3.55.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -15812,12 +15812,17 @@ const WB = {
           <span class="cl-item-text${item.done?' done':''}">${item.text}</span>
         </div>`;
       });
-      // "Als Aufgabe anlegen" Button immer oben
-      html += `<div style="padding:10px 16px 4px;">
+      // "Als Aufgabe/Termin anlegen" Buttons oben
+      html += `<div style="padding:10px 16px 4px;display:flex;flex-direction:column;gap:6px;">
         <button onclick="WB._clToTask('${instId}')"
           style="width:100%;padding:10px;border:1px solid var(--c-beruf);background:none;border-radius:var(--radius-sm);font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;color:var(--c-beruf);display:flex;align-items:center;justify-content:center;gap:8px;">
           <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           Als Aufgabe anlegen
+        </button>
+        <button onclick="WB._clToEvent('${instId}')"
+          style="width:100%;padding:10px;border:1px solid var(--c-border);background:none;border-radius:var(--radius-sm);font-family:var(--font);font-size:0.85rem;font-weight:500;cursor:pointer;color:var(--c-muted);display:flex;align-items:center;justify-content:center;gap:8px;">
+          <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Als Termin anlegen
         </button>
       </div>`;
       if(done===total && total>0) {
@@ -15986,6 +15991,71 @@ const WB = {
 
 
   // ── Checkliste als Aufgabe anlegen (v3.52.1) ─────────
+  // ── Checkliste als Termin anlegen (v3.55.0) ──────────
+  _clToEvent(instId) {
+    const store = this._clInstanzStore(); if (!store) return;
+    const inst  = store.find(x => x.id === instId); if (!inst) return;
+
+    const checklist = inst.items.map(i => ({ text: i.text, done: i.done }));
+    const ctx   = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db    = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Keine Datenbank geladen'); return; }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // _editType für event-new setzen
+    this._editType = 'event-new';
+    this._editCtx  = ctx;
+    this._editPKey = '';
+    this._editId   = null;
+    this._editFromClInstId = instId; // für Auto-Abschluss
+
+    const titleEl = document.getElementById('edit-title');
+    if (titleEl) titleEl.childNodes[0].textContent = 'Neuer Termin ';
+    const delBtn = document.getElementById('edit-delete-btn');
+    if (delBtn) delBtn.style.display = 'none';
+
+    // Termin-Formular aufbauen
+    const selTyp = 'sonstiges';
+    const body = document.getElementById('edit-body');
+    if (body) {
+      body.innerHTML =
+        '<div class="edit-field"><label>Titel</label>'
+        + `<input id="ef-title" type="text" value="${inst.name.replace(/"/g,'&quot;')}">`+'</div>'
+        + '<div class="edit-field"><label>Typ</label>'
+        + this._evTypePills(selTyp)
+        + '</div>'
+        + '<div class="edit-row">'
+        + `<div class="edit-field"><label>Datum</label><input id="ef-date" type="date" value="${today}"></div>`
+        + '<div class="edit-field"><label>Welt</label><select id="ef-ev-welt">'
+        + `<option value="pro"${ctx==='pro'?' selected':''}>Beruf</option>`
+        + `<option value="priv"${ctx==='priv'?' selected':''}>Privat</option>`
+        + '</select></div></div>'
+        + '<div class="edit-row">'
+        + '<div class="edit-field"><label>Von</label><input id="ef-time" type="time" value="09:00" onchange="WB._evRecalcDur()"></div>'
+        + '<div class="edit-field"><label>Bis</label><input id="ef-endtime" type="time" value="10:00" onchange="WB._evRecalcDur()"></div>'
+        + '</div>'
+        + '<div class="edit-field"><label>Ort</label><input id="ef-loc" type="text" value=""></div>'
+        + '<div class="edit-field"><label>Checkliste</label>'
+        + '<div id="ef-chk-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">'
+        + checklist.map((item,i) =>
+            `<div class="ef-chk-row" data-idx="${i}" style="display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" ${item.done?'checked':''} onchange="WB._efChkToggle(${i})" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
+              <span style="flex:1;font-size:0.9rem;${item.done?'text-decoration:line-through;color:var(--c-faint);':''}" id="ef-chk-text-${i}">${item.text}</span>
+              <button onclick="WB._efChkDelete(${i})" style="background:none;border:none;color:var(--c-faint);cursor:pointer;font-size:1rem;padding:0 4px;">×</button>
+            </div>`
+          ).join('')
+        + '</div>'
+        + '<div style="display:flex;gap:6px;">'
+        + '<input id="ef-chk-new" type="text" placeholder="Neuer Schritt…" style="flex:1;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);" onkeydown="WB._efChkKey(event)">'
+        + '<button onclick="WB._efChkAdd()" style="padding:7px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;cursor:pointer;">+</button>'
+        + '</div></div>';
+    }
+
+    document.getElementById('edit-overlay').classList.add('open');
+    this.clDetailClose();
+  },
+
   _clToTask(instId) {
     const store = this._clInstanzStore(); if (!store) return;
     const inst  = store.find(x => x.id === instId); if (!inst) return;
@@ -17635,7 +17705,21 @@ const WB = {
       }
       this.setDirty();
       this.editClose();
-      if (typV !== 'besprechung') this._toast('Termin angelegt');
+      // Auto-Abschluss wenn aus Checkliste erstellt
+      if (this._editFromClInstId) {
+        const clStore = this._clInstanzStore();
+        const clInst  = clStore?.find(x => x.id === this._editFromClInstId);
+        if (clInst) {
+          clInst.items.forEach(i => i.done = true);
+          clInst.abgeschlossen = true;
+          clInst.abgeschlossenAt = Date.now();
+          this.setDirty();
+          if (typV !== 'besprechung') this._toast('Termin angelegt · Checkliste abgeschlossen');
+        }
+        this._editFromClInstId = null;
+      } else {
+        if (typV !== 'besprechung') this._toast('Termin angelegt');
+      }
       if(this.activeTab==='cockpit') this.renderCockpit();
       if(this.activeTab==='woche') this.renderWoche();
       return;
@@ -18554,7 +18638,7 @@ const WB = {
       t.date ? ['Fällig', t.date] : null,
       ['Prio',    prioLbl],
       ['Größe',   sizeLbl],
-      t.remainingMinutes!=null ? ['Rest', t.remainingMinutes+' Min'] : null,
+      // remainingMinutes entfernt (v3.54.1)
     ].filter(Boolean);
 
     let body = rows.map(([k,v]) =>
