@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.51.0</title>
+<title>WorkBench 3.51.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5419,6 +5419,10 @@ html, body {
         <input type="time" id="wd-reminder-time"
           style="padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
       </div>
+      <div style="display:flex;align-items:center;gap:10px;margin:10px 0 4px;">
+        <input type="checkbox" id="wd-musttoday" style="width:16px;height:16px;cursor:pointer;accent-color:#C62828;">
+        <label for="wd-musttoday" style="font-size:0.85rem;cursor:pointer;color:#C62828;font-weight:500;">Muss am Fälligkeitstag zwingend erledigt werden</label>
+      </div>
       <button class="wd-add-btn" onclick="WB.dutyAdd()">+ Pflicht hinzufügen</button>
     </div>
   </div>
@@ -5756,7 +5760,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.51.0 · Build 20260528-1500</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.51.2 · Build 20260528-1530</div>
     </div>
 
     <!-- Welt -->
@@ -5907,7 +5911,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.51.0',
+  APP_VERSION: '3.51.2',
   APP_BUILD:   '20260526-0723',
 
 
@@ -13151,6 +13155,10 @@ const WB = {
           <input type="time" id="wde-rem-${dutyId}" value="${duty.reminderTime||''}"
             style="padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
         </div>
+        <div style="display:flex;align-items:center;gap:8px;margin:8px 0 4px;">
+          <input type="checkbox" id="wde-musttoday-${dutyId}" ${duty.mustToday?'checked':''} style="width:16px;height:16px;cursor:pointer;accent-color:#C62828;">
+          <label for="wde-musttoday-${dutyId}" style="font-size:0.82rem;cursor:pointer;color:#C62828;font-weight:500;">Muss zwingend am Fälligkeitstag erledigt werden</label>
+        </div>
         <div style="display:flex;gap:8px;margin-top:8px;">
           <button onclick="WB.dutyEditSave('${ctx}','${dutyId}')"
             style="flex:1;padding:9px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;">
@@ -13209,6 +13217,9 @@ const WB = {
     }
     if (rem) duty.reminderTime = rem;
     else delete duty.reminderTime;
+
+    const mustToday = document.getElementById('wde-musttoday-' + dutyId)?.checked || false;
+    duty.mustToday = mustToday;
 
     this.setDirty();
     this._dutiesRender();
@@ -13293,6 +13304,7 @@ const WB = {
     const repeatEvery  = parseInt(document.getElementById('wd-repeat-n')?.value) || 2;
     const monthlyRule  = document.getElementById('wd-monthly-rule')?.value || 'day-1';
     const reminderTime = document.getElementById('wd-reminder-time')?.value || '';
+    const mustToday    = document.getElementById('wd-musttoday')?.checked || false;
     const startDate    = new Date().toISOString().split('T')[0];
 
     const entry = {
@@ -13306,6 +13318,7 @@ const WB = {
     if (repeat === 'every-n-weeks') entry.repeatEvery = repeatEvery;
     if (repeat === 'monthly')       entry.monthlyRule  = monthlyRule;
     if (reminderTime)               entry.reminderTime = reminderTime;
+    if (mustToday)                  entry.mustToday    = true;
 
     store.push(entry);
     this.setDirty();
