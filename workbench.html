@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.58.4</title>
+<title>WorkBench 3.59.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5430,6 +5430,18 @@ html, body {
       <div class="wbs-section-label">Assistenten-Fenster</div>
       <div class="wbs-row">
         <div class="wbs-label">
+          <div class="wbs-label-main">Assistent im Cockpit</div>
+          <div class="wbs-label-sub">Scout-Banner anzeigen</div>
+        </div>
+        <label style="display:flex;align-items:center;cursor:pointer;gap:8px;">
+          <input type="checkbox" id="s-asst-cockpit-show"
+            onchange="WB.saveSetting('assistCockpitShow', this.checked); WB.renderCockpit();"
+            style="width:16px;height:16px;cursor:pointer;accent-color:var(--c-beruf);">
+          <span style="font-size:0.82rem;color:var(--c-muted);">Anzeigen</span>
+        </label>
+      </div>
+      <div class="wbs-row">
+        <div class="wbs-label">
           <div class="wbs-label-main">Morgen-Planung</div>
           <div class="wbs-label-sub">Einblenden von · bis Uhr</div>
         </div>
@@ -5991,7 +6003,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.58.4 · Build 20260529-0130</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.59.0 · Build 20260529-0205</div>
     </div>
 
     <!-- Welt -->
@@ -6142,7 +6154,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.58.4',
+  APP_VERSION: '3.59.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -10234,6 +10246,11 @@ const WB = {
   _ckRenderAssistantBanner() {
     const banner = document.getElementById('ck-assistant-banner');
     if (!banner) return;
+    // Einstellung prüfen — Standard: aus
+    if (!this._settings?.assistCockpitShow) {
+      banner.classList.remove('visible');
+      return;
+    }
     const now   = new Date();
     const h     = now.getHours();
     const s     = this._settings;
@@ -18376,6 +18393,8 @@ const WB = {
     sv('s-asst-morning-end',    s.assistMorningEnd     ?? 8);
     sv('s-asst-evening-start',  s.assistEveningStart   ?? 20);
     sv('s-asst-evening-end',    s.assistEveningEnd     ?? 23);
+    const ckShow = document.getElementById('s-asst-cockpit-show');
+    if (ckShow) ckShow.checked = !!(s.assistCockpitShow ?? false);
     // Abend-Fragen laden
     const qContainer = document.getElementById('wbs-evening-questions');
     if (qContainer) {
