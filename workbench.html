@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.59.0</title>
+<title>WorkBench 3.59.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6003,7 +6003,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.59.0 · Build 20260529-0205</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.59.2 · Build 20260529-0230</div>
     </div>
 
     <!-- Welt -->
@@ -6154,7 +6154,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.59.0',
+  APP_VERSION: '3.59.2',
   APP_BUILD:   '20260526-0723',
 
 
@@ -6974,7 +6974,7 @@ const WB = {
 
       const aktionen = [
         ['notiz','Notiz'], ['aufgabe','Aufgabe'], ['termin','Termin'],
-        ['checkliste','Checkliste'], ['ziel','Ziel'], ['verwerfen','Verwerfen']
+        ['checkliste','Checkliste'], ['projekt','Projekt'], ['ziel','Ziel'], ['verwerfen','Verwerfen']
       ];
       aktionen.forEach(([ziel, label]) => {
         const btn = document.createElement('button');
@@ -7041,8 +7041,54 @@ const WB = {
         if (el) el.value = text;
       }, 100);
     } else if (ziel === 'checkliste') {
-      this._goTab('checklisten');
-      this._toast('Neue Checkliste anlegen und Titel einfügen: ' + text.slice(0,30));
+      // Zeile 1 = Titel, Zeile 2+ = Checklistenpunkte
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      const titel = lines[0] || 'Neue Checkliste';
+      const items = lines.slice(1).map(l => ({ text: l, done: false }));
+      // In _clVorlagenStore (Object mit Name als Key) speichern
+      const vorlagenStore = this._clVorlagenStore();
+      if (vorlagenStore) {
+        let finalName = titel;
+        let n = 2;
+        while (vorlagenStore[finalName]) { finalName = titel + ' ' + n++; }
+        vorlagenStore[finalName] = { items };
+        this.setDirty();
+        this._goTab('checklisten');
+        setTimeout(() => {
+          this.clStartInstanz(finalName);
+          this._toast(items.length
+            ? '"' + finalName + '" \u00b7 ' + items.length + ' Punkte angelegt'
+            : '"' + finalName + '" angelegt');
+        }, 200);
+      } else {
+        this._toast('Keine Datenbank geladen');
+      }
+    } else if (ziel === 'projekt') {
+      // Zeile 1 = Projektname, Zeile 2+ = Aufgaben
+      const lines    = text.split('\n').map(l => l.trim()).filter(Boolean);
+      const projName = lines[0] || 'Neues Projekt';
+      const taskLines = lines.slice(1);
+      if (!db.projects) db.projects = {};
+      if (!db.projects[projName]) {
+        db.projects[projName] = { tasks: [], notes: '' };
+      }
+      const now = Date.now();
+      taskLines.forEach((tText, i) => {
+        db.projects[projName].tasks.push({
+          id: String(now + i),
+          text: tText,
+          done: false,
+          prioLvl: 'C',
+          size: 'M',
+          date: null,
+        });
+      });
+      this.setDirty();
+      this._goTab('projekte');
+      setTimeout(() => this.renderProjekte(), 100);
+      this._toast(taskLines.length
+        ? `"${projName}" · ${taskLines.length} Aufgaben angelegt`
+        : `Projekt "${projName}" angelegt`);
     } else if (ziel === 'ziel') {
       this.goalNew();
       setTimeout(() => {
