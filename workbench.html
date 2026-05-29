@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.59.3</title>
+<title>WorkBench 3.59.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6003,7 +6003,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.59.3 · Build 20260529-0900</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.59.4 · Build 20260529-1730</div>
     </div>
 
     <!-- Welt -->
@@ -6154,7 +6154,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.59.3',
+  APP_VERSION: '3.59.4',
   APP_BUILD:   '20260526-0723',
 
 
@@ -15680,10 +15680,17 @@ const WB = {
       });
     });
 
-    // Wochenpflichten mit mustToday
+    // Wochenpflichten mit mustToday — nur wenn heute fällig
+    const now = new Date();
     ['pro','priv'].forEach(ctx => {
       const store = this._dutyStore(ctx) || [];
-      store.filter(d => d.mustToday && !this._dutyIsDone(d, new Date())).forEach(d => {
+      store.filter(d => {
+        if (!d.mustToday) return false;
+        if (this._dutyIsDone(d, now)) return false;
+        // Nur anzeigen wenn heute wirklich fällig (nicht nur überfällig)
+        const info = this._dutyDayInfo(d, now);
+        return info.due && !info.late;
+      }).forEach(d => {
         items.push({ text: d.title, type: 'duty', id: d.id, ctx });
       });
     });
