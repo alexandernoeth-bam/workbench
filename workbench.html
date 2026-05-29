@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.59.2</title>
+<title>WorkBench 3.59.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6003,7 +6003,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.59.2 · Build 20260529-0230</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.59.3 · Build 20260529-0900</div>
     </div>
 
     <!-- Welt -->
@@ -6154,7 +6154,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.59.2',
+  APP_VERSION: '3.59.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -9132,6 +9132,12 @@ const WB = {
   },
 
   renderCockpit() {
+    // Datum täglich aktualisieren (App über Nacht offen)
+    const todayCheck = new Date();
+    const vd = this.viewDate instanceof Date ? this.viewDate : new Date();
+    if (vd.toDateString() !== todayCheck.toDateString()) {
+      this.viewDate = todayCheck;
+    }
     // FAB-Sichtbarkeit
     const ckFab = document.getElementById('ck-fab');
     const ztFab = document.getElementById('zt-fab');
@@ -10858,6 +10864,7 @@ const WB = {
     if (this._idbDevice) {
       this._fixViewportHeight();
     this._swipeInit();
+    this.viewDate = new Date(); // Sicherstellen dass viewDate heute ist
     this.start();
       // OAuth Init + Auto-Sync + Auto-Refresh starten
       setTimeout(async () => {
@@ -10970,25 +10977,9 @@ const WB = {
     // Kein JS-Höhen-Hack nötig — html/body height:100% reicht
   },
 
-  // ── Swipe-Navigation (v3.50.0) ──────────────────────
+  // ── Swipe-Navigation entfernt (v3.59.3) ─────────────
   _swipeInit() {
-    const el = document.getElementById('wb-content');
-    if (!el) return;
-    let startX = 0, startY = 0;
-    el.addEventListener('touchstart', e => {
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-    }, { passive: true });
-    el.addEventListener('touchend', e => {
-      const dx = e.changedTouches[0].clientX - startX;
-      const dy = e.changedTouches[0].clientY - startY;
-      if (Math.abs(dx) < 50 || Math.abs(dy) > 40) return; // zu kurz oder zu vertikal
-      const tabs = ['cockpit','aufgaben','projekte','notizen','checklisten','woche'];
-      const cur  = tabs.indexOf(this.activeTab);
-      if (cur === -1) return;
-      if (dx < 0 && cur < tabs.length - 1) this._goTab(tabs[cur + 1]); // links → nächster
-      if (dx > 0 && cur > 0)               this._goTab(tabs[cur - 1]); // rechts → vorheriger
-    }, { passive: true });
+    // Deaktiviert — störte Scroll und Zeitband-Interaktion
   },
 
   // ── Wiederkehrende Aufgaben: Datum-Reset (v3.53.0) ──
