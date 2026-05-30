@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.60.1</title>
+<title>WorkBench 3.61.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4844,6 +4844,77 @@ html, body {
   font-size: 0.85rem;
 }
 
+
+/* ── Tages-Quicklist (v3.61.0) ──────────────────── */
+#ck-quicklist {
+  max-width: 420px;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin: 0 auto;
+}
+#ck-quicklist-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid var(--c-border);
+}
+#ck-quicklist-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  flex: 1;
+}
+#ck-quicklist-add {
+  background: none;
+  border: none;
+  color: var(--c-beruf);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  font-weight: 600;
+}
+.ck-quick-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--c-border);
+}
+.ck-quick-item:last-child { border-bottom: none; }
+.ck-quick-chk {
+  width: 16px; height: 16px;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--c-beruf);
+}
+.ck-quick-text {
+  flex: 1;
+  font-size: 0.88rem;
+  color: var(--c-text);
+}
+.ck-quick-text.done {
+  text-decoration: line-through;
+  color: var(--c-faint);
+}
+.ck-quick-del {
+  background: none;
+  border: none;
+  color: var(--c-faint);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0 2px;
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+.ck-quick-item:hover .ck-quick-del { opacity: 1; }
+
 </style>
 </head>
 <body>
@@ -6001,7 +6072,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.60.1 · Build 20260530-0830</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.61.0 · Build 20260530-0910</div>
     </div>
 
     <!-- Welt -->
@@ -6152,7 +6223,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.60.1',
+  APP_VERSION: '3.61.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -6972,7 +7043,7 @@ const WB = {
 
       const aktionen = [
         ['notiz','Notiz'], ['aufgabe','Aufgabe'], ['termin','Termin'],
-        ['checkliste','Checkliste'], ['projekt','Projekt'], ['ziel','Ziel'], ['verwerfen','Verwerfen']
+        ['checkliste','Checkliste'], ['projekt','Projekt'], ['quick','Quick ✓'], ['ziel','Ziel'], ['verwerfen','Verwerfen']
       ];
       aktionen.forEach(([ziel, label]) => {
         const btn = document.createElement('button');
@@ -7370,6 +7441,18 @@ const WB = {
         const el = document.getElementById('ef-title');
         if (el) el.value = text;
       }, 100);
+    }
+
+    // Quick-Item anlegen
+    if (ziel === 'quick') {
+      const today = new Date().toISOString().split('T')[0];
+      const qs = this._quickStore();
+      if (qs) {
+        qs.push({ id: String(Date.now()), text: text.trim(), date: today, done: false });
+        this.setDirty();
+        this._toast('"' + text.trim().slice(0,30) + '" als Quick-Item angelegt');
+        if (this.activeTab === 'cockpit') this.renderCockpit();
+      }
     }
 
     // Eintrag aus Inbox entfernen nach Weiterleitung
@@ -9413,10 +9496,87 @@ const WB = {
       + '<span class="ck-pill-label" style="color:rgba(55,68,35,0.75);">Termine heute</span>';
     tRow.addEventListener('click', () => WB._ckToggleZeitband());
     grid.appendChild(tRow);
+
+    // Quick-List rendern
+    this._ckRenderQuickList(grid);
   },
 
   // Welt setzen + Checklisten-Tab öffnen
   // Welt setzen + Checklisten-Tab öffnen
+  // ── Tages-Quicklist (v3.61.0) ──────────────────────
+  _quickStore() {
+    const db = this.activeWorld === 'beruf' ? this.dataPro : this.dataPriv;
+    if (!db) return null;
+    if (!db.quickItems) db.quickItems = [];
+    return db.quickItems;
+  },
+
+  _ckRenderQuickList(grid) {
+    const today = new Date().toISOString().split('T')[0];
+    const store = this._quickStore();
+    if (!store) return;
+
+    // Nur Items für heute anzeigen
+    const items = store.filter(i => i.date === today);
+    if (!items.length) return;
+
+    // Altes Element entfernen
+    document.getElementById('ck-quicklist')?.remove();
+
+    const el = document.createElement('div');
+    el.id = 'ck-quicklist';
+    el.innerHTML =
+      '<div id="ck-quicklist-header">'
+      + '<span id="ck-quicklist-title">Heute noch</span>'
+      + '<button id="ck-quicklist-add" onclick="WB._quickAdd()" title="Hinzufügen">+</button>'
+      + '</div>'
+      + items.map(item =>
+        '<div class="ck-quick-item" data-id="' + item.id + '">'
+        + '<input type="checkbox" class="ck-quick-chk" ' + (item.done?'checked':'') + ' onchange="WB._quickToggle('' + item.id + '',this)">'
+        + '<span class="ck-quick-text' + (item.done?' done':'') + '">' + item.text + '</span>'
+        + '<button class="ck-quick-del" onclick="WB._quickDelete('' + item.id + '')" title="Löschen">×</button>'
+        + '</div>'
+      ).join('');
+
+    grid.appendChild(el);
+  },
+
+  _quickAdd(prefillDate) {
+    const today = new Date().toISOString().split('T')[0];
+    const text = prompt('Was muss erledigt werden?');
+    if (!text?.trim()) return;
+    const dateInput = prompt('Datum (leer = heute):', prefillDate || today);
+    const date = dateInput?.trim() || today;
+    const store = this._quickStore();
+    if (!store) return;
+    store.push({ id: String(Date.now()), text: text.trim(), date, done: false });
+    this.setDirty();
+    this.renderCockpit();
+  },
+
+  _quickToggle(id, chk) {
+    const store = this._quickStore();
+    if (!store) return;
+    const item = store.find(i => i.id === id);
+    if (!item) return;
+    item.done = chk.checked;
+    // Visuelle Reaktion sofort
+    const span = chk.nextElementSibling;
+    if (span) span.className = 'ck-quick-text' + (item.done ? ' done' : '');
+    this.setDirty();
+    // Nach 1.5s erledigte Items ausblenden
+    if (item.done) setTimeout(() => this.renderCockpit(), 1500);
+  },
+
+  _quickDelete(id) {
+    const store = this._quickStore();
+    if (!store) return;
+    const idx = store.findIndex(i => i.id === id);
+    if (idx !== -1) store.splice(idx, 1);
+    this.setDirty();
+    this.renderCockpit();
+  },
+
   _ckGoChecklisten(ctx) {
     const targetWorld = ctx === 'pro' ? 'beruf' : 'privat';
     if (this.activeWorld !== targetWorld) this.setWorld(targetWorld, false);
