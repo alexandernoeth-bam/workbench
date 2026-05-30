@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.61.2</title>
+<title>WorkBench 3.61.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6072,7 +6072,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.61.2 · Build 20260530-0940</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.61.3 · Build 20260530-1000</div>
     </div>
 
     <!-- Welt -->
@@ -6223,7 +6223,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.61.2',
+  APP_VERSION: '3.61.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -7445,14 +7445,14 @@ const WB = {
 
     // Quick-Item anlegen
     if (ziel === 'quick') {
+      // Sheet öffnen mit vorausgefülltem Text
       const today = new Date().toISOString().split('T')[0];
-      const qs = this._quickStore();
-      if (qs) {
-        qs.push({ id: String(Date.now()), text: text.trim(), date: today, done: false });
-        this.setDirty();
-        this._toast('"' + text.trim().slice(0,30) + '" als Quick-Item angelegt');
-        if (this.activeTab === 'cockpit') this.renderCockpit();
-      }
+      this.inboxClose();
+      this._quickAdd(today);
+      setTimeout(() => {
+        const el = document.getElementById('wqa-text');
+        if (el) el.value = text.trim();
+      }, 100);
     }
 
     // Eintrag aus Inbox entfernen nach Weiterleitung
@@ -9518,39 +9518,72 @@ const WB = {
 
     // Nur Items für heute anzeigen
     const items = store.filter(i => i.date === today);
-    if (!items.length) return;
 
     // Altes Element entfernen
     document.getElementById('ck-quicklist')?.remove();
 
     const el = document.createElement('div');
     el.id = 'ck-quicklist';
+    const itemsHtml = items.length
+      ? items.map(item =>
+          '<div class="ck-quick-item" data-id="' + item.id + '">'
+          + '<input type="checkbox" class="ck-quick-chk" ' + (item.done?'checked':'') + ' onchange="WB._quickToggle(&quot;' + item.id + '&quot;,this)">'
+          + '<span class="ck-quick-text' + (item.done?' done':'') + '">' + item.text + '</span>'
+          + '<button class="ck-quick-del" onclick="WB._quickDelete(&quot;' + item.id + '&quot;)" title="Löschen">×</button>'
+          + '</div>'
+        ).join('')
+      : '<div style="padding:8px 12px;font-size:0.82rem;color:var(--c-faint);">Nichts für heute — + zum Hinzufügen</div>';
+
     el.innerHTML =
       '<div id="ck-quicklist-header">'
       + '<span id="ck-quicklist-title">Heute noch</span>'
       + '<button id="ck-quicklist-add" onclick="WB._quickAdd()" title="Hinzufügen">+</button>'
       + '</div>'
-      + items.map(item =>
-        '<div class="ck-quick-item" data-id="' + item.id + '">'
-        + '<input type="checkbox" class="ck-quick-chk" ' + (item.done?'checked':'') + ' onchange="WB._quickToggle(&quot;' + item.id + '&quot;,this)">'
-        + '<span class="ck-quick-text' + (item.done?' done':'') + '">' + item.text + '</span>'
-        + '<button class="ck-quick-del" onclick="WB._quickDelete(&quot;' + item.id + '&quot;)" title="Löschen">×</button>'
-        + '</div>'
-      ).join('');
+      + itemsHtml;
 
     grid.appendChild(el);
   },
 
   _quickAdd(prefillDate) {
     const today = new Date().toISOString().split('T')[0];
-    const text = prompt('Was muss erledigt werden?');
-    if (!text?.trim()) return;
-    const dateInput = prompt('Datum (leer = heute):', prefillDate || today);
-    const date = dateInput?.trim() || today;
+    // Kleines Sheet aufbauen
+    document.getElementById('wb-quick-add-sheet')?.remove();
+    const sheet = document.createElement('div');
+    sheet.id = 'wb-quick-add-sheet';
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;';
+    sheet.innerHTML =
+      '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;">'
+      + '<div style="font-size:0.8rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:12px;">Schnell-Erledigung</div>'
+      + '<input id="wqa-text" type="text" placeholder="Was muss erledigt werden?" autofocus style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:10px;">'
+      + '<div style="display:flex;gap:8px;margin-bottom:14px;">'
+      + '<div style="flex:1;">'
+      + '<div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;">Datum</div>'
+      + '<input id="wqa-date" type="date" value="' + (prefillDate || today) + '" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">'
+      + '</div></div>'
+      + '<div style="display:flex;gap:8px;">'
+      + '<button onclick="document.getElementById(&quot;wb-quick-add-sheet&quot;).remove()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Abbrechen</button>'
+      + '<button onclick="WB._quickSave()" style="flex:2;padding:11px;background:var(--c-beruf);border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;color:#fff;">Speichern</button>'
+      + '</div>'
+      + '</div>';
+    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
+    document.body.appendChild(sheet);
+    setTimeout(() => document.getElementById('wqa-text')?.focus(), 50);
+    // Enter speichert
+    sheet.querySelector('#wqa-text').addEventListener('keydown', e => {
+      if (e.key === 'Enter') WB._quickSave();
+    });
+  },
+
+  _quickSave() {
+    const text = document.getElementById('wqa-text')?.value?.trim();
+    const date = document.getElementById('wqa-date')?.value || new Date().toISOString().split('T')[0];
+    if (!text) { document.getElementById('wqa-text')?.focus(); return; }
     const store = this._quickStore();
     if (!store) return;
-    store.push({ id: String(Date.now()), text: text.trim(), date, done: false });
+    store.push({ id: String(Date.now()), text, date, done: false });
     this.setDirty();
+    document.getElementById('wb-quick-add-sheet')?.remove();
+    this._toast('Quick-Item angelegt für ' + date);
     this.renderCockpit();
   },
 
