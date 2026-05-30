@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.59.5</title>
+<title>WorkBench 3.60.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4954,7 +4954,7 @@ html, body {
       <!-- zt-daytype-banner versteckt -->
       <div id="zt-daytype-banner" style="display:none;"></div>
       <!-- Zeitband eingeklappt (Standard) -->
-      <div id="ck-zeitband-panel" style="display:none;">
+      <div id="ck-zeitband-panel">
         <div style="padding:8px 16px 4px;display:flex;justify-content:flex-end;">
           <button onclick="WB._ztNewEvent()" style="padding:6px 14px;border:1px solid var(--c-beruf);border-radius:var(--radius-xs);background:none;color:var(--c-beruf);font-family:var(--font);font-size:0.82rem;font-weight:600;cursor:pointer;">+ Termin</button>
         </div>
@@ -5032,9 +5032,16 @@ html, body {
       </svg>
       Cockpit
     </button>
-
-
-
+    <button class="wb-tab" role="tab" aria-selected="false" aria-controls="sec-planer"
+            onclick="WB.switchTab('planer', this)" data-label="Planer" id="tab-planer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+        <line x1="7" y1="14" x2="17" y2="14"/>
+        <line x1="7" y1="17" x2="13" y2="17"/>
+      </svg>
+      Planer
+    </button>
     <button class="wb-tab" role="tab" aria-selected="false" aria-controls="sec-aufgaben"
             onclick="WB.switchTab('aufgaben', this)" data-label="Aufgaben" id="tab-aufgaben">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -5087,15 +5094,6 @@ html, body {
       </svg>
       Woche
     </button>
-    <button class="wb-tab" role="tab" aria-selected="false" aria-controls="sec-planer"
-            onclick="WB.switchTab('planer', this)" data-label="Planer" id="tab-planer">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="3" y="4" width="18" height="18" rx="2"/>
-        <line x1="3" y1="10" x2="21" y2="10"/>
-        <line x1="7" y1="14" x2="17" y2="14"/>
-        <line x1="7" y1="17" x2="13" y2="17"/>
-      </svg>
-      Planer
     </button>
 
   </nav>
@@ -6003,7 +6001,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.59.5 · Build 20260529-1745</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.60.0 · Build 20260530-0800</div>
     </div>
 
     <!-- Welt -->
@@ -6154,7 +6152,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.59.5',
+  APP_VERSION: '3.60.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -15617,7 +15615,7 @@ const WB = {
   _ztConfig: { dayStart: 5, dayEnd: 23, lunchH: 12, lunchDur: 0.75 },
 
   // ── Zeitband Toggle im Cockpit (v3.46.0) ──────────────
-  _ckZeitbandOpen: false,
+  _ckZeitbandOpen: true,
 
   _ckToggleZeitband() {
     this._ckZeitbandOpen = !this._ckZeitbandOpen;
@@ -19300,8 +19298,9 @@ const WB = {
 
     // ── Blöcke sammeln ───────────────────────────────
     let blocks = [];
-    if(!isSun) blocks.push({start:dayStart, end:dayStart+10/60, title:'Tagesplanung', type:'system'});
-    blocks.push({start:lunchH, end:lunchH+lunchDur, title:'Mittagspause', type:'lunch'});
+    // Tagesplanung + Abschluss entfernt (v3.60.0) — zu viel Rauschen
+    // Mittagspause nur an Berufstagen
+    if (!isPrivDay2) blocks.push({start:lunchH, end:lunchH+lunchDur, title:'Mittagspause', type:'lunch'});
 
     [['pro', this.dataPro], ['priv', this.dataPriv]].forEach(([ctx, db]) => {
       if(!db) return;
@@ -19334,8 +19333,7 @@ const WB = {
 
     let rS = dayEnd - 10/60;
     blocks.filter(b => b.end > dayEnd-10/60 && b.ctx!=='priv').forEach(b => { if(b.end>rS) rS=b.end; });
-    if(isSun) blocks.push({start:20, end:20.5, title:'Wochenabschluss', type:'system'});
-    else      blocks.push({start:rS, end:rS+10/60, title:'Tagesabschluss & Reflexion', type:'system'});
+    // Wochenabschluss + Tagesabschluss entfernt (v3.60.0)
     blocks.sort((a,b) => a.start - b.start);
 
     // ── Flex-Aufgaben sammeln ─────────────────────────
