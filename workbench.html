@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.61.3</title>
+<title>WorkBench 3.61.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -630,6 +630,19 @@ html, body {
 #ck-grid > * {
   width: 100%;
   max-width: 420px;
+}
+/* 50/50 Split: World-Card + Quicklist nebeneinander */
+#ck-split-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 860px;
+  align-items: flex-start;
+}
+#ck-split-row > * {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
 }
 @media (min-width: 900px) {
   #ck-grid { padding: 16px 20px 0; gap: 16px; }
@@ -6072,7 +6085,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.61.3 · Build 20260530-1000</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.61.4 · Build 20260530-1030</div>
     </div>
 
     <!-- Welt -->
@@ -6223,7 +6236,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.61.3',
+  APP_VERSION: '3.61.4',
   APP_BUILD:   '20260526-0723',
 
 
@@ -9495,10 +9508,28 @@ const WB = {
       + (evCount2===0?'\u2013':String(evCount2)) + '</div>'
       + '<span class="ck-pill-label" style="color:rgba(55,68,35,0.75);">Termine heute</span>';
     tRow.addEventListener('click', () => WB._ckToggleZeitband());
+
+    // Split-Row: World-Card + Quicklist 50/50
+    const splitRow = document.createElement('div');
+    splitRow.id = 'ck-split-row';
+
+    // World-Card in Split-Row verschieben
+    const worldCard = grid.querySelector('.ck-world-card');
+    if (worldCard) splitRow.appendChild(worldCard);
+
+    // Termin-Pill direkt darunter (nicht in Split)
     grid.appendChild(tRow);
 
-    // Quick-List rendern
-    this._ckRenderQuickList(grid);
+    // Quicklist in Split-Row
+    const quickEl = document.createElement('div');
+    quickEl.id = 'ck-quicklist-wrapper';
+    splitRow.appendChild(quickEl);
+
+    // Split-Row VOR Termin-Pill einfügen
+    grid.insertBefore(splitRow, tRow);
+
+    // Quick-List in wrapper rendern
+    this._ckRenderQuickList(quickEl);
   },
 
   // Welt setzen + Checklisten-Tab öffnen
@@ -9511,16 +9542,13 @@ const WB = {
     return db.quickItems;
   },
 
-  _ckRenderQuickList(grid) {
+  _ckRenderQuickList(container) {
     const today = new Date().toISOString().split('T')[0];
     const store = this._quickStore();
-    if (!store) return;
+    if (!store) { if(container) container.innerHTML = ''; return; }
 
     // Nur Items für heute anzeigen
     const items = store.filter(i => i.date === today);
-
-    // Altes Element entfernen
-    document.getElementById('ck-quicklist')?.remove();
 
     const el = document.createElement('div');
     el.id = 'ck-quicklist';
@@ -9541,7 +9569,7 @@ const WB = {
       + '</div>'
       + itemsHtml;
 
-    grid.appendChild(el);
+    if (container) { container.innerHTML = ''; container.appendChild(el); }
   },
 
   _quickAdd(prefillDate) {
@@ -9593,12 +9621,21 @@ const WB = {
     const item = store.find(i => i.id === id);
     if (!item) return;
     item.done = chk.checked;
-    // Visuelle Reaktion sofort
-    const span = chk.nextElementSibling;
-    if (span) span.className = 'ck-quick-text' + (item.done ? ' done' : '');
     this.setDirty();
-    // Nach 1.5s erledigte Items ausblenden
-    if (item.done) setTimeout(() => this.renderCockpit(), 1500);
+    if (item.done) {
+      // Sofort ausblenden mit Animation
+      const row = chk.closest('.ck-quick-item');
+      if (row) {
+        row.style.transition = 'opacity 0.4s, max-height 0.4s';
+        row.style.opacity = '0';
+        row.style.maxHeight = row.offsetHeight + 'px';
+        setTimeout(() => { row.style.maxHeight = '0'; row.style.overflow = 'hidden'; }, 10);
+        setTimeout(() => row.remove(), 450);
+      }
+    } else {
+      const span = chk.nextElementSibling;
+      if (span) span.className = 'ck-quick-text';
+    }
   },
 
   _quickDelete(id) {
