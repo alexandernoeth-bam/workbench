@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.65.0</title>
+<title>WorkBench 3.65.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6725,7 +6725,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.65.0 · Build 20260531-1945</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.65.1 · Build 20260531-2002</div>
     </div>
 
     <!-- Welt -->
@@ -6876,7 +6876,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.65.0',
+  APP_VERSION: '3.65.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -10043,34 +10043,39 @@ const WB = {
   },
 
   _planmodusRauschenRender(container) {
+    // Projekte ohne Ziel (nicht einzelne Aufgaben)
     const rauschen = [];
     ['pro','priv'].forEach(ctx => {
       const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
       if (!db) return;
       Object.entries(db.projects || {}).forEach(([pKey, proj]) => {
-        (proj.tasks || []).filter(t => !t.done && !t.goalId).forEach(t => {
-          rauschen.push({ t, pKey, ctx });
-        });
+        const isSystem = pKey.toLowerCase().startsWith('system') || pKey.toLowerCase().includes('tageslog');
+        if (isSystem) return;
+        const hasOpenTasks = (proj.tasks || []).some(t => !t.done);
+        if (!hasOpenTasks) return;
+        const hasGoal = this._goalForProject(pKey);
+        if (!hasGoal) rauschen.push({ pKey, ctx, count: (proj.tasks||[]).filter(t=>!t.done).length });
       });
     });
 
     if (!rauschen.length) {
-      container.innerHTML += '<div style="font-size:0.82rem;color:var(--c-beruf);padding:6px 0;">✓ Alle Aufgaben haben ein klares Warum.</div>';
+      container.innerHTML += '<div style="font-size:0.82rem;color:var(--c-beruf);padding:6px 0;">✓ Alle Projekte haben ein klares Ziel.</div>';
       return;
     }
 
     container.innerHTML +=
       '<div style="font-size:0.8rem;color:var(--c-muted);padding:4px 0 10px;">'
-      + rauschen.length + ' Aufgaben ohne Ziel — klicke um ein Warum zuzuordnen:</div>'
-      + rauschen.slice(0, 10).map(({t, pKey, ctx}) =>
-          '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--c-border);font-size:0.85rem;">'
-          + '<span style="flex:1;color:var(--c-text);">' + t.text + '</span>'
-          + '<span style="font-size:0.7rem;color:var(--c-faint);">' + (ctx==='pro'?'Beruf':'Privat') + '</span>'
-          + '<button style="font-size:0.72rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);white-space:nowrap;" '
-          + 'onclick="WB.openTaskDetail(&quot;' + pKey.replace(/"/g,'&quot;') + '&quot;,&quot;' + t.id + '&quot;,&quot;' + ctx + '&quot;)">Zuordnen →</button>'
+      + rauschen.length + ' Projekte ohne Ziel — klicke ⊕ im Projekt um ein Ziel zuzuordnen:</div>'
+      + rauschen.map(({pKey, ctx, count}) =>
+          '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--c-border);">'
+          + '<div style="flex:1;">'
+          + '<div style="font-size:0.88rem;color:var(--c-text);font-weight:500;">' + pKey + '</div>'
+          + '<div style="font-size:0.72rem;color:var(--c-faint);">' + (ctx==='pro'?'Beruf':'Privat') + ' · ' + count + ' offene Aufgaben</div>'
           + '</div>'
-        ).join('')
-      + (rauschen.length > 10 ? '<div style="font-size:0.75rem;color:var(--c-faint);padding:6px 0;">+ ' + (rauschen.length-10) + ' weitere...</div>' : '');
+          + '<button style="font-size:0.75rem;color:var(--c-beruf);background:none;border:1px solid var(--c-beruf);border-radius:var(--radius-xs);cursor:pointer;font-family:var(--font);padding:4px 8px;white-space:nowrap;" '
+          + 'onclick="WB._projZielZuordnen(&quot;' + pKey.replace(/"/g,'&quot;') + '&quot;,&quot;' + ctx + '&quot;)">Ziel zuordnen</button>'
+          + '</div>'
+        ).join('');
   },
 
   planmodusBaustellenRender(container) {
@@ -10547,7 +10552,7 @@ const WB = {
             type: 'aufgabe',
             time: t.time || '',
             title: t.text,
-            meta: (t.goalId && t.goalId !== 'rauschen' ? '→ ' + (this._goalStore()?.find(g => g.id === t.goalId)?.title || '') : pKey) + (t.date < today ? ' · überfällig' : ''),
+            meta: (() => { const goalTitle = (t.goalId && t.goalId !== 'rauschen') ? this._goalStore()?.find(g => g.id === t.goalId)?.title : this._goalForProject(pKey)?.title; const overdue = t.date < today ? ' · überfällig' : ''; return goalTitle ? '→ ' + goalTitle + overdue : pKey + overdue; })(),
             done: false,
             ctx,
             id: t.id,
@@ -20225,6 +20230,63 @@ const WB = {
   projViewMode: 'proj',
 
   // ── Projekte Rendering ──────────────────────────────
+  // Welches Ziel gehört zu diesem Projekt?
+  _goalForProject(pKey) {
+    const goals = this._goalStore() || [];
+    return goals.find(g => g.linkedProjects?.includes(pKey)) || null;
+  },
+
+  // Ziel einem Projekt zuordnen
+  _projZielZuordnen(pKey, ctx) {
+    const goals = this._goalStore() || [];
+    if (!goals.length) {
+      this._toast('Noch keine Ziele definiert — bitte zuerst Ziele anlegen');
+      return;
+    }
+
+    // Sheet mit Ziel-Auswahl
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;';
+    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
+
+    const currentGoal = this._goalForProject(pKey);
+
+    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;">'
+      + '<div style="font-size:0.8rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:4px;">Ziel zuordnen</div>'
+      + '<div style="font-size:0.88rem;color:var(--c-text);margin-bottom:14px;font-weight:500;">' + pKey + '</div>'
+      + goals.map(g => {
+          const isActive = g.linkedProjects?.includes(pKey);
+          return '<button onclick="WB._projZielSetzen(&quot;' + pKey.replace(/"/g,'&quot;') + '&quot;,&quot;' + ctx + '&quot;,&quot;' + g.id + '&quot;);document.querySelectorAll(\"[style*=fixed]\").forEach(e=>e.remove())" '
+            + 'style="width:100%;padding:12px 14px;margin-bottom:6px;background:' + (isActive ? 'rgba(13,122,107,0.08)' : 'var(--c-bg)') + ';border:' + (isActive ? '2px solid var(--c-beruf)' : '1px solid var(--c-border)') + ';border-radius:var(--radius-sm);font-family:var(--font);font-size:0.88rem;cursor:pointer;text-align:left;color:var(--c-text);">'
+            + (isActive ? '✓ ' : '') + g.title + '</button>';
+        }).join('')
+      + '<button onclick="WB._projZielSetzen(&quot;' + pKey.replace(/"/g,'&quot;') + '&quot;,&quot;' + ctx + '&quot;,&quot;&quot;);document.querySelectorAll(\"[style*=fixed]\").forEach(e=>e.remove())" '
+      + 'style="width:100%;padding:10px;margin-top:4px;background:none;border:1px dashed var(--c-border);border-radius:var(--radius-sm);font-family:var(--font);font-size:0.82rem;cursor:pointer;color:var(--c-faint);">Kein Ziel (Alltag/Pflicht)</button>'
+      + '</div>';
+
+    document.body.appendChild(sheet);
+  },
+
+  _projZielSetzen(pKey, ctx, goalId) {
+    const goals = this._goalStore() || [];
+    // Altes Ziel entfernen
+    goals.forEach(g => {
+      if (!g.linkedProjects) return;
+      g.linkedProjects = g.linkedProjects.filter(p => p !== pKey);
+    });
+    // Neues Ziel setzen
+    if (goalId) {
+      const goal = goals.find(g => g.id === goalId);
+      if (goal) {
+        if (!goal.linkedProjects) goal.linkedProjects = [];
+        if (!goal.linkedProjects.includes(pKey)) goal.linkedProjects.push(pKey);
+      }
+    }
+    this.setDirty();
+    this.renderProjekte();
+    this._toast(goalId ? 'Projekt → Ziel zugeordnet' : 'Ziel-Zuordnung entfernt');
+  },
+
   renderProjekte() {
     const hdr    = document.getElementById('projekte-header');
     const scroll = document.getElementById('projekte-scroll');
@@ -20262,7 +20324,9 @@ const WB = {
           <div class="af-world-dot ${ctx}"></div>
           <span class="af-group-name" style="pointer-events:none;">${k}</span>
           ${pct>0?`<span style="font-size:0.7rem;color:var(--c-faint);font-family:var(--font-mono);">${pct}%</span>`:''}
+          ${(() => { const g = WB._goalForProject(k); return g ? `<span style="font-size:0.68rem;color:var(--c-beruf);background:rgba(13,122,107,0.1);padding:1px 6px;border-radius:8px;pointer-events:none;">→ ${g.title}</span>` : ''; })()}
           <span class="af-group-count">${open}</span>
+          <button onclick="event.stopPropagation();WB._projZielZuordnen('${k.replace(/'/g,"\'")}','${ctx}')" style="background:none;border:none;cursor:pointer;padding:2px 4px;color:var(--c-faint);font-size:0.8rem;" title="Ziel zuordnen">⊕</button>
         </div>`;
         // Aufgeklappte Tasks anzeigen
         const gid = k+'|||'+ctx;
