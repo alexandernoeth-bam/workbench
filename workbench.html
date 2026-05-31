@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.62.0</title>
+<title>WorkBench 3.62.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4946,12 +4946,12 @@ html, body {
 
 /* Tagesdatum-Header */
 #ck-tag-header {
-  padding: 14px 0 10px;
+  padding: 10px 0 8px;
   border-bottom: 1px solid var(--c-border);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 #ck-tag-datum {
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: var(--c-text);
   line-height: 1.2;
@@ -4985,40 +4985,48 @@ html, body {
   padding: 6px 0 4px;
 }
 
-/* Einzel-Eintrag */
+/* Einzel-Eintrag — kompakt */
 .ck-liste-item {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 0;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
   border-bottom: 1px solid var(--c-border);
   cursor: pointer;
-  transition: background var(--t-fast);
 }
 .ck-liste-item:last-child { border-bottom: none; }
-.ck-liste-item:active { background: var(--c-bg); }
+.ck-liste-item:active { opacity: 0.7; }
+/* mustToday: rote linke Markierung */
+.ck-liste-item.must {
+  border-left: 3px solid #C62828;
+  padding-left: 6px;
+  margin-left: -9px;
+}
+.ck-liste-item.must .ck-liste-title::before {
+  content: '⚠ ';
+  color: #C62828;
+  font-size: 0.75em;
+}
 
 /* Linke Spalte: Uhrzeit oder Dot */
 .ck-liste-time {
-  width: 44px;
+  width: 40px;
   flex-shrink: 0;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-family: var(--font-mono);
   color: var(--c-muted);
-  padding-top: 2px;
   text-align: right;
 }
 .ck-liste-dot {
-  width: 44px;
+  width: 40px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-top: 5px;
 }
 .ck-liste-dot-inner {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--c-border2);
 }
@@ -5028,49 +5036,43 @@ html, body {
 .ck-liste-dot-inner.quick { background: var(--c-warn); }
 
 /* Inhalt */
-.ck-liste-content {
-  flex: 1;
-  min-width: 0;
-}
+.ck-liste-content { flex: 1; min-width: 0; }
 .ck-liste-title {
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   color: var(--c-text);
-  line-height: 1.35;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.ck-liste-title.done {
-  text-decoration: line-through;
-  color: var(--c-faint);
-}
+.ck-liste-title.done { text-decoration: line-through; color: var(--c-faint); }
 .ck-liste-meta {
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   color: var(--c-muted);
-  margin-top: 2px;
 }
 
 /* Checkbox rechts */
 .ck-liste-chk {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   cursor: pointer;
   accent-color: var(--c-beruf);
-  margin-top: 2px;
 }
 
 /* Add-Button */
 .ck-liste-add {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 0;
+  gap: 6px;
+  padding: 8px 0 4px;
   color: var(--c-beruf);
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
   border: none;
   background: none;
   font-family: var(--font);
-  margin-top: 4px;
 }
 .ck-liste-add:hover { opacity: 0.75; }
 
@@ -5181,12 +5183,18 @@ html, body {
         </div>
         <!-- Tagesliste wird per JS gefüllt -->
         <div id="ck-tagesliste"></div>
-        <!-- Zeitband kompakt -->
-        <div id="ck-zeitband-kompakt" style="display:none;">
-          <div id="ck-zeitband-kompakt-label">
-            <span>Zeitband</span>
-            <button onclick="WB._ckToggleZeitband()" style="background:none;border:none;font-size:0.75rem;color:var(--c-beruf);cursor:pointer;font-family:var(--font);">einklappen</button>
-          </div>
+        <!-- Neu-Eintrag Button am Ende der Liste -->
+        <div id="ck-neue-eingabe" style="padding:12px 0 4px;border-top:1px solid var(--c-border);display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="WB._quickAdd()" style="flex:1;min-width:120px;padding:9px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+            <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Schnell hinzufügen
+          </button>
+          <button onclick="WB.editOpen('task-new','priv','Einzelaufgaben (Ohne Projekt)',null)" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
+            + Aufgabe
+          </button>
+          <button onclick="WB.newEventOpenPicker()" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
+            + Termin
+          </button>
         </div>
       </div>
       <!-- Zeitband Panel (bleibt für Kompatibilität) -->
@@ -6237,7 +6245,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.62.0 · Build 20260530-1200</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.62.1 · Build 20260530-1230</div>
     </div>
 
     <!-- Welt -->
@@ -6388,7 +6396,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.62.0',
+  APP_VERSION: '3.62.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -9534,7 +9542,8 @@ const WB = {
         } else if (item.type === 'quick') {
           chkHtml = '<input type="checkbox" class="ck-liste-chk" ' + (item.done?'checked':'') + ' onchange="event.stopPropagation();WB._quickToggle(&quot;' + item.id + '&quot;,this)">';
         }
-        return '<div class="ck-liste-item"' + doneAttr + (onclick ? ' onclick="' + onclick + '"' : '') + '>'
+        const mustClass = item.obj?.mustToday ? ' must' : '';
+        return '<div class="ck-liste-item' + mustClass + '"' + doneAttr + (onclick ? ' onclick="' + onclick + '"' : '') + '>'
           + timeHtml
           + '<div class="ck-liste-content">'
           + '<div class="' + titleClass + '">' + item.title + '</div>'
@@ -9544,13 +9553,6 @@ const WB = {
           + '</div>';
       }).join('');
     }
-
-    // ── Quick-Add Button ──────────────────────────────────
-    const addBtn = document.createElement('button');
-    addBtn.className = 'ck-liste-add';
-    addBtn.innerHTML = '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Hinzufügen';
-    addBtn.onclick = () => WB._quickAdd();
-    liste.appendChild(addBtn);
 
     // ── Inbox-Badge in Header ─────────────────────────────
     this._inboxUpdateMenuSub();
@@ -16185,7 +16187,7 @@ const WB = {
   _ztConfig: { dayStart: 5, dayEnd: 23, lunchH: 12, lunchDur: 0.75 },
 
   // ── Zeitband Toggle im Cockpit (v3.46.0) ──────────────
-  _ckZeitbandOpen: true,
+  _ckZeitbandOpen: false, // v3.62.1: kein Zeitband im Cockpit
 
   _ckToggleZeitband() {
     this._ckZeitbandOpen = !this._ckZeitbandOpen;
