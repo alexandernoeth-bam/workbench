@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.63.4</title>
+<title>WorkBench 3.64.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5353,6 +5353,185 @@ html, body {
   background: rgba(0,0,0,0.3);
 }
 
+
+/* ══════════════════════════════════════════════════
+   BAUSTELLEN & KOSTEN-KLARHEIT v3.64.0
+══════════════════════════════════════════════════ */
+
+/* Baustellen-Karte */
+.pm-baustelle-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.pm-baustelle-card.entschieden-tun    { border-left: 3px solid var(--c-beruf); }
+.pm-baustelle-card.entschieden-lassen { border-left: 3px solid var(--c-faint); opacity: 0.6; }
+.pm-baustelle-card.entschieden-delegieren { border-left: 3px solid var(--c-warn); }
+
+.pm-baustelle-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--c-text);
+  margin-bottom: 4px;
+}
+.pm-baustelle-meta {
+  font-size: 0.72rem;
+  color: var(--c-muted);
+  margin-bottom: 10px;
+}
+.pm-baustelle-kosten {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.pm-kosten-badge {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: rgba(198,40,40,0.08);
+  color: #C62828;
+  font-weight: 600;
+}
+.pm-kosten-badge.seit {
+  background: var(--c-bg);
+  color: var(--c-muted);
+  font-weight: 400;
+}
+
+/* Entscheidungs-Buttons */
+.pm-entscheid-row {
+  display: flex;
+  gap: 6px;
+}
+.pm-entscheid-btn {
+  flex: 1;
+  padding: 7px 4px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--c-border);
+  background: none;
+  font-family: var(--font);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--c-muted);
+  transition: all var(--t-fast);
+}
+.pm-entscheid-btn.tun.active     { background: var(--c-beruf); border-color: var(--c-beruf); color: #fff; }
+.pm-entscheid-btn.delegieren.active { background: var(--c-warn); border-color: var(--c-warn); color: #fff; }
+.pm-entscheid-btn.lassen.active  { background: var(--c-faint); border-color: var(--c-faint); color: #fff; }
+
+/* Gesamtkosten-Box */
+.pm-gesamtkosten {
+  background: rgba(198,40,40,0.05);
+  border: 1px solid rgba(198,40,40,0.15);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.pm-gesamtkosten-titel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #C62828;
+  margin-bottom: 8px;
+}
+.pm-gesamtkosten-zahl {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #C62828;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.pm-gesamtkosten-sub {
+  font-size: 0.75rem;
+  color: var(--c-muted);
+}
+
+/* Neue Baustelle Button */
+.pm-add-baustelle {
+  width: 100%;
+  padding: 10px;
+  border: 1.5px dashed var(--c-border);
+  border-radius: var(--radius-sm);
+  background: none;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  color: var(--c-muted);
+  cursor: pointer;
+  margin-top: 4px;
+}
+.pm-add-baustelle:hover { border-color: var(--c-beruf); color: var(--c-beruf); }
+
+/* Kosten-Detail Sheet */
+#pm-kosten-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: flex-end;
+  display: none;
+}
+#pm-kosten-sheet.open { display: flex; }
+#pm-kosten-panel {
+  background: var(--c-surface);
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 20px 16px 32px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.pm-kosten-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--c-border);
+  font-size: 0.88rem;
+}
+.pm-kosten-row:last-child { border-bottom: none; }
+.pm-kosten-label { color: var(--c-text); flex: 1; }
+.pm-kosten-input {
+  width: 90px;
+  padding: 6px 8px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-xs);
+  font-family: var(--font);
+  font-size: 0.88rem;
+  text-align: right;
+  background: var(--c-bg);
+  color: var(--c-text);
+}
+.pm-kosten-result {
+  background: var(--c-bg);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin-top: 14px;
+}
+.pm-kosten-result-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  padding: 4px 0;
+  color: var(--c-muted);
+}
+.pm-kosten-result-row.highlight {
+  font-weight: 700;
+  color: var(--c-text);
+  font-size: 0.92rem;
+  border-top: 1px solid var(--c-border);
+  margin-top: 6px;
+  padding-top: 8px;
+}
+.pm-kosten-result-row.rot { color: #C62828; }
+
 </style>
 </head>
 <body>
@@ -5943,6 +6122,21 @@ html, body {
 
       <div class="wbs-divider"></div>
 
+      <!-- Stundensatz -->
+      <div class="wbs-section-label">Persönlich</div>
+      <div class="wbs-row">
+        <div class="wbs-label">
+          <div class="wbs-label-main">Beruflicher Stundensatz</div>
+          <div class="wbs-label-sub">Für Kosten-Klarheit Berechnung</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <input type="number" id="s-stundensatz" value="92" min="0" step="1"
+            onchange="WB.saveSetting('stundensatz',+this.value)"
+            style="width:70px;padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);text-align:right;">
+          <span style="font-size:0.82rem;color:var(--c-muted);">€/h</span>
+        </div>
+      </div>
+
       <!-- Assistenten -->
       <div class="wbs-section-label">Assistenten-Fenster</div>
       <div class="wbs-row">
@@ -6531,7 +6725,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.63.4 · Build 20260531-1730</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.64.0 · Build 20260531-1830</div>
     </div>
 
     <!-- Welt -->
@@ -6682,7 +6876,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.63.4',
+  APP_VERSION: '3.64.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -9710,6 +9904,188 @@ const WB = {
   },
 
   // ══════════════════════════════════════════════════════
+  // BAUSTELLEN & KOSTEN-KLARHEIT v3.64.0
+  // ══════════════════════════════════════════════════════
+
+  _baustellenStore() {
+    // Baustellen in Privat-DB (persönlich, weltübergreifend)
+    const db = this.dataPriv;
+    if (!db) return null;
+    if (!db.baustellen) db.baustellen = [];
+    return db.baustellen;
+  },
+
+  _stundensatz() {
+    // Aus Einstellungen, Standard: 92 EUR/h
+    return this._settings?.stundensatz || 92;
+  },
+
+  _baustelleKopfmiete(b) {
+    // Wöchentliche Kopfmiete in EUR
+    const h = b.mentalStundenProWoche || 0;
+    return Math.round(h * this._stundensatz());
+  },
+
+  _baustelleGesamtKopfmiete(b) {
+    // Gesamte Kopfmiete seit Beginn
+    const wochenSeit = b.seitJahren ? Math.round(b.seitJahren * 52) : 0;
+    return Math.round(this._baustelleKopfmiete(b) * wochenSeit);
+  },
+
+  planmodusBaustellenRender(container) {
+    const store = this._baustellenStore() || [];
+    const stundensatz = this._stundensatz();
+
+    // Gesamtkosten aller offenen Baustellen pro Jahr
+    const offene = store.filter(b => b.entscheidung !== 'lassen');
+    const gesamtProJahr = offene.reduce((sum, b) =>
+      sum + (b.mentalStundenProWoche || 0) * stundensatz * 52, 0);
+    const gesamtHistorisch = store.reduce((sum, b) =>
+      sum + this._baustelleGesamtKopfmiete(b), 0);
+
+    let html = '';
+
+    // Gesamtkosten-Box
+    if (store.length) {
+      html += '<div class="pm-gesamtkosten">'
+        + '<div class="pm-gesamtkosten-titel">Kopfmiete aller Baustellen</div>'
+        + '<div class="pm-gesamtkosten-zahl">' + gesamtProJahr.toLocaleString('de-DE') + ' €<span style="font-size:0.9rem;font-weight:400;">/Jahr</span></div>'
+        + '<div class="pm-gesamtkosten-sub">Bereits gezahlte Kopfmiete: ' + gesamtHistorisch.toLocaleString('de-DE') + ' € · Stundensatz: ' + stundensatz + ' €/h</div>'
+        + '</div>';
+    }
+
+    // Baustellen-Karten
+    html += store.map((b, idx) => {
+      const kopfmieteJahr = Math.round((b.mentalStundenProWoche || 0) * stundensatz * 52);
+      const kopfmieteGesamt = this._baustelleGesamtKopfmiete(b);
+      const entscheid = b.entscheidung || '';
+      const seitText = b.seitJahren
+        ? (b.seitJahren >= 1 ? 'Seit ' + b.seitJahren + ' Jahr' + (b.seitJahren > 1 ? 'en' : '') : 'Seit einigen Monaten')
+        : 'Seit unbekannt';
+
+      return '<div class="pm-baustelle-card entschieden-' + (entscheid||'offen') + '">'
+        + '<div class="pm-baustelle-title">' + b.titel + '</div>'
+        + '<div class="pm-baustelle-meta">' + seitText + (b.kategorie ? ' · ' + b.kategorie : '') + '</div>'
+        + '<div class="pm-baustelle-kosten">'
+        + (kopfmieteJahr ? '<span class="pm-kosten-badge">' + kopfmieteJahr.toLocaleString('de-DE') + ' €/Jahr Kopfmiete</span>' : '')
+        + (kopfmieteGesamt ? '<span class="pm-kosten-badge seit">∑ ' + kopfmieteGesamt.toLocaleString('de-DE') + ' € bereits bezahlt</span>' : '')
+        + '</div>'
+        + '<div class="pm-entscheid-row">'
+        + '<button class="pm-entscheid-btn tun' + (entscheid==='tun'?' active':'') + '" onclick="WB._baustelleEntscheid(' + idx + ',&quot;tun&quot;)">✓ Tun</button>'
+        + '<button class="pm-entscheid-btn delegieren' + (entscheid==='delegieren'?' active':'') + '" onclick="WB._baustelleEntscheid(' + idx + ',&quot;delegieren&quot;)">→ Delegieren</button>'
+        + '<button class="pm-entscheid-btn lassen' + (entscheid==='lassen'?' active':'') + '" onclick="WB._baustelleEntscheid(' + idx + ',&quot;lassen&quot;)">✗ Bewusst lassen</button>'
+        + '</div>'
+        + '<div style="display:flex;gap:8px;margin-top:8px;">'
+        + '<button style="font-size:0.72rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);padding:2px 0;" onclick="WB._baustelleKostenDetail(' + idx + ')">Kosten-Detail →</button>'
+        + '<button style="font-size:0.72rem;color:var(--c-faint);background:none;border:none;cursor:pointer;font-family:var(--font);padding:2px 0;margin-left:auto;" onclick="WB._baustelleLoeschen(' + idx + ')">Löschen</button>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+
+    // Neue Baustelle
+    html += '<button class="pm-add-baustelle" onclick="WB._baustelleNeu()">+ Neue Baustelle erfassen</button>';
+
+    container.innerHTML = html;
+  },
+
+  _baustelleEntscheid(idx, entscheid) {
+    const store = this._baustellenStore();
+    if (!store?.[idx]) return;
+    store[idx].entscheidung = entscheid;
+    this.setDirty();
+    this._planmodusRender();
+  },
+
+  _baustelleLoeschen(idx) {
+    const store = this._baustellenStore();
+    if (!store) return;
+    if (!confirm('Baustelle wirklich löschen?')) return;
+    store.splice(idx, 1);
+    this.setDirty();
+    this._planmodusRender();
+  },
+
+  _baustelleNeu() {
+    const titel = prompt('Titel der Baustelle:');
+    if (!titel?.trim()) return;
+    const store = this._baustellenStore();
+    if (!store) return;
+    const seitJahre = parseFloat(prompt('Wie lange offen? (Jahre, z.B. 1.5):') || '0') || 0;
+    const mental = parseFloat(prompt('Mentale Stunden pro Woche die du daran denkst (z.B. 0.5):') || '0') || 0;
+    store.push({
+      id: String(Date.now()),
+      titel: titel.trim(),
+      seitJahren: seitJahre,
+      mentalStundenProWoche: mental,
+      entscheidung: '',
+      kategorie: '',
+    });
+    this.setDirty();
+    this._planmodusRender();
+  },
+
+  _baustelleKostenDetail(idx) {
+    const store = this._baustellenStore();
+    const b = store?.[idx];
+    if (!b) return;
+    const stundensatz = this._stundensatz();
+
+    // Sheet öffnen
+    let sheet = document.getElementById('pm-kosten-sheet');
+    if (!sheet) {
+      sheet = document.createElement('div');
+      sheet.id = 'pm-kosten-sheet';
+      sheet.innerHTML = '<div id="pm-kosten-panel"></div>';
+      sheet.addEventListener('click', e => { if (e.target === sheet) sheet.classList.remove('open'); });
+      document.body.appendChild(sheet);
+    }
+
+    const wochenSeit = Math.round((b.seitJahren || 0) * 52);
+    const kopfmieteGesamt = Math.round((b.mentalStundenProWoche || 0) * stundensatz * wochenSeit);
+    const kopfmieteJahr   = Math.round((b.mentalStundenProWoche || 0) * stundensatz * 52);
+    const kostenTun       = b.kostenTun || 0;
+    const zeitTun         = b.zeitTunStunden || 0;
+    const breakEven       = kostenTun > 0 && kopfmieteJahr > 0
+      ? (kostenTun / (kopfmieteJahr / 12)).toFixed(1) : null;
+
+    document.getElementById('pm-kosten-panel').innerHTML =
+      '<div style="font-size:0.8rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:14px;">' + b.titel + ' — Kosten-Klarheit</div>'
+
+      + '<div class="pm-kosten-row"><span class="pm-kosten-label">Mentale Stunden/Woche</span>'
+      + '<input class="pm-kosten-input" type="number" step="0.25" min="0" value="' + (b.mentalStundenProWoche||0) + '" onchange="WB._baustelleUpdate(' + idx + ',&quot;mentalStundenProWoche&quot;,+this.value)"></div>'
+
+      + '<div class="pm-kosten-row"><span class="pm-kosten-label">Offen seit (Jahre)</span>'
+      + '<input class="pm-kosten-input" type="number" step="0.5" min="0" value="' + (b.seitJahren||0) + '" onchange="WB._baustelleUpdate(' + idx + ',&quot;seitJahren&quot;,+this.value)"></div>'
+
+      + '<div class="pm-kosten-row"><span class="pm-kosten-label">Kosten wenn ich es tue (€)</span>'
+      + '<input class="pm-kosten-input" type="number" step="100" min="0" value="' + (b.kostenTun||0) + '" onchange="WB._baustelleUpdate(' + idx + ',&quot;kostenTun&quot;,+this.value)"></div>'
+
+      + '<div class="pm-kosten-row"><span class="pm-kosten-label">Zeit wenn ich es tue (Std)</span>'
+      + '<input class="pm-kosten-input" type="number" step="1" min="0" value="' + (b.zeitTunStunden||0) + '" onchange="WB._baustelleUpdate(' + idx + ',&quot;zeitTunStunden&quot;,+this.value)"></div>'
+
+      + '<div class="pm-kosten-result">'
+      + '<div class="pm-kosten-result-row rot"><span>Bereits bezahlte Kopfmiete</span><span>' + kopfmieteGesamt.toLocaleString('de-DE') + ' €</span></div>'
+      + '<div class="pm-kosten-result-row"><span>Kopfmiete pro Jahr (weiter so)</span><span>' + kopfmieteJahr.toLocaleString('de-DE') + ' €/Jahr</span></div>'
+      + (zeitTun ? '<div class="pm-kosten-result-row"><span>Zeitkosten Erledigen</span><span>' + Math.round(zeitTun * stundensatz).toLocaleString('de-DE') + ' €</span></div>' : '')
+      + '<div class="pm-kosten-result-row highlight"><span>Gesamtkosten Erledigen</span><span>' + (kostenTun + Math.round(zeitTun * stundensatz)).toLocaleString('de-DE') + ' €</span></div>'
+      + (breakEven ? '<div class="pm-kosten-result-row" style="color:var(--c-beruf);"><span>Break-Even in</span><span>' + breakEven + ' Monaten</span></div>' : '')
+      + '</div>'
+
+      + '<button onclick="document.getElementById(&quot;pm-kosten-sheet&quot;).classList.remove(&quot;open&quot;)" style="width:100%;margin-top:14px;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;">Schließen</button>';
+
+    sheet.classList.add('open');
+  },
+
+  _baustelleUpdate(idx, field, value) {
+    const store = this._baustellenStore();
+    if (!store?.[idx]) return;
+    store[idx][field] = value;
+    this.setDirty();
+    // Ergebnis neu berechnen ohne Sheet zu schließen
+    this._baustelleKostenDetail(idx);
+  },
+
+  // ══════════════════════════════════════════════════════
   // PLANUNGSMODUS v4.0 Phase 2 (v3.63.0)
   // ══════════════════════════════════════════════════════
 
@@ -9902,7 +10278,14 @@ const WB = {
       + '<div class="pm-section">'
       + '<div class="pm-section-label">Wochenrückblick</div>'
       + reflexHtml
+      + '</div>'
+      + '<div class="pm-section" id="pm-baustellen-section">'
+      + '<div class="pm-section-label">Meine Baustellen</div>'
       + '</div>';
+
+    // Baustellen separat rendern
+    const bauContainer = document.getElementById('pm-baustellen-section');
+    if (bauContainer) this.planmodusBaustellenRender(bauContainer);
   },
 
   // ══════════════════════════════════════════════════════
@@ -19546,6 +19929,8 @@ const WB = {
     sv('s-asst-evening-end',    s.assistEveningEnd     ?? 23);
     const ckShow = document.getElementById('s-asst-cockpit-show');
     if (ckShow) ckShow.checked = !!(s.assistCockpitShow ?? false);
+    const ssEl = document.getElementById('s-stundensatz');
+    if (ssEl) ssEl.value = s.stundensatz || 92;
     // Abend-Fragen laden
     const qContainer = document.getElementById('wbs-evening-questions');
     if (qContainer) {
