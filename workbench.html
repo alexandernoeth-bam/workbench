@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.62.5</title>
+<title>WorkBench 3.63.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5098,6 +5098,169 @@ html, body {
   justify-content: space-between;
 }
 
+
+/* ══════════════════════════════════════════════════
+   PLANUNGSMODUS v4.0 Phase 2 (v3.63.0)
+══════════════════════════════════════════════════ */
+#wb-planmodus {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: var(--c-bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+#wb-planmodus.open { transform: translateY(0); }
+
+#wb-planmodus-header {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px 12px;
+  border-bottom: 2px solid var(--c-beruf);
+  background: var(--c-surface);
+  gap: 12px;
+  flex-shrink: 0;
+}
+#wb-planmodus-title {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--c-text);
+}
+#wb-planmodus-close {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  color: var(--c-muted);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+#wb-planmodus-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16px 40px;
+}
+
+/* Planmodus Sektionen */
+.pm-section {
+  margin-top: 20px;
+}
+.pm-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--c-border);
+  margin-bottom: 10px;
+}
+
+/* Ziel-Karte im Planmodus */
+.pm-goal-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.pm-goal-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--c-text);
+  margin-bottom: 6px;
+}
+.pm-goal-bar-wrap {
+  height: 6px;
+  background: var(--c-border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.pm-goal-bar {
+  height: 100%;
+  background: var(--c-beruf);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.pm-goal-meta {
+  font-size: 0.72rem;
+  color: var(--c-muted);
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Wochen-Item */
+.pm-week-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--c-border);
+  font-size: 0.88rem;
+}
+.pm-week-item:last-child { border-bottom: none; }
+.pm-week-day {
+  width: 32px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--c-muted);
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+.pm-week-day.today { color: var(--c-beruf); }
+.pm-week-content { flex: 1; min-width: 0; }
+.pm-week-title { color: var(--c-text); line-height: 1.3; }
+.pm-week-meta { font-size: 0.7rem; color: var(--c-faint); }
+.pm-week-badge {
+  font-size: 0.7rem;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--c-border);
+  color: var(--c-muted);
+  white-space: nowrap;
+}
+.pm-week-badge.termin { background: rgba(13,122,107,0.12); color: var(--c-beruf); }
+
+/* Reflexions-Box */
+.pm-reflexion-btn {
+  width: 100%;
+  padding: 12px;
+  border: 1.5px dashed var(--c-border);
+  border-radius: var(--radius-sm);
+  background: none;
+  font-family: var(--font);
+  font-size: 0.85rem;
+  color: var(--c-muted);
+  cursor: pointer;
+  text-align: center;
+  margin-top: 8px;
+}
+.pm-reflexion-btn:hover { border-color: var(--c-beruf); color: var(--c-beruf); }
+
+/* Planmodus-Button im Cockpit */
+#ck-plan-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--c-beruf);
+  cursor: pointer;
+  width: 100%;
+  margin-bottom: 4px;
+}
+#ck-plan-btn:hover { background: var(--c-bg); }
+
 </style>
 </head>
 <body>
@@ -5188,6 +5351,15 @@ html, body {
         <!-- Tagesliste wird per JS gefüllt -->
         <div id="ck-tagesliste"></div>
         <!-- Neu-Eintrag Button am Ende der Liste -->
+        <!-- Planungsmodus-Button -->
+        <button id="ck-plan-btn" onclick="WB.planmodusOpen()">
+          <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Planungsmodus
+          <svg style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;margin-left:auto;" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+
         <div id="ck-neue-eingabe" style="padding:12px 0 4px;border-top:1px solid var(--c-border);display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="WB._quickAdd()" style="flex:1;min-width:120px;padding:9px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
             <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -6249,7 +6421,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.62.5 · Build 20260531-1030</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.63.0 · Build 20260531-1100</div>
     </div>
 
     <!-- Welt -->
@@ -6400,7 +6572,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.62.5',
+  APP_VERSION: '3.63.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -9387,6 +9559,181 @@ const WB = {
         </div>
       </div>`;
     document.body.appendChild(overlay);
+  },
+
+  // ══════════════════════════════════════════════════════
+  // PLANUNGSMODUS v4.0 Phase 2 (v3.63.0)
+  // ══════════════════════════════════════════════════════
+
+  planmodusOpen() {
+    const overlay = document.getElementById('wb-planmodus');
+    if (overlay) overlay.classList.add('open');
+    this._planmodusRender();
+  },
+
+  planmodusClose() {
+    const overlay = document.getElementById('wb-planmodus');
+    if (overlay) overlay.classList.remove('open');
+  },
+
+  _planmodusRender() {
+    const body = document.getElementById('wb-planmodus-body');
+    if (!body) return;
+
+    const now   = new Date();
+    const today = now.toISOString().split('T')[0];
+    const dow   = now.getDay(); // 0=So
+    const year  = now.getFullYear();
+
+    // Woche: Mo-So
+    const daysSinceMon = (dow + 6) % 7;
+    const weekDays = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - daysSinceMon + i);
+      weekDays.push(d);
+    }
+    const weekStart = weekDays[0].toISOString().split('T')[0];
+    const weekEnd   = weekDays[6].toISOString().split('T')[0];
+    const dayNames  = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+    const months    = ['Jan','Feb','Mrz','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+    // ── Ziele-Fortschritt ───────────────────────────────
+    const goals = this._goalStore() || [];
+    const thisYearGoals = goals.filter(g => !g.year || g.year === year);
+    const goalHtml = thisYearGoals.length
+      ? thisYearGoals.map(g => {
+          const pct = this._goalProgress(g);
+          const ms  = g.milestones || [];
+          const msDone = ms.filter(m => m.done).length;
+          return '<div class="pm-goal-card">'
+            + '<div class="pm-goal-title">' + g.title + '</div>'
+            + '<div class="pm-goal-bar-wrap"><div class="pm-goal-bar" style="width:' + pct + '%"></div></div>'
+            + '<div class="pm-goal-meta">'
+            + '<span>' + pct + '% erreicht</span>'
+            + (ms.length ? '<span>' + msDone + '/' + ms.length + ' Meilensteine</span>' : '')
+            + '</div>'
+            + '</div>';
+        }).join('')
+      : '<div style="font-size:0.85rem;color:var(--c-faint);padding:8px 0;">Noch keine Ziele definiert — im Ziele-Tab anlegen.</div>';
+
+    // ── Wochenüberblick ─────────────────────────────────
+    const weekItems = [];
+    weekDays.forEach((d, i) => {
+      const ds = d.toISOString().split('T')[0];
+      const isToday = ds === today;
+      const isPast  = ds < today;
+
+      // Termine
+      ['pro','priv'].forEach(ctx => {
+        const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+        if (!db) return;
+        (db.customEvents || []).forEach(ev => {
+          if (ev.date !== ds) return;
+          weekItems.push({ day: i, ds, isToday, isPast, type:'termin',
+            title: ev.text, meta: ev.startTime || '', ctx });
+        });
+      });
+
+      // Aufgaben mit Datum
+      ['pro','priv'].forEach(ctx => {
+        const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+        if (!db) return;
+        Object.values(db.projects || {}).forEach(p => {
+          (p.tasks || []).forEach(t => {
+            if (t.done || t.date !== ds) return;
+            weekItems.push({ day: i, ds, isToday, isPast, type:'aufgabe',
+              title: t.text, meta: ctx === 'pro' ? 'Beruf' : 'Privat', ctx });
+          });
+        });
+      });
+    });
+
+    // Gruppiert nach Tag
+    const byDay = {};
+    weekItems.forEach(it => {
+      if (!byDay[it.day]) byDay[it.day] = [];
+      byDay[it.day].push(it);
+    });
+
+    const weekHtml = weekDays.map((d, i) => {
+      const ds      = d.toISOString().split('T')[0];
+      const isToday = ds === today;
+      const isPast  = ds < today;
+      const items   = byDay[i] || [];
+      const dayLabel= dayNames[i] + ' ' + d.getDate() + '.';
+
+      if (!items.length) {
+        return '<div class="pm-week-item" style="opacity:' + (isPast?'0.4':'1') + ';">'
+          + '<span class="pm-week-day' + (isToday?' today':'') + '">' + dayLabel + '</span>'
+          + '<span class="pm-week-content" style="color:var(--c-faint);font-size:0.8rem;">Frei</span>'
+          + '</div>';
+      }
+
+      return items.map((it, idx) =>
+        '<div class="pm-week-item" style="opacity:' + (isPast?'0.5':'1') + ';">'
+        + (idx === 0
+          ? '<span class="pm-week-day' + (isToday?' today':'') + '">' + dayLabel + '</span>'
+          : '<span class="pm-week-day"></span>')
+        + '<div class="pm-week-content">'
+        + '<div class="pm-week-title">' + it.title + '</div>'
+        + (it.meta ? '<div class="pm-week-meta">' + it.meta + '</div>' : '')
+        + '</div>'
+        + '<span class="pm-week-badge ' + it.type + '">' + (it.type==='termin'?'Termin':'Aufgabe') + '</span>'
+        + '</div>'
+      ).join('');
+    }).join('');
+
+    // ── Offene Projekte diese Woche ─────────────────────
+    const projItems = [];
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      Object.entries(db.projects || {}).forEach(([pKey, p]) => {
+        const tasks = (p.tasks || []).filter(t => !t.done);
+        if (!tasks.length) return;
+        const thisWeekTasks = tasks.filter(t => t.date && t.date >= weekStart && t.date <= weekEnd);
+        if (thisWeekTasks.length) {
+          projItems.push({ pKey, ctx, total: tasks.length, thisWeek: thisWeekTasks.length });
+        }
+      });
+    });
+
+    const projHtml = projItems.length
+      ? projItems.map(p =>
+          '<div class="pm-week-item">'
+          + '<div class="pm-week-content">'
+          + '<div class="pm-week-title">' + p.pKey + '</div>'
+          + '<div class="pm-week-meta">' + p.ctx === 'pro' ? 'Beruf' : 'Privat' + ' · ' + p.total + ' offen gesamt</div>'
+          + '</div>'
+          + '<span class="pm-week-badge termin">' + p.thisWeek + ' diese Woche</span>'
+          + '</div>'
+        ).join('')
+      : '<div style="font-size:0.82rem;color:var(--c-faint);padding:6px 0;">Keine Aufgaben diese Woche eingeplant.</div>';
+
+    // ── Wochenrückblick ─────────────────────────────────
+    const reflexHtml = '<button class="pm-reflexion-btn" onclick="WB.wzWeekOpen()">'
+      + '✦ Wochenrückblick & Reflexion starten'
+      + '</button>';
+
+    body.innerHTML =
+      '<div class="pm-section">'
+      + '<div class="pm-section-label">Meine Ziele ' + year + '</div>'
+      + goalHtml
+      + '<button style="font-size:0.8rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);padding:4px 0;" onclick="WB._goTab(&quot;ziele&quot;);WB.planmodusClose();">Alle Ziele anzeigen →</button>'
+      + '</div>'
+      + '<div class="pm-section">'
+      + '<div class="pm-section-label">Diese Woche ' + weekDays[0].getDate() + '. – ' + weekDays[6].getDate() + '. ' + months[weekDays[6].getMonth()] + '</div>'
+      + weekHtml
+      + '</div>'
+      + '<div class="pm-section">'
+      + '<div class="pm-section-label">Projekte mit Aufgaben diese Woche</div>'
+      + projHtml
+      + '</div>'
+      + '<div class="pm-section">'
+      + '<div class="pm-section-label">Wochenrückblick</div>'
+      + reflexHtml
+      + '</div>';
   },
 
   // ══════════════════════════════════════════════════════
@@ -20384,6 +20731,19 @@ WB.init();
 
 <!-- FABs außerhalb main damit sie keinen Flex-Platz verbrauchen -->
 <button id="woche-fab" onclick="WB.newEventOpenPicker()" title="Neuer Termin">+</button>
+
+<!-- PLANUNGSMODUS v4.0 -->
+<div id="wb-planmodus">
+  <div id="wb-planmodus-header">
+    <svg style="width:18px;height:18px;stroke:var(--c-beruf);fill:none;stroke-width:2;stroke-linecap:round;" viewBox="0 0 24 24">
+      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+      <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+    <div id="wb-planmodus-title">Planungsmodus</div>
+    <button id="wb-planmodus-close" onclick="WB.planmodusClose()">×</button>
+  </div>
+  <div id="wb-planmodus-body"></div>
+</div>
 
 </body>
 </html>
