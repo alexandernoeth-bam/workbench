@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.63.2</title>
+<title>WorkBench 3.63.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2535,12 +2535,23 @@ html, body {
   background: var(--c-bg); color: var(--c-text); line-height: 1.5;
 }
 #qc-text:focus { outline: none; border-color: var(--c-beruf); }
-#qc-mic-btn {
+#qc-mic-btn, #qc-cam-btn {
   padding: 10px 12px; background: none;
   border: 1px solid var(--c-border); border-radius: var(--radius-xs);
   cursor: pointer; color: var(--c-muted); font-size: 1rem;
   flex-shrink: 0; align-self: stretch;
   transition: all var(--t-fast);
+}
+#qc-cam-btn { display: flex; align-items: center; }
+#qc-cam-btn svg { stroke: var(--c-muted); }
+#qc-cam-preview {
+  width: 100%;
+  border-radius: var(--radius-xs);
+  margin-top: 8px;
+  max-height: 180px;
+  object-fit: cover;
+  display: none;
+  border: 1px solid var(--c-border);
 }
 #qc-mic-btn.listening {
   border-color: var(--c-danger); color: var(--c-danger);
@@ -6251,8 +6262,19 @@ html, body {
     <!-- Eingabe -->
     <div class="qc-input-row">
       <textarea id="qc-text" placeholder="Was möchtest du festhalten?" rows="2"></textarea>
+      <button id="qc-cam-btn" onclick="WB._qcCameraOpen()" title="Foto / Bild hinzufügen">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </button>
       <button id="qc-mic-btn" onclick="WB._qcMicToggle()" style="display:none;" title="Spracheingabe">&#9679;</button>
     </div>
+    <!-- Vorschau Bild -->
+    <img id="qc-cam-preview" alt="Vorschau">
+    <!-- Verstecktes File Input -->
+    <input type="file" id="qc-cam-input" accept="image/*" capture="environment" style="display:none;"
+      onchange="WB._qcCameraCapture(this)">
     <button onclick="WB._qcPaste()" style="width:100%;padding:8px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;color:var(--c-muted);cursor:pointer;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;">
       <span>&#128203;</span> Aus Zwischenablage einfügen
     </button>
@@ -6509,7 +6531,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.63.2 · Build 20260531-1200</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.63.3 · Build 20260531-1215</div>
     </div>
 
     <!-- Welt -->
@@ -6660,7 +6682,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.63.2',
+  APP_VERSION: '3.63.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -7703,6 +7725,14 @@ const WB = {
   qcClose() {
     this._qcStopMic();
     document.getElementById('wb-qc-overlay').classList.remove('open');
+    // Kamera-Reset
+    this._qcPendingImage = null;
+    const preview = document.getElementById('qc-cam-preview');
+    if (preview) { preview.style.display = 'none'; preview.src = ''; }
+    const camBtn = document.getElementById('qc-cam-btn');
+    if (camBtn) camBtn.style.borderColor = '';
+    const txt = document.getElementById('qc-text');
+    if (txt) txt.value = '';
   },
 
   _qcSetWelt(welt) {
@@ -7722,6 +7752,33 @@ const WB = {
   },
 
   // ── Mikrofon ─────────────────────────────────────────
+  _qcCameraOpen() {
+    // Öffnet Kamera oder Galerie je nach Gerät
+    const input = document.getElementById('qc-cam-input');
+    if (input) input.click();
+  },
+
+  _qcCameraCapture(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      // Vorschau zeigen
+      const preview = document.getElementById('qc-cam-preview');
+      if (preview) {
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+      }
+      // Bild als Anhang speichern (Base64)
+      this._qcPendingImage = e.target.result;
+      // Kamera-Icon hervorheben
+      const btn = document.getElementById('qc-cam-btn');
+      if (btn) btn.style.borderColor = 'var(--c-beruf)';
+    };
+    reader.readAsDataURL(file);
+    input.value = ''; // Reset für erneute Auswahl
+  },
+
   _qcMicToggle() {
     if (this._qcRecog) { this._qcStopMic(); return; }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -7790,7 +7847,8 @@ const WB = {
   // ── Schnell in Inbox ──────────────────────────────────
   _qcSaveSchnell() {
     const text = this._qcGetText();
-    if (!text) { this._toast('Bitte zuerst etwas eingeben'); return; }
+    const img  = this._qcPendingImage || null;
+    if (!text && !img) { this._toast('Bitte zuerst etwas eingeben'); return; }
     const ctx = this._qcWelt;
     const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
     if (!db) { this._toast('Bitte zuerst Datenbank laden'); return; }
@@ -7799,15 +7857,16 @@ const WB = {
     if (!db.inbox) db.inbox = [];
     const entry = {
       id:  'inbox_' + Date.now() + '_' + Math.random().toString(36).slice(2),
-      text,
+      text: text || '(Foto)',
       ts:  Date.now(),
       ctx,
     };
+    if (img) entry.image = img;
     db.inbox.push(entry);
     this.setDirty();
     this.qcClose();
     this._inboxUpdateMenuSub();
-    this._toast('✓ In Inbox gespeichert');
+    this._toast(img ? '✓ Foto in Inbox gespeichert' : '✓ In Inbox gespeichert');
   },
 
   // ── Inbox-Assistent ──────────────────────────────────
