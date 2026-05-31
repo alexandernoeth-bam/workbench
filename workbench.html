@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.63.0</title>
+<title>WorkBench 3.63.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5261,6 +5261,36 @@ html, body {
 }
 #ck-plan-btn:hover { background: var(--c-bg); }
 
+
+/* ── Tabbar-Sichtbarkeit v3.63.1 ──────────────────── */
+/* Im Cockpit: Tabbar versteckt, nur Planungs-Icon */
+#wb-tabbar.cockpit-mode {
+  justify-content: center;
+  padding: 0 16px;
+  padding-bottom: var(--safe-b);
+}
+#wb-tabbar.cockpit-mode .wb-tab { display: none; }
+#wb-tabbar.cockpit-mode #wb-plan-icon-btn { display: flex; }
+
+/* Im Planungsmodus: Tabbar sichtbar */
+#wb-plan-icon-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 8px 20px;
+  color: var(--c-beruf);
+  font-family: var(--font);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  flex-direction: column;
+}
+#wb-plan-icon-btn svg { stroke: var(--c-beruf); }
+
 </style>
 </head>
 <body>
@@ -5351,15 +5381,6 @@ html, body {
         <!-- Tagesliste wird per JS gefüllt -->
         <div id="ck-tagesliste"></div>
         <!-- Neu-Eintrag Button am Ende der Liste -->
-        <!-- Planungsmodus-Button -->
-        <button id="ck-plan-btn" onclick="WB.planmodusOpen()">
-          <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          Planungsmodus
-          <svg style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;margin-left:auto;" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-
         <div id="ck-neue-eingabe" style="padding:12px 0 4px;border-top:1px solid var(--c-border);display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="WB._quickAdd()" style="flex:1;min-width:120px;padding:9px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
             <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -5516,6 +5537,14 @@ html, body {
     </button>
     </button>
 
+    <!-- Planungs-Icon (nur im Cockpit sichtbar) -->
+    <button id="wb-plan-icon-btn" onclick="WB.planmodusOpen()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+      Planen
+    </button>
   </nav>
 </div>
 
@@ -6421,7 +6450,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.63.0 · Build 20260531-1100</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.63.1 · Build 20260531-1130</div>
     </div>
 
     <!-- Welt -->
@@ -6572,7 +6601,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.63.0',
+  APP_VERSION: '3.63.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -9433,6 +9462,7 @@ const WB = {
         }
         setTimeout(() => {
           this._goTab('cockpit');
+    this._updateTabbarMode('cockpit');
           if (bar) bar.classList.remove('visible');
           // Scout beim Auto-Return immer neu auswählen
           this._scoutLastShown = null;
@@ -9574,6 +9604,8 @@ const WB = {
   planmodusClose() {
     const overlay = document.getElementById('wb-planmodus');
     if (overlay) overlay.classList.remove('open');
+    // Tabbar zurück in cockpit-mode
+    this._updateTabbarMode(this.activeTab || 'cockpit');
   },
 
   _planmodusRender() {
@@ -20535,6 +20567,16 @@ const WB = {
     this.switchTab(id, btn || null);
   },
 
+  _updateTabbarMode(id) {
+    const tabbar = document.getElementById('wb-tabbar');
+    if (!tabbar) return;
+    if (id === 'cockpit') {
+      tabbar.classList.add('cockpit-mode');
+    } else {
+      tabbar.classList.remove('cockpit-mode');
+    }
+  },
+
   switchTab(id, btn) {
     // Alle Sektionen ausblenden
     document.querySelectorAll('.wb-section').forEach(s => s.classList.remove('active'));
@@ -20555,6 +20597,7 @@ const WB = {
            .find(t => t.getAttribute('aria-controls') === 'sec-' + id);
     if(tabBtn) { tabBtn.classList.add('active'); tabBtn.setAttribute('aria-selected', 'true'); }
     this.activeTab = id;
+    this._updateTabbarMode(id);
     // Header-Label
     const lbl = document.getElementById('wb-section-label');
     if(lbl) lbl.textContent = tabBtn?.dataset?.label || id;
