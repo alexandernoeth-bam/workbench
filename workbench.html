@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.64.0</title>
+<title>WorkBench 3.64.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6725,7 +6725,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.64.0 · Build 20260531-1830</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.64.1 · Build 20260531-1900</div>
     </div>
 
     <!-- Welt -->
@@ -6876,7 +6876,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.64.0',
+  APP_VERSION: '3.64.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -9932,6 +9932,37 @@ const WB = {
     return Math.round(this._baustelleKopfmiete(b) * wochenSeit);
   },
 
+  _planmodusRauschenRender(container) {
+    const rauschen = [];
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      Object.entries(db.projects || {}).forEach(([pKey, proj]) => {
+        (proj.tasks || []).filter(t => !t.done && !t.goalId).forEach(t => {
+          rauschen.push({ t, pKey, ctx });
+        });
+      });
+    });
+
+    if (!rauschen.length) {
+      container.innerHTML += '<div style="font-size:0.82rem;color:var(--c-beruf);padding:6px 0;">✓ Alle Aufgaben haben ein klares Warum.</div>';
+      return;
+    }
+
+    container.innerHTML +=
+      '<div style="font-size:0.8rem;color:var(--c-muted);padding:4px 0 10px;">'
+      + rauschen.length + ' Aufgaben ohne Ziel — klicke um ein Warum zuzuordnen:</div>'
+      + rauschen.slice(0, 10).map(({t, pKey, ctx}) =>
+          '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--c-border);font-size:0.85rem;">'
+          + '<span style="flex:1;color:var(--c-text);">' + t.text + '</span>'
+          + '<span style="font-size:0.7rem;color:var(--c-faint);">' + (ctx==='pro'?'Beruf':'Privat') + '</span>'
+          + '<button style="font-size:0.72rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);white-space:nowrap;" '
+          + 'onclick="WB.openTaskDetail(&quot;' + pKey.replace(/"/g,'&quot;') + '&quot;,&quot;' + t.id + '&quot;,&quot;' + ctx + '&quot;)">Zuordnen →</button>'
+          + '</div>'
+        ).join('')
+      + (rauschen.length > 10 ? '<div style="font-size:0.75rem;color:var(--c-faint);padding:6px 0;">+ ' + (rauschen.length-10) + ' weitere...</div>' : '');
+  },
+
   planmodusBaustellenRender(container) {
     const store = this._baustellenStore() || [];
     const stundensatz = this._stundensatz();
@@ -10279,9 +10310,16 @@ const WB = {
       + '<div class="pm-section-label">Wochenrückblick</div>'
       + reflexHtml
       + '</div>'
+      + '<div class="pm-section" id="pm-rauschen-section">'
+      + '<div class="pm-section-label">Aufgaben ohne Ziel</div>'
+      + '</div>'
       + '<div class="pm-section" id="pm-baustellen-section">'
       + '<div class="pm-section-label">Meine Baustellen</div>'
       + '</div>';
+
+    // Rauschen-Aufgaben anzeigen
+    const rauschContainer = document.getElementById('pm-rauschen-section');
+    if (rauschContainer) this._planmodusRauschenRender(rauschContainer);
 
     // Baustellen separat rendern
     const bauContainer = document.getElementById('pm-baustellen-section');
@@ -10361,7 +10399,7 @@ const WB = {
             type: 'aufgabe',
             time: t.time || '',
             title: t.text,
-            meta: pKey + (t.date < today ? ' · überfällig' : ''),
+            meta: (t.goalId && t.goalId !== 'rauschen' ? '→ ' + (this._goalStore()?.find(g => g.id === t.goalId)?.title || '') : pKey) + (t.date < today ? ' · überfällig' : ''),
             done: false,
             ctx,
             id: t.id,
@@ -19400,6 +19438,17 @@ const WB = {
       + '<label for="ef-musttoday" style="cursor:pointer;font-size:0.88rem;font-weight:500;color:#C62828;">Muss heute erledigt werden</label>'
       + '</div>'
 
+      // Ziel-Zuordnung
+      + '<div class="edit-field"><label style="display:flex;align-items:center;gap:6px;">Warum / Ziel <span style="font-size:0.72rem;color:var(--c-faint);font-weight:400;">(optional)</span></label>'
+      + '<select id="ef-goal-id">'
+      + '<option value="">— Kein Ziel (Alltag/Pflicht)</option>'
+      + '<option value="rauschen" ' + (t?.goalId==='rauschen'?' selected':'') + '>⚠ Rauschen — kein klarer Grund</option>'
+      + (this._goalStore()||[]).map(g =>
+          '<option value="' + g.id + '"' + (t?.goalId===g.id?' selected':'') + '>' + g.title + '</option>'
+        ).join('')
+      + '</select>'
+      + '</div>'
+
       // Notiz
       + '<div class="edit-field"><label>Notiz</label>'
       + `<textarea id="ef-notes" rows="3" style="resize:none;">${t?.notes||''}</textarea></div>`
@@ -19826,6 +19875,8 @@ const WB = {
       // Checkliste aus Dialog übernehmen
       t.checklist = this._efChkGetList();
       t.mustToday = document.getElementById('ef-musttoday')?.checked || false;
+    const goalEl = document.getElementById('ef-goal-id');
+    if (goalEl) t.goalId = goalEl.value || '';
       // Wiederkehrend
       const recurOn = document.getElementById('ef-recur-on')?.checked;
       if (recurOn) {
