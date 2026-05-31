@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.62.4</title>
+<title>WorkBench 3.62.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5037,6 +5037,7 @@ html, body {
 .ck-liste-dot-inner.privat { background: var(--c-privat); }
 .ck-liste-dot-inner.pflicht { background: var(--c-muted); }
 .ck-liste-dot-inner.quick { background: var(--c-warn); }
+.ck-liste-dot-inner.checklist { background: var(--c-beruf); opacity: 0.5; }
 
 /* Inhalt */
 .ck-liste-content { flex: 1; min-width: 0; }
@@ -5197,6 +5198,9 @@ html, body {
           </button>
           <button onclick="WB.newEventOpenPicker()" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
             + Termin
+          </button>
+          <button onclick="WB.qcOpen()" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
+            + Inbox
           </button>
         </div>
       </div>
@@ -6245,7 +6249,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.62.4 · Build 20260531-1000</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.62.5 · Build 20260531-1030</div>
     </div>
 
     <!-- Welt -->
@@ -6396,7 +6400,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.62.4',
+  APP_VERSION: '3.62.5',
   APP_BUILD:   '20260526-0723',
 
 
@@ -9489,7 +9493,23 @@ const WB = {
       });
     });
 
-    // ── D: Quicklist heute ────────────────────────────────
+    // ── D: Aktive Checklisten (nicht abgeschlossen) ──────
+    const clStore = this._clInstanzStore() || [];
+    clStore.filter(inst => !inst.abgeschlossen && inst.items?.length > 0).forEach(inst => {
+      const done  = inst.items.filter(i => i.done).length;
+      const total = inst.items.length;
+      items.push({
+        type:  'checklist',
+        time:  '',
+        title: inst.name,
+        meta:  done + '/' + total + ' Schritte',
+        done:  done === total,
+        id:    inst.id,
+        obj:   inst,
+      });
+    });
+
+    // ── E: Quicklist heute ────────────────────────────────
     const quickStore = this._quickStore() || [];
     quickStore.filter(i => i.date === today && !i.done).forEach(i => {
       items.push({
@@ -9529,6 +9549,7 @@ const WB = {
         if (item.type === 'termin') onclick = 'WB._openEvent(&quot;' + item.id + '&quot;,&quot;' + (item.ctx||'') + '&quot;)';
         else if (item.type === 'aufgabe') onclick = 'WB.openTaskDetail(&quot;' + (item.pKey||'').replace(/"/g,'&quot;') + '&quot;,&quot;' + item.id + '&quot;,&quot;' + item.ctx + '&quot;)';
         else if (item.type === 'pflicht') onclick = 'WB.dutiesOpen()';
+        else if (item.type === 'checklist') onclick = 'WB.clDetailOpen(&quot;' + item.id + '&quot;)';
         else if (item.type === 'quick') onclick = '';
 
         let chkHtml = '';
@@ -9539,6 +9560,9 @@ const WB = {
           chkHtml = '<input type="checkbox" class="ck-liste-chk" onclick="event.stopPropagation();WB._doneTask(&quot;' + pid + '&quot;,&quot;' + item.id + '&quot;,&quot;' + item.ctx + '&quot;,this)">';
         } else if (item.type === 'pflicht') {
           chkHtml = '<input type="checkbox" class="ck-liste-chk" onclick="event.stopPropagation();WB._dutyToggleFromList(&quot;' + item.id + '&quot;,&quot;' + item.ctx + '&quot;,this)">';
+        } else if (item.type === 'checklist') {
+          // Kein Checkbox — Klick öffnet Detail
+          chkHtml = '<span style="font-size:0.75rem;color:var(--c-beruf);font-weight:600;flex-shrink:0;">›</span>';
         } else if (item.type === 'quick') {
           chkHtml = '<input type="checkbox" class="ck-liste-chk" ' + (item.done?'checked':'') + ' onchange="event.stopPropagation();WB._quickToggle(&quot;' + item.id + '&quot;,this)">';
         }
