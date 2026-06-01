@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.72.0</title>
+<title>WorkBench 3.72.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6453,20 +6453,28 @@ html, body {
   <div id="nz-editor-topbar">
     <button id="nz-ed-back" onclick="WB.nzEdClose()">&#8249;</button>
     <input id="nz-ed-titel" type="text" placeholder="Titel...">
+    <button id="nz-ed-delete" onclick="WB.nzEdDelete()" style="background:none;border:none;cursor:pointer;color:#C62828;font-size:1.2rem;padding:0 6px;line-height:1;" title="Notiz löschen">&#128465;</button>
     <button id="nz-ed-save" onclick="WB.nzEdSave(true)">Speichern</button>
   </div>
   <div id="nz-ed-meta">
     <select id="nz-ed-typ" onchange="WB._nzTypChanged(this.value)">
+      <option value="schnellnotiz">Schnellnotiz</option>
+      <option value="schnellnotiz">Schnellnotiz</option>
       <option value="braindump">Braindump</option>
       <option value="besprechung">Besprechung</option>
       <option value="brainstorming">Brainstorming</option>
       <option value="wissen">Wissen</option>
       <option value="plan">Plan</option>
+      <option value="reflexion">Reflexion</option>
     </select>
     <select id="nz-ed-welt">
       <option value="pro">Beruf</option>
       <option value="priv">Privat</option>
     </select>
+    <label id="nz-archiv-label" style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.78rem;color:var(--c-muted);">
+      <input type="checkbox" id="nz-ed-archiv" style="width:14px;height:14px;accent-color:var(--c-muted);">
+      Archiv
+    </label>
   </div>
   <div id="nz-ed-toolbar">
     <button class="nz-tb" onclick="WB.nzCmd('bold')"><b>B</b></button>
@@ -6505,7 +6513,8 @@ html, body {
     <button id="nz-ed-save" onclick="WB.nzEdSave(true)">Speichern</button>
   </div>
   <div id="nz-ed-meta">
-    <select id="nz-ed-typ">
+    <select id="nz-ed-typ" onchange="WB._nzTypChanged(this.value)">
+      <option value="schnellnotiz">Schnellnotiz</option>
       <option value="braindump">Braindump</option>
       <option value="besprechung">Besprechung</option>
       <option value="brainstorming">Brainstorming</option>
@@ -6516,6 +6525,10 @@ html, body {
       <option value="pro">Beruf</option>
       <option value="priv">Privat</option>
     </select>
+    <label id="nz-archiv-label" style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.78rem;color:var(--c-muted);">
+      <input type="checkbox" id="nz-ed-archiv" style="width:14px;height:14px;accent-color:var(--c-muted);">
+      Archiv
+    </label>
   </div>
   <div id="nz-ed-toolbar">
     <button class="nz-tb" onclick="WB.nzCmd('bold')"><b>B</b></button>
@@ -7332,7 +7345,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.72.0 · Build 20260601-2345</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.72.2 · Build 20260601-2359</div>
     </div>
 
     <!-- Welt -->
@@ -7516,7 +7529,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.72.0',
+  APP_VERSION: '3.72.2',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8992,7 +9005,7 @@ const WB = {
       id:       'nz_' + nowTs,
       titel:    text ? text.split('\n')[0].slice(0, 60) : '(Foto)',
       inhalt:   text ? '<p>' + text.replace(/\n/g, '</p><p>') + '</p>' : '',
-      typ:      'notiz',
+      typ:      'schnellnotiz',
       welt:     ctx,
       _db:      ctx,
       erstellt: nowTs,
@@ -21228,6 +21241,7 @@ const WB = {
 
   // ── Notizen State ────────────────────────────────────
   nzTypen: [
+    {id:'schnellnotiz', label:'Schnellnotiz', bg:'#f0fdf4', color:'#166534'},
     {id:'braindump',    label:'Braindump',    bg:'#fef9c3', color:'#854d0e'},
     {id:'besprechung',  label:'Besprechung',  bg:'#dbeafe', color:'#1e40af'},
     {id:'brainstorming',label:'Brainstorm',   bg:'#ede9fe', color:'#6d28d9'},
@@ -21322,6 +21336,9 @@ const WB = {
     // Welt-Filter
     if(this.activeWorld === 'privat')
       all = all.filter(n => n._db==='priv');
+
+    // Archiv-Filter (standardmässig ausgeblendet)
+    if(!this.nzShowArchiv) all = all.filter(n => !n.archiv);
 
     // Typ-Filter
     let filtered = this.nzFilterTyp ? all.filter(n => n.typ===this.nzFilterTyp) : all;
@@ -21419,6 +21436,8 @@ const WB = {
 
     const cnt = document.getElementById('nz-ed-content');
     if(cnt) cnt.innerHTML = inhalt || '';
+    const archivCb = document.getElementById('nz-ed-archiv');
+    if(archivCb) archivCb.checked = !!(notiz?.archiv);
 
     document.getElementById('nz-ed-hint').textContent = '';
     setTimeout(()=>{
@@ -21452,11 +21471,13 @@ const WB = {
     if(this.nzActiveId) {
       const store = this._nzStoreWrite(this._nzStore().find(n=>n.id===this.nzActiveId)?._db || welt);
       const orig  = store.find(n => n.id===this.nzActiveId);
-      if(orig) { orig.titel=titel; orig.typ=typ; orig.inhalt=inhalt; orig.geaendert=now; }
+      const archiv = document.getElementById('nz-ed-archiv')?.checked || false;
+      if(orig) { orig.titel=titel; orig.typ=typ; orig.inhalt=inhalt; orig.geaendert=now; orig.archiv=archiv; }
     } else {
       const store = this._nzStoreWrite(welt);
       const newId = String(now);
-      store.push({id:newId, titel, typ, inhalt, welt, erstellt:now, geaendert:now});
+      const archivNew = document.getElementById('nz-ed-archiv')?.checked || false;
+      store.push({id:newId, titel, typ, inhalt, welt, archiv:archivNew, erstellt:now, geaendert:now});
       this.nzActiveId = newId;
     }
     this.setDirty();
@@ -21464,6 +21485,19 @@ const WB = {
     // Auto-Save-Hinweis
     const hint = document.getElementById('nz-ed-hint');
     if(hint) { hint.textContent = '\u2713 Gespeichert'; setTimeout(()=>{if(hint)hint.textContent='';}, 1200); }
+  },
+
+  nzEdDelete() {
+    if (!this.nzActiveId) { this.nzEdClose(); return; }
+    if (!confirm('Notiz wirklich löschen?')) return;
+    const notiz = this._nzStore().find(n => n.id === this.nzActiveId);
+    const db    = notiz?._db === 'pro' ? this.dataPro : this.dataPriv;
+    if (db?.settings?.cockpitNotizen) {
+      db.settings.cockpitNotizen = db.settings.cockpitNotizen.filter(n => n.id !== this.nzActiveId);
+    }
+    this.setDirty();
+    this.nzEdClose();
+    this._toast('Notiz gelöscht');
   },
 
   nzAutoSave() {
