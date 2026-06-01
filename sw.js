@@ -1,5 +1,5 @@
-// WorkBench Service Worker v3.71.6 · Build 20260601-2200
-const BUILD = '20260601-2200';
+// WorkBench Service Worker v3.71.7 · Build 20260601-2230
+const BUILD = '20260601-2230';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -16,6 +16,22 @@ self.addEventListener('activate', e => {
       })
   );
 });
+
+// Helper: IDB schreiben
+function idbWrite(data) {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('wb-share', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('share');
+    req.onsuccess = e => {
+      const db = e.target.result;
+      const tx = db.transaction('share', 'readwrite');
+      tx.objectStore('share').put(data, 'pending');
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror    = () => { db.close(); reject(tx.error); };
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
 
 // Share Target: POST mit Bild
 self.addEventListener('fetch', e => {
@@ -42,35 +58,19 @@ self.addEventListener('fetch', e => {
           imageData = 'data:' + image.type + ';base64,' + btoa(bin);
         }
 
-        const payload = { title, text, url: shareUrl, imageData, ts: Date.now() };
+        // In IDB speichern
+        await idbWrite({ title, text, url: shareUrl, imageData, ts: Date.now() });
 
-        // 1. In Cache schreiben (für neue Instanz)
-        const cache = await caches.open('wb-share-v1');
-        await cache.put('/__share_data__', new Response(JSON.stringify(payload), {
-          headers: { 'Content-Type': 'application/json' }
-        }));
-
-        // 2. Alle laufenden Clients direkt anschreiben
-        const allClients = await self.clients.matchAll({
-          type: 'window',
-          includeUncontrolled: true
-        });
-
-        if (allClients.length > 0) {
-          // App läuft bereits — direkt anschreiben + fokussieren
-          for (const client of allClients) {
-            client.postMessage({ type: 'SHARE_TARGET', ...payload });
-            if ('focus' in client) await client.focus();
-          }
-          // Kein Redirect nötig — App ist bereits offen
-          return new Response('OK', { status: 200 });
+        // Laufende Clients anschreiben
+        const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        for (const client of allClients) {
+          client.postMessage({ type: 'SHARE_TARGET', title, text, url: shareUrl, imageData });
         }
 
       } catch(err) {
-        console.error('[SW Share Error]', err);
+        console.error('[SW Share]', err);
       }
 
-      // App läuft nicht → neu starten mit Flag
       return Response.redirect('/workbench/workbench.html?wb_share=1', 303);
     })());
     return;

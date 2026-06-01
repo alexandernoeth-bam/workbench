@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.71.6</title>
+<title>WorkBench 3.71.7</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7326,7 +7326,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.6 · Build 20260601-2200</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.7 · Build 20260601-2230</div>
     </div>
 
     <!-- Welt -->
@@ -7510,7 +7510,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.71.6',
+  APP_VERSION: '3.71.7',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8680,62 +8680,54 @@ const WB = {
   // ── Share Target ──────────────────────────────────────
   _checkShareTarget() {
     document.getElementById('wb-reminder-overlay')?.classList.remove('open');
-    this._toast('Share: wird verarbeitet...');
-
-    if (!('caches' in window)) {
-      this._toast('Share: kein Cache-Support');
-      this.qcOpen();
-      return;
-    }
-
-    (async () => {
+    // IDB lesen
+    const req = indexedDB.open('wb-share', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('share');
+    req.onsuccess = e => {
+      const db = e.target.result;
       try {
-        const cache = await caches.open('wb-share-v1');
-        const resp  = await cache.match('/__share_data__');
-        if (!resp) {
-          this._toast('Share: kein Bild im Cache');
-          this.qcOpen();
-          return;
-        }
-        const data = await resp.json();
-        await cache.delete('/__share_data__');
+        const tx   = db.transaction('share', 'readwrite');
+        const store = tx.objectStore('share');
+        const get  = store.get('pending');
+        get.onsuccess = () => {
+          const data = get.result;
+          // Eintrag sofort löschen
+          store.delete('pending');
+          db.close();
+          if (!data || Date.now() - (data.ts||0) > 120000) {
+            this.qcOpen();
+            return;
+          }
+          this._applyShareData(data);
+        };
+        get.onerror = () => { db.close(); this.qcOpen(); };
+      } catch(err) { db.close(); this.qcOpen(); }
+    };
+    req.onerror = () => this.qcOpen();
+  },
 
-        const age = Date.now() - (data.ts || 0);
-        if (age > 120000) {
-          this._toast('Share: Daten zu alt (' + Math.round(age/1000) + 's)');
-          this.qcOpen();
-          return;
-        }
-
-        this.qcOpen();
-        if (data.title || data.text) {
-          const ta = document.getElementById('qc-text');
-          if (ta) { ta.value = [data.title, data.text].filter(Boolean).join(' '); this._qcUpdateActions(); }
-        }
-        if (data.imageData) {
-          this._qcPendingImage = data.imageData;
-          const preview = document.getElementById('qc-cam-preview');
-          if (preview) { preview.src = data.imageData; preview.style.display = 'block'; }
-          const btn = document.getElementById('qc-cam-btn');
-          if (btn) btn.style.borderColor = 'var(--c-beruf)';
-          this._toast('✓ Bild geladen — speichern mit "Als Notiz"');
-        } else {
-          this._toast('Share: Kein Bild-Daten');
-        }
-      } catch(err) {
-        this._toast('Share Fehler: ' + err.message);
-        console.error('[Share]', err);
-        this.qcOpen();
+  _applyShareData(data) {
+    this.qcOpen();
+    setTimeout(() => {
+      if (data.title || data.text) {
+        const ta = document.getElementById('qc-text');
+        if (ta) { ta.value = [data.title, data.text].filter(Boolean).join(' '); this._qcUpdateActions(); }
       }
-    })();
+      if (data.imageData) {
+        this._qcPendingImage = data.imageData;
+        const preview = document.getElementById('qc-cam-preview');
+        if (preview) { preview.src = data.imageData; preview.style.display = 'block'; }
+        const btn = document.getElementById('qc-cam-btn');
+        if (btn) btn.style.borderColor = 'var(--c-beruf)';
+        this._toast('✓ Bild geladen');
+      }
+    }, 300);
   },
 
   _handleShare(data) {
     this._shareHandled = true;
     document.getElementById('wb-reminder-overlay')?.classList.remove('open');
-    // Sofort öffnen — kein Delay
-    this.qcOpen();
-    // Kurz warten bis QC gerendert
+    this._applyShareData(data);
     setTimeout(() => {
       const ta = document.getElementById('qc-text');
       if (ta && (data.title || data.text)) {
@@ -10680,13 +10672,10 @@ const WB = {
     this._updateTabbarMode('cockpit');
     // _reminderInit wird nach DB-Load aufgerufen (in _onFileLoaded)
     // Share-Flag merken für späteren Aufruf nach DB-Load
-    this._pendingShare = new URLSearchParams(window.location.search).has('wb_share')
-      || new URLSearchParams(window.location.search).has('share_title')
-      || new URLSearchParams(window.location.search).has('share_text');
-    if (this._pendingShare) {
-      this._isShareMode = true;
-      window.history.replaceState({}, '', window.location.pathname);
-    }
+    // Share: immer IDB prüfen beim Start (unabhängig von URL)
+    this._pendingShare = true;
+    this._isShareMode = new URLSearchParams(window.location.search).has('wb_share');
+    if (this._isShareMode) window.history.replaceState({}, '', window.location.pathname);
     // Service Worker Message Listener
     if (navigator.serviceWorker) {
       navigator.serviceWorker.addEventListener('message', e => {
