@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.71.2</title>
+<title>WorkBench 3.71.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7326,7 +7326,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.2 · Build 20260601-2030</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.3 · Build 20260601-2100</div>
     </div>
 
     <!-- Welt -->
@@ -7510,7 +7510,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.71.2',
+  APP_VERSION: '3.71.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8679,42 +8679,21 @@ const WB = {
   // ── Schnell in Inbox ──────────────────────────────────
   // ── Share Target ──────────────────────────────────────
   _checkShareTarget() {
-    const p = new URLSearchParams(window.location.search);
-    const isShare = p.has('wb_share') || p.has('share_title') || p.has('share_text') || p.has('share_url');
-    if (!isShare) return;
-
-    this._isShareMode = true;
-    window.history.replaceState({}, '', window.location.pathname);
-
-    // GET Share: Text/URL direkt aus Parametern
-    const title    = p.get('share_title') || '';
-    const text     = p.get('share_text')  || '';
-    const shareUrl = p.get('share_url')   || '';
-    const combined = [title, text, shareUrl].filter(Boolean).join(' ');
-
-    if (combined) {
-      document.getElementById('wb-reminder-overlay')?.classList.remove('open');
-      setTimeout(() => {
-        this.qcOpen();
-        const ta = document.getElementById('qc-text');
-        if (ta) { ta.value = combined; this._qcUpdateActions(); }
-      }, 800);
-      return;
-    }
+    // Immer aus Cache lesen (URL wurde bereits bereinigt)
+    document.getElementById('wb-reminder-overlay')?.classList.remove('open');
 
     // POST Share: Daten aus SW-Cache lesen
-    if (p.has('wb_share') && 'caches' in window) {
-      document.getElementById('wb-reminder-overlay')?.classList.remove('open');
-      setTimeout(async () => {
+    if ('caches' in window) {
+      (async () => {
         try {
           const cache = await caches.open('wb-share-v1');
           const resp  = await cache.match('/__share_data__');
-          if (!resp) { this.qcOpen(); return; }
+          if (!resp) { this.qcOpen(); this._toast('Kein Bild gefunden'); return; }
           const data  = await resp.json();
-          await cache.delete('/__share_data__'); // einmal lesen, dann löschen
+          await cache.delete('/__share_data__');
 
-          // Nicht älter als 30 Sekunden
-          if (Date.now() - (data.ts || 0) > 30000) { this.qcOpen(); return; }
+          // Nicht älter als 60 Sekunden
+          if (Date.now() - (data.ts || 0) > 60000) { this.qcOpen(); return; }
 
           this.qcOpen();
           if (data.title || data.text) {
@@ -8727,12 +8706,13 @@ const WB = {
             if (preview) { preview.src = data.imageData; preview.style.display = 'block'; }
             const btn = document.getElementById('qc-cam-btn');
             if (btn) btn.style.borderColor = 'var(--c-beruf)';
+            this._toast('✓ Bild aus Teilen geladen');
           }
         } catch(err) {
           console.error('[Share read]', err);
           this.qcOpen();
         }
-      }, 600);
+      })();
     }
   },
 
@@ -10684,8 +10664,14 @@ const WB = {
           this._goTab('cockpit');
     this._updateTabbarMode('cockpit');
     // _reminderInit wird nach DB-Load aufgerufen (in _onFileLoaded)
-    // Share Target: URL-Parameter prüfen
-    this._checkShareTarget();
+    // Share-Flag merken für späteren Aufruf nach DB-Load
+    this._pendingShare = new URLSearchParams(window.location.search).has('wb_share')
+      || new URLSearchParams(window.location.search).has('share_title')
+      || new URLSearchParams(window.location.search).has('share_text');
+    if (this._pendingShare) {
+      this._isShareMode = true;
+      window.history.replaceState({}, '', window.location.pathname);
+    }
     // Service Worker Message Listener
     if (navigator.serviceWorker) {
       navigator.serviceWorker.addEventListener('message', e => {
@@ -14621,8 +14607,14 @@ const WB = {
       cont.disabled = false;
     }
     this._toast((isPro ? 'Beruf' : 'Privat') + '-Datenbank geladen');
-    // Erinnerungs-Timer starten/neustarten sobald DB geladen
-    setTimeout(() => this._reminderInit(), 500);
+    // Share Target nach DB-Load verarbeiten
+    if (this._pendingShare) {
+      this._pendingShare = false;
+      setTimeout(() => this._checkShareTarget(), 300);
+    } else {
+      // Erinnerungs-Timer nur wenn kein Share
+      setTimeout(() => this._reminderInit(), 500);
+    }
   },
 
   // ── App starten ─────────────────────────────────────
