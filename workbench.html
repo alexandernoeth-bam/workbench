@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.68.2</title>
+<title>WorkBench 3.68.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7017,7 +7017,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.68.2 · Build 20260601-1045</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.68.3 · Build 20260601-1100</div>
     </div>
 
     <!-- Welt -->
@@ -7197,7 +7197,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.68.2',
+  APP_VERSION: '3.68.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -21561,11 +21561,54 @@ const WB = {
     }
 
     document.getElementById('proj-detail-title').textContent = pKey;
-    body += `<div style="margin-top:14px;">`
-      + `<button class="af-action-btn" style="width:100%;" onclick="WB._addTaskToProj('${pKey.replace(/'/g,"\\'")}'  ,'${ctx}')">+ Aufgabe hinzuf&#252;gen</button>`
-      + `</div>`;
+    document.getElementById('proj-detail-title').textContent = pKey;
+    const pKeyS = pKey.replace(/'/g, String.fromCharCode(92,39));
+    body += '<div style="margin-top:14px;display:flex;flex-direction:column;gap:8px;">'
+      + '<button class="af-action-btn" style="width:100%;" onclick="WB._addTaskToProj(\'' + pKeyS + '\',\'' + ctx + '\')">+ Aufgabe hinzufügen</button>'
+      + '<button onclick="WB._projRename(\'' + pKeyS + '\',\'' + ctx + '\')" style="width:100%;padding:10px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;cursor:pointer;color:var(--c-text);">Umbenennen</button>'
+      + '<button onclick="WB._projDelete(\'' + pKeyS + '\',\'' + ctx + '\')" style="width:100%;padding:10px;background:none;border:1px solid #C62828;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;cursor:pointer;color:#C62828;">Projekt löschen</button>'
+      + '</div>';
     document.getElementById('proj-detail-body').innerHTML = body;
     document.getElementById('proj-detail-overlay').classList.add('open');
+  },
+
+  _projRename(pKey, ctx) {
+    const newName = prompt('Neuer Projektname:', pKey);
+    if (!newName?.trim() || newName.trim() === pKey) return;
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db?.projects?.[pKey]) return;
+    const proj = db.projects[pKey];
+    delete db.projects[pKey];
+    db.projects[newName.trim()] = proj;
+    // linkedProjects in Zielen aktualisieren
+    (this._goalStore() || []).forEach(g => {
+      if (!g.linkedProjects) return;
+      const idx = g.linkedProjects.indexOf(pKey);
+      if (idx >= 0) g.linkedProjects[idx] = newName.trim();
+    });
+    this.setDirty();
+    this.closeProjDetail();
+    this.renderProjekte();
+    this._toast('Umbenannt: ' + newName.trim());
+  },
+
+  _projDelete(pKey, ctx) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db?.projects?.[pKey]) return;
+    const count = (db.projects[pKey].tasks || []).length;
+    const msg = count > 0
+      ? 'Projekt "' + pKey + '" mit ' + count + ' Aufgaben wirklich löschen?'
+      : 'Projekt "' + pKey + '" wirklich löschen?';
+    if (!confirm(msg)) return;
+    delete db.projects[pKey];
+    // linkedProjects bereinigen
+    (this._goalStore() || []).forEach(g => {
+      if (g.linkedProjects) g.linkedProjects = g.linkedProjects.filter(p => p !== pKey);
+    });
+    this.setDirty();
+    this.closeProjDetail();
+    this.renderProjekte();
+    this._toast('Projekt gelöscht');
   },
 
   _addTaskToProj(pKey, ctx) {
