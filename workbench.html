@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.71.9</title>
+<title>WorkBench 3.71.10</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7063,8 +7063,8 @@ html, body {
           <circle cx="12" cy="13" r="4"/>
         </svg>
       </button>
-      <button id="qc-paste-btn" onclick="WB._qcPasteFromClipboard()" title="Bild aus Zwischenablage">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
+      <button id="qc-paste-btn" onclick="WB._qcPasteFromClipboard()" title="Bild aus Zwischenablage" style="display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
           <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
           <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
         </svg>
@@ -7332,7 +7332,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.9 · Build 20260601-2315</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.10 · Build 20260601-2330</div>
     </div>
 
     <!-- Welt -->
@@ -7516,7 +7516,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.71.9',
+  APP_VERSION: '3.71.10',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8984,19 +8984,20 @@ const WB = {
     const db  = ctx === 'pro' ? this.dataPro : (this.dataPriv || this.dataPro);
     if (!db) { this._toast('Bitte zuerst Datenbank laden'); return; }
 
-    // Direkt als Notiz speichern
-    if (!db.notizen) db.notizen = [];
+    // In cockpitNotizen speichern (= _nzStore Speicherort)
+    if (!db.settings) db.settings = {};
+    if (!db.settings.cockpitNotizen) db.settings.cockpitNotizen = [];
     const now = new Date();
     const notiz = {
-      id:      'nz_' + Date.now(),
-      titel:   text ? text.split('\n')[0].slice(0, 60) : '(Foto)',
-      inhalt:  text || '',
-      typ:     'schnell',
-      ts:      Date.now(),
-      datum:   now.toISOString().split('T')[0],
+      id:     'nz_' + Date.now(),
+      titel:  text ? text.split('\n')[0].slice(0, 60) : '(Foto)',
+      inhalt: text || '',
+      typ:    'schnell',
+      ts:     Date.now(),
+      datum:  now.toISOString().split('T')[0],
     };
     if (img) notiz.image = img;
-    db.notizen.unshift(notiz); // neueste oben
+    db.settings.cockpitNotizen.unshift(notiz);
     this.setDirty();
     this.qcClose();
     this._toast(img ? '\u2713 Foto als Notiz gespeichert' : '\u2713 Notiz gespeichert');
