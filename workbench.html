@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.66.1</title>
+<title>WorkBench 3.67.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5827,7 +5827,7 @@ html, body {
 <div id="cl-detail-overlay">
   <div id="cl-detail-topbar">
     <button id="cl-detail-back" onclick="WB.clDetailClose()">&#8249;</button>
-    <div id="cl-detail-title">Checkliste</div>
+    <div id="cl-detail-title" onclick="WB._clInstRenamePrompt()" title="Tippen zum Umbenennen" style="cursor:pointer;">Checkliste</div>
     <div id="cl-detail-progress"></div>
   </div>
   <div id="cl-detail-scroll"></div>
@@ -6717,7 +6717,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.66.1 · Build 20260531-2210</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.67.1 · Build 20260601-0815</div>
     </div>
 
     <!-- Welt -->
@@ -6893,7 +6893,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.66.1',
+  APP_VERSION: '3.67.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -10692,14 +10692,33 @@ const WB = {
 
     // ── D: Aktive Checklisten (nicht abgeschlossen) ──────
     const clStore = this._clInstanzStore() || [];
-    clStore.filter(inst => !inst.erledigt && !inst.abgeschlossen && inst.items?.length > 0).forEach(inst => {
+    clStore.filter(inst => {
+      if (inst.erledigt || inst.abgeschlossen) return false;
+      if (!inst.items?.length) return false;
+      // Start-Datum: Checkliste nur ab diesem Datum anzeigen
+      if (inst.startDate && inst.startDate > today) return false;
+      // Item-Datum: wenn alle offenen Items ein Datum haben,
+      // nur anzeigen wenn mind. ein Item heute oder überfällig ist
+      const offeneItems = inst.items.filter(i => !i.done);
+      const itemsOhneDatum = offeneItems.filter(i => !i.date);
+      if (itemsOhneDatum.length === 0 && offeneItems.length > 0) {
+        // Alle offenen Items haben Datum — nur anzeigen wenn mind. eines heute/überfällig
+        return offeneItems.some(i => i.date && i.date <= today);
+      }
+      return true; // keine Item-Daten gesetzt → immer anzeigen
+    }).forEach(inst => {
       const done  = inst.items.filter(i => i.done).length;
       const total = inst.items.length;
+      // Nächstes Item für heute
+      const nextToday = inst.items.find(i => !i.done && (!i.date || i.date <= today));
+      const meta = nextToday?.date
+        ? done + '/' + total + ' · heute: ' + nextToday.text.slice(0,25)
+        : done + '/' + total + ' Schritte';
       items.push({
         type:  'checklist',
         time:  '',
         title: inst.name,
-        meta:  done + '/' + total + ' Schritte',
+        meta,
         done:  done === total,
         id:    inst.id,
         obj:   inst,
@@ -17842,11 +17861,13 @@ const WB = {
     if(mode === 'check') {
       // ── Abhak-Modus ────────────────────────────────
       inst.items.forEach(item => {
-        const linked = !!(item.taskId);
+        const dateBadge = item.date
+          ? `<span style="font-size:0.68rem;color:${item.date < today ? '#C62828' : 'var(--c-muted)'};margin-left:6px;font-family:var(--font-mono);">${item.date === today ? 'heute' : item.date}</span>`
+          : '';
         html += `<div class="cl-item-row${item.done?' done-row':''}" id="cl-item-${item.id}">
           <input type="checkbox" class="cl-item-chk" ${item.done?'checked':''}
             onchange="WB.clToggleItem('${instId}','${item.id}',this)">
-          <span class="cl-item-text${item.done?' done':''}">${item.text}</span>
+          <span class="cl-item-text${item.done?' done':''}">${item.text}${dateBadge}</span>
         </div>`;
       });
       // "Als Aufgabe/Termin anlegen" Buttons oben
@@ -17869,6 +17890,14 @@ const WB = {
       }
     } else {
       // ── Bearbeitungs-Modus ─────────────────────────
+      // Start-Datum der Instanz
+      html += `<div style="padding:4px 0 12px;border-bottom:1px solid var(--c-border);margin-bottom:8px;">
+        <div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:4px;">Im Cockpit anzeigen ab (leer = immer)</div>
+        <input type="date" id="cl-inst-startdate" value="${inst.startDate||''}"
+          onchange="WB._clInstSetStartDate('${instId}',this.value)"
+          style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">
+      </div>`;
+
       html += `<div id="cl-inst-edit-items">`;
       inst.items.forEach((item, idx) => {
         html += `<div class="cl-item-edit-row" id="cl-iedit-${item.id}" draggable="true"
@@ -17879,9 +17908,14 @@ const WB = {
           <span class="cl-drag-handle">
             <svg style="width:16px;height:16px;stroke:var(--c-faint);fill:none;stroke-width:2;stroke-linecap:round;" viewBox="0 0 24 24"><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="18" x2="16" y2="18"/></svg>
           </span>
-          <input class="cl-item-edit-input" type="text" value="${item.text.replace(/"/g,'&quot;')}"
-            onchange="WB._clInstItemRename('${instId}','${item.id}',this.value)"
-            onblur="WB._clInstItemRename('${instId}','${item.id}',this.value)">
+          <div style="flex:1;display:flex;flex-direction:column;gap:3px;">
+            <input class="cl-item-edit-input" type="text" value="${item.text.replace(/"/g,'&quot;')}"
+              onchange="WB._clInstItemRename('${instId}','${item.id}',this.value)"
+              onblur="WB._clInstItemRename('${instId}','${item.id}',this.value)">
+            <input type="date" value="${item.date||''}" placeholder="Datum (optional)"
+              onchange="WB._clInstItemSetDate('${instId}','${item.id}',this.value)"
+              style="font-size:0.72rem;padding:3px 6px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);background:var(--c-bg);color:var(--c-muted);width:100%;box-sizing:border-box;">
+          </div>
           <button class="cl-item-del-btn" onclick="WB._clInstItemDelete('${instId}','${item.id}')">&#215;</button>
         </div>`;
       });
@@ -18205,6 +18239,60 @@ const WB = {
     const btn = document.querySelector(`#cl-item-${itemId} .cl-item-to-task`);
     if(btn) { btn.textContent = '✓ Aufgabe'; btn.classList.add('linked'); }
     this._toast('Aufgabe erstellt: ' + item.text.substring(0,30));
+  },
+
+  _clInstRenamePrompt() {
+    const instId = this.clActiveInstanzId; if (!instId) return;
+    const store  = this._clInstanzStore(); if (!store) return;
+    const inst   = store.find(x => x.id === instId); if (!inst) return;
+
+    const titleEl = document.getElementById('cl-detail-title');
+    if (!titleEl) return;
+
+    // Inline-Input ersetzen
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = inst.name;
+    input.style.cssText = 'font-size:inherit;font-family:inherit;font-weight:inherit;border:none;border-bottom:2px solid var(--c-beruf);background:transparent;color:inherit;width:100%;outline:none;padding:0;';
+
+    const save = () => {
+      const newName = input.value.trim();
+      if (newName && newName !== inst.name) {
+        inst.name = newName;
+        this.setDirty();
+        this._toast('Umbenannt: ' + newName);
+      }
+      titleEl.textContent = inst.name;
+      titleEl.style.cursor = 'pointer';
+    };
+
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      if (e.key === 'Escape') { input.value = inst.name; input.blur(); }
+    });
+
+    titleEl.textContent = '';
+    titleEl.style.cursor = 'text';
+    titleEl.appendChild(input);
+    input.focus();
+    input.select();
+  },
+
+  _clInstSetStartDate(instId, date) {
+    const store = this._clInstanzStore(); if (!store) return;
+    const inst  = store.find(x => x.id === instId); if (!inst) return;
+    inst.startDate = date || '';
+    this.setDirty();
+    this._toast(date ? 'Erscheint im Cockpit ab ' + date : 'Immer im Cockpit sichtbar');
+  },
+
+  _clInstItemSetDate(instId, itemId, date) {
+    const store = this._clInstanzStore(); if (!store) return;
+    const inst  = store.find(x => x.id === instId); if (!inst) return;
+    const item  = inst.items.find(i => i.id === itemId); if (!item) return;
+    item.date = date || '';
+    this.setDirty();
   },
 
   clFinishInstanz(instId) {
