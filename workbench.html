@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.71.1</title>
+<title>WorkBench 3.71.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7326,7 +7326,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.1 · Build 20260601-2000</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.2 · Build 20260601-2030</div>
     </div>
 
     <!-- Welt -->
@@ -7510,7 +7510,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.71.1',
+  APP_VERSION: '3.71.2',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8680,38 +8680,59 @@ const WB = {
   // ── Share Target ──────────────────────────────────────
   _checkShareTarget() {
     const p = new URLSearchParams(window.location.search);
-    const isShare = p.has('share_title') || p.has('share_text') || p.has('share_url') || p.has('shared');
+    const isShare = p.has('wb_share') || p.has('share_title') || p.has('share_text') || p.has('share_url');
     if (!isShare) return;
 
-    // Merken dass wir im Share-Modus sind → Erinnerung unterdrücken
     this._isShareMode = true;
-
-    const title = p.get('share_title') || '';
-    const text  = p.get('share_text')  || '';
-    const url   = p.get('share_url')   || '';
-    const combined = [title, text, url].filter(Boolean).join(' ');
-
-    // URL-Parameter entfernen
     window.history.replaceState({}, '', window.location.pathname);
 
+    // GET Share: Text/URL direkt aus Parametern
+    const title    = p.get('share_title') || '';
+    const text     = p.get('share_text')  || '';
+    const shareUrl = p.get('share_url')   || '';
+    const combined = [title, text, shareUrl].filter(Boolean).join(' ');
+
     if (combined) {
-      // Erinnerung schliessen
       document.getElementById('wb-reminder-overlay')?.classList.remove('open');
       setTimeout(() => {
         this.qcOpen();
         const ta = document.getElementById('qc-text');
         if (ta) { ta.value = combined; this._qcUpdateActions(); }
       }, 800);
-    } else if (p.has('shared')) {
-      // POST Share (Bild) — auf SW-Nachricht warten
-      // SW schickt SHARE_TARGET Message sobald er bereit ist
-      setTimeout(() => {
-        // Falls nach 3 Sek noch nichts kam: leeres QC öffnen
-        if (!this._shareHandled) {
+      return;
+    }
+
+    // POST Share: Daten aus SW-Cache lesen
+    if (p.has('wb_share') && 'caches' in window) {
+      document.getElementById('wb-reminder-overlay')?.classList.remove('open');
+      setTimeout(async () => {
+        try {
+          const cache = await caches.open('wb-share-v1');
+          const resp  = await cache.match('/__share_data__');
+          if (!resp) { this.qcOpen(); return; }
+          const data  = await resp.json();
+          await cache.delete('/__share_data__'); // einmal lesen, dann löschen
+
+          // Nicht älter als 30 Sekunden
+          if (Date.now() - (data.ts || 0) > 30000) { this.qcOpen(); return; }
+
           this.qcOpen();
-          this._toast('Bild wird geladen...');
+          if (data.title || data.text) {
+            const ta = document.getElementById('qc-text');
+            if (ta) { ta.value = [data.title, data.text].filter(Boolean).join(' '); this._qcUpdateActions(); }
+          }
+          if (data.imageData) {
+            this._qcPendingImage = data.imageData;
+            const preview = document.getElementById('qc-cam-preview');
+            if (preview) { preview.src = data.imageData; preview.style.display = 'block'; }
+            const btn = document.getElementById('qc-cam-btn');
+            if (btn) btn.style.borderColor = 'var(--c-beruf)';
+          }
+        } catch(err) {
+          console.error('[Share read]', err);
+          this.qcOpen();
         }
-      }, 3000);
+      }, 600);
     }
   },
 

@@ -1,5 +1,5 @@
-// WorkBench Service Worker v3.71.0 · Build 20260601-1945
-const BUILD = '20260601-1945';
+// WorkBench Service Worker v3.71.2 · Build 20260601-2030
+const BUILD = '20260601-2030';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -24,37 +24,43 @@ self.addEventListener('fetch', e => {
   if (e.request.method === 'POST' && url.pathname.includes('workbench.html')) {
     e.respondWith((async () => {
       try {
-        const formData  = await e.request.formData();
-        const image     = formData.get('share_image');
-        const title     = formData.get('share_title') || '';
-        const text      = formData.get('share_text')  || '';
-        const shareUrl  = formData.get('share_url')   || '';
+        const formData = await e.request.formData();
+        const image    = formData.get('share_image');
+        const title    = formData.get('share_title') || '';
+        const text     = formData.get('share_text')  || '';
+        const shareUrl = formData.get('share_url')   || '';
 
         let imageData = null;
         if (image && image instanceof File && image.size > 0) {
-          const ab  = await image.arrayBuffer();
-          const u8  = new Uint8Array(ab);
-          let bin   = '';
-          u8.forEach(b => bin += String.fromCharCode(b));
+          const ab = await image.arrayBuffer();
+          const u8 = new Uint8Array(ab);
+          let bin  = '';
+          // In Chunks konvertieren um Stack-Overflow zu vermeiden
+          const CHUNK = 8192;
+          for (let i = 0; i < u8.length; i += CHUNK) {
+            bin += String.fromCharCode(...u8.slice(i, i + CHUNK));
+          }
           imageData = 'data:' + image.type + ';base64,' + btoa(bin);
         }
 
-        // An alle offenen Clients schicken
-        const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        for (const client of allClients) {
-          client.postMessage({ type: 'SHARE_TARGET', title, text, url: shareUrl, imageData });
-        }
+        // Daten in Cache speichern damit App sie beim Start lesen kann
+        const cache = await caches.open('wb-share-v1');
+        await cache.put('/__share_data__', new Response(JSON.stringify({
+          title, text, url: shareUrl, imageData, ts: Date.now()
+        }), { headers: { 'Content-Type': 'application/json' } }));
+
       } catch(err) {
         console.error('[SW Share]', err);
       }
 
-      return Response.redirect('/workbench/workbench.html', 303);
+      // Zur App weiterleiten mit share-Flag
+      return Response.redirect('/workbench/workbench.html?wb_share=1', 303);
     })());
     return;
   }
 });
 
-// Notification-Click: App öffnen
+// Notification-Click
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   e.waitUntil(
