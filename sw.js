@@ -1,5 +1,5 @@
-// WorkBench Service Worker v3.71.2 · Build 20260601-2030
-const BUILD = '20260601-2030';
+// WorkBench Service Worker v3.71.4 · Build 20260601-2130
+const BUILD = '20260601-2130';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -35,7 +35,6 @@ self.addEventListener('fetch', e => {
           const ab = await image.arrayBuffer();
           const u8 = new Uint8Array(ab);
           let bin  = '';
-          // In Chunks konvertieren um Stack-Overflow zu vermeiden
           const CHUNK = 8192;
           for (let i = 0; i < u8.length; i += CHUNK) {
             bin += String.fromCharCode(...u8.slice(i, i + CHUNK));
@@ -43,17 +42,17 @@ self.addEventListener('fetch', e => {
           imageData = 'data:' + image.type + ';base64,' + btoa(bin);
         }
 
-        // Daten in Cache speichern damit App sie beim Start lesen kann
+        // In Cache speichern
         const cache = await caches.open('wb-share-v1');
-        await cache.put('/__share_data__', new Response(JSON.stringify({
-          title, text, url: shareUrl, imageData, ts: Date.now()
-        }), { headers: { 'Content-Type': 'application/json' } }));
+        const payload = JSON.stringify({ title, text, url: shareUrl, imageData, ts: Date.now() });
+        await cache.put('/__share_data__', new Response(payload, {
+          headers: { 'Content-Type': 'application/json' }
+        }));
 
       } catch(err) {
-        console.error('[SW Share]', err);
+        console.error('[SW Share Error]', err);
       }
 
-      // Zur App weiterleiten mit share-Flag
       return Response.redirect('/workbench/workbench.html?wb_share=1', 303);
     })());
     return;

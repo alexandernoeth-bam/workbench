@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.71.3</title>
+<title>WorkBench 3.71.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7326,7 +7326,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.3 · Build 20260601-2100</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.4 · Build 20260601-2130</div>
     </div>
 
     <!-- Welt -->
@@ -7510,7 +7510,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.71.3',
+  APP_VERSION: '3.71.4',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8679,41 +8679,55 @@ const WB = {
   // ── Schnell in Inbox ──────────────────────────────────
   // ── Share Target ──────────────────────────────────────
   _checkShareTarget() {
-    // Immer aus Cache lesen (URL wurde bereits bereinigt)
     document.getElementById('wb-reminder-overlay')?.classList.remove('open');
+    this._toast('Share: wird verarbeitet...');
 
-    // POST Share: Daten aus SW-Cache lesen
-    if ('caches' in window) {
-      (async () => {
-        try {
-          const cache = await caches.open('wb-share-v1');
-          const resp  = await cache.match('/__share_data__');
-          if (!resp) { this.qcOpen(); this._toast('Kein Bild gefunden'); return; }
-          const data  = await resp.json();
-          await cache.delete('/__share_data__');
-
-          // Nicht älter als 60 Sekunden
-          if (Date.now() - (data.ts || 0) > 60000) { this.qcOpen(); return; }
-
-          this.qcOpen();
-          if (data.title || data.text) {
-            const ta = document.getElementById('qc-text');
-            if (ta) { ta.value = [data.title, data.text].filter(Boolean).join(' '); this._qcUpdateActions(); }
-          }
-          if (data.imageData) {
-            this._qcPendingImage = data.imageData;
-            const preview = document.getElementById('qc-cam-preview');
-            if (preview) { preview.src = data.imageData; preview.style.display = 'block'; }
-            const btn = document.getElementById('qc-cam-btn');
-            if (btn) btn.style.borderColor = 'var(--c-beruf)';
-            this._toast('✓ Bild aus Teilen geladen');
-          }
-        } catch(err) {
-          console.error('[Share read]', err);
-          this.qcOpen();
-        }
-      })();
+    if (!('caches' in window)) {
+      this._toast('Share: kein Cache-Support');
+      this.qcOpen();
+      return;
     }
+
+    (async () => {
+      try {
+        const cache = await caches.open('wb-share-v1');
+        const resp  = await cache.match('/__share_data__');
+        if (!resp) {
+          this._toast('Share: kein Bild im Cache');
+          this.qcOpen();
+          return;
+        }
+        const data = await resp.json();
+        await cache.delete('/__share_data__');
+
+        const age = Date.now() - (data.ts || 0);
+        if (age > 120000) {
+          this._toast('Share: Daten zu alt (' + Math.round(age/1000) + 's)');
+          this.qcOpen();
+          return;
+        }
+
+        this.qcOpen();
+        if (data.title || data.text) {
+          const ta = document.getElementById('qc-text');
+          if (ta) { ta.value = [data.title, data.text].filter(Boolean).join(' '); this._qcUpdateActions(); }
+        }
+        if (data.imageData) {
+          this._qcPendingImage = data.imageData;
+          const preview = document.getElementById('qc-cam-preview');
+          if (preview) { preview.src = data.imageData; preview.style.display = 'block'; }
+          const btn = document.getElementById('qc-cam-btn');
+          if (btn) btn.style.borderColor = 'var(--c-beruf)';
+          this._toast('✓ Bild geladen — speichern mit "Als Notiz"');
+        } else {
+          this._toast('Share: Kein Bild-Daten');
+        }
+      } catch(err) {
+        this._toast('Share Fehler: ' + err.message);
+        console.error('[Share]', err);
+        this.qcOpen();
+      }
+    })();
   },
 
   _handleShare(data) {
