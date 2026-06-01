@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.70.5</title>
+<title>WorkBench 3.70.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -3743,7 +3743,7 @@ html, body {
     color: var(--c-faint);
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    width: 70px;
+    min-width: 110px;
     flex-shrink: 0;
   }
   .af-detail-val { flex: 1; color: var(--c-text); }
@@ -7326,7 +7326,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.70.5 · Build 20260601-1615</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.70.6 · Build 20260601-1630</div>
     </div>
 
     <!-- Welt -->
@@ -7506,7 +7506,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.70.5',
+  APP_VERSION: '3.70.6',
   APP_BUILD:   '20260526-0723',
 
 
@@ -10751,10 +10751,12 @@ const WB = {
       const bisMin = r.bis  ? parseInt(r.bis.split(':')[0])*60  + parseInt(r.bis.split(':')[1])  : 1440;
       if (hhmm < vonMin || hhmm > bisMin) continue;
 
-      // Intervall prüfen — beim ersten Mal (last=0) sofort zeigen
+      // Intervall prüfen
       const last = this._reminderLastShown[r.id] || 0;
+      const isFirstCall = last === 0;
       const minSinceLast = (Date.now() - last) / 60000;
-      if (last > 0 && minSinceLast < (r.intervall || 60)) continue;
+      if (isFirstCall && !r.beimStart) continue;
+      if (!isFirstCall && minSinceLast < (r.intervall || 60)) continue;
 
       // Zeigen
       this._reminderShow(r);
@@ -10798,9 +10800,14 @@ const WB = {
       + '<input type="text" value="' + (r.text||'').replace(/"/g,'&quot;') + '" placeholder="Text der Erinnerung" '
       + 'onchange="WB._reminderUpdate(' + idx + ',&quot;text&quot;,this.value)" '
       + 'style="flex:1;padding:6px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">'
+      + '<div style="display:flex;flex-direction:column;gap:4px;">'
       + '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;">'
-      + '<input type="checkbox" ' + (r.aktiv?'checked':'') + ' onchange="WB._reminderUpdate(' + idx + ',&quot;aktiv&quot;,this.checked)" style="width:16px;height:16px;accent-color:var(--c-beruf);">'
-      + '<span style="font-size:0.78rem;color:var(--c-muted);">An</span></label>'
+      + '<input type="checkbox" ' + (r.aktiv?'checked':'') + ' onchange="WB._reminderUpdate(' + idx + ',&quot;aktiv&quot;,this.checked)" style="width:15px;height:15px;accent-color:var(--c-beruf);">'
+      + '<span style="font-size:0.75rem;color:var(--c-muted);">An</span></label>'
+      + '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;" title="Beim App-Start sofort anzeigen">'
+      + '<input type="checkbox" ' + (r.beimStart?'checked':'') + ' onchange="WB._reminderUpdate(' + idx + ',&quot;beimStart&quot;,this.checked)" style="width:15px;height:15px;accent-color:var(--c-beruf);">'
+      + '<span style="font-size:0.75rem;color:var(--c-muted);">Start</span></label>'
+      + '</div>'
       + '</div>'
       + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
       + '<div style="display:flex;align-items:center;gap:4px;">'
@@ -10850,6 +10857,7 @@ const WB = {
       icon: '💧',
       text: 'Trinken nicht vergessen!',
       aktiv: true,
+      beimStart: true,
       von: '08:00',
       bis: '22:00',
       intervall: 60,
