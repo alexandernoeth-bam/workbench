@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.72.2</title>
+<title>WorkBench 3.72.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7345,7 +7345,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.72.2 · Build 20260601-2359</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.72.3 · Build 20260601-2359</div>
     </div>
 
     <!-- Welt -->
@@ -7529,7 +7529,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.72.2',
+  APP_VERSION: '3.72.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -21469,10 +21469,23 @@ const WB = {
     const now    = Date.now();
 
     if(this.nzActiveId) {
-      const store = this._nzStoreWrite(this._nzStore().find(n=>n.id===this.nzActiveId)?._db || welt);
-      const orig  = store.find(n => n.id===this.nzActiveId);
-      const archiv = document.getElementById('nz-ed-archiv')?.checked || false;
-      if(orig) { orig.titel=titel; orig.typ=typ; orig.inhalt=inhalt; orig.geaendert=now; orig.archiv=archiv; }
+      const archiv  = document.getElementById('nz-ed-archiv')?.checked || false;
+      const allNow  = this._nzStore();
+      const origMeta = allNow.find(n => n.id===this.nzActiveId);
+      const oldWelt  = origMeta?._db || welt;
+
+      if (oldWelt !== welt) {
+        // Welt gewechselt: aus alter DB löschen, in neue einfügen
+        const oldStore = this._nzStoreWrite(oldWelt);
+        const idx = oldStore.findIndex(n => n.id===this.nzActiveId);
+        if (idx >= 0) oldStore.splice(idx, 1);
+        const newStore = this._nzStoreWrite(welt);
+        newStore.push({id:this.nzActiveId, titel, typ, inhalt, welt, archiv, erstellt: origMeta?.erstellt||now, geaendert:now});
+      } else {
+        const store = this._nzStoreWrite(welt);
+        const orig  = store.find(n => n.id===this.nzActiveId);
+        if(orig) { orig.titel=titel; orig.typ=typ; orig.inhalt=inhalt; orig.geaendert=now; orig.archiv=archiv; }
+      }
     } else {
       const store = this._nzStoreWrite(welt);
       const newId = String(now);
