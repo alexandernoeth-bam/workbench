@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.70.7</title>
+<title>WorkBench 3.71.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7326,7 +7326,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.70.7 · Build 20260601-1900</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.0 · Build 20260601-1945</div>
     </div>
 
     <!-- Welt -->
@@ -7376,6 +7376,10 @@ html, body {
       <button class="wb-menu-item" onclick="WB.planListOpen(); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         <span class="label">Meine Pläne</span>
+      </button>
+      <button class="wb-menu-item" onclick="WB.schnellListeOpen(); WB.closeMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span class="label">Schnell-Erledigungen</span>
       </button>
       <button class="wb-menu-item" onclick="WB._goTab('planer'); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="14" x2="17" y2="14"/><line x1="7" y1="17" x2="13" y2="17"/></svg>
@@ -7506,7 +7510,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.70.7',
+  APP_VERSION: '3.71.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8673,6 +8677,107 @@ const WB = {
   },
 
   // ── Schnell in Inbox ──────────────────────────────────
+  // ── Share Target ──────────────────────────────────────
+  _checkShareTarget() {
+    // GET Share: ?share_title=...&share_text=...&share_url=...
+    const p = new URLSearchParams(window.location.search);
+    if (!p.has('share_title') && !p.has('share_text') && !p.has('share_url')) return;
+
+    const title = p.get('share_title') || '';
+    const text  = p.get('share_text')  || '';
+    const url   = p.get('share_url')   || '';
+    const combined = [title, text, url].filter(Boolean).join(' ');
+
+    if (combined) {
+      // URL-Parameter entfernen ohne Reload
+      window.history.replaceState({}, '', window.location.pathname);
+      // Quick Capture öffnen mit Text
+      setTimeout(() => {
+        this.qcOpen();
+        const ta = document.getElementById('qc-text');
+        if (ta) { ta.value = combined; this._qcUpdateActions(); }
+      }, 500);
+    }
+  },
+
+  _handleShare(data) {
+    // POST Share: Bild + Text vom Service Worker
+    setTimeout(() => {
+      this.qcOpen();
+      const ta = document.getElementById('qc-text');
+      if (ta && (data.title || data.text)) {
+        ta.value = [data.title, data.text].filter(Boolean).join(' ');
+        this._qcUpdateActions();
+      }
+      if (data.imageData) {
+        // Bild in Quick Capture laden
+        this._qcPendingImage = data.imageData;
+        const preview = document.getElementById('qc-cam-preview');
+        if (preview) { preview.src = data.imageData; preview.style.display = 'block'; }
+        const btn = document.getElementById('qc-cam-btn');
+        if (btn) btn.style.borderColor = 'var(--c-beruf)';
+      }
+    }, 800);
+  },
+
+  // ── Schnell-Liste ─────────────────────────────────────
+  schnellListeOpen() {
+    const overlay = document.getElementById('wb-schnell-overlay');
+    if (overlay) { overlay.style.display = 'flex'; this._schnellListeRender(); }
+  },
+
+  schnellListeClose() {
+    const overlay = document.getElementById('wb-schnell-overlay');
+    if (overlay) overlay.style.display = 'none';
+  },
+
+  _schnellListeRender() {
+    const body = document.getElementById('wb-schnell-body');
+    if (!body) return;
+    const store = this._quickStore() || [];
+    const today = new Date().toISOString().split('T')[0];
+
+    const offene   = store.filter(i => !i.done).sort((a,b) => (a.date||'').localeCompare(b.date||'') || (a.time||'99:99').localeCompare(b.time||'99:99'));
+    const erledigte = store.filter(i => i.done).slice(-10).reverse();
+
+    if (!offene.length && !erledigte.length) {
+      body.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--c-faint);font-size:0.9rem;">Keine Schnell-Erledigungen</div>';
+      return;
+    }
+
+    const renderItem = (item) => {
+      const isToday    = item.date === today;
+      const isPast     = item.date && item.date < today;
+      const dateLabel  = item.date === today ? 'Heute' : item.date === new Date(new Date().setDate(new Date().getDate()+1)).toISOString().split('T')[0] ? 'Morgen' : item.date || '';
+      const dateColor  = isPast ? '#C62828' : 'var(--c-muted)';
+
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--c-border);">'
+        + '<input type="checkbox" ' + (item.done?'checked':'') + ' onchange="WB._quickToggle(&quot;' + item.id + '&quot;,this);WB._schnellListeRender()" '
+        + 'style="width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:var(--c-beruf);">'
+        + '<div style="flex:1;min-width:0;cursor:pointer;" onclick="WB._quickDetail(&quot;' + item.id + '&quot;)">'
+        + '<div style="font-size:0.88rem;color:' + (item.done?'var(--c-faint)':'var(--c-text)') + ';' + (item.done?'text-decoration:line-through;':'') + '">' + item.text + '</div>'
+        + '<div style="font-size:0.72rem;color:' + dateColor + ';margin-top:2px;">'
+        + (dateLabel ? dateLabel : '') + (item.time ? (dateLabel?' · ':'')+item.time : '') + '</div>'
+        + '</div>'
+        + '<button onclick="WB._quickDetail(&quot;' + item.id + '&quot;)" style="background:none;border:none;cursor:pointer;color:var(--c-faint);font-size:1rem;padding:2px 6px;">›</button>'
+        + '</div>';
+    };
+
+    let html = '';
+
+    if (offene.length) {
+      html += '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--c-muted);padding:14px 0 6px;">Offen (' + offene.length + ')</div>';
+      html += offene.map(renderItem).join('');
+    }
+
+    if (erledigte.length) {
+      html += '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--c-faint);padding:18px 0 6px;">Zuletzt erledigt</div>';
+      html += erledigte.map(renderItem).join('');
+    }
+
+    body.innerHTML = html;
+  },
+
   // ── Quick Capture: Zeilen-Import ──────────────────────
   _qcUpdateActions() {
     const box = document.getElementById('qc-actions');
@@ -10541,6 +10646,16 @@ const WB = {
           this._goTab('cockpit');
     this._updateTabbarMode('cockpit');
     // _reminderInit wird nach DB-Load aufgerufen (in _onFileLoaded)
+    // Share Target: URL-Parameter prüfen
+    this._checkShareTarget();
+    // Service Worker Message Listener
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener('message', e => {
+        if (e.data?.type === 'SHARE_TARGET') WB._handleShare(e.data);
+      });
+    }
+    // Clipboard Paste (Bilder)
+    document.addEventListener('paste', e => WB._nzPasteImage(e));
           if (bar) bar.classList.remove('visible');
           // Scout beim Auto-Return immer neu auswählen
           this._scoutLastShown = null;
@@ -12379,39 +12494,6 @@ const WB = {
     }
 
     // ── Inbox-Badge in Header ─────────────────────────────
-    // ── Morgen-Vorschau ──────────────────────────────────
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
-    const morgenItems = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-      if (!db) return;
-      (db.customEvents || []).forEach(ev => {
-        if (ev.date === tomorrowStr) morgenItems.push({ time: ev.startTime||'', title: ev.text });
-      });
-      Object.values(db.projects || {}).forEach(p => {
-        (p.tasks || []).filter(t => !t.done && t.date === tomorrowStr).forEach(t => {
-          morgenItems.push({ time: t.time||'', title: t.text });
-        });
-      });
-    });
-    (this._quickStore() || []).filter(i => !i.done && i.date === tomorrowStr).forEach(i => {
-      morgenItems.push({ time: i.time||'', title: i.text });
-    });
-    if (morgenItems.length) {
-      morgenItems.sort((a,b) => (a.time||'99:99').localeCompare(b.time||'99:99'));
-      const morgenHtml = '<div style="margin-top:16px;padding-top:10px;border-top:1px solid var(--c-border);">'
-        + '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--c-faint);margin-bottom:6px;">Morgen</div>'
-        + morgenItems.map(it =>
-            '<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--c-border);font-size:0.82rem;color:var(--c-muted);">'
-            + '<span style="width:40px;text-align:right;font-family:var(--font-mono);font-size:0.72rem;flex-shrink:0;">' + (it.time || '') + '</span>'
-            + '<span>' + it.title + '</span>'
-            + '</div>'
-          ).join('')
-        + '</div>';
-      liste.insertAdjacentHTML('beforeend', morgenHtml);
-    }
 
     this._inboxUpdateMenuSub();
   },
@@ -21111,6 +21193,30 @@ const WB = {
   },
 
   // ── Rendering ────────────────────────────────────────
+  _nzPasteImage(e) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file   = item.getAsFile();
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          // Bild in Quick Capture laden
+          this._qcPendingImage = ev.target.result;
+          this.qcOpen();
+          const preview = document.getElementById('qc-cam-preview');
+          if (preview) { preview.src = ev.target.result; preview.style.display = 'block'; }
+          const btn = document.getElementById('qc-cam-btn');
+          if (btn) btn.style.borderColor = 'var(--c-beruf)';
+          this._toast('✓ Bild aus Zwischenablage — speichern mit "Als Notiz"');
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
+  },
+
   renderNotizen() {
     const scroll = document.getElementById('notizen-scroll');
     if(!scroll) return;
@@ -23701,6 +23807,16 @@ WB.init();
     <button onclick="WB._planEdit()" style="background:none;border:none;cursor:pointer;padding:4px 8px;font-size:0.78rem;color:var(--c-beruf);font-family:var(--font);font-weight:600;">⚙</button>
   </div>
   <div id="wb-plan-body"></div>
+</div>
+
+<!-- SCHNELL-LISTE OVERLAY -->
+<div id="wb-schnell-overlay" style="position:fixed;inset:0;z-index:290;background:var(--c-bg);display:none;flex-direction:column;">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:2px solid var(--c-beruf);background:var(--c-surface);flex-shrink:0;">
+    <button onclick="WB.schnellListeClose()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--c-muted);padding:0;line-height:1;">&#8249;</button>
+    <div style="flex:1;font-size:1rem;font-weight:800;color:var(--c-text);">Schnell-Erledigungen</div>
+    <button onclick="WB._quickAdd()" style="background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);padding:7px 14px;font-family:var(--font);font-size:0.82rem;font-weight:600;cursor:pointer;">+ Neu</button>
+  </div>
+  <div id="wb-schnell-body" style="flex:1;overflow-y:auto;padding:0 16px 32px;"></div>
 </div>
 
 <!-- PLAN-LISTE OVERLAY -->
