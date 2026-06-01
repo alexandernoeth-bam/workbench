@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.67.1</title>
+<title>WorkBench 3.68.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5531,6 +5531,311 @@ html, body {
 }
 .pm-kosten-result-row.rot { color: #C62828; }
 
+
+/* ══════════════════════════════════════════════════
+   PLAN-DOKUMENTE v3.68.0
+══════════════════════════════════════════════════ */
+
+/* Plan-Overlay */
+#wb-plan-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: var(--c-bg);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+  overflow: hidden;
+}
+#wb-plan-overlay.open { transform: translateY(0); }
+
+#wb-plan-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 2px solid var(--c-beruf);
+  background: var(--c-surface);
+  flex-shrink: 0;
+}
+#wb-plan-back {
+  background: none; border: none;
+  font-size: 1.4rem; cursor: pointer;
+  color: var(--c-muted); padding: 0; line-height: 1;
+}
+#wb-plan-title {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--c-text);
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: var(--font);
+  padding: 2px 0;
+}
+#wb-plan-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0 80px;
+}
+
+/* Plan-Abschnitt */
+.plan-section {
+  border-bottom: 1px solid var(--c-border);
+}
+.plan-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--c-surface);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.plan-section-header:active { opacity: 0.8; }
+.plan-section-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  width: 28px;
+  text-align: center;
+}
+.plan-section-title {
+  flex: 1;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--c-text);
+}
+.plan-section-badge {
+  font-size: 0.72rem;
+  color: var(--c-muted);
+  font-family: var(--font-mono);
+}
+.plan-section-toggle {
+  font-size: 0.7rem;
+  color: var(--c-faint);
+  transition: transform 0.2s;
+}
+.plan-section-toggle.open { transform: rotate(90deg); }
+.plan-section-body {
+  padding: 12px 16px 16px;
+  display: none;
+}
+.plan-section-body.open { display: block; }
+
+/* Vision Block */
+.plan-vision-text {
+  width: 100%;
+  min-height: 80px;
+  resize: none;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-family: var(--font);
+  font-size: 0.88rem;
+  color: var(--c-text);
+  background: var(--c-bg);
+  line-height: 1.6;
+  box-sizing: border-box;
+}
+.plan-vision-text:focus { outline: none; border-color: var(--c-beruf); }
+
+/* Aufgaben im Plan */
+.plan-task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+.plan-task-row:last-child { border-bottom: none; }
+.plan-task-chk {
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--c-beruf);
+}
+.plan-task-text {
+  flex: 1;
+  font-size: 0.86rem;
+  color: var(--c-text);
+}
+.plan-task-text.done {
+  text-decoration: line-through;
+  color: var(--c-faint);
+}
+
+/* Habit-Tracking */
+.habit-row {
+  margin-bottom: 14px;
+}
+.habit-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--c-text);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.habit-streak {
+  font-size: 0.72rem;
+  color: var(--c-beruf);
+  font-family: var(--font-mono);
+}
+.habit-grid {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.habit-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--c-border);
+  cursor: pointer;
+  border: none;
+  position: relative;
+  transition: background 0.15s;
+}
+.habit-dot.done { background: var(--c-beruf); }
+.habit-dot.today { box-shadow: 0 0 0 2px var(--c-beruf); }
+.habit-dot-label {
+  font-size: 0.55rem;
+  color: var(--c-faint);
+  text-align: center;
+  margin-top: 2px;
+}
+
+/* Metriken */
+.metric-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+.metric-row:last-child { border-bottom: none; }
+.metric-label {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--c-text);
+}
+.metric-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--c-beruf);
+  font-family: var(--font-mono);
+  min-width: 60px;
+  text-align: right;
+}
+.metric-unit {
+  font-size: 0.75rem;
+  color: var(--c-muted);
+  min-width: 30px;
+}
+.metric-input {
+  width: 70px;
+  padding: 5px 8px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  text-align: right;
+  background: var(--c-bg);
+  color: var(--c-text);
+}
+
+/* Reflexion */
+.reflexion-entry {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+.reflexion-entry:last-child { border-bottom: none; }
+.reflexion-date {
+  font-size: 0.72rem;
+  color: var(--c-muted);
+  font-family: var(--font-mono);
+  margin-bottom: 4px;
+}
+.reflexion-text {
+  font-size: 0.85rem;
+  color: var(--c-text);
+  line-height: 1.6;
+}
+
+/* Plan-Liste (Übersicht) */
+.plan-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.plan-card:active { opacity: 0.8; }
+.plan-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.plan-card-icon { font-size: 1.2rem; }
+.plan-card-title {
+  flex: 1;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--c-text);
+}
+.plan-card-typ {
+  font-size: 0.7rem;
+  color: var(--c-muted);
+  background: var(--c-bg);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.plan-card-meta {
+  font-size: 0.75rem;
+  color: var(--c-muted);
+}
+.plan-card-link {
+  font-size: 0.72rem;
+  color: var(--c-beruf);
+  margin-top: 4px;
+}
+
+/* Fortschrittsring */
+.plan-progress-ring {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+}
+.plan-ring-svg { flex-shrink: 0; }
+.plan-ring-info { flex: 1; }
+.plan-ring-pct {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--c-beruf);
+  line-height: 1;
+}
+.plan-ring-label {
+  font-size: 0.75rem;
+  color: var(--c-muted);
+  margin-top: 2px;
+}
+.plan-ring-link {
+  font-size: 0.78rem;
+  color: var(--c-beruf);
+  font-weight: 600;
+}
+
 </style>
 </head>
 <body>
@@ -6717,7 +7022,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.67.1 · Build 20260601-0815</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.68.0 · Build 20260601-1000</div>
     </div>
 
     <!-- Welt -->
@@ -6764,6 +7069,10 @@ html, body {
     <!-- Bereiche -->
     <div class="wb-menu-section">
       <div class="wb-menu-section-label">Bereiche</div>
+      <button class="wb-menu-item" onclick="WB.planListOpen(); WB.closeMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span class="label">Meine Pläne</span>
+      </button>
       <button class="wb-menu-item" onclick="WB._goTab('planer'); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="14" x2="17" y2="14"/><line x1="7" y1="17" x2="13" y2="17"/></svg>
         <span class="label">Planer</span>
@@ -6893,7 +7202,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.67.1',
+  APP_VERSION: '3.68.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -9966,6 +10275,549 @@ const WB = {
 
     document.body.appendChild(overlay);
   },
+  // ══════════════════════════════════════════════════════
+  // PLAN-DOKUMENTE v3.68.0
+  // ══════════════════════════════════════════════════════
+
+  PLAN_TYPEN: {
+    sport:      { label: 'Sport & Fitness',   icon: '🏃', sektionen: ['vision','aufgaben','habits','metriken','reflexion'] },
+    ernaehrung: { label: 'Ernährung',          icon: '🥗', sektionen: ['vision','aufgaben','habits','metriken','reflexion'] },
+    projekt:    { label: 'Projekt-Plan',       icon: '🏗',  sektionen: ['vision','phasen','aufgaben','termine','reflexion'] },
+    baustelle:  { label: 'Baustellen-Plan',    icon: '⚠',   sektionen: ['vision','kosten','aufgaben','entscheid','reflexion'] },
+    allgemein:  { label: 'Allgemeiner Plan',   icon: '📋',  sektionen: ['vision','aufgaben','habits','metriken','termine','reflexion'] },
+  },
+
+  _planStore() {
+    const db = this.dataPriv || this.dataPro;
+    if (!db) return null;
+    if (!db.plaene) db.plaene = [];
+    return db.plaene;
+  },
+
+  _planActive: null,
+  _planSektionenOpen: {},
+
+  // ── Plan-Liste öffnen ─────────────────────────────────
+  _closeAllSheets() {
+    document.querySelectorAll('[style*="rgba(0,0,0"]').forEach(e => e.remove());
+  },
+
+  planListOpen() {
+    const overlay = document.getElementById('wb-planlist-overlay');
+    if (overlay) { overlay.style.display = 'flex'; this._planListRender(); }
+  },
+
+  _planListRender() {
+    const body = document.getElementById('wb-planlist-body');
+    if (!body) return;
+    const store = this._planStore() || [];
+
+    if (!store.length) {
+      body.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--c-faint);">'
+        + '<div style="font-size:2rem;margin-bottom:12px;">📋</div>'
+        + '<div style="font-size:0.9rem;margin-bottom:16px;">Noch keine Pläne — erstelle deinen ersten Plan.</div>'
+        + '<button onclick="WB.planNeu()" style="background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-sm);padding:10px 20px;font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;">+ Neuer Plan</button>'
+        + '</div>';
+      return;
+    }
+
+    body.innerHTML = store.map((p, idx) => {
+      const typ = this.PLAN_TYPEN[p.typ] || this.PLAN_TYPEN.allgemein;
+      const link = p.zielId ? (this._goalStore()?.find(g => g.id === p.zielId)?.title || '')
+                 : p.projektKey ? p.projektKey : '';
+      const habits = (p.habits || []).length;
+      const tasks  = (p.aufgaben || []).length;
+      const tasksDone = (p.aufgaben || []).filter(t => t.done).length;
+      return '<div class="plan-card" onclick="WB.planOpen(' + idx + ')">'
+        + '<div class="plan-card-header">'
+        + '<span class="plan-card-icon">' + typ.icon + '</span>'
+        + '<span class="plan-card-title">' + p.titel + '</span>'
+        + '<span class="plan-card-typ">' + typ.label + '</span>'
+        + '</div>'
+        + (link ? '<div class="plan-card-link">→ ' + link + '</div>' : '')
+        + '<div class="plan-card-meta">'
+        + (tasks ? tasksDone + '/' + tasks + ' Aufgaben · ' : '')
+        + (habits ? habits + ' Habits · ' : '')
+        + 'Erstellt ' + (p.erstellt || '').slice(0,10)
+        + '</div>'
+        + '</div>';
+    }).join('');
+  },
+
+  // ── Neuen Plan anlegen ────────────────────────────────
+  planNeu() {
+    // Sheet mit Typ-Auswahl + Verknüpfung
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;z-index:600;';
+    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
+
+    // Ziele + Projekte für Verknüpfung
+    const goals = this._goalStore() || [];
+    const projekte = [];
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      Object.keys(db?.projects || {}).forEach(k => {
+        if (!k.toLowerCase().includes('system') && !k.toLowerCase().includes('tageslog'))
+          projekte.push({ key: k, ctx });
+      });
+    });
+
+    const typOpts = Object.entries(this.PLAN_TYPEN).map(([k,v]) =>
+      '<button onclick="WB._planNeuTyp(this,&quot;' + k + '&quot;)" data-typ="' + k + '" style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 14px;margin-bottom:6px;background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-sm);font-family:var(--font);font-size:0.88rem;cursor:pointer;text-align:left;color:var(--c-text);">'
+        + '<span style="font-size:1.2rem;">' + v.icon + '</span><span>' + v.label + '</span></button>'
+    ).join('');
+
+    const linkOpts = '<option value="">— Kein Ziel/Projekt</option>'
+      + goals.map(g => '<option value="ziel:' + g.id + '">' + g.title + ' (Ziel)</option>').join('')
+      + projekte.map(p => '<option value="proj:' + p.key + ':' + p.ctx + '">' + p.key + ' (Projekt)</option>').join('');
+
+    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto;">'
+      + '<div style="font-size:0.8rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:4px;">Neuer Plan</div>'
+      + '<input id="plan-neu-titel" type="text" placeholder="Titel des Plans..." style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:14px;">'
+      + '<div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:8px;font-weight:600;">Plantyp wählen</div>'
+      + '<div id="plan-typ-list">' + typOpts + '</div>'
+      + '<div style="margin:14px 0 8px;"><div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:6px;font-weight:600;">Verknüpfen mit (Ziel, Projekt oder Baustelle)</div>'
+      + '<select id="plan-neu-link" style="width:100%;padding:9px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">'
+      + linkOpts + '</select></div>'
+      + '<input type="hidden" id="plan-neu-typ" value="allgemein">'
+      + '<div style="display:flex;gap:8px;margin-top:14px;">'
+      + '<button onclick="WB._closeAllSheets()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Abbrechen</button>'
+      + '<button onclick="WB._planNeuSpeichern()" style="flex:2;padding:11px;background:var(--c-beruf);border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;color:#fff;">Plan anlegen</button>'
+      + '</div></div>';
+
+    document.body.appendChild(sheet);
+    setTimeout(() => document.getElementById('plan-neu-titel')?.focus(), 50);
+  },
+
+  _planNeuTyp(btn, typ) {
+    document.querySelectorAll('[data-typ]').forEach(b => b.style.background = 'var(--c-bg)');
+    btn.style.background = 'rgba(13,122,107,0.1)';
+    btn.style.borderColor = 'var(--c-beruf)';
+    document.getElementById('plan-neu-typ').value = typ;
+  },
+
+  _planNeuSpeichern() {
+    const titel = document.getElementById('plan-neu-titel')?.value.trim();
+    const typ   = document.getElementById('plan-neu-typ')?.value || 'allgemein';
+    const link  = document.getElementById('plan-neu-link')?.value || '';
+    if (!titel) { document.getElementById('plan-neu-titel')?.focus(); return; }
+
+    const store = this._planStore();
+    if (!store) { this._toast('Bitte zuerst Datenbank laden'); return; }
+
+    const plan = {
+      id: 'plan_' + Date.now(),
+      titel,
+      typ,
+      erstellt: new Date().toISOString().split('T')[0],
+      vision: '',
+      aufgaben: [],
+      habits: [],
+      metriken: [],
+      reflexionen: [],
+      termine: [],
+      sektionenOpen: {},
+    };
+
+    // Verknüpfung
+    if (link.startsWith('ziel:')) plan.zielId = link.slice(5);
+    else if (link.startsWith('proj:')) {
+      const parts = link.split(':');
+      plan.projektKey = parts[1];
+      plan.projektCtx = parts[2];
+    }
+
+    store.push(plan);
+    this.setDirty();
+    document.querySelector('[style*="z-index:600"]')?.remove();
+    this._planListRender();
+    this.planOpen(store.length - 1);
+    this._toast('Plan "' + titel + '" angelegt');
+  },
+
+  // ── Plan öffnen ───────────────────────────────────────
+  planOpen(idx) {
+    const store = this._planStore();
+    if (!store?.[idx]) return;
+    this._planActive = idx;
+    document.getElementById('wb-plan-overlay')?.classList.add('open');
+    document.getElementById('wb-planlist-overlay') && (document.getElementById('wb-planlist-overlay').style.display = 'none');
+    this._planRender();
+  },
+
+  planClose() {
+    document.getElementById('wb-plan-overlay')?.classList.remove('open');
+    this._planActive = null;
+  },
+
+  // ── Plan rendern ──────────────────────────────────────
+  _planRender() {
+    const store = this._planStore();
+    const idx   = this._planActive;
+    if (idx === null || !store?.[idx]) return;
+    const plan  = store[idx];
+    const typ   = this.PLAN_TYPEN[plan.typ] || this.PLAN_TYPEN.allgemein;
+    const today = new Date().toISOString().split('T')[0];
+
+    // Titel
+    const titleEl = document.getElementById('wb-plan-title');
+    if (titleEl) titleEl.textContent = typ.icon + ' ' + plan.titel;
+
+    const body = document.getElementById('wb-plan-body');
+    if (!body) return;
+
+    // Fortschrittsring
+    const aufgaben = plan.aufgaben || [];
+    const done = aufgaben.filter(t => t.done).length;
+    const total = aufgaben.length;
+    const pct = total ? Math.round(done/total*100) : 0;
+    const r = 28, circ = Math.round(2 * Math.PI * r);
+    const offset = circ - Math.round(pct/100 * circ);
+
+    // Verknüpfung anzeigen
+    let linkHtml = '';
+    if (plan.zielId) {
+      const g = this._goalStore()?.find(g => g.id === plan.zielId);
+      if (g) linkHtml = '<span class="plan-ring-link">→ Ziel: ' + g.title + '</span>';
+    } else if (plan.projektKey) {
+      linkHtml = '<span class="plan-ring-link">→ Projekt: ' + plan.projektKey + '</span>';
+    }
+
+    let html = '<div class="plan-progress-ring">'
+      + '<svg class="plan-ring-svg" width="70" height="70" viewBox="0 0 70 70">'
+      + '<circle cx="35" cy="35" r="' + r + '" fill="none" stroke="var(--c-border)" stroke-width="6"/>'
+      + '<circle cx="35" cy="35" r="' + r + '" fill="none" stroke="var(--c-beruf)" stroke-width="6"'
+      + ' stroke-dasharray="' + circ + '" stroke-dashoffset="' + offset + '"'
+      + ' stroke-linecap="round" transform="rotate(-90 35 35)"/>'
+      + '<text x="35" y="39" text-anchor="middle" font-size="14" font-weight="800" fill="var(--c-beruf)" font-family="var(--font)">' + pct + '%</text>'
+      + '</svg>'
+      + '<div class="plan-ring-info">'
+      + '<div class="plan-ring-pct">' + plan.titel + '</div>'
+      + '<div class="plan-ring-label">' + typ.label + (total ? ' · ' + done + '/' + total + ' Aufgaben' : '') + '</div>'
+      + linkHtml
+      + '</div>'
+      + '</div>';
+
+    // Sektionen aufbauen
+    const sektionen = typ.sektionen || ['vision','aufgaben','reflexion'];
+
+    sektionen.forEach(sk => {
+      const isOpen = plan.sektionenOpen?.[sk] !== false; // default offen
+      html += this._planSektionHtml(plan, sk, isOpen, today, idx);
+    });
+
+    body.innerHTML = html;
+  },
+
+  _planSektionHtml(plan, sk, isOpen, today, planIdx) {
+    const configs = {
+      vision:    { icon: '🎯', label: 'Vision & Warum' },
+      aufgaben:  { icon: '✓',  label: 'Aufgaben' },
+      habits:    { icon: '🔥', label: 'Habit-Tracking' },
+      metriken:  { icon: '📊', label: 'Metriken' },
+      termine:   { icon: '📅', label: 'Termine' },
+      reflexion: { icon: '💭', label: 'Reflexion' },
+      phasen:    { icon: '🗺', label: 'Phasen & Meilensteine' },
+      kosten:    { icon: '💰', label: 'Kosten-Klarheit' },
+      entscheid: { icon: '⚡', label: 'Entscheidung' },
+    };
+    const cfg = configs[sk] || { icon: '•', label: sk };
+
+    let badge = '';
+    if (sk === 'aufgaben') {
+      const done = (plan.aufgaben||[]).filter(t=>t.done).length;
+      badge = done + '/' + (plan.aufgaben||[]).length;
+    } else if (sk === 'habits') {
+      badge = (plan.habits||[]).length + ' Habits';
+    } else if (sk === 'metriken') {
+      badge = (plan.metriken||[]).length + ' Werte';
+    } else if (sk === 'reflexion') {
+      badge = (plan.reflexionen||[]).length + ' Einträge';
+    }
+
+    let bodyHtml = '';
+
+    if (sk === 'vision') {
+      bodyHtml = '<textarea class="plan-vision-text" placeholder="Warum ist mir das wichtig? Was will ich erreichen?"'
+        + ' onblur="WB._planSaveVision(' + planIdx + ',this.value)">'
+        + (plan.vision || '') + '</textarea>';
+
+    } else if (sk === 'aufgaben') {
+      const tasks = plan.aufgaben || [];
+      bodyHtml = tasks.map((t,ti) =>
+        '<div class="plan-task-row">'
+        + '<input type="checkbox" class="plan-task-chk" ' + (t.done?'checked':'') + ' onchange="WB._planTaskToggle(' + planIdx + ',' + ti + ',this)">'
+        + '<span class="plan-task-text' + (t.done?' done':'') + '">' + t.text + '</span>'
+        + '<button onclick="WB._planTaskDelete(' + planIdx + ',' + ti + ')" style="background:none;border:none;cursor:pointer;color:var(--c-faint);font-size:1rem;padding:0 4px;">×</button>'
+        + '</div>'
+      ).join('');
+      bodyHtml += '<div style="display:flex;gap:6px;margin-top:10px;">'
+        + '<input id="plan-task-input-' + planIdx + '" type="text" placeholder="Neue Aufgabe..." style="flex:1;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"'
+        + ' onkeydown="if(event.key===&quot;Enter&quot;)WB._planTaskAdd(' + planIdx + ')">'
+        + '<button onclick="WB._planTaskAdd(' + planIdx + ')" style="padding:8px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;cursor:pointer;">+</button>'
+        + '</div>';
+
+    } else if (sk === 'habits') {
+      const habits = plan.habits || [];
+      if (!habits.length) {
+        bodyHtml = '<div style="color:var(--c-faint);font-size:0.85rem;margin-bottom:10px;">Noch keine Habits definiert.</div>';
+      }
+      bodyHtml += habits.map((h,hi) => {
+        const days = 28; // 4 Wochen
+        const now = new Date();
+        const dots = Array.from({length:days}, (_,di) => {
+          const d = new Date(now);
+          d.setDate(now.getDate() - (days-1-di));
+          const ds = d.toISOString().split('T')[0];
+          const isDone = (h.log || {})[ds];
+          const isToday = ds === today;
+          const dayLbl = di % 7 === 0 ? ['Mo','Di','Mi','Do','Fr','Sa','So'][d.getDay()===0?6:d.getDay()-1] : '';
+          return '<div style="display:flex;flex-direction:column;align-items:center;">'
+            + '<button class="habit-dot' + (isDone?' done':'') + (isToday?' today':'') + '"'
+            + ' onclick="WB._planHabitToggle(' + planIdx + ',' + hi + ',&quot;' + ds + '&quot;)" title="' + ds + '"></button>'
+            + '<div class="habit-dot-label">' + dayLbl + '</div>'
+            + '</div>';
+        }).join('');
+
+        // Streak berechnen
+        let streak = 0;
+        for (let di = 0; di < 365; di++) {
+          const d = new Date(now);
+          d.setDate(now.getDate() - di);
+          const ds = d.toISOString().split('T')[0];
+          if ((h.log||{})[ds]) streak++;
+          else break;
+        }
+
+        return '<div class="habit-row">'
+          + '<div class="habit-name">' + h.name
+          + '<span class="habit-streak">' + (streak ? '🔥 ' + streak + ' Tage' : '') + '</span>'
+          + '<button onclick="WB._planHabitDelete(' + planIdx + ',' + hi + ')" style="background:none;border:none;cursor:pointer;color:var(--c-faint);font-size:0.85rem;margin-left:8px;">×</button>'
+          + '</div>'
+          + '<div class="habit-grid">' + dots + '</div>'
+          + '</div>';
+      }).join('');
+
+      bodyHtml += '<div style="display:flex;gap:6px;margin-top:8px;">'
+        + '<input id="plan-habit-input-' + planIdx + '" type="text" placeholder="Neuer Habit (z.B. Sport, Wasser)..." style="flex:1;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"'
+        + ' onkeydown="if(event.key===&quot;Enter&quot;)WB._planHabitAdd(' + planIdx + ')">'
+        + '<button onclick="WB._planHabitAdd(' + planIdx + ')" style="padding:8px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;cursor:pointer;">+</button>'
+        + '</div>';
+
+    } else if (sk === 'metriken') {
+      const metriken = plan.metriken || [];
+      if (!metriken.length) {
+        bodyHtml = '<div style="color:var(--c-faint);font-size:0.85rem;margin-bottom:10px;">Noch keine Metriken definiert.</div>';
+      }
+      bodyHtml += metriken.map((m,mi) => {
+        const entries = Object.entries(m.log||{}).sort((a,b) => b[0].localeCompare(a[0]));
+        const latest = entries[0];
+        return '<div class="metric-row">'
+          + '<span class="metric-label">' + m.name + '</span>'
+          + '<input type="number" class="metric-input" step="any" value="' + (latest?.[1]||'') + '" placeholder="Wert"'
+          + ' onchange="WB._planMetrikLog(' + planIdx + ',' + mi + ',this.value)">'
+          + '<span class="metric-unit">' + (m.einheit||'') + '</span>'
+          + '<button onclick="WB._planMetrikDelete(' + planIdx + ',' + mi + ')" style="background:none;border:none;cursor:pointer;color:var(--c-faint);">×</button>'
+          + '</div>';
+      }).join('');
+
+      bodyHtml += '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'
+        + '<input id="plan-metrik-name-' + planIdx + '" type="text" placeholder="Name (z.B. Gewicht)" style="flex:2;min-width:100px;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);">'
+        + '<input id="plan-metrik-unit-' + planIdx + '" type="text" placeholder="Einheit (kg)" style="flex:1;min-width:60px;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);">'
+        + '<button onclick="WB._planMetrikAdd(' + planIdx + ')" style="padding:7px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;cursor:pointer;">+</button>'
+        + '</div>';
+
+    } else if (sk === 'reflexion') {
+      const reflexionen = (plan.reflexionen||[]).slice().reverse();
+      bodyHtml = reflexionen.map(r =>
+        '<div class="reflexion-entry">'
+        + '<div class="reflexion-date">' + r.datum + '</div>'
+        + '<div class="reflexion-text">' + r.text + '</div>'
+        + '</div>'
+      ).join('');
+      bodyHtml += '<div style="margin-top:12px;">'
+        + '<textarea id="plan-reflex-input-' + planIdx + '" rows="3" placeholder="Was ist dir aufgefallen? Was änderst du?" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);resize:none;"></textarea>'
+        + '<button onclick="WB._planReflexSave(' + planIdx + ')" style="width:100%;margin-top:6px;padding:9px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;">Eintrag speichern</button>'
+        + '</div>';
+    }
+
+    return '<div class="plan-section">'
+      + '<div class="plan-section-header" onclick="WB._planToggleSektion(' + planIdx + ',&quot;' + sk + '&quot;)">'
+      + '<span class="plan-section-icon">' + cfg.icon + '</span>'
+      + '<span class="plan-section-title">' + cfg.label + '</span>'
+      + (badge ? '<span class="plan-section-badge">' + badge + '</span>' : '')
+      + '<span class="plan-section-toggle' + (isOpen?' open':'') + '">&#9654;</span>'
+      + '</div>'
+      + '<div class="plan-section-body' + (isOpen?' open':'') + '">' + bodyHtml + '</div>'
+      + '</div>';
+  },
+
+  // ── Aktionen ──────────────────────────────────────────
+  _planToggleSektion(planIdx, sk) {
+    const store = this._planStore();
+    if (!store?.[planIdx]) return;
+    const plan = store[planIdx];
+    if (!plan.sektionenOpen) plan.sektionenOpen = {};
+    const isOpen = plan.sektionenOpen[sk] !== false;
+    plan.sektionenOpen[sk] = !isOpen;
+    this.setDirty();
+    this._planRender();
+  },
+
+  _planSaveVision(planIdx, val) {
+    const store = this._planStore();
+    if (!store?.[planIdx]) return;
+    store[planIdx].vision = val;
+    this.setDirty();
+  },
+
+  _planTaskAdd(planIdx) {
+    const input = document.getElementById('plan-task-input-' + planIdx);
+    const text = input?.value.trim();
+    if (!text) return;
+    const store = this._planStore();
+    if (!store?.[planIdx]) return;
+    if (!store[planIdx].aufgaben) store[planIdx].aufgaben = [];
+    store[planIdx].aufgaben.push({ id: String(Date.now()), text, done: false });
+    input.value = '';
+    this.setDirty();
+    this._planRender();
+  },
+
+  _planTaskToggle(planIdx, taskIdx, chk) {
+    const store = this._planStore();
+    if (!store?.[planIdx]?.aufgaben?.[taskIdx]) return;
+    store[planIdx].aufgaben[taskIdx].done = chk.checked;
+    this.setDirty();
+    // Nur Fortschrittsring neu rendern
+    setTimeout(() => this._planRender(), 300);
+  },
+
+  _planTaskDelete(planIdx, taskIdx) {
+    const store = this._planStore();
+    if (!store?.[planIdx]) return;
+    store[planIdx].aufgaben.splice(taskIdx, 1);
+    this.setDirty();
+    this._planRender();
+  },
+
+  _planHabitAdd(planIdx) {
+    const input = document.getElementById('plan-habit-input-' + planIdx);
+    const name = input?.value.trim();
+    if (!name) return;
+    const store = this._planStore();
+    if (!store?.[planIdx]) return;
+    if (!store[planIdx].habits) store[planIdx].habits = [];
+    store[planIdx].habits.push({ id: String(Date.now()), name, log: {} });
+    input.value = '';
+    this.setDirty();
+    this._planRender();
+  },
+
+  _planHabitToggle(planIdx, habitIdx, date) {
+    const store = this._planStore();
+    const h = store?.[planIdx]?.habits?.[habitIdx];
+    if (!h) return;
+    if (!h.log) h.log = {};
+    h.log[date] = !h.log[date];
+    if (!h.log[date]) delete h.log[date];
+    this.setDirty();
+    this._planRender();
+  },
+
+  _planHabitDelete(planIdx, habitIdx) {
+    const store = this._planStore();
+    if (!store?.[planIdx]) return;
+    store[planIdx].habits.splice(habitIdx, 1);
+    this.setDirty();
+    this._planRender();
+  },
+
+  _planMetrikAdd(planIdx) {
+    const name  = document.getElementById('plan-metrik-name-' + planIdx)?.value.trim();
+    const unit  = document.getElementById('plan-metrik-unit-' + planIdx)?.value.trim();
+    if (!name) return;
+    const store = this._planStore();
+    if (!store?.[planIdx]) return;
+    if (!store[planIdx].metriken) store[planIdx].metriken = [];
+    store[planIdx].metriken.push({ id: String(Date.now()), name, einheit: unit, log: {} });
+    this.setDirty();
+    this._planRender();
+  },
+
+  _planMetrikLog(planIdx, metrikIdx, val) {
+    const store = this._planStore();
+    const m = store?.[planIdx]?.metriken?.[metrikIdx];
+    if (!m) return;
+    if (!m.log) m.log = {};
+    const today = new Date().toISOString().split('T')[0];
+    m.log[today] = parseFloat(val) || 0;
+    this.setDirty();
+  },
+
+  _planMetrikDelete(planIdx, metrikIdx) {
+    const store = this._planStore();
+    if (!store?.[planIdx]) return;
+    store[planIdx].metriken.splice(metrikIdx, 1);
+    this.setDirty();
+    this._planRender();
+  },
+
+  _planReflexSave(planIdx) {
+    const input = document.getElementById('plan-reflex-input-' + planIdx);
+    const text = input?.value.trim();
+    if (!text) return;
+    const store = this._planStore();
+    if (!store?.[planIdx]) return;
+    if (!store[planIdx].reflexionen) store[planIdx].reflexionen = [];
+    store[planIdx].reflexionen.push({
+      id: String(Date.now()),
+      datum: new Date().toISOString().split('T')[0],
+      text
+    });
+    input.value = '';
+    this.setDirty();
+    this._planRender();
+  },
+
+  _planEdit() {
+    // Plan umbenennen / löschen
+    const store = this._planStore();
+    const idx = this._planActive;
+    if (!store?.[idx]) return;
+    const plan = store[idx];
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;';
+    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
+    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;">'
+      + '<div style="font-size:0.8rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:12px;">Plan bearbeiten</div>'
+      + '<input id="plan-edit-titel" type="text" value="' + plan.titel.replace(/"/g,'&quot;') + '" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:12px;">'
+      + '<button onclick="WB._planSaveTitel();WB._closeAllSheets()" style="width:100%;padding:11px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;margin-bottom:8px;">Speichern</button>'
+      + '<button onclick="WB._planDelete();WB._closeAllSheets()" style="width:100%;padding:11px;background:none;border:1px solid #C62828;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:#C62828;">Plan löschen</button>'
+      + '</div>';
+    document.body.appendChild(sheet);
+    setTimeout(() => document.getElementById('plan-edit-titel')?.select(), 50);
+  },
+
+  _planSaveTitel() {
+    const store = this._planStore();
+    const idx = this._planActive;
+    if (!store?.[idx]) return;
+    const val = document.getElementById('plan-edit-titel')?.value.trim();
+    if (val) { store[idx].titel = val; this.setDirty(); this._planRender(); }
+  },
+
+  _planDelete() {
+    const store = this._planStore();
+    const idx = this._planActive;
+    if (!store?.[idx]) return;
+    if (!confirm('Plan "' + store[idx].titel + '" wirklich löschen?')) return;
+    store.splice(idx, 1);
+    this.setDirty();
+    this.planClose();
+    this._toast('Plan gelöscht');
+  },
+
   // ══════════════════════════════════════════════════════
   // BAUSTELLEN & KOSTEN-KLARHEIT v3.64.0
   // ══════════════════════════════════════════════════════
@@ -21863,6 +22715,26 @@ WB.init();
 
 <!-- FABs außerhalb main damit sie keinen Flex-Platz verbrauchen -->
 <button id="woche-fab" onclick="WB.newEventOpenPicker()" title="Neuer Termin">+</button>
+
+<!-- PLAN-DOKUMENT OVERLAY -->
+<div id="wb-plan-overlay">
+  <div id="wb-plan-header">
+    <button id="wb-plan-back" onclick="WB.planClose()">&#8249;</button>
+    <div id="wb-plan-title">Plan</div>
+    <button onclick="WB._planEdit()" style="background:none;border:none;cursor:pointer;padding:4px 8px;font-size:0.78rem;color:var(--c-beruf);font-family:var(--font);font-weight:600;">⚙</button>
+  </div>
+  <div id="wb-plan-body"></div>
+</div>
+
+<!-- PLAN-LISTE OVERLAY -->
+<div id="wb-planlist-overlay" style="position:fixed;inset:0;z-index:290;background:var(--c-bg);display:none;flex-direction:column;">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:2px solid var(--c-beruf);background:var(--c-surface);flex-shrink:0;">
+    <button onclick="document.getElementById('wb-planlist-overlay').style.display='none'" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--c-muted);padding:0;line-height:1;">&#8249;</button>
+    <div style="flex:1;font-size:1rem;font-weight:800;color:var(--c-text);">Meine Pläne</div>
+    <button onclick="WB.planNeu()" style="background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);padding:7px 14px;font-family:var(--font);font-size:0.82rem;font-weight:600;cursor:pointer;">+ Neuer Plan</button>
+  </div>
+  <div id="wb-planlist-body" style="flex:1;overflow-y:auto;padding:16px;"></div>
+</div>
 
 <!-- TAB-DRAWER -->
 <div class="wb-drawer-overlay" id="wb-tab-drawer-overlay" style="display:none;" onclick="WB._tabDrawerClose()"></div>
