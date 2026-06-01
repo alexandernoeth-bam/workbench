@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.68.5</title>
+<title>WorkBench 3.69.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5836,6 +5836,42 @@ html, body {
   font-weight: 600;
 }
 
+
+/* ── Quick Capture Aktions-Buttons ──────────────────── */
+.qc-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+.qc-action-btn {
+  padding: 10px 8px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-xs);
+  background: var(--c-bg);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--c-text);
+  text-align: center;
+  line-height: 1.3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.qc-action-btn:hover { background: var(--c-surface); border-color: var(--c-beruf); }
+.qc-action-btn.primary {
+  background: var(--c-beruf);
+  color: #fff;
+  border-color: var(--c-beruf);
+  grid-column: 1 / -1;
+}
+.qc-action-btn .qc-act-icon { font-size: 1.1rem; }
+.qc-action-btn .qc-act-sub { font-size: 0.68rem; color: var(--c-muted); font-weight: 400; }
+.qc-action-btn.primary .qc-act-sub { color: rgba(255,255,255,0.7); }
+
 </style>
 </head>
 <body>
@@ -6768,10 +6804,13 @@ html, body {
       <span>&#128203;</span> Aus Zwischenablage einfügen
     </button>
 
-    <!-- Speichern -->
-    <button onclick="WB._qcSaveSchnell()" style="width:100%;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;margin-top:4px;">
-      Als Notiz speichern
-    </button>
+    <!-- Aktions-Bereich -->
+    <div id="qc-actions" style="margin-top:8px;">
+      <!-- Wird dynamisch befüllt wenn Text eingegeben wird -->
+      <button onclick="WB._qcSaveSchnell()" style="width:100%;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;">
+        Als Notiz speichern
+      </button>
+    </div>
   </div>
 </div>
 
@@ -7017,7 +7056,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.68.5 · Build 20260601-1145</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.69.0 · Build 20260601-1200</div>
     </div>
 
     <!-- Welt -->
@@ -7197,7 +7236,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.68.5',
+  APP_VERSION: '3.69.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8227,7 +8266,11 @@ const WB = {
     this._qcWelt = this.activeWorld === 'beruf' ? 'pro' : 'priv';
     this._qcUpdateWeltBtns();
     const ta = document.getElementById('qc-text');
-    if (ta) { ta.value = ''; ta.focus(); }
+    if (ta) {
+      ta.value = '';
+      ta.focus();
+      ta.oninput = () => WB._qcUpdateActions();
+    }
     // Mikrofon prüfen
     const micBtn = document.getElementById('qc-mic-btn');
     if (micBtn) {
@@ -8235,8 +8278,8 @@ const WB = {
       micBtn.style.display = hasRecog ? '' : 'none';
     }
     document.getElementById('wb-qc-overlay').classList.add('open');
+    this._qcUpdateActions();
   },
-
   qcClose() {
     this._qcStopMic();
     document.getElementById('wb-qc-overlay').classList.remove('open');
@@ -8360,6 +8403,135 @@ const WB = {
   },
 
   // ── Schnell in Inbox ──────────────────────────────────
+  // ── Quick Capture: Zeilen-Import ──────────────────────
+  _qcUpdateActions() {
+    const box = document.getElementById('qc-actions');
+    if (!box) return;
+    const text = (document.getElementById('qc-text')?.value || '').trim();
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const isMulti = lines.length >= 2;
+
+    if (!isMulti) {
+      // Einzeiler: nur Notiz-Button
+      box.innerHTML = '<button onclick="WB._qcSaveSchnell()" style="width:100%;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;">Als Notiz speichern</button>';
+      return;
+    }
+
+    // Mehrzeilig: alle Optionen anzeigen
+    box.innerHTML =
+      '<div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:6px;font-weight:600;">'
+      + 'Zeile 1 = Titel · ' + (lines.length-1) + ' weitere Zeilen = Items</div>'
+      + '<div class="qc-action-grid">'
+      + '<button class="qc-action-btn primary" onclick="WB._qcSaveSchnell()">'
+      + '<span class="qc-act-icon">📝</span>Als Notiz'
+      + '<span class="qc-act-sub">Ganzer Text als Notiz</span></button>'
+      + '<button class="qc-action-btn" onclick="WB._qcImportCheckliste()">'
+      + '<span class="qc-act-icon">☑</span>Checkliste'
+      + '<span class="qc-act-sub">Vorlage + Instanz</span></button>'
+      + '<button class="qc-action-btn" onclick="WB._qcImportProjekt()">'
+      + '<span class="qc-act-icon">📁</span>Projekt'
+      + '<span class="qc-act-sub">Mit Aufgaben</span></button>'
+      + '<button class="qc-action-btn" onclick="WB._qcImportAufgabeMitCheckliste()">'
+      + '<span class="qc-act-icon">✓</span>Aufgabe'
+      + '<span class="qc-act-sub">Mit Checkliste</span></button>'
+      + '</div>';
+  },
+
+  _qcImportCheckliste() {
+    const text  = (document.getElementById('qc-text')?.value || '').trim();
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) { this._toast('Mindestens 2 Zeilen nötig'); return; }
+    const titel = lines[0];
+    const items = lines.slice(1).map(l => ({
+      id: String(Date.now() + Math.random()),
+      text: l,
+      done: false,
+    }));
+
+    // Vorlage anlegen
+    const ctx = this._qcWelt;
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Keine Datenbank geladen'); return; }
+    if (!db.clVorlagen) db.clVorlagen = [];
+    const vorlage = { id: 'cl_' + Date.now(), name: titel, items };
+    db.clVorlagen.push(vorlage);
+
+    // Sofort eine Instanz erstellen
+    const store = this._clInstanzStore();
+    if (store) {
+      store.push({
+        id: 'cli_' + Date.now(),
+        name: titel,
+        vorlagenId: vorlage.id,
+        items: items.map(i => ({ ...i, id: String(Date.now() + Math.random()) })),
+        erledigt: false,
+        startDate: '',
+      });
+    }
+    this.setDirty();
+    this.qcClose();
+    this._toast('✓ Checkliste "' + titel + '" angelegt');
+  },
+
+  _qcImportProjekt() {
+    const text  = (document.getElementById('qc-text')?.value || '').trim();
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) { this._toast('Mindestens 2 Zeilen nötig'); return; }
+    const projName = lines[0];
+    const taskTexts = lines.slice(1);
+
+    const ctx = this._qcWelt;
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Keine Datenbank geladen'); return; }
+    if (!db.projects) db.projects = {};
+    if (db.projects[projName]) {
+      this._toast('Projekt "' + projName + '" existiert bereits');
+      return;
+    }
+    const tasks = taskTexts.map(t => ({
+      id: String(Date.now() + Math.random()),
+      text: t,
+      done: false,
+      prio: false,
+      date: '',
+      size: 'M',
+      checklist: [],
+    }));
+    db.projects[projName] = { status: 'aktiv', tasks, desc: '' };
+    this.setDirty();
+    this.qcClose();
+    this._toast('✓ Projekt "' + projName + '" mit ' + tasks.length + ' Aufgaben angelegt');
+  },
+
+  _qcImportAufgabeMitCheckliste() {
+    const text  = (document.getElementById('qc-text')?.value || '').trim();
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) { this._toast('Mindestens 2 Zeilen nötig'); return; }
+    const aufgabenTitel = lines[0];
+    const checkItems    = lines.slice(1).map(l => ({ id: String(Date.now() + Math.random()), text: l, done: false }));
+
+    const ctx = this._qcWelt;
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Keine Datenbank geladen'); return; }
+    if (!db.projects) db.projects = {};
+
+    // In "Einzelaufgaben" Projekt ablegen
+    const projKey = 'Einzelaufgaben';
+    if (!db.projects[projKey]) db.projects[projKey] = { status: 'aktiv', tasks: [], desc: '' };
+    db.projects[projKey].tasks.push({
+      id: String(Date.now()),
+      text: aufgabenTitel,
+      done: false,
+      prio: false,
+      date: '',
+      size: 'M',
+      checklist: checkItems,
+    });
+    this.setDirty();
+    this.qcClose();
+    this._toast('✓ Aufgabe "' + aufgabenTitel + '" mit ' + checkItems.length + ' Schritten angelegt');
+  },
+
   _qcSaveSchnell() {
     const text = this._qcGetText();
     const img  = this._qcPendingImage || null;
