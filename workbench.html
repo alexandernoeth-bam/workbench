@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.71.8</title>
+<title>WorkBench 3.71.9</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2535,7 +2535,7 @@ html, body {
   background: var(--c-bg); color: var(--c-text); line-height: 1.5;
 }
 #qc-text:focus { outline: none; border-color: var(--c-beruf); }
-#qc-mic-btn, #qc-cam-btn {
+#qc-mic-btn, #qc-cam-btn, #qc-paste-btn {
   padding: 10px 12px; background: none;
   border: 1px solid var(--c-border); border-radius: var(--radius-xs);
   cursor: pointer; color: var(--c-muted); font-size: 1rem;
@@ -7057,10 +7057,16 @@ html, body {
     <!-- Eingabe -->
     <div class="qc-input-row">
       <textarea id="qc-text" placeholder="Gedanke, Idee oder Notiz..." rows="3"></textarea>
-      <button id="qc-cam-btn" onclick="WB._qcCameraOpen()" title="Foto / Bild hinzufügen">
+      <button id="qc-cam-btn" onclick="WB._qcCameraOpen()" title="Foto aufnehmen">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
           <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </button>
+      <button id="qc-paste-btn" onclick="WB._qcPasteFromClipboard()" title="Bild aus Zwischenablage">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
+          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+          <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
         </svg>
       </button>
       <button id="qc-mic-btn" onclick="WB._qcMicToggle()" style="display:none;" title="Spracheingabe">&#9679;</button>
@@ -7326,7 +7332,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.8 · Build 20260601-2300</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.9 · Build 20260601-2315</div>
     </div>
 
     <!-- Welt -->
@@ -7510,7 +7516,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.71.8',
+  APP_VERSION: '3.71.9',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8475,7 +8481,7 @@ const WB = {
       if (!text.trim()) { this._toast('Zwischenablage leer'); return; }
       const ta = document.getElementById('qc-text');
       if (ta) {
-        ta.value = (ta.value ? ta.value + '\n' : '') + text.trim();
+        ta.value = (ta.value ? ta.value + String.fromCharCode(10) : '') + text.trim();
         ta.focus();
         this._toast('Eingefügt');
       }
@@ -8584,6 +8590,44 @@ const WB = {
   },
 
   // ── Mikrofon ─────────────────────────────────────────
+  _qcPasteFromClipboard() {
+    if (!navigator.clipboard?.read) {
+      this._toast('Clipboard API nicht verfügbar — bitte Strg+V im Textfeld nutzen');
+      return;
+    }
+    navigator.clipboard.read().then(items => {
+      for (const item of items) {
+        const imgType = item.types.find(t => t.startsWith('image/'));
+        if (imgType) {
+          item.getType(imgType).then(blob => {
+            const reader = new FileReader();
+            reader.onload = e => {
+              this._qcPendingImage = e.target.result;
+              const preview = document.getElementById('qc-cam-preview');
+              if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
+              const btn = document.getElementById('qc-cam-btn');
+              if (btn) btn.style.borderColor = 'var(--c-beruf)';
+              const pasteBtn = document.getElementById('qc-paste-btn');
+              if (pasteBtn) pasteBtn.style.borderColor = 'var(--c-beruf)';
+              this._toast('✓ Bild aus Zwischenablage eingefügt');
+            };
+            reader.readAsDataURL(blob);
+          });
+          return;
+        }
+        // Text aus Clipboard
+        if (item.types.includes('text/plain')) {
+          item.getType('text/plain').then(blob => blob.text()).then(text => {
+            const ta = document.getElementById('qc-text');
+            if (ta) { ta.value = (ta.value ? ta.value + String.fromCharCode(10) : '') + text; this._qcUpdateActions(); }
+          });
+        }
+      }
+    }).catch(() => {
+      this._toast('Zugriff auf Zwischenablage verweigert — bitte Strg+V im Textfeld nutzen');
+    });
+  },
+
   _qcCameraOpen() {
     // Öffnet Kamera oder Galerie je nach Gerät
     const input = document.getElementById('qc-cam-input');
@@ -8936,8 +8980,8 @@ const WB = {
     const text = this._qcGetText();
     const img  = this._qcPendingImage || null;
     if (!text && !img) { this._toast('Bitte zuerst etwas eingeben'); return; }
-    const ctx = this._qcWelt;
-    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const ctx = this._qcWelt || 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : (this.dataPriv || this.dataPro);
     if (!db) { this._toast('Bitte zuerst Datenbank laden'); return; }
 
     // Direkt als Notiz speichern
