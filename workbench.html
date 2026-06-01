@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.70.2</title>
+<title>WorkBench 3.70.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6071,6 +6071,61 @@ html, body {
 }
 #ck-fokus-btn:hover { background: var(--c-bg); }
 
+
+/* ══════════════════════════════════════════════════
+   ERINNERUNGS-OVERLAY v3.70.3
+══════════════════════════════════════════════════ */
+#wb-reminder-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  background: var(--c-beruf);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  text-align: center;
+}
+#wb-reminder-overlay.open { display: flex; }
+
+#reminder-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+  line-height: 1;
+}
+#reminder-text {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.4;
+  max-width: 340px;
+  margin-bottom: 40px;
+}
+#reminder-ok-btn {
+  padding: 16px 48px;
+  background: #fff;
+  color: var(--c-beruf);
+  border: none;
+  border-radius: 50px;
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+}
+#reminder-ok-btn:active { opacity: 0.85; transform: scale(0.97); }
+#reminder-skip {
+  margin-top: 16px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 8px;
+}
+
 </style>
 </head>
 <body>
@@ -6662,6 +6717,11 @@ html, body {
       </div>
 
       <div class="wbs-divider"></div>
+
+      <!-- Erinnerungen -->
+      <div class="wbs-section-label">Erinnerungen</div>
+      <div id="reminder-settings-list"></div>
+      <button onclick="WB._reminderSettingsAdd()" style="width:100%;padding:10px;margin-top:6px;background:none;border:1px dashed var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-beruf);cursor:pointer;">+ Neue Erinnerung</button>
 
       <!-- Stundensatz -->
       <div class="wbs-section-label">Persönlich</div>
@@ -7266,7 +7326,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.70.2 · Build 20260601-1515</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.70.3 · Build 20260601-1545</div>
     </div>
 
     <!-- Welt -->
@@ -7446,7 +7506,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.70.2',
+  APP_VERSION: '3.70.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -10480,6 +10540,7 @@ const WB = {
         setTimeout(() => {
           this._goTab('cockpit');
     this._updateTabbarMode('cockpit');
+    setTimeout(() => this._reminderInit(), 2000); // nach 2 Sek starten
           if (bar) bar.classList.remove('visible');
           // Scout beim Auto-Return immer neu auswählen
           this._scoutLastShown = null;
@@ -10654,6 +10715,149 @@ const WB = {
 
     document.body.appendChild(overlay);
   },
+  // ══════════════════════════════════════════════════════
+  // ERINNERUNGEN v3.70.3
+  // ══════════════════════════════════════════════════════
+
+  _reminderStore() {
+    // Erinnerungen in Privat-DB (geräteübergreifend)
+    const db = this.dataPriv || this.dataPro;
+    if (!db) return null;
+    if (!db.erinnerungen) db.erinnerungen = [];
+    return db.erinnerungen;
+  },
+
+  _reminderInterval: null,
+  _reminderLastShown: {}, // id -> timestamp
+
+  _reminderInit() {
+    // Beim App-Start + alle 60 Sek prüfen
+    clearInterval(this._reminderInterval);
+    this._reminderCheck();
+    this._reminderInterval = setInterval(() => this._reminderCheck(), 60000);
+  },
+
+  _reminderCheck() {
+    const store = this._reminderStore() || [];
+    const now   = new Date();
+    const hhmm  = now.getHours() * 60 + now.getMinutes();
+    const today = now.toISOString().split('T')[0];
+
+    for (const r of store) {
+      if (!r.aktiv) continue;
+
+      // Von-Bis prüfen
+      const vonMin = r.von  ? parseInt(r.von.split(':')[0])*60  + parseInt(r.von.split(':')[1])  : 0;
+      const bisMin = r.bis  ? parseInt(r.bis.split(':')[0])*60  + parseInt(r.bis.split(':')[1])  : 1440;
+      if (hhmm < vonMin || hhmm > bisMin) continue;
+
+      // Intervall prüfen
+      const last = this._reminderLastShown[r.id] || 0;
+      const minSinceLast = (Date.now() - last) / 60000;
+      if (last && minSinceLast < (r.intervall || 60)) continue;
+
+      // Zeigen
+      this._reminderShow(r);
+      return; // nur eine gleichzeitig
+    }
+  },
+
+  _reminderShow(r) {
+    this._reminderCurrentId = r.id;
+    const iconEl = document.getElementById('reminder-icon');
+    const textEl = document.getElementById('reminder-text');
+    if (iconEl) iconEl.textContent = r.icon || '💧';
+    if (textEl) textEl.textContent = r.text || 'Erinnerung';
+    document.getElementById('wb-reminder-overlay')?.classList.add('open');
+  },
+
+  _reminderDismiss() {
+    document.getElementById('wb-reminder-overlay')?.classList.remove('open');
+    if (this._reminderCurrentId) {
+      this._reminderLastShown[this._reminderCurrentId] = Date.now();
+    }
+  },
+
+  // ── Einstellungs-UI ───────────────────────────────────
+  _reminderSettingsRender() {
+    const list = document.getElementById('reminder-settings-list');
+    if (!list) return;
+    const store = this._reminderStore() || [];
+
+    if (!store.length) {
+      list.innerHTML = '<div style="font-size:0.82rem;color:var(--c-faint);padding:8px 0;">Noch keine Erinnerungen definiert.</div>';
+      return;
+    }
+
+    list.innerHTML = store.map((r, idx) =>
+      '<div style="background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+      + '<input type="text" value="' + (r.icon||'💧') + '" maxlength="2" '
+      + 'onchange="WB._reminderUpdate(' + idx + ',&quot;icon&quot;,this.value)" '
+      + 'style="width:36px;text-align:center;padding:4px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-size:1.2rem;background:var(--c-bg);">'
+      + '<input type="text" value="' + (r.text||'').replace(/"/g,'&quot;') + '" placeholder="Text der Erinnerung" '
+      + 'onchange="WB._reminderUpdate(' + idx + ',&quot;text&quot;,this.value)" '
+      + 'style="flex:1;padding:6px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">'
+      + '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;">'
+      + '<input type="checkbox" ' + (r.aktiv?'checked':'') + ' onchange="WB._reminderUpdate(' + idx + ',&quot;aktiv&quot;,this.checked)" style="width:16px;height:16px;accent-color:var(--c-beruf);">'
+      + '<span style="font-size:0.78rem;color:var(--c-muted);">An</span></label>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      + '<div style="display:flex;align-items:center;gap:4px;">'
+      + '<span style="font-size:0.75rem;color:var(--c-muted);">Von</span>'
+      + '<input type="time" value="' + (r.von||'08:00') + '" onchange="WB._reminderUpdate(' + idx + ',&quot;von&quot;,this.value)" '
+      + 'style="padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);">'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:4px;">'
+      + '<span style="font-size:0.75rem;color:var(--c-muted);">Bis</span>'
+      + '<input type="time" value="' + (r.bis||'22:00') + '" onchange="WB._reminderUpdate(' + idx + ',&quot;bis&quot;,this.value)" '
+      + 'style="padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);">'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:4px;">'
+      + '<span style="font-size:0.75rem;color:var(--c-muted);">Alle</span>'
+      + '<input type="number" value="' + (r.intervall||60) + '" min="5" max="480" step="5" onchange="WB._reminderUpdate(' + idx + ',&quot;intervall&quot;,+this.value)" '
+      + 'style="width:60px;padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);text-align:right;">'
+      + '<span style="font-size:0.75rem;color:var(--c-muted);">Min</span>'
+      + '</div>'
+      + '<button onclick="WB._reminderDelete(' + idx + ')" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#C62828;font-size:0.8rem;padding:4px;">Löschen</button>'
+      + '</div>'
+      + '</div>'
+    ).join('');
+  },
+
+  _reminderUpdate(idx, field, value) {
+    const store = this._reminderStore();
+    if (!store?.[idx]) return;
+    store[idx][field] = value;
+    this.setDirty();
+    this._reminderSettingsRender();
+    this._reminderInit(); // Timer neu starten
+  },
+
+  _reminderDelete(idx) {
+    const store = this._reminderStore();
+    if (!store) return;
+    store.splice(idx, 1);
+    this.setDirty();
+    this._reminderSettingsRender();
+  },
+
+  _reminderSettingsAdd() {
+    const store = this._reminderStore();
+    if (!store) return;
+    store.push({
+      id: 'rem_' + Date.now(),
+      icon: '💧',
+      text: 'Trinken nicht vergessen!',
+      aktiv: true,
+      von: '08:00',
+      bis: '22:00',
+      intervall: 60,
+    });
+    this.setDirty();
+    this._reminderSettingsRender();
+  },
+
   // ══════════════════════════════════════════════════════
   // FOKUS-TIMER v3.70.0
   // ══════════════════════════════════════════════════════
@@ -21736,6 +21940,7 @@ const WB = {
   // ── Einstellungen ────────────────────────────────────
   // ── Einstellungs-Modal ────────────────────────────────
   settingsOpen() {
+    this._reminderSettingsRender();
     const s = this._settings;
     const sv = (id, v) => { const el=document.getElementById(id); if(el) el.value=v; };
     // Berufstag
@@ -23393,6 +23598,14 @@ WB.init();
       </button>
     </div>
   </div>
+</div>
+
+<!-- ERINNERUNGS-OVERLAY -->
+<div id="wb-reminder-overlay">
+  <div id="reminder-icon">💧</div>
+  <div id="reminder-text">Trinken nicht vergessen!</div>
+  <button id="reminder-ok-btn" onclick="WB._reminderDismiss()">Verstanden ✓</button>
+  <button id="reminder-skip" onclick="WB._reminderDismiss()">Später erinnern</button>
 </div>
 
 <!-- PLAN-DOKUMENT OVERLAY -->
