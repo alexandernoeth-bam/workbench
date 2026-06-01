@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.70.3</title>
+<title>WorkBench 3.70.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7326,7 +7326,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.70.3 · Build 20260601-1545</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.70.4 · Build 20260601-1600</div>
     </div>
 
     <!-- Welt -->
@@ -7506,7 +7506,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.70.3',
+  APP_VERSION: '3.70.4',
   APP_BUILD:   '20260526-0723',
 
 
@@ -10540,7 +10540,7 @@ const WB = {
         setTimeout(() => {
           this._goTab('cockpit');
     this._updateTabbarMode('cockpit');
-    setTimeout(() => this._reminderInit(), 2000); // nach 2 Sek starten
+    // _reminderInit wird nach DB-Load aufgerufen (in _onFileLoaded)
           if (bar) bar.classList.remove('visible');
           // Scout beim Auto-Return immer neu auswählen
           this._scoutLastShown = null;
@@ -10751,10 +10751,10 @@ const WB = {
       const bisMin = r.bis  ? parseInt(r.bis.split(':')[0])*60  + parseInt(r.bis.split(':')[1])  : 1440;
       if (hhmm < vonMin || hhmm > bisMin) continue;
 
-      // Intervall prüfen
+      // Intervall prüfen — beim ersten Mal (last=0) sofort zeigen
       const last = this._reminderLastShown[r.id] || 0;
       const minSinceLast = (Date.now() - last) / 60000;
-      if (last && minSinceLast < (r.intervall || 60)) continue;
+      if (last > 0 && minSinceLast < (r.intervall || 60)) continue;
 
       // Zeigen
       this._reminderShow(r);
@@ -14412,6 +14412,8 @@ const WB = {
       cont.disabled = false;
     }
     this._toast((isPro ? 'Beruf' : 'Privat') + '-Datenbank geladen');
+    // Erinnerungs-Timer starten/neustarten sobald DB geladen
+    setTimeout(() => this._reminderInit(), 500);
   },
 
   // ── App starten ─────────────────────────────────────
