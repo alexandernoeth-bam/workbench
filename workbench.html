@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.71.7</title>
+<title>WorkBench 3.71.8</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7326,7 +7326,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.7 · Build 20260601-2230</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.8 · Build 20260601-2300</div>
     </div>
 
     <!-- Welt -->
@@ -7510,7 +7510,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.71.7',
+  APP_VERSION: '3.71.8',
   APP_BUILD:   '20260526-0723',
 
 
@@ -10672,29 +10672,25 @@ const WB = {
     this._updateTabbarMode('cockpit');
     // _reminderInit wird nach DB-Load aufgerufen (in _onFileLoaded)
     // Share-Flag merken für späteren Aufruf nach DB-Load
-    // Share: immer IDB prüfen beim Start (unabhängig von URL)
-    this._pendingShare = true;
-    this._isShareMode = new URLSearchParams(window.location.search).has('wb_share');
-    if (this._isShareMode) window.history.replaceState({}, '', window.location.pathname);
+    // Share Target via GET (Text/URL) — kein POST auf GitHub Pages möglich
+    const _sp = new URLSearchParams(window.location.search);
+    if (_sp.has('share_title') || _sp.has('share_text') || _sp.has('share_url')) {
+      window.history.replaceState({}, '', window.location.pathname);
+      const combined = [_sp.get('share_title'), _sp.get('share_text'), _sp.get('share_url')].filter(Boolean).join(' ');
+      if (combined) setTimeout(() => {
+        this.qcOpen();
+        const ta = document.getElementById('qc-text');
+        if (ta) { ta.value = combined; this._qcUpdateActions(); }
+      }, 800);
+    }
     // Service Worker Message Listener
     if (navigator.serviceWorker) {
       navigator.serviceWorker.addEventListener('message', e => {
-        if (e.data?.type === 'SHARE_TARGET') {
-          document.getElementById('wb-reminder-overlay')?.classList.remove('open');
-          WB._handleShare(e.data);
+        if (e.data?.type === 'SW_UPDATED') {
+          console.log('[WB] SW aktualisiert:', e.data.build);
         }
       });
     }
-    // Auch auf BroadcastChannel hören (Fallback)
-    try {
-      const bc = new BroadcastChannel('wb-share');
-      bc.onmessage = e => {
-        if (e.data?.type === 'SHARE_TARGET') {
-          document.getElementById('wb-reminder-overlay')?.classList.remove('open');
-          WB._handleShare(e.data);
-        }
-      };
-    } catch(e) {}
     // Clipboard Paste (Bilder)
     document.addEventListener('paste', e => WB._nzPasteImage(e));
           if (bar) bar.classList.remove('visible');
@@ -14620,14 +14616,8 @@ const WB = {
       cont.disabled = false;
     }
     this._toast((isPro ? 'Beruf' : 'Privat') + '-Datenbank geladen');
-    // Share Target nach DB-Load verarbeiten
-    if (this._pendingShare) {
-      this._pendingShare = false;
-      setTimeout(() => this._checkShareTarget(), 300);
-    } else {
-      // Erinnerungs-Timer nur wenn kein Share
-      setTimeout(() => this._reminderInit(), 500);
-    }
+    // Erinnerungs-Timer nach DB-Load
+    setTimeout(() => this._reminderInit(), 500);
   },
 
   // ── App starten ─────────────────────────────────────
