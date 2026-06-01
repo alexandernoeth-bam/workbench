@@ -1,5 +1,5 @@
-// WorkBench Service Worker v3.71.4 · Build 20260601-2130
-const BUILD = '20260601-2130';
+// WorkBench Service Worker v3.71.6 · Build 20260601-2200
+const BUILD = '20260601-2200';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -34,7 +34,7 @@ self.addEventListener('fetch', e => {
         if (image && image instanceof File && image.size > 0) {
           const ab = await image.arrayBuffer();
           const u8 = new Uint8Array(ab);
-          let bin  = '';
+          let bin = '';
           const CHUNK = 8192;
           for (let i = 0; i < u8.length; i += CHUNK) {
             bin += String.fromCharCode(...u8.slice(i, i + CHUNK));
@@ -42,17 +42,35 @@ self.addEventListener('fetch', e => {
           imageData = 'data:' + image.type + ';base64,' + btoa(bin);
         }
 
-        // In Cache speichern
+        const payload = { title, text, url: shareUrl, imageData, ts: Date.now() };
+
+        // 1. In Cache schreiben (für neue Instanz)
         const cache = await caches.open('wb-share-v1');
-        const payload = JSON.stringify({ title, text, url: shareUrl, imageData, ts: Date.now() });
-        await cache.put('/__share_data__', new Response(payload, {
+        await cache.put('/__share_data__', new Response(JSON.stringify(payload), {
           headers: { 'Content-Type': 'application/json' }
         }));
+
+        // 2. Alle laufenden Clients direkt anschreiben
+        const allClients = await self.clients.matchAll({
+          type: 'window',
+          includeUncontrolled: true
+        });
+
+        if (allClients.length > 0) {
+          // App läuft bereits — direkt anschreiben + fokussieren
+          for (const client of allClients) {
+            client.postMessage({ type: 'SHARE_TARGET', ...payload });
+            if ('focus' in client) await client.focus();
+          }
+          // Kein Redirect nötig — App ist bereits offen
+          return new Response('OK', { status: 200 });
+        }
 
       } catch(err) {
         console.error('[SW Share Error]', err);
       }
 
+      // App läuft nicht → neu starten mit Flag
       return Response.redirect('/workbench/workbench.html?wb_share=1', 303);
     })());
     return;
