@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.71.10</title>
+<title>WorkBench 3.72.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7332,7 +7332,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.71.10 · Build 20260601-2330</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.72.0 · Build 20260601-2345</div>
     </div>
 
     <!-- Welt -->
@@ -7516,7 +7516,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.71.10',
+  APP_VERSION: '3.72.0',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8980,26 +8980,33 @@ const WB = {
     const text = this._qcGetText();
     const img  = this._qcPendingImage || null;
     if (!text && !img) { this._toast('Bitte zuerst etwas eingeben'); return; }
-    const ctx = this._qcWelt || 'priv';
-    const db  = ctx === 'pro' ? this.dataPro : (this.dataPriv || this.dataPro);
+    // Welt: aktive Welt bestimmen
+    const ctx = (this.activeWorld === 'beruf') ? 'pro' : 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
     if (!db) { this._toast('Bitte zuerst Datenbank laden'); return; }
 
     // In cockpitNotizen speichern (= _nzStore Speicherort)
-    if (!db.settings) db.settings = {};
-    if (!db.settings.cockpitNotizen) db.settings.cockpitNotizen = [];
-    const now = new Date();
+    const store = this._nzStoreWrite(ctx);
+    const nowTs = Date.now();
     const notiz = {
-      id:     'nz_' + Date.now(),
-      titel:  text ? text.split('\n')[0].slice(0, 60) : '(Foto)',
-      inhalt: text || '',
-      typ:    'schnell',
-      ts:     Date.now(),
-      datum:  now.toISOString().split('T')[0],
+      id:       'nz_' + nowTs,
+      titel:    text ? text.split('\n')[0].slice(0, 60) : '(Foto)',
+      inhalt:   text ? '<p>' + text.replace(/\n/g, '</p><p>') + '</p>' : '',
+      typ:      'notiz',
+      welt:     ctx,
+      _db:      ctx,
+      erstellt: nowTs,
+      geaendert: nowTs,
     };
-    if (img) notiz.image = img;
-    db.settings.cockpitNotizen.unshift(notiz);
+    if (img) notiz.inhalt += '<img src="' + img + '" style="max-width:100%;border-radius:8px;margin-top:8px;">';
+    store.push(notiz);
     this.setDirty();
     this.qcClose();
+    // Notiz direkt im Editor öffnen
+    setTimeout(() => {
+      this._goTab('notizen');
+      setTimeout(() => this.nzEdOpen(notiz.id), 150);
+    }, 200);
     this._toast(img ? '\u2713 Foto als Notiz gespeichert' : '\u2713 Notiz gespeichert');
   },
 
