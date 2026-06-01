@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.68.3</title>
+<title>WorkBench 3.68.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7017,7 +7017,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.68.3 · Build 20260601-1100</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.68.5 · Build 20260601-1145</div>
     </div>
 
     <!-- Welt -->
@@ -7197,7 +7197,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.68.3',
+  APP_VERSION: '3.68.5',
   APP_BUILD:   '20260526-0723',
 
 
@@ -11579,9 +11579,9 @@ const WB = {
     quickStore.filter(i => i.date === today && !i.done).forEach(i => {
       items.push({
         type: 'quick',
-        time: '',
+        time: i.time || '',
         title: i.text,
-        meta: 'Schnell',
+        meta: i.time ? 'Schnell · ' + i.time : 'Schnell',
         done: i.done,
         id: i.id,
         obj: i,
@@ -11629,7 +11629,10 @@ const WB = {
           // Kein Checkbox — Klick öffnet Detail
           chkHtml = '<span style="font-size:0.75rem;color:var(--c-beruf);font-weight:600;flex-shrink:0;">›</span>';
         } else if (item.type === 'quick') {
-          chkHtml = '<input type="checkbox" class="ck-liste-chk" ' + (item.done?'checked':'') + ' onchange="event.stopPropagation();WB._quickToggle(&quot;' + item.id + '&quot;,this)">';
+          chkHtml = '<div style="display:flex;align-items:center;gap:4px;">'
+            + '<input type="checkbox" class="ck-liste-chk" ' + (item.done?'checked':'') + ' onchange="event.stopPropagation();WB._quickToggle(&quot;' + item.id + '&quot;,this)">'
+            + '<button onclick="event.stopPropagation();WB._quickDelete(&quot;' + item.id + '&quot;)" style="background:none;border:none;cursor:pointer;color:var(--c-faint);font-size:1.1rem;padding:0 2px;line-height:1;" title="Löschen">×</button>'
+            + '</div>';
         }
         const mustClass = item.obj?.mustToday ? ' must' : '';
         return '<div class="ck-liste-item' + mustClass + '"' + doneAttr + (onclick ? ' onclick="' + onclick + '"' : '') + '>'
@@ -12010,10 +12013,15 @@ const WB = {
       + '<div style="font-size:0.8rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:12px;">Schnell-Erledigung</div>'
       + '<input id="wqa-text" type="text" placeholder="Was muss erledigt werden?" autofocus style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:10px;">'
       + '<div style="display:flex;gap:8px;margin-bottom:14px;">'
-      + '<div style="flex:1;">'
+      + '<div style="flex:2;">'
       + '<div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;">Datum</div>'
       + '<input id="wqa-date" type="date" value="' + (prefillDate || today) + '" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">'
-      + '</div></div>'
+      + '</div>'
+      + '<div style="flex:1;">'
+      + '<div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;">Uhrzeit (optional)</div>'
+      + '<input id="wqa-time" type="time" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">'
+      + '</div>'
+      + '</div>'
       + '<div style="display:flex;gap:8px;">'
       + '<button onclick="document.getElementById(&quot;wb-quick-add-sheet&quot;).remove()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Abbrechen</button>'
       + '<button onclick="WB._quickSave()" style="flex:2;padding:11px;background:var(--c-beruf);border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;color:#fff;">Speichern</button>'
@@ -12034,10 +12042,13 @@ const WB = {
     if (!text) { document.getElementById('wqa-text')?.focus(); return; }
     const store = this._quickStore();
     if (!store) return;
-    store.push({ id: String(Date.now()), text, date, done: false });
+    const time = document.getElementById('wqa-time')?.value || '';
+    const item = { id: String(Date.now()), text, date, done: false };
+    if (time) item.time = time;
+    store.push(item);
     this.setDirty();
     document.getElementById('wb-quick-add-sheet')?.remove();
-    this._toast('Quick-Item angelegt für ' + date);
+    this._toast('Quick-Item angelegt' + (time ? ' um ' + time : ' für ' + date));
     this.renderCockpit();
   },
 
@@ -21434,6 +21445,15 @@ const WB = {
       + `<button class="af-pill${this.projViewMode==='proj'?' active':''}" onclick="WB.setProjViewMode('proj')">Projekte</button>`
       + `<button class="af-pill${this.projViewMode==='area'?' active':''}" onclick="WB.setProjViewMode('area')">Bereiche</button>`
       + '</div>';
+    // FAB: neues Projekt
+    const afFabP = document.getElementById('af-fab');
+    if (afFabP) {
+      afFabP.style.display = '';
+      afFabP.classList.add('visible');
+      afFabP.onclick = () => WB._projNeu();
+      afFabP.title = 'Neues Projekt';
+    }
+
     const ctx = this.projFilter;
     const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
     if(!db) { scroll.innerHTML='<div class="zt-empty">Keine '+( ctx==='pro'?'Beruf':'Privat')+'-Datenbank geladen.</div>'; return; }
@@ -21525,6 +21545,12 @@ const WB = {
     const total = tasks.length;
     const pct   = total>0 ? Math.round(done.length/total*100) : 0;
 
+    // Aufwand berechnen
+    const sizeMin = {XS:5,S:15,M:30,L:60,XL:120,XXL:240};
+    const aufwandOffen = open.reduce((s,t) => s + (sizeMin[t.size]||30), 0);
+    const aufwandGesamt = tasks.reduce((s,t) => s + (sizeMin[t.size]||30), 0);
+    const aufwandH = h => h >= 60 ? Math.round(h/60*10)/10 + 'h' : h + ' Min';
+
     let body = `
       <div class="af-detail-row">
         <span class="af-detail-label">Welt</span>
@@ -21532,11 +21558,26 @@ const WB = {
       </div>
       <div class="af-detail-row">
         <span class="af-detail-label">Status</span>
-        <span class="af-detail-val">${p.status||'aktiv'}</span>
+        <span>
+          <select onchange="WB._projSetStatus('${pKey.replace(/'/g,"\'").replace(/"/g,'&quot;')}','${ctx}',this.value)"
+            style="padding:4px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);cursor:pointer;">
+            <option value="aktiv" ${(p.status||'aktiv')==='aktiv'?'selected':''}>Aktiv</option>
+            <option value="pausiert" ${p.status==='pausiert'?'selected':''}>Pausiert</option>
+            <option value="erledigt" ${p.status==='erledigt'?'selected':''}>Erledigt</option>
+          </select>
+        </span>
       </div>
       <div class="af-detail-row">
         <span class="af-detail-label">Aufgaben</span>
-        <span class="af-detail-val">${open.length} offen${pct>0?' · '+pct+'% erledigt':''}</span>
+        <span class="af-detail-val">${open.length} offen · ${done.length} erledigt${pct>0?' · '+pct+'%':''}</span>
+      </div>
+      <div class="af-detail-row">
+        <span class="af-detail-label">Offener Aufwand</span>
+        <span class="af-detail-val" style="color:var(--c-beruf);font-weight:600;">${aufwandH(aufwandOffen)}</span>
+      </div>
+      <div class="af-detail-row">
+        <span class="af-detail-label">Gesamtaufwand</span>
+        <span class="af-detail-val">${aufwandH(aufwandGesamt)}</span>
       </div>`;
 
     if(open.length) {
@@ -21572,6 +21613,20 @@ const WB = {
     document.getElementById('proj-detail-overlay').classList.add('open');
   },
 
+  _projNeu() {
+    const name = prompt('Name des neuen Projekts:');
+    if (!name?.trim()) return;
+    const ctx = this.projFilter || 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Keine Datenbank geladen'); return; }
+    if (!db.projects) db.projects = {};
+    if (db.projects[name.trim()]) { this._toast('Projekt existiert bereits'); return; }
+    db.projects[name.trim()] = { status: 'aktiv', tasks: [], desc: '' };
+    this.setDirty();
+    this.renderProjekte();
+    this._toast('✓ Projekt "' + name.trim() + '" angelegt');
+  },
+
   _projRename(pKey, ctx) {
     const newName = prompt('Neuer Projektname:', pKey);
     if (!newName?.trim() || newName.trim() === pKey) return;
@@ -21590,6 +21645,15 @@ const WB = {
     this.closeProjDetail();
     this.renderProjekte();
     this._toast('Umbenannt: ' + newName.trim());
+  },
+
+  _projSetStatus(pKey, ctx, status) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db?.projects?.[pKey]) return;
+    db.projects[pKey].status = status;
+    this.setDirty();
+    this.renderProjekte();
+    this._toast('Status: ' + status);
   },
 
   _projDelete(pKey, ctx) {
