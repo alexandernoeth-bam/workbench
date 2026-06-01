@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.68.0</title>
+<title>WorkBench 3.68.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5937,9 +5937,7 @@ html, body {
           <button onclick="WB.newEventOpenPicker()" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
             + Termin
           </button>
-          <button onclick="WB.qcOpen()" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
-            + Inbox
-          </button>
+
         </div>
       </div>
       <!-- Zeitband Panel (Kompatibilität) -->
@@ -6746,13 +6744,13 @@ html, body {
 <div id="wb-qc-overlay" onclick="if(event.target===this)WB.qcClose()">
   <div id="wb-qc-panel">
     <div class="qc-header">
-      <div class="qc-header-title">Schnell erfassen</div>
+      <div class="qc-header-title">Schnelle Notiz</div>
       <button class="qc-close" onclick="WB.qcClose()">&#215;</button>
     </div>
 
     <!-- Eingabe -->
     <div class="qc-input-row">
-      <textarea id="qc-text" placeholder="Was möchtest du festhalten?" rows="2"></textarea>
+      <textarea id="qc-text" placeholder="Gedanke, Idee oder Notiz..." rows="3"></textarea>
       <button id="qc-cam-btn" onclick="WB._qcCameraOpen()" title="Foto / Bild hinzufügen">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -6772,11 +6770,8 @@ html, body {
 
     <!-- Speichern -->
     <button onclick="WB._qcSaveSchnell()" style="width:100%;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;margin-top:4px;">
-      In Inbox speichern
+      Als Notiz speichern
     </button>
-    <div style="font-size:0.72rem;color:var(--c-faint);text-align:center;margin-top:8px;">
-      Aus der Inbox weiterverarbeiten → Termin, Aufgabe, Notiz, Checkliste
-    </div>
   </div>
 </div>
 
@@ -7022,7 +7017,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.68.0 · Build 20260601-1000</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.68.1 · Build 20260601-1030</div>
     </div>
 
     <!-- Welt -->
@@ -7202,7 +7197,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.68.0',
+  APP_VERSION: '3.68.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -8373,20 +8368,22 @@ const WB = {
     const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
     if (!db) { this._toast('Bitte zuerst Datenbank laden'); return; }
 
-    // Inbox-Eintrag anlegen
-    if (!db.inbox) db.inbox = [];
-    const entry = {
-      id:  'inbox_' + Date.now() + '_' + Math.random().toString(36).slice(2),
-      text: text || '(Foto)',
-      ts:  Date.now(),
-      ctx,
+    // Direkt als Notiz speichern
+    if (!db.notizen) db.notizen = [];
+    const now = new Date();
+    const notiz = {
+      id:      'nz_' + Date.now(),
+      titel:   text ? text.split('\n')[0].slice(0, 60) : '(Foto)',
+      inhalt:  text || '',
+      typ:     'schnell',
+      ts:      Date.now(),
+      datum:   now.toISOString().split('T')[0],
     };
-    if (img) entry.image = img;
-    db.inbox.push(entry);
+    if (img) notiz.image = img;
+    db.notizen.unshift(notiz); // neueste oben
     this.setDirty();
     this.qcClose();
-    this._inboxUpdateMenuSub();
-    this._toast(img ? '✓ Foto in Inbox gespeichert' : '✓ In Inbox gespeichert');
+    this._toast(img ? '\u2713 Foto als Notiz gespeichert' : '\u2713 Notiz gespeichert');
   },
 
   // ── Inbox-Assistent ──────────────────────────────────
