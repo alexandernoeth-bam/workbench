@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.73.3</title>
+<title>WorkBench 3.73.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7354,7 +7354,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.73.3 · Build 20260602-1130</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.73.4 · Build 20260602-1145</div>
     </div>
 
     <!-- Welt -->
@@ -7538,7 +7538,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.73.3',
+  APP_VERSION: '3.73.4',
   APP_BUILD:   '20260526-0723',
 
 
@@ -11239,11 +11239,11 @@ const WB = {
   // ══════════════════════════════════════════════════════
 
   PLAN_TYPEN: {
-    sport:      { label: 'Sport & Fitness',   icon: '🏃', sektionen: ['vision','aufgaben','habits','metriken','reflexion'] },
-    ernaehrung: { label: 'Ernährung',          icon: '🥗', sektionen: ['vision','aufgaben','habits','metriken','reflexion'] },
-    projekt:    { label: 'Projekt-Plan',       icon: '🏗',  sektionen: ['vision','phasen','aufgaben','termine','reflexion'] },
-    baustelle:  { label: 'Baustellen-Plan',    icon: '⚠',   sektionen: ['vision','kosten','aufgaben','entscheid','reflexion'] },
-    allgemein:  { label: 'Allgemeiner Plan',   icon: '📋',  sektionen: ['vision','aufgaben','habits','metriken','termine','reflexion'] },
+    sport:      { label: 'Sport & Fitness',   icon: '🏃', sektionen: ['vision','notizplan','aufgaben','habits','metriken','reflexion'] },
+    ernaehrung: { label: 'Ernährung',          icon: '🥗', sektionen: ['vision','notizplan','aufgaben','habits','metriken','reflexion'] },
+    projekt:    { label: 'Projekt-Plan',       icon: '🏗',  sektionen: ['vision','notizplan','phasen','aufgaben','termine','reflexion'] },
+    baustelle:  { label: 'Baustellen-Plan',    icon: '⚠',   sektionen: ['vision','notizplan','kosten','aufgaben','entscheid','reflexion'] },
+    allgemein:  { label: 'Allgemeiner Plan',   icon: '📋',  sektionen: ['vision','notizplan','aufgaben','habits','metriken','termine','reflexion'] },
   },
 
   _planStore() {
@@ -11455,6 +11455,49 @@ const WB = {
     this._planRender();
   },
 
+  _planCreateNotizplan(planIdx) {
+    const store = this._planStore();
+    if (!store?.[planIdx]) return;
+    const plan = store[planIdx];
+    // Neue Notiz vom Typ "plan" anlegen
+    const ctx = 'priv';
+    const db  = this.dataPriv || this.dataPro;
+    if (!db) { this._toast('Keine Datenbank geladen'); return; }
+    if (!db.settings) db.settings = {};
+    if (!db.settings.cockpitNotizen) db.settings.cockpitNotizen = [];
+    const now = Date.now();
+    const notiz = {
+      id:        'nz_plan_' + now,
+      titel:     plan.titel,
+      inhalt:    '',
+      typ:       'plan',
+      welt:      ctx,
+      _db:       ctx,
+      erstellt:  now,
+      geaendert: now,
+      planLinks: [],
+    };
+    db.settings.cockpitNotizen.unshift(notiz);
+    plan.notizplanId = notiz.id;
+    this.setDirty();
+    this._planRender();
+    this._toast('✓ Plan-Dokument angelegt');
+    // Direkt in Editor
+    setTimeout(() => this._planOpenNotizplan(planIdx), 200);
+  },
+
+  _planOpenNotizplan(planIdx) {
+    const store = this._planStore();
+    if (!store?.[planIdx]) return;
+    const notizId = store[planIdx].notizplanId;
+    if (!notizId) return;
+    this.planClose();
+    setTimeout(() => {
+      this._goTab('notizen');
+      setTimeout(() => this.nzEdOpen(notizId), 200);
+    }, 100);
+  },
+
   planClose() {
     document.getElementById('wb-plan-overlay')?.classList.remove('open');
     this._planActive = null;
@@ -11522,7 +11565,7 @@ const WB = {
   _planSektionHtml(plan, sk, isOpen, today, planIdx) {
     const configs = {
       vision:    { icon: '🎯', label: 'Vision & Warum' },
-      aufgaben:  { icon: '✓',  label: 'Aufgaben' },
+      aufgaben:  { icon: '🏁', label: 'Meilensteine' },
       habits:    { icon: '🔥', label: 'Habit-Tracking' },
       metriken:  { icon: '📊', label: 'Metriken' },
       termine:   { icon: '📅', label: 'Termine' },
@@ -11530,6 +11573,7 @@ const WB = {
       phasen:    { icon: '🗺', label: 'Phasen & Meilensteine' },
       kosten:    { icon: '💰', label: 'Kosten-Klarheit' },
       entscheid: { icon: '⚡', label: 'Entscheidung' },
+      notizplan: { icon: '📝', label: 'Mein Plan' },
     };
     const cfg = configs[sk] || { icon: '•', label: sk };
 
@@ -11541,6 +11585,32 @@ const WB = {
       badge = (plan.habits||[]).length + ' Habits';
     } else if (sk === 'metriken') {
       badge = (plan.metriken||[]).length + ' Werte';
+    } else if (sk === 'notizplan') {
+      // Notiztyp "Plan" als eingebetteter Editor
+      const notizId = plan.notizplanId || null;
+      const notiz   = notizId ? this._nzStore().find(n => n.id === notizId) : null;
+
+      if (!notiz) {
+        bodyHtml = '<div style="font-size:0.85rem;color:var(--c-faint);margin-bottom:10px;">Noch kein Plan-Dokument verknüpft.</div>'
+          + '<button onclick="WB._planCreateNotizplan(' + planIdx + ')" '
+          + 'style="width:100%;padding:10px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;">'
+          + '+ Plan-Dokument anlegen</button>';
+      } else {
+        // Notiz-Inhalt anzeigen + Link zum Editor
+        const inhalt = notiz.inhalt || '';
+        const textVorschau = inhalt.replace(/<[^>]+>/g, '').slice(0, 200);
+        bodyHtml = '<div style="background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-xs);padding:12px;font-size:0.85rem;color:var(--c-text);line-height:1.7;margin-bottom:10px;cursor:pointer;" '
+          + 'onclick="WB._planOpenNotizplan(' + planIdx + ')">'
+          + (textVorschau || '<em style="color:var(--c-faint);">Noch kein Inhalt — klicken zum Bearbeiten</em>')
+          + (inhalt.replace(/<[^>]+>/g,'').length > 200 ? '…' : '')
+          + '</div>'
+          + '<div style="display:flex;gap:8px;">'
+          + '<button onclick="WB._planOpenNotizplan(' + planIdx + ')" '
+          + 'style="flex:1;padding:9px;background:none;border:1px solid var(--c-beruf);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-beruf);cursor:pointer;font-weight:600;">'
+          + '→ Im Editor öffnen</button>'
+          + '</div>';
+      }
+
     } else if (sk === 'reflexion') {
       badge = (plan.reflexionen||[]).length + ' Einträge';
     }
