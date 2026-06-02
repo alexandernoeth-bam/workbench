@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.73.2</title>
+<title>WorkBench 3.73.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7354,7 +7354,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.73.2 · Build 20260602-1100</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.73.3 · Build 20260602-1130</div>
     </div>
 
     <!-- Welt -->
@@ -7538,7 +7538,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.73.2',
+  APP_VERSION: '3.73.3',
   APP_BUILD:   '20260526-0723',
 
 
@@ -11622,32 +11622,84 @@ const WB = {
       bodyHtml += metriken.map((m,mi) => {
         const entries = Object.entries(m.log||{}).sort((a,b) => b[0].localeCompare(a[0]));
         const latest  = entries[0];
+        const prev    = entries[1];
         const isDate  = m.typ === 'datum';
-        const isJaNein = m.typ === 'janein';
+        const isJN    = m.typ === 'janein';
+
+        // Tendenz aus letzten zwei Einträgen
+        let tendenz = '';
+        if (!isDate && !isJN && latest && prev) {
+          const d = parseFloat(latest[1]) - parseFloat(prev[1]);
+          if (!isNaN(d) && d !== 0) tendenz = d > 0 ? '↑' : '↓';
+        }
+
+        // Fortschritt IST vs ZIEL
         let progressHtml = '';
-        if (m.ziel && !isDate && !isJaNein) {
-          const zielVal = parseFloat(m.ziel), aktVal = parseFloat(latest?.[1]||0);
-          if (!isNaN(zielVal) && !isNaN(aktVal) && zielVal > 0) {
-            const pct = Math.min(100, Math.round(aktVal/zielVal*100));
-            progressHtml = '<div style="height:3px;background:var(--c-border);border-radius:2px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:var(--c-beruf);"></div></div>';
+        if (m.ziel && !isDate && !isJN && latest) {
+          const z = parseFloat(m.ziel), a = parseFloat(latest[1]||0);
+          if (!isNaN(z) && !isNaN(a) && z > 0) {
+            const pct = Math.min(100, Math.round(a/z*100));
+            progressHtml = '<div style="display:flex;align-items:center;gap:4px;margin-top:3px;">'
+              + '<div style="flex:1;height:4px;background:var(--c-border);border-radius:2px;overflow:hidden;">'
+              + '<div style="height:100%;width:'+pct+'%;background:var(--c-beruf);border-radius:2px;"></div></div>'
+              + '<span style="font-size:0.65rem;color:var(--c-beruf);font-family:var(--font-mono);min-width:28px;text-align:right;">'+pct+'%</span></div>';
           }
         }
+
+        // Datum-Info
+        let datumExtra = '';
+        if (isDate && latest?.[1]) {
+          const diff = Math.ceil((new Date(latest[1]) - new Date()) / 86400000);
+          datumExtra = diff > 0
+            ? ' <span style="font-size:0.7rem;color:var(--c-beruf);">noch '+diff+'d</span>'
+            : diff === 0 ? ' <span style="font-size:0.7rem;color:#C62828;">heute</span>'
+            : ' <span style="font-size:0.7rem;color:#C62828;">'+Math.abs(diff)+'d überf.</span>';
+        }
+
+        // Eingabebereich
         let inputHtml = '';
         if (isDate) {
-          inputHtml = '<input type="date" class="metric-input" value="'+(latest?.[1]||m.ziel||'')+'" onchange="WB._planMetrikLog('+planIdx+','+mi+',this.value)" style="width:130px;">';
-        } else if (isJaNein) {
-          inputHtml = '<input type="checkbox" '+(latest?.[1]==='1'?'checked':'')+' onchange="WB._planMetrikLog('+planIdx+','+mi+',this.checked?&quot;1&quot;:&quot;0&quot;)" style="width:20px;height:20px;accent-color:var(--c-beruf);">';
+          inputHtml = '<div style="display:flex;align-items:center;gap:4px;">'
+            + '<input type="date" class="metric-input" value="'+(latest?.[1]||m.ziel||'')+'"'
+            + ' onchange="WB._planMetrikLog('+planIdx+','+mi+',this.value)" style="width:138px;">'
+            + datumExtra + '</div>';
+        } else if (isJN) {
+          inputHtml = '<input type="checkbox" '+(latest?.[1]==='1'?'checked':'')
+            + ' onchange="WB._planMetrikLog('+planIdx+','+mi+',this.checked?&quot;1&quot;:&quot;0&quot;)"'
+            + ' style="width:20px;height:20px;accent-color:var(--c-beruf);">';
         } else {
-          inputHtml = '<input type="number" class="metric-input" step="any" value="'+(latest?.[1]||'')+'" placeholder="Wert" onchange="WB._planMetrikLog('+planIdx+','+mi+',this.value)">';
+          // IST / ZIEL / Tendenz
+          const tendenzColor = tendenz === '↑' ? 'var(--c-beruf)' : '#C62828';
+          inputHtml = '<div style="display:flex;align-items:flex-end;gap:6px;">'
+            + '<div style="display:flex;flex-direction:column;gap:1px;">'
+            + '<span style="font-size:0.58rem;font-weight:700;letter-spacing:0.05em;color:var(--c-muted);text-align:center;">IST</span>'
+            + '<input type="number" class="metric-input" step="any" value="'+(latest?.[1]||'')+'" placeholder="—"'
+            + ' onchange="WB._planMetrikLog('+planIdx+','+mi+',this.value)" style="width:68px;"></div>'
+            + (m.ziel !== undefined ? '<div style="display:flex;flex-direction:column;gap:1px;">'
+              + '<span style="font-size:0.58rem;font-weight:700;letter-spacing:0.05em;color:var(--c-muted);text-align:center;">ZIEL</span>'
+              + '<input type="number" class="metric-input" step="any" value="'+m.ziel+'" placeholder="—"'
+              + ' onchange="WB._planMetrikZiel('+planIdx+','+mi+',this.value)" style="width:68px;"></div>' : '')
+            + '<div style="display:flex;flex-direction:column;gap:1px;align-items:center;">'
+            + '<span style="font-size:0.58rem;font-weight:700;letter-spacing:0.05em;color:var(--c-muted);">+/-</span>'
+            + '<select onchange="WB._planMetrikTendenz('+planIdx+','+mi+',this.value)"'
+            + ' style="padding:5px 4px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;background:var(--c-bg);color:'+(m.tendenzManuell==='hoch'?'var(--c-beruf)':m.tendenzManuell==='tief'?'#C62828':'var(--c-muted)')+';width:52px;">'
+            + '<option value="" '+(m.tendenzManuell===''||!m.tendenzManuell?'selected':'')+'>&#8212;</option>'
+            + '<option value="hoch" '+(m.tendenzManuell==='hoch'?'selected':'')+' style="color:var(--c-beruf);">↑</option>'
+            + '<option value="tief" '+(m.tendenzManuell==='tief'?'selected':'')+' style="color:#C62828;">↓</option>'
+            + '</select></div>'
+            + (tendenz ? '<span style="font-size:1.1rem;color:'+tendenzColor+';line-height:1;align-self:flex-end;padding-bottom:4px;">'+tendenz+'</span>' : '')
+            + '</div>';
         }
-        return '<div class="metric-row" style="flex-wrap:wrap;align-items:flex-start;">'
-          + '<div style="flex:1;min-width:0;">'
-          + '<span class="metric-label">' + m.name + '</span>'
-          + (m.ziel && !isDate ? '<span style="font-size:0.68rem;color:var(--c-faint);margin-left:6px;">Ziel: '+m.ziel+(m.einheit?' '+m.einheit:'')+'</span>' : '')
+
+        return '<div class="metric-row" style="flex-wrap:wrap;align-items:flex-start;gap:6px;">'
+          + '<div style="flex:1;min-width:80px;">'
+          + '<span class="metric-label" style="font-size:0.83rem;font-weight:600;color:var(--c-text);">'
+          + m.name + (m.einheit ? ' <span style="font-size:0.68rem;color:var(--c-faint);">('+m.einheit+')</span>' : '')
+          + '</span>'
           + progressHtml + '</div>'
           + inputHtml
-          + '<span class="metric-unit">'+(m.einheit&&!isJaNein?m.einheit:'')+'</span>'
-          + '<button onclick="WB._planMetrikDelete('+planIdx+','+mi+')" style="background:none;border:none;cursor:pointer;color:var(--c-faint);">×</button>'
+          + '<button onclick="WB._planMetrikDelete('+planIdx+','+mi+')"'
+          + ' style="background:none;border:none;cursor:pointer;color:var(--c-faint);align-self:center;font-size:1rem;">×</button>'
           + '</div>';
       }).join('');
 
@@ -11778,6 +11830,14 @@ const WB = {
     store[planIdx].metriken.push({ id: String(Date.now()), name, einheit: unit, ziel, typ, log: {} });
     this.setDirty();
     this._planRender();
+  },
+
+  _planMetrikTendenz(planIdx, metrikIdx, val) {
+    const store = this._planStore();
+    const m = store?.[planIdx]?.metriken?.[metrikIdx];
+    if (!m) return;
+    m.tendenzManuell = val;
+    this.setDirty();
   },
 
   _planMetrikZiel(planIdx, metrikIdx, val) {
