@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.77.2</title>
+<title>WorkBench 3.77.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6739,7 +6739,7 @@ html, body {
   <div id="nz-plan-links" style="display:none;max-height:280px;overflow-y:auto;border-top:2px solid var(--c-border);background:var(--c-surface);">
     <div style="padding:10px 14px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);flex:1;">Verkn&#252;pfte Aufgaben &amp; Projekte</span>
+        <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);flex:1;">Aufgaben aus Plan-Notizen</span>
         <button onclick="WB._nzPlanLinkAdd()" style="background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.72rem;color:var(--c-beruf);cursor:pointer;padding:2px 8px;">+ Verkn&#252;pfen</button>
       </div>
       <div id="nz-plan-links-body"></div>
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.77.2 · Build 20260603-0900</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.77.3 · Build 20260603-0930</div>
     </div>
 
     <!-- Welt -->
@@ -7758,8 +7758,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.77.2',
-  APP_BUILD:   '20260603-0900',
+  APP_VERSION: '3.77.3',
+  APP_BUILD:   '20260603-0930',
 
 
   // ══════════════════════════════════════════════════════
@@ -11286,7 +11286,9 @@ const WB = {
     store[idx][field] = value;
     this.setDirty();
     this._reminderSettingsRender();
-    this._reminderInit(); // Timer neu starten
+    this._reminderInit();
+    this._initMidnightCheck();
+    this._initMidnightCheck(); // Timer neu starten
   },
 
   _reminderDelete(idx) {
@@ -15116,6 +15118,23 @@ const WB = {
     this.wzClose();
     this._toast('✓ Tagesplan gespeichert');
     this.renderCockpit();
+  },
+
+  _initMidnightCheck() {
+    const msUntilMidnight = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      return midnight - now;
+    };
+    const scheduleNext = () => {
+      setTimeout(() => {
+        this.renderCockpit();
+        this._planerDate = null;
+        scheduleNext();
+      }, msUntilMidnight() + 1000);
+    };
+    scheduleNext();
   },
 
   async init() {
@@ -21764,36 +21783,20 @@ const WB = {
   },
 
   _renderPlanSektion(notiz) {
-    const link = notiz?.projektLink;
-    let h = '<div class="nz-proj-sektion"><div class="nz-verkn-box-title">&#128193; Plan &mdash; Projekt</div>';
-    if(link?.proj) {
-      h += '<div style="display:flex;align-items:center;gap:8px;">'
-        + '<span style="flex:1;font-weight:500;">'+link.proj+'</span>'
-        + '<span style="font-size:0.75rem;color:var(--c-muted);">'+(link.ctx==='pro'?'Beruf':'Privat')+'</span>'
-        + '<button onclick="WB._planProjektLoesen()" style="background:none;border:1px solid var(--c-danger);color:var(--c-danger);border-radius:4px;padding:2px 8px;cursor:pointer;font-size:0.8rem;">&#10005;</button>'
-        + '</div>';
-    } else {
-      h += '<div style="display:flex;gap:6px;margin-top:4px;">'
-        + '<select id="nz-proj-sel" style="flex:1;padding:6px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);">'
-        + '<option value="">Projekt w\u00e4hlen\u2026</option>'
-        + this._nzProjOptions()
-        + '</select>'
-        + '<button onclick="WB._planProjektZuordnen()" style="padding:6px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:0.85rem;">Zuordnen</button>'
-        + '</div>';
-    }
     const cbCount = notiz?.cbLinks?.length||0;
-    h += '<div style="margin-top:8px;border-top:1px solid var(--c-border);padding-top:8px;">'
-      + '<div style="font-size:0.75rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--c-muted);margin-bottom:6px;">Aufgaben aus Text</div>'
-      + (cbCount > 0
-          ? '<div style="font-size:0.82rem;color:var(--c-beruf);margin-bottom:6px;">✓ ' + cbCount + ' Aufgabe(n) aus ☐ verknüpft</div>'
-          : '<div style="font-size:0.78rem;color:var(--c-muted);margin-bottom:6px;">Füge ☐ Checkboxen in den Text ein, dann scannen.</div>'
-        )
-      + '<button onclick="WB._planScanCheckboxen()" '
+    let h = '<div class="nz-proj-sektion">';
+    h += '<div style="margin-top:0;">';
+    h += '<div style="font-size:0.75rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--c-muted);margin-bottom:6px;">Aufgaben aus Text</div>';
+    h += (cbCount > 0
+        ? '<div style="font-size:0.82rem;color:var(--c-beruf);margin-bottom:6px;">✓ ' + cbCount + ' Aufgabe(n) aus ☐ verknüpft</div>'
+        : '<div style="font-size:0.78rem;color:var(--c-muted);margin-bottom:6px;">Füge ☐ Checkboxen in den Text ein, dann Scannen klicken.</div>'
+    );
+    h += '<button onclick="WB._planScanCheckboxen()" '
       + 'style="width:100%;padding:8px;background:var(--c-surface);border:1px solid var(--c-beruf);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;color:var(--c-beruf);cursor:pointer;font-weight:600;">'
-      + '☐ Checkboxen scannen &amp; Aufgaben verknüpfen</button>'
-      + '</div>';
-    return h+'</div>';
+      + '☐ Checkboxen scannen &amp; Aufgaben verknüpfen</button>';
+    return h + '</div></div>';
   },
+
 
   _nzProjOptions() {
     const opts=[];
