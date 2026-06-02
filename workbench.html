@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.72.7</title>
+<title>WorkBench 3.72.8</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7345,7 +7345,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.72.7 · Build 20260602-0900</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.72.8 · Build 20260602-0910</div>
     </div>
 
     <!-- Welt -->
@@ -7529,7 +7529,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.72.7',
+  APP_VERSION: '3.72.8',
   APP_BUILD:   '20260526-0723',
 
 
@@ -19802,6 +19802,11 @@ const WB = {
             <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             Vorlage bearbeiten
           </button>
+          <button onclick="WB._clInstanzLoeschen('${instId}')"
+            style="width:100%;padding:11px;margin-top:6px;border:1px solid #C62828;background:none;border-radius:var(--radius-sm);font-family:var(--font);font-size:0.85rem;cursor:pointer;color:#C62828;display:flex;align-items:center;justify-content:center;gap:6px;">
+            <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            Instanz löschen
+          </button>
         </div>`;
     }
 
@@ -20164,6 +20169,22 @@ const WB = {
     const item  = inst.items.find(i => i.id === itemId); if (!item) return;
     item.date = date || '';
     this.setDirty();
+  },
+
+  _clInstanzLoeschen(instId) {
+    if (!confirm('Checkliste wirklich löschen?')) return;
+    const store = this._clInstanzStore();
+    if (!store) return;
+    // In beiden DBs suchen und löschen
+    [this.dataPriv, this.dataPro].forEach(db => {
+      if (!db?.settings?.cockpitInstanzen) return;
+      const idx = db.settings.cockpitInstanzen.findIndex(x => x.id === instId);
+      if (idx >= 0) db.settings.cockpitInstanzen.splice(idx, 1);
+    });
+    this.setDirty();
+    document.getElementById('cl-detail-overlay')?.classList.remove('open');
+    this.renderChecklisten();
+    this._toast('Checkliste gelöscht');
   },
 
   clFinishInstanz(instId) {
