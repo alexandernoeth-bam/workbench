@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.77.1</title>
+<title>WorkBench 3.77.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.77.1 · Build 20260602-2145</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.77.2 · Build 20260603-0900</div>
     </div>
 
     <!-- Welt -->
@@ -7758,8 +7758,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.77.1',
-  APP_BUILD:   '20260602-2145',
+  APP_VERSION: '3.77.2',
+  APP_BUILD:   '20260603-0900',
 
 
   // ══════════════════════════════════════════════════════
@@ -21964,25 +21964,26 @@ const WB = {
         const cbChar=document.createElement('span');
         cbChar.className='nz-cb-char';
         if(linked){
-          const taskDb=linked.ctx==='priv'?this.dataPriv:this.dataPro;
-          const taskObj=taskDb?.projects?.[linked.proj]?.tasks?.find(t=>String(t.id)===linked.taskId);
-          const isDone=!!taskObj?.done;
+          // Status aus planAufgaben der Notiz lesen
+          const notizStore=this._nzStoreWrite(this._nzActiveDb||'pro');
+          const nz=notizStore.find(n=>n.id===this.nzActiveId);
+          const aufgabe=(nz?.planAufgaben||[]).find(a=>a.id===linked.taskId);
+          const isDone=!!aufgabe?.done;
           cbChar.textContent=isDone?'\u2714\ufe0f':'\u2610';
           wrap.appendChild(cbChar);
           const linkSpan=document.createElement('span');
           linkSpan.className=isDone?'nz-cb-done nz-cb-link':'nz-cb-link';
           linkSpan.textContent=' '+lineText;
-          linkSpan.title='Aufgabe \u00f6ffnen';
-          linkSpan.dataset.proj=linked.proj;
+          linkSpan.title='Aufgabe abhaken';
           linkSpan.dataset.taskid=linked.taskId;
-          linkSpan.dataset.ctx=linked.ctx;
-          linkSpan.onclick=e=>{e.stopPropagation();e.preventDefault();
-            WB.openTaskDetail(e.currentTarget.dataset.proj,e.currentTarget.dataset.taskid,e.currentTarget.dataset.ctx);};
+          linkSpan.onclick=e=>{
+            e.stopPropagation();e.preventDefault();
+            WB._planCbToggle(e.currentTarget.dataset.taskid);};
           wrap.appendChild(linkSpan);
           const delBtn=document.createElement('span');
           delBtn.className='nz-cb-btn';
-          delBtn.textContent=' \u2715';
-          delBtn.title='Verkn\u00fcpfung l\u00f6sen';
+          delBtn.textContent=' ✕';
+          delBtn.title='Verknüpfung lösen';
           delBtn.dataset.cbid=cbId;
           delBtn.onclick=e=>{e.stopPropagation();e.preventDefault();
             WB._planCbLoesen(e.currentTarget.dataset.cbid);};
@@ -22021,25 +22022,26 @@ const WB = {
     if(!notizId){this._toast('Notiz erst speichern');return;}
     const store=this._nzStoreWrite(this._nzActiveDb||'pro');
     const notiz=store.find(n=>n.id===notizId); if(!notiz) return;
-    const projLink=notiz.projektLink;
-    const ctx=projLink?.ctx||(this._nzActiveDb==='priv'?'priv':'pro');
-    const db=ctx==='priv'?this.dataPriv:this.dataPro;
-    if(!db){this._toast('Keine Datenbank geladen');return;}
-    let proj=projLink?.proj;
-    if(!proj){
-      const projs=Object.keys(db.projects||{}).filter(k=>!db.projects[k].isArea);
-      if(!projs.length){this._toast('Bitte zuerst Projekt verkn\u00fcpfen');return;}
-      proj=projs[0];
-    }
-    db.projects[proj]=db.projects[proj]||{status:'aktiv',tasks:[],desc:''};
-    const taskId=String(Date.now());
-    db.projects[proj].tasks.push({id:taskId,text:taskText,done:false,prio:false,isToday:false,date:'',size:'S',checklist:[],planNotizId:notizId,planNotizDb:this._nzActiveDb||'pro'});
+    const taskId='task_'+String(Date.now());
     const stableCbId='cb_'+btoa(encodeURIComponent(taskText)).slice(0,12).replace(/[^a-zA-Z0-9]/g,'x');
+    if(!notiz.planAufgaben) notiz.planAufgaben=[];
+    notiz.planAufgaben.push({id:taskId,text:taskText,done:false,erstellt:new Date().toISOString().split('T')[0]});
     notiz.cbLinks=notiz.cbLinks||[];
     notiz.cbLinks=notiz.cbLinks.filter(l=>l.cbId!==stableCbId&&l.taskText!==taskText);
-    notiz.cbLinks.push({cbId:stableCbId,taskId,proj,ctx,taskText});
+    notiz.cbLinks.push({cbId:stableCbId,taskId,notizId,type:'planAufgabe',taskText});
     this.setDirty();
-    this._toast('Aufgabe erstellt: '+taskText.substring(0,30));
+    this._toast('\u2713 Aufgabe: '+taskText.substring(0,30));
+    setTimeout(()=>this._planScanCheckboxen(),50);
+  },
+
+  _planCbToggle(taskId) {
+    const notizId=this.nzActiveId; if(!notizId) return;
+    const store=this._nzStoreWrite(this._nzActiveDb||'pro');
+    const notiz=store.find(n=>n.id===notizId); if(!notiz) return;
+    const aufgabe=(notiz.planAufgaben||[]).find(a=>a.id===taskId);
+    if(!aufgabe) return;
+    aufgabe.done=!aufgabe.done;
+    this.setDirty();
     setTimeout(()=>this._planScanCheckboxen(),50);
   },
 
@@ -22052,19 +22054,20 @@ const WB = {
   },
 
   _planCbZuordnenDialog(cbId,taskText) {
+    // Plan-Notizen anzeigen zum Zuordnen
+    const alleNotizen=this._nzStore().filter(n=>n.typ==='plan'&&!n.archiv);
     const tasks=[];
-    [['pro',this.dataPro],['priv',this.dataPriv]].forEach(([ctx,db])=>{
-      if(!db) return;
-      Object.keys(db.projects||{}).forEach(proj=>{
-        (db.projects[proj].tasks||[]).forEach(t=>{if(!t.done)tasks.push({taskId:String(t.id),text:t.text,proj,ctx});});
+    alleNotizen.forEach(nz=>{
+      (nz.planAufgaben||[]).filter(a=>!a.done).forEach(a=>{
+        tasks.push({taskId:a.id,text:a.text,notizId:nz.id,notizTitel:nz.titel||'Plan'});
       });
     });
-    if(!tasks.length){this._toast('Keine offenen Aufgaben');return;}
+    if(!tasks.length){this._toast('Keine offenen Plan-Aufgaben');return;}
     const ex=document.getElementById('nzCbModal'); if(ex)ex.remove();
     const modal=document.createElement('div');
     modal.id='nzCbModal';
     modal.style.cssText='position:fixed;inset:0;z-index:500;background:rgba(28,27,24,0.45);display:flex;align-items:flex-end;';
-    const sel=tasks.map((t,i)=>'<option value="'+i+'">['+( t.ctx==='pro'?'B':'P')+'] '+t.proj+' \u2192 '+t.text.substring(0,40)+'</option>').join('');
+    const sel=tasks.map((t,i)=>'<option value="'+i+'">'+(t.notizTitel||'Plan')+' → '+t.text.substring(0,40)+'</option>').join('');
     modal.innerHTML='<div style="background:var(--c-surface);border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 30px;width:100%;box-sizing:border-box;">'
       +'<div style="font-size:0.95rem;font-weight:600;margin-bottom:12px;">Aufgabe zuordnen</div>'
       +'<select id="nzCbTaskSel" style="width:100%;padding:9px;border:1px solid var(--c-border);border-radius:var(--radius-sm);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);margin-bottom:12px;">'+sel+'</select>'
@@ -22084,9 +22087,10 @@ const WB = {
     const notizId=this.nzActiveId; if(!notizId) return;
     const store=this._nzStoreWrite(this._nzActiveDb||'pro');
     const notiz=store.find(n=>n.id===notizId); if(!notiz) return;
-    const db=chosen.ctx==='priv'?this.dataPriv:this.dataPro;
-    const task=db?.projects?.[chosen.proj]?.tasks?.find(t=>String(t.id)===chosen.taskId);
-    if(task){task.planNotizId=notizId;task.planNotizDb=this._nzActiveDb||'pro';}
+    // Aufgabe aus Plan-Notiz holen und verknüpfen
+    const srcNotiz=this._nzStore().find(n=>n.id===chosen.notizId);
+    // cbLink in aktueller Notiz speichern
+    const stableCbId2='cb_'+btoa(encodeURIComponent(chosen.text)).slice(0,12).replace(/[^a-zA-Z0-9]/g,'x');
     notiz.cbLinks=notiz.cbLinks||[];
     notiz.cbLinks=notiz.cbLinks.filter(l=>l.cbId!==cbId&&l.taskText!==chosen.text);
     notiz.cbLinks.push({cbId,taskId:chosen.taskId,proj:chosen.proj,ctx:chosen.ctx,taskText:chosen.text});
