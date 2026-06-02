@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.77.7</title>
+<title>WorkBench 3.77.8</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.77.7 · Build 20260603-1030</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.77.8 · Build 20260603-1045</div>
     </div>
 
     <!-- Welt -->
@@ -7758,8 +7758,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.77.7',
-  APP_BUILD:   '20260603-1030',
+  APP_VERSION: '3.77.8',
+  APP_BUILD:   '20260603-1045',
 
 
   // ══════════════════════════════════════════════════════
@@ -22629,29 +22629,26 @@ const WB = {
   nzInsertCb() {
     const ed = document.getElementById('nz-ed-content');
     if(!ed) return;
+    // Cursor ans Ende setzen
     ed.focus();
-    // Cursor ans Ende setzen falls kein Selection
+    const range = document.createRange();
+    range.selectNodeContents(ed);
+    range.collapse(false);
     const sel = window.getSelection();
-    if(!sel || sel.rangeCount === 0 || !ed.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-      const range = document.createRange();
-      range.selectNodeContents(ed);
-      range.collapse(false);
-      sel?.removeAllRanges();
-      sel?.addRange(range);
-    }
+    sel.removeAllRanges();
+    sel.addRange(range);
+    // ☐ einfügen nach kurzer Pause
     setTimeout(() => {
+      ed.focus();
       const s = window.getSelection();
-      if(s && s.rangeCount > 0) {
-        const r = s.getRangeAt(0);
-        r.deleteContents();
-        const tn = document.createTextNode('☐ ');
-        r.insertNode(tn);
-        r.setStartAfter(tn);
-        r.collapse(true);
-        s.removeAllRanges();
-        s.addRange(r);
-      }
-    }, 10);
+      const r = s.rangeCount > 0 ? s.getRangeAt(0) : (() => { const rr=document.createRange(); rr.selectNodeContents(ed); rr.collapse(false); return rr; })();
+      const tn = document.createTextNode('☐ ');
+      r.insertNode(tn);
+      r.setStartAfter(tn);
+      r.collapse(true);
+      s.removeAllRanges();
+      s.addRange(r);
+    }, 50);
   },
   nzInsertHr() {
     document.getElementById('nz-ed-content')?.focus();
