@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.73.0</title>
+<title>WorkBench 3.73.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7345,7 +7345,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.73.0 · Build 20260602-0945</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.73.1 · Build 20260602-1030</div>
     </div>
 
     <!-- Welt -->
@@ -7529,7 +7529,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.73.0',
+  APP_VERSION: '3.73.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -11360,13 +11360,8 @@ const WB = {
       titel,
       typ,
       erstellt: new Date().toISOString().split('T')[0],
-      vision: '',
-      aufgaben: [],
-      habits: [],
-      metriken: [],
-      reflexionen: [],
-      termine: [],
       sektionenOpen: {},
+      ...this._planVorlage(typ),
     };
 
     // Verknüpfung
@@ -11383,6 +11378,62 @@ const WB = {
     this._planListRender();
     this.planOpen(store.length - 1);
     this._toast('Plan "' + titel + '" angelegt');
+  },
+
+  _planVorlage(typ) {
+    const base = { vision: '', aufgaben: [], habits: [], metriken: [], reflexionen: [], termine: [] };
+
+    if (typ === 'sport') return {
+      ...base,
+      vision: 'Ich möchte mein Gewicht und meinen BMI senken — für mehr Energie, Gesundheit und Wohlbefinden.',
+      habits: [
+        { id: 'h1', name: 'Sport / Bewegung', log: {} },
+        { id: 'h2', name: 'Wasser 2l+', log: {} },
+      ],
+      metriken: [
+        { id: 'm1', name: 'Gewicht', einheit: 'kg', ziel: '', typ: 'zahl', log: {} },
+        { id: 'm2', name: 'BMI', einheit: '', ziel: '', typ: 'zahl', log: {} },
+        { id: 'm3', name: 'Sport-Tage', einheit: 'Tage/Woche', ziel: '3', typ: 'zahl', log: {} },
+        { id: 'm4', name: 'Ziel-Datum', einheit: '', ziel: '', typ: 'datum', log: {} },
+      ],
+    };
+
+    if (typ === 'ernaehrung') return {
+      ...base,
+      vision: 'Ich möchte mich bewusster ernähren und gesunde Gewohnheiten aufbauen.',
+      habits: [
+        { id: 'h1', name: 'Ernährungsplan eingehalten', log: {} },
+        { id: 'h2', name: 'Wasser 2l+', log: {} },
+        { id: 'h3', name: 'Kein Zucker', log: {} },
+      ],
+      metriken: [
+        { id: 'm1', name: 'Gewicht', einheit: 'kg', ziel: '', typ: 'zahl', log: {} },
+        { id: 'm2', name: 'Kalorien', einheit: 'kcal/Tag', ziel: '', typ: 'zahl', log: {} },
+        { id: 'm3', name: 'Ziel-Datum', einheit: '', ziel: '', typ: 'datum', log: {} },
+      ],
+    };
+
+    if (typ === 'projekt') return {
+      ...base,
+      vision: 'Was ist das Ziel dieses Projekts und warum ist es wichtig?',
+      aufgaben: [
+        { id: 'a1', text: 'Ersten Schritt definieren', done: false },
+        { id: 'a2', text: 'Ressourcen klären', done: false },
+      ],
+      metriken: [
+        { id: 'm1', name: 'Fertigstellung', einheit: '', ziel: '', typ: 'datum', log: {} },
+      ],
+    };
+
+    if (typ === 'baustelle') return {
+      ...base,
+      vision: 'Warum liegt das schon so lange offen? Was würde sich ändern wenn es erledigt wäre?',
+      metriken: [
+        { id: 'm1', name: 'Entscheidung bis', einheit: '', ziel: '', typ: 'datum', log: {} },
+      ],
+    };
+
+    return base; // allgemein
   },
 
   // ── Plan öffnen ───────────────────────────────────────
@@ -11561,19 +11612,42 @@ const WB = {
       }
       bodyHtml += metriken.map((m,mi) => {
         const entries = Object.entries(m.log||{}).sort((a,b) => b[0].localeCompare(a[0]));
-        const latest = entries[0];
-        return '<div class="metric-row">'
+        const latest  = entries[0];
+        const isDate  = m.typ === 'datum';
+        const isJaNein = m.typ === 'janein';
+        let progressHtml = '';
+        if (m.ziel && !isDate && !isJaNein) {
+          const zielVal = parseFloat(m.ziel), aktVal = parseFloat(latest?.[1]||0);
+          if (!isNaN(zielVal) && !isNaN(aktVal) && zielVal > 0) {
+            const pct = Math.min(100, Math.round(aktVal/zielVal*100));
+            progressHtml = '<div style="height:3px;background:var(--c-border);border-radius:2px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:var(--c-beruf);"></div></div>';
+          }
+        }
+        let inputHtml = '';
+        if (isDate) {
+          inputHtml = '<input type="date" class="metric-input" value="'+(latest?.[1]||m.ziel||'')+'" onchange="WB._planMetrikLog('+planIdx+','+mi+',this.value)" style="width:130px;">';
+        } else if (isJaNein) {
+          inputHtml = '<input type="checkbox" '+(latest?.[1]==='1'?'checked':'')+' onchange="WB._planMetrikLog('+planIdx+','+mi+',this.checked?&quot;1&quot;:&quot;0&quot;)" style="width:20px;height:20px;accent-color:var(--c-beruf);">';
+        } else {
+          inputHtml = '<input type="number" class="metric-input" step="any" value="'+(latest?.[1]||'')+'" placeholder="Wert" onchange="WB._planMetrikLog('+planIdx+','+mi+',this.value)">';
+        }
+        return '<div class="metric-row" style="flex-wrap:wrap;align-items:flex-start;">'
+          + '<div style="flex:1;min-width:0;">'
           + '<span class="metric-label">' + m.name + '</span>'
-          + '<input type="number" class="metric-input" step="any" value="' + (latest?.[1]||'') + '" placeholder="Wert"'
-          + ' onchange="WB._planMetrikLog(' + planIdx + ',' + mi + ',this.value)">'
-          + '<span class="metric-unit">' + (m.einheit||'') + '</span>'
-          + '<button onclick="WB._planMetrikDelete(' + planIdx + ',' + mi + ')" style="background:none;border:none;cursor:pointer;color:var(--c-faint);">×</button>'
+          + (m.ziel && !isDate ? '<span style="font-size:0.68rem;color:var(--c-faint);margin-left:6px;">Ziel: '+m.ziel+(m.einheit?' '+m.einheit:'')+'</span>' : '')
+          + progressHtml + '</div>'
+          + inputHtml
+          + '<span class="metric-unit">'+(m.einheit&&!isJaNein?m.einheit:'')+'</span>'
+          + '<button onclick="WB._planMetrikDelete('+planIdx+','+mi+')" style="background:none;border:none;cursor:pointer;color:var(--c-faint);">×</button>'
           + '</div>';
       }).join('');
 
       bodyHtml += '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'
         + '<input id="plan-metrik-name-' + planIdx + '" type="text" placeholder="Name (z.B. Gewicht)" style="flex:2;min-width:100px;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);">'
-        + '<input id="plan-metrik-unit-' + planIdx + '" type="text" placeholder="Einheit (kg)" style="flex:1;min-width:60px;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);">'
+        + '<input id="plan-metrik-unit-' + planIdx + '" type="text" placeholder="Einheit (kg)" style="flex:1;min-width:50px;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);">'
+        + '<input id="plan-metrik-ziel-' + planIdx + '" type="text" placeholder="Zielwert" style="flex:1;min-width:50px;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);">'
+        + '<select id="plan-metrik-typ-' + planIdx + '" style="padding:7px 6px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.78rem;background:var(--c-bg);color:var(--c-text);">'
+        + '<option value="zahl">Zahl</option><option value="datum">Datum</option><option value="janein">Ja/Nein</option></select>'
         + '<button onclick="WB._planMetrikAdd(' + planIdx + ')" style="padding:7px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;cursor:pointer;">+</button>'
         + '</div>';
 
@@ -11684,13 +11758,15 @@ const WB = {
   },
 
   _planMetrikAdd(planIdx) {
-    const name  = document.getElementById('plan-metrik-name-' + planIdx)?.value.trim();
-    const unit  = document.getElementById('plan-metrik-unit-' + planIdx)?.value.trim();
+    const name = document.getElementById('plan-metrik-name-' + planIdx)?.value.trim();
+    const unit = document.getElementById('plan-metrik-unit-' + planIdx)?.value.trim();
+    const ziel = document.getElementById('plan-metrik-ziel-' + planIdx)?.value.trim();
+    const typ  = document.getElementById('plan-metrik-typ-'  + planIdx)?.value || 'zahl';
     if (!name) return;
     const store = this._planStore();
     if (!store?.[planIdx]) return;
     if (!store[planIdx].metriken) store[planIdx].metriken = [];
-    store[planIdx].metriken.push({ id: String(Date.now()), name, einheit: unit, log: {} });
+    store[planIdx].metriken.push({ id: String(Date.now()), name, einheit: unit, ziel, typ, log: {} });
     this.setDirty();
     this._planRender();
   },
@@ -11905,6 +11981,54 @@ const WB = {
 
     sheet.innerHTML = '';
     sheet.appendChild(panel);
+  },
+
+  _planmodusKpiUebersicht() {
+    const plaene = this._planStore() || [];
+    if (!plaene.length) return '';
+
+    const rows = plaene
+      .filter(p => (p.metriken||[]).length > 0)
+      .map(p => {
+        const typ = this.PLAN_TYPEN[p.typ] || this.PLAN_TYPEN.allgemein;
+        const kpiRows = (p.metriken||[]).map(m => {
+          const entries = Object.entries(m.log||{}).sort((a,b) => b[0].localeCompare(a[0]));
+          const latest  = entries[0];
+          const val     = latest?.[1] || '—';
+          const isDate  = m.typ === 'datum';
+
+          let badge = '';
+          if (m.ziel && !isDate && !isNaN(parseFloat(m.ziel)) && !isNaN(parseFloat(val))) {
+            const pct = Math.min(100, Math.round(parseFloat(val) / parseFloat(m.ziel) * 100));
+            badge = '<div style="height:3px;background:var(--c-border);border-radius:2px;width:60px;display:inline-block;vertical-align:middle;margin-left:6px;overflow:hidden;">'
+              + '<div style="height:100%;width:' + pct + '%;background:var(--c-beruf);"></div></div>'
+              + '<span style="font-size:0.65rem;color:var(--c-beruf);margin-left:4px;">' + pct + '%</span>';
+          }
+
+          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--c-border);font-size:0.82rem;">'
+            + '<span style="flex:1;color:var(--c-muted);">' + m.name + '</span>'
+            + '<span style="font-weight:600;color:var(--c-text);font-family:var(--font-mono);">'
+            + (isDate ? (val !== '—' ? val : '—') : val + (m.einheit?' '+m.einheit:''))
+            + '</span>'
+            + (m.ziel && !isDate ? '<span style="font-size:0.72rem;color:var(--c-faint);">/ ' + m.ziel + '</span>' : '')
+            + badge
+            + '</div>';
+        }).join('');
+
+        return '<div style="background:var(--c-bg);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;">'
+          + '<div style="font-size:0.78rem;font-weight:700;color:var(--c-text);margin-bottom:6px;display:flex;align-items:center;gap:6px;">'
+          + '<span>' + typ.icon + '</span>' + p.titel
+          + '<button onclick="WB.planOpen(' + (this._planStore()||[]).indexOf(p) + ')" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:0.72rem;color:var(--c-beruf);font-family:var(--font);">→ Plan</button>'
+          + '</div>'
+          + kpiRows
+          + '</div>';
+      }).join('');
+
+    if (!rows) return '';
+
+    return '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--c-border);">'
+      + '<div style="font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:8px;">KPI-Übersicht aus Plänen</div>'
+      + rows + '</div>';
   },
 
   _planmodusRauschenRender(container) {
@@ -12358,6 +12482,7 @@ const WB = {
       '<div class="pm-section">'
       + '<div class="pm-section-label">Meine Ziele ' + year + '</div>'
       + goalHtml
+      + this._planmodusKpiUebersicht()
       + '<button style="font-size:0.8rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);padding:4px 0;" onclick="WB._goTab(&quot;ziele&quot;);WB.planmodusClose();">Alle Ziele anzeigen →</button>'
       + '</div>'
       + '<div class="pm-section">'
