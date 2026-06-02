@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.75.0</title>
+<title>WorkBench 3.75.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6244,6 +6244,124 @@ html, body {
 }
 .planer-slot-btn button:hover { background: var(--c-beruf); color: #fff; border-color: var(--c-beruf); }
 
+
+/* ── Slot-Planer Layout v3.75.1 ─────────────────── */
+#planer-body-v2 {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: calc(100vh - 120px);
+}
+#planer-zones {
+  flex: 1;
+  overflow-y: auto;
+  border-right: 2px solid var(--c-border);
+  padding: 8px 0;
+}
+#planer-backlog-section {
+  width: 340px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#planer-backlog-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--c-border);
+  cursor: default;
+}
+#planer-backlog-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Zone-Karte */
+.zone-card {
+  border-bottom: 1px solid var(--c-border);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+.zone-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--c-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  background: var(--c-bg);
+  z-index: 1;
+}
+.zone-time-hint {
+  font-size: 0.68rem;
+  color: var(--c-faint);
+  font-weight: 400;
+  margin-left: auto;
+}
+
+/* Termin in Zone */
+.zone-event {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 14px 6px 28px;
+  font-size: 0.83rem;
+  border-left: 3px solid var(--c-beruf);
+  margin: 3px 10px 3px 14px;
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  background: rgba(13,122,107,0.06);
+}
+.zone-event-time {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--c-beruf);
+  flex-shrink: 0;
+  margin-top: 1px;
+  min-width: 36px;
+}
+.zone-event-title {
+  flex: 1;
+  color: var(--c-text);
+  font-weight: 500;
+}
+.zone-event-sub {
+  font-size: 0.68rem;
+  color: var(--c-muted);
+  margin-top: 1px;
+}
+
+/* Aufgabe in Zone */
+.zone-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 7px 28px;
+  font-size: 0.83rem;
+}
+.zone-task-title { flex: 1; color: var(--c-text); }
+.zone-task-title.done { text-decoration: line-through; color: var(--c-faint); }
+.zone-task-meta { font-size: 0.68rem; color: var(--c-muted); margin-top: 1px; }
+.zone-task-del {
+  background: none; border: none; cursor: pointer;
+  color: var(--c-faint); font-size: 0.9rem; padding: 0 2px;
+}
+.zone-empty {
+  padding: 6px 14px 6px 28px;
+  font-size: 0.78rem;
+  color: var(--c-faint);
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  #planer-body-v2 { flex-direction: column; height: auto; }
+  #planer-backlog-section { width: 100%; border-right: none; border-top: 2px solid var(--c-border); }
+  #planer-zones { height: auto; overflow-y: visible; }
+}
+
 </style>
 </head>
 <body>
@@ -7459,7 +7577,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.75.0 · Build 20260602-1600</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.75.1 · Build 20260602-1630</div>
     </div>
 
     <!-- Welt -->
@@ -7629,7 +7747,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.75.0',
+  APP_VERSION: '3.75.1',
   APP_BUILD:   '20260526-0723',
 
 
@@ -20853,17 +20971,18 @@ const WB = {
       + '<button class="planer-nav-btn" onclick="WB._planerShift(1)">&#8250;</button>'
       + todayBtn
       + '</div>'
-      + '<div id="planer-slots"></div>'
+      + '<div id="planer-body-v2">'
+      + '<div id="planer-zones"></div>'
       + '<div id="planer-backlog-section">'
-      + '<div id="planer-backlog-header" onclick="WB._planerToggleBacklog()">'
-      + '<span id="planer-backlog-toggle">&#9660;</span>'
-      + '<span>Backlog</span>'
-      + '<span id="planer-backlog-count" style="margin-left:4px;"></span>'
+      + '<div id="planer-backlog-header">'
+      + '<span style="font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);">Backlog </span>'
+      + '<span id="planer-backlog-count" style="font-size:0.72rem;color:var(--c-faint);"></span>'
       + '</div>'
       + '<div id="planer-backlog-body"></div>'
+      + '</div>'
       + '</div>';
 
-    this._planerRenderSlots(dateStr);
+    this._planerRenderZones(dateStr);
     this._planerRenderBacklog(dateStr);
   },
 
@@ -20915,6 +21034,97 @@ const WB = {
     const toggle = document.getElementById('planer-backlog-toggle');
     if (body) body.style.display = this._planerBacklogOpen ? '' : 'none';
     if (toggle) toggle.textContent = this._planerBacklogOpen ? '\u25bc' : '\u25b6';
+  },
+
+  _planerRenderZones(dateStr) {
+    const el = document.getElementById('planer-zones');
+    if (!el) return;
+
+    const zones = [
+      { id: 'vm', icon: '🌅', label: 'Vormittag', hint: 'bis 12:00', from: '00:00', to: '12:00' },
+      { id: 'nm', icon: '🌞', label: 'Nachmittag', hint: '12:00 – 18:00', from: '12:00', to: '18:00' },
+      { id: 'ab', icon: '🌙', label: 'Abend', hint: 'ab 18:00', from: '18:00', to: '24:00' },
+    ];
+
+    // Termine des Tages laden
+    const events = [];
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      (db.customEvents || []).filter(ev => ev.date === dateStr && ev.type !== 'horizon').forEach(ev => {
+        events.push({ time: ev.startTime || '', title: ev.text, ctx, type: 'event' });
+      });
+    });
+
+    // Eingeplante Aufgaben laden
+    const planned = { vm: [], nm: [], ab: [] };
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      Object.entries(db.projects || {}).forEach(([pKey, proj]) => {
+        (proj.tasks || []).forEach(t => {
+          if (!t.planerSlot || t.planerDate !== dateStr) return;
+          if (!planned[t.planerSlot]) return;
+          planned[t.planerSlot].push({ t, pKey, ctx });
+        });
+      });
+    });
+
+    el.innerHTML = zones.map(zone => {
+      // Termine in dieser Zone
+      const zoneEvents = events.filter(ev => {
+        if (!ev.time) return zone.id === 'vm'; // ohne Uhrzeit → Vormittag
+        return ev.time >= zone.from && ev.time < zone.to;
+      }).sort((a,b) => (a.time||'').localeCompare(b.time||''));
+
+      const zoneTasks = planned[zone.id] || [];
+      const openCount = zoneTasks.filter(i => !i.t.done).length;
+
+      const eventsHtml = zoneEvents.map(ev =>
+        '<div class="zone-event">'
+        + '<div class="zone-event-time">' + (ev.time || '') + '</div>'
+        + '<div>'
+        + '<div class="zone-event-title">' + ev.title + '</div>'
+        + '<div class="zone-event-sub">' + (ev.ctx === 'pro' ? 'Beruf' : 'Privat') + ' &middot; Termin</div>'
+        + '</div></div>'
+      ).join('');
+
+      const tasksHtml = zoneTasks.map(({t, pKey, ctx}) => {
+        const pid = pKey.replace(/'/g, String.fromCharCode(92,39));
+        return '<div class="zone-task">'
+          + '<input type="checkbox" ' + (t.done?'checked':'') + ' '
+          + 'onchange="WB._planerTaskDone(&quot;'+t.id+'&quot;,&quot;'+pid+'&quot;,&quot;'+ctx+'&quot;)" '
+          + 'style="width:15px;height:15px;accent-color:var(--c-beruf);cursor:pointer;flex-shrink:0;">'
+          + '<div style="flex:1;min-width:0;">'
+          + '<div class="zone-task-title' + (t.done?' done':'') + '">' + t.text + '</div>'
+          + '<div class="zone-task-meta">' + pKey + ' &middot; ' + (ctx==='pro'?'Beruf':'Privat') + '</div>'
+          + '</div>'
+          + '<button class="zone-task-del" '
+          + 'onclick="WB._planerSlotRemove(&quot;'+t.id+'&quot;,&quot;'+pid+'&quot;,&quot;'+ctx+'&quot;)" '
+          + 'title="Entfernen">&times;</button>'
+          + '</div>';
+      }).join('');
+
+      const emptyTask = (!zoneTasks.length)
+        ? '<div class="zone-empty">Keine Aufgaben — aus Backlog einplanen</div>'
+        : '';
+
+      const badge = openCount > 0
+        ? ' <span style="font-size:0.68rem;background:var(--c-beruf);color:#fff;border-radius:10px;padding:1px 6px;margin-left:4px;">' + openCount + '</span>'
+        : '';
+
+      return '<div class="zone-card">'
+        + '<div class="zone-header">'
+        + '<span style="font-size:1rem;">' + zone.icon + '</span>'
+        + '<span>' + zone.label + '</span>'
+        + badge
+        + '<span class="zone-time-hint">' + zone.hint + '</span>'
+        + '</div>'
+        + eventsHtml
+        + tasksHtml
+        + emptyTask
+        + '</div>';
+    }).join('');
   },
 
   _planerRenderSlots(dateStr) {
