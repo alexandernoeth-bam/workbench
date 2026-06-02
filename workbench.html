@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.72.8</title>
+<title>WorkBench 3.72.9</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7345,7 +7345,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.72.8 · Build 20260602-0910</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.72.9 · Build 20260602-0930</div>
     </div>
 
     <!-- Welt -->
@@ -7529,7 +7529,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.72.8',
+  APP_VERSION: '3.72.9',
   APP_BUILD:   '20260526-0723',
 
 
@@ -12497,17 +12497,24 @@ const WB = {
     clStore.filter(inst => {
       if (inst.erledigt || inst.abgeschlossen) return false;
       if (!inst.items?.length) return false;
-      // Start-Datum: Checkliste nur ab diesem Datum anzeigen
-      if (inst.startDate && inst.startDate > today) return false;
-      // Item-Datum: wenn alle offenen Items ein Datum haben,
-      // nur anzeigen wenn mind. ein Item heute oder überfällig ist
+
       const offeneItems = inst.items.filter(i => !i.done);
-      const itemsOhneDatum = offeneItems.filter(i => !i.date);
-      if (itemsOhneDatum.length === 0 && offeneItems.length > 0) {
-        // Alle offenen Items haben Datum — nur anzeigen wenn mind. eines heute/überfällig
+      if (!offeneItems.length) return false;
+
+      // Start-Datum prüfen
+      if (inst.startDate) {
+        if (inst.startDate > today) return false; // noch nicht gestartet
+        // Start-Datum ≤ heute: Items ohne Datum → anzeigen
+        // Items alle mit Datum → nur wenn mind. eines heute/überfällig
+        const itemsOhneDatum = offeneItems.filter(i => !i.date);
+        if (itemsOhneDatum.length > 0) return true;
         return offeneItems.some(i => i.date && i.date <= today);
       }
-      return true; // keine Item-Daten gesetzt → immer anzeigen
+
+      // Kein Start-Datum: nur anzeigen wenn mind. ein Item heute/überfällig
+      const itemsMitDatum = offeneItems.filter(i => !!i.date);
+      if (itemsMitDatum.length === 0) return false; // keine Datumszuordnung → nicht im Cockpit
+      return itemsMitDatum.some(i => i.date <= today);
     }).forEach(inst => {
       const done  = inst.items.filter(i => i.done).length;
       const total = inst.items.length;
