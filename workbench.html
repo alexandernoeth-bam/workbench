@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.72.4</title>
+<title>WorkBench 3.72.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7345,7 +7345,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.72.4 · Build 20260602-0800</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.72.5 · Build 20260602-0830</div>
     </div>
 
     <!-- Welt -->
@@ -7529,7 +7529,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.72.4',
+  APP_VERSION: '3.72.5',
   APP_BUILD:   '20260526-0723',
 
 
@@ -14862,20 +14862,21 @@ const WB = {
     return db.settings.cockpitChecklisten;
   },
   _clInstanzStore() {
-    // Beide DBs zusammenführen — Instanzen können in beiden liegen
+    // Gibt Original-Referenzen aus BEIDEN DBs zurück (für Lesen + Schreiben)
     const all = [];
-    [this.dataPro, this.dataPriv].forEach(db => {
+    [this.dataPriv, this.dataPro].forEach(db => {
       if (!db) return;
       db.settings = db.settings || {};
       db.settings.cockpitInstanzen = db.settings.cockpitInstanzen || [];
+      // Direkte Referenzen — keine Kopien
       db.settings.cockpitInstanzen.forEach(inst => {
-        if (!all.find(x => x.id === inst.id)) all.push(inst);
+        if (!all.some(x => x.id === inst.id)) all.push(inst);
       });
     });
     return all;
   },
 
-  // Schreibzugriff auf die richtige DB
+  // Schreibzugriff: neue Instanz in aktive DB
   _clInstanzStoreWrite() {
     const db = this.activeWorld === 'privat' ? this.dataPriv : (this.dataPro || this.dataPriv);
     if (!db) return null;
