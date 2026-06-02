@@ -1,5 +1,5 @@
-// WorkBench Service Worker v3.71.8 · Build 20260601-2300
-const BUILD = '20260601-2300';
+// WorkBench Service Worker v3.76.5 · Build 20260602-2010
+const BUILD = '20260602-2010';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -20,13 +20,12 @@ self.addEventListener('activate', e => {
 // Notification-Click
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then(clientList => {
-        for (const c of clientList) {
-          if (c.url.includes('workbench') && 'focus' in c) return c.focus();
-        }
-        if (self.clients.openWindow) return self.clients.openWindow('./workbench.html');
-      })
+  e.waitUntil(clients.openWindow('/'));
+});
+
+// Fetch: Network-first, kein Cache
+self.addEventListener('fetch', e => {
+  e.respondWith(
+    fetch(e.request).catch(() => caches.match(e.request))
   );
 });
