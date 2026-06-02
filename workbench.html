@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.77.4</title>
+<title>WorkBench 3.77.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.77.4 · Build 20260603-0945</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.77.5 · Build 20260603-1000</div>
     </div>
 
     <!-- Welt -->
@@ -7758,8 +7758,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.77.4',
-  APP_BUILD:   '20260603-0945',
+  APP_VERSION: '3.77.5',
+  APP_BUILD:   '20260603-1000',
 
 
   // ══════════════════════════════════════════════════════
@@ -22630,8 +22630,26 @@ const WB = {
     const ed = document.getElementById('nz-ed-content');
     if(!ed) return;
     ed.focus();
-    // Scanner sucht nach ☐ Unicode — kein HTML-Input
-    document.execCommand('insertText', false, '☐ ');
+    const sel = window.getSelection();
+    if(sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      const textNode = document.createTextNode('☐ ');
+      range.insertNode(textNode);
+      range.setStartAfter(textNode);
+      range.setEndAfter(textNode);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } else {
+      // Fallback: ans Ende
+      const textNode = document.createTextNode('☐ ');
+      ed.appendChild(textNode);
+      const range = document.createRange();
+      range.setStartAfter(textNode);
+      range.collapse(true);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
   },
   nzInsertHr() {
     document.getElementById('nz-ed-content')?.focus();
