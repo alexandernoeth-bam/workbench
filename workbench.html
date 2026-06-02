@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.77.0</title>
+<title>WorkBench 3.77.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6476,7 +6476,7 @@ html, body {
             <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Schnell hinzufügen
           </button>
-          <button onclick="WB._ckNewAufgabe()" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
+          <button onclick="WB._ckOeffnePlanNotiz()" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
             + Aufgabe
           </button>
           <button onclick="WB.newEventOpenPicker()" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.77.0 · Build 20260602-2130</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.77.1 · Build 20260602-2145</div>
     </div>
 
     <!-- Welt -->
@@ -7758,8 +7758,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.77.0',
-  APP_BUILD:   '20260602-2130',
+  APP_VERSION: '3.77.1',
+  APP_BUILD:   '20260602-2145',
 
 
   // ══════════════════════════════════════════════════════
@@ -12884,79 +12884,52 @@ const WB = {
   // TAGESBEGLEITER v4.0 (v3.62.0)
   // ══════════════════════════════════════════════════════
 
-  _ckNewAufgabe() {
-    const plaene = this._planStore() || [];
-    if (!plaene.length) {
-      this._toast('Erst einen Plan anlegen \u2014 Hamburger \u2192 Ziele');
-      return;
-    }
+  _ckOeffnePlanNotiz() {
+    // Alle Plan-Notizen sammeln
+    const alleNotizen = this._nzStore().filter(n => n.typ === 'plan' && !n.archiv);
     const sheet = document.createElement('div');
     sheet.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;';
     sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
-    const planOpts = plaene.map((p, i) =>
-      '<button onclick="WB._ckNewAufgabeInPlan(' + i + ')" '
+
+    let rows = '';
+    if (alleNotizen.length) {
+      rows = alleNotizen.map(n =>
+        '<button onclick="WB._ckOpenPlanNz(&quot;' + n.id + '&quot;)" '
+        + 'style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;margin-bottom:4px;'
+        + 'background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-xs);'
+        + 'font-family:var(--font);font-size:0.88rem;cursor:pointer;text-align:left;">'
+        + '<span style="flex:1;color:var(--c-text);font-weight:500;">' + (n.titel||'Ohne Titel') + '</span>'
+        + '</button>'
+      ).join('');
+    }
+
+    rows += '<button onclick="WB._ckNewPlanNz()" '
       + 'style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;margin-bottom:4px;'
-      + 'background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-xs);'
-      + 'font-family:var(--font);font-size:0.88rem;cursor:pointer;text-align:left;">'
-      + '<span style="flex:1;color:var(--c-text);font-weight:500;">' + p.titel + '</span>'
-      + '<span style="font-size:0.72rem;color:var(--c-muted);">' + (p.aufgaben||[]).length + ' Meilensteine</span>'
-      + '</button>'
-    ).join('');
+      + 'background:var(--c-beruf);border:none;border-radius:var(--radius-xs);'
+      + 'font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;text-align:left;color:#fff;">'
+      + '+ Neue Plan-Notiz anlegen</button>';
+
     sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;'
       + 'border-radius:var(--radius) var(--radius) 0 0;padding:16px;max-height:70vh;overflow-y:auto;">'
       + '<div style="font-size:0.75rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;'
-      + 'color:var(--c-muted);margin-bottom:12px;">Meilenstein zu welchem Plan?</div>'
-      + planOpts + '</div>';
+      + 'color:var(--c-muted);margin-bottom:12px;">Plan-Notiz öffnen</div>'
+      + rows + '</div>';
     document.body.appendChild(sheet);
   },
 
-  _ckNewAufgabeInPlan(planIdx) {
+  _ckOpenPlanNz(id) {
     document.querySelector('[style*="z-index:500"]')?.remove();
-    const plan = (this._planStore()||[])[planIdx];
-    if (!plan) return;
-    const sheet = document.createElement('div');
-    sheet.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;';
-    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
-    const today = new Date().toISOString().split('T')[0];
-    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;'
-      + 'border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;">'
-      + '<div style="font-size:0.75rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;'
-      + 'color:var(--c-muted);margin-bottom:12px;">Meilenstein \u2014 ' + plan.titel + '</div>'
-      + '<input id="ck-aufgabe-text" type="text" placeholder="Was soll erreicht werden?" autofocus '
-      + 'style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);'
-      + 'border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;'
-      + 'background:var(--c-bg);color:var(--c-text);margin-bottom:10px;">'
-      + '<input id="ck-aufgabe-date" type="date" value="' + today + '" '
-      + 'style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--c-border);'
-      + 'border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;'
-      + 'background:var(--c-bg);color:var(--c-text);margin-bottom:14px;">'
-      + '<div style="display:flex;gap:8px;">'
-      + '<button onclick="document.querySelector(\'[style*=\\\"z-index:500\\\"]\')?.remove()" '
-      + 'style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);'
-      + 'font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Abbrechen</button>'
-      + '<button onclick="WB._ckAufgabeSpeichern(' + planIdx + ')" '
-      + 'style="flex:2;padding:11px;background:var(--c-beruf);border:none;border-radius:var(--radius-xs);'
-      + 'font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;color:#fff;">Speichern</button>'
-      + '</div></div>';
-    document.body.appendChild(sheet);
-    setTimeout(() => document.getElementById('ck-aufgabe-text')?.focus(), 50);
+    this._goTab('notizen');
+    setTimeout(() => this.nzEdOpen(id), 200);
   },
 
-  _ckAufgabeSpeichern(planIdx) {
-    const text = document.getElementById('ck-aufgabe-text')?.value.trim();
-    const date = document.getElementById('ck-aufgabe-date')?.value || '';
-    if (!text) return;
-    const store = this._planStore();
-    if (!store?.[planIdx]) return;
-    if (!store[planIdx].aufgaben) store[planIdx].aufgaben = [];
-    store[planIdx].aufgaben.push({ id: String(Date.now()), text, date, done: false });
-    this.setDirty();
+  _ckNewPlanNz() {
     document.querySelector('[style*="z-index:500"]')?.remove();
-    this._toast('\u2713 Meilenstein in: ' + store[planIdx].titel);
-    this.renderCockpit();
+    this._goTab('notizen');
+    setTimeout(() => this.nzEdOpen(null, 'Mein Plan', 'plan', ''), 200);
   },
 
-  _ckRenderTagesseite() {
+    _ckRenderTagesseite() {
     const now    = new Date();
     const today  = now.toISOString().split('T')[0];
     const dow    = now.getDay();
