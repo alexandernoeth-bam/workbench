@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.79.9</title>
+<title>WorkBench 3.79.10</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.79.9 · Build 20260603-1400</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.79.10 · Build 20260603-1415</div>
     </div>
 
     <!-- Welt -->
@@ -7762,8 +7762,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.79.9',
-  APP_BUILD:   '20260603-1400',
+  APP_VERSION: '3.79.10',
+  APP_BUILD:   '20260603-1415',
 
 
   // ══════════════════════════════════════════════════════
@@ -11685,11 +11685,23 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<div style="font-size:0.75rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:6px;">' + pKey + ' &middot; ' + (ctx==='pro'?'Beruf':'Privat') + '</div>'
       + '<div style="font-size:1rem;font-weight:600;color:var(--c-text);margin-bottom:10px;user-select:text;">' + task.text + '</div>'
       + dateHtml + notizHtml
-      + '<div style="display:flex;gap:8px;margin-top:4px;">'
+      + '<div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;">'
       + '<button onclick="WB._closeSheet600()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Schließen</button>'
-      + '<button onclick="WB._backlogImportAufgabe(&quot;'+taskId+'&quot;,&quot;'+pKey+'&quot;,&quot;'+ctx+'&quot;);WB._closeSheet600()" style="flex:2;padding:11px;background:var(--c-beruf);border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;color:#fff;">→ In Plan-Notiz importieren</button>'
+      + '<button onclick="WB._backlogProjAufgabeLoeschen(&quot;'+taskId+'&quot;,&quot;'+pKey+'&quot;,&quot;'+ctx+'&quot;)" style="flex:1;padding:11px;background:none;border:1px solid #C62828;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:#C62828;">Löschen</button>'
+      + '<button onclick="WB._backlogImportAufgabe(&quot;'+taskId+'&quot;,&quot;'+pKey+'&quot;,&quot;'+ctx+'&quot;);WB._closeSheet600()" style="flex:2;padding:11px;background:var(--c-beruf);border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;color:#fff;">→ In Plan importieren</button>'
       + '</div></div>';
     document.body.appendChild(sheet);
+  },
+
+  _backlogProjAufgabeLoeschen(taskId, pKey, ctx) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const proj = db?.projects?.[pKey];
+    if (!proj) return;
+    proj.tasks = (proj.tasks||[]).filter(t => String(t.id) !== String(taskId));
+    this.setDirty();
+    WB._closeSheet600();
+    this._backlogRender();
+    this._toast('Aufgabe gelöscht');
   },
 
   _backlogImportAufgabe(taskId, pKey, ctx) {
