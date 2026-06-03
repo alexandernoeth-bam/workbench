@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.80.2</title>
+<title>WorkBench 3.80.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.80.2 · Build 20260603-1500</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.80.3 · Build 20260603-1515</div>
     </div>
 
     <!-- Welt -->
@@ -7762,8 +7762,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.80.2',
-  APP_BUILD:   '20260603-1500',
+  APP_VERSION: '3.80.3',
+  APP_BUILD:   '20260603-1515',
 
 
   // ══════════════════════════════════════════════════════
@@ -13910,13 +13910,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + (item?.notiz||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')
       + '</textarea></div>'
       + '<div style="display:flex;gap:8px;">'
-      + '<button onclick="document.querySelector(\'[style*=z-index\\:500]\').remove()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Abbrechen</button>'
-      + (isNew ? '' : '<button onclick="WB._quickDelete(&quot;'+id+'&quot;);document.querySelector(\'[style*=z-index\\:500]\').remove()" style="flex:1;padding:11px;background:none;border:1px solid #C62828;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:#C62828;">L&ouml;schen</button>')
+      + '<button onclick="WB._closeSheet500()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Abbrechen</button>'
+      + (isNew ? '' : '<button onclick="WB._quickDelete(&quot;'+id+'&quot;);WB._closeSheet500()" style="flex:1;padding:11px;background:none;border:1px solid #C62828;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:#C62828;">L&ouml;schen</button>')
       + '<button onclick="WB._quickDetailSave(&quot;' + (id||'') + '&quot;)" style="flex:2;padding:11px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;">Speichern</button>'
       + '</div></div>';
 
     document.body.appendChild(sheet);
     setTimeout(() => document.getElementById('wqa-text')?.select(), 50);
+  },
+
+  _closeSheet500() {
+    document.querySelectorAll('[style*="z-index:500"]').forEach(e => e.remove());
   },
 
   _quickDetailSave(id) {
@@ -13946,8 +13950,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (notiz) item.notiz = notiz; else delete item.notiz;
 
     this.setDirty();
-    document.querySelectorAll('[style*="z-index:500"],[style*="rgba(0,0,0"]').forEach(e => e.remove());
+    this._closeSheet500();
     this._ckRenderTagesseite();
+    this._schnellListeRender();
     this._toast(id ? '✓ Gespeichert' : 'Angelegt' + (recur?' (wiederkehrend)':'') + (time?' um '+time:''));
   },
 
