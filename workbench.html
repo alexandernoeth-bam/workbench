@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.93.1</title>
+<title>WorkBench 3.95.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7964,7 +7964,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.93.1 · Build 20260604-0012</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.95.0 · Build 20260604-0058</div>
     </div>
 
     <!-- Welt -->
@@ -8129,8 +8129,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.93.1',
-  APP_BUILD:   '20260604-0012',
+  APP_VERSION: '3.95.0',
+  APP_BUILD:   '20260604-0058',
 
 
   // ══════════════════════════════════════════════════════
@@ -14489,7 +14489,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       vision: vorlage.vision || '',
       inhalt: '',
       planAufgaben: [],            // die EINE Aufgabenliste (Inline-System)
-      habits: vorlage.habits || [],
+      habits: [],                  // v3.95.0: Habits entfernt — Feld bleibt leer für Datenkonsistenz
       metriken: vorlage.metriken || [],
       reflexionen: [],
       termine: [],
@@ -14706,15 +14706,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + (p.metricPct !== null ? ' · Messung ' + p.metricPct + '%' : '') + '</div>'
       + '</div>';
 
-    // Sektionen
+    // Sektionen — Reihenfolge v3.94.0; Habits vorerst ausgeblendet (Daten bleiben erhalten)
     const sektionen = [
       ['vision',     '🎯', 'Vision & Warum'],
-      ['aufgaben',   '✓',  'Aufgaben'],
-      ['habits',     '🔥', 'Habit-Tracking'],
       ['metriken',   '📊', 'Metriken'],
       ['milestones', '🏁', 'Meilensteine'],
-      ['reflexion',  '💭', 'Reflexion'],
+      ['aufgaben',   '✓',  'Aufgaben'],
       ['baustelle',  '⚠',  'Baustelle'],
+      ['reflexion',  '💭', 'Reflexion'],
     ];
     sektionen.forEach(([sk, icon, label]) => {
       const isOpen = this._vorhabenSektionenOpen[sk] !== false; // default offen
@@ -14750,30 +14749,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<input id="vh-task-input" type="text" placeholder="Neue Aufgabe…" style="flex:1;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);" onkeydown="if(event.key===&quot;Enter&quot;)WB._vorhabenTaskAdd()">'
         + '<button onclick="WB._vorhabenTaskAdd()" style="padding:8px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;cursor:pointer;">+</button>'
         + '</div>';
-
-    } else if (sk === 'habits') {
-      const habits = v.habits || [];
-      badge = habits.length + ' Habits';
-      if (!habits.length) bodyHtml = '<div style="color:var(--c-faint);font-size:0.85rem;margin-bottom:10px;">Noch keine Habits.</div>';
-      bodyHtml += habits.map((hb, hi) => {
-        const days = 28; const now = new Date();
-        const dots = Array.from({length:days}, (_,di) => {
-          const d = new Date(now); d.setDate(now.getDate() - (days-1-di));
-          const ds = d.toISOString().split('T')[0];
-          const isDone = (hb.log || {})[ds];
-          const isToday = ds === today;
-          return '<button class="habit-dot' + (isDone?' done':'') + (isToday?' today':'') + '" onclick="WB._vorhabenHabitToggle(' + hi + ',&quot;' + ds + '&quot;)" title="' + ds + '"></button>';
-        }).join('');
-        const streak = this._vorhabenHabitStreak(hb);
-        return '<div style="margin-bottom:14px;">'
-          + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
-          + '<span style="font-size:0.86rem;font-weight:600;color:var(--c-text);">' + this._esc(hb.name) + '</span>'
-          + '<span style="font-size:0.74rem;color:var(--c-beruf);font-weight:700;">🔥 ' + streak + '</span></div>'
-          + '<div style="display:flex;flex-wrap:wrap;gap:3px;">' + dots + '</div></div>';
-      }).join('');
-      bodyHtml += '<div style="display:flex;gap:6px;margin-top:6px;">'
-        + '<input id="vh-habit-input" type="text" placeholder="Neuer Habit…" style="flex:1;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);" onkeydown="if(event.key===&quot;Enter&quot;)WB._vorhabenHabitAdd()">'
-        + '<button onclick="WB._vorhabenHabitAdd()" style="padding:8px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;cursor:pointer;">+</button></div>';
 
     } else if (sk === 'metriken') {
       const metriken = v.metriken || [];
@@ -14842,17 +14817,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this._vorhabenDetailRender();
   },
 
-  _vorhabenHabitStreak(habit) {
-    const log = habit.log || {};
-    let streak = 0; const d = new Date();
-    while (true) {
-      const ds = d.toISOString().split('T')[0];
-      if (log[ds]) { streak++; d.setDate(d.getDate() - 1); }
-      else break;
-    }
-    return streak;
-  },
-
   // ── Vorhaben-Detail Interaktionen ─────────────────────
   _vorhabenDetailSetWelt(welt) {
     const v = this._vorhabenAktiv();
@@ -14901,24 +14865,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
     if (inp) inp.value = '';
     setTimeout(() => document.getElementById('vh-task-input')?.focus(), 50);
-  },
-
-  _vorhabenHabitToggle(hi, ds) {
-    const v = this._vorhabenAktiv(); if (!v) return;
-    const hb = (v.habits || [])[hi]; if (!hb) return;
-    if (!hb.log) hb.log = {};
-    if (hb.log[ds]) delete hb.log[ds]; else hb.log[ds] = true;
-    v.geaendert = Date.now(); this.setDirty(); this._vorhabenDetailRender();
-  },
-
-  _vorhabenHabitAdd() {
-    const inp = document.getElementById('vh-habit-input');
-    const name = (inp?.value || '').trim();
-    if (!name) return;
-    const v = this._vorhabenAktiv(); if (!v) return;
-    if (!v.habits) v.habits = [];
-    v.habits.push({ id: 'h_' + Date.now(), name, log: {} });
-    v.geaendert = Date.now(); this.setDirty(); this._vorhabenDetailRender();
   },
 
   _vorhabenMetrikLog(mi) {
