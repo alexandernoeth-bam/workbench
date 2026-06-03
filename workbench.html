@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.96.0</title>
+<title>WorkBench 3.97.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7962,7 +7962,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.96.0 · Build 20260604-0122</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.97.0 · Build 20260604-0156</div>
     </div>
 
     <!-- Welt -->
@@ -8127,8 +8127,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.96.0',
-  APP_BUILD:   '20260604-0122',
+  APP_VERSION: '3.97.0',
+  APP_BUILD:   '20260604-0156',
 
 
   // ══════════════════════════════════════════════════════
@@ -12703,7 +12703,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     weekStart.setDate(now.getDate() - daysSinceMon);
     const weekStartStr = weekStart.toISOString().split('T')[0];
 
-    const goals = this._goalStore() || [];
     const stundensatz = this._stundensatz();
 
     // Erledigte Aufgaben diese Woche
@@ -12730,11 +12729,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     });
 
     // Ziel-Fortschritt diese Woche
-    const zielFortschritt = goals.map(g => {
-      const zielAufgaben = erledigt_ziel.filter(({t}) => t.goalId === g.id);
-      return { g, anzahl: zielAufgaben.length };
-    }).filter(z => z.anzahl > 0);
-
     // Baustellen-Kosten diese Woche
     const baustellenStore = this._baustellenStore() || [];
     const kopfmieteWoche = baustellenStore
@@ -12769,24 +12763,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<div style="font-size:1.4rem;font-weight:800;color:#C62828;">' + Math.round(kopfmieteWoche) + '€</div>'
       + '<div style="font-size:0.7rem;color:var(--c-muted);">Kopfmiete/Woche</div></div>'
       + '</div>'
-
-      // Ziel-Fortschritt
-      + (zielFortschritt.length
-        ? '<div style="font-size:0.75rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:8px;">Diese Woche für deine Ziele</div>'
-          + zielFortschritt.map(({g, anzahl}) => {
-              const pct = this._goalProgress(g);
-              return '<div style="padding:8px 0;border-bottom:1px solid var(--c-border);">'
-                + '<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
-                + '<span style="font-size:0.85rem;font-weight:600;color:var(--c-text);">' + g.title + '</span>'
-                + '<span style="font-size:0.8rem;color:var(--c-beruf);">+' + anzahl + ' Aufgabe' + (anzahl>1?'n':'') + '</span>'
-                + '</div>'
-                + '<div style="height:4px;background:var(--c-border);border-radius:2px;overflow:hidden;">'
-                + '<div style="height:100%;width:' + pct + '%;background:var(--c-beruf);border-radius:2px;"></div>'
-                + '</div>'
-                + '<div style="font-size:0.7rem;color:var(--c-muted);margin-top:2px;">' + pct + '% Gesamtfortschritt</div>'
-                + '</div>';
-            }).join('')
-        : '<div style="font-size:0.85rem;color:var(--c-faint);padding:8px 0;">Diese Woche keine Aufgaben mit Ziel erledigt.</div>')
 
       // Reflexions-Fragen
       + '<div style="margin-top:16px;font-size:0.75rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:8px;">Drei Fragen</div>'
@@ -12875,13 +12851,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       });
     });
 
-    // Baustellen aus Zielen sammeln
-    const zielBaustellen = (this._goalStore() || [])
-      .filter(g => g.isBaustelle)
-      .map(g => ({ titel: g.title, typ: 'ziel', id: g.id, obj: g,
-        mentalStundenProWoche: g.mentalStundenProWoche || 0,
-        seitJahren: g.seitJahren || 0,
-        entscheidung: g.entscheidung || '',
+    // Baustellen aus Vorhaben sammeln
+    const zielBaustellen = (this._vorhabenAlle ? this._vorhabenAlle() : [])
+      .filter(v => v.isBaustelle)
+      .map(v => ({ titel: v.titel, typ: 'vorhaben', id: v.id, obj: v,
+        mentalStundenProWoche: v.mentalStundenProWoche || 0,
+        seitJahren: v.seitJahren || 0,
+        entscheidung: v.entscheidung || '',
       }));
 
     const store = [...zielBaustellen, ...projBaustellen];
@@ -12955,9 +12931,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       if (db?.projects?.[b.titel]) {
         db.projects[b.titel].entscheidung = entscheid;
       }
-    } else if (b.typ === 'ziel') {
-      const goal = this._goalStore()?.find(g => g.id === b.id);
-      if (goal) goal.entscheidung = entscheid;
+    } else if (b.typ === 'vorhaben') {
+      const v = this._vorhabenFind ? this._vorhabenFind(b.id)?.vorhaben : null;
+      if (v) { v.entscheidung = entscheid; v.geaendert = Date.now(); }
     }
     this.setDirty();
     this._planmodusRender();
@@ -12983,9 +12959,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       document.body.appendChild(sheet);
     }
 
-    const goals = this._goalStore() || [];
-    const goalOpts = goals.map(g =>
-      '<option value="' + g.id + '">' + g.title + '</option>'
+    const goals = this._vorhabenAlle ? this._vorhabenAlle() : [];
+    const goalOpts = goals.map(v =>
+      '<option value="' + v.id + '">' + this._esc(v.titel) + '</option>'
     ).join('');
 
     sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;">'
@@ -12997,9 +12973,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<div><div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;">Kopfmiete Std/Woche</div>'
       + '<input id="bau-mental" type="number" step="0.25" min="0" value="0.5" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);"></div>'
       + '</div>'
-      + (goalOpts ? '<div style="margin-bottom:10px;"><div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;">Gehört zu Ziel (optional)</div>'
+      + (goalOpts ? '<div style="margin-bottom:10px;"><div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;">Gehört zu Vorhaben (optional)</div>'
       + '<select id="bau-goal" style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">'
-      + '<option value="">— Kein Ziel</option>' + goalOpts + '</select></div>' : '')
+      + '<option value="">— Kein Vorhaben</option>' + goalOpts + '</select></div>' : '')
       + '<div style="display:flex;gap:8px;">'
       + '<button onclick="document.getElementById(&quot;wb-bau-neu-sheet&quot;).remove()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Abbrechen</button>'
       + '<button onclick="WB._baustelleNeuSpeichern()" style="flex:2;padding:11px;background:var(--c-beruf);border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;color:#fff;">Speichern</button>'
@@ -13148,24 +13124,24 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const dayNames  = ['Mo','Di','Mi','Do','Fr','Sa','So'];
     const months    = ['Jan','Feb','Mrz','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 
-    // ── Ziele-Fortschritt ───────────────────────────────
-    const goals = this._goalStore() || [];
-    const thisYearGoals = goals.filter(g => !g.year || g.year === year);
+    // ── Vorhaben-Fortschritt ────────────────────────────
+    const alleVorhaben = this._vorhabenAlle ? this._vorhabenAlle() : [];
+    const thisYearGoals = alleVorhaben.filter(v => !v.year || v.year === year);
     const goalHtml = thisYearGoals.length
-      ? thisYearGoals.map(g => {
-          const pct = this._goalProgress(g);
-          const ms  = g.milestones || [];
+      ? thisYearGoals.map(v => {
+          const prog = this._vorhabenProgress(v);
+          const ms  = v.milestones || [];
           const msDone = ms.filter(m => m.done).length;
           return '<div class="pm-goal-card">'
-            + '<div class="pm-goal-title">' + g.title + '</div>'
-            + '<div class="pm-goal-bar-wrap"><div class="pm-goal-bar" style="width:' + pct + '%"></div></div>'
+            + '<div class="pm-goal-title">' + this._esc(v.titel) + '</div>'
+            + '<div class="pm-goal-bar-wrap"><div class="pm-goal-bar" style="width:' + prog.aufgabenPct + '%"></div></div>'
             + '<div class="pm-goal-meta">'
-            + '<span>' + pct + '% erreicht</span>'
+            + '<span>' + prog.aufgabenPct + '% · ' + prog.done + '/' + prog.total + ' Aufgaben</span>'
             + (ms.length ? '<span>' + msDone + '/' + ms.length + ' Meilensteine</span>' : '')
             + '</div>'
             + '</div>';
         }).join('')
-      : '<div style="font-size:0.85rem;color:var(--c-faint);padding:8px 0;">Noch keine Ziele definiert — im Ziele-Tab anlegen.</div>';
+      : '<div style="font-size:0.85rem;color:var(--c-faint);padding:8px 0;">Noch keine Vorhaben — im Menü unter „Vorhaben" anlegen.</div>';
 
     // ── Wochenüberblick ─────────────────────────────────
     const weekItems = [];
@@ -13268,7 +13244,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     body.innerHTML =
       '<div class="pm-section">'
-      + '<div class="pm-section-label">Meine Ziele ' + year + '</div>'
+      + '<div class="pm-section-label">Meine Vorhaben ' + year + '</div>'
       + goalHtml
       + this._planmodusKpiUebersicht()
       + '<button style="font-size:0.8rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);padding:4px 0;" onclick="WB._goTab(&quot;ziele&quot;);WB.planmodusClose();">Alle Ziele anzeigen →</button>'
@@ -23965,7 +23941,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     {id:'besprechung',  label:'Besprechung',  bg:'#dbeafe', color:'#1e40af'},
     {id:'brainstorming',label:'Brainstorm',   bg:'#ede9fe', color:'#6d28d9'},
     {id:'wissen',       label:'Wissen',       bg:'#dcfce7', color:'#15803d'},
-    {id:'plan',         label:'Plan',         bg:'#e0e7ff', color:'#3730a3'},
     {id:'reflexion',    label:'Reflexion',    bg:'#fce7f3', color:'#9d174d'},
   ],
   nzSubTab:       'notizen',
