@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.80.4</title>
+<title>WorkBench 3.81.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6077,6 +6077,233 @@ html, body {
 
 
 /* ══════════════════════════════════════════════════
+   TAGES-FOKUS-RITUAL OVERLAY
+══════════════════════════════════════════════════ */
+#wb-ritual-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 960;
+  background: var(--c-bg);
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 0;
+}
+#wb-ritual-overlay.open { display: flex; }
+#ritual-card {
+  width: 100%;
+  max-width: 460px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 22px 40px;
+  box-sizing: border-box;
+}
+#ritual-progress {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+.ritual-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--c-border);
+  transition: background 0.25s, transform 0.25s;
+}
+.ritual-dot.active { background: var(--c-beruf); transform: scale(1.3); }
+.ritual-dot.done   { background: var(--c-beruf); opacity: 0.5; }
+.ritual-step {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: ritualFade 0.3s ease;
+}
+@keyframes ritualFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.ritual-emoji { font-size: 2.6rem; margin-bottom: 10px; }
+.ritual-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--c-text);
+  margin-bottom: 6px;
+  line-height: 1.25;
+}
+.ritual-sub {
+  font-size: 0.9rem;
+  color: var(--c-muted);
+  margin-bottom: 22px;
+  line-height: 1.4;
+}
+#ritual-overview {
+  width: 100%;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  margin-bottom: 26px;
+}
+.ritual-ov-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  font-size: 0.9rem;
+  color: var(--c-text);
+  border-bottom: 1px solid var(--c-border);
+}
+.ritual-ov-row:last-child { border-bottom: none; }
+.ritual-ov-row .ov-val { font-weight: 800; font-family: var(--font-mono); }
+.ritual-ov-row.warn .ov-val { color: var(--c-danger, #C62828); }
+#ritual-candidates {
+  width: 100%;
+  margin-bottom: 14px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.ritual-cand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 13px;
+  margin-bottom: 7px;
+  background: var(--c-surface);
+  border: 1.5px solid var(--c-border);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  color: var(--c-text);
+  transition: border-color 0.18s, background 0.18s;
+  box-sizing: border-box;
+}
+.ritual-cand:hover { border-color: var(--c-muted); }
+.ritual-cand.selected {
+  border-color: var(--c-beruf);
+  background: color-mix(in srgb, var(--c-beruf) 8%, var(--c-surface));
+}
+.ritual-cand.disabled { opacity: 0.4; pointer-events: none; }
+.ritual-cand-check {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--c-border);
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; color: #fff;
+  transition: background 0.18s, border-color 0.18s;
+}
+.ritual-cand.selected .ritual-cand-check { background: var(--c-beruf); border-color: var(--c-beruf); }
+.ritual-cand-body { flex: 1; min-width: 0; }
+.ritual-cand-title { font-weight: 600; line-height: 1.3; }
+.ritual-cand-meta { font-size: 0.74rem; color: var(--c-faint); margin-top: 2px; }
+#ritual-freitext-wrap {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+#ritual-freitext {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1.5px solid var(--c-border);
+  border-radius: var(--radius-xs);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  background: var(--c-surface);
+  color: var(--c-text);
+}
+#ritual-freitext-wrap button {
+  width: 42px;
+  border: 1.5px solid var(--c-beruf);
+  background: var(--c-beruf);
+  color: #fff;
+  border-radius: var(--radius-xs);
+  font-size: 1.2rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.ritual-count {
+  font-size: 0.8rem;
+  color: var(--c-faint);
+  margin-bottom: 18px;
+}
+#ritual-confirm-list {
+  width: 100%;
+  margin-bottom: 26px;
+}
+.ritual-confirm-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 15px;
+  margin-bottom: 8px;
+  background: color-mix(in srgb, var(--c-beruf) 8%, var(--c-surface));
+  border: 1.5px solid var(--c-beruf);
+  border-radius: var(--radius-xs);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--c-text);
+  text-align: left;
+}
+.ritual-confirm-item .ci-num {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--c-beruf);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.ritual-confirm-empty {
+  padding: 20px;
+  color: var(--c-faint);
+  font-size: 0.88rem;
+}
+.ritual-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius-xs);
+  font-family: var(--font);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 10px;
+  border: none;
+}
+.ritual-btn.primary { background: var(--c-beruf); color: #fff; }
+.ritual-btn.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.ritual-btn.ghost { background: none; color: var(--c-muted); border: 1px solid var(--c-border); }
+.ritual-skip-link {
+  margin-top: 18px;
+  background: none;
+  border: none;
+  color: var(--c-faint);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+#ritual-skip-reason {
+  width: 100%;
+  min-height: 90px;
+  padding: 12px;
+  border: 1.5px solid var(--c-border);
+  border-radius: var(--radius-xs);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  background: var(--c-surface);
+  color: var(--c-text);
+  resize: vertical;
+  margin-bottom: 20px;
+  box-sizing: border-box;
+}
+
+/* ══════════════════════════════════════════════════
    ERINNERUNGS-OVERLAY v3.70.3
 ══════════════════════════════════════════════════ */
 #wb-reminder-overlay {
@@ -7044,6 +7271,21 @@ html, body {
 
       <div class="wbs-divider"></div>
 
+      <!-- Tages-Fokus-Ritual -->
+      <div class="wbs-section-label">Tages-Fokus-Ritual</div>
+      <div class="wbs-row">
+        <div class="wbs-label">
+          <div class="wbs-label-main">Heutiges Ritual</div>
+          <div class="wbs-label-sub" id="s-ritual-status">–</div>
+        </div>
+        <button onclick="WB.ritualResetToday(); WB._ritualUpdateSettingStatus();"
+          style="padding:8px 14px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;color:var(--c-beruf);cursor:pointer;white-space:nowrap;">
+          Zurücksetzen
+        </button>
+      </div>
+
+      <div class="wbs-divider"></div>
+
       <!-- Abend-Reflexion Fragen -->
       <div class="wbs-section-label">Abend-Reflexion Fragen</div>
       <div id="wbs-evening-questions"></div>
@@ -7588,7 +7830,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.80.4 · Build 20260603-1530</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.81.0 · Build 20260603-1648</div>
     </div>
 
     <!-- Welt -->
@@ -7762,8 +8004,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.80.4',
-  APP_BUILD:   '20260603-1530',
+  APP_VERSION: '3.81.0',
+  APP_BUILD:   '20260603-1648',
 
 
   // ══════════════════════════════════════════════════════
@@ -11344,6 +11586,317 @@ const WB = {
     document.getElementById('wb-fokus-overlay').classList.remove('open');
   },
 
+  // ── TAGES-FOKUS-RITUAL ───────────────────────────────────
+  _ritualStore() {
+    // Heimat: Privat-DB (geräteübergreifend via Drive)
+    if (!this.dataPriv) return null;
+    if (!this.dataPriv.tagesRitual) this.dataPriv.tagesRitual = {};
+    return this.dataPriv.tagesRitual;
+  },
+
+  _ritualTodayKey() {
+    return new Date().toISOString().split('T')[0];
+  },
+
+  _ritualIsDoneToday() {
+    const store = this._ritualStore();
+    if (!store) return false;
+    const e = store[this._ritualTodayKey()];
+    return !!(e && e.done);
+  },
+
+  // Auto-Trigger: beim Cockpit-Render aufgerufen
+  _ritualMaybeOpen() {
+    if (!this.dataPriv) return;              // Privat-DB noch nicht geladen
+    if (this._ritualIsDoneToday()) return;   // heute schon erledigt/übersprungen
+    if (document.getElementById('wb-ritual-overlay')?.classList.contains('open')) return;
+    this.ritualOpen();
+  },
+
+  ritualOpen() {
+    this._ritualSelected = [];   // [{id,type,title,meta,obj,ctx,pKey,freitext}]
+    this._ritualFreitexte = [];
+    // Datum-Header
+    const now = new Date();
+    const DAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    const dEl = document.getElementById('ritual-date');
+    if (dEl) dEl.textContent = DAYS[now.getDay()] + ', ' + now.getDate() + '. ' + MONTHS[now.getMonth()];
+    this._ritualRenderOverview();
+    this._ritualGoto(1);
+    document.getElementById('wb-ritual-overlay').classList.add('open');
+  },
+
+  _ritualGoto(step) {
+    [1,2,3,'skip'].forEach(s => {
+      const el = document.getElementById('ritual-step-' + s);
+      if (el) el.style.display = (s === step) ? 'flex' : 'none';
+    });
+    // Skip-Link nur in 1-3 zeigen, nicht im Skip-Screen
+    const skipLink = document.getElementById('ritual-skip-link');
+    if (skipLink) skipLink.style.display = (step === 'skip') ? 'none' : '';
+    // Fortschritts-Punkte
+    document.querySelectorAll('.ritual-dot').forEach(dot => {
+      const ds = parseInt(dot.getAttribute('data-step'));
+      dot.classList.toggle('active', ds === step);
+      dot.classList.toggle('done', typeof step === 'number' && ds < step);
+    });
+    if (step === 2) this._ritualRenderCandidates();
+    if (step === 3) this._ritualRenderConfirm();
+  },
+
+  // Schritt 1: Tagesübersicht (wiederverwendet Banner-Logik)
+  _ritualRenderOverview() {
+    const el = document.getElementById('ritual-overview');
+    if (!el) return;
+    const today = this._ritualTodayKey();
+    let termine = 0, prioA = 0, overdue = 0, offen = 0;
+    [this.dataPro, this.dataPriv].forEach(db => {
+      if (!db) return;
+      termine += (db.customEvents || []).filter(e => e.date === today && e.type !== 'horizon').length;
+      Object.values(db.projects || {}).forEach(p => {
+        (p.tasks || []).forEach(t => {
+          if (t && !t.done) {
+            offen++;
+            if (t.prio === true || t.prio === 'A') prioA++;
+            if (t.date && t.date < today) overdue++;
+          }
+        });
+      });
+    });
+    // Plan-Aufgaben für heute
+    let planHeute = 0;
+    this._nzStore().filter(n => n.typ === 'plan' && !n.archiv).forEach(n => {
+      (n.planAufgaben || []).forEach(a => {
+        if (!a.done && (a.date === today || a.planerDate === today)) planHeute++;
+      });
+    });
+    const rows = [
+      ['Termine heute', termine, false],
+      ['Aufgaben für heute', planHeute, false],
+      ['Prio-A offen', prioA, false],
+      ['Überfällig', overdue, overdue > 0],
+    ];
+    el.innerHTML = rows.map(([label, val, warn]) =>
+      '<div class="ritual-ov-row' + (warn ? ' warn' : '') + '">'
+      + '<span>' + label + '</span><span class="ov-val">' + val + '</span></div>'
+    ).join('');
+  },
+
+  // Schritt 2: Kandidaten sammeln (heutige Tagesliste + offene Plan-Aufgaben)
+  _ritualCollectCandidates() {
+    const today = this._ritualTodayKey();
+    const out = [];
+    const seen = new Set();
+    const push = (c) => { if (!seen.has(c.type + ':' + c.id)) { seen.add(c.type + ':' + c.id); out.push(c); } };
+
+    // Termine heute
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      (db.customEvents || []).forEach(ev => {
+        if (ev.date !== today || ev.done || ev.type === 'horizon') return;
+        push({ id: ev.id, type: 'termin', title: ev.text, meta: (ev.startTime ? ev.startTime + ' · ' : '') + (ctx==='pro'?'Beruf':'Privat'), ctx, obj: ev });
+      });
+    });
+
+    // Plan-Aufgaben (heute fällig zuerst, dann sonstige offene)
+    this._nzStore().filter(n => n.typ === 'plan' && !n.archiv).forEach(n => {
+      (n.planAufgaben || []).forEach(a => {
+        if (a.done) return;
+        const heute = (a.date === today || a.planerDate === today);
+        push({ id: a.id, type: 'aufgabe', title: a.text, meta: (n.titel || 'Plan') + (heute ? ' · heute' : ''), pKey: '', obj: a, _heute: heute });
+      });
+    });
+
+    // Projekt-Aufgaben (Prio-A oder überfällig zuerst)
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      Object.entries(db.projects || {}).forEach(([pKey, p]) => {
+        (p.tasks || []).forEach(t => {
+          if (!t || t.done || !t.id) return;
+          const isPrio = (t.prio === true || t.prio === 'A');
+          const isOver = (t.date && t.date < today);
+          if (!isPrio && !isOver && t.date !== today) return; // nur relevante zeigen
+          let metaParts = [ctx==='pro'?'Beruf':'Privat'];
+          if (isPrio) metaParts.push('Prio-A');
+          if (isOver) metaParts.push('überfällig');
+          push({ id: t.id, type: 'projektaufgabe', title: t.text, meta: metaParts.join(' · '), ctx, pKey, obj: t, _heute: isPrio || isOver });
+        });
+      });
+    });
+
+    // Sortierung: heute/dringend zuerst
+    out.sort((a, b) => (b._heute === true) - (a._heute === true));
+    return out;
+  },
+
+  _ritualRenderCandidates() {
+    const el = document.getElementById('ritual-candidates');
+    if (!el) return;
+    const cands = this._ritualCollectCandidates();
+    if (!cands.length) {
+      el.innerHTML = '<div style="padding:14px;text-align:center;color:var(--c-faint);font-size:0.86rem;">Keine offenen Aufgaben gefunden — du kannst unten einen eigenen Fokus eintragen.</div>';
+      this._ritualUpdateCount();
+      return;
+    }
+    const maxReached = this._ritualSelected.length >= 3;
+    el.innerHTML = cands.map(c => {
+      const sel = this._ritualSelected.some(s => s.type === c.type && s.id === c.id);
+      const disabled = !sel && maxReached;
+      const payload = encodeURIComponent(JSON.stringify({ id: c.id, type: c.type, title: c.title, meta: c.meta, ctx: c.ctx || '', pKey: c.pKey || '' }));
+      return '<button class="ritual-cand' + (sel ? ' selected' : '') + (disabled ? ' disabled' : '') + '" '
+        + 'onclick="WB._ritualToggleCand(&quot;' + payload + '&quot;)">'
+        + '<span class="ritual-cand-check">' + (sel ? '✓' : '') + '</span>'
+        + '<span class="ritual-cand-body">'
+        + '<span class="ritual-cand-title">' + this._esc(c.title) + '</span>'
+        + '<span class="ritual-cand-meta">' + this._esc(c.meta) + '</span>'
+        + '</span></button>';
+    }).join('');
+    this._ritualUpdateCount();
+  },
+
+  _esc(s) {
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  },
+
+  _ritualToggleCand(payloadEnc) {
+    let c;
+    try { c = JSON.parse(decodeURIComponent(payloadEnc)); } catch(e) { return; }
+    const idx = this._ritualSelected.findIndex(s => s.type === c.type && s.id === c.id);
+    if (idx >= 0) {
+      this._ritualSelected.splice(idx, 1);
+    } else {
+      if (this._ritualSelected.length >= 3) return;
+      this._ritualSelected.push(c);
+    }
+    this._ritualRenderCandidates();
+  },
+
+  _ritualAddFreitext() {
+    const inp = document.getElementById('ritual-freitext');
+    if (!inp) return;
+    const txt = (inp.value || '').trim();
+    if (!txt) return;
+    if (this._ritualSelected.length >= 3) { this._toast('Maximal 3 Fokus-Punkte'); return; }
+    const id = 'ft-' + Date.now();
+    this._ritualSelected.push({ id, type: 'freitext', title: txt, meta: 'Eigener Fokus', ctx: '', pKey: '' });
+    inp.value = '';
+    this._ritualRenderCandidates();
+  },
+
+  _ritualUpdateCount() {
+    const el = document.getElementById('ritual-count');
+    if (el) el.textContent = this._ritualSelected.length + ' von 3 gewählt';
+    const next = document.getElementById('ritual-step2-next');
+    // Weiter ist immer erlaubt (auch 0 Fokus möglich), aber Hinweis bei 0
+    if (next) next.textContent = this._ritualSelected.length ? 'Weiter →' : 'Ohne Fokus weiter →';
+  },
+
+  _ritualRenderConfirm() {
+    const el = document.getElementById('ritual-confirm-list');
+    if (!el) return;
+    if (!this._ritualSelected.length) {
+      el.innerHTML = '<div class="ritual-confirm-empty">Du hast keinen Fokus gewählt. Das ist okay — manche Tage laufen ohne festen Plan.</div>';
+      return;
+    }
+    el.innerHTML = this._ritualSelected.map((s, i) =>
+      '<div class="ritual-confirm-item"><span class="ci-num">' + (i+1) + '</span><span>' + this._esc(s.title) + '</span></div>'
+    ).join('');
+  },
+
+  // Abschluss: Fokus als mustToday markieren + Tag speichern
+  _ritualFinish() {
+    this._ritualSelected.forEach(s => {
+      if (s.type === 'aufgabe') {
+        const n = this._nzStore().find(nz => (nz.planAufgaben || []).some(a => a.id === s.id));
+        const a = n && (n.planAufgaben || []).find(x => x.id === s.id);
+        if (a) a.mustToday = true;
+      } else if (s.type === 'projektaufgabe') {
+        const db = s.ctx === 'pro' ? this.dataPro : this.dataPriv;
+        const p = db && db.projects && db.projects[s.pKey];
+        const t = p && (p.tasks || []).find(x => x.id === s.id);
+        if (t) t.mustToday = true;
+      } else if (s.type === 'termin') {
+        const db = s.ctx === 'pro' ? this.dataPro : this.dataPriv;
+        const ev = db && (db.customEvents || []).find(x => x.id === s.id);
+        if (ev) ev.mustToday = true;
+      }
+      // freitext: nur im Ritual-Eintrag gespeichert (keine Aufgabe angelegt)
+    });
+    const store = this._ritualStore();
+    if (store) {
+      store[this._ritualTodayKey()] = {
+        done: true,
+        skipped: false,
+        ts: Date.now(),
+        fokus: this._ritualSelected.map(s => ({ id: s.id, type: s.type, title: s.title })),
+      };
+    }
+    this.setDirty();
+    document.getElementById('wb-ritual-overlay').classList.remove('open');
+    this.renderCockpit();
+    this._toast(this._ritualSelected.length ? 'Fokus gesetzt — guten Start!' : 'Tag begonnen');
+  },
+
+  // Aussprung
+  _ritualSkipPrompt() {
+    const ta = document.getElementById('ritual-skip-reason');
+    if (ta) ta.value = '';
+    this._ritualGoto('skip');
+    setTimeout(() => ta && ta.focus(), 100);
+  },
+
+  _ritualSkipCancel() {
+    this._ritualGoto(1);
+  },
+
+  _ritualSkipConfirm() {
+    const ta = document.getElementById('ritual-skip-reason');
+    const reason = (ta && ta.value || '').trim();
+    if (!reason) { this._toast('Bitte einen kurzen Grund eingeben'); ta && ta.focus(); return; }
+    const store = this._ritualStore();
+    if (store) {
+      store[this._ritualTodayKey()] = {
+        done: true,
+        skipped: true,
+        ts: Date.now(),
+        skipReason: reason,
+        fokus: [],
+      };
+    }
+    this.setDirty();
+    document.getElementById('wb-ritual-overlay').classList.remove('open');
+    this.renderCockpit();
+    this._toast('Ritual übersprungen');
+  },
+
+  // Reset (für Einstellungen / Testen)
+  ritualResetToday() {
+    const store = this._ritualStore();
+    if (!store) { this._toast('Privat-DB nicht geladen'); return; }
+    const key = this._ritualTodayKey();
+    if (store[key]) { delete store[key]; this.setDirty(); }
+    this._toast('Ritual für heute zurückgesetzt');
+    if (this.activeTab === 'cockpit') this._ritualMaybeOpen();
+  },
+
+  _ritualUpdateSettingStatus() {
+    const el = document.getElementById('s-ritual-status');
+    if (!el) return;
+    const store = this._ritualStore();
+    const e = store && store[this._ritualTodayKey()];
+    if (!e || !e.done) {
+      el.textContent = 'Heute noch offen';
+    } else if (e.skipped) {
+      el.textContent = 'Heute übersprungen';
+    } else {
+      const n = (e.fokus || []).length;
+      el.textContent = 'Heute erledigt · ' + n + ' Fokus' + (n === 1 ? '' : '-Punkte');
+    }
+  },
+
   _fokusPreset(min) {
     this._fokusMinutes = min;
     document.getElementById('fokus-custom-input').value = min;
@@ -13471,6 +14024,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         this._ckRenderTagesseite();
       }
     }, 60000);
+    // Tages-Fokus-Ritual: morgens automatisch, blockiert bis durchlaufen
+    this._ritualMaybeOpen();
   },
 
   _ckRenderDateHeader() {
@@ -23710,6 +24265,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const clientInput = document.getElementById('s-oauth-client-id');
     if (clientInput) clientInput.value = this._oauthClientId || '';
     this._oauthUpdateUI();
+    this._ritualUpdateSettingStatus();
     document.getElementById('wb-settings-overlay').classList.add('open');
   },
 
@@ -25313,6 +25869,63 @@ WB.init();
         </div>
         <span class="fokus-btn-label" id="fokus-pause-label">Pause</span>
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- TAGES-FOKUS-RITUAL OVERLAY -->
+<div id="wb-ritual-overlay">
+  <div id="ritual-card">
+    <div id="ritual-progress">
+      <span class="ritual-dot" data-step="1"></span>
+      <span class="ritual-dot" data-step="2"></span>
+      <span class="ritual-dot" data-step="3"></span>
+    </div>
+
+    <!-- Schritt 1: Sichten -->
+    <div class="ritual-step" id="ritual-step-1">
+      <div class="ritual-emoji">🌅</div>
+      <div class="ritual-title">Guten Morgen</div>
+      <div class="ritual-sub" id="ritual-date">–</div>
+      <div id="ritual-overview"></div>
+      <button class="ritual-btn primary" onclick="WB._ritualGoto(2)">Weiter →</button>
+    </div>
+
+    <!-- Schritt 2: Wählen -->
+    <div class="ritual-step" id="ritual-step-2" style="display:none;">
+      <div class="ritual-title">Worauf konzentrierst du dich?</div>
+      <div class="ritual-sub">Wähle bis zu 3 Dinge, die heute wirklich zählen.</div>
+      <div id="ritual-candidates"></div>
+      <div id="ritual-freitext-wrap">
+        <input type="text" id="ritual-freitext" placeholder="Eigener Fokus (optional)…" maxlength="120"
+          onkeydown="if(event.key==='Enter'){WB._ritualAddFreitext();}">
+        <button onclick="WB._ritualAddFreitext()">+</button>
+      </div>
+      <div class="ritual-count" id="ritual-count">0 von 3 gewählt</div>
+      <button class="ritual-btn primary" id="ritual-step2-next" onclick="WB._ritualGoto(3)">Weiter →</button>
+      <button class="ritual-btn ghost" onclick="WB._ritualGoto(1)">← Zurück</button>
+    </div>
+
+    <!-- Schritt 3: Vornehmen -->
+    <div class="ritual-step" id="ritual-step-3" style="display:none;">
+      <div class="ritual-emoji">🎯</div>
+      <div class="ritual-title">Dein Fokus für heute</div>
+      <div id="ritual-confirm-list"></div>
+      <button class="ritual-btn primary" onclick="WB._ritualFinish()">Tag beginnen ✓</button>
+      <button class="ritual-btn ghost" onclick="WB._ritualGoto(2)">← Auswahl ändern</button>
+    </div>
+
+    <!-- Aussprung-Link (in allen Schritten) -->
+    <button class="ritual-skip-link" id="ritual-skip-link" onclick="WB._ritualSkipPrompt()">Heute überspringen</button>
+
+    <!-- Aussprung: Grund-Eingabe -->
+    <div class="ritual-step" id="ritual-step-skip" style="display:none;">
+      <div class="ritual-emoji">⏭️</div>
+      <div class="ritual-title">Warum überspringst du heute?</div>
+      <div class="ritual-sub">Ein kurzer Grund hilft dir beim Rückblick.</div>
+      <textarea id="ritual-skip-reason" placeholder="z. B. Krank, früher Termin, kein Arbeitstag…" maxlength="200"></textarea>
+      <button class="ritual-btn primary" id="ritual-skip-confirm" onclick="WB._ritualSkipConfirm()">Überspringen bestätigen</button>
+      <button class="ritual-btn ghost" onclick="WB._ritualSkipCancel()">← Doch durchführen</button>
     </div>
   </div>
 </div>
