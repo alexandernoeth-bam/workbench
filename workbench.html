@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.79.7</title>
+<title>WorkBench 3.79.8</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.79.7 · Build 20260603-1315</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.79.8 · Build 20260603-1330</div>
     </div>
 
     <!-- Welt -->
@@ -7762,8 +7762,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.79.7',
-  APP_BUILD:   '20260603-1315',
+  APP_VERSION: '3.79.8',
+  APP_BUILD:   '20260603-1330',
 
 
   // ══════════════════════════════════════════════════════
@@ -11547,7 +11547,7 @@ const WB = {
       items.forEach(a => {
         const isOvd = a.date && a.date < today;
         html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--c-border);">'
-          + '<div style="flex:1;min-width:0;">'
+          + '<div style="flex:1;min-width:0;cursor:pointer;" onclick="WB._backlogAufgabeDetail(&quot;'+a.id+'&quot;,&quot;'+a.notizId+'&quot;)">'
           + '<div style="font-size:0.88rem;font-weight:500;color:var(--c-text);">' + a.text + '</div>'
           + '<div style="font-size:0.72rem;color:var(--c-muted);margin-top:2px;">' + a.notizTitel
           + (a.date ? ' &middot; <span style="color:'+(isOvd?'#C62828':'var(--c-muted)')+';">' + a.date + (isOvd?' ⚠':'') + '</span>' : '')
@@ -11578,6 +11578,33 @@ const WB = {
     }
 
     body.innerHTML = html;
+  },
+
+_backlogAufgabeDetail(aufgabeId, notizId) {
+    const notiz = this._nzStore().find(n => n.id === notizId);
+    if (!notiz) return;
+    const a = (notiz.planAufgaben||[]).find(x => x.id === aufgabeId);
+    if (!a) return;
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;';
+    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
+    const datumHtml = a.date ? '<div style="font-size:0.82rem;color:var(--c-muted);margin-bottom:10px;">📅 ' + a.date + '</div>' : '';
+    const notizHtml = a.notiz
+      ? '<div style="background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-xs);padding:10px 12px;font-size:0.85rem;color:var(--c-text);line-height:1.6;margin-bottom:12px;white-space:pre-wrap;">' + a.notiz.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>'
+      : '<div style="font-size:0.82rem;color:var(--c-faint);margin-bottom:12px;font-style:italic;">Keine Notiz</div>';
+    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;">'
+      + '<div style="font-size:0.75rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:6px;">Aufgabe &mdash; ' + (notiz.titel||'Plan') + '</div>'
+      + '<div style="font-size:1rem;font-weight:600;color:var(--c-text);margin-bottom:10px;">' + a.text + '</div>'
+      + datumHtml + notizHtml
+      + '<div style="display:flex;gap:8px;">'
+      + '<button onclick="WB._closeSheet600()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Schließen</button>'
+      + '<button onclick="WB._backlogAufgabeVerschieben(&quot;'+aufgabeId+'&quot;,&quot;'+notizId+'&quot;);WB._closeSheet600()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-beruf);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-beruf);">Verschieben</button>'
+      + '</div></div>';
+    document.body.appendChild(sheet);
+  },
+
+    _closeSheet600() {
+    document.querySelectorAll('[style*="z-index:600"]').forEach(e => e.remove());
   },
 
   _backlogAufgabeVerschieben(aufgabeId, aktNotizId) {
