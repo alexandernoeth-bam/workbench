@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.77.8</title>
+<title>WorkBench 3.78.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6476,7 +6476,7 @@ html, body {
             <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Schnell hinzufügen
           </button>
-          <button onclick="WB._ckOeffnePlanNotiz()" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
+          <button onclick="WB.editOpen('task-new','priv','Einzelaufgaben (Ohne Projekt)',null)" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
             + Aufgabe
           </button>
           <button onclick="WB.newEventOpenPicker()" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
@@ -6721,7 +6721,7 @@ html, body {
     <div class="nz-tb-sep"></div>
     <button class="nz-tb" onclick="WB.nzCmd('insertUnorderedList')">&#8226;</button>
     <button class="nz-tb" onclick="WB.nzCmd('insertOrderedList')">1.</button>
-    <button class="nz-tb" onmousedown="event.preventDefault()" onclick="WB.nzInsertCb()">&#9744;</button>
+    <button class="nz-tb" onclick="WB.nzInsertCb()">&#9744;</button>
     <button class="nz-tb" onclick="WB.nzCmd('indent')" title="Einrücken">&#8677;</button>
     <button class="nz-tb" onclick="WB.nzCmd('outdent')" title="Ausrücken">&#8676;</button>
     <div class="nz-tb-sep"></div>
@@ -6739,7 +6739,7 @@ html, body {
   <div id="nz-plan-links" style="display:none;max-height:280px;overflow-y:auto;border-top:2px solid var(--c-border);background:var(--c-surface);">
     <div style="padding:10px 14px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);flex:1;">Aufgaben aus Plan-Notizen</span>
+        <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);flex:1;">Verkn&#252;pfte Aufgaben &amp; Projekte</span>
         <button onclick="WB._nzPlanLinkAdd()" style="background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.72rem;color:var(--c-beruf);cursor:pointer;padding:2px 8px;">+ Verkn&#252;pfen</button>
       </div>
       <div id="nz-plan-links-body"></div>
@@ -6784,7 +6784,7 @@ html, body {
     <div class="nz-tb-sep"></div>
     <button class="nz-tb" onclick="WB.nzCmd('insertUnorderedList')">&#8226;</button>
     <button class="nz-tb" onclick="WB.nzCmd('insertOrderedList')">1.</button>
-    <button class="nz-tb" onmousedown="event.preventDefault()" onclick="WB.nzInsertCb()">&#9744;</button>
+    <button class="nz-tb" onclick="WB.nzInsertCb()">&#9744;</button>
     <div class="nz-tb-sep"></div>
     <button class="nz-tb" onclick="WB.nzCmd('formatBlock','blockquote')">&#10077;</button>
     <button class="nz-tb" onclick="WB.nzInsertHr()">&#8213;</button>
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.77.8 · Build 20260603-1045</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.78.0 · Build 20260603-1100</div>
     </div>
 
     <!-- Welt -->
@@ -7758,8 +7758,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.77.8',
-  APP_BUILD:   '20260603-1045',
+  APP_VERSION: '3.78.0',
+  APP_BUILD:   '20260603-1100',
 
 
   // ══════════════════════════════════════════════════════
@@ -11286,9 +11286,7 @@ const WB = {
     store[idx][field] = value;
     this.setDirty();
     this._reminderSettingsRender();
-    this._reminderInit();
-    this._initMidnightCheck();
-    this._initMidnightCheck(); // Timer neu starten
+    this._reminderInit(); // Timer neu starten
   },
 
   _reminderDelete(idx) {
@@ -12886,52 +12884,7 @@ const WB = {
   // TAGESBEGLEITER v4.0 (v3.62.0)
   // ══════════════════════════════════════════════════════
 
-  _ckOeffnePlanNotiz() {
-    // Alle Plan-Notizen sammeln
-    const alleNotizen = this._nzStore().filter(n => n.typ === 'plan' && !n.archiv);
-    const sheet = document.createElement('div');
-    sheet.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;';
-    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
-
-    let rows = '';
-    if (alleNotizen.length) {
-      rows = alleNotizen.map(n =>
-        '<button onclick="WB._ckOpenPlanNz(&quot;' + n.id + '&quot;)" '
-        + 'style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;margin-bottom:4px;'
-        + 'background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-xs);'
-        + 'font-family:var(--font);font-size:0.88rem;cursor:pointer;text-align:left;">'
-        + '<span style="flex:1;color:var(--c-text);font-weight:500;">' + (n.titel||'Ohne Titel') + '</span>'
-        + '</button>'
-      ).join('');
-    }
-
-    rows += '<button onclick="WB._ckNewPlanNz()" '
-      + 'style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;margin-bottom:4px;'
-      + 'background:var(--c-beruf);border:none;border-radius:var(--radius-xs);'
-      + 'font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;text-align:left;color:#fff;">'
-      + '+ Neue Plan-Notiz anlegen</button>';
-
-    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;'
-      + 'border-radius:var(--radius) var(--radius) 0 0;padding:16px;max-height:70vh;overflow-y:auto;">'
-      + '<div style="font-size:0.75rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;'
-      + 'color:var(--c-muted);margin-bottom:12px;">Plan-Notiz öffnen</div>'
-      + rows + '</div>';
-    document.body.appendChild(sheet);
-  },
-
-  _ckOpenPlanNz(id) {
-    document.querySelector('[style*="z-index:500"]')?.remove();
-    this._goTab('notizen');
-    setTimeout(() => this.nzEdOpen(id), 200);
-  },
-
-  _ckNewPlanNz() {
-    document.querySelector('[style*="z-index:500"]')?.remove();
-    this._goTab('notizen');
-    setTimeout(() => this.nzEdOpen(null, 'Mein Plan', 'plan', ''), 200);
-  },
-
-    _ckRenderTagesseite() {
+  _ckRenderTagesseite() {
     const now    = new Date();
     const today  = now.toISOString().split('T')[0];
     const dow    = now.getDay();
@@ -12988,29 +12941,40 @@ const WB = {
       });
     });
 
-    // ── B: Aufgaben heute (fällig heute oder überfällig) ───
-    ['pro','priv'].forEach(ctx => {
-      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-      if (!db) return;
-      Object.entries(db.projects || {}).forEach(([pKey, proj]) => {
-        (proj.tasks || []).forEach(t => {
-          if (t.done) return;
-          if (!t.date || t.date > today) return;
-          items.push({
-            type: 'aufgabe',
-            time: t.time || '',
-            title: t.text,
-            meta: (() => { const goalTitle = (t.goalId && t.goalId !== 'rauschen') ? this._goalStore()?.find(g => g.id === t.goalId)?.title : this._goalForProject(pKey)?.title; const overdue = t.date < today ? ' · überfällig' : ''; return goalTitle ? '→ ' + goalTitle + overdue : pKey + overdue; })(),
-            done: false,
-            ctx,
-            id: t.id,
-            pKey,
-            obj: t,
-          });
+    // ── B: Aufgaben aus Plan-Notizen
+    this._nzStore().filter(n => n.typ === 'plan' && !n.archiv).forEach(notiz => {
+      (notiz.planAufgaben || []).filter(a => !a.done && (a.date === today || a.planerDate === today)).forEach(a => {
+        items.push({
+          type:  'aufgabe',
+          time:  a.planerSlot === 'vm' ? '07:00' : a.planerSlot === 'nm' ? '12:00' : a.planerSlot === 'ab' ? '18:00' : '',
+          title: a.text,
+          meta:  notiz.titel || 'Plan',
+          done:  false,
+          id:    a.id,
+          obj:   a,
         });
       });
     });
 
+    // ── C: Heutige Wochenpflichten (nur genau heute fällig, nicht überfällige)
+    ['pro','priv'].forEach(ctx => {
+      const store = this._dutyStore(ctx) || [];
+      store.forEach(d => {
+        const info = this._dutyDayInfo(d, now);
+        if (!info.due || info.late) return; // nur genau heute, nicht überfällig
+        if (this._dutyIsDone(d, now)) return;
+        items.push({
+          type: 'pflicht',
+          time: '',
+          title: d.title,
+          meta: ctx === 'pro' ? 'Beruf · Pflicht' : 'Privat · Pflicht',
+          done: false,
+          ctx,
+          id: d.id,
+          obj: d,
+        });
+      });
+    });
 
     // ── D: Aktive Checklisten (nicht abgeschlossen) ──────
     const clStore = this._clInstanzStore() || [];
@@ -15118,23 +15082,6 @@ const WB = {
     this.wzClose();
     this._toast('✓ Tagesplan gespeichert');
     this.renderCockpit();
-  },
-
-  _initMidnightCheck() {
-    const msUntilMidnight = () => {
-      const now = new Date();
-      const midnight = new Date(now);
-      midnight.setHours(24, 0, 0, 0);
-      return midnight - now;
-    };
-    const scheduleNext = () => {
-      setTimeout(() => {
-        this.renderCockpit();
-        this._planerDate = null;
-        scheduleNext();
-      }, msUntilMidnight() + 1000);
-    };
-    scheduleNext();
   },
 
   async init() {
@@ -20973,6 +20920,54 @@ const WB = {
   // ── Tagesplaner (v3.56.0) ──────────────────────────
   _planerDate: null, // aktuell angezeigter Tag
 
+  _getAllePlanAufgaben() {
+    const result = [];
+    const today = new Date().toISOString().split('T')[0];
+    const in7 = new Date(); in7.setDate(in7.getDate()+7);
+    const in7str = in7.toISOString().split('T')[0];
+    this._nzStore().filter(n => n.typ === 'plan' && !n.archiv).forEach(notiz => {
+      (notiz.planAufgaben || []).filter(a => !a.done).forEach(a => {
+        let gruppe = 'irgendwann';
+        if (a.date && a.date < today)        gruppe = 'baustelle';
+        else if (notiz.baustelle)            gruppe = 'baustelle';
+        else if (a.date && a.date <= in7str) gruppe = 'woche';
+        else if (a.date)                     gruppe = 'pipeline';
+        result.push({ id:a.id, text:a.text, date:a.date||'', done:false,
+          notizId:notiz.id, notizTitel:notiz.titel||'Plan', gruppe,
+          planerSlot:a.planerSlot, planerDate:a.planerDate });
+      });
+    });
+    return result;
+  },
+
+  _planerSlotPlan(aufgabeId, notizId, slot, dateStr) {
+    const notiz = this._nzStore().find(n => n.id === notizId);
+    if (!notiz) return;
+    const a = (notiz.planAufgaben||[]).find(x => x.id === aufgabeId);
+    if (!a) return;
+    a.planerSlot = slot; a.planerDate = dateStr;
+    if (!a.date) a.date = dateStr;
+    this.setDirty(); this.renderPlaner();
+  },
+
+  _planerSlotPlanRemove(aufgabeId, notizId) {
+    const notiz = this._nzStore().find(n => n.id === notizId);
+    if (!notiz) return;
+    const a = (notiz.planAufgaben||[]).find(x => x.id === aufgabeId);
+    if (!a) return;
+    delete a.planerSlot; delete a.planerDate;
+    this.setDirty(); this.renderPlaner();
+  },
+
+  _planerTaskPlanDone(aufgabeId, notizId) {
+    const notiz = this._nzStore().find(n => n.id === notizId);
+    if (!notiz) return;
+    const a = (notiz.planAufgaben||[]).find(x => x.id === aufgabeId);
+    if (!a) return;
+    a.done = !a.done;
+    this.setDirty(); this.renderPlaner();
+  },
+
   renderPlaner() {
     const sec = document.getElementById('sec-planer');
     if (!sec) return;
@@ -21109,17 +21104,13 @@ const WB = {
       });
     });
 
-    // Eingeplante Aufgaben laden
+    // Eingeplante Plan-Aufgaben
     const planned = { vm: [], nm: [], ab: [] };
-    ['pro','priv'].forEach(ctx => {
-      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-      if (!db) return;
-      Object.entries(db.projects || {}).forEach(([pKey, proj]) => {
-        (proj.tasks || []).forEach(t => {
-          if (!t.planerSlot || t.planerDate !== dateStr) return;
-          if (!planned[t.planerSlot]) return;
-          planned[t.planerSlot].push({ t, pKey, ctx });
-        });
+    this._nzStore().filter(n => n.typ === 'plan' && !n.archiv).forEach(notiz => {
+      (notiz.planAufgaben || []).forEach(a => {
+        if (!a.planerSlot || a.planerDate !== dateStr) return;
+        if (!planned[a.planerSlot]) return;
+        planned[a.planerSlot].push({ a, notiz });
       });
     });
 
@@ -21142,21 +21133,21 @@ const WB = {
         + '</div></div>'
       ).join('');
 
-      const tasksHtml = zoneTasks.map(({t, pKey, ctx}) => {
-        const pid = pKey.replace(/'/g, String.fromCharCode(92,39));
+      const tasksHtml = zoneTasks.map(({a, notiz}) => {
         return '<div class="zone-task">'
-          + '<input type="checkbox" ' + (t.done?'checked':'') + ' '
-          + 'onchange="WB._planerTaskDone(&quot;'+t.id+'&quot;,&quot;'+pid+'&quot;,&quot;'+ctx+'&quot;)" '
+          + '<input type="checkbox" ' + (a.done?'checked':'') + ' '
+          + 'onchange="WB._planerTaskPlanDone(&quot;'+a.id+'&quot;,&quot;'+notiz.id+'&quot;)" '
           + 'style="width:15px;height:15px;accent-color:var(--c-beruf);cursor:pointer;flex-shrink:0;">'
           + '<div style="flex:1;min-width:0;">'
-          + '<div class="zone-task-title' + (t.done?' done':'') + '">' + t.text + '</div>'
-          + '<div class="zone-task-meta">' + pKey + ' &middot; ' + (ctx==='pro'?'Beruf':'Privat') + '</div>'
+          + '<div class="zone-task-title' + (a.done?' done':'') + '">' + a.text + '</div>'
+          + '<div class="zone-task-meta">' + (notiz.titel||'Plan') + '</div>'
           + '</div>'
           + '<button class="zone-task-del" '
-          + 'onclick="WB._planerSlotRemove(&quot;'+t.id+'&quot;,&quot;'+pid+'&quot;,&quot;'+ctx+'&quot;)" '
+          + 'onclick="WB._planerSlotPlanRemove(&quot;'+a.id+'&quot;,&quot;'+notiz.id+'&quot;)" '
           + 'title="Entfernen">&times;</button>'
           + '</div>';
       }).join('');
+
 
       const emptyTask = (!zoneTasks.length)
         ? '<div class="zone-empty">Keine Aufgaben — aus Backlog einplanen</div>'
@@ -21251,61 +21242,39 @@ const WB = {
     const el = document.getElementById('planer-backlog-body');
     const countEl = document.getElementById('planer-backlog-count');
     if (!el) return;
-
-    // Alle offenen Aufgaben die NICHT für diesen Tag eingeplant sind
-    const backlog = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-      if (!db) return;
-      Object.entries(db.projects || {}).forEach(([pKey, proj]) => {
-        (proj.tasks || []).forEach(t => {
-          if (t.done) return;
-          // Nicht für heute eingeplant
-          if (t.planerSlot && t.planerDate === dateStr) return;
-          // Datum: nur aufgaben ohne Datum, oder Datum ≤ heute+7
-          const maxDate = new Date(dateStr);
-          maxDate.setDate(maxDate.getDate() + 7);
-          const maxStr = maxDate.toISOString().split('T')[0];
-          if (t.date && t.date > maxStr) return;
-          backlog.push({ t, pKey, ctx });
-        });
+    const alle = this._getAllePlanAufgaben();
+    const backlog = alle.filter(a => !(a.planerSlot && a.planerDate === dateStr));
+    if (countEl) countEl.textContent = backlog.length ? '(' + backlog.length + ')' : '';
+    if (!backlog.length) {
+      el.innerHTML = '<div style="padding:16px;font-size:0.85rem;color:var(--c-faint);">✓ Alles eingeplant!</div>';
+      el.style.display = this._planerBacklogOpen ? '' : 'none'; return;
+    }
+    const gDef = [
+      ['baustelle','🔴','Baustellen','#C62828'],
+      ['woche',    '🟡','Diese Woche','#F57F17'],
+      ['pipeline', '🟢','Pipeline','var(--c-beruf)'],
+      ['irgendwann','□','Irgendwann','var(--c-muted)'],
+    ];
+    let html = '';
+    gDef.forEach(([gid, icon, label, color]) => {
+      const items = backlog.filter(a => a.gruppe === gid);
+      if (!items.length) return;
+      html += '<div style="padding:6px 14px 2px;font-size:0.68rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:' + color + ';background:var(--c-bg);">'
+        + icon + ' ' + label + ' (' + items.length + ')</div>';
+      items.forEach(a => {
+        const isOvd = a.date && a.date < dateStr;
+        const dl = !a.date ? '' : (a.date===dateStr?'Heute':(isOvd?a.date+' ⚠':a.date));
+        html += '<div class="planer-bl-item">'
+          + '<div class="planer-bl-text"><div class="planer-bl-title">' + a.text + '</div>'
+          + '<div class="planer-bl-meta">' + a.notizTitel + (dl?' &middot; <span style="color:'+(isOvd?'#C62828':'var(--c-muted)')+';">' + dl + '</span>':'') + '</div></div>'
+          + '<div class="planer-slot-btn">'
+          + '<button onclick="WB._planerSlotPlan(&quot;'+a.id+'&quot;,&quot;'+a.notizId+'&quot;,&quot;vm&quot;,&quot;'+dateStr+'&quot;)">VM</button>'
+          + '<button onclick="WB._planerSlotPlan(&quot;'+a.id+'&quot;,&quot;'+a.notizId+'&quot;,&quot;nm&quot;,&quot;'+dateStr+'&quot;)">NM</button>'
+          + '<button onclick="WB._planerSlotPlan(&quot;'+a.id+'&quot;,&quot;'+a.notizId+'&quot;,&quot;ab&quot;,&quot;'+dateStr+'&quot;)">AB</button>'
+          + '</div></div>';
       });
     });
-
-    // Sortierung: überfällig → heute → ohne Datum → zukünftig; dann Prio
-    backlog.sort((a,b) => {
-      const da = a.t.date || '9999', db2 = b.t.date || '9999';
-      if (da !== db2) return da.localeCompare(db2);
-      return (a.t.prioLvl||'C').localeCompare(b.t.prioLvl||'C');
-    });
-
-    if (countEl) countEl.textContent = backlog.length ? '(' + backlog.length + ')' : '';
-
-    if (!backlog.length) {
-      el.innerHTML = '<div style="padding:16px;font-size:0.85rem;color:var(--c-faint);">Backlog leer \u2014 alle Aufgaben eingeplant!</div>';
-      return;
-    }
-
-    el.innerHTML = backlog.map(({t, pKey, ctx}) => {
-      const pid = pKey.replace(/'/g, String.fromCharCode(92,39));
-      const isOverdue = t.date && t.date < dateStr;
-      const dateLabel = !t.date ? '' : (t.date === dateStr ? 'Heute' : (isOverdue ? t.date + ' \u26a0' : t.date));
-
-      return '<div class="planer-bl-item">'
-        + '<div class="planer-bl-text">'
-        + '<div class="planer-bl-title">' + t.text + '</div>'
-        + '<div class="planer-bl-meta">' + pKey
-        + (dateLabel ? ' &middot; <span style="color:' + (isOverdue?'#C62828':'var(--c-muted)') + ';">' + dateLabel + '</span>' : '')
-        + '</div>'
-        + '</div>'
-        + '<div class="planer-slot-btn">'
-        + '<button onclick="WB._planerSlotAssign(&quot;' + t.id + '&quot;,&quot;' + pid + '&quot;,&quot;' + ctx + '&quot;,&quot;vm&quot;,&quot;' + dateStr + '&quot;)">VM</button>'
-        + '<button onclick="WB._planerSlotAssign(&quot;' + t.id + '&quot;,&quot;' + pid + '&quot;,&quot;' + ctx + '&quot;,&quot;nm&quot;,&quot;' + dateStr + '&quot;)">NM</button>'
-        + '<button onclick="WB._planerSlotAssign(&quot;' + t.id + '&quot;,&quot;' + pid + '&quot;,&quot;' + ctx + '&quot;,&quot;ab&quot;,&quot;' + dateStr + '&quot;)">AB</button>'
-        + '</div>'
-        + '</div>';
-    }).join('');
-
+    el.innerHTML = html;
     el.style.display = this._planerBacklogOpen ? '' : 'none';
   },
 
@@ -21783,20 +21752,36 @@ const WB = {
   },
 
   _renderPlanSektion(notiz) {
+    const link = notiz?.projektLink;
+    let h = '<div class="nz-proj-sektion"><div class="nz-verkn-box-title">&#128193; Plan &mdash; Projekt</div>';
+    if(link?.proj) {
+      h += '<div style="display:flex;align-items:center;gap:8px;">'
+        + '<span style="flex:1;font-weight:500;">'+link.proj+'</span>'
+        + '<span style="font-size:0.75rem;color:var(--c-muted);">'+(link.ctx==='pro'?'Beruf':'Privat')+'</span>'
+        + '<button onclick="WB._planProjektLoesen()" style="background:none;border:1px solid var(--c-danger);color:var(--c-danger);border-radius:4px;padding:2px 8px;cursor:pointer;font-size:0.8rem;">&#10005;</button>'
+        + '</div>';
+    } else {
+      h += '<div style="display:flex;gap:6px;margin-top:4px;">'
+        + '<select id="nz-proj-sel" style="flex:1;padding:6px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);">'
+        + '<option value="">Projekt w\u00e4hlen\u2026</option>'
+        + this._nzProjOptions()
+        + '</select>'
+        + '<button onclick="WB._planProjektZuordnen()" style="padding:6px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:0.85rem;">Zuordnen</button>'
+        + '</div>';
+    }
     const cbCount = notiz?.cbLinks?.length||0;
-    let h = '<div class="nz-proj-sektion">';
-    h += '<div style="margin-top:0;">';
-    h += '<div style="font-size:0.75rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--c-muted);margin-bottom:6px;">Aufgaben aus Text</div>';
-    h += (cbCount > 0
-        ? '<div style="font-size:0.82rem;color:var(--c-beruf);margin-bottom:6px;">✓ ' + cbCount + ' Aufgabe(n) aus ☐ verknüpft</div>'
-        : '<div style="font-size:0.78rem;color:var(--c-muted);margin-bottom:6px;">Füge ☐ Checkboxen in den Text ein, dann Scannen klicken.</div>'
-    );
-    h += '<button onclick="WB._planScanCheckboxen()" '
+    h += '<div style="margin-top:8px;border-top:1px solid var(--c-border);padding-top:8px;">'
+      + '<div style="font-size:0.75rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--c-muted);margin-bottom:6px;">Aufgaben aus Text</div>'
+      + (cbCount > 0
+          ? '<div style="font-size:0.82rem;color:var(--c-beruf);margin-bottom:6px;">✓ ' + cbCount + ' Aufgabe(n) aus ☐ verknüpft</div>'
+          : '<div style="font-size:0.78rem;color:var(--c-muted);margin-bottom:6px;">Füge ☐ Checkboxen in den Text ein, dann scannen.</div>'
+        )
+      + '<button onclick="WB._planScanCheckboxen()" '
       + 'style="width:100%;padding:8px;background:var(--c-surface);border:1px solid var(--c-beruf);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;color:var(--c-beruf);cursor:pointer;font-weight:600;">'
-      + '☐ Checkboxen scannen &amp; Aufgaben verknüpfen</button>';
-    return h + '</div></div>';
+      + '☐ Checkboxen scannen &amp; Aufgaben verknüpfen</button>'
+      + '</div>';
+    return h+'</div>';
   },
-
 
   _nzProjOptions() {
     const opts=[];
@@ -21967,26 +21952,25 @@ const WB = {
         const cbChar=document.createElement('span');
         cbChar.className='nz-cb-char';
         if(linked){
-          // Status aus planAufgaben der Notiz lesen
-          const notizStore=this._nzStoreWrite(this._nzActiveDb||'pro');
-          const nz=notizStore.find(n=>n.id===this.nzActiveId);
-          const aufgabe=(nz?.planAufgaben||[]).find(a=>a.id===linked.taskId);
-          const isDone=!!aufgabe?.done;
+          const taskDb=linked.ctx==='priv'?this.dataPriv:this.dataPro;
+          const taskObj=taskDb?.projects?.[linked.proj]?.tasks?.find(t=>String(t.id)===linked.taskId);
+          const isDone=!!taskObj?.done;
           cbChar.textContent=isDone?'\u2714\ufe0f':'\u2610';
           wrap.appendChild(cbChar);
           const linkSpan=document.createElement('span');
           linkSpan.className=isDone?'nz-cb-done nz-cb-link':'nz-cb-link';
           linkSpan.textContent=' '+lineText;
-          linkSpan.title='Aufgabe abhaken';
+          linkSpan.title='Aufgabe \u00f6ffnen';
+          linkSpan.dataset.proj=linked.proj;
           linkSpan.dataset.taskid=linked.taskId;
-          linkSpan.onclick=e=>{
-            e.stopPropagation();e.preventDefault();
-            WB._planCbToggle(e.currentTarget.dataset.taskid);};
+          linkSpan.dataset.ctx=linked.ctx;
+          linkSpan.onclick=e=>{e.stopPropagation();e.preventDefault();
+            WB.openTaskDetail(e.currentTarget.dataset.proj,e.currentTarget.dataset.taskid,e.currentTarget.dataset.ctx);};
           wrap.appendChild(linkSpan);
           const delBtn=document.createElement('span');
           delBtn.className='nz-cb-btn';
-          delBtn.textContent=' ✕';
-          delBtn.title='Verknüpfung lösen';
+          delBtn.textContent=' \u2715';
+          delBtn.title='Verkn\u00fcpfung l\u00f6sen';
           delBtn.dataset.cbid=cbId;
           delBtn.onclick=e=>{e.stopPropagation();e.preventDefault();
             WB._planCbLoesen(e.currentTarget.dataset.cbid);};
@@ -22025,26 +22009,25 @@ const WB = {
     if(!notizId){this._toast('Notiz erst speichern');return;}
     const store=this._nzStoreWrite(this._nzActiveDb||'pro');
     const notiz=store.find(n=>n.id===notizId); if(!notiz) return;
-    const taskId='task_'+String(Date.now());
+    const projLink=notiz.projektLink;
+    const ctx=projLink?.ctx||(this._nzActiveDb==='priv'?'priv':'pro');
+    const db=ctx==='priv'?this.dataPriv:this.dataPro;
+    if(!db){this._toast('Keine Datenbank geladen');return;}
+    let proj=projLink?.proj;
+    if(!proj){
+      const projs=Object.keys(db.projects||{}).filter(k=>!db.projects[k].isArea);
+      if(!projs.length){this._toast('Bitte zuerst Projekt verkn\u00fcpfen');return;}
+      proj=projs[0];
+    }
+    db.projects[proj]=db.projects[proj]||{status:'aktiv',tasks:[],desc:''};
+    const taskId=String(Date.now());
+    db.projects[proj].tasks.push({id:taskId,text:taskText,done:false,prio:false,isToday:false,date:'',size:'S',checklist:[],planNotizId:notizId,planNotizDb:this._nzActiveDb||'pro'});
     const stableCbId='cb_'+btoa(encodeURIComponent(taskText)).slice(0,12).replace(/[^a-zA-Z0-9]/g,'x');
-    if(!notiz.planAufgaben) notiz.planAufgaben=[];
-    notiz.planAufgaben.push({id:taskId,text:taskText,done:false,erstellt:new Date().toISOString().split('T')[0]});
     notiz.cbLinks=notiz.cbLinks||[];
     notiz.cbLinks=notiz.cbLinks.filter(l=>l.cbId!==stableCbId&&l.taskText!==taskText);
-    notiz.cbLinks.push({cbId:stableCbId,taskId,notizId,type:'planAufgabe',taskText});
+    notiz.cbLinks.push({cbId:stableCbId,taskId,proj,ctx,taskText});
     this.setDirty();
-    this._toast('\u2713 Aufgabe: '+taskText.substring(0,30));
-    setTimeout(()=>this._planScanCheckboxen(),50);
-  },
-
-  _planCbToggle(taskId) {
-    const notizId=this.nzActiveId; if(!notizId) return;
-    const store=this._nzStoreWrite(this._nzActiveDb||'pro');
-    const notiz=store.find(n=>n.id===notizId); if(!notiz) return;
-    const aufgabe=(notiz.planAufgaben||[]).find(a=>a.id===taskId);
-    if(!aufgabe) return;
-    aufgabe.done=!aufgabe.done;
-    this.setDirty();
+    this._toast('Aufgabe erstellt: '+taskText.substring(0,30));
     setTimeout(()=>this._planScanCheckboxen(),50);
   },
 
@@ -22057,20 +22040,19 @@ const WB = {
   },
 
   _planCbZuordnenDialog(cbId,taskText) {
-    // Plan-Notizen anzeigen zum Zuordnen
-    const alleNotizen=this._nzStore().filter(n=>n.typ==='plan'&&!n.archiv);
     const tasks=[];
-    alleNotizen.forEach(nz=>{
-      (nz.planAufgaben||[]).filter(a=>!a.done).forEach(a=>{
-        tasks.push({taskId:a.id,text:a.text,notizId:nz.id,notizTitel:nz.titel||'Plan'});
+    [['pro',this.dataPro],['priv',this.dataPriv]].forEach(([ctx,db])=>{
+      if(!db) return;
+      Object.keys(db.projects||{}).forEach(proj=>{
+        (db.projects[proj].tasks||[]).forEach(t=>{if(!t.done)tasks.push({taskId:String(t.id),text:t.text,proj,ctx});});
       });
     });
-    if(!tasks.length){this._toast('Keine offenen Plan-Aufgaben');return;}
+    if(!tasks.length){this._toast('Keine offenen Aufgaben');return;}
     const ex=document.getElementById('nzCbModal'); if(ex)ex.remove();
     const modal=document.createElement('div');
     modal.id='nzCbModal';
     modal.style.cssText='position:fixed;inset:0;z-index:500;background:rgba(28,27,24,0.45);display:flex;align-items:flex-end;';
-    const sel=tasks.map((t,i)=>'<option value="'+i+'">'+(t.notizTitel||'Plan')+' → '+t.text.substring(0,40)+'</option>').join('');
+    const sel=tasks.map((t,i)=>'<option value="'+i+'">['+( t.ctx==='pro'?'B':'P')+'] '+t.proj+' \u2192 '+t.text.substring(0,40)+'</option>').join('');
     modal.innerHTML='<div style="background:var(--c-surface);border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 30px;width:100%;box-sizing:border-box;">'
       +'<div style="font-size:0.95rem;font-weight:600;margin-bottom:12px;">Aufgabe zuordnen</div>'
       +'<select id="nzCbTaskSel" style="width:100%;padding:9px;border:1px solid var(--c-border);border-radius:var(--radius-sm);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);margin-bottom:12px;">'+sel+'</select>'
@@ -22090,10 +22072,9 @@ const WB = {
     const notizId=this.nzActiveId; if(!notizId) return;
     const store=this._nzStoreWrite(this._nzActiveDb||'pro');
     const notiz=store.find(n=>n.id===notizId); if(!notiz) return;
-    // Aufgabe aus Plan-Notiz holen und verknüpfen
-    const srcNotiz=this._nzStore().find(n=>n.id===chosen.notizId);
-    // cbLink in aktueller Notiz speichern
-    const stableCbId2='cb_'+btoa(encodeURIComponent(chosen.text)).slice(0,12).replace(/[^a-zA-Z0-9]/g,'x');
+    const db=chosen.ctx==='priv'?this.dataPriv:this.dataPro;
+    const task=db?.projects?.[chosen.proj]?.tasks?.find(t=>String(t.id)===chosen.taskId);
+    if(task){task.planNotizId=notizId;task.planNotizDb=this._nzActiveDb||'pro';}
     notiz.cbLinks=notiz.cbLinks||[];
     notiz.cbLinks=notiz.cbLinks.filter(l=>l.cbId!==cbId&&l.taskText!==chosen.text);
     notiz.cbLinks.push({cbId,taskId:chosen.taskId,proj:chosen.proj,ctx:chosen.ctx,taskText:chosen.text});
@@ -22627,28 +22608,9 @@ const WB = {
     document.execCommand('formatBlock', false, 'h'+level);
   },
   nzInsertCb() {
-    const ed = document.getElementById('nz-ed-content');
-    if(!ed) return;
-    // Cursor ans Ende setzen
-    ed.focus();
-    const range = document.createRange();
-    range.selectNodeContents(ed);
-    range.collapse(false);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-    // ☐ einfügen nach kurzer Pause
-    setTimeout(() => {
-      ed.focus();
-      const s = window.getSelection();
-      const r = s.rangeCount > 0 ? s.getRangeAt(0) : (() => { const rr=document.createRange(); rr.selectNodeContents(ed); rr.collapse(false); return rr; })();
-      const tn = document.createTextNode('☐ ');
-      r.insertNode(tn);
-      r.setStartAfter(tn);
-      r.collapse(true);
-      s.removeAllRanges();
-      s.addRange(r);
-    }, 50);
+    document.getElementById('nz-ed-content')?.focus();
+    const id = 'cb'+Date.now();
+    document.execCommand('insertHTML', false, '<div><input type="checkbox" id="'+id+'"> <label for="'+id+'">Aufgabe</label></div>');
   },
   nzInsertHr() {
     document.getElementById('nz-ed-content')?.focus();
