@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.81.0</title>
+<title>WorkBench 3.82.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6452,6 +6452,36 @@ html, body {
 .planer-bl-text { flex: 1; min-width: 0; }
 .planer-bl-title { font-size: 0.85rem; color: var(--c-text); font-weight: 500; }
 .planer-bl-meta { font-size: 0.72rem; color: var(--c-muted); margin-top: 1px; }
+.planer-bl-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 5px;
+  margin-right: 6px;
+  border-radius: 9px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: #fff;
+  vertical-align: middle;
+}
+.planer-bl-score.plbw-hoch    { background: #C62828; }
+.planer-bl-score.plbw-mittel  { background: var(--c-beruf); }
+.planer-bl-score.plbw-niedrig { background: var(--c-muted); }
+.planer-bl-must { color: #F57F17; font-size: 0.8rem; margin-right: 4px; vertical-align: middle; }
+.planer-bl-gew {
+  font-family: var(--font);
+  font-size: 0.7rem;
+  padding: 1px 3px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-xs);
+  background: var(--c-surface);
+  color: var(--c-muted);
+  cursor: pointer;
+  vertical-align: middle;
+}
 .planer-slot-btn {
   display: flex;
   gap: 4px;
@@ -7286,6 +7316,22 @@ html, body {
 
       <div class="wbs-divider"></div>
 
+      <!-- Alt-Aufgaben Analyse (db.projects Migration · Stufe 0) -->
+      <div class="wbs-section-label">Alt-Aufgaben (db.projects)</div>
+      <div class="wbs-row">
+        <div class="wbs-label">
+          <div class="wbs-label-main">Migration vorbereiten</div>
+          <div class="wbs-label-sub">Analysiert offene Aufgaben aus alten Projekten</div>
+        </div>
+        <button onclick="WB.legacyProjectsReport()"
+          style="padding:8px 14px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;color:var(--c-beruf);cursor:pointer;white-space:nowrap;">
+          Analysieren
+        </button>
+      </div>
+      <div id="s-legacy-report" style="display:none;padding:4px 0 8px;"></div>
+
+      <div class="wbs-divider"></div>
+
       <!-- Abend-Reflexion Fragen -->
       <div class="wbs-section-label">Abend-Reflexion Fragen</div>
       <div id="wbs-evening-questions"></div>
@@ -7830,7 +7876,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.81.0 · Build 20260603-1648</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.82.0 · Build 20260603-1712</div>
     </div>
 
     <!-- Welt -->
@@ -8004,8 +8050,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.81.0',
-  APP_BUILD:   '20260603-1648',
+  APP_VERSION: '3.82.0',
+  APP_BUILD:   '20260603-1712',
 
 
   // ══════════════════════════════════════════════════════
@@ -11895,6 +11941,61 @@ const WB = {
       const n = (e.fokus || []).length;
       el.textContent = 'Heute erledigt · ' + n + ' Fokus' + (n === 1 ? '' : '-Punkte');
     }
+  },
+
+  // ── db.projects MIGRATION · STUFE 0: Analyse (read-only, kein Datenrisiko) ──
+  _legacyProjectsAnalyse() {
+    const today = new Date().toISOString().split('T')[0];
+    const report = { pro: null, priv: null };
+    [['pro', this.dataPro], ['priv', this.dataPriv]].forEach(([ctx, db]) => {
+      if (!db) return;
+      const projects = db.projects || {};
+      let projektAnzahl = 0, aufgabenOffen = 0, aufgabenErledigt = 0, mitDatum = 0, ueberfaellig = 0, mitPrio = 0;
+      const projektListe = [];
+      Object.entries(projects).forEach(([pKey, p]) => {
+        const tasks = (p && p.tasks) || [];
+        const offen = tasks.filter(t => t && !t.done);
+        if (tasks.length) projektAnzahl++;
+        aufgabenOffen += offen.length;
+        aufgabenErledigt += tasks.filter(t => t && t.done).length;
+        offen.forEach(t => {
+          if (t.date) { mitDatum++; if (t.date < today) ueberfaellig++; }
+          if (t.prio === true || t.prio === 'A' || t.prioLvl) mitPrio++;
+        });
+        if (offen.length) projektListe.push({ name: pKey, offen: offen.length });
+      });
+      projektListe.sort((a, b) => b.offen - a.offen);
+      report[ctx] = { projektAnzahl, aufgabenOffen, aufgabenErledigt, mitDatum, ueberfaellig, mitPrio, projektListe };
+    });
+    return report;
+  },
+
+  legacyProjectsReport() {
+    const r = this._legacyProjectsAnalyse();
+    const el = document.getElementById('s-legacy-report');
+    if (!el) return;
+    const block = (label, d) => {
+      if (!d) return '<div style="padding:8px 0;color:var(--c-faint);font-size:0.8rem;">' + label + ': nicht geladen</div>';
+      let h = '<div style="padding:8px 0;border-bottom:1px solid var(--c-border);">'
+        + '<div style="font-weight:700;font-size:0.82rem;color:var(--c-text);margin-bottom:4px;">' + label + '</div>'
+        + '<div style="font-size:0.78rem;color:var(--c-muted);line-height:1.6;">'
+        + 'Projekte mit Aufgaben: <b>' + d.projektAnzahl + '</b><br>'
+        + 'Offene Alt-Aufgaben: <b>' + d.aufgabenOffen + '</b> (davon ' + d.mitDatum + ' mit Datum, ' + d.ueberfaellig + ' überfällig, ' + d.mitPrio + ' mit Prio)<br>'
+        + 'Bereits erledigt: ' + d.aufgabenErledigt
+        + '</div>';
+      if (d.projektListe.length) {
+        h += '<div style="font-size:0.72rem;color:var(--c-faint);margin-top:6px;">Top-Projekte: '
+          + d.projektListe.slice(0, 5).map(p => this._esc(p.name) + ' (' + p.offen + ')').join(', ')
+          + (d.projektListe.length > 5 ? ' …' : '') + '</div>';
+      }
+      h += '</div>';
+      return h;
+    };
+    const totalOffen = (r.pro?.aufgabenOffen || 0) + (r.priv?.aufgabenOffen || 0);
+    el.innerHTML = block('Beruf', r.pro) + block('Privat', r.priv)
+      + '<div style="padding:10px 0 2px;font-size:0.82rem;font-weight:700;color:var(--c-beruf);">Gesamt offen: ' + totalOffen + ' Alt-Aufgaben</div>'
+      + '<div style="font-size:0.72rem;color:var(--c-faint);margin-top:4px;">Stufe 0 · reine Analyse, keine Daten verändert.</div>';
+    el.style.display = '';
   },
 
   _fokusPreset(min) {
@@ -21869,6 +21970,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _getAllePlanAufgaben() {
     const result = [];
     const today = new Date().toISOString().split('T')[0];
+    const todayMs = new Date(today + 'T12:00:00').getTime();
     const in7 = new Date(); in7.setDate(in7.getDate()+7);
     const in7str = in7.toISOString().split('T')[0];
     this._nzStore().filter(n => n.typ === 'plan' && !n.archiv).forEach(notiz => {
@@ -21878,12 +21980,43 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         else if (notiz.baustelle)            gruppe = 'baustelle';
         else if (a.date && a.date <= in7str) gruppe = 'woche';
         else if (a.date)                     gruppe = 'pipeline';
+        // Lazy-Nachrüstung: createdAt für Alter (Fallback aufs heutige Datum)
+        if (!a.erstellt) { a.erstellt = today; }
+        const score = this._planerBacklogScore(a, today, todayMs);
         result.push({ id:a.id, text:a.text, date:a.date||'', done:false,
           notizId:notiz.id, notizTitel:notiz.titel||'Plan', gruppe,
-          planerSlot:a.planerSlot, planerDate:a.planerDate });
+          planerSlot:a.planerSlot, planerDate:a.planerDate,
+          gewicht: a.gewicht || 'mittel', erstellt: a.erstellt,
+          mustToday: !!a.mustToday, score });
       });
     });
     return result;
+  },
+
+  // Gewichtungs-Score: höher = wichtiger. Faktoren: Deadline-Nähe, überfällig, mustToday, Alter
+  _planerBacklogScore(a, today, todayMs) {
+    let s = 0;
+    // mustToday: starker Boost
+    if (a.mustToday) s += 100;
+    // Deadline-Nähe / Überfälligkeit
+    if (a.date) {
+      const dMs = new Date(a.date + 'T12:00:00').getTime();
+      const diffTage = Math.round((dMs - todayMs) / 86400000);
+      if (diffTage < 0)        s += 60 + Math.min(40, -diffTage * 2); // überfällig: je länger, desto höher (cap)
+      else if (diffTage === 0) s += 55;   // heute fällig
+      else if (diffTage <= 2)  s += 40;
+      else if (diffTage <= 7)  s += 25;
+      else if (diffTage <= 30) s += 10;
+      else                     s += 3;
+    }
+    // Alter (älter = leicht höher, damit Liegengebliebenes nach oben wandert; cap)
+    if (a.erstellt) {
+      const ageTage = Math.max(0, Math.round((todayMs - new Date(a.erstellt + 'T12:00:00').getTime()) / 86400000));
+      s += Math.min(20, ageTage * 0.5);
+    }
+    // Manuelles Gewicht als Multiplikator/Override
+    const gMul = { hoch: 1.5, mittel: 1.0, niedrig: 0.6 }[a.gewicht || 'mittel'] ?? 1.0;
+    return Math.round(s * gMul);
   },
 
   _planerSlotPlan(aufgabeId, notizId, slot, dateStr) {
@@ -22205,14 +22338,30 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     gDef.forEach(([gid, icon, label, color]) => {
       const items = backlog.filter(a => a.gruppe === gid);
       if (!items.length) return;
+      // Automatische Sortierung nach Score (höchster zuerst), Tie-Break: Deadline, dann Alter
+      items.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        const ad = a.date || '9999-99-99', bd = b.date || '9999-99-99';
+        if (ad !== bd) return ad.localeCompare(bd);
+        return (a.erstellt || '').localeCompare(b.erstellt || '');
+      });
       html += '<div style="padding:6px 14px 2px;font-size:0.68rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:' + color + ';background:var(--c-bg);">'
         + icon + ' ' + label + ' (' + items.length + ')</div>';
       items.forEach(a => {
         const isOvd = a.date && a.date < dateStr;
         const dl = !a.date ? '' : (a.date===dateStr?'Heute':(isOvd?a.date+' ⚠':a.date));
+        const gewClass = 'plbw-' + a.gewicht;
         html += '<div class="planer-bl-item">'
-          + '<div class="planer-bl-text"><div class="planer-bl-title">' + a.text + '</div>'
-          + '<div class="planer-bl-meta">' + a.notizTitel + (dl?' &middot; <span style="color:'+(isOvd?'#C62828':'var(--c-muted)')+';">' + dl + '</span>':'') + '</div></div>'
+          + '<div class="planer-bl-text"><div class="planer-bl-title">'
+          + '<span class="planer-bl-score ' + gewClass + '" title="Gewichtung · Score ' + a.score + '">' + a.score + '</span>'
+          + (a.mustToday ? '<span class="planer-bl-must" title="Heutiger Fokus">★</span>' : '')
+          + this._esc(a.text) + '</div>'
+          + '<div class="planer-bl-meta">' + this._esc(a.notizTitel) + (dl?' &middot; <span style="color:'+(isOvd?'#C62828':'var(--c-muted)')+';">' + dl + '</span>':'')
+          + ' &middot; <select class="planer-bl-gew" onchange="WB._planerSetGewicht(&quot;'+a.id+'&quot;,&quot;'+a.notizId+'&quot;,this.value)" onclick="event.stopPropagation();">'
+          + '<option value="hoch"'    + (a.gewicht==='hoch'?' selected':'')    + '>Hoch</option>'
+          + '<option value="mittel"'  + (a.gewicht==='mittel'?' selected':'')  + '>Mittel</option>'
+          + '<option value="niedrig"' + (a.gewicht==='niedrig'?' selected':'') + '>Niedrig</option>'
+          + '</select></div></div>'
           + '<div class="planer-slot-btn">'
           + '<button onclick="WB._planerSlotPlan(&quot;'+a.id+'&quot;,&quot;'+a.notizId+'&quot;,&quot;vm&quot;,&quot;'+dateStr+'&quot;)">VM</button>'
           + '<button onclick="WB._planerSlotPlan(&quot;'+a.id+'&quot;,&quot;'+a.notizId+'&quot;,&quot;nm&quot;,&quot;'+dateStr+'&quot;)">NM</button>'
@@ -22222,6 +22371,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     });
     el.innerHTML = html;
     el.style.display = this._planerBacklogOpen ? '' : 'none';
+  },
+
+  // Manuelles Gewicht einer Plan-Aufgabe setzen
+  _planerSetGewicht(aufgabeId, notizId, gewicht) {
+    const notiz = this._nzStore().find(n => n.id === notizId);
+    if (!notiz) return;
+    const a = (notiz.planAufgaben || []).find(x => x.id === aufgabeId);
+    if (!a) return;
+    a.gewicht = gewicht;
+    this.setDirty();
+    this.renderPlaner();
   },
 
   _planerShift(n) {
