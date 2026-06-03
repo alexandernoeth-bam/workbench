@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.80.0</title>
+<title>WorkBench 3.80.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.80.0 · Build 20260603-1430</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.80.1 · Build 20260603-1445</div>
     </div>
 
     <!-- Welt -->
@@ -7762,8 +7762,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.80.0',
-  APP_BUILD:   '20260603-1430',
+  APP_VERSION: '3.80.1',
+  APP_BUILD:   '20260603-1445',
 
 
   // ══════════════════════════════════════════════════════
@@ -13786,14 +13786,18 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const sheet = document.createElement('div');
     sheet.id = 'wb-quick-add-sheet';
     sheet.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;';
-    const welt = this.activeWorld === 'beruf' ? 'Beruf' : 'Privat';
-    const weltColor = this.activeWorld === 'beruf' ? 'var(--c-beruf)' : 'var(--c-priv,#7B5EA7)';
     sheet.innerHTML =
       '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
       + '<div style="font-size:0.8rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);">Schnell-Erledigung</div>'
-      + '<div style="font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:20px;background:'+weltColor+';color:#fff;">'+welt+'</div>'
-      + '</div>'
+      + '<div style="display:flex;gap:4px;">'
+      + '<button id="wqa-welt-pro" onclick="WB._wqaSetWelt(\'pro\')" style="font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:20px;border:none;cursor:pointer;'
+      + (this.activeWorld==='beruf' ? 'background:var(--c-beruf);color:#fff;' : 'background:var(--c-border);color:var(--c-muted);')
+      + '">Beruf</button>'
+      + '<button id="wqa-welt-priv" onclick="WB._wqaSetWelt(\'priv\')" style="font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:20px;border:none;cursor:pointer;'
+      + (this.activeWorld!=='beruf' ? 'background:#7B5EA7;color:#fff;' : 'background:var(--c-border);color:var(--c-muted);')
+      + '">Privat</button>'
+      + '</div></div>'
       + '<input id="wqa-text" type="text" placeholder="Was muss erledigt werden?" autofocus style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:10px;">'
       + '<div style="display:flex;gap:8px;margin-bottom:14px;">'
       + '<div style="flex:2;">'
@@ -13906,6 +13910,15 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     document.querySelectorAll('[style*="z-index:500"],[style*="rgba(0,0,0"]').forEach(e => e.remove());
     this._ckRenderTagesseite();
     this._toast('✓ Gespeichert');
+  },
+
+  _wqaSetWelt(welt) {
+    this.activeWorld = welt === 'pro' ? 'beruf' : 'privat';
+    // Buttons umfärben
+    const pro  = document.getElementById('wqa-welt-pro');
+    const priv = document.getElementById('wqa-welt-priv');
+    if (pro)  { pro.style.background  = welt==='pro'  ? 'var(--c-beruf)' : 'var(--c-border)'; pro.style.color  = welt==='pro'  ? '#fff' : 'var(--c-muted)'; }
+    if (priv) { priv.style.background = welt==='priv' ? '#7B5EA7'        : 'var(--c-border)'; priv.style.color = welt==='priv' ? '#fff' : 'var(--c-muted)'; }
   },
 
   _wqaRecurChange(val) {
