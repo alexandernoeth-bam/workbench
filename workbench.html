@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.87.0</title>
+<title>WorkBench 3.88.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7906,7 +7906,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.87.0 · Build 20260603-2042</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.88.0 · Build 20260603-2108</div>
     </div>
 
     <!-- Welt -->
@@ -8075,8 +8075,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.87.0',
-  APP_BUILD:   '20260603-2042',
+  APP_VERSION: '3.88.0',
+  APP_BUILD:   '20260603-2108',
 
 
   // ══════════════════════════════════════════════════════
@@ -14395,6 +14395,114 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _goalEditId: null,
 
   // ── Store ──────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════
+  // VORHABEN (Stufe 3b) — verschmolzenes Ziel+Plan-Objekt
+  // Additiv: berührt goals/plaene/Plan-Notizen NICHT.
+  // Speicher: db.vorhaben[] (welt-getrennt pro/priv)
+  // ══════════════════════════════════════════════════════
+  _vorhabenStore(welt) {
+    // welt: 'pro' | 'priv' | undefined (=aktive Welt)
+    const w = welt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const db = w === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return null;
+    if (!db.vorhaben) db.vorhaben = [];
+    return db.vorhaben;
+  },
+
+  // Alle Vorhaben beider Welten (mit Welt-Markierung)
+  _vorhabenAlle() {
+    const out = [];
+    [['pro', this.dataPro], ['priv', this.dataPriv]].forEach(([w, db]) => {
+      if (!db || !db.vorhaben) return;
+      db.vorhaben.forEach(v => out.push({ ...v, _welt: w }));
+    });
+    return out;
+  },
+
+  // Neues Vorhaben anlegen (nutzt bestehende PLAN_TYPEN-Vorlagen)
+  vorhabenNeu(titel, typ, welt) {
+    const w = welt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const store = this._vorhabenStore(w);
+    if (!store) { this._toast('Bitte zuerst Datenbank laden'); return null; }
+    const t = (typ && this.PLAN_TYPEN[typ]) ? typ : 'allgemein';
+    const vorlage = this._planVorlage(t);
+    const today = new Date().toISOString().split('T')[0];
+    const vorhaben = {
+      id: 'vh_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      titel: titel || 'Neues Vorhaben',
+      welt: w,
+      typ: t,
+      vision: vorlage.vision || '',
+      inhalt: '',
+      planAufgaben: [],            // die EINE Aufgabenliste (Inline-System)
+      habits: vorlage.habits || [],
+      metriken: vorlage.metriken || [],
+      reflexionen: [],
+      termine: [],
+      milestones: [],
+      metric: null,                // optionale Mess-Metrik (start/target/current)
+      area: 'Sonstiges',
+      year: new Date().getFullYear(),
+      stichtag: '',
+      isBaustelle: false,
+      mentalStundenProWoche: 0,
+      seitJahren: 0,
+      erstellt: today,
+      geaendert: Date.now(),
+    };
+    store.push(vorhaben);
+    this.setDirty();
+    return vorhaben;
+  },
+
+  // Vorhaben anhand id finden (über beide Welten)
+  _vorhabenFind(id) {
+    for (const w of ['pro', 'priv']) {
+      const store = this._vorhabenStore(w);
+      const v = store && store.find(x => x.id === id);
+      if (v) return { vorhaben: v, welt: w };
+    }
+    return null;
+  },
+
+  // Fortschritt: Anzeige aus planAufgaben, Messung metric-basiert (getrennt)
+  _vorhabenProgress(v) {
+    // Anzeige-Fortschritt: erledigte / gesamte planAufgaben
+    const aufg = v.planAufgaben || [];
+    const total = aufg.length;
+    const done = aufg.filter(a => a.done).length;
+    const aufgabenPct = total ? Math.round(done / total * 100) : 0;
+
+    // Mess-Fortschritt: metric-basiert (optional, separat)
+    let metricPct = null;
+    if (v.metric && v.metric.target !== undefined && v.metric.start !== undefined) {
+      const { start, target, current } = v.metric;
+      if (target !== start) {
+        metricPct = Math.max(0, Math.min(100, Math.round(((current - start) / (target - start)) * 100)));
+      }
+    }
+    return { aufgabenPct, done, total, metricPct };
+  },
+
+  // Welt eines Vorhabens manuell ändern (verschiebt zwischen pro/priv)
+  _vorhabenSetWelt(id, neueWelt) {
+    if (neueWelt !== 'pro' && neueWelt !== 'priv') return false;
+    const found = this._vorhabenFind(id);
+    if (!found) return false;
+    if (found.welt === neueWelt) return true;  // schon dort
+    const quelle = this._vorhabenStore(found.welt);
+    const ziel   = this._vorhabenStore(neueWelt);
+    if (!quelle || !ziel) return false;
+    const idx = quelle.findIndex(x => x.id === id);
+    if (idx < 0) return false;
+    const [v] = quelle.splice(idx, 1);
+    v.welt = neueWelt;
+    v.geaendert = Date.now();
+    ziel.push(v);
+    this.setDirty();
+    return true;
+  },
+
   _goalStore() {
     const db = this.dataPriv;
     if (!db) return null;
