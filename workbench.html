@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.84.1</title>
+<title>WorkBench 3.85.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4707,7 +4707,7 @@ html, body {
   .nz-plan-aufg-list { display:flex; flex-direction:column; gap:4px; }
   .nz-plan-aufg-item { display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--c-bg); border:1px solid var(--c-border); border-radius:var(--radius-xs); font-size:0.86rem; }
   .nz-plan-aufg-item input[type=checkbox] { width:16px; height:16px; flex-shrink:0; accent-color:var(--c-beruf); cursor:pointer; }
-  .nz-plan-aufg-text { flex:1; min-width:0; color:var(--c-text); }
+  .nz-plan-aufg-text { flex:1; min-width:0; color:var(--c-text); cursor:pointer; }
   .nz-plan-aufg-text.done { text-decoration:line-through; color:var(--c-faint); }
   .nz-plan-aufg-date { font-size:0.72rem; color:var(--c-muted); margin-left:6px; font-family:var(--font-mono); }
   .nz-plan-aufg-gew { font-size:0.66rem; font-weight:700; padding:1px 6px; border-radius:8px; color:#fff; flex-shrink:0; }
@@ -4717,8 +4717,42 @@ html, body {
   .nz-plan-aufg-del { background:none; border:none; color:var(--c-faint); cursor:pointer; font-size:0.85rem; flex-shrink:0; padding:2px 4px; }
   .nz-plan-aufg-del:hover { color:var(--c-danger); }
   .nz-plan-aufg-empty { font-size:0.8rem; color:var(--c-muted); padding:8px 4px; }
-  .nz-plan-aufg-done-wrap { margin-top:8px; }
-  .nz-plan-aufg-done-wrap summary { font-size:0.78rem; color:var(--c-muted); cursor:pointer; padding:4px 0; }
+  /* Kompakte eingeklappte Mini-Box */
+  .nz-plan-mini { background:var(--c-beruf-bg); border:1px solid rgba(13,122,107,0.25); border-radius:var(--radius-sm); margin:6px 0; }
+  .nz-plan-mini summary { padding:8px 12px; font-size:0.8rem; font-weight:700; color:var(--c-beruf); cursor:pointer; list-style:none; }
+  .nz-plan-mini summary::-webkit-details-marker { display:none; }
+  .nz-plan-mini summary::before { content:'\\25B8'; margin-right:6px; font-size:0.7rem; }
+  .nz-plan-mini[open] summary::before { content:'\\25BE'; }
+  .nz-plan-mini-body { padding:0 10px 10px; }
+  .nz-plan-mini-hint { font-size:0.72rem; color:var(--c-muted); padding:4px 2px 8px; line-height:1.4; }
+  /* Inline-Checkbox-Wraps im Text */
+  .pcb-wrap { display:inline-flex; align-items:baseline; gap:2px; background:rgba(13,122,107,0.06); border-radius:4px; padding:0 4px; margin:1px 0; user-select:none; }
+  .pcb-wrap.done { opacity:0.6; }
+  .pcb-box { cursor:pointer; font-size:1.05rem; color:var(--c-beruf); flex-shrink:0; }
+  .pcb-text { cursor:pointer; color:var(--c-text); }
+  .pcb-text.done { text-decoration:line-through; color:var(--c-faint); }
+  .pcb-badge { font-size:0.6rem; font-weight:700; padding:0 4px; border-radius:6px; color:#fff; margin-left:3px; }
+  .pcb-badge.plbw-hoch { background:#C62828; }
+  .pcb-badge.plbw-niedrig { background:var(--c-muted); }
+  /* Detail-View Overlay */
+  #wb-plan-aufg-detail { display:none; position:fixed; inset:0; z-index:520; background:rgba(28,27,24,0.45); align-items:flex-end; justify-content:center; }
+  #wb-plan-aufg-detail.open { display:flex; }
+  #pad-panel { background:var(--c-surface); border-radius:var(--radius) var(--radius) 0 0; width:100%; max-width:520px; max-height:85vh; display:flex; flex-direction:column; }
+  #pad-header { display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid var(--c-border); }
+  #pad-title { flex:1; font-size:1rem; font-weight:700; color:var(--c-text); }
+  #pad-close { background:none; border:none; font-size:1.5rem; color:var(--c-muted); cursor:pointer; line-height:1; padding:0; }
+  #pad-body { padding:14px 16px; overflow-y:auto; }
+  .pad-label { display:block; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--c-muted); margin:10px 0 4px; }
+  #pad-text { width:100%; box-sizing:border-box; padding:10px; border:1px solid var(--c-border); border-radius:var(--radius-xs); font-family:var(--font); font-size:0.9rem; background:var(--c-bg); color:var(--c-text); resize:vertical; }
+  .pad-gew-row { display:flex; gap:6px; }
+  .pad-gew-btn { flex:1; padding:9px; border:1px solid var(--c-border); border-radius:var(--radius-xs); background:var(--c-bg); font-family:var(--font); font-size:0.84rem; color:var(--c-muted); cursor:pointer; }
+  .pad-gew-btn.active { background:var(--c-beruf); color:#fff; border-color:var(--c-beruf); font-weight:700; }
+  #pad-date { width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid var(--c-border); border-radius:var(--radius-xs); font-family:var(--font); font-size:0.9rem; background:var(--c-bg); color:var(--c-text); }
+  .pad-check-row { display:flex; align-items:center; gap:8px; margin-top:14px; cursor:pointer; font-size:0.9rem; color:var(--c-text); }
+  .pad-check-row input { width:18px; height:18px; accent-color:var(--c-beruf); }
+  #pad-footer { display:flex; gap:8px; padding:12px 16px 20px; border-top:1px solid var(--c-border); }
+  #pad-del { padding:11px 16px; background:none; border:1px solid var(--c-danger); color:var(--c-danger); border-radius:var(--radius-xs); font-family:var(--font); font-size:0.88rem; cursor:pointer; }
+  #pad-save { flex:1; padding:11px; background:var(--c-beruf); color:#fff; border:none; border-radius:var(--radius-xs); font-family:var(--font); font-size:0.9rem; font-weight:700; cursor:pointer; }
 
 /* ── Utility ────────────────────────────────────────── */
 .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
@@ -7011,7 +7045,7 @@ html, body {
     <button class="nz-tb" onclick="WB._nzPaste()" title="Zwischenablage einfügen">&#128203;</button>
     <button class="nz-tb" style="margin-left:auto;" onclick="WB.nzToggleFullscreen()">&#x26F6;</button>
   </div>
-  <div id="nz-ed-content" contenteditable="true" oninput="WB.nzAutoSave()"></div>
+  <div id="nz-ed-content" contenteditable="true" oninput="WB.nzAutoSave()" onkeyup="if(event.key==='Enter'){WB._planHandleEnter();}"></div>
   <div id="nz-verkn-sektion" style="padding:0 14px;flex-shrink:0;max-height:45vh;overflow-y:auto;-webkit-overflow-scrolling:touch;border-top:1px solid var(--c-border);"></div>
   <div id="nz-plan-links" style="display:none;max-height:280px;overflow-y:auto;border-top:2px solid var(--c-border);background:var(--c-surface);">
     <div style="padding:10px 14px;">
@@ -7072,6 +7106,39 @@ html, body {
   </div>
   <div id="nz-ed-content" contenteditable="true" oninput="WB.nzAutoSave()"></div>
   <div id="nz-ed-hint"></div>
+</div>
+
+<!-- Plan-Aufgabe Detail-View -->
+<div id="wb-plan-aufg-detail" onclick="if(event.target===this)WB._planAufgabeDetailClose()">
+  <div id="pad-panel">
+    <div id="pad-header">
+      <div id="pad-title">Aufgabe bearbeiten</div>
+      <button onclick="WB._planAufgabeDetailClose()" id="pad-close">&#215;</button>
+    </div>
+    <div id="pad-body">
+      <label class="pad-label">Aufgabe</label>
+      <textarea id="pad-text" rows="2" placeholder="Aufgabentext…"></textarea>
+
+      <label class="pad-label">Gewicht</label>
+      <div class="pad-gew-row">
+        <button class="pad-gew-btn" data-gew="hoch"    onclick="WB._padSetGewicht('hoch')">Hoch</button>
+        <button class="pad-gew-btn" data-gew="mittel"  onclick="WB._padSetGewicht('mittel')">Mittel</button>
+        <button class="pad-gew-btn" data-gew="niedrig" onclick="WB._padSetGewicht('niedrig')">Niedrig</button>
+      </div>
+
+      <label class="pad-label">Datum</label>
+      <input type="date" id="pad-date">
+
+      <label class="pad-check-row">
+        <input type="checkbox" id="pad-done">
+        <span>Erledigt</span>
+      </label>
+    </div>
+    <div id="pad-footer">
+      <button id="pad-del" onclick="WB._planAufgabeDetailDelete()">Löschen</button>
+      <button id="pad-save" onclick="WB._planAufgabeDetailSave()">Speichern</button>
+    </div>
+  </div>
 </div>
 
 <!-- Projekt Detail Sheet -->
@@ -7902,7 +7969,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.84.1 · Build 20260603-1834</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.85.0 · Build 20260603-1912</div>
     </div>
 
     <!-- Welt -->
@@ -8076,8 +8143,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.84.1',
-  APP_BUILD:   '20260603-1834',
+  APP_VERSION: '3.85.0',
+  APP_BUILD:   '20260603-1912',
 
 
   // ══════════════════════════════════════════════════════
@@ -23046,53 +23113,38 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const erledigt = aufgaben.filter(a => a.done);
     const gewLabel = { hoch: 'Hoch', mittel: 'Mittel', niedrig: 'Niedrig' };
 
-    let h = '<div class="nz-plan-aufg-sektion"><div class="nz-verkn-box-title">&#128203; Aufgaben (' + offen.length + ' offen)</div>';
+    // Kompakte, eingeklappte Übersicht (Quelle = ☐-Zeilen im Text)
+    let h = '<details class="nz-plan-mini" ' + (this._planMiniOpen ? 'open' : '') + ' ontoggle="WB._planMiniToggle(this)">';
+    h += '<summary>&#128203; Aufgaben · ' + offen.length + ' offen'
+      + (erledigt.length ? ' · ' + erledigt.length + ' erledigt' : '') + '</summary>';
+    h += '<div class="nz-plan-mini-body">';
+    h += '<div class="nz-plan-mini-hint">Schreibe ☐-Zeilen in den Text oben (Toolbar ☐) und drücke Enter. Tippe eine Aufgabe an, um sie zu bearbeiten.</div>';
 
-    // Eingabefeld für neue Aufgabe
-    h += '<div class="nz-plan-add-row">'
-      + '<input type="text" id="nz-plan-add-input" placeholder="Neue Aufgabe…" maxlength="200" '
-      + 'onkeydown="if(event.key===&quot;Enter&quot;){WB._planAufgabeAdd();}">'
-      + '<button onclick="WB._planAufgabeAdd()" title="Hinzufügen">+</button>'
-      + '</div>';
+    const renderItem = (a, isDone) => {
+      const g = a.gewicht || 'mittel';
+      const dl = a.date ? '<span class="nz-plan-aufg-date">' + a.date + '</span>' : '';
+      return '<div class="nz-plan-aufg-item' + (isDone ? ' done' : '') + '">'
+        + '<input type="checkbox" ' + (isDone ? 'checked' : '') + ' onchange="WB._planAufgabeToggle(&quot;' + a.id + '&quot;)">'
+        + '<span class="nz-plan-aufg-text' + (isDone ? ' done' : '') + '" onclick="WB._planAufgabeDetailOpen(&quot;' + a.id + '&quot;)">' + this._esc(a.text) + dl + '</span>'
+        + (isDone ? '' : '<span class="nz-plan-aufg-gew plbw-' + g + '">' + (gewLabel[g] || 'Mittel') + '</span>')
+        + '<button class="nz-plan-aufg-del" onclick="WB._planAufgabeDel(&quot;' + a.id + '&quot;)" title="Löschen">&#10005;</button>'
+        + '</div>';
+    };
 
-    // Scan-Button
-    h += '<button class="nz-plan-scan-btn" onclick="WB._planScanZuPlanAufgaben()">'
-      + '☐ Checkboxen aus Text scannen</button>';
-
-    // Offene Aufgaben
-    if (offen.length) {
+    if (offen.length || erledigt.length) {
       h += '<div class="nz-plan-aufg-list">';
-      offen.forEach(a => {
-        const g = a.gewicht || 'mittel';
-        const dl = a.date ? '<span class="nz-plan-aufg-date">' + a.date + '</span>' : '';
-        h += '<div class="nz-plan-aufg-item">'
-          + '<input type="checkbox" onchange="WB._planAufgabeToggle(&quot;' + a.id + '&quot;)">'
-          + '<span class="nz-plan-aufg-text">' + this._esc(a.text) + dl + '</span>'
-          + '<span class="nz-plan-aufg-gew plbw-' + g + '" title="Gewicht">' + (gewLabel[g] || 'Mittel') + '</span>'
-          + '<button class="nz-plan-aufg-del" onclick="WB._planAufgabeDel(&quot;' + a.id + '&quot;)" title="Löschen">&#10005;</button>'
-          + '</div>';
-      });
+      offen.forEach(a => h += renderItem(a, false));
+      erledigt.forEach(a => h += renderItem(a, true));
       h += '</div>';
     } else {
-      h += '<div class="nz-plan-aufg-empty">Noch keine offenen Aufgaben. Tippe oben eine ein oder scanne ☐-Zeilen aus dem Text.</div>';
+      h += '<div class="nz-plan-aufg-empty">Noch keine Aufgaben. Schreibe eine ☐-Zeile in den Text und drücke Enter.</div>';
     }
-
-    // Erledigte (eingeklappt)
-    if (erledigt.length) {
-      h += '<details class="nz-plan-aufg-done-wrap"><summary>' + erledigt.length + ' erledigt</summary>';
-      h += '<div class="nz-plan-aufg-list">';
-      erledigt.forEach(a => {
-        h += '<div class="nz-plan-aufg-item done">'
-          + '<input type="checkbox" checked onchange="WB._planAufgabeToggle(&quot;' + a.id + '&quot;)">'
-          + '<span class="nz-plan-aufg-text done">' + this._esc(a.text) + '</span>'
-          + '<button class="nz-plan-aufg-del" onclick="WB._planAufgabeDel(&quot;' + a.id + '&quot;)" title="Löschen">&#10005;</button>'
-          + '</div>';
-      });
-      h += '</div></details>';
-    }
-
-    return h + '</div>';
+    h += '</div></details>';
+    return h;
   },
+
+  _planMiniOpen: false,
+  _planMiniToggle(el) { this._planMiniOpen = !!el.open; },
 
   // Aktive Plan-Notiz holen (Schreibzugriff)
   _planAktiveNotiz() {
@@ -23105,23 +23157,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     return notiz;
   },
 
-  _planAufgabeAdd() {
-    const inp = document.getElementById('nz-plan-add-input');
-    if (!inp) return;
-    const text = (inp.value || '').trim();
-    if (!text) return;
-    const notiz = this._planAktiveNotiz();
-    if (!notiz) return;
-    const today = new Date().toISOString().split('T')[0];
-    notiz.planAufgaben.push({
-      id: 'pa_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-      text, date: '', done: false, erstellt: today, gewicht: 'mittel',
-    });
-    notiz.geaendert = Date.now();
-    inp.value = '';
-    this.setDirty();
-    this._nzUpdateVerknSektion(notiz, 'plan');
-    setTimeout(() => document.getElementById('nz-plan-add-input')?.focus(), 50);
+  // Stabile cbId aus Text generieren
+  _planCbId(text) {
+    try {
+      return 'pcb_' + btoa(encodeURIComponent(text)).slice(0, 14).replace(/[^a-zA-Z0-9]/g, 'x');
+    } catch (e) {
+      return 'pcb_' + Math.abs(text.split('').reduce((a,c)=>((a<<5)-a+c.charCodeAt(0))|0,0));
+    }
   },
 
   _planAufgabeToggle(aufgabeId) {
@@ -23132,6 +23174,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     a.done = !a.done;
     notiz.geaendert = Date.now();
     this.setDirty();
+    this._planSyncTextFromAufgaben(notiz);   // Text-Symbol ☐↔☑ angleichen
+    this._planInlineRender();
     this._nzUpdateVerknSektion(notiz, 'plan');
     if (this.activeTab === 'planer') this.renderPlaner();
   },
@@ -23141,57 +23185,319 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!notiz) return;
     const idx = notiz.planAufgaben.findIndex(x => x.id === aufgabeId);
     if (idx < 0) return;
+    const cbId = notiz.planAufgaben[idx].cbId;
     notiz.planAufgaben.splice(idx, 1);
+    // Zugehörige Textzeile entfernen (Wrap → leer)
+    if (cbId) this._planRemoveTextLine(notiz, cbId);
     notiz.geaendert = Date.now();
     this.setDirty();
+    this._planInlineRender();
     this._nzUpdateVerknSektion(notiz, 'plan');
     if (this.activeTab === 'planer') this.renderPlaner();
   },
 
-  // Checkbox-Scan NEU: erzeugt planAufgaben (idempotent über Text-Abgleich)
-  _planScanZuPlanAufgaben() {
+  // ── INLINE-RENDER: ☐-Zeilen im Text → klickbare Aufgaben ──
+  // Quelle: ☐/☑-Zeilen im Text. planAufgaben werden per cbId synchronisiert.
+  _planInlineRender() {
     const ed = document.getElementById('nz-ed-content');
     if (!ed) return;
+    const typ = document.getElementById('nz-ed-typ')?.value;
+    if (typ !== 'plan') return;
     const notiz = this._planAktiveNotiz();
     if (!notiz) return;
     const today = new Date().toISOString().split('T')[0];
 
-    // Alle ☐/☑-Zeilen aus dem Text extrahieren
-    const plain = ed.innerText || ed.textContent || '';
-    const zeilen = plain.split(/[\n\r]+/);
-    const gefunden = []; // {text, done}
-    zeilen.forEach(z => {
-      const m = z.match(/^[\s]*([\u2610\u2611\u2612\u2714])\s*(.+)$/);
-      if (!m) return;
-      const text = m[2].trim();
-      if (!text) return;
-      const done = (m[1] === '\u2611' || m[1] === '\u2612' || m[1] === '\u2714');
-      gefunden.push({ text, done });
+    // Cursor-Position merken (Offset im Text)
+    const caret = this._planSaveCaret(ed);
+
+    // 1. Bestehende Wraps zurück in reinen Text wandeln (für sauberen Re-Scan)
+    ed.querySelectorAll('.pcb-wrap').forEach(wrap => {
+      const sym = wrap.dataset.done === '1' ? '\u2611' : '\u2610';
+      const txt = wrap.dataset.cbText || '';
+      wrap.parentNode.replaceChild(document.createTextNode(sym + ' ' + txt), wrap);
     });
+    ed.normalize();
 
-    if (!gefunden.length) {
-      this._toast('Keine ☐-Zeilen im Text gefunden');
-      return;
-    }
+    // 2. Alle ☐/☑-Zeilen finden und in Wraps verwandeln
+    const gefundeneCbIds = new Set();
+    const walker = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+    const hits = []; let tn;
+    while ((tn = walker.nextNode())) { if (/[\u2610\u2611\u2612\u2714]/.test(tn.textContent)) hits.push(tn); }
 
-    let neu = 0, aktualisiert = 0;
-    gefunden.forEach(g => {
-      // Idempotenz: existiert bereits eine planAufgabe mit gleichem Text?
-      const vorhanden = notiz.planAufgaben.find(a => (a.text || '').trim() === g.text);
-      if (vorhanden) {
-        if (g.done && !vorhanden.done) { vorhanden.done = true; aktualisiert++; }
-        return;
+    hits.forEach(textNode => {
+      const parent = textNode.parentNode;
+      if (!parent || parent.classList?.contains('pcb-wrap')) return;
+      const text = textNode.textContent;
+      const regex = /[\u2610\u2611\u2612\u2714]/g;
+      let m, parts = [], lastIdx = 0;
+      while ((m = regex.exec(text)) !== null) {
+        if (m.index > lastIdx) parts.push({ type: 'text', val: text.slice(lastIdx, m.index) });
+        const afterCb = text.slice(m.index + 1);
+        const nlIdx = afterCb.search(/[\n\r]/);
+        const lineText = (nlIdx >= 0 ? afterCb.slice(0, nlIdx) : afterCb).trim();
+        const done = (m[0] === '\u2611' || m[0] === '\u2612' || m[0] === '\u2714');
+        if (!lineText) { parts.push({ type: 'text', val: m[0] + ' ' }); lastIdx = m.index + 1; continue; }
+        parts.push({ type: 'cb', lineText, done });
+        lastIdx = m.index + 1 + (nlIdx >= 0 ? nlIdx : afterCb.length);
       }
-      notiz.planAufgaben.push({
-        id: 'pa_scan_' + Date.now() + '_' + (neu++),
-        text: g.text, date: '', done: g.done, erstellt: today, gewicht: 'mittel',
+      if (lastIdx < text.length) parts.push({ type: 'text', val: text.slice(lastIdx) });
+      if (!parts.some(p => p.type === 'cb')) return;
+
+      const frag = document.createDocumentFragment();
+      parts.forEach(part => {
+        if (part.type === 'text') { frag.appendChild(document.createTextNode(part.val)); return; }
+        const cbId = this._planCbId(part.lineText);
+        gefundeneCbIds.add(cbId);
+        // planAufgabe per cbId oder Text finden/anlegen
+        let a = notiz.planAufgaben.find(x => x.cbId === cbId)
+             || notiz.planAufgaben.find(x => (x.text || '').trim() === part.lineText && !x.cbId);
+        if (a) {
+          a.cbId = cbId;
+          a.text = part.lineText;
+          a.done = part.done;
+        } else {
+          a = { id: 'pa_' + Date.now() + '_' + Math.floor(Math.random()*10000),
+                cbId, text: part.lineText, date: '', done: part.done,
+                erstellt: today, gewicht: 'mittel' };
+          notiz.planAufgaben.push(a);
+        }
+        frag.appendChild(this._planMakeWrap(a));
       });
+      parent.replaceChild(frag, textNode);
     });
+
+    // 3. planAufgaben ohne zugehörige Textzeile = gelöscht im Text → entfernen
+    //    (nur solche mit cbId, die nicht mehr gefunden wurden; manuell angelegte ohne cbId bleiben)
+    notiz.planAufgaben = notiz.planAufgaben.filter(a => !a.cbId || gefundeneCbIds.has(a.cbId));
+
+    // Cursor wiederherstellen
+    this._planRestoreCaret(ed, caret);
+  },
+
+  _planMakeWrap(a) {
+    const wrap = document.createElement('span');
+    wrap.className = 'pcb-wrap' + (a.done ? ' done' : '');
+    wrap.contentEditable = 'false';
+    wrap.dataset.cbid = a.cbId;
+    wrap.dataset.cbText = a.text;
+    wrap.dataset.done = a.done ? '1' : '0';
+
+    const box = document.createElement('span');
+    box.className = 'pcb-box';
+    box.textContent = a.done ? '\u2611' : '\u2610';
+    box.title = 'Abhaken';
+    box.onclick = (e) => { e.stopPropagation(); e.preventDefault(); WB._planInlineToggle(a.cbId); };
+    wrap.appendChild(box);
+
+    const txt = document.createElement('span');
+    txt.className = 'pcb-text' + (a.done ? ' done' : '');
+    txt.textContent = ' ' + a.text;
+    txt.title = 'Aufgabe bearbeiten';
+    txt.onclick = (e) => { e.stopPropagation(); e.preventDefault(); WB._planAufgabeDetailOpenByCb(a.cbId); };
+    wrap.appendChild(txt);
+
+    if (!a.done && a.gewicht && a.gewicht !== 'mittel') {
+      const badge = document.createElement('span');
+      badge.className = 'pcb-badge plbw-' + a.gewicht;
+      badge.textContent = a.gewicht === 'hoch' ? 'H' : 'N';
+      wrap.appendChild(badge);
+    }
+    return wrap;
+  },
+
+  // Checkbox im Text klicken
+  _planInlineToggle(cbId) {
+    const notiz = this._planAktiveNotiz();
+    if (!notiz) return;
+    const a = notiz.planAufgaben.find(x => x.cbId === cbId);
+    if (!a) return;
+    a.done = !a.done;
     notiz.geaendert = Date.now();
     this.setDirty();
+    this.nzEdSave(false);
+    this._planInlineRender();
     this._nzUpdateVerknSektion(notiz, 'plan');
     if (this.activeTab === 'planer') this.renderPlaner();
-    this._toast(neu + ' neu, ' + aktualisiert + ' aktualisiert');
+  },
+
+  // Enter am Zeilenende: ☐-Zeile zur Aufgabe machen
+  _planHandleEnter() {
+    const typ = document.getElementById('nz-ed-typ')?.value;
+    if (typ !== 'plan') return;
+    // kurz warten bis der Zeilenumbruch im DOM ist, dann rendern
+    setTimeout(() => {
+      this.nzEdSave(false);
+      this._planInlineRender();
+      const notiz = this._planAktiveNotiz();
+      if (notiz) this._nzUpdateVerknSektion(notiz, 'plan');
+    }, 30);
+  },
+
+  // Text-Symbol (☐/☑) im Notiztext an planAufgaben.done angleichen
+  _planSyncTextFromAufgaben(notiz) {
+    const ed = document.getElementById('nz-ed-content');
+    if (!ed) return;
+    ed.querySelectorAll('.pcb-wrap').forEach(wrap => {
+      const a = notiz.planAufgaben.find(x => x.cbId === wrap.dataset.cbid);
+      if (!a) return;
+      wrap.dataset.done = a.done ? '1' : '0';
+      const box = wrap.querySelector('.pcb-box');
+      if (box) box.textContent = a.done ? '\u2611' : '\u2610';
+      wrap.classList.toggle('done', a.done);
+      const txt = wrap.querySelector('.pcb-text');
+      if (txt) txt.classList.toggle('done', a.done);
+    });
+    this.nzEdSave(false);
+  },
+
+  // Textzeile zu einer cbId aus dem Notiztext entfernen
+  _planRemoveTextLine(notiz, cbId) {
+    const ed = document.getElementById('nz-ed-content');
+    if (!ed) return;
+    const wrap = ed.querySelector('.pcb-wrap[data-cbid="' + cbId + '"]');
+    if (wrap) { wrap.remove(); this.nzEdSave(false); }
+  },
+
+  // Cursor-Offset speichern/wiederherstellen (robuste Caret-Erhaltung)
+  _planSaveCaret(ed) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    const range = sel.getRangeAt(0);
+    if (!ed.contains(range.startContainer)) return null;
+    const pre = range.cloneRange();
+    pre.selectNodeContents(ed);
+    pre.setEnd(range.startContainer, range.startOffset);
+    return pre.toString().length;
+  },
+
+  _planRestoreCaret(ed, offset) {
+    if (offset == null) return;
+    const sel = window.getSelection();
+    const walker = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+    let count = 0, node, target = null, targetOffset = 0;
+    while ((node = walker.nextNode())) {
+      const len = node.textContent.length;
+      if (count + len >= offset) { target = node; targetOffset = offset - count; break; }
+      count += len;
+    }
+    if (target) {
+      try {
+        const range = document.createRange();
+        range.setStart(target, Math.min(targetOffset, target.textContent.length));
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch (e) { /* Cursor-Wiederherstellung optional */ }
+    }
+  },
+
+  // Einmalige Befüllung: planAufgaben ohne Textzeile als ☐-Zeilen einfügen
+  _planAufgabenInText(notiz) {
+    const ed = document.getElementById('nz-ed-content');
+    if (!ed || !notiz) return 0;
+    const vorhanden = new Set();
+    ed.querySelectorAll('.pcb-wrap').forEach(w => vorhanden.add(w.dataset.cbid));
+    // Plain-Text-☐-Zeilen ebenfalls als vorhanden zählen
+    const plain = ed.innerText || '';
+    plain.split(/[\n\r]+/).forEach(z => {
+      const m = z.match(/^[\s]*[\u2610\u2611\u2612\u2714]\s*(.+)$/);
+      if (m) vorhanden.add(this._planCbId(m[1].trim()));
+    });
+    const fehlend = notiz.planAufgaben.filter(a => {
+      const cb = a.cbId || this._planCbId((a.text||'').trim());
+      return !vorhanden.has(cb);
+    });
+    if (!fehlend.length) return 0;
+    let zusatz = '';
+    fehlend.forEach(a => {
+      zusatz += '<div>' + (a.done ? '\u2611' : '\u2610') + ' ' + this._esc(a.text) + '</div>';
+    });
+    ed.innerHTML = (ed.innerHTML || '') + zusatz;
+    this.nzEdSave(false);
+    this._planInlineRender();
+    return fehlend.length;
+  },
+
+  // ── DETAIL-VIEW einer Plan-Aufgabe ──────────────────────
+  _planDetailAktiv: null,  // { notizId, aufgabeId }
+
+  _planAufgabeDetailOpenByCb(cbId) {
+    const notiz = this._planAktiveNotiz();
+    if (!notiz) return;
+    const a = notiz.planAufgaben.find(x => x.cbId === cbId);
+    if (a) this._planAufgabeDetailOpen(a.id);
+  },
+
+  _planAufgabeDetailOpen(aufgabeId) {
+    const notiz = this._planAktiveNotiz();
+    if (!notiz) return;
+    const a = notiz.planAufgaben.find(x => x.id === aufgabeId);
+    if (!a) return;
+    this._planDetailAktiv = { notizId: notiz.id, aufgabeId };
+    document.getElementById('pad-text').value   = a.text || '';
+    document.getElementById('pad-date').value   = a.date || '';
+    document.getElementById('pad-done').checked  = !!a.done;
+    document.querySelectorAll('.pad-gew-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.gew === (a.gewicht || 'mittel'));
+    });
+    this._padGewWahl = a.gewicht || 'mittel';
+    document.getElementById('wb-plan-aufg-detail').classList.add('open');
+  },
+
+  _planAufgabeDetailClose() {
+    document.getElementById('wb-plan-aufg-detail').classList.remove('open');
+    this._planDetailAktiv = null;
+  },
+
+  _padSetGewicht(g) {
+    this._padGewWahl = g;
+    document.querySelectorAll('.pad-gew-btn').forEach(b => b.classList.toggle('active', b.dataset.gew === g));
+  },
+
+  _planAufgabeDetailSave() {
+    const ref = this._planDetailAktiv;
+    if (!ref) return;
+    const store = this._nzStoreWrite(this._nzActiveDb || 'pro');
+    const notiz = store.find(n => n.id === ref.notizId);
+    if (!notiz) return;
+    const a = (notiz.planAufgaben || []).find(x => x.id === ref.aufgabeId);
+    if (!a) return;
+
+    const neuerText = (document.getElementById('pad-text').value || '').trim();
+    const altText = a.text;
+    a.date = document.getElementById('pad-date').value || '';
+    a.done = document.getElementById('pad-done').checked;
+    a.gewicht = this._padGewWahl || 'mittel';
+
+    // Text editierbar: bei Änderung auch Textzeile + cbId aktualisieren
+    if (neuerText && neuerText !== altText) {
+      const ed = document.getElementById('nz-ed-content');
+      const altCbId = a.cbId;
+      a.text = neuerText;
+      a.cbId = this._planCbId(neuerText);
+      if (ed && altCbId) {
+        const wrap = ed.querySelector('.pcb-wrap[data-cbid="' + altCbId + '"]');
+        if (wrap) {
+          wrap.dataset.cbid = a.cbId;
+          wrap.dataset.cbText = neuerText;
+        }
+      }
+    }
+    notiz.geaendert = Date.now();
+    this.setDirty();
+    this._planSyncTextFromAufgaben(notiz);
+    this._planInlineRender();
+    this._nzUpdateVerknSektion(notiz, 'plan');
+    if (this.activeTab === 'planer') this.renderPlaner();
+    this._planAufgabeDetailClose();
+    this._toast('Aufgabe gespeichert');
+  },
+
+  _planAufgabeDetailDelete() {
+    const ref = this._planDetailAktiv;
+    if (!ref) return;
+    this._planAufgabeDetailClose();
+    this._planAufgabeDel(ref.aufgabeId);
   },
 
   _nzProjOptions() {
@@ -23850,6 +24156,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     setTimeout(()=>{
       const allN = this._nzStore().find(x=>x.id===id);
       this._nzUpdateVerknSektion(allN||null, typ);
+      if (typ === 'plan' && allN) {
+        // Migrierte/bestehende planAufgaben ohne Textzeile einmalig als ☐-Zeilen einfügen
+        this._planAufgabenInText(allN);
+        this._planInlineRender();
+        this._nzUpdateVerknSektion(allN, typ);
+      }
     }, 150);
     document.getElementById('nz-editor-overlay').classList.add('open');
     setTimeout(() => {
