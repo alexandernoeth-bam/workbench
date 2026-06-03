@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.79.8</title>
+<title>WorkBench 3.79.9</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.79.8 · Build 20260603-1345</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.79.9 · Build 20260603-1400</div>
     </div>
 
     <!-- Welt -->
@@ -7762,8 +7762,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.79.8',
-  APP_BUILD:   '20260603-1345',
+  APP_VERSION: '3.79.9',
+  APP_BUILD:   '20260603-1400',
 
 
   // ══════════════════════════════════════════════════════
@@ -11564,7 +11564,7 @@ const WB = {
         + '📁 Alte Projekt-Aufgaben (' + projItems.length + ') &mdash; <span style="font-weight:400;font-size:0.65rem;">In Plan-Notiz importieren</span></div>';
       projItems.forEach(a => {
         html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--c-border);opacity:0.8;">'
-          + '<div style="flex:1;min-width:0;">'
+          + '<div style="flex:1;min-width:0;cursor:pointer;" onclick="WB._backlogProjAufgabeDetail(&quot;'+a.id+'&quot;,&quot;'+a.pKey+'&quot;,&quot;'+a.ctx+'&quot;)">'
           + '<div style="font-size:0.88rem;font-weight:500;color:var(--c-text);">' + a.text + '</div>'
           + '<div style="font-size:0.72rem;color:var(--c-muted);margin-top:2px;">' + a.pKey + ' &middot; ' + (a.ctx==='pro'?'Beruf':'Privat') + '</div></div>'
           + '<button onclick="WB._backlogImportAufgabe(&quot;'+a.id+'&quot;,&quot;'+a.pKey+'&quot;,&quot;'+a.ctx+'&quot;)" '
@@ -11668,6 +11668,28 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this.setDirty();
     this._backlogRender();
     this._toast('✓ Verschoben nach: ' + zuNotiz.titel);
+  },
+
+  _backlogProjAufgabeDetail(taskId, pKey, ctx) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const task = db?.projects?.[pKey]?.tasks?.find(t => String(t.id) === String(taskId));
+    if (!task) { this._toast('Aufgabe nicht gefunden'); return; }
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;';
+    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
+    const notizHtml = task.notiz
+      ? '<div style="background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-xs);padding:10px 12px;font-size:0.85rem;color:var(--c-text);line-height:1.6;margin-bottom:12px;white-space:pre-wrap;">' + task.notiz.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>'
+      : '';
+    const dateHtml = task.date ? '<div style="font-size:0.82rem;color:var(--c-muted);margin-bottom:8px;">📅 ' + task.date + '</div>' : '';
+    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;">'
+      + '<div style="font-size:0.75rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:6px;">' + pKey + ' &middot; ' + (ctx==='pro'?'Beruf':'Privat') + '</div>'
+      + '<div style="font-size:1rem;font-weight:600;color:var(--c-text);margin-bottom:10px;user-select:text;">' + task.text + '</div>'
+      + dateHtml + notizHtml
+      + '<div style="display:flex;gap:8px;margin-top:4px;">'
+      + '<button onclick="WB._closeSheet600()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Schließen</button>'
+      + '<button onclick="WB._backlogImportAufgabe(&quot;'+taskId+'&quot;,&quot;'+pKey+'&quot;,&quot;'+ctx+'&quot;);WB._closeSheet600()" style="flex:2;padding:11px;background:var(--c-beruf);border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;color:#fff;">→ In Plan-Notiz importieren</button>'
+      + '</div></div>';
+    document.body.appendChild(sheet);
   },
 
   _backlogImportAufgabe(taskId, pKey, ctx) {
