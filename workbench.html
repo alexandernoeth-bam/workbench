@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.80.1</title>
+<title>WorkBench 3.80.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6472,7 +6472,7 @@ html, body {
         </button>
 
         <div id="ck-neue-eingabe" style="padding:12px 0 4px;border-top:1px solid var(--c-border);display:flex;gap:8px;flex-wrap:wrap;">
-          <button onclick="WB._quickAdd()" style="flex:1;min-width:120px;padding:9px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          <button onclick="WB._quickDetail(null)" style="flex:1;min-width:120px;padding:9px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
             <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Schnell hinzufügen
           </button>
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.80.1 · Build 20260603-1445</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.80.2 · Build 20260603-1500</div>
     </div>
 
     <!-- Welt -->
@@ -7762,8 +7762,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.80.1',
-  APP_BUILD:   '20260603-1445',
+  APP_VERSION: '3.80.2',
+  APP_BUILD:   '20260603-1500',
 
 
   // ══════════════════════════════════════════════════════
@@ -13862,54 +13862,93 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _quickDetail(id) {
+    // Universelles Sheet: id=null -> Neu anlegen, id=string -> Bearbeiten
     const store = this._quickStore();
-    const item  = store?.find(i => i.id === id);
-    if (!item) return;
+    const item = id ? store?.find(i => i.id === id) : null;
+    const isNew = !item;
+    const today = new Date().toISOString().split('T')[0];
 
     const sheet = document.createElement('div');
     sheet.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;';
     sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
 
+    const isBeruf = this.activeWorld === 'beruf';
+    const recurVal = item?.recurring || '';
+
     sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;">'
-      + '<div style="font-size:0.75rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:10px;">Schnell-Item</div>'
-      + '<input id="quick-detail-text" type="text" value="' + item.text.replace(/"/g,'&quot;') + '" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:10px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
+      + '<div style="font-size:0.8rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);">' + (isNew ? 'Schnell-Erledigung' : 'Bearbeiten') + '</div>'
+      + '<div style="display:flex;gap:4px;">'
+      + '<button id="wqa-welt-pro" onclick="WB._wqaSetWelt(\'pro\')" style="font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:20px;border:none;cursor:pointer;' + (isBeruf ? 'background:var(--c-beruf);color:#fff;' : 'background:var(--c-border);color:var(--c-muted);') + '">Beruf</button>'
+      + '<button id="wqa-welt-priv" onclick="WB._wqaSetWelt(\'priv\')" style="font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:20px;border:none;cursor:pointer;' + (!isBeruf ? 'background:#7B5EA7;color:#fff;' : 'background:var(--c-border);color:var(--c-muted);') + '">Privat</button>'
+      + '</div></div>'
+      + '<input id="wqa-text" type="text" value="' + (item?.text||'').replace(/"/g,'&quot;') + '" placeholder="Was muss erledigt werden?" autofocus style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:10px;">'
       + '<div style="display:flex;gap:8px;margin-bottom:10px;">'
-      + '<div style="flex:1;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:3px;">Datum</div>'
-      + '<input type="date" id="quick-detail-date" value="' + (item.date||'') + '" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"></div>'
-      + '<div style="flex:1;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:3px;">Uhrzeit (optional)</div>'
-      + '<input type="time" id="quick-detail-time" value="' + (item.time||'') + '" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"></div>'
+      + '<div style="flex:2;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:3px;">Datum</div>'
+      + '<input type="date" id="wqa-date" value="' + (item?.date||today) + '" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"></div>'
+      + '<div style="flex:1;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:3px;">Uhrzeit</div>'
+      + '<input type="time" id="wqa-time" value="' + (item?.time||'') + '" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"></div>'
       + '</div>'
+      + '<div style="margin-bottom:10px;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:3px;font-weight:600;">Wiederholung</div>'
+      + '<select id="wqa-recur" onchange="WB._wqaRecurChange(this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">'
+      + '<option value=""' + (!recurVal?'selected':'') + '>Einmalig</option>'
+      + '<option value="daily"' + (recurVal==='daily'?'selected':'') + '>T&auml;glich</option>'
+      + '<option value="weekly"' + (recurVal==='weekly'?'selected':'') + '>W&ouml;chentlich</option>'
+      + '<option value="monthly"' + (recurVal==='monthly'?'selected':'') + '>Monatlich</option>'
+      + '</select>'
+      + '<div id="wqa-days-row" style="display:' + (recurVal==='weekly'?'flex':'none') + ';flex-wrap:wrap;gap:8px;margin-top:8px;">'
+      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="1"' + ((item?.recurringDays||[]).includes(1)?'checked':'') + '> Mo</label>'
+      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="2"' + ((item?.recurringDays||[]).includes(2)?'checked':'') + '> Di</label>'
+      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="3"' + ((item?.recurringDays||[]).includes(3)?'checked':'') + '> Mi</label>'
+      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="4"' + ((item?.recurringDays||[]).includes(4)?'checked':'') + '> Do</label>'
+      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="5"' + ((item?.recurringDays||[]).includes(5)?'checked':'') + '> Fr</label>'
+      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="6"' + ((item?.recurringDays||[]).includes(6)?'checked':'') + '> Sa</label>'
+      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="0"' + ((item?.recurringDays||[]).includes(0)?'checked':'') + '> So</label>'
+      + '</div></div>'
       + '<div style="margin-bottom:12px;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:3px;">Notiz (optional)</div>'
-      + '<textarea id="quick-detail-notiz" rows="3" placeholder="Zusätzliche Infos, Links, Gedanken..." style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);resize:vertical;">'
-      + (item.notiz||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      + '<textarea id="wqa-notiz" rows="3" placeholder="Infos, Links, Gedanken..." style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);resize:vertical;">'
+      + (item?.notiz||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')
       + '</textarea></div>'
       + '<div style="display:flex;gap:8px;">'
-      + '<button onclick="WB._quickDetailSave(&quot;' + id + '&quot;);WB._closeAllSheets()" style="flex:2;padding:11px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;">Speichern</button>'
-      + '<button onclick="WB._quickDelete(&quot;' + id + '&quot;);WB._closeAllSheets()" style="flex:1;padding:11px;background:none;border:1px solid #C62828;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:#C62828;">Löschen</button>'
+      + '<button onclick="document.querySelector(\'[style*=z-index\\:500]\').remove()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Abbrechen</button>'
+      + (isNew ? '' : '<button onclick="WB._quickDelete(&quot;'+id+'&quot;);document.querySelector(\'[style*=z-index\\:500]\').remove()" style="flex:1;padding:11px;background:none;border:1px solid #C62828;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:#C62828;">L&ouml;schen</button>')
+      + '<button onclick="WB._quickDetailSave(&quot;' + (id||'') + '&quot;)" style="flex:2;padding:11px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;">Speichern</button>'
       + '</div></div>';
 
     document.body.appendChild(sheet);
-    setTimeout(() => document.getElementById('quick-detail-text')?.select(), 50);
+    setTimeout(() => document.getElementById('wqa-text')?.select(), 50);
   },
 
   _quickDetailSave(id) {
-    const store = this._quickStore();
-    const item  = store?.find(i => i.id === id);
-    if (!item) return;
-    const text = document.getElementById('quick-detail-text')?.value.trim();
-    const date = document.getElementById('quick-detail-date')?.value;
-    const time = document.getElementById('quick-detail-time')?.value;
+    const text  = document.getElementById('wqa-text')?.value.trim();
+    const date  = document.getElementById('wqa-date')?.value;
+    const time  = document.getElementById('wqa-time')?.value;
+    const recur = document.getElementById('wqa-recur')?.value || '';
+    const notiz = document.getElementById('wqa-notiz')?.value.trim() || '';
+    const recurDays = [];
+    if (recur === 'weekly') document.querySelectorAll('.wqa-day:checked').forEach(cb => recurDays.push(+cb.value));
     if (!text) return;
-    item.text = text;
-    if (date) item.date = date;
+
+    const store = this._quickStore();
+    let item = id ? store?.find(i => i.id === id) : null;
+
+    if (!item) {
+      // Neu anlegen
+      item = { id: String(Date.now()), text, date: date||new Date().toISOString().split('T')[0], done: false };
+      store?.push(item);
+    } else {
+      item.text = text;
+      if (date) item.date = date;
+    }
     if (time) item.time = time; else delete item.time;
-    const notiz = document.getElementById('quick-detail-notiz')?.value.trim() || '';
+    if (recur) { item.recurring = recur; if (recurDays.length) item.recurringDays = recurDays; else delete item.recurringDays; }
+    else { delete item.recurring; delete item.recurringDays; }
     if (notiz) item.notiz = notiz; else delete item.notiz;
+
     this.setDirty();
-    // Sheet schließen BEVOR renderCockpit (verhindert Race-Condition)
     document.querySelectorAll('[style*="z-index:500"],[style*="rgba(0,0,0"]').forEach(e => e.remove());
     this._ckRenderTagesseite();
-    this._toast('✓ Gespeichert');
+    this._toast(id ? '✓ Gespeichert' : 'Angelegt' + (recur?' (wiederkehrend)':'') + (time?' um '+time:''));
   },
 
   _wqaSetWelt(welt) {
