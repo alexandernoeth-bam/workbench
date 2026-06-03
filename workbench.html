@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.82.0</title>
+<title>WorkBench 3.83.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7323,10 +7323,16 @@ html, body {
           <div class="wbs-label-main">Migration vorbereiten</div>
           <div class="wbs-label-sub">Analysiert offene Aufgaben aus alten Projekten</div>
         </div>
-        <button onclick="WB.legacyProjectsReport()"
-          style="padding:8px 14px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;color:var(--c-beruf);cursor:pointer;white-space:nowrap;">
-          Analysieren
-        </button>
+        <div style="display:flex;gap:6px;">
+          <button onclick="WB.legacyProjectsReport()"
+            style="padding:8px 14px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;color:var(--c-beruf);cursor:pointer;white-space:nowrap;">
+            Analysieren
+          </button>
+          <button onclick="WB.legacyMigrationVorschau()"
+            style="padding:8px 14px;background:none;border:1px solid var(--c-beruf);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;color:var(--c-beruf);cursor:pointer;white-space:nowrap;">
+            Migrieren
+          </button>
+        </div>
       </div>
       <div id="s-legacy-report" style="display:none;padding:4px 0 8px;"></div>
 
@@ -7876,7 +7882,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.82.0 · Build 20260603-1712</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.83.0 · Build 20260603-1736</div>
     </div>
 
     <!-- Welt -->
@@ -8050,8 +8056,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.82.0',
-  APP_BUILD:   '20260603-1712',
+  APP_VERSION: '3.83.0',
+  APP_BUILD:   '20260603-1736',
 
 
   // ══════════════════════════════════════════════════════
@@ -11996,6 +12002,166 @@ const WB = {
       + '<div style="padding:10px 0 2px;font-size:0.82rem;font-weight:700;color:var(--c-beruf);">Gesamt offen: ' + totalOffen + ' Alt-Aufgaben</div>'
       + '<div style="font-size:0.72rem;color:var(--c-faint);margin-top:4px;">Stufe 0 · reine Analyse, keine Daten verändert.</div>';
     el.style.display = '';
+  },
+
+  // ── db.projects MIGRATION · STUFE 1: Plan-Notizen anlegen (weich, mit Backup) ──
+
+  // Prio → Gewicht-Mapping
+  _legacyPrioToGewicht(t) {
+    const lvl = t.prioLvl;
+    if (lvl === 'A') return 'hoch';
+    if (lvl === 'B') return 'mittel';
+    if (lvl === 'C') return 'niedrig';
+    if (t.prio === true || t.prio === 'A') return 'hoch';
+    return 'mittel';
+  },
+
+  // Vorschau: was würde migriert?
+  _legacyMigrationPlan() {
+    const today = new Date().toISOString().split('T')[0];
+    const plan = []; // [{ctx, projektName, aufgaben:[task...]}]
+    [['pro', this.dataPro], ['priv', this.dataPriv]].forEach(([ctx, db]) => {
+      if (!db) return;
+      Object.entries(db.projects || {}).forEach(([pKey, p]) => {
+        const offen = ((p && p.tasks) || []).filter(t => t && !t.done && !t._migriert);
+        if (!offen.length) return;
+        plan.push({ ctx, projektName: pKey, aufgaben: offen });
+      });
+    });
+    return plan;
+  },
+
+  // Schritt 1: Vorschau zeigen + Buttons
+  legacyMigrationVorschau() {
+    const plan = this._legacyMigrationPlan();
+    const el = document.getElementById('s-legacy-report');
+    if (!el) return;
+    if (!plan.length) {
+      el.innerHTML = '<div style="padding:12px 0;color:var(--c-faint);font-size:0.82rem;">Keine offenen Alt-Aufgaben zu migrieren — alles bereits überführt oder erledigt.</div>';
+      el.style.display = '';
+      return;
+    }
+    const totalAufg = plan.reduce((s, g) => s + g.aufgaben.length, 0);
+    let h = '<div style="padding:8px 0;font-size:0.82rem;font-weight:700;color:var(--c-text);">Vorschau · ' + totalAufg + ' Aufgaben → ' + plan.length + ' Plan-Notizen</div>';
+    plan.forEach(g => {
+      h += '<div style="padding:6px 0;border-bottom:1px solid var(--c-border);font-size:0.78rem;color:var(--c-muted);">'
+        + '<b>' + (g.ctx === 'pro' ? 'Beruf' : 'Privat') + '</b> · „' + this._esc(g.projektName) + '" → '
+        + g.aufgaben.length + ' Aufgabe' + (g.aufgaben.length === 1 ? '' : 'n') + '</div>';
+    });
+    h += '<div style="font-size:0.72rem;color:var(--c-faint);margin:8px 0 12px;line-height:1.5;">'
+      + 'Pro Projekt wird eine Plan-Notiz angelegt (oder eine bestehende gleichen Namens genutzt). '
+      + 'Original-Aufgaben bleiben als Backup erhalten und werden als erledigt markiert. '
+      + 'Vor der Migration wird automatisch ein Backup heruntergeladen.</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      + '<button onclick="WB.legacyMigrationRun()" style="flex:1;min-width:140px;padding:10px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.84rem;font-weight:700;cursor:pointer;">Backup + Jetzt migrieren</button>'
+      + '<button onclick="WB.legacyProjectsReport()" style="padding:10px 14px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.84rem;color:var(--c-muted);cursor:pointer;">Abbrechen</button>'
+      + '</div>';
+    el.innerHTML = h;
+    el.style.display = '';
+  },
+
+  // Backup beider DBs in einer Datei
+  _legacyMigrationBackup() {
+    try {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const payload = {
+        _backupTyp: 'pre-migration',
+        _erstellt: new Date().toISOString(),
+        appVersion: this.APP_VERSION,
+        dataPro: this.dataPro || null,
+        dataPriv: this.dataPriv || null,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'workbench-backup-vor-migration-' + stamp + '.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      return true;
+    } catch (e) {
+      this._toast('Backup fehlgeschlagen: ' + e.message);
+      return false;
+    }
+  },
+
+  // Schritt 2: Migration ausführen (idempotent)
+  legacyMigrationRun() {
+    // 1. Backup zwingend zuerst
+    if (!this._legacyMigrationBackup()) {
+      this._toast('Migration abgebrochen — Backup nicht möglich');
+      return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const nowTs = Date.now();
+    let migAufgaben = 0, migNotizen = 0, wiederverwendet = 0;
+    let seq = 0;
+
+    [['pro', this.dataPro], ['priv', this.dataPriv]].forEach(([ctx, db]) => {
+      if (!db) return;
+      const store = this._nzStoreWrite(ctx);
+      Object.entries(db.projects || {}).forEach(([pKey, p]) => {
+        const offen = ((p && p.tasks) || []).filter(t => t && !t.done && !t._migriert);
+        if (!offen.length) return;
+
+        // Ziel-Plan-Notiz: bestehende gleichen Namens (typ plan) oder neu
+        let notiz = store.find(n => n.typ === 'plan' && !n.archiv && (n.titel || '') === pKey);
+        if (notiz) {
+          wiederverwendet++;
+          if (!notiz.planAufgaben) notiz.planAufgaben = [];
+        } else {
+          notiz = {
+            id:        'nz_mig_' + nowTs + '_' + (seq++),
+            titel:     pKey,
+            inhalt:    '<p>Aus Alt-Projekt migriert am ' + today + '.</p>',
+            typ:       'plan',
+            welt:      ctx,
+            planAufgaben: [],
+            erstellt:  nowTs,
+            geaendert: nowTs,
+            _migriertAus: 'db.projects',
+          };
+          store.push(notiz);
+          migNotizen++;
+        }
+
+        offen.forEach(t => {
+          notiz.planAufgaben.push({
+            id:       'pa_mig_' + nowTs + '_' + (seq++),
+            text:     t.text || '(ohne Text)',
+            date:     t.date || '',
+            done:     false,
+            erstellt: t.erstellt || today,
+            gewicht:  this._legacyPrioToGewicht(t),
+            mustToday: !!t.mustToday,
+            _migriertVon: pKey,
+          });
+          // Weich: Original als migriert markieren (bleibt als Backup in db.projects)
+          t.done = true;
+          t._migriert = true;
+          t._migriertAm = today;
+          migAufgaben++;
+        });
+      });
+    });
+
+    this.setDirty();
+
+    const el = document.getElementById('s-legacy-report');
+    if (el) {
+      el.innerHTML = '<div style="padding:12px 0;font-size:0.84rem;color:var(--c-text);line-height:1.6;">'
+        + '<div style="font-weight:700;color:var(--c-beruf);margin-bottom:4px;">✓ Migration abgeschlossen</div>'
+        + migAufgaben + ' Aufgaben migriert<br>'
+        + migNotizen + ' neue Plan-Notizen angelegt'
+        + (wiederverwendet ? '<br>' + wiederverwendet + ' bestehende Plan-Notizen wiederverwendet' : '')
+        + '<div style="font-size:0.72rem;color:var(--c-faint);margin-top:8px;">Original-Aufgaben bleiben als Backup in db.projects (als erledigt markiert). '
+        + 'Sie erscheinen nicht mehr in Cockpit/Planer. Endgültiges Aufräumen folgt in Stufe 2.</div>'
+        + '</div>';
+      el.style.display = '';
+    }
+    if (this.activeTab === 'cockpit') this.renderCockpit();
+    if (this.activeTab === 'planer')  this.renderPlaner();
+    this._toast('✓ ' + migAufgaben + ' Aufgaben migriert');
   },
 
   _fokusPreset(min) {
