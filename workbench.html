@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.83.0</title>
+<title>WorkBench 3.84.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4699,6 +4699,26 @@ html, body {
   .nz-verkn-btn { flex:1; padding:7px 10px; border-radius:var(--radius-xs); font-family:var(--font); font-size:0.84rem; font-weight:500; cursor:pointer; border:1px solid; }
   .nz-proj-sektion { background:var(--c-beruf-bg); border:1px solid rgba(13,122,107,0.25); border-radius:var(--radius-sm); padding:8px 12px; margin:6px 0; font-size:0.85rem; }
   .nz-termin-sektion { background:#E6F1FB; border:1px solid #BAD5F0; border-radius:var(--radius-sm); padding:8px 12px; margin:6px 0; font-size:0.85rem; }
+  .nz-plan-aufg-sektion { background:var(--c-beruf-bg); border:1px solid rgba(13,122,107,0.25); border-radius:var(--radius-sm); padding:10px 12px; margin:6px 0; }
+  .nz-plan-add-row { display:flex; gap:6px; margin-bottom:8px; }
+  .nz-plan-add-row input { flex:1; padding:8px 10px; border:1px solid var(--c-border); border-radius:var(--radius-xs); font-family:var(--font); font-size:0.86rem; background:var(--c-bg); color:var(--c-text); }
+  .nz-plan-add-row button { width:40px; border:none; background:var(--c-beruf); color:#fff; border-radius:var(--radius-xs); font-size:1.2rem; cursor:pointer; flex-shrink:0; }
+  .nz-plan-scan-btn { width:100%; padding:8px; background:var(--c-surface); border:1px solid var(--c-beruf); border-radius:var(--radius-xs); font-family:var(--font); font-size:0.82rem; color:var(--c-beruf); cursor:pointer; font-weight:600; margin-bottom:10px; }
+  .nz-plan-aufg-list { display:flex; flex-direction:column; gap:4px; }
+  .nz-plan-aufg-item { display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--c-bg); border:1px solid var(--c-border); border-radius:var(--radius-xs); font-size:0.86rem; }
+  .nz-plan-aufg-item input[type=checkbox] { width:16px; height:16px; flex-shrink:0; accent-color:var(--c-beruf); cursor:pointer; }
+  .nz-plan-aufg-text { flex:1; min-width:0; color:var(--c-text); }
+  .nz-plan-aufg-text.done { text-decoration:line-through; color:var(--c-faint); }
+  .nz-plan-aufg-date { font-size:0.72rem; color:var(--c-muted); margin-left:6px; font-family:var(--font-mono); }
+  .nz-plan-aufg-gew { font-size:0.66rem; font-weight:700; padding:1px 6px; border-radius:8px; color:#fff; flex-shrink:0; }
+  .nz-plan-aufg-gew.plbw-hoch { background:#C62828; }
+  .nz-plan-aufg-gew.plbw-mittel { background:var(--c-beruf); }
+  .nz-plan-aufg-gew.plbw-niedrig { background:var(--c-muted); }
+  .nz-plan-aufg-del { background:none; border:none; color:var(--c-faint); cursor:pointer; font-size:0.85rem; flex-shrink:0; padding:2px 4px; }
+  .nz-plan-aufg-del:hover { color:var(--c-danger); }
+  .nz-plan-aufg-empty { font-size:0.8rem; color:var(--c-muted); padding:8px 4px; }
+  .nz-plan-aufg-done-wrap { margin-top:8px; }
+  .nz-plan-aufg-done-wrap summary { font-size:0.78rem; color:var(--c-muted); cursor:pointer; padding:4px 0; }
 
 /* ── Utility ────────────────────────────────────────── */
 .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
@@ -7882,7 +7902,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.83.0 · Build 20260603-1736</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.84.0 · Build 20260603-1812</div>
     </div>
 
     <!-- Welt -->
@@ -8056,8 +8076,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.83.0',
-  APP_BUILD:   '20260603-1736',
+  APP_VERSION: '3.84.0',
+  APP_BUILD:   '20260603-1812',
 
 
   // ══════════════════════════════════════════════════════
@@ -23000,15 +23020,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _nzActiveDb: null,
 
   _nzTypChanged(typ) {
+    // v3.84.0: altes Plan-Links-Panel (db.projects-Verknüpfung) deaktiviert
     const planLinksPanel = document.getElementById('nz-plan-links');
-    if (planLinksPanel) {
-      planLinksPanel.style.display = typ === 'plan' ? '' : 'none';
-      if (typ === 'plan') this._nzPlanLinksRender();
-    }
+    if (planLinksPanel) planLinksPanel.style.display = 'none';
     const id = this.nzActiveId;
     const n  = id ? this._nzStore().find(x=>x.id===id) : null;
     this._nzUpdateVerknSektion(n, typ);
-    if(typ==='plan') setTimeout(()=>this._planScanCheckboxen(), 200);
   },
 
   _nzUpdateVerknSektion(notiz, typ) {
@@ -23024,35 +23041,157 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _renderPlanSektion(notiz) {
-    const link = notiz?.projektLink;
-    let h = '<div class="nz-proj-sektion"><div class="nz-verkn-box-title">&#128193; Plan &mdash; Projekt</div>';
-    if(link?.proj) {
-      h += '<div style="display:flex;align-items:center;gap:8px;">'
-        + '<span style="flex:1;font-weight:500;">'+link.proj+'</span>'
-        + '<span style="font-size:0.75rem;color:var(--c-muted);">'+(link.ctx==='pro'?'Beruf':'Privat')+'</span>'
-        + '<button onclick="WB._planProjektLoesen()" style="background:none;border:1px solid var(--c-danger);color:var(--c-danger);border-radius:4px;padding:2px 8px;cursor:pointer;font-size:0.8rem;">&#10005;</button>'
-        + '</div>';
-    } else {
-      h += '<div style="display:flex;gap:6px;margin-top:4px;">'
-        + '<select id="nz-proj-sel" style="flex:1;padding:6px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);">'
-        + '<option value="">Projekt w\u00e4hlen\u2026</option>'
-        + this._nzProjOptions()
-        + '</select>'
-        + '<button onclick="WB._planProjektZuordnen()" style="padding:6px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:0.85rem;">Zuordnen</button>'
-        + '</div>';
-    }
-    const cbCount = notiz?.cbLinks?.length||0;
-    h += '<div style="margin-top:8px;border-top:1px solid var(--c-border);padding-top:8px;">'
-      + '<div style="font-size:0.75rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--c-muted);margin-bottom:6px;">Aufgaben aus Text</div>'
-      + (cbCount > 0
-          ? '<div style="font-size:0.82rem;color:var(--c-beruf);margin-bottom:6px;">✓ ' + cbCount + ' Aufgabe(n) aus ☐ verknüpft</div>'
-          : '<div style="font-size:0.78rem;color:var(--c-muted);margin-bottom:6px;">Füge ☐ Checkboxen in den Text ein, dann scannen.</div>'
-        )
-      + '<button onclick="WB._planScanCheckboxen()" '
-      + 'style="width:100%;padding:8px;background:var(--c-surface);border:1px solid var(--c-beruf);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;color:var(--c-beruf);cursor:pointer;font-weight:600;">'
-      + '☐ Checkboxen scannen &amp; Aufgaben verknüpfen</button>'
+    const aufgaben = (notiz?.planAufgaben || []);
+    const offen = aufgaben.filter(a => !a.done);
+    const erledigt = aufgaben.filter(a => a.done);
+    const gewLabel = { hoch: 'Hoch', mittel: 'Mittel', niedrig: 'Niedrig' };
+
+    let h = '<div class="nz-plan-aufg-sektion"><div class="nz-verkn-box-title">&#128203; Aufgaben (' + offen.length + ' offen)</div>';
+
+    // Eingabefeld für neue Aufgabe
+    h += '<div class="nz-plan-add-row">'
+      + '<input type="text" id="nz-plan-add-input" placeholder="Neue Aufgabe…" maxlength="200" '
+      + 'onkeydown="if(event.key===&quot;Enter&quot;){WB._planAufgabeAdd();}">'
+      + '<button onclick="WB._planAufgabeAdd()" title="Hinzufügen">+</button>'
       + '</div>';
-    return h+'</div>';
+
+    // Scan-Button
+    h += '<button class="nz-plan-scan-btn" onclick="WB._planScanZuPlanAufgaben()">'
+      + '☐ Checkboxen aus Text scannen</button>';
+
+    // Offene Aufgaben
+    if (offen.length) {
+      h += '<div class="nz-plan-aufg-list">';
+      offen.forEach(a => {
+        const g = a.gewicht || 'mittel';
+        const dl = a.date ? '<span class="nz-plan-aufg-date">' + a.date + '</span>' : '';
+        h += '<div class="nz-plan-aufg-item">'
+          + '<input type="checkbox" onchange="WB._planAufgabeToggle(&quot;' + a.id + '&quot;)">'
+          + '<span class="nz-plan-aufg-text">' + this._esc(a.text) + dl + '</span>'
+          + '<span class="nz-plan-aufg-gew plbw-' + g + '" title="Gewicht">' + (gewLabel[g] || 'Mittel') + '</span>'
+          + '<button class="nz-plan-aufg-del" onclick="WB._planAufgabeDel(&quot;' + a.id + '&quot;)" title="Löschen">&#10005;</button>'
+          + '</div>';
+      });
+      h += '</div>';
+    } else {
+      h += '<div class="nz-plan-aufg-empty">Noch keine offenen Aufgaben. Tippe oben eine ein oder scanne ☐-Zeilen aus dem Text.</div>';
+    }
+
+    // Erledigte (eingeklappt)
+    if (erledigt.length) {
+      h += '<details class="nz-plan-aufg-done-wrap"><summary>' + erledigt.length + ' erledigt</summary>';
+      h += '<div class="nz-plan-aufg-list">';
+      erledigt.forEach(a => {
+        h += '<div class="nz-plan-aufg-item done">'
+          + '<input type="checkbox" checked onchange="WB._planAufgabeToggle(&quot;' + a.id + '&quot;)">'
+          + '<span class="nz-plan-aufg-text done">' + this._esc(a.text) + '</span>'
+          + '<button class="nz-plan-aufg-del" onclick="WB._planAufgabeDel(&quot;' + a.id + '&quot;)" title="Löschen">&#10005;</button>'
+          + '</div>';
+      });
+      h += '</div></details>';
+    }
+
+    return h + '</div>';
+  },
+
+  // Aktive Plan-Notiz holen (Schreibzugriff)
+  _planAktiveNotiz() {
+    const notizId = this.nzActiveId;
+    if (!notizId) { this._toast('Notiz erst speichern'); return null; }
+    const store = this._nzStoreWrite(this._nzActiveDb || 'pro');
+    const notiz = store.find(n => n.id === notizId);
+    if (!notiz) return null;
+    if (!notiz.planAufgaben) notiz.planAufgaben = [];
+    return notiz;
+  },
+
+  _planAufgabeAdd() {
+    const inp = document.getElementById('nz-plan-add-input');
+    if (!inp) return;
+    const text = (inp.value || '').trim();
+    if (!text) return;
+    const notiz = this._planAktiveNotiz();
+    if (!notiz) return;
+    const today = new Date().toISOString().split('T')[0];
+    notiz.planAufgaben.push({
+      id: 'pa_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      text, date: '', done: false, erstellt: today, gewicht: 'mittel',
+    });
+    notiz.geaendert = Date.now();
+    inp.value = '';
+    this.setDirty();
+    this._nzUpdateVerknSektion(notiz, 'plan');
+    setTimeout(() => document.getElementById('nz-plan-add-input')?.focus(), 50);
+  },
+
+  _planAufgabeToggle(aufgabeId) {
+    const notiz = this._planAktiveNotiz();
+    if (!notiz) return;
+    const a = notiz.planAufgaben.find(x => x.id === aufgabeId);
+    if (!a) return;
+    a.done = !a.done;
+    notiz.geaendert = Date.now();
+    this.setDirty();
+    this._nzUpdateVerknSektion(notiz, 'plan');
+    if (this.activeTab === 'planer') this.renderPlaner();
+  },
+
+  _planAufgabeDel(aufgabeId) {
+    const notiz = this._planAktiveNotiz();
+    if (!notiz) return;
+    const idx = notiz.planAufgaben.findIndex(x => x.id === aufgabeId);
+    if (idx < 0) return;
+    notiz.planAufgaben.splice(idx, 1);
+    notiz.geaendert = Date.now();
+    this.setDirty();
+    this._nzUpdateVerknSektion(notiz, 'plan');
+    if (this.activeTab === 'planer') this.renderPlaner();
+  },
+
+  // Checkbox-Scan NEU: erzeugt planAufgaben (idempotent über Text-Abgleich)
+  _planScanZuPlanAufgaben() {
+    const ed = document.getElementById('nz-ed-content');
+    if (!ed) return;
+    const notiz = this._planAktiveNotiz();
+    if (!notiz) return;
+    const today = new Date().toISOString().split('T')[0];
+
+    // Alle ☐/☑-Zeilen aus dem Text extrahieren
+    const plain = ed.innerText || ed.textContent || '';
+    const zeilen = plain.split(/[\n\r]+/);
+    const gefunden = []; // {text, done}
+    zeilen.forEach(z => {
+      const m = z.match(/^[\s]*([\u2610\u2611\u2612\u2714])\s*(.+)$/);
+      if (!m) return;
+      const text = m[2].trim();
+      if (!text) return;
+      const done = (m[1] === '\u2611' || m[1] === '\u2612' || m[1] === '\u2714');
+      gefunden.push({ text, done });
+    });
+
+    if (!gefunden.length) {
+      this._toast('Keine ☐-Zeilen im Text gefunden');
+      return;
+    }
+
+    let neu = 0, aktualisiert = 0;
+    gefunden.forEach(g => {
+      // Idempotenz: existiert bereits eine planAufgabe mit gleichem Text?
+      const vorhanden = notiz.planAufgaben.find(a => (a.text || '').trim() === g.text);
+      if (vorhanden) {
+        if (g.done && !vorhanden.done) { vorhanden.done = true; aktualisiert++; }
+        return;
+      }
+      notiz.planAufgaben.push({
+        id: 'pa_scan_' + Date.now() + '_' + (neu++),
+        text: g.text, date: '', done: g.done, erstellt: today, gewicht: 'mittel',
+      });
+    });
+    notiz.geaendert = Date.now();
+    this.setDirty();
+    this._nzUpdateVerknSektion(notiz, 'plan');
+    if (this.activeTab === 'planer') this.renderPlaner();
+    this._toast(neu + ' neu, ' + aktualisiert + ' aktualisiert');
   },
 
   _nzProjOptions() {
@@ -23698,10 +23837,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const typSel = document.getElementById('nz-ed-typ');
     if(typSel) typSel.value = typ;
     const planLinksPanel2 = document.getElementById('nz-plan-links');
-    if (planLinksPanel2) {
-      planLinksPanel2.style.display = typ === 'plan' ? '' : 'none';
-      if (typ === 'plan') this._nzPlanLinksRender();
-    }
+    if (planLinksPanel2) planLinksPanel2.style.display = 'none';
     const weltSel = document.getElementById('nz-ed-welt');
     if(weltSel) weltSel.value = welt;
 
@@ -23714,7 +23850,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     setTimeout(()=>{
       const allN = this._nzStore().find(x=>x.id===id);
       this._nzUpdateVerknSektion(allN||null, typ);
-      if(typ==='plan'||allN?.linkModus==='extraktion') this._planScanCheckboxen();
     }, 150);
     document.getElementById('nz-editor-overlay').classList.add('open');
     setTimeout(() => {
@@ -23788,9 +23923,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     clearTimeout(this.nzAutoSaveTimer);
     this.nzAutoSaveTimer = setTimeout(() => {
       this.nzEdSave(false);
-      const typ = document.getElementById('nz-ed-typ')?.value;
-      const n = this._nzStore().find(x=>x.id===this.nzActiveId);
-      if(typ==='plan'||n?.linkModus==='extraktion') setTimeout(()=>this._planScanCheckboxen(), 80);
     }, 1000);
   },
 
