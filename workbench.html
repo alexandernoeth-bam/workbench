@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.93.0</title>
+<title>WorkBench 3.93.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5809,6 +5809,14 @@ html, body {
   outline: none;
 }
 #vh-inhalt-content:focus { border-color: var(--c-beruf); }
+.vh-sek { border: 1px solid var(--c-border); border-radius: var(--radius-sm); margin-bottom: 10px; overflow: hidden; background: var(--c-surface); }
+.vh-sek-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; background: var(--c-bg); border-bottom: 1px solid transparent; user-select: none; }
+.vh-sek-head:hover { background: color-mix(in srgb, var(--c-beruf) 5%, var(--c-bg)); }
+.vh-sek-icon { font-size: 1.05rem; flex-shrink: 0; }
+.vh-sek-label { flex: 1; min-width: 0; font-size: 0.92rem; font-weight: 700; color: var(--c-text); }
+.vh-sek-badge { font-size: 0.72rem; font-weight: 600; color: var(--c-muted); background: var(--c-surface); border: 1px solid var(--c-border); padding: 2px 8px; border-radius: 10px; flex-shrink: 0; }
+.vh-sek-chevron { font-size: 0.8rem; color: var(--c-muted); flex-shrink: 0; margin-left: 2px; }
+.vh-sek-body { padding: 14px; border-top: 1px solid var(--c-border); }
 .plan-card {
   background: var(--c-surface);
   border: 1px solid var(--c-border);
@@ -7956,7 +7964,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.93.0 · Build 20260603-2358</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.93.1 · Build 20260604-0012</div>
     </div>
 
     <!-- Welt -->
@@ -8121,8 +8129,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.93.0',
-  APP_BUILD:   '20260603-2358',
+  APP_VERSION: '3.93.1',
+  APP_BUILD:   '20260604-0012',
 
 
   // ══════════════════════════════════════════════════════
@@ -14818,14 +14826,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       }
     }
 
-    return '<div class="plan-sektion">'
-      + '<div class="plan-sektion-head" onclick="WB._vorhabenSektionToggle(&quot;' + sk + '&quot;)">'
-      + '<span class="plan-sektion-icon">' + icon + '</span>'
-      + '<span class="plan-sektion-label">' + label + '</span>'
-      + (badge ? '<span class="plan-sektion-badge">' + badge + '</span>' : '')
-      + '<span class="plan-sektion-chevron">' + (isOpen ? '▾' : '▸') + '</span>'
+    return '<div class="vh-sek">'
+      + '<div class="vh-sek-head" onclick="WB._vorhabenSektionToggle(&quot;' + sk + '&quot;)">'
+      + '<span class="vh-sek-icon">' + icon + '</span>'
+      + '<span class="vh-sek-label">' + label + '</span>'
+      + (badge ? '<span class="vh-sek-badge">' + badge + '</span>' : '')
+      + '<span class="vh-sek-chevron">' + (isOpen ? '▾' : '▸') + '</span>'
       + '</div>'
-      + (isOpen ? '<div class="plan-sektion-body">' + bodyHtml + '</div>' : '')
+      + (isOpen ? '<div class="vh-sek-body">' + bodyHtml + '</div>' : '')
       + '</div>';
   },
 
@@ -14980,23 +14988,36 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const v = this._vorhabenAktiv();
     const ed = document.getElementById('vh-inhalt-content');
     if (!v || !ed) return;
-    ed.innerHTML = v.inhalt || '';
-    // Fehlende planAufgaben als ☐-Zeilen anhängen
-    const vorhanden = new Set();
-    const plain = ed.innerText || '';
-    plain.split(/[\n\r]+/).forEach(z => {
-      const m = z.match(/^[\s]*[\u2610\u2611\u2612\u2714]\s*(.+)$/);
-      if (m) vorhanden.add(this._planCbId(m[1].trim()));
-    });
-    const fehlend = (v.planAufgaben || []).filter(a => {
-      const cb = a.cbId || this._planCbId((a.text||'').trim());
-      return !vorhanden.has(cb);
-    });
-    if (fehlend.length) {
-      let zusatz = '';
-      fehlend.forEach(a => { zusatz += '<div>' + (a.done ? '\u2611' : '\u2610') + ' ' + this._esc(a.text) + '</div>'; });
-      ed.innerHTML = (ed.innerHTML || '') + zusatz;
+
+    // Einmalige Bereinigung migrierter Daten: Duplikate (gleicher Text+done) entfernen,
+    // cbId sicherstellen. Nur solange v.inhalt noch nicht befüllt wurde.
+    if (!v._inlineInit) {
+      // Dedup nach Text (Bug-Artefakte aus Migration entfernen)
+      const seen = new Set();
+      v.planAufgaben = (v.planAufgaben || []).filter(a => {
+        const key = (a.text || '').trim().toLowerCase();
+        if (!key) return false;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      // cbId für alle sicherstellen
+      v.planAufgaben.forEach(a => { if (!a.cbId) a.cbId = this._planCbId((a.text || '').trim()); });
+      // inhalt aus den (deduplizierten) planAufgaben neu aufbauen — bereinigt auch
+      // bereits im Text gespeicherte Duplikate aus der fehlerhaften Migration.
+      if (v.planAufgaben.length) {
+        let html = '';
+        v.planAufgaben.forEach(a => { html += '<div>' + (a.done ? '\u2611' : '\u2610') + ' ' + this._esc(a.text) + '</div>'; });
+        v.inhalt = html;
+      } else {
+        v.inhalt = v.inhalt || '';
+      }
+      v._inlineInit = true;
+      this.setDirty();
     }
+
+    // Ab jetzt nur noch laden + rendern, nichts mehr anhängen
+    ed.innerHTML = v.inhalt || '';
     this._vorhabenInlineRender();
   },
 
