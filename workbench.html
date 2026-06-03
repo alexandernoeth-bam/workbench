@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.79.4</title>
+<title>WorkBench 3.79.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.79.4 · Build 20260603-1230</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.79.6 · Build 20260603-1300</div>
     </div>
 
     <!-- Welt -->
@@ -7762,8 +7762,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.79.4',
-  APP_BUILD:   '20260603-1230',
+  APP_VERSION: '3.79.6',
+  APP_BUILD:   '20260603-1300',
 
 
   // ══════════════════════════════════════════════════════
@@ -11463,11 +11463,11 @@ const WB = {
   // ══════════════════════════════════════════════════════
 
   PLAN_TYPEN: {
-    sport:      { label: 'Sport & Fitness',   icon: '🏃', sektionen: ['vision','notizplan','aufgaben','habits','metriken','reflexion'] },
-    ernaehrung: { label: 'Ernährung',          icon: '🥗', sektionen: ['vision','notizplan','aufgaben','habits','metriken','reflexion'] },
-    projekt:    { label: 'Projekt-Plan',       icon: '🏗',  sektionen: ['vision','notizplan','phasen','aufgaben','termine','reflexion'] },
-    baustelle:  { label: 'Baustellen-Plan',    icon: '⚠',   sektionen: ['vision','notizplan','kosten','aufgaben','entscheid','reflexion'] },
-    allgemein:  { label: 'Allgemeiner Plan',   icon: '📋',  sektionen: ['vision','notizplan','aufgaben','habits','metriken','termine','reflexion'] },
+    sport:      { label: 'Sport & Fitness',   icon: '🏃', sektionen: ['vision','notizplan','aufgaben','planaufgaben','habits','metriken','reflexion'] },
+    ernaehrung: { label: 'Ernährung',          icon: '🥗', sektionen: ['vision','notizplan','aufgaben','planaufgaben','habits','metriken','reflexion'] },
+    projekt:    { label: 'Projekt-Plan',       icon: '🏗',  sektionen: ['vision','notizplan','phasen','aufgaben','planaufgaben','termine','reflexion'] },
+    baustelle:  { label: 'Baustellen-Plan',    icon: '⚠',   sektionen: ['vision','notizplan','kosten','aufgaben','planaufgaben','entscheid','reflexion'] },
+    allgemein:  { label: 'Allgemeiner Plan',   icon: '📋',  sektionen: ['vision','notizplan','aufgaben','planaufgaben','habits','metriken','termine','reflexion'] },
   },
 
   _planStore() {
@@ -11995,7 +11995,8 @@ const WB = {
       phasen:    { icon: '🗺', label: 'Phasen & Meilensteine' },
       kosten:    { icon: '💰', label: 'Kosten-Klarheit' },
       entscheid: { icon: '⚡', label: 'Entscheidung' },
-      notizplan: { icon: '📝', label: 'Mein Plan' },
+      notizplan:  { icon: '📝', label: 'Mein Plan' },
+      planaufgaben: { icon: '✓',  label: 'Aufgaben' },
     };
     const cfg = configs[sk] || { icon: '•', label: sk };
 
@@ -12004,6 +12005,10 @@ const WB = {
     if (sk === 'aufgaben') {
       const done = (plan.aufgaben||[]).filter(t=>t.done).length;
       badge = done + '/' + (plan.aufgaben||[]).length;
+    } else if (sk === 'planaufgaben') {
+      const pa = this._nzStore().find(n => n.id === plan.notizplanId)?.planAufgaben || [];
+      const paDone = pa.filter(a => a.done).length;
+      badge = paDone + '/' + pa.length;
     } else if (sk === 'habits') {
       badge = (plan.habits||[]).length + ' Habits';
     } else if (sk === 'metriken') {
@@ -12058,53 +12063,6 @@ const WB = {
         + ' onkeydown="if(event.key===&quot;Enter&quot;)WB._planTaskAdd(' + planIdx + ')">'
         + '<button onclick="WB._planTaskAdd(' + planIdx + ')" style="padding:8px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;cursor:pointer;">+</button>'
         + '</div>';
-
-      // Klappbarer Aufgaben-Block aus Plan-Notizen
-      const notizplanId = plan.notizplanId;
-      const planNotiz = notizplanId ? this._nzStore().find(n => n.id === notizplanId) : null;
-      const planAufgaben = planNotiz?.planAufgaben || [];
-      if (true) { // immer anzeigen
-        const open = plan.sektionenOpen?.['_planaufgaben'];
-        const offene = planAufgaben.filter(a => !a.done).sort((a,b) => {
-          if (!a.date && !b.date) return 0;
-          if (!a.date) return 1;
-          if (!b.date) return -1;
-          return a.date.localeCompare(b.date);
-        });
-        const erledigte = planAufgaben.filter(a => a.done).sort((a,b) => {
-          if (!a.date && !b.date) return 0;
-          if (!a.date) return 1;
-          if (!b.date) return -1;
-          return a.date.localeCompare(b.date);
-        });
-        const rowsHtml = [
-          ...offene.map(a =>
-            '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--c-border);">'
-            + '<input type="checkbox" onchange="WB._backlogVerschiebenToggle(this,&quot;'+notizplanId+'&quot;,&quot;'+a.id+'&quot;)"'
-            + ' style="width:15px;height:15px;accent-color:var(--c-beruf);flex-shrink:0;cursor:pointer;">'
-            + '<div style="flex:1;min-width:0;"><div style="font-size:0.85rem;color:var(--c-text);font-weight:500;">'+a.text+'</div>'
-            + (a.date?'<div style="font-size:0.7rem;color:var(--c-muted);">'+a.date+'</div>':'')
-            + '</div></div>'
-          ),
-          ...(erledigte.length ? ['<div style="font-size:0.7rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--c-faint);padding:8px 0 4px;">Erledigt ('+erledigte.length+')</div>'] : []),
-          ...erledigte.map(a =>
-            '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--c-border);opacity:0.5;">'
-            + '<input type="checkbox" checked onchange="WB._backlogVerschiebenToggle(this,&quot;'+notizplanId+'&quot;,&quot;'+a.id+'&quot;)"'
-            + ' style="width:15px;height:15px;accent-color:var(--c-beruf);flex-shrink:0;cursor:pointer;">'
-            + '<div style="flex:1;min-width:0;"><div style="font-size:0.85rem;color:var(--c-faint);text-decoration:line-through;">'+a.text+'</div></div>'
-            + '</div>'
-          ),
-        ].join('');
-        bodyHtml += '<div class="plan-section" style="margin-top:8px;">'
-          + '<div class="plan-section-header" onclick="WB._planToggleSub(' + planIdx + ',\'_planaufgaben\')">' 
-          + '<span class="plan-section-icon">✓</span>'
-          + '<span class="plan-section-title">Aufgaben (' + planAufgaben.length + ')</span>'
-          + '<span class="plan-section-toggle' + (open?' open':'') + '">&#9654;</span>'
-          + '</div>'
-          + '<div class="plan-section-body' + (open?' open':'') + '">' + rowsHtml + '</div>'
-          + '</div>';
-
-      }
 
     } else if (sk === 'habits') {
       const habits = plan.habits || [];
@@ -12250,6 +12208,31 @@ const WB = {
         + '<option value="zahl">Zahl</option><option value="datum">Datum</option><option value="janein">Ja/Nein</option></select>'
         + '<button onclick="WB._planMetrikAdd(' + planIdx + ')" style="padding:7px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;cursor:pointer;">+</button>'
         + '</div>';
+
+    } else if (sk === 'planaufgaben') {
+      const paNotiz = this._nzStore().find(n => n.id === plan.notizplanId);
+      const pa = paNotiz?.planAufgaben || [];
+      if (!pa.length) {
+        bodyHtml = '<div style="color:var(--c-faint);font-size:0.85rem;">Noch keine Aufgaben. Im Plan-Notiz-Editor ☐ Checkboxen einfügen.</div>';
+      } else {
+        const offene = pa.filter(a => !a.done).sort((a,b) => (!a.date&&!b.date)?0:(!a.date?1:(!b.date?-1:a.date.localeCompare(b.date))));
+        const erledigte = pa.filter(a => a.done).sort((a,b) => (!a.date&&!b.date)?0:(!a.date?1:(!b.date?-1:a.date.localeCompare(b.date))));
+        bodyHtml = offene.map(a =>
+          '<div class="plan-task-row">'
+          + '<input type="checkbox" class="plan-task-chk" onchange="WB._backlogVerschiebenToggle(this,&quot;'+plan.notizplanId+'&quot;,&quot;'+a.id+'&quot;)">'
+          + '<span class="plan-task-text">' + a.text + (a.date?' <span style="font-size:0.7rem;color:var(--c-muted);">· '+a.date+'</span>':'') + '</span>'
+          + '</div>'
+        ).join('');
+        if (erledigte.length) {
+          bodyHtml += '<div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--c-faint);padding:8px 0 4px;">Erledigt (' + erledigte.length + ')</div>';
+          bodyHtml += erledigte.map(a =>
+            '<div class="plan-task-row" style="opacity:0.5;">'
+            + '<input type="checkbox" class="plan-task-chk" checked onchange="WB._backlogVerschiebenToggle(this,&quot;'+plan.notizplanId+'&quot;,&quot;'+a.id+'&quot;)">'
+            + '<span class="plan-task-text done">' + a.text + '</span>'
+            + '</div>'
+          ).join('');
+        }
+      }
 
     } else if (sk === 'reflexion') {
       const reflexionen = (plan.reflexionen||[]).slice().reverse();
