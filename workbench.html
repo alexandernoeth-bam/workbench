@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.79.2</title>
+<title>WorkBench 3.79.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7588,7 +7588,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.79.2 · Build 20260603-1200</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.79.3 · Build 20260603-1215</div>
     </div>
 
     <!-- Welt -->
@@ -7762,8 +7762,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.79.2',
-  APP_BUILD:   '20260603-1200',
+  APP_VERSION: '3.79.3',
+  APP_BUILD:   '20260603-1215',
 
 
   // ══════════════════════════════════════════════════════
@@ -11488,8 +11488,13 @@ const WB = {
   _backlogOpen() {
     const el = document.getElementById('wb-backlog-overlay');
     if (!el) return;
+    // Zuerst alle anderen Overlays schließen
+    document.getElementById('wb-planlist-overlay') && (document.getElementById('wb-planlist-overlay').style.display = 'none');
+    document.getElementById('wb-plan-overlay')?.classList.remove('open');
     el.style.display = 'flex';
-    this._backlogRender();
+    el.style.flexDirection = 'column';
+    // Kurze Pause damit DOM updated
+    setTimeout(() => this._backlogRender(), 30);
   },
 
   _backlogRender() {
@@ -12089,14 +12094,16 @@ const WB = {
             + '</div>'
           ),
         ].join('');
-        bodyHtml += '<div style="margin-top:12px;border-top:1px solid var(--c-border);padding-top:10px;">'
-          + '<button onclick="WB._planToggleSub(' + planIdx + ',\'_planaufgaben\')"'
-          + ' style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;cursor:pointer;font-family:var(--font);font-size:0.8rem;font-weight:700;color:var(--c-muted);padding:0 0 8px;">'
-          + (open ? '▼' : '▶') + ' Aufgaben (' + planAufgaben.length + ')</button>'
-          + (open ? '<div>' + rowsHtml + '</div>' : '')
+        bodyHtml += '<div class="plan-section" style="margin-top:8px;">'
+          + '<div class="plan-section-header" onclick="WB._planToggleSub(' + planIdx + ',\'_planaufgaben\')">' 
+          + '<span class="plan-section-icon">✓</span>'
+          + '<span class="plan-section-title">Aufgaben (' + planAufgaben.length + ')</span>'
+          + '<span class="plan-section-toggle' + (open?' open':'') + '">&#9654;</span>'
+          + '</div>'
+          + '<div class="plan-section-body' + (open?' open':'') + '">' + rowsHtml + '</div>'
           + '</div>';
-      }
 
+      }
 
     } else if (sk === 'habits') {
       const habits = plan.habits || [];
