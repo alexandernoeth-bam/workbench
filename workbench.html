@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.99.4</title>
+<title>WorkBench 3.99.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8008,7 +8008,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.99.4 · Build 20260604-0530</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.99.5 · Build 20260604-0612</div>
     </div>
 
     <!-- Welt -->
@@ -8173,8 +8173,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.99.4',
-  APP_BUILD:   '20260604-0530',
+  APP_VERSION: '3.99.5',
+  APP_BUILD:   '20260604-0612',
 
 
   // ══════════════════════════════════════════════════════
@@ -14585,6 +14585,20 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const store = this._vorhabenStore(w);
       const v = store && store.find(x => x.id === id);
       if (v) return { vorhaben: v, welt: w };
+    }
+    return null;
+  },
+
+  // v3.99.5: Findet die LEBENDE Aufgabe im echten db.vorhaben-Store (nicht in Kopien).
+  // Schreibzugriffe müssen hierüber laufen, nicht über _vorhabenAlle() (liefert Klone).
+  _vorhabenFindAufgabe(aufgabeId) {
+    for (const w of ['pro', 'priv']) {
+      const store = this._vorhabenStore(w);
+      if (!store) continue;
+      for (const v of store) {
+        const a = (v.planAufgaben || []).find(x => x.id === aufgabeId);
+        if (a) return { aufgabe: a, vorhaben: v, welt: w };
+      }
     }
     return null;
   },
@@ -22716,7 +22730,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         if (!a.erstellt) { a.erstellt = today; }
         const score = this._planerBacklogScore(a, today, todayMs);
         result.push({ id:a.id, text:a.text, date:a.date||'', done:false,
-          vorhabenId:v.id, notizTitel:(v.titel||'Vorhaben'), gruppe,
+          vorhabenId:v.id, notizId:'', notizTitel:(v.titel||'Vorhaben'), gruppe,
           planerSlot:a.planerSlot, planerDate:a.planerDate,
           gewicht: a.gewicht || 'mittel', erstellt: a.erstellt,
           mustToday: !!a.mustToday, score });
@@ -22755,14 +22769,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     let a = null;
     const notiz = notizId ? this._nzStore().find(n => n.id === notizId) : null;
     if (notiz) a = (notiz.planAufgaben||[]).find(x => x.id === aufgabeId);
-    // v3.99.4: Fallback — Aufgabe in Vorhaben suchen
-    if (!a) {
-      (this._vorhabenAlle ? this._vorhabenAlle() : []).some(v => {
-        const cand = (v.planAufgaben||[]).find(x => x.id === aufgabeId);
-        if (cand) { a = cand; return true; }
-        return false;
-      });
-    }
+    // v3.99.5: Fallback — lebende Aufgabe im echten Vorhaben-Store finden
+    if (!a) { const hit = this._vorhabenFindAufgabe(aufgabeId); if (hit) a = hit.aufgabe; }
     if (!a) return;
     a.planerSlot = slot; a.planerDate = dateStr;
     if (!a.date) a.date = dateStr;
@@ -22773,13 +22781,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     let a = null;
     const notiz = notizId ? this._nzStore().find(n => n.id === notizId) : null;
     if (notiz) a = (notiz.planAufgaben||[]).find(x => x.id === aufgabeId);
-    if (!a) {
-      (this._vorhabenAlle ? this._vorhabenAlle() : []).some(v => {
-        const cand = (v.planAufgaben||[]).find(x => x.id === aufgabeId);
-        if (cand) { a = cand; return true; }
-        return false;
-      });
-    }
+    if (!a) { const hit = this._vorhabenFindAufgabe(aufgabeId); if (hit) a = hit.aufgabe; }
     if (!a) return;
     delete a.planerSlot; delete a.planerDate;
     this.setDirty(); this.renderPlaner();
@@ -22789,14 +22791,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     let a = null, vorhaben = null;
     const notiz = notizId ? this._nzStore().find(n => n.id === notizId) : null;
     if (notiz) a = (notiz.planAufgaben||[]).find(x => x.id === aufgabeId);
-    // v3.99.4: Fallback — in Vorhaben suchen
-    if (!a) {
-      (this._vorhabenAlle ? this._vorhabenAlle() : []).some(v => {
-        const cand = (v.planAufgaben||[]).find(x => x.id === aufgabeId);
-        if (cand) { a = cand; vorhaben = v; return true; }
-        return false;
-      });
-    }
+    // v3.99.5: Fallback — lebende Aufgabe im echten Vorhaben-Store
+    if (!a) { const hit = this._vorhabenFindAufgabe(aufgabeId); if (hit) { a = hit.aufgabe; vorhaben = hit.vorhaben; } }
     if (!a) return;
     a.done = !a.done;
     // ☐→☑ im Vorhaben-Inhalt nachziehen
@@ -22872,8 +22868,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '</div>'
       + '</div>';
 
-    this._planerRenderZones(dateStr);
-    this._planerRenderBacklog(dateStr);
+    try { this._planerRenderZones(dateStr); }
+    catch (e) { console.error('planerRenderZones:', e); const z = document.getElementById('planer-zones'); if (z) z.innerHTML = '<div style="padding:16px;font-size:0.85rem;color:var(--c-danger);">Fehler beim Laden der Tagesansicht: ' + (e.message||e) + '</div>'; }
+    try { this._planerRenderBacklog(dateStr); }
+    catch (e) { console.error('planerRenderBacklog:', e); const b = document.getElementById('planer-backlog-body'); if (b) b.innerHTML = '<div style="padding:16px;font-size:0.85rem;color:var(--c-danger);">Fehler beim Laden des Backlogs: ' + (e.message||e) + '</div>'; }
   },
 
   // ══════════════════════════════════════════════════════
@@ -23149,13 +23147,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     let a = null;
     const notiz = notizId ? this._nzStore().find(n => n.id === notizId) : null;
     if (notiz) a = (notiz.planAufgaben || []).find(x => x.id === aufgabeId);
-    if (!a) {
-      (this._vorhabenAlle ? this._vorhabenAlle() : []).some(v => {
-        const cand = (v.planAufgaben||[]).find(x => x.id === aufgabeId);
-        if (cand) { a = cand; return true; }
-        return false;
-      });
-    }
+    if (!a) { const hit = this._vorhabenFindAufgabe(aufgabeId); if (hit) a = hit.aufgabe; }
     if (!a) return;
     a.gewicht = gewicht;
     this.setDirty();
