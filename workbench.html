@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.99.1</title>
+<title>WorkBench 3.99.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5824,6 +5824,20 @@ html, body {
   outline: none;
 }
 #vh-inhalt-content:focus { border-color: var(--c-beruf); }
+#vh-inhalt-content h1 { font-size:1.3rem; font-weight:700; margin:8px 0 4px; }
+#vh-inhalt-content h2 { font-size:1.1rem; font-weight:700; margin:8px 0 4px; }
+#vh-inhalt-content h3 { font-size:1rem;   font-weight:700; margin:6px 0 3px; }
+#vh-inhalt-content p  { margin: 0 0 8px; }
+#vh-inhalt-content ul, #vh-inhalt-content ol { padding-left: 20px; margin: 4px 0; }
+#vh-inhalt-content blockquote { border-left: 3px solid var(--c-beruf); margin: 6px 0; padding: 4px 12px; color: var(--c-muted); }
+/* Editor-Toolbar */
+.vh-ed-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 6px; margin-bottom: 6px; background: var(--c-bg); border: 1px solid var(--c-border); border-radius: var(--radius-xs); }
+.vh-tb { min-width: 30px; height: 30px; padding: 0 7px; border: none; background: none; color: var(--c-muted); font-family: var(--font); font-size: 0.85rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-xs); }
+.vh-tb:hover { background: var(--c-surface); color: var(--c-text); }
+.vh-tb:active { opacity: 0.7; }
+.vh-tb-sep { width: 1px; height: 18px; background: var(--c-border); margin: 0 3px; }
+/* Vollbild-Modus des Vorhaben-Detail */
+#wb-vorhaben-detail.vh-ed-fullscreen #vh-inhalt-content { max-height: none; min-height: 70vh; }
 .vh-sek { border: 1px solid var(--c-border); border-radius: var(--radius-sm); margin-bottom: 10px; overflow: hidden; background: var(--c-surface); }
 .vh-sek-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; background: var(--c-bg); border-bottom: 1px solid transparent; user-select: none; }
 .vh-sek-head:hover { background: color-mix(in srgb, var(--c-beruf) 5%, var(--c-bg)); }
@@ -7980,7 +7994,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.99.1 · Build 20260604-0348</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.99.2 · Build 20260604-0420</div>
     </div>
 
     <!-- Welt -->
@@ -8145,8 +8159,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.99.1',
-  APP_BUILD:   '20260604-0348',
+  APP_VERSION: '3.99.2',
+  APP_BUILD:   '20260604-0420',
 
 
   // ══════════════════════════════════════════════════════
@@ -14743,6 +14757,22 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const done = tasks.filter(t => t.done).length;
       badge = done + '/' + tasks.length;
       bodyHtml = '<div class="vh-inhalt-hint">Schreibe ☐-Zeilen (Toolbar-Stil) und drücke Enter. Tippe eine Aufgabe an, um sie zu bearbeiten.</div>'
+        + '<div id="vh-ed-toolbar" class="vh-ed-toolbar">'
+        + '<button class="vh-tb" onclick="WB._vhH(1)" title="Überschrift 1">H1</button>'
+        + '<button class="vh-tb" onclick="WB._vhH(2)" title="Überschrift 2">H2</button>'
+        + '<button class="vh-tb" onclick="WB._vhH(3)" title="Überschrift 3">H3</button>'
+        + '<span class="vh-tb-sep"></span>'
+        + '<button class="vh-tb" onclick="WB._vhCmd(&quot;insertUnorderedList&quot;)" title="Aufzählung">&#8226;</button>'
+        + '<button class="vh-tb" onclick="WB._vhCmd(&quot;insertOrderedList&quot;)" title="Nummerierung">1.</button>'
+        + '<button class="vh-tb" onclick="WB._vhInsertCb()" title="Aufgabe (Checkbox)">&#9744;</button>'
+        + '<button class="vh-tb" onclick="WB._vhCmd(&quot;indent&quot;)" title="Einrücken">&#8677;</button>'
+        + '<button class="vh-tb" onclick="WB._vhCmd(&quot;outdent&quot;)" title="Ausrücken">&#8676;</button>'
+        + '<span class="vh-tb-sep"></span>'
+        + '<button class="vh-tb" onclick="WB._vhCmd(&quot;formatBlock&quot;,&quot;blockquote&quot;)" title="Zitat">&#10077;</button>'
+        + '<button class="vh-tb" onclick="WB._vhInsertHr()" title="Trennlinie">&#8213;</button>'
+        + '<button class="vh-tb" onclick="WB._vhCmd(&quot;removeFormat&quot;)" title="Format entfernen">&#10006;</button>'
+        + '<button class="vh-tb" id="vh-ed-fs-btn" style="margin-left:auto;" onclick="WB._vhToggleFullscreen()" title="Vollbild">&#x26F6;</button>'
+        + '</div>'
         + '<div id="vh-inhalt-content" contenteditable="true" '
         + 'oninput="WB._vorhabenInlineDebounced()" '
         + 'onkeyup="if(event.key===&quot;Enter&quot;){WB._vorhabenInlineEnter();}"></div>'
@@ -15183,6 +15213,40 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _vorhabenInlineEnter() {
     setTimeout(() => { this._vorhabenInlineRender(); this._vorhabenDetailUpdateProgress(); }, 30);
+  },
+
+  // ── VORHABEN-VOLLBILD-EDITOR (v3.99.2, Weg B) ─────────
+  // Eigene Befehle, wirken auf vh-inhalt-content. Notiz-System unangetastet.
+  _vhCmd(cmd, val) {
+    document.getElementById('vh-inhalt-content')?.focus();
+    document.execCommand(cmd, false, val || null);
+    this._vorhabenInlineDebounced();
+  },
+  _vhH(level) {
+    document.getElementById('vh-inhalt-content')?.focus();
+    document.execCommand('formatBlock', false, 'h' + level);
+    this._vorhabenInlineDebounced();
+  },
+  _vhInsertHr() {
+    document.getElementById('vh-inhalt-content')?.focus();
+    document.execCommand('insertHTML', false, '<hr style="border:none;border-top:1px solid var(--c-border);margin:8px 0;">');
+    this._vorhabenInlineDebounced();
+  },
+  // Checkbox-Zeile einfügen: nutzt das bestehende ☐-Inline-System (Unicode-Box)
+  _vhInsertCb() {
+    document.getElementById('vh-inhalt-content')?.focus();
+    document.execCommand('insertHTML', false, '<div>\u2610 </div>');
+    setTimeout(() => { this._vorhabenInlineRender(); this._vorhabenDetailUpdateProgress(); }, 30);
+  },
+  _vhToggleFullscreen() {
+    const ov = document.getElementById('wb-vorhaben-detail');
+    if (!ov) return;
+    this._vhFsActive = !this._vhFsActive;
+    ov.classList.toggle('vh-ed-fullscreen', this._vhFsActive);
+    const btn = document.getElementById('vh-ed-fs-btn');
+    if (btn) btn.textContent = this._vhFsActive ? '\u2715' : '\u26F6';
+    // Beim Verlassen speichern
+    if (!this._vhFsActive) this._vorhabenInlineSave();
   },
 
   // Nur den Fortschrittsbalken neu berechnen (ohne ganzes Detail-Rerender, um Cursor zu schonen)
