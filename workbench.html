@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.97.0</title>
+<title>WorkBench 3.98.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -1646,6 +1646,21 @@ html, body {
 .ev-type-pill.active.t-reise       { background: #6A1B9A; }
 .ev-type-pill.active.t-privat      { background: var(--c-privat); }
 .ev-type-pill.active.t-sonstiges   { background: var(--c-muted); }
+
+/* Aktivierungsenergie-Pills (v3.98.0) */
+.aktiv-pill-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
+.aktiv-pill {
+  padding: 8px 4px; border-radius: var(--radius-xs);
+  border: 1px solid var(--c-border); background: var(--c-bg);
+  font-family: var(--font); font-size: 0.8rem; font-weight: 500;
+  cursor: pointer; text-align: center; color: var(--c-muted);
+  transition: all var(--t-fast);
+}
+.aktiv-pill:active { opacity: 0.8; }
+.aktiv-pill.active { color: #fff; border-color: transparent; font-weight: 700; }
+.aktiv-pill.active.ae-niedrig { background: #2E7D32; }
+.aktiv-pill.active.ae-mittel  { background: var(--c-beruf); }
+.aktiv-pill.active.ae-hoch    { background: #C62828; }
 
 /* Wochensicht Event Typ-Farben */
 .woche-event.t-besprechung { background: #1565C0 !important; }
@@ -7619,6 +7634,15 @@ html, body {
         <input type="checkbox" id="wd-musttoday" style="width:16px;height:16px;cursor:pointer;accent-color:#C62828;">
         <label for="wd-musttoday" style="font-size:0.85rem;cursor:pointer;color:#C62828;font-weight:500;">Muss am Fälligkeitstag zwingend erledigt werden</label>
       </div>
+      <div style="margin:10px 0 4px;">
+        <div style="font-size:0.82rem;color:var(--c-muted);margin-bottom:6px;">Aktivierungsenergie</div>
+        <div class="aktiv-pill-grid" id="wd-aktiv-grid">
+          <div class="aktiv-pill ae-niedrig" onclick="WB._aktivSelect(this,&quot;niedrig&quot;,&quot;wd-aktiv&quot;)">Niedrig</div>
+          <div class="aktiv-pill ae-mittel active" onclick="WB._aktivSelect(this,&quot;mittel&quot;,&quot;wd-aktiv&quot;)">Mittel</div>
+          <div class="aktiv-pill ae-hoch" onclick="WB._aktivSelect(this,&quot;hoch&quot;,&quot;wd-aktiv&quot;)">Hoch</div>
+          <input type="hidden" id="wd-aktiv" value="mittel">
+        </div>
+      </div>
       <button class="wd-add-btn" onclick="WB.dutyAdd()">+ Pflicht hinzufügen</button>
     </div>
   </div>
@@ -7962,7 +7986,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.97.0 · Build 20260604-0156</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.98.0 · Build 20260604-0234</div>
     </div>
 
     <!-- Welt -->
@@ -8127,8 +8151,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.97.0',
-  APP_BUILD:   '20260604-0156',
+  APP_VERSION: '3.98.0',
+  APP_BUILD:   '20260604-0234',
 
 
   // ══════════════════════════════════════════════════════
@@ -13883,6 +13907,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="6"> Sa</label>'
       + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="0"> So</label>'
       + '</div></div>'
+      + '<div style="margin-bottom:14px;">'
+      + '<div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;font-weight:600;">Aktivierungsenergie</div>'
+      + '<div class="aktiv-pill-grid" id="wqa-aktiv-grid">'
+      + '<div class="aktiv-pill ae-niedrig" onclick="WB._aktivSelect(this,&quot;niedrig&quot;,&quot;wqa-aktiv&quot;)">Niedrig</div>'
+      + '<div class="aktiv-pill ae-mittel active" onclick="WB._aktivSelect(this,&quot;mittel&quot;,&quot;wqa-aktiv&quot;)">Mittel</div>'
+      + '<div class="aktiv-pill ae-hoch" onclick="WB._aktivSelect(this,&quot;hoch&quot;,&quot;wqa-aktiv&quot;)">Hoch</div>'
+      + '<input type="hidden" id="wqa-aktiv" value="mittel">'
+      + '</div></div>'
       + '<div style="display:flex;gap:8px;">'
       + '<button onclick="document.getElementById(&quot;wb-quick-add-sheet&quot;).remove()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Abbrechen</button>'
       + '<button onclick="WB._quickSave()" style="flex:2;padding:11px;background:var(--c-beruf);border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;color:#fff;">Speichern</button>'
@@ -13909,6 +13941,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (recur === 'weekly')
       document.querySelectorAll('.wqa-day:checked').forEach(cb => recurDays.push(+cb.value));
     const item = { id: String(Date.now()), text, date, done: false };
+    item.aktivEnergie = document.getElementById('wqa-aktiv')?.value || 'mittel';
     if (time) item.time = time;
     if (recur) { item.recurring = recur; if (recurDays.length) item.recurringDays = recurDays; }
     store.push(item);
@@ -19244,6 +19277,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const monthlyRule  = document.getElementById('wd-monthly-rule')?.value || 'day-1';
     const reminderTime = document.getElementById('wd-reminder-time')?.value || '';
     const mustToday    = document.getElementById('wd-musttoday')?.checked || false;
+    const aktivEnergie = document.getElementById('wd-aktiv')?.value || 'mittel';
     const startDate    = new Date().toISOString().split('T')[0];
 
     const entry = {
@@ -19253,6 +19287,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       dayFixed: repeat === 'monthly' ? null : dayFixed,
       days:     repeat === 'monthly' ? [] : days,
       instances: {},
+      aktivEnergie,
     };
     if (repeat === 'every-n-weeks') entry.repeatEvery = repeatEvery;
     if (repeat === 'monthly')       entry.monthlyRule  = monthlyRule;
@@ -19266,6 +19301,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (document.getElementById('wd-reminder-time'))
       document.getElementById('wd-reminder-time').value = '';
     document.querySelectorAll('.wd-day-btn').forEach(b => b.classList.remove('selected'));
+    // Aktivierungsenergie zurück auf Mittel
+    const aktivInp = document.getElementById('wd-aktiv'); if (aktivInp) aktivInp.value = 'mittel';
+    document.querySelectorAll('#wd-aktiv-grid .aktiv-pill').forEach(p => p.classList.toggle('active', p.classList.contains('ae-mittel')));
     this._dutyFormRepeat('weekly');
     this._dutiesRender();
     this._toast('Pflicht hinzugefügt');
@@ -19316,7 +19354,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<input id="ef-ev-end" type="time" value="10:00"></div>'
       + '</div>'
       + '<div class="edit-field"><label>Ort (optional)</label>'
-      + '<input id="ef-ev-loc" type="text" placeholder="Ort oder Link"></div>';
+      + '<input id="ef-ev-loc" type="text" placeholder="Ort oder Link"></div>'
+      + this._aktivEnergiePills('mittel', 'ef-evn-aktiv')
+      + this._kippTypSelect('', 'ef-evn-kipp');
 
     document.getElementById('edit-overlay').classList.add('open');
   },
@@ -20766,6 +20806,53 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (inp) inp.value = key;
   },
 
+  // ── Aktivierungsenergie & Kippmoment-Typ (v3.98.0) ────
+  AKTIV_STUFEN: [
+    { key: 'niedrig', label: 'Niedrig' },
+    { key: 'mittel',  label: 'Mittel'  },
+    { key: 'hoch',    label: 'Hoch'    },
+  ],
+  KIPP_TYPEN: [
+    { key: '',            label: '— keiner' },
+    { key: 'urteil',      label: 'Urteil — Angst vor Konsequenz / Sichtbarkeit' },
+    { key: 'stolz',       label: 'Stolz — Aufwand bei bedeutsamen Dingen' },
+    { key: 'routine',     label: 'Routine — Pflicht ohne Stolzpotenzial' },
+    { key: 'tunnelblick', label: 'Tunnelblick — Scope geht verloren' },
+  ],
+
+  // Pill-Gruppe für Aktivierungsenergie. idSuffix macht IDs eindeutig (ef-aktiv, ef-ev-aktiv, …)
+  _aktivEnergiePills(selected, idSuffix) {
+    const sel = selected || 'mittel';
+    return '<div class="edit-field"><label>Aktivierungsenergie</label>'
+      + '<div class="aktiv-pill-grid" id="' + idSuffix + '-grid">'
+      + this.AKTIV_STUFEN.map(s =>
+          '<div class="aktiv-pill ae-' + s.key + (sel === s.key ? ' active' : '') + '" '
+          + 'onclick="WB._aktivSelect(this,&quot;' + s.key + '&quot;,&quot;' + idSuffix + '&quot;)">' + s.label + '</div>'
+        ).join('')
+      + '<input type="hidden" id="' + idSuffix + '" value="' + sel + '">'
+      + '</div></div>';
+  },
+
+  _aktivSelect(el, key, idSuffix) {
+    const grid = document.getElementById(idSuffix + '-grid');
+    if (grid) grid.querySelectorAll('.aktiv-pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    const inp = document.getElementById(idSuffix);
+    if (inp) inp.value = key;
+  },
+
+  // Kippmoment-Typ als Dropdown
+  _kippTypSelect(selected, idSuffix) {
+    const sel = selected || '';
+    return '<div class="edit-field"><label style="display:flex;align-items:center;gap:6px;">Kippmoment-Typ <span style="font-size:0.72rem;color:var(--c-faint);font-weight:400;">(optional)</span></label>'
+      + '<select id="' + idSuffix + '">'
+      + this.KIPP_TYPEN.map(k =>
+          '<option value="' + k.key + '"' + (sel === k.key ? ' selected' : '') + '>' + k.label + '</option>'
+        ).join('')
+      + '</select></div>';
+  },
+
+
   // ── Wochensicht FAB: Datums-Picker (heute als Default) ─
   newEventOpenPicker() {
     const today = new Date().toISOString().split('T')[0];
@@ -20939,7 +21026,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<input id="ef-ev-end" type="time" value="10:00"></div>'
       + '</div>'
       + '<div class="edit-field"><label>Ort (optional)</label>'
-      + '<input id="ef-ev-loc" type="text" placeholder="Ort oder Link"></div>';
+      + '<input id="ef-ev-loc" type="text" placeholder="Ort oder Link"></div>'
+      + this._aktivEnergiePills('mittel', 'ef-evn-aktiv')
+      + this._kippTypSelect('', 'ef-evn-kipp');
 
     document.getElementById('edit-overlay').classList.add('open');
   },
@@ -21858,6 +21947,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<div class="edit-field"><label>Bis</label><input id="ef-endtime" type="time" value="10:00" onchange="WB._evRecalcDur()"></div>'
         + '</div>'
         + '<div class="edit-field"><label>Ort</label><input id="ef-loc" type="text" value=""></div>'
+        + this._aktivEnergiePills('mittel', 'ef-ev-aktiv')
+        + this._kippTypSelect('', 'ef-ev-kipp')
         + '<div class="edit-field"><label>Checkliste</label>'
         + '<div id="ef-chk-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">'
         + checklist.map((item,i) =>
@@ -24570,6 +24661,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '</select>'
       + '</div>'
 
+      // v3.98.0: Aktivierungsenergie + Kippmoment-Typ
+      + this._aktivEnergiePills(t?.aktivEnergie, 'ef-aktiv')
+      + this._kippTypSelect(t?.kippTyp, 'ef-kipp')
+
       // Notiz
       + '<div class="edit-field"><label>Notiz</label>'
       + `<textarea id="ef-notes" rows="3" style="resize:none;">${t?.notes||''}</textarea></div>`
@@ -24776,6 +24871,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<div class="edit-field"><label>Bis</label><input id="ef-endtime" type="time" value="'+evEnd+'" onchange="WB._evRecalcDur()">'+'</div>'
         + '</div>'
         + '<div class="edit-field"><label>Ort</label><input id="ef-loc" type="text" value="'+(ev.location||'')+'">'+'</div>'
+        + this._aktivEnergiePills(ev.aktivEnergie, 'ef-ev-aktiv')
+        + this._kippTypSelect(ev.kippTyp, 'ef-ev-kipp')
         + '<div class="edit-field"><label>Checkliste</label>'
         + '<div id="ef-chk-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">'
         + (ev.checklist||[]).map((item,i) =>
@@ -24880,6 +24977,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         ort:       loc,
         welt:      world,
         typ:       typV,
+        aktivEnergie: document.getElementById('ef-evn-aktiv')?.value || 'mittel',
+        kippTyp:      document.getElementById('ef-evn-kipp')?.value || '',
       };
       newEv.checklist = this._efChkGetList();
       if (!targetDb.customEvents) targetDb.customEvents = [];
@@ -24941,6 +25040,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         status:   'aktiv',
         checklist: this._efChkGetList(),
         mustToday: document.getElementById('ef-musttoday')?.checked || false,
+        aktivEnergie: document.getElementById('ef-aktiv')?.value || 'mittel',
+        kippTyp:      document.getElementById('ef-kipp')?.value || '',
         remainingMinutes: ({XS:5,S:15,M:30,L:60,XL:120,XXL:240}[size] || 30),
       };
       if (recurOn) {
@@ -24992,6 +25093,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       t.size   = size||'M';
       t.notes  = notes||'';
       t.status = document.getElementById('ef-status')?.value||'aktiv';
+      t.aktivEnergie = document.getElementById('ef-aktiv')?.value || 'mittel';
+      t.kippTyp      = document.getElementById('ef-kipp')?.value || '';
       t.remainingMinutes = t.remainingMinutes ?? ({XS:5,S:15,M:30,L:60,XL:120,XXL:240}[size]||30);
       // Checkliste aus Dialog übernehmen
       t.checklist = this._efChkGetList();
@@ -25037,6 +25140,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       ev.date      = document.getElementById('ef-date')?.value||ev.date;
       ev.startTime = document.getElementById('ef-time')?.value||ev.startTime;
       ev.location  = document.getElementById('ef-loc')?.value||'';
+      ev.aktivEnergie = document.getElementById('ef-ev-aktiv')?.value || 'mittel';
+      ev.kippTyp      = document.getElementById('ef-ev-kipp')?.value || '';
       ev.checklist = this._efChkGetList();
       // Dauer aus Von/Bis berechnen — Endzeit direkt speichern
       const pS = s=>{ const [h,m]=(s||'0:0').split(':').map(Number); return h*60+m; };
