@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.98.0</title>
+<title>WorkBench 3.99.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6792,12 +6792,6 @@ html, body {
             <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Schnell hinzufügen
           </button>
-          <button onclick="WB.editOpen('task-new','priv','Einzelaufgaben (Ohne Projekt)',null)" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
-            + Aufgabe
-          </button>
-          <button onclick="WB.newEventOpenPicker()" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
-            + Termin
-          </button>
           <button onclick="WB.qcOpen()" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
             + Notiz
           </button>
@@ -7986,7 +7980,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.98.0 · Build 20260604-0234</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.99.0 · Build 20260604-0312</div>
     </div>
 
     <!-- Welt -->
@@ -8151,8 +8145,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.98.0',
-  APP_BUILD:   '20260604-0234',
+  APP_VERSION: '3.99.0',
+  APP_BUILD:   '20260604-0312',
 
 
   // ══════════════════════════════════════════════════════
@@ -14754,7 +14748,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + 'onkeyup="if(event.key===&quot;Enter&quot;){WB._vorhabenInlineEnter();}"></div>'
         + '<div style="display:flex;gap:6px;margin-top:8px;">'
         + '<input id="vh-task-input" type="text" placeholder="Neue Aufgabe…" style="flex:1;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);" onkeydown="if(event.key===&quot;Enter&quot;)WB._vorhabenTaskAdd()">'
-        + '<button onclick="WB._vorhabenTaskAdd()" style="padding:8px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;cursor:pointer;">+</button>'
+        + '<button onclick="WB._vorhabenTaskAdd()" style="padding:8px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;cursor:pointer;" title="Schnell">+</button>'
+        + '<button onclick="WB.vorhabenTaskFormOpen()" style="padding:8px 12px;background:none;border:1px solid var(--c-beruf);color:var(--c-beruf);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;cursor:pointer;white-space:nowrap;" title="Mit Aktivierungsenergie &amp; Kippmoment-Typ">+ Details</button>'
         + '</div>';
 
     } else if (sk === 'metriken') {
@@ -14872,6 +14867,63 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
     if (inp) inp.value = '';
     setTimeout(() => document.getElementById('vh-task-input')?.focus(), 50);
+  },
+
+  // v3.99.0: Aufgabe im Vorhaben über das volle Formular anlegen
+  vorhabenTaskFormOpen() {
+    const v = this._vorhabenAktiv();
+    if (!v) return;
+    const ctx = v.welt === 'pro' ? 'pro' : 'priv';
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Datenbank nicht geladen'); return; }
+    this._editType = 'vorhaben-task-new';
+    this._editCtx  = ctx;
+    this._vhTaskTargetId = v.id;   // Merker für den Save
+    const titleEl = document.getElementById('edit-title');
+    const body    = document.getElementById('edit-body');
+    const delBtn  = document.getElementById('edit-delete-btn');
+    if (delBtn) delBtn.style.display = 'none';
+    const existingDanger = document.querySelector('.edit-actions .danger');
+    if (existingDanger) existingDanger.remove();
+    if (titleEl) titleEl.childNodes[0].textContent = 'Neue Aufgabe ';
+    if (body) body.innerHTML = this._taskFormHtml(null, ctx, null, db, true, true); // vorhabenMode=true
+    document.getElementById('edit-overlay').classList.add('open');
+  },
+
+  // Speichern einer Vorhaben-Aufgabe aus dem Vollformular
+  _vorhabenTaskFormSave() {
+    const v = this._vhTaskTargetId ? this._vorhabenFind(this._vhTaskTargetId)?.vorhaben : null;
+    if (!v) { this.editClose(); return; }
+    const title = document.getElementById('ef-title')?.value.trim();
+    if (!title) { this._toast('Bitte Titel eingeben'); return; }
+    const today = new Date().toISOString().split('T')[0];
+    if (!v.planAufgaben) v.planAufgaben = [];
+    const aufg = {
+      id: 'pa_' + Date.now() + '_' + Math.floor(Math.random()*1000),
+      text: title,
+      cbId: this._planCbId(title),
+      date: document.getElementById('ef-date')?.value || '',
+      time: document.getElementById('ef-time-task')?.value || '',
+      done: false,
+      erstellt: today,
+      gewicht: 'mittel',
+      prioLvl: document.getElementById('ef-prio')?.value || 'C',
+      size: document.getElementById('ef-size')?.value || 'M',
+      mustToday: document.getElementById('ef-musttoday')?.checked || false,
+      notes: document.getElementById('ef-notes')?.value || '',
+      aktivEnergie: document.getElementById('ef-aktiv')?.value || 'mittel',
+      kippTyp: document.getElementById('ef-kipp')?.value || '',
+      checklist: this._efChkGetList ? this._efChkGetList() : [],
+    };
+    v.planAufgaben.push(aufg);
+    // Als ☐-Zeile in den Inhalt übernehmen, damit das Inline-System sie zeigt
+    v.inhalt = (v.inhalt || '') + '<div>\u2610 ' + this._esc(title) + '</div>';
+    v.geaendert = Date.now();
+    this.setDirty();
+    this.editClose();
+    this._vhTaskTargetId = null;
+    this._vorhabenDetailRender();
+    this._toast('Aufgabe angelegt');
   },
 
   _vorhabenMetrikLog(mi) {
@@ -24545,8 +24597,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   // ── Aufgabe / Termin bearbeiten ──────────────────────
 
   // ── Einheitliches Aufgaben-Formular (v3.42.0) ─────────
-  _taskFormHtml(t, ctx, pKey, db, isNew) {
+  _taskFormHtml(t, ctx, pKey, db, isNew, vorhabenMode) {
     const today = new Date().toISOString().split('T')[0];
+    const vh = !!vorhabenMode;  // v3.99.0: im Vorhaben-Kontext irrelevante Felder ausblenden
     const prioVal = t ? (t.prio === true || t.prioLvl === 'A' ? 'A' : t.prioLvl === 'B' ? 'B' : 'C') : 'C';
 
     // Projekt + Bereiche in <optgroup> aufteilen
@@ -24612,7 +24665,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '</div>'
 
       // Zeile: Welt + Status
-      + '<div class="edit-row">'
+      + (vh ? '' : '<div class="edit-row">'
       + '<div class="edit-field"><label>Welt</label><select id="ef-welt">'
       + `<option value="pro"${ctx==='pro'?' selected':''}>Beruf</option>`
       + `<option value="priv"${ctx==='priv'?' selected':''}>Privat</option>`
@@ -24620,10 +24673,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<div class="edit-field"><label>Status</label><select id="ef-status">'
       + ['aktiv','wartend','delegiert'].map(s=>`<option${(t?.status||'aktiv')===s?' selected':''}>${s}</option>`).join('')
       + '</select></div>'
-      + '</div>'
+      + '</div>')
 
       // Projekt / Bereich
-      + `<div class="edit-field"><label>Projekt / Bereich</label>${projSelect}</div>`
+      + (vh ? '' : `<div class="edit-field"><label>Projekt / Bereich</label>${projSelect}</div>`)
 
       // Wiederkehrend
       + `<div class="edit-field" style="display:flex;align-items:center;gap:10px;">`
@@ -24651,15 +24704,15 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<label for="ef-musttoday" style="cursor:pointer;font-size:0.88rem;font-weight:500;color:#C62828;">Muss heute erledigt werden</label>'
       + '</div>'
 
-      // Ziel-Zuordnung
-      + '<div class="edit-field"><label style="display:flex;align-items:center;gap:6px;">Warum / Ziel <span style="font-size:0.72rem;color:var(--c-faint);font-weight:400;">(optional)</span></label>'
+      // Ziel-Zuordnung (im Vorhaben-Kontext irrelevant — Vorhaben IST das Ziel)
+      + (vh ? '' : '<div class="edit-field"><label style="display:flex;align-items:center;gap:6px;">Warum / Ziel <span style="font-size:0.72rem;color:var(--c-faint);font-weight:400;">(optional)</span></label>'
       + '<select id="ef-goal-id">'
       + '<option value="">— Kein Ziel (Alltag/Pflicht)</option>'
       + (this._goalStore()||[]).map(g =>
           '<option value="' + g.id + '"' + (t?.goalId===g.id?' selected':'') + '>' + g.title + '</option>'
         ).join('')
       + '</select>'
-      + '</div>'
+      + '</div>')
 
       // v3.98.0: Aktivierungsenergie + Kippmoment-Typ
       + this._aktivEnergiePills(t?.aktivEnergie, 'ef-aktiv')
@@ -24951,6 +25004,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _editSaveInner() {
     const {_editType:type, _editCtx:ctx, _editPKey:pKey, _editId:id} = this;
+    // v3.99.0: Vorhaben-Aufgabe aus Vollformular
+    if (type === 'vorhaben-task-new') { this._vorhabenTaskFormSave(); return; }
     let db = ctx==='pro' ? this.dataPro : this.dataPriv;
     if(!db || !type) return;
     const title = document.getElementById('ef-title')?.value.trim();
