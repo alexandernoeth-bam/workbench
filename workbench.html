@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.99.3</title>
+<title>WorkBench 3.99.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8008,7 +8008,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.99.3 · Build 20260604-0452</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.99.4 · Build 20260604-0530</div>
     </div>
 
     <!-- Welt -->
@@ -8173,8 +8173,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.99.3',
-  APP_BUILD:   '20260604-0452',
+  APP_VERSION: '3.99.4',
+  APP_BUILD:   '20260604-0530',
 
 
   // ══════════════════════════════════════════════════════
@@ -13392,6 +13392,23 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       });
     });
 
+    // ── B2: Aufgaben aus Vorhaben (v3.99.4) ───────────────
+    (this._vorhabenAlle ? this._vorhabenAlle() : []).forEach(v => {
+      (v.planAufgaben || []).filter(a => !a.done && (a.date === today || a.planerDate === today)).forEach(a => {
+        items.push({
+          type:  'vorhaben-aufgabe',
+          time:  a.planerSlot === 'vm' ? '07:00' : a.planerSlot === 'nm' ? '12:00' : a.planerSlot === 'ab' ? '18:00' : (a.time || ''),
+          title: a.text,
+          meta:  (v.titel || 'Vorhaben'),
+          done:  false,
+          ctx:   v.welt === 'pro' ? 'pro' : 'priv',
+          id:    a.id,
+          vorhabenId: v.id,
+          obj:   a,
+        });
+      });
+    });
+
     // ── C: Heutige Wochenpflichten (nur genau heute fällig, nicht überfällige)
     ['pro','priv'].forEach(ctx => {
       const store = this._dutyStore(ctx) || [];
@@ -13508,6 +13525,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         let onclick = '';
         if (item.type === 'termin') onclick = 'WB._openEvent(&quot;' + item.id + '&quot;,&quot;' + (item.ctx||'') + '&quot;)';
         else if (item.type === 'aufgabe') onclick = 'WB.openTaskDetail(&quot;' + (item.pKey||'').replace(/"/g,'&quot;') + '&quot;,&quot;' + item.id + '&quot;,&quot;' + item.ctx + '&quot;)';
+        else if (item.type === 'vorhaben-aufgabe') onclick = 'WB.vorhabenOpen(&quot;' + item.vorhabenId + '&quot;)';
         else if (item.type === 'pflicht') onclick = 'WB.dutiesOpen()';
         else if (item.type === 'checklist') onclick = 'WB.clDetailOpen(&quot;' + item.id + '&quot;)';
         else if (item.type === 'quick') onclick = '';
@@ -13518,6 +13536,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         } else if (item.type === 'aufgabe') {
           const pid = (item.pKey||'').replace(/"/g,'&quot;');
           chkHtml = '<input type="checkbox" class="ck-liste-chk" onclick="event.stopPropagation();WB._doneTask(&quot;' + pid + '&quot;,&quot;' + item.id + '&quot;,&quot;' + item.ctx + '&quot;,this)">';
+        } else if (item.type === 'vorhaben-aufgabe') {
+          chkHtml = '<input type="checkbox" class="ck-liste-chk" onclick="event.stopPropagation();WB._vorhabenAufgabeToggleFromList(&quot;' + item.vorhabenId + '&quot;,&quot;' + item.id + '&quot;,this)">';
         } else if (item.type === 'pflicht') {
           chkHtml = '<input type="checkbox" class="ck-liste-chk" onclick="event.stopPropagation();WB._dutyToggleFromList(&quot;' + item.id + '&quot;,&quot;' + item.ctx + '&quot;,this)">';
         } else if (item.type === 'checklist') {
@@ -13554,6 +13574,27 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     } else {
       delete duty.instances[key];
     }
+    this.setDirty();
+    setTimeout(() => this.renderCockpit(), 600);
+  },
+
+  // v3.99.4: Vorhaben-Aufgabe von der Tagesliste aus abhaken (wirkt zurück aufs Vorhaben)
+  _vorhabenAufgabeToggleFromList(vorhabenId, aufgabeId, chk) {
+    const found = this._vorhabenFind ? this._vorhabenFind(vorhabenId) : null;
+    const v = found?.vorhaben;
+    if (!v) return;
+    const a = (v.planAufgaben || []).find(x => x.id === aufgabeId);
+    if (!a) return;
+    a.done = chk ? chk.checked : !a.done;
+    // ☐→☑ im Inline-Inhalt nachziehen (falls dort als Zeile vorhanden)
+    if (a.cbId && v.inhalt) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = v.inhalt;
+      const wrap = tmp.querySelector('.pcb-wrap[data-cbid="' + a.cbId + '"]');
+      if (wrap) wrap.dataset.done = a.done ? '1' : '0';
+      v.inhalt = tmp.innerHTML;
+    }
+    v.geaendert = Date.now();
     this.setDirty();
     setTimeout(() => this.renderCockpit(), 600);
   },
@@ -22664,6 +22705,23 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           mustToday: !!a.mustToday, score });
       });
     });
+    // v3.99.4: Aufgaben aus Vorhaben einspeisen
+    (this._vorhabenAlle ? this._vorhabenAlle() : []).forEach(v => {
+      (v.planAufgaben || []).filter(a => !a.done).forEach(a => {
+        let gruppe = 'irgendwann';
+        if (a.date && a.date < today)        gruppe = 'baustelle';
+        else if (v.isBaustelle)              gruppe = 'baustelle';
+        else if (a.date && a.date <= in7str) gruppe = 'woche';
+        else if (a.date)                     gruppe = 'pipeline';
+        if (!a.erstellt) { a.erstellt = today; }
+        const score = this._planerBacklogScore(a, today, todayMs);
+        result.push({ id:a.id, text:a.text, date:a.date||'', done:false,
+          vorhabenId:v.id, notizTitel:(v.titel||'Vorhaben'), gruppe,
+          planerSlot:a.planerSlot, planerDate:a.planerDate,
+          gewicht: a.gewicht || 'mittel', erstellt: a.erstellt,
+          mustToday: !!a.mustToday, score });
+      });
+    });
     return result;
   },
 
@@ -22694,9 +22752,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _planerSlotPlan(aufgabeId, notizId, slot, dateStr) {
-    const notiz = this._nzStore().find(n => n.id === notizId);
-    if (!notiz) return;
-    const a = (notiz.planAufgaben||[]).find(x => x.id === aufgabeId);
+    let a = null;
+    const notiz = notizId ? this._nzStore().find(n => n.id === notizId) : null;
+    if (notiz) a = (notiz.planAufgaben||[]).find(x => x.id === aufgabeId);
+    // v3.99.4: Fallback — Aufgabe in Vorhaben suchen
+    if (!a) {
+      (this._vorhabenAlle ? this._vorhabenAlle() : []).some(v => {
+        const cand = (v.planAufgaben||[]).find(x => x.id === aufgabeId);
+        if (cand) { a = cand; return true; }
+        return false;
+      });
+    }
     if (!a) return;
     a.planerSlot = slot; a.planerDate = dateStr;
     if (!a.date) a.date = dateStr;
@@ -22704,20 +22770,43 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _planerSlotPlanRemove(aufgabeId, notizId) {
-    const notiz = this._nzStore().find(n => n.id === notizId);
-    if (!notiz) return;
-    const a = (notiz.planAufgaben||[]).find(x => x.id === aufgabeId);
+    let a = null;
+    const notiz = notizId ? this._nzStore().find(n => n.id === notizId) : null;
+    if (notiz) a = (notiz.planAufgaben||[]).find(x => x.id === aufgabeId);
+    if (!a) {
+      (this._vorhabenAlle ? this._vorhabenAlle() : []).some(v => {
+        const cand = (v.planAufgaben||[]).find(x => x.id === aufgabeId);
+        if (cand) { a = cand; return true; }
+        return false;
+      });
+    }
     if (!a) return;
     delete a.planerSlot; delete a.planerDate;
     this.setDirty(); this.renderPlaner();
   },
 
   _planerTaskPlanDone(aufgabeId, notizId) {
-    const notiz = this._nzStore().find(n => n.id === notizId);
-    if (!notiz) return;
-    const a = (notiz.planAufgaben||[]).find(x => x.id === aufgabeId);
+    let a = null, vorhaben = null;
+    const notiz = notizId ? this._nzStore().find(n => n.id === notizId) : null;
+    if (notiz) a = (notiz.planAufgaben||[]).find(x => x.id === aufgabeId);
+    // v3.99.4: Fallback — in Vorhaben suchen
+    if (!a) {
+      (this._vorhabenAlle ? this._vorhabenAlle() : []).some(v => {
+        const cand = (v.planAufgaben||[]).find(x => x.id === aufgabeId);
+        if (cand) { a = cand; vorhaben = v; return true; }
+        return false;
+      });
+    }
     if (!a) return;
     a.done = !a.done;
+    // ☐→☑ im Vorhaben-Inhalt nachziehen
+    if (vorhaben && a.cbId && vorhaben.inhalt) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = vorhaben.inhalt;
+      const wrap = tmp.querySelector('.pcb-wrap[data-cbid="' + a.cbId + '"]');
+      if (wrap) wrap.dataset.done = a.done ? '1' : '0';
+      vorhaben.inhalt = tmp.innerHTML;
+    }
     this.setDirty(); this.renderPlaner();
   },
 
@@ -22864,6 +22953,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         if (!a.planerSlot || a.planerDate !== dateStr) return;
         if (!planned[a.planerSlot]) return;
         planned[a.planerSlot].push({ a, notiz });
+      });
+    });
+    // v3.99.4: Eingeplante Vorhaben-Aufgaben (Ersatz-notiz-Objekt für unverändertes Render)
+    (this._vorhabenAlle ? this._vorhabenAlle() : []).forEach(v => {
+      (v.planAufgaben || []).forEach(a => {
+        if (!a.planerSlot || a.planerDate !== dateStr) return;
+        if (!planned[a.planerSlot]) return;
+        planned[a.planerSlot].push({ a, notiz: { id: v.id, titel: v.titel || 'Vorhaben' } });
       });
     });
 
@@ -23049,9 +23146,16 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   // Manuelles Gewicht einer Plan-Aufgabe setzen
   _planerSetGewicht(aufgabeId, notizId, gewicht) {
-    const notiz = this._nzStore().find(n => n.id === notizId);
-    if (!notiz) return;
-    const a = (notiz.planAufgaben || []).find(x => x.id === aufgabeId);
+    let a = null;
+    const notiz = notizId ? this._nzStore().find(n => n.id === notizId) : null;
+    if (notiz) a = (notiz.planAufgaben || []).find(x => x.id === aufgabeId);
+    if (!a) {
+      (this._vorhabenAlle ? this._vorhabenAlle() : []).some(v => {
+        const cand = (v.planAufgaben||[]).find(x => x.id === aufgabeId);
+        if (cand) { a = cand; return true; }
+        return false;
+      });
+    }
     if (!a) return;
     a.gewicht = gewicht;
     this.setDirty();
