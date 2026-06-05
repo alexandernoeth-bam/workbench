@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.99.2</title>
+<title>WorkBench 3.99.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5838,6 +5838,20 @@ html, body {
 .vh-tb-sep { width: 1px; height: 18px; background: var(--c-border); margin: 0 3px; }
 /* Vollbild-Modus des Vorhaben-Detail */
 #wb-vorhaben-detail.vh-ed-fullscreen #vh-inhalt-content { max-height: none; min-height: 70vh; }
+/* Einklappbare Absätze */
+#vh-inhalt-content details { border-left: 2px solid var(--c-border); padding: 4px 0 4px 12px; margin: 4px 0; }
+#vh-inhalt-content details summary { cursor: pointer; font-weight: 600; list-style: none; }
+#vh-inhalt-content details summary::-webkit-details-marker { display: none; }
+#vh-inhalt-content details summary::before { content: '▸ '; color: var(--c-muted); }
+#vh-inhalt-content details[open] summary::before { content: '▾ '; }
+/* Inhaltsverzeichnis-Panel */
+.vh-toc-panel { position: absolute; top: 60px; right: 16px; width: 260px; max-height: 60vh; overflow-y: auto; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius-sm); box-shadow: 0 6px 24px rgba(0,0,0,0.18); z-index: 320; display: none; }
+.vh-toc-panel.open { display: block; }
+.vh-toc-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--c-border); font-size: 0.8rem; font-weight: 700; color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.vh-toc-item { padding: 7px 14px; font-size: 0.85rem; color: var(--c-text); cursor: pointer; border-bottom: 1px solid var(--c-border); }
+.vh-toc-item:hover { background: var(--c-bg); }
+.vh-toc-item.h2 { padding-left: 26px; font-size: 0.82rem; }
+.vh-toc-item.h3 { padding-left: 38px; font-size: 0.8rem; color: var(--c-muted); }
 .vh-sek { border: 1px solid var(--c-border); border-radius: var(--radius-sm); margin-bottom: 10px; overflow: hidden; background: var(--c-surface); }
 .vh-sek-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; background: var(--c-bg); border-bottom: 1px solid transparent; user-select: none; }
 .vh-sek-head:hover { background: color-mix(in srgb, var(--c-beruf) 5%, var(--c-bg)); }
@@ -7994,7 +8008,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.99.2 · Build 20260604-0420</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.99.3 · Build 20260604-0452</div>
     </div>
 
     <!-- Welt -->
@@ -8159,8 +8173,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.99.2',
-  APP_BUILD:   '20260604-0420',
+  APP_VERSION: '3.99.3',
+  APP_BUILD:   '20260604-0452',
 
 
   // ══════════════════════════════════════════════════════
@@ -14770,7 +14784,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<span class="vh-tb-sep"></span>'
         + '<button class="vh-tb" onclick="WB._vhCmd(&quot;formatBlock&quot;,&quot;blockquote&quot;)" title="Zitat">&#10077;</button>'
         + '<button class="vh-tb" onclick="WB._vhInsertHr()" title="Trennlinie">&#8213;</button>'
+        + '<button class="vh-tb" onclick="WB._vhToggleCollapse()" title="Absatz einklappbar machen / aufheben">&#8862;</button>'
         + '<button class="vh-tb" onclick="WB._vhCmd(&quot;removeFormat&quot;)" title="Format entfernen">&#10006;</button>'
+        + '<button class="vh-tb" onclick="WB._vhTocOpen()" title="Inhaltsverzeichnis">&#9776;</button>'
         + '<button class="vh-tb" id="vh-ed-fs-btn" style="margin-left:auto;" onclick="WB._vhToggleFullscreen()" title="Vollbild">&#x26F6;</button>'
         + '</div>'
         + '<div id="vh-inhalt-content" contenteditable="true" '
@@ -15247,6 +15263,89 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (btn) btn.textContent = this._vhFsActive ? '\u2715' : '\u26F6';
     // Beim Verlassen speichern
     if (!this._vhFsActive) this._vorhabenInlineSave();
+  },
+
+  // Inhaltsverzeichnis (Adaption von nzTocOpen, auf vh-inhalt-content)
+  _vhTocOpen() {
+    const cnt = document.getElementById('vh-inhalt-content');
+    const list = document.getElementById('vh-toc-list');
+    const panel = document.getElementById('vh-toc-panel');
+    if (!cnt || !list || !panel) return;
+    const headings = [...cnt.querySelectorAll('h1,h2,h3')];
+    if (!headings.length) {
+      list.innerHTML = '<div style="padding:12px 14px;font-size:0.82rem;color:var(--c-faint);">Keine Überschriften gefunden.</div>';
+    } else {
+      list.innerHTML = headings.map((h, i) => {
+        const id = 'vh-h-' + i; h.id = id;
+        const lvl = h.tagName.toLowerCase();
+        return '<div class="vh-toc-item ' + lvl + '" onclick="WB._vhTocGo(&quot;' + id + '&quot;)">' + (h.textContent.trim() || '(leer)') + '</div>';
+      }).join('');
+    }
+    panel.classList.toggle('open');
+  },
+  _vhTocClose() {
+    document.getElementById('vh-toc-panel')?.classList.remove('open');
+  },
+  _vhTocGo(id) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    this._vhTocClose();
+  },
+
+  // Einklappbare Absätze (Adaption von nzToggleCollapse, auf vh-inhalt-content)
+  _vhToggleCollapse() {
+    const ed = document.getElementById('vh-inhalt-content');
+    if (!ed) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) { this._toast('Bitte zuerst Zeilen markieren'); return; }
+    const range = sel.getRangeAt(0);
+
+    // Bereits in einem details? → aufheben
+    let checkNode = range.startContainer;
+    while (checkNode && checkNode !== ed) {
+      if (checkNode.tagName === 'DETAILS') {
+        const summary = checkNode.querySelector('summary');
+        const frag = document.createDocumentFragment();
+        const titleP = document.createElement('p');
+        titleP.innerHTML = summary ? summary.innerHTML : '';
+        frag.appendChild(titleP);
+        Array.from(checkNode.childNodes).forEach(n => { if (n !== summary) frag.appendChild(n.cloneNode(true)); });
+        checkNode.parentNode.replaceChild(frag, checkNode);
+        sel.removeAllRanges();
+        this._vorhabenInlineSave();
+        this._toast('Einklappbar aufgehoben');
+        return;
+      }
+      checkNode = checkNode.parentNode;
+    }
+
+    const div = document.createElement('div');
+    div.appendChild(range.cloneContents());
+    const selectedHtml = div.innerHTML;
+
+    const details = document.createElement('details');
+    details.setAttribute('open', '');
+    details.style.cssText = 'border-left:2px solid var(--c-border);padding:4px 0 4px 12px;margin:4px 0;';
+    const summary = document.createElement('summary');
+    summary.style.cssText = 'cursor:pointer;font-weight:600;list-style:none;';
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = selectedHtml;
+    const allNodes = Array.from(tempDiv.childNodes);
+    if (allNodes.length === 0) { this._toast('Bitte Zeilen markieren'); return; }
+
+    const firstNode = allNodes[0];
+    summary.innerHTML = firstNode.innerHTML || firstNode.textContent || '';
+    details.appendChild(summary);
+    if (allNodes.length > 1) {
+      const content = document.createElement('div');
+      allNodes.slice(1).forEach(n => content.appendChild(n.cloneNode(true)));
+      details.appendChild(content);
+    }
+    range.deleteContents();
+    range.insertNode(details);
+    sel.removeAllRanges();
+    this._vorhabenInlineSave();
+    this._toast('✓ Einklappbar — ⊟ nochmal zum Aufheben');
   },
 
   // Nur den Fortschrittsbalken neu berechnen (ohne ganzes Detail-Rerender, um Cursor zu schonen)
@@ -27179,6 +27278,14 @@ WB.init();
     <div id="wb-vorhaben-detail-titel" style="flex:1;font-size:1rem;font-weight:800;color:var(--c-text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Vorhaben</div>
   </div>
   <div id="wb-vorhaben-detail-body" style="flex:1;overflow-y:auto;padding:16px;"></div>
+  <!-- Inhaltsverzeichnis-Panel (v3.99.3) -->
+  <div id="vh-toc-panel" class="vh-toc-panel">
+    <div class="vh-toc-head">
+      <span>Inhaltsverzeichnis</span>
+      <button onclick="WB._vhTocClose()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--c-muted);padding:0;line-height:1;">&times;</button>
+    </div>
+    <div id="vh-toc-list"></div>
+  </div>
 </div>
 <!-- BACKLOG OVERLAY -->
 <div id="wb-backlog-overlay" style="position:fixed;inset:0;z-index:500;background:var(--c-bg);display:none;flex-direction:column;">
