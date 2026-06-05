@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.99.0</title>
+<title>WorkBench 3.99.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7980,7 +7980,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.99.0 · Build 20260604-0312</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.99.1 · Build 20260604-0348</div>
     </div>
 
     <!-- Welt -->
@@ -8145,8 +8145,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.99.0',
-  APP_BUILD:   '20260604-0312',
+  APP_VERSION: '3.99.1',
+  APP_BUILD:   '20260604-0348',
 
 
   // ══════════════════════════════════════════════════════
@@ -14887,26 +14887,23 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (existingDanger) existingDanger.remove();
     if (titleEl) titleEl.childNodes[0].textContent = 'Neue Aufgabe ';
     if (body) body.innerHTML = this._taskFormHtml(null, ctx, null, db, true, true); // vorhabenMode=true
-    document.getElementById('edit-overlay').classList.add('open');
+    const ov = document.getElementById('edit-overlay');
+    ov.style.zIndex = '350';   // v3.99.1: über Vorhaben-Detail (z-index 300)
+    ov.classList.add('open');
   },
 
-  // Speichern einer Vorhaben-Aufgabe aus dem Vollformular
-  _vorhabenTaskFormSave() {
+  // Speichern einer Vorhaben-Aufgabe aus dem Vollformular (isEdit = bestehende aktualisieren)
+  _vorhabenTaskFormSave(isEdit) {
     const v = this._vhTaskTargetId ? this._vorhabenFind(this._vhTaskTargetId)?.vorhaben : null;
     if (!v) { this.editClose(); return; }
     const title = document.getElementById('ef-title')?.value.trim();
     if (!title) { this._toast('Bitte Titel eingeben'); return; }
     const today = new Date().toISOString().split('T')[0];
     if (!v.planAufgaben) v.planAufgaben = [];
-    const aufg = {
-      id: 'pa_' + Date.now() + '_' + Math.floor(Math.random()*1000),
-      text: title,
-      cbId: this._planCbId(title),
+
+    const felder = {
       date: document.getElementById('ef-date')?.value || '',
       time: document.getElementById('ef-time-task')?.value || '',
-      done: false,
-      erstellt: today,
-      gewicht: 'mittel',
       prioLvl: document.getElementById('ef-prio')?.value || 'C',
       size: document.getElementById('ef-size')?.value || 'M',
       mustToday: document.getElementById('ef-musttoday')?.checked || false,
@@ -14915,15 +14912,46 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       kippTyp: document.getElementById('ef-kipp')?.value || '',
       checklist: this._efChkGetList ? this._efChkGetList() : [],
     };
-    v.planAufgaben.push(aufg);
-    // Als ☐-Zeile in den Inhalt übernehmen, damit das Inline-System sie zeigt
-    v.inhalt = (v.inhalt || '') + '<div>\u2610 ' + this._esc(title) + '</div>';
+
+    if (isEdit && this._vhTaskEditId) {
+      // Bestehende Aufgabe aktualisieren
+      const a = v.planAufgaben.find(x => x.id === this._vhTaskEditId);
+      if (a) {
+        const altCbId = a.cbId;
+        const textGeaendert = (a.text || '').trim() !== title;
+        Object.assign(a, felder);
+        a.text = title;
+        if (textGeaendert) {
+          a.cbId = this._planCbId(title);
+          // ☐-Zeile/Wrap im Inhalt nachziehen
+          const tmp = document.createElement('div');
+          tmp.innerHTML = v.inhalt || '';
+          const wrap = altCbId && tmp.querySelector('.pcb-wrap[data-cbid="' + altCbId + '"]');
+          if (wrap) { wrap.dataset.cbid = a.cbId; wrap.dataset.cbText = title; }
+          v.inhalt = tmp.innerHTML;
+        }
+      }
+    } else {
+      // Neue Aufgabe
+      const aufg = Object.assign({
+        id: 'pa_' + Date.now() + '_' + Math.floor(Math.random()*1000),
+        text: title,
+        cbId: this._planCbId(title),
+        done: false,
+        erstellt: today,
+        gewicht: 'mittel',
+      }, felder);
+      v.planAufgaben.push(aufg);
+      v.inhalt = (v.inhalt || '') + '<div>\u2610 ' + this._esc(title) + '</div>';
+    }
+
     v.geaendert = Date.now();
     this.setDirty();
     this.editClose();
     this._vhTaskTargetId = null;
+    this._vhTaskEditId = null;
     this._vorhabenDetailRender();
-    this._toast('Aufgabe angelegt');
+    this._toast(isEdit ? 'Aufgabe gespeichert' : 'Aufgabe angelegt');
   },
 
   _vorhabenMetrikLog(mi) {
@@ -15174,14 +15202,59 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!v) return;
     const a = (v.planAufgaben || []).find(x => x.cbId === cbId);
     if (!a) return;
-    this._padKontext = 'vorhaben';
-    this._planDetailAktiv = { vorhabenId: v.id, aufgabeId: a.id };
-    document.getElementById('pad-text').value = a.text || '';
-    document.getElementById('pad-date').value = a.date || '';
-    document.getElementById('pad-done').checked = !!a.done;
-    document.querySelectorAll('.pad-gew-btn').forEach(b => b.classList.toggle('active', b.dataset.gew === (a.gewicht || 'mittel')));
-    this._padGewWahl = a.gewicht || 'mittel';
-    document.getElementById('wb-plan-aufg-detail').classList.add('open');
+    const ctx = v.welt === 'pro' ? 'pro' : 'priv';
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    this._editType = 'vorhaben-task-edit';
+    this._editCtx  = ctx;
+    this._vhTaskTargetId = v.id;
+    this._vhTaskEditId   = a.id;   // bestehende Aufgabe aktualisieren
+    const titleEl = document.getElementById('edit-title');
+    const body    = document.getElementById('edit-body');
+    const delBtn  = document.getElementById('edit-delete-btn');
+    if (delBtn) delBtn.style.display = 'none';
+    const existingDanger = document.querySelector('.edit-actions .danger');
+    if (existingDanger) existingDanger.remove();
+    if (titleEl) titleEl.childNodes[0].textContent = 'Aufgabe bearbeiten ';
+    // Vollformular vorbefüllt mit der Aufgabe (vorhabenMode)
+    if (body) body.innerHTML = this._taskFormHtml(a, ctx, null, db, false, true);
+    // Löschen-Button
+    const actions = document.querySelector('.edit-actions');
+    if (actions) {
+      const del = document.createElement('button');
+      del.className = 'edit-btn danger';
+      del.textContent = 'Löschen';
+      del.onclick = () => this._vorhabenTaskFormDelete();
+      actions.prepend(del);
+    }
+    const ov = document.getElementById('edit-overlay');
+    ov.style.zIndex = '350';   // über Vorhaben-Detail
+    ov.classList.add('open');
+  },
+
+  _vorhabenTaskFormDelete() {
+    const v = this._vhTaskTargetId ? this._vorhabenFind(this._vhTaskTargetId)?.vorhaben : null;
+    if (v && this._vhTaskEditId) {
+      const a = (v.planAufgaben || []).find(x => x.id === this._vhTaskEditId);
+      const cbId = a?.cbId;
+      const idx = (v.planAufgaben || []).findIndex(x => x.id === this._vhTaskEditId);
+      if (idx >= 0) v.planAufgaben.splice(idx, 1);
+      // ☐-Zeile aus Inhalt entfernen
+      if (cbId) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = v.inhalt || '';
+        const wrap = tmp.querySelector('.pcb-wrap[data-cbid="' + cbId + '"]');
+        if (wrap) wrap.remove();
+        v.inhalt = tmp.innerHTML;
+      }
+      v.geaendert = Date.now();
+      this.setDirty();
+    }
+    this._vhTaskEditId = null;
+    this._vhTaskTargetId = null;
+    this.editClose();
+    this._vorhabenDetailRender();
+    this._toast('Aufgabe gelöscht');
   },
 
   // ── VORHABEN-MIGRATION (Stufe 3c) ─────────────────────
@@ -24991,7 +25064,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   editClose() {
-    document.getElementById('edit-overlay')?.classList.remove('open');
+    const ov = document.getElementById('edit-overlay');
+    ov?.classList.remove('open');
+    if (ov) ov.style.zIndex = '';   // v3.99.1: temporären z-index (Vorhaben) zurücksetzen
     const delBtn2 = document.getElementById('edit-delete-btn');
     if (delBtn2) delBtn2.style.display = 'none';
     this._editType = null;
@@ -25004,8 +25079,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _editSaveInner() {
     const {_editType:type, _editCtx:ctx, _editPKey:pKey, _editId:id} = this;
-    // v3.99.0: Vorhaben-Aufgabe aus Vollformular
-    if (type === 'vorhaben-task-new') { this._vorhabenTaskFormSave(); return; }
+    // v3.99.0/3.99.1: Vorhaben-Aufgabe aus Vollformular
+    if (type === 'vorhaben-task-new')  { this._vorhabenTaskFormSave(); return; }
+    if (type === 'vorhaben-task-edit') { this._vorhabenTaskFormSave(true); return; }
     let db = ctx==='pro' ? this.dataPro : this.dataPriv;
     if(!db || !type) return;
     const title = document.getElementById('ef-title')?.value.trim();
