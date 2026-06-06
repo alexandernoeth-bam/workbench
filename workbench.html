@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.1.5</title>
+<title>WorkBench 4.1.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8051,7 +8051,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.1.5 · Build 20260606-0842</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.1.6 · Build 20260606-0915</div>
     </div>
 
     <!-- Welt -->
@@ -8216,8 +8216,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.1.5',
-  APP_BUILD:   '20260606-0842',
+  APP_VERSION: '4.1.6',
+  APP_BUILD:   '20260606-0915',
 
 
   // ══════════════════════════════════════════════════════
@@ -12040,8 +12040,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + rows;
   },
 
+  // v4.1.6: Helfer — Store der aktuell gewählten Schnell-Liste-Welt
+  _schnellWeltStore() {
+    const w = this._schnellWelt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const db = w === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return null;
+    if (!db.quickItems) db.quickItems = [];
+    return db.quickItems;
+  },
+
   _schnellToggle(id) {
-    const store = this._quickStore();
+    const store = this._schnellWeltStore();
     if (!store) return;
     const item = store.find(i => i.id === id);
     if (!item) return;
@@ -12052,7 +12061,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _schnellDelete(id) {
-    const store = this._quickStore();
+    const store = this._schnellWeltStore();
     if (!store) return;
     const idx = store.findIndex(i => i.id === id);
     if (idx !== -1) store.splice(idx, 1);
@@ -14253,8 +14262,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _quickDetail(id) {
     // Universelles Sheet: id=null -> Neu anlegen, id=string -> Bearbeiten
-    const store = this._quickStore();
-    const item = id ? store?.find(i => i.id === id) : null;
+    // v4.1.6: Store aus _schnellWelt lesen, nicht activeWorld
+    const w = this._schnellWelt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const db = w === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    if (!db.quickItems) db.quickItems = [];
+    const store = db.quickItems;
+    const item = id ? store.find(i => i.id === id) : null;
     const isNew = !item;
     const today = new Date().toISOString().split('T')[0];
 
@@ -14324,12 +14338,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (recur === 'weekly') document.querySelectorAll('.wqa-day:checked').forEach(cb => recurDays.push(+cb.value));
     if (!text) return;
 
-    // v4.1.4: Welt aus _schnellWelt (unabhängig von activeWorld)
-    const w = this._schnellWelt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
-    const db = w === 'pro' ? this.dataPro : this.dataPriv;
-    if (!db) return;
-    if (!db.quickItems) db.quickItems = [];
-    const store = db.quickItems;
+    // v4.1.6: Store aus _schnellWelt
+    const store = this._schnellWeltStore();
+    if (!store) return;
     let item = id ? store.find(i => i.id === id) : null;
 
     if (!item) {
