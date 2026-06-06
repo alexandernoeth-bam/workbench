@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.0.0</title>
+<title>WorkBench 4.0.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5832,6 +5832,16 @@ html, body {
 .vh-ae-badge { font-size: 0.75rem; padding: 1px 5px; border-radius: 8px; flex-shrink: 0; }
 .vh-ae-badge.ae-hoch { background: #fde8e8; color: #C62828; }
 .vh-ae-badge.ae-niedrig { background: #e8f5e9; color: #2E7D32; }
+/* v4.0.1 Ebenen-Liste */
+.vh-gruppe-header { display: flex; align-items: center; gap: 8px; padding: 14px 0 6px; border-bottom: 1px solid var(--c-border); margin-bottom: 8px; }
+.vh-gruppe-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--c-muted); }
+.vh-gruppe-count { font-size: 0.72rem; color: var(--c-faint); background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 10px; padding: 1px 7px; }
+.vh-card-ziel { font-size: 0.82rem; color: var(--c-muted); padding: 3px 0 6px; line-height: 1.4; }
+.vh-card-wartend { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--c-bg); border: 1px solid var(--c-border); border-radius: var(--radius-xs); margin-bottom: 6px; cursor: pointer; }
+.vh-card-wartend:hover { background: var(--c-surface); }
+.vh-ruhend-liste { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0 10px; }
+.vh-ruhend-item { font-size: 0.8rem; color: var(--c-faint); cursor: pointer; padding: 3px 10px; border: 1px solid var(--c-border); border-radius: 12px; background: var(--c-bg); }
+.vh-ruhend-item:hover { color: var(--c-muted); border-color: var(--c-muted); }
 #vh-inhalt-content {
   min-height: 80px; max-height: 45vh; overflow-y: auto;
   border: 1px solid var(--c-border); border-radius: var(--radius-xs);
@@ -8024,7 +8034,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.0.0 · Build 20260605-0900</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.0.1 · Build 20260605-0942</div>
     </div>
 
     <!-- Welt -->
@@ -8189,8 +8199,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.0.0',
-  APP_BUILD:   '20260605-0900',
+  APP_VERSION: '4.0.1',
+  APP_BUILD:   '20260605-0942',
 
 
   // ══════════════════════════════════════════════════════
@@ -14685,21 +14695,57 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       return;
     }
 
-    body.innerHTML = store.map(v => {
-      const typ = this.PLAN_TYPEN[v.typ] || this.PLAN_TYPEN.allgemein;
-      const p = this._vorhabenProgress(v);
-      const metricInfo = (p.metricPct !== null) ? ' · Messung ' + p.metricPct + '%' : '';
-      const baustelle = v.isBaustelle ? '<span class="vh-card-baustelle">⚠ Baustelle</span>' : '';
-      return '<div class="vh-card" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
-        + '<div class="vh-card-head">'
-        + '<span class="vh-card-icon">' + typ.icon + '</span>'
-        + '<span class="vh-card-title">' + this._esc(v.titel) + '</span>'
-        + baustelle
-        + '</div>'
-        + '<div class="vh-card-bar"><div class="vh-card-bar-fill" style="width:' + p.aufgabenPct + '%;"></div></div>'
-        + '<div class="vh-card-meta">' + p.done + '/' + p.total + ' Aufgaben · ' + p.aufgabenPct + '%' + metricInfo + ' · ' + typ.label + '</div>'
+    // v4.0.1: Nach Ebenen gruppieren
+    const gruppen = [
+      { id: 'aktiv',   label: 'Aktiv',   leer: 'Noch keine aktiven Vorhaben.' },
+      { id: 'wartend', label: 'Wartend', leer: 'Keine wartenden Vorhaben.' },
+      { id: 'ruhend',  label: 'Ruhend',  leer: null },
+    ];
+    let html = '';
+    gruppen.forEach(g => {
+      const items = store.filter(v => (v.aktivitaet || 'aktiv') === g.id);
+      if (!items.length && !g.leer) return; // Ruhend weglassen wenn leer
+      html += '<div class="vh-gruppe-header">'
+        + '<span class="vh-gruppe-label">' + g.label + '</span>'
+        + '<span class="vh-gruppe-count">' + items.length + '</span>'
         + '</div>';
-    }).join('');
+      if (!items.length) {
+        html += '<div style="font-size:0.83rem;color:var(--c-faint);padding:10px 4px;">' + g.leer + '</div>';
+        return;
+      }
+      if (g.id === 'aktiv') {
+        // Aktiv: volle Karte mit Ziel + Fortschritt
+        html += items.map(v => {
+          const typ = this.PLAN_TYPEN[v.typ] || this.PLAN_TYPEN.allgemein;
+          const p = this._vorhabenProgress(v);
+          const stichtag = v.stichtag ? ' · bis ' + v.stichtag : '';
+          return '<div class="vh-card" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
+            + '<div class="vh-card-head">'
+            + '<span class="vh-card-icon">' + typ.icon + '</span>'
+            + '<span class="vh-card-title">' + this._esc(v.titel) + '</span>'
+            + '</div>'
+            + (v.ziel ? '<div class="vh-card-ziel">' + this._esc(v.ziel) + '</div>' : '')
+            + '<div class="vh-card-bar"><div class="vh-card-bar-fill" style="width:' + p.aufgabenPct + '%;"></div></div>'
+            + '<div class="vh-card-meta">' + p.done + '/' + p.total + ' Schritte · ' + p.aufgabenPct + '%' + stichtag + '</div>'
+            + '</div>';
+        }).join('');
+      } else if (g.id === 'wartend') {
+        // Wartend: nur Titel, kein Inhalt
+        html += items.map(v => {
+          const typ = this.PLAN_TYPEN[v.typ] || this.PLAN_TYPEN.allgemein;
+          return '<div class="vh-card vh-card-wartend" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
+            + '<span class="vh-card-icon" style="opacity:0.5;">' + typ.icon + '</span>'
+            + '<span class="vh-card-title" style="color:var(--c-muted);">' + this._esc(v.titel) + '</span>'
+            + '</div>';
+        }).join('');
+      } else {
+        // Ruhend: minimal, nur Name
+        html += '<div class="vh-ruhend-liste">'
+          + items.map(v => '<span class="vh-ruhend-item" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">' + this._esc(v.titel) + '</span>').join('')
+          + '</div>';
+      }
+    });
+    body.innerHTML = html;
   },
 
   // Platzhalter — wird in 3d-2 mit Detail gefüllt
@@ -14749,10 +14795,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     ).join('');
     sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto;">'
       + '<div style="font-size:0.8rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:8px;">Neues Vorhaben · ' + (this.activeWorld === 'beruf' ? 'Beruf' : 'Privat') + '</div>'
-      + '<input id="vh-neu-titel" type="text" placeholder="Titel des Vorhabens…" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:14px;">'
-      + '<div style="font-size:0.74rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--c-muted);margin-bottom:6px;">Typ</div>'
-      + typOpts
-      + '<button onclick="WB._vorhabenNeuSave()" style="width:100%;margin-top:10px;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.92rem;font-weight:700;cursor:pointer;">Anlegen</button>'
+      + '<input id="vh-neu-titel" type="text" placeholder="Wie heißt das Vorhaben?" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:10px;">'
+      + '<input id="vh-neu-ziel" type="text" placeholder="Was will ich erreichen? (ein Satz, optional)" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);margin-bottom:10px;">'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'
+      + '<label style="font-size:0.78rem;color:var(--c-muted);white-space:nowrap;">Bis wann?</label>'
+      + '<input id="vh-neu-stichtag" type="date" style="flex:1;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">'
+      + '</div>'
+      + '<button onclick="WB._vorhabenNeuSave()" style="width:100%;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.92rem;font-weight:700;cursor:pointer;">Anlegen</button>'
       + '</div>';
     document.body.appendChild(sheet);
     this._vorhabenNeuTypWahl = 'allgemein';
@@ -14771,6 +14820,11 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const titel = (document.getElementById('vh-neu-titel')?.value || '').trim();
     if (!titel) { this._toast('Bitte Titel eingeben'); document.getElementById('vh-neu-titel')?.focus(); return; }
     const v = this.vorhabenNeu(titel, this._vorhabenNeuTypWahl || 'allgemein');
+    if (v) {
+      v.ziel = (document.getElementById('vh-neu-ziel')?.value || '').trim();
+      v.stichtag = document.getElementById('vh-neu-stichtag')?.value || '';
+      if (v.ziel || v.stichtag) this.setDirty();
+    }
     document.getElementById('wb-vorhaben-neu-sheet')?.remove();
     if (v) { this._vorhabenListeRender(); this._toast('✓ Vorhaben angelegt'); }
   },
@@ -27427,6 +27481,11 @@ WB.init();
       <div class="ritual-sub" id="ritual-date">–</div>
       <div id="ritual-overview"></div>
       <button class="ritual-btn primary" onclick="WB._ritualGoto(2)">Weiter →</button>
+      <div style="margin-top:16px;padding:10px 14px;background:color-mix(in srgb,var(--c-beruf) 6%,var(--c-bg));border-radius:var(--radius-xs);font-size:0.78rem;color:var(--c-muted);line-height:1.5;text-align:center;">
+        💬 Für den geführten Morgendialog →
+        <a href="https://claude.ai" target="_blank" rel="noopener"
+          style="color:var(--c-beruf);font-weight:600;text-decoration:none;">Wechsel zu Claude.ai</a>
+      </div>
     </div>
 
     <!-- Schritt 2: Wählen -->
