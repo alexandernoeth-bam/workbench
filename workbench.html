@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.2.1</title>
+<title>WorkBench 4.2.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8051,7 +8051,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.2.1 · Build 20260606-1205</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.2.2 · Build 20260606-1248</div>
     </div>
 
     <!-- Welt -->
@@ -8216,8 +8216,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.2.1',
-  APP_BUILD:   '20260606-1205',
+  APP_VERSION: '4.2.2',
+  APP_BUILD:   '20260606-1248',
 
 
   // ══════════════════════════════════════════════════════
@@ -11976,7 +11976,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const dl = (i.date && i.date !== today) ? '<span style="font-size:0.72rem;color:var(--c-muted);font-family:var(--font-mono);margin-left:6px;">' + i.date + (i.time ? ' ' + i.time : '') + '</span>' : (i.time ? '<span style="font-size:0.72rem;color:var(--c-muted);margin-left:6px;">' + i.time + '</span>' : '');
       return '<div class="schnell-item" style="display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:7px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);">'
         + '<input type="checkbox" ' + (i.done ? 'checked' : '') + ' style="width:18px;height:18px;accent-color:var(--c-beruf);flex-shrink:0;cursor:pointer;" onchange="WB._schnellToggle(&quot;' + i.id + '&quot;)">'
-        + '<span style="flex:1;min-width:0;font-size:0.9rem;color:' + (i.done ? 'var(--c-faint)' : 'var(--c-text)') + ';' + (i.done ? 'text-decoration:line-through;' : '') + '">' + this._esc(i.text) + dl + '</span>'
+        + '<span style="flex:1;min-width:0;font-size:0.9rem;color:' + (i.done ? 'var(--c-faint)' : 'var(--c-text)') + ';' + (i.done ? 'text-decoration:line-through;' : '') + '">' + this._esc(i.text) + dl + this._aeBadge(i.aktivEnergie) + '</span>'
         + '<button onclick="WB._quickDetail(&quot;' + i.id + '&quot;)" title="Bearbeiten" style="background:none;border:none;color:var(--c-muted);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:2px 6px;">✎</button>'
         + '<button onclick="WB._schnellDelete(&quot;' + i.id + '&quot;)" title="Löschen" style="background:none;border:none;color:var(--c-faint);cursor:pointer;font-size:0.95rem;flex-shrink:0;padding:2px 4px;">&#10005;</button>'
         + '</div>';
@@ -12005,14 +12005,15 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const rows = duties.map(({ d, ctx }) => {
       const done = this._dutyIsDone(d, now);
       const fällig = this._dutyIsToday(d, now);
-      return '<div class="schnell-item" style="display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:7px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);' + (done ? 'opacity:0.5;' : '') + '">'
+      const freq = this._dutyRepeatLabel(d);
+      return '<div class="schnell-item" style="display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:7px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);">'
         + '<input type="checkbox"' + (done ? ' checked' : '') + ' style="width:18px;height:18px;accent-color:var(--c-beruf);flex-shrink:0;cursor:pointer;"'
-        + (fällig ? ' onchange="WB._dutyToggleFromList(&quot;' + d.id + '&quot;,&quot;' + ctx + '&quot;,this);WB._schnellListeRender();"' : ' disabled title="Heute nicht fällig"')
-        + '>'
+        + ' onchange="WB._dutyToggleFromList(&quot;' + d.id + '&quot;,&quot;' + ctx + '&quot;,this);WB._schnellListeRender();">'
         + '<span style="flex:1;min-width:0;">'
-        + '<div style="font-size:0.9rem;color:' + (done ? 'var(--c-faint)' : 'var(--c-text)') + ';' + (done ? 'text-decoration:line-through;' : '') + '">' + this._esc(d.title || d.name || '') + '</div>'
-        + '<div style="font-size:0.72rem;color:var(--c-faint);">' + this._dutyRepeatLabel(d) + ' · ' + (ctx === 'pro' ? 'Beruf' : 'Privat') + (fällig ? ' · <span style="color:var(--c-beruf);">heute fällig</span>' : '') + '</div>'
+        + '<div style="font-size:0.9rem;color:' + (done ? 'var(--c-faint)' : 'var(--c-text)') + ';' + (done ? 'text-decoration:line-through;' : '') + '">' + this._esc(d.title || d.name || '') + this._aeBadge(d.aktivEnergie) + '</div>'
+        + '<div style="font-size:0.72rem;color:var(--c-faint);">' + freq + (fällig ? ' · <span style="color:var(--c-beruf);">heute fällig</span>' : '') + '</div>'
         + '</span>'
+        + '<button onclick="WB.dutiesOpen()" title="Bearbeiten" style="background:none;border:none;color:var(--c-muted);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:2px 6px;">✎</button>'
         + '</div>';
     }).join('');
     return '<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 6px;">'
@@ -12037,6 +12038,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       return (d.days || []).map(i => names[i]).join(', ');
     }
     return d.repeat || '';
+  },
+
+  // Aktivierungsenergie-Badge (zentral für alle Listen)
+  _aeBadge(aktivEnergie) {
+    if (!aktivEnergie || aktivEnergie === 'mittel') return '';
+    if (aktivEnergie === 'hoch')    return '<span style="font-size:0.7rem;font-weight:700;color:#C62828;margin-left:5px;flex-shrink:0;" title="Aktivierungsenergie: Hoch">⚡</span>';
+    if (aktivEnergie === 'niedrig') return '<span style="font-size:0.7rem;font-weight:700;color:#2E7D32;margin-left:5px;flex-shrink:0;" title="Aktivierungsenergie: Niedrig">↓</span>';
+    return '';
   },
 
   // Helfer: Store der aktiven Welt
@@ -13721,7 +13730,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<input type="checkbox" class="ck-eintrag-chk" onchange="event.stopPropagation();WB._ckTerminDone(&quot;' + ev.id + '&quot;,&quot;' + ctx + '&quot;,this)">'
         + (zeit ? '<span class="ck-eintrag-zeit">' + zeit + '</span>' : '')
         + '<div class="ck-eintrag-text">'
-        + '<div class="ck-eintrag-titel">' + this._esc(ev.text || '') + '</div>'
+        + '<div class="ck-eintrag-titel">' + this._esc(ev.text || '') + this._aeBadge(ev.aktivEnergie) + '</div>'
         + (ev.location ? '<div class="ck-eintrag-meta">' + this._esc(ev.location) + '</div>' : '')
         + '</div></div>';
     }).join('');
@@ -13751,7 +13760,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       '<div class="ck-eintrag">'
       + '<input type="checkbox" class="ck-eintrag-chk" onchange="event.stopPropagation();WB._ckFokusDone(' + i + ',this)">'
       + '<div class="ck-eintrag-text">'
-      + '<div class="ck-eintrag-titel">' + this._esc(f.title || '') + '</div>'
+      + '<div class="ck-eintrag-titel">' + this._esc(f.title || '') + this._aeBadge(f.aktivEnergie) + '</div>'
       + '</div></div>'
     ).join('');
   },
@@ -13829,7 +13838,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       return '<div class="ck-eintrag">'
         + '<input type="checkbox" class="ck-eintrag-chk" onchange="event.stopPropagation();' + chk + '">'
         + '<div class="ck-eintrag-text">'
-        + '<div class="ck-eintrag-titel">' + this._esc(item.titel) + '</div>'
+        + '<div class="ck-eintrag-titel">' + this._esc(item.titel) + this._aeBadge(item.obj?.aktivEnergie) + '</div>'
         + '</div></div>';
     }).join('');
   },
@@ -23545,7 +23554,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           + '<div class="planer-bl-text"><div class="planer-bl-title">'
           + '<span class="planer-bl-score ' + gewClass + '" title="Gewichtung · Score ' + a.score + '">' + a.score + '</span>'
           + (a.mustToday ? '<span class="planer-bl-must" title="Heutiger Fokus">★</span>' : '')
-          + this._esc(a.text) + '</div>'
+          + this._esc(a.text) + this._aeBadge(a.aktivEnergie) + '</div>'
           + '<div class="planer-bl-meta">' + this._esc(a.notizTitel) + (dl?' &middot; <span style="color:'+(isOvd?'#C62828':'var(--c-muted)')+';">' + dl + '</span>':'')
           + ' &middot; <select class="planer-bl-gew" onchange="WB._planerSetGewicht(&quot;'+a.id+'&quot;,&quot;'+a.notizId+'&quot;,this.value)" onclick="event.stopPropagation();">'
           + '<option value="hoch"'    + (a.gewicht==='hoch'?' selected':'')    + '>Hoch</option>'
@@ -23909,7 +23918,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         const meetIcon = isMeet ? '&#9679; ' : '';
         eventsHtml += `<div class="woche-event ${cls}" style="top:${top}px;height:${height}px;"
           onclick="WB.editOpen('event','${ev.ctx}','','${ev.id}')" title="${title}">
-          <span>${ev.startTime} ${title}</span>
+          <span>${ev.startTime} ${title}${ev.aktivEnergie === 'hoch' ? ' ⚡' : ev.aktivEnergie === 'niedrig' ? ' ↓' : ''}</span>
         </div>`;
       });
 
