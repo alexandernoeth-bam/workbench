@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 3.99.5</title>
+<title>WorkBench 4.0.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5816,6 +5816,22 @@ html, body {
 .vh-detail-bar-fill { height: 100%; background: var(--c-beruf); border-radius: 4px; transition: width 0.3s; }
 .vh-detail-progress-lbl { font-size: 0.78rem; color: var(--c-muted); }
 .vh-inhalt-hint { font-size: 0.72rem; color: var(--c-faint); margin-bottom: 8px; line-height: 1.4; }
+/* v4.0.0 neue Detail-Elemente */
+.vh-ebene-row { display: flex; align-items: center; gap: 4px; margin-bottom: 14px; flex-wrap: wrap; }
+.vh-ebene-btn { padding: 5px 14px; border: 1px solid var(--c-border); border-radius: 20px; font-family: var(--font); font-size: 0.78rem; font-weight: 600; cursor: pointer; background: var(--c-bg); color: var(--c-muted); }
+.vh-ebene-btn.active { background: var(--c-beruf); color: #fff; border-color: var(--c-beruf); }
+.vh-feld { margin-bottom: 16px; }
+.vh-feld-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--c-muted); margin-bottom: 6px; }
+.vh-ziel-text { font-size: 0.95rem; line-height: 1.5; padding: 8px 0; border-bottom: 1px solid var(--c-border); outline: none; min-height: 1.5em; color: var(--c-text); }
+.vh-ziel-text:focus { border-bottom-color: var(--c-beruf); }
+.vh-ziel-text:empty::before { content: attr(placeholder); color: var(--c-faint); }
+.vh-schritt-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid color-mix(in srgb, var(--c-border) 50%, transparent); }
+.vh-schritt-cb { font-size: 1.05rem; cursor: pointer; color: var(--c-beruf); flex-shrink: 0; }
+.vh-schritt-text { flex: 1; font-size: 0.9rem; cursor: pointer; color: var(--c-text); }
+.vh-schritt-text:hover { color: var(--c-beruf); }
+.vh-ae-badge { font-size: 0.75rem; padding: 1px 5px; border-radius: 8px; flex-shrink: 0; }
+.vh-ae-badge.ae-hoch { background: #fde8e8; color: #C62828; }
+.vh-ae-badge.ae-niedrig { background: #e8f5e9; color: #2E7D32; }
 #vh-inhalt-content {
   min-height: 80px; max-height: 45vh; overflow-y: auto;
   border: 1px solid var(--c-border); border-radius: var(--radius-xs);
@@ -8008,7 +8024,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v3.99.5 · Build 20260604-0612</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.0.0 · Build 20260605-0900</div>
     </div>
 
     <!-- Welt -->
@@ -8173,8 +8189,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '3.99.5',
-  APP_BUILD:   '20260604-0612',
+  APP_VERSION: '4.0.0',
+  APP_BUILD:   '20260605-0900',
 
 
   // ══════════════════════════════════════════════════════
@@ -12897,14 +12913,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       });
     });
 
-    // Baustellen aus Vorhaben sammeln
-    const zielBaustellen = (this._vorhabenAlle ? this._vorhabenAlle() : [])
-      .filter(v => v.isBaustelle)
-      .map(v => ({ titel: v.titel, typ: 'vorhaben', id: v.id, obj: v,
-        mentalStundenProWoche: v.mentalStundenProWoche || 0,
-        seitJahren: v.seitJahren || 0,
-        entscheidung: v.entscheidung || '',
-      }));
+    // Baustellen aus Vorhaben (v4.0.0: isBaustelle entfällt — Block deaktiviert)
+    const zielBaustellen = [];
 
     const store = [...zielBaustellen, ...projBaustellen];
     // Legacy store ignorieren (alter separater Store)
@@ -13172,7 +13182,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     // ── Vorhaben-Fortschritt ────────────────────────────
     const alleVorhaben = this._vorhabenAlle ? this._vorhabenAlle() : [];
-    const thisYearGoals = alleVorhaben.filter(v => !v.year || v.year === year);
+    const thisYearGoals = alleVorhaben.filter(v => v.aktivitaet === 'aktiv' || !v.aktivitaet);
     const goalHtml = thisYearGoals.length
       ? thisYearGoals.map(v => {
           const prog = this._vorhabenProgress(v);
@@ -14556,21 +14566,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       titel: titel || 'Neues Vorhaben',
       welt: w,
       typ: t,
-      vision: vorlage.vision || '',
-      inhalt: '',
-      planAufgaben: [],            // die EINE Aufgabenliste (Inline-System)
-      habits: [],                  // v3.95.0: Habits entfernt — Feld bleibt leer für Datenkonsistenz
-      metriken: vorlage.metriken || [],
-      reflexionen: [],
-      termine: [],
-      milestones: [],
-      metric: null,                // optionale Mess-Metrik (start/target/current)
-      area: 'Sonstiges',
-      year: new Date().getFullYear(),
+      ziel: '',          // v4.0.0: ein Satz (ersetzt vision)
       stichtag: '',
-      isBaustelle: false,
-      mentalStundenProWoche: 0,
-      seitJahren: 0,
+      aktivitaet: 'aktiv', // v4.0.0: aktiv | wartend | ruhend
+      inhalt: '',
+      planAufgaben: [],
+      habits: [],        // leer, Kompatibilität
       erstellt: today,
       geaendert: Date.now(),
     };
@@ -14706,6 +14707,18 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const found = this._vorhabenFind(id);
     if (!found) return;
     this._vorhabenAktivId = id;
+    // v4.0.0: einmalige Migration alter Felder beim ersten Öffnen
+    const v = found.vorhaben;
+    if (!v._v4migr) {
+      if (!v.ziel && v.vision) v.ziel = v.vision;
+      if (!v.aktivitaet) v.aktivitaet = 'aktiv';
+      delete v.vision; delete v.metriken; delete v.reflexionen;
+      delete v.milestones; delete v.metric; delete v.area; delete v.year;
+      delete v.isBaustelle; delete v.mentalStundenProWoche; delete v.seitJahren;
+      delete v.termine;
+      v._v4migr = true;
+      this.setDirty();
+    }
     const overlay = document.getElementById('wb-vorhaben-detail');
     if (overlay) { overlay.style.display = 'flex'; this._vorhabenDetailRender(); }
   },
@@ -14779,40 +14792,147 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     let h = '';
 
-    // Kopf-Box: Welt-Umschalter + Fortschritt
-    h += '<div class="vh-detail-kopf">'
-      + '<div class="vh-welt-switch">'
-      + '<button class="vh-welt-btn ' + (v.welt === 'pro' ? 'active' : '') + '" onclick="WB._vorhabenDetailSetWelt(&quot;pro&quot;)">Beruf</button>'
+    // ── Sichtbarkeits-Ebene (v4.0.0) ─────────────────────
+    const ebene = v.aktivitaet || 'aktiv';
+    const ebenenLabels = { aktiv: 'Aktiv', wartend: 'Wartend', ruhend: 'Ruhend' };
+    h += '<div class="vh-ebene-row">'
+      + ['aktiv','wartend','ruhend'].map(e =>
+          '<button class="vh-ebene-btn' + (ebene === e ? ' active' : '') + '" '
+          + 'onclick="WB._vorhabenSetEbene(&quot;' + e + '&quot;)">' + ebenenLabels[e] + '</button>'
+        ).join('')
+      + '<div style="flex:1"></div>'
+      + '<button class="vh-welt-btn ' + (v.welt === 'pro' ? 'active' : '') + '" onclick="WB._vorhabenDetailSetWelt(&quot;pro&quot;)" style="margin-right:4px;">Beruf</button>'
       + '<button class="vh-welt-btn ' + (v.welt === 'priv' ? 'active' : '') + '" onclick="WB._vorhabenDetailSetWelt(&quot;priv&quot;)">Privat</button>'
-      + '</div>'
-      + '<div class="vh-detail-bar"><div class="vh-detail-bar-fill" style="width:' + p.aufgabenPct + '%;"></div></div>'
-      + '<div class="vh-detail-progress-lbl">' + p.done + '/' + p.total + ' Aufgaben · ' + p.aufgabenPct + '%'
-      + (p.metricPct !== null ? ' · Messung ' + p.metricPct + '%' : '') + '</div>'
       + '</div>';
 
-    // Sektionen — Reihenfolge v3.94.0; Habits vorerst ausgeblendet (Daten bleiben erhalten)
-    const sektionen = [
-      ['vision',     '🎯', 'Vision & Warum'],
-      ['metriken',   '📊', 'Metriken'],
-      ['milestones', '🏁', 'Meilensteine'],
-      ['aufgaben',   '✓',  'Aufgaben'],
-      ['baustelle',  '⚠',  'Baustelle'],
-      ['reflexion',  '💭', 'Reflexion'],
-    ];
-    sektionen.forEach(([sk, icon, label]) => {
-      const isOpen = this._vorhabenSektionenOpen[sk] !== false; // default offen
-      h += this._vorhabenSektionHtml(v, sk, icon, label, isOpen, today);
-    });
+    // ── Ziel (ein Satz) ───────────────────────────────────
+    h += '<div class="vh-feld">'
+      + '<div class="vh-feld-label">Was will ich erreichen?</div>'
+      + '<div class="vh-ziel-text" id="vh-ziel-text" contenteditable="true" '
+      + 'placeholder="Ein Satz genügt…" '
+      + 'onblur="WB._vorhabenSaveZiel()" '
+      + 'onkeydown="if(event.key===&quot;Enter&quot;){event.preventDefault();this.blur();}">'
+      + this._esc(v.ziel || '') + '</div>'
+      + '</div>';
 
-    // Löschen
-    h += '<button onclick="WB._vorhabenDelete()" style="width:100%;margin-top:20px;padding:11px;background:none;border:1px solid var(--c-danger);color:var(--c-danger);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.86rem;cursor:pointer;">Vorhaben löschen</button>';
+    // ── Stichtag ──────────────────────────────────────────
+    h += '<div class="vh-feld">'
+      + '<div class="vh-feld-label">Bis wann?</div>'
+      + '<input id="vh-stichtag" type="date" value="' + (v.stichtag || '') + '" '
+      + 'onchange="WB._vorhabenSaveStichtag(this.value)" '
+      + 'style="border:1px solid var(--c-border);border-radius:var(--radius-xs);padding:7px 10px;font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);width:100%;box-sizing:border-box;">'
+      + '</div>';
+
+    // ── Nächste Schritte (erste 3 planAufgaben) ───────────
+    const offene = (v.planAufgaben || []).filter(a => !a.done);
+    const schritte = offene.slice(0, 3);
+    const weitere = offene.slice(3);
+    const erledigt = (v.planAufgaben || []).filter(a => a.done);
+
+    h += '<div class="vh-feld">'
+      + '<div class="vh-feld-label">Nächste Schritte</div>';
+
+    // Die ersten 3
+    if (schritte.length) {
+      h += schritte.map(a =>
+        '<div class="vh-schritt-row">'
+        + '<span class="vh-schritt-cb" onclick="WB._vorhabenInlineToggle(&quot;' + a.cbId + '&quot;)">'
+        + (a.done ? '&#9745;' : '&#9744;') + '</span>'
+        + '<span class="vh-schritt-text" onclick="WB._vorhabenAufgabeDetailOpenByCb(&quot;' + a.cbId + '&quot;)">'
+        + this._esc(a.text) + '</span>'
+        + (a.aktivEnergie && a.aktivEnergie !== 'mittel'
+          ? '<span class="vh-ae-badge ae-' + a.aktivEnergie + '">' + (a.aktivEnergie === 'hoch' ? '⚡' : '·') + '</span>'
+          : '')
+        + '</div>'
+      ).join('');
+    } else {
+      h += '<div style="font-size:0.83rem;color:var(--c-faint);padding:6px 0;">Noch keine offenen Schritte.</div>';
+    }
+
+    // + Neue Aufgabe
+    h += '<div style="display:flex;gap:6px;margin-top:8px;">'
+      + '<input id="vh-task-input" type="text" placeholder="Neuer Schritt…" '
+      + 'style="flex:1;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);" '
+      + 'onkeydown="if(event.key===&quot;Enter&quot;)WB._vorhabenTaskAdd()">'
+      + '<button onclick="WB._vorhabenTaskAdd()" title="Schnell hinzufügen" '
+      + 'style="padding:7px 13px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-size:0.9rem;cursor:pointer;">+</button>'
+      + '<button onclick="WB.vorhabenTaskFormOpen()" title="Mit Details (Energie, Kippmoment…)" '
+      + 'style="padding:7px 11px;background:none;border:1px solid var(--c-beruf);color:var(--c-beruf);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;cursor:pointer;">+ Details</button>'
+      + '</div>';
+
+    // Weitere offene (zusammengeklappt)
+    if (weitere.length) {
+      const mOpen = this._vhWeitereOpen;
+      h += '<div style="margin-top:6px;">'
+        + '<button onclick="WB._vhToggleWeitere()" '
+        + 'style="font-size:0.78rem;color:var(--c-muted);background:none;border:none;cursor:pointer;padding:4px 0;">'
+        + (mOpen ? '▾' : '▸') + ' ' + weitere.length + ' weitere Schritte</button>';
+      if (mOpen) {
+        h += weitere.map(a =>
+          '<div class="vh-schritt-row" style="opacity:0.7;">'
+          + '<span class="vh-schritt-cb" onclick="WB._vorhabenInlineToggle(&quot;' + a.cbId + '&quot;)">'
+          + '&#9744;</span>'
+          + '<span class="vh-schritt-text" onclick="WB._vorhabenAufgabeDetailOpenByCb(&quot;' + a.cbId + '&quot;)">'
+          + this._esc(a.text) + '</span>'
+          + '</div>'
+        ).join('');
+      }
+      h += '</div>';
+    }
+
+    // Erledigte (immer zusammengeklappt)
+    if (erledigt.length) {
+      h += '<div style="margin-top:4px;">'
+        + '<button onclick="WB._vhToggleErledigt()" '
+        + 'style="font-size:0.75rem;color:var(--c-faint);background:none;border:none;cursor:pointer;padding:2px 0;">'
+        + '▸ ' + erledigt.length + ' erledigt</button>'
+        + (this._vhErledigtOpen
+          ? erledigt.map(a =>
+              '<div class="vh-schritt-row" style="opacity:0.4;text-decoration:line-through;">'
+              + '<span style="margin-right:8px;">&#9745;</span>'
+              + '<span class="vh-schritt-text">' + this._esc(a.text) + '</span>'
+              + '</div>'
+            ).join('')
+          : '')
+        + '</div>';
+    }
+
+    h += '</div>'; // vh-feld Schritte
+
+    // ── Notiz / Freitext (Vollbild-Editor) ───────────────
+    h += '<div class="vh-feld">'
+      + '<div class="vh-feld-label">Notizen & Ideen</div>'
+      + '<div id="vh-ed-toolbar" class="vh-ed-toolbar">'
+      + '<button class="vh-tb" onclick="WB._vhH(1)" title="Überschrift 1">H1</button>'
+      + '<button class="vh-tb" onclick="WB._vhH(2)" title="Überschrift 2">H2</button>'
+      + '<button class="vh-tb" onclick="WB._vhH(3)" title="Überschrift 3">H3</button>'
+      + '<span class="vh-tb-sep"></span>'
+      + '<button class="vh-tb" onclick="WB._vhCmd(&quot;insertUnorderedList&quot;)" title="Aufzählung">&#8226;</button>'
+      + '<button class="vh-tb" onclick="WB._vhCmd(&quot;insertOrderedList&quot;)" title="Nummerierung">1.</button>'
+      + '<button class="vh-tb" onclick="WB._vhInsertCb()" title="Aufgabe einfügen">&#9744;</button>'
+      + '<span class="vh-tb-sep"></span>'
+      + '<button class="vh-tb" onclick="WB._vhCmd(&quot;formatBlock&quot;,&quot;blockquote&quot;)" title="Zitat">&#10077;</button>'
+      + '<button class="vh-tb" onclick="WB._vhInsertHr()" title="Trennlinie">&#8213;</button>'
+      + '<button class="vh-tb" onclick="WB._vhToggleCollapse()" title="Einklappbar">&#8862;</button>'
+      + '<button class="vh-tb" onclick="WB._vhCmd(&quot;removeFormat&quot;)" title="Format entfernen">&#10006;</button>'
+      + '<button class="vh-tb" onclick="WB._vhTocOpen()" title="Inhaltsverzeichnis">&#9776;</button>'
+      + '<button class="vh-tb" id="vh-ed-fs-btn" style="margin-left:auto;" onclick="WB._vhToggleFullscreen()" title="Vollbild">&#x26F6;</button>'
+      + '</div>'
+      + '<div id="vh-inhalt-content" contenteditable="true" '
+      + 'oninput="WB._vorhabenInlineDebounced()" '
+      + 'onkeyup="if(event.key===&quot;Enter&quot;){WB._vorhabenInlineEnter();}"></div>'
+      + '</div>';
+
+    // ── Löschen ───────────────────────────────────────────
+    h += '<button onclick="WB._vorhabenDelete()" '
+      + 'style="width:100%;margin-top:16px;padding:10px;background:none;border:1px solid var(--c-danger);color:var(--c-danger);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.84rem;cursor:pointer;">Vorhaben löschen</button>';
 
     body.innerHTML = h;
 
-    // Inline-Aufgaben-Feld initialisieren, sobald es im DOM ist (nur wenn Aufgaben-Sektion offen)
-    if (this._vorhabenSektionenOpen['aufgaben'] !== false) {
-      setTimeout(() => { if (document.getElementById('vh-inhalt-content')) this._vorhabenInlineInit(); }, 0);
-    }
+    // Inline-Aufgaben-Feld und Notizfeld initialisieren
+    setTimeout(() => {
+      if (document.getElementById('vh-inhalt-content')) this._vorhabenInlineInit();
+    }, 0);
   },
 
   _vorhabenSektionHtml(v, sk, icon, label, isOpen, today) {
@@ -14930,10 +15050,38 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
   },
 
-  _vorhabenSaveVision(text) {
+  // v4.0.0: Sichtbarkeits-Ebene setzen
+  _vhWeitereOpen: false,
+  _vhErledigtOpen: false,
+
+  _vorhabenSetEbene(ebene) {
     const v = this._vorhabenAktiv(); if (!v) return;
-    v.vision = text; v.geaendert = Date.now(); this.setDirty();
+    v.aktivitaet = ebene; v.geaendert = Date.now(); this.setDirty();
+    this._vorhabenDetailRender();
+    this._vorhabenListeRender();
   },
+
+  _vorhabenSaveZiel() {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    const el = document.getElementById('vh-ziel-text');
+    v.ziel = (el?.innerText || '').trim(); v.geaendert = Date.now(); this.setDirty();
+  },
+
+  _vorhabenSaveStichtag(val) {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    v.stichtag = val; v.geaendert = Date.now(); this.setDirty();
+  },
+
+  _vhToggleWeitere() {
+    this._vhWeitereOpen = !this._vhWeitereOpen;
+    this._vorhabenDetailRender();
+  },
+
+  _vhToggleErledigt() {
+    this._vhErledigtOpen = !this._vhErledigtOpen;
+    this._vorhabenDetailRender();
+  },
+
 
   _vorhabenTaskToggle(taskId) {
     const v = this._vorhabenAktiv(); if (!v) return;
