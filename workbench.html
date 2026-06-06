@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.2.0</title>
+<title>WorkBench 4.2.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8051,7 +8051,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.2.0 · Build 20260606-1142</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.2.1 · Build 20260606-1205</div>
     </div>
 
     <!-- Welt -->
@@ -8216,8 +8216,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.2.0',
-  APP_BUILD:   '20260606-1142',
+  APP_VERSION: '4.2.1',
+  APP_BUILD:   '20260606-1205',
 
 
   // ══════════════════════════════════════════════════════
@@ -11933,8 +11933,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   schnellListeOpen() {
     const overlay = document.getElementById('wb-schnell-overlay');
     if (!overlay) return;
-    // Beim Öffnen immer mit aktueller activeWorld starten
-    this._schnellWelt = this.activeWorld === 'beruf' ? 'pro' : 'priv';
     overlay.style.display = 'flex';
     this._schnellListeRender();
   },
@@ -11944,29 +11942,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (overlay) overlay.style.display = 'none';
   },
 
-  _schnellWelt: null, // eigene Welt für die Schnellerinnerungen-Liste
-
-  _schnellSetWelt(welt) {
-    this._schnellWelt = welt;
-    this._schnellListeRender();
-  },
-
   _schnellListeRender() {
     const body = document.getElementById('wb-schnell-body');
     if (!body) return;
-    // Eigene Welt — unabhängig von activeWorld/Automatik
-    const w = this._schnellWelt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
-    this._schnellWelt = w;
-    const weltLbl = w === 'pro' ? 'Beruf' : 'Privat';
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const weltLbl = ctx === 'pro' ? 'Beruf' : 'Privat';
     const weltEl = document.getElementById('wb-schnell-welt');
     if (weltEl) weltEl.textContent = '· ' + weltLbl;
-    // Umschalter-Buttons färben
-    const btnPro  = document.getElementById('wb-schnell-welt-pro');
-    const btnPriv = document.getElementById('wb-schnell-welt-priv');
-    if (btnPro)  { btnPro.style.background  = w === 'pro'  ? 'var(--c-beruf)' : 'var(--c-border)'; btnPro.style.color  = w === 'pro'  ? '#fff' : 'var(--c-muted)'; }
-    if (btnPriv) { btnPriv.style.background = w === 'priv' ? '#7B5EA7'        : 'var(--c-border)'; btnPriv.style.color = w === 'priv' ? '#fff' : 'var(--c-muted)'; }
-    // Store der gewählten Welt direkt ansprechen
-    const db = w === 'pro' ? this.dataPro : this.dataPriv;
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     if (!db) { body.innerHTML = '<div style="padding:20px;color:var(--c-faint);">Keine Daten verfügbar.</div>'; return; }
     if (!db.quickItems) db.quickItems = [];
     const store = db.quickItems;
@@ -12015,15 +11998,11 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _schnellDutiesHtml() {
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
     const now = new Date();
-    const allDuties = [];
-    ['pro', 'priv'].forEach(ctx => {
-      (this._dutyStore(ctx) || []).forEach(d => {
-        allDuties.push({ d, ctx });
-      });
-    });
-    if (!allDuties.length) return '';
-    const rows = allDuties.map(({ d, ctx }) => {
+    const duties = (this._dutyStore(ctx) || []).map(d => ({ d, ctx }));
+    if (!duties.length) return '';
+    const rows = duties.map(({ d, ctx }) => {
       const done = this._dutyIsDone(d, now);
       const fällig = this._dutyIsToday(d, now);
       return '<div class="schnell-item" style="display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:7px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);' + (done ? 'opacity:0.5;' : '') + '">'
@@ -12060,10 +12039,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     return d.repeat || '';
   },
 
-  // v4.1.6: Helfer — Store der aktuell gewählten Schnell-Liste-Welt
+  // Helfer: Store der aktiven Welt
   _schnellWeltStore() {
-    const w = this._schnellWelt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
-    const db = w === 'pro' ? this.dataPro : this.dataPriv;
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     if (!db) return null;
     if (!db.quickItems) db.quickItems = [];
     return db.quickItems;
@@ -14281,17 +14260,15 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _quickDetail(id) {
-    // Universelles Sheet: id=null -> Neu anlegen, id=string -> Bearbeiten
-    // v4.1.6: Store aus _schnellWelt lesen, nicht activeWorld
-    const w = this._schnellWelt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
-    const db = w === 'pro' ? this.dataPro : this.dataPriv;
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     if (!db) return;
     if (!db.quickItems) db.quickItems = [];
     const store = db.quickItems;
     const item = id ? store.find(i => i.id === id) : null;
     const isNew = !item;
     const today = new Date().toISOString().split('T')[0];
-    const isBeruf = w === 'pro';
+    const isBeruf = ctx === 'pro';
     const recurVal = item?.recurring || '';
 
     const sheet = document.createElement('div');
@@ -14357,7 +14334,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (recur === 'weekly') document.querySelectorAll('.wqa-day:checked').forEach(cb => recurDays.push(+cb.value));
     if (!text) return;
 
-    // v4.1.6: Store aus _schnellWelt
+    // Store der aktiven Welt
     const store = this._schnellWeltStore();
     if (!store) return;
     let item = id ? store.find(i => i.id === id) : null;
@@ -14380,15 +14357,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this._ckRenderTagesseite();
     this._schnellListeRender();
     this._toast(id ? '✓ Gespeichert' : 'Angelegt' + (recur?' (wiederkehrend)':'') + (time?' um '+time:''));
-  },
-
-  _wqaSetWelt(welt) {
-    // v4.1.8: nur _schnellWelt ändern, nicht activeWorld
-    this._schnellWelt = welt;
-    const pro  = document.getElementById('wqa-welt-pro');
-    const priv = document.getElementById('wqa-welt-priv');
-    if (pro)  { pro.style.background  = welt==='pro'  ? 'var(--c-beruf)' : 'var(--c-border)'; pro.style.color  = welt==='pro'  ? '#fff' : 'var(--c-muted)'; }
-    if (priv) { priv.style.background = welt==='priv' ? '#7B5EA7'        : 'var(--c-border)'; priv.style.color = welt==='priv' ? '#fff' : 'var(--c-muted)'; }
   },
 
   _wqaRecurChange(val) {
@@ -27812,8 +27780,6 @@ WB.init();
   <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:2px solid var(--c-beruf);background:var(--c-surface);flex-shrink:0;">
     <button onclick="WB.schnellListeClose()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--c-muted);padding:0;line-height:1;">&#8249;</button>
     <div style="flex:1;font-size:1rem;font-weight:800;color:var(--c-text);">Schnellerinnerungen <span id="wb-schnell-welt" style="font-size:0.78rem;font-weight:600;color:var(--c-muted);"></span></div>
-    <button id="wb-schnell-welt-pro" onclick="WB._schnellSetWelt('pro')" style="font-size:0.72rem;font-weight:700;padding:3px 10px;border-radius:20px;border:none;cursor:pointer;background:var(--c-border);color:var(--c-muted);">Beruf</button>
-    <button id="wb-schnell-welt-priv" onclick="WB._schnellSetWelt('priv')" style="font-size:0.72rem;font-weight:700;padding:3px 10px;border-radius:20px;border:none;cursor:pointer;background:var(--c-border);color:var(--c-muted);">Privat</button>
     <button onclick="WB._quickDetail(null)" style="background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);padding:7px 14px;font-family:var(--font);font-size:0.82rem;font-weight:600;cursor:pointer;">+ Neu</button>
   </div>
   <div id="wb-schnell-body" style="flex:1;overflow-y:auto;padding:16px;"></div>
