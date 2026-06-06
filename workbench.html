@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.1.3</title>
+<title>WorkBench 4.1.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8051,7 +8051,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.1.3 · Build 20260605-1145</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.1.5 · Build 20260606-0842</div>
     </div>
 
     <!-- Welt -->
@@ -8216,8 +8216,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.1.3',
-  APP_BUILD:   '20260605-1145',
+  APP_VERSION: '4.1.5',
+  APP_BUILD:   '20260606-0842',
 
 
   // ══════════════════════════════════════════════════════
@@ -11932,7 +11932,11 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   // ── Schnellerinnerungen-Liste (Hamburger-Menü) ────────
   schnellListeOpen() {
     const overlay = document.getElementById('wb-schnell-overlay');
-    if (overlay) { overlay.style.display = 'flex'; this._schnellListeRender(); }
+    if (!overlay) return;
+    // Eigene Welt-Variable für die Liste — unabhängig von activeWorld
+    if (!this._schnellWelt) this._schnellWelt = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    overlay.style.display = 'flex';
+    this._schnellListeRender();
   },
 
   schnellListeClose() {
@@ -11940,15 +11944,32 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (overlay) overlay.style.display = 'none';
   },
 
+  _schnellWelt: null, // eigene Welt für die Schnellerinnerungen-Liste
+
+  _schnellSetWelt(welt) {
+    this._schnellWelt = welt;
+    this._schnellListeRender();
+  },
+
   _schnellListeRender() {
     const body = document.getElementById('wb-schnell-body');
     if (!body) return;
-    // Folgt der aktiven Welt (getrennte Listen, nicht kombiniert)
-    const weltLbl = this.activeWorld === 'beruf' ? 'Beruf' : 'Privat';
+    // Eigene Welt — unabhängig von activeWorld/Automatik
+    const w = this._schnellWelt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    this._schnellWelt = w;
+    const weltLbl = w === 'pro' ? 'Beruf' : 'Privat';
     const weltEl = document.getElementById('wb-schnell-welt');
     if (weltEl) weltEl.textContent = '· ' + weltLbl;
-
-    const store = this._quickStore() || [];
+    // Umschalter-Buttons färben
+    const btnPro  = document.getElementById('wb-schnell-welt-pro');
+    const btnPriv = document.getElementById('wb-schnell-welt-priv');
+    if (btnPro)  { btnPro.style.background  = w === 'pro'  ? 'var(--c-beruf)' : 'var(--c-border)'; btnPro.style.color  = w === 'pro'  ? '#fff' : 'var(--c-muted)'; }
+    if (btnPriv) { btnPriv.style.background = w === 'priv' ? '#7B5EA7'        : 'var(--c-border)'; btnPriv.style.color = w === 'priv' ? '#fff' : 'var(--c-muted)'; }
+    // Store der gewählten Welt direkt ansprechen
+    const db = w === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { body.innerHTML = '<div style="padding:20px;color:var(--c-faint);">Keine Daten verfügbar.</div>'; return; }
+    if (!db.quickItems) db.quickItems = [];
+    const store = db.quickItems;
     const today = new Date().toISOString().split('T')[0];
 
     if (!store.length) {
@@ -11997,7 +12018,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _schnellDutiesHtml() {
-    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const w = this._schnellWelt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const ctx = w;
     const now = new Date();
     const dow = now.getDay();
     const duties = (this._dutyStore(ctx) || []).filter(d => {
@@ -14302,8 +14324,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (recur === 'weekly') document.querySelectorAll('.wqa-day:checked').forEach(cb => recurDays.push(+cb.value));
     if (!text) return;
 
-    const store = this._quickStore();
-    let item = id ? store?.find(i => i.id === id) : null;
+    // v4.1.4: Welt aus _schnellWelt (unabhängig von activeWorld)
+    const w = this._schnellWelt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const db = w === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    if (!db.quickItems) db.quickItems = [];
+    const store = db.quickItems;
+    let item = id ? store.find(i => i.id === id) : null;
 
     if (!item) {
       // Neu anlegen
@@ -27755,6 +27782,8 @@ WB.init();
   <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:2px solid var(--c-beruf);background:var(--c-surface);flex-shrink:0;">
     <button onclick="WB.schnellListeClose()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--c-muted);padding:0;line-height:1;">&#8249;</button>
     <div style="flex:1;font-size:1rem;font-weight:800;color:var(--c-text);">Schnellerinnerungen <span id="wb-schnell-welt" style="font-size:0.78rem;font-weight:600;color:var(--c-muted);"></span></div>
+    <button id="wb-schnell-welt-pro" onclick="WB._schnellSetWelt('pro')" style="font-size:0.72rem;font-weight:700;padding:3px 10px;border-radius:20px;border:none;cursor:pointer;background:var(--c-border);color:var(--c-muted);">Beruf</button>
+    <button id="wb-schnell-welt-priv" onclick="WB._schnellSetWelt('priv')" style="font-size:0.72rem;font-weight:700;padding:3px 10px;border-radius:20px;border:none;cursor:pointer;background:var(--c-border);color:var(--c-muted);">Privat</button>
     <button onclick="WB._quickAdd()" style="background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);padding:7px 14px;font-family:var(--font);font-size:0.82rem;font-weight:600;cursor:pointer;">+ Neu</button>
   </div>
   <div id="wb-schnell-body" style="flex:1;overflow-y:auto;padding:16px;"></div>
