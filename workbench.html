@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.1.2</title>
+<title>WorkBench 4.1.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8216,7 +8216,7 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.1.2',
+  APP_VERSION: '4.1.3',
   APP_BUILD:   '20260605-1108',
 
 
@@ -11990,9 +11990,32 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         gruppe('Heute', heute)
       + gruppe('Kommende', kommende)
       + gruppe('Ohne Datum', ohneDatum)
+      + this._schnellDutiesHtml()
       + (erledigt.length
           ? '<details style="margin-top:14px;"><summary style="font-size:0.78rem;color:var(--c-muted);cursor:pointer;padding:4px 0;">' + erledigt.length + ' erledigt</summary>' + erledigt.map(itemRow).join('') + '</details>'
           : '');
+  },
+
+  _schnellDutiesHtml() {
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const now = new Date();
+    const dow = now.getDay();
+    const duties = (this._dutyStore(ctx) || []).filter(d => {
+      if (this._dutyIsDone(d, now)) return false;
+      return d.repeat === 'daily'
+        || (d.repeat === 'weekly' && (d.days || []).includes(dow))
+        || (d.repeat === 'monthly' && d.dayFixed === now.getDate());
+    });
+    if (!duties.length) return '';
+    const rows = duties.map(d =>
+      '<div class="schnell-item" style="display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:7px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);">'
+      + '<input type="checkbox" style="width:18px;height:18px;accent-color:var(--c-beruf);flex-shrink:0;cursor:pointer;" onchange="WB._dutyToggleFromList(&quot;' + d.id + '&quot;,&quot;' + ctx + '&quot;,this);WB._schnellListeRender();">'
+      + '<span style="flex:1;min-width:0;font-size:0.9rem;color:var(--c-text);">' + this._esc(d.title || d.name || '') + '</span>'
+      + '<span style="font-size:0.72rem;color:var(--c-faint);flex-shrink:0;">Pflicht</span>'
+      + '</div>'
+    ).join('');
+    return '<div style="font-size:0.7rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--c-muted);margin:14px 0 6px;">Wochenpflichten</div>'
+      + rows;
   },
 
   _schnellToggle(id) {
@@ -14303,7 +14326,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _wqaSetWelt(welt) {
-    this.activeWorld = welt === 'pro' ? 'beruf' : 'privat';
+    this.setWorld(welt === 'pro' ? 'beruf' : 'privat', false, true);
     // Buttons umfärben
     const pro  = document.getElementById('wqa-welt-pro');
     const priv = document.getElementById('wqa-welt-priv');
