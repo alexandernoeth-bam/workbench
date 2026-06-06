@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.2.4</title>
+<title>WorkBench 4.2.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8051,7 +8051,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.2.4 · Build 20260606-1338</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.2.6 · Build 20260606-1428</div>
     </div>
 
     <!-- Welt -->
@@ -8216,8 +8216,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.2.4',
-  APP_BUILD:   '20260606-1338',
+  APP_VERSION: '4.2.6',
+  APP_BUILD:   '20260606-1428',
 
 
   // ══════════════════════════════════════════════════════
@@ -12071,19 +12071,27 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _dutyIsToday(d, now) {
     const dow = now.getDay();
-    return d.repeat === 'daily'
-      || (d.repeat === 'weekly' && (d.days || []).includes(dow))
-      || (d.repeat === 'monthly' && d.dayFixed === now.getDate());
+    if (d.repeat === 'daily') return true;
+    if (d.repeat === 'monthly') return d.dayFixed === now.getDate();
+    // weekly oder kein repeat: days-Array prüfen
+    const days = d.type === 'fixed' ? [parseInt(d.dayFixed)] : (d.days || []);
+    return days.includes(dow);
   },
 
   _dutyRepeatLabel(d) {
+    const names = ['So','Mo','Di','Mi','Do','Fr','Sa'];
     if (d.repeat === 'daily') return 'Täglich';
     if (d.repeat === 'monthly') return 'Monatlich';
-    if (d.repeat === 'weekly') {
-      const names = ['So','Mo','Di','Mi','Do','Fr','Sa'];
-      return (d.days || []).map(i => names[i]).join(', ');
+    if (d.repeat === 'every-n-weeks') {
+      const days = (d.days || []).map(i => names[i]).join(', ');
+      return 'Alle ' + (d.repeatEvery || 2) + ' Wo · ' + days;
     }
-    return d.repeat || '';
+    // weekly oder kein repeat-Feld: days-Array anzeigen
+    const days = d.type === 'fixed'
+      ? (d.dayFixed !== undefined ? [names[d.dayFixed]] : [])
+      : (d.days || []).map(i => names[i]);
+    if (days.length) return days.join(', ');
+    return d.repeat || '?';
   },
 
   // Aktivierungsenergie-Badge (zentral für alle Listen)
@@ -14260,6 +14268,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<option value="weekly">W&ouml;chentlich</option>'
       + '<option value="monthly">Monatlich</option>'
       + '</select>'
+      + '<div id="wqa-recur-hint" style="display:none;font-size:0.72rem;color:var(--c-beruf);margin-top:4px;">Wird als Wochenpflicht gespeichert</div>'
       + '<div id="wqa-days-row" style="display:none;flex-wrap:wrap;gap:8px;margin-top:8px;">'
       + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="1"> Mo</label>'
       + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="2"> Di</label>'
@@ -14385,26 +14394,49 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const time  = document.getElementById('wqa-time')?.value;
     const recur = document.getElementById('wqa-recur')?.value || '';
     const notiz = document.getElementById('wqa-notiz')?.value.trim() || '';
+    const ae    = document.getElementById('wqa-aktiv')?.value || 'mittel';
     const recurDays = [];
     if (recur === 'weekly') document.querySelectorAll('.wqa-day:checked').forEach(cb => recurDays.push(+cb.value));
     if (!text) return;
 
-    // Store der aktiven Welt
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+
+    // Wiederkehrend → als Wochenpflicht in _dutyStore speichern
+    if (recur && recur !== '' && !id) {
+      const dutyStore = this._dutyStore(ctx);
+      if (!dutyStore) return;
+      const duty = {
+        id: 'duty_' + Date.now(),
+        title: text,
+        repeat: recur,
+        type: recurDays.length ? 'multiple' : 'daily',
+        days: recurDays.length ? recurDays : [],
+        reminderTime: time || '',
+        aktivEnergie: ae,
+        instances: {},
+      };
+      dutyStore.push(duty);
+      this.setDirty();
+      this._closeSheet500();
+      this._schnellListeRender();
+      this._toast('Wochenpflicht angelegt');
+      return;
+    }
+
+    // Einmalig → quickItems wie bisher
     const store = this._schnellWeltStore();
     if (!store) return;
     let item = id ? store.find(i => i.id === id) : null;
 
     if (!item) {
-      // Neu anlegen
       item = { id: String(Date.now()), text, date: date||new Date().toISOString().split('T')[0], done: false };
-      store?.push(item);
+      store.push(item);
     } else {
       item.text = text;
       if (date) item.date = date;
     }
+    item.aktivEnergie = ae;
     if (time) item.time = time; else delete item.time;
-    if (recur) { item.recurring = recur; if (recurDays.length) item.recurringDays = recurDays; else delete item.recurringDays; }
-    else { delete item.recurring; delete item.recurringDays; }
     if (notiz) item.notiz = notiz; else delete item.notiz;
 
     this.setDirty();
@@ -14417,6 +14449,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _wqaRecurChange(val) {
     const row = document.getElementById('wqa-days-row');
     if (row) row.style.display = val === 'weekly' ? 'flex' : 'none';
+    const hint = document.getElementById('wqa-recur-hint');
+    if (hint) hint.style.display = val ? 'block' : 'none';
   },
 
   _quickToggle(id, chk) {
