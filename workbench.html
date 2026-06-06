@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.2.3</title>
+<title>WorkBench 4.2.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8051,7 +8051,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.2.3 · Build 20260606-1310</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.2.4 · Build 20260606-1338</div>
     </div>
 
     <!-- Welt -->
@@ -8216,8 +8216,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.2.3',
-  APP_BUILD:   '20260606-1310',
+  APP_VERSION: '4.2.4',
+  APP_BUILD:   '20260606-1338',
 
 
   // ══════════════════════════════════════════════════════
@@ -12013,7 +12013,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<div style="font-size:0.9rem;color:' + (done ? 'var(--c-faint)' : 'var(--c-text)') + ';' + (done ? 'text-decoration:line-through;' : '') + '">' + this._esc(d.title || d.name || '') + this._aeBadge(d.aktivEnergie) + '</div>'
         + '<div style="font-size:0.72rem;color:var(--c-faint);">' + freq + (fällig ? ' · <span style="color:var(--c-beruf);">heute fällig</span>' : '') + '</div>'
         + '</span>'
-        + '<button onclick="WB.dutiesOpen();setTimeout(()=>WB.dutyEditOpen(&quot;' + ctx + '&quot;,&quot;' + d.id + '&quot;),150)" title="Bearbeiten" style="background:none;border:none;color:var(--c-muted);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:2px 6px;">✎</button>'
+        + '<button onclick="WB._schnellDutyEdit(&quot;' + ctx + '&quot;,&quot;' + d.id + '&quot;)" title="Bearbeiten" style="background:none;border:none;color:var(--c-muted);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:2px 6px;">✎</button>'
         + '</div>';
     }).join('');
     return '<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 6px;">'
@@ -12021,6 +12021,52 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<button onclick="WB.dutiesOpen()" style="font-size:0.75rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;padding:0;">Verwalten →</button>'
       + '</div>'
       + rows;
+  },
+
+  // Schlanker Edit-Dialog für eine Pflicht direkt aus Schnellerinnerungen
+  _schnellDutyEdit(ctx, dutyId) {
+    const duty = (this._dutyStore(ctx) || []).find(d => d.id === dutyId);
+    if (!duty) return;
+    document.getElementById('wb-quick-sheet')?.remove();
+    const sheet = document.createElement('div');
+    sheet.id = 'wb-quick-sheet';
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;';
+    sheet.addEventListener('click', e => { if (e.target === sheet) { sheet.remove(); } });
+    const DAY_NAMES = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+    const days = duty.type === 'fixed' ? [parseInt(duty.dayFixed)] : (duty.days || []);
+    const dayBtns = DAY_NAMES.map((n, i) =>
+      '<button style="padding:6px 10px;border-radius:20px;border:1px solid var(--c-border);font-family:var(--font);font-size:0.82rem;cursor:pointer;'
+      + (days.includes(i) ? 'background:var(--c-beruf);color:#fff;border-color:var(--c-beruf);' : 'background:none;color:var(--c-muted);')
+      + '" onclick="this.dataset.sel=this.dataset.sel===\'1\'?\'0\':\'1\';this.style.background=this.dataset.sel===\'1\'?\'var(--c-beruf)\':\'none\';this.style.color=this.dataset.sel===\'1\'?\'#fff\':\'var(--c-muted)\';this.style.borderColor=this.dataset.sel===\'1\'?\'var(--c-beruf)\':\'var(--c-border)\';" data-dow="' + i + '" data-sel="' + (days.includes(i) ? '1' : '0') + '">' + n + '</button>'
+    ).join('');
+    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto;">'
+      + '<div style="font-size:0.8rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:10px;">Pflicht bearbeiten</div>'
+      + '<input id="sde-title" type="text" value="' + this._esc(duty.title || '') + '" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:12px;">'
+      + '<div style="font-size:0.78rem;color:var(--c-muted);margin-bottom:6px;">Tage</div>'
+      + '<div id="sde-days" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">' + dayBtns + '</div>'
+      + '<div style="display:flex;gap:8px;">'
+      + '<button onclick="document.getElementById(\'wb-quick-sheet\').remove()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Abbrechen</button>'
+      + '<button onclick="WB._schnellDutyEditSave(\'' + ctx + '\',\'' + dutyId + '\')" style="flex:2;padding:11px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;">Speichern</button>'
+      + '</div></div>';
+    document.body.appendChild(sheet);
+    setTimeout(() => document.getElementById('sde-title')?.focus(), 50);
+  },
+
+  _schnellDutyEditSave(ctx, dutyId) {
+    const duty = (this._dutyStore(ctx) || []).find(d => d.id === dutyId);
+    if (!duty) return;
+    const title = document.getElementById('sde-title')?.value.trim();
+    if (!title) return;
+    duty.title = title;
+    const selDays = [];
+    document.querySelectorAll('#sde-days button').forEach(btn => {
+      if (btn.dataset.sel === '1') selDays.push(parseInt(btn.dataset.dow));
+    });
+    if (selDays.length) { duty.days = selDays; duty.type = 'multiple'; }
+    this.setDirty();
+    document.getElementById('wb-quick-sheet')?.remove();
+    this._schnellListeRender();
+    this._toast('Pflicht gespeichert');
   },
 
   _dutyIsToday(d, now) {
