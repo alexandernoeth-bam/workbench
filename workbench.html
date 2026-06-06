@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.0.1</title>
+<title>WorkBench 4.1.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -464,6 +464,26 @@ html, body {
 /* Im Cockpit v4.0: ck-fab nicht anzeigen */
 #sec-cockpit.active ~ #ck-fab,
 .wb-section.active#sec-cockpit ~ #ck-fab { display: none !important; }
+
+/* ── Cockpit v4.1: drei feste Blöcke ─────────────────── */
+#ck-tagesseite { display:flex; flex-direction:column; height:calc(100vh - 110px); overflow:hidden; }
+.ck-block { display:flex; flex-direction:column; border-bottom:1px solid var(--c-border); overflow:hidden; }
+#ck-block-termine  { flex:0 0 auto; max-height:30vh; }
+#ck-block-fokus    { flex:1 1 auto; min-height:80px; max-height:40vh; }
+#ck-block-rauschen { flex:0 0 auto; max-height:28vh; }
+.ck-block-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--c-faint); padding:8px 16px 4px; flex-shrink:0; }
+.ck-block-body  { overflow-y:auto; flex:1; padding:0 16px 8px; }
+.ck-eintrag { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid color-mix(in srgb,var(--c-border) 60%,transparent); }
+.ck-eintrag:last-child { border-bottom:none; }
+.ck-eintrag-chk  { width:17px; height:17px; flex-shrink:0; accent-color:var(--c-beruf); cursor:pointer; }
+.ck-eintrag-text { flex:1; min-width:0; }
+.ck-eintrag-titel{ font-size:0.9rem; color:var(--c-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ck-eintrag-meta { font-size:0.75rem; color:var(--c-faint); margin-top:1px; }
+.ck-eintrag-zeit { font-size:0.78rem; color:var(--c-muted); font-family:var(--font-mono); flex-shrink:0; }
+.ck-leer { font-size:0.85rem; color:var(--c-faint); padding:6px 0 4px; font-style:italic; }
+#ck-aktions-leiste { display:flex; gap:6px; padding:8px 16px; border-top:1px solid var(--c-border); flex-shrink:0; background:var(--c-bg); }
+#ck-aktions-leiste button { padding:7px 12px; border-radius:var(--radius-xs); font-family:var(--font); font-size:0.82rem; cursor:pointer; display:flex; align-items:center; gap:5px; white-space:nowrap; background:var(--c-beruf); color:#fff; border:none; font-weight:600; }
+#ck-aktions-leiste button.ghost { background:none; border:1px solid var(--c-border); color:var(--c-muted); font-weight:400; }
 
 /* Termin-Toggle CSS entfernt v3.46.4 */
 
@@ -6819,37 +6839,34 @@ html, body {
       <div id="ck-grid" style="display:none;"></div>
       <div id="zt-daytype-banner" style="display:none;"></div>
 
-      <!-- NEUE TAGESSEITE v4.0 -->
+      <!-- NEUE TAGESSEITE v4.1 — drei feste Blöcke -->
       <div id="ck-tagesseite">
-        <!-- Datum-Header -->
-        <div id="ck-tag-header">
-          <div id="ck-tag-datum">–</div>
-          <div id="ck-tag-sub">
-            <span id="ck-tag-kw">–</span>
-            <span>·</span>
-            <span id="ck-tag-typ">–</span>
-          </div>
+        <!-- Block 1: Termine -->
+        <div class="ck-block" id="ck-block-termine">
+          <div class="ck-block-label">Termine</div>
+          <div class="ck-block-body" id="ck-termine-body"></div>
         </div>
-        <!-- Tagesliste wird per JS gefüllt -->
-        <div id="ck-tagesliste"></div>
-        <!-- Neu-Eintrag Button am Ende der Liste -->
-        <!-- Fokus-Timer Button -->
-        <button id="ck-fokus-btn" onclick="WB.fokusOpen()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
-            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-          </svg>
-          Fokus-Timer starten
-        </button>
-
-        <div id="ck-neue-eingabe" style="padding:12px 0 4px;border-top:1px solid var(--c-border);display:flex;gap:8px;flex-wrap:wrap;">
-          <button onclick="WB._quickDetail(null)" style="flex:1;min-width:120px;padding:9px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
-            <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <!-- Block 2: Fokus -->
+        <div class="ck-block" id="ck-block-fokus">
+          <div class="ck-block-label">Fokus</div>
+          <div class="ck-block-body" id="ck-fokus-body"></div>
+        </div>
+        <!-- Block 3: Rauschen (verschwindet komplett wenn leer) -->
+        <div class="ck-block" id="ck-block-rauschen" style="display:none;">
+          <div class="ck-block-label">Rauschen</div>
+          <div class="ck-block-body" id="ck-rauschen-body"></div>
+        </div>
+        <!-- Aktions-Leiste -->
+        <div id="ck-aktions-leiste">
+          <button onclick="WB._quickDetail(null)">
+            <svg style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Schnell hinzufügen
           </button>
-          <button onclick="WB.qcOpen()" style="flex:1;min-width:100px;padding:9px 12px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">
-            + Notiz
+          <button onclick="WB.qcOpen()" class="ghost">+ Notiz</button>
+          <button onclick="WB.fokusOpen()" class="ghost" style="margin-left:auto;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="width:13px;height:13px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Timer
           </button>
-
         </div>
       </div>
       <!-- Zeitband Panel (Kompatibilität) -->
@@ -8034,7 +8051,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.0.1 · Build 20260605-0942</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.1.0 · Build 20260605-1045</div>
     </div>
 
     <!-- Welt -->
@@ -8199,8 +8216,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.0.1',
-  APP_BUILD:   '20260605-0942',
+  APP_VERSION: '4.1.0',
+  APP_BUILD:   '20260605-1045',
 
 
   // ══════════════════════════════════════════════════════
@@ -13372,10 +13389,16 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       }
     }
 
-    // Tagesliste aufbauen
+    // v4.1: Drei Blöcke rendern statt flacher Tagesliste
+    this._ckRenderTermine();
+    this._ckRenderFokus();
+    this._ckRenderRauschen();
+  },
+
+  _renderCockpitLegacy() {
+    // Alter items-basierter Render — bleibt als Fallback/Referenz, wird nicht mehr aufgerufen
     const liste = document.getElementById('ck-tagesliste');
     if (!liste) return;
-
     const items = [];
 
     // ── A: Termine heute ──────────────────────────────────
@@ -13595,7 +13618,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       delete duty.instances[key];
     }
     this.setDirty();
-    setTimeout(() => this.renderCockpit(), 600);
+    if (chk.checked) setTimeout(() => this._ckRenderRauschen(), 400);
+    else this._ckRenderRauschen();
   },
 
   // v3.99.4: Vorhaben-Aufgabe von der Tagesliste aus abhaken (wirkt zurück aufs Vorhaben)
@@ -13617,6 +13641,151 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     v.geaendert = Date.now();
     this.setDirty();
     setTimeout(() => this.renderCockpit(), 600);
+  },
+
+  // ── COCKPIT v4.1: DREI BLÖCKE ────────────────────────
+
+  _ckRenderTermine() {
+    const body = document.getElementById('ck-termine-body');
+    if (!body) return;
+    const today = new Date().toISOString().split('T')[0];
+    const termine = [];
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      (db?.customEvents || []).filter(ev =>
+        ev.date === today && !ev.done && ev.type !== 'horizon'
+      ).forEach(ev => termine.push({ ev, ctx }));
+    });
+    termine.sort((a,b) => (a.ev.startTime||'').localeCompare(b.ev.startTime||''));
+    if (!termine.length) {
+      body.innerHTML = '<div class="ck-leer">Heute terminfrei</div>';
+      return;
+    }
+    body.innerHTML = termine.map(({ev, ctx}) => {
+      const zeit = ev.startTime ? ev.startTime.slice(0,5) : '';
+      return '<div class="ck-eintrag">'
+        + '<input type="checkbox" class="ck-eintrag-chk" onchange="event.stopPropagation();WB._ckTerminDone(&quot;' + ev.id + '&quot;,&quot;' + ctx + '&quot;,this)">'
+        + (zeit ? '<span class="ck-eintrag-zeit">' + zeit + '</span>' : '')
+        + '<div class="ck-eintrag-text">'
+        + '<div class="ck-eintrag-titel">' + this._esc(ev.text || '') + '</div>'
+        + (ev.location ? '<div class="ck-eintrag-meta">' + this._esc(ev.location) + '</div>' : '')
+        + '</div></div>';
+    }).join('');
+  },
+
+  _ckTerminDone(id, ctx, chk) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const ev = (db?.customEvents || []).find(e => String(e.id) === String(id));
+    if (!ev) return;
+    ev.done = chk.checked;
+    this.setDirty();
+    if (chk.checked) setTimeout(() => this._ckRenderTermine(), 400);
+  },
+
+  _ckRenderFokus() {
+    const body = document.getElementById('ck-fokus-body');
+    if (!body) return;
+    const store = this._ritualStore();
+    const key = this._ritualTodayKey();
+    const eintrag = store && store[key];
+    const fokus = eintrag?.fokus || [];
+    if (!fokus.length) {
+      body.innerHTML = '<div class="ck-leer">Kein Fokus gesetzt</div>';
+      return;
+    }
+    body.innerHTML = fokus.map((f, i) =>
+      '<div class="ck-eintrag">'
+      + '<input type="checkbox" class="ck-eintrag-chk" onchange="event.stopPropagation();WB._ckFokusDone(' + i + ',this)">'
+      + '<div class="ck-eintrag-text">'
+      + '<div class="ck-eintrag-titel">' + this._esc(f.title || '') + '</div>'
+      + '</div></div>'
+    ).join('');
+  },
+
+  _ckFokusDone(idx, chk) {
+    if (!chk.checked) return;
+    const store = this._ritualStore();
+    const key = this._ritualTodayKey();
+    const eintrag = store && store[key];
+    if (!eintrag?.fokus) return;
+    // Echte Aufgabe abhaken falls nicht Freitext
+    const f = eintrag.fokus[idx];
+    if (f && f.type !== 'freitext') {
+      if (f.type === 'vorhaben-aufgabe') {
+        const hit = this._vorhabenFindAufgabe(f.id);
+        if (hit) { hit.aufgabe.done = true; hit.vorhaben.geaendert = Date.now(); }
+      } else if (f.type === 'aufgabe') {
+        // In Notiz-planAufgaben suchen
+        const notiz = this._nzStore().find(n =>
+          (n.planAufgaben||[]).some(a => a.id === f.id)
+        );
+        const a = notiz && notiz.planAufgaben.find(a => a.id === f.id);
+        if (a) a.done = true;
+      }
+    }
+    // Fokus-Eintrag entfernen
+    eintrag.fokus.splice(idx, 1);
+    this.setDirty();
+    setTimeout(() => this._ckRenderFokus(), 400);
+  },
+
+  _ckRenderRauschen() {
+    const body = document.getElementById('ck-rauschen-body');
+    const block = document.getElementById('ck-block-rauschen');
+    if (!body || !block) return;
+    const today = new Date().toISOString().split('T')[0];
+    const items = [];
+
+    // Pflichten
+    ['pro','priv'].forEach(ctx => {
+      (this._dutyStore(ctx) || []).forEach(d => {
+        const now = new Date();
+        const key = this._dutyInstKey(now);
+        const inst = d.instances?.[key];
+        if (inst?.done) return;
+        // Nur wenn heute fällig
+        const dow = now.getDay();
+        const fällig = d.repeat === 'daily'
+          || (d.repeat === 'weekly' && (d.days||[]).includes(dow))
+          || (d.repeat === 'monthly' && d.dayFixed === now.getDate());
+        if (!fällig) return;
+        items.push({
+          type: 'pflicht', id: d.id, ctx,
+          titel: d.title || d.name || '(Pflicht)',
+          key,
+        });
+      });
+    });
+
+    // Schnellerinnerungen heute
+    (this._quickStore() || []).filter(q =>
+      !q.done && (q.date === today || (!q.date && !q.recurring))
+    ).forEach(q => items.push({ type: 'quick', id: q.id, titel: q.text || '', ctx: '' }));
+
+    if (!items.length) {
+      block.style.display = 'none';
+      return;
+    }
+    block.style.display = 'flex';
+    body.innerHTML = items.map(item => {
+      const chk = item.type === 'pflicht'
+        ? 'WB._dutyToggleFromList(&quot;' + item.id + '&quot;,&quot;' + item.ctx + '&quot;,this)'
+        : 'WB._ckQuickDone(&quot;' + item.id + '&quot;,this)';
+      return '<div class="ck-eintrag">'
+        + '<input type="checkbox" class="ck-eintrag-chk" onchange="event.stopPropagation();' + chk + '">'
+        + '<div class="ck-eintrag-text">'
+        + '<div class="ck-eintrag-titel">' + this._esc(item.titel) + '</div>'
+        + '</div></div>';
+    }).join('');
+  },
+
+  _ckQuickDone(id, chk) {
+    const store = this._quickStore();
+    const q = store && store.find(x => x.id === id);
+    if (!q) return;
+    q.done = chk.checked;
+    this.setDirty();
+    if (chk.checked) setTimeout(() => this._ckRenderRauschen(), 400);
   },
 
   renderCockpit() {
