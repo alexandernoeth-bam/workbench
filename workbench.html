@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.1.8</title>
+<title>WorkBench 4.2.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8051,7 +8051,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.1.8 · Build 20260606-1005</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.2.0 · Build 20260606-1142</div>
     </div>
 
     <!-- Welt -->
@@ -8216,8 +8216,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.1.8',
-  APP_BUILD:   '20260606-1005',
+  APP_VERSION: '4.2.0',
+  APP_BUILD:   '20260606-1142',
 
 
   // ══════════════════════════════════════════════════════
@@ -12015,26 +12015,49 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _schnellDutiesHtml() {
-    const w = this._schnellWelt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
-    const ctx = w;
     const now = new Date();
-    const dow = now.getDay();
-    const duties = (this._dutyStore(ctx) || []).filter(d => {
-      if (this._dutyIsDone(d, now)) return false;
-      return d.repeat === 'daily'
-        || (d.repeat === 'weekly' && (d.days || []).includes(dow))
-        || (d.repeat === 'monthly' && d.dayFixed === now.getDate());
+    const allDuties = [];
+    ['pro', 'priv'].forEach(ctx => {
+      (this._dutyStore(ctx) || []).forEach(d => {
+        allDuties.push({ d, ctx });
+      });
     });
-    if (!duties.length) return '';
-    const rows = duties.map(d =>
-      '<div class="schnell-item" style="display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:7px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);">'
-      + '<input type="checkbox" style="width:18px;height:18px;accent-color:var(--c-beruf);flex-shrink:0;cursor:pointer;" onchange="WB._dutyToggleFromList(&quot;' + d.id + '&quot;,&quot;' + ctx + '&quot;,this);WB._schnellListeRender();">'
-      + '<span style="flex:1;min-width:0;font-size:0.9rem;color:var(--c-text);">' + this._esc(d.title || d.name || '') + '</span>'
-      + '<span style="font-size:0.72rem;color:var(--c-faint);flex-shrink:0;">Pflicht</span>'
+    if (!allDuties.length) return '';
+    const rows = allDuties.map(({ d, ctx }) => {
+      const done = this._dutyIsDone(d, now);
+      const fällig = this._dutyIsToday(d, now);
+      return '<div class="schnell-item" style="display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:7px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);' + (done ? 'opacity:0.5;' : '') + '">'
+        + '<input type="checkbox"' + (done ? ' checked' : '') + ' style="width:18px;height:18px;accent-color:var(--c-beruf);flex-shrink:0;cursor:pointer;"'
+        + (fällig ? ' onchange="WB._dutyToggleFromList(&quot;' + d.id + '&quot;,&quot;' + ctx + '&quot;,this);WB._schnellListeRender();"' : ' disabled title="Heute nicht fällig"')
+        + '>'
+        + '<span style="flex:1;min-width:0;">'
+        + '<div style="font-size:0.9rem;color:' + (done ? 'var(--c-faint)' : 'var(--c-text)') + ';' + (done ? 'text-decoration:line-through;' : '') + '">' + this._esc(d.title || d.name || '') + '</div>'
+        + '<div style="font-size:0.72rem;color:var(--c-faint);">' + this._dutyRepeatLabel(d) + ' · ' + (ctx === 'pro' ? 'Beruf' : 'Privat') + (fällig ? ' · <span style="color:var(--c-beruf);">heute fällig</span>' : '') + '</div>'
+        + '</span>'
+        + '</div>';
+    }).join('');
+    return '<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 6px;">'
+      + '<div style="font-size:0.7rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--c-muted);">Wochenpflichten</div>'
+      + '<button onclick="WB.dutiesOpen()" style="font-size:0.75rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;padding:0;">Verwalten →</button>'
       + '</div>'
-    ).join('');
-    return '<div style="font-size:0.7rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--c-muted);margin:14px 0 6px;">Wochenpflichten</div>'
       + rows;
+  },
+
+  _dutyIsToday(d, now) {
+    const dow = now.getDay();
+    return d.repeat === 'daily'
+      || (d.repeat === 'weekly' && (d.days || []).includes(dow))
+      || (d.repeat === 'monthly' && d.dayFixed === now.getDate());
+  },
+
+  _dutyRepeatLabel(d) {
+    if (d.repeat === 'daily') return 'Täglich';
+    if (d.repeat === 'monthly') return 'Monatlich';
+    if (d.repeat === 'weekly') {
+      const names = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+      return (d.days || []).map(i => names[i]).join(', ');
+    }
+    return d.repeat || '';
   },
 
   // v4.1.6: Helfer — Store der aktuell gewählten Schnell-Liste-Welt
