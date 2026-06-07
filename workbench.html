@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.6.1</title>
+<title>WorkBench 4.6.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5869,6 +5869,11 @@ html, body {
 .vh-cluster-count { font-size:0.72rem; color:var(--c-muted); background:var(--c-bg); border:1px solid var(--c-border); border-radius:10px; padding:1px 8px; }
 .vh-cluster-arrow { font-size:0.75rem; color:var(--c-faint); flex-shrink:0; }
 .vh-cluster-body { padding:8px 12px 12px; background:var(--c-bg); }
+/* Ganztags-Termine Wochenansicht */
+.woche-ganztag-row { padding:2px 3px; border-bottom:1px solid var(--c-border); min-height:20px; }
+.woche-ganztag { font-size:0.68rem; padding:1px 5px; border-radius:3px; margin-bottom:2px; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.woche-ganztag.beruf { background:var(--c-beruf); color:#fff; }
+.woche-ganztag.privat { background:#7B5EA7; color:#fff; }
 #vh-inhalt-content {
   min-height: 80px; max-height: 45vh; overflow-y: auto;
   border: 1px solid var(--c-border); border-radius: var(--radius-xs);
@@ -8065,7 +8070,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.6.1 · Build 20260607-1755</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.6.2 · Build 20260607-1820</div>
     </div>
 
     <!-- Welt -->
@@ -8226,8 +8231,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.6.1',
-  APP_BUILD:   '20260607-1755',
+  APP_VERSION: '4.6.2',
+  APP_BUILD:   '20260607-1820',
 
 
   // ══════════════════════════════════════════════════════
@@ -24239,9 +24244,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
       // Events für diesen Tag
       let eventsHtml = '';
-      // V3.7.1: Nur nach ev.date filtern — evDate war redundant und führte zu Duplikaten
       const dayEvs = allEvents.filter(ev => ev.date===dayStr);
-      dayEvs.forEach(ev => {
+
+      // Ganztags-Termine (ohne startTime) als Badge über der Zeitachse
+      const ganztags = dayEvs.filter(ev => !ev.startTime);
+      let ganztagsHtml = ganztags.map(ev => {
+        const cls = ev.welt === 'pro' ? 'beruf' : 'privat';
+        const title = (ev.text||'').trim();
+        return `<div class="woche-ganztag ${cls}" onclick="WB.editOpen('event','${ev.ctx}','','${ev.id}')" title="${title}">${title}</div>`;
+      }).join('');
+
+      dayEvs.filter(ev => ev.startTime).forEach(ev => {
         const start  = pT(ev.startTime);
         const dur    = parseFloat(ev.duration||1);
         const end    = Math.min(start+dur, DAY_START+DAY_HOURS);
@@ -24280,6 +24293,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           <div class="woche-day-date">${dayDate.getDate()}.${dayDate.getMonth()+1}.</div>
           ${tdBadge}
         </div>
+        ${ganztagsHtml ? `<div class="woche-ganztag-row">${ganztagsHtml}</div>` : ''}
         <div class="woche-day-body">${slotsHtml}${eventsHtml}${nowLineHtml}</div>
       </div>`;
     }
