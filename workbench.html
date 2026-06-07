@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.5.3</title>
+<title>WorkBench 4.5.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8057,7 +8057,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.5.3 · Build 20260607-1602</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.5.5 · Build 20260607-1642</div>
     </div>
 
     <!-- Welt -->
@@ -8218,8 +8218,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.5.3',
-  APP_BUILD:   '20260607-1602',
+  APP_VERSION: '4.5.5',
+  APP_BUILD:   '20260607-1642',
 
 
   // ══════════════════════════════════════════════════════
@@ -13897,12 +13897,24 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const lbl = document.getElementById('ck-label-fokus');
     if (lbl) lbl.textContent = 'Fokus (' + fokus.length + ')';
     body.innerHTML = fokus.map((f, i) => {
-      // onclick: Vorhaben öffnen wenn vorhaben-aufgabe, sonst nichts
-      const onclick = (f.type === 'vorhaben-aufgabe' && f.vorhabenId)
-        ? 'WB.vorhabenOpen(&quot;' + f.vorhabenId + '&quot;)'
-        : '';
-      // AE aus echter Aufgabe nachladen
-      let ae = f.aktivEnergie || '';
+      // onclick: Vorhaben suchen — über vorhabenId, Aufgaben-ID oder Freitext ignorieren
+      let onclick = '';
+      if (f.vorhabenId) {
+        onclick = 'WB.vorhabenOpen(&quot;' + f.vorhabenId + '&quot;)';
+      } else if (f.id && f.type !== 'freitext') {
+        const hit = this._vorhabenFindAufgabe(f.id);
+        if (hit) onclick = 'WB.vorhabenOpen(&quot;' + hit.vorhaben.id + '&quot;)';
+      }
+      // Vorhaben-Name: aus meta oder zur Laufzeit nachladen
+      let vorhabenName = f.meta || '';
+      if (!vorhabenName && f.id && f.type !== 'freitext') {
+        const hit2 = this._vorhabenFindAufgabe(f.id);
+        if (hit2) vorhabenName = hit2.vorhaben.titel || '';
+      }
+      if (!vorhabenName && f.vorhabenId) {
+        const vh = this._vorhabenFind(f.vorhabenId);
+        if (vh) vorhabenName = vh.vorhaben.titel || '';
+      }
       if (f.type === 'vorhaben-aufgabe' && f.id) {
         const hit = this._vorhabenFindAufgabe(f.id);
         if (hit) ae = hit.aufgabe.aktivEnergie || '';
@@ -13911,7 +13923,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<input type="checkbox" class="ck-eintrag-chk" onchange="event.stopPropagation();WB._ckFokusDone(' + i + ',this)">'
         + '<div class="ck-eintrag-text">'
         + '<div class="ck-eintrag-titel">' + this._esc(f.title || '') + this._aeBadge(ae) + '</div>'
-        + (f.meta ? '<div class="ck-eintrag-meta">' + this._esc(f.meta) + '</div>' : '')
+        + (vorhabenName ? '<div class="ck-eintrag-meta">' + this._esc(vorhabenName) + '</div>' : '')
         + '</div></div>';
     }).join('');
   },
