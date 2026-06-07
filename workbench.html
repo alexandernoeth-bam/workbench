@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.4.2</title>
+<title>WorkBench 4.4.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8065,7 +8065,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.4.2 · Build 20260607-1335</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.4.3 · Build 20260607-1410</div>
     </div>
 
     <!-- Welt -->
@@ -8230,8 +8230,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.4.2',
-  APP_BUILD:   '20260607-1335',
+  APP_VERSION: '4.4.3',
+  APP_BUILD:   '20260607-1410',
 
 
   // ══════════════════════════════════════════════════════
@@ -11199,25 +11199,35 @@ const WB = {
     btn.closest('div').querySelectorAll('button').forEach(b => { const on=b===btn; b.style.background=on?'var(--c-beruf)':'none'; b.style.color=on?'#fff':'var(--c-muted)'; b.style.borderColor=on?'var(--c-beruf)':'var(--c-border)'; });
   },
 
+  _ritualTerminCheck: null, // aktiver Interval-Handle
+
   _ritualAddTermin() {
     const today = this._ritualTodayKey();
     const ritualOv = document.getElementById('wb-ritual-overlay');
+    // Vorherigen Check abbrechen falls noch aktiv
+    if (this._ritualTerminCheck) { clearInterval(this._ritualTerminCheck); this._ritualTerminCheck = null; }
     if (ritualOv) ritualOv.style.display = 'none';
     this.newEventOpen(today);
-    // Erst warten bis Edit-Dialog offen ist, dann auf Schließen warten
-    let editOpened = false;
-    const check = setInterval(() => {
-      const editOv = document.getElementById('edit-overlay');
-      const isOpen = editOv?.classList.contains('open');
-      if (!editOpened && isOpen) { editOpened = true; return; }
-      if (editOpened && !isOpen) {
-        clearInterval(check);
-        if (ritualOv) ritualOv.style.display = '';
-        this._ritualRenderCandidates();
-      }
-    }, 200);
-    // Fallback: nach 30 Sekunden aufräumen falls etwas schiefläuft
-    setTimeout(() => { clearInterval(check); if (ritualOv) ritualOv.style.display = ''; }, 30000);
+    // 600ms warten bis Dialog sicher offen ist, dann auf Schließen warten
+    setTimeout(() => {
+      this._ritualTerminCheck = setInterval(() => {
+        const editOv = document.getElementById('edit-overlay');
+        if (!editOv?.classList.contains('open')) {
+          clearInterval(this._ritualTerminCheck);
+          this._ritualTerminCheck = null;
+          if (ritualOv) ritualOv.style.display = '';
+          this._ritualRenderCandidates();
+        }
+      }, 250);
+      // Fallback nach 60 Sekunden
+      setTimeout(() => {
+        if (this._ritualTerminCheck) {
+          clearInterval(this._ritualTerminCheck);
+          this._ritualTerminCheck = null;
+          if (ritualOv) ritualOv.style.display = '';
+        }
+      }, 60000);
+    }, 600);
   },
 
   _ritualAddFreitext() {
