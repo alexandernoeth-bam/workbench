@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.8.7</title>
+<title>WorkBench 4.8.8</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8123,7 +8123,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.8.7 · Build 20260608-0310</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.8.8 · Build 20260608-0330</div>
     </div>
 
     <!-- Welt -->
@@ -8288,8 +8288,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.8.7',
-  APP_BUILD:   '20260608-0310',
+  APP_VERSION: '4.8.8',
+  APP_BUILD:   '20260608-0330',
 
 
   // ══════════════════════════════════════════════════════
@@ -15773,30 +15773,33 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _vhAufgDetail(msId, aufgId) {
     const v = this._vorhabenAktiv(); if (!v) return;
     const ms = (v.meilensteine||[]).find(m => m.id === msId); if (!ms) return;
-    const a = (ms.aufgaben||[]).find(x => x.id === aufgId); if (!a) return;
-    const ctx = v.welt === 'pro' ? 'pro' : 'priv';
+    const a  = (ms.aufgaben||[]).find(x => x.id === aufgId); if (!a) return;
+    // ctx aus _vorhabenFind bestimmen
+    const found = this._vorhabenFind(v.id);
+    const ctx = found?.welt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
     const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
 
-    // edit-overlay öffnen mit task-Formular
-    this._editType = 'vorhaben-ms-aufgabe';
-    this._editCtx  = ctx;
+    this._editType     = 'vorhaben-ms-aufgabe';
+    this._editCtx      = ctx;
     this._vhEditMsId   = msId;
     this._vhEditAufgId = aufgId;
 
-    const ov = document.getElementById('edit-overlay');
+    const ov   = document.getElementById('edit-overlay');
     const body = document.getElementById('edit-body');
     const titleEl = document.getElementById('edit-title');
     if (!ov || !body) return;
 
+    // Titel setzen
     if (titleEl) {
-      titleEl.childNodes[0] && (titleEl.childNodes[0].textContent = 'Aufgabe · ');
-      const sub = titleEl.querySelector('span') || document.createElement('span');
+      const firstNode = titleEl.childNodes[0];
+      if (firstNode) firstNode.textContent = 'Aufgabe bearbeiten ';
+      let sub = titleEl.querySelector('.vh-ms-sub');
+      if (!sub) { sub = document.createElement('span'); sub.className = 'vh-ms-sub'; titleEl.appendChild(sub); }
       sub.style.cssText = 'font-size:0.8rem;font-weight:400;color:var(--c-muted);';
-      sub.textContent = this._esc(ms.titel);
-      if (!titleEl.querySelector('span')) titleEl.appendChild(sub);
+      sub.textContent = ms.titel;
     }
 
-    // Aufgabe als task-ähnliches Objekt für _taskFormHtml
+    // Aufgabe als task-Proxy für _taskFormHtml
     const tProxy = {
       id: a.id, text: a.text, date: a.date||'', time: a.time||'',
       notes: a.notes||'', checklist: a.checklist||[],
@@ -15808,7 +15811,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     // Löschen-Button
     const actions = document.querySelector('.edit-actions');
-    if (actions) {
+    if (actions && !actions.querySelector('.edit-del-btn')) {
       const del = document.createElement('button');
       del.className = 'edit-del-btn';
       del.textContent = 'Löschen';
@@ -15824,8 +15827,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const ms = (v.meilensteine||[]).find(m => m.id === this._vhEditMsId); if (!ms) return;
     const a  = (ms.aufgaben||[]).find(x => x.id === this._vhEditAufgId); if (!a) return;
 
-    const text = (document.getElementById('ef-text')?.value || '').trim();
-    if (!text) { document.getElementById('ef-text')?.focus(); return; }
+    const text = (document.getElementById('ef-title')?.value || '').trim();
+    if (!text) { document.getElementById('ef-title')?.focus(); return; }
 
     a.text         = text;
     a.date         = document.getElementById('ef-date')?.value || '';
