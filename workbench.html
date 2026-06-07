@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.7.2</title>
+<title>WorkBench 4.7.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8122,7 +8122,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.7.2 · Build 20260607-2140</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.7.3 · Build 20260607-2158</div>
     </div>
 
     <!-- Welt -->
@@ -8287,8 +8287,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.7.2',
-  APP_BUILD:   '20260607-2140',
+  APP_VERSION: '4.7.3',
+  APP_BUILD:   '20260607-2158',
 
 
   // ══════════════════════════════════════════════════════
@@ -15628,6 +15628,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _vhNotizKeyUp(e) {
+    if (e.key === 'Escape' && this._vhFsActive) { this._vhToggleFullscreen(); return; }
     if (e.key === 'Enter') this._vhNotizRenderPcb(document.getElementById('vh-inhalt-content'), this._vorhabenAktiv());
   },
 
@@ -15707,13 +15708,26 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this._vhNotizRenderPcb(ed, this._vorhabenAktiv());
   },
   _vhToggleFullscreen() {
-    const ov = document.getElementById('wb-vorhaben-detail');
-    if (!ov) return;
     this._vhFsActive = !this._vhFsActive;
-    ov.style.zIndex = this._vhFsActive ? '999' : '';
+    const ed = document.getElementById('vh-inhalt-content');
+    const toolbar = document.getElementById('vh-ed-toolbar');
     const btn = document.getElementById('vh-ed-fs-btn');
-    if (btn) btn.textContent = this._vhFsActive ? '\u26F6' : '\u26F6';
-    if (!this._vhFsActive) this._vhNotizSave();
+    if (!ed) return;
+    if (this._vhFsActive) {
+      // Editor als fixiertes Vollbild-Overlay
+      ed._fsOldStyle = ed.getAttribute('style') || '';
+      ed.style.cssText = 'position:fixed;inset:0;z-index:800;max-height:none;min-height:100vh;border-radius:0;border:none;padding:16px 20px 80px;background:var(--c-bg);overflow-y:auto;';
+      if (toolbar) {
+        toolbar._fsOldStyle = toolbar.getAttribute('style') || '';
+        toolbar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:801;border-radius:0;border-top:1px solid var(--c-border);border-bottom:none;border-left:none;border-right:none;';
+      }
+      if (btn) btn.title = 'Vollbild beenden';
+    } else {
+      ed.setAttribute('style', ed._fsOldStyle || '');
+      if (toolbar) toolbar.setAttribute('style', toolbar._fsOldStyle || '');
+      if (btn) btn.title = 'Vollbild';
+      this._vhNotizSave();
+    }
   },
   _vhTocOpen() {
     const cnt = document.getElementById('vh-inhalt-content');
