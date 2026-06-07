@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.3.0</title>
+<title>WorkBench 4.3.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8061,7 +8061,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.3.0 · Build 20260607-0900</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.3.1 · Build 20260607-0945</div>
     </div>
 
     <!-- Welt -->
@@ -8226,8 +8226,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.3.0',
-  APP_BUILD:   '20260607-0900',
+  APP_VERSION: '4.3.1',
+  APP_BUILD:   '20260607-0945',
 
 
   // ══════════════════════════════════════════════════════
@@ -10999,36 +10999,8 @@ const WB = {
     const dEl = document.getElementById('ritual-date');
     if (dEl) dEl.textContent = DAYS[now.getDay()] + ', ' + now.getDate() + '. ' + MONTHS[now.getMonth()];
     this._ritualRenderOverview();
-    this._ritualRenderStep1();
     this._ritualGoto(1);
     document.getElementById('wb-ritual-overlay').classList.add('open');
-  },
-
-  _ritualRenderStep1() {
-    const today = new Date().toISOString().split('T')[0];
-    // Termine heute (beide Welten)
-    const termine = (this._evStore() || [])
-      .filter(ev => ev.date === today && !ev.done && ev.type !== 'horizon')
-      .sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
-    const tEl = document.getElementById('ritual-termine');
-    if (tEl) {
-      if (termine.length) {
-        tEl.innerHTML = '<div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:6px;">Heute</div>'
-          + termine.map(ev =>
-            '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid color-mix(in srgb,var(--c-border) 50%,transparent);font-size:0.88rem;">'
-            + '<span style="font-family:var(--font-mono);font-size:0.78rem;color:var(--c-muted);flex-shrink:0;">' + (ev.startTime||'').slice(0,5) + '</span>'
-            + '<span style="flex:1;color:var(--c-text);">' + this._esc(ev.text) + '</span>'
-            + '<span style="font-size:0.7rem;color:var(--c-faint);">' + (ev.welt==='pro'?'Beruf':'Privat') + '</span>'
-            + '</div>'
-          ).join('');
-      } else {
-        tEl.innerHTML = '<div style="font-size:0.85rem;color:var(--c-faint);padding:6px 0;">Heute terminfrei</div>';
-      }
-    }
-    // Aktive Vorhaben
-    const aktive = (this._vorhabenAlle ? this._vorhabenAlle() : []).filter(v => (v.aktivitaet||'aktiv')==='aktiv').length;
-    const vEl = document.getElementById('ritual-vorhaben');
-    if (vEl) vEl.innerHTML = '<span style="font-weight:700;color:var(--c-text);">' + aktive + '</span> aktive Vorhaben';
   },
 
   // Öffnet Claude-Chat direkt und geht zu Step 2
@@ -11074,37 +11046,19 @@ const WB = {
     const el = document.getElementById('ritual-overview');
     if (!el) return;
     const today = this._ritualTodayKey();
-    let termine = 0, prioA = 0, overdue = 0, offen = 0;
-    [this.dataPro, this.dataPriv].forEach(db => {
-      if (!db) return;
-      termine += (db.customEvents || []).filter(e => e.date === today && e.type !== 'horizon').length;
-      Object.values(db.projects || {}).forEach(p => {
-        (p.tasks || []).forEach(t => {
-          if (t && !t.done) {
-            offen++;
-            if (t.prio === true || t.prio === 'A') prioA++;
-            if (t.date && t.date < today) overdue++;
-          }
-        });
-      });
-    });
-    // Plan-Aufgaben für heute
-    let planHeute = 0;
-    this._nzStore().filter(n => n.typ === 'plan' && !n.archiv).forEach(n => {
-      (n.planAufgaben || []).forEach(a => {
-        if (!a.done && (a.date === today || a.planerDate === today)) planHeute++;
-      });
-    });
-    const rows = [
-      ['Termine heute', termine, false],
-      ['Aufgaben für heute', planHeute, false],
-      ['Prio-A offen', prioA, false],
-      ['Überfällig', overdue, overdue > 0],
-    ];
-    el.innerHTML = rows.map(([label, val, warn]) =>
-      '<div class="ritual-ov-row' + (warn ? ' warn' : '') + '">'
-      + '<span>' + label + '</span><span class="ov-val">' + val + '</span></div>'
-    ).join('');
+
+    // Termine heute (alle aus dataPriv)
+    const termine = (this._evStore() || [])
+      .filter(e => e.date === today && e.type !== 'horizon').length;
+
+    // Aktive Vorhaben
+    const aktive = (this._vorhabenAlle ? this._vorhabenAlle() : [])
+      .filter(v => (v.aktivitaet || 'aktiv') === 'aktiv').length;
+
+    const termineLabel = termine === 0 ? 'Heute terminfrei' : termine + ' Termin' + (termine !== 1 ? 'e' : '');
+    el.innerHTML =
+      '<div class="ritual-ov-row"><span>Termine</span><span class="ov-val">' + termineLabel + '</span></div>'
+      + '<div class="ritual-ov-row"><span>Aktive Vorhaben</span><span class="ov-val">' + aktive + '</span></div>';
   },
 
   // Schritt 2: Kandidaten sammeln (heutige Tagesliste + offene Plan-Aufgaben)
@@ -27871,12 +27825,6 @@ WB.init();
       <div class="ritual-title">Guten Morgen</div>
       <div class="ritual-sub" id="ritual-date">–</div>
       <div id="ritual-overview"></div>
-
-      <!-- Termine heute -->
-      <div id="ritual-termine" style="width:100%;margin:12px 0 0;text-align:left;"></div>
-
-      <!-- Aktive Vorhaben Zahl -->
-      <div id="ritual-vorhaben" style="width:100%;margin:8px 0 12px;font-size:0.85rem;color:var(--c-muted);text-align:left;"></div>
 
       <!-- Weiter öffnet Claude-Chat direkt -->
       <button class="ritual-btn primary" onclick="WB._ritualWeiter()">Zum Morgendialog →</button>
