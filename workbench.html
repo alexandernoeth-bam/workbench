@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.8.4</title>
+<title>WorkBench 4.8.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8123,7 +8123,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.8.4 · Build 20260608-0200</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.8.6 · Build 20260608-0240</div>
     </div>
 
     <!-- Welt -->
@@ -8288,8 +8288,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.8.4',
-  APP_BUILD:   '20260608-0200',
+  APP_VERSION: '4.8.6',
+  APP_BUILD:   '20260608-0240',
 
 
   // ══════════════════════════════════════════════════════
@@ -15587,7 +15587,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
             + '<input type="checkbox" class="vh47-ak-chk"' + (a.done?' checked':'') + ' '
             + 'onchange="WB._vhAufgDone(&quot;' + ms.id + '&quot;,&quot;' + a.id + '&quot;,this)">'
             + '<span class="vh47-gp-text' + (a.done?' vh47-done':'') + '" '
-            + 'onclick="WB._vhAufgEdit(&quot;' + ms.id + '&quot;,&quot;' + a.id + '&quot;)" style="cursor:text;">'
+            + 'onclick="WB._vhAufgDetail(&quot;' + ms.id + '&quot;,&quot;' + a.id + '&quot;)" style="cursor:pointer;">'
             + this._esc(a.text) + '</span>'
             + (a.aktivEnergie && a.aktivEnergie !== 'mittel' ? (AE_BADGE[a.aktivEnergie]||'') : '')
             + '<select onchange="WB._vhAufgSetAE(&quot;' + ms.id + '&quot;,&quot;' + a.id + '&quot;,this.value)" '
@@ -15628,7 +15628,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<span class="vh-tb-sep"></span>'
         + '<button class="vh-tb" onclick="WB._vhCmd(&quot;insertUnorderedList&quot;)">&#8226;</button>'
         + '<button class="vh-tb" onclick="WB._vhCmd(&quot;insertOrderedList&quot;)">1.</button>'
-        + '<button class="vh-tb" onclick="WB._vhInsertCb()">&#9744;</button>'
         + '<span class="vh-tb-sep"></span>'
         + '<button class="vh-tb" onclick="WB._vhCmd(&quot;formatBlock&quot;,&quot;blockquote&quot;)">&#10077;</button>'
         + '<button class="vh-tb" onclick="WB._vhInsertHr()">&#8213;</button>'
@@ -15684,7 +15683,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (notizOpen) {
       setTimeout(() => {
         const ed = document.getElementById('vh-inhalt-content');
-        if (ed) { ed.innerHTML = v.inhalt || ''; this._vhNotizRenderPcb(ed, v); }
+        if (ed) ed.innerHTML = v.inhalt || '';
       }, 0);
     }
   },
@@ -15771,11 +15770,23 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     a.aktivEnergie = val; v.geaendert = Date.now(); this.setDirty();
   },
 
-  _vhAufgEdit(msId, aufgId) {
+  _vhAufgDetail(msId, aufgId) {
     const v = this._vorhabenAktiv(); if (!v) return;
     const ms = (v.meilensteine||[]).find(m => m.id === msId); if (!ms) return;
     const a = (ms.aufgaben||[]).find(x => x.id === aufgId); if (!a) return;
-    const row = document.getElementById('vhms-' + msId + '-' + aufgId); if (!row) return;
+    this._padKontext = 'vorhaben-ms';
+    this._planDetailAktiv = { vorhabenId: v.id, msId, aufgabeId: aufgId };
+    document.getElementById('pad-text').value  = a.text || '';
+    document.getElementById('pad-date').value  = a.date || '';
+    document.getElementById('pad-done').checked = !!a.done;
+    document.querySelectorAll('.pad-gew-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.gew === (a.aktivEnergie || 'mittel'));
+    });
+    this._padGewWahl = a.aktivEnergie || 'mittel';
+    document.getElementById('wb-plan-aufg-detail').classList.add('open');
+  },
+
+  _vhAufgEdit(msId, aufgId) { if (!row) return;
     const oldHtml = row.innerHTML;
     row.innerHTML = '<input id="vh-aufg-edit-inp" type="text" value="' + this._esc(a.text) + '" '
       + 'style="flex:1;padding:5px 8px;border:1px solid var(--c-beruf);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-surface);color:var(--c-text);" '
@@ -24552,7 +24563,36 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const ref = this._planDetailAktiv;
     if (!ref) return;
 
-    // v3.92.0: Vorhaben-Kontext (Weg 2)
+    // v4.8.5: Meilenstein-Aufgabe (neue Struktur)
+    if (this._padKontext === 'vorhaben-ms') {
+      const found = ref.vorhabenId ? this._vorhabenFind(ref.vorhabenId) : null;
+      const v = found?.vorhaben;
+      if (!v) { this._planAufgabeDetailClose(); return; }
+      const ms = (v.meilensteine||[]).find(m => m.id === ref.msId);
+      const a = ms && (ms.aufgaben||[]).find(x => x.id === ref.aufgabeId);
+      if (!a) { this._planAufgabeDetailClose(); return; }
+      a.text = (document.getElementById('pad-text').value || '').trim() || a.text;
+      a.date = document.getElementById('pad-date').value || '';
+      a.aktivEnergie = this._padGewWahl || 'mittel';
+      const isDone = document.getElementById('pad-done').checked;
+      if (isDone && !a.done) {
+        // Ins Logbuch verschieben
+        const today = new Date().toISOString().split('T')[0];
+        if (!v.logbuch) v.logbuch = [];
+        v.logbuch.push({ id: a.id, text: a.text, erledigtAm: a.date || today, aktivEnergie: a.aktivEnergie, kippTyp: a.kippTyp||'' });
+        ms.aufgaben = ms.aufgaben.filter(x => x.id !== a.id);
+      } else {
+        a.done = isDone;
+      }
+      v.geaendert = Date.now(); this.setDirty();
+      this._planAufgabeDetailClose();
+      this._padKontext = null;
+      this._vorhabenDetailRender();
+      this._toast('Aufgabe gespeichert');
+      return;
+    }
+
+    // v3.92.0: Vorhaben-Kontext (alter Weg — planAufgaben)
     if (this._padKontext === 'vorhaben') {
       const found = ref.vorhabenId ? this._vorhabenFind(ref.vorhabenId) : null;
       const v = found?.vorhaben;
@@ -24623,7 +24663,21 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _planAufgabeDetailDelete() {
     const ref = this._planDetailAktiv;
     if (!ref) return;
-    // v3.92.0: Vorhaben-Kontext
+    // v4.8.5: Meilenstein-Aufgabe
+    if (this._padKontext === 'vorhaben-ms') {
+      const found = ref.vorhabenId ? this._vorhabenFind(ref.vorhabenId) : null;
+      const v = found?.vorhaben;
+      this._planAufgabeDetailClose();
+      this._padKontext = null;
+      if (v) {
+        const ms = (v.meilensteine||[]).find(m => m.id === ref.msId);
+        if (ms) ms.aufgaben = (ms.aufgaben||[]).filter(x => x.id !== ref.aufgabeId);
+        v.geaendert = Date.now(); this.setDirty();
+        this._vorhabenDetailRender();
+      }
+      return;
+    }
+    // v3.92.0: alter Vorhaben-Kontext (planAufgaben)
     if (this._padKontext === 'vorhaben') {
       const v = ref.vorhabenId ? this._vorhabenFind(ref.vorhabenId)?.vorhaben : null;
       this._planAufgabeDetailClose();
