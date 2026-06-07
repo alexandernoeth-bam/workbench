@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.3.2</title>
+<title>WorkBench 4.3.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8061,7 +8061,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.3.2 · Build 20260607-1005</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.3.3 · Build 20260607-1025</div>
     </div>
 
     <!-- Welt -->
@@ -8226,8 +8226,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.3.2',
-  APP_BUILD:   '20260607-1005',
+  APP_VERSION: '4.3.3',
+  APP_BUILD:   '20260607-1025',
 
 
   // ══════════════════════════════════════════════════════
@@ -10982,11 +10982,22 @@ const WB = {
     return !!(e && e.done);
   },
 
+  _ritualOpenedToSession: false,  // Session-Lock: verhindert Re-Open nach Auth-Renewal
+
   // Auto-Trigger: beim Cockpit-Render aufgerufen
   _ritualMaybeOpen() {
-    if (!this.dataPriv) return;              // Privat-DB noch nicht geladen
-    if (this._ritualIsDoneToday()) return;   // heute schon erledigt/übersprungen
+    // Beide DBs müssen geladen sein
+    if (!this.dataPriv || !this.dataPro) return;
+    // Google-Auth-Overlay darf nicht offen sein
+    if (document.getElementById('wb-google-auth')?.style.display !== 'none' &&
+        document.getElementById('wb-google-auth')?.style.display !== '') return;
+    // Einmal pro Session öffnen — verhindert Re-Open nach Auth-Renewal
+    if (this._ritualOpenedToSession) return;
+    // Heute schon erledigt
+    if (this._ritualIsDoneToday()) return;
+    // Dialog schon offen
     if (document.getElementById('wb-ritual-overlay')?.classList.contains('open')) return;
+    this._ritualOpenedToSession = true;
     this.ritualOpen();
   },
 
@@ -11253,6 +11264,7 @@ const WB = {
     if (!store) { this._toast('Privat-DB nicht geladen'); return; }
     const key = this._ritualTodayKey();
     if (store[key]) { delete store[key]; this.setDirty(); }
+    this._ritualOpenedToSession = false;  // Session-Lock freigeben
     this._toast('Ritual für heute zurückgesetzt');
     if (this.activeTab === 'cockpit') this._ritualMaybeOpen();
   },
