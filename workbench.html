@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.8.8</title>
+<title>WorkBench 4.8.9</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4525,7 +4525,7 @@ html, body {
   #edit-overlay {
     display: none;
     position: fixed; inset: 0;
-    z-index: 250;
+    z-index: 400;
     background: rgba(28,27,24,0.45);
     align-items: flex-end;
   }
@@ -8123,7 +8123,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.8.8 · Build 20260608-0330</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.8.9 · Build 20260608-0345</div>
     </div>
 
     <!-- Welt -->
@@ -8288,8 +8288,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.8.8',
-  APP_BUILD:   '20260608-0330',
+  APP_VERSION: '4.8.9',
+  APP_BUILD:   '20260608-0345',
 
 
   // ══════════════════════════════════════════════════════
@@ -15789,14 +15789,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const titleEl = document.getElementById('edit-title');
     if (!ov || !body) return;
 
-    // Titel setzen
+    // Titel setzen — nur den Textknoten (childNodes[0] ist immer der Text vor dem ×-Button)
     if (titleEl) {
-      const firstNode = titleEl.childNodes[0];
-      if (firstNode) firstNode.textContent = 'Aufgabe bearbeiten ';
-      let sub = titleEl.querySelector('.vh-ms-sub');
-      if (!sub) { sub = document.createElement('span'); sub.className = 'vh-ms-sub'; titleEl.appendChild(sub); }
-      sub.style.cssText = 'font-size:0.8rem;font-weight:400;color:var(--c-muted);';
-      sub.textContent = ms.titel;
+      // Textknoten finden und setzen
+      for (const node of titleEl.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE) { node.textContent = 'Aufgabe · ' + ms.titel + ' '; break; }
+      }
+      // Sub-span entfernen falls vorhanden
+      titleEl.querySelector('.vh-ms-sub')?.remove();
     }
 
     // Aufgabe als task-Proxy für _taskFormHtml
