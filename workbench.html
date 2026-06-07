@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.4.1</title>
+<title>WorkBench 4.4.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8065,7 +8065,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.4.1 · Build 20260607-1310</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.4.2 · Build 20260607-1335</div>
     </div>
 
     <!-- Welt -->
@@ -8230,8 +8230,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.4.1',
-  APP_BUILD:   '20260607-1310',
+  APP_VERSION: '4.4.2',
+  APP_BUILD:   '20260607-1335',
 
 
   // ══════════════════════════════════════════════════════
@@ -11201,18 +11201,23 @@ const WB = {
 
   _ritualAddTermin() {
     const today = this._ritualTodayKey();
-    // Schließt das Ritual-Overlay kurz, öffnet normalen Termin-Dialog, kehrt zurück
-    document.getElementById('wb-ritual-overlay').classList.remove('open');
+    const ritualOv = document.getElementById('wb-ritual-overlay');
+    if (ritualOv) ritualOv.style.display = 'none';
     this.newEventOpen(today);
-    // Nach dem Schließen des Termin-Dialogs Ritual wieder öffnen
-    const checkClose = setInterval(() => {
-      const editOverlay = document.getElementById('wb-edit-overlay');
-      if (!editOverlay || editOverlay.style.display === 'none' || !editOverlay.classList.contains('open')) {
-        clearInterval(checkClose);
-        document.getElementById('wb-ritual-overlay')?.classList.add('open');
+    // Erst warten bis Edit-Dialog offen ist, dann auf Schließen warten
+    let editOpened = false;
+    const check = setInterval(() => {
+      const editOv = document.getElementById('edit-overlay');
+      const isOpen = editOv?.classList.contains('open');
+      if (!editOpened && isOpen) { editOpened = true; return; }
+      if (editOpened && !isOpen) {
+        clearInterval(check);
+        if (ritualOv) ritualOv.style.display = '';
         this._ritualRenderCandidates();
       }
-    }, 500);
+    }, 200);
+    // Fallback: nach 30 Sekunden aufräumen falls etwas schiefläuft
+    setTimeout(() => { clearInterval(check); if (ritualOv) ritualOv.style.display = ''; }, 30000);
   },
 
   _ritualAddFreitext() {
