@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.8.0</title>
+<title>WorkBench 4.8.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8123,7 +8123,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.8.0 · Build 20260608-0045</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.8.1 · Build 20260608-0115</div>
     </div>
 
     <!-- Welt -->
@@ -8288,8 +8288,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.8.0',
-  APP_BUILD:   '20260608-0045',
+  APP_VERSION: '4.8.1',
+  APP_BUILD:   '20260608-0115',
 
 
   // ══════════════════════════════════════════════════════
@@ -15238,15 +15238,21 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         }
         // Aktiv: volle Karte
         html += aktiv.map(v => {
-          const offeneSchritte = (v.planAufgaben || []).filter(a => !a.done).length;
-          const stichtag = v.stichtag ? ' · bis ' + v.stichtag : '';
-          return '<div class="vh-card" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
-            + '<div class="vh-card-head">'
-            + '<span class="vh-card-title">' + this._esc(v.titel) + '</span>'
-            + '</div>'
-            + (v.ziel ? '<div class="vh-card-ziel">' + this._esc(v.ziel) + '</div>' : '')
-            + '<div class="vh-card-meta">' + offeneSchritte + ' offene Schritte' + stichtag + '</div>'
-            + '</div>';
+          try {
+            const offeneSchritte = (v.meilensteine || [])
+              .reduce((sum, ms) => sum + (ms.aufgaben || []).filter(a => !a.done).length, 0);
+            const stichtag = v.stichtag ? ' · bis ' + v.stichtag : '';
+            return '<div class="vh-card" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
+              + '<div class="vh-card-head">'
+              + '<span class="vh-card-title">' + this._esc(v.titel) + '</span>'
+              + '</div>'
+              + (v.ziel ? '<div class="vh-card-ziel">' + this._esc(v.ziel) + '</div>' : '')
+              + '<div class="vh-card-meta">' + offeneSchritte + ' offene Aufgaben' + stichtag + '</div>'
+              + '</div>';
+          } catch(e) {
+            return '<div class="vh-card" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
+              + '<div class="vh-card-head"><span class="vh-card-title">' + this._esc(v.titel||'?') + '</span></div></div>';
+          }
         }).join('');
         // Wartend: nur Titel
         html += wartend.map(v =>
@@ -27600,6 +27606,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this.projFilter = world==='beruf' ? 'pro' : 'priv';
     this._syncUpdateUI();
     if(rerender) this._renderSection(this.activeTab);
+    // Vorhaben-Liste neu rendern wenn offen
+    if (document.getElementById('wb-vorhaben-overlay')?.style.display === 'flex') {
+      this._vorhabenListeRender();
+    }
   },
 
   // v3.87.0: Welt-Automatik im laufenden Betrieb (stündlich + bei App-Rückkehr)
