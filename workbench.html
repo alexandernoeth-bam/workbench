@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.7.3</title>
+<title>WorkBench 4.7.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8122,7 +8122,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.7.3 · Build 20260607-2158</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.7.5 · Build 20260607-2225</div>
     </div>
 
     <!-- Welt -->
@@ -8287,8 +8287,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.7.3',
-  APP_BUILD:   '20260607-2158',
+  APP_VERSION: '4.7.5',
+  APP_BUILD:   '20260607-2225',
 
 
   // ══════════════════════════════════════════════════════
@@ -15310,6 +15310,53 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     return found ? found.vorhaben : null;
   },
 
+  _vorhabenSetEbene(ebene) {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    v.aktivitaet = ebene; v.geaendert = Date.now(); this.setDirty();
+    this._vorhabenDetailRender();
+    this._vorhabenListeRender();
+  },
+
+  _vorhabenSetCluster(cluster) {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    v.cluster = cluster; v.geaendert = Date.now(); this.setDirty();
+  },
+
+  _vorhabenSaveStichtag(val) {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    v.stichtag = val; v.geaendert = Date.now(); this.setDirty();
+  },
+
+  _vorhabenWechselWelt(zielWelt) {
+    const found = this._vorhabenFind(this._vorhabenAktivId);
+    if (!found) return;
+    const v = found.vorhaben;
+    const quellStore = this._vorhabenStore(found.welt);
+    const zielStore  = this._vorhabenStore(zielWelt);
+    if (!quellStore || !zielStore) return;
+    const idx = quellStore.findIndex(x => x.id === v.id);
+    if (idx !== -1) quellStore.splice(idx, 1);
+    if (zielWelt === 'pro' && !['mindset','beruf'].includes(v.cluster)) v.cluster = 'mindset';
+    if (zielWelt === 'priv' && !['mindset','koerper','umgebung'].includes(v.cluster)) v.cluster = 'mindset';
+    v.welt = zielWelt; v.geaendert = Date.now();
+    zielStore.push(v);
+    this.setDirty();
+    this.vorhabenDetailClose();
+    this._toast('✓ Vorhaben nach ' + (zielWelt === 'pro' ? 'Beruf' : 'Privat') + ' verschoben');
+  },
+
+  _vorhabenDelete() {
+    const found = this._vorhabenFind(this._vorhabenAktivId);
+    if (!found) return;
+    if (!confirm('Vorhaben „' + found.vorhaben.titel + '" wirklich löschen?')) return;
+    const store = this._vorhabenStore(found.welt);
+    const idx = (store || []).findIndex(x => x.id === found.vorhaben.id);
+    if (idx !== -1) store.splice(idx, 1);
+    this.setDirty();
+    this.vorhabenDetailClose();
+    this._toast('Vorhaben gelöscht');
+  },
+
   // Neues Vorhaben — Sheet mit Titel + Typ
   vorhabenNeuSheet() {
     document.getElementById('wb-vorhaben-neu-sheet')?.remove();
@@ -15410,8 +15457,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       tmp.innerHTML = v.inhalt;
       v.notiz = (tmp.textContent || '').trim();
     }
-    // planAufgaben: erledigtAm + aktiv Felder ergänzen
+    // planAufgaben: erledigtAm + aktiv + id Felder ergänzen
     (v.planAufgaben || []).forEach(a => {
+      if (!a.id) a.id = 'pa_' + Date.now() + '_' + Math.floor(Math.random()*10000);
       if (a.done && !a.erledigtAm) a.erledigtAm = a.erstellt || new Date().toISOString().split('T')[0];
       if (a.aktiv === undefined) a.aktiv = false;
     });
@@ -15502,13 +15550,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (gesamtOffen.length) {
       gpHtml += gesamtOffen.map(a => {
         const isAktiv = !!a.aktiv;
-        return '<div class="vh47-gp-row">'
+      return '<div class="vh47-gp-row">'
           + '<span class="vh47-gp-text">' + this._esc(a.text) + '</span>'
           + (a.zeitrahmen ? '<span class="vh47-gp-meta">' + this._esc(a.zeitrahmen) + '</span>' : '')
           + '<button class="vh47-gp-aktiv-btn' + (isAktiv ? ' on' : '') + '" '
           + 'title="' + (isAktiv ? 'Aus aktiven Aufgaben entfernen' : 'Als aktive Aufgabe setzen') + '" '
           + 'onclick="WB._vhToggleAktiv(&quot;' + a.cbId + '&quot;)">▶</button>'
-          + '<button class="vh47-gp-del" onclick="WB._vhGesamtplanDel(&quot;' + a.cbId + '&quot;)" title="Löschen">×</button>'
+          + '<button class="vh47-gp-del" onclick="WB._vhGesamtplanDel(&quot;' + a.id + '&quot;)" title="Löschen">×</button>'
           + '</div>';
       }).join('');
     } else {
@@ -15803,9 +15851,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     setTimeout(() => document.getElementById('vh47-gp-inp')?.focus(), 50);
   },
 
-  _vhGesamtplanDel(cbId) {
+  _vhGesamtplanDel(aufgabeId) {
     const v = this._vorhabenAktiv(); if (!v) return;
-    v.planAufgaben = (v.planAufgaben||[]).filter(a => a.cbId !== cbId);
+    v.planAufgaben = (v.planAufgaben||[]).filter(a => a.id !== aufgabeId);
     v.geaendert = Date.now(); this.setDirty();
     this._vorhabenDetailRender();
   },
