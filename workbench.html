@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.3.3</title>
+<title>WorkBench 4.3.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -482,8 +482,8 @@ html, body {
 .ck-eintrag-meta { font-size:0.75rem; color:var(--c-faint); margin-top:1px; }
 .ck-eintrag-zeit { font-size:0.78rem; color:var(--c-muted); font-family:var(--font-mono); flex-shrink:0; }
 .ck-leer { font-size:0.85rem; color:var(--c-faint); padding:6px 0 4px; font-style:italic; }
-#ck-aktions-leiste { display:flex; gap:6px; padding:8px 16px; border-top:1px solid var(--c-border); flex-shrink:0; background:var(--c-bg); }
-#ck-aktions-leiste button { padding:7px 12px; border-radius:var(--radius-xs); font-family:var(--font); font-size:0.82rem; cursor:pointer; display:flex; align-items:center; gap:5px; white-space:nowrap; background:var(--c-beruf); color:#fff; border:none; font-weight:600; }
+#ck-aktions-leiste { display:flex; gap:6px; padding:6px 12px; border-top:1px solid var(--c-border); flex-shrink:0; background:var(--c-bg); }
+#ck-aktions-leiste button { padding:5px 10px; border-radius:var(--radius-xs); font-family:var(--font); font-size:0.78rem; cursor:pointer; display:flex; align-items:center; gap:4px; white-space:nowrap; background:var(--c-beruf); color:#fff; border:none; font-weight:600; }
 #ck-aktions-leiste button.ghost { background:none; border:1px solid var(--c-border); color:var(--c-muted); font-weight:400; }
 
 /* Termin-Toggle CSS entfernt v3.46.4 */
@@ -6853,17 +6853,17 @@ html, body {
         </div>
         <!-- Block 1: Termine -->
         <div class="ck-block" id="ck-block-termine">
-          <div class="ck-block-label">Termine</div>
+          <div class="ck-block-label" id="ck-label-termine">Termine</div>
           <div class="ck-block-body" id="ck-termine-body"></div>
         </div>
         <!-- Block 2: Fokus -->
         <div class="ck-block" id="ck-block-fokus">
-          <div class="ck-block-label">Fokus</div>
+          <div class="ck-block-label" id="ck-label-fokus">Fokus</div>
           <div class="ck-block-body" id="ck-fokus-body"></div>
         </div>
         <!-- Block 3: Rauschen (verschwindet komplett wenn leer) -->
         <div class="ck-block" id="ck-block-rauschen" style="display:none;">
-          <div class="ck-block-label">Rauschen</div>
+          <div class="ck-block-label" id="ck-label-rauschen">Rauschen</div>
           <div class="ck-block-body" id="ck-rauschen-body"></div>
         </div>
         <!-- Aktions-Leiste -->
@@ -8061,7 +8061,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.3.3 · Build 20260607-1025</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.3.4 · Build 20260607-1100</div>
     </div>
 
     <!-- Welt -->
@@ -8226,8 +8226,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.3.3',
-  APP_BUILD:   '20260607-1025',
+  APP_VERSION: '4.3.4',
+  APP_BUILD:   '20260607-1100',
 
 
   // ══════════════════════════════════════════════════════
@@ -10988,9 +10988,8 @@ const WB = {
   _ritualMaybeOpen() {
     // Beide DBs müssen geladen sein
     if (!this.dataPriv || !this.dataPro) return;
-    // Google-Auth-Overlay darf nicht offen sein
-    if (document.getElementById('wb-google-auth')?.style.display !== 'none' &&
-        document.getElementById('wb-google-auth')?.style.display !== '') return;
+    // Device-Overlay (Geräteauswahl/Auth) darf nicht offen sein
+    if (document.getElementById('wb-device-overlay')?.classList.contains('open')) return;
     // Einmal pro Session öffnen — verhindert Re-Open nach Auth-Renewal
     if (this._ritualOpenedToSession) return;
     // Heute schon erledigt
@@ -10998,6 +10997,8 @@ const WB = {
     // Dialog schon offen
     if (document.getElementById('wb-ritual-overlay')?.classList.contains('open')) return;
     this._ritualOpenedToSession = true;
+    const ts = document.getElementById('ck-tagesseite');
+    if (ts) ts.style.visibility = 'hidden';
     this.ritualOpen();
   },
 
@@ -11222,6 +11223,8 @@ const WB = {
     }
     this.setDirty();
     document.getElementById('wb-ritual-overlay').classList.remove('open');
+    const ts = document.getElementById('ck-tagesseite');
+    if (ts) ts.style.visibility = 'visible';
     this.renderCockpit();
     this._toast(this._ritualSelected.length ? 'Fokus gesetzt — guten Start!' : 'Tag begonnen');
   },
@@ -13794,8 +13797,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       .map(ev => ({ ev, ctx: ev.welt === 'pro' ? 'pro' : 'priv' }));
     if (!termine.length) {
       body.innerHTML = '<div class="ck-leer">Heute terminfrei</div>';
+      const lbl = document.getElementById('ck-label-termine');
+      if (lbl) lbl.textContent = 'Termine';
       return;
     }
+    const lbl = document.getElementById('ck-label-termine');
+    if (lbl) lbl.textContent = 'Termine (' + termine.length + ')';
     body.innerHTML = termine.map(({ev, ctx}) => {
       const zeit = ev.startTime ? ev.startTime.slice(0,5) : '';
       return '<div class="ck-eintrag">'
@@ -13826,8 +13833,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const fokus = eintrag?.fokus || [];
     if (!fokus.length) {
       body.innerHTML = '<div class="ck-leer">Kein Fokus gesetzt</div>';
+      const lbl = document.getElementById('ck-label-fokus');
+      if (lbl) lbl.textContent = 'Fokus';
       return;
     }
+    const lbl = document.getElementById('ck-label-fokus');
+    if (lbl) lbl.textContent = 'Fokus (' + fokus.length + ')';
     body.innerHTML = fokus.map((f, i) =>
       '<div class="ck-eintrag">'
       + '<input type="checkbox" class="ck-eintrag-chk" onchange="event.stopPropagation();WB._ckFokusDone(' + i + ',this)">'
@@ -13900,9 +13911,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     if (!items.length) {
       block.style.display = 'none';
+      const lbl = document.getElementById('ck-label-rauschen');
+      if (lbl) lbl.textContent = 'Rauschen';
       return;
     }
     block.style.display = 'flex';
+    const lbl = document.getElementById('ck-label-rauschen');
+    if (lbl) lbl.textContent = 'Rauschen (' + items.length + ')';
     body.innerHTML = items.map(item => {
       const chk = item.type === 'pflicht'
         ? 'WB._dutyToggleFromList(&quot;' + item.id + '&quot;,&quot;' + item.ctx + '&quot;,this)'
