@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.5.5</title>
+<title>WorkBench 4.6.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5861,6 +5861,14 @@ html, body {
 .vh-ruhend-liste { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0 10px; }
 .vh-ruhend-item { font-size: 0.8rem; color: var(--c-faint); cursor: pointer; padding: 3px 10px; border: 1px solid var(--c-border); border-radius: 12px; background: var(--c-bg); }
 .vh-ruhend-item:hover { color: var(--c-muted); border-color: var(--c-muted); }
+/* v4.6.0 Cluster */
+.vh-cluster { margin-bottom:8px; border:1px solid var(--c-border); border-radius:var(--radius-xs); overflow:hidden; }
+.vh-cluster-header { display:flex; align-items:center; gap:8px; padding:11px 14px; background:var(--c-surface); cursor:pointer; user-select:none; }
+.vh-cluster-header:hover { background:color-mix(in srgb,var(--c-beruf) 5%,var(--c-surface)); }
+.vh-cluster-name { font-size:0.88rem; font-weight:700; color:var(--c-text); flex:1; }
+.vh-cluster-count { font-size:0.72rem; color:var(--c-muted); background:var(--c-bg); border:1px solid var(--c-border); border-radius:10px; padding:1px 8px; }
+.vh-cluster-arrow { font-size:0.75rem; color:var(--c-faint); flex-shrink:0; }
+.vh-cluster-body { padding:8px 12px 12px; background:var(--c-bg); }
 #vh-inhalt-content {
   min-height: 80px; max-height: 45vh; overflow-y: auto;
   border: 1px solid var(--c-border); border-radius: var(--radius-xs);
@@ -8057,7 +8065,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.5.5 · Build 20260607-1642</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.6.0 · Build 20260607-1730</div>
     </div>
 
     <!-- Welt -->
@@ -8218,8 +8226,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.5.5',
-  APP_BUILD:   '20260607-1642',
+  APP_VERSION: '4.6.0',
+  APP_BUILD:   '20260607-1730',
 
 
   // ══════════════════════════════════════════════════════
@@ -15098,7 +15106,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     const store = this._vorhabenStore();
     if (!store || !store.length) {
-      // v3.93.0: Prüfen, ob noch nicht-migrierte Ziele/Pläne/Notizen existieren
       let migHinweis = '';
       try {
         const plan = this._vorhabenMigrationPlan();
@@ -15119,57 +15126,96 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       return;
     }
 
-    // v4.0.1: Nach Ebenen gruppieren
-    const gruppen = [
-      { id: 'aktiv',   label: 'Aktiv',   leer: 'Noch keine aktiven Vorhaben.' },
-      { id: 'wartend', label: 'Wartend', leer: 'Keine wartenden Vorhaben.' },
-      { id: 'ruhend',  label: 'Ruhend',  leer: null },
+    // v4.6.0: Cluster-Struktur
+    const CLUSTER = [
+      { id: 'mindset',  label: 'Mindset'  },
+      { id: 'koerper',  label: 'Körper'   },
+      { id: 'umgebung', label: 'Umgebung' },
+      { id: 'beruf',    label: 'Beruf',   nurBeruf: true },
     ];
-    let html = '';
-    gruppen.forEach(g => {
-      const items = store.filter(v => (v.aktivitaet || 'aktiv') === g.id);
-      if (!items.length && !g.leer) return; // Ruhend weglassen wenn leer
-      html += '<div class="vh-gruppe-header">'
-        + '<span class="vh-gruppe-label">' + g.label + '</span>'
-        + '<span class="vh-gruppe-count">' + items.length + '</span>'
+    const isBeruf = this.activeWorld === 'beruf';
+
+    let html = '<div style="margin-bottom:8px;"></div>';
+    CLUSTER.forEach(cl => {
+      if (cl.nurBeruf && !isBeruf) return;
+      const alle = store.filter(v => (v.cluster || 'mindset') === cl.id);
+      const aktiv   = alle.filter(v => (v.aktivitaet || 'aktiv') === 'aktiv');
+      const wartend = alle.filter(v => (v.aktivitaet || 'aktiv') === 'wartend');
+      const ruhend  = alle.filter(v => (v.aktivitaet || 'aktiv') === 'ruhend');
+      const isOpen  = this._vorhabenClusterOpen[cl.id] !== false;
+
+      html += '<div class="vh-cluster">'
+        + '<div class="vh-cluster-header" onclick="WB._vorhabenClusterToggle(&quot;' + cl.id + '&quot;)">'
+        + '<span class="vh-cluster-name">' + cl.label + '</span>'
+        + '<span class="vh-cluster-count">' + aktiv.length + ' aktiv</span>'
+        + '<span class="vh-cluster-arrow">' + (isOpen ? '▾' : '▸') + '</span>'
         + '</div>';
-      if (!items.length) {
-        html += '<div style="font-size:0.83rem;color:var(--c-faint);padding:10px 4px;">' + g.leer + '</div>';
-        return;
-      }
-      if (g.id === 'aktiv') {
-        // Aktiv: volle Karte mit Ziel + Fortschritt
-        html += items.map(v => {
-          const typ = this.PLAN_TYPEN[v.typ] || this.PLAN_TYPEN.allgemein;
-          const p = this._vorhabenProgress(v);
+
+      if (isOpen) {
+        html += '<div class="vh-cluster-body">';
+        if (!aktiv.length && !wartend.length) {
+          html += '<div style="font-size:0.83rem;color:var(--c-faint);padding:8px 4px;">Keine Vorhaben in diesem Cluster.</div>';
+        }
+        // Aktiv: volle Karte
+        html += aktiv.map(v => {
+          const offeneSchritte = (v.planAufgaben || []).filter(a => !a.done).length;
           const stichtag = v.stichtag ? ' · bis ' + v.stichtag : '';
           return '<div class="vh-card" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
             + '<div class="vh-card-head">'
-            + '<span class="vh-card-icon">' + typ.icon + '</span>'
             + '<span class="vh-card-title">' + this._esc(v.titel) + '</span>'
             + '</div>'
             + (v.ziel ? '<div class="vh-card-ziel">' + this._esc(v.ziel) + '</div>' : '')
-            + '<div class="vh-card-bar"><div class="vh-card-bar-fill" style="width:' + p.aufgabenPct + '%;"></div></div>'
-            + '<div class="vh-card-meta">' + p.done + '/' + p.total + ' Schritte · ' + p.aufgabenPct + '%' + stichtag + '</div>'
+            + '<div class="vh-card-meta">' + offeneSchritte + ' offene Schritte' + stichtag + '</div>'
             + '</div>';
         }).join('');
-      } else if (g.id === 'wartend') {
-        // Wartend: nur Titel, kein Inhalt
-        html += items.map(v => {
-          const typ = this.PLAN_TYPEN[v.typ] || this.PLAN_TYPEN.allgemein;
-          return '<div class="vh-card vh-card-wartend" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
-            + '<span class="vh-card-icon" style="opacity:0.5;">' + typ.icon + '</span>'
-            + '<span class="vh-card-title" style="color:var(--c-muted);">' + this._esc(v.titel) + '</span>'
-            + '</div>';
-        }).join('');
-      } else {
-        // Ruhend: minimal, nur Name
-        html += '<div class="vh-ruhend-liste">'
-          + items.map(v => '<span class="vh-ruhend-item" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">' + this._esc(v.titel) + '</span>').join('')
-          + '</div>';
+        // Wartend: nur Titel
+        html += wartend.map(v =>
+          '<div class="vh-card vh-card-wartend" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
+          + '<span class="vh-card-title" style="color:var(--c-muted);">' + this._esc(v.titel) + '</span>'
+          + '<span style="font-size:0.7rem;color:var(--c-faint);margin-left:auto;">Wartend</span>'
+          + '</div>'
+        ).join('');
+        // Ruhend: nur wenn explizit eingeblendet (toggle per Cluster)
+        if (ruhend.length) {
+          const ruhendOpen = this._vorhabenClusterOpen[cl.id + '_ruhend'];
+          html += '<div style="margin-top:4px;">'
+            + '<button onclick="event.stopPropagation();WB._vorhabenClusterToggleRuhend(&quot;' + cl.id + '&quot;)" '
+            + 'style="font-size:0.72rem;color:var(--c-faint);background:none;border:none;cursor:pointer;padding:2px 0;">'
+            + (ruhendOpen ? '▾' : '▸') + ' ' + ruhend.length + ' ruhend'
+            + '</button>';
+          if (ruhendOpen) {
+            html += '<div class="vh-ruhend-liste" style="margin-top:4px;">'
+              + ruhend.map(v => '<span class="vh-ruhend-item" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">' + this._esc(v.titel) + '</span>').join('')
+              + '</div>';
+          }
+          html += '</div>';
+        }
+        html += '</div>'; // vh-cluster-body
       }
+      html += '</div>'; // vh-cluster
     });
+
+    html += '<div style="padding:12px 0;text-align:center;">'
+      + '<button onclick="WB.vorhabenNeuSheet()" style="background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);padding:9px 20px;font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;">+ Neues Vorhaben</button>'
+      + '</div>';
     body.innerHTML = html;
+  },
+
+  _vorhabenClusterOpen: { mindset: true, koerper: false, umgebung: false, beruf: false },
+
+  _vorhabenClusterToggle(clusterId) {
+    this._vorhabenClusterOpen[clusterId] = !this._vorhabenClusterOpen[clusterId];
+    // State in Settings persistieren
+    if (!this._settings) this._settings = {};
+    this._settings.clusterOpen = { ...this._vorhabenClusterOpen };
+    this.saveSetting('clusterOpen', this._settings.clusterOpen);
+    this._vorhabenListeRender();
+  },
+
+  _vorhabenClusterToggleRuhend(clusterId) {
+    const key = clusterId + '_ruhend';
+    this._vorhabenClusterOpen[key] = !this._vorhabenClusterOpen[key];
+    this._vorhabenListeRender();
   },
 
   // Platzhalter — wird in 3d-2 mit Detail gefüllt
@@ -15182,6 +15228,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!v._v4migr) {
       if (!v.ziel && v.vision) v.ziel = v.vision;
       if (!v.aktivitaet) v.aktivitaet = 'aktiv';
+      if (!v.cluster) v.cluster = 'mindset';  // v4.6.0: Default-Cluster
       delete v.vision; delete v.metriken; delete v.reflexionen;
       delete v.milestones; delete v.metric; delete v.area; delete v.year;
       delete v.isBaustelle; delete v.mentalStundenProWoche; delete v.seitJahren;
@@ -15225,11 +15272,33 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<label style="font-size:0.78rem;color:var(--c-muted);white-space:nowrap;">Bis wann?</label>'
       + '<input id="vh-neu-stichtag" type="date" style="flex:1;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">'
       + '</div>'
+      + '<div style="margin-bottom:14px;">'
+      + '<div style="font-size:0.75rem;font-weight:700;color:var(--c-muted);margin-bottom:6px;">Cluster <span style="color:var(--c-danger);">*</span></div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+      + ['mindset','koerper','umgebung'].concat(this.activeWorld === 'beruf' ? ['beruf'] : []).map(c => {
+          const lbl = {mindset:'Mindset',koerper:'Körper',umgebung:'Umgebung',beruf:'Beruf'}[c];
+          return '<button id="vh-neu-cl-' + c + '" onclick="WB._vorhabenNeuCluster(&quot;' + c + '&quot;)" '
+            + 'style="padding:7px 14px;border-radius:20px;font-family:var(--font);font-size:0.82rem;cursor:pointer;border:1px solid var(--c-border);background:none;color:var(--c-muted);">'
+            + lbl + '</button>';
+        }).join('')
+      + '</div></div>'
       + '<button onclick="WB._vorhabenNeuSave()" style="width:100%;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.92rem;font-weight:700;cursor:pointer;">Anlegen</button>'
       + '</div>';
     document.body.appendChild(sheet);
     this._vorhabenNeuTypWahl = 'allgemein';
+    this._vorhabenNeuClusterWahl = null;
     setTimeout(() => document.getElementById('vh-neu-titel')?.focus(), 50);
+  },
+
+  _vorhabenNeuCluster(c) {
+    this._vorhabenNeuClusterWahl = c;
+    ['mindset','koerper','umgebung','beruf'].forEach(id => {
+      const btn = document.getElementById('vh-neu-cl-' + id);
+      if (!btn) return;
+      btn.style.background = id === c ? 'var(--c-beruf)' : 'none';
+      btn.style.color = id === c ? '#fff' : 'var(--c-muted)';
+      btn.style.borderColor = id === c ? 'var(--c-beruf)' : 'var(--c-border)';
+    });
   },
 
   _vorhabenNeuTyp(btn, typ) {
@@ -15243,11 +15312,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _vorhabenNeuSave() {
     const titel = (document.getElementById('vh-neu-titel')?.value || '').trim();
     if (!titel) { this._toast('Bitte Titel eingeben'); document.getElementById('vh-neu-titel')?.focus(); return; }
+    if (!this._vorhabenNeuClusterWahl) { this._toast('Bitte einen Cluster wählen'); return; }
     const v = this.vorhabenNeu(titel, this._vorhabenNeuTypWahl || 'allgemein');
     if (v) {
       v.ziel = (document.getElementById('vh-neu-ziel')?.value || '').trim();
       v.stichtag = document.getElementById('vh-neu-stichtag')?.value || '';
-      if (v.ziel || v.stichtag) this.setDirty();
+      v.cluster = this._vorhabenNeuClusterWahl;
+      this.setDirty();
     }
     document.getElementById('wb-vorhaben-neu-sheet')?.remove();
     if (v) { this._vorhabenListeRender(); this._toast('✓ Vorhaben angelegt'); }
@@ -15270,17 +15341,21 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     let h = '';
 
-    // ── Sichtbarkeits-Ebene (v4.0.0) ─────────────────────
+    // ── Sichtbarkeits-Ebene + Cluster (v4.6.0) ────────────
     const ebene = v.aktivitaet || 'aktiv';
     const ebenenLabels = { aktiv: 'Aktiv', wartend: 'Wartend', ruhend: 'Ruhend' };
+    const CLUSTER_LBL = { mindset:'Mindset', koerper:'Körper', umgebung:'Umgebung', beruf:'Beruf' };
+    const clusterOpts = ['mindset','koerper','umgebung'].concat(this.activeWorld === 'beruf' ? ['beruf'] : []);
     h += '<div class="vh-ebene-row">'
       + ['aktiv','wartend','ruhend'].map(e =>
           '<button class="vh-ebene-btn' + (ebene === e ? ' active' : '') + '" '
           + 'onclick="WB._vorhabenSetEbene(&quot;' + e + '&quot;)">' + ebenenLabels[e] + '</button>'
         ).join('')
       + '<div style="flex:1"></div>'
-      + '<button class="vh-welt-btn ' + (v.welt === 'pro' ? 'active' : '') + '" onclick="WB._vorhabenDetailSetWelt(&quot;pro&quot;)" style="margin-right:4px;">Beruf</button>'
-      + '<button class="vh-welt-btn ' + (v.welt === 'priv' ? 'active' : '') + '" onclick="WB._vorhabenDetailSetWelt(&quot;priv&quot;)">Privat</button>'
+      + '<select onchange="WB._vorhabenSetCluster(this.value)" '
+      + 'style="font-size:0.75rem;border:1px solid var(--c-border);border-radius:var(--radius-xs);padding:3px 6px;background:var(--c-bg);color:var(--c-muted);font-family:var(--font);cursor:pointer;">'
+      + clusterOpts.map(c => '<option value="' + c + '"' + ((v.cluster||'mindset')===c?' selected':'') + '>' + CLUSTER_LBL[c] + '</option>').join('')
+      + '</select>'
       + '</div>';
 
     // ── Ziel (ein Satz) ───────────────────────────────────
@@ -15532,8 +15607,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _vhWeitereOpen: false,
   _vhErledigtOpen: false,
 
-  _vorhabenSetEbene(ebene) {
+  _vorhabenSetCluster(cluster) {
     const v = this._vorhabenAktiv(); if (!v) return;
+    v.cluster = cluster; v.geaendert = Date.now(); this.setDirty();
+  },
+
+  _vorhabenSetEbene(ebene) {
     v.aktivitaet = ebene; v.geaendert = Date.now(); this.setDirty();
     this._vorhabenDetailRender();
     this._vorhabenListeRender();
@@ -17633,6 +17712,11 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       startup.classList.add('hidden');
       setTimeout(() => startup.remove(), 500);
     }
+    // v4.6.0: Cluster-State aus Settings laden
+    if (this._settings?.clusterOpen) {
+      Object.assign(this._vorhabenClusterOpen, this._settings.clusterOpen);
+    }
+
     // v4.3.0: Termine aus dataPro nach dataPriv migrieren
     this._evMigrateProToPriv();
     // Welt automatisch bestimmen
