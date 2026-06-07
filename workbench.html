@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.2.7</title>
+<title>WorkBench 4.3.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8061,7 +8061,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.2.7 · Build 20260606-1445</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.3.0 · Build 20260607-0900</div>
     </div>
 
     <!-- Welt -->
@@ -8226,8 +8226,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.2.7',
-  APP_BUILD:   '20260606-1445',
+  APP_VERSION: '4.3.0',
+  APP_BUILD:   '20260607-0900',
 
 
   // ══════════════════════════════════════════════════════
@@ -10991,17 +10991,64 @@ const WB = {
   },
 
   ritualOpen() {
-    this._ritualSelected = [];   // [{id,type,title,meta,obj,ctx,pKey,freitext}]
+    this._ritualSelected = [];
     this._ritualFreitexte = [];
-    // Datum-Header
     const now = new Date();
     const DAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
     const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
     const dEl = document.getElementById('ritual-date');
     if (dEl) dEl.textContent = DAYS[now.getDay()] + ', ' + now.getDate() + '. ' + MONTHS[now.getMonth()];
     this._ritualRenderOverview();
+    this._ritualRenderStep1();
     this._ritualGoto(1);
     document.getElementById('wb-ritual-overlay').classList.add('open');
+  },
+
+  _ritualRenderStep1() {
+    const today = new Date().toISOString().split('T')[0];
+    // Termine heute (beide Welten)
+    const termine = (this._evStore() || [])
+      .filter(ev => ev.date === today && !ev.done && ev.type !== 'horizon')
+      .sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
+    const tEl = document.getElementById('ritual-termine');
+    if (tEl) {
+      if (termine.length) {
+        tEl.innerHTML = '<div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:6px;">Heute</div>'
+          + termine.map(ev =>
+            '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid color-mix(in srgb,var(--c-border) 50%,transparent);font-size:0.88rem;">'
+            + '<span style="font-family:var(--font-mono);font-size:0.78rem;color:var(--c-muted);flex-shrink:0;">' + (ev.startTime||'').slice(0,5) + '</span>'
+            + '<span style="flex:1;color:var(--c-text);">' + this._esc(ev.text) + '</span>'
+            + '<span style="font-size:0.7rem;color:var(--c-faint);">' + (ev.welt==='pro'?'Beruf':'Privat') + '</span>'
+            + '</div>'
+          ).join('');
+      } else {
+        tEl.innerHTML = '<div style="font-size:0.85rem;color:var(--c-faint);padding:6px 0;">Heute terminfrei</div>';
+      }
+    }
+    // Aktive Vorhaben
+    const aktive = (this._vorhabenAlle ? this._vorhabenAlle() : []).filter(v => (v.aktivitaet||'aktiv')==='aktiv').length;
+    const vEl = document.getElementById('ritual-vorhaben');
+    if (vEl) vEl.innerHTML = '<span style="font-weight:700;color:var(--c-text);">' + aktive + '</span> aktive Vorhaben';
+  },
+
+  // Öffnet Claude-Chat direkt und geht zu Step 2
+  _ritualWeiter() {
+    window.open('https://claude.ai/chat/3d271183-71ca-4e9c-80fb-b8734a7c24df', '_blank', 'noopener');
+    this._ritualGoto(2);
+  },
+
+  // Privat-JSON als Datei herunterladen
+  _ritualDownloadPrivJson() {
+    if (!this.dataPriv) { this._toast('Privat-DB nicht geladen'); return; }
+    const json = JSON.stringify(this.dataPriv, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'workbench-privat-' + new Date().toISOString().split('T')[0] + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    this._toast('✓ Privat-JSON heruntergeladen');
   },
 
   _ritualGoto(step) {
@@ -13776,14 +13823,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const body = document.getElementById('ck-termine-body');
     if (!body) return;
     const today = new Date().toISOString().split('T')[0];
-    const termine = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-      (db?.customEvents || []).filter(ev =>
-        ev.date === today && !ev.done && ev.type !== 'horizon'
-      ).forEach(ev => termine.push({ ev, ctx }));
-    });
-    termine.sort((a,b) => (a.ev.startTime||'').localeCompare(b.ev.startTime||''));
+    const welt = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    // v4.3.0: Alle Termine in dataPriv, nach Welt gefiltert
+    const termine = (this._evStoreForWelt(welt) || [])
+      .filter(ev => ev.date === today && !ev.done && ev.type !== 'horizon')
+      .sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''))
+      .map(ev => ({ ev, ctx: ev.welt === 'pro' ? 'pro' : 'priv' }));
     if (!termine.length) {
       body.innerHTML = '<div class="ck-leer">Heute terminfrei</div>';
       return;
@@ -17527,6 +17572,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       startup.classList.add('hidden');
       setTimeout(() => startup.remove(), 500);
     }
+    // v4.3.0: Termine aus dataPro nach dataPriv migrieren
+    this._evMigrateProToPriv();
     // Welt automatisch bestimmen
     const world = this._detectWorld();
     this.setWorld(world, false);
@@ -18044,6 +18091,37 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const kw = Math.ceil((((d - y) / 86400000) + 1) / 7);
     return d.getUTCFullYear() + '-W' + String(kw).padStart(2, '0');
   },
+
+  // v4.3.0: Alle Termine in dataPriv ─────────────────────
+  _evStore() {
+    if (!this.dataPriv) return null;
+    if (!this.dataPriv.customEvents) this.dataPriv.customEvents = [];
+    return this.dataPriv.customEvents;
+  },
+  _evStoreForWelt(welt) {
+    const store = this._evStore() || [];
+    if (!welt) return store;
+    return store.filter(ev => (ev.welt || 'priv') === welt);
+  },
+  _evMigrateProToPriv() {
+    if (!this.dataPro?.customEvents?.length) return;
+    if (!this.dataPriv) return;
+    if (!this.dataPriv.customEvents) this.dataPriv.customEvents = [];
+    const privIds = new Set(this.dataPriv.customEvents.map(e => String(e.id)));
+    let migrated = 0;
+    this.dataPro.customEvents.forEach(ev => {
+      if (!privIds.has(String(ev.id))) {
+        this.dataPriv.customEvents.push({ ...ev, welt: ev.welt || 'pro' });
+        migrated++;
+      }
+    });
+    if (migrated > 0) {
+      this.dataPro.customEvents = [];
+      this.setDirty();
+      this._toast('✓ ' + migrated + ' Termin(e) nach Privat migriert');
+    }
+  },
+
 
   // ── Duty-Store ─────────────────────────────────────────
   _dutyStore(ctx) {
@@ -23951,19 +24029,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const pT = s => { if(!s) return DAY_START; const [h,m]=s.split(':').map(Number); return h+m/60; };
     const fmtDay = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 
-    // V3.7.2: Events per String-Vergleich filtern — kein Date-Objekt (Timezone-Bug)
+    // v4.3.0: Alle Termine in dataPriv, nach aktiver Welt gefiltert
     const mondayStr = monday.toISOString().split('T')[0];
     const sundayStr = sunday.toISOString().split('T')[0];
-    const allEvents = [];
-    [['pro', this.dataPro], ['priv', this.dataPriv]].forEach(([ctx, db]) => {
-      if(!db) return;
-      (db.customEvents||[]).forEach(ev => {
-        if(!ev.date || !ev.startTime) return;
-        if(ev.date >= mondayStr && ev.date <= sundayStr) {
-          allEvents.push({...ev, ctx});
-        }
-      });
-    });
+    const welt = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const allEvents = (this._evStoreForWelt(welt) || [])
+      .filter(ev => ev.date && ev.startTime && ev.date >= mondayStr && ev.date <= sundayStr)
+      .map(ev => ({ ...ev, ctx: ev.welt === 'pro' ? 'pro' : 'priv' }));
 
     // Zeitachse links
     let timeHtml = '<div class="woche-time-col"><div class="woche-time-header"></div>';
@@ -25869,8 +25941,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     // ── Neuer Termin ──────────────────────────────────
     if(type === 'event-new') {
       const world   = document.getElementById('ef-ev-world')?.value || ctx;
-      const targetDb = world === 'pro' ? this.dataPro : this.dataPriv;
-      if (!targetDb) { this._toast('Datenbank nicht geladen'); return; }
+      // v4.3.0: Alle Termine in dataPriv, welt-Feld als Markierung
+      const targetDb = this.dataPriv;
+      if (!targetDb) { this._toast('Privat-DB nicht geladen'); return; }
       const startT  = document.getElementById('ef-ev-start')?.value || '09:00';
       const endT    = document.getElementById('ef-ev-end')?.value   || '10:00';
       const dateV   = document.getElementById('ef-ev-date')?.value  || this._editNewDate;
@@ -27798,11 +27871,20 @@ WB.init();
       <div class="ritual-title">Guten Morgen</div>
       <div class="ritual-sub" id="ritual-date">–</div>
       <div id="ritual-overview"></div>
-      <button class="ritual-btn primary" onclick="WB._ritualGoto(2)">Weiter →</button>
-      <div style="margin-top:16px;padding:10px 14px;background:color-mix(in srgb,var(--c-beruf) 6%,var(--c-bg));border-radius:var(--radius-xs);font-size:0.78rem;color:var(--c-muted);line-height:1.5;text-align:center;">
-        💬 Für den geführten Morgendialog →
-        <a href="https://claude.ai" target="_blank" rel="noopener"
-          style="color:var(--c-beruf);font-weight:600;text-decoration:none;">Wechsel zu Claude.ai</a>
+
+      <!-- Termine heute -->
+      <div id="ritual-termine" style="width:100%;margin:12px 0 0;text-align:left;"></div>
+
+      <!-- Aktive Vorhaben Zahl -->
+      <div id="ritual-vorhaben" style="width:100%;margin:8px 0 12px;font-size:0.85rem;color:var(--c-muted);text-align:left;"></div>
+
+      <!-- Weiter öffnet Claude-Chat direkt -->
+      <button class="ritual-btn primary" onclick="WB._ritualWeiter()">Zum Morgendialog →</button>
+
+      <!-- JSON-Download Hinweis -->
+      <div style="margin-top:14px;padding:10px 14px;background:color-mix(in srgb,var(--c-beruf) 6%,var(--c-bg));border-radius:var(--radius-xs);font-size:0.78rem;color:var(--c-muted);line-height:1.6;text-align:left;">
+        <div style="margin-bottom:4px;">📎 Kontext für Claude: Lade deine Privat-JSON hoch</div>
+        <button onclick="WB._ritualDownloadPrivJson()" style="background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);padding:5px 12px;font-family:var(--font);font-size:0.78rem;cursor:pointer;">⬇ Privat-JSON herunterladen</button>
       </div>
     </div>
 
