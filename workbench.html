@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.4.0</title>
+<title>WorkBench 4.4.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8065,7 +8065,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.4.0 · Build 20260607-1230</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.4.1 · Build 20260607-1310</div>
     </div>
 
     <!-- Welt -->
@@ -8230,8 +8230,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.4.0',
-  APP_BUILD:   '20260607-1230',
+  APP_VERSION: '4.4.1',
+  APP_BUILD:   '20260607-1310',
 
 
   // ══════════════════════════════════════════════════════
@@ -9680,6 +9680,9 @@ const WB = {
       this._toast('Lade Daten aus Drive…');
       await this.oauthSyncDownload('priv');
       if (this.dataPro) await this.oauthSyncDownload('pro');
+      // v4.4.1: Auth + Drive-Sync abgeschlossen → Ritual freigeben
+      this._ritualDriveReady = true;
+      if (this.activeTab === 'cockpit') this.renderCockpit();
     } catch(e) {
       this._toast('Anmeldung fehlgeschlagen: ' + e.message);
     }
@@ -9804,6 +9807,8 @@ const WB = {
       this._oauthUpdateUI();
       this._driveLoginBannerDismiss();
       this._toast('✓ ' + (ctx==='pro'?'Beruf':'Privat') + ' von Drive geladen');
+      // v4.4.1: Drive-Sync abgeschlossen → Ritual freigeben
+      this._ritualDriveReady = true;
       // Vollständiger UI-Refresh
       this.renderCockpit();
       if (this.activeTab !== 'cockpit') this._renderSection(this.activeTab);
@@ -10048,6 +10053,8 @@ const WB = {
       this._drivePendingData = null;
       document.getElementById('wb-drive-sync-banner').classList.remove('visible');
       this._toast('✓ Von Drive synchronisiert');
+      // v4.4.1: Drive-Sync abgeschlossen → Ritual freigeben
+      this._ritualDriveReady = true;
       if (this.activeTab === 'cockpit') this.renderCockpit();
     } catch(e) {
       this._toast('Import-Fehler: ' + e.message);
@@ -10987,14 +10994,19 @@ const WB = {
   },
 
   _ritualOpenedToSession: false,  // Session-Lock: verhindert Re-Open nach Auth-Renewal
+  _ritualDriveReady: false,       // v4.4.1: Drive-Sync abgeschlossen oder kein Drive konfiguriert
 
   // Auto-Trigger: beim Cockpit-Render aufgerufen
   _ritualMaybeOpen() {
     // Beide DBs müssen geladen sein
     if (!this.dataPriv || !this.dataPro) return;
-    // Device-Overlay (Geräteauswahl/Auth) darf nicht offen sein
+    // Drive-Login-Banner sichtbar → Auth-Renewal läuft → warten
+    if (document.getElementById('wb-drive-login-banner')?.classList.contains('visible')) return;
+    // Device-Overlay offen → warten
     if (document.getElementById('wb-device-overlay')?.classList.contains('open')) return;
-    // Einmal pro Session öffnen — verhindert Re-Open nach Auth-Renewal
+    // Drive noch nicht bereit → warten (aber max. 8 Sekunden nach Start)
+    if (!this._ritualDriveReady) return;
+    // Einmal pro Session öffnen
     if (this._ritualOpenedToSession) return;
     // Heute schon erledigt
     if (this._ritualIsDoneToday()) return;
@@ -17606,6 +17618,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     requestAnimationFrame(() => {
       this._goTab('cockpit');
     });
+    // v4.4.1: Wenn kein Drive konfiguriert → Ritual nach kurzem Delay freigeben
+    const hasDrive = !!(this._oauthDriveFileIds?.pro || this._oauthDriveFileIds?.priv);
+    if (!hasDrive) {
+      setTimeout(() => { this._ritualDriveReady = true; this._ritualMaybeOpen(); }, 1500);
+    }
+
     // Activity-Tracking für Auto-Return starten
     this._ckStartActivityTracking();
     // v3.40.0: Duty-Erinnerungen beim Start prüfen
