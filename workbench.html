@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.6.0</title>
+<title>WorkBench 4.6.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8065,7 +8065,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.6.0 · Build 20260607-1730</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.6.1 · Build 20260607-1755</div>
     </div>
 
     <!-- Welt -->
@@ -8226,8 +8226,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.6.0',
-  APP_BUILD:   '20260607-1730',
+  APP_VERSION: '4.6.1',
+  APP_BUILD:   '20260607-1755',
 
 
   // ══════════════════════════════════════════════════════
@@ -15126,18 +15126,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       return;
     }
 
-    // v4.6.0: Cluster-Struktur
-    const CLUSTER = [
-      { id: 'mindset',  label: 'Mindset'  },
-      { id: 'koerper',  label: 'Körper'   },
-      { id: 'umgebung', label: 'Umgebung' },
-      { id: 'beruf',    label: 'Beruf',   nurBeruf: true },
-    ];
+    // v4.6.1: Cluster nach Welt — Beruf: Mindset+Beruf, Privat: Mindset+Körper+Umgebung
     const isBeruf = this.activeWorld === 'beruf';
+    const CLUSTER = isBeruf
+      ? [ { id: 'mindset', label: 'Mindset' }, { id: 'beruf', label: 'Beruf' } ]
+      : [ { id: 'mindset', label: 'Mindset' }, { id: 'koerper', label: 'Körper' }, { id: 'umgebung', label: 'Umgebung' } ];
 
     let html = '<div style="margin-bottom:8px;"></div>';
     CLUSTER.forEach(cl => {
-      if (cl.nurBeruf && !isBeruf) return;
       const alle = store.filter(v => (v.cluster || 'mindset') === cl.id);
       const aktiv   = alle.filter(v => (v.aktivitaet || 'aktiv') === 'aktiv');
       const wartend = alle.filter(v => (v.aktivitaet || 'aktiv') === 'wartend');
@@ -15275,7 +15271,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<div style="margin-bottom:14px;">'
       + '<div style="font-size:0.75rem;font-weight:700;color:var(--c-muted);margin-bottom:6px;">Cluster <span style="color:var(--c-danger);">*</span></div>'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
-      + ['mindset','koerper','umgebung'].concat(this.activeWorld === 'beruf' ? ['beruf'] : []).map(c => {
+      + (this.activeWorld === 'beruf'
+          ? ['mindset','beruf']
+          : ['mindset','koerper','umgebung']
+        ).map(c => {
           const lbl = {mindset:'Mindset',koerper:'Körper',umgebung:'Umgebung',beruf:'Beruf'}[c];
           return '<button id="vh-neu-cl-' + c + '" onclick="WB._vorhabenNeuCluster(&quot;' + c + '&quot;)" '
             + 'style="padding:7px 14px;border-radius:20px;font-family:var(--font);font-size:0.82rem;cursor:pointer;border:1px solid var(--c-border);background:none;color:var(--c-muted);">'
@@ -15345,7 +15344,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const ebene = v.aktivitaet || 'aktiv';
     const ebenenLabels = { aktiv: 'Aktiv', wartend: 'Wartend', ruhend: 'Ruhend' };
     const CLUSTER_LBL = { mindset:'Mindset', koerper:'Körper', umgebung:'Umgebung', beruf:'Beruf' };
-    const clusterOpts = ['mindset','koerper','umgebung'].concat(this.activeWorld === 'beruf' ? ['beruf'] : []);
+    const clusterOpts = this.activeWorld === 'beruf' ? ['mindset','beruf'] : ['mindset','koerper','umgebung'];
+    const andereWelt = v.welt === 'pro' ? 'priv' : 'pro';
+    const andereWeltLbl = v.welt === 'pro' ? '→ Privat' : '→ Beruf';
     h += '<div class="vh-ebene-row">'
       + ['aktiv','wartend','ruhend'].map(e =>
           '<button class="vh-ebene-btn' + (ebene === e ? ' active' : '') + '" '
@@ -15353,9 +15354,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         ).join('')
       + '<div style="flex:1"></div>'
       + '<select onchange="WB._vorhabenSetCluster(this.value)" '
-      + 'style="font-size:0.75rem;border:1px solid var(--c-border);border-radius:var(--radius-xs);padding:3px 6px;background:var(--c-bg);color:var(--c-muted);font-family:var(--font);cursor:pointer;">'
+      + 'style="font-size:0.75rem;border:1px solid var(--c-border);border-radius:var(--radius-xs);padding:3px 6px;background:var(--c-bg);color:var(--c-muted);font-family:var(--font);cursor:pointer;margin-right:6px;">'
       + clusterOpts.map(c => '<option value="' + c + '"' + ((v.cluster||'mindset')===c?' selected':'') + '>' + CLUSTER_LBL[c] + '</option>').join('')
       + '</select>'
+      + '<button onclick="WB._vorhabenWechselWelt(&quot;' + andereWelt + '&quot;)" '
+      + 'style="font-size:0.72rem;padding:3px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;color:var(--c-muted);cursor:pointer;white-space:nowrap;" '
+      + 'title="In andere Welt verschieben">' + andereWeltLbl + '</button>'
       + '</div>';
 
     // ── Ziel (ein Satz) ───────────────────────────────────
@@ -15610,6 +15614,28 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _vorhabenSetCluster(cluster) {
     const v = this._vorhabenAktiv(); if (!v) return;
     v.cluster = cluster; v.geaendert = Date.now(); this.setDirty();
+  },
+
+  // v4.6.1: Vorhaben in andere Welt verschieben
+  _vorhabenWechselWelt(zielWelt) {
+    const found = this._vorhabenFind(this._vorhabenAktivId);
+    if (!found) return;
+    const v = found.vorhaben;
+    const quellStore = this._vorhabenStore(found.welt);
+    const zielStore  = this._vorhabenStore(zielWelt);
+    if (!quellStore || !zielStore) return;
+    // Aus Quell-Store entfernen
+    const idx = quellStore.findIndex(x => x.id === v.id);
+    if (idx !== -1) quellStore.splice(idx, 1);
+    // Cluster anpassen falls nicht kompatibel
+    if (zielWelt === 'pro' && !['mindset','beruf'].includes(v.cluster)) v.cluster = 'mindset';
+    if (zielWelt === 'priv' && !['mindset','koerper','umgebung'].includes(v.cluster)) v.cluster = 'mindset';
+    v.welt = zielWelt;
+    v.geaendert = Date.now();
+    zielStore.push(v);
+    this.setDirty();
+    this.vorhabenDetailClose();
+    this._toast('✓ Vorhaben nach ' + (zielWelt === 'pro' ? 'Beruf' : 'Privat') + ' verschoben');
   },
 
   _vorhabenSetEbene(ebene) {
