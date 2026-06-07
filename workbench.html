@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.6.7</title>
+<title>WorkBench 4.6.8</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8072,7 +8072,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.6.7 · Build 20260607-1958</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.6.8 · Build 20260607-2010</div>
     </div>
 
     <!-- Welt -->
@@ -8237,8 +8237,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.6.7',
-  APP_BUILD:   '20260607-1958',
+  APP_VERSION: '4.6.8',
+  APP_BUILD:   '20260607-2010',
 
 
   // ══════════════════════════════════════════════════════
@@ -15705,7 +15705,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     } else {
       // Fallback (Sektion nicht offen): direkt in planAufgaben
       if (!v.planAufgaben) v.planAufgaben = [];
-      v.planAufgaben.push({ id: 'pa_' + Date.now() + '_' + Math.floor(Math.random()*1000), text, cbId: this._planCbId(text), date: '', done: false, erstellt: new Date().toISOString().split('T')[0], gewicht: 'mittel' });
+      v.planAufgaben.push({ id: 'pa_' + Date.now() + '_' + Math.floor(Math.random()*1000), text, cbId: this._planCbId(text, v.id), date: '', done: false, erstellt: new Date().toISOString().split('T')[0], gewicht: 'mittel' });
       v.geaendert = Date.now(); this.setDirty();
     }
     if (inp) inp.value = '';
@@ -15955,7 +15955,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const frag = document.createDocumentFragment();
       parts.forEach(part => {
         if (part.type === 'text') { frag.appendChild(document.createTextNode(part.val)); return; }
-        const cbId = this._planCbId(part.lineText);
+        const cbId = this._planCbId(part.lineText, v.id);
         gefunden.add(cbId);
         let a = v.planAufgaben.find(x => x.cbId === cbId)
              || v.planAufgaben.find(x => (x.text || '').trim() === part.lineText && !x.cbId);
@@ -24465,11 +24465,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   // Stabile cbId aus Text generieren
-  _planCbId(text) {
+  _planCbId(text, vorhabenId) {
+    const key = (vorhabenId || '') + '::' + text;
     try {
-      return 'pcb_' + btoa(encodeURIComponent(text)).slice(0, 14).replace(/[^a-zA-Z0-9]/g, 'x');
+      return 'pcb_' + btoa(encodeURIComponent(key)).slice(0, 14).replace(/[^a-zA-Z0-9]/g, 'x');
     } catch (e) {
-      return 'pcb_' + Math.abs(text.split('').reduce((a,c)=>((a<<5)-a+c.charCodeAt(0))|0,0));
+      return 'pcb_' + Math.abs(key.split('').reduce((a,c)=>((a<<5)-a+c.charCodeAt(0))|0,0));
     }
   },
 
