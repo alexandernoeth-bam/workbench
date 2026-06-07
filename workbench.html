@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.7.7</title>
+<title>WorkBench 4.7.8</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8122,7 +8122,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.7.7 · Build 20260607-2255</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.7.8 · Build 20260607-2310</div>
     </div>
 
     <!-- Welt -->
@@ -8287,8 +8287,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.7.7',
-  APP_BUILD:   '20260607-2255',
+  APP_VERSION: '4.7.8',
+  APP_BUILD:   '20260607-2310',
 
 
   // ══════════════════════════════════════════════════════
@@ -13967,45 +13967,32 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (lbl) lbl.textContent = 'Fokus (' + fokus.length + ')';
     body.innerHTML = fokus.map((f, i) => {
       try {
-        // onclick: Vorhaben suchen — über vorhabenId, Aufgaben-ID oder Freitext ignorieren
         let onclick = '';
-        if (f.vorhabenId) {
-          onclick = 'WB.vorhabenOpen(&quot;' + f.vorhabenId + '&quot;)';
-        } else if (f.id && f.type !== 'freitext') {
-          try {
-            const hit = this._vorhabenFindAufgabe(f.id);
-            if (hit) onclick = 'WB.vorhabenOpen(&quot;' + hit.vorhaben.id + '&quot;)';
-          } catch(e) {}
-        }
-        // Vorhaben-Name: aus meta oder zur Laufzeit nachladen
         let vorhabenName = f.meta || '';
-        if (!vorhabenName && f.id && f.type !== 'freitext') {
-          try {
-            const hit2 = this._vorhabenFindAufgabe(f.id);
-            if (hit2) vorhabenName = hit2.vorhaben.titel || '';
-          } catch(e) {}
-        }
-        if (!vorhabenName && f.vorhabenId) {
-          try {
-            const vh = this._vorhabenFind(f.vorhabenId);
-            if (vh) vorhabenName = vh.vorhaben.titel || '';
-          } catch(e) {}
-        }
         let ae = f.aktivEnergie || '';
-        if (f.type === 'vorhaben-aufgabe' && f.id) {
+
+        // Vorhaben suchen — robust gegen fehlende Felder
+        let vhId = f.vorhabenId || '';
+        if (!vhId && f.id && f.type !== 'freitext') {
           try {
             const hit = this._vorhabenFindAufgabe(f.id);
-            if (hit) ae = hit.aufgabe.aktivEnergie || '';
+            if (hit) { vhId = hit.vorhaben.id; if (!vorhabenName) vorhabenName = hit.vorhaben.titel || ''; ae = hit.aufgabe.aktivEnergie || ae; }
           } catch(e) {}
         }
-        return '<div class="ck-eintrag"' + (onclick ? ' onclick="' + onclick + '"' : '') + '>'
+        if (!vorhabenName && vhId) {
+          try { const vh = this._vorhabenFind(vhId); if (vh) vorhabenName = vh.vorhaben.titel || ''; } catch(e) {}
+        }
+        if (vhId) onclick = 'WB.vorhabenOpen(&quot;' + vhId + '&quot;)';
+
+        return '<div class="ck-eintrag"' + (onclick ? ' onclick="' + onclick + '"' : '') + ' style="' + (onclick ? 'cursor:pointer;' : '') + '">'
           + '<input type="checkbox" class="ck-eintrag-chk" onchange="event.stopPropagation();WB._ckFokusDone(' + i + ',this)">'
           + '<div class="ck-eintrag-text">'
-          + '<div class="ck-eintrag-titel">' + this._esc(f.title || '') + this._aeBadge(ae) + '</div>'
+          + '<div class="ck-eintrag-titel">' + this._esc(f.title || '(Fokus)') + this._aeBadge(ae) + '</div>'
           + (vorhabenName ? '<div class="ck-eintrag-meta">' + this._esc(vorhabenName) + '</div>' : '')
           + '</div></div>';
       } catch(e) {
-        return '<div class="ck-eintrag"><div class="ck-eintrag-text"><div class="ck-eintrag-titel">' + this._esc(f.title || '?') + '</div></div></div>';
+        console.error('Fokus-Render Fehler:', e, f);
+        return '<div class="ck-eintrag"><div class="ck-eintrag-text"><div class="ck-eintrag-titel">' + (f.title || '?') + '</div></div></div>';
       }
     }).join('');
   },
