@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.5.0</title>
+<title>WorkBench 4.5.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8057,7 +8057,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.5.0 · Build 20260607-1500</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.5.1 · Build 20260607-1525</div>
     </div>
 
     <!-- Welt -->
@@ -8222,8 +8222,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.5.0',
-  APP_BUILD:   '20260607-1500',
+  APP_VERSION: '4.5.1',
+  APP_BUILD:   '20260607-1525',
 
 
   // ══════════════════════════════════════════════════════
@@ -13866,9 +13866,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (lbl) lbl.textContent = 'Termine (' + termine.length + ')';
     body.innerHTML = termine.map(({ev, ctx}) => {
       const zeit = ev.startTime ? ev.startTime.slice(0,5) : '';
-      const item = { type:'termin', id:ev.id, ctx, titel:ev.text||'', zeit, ort:ev.location||'', aktivEnergie:ev.aktivEnergie||'', kippTyp:ev.kippTyp||'', checklist:ev.checklist||[] };
-      const payload = encodeURIComponent(JSON.stringify(item));
-      return '<div class="ck-eintrag" onclick="WB._ckItemDetail(&quot;' + payload + '&quot;)">'
+      return '<div class="ck-eintrag" onclick="WB.editOpen(\'event\',\'' + ctx + '\',\'\',\'' + ev.id + '\')">'
         + '<input type="checkbox" class="ck-eintrag-chk" onchange="event.stopPropagation();WB._ckTerminDone(&quot;' + ev.id + '&quot;,&quot;' + ctx + '&quot;,this)">'
         + (zeit ? '<span class="ck-eintrag-zeit">' + zeit + '</span>' : '')
         + '<div class="ck-eintrag-text">'
@@ -13876,73 +13874,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + (ev.location ? '<div class="ck-eintrag-meta">' + this._esc(ev.location) + '</div>' : '')
         + '</div></div>';
     }).join('');
-  },
-
-  // v4.5.0: Detail-Sheet für Cockpit-Items
-  _ckItemDetail(payloadEnc) {
-    let item;
-    try { item = JSON.parse(decodeURIComponent(payloadEnc)); } catch(e) { return; }
-    document.getElementById('ck-item-sheet')?.remove();
-
-    const HEBEL = {
-      urteil:     'Kurz rein, dann raus — was passiert wirklich?',
-      stolz:      'Wie sieht es fertig aus — bist du jemand, der das hinbekommt?',
-      routine:    'Fixer Rhythmus. Einfach machen, kein Drama.',
-      tunnelblick:'Heute nur das eine. Der Rest existiert jetzt nicht.',
-    };
-    const zeigeHebel = item.aktivEnergie === 'hoch' && item.kippTyp && HEBEL[item.kippTyp];
-
-    // Checkliste (nur bei Terminen mit checklist-Array)
-    const checklistHtml = (item.checklist || []).length
-      ? '<div style="margin-top:12px;">'
-        + '<div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--c-muted);margin-bottom:6px;">Checkliste</div>'
-        + item.checklist.map((c, i) =>
-            '<label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.88rem;cursor:pointer;">'
-            + '<input type="checkbox"' + (c.done ? ' checked' : '') + ' style="accent-color:var(--c-beruf);" onchange="WB._ckSheetCheckItem(\'' + item.id + '\',\'' + item.ctx + '\',' + i + ',this)">'
-            + '<span' + (c.done ? ' style="text-decoration:line-through;color:var(--c-faint);"' : '') + '>' + this._esc(c.text || '') + '</span>'
-            + '</label>'
-          ).join('')
-        + '</div>'
-      : '';
-
-    const sheet = document.createElement('div');
-    sheet.id = 'ck-item-sheet';
-    sheet.style.cssText = 'position:fixed;inset:0;z-index:450;background:rgba(0,0,0,0.3);display:flex;align-items:flex-end;';
-    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
-    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 18px 32px;max-height:75vh;overflow-y:auto;">'
-      // Hebel-Hinweis (wenn AE=hoch + Kipp gesetzt)
-      + (zeigeHebel
-          ? '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:color-mix(in srgb,#C62828 8%,var(--c-bg));border-radius:var(--radius-xs);margin-bottom:14px;font-size:0.8rem;color:#C62828;">'
-            + '<span style="flex-shrink:0;">⚡</span>'
-            + '<span style="flex:1;">' + HEBEL[item.kippTyp] + '</span>'
-            + '<button onclick="this.parentElement.remove()" style="background:none;border:none;color:#C62828;cursor:pointer;font-size:1rem;flex-shrink:0;">×</button>'
-            + '</div>'
-          : '')
-      // Titel + Kontext
-      + '<div style="font-size:1rem;font-weight:700;color:var(--c-text);margin-bottom:' + (item.meta ? '3px' : '14px') + ';">' + this._esc(item.titel) + '</div>'
-      + (item.meta ? '<div style="font-size:0.78rem;color:var(--c-faint);margin-bottom:14px;">' + this._esc(item.meta) + '</div>' : '')
-      // Zeit + Ort bei Terminen
-      + (item.zeit || item.ort ? '<div style="font-size:0.82rem;color:var(--c-muted);margin-bottom:12px;">'
-          + (item.zeit ? '🕐 ' + item.zeit : '') + (item.zeit && item.ort ? '  ·  ' : '') + (item.ort ? '📍 ' + this._esc(item.ort) : '')
-          + '</div>' : '')
-      // Checkliste
-      + checklistHtml
-      // Notizfeld
-      + '<div style="margin-top:14px;">'
-      + '<div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--c-muted);margin-bottom:6px;">Notiz</div>'
-      + '<textarea id="ck-sheet-notiz" placeholder="Kurze Notiz zum Item…" style="width:100%;box-sizing:border-box;min-height:72px;padding:9px 11px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);resize:none;"></textarea>'
-      + '</div>'
-      + '<button onclick="document.getElementById(\'ck-item-sheet\').remove()" style="width:100%;margin-top:14px;padding:10px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;">Fertig</button>'
-      + '</div>';
-    document.body.appendChild(sheet);
-    setTimeout(() => sheet.querySelector('#ck-sheet-notiz')?.focus(), 50);
-  },
-
-  _ckSheetCheckItem(evId, ctx, idx, chk) {
-    const ev = (this._evStore() || []).find(e => String(e.id) === String(evId));
-    if (!ev || !ev.checklist) return;
-    ev.checklist[idx].done = chk.checked;
-    this.setDirty();
   },
 
   _ckTerminDone(id, ctx, chk) {
@@ -13970,17 +13901,20 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const lbl = document.getElementById('ck-label-fokus');
     if (lbl) lbl.textContent = 'Fokus (' + fokus.length + ')';
     body.innerHTML = fokus.map((f, i) => {
-      const item = { type:'fokus', idx:i, titel:f.title||'', meta:f.meta||'', vorhabenId:f.vorhabenId||'', aktivEnergie:f.aktivEnergie||'', kippTyp:f.kippTyp||'' };
-      // AE + Kipp aus echter Aufgabe nachladen falls vorhaben-aufgabe
+      // onclick: Vorhaben öffnen wenn vorhaben-aufgabe, sonst nichts
+      const onclick = (f.type === 'vorhaben-aufgabe' && f.vorhabenId)
+        ? 'WB.vorhabenOpen(\'' + f.vorhabenId + '\')'
+        : '';
+      // AE aus echter Aufgabe nachladen
+      let ae = f.aktivEnergie || '';
       if (f.type === 'vorhaben-aufgabe' && f.id) {
         const hit = this._vorhabenFindAufgabe(f.id);
-        if (hit) { item.aktivEnergie = hit.aufgabe.aktivEnergie||''; item.kippTyp = hit.aufgabe.kippTyp||''; }
+        if (hit) ae = hit.aufgabe.aktivEnergie || '';
       }
-      const payload = encodeURIComponent(JSON.stringify(item));
-      return '<div class="ck-eintrag" onclick="WB._ckItemDetail(&quot;' + payload + '&quot;)">'
+      return '<div class="ck-eintrag"' + (onclick ? ' onclick="' + onclick + '"' : '') + '>'
         + '<input type="checkbox" class="ck-eintrag-chk" onchange="event.stopPropagation();WB._ckFokusDone(' + i + ',this)">'
         + '<div class="ck-eintrag-text">'
-        + '<div class="ck-eintrag-titel">' + this._esc(f.title || '') + this._aeBadge(item.aktivEnergie) + '</div>'
+        + '<div class="ck-eintrag-titel">' + this._esc(f.title || '') + this._aeBadge(ae) + '</div>'
         + (f.meta ? '<div class="ck-eintrag-meta">' + this._esc(f.meta) + '</div>' : '')
         + '</div></div>';
     }).join('');
@@ -14060,8 +13994,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const chk = item.type === 'pflicht'
         ? 'WB._dutyToggleFromList(&quot;' + item.id + '&quot;,&quot;' + item.ctx + '&quot;,this)'
         : 'WB._ckQuickDone(&quot;' + item.id + '&quot;,this)';
-      const payload = encodeURIComponent(JSON.stringify({ type:item.type, id:item.id, ctx:item.ctx, titel:item.titel, aktivEnergie:item.obj?.aktivEnergie||'' }));
-      return '<div class="ck-eintrag" onclick="WB._ckItemDetail(&quot;' + payload + '&quot;)">'
+      const onclick = item.type === 'pflicht'
+        ? 'WB.dutiesOpen()'
+        : 'WB._quickDetail(&quot;' + item.id + '&quot;)';
+      return '<div class="ck-eintrag" onclick="' + onclick + '">'
         + '<input type="checkbox" class="ck-eintrag-chk" onchange="event.stopPropagation();' + chk + '">'
         + '<div class="ck-eintrag-text">'
         + '<div class="ck-eintrag-titel">' + this._esc(item.titel) + this._aeBadge(item.obj?.aktivEnergie) + '</div>'
