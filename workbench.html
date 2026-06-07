@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.8.6</title>
+<title>WorkBench 4.8.7</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8123,7 +8123,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.8.6 · Build 20260608-0240</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.8.7 · Build 20260608-0310</div>
     </div>
 
     <!-- Welt -->
@@ -8288,8 +8288,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.8.6',
-  APP_BUILD:   '20260608-0240',
+  APP_VERSION: '4.8.7',
+  APP_BUILD:   '20260608-0310',
 
 
   // ══════════════════════════════════════════════════════
@@ -15774,19 +15774,95 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const v = this._vorhabenAktiv(); if (!v) return;
     const ms = (v.meilensteine||[]).find(m => m.id === msId); if (!ms) return;
     const a = (ms.aufgaben||[]).find(x => x.id === aufgId); if (!a) return;
-    this._padKontext = 'vorhaben-ms';
-    this._planDetailAktiv = { vorhabenId: v.id, msId, aufgabeId: aufgId };
-    document.getElementById('pad-text').value  = a.text || '';
-    document.getElementById('pad-date').value  = a.date || '';
-    document.getElementById('pad-done').checked = !!a.done;
-    document.querySelectorAll('.pad-gew-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.gew === (a.aktivEnergie || 'mittel'));
-    });
-    this._padGewWahl = a.aktivEnergie || 'mittel';
-    document.getElementById('wb-plan-aufg-detail').classList.add('open');
+    const ctx = v.welt === 'pro' ? 'pro' : 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+
+    // edit-overlay öffnen mit task-Formular
+    this._editType = 'vorhaben-ms-aufgabe';
+    this._editCtx  = ctx;
+    this._vhEditMsId   = msId;
+    this._vhEditAufgId = aufgId;
+
+    const ov = document.getElementById('edit-overlay');
+    const body = document.getElementById('edit-body');
+    const titleEl = document.getElementById('edit-title');
+    if (!ov || !body) return;
+
+    if (titleEl) {
+      titleEl.childNodes[0] && (titleEl.childNodes[0].textContent = 'Aufgabe · ');
+      const sub = titleEl.querySelector('span') || document.createElement('span');
+      sub.style.cssText = 'font-size:0.8rem;font-weight:400;color:var(--c-muted);';
+      sub.textContent = this._esc(ms.titel);
+      if (!titleEl.querySelector('span')) titleEl.appendChild(sub);
+    }
+
+    // Aufgabe als task-ähnliches Objekt für _taskFormHtml
+    const tProxy = {
+      id: a.id, text: a.text, date: a.date||'', time: a.time||'',
+      notes: a.notes||'', checklist: a.checklist||[],
+      aktivEnergie: a.aktivEnergie||'mittel', kippTyp: a.kippTyp||'',
+      mustToday: !!a.mustToday, done: !!a.done,
+      gewicht: a.aktivEnergie||'mittel', size: a.size||'M', prio: false, prioLvl: 'C',
+    };
+    body.innerHTML = this._taskFormHtml(tProxy, ctx, '', db, false, true);
+
+    // Löschen-Button
+    const actions = document.querySelector('.edit-actions');
+    if (actions) {
+      const del = document.createElement('button');
+      del.className = 'edit-del-btn';
+      del.textContent = 'Löschen';
+      del.onclick = () => { if (confirm('Aufgabe löschen?')) { this._vhAufgDel(msId, aufgId); this.editClose(); } };
+      actions.prepend(del);
+    }
+
+    ov.classList.add('open');
   },
 
-  _vhAufgEdit(msId, aufgId) { if (!row) return;
+  _vhAufgFormSave() {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    const ms = (v.meilensteine||[]).find(m => m.id === this._vhEditMsId); if (!ms) return;
+    const a  = (ms.aufgaben||[]).find(x => x.id === this._vhEditAufgId); if (!a) return;
+
+    const text = (document.getElementById('ef-text')?.value || '').trim();
+    if (!text) { document.getElementById('ef-text')?.focus(); return; }
+
+    a.text         = text;
+    a.date         = document.getElementById('ef-date')?.value || '';
+    a.time         = document.getElementById('ef-time')?.value || '';
+    a.notes        = document.getElementById('ef-notes')?.value || '';
+    a.mustToday    = document.getElementById('ef-musttoday')?.checked || false;
+    a.aktivEnergie = document.getElementById('ef-aktiv')?.value || 'mittel';
+    a.kippTyp      = document.getElementById('ef-kipp')?.value || '';
+    a.size         = document.getElementById('ef-size')?.value || 'M';
+
+    // Checkliste
+    const chkItems = [...document.querySelectorAll('.ef-chk-row')];
+    a.checklist = chkItems.map((row, i) => ({
+      text: document.getElementById('ef-chk-text-' + i)?.textContent || '',
+      done: row.querySelector('input[type=checkbox]')?.checked || false,
+    })).filter(c => c.text);
+
+    // Erledigt → Logbuch
+    const isDone = document.getElementById('ef-done')?.checked || false;
+    if (isDone) {
+      const today = new Date().toISOString().split('T')[0];
+      if (!v.logbuch) v.logbuch = [];
+      v.logbuch.push({ id: a.id, text: a.text, erledigtAm: a.date || today, aktivEnergie: a.aktivEnergie, kippTyp: a.kippTyp });
+      ms.aufgaben = ms.aufgaben.filter(x => x.id !== a.id);
+    }
+
+    v.geaendert = Date.now(); this.setDirty();
+    this.editClose();
+    this._vorhabenDetailRender();
+    this._toast('✓ Aufgabe gespeichert');
+  },
+
+  _vhAufgEdit(msId, aufgId) {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    const ms = (v.meilensteine||[]).find(m => m.id === msId); if (!ms) return;
+    const a = (ms.aufgaben||[]).find(x => x.id === aufgId); if (!a) return;
+    const row = document.getElementById('vhms-' + msId + '-' + aufgId); if (!row) return;
     const oldHtml = row.innerHTML;
     row.innerHTML = '<input id="vh-aufg-edit-inp" type="text" value="' + this._esc(a.text) + '" '
       + 'style="flex:1;padding:5px 8px;border:1px solid var(--c-beruf);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-surface);color:var(--c-text);" '
@@ -25968,6 +26044,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _editSaveInner() {
     const {_editType:type, _editCtx:ctx, _editPKey:pKey, _editId:id} = this;
+    // v4.8.6: Vorhaben-Meilenstein-Aufgabe
+    if (type === 'vorhaben-ms-aufgabe') { this._vhAufgFormSave(); return; }
     // v3.99.0/3.99.1: Vorhaben-Aufgabe aus Vollformular
     if (type === 'vorhaben-task-new')  { this._vorhabenTaskFormSave(); return; }
     if (type === 'vorhaben-task-edit') { this._vorhabenTaskFormSave(true); return; }
