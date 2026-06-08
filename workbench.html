@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.2.0</title>
+<title>WorkBench 5.2.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8254,7 +8254,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.2.0 · Build 20260608-1620</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.2.1 · Build 20260608-1640</div>
     </div>
 
     <!-- Welt -->
@@ -8423,8 +8423,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.2.0',
-  APP_BUILD:   '20260608-1620',
+  APP_VERSION: '5.2.1',
+  APP_BUILD:   '20260608-1640',
 
 
   // ══════════════════════════════════════════════════════
@@ -11355,7 +11355,7 @@ const WB = {
         .sort((a, b) => (a.startTime||'').localeCompare(b.startTime||''))
         .forEach(e => {
           const dur = parseFloat(e.duration || 1);
-          const kosten = !e.startTime ? 5 : dur < 1 ? 10 : 15;
+          const kosten = !e.startTime ? 2 : dur < 1 ? 4 : 6;
           infoItems.push({
             label: e.text,
             sub: e.startTime || 'Ganztägig',
@@ -11374,7 +11374,7 @@ const WB = {
           infoItems.push({
             label: d.title || d.name || '',
             sub: d.startTime || 'Pflicht',
-            kosten: 5,
+            kosten: 2,
             weltColor: ''
           });
         }
@@ -11777,8 +11777,26 @@ const WB = {
     let c;
     try { c = JSON.parse(decodeURIComponent(payloadEnc)); } catch(e) { return; }
     const idx = this._ritualSelected.findIndex(s => s.type === c.type && s.id === c.id);
-    if (idx >= 0) { this._ritualSelected.splice(idx, 1); }
-    else { if (this._ritualSelected.length >= this._ritualGetMaxFokus()) return; this._ritualSelected.push(c); }
+    if (idx >= 0) {
+      this._ritualSelected.splice(idx, 1);
+    } else {
+      // Schritt 4 (Backlog): Energie-Check, kein Fokus-Limit
+      const step4 = document.getElementById('ritual-step-4');
+      const inBacklog = step4 && step4.style.display !== 'none';
+      if (!inBacklog && this._ritualSelected.length >= this._ritualGetMaxFokus()) return;
+      // Energie reicht nicht → blockieren
+      try {
+        if (c.type === 'vorhaben-aufgabe' && c.id) {
+          const hit = this._vorhabenFindAufgabe(c.id);
+          if (hit) {
+            const kosten = this._ritualAufgabeKosten(hit.aufgabe);
+            const rest   = this._ritualBerechneEnergie();
+            if (kosten > rest) return;
+          }
+        }
+      } catch(e) {}
+      this._ritualSelected.push(c);
+    }
     this._ritualRenderCandidates();
     const step4 = document.getElementById('ritual-step-4');
     if (step4 && step4.style.display !== 'none') {
