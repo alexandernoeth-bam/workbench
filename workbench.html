@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.4.1</title>
+<title>WorkBench 5.4.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8286,7 +8286,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.4.1 · Build 20260608-2040</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.4.2 · Build 20260608-2100</div>
     </div>
 
     <!-- Welt -->
@@ -8459,8 +8459,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.4.1',
-  APP_BUILD:   '20260608-2040',
+  APP_VERSION: '5.4.2',
+  APP_BUILD:   '20260608-2100',
 
 
   // ══════════════════════════════════════════════════════
@@ -16480,71 +16480,105 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const today    = new Date().toISOString().split('T')[0];
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
     const tomStr   = tomorrow.toISOString().split('T')[0];
-    const items    = [];
+
+    const ritStore = this._ritualStore();
+    const ritual   = ritStore && ritStore[today];
+    const fokusIds = new Set((ritual?.fokus||[]).map(f => f.id));
+
+    const offen = [], erledigt = [];
 
     const alle = (this._vorhabenAlle ? this._vorhabenAlle() : []);
     alle.forEach(v => {
+      (v.logbuch||[]).filter(e => e.erledigtAm === today)
+        .forEach(e => erledigt.push({ id: e.id, text: e.text, type: 'vorhaben', meta: v.titel||'', done: true }));
       (v.meilensteine||[]).forEach(ms => {
-        (ms.aufgaben||[]).filter(a => !a.done && (a.datum === today || (a.naechsterSchritt && (!a.datum || a.datum <= today))))
-          .forEach(a => items.push({ id: a.id, text: a.text, type: 'vorhaben', meta: v.titel||'', v, ms }));
+        (ms.aufgaben||[]).filter(a => !a.done && (a.datum === today || fokusIds.has(a.id)))
+          .forEach(a => offen.push({ id: a.id, text: a.text, type: 'vorhaben', meta: v.titel||'', v, ms, done: false }));
       });
     });
 
     [['pro',this.dataPro],['priv',this.dataPriv]].forEach(([ctx,db]) => {
       if (!db) return;
       Object.entries(db.projects||{}).forEach(([pKey,p]) => {
-        (p.tasks||[]).filter(t => t && !t.done && t.date === today)
-          .forEach(t => items.push({ id: t.id, text: t.text, type: 'projekt', meta: p.name||'Projekt', pKey, ctx }));
+        (p.tasks||[]).filter(t => t && t.date === today).forEach(t => {
+          const item = { id: t.id, text: t.text, type: 'projekt', meta: p.name||'Projekt', pKey, ctx, done: !!t.done };
+          if (t.done) erledigt.push(item); else offen.push(item);
+        });
       });
     });
 
-    const ritStore = this._ritualStore();
-    const ritual   = ritStore && ritStore[today];
-    const fokusIds = new Set((ritual?.fokus||[]).map(f => f.id));
+    if (!offen.length && !erledigt.length) {
+      return '<p style="color:var(--c-faint);text-align:center;padding:24px 0;">Keine Aufgaben für heute geplant — gut gemacht! ✓</p>';
+    }
 
-    if (!items.length) return '<p style="color:var(--c-faint);text-align:center;padding:24px 0;">Keine Aufgaben für heute geplant — gut gemacht! ✓</p>';
+    const renderRow = (item) => {
+      const shifted = this._evWz.shiftedTasks.some(s => s.id === item.id);
+      const isFokus = fokusIds.has(item.id);
+      if (item.done) {
+        return '<div class="wz-task-shift-row" style="opacity:0.55;">'
+          + '<span style="color:var(--c-beruf);margin-right:6px;flex-shrink:0;">✓</span>'
+          + '<span class="wz-task-shift-name" style="text-decoration:line-through;">'
+          + (isFokus ? '<span style="color:var(--c-beruf);font-size:0.7rem;margin-right:4px;">🎯</span>' : '')
+          + this._esc(item.text)
+          + '<span style="font-size:0.68rem;color:var(--c-faint);margin-left:6px;">' + this._esc(item.meta) + '</span>'
+          + '</span></div>';
+      }
+      return '<div class="wz-task-shift-row">'
+        + '<span class="wz-task-shift-name">'
+        + (isFokus ? '<span style="color:var(--c-beruf);font-size:0.7rem;margin-right:4px;">🎯</span>' : '')
+        + this._esc(item.text)
+        + '<span style="font-size:0.68rem;color:var(--c-faint);margin-left:6px;">' + this._esc(item.meta) + '</span>'
+        + '</span>'
+        + (item.type === 'vorhaben'
+          ? '<button class="wz-task-shift-btn' + (shifted?' shifted':'') + '" onclick="WB._evWzShiftVorhaben(&quot;' + item.v.id + '&quot;,&quot;' + item.ms.id + '&quot;,&quot;' + item.id + '&quot;,&quot;' + tomStr + '&quot;,this)">' + (shifted ? '✓ Morgen' : '→ Morgen') + '</button>'
+          : '<button class="wz-task-shift-btn' + (shifted?' shifted':'') + '" onclick="WB._evWzShiftTask(&quot;' + item.ctx + '&quot;,&quot;' + item.pKey + '&quot;,&quot;' + item.id + '&quot;,&quot;' + tomStr + '&quot;,this)">' + (shifted ? '✓ Morgen' : '→ Morgen') + '</button>')
+        + '</div>';
+    };
 
-    return '<div style="margin-bottom:8px;font-size:0.78rem;color:var(--c-muted);">Heute geplante Aufgaben — erledigt oder auf morgen verschieben?</div>'
-      + items.map(item => {
-          const shifted = this._evWz.shiftedTasks.some(s => s.id === item.id);
-          const isFokus = fokusIds.has(item.id);
-          return '<div class="wz-task-shift-row">'
-            + '<span class="wz-task-shift-name">'
-            + (isFokus ? '<span style="color:var(--c-beruf);font-size:0.7rem;margin-right:4px;">🎯</span>' : '')
-            + this._esc(item.text)
-            + '<span style="font-size:0.68rem;color:var(--c-faint);margin-left:6px;">' + this._esc(item.meta) + '</span>'
-            + '</span>'
-            + (item.type === 'vorhaben'
-              ? '<button class="wz-task-shift-btn' + (shifted?' shifted':'') + '" onclick="WB._evWzShiftVorhaben(&quot;' + item.v.id + '&quot;,&quot;' + item.ms.id + '&quot;,&quot;' + item.id + '&quot;,&quot;' + tomStr + '&quot;,this)">' + (shifted ? '✓ Morgen' : '→ Morgen') + '</button>'
-              : '<button class="wz-task-shift-btn' + (shifted?' shifted':'') + '" onclick="WB._evWzShiftTask(&quot;' + item.ctx + '&quot;,&quot;' + item.pKey + '&quot;,&quot;' + item.id + '&quot;,&quot;' + tomStr + '&quot;,this)">' + (shifted ? '✓ Morgen' : '→ Morgen') + '</button>')
-            + '</div>';
-        }).join('');
-  },
-
-  _evWzShiftVorhaben(vorhabenId, msId, aufgId, tomStr, btn) {
-    const alle = (this._vorhabenAlle ? this._vorhabenAlle() : []);
-    const v    = alle.find(x => x.id === vorhabenId); if (!v) return;
-    const ms   = (v.meilensteine||[]).find(m => m.id === msId); if (!ms) return;
-    const a    = (ms.aufgaben||[]).find(x => x.id === aufgId); if (!a) return;
-    a.datum    = tomStr;
-    v.geaendert = Date.now();
-    this.setDirty();
-    this._evWz.shiftedTasks.push({ id: aufgId });
-    btn.textContent = '✓ Morgen'; btn.classList.add('shifted');
+    let html = '';
+    if (erledigt.length) {
+      html += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-beruf);padding:0 0 6px;">ERLEDIGT</div>'
+        + erledigt.map(renderRow).join('');
+    }
+    if (offen.length) {
+      html += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);padding:' + (erledigt.length?'12px':'0') + ' 0 6px;">OFFEN</div>'
+        + '<div style="margin-bottom:6px;font-size:0.78rem;color:var(--c-muted);">Auf morgen verschieben?</div>'
+        + offen.map(renderRow).join('');
+    }
+    return html;
   },
 
   // ── Schritt 2: Schnellerinnerungen ────────────────────
   _evWzStep2() {
     const today = new Date().toISOString().split('T')[0];
-    const items = (this._quickStore() || []).filter(q => !q.done && (!q.date || q.date === today));
-    if (!items.length) return '<p style="color:var(--c-faint);text-align:center;padding:24px 0;">Keine offenen Schnellerinnerungen.</p>';
-    return '<div style="margin-bottom:8px;font-size:0.78rem;color:var(--c-muted);">Offene Schnellerinnerungen — erledigt?</div>'
-      + items.map(q =>
-          '<div class="wz-pfl-row" onclick="WB._evWzToggleQuick(&quot;' + q.id + '&quot;,this)">'
-          + '<div class="wz-duty-check' + (q.done?' done':'') + '"></div>'
-          + '<span class="wz-duty-label' + (q.done?' done':'') + '">' + this._esc(q.text||q.title||'') + '</span>'
-          + '</div>'
-        ).join('');
+    const alle  = (this._quickStore() || []).filter(q => !q.date || q.date === today);
+    const erledigt = alle.filter(q =>  q.done);
+    const offen    = alle.filter(q => !q.done);
+
+    if (!alle.length) {
+      return '<p style="color:var(--c-faint);text-align:center;padding:24px 0;">Keine Schnellerinnerungen für heute.</p>';
+    }
+
+    let html = '';
+    if (erledigt.length) {
+      html += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-beruf);padding:0 0 6px;">ERLEDIGT</div>'
+        + erledigt.map(q =>
+            '<div class="wz-pfl-row" style="opacity:0.55;">'
+            + '<div class="wz-duty-check done"></div>'
+            + '<span class="wz-duty-label done">' + this._esc(q.text||q.title||'') + '</span>'
+            + '</div>'
+          ).join('');
+    }
+    if (offen.length) {
+      html += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);padding:' + (erledigt.length?'12px':'0') + ' 0 6px;">OFFEN</div>'
+        + offen.map(q =>
+            '<div class="wz-pfl-row" onclick="WB._evWzToggleQuick(&quot;' + q.id + '&quot;,this)">'
+            + '<div class="wz-duty-check"></div>'
+            + '<span class="wz-duty-label">' + this._esc(q.text||q.title||'') + '</span>'
+            + '</div>'
+          ).join('');
+    }
+    return html;
   },
 
   _evWzToggleQuick(id, row) {
