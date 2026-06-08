@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.2.3</title>
+<title>WorkBench 5.2.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8254,7 +8254,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.2.3 · Build 20260608-1715</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.2.4 · Build 20260608-1730</div>
     </div>
 
     <!-- Welt -->
@@ -8423,8 +8423,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.2.3',
-  APP_BUILD:   '20260608-1715',
+  APP_VERSION: '5.2.4',
+  APP_BUILD:   '20260608-1730',
 
 
   // ══════════════════════════════════════════════════════
@@ -14672,7 +14672,33 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           badgesEl.innerHTML = badges;
           badgesEl.style.display = badges ? 'flex' : 'none';
         } else { badgesEl.style.display = 'none'; }
-      } else { badgesEl.style.display = 'none'; }
+      } else {
+        // Zukunftstage: bereits verbrauchte Energie durch Termine berechnen
+        try {
+          const pT = t => { if (!t) return -1; const [h,m] = t.split(':').map(Number); return h*60+m; };
+          let verbraucht = 0;
+          const dayInfo2  = this._getDayInfo(dateStr);
+          const dow2      = new Date(dateStr + 'T12:00:00').getDay();
+          const isWE      = dow2 === 0 || dow2 === 6;
+          const welten    = (dayInfo2.isPrivDay || isWE) ? ['priv'] : ['pro','priv'];
+          welten.forEach(ctx => {
+            const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+            (db?.customEvents || [])
+              .filter(e => e.date === dateStr && e.type !== 'horizon' && !e.done)
+              .forEach(ev => {
+                const dur = parseFloat(ev.duration || 1);
+                verbraucht += !ev.startTime ? 2 : dur < 1 ? 4 : 6;
+              });
+          });
+          if (verbraucht > 0) {
+            const col = verbraucht >= 20 ? 'var(--c-warn,#E67E22)' : '#B45309';
+            badgesEl.innerHTML = '<span class="ck-fokus-badge" style="color:' + col + ';border-color:' + col + ';">📅 -' + verbraucht + ' Energie geplant</span>';
+            badgesEl.style.display = 'flex';
+          } else {
+            badgesEl.style.display = 'none';
+          }
+        } catch(e) { badgesEl.style.display = 'none'; }
+      }
     }
 
     try { this._ckRenderZone('vm', dateStr, isToday); } catch(e) { console.error('ck-zone-vm:', e); }
