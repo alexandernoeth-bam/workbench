@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.3.5</title>
+<title>WorkBench 5.4.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7691,6 +7691,16 @@ html, body {
           Zurücksetzen
         </button>
       </div>
+      <div class="wbs-row">
+        <div class="wbs-label">
+          <div class="wbs-label-main">Abend-Reflexion zurücksetzen</div>
+          <div class="wbs-label-sub">Heute — zum Testen</div>
+        </div>
+        <button onclick="WB._evWzReset()"
+          style="padding:6px 12px;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;cursor:pointer;border:1px solid var(--c-danger,#C0392B);color:var(--c-danger,#C0392B);background:none;">
+          Zurücksetzen
+        </button>
+      </div>
 
       <!-- Alt-Aufgaben Analyse (db.projects Migration · Stufe 0) -->
       <div class="wbs-section-label">Alt-Aufgaben (db.projects)</div>
@@ -8276,7 +8286,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.3.5 · Build 20260608-1940</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.4.0 · Build 20260608-2020</div>
     </div>
 
     <!-- Welt -->
@@ -8449,8 +8459,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.3.5',
-  APP_BUILD:   '20260608-1940',
+  APP_VERSION: '5.4.0',
+  APP_BUILD:   '20260608-2020',
 
 
   // ══════════════════════════════════════════════════════
@@ -16348,9 +16358,21 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     shiftedTasks: [], // { pKey, id, ctx } — auf morgen verschoben
   },
 
+  _evWzReset() {
+    const today = new Date().toISOString().split('T')[0];
+    const db    = this.dataPriv;
+    if (!db) return;
+    if (!db.dailyPlans) db.dailyPlans = {};
+    if (db.dailyPlans[today]) {
+      ['eveningDone','energie','koerper','kipppunkte','kippNotiz','vorhabenStmt','energieAbend','koerperAbend'].forEach(k => delete db.dailyPlans[today][k]);
+    }
+    this.setDirty();
+    this._toast('Abend-Reflexion zur\u00fcckgesetzt');
+  },
+
   wzOpenEvening() {
     this._wizardMode = 'evening';
-    this._evWz = { step: 0, answers: {}, energie: 0, koerper: 0, leitsatz: '', shiftedTasks: [] };
+    this._evWz = { step: 0, answers: {}, energie: 0, koerper: 0, leitsatz: '', shiftedTasks: [], kipppunkte: [], kippNotiz: '', vorhabenStmt: {} };
     document.getElementById('wb-wizard-overlay').classList.add('open');
     this._evWzRender();
   },
@@ -16379,18 +16401,20 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (focus) focus.style.display = 'none';
     if (eve)   eve.style.display   = 'none';
 
-    step.textContent = `Schritt ${wz.step + 1} / 7`;
+    step.textContent = `Schritt ${wz.step + 1} / 9`;
     back.textContent = wz.step === 0 ? 'Abbrechen' : '← Zurück';
-    next.textContent = wz.step === 6 ? 'Speichern ✓' : 'Weiter →';
+    next.textContent = wz.step === 8 ? 'Speichern ✓' : 'Weiter →';
     next.disabled    = false;
 
     const TITLES = [
       'Guten Abend 🌙',
-      'Offene Aufgaben',
+      'Fokus-Aufgaben',
+      'Schnellerinnerungen',
       'Meine Termine heute',
       'Wochenpflichten',
-      'Was ich gelernt habe',
-      'Energie & Körpergefühl',
+      'Vorhaben-Review',
+      'Energie & Körper',
+      'Kipppunkte',
       'Abschluss & Intention',
     ];
     title.textContent = TITLES[wz.step];
@@ -16403,6 +16427,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       () => this._evWzStep4(),
       () => this._evWzStep5(),
       () => this._evWzStep6(),
+      () => this._evWzStep7(),
+      () => this._evWzStep8(),
     ];
     body.innerHTML = renders[wz.step]();
   },
@@ -16412,7 +16438,23 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     // Antworten aus aktuellem Schritt lesen
     const ta = document.getElementById('evwz-textarea');
     if (ta) wz.answers['q' + wz.step] = ta.value.trim();
-    if (wz.step < 6) { wz.step++; this._evWzRender(); }
+    // Schritt 5: Vorhaben-Notizen sichern
+    if (wz.step === 5) {
+      const alle = (this._vorhabenAlle ? this._vorhabenAlle() : []).filter(v => (v.aktivitaet||'aktiv') === 'aktiv');
+      alle.forEach(v => {
+        const taV = document.getElementById('evwz-vh-notiz-' + v.id);
+        if (taV) {
+          if (!wz.vorhabenStmt[v.id]) wz.vorhabenStmt[v.id] = { bewegt: null, notiz: '' };
+          wz.vorhabenStmt[v.id].notiz = taV.value;
+        }
+      });
+    }
+    // Schritt 7: Kipp-Notiz sichern
+    if (wz.step === 7) {
+      const taK = document.getElementById('evwz-kipp-notiz');
+      if (taK) wz.kippNotiz = taK.value;
+    }
+    if (wz.step < 8) { wz.step++; this._evWzRender(); }
     else this._evWzSave();
   },
 
@@ -16433,128 +16475,219 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     </div>`;
   },
 
-  // ── Schritt 1: Offene Aufgaben verschieben ─────────────
+  // ── Schritt 1: Fokus-Aufgaben (Vorhaben + Projekte) ─────
   _evWzStep1() {
     const today    = new Date().toISOString().split('T')[0];
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
     const tomStr   = tomorrow.toISOString().split('T')[0];
-    const tasks    = [];
+    const items    = [];
+
+    const alle = (this._vorhabenAlle ? this._vorhabenAlle() : []);
+    alle.forEach(v => {
+      (v.meilensteine||[]).forEach(ms => {
+        (ms.aufgaben||[]).filter(a => !a.done && a.datum === today)
+          .forEach(a => items.push({ id: a.id, text: a.text, type: 'vorhaben', meta: v.titel||'', v, ms }));
+      });
+    });
 
     [['pro',this.dataPro],['priv',this.dataPriv]].forEach(([ctx,db]) => {
       if (!db) return;
       Object.entries(db.projects||{}).forEach(([pKey,p]) => {
-        (p.tasks||[]).forEach(t => {
-          if (t && !t.done && t.date === today) tasks.push({t,pKey,ctx});
-        });
+        (p.tasks||[]).filter(t => t && !t.done && t.date === today)
+          .forEach(t => items.push({ id: t.id, text: t.text, type: 'projekt', meta: p.name||'Projekt', pKey, ctx }));
       });
     });
 
-    if (!tasks.length) return '<p style="color:var(--c-faint);text-align:center;padding:24px 0;">Keine offenen Aufgaben mit heutigem Datum — gut gemacht! ✓</p>';
+    const ritStore = this._ritualStore();
+    const ritual   = ritStore && ritStore[today];
+    const fokusIds = new Set((ritual?.fokus||[]).map(f => f.id));
 
-    return '<div style="margin-bottom:8px;font-size:0.78rem;color:var(--c-muted);">Diese Aufgaben haben heute als Datum. Auf morgen verschieben?</div>' +
-      tasks.map(({t,pKey,ctx}) => {
-        const shifted = this._evWz.shiftedTasks.some(s => s.id === t.id);
-        return `<div class="wz-task-shift-row">
-          <span class="wz-task-shift-name">${t.text}</span>
-          <button class="wz-task-shift-btn${shifted?' shifted':''}"
-            onclick="WB._evWzShiftTask('${ctx}','${pKey.replace(/'/g,"\'")}','${t.id}','${tomStr}',this)">
-            ${shifted ? '✓ Morgen' : '→ Morgen'}
-          </button>
-        </div>`;
-      }).join('');
+    if (!items.length) return '<p style="color:var(--c-faint);text-align:center;padding:24px 0;">Keine Aufgaben für heute geplant — gut gemacht! ✓</p>';
+
+    return '<div style="margin-bottom:8px;font-size:0.78rem;color:var(--c-muted);">Heute geplante Aufgaben — erledigt oder auf morgen verschieben?</div>'
+      + items.map(item => {
+          const shifted = this._evWz.shiftedTasks.some(s => s.id === item.id);
+          const isFokus = fokusIds.has(item.id);
+          return '<div class="wz-task-shift-row">'
+            + '<span class="wz-task-shift-name">'
+            + (isFokus ? '<span style="color:var(--c-beruf);font-size:0.7rem;margin-right:4px;">🎯</span>' : '')
+            + this._esc(item.text)
+            + '<span style="font-size:0.68rem;color:var(--c-faint);margin-left:6px;">' + this._esc(item.meta) + '</span>'
+            + '</span>'
+            + (item.type === 'vorhaben'
+              ? '<button class="wz-task-shift-btn' + (shifted?' shifted':'') + '" onclick="WB._evWzShiftVorhaben(&quot;' + item.v.id + '&quot;,&quot;' + item.ms.id + '&quot;,&quot;' + item.id + '&quot;,&quot;' + tomStr + '&quot;,this)">' + (shifted ? '✓ Morgen' : '→ Morgen') + '</button>'
+              : '<button class="wz-task-shift-btn' + (shifted?' shifted':'') + '" onclick="WB._evWzShiftTask(&quot;' + item.ctx + '&quot;,&quot;' + item.pKey + '&quot;,&quot;' + item.id + '&quot;,&quot;' + tomStr + '&quot;,this)">' + (shifted ? '✓ Morgen' : '→ Morgen') + '</button>')
+            + '</div>';
+        }).join('');
   },
 
-  _evWzShiftTask(ctx, pKey, taskId, tomStr, btn) {
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
-    const p  = db?.projects?.[pKey]; if (!p) return;
-    const t  = (p.tasks||[]).find(x => x.id===taskId); if (!t) return;
-    // dateHistory
-    if (!t.dateHistory) t.dateHistory = [];
-    t.dateHistory.push({ from: t.date, to: tomStr, ts: Date.now() });
-    t.date = tomStr; t.isToday = false;
+  _evWzShiftVorhaben(vorhabenId, msId, aufgId, tomStr, btn) {
+    const alle = (this._vorhabenAlle ? this._vorhabenAlle() : []);
+    const v    = alle.find(x => x.id === vorhabenId); if (!v) return;
+    const ms   = (v.meilensteine||[]).find(m => m.id === msId); if (!ms) return;
+    const a    = (ms.aufgaben||[]).find(x => x.id === aufgId); if (!a) return;
+    a.datum    = tomStr;
+    v.geaendert = Date.now();
     this.setDirty();
-    this._evWz.shiftedTasks.push({ ctx, pKey, id: taskId });
+    this._evWz.shiftedTasks.push({ id: aufgId });
     btn.textContent = '✓ Morgen'; btn.classList.add('shifted');
   },
 
-  // ── Schritt 2: Termine heute ───────────────────────────
+  // ── Schritt 2: Schnellerinnerungen ────────────────────
   _evWzStep2() {
-    const q = this._settings.eveningQ?.[1] || 'Wie waren meine Termine heute?';
-    const today = new Date().toISOString().split('T')[0];
-    // Termine des Tages auflisten
-    const evs = [];
-    [this.dataPro, this.dataPriv].forEach(db => {
-      (db?.customEvents||[]).filter(e => e.date===today && e.startTime).forEach(e => evs.push(e));
-    });
-    const evList = evs.length
-      ? '<div style="margin-bottom:12px;">' + evs.map(e =>
-          `<div class="wz-ev-row"><span class="wz-ev-time">${e.startTime}</span><span class="wz-ev-title">${e.text}</span></div>`
-        ).join('') + '</div>'
-      : '<p style="color:var(--c-faint);font-size:0.82rem;margin-bottom:12px;">Keine Termine heute eingetragen.</p>';
-    return evList + `<div class="wz-field">
-      <label class="wz-label">${q}</label>
-      <textarea class="wz-input" id="evwz-textarea" rows="4"
-        style="resize:none;width:100%;box-sizing:border-box;"
-        placeholder="Die Besprechung war produktiv weil…">${this._evWz.answers.q2||''}</textarea>
-    </div>`;
+    const items = (this._quickStore() || []).filter(q => !q.date && !q.done);
+    if (!items.length) return '<p style="color:var(--c-faint);text-align:center;padding:24px 0;">Keine offenen Schnellerinnerungen.</p>';
+    return '<div style="margin-bottom:8px;font-size:0.78rem;color:var(--c-muted);">Offene Schnellerinnerungen — erledigt?</div>'
+      + items.map(q =>
+          '<div class="wz-pfl-row" onclick="WB._evWzToggleQuick(&quot;' + q.id + '&quot;,this)">'
+          + '<div class="wz-duty-check' + (q.done?' done':'') + '"></div>'
+          + '<span class="wz-duty-label' + (q.done?' done':'') + '">' + this._esc(q.text||q.title||'') + '</span>'
+          + '</div>'
+        ).join('');
   },
 
-  // ── Schritt 3: Wochenpflichten ─────────────────────────
+  _evWzToggleQuick(id, row) {
+    const q = (this._quickStore()||[]).find(x => x.id === id);
+    if (!q) return;
+    q.done = !q.done;
+    this.setDirty();
+    const check = row.querySelector('.wz-duty-check');
+    const label = row.querySelector('.wz-duty-label');
+    if (check) check.className = 'wz-duty-check' + (q.done?' done':'');
+    if (label) label.className = 'wz-duty-label' + (q.done?' done':'');
+  },
+
+  // ── Schritt 3: Termine (war Schritt 2) ────────────────
   _evWzStep3() {
-    const kw = this._kwStr(new Date());
-    const all = [];
-    ['pro','priv'].forEach(ctx => (this._dutyStore(ctx)||[]).forEach(d => all.push({...d,ctx})));
-    const relevant = all.filter(d => this._dutyRelevantThisWeek({...d}));
-    if (!relevant.length) return '<p style="color:var(--c-faint);text-align:center;padding:24px 0;">Keine Wochenpflichten diese Woche.</p>';
-    return '<div style="margin-bottom:6px;font-size:0.78rem;color:var(--c-muted);">Noch nicht erledigt? Jetzt abhaken.</div>' +
-      relevant.map(duty => {
-        const done = this._dutyIsDone(duty, new Date());
-        const wCls = duty.ctx==='pro' ? 'beruf' : 'priv';
-        return `<div class="wz-pfl-row" onclick="WB.dutyToggle('${duty.ctx}','${duty.id}');this.querySelector('.wz-duty-check').className='wz-duty-check done'">
-          <div class="wz-duty-check ${done?'done':wCls}"></div>
-          <span class="wz-duty-label${done?' done':''}">${duty.title}</span>
-          <span class="wz-duty-world">${duty.ctx==='pro'?'Beruf':'Privat'}</span>
-        </div>`;
-      }).join('');
+    const today   = new Date().toISOString().split('T')[0];
+    const q       = this._settings.eveningQ?.[1] || 'Wie liefen deine Termine und Meetings heute?';
+    const ctx     = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db      = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const termine = (db?.customEvents||[]).filter(e => e.date === today && e.type !== 'horizon');
+    const tHtml   = termine.length
+      ? '<div style="margin-bottom:12px;">'
+        + termine.map(e => '<div style="font-size:0.82rem;padding:4px 0;color:var(--c-muted);">• '
+          + this._esc(e.text||'') + (e.startTime ? ' (' + e.startTime + ')' : '') + '</div>').join('')
+        + '</div>'
+      : '';
+    return tHtml + `<div class="wz-field"><label class="wz-label">${q}</label><textarea class="wz-input" id="evwz-textarea" rows="4" style="resize:none;width:100%;box-sizing:border-box;" placeholder="Die Besprechung war produktiv…">${this._evWz.answers.q3||''}</textarea></div>`;
   },
 
-  // ── Schritt 4: Was gelernt? ───────────────────────────
+  // ── Schritt 4: Wochenpflichten — nur heutige Instanz ──
   _evWzStep4() {
-    const q = this._settings.eveningQ?.[2] || 'Was habe ich heute gelernt?';
-    return `<div class="wz-field">
-      <label class="wz-label">${q}</label>
-      <textarea class="wz-input" id="evwz-textarea" rows="5"
-        style="resize:none;width:100%;box-sizing:border-box;"
-        placeholder="Eine neue Erkenntnis, eine Methode, ein Feedback…">${this._evWz.answers.q4||''}</textarea>
-    </div>`;
+    const today = new Date().toISOString().split('T')[0];
+    const items = [];
+    ['pro','priv'].forEach(ctx => {
+      (this._dutyStore(ctx)||[]).forEach(d => {
+        try {
+          const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
+          const inst  = insts.find(i => i.isToday);
+          if (inst) items.push({ ...d, ctx, done: inst.done });
+        } catch(e) {}
+      });
+    });
+    if (!items.length) return '<p style="color:var(--c-faint);text-align:center;padding:24px 0;">Keine Wochenpflichten für heute.</p>';
+    return '<div style="margin-bottom:6px;font-size:0.78rem;color:var(--c-muted);">Heute fällige Pflichten — noch nicht erledigt?</div>'
+      + items.map(duty => {
+          const wCls = duty.ctx === 'pro' ? 'beruf' : 'priv';
+          return '<div class="wz-pfl-row" onclick="WB.dutyToggle(&quot;' + duty.ctx + '&quot;,&quot;' + duty.id + '&quot;);this.querySelector(&quot;.wz-duty-check&quot;).className=&quot;wz-duty-check done&quot;">'
+            + '<div class="wz-duty-check ' + (duty.done?'done':wCls) + '"></div>'
+            + '<span class="wz-duty-label' + (duty.done?' done':'') + '">' + this._esc(duty.title||duty.name||'') + '</span>'
+            + '<span class="wz-duty-world">' + (duty.ctx==='pro'?'Beruf':'Privat') + '</span>'
+            + '</div>';
+        }).join('');
   },
 
-  // ── Schritt 5: Energie & Körper ───────────────────────
+  // ── Schritt 5: Vorhaben-Review ────────────────────────
   _evWzStep5() {
+    const alle = (this._vorhabenAlle ? this._vorhabenAlle() : []).filter(v => (v.aktivitaet||'aktiv') === 'aktiv');
+    if (!alle.length) return '<p style="color:var(--c-faint);text-align:center;padding:24px 0;">Keine aktiven Vorhaben.</p>';
+    const sorted = [...alle].sort((a,b) => (a.wochenFokus&&!b.wochenFokus)?-1:(!a.wochenFokus&&b.wochenFokus)?1:0);
+    return '<div style="margin-bottom:8px;font-size:0.78rem;color:var(--c-muted);">Hat sich heute etwas bewegt?</div>'
+      + sorted.map(v => {
+          const stmt = this._evWz.vorhabenStmt[v.id] || { bewegt: null, notiz: '' };
+          const charBadge = v.charakter === 'baustelle' ? '🔥 ' : '';
+          const wfBadge   = v.wochenFokus ? '<span style="font-size:0.65rem;color:var(--c-beruf);background:var(--c-beruf-bg,#E8F5F3);border-radius:6px;padding:1px 5px;margin-left:4px;">⭐ Wochenfokus</span>' : '';
+          return '<div style="background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:8px;">'
+            + '<div style="font-size:0.88rem;font-weight:600;margin-bottom:8px;">' + charBadge + this._esc(v.titel||'') + wfBadge + '</div>'
+            + '<div style="display:flex;gap:8px;margin-bottom:8px;">'
+            + ['ja','nein'].map(val =>
+                '<button onclick="WB._evWzSetVorhabenBewegt(&quot;' + v.id + '&quot;,&quot;' + val + '&quot;)" style="flex:1;padding:7px;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;cursor:pointer;border:1.5px solid '
+                + (stmt.bewegt===val ? 'var(--c-beruf)' : 'var(--c-border)') + ';background:'
+                + (stmt.bewegt===val ? 'var(--c-beruf)' : 'var(--c-bg)') + ';color:'
+                + (stmt.bewegt===val ? '#fff' : 'var(--c-muted)') + ';">'
+                + (val==='ja' ? '✓ Bewegt' : '✗ Nicht bewegt') + '</button>'
+              ).join('')
+            + '</div>'
+            + '<textarea placeholder="Kurze Notiz (optional)..." id="evwz-vh-notiz-' + v.id + '" style="width:100%;padding:7px 9px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);resize:none;min-height:50px;box-sizing:border-box;">' + this._esc(stmt.notiz||'') + '</textarea>'
+            + '</div>';
+        }).join('');
+  },
+
+  _evWzSetVorhabenBewegt(id, val) {
+    if (!this._evWz.vorhabenStmt[id]) this._evWz.vorhabenStmt[id] = { bewegt: null, notiz: '' };
+    this._evWz.vorhabenStmt[id].bewegt = val;
+    const ta = document.getElementById('evwz-vh-notiz-' + id);
+    if (ta) this._evWz.vorhabenStmt[id].notiz = ta.value;
+    this._evWzRender();
+  },
+
+  // ── Schritt 6: Energie & Körper mit Morgen-Vergleich ──
+  _evWzStep6() {
     const wz = this._evWz;
+    const today    = new Date().toISOString().split('T')[0];
+    const ritStore = this._ritualStore();
+    const ritual   = ritStore && ritStore[today];
+    const morgEnergie = ritual?.energie || null;
+    const E_LBL = { hoch: '🟢 Hoch', mittel: '🟡 Mittel', niedrig: '🔴 Niedrig' };
+    const morgHtml = morgEnergie
+      ? '<div style="font-size:0.78rem;color:var(--c-muted);margin-bottom:12px;padding:6px 10px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);">Morgens eingeschätzt: ' + (E_LBL[morgEnergie]||morgEnergie) + '</div>'
+      : '';
     const scaleHtml = (id, label, current) => {
       const btns = [1,2,3,4,5].map(n =>
-        `<button class="wz-scale-btn${current===n?' active':''}"
-          onclick="WB._evWzSetScale('${id}',${n},this)">${n}</button>`
+        '<button class="wz-scale-btn' + (current===n?' active':'') + '" onclick="WB._evWzSetScale(&quot;' + id + '&quot;,' + n + ',this)">' + n + '</button>'
       ).join('');
-      return `<div class="wz-field">
-        <label class="wz-label">${label}</label>
-        <div class="wz-scale-label"><span>Erschöpft</span><span>Voller Energie</span></div>
-        <div class="wz-scale-row">${btns}</div>
-      </div>`;
+      return '<div class="wz-field"><label class="wz-label">' + label + '</label>'
+        + '<div class="wz-scale-label"><span>Erschöpft</span><span>Voller Energie</span></div>'
+        + '<div class="wz-scale-row">' + btns + '</div></div>';
     };
-    return scaleHtml('energie','Energie-Level heute',wz.energie) +
-           scaleHtml('koerper','Körpergefühl heute', wz.koerper);
+    return morgHtml + scaleHtml('energie','Energie-Level heute',wz.energie) + scaleHtml('koerper','Körpergefühl heute',wz.koerper);
   },
 
-  _evWzSetScale(id, val, btn) {
-    this._evWz[id] = val;
-    btn.closest('.wz-scale-row').querySelectorAll('.wz-scale-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+  // ── Schritt 7: Kipppunkte ─────────────────────────────
+  _evWzStep7() {
+    const wz = this._evWz;
+    const KIPP = [
+      { val: 'urteil',      lbl: 'Urteil',      desc: 'Angst vor Konsequenz oder Sichtbarkeit' },
+      { val: 'stolz',       lbl: 'Stolz',        desc: 'Zu viel Aufwand bei bedeutsamen Dingen' },
+      { val: 'routine',     lbl: 'Routine',      desc: 'Pflicht ohne Stolzpotenzial — Autopilot' },
+      { val: 'tunnelblick', lbl: 'Tunnelblick',  desc: 'Scope verloren, verzettelt' },
+    ];
+    const sel = wz.kipppunkte || [];
+    return '<div style="margin-bottom:10px;font-size:0.78rem;color:var(--c-muted);">Wo bin ich heute gerutscht? Mehrere möglich.</div>'
+      + KIPP.map(k => {
+          const active = sel.includes(k.val);
+          return '<div onclick="WB._evWzToggleKipp(&quot;' + k.val + '&quot;)" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:' + (active?'var(--c-beruf-bg,#E8F5F3)':'var(--c-surface)') + ';border:1.5px solid ' + (active?'var(--c-beruf)':'var(--c-border)') + ';border-radius:var(--radius-xs);margin-bottom:6px;cursor:pointer;">'
+            + '<div style="width:18px;height:18px;border-radius:50%;border:2px solid ' + (active?'var(--c-beruf)':'var(--c-border)') + ';background:' + (active?'var(--c-beruf)':'transparent') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
+            + (active ? '<span style="color:#fff;font-size:0.7rem;font-weight:700;">✓</span>' : '')
+            + '</div>'
+            + '<div style="flex:1;"><div style="font-size:0.88rem;font-weight:600;">' + k.lbl + '</div>'
+            + '<div style="font-size:0.72rem;color:var(--c-faint);">' + k.desc + '</div></div></div>';
+        }).join('')
+      + '<div style="margin-top:10px;"><textarea placeholder="Optionale Notiz dazu..." id="evwz-kipp-notiz" style="width:100%;padding:7px 9px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);resize:none;min-height:60px;box-sizing:border-box;">' + this._esc(wz.kippNotiz||'') + '</textarea></div>';
   },
 
-  // ── Schritt 6: Abschluss + Leitsatz + Intention ───────
-  _evWzStep6() {
+  _evWzToggleKipp(val) {
+    const sel = this._evWz.kipppunkte;
+    const idx = sel.indexOf(val);
+    if (idx === -1) sel.push(val); else sel.splice(idx, 1);
+    const ta = document.getElementById('evwz-kipp-notiz');
+    if (ta) this._evWz.kippNotiz = ta.value;
+    this._evWzRender();
+  },
+
+  // ── Schritt 8: Abschluss & Intention (war Schritt 6) ──
+  _evWzStep8() {
     const wz = this._evWz;
     const LEITSAETZE = [
       'Mein Rhythmus, meine Regeln.',
@@ -16581,11 +16714,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       </div>`;
   },
 
-  _evWzSetLeitsatz(btn, text) {
-    this._evWz.leitsatz = text;
-    btn.closest('.wz-leitsatz-grid').querySelectorAll('.wz-leitsatz-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-  },
 
   // ── Speichern ─────────────────────────────────────────
   _evWzSave() {
@@ -16601,17 +16729,30 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     db.dailyPlans[today].energie      = wz.energie;
     db.dailyPlans[today].koerper      = wz.koerper;
     db.dailyPlans[today].leitsatzMorgen = wz.leitsatz;
+    db.dailyPlans[today].kipppunkte   = wz.kipppunkte || [];
+    db.dailyPlans[today].kippNotiz    = wz.kippNotiz  || '';
+    db.dailyPlans[today].vorhabenStmt = wz.vorhabenStmt || {};
+    db.dailyPlans[today].energieAbend = wz.energie;
+    db.dailyPlans[today].koerperAbend = wz.koerper;
 
     // Reflexions-Notiz anlegen
     if (!db.settings) db.settings = {};
     if (!db.settings.cockpitNotizen) db.settings.cockpitNotizen = [];
     const inhalt = [
       wz.answers.q0 ? `<h3>Heute erreicht</h3><p>${wz.answers.q0}</p>` : '',
-      wz.answers.q2 ? `<h3>Termine & Meetings</h3><p>${wz.answers.q2}</p>` : '',
-      wz.answers.q4 ? `<h3>Heute gelernt</h3><p>${wz.answers.q4}</p>` : '',
+      wz.answers.q3 ? `<h3>Termine & Meetings</h3><p>${wz.answers.q3}</p>` : '',
       wz.energie    ? `<h3>Energie / Körper</h3><p>${wz.energie} / ${wz.koerper} von 5</p>` : '',
+      wz.kipppunkte?.length
+        ? '<h3>Kipppunkte</h3><p>' + wz.kipppunkte.join(', ') + (wz.kippNotiz ? ' — ' + wz.kippNotiz : '') + '</p>'
+        : '',
+      Object.keys(wz.vorhabenStmt||{}).length
+        ? '<h3>Vorhaben</h3>' + Object.entries(wz.vorhabenStmt).map(([id, s]) => {
+            const v = (this._vorhabenAlle ? this._vorhabenAlle() : []).find(x => x.id === id);
+            return v ? '<p>' + (v.titel||'') + ': ' + (s.bewegt==='ja' ? '✓ Bewegt' : '✗ Nicht bewegt') + (s.notiz ? ' — ' + s.notiz : '') + '</p>' : '';
+          }).join('')
+        : '',
       wz.leitsatz   ? `<h3>Leitsatz für morgen</h3><p><em>„${wz.leitsatz}"</em></p>` : '',
-      wz.answers.q6 ? `<h3>Morgen-Intention</h3><p>${wz.answers.q6}</p>` : '',
+      wz.answers.q8 ? `<h3>Morgen-Intention</h3><p>${wz.answers.q8}</p>` : '',
     ].filter(Boolean).join('');
 
     db.settings.cockpitNotizen.push({
