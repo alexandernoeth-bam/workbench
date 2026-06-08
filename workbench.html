@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.1.9</title>
+<title>WorkBench 5.2.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -483,7 +483,33 @@ html, body {
 .ck-eintrag-meta { font-size:0.75rem; color:var(--c-faint); margin-top:1px; }
 .ck-eintrag-zeit { font-size:0.78rem; color:var(--c-muted); font-family:var(--font-mono); flex-shrink:0; }
 .ck-leer { font-size:0.85rem; color:var(--c-faint); padding:6px 0 4px; font-style:italic; }
-  /* Cockpit C1 — Zeitzonen-Ansicht */
+  /* Wochen-Reflexion Overlay */
+  #wb-wochen-reflexion-overlay {
+    position:fixed; inset:0; z-index:960;
+    background:var(--c-bg); display:none;
+    align-items:flex-start; justify-content:center;
+    overflow-y:auto; padding:0;
+  }
+  #wb-wochen-reflexion-overlay.open { display:flex; }
+  #wr-card {
+    width:100%; max-width:460px; min-height:100%;
+    display:flex; flex-direction:column;
+    align-items:center; padding:32px 22px 40px; box-sizing:border-box;
+  }
+  #wr-progress { display:flex; gap:8px; margin-bottom:28px; }
+  .wr-dot { width:8px; height:8px; border-radius:50%; background:var(--c-border); transition:background 0.2s; }
+  .wr-dot.active { background:var(--c-beruf); }
+  .wr-dot.done   { background:color-mix(in srgb,var(--c-beruf) 40%,var(--c-border)); }
+  .wr-step { display:none; flex-direction:column; align-items:center; width:100%; }
+  .wr-step.active { display:flex; }
+  .wr-emoji { font-size:2.8rem; margin-bottom:12px; }
+  .wr-title { font-size:1.4rem; font-weight:700; text-align:center; margin-bottom:6px; }
+  .wr-sub { font-size:0.88rem; color:var(--c-muted); text-align:center; margin-bottom:20px; }
+  .wr-btn { width:100%; padding:14px; border-radius:var(--radius-sm); font-family:var(--font); font-size:0.95rem; font-weight:600; cursor:pointer; border:none; margin-top:10px; background:var(--c-beruf); color:#fff; }
+  .wr-btn.ghost { background:none; border:1px solid var(--c-border); color:var(--c-muted); font-weight:400; }
+  .wr-section-label { font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--c-faint); width:100%; padding:0 0 6px; margin-top:12px; }
+  .wr-card-block { width:100%; background:var(--c-surface); border:1px solid var(--c-border); border-radius:var(--radius-xs); overflow:hidden; margin-bottom:8px; }
+  .wr-textarea { width:100%; padding:10px 12px; border:none; outline:none; font-family:var(--font); font-size:0.88rem; background:var(--c-surface); color:var(--c-text); resize:none; min-height:80px; line-height:1.5; border-radius:var(--radius-xs); border:1px solid var(--c-border); box-sizing:border-box; }
   #ck-tagesseite { display:flex; flex-direction:column; height:calc(100vh - 110px); overflow:hidden; }
   #ck-tag-header { flex-shrink:0; padding:8px 16px; border-bottom:1px solid var(--c-border); background:var(--c-surface); }
   #ck-scroll-body { flex:1; overflow-y:auto; padding:8px 12px 80px; }
@@ -7632,6 +7658,17 @@ html, body {
       </div>
 
       <div class="wbs-divider"></div>
+      <div class="wbs-section-label">Wochen-Dialoge</div>
+      <div class="wbs-row">
+        <div class="wbs-label">
+          <div class="wbs-label-main">Wochen-Reflexion zurücksetzen</div>
+          <div class="wbs-label-sub">Aktuelle KW — zum Testen</div>
+        </div>
+        <button onclick="WB._wrReset()"
+          style="padding:6px 12px;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;cursor:pointer;border:1px solid var(--c-danger,#C0392B);color:var(--c-danger,#C0392B);background:none;">
+          Zurücksetzen
+        </button>
+      </div>
 
       <!-- Alt-Aufgaben Analyse (db.projects Migration · Stufe 0) -->
       <div class="wbs-section-label">Alt-Aufgaben (db.projects)</div>
@@ -8217,7 +8254,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.1.9 · Build 20260608-1545</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.2.0 · Build 20260608-1620</div>
     </div>
 
     <!-- Welt -->
@@ -8296,6 +8333,10 @@ html, body {
       <button class="wb-menu-item" onclick="WB.tdCalOpen(); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><circle cx="8" cy="16" r="1" fill="currentColor"/></svg>
         <span class="label">Urlaub &amp; Sondertage</span>
+      </button>
+      <button class="wb-menu-item" onclick="WB.wochenReflexionOpen(); WB.closeMenu()">
+        <span class="icon">🌙</span>
+        <span class="label">Wochen-Reflexion</span>
       </button>
       <button class="wb-menu-item" onclick="WB.icsExportOpen(); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -8382,8 +8423,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.1.9',
-  APP_BUILD:   '20260608-1545',
+  APP_VERSION: '5.2.0',
+  APP_BUILD:   '20260608-1620',
 
 
   // ══════════════════════════════════════════════════════
@@ -11418,6 +11459,312 @@ const WB = {
 
     el.innerHTML = infoHtml + energieHtml + fokusHtml;
     this._ritualUpdateCount();
+  },
+
+  // ── Wochen-Reflexion ──────────────────────────────────────────────
+
+  _WOCHEN_FRAGEN: [
+    'Wo war ich souverän — im Beruf, in der Beziehung, in offenen Situationen?',
+    'Wann habe ich bewusst reagiert statt automatisch?',
+    'Wo hätte ich souveräner sein können — was hat mich überwältigt?',
+    'In welchem Moment diese Woche war ich am meisten ich selbst?',
+    'Wo bin ich standhaft geblieben — was habe ich bewusst getan oder gelassen?',
+    'Was habe ich diese Woche trotz Widerstand durchgezogen?',
+    'Wo habe ich nachgegeben obwohl ich es nicht wollte — warum?',
+    'Was hätte ich früher entscheiden sollen?',
+    'Wo bin ich in Urteil gerutscht — was hat mich blockiert?',
+    'Wo hätte ich stolz sein können aber es nicht war?',
+    'Was habe ich aus Routine gemacht ohne nachzudenken?',
+    'Wo habe ich den Überblick verloren — Tunnelblick?',
+    'Was habe ich diese Woche gelernt?',
+    'Was musste ich schmerzlich lernen?',
+    'Was würde ich diese Woche anders machen?',
+    'Was bin ich mir selbst schuldig geblieben?',
+    'Was hat mir Energie gegeben — was hat sie genommen?',
+    'Habe ich meinen Körper diese Woche gut behandelt?',
+    'Wo war ich im Einklang mit mir — wo nicht?',
+    'Was brauche ich nächste Woche mehr von?',
+  ],
+
+  _wrVhCheck: null,
+
+  _wrStore() {
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return {};
+    if (!db.wochenReview) db.wochenReview = {};
+    return db.wochenReview;
+  },
+
+  _wrKwKey() {
+    return this._kwStr(new Date());
+  },
+
+  _wrFragenFuerKW() {
+    const kw  = parseInt(this._kwStr(new Date()).split('-W')[1]) || 1;
+    const rot = (kw - 1) % 4;
+    return [0,4,8,12,16].map(base => ({
+      idx: base + rot,
+      frage: this._WOCHEN_FRAGEN[base + rot]
+    }));
+  },
+
+  wochenReflexionOpen() {
+    const store = this._wrStore();
+    const key   = this._wrKwKey();
+    if (!store[key]) store[key] = {
+      done: false, ts: null,
+      vorhabenEntscheidungen: {},
+      zielReflexionBeruf: '', zielReflexionPrivat: '',
+      antworten: [], abschlussSatz: ''
+    };
+    this._wrGoto(0);
+    document.getElementById('wb-wochen-reflexion-overlay').classList.add('open');
+  },
+
+  wochenReflexionClose() {
+    document.getElementById('wb-wochen-reflexion-overlay').classList.remove('open');
+  },
+
+  _wrGoto(step) {
+    document.querySelectorAll('.wr-step').forEach(s => s.classList.remove('active'));
+    const active = document.getElementById('wr-step-' + step);
+    if (active) active.classList.add('active');
+    document.querySelectorAll('.wr-dot').forEach(dot => {
+      const ds = parseInt(dot.dataset.step);
+      dot.classList.toggle('active', ds === step);
+      dot.classList.toggle('done', ds < step);
+    });
+    if (step === 0) this._wrRenderBlick();
+    if (step === 1) this._wrRenderVorhaben();
+    if (step === 2) this._wrRenderZiele();
+    if (step === 3) this._wrRenderFragen();
+  },
+
+  _wrRenderBlick() {
+    const el = document.getElementById('wr-blick-body');
+    if (!el) return;
+    const kw    = this._wrKwKey();
+    const kwNum = kw.split('-W')[1];
+    const kwEl  = document.getElementById('wr-kw-label');
+    if (kwEl) kwEl.textContent = 'KW ' + kwNum + ' \u00b7 R\u00fcckblick';
+
+    const now = new Date();
+    const dow = now.getDay() === 0 ? 7 : now.getDay();
+    const mo  = new Date(now); mo.setDate(now.getDate() - dow + 1);
+    const days = Array.from({length: 7}, (_, i) => {
+      const d = new Date(mo); d.setDate(mo.getDate() + i);
+      return d.toISOString().split('T')[0];
+    });
+    const DAYS = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+
+    const store = this._ritualStore();
+    let fokusGesamt = 0;
+    const energieVerlauf = [];
+    days.forEach((ds, i) => {
+      const r = store && store[ds];
+      if (r && r.done && !r.skipped) {
+        fokusGesamt += (r.fokus || []).length;
+        energieVerlauf.push({ tag: DAYS[i], energie: r.energie || 'mittel' });
+      }
+    });
+
+    const moTs  = mo.getTime();
+    const alle  = (this._vorhabenAlle ? this._vorhabenAlle() : []).filter(v => (v.aktivitaet||'aktiv') === 'aktiv');
+    const bewegt = alle.filter(v => v.geaendert && v.geaendert >= moTs);
+
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    let sportSoll = 0, sportIst = 0;
+    (this._dutyStore(ctx) || []).forEach(d => {
+      try {
+        const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
+        const week  = insts.filter(i => days.includes(i.date));
+        sportSoll += week.length;
+        sportIst  += week.filter(i => i.done).length;
+      } catch(e) {}
+    });
+
+    const E_ICON = { hoch: '🟢', mittel: '🟡', niedrig: '🔴' };
+    const energieListe = energieVerlauf.length
+      ? energieVerlauf.map(e => '<span style="font-size:0.75rem;">' + e.tag + ' ' + (E_ICON[e.energie]||'🟡') + '</span>').join(' ')
+      : '<span style="color:var(--c-faint);">Keine Daten</span>';
+
+    const rows = [
+      { label: 'Fokus-Aufgaben geplant', val: String(fokusGesamt) },
+      { label: 'Energie Mo\u2013So', val: energieListe, raw: true },
+      { label: 'Vorhaben bewegt', val: bewegt.length + ' von ' + alle.length },
+      { label: 'Pflichten Soll / Ist', val: sportIst + ' / ' + sportSoll },
+    ].map(row =>
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:1px solid var(--c-border);">'
+      + '<span style="font-size:0.85rem;color:var(--c-muted);">' + this._esc(row.label) + '</span>'
+      + '<span style="font-size:0.85rem;font-weight:600;">' + (row.raw ? row.val : this._esc(row.val)) + '</span>'
+      + '</div>'
+    ).join('');
+
+    el.innerHTML = '<div style="background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);overflow:hidden;">' + rows + '</div>';
+  },
+
+  _wrRenderVorhaben() {
+    const el = document.getElementById('wr-vorhaben-body');
+    if (!el) return;
+    const key    = this._wrKwKey();
+    const store  = this._wrStore();
+    const entsch = store[key]?.vorhabenEntscheidungen || {};
+    const alle   = (this._vorhabenAlle ? this._vorhabenAlle() : []).filter(v => (v.aktivitaet||'aktiv') === 'aktiv');
+
+    if (!alle.length) {
+      el.innerHTML = '<div style="padding:12px;color:var(--c-faint);text-align:center;font-size:0.85rem;">Keine aktiven Vorhaben.</div>';
+      return;
+    }
+
+    const OPTS = [
+      { val: 'weiter',    lbl: 'Weiter so' },
+      { val: 'pausieren', lbl: 'Pausieren' },
+      { val: 'schritt',   lbl: '\u2192 Schritt setzen' },
+    ];
+    el.innerHTML = alle.map(v => {
+      const e = entsch[v.id] || '';
+      const charBadge = v.charakter === 'baustelle' ? '🔥 ' : '';
+      return '<div style="background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:8px;">'
+        + '<div style="font-size:0.88rem;font-weight:600;margin-bottom:8px;">' + charBadge + this._esc(v.titel||'') + '</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+        + OPTS.map(opt =>
+            '<button onclick="WB._wrSetEntscheidung(&quot;' + v.id + '&quot;,&quot;' + opt.val + '&quot;)"'
+            + ' style="padding:5px 10px;border-radius:16px;font-family:var(--font);font-size:0.75rem;cursor:pointer;border:1.5px solid '
+            + (e===opt.val ? 'var(--c-beruf)' : 'var(--c-border)') + ';background:'
+            + (e===opt.val ? 'var(--c-beruf)' : 'var(--c-bg)') + ';color:'
+            + (e===opt.val ? '#fff' : 'var(--c-muted)') + ';">' + opt.lbl + '</button>'
+          ).join('')
+        + '<button onclick="WB._wrOpenVorhaben(&quot;' + v.id + '&quot;)" style="padding:5px 10px;border-radius:16px;font-family:var(--font);font-size:0.75rem;cursor:pointer;border:1.5px solid var(--c-border);background:none;color:var(--c-muted);">⊙</button>'
+        + '</div></div>';
+    }).join('');
+  },
+
+  _wrSetEntscheidung(vorhabenId, wert) {
+    const key   = this._wrKwKey();
+    const store = this._wrStore();
+    if (!store[key]) return;
+    if (!store[key].vorhabenEntscheidungen) store[key].vorhabenEntscheidungen = {};
+    store[key].vorhabenEntscheidungen[vorhabenId] = wert;
+    if (wert === 'pausieren') {
+      const v = (this._vorhabenAlle ? this._vorhabenAlle() : []).find(x => x.id === vorhabenId);
+      if (v) { v.aktivitaet = 'wartend'; v.geaendert = Date.now(); }
+    }
+    this.setDirty();
+    this._wrRenderVorhaben();
+  },
+
+  _wrOpenVorhaben(id) {
+    const ov = document.getElementById('wb-wochen-reflexion-overlay');
+    if (ov) ov.style.display = 'none';
+    this.vorhabenOpen(id);
+    if (this._wrVhCheck) clearInterval(this._wrVhCheck);
+    this._wrVhCheck = setInterval(() => {
+      const vhOv = document.getElementById('wb-vorhaben-detail');
+      if (!vhOv || vhOv.style.display === 'none' || vhOv.style.display === '') {
+        clearInterval(this._wrVhCheck); this._wrVhCheck = null;
+        if (ov) ov.style.display = '';
+        this._wrRenderVorhaben();
+      }
+    }, 300);
+    setTimeout(() => {
+      if (this._wrVhCheck) {
+        clearInterval(this._wrVhCheck); this._wrVhCheck = null;
+        if (ov) ov.style.display = '';
+      }
+    }, 300000);
+  },
+
+  _wrRenderZiele() {
+    const el = document.getElementById('wr-ziele-body');
+    if (!el) return;
+    const kw    = this._wrKwKey();
+    const ctx   = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db    = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const plan  = db?.wochenPlanung?.[kw] || {};
+    const store = this._wrStore();
+    const rev   = store[kw] || {};
+
+    el.innerHTML = [
+      { label: '🏢 Beruf',  ziel: plan.zielBeruf  || '', key: 'Beruf',  val: rev.zielReflexionBeruf  || '' },
+      { label: '🏠 Privat', ziel: plan.zielPrivat || '', key: 'Privat', val: rev.zielReflexionPrivat || '' },
+    ].map(row =>
+      '<div style="background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:8px;">'
+      + '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:4px;">' + this._esc(row.label) + '</div>'
+      + (row.ziel
+        ? '<div style="font-size:0.85rem;color:var(--c-muted);font-style:italic;margin-bottom:8px;">' + this._esc(row.ziel) + '</div>'
+        : '<div style="font-size:0.82rem;color:var(--c-faint);margin-bottom:8px;">Kein Ziel gesetzt</div>')
+      + '<textarea class="wr-textarea" id="wr-ziel-' + row.key + '" placeholder="Habe ich das gelebt? Was war anders?" style="min-height:60px;width:100%;">' + this._esc(row.val) + '</textarea>'
+      + '</div>'
+    ).join('');
+  },
+
+  _wrSaveZielReflexion() {
+    const key   = this._wrKwKey();
+    const store = this._wrStore();
+    if (!store[key]) return;
+    store[key].zielReflexionBeruf  = document.getElementById('wr-ziel-Beruf')?.value  || '';
+    store[key].zielReflexionPrivat = document.getElementById('wr-ziel-Privat')?.value || '';
+    this.setDirty();
+  },
+
+  _wrRenderFragen() {
+    const el = document.getElementById('wr-fragen-body');
+    if (!el) return;
+    const fragen = this._wrFragenFuerKW();
+    const key    = this._wrKwKey();
+    const store  = this._wrStore();
+    const saved  = store[key]?.antworten || [];
+    el.innerHTML = fragen.map((f, i) => {
+      const existing = saved.find(a => a.frageIdx === f.idx);
+      return '<div style="margin-bottom:12px;">'
+        + '<div style="font-size:0.82rem;font-weight:600;color:var(--c-text);margin-bottom:6px;line-height:1.4;">' + (i+1) + '. ' + this._esc(f.frage) + '</div>'
+        + '<textarea class="wr-textarea" id="wr-frage-' + i + '" placeholder="Deine Antwort...">' + this._esc(existing?.antwort || '') + '</textarea>'
+        + '</div>';
+    }).join('');
+  },
+
+  _wrSaveAntworten() {
+    const key    = this._wrKwKey();
+    const store  = this._wrStore();
+    if (!store[key]) return;
+    const fragen = this._wrFragenFuerKW();
+    store[key].antworten = fragen.map((f, i) => ({
+      frageIdx: f.idx, frage: f.frage,
+      antwort: document.getElementById('wr-frage-' + i)?.value || ''
+    }));
+    this.setDirty();
+  },
+
+  _wrFinish() {
+    const key   = this._wrKwKey();
+    const store = this._wrStore();
+    if (!store[key]) return;
+    store[key].abschlussSatz = document.getElementById('wr-abschluss-input')?.value || '';
+    store[key].done = true;
+    store[key].ts   = Date.now();
+    this.setDirty();
+    this._toast('\u2713 Woche abgeschlossen');
+    this.wochenReflexionClose();
+  },
+
+  _wrReset() {
+    const store = this._wrStore();
+    const key   = this._wrKwKey();
+    delete store[key];
+    this.setDirty();
+    this._toast('Wochen-Reflexion zur\u00fcckgesetzt');
+  },
+
+  _wrCheckAutoOpen() {
+    const now = new Date();
+    if (now.getDay() !== 0) return;
+    if (now.getHours() < 19) return;
+    const store = this._wrStore();
+    const key   = this._wrKwKey();
+    if (store[key]?.done) return;
+    const ov = document.getElementById('wb-wochen-reflexion-overlay');
+    if (ov && !ov.classList.contains('open')) this.wochenReflexionOpen();
   },
 
   _esc(s) {
@@ -15037,6 +15384,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }, 60000);
     // Tages-Fokus-Ritual: morgens automatisch, blockiert bis durchlaufen
     this._ritualMaybeOpen();
+    // Wochen-Reflexion: Sonntag ab 19:00
+    try { this._wrCheckAutoOpen(); } catch(e) {}
   },
 
   _ckRenderDateHeader() {
@@ -29382,6 +29731,57 @@ WB.init();
     <button id="wb-planmodus-close" onclick="WB.planmodusClose()">×</button>
   </div>
   <div id="wb-planmodus-body"></div>
+</div>
+<!-- WOCHEN-REFLEXION OVERLAY -->
+<div id="wb-wochen-reflexion-overlay">
+  <div id="wr-card">
+    <div id="wr-progress">
+      <span class="wr-dot" data-step="0"></span>
+      <span class="wr-dot" data-step="1"></span>
+      <span class="wr-dot" data-step="2"></span>
+      <span class="wr-dot" data-step="3"></span>
+      <span class="wr-dot" data-step="4"></span>
+    </div>
+    <div class="wr-step" id="wr-step-0">
+      <div class="wr-emoji">📊</div>
+      <div class="wr-title">Deine Woche</div>
+      <div class="wr-sub" id="wr-kw-label">KW –</div>
+      <div id="wr-blick-body" style="width:100%;margin-bottom:16px;"></div>
+      <button class="wr-btn" onclick="WB._wrGoto(1)">Weiter →</button>
+    </div>
+    <div class="wr-step" id="wr-step-1">
+      <div class="wr-emoji">🎯</div>
+      <div class="wr-title">Vorhaben-Review</div>
+      <div class="wr-sub">Eine Entscheidung je Vorhaben</div>
+      <div id="wr-vorhaben-body" style="width:100%;margin-bottom:16px;"></div>
+      <button class="wr-btn" onclick="WB._wrGoto(2)">Weiter →</button>
+      <button class="wr-btn ghost" onclick="WB._wrGoto(0)">← Zurück</button>
+    </div>
+    <div class="wr-step" id="wr-step-2">
+      <div class="wr-emoji">🏁</div>
+      <div class="wr-title">Wochenziele</div>
+      <div class="wr-sub">Hast du deine Ziele diese Woche gelebt?</div>
+      <div id="wr-ziele-body" style="width:100%;margin-bottom:16px;"></div>
+      <button class="wr-btn" onclick="WB._wrSaveZielReflexion();WB._wrGoto(3)">Weiter →</button>
+      <button class="wr-btn ghost" onclick="WB._wrGoto(1)">← Zurück</button>
+    </div>
+    <div class="wr-step" id="wr-step-3">
+      <div class="wr-emoji">💬</div>
+      <div class="wr-title">Reflexion</div>
+      <div class="wr-sub">5 Fragen für diese Woche</div>
+      <div id="wr-fragen-body" style="width:100%;margin-bottom:16px;"></div>
+      <button class="wr-btn" onclick="WB._wrSaveAntworten();WB._wrGoto(4)">Weiter →</button>
+      <button class="wr-btn ghost" onclick="WB._wrGoto(2)">← Zurück</button>
+    </div>
+    <div class="wr-step" id="wr-step-4">
+      <div class="wr-emoji">✨</div>
+      <div class="wr-title">Woche abschließen</div>
+      <div class="wr-sub">Ein Satz für diese Woche</div>
+      <textarea class="wr-textarea" id="wr-abschluss-input" placeholder="Diese Woche war für mich..." style="margin-bottom:16px;min-height:100px;width:100%;"></textarea>
+      <button class="wr-btn" onclick="WB._wrFinish()">Woche abschließen ✓</button>
+      <button class="wr-btn ghost" onclick="WB._wrGoto(3)">← Zurück</button>
+    </div>
+  </div>
 </div>
 
 </body>
