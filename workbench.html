@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.0.1</title>
+<title>WorkBench 5.0.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5430,8 +5430,8 @@ html, body {
 #wb-plan-icon-btn svg { stroke: var(--c-beruf); }
 #wb-tabs-icon-btn svg { stroke: var(--c-muted); }
 
-/* Im cockpit-mode: Claude-Button anzeigen */
-#wb-tabbar.cockpit-mode .wb-tab { display: none; }
+/* Im cockpit-mode: normale Tabs bleiben sichtbar */
+/* #wb-tabbar.cockpit-mode .wb-tab { display: none; } — entfernt v5.0.1 */
 
 /* Tab-Drawer */
 #wb-tab-drawer {
@@ -8211,7 +8211,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.0.1 · Build 20260608-1100</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.0.2 · Build 20260608-1130</div>
     </div>
 
     <!-- Welt -->
@@ -8376,8 +8376,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.0.1',
-  APP_BUILD:   '20260608-1100',
+  APP_VERSION: '5.0.2',
+  APP_BUILD:   '20260608-1130',
 
 
   // ══════════════════════════════════════════════════════
@@ -14136,7 +14136,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       });
     }
 
-    // 3. Vorhaben-Aufgaben mit datum === dateStr (nicht im Ritual)
+    // 3. Vorhaben-Aufgaben: datum === dateStr ODER (naechsterSchritt && andere Tage)
     const ritualIds = new Set();
     if (dateStr === today) {
       const store  = this._ritualStore();
@@ -14147,7 +14147,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
     (db?.vorhaben || []).forEach(v => {
       (v.meilensteine || []).forEach(ms => {
-        (ms.aufgaben || []).filter(a => !a.done && a.datum === dateStr && !ritualIds.has(a.id))
+        (ms.aufgaben || [])
+          .filter(a => !a.done && !ritualIds.has(a.id) && (
+            // Aufgabe hat genau dieses Datum
+            a.datum === dateStr ||
+            // Für andere Tage: naechsterSchritt-Aufgaben ohne Datum in Vormittag anzeigen
+            (!a.datum && a.naechsterSchritt && dateStr !== today && zone === 'vm')
+          ))
           .forEach(a => {
             const aZone = getZone(a.startTime || '');
             const matchesZone = zone === null ? !aZone : (aZone === zone || (!aZone && zone === 'vm'));
