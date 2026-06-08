@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.4.4</title>
+<title>WorkBench 5.4.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5946,6 +5946,9 @@ html, body {
 .vh-card:hover { border-color: var(--c-muted); }
 .vh-card:active { opacity: 0.8; }
 .vh-card-head { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
+.vh-card.fokus-vorhaben { background: color-mix(in srgb, var(--c-beruf) 6%, var(--c-surface)); border-color: color-mix(in srgb, var(--c-beruf) 30%, var(--c-border)); }
+.vh-card.fokus-vorhaben:hover { border-color: var(--c-beruf); }
+.vh-fokus-badge { font-size: 0.62rem; font-weight: 700; color: var(--c-beruf); background: var(--c-beruf-bg,#E8F5F3); padding: 2px 6px; border-radius: 8px; flex-shrink: 0; }
 .vh-card-icon { font-size: 1.15rem; flex-shrink: 0; }
 .vh-card-title { flex: 1; min-width: 0; font-size: 0.95rem; font-weight: 700; color: var(--c-text); }
 .vh-card-baustelle { font-size: 0.66rem; font-weight: 700; color: #C62828; background: #FCE4EC; padding: 2px 7px; border-radius: 8px; flex-shrink: 0; }
@@ -8286,7 +8289,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.4.4 · Build 20260608-2125</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.4.5 · Build 20260608-2150</div>
     </div>
 
     <!-- Welt -->
@@ -8459,8 +8462,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.4.4',
-  APP_BUILD:   '20260608-2125',
+  APP_VERSION: '5.4.5',
+  APP_BUILD:   '20260608-2150',
 
 
   // ══════════════════════════════════════════════════════
@@ -11617,7 +11620,12 @@ const WB = {
     const key    = this._wpKwKey();
     const store  = this._wpStore();
     const selIds = new Set(store[key]?.hauptVorhaben || []);
-    const alle   = (this._vorhabenAlle ? this._vorhabenAlle() : []).filter(v => (v.aktivitaet||'aktiv') === 'aktiv');
+    const alleAktiv = (this._vorhabenAlle ? this._vorhabenAlle() : []).filter(v => (v.aktivitaet||'aktiv') === 'aktiv');
+    const alle = alleAktiv.filter(v => v.fokus);
+    if (!alle.length) {
+      el.innerHTML = '<div style="padding:16px;text-align:center;font-size:0.85rem;color:var(--c-faint);">Keine Fokus-Vorhaben gesetzt.<br><span style="font-size:0.78rem;">Markiere Vorhaben als ⭐ Fokus um sie hier auszuwählen.</span></div>';
+      return;
+    }
     el.innerHTML = alle.map(v => {
       const sel = selIds.has(v.id);
       const charBadge = v.charakter === 'baustelle' ? '🔥 ' : '';
@@ -17009,7 +17017,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     let html = '<div style="margin-bottom:8px;"></div>';
     CLUSTER.forEach(cl => {
       const alle = store.filter(v => (v.cluster || 'mindset') === cl.id);
-      const aktiv   = alle.filter(v => (v.aktivitaet || 'aktiv') === 'aktiv');
+      const aktiv   = alle.filter(v => (v.aktivitaet || 'aktiv') === 'aktiv')
+        .sort((a, b) => (a.fokus && !b.fokus) ? -1 : (!a.fokus && b.fokus) ? 1 : 0);
       const wartend = alle.filter(v => (v.aktivitaet || 'aktiv') === 'wartend');
       const ruhend  = alle.filter(v => (v.aktivitaet || 'aktiv') === 'ruhend');
       const isOpen  = this._vorhabenClusterOpen[cl.id] !== false;
@@ -17032,9 +17041,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
             const offeneSchritte = (v.meilensteine || [])
               .reduce((sum, ms) => sum + (ms.aufgaben || []).filter(a => !a.done).length, 0);
             const stichtag = v.stichtag ? ' · bis ' + v.stichtag : '';
-            return '<div class="vh-card" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
+            const fokusClass = v.fokus ? ' fokus-vorhaben' : '';
+            const fokusBadge = v.fokus ? '<span class="vh-fokus-badge">⭐ Fokus</span>' : '';
+            return '<div class="vh-card' + fokusClass + '" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
               + '<div class="vh-card-head">'
               + '<span class="vh-card-title">' + this._esc(v.titel) + '</span>'
+              + fokusBadge
               + (v.charakter === 'baustelle' ? '<span style="font-size:0.85rem;" title="Baustelle">🔥</span>' : '')
               + '</div>'
               + (v.ziel ? '<div class="vh-card-ziel">' + this._esc(v.ziel) + '</div>' : '')
@@ -17135,6 +17147,15 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const v = this._vorhabenAktiv(); if (!v) return;
     v.charakter = val; v.geaendert = Date.now(); this.setDirty();
     this._vorhabenDetailRender();
+  },
+
+  _vhToggleFokus() {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    v.fokus = !v.fokus;
+    v.geaendert = Date.now();
+    this.setDirty();
+    this._vorhabenDetailRender();
+    this._vorhabenListeRender();
   },
 
   _vorhabenSetEbene(ebene) {
@@ -17280,6 +17301,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   // Migration: inhalt-HTML → notiz Plaintext, planAufgaben Felder ergänzen
   _vhMigrateV47(v) {
     if (v._v48migr) return;
+    if (v.fokus === undefined) v.fokus = false;
     if (v.inhalt && !v.notiz) {
       const tmp = document.createElement('div');
       tmp.innerHTML = v.inhalt;
@@ -17349,6 +17371,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + 'onclick="WB._vorhabenSetCharakter(&quot;' + c + '&quot;)">' + lbl + '</button>'
     ).join('');
     h += '<div style="flex:1"></div>';
+    // Fokus-Toggle
+    const fokusActive = v.fokus ? 'background:var(--c-beruf);color:#fff;border-color:var(--c-beruf);' : '';
+    h += '<button onclick="WB._vhToggleFokus()" style="padding:5px 12px;border-radius:20px;font-family:var(--font);font-size:0.78rem;cursor:pointer;border:1.5px solid var(--c-border);' + fokusActive + 'margin-left:8px;">\u2b50 Fokus</button>';
     h += '<button onclick="WB._vorhabenWechselWelt(&quot;' + andereWelt + '&quot;)" class="vh47-welt-btn">' + andereWeltLbl + '</button>';
     h += '</div>';
     h += '<div class="vh47-titel" id="vh47-titel" contenteditable="true" '
