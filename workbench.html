@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.4.0</title>
+<title>WorkBench 5.4.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8286,7 +8286,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.4.0 · Build 20260608-2020</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.4.1 · Build 20260608-2040</div>
     </div>
 
     <!-- Welt -->
@@ -8459,8 +8459,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.4.0',
-  APP_BUILD:   '20260608-2020',
+  APP_VERSION: '5.4.1',
+  APP_BUILD:   '20260608-2040',
 
 
   // ══════════════════════════════════════════════════════
@@ -16485,7 +16485,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const alle = (this._vorhabenAlle ? this._vorhabenAlle() : []);
     alle.forEach(v => {
       (v.meilensteine||[]).forEach(ms => {
-        (ms.aufgaben||[]).filter(a => !a.done && a.datum === today)
+        (ms.aufgaben||[]).filter(a => !a.done && (a.datum === today || (a.naechsterSchritt && (!a.datum || a.datum <= today))))
           .forEach(a => items.push({ id: a.id, text: a.text, type: 'vorhaben', meta: v.titel||'', v, ms }));
       });
     });
@@ -16535,7 +16535,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   // ── Schritt 2: Schnellerinnerungen ────────────────────
   _evWzStep2() {
-    const items = (this._quickStore() || []).filter(q => !q.date && !q.done);
+    const today = new Date().toISOString().split('T')[0];
+    const items = (this._quickStore() || []).filter(q => !q.done && (!q.date || q.date === today));
     if (!items.length) return '<p style="color:var(--c-faint);text-align:center;padding:24px 0;">Keine offenen Schnellerinnerungen.</p>';
     return '<div style="margin-bottom:8px;font-size:0.78rem;color:var(--c-muted);">Offene Schnellerinnerungen — erledigt?</div>'
       + items.map(q =>
@@ -16714,6 +16715,19 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       </div>`;
   },
 
+
+  _evWzSetScale(id, val, btn) {
+    if (id === 'energie') this._evWz.energie = val;
+    if (id === 'koerper') this._evWz.koerper = val;
+    btn.closest('.wz-scale-row').querySelectorAll('.wz-scale-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  },
+
+  _evWzSetLeitsatz(btn, leitsatz) {
+    this._evWz.leitsatz = leitsatz;
+    document.querySelectorAll('.wz-leitsatz-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  },
 
   // ── Speichern ─────────────────────────────────────────
   _evWzSave() {
