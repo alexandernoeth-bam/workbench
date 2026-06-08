@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.4.5</title>
+<title>WorkBench 5.5.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8289,7 +8289,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.4.5 · Build 20260608-2150</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.5.0 · Build 20260608-2200</div>
     </div>
 
     <!-- Welt -->
@@ -8462,8 +8462,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.4.5',
-  APP_BUILD:   '20260608-2150',
+  APP_VERSION: '5.5.0',
+  APP_BUILD:   '20260608-2200',
 
 
   // ══════════════════════════════════════════════════════
@@ -11226,10 +11226,13 @@ const WB = {
   },
 
   _ritualOpenedToSession: false,  // Session-Lock: verhindert Re-Open nach Auth-Renewal
+  _syncReadyForDialogs: false,
   _ritualDriveReady: false,       // v4.4.1: Drive-Sync abgeschlossen oder kein Drive konfiguriert
 
   // Auto-Trigger: beim Cockpit-Render aufgerufen
   _ritualMaybeOpen() {
+    // Sync noch nicht abgeschlossen → warten
+    if (!this._syncReadyForDialogs) return;
     // Beide DBs müssen geladen sein
     if (!this.dataPriv || !this.dataPro) return;
     // Drive-Login-Banner sichtbar → Auth-Renewal läuft → warten
@@ -11713,6 +11716,7 @@ const WB = {
   },
 
   _wpCheckAutoOpen() {
+    if (!this._syncReadyForDialogs) return;
     const now = new Date();
     if (now.getDay() !== 1) return;
     const store = this._wpStore();
@@ -12020,6 +12024,7 @@ const WB = {
   },
 
   _wrCheckAutoOpen() {
+    if (!this._syncReadyForDialogs) return;
     const now = new Date();
     if (now.getDay() !== 0) return;
     if (now.getHours() < 19) return;
@@ -19531,11 +19536,51 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       // OAuth Init + Auto-Sync + Auto-Refresh starten
       setTimeout(async () => {
         await this._oauthInit();
-        await this.oauthAutoSync();
+        if (!this._oauthTokenValid()) {
+          // Offline: Dialoge sofort freigeben
+          this._syncReadyForDialogs = true;
+          setTimeout(() => {
+            try { this._ritualMaybeOpen();   } catch(e) {}
+            try { this._wpCheckAutoOpen();   } catch(e) {}
+            try { this._wrCheckAutoOpen();   } catch(e) {}
+          }, 300);
+        } else {
+          // Online: Sync VOR Dialog-Auto-Open
+          this._syncStartBanner();
+          try {
+            await this.oauthAutoSync();
+          } catch(e) {
+            console.warn('[Init Sync]', e);
+          }
+          this._syncStartBannerHide();
+          this._syncReadyForDialogs = true;
+          setTimeout(() => {
+            try { this._ritualMaybeOpen();   } catch(e) {}
+            try { this._wpCheckAutoOpen();   } catch(e) {}
+            try { this._wrCheckAutoOpen();   } catch(e) {}
+          }, 300);
+        }
         this._startAutoRefresh();
     setTimeout(() => this._recurCheck(), 500);
-      }, 2000);
+      }, 500);
     }
+  },
+
+  _syncStartBanner() {
+    let el = document.getElementById('wb-sync-start-banner');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'wb-sync-start-banner';
+      el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--c-beruf);color:#fff;text-align:center;font-size:0.78rem;font-family:var(--font);padding:6px 16px;font-weight:600;letter-spacing:0.03em;';
+      el.textContent = '\u27f3 Synchronisiere mit Google Drive...';
+      document.body.appendChild(el);
+    }
+    el.style.display = '';
+  },
+
+  _syncStartBannerHide() {
+    const el = document.getElementById('wb-sync-start-banner');
+    if (el) el.style.display = 'none';
   },
 
   // ── Datei laden (mit Sync-Validierung v3.10.0) ─────
