@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.9.5</title>
+<title>WorkBench 4.9.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8149,7 +8149,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.9.5 · Build 20260608-0840</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.9.6 · Build 20260608-0920</div>
     </div>
 
     <!-- Welt -->
@@ -8314,8 +8314,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.9.5',
-  APP_BUILD:   '20260608-0840',
+  APP_VERSION: '4.9.6',
+  APP_BUILD:   '20260608-0920',
 
 
   // ══════════════════════════════════════════════════════
@@ -11108,6 +11108,8 @@ const WB = {
     this._ritualEnergie    = 'mittel';
     this._ritualTagestyp   = null;
     this._ritualZeitbloecke = {};
+    this._ritualAutoSelectDone = false;
+    if (this._ritualVorhabenCheck) { clearInterval(this._ritualVorhabenCheck); this._ritualVorhabenCheck = null; }
     const now = new Date();
     const DAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
     const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
@@ -11150,7 +11152,7 @@ const WB = {
     });
     if (step === 0) this._ritualRenderVorhabenScan();
     if (step === 1) { this._ritualRenderOverview(); this._ritualInitTagestyp(); }
-    if (step === 2) this._ritualRenderCandidates();
+    if (step === 2) { this._ritualAutoSelect(); this._ritualRenderCandidates(); }
     if (step === 3) this._ritualRenderZeitbloecke();
     if (step === 4) this._ritualRenderBacklog();
     if (step === 5) this._ritualRenderConfirm();
@@ -11180,6 +11182,15 @@ const WB = {
   _ritualBuildGroups() {
     // v4.8.0: Aufgaben aus Vorhaben-Meilensteinen
     const gruppen = [];
+    const today = this._ritualTodayKey();
+    const score = (a) => {
+      let s = 0;
+      if (a.naechsterSchritt && a.datum && a.datum <= today) s += 100;
+      else if (a.naechsterSchritt) s += 50;
+      else if (a.datum && a.datum === today) s += 30;
+      else if (a.datum && a.datum < today) s += 20;
+      return s;
+    };
     ['aktiv','wartend'].forEach(ebene => {
       const vorhaben = (this._vorhabenAlle ? this._vorhabenAlle() : [])
         .filter(v => (v.aktivitaet || 'aktiv') === ebene);
@@ -11187,6 +11198,7 @@ const WB = {
         const aufgaben = (v.meilensteine || []).flatMap(ms =>
           (ms.aufgaben || []).filter(a => !a.done).map(a => ({ ...a, msId: ms.id, msTitel: ms.titel }))
         );
+        aufgaben.sort((a, b) => score(b) - score(a));
         if (aufgaben.length) gruppen.push({ v, aufgaben, ebene });
       });
     });
@@ -11197,12 +11209,57 @@ const WB = {
     const el = document.getElementById('ritual-candidates');
     if (!el) return;
     const gruppen = this._ritualBuildGroups();
-    const maxReached = this._ritualSelected.length >= 3;
-    if (!gruppen.length) {
+    const maxFokus = this._ritualGetMaxFokus();
+    const maxReached = this._ritualSelected.length >= maxFokus;
+
+    // ── Termine-Block ──────────────────────────────────────
+    const today = this._ritualTodayKey();
+    const typ = this._ritualTagestyp || 'normal';
+    const ctxList = typ === 'normal'
+      ? (this._getDayType(today) === 'workday' ? ['pro','priv'] : ['priv'])
+      : ['priv'];
+    const termine = [];
+    ctxList.forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      (db?.customEvents || [])
+        .filter(e => e.date === today && e.type !== 'horizon' && !e.done)
+        .forEach(e => termine.push({ ...e, _ctx: ctx }));
+    });
+    termine.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+
+    let terminHtml = '';
+    if (termine.length) {
+      const terminRows = termine.map(e => {
+        const sel = this._ritualSelected.some(s => s.type === 'termin' && s.id === String(e.id));
+        const disabled = !sel && maxReached;
+        const payload = encodeURIComponent(JSON.stringify({
+          id: String(e.id), type: 'termin', title: e.text, meta: 'Termin', ctx: e._ctx, pKey: ''
+        }));
+        const zeitLabel = e.startTime
+          ? '<span style="font-size:0.72rem;color:var(--c-muted);font-family:var(--font-mono);">' + e.startTime + '</span>'
+          : '';
+        return '<div class="ritual-cand-row' + (disabled?' disabled':'') + '">'
+          + '<button class="ritual-cand' + (sel?' selected':'') + '" onclick="WB._ritualToggleCandVh(&quot;' + payload + '&quot;)">'
+          + '<span class="ritual-cand-check">' + (sel?'✓':'') + '</span>'
+          + '<span class="ritual-cand-body">'
+          + '<span class="ritual-cand-title">' + this._esc(e.text||'Termin') + '</span>'
+          + (zeitLabel ? '<span class="ritual-cand-tags">' + zeitLabel + '</span>' : '')
+          + '</span></button>'
+          + '</div>';
+      }).join('');
+      terminHtml = '<div class="ritual-gruppe">'
+        + '<div class="ritual-gruppe-titel">Termine heute'
+        + '<span style="font-size:0.65rem;color:var(--c-muted);background:var(--c-border);border-radius:8px;padding:1px 6px;margin-left:6px;">' + termine.length + '</span>'
+        + '</div>' + terminRows + '</div>';
+    }
+
+    // ── Vorhaben-Gruppen ───────────────────────────────────
+    if (!gruppen.length && !terminHtml) {
       el.innerHTML = '<div style="padding:14px;text-align:center;color:var(--c-faint);font-size:0.86rem;">Keine offenen Aufgaben — trage unten einen eigenen Fokus ein.</div>';
       this._ritualUpdateCount(); return;
     }
-    el.innerHTML = gruppen.map(({ v, aufgaben, ebene }) => {
+
+    const gruppenHtml = gruppen.map(({ v, aufgaben, ebene }) => {
       const ebeneTag = ebene === 'wartend'
         ? '<span style="font-size:0.65rem;color:var(--c-muted);background:var(--c-border);border-radius:8px;padding:1px 6px;margin-left:6px;">Wartend</span>' : '';
       const rows = aufgaben.map(a => {
@@ -11214,18 +11271,22 @@ const WB = {
         }));
         const aeBadge = a.aktivEnergie && a.aktivEnergie !== 'mittel'
           ? '<span class="ritual-ae-tag ae-' + a.aktivEnergie + '">' + (a.aktivEnergie==='hoch'?'⚡':'↓') + ' ' + a.aktivEnergie + '</span>' : '';
+        const nsBadge = a.naechsterSchritt ? '<span class="ritual-ae-tag" style="color:var(--c-beruf);">→ Nächster Schritt</span>' : '';
         return '<div class="ritual-cand-row' + (disabled?' disabled':'') + '">'
           + '<button class="ritual-cand' + (sel?' selected':'') + '" onclick="WB._ritualToggleCandVh(&quot;' + payload + '&quot;)">'
           + '<span class="ritual-cand-check">' + (sel?'✓':'') + '</span>'
           + '<span class="ritual-cand-body">'
           + '<span class="ritual-cand-title">' + this._esc(a.text) + '</span>'
-          + (aeBadge ? '<span class="ritual-cand-tags">' + aeBadge + '</span>' : '')
+          + ((aeBadge||nsBadge) ? '<span class="ritual-cand-tags">' + (nsBadge||'') + (aeBadge||'') + '</span>' : '')
           + '</span></button>'
-          + '<button class="ritual-edit-btn" onclick="WB._ritualEditAufgabe(&quot;' + a.id + '&quot;,&quot;' + v.id + '&quot;,&quot;' + a.msId + '&quot;)" title="Energie & Kippmoment">✎</button>'
+          + '<button class="ritual-edit-btn" onclick="WB._ritualEditAufgabe(&quot;' + a.id + '&quot;,&quot;' + v.id + '&quot;,&quot;' + a.msId + '&quot;)" title="Energie &amp; Kippmoment">✎</button>'
+          + '<button class="ritual-edit-btn" onclick="WB._ritualOpenVorhabenFromCand(&quot;' + v.id + '&quot;)" title="Vorhaben öffnen">⊙</button>'
           + '</div>';
       }).join('');
       return '<div class="ritual-gruppe"><div class="ritual-gruppe-titel">' + this._esc(v.titel||'Vorhaben') + ebeneTag + '</div>' + rows + '</div>';
     }).join('');
+
+    el.innerHTML = terminHtml + gruppenHtml;
     this._ritualUpdateCount();
   },
   _esc(s) {
@@ -11363,6 +11424,8 @@ const WB = {
   _ritualEnergie: null,
   _ritualTagestyp: null,
   _ritualZeitbloecke: {},
+  _ritualVorhabenCheck: null,
+  _ritualAutoSelectDone: false,
 
   _ritualGetMaxFokus() {
     const today = this._ritualTodayKey();
@@ -11408,6 +11471,75 @@ const WB = {
     }
   },
 
+  _ritualOpenVorhaben(id) {
+    const ritualOv = document.getElementById('wb-ritual-overlay');
+    if (ritualOv) ritualOv.style.display = 'none';
+    this.vorhabenOpen(id);
+    if (this._ritualVorhabenCheck) clearInterval(this._ritualVorhabenCheck);
+    this._ritualVorhabenCheck = setInterval(() => {
+      const vhOv = document.getElementById('wb-vorhaben-detail');
+      if (!vhOv || vhOv.style.display === 'none' || vhOv.style.display === '') {
+        clearInterval(this._ritualVorhabenCheck);
+        this._ritualVorhabenCheck = null;
+        if (ritualOv) ritualOv.style.display = '';
+      }
+    }, 300);
+    setTimeout(() => {
+      if (this._ritualVorhabenCheck) {
+        clearInterval(this._ritualVorhabenCheck);
+        this._ritualVorhabenCheck = null;
+        if (ritualOv) ritualOv.style.display = '';
+      }
+    }, 300000);
+  },
+
+  _ritualOpenVorhabenFromCand(id) {
+    const ritualOv = document.getElementById('wb-ritual-overlay');
+    if (ritualOv) ritualOv.style.display = 'none';
+    this.vorhabenOpen(id);
+    if (this._ritualVorhabenCheck) clearInterval(this._ritualVorhabenCheck);
+    this._ritualVorhabenCheck = setInterval(() => {
+      const vhOv = document.getElementById('wb-vorhaben-detail');
+      if (!vhOv || vhOv.style.display === 'none' || vhOv.style.display === '') {
+        clearInterval(this._ritualVorhabenCheck);
+        this._ritualVorhabenCheck = null;
+        if (ritualOv) ritualOv.style.display = '';
+        this._ritualRenderCandidates();
+      }
+    }, 300);
+    setTimeout(() => {
+      if (this._ritualVorhabenCheck) {
+        clearInterval(this._ritualVorhabenCheck);
+        this._ritualVorhabenCheck = null;
+        if (ritualOv) ritualOv.style.display = '';
+        this._ritualRenderCandidates();
+      }
+    }, 300000);
+  },
+
+  _ritualAutoSelect() {
+    if (this._ritualAutoSelectDone) return;
+    this._ritualAutoSelectDone = true;
+    const today = this._ritualTodayKey();
+    const max   = this._ritualGetMaxFokus();
+    const gruppen = this._ritualBuildGroups();
+    gruppen.forEach(({ v, aufgaben }) => {
+      aufgaben.forEach(a => {
+        if (this._ritualSelected.length >= max) return;
+        const istHeute = a.datum && a.datum === today;
+        if (a.naechsterSchritt && istHeute) {
+          if (!this._ritualSelected.some(s => s.id === a.id)) {
+            this._ritualSelected.push({
+              id: a.id, type: 'vorhaben-aufgabe', title: a.text,
+              meta: v.titel || 'Vorhaben', vorhabenId: v.id,
+              msId: a.msId, ctx: v._welt || 'priv', pKey: ''
+            });
+          }
+        }
+      });
+    });
+  },
+
   _ritualRenderVorhabenScan() {
     const el = document.getElementById('ritual-vorhaben-scan');
     if (!el) return;
@@ -11425,7 +11557,8 @@ const WB = {
       const charBadge = v.charakter === 'baustelle' ? '🔥 ' : '';
       return '<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 12px;'
         + 'background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);'
-        + 'margin-bottom:6px;text-align:left;">'
+        + 'margin-bottom:6px;text-align:left;cursor:pointer;" '
+        + 'onclick="WB._ritualOpenVorhaben(&quot;' + v.id + '&quot;)">'
         + '<div style="flex:1;min-width:0;">'
         + '<div style="font-size:0.88rem;font-weight:600;color:var(--c-text);">'
         + charBadge + this._esc(v.titel) + '</div>'
