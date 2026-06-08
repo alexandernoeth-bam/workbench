@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.9.0</title>
+<title>WorkBench 4.9.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4838,6 +4838,15 @@ html, body {
 .vh47-lg-date { font-size:0.72rem; color:var(--c-faint); font-family:var(--font-mono); flex-shrink:0; white-space:nowrap; padding-top:1px; }
 .vh47-lg-text { font-size:0.85rem; color:var(--c-faint); text-decoration:line-through; }
 .vh47-done { text-decoration:line-through; color:var(--c-faint); }
+  .vh-tabs { display:flex; border-bottom:1px solid var(--c-border); background:var(--c-surface); flex-shrink:0; }
+  .vh-tab-btn { flex:1; padding:10px 0; border:none; background:none; font-family:var(--font); font-size:0.83rem; font-weight:600; color:var(--c-muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:color 0.15s,border-color 0.15s; }
+  .vh-tab-btn.active { color:var(--c-beruf); border-bottom-color:var(--c-beruf); }
+  .vh-aktuell-card { background:var(--c-surface); border-radius:var(--radius-sm,6px); border:1px solid var(--c-border); padding:12px 14px; margin-bottom:8px; }
+  .vh-aktuell-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--c-faint); margin-bottom:6px; }
+  .vh-progress-bar-wrap { height:6px; background:var(--c-border); border-radius:3px; margin:6px 0; overflow:hidden; }
+  .vh-progress-bar { height:100%; background:var(--c-beruf); border-radius:3px; transition:width 0.3s; }
+  .vh-naechste-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid color-mix(in srgb,var(--c-border) 60%,transparent); }
+  .vh-naechste-row:last-child { border-bottom:none; }
 .vh47-delete-btn { width:100%;margin:16px 0 0;padding:10px;background:none;border:1px solid var(--c-danger);color:var(--c-danger);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.84rem;cursor:pointer; }
 #sec-planer {
   overflow: hidden;
@@ -8123,7 +8132,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.9.0 · Build 20260608-0530</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.9.1 · Build 20260608-0620</div>
     </div>
 
     <!-- Welt -->
@@ -8288,8 +8297,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.9.0',
-  APP_BUILD:   '20260608-0530',
+  APP_VERSION: '4.9.1',
+  APP_BUILD:   '20260608-0620',
 
 
   // ══════════════════════════════════════════════════════
@@ -15138,21 +15147,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   // Fortschritt: Anzeige aus planAufgaben, Messung metric-basiert (getrennt)
   _vorhabenProgress(v) {
-    // Anzeige-Fortschritt: erledigte / gesamte planAufgaben
-    const aufg = v.planAufgaben || [];
-    const total = aufg.length;
-    const done = aufg.filter(a => a.done).length;
+    // Anzeige-Fortschritt: offene/erledigte Aufgaben aus meilensteine + logbuch
+    const offen   = (v.meilensteine || []).reduce((s, ms) => s + (ms.aufgaben||[]).filter(a=>!a.done).length, 0);
+    const erledigt = (v.logbuch || []).length;
+    const total = offen + erledigt;
+    const done  = erledigt;
     const aufgabenPct = total ? Math.round(done / total * 100) : 0;
-
-    // Mess-Fortschritt: metric-basiert (optional, separat)
-    let metricPct = null;
-    if (v.metric && v.metric.target !== undefined && v.metric.start !== undefined) {
-      const { start, target, current } = v.metric;
-      if (target !== start) {
-        metricPct = Math.max(0, Math.min(100, Math.round(((current - start) / (target - start)) * 100)));
-      }
-    }
-    return { aufgabenPct, done, total, metricPct };
+    return { total, done, aufgabenPct };
   },
 
   // Welt eines Vorhabens manuell ändern (verschiebt zwischen pro/priv)
@@ -15337,6 +15338,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       this.setDirty();
     }
     const overlay = document.getElementById('wb-vorhaben-detail');
+    if (v.fortschrittManuell === undefined) v.fortschrittManuell = null;
     if (overlay) { overlay.style.display = 'flex'; this._vorhabenDetailRender(); }
   },
 
@@ -15475,6 +15477,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       v.stichtag = document.getElementById('vh-neu-stichtag')?.value || '';
       v.cluster = this._vorhabenNeuClusterWahl;
       v.charakter = 'laufend';
+      v.fortschrittManuell = null;
       this.setDirty();
     }
     document.getElementById('wb-vorhaben-neu-sheet')?.remove();
@@ -15578,6 +15581,105 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<input type="date" value="' + (v.stichtag||'') + '" onchange="WB._vorhabenSaveStichtag(this.value)" '
       + 'style="font-size:0.78rem;border:none;border-bottom:1px solid var(--c-border);background:none;color:var(--c-muted);font-family:var(--font);padding:2px 0;cursor:pointer;"></div>';
     h += '</div>';
+
+    // ── TAB-LEISTE ─────────────────────────────────────────
+    h += '<div class="vh-tabs">'
+      + '<button class="vh-tab-btn" data-tab="aktuell" onclick="WB._vhSetTab(&quot;aktuell&quot;)">Aktuell</button>'
+      + '<button class="vh-tab-btn" data-tab="plan" onclick="WB._vhSetTab(&quot;plan&quot;)">Plan</button>'
+      + '</div>';
+
+    // ── AKTUELL-TAB ────────────────────────────────────────
+    h += '<div id="vh-tab-aktuell" style="padding:12px 16px;overflow-y:auto;flex:1;">';
+
+    // ── ZIEL ──
+    h += '<div class="vh-aktuell-card">'
+      + '<div class="vh-aktuell-label">Ziel</div>'
+      + '<div contenteditable="true" id="vh-ziel-edit" onblur="WB._vhSaveZiel(this.textContent)" '
+      + 'style="font-size:0.9rem;color:var(--c-text);outline:none;min-height:1.4em;line-height:1.5;">'
+      + this._esc(v.ziel || '') + '</div>'
+      + '</div>';
+
+    // ── FORTSCHRITT ──
+    const prog = this._vorhabenProgress(v);
+    const pct  = (v.fortschrittManuell !== null && v.fortschrittManuell !== undefined)
+      ? v.fortschrittManuell : prog.aufgabenPct;
+    h += '<div class="vh-aktuell-card">'
+      + '<div class="vh-aktuell-label">Fortschritt</div>'
+      + '<div class="vh-progress-bar-wrap"><div class="vh-progress-bar" id="vh-progress-bar" style="width:' + pct + '%"></div></div>'
+      + '<div style="font-size:0.78rem;color:var(--c-muted);margin:4px 0 8px;">' + prog.done + '/' + prog.total + ' Aufgaben erledigt</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;">'
+      + '<input type="number" min="0" max="100" placeholder="—" value="' + (v.fortschrittManuell ?? '') + '" '
+      + 'onchange="WB._vhSetFortschrittManuell(this.value)" '
+      + 'style="width:64px;padding:4px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);">'
+      + '<span style="font-size:0.78rem;color:var(--c-faint);">% (leer = automatisch)</span>'
+      + '</div>'
+      + '</div>';
+
+    // ── NÄCHSTE SCHRITTE ──
+    const alleOffen = (v.meilensteine || []).flatMap(ms =>
+      (ms.aufgaben || []).filter(a => !a.done).map(a => ({ ...a, msId: ms.id }))
+    );
+    const KIPP_LBL = { urteil:'Urteil', stolz:'Stolz', routine:'Routine', tunnelblick:'Tunnelblick' };
+    const AE_BADGE_AK = { hoch:'<span style="font-size:0.7rem;color:#C62828;">⚡</span>', niedrig:'<span style="font-size:0.7rem;color:#2E7D32;">↓</span>' };
+    h += '<div class="vh-aktuell-card">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+      + '<div class="vh-aktuell-label" style="margin-bottom:0;">Nächste Schritte</div>'
+      + '<button onclick="WB._vhAktuellAddAufgabe()" style="font-size:0.78rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);">＋ Hinzufügen</button>'
+      + '</div>';
+    if (!alleOffen.length) {
+      h += '<div style="font-size:0.82rem;color:var(--c-faint);">Keine offenen Aufgaben.</div>';
+    } else {
+      h += alleOffen.map(a =>
+        '<div class="vh-naechste-row">'
+        + '<input type="checkbox" style="flex-shrink:0;width:15px;height:15px;accent-color:var(--c-beruf);" '
+        + 'onchange="WB._vhAufgDone(&quot;' + a.msId + '&quot;,&quot;' + a.id + '&quot;,this)">'
+        + '<span onclick="WB._vhAufgDetail(&quot;' + a.msId + '&quot;,&quot;' + a.id + '&quot;)" '
+        + 'style="flex:1;font-size:0.87rem;cursor:pointer;">' + this._esc(a.text) + '</span>'
+        + (a.aktivEnergie && a.aktivEnergie !== 'mittel' ? (AE_BADGE_AK[a.aktivEnergie] || '') : '')
+        + (a.kippTyp && a.kippTyp !== '' && a.kippTyp !== 'keiner'
+          ? '<span style="font-size:0.7rem;color:var(--c-muted);">' + (KIPP_LBL[a.kippTyp] || a.kippTyp) + '</span>' : '')
+        + '</div>'
+      ).join('');
+    }
+    h += '</div>';
+
+    // ── NOTIZ ──
+    h += '<div class="vh-aktuell-card">'
+      + '<div class="vh-aktuell-label">Notiz</div>'
+      + '<div style="font-size:0.84rem;color:var(--c-muted);white-space:pre-wrap;max-height:80px;overflow:hidden;">'
+      + this._esc((v.notiz || '').slice(0, 200)) + (v.notiz && v.notiz.length > 200 ? '…' : '') + '</div>'
+      + '<button onclick="WB._vhSetTab(&quot;plan&quot;)" style="font-size:0.78rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);padding:4px 0 0 0;">Bearbeiten →</button>'
+      + '</div>';
+
+    // ── STICHTAG + ZULETZT AKTIV ──
+    const geaendert = v.geaendert ? new Date(v.geaendert) : null;
+    const today = new Date(); today.setHours(0,0,0,0);
+    let zeitRel = '—';
+    if (geaendert) {
+      const g = new Date(geaendert); g.setHours(0,0,0,0);
+      const diff = Math.round((today - g) / 86400000);
+      zeitRel = diff === 0 ? 'heute' : diff === 1 ? 'gestern' : 'vor ' + diff + ' Tagen';
+    }
+    h += '<div style="display:flex;gap:8px;margin-bottom:8px;">'
+      + '<div class="vh-aktuell-card" style="flex:1;margin-bottom:0;">'
+      + '<div class="vh-aktuell-label">Stichtag</div>'
+      + '<div style="font-size:0.88rem;color:var(--c-text);">' + (v.stichtag || '—') + '</div>'
+      + '</div>'
+      + '<div class="vh-aktuell-card" style="flex:1;margin-bottom:0;">'
+      + '<div class="vh-aktuell-label">Zuletzt aktiv</div>'
+      + '<div style="font-size:0.88rem;color:var(--c-text);">' + zeitRel + '</div>'
+      + '</div>'
+      + '</div>';
+
+    // ── PLAN-HINWEIS ──
+    h += '<div style="text-align:center;padding:8px 0 16px;">'
+      + '<button onclick="WB._vhSetTab(&quot;plan&quot;)" style="font-size:0.82rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);">→ Zur Plan-Ansicht</button>'
+      + '</div>';
+
+    h += '</div>'; // Ende vh-tab-aktuell
+
+    // ── PLAN-TAB ───────────────────────────────────────────
+    h += '<div id="vh-tab-plan" style="display:none;overflow-y:auto;flex:1;">';
 
     // ── MEILENSTEINE ───────────────────────────────────────
     const meilensteine = v.meilensteine || [];
@@ -15688,7 +15790,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     // ── LÖSCHEN ────────────────────────────────────────────
     h += '<button onclick="WB._vorhabenDelete()" class="vh47-delete-btn">Vorhaben löschen</button>';
 
+    h += '</div>'; // Ende vh-tab-plan
+
     body.innerHTML = h;
+
 
     // Vision Placeholder
     const vision = document.getElementById('vh47-vision');
@@ -15704,6 +15809,48 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         if (ed) ed.innerHTML = v.inhalt || '';
       }, 0);
     }
+    // Immer mit Aktuell-Tab öffnen
+    this._vhSetTab('aktuell');
+  },
+
+  _vhSetTab(tab) {
+    const ak = document.getElementById('vh-tab-aktuell');
+    const pl = document.getElementById('vh-tab-plan');
+    if (ak) ak.style.display = tab === 'aktuell' ? '' : 'none';
+    if (pl) pl.style.display = tab === 'plan'    ? '' : 'none';
+    document.querySelectorAll('.vh-tab-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.tab === tab));
+  },
+
+  _vhSetFortschrittManuell(val) {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    const n = parseInt(val);
+    v.fortschrittManuell = (isNaN(n) || val === '') ? null : Math.min(100, Math.max(0, n));
+    v.geaendert = Date.now(); this.setDirty();
+    this._vorhabenDetailUpdateProgress();
+  },
+
+  _vorhabenDetailUpdateProgress() {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    const prog = this._vorhabenProgress(v);
+    const pct  = (v.fortschrittManuell !== null && v.fortschrittManuell !== undefined)
+      ? v.fortschrittManuell : prog.aufgabenPct;
+    const bar = document.getElementById('vh-progress-bar');
+    if (bar) bar.style.width = pct + '%';
+  },
+
+  _vhAktuellAddAufgabe() {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    if (!v.meilensteine || !v.meilensteine.length) {
+      const id = 'ms_' + Date.now();
+      v.meilensteine = [{ id, titel: 'Nächste Schritte', datum: '', aufgaben: [] }];
+      this._vhBlockOpen['ms_' + id] = true;
+      v.geaendert = Date.now(); this.setDirty();
+    }
+    // Plan-Tab öffnen und Eingabefeld fokussieren
+    this._vhSetTab('plan');
+    const firstMsId = v.meilensteine[0].id;
+    setTimeout(() => document.getElementById('vh-aufg-inp-' + firstMsId)?.focus(), 100);
   },
 
   _vhMsToggle(msId) {
@@ -15909,6 +16056,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const el = document.getElementById('vh47-titel');
     v.titel = (el?.textContent || '').trim();
     v.geaendert = Date.now(); this.setDirty();
+  },
+
+  _vhSaveZiel(text) {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    v.ziel = (text || '').trim(); v.geaendert = Date.now(); this.setDirty();
+    this._vorhabenListeRender();
   },
 
   _vhSaveVision() {
