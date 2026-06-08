@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.2.4</title>
+<title>WorkBench 5.3.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -483,6 +483,18 @@ html, body {
 .ck-eintrag-meta { font-size:0.75rem; color:var(--c-faint); margin-top:1px; }
 .ck-eintrag-zeit { font-size:0.78rem; color:var(--c-muted); font-family:var(--font-mono); flex-shrink:0; }
 .ck-leer { font-size:0.85rem; color:var(--c-faint); padding:6px 0 4px; font-style:italic; }
+  /* Wochen-Planung Overlay */
+  #wb-wochen-planung-overlay { position:fixed; inset:0; z-index:960; background:var(--c-bg); display:none; align-items:flex-start; justify-content:center; overflow-y:auto; padding:0; }
+  #wb-wochen-planung-overlay.open { display:flex; }
+  #wp-card { width:100%; max-width:460px; min-height:100%; display:flex; flex-direction:column; align-items:center; padding:32px 22px 40px; box-sizing:border-box; }
+  #wp-progress { display:flex; gap:8px; margin-bottom:28px; }
+  .wp-dot { width:8px; height:8px; border-radius:50%; background:var(--c-border); transition:background 0.2s; }
+  .wp-dot.active { background:var(--c-beruf); }
+  .wp-dot.done   { background:color-mix(in srgb,var(--c-beruf) 40%,var(--c-border)); }
+  .wp-step { display:none; flex-direction:column; align-items:center; width:100%; }
+  .wp-step.active { display:flex; }
+  .wp-btn { width:100%; padding:14px; border-radius:var(--radius-sm); font-family:var(--font); font-size:0.95rem; font-weight:600; cursor:pointer; border:none; margin-top:10px; background:var(--c-beruf); color:#fff; }
+  .wp-btn.ghost { background:none; border:1px solid var(--c-border); color:var(--c-muted); font-weight:400; }
   /* Wochen-Reflexion Overlay */
   #wb-wochen-reflexion-overlay {
     position:fixed; inset:0; z-index:960;
@@ -7669,6 +7681,16 @@ html, body {
           Zurücksetzen
         </button>
       </div>
+      <div class="wbs-row">
+        <div class="wbs-label">
+          <div class="wbs-label-main">Wochen-Planung zurücksetzen</div>
+          <div class="wbs-label-sub">Aktuelle KW — zum Testen</div>
+        </div>
+        <button onclick="WB._wpReset()"
+          style="padding:6px 12px;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;cursor:pointer;border:1px solid var(--c-danger,#C0392B);color:var(--c-danger,#C0392B);background:none;">
+          Zurücksetzen
+        </button>
+      </div>
 
       <!-- Alt-Aufgaben Analyse (db.projects Migration · Stufe 0) -->
       <div class="wbs-section-label">Alt-Aufgaben (db.projects)</div>
@@ -8254,7 +8276,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.2.4 · Build 20260608-1730</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.3.0 · Build 20260608-1800</div>
     </div>
 
     <!-- Welt -->
@@ -8337,6 +8359,10 @@ html, body {
       <button class="wb-menu-item" onclick="WB.wochenReflexionOpen(); WB.closeMenu()">
         <span class="icon">🌙</span>
         <span class="label">Wochen-Reflexion</span>
+      </button>
+      <button class="wb-menu-item" onclick="WB.wochenPlanungOpen(); WB.closeMenu()">
+        <span class="icon">🗓</span>
+        <span class="label">Wochen-Planung</span>
       </button>
       <button class="wb-menu-item" onclick="WB.icsExportOpen(); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -8423,8 +8449,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.2.4',
-  APP_BUILD:   '20260608-1730',
+  APP_VERSION: '5.3.0',
+  APP_BUILD:   '20260608-1800',
 
 
   // ══════════════════════════════════════════════════════
@@ -11307,6 +11333,8 @@ const WB = {
         if (ae === 'hoch')    s += 15;
         if (ae === 'niedrig') s -=  5;
       }
+      // Wochen-Fokus Bonus
+      if (v && v.wochenFokus) s += 30;
       return s;
     };
     ['aktiv','wartend'].forEach(ebene => {
@@ -11459,6 +11487,215 @@ const WB = {
 
     el.innerHTML = infoHtml + energieHtml + fokusHtml;
     this._ritualUpdateCount();
+  },
+
+  // ── Wochen-Planung ──────────────────────────────────────────────
+
+  _wpStore() {
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return {};
+    if (!db.wochenPlanung) db.wochenPlanung = {};
+    return db.wochenPlanung;
+  },
+
+  _wpKwKey() { return this._kwStr(new Date()); },
+
+  wochenPlanungOpen() {
+    const store = this._wpStore();
+    const key   = this._wpKwKey();
+    if (!store[key]) store[key] = { done: false, ts: null, zielBeruf: '', zielPrivat: '', hauptVorhaben: [] };
+    this._wpGoto(0);
+    document.getElementById('wb-wochen-planung-overlay').classList.add('open');
+  },
+
+  wochenPlanungClose() {
+    document.getElementById('wb-wochen-planung-overlay').classList.remove('open');
+  },
+
+  _wpGoto(step) {
+    document.querySelectorAll('.wp-step').forEach(s => s.classList.remove('active'));
+    const active = document.getElementById('wp-step-' + step);
+    if (active) active.classList.add('active');
+    document.querySelectorAll('.wp-dot').forEach(dot => {
+      const ds = parseInt(dot.dataset.step);
+      dot.classList.toggle('active', ds === step);
+      dot.classList.toggle('done', ds < step);
+    });
+    if (step === 0) this._wpRenderUebersicht();
+    if (step === 1) this._wpRestoreZiele();
+    if (step === 2) this._wpRenderVorhaben();
+    if (step === 3) this._wpRenderAbschluss();
+  },
+
+  _wpRenderUebersicht() {
+    const el  = document.getElementById('wp-uebersicht-body');
+    const kwEl = document.getElementById('wp-kw-label');
+    if (!el) return;
+    const now = new Date();
+    const kw  = this._wpKwKey();
+    const kwNum = kw.split('-W')[1];
+    if (kwEl) kwEl.textContent = 'KW ' + kwNum;
+
+    const dow = now.getDay() === 0 ? 7 : now.getDay();
+    const mo  = new Date(now); mo.setDate(now.getDate() - dow + 1);
+    const days = Array.from({length: 7}, (_, i) => {
+      const d = new Date(mo); d.setDate(mo.getDate() + i);
+      return d.toISOString().split('T')[0];
+    });
+    const DAYS   = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+    const MONTHS = ['Jan','Feb','M\u00e4r','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+    el.innerHTML = '<div style="background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);overflow:hidden;">'
+      + days.map((ds, i) => {
+          const d = new Date(ds + 'T12:00:00');
+          const dateLabel = DAYS[i] + ' ' + d.getDate() + '. ' + MONTHS[d.getMonth()];
+          let terminCount = 0, terminKosten = 0;
+          ['pro','priv'].forEach(ctx => {
+            const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+            (db?.customEvents || []).filter(e => e.date === ds && e.type !== 'horizon' && !e.done).forEach(ev => {
+              terminCount++;
+              const dur = parseFloat(ev.duration || 1);
+              terminKosten += !ev.startTime ? 2 : dur < 1 ? 4 : 6;
+            });
+          });
+          let aufgabeCount = 0;
+          (this._vorhabenAlle ? this._vorhabenAlle() : []).forEach(v => {
+            (v.meilensteine||[]).forEach(ms => {
+              (ms.aufgaben||[]).filter(a => !a.done && a.datum === ds).forEach(() => aufgabeCount++);
+            });
+          });
+          const restEnergie = Math.max(0, 28 - terminKosten);
+          const eColor = restEnergie < 10 ? '#C0392B' : restEnergie < 20 ? '#B45309' : '#0D7A6B';
+          const eBg    = restEnergie < 10 ? '#FDECEA' : restEnergie < 20 ? '#FFF7E6' : '#E8F5F3';
+          const info = [];
+          if (terminCount)  info.push(terminCount + ' Termin' + (terminCount>1?'e':''));
+          if (aufgabeCount) info.push(aufgabeCount + ' Aufgabe' + (aufgabeCount>1?'n':''));
+          if (!info.length) info.push('Nichts geplant');
+          return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--c-border);">'
+            + '<div style="font-size:0.78rem;font-weight:700;width:80px;color:var(--c-text);flex-shrink:0;">' + dateLabel + '</div>'
+            + '<div style="flex:1;font-size:0.75rem;color:var(--c-muted);">' + info.join(' \u00b7 ') + '</div>'
+            + '<div style="font-size:0.70rem;font-weight:700;font-family:var(--font-mono);padding:2px 7px;border-radius:8px;flex-shrink:0;background:' + eBg + ';color:' + eColor + ';">' + restEnergie + '</div>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+  },
+
+  _wpRestoreZiele() {
+    const key  = this._wpKwKey();
+    const plan = this._wpStore()[key] || {};
+    const zb   = document.getElementById('wp-ziel-beruf');
+    const zp   = document.getElementById('wp-ziel-privat');
+    if (zb) zb.value = plan.zielBeruf  || '';
+    if (zp) zp.value = plan.zielPrivat || '';
+  },
+
+  _wpSaveZiele() {
+    const key   = this._wpKwKey();
+    const store = this._wpStore();
+    if (!store[key]) return;
+    store[key].zielBeruf  = document.getElementById('wp-ziel-beruf')?.value  || '';
+    store[key].zielPrivat = document.getElementById('wp-ziel-privat')?.value || '';
+    this.setDirty();
+  },
+
+  _wpRenderVorhaben() {
+    const el = document.getElementById('wp-vorhaben-body');
+    if (!el) return;
+    const key    = this._wpKwKey();
+    const store  = this._wpStore();
+    const selIds = new Set(store[key]?.hauptVorhaben || []);
+    const alle   = (this._vorhabenAlle ? this._vorhabenAlle() : []).filter(v => (v.aktivitaet||'aktiv') === 'aktiv');
+    el.innerHTML = alle.map(v => {
+      const sel = selIds.has(v.id);
+      const charBadge = v.charakter === 'baustelle' ? '🔥 ' : '';
+      return '<div onclick="WB._wpToggleVorhaben(&quot;' + v.id + '&quot;)"'
+        + ' style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:'
+        + (sel ? 'var(--c-beruf-bg,#E8F5F3)' : 'var(--c-surface)') + ';border:1.5px solid '
+        + (sel ? 'var(--c-beruf)' : 'var(--c-border)') + ';border-radius:var(--radius-xs);margin-bottom:6px;cursor:pointer;">'
+        + '<div style="width:18px;height:18px;border-radius:50%;border:2px solid '
+          + (sel ? 'var(--c-beruf)' : 'var(--c-border)') + ';background:'
+          + (sel ? 'var(--c-beruf)' : 'transparent') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
+          + (sel ? '<span style="color:#fff;font-size:0.7rem;font-weight:700;">\u2713</span>' : '')
+          + '</div>'
+        + '<div style="flex:1;font-size:0.88rem;font-weight:600;">' + charBadge + this._esc(v.titel||'') + '</div>'
+        + '</div>';
+    }).join('');
+  },
+
+  _wpToggleVorhaben(id) {
+    const key   = this._wpKwKey();
+    const store = this._wpStore();
+    if (!store[key]) return;
+    const sel = store[key].hauptVorhaben || [];
+    const idx = sel.indexOf(id);
+    if (idx === -1) {
+      if (sel.length >= 3) { this._toast('Maximal 3 Haupt-Vorhaben'); return; }
+      sel.push(id);
+    } else { sel.splice(idx, 1); }
+    store[key].hauptVorhaben = sel;
+    this.setDirty();
+    this._wpRenderVorhaben();
+  },
+
+  _wpSaveHauptVorhaben() {
+    const key  = this._wpKwKey();
+    const ids  = new Set(this._wpStore()[key]?.hauptVorhaben || []);
+    (this._vorhabenAlle ? this._vorhabenAlle() : []).forEach(v => { v.wochenFokus = ids.has(v.id); });
+    this.setDirty();
+  },
+
+  _wpRenderAbschluss() {
+    const key   = this._wpKwKey();
+    const store = this._wpStore();
+    const plan  = store[key] || {};
+    const alle  = (this._vorhabenAlle ? this._vorhabenAlle() : []);
+    const kwNum = key.split('-W')[1];
+    const subEl = document.getElementById('wp-abschluss-sub');
+    if (subEl) subEl.textContent = 'KW ' + kwNum + ' \u2014 Planung abgeschlossen';
+    const el = document.getElementById('wp-abschluss-body');
+    if (!el) return;
+    const hauptTitel = (plan.hauptVorhaben || []).map(id => {
+      const v = alle.find(x => x.id === id);
+      return v ? '\u2b50 ' + v.titel : '';
+    }).filter(Boolean);
+    el.innerHTML = '<div style="background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);padding:12px 14px;">'
+      + (plan.zielBeruf  ? '<div style="font-size:0.78rem;color:var(--c-muted);margin-bottom:4px;">🏢 ' + this._esc(plan.zielBeruf)  + '</div>' : '')
+      + (plan.zielPrivat ? '<div style="font-size:0.78rem;color:var(--c-muted);margin-bottom:8px;">🏠 ' + this._esc(plan.zielPrivat) + '</div>' : '')
+      + hauptTitel.map(t => '<div style="font-size:0.85rem;font-weight:600;margin-bottom:4px;">' + this._esc(t) + '</div>').join('')
+      + '</div>';
+  },
+
+  _wpFinish() {
+    const key   = this._wpKwKey();
+    const store = this._wpStore();
+    if (!store[key]) return;
+    store[key].done = true;
+    store[key].ts   = Date.now();
+    this.setDirty();
+    this.wochenPlanungClose();
+    setTimeout(() => { try { this.ritualOpen(); } catch(e) {} }, 300);
+  },
+
+  _wpReset() {
+    const store = this._wpStore();
+    const key   = this._wpKwKey();
+    delete store[key];
+    (this._vorhabenAlle ? this._vorhabenAlle() : []).forEach(v => { v.wochenFokus = false; });
+    this.setDirty();
+    this._toast('Wochen-Planung zur\u00fcckgesetzt');
+  },
+
+  _wpCheckAutoOpen() {
+    const now = new Date();
+    if (now.getDay() !== 1) return;
+    const store = this._wpStore();
+    const key   = this._wpKwKey();
+    if (store[key]?.done) return;
+    const ritOv = document.getElementById('wb-ritual-overlay');
+    if (ritOv?.classList.contains('open')) return;
+    const ov = document.getElementById('wb-wochen-planung-overlay');
+    if (ov && !ov.classList.contains('open')) this.wochenPlanungOpen();
   },
 
   // ── Wochen-Reflexion ──────────────────────────────────────────────
@@ -15473,6 +15710,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this._ritualMaybeOpen();
     // Wochen-Reflexion: Sonntag ab 19:00
     try { this._wrCheckAutoOpen(); } catch(e) {}
+    try { this._wpCheckAutoOpen(); } catch(e) {}
   },
 
   _ckRenderDateHeader() {
@@ -29867,6 +30105,52 @@ WB.init();
       <textarea class="wr-textarea" id="wr-abschluss-input" placeholder="Diese Woche war für mich..." style="margin-bottom:16px;min-height:100px;width:100%;"></textarea>
       <button class="wr-btn" onclick="WB._wrFinish()">Woche abschließen ✓</button>
       <button class="wr-btn ghost" onclick="WB._wrGoto(3)">← Zurück</button>
+    </div>
+  </div>
+</div>
+<!-- WOCHEN-PLANUNG OVERLAY -->
+<div id="wb-wochen-planung-overlay">
+  <div id="wp-card">
+    <div id="wp-progress">
+      <span class="wp-dot" data-step="0"></span>
+      <span class="wp-dot" data-step="1"></span>
+      <span class="wp-dot" data-step="2"></span>
+      <span class="wp-dot" data-step="3"></span>
+    </div>
+    <div class="wp-step" id="wp-step-0">
+      <div class="wr-emoji">📅</div>
+      <div class="wr-title">Deine Woche</div>
+      <div class="wr-sub" id="wp-kw-label">KW –</div>
+      <div id="wp-uebersicht-body" style="width:100%;margin-bottom:16px;"></div>
+      <button class="wp-btn" onclick="WB._wpGoto(1)">Weiter →</button>
+    </div>
+    <div class="wp-step" id="wp-step-1">
+      <div class="wr-emoji">🎯</div>
+      <div class="wr-title">Wochenziele</div>
+      <div class="wr-sub">Was will ich diese Woche sein oder erreichen?</div>
+      <div style="width:100%;margin-bottom:16px;">
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:6px;">🏢 Beruf</div>
+        <textarea class="wr-textarea" id="wp-ziel-beruf" placeholder="Diese Woche im Beruf will ich..." style="width:100%;margin-bottom:12px;min-height:70px;"></textarea>
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:6px;">🏠 Privat</div>
+        <textarea class="wr-textarea" id="wp-ziel-privat" placeholder="Diese Woche privat will ich..." style="width:100%;min-height:70px;"></textarea>
+      </div>
+      <button class="wp-btn" onclick="WB._wpSaveZiele();WB._wpGoto(2)">Weiter →</button>
+      <button class="wp-btn ghost" onclick="WB._wpGoto(0)">← Zurück</button>
+    </div>
+    <div class="wp-step" id="wp-step-2">
+      <div class="wr-emoji">⭐</div>
+      <div class="wr-title">Haupt-Vorhaben</div>
+      <div class="wr-sub">1–3 Vorhaben die sich diese Woche bewegen müssen</div>
+      <div id="wp-vorhaben-body" style="width:100%;margin-bottom:16px;"></div>
+      <button class="wp-btn" onclick="WB._wpSaveHauptVorhaben();WB._wpGoto(3)">Weiter →</button>
+      <button class="wp-btn ghost" onclick="WB._wpGoto(1)">← Zurück</button>
+    </div>
+    <div class="wp-step" id="wp-step-3">
+      <div class="wr-emoji">🚀</div>
+      <div class="wr-title">Woche kann starten</div>
+      <div class="wr-sub" id="wp-abschluss-sub">–</div>
+      <div id="wp-abschluss-body" style="width:100%;margin-bottom:16px;"></div>
+      <button class="wp-btn" onclick="WB._wpFinish()">Morgendialog starten →</button>
     </div>
   </div>
 </div>
