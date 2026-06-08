@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.0.8</title>
+<title>WorkBench 5.0.9</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8217,7 +8217,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.0.8 · Build 20260608-1310</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.0.9 · Build 20260608-1330</div>
     </div>
 
     <!-- Welt -->
@@ -8382,8 +8382,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.0.8',
-  APP_BUILD:   '20260608-1310',
+  APP_VERSION: '5.0.9',
+  APP_BUILD:   '20260608-1330',
 
 
   // ══════════════════════════════════════════════════════
@@ -11248,15 +11248,24 @@ const WB = {
 
   // v4.4.0: Vorhaben-Gruppen für Step 2 — nur Vorhaben-Aufgaben, gruppiert nach Ebene
   _ritualBuildGroups() {
-    // v4.8.0: Aufgaben aus Vorhaben-Meilensteinen
     const gruppen = [];
-    const today = this._ritualTodayKey();
-    const score = (a) => {
+    const today   = this._ritualTodayKey();
+    const energie = this._ritualEnergie || 'mittel';
+    const score = (a, v) => {
       let s = 0;
       if (a.naechsterSchritt && a.datum && a.datum <= today) s += 100;
       else if (a.naechsterSchritt) s += 50;
       else if (a.datum && a.datum === today) s += 30;
       else if (a.datum && a.datum < today) s += 20;
+      const ae = a.aktivEnergie || 'mittel';
+      if (energie === 'niedrig') {
+        if (ae === 'niedrig') s += 25;
+        if (ae === 'hoch')    s -= 20;
+        if (a.kippTyp === 'urteil' || a.kippTyp === 'stolz') s -= 10;
+      } else if (energie === 'hoch') {
+        if (ae === 'hoch')    s += 15;
+        if (ae === 'niedrig') s -=  5;
+      }
       return s;
     };
     ['aktiv','wartend'].forEach(ebene => {
@@ -11266,9 +11275,16 @@ const WB = {
         const aufgaben = (v.meilensteine || []).flatMap(ms =>
           (ms.aufgaben || []).filter(a => !a.done).map(a => ({ ...a, msId: ms.id, msTitel: ms.titel }))
         );
-        aufgaben.sort((a, b) => score(b) - score(a));
+        aufgaben.sort((a, b) => score(b, v) - score(a, v));
         if (aufgaben.length) gruppen.push({ v, aufgaben, ebene });
       });
+    });
+    const charOrder = { baustelle: 0, laufend: 1, pflicht: 2 };
+    gruppen.sort((a, b) => {
+      const ca = charOrder[a.v.charakter || 'laufend'] ?? 1;
+      const cb = charOrder[b.v.charakter || 'laufend'] ?? 1;
+      if (ca !== cb) return ca - cb;
+      return (a.v.geaendert || 0) - (b.v.geaendert || 0);
     });
     return gruppen;
   },
@@ -11340,12 +11356,18 @@ const WB = {
         const aeBadge = a.aktivEnergie && a.aktivEnergie !== 'mittel'
           ? '<span class="ritual-ae-tag ae-' + a.aktivEnergie + '">' + (a.aktivEnergie==='hoch'?'⚡':'↓') + ' ' + a.aktivEnergie + '</span>' : '';
         const nsBadge = a.naechsterSchritt ? '<span class="ritual-ae-tag" style="color:var(--c-beruf);">→ Nächster Schritt</span>' : '';
+        const KIPP_LBL = { urteil:'Urteil ⚠', stolz:'Stolz ⚠', routine:'Routine', tunnelblick:'Tunnelblick' };
+        const kippBadge = (a.kippTyp && a.kippTyp !== '' && a.kippTyp !== 'keiner')
+          ? '<span class="ritual-ae-tag ritual-kipp-tag">' + (KIPP_LBL[a.kippTyp] || a.kippTyp) + '</span>'
+          : '';
         return '<div class="ritual-cand-row' + (disabled?' disabled':'') + '">'
           + '<button class="ritual-cand' + (sel?' selected':'') + '" onclick="WB._ritualToggleCandVh(&quot;' + payload + '&quot;)">'
           + '<span class="ritual-cand-check">' + (sel?'✓':'') + '</span>'
           + '<span class="ritual-cand-body">'
           + '<span class="ritual-cand-title">' + this._esc(a.text) + '</span>'
-          + ((aeBadge||nsBadge) ? '<span class="ritual-cand-tags">' + (nsBadge||'') + (aeBadge||'') + '</span>' : '')
+          + ((aeBadge||nsBadge||kippBadge)
+            ? '<span class="ritual-cand-tags">' + (nsBadge||'') + (aeBadge||'') + (kippBadge||'') + '</span>'
+            : '')
           + '</span></button>'
           + '<button class="ritual-edit-btn" onclick="WB._ritualEditAufgabe(&quot;' + a.id + '&quot;,&quot;' + v.id + '&quot;,&quot;' + a.msId + '&quot;)" title="Energie &amp; Kippmoment">✎</button>'
           + '<button class="ritual-edit-btn" onclick="WB._ritualOpenVorhabenFromCand(&quot;' + v.id + '&quot;)" title="Vorhaben öffnen">⊙</button>'
@@ -11354,7 +11376,15 @@ const WB = {
       return '<div class="ritual-gruppe"><div class="ritual-gruppe-titel">' + this._esc(v.titel||'Vorhaben') + ebeneTag + '</div>' + rows + '</div>';
     }).join('');
 
-    el.innerHTML = terminHtml + gruppenHtml;
+    const energie = this._ritualEnergie || 'mittel';
+    let energieHinweis = '';
+    if (energie === 'niedrig') {
+      energieHinweis = '<div style="font-size:0.75rem;color:var(--c-warn,#E67E22);padding:6px 10px;background:color-mix(in srgb,var(--c-warn,#E67E22) 8%,var(--c-bg));border-radius:var(--radius-xs);margin-bottom:10px;text-align:center;">🔴 Niedrige Energie — leichte Aufgaben werden bevorzugt</div>';
+    } else if (energie === 'hoch') {
+      energieHinweis = '<div style="font-size:0.75rem;color:var(--c-beruf);padding:6px 10px;background:var(--c-beruf-bg,#E8F5F3);border-radius:var(--radius-xs);margin-bottom:10px;text-align:center;">🟢 Hohe Energie — anspruchsvolle Aufgaben werden bevorzugt</div>';
+    }
+
+    el.innerHTML = energieHinweis + terminHtml + gruppenHtml;
     this._ritualUpdateCount();
   },
   _esc(s) {
@@ -11528,6 +11558,10 @@ const WB = {
     document.querySelectorAll('.ritual-energie-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.val === val);
     });
+    const step2 = document.getElementById('ritual-step-2');
+    if (step2 && step2.style.display !== 'none') {
+      this._ritualRenderCandidates();
+    }
   },
 
   _ritualStep1Weiter() {
