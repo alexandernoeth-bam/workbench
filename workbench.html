@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.9.7</title>
+<title>WorkBench 5.0.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -483,6 +483,32 @@ html, body {
 .ck-eintrag-meta { font-size:0.75rem; color:var(--c-faint); margin-top:1px; }
 .ck-eintrag-zeit { font-size:0.78rem; color:var(--c-muted); font-family:var(--font-mono); flex-shrink:0; }
 .ck-leer { font-size:0.85rem; color:var(--c-faint); padding:6px 0 4px; font-style:italic; }
+  /* Cockpit C1 — Zeitzonen-Ansicht */
+  #ck-tagesseite { display:flex; flex-direction:column; height:calc(100vh - 110px); overflow:hidden; }
+  #ck-tag-header { flex-shrink:0; padding:8px 16px; border-bottom:1px solid var(--c-border); background:var(--c-surface); }
+  #ck-scroll-body { flex:1; overflow-y:auto; padding:8px 12px 80px; }
+  .ck-zone { margin-bottom:8px; border-radius:var(--radius-sm,6px); border:1px solid var(--c-border); background:var(--c-surface); overflow:hidden; }
+  .ck-zone-header { display:flex; align-items:center; gap:8px; padding:7px 12px; background:var(--c-bg); border-bottom:1px solid var(--c-border); }
+  .ck-zone-icon { font-size:0.9rem; flex-shrink:0; }
+  .ck-zone-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--c-muted); flex:1; }
+  .ck-zone-hint { font-size:0.68rem; color:var(--c-faint); font-family:var(--font-mono); }
+  .ck-zone-count { font-size:0.68rem; color:var(--c-faint); background:var(--c-border); border-radius:8px; padding:1px 6px; min-width:16px; text-align:center; }
+  .ck-z-eintrag { display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px solid color-mix(in srgb,var(--c-border) 50%,transparent); cursor:pointer; transition:background var(--t-fast,0.15s); }
+  .ck-z-eintrag:last-child { border-bottom:none; }
+  .ck-z-eintrag:hover { background:color-mix(in srgb,var(--c-beruf) 4%,transparent); }
+  .ck-z-eintrag.done { opacity:0.45; }
+  .ck-z-cb { width:17px; height:17px; flex-shrink:0; accent-color:var(--c-beruf); cursor:pointer; }
+  .ck-z-text { flex:1; min-width:0; }
+  .ck-z-titel { font-size:0.88rem; color:var(--c-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ck-z-titel.done { text-decoration:line-through; color:var(--c-faint); }
+  .ck-z-meta { font-size:0.72rem; color:var(--c-faint); margin-top:1px; }
+  .ck-z-zeit { font-size:0.75rem; color:var(--c-muted); font-family:var(--font-mono); flex-shrink:0; }
+  .ck-z-badge { display:inline-block; font-size:0.62rem; padding:1px 5px; border-radius:5px; margin-left:4px; font-weight:600; vertical-align:middle; }
+  .ck-z-badge-fokus  { background:var(--c-beruf-bg,#E8F5F3); color:var(--c-beruf); }
+  .ck-z-badge-termin { background:#EEF2FF; color:#3730A3; }
+  .ck-z-badge-pflicht { background:#FFF7E6; color:#B45309; }
+  .ck-energie-badge { font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:var(--c-beruf-bg,#E8F5F3); color:var(--c-beruf); }
+  .ck-fokus-badge { font-size:0.72rem; padding:2px 8px; border-radius:10px; background:var(--c-bg); color:var(--c-muted); border:1px solid var(--c-border); }
 #ck-aktions-leiste { display:flex; gap:6px; padding:6px 12px; border-top:1px solid var(--c-border); flex-shrink:0; background:var(--c-bg); }
 #ck-aktions-leiste button { padding:5px 10px; border-radius:var(--radius-xs); font-family:var(--font); font-size:0.78rem; cursor:pointer; display:flex; align-items:center; gap:4px; white-space:nowrap; background:var(--c-beruf); color:#fff; border:none; font-weight:600; }
 #ck-aktions-leiste button.ghost { background:none; border:1px solid var(--c-border); color:var(--c-muted); font-weight:400; }
@@ -6944,36 +6970,77 @@ html, body {
 
       <!-- NEUE TAGESSEITE v4.1 — drei feste Blöcke -->
       <div id="ck-tagesseite">
-        <!-- Datum-Header -->
-        <div id="ck-tag-header">
-          <div id="ck-tag-datum">–</div>
-          <div id="ck-tag-sub">
-            <span id="ck-tag-kw">–</span>
-            <span>·</span>
-            <span id="ck-tag-typ">–</span>
-          </div>
+
+  <!-- Datum-Header -->
+  <div id="ck-tag-header">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button onclick="WB._ckShift(-1)" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--c-muted);padding:0 4px;line-height:1;">‹</button>
+      <div style="flex:1;">
+        <div id="ck-tag-datum">–</div>
+        <div id="ck-tag-sub">
+          <span id="ck-tag-kw">–</span>
+          <span>·</span>
+          <span id="ck-tag-typ">–</span>
         </div>
-        <!-- Block 1: Termine -->
-        <div class="ck-block" id="ck-block-termine">
-          <div class="ck-block-label" id="ck-label-termine">Termine</div>
-          <div class="ck-block-body" id="ck-termine-body"></div>
-        </div>
-        <!-- Block 2: Fokus -->
-        <div class="ck-block" id="ck-block-fokus">
-          <div class="ck-block-label" id="ck-label-fokus">Fokus</div>
-          <div class="ck-block-body" id="ck-fokus-body"></div>
-        </div>
-        <!-- Block 3: Rauschen (verschwindet komplett wenn leer) -->
-        <div class="ck-block" id="ck-block-rauschen" style="display:none;">
-          <div class="ck-block-label" id="ck-label-rauschen">Rauschen</div>
-          <div class="ck-block-body" id="ck-rauschen-body"></div>
-        </div>
-        <!-- Aktions-Leiste -->
-        <div id="ck-aktions-leiste">
-          <button onclick="WB._quickDetail(null)">+ Neu</button>
-          <button onclick="WB.qcOpen()" class="ghost">+ Notiz</button>
-          <button onclick="WB.fokusOpen()" class="ghost" style="margin-left:auto;">⏱ Timer</button>
-        </div>
+      </div>
+      <button id="ck-today-btn" onclick="WB._ckGoToday()" style="display:none;font-size:0.72rem;padding:3px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;cursor:pointer;font-family:var(--font);color:var(--c-muted);">Heute</button>
+      <button onclick="WB._ckShift(1)" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--c-muted);padding:0 4px;line-height:1;">›</button>
+    </div>
+    <div id="ck-tag-badges" style="display:none;margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;"></div>
+  </div>
+
+  <!-- Scrollbarer Body -->
+  <div id="ck-scroll-body">
+
+    <div class="ck-zone" id="ck-zone-vm">
+      <div class="ck-zone-header">
+        <span class="ck-zone-icon">🌅</span>
+        <span class="ck-zone-label">Vormittag</span>
+        <span class="ck-zone-hint">07:00 – 12:00</span>
+        <span class="ck-zone-count" id="ck-count-vm"></span>
+      </div>
+      <div class="ck-zone-body" id="ck-body-vm"></div>
+    </div>
+
+    <div class="ck-zone" id="ck-zone-nm">
+      <div class="ck-zone-header">
+        <span class="ck-zone-icon">🌞</span>
+        <span class="ck-zone-label">Nachmittag</span>
+        <span class="ck-zone-hint">12:45 – 16:00</span>
+        <span class="ck-zone-count" id="ck-count-nm"></span>
+      </div>
+      <div class="ck-zone-body" id="ck-body-nm"></div>
+    </div>
+
+    <div class="ck-zone" id="ck-zone-ab">
+      <div class="ck-zone-header">
+        <span class="ck-zone-icon">🌙</span>
+        <span class="ck-zone-label">Abend</span>
+        <span class="ck-zone-hint">ab 16:00</span>
+        <span class="ck-zone-count" id="ck-count-ab"></span>
+      </div>
+      <div class="ck-zone-body" id="ck-body-ab"></div>
+    </div>
+
+    <div class="ck-zone" id="ck-zone-rauschen" style="display:none;">
+      <div class="ck-zone-header">
+        <span class="ck-zone-icon">〰</span>
+        <span class="ck-zone-label">Rauschen</span>
+        <span class="ck-zone-hint"></span>
+        <span class="ck-zone-count" id="ck-count-rauschen"></span>
+      </div>
+      <div class="ck-zone-body" id="ck-body-rauschen"></div>
+    </div>
+
+  </div>
+
+  <!-- Aktions-Leiste -->
+  <div id="ck-aktions-leiste">
+    <button onclick="WB._quickDetail(null)">+ Neu</button>
+    <button onclick="WB.qcOpen()" class="ghost">+ Notiz</button>
+    <button onclick="WB.fokusOpen()" class="ghost" style="margin-left:auto;">⏱ Timer</button>
+  </div>
+
       </div>
       <!-- Zeitband Panel (Kompatibilität) -->
       <div id="ck-zeitband-panel" style="display:none;">
@@ -8149,7 +8216,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.9.7 · Build 20260608-0940</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.0.0 · Build 20260608-1030</div>
     </div>
 
     <!-- Welt -->
@@ -8314,8 +8381,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.9.7',
-  APP_BUILD:   '20260608-0940',
+  APP_VERSION: '5.0.0',
+  APP_BUILD:   '20260608-1030',
 
 
   // ══════════════════════════════════════════════════════
@@ -13954,42 +14021,306 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   // ══════════════════════════════════════════════════════
 
   _ckRenderTagesseite() {
-    const now    = new Date();
-    const today  = now.toISOString().split('T')[0];
-    const dow    = now.getDay();
-    const dayNames = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
-    const months   = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    const now   = new Date();
+    const today = now.toISOString().split('T')[0];
+    if (!this._ckDate) this._ckDate = today;
+    const dateStr  = this._ckDate;
+    const isToday  = dateStr === today;
+    const dispDate = new Date(dateStr + 'T12:00:00');
+    const dow      = dispDate.getDay();
+    const DAYS   = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 
-    // Datum-Header
     const datumEl = document.getElementById('ck-tag-datum');
-    if (datumEl) datumEl.textContent = dayNames[dow] + ', ' + now.getDate() + '. ' + months[now.getMonth()];
+    if (datumEl) datumEl.textContent = DAYS[dow] + ', ' + dispDate.getDate() + '. ' + MONTHS[dispDate.getMonth()];
     const kwEl = document.getElementById('ck-tag-kw');
-    if (kwEl) kwEl.textContent = now.getFullYear() + ' · ' + this._kwStr(now);
+    if (kwEl) kwEl.textContent = dispDate.getFullYear() + ' · ' + this._kwStr(dispDate);
 
-    // Tagestyp
-    const dayInfo   = this._getDayInfo(today);
+    const dayInfo   = this._getDayInfo(dateStr);
     const isWeekend = dow === 0 || dow === 6;
     const typEl = document.getElementById('ck-tag-typ');
     if (typEl) {
-      typEl.className = '';
-      if (dayInfo.isPrivDay) {
-        const label = dayInfo.label || (dayInfo.type === 'urlaub' ? 'Urlaub' : 'Sondertag');
-        typEl.textContent = label;
+      if (dayInfo.type === 'sick') {
+        typEl.textContent = 'Krank'; typEl.className = 'urlaub';
+      } else if (dayInfo.isPrivDay) {
+        typEl.textContent = dayInfo.label || (dayInfo.type === 'vacation' ? 'Urlaub' : 'Sondertag');
         typEl.className = 'urlaub';
       } else if (isWeekend) {
-        typEl.textContent = 'Wochenende';
-        typEl.className = 'wochenende';
+        typEl.textContent = 'Wochenende'; typEl.className = 'wochenende';
       } else {
-        typEl.textContent = 'Arbeitstag';
-        typEl.className = '';
+        typEl.textContent = 'Arbeitstag'; typEl.className = '';
       }
     }
 
-    // v4.1: Drei Blöcke rendern statt flacher Tagesliste
-    try { this._ckRenderTermine(); } catch(e) { console.error('_ckRenderTermine:', e); }
-    try { this._ckRenderFokus(); } catch(e) { console.error('_ckRenderFokus:', e); }
-    try { this._ckRenderRauschen(); } catch(e) { console.error('_ckRenderRauschen:', e); }
+    const todayBtn = document.getElementById('ck-today-btn');
+    if (todayBtn) todayBtn.style.display = isToday ? 'none' : '';
+
+    const badgesEl = document.getElementById('ck-tag-badges');
+    if (badgesEl) {
+      if (isToday) {
+        const store  = this._ritualStore();
+        const ritual = store && store[this._ritualTodayKey()];
+        if (ritual && ritual.done && !ritual.skipped) {
+          const energieLabel = { hoch:'🟢 Energie: Hoch', mittel:'🟡 Energie: Mittel', niedrig:'🔴 Energie: Niedrig' };
+          const fokusTotal = (ritual.fokus || []).length;
+          let badges = '';
+          if (ritual.energie) badges += '<span class="ck-energie-badge">' + (energieLabel[ritual.energie] || ritual.energie) + '</span>';
+          if (fokusTotal > 0) badges += '<span class="ck-fokus-badge">🎯 ' + fokusTotal + ' Fokus geplant</span>';
+          badgesEl.innerHTML = badges;
+          badgesEl.style.display = badges ? 'flex' : 'none';
+        } else { badgesEl.style.display = 'none'; }
+      } else { badgesEl.style.display = 'none'; }
+    }
+
+    try { this._ckRenderZone('vm', dateStr, isToday); } catch(e) { console.error('ck-zone-vm:', e); }
+    try { this._ckRenderZone('nm', dateStr, isToday); } catch(e) { console.error('ck-zone-nm:', e); }
+    try { this._ckRenderZone('ab', dateStr, isToday); } catch(e) { console.error('ck-zone-ab:', e); }
+    try { this._ckRenderZoneRauschen(dateStr, isToday); } catch(e) { console.error('ck-zone-rauschen:', e); }
   },
+
+  _ckGetZoneItems(dateStr, zone) {
+    const items = [];
+    const pT = t => { if (!t) return -1; const [h,m] = t.split(':').map(Number); return h*60+m; };
+    const today = new Date().toISOString().split('T')[0];
+    const getZone = (timeStr) => {
+      const min = pT(timeStr);
+      if (min < 0) return null;
+      if (min < 12*60) return 'vm';
+      if (min < 16*60) return 'nm';
+      return 'ab';
+    };
+    const slotToZone = { vm:'vm', nm:'nm', ab:'ab' };
+    const dayInfo   = this._getDayInfo(dateStr);
+    const dow       = new Date(dateStr + 'T12:00:00').getDay();
+    const isWeekend = dow === 0 || dow === 6;
+    const noWork    = dayInfo.isPrivDay || isWeekend;
+    const welt      = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+
+    // 1. Termine
+    (this._evStoreForWelt(welt) || [])
+      .filter(ev => ev.date === dateStr && ev.type !== 'horizon')
+      .forEach(ev => {
+        const evZone = getZone(ev.startTime);
+        if (zone === null) {
+          if (!ev.startTime) items.push({ type:'termin', id:String(ev.id), title:ev.text, meta:ev.location||'', done:!!ev.done, zeit:'', ctx:welt, obj:ev, sort:9999 });
+        } else {
+          if (evZone === zone || (!evZone && zone === 'vm')) {
+            items.push({ type:'termin', id:String(ev.id), title:ev.text, meta:ev.location||'', done:!!ev.done, zeit:ev.startTime||'', ctx:welt, obj:ev, sort:pT(ev.startTime) });
+          }
+        }
+      });
+
+    // 2. Fokus-Aufgaben (aus Morgendialog, nur heute)
+    if (dateStr === today) {
+      const store  = this._ritualStore();
+      const ritual = store && store[this._ritualTodayKey()];
+      (ritual?.fokus || []).forEach(f => {
+        const fZone = slotToZone[f.zeitblock] || null;
+        const matchesZone = zone === null ? !fZone : fZone === zone;
+        if (matchesZone) {
+          let ae = '';
+          if (f.type === 'vorhaben-aufgabe' && f.id) {
+            try { const hit = this._vorhabenFindAufgabe(f.id); if (hit) ae = hit.aufgabe.aktivEnergie||''; } catch(e) {}
+          }
+          items.push({ type:'fokus', id:f.id||f.title, title:f.title, meta:f.meta||'', done:!!f._done, zeit:'', ctx:f.ctx||'', obj:f, ae, sort:zone ? 5000 : 9999 });
+        }
+      });
+    }
+
+    // 3. Vorhaben-Aufgaben mit datum === dateStr (nicht im Ritual)
+    const ritualIds = new Set();
+    if (dateStr === today) {
+      const store  = this._ritualStore();
+      const ritual = store && store[this._ritualTodayKey()];
+      (ritual?.fokus || []).forEach(f => ritualIds.add(f.id));
+    }
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    (db?.vorhaben || []).forEach(v => {
+      (v.meilensteine || []).forEach(ms => {
+        (ms.aufgaben || []).filter(a => !a.done && a.datum === dateStr && !ritualIds.has(a.id))
+          .forEach(a => {
+            const aZone = getZone(a.startTime || '');
+            const matchesZone = zone === null ? !aZone : (aZone === zone || (!aZone && zone === 'vm'));
+            if (matchesZone) {
+              items.push({ type:'vorhaben', id:a.id, title:a.text, meta:v.titel||'', done:false, zeit:a.startTime||'', ctx, obj:{a,v,ms}, ae:a.aktivEnergie||'', sort:pT(a.startTime||'') >= 0 ? pT(a.startTime) : 6000 });
+            }
+          });
+      });
+    });
+
+    // 4. Wochenpflichten fällig
+    const aktivCtx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    if (!noWork || aktivCtx === 'priv') {
+      (this._dutyStore(aktivCtx) || []).forEach(d => {
+        try {
+          const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
+          const inst  = insts.find(i => i.date === dateStr || (dateStr === today && i.isToday));
+          if (!inst || inst.done) return;
+          if (zone === 'vm' || zone === null) {
+            items.push({ type:'pflicht', id:d.id, title:d.title||d.name||'', meta:aktivCtx==='pro'?'Beruf':'Privat', done:false, zeit:'', ctx:aktivCtx, obj:{d,inst}, sort:7000 });
+          }
+        } catch(e) {}
+      });
+    }
+
+    // 5. Schnellerinnerungen mit Datum = dateStr
+    (this._quickStore() || []).filter(q => q.date === dateStr).forEach(q => {
+      const qZone = q.time ? getZone(q.time) : null;
+      const matchesZone = zone === null ? !qZone : qZone === zone;
+      if (matchesZone) {
+        items.push({ type:'schnell', id:q.id, title:q.text||q.title||'', meta:'', done:!!q.done, zeit:q.time||'', ctx:'', obj:q, sort:q.time ? pT(q.time) : 8000 });
+      }
+    });
+
+    items.sort((a, b) => a.sort - b.sort);
+    return items;
+  },
+
+  _ckRenderZone(zoneId, dateStr, isToday) {
+    const body  = document.getElementById('ck-body-' + zoneId);
+    const count = document.getElementById('ck-count-' + zoneId);
+    if (!body) return;
+    const items = this._ckGetZoneItems(dateStr, zoneId);
+    if (count) count.textContent = items.filter(i => !i.done).length || '';
+    if (!items.length) {
+      body.innerHTML = '<div style="padding:8px 12px;font-size:0.82rem;color:var(--c-faint);font-style:italic;">Nichts geplant</div>';
+      return;
+    }
+    body.innerHTML = items.map(item => this._ckRenderZoneItem(item)).join('');
+  },
+
+  _ckRenderZoneItem(item) {
+    const doneClass  = item.done ? ' done' : '';
+    const titelDone  = item.done ? ' done' : '';
+    const BADGES = {
+      termin:   '<span class="ck-z-badge ck-z-badge-termin">Termin</span>',
+      fokus:    '<span class="ck-z-badge ck-z-badge-fokus">🎯 Fokus</span>',
+      vorhaben: '<span class="ck-z-badge ck-z-badge-fokus">→ Nächster Schritt</span>',
+      pflicht:  '<span class="ck-z-badge ck-z-badge-pflicht">Pflicht</span>',
+      schnell:  '',
+    };
+    const badge = BADGES[item.type] || '';
+    let cbHandler = '';
+    if (item.type === 'termin')   cbHandler = 'WB._ckZTerminDone(&quot;'  + item.id + '&quot;,&quot;' + item.ctx + '&quot;,this)';
+    if (item.type === 'fokus')    cbHandler = 'WB._ckZFokusDone(&quot;'   + item.id + '&quot;,this)';
+    if (item.type === 'schnell')  cbHandler = 'WB._ckZSchnellDone(&quot;' + item.id + '&quot;,this)';
+    if (item.type === 'pflicht')  cbHandler = 'WB._ckZPflichtDone(&quot;' + item.id + '&quot;,&quot;' + item.ctx + '&quot;,this)';
+    if (item.type === 'vorhaben') cbHandler = 'WB._ckZVorhabenDone(&quot;'+ item.id + '&quot;,this)';
+    const aeBadge = item.ae && item.ae !== 'mittel' ? this._aeBadge(item.ae) : '';
+    return '<div class="ck-z-eintrag' + doneClass + '">'
+      + '<input type="checkbox" class="ck-z-cb"' + (item.done?' checked':'')
+      + (cbHandler ? ' onchange="event.stopPropagation();' + cbHandler + '"' : '') + '>'
+      + '<div class="ck-z-text">'
+      + '<div class="ck-z-titel' + titelDone + '">' + this._esc(item.title) + badge + aeBadge + '</div>'
+      + (item.meta ? '<div class="ck-z-meta">' + this._esc(item.meta) + '</div>' : '')
+      + '</div>'
+      + (item.zeit ? '<div class="ck-z-zeit">' + item.zeit + '</div>' : '')
+      + '</div>';
+  },
+
+  _ckRenderZoneRauschen(dateStr, isToday) {
+    const body  = document.getElementById('ck-body-rauschen');
+    const count = document.getElementById('ck-count-rauschen');
+    const block = document.getElementById('ck-zone-rauschen');
+    if (!body || !block) return;
+    const items = [];
+
+    // Schnellerinnerungen ohne Datum (immer Rauschen)
+    (this._quickStore() || []).filter(q => !q.date && !q.done).forEach(q => {
+      items.push({ type:'schnell', id:q.id, title:q.text||q.title||'', meta:'', done:false, zeit:'', obj:q, ae:'', sort:9999 });
+    });
+
+    // Fokus ohne Zeitblock (heute)
+    if (isToday) {
+      const store  = this._ritualStore();
+      const ritual = store && store[this._ritualTodayKey()];
+      (ritual?.fokus || []).filter(f => !f.zeitblock).forEach(f => {
+        items.push({ type:'fokus', id:f.id||f.title, title:f.title, meta:f.meta||'', done:!!f._done, zeit:'', obj:f, ae:'', sort:8000 });
+      });
+    }
+
+    if (!items.length) { block.style.display = 'none'; return; }
+    block.style.display = '';
+    if (count) count.textContent = items.length;
+    body.innerHTML = items.map(item => this._ckRenderZoneItem(item)).join('');
+  },
+
+  _ckZTerminDone(id, ctx, chk) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const ev = (db?.customEvents || []).find(e => String(e.id) === String(id));
+    if (!ev) return;
+    ev.done = chk.checked;
+    this.setDirty();
+    setTimeout(() => this._ckRenderTagesseite(), 400);
+  },
+
+  _ckZFokusDone(fokusId, chk) {
+    const store  = this._ritualStore();
+    const key    = this._ritualTodayKey();
+    const ritual = store && store[key];
+    if (!ritual?.fokus) return;
+    const f = ritual.fokus.find(x => x.id === fokusId || x.title === fokusId);
+    if (!f) return;
+    if (f.type === 'vorhaben-aufgabe' && f.id && chk.checked) {
+      const hit = this._vorhabenFindAufgabe(f.id);
+      if (hit) {
+        const today = new Date().toISOString().split('T')[0];
+        const { aufgabe: a, vorhaben: v } = hit;
+        for (const ms of (v.meilensteine||[])) {
+          const ai = (ms.aufgaben||[]).findIndex(x => x.id === a.id);
+          if (ai !== -1) { ms.aufgaben.splice(ai, 1); break; }
+        }
+        if (!v.logbuch) v.logbuch = [];
+        v.logbuch.push({ id:a.id, text:a.text, erledigtAm:today, aktivEnergie:a.aktivEnergie||'', kippTyp:a.kippTyp||'' });
+        v.geaendert = Date.now();
+      }
+    }
+    f._done = chk.checked;
+    this.setDirty();
+    setTimeout(() => this._ckRenderTagesseite(), 400);
+  },
+
+  _ckZSchnellDone(id, chk) {
+    const store = this._quickStore();
+    const q = store && store.find(x => x.id === id);
+    if (!q) return;
+    q.done = chk.checked;
+    this.setDirty();
+    setTimeout(() => this._ckRenderTagesseite(), 400);
+  },
+
+  _ckZPflichtDone(id, ctx, chk) {
+    const duty = (this._dutyStore(ctx) || []).find(d => d.id === id);
+    if (!duty) return;
+    const now = new Date();
+    const key = this._dutyInstKey ? this._dutyInstKey(now) : null;
+    if (key) {
+      if (!duty.instances) duty.instances = {};
+      if (!duty.instances[key]) duty.instances[key] = {};
+      duty.instances[key].done = chk.checked;
+    }
+    this.setDirty();
+    setTimeout(() => this._ckRenderTagesseite(), 400);
+  },
+
+  _ckZVorhabenDone(aufgabeId, chk) {
+    if (!chk.checked) return;
+    const hit = this._vorhabenFindAufgabe(aufgabeId);
+    if (!hit) return;
+    const today = new Date().toISOString().split('T')[0];
+    const { aufgabe: a, vorhaben: v } = hit;
+    for (const ms of (v.meilensteine||[])) {
+      const ai = (ms.aufgaben||[]).findIndex(x => x.id === a.id);
+      if (ai !== -1) { ms.aufgaben.splice(ai, 1); break; }
+    }
+    if (!v.logbuch) v.logbuch = [];
+    v.logbuch.push({ id:a.id, text:a.text, erledigtAm:today, aktivEnergie:a.aktivEnergie||'', kippTyp:a.kippTyp||'' });
+    v.geaendert = Date.now();
+    this.setDirty();
+    setTimeout(() => this._ckRenderTagesseite(), 400);
+  },
+
 
   _renderCockpitLegacy() {
     // Alter items-basierter Render — bleibt als Fallback/Referenz, wird nicht mehr aufgerufen
@@ -14429,6 +14760,21 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (chk.checked) setTimeout(() => this._ckRenderRauschen(), 400);
   },
 
+  _ckDate: null,
+
+  _ckShift(n) {
+    const [y,m,d] = (this._ckDate || new Date().toISOString().split('T')[0]).split('-').map(Number);
+    const nd = new Date(y, m-1, d+n);
+    const pad = x => String(x).padStart(2,'0');
+    this._ckDate = nd.getFullYear() + '-' + pad(nd.getMonth()+1) + '-' + pad(nd.getDate());
+    this._ckRenderTagesseite();
+  },
+
+  _ckGoToday() {
+    this._ckDate = new Date().toISOString().split('T')[0];
+    this._ckRenderTagesseite();
+  },
+
   renderCockpit() {
     // Datum täglich aktualisieren (App über Nacht offen)
     const todayCheck = new Date();
@@ -14436,10 +14782,11 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (vd.toDateString() !== todayCheck.toDateString()) {
       this.viewDate = todayCheck;
     }
+    if (!this._ckDate) this._ckDate = new Date().toISOString().split('T')[0];
     // FAB-Sichtbarkeit
     const ckFab = document.getElementById('ck-fab');
     const ztFab = document.getElementById('zt-fab');
-    if (ckFab) ckFab.style.display = 'none'; // v3.62.3: kein FAB im neuen Cockpit
+    if (ckFab) ckFab.style.display = 'none';
     if (ztFab) { ztFab.classList.remove('visible'); ztFab.style.display = 'none'; }
     const afFab0 = document.getElementById('af-fab');
     if (afFab0) { afFab0.classList.remove('visible'); afFab0.style.display = 'none'; }
@@ -14450,7 +14797,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     clearInterval(this._ckCountdownTimer);
     this._ckCountdownTimer = setInterval(() => {
       if (this.activeTab === 'cockpit') {
-        // v4.0: nur Tagesseite aktualisieren
         this._ckRenderTagesseite();
       }
     }, 60000);
