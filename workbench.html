@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.8.9</title>
+<title>WorkBench 4.9.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8123,7 +8123,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.8.9 · Build 20260608-0510</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.9.0 · Build 20260608-0530</div>
     </div>
 
     <!-- Welt -->
@@ -8288,8 +8288,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.8.9',
-  APP_BUILD:   '20260608-0510',
+  APP_VERSION: '4.9.0',
+  APP_BUILD:   '20260608-0530',
 
 
   // ══════════════════════════════════════════════════════
@@ -15258,6 +15258,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
             return '<div class="vh-card" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
               + '<div class="vh-card-head">'
               + '<span class="vh-card-title">' + this._esc(v.titel) + '</span>'
+              + (v.charakter === 'baustelle' ? '<span style="font-size:0.85rem;" title="Baustelle">🔥</span>' : '')
               + '</div>'
               + (v.ziel ? '<div class="vh-card-ziel">' + this._esc(v.ziel) + '</div>' : '')
               + '<div class="vh-card-meta">' + offeneSchritte + ' offene Aufgaben' + stichtag + '</div>'
@@ -15350,6 +15351,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!this._vorhabenAktivId) return null;
     const found = this._vorhabenFind(this._vorhabenAktivId);
     return found ? found.vorhaben : null;
+  },
+
+  _vorhabenSetCharakter(val) {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    v.charakter = val; v.geaendert = Date.now(); this.setDirty();
+    this._vorhabenDetailRender();
   },
 
   _vorhabenSetEbene(ebene) {
@@ -15467,6 +15474,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       v.ziel = (document.getElementById('vh-neu-ziel')?.value || '').trim();
       v.stichtag = document.getElementById('vh-neu-stichtag')?.value || '';
       v.cluster = this._vorhabenNeuClusterWahl;
+      v.charakter = 'laufend';
       this.setDirty();
     }
     document.getElementById('wb-vorhaben-neu-sheet')?.remove();
@@ -15515,6 +15523,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       v.logbuch.push(...erledigt);
     }
     if (!v.logbuch) v.logbuch = [];
+    if (!v.charakter) v.charakter = 'laufend';
     v._v48migr = true;
     this.setDirty();
   },
@@ -15530,9 +15539,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     const CLUSTER_LBL = { mindset:'Mindset', koerper:'Körper', umgebung:'Umgebung', beruf:'Beruf' };
     const EBENE_CLR   = { aktiv:'var(--c-beruf)', wartend:'#B87333', ruhend:'var(--c-faint)' };
-    const ebene   = v.aktivitaet || 'aktiv';
-    const cluster = v.cluster || 'mindset';
-    const clusterOpts = this.activeWorld === 'beruf' ? ['mindset','beruf'] : ['mindset','koerper','umgebung'];
+    const CHAR_CLR    = { baustelle:'#C0392B', laufend:'var(--c-beruf)', pflicht:'var(--c-faint)' };
+    const CHAR_LBL    = { baustelle:'🔥 Baustelle', laufend:'→ Laufend', pflicht:'◎ Pflicht' };
+    const ebene    = v.aktivitaet || 'aktiv';
+    const charakter = v.charakter || 'laufend';
+    const cluster  = v.cluster || 'mindset';
+    const clusterOpts = this.activeWorld === 'beruf' ? ['mindset','beruf'] : ['mindset','koerper','umgebung','beruf'];
     const andereWelt    = v.welt === 'pro' ? 'priv' : 'pro';
     const andereWeltLbl = v.welt === 'pro' ? '→ Privat' : '→ Beruf';
 
@@ -15546,6 +15558,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       '<button class="vh47-badge vh47-badge-ebene' + (ebene===e?' active':'') + '" '
       + 'style="' + (ebene===e?'background:' + EBENE_CLR[e] + ';color:#fff;border-color:' + EBENE_CLR[e] + ';':'') + '" '
       + 'onclick="WB._vorhabenSetEbene(&quot;' + e + '&quot;)">' + (e.charAt(0).toUpperCase()+e.slice(1)) + '</button>'
+    ).join('');
+    h += '<span style="width:1px;background:var(--c-border);height:16px;display:inline-block;margin:0 2px;"></span>';
+    h += Object.entries(CHAR_LBL).map(([c, lbl]) =>
+      '<button class="vh47-badge vh47-badge-ebene' + (charakter===c?' active':'') + '" '
+      + 'style="' + (charakter===c?'background:' + CHAR_CLR[c] + ';color:#fff;border-color:' + CHAR_CLR[c] + ';':'') + '" '
+      + 'onclick="WB._vorhabenSetCharakter(&quot;' + c + '&quot;)">' + lbl + '</button>'
     ).join('');
     h += '<div style="flex:1"></div>';
     h += '<button onclick="WB._vorhabenWechselWelt(&quot;' + andereWelt + '&quot;)" class="vh47-welt-btn">' + andereWeltLbl + '</button>';
