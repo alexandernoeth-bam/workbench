@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.2.1</title>
+<title>WorkBench 5.2.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8254,7 +8254,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.2.1 · Build 20260608-1640</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.2.2 · Build 20260608-1700</div>
     </div>
 
     <!-- Welt -->
@@ -8423,8 +8423,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.2.1',
-  APP_BUILD:   '20260608-1640',
+  APP_VERSION: '5.2.2',
+  APP_BUILD:   '20260608-1700',
 
 
   // ══════════════════════════════════════════════════════
@@ -12190,11 +12190,46 @@ const WB = {
     const el = document.getElementById('ritual-backlog-body');
     if (!el) return;
     const today = this._ritualTodayKey();
+    const SLOTS = [
+      { id: 'vm', label: '🌅 VM' },
+      { id: 'nm', label: '🌞 NM' },
+      { id: 'ab', label: '🌙 Ab' },
+    ];
 
     const selectedIds = new Set(
       (this._ritualSelected || []).filter(s => s.type === 'vorhaben-aufgabe').map(s => s.id)
     );
 
+    // ── Ausgewählte Items oben anzeigen ──
+    let selHtml = '';
+    const ausgewaehlt = (this._ritualSelected || []).filter(s => s.type === 'vorhaben-aufgabe');
+    if (ausgewaehlt.length) {
+      selHtml = '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-beruf);margin-bottom:6px;">Ausgewählt</div>';
+      selHtml += ausgewaehlt.map(s => {
+        const payload = encodeURIComponent(JSON.stringify(s));
+        const current = (this._ritualZeitbloecke || {})[s.id] || '';
+        return '<div style="background:color-mix(in srgb,var(--c-beruf) 6%,var(--c-surface));border:1.5px solid var(--c-beruf);border-radius:var(--radius-xs);padding:8px 10px;margin-bottom:6px;">'
+          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+          + '<span style="font-size:0.85rem;flex:1;font-weight:500;">' + this._esc(s.title) + '</span>'
+          + '<button onclick="WB._ritualToggleCandVh(&quot;' + payload + '&quot;)" '
+          + 'style="background:none;border:none;font-size:1rem;cursor:pointer;color:var(--c-faint);padding:0 2px;" title="Abwählen">✕</button>'
+          + '</div>'
+          + '<div style="display:flex;gap:4px;flex-wrap:wrap;">'
+          + SLOTS.map(slot =>
+              '<button onclick="WB._ritualSetZeitblock(&quot;' + s.id + '&quot;,&quot;' + slot.id + '&quot;)" '
+              + 'style="padding:3px 8px;border-radius:12px;font-family:var(--font);font-size:0.72rem;cursor:pointer;border:1.5px solid '
+              + (current===slot.id ? 'var(--c-beruf)' : 'var(--c-border)') + ';background:'
+              + (current===slot.id ? 'var(--c-beruf)' : 'var(--c-bg)') + ';color:'
+              + (current===slot.id ? '#fff' : 'var(--c-muted)') + ';">'
+              + slot.label + '</button>'
+            ).join('')
+          + '</div>'
+          + '</div>';
+      }).join('');
+      selHtml += '<div style="height:1px;background:var(--c-border);margin:8px 0 12px;"></div>';
+    }
+
+    // ── Alle offenen Aufgaben (nicht bereits gewählt, nicht heute) ──
     const items = [];
     const alleVorhaben = (this._vorhabenAlle ? this._vorhabenAlle() : [])
       .filter(v => (v.aktivitaet || 'aktiv') !== 'ruhend');
@@ -12209,24 +12244,21 @@ const WB = {
       });
     });
 
-    const schnellItems = (this._quickStore() || []).filter(q => !q.date && !q.done);
-    let html = '';
-
+    let aufgHtml = '';
     if (items.length) {
-      html += '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:6px;">Aus Vorhaben</div>';
+      aufgHtml += '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:6px;">Aus Vorhaben</div>';
       const restE = this._ritualBerechneEnergie();
-      html += items.map(({ a, v, ms }) => {
-        const sel = this._ritualSelected.some(s => s.type === 'vorhaben-aufgabe' && s.id === a.id);
-        const kosten = this._ritualAufgabeKosten(a);
-        const disabled = !sel && kosten > restE;
-        const payload = encodeURIComponent(JSON.stringify({
+      aufgHtml += items.map(({ a, v, ms }) => {
+        const kosten  = this._ritualAufgabeKosten(a);
+        const disabled = kosten > restE;
+        const payload  = encodeURIComponent(JSON.stringify({
           id: a.id, type: 'vorhaben-aufgabe', title: a.text,
           meta: v.titel || 'Vorhaben', vorhabenId: v.id,
           msId: ms.id, ctx: v._welt || 'priv', pKey: ''
         }));
         return '<div class="ritual-cand-row' + (disabled?' disabled':'') + '" style="margin-bottom:6px;">'
-          + '<button class="ritual-cand' + (sel?' selected':'') + '" onclick="WB._ritualToggleCandVh(&quot;' + payload + '&quot;)">'
-          + '<span class="ritual-cand-check">' + (sel?'✓':'') + '</span>'
+          + '<button class="ritual-cand" onclick="WB._ritualToggleCandVh(&quot;' + payload + '&quot;)">'
+          + '<span class="ritual-cand-check"></span>'
           + '<span class="ritual-cand-body">'
           + '<span class="ritual-cand-title">' + this._esc(a.text) + '</span>'
           + '<span class="ritual-cand-tags">'
@@ -12236,8 +12268,11 @@ const WB = {
       }).join('');
     }
 
+    // ── Schnellerinnerungen ──
+    const schnellItems = (this._quickStore() || []).filter(q => !q.date && !q.done);
+    let schnellHtml = '';
     if (schnellItems.length) {
-      html += '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin:14px 0 6px;">Rauschen</div>'
+      schnellHtml = '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin:14px 0 6px;">Rauschen</div>'
         + schnellItems.map(q =>
             '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);margin-bottom:6px;font-size:0.85rem;">'
             + '<span style="color:var(--c-faint);">〰</span>'
@@ -12245,11 +12280,8 @@ const WB = {
           ).join('');
     }
 
-    if (!html) {
-      html = '<div style="font-size:0.85rem;color:var(--c-faint);text-align:center;padding:12px;">Keine offenen Aufgaben.</div>';
-    }
-
-    el.innerHTML = html;
+    el.innerHTML = selHtml + aufgHtml + schnellHtml
+      || '<div style="font-size:0.85rem;color:var(--c-faint);text-align:center;padding:12px;">Keine offenen Aufgaben.</div>';
   },
 
   _ritualRenderConfirm() {
@@ -14626,6 +14658,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           let badges = '';
           if (ritual.energie) badges += '<span class="ck-energie-badge">' + (energieLabel[ritual.energie] || ritual.energie) + '</span>';
           if (fokusTotal > 0) badges += '<span class="ck-fokus-badge">🎯 ' + fokusTotal + ' Fokus geplant</span>';
+          // Rest-Energie live berechnen
+          try {
+            const restE = this._ritualBerechneEnergie ? this._ritualBerechneEnergie() : null;
+            if (restE !== null) {
+              const col = restE < 20 ? 'var(--c-warn,#E67E22)' : restE < 50 ? '#B45309' : 'var(--c-beruf)';
+              badges += '<span class="ck-fokus-badge" style="color:' + col + ';border-color:' + col + ';">⚡ ' + restE + ' Energie</span>';
+            }
+          } catch(e) {}
           badgesEl.innerHTML = badges;
           badgesEl.style.display = badges ? 'flex' : 'none';
         } else { badgesEl.style.display = 'none'; }
