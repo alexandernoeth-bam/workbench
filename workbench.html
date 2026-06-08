@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.3.1</title>
+<title>WorkBench 5.3.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8276,7 +8276,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.3.1 · Build 20260608-1830</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.3.2 · Build 20260608-1900</div>
     </div>
 
     <!-- Welt -->
@@ -8449,8 +8449,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.3.1',
-  APP_BUILD:   '20260608-1830',
+  APP_VERSION: '5.3.2',
+  APP_BUILD:   '20260608-1900',
 
 
   // ══════════════════════════════════════════════════════
@@ -11382,8 +11382,9 @@ const WB = {
         .filter(e => e.date === today && e.type !== 'horizon' && !e.done)
         .sort((a, b) => (a.startTime||'').localeCompare(b.startTime||''))
         .forEach(e => {
-          const dur = parseFloat(e.duration || 1);
-          const kosten = !e.startTime ? 2 : dur < 1 ? 4 : 6;
+          const kosten = (e.energieKosten != null && !isNaN(e.energieKosten))
+            ? e.energieKosten
+            : (!e.startTime ? 2 : parseFloat(e.duration||1) < 1 ? 4 : 6);
           infoItems.push({
             label: e.text,
             sub: e.startTime || 'Ganztägig',
@@ -12208,10 +12209,14 @@ const WB = {
       (db?.customEvents || [])
         .filter(e => e.date === today && e.type !== 'horizon' && !e.done)
         .forEach(ev => {
-          const dur = parseFloat(ev.duration || 1);
-          if (!ev.startTime) punkte -= 2;
-          else if (dur < 1)  punkte -= 4;
-          else               punkte -= 6;
+          if (ev.energieKosten != null && !isNaN(ev.energieKosten)) {
+            punkte -= ev.energieKosten;
+          } else {
+            const dur = parseFloat(ev.duration || 1);
+            if (!ev.startTime) punkte -= 2;
+            else if (dur < 1)  punkte -= 4;
+            else               punkte -= 6;
+          }
         });
     });
 
@@ -27823,6 +27828,11 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<div class="edit-field"><label>Ort</label><input id="ef-loc" type="text" value="'+(ev.location||'')+'">'+'</div>'
         + this._aktivEnergiePills(ev.aktivEnergie, 'ef-ev-aktiv')
         + this._kippTypSelect(ev.kippTyp, 'ef-ev-kipp')
+        + '<div class="edit-field"><label>Energiekosten <span style="font-size:0.72rem;color:var(--c-faint);font-weight:400;">(optional)</span></label>'
+        + '<input type="number" id="ef-ev-energiekosten" min="0" max="40" step="1" placeholder="Standard" '
+        + 'style="width:80px;padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);" '
+        + 'value="' + (ev.energieKosten != null ? ev.energieKosten : '') + '">'
+        + '</div>'
         + '<div class="edit-field"><label>Checkliste</label>'
         + '<div id="ef-chk-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">'
         + (ev.checklist||[]).map((item,i) =>
@@ -27938,6 +27948,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         aktivEnergie: document.getElementById('ef-evn-aktiv')?.value || 'mittel',
         kippTyp:      document.getElementById('ef-evn-kipp')?.value || '',
       };
+      const ekValN = document.getElementById('ef-ev-energiekosten')?.value;
+      const ekN = (ekValN !== '' && ekValN != null) ? parseInt(ekValN) : null;
+      if (ekN !== null && !isNaN(ekN)) newEv.energieKosten = ekN;
       newEv.checklist = this._efChkGetList();
       if (!targetDb.customEvents) targetDb.customEvents = [];
       targetDb.customEvents.push(newEv);
@@ -28100,6 +28113,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       ev.location  = document.getElementById('ef-loc')?.value||'';
       ev.aktivEnergie = document.getElementById('ef-ev-aktiv')?.value || 'mittel';
       ev.kippTyp      = document.getElementById('ef-ev-kipp')?.value || '';
+      const ekVal = document.getElementById('ef-ev-energiekosten')?.value;
+      const ek = (ekVal !== '' && ekVal != null) ? parseInt(ekVal) : null;
+      if (ek !== null && !isNaN(ek)) ev.energieKosten = ek;
+      else delete ev.energieKosten;
       ev.checklist = this._efChkGetList();
       // Dauer aus Von/Bis berechnen — Endzeit direkt speichern
       const pS = s=>{ const [h,m]=(s||'0:0').split(':').map(Number); return h*60+m; };
