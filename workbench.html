@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.9.3</title>
+<title>WorkBench 4.9.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8132,7 +8132,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.9.3 · Build 20260608-0700</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.9.4 · Build 20260608-0740</div>
     </div>
 
     <!-- Welt -->
@@ -8297,8 +8297,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.9.3',
-  APP_BUILD:   '20260608-0700',
+  APP_VERSION: '4.9.4',
+  APP_BUILD:   '20260608-0740',
 
 
   // ══════════════════════════════════════════════════════
@@ -15527,6 +15527,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
     if (!v.logbuch) v.logbuch = [];
     if (!v.charakter) v.charakter = 'laufend';
+    // naechsterSchritt-Feld für alle Aufgaben
+    (v.meilensteine||[]).forEach(ms =>
+      (ms.aufgaben||[]).forEach(a => { if (a.naechsterSchritt === undefined) a.naechsterSchritt = false; })
+    );
     v._v48migr = true;
     this.setDirty();
   },
@@ -15611,7 +15615,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     // ── NÄCHSTE SCHRITTE ──
     const alleOffen = (v.meilensteine || []).flatMap(ms =>
-      (ms.aufgaben || []).filter(a => !a.done).map(a => ({ ...a, msId: ms.id }))
+      (ms.aufgaben || []).filter(a => !a.done && this.istNaechsterSchritt(a)).map(a => ({ ...a, msId: ms.id }))
     );
     const KIPP_LBL = { urteil:'Urteil', stolz:'Stolz', routine:'Routine', tunnelblick:'Tunnelblick' };
     const AE_BADGE_AK = { hoch:'<span style="font-size:0.7rem;color:#C62828;">⚡</span>', niedrig:'<span style="font-size:0.7rem;color:#2E7D32;">↓</span>' };
@@ -15621,7 +15625,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<button onclick="WB._vhAktuellAddAufgabe()" style="font-size:0.78rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);">＋ Hinzufügen</button>'
       + '</div>';
     if (!alleOffen.length) {
-      h += '<div style="font-size:0.82rem;color:var(--c-faint);">Keine offenen Aufgaben.</div>';
+      h += '<div style="font-size:0.82rem;color:var(--c-faint);padding:8px 0;">Keine nächsten Schritte — markiere Aufgaben im Plan-Tab.</div>';
     } else {
       h += alleOffen.map(a =>
         '<div class="vh-naechste-row">'
@@ -15698,9 +15702,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         h += '<div class="vh47-block-body">';
         const AE_BADGE = { hoch:'<span class="ritual-ae-tag ae-hoch">⚡ hoch</span>', niedrig:'<span class="ritual-ae-tag ae-niedrig">↓ niedrig</span>' };
         aufgaben.forEach((a, ai) => {
+          const today2 = new Date().toISOString().split('T')[0];
+          const isNS = this.istNaechsterSchritt(a);
+          const nsAuto = isNS && a.datum && a.datum <= today2;
+          const nsBadge = isNS
+            ? '<span style="font-size:0.72rem;font-weight:700;margin-right:4px;color:' + (nsAuto ? 'var(--c-warn,#E67E22)' : 'var(--c-beruf)') + ';" '
+              + (nsAuto ? 'title="Fällig — automatisch als nächster Schritt markiert"' : '') + '>→</span>'
+            : '';
           h += '<div class="vh47-gp-row" id="vhms-' + ms.id + '-' + a.id + '">'
             + '<input type="checkbox" class="vh47-ak-chk"' + (a.done?' checked':'') + ' '
             + 'onchange="WB._vhAufgDone(&quot;' + ms.id + '&quot;,&quot;' + a.id + '&quot;,this)">'
+            + nsBadge
             + '<span class="vh47-gp-text' + (a.done?' vh47-done':'') + '" '
             + 'onclick="WB._vhAufgDetail(&quot;' + ms.id + '&quot;,&quot;' + a.id + '&quot;)" style="cursor:pointer;">'
             + this._esc(a.text) + '</span>'
@@ -15848,6 +15860,57 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     setTimeout(() => document.getElementById('vh-aufg-inp-' + firstMsId)?.focus(), 100);
   },
 
+  _vhSetNaechsterSchritt(msId, aufgId, val) {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    const ms = (v.meilensteine||[]).find(m => m.id === msId); if (!ms) return;
+    const a = (ms.aufgaben||[]).find(x => x.id === aufgId); if (!a) return;
+    a.naechsterSchritt = !!val;
+    v.geaendert = Date.now(); this.setDirty();
+    this._vorhabenDetailRender();
+  },
+
+  _vhAufgVerschieben(msId, aufgId, val) {
+    if (!val) return;
+    const v = this._vorhabenAktiv(); if (!v) return;
+    const found = this._vorhabenFind(v.id);
+    const ctx = found?.welt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const ms = (v.meilensteine||[]).find(m => m.id === msId); if (!ms) return;
+    const idx = (ms.aufgaben||[]).findIndex(x => x.id === aufgId); if (idx === -1) return;
+    const [aufgabe] = ms.aufgaben.splice(idx, 1);
+
+    if (val === 'intern:neu') {
+      const neuMs = { id: 'ms_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), titel: 'Nächste Schritte', datum: '', aufgaben: [aufgabe] };
+      v.meilensteine.push(neuMs);
+    } else if (val.startsWith('intern:')) {
+      const zielMsId = val.replace('intern:', '');
+      const zielMs = (v.meilensteine||[]).find(m => m.id === zielMsId);
+      if (zielMs) zielMs.aufgaben.push(aufgabe);
+      else ms.aufgaben.splice(idx, 0, aufgabe);
+    } else if (val.startsWith('extern:')) {
+      const parts = val.split(':');
+      const zielVId = parts[1];
+      const zielMsId = parts[2];
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      const zielV = (db?.vorhaben||[]).find(x => x.id === zielVId);
+      if (!zielV) { ms.aufgaben.splice(idx, 0, aufgabe); return; }
+      const zielMs = (zielV.meilensteine||[]).find(m => m.id === zielMsId);
+      if (!zielMs) { ms.aufgaben.splice(idx, 0, aufgabe); return; }
+      zielV.geaendert = Date.now();
+      zielMs.aufgaben.push(aufgabe);
+    }
+
+    v.geaendert = Date.now(); this.setDirty();
+    this._toast('✓ Aufgabe verschoben');
+    this.editClose();
+    this._vorhabenDetailRender();
+  },
+
+  istNaechsterSchritt(a) {
+    const today = new Date().toISOString().split('T')[0];
+    if (a.datum && a.datum <= today) return true;
+    return a.naechsterSchritt === true;
+  },
+
   _vhMsToggle(msId) {
     const key = 'ms_' + msId;
     this._vhBlockOpen[key] = !( this._vhBlockOpen[key] !== false);
@@ -15978,6 +16041,61 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       del.onclick = () => { if (confirm('Aufgabe löschen?')) { this._vhAufgDel(msId, aufgId); this.editClose(); } };
       actions.prepend(del);
     }
+
+    // ── Nächster Schritt + Verschieben als Extra-Panel unter dem Formular ──
+    const extraPanel = document.createElement('div');
+    extraPanel.style.cssText = 'padding:14px 16px 0;border-top:1px solid var(--c-border);margin-top:8px;';
+    const today3 = new Date().toISOString().split('T')[0];
+    const isNSAuto = !!(a.datum && a.datum <= today3);
+    const isNS = isNSAuto || a.naechsterSchritt === true;
+
+    // Toggle
+    const toggleId = 'vhas-ns-toggle';
+    extraPanel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+      + '<span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--c-muted);">Nächster Schritt</span>'
+      + '<label style="display:flex;align-items:center;gap:8px;cursor:' + (isNSAuto?'default':'pointer') + ';">'
+      + '<input type="checkbox" id="' + toggleId + '"' + (isNS?' checked':'') + (isNSAuto?' disabled':'') + ' '
+      + (isNSAuto ? '' : 'onchange="WB._vhSetNaechsterSchritt(&quot;' + msId + '&quot;,&quot;' + aufgId + '&quot;,this.checked)"')
+      + ' style="width:16px;height:16px;accent-color:var(--c-beruf);">'
+      + '<span style="font-size:0.82rem;color:var(--c-text);">' + (isNS ? 'Ja' : 'Nein') + '</span>'
+      + '</label>'
+      + '</div>'
+      + (isNSAuto ? '<div style="font-size:0.72rem;color:var(--c-faint);margin-bottom:10px;">Automatisch — Datum ändern um zu entfernen</div>' : '');
+
+    // Verschieben-Dropdown
+    const vhFound = this._vorhabenFind(v.id);
+    const vhWelt  = vhFound?.welt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const db2 = vhWelt === 'pro' ? this.dataPro : this.dataPriv;
+    let opts = '<option value="" disabled selected>— Meilenstein wählen —</option>';
+    // Internes optgroup
+    const internMs = (v.meilensteine||[]).filter(m => m.id !== msId);
+    if (internMs.length || true) {
+      opts += '<optgroup label="Dieses Vorhaben">';
+      internMs.forEach(m => { opts += '<option value="intern:' + m.id + '">' + m.titel + '</option>'; });
+      opts += '<option value="intern:neu">+ Neuer Meilenstein</option></optgroup>';
+    }
+    // Externe optgroup
+    const externeVorhaben = (db2?.vorhaben||[]).filter(x => x.id !== v.id && (x.aktivitaet === 'aktiv' || x.aktivitaet === 'wartend'));
+    if (externeVorhaben.length) {
+      opts += '<optgroup label="Andere Vorhaben">';
+      externeVorhaben.forEach(xv => {
+        (xv.meilensteine||[]).forEach(m => {
+          opts += '<option value="extern:' + xv.id + ':' + m.id + '">' + xv.titel + ' → ' + m.titel + '</option>';
+        });
+      });
+      opts += '</optgroup>';
+    }
+
+    const verschDiv = document.createElement('div');
+    verschDiv.style.cssText = 'margin-bottom:14px;';
+    verschDiv.innerHTML = '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--c-muted);margin-bottom:6px;">Verschieben nach</div>'
+      + '<select onchange="WB._vhAufgVerschieben(&quot;' + msId + '&quot;,&quot;' + aufgId + '&quot;,this.value)" '
+      + 'style="width:100%;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.84rem;background:var(--c-bg);color:var(--c-text);">'
+      + opts + '</select>';
+    extraPanel.appendChild(verschDiv);
+
+    const panelContainer = document.getElementById('edit-body');
+    if (panelContainer) panelContainer.appendChild(extraPanel);
 
     ov.classList.add('open');
   },
