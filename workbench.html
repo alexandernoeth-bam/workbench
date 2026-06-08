@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 4.9.4</title>
+<title>WorkBench 4.9.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6393,6 +6393,23 @@ html, body {
   background: color-mix(in srgb, var(--c-beruf) 8%, var(--c-surface));
 }
 .ritual-cand.disabled { opacity: 0.4; pointer-events: none; }
+.ritual-typ-btn, .ritual-energie-btn {
+  padding: 8px 14px;
+  border: 1.5px solid var(--c-border);
+  border-radius: 20px;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--c-bg);
+  color: var(--c-muted);
+  transition: all 0.18s;
+}
+.ritual-typ-btn.active, .ritual-energie-btn.active {
+  background: var(--c-beruf);
+  color: #fff;
+  border-color: var(--c-beruf);
+}
 .ritual-cand-check {
   width: 20px; height: 20px;
   border-radius: 50%;
@@ -8132,7 +8149,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.9.4 · Build 20260608-0740</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v4.9.5 · Build 20260608-0840</div>
     </div>
 
     <!-- Welt -->
@@ -8297,8 +8314,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '4.9.4',
-  APP_BUILD:   '20260608-0740',
+  APP_VERSION: '4.9.5',
+  APP_BUILD:   '20260608-0840',
 
 
   // ══════════════════════════════════════════════════════
@@ -11086,15 +11103,17 @@ const WB = {
   },
 
   ritualOpen() {
-    this._ritualSelected = [];
-    this._ritualFreitexte = [];
+    this._ritualSelected   = [];
+    this._ritualFreitexte  = [];
+    this._ritualEnergie    = 'mittel';
+    this._ritualTagestyp   = null;
+    this._ritualZeitbloecke = {};
     const now = new Date();
     const DAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
     const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
     const dEl = document.getElementById('ritual-date');
     if (dEl) dEl.textContent = DAYS[now.getDay()] + ', ' + now.getDate() + '. ' + MONTHS[now.getMonth()];
-    this._ritualRenderOverview();
-    this._ritualGoto(1);
+    this._ritualGoto(0);
     document.getElementById('wb-ritual-overlay').classList.add('open');
   },
 
@@ -11119,18 +11138,22 @@ const WB = {
   },
 
   _ritualGoto(step) {
-    [1,2,3].forEach(s => {
+    [0,1,2,3,4,5].forEach(s => {
       const el = document.getElementById('ritual-step-' + s);
       if (el) el.style.display = (s === step) ? 'flex' : 'none';
     });
-    // Fortschritts-Punkte
+    const dotStep = Math.min(step, 4);
     document.querySelectorAll('.ritual-dot').forEach(dot => {
       const ds = parseInt(dot.getAttribute('data-step'));
-      dot.classList.toggle('active', ds === step);
-      dot.classList.toggle('done', typeof step === 'number' && ds < step);
+      dot.classList.toggle('active', ds === dotStep);
+      dot.classList.toggle('done', typeof step === 'number' && ds < dotStep);
     });
+    if (step === 0) this._ritualRenderVorhabenScan();
+    if (step === 1) { this._ritualRenderOverview(); this._ritualInitTagestyp(); }
     if (step === 2) this._ritualRenderCandidates();
-    if (step === 3) this._ritualRenderConfirm();
+    if (step === 3) this._ritualRenderZeitbloecke();
+    if (step === 4) this._ritualRenderBacklog();
+    if (step === 5) this._ritualRenderConfirm();
   },
 
   // Schritt 1: Tagesübersicht (wiederverwendet Banner-Logik)
@@ -11216,7 +11239,7 @@ const WB = {
     try { c = JSON.parse(decodeURIComponent(payloadEnc)); } catch(e) { return; }
     const idx = this._ritualSelected.findIndex(s => s.type === c.type && s.id === c.id);
     if (idx >= 0) { this._ritualSelected.splice(idx, 1); }
-    else { if (this._ritualSelected.length >= 3) return; this._ritualSelected.push(c); }
+    else { if (this._ritualSelected.length >= this._ritualGetMaxFokus()) return; this._ritualSelected.push(c); }
     this._ritualRenderCandidates();
   },
 
@@ -11328,11 +11351,151 @@ const WB = {
   },
 
   _ritualUpdateCount() {
+    const max = this._ritualGetMaxFokus();
     const el = document.getElementById('ritual-count');
-    if (el) el.textContent = this._ritualSelected.length + ' von 3 gewählt';
+    if (el) el.textContent = this._ritualSelected.length + ' von ' + max + ' gewählt';
     const next = document.getElementById('ritual-step2-next');
-    // Weiter ist immer erlaubt (auch 0 Fokus möglich), aber Hinweis bei 0
     if (next) next.textContent = this._ritualSelected.length ? 'Weiter →' : 'Ohne Fokus weiter →';
+    if (next) next.textContent = this._ritualSelected.length ? 'Weiter →' : 'Ohne Fokus weiter →';
+  },
+
+  // State-Variablen für Morgendialog
+  _ritualEnergie: null,
+  _ritualTagestyp: null,
+  _ritualZeitbloecke: {},
+
+  _ritualGetMaxFokus() {
+    const today = this._ritualTodayKey();
+    const info  = this._getDayInfo(today);
+    const typ   = this._ritualTagestyp || 'normal';
+    if (typ === 'krank' || typ === 'geschuetzt') return 0;
+    if (info.type === 'vacation' || info.type === 'holiday' || info.type === 'sick') return 1;
+    return 3;
+  },
+
+  _ritualInitTagestyp() {
+    const today = this._ritualTodayKey();
+    const info  = this._getDayInfo(today);
+    let typ = 'normal';
+    if (info.type === 'sick')      typ = 'krank';
+    if (info.type === 'protected') typ = 'geschuetzt';
+    this._ritualTagestyp = typ;
+    document.querySelectorAll('.ritual-typ-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.typ === typ);
+    });
+  },
+
+  _ritualSetTagestyp(typ) {
+    this._ritualTagestyp = typ;
+    document.querySelectorAll('.ritual-typ-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.typ === typ);
+    });
+  },
+
+  _ritualSetEnergie(val) {
+    this._ritualEnergie = val;
+    document.querySelectorAll('.ritual-energie-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.val === val);
+    });
+  },
+
+  _ritualStep1Weiter() {
+    const typ = this._ritualTagestyp || 'normal';
+    if (typ === 'geschuetzt' || typ === 'krank') {
+      this._ritualGoto(5);
+    } else {
+      this._ritualGoto(2);
+    }
+  },
+
+  _ritualRenderVorhabenScan() {
+    const el = document.getElementById('ritual-vorhaben-scan');
+    if (!el) return;
+    const alle = (this._vorhabenAlle ? this._vorhabenAlle() : [])
+      .filter(v => (v.aktivitaet || 'aktiv') === 'aktiv');
+    if (!alle.length) {
+      el.innerHTML = '<div style="font-size:0.85rem;color:var(--c-faint);text-align:center;padding:12px;">Keine aktiven Vorhaben.</div>';
+      return;
+    }
+    const today = new Date();
+    el.innerHTML = alle.map(v => {
+      const tage = v.geaendert ? Math.floor((today - new Date(v.geaendert)) / 86400000) : null;
+      const tageLabel = tage === null ? '' : tage === 0 ? 'heute' : tage === 1 ? 'gestern' : 'vor ' + tage + ' Tagen';
+      const warn = tage !== null && tage > 7;
+      const charBadge = v.charakter === 'baustelle' ? '🔥 ' : '';
+      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 12px;'
+        + 'background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);'
+        + 'margin-bottom:6px;text-align:left;">'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:0.88rem;font-weight:600;color:var(--c-text);">'
+        + charBadge + this._esc(v.titel) + '</div>'
+        + (v.ziel ? '<div style="font-size:0.78rem;color:var(--c-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+          + this._esc(v.ziel) + '</div>' : '')
+        + '</div>'
+        + (tageLabel ? '<div style="font-size:0.72rem;font-family:var(--font-mono);flex-shrink:0;color:'
+          + (warn ? 'var(--c-warn,#E67E22)' : 'var(--c-faint)') + ';">' + tageLabel + '</div>' : '')
+        + '</div>';
+    }).join('');
+  },
+
+  _ritualRenderZeitbloecke() {
+    const el = document.getElementById('ritual-zeitblock-body');
+    if (!el) return;
+    const SLOTS = [
+      { id: 'vm', label: '🌅 Vormittag', hint: '07:00 – 12:00' },
+      { id: 'nm', label: '🌞 Nachmittag', hint: '12:45 – 16:00' },
+      { id: 'ab', label: '🌙 Abend',      hint: 'ab 16:00' },
+    ];
+    if (!this._ritualZeitbloecke) this._ritualZeitbloecke = {};
+    if (!this._ritualSelected.length) {
+      el.innerHTML = '<div style="font-size:0.85rem;color:var(--c-faint);text-align:center;padding:12px;">Kein Fokus gewählt — Zeitblöcke werden übersprungen.</div>';
+      return;
+    }
+    el.innerHTML = this._ritualSelected.map((s) => {
+      const current = this._ritualZeitbloecke[s.id] || '';
+      return '<div style="margin-bottom:12px;">'
+        + '<div style="font-size:0.85rem;font-weight:600;color:var(--c-text);margin-bottom:6px;">' + this._esc(s.title) + '</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+        + SLOTS.map(slot =>
+            '<button style="padding:6px 12px;border-radius:16px;font-family:var(--font);font-size:0.78rem;cursor:pointer;border:1.5px solid '
+            + (current===slot.id ? 'var(--c-beruf)' : 'var(--c-border)') + ';background:'
+            + (current===slot.id ? 'var(--c-beruf)' : 'var(--c-bg)') + ';color:'
+            + (current===slot.id ? '#fff' : 'var(--c-muted)') + ';" '
+            + 'onclick="WB._ritualSetZeitblock(&quot;' + s.id + '&quot;,&quot;' + slot.id + '&quot;)">'
+            + slot.label + '</button>'
+          ).join('')
+        + '</div>'
+        + '<div style="font-size:0.72rem;color:var(--c-faint);margin-top:3px;">'
+        + (current ? (SLOTS.find(sl=>sl.id===current)?.hint || '') : 'Kein Block gewählt') + '</div>'
+        + '</div>';
+    }).join('');
+  },
+
+  _ritualSetZeitblock(fokusId, slotId) {
+    if (!this._ritualZeitbloecke) this._ritualZeitbloecke = {};
+    this._ritualZeitbloecke[fokusId] = this._ritualZeitbloecke[fokusId] === slotId ? '' : slotId;
+    this._ritualRenderZeitbloecke();
+  },
+
+  _ritualRenderBacklog() {
+    const el = document.getElementById('ritual-backlog-body');
+    if (!el) return;
+    const aktivCtx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const items = [];
+    (this._dutyStore(aktivCtx) || []).forEach(d => {
+      const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
+      const inst = insts.find ? insts.find(i => i.isToday) : null;
+      if (inst && !inst.done) items.push({ label: d.title || d.name || '' });
+    });
+    if (!items.length) {
+      el.innerHTML = '<div style="font-size:0.85rem;color:var(--c-faint);text-align:center;padding:12px;">Keine offenen Pflichten heute.</div>';
+    } else {
+      el.innerHTML = '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:8px;">Fällige Pflichten</div>'
+        + items.map(it =>
+            '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);margin-bottom:6px;font-size:0.85rem;">'
+            + '<span>●</span><span>' + this._esc(it.label) + '</span></div>'
+          ).join('');
+    }
   },
 
   _ritualRenderConfirm() {
@@ -11372,7 +11535,13 @@ const WB = {
         done: true,
         skipped: false,
         ts: Date.now(),
-        fokus: this._ritualSelected.map(s => ({ id: s.id, type: s.type, title: s.title, meta: s.meta || '', vorhabenId: s.vorhabenId || '' })),
+        energie: this._ritualEnergie || null,
+        tagestyp: this._ritualTagestyp || null,
+        fokus: this._ritualSelected.map(s => ({
+          id: s.id, type: s.type, title: s.title,
+          meta: s.meta || '', vorhabenId: s.vorhabenId || '',
+          zeitblock: (this._ritualZeitbloecke || {})[s.id] || '',
+        })),
       };
     }
     this.setDirty();
@@ -18160,12 +18329,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const special = this._getSpecialDays();
     if (special[dateStr]) {
       const d = special[dateStr];
+      const isSickOrVacation = d.type === 'sick' || d.type === 'vacation';
       return {
         type:        d.type || 'custom',
         label:       d.label || '',
         proBlocked:  d.pro?.focusBlocked  ?? true,
         privBlocked: d.priv?.focusBlocked ?? false,
-        isPrivDay:   d.pro?.focusBlocked  ?? true,
+        isPrivDay:   isSickOrVacation ? true : (d.pro?.focusBlocked ?? true),
       };
     }
     const dow = new Date(dateStr + 'T12:00:00').getDay();
@@ -18184,6 +18354,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     // 'workday' | 'privday' | 'protected'
     const info = this._getDayInfo(dateStr);
     if (info.type === 'protected') return 'protected';
+    if (info.type === 'sick') return 'privday';
     return info.isPrivDay ? 'privday' : 'workday';
   },
 
@@ -18256,6 +18427,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     // 'workday' | 'privday' | 'protected'
     const info = this._getDayInfo(dateStr);
     if (info.type === 'protected') return 'protected';
+    if (info.type === 'sick') return 'privday';
     return info.isPrivDay ? 'privday' : 'workday';
   },
 
@@ -20745,6 +20917,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       { k:'holiday',   l:'Feiertag' },
       { k:'protected', l:'Geschützt' },
       { k:'custom',    l:'Sonstiges' },
+      { k:'sick',      l:'Krank 🤒' },
     ];
     const typeBtns = TYPES.map(t =>
       `<button class="tdcal-type-btn${type===t.k ? ' active td-'+t.k : ''} "
@@ -20791,6 +20964,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       holiday:   { pro: { focusBlocked: true },  priv: { focusBlocked: false } },
       protected: { pro: { focusBlocked: true },  priv: { focusBlocked: true  } },
       custom:    { pro: { focusBlocked: false }, priv: { focusBlocked: false } },
+      sick:      { pro: { focusBlocked: true },  priv: { focusBlocked: false } },
     };
     this._saveSpecialDay(ds, {
       ...defaults[type],
@@ -28267,26 +28441,50 @@ WB.init();
 <div id="wb-ritual-overlay">
   <div id="ritual-card">
     <div id="ritual-progress">
+      <span class="ritual-dot" data-step="0"></span>
       <span class="ritual-dot" data-step="1"></span>
       <span class="ritual-dot" data-step="2"></span>
       <span class="ritual-dot" data-step="3"></span>
+      <span class="ritual-dot" data-step="4"></span>
     </div>
 
-    <!-- Schritt 1: Sichten -->
-    <div class="ritual-step" id="ritual-step-1">
+    <!-- Schritt 0: Vorhaben-Scan -->
+    <div class="ritual-step" id="ritual-step-0" style="display:none;">
+      <div class="ritual-emoji">🧭</div>
+      <div class="ritual-title">Vorhaben-Scan</div>
+      <div class="ritual-sub">Kurzer Blick auf deine aktiven Vorhaben.</div>
+      <div id="ritual-vorhaben-scan" style="width:100%;margin-bottom:16px;"></div>
+      <button class="ritual-btn primary" onclick="WB._ritualGoto(1)">Weiter →</button>
+      <button class="ritual-btn ghost" onclick="WB._ritualGoto(1)">Überspringen</button>
+    </div>
+
+    <!-- Schritt 1: Orientierung -->
+    <div class="ritual-step" id="ritual-step-1" style="display:none;">
       <div class="ritual-emoji">🌅</div>
       <div class="ritual-title">Guten Morgen</div>
       <div class="ritual-sub" id="ritual-date">–</div>
-      <div id="ritual-overview"></div>
 
-      <!-- Weiter öffnet Claude-Chat direkt -->
-      <button class="ritual-btn primary" onclick="WB._ritualGoto(2)">Weiter →</button>
-
-      <!-- JSON-Download Hinweis -->
-      <div style="margin-top:14px;padding:10px 14px;background:color-mix(in srgb,var(--c-beruf) 6%,var(--c-bg));border-radius:var(--radius-xs);font-size:0.78rem;color:var(--c-muted);line-height:1.6;text-align:left;">
-        <div style="margin-bottom:4px;">📎 Kontext für Claude: Lade deine Privat-JSON hoch</div>
-        <button onclick="WB._ritualDownloadPrivJson()" style="background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);padding:5px 12px;font-family:var(--font);font-size:0.78rem;cursor:pointer;">⬇ Privat-JSON herunterladen</button>
+      <div style="width:100%;margin-bottom:14px;">
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:8px;">Tagestyp</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;" id="ritual-tagestyp-row">
+          <button class="ritual-typ-btn active" data-typ="normal" onclick="WB._ritualSetTagestyp('normal')">Normal</button>
+          <button class="ritual-typ-btn" data-typ="krank" onclick="WB._ritualSetTagestyp('krank')">🤒 Krank</button>
+          <button class="ritual-typ-btn" data-typ="geschuetzt" onclick="WB._ritualSetTagestyp('geschuetzt')">🔒 Geschützt</button>
+        </div>
       </div>
+
+      <div id="ritual-overview" style="width:100%;margin-bottom:14px;"></div>
+
+      <div style="width:100%;margin-bottom:20px;">
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:8px;">Energie heute</div>
+        <div style="display:flex;gap:8px;" id="ritual-energie-row">
+          <button class="ritual-energie-btn" data-val="niedrig" onclick="WB._ritualSetEnergie('niedrig')">🔴 Niedrig</button>
+          <button class="ritual-energie-btn active" data-val="mittel" onclick="WB._ritualSetEnergie('mittel')">🟡 Mittel</button>
+          <button class="ritual-energie-btn" data-val="hoch" onclick="WB._ritualSetEnergie('hoch')">🟢 Hoch</button>
+        </div>
+      </div>
+
+      <button class="ritual-btn primary" id="ritual-step1-next" onclick="WB._ritualStep1Weiter()">Weiter →</button>
     </div>
 
     <!-- Schritt 2: Wählen -->
@@ -28305,13 +28503,33 @@ WB.init();
       <button class="ritual-btn ghost" onclick="WB._ritualGoto(1)">← Zurück</button>
     </div>
 
-    <!-- Schritt 3: Vornehmen -->
+    <!-- Schritt 3: Zeitblöcke -->
     <div class="ritual-step" id="ritual-step-3" style="display:none;">
+      <div class="ritual-emoji">⏰</div>
+      <div class="ritual-title">Zeitblöcke</div>
+      <div class="ritual-sub">Wann machst du was?</div>
+      <div id="ritual-zeitblock-body" style="width:100%;margin-bottom:16px;"></div>
+      <button class="ritual-btn primary" onclick="WB._ritualGoto(4)">Weiter →</button>
+      <button class="ritual-btn ghost" onclick="WB._ritualGoto(2)">← Zurück</button>
+    </div>
+
+    <!-- Schritt 4: Backlog -->
+    <div class="ritual-step" id="ritual-step-4" style="display:none;">
+      <div class="ritual-emoji">📋</div>
+      <div class="ritual-title">Backlog ergänzen</div>
+      <div class="ritual-sub">Kleine Aufgaben für heute — optional.</div>
+      <div id="ritual-backlog-body" style="width:100%;margin-bottom:16px;"></div>
+      <button class="ritual-btn primary" onclick="WB._ritualGoto(5)">Weiter →</button>
+      <button class="ritual-btn ghost" onclick="WB._ritualGoto(3)">← Zurück</button>
+    </div>
+
+    <!-- Schritt 5: Bestätigung -->
+    <div class="ritual-step" id="ritual-step-5" style="display:none;">
       <div class="ritual-emoji">🎯</div>
       <div class="ritual-title">Dein Fokus für heute</div>
       <div id="ritual-confirm-list"></div>
       <button class="ritual-btn primary" onclick="WB._ritualFinish()">Tag beginnen ✓</button>
-      <button class="ritual-btn ghost" onclick="WB._ritualGoto(2)">← Auswahl ändern</button>
+      <button class="ritual-btn ghost" onclick="WB._ritualGoto(4)">← Zurück</button>
     </div>
 
     <!-- Aussprung-Link (in allen Schritten) -->
