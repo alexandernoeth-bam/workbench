@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.4.2</title>
+<title>WorkBench 5.4.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8286,7 +8286,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.4.2 · Build 20260608-2100</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.4.3 · Build 20260608-2115</div>
     </div>
 
     <!-- Welt -->
@@ -8459,8 +8459,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.4.2',
-  APP_BUILD:   '20260608-2100',
+  APP_VERSION: '5.4.3',
+  APP_BUILD:   '20260608-2115',
 
 
   // ══════════════════════════════════════════════════════
@@ -11253,6 +11253,7 @@ const WB = {
     this._ritualEnergie    = 'mittel';
     this._ritualTagestyp   = null;
     this._ritualZeitbloecke = {};
+    this._ritualBodyBattery = null;
     this._ritualAutoSelectDone = false;
     if (this._ritualVorhabenCheck) { clearInterval(this._ritualVorhabenCheck); this._ritualVorhabenCheck = null; }
     const now = new Date();
@@ -12297,6 +12298,8 @@ const WB = {
   },
 
   _ritualStep1Weiter() {
+    const bbVal = document.getElementById('ritual-body-battery')?.value;
+    this._ritualBodyBattery = bbVal ? parseInt(bbVal) : null;
     const typ = this._ritualTagestyp || 'normal';
     if (typ === 'geschuetzt' || typ === 'krank') {
       this._ritualGoto(5);
@@ -12584,6 +12587,7 @@ const WB = {
         ts: Date.now(),
         energie: this._ritualEnergie || null,
         tagestyp: this._ritualTagestyp || null,
+        bodyBattery: this._ritualBodyBattery || null,
         fokus: this._ritualSelected.map(s => ({
           id: s.id, type: s.type, title: s.title,
           meta: s.meta || '', vorhabenId: s.vorhabenId || '',
@@ -16678,6 +16682,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const morgHtml = morgEnergie
       ? '<div style="font-size:0.78rem;color:var(--c-muted);margin-bottom:12px;padding:6px 10px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);">Morgens eingeschätzt: ' + (E_LBL[morgEnergie]||morgEnergie) + '</div>'
       : '';
+    const bbVal  = ritual?.bodyBattery;
+    const bbHtml = bbVal
+      ? '<div style="font-size:0.78rem;color:var(--c-muted);margin-bottom:12px;padding:6px 10px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);">Body Battery heute früh: <strong>' + bbVal + '</strong></div>'
+      : '';
     const scaleHtml = (id, label, current) => {
       const btns = [1,2,3,4,5].map(n =>
         '<button class="wz-scale-btn' + (current===n?' active':'') + '" onclick="WB._evWzSetScale(&quot;' + id + '&quot;,' + n + ',this)">' + n + '</button>'
@@ -16686,7 +16694,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<div class="wz-scale-label"><span>Erschöpft</span><span>Voller Energie</span></div>'
         + '<div class="wz-scale-row">' + btns + '</div></div>';
     };
-    return morgHtml + scaleHtml('energie','Energie-Level heute',wz.energie) + scaleHtml('koerper','Körpergefühl heute',wz.koerper);
+    return morgHtml + bbHtml + scaleHtml('energie','Energie-Level heute',wz.energie) + scaleHtml('koerper','Körpergefühl heute',wz.koerper);
   },
 
   // ── Schritt 7: Kipppunkte ─────────────────────────────
@@ -30088,6 +30096,15 @@ WB.init();
           <button class="ritual-energie-btn" data-val="niedrig" onclick="WB._ritualSetEnergie('niedrig')">🔴 Niedrig</button>
           <button class="ritual-energie-btn active" data-val="mittel" onclick="WB._ritualSetEnergie('mittel')">🟡 Mittel</button>
           <button class="ritual-energie-btn" data-val="hoch" onclick="WB._ritualSetEnergie('hoch')">🟢 Hoch</button>
+        </div>
+      </div>
+
+      <div style="width:100%;margin-bottom:20px;">
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:8px;">BODY BATTERY (optional)</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="number" id="ritual-body-battery" min="1" max="100" step="1" placeholder="z.B. 72"
+            style="width:90px;padding:8px 10px;border:1.5px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);text-align:center;">
+          <span style="font-size:0.78rem;color:var(--c-faint);">Garmin-Wert nach dem Aufstehen</span>
         </div>
       </div>
 
