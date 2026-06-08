@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.0.2</title>
+<title>WorkBench 5.0.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7116,20 +7116,25 @@ html, body {
       </svg>
       Cockpit
     </button>
-    
-    
 
-    
-
-    <button class="wb-tab" role="tab" aria-selected="false" aria-controls="sec-notizen"
-            onclick="WB.switchTab('notizen', this)" data-label="Notizen" id="tab-notizen">
+    <button class="wb-tab" role="tab" aria-selected="false" aria-controls="sec-vorhaben-dummy"
+            onclick="WB.vorhabenListeOpen()" data-label="Vorhaben" id="tab-vorhaben">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <polyline points="14 2 14 8 20 8"/>
-        <line x1="16" y1="13" x2="8" y2="13"/>
-        <line x1="13" y1="17" x2="8" y2="17"/>
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
       </svg>
-      Notizen
+      Vorhaben
+    </button>
+
+    <button class="wb-tab" role="tab" aria-selected="false" aria-controls="sec-woche"
+            onclick="WB.switchTab('woche', this)" data-label="Woche" id="tab-woche">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+      Woche
     </button>
 
     <button class="wb-tab" role="tab" aria-selected="false" aria-controls="sec-checklisten"
@@ -7145,16 +7150,15 @@ html, body {
       Checklisten
     </button>
 
-    <button class="wb-tab" role="tab" aria-selected="false" aria-controls="sec-woche"
-            onclick="WB.switchTab('woche', this)" data-label="Woche" id="tab-woche">
+    <button class="wb-tab" role="tab" aria-selected="false" aria-controls="sec-notizen"
+            onclick="WB.switchTab('notizen', this)" data-label="Notizen" id="tab-notizen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="3" y="4" width="18" height="18" rx="2"/>
-        <line x1="3" y1="10" x2="21" y2="10"/>
-        <line x1="8" y1="4" x2="8" y2="10"/>
-        <line x1="12" y1="4" x2="12" y2="10"/>
-        <line x1="16" y1="4" x2="16" y2="10"/>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="13" y1="17" x2="8" y2="17"/>
       </svg>
-      Woche
+      Notizen
     </button>
     </button>
 
@@ -8211,7 +8215,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.0.2 · Build 20260608-1130</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.0.3 · Build 20260608-1150</div>
     </div>
 
     <!-- Welt -->
@@ -8376,8 +8380,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.0.2',
-  APP_BUILD:   '20260608-1130',
+  APP_VERSION: '5.0.3',
+  APP_BUILD:   '20260608-1150',
 
 
   // ══════════════════════════════════════════════════════
@@ -27738,11 +27742,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   // ── Event Detail ────────────────────────────────────
   _openEvent(evId, ctx) {
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv; if(!db) return;
-    const ev = (db.customEvents||[]).find(e => String(e.id)===String(evId));
-    if(!ev) return;
-    // Direkt Bearbeitungs-Dialog öffnen
-    this.editOpen('event', ctx, '', evId);
+    const ev = (this.dataPriv?.customEvents || []).find(e => String(e.id) === String(evId));
+    if (!ev) return;
+    const evCtx = ev.welt === 'pro' ? 'pro' : 'priv';
+    this.editOpen('event', evCtx, '', evId);
   },
 
   openEventDetail(evId, ctx) {
@@ -28594,10 +28597,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _openEvent(evId, ctx) {
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv; if(!db) return;
-    const ev = (db.customEvents||[]).find(e => String(e.id)===String(evId));
-    if(!ev) return;
-    this.editOpen('event', ctx, '', evId);
+    // Termine sind seit v4.3.0 immer in dataPriv.customEvents
+    const ev = (this.dataPriv?.customEvents || []).find(e => String(e.id) === String(evId));
+    if (!ev) return;
+    // ctx aus welt-Feld des Termins bestimmen
+    const evCtx = ev.welt === 'pro' ? 'pro' : 'priv';
+    this.editOpen('event', evCtx, '', evId);
   },
 
   // ── Quick-Add ───────────────────────────────────────
