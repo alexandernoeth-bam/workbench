@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.6.3</title>
+<title>WorkBench 5.6.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8343,7 +8343,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.6.3 · Build 20260609-1100</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.6.4 · Build 20260609-1120</div>
     </div>
 
     <!-- Welt -->
@@ -8520,8 +8520,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.6.3',
-  APP_BUILD:   '20260609-1100',
+  APP_VERSION: '5.6.4',
+  APP_BUILD:   '20260609-1120',
 
 
   // ══════════════════════════════════════════════════════
@@ -11103,6 +11103,11 @@ const WB = {
   _reminderInit() {
     // Beim App-Start + alle 60 Sek prüfen
     clearInterval(this._reminderInterval);
+    // lastShown für beimStart-Einträge zurücksetzen damit sie sofort angezeigt werden
+    const store = this._reminderStore() || [];
+    store.forEach(r => {
+      if (r.aktiv && r.beimStart) delete this._reminderLastShown[r.id];
+    });
     this._reminderCheck();
     this._reminderInterval = setInterval(() => this._reminderCheck(), 60000);
   },
@@ -11110,7 +11115,10 @@ const WB = {
   _reminderCheck() {
     // Im Share-Modus keine Erinnerung anzeigen
     if (this._isShareMode) return;
+    // DB muss geladen sein
+    if (!this.dataPriv && !this.dataPro) return;
     const store = this._reminderStore() || [];
+    if (!store.length) return;
     const now   = new Date();
     const hhmm  = now.getHours() * 60 + now.getMinutes();
     const today = now.toISOString().split('T')[0];
