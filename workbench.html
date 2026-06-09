@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.5.1</title>
+<title>WorkBench 5.5.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8294,7 +8294,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.5.1 · Build 20260608-2230</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.5.3 · Build 20260608-2300</div>
     </div>
 
     <!-- Welt -->
@@ -8467,8 +8467,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.5.1',
-  APP_BUILD:   '20260608-2230',
+  APP_VERSION: '5.5.3',
+  APP_BUILD:   '20260608-2300',
 
 
   // ══════════════════════════════════════════════════════
@@ -12258,6 +12258,12 @@ const WB = {
       } catch(e) {}
     });
 
+    // Schnellerinnerungen kosten je -2 Energie
+    const todayStr = new Date().toISOString().split('T')[0];
+    (this._quickStore() || [])
+      .filter(q => !q.done && (!q.date || q.date === todayStr))
+      .forEach(() => { punkte -= 2; });
+
     // Gewählte Fokus-Aufgaben kosten Energie
     (this._ritualSelected || []).forEach(s => {
       if (s.type === 'vorhaben-aufgabe' && s.id) {
@@ -15213,13 +15219,18 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!body || !block) return;
 
     const items = [];
+    // Welt-Lookup: in welchem Store liegt eine ID?
+    const proIds  = new Set((this.dataPro?.quickItems  || []).map(q => q.id));
+    const privIds = new Set((this.dataPriv?.quickItems || []).map(q => q.id));
+    const getWelt = id => proIds.has(id) ? 'pro' : privIds.has(id) ? 'priv' : null;
+
     // A) Schnellerinnerungen ohne Datum
     (this._quickStore() || []).filter(q => !q.date && !q.done).forEach(q => {
-      items.push({ type: 'schnell', id: q.id, title: q.text||q.title||'', done: false, zeit: '', obj: q, welt: q.welt||q.ctx||null });
+      items.push({ type: 'schnell', id: q.id, title: q.text||q.title||'', done: false, zeit: '', obj: q, welt: getWelt(q.id) });
     });
     // B) Schnellerinnerungen mit Datum = dateStr aber ohne Uhrzeit
     (this._quickStore() || []).filter(q => q.date === dateStr && !q.time && !q.done).forEach(q => {
-      items.push({ type: 'schnell', id: q.id, title: q.text||q.title||'', done: false, zeit: '', obj: q, welt: q.welt||q.ctx||null });
+      items.push({ type: 'schnell', id: q.id, title: q.text||q.title||'', done: false, zeit: '', obj: q, welt: getWelt(q.id) });
     });
 
     if (!items.length) { block.style.display = 'none'; return; }
@@ -16164,12 +16175,33 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     });
   },
 
+  _wqaSetWelt(welt) {
+    const proBt  = document.getElementById('wqa-welt-pro');
+    const privBt = document.getElementById('wqa-welt-priv');
+    if (!proBt || !privBt) return;
+    if (welt === 'pro') {
+      proBt.style.background  = 'var(--c-beruf)'; proBt.style.color  = '#fff';
+      privBt.style.background = 'var(--c-border)'; privBt.style.color = 'var(--c-muted)';
+    } else {
+      privBt.style.background = '#7B5EA7'; privBt.style.color = '#fff';
+      proBt.style.background  = 'var(--c-border)'; proBt.style.color = 'var(--c-muted)';
+    }
+    // Merken in hidden input
+    let inp = document.getElementById('wqa-welt-val');
+    if (!inp) { inp = document.createElement('input'); inp.type = 'hidden'; inp.id = 'wqa-welt-val'; document.getElementById('wb-quick-add-sheet')?.querySelector('div')?.appendChild(inp); }
+    if (inp) inp.value = welt;
+  },
+
   _quickSave() {
     const text = document.getElementById('wqa-text')?.value?.trim();
     const date = document.getElementById('wqa-date')?.value || new Date().toISOString().split('T')[0];
     if (!text) { document.getElementById('wqa-text')?.focus(); return; }
-    const store = this._quickStore();
-    if (!store) return;
+    // Welt aus Pill-Auswahl lesen (Fallback: activeWorld)
+    const weltVal = document.getElementById('wqa-welt-val')?.value || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const db = weltVal === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    if (!db.quickItems) db.quickItems = [];
+    const store = db.quickItems;
     const time  = document.getElementById('wqa-time')?.value || '';
     const recur = document.getElementById('wqa-recur')?.value || '';
     const recurDays = [];
