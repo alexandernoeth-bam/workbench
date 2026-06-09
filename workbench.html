@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.5.3</title>
+<title>WorkBench 5.5.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8294,7 +8294,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.5.3 · Build 20260608-2300</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.5.4 · Build 20260609-0800</div>
     </div>
 
     <!-- Welt -->
@@ -8467,8 +8467,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.5.3',
-  APP_BUILD:   '20260608-2300',
+  APP_VERSION: '5.5.4',
+  APP_BUILD:   '20260609-0800',
 
 
   // ══════════════════════════════════════════════════════
@@ -15112,11 +15112,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
 
     // 5. Schnellerinnerungen mit Datum = dateStr
+    const _proQIds  = new Set((this.dataPro?.quickItems  || []).map(q => q.id));
+    const _privQIds = new Set((this.dataPriv?.quickItems || []).map(q => q.id));
     (this._quickStore() || []).filter(q => q.date === dateStr).forEach(q => {
       const qZone = q.time ? getZone(q.time) : null;
       const matchesZone = zone === null ? !qZone : qZone === zone;
+      const qCtx = _proQIds.has(q.id) ? 'pro' : _privQIds.has(q.id) ? 'priv' : (this.activeWorld === 'beruf' ? 'pro' : 'priv');
       if (matchesZone) {
-        items.push({ type:'schnell', id:q.id, title:q.text||q.title||'', meta:'', done:!!q.done, zeit:q.time||'', ctx:'', obj:q, sort:q.time ? pT(q.time) : 8000 });
+        items.push({ type:'schnell', id:q.id, title:q.text||q.title||'', meta:'', done:!!q.done, zeit:q.time||'', ctx:qCtx, obj:q, sort:q.time ? pT(q.time) : 8000 });
       }
     });
 
@@ -15186,6 +15189,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const weltClass = (item.type === 'termin')
       ? (item.ctx === 'pro' ? ' welt-pro' : ' welt-priv')
       : '';
+    // Welt-Pill für alle Typen
+    const weltPill = item.ctx === 'pro'
+      ? '<span style="font-size:0.58rem;font-weight:700;padding:1px 5px;border-radius:5px;background:var(--c-beruf-bg,#E8F5F3);color:var(--c-beruf);margin-left:4px;flex-shrink:0;">Beruf</span>'
+      : item.ctx === 'priv'
+      ? '<span style="font-size:0.58rem;font-weight:700;padding:1px 5px;border-radius:5px;background:color-mix(in srgb,var(--c-privat,#27AE60) 12%,var(--c-bg));color:var(--c-privat,#27AE60);margin-left:4px;flex-shrink:0;">Privat</span>'
+      : '';
     let cbHandler = '';
     if (item.type === 'termin')   cbHandler = 'WB._ckZTerminDone(&quot;'  + item.id + '&quot;,&quot;' + item.ctx + '&quot;,this)';
     if (item.type === 'fokus')    cbHandler = 'WB._ckZFokusDone(&quot;'   + item.id + '&quot;,this)';
@@ -15205,7 +15214,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<input type="checkbox" class="ck-z-cb"' + (item.done?' checked':'')
       + (cbHandler ? ' onchange="event.stopPropagation();' + cbHandler + '"' : '') + '>'
       + '<div class="ck-z-text">'
-      + '<div class="ck-z-titel' + titelDone + '">' + this._esc(item.title) + badge + aeBadge + '</div>'
+      + '<div class="ck-z-titel' + titelDone + '">' + this._esc(item.title) + badge + aeBadge + weltPill + '</div>'
       + (item.meta ? '<div class="ck-z-meta">' + this._esc(item.meta) + '</div>' : '')
       + '</div>'
       + (item.zeit ? '<div class="ck-z-zeit">' + item.zeit + '</div>' : '')
