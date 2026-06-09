@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.5.4</title>
+<title>WorkBench 5.5.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8294,7 +8294,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.5.4 · Build 20260609-0800</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.5.5 · Build 20260609-0820</div>
     </div>
 
     <!-- Welt -->
@@ -8467,8 +8467,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.5.4',
-  APP_BUILD:   '20260609-0800',
+  APP_VERSION: '5.5.5',
+  APP_BUILD:   '20260609-0820',
 
 
   // ══════════════════════════════════════════════════════
@@ -16229,16 +16229,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _quickDetail(id) {
-    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    if (!db) return;
-    if (!db.quickItems) db.quickItems = [];
-    const store = db.quickItems;
-    const item = id ? store.find(i => i.id === id) : null;
-    const isNew = !item;
-    const today = new Date().toISOString().split('T')[0];
-    const isBeruf = ctx === 'pro';
-    const recurVal = item?.recurring || '';
+    // Item aus beiden Stores suchen
+    const proStore  = this.dataPro?.quickItems  || [];
+    const privStore = this.dataPriv?.quickItems || [];
+    const proItem   = id ? proStore.find(i => i.id === id)  : null;
+    const privItem  = id ? privStore.find(i => i.id === id) : null;
+    const item      = proItem || privItem || null;
+    const itemCtx   = proItem ? 'pro' : privItem ? 'priv' : (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const isNew     = !item;
+    const today     = new Date().toISOString().split('T')[0];
+    const isBeruf   = itemCtx === 'pro';
+    const recurVal  = item?.recurring || '';
 
     const sheet = document.createElement('div');
     sheet.id = 'wb-quick-sheet';
@@ -16286,7 +16287,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '</div></div>';
 
     document.body.appendChild(sheet);
-    setTimeout(() => document.getElementById('wqa-text')?.select(), 50);
+    setTimeout(() => {
+      this._wqaSetWelt(itemCtx);
+      document.getElementById('wqa-text')?.select();
+    }, 50);
   },
 
   _closeSheet500() {
@@ -16328,9 +16332,29 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       return;
     }
 
-    // Einmalig → quickItems wie bisher
-    const store = this._schnellWeltStore();
-    if (!store) return;
+    // Welt aus Pill-Auswahl lesen
+    const weltVal = document.getElementById('wqa-welt-val')?.value
+      || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const newDb  = weltVal === 'pro' ? this.dataPro  : this.dataPriv;
+    if (!newDb) return;
+    if (!newDb.quickItems) newDb.quickItems = [];
+
+    // Einmalig → quickItems
+    // Bei Welt-Wechsel: aus altem Store entfernen
+    if (id) {
+      const proStore  = this.dataPro?.quickItems  || [];
+      const privStore = this.dataPriv?.quickItems || [];
+      const oldProIdx  = proStore.findIndex(i => i.id === id);
+      const oldPrivIdx = privStore.findIndex(i => i.id === id);
+      const oldCtx = oldProIdx >= 0 ? 'pro' : oldPrivIdx >= 0 ? 'priv' : null;
+      if (oldCtx && oldCtx !== weltVal) {
+        // Aus altem Store entfernen
+        if (oldCtx === 'pro')  proStore.splice(oldProIdx, 1);
+        else                   privStore.splice(oldPrivIdx, 1);
+      }
+    }
+
+    const store = newDb.quickItems;
     let item = id ? store.find(i => i.id === id) : null;
 
     if (!item) {
