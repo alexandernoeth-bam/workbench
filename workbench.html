@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.5.0</title>
+<title>WorkBench 5.5.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -526,7 +526,12 @@ html, body {
   #ck-tag-header { flex-shrink:0; padding:8px 16px; border-bottom:1px solid var(--c-border); background:var(--c-surface); }
   #ck-scroll-body { flex:1; overflow-y:auto; padding:8px 12px 80px; }
   .ck-zone { margin-bottom:8px; border-radius:var(--radius-sm,6px); border:1px solid var(--c-border); background:var(--c-surface); overflow:hidden; }
-  .ck-zone-header { display:flex; align-items:center; gap:8px; padding:7px 12px; background:var(--c-bg); border-bottom:1px solid var(--c-border); }
+  .ck-zone-header.jetzt { background:color-mix(in srgb,var(--c-beruf) 8%,var(--c-bg)); border-bottom-color:color-mix(in srgb,var(--c-beruf) 25%,var(--c-border)); }
+.ck-zone-header.jetzt .ck-zone-label { color:var(--c-beruf); }
+.ck-zone-jetzt-badge { font-size:0.62rem;font-weight:700;color:var(--c-beruf);background:var(--c-beruf-bg,#E8F5F3);padding:1px 6px;border-radius:8px;margin-left:4px; }
+.ck-z-eintrag.faellig-bald .ck-z-titel { color:var(--c-beruf);font-weight:600; }
+.ck-z-eintrag.faellig-bald::before { content:'⏰';font-size:0.75rem;margin-right:4px; }
+.ck-zone-header { display:flex; align-items:center; gap:8px; padding:7px 12px; background:var(--c-bg); border-bottom:1px solid var(--c-border); }
   .ck-zone-icon { font-size:0.9rem; flex-shrink:0; }
   .ck-zone-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--c-muted); flex:1; }
   .ck-zone-hint { font-size:0.68rem; color:var(--c-faint); font-family:var(--font-mono); }
@@ -7066,7 +7071,7 @@ html, body {
     <div class="ck-zone" id="ck-zone-rauschen" style="display:none;">
       <div class="ck-zone-header">
         <span class="ck-zone-icon">〰</span>
-        <span class="ck-zone-label">Rauschen</span>
+        <span class="ck-zone-label">Kleinigkeiten</span>
         <span class="ck-zone-hint"></span>
         <span class="ck-zone-count" id="ck-count-rauschen"></span>
       </div>
@@ -8289,7 +8294,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.5.0 · Build 20260608-2200</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.5.1 · Build 20260608-2230</div>
     </div>
 
     <!-- Welt -->
@@ -8462,8 +8467,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.5.0',
-  APP_BUILD:   '20260608-2200',
+  APP_VERSION: '5.5.1',
+  APP_BUILD:   '20260608-2230',
 
 
   // ══════════════════════════════════════════════════════
@@ -14897,6 +14902,16 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const dateStr  = this._ckDate;
     const isToday  = dateStr === today;
     const dispDate = new Date(dateStr + 'T12:00:00');
+
+    // Aktive Zone bestimmen (nur heute)
+    if (isToday) {
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      this._ckAktiveZone = nowMin < 12*60 ? 'vm' : nowMin < 16*60 ? 'nm' : 'ab';
+      this._ckNowMin     = nowMin;
+    } else {
+      this._ckAktiveZone = null;
+      this._ckNowMin     = 0;
+    }
     const dow      = dispDate.getDay();
     const DAYS   = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
     const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
@@ -14983,7 +14998,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     try { this._ckRenderZone('vm', dateStr, isToday); } catch(e) { console.error('ck-zone-vm:', e); }
     try { this._ckRenderZone('nm', dateStr, isToday); } catch(e) { console.error('ck-zone-nm:', e); }
     try { this._ckRenderZone('ab', dateStr, isToday); } catch(e) { console.error('ck-zone-ab:', e); }
-    try { this._ckRenderZoneRauschen(dateStr, isToday); } catch(e) { console.error('ck-zone-rauschen:', e); }
+    try { this._ckRenderKleinigkeiten(dateStr, isToday); } catch(e) { console.error('ck-zone-rauschen:', e); }
   },
 
   _ckGetZoneItems(dateStr, zone) {
@@ -15113,10 +15128,28 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       body.innerHTML = '<div style="padding:8px 12px;font-size:0.82rem;color:var(--c-faint);font-style:italic;">Nichts geplant</div>';
       return;
     }
-    body.innerHTML = items.map(item => this._ckRenderZoneItem(item)).join('');
+    body.innerHTML = items.map(item => this._ckRenderZoneItem(item, isToday)).join('');
+
+    // Jetzt-Badge im Zone-Header
+    const header = document.querySelector('#ck-zone-' + zoneId + ' .ck-zone-header');
+    if (header) {
+      const isAktiv = isToday && this._ckAktiveZone === zoneId;
+      header.classList.toggle('jetzt', isAktiv);
+      let badge = header.querySelector('.ck-zone-jetzt-badge');
+      if (isAktiv) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'ck-zone-jetzt-badge';
+          badge.textContent = 'JETZT';
+          const countEl = header.querySelector('.ck-zone-count');
+          if (countEl) header.insertBefore(badge, countEl);
+          else header.appendChild(badge);
+        }
+      } else { if (badge) badge.remove(); }
+    }
   },
 
-  _ckRenderZoneItem(item) {
+  _ckRenderZoneItem(item, isToday) {
     const doneClass  = item.done ? ' done' : '';
     const titelDone  = item.done ? ' done' : '';
     const BADGES = {
@@ -15154,7 +15187,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (item.type === 'pflicht')  cbHandler = 'WB._ckZPflichtDone(&quot;' + item.id + '&quot;,&quot;' + item.ctx + '&quot;,this)';
     if (item.type === 'vorhaben') cbHandler = 'WB._ckZVorhabenDone(&quot;'+ item.id + '&quot;,this)';
     const aeBadge = item.ae && item.ae !== 'mittel' ? this._aeBadge(item.ae) : '';
-    return '<div class="ck-z-eintrag' + doneClass + weltClass + '"'
+    let faelligClass = '';
+    if (isToday && item.zeit && item.type === 'termin') {
+      const [fh, fm] = item.zeit.split(':').map(Number);
+      const diff = (fh*60 + (fm||0)) - (this._ckNowMin || 0);
+      if (diff >= 0 && diff <= 30) faelligClass = ' faellig-bald';
+    }
+    return '<div class="ck-z-eintrag' + doneClass + weltClass + faelligClass + '"'
       + (onclickHandler ? ' onclick="' + onclickHandler + '" style="cursor:pointer;"' : '')
       + '>'
       + '<input type="checkbox" class="ck-z-cb"' + (item.done?' checked':'')
@@ -15167,31 +15206,36 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '</div>';
   },
 
-  _ckRenderZoneRauschen(dateStr, isToday) {
+  _ckRenderKleinigkeiten(dateStr, isToday) {
     const body  = document.getElementById('ck-body-rauschen');
     const count = document.getElementById('ck-count-rauschen');
     const block = document.getElementById('ck-zone-rauschen');
     if (!body || !block) return;
+
     const items = [];
-
-    // Schnellerinnerungen ohne Datum (immer Rauschen)
+    // A) Schnellerinnerungen ohne Datum
     (this._quickStore() || []).filter(q => !q.date && !q.done).forEach(q => {
-      items.push({ type:'schnell', id:q.id, title:q.text||q.title||'', meta:'', done:false, zeit:'', obj:q, ae:'', sort:9999 });
+      items.push({ type: 'schnell', id: q.id, title: q.text||q.title||'', done: false, zeit: '', obj: q, welt: q.welt||q.ctx||null });
     });
-
-    // Fokus ohne Zeitblock (heute)
-    if (isToday) {
-      const store  = this._ritualStore();
-      const ritual = store && store[this._ritualTodayKey()];
-      (ritual?.fokus || []).filter(f => !f.zeitblock).forEach(f => {
-        items.push({ type:'fokus', id:f.id||f.title, title:f.title, meta:f.meta||'', done:!!f._done, zeit:'', obj:f, ae:'', sort:8000 });
-      });
-    }
+    // B) Schnellerinnerungen mit Datum = dateStr aber ohne Uhrzeit
+    (this._quickStore() || []).filter(q => q.date === dateStr && !q.time && !q.done).forEach(q => {
+      items.push({ type: 'schnell', id: q.id, title: q.text||q.title||'', done: false, zeit: '', obj: q, welt: q.welt||q.ctx||null });
+    });
 
     if (!items.length) { block.style.display = 'none'; return; }
     block.style.display = '';
     if (count) count.textContent = items.length;
-    body.innerHTML = items.map(item => this._ckRenderZoneItem(item)).join('');
+
+    body.innerHTML = items.map(item => {
+      const weltBadge = item.welt === 'pro'
+        ? '<span style="font-size:0.62rem;padding:1px 5px;border-radius:5px;background:var(--c-beruf-bg,#E8F5F3);color:var(--c-beruf);font-weight:600;margin-left:4px;">Beruf</span>'
+        : item.welt === 'priv'
+        ? '<span style="font-size:0.62rem;padding:1px 5px;border-radius:5px;background:color-mix(in srgb,var(--c-privat,#27AE60) 12%,var(--c-bg));color:var(--c-privat,#27AE60);font-weight:600;margin-left:4px;">Privat</span>'
+        : '';
+      return '<div class="ck-z-eintrag" onclick="WB._quickDetail(&quot;' + item.id + '&quot;)" style="cursor:pointer;">'
+        + '<input type="checkbox" class="ck-z-cb" onchange="event.stopPropagation();WB._ckZSchnellDone(&quot;' + item.id + '&quot;,this)">'
+        + '<div class="ck-z-text"><div class="ck-z-titel">' + this._esc(item.title) + weltBadge + '</div></div></div>';
+    }).join('');
   },
 
   _ckZTerminDone(id, ctx, chk) {
