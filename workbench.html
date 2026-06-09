@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.11.2</title>
+<title>WorkBench 5.12.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6003,27 +6003,18 @@ html, body {
 }
 
 /* Plan-Liste (Übersicht) */
-.vh-card {
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-sm);
-  padding: 14px;
-  margin-bottom: 8px;
-  cursor: pointer;
-  transition: border-color 0.15s;
-}
-.vh-card:hover { border-color: var(--c-muted); }
-.vh-card:active { opacity: 0.8; }
-.vh-card-head { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
-.vh-card.fokus-vorhaben { background: color-mix(in srgb, var(--c-beruf) 6%, var(--c-surface)); border-color: color-mix(in srgb, var(--c-beruf) 30%, var(--c-border)); }
-.vh-card.fokus-vorhaben:hover { border-color: var(--c-beruf); }
-.vh-fokus-badge { font-size: 0.62rem; font-weight: 700; color: var(--c-beruf); background: var(--c-beruf-bg,#E8F5F3); padding: 2px 6px; border-radius: 8px; flex-shrink: 0; }
-.vh-card-icon { font-size: 1.15rem; flex-shrink: 0; }
-.vh-card-title { flex: 1; min-width: 0; font-size: 0.95rem; font-weight: 700; color: var(--c-text); }
-.vh-card-baustelle { font-size: 0.66rem; font-weight: 700; color: #C62828; background: #FCE4EC; padding: 2px 7px; border-radius: 8px; flex-shrink: 0; }
-.vh-card-bar { height: 6px; background: var(--c-border); border-radius: 3px; overflow: hidden; margin-bottom: 7px; }
-.vh-card-bar-fill { height: 100%; background: var(--c-beruf); border-radius: 3px; transition: width 0.3s; }
-.vh-card-meta { font-size: 0.74rem; color: var(--c-muted); }
+.vh-card { background:var(--c-surface); border:1px solid var(--c-border); border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:8px; cursor:pointer; transition:border-color 0.15s; }
+.vh-card:hover { border-color:var(--c-beruf); }
+.vh-card.fokus-vorhaben { background:color-mix(in srgb, var(--c-beruf) 5%, var(--c-surface)); border-color:color-mix(in srgb, var(--c-beruf) 25%, var(--c-border)); }
+.vh-card-head { display:flex; align-items:center; gap:8px; }
+.vh-card-fokus { font-size:0.9rem; flex-shrink:0; }
+.vh-card-title { flex:1; min-width:0; font-size:0.95rem; font-weight:700; color:var(--c-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.vh-card-pills { font-size:0.78rem; color:var(--c-muted); margin-top:4px; }
+.vh-card-status { font-size:0.68rem; font-weight:700; padding:2px 8px; border-radius:10px; flex-shrink:0; white-space:nowrap; }
+.vh-status-aktiv { background:var(--c-beruf-bg); color:var(--c-beruf); }
+.vh-status-wartend { background:#FFF3E0; color:#B87333; }
+.vh-status-ruhend { background:var(--c-border); color:var(--c-faint); }
+.vh-card-wartend .vh-card-title { color:var(--c-muted); }
 .vh-detail-kopf { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 14px; }
 .vh-welt-switch { display: flex; gap: 6px; margin-bottom: 12px; }
 .vh-welt-btn { flex: 1; padding: 8px; border: 1px solid var(--c-border); border-radius: var(--radius-xs); background: var(--c-bg); font-family: var(--font); font-size: 0.82rem; color: var(--c-muted); cursor: pointer; }
@@ -8398,7 +8389,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.11.2 · Build 20260609-1815</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.12.0 · Build 20260609-1845</div>
     </div>
 
     <!-- Welt -->
@@ -8575,8 +8566,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.11.2',
-  APP_BUILD:   '20260609-1815',
+  APP_VERSION: '5.12.0',
+  APP_BUILD:   '20260609-1845',
 
 
   // ══════════════════════════════════════════════════════
@@ -18182,33 +18173,36 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         }
         // Aktiv: volle Karte
         html += aktiv.map(v => {
-          try {
-            const offeneSchritte = (v.meilensteine || [])
-              .reduce((sum, ms) => sum + (ms.aufgaben || []).filter(a => !a.done).length, 0);
-            const stichtag = v.stichtag ? ' · bis ' + v.stichtag : '';
-            const fokusClass = v.fokus ? ' fokus-vorhaben' : '';
-            const fokusBadge = v.fokus ? '<span class="vh-fokus-badge">⭐ Fokus</span>' : '';
-            return '<div class="vh-card' + fokusClass + '" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
-              + '<div class="vh-card-head">'
-              + '<span class="vh-card-title">' + this._esc(v.titel) + '</span>'
-              + fokusBadge
-              + (v.charakter === 'baustelle' ? '<span style="font-size:0.85rem;" title="Baustelle">🔥</span>' : '')
-              + '</div>'
-              + (v.ziel ? '<div class="vh-card-ziel">' + this._esc(v.ziel) + '</div>' : '')
-              + '<div class="vh-card-meta">' + offeneSchritte + ' offene Aufgaben' + stichtag + '</div>'
-              + '</div>';
-          } catch(e) {
-            return '<div class="vh-card" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
-              + '<div class="vh-card-head"><span class="vh-card-title">' + this._esc(v.titel||'?') + '</span></div></div>';
-          }
-        }).join('');
+    try {
+      const alleAufg = (v.meilensteine||[]).flatMap(ms => (ms.aufgaben||[]).filter(a => !a.done));
+      const aufgNS = alleAufg.filter(a => this.istNaechsterSchritt(a)).length;
+      const aufgTotal = alleAufg.length;
+      let terminCount = 0;
+      [this.dataPro, this.dataPriv].forEach(db => { if (!db) return; (db.customEvents||[]).filter(e => e.vorhabenId === v.id && !e.done).forEach(() => terminCount++); });
+      let pflichtCount = 0;
+      ['pro','priv'].forEach(ctx => { (this._dutyStore(ctx)||[]).filter(d => d.vorhabenId === v.id).forEach(() => pflichtCount++); });
+      const pills = [];
+      if (aufgTotal > 0) pills.push(aufgNS + '/' + aufgTotal + ' Aufgaben');
+      if (terminCount > 0) pills.push(terminCount + ' Termin' + (terminCount>1?'e':''));
+      if (pflichtCount > 0) pills.push(pflichtCount + ' Pflicht' + (pflichtCount>1?'en':''));
+      const pillsHtml = pills.length ? '<div class="vh-card-pills">' + pills.join(' \u00b7 ') + '</div>' : '';
+      const ebene = v.aktivitaet || 'aktiv';
+      const EBENE_BADGE = { aktiv:'<span class="vh-card-status vh-status-aktiv">Aktiv</span>', wartend:'<span class="vh-card-status vh-status-wartend">Wartend</span>', ruhend:'<span class="vh-card-status vh-status-ruhend">Ruhend</span>' };
+      const fokus = v.fokus ? '<span class="vh-card-fokus">\u2b50</span>' : '';
+      return '<div class="vh-card' + (v.fokus ? ' fokus-vorhaben' : '') + '" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
+        + '<div class="vh-card-head">' + fokus + '<span class="vh-card-title">' + this._esc(v.titel) + '</span>' + (EBENE_BADGE[ebene]||'') + '</div>' + pillsHtml + '</div>';
+    } catch(e) {
+      return '<div class="vh-card" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)"><div class="vh-card-head"><span class="vh-card-title">' + this._esc(v.titel||'?') + '</span></div></div>';
+    }
+  }).join('');
         // Wartend: nur Titel
-        html += wartend.map(v =>
-          '<div class="vh-card vh-card-wartend" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
-          + '<span class="vh-card-title" style="color:var(--c-muted);">' + this._esc(v.titel) + '</span>'
-          + '<span style="font-size:0.7rem;color:var(--c-faint);margin-left:auto;">Wartend</span>'
-          + '</div>'
-        ).join('');
+        html += wartend.map(v => {
+    const alleAufg = (v.meilensteine||[]).flatMap(ms => (ms.aufgaben||[]).filter(a => !a.done));
+    const pillsHtml = alleAufg.length ? '<div class="vh-card-pills">' + alleAufg.length + ' Aufgaben offen</div>' : '';
+    return '<div class="vh-card vh-card-wartend" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
+      + '<div class="vh-card-head"><span class="vh-card-title">' + this._esc(v.titel) + '</span>'
+      + '<span class="vh-card-status vh-status-wartend">Wartend</span></div>' + pillsHtml + '</div>';
+  }).join('');
         // Ruhend: nur wenn explizit eingeblendet (toggle per Cluster)
         if (ruhend.length) {
           const ruhendOpen = this._vorhabenClusterOpen[cl.id + '_ruhend'];
@@ -18292,6 +18286,37 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const v = this._vorhabenAktiv(); if (!v) return;
     v.charakter = val; v.geaendert = Date.now(); this.setDirty();
     this._vorhabenDetailRender();
+  },
+
+  _vhOpenSettings() {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    const ebene = v.aktivitaet || 'aktiv';
+    const charakter = v.charakter || 'laufend';
+    const cluster = v.cluster || 'mindset';
+    const fokus = v.fokus || false;
+    const clusterOpts = this.activeWorld === 'beruf' ? ['mindset','beruf'] : ['mindset','koerper','umgebung','beruf'];
+    const CLUSTER_LBL = { mindset:'Mindset', koerper:'K\u00f6rper', umgebung:'Umgebung', beruf:'Beruf' };
+    const CHAR_LBL = { baustelle:'\ud83d\udd25 Baustelle', laufend:'\u2192 Laufend', pflicht:'\u25ce Pflicht' };
+    const andereWelt = v.welt === 'pro' ? 'priv' : 'pro';
+    const andereWeltLbl = v.welt === 'pro' ? '\u2192 Privat verschieben' : '\u2192 Beruf verschieben';
+    let sheet = document.getElementById('vh-settings-sheet');
+    if (sheet) sheet.remove();
+    sheet = document.createElement('div');
+    sheet.id = 'vh-settings-sheet';
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:700;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;';
+    sheet.onclick = e => { if (e.target === sheet) sheet.remove(); };
+    const row = (label, content) => '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--c-border);"><span style="font-size:0.88rem;color:var(--c-muted);">' + label + '</span><div style="display:flex;gap:6px;">' + content + '</div></div>';
+    const pill = (label, val, current, fn) => '<button onclick="' + fn + '" style="padding:5px 12px;border-radius:16px;font-family:var(--font);font-size:0.78rem;cursor:pointer;border:1.5px solid ' + (val===current ? 'var(--c-beruf)' : 'var(--c-border)') + ';background:' + (val===current ? 'var(--c-beruf)' : 'none') + ';color:' + (val===current ? '#fff' : 'var(--c-muted)') + ';">' + label + '</button>';
+    const reopen = 'document.getElementById(&quot;vh-settings-sheet&quot;).remove();WB._vhOpenSettings();';
+    let body = '';
+    body += row('Cluster', '<select onchange="WB._vorhabenSetCluster(this.value);' + reopen.replace(/&quot;/g,'\\"') + '" style="padding:6px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">' + clusterOpts.map(c => '<option value="' + c + '"' + (cluster===c?' selected':'') + '>' + CLUSTER_LBL[c] + '</option>').join('') + '</select>');
+    body += row('Status', ['aktiv','wartend','ruhend'].map(e => pill(e.charAt(0).toUpperCase()+e.slice(1), e, ebene, 'WB._vorhabenSetEbene(&quot;' + e + '&quot;);' + reopen)).join(''));
+    body += row('Charakter', Object.entries(CHAR_LBL).map(([c, lbl]) => pill(lbl, c, charakter, 'WB._vorhabenSetCharakter(&quot;' + c + '&quot;);' + reopen)).join(''));
+    body += row('Fokus', '<button onclick="WB._vhToggleFokus();' + reopen.replace(/&quot;/g,'\\"') + '" style="padding:5px 12px;border-radius:16px;font-family:var(--font);font-size:0.78rem;cursor:pointer;border:1.5px solid ' + (fokus ? 'var(--c-beruf)' : 'var(--c-border)') + ';background:' + (fokus ? 'var(--c-beruf)' : 'none') + ';color:' + (fokus ? '#fff' : 'var(--c-muted)') + ';">' + (fokus ? '\u2b50 Fokus aktiv' : '\u2b50 Als Fokus setzen') + '</button>');
+    body += row('Fortschritt', '<input type="number" min="0" max="100" value="' + (v.fortschrittManuell ?? '') + '" placeholder="auto" onchange="WB._vhSetFortschrittManuell(this.value)" style="width:60px;padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);text-align:center;"><span style="font-size:0.78rem;color:var(--c-faint);">%</span>');
+    body += '<div style="padding:12px 0;text-align:center;"><button onclick="WB._vorhabenWechselWelt(&quot;' + andereWelt + '&quot;);document.getElementById(&quot;vh-settings-sheet&quot;).remove();" style="font-size:0.82rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);">' + andereWeltLbl + '</button></div>';
+    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:16px 20px 32px;max-height:80vh;overflow-y:auto;"><div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:8px;">Vorhaben-Einstellungen</div>' + body + '</div>';
+    document.body.appendChild(sheet);
   },
 
   _vhToggleFokus() {
@@ -18500,30 +18525,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     // ── HEADER ─────────────────────────────────────────────
     let h = '<div class="vh47-header">';
-    h += '<div class="vh47-badge-row" style="flex-wrap:wrap;">';
-    h += '<select onchange="WB._vorhabenSetCluster(this.value)" class="vh47-badge vh47-badge-cluster">';
-    h += clusterOpts.map(c => '<option value="' + c + '"' + (cluster===c?' selected':'') + '>' + CLUSTER_LBL[c] + '</option>').join('');
-    h += '</select>';
-    h += ['aktiv','wartend','ruhend'].map(e =>
-      '<button class="vh47-badge vh47-badge-ebene' + (ebene===e?' active':'') + '" '
-      + 'style="' + (ebene===e?'background:' + EBENE_CLR[e] + ';color:#fff;border-color:' + EBENE_CLR[e] + ';':'') + '" '
-      + 'onclick="WB._vorhabenSetEbene(&quot;' + e + '&quot;)">' + (e.charAt(0).toUpperCase()+e.slice(1)) + '</button>'
-    ).join('');
-    h += '<span style="width:1px;background:var(--c-border);height:16px;display:inline-block;margin:0 2px;"></span>';
-    h += Object.entries(CHAR_LBL).map(([c, lbl]) =>
-      '<button class="vh47-badge vh47-badge-ebene' + (charakter===c?' active':'') + '" '
-      + 'style="' + (charakter===c?'background:' + CHAR_CLR[c] + ';color:#fff;border-color:' + CHAR_CLR[c] + ';':'') + '" '
-      + 'onclick="WB._vorhabenSetCharakter(&quot;' + c + '&quot;)">' + lbl + '</button>'
-    ).join('');
-    h += '<div style="flex:1"></div>';
-    // Fokus-Toggle
-    const fokusActive = v.fokus ? 'background:var(--c-beruf);color:#fff;border-color:var(--c-beruf);' : '';
-    h += '<button onclick="WB._vhToggleFokus()" style="padding:5px 12px;border-radius:20px;font-family:var(--font);font-size:0.78rem;cursor:pointer;border:1.5px solid var(--c-border);' + fokusActive + 'margin-left:8px;">\u2b50 Fokus</button>';
-    h += '<button onclick="WB._vorhabenWechselWelt(&quot;' + andereWelt + '&quot;)" class="vh47-welt-btn">' + andereWeltLbl + '</button>';
-    h += '</div>';
-    h += '<div class="vh47-titel" id="vh47-titel" contenteditable="true" '
-      + 'onblur="WB._vhSaveTitel()" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}">'
-      + this._esc(v.titel||'') + '</div>';
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:0 0 8px;">'
+      + '<div style="flex:1;">'
+      + '<div class="vh47-titel" id="vh47-titel" contenteditable="true" '
+      + 'onblur="WB._vhSaveTitel()" '
+      + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}">'
+      + this._esc(v.titel||'') + '</div></div>'
+      + '<button onclick="WB._vhOpenSettings()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--c-muted);padding:4px;">\u2699</button>'
+      + '</div>';
 
 
     // ── TAB-LEISTE ─────────────────────────────────────────
