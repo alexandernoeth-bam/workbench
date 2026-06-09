@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.7.3</title>
+<title>WorkBench 5.7.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8367,7 +8367,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.7.3 · Build 20260609-1345</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.7.4 · Build 20260609-1400</div>
     </div>
 
     <!-- Welt -->
@@ -8544,8 +8544,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.7.3',
-  APP_BUILD:   '20260609-1345',
+  APP_VERSION: '5.7.4',
+  APP_BUILD:   '20260609-1400',
 
 
   // ══════════════════════════════════════════════════════
@@ -28935,8 +28935,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<div class="edit-row">'
         + '<div class="edit-field"><label>Datum</label><input id="ef-date" type="date" value="'+(ev.date||'')+'">'+'</div>'
         + '<div class="edit-field"><label>Welt</label><select id="ef-ev-welt">'
-        + '<option value="pro"'+(ctx==='pro'?' selected':'')+'>Beruf</option>'
-        + '<option value="priv"'+(ctx==='priv'?' selected':'')+'>Privat</option>'
+        + '<option value="pro"'+((ev.welt||ctx)==='pro'?' selected':'')+'>Beruf</option>'
+        + '<option value="priv"'+((ev.welt||ctx)==='priv'?' selected':'')+'>Privat</option>'
         + '</select></div></div>'
         + '<div class="edit-row">'
         + '<div class="edit-field"><label>Von</label><input id="ef-time" type="time" value="'+(ev.startTime||'09:00')+'" onchange="WB._evRecalcDur()">'+'</div>'
@@ -29228,6 +29228,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       ev.date      = document.getElementById('ef-date')?.value||ev.date;
       ev.startTime = document.getElementById('ef-time')?.value||ev.startTime;
       ev.location  = document.getElementById('ef-loc')?.value||'';
+      ev.typ       = document.getElementById('ef-ev-type')?.value || ev.typ || 'sonstiges';
       ev.aktivEnergie = document.getElementById('ef-ev-aktiv')?.value || 'mittel';
       ev.kippTyp      = document.getElementById('ef-ev-kipp')?.value || '';
       const ekVal = document.getElementById('ef-ev-energiekosten')?.value;
@@ -29246,12 +29247,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         // Keine Endzeit → duration beibehalten oder 0.25h default
         ev.duration = ev.duration || 0.25;
       }
-      // Welt wechseln
-      const evNewCtx = document.getElementById('ef-ev-welt')?.value;
-      if(evNewCtx && evNewCtx !== ctx) {
-        const newDb = evNewCtx==='pro' ? this.dataPro : this.dataPriv;
-        if(newDb) { newDb.customEvents = newDb.customEvents||[]; newDb.customEvents.push({...ev}); db.customEvents = (db.customEvents||[]).filter(x=>String(x.id)!==String(id)); }
-      }
+      // Welt setzen (v4.3.0: alle Events in dataPriv, welt als Feld)
+      const evNewWelt = document.getElementById('ef-ev-welt')?.value;
+      if (evNewWelt) ev.welt = evNewWelt;
     }
 
     this.setDirty();
