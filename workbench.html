@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.5.7</title>
+<title>WorkBench 5.5.8</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -466,6 +466,14 @@ html, body {
 .wb-section.active#sec-cockpit ~ #ck-fab { display: none !important; }
 
 /* ── Cockpit v4.1: drei feste Blöcke ─────────────────── */
+#ck-reminder-chips { display:flex; gap:6px; flex-wrap:wrap; padding:4px 12px; background:var(--c-bg); border-bottom:1px solid var(--c-border); min-height:0; transition:all 0.2s; }
+#ck-reminder-chips:empty { display:none; }
+.ck-reminder-chip { display:flex; align-items:center; gap:6px; padding:5px 10px 5px 8px; background:color-mix(in srgb,var(--c-beruf) 10%,var(--c-bg)); border:1px solid color-mix(in srgb,var(--c-beruf) 25%,var(--c-border)); border-radius:20px; font-size:0.78rem; font-family:var(--font); color:var(--c-text); font-weight:500; animation:chip-in 0.2s ease; }
+@keyframes chip-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+.ck-reminder-chip-icon { font-size:0.9rem; }
+.ck-reminder-chip-text { flex:1; }
+.ck-reminder-chip-close { background:none; border:none; cursor:pointer; font-size:0.85rem; color:var(--c-muted); padding:0 0 0 2px; line-height:1; font-family:var(--font); }
+.ck-reminder-chip-close:hover { color:var(--c-text); }
 #ck-tagesseite { display:flex; flex-direction:column; height:calc(100vh - 110px); overflow:hidden; }
 #ck-tag-header { flex-shrink:0; padding:10px 16px 8px; border-bottom:1px solid var(--c-border); }
 .ck-block { display:flex; flex-direction:column; border-bottom:1px solid var(--c-border); overflow:hidden; }
@@ -7035,6 +7043,8 @@ html, body {
     <div id="ck-tag-badges" style="display:none;margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;"></div>
   </div>
 
+  <div id="ck-reminder-chips"></div>
+
   <!-- Scrollbarer Body -->
   <div id="ck-scroll-body">
 
@@ -8294,7 +8304,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.5.7 · Build 20260609-0900</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.5.8 · Build 20260609-0920</div>
     </div>
 
     <!-- Welt -->
@@ -8467,8 +8477,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.5.7',
-  APP_BUILD:   '20260609-0900',
+  APP_VERSION: '5.5.8',
+  APP_BUILD:   '20260609-0920',
 
 
   // ══════════════════════════════════════════════════════
@@ -11077,19 +11087,55 @@ const WB = {
       if (isFirstCall && !r.beimStart) continue;
       if (!isFirstCall && minSinceLast < (r.intervall || 60)) continue;
 
-      // Zeigen
-      this._reminderShow(r);
-      return; // nur eine gleichzeitig
+      // Zeigen — alle fälligen als Chips
+      if (!this._reminderChips[r.id]) {
+        this._reminderShowChip(r);
+      }
     }
   },
 
   _reminderShow(r) {
-    this._reminderCurrentId = r.id;
-    const iconEl = document.getElementById('reminder-icon');
-    const textEl = document.getElementById('reminder-text');
-    if (iconEl) iconEl.textContent = r.icon || '💧';
-    if (textEl) textEl.textContent = r.text || 'Erinnerung';
-    document.getElementById('wb-reminder-overlay')?.classList.add('open');
+    // Overlay ersetzt durch Chip
+    this._reminderShowChip(r);
+  },
+
+  _reminderShowChip(r) {
+    const container = document.getElementById('ck-reminder-chips');
+    if (!container) return;
+    if (this._reminderChips[r.id]) return;
+
+    const chip = document.createElement('div');
+    chip.className = 'ck-reminder-chip';
+    chip.id = 'ck-chip-' + r.id;
+    chip.innerHTML =
+      '<span class="ck-reminder-chip-icon">' + (r.icon || '💧') + '</span>'
+      + '<span class="ck-reminder-chip-text">' + this._esc(r.text || 'Erinnerung') + '</span>'
+      + '<button class="ck-reminder-chip-close"'
+        + ' onclick="WB._reminderDismissChip(&quot;' + r.id + '&quot;)"'
+        + ' title="Schlie\u00dfen">\u2715</button>';
+
+    container.appendChild(chip);
+    this._reminderLastShown[r.id] = Date.now();
+
+    const timer = setTimeout(() => {
+      this._reminderDismissChip(r.id);
+    }, 10 * 60 * 1000);
+
+    this._reminderChips[r.id] = { timer, shownAt: Date.now() };
+  },
+
+  _reminderDismissChip(reminderId) {
+    const chip = this._reminderChips[reminderId];
+    if (chip?.timer) clearTimeout(chip.timer);
+    delete this._reminderChips[reminderId];
+
+    const el = document.getElementById('ck-chip-' + reminderId);
+    if (el) {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(-4px)';
+      el.style.transition = 'all 0.15s';
+      setTimeout(() => el.remove(), 150);
+    }
   },
 
   _reminderDismiss() {
@@ -11232,6 +11278,7 @@ const WB = {
 
   _ritualOpenedToSession: false,  // Session-Lock: verhindert Re-Open nach Auth-Renewal
   _syncReadyForDialogs: false,
+  _reminderChips: {},
   _ritualDriveReady: false,       // v4.4.1: Drive-Sync abgeschlossen oder kein Drive konfiguriert
 
   // Auto-Trigger: beim Cockpit-Render aufgerufen
