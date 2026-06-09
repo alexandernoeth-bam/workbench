@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.6.4</title>
+<title>WorkBench 5.6.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7097,6 +7097,16 @@ html, body {
       <div class="ck-zone-body" id="ck-body-vm"></div>
     </div>
 
+    <div class="ck-zone" id="ck-zone-mi">
+      <div class="ck-zone-header">
+        <span class="ck-zone-icon">🍽</span>
+        <span class="ck-zone-label">Mittag</span>
+        <span class="ck-zone-hint" id="ck-hint-mi">12:00 – 12:45</span>
+        <span class="ck-zone-count" id="ck-count-mi"></span>
+      </div>
+      <div class="ck-zone-body" id="ck-body-mi"></div>
+    </div>
+
     <div class="ck-zone" id="ck-zone-nm">
       <div class="ck-zone-header">
         <span class="ck-zone-icon">🌞</span>
@@ -7105,6 +7115,16 @@ html, body {
         <span class="ck-zone-count" id="ck-count-nm"></span>
       </div>
       <div class="ck-zone-body" id="ck-body-nm"></div>
+    </div>
+
+    <div class="ck-zone" id="ck-zone-fe">
+      <div class="ck-zone-header">
+        <span class="ck-zone-icon">🏠</span>
+        <span class="ck-zone-label">Feierabend</span>
+        <span class="ck-zone-hint" id="ck-hint-fe">16:00 – 17:00</span>
+        <span class="ck-zone-count" id="ck-count-fe"></span>
+      </div>
+      <div class="ck-zone-body" id="ck-body-fe"></div>
     </div>
 
     <div class="ck-zone" id="ck-zone-ab">
@@ -8343,7 +8363,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.6.4 · Build 20260609-1120</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.6.5 · Build 20260609-1140</div>
     </div>
 
     <!-- Welt -->
@@ -8520,8 +8540,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.6.4',
-  APP_BUILD:   '20260609-1120',
+  APP_VERSION: '5.6.5',
+  APP_BUILD:   '20260609-1140',
 
 
   // ══════════════════════════════════════════════════════
@@ -12866,10 +12886,13 @@ const WB = {
   _ritualRenderZeitbloecke() {
     const el = document.getElementById('ritual-zeitblock-body');
     if (!el) return;
+    const zr = this._ckZoneRanges();
     const SLOTS = [
-      { id: 'vm', label: '🌅 Vormittag', hint: '07:00 – 12:00' },
-      { id: 'nm', label: '🌞 Nachmittag', hint: '12:45 – 16:00' },
-      { id: 'ab', label: '🌙 Abend',      hint: 'ab 16:00' },
+      { id: 'vm', label: '🌅 Vormittag',  hint: zr.vm.hint },
+      { id: 'mi', label: '🍽 Mittag',     hint: zr.mi.hint },
+      { id: 'nm', label: '🌞 Nachmittag', hint: zr.nm.hint },
+      { id: 'fe', label: '🏠 Feierabend', hint: zr.fe.hint },
+      { id: 'ab', label: '🌙 Abend',      hint: zr.ab.hint },
     ];
     if (!this._ritualZeitbloecke) this._ritualZeitbloecke = {};
     if (!this._ritualSelected.length) {
@@ -15341,10 +15364,25 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const dispDate = new Date(dateStr + 'T12:00:00');
 
     // Aktive Zone bestimmen (nur heute)
+    const zoneRanges = this._ckZoneRanges();
+    // Hint-Texte aktualisieren
+    const hintMi = document.getElementById('ck-hint-mi');
+    const hintFe = document.getElementById('ck-hint-fe');
+    const hintNm = document.querySelector('#ck-zone-nm .ck-zone-hint');
+    const hintAb = document.querySelector('#ck-zone-ab .ck-zone-hint');
+    if (hintMi) hintMi.textContent = zoneRanges.mi.hint;
+    if (hintFe) hintFe.textContent = zoneRanges.fe.hint;
+    if (hintNm) hintNm.textContent = zoneRanges.nm.hint;
+    if (hintAb) hintAb.textContent = zoneRanges.ab.hint;
     if (isToday) {
       const nowMin = now.getHours() * 60 + now.getMinutes();
-      this._ckAktiveZone = nowMin < 12*60 ? 'vm' : nowMin < 16*60 ? 'nm' : 'ab';
-      this._ckNowMin     = nowMin;
+      const zr = zoneRanges;
+      this._ckNowMin = nowMin;
+      if      (nowMin < zr.mi.from) this._ckAktiveZone = 'vm';
+      else if (nowMin < zr.mi.to)   this._ckAktiveZone = 'mi';
+      else if (nowMin < zr.fe.from) this._ckAktiveZone = 'nm';
+      else if (nowMin < zr.fe.to)   this._ckAktiveZone = 'fe';
+      else                          this._ckAktiveZone = 'ab';
     } else {
       this._ckAktiveZone = null;
       this._ckNowMin     = 0;
@@ -15433,7 +15471,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
 
     try { this._ckRenderZone('vm', dateStr, isToday); } catch(e) { console.error('ck-zone-vm:', e); }
+    try { this._ckRenderZone('mi', dateStr, isToday); } catch(e) { console.error('ck-zone-mi:', e); }
     try { this._ckRenderZone('nm', dateStr, isToday); } catch(e) { console.error('ck-zone-nm:', e); }
+    try { this._ckRenderZone('fe', dateStr, isToday); } catch(e) { console.error('ck-zone-fe:', e); }
     try { this._ckRenderZone('ab', dateStr, isToday); } catch(e) { console.error('ck-zone-ab:', e); }
     try { this._ckRenderKleinigkeiten(dateStr, isToday); } catch(e) { console.error('ck-zone-rauschen:', e); }
   },
@@ -15442,11 +15482,15 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const items = [];
     const pT = t => { if (!t) return -1; const [h,m] = t.split(':').map(Number); return h*60+m; };
     const today = new Date().toISOString().split('T')[0];
+    const ZONE_RANGE = this._ckZoneRanges();
     const getZone = (timeStr) => {
       const min = pT(timeStr);
       if (min < 0) return null;
-      if (min < 12*60) return 'vm';
-      if (min < 16*60) return 'nm';
+      const zr = ZONE_RANGE;
+      if (min < zr.mi.from) return 'vm';
+      if (min < zr.mi.to)   return 'mi';
+      if (min < zr.fe.from) return 'nm';
+      if (min < zr.fe.to)   return 'fe';
       return 'ab';
     };
     const slotToZone = { vm:'vm', nm:'nm', ab:'ab' };
@@ -15561,6 +15605,26 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     return items;
   },
 
+  _ckZoneRanges() {
+    const s = this._settings || {};
+    const miBreakMin  = parseInt(s.proBreakMin || 45);
+    const miEndMin    = 12*60 + miBreakMin;
+    const miEndStr    = String(Math.floor(miEndMin/60)).padStart(2,'0') + ':' + String(miEndMin%60).padStart(2,'0');
+    const feStartStr  = s.privAfterWorkStart || '16:00';
+    const feDeductMin = parseInt(s.privAfterWorkDeductMin || 60);
+    const feStartParts = feStartStr.split(':').map(Number);
+    const feStartMin  = feStartParts[0]*60 + (feStartParts[1]||0);
+    const feEndMin    = feStartMin + feDeductMin;
+    const feEndStr    = String(Math.floor(feEndMin/60)).padStart(2,'0') + ':' + String(feEndMin%60).padStart(2,'0');
+    return {
+      vm: { from: 7*60,       to: 12*60,       hint: '07:00 – 12:00' },
+      mi: { from: 12*60,      to: miEndMin,    hint: '12:00 – ' + miEndStr },
+      nm: { from: miEndMin,   to: feStartMin,  hint: miEndStr + ' – ' + feStartStr },
+      fe: { from: feStartMin, to: feEndMin,    hint: feStartStr + ' – ' + feEndStr },
+      ab: { from: feEndMin,   to: 24*60,       hint: 'ab ' + feEndStr },
+    };
+  },
+
   _ckRenderZone(zoneId, dateStr, isToday) {
     const body  = document.getElementById('ck-body-' + zoneId);
     const count = document.getElementById('ck-count-' + zoneId);
@@ -15589,6 +15653,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           else header.appendChild(badge);
         }
       } else { if (badge) badge.remove(); }
+      // Übergangs-Zonen: subtil anders einfärben
+      if ((zoneId === 'mi' || zoneId === 'fe') && !isAktiv) {
+        header.style.background = 'color-mix(in srgb, var(--c-beruf) 3%, var(--c-bg))';
+      } else if (zoneId !== 'mi' && zoneId !== 'fe') {
+        header.style.background = '';
+      }
     }
   },
 
