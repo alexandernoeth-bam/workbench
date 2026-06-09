@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.6.5</title>
+<title>WorkBench 5.6.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -575,6 +575,8 @@ html, body {
   .ck-zone { margin-bottom:8px; border-radius:var(--radius-sm,6px); border:1px solid var(--c-border); background:var(--c-surface); overflow:hidden; }
   .ck-zone-header.jetzt { background:color-mix(in srgb,var(--c-beruf) 8%,var(--c-bg)); border-bottom-color:color-mix(in srgb,var(--c-beruf) 25%,var(--c-border)); }
 .ck-zone-header.jetzt .ck-zone-label { color:var(--c-beruf); }
+.ck-zone-header.vergangen { opacity:0.45; }
+.ck-zone-header.vergangen .ck-zone-label { color:var(--c-faint); }
 .ck-zone-jetzt-badge { font-size:0.62rem;font-weight:700;color:var(--c-beruf);background:var(--c-beruf-bg,#E8F5F3);padding:1px 6px;border-radius:8px;margin-left:4px; }
 .ck-z-eintrag.faellig-bald .ck-z-titel { color:var(--c-beruf);font-weight:600; }
 .ck-z-eintrag.faellig-bald::before { content:'⏰';font-size:0.75rem;margin-right:4px; }
@@ -8363,7 +8365,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.6.5 · Build 20260609-1140</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.6.6 · Build 20260609-1200</div>
     </div>
 
     <!-- Welt -->
@@ -8540,8 +8542,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.6.5',
-  APP_BUILD:   '20260609-1140',
+  APP_VERSION: '5.6.6',
+  APP_BUILD:   '20260609-1200',
 
 
   // ══════════════════════════════════════════════════════
@@ -11155,7 +11157,7 @@ const WB = {
       const last = this._reminderLastShown[r.id] || 0;
       const isFirstCall = last === 0;
       const minSinceLast = (Date.now() - last) / 60000;
-      if (isFirstCall && !r.beimStart) continue;
+      if (isFirstCall && r.beimStart === false) continue;  // undefined/true = sofort zeigen
       if (!isFirstCall && minSinceLast < (r.intervall || 60)) continue;
 
       // Zeigen — alle fälligen als Chips
@@ -15628,20 +15630,45 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _ckRenderZone(zoneId, dateStr, isToday) {
     const body  = document.getElementById('ck-body-' + zoneId);
     const count = document.getElementById('ck-count-' + zoneId);
+    const zoneEl = document.getElementById('ck-zone-' + zoneId);
     if (!body) return;
-    const items = this._ckGetZoneItems(dateStr, zoneId);
-    if (count) count.textContent = items.filter(i => !i.done).length || '';
-    if (!items.length) {
-      body.innerHTML = '<div style="padding:8px 12px;font-size:0.82rem;color:var(--c-faint);font-style:italic;">Nichts geplant</div>';
-      return;
-    }
-    body.innerHTML = items.map(item => this._ckRenderZoneItem(item, isToday)).join('');
 
-    // Jetzt-Badge im Zone-Header
-    const header = document.querySelector('#ck-zone-' + zoneId + ' .ck-zone-header');
+    const items    = this._ckGetZoneItems(dateStr, zoneId);
+    const offene   = items.filter(i => !i.done).length;
+    const zr       = this._ckZoneRanges();
+    const zoneInfo = zr[zoneId];
+
+    // Vergangene Zone: Zeitfenster ist bereits abgelaufen + heute + keine offenen Items
+    const isPast = isToday && zoneInfo && (this._ckNowMin || 0) > (zoneInfo.to || 0);
+    const isTransition = zoneId === 'mi' || zoneId === 'fe';
+
+    if (count) count.textContent = offene || '';
+
+    // Mittag/Feierabend leer → nur Header, kein Body
+    if (isTransition && !items.length) {
+      body.style.display = 'none';
+      body.innerHTML = '';
+    } else if (isPast && !offene) {
+      // Vergangene Zone ohne offene Items → eingeklappt
+      body.style.display = 'none';
+      body.innerHTML = '';
+    } else {
+      body.style.display = '';
+      if (!items.length) {
+        body.innerHTML = '<div style="padding:8px 12px;font-size:0.82rem;color:var(--c-faint);font-style:italic;">Nichts geplant</div>';
+      } else {
+        body.innerHTML = items.map(item => this._ckRenderZoneItem(item, isToday)).join('');
+      }
+    }
+
+    // Jetzt-Badge + Header-Styling
+    const header = zoneEl?.querySelector('.ck-zone-header');
     if (header) {
       const isAktiv = isToday && this._ckAktiveZone === zoneId;
       header.classList.toggle('jetzt', isAktiv);
+      // Vergangen-Klasse
+      header.classList.toggle('vergangen', isPast && !offene && !isAktiv);
+
       let badge = header.querySelector('.ck-zone-jetzt-badge');
       if (isAktiv) {
         if (!badge) {
@@ -15653,11 +15680,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           else header.appendChild(badge);
         }
       } else { if (badge) badge.remove(); }
-      // Übergangs-Zonen: subtil anders einfärben
-      if ((zoneId === 'mi' || zoneId === 'fe') && !isAktiv) {
-        header.style.background = 'color-mix(in srgb, var(--c-beruf) 3%, var(--c-bg))';
-      } else if (zoneId !== 'mi' && zoneId !== 'fe') {
+
+      // Übergangs-Zonen: dunkelrot statt petrol
+      if (isTransition && !isAktiv) {
+        header.style.background = 'color-mix(in srgb, #C0392B 5%, var(--c-bg))';
+        header.style.borderBottomColor = 'color-mix(in srgb, #C0392B 20%, var(--c-border))';
+      } else if (!isAktiv) {
         header.style.background = '';
+        header.style.borderBottomColor = '';
       }
     }
   },
