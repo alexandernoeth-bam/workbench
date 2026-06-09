@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.7.0</title>
+<title>WorkBench 5.7.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7081,10 +7081,10 @@ html, body {
       <button id="ck-today-btn" onclick="WB._ckGoToday()" style="display:none;font-size:0.72rem;padding:3px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;cursor:pointer;font-family:var(--font);color:var(--c-muted);">Heute</button>
       <button onclick="WB._ckShift(1)" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--c-muted);padding:0 4px;line-height:1;">›</button>
     </div>
-    <div id="ck-smart-toggle" style="margin-top:4px;">
-      <button onclick="WB._ckToggleSmartView()" id="ck-smart-btn" style="font-size:0.68rem;padding:2px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;cursor:pointer;font-family:var(--font);color:var(--c-faint);">Alle Zonen</button>
+    <div id="ck-tag-badges" style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <span id="ck-badges-content"></span>
+      <button onclick="WB._ckToggleSmartView()" id="ck-smart-btn" style="font-size:0.65rem;padding:3px 10px;border-radius:12px;border:none;cursor:pointer;font-family:var(--font);font-weight:600;margin-left:auto;background:var(--c-beruf);color:#fff;letter-spacing:0.03em;">Alle Zonen</button>
     </div>
-    <div id="ck-tag-badges" style="display:none;margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;"></div>
   </div>
 
   <div id="ck-reminder-chips"></div>
@@ -8368,7 +8368,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.7.0 · Build 20260609-1300</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.7.1 · Build 20260609-1315</div>
     </div>
 
     <!-- Welt -->
@@ -8545,8 +8545,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.7.0',
-  APP_BUILD:   '20260609-1300',
+  APP_VERSION: '5.7.1',
+  APP_BUILD:   '20260609-1315',
 
 
   // ══════════════════════════════════════════════════════
@@ -15424,7 +15424,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const todayBtn = document.getElementById('ck-today-btn');
     if (todayBtn) todayBtn.style.display = isToday ? 'none' : '';
 
-    const badgesEl = document.getElementById('ck-tag-badges');
+    const badgesEl = document.getElementById('ck-badges-content');
+    const badgesWrap = document.getElementById('ck-tag-badges');
     if (badgesEl) {
       if (isToday) {
         const store  = this._ritualStore();
@@ -15444,8 +15445,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
             }
           } catch(e) {}
           badgesEl.innerHTML = badges;
-          badgesEl.style.display = badges ? 'flex' : 'none';
-        } else { badgesEl.style.display = 'none'; }
+          // badges-content: kein display-Toggle
+        } else { badgesEl.innerHTML = ''; }
       } else {
         // Zukunftstage: bereits verbrauchte Energie durch Termine berechnen
         try {
@@ -15471,17 +15472,24 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           if (verbraucht > 0) {
             const col = verbraucht >= 20 ? 'var(--c-warn,#E67E22)' : '#B45309';
             badgesEl.innerHTML = '<span class="ck-fokus-badge" style="color:' + col + ';border-color:' + col + ';">📅 -' + verbraucht + ' Energie geplant</span>';
-            badgesEl.style.display = 'flex';
+            // badges sichtbar via content
           } else {
-            badgesEl.style.display = 'none';
+            badgesEl.innerHTML = '';
           }
-        } catch(e) { badgesEl.style.display = 'none'; }
+        } catch(e) { badgesEl.innerHTML = ''; }
       }
     }
 
-    // Smart-View Button-Text synchronisieren
+    // Smart-View Button synchronisieren
     const smartBtn = document.getElementById('ck-smart-btn');
-    if (smartBtn) smartBtn.textContent = this._ckSmartView ? 'Alle Zonen' : 'Smart-View';
+    if (smartBtn) {
+      smartBtn.textContent = this._ckSmartView ? 'Alle Zonen' : 'Smart-View';
+      if (this._ckSmartView) {
+        smartBtn.style.background = 'var(--c-beruf)'; smartBtn.style.color = '#fff'; smartBtn.style.border = 'none';
+      } else {
+        smartBtn.style.background = 'none'; smartBtn.style.color = 'var(--c-beruf)'; smartBtn.style.border = '1px solid var(--c-beruf)';
+      }
+    }
 
     try { this._ckRenderZone('vm', dateStr, isToday); } catch(e) { console.error('ck-zone-vm:', e); }
     try { this._ckRenderZone('mi', dateStr, isToday); } catch(e) { console.error('ck-zone-mi:', e); }
@@ -15636,8 +15644,15 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _ckToggleSmartView() {
     this._ckSmartView = !this._ckSmartView;
     const btn = document.getElementById('ck-smart-btn');
-    if (btn) btn.textContent = this._ckSmartView ? 'Alle Zonen' : 'Smart-View';
-    this._ckZoneCollapsed = {};  // manuelle Overrides zurücksetzen
+    if (btn) {
+      btn.textContent = this._ckSmartView ? 'Alle Zonen' : 'Smart-View';
+      if (this._ckSmartView) {
+        btn.style.background = 'var(--c-beruf)'; btn.style.color = '#fff'; btn.style.border = 'none';
+      } else {
+        btn.style.background = 'none'; btn.style.color = 'var(--c-beruf)'; btn.style.border = '1px solid var(--c-beruf)';
+      }
+    }
+    this._ckZoneCollapsed = {};
     this._ckRenderTagesseite();
   },
 
