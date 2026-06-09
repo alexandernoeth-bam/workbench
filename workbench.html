@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.5.6</title>
+<title>WorkBench 5.5.7</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8294,7 +8294,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.5.6 · Build 20260609-0840</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.5.7 · Build 20260609-0900</div>
     </div>
 
     <!-- Welt -->
@@ -8467,8 +8467,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.5.6',
-  APP_BUILD:   '20260609-0840',
+  APP_VERSION: '5.5.7',
+  APP_BUILD:   '20260609-0900',
 
 
   // ══════════════════════════════════════════════════════
@@ -15073,31 +15073,30 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const ritual = store && store[this._ritualTodayKey()];
       (ritual?.fokus || []).forEach(f => ritualIds.add(f.id));
     }
-    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    (db?.vorhaben || []).forEach(v => {
-      (v.meilensteine || []).forEach(ms => {
-        (ms.aufgaben || [])
-          .filter(a => !a.done && !ritualIds.has(a.id) && (
-            // Aufgabe hat genau dieses Datum
-            a.datum === dateStr ||
-            // Für andere Tage: naechsterSchritt-Aufgaben ohne Datum in Vormittag anzeigen
-            (!a.datum && a.naechsterSchritt && dateStr !== today && zone === 'vm')
-          ))
-          .forEach(a => {
-            const aZone = getZone(a.startTime || '');
-            const matchesZone = zone === null ? !aZone : (aZone === zone || (!aZone && zone === 'vm'));
-            if (matchesZone) {
-              items.push({ type:'vorhaben', id:a.id, title:a.text, meta:v.titel||'', done:false, zeit:a.startTime||'', ctx, obj:{a,v,ms}, ae:a.aktivEnergie||'', sort:pT(a.startTime||'') >= 0 ? pT(a.startTime) : 6000 });
-            }
-          });
+    // Beide Welten
+    [['pro', this.dataPro], ['priv', this.dataPriv]].forEach(([vCtx, vDb]) => {
+      (vDb?.vorhaben || []).forEach(v => {
+        (v.meilensteine || []).forEach(ms => {
+          (ms.aufgaben || [])
+            .filter(a => !a.done && !ritualIds.has(a.id) && (
+              a.datum === dateStr ||
+              (!a.datum && a.naechsterSchritt && dateStr !== today && zone === 'vm')
+            ))
+            .forEach(a => {
+              const aZone = getZone(a.startTime || '');
+              const matchesZone = zone === null ? !aZone : (aZone === zone || (!aZone && zone === 'vm'));
+              if (matchesZone) {
+                items.push({ type:'vorhaben', id:a.id, title:a.text, meta:v.titel||'', done:false, zeit:a.startTime||'', ctx:vCtx, obj:{a,v,ms}, ae:a.aktivEnergie||'', sort:pT(a.startTime||'') >= 0 ? pT(a.startTime) : 6000 });
+              }
+            });
+        });
       });
     });
 
-    // 4. Wochenpflichten fällig
-    const aktivCtx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-    if (!noWork || aktivCtx === 'priv') {
-      (this._dutyStore(aktivCtx) || []).forEach(d => {
+    // 4. Wochenpflichten fällig — beide Welten
+    ['pro', 'priv'].forEach(dCtx => {
+      if (dCtx === 'pro' && noWork) return;  // Beruf-Pflichten an Nicht-Arbeitstagen überspringen
+      (this._dutyStore(dCtx) || []).forEach(d => {
         try {
           const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
           const inst  = insts.find(i => i.date === dateStr || (dateStr === today && i.isToday));
@@ -15105,19 +15104,23 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           const dutyZone    = getZone(d.startTime || '') || 'vm';
           const pflichtZone = zone === null ? false : (dutyZone === zone);
           if (pflichtZone) {
-            items.push({ type:'pflicht', id:d.id, title:d.title||d.name||'', meta:aktivCtx==='pro'?'Beruf':'Privat', done:false, zeit:d.startTime||'', ctx:aktivCtx, obj:{d,inst}, sort:d.startTime ? pT(d.startTime) : 7000 });
+            items.push({ type:'pflicht', id:d.id, title:d.title||d.name||'', meta:dCtx==='pro'?'Beruf':'Privat', done:false, zeit:d.startTime||'', ctx:dCtx, obj:{d,inst}, sort:d.startTime ? pT(d.startTime) : 7000 });
           }
         } catch(e) {}
       });
-    }
+    });
 
-    // 5. Schnellerinnerungen mit Datum = dateStr
+    // 5. Schnellerinnerungen mit Datum = dateStr — beide Stores
     const _proQIds  = new Set((this.dataPro?.quickItems  || []).map(q => q.id));
     const _privQIds = new Set((this.dataPriv?.quickItems || []).map(q => q.id));
-    (this._quickStore() || []).filter(q => q.date === dateStr).forEach(q => {
+    const allQuick  = [
+      ...(this.dataPro?.quickItems  || []),
+      ...(this.dataPriv?.quickItems || []),
+    ];
+    allQuick.filter(q => q.date === dateStr).forEach(q => {
       const qZone = q.time ? getZone(q.time) : null;
       const matchesZone = zone === null ? !qZone : qZone === zone;
-      const qCtx = _proQIds.has(q.id) ? 'pro' : _privQIds.has(q.id) ? 'priv' : (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+      const qCtx = _proQIds.has(q.id) ? 'pro' : 'priv';
       if (matchesZone) {
         items.push({ type:'schnell', id:q.id, title:q.text||q.title||'', meta:'', done:!!q.done, zeit:q.time||'', ctx:qCtx, obj:q, sort:q.time ? pT(q.time) : 8000 });
       }
@@ -15228,17 +15231,18 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!body || !block) return;
 
     const items = [];
-    // Welt-Lookup: in welchem Store liegt eine ID?
+    // Welt-Lookup
     const proIds  = new Set((this.dataPro?.quickItems  || []).map(q => q.id));
     const privIds = new Set((this.dataPriv?.quickItems || []).map(q => q.id));
     const getWelt = id => proIds.has(id) ? 'pro' : privIds.has(id) ? 'priv' : null;
+    const allQ    = [...(this.dataPro?.quickItems||[]), ...(this.dataPriv?.quickItems||[])];
 
-    // A) Schnellerinnerungen ohne Datum
-    (this._quickStore() || []).filter(q => !q.date && !q.done).forEach(q => {
+    // A) Schnellerinnerungen ohne Datum (klassisches Rauschen) — beide Stores
+    allQ.filter(q => !q.date && !q.done).forEach(q => {
       items.push({ type: 'schnell', id: q.id, title: q.text||q.title||'', done: false, zeit: '', obj: q, welt: getWelt(q.id) });
     });
-    // B) Schnellerinnerungen mit Datum = dateStr aber ohne Uhrzeit
-    (this._quickStore() || []).filter(q => q.date === dateStr && !q.time && !q.done).forEach(q => {
+    // B) Schnellerinnerungen mit Datum = dateStr aber ohne Uhrzeit — beide Stores
+    allQ.filter(q => q.date === dateStr && !q.time && !q.done).forEach(q => {
       items.push({ type: 'schnell', id: q.id, title: q.text||q.title||'', done: false, zeit: '', obj: q, welt: getWelt(q.id) });
     });
 
