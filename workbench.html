@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.6.7</title>
+<title>WorkBench 5.6.8</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7090,7 +7090,7 @@ html, body {
   <div id="ck-scroll-body">
 
     <div class="ck-zone" id="ck-zone-vm">
-      <div class="ck-zone-header">
+      <div class="ck-zone-header" onclick="WB._ckZoneToggle('vm')" style="cursor:pointer;">
         <span class="ck-zone-icon">🌅</span>
         <span class="ck-zone-label">Vormittag</span>
         <span class="ck-zone-hint">07:00 – 12:00</span>
@@ -7100,7 +7100,7 @@ html, body {
     </div>
 
     <div class="ck-zone" id="ck-zone-mi">
-      <div class="ck-zone-header">
+      <div class="ck-zone-header" onclick="WB._ckZoneToggle('mi')" style="cursor:pointer;">
         <span class="ck-zone-icon">🍽</span>
         <span class="ck-zone-label">Mittag</span>
         <span class="ck-zone-hint" id="ck-hint-mi">12:00 – 12:45</span>
@@ -7110,7 +7110,7 @@ html, body {
     </div>
 
     <div class="ck-zone" id="ck-zone-nm">
-      <div class="ck-zone-header">
+      <div class="ck-zone-header" onclick="WB._ckZoneToggle('nm')" style="cursor:pointer;">
         <span class="ck-zone-icon">🌞</span>
         <span class="ck-zone-label">Nachmittag</span>
         <span class="ck-zone-hint">12:45 – 16:00</span>
@@ -7120,7 +7120,7 @@ html, body {
     </div>
 
     <div class="ck-zone" id="ck-zone-fe">
-      <div class="ck-zone-header">
+      <div class="ck-zone-header" onclick="WB._ckZoneToggle('fe')" style="cursor:pointer;">
         <span class="ck-zone-icon">🏠</span>
         <span class="ck-zone-label">Feierabend</span>
         <span class="ck-zone-hint" id="ck-hint-fe">16:00 – 17:00</span>
@@ -7130,7 +7130,7 @@ html, body {
     </div>
 
     <div class="ck-zone" id="ck-zone-ab">
-      <div class="ck-zone-header">
+      <div class="ck-zone-header" onclick="WB._ckZoneToggle('ab')" style="cursor:pointer;">
         <span class="ck-zone-icon">🌙</span>
         <span class="ck-zone-label">Abend</span>
         <span class="ck-zone-hint">ab 16:00</span>
@@ -8365,7 +8365,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.6.7 · Build 20260609-1215</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.6.8 · Build 20260609-1230</div>
     </div>
 
     <!-- Welt -->
@@ -8542,8 +8542,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.6.7',
-  APP_BUILD:   '20260609-1215',
+  APP_VERSION: '5.6.8',
+  APP_BUILD:   '20260609-1230',
 
 
   // ══════════════════════════════════════════════════════
@@ -15361,6 +15361,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const now   = new Date();
     const today = now.toISOString().split('T')[0];
     if (!this._ckDate) this._ckDate = today;
+    // Tageswechsel → manuelle Collapsed-States zurücksetzen
+    if (this._ckDate !== today && dateStr === today) {
+      this._ckZoneCollapsed = {};
+    }
     const dateStr  = this._ckDate;
     const isToday  = dateStr === today;
     const dispDate = new Date(dateStr + 'T12:00:00');
@@ -15607,6 +15611,16 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     return items;
   },
 
+  _ckZoneCollapsed: {},   // { vm: true/false, mi: true/false, ... } — null = auto
+
+  _ckZoneToggle(zoneId) {
+    // Aktuellen Zustand umkehren (body sichtbar?)
+    const body = document.getElementById('ck-body-' + zoneId);
+    const isCurrentlyOpen = body && body.style.display !== 'none';
+    this._ckZoneCollapsed[zoneId] = isCurrentlyOpen;  // true = collapsed
+    this._ckRenderTagesseite();
+  },
+
   _ckZoneRanges() {
     const s = this._settings || {};
     const miBreakMin  = parseInt(s.proBreakMin || 45);
@@ -15628,41 +15642,39 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _ckRenderZone(zoneId, dateStr, isToday) {
-    const body  = document.getElementById('ck-body-' + zoneId);
-    const count = document.getElementById('ck-count-' + zoneId);
+    const body   = document.getElementById('ck-body-' + zoneId);
+    const count  = document.getElementById('ck-count-' + zoneId);
     const zoneEl = document.getElementById('ck-zone-' + zoneId);
     if (!body) return;
 
-    const items    = this._ckGetZoneItems(dateStr, zoneId);
-    const offene   = items.filter(i => !i.done).length;
-    const zr       = this._ckZoneRanges();
-    const zoneInfo = zr[zoneId];
+    const items        = this._ckGetZoneItems(dateStr, zoneId);
+    const offene       = items.filter(i => !i.done).length;
+    const zr           = this._ckZoneRanges();
+    const zoneInfo     = zr[zoneId];
+    const isTransition = zoneId === 'mi' || zoneId === 'fe';
 
-    // Zone zeitlich vorbei? → immer einklappen
-    const isPast = isToday && zoneInfo && (this._ckNowMin || 0) > (zoneInfo.to || 0);
+    // Vergangene Zone: Zeitfenster vorbei (nur heute)
+    const nowMin = this._ckNowMin || 0;
+    const isPast = isToday && zoneInfo && nowMin > (zoneInfo.to || 0);
 
-    if (count) count.textContent = offene || '';
-
-    // Mittag/Feierabend leer → nur Header
-    if (isTransition && !items.length) {
-      body.style.display = 'none';
-      body.innerHTML = '';
+    // Collapsed-State bestimmen:
+    // 1. Manuell gesetzt (_ckZoneCollapsed) → gewinnt immer
+    // 2. Sonst: vergangene Zone → collapsed; Mittag/Feierabend leer → collapsed; sonst offen
+    let collapsed;
+    if (this._ckZoneCollapsed[zoneId] !== undefined) {
+      collapsed = this._ckZoneCollapsed[zoneId];
     } else if (isPast) {
-      // Vergangene Zone → immer einklappen
+      collapsed = true;
+    } else if (isTransition && !items.length) {
+      collapsed = true;
+    } else {
+      collapsed = false;
+    }
+
+    // Body
+    if (collapsed) {
       body.style.display = 'none';
       body.innerHTML = '';
-      // Offene Items im Count anzeigen (rötlich wenn noch offen)
-      if (count) {
-        if (offene) {
-          count.textContent = offene + ' offen';
-          count.style.color = 'var(--c-danger,#C0392B)';
-          count.style.fontWeight = '600';
-        } else {
-          count.textContent = '✓';
-          count.style.color = 'var(--c-beruf)';
-          count.style.fontWeight = '600';
-        }
-      }
     } else {
       body.style.display = '';
       if (!items.length) {
@@ -15672,14 +15684,33 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       }
     }
 
-    // Jetzt-Badge + Header-Styling
+    // Count-Badge
+    if (count) {
+      if (isPast && collapsed) {
+        if (offene) {
+          count.textContent = offene + ' offen';
+          count.style.color = 'var(--c-danger,#C0392B)';
+          count.style.fontWeight = '600';
+        } else {
+          count.textContent = items.length ? '✓' : '';
+          count.style.color = items.length ? 'var(--c-beruf)' : '';
+          count.style.fontWeight = items.length ? '600' : '';
+        }
+      } else {
+        count.textContent = offene || '';
+        count.style.color = '';
+        count.style.fontWeight = '';
+      }
+    }
+
+    // Header: Jetzt-Badge + Pfeil + Styling
     const header = zoneEl?.querySelector('.ck-zone-header');
     if (header) {
       const isAktiv = isToday && this._ckAktiveZone === zoneId;
-      header.classList.toggle('jetzt', isAktiv);
-      // Vergangen-Klasse
-      header.classList.toggle('vergangen', isPast && !offene && !isAktiv);
+      header.classList.toggle('jetzt',    isAktiv);
+      header.classList.toggle('vergangen', isPast && collapsed && !isAktiv);
 
+      // Jetzt-Badge
       let badge = header.querySelector('.ck-zone-jetzt-badge');
       if (isAktiv) {
         if (!badge) {
@@ -15692,7 +15723,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         }
       } else { if (badge) badge.remove(); }
 
-      // Übergangs-Zonen: dunkelrot statt petrol
+      // Pfeil-Icon (▾ = offen, ▸ = zu)
+      let arrow = header.querySelector('.ck-zone-arrow');
+      if (!arrow) {
+        arrow = document.createElement('span');
+        arrow.className = 'ck-zone-arrow';
+        arrow.style.cssText = 'font-size:0.7rem;color:var(--c-faint);margin-left:auto;padding-left:6px;flex-shrink:0;';
+        header.appendChild(arrow);
+      }
+      arrow.textContent = collapsed ? '▸' : '▾';
+
+      // Übergangs-Zonen: dunkelrot
       if (isTransition && !isAktiv) {
         header.style.background = 'color-mix(in srgb, #C0392B 5%, var(--c-bg))';
         header.style.borderBottomColor = 'color-mix(in srgb, #C0392B 20%, var(--c-border))';
