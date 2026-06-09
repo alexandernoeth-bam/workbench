@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.7.2</title>
+<title>WorkBench 5.7.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -466,8 +466,8 @@ html, body {
 .wb-section.active#sec-cockpit ~ #ck-fab { display: none !important; }
 
 /* ── Cockpit v4.1: drei feste Blöcke ─────────────────── */
-#ck-reminder-chips { display:flex; gap:6px; flex-wrap:wrap; padding:4px 12px; background:var(--c-bg); border-bottom:1px solid var(--c-border); min-height:0; transition:all 0.2s; }
-#ck-reminder-chips:empty { display:none; }
+#ck-reminder-chips { display:contents; }
+#ck-reminder-chips:empty { display:contents; }
 .ck-reminder-chip { display:flex; align-items:center; gap:6px; padding:5px 10px 5px 8px; background:color-mix(in srgb,var(--c-beruf) 10%,var(--c-bg)); border:1px solid color-mix(in srgb,var(--c-beruf) 25%,var(--c-border)); border-radius:20px; font-size:0.78rem; font-family:var(--font); color:var(--c-text); font-weight:500; animation:chip-in 0.2s ease; }
 @keyframes chip-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
 .ck-reminder-chip-icon { font-size:0.9rem; }
@@ -7083,11 +7083,10 @@ html, body {
     </div>
     <div id="ck-tag-badges" style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
       <span id="ck-badges-content"></span>
+      <span id="ck-reminder-chips" style="display:contents;"></span>
       <button onclick="WB._ckToggleSmartView()" id="ck-smart-btn" style="font-size:0.65rem;padding:3px 10px;border-radius:12px;border:none;cursor:pointer;font-family:var(--font);font-weight:600;margin-left:auto;background:var(--c-beruf);color:#fff;letter-spacing:0.03em;">Alle Zonen</button>
     </div>
   </div>
-
-  <div id="ck-reminder-chips"></div>
 
   <!-- Scrollbarer Body -->
   <div id="ck-scroll-body">
@@ -8368,7 +8367,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.7.2 · Build 20260609-1330</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.7.3 · Build 20260609-1345</div>
     </div>
 
     <!-- Welt -->
@@ -8545,8 +8544,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.7.2',
-  APP_BUILD:   '20260609-1330',
+  APP_VERSION: '5.7.3',
+  APP_BUILD:   '20260609-1345',
 
 
   // ══════════════════════════════════════════════════════
@@ -11126,12 +11125,17 @@ const WB = {
   _reminderLastShown: {}, // id -> timestamp
 
   _reminderInit() {
-    // Beim App-Start + alle 60 Sek prüfen
     clearInterval(this._reminderInterval);
-    // lastShown für beimStart-Einträge zurücksetzen damit sie sofort angezeigt werden
     const store = this._reminderStore() || [];
     store.forEach(r => {
-      if (r.aktiv && r.beimStart) delete this._reminderLastShown[r.id];
+      if (!r.aktiv) return;
+      if (r.beimStart !== false) {
+        // beimStart=true/undefined → sofort zeigen (lastShown reset)
+        delete this._reminderLastShown[r.id];
+      } else if (!this._reminderLastShown[r.id]) {
+        // beimStart=false → Intervall-Timer starten (zeigt nach intervall Minuten)
+        this._reminderLastShown[r.id] = Date.now();
+      }
     });
     this._reminderCheck();
     this._reminderInterval = setInterval(() => this._reminderCheck(), 60000);
