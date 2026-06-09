@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.10.2</title>
+<title>WorkBench 5.11.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -1699,22 +1699,8 @@ html, body {
   flex-direction: column;
 }
 
-.wd-form {
-  border-top: 1px solid var(--c-border);
-  background: var(--c-bg); flex-shrink: 1; overflow-y: auto;
-}
-.wd-form-toggle {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 18px; cursor: pointer; user-select: none;
-}
-.wd-form-title {
-  font-size: 0.65rem; font-weight: 700;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--c-faint); margin: 0;
-}
-.wd-form-arrow { font-size: 0.7rem; color: var(--c-faint); }
-.wd-form-body { padding: 0 18px 14px; }
-.wd-form-body.collapsed { display: none; }
+#wb-duties-list { display:flex; flex-direction:column; flex:1; overflow:hidden; }
+#wb-duties-form { display:none; }
 .wd-form-row {
   display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;
 }
@@ -7987,58 +7973,52 @@ html, body {
 <div id="wb-duties-overlay" onclick="if(event.target===this)WB.dutiesClose()">
   <div id="wb-duties-panel">
     <div id="wb-duties-header">
-      <h2>Wochenpflichten</h2>
+      <button id="wd-back-btn" onclick="WB._dutyViewList()" style="display:none;background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--c-muted);padding:0 8px 0 0;font-family:var(--font);">&#8249;</button>
+      <h2 id="wd-header-title" style="flex:1;margin:0;font-size:1rem;font-weight:700;color:var(--c-text);">Wochenpflichten</h2>
+      <button id="wd-delete-btn" onclick="WB._dutyDeleteCurrent()" style="display:none;background:none;border:1px solid var(--c-danger);color:var(--c-danger);border-radius:6px;padding:4px 10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:var(--font);margin-right:6px;">Löschen</button>
       <button class="wb-settings-close" onclick="WB.dutiesClose()">&#215;</button>
     </div>
-    <!-- Liste nach Welt gegliedert -->
-    <div id="wb-duties-body"></div>
-    <!-- Formular: Neue Pflicht -->
-    <div class="wd-form">
-      <div class="wd-form-toggle" onclick="WB._dutyFormToggle()">
-        <div class="wd-form-title">Neue Pflicht</div>
-        <span class="wd-form-arrow" id="wd-form-arrow">▸</span>
+
+    <!-- LIST VIEW -->
+    <div id="wb-duties-list">
+      <div id="wb-duties-body" style="flex:1;overflow-y:auto;"></div>
+      <div style="padding:12px 18px 16px;border-top:1px solid var(--c-border);background:var(--c-bg);">
+        <button onclick="WB._dutyViewForm(null)" style="width:100%;padding:10px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-size:0.88rem;font-weight:600;cursor:pointer;font-family:var(--font);">+ Neue Pflicht</button>
       </div>
-      <div class="wd-form-body collapsed" id="wd-form-body">
-      <!-- Welt-Tabs -->
+    </div>
+
+    <!-- FORM VIEW (New + Edit) -->
+    <div id="wb-duties-form" style="display:none;flex:1;overflow-y:auto;padding:16px 18px;">
+      <input class="wd-input" type="text" id="wd-new-title" placeholder="Bezeichnung (z.B. Wäsche waschen)" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+      <div style="font-size:0.78rem;color:var(--c-muted);margin:12px 0 4px;">Welt</div>
       <div class="wd-world-tabs">
         <button class="wd-world-tab priv active" id="wd-tab-priv" onclick="WB._dutyFormWorld('priv')">Privat</button>
-        <button class="wd-world-tab pro"          id="wd-tab-pro"  onclick="WB._dutyFormWorld('pro')">Beruf</button>
+        <button class="wd-world-tab pro" id="wd-tab-pro" onclick="WB._dutyFormWorld('pro')">Beruf</button>
       </div>
-      <input class="wd-input" type="text" id="wd-new-title"
-        placeholder="Bezeichnung (z.B. Wäsche waschen)" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
-      <!-- Wiederholung -->
+      <div style="font-size:0.78rem;color:var(--c-muted);margin:12px 0 4px;">Wiederholung</div>
       <div class="wd-type-row" style="flex-wrap:wrap;gap:6px;">
-        <button class="wd-type-btn active" id="wd-rep-weekly"    onclick="WB._dutyFormRepeat('weekly')">Wöchentlich</button>
-        <button class="wd-type-btn"        id="wd-rep-everyN"    onclick="WB._dutyFormRepeat('every-n-weeks')">Alle N Wochen</button>
-        <button class="wd-type-btn"        id="wd-rep-monthly"   onclick="WB._dutyFormRepeat('monthly')">Monatlich</button>
+        <button class="wd-type-btn active" id="wd-rep-weekly" onclick="WB._dutyFormRepeat('weekly')">Wöchentlich</button>
+        <button class="wd-type-btn" id="wd-rep-everyN" onclick="WB._dutyFormRepeat('every-n-weeks')">Alle N Wochen</button>
+        <button class="wd-type-btn" id="wd-rep-monthly" onclick="WB._dutyFormRepeat('monthly')">Monatlich</button>
       </div>
-      <!-- every-n-weeks: N einstellen -->
-      <div id="wd-everyN-row" style="display:none;align-items:center;gap:8px;margin-bottom:8px;">
+      <div id="wd-everyN-row" style="display:none;align-items:center;gap:8px;margin:8px 0;">
         <span style="font-size:0.82rem;color:var(--c-muted);">Alle</span>
-        <input type="number" id="wd-repeat-n" min="2" max="12" value="2"
-          style="width:56px;padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;text-align:center;">
+        <input type="number" id="wd-repeat-n" min="2" max="12" value="2" style="width:56px;padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;text-align:center;">
         <span style="font-size:0.82rem;color:var(--c-muted);">Wochen</span>
       </div>
-      <!-- monthly: Regel -->
-      <div id="wd-monthly-row" style="display:none;margin-bottom:8px;">
+      <div id="wd-monthly-row" style="display:none;margin:8px 0;">
         <select id="wd-monthly-rule" style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
-          <option value="first-mo">Erster Montag</option>
-          <option value="first-fr">Erster Freitag</option>
-          <option value="last-sa">Letzter Samstag</option>
-          <option value="last-so">Letzter Sonntag</option>
-          <option value="last-fr">Letzter Freitag</option>
-          <option value="day-1">1. des Monats</option>
-          <option value="day-15">15. des Monats</option>
-          <option value="day-28">28. des Monats</option>
+          <option value="first-mo">Erster Montag</option><option value="first-fr">Erster Freitag</option>
+          <option value="last-sa">Letzter Samstag</option><option value="last-so">Letzter Sonntag</option>
+          <option value="last-fr">Letzter Freitag</option><option value="day-1">1. des Monats</option>
+          <option value="day-15">15. des Monats</option><option value="day-28">28. des Monats</option>
         </select>
       </div>
-      <!-- Typ (nur bei wöchentlich) -->
       <div id="wd-type-section">
         <div class="wd-type-row">
           <button class="wd-type-btn active" id="wd-type-multi" onclick="WB._dutyFormType('multi')">Mehrere Tage</button>
-          <button class="wd-type-btn"        id="wd-type-fixed" onclick="WB._dutyFormType('fixed')">Fester Tag</button>
+          <button class="wd-type-btn" id="wd-type-fixed" onclick="WB._dutyFormType('fixed')">Fester Tag</button>
         </div>
-        <!-- Multi: Wochentage -->
         <div class="wd-day-grid" id="wd-day-grid">
           <button class="wd-day-btn" data-dow="1" onclick="WB._dutyDayToggle(this)">Mo</button>
           <button class="wd-day-btn" data-dow="2" onclick="WB._dutyDayToggle(this)">Di</button>
@@ -8048,7 +8028,6 @@ html, body {
           <button class="wd-day-btn" data-dow="6" onclick="WB._dutyDayToggle(this)">Sa</button>
           <button class="wd-day-btn" data-dow="0" onclick="WB._dutyDayToggle(this)">So</button>
         </div>
-        <!-- Fixed: ein Tag -->
         <div class="wd-day-grid" id="wd-fixed-grid" style="display:none;">
           <button class="wd-day-btn" data-dow="1" onclick="WB._dutyFixedDay(this)">Mo</button>
           <button class="wd-day-btn" data-dow="2" onclick="WB._dutyFixedDay(this)">Di</button>
@@ -8059,38 +8038,26 @@ html, body {
           <button class="wd-day-btn" data-dow="0" onclick="WB._dutyFixedDay(this)">So</button>
         </div>
       </div>
-      <!-- Erinnerung -->
-      <div style="display:flex;align-items:center;gap:10px;margin:10px 0 4px;">
-        <span style="font-size:0.82rem;color:var(--c-muted);flex:1;">Erinnerung (optional)</span>
-        <input type="time" id="wd-reminder-time"
-          style="padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;margin:10px 0 4px;">
-        <span style="font-size:0.82rem;color:var(--c-muted);flex:1;">Uhrzeit im Cockpit (optional)</span>
-        <input type="time" id="wd-start-time"
-          style="padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
-      </div>
+      <div style="font-size:0.78rem;color:var(--c-muted);margin:12px 0 4px;">Uhrzeit im Cockpit (optional)</div>
+      <input type="time" id="wd-start-time" style="padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
+      <div style="display:flex;align-items:center;gap:8px;margin:10px 0 4px;">
         <input type="checkbox" id="wd-musttoday" style="width:16px;height:16px;cursor:pointer;accent-color:#C62828;">
-        <label for="wd-musttoday" style="font-size:0.85rem;cursor:pointer;color:#C62828;font-weight:500;">Muss am Fälligkeitstag zwingend erledigt werden</label>
+        <label for="wd-musttoday" style="font-size:0.85rem;cursor:pointer;color:#C62828;font-weight:500;">Muss am Fälligkeitstag erledigt werden</label>
       </div>
-      <div style="margin:10px 0 4px;">
-        <div style="font-size:0.82rem;color:var(--c-muted);margin-bottom:6px;">Aktivierungsenergie</div>
-        <div class="aktiv-pill-grid" id="wd-aktiv-grid">
-          <div class="aktiv-pill ae-niedrig" onclick="WB._aktivSelect(this,&quot;niedrig&quot;,&quot;wd-aktiv&quot;)">Niedrig</div>
-          <div class="aktiv-pill ae-mittel active" onclick="WB._aktivSelect(this,&quot;mittel&quot;,&quot;wd-aktiv&quot;)">Mittel</div>
-          <div class="aktiv-pill ae-hoch" onclick="WB._aktivSelect(this,&quot;hoch&quot;,&quot;wd-aktiv&quot;)">Hoch</div>
-          <input type="hidden" id="wd-aktiv" value="mittel">
-        </div>
+      <div style="font-size:0.78rem;color:var(--c-muted);margin:12px 0 4px;">Aktivierungsenergie</div>
+      <div class="aktiv-pill-grid" id="wd-aktiv-grid">
+        <div class="aktiv-pill ae-niedrig" onclick="WB._aktivSelect(this,&quot;niedrig&quot;,&quot;wd-aktiv&quot;)">Niedrig</div>
+        <div class="aktiv-pill ae-mittel active" onclick="WB._aktivSelect(this,&quot;mittel&quot;,&quot;wd-aktiv&quot;)">Mittel</div>
+        <div class="aktiv-pill ae-hoch" onclick="WB._aktivSelect(this,&quot;hoch&quot;,&quot;wd-aktiv&quot;)">Hoch</div>
+        <input type="hidden" id="wd-aktiv" value="mittel">
       </div>
-      <div style="margin:10px 0 4px;">
-        <span style="font-size:0.82rem;color:var(--c-muted);">Vorhaben (optional)</span>
-        <select id="wd-vorhaben" style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
-          <option value="">&ndash; Kein Vorhaben &ndash;</option>
-        </select>
-      </div>
-      <button class="wd-add-btn" onclick="WB.dutyAdd()">+ Pflicht hinzufügen</button>
-      </div>
+      <div style="font-size:0.78rem;color:var(--c-muted);margin:12px 0 4px;">Vorhaben (optional)</div>
+      <select id="wd-vorhaben" style="width:100%;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
+        <option value="">&ndash; Kein Vorhaben &ndash;</option>
+      </select>
+      <button id="wd-save-btn" onclick="WB._dutyFormSave()" style="width:100%;padding:12px 0;margin-top:20px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-size:0.92rem;font-weight:700;cursor:pointer;font-family:var(--font);">Pflicht erstellen</button>
     </div>
+
   </div>
 </div>
 
@@ -8432,7 +8399,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.10.2 · Build 20260609-1715</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.11.0 · Build 20260609-1745</div>
     </div>
 
     <!-- Welt -->
@@ -8609,8 +8576,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.10.2',
-  APP_BUILD:   '20260609-1715',
+  APP_VERSION: '5.11.0',
+  APP_BUILD:   '20260609-1745',
 
 
   // ══════════════════════════════════════════════════════
@@ -15850,13 +15817,159 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<span class="ck-timer-countdown">' + countdown + '</span>';
   },
 
-  _dutyFormToggle() {
-    const body = document.getElementById('wd-form-body');
-    const arrow = document.getElementById('wd-form-arrow');
-    if (!body) return;
-    const isOpen = !body.classList.contains('collapsed');
-    body.classList.toggle('collapsed', isOpen);
-    if (arrow) arrow.textContent = isOpen ? '▸' : '▾';
+  _dutyOpenEdit(ctx, dutyId) {
+    const store = this._dutyStore(ctx) || [];
+    const duty = store.find(d => d.id === dutyId);
+    if (duty) this._dutyViewForm(duty, ctx);
+  },
+
+  _dutyEditId: null,
+  _dutyEditCtx: null,
+
+  _dutyViewList() {
+    document.getElementById('wb-duties-list').style.display = 'flex';
+    document.getElementById('wb-duties-form').style.display = 'none';
+    document.getElementById('wd-back-btn').style.display = 'none';
+    document.getElementById('wd-delete-btn').style.display = 'none';
+    document.getElementById('wd-header-title').textContent = 'Wochenpflichten';
+    this._dutyEditId = null;
+    this._dutyEditCtx = null;
+    this._dutiesRender();
+  },
+
+  _dutyViewForm(duty, ctx) {
+    document.getElementById('wb-duties-list').style.display = 'none';
+    document.getElementById('wb-duties-form').style.display = '';
+    document.getElementById('wd-back-btn').style.display = '';
+    const isEdit = !!duty;
+    document.getElementById('wd-header-title').textContent = isEdit ? 'Pflicht bearbeiten' : 'Neue Pflicht';
+    document.getElementById('wd-delete-btn').style.display = isEdit ? '' : 'none';
+    document.getElementById('wd-save-btn').textContent = isEdit ? 'Speichern' : 'Pflicht erstellen';
+    this._dutyEditId = isEdit ? duty.id : null;
+    this._dutyEditCtx = ctx || null;
+    // Form befüllen
+    document.getElementById('wd-new-title').value = duty ? (duty.title||'') : '';
+    this._dutyFormWorld(duty ? (duty.world||'priv') : 'priv');
+    this._dutyFormRepeat(duty ? (duty.repeat||'weekly') : 'weekly');
+    if (duty && duty.repeat === 'every-n-weeks') {
+      const rn = document.getElementById('wd-repeat-n'); if (rn) rn.value = duty.repeatEvery || 2;
+    }
+    if (duty && duty.repeat === 'monthly') {
+      const mr = document.getElementById('wd-monthly-rule'); if (mr) mr.value = duty.monthlyRule || 'day-1';
+    }
+    this._dutyFormType(duty ? (duty.type||'multi') : 'multi');
+    // Tage setzen
+    document.querySelectorAll('#wd-day-grid .wd-day-btn, #wd-fixed-grid .wd-day-btn').forEach(b => b.classList.remove('selected'));
+    if (duty) {
+      if (duty.type === 'fixed' && duty.dayFixed != null) {
+        const fb = document.querySelector('#wd-fixed-grid .wd-day-btn[data-dow="' + duty.dayFixed + '"]');
+        if (fb) fb.classList.add('selected');
+      } else {
+        (duty.days||[]).forEach(d => {
+          const db = document.querySelector('#wd-day-grid .wd-day-btn[data-dow="' + d + '"]');
+          if (db) db.classList.add('selected');
+        });
+      }
+    }
+    // Optionale Felder
+    const st = document.getElementById('wd-start-time'); if (st) st.value = duty ? (duty.startTime||'') : '';
+    const mt = document.getElementById('wd-musttoday'); if (mt) mt.checked = duty ? !!duty.mustToday : false;
+    const ae = document.getElementById('wd-aktiv'); if (ae) ae.value = duty ? (duty.aktivEnergie||'mittel') : 'mittel';
+    document.querySelectorAll('#wd-aktiv-grid .aktiv-pill').forEach(p => {
+      const v = duty ? (duty.aktivEnergie||'mittel') : 'mittel';
+      p.classList.toggle('active', p.classList.contains('ae-' + v));
+    });
+    // Vorhaben-Dropdown befüllen
+    const vhSel = document.getElementById('wd-vorhaben');
+    if (vhSel) {
+      const opts = ['<option value="">&ndash; Kein Vorhaben &ndash;</option>'];
+      ['pro','priv'].forEach(welt => {
+        const store = this._vorhabenStore(welt) || [];
+        store.filter(v => (v.aktivitaet||'aktiv') !== 'ruhend')
+          .forEach(v => { opts.push('<option value="' + v.id + '"' + (duty && duty.vorhabenId === v.id ? ' selected' : '') + '>' + this._esc(v.titel) + ' (' + (welt==='pro'?'Beruf':'Privat') + ')' + '</option>'); });
+      });
+      vhSel.innerHTML = opts.join('');
+    }
+  },
+
+  _dutyFormSave() {
+    const title = document.getElementById('wd-new-title')?.value.trim();
+    if (!title) { this._toast('Bitte Bezeichnung eingeben'); return; }
+    const world = this._dutyFormCurrentWorld || 'priv';
+    const type  = this._dutyFormCurrentType || 'multi';
+    const store = this._dutyStore(world); if (!store) return;
+    let dayFixed = null, days = [];
+    if (type === 'fixed') {
+      const sel = document.querySelector('#wd-fixed-grid .wd-day-btn.selected');
+      if (!sel) { this._toast('Bitte einen Tag auswählen'); return; }
+      dayFixed = parseInt(sel.dataset.dow);
+    } else {
+      const sels = document.querySelectorAll('#wd-day-grid .wd-day-btn.selected');
+      days = [...sels].map(b => parseInt(b.dataset.dow));
+      if (!days.length) { this._toast('Bitte mindestens einen Tag auswählen'); return; }
+    }
+    const repeat = this._dutyFormCurrentRepeat || 'weekly';
+    const repeatEvery = parseInt(document.getElementById('wd-repeat-n')?.value) || 2;
+    const monthlyRule = document.getElementById('wd-monthly-rule')?.value || 'day-1';
+    const startTime = document.getElementById('wd-start-time')?.value || '';
+    const mustToday = document.getElementById('wd-musttoday')?.checked || false;
+    const aktivEnergie = document.getElementById('wd-aktiv')?.value || 'mittel';
+    const vorhabenId = document.getElementById('wd-vorhaben')?.value || '';
+    if (this._dutyEditId) {
+      // Edit mode: find and update
+      let duty = null;
+      ['pro','priv'].forEach(ctx => {
+        const s = this._dutyStore(ctx) || [];
+        const d = s.find(x => x.id === this._dutyEditId);
+        if (d) duty = d;
+      });
+      if (!duty) { this._toast('Pflicht nicht gefunden'); return; }
+      // If world changed, move duty
+      if (duty.world !== world) {
+        const oldStore = this._dutyStore(duty.world);
+        const newStore = this._dutyStore(world);
+        if (oldStore && newStore) {
+          const idx = oldStore.findIndex(x => x.id === duty.id);
+          if (idx >= 0) oldStore.splice(idx, 1);
+          newStore.push(duty);
+        }
+      }
+      duty.title = title; duty.world = world; duty.type = type;
+      duty.repeat = repeat; duty.dayFixed = dayFixed; duty.days = days;
+      duty.aktivEnergie = aktivEnergie;
+      if (repeat === 'every-n-weeks') duty.repeatEvery = repeatEvery; else delete duty.repeatEvery;
+      if (repeat === 'monthly') duty.monthlyRule = monthlyRule; else delete duty.monthlyRule;
+      if (startTime) duty.startTime = startTime; else delete duty.startTime;
+      if (mustToday) duty.mustToday = true; else delete duty.mustToday;
+      if (vorhabenId) duty.vorhabenId = vorhabenId; else delete duty.vorhabenId;
+      this._toast('Pflicht aktualisiert');
+    } else {
+      // New mode
+      const entry = { id: 'duty_' + Date.now(), title, world, type, repeat, startDate: new Date().toISOString().split('T')[0], dayFixed: repeat==='monthly'?null:dayFixed, days: repeat==='monthly'?[]:days, instances: {}, aktivEnergie };
+      if (repeat === 'every-n-weeks') entry.repeatEvery = repeatEvery;
+      if (repeat === 'monthly') entry.monthlyRule = monthlyRule;
+      if (startTime) entry.startTime = startTime;
+      if (mustToday) entry.mustToday = true;
+      if (vorhabenId) entry.vorhabenId = vorhabenId;
+      store.push(entry);
+      this._toast('Pflicht erstellt');
+    }
+    this.setDirty();
+    this._dutyViewList();
+  },
+
+  _dutyDeleteCurrent() {
+    if (!this._dutyEditId) return;
+    if (!confirm('Pflicht wirklich löschen?')) return;
+    ['pro','priv'].forEach(ctx => {
+      const s = this._dutyStore(ctx);
+      if (!s) return;
+      const idx = s.findIndex(x => x.id === this._dutyEditId);
+      if (idx >= 0) s.splice(idx, 1);
+    });
+    this.setDirty();
+    this._toast('Pflicht gelöscht');
+    this._dutyViewList();
   },
 
   _vhDropdownHtml(selectedId, inputId) {
@@ -23304,11 +23417,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
             : (duty.days||[]).map(d=>DAY_NAMES_L[d]).join(', ');
         }
         if (duty.reminderTime) when += ` · 🔔 ${duty.reminderTime}`;
-        return `<div class="wd-item" id="wd-item-${duty.id}">
+        return `<div class="wd-item" id="wd-item-${duty.id}" onclick="WB._dutyOpenEdit('${ctx}','${duty.id}')" style="cursor:pointer;">
           <div class="wd-item-name">${duty.title}</div>
           <div class="wd-item-meta">${when}</div>
-          <button class="wd-edit-btn" onclick="WB.dutyEditOpen('${ctx}','${duty.id}')" title="Bearbeiten">✎</button>
-          <button class="wd-del-btn" onclick="WB.dutyDelete('${ctx}','${duty.id}')">&#215;</button>
+          <span style="font-size:0.8rem;color:var(--c-faint);">›</span>
         </div>`;
       }).join('');
       return html;
@@ -25042,17 +25154,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   // ── Verwaltungs-Modal ──────────────────────────────────
   dutiesOpen() {
     document.getElementById('wb-duties-overlay').classList.add('open');
-    this._dutiesRender();
-    const vhSel = document.getElementById('wd-vorhaben');
-    if (vhSel) {
-      const opts = ['<option value="">&ndash; Kein Vorhaben &ndash;</option>'];
-      ['pro','priv'].forEach(welt => {
-        const store = this._vorhabenStore(welt) || [];
-        store.filter(v => (v.aktivitaet||'aktiv') !== 'ruhend')
-          .forEach(v => { opts.push('<option value="' + v.id + '">' + this._esc(v.titel) + ' (' + (welt==='pro'?'Beruf':'Privat') + ')' + '</option>'); });
-      });
-      vhSel.innerHTML = opts.join('');
-    }
+    this._dutyViewList();
   },
 
   EV_TYPES: [
