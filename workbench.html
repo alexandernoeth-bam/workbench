@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.6.8</title>
+<title>WorkBench 5.7.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7081,6 +7081,9 @@ html, body {
       <button id="ck-today-btn" onclick="WB._ckGoToday()" style="display:none;font-size:0.72rem;padding:3px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;cursor:pointer;font-family:var(--font);color:var(--c-muted);">Heute</button>
       <button onclick="WB._ckShift(1)" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--c-muted);padding:0 4px;line-height:1;">›</button>
     </div>
+    <div id="ck-smart-toggle" style="margin-top:4px;">
+      <button onclick="WB._ckToggleSmartView()" id="ck-smart-btn" style="font-size:0.68rem;padding:2px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;cursor:pointer;font-family:var(--font);color:var(--c-faint);">Alle Zonen</button>
+    </div>
     <div id="ck-tag-badges" style="display:none;margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;"></div>
   </div>
 
@@ -8365,7 +8368,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.6.8 · Build 20260609-1230</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.7.0 · Build 20260609-1300</div>
     </div>
 
     <!-- Welt -->
@@ -8542,8 +8545,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.6.8',
-  APP_BUILD:   '20260609-1230',
+  APP_VERSION: '5.7.0',
+  APP_BUILD:   '20260609-1300',
 
 
   // ══════════════════════════════════════════════════════
@@ -15476,12 +15479,27 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       }
     }
 
+    // Smart-View Button-Text synchronisieren
+    const smartBtn = document.getElementById('ck-smart-btn');
+    if (smartBtn) smartBtn.textContent = this._ckSmartView ? 'Alle Zonen' : 'Smart-View';
+
     try { this._ckRenderZone('vm', dateStr, isToday); } catch(e) { console.error('ck-zone-vm:', e); }
     try { this._ckRenderZone('mi', dateStr, isToday); } catch(e) { console.error('ck-zone-mi:', e); }
     try { this._ckRenderZone('nm', dateStr, isToday); } catch(e) { console.error('ck-zone-nm:', e); }
     try { this._ckRenderZone('fe', dateStr, isToday); } catch(e) { console.error('ck-zone-fe:', e); }
     try { this._ckRenderZone('ab', dateStr, isToday); } catch(e) { console.error('ck-zone-ab:', e); }
     try { this._ckRenderKleinigkeiten(dateStr, isToday); } catch(e) { console.error('ck-zone-rauschen:', e); }
+
+    // Auto-Scroll zur aktiven Zone (nur heute, einmal pro Session)
+    if (isToday && this._ckAktiveZone && !this._ckDidAutoScroll) {
+      this._ckDidAutoScroll = true;
+      setTimeout(() => {
+        const activeZoneEl = document.getElementById('ck-zone-' + this._ckAktiveZone);
+        if (activeZoneEl && activeZoneEl.style.display !== 'none') {
+          activeZoneEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 200);
+    }
   },
 
   _ckGetZoneItems(dateStr, zone) {
@@ -15611,7 +15629,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     return items;
   },
 
-  _ckZoneCollapsed: {},   // { vm: true/false, mi: true/false, ... } — null = auto
+  _ckZoneCollapsed: {},
+  _ckSmartView: true,
+  _ckDidAutoScroll: false,   // { vm: true/false, mi: true/false, ... } — null = auto
+
+  _ckToggleSmartView() {
+    this._ckSmartView = !this._ckSmartView;
+    const btn = document.getElementById('ck-smart-btn');
+    if (btn) btn.textContent = this._ckSmartView ? 'Alle Zonen' : 'Smart-View';
+    this._ckZoneCollapsed = {};  // manuelle Overrides zurücksetzen
+    this._ckRenderTagesseite();
+  },
 
   _ckZoneToggle(zoneId) {
     // Aktuellen Zustand umkehren (body sichtbar?)
@@ -15741,6 +15769,27 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         header.style.background = '';
         header.style.borderBottomColor = '';
       }
+    }
+
+    // Smart-View: Zone ein-/ausblenden
+    if (zoneEl && this._ckSmartView) {
+      const isAktivZ  = isToday && this._ckAktiveZone === zoneId;
+      const hasItems  = items.length > 0;
+      const hasOffene = items.some(i => !i.done);
+      const ZONE_ORDER = ['vm','mi','nm','fe','ab'];
+      const zoneIdx    = ZONE_ORDER.indexOf(zoneId);
+      const aktivIdx   = ZONE_ORDER.indexOf(this._ckAktiveZone || 'vm');
+      const istVergangen = isToday && zoneIdx < aktivIdx;
+
+      let show = false;
+      if (isAktivZ)                       show = true;
+      else if (istVergangen && hasOffene)  show = true;
+      else if (!istVergangen && hasItems)  show = true;
+      else if (!isToday && hasItems)       show = true;
+
+      zoneEl.style.display = show ? '' : 'none';
+    } else if (zoneEl) {
+      zoneEl.style.display = '';
     }
   },
 
@@ -16434,6 +16483,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _ckDate: null,
 
   _ckShift(n) {
+    this._ckDidAutoScroll = false;
+    this._ckZoneCollapsed = {};
     const [y,m,d] = (this._ckDate || new Date().toISOString().split('T')[0]).split('-').map(Number);
     const nd = new Date(y, m-1, d+n);
     const pad = x => String(x).padStart(2,'0');
@@ -16442,6 +16493,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _ckGoToday() {
+    this._ckDidAutoScroll = false;
+    this._ckZoneCollapsed = {};
     this._ckDate = new Date().toISOString().split('T')[0];
     this._ckRenderTagesseite();
   },
