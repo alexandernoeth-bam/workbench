@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.6.0</title>
+<title>WorkBench 5.6.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8343,7 +8343,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.6.0 · Build 20260609-1000</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.6.1 · Build 20260609-1030</div>
     </div>
 
     <!-- Welt -->
@@ -8520,8 +8520,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.6.0',
-  APP_BUILD:   '20260609-1000',
+  APP_VERSION: '5.6.1',
+  APP_BUILD:   '20260609-1030',
 
 
   // ══════════════════════════════════════════════════════
@@ -15380,9 +15380,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           let badges = '';
           if (ritual.energie) badges += '<span class="ck-energie-badge">' + (energieLabel[ritual.energie] || ritual.energie) + '</span>';
           if (fokusTotal > 0) badges += '<span class="ck-fokus-badge">🎯 ' + fokusTotal + ' Fokus geplant</span>';
-          // Rest-Energie live berechnen
+          // Rest-Energie: Startkapital minus verbrauchte Energie erledigter Items
           try {
-            const restE = this._ritualBerechneEnergie ? this._ritualBerechneEnergie() : null;
+            const restE = this._ckBerechneRestEnergie();
             if (restE !== null) {
               const col = restE < 20 ? 'var(--c-warn,#E67E22)' : restE < 50 ? '#B45309' : 'var(--c-beruf)';
               badges += '<span class="ck-fokus-badge" style="color:' + col + ';border-color:' + col + ';">⚡ ' + restE + ' Energie</span>';
@@ -15683,6 +15683,68 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<input type="checkbox" class="ck-z-cb" onchange="event.stopPropagation();WB._ckZSchnellDone(&quot;' + item.id + '&quot;,this)">'
         + '<div class="ck-z-text"><div class="ck-z-titel">' + this._esc(item.title) + weltBadge + '</div></div></div>';
     }).join('');
+  },
+
+  // Cockpit Rest-Energie: Startkapital - Kosten erledigter Items heute
+  _ckBerechneRestEnergie() {
+    const today    = new Date().toISOString().split('T')[0];
+    const ritStore = this._ritualStore();
+    const ritual   = ritStore && ritStore[this._ritualTodayKey()];
+    if (!ritual?.done) return null;  // Morgendialog noch nicht gemacht → kein Badge
+
+    const START = { hoch: 100, mittel: 75, niedrig: 50 };
+    let rest = START[ritual.energie] || 75;
+
+    // Erledigte Termine
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      (db?.customEvents || [])
+        .filter(e => e.date === today && e.done)
+        .forEach(ev => {
+          if (ev.energieKosten != null && !isNaN(ev.energieKosten)) {
+            rest -= ev.energieKosten;
+          } else {
+            const dur = parseFloat(ev.duration || 1);
+            rest -= !ev.startTime ? 2 : dur < 1 ? 4 : 6;
+          }
+        });
+    });
+
+    // Erledigte Pflichten heute
+    ['pro','priv'].forEach(ctx => {
+      (this._dutyStore(ctx) || []).forEach(d => {
+        try {
+          const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
+          const inst  = insts.find(i => i.isToday);
+          if (inst?.done) rest -= 2;
+        } catch(e) {}
+      });
+    });
+
+    // Erledigte Schnellerinnerungen heute (beide Stores)
+    [...(this.dataPro?.quickItems||[]), ...(this.dataPriv?.quickItems||[])]
+      .filter(q => q.done && (!q.date || q.date === today))
+      .forEach(() => { rest -= 2; });
+
+    // Erledigte Fokus-Aufgaben (aus Ritual)
+    (ritual.fokus || []).forEach(f => {
+      if (f._done) {
+        try {
+          const AE_COST = { niedrig: 2, mittel: 4, hoch: 8 };
+          const SIZE_COST = { XS: 0, S: 2, M: 2, L: 4, XL: 8, XXL: 12 };
+          const hit = f.type === 'vorhaben-aufgabe' && f.id
+            ? this._vorhabenFindAufgabe(f.id) : null;
+          if (hit) {
+            const a = hit.aufgabe;
+            rest -= (AE_COST[a.aktivEnergie||'mittel']||4) + (SIZE_COST[a.size||'M']||2);
+          } else {
+            rest -= 4;  // Fallback
+          }
+        } catch(e) {}
+      }
+    });
+
+    return Math.max(0, rest);
   },
 
   _ckZTerminDone(id, ctx, chk) {
