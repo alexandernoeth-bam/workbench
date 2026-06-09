@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.12.0</title>
+<title>WorkBench 5.12.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -8389,7 +8389,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.12.0 · Build 20260609-1845</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.12.1 · Build 20260609-1900</div>
     </div>
 
     <!-- Welt -->
@@ -8566,8 +8566,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.12.0',
-  APP_BUILD:   '20260609-1845',
+  APP_VERSION: '5.12.1',
+  APP_BUILD:   '20260609-1900',
 
 
   // ══════════════════════════════════════════════════════
@@ -18525,6 +18525,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     // ── HEADER ─────────────────────────────────────────────
     let h = '<div class="vh47-header">';
+    // ── HEADER: Titel + ⚙ ──
     h += '<div style="display:flex;align-items:center;gap:10px;padding:0 0 8px;">'
       + '<div style="flex:1;">'
       + '<div class="vh47-titel" id="vh47-titel" contenteditable="true" '
@@ -18534,159 +18535,104 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<button onclick="WB._vhOpenSettings()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--c-muted);padding:4px;">\u2699</button>'
       + '</div>';
 
+    // ── PILLS ──
+    const vId = v.id;
+    const alleAufg = (v.meilensteine||[]).flatMap(ms => (ms.aufgaben||[]).filter(a => !a.done));
+    const aufgNS = alleAufg.filter(a => this.istNaechsterSchritt(a)).length;
+    const aufgTotal = alleAufg.length;
+    const vhTermine = [];
+    [this.dataPro, this.dataPriv].forEach(db => {
+      if (!db) return;
+      (db.customEvents||[]).filter(e => e.vorhabenId === vId && !e.done).forEach(e => vhTermine.push(e));
+    });
+    vhTermine.sort((a,b) => (a.date||'').localeCompare(b.date||''));
+    const vhPflichten = [];
+    ['pro','priv'].forEach(ctx => {
+      (this._dutyStore(ctx)||[]).filter(d => d.vorhabenId === vId).forEach(d => vhPflichten.push({ ...d, ctx }));
+    });
+    const detPills = [];
+    if (aufgTotal > 0) detPills.push('<span class="vh-pill">' + aufgNS + '/' + aufgTotal + ' Aufgaben</span>');
+    if (vhTermine.length) detPills.push('<span class="vh-pill">' + vhTermine.length + ' Termin' + (vhTermine.length>1?'e':'') + '</span>');
+    if (vhPflichten.length) detPills.push('<span class="vh-pill">' + vhPflichten.length + ' Pflicht' + (vhPflichten.length>1?'en':'') + '</span>');
+    if (detPills.length) {
+      h += '<div style="display:flex;gap:6px;flex-wrap:wrap;padding:0 0 12px;">' + detPills.join('') + '</div>';
+    }
 
-    // ── TAB-LEISTE ─────────────────────────────────────────
+    // ── TAB-LEISTE ──
     h += '<div class="vh-tabs">'
       + '<button class="vh-tab-btn" data-tab="aktuell" onclick="WB._vhSetTab(&quot;aktuell&quot;)">Aktuell</button>'
       + '<button class="vh-tab-btn" data-tab="plan" onclick="WB._vhSetTab(&quot;plan&quot;)">Plan</button>'
       + '</div>';
 
-    // ── AKTUELL-TAB ────────────────────────────────────────
     h += '<div id="vh-tab-aktuell" style="padding:12px 16px;overflow-y:auto;flex:1;">';
 
-    // ── ZIEL ──
-    h += '<div class="vh-aktuell-card">'
-      + '<div class="vh-aktuell-label">Ziel</div>'
-      + '<div contenteditable="true" id="vh-ziel-edit" onblur="WB._vhSaveZiel(this.textContent)" '
-      + 'style="font-size:0.9rem;color:var(--c-text);outline:none;min-height:1.4em;line-height:1.5;">'
-      + this._esc(v.ziel || '') + '</div>'
-      + '</div>';
-
-    // ── FORTSCHRITT ──
-    const prog = this._vorhabenProgress(v);
-    const pct  = (v.fortschrittManuell !== null && v.fortschrittManuell !== undefined)
-      ? v.fortschrittManuell : prog.aufgabenPct;
-    h += '<div class="vh-aktuell-card">'
-      + '<div class="vh-aktuell-label">Fortschritt</div>'
-      + '<div class="vh-progress-bar-wrap"><div class="vh-progress-bar" id="vh-progress-bar" style="width:' + pct + '%"></div></div>'
-      + '<div style="font-size:0.78rem;color:var(--c-muted);margin:4px 0 8px;">' + prog.done + '/' + prog.total + ' Aufgaben erledigt</div>'
-      + '<div style="display:flex;align-items:center;gap:8px;">'
-      + '<input type="number" min="0" max="100" placeholder="—" value="' + (v.fortschrittManuell ?? '') + '" '
-      + 'onchange="WB._vhSetFortschrittManuell(this.value)" '
-      + 'style="width:64px;padding:4px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);">'
-      + '<span style="font-size:0.78rem;color:var(--c-faint);">% (leer = automatisch)</span>'
-      + '</div>'
-      + '</div>';
-
-    // ── VH1: PILLS + VERKNÜPFTE TERMINE + PFLICHTEN ──
-    const vId = v.id;
-    const alleAufg = (v.meilensteine||[]).flatMap(ms => ms.aufgaben||[]);
-    const aufgOffen = alleAufg.filter(a => !a.done).length;
-    const aufgNS = alleAufg.filter(a => !a.done && this.istNaechsterSchritt(a)).length;
-    const aufgTotal = alleAufg.length;
-
-    const vhTermine = [];
-    [this.dataPro, this.dataPriv].forEach(db => {
-      if (!db) return;
-      (db.customEvents||[]).filter(e => e.vorhabenId === vId && !e.done)
-        .forEach(e => vhTermine.push(e));
-    });
-    vhTermine.sort((a,b) => (a.date||'').localeCompare(b.date||'') || (a.startTime||'').localeCompare(b.startTime||''));
-
-    const vhPflichten = [];
-    ['pro','priv'].forEach(ctx => {
-      (this._dutyStore(ctx)||[]).filter(d => d.vorhabenId === vId)
-        .forEach(d => vhPflichten.push({ ...d, ctx }));
-    });
-
-    const pills = [];
-    if (aufgTotal > 0) pills.push('<span class="vh-pill">Aufgaben ' + aufgNS + '/' + aufgOffen + '</span>');
-    if (vhTermine.length) pills.push('<span class="vh-pill">Termine ' + vhTermine.length + '</span>');
-    if (vhPflichten.length) pills.push('<span class="vh-pill">Pflichten ' + vhPflichten.length + '</span>');
-    if (pills.length) {
-      h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">' + pills.join('') + '</div>';
-    }
-
-    // Verknüpfte Termine
-    if (vhTermine.length) {
-      const todayVh = new Date().toISOString().split('T')[0];
-      h += '<div class="vh-aktuell-card"><div class="vh-aktuell-label">Verknüpfte Termine</div>';
-      h += vhTermine.slice(0, 5).map(e => {
-        const dd = new Date(e.date + 'T12:00:00');
-        const dateStr = e.date === todayVh ? 'Heute' : dd.getDate() + '.' + (dd.getMonth()+1) + '.';
-        const isPast = e.date < todayVh;
-        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--c-border);' + (isPast?'opacity:0.5;':'') + 'cursor:pointer;" onclick="WB._openEvent(&quot;' + e.id + '&quot;,&quot;priv&quot;)">'
-          + '<span style="font-size:0.82rem;font-family:var(--font-mono);color:var(--c-muted);flex-shrink:0;width:50px;">' + dateStr + '</span>'
-          + '<span style="flex:1;font-size:0.88rem;color:var(--c-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + this._esc(e.text) + '</span>'
-          + (e.startTime ? '<span style="font-size:0.78rem;color:var(--c-faint);font-family:var(--font-mono);">' + e.startTime + '</span>' : '')
-          + '</div>';
-      }).join('');
-      if (vhTermine.length > 5) h += '<div style="font-size:0.78rem;color:var(--c-faint);padding:4px 0;">+ ' + (vhTermine.length - 5) + ' weitere</div>';
-      h += '</div>';
-    }
-
-    // Verknüpfte Pflichten
-    if (vhPflichten.length) {
-      h += '<div class="vh-aktuell-card"><div class="vh-aktuell-label">Verknüpfte Pflichten</div>';
-      h += vhPflichten.map(d => {
-        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--c-border);cursor:pointer;" onclick="WB.dutiesOpen()">'
-          + '<span style="flex:1;font-size:0.88rem;color:var(--c-text);">' + this._esc(d.title||d.name||'') + '</span>'
-          + '</div>';
-      }).join('');
-      h += '</div>';
-    }
-
     // ── NÄCHSTE SCHRITTE ──
-    const alleOffen = (v.meilensteine || []).flatMap(ms =>
-      (ms.aufgaben || []).filter(a => !a.done && this.istNaechsterSchritt(a)).map(a => ({ ...a, msId: ms.id }))
-    );
     const KIPP_LBL = { urteil:'Urteil', stolz:'Stolz', routine:'Routine', tunnelblick:'Tunnelblick' };
-    const AE_BADGE_AK = { hoch:'<span style="font-size:0.7rem;color:#C62828;">⚡</span>', niedrig:'<span style="font-size:0.7rem;color:#2E7D32;">↓</span>' };
-    h += '<div class="vh-aktuell-card">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
-      + '<div class="vh-aktuell-label" style="margin-bottom:0;">Nächste Schritte</div>'
-      + '<button onclick="WB._vhAktuellAddAufgabe()" style="font-size:0.78rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);">＋ Hinzufügen</button>'
+    const AE_BADGE_AK = { hoch:'<span style="font-size:0.7rem;color:#C62828;">\u26a1</span>', niedrig:'<span style="font-size:0.7rem;color:#2E7D32;">\u2193</span>' };
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+      + '<div class="vh-aktuell-label" style="margin-bottom:0;">N\u00e4chste Schritte</div>'
+      + '<button onclick="WB._vhAktuellAddAufgabe()" style="font-size:0.82rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);">\uff0b Hinzuf\u00fcgen</button>'
       + '</div>';
+    const alleOffen = (v.meilensteine||[]).flatMap(ms =>
+      (ms.aufgaben||[]).filter(a => !a.done && this.istNaechsterSchritt(a)).map(a => ({ ...a, msId: ms.id }))
+    );
     if (!alleOffen.length) {
-      h += '<div style="font-size:0.82rem;color:var(--c-faint);padding:8px 0;">Keine nächsten Schritte — markiere Aufgaben im Plan-Tab.</div>';
+      h += '<div style="font-size:0.85rem;color:var(--c-faint);padding:8px 0;">Keine n\u00e4chsten Schritte \u2014 markiere Aufgaben im Plan-Tab.</div>';
     } else {
       h += alleOffen.map(a =>
         '<div class="vh-naechste-row">'
-        + '<input type="checkbox" style="flex-shrink:0;width:15px;height:15px;accent-color:var(--c-beruf);" '
-        + 'onchange="WB._vhAufgDone(&quot;' + a.msId + '&quot;,&quot;' + a.id + '&quot;,this)">'
-        + '<span onclick="WB._vhAufgDetail(&quot;' + a.msId + '&quot;,&quot;' + a.id + '&quot;)" '
-        + 'style="flex:1;font-size:0.87rem;cursor:pointer;">' + this._esc(a.text) + '</span>'
-        + (a.aktivEnergie && a.aktivEnergie !== 'mittel' ? (AE_BADGE_AK[a.aktivEnergie] || '') : '')
-        + (a.kippTyp && a.kippTyp !== '' && a.kippTyp !== 'keiner'
-          ? '<span style="font-size:0.7rem;color:var(--c-muted);">' + (KIPP_LBL[a.kippTyp] || a.kippTyp) + '</span>' : '')
+        + '<input type="checkbox" style="flex-shrink:0;width:16px;height:16px;accent-color:var(--c-beruf);" onchange="WB._vhAufgDone(&quot;' + a.msId + '&quot;,&quot;' + a.id + '&quot;,this)">'
+        + '<span onclick="WB._vhAufgDetail(&quot;' + a.msId + '&quot;,&quot;' + a.id + '&quot;)" style="flex:1;font-size:0.92rem;cursor:pointer;">' + this._esc(a.text) + '</span>'
+        + (a.aktivEnergie && a.aktivEnergie !== 'mittel' ? (AE_BADGE_AK[a.aktivEnergie]||'') : '')
+        + (a.kippTyp && a.kippTyp !== '' && a.kippTyp !== 'keiner' ? '<span style="font-size:0.72rem;color:var(--c-muted);">' + (KIPP_LBL[a.kippTyp]||a.kippTyp) + '</span>' : '')
         + '</div>'
       ).join('');
     }
+
+    // ── VERKNÜPFTE TERMINE ──
+    if (vhTermine.length) {
+      const today = new Date().toISOString().split('T')[0];
+      h += '<div class="vh-aktuell-label" style="margin-top:16px;">Termine</div>';
+      h += vhTermine.slice(0, 5).map(e => {
+        const dd = new Date(e.date + 'T12:00:00');
+        const dateStr = e.date === today ? 'Heute' : dd.getDate() + '.' + (dd.getMonth()+1) + '.';
+        const isPast = e.date < today;
+        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--c-border);' + (isPast?'opacity:0.5;':'') + 'cursor:pointer;" onclick="WB._openEvent(&quot;' + e.id + '&quot;,&quot;priv&quot;)">'
+          + '<span style="font-size:0.82rem;font-family:var(--font-mono);color:var(--c-muted);width:48px;flex-shrink:0;">' + dateStr + '</span>'
+          + '<span style="flex:1;font-size:0.90rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + this._esc(e.text) + '</span>'
+          + (e.startTime ? '<span style="font-size:0.80rem;color:var(--c-faint);font-family:var(--font-mono);">' + e.startTime + '</span>' : '')
+          + '</div>';
+      }).join('');
+      if (vhTermine.length > 5) h += '<div style="font-size:0.78rem;color:var(--c-faint);padding:4px 0;">+ ' + (vhTermine.length - 5) + ' weitere</div>';
+    }
+
+    // ── VERKNÜPFTE PFLICHTEN ──
+    if (vhPflichten.length) {
+      h += '<div class="vh-aktuell-label" style="margin-top:16px;">Pflichten</div>';
+      h += vhPflichten.map(d => {
+        let soll = 0, ist = 0;
+        try { const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : []; soll = insts.length; ist = insts.filter(i => i.done).length; } catch(e) {}
+        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--c-border);cursor:pointer;" onclick="WB.dutiesOpen()">'
+          + '<span style="flex:1;font-size:0.90rem;">' + this._esc(d.title||d.name||'') + '</span>'
+          + '<span style="font-size:0.80rem;color:var(--c-muted);font-family:var(--font-mono);">' + ist + '/' + soll + ' diese Woche</span></div>';
+      }).join('');
+    }
+
+    // ── META-ZEILE ──
+    const geaendert = v.geaendert ? new Date(v.geaendert) : null;
+    const today2 = new Date(); today2.setHours(0,0,0,0);
+    let zeitRel = '\u2014';
+    if (geaendert) { const g = new Date(geaendert); g.setHours(0,0,0,0); const diff = Math.round((today2 - g) / 86400000); zeitRel = diff === 0 ? 'heute' : diff === 1 ? 'gestern' : 'vor ' + diff + ' Tagen'; }
+    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:20px;padding:10px 0;border-top:1px solid var(--c-border);font-size:0.82rem;color:var(--c-muted);">';
+    if (v.ziel) { h += '<span style="max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + this._esc(v.ziel) + '">\ud83c\udfaf ' + this._esc(v.ziel.length > 40 ? v.ziel.slice(0,40) + '\u2026' : v.ziel) + '</span><span>\u00b7</span>'; }
+    if (v.stichtag) { h += '<span>\ud83d\udcc5 ' + v.stichtag + '</span><span>\u00b7</span>'; }
+    h += '<span>Aktiv: ' + zeitRel + '</span>';
+    if (v.notiz) { h += '<span>\u00b7</span><button onclick="WB._vhSetTab(&quot;plan&quot;)" style="font-size:0.82rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);padding:0;">\ud83d\udcdd Notiz \u2192</button>'; }
     h += '</div>';
 
-    // ── NOTIZ ──
-    h += '<div class="vh-aktuell-card">'
-      + '<div class="vh-aktuell-label">Notiz</div>'
-      + '<div style="font-size:0.84rem;color:var(--c-muted);white-space:pre-wrap;max-height:80px;overflow:hidden;">'
-      + this._esc((v.notiz || '').slice(0, 200)) + (v.notiz && v.notiz.length > 200 ? '…' : '') + '</div>'
-      + '<button onclick="WB._vhSetTab(&quot;plan&quot;)" style="font-size:0.78rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);padding:4px 0 0 0;">Bearbeiten →</button>'
-      + '</div>';
-
-    // ── STICHTAG + ZULETZT AKTIV ──
-    const geaendert = v.geaendert ? new Date(v.geaendert) : null;
-    const today = new Date(); today.setHours(0,0,0,0);
-    let zeitRel = '—';
-    if (geaendert) {
-      const g = new Date(geaendert); g.setHours(0,0,0,0);
-      const diff = Math.round((today - g) / 86400000);
-      zeitRel = diff === 0 ? 'heute' : diff === 1 ? 'gestern' : 'vor ' + diff + ' Tagen';
-    }
-    h += '<div style="display:flex;gap:8px;margin-bottom:8px;">'
-      + '<div class="vh-aktuell-card" style="flex:1;margin-bottom:0;">'
-      + '<div class="vh-aktuell-label">Stichtag</div>'
-      + '<input type="date" value="' + (v.stichtag||'') + '" onchange="WB._vorhabenSaveStichtag(this.value)" '
-      + 'style="font-size:0.85rem;border:none;border-bottom:1px solid var(--c-border);background:none;color:var(--c-text);font-family:var(--font);padding:2px 0;cursor:pointer;width:100%;">'
-      + '</div>'
-      + '<div class="vh-aktuell-card" style="flex:1;margin-bottom:0;">'
-      + '<div class="vh-aktuell-label">Zuletzt aktiv</div>'
-      + '<div style="font-size:0.88rem;color:var(--c-text);">' + zeitRel + '</div>'
-      + '</div>'
-      + '</div>';
-
-    // ── PLAN-HINWEIS ──
+    // ── PLAN-LINK ──
     h += '<div style="text-align:center;padding:8px 0 16px;">'
-      + '<button onclick="WB._vhSetTab(&quot;plan&quot;)" style="font-size:0.82rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);">→ Zur Plan-Ansicht</button>'
-      + '</div>';
+      + '<button onclick="WB._vhSetTab(&quot;plan&quot;)" style="font-size:0.85rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);">\u2192 Zur Plan-Ansicht</button></div>';
 
     h += '</div>'; // Ende vh-tab-aktuell
 
