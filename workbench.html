@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.9.5</title>
+<title>WorkBench 5.10.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4980,7 +4980,8 @@ html, body {
   .vh-tab-btn { flex:1; padding:10px 0; border:none; background:none; font-family:var(--font); font-size:0.83rem; font-weight:600; color:var(--c-muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:color 0.15s,border-color 0.15s; }
   .vh-tab-btn.active { color:var(--c-beruf); border-bottom-color:var(--c-beruf); }
   .vh-aktuell-card { background:var(--c-surface); border-radius:var(--radius-sm,6px); border:1px solid var(--c-border); padding:12px 14px; margin-bottom:8px; }
-  .vh-aktuell-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--c-faint); margin-bottom:6px; }
+  .vh-pill { display:inline-flex; align-items:center; font-size:0.78rem; font-weight:600; padding:3px 10px; border-radius:12px; background:var(--c-beruf-bg); color:var(--c-beruf); white-space:nowrap; }
+.vh-aktuell-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--c-faint); margin-bottom:6px; }
   .vh-progress-bar-wrap { height:6px; background:var(--c-border); border-radius:3px; margin:6px 0; overflow:hidden; }
   .vh-progress-bar { height:100%; background:var(--c-beruf); border-radius:3px; transition:width 0.3s; }
   .vh-naechste-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid color-mix(in srgb,var(--c-border) 60%,transparent); }
@@ -8064,6 +8065,12 @@ html, body {
           <input type="hidden" id="wd-aktiv" value="mittel">
         </div>
       </div>
+      <div style="margin:10px 0 4px;">
+        <span style="font-size:0.82rem;color:var(--c-muted);">Vorhaben (optional)</span>
+        <select id="wd-vorhaben" style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
+          <option value="">&ndash; Kein Vorhaben &ndash;</option>
+        </select>
+      </div>
       <button class="wd-add-btn" onclick="WB.dutyAdd()">+ Pflicht hinzufügen</button>
     </div>
   </div>
@@ -8407,7 +8414,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.9.5 · Build 20260609-1610</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.10.0 · Build 20260609-1640</div>
     </div>
 
     <!-- Welt -->
@@ -8584,8 +8591,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.9.5',
-  APP_BUILD:   '20260609-1610',
+  APP_VERSION: '5.10.0',
+  APP_BUILD:   '20260609-1640',
 
 
   // ══════════════════════════════════════════════════════
@@ -15756,6 +15763,20 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     root.style.setProperty('--c-bg', bg);
   },
 
+  _vhDropdownHtml(selectedId, inputId) {
+    const alle = [];
+    ['pro','priv'].forEach(welt => {
+      const store = this._vorhabenStore(welt) || [];
+      store.filter(v => (v.aktivitaet||'aktiv') !== 'ruhend')
+        .forEach(v => alle.push({ id: v.id, titel: v.titel, welt }));
+    });
+    return '<div class="edit-field"><label>Vorhaben (optional)</label>'
+      + '<select id="' + inputId + '" style="width:100%;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">'
+      + '<option value="">&ndash; Kein Vorhaben &ndash;</option>'
+      + alle.map(v => '<option value="' + v.id + '"' + (v.id === selectedId ? ' selected' : '') + '>' + this._esc(v.titel) + ' (' + (v.welt==='pro'?'Beruf':'Privat') + ')' + '</option>').join('')
+      + '</select></div>';
+  },
+
   _ckToggleSmartView() {
     this._ckSmartView = !this._ckSmartView;
     const btn = document.getElementById('ck-smart-btn');
@@ -18368,6 +18389,64 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<span style="font-size:0.78rem;color:var(--c-faint);">% (leer = automatisch)</span>'
       + '</div>'
       + '</div>';
+
+    // ── VH1: PILLS + VERKNÜPFTE TERMINE + PFLICHTEN ──
+    const vId = v.id;
+    const alleAufg = (v.meilensteine||[]).flatMap(ms => ms.aufgaben||[]);
+    const aufgOffen = alleAufg.filter(a => !a.done).length;
+    const aufgNS = alleAufg.filter(a => !a.done && this.istNaechsterSchritt(a)).length;
+    const aufgTotal = alleAufg.length;
+
+    const vhTermine = [];
+    [this.dataPro, this.dataPriv].forEach(db => {
+      if (!db) return;
+      (db.customEvents||[]).filter(e => e.vorhabenId === vId && !e.done)
+        .forEach(e => vhTermine.push(e));
+    });
+    vhTermine.sort((a,b) => (a.date||'').localeCompare(b.date||'') || (a.startTime||'').localeCompare(b.startTime||''));
+
+    const vhPflichten = [];
+    ['pro','priv'].forEach(ctx => {
+      (this._dutyStore(ctx)||[]).filter(d => d.vorhabenId === vId)
+        .forEach(d => vhPflichten.push({ ...d, ctx }));
+    });
+
+    const pills = [];
+    if (aufgTotal > 0) pills.push('<span class="vh-pill">Aufgaben ' + aufgNS + '/' + aufgOffen + '</span>');
+    if (vhTermine.length) pills.push('<span class="vh-pill">Termine ' + vhTermine.length + '</span>');
+    if (vhPflichten.length) pills.push('<span class="vh-pill">Pflichten ' + vhPflichten.length + '</span>');
+    if (pills.length) {
+      h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">' + pills.join('') + '</div>';
+    }
+
+    // Verknüpfte Termine
+    if (vhTermine.length) {
+      const todayVh = new Date().toISOString().split('T')[0];
+      h += '<div class="vh-aktuell-card"><div class="vh-aktuell-label">Verknüpfte Termine</div>';
+      h += vhTermine.slice(0, 5).map(e => {
+        const dd = new Date(e.date + 'T12:00:00');
+        const dateStr = e.date === todayVh ? 'Heute' : dd.getDate() + '.' + (dd.getMonth()+1) + '.';
+        const isPast = e.date < todayVh;
+        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--c-border);' + (isPast?'opacity:0.5;':'') + 'cursor:pointer;" onclick="WB._openEvent(&quot;' + e.id + '&quot;,&quot;priv&quot;)">'
+          + '<span style="font-size:0.82rem;font-family:var(--font-mono);color:var(--c-muted);flex-shrink:0;width:50px;">' + dateStr + '</span>'
+          + '<span style="flex:1;font-size:0.88rem;color:var(--c-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + this._esc(e.text) + '</span>'
+          + (e.startTime ? '<span style="font-size:0.78rem;color:var(--c-faint);font-family:var(--font-mono);">' + e.startTime + '</span>' : '')
+          + '</div>';
+      }).join('');
+      if (vhTermine.length > 5) h += '<div style="font-size:0.78rem;color:var(--c-faint);padding:4px 0;">+ ' + (vhTermine.length - 5) + ' weitere</div>';
+      h += '</div>';
+    }
+
+    // Verknüpfte Pflichten
+    if (vhPflichten.length) {
+      h += '<div class="vh-aktuell-card"><div class="vh-aktuell-label">Verknüpfte Pflichten</div>';
+      h += vhPflichten.map(d => {
+        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--c-border);cursor:pointer;" onclick="WB.dutiesOpen()">'
+          + '<span style="flex:1;font-size:0.88rem;color:var(--c-text);">' + this._esc(d.title||d.name||'') + '</span>'
+          + '</div>';
+      }).join('');
+      h += '</div>';
+    }
 
     // ── NÄCHSTE SCHRITTE ──
     const alleOffen = (v.meilensteine || []).flatMap(ms =>
@@ -23384,6 +23463,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (reminderTime)               entry.reminderTime = reminderTime;
     if (mustToday)                  entry.mustToday    = true;
     if (startTime)                  entry.startTime    = startTime;
+    const vorhabenId = document.getElementById('wd-vorhaben')?.value || '';
+    if (vorhabenId) entry.vorhabenId = vorhabenId;
 
     store.push(entry);
     this.setDirty();
@@ -23396,6 +23477,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     document.querySelectorAll('.wd-day-btn').forEach(b => b.classList.remove('selected'));
     // Aktivierungsenergie zurück auf Mittel
     const aktivInp = document.getElementById('wd-aktiv'); if (aktivInp) aktivInp.value = 'mittel';
+    const vhSelR = document.getElementById('wd-vorhaben'); if (vhSelR) vhSelR.value = '';
     document.querySelectorAll('#wd-aktiv-grid .aktiv-pill').forEach(p => p.classList.toggle('active', p.classList.contains('ae-mittel')));
     this._dutyFormRepeat('weekly');
     this._dutiesRender();
@@ -23449,7 +23531,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<div class="edit-field"><label>Ort (optional)</label>'
       + '<input id="ef-ev-loc" type="text" placeholder="Ort oder Link"></div>'
       + this._aktivEnergiePills('mittel', 'ef-evn-aktiv')
-      + this._kippTypSelect('', 'ef-evn-kipp');
+      + this._kippTypSelect('', 'ef-evn-kipp')
+      + this._vhDropdownHtml('', 'ef-ev-vorhaben');
 
     document.getElementById('edit-overlay').classList.add('open');
   },
@@ -24864,6 +24947,16 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   dutiesOpen() {
     document.getElementById('wb-duties-overlay').classList.add('open');
     this._dutiesRender();
+    const vhSel = document.getElementById('wd-vorhaben');
+    if (vhSel) {
+      const opts = ['<option value="">&ndash; Kein Vorhaben &ndash;</option>'];
+      ['pro','priv'].forEach(welt => {
+        const store = this._vorhabenStore(welt) || [];
+        store.filter(v => (v.aktivitaet||'aktiv') !== 'ruhend')
+          .forEach(v => { opts.push('<option value="' + v.id + '">' + this._esc(v.titel) + ' (' + (welt==='pro'?'Beruf':'Privat') + ')' + '</option>'); });
+      });
+      vhSel.innerHTML = opts.join('');
+    }
   },
 
   EV_TYPES: [
@@ -25123,7 +25216,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<div class="edit-field"><label>Ort (optional)</label>'
       + '<input id="ef-ev-loc" type="text" placeholder="Ort oder Link"></div>'
       + this._aktivEnergiePills('mittel', 'ef-evn-aktiv')
-      + this._kippTypSelect('', 'ef-evn-kipp');
+      + this._kippTypSelect('', 'ef-evn-kipp')
+      + this._vhDropdownHtml('', 'ef-ev-vorhaben');
 
     document.getElementById('edit-overlay').classList.add('open');
   },
@@ -26047,6 +26141,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<div class="edit-field"><label>Ort</label><input id="ef-ev-loc" type="text" value=""></div>'
         + this._aktivEnergiePills('mittel', 'ef-evn-aktiv')
         + this._kippTypSelect('', 'ef-evn-kipp')
+        + this._vhDropdownHtml('', 'ef-ev-vorhaben')
         + '<div class="edit-field"><label>Checkliste</label>'
         + '<div id="ef-chk-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">'
         + checklist.map((item,i) =>
@@ -29066,6 +29161,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + 'style="width:80px;padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);" '
         + 'value="' + (ev.energieKosten != null ? ev.energieKosten : '') + '">'
         + '</div>'
+        + this._vhDropdownHtml(ev.vorhabenId || '', 'ef-ev-vorhaben')
         + '<div class="edit-field"><label>Checkliste</label>'
         + '<div id="ef-chk-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">'
         + (ev.checklist||[]).map((item,i) =>
@@ -29185,6 +29281,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const ekN = (ekValN !== '' && ekValN != null) ? parseInt(ekValN) : null;
       if (ekN !== null && !isNaN(ekN)) newEv.energieKosten = ekN;
       newEv.checklist = this._efChkGetList();
+      const vhIdNew = document.getElementById('ef-ev-vorhaben')?.value || '';
+      if (vhIdNew) newEv.vorhabenId = vhIdNew;
       if (!targetDb.customEvents) targetDb.customEvents = [];
       targetDb.customEvents.push(newEv);
       // Besprechungs-Prozess
@@ -29352,7 +29450,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       if (ek !== null && !isNaN(ek)) ev.energieKosten = ek;
       else delete ev.energieKosten;
       ev.checklist = this._efChkGetList();
-      // Dauer aus Von/Bis berechnen — Endzeit direkt speichern
+      const vhIdEdit = document.getElementById('ef-ev-vorhaben')?.value || '';
+      if (vhIdEdit) ev.vorhabenId = vhIdEdit; else delete ev.vorhabenId;
       const pS = s=>{ const [h,m]=(s||'0:0').split(':').map(Number); return h*60+m; };
       const end = document.getElementById('ef-endtime')?.value;
       ev.endTime = end || ev.endTime || '';
