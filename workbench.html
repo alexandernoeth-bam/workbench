@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.10.0</title>
+<title>WorkBench 5.10.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -4980,7 +4980,11 @@ html, body {
   .vh-tab-btn { flex:1; padding:10px 0; border:none; background:none; font-family:var(--font); font-size:0.83rem; font-weight:600; color:var(--c-muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:color 0.15s,border-color 0.15s; }
   .vh-tab-btn.active { color:var(--c-beruf); border-bottom-color:var(--c-beruf); }
   .vh-aktuell-card { background:var(--c-surface); border-radius:var(--radius-sm,6px); border:1px solid var(--c-border); padding:12px 14px; margin-bottom:8px; }
-  .vh-pill { display:inline-flex; align-items:center; font-size:0.78rem; font-weight:600; padding:3px 10px; border-radius:12px; background:var(--c-beruf-bg); color:var(--c-beruf); white-space:nowrap; }
+  #ck-next-timer { display:flex; align-items:center; gap:6px; padding:4px 10px; background:var(--c-beruf-bg); border:1px solid color-mix(in srgb, var(--c-beruf) 20%, var(--c-border)); border-radius:var(--radius-xs); font-size:0.82rem; color:var(--c-beruf); font-weight:500; cursor:default; margin:6px 12px 0; }
+#ck-next-timer .ck-timer-icon { font-size:0.85rem; flex-shrink:0; }
+#ck-next-timer .ck-timer-title { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+#ck-next-timer .ck-timer-countdown { font-family:var(--font-mono); font-weight:700; flex-shrink:0; }
+.vh-pill { display:inline-flex; align-items:center; font-size:0.78rem; font-weight:600; padding:3px 10px; border-radius:12px; background:var(--c-beruf-bg); color:var(--c-beruf); white-space:nowrap; }
 .vh-aktuell-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--c-faint); margin-bottom:6px; }
   .vh-progress-bar-wrap { height:6px; background:var(--c-border); border-radius:3px; margin:6px 0; overflow:hidden; }
   .vh-progress-bar { height:100%; background:var(--c-beruf); border-radius:3px; transition:width 0.3s; }
@@ -7107,6 +7111,8 @@ html, body {
     </div>
   </div>
 
+  <div id="ck-next-timer" style="display:none;margin-top:6px;"></div>
+
   <!-- Scrollbarer Body -->
   <div id="ck-scroll-body">
 
@@ -8414,7 +8420,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.10.0 · Build 20260609-1640</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.10.1 · Build 20260609-1700</div>
     </div>
 
     <!-- Welt -->
@@ -8591,8 +8597,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.10.0',
-  APP_BUILD:   '20260609-1640',
+  APP_VERSION: '5.10.1',
+  APP_BUILD:   '20260609-1700',
 
 
   // ══════════════════════════════════════════════════════
@@ -15545,6 +15551,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     try { this._ckRenderZone('ab', dateStr, isToday); } catch(e) { console.error('ck-zone-ab:', e); }
     try { this._ckRenderKleinigkeiten(dateStr, isToday); } catch(e) { console.error('ck-zone-rauschen:', e); }
 
+    // Timer aktualisieren
+    this._ckUpdateNextTimer();
+    if (!this._ckTimerInterval) {
+      this._ckTimerInterval = setInterval(() => {
+        if (this.activeTab === 'cockpit') this._ckUpdateNextTimer();
+      }, 60000);
+    }
+
     // Auto-Scroll zur aktiven Zone (nur heute, einmal pro Session)
     if (isToday && this._ckAktiveZone && !this._ckDidAutoScroll) {
       this._ckDidAutoScroll = true;
@@ -15686,7 +15700,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _ckZoneCollapsed: {},
   _ckSmartView: true,
-  _ckDidAutoScroll: false,   // { vm: true/false, mi: true/false, ... } — null = auto
+  _ckDidAutoScroll: false,
+  _ckTimerInterval: null,   // { vm: true/false, mi: true/false, ... } — null = auto
 
   // ═══ UI3: Darstellung — Textgröße + Farben ═══════════
   _UI_DEFAULTS: { size: 100, beruf: '#0A6B5E', privat: '#4D5F33', bg: '#E5E2D9' },
@@ -15761,6 +15776,66 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     root.style.setProperty('--c-privat', privat);
     root.style.setProperty('--c-privat-bg', 'color-mix(in srgb, ' + privat + ' 12%, #FFFFFF)');
     root.style.setProperty('--c-bg', bg);
+  },
+
+  _ckUpdateNextTimer() {
+    const el = document.getElementById('ck-next-timer');
+    if (!el) return;
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    if (this._ckDate && this._ckDate !== today) { el.style.display = 'none'; return; }
+    const pT = s => { if (!s) return -1; const [h,m] = s.split(':').map(Number); return h*60+m; };
+    const candidates = [];
+    [this.dataPro, this.dataPriv].forEach(db => {
+      if (!db) return;
+      (db.customEvents||[]).filter(e => e.date===today && e.startTime && !e.done).forEach(e => {
+        const min = pT(e.startTime);
+        if (min > nowMin) candidates.push({ title: e.text, min, zeit: e.startTime });
+      });
+    });
+    (this._vorhabenAlle ? this._vorhabenAlle() : []).forEach(v => {
+      (v.meilensteine||[]).forEach(ms => {
+        (ms.aufgaben||[]).filter(a => !a.done && a.datum===today && a.startTime).forEach(a => {
+          const min = pT(a.startTime);
+          if (min > nowMin) candidates.push({ title: a.text, min, zeit: a.startTime });
+        });
+      });
+    });
+    ['pro','priv'].forEach(ctx => {
+      (this._dutyStore(ctx)||[]).forEach(d => {
+        if (!d.startTime) return;
+        const min = pT(d.startTime);
+        if (min <= nowMin) return;
+        try {
+          const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
+          const inst = insts.find(i => i.isToday);
+          if (inst && !inst.done) candidates.push({ title: d.title||d.name||'', min, zeit: d.startTime });
+        } catch(e) {}
+      });
+    });
+    (this._quickStore()||[]).filter(q => q.date===today && q.time && !q.done).forEach(q => {
+      const min = pT(q.time);
+      if (min > nowMin) candidates.push({ title: q.text||q.title||'', min, zeit: q.time });
+    });
+    if (!candidates.length) { el.style.display = 'none'; return; }
+    candidates.sort((a,b) => a.min - b.min);
+    const next = candidates[0];
+    const diff = next.min - nowMin;
+    if (diff <= 0) { el.style.display = 'none'; return; }
+    let countdown = '';
+    if (diff < 60) countdown = 'in ' + diff + ' Min';
+    else { const h = Math.floor(diff/60), m = diff%60; countdown = 'in ' + h + 'h' + (m>0?' '+m+'m':''); }
+    let urgencyColor = 'var(--c-beruf)', urgencyBg = 'var(--c-beruf-bg)';
+    if (diff <= 5) { urgencyColor = 'var(--c-danger)'; urgencyBg = 'color-mix(in srgb, var(--c-danger) 10%, var(--c-bg))'; }
+    else if (diff <= 15) { urgencyColor = 'var(--c-warn)'; urgencyBg = 'color-mix(in srgb, var(--c-warn) 10%, var(--c-bg))'; }
+    el.style.display = 'flex';
+    el.style.color = urgencyColor;
+    el.style.background = urgencyBg;
+    el.style.borderColor = 'color-mix(in srgb, ' + urgencyColor + ' 20%, var(--c-border))';
+    el.innerHTML = '<span class="ck-timer-icon">\u23f1</span>'
+      + '<span class="ck-timer-title">' + this._esc(next.title) + '</span>'
+      + '<span class="ck-timer-countdown">' + countdown + '</span>';
   },
 
   _vhDropdownHtml(selectedId, inputId) {
