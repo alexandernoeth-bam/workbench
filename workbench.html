@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.16.0</title>
+<title>WorkBench 5.17.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7062,7 +7062,7 @@ html, body {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.16.0</div>
+  <div class="wb-startup-tagline">v5.17.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7161,6 +7161,22 @@ html, body {
   </div>
 
   <div id="ck-next-timer" style="display:none;margin-top:6px;"></div>
+
+  <div id="ck-feierabend-btn" style="display:none;padding:6px 12px 0;">
+    <button onclick="WB.feierabendOpen()"
+      style="font-size:0.82rem;padding:5px 12px;border:1.5px solid var(--c-beruf);border-radius:var(--radius-xs);background:var(--c-beruf);color:#fff;cursor:pointer;font-family:var(--font);font-weight:600;">
+      🏁 Feierabend-Check starten</button>
+  </div>
+
+  <div id="ck-triage-banner" style="display:none;padding:6px 12px;background:color-mix(in srgb,var(--c-beruf) 8%,var(--c-bg));border-bottom:1px solid color-mix(in srgb,var(--c-beruf) 15%,var(--c-border));">
+    <div style="display:flex;align-items:center;gap:8px;font-size:0.82rem;">
+      <span>💼</span>
+      <span style="flex:1;color:var(--c-beruf);font-weight:500;">Tages-Triage noch ausstehend</span>
+      <button onclick="WB.triageOpen()"
+        style="font-size:0.78rem;padding:3px 10px;border-radius:8px;background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);cursor:pointer;font-weight:600;">
+        Starten →</button>
+    </div>
+  </div>
 
   <!-- Scrollbarer Body -->
   <div id="ck-scroll-body">
@@ -7845,6 +7861,26 @@ html, body {
           Zurücksetzen
         </button>
       </div>
+      <div class="wbs-row">
+        <div class="wbs-label">
+          <div class="wbs-label-main">Tages-Triage</div>
+          <div class="wbs-label-sub">Heute — zum Testen</div>
+        </div>
+        <button onclick="WB._triageReset()"
+          style="padding:6px 12px;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;cursor:pointer;border:1px solid var(--c-border);color:var(--c-beruf);background:none;">
+          Zurücksetzen
+        </button>
+      </div>
+      <div class="wbs-row">
+        <div class="wbs-label">
+          <div class="wbs-label-main">Feierabend-Check</div>
+          <div class="wbs-label-sub">Heute — zum Testen</div>
+        </div>
+        <button onclick="WB._feierabendReset()"
+          style="padding:6px 12px;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;cursor:pointer;border:1px solid var(--c-border);color:var(--c-beruf);background:none;">
+          Zurücksetzen
+        </button>
+      </div>
 
       <div class="wbs-divider"></div>
       <div class="wbs-section-label">Wochen-Dialoge</div>
@@ -8470,7 +8506,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.16.0 · Build 20260610-2030</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.17.0 · Build 20260610-2130</div>
     </div>
 
     <!-- Welt -->
@@ -8549,6 +8585,14 @@ html, body {
       <button class="wb-menu-item" onclick="WB.tdCalOpen(); WB.closeMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><circle cx="8" cy="16" r="1" fill="currentColor"/></svg>
         <span class="label">Urlaub &amp; Sondertage</span>
+      </button>
+      <button class="wb-menu-item" onclick="WB.triageOpen();WB.closeMenu()">
+        <span class="icon">💼</span>
+        <span class="label">Tages-Triage</span>
+      </button>
+      <button class="wb-menu-item" onclick="WB.feierabendOpen();WB.closeMenu()">
+        <span class="icon">🏁</span>
+        <span class="label">Feierabend-Check</span>
       </button>
       <button class="wb-menu-item" onclick="WB.wochenReflexionOpen(); WB.closeMenu()">
         <span class="icon">🌙</span>
@@ -8647,8 +8691,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.16.0',
-  APP_BUILD:   '20260610-2030',
+  APP_VERSION: '5.17.0',
+  APP_BUILD:   '20260610-2130',
 
 
   // ══════════════════════════════════════════════════════
@@ -11450,6 +11494,409 @@ const WB = {
 
   _ritualTodayKey() {
     return new Date().toISOString().split('T')[0];
+  },
+
+  // ══════════════════════════════════════════════════════
+  // TAGES-TRIAGE (A1b)
+  // ══════════════════════════════════════════════════════
+
+  _triageSelected: [],
+  _triageZeitbloecke: {},
+
+  triageOpen() {
+    this._triageSelected   = [];
+    this._triageZeitbloecke = {};
+    this._triageGoto(0);
+    document.getElementById('wb-triage-overlay').style.display = 'flex';
+  },
+
+  triageClose() {
+    document.getElementById('wb-triage-overlay').style.display = 'none';
+  },
+
+  _triageGoto(step) {
+    [0,1,2,3].forEach(s => {
+      const el = document.getElementById('triage-step-' + s);
+      if (el) el.style.display = s === step ? 'flex' : 'none';
+    });
+    document.querySelectorAll('#triage-progress .ritual-dot').forEach(dot => {
+      const ds = parseInt(dot.getAttribute('data-step'));
+      dot.classList.toggle('active', ds === step);
+      dot.classList.toggle('done', ds < step);
+    });
+    if (step === 0) this._triageRenderUebersicht();
+    if (step === 1) this._triageRenderFokus();
+    if (step === 2) this._triageRenderZeitbloecke();
+    if (step === 3) this._triageRenderConfirm();
+  },
+
+  _triageRenderUebersicht() {
+    const el = document.getElementById('triage-step-0');
+    if (!el) return;
+    const today    = this._ritualTodayKey();
+    const store    = this._ritualStore();
+    const ritual   = store?.[today] || {};
+    const isWorkday = new Date().getDay() >= 1 && new Date().getDay() <= 5;
+    const termine = [];
+    [this.dataPro, this.dataPriv].forEach(db => {
+      if (!db) return;
+      (db.customEvents||[]).filter(e => e.date === today && e.type !== 'horizon')
+        .sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''))
+        .forEach(e => termine.push(e));
+    });
+    const termineHtml = termine.length
+      ? termine.map(e =>
+          '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--c-border);">'
+          + '<span style="font-family:var(--font-mono);font-size:0.80rem;color:var(--c-muted);width:44px;flex-shrink:0;">'
+            + (e.startTime||'–') + '</span>'
+          + '<span style="flex:1;font-size:0.90rem;">' + this._esc(e.text) + '</span>'
+          + (e.done ? '<span style="color:var(--c-beruf);">✓</span>' : '')
+          + '</div>'
+        ).join('')
+      : '<div style="color:var(--c-faint);font-size:0.85rem;padding:8px 0;">Heute terminfrei 🎉</div>';
+    const intentionHtml = ritual.intention
+      ? '<div style="padding:10px 12px;background:var(--c-beruf-bg);border-radius:var(--radius-xs);font-size:0.85rem;color:var(--c-beruf);font-style:italic;margin-bottom:12px;">„' + this._esc(ritual.intention) + '“</div>'
+      : '';
+    el.innerHTML =
+      '<div style="font-size:2.5rem;margin-bottom:12px;">💼</div>'
+      + '<div style="font-size:1.3rem;font-weight:700;margin-bottom:6px;">Tages-Triage</div>'
+      + '<div style="font-size:0.85rem;color:var(--c-muted);margin-bottom:20px;">' + (isWorkday ? 'Arbeitstag' : 'Freier Tag') + '</div>'
+      + intentionHtml
+      + '<div style="width:100%;margin-bottom:16px;">'
+        + '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);margin-bottom:8px;">TERMINE HEUTE</div>'
+        + termineHtml
+      + '</div>'
+      + '<button onclick="WB._triageGoto(1)" style="width:100%;padding:14px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;margin-top:8px;">Weiter →</button>';
+  },
+
+  _triageRenderFokus() {
+    const el = document.getElementById('triage-step-1');
+    if (!el) return;
+    const isWorkday = new Date().getDay() >= 1 && new Date().getDay() <= 5;
+    // _ritualSelected auf _triageSelected umleiten
+    this._ritualSelected = this._triageSelected;
+    el.innerHTML =
+      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:6px;align-self:flex-start;">Worauf konzentrierst du dich?</div>'
+      + '<div style="font-size:0.82rem;color:var(--c-muted);margin-bottom:14px;align-self:flex-start;">'
+        + (isWorkday ? 'Berufliche Aufgaben zuerst' : 'Was steht heute an?') + '</div>'
+      + '<div id="ritual-energie-counter" style="width:100%;position:sticky;top:0;z-index:5;background:var(--c-bg);padding:8px 0;margin-bottom:8px;border-bottom:1px solid var(--c-border);">'
+        + '<div style="display:flex;align-items:center;justify-content:center;gap:12px;font-size:0.78rem;">'
+          + '<span style="color:var(--c-muted);">Verfügbare Energie:</span>'
+          + '<span id="ritual-energie-rest" style="font-weight:700;font-family:var(--font-mono);color:var(--c-beruf);">&#x2013;</span>'
+        + '</div></div>'
+      + '<div id="ritual-candidates" style="width:100%;"></div>'
+      + '<div style="margin-top:10px;width:100%;">'
+        + '<button id="ritual-step2-next" onclick="WB._triageGoto(2)" style="width:100%;padding:14px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;">Weiter →</button>'
+        + '<button onclick="WB._triageGoto(0)" style="width:100%;padding:12px;border-radius:var(--radius-sm);background:none;border:1px solid var(--c-border);margin-top:8px;font-family:var(--font);font-size:0.88rem;cursor:pointer;color:var(--c-muted);">← Zurück</button>'
+      + '</div>';
+    this._ritualRenderCandidates();
+    this._ritualUpdateEnergieCounter();
+  },
+
+  _triageRenderZeitbloecke() {
+    const el = document.getElementById('triage-step-2');
+    if (!el) return;
+    el.innerHTML =
+      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:16px;">Zeitblöcke</div>'
+      + '<div id="ritual-zeitbloecke-body" style="width:100%;"></div>'
+      + '<button onclick="WB._triageGoto(3)" style="width:100%;padding:14px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;margin-top:16px;">Weiter →</button>'
+      + '<button onclick="WB._triageGoto(1)" style="width:100%;padding:12px;border-radius:var(--radius-sm);background:none;border:1px solid var(--c-border);margin-top:8px;font-family:var(--font);font-size:0.88rem;cursor:pointer;color:var(--c-muted);">← Zurück</button>';
+    this._ritualZeitbloecke = this._triageZeitbloecke;
+    this._ritualRenderZeitbloecke();
+  },
+
+  _triageRenderConfirm() {
+    const el = document.getElementById('triage-step-3');
+    if (!el) return;
+    const sel = this._triageSelected;
+    const itemsHtml = sel.length
+      ? sel.map((s, i) =>
+          '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--c-beruf-bg);border-radius:var(--radius-xs);margin-bottom:6px;">'
+          + '<span style="width:22px;height:22px;border-radius:50%;background:var(--c-beruf);color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0;">' + (i+1) + '</span>'
+          + '<span style="font-size:0.88rem;">' + this._esc(s.title) + '</span>'
+          + '</div>'
+        ).join('')
+      : '<div style="color:var(--c-faint);font-size:0.85rem;padding:8px 0;">Kein Fokus gesetzt</div>';
+    el.innerHTML =
+      '<div style="font-size:2.5rem;margin-bottom:12px;">🎯</div>'
+      + '<div style="font-size:1.3rem;font-weight:700;margin-bottom:16px;">Dein Fokus für heute</div>'
+      + '<div style="width:100%;margin-bottom:20px;">' + itemsHtml + '</div>'
+      + '<button onclick="WB._triageFinish()" style="width:100%;padding:14px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;">Tag starten ✓</button>'
+      + '<button onclick="WB._triageGoto(2)" style="width:100%;padding:12px;border-radius:var(--radius-sm);background:none;border:1px solid var(--c-border);margin-top:8px;font-family:var(--font);font-size:0.88rem;cursor:pointer;color:var(--c-muted);">← Zurück</button>';
+  },
+
+  _triageFinish() {
+    const store = this._ritualStore();
+    const key   = this._ritualTodayKey();
+    if (store) {
+      if (!store[key]) store[key] = {};
+      store[key].doneB = true;
+      store[key].tsB   = Date.now();
+      store[key].done  = true;
+      store[key].fokus = this._triageSelected.map(s => ({
+        id: s.id, type: s.type, title: s.title,
+        meta: s.meta||'', vorhabenId: s.vorhabenId||'',
+        zeitblock: (this._triageZeitbloecke||{})[s.id]||'',
+      }));
+    }
+    this.setDirty();
+    this.triageClose();
+    this.renderCockpit();
+    this._toast(this._triageSelected.length ? '🎯 Fokus gesetzt — guten Start!' : 'Triage abgeschlossen');
+  },
+
+  _triageReset() {
+    const store = this._ritualStore();
+    const key   = this._ritualTodayKey();
+    if (store?.[key]) {
+      delete store[key].doneB;
+      delete store[key].tsB;
+      store[key].fokus = [];
+    }
+    this.setDirty();
+    this._toast('Triage zurückgesetzt');
+  },
+
+  // ══════════════════════════════════════════════════════
+  // FEIERABEND-CHECK (A1b)
+  // ══════════════════════════════════════════════════════
+
+  _feAntworten: { geleistet:'', mitnehmen:'', loslassen:'' },
+  _fePrivatFokus: null,
+  _feEnergie: null,
+
+  feierabendOpen() {
+    this._feAntworten  = { geleistet:'', mitnehmen:'', loslassen:'' };
+    this._fePrivatFokus = null;
+    this._feEnergie    = null;
+    this._feGoto(0);
+    document.getElementById('wb-feierabend-overlay').style.display = 'flex';
+  },
+
+  feierabendClose() {
+    document.getElementById('wb-feierabend-overlay').style.display = 'none';
+  },
+
+  _feGoto(step) {
+    [0,1,2,3,4].forEach(s => {
+      const el = document.getElementById('fe-step-' + s);
+      if (el) el.style.display = s === step ? 'flex' : 'none';
+    });
+    document.querySelectorAll('#feierabend-progress .ritual-dot').forEach(dot => {
+      const ds = parseInt(dot.getAttribute('data-step'));
+      dot.classList.toggle('active', ds === step);
+      dot.classList.toggle('done', ds < step);
+    });
+    if (step === 0) this._feRenderGeleistet();
+    if (step === 1) this._feRenderMitnehmen();
+    if (step === 2) this._feRenderLoslassen();
+    if (step === 3) this._feRenderVerschieben();
+    if (step === 4) this._feRenderAbendFokus();
+  },
+
+  _feSaveAndGoto(fromStep, toStep) {
+    if (fromStep === 0) this._feAntworten.geleistet = document.getElementById('fe-geleistet-text')?.value || '';
+    else if (fromStep === 1) this._feAntworten.mitnehmen = document.getElementById('fe-mitnehmen-text')?.value || '';
+    else if (fromStep === 2) this._feAntworten.loslassen = document.getElementById('fe-loslassen-text')?.value || '';
+    this._feGoto(toStep);
+  },
+
+  _feRenderGeleistet() {
+    const el = document.getElementById('fe-step-0');
+    if (!el) return;
+    const today  = this._ritualTodayKey();
+    const store  = this._ritualStore();
+    const ritual = store?.[today] || {};
+    const fokus  = ritual.fokus || [];
+    const fokusHtml = fokus.length
+      ? fokus.map(f =>
+          '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--c-border);font-size:0.88rem;">'
+          + '<span style="color:var(--c-beruf);">🎯</span>'
+          + '<span>' + this._esc(f.title) + '</span></div>'
+        ).join('')
+      : '<div style="color:var(--c-faint);font-size:0.85rem;padding:6px 0;">Kein Fokus gesetzt heute</div>';
+    el.innerHTML =
+      '<div style="font-size:2.5rem;margin-bottom:12px;">🏁</div>'
+      + '<div style="font-size:1.3rem;font-weight:700;margin-bottom:6px;">Feierabend</div>'
+      + '<div style="font-size:0.85rem;color:var(--c-muted);margin-bottom:20px;">Was habe ich heute wirklich geleistet?</div>'
+      + '<div style="width:100%;margin-bottom:12px;">'
+        + '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);margin-bottom:8px;">FOKUS HEUTE</div>'
+        + fokusHtml + '</div>'
+      + '<textarea id="fe-geleistet-text" placeholder="Was sonst noch..." style="width:100%;padding:10px 12px;border:1.5px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);resize:none;min-height:80px;box-sizing:border-box;">'
+        + this._esc(this._feAntworten.geleistet||'') + '</textarea>'
+      + '<button onclick="WB._feSaveAndGoto(0,1)" style="width:100%;padding:14px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;margin-top:12px;">Weiter →</button>';
+  },
+
+  _feRenderMitnehmen() {
+    const el = document.getElementById('fe-step-1');
+    if (!el) return;
+    el.innerHTML =
+      '<div style="font-size:2.5rem;margin-bottom:12px;">→</div>'
+      + '<div style="font-size:1.2rem;font-weight:700;margin-bottom:6px;">Was nehme ich mit?</div>'
+      + '<div style="font-size:0.85rem;color:var(--c-muted);margin-bottom:20px;">Aufgaben, Gedanken oder Absichten für morgen</div>'
+      + '<textarea id="fe-mitnehmen-text" placeholder="Morgen zuerst..." style="width:100%;padding:10px 12px;border:1.5px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);resize:none;min-height:100px;box-sizing:border-box;">'
+        + this._esc(this._feAntworten.mitnehmen||'') + '</textarea>'
+      + '<button onclick="WB._feSaveAndGoto(1,2)" style="width:100%;padding:14px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;margin-top:12px;">Weiter →</button>'
+      + '<button onclick="WB._feGoto(0)" style="width:100%;padding:10px;border-radius:var(--radius-sm);background:none;border:1px solid var(--c-border);margin-top:8px;font-family:var(--font);font-size:0.88rem;cursor:pointer;color:var(--c-muted);">← Zurück</button>';
+  },
+
+  _feRenderLoslassen() {
+    const el = document.getElementById('fe-step-2');
+    if (!el) return;
+    el.innerHTML =
+      '<div style="font-size:2.5rem;margin-bottom:12px;">✋</div>'
+      + '<div style="font-size:1.2rem;font-weight:700;margin-bottom:6px;">Was lasse ich los?</div>'
+      + '<div style="font-size:0.85rem;color:var(--c-muted);margin-bottom:20px;">Was gehört nicht in den Abend</div>'
+      + '<textarea id="fe-loslassen-text" placeholder="Ich lasse los..." style="width:100%;padding:10px 12px;border:1.5px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);resize:none;min-height:100px;box-sizing:border-box;">'
+        + this._esc(this._feAntworten.loslassen||'') + '</textarea>'
+      + '<button onclick="WB._feSaveAndGoto(2,3)" style="width:100%;padding:14px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;margin-top:12px;">Weiter →</button>'
+      + '<button onclick="WB._feGoto(1)" style="width:100%;padding:10px;border-radius:var(--radius-sm);background:none;border:1px solid var(--c-border);margin-top:8px;font-family:var(--font);font-size:0.88rem;cursor:pointer;color:var(--c-muted);">← Zurück</button>';
+  },
+
+  _feRenderVerschieben() {
+    const el = document.getElementById('fe-step-3');
+    if (!el) return;
+    const today    = this._ritualTodayKey();
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+    const tomStr   = tomorrow.toISOString().split('T')[0];
+    const items = [];
+    (this._vorhabenStore('pro')||[]).forEach(v => {
+      (v.meilensteine||[]).forEach(ms => {
+        (ms.aufgaben||[]).filter(a => !a.done && a.datum === today)
+          .forEach(a => items.push({ a, v, ms }));
+      });
+    });
+    const itemsHtml = items.length
+      ? items.map(({ a, v, ms }) => {
+          const shifted = a.datum === tomStr;
+          return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--c-border);">'
+            + '<span style="flex:1;font-size:0.88rem;">' + this._esc(a.text) + '</span>'
+            + '<button onclick="WB._feShiftAufgabe(&quot;' + v.id + '&quot;,&quot;' + ms.id + '&quot;,&quot;' + a.id + '&quot;,&quot;' + tomStr + '&quot;,this)"'
+              + ' style="font-size:0.75rem;padding:3px 10px;border-radius:8px;'
+              + 'border:1px solid ' + (shifted ? 'var(--c-beruf)' : 'var(--c-border)') + ';'
+              + 'background:' + (shifted ? 'var(--c-beruf)' : 'none') + ';'
+              + 'color:' + (shifted ? '#fff' : 'var(--c-muted)') + ';'
+              + 'font-family:var(--font);cursor:pointer;white-space:nowrap;">'
+              + (shifted ? '✓ Morgen' : '→ Morgen') + '</button>'
+            + '</div>';
+        }).join('')
+      : '<div style="color:var(--c-faint);font-size:0.85rem;padding:8px 0;">Keine offenen Aufgaben für heute 🎉</div>';
+    el.innerHTML =
+      '<div style="font-size:2.5rem;margin-bottom:12px;">📋</div>'
+      + '<div style="font-size:1.2rem;font-weight:700;margin-bottom:6px;">Offene Aufgaben</div>'
+      + '<div style="font-size:0.85rem;color:var(--c-muted);margin-bottom:16px;">Was verschiebt sich auf morgen?</div>'
+      + '<div style="width:100%;margin-bottom:16px;">' + itemsHtml + '</div>'
+      + '<button onclick="WB._feGoto(4)" style="width:100%;padding:14px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;">Weiter →</button>'
+      + '<button onclick="WB._feGoto(2)" style="width:100%;padding:10px;border-radius:var(--radius-sm);background:none;border:1px solid var(--c-border);margin-top:8px;font-family:var(--font);font-size:0.88rem;cursor:pointer;color:var(--c-muted);">← Zurück</button>';
+  },
+
+  _feShiftAufgabe(vId, msId, aId, tomStr, btn) {
+    const alle = this._vorhabenStore('pro') || [];
+    const v  = alle.find(x => x.id === vId); if (!v) return;
+    const ms = (v.meilensteine||[]).find(m => m.id === msId); if (!ms) return;
+    const a  = (ms.aufgaben||[]).find(x => x.id === aId); if (!a) return;
+    a.datum  = tomStr;
+    v.geaendert = Date.now();
+    this.setDirty();
+    btn.textContent = '✓ Morgen';
+    btn.style.background = 'var(--c-beruf)';
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'var(--c-beruf)';
+  },
+
+  _feRenderAbendFokus() {
+    const el = document.getElementById('fe-step-4');
+    if (!el) return;
+    const energie = this._feEnergie;
+    const E_BTNS  = [
+      { val:'niedrig', lbl:'🔴 Niedrig' },
+      { val:'mittel',  lbl:'🟡 Mittel'  },
+      { val:'hoch',    lbl:'🟢 Hoch'    },
+    ];
+    const kandidaten = [];
+    (this._vorhabenStore('priv')||[])
+      .filter(v => (v.aktivitaet||'aktiv') !== 'ruhend')
+      .forEach(v => {
+        (v.meilensteine||[]).forEach(ms => {
+          (ms.aufgaben||[])
+            .filter(a => !a.done && this.istNaechsterSchritt(a))
+            .slice(0, 2)
+            .forEach(a => kandidaten.push({ a, v }));
+        });
+      });
+    const kandidatenHtml = kandidaten.slice(0, 6).map(({ a, v }) => {
+      const sel = this._fePrivatFokus === a.id;
+      return '<div onclick="WB._feSetPrivatFokus(&quot;' + a.id + '&quot;,&quot;' + this._esc(a.text) + '&quot;)"'
+        + ' style="display:flex;align-items:center;gap:10px;padding:8px 12px;'
+        + 'background:' + (sel ? 'var(--c-beruf-bg)' : 'var(--c-surface)') + ';'
+        + 'border:1.5px solid ' + (sel ? 'var(--c-beruf)' : 'var(--c-border)') + ';'
+        + 'border-radius:var(--radius-xs);margin-bottom:6px;cursor:pointer;">'
+        + '<div style="width:16px;height:16px;border-radius:50%;border:2px solid '
+          + (sel ? 'var(--c-beruf)' : 'var(--c-border)') + ';background:'
+          + (sel ? 'var(--c-beruf)' : 'transparent') + ';flex-shrink:0;"></div>'
+        + '<div style="flex:1;">'
+          + '<div style="font-size:0.88rem;">' + this._esc(a.text) + '</div>'
+          + '<div style="font-size:0.72rem;color:var(--c-faint);">' + this._esc(v.titel||'') + '</div>'
+        + '</div></div>';
+    }).join('');
+    el.innerHTML =
+      '<div style="font-size:2.5rem;margin-bottom:12px;">🏠</div>'
+      + '<div style="font-size:1.2rem;font-weight:700;margin-bottom:6px;">Abend-Fokus</div>'
+      + '<div style="font-size:0.85rem;color:var(--c-muted);margin-bottom:16px;">Wie viel Energie hast du noch?</div>'
+      + '<div style="display:flex;gap:8px;width:100%;margin-bottom:20px;">'
+      + E_BTNS.map(b =>
+          '<button onclick="WB._feSetEnergie(&quot;' + b.val + '&quot;)"'
+          + ' style="flex:1;padding:10px;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;cursor:pointer;'
+          + 'border:1.5px solid ' + (energie===b.val ? 'var(--c-beruf)' : 'var(--c-border)') + ';'
+          + 'background:' + (energie===b.val ? 'var(--c-beruf)' : 'none') + ';'
+          + 'color:' + (energie===b.val ? '#fff' : 'var(--c-muted)') + ';">' + b.lbl + '</button>'
+        ).join('')
+      + '</div>'
+      + (kandidaten.length
+        ? '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);margin-bottom:8px;align-self:flex-start;">ABEND-FOKUS (max. 1)</div>'
+          + '<div style="width:100%;margin-bottom:16px;">' + kandidatenHtml + '</div>'
+        : '')
+      + '<button onclick="WB._feFinish()" style="width:100%;padding:14px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;">Feierabend ✓</button>'
+      + '<button onclick="WB._feGoto(3)" style="width:100%;padding:10px;border-radius:var(--radius-sm);background:none;border:1px solid var(--c-border);margin-top:8px;font-family:var(--font);font-size:0.88rem;cursor:pointer;color:var(--c-muted);">← Zurück</button>';
+  },
+
+  _feSetEnergie(val) {
+    this._feEnergie = val;
+    this._feRenderAbendFokus();
+  },
+
+  _feSetPrivatFokus(id, title) {
+    this._fePrivatFokus = this._fePrivatFokus === id ? null : id;
+    this._feRenderAbendFokus();
+  },
+
+  _feFinish() {
+    const store = this._ritualStore();
+    const key   = this._ritualTodayKey();
+    if (store) {
+      if (!store[key]) store[key] = {};
+      store[key].feierabend = {
+        done: true,
+        ts: Date.now(),
+        geleistet:    this._feAntworten.geleistet  || '',
+        mitnehmen:    this._feAntworten.mitnehmen  || '',
+        loslassen:    this._feAntworten.loslassen  || '',
+        energieAbend: this._feEnergie || null,
+        privatFokus:  this._fePrivatFokus ? { id: this._fePrivatFokus } : null,
+      };
+    }
+    this.setDirty();
+    this.feierabendClose();
+    this.renderCockpit();
+    this._toast('🏠 Schönen Feierabend!');
+  },
+
+  _feierabendReset() {
+    const store = this._ritualStore();
+    const key   = this._ritualTodayKey();
+    if (store?.[key]) delete store[key].feierabend;
+    this.setDirty();
+    this._toast('Feierabend-Check zurückgesetzt');
   },
 
   _ritualIsDoneToday() {
@@ -15604,6 +16051,22 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       } else {
         smartBtn.style.background = ''; smartBtn.style.color = ''; smartBtn.style.border = '';
       }
+    }
+
+    // Triage-Banner und Feierabend-Button
+    const triageBannerEl = document.getElementById('ck-triage-banner');
+    if (triageBannerEl) {
+      const _rStore  = this._ritualStore();
+      const _rRitual = _rStore?.[today];
+      const _rHour   = new Date().getHours();
+      const _rIsWD   = new Date().getDay() >= 1 && new Date().getDay() <= 5;
+      const _rTriAb  = _rIsWD ? 7 : 8;
+      const _showBanner = isToday && _rRitual?.doneA && !_rRitual?.doneB && _rHour >= _rTriAb;
+      triageBannerEl.style.display = _showBanner ? '' : 'none';
+    }
+    const feBtnEl = document.getElementById('ck-feierabend-btn');
+    if (feBtnEl) {
+      feBtnEl.style.display = (isToday && this._ckAktiveZone === 'fe') ? '' : 'none';
     }
 
     try { this._ckRenderZone('vm', dateStr, isToday); } catch(e) { console.error('ck-zone-vm:', e); }
@@ -31869,6 +32332,40 @@ WB.init();
     <!-- Aussprung-Link (in allen Schritten) -->
     <!-- Keine Überspringen-Option mehr (v4.3.2) -->
 
+  </div>
+</div>
+
+<!-- TAGES-TRIAGE OVERLAY -->
+<div id="wb-triage-overlay" style="position:fixed;inset:0;z-index:960;background:var(--c-bg);display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:0;">
+  <div id="triage-card" style="width:100%;max-width:460px;min-height:100%;display:flex;flex-direction:column;align-items:center;padding:32px 22px 40px;box-sizing:border-box;">
+    <div id="triage-progress" style="display:flex;gap:8px;margin-bottom:28px;">
+      <span class="ritual-dot" data-step="0"></span>
+      <span class="ritual-dot" data-step="1"></span>
+      <span class="ritual-dot" data-step="2"></span>
+      <span class="ritual-dot" data-step="3"></span>
+    </div>
+    <div id="triage-step-0" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
+    <div id="triage-step-1" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
+    <div id="triage-step-2" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
+    <div id="triage-step-3" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
+  </div>
+</div>
+
+<!-- FEIERABEND-CHECK OVERLAY -->
+<div id="wb-feierabend-overlay" style="position:fixed;inset:0;z-index:960;background:var(--c-bg);display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:0;">
+  <div style="width:100%;max-width:460px;min-height:100%;display:flex;flex-direction:column;align-items:center;padding:32px 22px 40px;box-sizing:border-box;">
+    <div id="feierabend-progress" style="display:flex;gap:8px;margin-bottom:28px;">
+      <span class="ritual-dot" data-step="0"></span>
+      <span class="ritual-dot" data-step="1"></span>
+      <span class="ritual-dot" data-step="2"></span>
+      <span class="ritual-dot" data-step="3"></span>
+      <span class="ritual-dot" data-step="4"></span>
+    </div>
+    <div id="fe-step-0" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
+    <div id="fe-step-1" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
+    <div id="fe-step-2" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
+    <div id="fe-step-3" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
+    <div id="fe-step-4" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
   </div>
 </div>
 
