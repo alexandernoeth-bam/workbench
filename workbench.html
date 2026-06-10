@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.21.6</title>
+<title>WorkBench 5.21.7</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7184,7 +7184,7 @@ body.layout-zwei-spalten #woche-fab {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.21.6</div>
+  <div class="wb-startup-tagline">v5.21.7</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8748,7 +8748,7 @@ body.layout-zwei-spalten #woche-fab {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.21.6 · Build 20260611-0510</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.21.7 · Build 20260611-0530</div>
     </div>
 
     <!-- Welt -->
@@ -8933,8 +8933,8 @@ body.layout-zwei-spalten #woche-fab {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.21.6',
-  APP_BUILD:   '20260611-0510',
+  APP_VERSION: '5.21.7',
+  APP_BUILD:   '20260611-0530',
 
 
   // ══════════════════════════════════════════════════════
@@ -16946,7 +16946,22 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (sel) sel.value = sektion;
     const TITEL = { vorhaben:'Vorhaben', woche:'Woche', notizen:'Notizen',
       checklisten:'Checklisten', schnellerinnerungen:'Schnellerinnerungen' };
-    if (titel) titel.textContent = TITEL[sektion] || sektion;
+    if (titel) {
+      titel.textContent = TITEL[sektion] || sektion;
+    }
+    // Woche: + Termin Button im Panel-Header
+    const existingBtn = sel?.parentElement?.querySelector('.panel-termin-btn');
+    if (existingBtn) existingBtn.remove();
+    if (sektion === 'woche' && sel?.parentElement) {
+      const tBtn = document.createElement('button');
+      tBtn.className = 'panel-termin-btn';
+      tBtn.textContent = '+ Termin';
+      tBtn.style.cssText = 'font-size:0.72rem;padding:2px 8px;border-radius:var(--radius-xs);'
+        + 'background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);'
+        + 'font-weight:600;cursor:pointer;flex-shrink:0;';
+      tBtn.onclick = () => WB.newEventOpenPicker();
+      sel.parentElement.insertBefore(tBtn, sel);
+    }
     // Bestehende Sektionen im Container zurücksetzen
     ['sec-vorhaben','sec-woche','sec-planer','sec-notizen','sec-checklisten'].forEach(id => {
       const sec = document.getElementById(id);
@@ -27422,13 +27437,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   viewDate: new Date(),
   _ztNowTimer: null,
   _ztConfig: { dayStart: 5, dayEnd: 23, lunchH: 12, lunchDur: 0.75 },
-
-  _wocheFabUpdate() {
-    const fab = document.getElementById('woche-fab');
-    if (!fab) return;
-    if (this.activeTab === 'woche') fab.classList.add('visible');
-    else fab.classList.remove('visible');
-  },
 
   // ── Besprechungs-Assistent: 15 Min vorher prüfen ──────
   _ckRenderMeetingBanner() {
