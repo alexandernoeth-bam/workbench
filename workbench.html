@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.21.1</title>
+<title>WorkBench 5.21.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -236,6 +236,11 @@ body.layout-zwei-spalten #wb-right-panel {
 }
 body.layout-zwei-spalten #wb-vorhaben-detail {
   display: none !important;
+}
+/* Bottom-Sheets im Zwei-Spalten-Modus auf rechte Spalte beschränken */
+body.layout-zwei-spalten [style*="z-index:600"],
+body.layout-zwei-spalten [style*="z-index: 600"] {
+  left: 35% !important;
 }
 #wb-right-panel-header {
   display: flex; align-items: center; gap: 8px;
@@ -7173,7 +7178,7 @@ body.layout-zwei-spalten #wb-vorhaben-detail {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.21.1</div>
+  <div class="wb-startup-tagline">v5.21.2</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7444,10 +7449,12 @@ body.layout-zwei-spalten #wb-vorhaben-detail {
             onchange="WB._panelSetSektion('oben', this.value)">
             <option value="vorhaben">Vorhaben</option>
             <option value="woche">Woche</option>
-            <option value="planer">Planer</option>
             <option value="notizen">Notizen</option>
             <option value="checklisten">Checklisten</option>
+            <option value="schnellerinnerungen">Schnellerinnerungen</option>
           </select>
+          <button class="panel-fullscreen-btn" onclick="WB._panelToggleFullscreen(this)" title="Vollbild"
+            style="background:none;border:none;cursor:pointer;font-size:0.85rem;color:var(--c-faint);padding:2px 4px;line-height:1;flex-shrink:0;">⤢</button>
         </div>
         <div class="panel-inhalt" id="wb-panel-oben-inhalt"></div>
       </div>
@@ -7463,10 +7470,12 @@ body.layout-zwei-spalten #wb-vorhaben-detail {
             onchange="WB._panelSetSektion('unten', this.value)">
             <option value="vorhaben">Vorhaben</option>
             <option value="woche" selected>Woche</option>
-            <option value="planer">Planer</option>
             <option value="notizen">Notizen</option>
             <option value="checklisten">Checklisten</option>
+            <option value="schnellerinnerungen">Schnellerinnerungen</option>
           </select>
+          <button class="panel-fullscreen-btn" onclick="WB._panelToggleFullscreen(this)" title="Vollbild"
+            style="background:none;border:none;cursor:pointer;font-size:0.85rem;color:var(--c-faint);padding:2px 4px;line-height:1;flex-shrink:0;">⤢</button>
         </div>
         <div class="panel-inhalt" id="wb-panel-unten-inhalt"></div>
       </div>
@@ -8682,7 +8691,7 @@ body.layout-zwei-spalten #wb-vorhaben-detail {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.21.1 · Build 20260611-0245</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.21.2 · Build 20260611-0300</div>
     </div>
 
     <!-- Welt -->
@@ -8867,8 +8876,8 @@ body.layout-zwei-spalten #wb-vorhaben-detail {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.21.1',
-  APP_BUILD:   '20260611-0245',
+  APP_VERSION: '5.21.2',
+  APP_BUILD:   '20260611-0300',
 
 
   // ══════════════════════════════════════════════════════
@@ -16677,7 +16686,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const sel    = document.getElementById('wb-panel-' + position + '-select');
     if (!inhalt) return;
     if (sel) sel.value = sektion;
-    const TITEL = { vorhaben:'Vorhaben', woche:'Woche', planer:'Planer', notizen:'Notizen', checklisten:'Checklisten' };
+    const TITEL = { vorhaben:'Vorhaben', woche:'Woche', notizen:'Notizen',
+      checklisten:'Checklisten', schnellerinnerungen:'Schnellerinnerungen' };
     if (titel) titel.textContent = TITEL[sektion] || sektion;
     // Bestehende Sektionen im Container zurücksetzen
     ['sec-vorhaben','sec-woche','sec-planer','sec-notizen','sec-checklisten'].forEach(id => {
@@ -16690,6 +16700,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     inhalt.innerHTML = '';
     if (sektion === 'vorhaben') {
       this._panelRenderVorhaben(inhalt, position);
+      return;
+    }
+    if (sektion === 'schnellerinnerungen') {
+      this._panelRenderSchnellerinnerungen(inhalt);
       return;
     }
     const sec = document.getElementById('sec-' + sektion);
@@ -16767,7 +16781,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + this._esc(v.titel||'');
     }
     inhalt.innerHTML = '<div id="wb-panel-vh-detail-inner" style="height:100%;overflow-y:auto;"></div>';
-    this._vorhabenDetailRenderInto(document.getElementById('wb-panel-vh-detail-inner'));
+    // Element ist jetzt im DOM — _vorhabenDetailRender() findet es selbst
+    this._vorhabenDetailRender();
   },
 
   _panelBackToListe() {
@@ -16777,6 +16792,62 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const titel  = document.getElementById('wb-panel-' + pos + '-titel');
     if (titel) titel.textContent = 'Vorhaben';
     if (inhalt) inhalt.innerHTML = this._panelBuildVorhabenListe();
+  },
+
+  _panelRenderSchnellerinnerungen(container) {
+    if (!container) return;
+    const items = (this._quickStore() || []).filter(q => !q.done);
+    const today  = new Date().toISOString().split('T')[0];
+    const heute  = items.filter(q => q.date === today);
+    const offen  = items.filter(q => !q.date);
+    const andere = items.filter(q => q.date && q.date !== today);
+    const renderItem = q =>
+      '<div onclick="WB._quickDetail(&quot;' + q.id + '&quot;)"'
+      + ' style="display:flex;align-items:center;gap:8px;padding:8px 12px;'
+      + 'background:var(--c-surface);border:1px solid var(--c-border);'
+      + 'border-radius:var(--radius-xs);margin-bottom:5px;cursor:pointer;">'
+      + '<span style="flex:1;font-size:0.88rem;">' + this._esc(q.text||q.title||'') + '</span>'
+      + (q.date ? '<span style="font-size:0.72rem;color:var(--c-faint);font-family:var(--font-mono);">' + q.date + '</span>' : '')
+      + (q.time ? '<span style="font-size:0.72rem;color:var(--c-muted);font-family:var(--font-mono);">' + q.time + '</span>' : '')
+      + '</div>';
+    let html = '<div style="padding:8px;">';
+    if (heute.length)  html += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);padding:6px 4px 4px;">Heute</div>' + heute.map(renderItem).join('');
+    if (offen.length)  html += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);padding:10px 4px 4px;">Offen</div>' + offen.map(renderItem).join('');
+    if (andere.length) html += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);padding:10px 4px 4px;">Geplant</div>' + andere.map(renderItem).join('');
+    if (!items.length) html += '<div style="padding:24px;text-align:center;color:var(--c-faint);font-size:0.85rem;">Keine offenen Erinnerungen</div>';
+    html += '<div style="padding:8px 4px;">'
+      + '<button onclick="WB._quickDetail(null)"'
+        + ' style="width:100%;padding:10px;border-radius:var(--radius-xs);'
+        + 'background:var(--c-beruf);color:#fff;border:none;'
+        + 'font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;">+ Neue Erinnerung</button>'
+      + '</div></div>';
+    container.innerHTML = html;
+  },
+
+  // ── Panel Vollbild-Toggle ─────────────────────────────
+  _panelToggleFullscreen(btn) {
+    const header = btn.closest('.panel-sektion-header');
+    const panel  = header?.parentElement;
+    const oben   = document.getElementById('wb-panel-oben');
+    const unten  = document.getElementById('wb-panel-unten');
+    const div    = document.getElementById('wb-panel-divider');
+    if (!panel || !oben || !unten) return;
+    const isOben = panel.id === 'wb-panel-oben';
+    const isFull = panel.dataset.fullscreen === '1';
+    if (isFull) {
+      const split = this._panelSplit || 50;
+      oben.style.flex  = split + '%';
+      unten.style.flex = (100 - split) + '%';
+      if (div) div.style.display = '';
+      panel.dataset.fullscreen = '0';
+      document.querySelectorAll('.panel-fullscreen-btn').forEach(b => b.textContent = '⤢');
+    } else {
+      if (isOben) { oben.style.flex = '100%'; unten.style.flex = '0%'; }
+      else        { oben.style.flex = '0%';   unten.style.flex = '100%'; }
+      if (div) div.style.display = 'none';
+      panel.dataset.fullscreen = '1';
+      btn.textContent = '⤡';
+    }
   },
 
   // ── Drag-Divider ──────────────────────────────────────
