@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.13.1</title>
+<title>WorkBench 5.14.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -147,6 +147,11 @@ html, body {
 #wb-menu-btn.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
 #wb-menu-btn.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
 #wb-menu-btn.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+#wb-buero-btn.aktiv {
+  opacity: 1;
+  color: var(--c-beruf);
+}
 
 /* ── Content-Bereich ───────────────────────────────── */
 #wb-content {
@@ -7002,7 +7007,7 @@ html, body {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.13.1</div>
+  <div class="wb-startup-tagline">v5.14.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7049,6 +7054,11 @@ html, body {
       <span id="wb-sync-text"></span>
     </div>
     <div style="width:8px;"></div>
+    <button id="wb-buero-btn" onclick="WB._bueroToggle()"
+      title="Büro-Modus"
+      style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px 6px;color:var(--c-muted);opacity:0.5;transition:opacity 0.15s;line-height:1;">
+      👁
+    </button>
     <button id="wb-menu-btn" onclick="WB.toggleMenu()" aria-label="Menü öffnen" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
@@ -8566,8 +8576,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.13.1',
-  APP_BUILD:   '20260610-1330',
+  APP_VERSION: '5.14.0',
+  APP_BUILD:   '20260610-1500',
 
 
   // ══════════════════════════════════════════════════════
@@ -15534,14 +15544,19 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       (this._evStoreForWelt(welt) || [])
         .filter(ev => ev.date === dateStr && ev.type !== 'horizon')
         .forEach(ev => {
+          // Büro-Modus: Privat komplett ausblenden
+          if (this._bueroModus && welt === 'priv') return;
           const evZone  = getZone(ev.startTime);
           const weltMeta = welt === 'pro' ? 'Beruf' : 'Privat';
           const metaStr  = [ev.location, weltMeta].filter(Boolean).join(' · ');
+          // Büro-Modus: Vertraulich maskieren
+          const evTitle = (this._bueroModus && ev.vertraulich) ? '🔒 Vertraulich' : ev.text;
+          const evMeta  = (this._bueroModus && ev.vertraulich) ? '' : metaStr;
           if (zone === null) {
-            if (!ev.startTime) items.push({ type:'termin', id:String(ev.id), title:ev.text, meta:metaStr, done:!!ev.done, zeit:'', ctx:welt, obj:ev, sort:9999 });
+            if (!ev.startTime) items.push({ type:'termin', id:String(ev.id), title:evTitle, meta:evMeta, done:!!ev.done, zeit:'', ctx:welt, obj:ev, sort:9999 });
           } else {
             if (evZone === zone || (!evZone && zone === 'vm')) {
-              items.push({ type:'termin', id:String(ev.id), title:ev.text, meta:metaStr, done:!!ev.done, zeit:ev.startTime||'', ctx:welt, obj:ev, sort:ev.startTime ? pT(ev.startTime) : 5000 });
+              items.push({ type:'termin', id:String(ev.id), title:evTitle, meta:evMeta, done:!!ev.done, zeit:ev.startTime||'', ctx:welt, obj:ev, sort:ev.startTime ? pT(ev.startTime) : 5000 });
             }
           }
         });
@@ -15574,6 +15589,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     // Beide Welten
     [['pro', this.dataPro], ['priv', this.dataPriv]].forEach(([vCtx, vDb]) => {
       (vDb?.vorhaben || []).forEach(v => {
+        // Büro-Modus: Privat-Vorhaben ausblenden
+        if (this._bueroModus && vCtx === 'priv') return;
         (v.meilensteine || []).forEach(ms => {
           (ms.aufgaben || [])
             .filter(a => !a.done && !ritualIds.has(a.id) && (
@@ -15584,7 +15601,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
               const aZone = getZone(a.startTime || '');
               const matchesZone = zone === null ? !aZone : (aZone === zone || (!aZone && zone === 'vm'));
               if (matchesZone) {
-                items.push({ type:'vorhaben', id:a.id, title:a.text, meta:v.titel||'', done:false, zeit:a.startTime||'', ctx:vCtx, obj:{a,v,ms}, ae:a.aktivEnergie||'', sort:pT(a.startTime||'') >= 0 ? pT(a.startTime) : 6000 });
+                // Büro-Modus: vertrauliche Aufgaben maskieren
+                const aufgTitel = (this._bueroModus && a.vertraulich) ? '🔒 Vertraulich' : a.text;
+                items.push({ type:'vorhaben', id:a.id, title:aufgTitel, meta:v.titel||'', done:false, zeit:a.startTime||'', ctx:vCtx, obj:{a,v,ms}, ae:a.aktivEnergie||'', sort:pT(a.startTime||'') >= 0 ? pT(a.startTime) : 6000 });
               }
             });
         });
@@ -15594,6 +15613,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     // 4. Wochenpflichten fällig — beide Welten
     ['pro', 'priv'].forEach(dCtx => {
       if (dCtx === 'pro' && noWork) return;  // Beruf-Pflichten an Nicht-Arbeitstagen überspringen
+      // Büro-Modus: Privat-Pflichten ausblenden
+      if (this._bueroModus && dCtx === 'priv') return;
       (this._dutyStore(dCtx) || []).forEach(d => {
         try {
           const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
@@ -15619,8 +15640,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const qZone = q.time ? getZone(q.time) : null;
       const matchesZone = zone === null ? !qZone : qZone === zone;
       const qCtx = _proQIds.has(q.id) ? 'pro' : 'priv';
+      // Büro-Modus: Privat ohne vertraulich ausblenden
+      if (this._bueroModus && qCtx === 'priv' && !q.vertraulich) return;
+      // Büro-Modus: vertraulich maskieren
+      const schnellTitel = (this._bueroModus && q.vertraulich) ? '🔒 Vertraulich' : (q.text||q.title||'');
       if (matchesZone) {
-        items.push({ type:'schnell', id:q.id, title:q.text||q.title||'', meta:'', done:!!q.done, zeit:q.time||'', ctx:qCtx, obj:q, sort:q.time ? pT(q.time) : 8000 });
+        items.push({ type:'schnell', id:q.id, title:schnellTitel, meta:'', done:!!q.done, zeit:q.time||'', ctx:qCtx, obj:q, sort:q.time ? pT(q.time) : 8000 });
       }
     });
 
@@ -16168,7 +16193,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const block = document.getElementById('ck-zone-rauschen');
     if (!body || !block) return;
 
-    const items = [];
+    let items = [];
     // Welt-Lookup
     const proIds  = new Set((this.dataPro?.quickItems  || []).map(q => q.id));
     const privIds = new Set((this.dataPriv?.quickItems || []).map(q => q.id));
@@ -16183,6 +16208,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     allQ.filter(q => q.date === dateStr && !q.time && !q.done).forEach(q => {
       items.push({ type: 'schnell', id: q.id, title: q.text||q.title||'', done: false, zeit: '', obj: q, welt: getWelt(q.id) });
     });
+
+    // Büro-Modus: Privat-Items ausblenden, Vertraulich maskieren
+    if (this._bueroModus) {
+      items = items.filter(i => i.welt !== 'priv' || i.obj?.vertraulich);
+      items = items.map(i => i.obj?.vertraulich
+        ? { ...i, title: '🔒 Vertraulich' } : i);
+    }
 
     if (!items.length) { block.style.display = 'none'; return; }
     block.style.display = '';
@@ -17305,6 +17337,11 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<button id="wqa-welt-priv" onclick="WB._wqaSetWelt(\'priv\')" style="font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:20px;border:none;cursor:pointer;' + (!isBeruf ? 'background:#7B5EA7;color:#fff;' : 'background:var(--c-border);color:var(--c-muted);') + '">Privat</button>'
       + '</div></div>'
       + '<input id="wqa-text" type="text" value="' + (item?.text||'').replace(/"/g,'&quot;') + '" placeholder="Was muss erledigt werden?" autofocus style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:10px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin:0 0 10px;">'
+      + '<input type="checkbox" id="qd-vertraulich" style="accent-color:var(--c-beruf);"'
+      + (item?.vertraulich ? ' checked' : '') + '>'
+      + '<label for="qd-vertraulich" style="font-size:0.85rem;color:var(--c-muted);cursor:pointer;">🔒 Vertraulich</label>'
+      + '</div>'
       + '<div style="display:flex;gap:8px;margin-bottom:10px;">'
       + '<div style="flex:2;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:3px;">Datum</div>'
       + '<input type="date" id="wqa-date" value="' + (item?.date||today) + '" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"></div>'
@@ -17417,6 +17454,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     item.aktivEnergie = ae;
     if (time) item.time = time; else delete item.time;
     if (notiz) item.notiz = notiz; else delete item.notiz;
+    item.vertraulich = document.getElementById('qd-vertraulich')?.checked || false;
 
     this.setDirty();
     this._closeSheet500();
@@ -18225,8 +18263,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const ebene = v.aktivitaet || 'aktiv';
       const EBENE_BADGE = { aktiv:'<span class="vh-card-status vh-status-aktiv">Aktiv</span>', wartend:'<span class="vh-card-status vh-status-wartend">Wartend</span>', ruhend:'<span class="vh-card-status vh-status-ruhend">Ruhend</span>' };
       const fokus = v.fokus ? '<span class="vh-card-fokus">\u2b50</span>' : '';
+      // Büro-Modus: Privat überspringen
+      if (this._bueroModus && v.welt === 'priv') return '';
+      // Büro-Modus: Vertraulich maskieren
+      const vTitel = (this._bueroModus && v.vertraulich) ? '🔒 Vertraulich' : v.titel;
+      const vPillsHtml = (this._bueroModus && v.vertraulich) ? '' : pillsHtml;
       return '<div class="vh-card' + (v.fokus ? ' fokus-vorhaben' : '') + '" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
-        + '<div class="vh-card-head">' + fokus + '<span class="vh-card-title">' + this._esc(v.titel) + '</span>' + (EBENE_BADGE[ebene]||'') + '</div>' + pillsHtml + '</div>';
+        + '<div class="vh-card-head">' + fokus + '<span class="vh-card-title">' + this._esc(vTitel) + '</span>' + (EBENE_BADGE[ebene]||'') + '</div>' + vPillsHtml + '</div>';
     } catch(e) {
       return '<div class="vh-card" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)"><div class="vh-card-head"><span class="vh-card-title">' + this._esc(v.titel||'?') + '</span></div></div>';
     }
@@ -18348,6 +18391,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     body += row('Cluster', '<select onchange="WB._vorhabenSetCluster(this.value);' + reopen.replace(/&quot;/g,'\\"') + '" style="padding:6px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">' + clusterOpts.map(c => '<option value="' + c + '"' + (cluster===c?' selected':'') + '>' + CLUSTER_LBL[c] + '</option>').join('') + '</select>');
     body += row('Status', ['aktiv','wartend','ruhend'].map(e => pill(e.charAt(0).toUpperCase()+e.slice(1), e, ebene, 'WB._vorhabenSetEbene(&quot;' + e + '&quot;);' + reopen)).join(''));
     body += row('Charakter', Object.entries(CHAR_LBL).map(([c, lbl]) => pill(lbl, c, charakter, 'WB._vorhabenSetCharakter(&quot;' + c + '&quot;);' + reopen)).join(''));
+    body += row('Vertraulich',
+      '<button onclick="WB._vhToggleVertraulich();'
+      + 'document.getElementById(&quot;vh-settings-sheet&quot;).remove();'
+      + 'WB._vhOpenSettings();" style="padding:5px 12px;border-radius:16px;'
+      + 'font-family:var(--font);font-size:0.78rem;cursor:pointer;'
+      + 'border:1.5px solid ' + (v.vertraulich ? '#B5332A' : 'var(--c-border)') + ';'
+      + 'background:' + (v.vertraulich ? '#B5332A' : 'none') + ';'
+      + 'color:' + (v.vertraulich ? '#fff' : 'var(--c-muted)') + ';">'
+      + (v.vertraulich ? '🔒 Vertraulich' : '🔒 Als vertraulich markieren')
+      + '</button>'
+    );
     body += row('Fokus', '<button onclick="WB._vhToggleFokus();' + reopen.replace(/&quot;/g,'\\"') + '" style="padding:5px 12px;border-radius:16px;font-family:var(--font);font-size:0.78rem;cursor:pointer;border:1.5px solid ' + (fokus ? 'var(--c-beruf)' : 'var(--c-border)') + ';background:' + (fokus ? 'var(--c-beruf)' : 'none') + ';color:' + (fokus ? '#fff' : 'var(--c-muted)') + ';">' + (fokus ? '\u2b50 Fokus aktiv' : '\u2b50 Als Fokus setzen') + '</button>');
     body += row('Fortschritt', '<input type="number" min="0" max="100" value="' + (v.fortschrittManuell ?? '') + '" placeholder="auto" onchange="WB._vhSetFortschrittManuell(this.value)" style="width:60px;padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);text-align:center;"><span style="font-size:0.78rem;color:var(--c-faint);">%</span>');
     body += '<div style="padding:12px 0;text-align:center;"><button onclick="WB._vorhabenWechselWelt(&quot;' + andereWelt + '&quot;);document.getElementById(&quot;vh-settings-sheet&quot;).remove();" style="font-size:0.82rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);">' + andereWeltLbl + '</button></div>';
@@ -18358,6 +18412,30 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _vhToggleFokus() {
     const v = this._vorhabenAktiv(); if (!v) return;
     v.fokus = !v.fokus;
+    v.geaendert = Date.now();
+    this.setDirty();
+    this._vorhabenDetailRender();
+    this._vorhabenListeRender();
+  },
+
+  // ── Büro-Modus (C1) ─────────────────────────────────────
+  _bueroModus: false,
+
+  _bueroToggle() {
+    this._bueroModus = !this._bueroModus;
+    const btn = document.getElementById('wb-buero-btn');
+    if (btn) btn.classList.toggle('aktiv', this._bueroModus);
+    this._toast(this._bueroModus
+      ? '👁 Büro-Modus aktiv — Private Inhalte ausgeblendet'
+      : '👁 Büro-Modus deaktiviert');
+    this._ckRenderTagesseite();
+    if (this.activeTab === 'vorhaben') this._vorhabenListeRender();
+  },
+
+  // ── Vorhaben vertraulich umschalten ────────────────────
+  _vhToggleVertraulich() {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    v.vertraulich = !v.vertraulich;
     v.geaendert = Date.now();
     this.setDirty();
     this._vorhabenDetailRender();
@@ -18543,6 +18621,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const v = this._vorhabenAktiv();
     const body = document.getElementById('wb-vorhaben-detail-body');
     if (!v || !body) return;
+
+    // Büro-Modus: vertrauliche Vorhaben nur Platzhalter zeigen
+    if (this._bueroModus && v.vertraulich) {
+      body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--c-faint);font-size:1.5rem;">🔒 Vertraulich</div>';
+      return;
+    }
 
     this._vhMigrateV47(v);
 
@@ -29372,6 +29456,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + 'style="width:80px;padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);" '
         + 'value="' + (ev.energieKosten != null ? ev.energieKosten : '') + '">'
         + '</div>'
+        + '<div style="display:flex;align-items:center;gap:10px;margin:8px 0;">'
+        + '<label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;color:var(--c-muted);cursor:pointer;">'
+        + '<input type="checkbox" id="ef-ev-vertraulich" style="accent-color:var(--c-beruf);width:16px;height:16px;"'
+        + (ev.vertraulich ? ' checked' : '') + '> 🔒 Vertraulich</label></div>'
         + this._vhDropdownHtml(ev.vorhabenId || '', 'ef-ev-vorhaben')
         + '<div class="edit-field"><label>Checkliste</label>'
         + '<div id="ef-chk-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">'
@@ -29494,6 +29582,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       newEv.checklist = this._efChkGetList();
       const vhIdNew = document.getElementById('ef-ev-vorhaben')?.value || '';
       if (vhIdNew) newEv.vorhabenId = vhIdNew;
+      newEv.vertraulich = document.getElementById('ef-ev-vertraulich')?.checked || false;
       if (!targetDb.customEvents) targetDb.customEvents = [];
       targetDb.customEvents.push(newEv);
       // Besprechungs-Prozess
@@ -29663,6 +29752,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       ev.checklist = this._efChkGetList();
       const vhIdEdit = document.getElementById('ef-ev-vorhaben')?.value || '';
       if (vhIdEdit) ev.vorhabenId = vhIdEdit; else delete ev.vorhabenId;
+      ev.vertraulich = document.getElementById('ef-ev-vertraulich')?.checked || false;
       const pS = s=>{ const [h,m]=(s||'0:0').split(':').map(Number); return h*60+m; };
       const end = document.getElementById('ef-endtime')?.value;
       ev.endTime = end || ev.endTime || '';
