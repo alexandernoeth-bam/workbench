@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.20.2</title>
+<title>WorkBench 5.20.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -148,6 +148,12 @@ html, body {
 #wb-menu-btn.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
 #wb-menu-btn.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
 
+/* Büro-Button: nur im Zwei-Spalten-Modus sinnvoll */
+#wb-buero-btn, #wb-buero-label { display: none !important; }
+body.layout-zwei-spalten #wb-buero-btn { display: inline !important; }
+body.layout-zwei-spalten #wb-buero-label { display: none; }
+body.layout-zwei-spalten.wb-buero-aktiv-header #wb-buero-label { display: block; }
+
 #wb-buero-btn.aktiv {
   opacity: 1;
   color: #fff;
@@ -200,7 +206,7 @@ html, body {
 /* ── Zwei-Spalten-Layout (D1) ──────────────────────── */
 body.layout-zwei-spalten #wb-content {
   display: grid;
-  grid-template-columns: 420px 1fr;
+  grid-template-columns: 35% 65%;
   overflow: hidden;
 }
 body.layout-zwei-spalten #sec-cockpit {
@@ -7120,7 +7126,7 @@ body.layout-zwei-spalten #wb-vorhaben-detail {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.20.2</div>
+  <div class="wb-startup-tagline">v5.20.3</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8591,7 +8597,7 @@ body.layout-zwei-spalten #wb-vorhaben-detail {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.20.2 · Build 20260611-0100</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.20.3 · Build 20260611-0130</div>
     </div>
 
     <!-- Welt -->
@@ -8776,8 +8782,8 @@ body.layout-zwei-spalten #wb-vorhaben-detail {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.20.2',
-  APP_BUILD:   '20260611-0100',
+  APP_VERSION: '5.20.3',
+  APP_BUILD:   '20260611-0130',
 
 
   // ══════════════════════════════════════════════════════
@@ -16685,6 +16691,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         }
       }
     } catch(e) {}
+    // Fix 5: Gerätetyp auto-erkennen wenn noch nicht manuell gesetzt
+    if (!this._settings.geraetTyp || this._settings.geraetTyp === 'standard') {
+      const ua = navigator.userAgent || '';
+      const w  = window.screen?.width || window.innerWidth || 0;
+      const isMobile = /Android|iPhone|iPod/.test(ua) && w < 768;
+      const isTablet = /iPad/.test(ua) || (/Android/.test(ua) && w >= 768);
+      const isPC     = !isMobile && !isTablet && w >= 900;
+      if (isPC)     this._settings.geraetTyp = 'arbeitsgeraet';
+      else if (isTablet) this._settings.geraetTyp = 'privatgeraet';
+      // Standard bleibt Standard für echte Mobilgeräte
+    }
     const s = this._settings || {};
     const d = this._UI_DEFAULTS;
     const size = s.uiSize || d.size;
@@ -19227,7 +19244,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     // v4.6.1: Cluster nach Welt — Beruf: Mindset+Beruf, Privat: Mindset+Körper+Umgebung
     const isBeruf = this.activeWorld === 'beruf';
     const CLUSTER = isBeruf
-      ? [ { id: 'fachlich', label: 'Fachlich' }, { id: 'entwicklung', label: 'Entwicklung' } ]
+      ? [ { id: 'fachlich', label: 'Fachlich' }, { id: 'entwicklung', label: 'Entwicklung' },
+          { id: 'fuehrung', label: 'Führung' }, { id: 'organisation', label: 'Organisation' } ]
       : [ { id: 'mindset', label: 'Mindset' }, { id: 'koerper', label: 'Körper' }, { id: 'umgebung', label: 'Umgebung' } ];
 
     let html = '<div style="margin-bottom:8px;"></div>';
@@ -19314,7 +19332,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     body.innerHTML = html;
   },
 
-  _vorhabenClusterOpen: { mindset: true, koerper: false, umgebung: false, fachlich: true, entwicklung: false },
+  _vorhabenClusterOpen: { mindset: true, koerper: false, umgebung: false, fachlich: true, entwicklung: false, fuehrung: false, organisation: false },
 
   _vorhabenClusterToggle(clusterId) {
     this._vorhabenClusterOpen[clusterId] = !this._vorhabenClusterOpen[clusterId];
@@ -19600,6 +19618,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   // Migration: inhalt-HTML → notiz Plaintext, planAufgaben Felder ergänzen
   _vhMigrateV47(v) {
+    // CL1: alte Beruf-Cluster migrieren
+    if (v.cluster === 'beruf' || v.cluster === 'mindset' && v.welt === 'pro') v.cluster = 'fachlich';
     if (v._v48migr) return;
     if (v.fokus === undefined) v.fokus = false;
     if (v.inhalt && !v.notiz) {
@@ -32466,6 +32486,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     // Vorhaben-Liste neu rendern wenn offen
     if (document.getElementById('wb-vorhaben-overlay')?.style.display === 'flex') {
       this._vorhabenListeRender();
+    }
+    // Zwei-Spalten: rechtes Panel bei Welt-Wechsel neu rendern
+    if (this._uiIsZweiSpalten() && !this._vorhabenAktivId) {
+      try { this._rightPanelRenderListe(); } catch(e) {}
     }
   },
 
