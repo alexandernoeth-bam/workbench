@@ -1,5 +1,5 @@
-// WorkBench Service Worker v5.21.4 · Build 20260611-0430
-const BUILD = '20260611-0430';
+// WorkBench Service Worker v5.21.8 · Build 20260611-0600
+const BUILD = '20260611-0600';
 const IDB_NAME = 'WorkBenchDB';
 
 // ── IDB öffnen (lesend) ──────────────────────────────
@@ -79,10 +79,42 @@ self.addEventListener('notificationclick', e => {
   );
 });
 
+// ── Nächste fällige Notification berechnen + Timer setzen ──
+let _notifTimer = null;
+
+async function scheduleNextCheck() {
+  if (_notifTimer) { clearTimeout(_notifTimer); _notifTimer = null; }
+  let db;
+  try { db = await swIdbOpen(); } catch(e) { return; }
+  let next = null;
+  try {
+    const tx    = db.transaction('notif-queue', 'readonly');
+    const store = tx.objectStore('notif-queue');
+    const all   = await new Promise(r => {
+      const req = store.getAll();
+      req.onsuccess = e => r(e.target.result || []);
+      req.onerror   = () => r([]);
+    });
+    const pending = all.filter(i => !i.shown && i.fireAt > Date.now());
+    if (pending.length) {
+      next = Math.min(...pending.map(i => i.fireAt));
+    }
+  } catch(e) {}
+  db.close();
+
+  if (next) {
+    const delay = Math.max(1000, next - Date.now());
+    console.log('[SW] Nächste Notification in', Math.round(delay/1000), 's');
+    _notifTimer = setTimeout(() => processNotifQueue().then(scheduleNextCheck), delay);
+  }
+}
+
 // ── Message von App: CHECK_NOTIFICATIONS ─────────────
 self.addEventListener('message', e => {
   if (e.data?.type === 'CHECK_NOTIFICATIONS') {
-    e.waitUntil(processNotifQueue());
+    e.waitUntil(
+      processNotifQueue().then(scheduleNextCheck)
+    );
   }
 });
 
