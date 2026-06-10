@@ -1,5 +1,5 @@
-// WorkBench Service Worker v5.21.8 · Build 20260611-0600
-const BUILD = '20260611-0600';
+// WorkBench Service Worker v5.22.0 · Build 20260611-0730
+const BUILD = '20260611-0730';
 const IDB_NAME = 'WorkBenchDB';
 
 // ── IDB öffnen (lesend) ──────────────────────────────
@@ -32,12 +32,15 @@ async function processNotifQueue() {
 
     try {
       await self.registration.showNotification(item.title, {
-        body:    item.body || '',
-        icon:    './icon-192.svg',
-        badge:   './icon-192.svg',
-        tag:     item.id,
-        vibrate: item.important ? [300, 100, 300, 100, 300] : [200, 100, 200],
-        data:    { url: item.url || './' },
+        body:             item.body || '',
+        icon:             './icon-192.svg',
+        badge:            './icon-192.svg',
+        tag:              item.id,
+        renotify:         true,
+        silent:           false,
+        requireInteraction: item.important || false,
+        vibrate:          item.important ? [300, 100, 300, 100, 300] : [200, 100, 200],
+        data:             { url: item.url || './' },
       });
       // Als gesendet markieren
       item.shown = true;
@@ -63,6 +66,7 @@ self.addEventListener('activate', e => {
       .then(clients => {
         clients.forEach(c => c.postMessage({ type: 'SW_UPDATED', build: BUILD }));
       })
+      .then(() => scheduleNextCheck())
   );
 });
 
@@ -81,6 +85,21 @@ self.addEventListener('notificationclick', e => {
 
 // ── Nächste fällige Notification berechnen + Timer setzen ──
 let _notifTimer = null;
+
+// Keep-Alive: verhindert SW-Termination während Notifications ausstehen
+let _keepAliveTimer = null;
+function keepAlive() {
+  if (_keepAliveTimer) clearTimeout(_keepAliveTimer);
+  // Alle 20 Sekunden einen No-Op fetch machen um SW wach zu halten
+  _keepAliveTimer = setTimeout(async () => {
+    try {
+      // Clients abfragen hält SW aktiv
+      await self.clients.matchAll();
+    } catch(e) {}
+    // Nur weiterlaufen wenn noch Notifications ausstehen
+    if (_notifTimer) keepAlive();
+  }, 20000);
+}
 
 async function scheduleNextCheck() {
   if (_notifTimer) { clearTimeout(_notifTimer); _notifTimer = null; }
@@ -106,6 +125,7 @@ async function scheduleNextCheck() {
     const delay = Math.max(1000, next - Date.now());
     console.log('[SW] Nächste Notification in', Math.round(delay/1000), 's');
     _notifTimer = setTimeout(() => processNotifQueue().then(scheduleNextCheck), delay);
+    keepAlive(); // SW wach halten bis Notification feuert
   }
 }
 
