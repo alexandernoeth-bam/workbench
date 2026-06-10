@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.22.1</title>
+<title>WorkBench 5.22.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7184,7 +7184,7 @@ body.layout-zwei-spalten #woche-fab {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.22.1</div>
+  <div class="wb-startup-tagline">v5.22.2</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8255,6 +8255,14 @@ body.layout-zwei-spalten #woche-fab {
             Senden
           </button>
         </div>
+        <div class="wbs-row" style="border:none;">
+          <div class="wbs-label"><div class="wbs-label-main">Queue debuggen</div>
+            <div class="wbs-label-sub" id="notif-debug-out" style="font-size:0.72rem;color:var(--c-muted);white-space:pre-wrap;"></div>
+          </div>
+          <button onclick="WB._notifDebug()" style="padding:6px 12px;background:none;border:1px solid var(--c-beruf);color:var(--c-beruf);border-radius:var(--radius-xs);cursor:pointer;font-size:0.8rem;">
+            Prüfen
+          </button>
+        </div>
       </div>
 
       <div class="wbs-divider"></div>
@@ -8748,7 +8756,7 @@ body.layout-zwei-spalten #woche-fab {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.22.1 · Build 20260611-0830</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.22.2 · Build 20260611-0900</div>
     </div>
 
     <!-- Welt -->
@@ -8933,8 +8941,8 @@ body.layout-zwei-spalten #woche-fab {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.22.1',
-  APP_BUILD:   '20260611-0830',
+  APP_VERSION: '5.22.2',
+  APP_BUILD:   '20260611-0900',
 
 
   // ══════════════════════════════════════════════════════
@@ -10454,6 +10462,50 @@ const WB = {
         this._notifTimers.push(timerId);
       });
     }
+  },
+
+  async _notifDebug() {
+    const out = document.getElementById('notif-debug-out');
+    const lines = [];
+
+    // 1. Wie viele Events hat _evStore?
+    const evs = (this._evStore()||[]);
+    const today = new Date().toISOString().split('T')[0];
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+    const tomStr = tomorrow.toISOString().split('T')[0];
+    const evHeute = evs.filter(e => e.date===today||e.date===tomStr);
+    lines.push('Events gesamt: '+evs.length+', heute/morgen: '+evHeute.length);
+    evHeute.forEach(e => lines.push('  → '+e.text+' | '+e.date+' '+e.startTime+' | done:'+e.done+' notifAus:'+e.notifAus));
+
+    // 2. Settings
+    lines.push('notifEnabled: '+this._settings?.notifEnabled);
+    lines.push('notifTermin: '+this._settings?.notifTermin);
+    lines.push('Vorlauf: '+this._settings?.notifTerminVorlauf+'min');
+
+    // 3. IDB Queue lesen
+    if (this._idb && this._idb.objectStoreNames.contains('notif-queue')) {
+      try {
+        const tx = this._idb.transaction('notif-queue','readonly');
+        const all = await new Promise(r => {
+          const req = tx.objectStore('notif-queue').getAll();
+          req.onsuccess = e => r(e.target.result||[]);
+          req.onerror = () => r([]);
+        });
+        lines.push('Queue: '+all.length+' Items');
+        const now = Date.now();
+        all.forEach(i => {
+          const inMin = Math.round((i.fireAt-now)/60000);
+          lines.push('  ['+i.type+'] '+i.title+' | in '+inMin+'min | shown:'+i.shown);
+        });
+      } catch(e) { lines.push('IDB Fehler: '+e.message); }
+    } else {
+      lines.push('notif-queue Store fehlt!');
+    }
+
+    const txt = lines.join('\n');
+    if (out) out.textContent = txt;
+    console.log('[NotifDebug]\n'+txt);
+    this._toast('Debug-Info in Einstellungen');
   },
 
   _notifToggleItem(type, id, ctx) {
