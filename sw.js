@@ -1,5 +1,5 @@
-// WorkBench Service Worker v5.22.0 · Build 20260611-0730
-const BUILD = '20260611-0730';
+// WorkBench Service Worker v5.22.2 · Build 20260611-0900
+const BUILD = '20260611-0900';
 const IDB_NAME = 'WorkBenchDB';
 
 // ── IDB öffnen (lesend) ──────────────────────────────
@@ -93,12 +93,10 @@ function keepAlive() {
   // Alle 20 Sekunden einen No-Op fetch machen um SW wach zu halten
   _keepAliveTimer = setTimeout(async () => {
     try {
-      // Clients abfragen hält SW aktiv
       await self.clients.matchAll();
     } catch(e) {}
-    // Nur weiterlaufen wenn noch Notifications ausstehen
     if (_notifTimer) keepAlive();
-  }, 20000);
+  }, 10000);
 }
 
 async function scheduleNextCheck() {
@@ -141,7 +139,7 @@ self.addEventListener('message', e => {
 // ── Periodic Background Sync ──────────────────────────
 self.addEventListener('periodicsync', e => {
   if (e.tag === 'wb-notifications') {
-    e.waitUntil(processNotifQueue());
+    e.waitUntil(processNotifQueue().then(scheduleNextCheck));
   }
 });
 
