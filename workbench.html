@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.18.0</title>
+<title>WorkBench 5.18.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7062,7 +7062,7 @@ html, body {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.18.0</div>
+  <div class="wb-startup-tagline">v5.18.1</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8506,7 +8506,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.18.0 · Build 20260610-2230</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.18.1 · Build 20260610-2245</div>
     </div>
 
     <!-- Welt -->
@@ -8691,8 +8691,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.18.0',
-  APP_BUILD:   '20260610-2230',
+  APP_VERSION: '5.18.1',
+  APP_BUILD:   '20260610-2245',
 
 
   // ══════════════════════════════════════════════════════
@@ -11740,10 +11740,13 @@ const WB = {
     (this._vorhabenStore('priv')||[])
       .filter(v => (v.aktivitaet||'aktiv') !== 'ruhend')
       .forEach(v => {
-        (v.meilensteine||[]).forEach(ms => {
-          (ms.aufgaben||[]).filter(a => !a.done && this.istNaechsterSchritt(a)).slice(0,2)
-            .forEach(a => kandidaten.push({ a, v }));
-        });
+        const alleOffen = (v.meilensteine||[]).flatMap(ms =>
+          (ms.aufgaben||[]).filter(a => !a.done)
+        );
+        // Bevorzuge naechsterSchritt, sonst alle offenen
+        const ns = alleOffen.filter(a => this.istNaechsterSchritt(a));
+        const pool = ns.length ? ns : alleOffen;
+        pool.slice(0, 2).forEach(a => kandidaten.push({ a, v }));
       });
     const kandidatenHtml = kandidaten.slice(0,6).map(({ a, v }) => {
       const sel = this._triagePrivatFokus?.id === a.id;
