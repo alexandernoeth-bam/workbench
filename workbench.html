@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.21.4</title>
+<title>WorkBench 5.21.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -2056,6 +2056,12 @@ body.layout-zwei-spalten [style*="z-index: 600"] {
 }
 #woche-fab.visible { display: flex; }
 #woche-fab:active { transform: scale(0.93); }
+/* Zwei-Spalten: FAB am Panel-Rand, kein Tab-Bar-Abstand */
+body.layout-zwei-spalten #woche-fab {
+  bottom: 20px;
+  right: 20px;
+  z-index: 50;
+}
 
 /* ══════════════════════════════════════════════════════
    MORGEN-WIZARD (v3.18.0)
@@ -7178,7 +7184,7 @@ body.layout-zwei-spalten [style*="z-index: 600"] {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.21.4</div>
+  <div class="wb-startup-tagline">v5.21.5</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8742,7 +8748,7 @@ body.layout-zwei-spalten [style*="z-index: 600"] {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.21.4 · Build 20260611-0430</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.21.5 · Build 20260611-0450</div>
     </div>
 
     <!-- Welt -->
@@ -8927,8 +8933,8 @@ body.layout-zwei-spalten [style*="z-index: 600"] {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.21.4',
-  APP_BUILD:   '20260611-0430',
+  APP_VERSION: '5.21.5',
+  APP_BUILD:   '20260611-0450',
 
 
   // ══════════════════════════════════════════════════════
@@ -16959,6 +16965,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     sec.classList.add('active');
     inhalt.appendChild(sec);
     this._renderSection(sektion);
+    // FAB bei Woche aktualisieren
+    if (sektion === 'woche') this._wocheFabUpdate();
   },
 
   _panelRenderVorhaben(container, position) {
@@ -27085,8 +27093,16 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _wocheFabUpdate() {
     const fab = document.getElementById('woche-fab');
     if (!fab) return;
-    if (this.activeTab === 'woche') fab.classList.add('visible');
-    else fab.classList.remove('visible');
+    // Im Zwei-Spalten-Modus: FAB sichtbar wenn Woche in einem Panel
+    if (this._uiIsZweiSpalten()) {
+      const wocheImPanel = 
+        this._panelOben === 'woche' || this._panelUnten === 'woche';
+      if (wocheImPanel) fab.classList.add('visible');
+      else fab.classList.remove('visible');
+    } else {
+      if (this.activeTab === 'woche') fab.classList.add('visible');
+      else fab.classList.remove('visible');
+    }
   },
 
   // ── Besprechungs-Assistent: 15 Min vorher prüfen ──────
