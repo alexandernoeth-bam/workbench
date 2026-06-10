@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.20.0</title>
+<title>WorkBench 5.20.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7113,7 +7113,7 @@ body.layout-zwei-spalten #wb-vorhaben-detail {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.20.0</div>
+  <div class="wb-startup-tagline">v5.20.1</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8584,7 +8584,7 @@ body.layout-zwei-spalten #wb-vorhaben-detail {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.20.0 · Build 20260611-0030</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.20.1 · Build 20260611-0045</div>
     </div>
 
     <!-- Welt -->
@@ -8769,8 +8769,8 @@ body.layout-zwei-spalten #wb-vorhaben-detail {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.20.0',
-  APP_BUILD:   '20260611-0030',
+  APP_VERSION: '5.20.1',
+  APP_BUILD:   '20260611-0045',
 
 
   // ══════════════════════════════════════════════════════
@@ -16551,7 +16551,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const isBeruf = this.activeWorld === 'beruf';
     const store   = this._vorhabenStore(isBeruf ? 'pro' : 'priv') || [];
     const CLUSTER = isBeruf
-      ? [ { id:'fachlich', label:'Fachlich' }, { id:'entwicklung', label:'Entwicklung' } ]
+      ? [ { id:'fachlich', label:'Fachlich' }, { id:'entwicklung', label:'Entwicklung' }, { id:'fuehrung', label:'Führung' }, { id:'organisation', label:'Organisation' } ]
       : [ { id:'mindset', label:'Mindset' }, { id:'koerper', label:'Körper' }, { id:'umgebung', label:'Umgebung' } ];
     let html = '';
     CLUSTER.forEach(cl => {
@@ -19377,7 +19377,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const charakter = v.charakter || 'laufend';
     const cluster = v.cluster || 'mindset';
     const fokus = v.fokus || false;
-    const clusterOpts = this.activeWorld === 'beruf' ? ['fachlich','entwicklung'] : ['mindset','koerper','umgebung'];
+    const clusterOpts = this.activeWorld === 'beruf' ? ['fachlich','entwicklung','fuehrung','organisation'] : ['mindset','koerper','umgebung'];
     const CLUSTER_LBL = { mindset:'Mindset', koerper:'K\u00f6rper', umgebung:'Umgebung', beruf:'Beruf' };
     const CHAR_LBL = { baustelle:'\ud83d\udd25 Baustelle', laufend:'\u2192 Laufend', pflicht:'\u25ce Pflicht' };
     const andereWelt = v.welt === 'pro' ? 'priv' : 'pro';
@@ -19474,7 +19474,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!quellStore || !zielStore) return;
     const idx = quellStore.findIndex(x => x.id === v.id);
     if (idx !== -1) quellStore.splice(idx, 1);
-    if (zielWelt === 'pro' && !['fachlich','entwicklung'].includes(v.cluster)) v.cluster = 'fachlich';
+    if (zielWelt === 'pro' && !['fachlich','entwicklung','fuehrung','organisation'].includes(v.cluster)) v.cluster = 'fachlich';
     if (zielWelt === 'priv' && !['mindset','koerper','umgebung'].includes(v.cluster)) v.cluster = 'mindset';
     v.welt = zielWelt; v.geaendert = Date.now();
     zielStore.push(v);
@@ -19518,10 +19518,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<div style="font-size:0.75rem;font-weight:700;color:var(--c-muted);margin-bottom:6px;">Cluster <span style="color:var(--c-danger);">*</span></div>'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
       + (this.activeWorld === 'beruf'
-          ? ['fachlich','entwicklung']
+          ? ['fachlich','entwicklung','fuehrung','organisation']
           : ['mindset','koerper','umgebung']
         ).map(c => {
-          const lbl = {mindset:'Mindset',koerper:'Körper',umgebung:'Umgebung',fachlich:'Fachlich',entwicklung:'Entwicklung'}[c];
+          const lbl = {mindset:'Mindset',koerper:'Körper',umgebung:'Umgebung',fachlich:'Fachlich',entwicklung:'Entwicklung',fuehrung:'Führung',organisation:'Organisation'}[c];
           return '<button id="vh-neu-cl-' + c + '" onclick="WB._vorhabenNeuCluster(&quot;' + c + '&quot;)" '
             + 'style="padding:7px 14px;border-radius:20px;font-family:var(--font);font-size:0.82rem;cursor:pointer;border:1px solid var(--c-border);background:none;color:var(--c-muted);">'
             + lbl + '</button>';
@@ -19537,7 +19537,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _vorhabenNeuCluster(c) {
     this._vorhabenNeuClusterWahl = c;
-    ['mindset','koerper','umgebung','fachlich','entwicklung'].forEach(id => {
+    ['mindset','koerper','umgebung','fachlich','entwicklung','fuehrung','organisation'].forEach(id => {
       const btn = document.getElementById('vh-neu-cl-' + id);
       if (!btn) return;
       btn.style.background = id === c ? 'var(--c-beruf)' : 'none';
@@ -19641,7 +19641,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     if (this._settings?.vhBlockOpen) Object.assign(this._vhBlockOpen, this._settings.vhBlockOpen);
 
-    const CLUSTER_LBL = { mindset:'Mindset', koerper:'Körper', umgebung:'Umgebung', fachlich:'Fachlich', entwicklung:'Entwicklung' };
+    const CLUSTER_LBL = { mindset:'Mindset', koerper:'Körper', umgebung:'Umgebung', fachlich:'Fachlich', entwicklung:'Entwicklung', fuehrung:'Führung', organisation:'Organisation' };
     const EBENE_CLR   = { aktiv:'var(--c-beruf)', wartend:'#B87333', ruhend:'var(--c-faint)' };
     const CHAR_CLR    = { baustelle:'#C0392B', laufend:'var(--c-beruf)', pflicht:'var(--c-faint)' };
     const CHAR_LBL    = { baustelle:'🔥 Baustelle', laufend:'→ Laufend', pflicht:'◎ Pflicht' };
