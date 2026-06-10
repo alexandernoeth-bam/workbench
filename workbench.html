@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.14.0</title>
+<title>WorkBench 5.14.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -150,8 +150,42 @@ html, body {
 
 #wb-buero-btn.aktiv {
   opacity: 1;
-  color: var(--c-beruf);
+  color: #fff;
+  background: #E65100 !important;
+  border-radius: 6px;
 }
+
+/* Büro-Modus: Header-Banner */
+#wb-header.buero-aktiv {
+  background: #E65100;
+  border-bottom-color: #BF360C;
+}
+#wb-header.buero-aktiv #wb-wordmark,
+#wb-header.buero-aktiv #wb-wordmark strong,
+#wb-header.buero-aktiv #wb-section-label,
+#wb-header.buero-aktiv #wb-world-badge,
+#wb-header.buero-aktiv #wb-sync-icon,
+#wb-header.buero-aktiv #wb-sync-text {
+  color: rgba(255,255,255,0.85) !important;
+  border-color: rgba(255,255,255,0.3) !important;
+  background: rgba(255,255,255,0.15) !important;
+}
+#wb-header.buero-aktiv #wb-menu-btn span {
+  background: #fff;
+}
+#wb-header.buero-aktiv #wb-dirty-dot {
+  background: #fff !important;
+}
+#wb-buero-label {
+  display: none;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.9);
+  white-space: nowrap;
+}
+#wb-header.buero-aktiv #wb-buero-label { display: block; }
 
 /* ── Content-Bereich ───────────────────────────────── */
 #wb-content {
@@ -7007,7 +7041,7 @@ html, body {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.14.0</div>
+  <div class="wb-startup-tagline">v5.14.1</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7054,9 +7088,10 @@ html, body {
       <span id="wb-sync-text"></span>
     </div>
     <div style="width:8px;"></div>
+    <span id="wb-buero-label">👁 Büro-Modus</span>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()"
-      title="Büro-Modus"
-      style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px 6px;color:var(--c-muted);opacity:0.5;transition:opacity 0.15s;line-height:1;">
+      title="Büro-Modus ein/aus"
+      style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px 6px;color:var(--c-muted);opacity:0.5;transition:all 0.15s;line-height:1;border-radius:6px;">
       👁
     </button>
     <button id="wb-menu-btn" onclick="WB.toggleMenu()" aria-label="Menü öffnen" aria-expanded="false">
@@ -8576,8 +8611,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.14.0',
-  APP_BUILD:   '20260610-1500',
+  APP_VERSION: '5.14.1',
+  APP_BUILD:   '20260610-1620',
 
 
   // ══════════════════════════════════════════════════════
@@ -16650,16 +16685,20 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
     body.innerHTML = termine.map(({ev, ctx}) => {
       const zeit = ev.startTime ? ev.startTime.slice(0,5) : '';
-      const endZ  = ev.endTime  ? ev.endTime.slice(0,5)   : '';
       let laufendStyle = '';
       if (zeit) {
         const [sh, sm] = zeit.split(':').map(Number);
         const startMin = sh * 60 + (sm || 0);
-        const endMin   = endZ
-          ? (parseInt(endZ.split(':')[0]) * 60 + parseInt(endZ.split(':')[1] || 0))
-          : startMin + 60;
+        // endTime bevorzugen, sonst aus duration berechnen, sonst +60min
+        let endMin = startMin + 60;
+        if (ev.endTime) {
+          const [eh, em] = ev.endTime.slice(0,5).split(':').map(Number);
+          endMin = eh * 60 + (em || 0);
+        } else if (ev.duration) {
+          endMin = startMin + Math.round(parseFloat(ev.duration) * 60);
+        }
         if (nowMin >= startMin && nowMin < endMin) {
-          laufendStyle = ' style="background:color-mix(in srgb,#C62828 8%,var(--c-bg));border-left:3px solid #C62828;padding-left:9px;"';
+          laufendStyle = ' style="background:color-mix(in srgb,#C62828 8%,var(--c-bg));border-left:3px solid #C62828;padding-left:9px;margin-left:-3px;"';
         }
       }
       return '<div class="ck-eintrag"' + laufendStyle + ' onclick="WB.editOpen(&quot;event&quot;,&quot;' + ctx + '&quot;,&quot;&quot;,&quot;' + ev.id + '&quot;)">'
@@ -18425,6 +18464,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this._bueroModus = !this._bueroModus;
     const btn = document.getElementById('wb-buero-btn');
     if (btn) btn.classList.toggle('aktiv', this._bueroModus);
+    const header = document.getElementById('wb-header');
+    if (header) header.classList.toggle('buero-aktiv', this._bueroModus);
     this._toast(this._bueroModus
       ? '👁 Büro-Modus aktiv — Private Inhalte ausgeblendet'
       : '👁 Büro-Modus deaktiviert');
