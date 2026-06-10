@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.15.1</title>
+<title>WorkBench 5.16.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7062,7 +7062,7 @@ html, body {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.15.1</div>
+  <div class="wb-startup-tagline">v5.16.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8470,7 +8470,7 @@ html, body {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.15.1 · Build 20260610-1930</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.16.0 · Build 20260610-2030</div>
     </div>
 
     <!-- Welt -->
@@ -8647,8 +8647,8 @@ html, body {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.15.1',
-  APP_BUILD:   '20260610-1930',
+  APP_VERSION: '5.16.0',
+  APP_BUILD:   '20260610-2030',
 
 
   // ══════════════════════════════════════════════════════
@@ -11456,7 +11456,7 @@ const WB = {
     const store = this._ritualStore();
     if (!store) return false;
     const e = store[this._ritualTodayKey()];
-    return !!(e && e.done);
+    return !!(e && (e.done || e.doneA));
   },
 
   _ritualOpenedToSession: false,  // Session-Lock: verhindert Re-Open nach Auth-Renewal
@@ -11493,6 +11493,7 @@ const WB = {
     this._ritualFreitexte  = [];
     this._ritualEnergie    = 'mittel';
     this._ritualTagestyp   = null;
+    this._ritualIntention  = '';
     this._ritualZeitbloecke = {};
     this._ritualBodyBattery = null;
     this._ritualAutoSelectDone = false;
@@ -11531,18 +11532,14 @@ const WB = {
       const el = document.getElementById('ritual-step-' + s);
       if (el) el.style.display = (s === step) ? 'flex' : 'none';
     });
-    const dotStep = Math.min(step, 4);
     document.querySelectorAll('.ritual-dot').forEach(dot => {
       const ds = parseInt(dot.getAttribute('data-step'));
-      dot.classList.toggle('active', ds === dotStep);
-      dot.classList.toggle('done', typeof step === 'number' && ds < dotStep);
+      dot.classList.toggle('active', ds === step);
+      dot.classList.toggle('done', ds < step);
     });
     if (step === 0) this._ritualRenderVorhabenScan();
     if (step === 1) { this._ritualRenderOverview(); this._ritualInitTagestyp(); }
-    if (step === 2) { this._ritualAutoSelect(); this._ritualRenderCandidates(); this._ritualUpdateEnergieCounter(); }
-    if (step === 3) this._ritualRenderZeitbloecke();
-    if (step === 4) this._ritualRenderBacklog();
-    if (step === 5) this._ritualRenderConfirm();
+    if (step === 2) this._ritualRenderConfirmA();
   },
 
   // Schritt 1: Tagesübersicht (wiederverwendet Banner-Logik)
@@ -12773,6 +12770,7 @@ const WB = {
   // State-Variablen für Morgendialog
   _ritualEnergie: null,
   _ritualTagestyp: null,
+  _ritualIntention: '',
   _ritualZeitbloecke: {},
   _ritualVorhabenCheck: null,
   _ritualAutoSelectDone: false,
@@ -12887,12 +12885,65 @@ const WB = {
   _ritualStep1Weiter() {
     const bbVal = document.getElementById('ritual-body-battery')?.value;
     this._ritualBodyBattery = bbVal ? parseInt(bbVal) : null;
+    this._ritualIntention = document.getElementById('ritual-intention')?.value.trim() || '';
+    this._ritualGoto(2);
+  },
+
+  _ritualRenderConfirmA() {
+    const el = document.getElementById('ritual-step-2');
+    if (!el) return;
+    const E_LBL = { hoch: '🟢 Hoch', mittel: '🟡 Mittel', niedrig: '🔴 Niedrig' };
     const typ = this._ritualTagestyp || 'normal';
-    if (typ === 'geschuetzt' || typ === 'krank') {
-      this._ritualGoto(5);
-    } else {
-      this._ritualGoto(2);
+    const TYP_LBL = { normal: 'Normaler Tag', krank: '🤢 Krank', geschuetzt: '🔒 Geschützt' };
+    const now = new Date();
+    const isWorkday = now.getDay() >= 1 && now.getDay() <= 5;
+    const triageHint = (typ !== 'krank' && typ !== 'geschuetzt')
+      ? '<div style="margin-top:12px;padding:10px 12px;background:var(--c-beruf-bg);border-radius:var(--radius-xs);font-size:0.82rem;color:var(--c-beruf);">'
+        + '💼 Tages-Triage startet ab ' + (isWorkday ? '07:00' : '08:00') + ' Uhr im Cockpit</div>'
+      : '';
+    const intentionHtml = this._ritualIntention
+      ? '<div style="margin-bottom:12px;padding:10px 12px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);font-size:0.88rem;color:var(--c-text);font-style:italic;">'
+        + '„' + this._esc(this._ritualIntention) + '“</div>'
+      : '';
+    el.innerHTML =
+      '<div class="ritual-emoji">✨</div>'
+      + '<div class="ritual-title">Guten Morgen</div>'
+      + '<div style="width:100%;margin-bottom:8px;">'
+        + '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--c-border);font-size:0.88rem;">'
+          + '<span style="color:var(--c-muted);">Energie</span>'
+          + '<span style="font-weight:600;">' + (E_LBL[this._ritualEnergie||'mittel']||'–') + '</span>'
+        + '</div>'
+        + '<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:0.88rem;">'
+          + '<span style="color:var(--c-muted);">Tag</span>'
+          + '<span style="font-weight:600;">' + (TYP_LBL[typ]||typ) + '</span>'
+        + '</div></div>'
+      + intentionHtml
+      + triageHint
+      + '<button class="ritual-btn primary" onclick="WB._ritualFinishA()" style="margin-top:16px;">Tag beginnen ✓</button>'
+      + '<button class="ritual-btn ghost" onclick="WB._ritualGoto(1)">← Zurück</button>';
+  },
+
+  _ritualFinishA() {
+    const store = this._ritualStore();
+    const key   = this._ritualTodayKey();
+    if (store) {
+      if (!store[key]) store[key] = {};
+      store[key].doneA    = true;
+      store[key].done     = true;  // Kompatibilität mit _ritualIsDoneToday
+      store[key].tsA      = Date.now();
+      store[key].ts       = Date.now();
+      store[key].energie  = this._ritualEnergie || 'mittel';
+      store[key].tagestyp = this._ritualTagestyp || 'normal';
+      store[key].intention = this._ritualIntention || '';
+      store[key].bodyBattery = this._ritualBodyBattery || null;
+      if (!store[key].fokus) store[key].fokus = [];
     }
+    this.setDirty();
+    document.getElementById('wb-ritual-overlay').classList.remove('open');
+    const ts = document.getElementById('ck-tagesseite');
+    if (ts) ts.style.visibility = 'visible';
+    this.renderCockpit();
+    this._toast('Guten Morgen 🌅');
   },
 
   _ritualOpenVorhaben(id) {
@@ -31726,8 +31777,6 @@ WB.init();
       <span class="ritual-dot" data-step="0"></span>
       <span class="ritual-dot" data-step="1"></span>
       <span class="ritual-dot" data-step="2"></span>
-      <span class="ritual-dot" data-step="3"></span>
-      <span class="ritual-dot" data-step="4"></span>
     </div>
 
     <!-- Schritt 0: Vorhaben-Scan -->
@@ -31775,32 +31824,17 @@ WB.init();
         </div>
       </div>
 
+      <div style="width:100%;margin-bottom:16px;">
+        <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);margin-bottom:8px;">MEINE INTENTION HEUTE</div>
+        <textarea id="ritual-intention" placeholder="Heute will ich…"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);resize:none;min-height:70px;box-sizing:border-box;line-height:1.5;"></textarea>
+      </div>
       <button class="ritual-btn primary" id="ritual-step1-next" onclick="WB._ritualStep1Weiter()">Weiter →</button>
     </div>
 
-    <!-- Schritt 2: Wählen -->
+    <!-- Schritt 2: Bestätigung Teil A -->
+    <!-- Schritt 2: Bestätigung Teil A -->
     <div class="ritual-step" id="ritual-step-2" style="display:none;">
-      <div class="ritual-title">Worauf konzentrierst du dich?</div>
-      <div class="ritual-sub">Wähle bis zu 3 Dinge, die heute wirklich zählen.</div>
-      <div id="ritual-energie-counter" style="position:sticky;top:0;z-index:5;background:var(--c-bg);padding:8px 0;margin:0 -22px 10px;border-bottom:1px solid var(--c-border);">
-        <div style="display:flex;align-items:center;justify-content:center;gap:12px;font-size:0.78rem;">
-          <span style="color:var(--c-muted);">Verfügbare Energie:</span>
-          <span id="ritual-energie-rest" style="font-weight:700;font-family:var(--font-mono);color:var(--c-beruf);">70</span>
-          <span style="color:var(--c-faint);">·</span>
-          <span style="color:var(--c-muted);">Fokus:</span>
-          <span id="ritual-fokus-count" style="font-weight:700;font-family:var(--font-mono);">0/3</span>
-        </div>
-      </div>
-      <div id="ritual-candidates"></div>
-      <button onclick="WB._ritualAddTermin()" style="width:100%;margin:8px 0 4px;padding:8px;background:none;border:1px dashed var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.83rem;color:var(--c-muted);cursor:pointer;">+ Termin für heute anlegen</button>
-      <div id="ritual-freitext-wrap">
-        <input type="text" id="ritual-freitext" placeholder="Eigener Fokus (optional)…" maxlength="120"
-          onkeydown="if(event.key===\'Enter\'){WB._ritualAddFreitext();}">
-        <button onclick="WB._ritualAddFreitext()">+</button>
-      </div>
-      <div class="ritual-count" id="ritual-count">0 von 3 gewählt</div>
-      <button class="ritual-btn primary" id="ritual-step2-next" onclick="WB._ritualGoto(3)">Weiter →</button>
-      <button class="ritual-btn ghost" onclick="WB._ritualGoto(1)">← Zurück</button>
     </div>
 
     <!-- Schritt 3: Zeitblöcke -->
