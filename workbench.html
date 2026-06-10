@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.21.7</title>
+<title>WorkBench 5.21.8</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7184,7 +7184,7 @@ body.layout-zwei-spalten #woche-fab {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.21.7</div>
+  <div class="wb-startup-tagline">v5.21.8</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8748,7 +8748,7 @@ body.layout-zwei-spalten #woche-fab {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.21.7 · Build 20260611-0530</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.21.8 · Build 20260611-0600</div>
     </div>
 
     <!-- Welt -->
@@ -8933,8 +8933,8 @@ body.layout-zwei-spalten #woche-fab {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.21.7',
-  APP_BUILD:   '20260611-0530',
+  APP_VERSION: '5.21.8',
+  APP_BUILD:   '20260611-0600',
 
 
   // ══════════════════════════════════════════════════════
@@ -10257,8 +10257,13 @@ const WB = {
       this._toast('Notifications nicht erlaubt — bitte in Browser-Einstellungen freischalten');
       return;
     }
-    this._notifSend('WorkBench Test 🎯', 'Notifications funktionieren!', '🎯');
-    this._toast('Test-Notification gesendet');
+    const hasSW  = !!navigator.serviceWorker?.controller;
+    const hasIDB = this._idb?.objectStoreNames?.contains('notif-queue');
+    this._notifSend('WorkBench Test 🎯',
+      'SW: ' + (hasSW ? '✓' : '✗') + '  IDB-Queue: ' + (hasIDB ? '✓' : '✗'), '🎯');
+    this._toast('Test gesendet | SW:' + (hasSW?'✓':'✗') + ' IDB:' + (hasIDB?'✓':'✗'));
+    // Auch Queue-Build triggern
+    try { await this._notifBuildQueue(); } catch(e) {}
   },
 
   // ── Alle Timer löschen ────────────────────────────────
@@ -10417,23 +10422,40 @@ const WB = {
       }
     }
 
-    // In IDB schreiben
-    try {
-      const tx     = this._idb.transaction('notif-queue', 'readwrite');
-      const store2 = tx.objectStore('notif-queue');
-      for (const item of items) {
-        const existing = await new Promise(r => {
-          const req = store2.get(item.id);
-          req.onsuccess = e => r(e.target.result);
-          req.onerror   = () => r(null);
-        });
-        if (!existing || !existing.shown) store2.put(item);
-      }
-    } catch(e) { console.warn('[Notif] IDB write:', e); }
+    // In IDB schreiben (wenn Store verfügbar)
+    let idbOk = false;
+    if (this._idb && this._idb.objectStoreNames.contains('notif-queue')) {
+      try {
+        const tx     = this._idb.transaction('notif-queue', 'readwrite');
+        const store2 = tx.objectStore('notif-queue');
+        for (const item of items) {
+          const existing = await new Promise(r => {
+            const req = store2.get(item.id);
+            req.onsuccess = e => r(e.target.result);
+            req.onerror   = () => r(null);
+          });
+          if (!existing || !existing.shown) store2.put(item);
+        }
+        idbOk = true;
+        // SW informieren
+        if (navigator.serviceWorker?.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: 'CHECK_NOTIFICATIONS' });
+        }
+      } catch(e) { console.warn('[Notif] IDB write:', e); }
+    }
 
-    // SW informieren
-    if (navigator.serviceWorker?.controller) {
-      navigator.serviceWorker.controller.postMessage({ type: 'CHECK_NOTIFICATIONS' });
+    // Fallback: direkte setTimeout-Timer (kein IDB-Store oder Store fehlt)
+    if (!idbOk) {
+      console.log('[Notif] Fallback auf Timer für', items.length, 'Items');
+      const nowMs = Date.now();
+      items.forEach(item => {
+        const delay = item.fireAt - nowMs;
+        if (delay <= 0) return;
+        const timerId = setTimeout(() => {
+          this._notifSend(item.title, item.body || '', '');
+        }, delay);
+        this._notifTimers.push(timerId);
+      });
     }
   },
 
