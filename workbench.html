@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.21.8</title>
+<title>WorkBench 5.22.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7184,7 +7184,7 @@ body.layout-zwei-spalten #woche-fab {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.21.8</div>
+  <div class="wb-startup-tagline">v5.22.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8748,7 +8748,7 @@ body.layout-zwei-spalten #woche-fab {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.21.8 · Build 20260611-0600</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.22.0 · Build 20260611-0800</div>
     </div>
 
     <!-- Welt -->
@@ -8933,8 +8933,8 @@ body.layout-zwei-spalten #woche-fab {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.21.8',
-  APP_BUILD:   '20260611-0600',
+  APP_VERSION: '5.22.0',
+  APP_BUILD:   '20260611-0800',
 
 
   // ══════════════════════════════════════════════════════
@@ -33283,8 +33283,16 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Start
-WB.init();
+// Wake-Parameter: ?wake=1 → SW antippen ohne volle App-Init
+if (new URLSearchParams(location.search).get('wake') === '1') {
+  navigator.serviceWorker?.ready.then(reg => {
+    if (reg.active) reg.active.postMessage({ type: 'CHECK_NOTIFICATIONS' });
+  });
+  // Fenster nach 2s schließen (für Tasker-Automation)
+  setTimeout(() => { try { window.close(); } catch(e) {} }, 2000);
+} else {
+  WB.init();
+}
 </script>
 
 <!-- FABs außerhalb main damit sie keinen Flex-Platz verbrauchen -->
