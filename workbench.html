@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.22.0</title>
+<title>WorkBench 5.22.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7184,7 +7184,7 @@ body.layout-zwei-spalten #woche-fab {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.22.0</div>
+  <div class="wb-startup-tagline">v5.22.1</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8748,7 +8748,7 @@ body.layout-zwei-spalten #woche-fab {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.22.0 · Build 20260611-0800</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.22.1 · Build 20260611-0830</div>
     </div>
 
     <!-- Welt -->
@@ -8933,8 +8933,8 @@ body.layout-zwei-spalten #woche-fab {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.22.0',
-  APP_BUILD:   '20260611-0800',
+  APP_VERSION: '5.22.1',
+  APP_BUILD:   '20260611-0830',
 
 
   // ══════════════════════════════════════════════════════
@@ -10326,20 +10326,17 @@ const WB = {
       return d.getTime();
     };
 
-    // Termine
+    // Termine — alle Events liegen in dataPriv.customEvents
     if (s.notifTermin !== false) {
       const vorlauf = parseInt(s.notifTerminVorlauf||15) * 60000;
-      ['pro','priv'].forEach(ctx => {
-        const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-        (db?.customEvents||[])
-          .filter(e => (e.date===today||e.date===tomStr) && e.startTime && !e.done && !e.notifAus)
-          .forEach(e => {
-            const fireAt = toMs(e.date, e.startTime) - vorlauf;
-            if (fireAt < now) return;
-            items.push({ id:'termin-'+e.id, type:'termin',
-              title:'📅 '+(e.text||'Termin'), body:'Um '+e.startTime+' Uhr', fireAt, url:'./' });
-          });
-      });
+      (this._evStore()||[])
+        .filter(e => (e.date===today||e.date===tomStr) && e.startTime && !e.done && !e.notifAus)
+        .forEach(e => {
+          const fireAt = toMs(e.date, e.startTime) - vorlauf;
+          if (fireAt < now) return;
+          items.push({ id:'termin-'+e.id, type:'termin',
+            title:'📅 '+(e.text||'Termin'), body:'Um '+e.startTime+' Uhr', fireAt, url:'./' });
+        });
     }
 
     // Wochenpflichten
