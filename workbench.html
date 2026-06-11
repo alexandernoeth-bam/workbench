@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.33.0</title>
+<title>WorkBench 5.33.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7447,7 +7447,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.33.0</div>
+  <div class="wb-startup-tagline">v5.33.1</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -9071,7 +9071,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.33.0 · Build 20260612-0330</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.33.1 · Build 20260612-0345</div>
     </div>
 
     <!-- Welt -->
@@ -9256,8 +9256,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.33.0',
-  APP_BUILD:   '20260612-0330',
+  APP_VERSION: '5.33.1',
+  APP_BUILD:   '20260612-0345',
 
 
   // ══════════════════════════════════════════════════════
@@ -11528,6 +11528,8 @@ const WB = {
       const driveId = await this.idbGet('meta', 'driveFileId');
       if (driveId) this._driveFileId = driveId;
       this._idbUpdateStatusUI();
+      try { this._bereichEnsureDefaults(); } catch(e) {}
+      try { this._bereichSettingsRender(); } catch(e) {}
     } catch(e) {
       console.error('IDB load error:', e);
     }
@@ -17770,47 +17772,69 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _panelBuildVorhabenListe() {
-    const isBeruf = this.activeWorld === 'beruf';
-    const store   = this._vorhabenStore(isBeruf ? 'pro' : 'priv') || [];
-    const CLUSTER = isBeruf
-      ? [ { id:'fachlich',     label:'Fachlich'      },
-          { id:'entwicklung',  label:'Entwicklung'   },
-          { id:'fuehrung',     label:'Führung'       },
-          { id:'organisation', label:'Organisation'  } ]
-      : [ { id:'mindset', label:'Mindset' }, { id:'koerper', label:'Körper' }, { id:'umgebung', label:'Umgebung' } ];
-    let html = '<div style="padding:8px;">';
-    CLUSTER.forEach(cl => {
-      const alle    = store.filter(v => {
-        const c = v.cluster || 'fachlich';
-        if (c === 'mindset' && isBeruf) return cl.id === 'fachlich';
-        if (c === 'beruf')              return cl.id === 'fachlich';
-        return c === cl.id;
-      });
-      const aktiv   = alle.filter(v => (v.aktivitaet||'aktiv') === 'aktiv');
-      const wartend = alle.filter(v => (v.aktivitaet||'aktiv') === 'wartend');
-      if (!aktiv.length && !wartend.length) return;
-      html += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--c-faint);padding:8px 4px 4px;">' + cl.label + '</div>';
+    const ctx     = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const store   = this._vorhabenStore() || [];
+    const bereiche = this._bereichSortiert(ctx);
+    const TYP_ICON = { pool:'🔧', konzept:'💡', thema:'📚', projekt:'📋' };
+
+    if (!store.length) {
+      return '<div style="padding:24px;text-align:center;color:var(--c-faint);font-size:0.85rem;">Keine aktiven Vorhaben</div>';
+    }
+
+    let html = '<div style="padding:6px 0;">';
+
+    bereiche.forEach(bereich => {
+      const vhInBereich = store.filter(v =>
+        v.bereichId === bereich.id && (v.aktivitaet||'aktiv') !== 'ruhend');
+      if (!vhInBereich.length) return;
+      const aktiv   = vhInBereich.filter(v => (v.aktivitaet||'aktiv') === 'aktiv')
+        .sort((a,b) => (a.fokus&&!b.fokus)?-1:(!a.fokus&&b.fokus)?1:0);
+      const wartend = vhInBereich.filter(v => (v.aktivitaet||'aktiv') === 'wartend');
+
+      html += '<div style="font-size:0.62rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--c-muted);padding:8px 8px 4px;">'
+        + this._esc(bereich.titel) + '</div>';
+
       [...aktiv, ...wartend].forEach(v => {
-        const alleAufg = (v.meilensteine||[]).flatMap(ms => (ms.aufgaben||[]).filter(a => !a.done));
-        const aufgNS   = alleAufg.filter(a => this.istNaechsterSchritt(a)).length;
-        const fokus    = v.fokus ? '⭐ ' : '';
-        const char     = v.charakter === 'baustelle' ? ' 🔥' : '';
-        const sel      = this._vorhabenAktivId === v.id;
+        if (this._bueroModus && v.welt === 'priv') return;
+        const isWartend = (v.aktivitaet||'aktiv') === 'wartend';
+        const alleAufg  = (v.meilensteine||[]).flatMap(ms => (ms.aufgaben||[]).filter(a => !a.done));
+        const aufgNS    = alleAufg.filter(a => this.istNaechsterSchritt(a)).length;
+        const isActive  = this._vorhabenAktivId === v.id;
+        const typIcon   = TYP_ICON[v.typ||'pool'] || '🔧';
+
         html += '<div onclick="WB._panelOpenVorhaben(&quot;' + v.id + '&quot;)"'
           + ' style="display:flex;align-items:center;gap:8px;padding:8px 10px;'
-          + 'background:' + (sel ? 'var(--c-beruf-bg)' : 'var(--c-surface)') + ';'
-          + 'border:1px solid ' + (sel ? 'var(--c-beruf)' : 'var(--c-border)') + ';'
-          + 'border-radius:var(--radius-xs);margin-bottom:5px;cursor:pointer;">'
+          + 'background:' + (isActive?'var(--c-beruf-bg)':'var(--c-surface)') + ';'
+          + 'border:1px solid ' + (isActive?'var(--c-beruf)':'var(--c-border)') + ';'
+          + 'border-radius:var(--radius-xs);margin:2px 6px 2px;cursor:pointer;'
+          + (isWartend?'opacity:0.65;':'')
+          + (v.fokus?'border-left:3px solid var(--c-beruf);':'') + '">'
+          + '<span style="font-size:0.82rem;flex-shrink:0;">' + typIcon + '</span>'
+          + (v.fokus ? '<span style="font-size:0.75rem;flex-shrink:0;">⭐</span>' : '')
           + '<div style="flex:1;min-width:0;">'
-            + '<div style="font-size:0.88rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + fokus + this._esc(v.titel||'') + char + '</div>'
-            + (alleAufg.length ? '<div style="font-size:0.70rem;color:var(--c-muted);">' + aufgNS + '/' + alleAufg.length + ' Aufgaben</div>' : '')
+            + '<div style="font-size:0.88rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+              + this._esc(v.titel||'') + '</div>'
+            + (alleAufg.length
+              ? '<div style="font-size:0.70rem;color:var(--c-muted);">' + aufgNS + '/' + alleAufg.length + ' Aufgaben</div>'
+              : '')
           + '</div></div>';
       });
     });
-    html += '</div>';
-    if (html === '<div style="padding:8px;"></div>') {
-      html = '<div style="padding:24px;text-align:center;color:var(--c-faint);font-size:0.85rem;">Keine aktiven Vorhaben</div>';
+
+    // Vorhaben ohne Bereich
+    const ohneBereich = store.filter(v => !v.bereichId && (v.aktivitaet||'aktiv') !== 'ruhend');
+    if (ohneBereich.length) {
+      html += '<div style="font-size:0.62rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--c-faint);padding:8px 8px 4px;">Sonstiges</div>';
+      ohneBereich.forEach(v => {
+        html += '<div onclick="WB._panelOpenVorhaben(&quot;' + v.id + '&quot;)"'
+          + ' style="display:flex;align-items:center;gap:8px;padding:8px 10px;'
+          + 'background:var(--c-surface);border:1px solid var(--c-border);'
+          + 'border-radius:var(--radius-xs);margin:2px 6px 2px;cursor:pointer;">'
+          + '<span style="flex:1;font-size:0.88rem;font-weight:500;">' + this._esc(v.titel||'') + '</span>'
+          + '</div>';
+      });
     }
+    html += '</div>';
     return html;
   },
 
@@ -21200,26 +21224,26 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       { id:'projekt', icon:'📋', label:'Projekt' },
     ];
     let h = ''; let total = 0, erledigt = 0;
-    ['beruf','priv'].forEach(welt => {
-      const ctx = welt === 'beruf' ? 'pro' : 'priv';
-      const store = this._vorhabenStore(welt);
+    ['pro','priv'].forEach(ctx => {
+      const welt = ctx === 'pro' ? 'beruf' : 'priv';
+      const store = this._vorhabenStore(ctx);
       if (!store?.length) return;
       const bereiche = this._bereichSortiert(ctx);
       h += '<div style="font-size:0.65rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--c-beruf);padding:8px 4px 6px;">'
-        + (welt === 'beruf' ? 'BERUF' : 'PRIVAT') + '</div>';
+        + (ctx === 'pro' ? 'BERUF' : 'PRIVAT') + '</div>';
       store.forEach(v => {
         total++;
         const done = !!(v.typ && v.bereichId);
         if (done) erledigt++;
         const typBtns = TYP_OPTS.map(t => {
           const active = v.typ === t.id;
-          return '<button onclick="WB._migSetTyp(&quot;' + v.id + '&quot;,&quot;' + welt + '&quot;,&quot;' + t.id + '&quot;)"'
+          return '<button onclick="WB._migSetTyp(&quot;' + v.id + '&quot;,&quot;' + ctx + '&quot;,&quot;' + t.id + '&quot;)"'
             + ' style="padding:4px 8px;border-radius:8px;font-size:0.72rem;font-family:var(--font);cursor:pointer;'
             + 'border:1.5px solid ' + (active?'var(--c-beruf)':'var(--c-border)') + ';'
             + 'background:' + (active?'var(--c-beruf)':'none') + ';'
             + 'color:' + (active?'#fff':'var(--c-muted)') + ';">' + t.icon + ' ' + t.label + '</button>';
         }).join('');
-        const bereichSel = '<select onchange="WB._migSetBereich(&quot;' + v.id + '&quot;,&quot;' + welt + '&quot;,this.value)"'
+        const bereichSel = '<select onchange="WB._migSetBereich(&quot;' + v.id + '&quot;,&quot;' + ctx + '&quot;,this.value)"'
           + ' style="padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.80rem;background:var(--c-bg);color:var(--c-text);">'
           + '<option value="">– Bereich wählen –</option>'
           + bereiche.map(b => '<option value="' + b.id + '"' + (v.bereichId === b.id ? ' selected' : '') + '>' + this._esc(b.titel) + '</option>').join('')
@@ -21241,15 +21265,15 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (status) status.textContent = erledigt + ' von ' + total + ' Vorhaben migriert';
   },
 
-  _migSetTyp(vId, welt, typ) {
-    const v = (this._vorhabenStore(welt)||[]).find(x => x.id === vId);
+  _migSetTyp(vId, ctx, typ) {
+    const v = (this._vorhabenStore(ctx)||[]).find(x => x.id === vId);
     if (v) { v.typ = typ; v.geaendert = Date.now(); this.setDirty(); }
     this._migrationRender();
   },
 
-  _migSetBereich(vId, welt, bereichId) {
-    const v = (this._vorhabenStore(welt)||[]).find(x => x.id === vId);
-    if (v) { v.bereichId = bereichId || null; v.geaendert = Date.now(); this.setDirty(); }
+  _migSetBereich(vId, ctx, bereichId) {
+    const v = (this._vorhabenStore(ctx)||[]).find(x => x.id === vId);
+    if (v) { v.bereichId = bereichId||null; v.geaendert = Date.now(); this.setDirty(); }
     this._migrationRender();
   },
 
@@ -33505,6 +33529,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   // ── Einstellungen ────────────────────────────────────
   // ── Einstellungs-Modal ────────────────────────────────
   settingsOpen() {
+    try { this._bereichEnsureDefaults(); } catch(e) {}
     this._reminderSettingsRender();
     const s = this._settings;
     const sv = (id, v) => { const el=document.getElementById(id); if(el) el.value=v; };
