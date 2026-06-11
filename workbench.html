@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.23.2</title>
+<title>WorkBench 5.23.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7181,7 +7181,7 @@ body.layout-zwei-spalten #woche-fab {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.23.2</div>
+  <div class="wb-startup-tagline">v5.23.3</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8760,7 +8760,7 @@ body.layout-zwei-spalten #woche-fab {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.23.2 · Build 20260611-1000</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.23.3 · Build 20260611-1030</div>
     </div>
 
     <!-- Welt -->
@@ -8945,8 +8945,8 @@ body.layout-zwei-spalten #woche-fab {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.23.2',
-  APP_BUILD:   '20260611-1000',
+  APP_VERSION: '5.23.3',
+  APP_BUILD:   '20260611-1030',
 
 
   // ══════════════════════════════════════════════════════
@@ -12399,12 +12399,37 @@ const WB = {
     // Datum der gewählten Aufgaben auf heute setzen
     const todayStr = new Date().toISOString().split('T')[0];
     this._triageSelected.forEach(s => {
-      if (s.id) {
-        try {
+      try {
+        let found = false;
+        // Primär: über vorhabenId + aufgabe.id
+        if (s.vorhabenId && s.id) {
+          ['pro','priv'].forEach(w => {
+            const vh = (this._vorhabenStore(w)||[]).find(v => v.id === s.vorhabenId);
+            if (!vh) return;
+            (vh.meilensteine||[]).forEach(ms => {
+              const a = (ms.aufgaben||[]).find(x => x.id === s.id);
+              if (a && !found) { a.datum = todayStr; vh.geaendert = Date.now(); found = true; }
+            });
+          });
+        }
+        // Fallback: über aufgabe.id allein
+        if (!found && s.id) {
           const hit = this._vorhabenFindAufgabe(s.id);
-          if (hit) { hit.aufgabe.datum = todayStr; hit.vorhaben.geaendert = Date.now(); }
-        } catch(e) {}
-      }
+          if (hit) { hit.aufgabe.datum = todayStr; hit.vorhaben.geaendert = Date.now(); found = true; }
+        }
+        // Fallback 2: über titel + vorhabenId
+        if (!found && s.vorhabenId && s.title) {
+          ['pro','priv'].forEach(w => {
+            const vh = (this._vorhabenStore(w)||[]).find(v => v.id === s.vorhabenId);
+            if (!vh) return;
+            (vh.meilensteine||[]).forEach(ms => {
+              const a = (ms.aufgaben||[]).find(x => x.text === s.title);
+              if (a && !found) { a.datum = todayStr; vh.geaendert = Date.now(); found = true; }
+            });
+          });
+        }
+        console.log('[Triage] datum gesetzt:', s.title, found);
+      } catch(e) { console.warn('[Triage] datum error:', e); }
     });
     this.setDirty();
     this.triageClose();
