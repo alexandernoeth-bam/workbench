@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.30.3</title>
+<title>WorkBench 5.31.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7401,6 +7401,43 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
   body.layout-zwei-spalten.vh-vollbild #wb-panel-unten { display: none !important; }
   body.layout-zwei-spalten.vh-vollbild #wb-panel-divider { display: none !important; }
   body.layout-zwei-spalten.vh-vollbild #sec-cockpit { display: none !important; }
+  /* ── BE1: Bereiche Vorhaben-Liste ── */
+  #wb-vorhaben-body { background: var(--c-bg) !important; min-height: 100%; }
+  .vh-cluster-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px 6px; cursor: pointer; user-select: none;
+  }
+  .vh-cluster-arrow { font-size: 0.62rem; color: var(--c-faint); flex-shrink: 0; width: 12px; }
+  .vh-cluster-name {
+    font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--c-muted); flex: 1;
+  }
+  .vh-cluster-count {
+    font-size: 0.62rem; color: var(--c-faint);
+    background: var(--c-border); padding: 1px 6px; border-radius: 5px;
+  }
+  .vh-cluster-body { padding: 0 8px 6px; }
+  .vh-card {
+    background: var(--c-surface); border: 1px solid var(--c-border);
+    border-radius: var(--radius-xs); padding: 9px 12px; margin-bottom: 5px;
+    cursor: pointer; transition: border-color 0.15s;
+  }
+  .vh-card:hover { border-color: var(--c-beruf); }
+  .vh-card.fokus-vorhaben {
+    background: color-mix(in srgb, var(--c-beruf) 6%, var(--c-surface));
+    border-color: color-mix(in srgb, var(--c-beruf) 25%, var(--c-border));
+  }
+  .vh-card.vh-card-wartend { opacity: 0.65; }
+  .vh-card-head { display: flex; align-items: center; gap: 6px; }
+  .vh-card-fokus { font-size: 0.85rem; flex-shrink: 0; }
+  .vh-card-title {
+    flex: 1; min-width: 0; font-size: 0.88rem; font-weight: 600;
+    color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .vh-card-pills { font-size: 0.70rem; color: var(--c-muted); margin-top: 3px; padding-left: 22px; }
+  .vh-card-status { font-size: 0.62rem; font-weight: 700; padding: 2px 7px; border-radius: 8px; flex-shrink: 0; }
+  .vh-status-wartend { background: #FFF3E0; color: #B87333; }
+
 </style>
 </head>
 <body>
@@ -7410,7 +7447,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.30.3</div>
+  <div class="wb-startup-tagline">v5.31.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8398,6 +8435,15 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
       <div id="s-vorhaben-report" style="display:none;padding:4px 0 8px;"></div>
 
       <div class="wbs-divider"></div>
+      <div class="wbs-section-label">Bereiche</div>
+      <div id="s-bereiche-container">
+        <div style="font-size:0.78rem;font-weight:700;color:var(--c-muted);padding:6px 0 4px;">Beruf</div>
+        <div id="s-bereiche-pro"></div>
+        <div style="font-size:0.78rem;font-weight:700;color:var(--c-muted);padding:10px 0 4px;">Privat</div>
+        <div id="s-bereiche-priv"></div>
+      </div>
+
+      <div class="wbs-divider"></div>
 
       <!-- Abend-Reflexion Fragen -->
       <div class="wbs-section-label">Abend-Reflexion Fragen</div>
@@ -9017,7 +9063,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.30.3 · Build 20260612-0145</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.31.0 · Build 20260612-0230</div>
     </div>
 
     <!-- Welt -->
@@ -9202,8 +9248,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.30.3',
-  APP_BUILD:   '20260612-0145',
+  APP_VERSION: '5.31.0',
+  APP_BUILD:   '20260612-0230',
 
 
   // ══════════════════════════════════════════════════════
@@ -12259,6 +12305,7 @@ const WB = {
     store[idx][field] = value;
     this.setDirty();
     this._reminderSettingsRender();
+    try { this._bereichSettingsRender(); } catch(e) {}
     this._reminderInit(); // Timer neu starten
   },
 
@@ -20963,131 +21010,219 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (overlay) overlay.style.display = 'none';
   },
 
+  _bereichStore(ctx) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return [];
+    if (!db.bereiche) db.bereiche = [];
+    return db.bereiche;
+  },
+  _bereichId() {
+    return 'be_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  },
+  _bereichSortiert(ctx) {
+    return [...(this._bereichStore(ctx)||[])]
+      .sort((a, b) => (a.reihenfolge||0) - (b.reihenfolge||0));
+  },
+  _bereichEnsureDefaults() {
+    const BERUF_DEFAULTS = [
+      'üQS on Premise', 'üQS hybrid', 'üQS Online',
+      'Online QS', 'Optimierung mit KI',
+      'Fachliche Führung Gruppe',
+      'Weiterentwicklung / Konferenzen',
+      'Trainer für QS', 'Sonstiges'
+    ];
+    const PRIV_DEFAULTS = [
+      'Haus und Hof', 'Familie', 'Freunde',
+      'Freizeit / Urlaube / Auszeiten', 'Finanzen',
+      'Sport', 'Ernährung / Gesundheit',
+      'Soziales Engagement', 'Hobbys',
+      'Persönliche Bildung', 'Sonstiges'
+    ];
+    ['pro','priv'].forEach(ctx => {
+      const store = this._bereichStore(ctx);
+      if (store.length > 0) return;
+      const defaults = ctx === 'pro' ? BERUF_DEFAULTS : PRIV_DEFAULTS;
+      defaults.forEach((titel, i) => {
+        store.push({ id: this._bereichId(), titel, welt: ctx, reihenfolge: i });
+      });
+    });
+  },
+  _bereichNeu(ctx) {
+    const titel = prompt('Bereich-Name:');
+    if (!titel?.trim()) return;
+    const store = this._bereichStore(ctx);
+    store.push({ id: this._bereichId(), titel: titel.trim(), welt: ctx, reihenfolge: store.length });
+    this.setDirty();
+    this._bereichSettingsRender();
+  },
+  _bereichEdit(id, ctx) {
+    const store = this._bereichStore(ctx);
+    const b = store.find(x => x.id === id);
+    if (!b) return;
+    const neu = prompt('Bereich umbenennen:', b.titel);
+    if (!neu?.trim()) return;
+    b.titel = neu.trim();
+    this.setDirty();
+    this._bereichSettingsRender();
+    this._vorhabenListeRender();
+  },
+  _bereichSettingsRender() {
+    const container = document.getElementById('s-bereiche-container');
+    if (!container) return;
+    ['pro','priv'].forEach(ctx => {
+      const el = document.getElementById('s-bereiche-' + ctx);
+      if (!el) return;
+      const bereiche = this._bereichSortiert(ctx);
+      el.innerHTML = bereiche.map((b, i) =>
+        '<div style="display:flex;align-items:center;gap:8px;'
+          + 'padding:8px 0;border-bottom:1px solid var(--c-border);">'
+          + '<span style="font-size:0.80rem;color:var(--c-faint);cursor:grab;">☰</span>'
+          + '<span style="flex:1;font-size:0.88rem;font-weight:600;">'
+            + this._esc(b.titel) + '</span>'
+          + '<button onclick="WB._bereichEdit(&quot;' + b.id + '&quot;,&quot;' + ctx + '&quot;)"'
+            + ' style="font-size:0.75rem;color:var(--c-muted);background:none;border:none;cursor:pointer;">✎</button>'
+        + '</div>'
+      ).join('')
+      + '<div style="padding:8px 0;">'
+        + '<button onclick="WB._bereichNeu(&quot;' + ctx + '&quot;)"'
+          + ' style="font-size:0.80rem;color:var(--c-beruf);background:none;'
+          + 'border:none;cursor:pointer;font-family:var(--font);">+ Neuen Bereich</button>'
+      + '</div>';
+    });
+  },
+
   _vorhabenListeRender() {
     const body = document.getElementById('wb-vorhaben-body');
     if (!body) return;
+    const ctx   = this.activeWorld === 'beruf' ? 'pro' : 'priv';
     const store = this._vorhabenStore();
-    console.log('[VH-Liste] activeWorld:', this.activeWorld, 'store:', store?.length, 'clusterOpen:', JSON.stringify(this._vorhabenClusterOpen));
-    // v4.8.3: Alle Vorhaben beim Listen-Render migrieren
     if (store) store.forEach(v => this._vhMigrateV47(v));
-    // Auch andere Welt migrieren
-    const andereWelt = this.activeWorld === 'beruf' ? 'priv' : 'pro';
-    const andereStore = this._vorhabenStore(andereWelt);
-    if (andereStore) andereStore.forEach(v => this._vhMigrateV47(v));
+    // Bereich-Defaults sicherstellen
+    try { this._bereichEnsureDefaults(); } catch(e) {}
+
     const weltLbl = this.activeWorld === 'beruf' ? 'Beruf' : 'Privat';
-    const weltEl = document.getElementById('wb-vorhaben-welt');
+    const weltEl  = document.getElementById('wb-vorhaben-welt');
     if (weltEl) weltEl.textContent = '· ' + weltLbl;
 
+    const bereiche = this._bereichSortiert(ctx);
+
     if (!store || !store.length) {
-      let migHinweis = '';
-      try {
-        const plan = this._vorhabenMigrationPlan();
-        if (plan && plan.gesamt > 0) {
-          migHinweis = '<div style="margin-top:24px;padding:16px;background:color-mix(in srgb, var(--c-beruf) 8%, var(--c-bg));border:1px solid var(--c-beruf);border-radius:var(--radius-sm);">'
-            + '<div style="font-size:0.86rem;font-weight:700;color:var(--c-beruf);margin-bottom:6px;">Noch nicht migriert</div>'
-            + '<div style="font-size:0.8rem;color:var(--c-muted);line-height:1.5;margin-bottom:12px;">Du hast ' + plan.gesamt + ' bestehende Ziele/Pläne, die noch nicht zu Vorhaben überführt wurden.</div>'
-            + '<button onclick="WB.vorhabenListeClose(); WB.settingsOpen(); setTimeout(function(){WB.vorhabenMigrationVorschau(); document.getElementById(&quot;s-vorhaben-report&quot;)?.scrollIntoView({behavior:&quot;smooth&quot;});}, 300);" style="width:100%;padding:10px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.86rem;font-weight:700;cursor:pointer;">Jetzt migrieren</button>'
-            + '</div>';
-        }
-      } catch (e) {}
       body.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--c-faint);">'
         + '<div style="font-size:2rem;margin-bottom:12px;">🎯</div>'
         + '<div style="font-size:0.9rem;margin-bottom:16px;">Keine Vorhaben in ' + weltLbl + '.</div>'
-        + '<button onclick="WB.vorhabenNeuSheet()" style="background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-sm);padding:10px 20px;font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;">+ Neues Vorhaben</button>'
-        + '</div>'
-        + migHinweis;
+        + '<button onclick="WB.vorhabenNeuSheet()" style="background:var(--c-beruf);color:#fff;border:none;'
+        + 'border-radius:var(--radius-sm);padding:10px 20px;font-family:var(--font);'
+        + 'font-size:0.88rem;font-weight:600;cursor:pointer;">+ Neues Vorhaben</button>'
+        + '</div>';
       return;
     }
 
-    // v4.6.1: Cluster nach Welt — Beruf: Mindset+Beruf, Privat: Mindset+Körper+Umgebung
-    const isBeruf = this.activeWorld === 'beruf';
-    const CLUSTER = isBeruf
-      ? [ { id: 'fachlich', label: 'Fachlich' }, { id: 'entwicklung', label: 'Entwicklung' },
-          { id: 'fuehrung', label: 'Führung' }, { id: 'organisation', label: 'Organisation' } ]
-      : [ { id: 'mindset', label: 'Mindset' }, { id: 'koerper', label: 'Körper' }, { id: 'umgebung', label: 'Umgebung' } ];
+    const alleAktiv = store.filter(v => (v.aktivitaet||'aktiv') === 'aktiv').length;
+    const alleAufg  = store.flatMap(v =>
+      (v.meilensteine||[]).flatMap(ms => (ms.aufgaben||[]).filter(a => !a.done))).length;
 
-    let html = '<div style="margin-bottom:8px;"></div>';
-    CLUSTER.forEach(cl => {
-      const alle = store.filter(v => (v.cluster || 'mindset') === cl.id);
-      const aktiv   = alle.filter(v => (v.aktivitaet || 'aktiv') === 'aktiv')
-        .sort((a, b) => (a.fokus && !b.fokus) ? -1 : (!a.fokus && b.fokus) ? 1 : 0);
-      const wartend = alle.filter(v => (v.aktivitaet || 'aktiv') === 'wartend');
-      const ruhend  = alle.filter(v => (v.aktivitaet || 'aktiv') === 'ruhend');
-      const isOpen  = this._vorhabenClusterOpen[cl.id] !== false;
+    let h = '';
 
-      html += '<div class="vh-cluster">'
-        + '<div class="vh-cluster-header" onclick="WB._vorhabenClusterToggle(&quot;' + cl.id + '&quot;)">'
-        + '<span class="vh-cluster-name">' + cl.label + '</span>'
-        + '<span class="vh-cluster-count">' + aktiv.length + ' aktiv</span>'
-        + '<span class="vh-cluster-arrow">' + (isOpen ? '▾' : '▸') + '</span>'
-        + '</div>';
+    // Aggregations-Leiste
+    h += '<div style="display:flex;gap:0;margin:8px 10px 10px;background:var(--c-surface);'
+      + 'border:1px solid var(--c-border);border-radius:var(--radius-xs);overflow:hidden;">'
+      + '<div style="flex:1;padding:8px 10px;text-align:center;border-right:1px solid var(--c-border);">'
+        + '<div style="font-size:1rem;font-weight:700;color:var(--c-beruf);">' + alleAktiv + '</div>'
+        + '<div style="font-size:0.60rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);">Aktiv</div>'
+      + '</div>'
+      + '<div style="flex:1;padding:8px 10px;text-align:center;">'
+        + '<div style="font-size:1rem;font-weight:700;color:var(--c-beruf);">' + alleAufg + '</div>'
+        + '<div style="font-size:0.60rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);">Aufgaben offen</div>'
+      + '</div>'
+      + '</div>';
 
-      if (isOpen) {
-        html += '<div class="vh-cluster-body">';
-        if (!aktiv.length && !wartend.length) {
-          html += '<div style="font-size:0.83rem;color:var(--c-faint);padding:8px 4px;">Keine Vorhaben in diesem Cluster.</div>';
-        }
-        // Aktiv: volle Karte
-        html += aktiv.map(v => {
-    try {
-      const alleAufg = (v.meilensteine||[]).flatMap(ms => (ms.aufgaben||[]).filter(a => !a.done));
-      const aufgNS = alleAufg.filter(a => this.istNaechsterSchritt(a)).length;
-      const aufgTotal = alleAufg.length;
+    const renderVhKarte = (v, isWartend) => {
+      if (this._bueroModus && v.welt === 'priv') return '';
+      if (this._bueroModus && v.vertraulich) {
+        return '<div class="vh-card"><div class="vh-card-head">'
+          + '<span class="vh-card-title">🔒 Vertraulich</span></div></div>';
+      }
+      const alleAufgaben = (v.meilensteine||[])
+        .flatMap(ms => (ms.aufgaben||[]).filter(a => !a.done));
+      const aufgNS    = alleAufgaben.filter(a => this.istNaechsterSchritt(a)).length;
+      const aufgTotal = alleAufgaben.length;
       let terminCount = 0;
-      [this.dataPro, this.dataPriv].forEach(db => { if (!db) return; (db.customEvents||[]).filter(e => e.vorhabenId === v.id && !e.done).forEach(() => terminCount++); });
-      let pflichtCount = 0;
-      ['pro','priv'].forEach(ctx => { (this._dutyStore(ctx)||[]).filter(d => d.vorhabenId === v.id).forEach(() => pflichtCount++); });
+      [this.dataPro, this.dataPriv].forEach(db => {
+        if (!db) return;
+        (db.customEvents||[]).filter(e => e.vorhabenId === v.id && !e.done).forEach(() => terminCount++);
+      });
       const pills = [];
       if (aufgTotal > 0) pills.push(aufgNS + '/' + aufgTotal + ' Aufgaben');
       if (terminCount > 0) pills.push(terminCount + ' Termin' + (terminCount>1?'e':''));
-      if (pflichtCount > 0) pills.push(pflichtCount + ' Pflicht' + (pflichtCount>1?'en':''));
-      const pillsHtml = pills.length ? '<div class="vh-card-pills">' + pills.join(' \u00b7 ') + '</div>' : '';
-      const ebene = v.aktivitaet || 'aktiv';
-      const EBENE_BADGE = { aktiv:'<span class="vh-card-status vh-status-aktiv">Aktiv</span>', wartend:'<span class="vh-card-status vh-status-wartend">Wartend</span>', ruhend:'<span class="vh-card-status vh-status-ruhend">Ruhend</span>' };
-      const fokus = v.fokus ? '<span class="vh-card-fokus">\u2b50</span>' : '';
-      // Büro-Modus: Privat überspringen
-      if (this._bueroModus && v.welt === 'priv') return '';
-      // Büro-Modus: Vertraulich maskieren
-      const vTitel = (this._bueroModus && v.vertraulich) ? '🔒 Vertraulich' : v.titel;
-      const vPillsHtml = (this._bueroModus && v.vertraulich) ? '' : pillsHtml;
-      return '<div class="vh-card' + (v.fokus ? ' fokus-vorhaben' : '') + '" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
-        + '<div class="vh-card-head">' + fokus + '<span class="vh-card-title">' + this._esc(vTitel) + '</span>' + (EBENE_BADGE[ebene]||'') + '</div>' + vPillsHtml + '</div>';
-    } catch(e) {
-      return '<div class="vh-card" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)"><div class="vh-card-head"><span class="vh-card-title">' + this._esc(v.titel||'?') + '</span></div></div>';
-    }
-  }).join('');
-        // Wartend: nur Titel
-        html += wartend.map(v => {
-    const alleAufg = (v.meilensteine||[]).flatMap(ms => (ms.aufgaben||[]).filter(a => !a.done));
-    const pillsHtml = alleAufg.length ? '<div class="vh-card-pills">' + alleAufg.length + ' Aufgaben offen</div>' : '';
-    return '<div class="vh-card vh-card-wartend" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
-      + '<div class="vh-card-head"><span class="vh-card-title">' + this._esc(v.titel) + '</span>'
-      + '<span class="vh-card-status vh-status-wartend">Wartend</span></div>' + pillsHtml + '</div>';
-  }).join('');
-        // Ruhend: nur wenn explizit eingeblendet (toggle per Cluster)
-        if (ruhend.length) {
-          const ruhendOpen = this._vorhabenClusterOpen[cl.id + '_ruhend'];
-          html += '<div style="margin-top:4px;">'
-            + '<button onclick="event.stopPropagation();WB._vorhabenClusterToggleRuhend(&quot;' + cl.id + '&quot;)" '
-            + 'style="font-size:0.72rem;color:var(--c-faint);background:none;border:none;cursor:pointer;padding:2px 0;">'
-            + (ruhendOpen ? '▾' : '▸') + ' ' + ruhend.length + ' ruhend'
-            + '</button>';
-          if (ruhendOpen) {
-            html += '<div class="vh-ruhend-liste" style="margin-top:4px;">'
-              + ruhend.map(v => '<span class="vh-ruhend-item" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">' + this._esc(v.titel) + '</span>').join('')
-              + '</div>';
-          }
-          html += '</div>';
+      const TYP_ICON = { projekt:'📋', konzept:'💡', thema:'📚', pool:'🔧' };
+      const typIcon = TYP_ICON[v.typ||'pool'] || '🔧';
+      const statusBadge = isWartend
+        ? '<span class="vh-card-status vh-status-wartend">Wartend</span>' : '';
+      return '<div class="vh-card' + (v.fokus?' fokus-vorhaben':'') + (isWartend?' vh-card-wartend':'')
+        + '" onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
+        + '<div class="vh-card-head">'
+        + (v.fokus ? '<span class="vh-card-fokus">⭐</span>' : '')
+        + '<span style="font-size:0.85rem;flex-shrink:0;">' + typIcon + '</span>'
+        + '<span class="vh-card-title">' + this._esc(v.titel||'') + '</span>'
+        + statusBadge + '</div>'
+        + (pills.length ? '<div class="vh-card-pills">' + pills.join(' · ') + '</div>' : '')
+        + '</div>';
+    };
+
+    bereiche.forEach(bereich => {
+      const vhInBereich = store.filter(v => v.bereichId === bereich.id);
+      const aktiv   = vhInBereich.filter(v => (v.aktivitaet||'aktiv') === 'aktiv')
+        .sort((a,b) => (a.fokus&&!b.fokus)?-1:(!a.fokus&&b.fokus)?1:0);
+      const wartend = vhInBereich.filter(v => (v.aktivitaet||'aktiv') === 'wartend');
+      const ruhend  = vhInBereich.filter(v => (v.aktivitaet||'aktiv') === 'ruhend');
+      const isOpen  = this._vorhabenClusterOpen[bereich.id] !== false;
+
+      h += '<div class="vh-cluster">'
+        + '<div class="vh-cluster-header" onclick="WB._vorhabenClusterToggle(&quot;' + bereich.id + '&quot;)">'
+          + '<span class="vh-cluster-arrow">' + (isOpen ? '▾' : '▸') + '</span>'
+          + '<span class="vh-cluster-name">' + this._esc(bereich.titel) + '</span>'
+          + '<span class="vh-cluster-count">' + aktiv.length + ' aktiv</span>'
+          + '<button onclick="event.stopPropagation();WB.vorhabenNeuInBereich(&quot;' + bereich.id + '&quot;)"'
+            + ' style="font-size:0.72rem;color:var(--c-beruf);background:none;border:none;'
+            + 'cursor:pointer;font-family:var(--font);padding:2px 6px;opacity:0.6;" title="Vorhaben anlegen">+</button>'
+        + '</div>';
+
+      if (isOpen) {
+        h += '<div class="vh-cluster-body">';
+        if (!aktiv.length && !wartend.length) {
+          h += '<div style="font-size:0.80rem;color:var(--c-faint);padding:6px 4px;font-style:italic;">Kein aktives Vorhaben</div>';
         }
-        html += '</div>'; // vh-cluster-body
+        h += aktiv.map(v => renderVhKarte(v, false)).join('');
+        h += wartend.map(v => renderVhKarte(v, true)).join('');
+        if (ruhend.length) {
+          const ruhendOpen = this._vorhabenClusterOpen[bereich.id + '_ruhend'];
+          h += '<div style="margin-top:4px;">'
+            + '<button onclick="WB._vorhabenClusterToggleRuhend(&quot;' + bereich.id + '&quot;)"'
+              + ' style="font-size:0.72rem;color:var(--c-faint);background:none;border:none;'
+              + 'cursor:pointer;font-family:var(--font);padding:4px 0;">'
+              + (ruhendOpen ? '▾' : '▸') + ' ' + ruhend.length + ' ruhend</button>';
+          if (ruhendOpen) {
+            h += ruhend.map(v =>
+              '<div style="font-size:0.80rem;color:var(--c-faint);padding:3px 4px;cursor:pointer;"'
+              + ' onclick="WB.vorhabenOpen(&quot;' + v.id + '&quot;)">'
+              + this._esc(v.titel||'') + '</div>'
+            ).join('');
+          }
+          h += '</div>';
+        }
+        h += '</div>';
       }
-      html += '</div>'; // vh-cluster
+      h += '</div>';
     });
 
-    html += '<div style="padding:12px 0;text-align:center;">'
-      + '<button onclick="WB.vorhabenNeuSheet()" style="background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);padding:9px 20px;font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;">+ Neues Vorhaben</button>'
+    h += '<div style="padding:8px 10px 16px;">'
+      + '<button onclick="WB.vorhabenNeuSheet()"'
+        + ' style="width:100%;padding:9px;border-radius:var(--radius-xs);background:none;'
+        + 'border:1.5px dashed var(--c-border);font-family:var(--font);font-size:0.85rem;'
+        + 'color:var(--c-faint);cursor:pointer;">+ Neues Vorhaben</button>'
       + '</div>';
-    body.innerHTML = html;
+
+    body.innerHTML = h;
   },
 
   _vorhabenClusterOpen: { mindset: true, koerper: false, umgebung: false, fachlich: true, entwicklung: false, fuehrung: false, organisation: false },
@@ -21303,43 +21438,156 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   // Neues Vorhaben — Sheet mit Titel + Typ
+  vorhabenNeuInBereich(bereichId) {
+    this._vorhabenNeuBereichId = bereichId;
+    this.vorhabenNeuSheet();
+  },
+
+  _vhNeuBereichId: null,
+  _vhNeuTyp: 'pool',
+
+  _vhNeuSetBereich(id) {
+    this._vhNeuBereichId = id;
+    document.querySelectorAll('#vh-neu-bereich-btns button').forEach(btn => {
+      const active = btn.dataset.bereich === id;
+      btn.style.borderColor = active ? 'var(--c-beruf)' : 'var(--c-border)';
+      btn.style.background  = active ? 'var(--c-beruf)' : 'none';
+      btn.style.color       = active ? '#fff' : 'var(--c-muted)';
+    });
+    const sel = document.getElementById('vh-neu-bereich-more');
+    if (sel) sel.value = '';
+  },
+
+  _vhNeuSetTyp(typ) {
+    this._vhNeuTyp = typ;
+    document.querySelectorAll('#vh-neu-typ-btns button').forEach(btn => {
+      const active = btn.dataset.typ === typ;
+      btn.style.borderColor = active ? 'var(--c-beruf)' : 'var(--c-border)';
+      btn.style.background  = active ? 'var(--c-beruf)' : 'none';
+      btn.style.color       = active ? '#fff' : 'var(--c-muted)';
+    });
+  },
+
+  _vhNeuSave() {
+    const titel = document.getElementById('vh-neu-titel')?.value.trim();
+    if (!titel) { this._toast('Titel eingeben'); document.getElementById('vh-neu-titel')?.focus(); return; }
+    const ctx      = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const bereiche = this._bereichStore(ctx) || [];
+    const sonstiges = bereiche.find(b => b.titel === 'Sonstiges');
+    const bereichId = this._vhNeuBereichId || sonstiges?.id || bereiche[0]?.id || null;
+    const store = this._vorhabenStore();
+    if (!store) return;
+    const newId = 'vh_' + Date.now();
+    store.push({
+      id: newId, titel,
+      typ:          this._vhNeuTyp || 'pool',
+      bereichId:    bereichId,
+      aktivitaet:   'aktiv',
+      cluster:      ctx === 'pro' ? 'fachlich' : 'mindset',
+      meilensteine: [],
+      fokus:        false,
+      geaendert:    Date.now(),
+    });
+    this._vhNeuBereichId = null;
+    this.setDirty();
+    this._toast('✓ Vorhaben angelegt');
+    document.getElementById('vh-neu-sheet-bd')?.remove();
+    this._vorhabenListeRender();
+    setTimeout(() => this.vorhabenOpen(newId), 200);
+  },
+
   vorhabenNeuSheet() {
-    document.getElementById('wb-vorhaben-neu-sheet')?.remove();
-    const sheet = document.createElement('div');
-    sheet.id = 'wb-vorhaben-neu-sheet';
-    sheet.style.cssText = 'position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;';
-    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
-    const typOpts = Object.entries(this.PLAN_TYPEN).map(([k, vv]) =>
-      '<button onclick="WB._vorhabenNeuTyp(this,&quot;' + k + '&quot;)" data-typ="' + k + '" class="vh-neu-typ" style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 14px;margin-bottom:6px;background:var(--c-bg);border:1.5px solid var(--c-border);border-radius:var(--radius-sm);font-family:var(--font);font-size:0.88rem;cursor:pointer;text-align:left;color:var(--c-text);">'
-      + '<span style="font-size:1.2rem;">' + vv.icon + '</span><span>' + vv.label + '</span></button>'
-    ).join('');
-    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto;">'
-      + '<div style="font-size:0.8rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);margin-bottom:8px;">Neues Vorhaben · ' + (this.activeWorld === 'beruf' ? 'Beruf' : 'Privat') + '</div>'
-      + '<input id="vh-neu-titel" type="text" placeholder="Wie heißt das Vorhaben?" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:10px;">'
-      + '<input id="vh-neu-ziel" type="text" placeholder="Was will ich erreichen? (ein Satz, optional)" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);margin-bottom:10px;">'
-      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'
-      + '<label style="font-size:0.78rem;color:var(--c-muted);white-space:nowrap;">Bis wann?</label>'
-      + '<input id="vh-neu-stichtag" type="date" style="flex:1;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">'
-      + '</div>'
+    const ctx      = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const bereiche = this._bereichSortiert(ctx);
+    const preselBe = this._vorhabenNeuBereichId || null;
+    delete this._vorhabenNeuBereichId;
+    const typOptionen = [
+      { id:'pool',    icon:'🔧', label:'Pool'    },
+      { id:'konzept', icon:'💡', label:'Konzept' },
+      { id:'thema',   icon:'📚', label:'Thema'   },
+      { id:'projekt', icon:'📋', label:'Projekt' },
+    ];
+    let sheet = document.getElementById('vh-neu-sheet-bd');
+    if (sheet) sheet.remove();
+    sheet = document.createElement('div');
+    sheet.id = 'vh-neu-sheet-bd';
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:650;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;justify-content:center;';
+    sheet.onclick = e => { if (e.target===sheet) sheet.remove(); };
+
+    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;'
+      + 'border-radius:var(--radius) var(--radius) 0 0;padding:18px 18px 36px;max-height:85vh;overflow-y:auto;">'
+      + '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;'
+        + 'color:var(--c-faint);margin-bottom:14px;">Neues Vorhaben</div>'
+      // Titel
       + '<div style="margin-bottom:14px;">'
-      + '<div style="font-size:0.75rem;font-weight:700;color:var(--c-muted);margin-bottom:6px;">Cluster <span style="color:var(--c-danger);">*</span></div>'
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
-      + (this.activeWorld === 'beruf'
-          ? ['fachlich','entwicklung','fuehrung','organisation']
-          : ['mindset','koerper','umgebung']
-        ).map(c => {
-          const lbl = {mindset:'Mindset',koerper:'Körper',umgebung:'Umgebung',fachlich:'Fachlich',entwicklung:'Entwicklung',fuehrung:'Führung',organisation:'Organisation'}[c];
-          return '<button id="vh-neu-cl-' + c + '" onclick="WB._vorhabenNeuCluster(&quot;' + c + '&quot;)" '
-            + 'style="padding:7px 14px;border-radius:20px;font-family:var(--font);font-size:0.82rem;cursor:pointer;border:1px solid var(--c-border);background:none;color:var(--c-muted);">'
-            + lbl + '</button>';
-        }).join('')
-      + '</div></div>'
-      + '<button onclick="WB._vorhabenNeuSave()" style="width:100%;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.92rem;font-weight:700;cursor:pointer;">Anlegen</button>'
+        + '<div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:5px;font-weight:600;">Titel *</div>'
+        + '<input id="vh-neu-titel" type="text" autofocus placeholder="z.B. Auslieferung 3 · 2026"'
+          + ' style="width:100%;padding:10px 12px;border:1.5px solid var(--c-beruf);'
+          + 'border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;'
+          + 'background:var(--c-bg);color:var(--c-text);box-sizing:border-box;">'
+      + '</div>'
+      // Bereich
+      + '<div style="margin-bottom:14px;">'
+        + '<div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:6px;font-weight:600;">Bereich *</div>'
+        + '<div style="display:flex;gap:5px;flex-wrap:wrap;" id="vh-neu-bereich-btns">'
+        + bereiche.slice(0,8).map(b => {
+            const active = b.id === preselBe;
+            return '<button onclick="WB._vhNeuSetBereich(&quot;' + b.id + '&quot;)"'
+              + ' data-bereich="' + b.id + '"'
+              + ' style="padding:5px 10px;border-radius:12px;font-size:0.75rem;font-family:var(--font);'
+              + 'cursor:pointer;margin-bottom:4px;border:1.5px solid '
+              + (active?'var(--c-beruf)':'var(--c-border)') + ';'
+              + 'background:' + (active?'var(--c-beruf)':'none') + ';'
+              + 'color:' + (active?'#fff':'var(--c-muted)') + ';">'
+              + this._esc(b.titel) + '</button>';
+          }).join('')
+        + (bereiche.length > 8
+          ? '<select id="vh-neu-bereich-more" onchange="WB._vhNeuSetBereich(this.value)"'
+              + ' style="padding:5px 8px;border-radius:10px;border:1.5px solid var(--c-border);'
+              + 'font-family:var(--font);font-size:0.75rem;background:var(--c-bg);color:var(--c-muted);cursor:pointer;">'
+              + '<option value="">Weitere...</option>'
+              + bereiche.slice(8).map(b => '<option value="' + b.id + '">' + this._esc(b.titel) + '</option>').join('')
+            + '</select>'
+          : '')
+        + '</div>'
+      + '</div>'
+      // Typ
+      + '<div style="margin-bottom:16px;">'
+        + '<div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:6px;font-weight:600;">Typ</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;" id="vh-neu-typ-btns">'
+        + typOptionen.map(t => {
+            const active = t.id === 'pool';
+            return '<button onclick="WB._vhNeuSetTyp(&quot;' + t.id + '&quot;)"'
+              + ' data-typ="' + t.id + '"'
+              + ' style="padding:8px 4px;border-radius:var(--radius-xs);text-align:center;'
+              + 'font-family:var(--font);cursor:pointer;border:1.5px solid '
+              + (active?'var(--c-beruf)':'var(--c-border)') + ';'
+              + 'background:' + (active?'var(--c-beruf)':'none') + ';'
+              + 'color:' + (active?'#fff':'var(--c-muted)') + ';">'
+              + '<div style="font-size:1rem;">' + t.icon + '</div>'
+              + '<div style="font-size:0.68rem;font-weight:700;margin-top:2px;">' + t.label + '</div>'
+              + '</button>';
+          }).join('')
+        + '</div>'
+      + '</div>'
+      + '<div style="padding:8px 12px;background:var(--c-beruf-bg);border-radius:var(--radius-xs);'
+        + 'font-size:0.75rem;color:var(--c-beruf);margin-bottom:16px;">'
+        + '💡 Stichtag, Ziel, Ressourcen — alles später ergänzbar'
+      + '</div>'
+      + '<button onclick="WB._vhNeuSave()"'
+        + ' style="width:100%;padding:13px;border-radius:var(--radius-sm);background:var(--c-beruf);'
+        + 'color:#fff;border:none;font-family:var(--font);font-size:0.92rem;font-weight:700;cursor:pointer;">'
+        + 'Vorhaben anlegen →</button>'
+      + '<button onclick="document.getElementById(&quot;vh-neu-sheet-bd&quot;).remove()"'
+        + ' style="width:100%;padding:10px;margin-top:8px;border-radius:var(--radius-sm);background:none;'
+        + 'border:1px solid var(--c-border);font-family:var(--font);font-size:0.85rem;'
+        + 'color:var(--c-muted);cursor:pointer;">Abbrechen</button>'
       + '</div>';
+
     document.body.appendChild(sheet);
-    this._vorhabenNeuTypWahl = 'allgemein';
-    this._vorhabenNeuClusterWahl = null;
-    setTimeout(() => document.getElementById('vh-neu-titel')?.focus(), 50);
+    this._vhNeuBereichId = preselBe || null;
+    this._vhNeuTyp = 'pool';
+    setTimeout(() => { document.getElementById('vh-neu-titel')?.focus(); }, 100);
   },
 
   _vorhabenNeuCluster(c) {
@@ -21429,6 +21677,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       (ms.aufgaben||[]).forEach(a => { if (a.naechsterSchritt === undefined) a.naechsterSchritt = false; })
     );
     v._v48migr = true;
+    // BE1: bereichId setzen wenn fehlt
+    if (!v.bereichId) {
+      const ctx2 = (v.welt === 'pro' || this.activeWorld === 'beruf') ? 'pro' : 'priv';
+      const bereiche2 = this._bereichStore(ctx2) || [];
+      const sonstiges2 = bereiche2.find(b => b.titel === 'Sonstiges');
+      v.bereichId = sonstiges2?.id || bereiche2[0]?.id || null;
+    }
     this.setDirty();
   },
 
@@ -21448,6 +21703,15 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
 
     this._vhMigrateV47(v);
+
+    // BE1: Bereich-Breadcrumb im Header anzeigen
+    {
+      const _ctx2   = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+      const _bers   = this._bereichStore(_ctx2) || [];
+      const _ber    = _bers.find(b => b.id === v.bereichId);
+      const _titEl  = document.getElementById('wb-vorhaben-detail-titel');
+      if (_titEl) _titEl.textContent = _ber?.titel || v.titel || 'Vorhaben';
+    }
 
     if (this._settings?.vhBlockOpen) Object.assign(this._vhBlockOpen, this._settings.vhBlockOpen);
 
@@ -23892,6 +24156,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     // UI3: Gespeicherte Darstellung anwenden
     this._uiApplyTheme();
     setTimeout(() => { try { this._eingangUpdateBadge(); } catch(e) {} }, 1200);
+    try { this._bereichEnsureDefaults(); } catch(e) {}
     window.addEventListener('resize', () => {
       const war = document.body.classList.contains('layout-zwei-spalten');
       const ist  = this._uiIsZweiSpalten();
