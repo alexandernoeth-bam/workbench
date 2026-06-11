@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.28.6</title>
+<title>WorkBench 5.29.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6512,6 +6512,22 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 .fokus-cl-progress-bar { flex: 1; height: 3px; background: var(--c-border); border-radius: 2px; overflow: hidden; }
 .fokus-cl-progress-fill { height: 100%; background: var(--c-beruf); border-radius: 2px; transition: width 0.2s; }
 
+/* ── Ressourcen-System (RES1) ── */
+.res-row { display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--c-surface); border:1px solid var(--c-border); border-radius:var(--radius-xs); margin-bottom:6px; cursor:pointer; transition:border-color 0.15s; }
+.res-row:hover { border-color:var(--c-beruf); }
+.res-icon { font-size:1.1rem; flex-shrink:0; width:24px; text-align:center; }
+.res-body { flex:1; min-width:0; }
+.res-titel { font-size:0.88rem; font-weight:600; color:var(--c-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.res-meta { font-size:0.70rem; color:var(--c-faint); margin-top:2px; display:flex; gap:6px; flex-wrap:wrap; }
+.res-tag { font-size:0.62rem; padding:1px 6px; border-radius:6px; font-weight:600; background:var(--c-border); color:var(--c-muted); }
+.res-open-btn { font-size:0.82rem; color:var(--c-muted); flex-shrink:0; background:none; border:none; cursor:pointer; padding:2px 6px; }
+#res-form-sheet-bd { position:fixed; inset:0; z-index:650; background:rgba(0,0,0,0.4); display:flex; align-items:flex-end; justify-content:center; }
+#res-form-sheet { background:var(--c-surface); width:100%; max-width:480px; border-radius:var(--radius) var(--radius) 0 0; padding:18px 18px 36px; max-height:85vh; overflow-y:auto; }
+.res-wiki-group-title { font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--c-faint); padding:10px 0 4px; }
+.res-filter-chips { display:flex; gap:6px; flex-wrap:wrap; padding:6px 0; }
+.res-filter-chip { font-size:0.72rem; padding:3px 10px; border-radius:10px; cursor:pointer; border:1px solid var(--c-border); background:none; font-family:var(--font); color:var(--c-muted); }
+.res-filter-chip.active { background:var(--c-beruf); color:#fff; border-color:var(--c-beruf); }
+
 /* ── Aufgaben-Detail-Sheet (CK6) ── */
 .ck-aufg-sheet-backdrop {
   position: fixed; inset: 0; z-index: 600;
@@ -7340,7 +7356,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.28.6</div>
+  <div class="wb-startup-tagline">v5.29.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7618,6 +7634,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
             onchange="WB._panelSetSektion('oben', this.value)">
             <option value="vorhaben">Vorhaben</option>
             <option value="woche">Woche</option>
+            <option value="ressourcen">Ressourcen</option>
             <option value="notizen">Notizen</option>
             <option value="checklisten">Checklisten</option>
             <option value="schnellerinnerungen">Schnellerinnerungen</option>
@@ -8945,7 +8962,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.28.6 · Build 20260611-2340</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.29.0 · Build 20260611-2359</div>
     </div>
 
     <!-- Welt -->
@@ -9130,8 +9147,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.28.6',
-  APP_BUILD:   '20260611-2340',
+  APP_VERSION: '5.29.0',
+  APP_BUILD:   '20260611-2359',
 
 
   // ══════════════════════════════════════════════════════
@@ -17588,7 +17605,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!inhalt) return;
     if (sel) sel.value = sektion;
     const TITEL = { vorhaben:'Vorhaben', woche:'Woche', notizen:'Notizen',
-      checklisten:'Checklisten', schnellerinnerungen:'Schnellerinnerungen' };
+      checklisten:'Checklisten', schnellerinnerungen:'Schnellerinnerungen', ressourcen:'Ressourcen' };
     if (titel) {
       titel.textContent = TITEL[sektion] || sektion;
     }
@@ -17629,6 +17646,11 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this._renderSection(sektion);
     // FAB bei Woche aktualisieren
     if (sektion === 'woche') this._wocheFabUpdate();
+    // Ressourcen-Panel rendern
+    if (sektion === 'ressourcen') {
+      this._resPanelRender(inhalt);
+      return;
+    }
   },
 
   _panelRenderVorhaben(container, position) {
@@ -18359,6 +18381,255 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
   },
 
+  _resStore(ctx) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return [];
+    if (!db.ressourcen) db.ressourcen = [];
+    return db.ressourcen;
+  },
+  _resId() { return 'res_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); },
+  _resCtx() { return this.activeWorld === 'beruf' ? 'pro' : 'priv'; },
+  _resAll() {
+    return [
+      ...(this._resStore('pro')||[]).map(r => ({...r, _ctx:'pro'})),
+      ...(this._resStore('priv')||[]).map(r => ({...r, _ctx:'priv'})),
+    ];
+  },
+  _resTags() {
+    const tags = new Set();
+    this._resAll().forEach(r => (r.tags||[]).forEach(t => tags.add(t)));
+    return [...tags].sort();
+  },
+  _resTypIcon(typ) {
+    return {onenote:'📓',onedrive:'📄',confluence:'🌐',
+            googledocs:'📝',googlesheets:'📊',url:'🔗'}[typ]||'🔗';
+  },
+  _resTypLabel(typ) {
+    return {onenote:'OneNote',onedrive:'OneDrive',confluence:'Confluence',
+            googledocs:'Google Docs',googlesheets:'Google Sheets',url:'URL'}[typ]||'Link';
+  },
+  _resOpen(r) { if (r?.url) window.open(r.url, '_blank', 'noopener'); },
+
+  _driveFolderIdCache: null,
+
+  async _driveEnsureFolder() {
+    if (this._driveFolderIdCache) return this._driveFolderIdCache;
+    const cached = await this.idbGet('meta', 'workbenchFolderId');
+    if (cached) { this._driveFolderIdCache = cached; return cached; }
+    const token = this._oauthToken;
+    if (!token) throw new Error('Nicht angemeldet');
+    const search = await fetch(
+      this.DRIVE_API + '/files?q=' + encodeURIComponent("name='WorkBench' and mimeType='application/vnd.google-apps.folder' and trashed=false") + '&fields=files(id,name)',
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+    const sd = await search.json();
+    if (sd.files?.length) {
+      const fId = sd.files[0].id;
+      this._driveFolderIdCache = fId;
+      await this.idbSet('meta', 'workbenchFolderId', fId);
+      return fId;
+    }
+    const cr = await fetch(this.DRIVE_API + '/files', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'WorkBench', mimeType: 'application/vnd.google-apps.folder' })
+    });
+    const cd = await cr.json();
+    this._driveFolderIdCache = cd.id;
+    await this.idbSet('meta', 'workbenchFolderId', cd.id);
+    return cd.id;
+  },
+
+  async _driveCreateDoc(titel) {
+    const token = this._oauthToken; if (!token) throw new Error('Nicht angemeldet');
+    const fId = await this._driveEnsureFolder();
+    const res = await fetch(this.DRIVE_API + '/files', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: titel||'Neues Dokument', mimeType: 'application/vnd.google-apps.document', parents: [fId] })
+    });
+    if (!res.ok) throw new Error('Drive Fehler ' + res.status);
+    const d = await res.json();
+    return 'https://docs.google.com/document/d/' + d.id + '/edit';
+  },
+
+  async _driveCreateSheet(titel) {
+    const token = this._oauthToken; if (!token) throw new Error('Nicht angemeldet');
+    const fId = await this._driveEnsureFolder();
+    const res = await fetch(this.DRIVE_API + '/files', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: titel||'Neue Tabelle', mimeType: 'application/vnd.google-apps.spreadsheet', parents: [fId] })
+    });
+    if (!res.ok) throw new Error('Drive Fehler ' + res.status);
+    const d = await res.json();
+    return 'https://docs.google.com/spreadsheets/d/' + d.id + '/edit';
+  },
+
+  async _resCreateAndOpen(typ, titel) {
+    if (!this._oauthTokenValid()) { this._toast('Bitte zuerst mit Google Drive verbinden'); return null; }
+    try {
+      let url = '';
+      if (typ === 'googledocs') { this._toast('Dokument wird erstellt...'); url = await this._driveCreateDoc(titel); }
+      else if (typ === 'googlesheets') { this._toast('Tabelle wird erstellt...'); url = await this._driveCreateSheet(titel); }
+      if (url) {
+        const ui = document.getElementById('res-form-url');
+        if (ui) ui.value = url;
+        this._toast('✓ Erstellt — Link eingetragen');
+        window.open(url, '_blank', 'noopener');
+      }
+      return url;
+    } catch(e) { this._toast('Fehler: ' + e.message); return null; }
+  },
+
+  _resFormTyp: 'url',
+  _vhResTagFilter: 'Alle',
+  _resPanelTagFilter: 'Alle',
+
+  resFormOpen(opts = {}) {
+    opts = opts || {};
+    const existing = opts.editId ? this._resAll().find(r => r.id === opts.editId) : null;
+    this._resFormTyp = existing?.typ || 'url';
+    const vhOpts = ['<option value="">– Kein Vorhaben –</option>'];
+    ['pro','priv'].forEach(ctx => {
+      (this._vorhabenStore(ctx)||[]).filter(v => (v.aktivitaet||'aktiv') !== 'ruhend').forEach(v => {
+        vhOpts.push('<option value="' + v.id + '"' + (existing?.vorhabenId===v.id||opts.vorhabenId===v.id?' selected':'') + '>' + this._esc(v.titel||'') + '</option>');
+      });
+    });
+    const fs = 'width:100%;padding:8px 10px;border:1.5px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);box-sizing:border-box;';
+    const TYPEN = ['onenote','onedrive','confluence','googledocs','googlesheets','url'];
+    const driveBtn = (t) => (t==='googledocs'||t==='googlesheets')
+      ? '<button onclick="WB._resCreateAndOpen(&quot;'+t+'&quot;,document.getElementById(&quot;res-form-titel&quot;).value||&quot;Neues Dokument&quot;)" style="margin-top:6px;font-size:0.78rem;padding:5px 12px;border-radius:var(--radius-xs);background:var(--c-beruf-bg);color:var(--c-beruf);border:1px solid var(--c-beruf);font-family:var(--font);cursor:pointer;width:100%;">+ Neues '+(t==='googledocs'?'Google Doc':'Google Sheet')+' in Drive erstellen</button>'
+      : '';
+    const bd = document.createElement('div');
+    bd.id = 'res-form-sheet-bd';
+    bd.onclick = e => { if (e.target === bd) bd.remove(); };
+    bd.innerHTML = '<div id="res-form-sheet">'
+      + '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);margin-bottom:12px;">' + (existing?'Ressource bearbeiten':'Neue Ressource') + '</div>'
+      + '<div style="margin-bottom:12px;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:6px;">Typ</div><div style="display:flex;gap:5px;flex-wrap:wrap;" id="res-typ-btns">'
+      + TYPEN.map(t => { const a=(existing?.typ||'url')===t; return '<button onclick="WB._resFormSetTyp(&quot;'+t+'&quot;)" data-typ="'+t+'" style="padding:4px 8px;border-radius:8px;font-size:0.72rem;font-family:var(--font);cursor:pointer;border:1.5px solid '+(a?'var(--c-beruf)':'var(--c-border)')+'!;background:'+(a?'var(--c-beruf)':'none')+';color:'+(a?'#fff':'var(--c-muted)')+';">' + this._resTypIcon(t)+' '+this._resTypLabel(t)+'</button>'; }).join('')
+      + '</div></div>'
+      + '<div style="margin-bottom:10px;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:4px;">Titel</div><input id="res-form-titel" type="text" style="'+fs+'" placeholder="z.B. Kickoff-Meeting 03.06." value="'+this._esc(existing?.titel||'')+'"></div>'
+      + '<div style="margin-bottom:10px;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:4px;">Link (URL)</div><input id="res-form-url" type="url" style="'+fs+'" placeholder="https://..." value="'+this._esc(existing?.url||'')+'"><div id="res-drive-btn-container">'+driveBtn(existing?.typ||'url')+'</div></div>'
+      + '<div style="margin-bottom:10px;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:4px;">Tags (kommagetrennt)</div><input id="res-form-tags" type="text" style="'+fs+'" placeholder="Protokoll, Sprint 4, ..." value="'+this._esc((existing?.tags||[]).join(', '))+'"></div>'
+      + '<div style="margin-bottom:10px;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:4px;">Vorhaben (optional)</div><select id="res-form-vorhaben" style="'+fs+'">'+vhOpts.join('')+'</select></div>'
+      + '<div style="margin-bottom:14px;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:4px;">Notiz (optional)</div><textarea id="res-form-notiz" style="'+fs+'resize:none;min-height:60px;">'+this._esc(existing?.notiz||'')+'</textarea></div>'
+      + '<button onclick="WB._resFormSave(&quot;'+(existing?.id||'')+'&quot;,&quot;'+(opts.terminId||'')+'&quot;,&quot;'+(opts.aufgabeId||'')+'&quot;)" style="width:100%;padding:12px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.92rem;font-weight:600;cursor:pointer;">'+(existing?'Speichern':'Ressource anlegen')+'</button>'
+      + (existing ? '<button onclick="WB._resDelete(&quot;'+existing.id+'&quot;)" style="width:100%;padding:10px;margin-top:8px;border-radius:var(--radius-sm);background:none;border:1px solid var(--c-danger,#B5332A);color:var(--c-danger,#B5332A);font-family:var(--font);font-size:0.85rem;cursor:pointer;">Löschen</button>' : '')
+      + '</div>';
+    document.body.appendChild(bd);
+  },
+
+  _resFormSetTyp(typ) {
+    this._resFormTyp = typ;
+    document.querySelectorAll('#res-typ-btns button').forEach(btn => {
+      const a = btn.dataset.typ === typ;
+      btn.style.borderColor = a ? 'var(--c-beruf)' : 'var(--c-border)';
+      btn.style.background  = a ? 'var(--c-beruf)' : 'none';
+      btn.style.color       = a ? '#fff' : 'var(--c-muted)';
+    });
+    const c = document.getElementById('res-drive-btn-container');
+    if (c) c.innerHTML = (typ==='googledocs'||typ==='googlesheets')
+      ? '<button onclick="WB._resCreateAndOpen(&quot;'+typ+'&quot;,document.getElementById(&quot;res-form-titel&quot;).value||&quot;Neues Dokument&quot;)" style="margin-top:6px;font-size:0.78rem;padding:5px 12px;border-radius:var(--radius-xs);background:var(--c-beruf-bg);color:var(--c-beruf);border:1px solid var(--c-beruf);font-family:var(--font);cursor:pointer;width:100%;">+ Neues '+(typ==='googledocs'?'Google Doc':'Google Sheet')+' in Drive erstellen</button>'
+      : '';
+  },
+
+  _resFormSave(editId, terminId, aufgabeId) {
+    const titel = document.getElementById('res-form-titel')?.value.trim();
+    const url   = document.getElementById('res-form-url')?.value.trim();
+    const tagsR = document.getElementById('res-form-tags')?.value || '';
+    const vhId  = document.getElementById('res-form-vorhaben')?.value || '';
+    const notiz = document.getElementById('res-form-notiz')?.value.trim()||'';
+    if (!titel) { this._toast('Titel ist Pflichtfeld'); return; }
+    if (!url)   { this._toast('URL ist Pflichtfeld'); return; }
+    const tags  = tagsR.split(',').map(t => t.trim()).filter(Boolean);
+    const today = new Date().toISOString().split('T')[0];
+    if (editId) {
+      ['pro','priv'].forEach(c => {
+        const r = (this._resStore(c)||[]).find(x => x.id === editId);
+        if (r) { r.titel=titel; r.url=url; r.tags=tags; r.notiz=notiz; r.vorhabenId=vhId||null; if(terminId) r.terminId=terminId; if(aufgabeId) r.aufgabeId=aufgabeId; }
+      });
+    } else {
+      this._resStore(this._resCtx()).push({ id:this._resId(), titel, typ:this._resFormTyp||'url', url, tags, datum:today, notiz, vorhabenId:vhId||null, terminId:terminId||null, aufgabeId:aufgabeId||null });
+    }
+    this.setDirty();
+    this._toast('✓ Ressource gespeichert');
+    document.getElementById('res-form-sheet-bd')?.remove();
+    try { this._vorhabenDetailRender(); } catch(e) {}
+    try { this._resPanelRender(); } catch(e) {}
+  },
+
+  _resDelete(id) {
+    if (!confirm('Ressource löschen?')) return;
+    ['pro','priv'].forEach(ctx => { const s=this._resStore(ctx); const i=s.findIndex(r=>r.id===id); if(i!==-1) s.splice(i,1); });
+    this.setDirty();
+    document.getElementById('res-form-sheet-bd')?.remove();
+    try { this._vorhabenDetailRender(); } catch(e) {}
+    try { this._resPanelRender(); } catch(e) {}
+  },
+
+  _resPanelRender(container) {
+    const el = container || document.getElementById('wb-panel-oben-inhalt') || document.getElementById('wb-panel-unten-inhalt');
+    if (!el) return;
+    const tagFilter = this._resPanelTagFilter || 'Alle';
+    const alle = this._resAll();
+    const allTags = new Set(['Alle']);
+    alle.forEach(r => (r.tags||[]).forEach(t => allTags.add(t)));
+    const filtered = tagFilter==='Alle' ? alle : alle.filter(r => (r.tags||[]).includes(tagFilter));
+    const byVh = {}; const ohneVh = [];
+    filtered.forEach(r => { if(r.vorhabenId){if(!byVh[r.vorhabenId])byVh[r.vorhabenId]=[];byVh[r.vorhabenId].push(r);}else ohneVh.push(r); });
+    const renderR = r => '<div class="res-row" onclick="WB._resOpen(' + JSON.stringify({url:r.url}).replace(/"/g,'&quot;') + ')"><span class="res-icon">'+this._resTypIcon(r.typ)+'</span><div class="res-body"><div class="res-titel">'+this._esc(r.titel)+'</div><div class="res-meta"><span>'+this._resTypLabel(r.typ)+'</span>'+(r.tags||[]).map(t=>'<span class="res-tag">'+this._esc(t)+'</span>').join('')+'</div></div><button class="res-open-btn" onclick="event.stopPropagation();WB.resFormOpen({editId:&quot;'+r.id+'&quot;})">&#9998;</button></div>';
+    const chips = [...allTags].map(t => '<button onclick="WB._resPanelFilterTag(&quot;'+this._esc(t)+'&quot;)" class="res-filter-chip'+(tagFilter===t?' active':'')+'">'+this._esc(t)+'</button>').join('');
+    const alle_vh = this._vorhabenAlle ? this._vorhabenAlle() : [];
+    let grHtml = '';
+    Object.entries(byVh).forEach(([vhId,items]) => { const v=alle_vh.find(x=>x.id===vhId); grHtml+='<div class="res-wiki-group-title">'+this._esc(v?.titel||'–')+'</div>'+items.map(renderR).join(''); });
+    if (ohneVh.length) grHtml += '<div class="res-wiki-group-title">Ohne Vorhaben</div>' + ohneVh.map(renderR).join('');
+    if (!grHtml) grHtml = '<div style="padding:24px;text-align:center;color:var(--c-faint);font-size:0.85rem;">Noch keine Ressourcen</div>';
+    el.innerHTML = '<div style="padding:8px 10px;">'
+      + '<div style="display:flex;gap:8px;margin-bottom:6px;"><input type="text" placeholder="Suche..." oninput="WB._resPanelSearch(this.value)" style="flex:1;padding:6px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"><button onclick="WB.resFormOpen({})" style="padding:6px 12px;border-radius:var(--radius-xs);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.82rem;font-weight:600;cursor:pointer;">+ Neu</button></div>'
+      + '<div class="res-filter-chips">'+chips+'</div>'
+      + grHtml + '</div>';
+  },
+
+  _resPanelFilterTag(tag) {
+    this._resPanelTagFilter = tag;
+    if (this._panelOben==='ressourcen')  this._resPanelRender(document.getElementById('wb-panel-oben-inhalt'));
+    if (this._panelUnten==='ressourcen') this._resPanelRender(document.getElementById('wb-panel-unten-inhalt'));
+  },
+
+  _resPanelSearch(query) {
+    const q = (query||'').toLowerCase();
+    const target = this._panelOben==='ressourcen' ? document.getElementById('wb-panel-oben-inhalt') : document.getElementById('wb-panel-unten-inhalt');
+    if (!target) return;
+    if (!q) { this._resPanelRender(target); return; }
+    const all = this._resAll().filter(r => r.titel.toLowerCase().includes(q) || (r.tags||[]).some(t=>t.toLowerCase().includes(q)) || (r.notiz||'').toLowerCase().includes(q));
+    const renderR = r => '<div class="res-row" onclick="WB._resOpen('+JSON.stringify({url:r.url}).replace(/"/g,'&quot;')+')"><span class="res-icon">'+this._resTypIcon(r.typ)+'</span><div class="res-body"><div class="res-titel">'+this._esc(r.titel)+'</div><div class="res-meta">'+(r.tags||[]).map(t=>'<span class="res-tag">'+this._esc(t)+'</span>').join('')+'</div></div></div>';
+    target.innerHTML = '<div style="padding:8px 10px;"><div style="font-size:0.72rem;color:var(--c-faint);padding:4px 0 8px;">'+(all.length)+' Ergebnisse für „'+this._esc(q)+'“</div>'+(all.length?all.map(renderR).join(''):'<div style="padding:16px;text-align:center;color:var(--c-faint);">Nichts gefunden</div>')+'</div>';
+  },
+
+  _vhRenderRessourcen(container) {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    const ctx = this.activeWorld==='beruf'?'pro':'priv';
+    const items = this._resStore(ctx).filter(r => r.vorhabenId===v.id);
+    const tagFilter = this._vhResTagFilter || 'Alle';
+    const allTags = new Set(['Alle']);
+    items.forEach(r => (r.tags||[]).forEach(t => allTags.add(t)));
+    const filtered = tagFilter==='Alle' ? items : items.filter(r=>(r.tags||[]).includes(tagFilter));
+    const chips = [...allTags].map(t => '<button onclick="WB._vhResFilterTag(&quot;'+this._esc(t)+'&quot;)" class="res-filter-chip'+(tagFilter===t?' active':'')+'">'+this._esc(t)+'</button>').join('');
+    const renderR = r => '<div class="res-row" onclick="WB._resOpen('+JSON.stringify({url:r.url}).replace(/"/g,'&quot;')+')"><span class="res-icon">'+this._resTypIcon(r.typ)+'</span><div class="res-body"><div class="res-titel">'+this._esc(r.titel)+'</div><div class="res-meta"><span>'+this._resTypLabel(r.typ)+'</span>'+(r.datum?'<span>'+r.datum+'</span>':'')+(r.tags||[]).map(t=>'<span class="res-tag">'+this._esc(t)+'</span>').join('')+'</div></div><button class="res-open-btn" onclick="event.stopPropagation();WB.resFormOpen({editId:&quot;'+r.id+'&quot;})">&#9998;</button></div>';
+    container.innerHTML = '<div style="padding:10px 14px;overflow-y:auto;flex:1;">'
+      + '<div class="res-filter-chips">'+chips+'</div>'
+      + (filtered.length ? filtered.map(renderR).join('') : '<div style="padding:16px;text-align:center;color:var(--c-faint);font-size:0.85rem;">Keine Ressourcen'+(tagFilter!=='Alle'?' mit diesem Tag':'')+'</div>')
+      + '<button onclick="WB.resFormOpen({vorhabenId:&quot;'+v.id+'&quot;})" style="width:100%;padding:10px;margin-top:8px;border-radius:var(--radius-xs);background:none;border:1.5px dashed var(--c-border);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">＋ Ressource verknüpfen</button>'
+      + '</div>';
+  },
+
+  _vhResFilterTag(tag) {
+    this._vhResTagFilter = tag;
+    const body = document.getElementById('vh-tab-ressourcen');
+    if (body) this._vhRenderRessourcen(body);
+  },
+
   _ckOpenAufgSheet(aufgabeId, vorhabenId) {
     const alle = (this._vorhabenAlle ? this._vorhabenAlle() : []);
     const v    = alle.find(x => x.id === vorhabenId);
@@ -18408,8 +18679,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<button class="ck-aufg-sheet-link"'
         + ' onclick="document.getElementById(&quot;ck-aufg-sheet-bd&quot;).remove();WB.vorhabenOpen(&quot;' + vorhabenId + '&quot;)">'
         + '→ Im Vorhaben öffnen</button>'
+      + '<button onclick="WB.resFormOpen({aufgabeId:&quot;' + aufgabeId + '&quot;,vorhabenId:&quot;' + vorhabenId + '&quot;})"'
+        + ' style="width:100%;padding:9px;border-radius:var(--radius-xs);background:none;border:1px solid var(--c-beruf);margin-top:6px;font-family:var(--font);font-size:0.85rem;cursor:pointer;color:var(--c-beruf);">↗ Ressource verknüpfen</button>'
       + '</div>';
-    document.body.appendChild(bd);
+    document.body.appendChild(bd);d(bd);
   },
 
   _ckAufgSheetClToggle(aufgabeId, vorhabenId, idx, chk) {
@@ -21388,6 +21661,28 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const pl = document.getElementById('vh-tab-plan');
     if (ak) ak.style.display = tab === 'aktuell' ? '' : 'none';
     if (pl) pl.style.display = tab === 'plan'    ? '' : 'none';
+    // Ressourcen-Tab
+    if (tab === 'ressourcen') {
+      document.querySelectorAll('.vh-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === 'ressourcen'));
+      if (ak) ak.style.display = 'none';
+      if (pl) pl.style.display = 'none';
+      const container = this._uiIsZweiSpalten()
+        ? (document.getElementById('wb-panel-vh-detail-inner') || document.getElementById('wb-right-vh-detail'))
+        : document.getElementById('wb-vorhaben-detail');
+      if (!container) return;
+      let body = container.querySelector('#vh-tab-aktuell') || container.querySelector('#vh-tab-plan') || container.querySelector('[id^="vh-tab"]');
+      if (!body) {
+        body = document.createElement('div');
+        container.appendChild(body);
+      }
+      body.id = 'vh-tab-ressourcen';
+      body.style.display = 'flex';
+      body.style.flexDirection = 'column';
+      body.style.flex = '1';
+      body.style.overflow = 'hidden';
+      this._vhRenderRessourcen(body);
+      return;
+    }
     document.querySelectorAll('.vh-tab-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === tab));
   },
@@ -32102,6 +32397,19 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       if(!ev) return;
       if(titleEl) titleEl.childNodes[0].textContent = 'Termin bearbeiten ';
       if (delBtn) delBtn.style.display = '';
+      // Ressource verknüpfen Button
+      const existingResBtn = document.getElementById('edit-res-btn');
+      if (existingResBtn) existingResBtn.remove();
+      const actionsRes = document.querySelector('.edit-actions');
+      if (actionsRes) {
+        const resBtn = document.createElement('button');
+        resBtn.id = 'edit-res-btn';
+        resBtn.className = 'edit-btn';
+        resBtn.style.cssText = 'background:none;border:1px solid var(--c-beruf);color:var(--c-beruf);font-size:0.78rem;';
+        resBtn.textContent = '↗ Ressource';
+        resBtn.onclick = () => { const evId = String(id); WB.resFormOpen({terminId: evId}); };
+        actionsRes.prepend(resBtn);
+      }
       // Duplizieren-Button
       const existingDupBtn = document.getElementById('edit-dup-btn');
       if (existingDupBtn) existingDupBtn.remove();
@@ -32215,6 +32523,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const ov = document.getElementById('edit-overlay');
     ov?.classList.remove('open');
     if (ov) ov.style.zIndex = '';   // v3.99.1: temporären z-index (Vorhaben) zurücksetzen
+    document.getElementById('edit-res-btn')?.remove();
     document.getElementById('edit-dup-btn')?.remove();
     const delBtn2 = document.getElementById('edit-delete-btn');
     if (delBtn2) delBtn2.style.display = 'none';
