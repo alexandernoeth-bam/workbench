@@ -1,5 +1,5 @@
-// WorkBench Service Worker v5.22.2 · Build 20260611-0900
-const BUILD = '20260611-0900';
+// WorkBench Service Worker v5.24.1 · Build 20260611-1300
+const BUILD = '20260611-1300';
 const IDB_NAME = 'WorkBenchDB';
 
 // ── IDB öffnen (lesend) ──────────────────────────────
@@ -26,6 +26,14 @@ async function processNotifQueue() {
     req.onerror   = () => r([]);
   });
 
+  // Veraltete Items aufräumen (älter als 2 Tage)
+  const twoDaysAgo = now - 2 * 24 * 60 * 60 * 1000;
+  for (const item of all) {
+    if (item.fireAt < twoDaysAgo) {
+      store.delete(item.id);
+      continue;
+    }
+  }
   for (const item of all) {
     if (item.shown) continue;
     if (item.fireAt > now) continue;
