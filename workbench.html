@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.25.0</title>
+<title>WorkBench 5.25.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6433,12 +6433,12 @@ body.fokus-modus #wb-panel-divider { display: none !important; }
   text-align: center; padding: 0 16px 8px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-body.fokus-modus #fokus-vorhaben-label { display: block; }
+#fokus-vorhaben-label.has-label { display: block; }
 #fokus-checklist-panel {
   display: none; flex-direction: column; flex: 1; overflow: hidden;
   border-top: 1px solid var(--c-border); background: var(--c-surface);
 }
-body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
+#fokus-checklist-panel.has-items { display: flex; }
 #fokus-checklist-header {
   padding: 8px 14px; font-size: 0.65rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.07em;
@@ -7241,7 +7241,7 @@ body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.25.0</div>
+  <div class="wb-startup-tagline">v5.25.1</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8824,7 +8824,7 @@ body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.25.0 · Build 20260611-1700</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.25.1 · Build 20260611-1730</div>
     </div>
 
     <!-- Welt -->
@@ -9009,8 +9009,8 @@ body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.25.0',
-  APP_BUILD:   '20260611-1700',
+  APP_VERSION: '5.25.1',
+  APP_BUILD:   '20260611-1730',
 
 
   // ══════════════════════════════════════════════════════
@@ -12180,13 +12180,15 @@ const WB = {
         this._panelSplitOrig = null;
       }
     }
-    // Checkliste zurücksetzen
+    // Temporäre Checklisten-Instanz löschen
     const panel = document.getElementById('fokus-checklist-panel');
     if (panel) panel.classList.remove('has-items');
     this._fokusCheckItems  = [];
     this._fokusVorhabenId  = null;
     this._fokusAufgabeId   = null;
     this._fokusVorlageKey  = null;
+    const lbl = document.getElementById('fokus-vorhaben-label');
+    if (lbl) { lbl.textContent = ''; lbl.classList.remove('has-label'); }
     setTimeout(() => { try { this._ckRenderTagesseite(); } catch(e) {} }, 200);
   },
 
@@ -14961,20 +14963,23 @@ const WB = {
     this._fokusRender();
     this._fokusInterval = setInterval(() => this._fokusTickk(), 1000);
 
-    // Checkliste vorbereiten
+    // Checkliste als temporäre Instanz vorbereiten
     const panel = document.getElementById('fokus-checklist-panel');
-    const itemsEl = document.getElementById('fokus-checklist-items');
     const titleEl = document.getElementById('fokus-checklist-title');
-    if (this._fokusVorlageKey && panel && itemsEl) {
+    if (this._fokusVorlageKey && panel) {
       const store = this._clVorlagenStore() || {};
       const vrl   = store[this._fokusVorlageKey];
       if (vrl?.items?.length) {
-        this._fokusCheckItems = vrl.items.map((it, i) => ({ id: i, text: it.text, done: false }));
+        // Temporäre Instanz — wird bei fokusClose gelöscht
+        this._fokusCheckItems = vrl.items.map((it, i) => ({
+          id: i, text: it.text, done: false
+        }));
         if (titleEl) titleEl.textContent = vrl.name || 'Checkliste';
         panel.classList.add('has-items');
         this._fokusRenderChecklist();
       } else {
         panel.classList.remove('has-items');
+        this._fokusCheckItems = [];
       }
     } else {
       if (panel) panel.classList.remove('has-items');
@@ -14995,9 +15000,11 @@ const WB = {
             if (a) lbl += ' · ' + a.text;
           }
           label.textContent = lbl;
+          label.classList.add('has-label');
         }
       } else {
         label.textContent = '';
+        label.classList.remove('has-label');
       }
     }
 
