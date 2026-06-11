@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.22.4</title>
+<title>WorkBench 5.23.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -160,6 +160,8 @@ body.layout-zwei-spalten.wb-buero-aktiv-header #wb-buero-label { display: block;
   background: #4D5F33 !important;
   border-radius: 6px;
 }
+#wb-notiz-btn { opacity: 0.4; transition: opacity 0.15s; }
+#wb-notiz-btn.aktiv { opacity: 1; color: var(--c-beruf); }
 
 /* Büro-Modus: Header-Banner */
 #wb-header.buero-aktiv {
@@ -242,12 +244,7 @@ body.layout-zwei-spalten [style*="z-index:600"],
 body.layout-zwei-spalten [style*="z-index: 600"] {
   left: 35% !important;
 }
-#wb-right-panel-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 14px; height: 44px;
-  border-bottom: 1px solid var(--c-border);
-  background: var(--c-surface); flex-shrink: 0;
-}
+#wb-right-panel-header { display: none; }
 #wb-right-panel-title { font-size: 0.95rem; font-weight: 700; flex: 1; }
 #wb-right-back-btn {
   display: none;
@@ -7184,7 +7181,7 @@ body.layout-zwei-spalten #woche-fab {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.22.4</div>
+  <div class="wb-startup-tagline">v5.23.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7232,6 +7229,11 @@ body.layout-zwei-spalten #woche-fab {
     </div>
     <div style="width:8px;"></div>
     <span id="wb-buero-label">👁 Büro-Modus</span>
+    <button id="wb-notiz-btn" onclick="WB._ckNotizToggle()"
+      title="Notizen einblenden"
+      style="background:none;border:none;cursor:pointer;font-size:1.0rem;padding:4px 6px;color:var(--c-muted);line-height:1;border-radius:6px;">
+      📝
+    </button>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()"
       title="Büro-Modus ein/aus"
       style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px 6px;color:var(--c-muted);opacity:0.5;transition:all 0.15s;line-height:1;border-radius:6px;">
@@ -7437,13 +7439,9 @@ body.layout-zwei-spalten #woche-fab {
     </section>
 
   <div id="wb-right-panel">
-    <div id="wb-right-panel-header">
+    <div id="wb-right-panel-header" style="display:none;">
       <button id="wb-right-back-btn" onclick="WB._rightPanelBack()">← Zurück</button>
-      <div id="wb-right-panel-title">Vorhaben</div>
-      <button onclick="WB.vorhabenNeuSheet()"
-        style="font-size:0.78rem;padding:3px 10px;border-radius:var(--radius-xs);
-        background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);
-        font-weight:600;cursor:pointer;">+ Neu</button>
+      <div id="wb-right-panel-title"></div>
     </div>
     <div id="wb-right-panel-body">
 
@@ -8412,6 +8410,12 @@ body.layout-zwei-spalten #woche-fab {
           <option value="30">30 Tage</option>
         </select>
       </div>
+      <!-- Notizfeld -->
+      <div style="margin:10px 0 4px;">
+        <label style="font-size:0.78rem;color:var(--c-muted);display:block;margin-bottom:4px;">Notiz (optional)</label>
+        <textarea id="wd-notiz" placeholder="Hinweise, Kontext..." rows="2"
+          style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);resize:vertical;box-sizing:border-box;"></textarea>
+      </div>
       <button id="wd-save-btn" onclick="WB._dutyFormSave()" style="width:100%;padding:12px 0;margin-top:20px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-size:0.92rem;font-weight:700;cursor:pointer;font-family:var(--font);">Pflicht erstellen</button>
     </div>
 
@@ -8756,7 +8760,7 @@ body.layout-zwei-spalten #woche-fab {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.22.4 · Build 20260611-1000</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.23.0 · Build 20260611-0800</div>
     </div>
 
     <!-- Welt -->
@@ -8941,8 +8945,8 @@ body.layout-zwei-spalten #woche-fab {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.22.4',
-  APP_BUILD:   '20260611-1000',
+  APP_VERSION: '5.23.0',
+  APP_BUILD:   '20260611-0800',
 
 
   // ══════════════════════════════════════════════════════
@@ -17489,6 +17493,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       p.classList.toggle('active', p.classList.contains('ae-' + v));
     });
     // Vorhaben-Dropdown befüllen
+    const notizEl = document.getElementById('wd-notiz');
+    if (notizEl) notizEl.value = duty?.notiz || '';
     const vhSel = document.getElementById('wd-vorhaben');
     if (vhSel) {
       const opts = ['<option value="">&ndash; Kein Vorhaben &ndash;</option>'];
@@ -17551,6 +17557,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       if (startTime) duty.startTime = startTime; else delete duty.startTime;
       if (mustToday) duty.mustToday = true; else delete duty.mustToday;
       if (vorhabenId) duty.vorhabenId = vorhabenId; else delete duty.vorhabenId;
+      const notizVal = document.getElementById('wd-notiz')?.value.trim() || '';
+      if (notizVal) duty.notiz = notizVal; else delete duty.notiz;
       this._toast('Pflicht aktualisiert');
     } else {
       // New mode
@@ -17560,6 +17568,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       if (startTime) entry.startTime = startTime;
       if (mustToday) entry.mustToday = true;
       if (vorhabenId) entry.vorhabenId = vorhabenId;
+      const notizNew = document.getElementById('wd-notiz')?.value.trim() || '';
+      if (notizNew) entry.notiz = notizNew;
       store.push(entry);
       this._toast('Pflicht erstellt');
     }
@@ -17852,6 +17862,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '<div class="ck-z-text">'
         + '<div class="ck-z-titel' + titelDone + '">' + this._esc(item.title) + badge + aeBadge + weltPill + expBadge + '</div>'
         + (item.meta ? '<div class="ck-z-meta">' + this._esc(item.meta) + '</div>' : '')
+        + (item.type === 'pflicht' && item.obj?.d?.notiz && this._ckNotizModus
+          ? '<div class="ck-z-meta" style="color:var(--c-muted);font-style:italic;">' + this._esc(item.obj.d.notiz) + '</div>'
+          : '')
+        + (item.type === 'vorhaben' && item.obj?.a?.notiz && this._ckNotizModus
+          ? '<div class="ck-z-meta" style="color:var(--c-muted);font-style:italic;">' + this._esc(item.obj.a.notiz) + '</div>'
+          : '')
         + '</div>'
         + expProgress
         + (item.zeit ? '<div class="ck-z-zeit">' + item.zeit + '</div>' : '')
@@ -20112,6 +20128,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   // ── Büro-Modus (C1) ─────────────────────────────────────
   _bueroModus: false,
+  _ckNotizModus: false,
 
   _bueroToggle() {
     this._bueroModus = !this._bueroModus;
@@ -20124,6 +20141,20 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       : '👁 Büro-Modus deaktiviert');
     this._ckRenderTagesseite();
     if (this.activeTab === 'vorhaben') this._vorhabenListeRender();
+    // Zwei-Spalten: Panels neu rendern
+    if (this._uiIsZweiSpalten()) {
+      try {
+        this._panelRenderSektion('oben',  this._panelOben  || 'vorhaben');
+        this._panelRenderSektion('unten', this._panelUnten || 'woche');
+      } catch(e) {}
+    }
+  },
+
+  _ckNotizToggle() {
+    this._ckNotizModus = !this._ckNotizModus;
+    const btn = document.getElementById('wb-notiz-btn');
+    if (btn) btn.classList.toggle('aktiv', this._ckNotizModus);
+    this._ckRenderTagesseite();
   },
 
   // ── Vorhaben vertraulich umschalten ────────────────────
@@ -25168,6 +25199,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         return `<div class="wd-item" id="wd-item-${duty.id}" onclick="WB._dutyOpenEdit('${ctx}','${duty.id}')" style="cursor:pointer;">
           <div class="wd-item-name">${duty.title}</div>
           <div class="wd-item-meta">${when}</div>
+          ${duty.notiz ? `<div style="font-size:0.78rem;color:var(--c-muted);margin-top:2px;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80%;">${duty.notiz}</div>` : ''}
           <span style="font-size:0.8rem;color:var(--c-faint);">›</span>
         </div>`;
       }).join('');
@@ -33166,9 +33198,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (document.getElementById('wb-vorhaben-overlay')?.style.display === 'flex') {
       this._vorhabenListeRender();
     }
-    // Zwei-Spalten: rechtes Panel bei Welt-Wechsel neu rendern
-    if (this._uiIsZweiSpalten() && !this._vorhabenAktivId) {
-      try { this._rightPanelRenderListe(); } catch(e) {}
+    // Zwei-Spalten: beide Panels bei Welt-Wechsel neu rendern
+    if (this._uiIsZweiSpalten()) {
+      try {
+        this._panelRenderSektion('oben',  this._panelOben  || 'vorhaben');
+        this._panelRenderSektion('unten', this._panelUnten || 'woche');
+      } catch(e) {}
     }
   },
 
