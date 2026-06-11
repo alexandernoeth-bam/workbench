@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.24.5</title>
+<title>WorkBench 5.24.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7241,7 +7241,7 @@ body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.24.5</div>
+  <div class="wb-startup-tagline">v5.24.6</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8820,7 +8820,7 @@ body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.24.5 · Build 20260611-1500</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.24.6 · Build 20260611-1530</div>
     </div>
 
     <!-- Welt -->
@@ -9005,8 +9005,8 @@ body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.24.5',
-  APP_BUILD:   '20260611-1500',
+  APP_VERSION: '5.24.6',
+  APP_BUILD:   '20260611-1530',
 
 
   // ══════════════════════════════════════════════════════
@@ -10344,8 +10344,6 @@ const WB = {
     }
 
     console.log('[Notif] ' + this._notifTimers.length + ' Timer geplant');
-    // Auch IDB-Queue aktualisieren für SW (Pixel)
-    setTimeout(() => { try { this._notifBuildQueue(); } catch(e) {} }, 500);
   },
 
   // ── Notification senden ───────────────────────────────
@@ -10555,13 +10553,15 @@ const WB = {
             req.onerror   = () => r(null);
           });
           // Nur schreiben wenn noch nicht gesendet
-          if (!existing) {
+          if (item.fireAt <= Date.now()) {
+            // Bereits vergangen → nicht in Queue schreiben
+            if (existing && !existing.shown) store2.delete(item.id);
+          } else if (!existing) {
             store2.put(item);
           } else if (!existing.shown) {
-            // fireAt aktualisieren aber shown-Status behalten
             store2.put({ ...existing, fireAt: item.fireAt, title: item.title, body: item.body });
           }
-          // existing.shown === true → nicht überschreiben → kein Doppel-Send
+          // existing.shown === true → nicht überschreiben
         }
         idbOk = true;
         // SW informieren
@@ -12253,7 +12253,9 @@ const WB = {
   },
 
   _triageZeitblockPills(aufgabeId) {
-    const current = this._triageZeitbloecke[aufgabeId] || '';
+    const current   = this._triageZeitbloecke[aufgabeId] || '';
+    const isFokus   = this._triageSelected.some(s => s.id === aufgabeId);
+    if (!isFokus) return ''; // Nur bei gewählten Fokus-Aufgaben anzeigen
     return ['vm','nm'].map(slot => {
       const lbl    = slot === 'vm' ? '🌅 VM' : '🌞 NM';
       const active = current === slot;
@@ -12421,7 +12423,6 @@ const WB = {
         this._toast('Maximale Fokus-Anzahl erreicht'); return;
       }
       this._triageSelected.push({ id: aufgabeId, title: titel, type: 'vorhaben-aufgabe', vorhabenId, meta: '', ctx: 'pro' });
-      this._toast('✓ ' + titel.slice(0,20) + ' | id:' + (aufgabeId||'?').slice(0,8));
     }
     // Energie-Counter aktualisieren
     const counter = document.getElementById('ritual-energie-counter');
@@ -12590,9 +12591,7 @@ const WB = {
     this.setDirty();
     this.triageClose();
     this.renderCockpit();
-    // Debug: IDs anzeigen
-    const dbg = this._triageSelected.map(s => (s.id||'?').slice(0,8) + '/' + (s.vorhabenId||'?').slice(0,6)).join(', ');
-    this._toast('🎯 ' + this._triageSelected.length + ' Fokus | ' + (dbg||'leer'));
+    this._toast(this._triageSelected.length ? '🎯 Fokus gesetzt — guten Start!' : 'Triage abgeschlossen');
   },
 
   _triageReset() {
@@ -23176,13 +23175,22 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     // Notifications planen
     setTimeout(() => {
       this._notifUpdateStatus();
-      if (this._settings.notifEnabled) this._notifScheduleAll();
+      if (this._settings.notifEnabled) {
+        this._notifLastSchedule = Date.now();
+        this._notifScheduleAll(); // Timer für PC
+        this._notifBuildQueue();  // IDB für Pixel-SW
+      }
     }, 1500);
     // Neu planen wenn App wieder sichtbar wird
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && this._settings.notifEnabled) {
-        this._notifClearAll();
-        this._notifScheduleAll();
+        // Nur neu planen wenn min 10 Minuten seit letztem Plan vergangen
+        const now = Date.now();
+        if (!this._notifLastSchedule || now - this._notifLastSchedule > 10 * 60000) {
+          this._notifLastSchedule = now;
+          this._notifClearAll();
+          this._notifScheduleAll();
+        }
       }
     });
   },
@@ -33620,11 +33628,11 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       this.saveAll();             // sekundär: FSA falls Handle
       // D2b: Notification-Queue aktualisieren (max 1x pro 5 Min)
       const nowMs = Date.now();
-      if (!this._notifLastBuild || nowMs - this._notifLastBuild > 5 * 60000) {
+      if (!this._notifLastBuild || nowMs - this._notifLastBuild > 10 * 60000) {
         clearTimeout(this._notifQueueTimer);
         this._notifQueueTimer = setTimeout(() => {
           try { this._notifLastBuild = Date.now(); this._notifBuildQueue(); } catch(e) {}
-        }, 3000);
+        }, 5000);
       }
       // Auto-Upload in Drive wenn angemeldet
       if (this._oauthTokenValid()) {

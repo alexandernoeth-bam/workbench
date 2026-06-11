@@ -1,5 +1,5 @@
-// WorkBench Service Worker v5.24.1 · Build 20260611-1300
-const BUILD = '20260611-1300';
+// WorkBench Service Worker v5.24.5 · Build 20260611-1500
+const BUILD = '20260611-1500';
 const IDB_NAME = 'WorkBenchDB';
 
 // ── IDB öffnen (lesend) ──────────────────────────────
@@ -37,6 +37,12 @@ async function processNotifQueue() {
   for (const item of all) {
     if (item.shown) continue;
     if (item.fireAt > now) continue;
+    // Mehr als 2h vergangen → nicht mehr senden, nur löschen
+    if (now - item.fireAt > 2 * 60 * 60 * 1000) {
+      item.shown = true;
+      store.put(item);
+      continue;
+    }
 
     try {
       await self.registration.showNotification(item.title, {
