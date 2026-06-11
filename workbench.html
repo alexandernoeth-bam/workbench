@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.31.0</title>
+<title>WorkBench 5.32.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7447,7 +7447,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.31.0</div>
+  <div class="wb-startup-tagline">v5.32.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -9063,7 +9063,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.31.0 · Build 20260612-0230</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.32.0 · Build 20260612-0300</div>
     </div>
 
     <!-- Welt -->
@@ -9248,8 +9248,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.31.0',
-  APP_BUILD:   '20260612-0230',
+  APP_VERSION: '5.32.0',
+  APP_BUILD:   '20260612-0300',
 
 
   // ══════════════════════════════════════════════════════
@@ -21293,6 +21293,41 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this._vorhabenDetailRender();
   },
 
+  _vhFlatAddAufgabe() {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    const text = document.getElementById('vh-flat-neu-input')?.value.trim();
+    if (!text) { document.getElementById('vh-flat-neu-input')?.focus(); return; }
+    if (!v.meilensteine) v.meilensteine = [];
+    if (!v.meilensteine.length) {
+      v.meilensteine.push({ id: 'ms_' + Date.now(), titel: 'Aufgaben', aufgaben: [] });
+    }
+    const ms = v.meilensteine[0];
+    if (!ms.aufgaben) ms.aufgaben = [];
+    ms.aufgaben.push({
+      id: 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2,5),
+      text, done: false, aktivEnergie: 'mittel', naechsterSchritt: false,
+    });
+    v.geaendert = Date.now();
+    this.setDirty();
+    const inp = document.getElementById('vh-flat-neu-input');
+    if (inp) inp.value = '';
+    this._vorhabenDetailRender();
+    this._vhSetTab('plan');
+  },
+
+  _vhSetTyp(typ) {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    v.typ = typ; v.geaendert = Date.now(); this.setDirty();
+    this._vorhabenDetailRender();
+    this._vorhabenListeRender();
+  },
+
+  _vhSetBereich(bereichId) {
+    const v = this._vorhabenAktiv(); if (!v) return;
+    v.bereichId = bereichId; v.geaendert = Date.now(); this.setDirty();
+    this._vorhabenListeRender();
+  },
+
   _vhOpenSettings() {
     const v = this._vorhabenAktiv(); if (!v) return;
     const ebene = v.aktivitaet || 'aktiv';
@@ -21314,9 +21349,38 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const pill = (label, val, current, fn) => '<button onclick="' + fn + '" style="padding:5px 12px;border-radius:16px;font-family:var(--font);font-size:0.78rem;cursor:pointer;border:1.5px solid ' + (val===current ? 'var(--c-beruf)' : 'var(--c-border)') + ';background:' + (val===current ? 'var(--c-beruf)' : 'none') + ';color:' + (val===current ? '#fff' : 'var(--c-muted)') + ';">' + label + '</button>';
     const reopen = 'document.getElementById(&quot;vh-settings-sheet&quot;).remove();WB._vhOpenSettings();';
     let body = '';
-    body += row('Cluster', '<select onchange="WB._vorhabenSetCluster(this.value);' + reopen.replace(/&quot;/g,'\\"') + '" style="padding:6px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">' + clusterOpts.map(c => '<option value="' + c + '"' + (cluster===c?' selected':'') + '>' + CLUSTER_LBL[c] + '</option>').join('') + '</select>');
+    // BE2: Typ-Auswahl
+    const TYP_OPTS = [
+      { id:'pool', icon:'🔧', label:'Pool' },
+      { id:'konzept', icon:'💡', label:'Konzept' },
+      { id:'thema', icon:'📚', label:'Thema' },
+      { id:'projekt', icon:'📋', label:'Projekt' },
+    ];
+    body += '<div style="padding:10px 0;border-bottom:1px solid var(--c-border);">'
+      + '<div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:8px;">Typ</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">'
+      + TYP_OPTS.map(t => {
+          const active = (v.typ||'pool') === t.id;
+          return '<button onclick="WB._vhSetTyp(&quot;' + t.id + '&quot;);document.getElementById(&quot;vh-settings-sheet&quot;).remove();WB._vhOpenSettings();"'
+            + ' style="padding:7px 4px;border-radius:var(--radius-xs);text-align:center;font-family:var(--font);cursor:pointer;'
+            + 'border:1.5px solid ' + (active?'var(--c-beruf)':'var(--c-border)') + ';'
+            + 'background:' + (active?'var(--c-beruf)':'none') + ';'
+            + 'color:' + (active?'#fff':'var(--c-muted)') + ';">'
+            + '<div>' + t.icon + '</div>'
+            + '<div style="font-size:0.65rem;font-weight:700;margin-top:2px;">' + t.label + '</div>'
+            + '</button>';
+        }).join('')
+      + '</div></div>';
+    // Bereich-Auswahl
+    const _bereiche2 = this._bereichStore(this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    body += '<div style="padding:10px 0;border-bottom:1px solid var(--c-border);">'
+      + '<div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:6px;">Bereich</div>'
+      + '<select onchange="WB._vhSetBereich(this.value);document.getElementById(&quot;vh-settings-sheet&quot;).remove();WB._vhOpenSettings();"'
+        + ' style="width:100%;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);'
+        + 'font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">'
+      + _bereiche2.map(b => '<option value="' + b.id + '"' + (b.id === v.bereichId ? ' selected' : '') + '>' + this._esc(b.titel) + '</option>').join('')
+      + '</select></div>';
     body += row('Status', ['aktiv','wartend','ruhend'].map(e => pill(e.charAt(0).toUpperCase()+e.slice(1), e, ebene, 'WB._vorhabenSetEbene(&quot;' + e + '&quot;);' + reopen)).join(''));
-    body += row('Charakter', Object.entries(CHAR_LBL).map(([c, lbl]) => pill(lbl, c, charakter, 'WB._vorhabenSetCharakter(&quot;' + c + '&quot;);' + reopen)).join(''));
     body += row('Vertraulich',
       '<button onclick="WB._vhToggleVertraulich();'
       + 'document.getElementById(&quot;vh-settings-sheet&quot;).remove();'
@@ -21677,6 +21741,12 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       (ms.aufgaben||[]).forEach(a => { if (a.naechsterSchritt === undefined) a.naechsterSchritt = false; })
     );
     v._v48migr = true;
+    // BE2: typ ableiten wenn fehlt
+    if (!v.typ) {
+      if (v.charakter === 'baustelle') v.typ = 'projekt';
+      else if (v.charakter === 'pflicht') v.typ = 'pool';
+      else v.typ = 'pool';
+    }
     // BE1: bereichId setzen wenn fehlt
     if (!v.bereichId) {
       const ctx2 = (v.welt === 'pro' || this.activeWorld === 'beruf') ? 'pro' : 'priv';
@@ -21722,6 +21792,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const ebene    = v.aktivitaet || 'aktiv';
     const charakter = v.charakter || 'laufend';
     const cluster  = v.cluster || 'mindset';
+    const typ = v.typ || 'pool';
+    const TYP_ICON = { pool:'🔧', konzept:'💡', thema:'📚', projekt:'📋' };
+    const TYP_LBL  = { pool:'Pool', konzept:'Konzept', thema:'Thema', projekt:'Projekt' };
     const clusterOpts = this.activeWorld === 'beruf' ? ['mindset','beruf'] : ['mindset','koerper','umgebung','beruf'];
     const andereWelt    = v.welt === 'pro' ? 'priv' : 'pro';
     const andereWeltLbl = v.welt === 'pro' ? '→ Privat' : '→ Beruf';
@@ -21774,11 +21847,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
 
     // ── TAB-LEISTE ──
-    h += '<div class="vh-tabs">'
-      + '<button class="vh-tab-btn" data-tab="aktuell" onclick="WB._vhSetTab(&quot;aktuell&quot;)">Aktuell</button>'
-      + '<button class="vh-tab-btn" data-tab="plan" onclick="WB._vhSetTab(&quot;plan&quot;)">Plan</button>'
-      + '<button class="vh-tab-btn" data-tab="ressourcen" onclick="WB._vhSetTab(&quot;ressourcen&quot;)">Ressourcen</button>'
-      + '</div>';
+    // BE2: Tab-Reihenfolge je Typ
+    const _tabOrder = typ === 'thema'
+      ? ['aktuell','ressourcen','plan']
+      : ['aktuell','plan','ressourcen'];
+    const _tabLbl = { aktuell:'Aktuell', plan:'Plan', ressourcen:'Ressourcen' };
+    h += '<div class="vh-tabs">';
+    _tabOrder.forEach(t => {
+      h += '<button class="vh-tab-btn" data-tab="' + t + '"'
+        + ' onclick="WB._vhSetTab(&quot;' + t + '&quot;)">' + _tabLbl[t] + '</button>';
+    });
+    h += '</div>';
 
     h += '<div id="vh-tab-container" style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;">';
     h += '<div id="vh-tab-aktuell" style="padding:12px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;">';
@@ -21842,7 +21921,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (geaendert) { const g = new Date(geaendert); g.setHours(0,0,0,0); const diff = Math.round((today2 - g) / 86400000); zeitRel = diff === 0 ? 'heute' : diff === 1 ? 'gestern' : 'vor ' + diff + ' Tagen'; }
     h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:20px;padding:10px 0;border-top:1px solid var(--c-border);font-size:0.82rem;color:var(--c-muted);">';
     if (v.ziel) { h += '<span style="max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + this._esc(v.ziel) + '">\ud83c\udfaf ' + this._esc(v.ziel.length > 40 ? v.ziel.slice(0,40) + '\u2026' : v.ziel) + '</span><span>\u00b7</span>'; }
-    if (v.stichtag) { h += '<span>\ud83d\udcc5 ' + v.stichtag + '</span><span>\u00b7</span>'; }
+    if (typ === 'projekt' && v.stichtag) { h += '<span>\ud83d\udcc5 ' + v.stichtag + '</span><span>\u00b7</span>'; }
     h += '<span>Aktiv: ' + zeitRel + '</span>';
     if (v.notiz) { h += '<span>\u00b7</span><button onclick="WB._vhSetTab(&quot;plan&quot;)" style="font-size:0.82rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);padding:0;">\ud83d\udcdd Notiz \u2192</button>'; }
     h += '</div>';
@@ -21851,11 +21930,124 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     h += '<div style="text-align:center;padding:8px 0 16px;">'
       + '<button onclick="WB._vhSetTab(&quot;plan&quot;)" style="font-size:0.85rem;color:var(--c-beruf);background:none;border:none;cursor:pointer;font-family:var(--font);">\u2192 Zur Plan-Ansicht</button></div>';
 
+    // BE2: Konzept — Notiz im Aktuell-Tab
+    if (typ === 'konzept') {
+      h += '<div class="vh-aktuell-label" style="margin-top:16px;">Notiz</div>';
+      if (v.notiz) {
+        h += '<div style="background:var(--c-surface);border:1px solid var(--c-border);'
+          + 'border-radius:var(--radius-xs);padding:10px 12px;'
+          + 'font-size:0.85rem;color:var(--c-text);line-height:1.5;'
+          + 'cursor:pointer;" onclick="WB._vhSetTab(&quot;plan&quot;)">'
+          + this._esc(v.notiz.slice(0,200))
+          + (v.notiz.length > 200 ? '…' : '')
+          + '</div>';
+      } else {
+        h += '<div style="font-size:0.85rem;color:var(--c-faint);padding:6px 0;">'
+          + 'Keine Notiz \u2014 '
+          + '<button onclick="WB._vhSetTab(&quot;plan&quot;)"'
+          + ' style="font-size:0.85rem;color:var(--c-beruf);background:none;'
+          + 'border:none;cursor:pointer;font-family:var(--font);">'
+          + 'im Plan-Tab erg\u00e4nzen</button></div>';
+      }
+    }
+    // BE2: Thema — Ressourcen-Vorschau im Aktuell-Tab
+    if (typ === 'thema') {
+      const _ctx3 = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+      const _resV = (this._resStore ? this._resStore(_ctx3)||[] : [])
+        .filter(r => r.vorhabenId === v.id).slice(0, 4);
+      h += '<div class="vh-aktuell-label" style="margin-top:16px;">Ressourcen</div>';
+      if (_resV.length) {
+        h += _resV.map(r =>
+          '<div class="res-row" onclick="WB._resOpen('
+          + JSON.stringify({url:r.url}).replace(/"/g,'&quot;') + ')">'
+          + '<span class="res-icon">' + this._resTypIcon(r.typ) + '</span>'
+          + '<div class="res-body"><div class="res-titel">' + this._esc(r.titel) + '</div>'
+          + '<div class="res-meta">' + (r.tags||[]).map(t => '<span class="res-tag">' + this._esc(t) + '</span>').join('') + '</div>'
+          + '</div></div>'
+        ).join('');
+        h += '<button onclick="WB._vhSetTab(&quot;ressourcen&quot;)"'
+          + ' style="font-size:0.78rem;color:var(--c-beruf);background:none;'
+          + 'border:none;cursor:pointer;font-family:var(--font);padding:4px 0;">'
+          + 'Alle Ressourcen →</button>';
+      } else {
+        h += '<button onclick="WB.resFormOpen({vorhabenId:&quot;' + v.id + '&quot;})"'
+          + ' style="font-size:0.82rem;color:var(--c-beruf);background:none;'
+          + 'border:1px solid var(--c-beruf);border-radius:var(--radius-xs);'
+          + 'padding:5px 12px;cursor:pointer;font-family:var(--font);">'
+          + '+ Erste Ressource verkn\u00fcpfen</button>';
+      }
+    }
     h += '</div>'; // Ende vh-tab-aktuell
 
     // ── PLAN-TAB ───────────────────────────────────────────
     h += '<div id="vh-tab-plan" style="display:none;overflow-y:auto;flex:1;flex-direction:column;">';
 
+    // BE2: Pool/Konzept/Thema → flache Aufgabenliste
+    if (typ !== 'projekt') {
+      const _alleAufg = (v.meilensteine||[]).flatMap(ms =>
+        (ms.aufgaben||[]).map(a => ({...a, msId: ms.id})));
+      const _offen    = _alleAufg.filter(a => !a.done);
+      const _erledigt = _alleAufg.filter(a => a.done);
+      const AE_ICON   = { hoch:'⚡', mittel:'', niedrig:'↓' };
+      h += '<div style="padding:12px 14px;">';
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+        + '<div style="font-size:0.62rem;font-weight:800;text-transform:uppercase;'
+          + 'letter-spacing:0.08em;color:var(--c-beruf);">Aufgaben</div>'
+        + '<div style="display:flex;gap:8px;align-items:center;">'
+          + '<span style="font-size:0.72rem;color:var(--c-faint);">'
+            + _erledigt.length + '/' + _alleAufg.length + ' erledigt</span>'
+          + '<button onclick="WB._vhFlatAddAufgabe()" style="font-size:0.80rem;color:var(--c-beruf);'
+            + 'background:none;border:none;cursor:pointer;font-family:var(--font);">＋ Neu</button>'
+        + '</div></div>';
+      if (!_offen.length) {
+        h += '<div style="font-size:0.82rem;color:var(--c-faint);padding:8px 0;font-style:italic;">Keine offenen Aufgaben</div>';
+      } else {
+        h += '<div style="background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);overflow:hidden;">';
+        h += _offen.map(a => {
+          const ns = this.istNaechsterSchritt(a);
+          return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;'
+            + 'border-bottom:1px solid color-mix(in srgb,var(--c-border) 50%,transparent);cursor:pointer;"'
+            + ' onclick="WB._vhAufgDetail(&quot;' + a.msId + '&quot;,&quot;' + a.id + '&quot;)">'
+            + '<input type="checkbox" style="accent-color:var(--c-beruf);width:15px;height:15px;flex-shrink:0;"'
+              + ' onchange="event.stopPropagation();WB._vhAufgDone(&quot;'
+                + a.msId + '&quot;,&quot;' + a.id + '&quot;,this)">'
+            + (ns ? '<span style="font-size:0.65rem;color:var(--c-beruf);">→</span>' : '')
+            + '<span style="flex:1;font-size:0.88rem;">' + this._esc(a.text) + '</span>'
+            + (a.aktivEnergie && a.aktivEnergie !== 'mittel'
+              ? '<span style="font-size:0.72rem;color:var(--c-faint);">' + (AE_ICON[a.aktivEnergie]||'') + '</span>' : '')
+            + (a.datum ? '<span style="font-size:0.70rem;color:var(--c-faint);font-family:var(--font-mono);">' + a.datum + '</span>' : '')
+            + '</div>';
+        }).join('');
+        h += '</div>';
+      }
+      h += '<div style="display:flex;gap:6px;margin-top:8px;">'
+        + '<input id="vh-flat-neu-input" type="text" placeholder="Neue Aufgabe..."'
+          + ' onkeydown="if(event.key===\'Enter\')WB._vhFlatAddAufgabe()"'
+          + ' style="flex:1;padding:7px 10px;border:1.5px solid var(--c-border);'
+          + 'border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;'
+          + 'background:var(--c-bg);color:var(--c-text);">'
+        + '<button onclick="WB._vhFlatAddAufgabe()" style="padding:7px 14px;'
+          + 'border-radius:var(--radius-xs);background:var(--c-beruf);color:#fff;border:none;'
+          + 'font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;">+</button>'
+        + '</div>';
+      if (_erledigt.length) {
+        const _erlOpen = this._vhBlockOpen['erledigt'];
+        h += '<div style="margin-top:12px;">'
+          + '<button onclick="WB._vhToggleBlock(&quot;erledigt&quot;)" style="font-size:0.72rem;color:var(--c-faint);'
+            + 'background:none;border:none;cursor:pointer;font-family:var(--font);padding:4px 0;">'
+            + (_erlOpen ? '▾' : '▸') + ' ' + _erledigt.length + ' erledigt</button>';
+        if (_erlOpen) {
+          h += '<div style="opacity:0.5;">' + _erledigt.slice(0,10).map(a =>
+            '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.82rem;'
+            + 'text-decoration:line-through;color:var(--c-faint);">'
+            + '<span>✓</span><span>' + this._esc(a.text) + '</span></div>'
+          ).join('') + '</div>';
+        }
+        h += '</div>';
+      }
+      h += '</div>'; // /padding
+    } // END non-projekt
+    if (typ === 'projekt') { // MEILENSTEIN-BLOCK BEGIN
     // ── MEILENSTEINE ───────────────────────────────────────
     const meilensteine = v.meilensteine || [];
     meilensteine.forEach((ms, mi) => {
@@ -21970,6 +22162,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
     h += '</div>';
 
+    } // END if (typ === 'projekt')
     h += '</div>'; // Ende vh-tab-plan
 
     // Ressourcen-Tab (leer, wird von _vhRenderRessourcen befüllt)
