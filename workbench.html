@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.33.1</title>
+<title>WorkBench 5.33.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7447,7 +7447,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.33.1</div>
+  <div class="wb-startup-tagline">v5.33.2</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -9071,7 +9071,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.33.1 · Build 20260612-0345</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.33.2 · Build 20260612-0400</div>
     </div>
 
     <!-- Welt -->
@@ -9256,8 +9256,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.33.1',
-  APP_BUILD:   '20260612-0345',
+  APP_VERSION: '5.33.2',
+  APP_BUILD:   '20260612-0400',
 
 
   // ══════════════════════════════════════════════════════
@@ -17772,6 +17772,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _panelBuildVorhabenListe() {
+    try { this._bereichEnsureDefaults(); } catch(e) {}
     const ctx     = this.activeWorld === 'beruf' ? 'pro' : 'priv';
     const store   = this._vorhabenStore() || [];
     const bereiche = this._bereichSortiert(ctx);
@@ -21440,9 +21441,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _vorhabenClusterOpen: { mindset: true, koerper: false, umgebung: false, fachlich: true, entwicklung: false, fuehrung: false, organisation: false },
 
-  _vorhabenClusterToggle(clusterId) {
-    this._vorhabenClusterOpen[clusterId] = !this._vorhabenClusterOpen[clusterId];
-    // State in Settings persistieren
+  _vorhabenClusterToggle(id) {
+    // Neue Bereiche (be_xxx) sind standardmäßig offen (undefined !== false → true)
+    this._vorhabenClusterOpen[id] = !(this._vorhabenClusterOpen[id] !== false);
     if (!this._settings) this._settings = {};
     this._settings.clusterOpen = { ...this._vorhabenClusterOpen };
     this.saveSetting('clusterOpen', this._settings.clusterOpen);
@@ -21774,6 +21775,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   vorhabenNeuSheet() {
+    try { this._bereichEnsureDefaults(); } catch(e) {}
     const ctx      = this.activeWorld === 'beruf' ? 'pro' : 'priv';
     const bereiche = this._bereichSortiert(ctx);
     const preselBe = this._vorhabenNeuBereichId || null;
@@ -21962,10 +21964,11 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
     // BE1: bereichId setzen wenn fehlt
     if (!v.bereichId) {
+      try { this._bereichEnsureDefaults(); } catch(e) {}
       const ctx2 = (v.welt === 'pro' || this.activeWorld === 'beruf') ? 'pro' : 'priv';
       const bereiche2 = this._bereichStore(ctx2) || [];
-      const sonstiges2 = bereiche2.find(b => b.titel === 'Sonstiges');
-      v.bereichId = sonstiges2?.id || bereiche2[0]?.id || null;
+      const sonstiges2 = bereiche2.find(b => b.titel === 'Sonstiges' || b.titel === 'sonstiges');
+      v.bereichId = sonstiges2?.id || bereiche2[bereiche2.length-1]?.id || null;
     }
     this.setDirty();
   },
@@ -33609,6 +33612,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (clientInput) clientInput.value = this._oauthClientId || '';
     this._oauthUpdateUI();
     this._ritualUpdateSettingStatus();
+    try { this._bereichSettingsRender(); } catch(e) {}
     document.getElementById('wb-settings-overlay').classList.add('open');
   },
 
