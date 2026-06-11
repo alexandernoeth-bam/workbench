@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.26.2</title>
+<title>WorkBench 5.27.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -348,6 +348,17 @@ body.layout-zwei-spalten [style*="z-index: 600"] {
 }
 .wb-tab:active svg { transform: scale(0.88); }
 .wb-tab.active { color: var(--c-beruf); }
+.wb-tab-badge {
+  position: absolute;
+  top: 4px; right: calc(50% - 18px);
+  min-width: 16px; height: 16px;
+  background: #C0392B; color: #fff;
+  font-size: 0.60rem; font-weight: 700;
+  border-radius: 8px; padding: 0 4px;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1; pointer-events: none;
+  border: 1.5px solid var(--c-bg);
+}
   .wb-tab:not(.active) { color: #5A5855; }
 .wb-tab.active svg { stroke: var(--c-beruf); }
 
@@ -7280,7 +7291,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.26.2</div>
+  <div class="wb-startup-tagline">v5.27.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7469,7 +7480,6 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
   <!-- Aktions-Leiste -->
   <div id="ck-aktions-leiste">
     <button onclick="WB._quickDetail(null)">+ Neu</button>
-    <button onclick="WB.qcOpen()" >+ Notiz</button>
     <button onclick="WB.fokusOpen()" style="margin-left:auto;">⏱ Timer</button>
   </div>
 
@@ -7537,6 +7547,13 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
     <section class="wb-section" id="sec-ziele" aria-label="Ziele">
     </section>
 
+  <section class="wb-section" id="sec-eingang"
+    aria-label="Eingang" style="display:none;">
+    <div id="sec-eingang-body"
+      style="height:100%;overflow-y:auto;padding:12px;">
+    </div>
+  </section>
+
   <div id="wb-right-panel">
     <div id="wb-right-panel-header" style="display:none;">
       <button id="wb-right-back-btn" onclick="WB._rightPanelBack()">← Zurück</button>
@@ -7602,6 +7619,22 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
         <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
       </svg>
       Cockpit
+    </button>
+
+    <button class="wb-tab" role="tab" aria-selected="false"
+      aria-controls="sec-eingang"
+      onclick="WB.switchTab('eingang', this)"
+      data-label="Eingang" id="tab-eingang"
+      style="position:relative;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="1.8" stroke-linecap="round"
+        stroke-linejoin="round" aria-hidden="true">
+        <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
+        <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+      </svg>
+      <span id="wb-eingang-badge" class="wb-tab-badge"
+        style="display:none;">0</span>
+      Eingang
     </button>
 
     <button class="wb-tab" role="tab" aria-selected="false" aria-controls="sec-vorhaben-dummy"
@@ -8863,7 +8896,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.26.2 · Build 20260611-2105</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.27.0 · Build 20260611-2130</div>
     </div>
 
     <!-- Welt -->
@@ -9048,8 +9081,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.26.2',
-  APP_BUILD:   '20260611-2105',
+  APP_VERSION: '5.27.0',
+  APP_BUILD:   '20260611-2130',
 
 
   // ══════════════════════════════════════════════════════
@@ -19297,6 +19330,94 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   // Welt setzen + Checklisten-Tab öffnen
   // Welt setzen + Checklisten-Tab öffnen
   // ── Tages-Quicklist (v3.61.0) ──────────────────────
+  _eingangRender() {
+    const el = document.getElementById('sec-eingang-body');
+    if (!el) return;
+    const today = new Date().toISOString().split('T')[0];
+    const items = [];
+    // quickItems direkt aus beiden DBs lesen (weltunabhängig)
+    [[this.dataPriv,'priv'],[this.dataPro,'pro']].forEach(([db,welt]) => {
+      if (!db) return;
+      if (!db.quickItems) db.quickItems = [];
+      db.quickItems.filter(q => !q.done)
+        .forEach(q => items.push({ ...q, _welt: welt }));
+    });
+    if (!items.length) {
+      el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--c-faint);font-size:0.88rem;">\u2713 Eingang leer</div>';
+      return;
+    }
+    const ueberfaellig = items.filter(q => q.date && q.date < today);
+    const heute        = items.filter(q => q.date === today);
+    const geplant      = items.filter(q => q.date && q.date > today);
+    const offen        = items.filter(q => !q.date);
+    const renderGroup  = (label, groupItems) => {
+      if (!groupItems.length) return '';
+      return '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;'
+        + 'letter-spacing:0.07em;color:var(--c-faint);padding:8px 4px 4px;">'
+        + label + '</div>'
+        + groupItems.map(q => {
+            const wc = q._welt === 'pro' ? 'var(--c-beruf)' : 'var(--c-privat)';
+            const wl = q._welt === 'pro' ? 'Beruf' : 'Privat';
+            return '<div onclick="WB._quickDetail(&quot;' + q.id + '&quot;)"'
+              + ' style="display:flex;align-items:center;gap:10px;'
+              + 'padding:9px 12px;background:var(--c-surface);'
+              + 'border:1px solid var(--c-border);'
+              + 'border-left:3px solid ' + wc + ';'
+              + 'border-radius:var(--radius-xs);margin-bottom:5px;cursor:pointer;">'
+              + '<input type="checkbox" style="width:16px;height:16px;'
+                + 'accent-color:var(--c-beruf);flex-shrink:0;"'
+                + ' onchange="event.stopPropagation();'
+                + 'WB._eingangCheck(&quot;' + q.id + '&quot;,&quot;' + q._welt + '&quot;,this)">'
+              + '<div style="flex:1;min-width:0;">'
+                + '<div style="font-size:0.90rem;color:var(--c-text);'
+                  + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+                  + this._esc(q.text||q.title||'') + '</div>'
+                + '<div style="font-size:0.70rem;color:var(--c-faint);margin-top:2px;display:flex;gap:6px;">'
+                  + '<span style="color:' + wc + ';font-weight:600;">' + wl + '</span>'
+                  + (q.date ? '<span>' + q.date + '</span>' : '')
+                  + (q.time ? '<span>' + q.time + '</span>' : '')
+                + '</div>'
+              + '</div>'
+            + '</div>';
+          }).join('');
+    };
+    el.innerHTML =
+      renderGroup('\u00dcberf\u00e4llig', ueberfaellig) +
+      renderGroup('Heute', heute) +
+      renderGroup('Geplant', geplant) +
+      renderGroup('Offen', offen);
+  },
+
+  _eingangCheck(id, welt, chk) {
+    const db    = welt === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db?.quickItems) return;
+    const q = db.quickItems.find(x => x.id === id);
+    if (q) {
+      q.done = chk.checked;
+      this.setDirty();
+      setTimeout(() => {
+        this._eingangRender();
+        this._eingangUpdateBadge();
+      }, 400);
+    }
+  },
+
+  _eingangUpdateBadge() {
+    const badge = document.getElementById('wb-eingang-badge');
+    if (!badge) return;
+    let count = 0;
+    [[this.dataPriv],[this.dataPro]].forEach(([db]) => {
+      if (!db?.quickItems) return;
+      count += db.quickItems.filter(q => !q.done).length;
+    });
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  },
+
   _quickStore() {
     const db = this.activeWorld === 'beruf' ? this.dataPro : this.dataPriv;
     if (!db) return null;
@@ -22944,6 +23065,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this.wzClose();
     this._toast('✓ Tagesplan gespeichert');
     this.renderCockpit();
+    try { this._eingangUpdateBadge(); } catch(e) {}
   },
 
   async init() {
@@ -23209,6 +23331,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     } catch(e) {}
     // UI3: Gespeicherte Darstellung anwenden
     this._uiApplyTheme();
+    setTimeout(() => { try { this._eingangUpdateBadge(); } catch(e) {} }, 1200);
     window.addEventListener('resize', () => {
       const war = document.body.classList.contains('layout-zwei-spalten');
       const ist  = this._uiIsZweiSpalten();
@@ -33564,6 +33687,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   switchTab(id, btn) {
     // Zwei-Spalten-Modus: Tab-Inhalt im rechten Panel
+    if (id === 'eingang') {
+      this._eingangRender();
+      this._eingangUpdateBadge();
+    }
     if (this._uiIsZweiSpalten() && id !== 'cockpit') {
       document.querySelectorAll('.wb-tab').forEach(t => {
         const isThis = t === btn || t?.getAttribute('aria-controls') === 'sec-' + id;
@@ -33627,6 +33754,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _renderSection(id) {
+    if(id === 'eingang')      this._eingangRender();
     if(id === 'cockpit')      this.renderCockpit();
     if(id === 'heute')        this.renderCockpit();
     if(id === 'notizen')      this.renderNotizen();
