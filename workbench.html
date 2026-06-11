@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.33.2</title>
+<title>WorkBench 5.33.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7447,7 +7447,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.33.2</div>
+  <div class="wb-startup-tagline">v5.33.3</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -9071,7 +9071,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.33.2 · Build 20260612-0400</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.33.3 · Build 20260612-0415</div>
     </div>
 
     <!-- Welt -->
@@ -9256,8 +9256,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.33.2',
-  APP_BUILD:   '20260612-0400',
+  APP_VERSION: '5.33.3',
+  APP_BUILD:   '20260612-0415',
 
 
   // ══════════════════════════════════════════════════════
@@ -21278,6 +21278,51 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this._migrationRender();
   },
 
+  _bereichDragCtx: null,
+  _bereichDragId:  null,
+
+  _bereichDragStart(e, id, ctx) {
+    this._bereichDragCtx = ctx;
+    this._bereichDragId  = id;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+    e.currentTarget.style.opacity = '0.4';
+  },
+
+  _bereichDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    e.currentTarget.style.borderTop = '2px solid var(--c-beruf)';
+  },
+
+  _bereichDragEnd(e) {
+    e.currentTarget.style.opacity = '';
+    e.currentTarget.style.borderTop = '';
+    document.querySelectorAll('#s-bereiche-pro > div, #s-bereiche-priv > div')
+      .forEach(el => { el.style.borderTop = ''; el.style.opacity = ''; });
+  },
+
+  _bereichDrop(e, targetId, ctx) {
+    e.preventDefault();
+    e.currentTarget.style.borderTop = '';
+    const dragId  = this._bereichDragId;
+    const dragCtx = this._bereichDragCtx;
+    if (!dragId || dragId === targetId || dragCtx !== ctx) return;
+    const store    = this._bereichStore(ctx);
+    const fromIdx  = store.findIndex(b => b.id === dragId);
+    const toIdx    = store.findIndex(b => b.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const [moved] = store.splice(fromIdx, 1);
+    store.splice(toIdx, 0, moved);
+    store.forEach((b, i) => b.reihenfolge = i);
+    this._bereichDragId  = null;
+    this._bereichDragCtx = null;
+    this.setDirty();
+    this._bereichSettingsRender();
+    this._vorhabenListeRender();
+    this._toast('\u2713 Reihenfolge gespeichert');
+  },
+
   _bereichSettingsRender() {
     const container = document.getElementById('s-bereiche-container');
     if (!container) return;
@@ -21286,13 +21331,19 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       if (!el) return;
       const bereiche = this._bereichSortiert(ctx);
       el.innerHTML = bereiche.map((b, i) =>
-        '<div style="display:flex;align-items:center;gap:8px;'
-          + 'padding:8px 0;border-bottom:1px solid var(--c-border);">'
-          + '<span style="font-size:0.80rem;color:var(--c-faint);cursor:grab;">☰</span>'
+        '<div draggable="true"'
+          + ' ondragstart="WB._bereichDragStart(event,&quot;' + b.id + '&quot;,&quot;' + ctx + '&quot;)"'
+          + ' ondragover="WB._bereichDragOver(event)"'
+          + ' ondrop="WB._bereichDrop(event,&quot;' + b.id + '&quot;,&quot;' + ctx + '&quot;)"'
+          + ' ondragend="WB._bereichDragEnd(event)"'
+          + ' style="display:flex;align-items:center;gap:8px;'
+            + 'padding:8px 0;border-bottom:1px solid var(--c-border);'
+            + 'cursor:default;transition:opacity 0.15s;">'
+          + '<span style="font-size:0.80rem;color:var(--c-faint);cursor:grab;touch-action:none;">⠇</span>'
           + '<span style="flex:1;font-size:0.88rem;font-weight:600;">'
             + this._esc(b.titel) + '</span>'
           + '<button onclick="WB._bereichEdit(&quot;' + b.id + '&quot;,&quot;' + ctx + '&quot;)"'
-            + ' style="font-size:0.75rem;color:var(--c-muted);background:none;border:none;cursor:pointer;">✎</button>'
+            + ' style="font-size:0.75rem;color:var(--c-muted);background:none;border:none;cursor:pointer;padding:2px 6px;">✎</button>'
         + '</div>'
       ).join('')
       + '<div style="padding:8px 0;">'
@@ -21534,6 +21585,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     v.typ = typ; v.geaendert = Date.now(); this.setDirty();
     this._vorhabenDetailRender();
     this._vorhabenListeRender();
+    this._toast('Typ: ' + typ);
   },
 
   _vhSetBereich(bereichId) {
@@ -21990,13 +22042,23 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     this._vhMigrateV47(v);
 
-    // BE1: Bereich-Breadcrumb im Header anzeigen
+    // BE1+BE-Fix3: Bereich-Breadcrumb + Typ im Header
     {
-      const _ctx2   = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-      const _bers   = this._bereichStore(_ctx2) || [];
-      const _ber    = _bers.find(b => b.id === v.bereichId);
-      const _titEl  = document.getElementById('wb-vorhaben-detail-titel');
+      const _ctx2    = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+      const _bers    = this._bereichStore(_ctx2) || [];
+      const _ber     = _bers.find(b => b.id === v.bereichId);
+      const _titEl   = document.getElementById('wb-vorhaben-detail-titel');
       if (_titEl) _titEl.textContent = _ber?.titel || v.titel || 'Vorhaben';
+      // Typ als Untertitel
+      const _typLbl  = {pool:'Pool',konzept:'Konzept',thema:'Thema',projekt:'Projekt'}[v.typ||'pool']||'';
+      let _subtitEl  = document.getElementById('wb-vorhaben-detail-sub');
+      if (!_subtitEl) {
+        _subtitEl = document.createElement('span');
+        _subtitEl.id = 'wb-vorhaben-detail-sub';
+        _subtitEl.style.cssText = 'font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-left:6px;flex-shrink:0;';
+        if (_titEl) _titEl.parentElement?.insertBefore(_subtitEl, _titEl.nextSibling);
+      }
+      if (_subtitEl) _subtitEl.textContent = _typLbl;
     }
 
     if (this._settings?.vhBlockOpen) Object.assign(this._vhBlockOpen, this._settings.vhBlockOpen);
