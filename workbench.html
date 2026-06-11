@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.23.0</title>
+<title>WorkBench 5.23.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7181,7 +7181,7 @@ body.layout-zwei-spalten #woche-fab {
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.23.0</div>
+  <div class="wb-startup-tagline">v5.23.2</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8760,7 +8760,7 @@ body.layout-zwei-spalten #woche-fab {
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.23.0 · Build 20260611-0800</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.23.2 · Build 20260611-1000</div>
     </div>
 
     <!-- Welt -->
@@ -8945,8 +8945,8 @@ body.layout-zwei-spalten #woche-fab {
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.23.0',
-  APP_BUILD:   '20260611-0800',
+  APP_VERSION: '5.23.2',
+  APP_BUILD:   '20260611-1000',
 
 
   // ══════════════════════════════════════════════════════
@@ -10211,28 +10211,77 @@ const WB = {
     }
 
     // 5. Alle Termine heute — X Min vorher
+    // Alle Events liegen in dataPriv.customEvents (_evStore)
     const pTMin = t => { const [h,m]=(t||'0:0').split(':').map(Number); return h*60+m; };
-    const minBefore = s.notifMeetingMin ?? 5;
-    [this.dataPro, this.dataPriv].forEach(dbx => {
-      if (!dbx) return;
-      (dbx.customEvents || [])
-        .filter(e => e.date === today && e.startTime)
-        .forEach(e => {
-          const startMin = pTMin(e.startTime);
-          const notifMin = startMin - minBefore;
-          if (notifMin > nowMin) {
-            const diffMs = (notifMin - nowMin) * 60000;
-            const id = setTimeout(() => {
-              this._notifSend(
-                'Termin in ' + minBefore + ' Min',
-                '"' + e.text + '" um ' + e.startTime + ' Uhr',
-                '📅'
-              );
-            }, diffMs);
-            this._notifTimers.push(id);
-          }
+    const minBefore = parseInt(s.notifTerminVorlauf) || 15;
+    (this._evStore() || [])
+      .filter(e => e.date === today && e.startTime && !e.done && !e.notifAus)
+      .forEach(e => {
+        const startMin = pTMin(e.startTime);
+        const notifMin = startMin - minBefore;
+        if (notifMin > nowMin) {
+          const diffMs = (notifMin - nowMin) * 60000;
+          const id = setTimeout(() => {
+            this._notifSend(
+              '📅 Termin in ' + minBefore + ' Min',
+              '"' + e.text + '" um ' + e.startTime + ' Uhr',
+              '📅'
+            );
+          }, diffMs);
+          this._notifTimers.push(id);
+        }
+      });
+
+    // 6. Wochenpflichten heute
+    if (s.notifPflicht !== false) {
+      ['pro','priv'].forEach(ctx => {
+        (this._dutyStore(ctx)||[]).filter(d => d.startTime && !d.notifAus).forEach(d => {
+          try {
+            const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
+            const ti = insts.find(i => i.isToday);
+            if (!ti || ti.done) return;
+            const notifMin = pTMin(d.startTime);
+            if (notifMin > nowMin) {
+              const id = setTimeout(() => {
+                this._notifSend('✅ ' + (d.title||d.name||'Pflicht'), 'Jetzt fällig', '✅');
+              }, (notifMin - nowMin) * 60000);
+              this._notifTimers.push(id);
+            }
+          } catch(e) {}
         });
-    });
+      });
+    }
+
+    // 7. Triage-Erinnerung
+    if (s.notifTriage !== false) {
+      const rs = this._ritualStore(), rk = this._ritualTodayKey();
+      const ritual = rs?.[rk];
+      if (ritual?.doneA && !ritual?.doneB) {
+        const triageH = (dow >= 1 && dow <= 5) ? 7 : 8;
+        const triageMin = triageH * 60;
+        if (triageMin > nowMin) {
+          const id = setTimeout(() => {
+            this._notifSend('💼 Tages-Triage', 'Dein Tag wartet auf Planung', '💼');
+          }, (triageMin - nowMin) * 60000);
+          this._notifTimers.push(id);
+        }
+      }
+    }
+
+    // 8. Feierabend-Check
+    if (s.notifFeierabend !== false) {
+      const feZ = s.privAfterWorkStart || '16:00';
+      const rs = this._ritualStore(), rk = this._ritualTodayKey();
+      if (!rs?.[rk]?.feierabend?.done) {
+        const feMin = pTMin(feZ);
+        if (feMin > nowMin) {
+          const id = setTimeout(() => {
+            this._notifSend('🏁 Feierabend-Check', 'Zeit für den Tagesabschluss', '🏁');
+          }, (feMin - nowMin) * 60000);
+          this._notifTimers.push(id);
+        }
+      }
+    }
 
     console.log(`[Notif] ${this._notifTimers.length} Notifications geplant`);
   },
@@ -12347,6 +12396,16 @@ const WB = {
       ];
       store[key].fokus = alle;
     }
+    // Datum der gewählten Aufgaben auf heute setzen
+    const todayStr = new Date().toISOString().split('T')[0];
+    this._triageSelected.forEach(s => {
+      if (s.id) {
+        try {
+          const hit = this._vorhabenFindAufgabe(s.id);
+          if (hit) { hit.aufgabe.datum = todayStr; hit.vorhaben.geaendert = Date.now(); }
+        } catch(e) {}
+      }
+    });
     this.setDirty();
     this.triageClose();
     this.renderCockpit();
@@ -17677,13 +17736,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const nowMin = this._ckNowMin || 0;
     const isPast = isToday && zoneInfo && nowMin > (zoneInfo.to || 0);
 
+    // Fokus-Aufgaben in dieser Zone? → Zone nicht auto-collapsieren
+    const hasFokus = items.some(i => i.type === 'fokus');
+
     // Collapsed-State bestimmen:
     // 1. Manuell gesetzt (_ckZoneCollapsed) → gewinnt immer
-    // 2. Sonst: vergangene Zone → collapsed; Mittag/Feierabend leer → collapsed; sonst offen
+    // 2. Vergangene Zone MIT Fokus → offen lassen
+    // 3. Vergangene Zone ohne Fokus → collapsed
     let collapsed;
     if (this._ckZoneCollapsed[zoneId] !== undefined) {
       collapsed = this._ckZoneCollapsed[zoneId];
-    } else if (isPast) {
+    } else if (isPast && !hasFokus) {
       collapsed = true;
     } else if (isTransition && !items.length) {
       collapsed = true;
