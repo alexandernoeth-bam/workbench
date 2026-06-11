@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.25.9</title>
+<title>WorkBench 5.26.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6407,6 +6407,7 @@ body.layout-zwei-spalten #woche-fab {
 
 /* Fokus-Modus (FT1) */
 /* ── Fokus-Modus ─────────────────────────────── */
+/* Timer: fixed linke Spalte */
 body.fokus-modus #wb-fokus-overlay {
   position: fixed !important;
   left: 0; top: 0; bottom: 0;
@@ -6420,32 +6421,42 @@ body.fokus-modus #fokus-timer-screen {
   flex: 1; display: flex !important; flex-direction: column;
   align-items: stretch; overflow: hidden; min-height: 0;
 }
-body.fokus-modus #wb-header           { display: none !important; }
-body.fokus-modus #wb-tabbar           { display: none !important; }
+/* App: Header weg, Content nach rechts */
+body.fokus-modus #wb-header  { display: none !important; }
+body.fokus-modus #wb-tabbar  { display: none !important; }
 body.fokus-modus #wb-content {
   margin-left: 380px !important;
-  display: flex !important;
-  flex-direction: column !important;
+  display: block !important;
   grid-template-columns: unset !important;
+  overflow: hidden;
+  height: 100%;
 }
+/* Sektionen: alle ausblenden außer wb-right-panel */
+body.fokus-modus .wb-section { display: none !important; }
+/* Rechtes Panel: voll sichtbar und volle Höhe */
 body.fokus-modus #wb-right-panel {
-  display: flex !important; flex-direction: column;
-  flex: 1; overflow: hidden;
+  display: flex !important; flex-direction: column !important;
+  height: 100% !important; overflow: hidden !important;
+  background: var(--c-bg);
 }
 body.fokus-modus #wb-right-panel-body {
-  display: flex !important; flex-direction: column;
-  flex: 1; overflow: hidden;
+  flex: 1 !important; display: flex !important;
+  flex-direction: column !important; overflow: hidden !important;
+  min-height: 0 !important;
 }
-body.fokus-modus #wb-panel-oben    { flex: 1 !important; min-height: 0; overflow-y: auto; }
+body.fokus-modus #wb-panel-oben {
+  flex: 1 !important; min-height: 0 !important; overflow-y: auto !important;
+}
 body.fokus-modus #wb-panel-unten   { display: none !important; }
 body.fokus-modus #wb-panel-divider { display: none !important; }
+/* Cockpit-Elemente ausblenden */
 body.fokus-modus #ck-aktions-leiste { display: none !important; }
-body.fokus-modus #ck-tag-header    { display: none !important; }
+body.fokus-modus #ck-tag-header     { display: none !important; }
 body.fokus-modus #ck-reminder-chips { display: none !important; }
-body.fokus-modus #ck-triage-banner { display: none !important; }
+body.fokus-modus #ck-triage-banner  { display: none !important; }
 body.fokus-modus #ck-feierabend-btn { display: none !important; }
-body.fokus-modus #ck-scroll-body   { display: none !important; }
-body.fokus-modus #ck-smart-toggle  { display: none !important; }
+body.fokus-modus #ck-scroll-body    { display: none !important; }
+body.fokus-modus #ck-smart-toggle   { display: none !important; }
 #fokus-vorhaben-label {
   display: none; font-size: 0.82rem; color: var(--c-muted);
   text-align: center; padding: 0 16px 8px;
@@ -7266,7 +7277,7 @@ body.fokus-modus #ck-smart-toggle  { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.25.9</div>
+  <div class="wb-startup-tagline">v5.26.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8849,7 +8860,7 @@ body.fokus-modus #ck-smart-toggle  { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.25.9 · Build 20260611-2030</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.26.0 · Build 20260611-2045</div>
     </div>
 
     <!-- Welt -->
@@ -9034,8 +9045,8 @@ body.fokus-modus #ck-smart-toggle  { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.25.9',
-  APP_BUILD:   '20260611-2030',
+  APP_VERSION: '5.26.0',
+  APP_BUILD:   '20260611-2045',
 
 
   // ══════════════════════════════════════════════════════
@@ -12199,6 +12210,11 @@ const WB = {
         this._panelOben  = this._panelObenOrig;
         this._panelUnten = this._panelUntenOrig;
         this._panelSplit = this._panelSplitOrig;
+        // inline styles zurücksetzen
+        const pO = document.getElementById('wb-panel-oben');
+        const pU = document.getElementById('wb-panel-unten');
+        if (pO) pO.style.flex = '';
+        if (pU) pU.style.display = '';
         this._uiApplyLayout();
         this._panelObenOrig  = null;
         this._panelUntenOrig = null;
@@ -15045,6 +15061,11 @@ const WB = {
       this._panelSplitOrig   = this._panelSplit;
       this._panelOben = 'vorhaben';
       this._panelRenderSektion('oben', 'vorhaben');
+      // inline flex:50% überschreiben damit Panel voll sichtbar
+      const pO = document.getElementById('wb-panel-oben');
+      if (pO) pO.style.flex = '1';
+      const pU = document.getElementById('wb-panel-unten');
+      if (pU) pU.style.display = 'none';
       setTimeout(() => {
         try { this._panelOpenVorhaben(this._fokusVorhabenId); } catch(e) {}
       }, 150);
