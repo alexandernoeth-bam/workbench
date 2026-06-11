@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.28.0</title>
+<title>WorkBench 5.28.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7340,7 +7340,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.28.0</div>
+  <div class="wb-startup-tagline">v5.28.1</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8945,7 +8945,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.28.0 · Build 20260611-2300</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.28.1 · Build 20260611-2315</div>
     </div>
 
     <!-- Welt -->
@@ -9130,8 +9130,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.28.0',
-  APP_BUILD:   '20260611-2300',
+  APP_VERSION: '5.28.1',
+  APP_BUILD:   '20260611-2315',
 
 
   // ══════════════════════════════════════════════════════
@@ -17947,12 +17947,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (this._ckDate && this._ckDate !== today) { el.style.display = 'none'; return; }
     const pT = s => { if (!s) return -1; const [h,m] = s.split(':').map(Number); return h*60+m; };
     const candidates = [];
-    [this.dataPro, this.dataPriv].forEach(db => {
-      if (!db) return;
-      (db.customEvents||[]).filter(e => e.date===today && e.startTime && !e.done).forEach(e => {
-        const min = pT(e.startTime);
-        if (min > nowMin) candidates.push({ title: e.text, min, zeit: e.startTime });
-      });
+    // Alle Termine aus _evStore() (alle in dataPriv seit Migration)
+    (this._evStore()||[]).filter(e => e.date===today && e.startTime && !e.done).forEach(e => {
+      const min = pT(e.startTime);
+      if (min > nowMin) candidates.push({ title: e.text, min, zeit: e.startTime, icon: '📅' });
     });
     (this._vorhabenAlle ? this._vorhabenAlle() : []).forEach(v => {
       (v.meilensteine||[]).forEach(ms => {
@@ -17974,9 +17972,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         } catch(e) {}
       });
     });
-    (this._quickStore()||[]).filter(q => q.date===today && q.time && !q.done).forEach(q => {
-      const min = pT(q.time);
-      if (min > nowMin) candidates.push({ title: q.text||q.title||'', min, zeit: q.time });
+    // Schnellerinnerungen beider Welten
+    [[this.dataPriv],[this.dataPro]].forEach(([db]) => {
+      if (!db?.quickItems) return;
+      db.quickItems.filter(q => q.date===today && q.time && !q.done).forEach(q => {
+        const min = pT(q.time);
+        if (min > nowMin) candidates.push({ title: q.text||q.title||'', min, zeit: q.time });
+      });
     });
     if (!candidates.length) { el.style.display = 'none'; return; }
     candidates.sort((a,b) => a.min - b.min);
