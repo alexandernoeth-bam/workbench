@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.26.0</title>
+<title>WorkBench 5.26.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6421,23 +6421,24 @@ body.fokus-modus #fokus-timer-screen {
   flex: 1; display: flex !important; flex-direction: column;
   align-items: stretch; overflow: hidden; min-height: 0;
 }
-/* App: Header weg, Content nach rechts */
+/* App-Shell */
 body.fokus-modus #wb-header  { display: none !important; }
 body.fokus-modus #wb-tabbar  { display: none !important; }
 body.fokus-modus #wb-content {
   margin-left: 380px !important;
-  display: block !important;
+  display: flex !important;
+  flex-direction: column !important;
   grid-template-columns: unset !important;
-  overflow: hidden;
-  height: 100%;
+  overflow: hidden !important;
+  height: calc(100vh - 0px) !important;
 }
-/* Sektionen: alle ausblenden außer wb-right-panel */
-body.fokus-modus .wb-section { display: none !important; }
-/* Rechtes Panel: voll sichtbar und volle Höhe */
+/* Alle Sektionen ausblenden */
+body.fokus-modus .wb-section  { display: none !important; }
+/* Rechtes Panel: erstes Kind → volle Fläche */
 body.fokus-modus #wb-right-panel {
   display: flex !important; flex-direction: column !important;
-  height: 100% !important; overflow: hidden !important;
-  background: var(--c-bg);
+  flex: 1 !important; overflow: hidden !important;
+  min-height: 0 !important;
 }
 body.fokus-modus #wb-right-panel-body {
   flex: 1 !important; display: flex !important;
@@ -6445,7 +6446,8 @@ body.fokus-modus #wb-right-panel-body {
   min-height: 0 !important;
 }
 body.fokus-modus #wb-panel-oben {
-  flex: 1 !important; min-height: 0 !important; overflow-y: auto !important;
+  flex: 1 !important; overflow-y: auto !important;
+  min-height: 0 !important;
 }
 body.fokus-modus #wb-panel-unten   { display: none !important; }
 body.fokus-modus #wb-panel-divider { display: none !important; }
@@ -7277,7 +7279,7 @@ body.fokus-modus #ck-smart-toggle   { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.26.0</div>
+  <div class="wb-startup-tagline">v5.26.1</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8860,7 +8862,7 @@ body.fokus-modus #ck-smart-toggle   { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.26.0 · Build 20260611-2045</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.26.1 · Build 20260611-2100</div>
     </div>
 
     <!-- Welt -->
@@ -9045,8 +9047,8 @@ body.fokus-modus #ck-smart-toggle   { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.26.0',
-  APP_BUILD:   '20260611-2045',
+  APP_VERSION: '5.26.1',
+  APP_BUILD:   '20260611-2100',
 
 
   // ══════════════════════════════════════════════════════
@@ -12210,6 +12212,10 @@ const WB = {
         this._panelOben  = this._panelObenOrig;
         this._panelUnten = this._panelUntenOrig;
         this._panelSplit = this._panelSplitOrig;
+        // wb-right-panel zurück an Ende
+        const wbContent2 = document.getElementById('wb-content');
+        const wbRight2   = document.getElementById('wb-right-panel');
+        if (wbContent2 && wbRight2) wbContent2.append(wbRight2);
         // inline styles zurücksetzen
         const pO = document.getElementById('wb-panel-oben');
         const pU = document.getElementById('wb-panel-unten');
@@ -15061,7 +15067,11 @@ const WB = {
       this._panelSplitOrig   = this._panelSplit;
       this._panelOben = 'vorhaben';
       this._panelRenderSektion('oben', 'vorhaben');
-      // inline flex:50% überschreiben damit Panel voll sichtbar
+      // wb-right-panel an Anfang von wb-content setzen
+      const wbContent = document.getElementById('wb-content');
+      const wbRight   = document.getElementById('wb-right-panel');
+      if (wbContent && wbRight) wbContent.prepend(wbRight);
+      // inline styles
       const pO = document.getElementById('wb-panel-oben');
       if (pO) pO.style.flex = '1';
       const pU = document.getElementById('wb-panel-unten');
