@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.24.7</title>
+<title>WorkBench 5.25.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7241,7 +7241,7 @@ body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.24.7</div>
+  <div class="wb-startup-tagline">v5.25.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7667,6 +7667,10 @@ body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
     <input id="cl-vorlage-name" type="text" placeholder="Name der Vorlage..."
       style="flex:1;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;font-weight:600;background:var(--c-bg);color:var(--c-text);outline:none;">
     <button onclick="WB.clVorlageSave()" style="padding:8px 16px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;">Speichern</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--c-border);background:var(--c-surface);">
+    <label style="font-size:0.82rem;color:var(--c-muted);flex:1;">Prozessvorlage (im Fokus-Timer verfügbar)</label>
+    <label class="wbs-toggle"><input type="checkbox" id="cl-vorlage-prozess"><span class="wbs-toggle-slider"></span></label>
   </div>
   <div id="cl-vorlage-scroll"></div>
 </div>
@@ -8820,7 +8824,7 @@ body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.24.7 · Build 20260611-1600</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.25.0 · Build 20260611-1700</div>
     </div>
 
     <!-- Welt -->
@@ -9005,8 +9009,8 @@ body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.24.7',
-  APP_BUILD:   '20260611-1600',
+  APP_VERSION: '5.25.0',
+  APP_BUILD:   '20260611-1700',
 
 
   // ══════════════════════════════════════════════════════
@@ -12147,9 +12151,11 @@ const WB = {
     if (vrlSel) {
       const store = this._clVorlagenStore() || {};
       const opts  = ['<option value="">– Keine Checkliste –</option>'];
-      Object.entries(store).forEach(([key, vrl]) => {
-        opts.push('<option value="' + this._esc(key) + '">' + this._esc(vrl.name || key) + '</option>');
-      });
+      Object.entries(store)
+        .filter(([, vrl]) => vrl.prozess === true)
+        .forEach(([key, vrl]) => {
+          opts.push('<option value="' + this._esc(key) + '">' + this._esc(vrl.name || key) + '</option>');
+        });
       vrlSel.innerHTML = opts.join('');
       vrlSel.value = '';
     }
@@ -23245,14 +23251,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           {id:4,text:'Kalender und Termine prüfen',done:false},
           {id:5,text:'Energie-Management planen',done:false},
         ]},
-        'Deep Work Session': {name:'Deep Work Session', welt:'pro', items:[
+        'Deep Work Session': {name:'Deep Work Session', welt:'pro', prozess:true, items:[
           {id:1,text:'Ablenkungen eliminieren',done:false},
           {id:2,text:'Session-Ziel formulieren',done:false},
           {id:3,text:'Timer stellen (25/50 Min)',done:false},
           {id:4,text:'Ergebnis dokumentieren',done:false},
           {id:5,text:'Kurze Reflexion',done:false},
         ]},
-        'Besprechung vorbereiten': {name:'Besprechung vorbereiten', welt:'pro', items:[
+        'Besprechung vorbereiten': {name:'Besprechung vorbereiten', welt:'pro', prozess:true, items:[
           {id:1,text:'Agenda erstellen',done:false},
           {id:2,text:'Unterlagen bereitstellen',done:false},
           {id:3,text:'Teilnehmer informieren',done:false},
@@ -23356,9 +23362,11 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if(!store || !Object.keys(store).length) {
       scroll.innerHTML = html + '<div class="zt-empty">Keine Vorlagen.</div>'; return;
     }
-    Object.keys(store).forEach(k => {
+    const prozessKeys = Object.keys(store).filter(k => store[k].prozess);
+    const standardKeys = Object.keys(store).filter(k => !store[k].prozess);
+    const renderCard = k => {
       const v = store[k];
-      html += `<div class="cl-card">
+      return `<div class="cl-card">
         <div class="cl-card-main">
           <div class="cl-card-name">${k}</div>
           <div class="cl-card-meta">${v.items.length} Items</div>
@@ -23366,7 +23374,15 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         <button class="af-pill" style="font-size:0.78rem;margin-right:4px;" onclick="event.stopPropagation();WB.clStartInstanz('${k.replace(/'/g,"\'")}')">&#9654; Start</button>
         <button class="cl-del-btn" style="font-size:0.9rem;padding:2px 6px;border:1px solid var(--c-border);border-radius:var(--radius-xs);" onclick="event.stopPropagation();WB.clVorlageEdit('${k.replace(/'/g,"\'")}')">&#9881;</button>
       </div>`;
-    });
+    };
+    if (prozessKeys.length) {
+      html += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);padding:10px 4px 6px;">Prozessvorlagen</div>';
+      prozessKeys.forEach(k => { html += renderCard(k); });
+    }
+    if (standardKeys.length) {
+      html += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);padding:10px 4px 6px;">Standard</div>';
+      standardKeys.forEach(k => { html += renderCard(k); });
+    }
     scroll.innerHTML = html;
   },
 
@@ -28902,6 +28918,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   clVorlageNew() {
     this.clEditVorlageKey = null;
     document.getElementById('cl-vorlage-name').value = '';
+    const pEl = document.getElementById('cl-vorlage-prozess');
+    if (pEl) pEl.checked = false;
     document.getElementById('cl-vorlage-scroll').innerHTML =
       '<div id="cl-vorlage-items"></div>'
       + '<button onclick="WB.clVorlageAddItem()" style="margin-top:10px;width:100%;padding:10px;border:1px dashed var(--c-border);background:none;border-radius:var(--radius-sm);font-family:var(--font);font-size:0.88rem;cursor:pointer;color:var(--c-muted);">+ Item hinzufügen</button>';
@@ -28918,6 +28936,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const vorlage = store[key]; if(!vorlage) return;
     this.clEditVorlageKey = key;
     document.getElementById('cl-vorlage-name').value = key;
+    const prozessEl = document.getElementById('cl-vorlage-prozess');
+    if (prozessEl) prozessEl.checked = !!vorlage.prozess;
     let itemsHtml = '';
     (vorlage.items||[]).forEach((item,i) => {
       itemsHtml += this._clVorlageItemHtml(item.text, i);
@@ -28966,7 +28986,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if(this.clEditVorlageKey && this.clEditVorlageKey !== name) {
       delete store[this.clEditVorlageKey];
     }
-    store[name] = {name, items, welt: this.activeWorld==='beruf'?'pro':'priv'};
+    const isProzess = document.getElementById('cl-vorlage-prozess')?.checked || false;
+    store[name] = {name, items, welt: this.activeWorld==='beruf'?'pro':'priv', prozess: isProzess};
     this.setDirty();
     this.clVorlageClose();
     this._toast('Vorlage gespeichert');
