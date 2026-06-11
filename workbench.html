@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.27.0</title>
+<title>WorkBench 5.27.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7291,7 +7291,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.27.0</div>
+  <div class="wb-startup-tagline">v5.27.1</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8896,7 +8896,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.27.0 · Build 20260611-2130</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.27.1 · Build 20260611-2145</div>
     </div>
 
     <!-- Welt -->
@@ -9081,8 +9081,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.27.0',
-  APP_BUILD:   '20260611-2130',
+  APP_VERSION: '5.27.1',
+  APP_BUILD:   '20260611-2145',
 
 
   // ══════════════════════════════════════════════════════
@@ -29264,6 +29264,24 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
   },
 
+  _evDuplizieren(ctx, id) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db?.customEvents) return;
+    const ev = db.customEvents.find(x => String(x.id) === String(id));
+    if (!ev) return;
+    const kopie = { ...ev,
+      id: 'ev_' + Date.now() + '_' + Math.random().toString(36).slice(2,5),
+      text: ev.text + ' (Kopie)',
+      done: false,
+    };
+    db.customEvents.push(kopie);
+    this.setDirty();
+    this.editClose();
+    this._toast('Termin dupliziert');
+    // Direkt zum Duplikat öffnen
+    setTimeout(() => this.editOpen('event', ctx, '', kopie.id), 200);
+  },
+
   clVorlageClose() {
     document.getElementById('cl-vorlage-overlay')?.classList.remove('open');
     this.clEditVorlageKey = null;
@@ -31887,6 +31905,19 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       if(!ev) return;
       if(titleEl) titleEl.childNodes[0].textContent = 'Termin bearbeiten ';
       if (delBtn) delBtn.style.display = '';
+      // Duplizieren-Button
+      const existingDupBtn = document.getElementById('edit-dup-btn');
+      if (existingDupBtn) existingDupBtn.remove();
+      const actions = document.querySelector('.edit-actions');
+      if (actions) {
+        const dupBtn = document.createElement('button');
+        dupBtn.id = 'edit-dup-btn';
+        dupBtn.className = 'edit-btn';
+        dupBtn.style.cssText = 'background:none;border:1px solid var(--c-border);color:var(--c-muted);';
+        dupBtn.textContent = '⧉ Duplizieren';
+        dupBtn.onclick = () => this._evDuplizieren(ctx, id);
+        actions.prepend(dupBtn);
+      }
       const pTEv = s => { if(!s) return 9; const [h,m]=s.split(':').map(Number); return h+m/60; };
       const fTEv = h => { const hr=Math.floor(h),m=Math.round((h-hr)*60); return String(hr).padStart(2,'0')+':'+String(m>=60?0:m).padStart(2,'0'); };
       const evEnd = fTEv(pTEv(ev.startTime||'09:00') + parseFloat(ev.duration||1));
@@ -31987,6 +32018,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const ov = document.getElementById('edit-overlay');
     ov?.classList.remove('open');
     if (ov) ov.style.zIndex = '';   // v3.99.1: temporären z-index (Vorhaben) zurücksetzen
+    document.getElementById('edit-dup-btn')?.remove();
     const delBtn2 = document.getElementById('edit-delete-btn');
     if (delBtn2) delBtn2.style.display = 'none';
     this._editType = null;
