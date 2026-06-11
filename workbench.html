@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.29.1</title>
+<title>WorkBench 5.29.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7356,7 +7356,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.29.1</div>
+  <div class="wb-startup-tagline">v5.29.2</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8963,7 +8963,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.29.1 · Build 20260612-0010</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.29.2 · Build 20260612-0030</div>
     </div>
 
     <!-- Welt -->
@@ -9148,8 +9148,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.29.1',
-  APP_BUILD:   '20260612-0010',
+  APP_VERSION: '5.29.2',
+  APP_BUILD:   '20260612-0030',
 
 
   // ══════════════════════════════════════════════════════
@@ -21375,9 +21375,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   _vorhabenDetailRender() {
     const v = this._vorhabenAktiv();
     // Zwei-Spalten: in Panel-Detail rendern
-    const body = this._uiIsZweiSpalten()
+    const body = (this._uiIsZweiSpalten()
       ? document.getElementById('wb-panel-vh-detail-inner')
-      : document.getElementById('wb-vorhaben-detail-body');
+      : null)
+      || document.getElementById('wb-vorhaben-detail-body');
     if (!v || !body) return;
 
     // Büro-Modus: vertrauliche Vorhaben nur Platzhalter zeigen
@@ -21666,23 +21667,22 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     // Ressourcen-Tab
     if (tab === 'ressourcen') {
       document.querySelectorAll('.vh-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === 'ressourcen'));
+      // Aktuell + Plan Tabs ausblenden — NICHT umbenennen
       if (ak) ak.style.display = 'none';
       if (pl) pl.style.display = 'none';
-      const container = this._uiIsZweiSpalten()
-        ? (document.getElementById('wb-panel-vh-detail-inner') || document.getElementById('wb-right-vh-detail'))
-        : document.getElementById('wb-vorhaben-detail');
-      if (!container) return;
-      let body = container.querySelector('#vh-tab-aktuell') || container.querySelector('#vh-tab-plan') || container.querySelector('[id^="vh-tab"]');
-      if (!body) {
-        body = document.createElement('div');
-        container.appendChild(body);
-      }
-      body.id = 'vh-tab-ressourcen';
-      body.style.display = 'flex';
-      body.style.flexDirection = 'column';
-      body.style.flex = '1';
-      body.style.overflow = 'hidden';
-      this._vhRenderRessourcen(body);
+      // Bestehenden Ressourcen-Tab entfernen um doppelten Render zu vermeiden
+      document.getElementById('vh-tab-ressourcen')?.remove();
+      // Neuen div als Sibling von ak/pl einfügen
+      const resBody = document.createElement('div');
+      resBody.id = 'vh-tab-ressourcen';
+      resBody.style.cssText = 'display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0;';
+      // Parent: wo ak/pl hängen — oder Detail-Body
+      const parent = ak?.parentElement || pl?.parentElement
+        || document.getElementById('wb-panel-vh-detail-inner')
+        || document.getElementById('wb-vorhaben-detail-body');
+      if (!parent) return;
+      parent.appendChild(resBody);
+      this._vhRenderRessourcen(resBody);
       return;
     }
     document.querySelectorAll('.vh-tab-btn').forEach(b =>
