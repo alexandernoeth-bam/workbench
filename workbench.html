@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.24.4</title>
+<title>WorkBench 5.24.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7241,7 +7241,7 @@ body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.24.4</div>
+  <div class="wb-startup-tagline">v5.24.5</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8820,7 +8820,7 @@ body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.24.4 · Build 20260611-1430</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.24.5 · Build 20260611-1500</div>
     </div>
 
     <!-- Welt -->
@@ -9005,8 +9005,8 @@ body.fokus-modus #fokus-checklist-panel.has-items { display: flex; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.24.4',
-  APP_BUILD:   '20260611-1430',
+  APP_VERSION: '5.24.5',
+  APP_BUILD:   '20260611-1500',
 
 
   // ══════════════════════════════════════════════════════
@@ -12322,64 +12322,73 @@ const WB = {
     const el = document.getElementById('triage-step-1');
     if (!el) return;
     const maxFokus = this._ritualGetMaxFokus();
-    const rest = this._ritualBerechneEnergie();
+    const rest     = this._ritualBerechneEnergie();
+
+    // Aufgaben sammeln + IDs sicherstellen
     const gruppen = [];
     (this._vorhabenStore('pro') || [])
       .filter(v => (v.aktivitaet||'aktiv') !== 'ruhend')
       .forEach(v => {
         const aufgaben = (v.meilensteine||[]).flatMap(ms =>
           (ms.aufgaben||[]).filter(a => !a.done).map(a => {
-            // Sicherstellen dass jede Aufgabe eine ID hat
-            if (!a.id) { a.id = 'pa_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
-            return { ...a, msId: ms.id };
+            if (!a.id) a.id = 'pa_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+            return a;
           })
         );
         if (!aufgaben.length) return;
         aufgaben.sort((a,b) => (a.naechsterSchritt&&!b.naechsterSchritt)?-1:(!a.naechsterSchritt&&b.naechsterSchritt)?1:0);
         gruppen.push({ v, aufgaben });
       });
-    const renderRow = (a, v) => {
-      const sel      = this._triageSelected.some(s => s.id === a.id);
-      const maxReached = this._triageSelected.length >= maxFokus;
-      const disabled = !sel && maxReached;
-      const kosten   = this._ritualAufgabeKosten(a);
-      const nsBadge  = a.naechsterSchritt
-        ? '<span style="font-size:0.65rem;color:var(--c-beruf);background:var(--c-beruf-bg);border-radius:6px;padding:1px 5px;margin-left:4px;">→ Nächster Schritt</span>'
-        : '';
-      return '<div data-triage-id="' + a.id + '"'
-        + ' onclick="WB._triageToggle(&quot;' + a.id + '&quot;,&quot;' + this._esc(a.text) + '&quot;,&quot;' + v.id + '&quot;)"'
-        + ' style="display:flex;align-items:center;gap:8px;padding:8px 10px;'
-        + 'background:' + (sel ? 'var(--c-beruf-bg)' : 'var(--c-surface)') + ';'
-        + 'border:1.5px solid ' + (sel ? 'var(--c-beruf)' : 'var(--c-border)') + ';'
-        + 'border-radius:var(--radius-xs);margin-bottom:6px;'
-        + (!disabled ? 'cursor:pointer;' : 'opacity:0.6;') + '">'
-        + '<div style="width:16px;height:16px;border-radius:50%;border:2px solid '
-          + (sel ? 'var(--c-beruf)' : 'var(--c-border)') + ';background:'
-          + (sel ? 'var(--c-beruf)' : 'transparent') + ';flex-shrink:0;display:flex;align-items:center;justify-content:center;">'
-          + (sel ? '<span style="color:#fff;font-size:0.65rem;">✓</span>' : '')
-        + '</div>'
-        + '<div style="flex:1;min-width:0;">'
-          + '<div style="font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + this._esc(a.text) + nsBadge + '</div>'
-          + '<div style="font-size:0.72rem;color:var(--c-faint);">' + this._esc(v.titel||'') + '</div>'
-        + '</div>'
-        + '<div class="triage-pills" style="display:flex;gap:4px;flex-shrink:0;">' + this._triageZeitblockPills(a.id) + '</div>'
-        + '<span style="font-size:0.68rem;color:var(--c-warn);font-family:var(--font-mono);flex-shrink:0;">-' + kosten + '</span>'
-        + '</div>';
-    };
+
+    // Energie-Counter
     const energieCounter =
       '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);margin-bottom:12px;font-size:0.80rem;">'
       + '<span style="color:var(--c-muted);">Energie verfügbar:</span>'
       + '<span style="font-weight:700;font-family:var(--font-mono);color:' + (rest<10?'var(--c-danger,#B5332A)':rest<20?'var(--c-warn)':'var(--c-beruf)') + ';">' + rest + '</span>'
       + '<span style="color:var(--c-faint);margin-left:auto;">' + this._triageSelected.length + '/' + maxFokus + ' gewählt</span>'
       + '</div>';
-    const gruppenHtml = gruppen.length
-      ? gruppen.map(({ v, aufgaben }) =>
-          '<div style="margin-bottom:12px;">'
-          + '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:6px;">' + this._esc(v.titel||'') + '</div>'
-          + aufgaben.map(a => renderRow(a, v)).join('')
+
+    // HTML aufbauen — KEINE onclick-Strings, stattdessen data-Attribute
+    let gruppenHtml = '';
+    gruppen.forEach(({ v, aufgaben }) => {
+      gruppenHtml += '<div style="margin-bottom:12px;">'
+        + '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin-bottom:6px;">' + this._esc(v.titel||'') + '</div>';
+      aufgaben.forEach(a => {
+        const sel      = this._triageSelected.some(s => s.id === a.id);
+        const maxReached = this._triageSelected.length >= maxFokus;
+        const disabled = !sel && maxReached;
+        const kosten   = this._ritualAufgabeKosten(a);
+        const nsBadge  = a.naechsterSchritt
+          ? '<span style="font-size:0.65rem;color:var(--c-beruf);background:var(--c-beruf-bg);border-radius:6px;padding:1px 5px;margin-left:4px;">→ Nächster Schritt</span>'
+          : '';
+        const pills    = this._triageZeitblockPills(a.id);
+        gruppenHtml +=
+          '<div data-triage-id="' + a.id + '" data-vh-id="' + v.id + '" data-titel="' + this._esc(a.text) + '"'
+          + ' style="display:flex;align-items:center;gap:8px;padding:8px 10px;'
+          + 'background:' + (sel ? 'var(--c-beruf-bg)' : 'var(--c-surface)') + ';'
+          + 'border:1.5px solid ' + (sel ? 'var(--c-beruf)' : 'var(--c-border)') + ';'
+          + 'border-radius:var(--radius-xs);margin-bottom:6px;'
+          + (!disabled ? 'cursor:pointer;' : 'opacity:0.6;') + '">'
+          + '<div style="width:16px;height:16px;border-radius:50%;border:2px solid '
+            + (sel ? 'var(--c-beruf)' : 'var(--c-border)') + ';background:'
+            + (sel ? 'var(--c-beruf)' : 'transparent') + ';flex-shrink:0;display:flex;align-items:center;justify-content:center;">'
+            + (sel ? '<span style="color:#fff;font-size:0.65rem;">✓</span>' : '')
           + '</div>'
-        ).join('')
-      : '<div style="color:var(--c-faint);font-size:0.85rem;padding:12px 0;">Keine offenen Beruf-Aufgaben</div>';
+          + '<div style="flex:1;min-width:0;">'
+            + '<div style="font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + this._esc(a.text) + nsBadge + '</div>'
+            + '<div style="font-size:0.72rem;color:var(--c-faint);">' + this._esc(v.titel||'') + '</div>'
+          + '</div>'
+          + '<div class="triage-pills" style="display:flex;gap:4px;flex-shrink:0;">' + pills + '</div>'
+          + '<span style="font-size:0.68rem;color:var(--c-warn);font-family:var(--font-mono);flex-shrink:0;">-' + kosten + '</span>'
+          + '</div>';
+      });
+      gruppenHtml += '</div>';
+    });
+
+    if (!gruppenHtml) {
+      gruppenHtml = '<div style="color:var(--c-faint);font-size:0.85rem;padding:12px 0;">Keine offenen Beruf-Aufgaben</div>';
+    }
+
     el.innerHTML =
       '<div style="font-size:1.1rem;font-weight:700;margin-bottom:4px;align-self:flex-start;">Beruflicher Fokus</div>'
       + '<div style="font-size:0.82rem;color:var(--c-muted);margin-bottom:12px;align-self:flex-start;">Was machst du heute?</div>'
@@ -12387,6 +12396,19 @@ const WB = {
       + '<div style="width:100%;margin-bottom:16px;">' + gruppenHtml + '</div>'
       + this._triageBtn('Weiter →', 'WB._triageGoto(2)')
       + this._triagebtnBack('WB._triageGoto(0)');
+
+    // Event-Delegation: ein einzelner Click-Handler auf dem Container
+    el.onclick = (e) => {
+      const row = e.target.closest('[data-triage-id]');
+      if (!row) return;
+      // Pills-Klick ignorieren (haben eigenen Handler)
+      if (e.target.closest('.triage-pills')) return;
+      const aufgabeId = row.dataset.triageId;
+      const vhId      = row.dataset.vhId;
+      // Titel aus data-Attribut holen falls gespeichert
+      const titel = row.dataset.titel || aufgabeId;
+      this._triageToggle(aufgabeId, titel, vhId);
+    };
   },
 
   _triageToggle(aufgabeId, titel, vorhabenId) {
