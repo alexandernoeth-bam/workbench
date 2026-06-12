@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.38.4</title>
+<title>WorkBench 5.38.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7454,7 +7454,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.38.4</div>
+  <div class="wb-startup-tagline">v5.38.5</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7633,11 +7633,12 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
     <div id="ck-logbuch" style="margin:0 14px 12px;padding:10px 12px;background:#F0EEE8;border:1px solid var(--c-border);border-radius:var(--radius-xs);display:none;"></div>
 
     <div class="ck-zone" id="ck-zone-rauschen" style="display:none;">
-      <div class="ck-zone-header">
-        <span class="ck-zone-icon">〰</span>
-        <span class="ck-zone-label">Kleinigkeiten</span>
+      <div class="ck-zone-header" onclick="WB._ckToggleRauschen()" style="cursor:pointer;">
+        <span class="ck-zone-icon">📥</span>
+        <span class="ck-zone-label">Eingang & Tagesaufgaben</span>
         <span class="ck-zone-hint"></span>
         <span class="ck-zone-count" id="ck-count-rauschen"></span>
+        <span id="ck-rauschen-toggle" style="margin-left:4px;font-size:0.72rem;color:var(--c-faint);">▼</span>
       </div>
       <div class="ck-zone-body" id="ck-body-rauschen"></div>
     </div>
@@ -9097,7 +9098,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.38.4 · Build 20260612-2230</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.38.5 · Build 20260612-2245</div>
     </div>
 
     <!-- Welt -->
@@ -9282,8 +9283,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.38.4',
-  APP_BUILD:   '20260612-2230',
+  APP_VERSION: '5.38.5',
+  APP_BUILD:   '20260612-2245',
 
 
   // ══════════════════════════════════════════════════════
@@ -19651,6 +19652,16 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '</div>';
   },
 
+  _ckRauschenCollapsed: false,
+
+  _ckToggleRauschen() {
+    this._ckRauschenCollapsed = !this._ckRauschenCollapsed;
+    const body = document.getElementById('ck-body-rauschen');
+    const arrow = document.getElementById('ck-rauschen-toggle');
+    if (body) body.style.display = this._ckRauschenCollapsed ? 'none' : '';
+    if (arrow) arrow.textContent = this._ckRauschenCollapsed ? '▶' : '▼';
+  },
+
   _ckRenderKleinigkeiten(dateStr, isToday) {
     const body  = document.getElementById('ck-body-rauschen');
     const count = document.getElementById('ck-count-rauschen');
@@ -19682,6 +19693,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     if (!items.length) { block.style.display = 'none'; return; }
     block.style.display = '';
+    if (this._ckRauschenCollapsed && body) body.style.display = 'none';
+    const _arrow = document.getElementById('ck-rauschen-toggle');
+    if (_arrow) _arrow.textContent = this._ckRauschenCollapsed ? '▶' : '▼';
     if (count) count.textContent = items.length;
 
     body.innerHTML = items.map(item => {
