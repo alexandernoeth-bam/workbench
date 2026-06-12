@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.37.1</title>
+<title>WorkBench 5.37.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7450,7 +7450,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.37.1</div>
+  <div class="wb-startup-tagline">v5.37.2</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -9054,7 +9054,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.37.1 · Build 20260612-2015</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.37.2 · Build 20260612-2030</div>
     </div>
 
     <!-- Welt -->
@@ -9239,8 +9239,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.37.1',
-  APP_BUILD:   '20260612-2015',
+  APP_VERSION: '5.37.2',
+  APP_BUILD:   '20260612-2030',
 
 
   // ══════════════════════════════════════════════════════
@@ -9272,6 +9272,17 @@ const WB = {
   _bmEv:    null,
   _bmCtx:   null,
   _bmSteps: [],
+  _bmPraesenz: null,
+
+  _bmSetPraesenz(n) {
+    this._bmPraesenz = n;
+    document.querySelectorAll('#bm-praesenz-btns button').forEach(btn => {
+      const v = parseInt(btn.getAttribute('data-val'));
+      btn.style.background = v === n ? 'var(--c-beruf)' : 'var(--c-bg)';
+      btn.style.color = v === n ? '#fff' : 'var(--c-text)';
+      btn.style.borderColor = v === n ? 'var(--c-beruf)' : 'var(--c-border)';
+    });
+  },
   _bmTasks: [],
 
   // ── Vor-Assistent öffnen ─────────────────────────────
@@ -9300,7 +9311,7 @@ const WB = {
     this._bmCtx   = ctx;
     this._bmStep  = 0;
     this._bmTasks = [{ text: '', done: false }];
-    this._bmSteps = ['ergebnisse', 'aufgaben', 'abschluss'];
+    this._bmSteps = ['ergebnisse', 'aufgaben', 'reflexion', 'abschluss'];
     this._bmUpdateHeader();
     this._bmRenderStep();
     document.getElementById('wb-bm-overlay').classList.add('open');
@@ -9351,9 +9362,13 @@ const WB = {
       ev.bm_ergebnisse = document.getElementById('bm-ergebnisse')?.value || '';
       ev.done = true;
     } else if (step === 'aufgaben') {
-      // Tasks aus Inputs lesen
       this._bmTasks = Array.from(document.querySelectorAll('.bm-task-input'))
         .map(el => el.value.trim()).filter(Boolean);
+    } else if (step === 'reflexion') {
+      ev.bm_praesenz = this._bmPraesenz || null;
+      ev.bm_ehrlich  = document.getElementById('bm-ehrlich')?.value || '';
+      ev.bm_unwohl   = document.getElementById('bm-unwohl')?.value || '';
+      ev.bm_naechstes_mal = document.getElementById('bm-naechstes-mal')?.value || '';
     }
   },
 
@@ -9432,6 +9447,36 @@ const WB = {
         + '</div>'
         + '<button class="bm-add-task" onclick="WB._bmAddTask()">+ Aufgabe hinzufügen</button>';
 
+    } else if (step === 'reflexion') {
+      html = '<div class="wz-step-title">Schritt 3 \u00b7 Wie war ich?</div>';
+      html += '<div class="wz-question">Wie pr\u00e4sent warst du?</div>'
+        + '<div style="display:flex;gap:6px;margin-bottom:14px;" id="bm-praesenz-btns">'
+        + [1,2,3,4,5].map(n =>
+            '<button onclick="WB._bmSetPraesenz(' + n + ')" data-val="' + n + '"'
+            + ' style="flex:1;padding:8px 4px;border-radius:var(--radius-xs);'
+            + 'border:1.5px solid var(--c-border);background:var(--c-bg);'
+            + 'font-family:var(--font);font-size:0.88rem;cursor:pointer;'
+            + 'color:var(--c-text);text-align:center;">' + n + '</button>'
+          ).join('')
+        + '</div>'
+        + '<div style="display:flex;justify-content:space-between;'
+          + 'font-size:0.68rem;color:var(--c-faint);margin-top:-10px;margin-bottom:14px;">'
+          + '<span>Abwesend</span><span>Voll da</span></div>';
+      html += '<div class="wz-question">Hast du gesagt was du wirklich denkst?</div>'
+        + '<textarea class="wz-textarea" id="bm-ehrlich"'
+          + ' placeholder="Ja / Nein \u2014 und warum?" style="min-height:50px;">'
+        + (ev.bm_ehrlich || '') + '</textarea>';
+      html += '<div class="wz-question">Gab es einen Moment der dich gest\u00f6rt hat?</div>'
+        + '<textarea class="wz-textarea" id="bm-unwohl"'
+          + ' placeholder="Optional \u2014 was war komisch?" style="min-height:50px;">'
+        + (ev.bm_unwohl || '') + '</textarea>';
+      html += '<div class="wz-question">Was w\u00fcrdest du beim n\u00e4chsten Mal anders machen?</div>'
+        + '<textarea class="wz-textarea" id="bm-naechstes-mal"'
+          + ' placeholder="1 konkreter Vorsatz" style="min-height:50px;">'
+        + (ev.bm_naechstes_mal || '') + '</textarea>';
+      body.innerHTML = html;
+      if (ev.bm_praesenz) this._bmSetPraesenz(ev.bm_praesenz);
+
     } else if (step === 'abschluss') {
       html = '<div class="wz-step-title">✓ Nachbereitung abgeschlossen</div>'
         + '<div style="text-align:center;padding:20px 0;">'
@@ -9462,27 +9507,59 @@ const WB = {
     const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
     if (!ev || !db) { this.bmClose(); return; }
 
-    // Aufgaben in erstes Projekt anlegen
+    // Aufgaben anlegen
     if (this._bmMode === 'post' && this._bmTasks.length) {
-      const projKeys = Object.keys(db.projects || {});
-      const projKey  = projKeys[0];
-      if (projKey && db.projects[projKey]) {
-        if (!db.projects[projKey].tasks) db.projects[projKey].tasks = [];
-        this._bmTasks.forEach(text => {
-          if (!text) return;
-          db.projects[projKey].tasks.push({
-            id:    'bm_' + Date.now() + '_' + Math.random().toString(36).slice(2),
-            text,
-            date:  new Date().toISOString().split('T')[0],
-            done:  false,
-            prio:  false,
-            notes: 'Aus Besprechung: ' + (ev.text || ''),
+      if (ev.vorhabenId) {
+        const vhStore2 = this._vorhabenStore(ctx) || [];
+        const vh2 = vhStore2.find(v => v.id === ev.vorhabenId);
+        if (vh2) {
+          if (!vh2.meilensteine) vh2.meilensteine = [];
+          if (!vh2.meilensteine.length) vh2.meilensteine.push({ id: 'ms_' + Date.now(), titel: 'Aufgaben', aufgaben: [] });
+          const ms2 = vh2.meilensteine[0];
+          if (!ms2.aufgaben) ms2.aufgaben = [];
+          this._bmTasks.forEach(text => {
+            if (!text) return;
+            ms2.aufgaben.push({
+              id: 'a_bm_' + Date.now() + '_' + Math.random().toString(36).slice(2,5),
+              text, done: false, naechsterSchritt: true,
+              aktivEnergie: 'mittel', datum: new Date().toISOString().split('T')[0],
+            });
           });
-        });
+          vh2.geaendert = Date.now();
+        }
+      } else {
+        const projKey2 = Object.keys(db.projects || {})[0];
+        if (projKey2 && db.projects[projKey2]) {
+          if (!db.projects[projKey2].tasks) db.projects[projKey2].tasks = [];
+          this._bmTasks.forEach(text => {
+            if (!text) return;
+            db.projects[projKey2].tasks.push({
+              id: 'bm_' + Date.now() + '_' + Math.random().toString(36).slice(2,5),
+              text, date: new Date().toISOString().split('T')[0],
+              done: false, prio: false,
+              notes: 'Aus Besprechung: ' + (ev.text || ''),
+            });
+          });
+        }
       }
     }
 
-    if (this._bmMode === 'post') ev.postDone = true;
+    if (this._bmMode === 'post') {
+      ev.postDone = true;
+      // Reflexion in Besprechungs-Notiz ergänzen
+      const ctx2 = this._bmCtx;
+      const db2  = ctx2 === 'pro' ? this.dataPro : this.dataPriv;
+      const nzStore2 = db2?.settings?.cockpitNotizen || [];
+      const notiz2 = nzStore2.find(n => n.evLink === ev.id && n.typ === 'besprechung');
+      if (notiz2) {
+        let refl = '';
+        if (ev.bm_praesenz)     refl += '<h3>Pr\u00e4senz</h3><p>' + ev.bm_praesenz + '/5</p>';
+        if (ev.bm_ehrlich)      refl += '<h3>Ehrlichkeit</h3><p>' + ev.bm_ehrlich + '</p>';
+        if (ev.bm_unwohl)       refl += '<h3>Was hat gest\u00f6rt</h3><p>' + ev.bm_unwohl + '</p>';
+        if (ev.bm_naechstes_mal) refl += '<h3>N\u00e4chstes Mal</h3><p>' + ev.bm_naechstes_mal + '</p>';
+        if (refl) { notiz2.inhalt += '<hr>' + refl; notiz2.geaendert = Date.now(); }
+      }
+    }
 
     this.setDirty();
     this._bmStep = this._bmSteps.length - 1;
@@ -13699,6 +13776,49 @@ const WB = {
     el.innerHTML =
       '<div class="ritual-ov-row"><span>Termine</span><span class="ov-val">' + termineLabel + '</span></div>'
       + '<div class="ritual-ov-row"><span>Aktive Vorhaben</span><span class="ov-val">' + aktive + '</span></div>';
+    // SLS-M4: Wichtige Besprechungen heute
+    const _m4Today = this._ritualTodayKey();
+    const _m4Events = (this._evStore ? this._evStore() : [])
+      .filter(e => e.date === _m4Today && e.typ === 'besprechung');
+    const _m4Wichtig = _m4Events.filter(e => {
+      if (e.prepDone) return false;
+      if (e.startTime && e.endTime) {
+        const [sh,sm] = e.startTime.split(':').map(Number);
+        const [eh,em] = e.endTime.split(':').map(Number);
+        return (eh*60+em) - (sh*60+sm) >= 30;
+      }
+      return true;
+    });
+    if (_m4Wichtig.length) {
+      el.innerHTML += '<div style="margin-top:12px;padding:10px 12px;'
+        + 'background:color-mix(in srgb,var(--c-beruf) 6%,var(--c-bg));'
+        + 'border:1px solid color-mix(in srgb,var(--c-beruf) 15%,var(--c-border));'
+        + 'border-radius:var(--radius-xs);">'
+        + '<div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;'
+          + 'letter-spacing:0.06em;color:var(--c-beruf);margin-bottom:6px;">'
+          + _m4Wichtig.length + ' wichtige Besprechung'
+          + (_m4Wichtig.length > 1 ? 'en' : '') + ' heute</div>'
+        + _m4Wichtig.map(e =>
+            '<div style="display:flex;align-items:flex-start;gap:8px;'
+              + 'padding:6px 0;border-bottom:1px solid var(--c-border);">'
+            + '<span style="font-size:0.78rem;font-family:var(--font-mono);'
+              + 'color:var(--c-faint);flex-shrink:0;width:40px;">'
+              + (e.startTime || '') + '</span>'
+            + '<div style="flex:1;">'
+              + '<div style="font-size:0.88rem;font-weight:600;">'
+                + this._esc(e.text) + '</div>'
+              + '<input type="text" id="sls-meetprep-' + e.id + '"'
+                + ' placeholder="Was willst du kl\u00e4ren? (1 Satz)"'
+                + ' value="' + (e.bm_ziel || '') + '"'
+                + ' style="width:100%;margin-top:4px;padding:5px 8px;'
+                + 'border:1px solid var(--c-border);border-radius:var(--radius-xs);'
+                + 'font-family:var(--font);font-size:0.82rem;background:var(--c-bg);'
+                + 'color:var(--c-text);box-sizing:border-box;">'
+            + '</div></div>'
+          ).join('')
+        + '</div>';
+    }
+
     // SLS-M1: Body Battery Hinweis
     const bbInput = document.getElementById('ritual-body-battery');
     if (bbInput) {
@@ -15038,6 +15158,14 @@ const WB = {
     const bbVal = document.getElementById('ritual-body-battery')?.value;
     this._ritualBodyBattery = bbVal ? parseInt(bbVal) : null;
     this._ritualIntention = document.getElementById('ritual-intention')?.value.trim() || '';
+    // SLS-M4: Meeting-Ziele speichern
+    const _m4TodayKey = this._ritualTodayKey ? this._ritualTodayKey() : new Date().toISOString().split('T')[0];
+    (this._evStore ? this._evStore() : [])
+      .filter(e => e.date === _m4TodayKey && e.typ === 'besprechung')
+      .forEach(e => {
+        const inp = document.getElementById('sls-meetprep-' + e.id);
+        if (inp && inp.value.trim()) e.bm_ziel = inp.value.trim();
+      });
     this._ritualGoto(2);
   },
 
@@ -29412,20 +29540,24 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (nextMeeting && !activeMeeting) {
       const { e, ctx, diff } = nextMeeting;
       const diffLabel = diff === 0 ? 'Jetzt' : 'in ' + diff + ' Min';
+      const _vhN = e.vorhabenId ? (this._vorhabenFind(e.vorhabenId)?.vorhaben) : null;
       document.getElementById('ck-meeting-title').textContent =
         'Besprechung ' + diffLabel + ': ' + e.text;
       document.getElementById('ck-meeting-sub').textContent =
-        e.startTime + ' Uhr · Vorbereitung starten';
+        e.startTime + ' Uhr · Vorbereitung starten'
+        + (_vhN ? ' · ' + (_vhN.titel || '') : '');
       document.getElementById('ck-meeting-btn').textContent = 'Vorbereiten →';
       document.getElementById('ck-meeting-btn').onclick =
         () => WB.bmOpenPre(e.id, ctx);
       banner.classList.add('visible');
     } else if (activeMeeting) {
       const { e, ctx } = activeMeeting;
+      const _vhA = e.vorhabenId ? (this._vorhabenFind(e.vorhabenId)?.vorhaben) : null;
       document.getElementById('ck-meeting-title').textContent =
         'Nachbereitung: ' + e.text;
       document.getElementById('ck-meeting-sub').textContent =
-        'Ergebnisse & Aufgaben festhalten';
+        'Ergebnisse & Aufgaben festhalten'
+        + (_vhA ? ' · ' + (_vhA.titel || '') : '');
       document.getElementById('ck-meeting-btn').textContent = 'Nachbereiten →';
       document.getElementById('ck-meeting-btn').onclick =
         () => WB.bmOpenPost(e.id, ctx);
@@ -29441,43 +29573,52 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!db) return;
 
     // 1. Vorbereitungs-Aufgabe anlegen
-    const projKey = Object.keys(db.projects || {})
-      .find(k => !['inbox','tageslog'].some(s => k.toLowerCase().includes(s)))
-      || Object.keys(db.projects || {})[0];
-
-    if (projKey && db.projects[projKey]) {
-      const taskId = String(Date.now());
-      if (!db.projects[projKey].tasks) db.projects[projKey].tasks = [];
-      db.projects[projKey].tasks.push({
-        id:       taskId,
-        text:     `Vorbereitung: ${ev.text}`,
-        done:     false,
-        prio:     true,
-        date:     ev.date,
-        isToday:  ev.date === new Date().toISOString().split('T')[0],
-        size:     'S',
-        checklist:[],
-        evLink:   ev.id,
-      });
+    if (ev.vorhabenId) {
+      const vhStore = this._vorhabenStore(ctx) || [];
+      const vh = vhStore.find(v => v.id === ev.vorhabenId);
+      if (vh) {
+        if (!vh.meilensteine) vh.meilensteine = [];
+        if (!vh.meilensteine.length) vh.meilensteine.push({ id: 'ms_' + Date.now(), titel: 'Aufgaben', aufgaben: [] });
+        const ms = vh.meilensteine[0];
+        if (!ms.aufgaben) ms.aufgaben = [];
+        ms.aufgaben.push({
+          id: 'a_bm_' + Date.now(), text: 'Vorbereitung: ' + (ev.text || ''),
+          done: false, naechsterSchritt: true, aktivEnergie: 'mittel', datum: ev.date,
+        });
+        vh.geaendert = Date.now();
+      }
+    } else {
+      const projKey = Object.keys(db.projects || {})
+        .find(k => !['inbox','tageslog'].some(s => k.toLowerCase().includes(s)))
+        || Object.keys(db.projects || {})[0];
+      if (projKey && db.projects[projKey]) {
+        if (!db.projects[projKey].tasks) db.projects[projKey].tasks = [];
+        db.projects[projKey].tasks.push({
+          id: String(Date.now()), text: 'Vorbereitung: ' + (ev.text || ''),
+          done: false, prio: true, date: ev.date,
+          isToday: ev.date === new Date().toISOString().split('T')[0],
+          size: 'S', checklist: [], evLink: ev.id,
+        });
+      }
     }
 
     // 2. Besprechungs-Notiz anlegen
     const store = ctx === 'pro'
-      ? (this.dataPro.settings  = this.dataPro.settings  || {}, this.dataPro.settings.cockpitNotizen  = this.dataPro.settings.cockpitNotizen  || [], this.dataPro.settings.cockpitNotizen)
+      ? (this.dataPro.settings = this.dataPro.settings || {}, this.dataPro.settings.cockpitNotizen = this.dataPro.settings.cockpitNotizen || [], this.dataPro.settings.cockpitNotizen)
       : (this.dataPriv.settings = this.dataPriv.settings || {}, this.dataPriv.settings.cockpitNotizen = this.dataPriv.settings.cockpitNotizen || [], this.dataPriv.settings.cockpitNotizen);
-
     store.push({
-      id:       'nz_' + Date.now(),
-      titel:    `Besprechung: ${ev.text}`,
-      typ:      'besprechung',
-      inhalt:   `<h2>Besprechung: ${ev.text}</h2><h3>Datum</h3><p>${ev.date} ${ev.startTime || ''}</p><h3>Ziele</h3><p></p><h3>Ergebnisse</h3><p></p><h3>Nächste Schritte</h3><p>☐ </p>`,
-      erstellt:  Date.now(),
-      geaendert: Date.now(),
-      _db:      ctx,
-      evLink:   ev.id,
+      id: 'nz_' + Date.now(),
+      titel: 'Besprechung: ' + (ev.text || ''),
+      typ: 'besprechung',
+      inhalt: '<h2>Besprechung: ' + (ev.text||'') + '</h2>'
+            + '<h3>Datum</h3><p>' + ev.date + ' ' + (ev.startTime||'') + '</p>'
+            + '<h3>Ziele</h3><p></p><h3>Ergebnisse</h3><p></p>'
+            + '<h3>N\u00e4chste Schritte</h3><p>\u2610 </p>',
+      erstellt: Date.now(), geaendert: Date.now(),
+      _db: ctx, evLink: ev.id, vorhabenId: ev.vorhabenId || null,
     });
 
-    this._toast('✓ Vorbereitungs-Aufgabe + Notiz angelegt');
+    this._toast('\u2713 Vorbereitungs-Aufgabe + Notiz angelegt');
   },
 
   // ── State ──────────────────────────────────────────
@@ -29622,51 +29763,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
   },
 
-  // ── Besprechungs-Prozess nach Anlage ─────────────────
-  _evBesprechungProcess(ev, ctx) {
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    if (!db) return;
-
-    // 1. Vorbereitungs-Aufgabe anlegen
-    const projKey = Object.keys(db.projects || {})
-      .find(k => !['inbox','tageslog'].some(s => k.toLowerCase().includes(s)))
-      || Object.keys(db.projects || {})[0];
-
-    if (projKey && db.projects[projKey]) {
-      const taskId = String(Date.now());
-      if (!db.projects[projKey].tasks) db.projects[projKey].tasks = [];
-      db.projects[projKey].tasks.push({
-        id:       taskId,
-        text:     `Vorbereitung: ${ev.text}`,
-        done:     false,
-        prio:     true,
-        date:     ev.date,
-        isToday:  ev.date === new Date().toISOString().split('T')[0],
-        size:     'S',
-        checklist:[],
-        evLink:   ev.id,
-      });
-    }
-
-    // 2. Besprechungs-Notiz anlegen
-    const store = ctx === 'pro'
-      ? (this.dataPro.settings  = this.dataPro.settings  || {}, this.dataPro.settings.cockpitNotizen  = this.dataPro.settings.cockpitNotizen  || [], this.dataPro.settings.cockpitNotizen)
-      : (this.dataPriv.settings = this.dataPriv.settings || {}, this.dataPriv.settings.cockpitNotizen = this.dataPriv.settings.cockpitNotizen || [], this.dataPriv.settings.cockpitNotizen);
-
-    store.push({
-      id:       'nz_' + Date.now(),
-      titel:    `Besprechung: ${ev.text}`,
-      typ:      'besprechung',
-      inhalt:   `<h2>Besprechung: ${ev.text}</h2><h3>Datum</h3><p>${ev.date} ${ev.startTime || ''}</p><h3>Ziele</h3><p></p><h3>Ergebnisse</h3><p></p><h3>Nächste Schritte</h3><p>☐ </p>`,
-      erstellt:  Date.now(),
-      geaendert: Date.now(),
-      _db:      ctx,
-      evLink:   ev.id,
-    });
-
-    this._toast('✓ Vorbereitungs-Aufgabe + Notiz angelegt');
-  },
-
   // ── State ──────────────────────────────────────────
   // ── Zeitband State ─────────────────────────────────
   viewDate: new Date(),
@@ -29742,51 +29838,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     } else {
       banner.classList.remove('visible');
     }
-  },
-
-  // ── Besprechungs-Prozess nach Anlage ─────────────────
-  _evBesprechungProcess(ev, ctx) {
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    if (!db) return;
-
-    // 1. Vorbereitungs-Aufgabe anlegen
-    const projKey = Object.keys(db.projects || {})
-      .find(k => !['inbox','tageslog'].some(s => k.toLowerCase().includes(s)))
-      || Object.keys(db.projects || {})[0];
-
-    if (projKey && db.projects[projKey]) {
-      const taskId = String(Date.now());
-      if (!db.projects[projKey].tasks) db.projects[projKey].tasks = [];
-      db.projects[projKey].tasks.push({
-        id:       taskId,
-        text:     `Vorbereitung: ${ev.text}`,
-        done:     false,
-        prio:     true,
-        date:     ev.date,
-        isToday:  ev.date === new Date().toISOString().split('T')[0],
-        size:     'S',
-        checklist:[],
-        evLink:   ev.id,
-      });
-    }
-
-    // 2. Besprechungs-Notiz anlegen
-    const store = ctx === 'pro'
-      ? (this.dataPro.settings  = this.dataPro.settings  || {}, this.dataPro.settings.cockpitNotizen  = this.dataPro.settings.cockpitNotizen  || [], this.dataPro.settings.cockpitNotizen)
-      : (this.dataPriv.settings = this.dataPriv.settings || {}, this.dataPriv.settings.cockpitNotizen = this.dataPriv.settings.cockpitNotizen || [], this.dataPriv.settings.cockpitNotizen);
-
-    store.push({
-      id:       'nz_' + Date.now(),
-      titel:    `Besprechung: ${ev.text}`,
-      typ:      'besprechung',
-      inhalt:   `<h2>Besprechung: ${ev.text}</h2><h3>Datum</h3><p>${ev.date} ${ev.startTime || ''}</p><h3>Ziele</h3><p></p><h3>Ergebnisse</h3><p></p><h3>Nächste Schritte</h3><p>☐ </p>`,
-      erstellt:  Date.now(),
-      geaendert: Date.now(),
-      _db:      ctx,
-      evLink:   ev.id,
-    });
-
-    this._toast('✓ Vorbereitungs-Aufgabe + Notiz angelegt');
   },
 
   // ── State ──────────────────────────────────────────
@@ -30045,101 +30096,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
   },
 
-  // ── Besprechungs-Prozess nach Anlage ─────────────────
-  _evBesprechungProcess(ev, ctx) {
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    if (!db) return;
-
-    // 1. Vorbereitungs-Aufgabe anlegen
-    const projKey = Object.keys(db.projects || {})
-      .find(k => !['inbox','tageslog'].some(s => k.toLowerCase().includes(s)))
-      || Object.keys(db.projects || {})[0];
-
-    if (projKey && db.projects[projKey]) {
-      const taskId = String(Date.now());
-      if (!db.projects[projKey].tasks) db.projects[projKey].tasks = [];
-      db.projects[projKey].tasks.push({
-        id:       taskId,
-        text:     `Vorbereitung: ${ev.text}`,
-        done:     false,
-        prio:     true,
-        date:     ev.date,
-        isToday:  ev.date === new Date().toISOString().split('T')[0],
-        size:     'S',
-        checklist:[],
-        evLink:   ev.id,
-      });
-    }
-
-    // 2. Besprechungs-Notiz anlegen
-    const store = ctx === 'pro'
-      ? (this.dataPro.settings  = this.dataPro.settings  || {}, this.dataPro.settings.cockpitNotizen  = this.dataPro.settings.cockpitNotizen  || [], this.dataPro.settings.cockpitNotizen)
-      : (this.dataPriv.settings = this.dataPriv.settings || {}, this.dataPriv.settings.cockpitNotizen = this.dataPriv.settings.cockpitNotizen || [], this.dataPriv.settings.cockpitNotizen);
-
-    store.push({
-      id:       'nz_' + Date.now(),
-      titel:    `Besprechung: ${ev.text}`,
-      typ:      'besprechung',
-      inhalt:   `<h2>Besprechung: ${ev.text}</h2><h3>Datum</h3><p>${ev.date} ${ev.startTime || ''}</p><h3>Ziele</h3><p></p><h3>Ergebnisse</h3><p></p><h3>Nächste Schritte</h3><p>☐ </p>`,
-      erstellt:  Date.now(),
-      geaendert: Date.now(),
-      _db:      ctx,
-      evLink:   ev.id,
-    });
-
-    this._toast('✓ Vorbereitungs-Aufgabe + Notiz angelegt');
-  },
-
   // ── State ──────────────────────────────────────────
-  // ── Zeitband State ─────────────────────────────────
-  viewDate: new Date(),
-  _ztNowTimer: null,
-  _ztConfig: { dayStart: 5, dayEnd: 23, lunchH: 12, lunchDur: 0.75 },
-
-  _evBesprechungProcess(ev, ctx) {
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    if (!db) return;
-
-    // 1. Vorbereitungs-Aufgabe anlegen
-    const projKey = Object.keys(db.projects || {})
-      .find(k => !['inbox','tageslog'].some(s => k.toLowerCase().includes(s)))
-      || Object.keys(db.projects || {})[0];
-
-    if (projKey && db.projects[projKey]) {
-      const taskId = String(Date.now());
-      if (!db.projects[projKey].tasks) db.projects[projKey].tasks = [];
-      db.projects[projKey].tasks.push({
-        id:       taskId,
-        text:     `Vorbereitung: ${ev.text}`,
-        done:     false,
-        prio:     true,
-        date:     ev.date,
-        isToday:  ev.date === new Date().toISOString().split('T')[0],
-        size:     'S',
-        checklist:[],
-        evLink:   ev.id,
-      });
-    }
-
-    // 2. Besprechungs-Notiz anlegen
-    const store = ctx === 'pro'
-      ? (this.dataPro.settings  = this.dataPro.settings  || {}, this.dataPro.settings.cockpitNotizen  = this.dataPro.settings.cockpitNotizen  || [], this.dataPro.settings.cockpitNotizen)
-      : (this.dataPriv.settings = this.dataPriv.settings || {}, this.dataPriv.settings.cockpitNotizen = this.dataPriv.settings.cockpitNotizen || [], this.dataPriv.settings.cockpitNotizen);
-
-    store.push({
-      id:       'nz_' + Date.now(),
-      titel:    `Besprechung: ${ev.text}`,
-      typ:      'besprechung',
-      inhalt:   `<h2>Besprechung: ${ev.text}</h2><h3>Datum</h3><p>${ev.date} ${ev.startTime || ''}</p><h3>Ziele</h3><p></p><h3>Ergebnisse</h3><p></p><h3>Nächste Schritte</h3><p>☐ </p>`,
-      erstellt:  Date.now(),
-      geaendert: Date.now(),
-      _db:      ctx,
-      evLink:   ev.id,
-    });
-
-    this._toast('✓ Vorbereitungs-Aufgabe + Notiz angelegt');
-  },
-
   // ── State ──────────────────────────────────────────
   // ── Zeitband State ─────────────────────────────────
   viewDate: new Date(),
