@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.38.0</title>
+<title>WorkBench 5.38.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7433,6 +7433,10 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
   
   
 
+  /* ── SLS-M2: Logbuch ── */
+  #ck-logbuch { scrollbar-width: none; }
+  #ck-logbuch::-webkit-scrollbar { display: none; }
+
   /* ── FT2: Fokus-Overlay ── */
   #fokus-overlay { display: none; }
   body.fokus-overlay-aktiv #fokus-overlay { display: flex !important; }
@@ -7450,7 +7454,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.38.0</div>
+  <div class="wb-startup-tagline">v5.38.1</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7625,6 +7629,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
       </div>
       <div class="ck-zone-body" id="ck-body-ab"></div>
     </div>
+
+    <div id="ck-logbuch" style="margin:0 14px 12px;padding:10px 12px;background:#F0EEE8;border:1px solid var(--c-border);border-radius:var(--radius-xs);display:none;"></div>
 
     <div class="ck-zone" id="ck-zone-rauschen" style="display:none;">
       <div class="ck-zone-header">
@@ -9055,7 +9061,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.38.0 · Build 20260612-2100</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.38.1 · Build 20260612-2130</div>
     </div>
 
     <!-- Welt -->
@@ -9240,8 +9246,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.38.0',
-  APP_BUILD:   '20260612-2100',
+  APP_VERSION: '5.38.1',
+  APP_BUILD:   '20260612-2130',
 
 
   // ══════════════════════════════════════════════════════
@@ -9684,7 +9690,8 @@ const WB = {
     let html = '';
 
     if (step === 'rueckblick') {
-      html = '<div class="wz-step-title">Schritt 1 · Rückblick diese Woche</div>'
+      html = this._lbWochenTrend();
+      html += '<div class="wz-step-title">Schritt 1 · Rückblick diese Woche</div>'
         + '<div class="wz-question">Was lief diese Woche gut?</div>'
         + '<textarea class="wz-textarea" id="wz-rb-gut" placeholder="Erfolge, Fortschritte, positive Momente…">' + (d.rueckblickGut||'') + '</textarea>'
         + '<div class="wz-question">Was lief nicht so gut?</div>'
@@ -13432,6 +13439,26 @@ const WB = {
       h += '</div>';
     }
 
+    // SLS-M2: Logbuch-Einträge
+    const _lb2 = this.dataPriv?.dailyPlans?.[today]?.logbuch || [];
+    if (_lb2.length) {
+      h += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;'
+        + 'letter-spacing:0.07em;color:var(--c-privat);margin-bottom:6px;">Heute für dich</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">';
+      _lb2.forEach(e => {
+        const _tLb = this.LOGBUCH_TAGS.find(t => t.id === e.tag);
+        h += '<span style="padding:4px 10px;border-radius:12px;'
+          + 'background:color-mix(in srgb,var(--c-privat) 8%,#F0EEE8);'
+          + 'border:1px solid color-mix(in srgb,var(--c-privat) 15%,var(--c-border));'
+          + 'font-size:0.78rem;color:var(--c-privat);font-weight:500;">'
+          + (_tLb?.emoji || '') + ' ' + (e.notiz || _tLb?.label || '') + '</span>';
+      });
+      h += '</div>';
+    } else {
+      h += '<div style="font-size:0.78rem;color:var(--c-faint);'
+        + 'font-style:italic;margin-bottom:12px;">Heute nichts im Logbuch. Gab es wirklich nichts Gutes?</div>';
+    }
+
     h += '<button onclick="WB._feSaveAndGoto(0,1)"'
       + ' style="width:100%;padding:14px;border-radius:var(--radius-sm);'
       + 'background:var(--c-beruf);color:#fff;border:none;'
@@ -13677,6 +13704,19 @@ const WB = {
   },
 
   // ── SLS-M1: Übergangswächter ─────────────────────────
+  LOGBUCH_TAGS: [
+    { id: 'bewegung',    emoji: '🚶', label: 'Bewegung' },
+    { id: 'zusammen',    emoji: '👫', label: 'Zeit zu zweit' },
+    { id: 'familie',     emoji: '👪', label: 'Familie' },
+    { id: 'freunde',     emoji: '🍻', label: 'Freunde' },
+    { id: 'lernen',      emoji: '📚', label: 'Lernen' },
+    { id: 'entspannung', emoji: '🧘', label: 'Entspannung' },
+    { id: 'natur',       emoji: '🌿', label: 'Natur' },
+    { id: 'kreativ',     emoji: '🎨', label: 'Kreativ' },
+    { id: 'sport',       emoji: '💪', label: 'Sport' },
+    { id: 'kochen',      emoji: '🍳', label: 'Gut gegessen' },
+  ],
+
   _slsLetzterKontext: null,
   _slsNachholNoetig: false,
   _slsNachholTyp:    null,
@@ -17977,6 +18017,158 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   // TAGESBEGLEITER v4.0 (v3.62.0)
   // ══════════════════════════════════════════════════════
 
+  // ── SLS-M2: Tages-Logbuch ────────────────────────
+  _ckRenderLogbuch() {
+    const container = document.getElementById('ck-logbuch');
+    if (!container) return;
+    const today = new Date().toISOString().split('T')[0];
+    const db = this.dataPriv;
+    if (!db) { container.style.display = 'none'; return; }
+    if (!db.dailyPlans) db.dailyPlans = {};
+    if (!db.dailyPlans[today]) db.dailyPlans[today] = {};
+    const eintraege = db.dailyPlans[today].logbuch || [];
+    container.style.display = 'block';
+
+    let h = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">'
+      + '<span style="font-size:0.65rem;font-weight:800;text-transform:uppercase;'
+        + 'letter-spacing:0.07em;color:var(--c-privat);">Mein Tag</span>'
+      + '<span style="font-size:0.62rem;color:var(--c-faint);">'
+        + eintraege.length + ' Eintr\u00e4ge</span>'
+      + '</div>';
+
+    h += '<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;'
+      + '-webkit-overflow-scrolling:touch;">';
+    this.LOGBUCH_TAGS.forEach(t => {
+      const aktiv = eintraege.some(e => e.tag === t.id);
+      h += '<button onclick="WB._lbToggleTag(&quot;' + t.id + '&quot;)"'
+        + ' style="display:flex;flex-direction:column;align-items:center;'
+          + 'gap:2px;padding:6px 10px;border-radius:var(--radius-xs);'
+          + 'border:1.5px solid ' + (aktiv ? 'var(--c-privat)' : 'var(--c-border)') + ';'
+          + 'background:' + (aktiv ? 'var(--c-privat)' : '#F0EEE8') + ';'
+          + 'color:' + (aktiv ? '#fff' : 'var(--c-muted)') + ';'
+          + 'cursor:pointer;font-family:var(--font);flex-shrink:0;'
+          + 'min-width:56px;font-size:0.72rem;font-weight:600;">'
+        + '<span style="font-size:1.1rem;">' + t.emoji + '</span>'
+        + '<span>' + t.label + '</span>'
+        + '</button>';
+    });
+    h += '</div>';
+
+    if (eintraege.length) {
+      h += '<div style="margin-top:6px;">';
+      eintraege.forEach(e => {
+        const tag = this.LOGBUCH_TAGS.find(t => t.id === e.tag);
+        h += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:0.82rem;">'
+          + '<span>' + (tag?.emoji || '\u2022') + '</span>'
+          + '<span style="flex:1;color:var(--c-text);">'
+            + (e.notiz ? this._esc(e.notiz) : (tag?.label || '')) + '</span>'
+          + '<button onclick="WB._lbRemove(&quot;' + e.id + '&quot;)"'
+            + ' style="background:none;border:none;color:var(--c-faint);'
+            + 'cursor:pointer;font-size:0.72rem;padding:2px 4px;">✕</button>'
+          + '</div>';
+      });
+      h += '</div>';
+    }
+    container.innerHTML = h;
+  },
+
+  _lbToggleTag(tagId) {
+    const today = new Date().toISOString().split('T')[0];
+    const db = this.dataPriv;
+    if (!db) return;
+    if (!db.dailyPlans) db.dailyPlans = {};
+    if (!db.dailyPlans[today]) db.dailyPlans[today] = {};
+    if (!db.dailyPlans[today].logbuch) db.dailyPlans[today].logbuch = [];
+    const lb = db.dailyPlans[today].logbuch;
+    const idx = lb.findIndex(e => e.tag === tagId);
+    if (idx >= 0) {
+      lb.splice(idx, 1);
+    } else {
+      const tag = this.LOGBUCH_TAGS.find(t => t.id === tagId);
+      const notiz = prompt(
+        (tag?.emoji || '') + ' ' + (tag?.label || '') + ' \u2014 optional ein Satz dazu:',
+        ''
+      );
+      lb.push({ id: 'lb_' + Date.now(), tag: tagId, notiz: notiz?.trim() || '', ts: Date.now() });
+    }
+    this.setDirty();
+    this._ckRenderLogbuch();
+  },
+
+  _lbRemove(id) {
+    const today = new Date().toISOString().split('T')[0];
+    const lb = this.dataPriv?.dailyPlans?.[today]?.logbuch;
+    if (!lb) return;
+    const idx = lb.findIndex(e => e.id === id);
+    if (idx >= 0) lb.splice(idx, 1);
+    this.setDirty();
+    this._ckRenderLogbuch();
+  },
+
+  _lbQuickAdd(tagId) {
+    const today = new Date().toISOString().split('T')[0];
+    const db = this.dataPriv;
+    if (!db) return;
+    if (!db.dailyPlans) db.dailyPlans = {};
+    if (!db.dailyPlans[today]) db.dailyPlans[today] = {};
+    if (!db.dailyPlans[today].logbuch) db.dailyPlans[today].logbuch = [];
+    db.dailyPlans[today].logbuch.push({ id: 'lb_' + Date.now(), tag: tagId, notiz: '', ts: Date.now() });
+    this.setDirty();
+  },
+
+  _lbWochenTrend() {
+    const db = this.dataPriv;
+    if (!db?.dailyPlans) return '';
+    const now = new Date();
+    const dow = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+    const lastMonday = new Date(monday);
+    lastMonday.setDate(monday.getDate() - 7);
+    const countTags = (startDate, days) => {
+      const counts = {};
+      for (let i = 0; i < days; i++) {
+        const d = new Date(startDate); d.setDate(startDate.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        (db.dailyPlans[dateStr]?.logbuch || []).forEach(e => {
+          counts[e.tag] = (counts[e.tag] || 0) + 1;
+        });
+      }
+      return counts;
+    };
+    const dieseWoche = countTags(monday, 7);
+    const letzteWoche = countTags(lastMonday, 7);
+    const totalDiese  = Object.values(dieseWoche).reduce((s,n) => s+n, 0);
+    const totalLetzte = Object.values(letzteWoche).reduce((s,n) => s+n, 0);
+    if (totalDiese === 0 && totalLetzte === 0) return '';
+    let h = '<div style="margin-bottom:14px;">'
+      + '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;'
+        + 'letter-spacing:0.07em;color:var(--c-privat);margin-bottom:8px;">Dein Wochen-Logbuch</div>'
+      + '<div style="background:#F0EEE8;border:1px solid var(--c-border);'
+        + 'border-radius:var(--radius-xs);overflow:hidden;">';
+    this.LOGBUCH_TAGS.forEach(t => {
+      const diese = dieseWoche[t.id] || 0;
+      const letzte = letzteWoche[t.id] || 0;
+      if (diese === 0 && letzte === 0) return;
+      const trend = diese > letzte ? '\u2191' : diese < letzte ? '\u2193' : '\u2192';
+      const trendColor = diese > letzte ? 'var(--c-privat)' : diese < letzte ? '#B87333' : 'var(--c-faint)';
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--c-border);">'
+        + '<span style="font-size:0.95rem;">' + t.emoji + '</span>'
+        + '<span style="flex:1;font-size:0.85rem;font-weight:500;">' + t.label + '</span>'
+        + '<span style="font-size:0.82rem;font-family:var(--font-mono);font-weight:700;color:var(--c-text);">' + diese + 'x</span>'
+        + '<span style="font-size:0.72rem;color:' + trendColor + ';font-weight:700;">' + trend + ' (' + letzte + 'x)</span>'
+        + '</div>';
+    });
+    h += '</div>';
+    if (totalDiese > totalLetzte) {
+      h += '<div style="font-size:0.78rem;color:var(--c-privat);margin-top:6px;font-weight:500;">\u2713 Mehr f\u00fcr dich getan als letzte Woche!</div>';
+    } else if (totalDiese < totalLetzte) {
+      h += '<div style="font-size:0.78rem;color:var(--c-faint);margin-top:6px;">Weniger als letzte Woche \u2014 kein Vorwurf, nur Bewusstsein.</div>';
+    }
+    h += '</div>';
+    return h;
+  },
+
   _ckRenderTagesseite() {
     const now   = new Date();
     const today = now.toISOString().split('T')[0];
@@ -20137,6 +20329,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         this._ckRenderTagesseite();
       }
     }, 60000);
+    // SLS-M2: Logbuch rendern
+    try { this._ckRenderLogbuch(); } catch(e) {}
     // Tages-Fokus-Ritual: morgens automatisch, blockiert bis durchlaufen
     this._ritualMaybeOpen();
     // Wochen-Reflexion: Sonntag ab 19:00
@@ -21018,7 +21212,40 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   // ── Schritt 0: Was erreicht? ───────────────────────────
   _evWzStep0() {
     const q = this._settings.eveningQ?.[0] || 'Was habe ich heute erreicht?';
-    return `<div class="wz-field">
+    // SLS-M2: Logbuch-Einträge des Tages
+    const _lbToday = new Date().toISOString().split('T')[0];
+    const _lbEintr = this.dataPriv?.dailyPlans?.[_lbToday]?.logbuch || [];
+    let _lbHtml = '';
+    if (_lbEintr.length) {
+      _lbHtml = '<div style="background:color-mix(in srgb,var(--c-privat) 6%,#F0EEE8);'
+        + 'border:1px solid color-mix(in srgb,var(--c-privat) 15%,var(--c-border));'
+        + 'border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:14px;">'
+        + '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;'
+          + 'letter-spacing:0.07em;color:var(--c-privat);margin-bottom:6px;">Was du heute für dich getan hast</div>';
+      _lbEintr.forEach(e => {
+        const _t = this.LOGBUCH_TAGS.find(t => t.id === e.tag);
+        _lbHtml += '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:0.85rem;">'
+          + '<span>' + (_t?.emoji || '\u2022') + '</span>'
+          + '<span>' + (e.notiz ? this._esc(e.notiz) : (_t?.label || '')) + '</span>'
+          + '</div>';
+      });
+      _lbHtml += '</div>';
+    } else {
+      _lbHtml = '<div style="background:color-mix(in srgb,var(--c-privat) 4%,#F0EEE8);'
+        + 'border:1px solid var(--c-border);border-radius:var(--radius-xs);'
+        + 'padding:10px 12px;margin-bottom:14px;">'
+        + '<div style="font-size:0.85rem;color:var(--c-faint);font-style:italic;">'
+          + 'Heute nichts im Logbuch. Gab es trotzdem etwas Gutes?</div>'
+        + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">';
+      this.LOGBUCH_TAGS.slice(0, 6).forEach(t => {
+        _lbHtml += '<button onclick="WB._lbQuickAdd(&quot;' + t.id + '&quot;);WB._evWzRender();"'
+          + ' style="padding:3px 8px;border-radius:12px;border:1px solid var(--c-border);'
+          + 'background:#F0EEE8;font-family:var(--font);font-size:0.72rem;cursor:pointer;'
+          + 'color:var(--c-muted);">' + t.emoji + ' ' + t.label + '</button>';
+      });
+      _lbHtml += '</div></div>';
+    }
+    return _lbHtml + `<div class="wz-field">
       <label class="wz-label">${q}</label>
       <textarea class="wz-input" id="evwz-textarea" rows="5"
         style="resize:none;width:100%;box-sizing:border-box;"
