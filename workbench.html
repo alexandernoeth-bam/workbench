@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.36.5</title>
+<title>WorkBench 5.37.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7450,7 +7450,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.36.5</div>
+  <div class="wb-startup-tagline">v5.37.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7572,6 +7572,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
   </div>
 
   <!-- Scrollbarer Body -->
+  <div id="sls-abend-banner" style="display:none;"></div>
   <div id="ck-scroll-body">
 
     <div class="ck-zone" id="ck-zone-vm">
@@ -8415,6 +8416,31 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
       <div id="wbs-evening-questions"></div>
 
       <div class="wbs-divider"></div>
+      <div class="wbs-section-label">Smart Life Support</div>
+
+      <div class="wbs-row">
+        <div class="wbs-label">
+          <div class="wbs-label-main">Schlafenszeit-Erinnerung</div>
+          <div class="wbs-label-sub">Wenn Abendreflexion noch offen</div>
+        </div>
+        <input class="wbs-input" type="time" id="s-sls-schlafenszeit" value="23:00"
+          onchange="WB.saveSetting('slsSchlafenszeit',this.value)"
+          style="width:88px;">
+      </div>
+
+      <div class="wbs-row">
+        <div class="wbs-label">
+          <div class="wbs-label-main">Versäumte Rituale nachholen</div>
+          <div class="wbs-label-sub">Morgendialog fragt nach versäumter Reflexion</div>
+        </div>
+        <label class="wbs-toggle">
+          <input type="checkbox" id="s-sls-nachholen" checked
+            onchange="WB.saveSetting('slsNachholen',this.checked)">
+          <span class="wbs-toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="wbs-divider"></div>
 
       <!-- Drive-Sync -->
       <div class="wbs-divider"></div>
@@ -9028,7 +9054,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.36.5 · Build 20260612-1930</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.37.0 · Build 20260612-2000</div>
     </div>
 
     <!-- Welt -->
@@ -9213,8 +9239,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.36.5',
-  APP_BUILD:   '20260612-1930',
+  APP_VERSION: '5.37.0',
+  APP_BUILD:   '20260612-2000',
 
 
   // ══════════════════════════════════════════════════════
@@ -10548,6 +10574,25 @@ const WB = {
           }, (feMin - nowMin) * 60000);
           this._notifTimers.push(id);
         }
+      }
+    }
+
+    // SLS-M1: Schlafenszeit-Erinnerung
+    const schlafZ2 = this._settings.slsSchlafenszeit || '23:00';
+    const today2 = new Date().toISOString().split('T')[0];
+    const evDone2 = this.dataPriv?.dailyPlans?.[today2]?.eveningDone;
+    if (!evDone2) {
+      const [schlafH2, schlafM2] = schlafZ2.split(':').map(Number);
+      const fireAt2 = new Date();
+      fireAt2.setHours(schlafH2, schlafM2, 0, 0);
+      if (fireAt2 > new Date()) {
+        const msUntil2 = fireAt2.getTime() - Date.now();
+        const id2 = setTimeout(() => {
+          if (!this.dataPriv?.dailyPlans?.[today2]?.eveningDone) {
+            this._notifSend('🌙 Schlafenszeit', 'Abend-Reflexion noch offen — 3 Minuten, dann ist gut.', '🌙');
+          }
+        }, msUntil2);
+        this._notifTimers.push(id2);
       }
     }
 
@@ -12272,6 +12317,11 @@ const WB = {
     store[idx][field] = value;
     this.setDirty();
     this._reminderSettingsRender();
+    // SLS-M1 Settings
+    const slsSchlaf = document.getElementById('s-sls-schlafenszeit');
+    if (slsSchlaf) slsSchlaf.value = s.slsSchlafenszeit || '23:00';
+    const slsNach = document.getElementById('s-sls-nachholen');
+    if (slsNach) slsNach.checked = s.slsNachholen !== false;
     try { this._bereichSettingsRender(); } catch(e) {}
     this._reminderInit(); // Timer neu starten
   },
@@ -13437,6 +13487,116 @@ const WB = {
     this.ritualOpen();
   },
 
+  // ── SLS-M1: Übergangswächter ─────────────────────────
+  _slsNachholNoetig: false,
+  _slsNachholTyp:    null,
+  _slsNachholDatum:  null,
+  _slsNachholEnergieWert: null,
+  _slsNachholGrundWert:   null,
+
+  _ritualRenderNachhol() {
+    const container = document.getElementById('wb-ritual-body');
+    if (!container) return;
+
+    if (this._slsNachholTyp === 'abend') {
+      const gestPlan  = this.dataPriv?.dailyPlans?.[this._slsNachholDatum] || {};
+      const gestStore = this._ritualStore ? this._ritualStore() : {};
+      const gestRitual = gestStore?.[this._slsNachholDatum] || {};
+      const hatFeierabend = !!(gestRitual.feierabend?.done || gestRitual.doneB);
+      container.innerHTML = '<div style="padding:20px 16px;text-align:center;">'
+        + '<div style="font-size:2rem;margin-bottom:12px;">🌙</div>'
+        + '<div style="font-size:1.1rem;font-weight:700;color:var(--c-text);margin-bottom:8px;">Gestern keine Abend-Reflexion</div>'
+        + '<div style="font-size:0.85rem;color:var(--c-muted);line-height:1.5;margin-bottom:20px;">'
+          + 'Du hast gestern die Reflexion \u00fcbersprungen. '
+          + (hatFeierabend ? 'Den Feierabend-Check hast du gemacht \u2014 gut.' : 'Auch kein Feierabend-Check.')
+          + '<br>Nimm dir jetzt 2 Minuten f\u00fcr gestern.</div>'
+        + '<div style="text-align:left;max-width:360px;margin:0 auto;">'
+          + '<div style="margin-bottom:12px;">'
+            + '<div style="font-size:0.72rem;font-weight:700;color:var(--c-beruf);margin-bottom:4px;">Was hast du gestern erreicht?</div>'
+            + '<textarea id="sls-nachhol-q1" placeholder="1-2 S\u00e4tze..."'
+              + ' style="width:100%;min-height:50px;padding:8px 10px;border:1px solid var(--c-border);'
+              + 'border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;'
+              + 'background:var(--c-bg);color:var(--c-text);resize:none;box-sizing:border-box;"></textarea>'
+          + '</div>'
+          + '<div style="margin-bottom:12px;">'
+            + '<div style="font-size:0.72rem;font-weight:700;color:var(--c-beruf);margin-bottom:4px;">Wie war deine Energie am Abend? (1-5)</div>'
+            + '<div style="display:flex;gap:6px;" id="sls-nachhol-energie">'
+            + [1,2,3,4,5].map(n =>
+                '<button onclick="WB._slsNachholEnergie(' + n + ')"'
+                + ' style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--c-border);'
+                + 'background:var(--c-bg);font-family:var(--font);font-size:0.88rem;cursor:pointer;'
+                + 'color:var(--c-text);" data-val="' + n + '">' + n + '</button>'
+              ).join('')
+            + '</div>'
+          + '</div>'
+          + '<div style="margin-bottom:16px;">'
+            + '<div style="font-size:0.72rem;font-weight:700;color:var(--c-beruf);margin-bottom:4px;">Warum keine Reflexion?</div>'
+            + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+            + ['Vergessen','Keine Zeit','Keine Lust','Zu sp\u00e4t'].map(r =>
+                '<button onclick="WB._slsNachholGrund(this,&quot;' + r + '&quot;)"'
+                + ' class="sls-grund-btn"'
+                + ' style="padding:5px 12px;border-radius:16px;border:1px solid var(--c-border);'
+                + 'background:var(--c-bg);font-family:var(--font);font-size:0.78rem;cursor:pointer;'
+                + 'color:var(--c-muted);">' + r + '</button>'
+              ).join('')
+            + '</div>'
+          + '</div>'
+        + '</div>'
+        + '<div style="display:flex;gap:8px;justify-content:center;margin-top:8px;">'
+          + '<button onclick="WB._slsNachholSave()" style="padding:12px 24px;border-radius:var(--radius-sm);'
+            + 'background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);'
+            + 'font-size:0.92rem;font-weight:600;cursor:pointer;">Speichern & weiter \u2192</button>'
+          + '<button onclick="WB._slsNachholSkip()" style="padding:12px 16px;border-radius:var(--radius-sm);'
+            + 'background:none;border:1px solid var(--c-border);font-family:var(--font);'
+            + 'font-size:0.85rem;cursor:pointer;color:var(--c-muted);">Überspringen</button>'
+        + '</div>'
+        + '</div>';
+    } else {
+      // Woche-Nachhol: einfacher Skip
+      this._slsNachholSkip();
+    }
+  },
+
+  _slsNachholEnergie(n) {
+    this._slsNachholEnergieWert = n;
+    document.querySelectorAll('#sls-nachhol-energie button').forEach(btn => {
+      const v = parseInt(btn.getAttribute('data-val'));
+      btn.style.background = v === n ? 'var(--c-beruf)' : 'var(--c-bg)';
+      btn.style.color = v === n ? '#fff' : 'var(--c-text)';
+      btn.style.borderColor = v === n ? 'var(--c-beruf)' : 'var(--c-border)';
+    });
+  },
+
+  _slsNachholGrund(btn, grund) {
+    this._slsNachholGrundWert = grund;
+    document.querySelectorAll('.sls-grund-btn').forEach(b => {
+      b.style.background = 'var(--c-bg)'; b.style.color = 'var(--c-muted)'; b.style.borderColor = 'var(--c-border)';
+    });
+    btn.style.background = 'var(--c-beruf)'; btn.style.color = '#fff'; btn.style.borderColor = 'var(--c-beruf)';
+  },
+
+  _slsNachholSave() {
+    const db = this.dataPriv;
+    if (!db) return;
+    if (!db.dailyPlans) db.dailyPlans = {};
+    const gestStr = this._slsNachholDatum;
+    if (!db.dailyPlans[gestStr]) db.dailyPlans[gestStr] = {};
+    db.dailyPlans[gestStr].eveningDone    = true;
+    db.dailyPlans[gestStr].nachgeholt     = true;
+    db.dailyPlans[gestStr].nachholQ1      = document.getElementById('sls-nachhol-q1')?.value || '';
+    db.dailyPlans[gestStr].nachholEnergie = this._slsNachholEnergieWert;
+    db.dailyPlans[gestStr].nachholGrund   = this._slsNachholGrundWert;
+    this.setDirty();
+    this._slsNachholNoetig = false;
+    this._toast('\u2713 Gestern nachgeholt');
+    this._ritualGoto(0);
+  },
+
+  _slsNachholSkip() {
+    this._slsNachholNoetig = false;
+    this._ritualGoto(0);
+  },
+
   ritualOpen() {
     this._ritualSelected   = [];
     this._ritualFreitexte  = [];
@@ -13448,6 +13608,32 @@ const WB = {
     this._ritualAutoSelectDone = false;
     if (this._ritualVorhabenCheck) { clearInterval(this._ritualVorhabenCheck); this._ritualVorhabenCheck = null; }
     const now = new Date();
+    // SLS-M1: Versäumte Abendreflexion prüfen
+    this._slsNachholNoetig = false;
+    this._slsNachholTyp    = null;
+    this._slsNachholDatum  = null;
+    if (this._settings.slsNachholen !== false) {
+      const gestern = new Date();
+      gestern.setDate(gestern.getDate() - 1);
+      const gestStr = gestern.toISOString().split('T')[0];
+      const gestPlan = this.dataPriv?.dailyPlans?.[gestStr];
+      if (!gestPlan?.eveningDone) {
+        this._slsNachholNoetig = true;
+        this._slsNachholTyp    = 'abend';
+        this._slsNachholDatum  = gestStr;
+      }
+      const dow = now.getDay();
+      if (dow >= 1 && dow <= 2) {
+        const letztenSo = new Date(now);
+        letztenSo.setDate(now.getDate() - dow);
+        const kwSo = this._kwStr ? this._kwStr(letztenSo) : null;
+        const weekPlan = kwSo ? this.dataPriv?.weeklyPlans?.[kwSo] : null;
+        if (!weekPlan?.weekDone && !this._slsNachholNoetig) {
+          this._slsNachholNoetig = true;
+          this._slsNachholTyp    = 'woche';
+        }
+      }
+    }
     const DAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
     const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
     const dEl = document.getElementById('ritual-date');
@@ -13486,7 +13672,11 @@ const WB = {
       dot.classList.toggle('active', ds === step);
       dot.classList.toggle('done', ds < step);
     });
-    if (step === 0) this._ritualRenderVorhabenScan();
+    if (step === 0) {
+      // SLS-M1: Nachhol-Screen wenn nötig
+      if (this._slsNachholNoetig) { this._ritualRenderNachhol(); return; }
+      this._ritualRenderVorhabenScan();
+    }
     if (step === 1) { this._ritualRenderOverview(); this._ritualInitTagestyp(); }
     if (step === 2) this._ritualRenderConfirmA();
   },
@@ -13509,6 +13699,19 @@ const WB = {
     el.innerHTML =
       '<div class="ritual-ov-row"><span>Termine</span><span class="ov-val">' + termineLabel + '</span></div>'
       + '<div class="ritual-ov-row"><span>Aktive Vorhaben</span><span class="ov-val">' + aktive + '</span></div>';
+    // SLS-M1: Body Battery Hinweis
+    const bbInput = document.getElementById('ritual-body-battery');
+    if (bbInput) {
+      bbInput.addEventListener('input', () => {
+        const v = parseInt(bbInput.value);
+        const hint = document.getElementById('ritual-bb-hinweis');
+        if (!hint || isNaN(v)) return;
+        if (v > 70)      { hint.textContent = '\u2713 Guter Start'; hint.style.color = 'var(--c-beruf)'; }
+        else if (v > 50) { hint.textContent = 'Etwas niedrig \u2014 weniger planen'; hint.style.color = 'var(--c-beruf)'; }
+        else if (v > 35) { hint.textContent = '\u26a0 Niedrig \u2014 nur 1 Fokus-Aufgabe'; hint.style.color = '#C62828'; }
+        else             { hint.textContent = '\U0001f534 Kritisch \u2014 Schonung heute'; hint.style.color = '#C62828'; }
+      });
+    }
   },
 
   // v4.4.0: Vorhaben-Gruppen für Step 2 — nur Vorhaben-Aufgaben, gruppiert nach Ebene
@@ -17670,6 +17873,37 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const _rTriAb  = _rIsWD ? 7 : 8;
       const _showBanner = isToday && _rRitual?.doneA && !_rRitual?.doneB && _rHour >= _rTriAb;
       triageBannerEl.style.display = _showBanner ? '' : 'none';
+    }
+    // SLS-M1: Abendreflexions-Banner
+    const slsBannerEl = document.getElementById('sls-abend-banner');
+    if (slsBannerEl) {
+      const eS2 = this._settings.assistEveningStart ?? 20;
+      const schlafZ = this._settings.slsSchlafenszeit || '23:00';
+      const schlafH = parseInt(schlafZ.split(':')[0]);
+      const plan_t = this.dataPriv?.dailyPlans?.[today] || {};
+      if (isToday && h >= eS2 && !plan_t.eveningDone) {
+        const dringend = h >= schlafH;
+        slsBannerEl.style.display = 'block';
+        slsBannerEl.innerHTML = '<div style="padding:10px 14px;'
+          + 'background:' + (dringend ? 'color-mix(in srgb,#C62828 10%,var(--c-bg))' : 'color-mix(in srgb,var(--c-beruf) 8%,var(--c-bg))') + ';'
+          + 'border-bottom:1px solid ' + (dringend ? '#C62828' : 'var(--c-border)') + ';">' 
+          + '<div style="display:flex;align-items:center;gap:8px;">'
+            + '<span style="font-size:1rem;">' + (dringend ? '\U0001f534' : '\U0001f319') + '</span>'
+            + '<div style="flex:1;">'
+              + '<div style="font-size:0.88rem;font-weight:600;color:' + (dringend ? '#C62828' : 'var(--c-beruf)') + ';">'
+                + (dringend ? 'Schlafenszeit \u2014 jetzt reflektieren' : 'Abend-Reflexion steht noch aus') + '</div>'
+              + (dringend ? '<div style="font-size:0.78rem;color:var(--c-faint);">\u201eMein Rhythmus, meine Regeln\u201c \u2014 3 Minuten, dann Schluss.</div>' : '')
+            + '</div>'
+            + '<button onclick="WB.wzOpenEvening()"'
+              + ' style="padding:6px 14px;border-radius:var(--radius-xs);'
+              + 'background:' + (dringend ? '#C62828' : 'var(--c-beruf)') + ';'
+              + 'color:#fff;border:none;font-family:var(--font);font-size:0.82rem;'
+              + 'font-weight:600;cursor:pointer;flex-shrink:0;">'
+              + (dringend ? 'Jetzt \u2192' : 'Reflektieren \u2192') + '</button>'
+          + '</div></div>';
+      } else {
+        slsBannerEl.style.display = 'none';
+      }
     }
     const feBtnEl = document.getElementById('ck-feierabend-btn');
     if (feBtnEl) {
@@ -24345,7 +24579,20 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         ${openD.length ? `<div class="wz-summary-row"><span class="wz-summary-key">Noch offen</span><span class="wz-summary-val" style="color:var(--c-warn);">${openD.map(d=>d.title).join(', ')}</span></div>` : ''}
       </div>`;
     }
-    return html;
+
+    // SLS-M1: Privater Fokus-Check
+    const ritualToday = this._ritualStore ? (this._ritualStore()?.[today] || {}) : {};
+    const hatPrivatFokus = (ritualToday.fokus || [])
+      .some(f => f.welt === 'priv' || f._welt === 'priv' || f.ctx === 'priv');
+    if (!hatPrivatFokus) {
+      html += '<div style="margin-top:12px;padding:10px 12px;'
+        + 'background:color-mix(in srgb,var(--c-privat) 8%,var(--c-bg));'
+        + 'border:1px solid color-mix(in srgb,var(--c-privat) 20%,var(--c-border));'
+        + 'border-radius:var(--radius-xs);font-size:0.85rem;color:var(--c-muted);">'
+        + '\U0001f4a1 Du hast heute keinen privaten Fokus gesetzt. '
+        + 'Bewusst so gewollt \u2014 oder vergessen?</div>';
+    }
+        return html;
   },
 
   // ── Tagesplan speichern ────────────────────────────────
@@ -35447,7 +35694,7 @@ if (new URLSearchParams(location.search).get('wake') === '1') {
         <div style="display:flex;align-items:center;gap:10px;">
           <input type="number" id="ritual-body-battery" min="1" max="100" step="1" placeholder="z.B. 72"
             style="width:90px;padding:8px 10px;border:1.5px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);text-align:center;">
-          <span style="font-size:0.78rem;color:var(--c-faint);">Garmin-Wert nach dem Aufstehen</span>
+          <span id="ritual-bb-hinweis" style="font-size:0.78rem;color:var(--c-faint);"></span>
         </div>
       </div>
 
