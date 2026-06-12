@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.38.1</title>
+<title>WorkBench 5.38.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7454,7 +7454,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.38.1</div>
+  <div class="wb-startup-tagline">v5.38.2</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8809,7 +8809,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
           <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
         </svg>
       </button>
-      <button id="qc-mic-btn" onclick="WB._qcMicToggle()" style="display:none;" title="Spracheingabe">&#9679;</button>
+      <button id="qc-mic-btn" onclick="WB._qcMicToggle()" title="Spracheingabe" style="display:flex;align-items:center;justify-content:center;">🎙</button>
     </div>
     <!-- Vorschau Bild -->
     <img id="qc-cam-preview" alt="Vorschau">
@@ -8820,13 +8820,49 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
       <span>&#128203;</span> Aus Zwischenablage einfügen
     </button>
 
-    <!-- Aktions-Bereich -->
-    <div id="qc-actions" style="margin-top:8px;">
-      <!-- Wird dynamisch befüllt wenn Text eingegeben wird -->
-      <button onclick="WB._qcSaveSchnell()" style="width:100%;padding:12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;">
-        Als Notiz speichern
-      </button>
+    <!-- Typ-Auswahl -->
+    <div id="qc-type-row" style="display:flex;gap:6px;margin-top:10px;">
+      <button onclick="WB._qcSetTyp('notiz')" class="qc-type-btn" data-typ="notiz"
+        style="flex:1;padding:8px 4px;border-radius:var(--radius-xs);border:1.5px solid var(--c-beruf);background:var(--c-beruf);color:#fff;font-family:var(--font);font-size:0.78rem;font-weight:600;cursor:pointer;text-align:center;">
+        📝 Notiz</button>
+      <button onclick="WB._qcSetTyp('aufgabe')" class="qc-type-btn" data-typ="aufgabe"
+        style="flex:1;padding:8px 4px;border-radius:var(--radius-xs);border:1.5px solid var(--c-border);background:#F0EEE8;color:var(--c-muted);font-family:var(--font);font-size:0.78rem;font-weight:600;cursor:pointer;text-align:center;">
+        ✓ Aufgabe</button>
+      <button onclick="WB._qcSetTyp('termin')" class="qc-type-btn" data-typ="termin"
+        style="flex:1;padding:8px 4px;border-radius:var(--radius-xs);border:1.5px solid var(--c-border);background:#F0EEE8;color:var(--c-muted);font-family:var(--font);font-size:0.78rem;font-weight:600;cursor:pointer;text-align:center;">
+        📅 Termin</button>
+      <button onclick="WB._qcSetTyp('erkenntnis')" class="qc-type-btn" data-typ="erkenntnis"
+        style="flex:1;padding:8px 4px;border-radius:var(--radius-xs);border:1.5px solid var(--c-border);background:#F0EEE8;color:var(--c-muted);font-family:var(--font);font-size:0.78rem;font-weight:600;cursor:pointer;text-align:center;">
+        💡 Erkenntnis</button>
     </div>
+
+    <!-- Vorhaben-Zuordnung -->
+    <div id="qc-vorhaben-row" style="margin-top:8px;">
+      <select id="qc-vorhaben-select"
+        style="width:100%;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);">
+        <option value="">– Kein Vorhaben (Inbox) –</option>
+      </select>
+    </div>
+
+    <!-- Datum (nur bei Aufgabe/Termin) -->
+    <div id="qc-datum-row" style="margin-top:8px;display:none;">
+      <input type="date" id="qc-datum"
+        style="width:100%;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
+    </div>
+
+    <!-- Uhrzeit (nur bei Termin) -->
+    <div id="qc-zeit-row" style="margin-top:6px;display:none;gap:8px;">
+      <input type="time" id="qc-zeit-start"
+        style="flex:1;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
+      <span style="color:var(--c-faint);align-self:center;">–</span>
+      <input type="time" id="qc-zeit-end"
+        style="flex:1;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
+    </div>
+
+    <!-- Speichern -->
+    <button onclick="WB._qcSave()" id="qc-save-btn"
+      style="width:100%;padding:12px;margin-top:10px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;">
+      Speichern</button>
   </div>
 </div>
 
@@ -9061,7 +9097,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.38.1 · Build 20260612-2130</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.38.2 · Build 20260612-2200</div>
     </div>
 
     <!-- Welt -->
@@ -9246,8 +9282,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.38.1',
-  APP_BUILD:   '20260612-2130',
+  APP_VERSION: '5.38.2',
+  APP_BUILD:   '20260612-2200',
 
 
   // ══════════════════════════════════════════════════════
@@ -20902,6 +20938,221 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       document.getElementById('wqa-text')?.select();
     }, 50);
   },
+
+  // ── SLS-M6: Quick-Capture ─────────────────────────
+  _qcTyp: 'notiz',
+  _qcPendingImage: null,
+
+  qcOpen() {
+    this._qcTyp = 'notiz';
+    this._qcPendingImage = null;
+    const overlay = document.getElementById('wb-qc-overlay');
+    if (!overlay) return;
+    overlay.classList.add('open');
+    const ta = document.getElementById('qc-text');
+    if (ta) { ta.value = ''; setTimeout(() => ta.focus(), 100); }
+    const preview = document.getElementById('qc-cam-preview');
+    if (preview) { preview.src = ''; preview.style.display = 'none'; }
+    const datumInput = document.getElementById('qc-datum');
+    if (datumInput) datumInput.value = new Date().toISOString().split('T')[0];
+    // Mic anzeigen wenn SpeechRecognition verfügbar
+    const micBtn = document.getElementById('qc-mic-btn');
+    if (micBtn) micBtn.style.display = ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) ? 'flex' : 'none';
+    this._qcSetTyp('notiz');
+    this._qcFillVorhaben();
+  },
+
+  qcClose() {
+    const overlay = document.getElementById('wb-qc-overlay');
+    if (overlay) overlay.classList.remove('open');
+    this._qcPendingImage = null;
+  },
+
+  _qcSetTyp(typ) {
+    this._qcTyp = typ;
+    document.querySelectorAll('.qc-type-btn').forEach(btn => {
+      const isActive = btn.getAttribute('data-typ') === typ;
+      btn.style.background   = isActive ? 'var(--c-beruf)' : '#F0EEE8';
+      btn.style.color        = isActive ? '#fff' : 'var(--c-muted)';
+      btn.style.borderColor  = isActive ? 'var(--c-beruf)' : 'var(--c-border)';
+    });
+    const datumRow = document.getElementById('qc-datum-row');
+    if (datumRow) datumRow.style.display = (typ === 'aufgabe' || typ === 'termin') ? 'block' : 'none';
+    const zeitRow = document.getElementById('qc-zeit-row');
+    if (zeitRow) zeitRow.style.display = typ === 'termin' ? 'flex' : 'none';
+    const saveBtn = document.getElementById('qc-save-btn');
+    if (saveBtn) {
+      const labels = {
+        notiz: '📝 Als Notiz speichern',
+        aufgabe: '✓ Aufgabe anlegen',
+        termin: '📅 Termin anlegen',
+        erkenntnis: '💡 Erkenntnis speichern',
+      };
+      saveBtn.textContent = labels[typ] || 'Speichern';
+    }
+  },
+
+  _qcFillVorhaben() {
+    const sel = document.getElementById('qc-vorhaben-select');
+    if (!sel) return;
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const bereiche = this._bereichSortiert ? this._bereichSortiert(ctx) : [];
+    const store = this._vorhabenStore() || [];
+    let h = '<option value="">– Kein Vorhaben (Inbox) –</option>';
+    bereiche.forEach(b => {
+      const vhs = store.filter(v => v.bereichId === b.id && (v.aktivitaet||'aktiv') === 'aktiv');
+      if (!vhs.length) return;
+      h += '<optgroup label="' + this._esc(b.titel) + '">';
+      vhs.forEach(v => { h += '<option value="' + v.id + '">' + this._esc(v.titel) + '</option>'; });
+      h += '</optgroup>';
+    });
+    const andereWelt = ctx === 'pro' ? 'priv' : 'pro';
+    const andereStore = (this._vorhabenStore(andereWelt) || []).filter(v => (v.aktivitaet||'aktiv') === 'aktiv');
+    if (andereStore.length) {
+      h += '<optgroup label="── ' + (andereWelt === 'pro' ? 'Beruf' : 'Privat') + ' ──">';
+      andereStore.forEach(v => { h += '<option value="' + v.id + '">' + this._esc(v.titel) + '</option>'; });
+      h += '</optgroup>';
+    }
+    sel.innerHTML = h;
+  },
+
+  _qcSave() {
+    const text = document.getElementById('qc-text')?.value.trim();
+    if (!text && !this._qcPendingImage) { this._toast('Bitte Text eingeben'); return; }
+    const typ  = this._qcTyp;
+    const vorhabenId = document.getElementById('qc-vorhaben-select')?.value || null;
+    const datum = document.getElementById('qc-datum')?.value || new Date().toISOString().split('T')[0];
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) { this._toast('Keine Datenbank geladen'); return; }
+
+    if (typ === 'notiz' || typ === 'erkenntnis') {
+      if (!db.settings) db.settings = {};
+      if (!db.settings.cockpitNotizen) db.settings.cockpitNotizen = [];
+      db.settings.cockpitNotizen.unshift({
+        id: 'qc_' + Date.now(),
+        titel: text && text.length > 60 ? text.slice(0, 60) + '…' : (text || 'Foto-Notiz'),
+        typ: typ === 'erkenntnis' ? 'wissen' : 'schnellnotiz',
+        inhalt: text || '',
+        erstellt: Date.now(), geaendert: Date.now(),
+        _db: ctx, vorhabenId: vorhabenId || null,
+        image: this._qcPendingImage || null,
+      });
+      this._toast('✓ ' + (typ === 'erkenntnis' ? 'Erkenntnis' : 'Notiz') + ' gespeichert');
+    } else if (typ === 'aufgabe') {
+      if (vorhabenId) {
+        const vh = this._vorhabenFind(vorhabenId)?.vorhaben;
+        if (vh) {
+          if (!vh.meilensteine) vh.meilensteine = [];
+          if (!vh.meilensteine.length) vh.meilensteine.push({ id: 'ms_' + Date.now(), titel: 'Aufgaben', aufgaben: [] });
+          const ms = vh.meilensteine[0];
+          if (!ms.aufgaben) ms.aufgaben = [];
+          ms.aufgaben.push({ id: 'a_qc_' + Date.now(), text: text || '', done: false, naechsterSchritt: false, aktivEnergie: 'mittel', datum: datum });
+          vh.geaendert = Date.now();
+          this._toast('✓ Aufgabe in ' + this._esc(vh.titel));
+        }
+      } else {
+        const qStore = this._quickStore();
+        if (qStore) {
+          qStore.push({ id: 'qi_' + Date.now(), text: text || '', date: datum, done: false, ts: Date.now() });
+          this._toast('✓ Aufgabe im Eingangskorb');
+        }
+      }
+    } else if (typ === 'termin') {
+      if (!db.customEvents) db.customEvents = [];
+      db.customEvents.push({
+        id: 'ev_qc_' + Date.now(),
+        text: text || '',
+        date: datum,
+        startTime: document.getElementById('qc-zeit-start')?.value || '',
+        endTime:   document.getElementById('qc-zeit-end')?.value || '',
+        typ: 'standard', done: false,
+        vorhabenId: vorhabenId || null,
+      });
+      this._toast('✓ Termin am ' + datum);
+    }
+    this.setDirty();
+    this.qcClose();
+    try { this.renderCockpit(); } catch(e) {}
+  },
+
+  _qcSaveSchnell() {
+    this._qcSetTyp('notiz');
+    this._qcSave();
+  },
+
+  _qcCameraOpen() {
+    document.getElementById('qc-cam-input')?.click();
+  },
+
+  _qcCameraCapture(input) {
+    if (!input.files?.length) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      this._qcPendingImage = ev.target.result;
+      const preview = document.getElementById('qc-cam-preview');
+      if (preview) { preview.src = ev.target.result; preview.style.display = 'block'; }
+      this._toast('✓ Foto aufgenommen');
+    };
+    reader.readAsDataURL(file);
+  },
+
+  _qcPaste() {
+    navigator.clipboard.readText().then(text => {
+      if (text) {
+        const ta = document.getElementById('qc-text');
+        if (ta) { ta.value = (ta.value ? ta.value + '\n' : '') + text; ta.focus(); }
+      }
+    }).catch(() => this._toast('Kein Zugriff auf Zwischenablage'));
+  },
+
+  _qcPasteFromClipboard() {
+    navigator.clipboard.read().then(items => {
+      for (const item of items) {
+        const imgType = item.types.find(t => t.startsWith('image/'));
+        if (imgType) {
+          item.getType(imgType).then(blob => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              this._qcPendingImage = ev.target.result;
+              const preview = document.getElementById('qc-cam-preview');
+              if (preview) { preview.src = ev.target.result; preview.style.display = 'block'; }
+              this._toast('✓ Bild aus Zwischenablage');
+            };
+            reader.readAsDataURL(blob);
+          });
+          return;
+        }
+      }
+      this._qcPaste();
+    }).catch(() => this._qcPaste());
+  },
+
+  _qcMicToggle() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      this._toast('Spracheingabe nicht unterstützt'); return;
+    }
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SpeechRec();
+    rec.lang = 'de-DE'; rec.continuous = false; rec.interimResults = false;
+    const btn = document.getElementById('qc-mic-btn');
+    rec.onresult = (e) => {
+      const text = e.results[0][0].transcript;
+      const ta = document.getElementById('qc-text');
+      if (ta) ta.value = (ta.value ? ta.value + ' ' : '') + text;
+      if (btn) btn.classList.remove('listening');
+    };
+    rec.onerror = rec.onend = () => { if (btn) btn.classList.remove('listening'); };
+    if (btn) btn.classList.add('listening');
+    rec.start();
+  },
+
+  _qcUpdateActions() {
+    const text = document.getElementById('qc-text')?.value || '';
+    if (text.match(/^https?:\/\//)) this._qcSetTyp('notiz');
+  },
+
 
   _closeSheet500() {
     document.getElementById('wb-quick-sheet')?.remove();
