@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.37.2</title>
+<title>WorkBench 5.38.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7450,7 +7450,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.37.2</div>
+  <div class="wb-startup-tagline">v5.38.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7573,6 +7573,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
   <!-- Scrollbarer Body -->
   <div id="sls-abend-banner" style="display:none;"></div>
+  <div id="sls-kontext-banner" style="display:none;"></div>
   <div id="ck-scroll-body">
 
     <div class="ck-zone" id="ck-zone-vm">
@@ -9054,7 +9055,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.37.2 · Build 20260612-2030</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.38.0 · Build 20260612-2100</div>
     </div>
 
     <!-- Welt -->
@@ -9239,8 +9240,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.37.2',
-  APP_BUILD:   '20260612-2030',
+  APP_VERSION: '5.38.0',
+  APP_BUILD:   '20260612-2100',
 
 
   // ══════════════════════════════════════════════════════
@@ -13307,7 +13308,7 @@ const WB = {
   },
 
   _feGoto(step) {
-    [0,1,2,3,4].forEach(s => {
+    [0,1,2,3,4,5].forEach(s => {
       const el = document.getElementById('fe-step-' + s);
       if (el) el.style.display = s === step ? 'flex' : 'none';
     });
@@ -13316,18 +13317,128 @@ const WB = {
       dot.classList.toggle('active', ds === step);
       dot.classList.toggle('done', ds < step);
     });
-    if (step === 0) this._feRenderGeleistet();
-    if (step === 1) this._feRenderMitnehmen();
-    if (step === 2) this._feRenderLoslassen();
-    if (step === 3) this._feRenderVerschieben();
-    if (step === 4) this._feRenderAbendFokus();
+    if (step === 0) this._feRenderBilanz();
+    if (step === 1) this._feRenderGeleistet();
+    if (step === 2) this._feRenderMitnehmen();
+    if (step === 3) this._feRenderLoslassen();
+    if (step === 4) this._feRenderVerschieben();
+    if (step === 5) this._feRenderAbendFokus();
   },
 
   _feSaveAndGoto(fromStep, toStep) {
-    if (fromStep === 0) this._feAntworten.geleistet = document.getElementById('fe-geleistet-text')?.value || '';
-    else if (fromStep === 1) this._feAntworten.mitnehmen = document.getElementById('fe-mitnehmen-text')?.value || '';
-    else if (fromStep === 2) this._feAntworten.loslassen = document.getElementById('fe-loslassen-text')?.value || '';
+    if (fromStep === 1) this._feAntworten.geleistet = document.getElementById('fe-geleistet-text')?.value || '';
+    else if (fromStep === 2) this._feAntworten.mitnehmen = document.getElementById('fe-mitnehmen-text')?.value || '';
+    else if (fromStep === 3) this._feAntworten.loslassen = document.getElementById('fe-loslassen-text')?.value || '';
     this._feGoto(toStep);
+  },
+
+  _feBilanz: null,
+
+  _feRenderBilanz() {
+    const el = document.getElementById('fe-step-0');
+    if (!el) return;
+
+    const today = this._ritualTodayKey();
+    const ritualToday = this._ritualStore()?.[today] || {};
+    const fokusAufgaben = ritualToday.fokus || [];
+
+    // Termine heute
+    let terminMinuten = 0, terminCount = 0;
+    [this.dataPro, this.dataPriv].forEach(db => {
+      if (!db) return;
+      (db.customEvents || []).forEach(e => {
+        if (e.date !== today) return;
+        if (e.startTime && e.endTime) {
+          const [sh,sm] = e.startTime.split(':').map(Number);
+          const [eh,em] = e.endTime.split(':').map(Number);
+          terminMinuten += (eh*60+em)-(sh*60+sm);
+        } else { terminMinuten += 30; }
+        terminCount++;
+      });
+    });
+    const terminStd = Math.round(terminMinuten / 60 * 10) / 10;
+
+    // Vorhaben-Aktivität
+    const vhAktivHeute = [], vhNichtHeute = [];
+    ['pro','priv'].forEach(welt => {
+      (this._vorhabenStore(welt)||[]).filter(v=>(v.aktivitaet||'aktiv')==='aktiv').forEach(v => {
+        const g = v.geaendert ? new Date(v.geaendert).toISOString().split('T')[0] : null;
+        (g === today ? vhAktivHeute : vhNichtHeute).push(v);
+      });
+    });
+
+    // Erledigte Aufgaben heute
+    let erledigteHeute = 0;
+    ['pro','priv'].forEach(welt => {
+      (this._vorhabenStore(welt)||[]).forEach(v => {
+        (v.meilensteine||[]).forEach(ms => {
+          (ms.aufgaben||[]).forEach(a => {
+            if (a.done && a.doneTs && new Date(a.doneTs).toISOString().split('T')[0] === today) erledigteHeute++;
+          });
+        });
+      });
+    });
+
+    // Stale Vorhaben (≥7 Tage)
+    const stale = vhNichtHeute.filter(v => !v.geaendert || (Date.now()-v.geaendert) > 7*24*60*60*1000);
+
+    // Bilanz-Daten für _feFinish speichern
+    this._feBilanz = { terminCount, terminStd, erledigteHeute, vhAktivAnzahl: vhAktivHeute.length, staleAnzahl: stale.length };
+
+    const cell = (val, label, color) =>
+      '<div style="background:#F0EEE8;padding:10px 8px;text-align:center;">'
+      + '<div style="font-size:1.1rem;font-weight:700;color:' + (color||'var(--c-beruf)') + ';">' + val + '</div>'
+      + '<div style="font-size:0.60rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);">' + label + '</div>'
+      + '</div>';
+
+    let h = '<div style="font-size:2rem;margin-bottom:10px;">📊</div>'
+      + '<div style="font-size:1.2rem;font-weight:700;margin-bottom:16px;">Dein Tag auf einen Blick</div>';
+
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;'
+      + 'background:var(--c-border);border:1px solid var(--c-border);'
+      + 'border-radius:var(--radius-xs);overflow:hidden;margin-bottom:16px;">'
+      + cell(terminCount + ' (' + terminStd + 'h)', 'Termine', null)
+      + cell(erledigteHeute, 'Aufgaben erledigt', null)
+      + cell(fokusAufgaben.length, 'Fokus-Aufgaben', null)
+      + '</div>';
+
+    if (vhAktivHeute.length) {
+      h += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;'
+        + 'letter-spacing:0.07em;color:var(--c-beruf);margin-bottom:6px;">Heute dran gearbeitet</div>'
+        + '<div style="background:#F0EEE8;border:1px solid var(--c-border);border-radius:var(--radius-xs);'
+          + 'overflow:hidden;margin-bottom:12px;">';
+      h += vhAktivHeute.map(v =>
+        '<div style="padding:7px 10px;border-bottom:1px solid var(--c-border);font-size:0.85rem;'
+          + 'display:flex;align-items:center;gap:6px;">'
+          + '<span style="color:var(--c-beruf);">\u2713</span>'
+          + '<span>' + this._esc(v.titel) + '</span></div>'
+      ).join('');
+      h += '</div>';
+    }
+
+    if (stale.length) {
+      h += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;'
+        + 'letter-spacing:0.07em;color:#B87333;margin-bottom:6px;">L\u00e4nger nicht angefasst</div>'
+        + '<div style="background:color-mix(in srgb,#B87333 5%,#F0EEE8);'
+          + 'border:1px solid color-mix(in srgb,#B87333 20%,var(--c-border));'
+          + 'border-radius:var(--radius-xs);overflow:hidden;margin-bottom:12px;">';
+      h += stale.slice(0,5).map(v => {
+        const diff = v.geaendert ? Math.floor((Date.now()-v.geaendert)/86400000) : '?';
+        return '<div style="padding:7px 10px;border-bottom:1px solid var(--c-border);font-size:0.85rem;'
+          + 'display:flex;align-items:center;gap:6px;">'
+          + '<span style="font-size:0.72rem;color:#B87333;">' + diff + 'd</span>'
+          + '<span style="color:var(--c-muted);">' + this._esc(v.titel) + '</span></div>';
+      }).join('');
+      h += '</div>';
+    }
+
+    h += '<button onclick="WB._feSaveAndGoto(0,1)"'
+      + ' style="width:100%;padding:14px;border-radius:var(--radius-sm);'
+      + 'background:var(--c-beruf);color:#fff;border:none;'
+      + 'font-family:var(--font);font-size:0.95rem;font-weight:600;'
+      + 'cursor:pointer;margin-top:8px;">Weiter \u2192</button>';
+
+    el.innerHTML = h;
   },
 
   _feRenderGeleistet() {
@@ -13353,7 +13464,7 @@ const WB = {
         + fokusHtml + '</div>'
       + '<textarea id="fe-geleistet-text" placeholder="Was sonst noch..." style="width:100%;padding:10px 12px;border:1.5px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);resize:none;min-height:80px;box-sizing:border-box;">'
         + this._esc(this._feAntworten.geleistet||'') + '</textarea>'
-      + '<button onclick="WB._feSaveAndGoto(0,1)" style="width:100%;padding:14px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;margin-top:12px;">Weiter →</button>';
+      + '<button onclick="WB._feSaveAndGoto(3,4)" style="width:100%;padding:14px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;margin-top:12px;">Weiter →</button>';
   },
 
   _feRenderMitnehmen() {
@@ -13512,6 +13623,7 @@ const WB = {
         loslassen:    this._feAntworten.loslassen  || '',
         energieAbend: this._feEnergie || null,
         privatFokus:  this._fePrivatFokus ? { id: this._fePrivatFokus } : null,
+        bilanz: this._feBilanz || null,
       };
     }
     this.setDirty();
@@ -13565,6 +13677,7 @@ const WB = {
   },
 
   // ── SLS-M1: Übergangswächter ─────────────────────────
+  _slsLetzterKontext: null,
   _slsNachholNoetig: false,
   _slsNachholTyp:    null,
   _slsNachholDatum:  null,
@@ -21897,6 +22010,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const found = this._vorhabenFind(id);
     if (!found) return;
     this._vorhabenAktivId = id;
+    // SLS-M5: Kontext merken
+    try {
+      const _vhCtx = this._vorhabenFind(id);
+      if (_vhCtx) {
+        this._slsLetzterKontext = {
+          vorhabenId: id,
+          vorhabenTitel: _vhCtx.vorhaben.titel || '',
+          ts: Date.now(),
+        };
+      }
+    } catch(e) {}
     // v4.0.0: einmalige Migration alter Felder beim ersten Öffnen
     const v = found.vorhaben;
     if (!v._v4migr) {
@@ -24155,6 +24279,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         }
       });
     });
+    // SLS-M5: Auch Vorhaben prüfen
+    ['pro','priv'].forEach(welt => {
+      (this._vorhabenStore(welt)||[]).filter(v=>(v.aktivitaet||'aktiv')==='aktiv').forEach(v => {
+        if (!v.geaendert) return;
+        const daysSince5 = Math.floor((now-v.geaendert)/86400000);
+        if (daysSince5 >= 7) {
+          const offeneAufg = (v.meilensteine||[]).flatMap(ms=>(ms.aufgaben||[]).filter(a=>!a.done)).length;
+          silent.push({ name: v.titel||'?', taskCount: offeneAufg, daysSince: daysSince5, vorhabenId: v.id });
+        }
+      });
+    });
     if (!silent.length) return null;
     return silent[Math.floor(Math.random() * silent.length)];
   },
@@ -24190,8 +24325,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       banner.classList.add('scout-proj');
       titleEl.textContent = `Stilles Projekt`;
       subEl.textContent   = `"${proj.name}" — ${proj.taskCount} offene Aufgaben, ${proj.daysSince} Tage keine Aktivität`;
-      btn.textContent     = 'Aufgaben →';
-      btn.setAttribute('onclick', `WB._goTab('projekte')`);
+      if (proj.vorhabenId) {
+        btn.textContent = 'Öffnen →';
+        btn.setAttribute('onclick', 'WB.vorhabenOpen("' + proj.vorhabenId + '")');
+      } else {
+        btn.textContent = 'Aufgaben →';
+        btn.setAttribute('onclick', `WB._goTab('projekte')`);
+      }
     }
 
     banner.classList.add('visible');
@@ -29564,6 +29704,47 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       banner.classList.add('visible');
     } else {
       banner.classList.remove('visible');
+      // SLS-M5: Kontext-Banner nach Meeting
+      const lk = this._slsLetzterKontext;
+      if (lk && lk.vorhabenId) {
+        ['pro','priv'].forEach(ctx5 => {
+          const db5 = ctx5 === 'pro' ? this.dataPro : this.dataPriv;
+          if (!db5) return;
+          (db5.customEvents || []).forEach(e => {
+            if (e.date !== today || e.typ !== 'besprechung' || !e.endTime) return;
+            const [eh5, em5] = e.endTime.split(':').map(Number);
+            const endTs5 = new Date(); endTs5.setHours(eh5, em5, 0, 0);
+            const diff5 = Date.now() - endTs5.getTime();
+            if (diff5 >= 0 && diff5 < 30 * 60 * 1000) {
+              const kontextBanner = document.getElementById('sls-kontext-banner');
+              if (kontextBanner) {
+                kontextBanner.style.display = 'block';
+                kontextBanner.innerHTML = '<div style="padding:8px 14px;'
+                  + 'background:color-mix(in srgb,var(--c-beruf) 6%,var(--c-bg));'
+                  + 'border-bottom:1px solid var(--c-border);">'
+                  + '<div style="display:flex;align-items:center;gap:8px;">'
+                    + '<span style="font-size:0.88rem;">🔄</span>'
+                    + '<div style="flex:1;">'
+                      + '<div style="font-size:0.82rem;font-weight:600;color:var(--c-text);">'
+                        + 'Vorher: ' + this._esc(lk.vorhabenTitel) + '</div>'
+                      + '<div style="font-size:0.72rem;color:var(--c-faint);">Weitermachen?</div>'
+                    + '</div>'
+                    + '<button onclick="WB.vorhabenOpen(&quot;' + lk.vorhabenId + '&quot;);'
+                      + 'document.getElementById(&quot;sls-kontext-banner&quot;).style.display=&quot;none&quot;;"'
+                      + ' style="padding:5px 12px;border-radius:var(--radius-xs);'
+                      + 'background:var(--c-beruf);color:#fff;border:none;'
+                      + 'font-family:var(--font);font-size:0.78rem;font-weight:600;cursor:pointer;flex-shrink:0;">'
+                      + 'Ja →</button>'
+                    + '<button onclick="document.getElementById(&quot;sls-kontext-banner&quot;).style.display=&quot;none&quot;;"'
+                      + ' style="padding:5px 8px;border-radius:var(--radius-xs);'
+                      + 'background:none;border:none;font-family:var(--font);'
+                      + 'font-size:0.78rem;cursor:pointer;color:var(--c-faint);">✕</button>'
+                  + '</div></div>';
+              }
+            }
+          });
+        });
+      }
     }
   },
 
@@ -35713,6 +35894,7 @@ if (new URLSearchParams(location.search).get('wake') === '1') {
       <span class="ritual-dot" data-step="2"></span>
       <span class="ritual-dot" data-step="3"></span>
       <span class="ritual-dot" data-step="4"></span>
+      <span class="ritual-dot" data-step="5"></span>
     </div>
     <div id="triage-step-0" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
     <div id="triage-step-1" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
@@ -35732,11 +35914,12 @@ if (new URLSearchParams(location.search).get('wake') === '1') {
       <span class="ritual-dot" data-step="3"></span>
       <span class="ritual-dot" data-step="4"></span>
     </div>
-    <div id="fe-step-0" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
+    <div id="fe-step-0" class="fe-step" style="display:none;flex-direction:column;align-items:center;padding:24px 20px;text-align:center;"></div>
     <div id="fe-step-1" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
     <div id="fe-step-2" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
     <div id="fe-step-3" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
     <div id="fe-step-4" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
+    <div id="fe-step-5" style="display:none;flex-direction:column;align-items:center;width:100%;"></div>
   </div>
 </div>
 
