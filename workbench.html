@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.36.2</title>
+<title>WorkBench 5.36.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7450,7 +7450,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.36.2</div>
+  <div class="wb-startup-tagline">v5.36.3</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -9027,7 +9027,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.36.2 · Build 20260612-1800</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.36.3 · Build 20260612-1830</div>
     </div>
 
     <!-- Welt -->
@@ -9212,8 +9212,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.36.2',
-  APP_BUILD:   '20260612-1800',
+  APP_VERSION: '5.36.3',
+  APP_BUILD:   '20260612-1830',
 
 
   // ══════════════════════════════════════════════════════
@@ -12368,7 +12368,8 @@ const WB = {
   _fokusOverlayTimerSync() {
     const display = document.getElementById('fokus-overlay-timer-display');
     if (!display) return;
-    const mainDisplay = document.getElementById('fokus-timer-display');
+    // fokus-time ist das echte Timer-Display im alten Overlay
+    const mainDisplay = document.getElementById('fokus-time');
     if (mainDisplay) display.textContent = mainDisplay.textContent;
     const playBtn = document.getElementById('fokus-overlay-play-btn');
     if (playBtn) playBtn.innerHTML = (!this._fokusPaused && this._fokusInterval) ? '\u23f8 Pause' : '\u25b6 Start';
@@ -12425,16 +12426,35 @@ const WB = {
       return;
     }
     if (kontext === 'notiz') {
-      inhalt.innerHTML = '<div style="padding:12px 14px;">'
-        + '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);margin-bottom:8px;">Notiz</div>'
+      // Notizen-Liste + Editor
+      const db = this.activeWorld === 'beruf' ? this.dataPro : this.dataPriv;
+      const notizen = (db?.settings?.cockpitNotizen || []).slice(0, 20);
+      let nHtml = '<div style="padding:10px 14px;">';
+      nHtml += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;'
+        + 'letter-spacing:0.07em;color:var(--c-faint);margin-bottom:8px;">Neue Notiz</div>'
         + '<textarea id="fokus-notiz-input" placeholder="Gedanken, Erkenntnisse..."'
-          + ' style="width:100%;min-height:300px;padding:10px 12px;border:1px solid var(--c-border);'
-          + 'border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;'
-          + 'background:#F0EEE8;color:var(--c-text);resize:vertical;box-sizing:border-box;line-height:1.5;"></textarea>'
-        + '<button onclick="WB._fokusNotizSpeichern()" style="margin-top:8px;padding:8px 16px;'
+          + ' style="width:100%;min-height:120px;padding:8px 10px;border:1px solid var(--c-border);'
+          + 'border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;'
+          + 'background:var(--c-bg);color:var(--c-text);resize:vertical;box-sizing:border-box;line-height:1.5;"></textarea>'
+        + '<button onclick="WB._fokusNotizSpeichern()" style="margin-top:6px;padding:7px 16px;'
           + 'border-radius:var(--radius-xs);background:var(--c-beruf);color:#fff;border:none;'
-          + 'font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;">Als Notiz speichern</button>'
-        + '</div>';
+          + 'font-family:var(--font);font-size:0.82rem;font-weight:600;cursor:pointer;">Speichern</button>';
+      if (notizen.length) {
+        nHtml += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;'
+          + 'letter-spacing:0.07em;color:var(--c-faint);margin:14px 0 6px;">Notizen</div>'
+          + '<div style="background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-xs);overflow:hidden;">'
+          + notizen.map((n, i) =>
+              '<div style="padding:8px 12px;border-bottom:1px solid color-mix(in srgb,var(--c-border) 50%,transparent);cursor:pointer;"'
+                + ' onclick="WB._fokusNotizBearbeiten(' + i + ')">'
+              + '<div style="font-size:0.85rem;font-weight:600;color:var(--c-text);margin-bottom:2px;">' + this._esc(n.titel||'Notiz') + '</div>'
+              + '<div style="font-size:0.75rem;color:var(--c-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+                + this._esc((n.inhalt||'').slice(0,80)) + '</div>'
+              + '</div>'
+            ).join('')
+          + '</div>';
+      }
+      nHtml += '</div>';
+      inhalt.innerHTML = nHtml;
       return;
     }
     if (kontext === 'vorhaben') {
@@ -12463,21 +12483,50 @@ const WB = {
       return;
     }
     if (kontext === 'woche') {
-      inhalt.innerHTML = '<div style="padding:12px 14px;"><div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);margin-bottom:8px;">Wochenplan</div></div>';
-      try { this._fokusRechtsWocheRender(inhalt); } catch(e) {}
+      // Woche-Tab im Hintergrund aktivieren und Grid-Inhalt spiegeln
+      inhalt.innerHTML = '<div id="fokus-woche-wrap" style="padding:8px;height:100%;overflow-y:auto;">'
+        + '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;'
+          + 'letter-spacing:0.07em;color:var(--c-faint);margin-bottom:8px;padding:0 6px;">Woche</div>'
+        + '<div id="fokus-woche-inhalt"></div>'
+        + '</div>';
+      // Woche rendern in den Container
+      try {
+        if (this.activeTab !== 'woche') this.switchTab('woche', null, true);
+        setTimeout(() => {
+          const wocheGrid = document.getElementById('woche-grid');
+          const target = document.getElementById('fokus-woche-inhalt');
+          if (wocheGrid && target) {
+            target.innerHTML = '';
+            // Clone des Wochenplans
+            const clone = wocheGrid.cloneNode(true);
+            clone.style.pointerEvents = 'none';
+            target.appendChild(clone);
+          }
+        }, 300);
+      } catch(e) {}
     }
   },
 
   _fokusRechtsVorhabenOpen(id) {
     const inhalt = document.getElementById('fokus-rechts-inhalt');
     if (!inhalt) return;
+    // wb-vorhaben-detail Overlay in den rechten Bereich einbetten
     this._vorhabenAktivId = id;
+    this._vhMigrateV47 && (() => { const v = this._vorhabenAktiv(); if(v) this._vhMigrateV47(v); })();
+    // Temporären Detail-Body im rechten Inhalt anlegen
     inhalt.innerHTML = '';
     const tmp = document.createElement('div');
     tmp.id = 'wb-vorhaben-detail-body';
-    tmp.style.cssText = 'flex:1;overflow-y:auto;padding:0;background:var(--c-bg);height:100%;';
+    tmp.style.cssText = 'flex:1;overflow-y:auto;overflow-x:hidden;padding:0;background:var(--c-bg);width:100%;min-height:100%;';
     inhalt.appendChild(tmp);
-    this._vorhabenDetailRender();
+    // Direkt rendern (body ist jetzt im DOM)
+    const body = document.getElementById('wb-vorhaben-detail-body');
+    if (body) {
+      const v = this._vorhabenAktiv();
+      if (!v) { body.innerHTML = '<div style="padding:20px;color:var(--c-faint);">Vorhaben nicht gefunden</div>'; return; }
+      // Tabs initialisieren
+      try { this._vorhabenDetailRender(); } catch(e) { console.error('FT2 VH detail:', e); }
+    }
   },
 
   _fokusNotizSpeichern() {
@@ -12487,12 +12536,32 @@ const WB = {
     if (!db) return;
     if (!db.settings) db.settings = {};
     if (!db.settings.cockpitNotizen) db.settings.cockpitNotizen = [];
-    db.settings.cockpitNotizen.unshift({ id:'fokus_'+Date.now(), titel:'Fokus-Notiz '+new Date().toLocaleDateString('de-DE'), typ:'schnellnotiz', inhalt:text, erstellt:Date.now(), geaendert:Date.now(), _db:this.activeWorld==='beruf'?'pro':'priv' });
+    if (this._fokusNotizEditIdx >= 0 && db.settings.cockpitNotizen[this._fokusNotizEditIdx]) {
+      db.settings.cockpitNotizen[this._fokusNotizEditIdx].inhalt = text;
+      db.settings.cockpitNotizen[this._fokusNotizEditIdx].geaendert = Date.now();
+      this._fokusNotizEditIdx = -1;
+    } else {
+      db.settings.cockpitNotizen.unshift({ id:'fokus_'+Date.now(), titel:'Fokus-Notiz '+new Date().toLocaleDateString('de-DE'), typ:'schnellnotiz', inhalt:text, erstellt:Date.now(), geaendert:Date.now(), _db:this.activeWorld==='beruf'?'pro':'priv' });
+    }
     this.setDirty();
     this._toast('\u2713 Notiz gespeichert');
     const inp = document.getElementById('fokus-notiz-input');
     if (inp) inp.value = '';
   },
+
+  _fokusNotizBearbeiten(idx) {
+    const db = this.activeWorld === 'beruf' ? this.dataPro : this.dataPriv;
+    const n = (db?.settings?.cockpitNotizen || [])[idx];
+    if (!n) return;
+    const ta = document.getElementById('fokus-notiz-input');
+    if (ta) ta.value = n.inhalt || '';
+    ta?.focus();
+    ta?.scrollIntoView({ behavior: 'smooth' });
+    // Beim Speichern bestehende Notiz überschreiben
+    this._fokusNotizEditIdx = idx;
+  },
+
+  _fokusNotizEditIdx: -1,
 
   _fokusRechtsWocheRender(container) {
     const today = new Date();
@@ -21990,8 +22059,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _vorhabenDetailRender() {
     const v = this._vorhabenAktiv();
-    // Zwei-Spalten: in Panel-Detail rendern
-
+    const body = document.getElementById('wb-vorhaben-detail-body');
+    if (!v || !body) return;
 
     this._vhMigrateV47(v);
 
