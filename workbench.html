@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.36.1</title>
+<title>WorkBench 5.36.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7450,7 +7450,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.36.1</div>
+  <div class="wb-startup-tagline">v5.36.2</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7713,60 +7713,13 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
     </div>
   </section>
 
-  <div id="wb-right-panel">
-    <div id="wb-right-panel-header" style="display:none;">
-      <button id="wb-right-back-btn" onclick="WB._rightPanelBack()">← Zurück</button>
-      <div id="wb-right-panel-title"></div>
-    </div>
-    <div id="wb-right-panel-body">
-
-      <!-- Oberes Panel -->
-      <div id="wb-panel-oben" style="flex:50%;">
-        <div class="panel-sektion-header">
-          <span class="panel-sektion-title" id="wb-panel-oben-titel">Vorhaben</span>
-          <select class="panel-sektion-select" id="wb-panel-oben-select"
-            onchange="WB._panelSetSektion('oben', this.value)">
-            <option value="vorhaben">Vorhaben</option>
-            <option value="woche">Woche</option>
-            <option value="ressourcen">Ressourcen</option>
-            <option value="notizen">Notizen</option>
-            <option value="checklisten">Checklisten</option>
-            <option value="schnellerinnerungen">Schnellerinnerungen</option>
-          </select>
-          <button class="panel-fullscreen-btn" onclick="WB._panelToggleFullscreen(this)" title="Vollbild"
-            style="background:none;border:none;cursor:pointer;font-size:0.85rem;color:var(--c-faint);padding:2px 4px;line-height:1;flex-shrink:0;">⤢</button>
-        </div>
-        <div class="panel-inhalt" id="wb-panel-oben-inhalt"></div>
-      </div>
-
-      <!-- Divider -->
-      <div id="wb-panel-divider"></div>
-
-      <!-- Unteres Panel -->
-      <div id="wb-panel-unten" style="flex:50%;">
-        <div class="panel-sektion-header">
-          <span class="panel-sektion-title" id="wb-panel-unten-titel">Woche</span>
-          <select class="panel-sektion-select" id="wb-panel-unten-select"
-            onchange="WB._panelSetSektion('unten', this.value)">
-            <option value="vorhaben">Vorhaben</option>
-            <option value="woche" selected>Woche</option>
-            <option value="ressourcen">Ressourcen</option>
-            <option value="notizen">Notizen</option>
-            <option value="checklisten">Checklisten</option>
-            <option value="schnellerinnerungen">Schnellerinnerungen</option>
-          </select>
-          <button class="panel-fullscreen-btn" onclick="WB._panelToggleFullscreen(this)" title="Vollbild"
-            style="background:none;border:none;cursor:pointer;font-size:0.85rem;color:var(--c-faint);padding:2px 4px;line-height:1;flex-shrink:0;">⤢</button>
-        </div>
-        <div class="panel-inhalt" id="wb-panel-unten-inhalt"></div>
-      </div>
-
-      <!-- Compat-IDs -->
-      <div id="wb-right-vh-liste" style="display:none;"></div>
-      <div id="wb-right-vh-detail" style="display:none;"></div>
-
-    </div>
+  <div id="wb-right-panel" style="display:none;">
+  <div id="wb-right-panel-body" style="display:none;">
+    <!-- Zwei-Spalten entfernt (D1-Remove) -->
+    <div id="wb-right-vh-liste" style="display:none;"></div>
+    <div id="wb-right-vh-detail" style="display:none;"></div>
   </div>
+</div>
 
   </main>
 
@@ -9074,7 +9027,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.36.1 · Build 20260612-1730</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.36.2 · Build 20260612-1800</div>
     </div>
 
     <!-- Welt -->
@@ -9259,8 +9212,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.36.1',
-  APP_BUILD:   '20260612-1730',
+  APP_VERSION: '5.36.2',
+  APP_BUILD:   '20260612-1800',
 
 
   // ══════════════════════════════════════════════════════
@@ -12385,6 +12338,8 @@ const WB = {
     const overlay = document.getElementById('fokus-overlay');
     if (overlay) overlay.style.display = 'none';
     document.body.classList.remove('fokus-overlay-aktiv');
+    // Timer stoppen wenn Overlay geschlossen
+    if (this._fokusInterval) { try { this.fokusClose(); } catch(e) {} }
   },
 
   _fokusOverlayRenderTimer() {
@@ -12623,7 +12578,10 @@ const WB = {
   fokusClose() {
     clearInterval(this._fokusInterval);
     this._fokusInterval = null;
-    try { this._fokusOverlayClose(); } catch(e) {}
+    // Neues fokus-overlay schließen
+    const fov = document.getElementById('fokus-overlay');
+    if (fov) fov.style.display = 'none';
+    document.body.classList.remove('fokus-overlay-aktiv');
     document.getElementById('wb-fokus-overlay').classList.remove('open');
     // Fokus-Modus beenden
     if (this._fokusModusAktiv) {
@@ -15475,7 +15433,8 @@ const WB = {
     this._fokusSecondsLeft = this._fokusTotal;
     this._fokusPaused   = false;
 
-    // Screens tauschen
+    // wb-fokus-overlay schließen, neues fokus-overlay öffnen (FT2)
+    document.getElementById('wb-fokus-overlay').classList.remove('open');
     document.getElementById('fokus-setup').style.display = 'none';
     document.getElementById('fokus-timer-screen').style.display = 'flex';
 
@@ -35730,7 +35689,7 @@ if (new URLSearchParams(location.search).get('wake') === '1') {
 
 
 
-<div id="fokus-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:var(--c-bg);flex-direction:column;">
+<div id="fokus-overlay" style="display:none;position:fixed;inset:0;z-index:950;background:var(--c-bg);flex-direction:column;">
   <div id="fokus-overlay-header" style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:#F0EEE8;border-bottom:1px solid var(--c-border);flex-shrink:0;">
     <span style="font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-beruf);">Fokus-Modus</span>
     <div style="flex:1;"></div>
