@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.39.5</title>
+<title>WorkBench 5.39.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7438,7 +7438,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.39.5 · Build 20260613-1010</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.39.6 · Build 20260613-1040</div>
     </div>
 
     <!-- Welt -->
@@ -7588,7 +7588,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.39.5</div>
+  <div class="wb-startup-tagline">v5.39.6</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -9209,8 +9209,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.39.5',
-  APP_BUILD:   '20260613-1010',
+  APP_VERSION: '5.39.6',
+  APP_BUILD:   '20260613-1040',
 
 
   // ══════════════════════════════════════════════════════
@@ -13533,7 +13533,8 @@ const WB = {
         ? '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);margin-bottom:8px;align-self:flex-start;">ABEND-FOKUS (max. 1)</div>'
           + '<div style="width:100%;margin-bottom:16px;">' + kandidatenHtml + '</div>'
         : '')
-      + '<button onclick="WB._feFinish()" style="width:100%;padding:14px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;">Feierabend ✓</button>'
+      + '<button onclick="WB._feFinish()" style="width:100%;padding:14px;border-radius:var(--radius-sm);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.95rem;font-weight:600;cursor:pointer;">✓ Feierabend</button>'
+      + '<button onclick="WB._kiExportCopy(\'Feierabend-Check\')" style="width:100%;padding:11px;border-radius:var(--radius-xs);background:none;border:1.5px solid var(--c-beruf);color:var(--c-beruf);font-family:var(--font);font-size:0.88rem;cursor:pointer;margin-top:8px;">' + '🤖 Mit KI sprechen — Kontext kopieren</button>'
       + '<button onclick="WB._feGoto(4)" style="width:100%;padding:10px;border-radius:var(--radius-sm);background:none;border:1px solid var(--c-border);margin-top:8px;font-family:var(--font);font-size:0.88rem;cursor:pointer;color:var(--c-muted);">← Zurück</button>';
   },
 
@@ -13902,6 +13903,16 @@ const WB = {
         else if (v > 35) { hint.textContent = '\u26a0 Niedrig \u2014 nur 1 Fokus-Aufgabe'; hint.style.color = '#C62828'; }
         else             { hint.textContent = '🔴 Kritisch \u2014 Schonung heute'; hint.style.color = '#C62828'; }
       });
+    }
+    // KI1: Button
+    const kiC2 = document.getElementById('ritual-step-0');
+    if (kiC2 && !kiC2.querySelector('#ritual-ki-btn')) {
+      const kb = document.createElement('button');
+      kb.id = 'ritual-ki-btn';
+      kb.textContent = '🤖 Mit KI sprechen — Kontext kopieren';
+      kb.style.cssText = 'width:100%;padding:11px;border-radius:var(--radius-xs);background:none;border:1.5px solid var(--c-beruf);color:var(--c-beruf);font-family:var(--font);font-size:0.88rem;cursor:pointer;margin-top:8px;';
+      kb.onclick = () => WB._kiExportCopy('Morgendialog');
+      kiC2.appendChild(kb);
     }
   },
 
@@ -18222,6 +18233,179 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this._toast('\u23ed \u00dcbersprungen');
   },
 
+
+  // ── KI1: Kontext-Export ──────────────────────────────────
+  _pflichtStatusHeute(dutyId, ctx) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const today = new Date().toISOString().split('T')[0];
+    return db?.pflichtStatus?.[dutyId + '_' + today] || null;
+  },
+
+  _kiExportText(kontext) {
+    const today   = new Date().toISOString().split('T')[0];
+    const dateStr = new Date().toLocaleDateString('de-DE', {
+      weekday:'long', day:'numeric', month:'long', year:'numeric'
+    });
+    const lines = [];
+    lines.push('WorkBench \u00b7 ' + dateStr);
+    lines.push('Kontext: ' + kontext);
+    lines.push('');
+
+    const bb = this._ritualBodyBattery
+      || this.dataPriv?.dailyPlans?.[today]?.bodyBattery;
+    const eg = this._ritualEnergie
+      || this.dataPriv?.dailyPlans?.[today]?.energie
+      || 'unbekannt';
+    lines.push('ENERGIE & K\u00d6RPER');
+    lines.push('- Energie: ' + eg);
+    if (bb) lines.push('- Body Battery: ' + bb);
+    lines.push('');
+
+    const termineHeute = [];
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      (db?.customEvents||[])
+        .filter(ev => ev.date === today && ev.status !== 'abgesagt' && ev.status !== 'verschoben')
+        .sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''))
+        .forEach(ev => {
+          const welt = ctx === 'pro' ? 'Beruf' : 'Privat';
+          const zeit = ev.startTime ? ev.startTime + ' ' : '';
+          const done = ev.done ? ' \u2713' : '';
+          const status = ev.status === 'verpasst' ? ' (verpasst)' : '';
+          termineHeute.push('- ' + zeit + ev.text + ' (' + welt + ')' + done + status);
+        });
+    });
+    if (termineHeute.length) {
+      lines.push('TERMINE HEUTE');
+      termineHeute.forEach(t => lines.push(t));
+      lines.push('');
+    }
+
+    const ritualToday = this._ritualStore()?.[today] || {};
+    const fokusItems  = ritualToday.fokus || this._ritualSelected || [];
+    if (fokusItems.length) {
+      lines.push('FOKUS HEUTE');
+      fokusItems.forEach(f => {
+        const done = f.done ? ' \u2713' : '';
+        lines.push('- ' + (f.titel || f.text || '') + done);
+      });
+      lines.push('');
+    }
+
+    const pflichten = [];
+    ['pro','priv'].forEach(ctx => {
+      (this._dutyStore(ctx)||[]).forEach(d => {
+        try {
+          const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
+          const todayInst = insts.find(i => i.isToday);
+          if (!todayInst) return;
+          const done = todayInst.done ? ' \u2713' : '';
+          const status = this._pflichtStatusHeute(d.id, ctx);
+          const statusStr = status === 'verpasst' ? ' (verpasst)'
+            : status === 'uebersprungen' ? ' (\u00fcbersprungen)' : '';
+          pflichten.push('- ' + (d.title||d.name||'') + done + statusStr);
+        } catch(e) {}
+      });
+    });
+    if (pflichten.length) {
+      lines.push('WOCHENPFLICHTEN HEUTE');
+      pflichten.forEach(p => lines.push(p));
+      lines.push('');
+    }
+
+    const vhAktiv = [];
+    ['pro','priv'].forEach(welt => {
+      const store = this._vorhabenStore(welt) || [];
+      store
+        .filter(v => (v.aktivitaet||'aktiv') === 'aktiv')
+        .sort((a,b) => (b.geaendert||0) - (a.geaendert||0))
+        .slice(0, 5)
+        .forEach(v => {
+          const offen = (v.meilensteine||[])
+            .flatMap(ms => (ms.aufgaben||[]).filter(a => !a.done)).length;
+          const weltLbl = welt === 'pro' ? 'Beruf' : 'Privat';
+          vhAktiv.push('- ' + (v.titel||'') + ' (' + weltLbl + ') \u00b7 ' + offen + ' offen');
+        });
+    });
+    if (vhAktiv.length) {
+      lines.push('AKTIVE VORHABEN');
+      vhAktiv.forEach(v => lines.push(v));
+      lines.push('');
+    }
+
+    const kipp = ritualToday.kipppunkte || this._evWz?.answers?.kipp || '';
+    if (kipp) {
+      lines.push('KIPPPUNKTE HEUTE');
+      lines.push('- ' + kipp);
+      lines.push('');
+    }
+
+    if (kontext === 'Feierabend-Check') {
+      if (this._feAntworten?.geleistet) {
+        lines.push('WAS HEUTE GELEISTET');
+        lines.push('- ' + this._feAntworten.geleistet);
+        lines.push('');
+      }
+      if (this._feAntworten?.mitnehmen) {
+        lines.push('MITNEHMEN');
+        lines.push('- ' + this._feAntworten.mitnehmen);
+        lines.push('');
+      }
+    }
+
+    if (kontext === 'Abend-Reflexion') {
+      const wz = this._evWz || {};
+      if (wz.answers?.q0) {
+        lines.push('HEUTE WAR ICH STOLZ AUF');
+        lines.push('- ' + wz.answers.q0);
+        lines.push('');
+      }
+      if (wz.energie) {
+        lines.push('ENERGIE ABEND: ' + wz.energie + '/5');
+        lines.push('');
+      }
+    }
+
+    if (kontext === 'Wochenplanung') {
+      const kw = this._wzWeekData?.kw || '';
+      if (kw) { lines.push('KALENDERWOCHE: ' + kw); lines.push(''); }
+      const wFokus = this._wzWeekData?.fokus || '';
+      if (wFokus) {
+        lines.push('WOCHEN-FOKUS');
+        lines.push('- ' + wFokus);
+        lines.push('');
+      }
+    }
+
+    lines.push('---');
+    lines.push('Exportiert aus WorkBench \u00b7 ' + new Date().toLocaleTimeString('de-DE'));
+    return lines.join('\n');
+  },
+
+  _kiExportCopy(kontext) {
+    const text = this._kiExportText(kontext);
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        this._toast('\U0001f4cb Kontext kopiert \u2014 jetzt in Claude einf\u00fcgen');
+      }).catch(() => {
+        this._kiFallbackCopy(text);
+      });
+    } else {
+      this._kiFallbackCopy(text);
+    }
+  },
+
+  _kiFallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:-9999px;';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    this._toast('\U0001f4cb Kontext kopiert');
+  },
+
   _ckRenderTagesseite() {
     const now   = new Date();
     const today = now.toISOString().split('T')[0];
@@ -21563,7 +21747,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       <textarea class="wz-input" id="evwz-textarea" rows="5"
         style="resize:none;width:100%;box-sizing:border-box;"
         placeholder="Heute war ich besonders stolz auf…">${this._evWz.answers.q0||''}</textarea>
-    </div>`;
+    </div><button onclick="WB._kiExportCopy('Abend-Reflexion')" style="width:100%;padding:11px;border-radius:var(--radius-xs);background:none;border:1.5px solid var(--c-beruf);color:var(--c-beruf);font-family:var(--font);font-size:0.88rem;cursor:pointer;margin-top:8px;">🤖 Mit KI sprechen — Kontext kopieren</button>`;
   },
 
   // ── Schritt 1: Fokus-Aufgaben (Vorhaben + Projekte) ─────
@@ -25424,7 +25608,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '💡 Du hast heute keinen privaten Fokus gesetzt. '
         + 'Bewusst so gewollt \u2014 oder vergessen?</div>';
     }
-        return html;
+        return html
+      + '<button onclick="WB._kiExportCopy(\'Wochenplanung\')" style="width:100%;padding:11px;border-radius:var(--radius-xs);background:none;border:1.5px solid var(--c-beruf);color:var(--c-beruf);font-family:var(--font);font-size:0.88rem;cursor:pointer;margin-top:8px;">'
+      + '🤖 Mit KI sprechen — Kontext kopieren</button>';
   },
 
   // ── Tagesplan speichern ────────────────────────────────
