@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.40.9</title>
+<title>WorkBench 5.41.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6143,7 +6143,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.40.9 · Build 20260613-1430</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.41.0 · Build 20260613-1450</div>
     </div>
 
     <!-- Welt -->
@@ -6293,7 +6293,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.40.9</div>
+  <div class="wb-startup-tagline">v5.41.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -6727,6 +6727,16 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
     <label style="font-size:0.82rem;color:var(--c-muted);flex:1;">Prozessvorlage (im Fokus-Timer verfügbar)</label>
     <label class="wbs-toggle"><input type="checkbox" id="cl-vorlage-prozess"><span class="wbs-toggle-slider"></span></label>
   </div>
+      <div class="wbs-row" style="margin-top:8px;">
+        <span class="wbs-label">Welt</span>
+        <select id="cl-vorlage-welt"
+          style="padding:5px 8px;border:1px solid var(--c-border);
+          border-radius:var(--radius-xs);font-family:var(--font);
+          font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">
+          <option value="pro">Beruf</option>
+          <option value="priv">Privat</option>
+        </select>
+      </div>
   <div id="cl-vorlage-scroll"></div>
 </div>
 
@@ -7902,8 +7912,8 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.40.9',
-  APP_BUILD:   '20260613-1430',
+  APP_VERSION: '5.41.0',
+  APP_BUILD:   '20260613-1450',
 
 
   // ══════════════════════════════════════════════════════
@@ -17518,7 +17528,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<button onclick="WB.resFormOpen({aufgabeId:&quot;' + aufgabeId + '&quot;,vorhabenId:&quot;' + vorhabenId + '&quot;})"'
         + ' style="width:100%;padding:9px;border-radius:var(--radius-xs);background:none;border:1px solid var(--c-beruf);margin-top:6px;font-family:var(--font);font-size:0.85rem;cursor:pointer;color:var(--c-beruf);">↗ Ressource verknüpfen</button>'
       + '</div>';
-    document.body.appendChild(bd);
+    document.body.appendChild(bd);d(bd);
   },
 
   _ckAufgSheetClToggle(aufgabeId, vorhabenId, idx, chk) {
@@ -23314,7 +23324,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           <div class="cl-card-meta">${v.items.length} Items</div>
         </div>
         <button class="af-pill" style="font-size:0.78rem;margin-right:4px;" onclick="event.stopPropagation();WB.clStartInstanz('${k.replace(/'/g,"\'")}')">&#9654; Start</button>
-        <button class="cl-del-btn" style="font-size:0.9rem;padding:2px 6px;border:1px solid var(--c-border);border-radius:var(--radius-xs);" onclick="event.stopPropagation();WB.clVorlageEdit('${k.replace(/'/g,"\'")}')">&#9881;</button>
+        <button class="af-pill" style="font-size:0.78rem;margin-right:4px;" onclick="event.stopPropagation();WB.clStartInstanz('${k.replace(/'/g,"\\'")}')">&#9654; Start</button><button class="cl-del-btn" style="font-size:0.9rem;padding:2px 6px;border:1px solid var(--c-border);border-radius:var(--radius-xs);margin-right:4px;" onclick="event.stopPropagation();WB.clVorlageEdit('${k.replace(/'/g,"\\'")}')">&#9881;</button><button class="cl-del-btn" style="font-size:0.9rem;padding:2px 6px;border:1px solid var(--c-border);border-radius:var(--radius-xs);color:var(--c-danger);" onclick="event.stopPropagation();WB.clVorlageDelete('${k.replace(/'/g,"\\'")}')">&#215;</button>
       </div>`;
     };
     if (prozessKeys.length) {
@@ -25960,6 +25970,16 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this.setDirty();
     this.clVorlageClose();
     this._toast('Vorlage gespeichert');
+  },
+
+  clVorlageDelete(key) {
+    if (!confirm('Vorlage "' + key + '" löschen?')) return;
+    const store = this._clVorlagenStore();
+    if (!store || !store[key]) return;
+    delete store[key];
+    this.setDirty();
+    this.renderChecklisten();
+    this._toast('Vorlage gelöscht');
   },
 
   // ── Checklisten-Drag ──────────────────────────────
