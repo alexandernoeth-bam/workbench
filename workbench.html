@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.39.3</title>
+<title>WorkBench 5.39.4</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -232,12 +232,7 @@ html, body {
   font-family: var(--font); cursor: pointer;
 }
 
-#wb-panel-oben .wb-section,
-#wb-panel-unten .wb-section {
-  display: block !important;
-  height: 100%;
-}
-#wb-right-vh-liste, #wb-right-vh-detail { display: none !important; }
+/* D1-Remove: Panel-Regeln entfernt */
 
 /* ── Tab-Bar ───────────────────────────────────────── */
 #wb-tabbar {
@@ -3423,7 +3418,7 @@ html, body {
 
 /* ── Section-Placeholder ───────────────────────────── */
 .wb-section {
-  display: none;
+  display: none !important;
 }
 .wb-section.active {
   display: flex !important;
@@ -6405,7 +6400,7 @@ body.fokus-modus #wb-content {
   height: calc(100vh - 0px) !important;
 }
 /* Alle Sektionen ausblenden */
-body.fokus-modus .wb-section  { display: none !important; }
+body.fokus-modus /* bereinigt — .wb-section display:none ist weiter oben */
 /* Rechtes Panel: erstes Kind → volle Fläche */
 body.fokus-modus 
 body.fokus-modus 
@@ -7442,7 +7437,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.39.3 · Build 20260613-0430</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.39.4 · Build 20260613-0445</div>
     </div>
 
     <!-- Welt -->
@@ -7592,7 +7587,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.39.3</div>
+  <div class="wb-startup-tagline">v5.39.4</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -9188,8 +9183,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.39.3',
-  APP_BUILD:   '20260613-0430',
+  APP_VERSION: '5.39.4',
+  APP_BUILD:   '20260613-0445',
 
 
   // ══════════════════════════════════════════════════════
@@ -16406,12 +16401,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   // ── Schnellerinnerungen-Liste (Hamburger-Menü) ────────
   schnellListeOpen() {
-    try {
-      const overlay = document.getElementById('wb-schnell-overlay');
-      if (!overlay) { alert('DEBUG: wb-schnell-overlay nicht gefunden'); return; }
-      overlay.style.display = 'flex';
-      this._schnellListeRender();
-    } catch(e) { alert('DEBUG schnellListeOpen: ' + e.message); }
+    const overlay = document.getElementById('wb-schnell-overlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    this._schnellListeRender();
   },
 
   schnellListeClose() {
@@ -22021,12 +22014,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   schnellVorhabenOpen() { this.vorhabenListeOpen(); }, // Alias-Schutz
 
   vorhabenListeOpen() {
-    try {
-      const overlay = document.getElementById('wb-vorhaben-overlay');
-      if (!overlay) { alert('DEBUG: wb-vorhaben-overlay nicht gefunden'); return; }
-      overlay.style.display = 'flex';
-      this._vorhabenListeRender();
-    } catch(e) { alert('DEBUG vorhabenListeOpen: ' + e.message); }
+    const overlay = document.getElementById('wb-vorhaben-overlay');
+    if (overlay) { overlay.style.display = 'flex'; this._vorhabenListeRender(); }
   },
 
   vorhabenListeClose() {
@@ -25748,19 +25737,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       if (this._settings.notifEnabled) {
         this._notifLastSchedule = Date.now();
         this._lastRenderDate = new Date().toISOString().split('T')[0];
-    // DEBUG: Touch-Blocker finden
-    document.getElementById('wb-tabbar')?.addEventListener('click', (e) => {
-      const x = e.clientX, y = e.clientY;
-      const els = document.elementsFromPoint(x, y);
-      const info = els.slice(0, 5).map(el => {
-        const id = el.id || el.className?.toString().slice(0,20) || el.tagName;
-        const z = getComputedStyle(el).zIndex;
-        const d = getComputedStyle(el).display;
-        const pe = getComputedStyle(el).pointerEvents;
-        return id + '(z:' + z + ',d:' + d + ',pe:' + pe + ')';
-      }).join(' > ');
-      alert('TAP at ' + x + ',' + y + ':\n' + info);
-    }, true);
+
         this._notifScheduleAll(); // Timer für PC (deaktiviert)
         this._notifBuildQueue();  // IDB für Pixel-SW
       }
@@ -36013,11 +35990,11 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   switchTab(id, btn) {
     // Overlay-Tabs: öffnen Overlay statt Section
     if (id === 'vorhaben') {
-      try { this.vorhabenListeOpen(); } catch(e) { alert('DEBUG switchTab vorhaben: ' + e.message); }
+      this.vorhabenListeOpen();
       return;
     }
     if (id === 'schnell') {
-      try { this.schnellListeOpen(); } catch(e) { alert('DEBUG switchTab schnell: ' + e.message); }
+      this.schnellListeOpen();
       return;
     }
     // Zwei-Spalten-Modus: Tab-Inhalt im rechten Panel
