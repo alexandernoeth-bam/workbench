@@ -7759,6 +7759,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
       <div class="ck-zone-body" id="ck-body-ab"></div>
     </div>
 
+    <div id="ck-verpasst" style="display:none;margin:0 14px 12px;"></div>
+
     <div id="ck-logbuch" style="margin:0 14px 12px;padding:10px 12px;background:#F0EEE8;border:1px solid var(--c-border);border-radius:var(--radius-xs);display:none;"></div>
 
     <div class="ck-zone" id="ck-zone-rauschen" style="display:none;">
@@ -13298,6 +13300,37 @@ const WB = {
       h += '</div>';
     }
 
+    // CK-Lifecycle: Verpasst/Abgesagt/Verschoben
+    const _lcV=[], _lcA=[], _lcS=[], _lcU=[];
+    ['pro','priv'].forEach(ctx5 => {
+      const db5 = ctx5==='pro' ? this.dataPro : this.dataPriv;
+      if (!db5) return;
+      (db5.customEvents||[]).filter(ev=>ev.date===today).forEach(ev => {
+        if (ev.status==='verpasst') _lcV.push(ev);
+        if (ev.status==='abgesagt') _lcA.push(ev);
+        if (ev.status==='verschoben') _lcS.push(ev);
+      });
+      if (db5.pflichtStatus) Object.entries(db5.pflichtStatus).forEach(([k,st]) => {
+        if (!k.endsWith('_'+today)) return;
+        if (st==='verpasst') _lcV.push({text:k});
+        if (st==='uebersprungen') _lcU.push({text:k});
+      });
+    });
+    if (_lcV.length||_lcA.length||_lcS.length||_lcU.length) {
+      h += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;'
+        + 'letter-spacing:0.07em;color:#B87333;margin-bottom:6px;">Nicht wie geplant</div>'
+        + '<div style="background:color-mix(in srgb,#B87333 5%,#F0EEE8);'
+          + 'border:1px solid color-mix(in srgb,#B87333 15%,var(--c-border));'
+          + 'border-radius:var(--radius-xs);padding:8px 10px;margin-bottom:12px;'
+          + 'font-size:0.82rem;color:var(--c-muted);">';
+      if (_lcV.length) h += _lcV.length + '\u00d7 verpasst<br>';
+      if (_lcA.length) h += _lcA.length + '\u00d7 abgesagt<br>';
+      if (_lcS.length) h += _lcS.length + '\u00d7 verschoben<br>';
+      if (_lcU.length) h += _lcU.length + '\u00d7 \u00fcbersprungen<br>';
+      h += '<div style="margin-top:6px;font-size:0.78rem;color:#B87333;">'
+        + 'Bewusst entschieden \u2014 oder vergessen?</div></div>';
+    }
+
     // SLS-M2: Logbuch-Einträge
     const _lb2 = this.dataPriv?.dailyPlans?.[today]?.logbuch || [];
     if (_lb2.length) {
@@ -17885,6 +17918,52 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   // ══════════════════════════════════════════════════════
 
   // ── SLS-M2: Tages-Logbuch ────────────────────────
+  _ckRenderVerpasst() {
+    const el = document.getElementById('ck-verpasst');
+    if (!el) return;
+    const today = new Date().toISOString().split('T')[0];
+    const items = [];
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      (db.customEvents||[]).filter(ev => ev.date === today
+        && (ev.status === 'verpasst' || ev.status === 'abgesagt')).forEach(ev => {
+          items.push({ type:'termin', title: ev.text, zeit: ev.startTime||'', status: ev.status });
+      });
+      if (db.pflichtStatus) {
+        Object.entries(db.pflichtStatus).forEach(([key, status]) => {
+          if (!key.endsWith('_' + today)) return;
+          const dutyId = key.replace('_' + today, '');
+          const duty = (this._dutyStore(ctx)||[]).find(d => d.id === dutyId);
+          if (duty) items.push({ type:'pflicht', title: duty.title||duty.name||'', zeit: duty.startTime||'', status });
+        });
+      }
+    });
+    if (!items.length) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    const SL = { verpasst:'verpasst', abgesagt:'abgesagt', uebersprungen:'\u00fcbersprungen' };
+    let h = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'
+      + '<span style="font-size:0.65rem;font-weight:800;text-transform:uppercase;'
+        + 'letter-spacing:0.07em;color:#B87333;">\u26a0 Verpasst</span>'
+      + '<span style="font-size:0.60rem;color:var(--c-faint);background:var(--c-border);'
+        + 'padding:1px 5px;border-radius:5px;">' + items.length + '</span></div>';
+    h += '<div style="background:#F0EEE8;border:1px solid var(--c-border);'
+      + 'border-radius:var(--radius-xs);overflow:hidden;">';
+    items.forEach(item => {
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;'
+        + 'border-bottom:1px solid var(--c-border);opacity:0.7;">'
+        + '<span style="font-size:0.72rem;color:var(--c-faint);">' + (item.type==='termin'?'\U0001f4c5':'\u2705') + '</span>'
+        + '<span style="flex:1;font-size:0.82rem;color:var(--c-muted);'
+          + (item.status==='abgesagt'?'text-decoration:line-through;':'') + '">'
+          + this._esc(item.title) + '</span>'
+        + (item.zeit ? '<span style="font-size:0.70rem;font-family:var(--font-mono);color:var(--c-faint);">' + item.zeit + '</span>' : '')
+        + '<span style="font-size:0.60rem;color:#B87333;font-weight:600;">' + (SL[item.status]||item.status) + '</span>'
+        + '</div>';
+    });
+    h += '</div>';
+    el.innerHTML = h;
+  },
+
   _ckRenderLogbuch() {
     const container = document.getElementById('ck-logbuch');
     if (!container) return;
@@ -18034,6 +18113,94 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
     h += '</div>';
     return h;
+  },
+
+  // ── CK-Lifecycle: Auto-Verpasst ──────────────────────
+  _ckAutoVerpasst() {
+    const today = new Date().toISOString().split('T')[0];
+    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    const zr = this._ckZoneRanges();
+    let changed = false;
+    const pT = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      (db.customEvents || [])
+        .filter(ev => ev.date === today && !ev.done && !ev.status && ev.startTime)
+        .forEach(ev => {
+          const evMin = pT(ev.startTime);
+          for (const [zId, range] of Object.entries(zr)) {
+            if (evMin >= range.from && evMin < range.to && nowMin > range.to) {
+              ev.status = 'verpasst';
+              changed = true;
+              break;
+            }
+          }
+        });
+      // Pflichten
+      if (!db.pflichtStatus) db.pflichtStatus = {};
+      (this._dutyStore(ctx) || []).forEach(d => {
+        if (!d.startTime) return;
+        try {
+          const key = d.id + '_' + today;
+          if (db.pflichtStatus[key]) return;
+          const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
+          const todayInst = insts.find(i => i.isToday);
+          if (!todayInst || todayInst.done) return;
+          const pflMin = pT(d.startTime);
+          for (const [zId, range] of Object.entries(zr)) {
+            if (pflMin >= range.from && pflMin < range.to && nowMin > range.to) {
+              db.pflichtStatus[key] = 'verpasst';
+              changed = true;
+              break;
+            }
+          }
+        } catch(e) {}
+      });
+    });
+    if (changed) this.setDirty();
+  },
+
+  _evSetStatus(evId, ctx, status) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const ev = (db?.customEvents||[]).find(e => String(e.id) === String(evId));
+    if (!ev) return;
+    ev.status = status;
+    if (status === 'abgesagt') ev.done = true;
+    this.setDirty();
+    try { document.getElementById('edit-overlay')?.classList.remove('open'); } catch(e) {}
+    this.renderCockpit();
+    this._toast(status === 'abgesagt' ? '\u2715 Termin abgesagt' : '\u2713 Status: ' + status);
+  },
+
+  _evVerschieben(evId, ctx) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const ev = (db?.customEvents||[]).find(e => String(e.id) === String(evId));
+    if (!ev) return;
+    const morgen = new Date(); morgen.setDate(morgen.getDate() + 1);
+    const neuesDatum = prompt('Neues Datum (JJJJ-MM-TT):', morgen.toISOString().split('T')[0]);
+    if (!neuesDatum || !neuesDatum.match(/^\d{4}-\d{2}-\d{2}$/)) return;
+    ev.status = 'verschoben'; ev.verschobenAuf = neuesDatum;
+    const kopie = JSON.parse(JSON.stringify(ev));
+    kopie.id = 'ev_' + Date.now(); kopie.date = neuesDatum;
+    kopie.status = undefined; kopie.done = false; delete kopie.verschobenAuf;
+    db.customEvents.push(kopie);
+    this.setDirty();
+    try { document.getElementById('edit-overlay')?.classList.remove('open'); } catch(e) {}
+    this.renderCockpit();
+    this._toast('\u2192 Termin verschoben auf ' + neuesDatum);
+  },
+
+  _pflichtUeberspringen(dutyId, ctx) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    if (!db.pflichtStatus) db.pflichtStatus = {};
+    const today = new Date().toISOString().split('T')[0];
+    db.pflichtStatus[dutyId + '_' + today] = 'uebersprungen';
+    this.setDirty();
+    this.renderCockpit();
+    this._toast('\u23ed \u00dcbersprungen');
   },
 
   _ckRenderTagesseite() {
@@ -18270,7 +18437,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     welten.forEach(welt => {
       (this._evStoreForWelt(welt) || [])
-        .filter(ev => ev.date === dateStr && ev.type !== 'horizon')
+        .filter(ev => ev.date === dateStr && ev.type !== 'horizon' && ev.status !== 'verpasst' && ev.status !== 'abgesagt' && ev.status !== 'verschoben')
         .forEach(ev => {
           // Büro-Modus: Privat komplett ausblenden
           if (this._bueroModus && welt === 'priv') return;
@@ -18354,6 +18521,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
           const inst  = insts.find(i => i.date === dateStr || (dateStr === today && i.isToday));
           if (!inst || inst.done) return;
+          // CK-Lifecycle: Pflicht-Status prüfen
+          const _pflKey2 = d.id + '_' + dateStr;
+          if (db.pflichtStatus?.[_pflKey2]) return;
           const dutyZone    = getZone(d.startTime || '') || 'vm';
           const pflichtZone = zone === null ? false : (dutyZone === zone);
           if (pflichtZone) {
@@ -18940,7 +19110,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     let collapsed;
     if (this._ckZoneCollapsed[zoneId] !== undefined) {
       collapsed = this._ckZoneCollapsed[zoneId];
-    } else if (isPast && !hasFokus) {
+    } else if (isPast) {
       collapsed = true;
     } else if (isTransition && !items.length) {
       collapsed = true;
@@ -20185,6 +20355,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   renderCockpit() {
+    try { this._ckAutoVerpasst(); } catch(e) {}
     // Datum täglich aktualisieren (App über Nacht offen)
     const todayCheck = new Date();
     const vd = this.viewDate instanceof Date ? this.viewDate : new Date();
@@ -20210,6 +20381,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       }
     }, 60000);
     // SLS-M2: Logbuch rendern
+    try { this._ckRenderVerpasst(); } catch(e) {}
     try { this._ckRenderLogbuch(); } catch(e) {}
     // Tages-Fokus-Ritual: morgens automatisch, blockiert bis durchlaufen
     this._ritualMaybeOpen();
@@ -21307,6 +21479,33 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   // ── Schritt 0: Was erreicht? ───────────────────────────
   _evWzStep0() {
     const q = this._settings.eveningQ?.[0] || 'Was habe ich heute erreicht?';
+    // CK-Lifecycle: Verpasste Items
+    const _lcVWz=[], _lcUWz=[];
+    ['pro','priv'].forEach(ctx6 => {
+      const db6 = ctx6==='pro' ? this.dataPro : this.dataPriv;
+      if (!db6) return;
+      (db6.customEvents||[]).filter(ev=>ev.date===_lbToday).forEach(ev => {
+        if (ev.status==='verpasst') _lcVWz.push(ev);
+      });
+      if (db6.pflichtStatus) Object.entries(db6.pflichtStatus).forEach(([k,st]) => {
+        if (!k.endsWith('_'+_lbToday)) return;
+        const dId = k.replace('_'+_lbToday,'');
+        const duty = (this._dutyStore(ctx6)||[]).find(d=>d.id===dId);
+        if (st==='verpasst') _lcVWz.push(duty||{text:dId});
+        if (st==='uebersprungen') _lcUWz.push(duty||{text:dId});
+      });
+    });
+    if (_lcVWz.length||_lcUWz.length) {
+      _lbHtml += '<div style="background:color-mix(in srgb,#B87333 6%,#F0EEE8);'
+        + 'border:1px solid color-mix(in srgb,#B87333 15%,var(--c-border));'
+        + 'border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:14px;">'
+        + '<div style="font-size:0.72rem;font-weight:700;color:#B87333;margin-bottom:4px;">Nicht wie geplant</div>'
+        + '<div style="font-size:0.82rem;color:var(--c-muted);">';
+      _lcVWz.forEach(item => { _lbHtml += '\u2022 ' + this._esc(item.text||item.title||item.name||'') + ' \u2014 verpasst<br>'; });
+      _lcUWz.forEach(item => { _lbHtml += '\u2022 ' + this._esc(item.text||item.title||item.name||'') + ' \u2014 \u00fcbersprungen<br>'; });
+      _lbHtml += '</div></div>';
+    }
+
     // SLS-M2: Logbuch-Einträge des Tages
     const _lbToday = new Date().toISOString().split('T')[0];
     const _lbEintr = this.dataPriv?.dailyPlans?.[_lbToday]?.logbuch || [];
@@ -31608,7 +31807,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     ['pro','priv'].forEach(ctx => {
       const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
       if (!db) return;
-      (db.customEvents || []).filter(ev => ev.date === dateStr && ev.type !== 'horizon').forEach(ev => {
+      (db.customEvents || []).filter(ev => ev.date === dateStr && ev.type !== 'horizon' && ev.status !== 'verpasst' && ev.status !== 'abgesagt' && ev.status !== 'verschoben').forEach(ev => {
         events.push({ time: ev.startTime || '', title: ev.text, ctx, type: 'event' });
       });
     });
