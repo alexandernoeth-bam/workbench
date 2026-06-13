@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.40.5</title>
+<title>WorkBench 5.40.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -5642,49 +5642,7 @@ html, body {
 ══════════════════════════════════════════════════ */
 
 /* Plan-Overlay */
-#wb-plan-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
-  background: var(--c-bg);
-  display: flex;
-  flex-direction: column;
-  transform: translateY(100%);
-  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
-  overflow: hidden;
-}
-#wb-plan-overlay.open { transform: translateY(0); }
 
-#wb-plan-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 2px solid var(--c-beruf);
-  background: var(--c-surface);
-  flex-shrink: 0;
-}
-#wb-plan-back {
-  background: none; border: none;
-  font-size: 1.4rem; cursor: pointer;
-  color: var(--c-muted); padding: 0; line-height: 1;
-}
-#wb-plan-title {
-  flex: 1;
-  font-size: 1rem;
-  font-weight: 800;
-  color: var(--c-text);
-  cursor: pointer;
-  border: none;
-  background: none;
-  font-family: var(--font);
-  padding: 2px 0;
-}
-#wb-plan-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 0 80px;
-}
 
 /* Plan-Abschnitt */
 .plan-section {
@@ -7058,7 +7016,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.40.5 · Build 20260613-1320</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.40.6 · Build 20260613-1335</div>
     </div>
 
     <!-- Welt -->
@@ -7208,7 +7166,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.40.5</div>
+  <div class="wb-startup-tagline">v5.40.6</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -8817,8 +8775,8 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.40.5',
-  APP_BUILD:   '20260613-1320',
+  APP_VERSION: '5.40.6',
+  APP_BUILD:   '20260613-1335',
 
 
   // ══════════════════════════════════════════════════════
@@ -15722,8 +15680,6 @@ const WB = {
     allgemein:  { label: 'Allgemeiner Plan',   icon: '📋',  sektionen: ['vision','notizplan','aufgaben','planaufgaben','habits','metriken','termine','reflexion'] },
   },
 
-  _planActive: null,
-  _planSektionenOpen: {},
 
   // ── Plan-Liste öffnen ─────────────────────────────────
   _closeAllSheets() {
@@ -15736,7 +15692,6 @@ const WB = {
     document.getElementById('wb-menu-btn')?.classList.remove('open');
     const el = document.getElementById('wb-backlog-overlay');
     if (!el) return;
-        document.getElementById('wb-plan-overlay')?.classList.remove('open');
     el.style.display = 'flex';
     el.style.flexDirection = 'column';
     setTimeout(() => this._backlogRender(), 30);
@@ -16242,287 +16197,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this._planRender();
   },
 
-  planClose() {
-    document.getElementById('wb-plan-overlay')?.classList.remove('open');
-    this._planActive = null;
-  },
-
   // ── Plan rendern ──────────────────────────────────────
-
-  _planSektionHtml(plan, sk, isOpen, today, planIdx) {
-    const configs = {
-      vision:    { icon: '🎯', label: 'Vision & Warum' },
-      aufgaben:  { icon: '🏁', label: 'Meilensteine' },
-      habits:    { icon: '🔥', label: 'Habit-Tracking' },
-      metriken:  { icon: '📊', label: 'Metriken' },
-      termine:   { icon: '📅', label: 'Termine' },
-      reflexion: { icon: '💭', label: 'Reflexion' },
-      phasen:    { icon: '🗺', label: 'Phasen & Meilensteine' },
-      kosten:    { icon: '💰', label: 'Kosten-Klarheit' },
-      entscheid: { icon: '⚡', label: 'Entscheidung' },
-      notizplan:  { icon: '📝', label: 'Mein Plan' },
-      planaufgaben: { icon: '✓',  label: 'Aufgaben' },
-    };
-    const cfg = configs[sk] || { icon: '•', label: sk };
-
-    let badge = '';
-    let bodyHtml = '';
-    if (sk === 'aufgaben') {
-      const done = (plan.aufgaben||[]).filter(t=>t.done).length;
-      badge = done + '/' + (plan.aufgaben||[]).length;
-    } else if (sk === 'planaufgaben') {
-      const pa = this._nzStore().find(n => n.id === plan.notizplanId)?.planAufgaben || [];
-      const paDone = pa.filter(a => a.done).length;
-      badge = paDone + '/' + pa.length;
-    } else if (sk === 'habits') {
-      badge = (plan.habits||[]).length + ' Habits';
-    } else if (sk === 'metriken') {
-      badge = (plan.metriken||[]).length + ' Werte';
-    } else if (sk === 'notizplan') {
-      // Notiztyp "Plan" als eingebetteter Editor
-      const notizId = plan.notizplanId || null;
-      const notiz   = notizId ? this._nzStore().find(n => n.id === notizId) : null;
-
-      if (!notiz) {
-        bodyHtml = '<div style="font-size:0.85rem;color:var(--c-faint);margin-bottom:10px;">Noch kein Plan-Dokument verknüpft.</div>'
-          + '<button onclick="WB._planCreateNotizplan(' + planIdx + ')" '
-          + 'style="width:100%;padding:10px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;">'
-          + '+ Plan-Dokument anlegen</button>';
-      } else {
-        // Notiz-Inhalt anzeigen + Link zum Editor
-        const inhalt = notiz.inhalt || '';
-        const textVorschau = inhalt.replace(/<[^>]+>/g, '').slice(0, 200);
-        bodyHtml = '<div style="background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-xs);padding:12px;font-size:0.85rem;color:var(--c-text);line-height:1.7;margin-bottom:10px;cursor:pointer;" '
-          + 'onclick="WB._planOpenNotizplan(' + planIdx + ')">'
-          + (textVorschau || '<em style="color:var(--c-faint);">Noch kein Inhalt — klicken zum Bearbeiten</em>')
-          + (inhalt.replace(/<[^>]+>/g,'').length > 200 ? '…' : '')
-          + '</div>'
-          + '<div style="display:flex;gap:8px;">'
-          + '<button onclick="WB._planOpenNotizplan(' + planIdx + ')" '
-          + 'style="flex:1;padding:9px;background:none;border:1px solid var(--c-beruf);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;color:var(--c-beruf);cursor:pointer;font-weight:600;">'
-          + '→ Im Editor öffnen</button>'
-          + '</div>';
-      }
-
-    } else if (sk === 'reflexion') {
-      badge = (plan.reflexionen||[]).length + ' Einträge';
-    }
-
-
-    if (sk === 'vision') {
-      bodyHtml = '<textarea class="plan-vision-text" placeholder="Warum ist mir das wichtig? Was will ich erreichen?"'
-        + ' onblur="WB._planSaveVision(' + planIdx + ',this.value)">'
-        + (plan.vision || '') + '</textarea>';
-
-    } else if (sk === 'aufgaben') {
-      const tasks = plan.aufgaben || [];
-      bodyHtml = tasks.map((t,ti) =>
-        '<div class="plan-task-row">'
-        + '<input type="checkbox" class="plan-task-chk" ' + (t.done?'checked':'') + ' onchange="WB._planTaskToggle(' + planIdx + ',' + ti + ',this)">'
-        + '<span class="plan-task-text' + (t.done?' done':'') + '">' + t.text + '</span>'
-        + '<button onclick="WB._planTaskDelete(' + planIdx + ',' + ti + ')" style="background:none;border:none;cursor:pointer;color:var(--c-faint);font-size:1rem;padding:0 4px;">×</button>'
-        + '</div>'
-      ).join('');
-      bodyHtml += '<div style="display:flex;gap:6px;margin-top:10px;">'
-        + '<input id="plan-task-input-' + planIdx + '" type="text" placeholder="Neue Aufgabe..." style="flex:1;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"'
-        + ' onkeydown="if(event.key===&quot;Enter&quot;)WB._planTaskAdd(' + planIdx + ')">'
-        + '<button onclick="WB._planTaskAdd(' + planIdx + ')" style="padding:8px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;cursor:pointer;">+</button>'
-        + '</div>';
-
-    } else if (sk === 'habits') {
-      const habits = plan.habits || [];
-      if (!habits.length) {
-        bodyHtml = '<div style="color:var(--c-faint);font-size:0.85rem;margin-bottom:10px;">Noch keine Habits definiert.</div>';
-      }
-      bodyHtml += habits.map((h,hi) => {
-        const days = 28; // 4 Wochen
-        const now = new Date();
-        const dots = Array.from({length:days}, (_,di) => {
-          const d = new Date(now);
-          d.setDate(now.getDate() - (days-1-di));
-          const ds = d.toISOString().split('T')[0];
-          const isDone = (h.log || {})[ds];
-          const isToday = ds === today;
-          const dayLbl = di % 7 === 0 ? ['Mo','Di','Mi','Do','Fr','Sa','So'][d.getDay()===0?6:d.getDay()-1] : '';
-          return '<div style="display:flex;flex-direction:column;align-items:center;">'
-            + '<button class="habit-dot' + (isDone?' done':'') + (isToday?' today':'') + '"'
-            + ' onclick="WB._planHabitToggle(' + planIdx + ',' + hi + ',&quot;' + ds + '&quot;)" title="' + ds + '"></button>'
-            + '<div class="habit-dot-label">' + dayLbl + '</div>'
-            + '</div>';
-        }).join('');
-
-        // Streak berechnen
-        let streak = 0;
-        for (let di = 0; di < 365; di++) {
-          const d = new Date(now);
-          d.setDate(now.getDate() - di);
-          const ds = d.toISOString().split('T')[0];
-          if ((h.log||{})[ds]) streak++;
-          else break;
-        }
-
-        return '<div class="habit-row">'
-          + '<div class="habit-name">' + h.name
-          + '<span class="habit-streak">' + (streak ? '🔥 ' + streak + ' Tage' : '') + '</span>'
-          + '<button onclick="WB._planHabitDelete(' + planIdx + ',' + hi + ')" style="background:none;border:none;cursor:pointer;color:var(--c-faint);font-size:0.85rem;margin-left:8px;">×</button>'
-          + '</div>'
-          + '<div class="habit-grid">' + dots + '</div>'
-          + '</div>';
-      }).join('');
-
-      bodyHtml += '<div style="display:flex;gap:6px;margin-top:8px;">'
-        + '<input id="plan-habit-input-' + planIdx + '" type="text" placeholder="Neuer Habit (z.B. Sport, Wasser)..." style="flex:1;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"'
-        + ' onkeydown="if(event.key===&quot;Enter&quot;)WB._planHabitAdd(' + planIdx + ')">'
-        + '<button onclick="WB._planHabitAdd(' + planIdx + ')" style="padding:8px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;cursor:pointer;">+</button>'
-        + '</div>';
-
-    } else if (sk === 'metriken') {
-      const metriken = plan.metriken || [];
-      if (!metriken.length) {
-        bodyHtml = '<div style="color:var(--c-faint);font-size:0.85rem;margin-bottom:10px;">Noch keine Metriken definiert.</div>';
-      }
-      bodyHtml += metriken.map((m,mi) => {
-        const entries = Object.entries(m.log||{}).sort((a,b) => b[0].localeCompare(a[0]));
-        const latest  = entries[0];
-        const prev    = entries[1];
-        const isDate  = m.typ === 'datum';
-        const isJN    = m.typ === 'janein';
-
-        // Tendenz aus letzten zwei Einträgen
-        let tendenz = '';
-        if (!isDate && !isJN && latest && prev) {
-          const d = parseFloat(latest[1]) - parseFloat(prev[1]);
-          if (!isNaN(d) && d !== 0) tendenz = d > 0 ? '↑' : '↓';
-        }
-
-        // Fortschritt IST vs ZIEL
-        let progressHtml = '';
-        if (m.ziel && !isDate && !isJN && latest) {
-          const z = parseFloat(m.ziel), a = parseFloat(latest[1]||0);
-          if (!isNaN(z) && !isNaN(a) && z > 0) {
-            const pct = Math.min(100, Math.round(a/z*100));
-            progressHtml = '<div style="display:flex;align-items:center;gap:4px;margin-top:3px;">'
-              + '<div style="flex:1;height:4px;background:var(--c-border);border-radius:2px;overflow:hidden;">'
-              + '<div style="height:100%;width:'+pct+'%;background:var(--c-beruf);border-radius:2px;"></div></div>'
-              + '<span style="font-size:0.65rem;color:var(--c-beruf);font-family:var(--font-mono);min-width:28px;text-align:right;">'+pct+'%</span></div>';
-          }
-        }
-
-        // Datum-Info
-        let datumExtra = '';
-        if (isDate && latest?.[1]) {
-          const diff = Math.ceil((new Date(latest[1]) - new Date()) / 86400000);
-          datumExtra = diff > 0
-            ? ' <span style="font-size:0.7rem;color:var(--c-beruf);">noch '+diff+'d</span>'
-            : diff === 0 ? ' <span style="font-size:0.7rem;color:#C62828;">heute</span>'
-            : ' <span style="font-size:0.7rem;color:#C62828;">'+Math.abs(diff)+'d überf.</span>';
-        }
-
-        // Eingabebereich
-        let inputHtml = '';
-        if (isDate) {
-          inputHtml = '<div style="display:flex;align-items:center;gap:4px;">'
-            + '<input type="date" class="metric-input" value="'+(latest?.[1]||m.ziel||'')+'"'
-            + ' onchange="WB._planMetrikLog('+planIdx+','+mi+',this.value)" style="width:138px;">'
-            + datumExtra + '</div>';
-        } else if (isJN) {
-          inputHtml = '<input type="checkbox" '+(latest?.[1]==='1'?'checked':'')
-            + ' onchange="WB._planMetrikLog('+planIdx+','+mi+',this.checked?&quot;1&quot;:&quot;0&quot;)"'
-            + ' style="width:20px;height:20px;accent-color:var(--c-beruf);">';
-        } else {
-          // IST / ZIEL / Tendenz
-          const tendenzColor = tendenz === '↑' ? 'var(--c-beruf)' : '#C62828';
-          inputHtml = '<div style="display:flex;align-items:flex-end;gap:6px;">'
-            + '<div style="display:flex;flex-direction:column;gap:1px;">'
-            + '<span style="font-size:0.58rem;font-weight:700;letter-spacing:0.05em;color:var(--c-muted);text-align:center;">IST</span>'
-            + '<input type="number" class="metric-input" step="any" value="'+(latest?.[1]||'')+'" placeholder="—"'
-            + ' onchange="WB._planMetrikLog('+planIdx+','+mi+',this.value)" style="width:68px;"></div>'
-            + (m.ziel !== undefined ? '<div style="display:flex;flex-direction:column;gap:1px;">'
-              + '<span style="font-size:0.58rem;font-weight:700;letter-spacing:0.05em;color:var(--c-muted);text-align:center;">ZIEL</span>'
-              + '<input type="number" class="metric-input" step="any" value="'+m.ziel+'" placeholder="—"'
-              + ' onchange="WB._planMetrikZiel('+planIdx+','+mi+',this.value)" style="width:68px;"></div>' : '')
-            + '<div style="display:flex;flex-direction:column;gap:1px;align-items:center;">'
-            + '<span style="font-size:0.58rem;font-weight:700;letter-spacing:0.05em;color:var(--c-muted);">+/-</span>'
-            + '<select onchange="WB._planMetrikTendenz('+planIdx+','+mi+',this.value)"'
-            + ' style="padding:5px 4px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;background:var(--c-bg);color:'+(m.tendenzManuell==='hoch'?'var(--c-beruf)':m.tendenzManuell==='tief'?'#C62828':'var(--c-muted)')+';width:52px;">'
-            + '<option value="" '+(m.tendenzManuell===''||!m.tendenzManuell?'selected':'')+'>&#8212;</option>'
-            + '<option value="hoch" '+(m.tendenzManuell==='hoch'?'selected':'')+' style="color:var(--c-beruf);">↑</option>'
-            + '<option value="tief" '+(m.tendenzManuell==='tief'?'selected':'')+' style="color:#C62828;">↓</option>'
-            + '</select></div>'
-            + (tendenz ? '<span style="font-size:1.1rem;color:'+tendenzColor+';line-height:1;align-self:flex-end;padding-bottom:4px;">'+tendenz+'</span>' : '')
-            + '</div>';
-        }
-
-        return '<div class="metric-row" style="flex-wrap:wrap;align-items:flex-start;gap:6px;">'
-          + '<div style="flex:1;min-width:80px;">'
-          + '<span class="metric-label" style="font-size:0.83rem;font-weight:600;color:var(--c-text);">'
-          + m.name + (m.einheit ? ' <span style="font-size:0.68rem;color:var(--c-faint);">('+m.einheit+')</span>' : '')
-          + '</span>'
-          + progressHtml + '</div>'
-          + inputHtml
-          + '<button onclick="WB._planMetrikDelete('+planIdx+','+mi+')"'
-          + ' style="background:none;border:none;cursor:pointer;color:var(--c-faint);align-self:center;font-size:1rem;">×</button>'
-          + '</div>';
-      }).join('');
-
-      bodyHtml += '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'
-        + '<input id="plan-metrik-name-' + planIdx + '" type="text" placeholder="Name (z.B. Gewicht)" style="flex:2;min-width:100px;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);">'
-        + '<input id="plan-metrik-unit-' + planIdx + '" type="text" placeholder="Einheit (kg)" style="flex:1;min-width:50px;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);">'
-        + '<input id="plan-metrik-ziel-' + planIdx + '" type="text" placeholder="Zielwert" style="flex:1;min-width:50px;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;background:var(--c-bg);color:var(--c-text);">'
-        + '<select id="plan-metrik-typ-' + planIdx + '" style="padding:7px 6px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.78rem;background:var(--c-bg);color:var(--c-text);">'
-        + '<option value="zahl">Zahl</option><option value="datum">Datum</option><option value="janein">Ja/Nein</option></select>'
-        + '<button onclick="WB._planMetrikAdd(' + planIdx + ')" style="padding:7px 14px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.82rem;cursor:pointer;">+</button>'
-        + '</div>';
-
-    } else if (sk === 'planaufgaben') {
-      const paNotiz = this._nzStore().find(n => n.id === plan.notizplanId);
-      const pa = paNotiz?.planAufgaben || [];
-      if (!pa.length) {
-        bodyHtml = '<div style="color:var(--c-faint);font-size:0.85rem;">Noch keine Aufgaben. Im Plan-Notiz-Editor ☐ Checkboxen einfügen.</div>';
-      } else {
-        const offene = pa.filter(a => !a.done).sort((a,b) => (!a.date&&!b.date)?0:(!a.date?1:(!b.date?-1:a.date.localeCompare(b.date))));
-        const erledigte = pa.filter(a => a.done).sort((a,b) => (!a.date&&!b.date)?0:(!a.date?1:(!b.date?-1:a.date.localeCompare(b.date))));
-        bodyHtml = offene.map(a =>
-          '<div class="plan-task-row">'
-          + '<input type="checkbox" class="plan-task-chk" onchange="WB._backlogVerschiebenToggle(this,&quot;'+plan.notizplanId+'&quot;,&quot;'+a.id+'&quot;)">'
-          + '<span class="plan-task-text">' + a.text + (a.date?' <span style="font-size:0.7rem;color:var(--c-muted);">· '+a.date+'</span>':'') + '</span>'
-          + '</div>'
-        ).join('');
-        if (erledigte.length) {
-          bodyHtml += '<div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--c-faint);padding:8px 0 4px;">Erledigt (' + erledigte.length + ')</div>';
-          bodyHtml += erledigte.map(a =>
-            '<div class="plan-task-row" style="opacity:0.5;">'
-            + '<input type="checkbox" class="plan-task-chk" checked onchange="WB._backlogVerschiebenToggle(this,&quot;'+plan.notizplanId+'&quot;,&quot;'+a.id+'&quot;)">'
-            + '<span class="plan-task-text done">' + a.text + '</span>'
-            + '</div>'
-          ).join('');
-        }
-      }
-
-    } else if (sk === 'reflexion') {
-      const reflexionen = (plan.reflexionen||[]).slice().reverse();
-      bodyHtml = reflexionen.map(r =>
-        '<div class="reflexion-entry">'
-        + '<div class="reflexion-date">' + r.datum + '</div>'
-        + '<div class="reflexion-text">' + r.text + '</div>'
-        + '</div>'
-      ).join('');
-      bodyHtml += '<div style="margin-top:12px;">'
-        + '<textarea id="plan-reflex-input-' + planIdx + '" rows="3" placeholder="Was ist dir aufgefallen? Was änderst du?" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);resize:none;"></textarea>'
-        + '<button onclick="WB._planReflexSave(' + planIdx + ')" style="width:100%;margin-top:6px;padding:9px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;">Eintrag speichern</button>'
-        + '</div>';
-    }
-
-    return '<div class="plan-section">'
-      + '<div class="plan-section-header" onclick="WB._planToggleSektion(' + planIdx + ',&quot;' + sk + '&quot;)">'
-      + '<span class="plan-section-icon">' + cfg.icon + '</span>'
-      + '<span class="plan-section-title">' + cfg.label + '</span>'
-      + (badge ? '<span class="plan-section-badge">' + badge + '</span>' : '')
-      + '<span class="plan-section-toggle' + (isOpen?' open':'') + '">&#9654;</span>'
-      + '</div>'
-      + '<div class="plan-section-body' + (isOpen?' open':'') + '">' + bodyHtml + '</div>'
-      + '</div>';
-  },
 
   // ── Aktionen ──────────────────────────────────────────
 
@@ -32281,14 +31956,6 @@ if (new URLSearchParams(location.search).get('wake') === '1') {
 </div>
 
 <!-- PLAN-DOKUMENT OVERLAY -->
-<div id="wb-plan-overlay">
-  <div id="wb-plan-header">
-    <button id="wb-plan-back" onclick="WB.planClose()">&#8249;</button>
-    <div id="wb-plan-title">Plan</div>
-    <button onclick="WB._planEdit()" style="background:none;border:none;cursor:pointer;padding:4px 8px;font-size:0.78rem;color:var(--c-beruf);font-family:var(--font);font-weight:600;">⚙</button>
-  </div>
-  <div id="wb-plan-body"></div>
-</div>
 
 <!-- PLAN-LISTE OVERLAY -->
 
