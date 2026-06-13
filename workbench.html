@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.39.1</title>
+<title>WorkBench 5.39.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -7445,7 +7445,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.39.1 · Build 20260613-0130</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.39.2 · Build 20260613-0200</div>
     </div>
 
     <!-- Welt -->
@@ -7595,7 +7595,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.39.1</div>
+  <div class="wb-startup-tagline">v5.39.2</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -9189,8 +9189,8 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.39.1',
-  APP_BUILD:   '20260613-0130',
+  APP_VERSION: '5.39.2',
+  APP_BUILD:   '20260613-0200',
 
 
   // ══════════════════════════════════════════════════════
@@ -10469,162 +10469,8 @@ const WB = {
   // ── Alle Notifications planen ────────────────────────
   _notifScheduleAll() {
     this._notifClearAll();
-    if (!this._settings.notifEnabled) return;
-    if (Notification.permission !== 'granted') return;
-
-    const now   = new Date();
-    const today = now.toISOString().split('T')[0];
-    const dow   = now.getDay(); // 0=So, 6=Sa
-    const s     = this._settings;
-    const pT    = str => { const [h,m] = str.split(':').map(Number); return h*60+m; };
-    const nowMin = now.getHours()*60 + now.getMinutes();
-
-    // Helper: Timer setzen
-    const plan = (title, body, timeStr, icon) => {
-      const t = pT(timeStr);
-      const diffMs = (t - nowMin) * 60000;
-      if (diffMs <= 0) return; // bereits vorbei
-      const id = setTimeout(() => {
-        this._notifSend(title, body, icon || '🎯');
-      }, diffMs);
-      this._notifTimers.push(id);
-    };
-
-    // 1. Morgen-Assistent
-    const db       = this.dataPriv;
-    const plan_today = db?.dailyPlans?.[today];
-    if (!plan_today?.morningDone) {
-      plan('Guten Morgen ☀️', 'Tagesplan noch nicht erstellt — jetzt planen!', s.notifMorning, '☀️');
-    }
-
-    // 2. Abend-Reflexion
-    if (!plan_today?.eveningDone) {
-      plan('Abend-Reflexion 🌙', 'Wie war dein Tag? Jetzt reflektieren.', s.notifEvening, '🌙');
-    }
-
-    // 3. Wochenplanung Sa
-    if (dow === 6) {
-      const kw = this._kwStr(now);
-      const weekPlan = db?.weeklyPlans?.[kw];
-      if (!weekPlan?.weekDone) {
-        plan('Wochenplanung 📋', 'Nächste Woche planen & diese Woche abschließen.', s.notifWeek, '📋');
-      }
-    }
-
-    // 4. Aufgaben heute
-    const tasksToday = [];
-    [this.dataPro, this.dataPriv].forEach(dbx => {
-      if (!dbx) return;
-      Object.values(dbx.projects || {}).forEach(p => {
-        (p.tasks || []).forEach(t => {
-          if (!t.done && t.date === today) tasksToday.push(t.text);
-        });
-      });
-    });
-    if (tasksToday.length) {
-      const notifTimeMin = pT(s.notifTasks || '08:00');
-      if (notifTimeMin > nowMin) {
-        plan(
-          `${tasksToday.length} Aufgaben heute 📌`,
-          tasksToday.slice(0, 3).join(', ') + (tasksToday.length > 3 ? ` +${tasksToday.length-3}` : ''),
-          s.notifTasks, '📌'
-        );
-      }
-    }
-
-    // 5. Alle Termine heute — X Min vorher
-    // Alle Events liegen in dataPriv.customEvents (_evStore)
-    const pTMin = t => { const [h,m]=(t||'0:0').split(':').map(Number); return h*60+m; };
-    const minBefore = parseInt(s.notifTerminVorlauf) || 15;
-    (this._evStore() || [])
-      .filter(e => e.date === today && e.startTime && !e.done && !e.notifAus)
-      .forEach(e => {
-        const startMin = pTMin(e.startTime);
-        const notifMin = startMin - minBefore;
-        if (notifMin > nowMin) {
-          const diffMs = (notifMin - nowMin) * 60000;
-          const id = setTimeout(() => {
-            this._notifSend(
-              '📅 Termin in ' + minBefore + ' Min',
-              '"' + e.text + '" um ' + e.startTime + ' Uhr',
-              '📅'
-            );
-          }, diffMs);
-          this._notifTimers.push(id);
-        }
-      });
-
-    // 6. Wochenpflichten heute
-    if (s.notifPflicht !== false) {
-      ['pro','priv'].forEach(ctx => {
-        (this._dutyStore(ctx)||[]).filter(d => d.startTime && !d.notifAus).forEach(d => {
-          try {
-            const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
-            const ti = insts.find(i => i.isToday);
-            if (!ti || ti.done) return;
-            const notifMin = pTMin(d.startTime);
-            if (notifMin > nowMin) {
-              const id = setTimeout(() => {
-                this._notifSend('✅ ' + (d.title||d.name||'Pflicht'), 'Jetzt fällig', '✅');
-              }, (notifMin - nowMin) * 60000);
-              this._notifTimers.push(id);
-            }
-          } catch(e) {}
-        });
-      });
-    }
-
-    // 7. Triage-Erinnerung
-    if (s.notifTriage !== false) {
-      const rs = this._ritualStore(), rk = this._ritualTodayKey();
-      const ritual = rs?.[rk];
-      if (ritual?.doneA && !ritual?.doneB) {
-        const triageH = (dow >= 1 && dow <= 5) ? 7 : 8;
-        const triageMin = triageH * 60;
-        if (triageMin > nowMin) {
-          const id = setTimeout(() => {
-            this._notifSend('💼 Tages-Triage', 'Dein Tag wartet auf Planung', '💼');
-          }, (triageMin - nowMin) * 60000);
-          this._notifTimers.push(id);
-        }
-      }
-    }
-
-    // 8. Feierabend-Check
-    if (s.notifFeierabend !== false) {
-      const feZ = s.privAfterWorkStart || '16:00';
-      const rs = this._ritualStore(), rk = this._ritualTodayKey();
-      if (!rs?.[rk]?.feierabend?.done) {
-        const feMin = pTMin(feZ);
-        if (feMin > nowMin) {
-          const id = setTimeout(() => {
-            this._notifSend('🏁 Feierabend-Check', 'Zeit für den Tagesabschluss', '🏁');
-          }, (feMin - nowMin) * 60000);
-          this._notifTimers.push(id);
-        }
-      }
-    }
-
-    // SLS-M1: Schlafenszeit-Erinnerung
-    const schlafZ2 = this._settings.slsSchlafenszeit || '23:00';
-    const today2 = new Date().toISOString().split('T')[0];
-    const evDone2 = this.dataPriv?.dailyPlans?.[today2]?.eveningDone;
-    if (!evDone2) {
-      const [schlafH2, schlafM2] = schlafZ2.split(':').map(Number);
-      const fireAt2 = new Date();
-      fireAt2.setHours(schlafH2, schlafM2, 0, 0);
-      if (fireAt2 > new Date()) {
-        const msUntil2 = fireAt2.getTime() - Date.now();
-        const id2 = setTimeout(() => {
-          if (!this.dataPriv?.dailyPlans?.[today2]?.eveningDone) {
-            this._notifSend('🌙 Schlafenszeit', 'Abend-Reflexion noch offen — 3 Minuten, dann ist gut.', '🌙');
-          }
-        }, msUntil2);
-        this._notifTimers.push(id2);
-      }
-    }
-
-    console.log('[Notif] ' + this._notifTimers.length + ' Timer geplant');
+    // NOTIF-Fix: Timer-System deaktiviert.
+    // Alle Notifications laufen über _notifBuildQueue + SW.
   },
 
   // ── Notification senden ───────────────────────────────
@@ -10713,6 +10559,23 @@ const WB = {
     if (!this._settings?.notifEnabled) return;
     if (Notification.permission !== 'granted') return;
     if (!this._idb) return;
+
+    // NOTIF-Fix: Alte Items aus Queue räumen (> 1h)
+    if (this._idb.objectStoreNames.contains('notif-queue')) {
+      try {
+        const txClean = this._idb.transaction('notif-queue', 'readwrite');
+        const storeClean = txClean.objectStore('notif-queue');
+        const allOld = await new Promise(r => {
+          const req = storeClean.getAll();
+          req.onsuccess = e => r(e.target.result || []);
+          req.onerror = () => r([]);
+        });
+        const cutoff = Date.now() - 60 * 60 * 1000;
+        for (const old of allOld) {
+          if (old.fireAt < cutoff) storeClean.delete(old.id);
+        }
+      } catch(e) {}
+    }
 
     const today    = new Date().toISOString().split('T')[0];
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
@@ -10805,6 +10668,21 @@ const WB = {
       }
     }
 
+    // SLS-M1: Schlafenszeit-Erinnerung
+    const schlafZ = s.slsSchlafenszeit || '23:00';
+    const evDoneSchlaf = this.dataPriv?.dailyPlans?.[today]?.eveningDone;
+    if (!evDoneSchlaf) {
+      const fireAtSchlaf = toMs(today, schlafZ);
+      if (fireAtSchlaf > now) {
+        items.push({
+          id: 'sls-schlaf-' + today, type: 'schlafenszeit',
+          title: '🌙 Schlafenszeit',
+          body: 'Abend-Reflexion noch offen — 3 Minuten, dann ist gut.',
+          fireAt: fireAtSchlaf, url: './', important: true,
+        });
+      }
+    }
+
     // Aufgaben mit Datum
     if (s.notifAufgabe === true) {
       const fireAt = toMs(today, '08:00');
@@ -10854,6 +10732,26 @@ const WB = {
 
     // Fallback: direkte setTimeout-Timer (kein IDB-Store oder Store fehlt)
     if (!idbOk) {
+    // NOTIF-Fix: Fällige sofort senden
+    const nowDirect = Date.now();
+    for (const item of items) {
+      if (item.fireAt <= nowDirect && item.fireAt > nowDirect - 20 * 60 * 1000) {
+        try {
+          const txChk = this._idb.transaction('notif-queue', 'readonly');
+          const ex = await new Promise(r => {
+            const req = txChk.objectStore('notif-queue').get(item.id);
+            req.onsuccess = e => r(e.target.result);
+            req.onerror = () => r(null);
+          });
+          if (!ex || !ex.shown) {
+            this._notifSend(item.title, item.body, '🔔');
+            const txMark = this._idb.transaction('notif-queue', 'readwrite');
+            txMark.objectStore('notif-queue').put({ ...item, shown: true });
+          }
+        } catch(e) {}
+      }
+    }
+
       console.log('[Notif] Fallback auf Timer für', items.length, 'Items');
       const nowMs = Date.now();
       items.forEach(item => {
@@ -25647,19 +25545,34 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       this._notifUpdateStatus();
       if (this._settings.notifEnabled) {
         this._notifLastSchedule = Date.now();
-        this._notifScheduleAll(); // Timer für PC
+        this._lastRenderDate = new Date().toISOString().split('T')[0];
+        this._notifScheduleAll(); // Timer für PC (deaktiviert)
         this._notifBuildQueue();  // IDB für Pixel-SW
       }
     }, 1500);
     // Neu planen wenn App wieder sichtbar wird
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && this._settings.notifEnabled) {
-        // Nur neu planen wenn min 10 Minuten seit letztem Plan vergangen
-        const now = Date.now();
-        if (!this._notifLastSchedule || now - this._notifLastSchedule > 10 * 60000) {
-          this._notifLastSchedule = now;
-          this._notifClearAll();
-          this._notifScheduleAll();
+      if (document.visibilityState === 'visible') {
+        // NOTIF-Fix: Cockpit neu rendern bei Tab-Fokus
+        if (this.activeTab === 'cockpit') {
+          try { this.renderCockpit(); } catch(e) {}
+        }
+        // NOTIF-Fix: Tageswechsel erkennen
+        const todayCheck = new Date().toISOString().split('T')[0];
+        if (this._lastRenderDate && this._lastRenderDate !== todayCheck) {
+          this._ritualOpenedToSession = false;
+          try { this._ritualMaybeOpen(); } catch(e) {}
+        }
+        this._lastRenderDate = todayCheck;
+        // Ritual prüfen
+        try { this._ritualMaybeOpen(); } catch(e) {}
+        // Notifications neu planen
+        if (this._settings.notifEnabled) {
+          const now = Date.now();
+          if (!this._notifLastSchedule || now - this._notifLastSchedule > 10 * 60000) {
+            this._notifLastSchedule = now;
+            try { this._notifBuildQueue(); } catch(e) {}
+          }
         }
       }
     });
