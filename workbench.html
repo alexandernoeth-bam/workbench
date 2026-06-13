@@ -242,11 +242,8 @@ html, body {
   display: flex;
   background: var(--c-surface);
   border-top: 1px solid var(--c-border);
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
+  position: relative;
+  z-index: 10;
 }
 
 .wb-tab {
@@ -7440,7 +7437,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.39.5 · Build 20260613-0910</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.39.5 · Build 20260613-0920</div>
     </div>
 
     <!-- Welt -->
@@ -9188,7 +9185,7 @@ body.fokus-modus #ck-next-timer     { display: none !important; }
 const WB = {
 
   APP_VERSION: '5.39.5',
-  APP_BUILD:   '20260613-0910',
+  APP_BUILD:   '20260613-0920',
 
 
   // ══════════════════════════════════════════════════════
@@ -28480,34 +28477,42 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (title) title.childNodes[0].textContent = 'Neuer Termin ';
 
     const selTyp = prefTyp || 'sonstiges';
+    // Welt-Pill
+    const weltPill = '<div style="position:absolute;top:12px;right:16px;">'
+      + '<select id="ef-ev-world" style="padding:3px 8px;border-radius:12px;font-size:0.72rem;font-weight:600;'
+      + 'border:1px solid var(--c-border);font-family:var(--font);background:var(--c-bg);color:var(--c-muted);cursor:pointer;">'
+      + '<option value="pro"' + (ctx==='pro'?' selected':'') + '>Beruf</option>'
+      + '<option value="priv"' + (ctx==='priv'?' selected':'') + '>Privat</option></select></div>';
     body.innerHTML =
-      '<div class="edit-field"><label>Titel</label>'
+      weltPill
+      + '<div class="edit-field"><label>Titel</label>'
       + '<input id="ef-title" type="text" placeholder="Termin-Bezeichnung"></div>'
       + '<div class="edit-field"><label>Typ</label>'
       + this._evTypePills(selTyp)
       + '</div>'
       + '<div class="edit-row">'
-      + '<div class="edit-field"><label>Datum</label>'
+      + '<div class="edit-field"><label>Datum (von)</label>'
       + '<input id="ef-ev-date" type="date" value="' + dateStr + '"'
-      + ' onchange="var ed=document.getElementById(\'ef-ev-enddate\');if(ed)ed.value=this.value;"></div>'
-      + '<div class="edit-field"><label>Welt</label>'
-      + '<select id="ef-ev-world"><option value="pro"' + (ctx==='pro'?' selected':'') + '>Beruf</option>'
-      + '<option value="priv"' + (ctx==='priv'?' selected':'') + '>Privat</option></select></div>'
+      + ' onchange="var ed=document.getElementById(\'ef-ev-enddate\');if(ed&&ed.value<=this.value)ed.value=this.value;"></div>'
+      + '<div class="edit-field"><label>Datum (bis)</label>'
+      + '<input id="ef-ev-enddate" type="date" value="' + dateStr + '"></div>'
       + '</div>'
       + '<div class="edit-row">'
-      + '<div class="edit-field"><label>Von</label>'
+      + '<div class="edit-field"><label>Von (Zeit)</label>'
       + '<input id="ef-ev-start" type="time" value="09:00" data-prev="09:00" onchange="WB._evNewKeepDuration()"></div>'
-      + '<div class="edit-field"><label>Bis</label>'
+      + '<div class="edit-field"><label>Bis (Zeit)</label>'
       + '<input id="ef-ev-end" type="time" value="10:00"></div>'
-      + '</div>'
-      + '<div style="display:flex;gap:8px;">'
-      + '<div class="edit-field" style="flex:1;"><label>Bis-Datum</label>'
-      + '<input id="ef-ev-enddate" type="date" value="' + dateStr + '"></div>'
       + '</div>'
       + '<div class="edit-field"><label>Ort (optional)</label>'
       + '<input id="ef-ev-loc" type="text" placeholder="Ort oder Link"></div>'
-      + this._aktivEnergiePills('mittel', 'ef-evn-aktiv')
+      + '<div class="edit-row">'
+      + '<div class="edit-field"><label>Aktivierungsenergie</label>'
+      + '<select id="ef-evn-aktiv" style="width:100%;padding:8px 10px;border:1.5px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">'
+      + '<option value="niedrig">Niedrig</option>'
+      + '<option value="mittel" selected>Mittel</option>'
+      + '<option value="hoch">Hoch</option></select></div>'
       + this._kippTypSelect('', 'ef-evn-kipp')
+      + '</div>'
       + this._vhDropdownHtml('', 'ef-ev-vorhaben');
 
     (() => { const _ev2 = document.getElementById('edit-overlay');
@@ -34209,18 +34214,33 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + this._evTypePills(ev.typ||'sonstiges')
         + '</div>'
         + '<div class="edit-row">'
-        + '<div class="edit-field"><label>Datum</label><input id="ef-date" type="date" value="'+(ev.date||'')+'" onchange="WB._evSyncEndDate()">'+'</div>'
-        + '<div class="edit-field"><label>Welt</label><select id="ef-ev-welt">'
+        + // Welt-Pill oben rechts
+        '<div style="position:absolute;top:12px;right:16px;">'
+        + '<select id="ef-ev-welt" style="padding:3px 8px;border-radius:12px;font-size:0.72rem;font-weight:600;'
+        + 'border:1px solid var(--c-border);font-family:var(--font);background:var(--c-bg);color:var(--c-muted);cursor:pointer;">'
         + '<option value="pro"'+((ev.welt||ctx)==='pro'?' selected':'')+'>Beruf</option>'
         + '<option value="priv"'+((ev.welt||ctx)==='priv'?' selected':'')+'>Privat</option>'
-        + '</select></div></div>'
+        + '</select></div>'
+        // Datum-Paar
+        + '<div class="edit-field"><label>Datum (von)</label><input id="ef-date" type="date" value="'+(ev.date||'')+'" onchange="WB._evSyncEndDate()">'+'</div></div>'
         + '<div class="edit-row">'
-        + '<div class="edit-field"><label>Von</label><input id="ef-time" type="time" value="'+(ev.startTime||'09:00')+'" onchange="WB._evKeepDuration()">'+'</div>'
-        + '<div class="edit-field"><label>Bis</label><input id="ef-endtime" type="time" value="'+evEnd+'" onchange="WB._evRecalcDur()">'+'</div>'+'<div class="edit-field"><label>Bis-Datum</label><input id="ef-enddate" type="date" value="'+(ev.endDate||ev.date||'')+'">'+'</div>'
+        + '<div class="edit-field"><label>Datum (bis)</label><input id="ef-enddate" type="date" value="'+(ev.endDate||ev.date||'')+'">'+'</div>'
+        + '</div>'
+        // Zeit-Paar
+        + '<div class="edit-row">'
+        + '<div class="edit-field"><label>Von (Zeit)</label><input id="ef-time" type="time" value="'+(ev.startTime||'09:00')+'" onchange="WB._evKeepDuration()">'+'</div>'
+        + '<div class="edit-field"><label>Bis (Zeit)</label><input id="ef-endtime" type="time" value="'+evEnd+'" onchange="WB._evRecalcDur()">'+'</div>'
         + '</div>'
         + '<div class="edit-field"><label>Ort</label><input id="ef-loc" type="text" value="'+(ev.location||'')+'">'+'</div>'
-        + this._aktivEnergiePills(ev.aktivEnergie, 'ef-ev-aktiv')
+        // AE + Kipp in einer Zeile
+        + '<div class="edit-row">'
+        + '<div class="edit-field"><label>Aktivierungsenergie</label>'
+        + '<select id="ef-ev-aktiv" style="width:100%;padding:8px 10px;border:1.5px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">'
+        + '<option value="niedrig"'+(ev.aktivEnergie==='niedrig'?' selected':'')+'>Niedrig</option>'
+        + '<option value="mittel"'+(!ev.aktivEnergie||ev.aktivEnergie==='mittel'?' selected':'')+'>Mittel</option>'
+        + '<option value="hoch"'+(ev.aktivEnergie==='hoch'?' selected':'')+'>Hoch</option></select></div>'
         + this._kippTypSelect(ev.kippTyp, 'ef-ev-kipp')
+        + '</div>'
         + '<div class="edit-field"><label>Energiekosten <span style="font-size:0.72rem;color:var(--c-faint);font-weight:400;">(optional)</span></label>'
         + '<input type="number" id="ef-ev-energiekosten" min="0" max="40" step="1" placeholder="Standard" '
         + 'style="width:80px;padding:6px 8px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);" '
@@ -36752,7 +36772,7 @@ if (new URLSearchParams(location.search).get('wake') === '1') {
 
 
 
-<div id="wb-schnell-overlay" style="position:fixed;inset:0;z-index:999;background:var(--c-bg);display:none;flex-direction:column;">
+<div id="wb-schnell-overlay" style="position:fixed;top:0;left:0;right:0;bottom:var(--tab-h, 60px);z-index:999;background:var(--c-bg);display:none;flex-direction:column;">
   <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:2px solid var(--c-beruf);background:var(--c-surface);flex-shrink:0;">
     <button onclick="WB.schnellListeClose()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--c-muted);padding:0;line-height:1;">&#8249;</button>
     <div style="flex:1;font-size:1rem;font-weight:800;color:var(--c-text);">Schnellerinnerungen <span id="wb-schnell-welt" style="font-size:0.78rem;font-weight:600;color:var(--c-muted);"></span></div>
@@ -36760,7 +36780,7 @@ if (new URLSearchParams(location.search).get('wake') === '1') {
   </div>
   <div id="wb-schnell-body" style="flex:1;overflow-y:auto;padding:16px;"></div>
 </div>
-<div id="wb-vorhaben-overlay" style="position:fixed;inset:0;z-index:999;background:var(--c-bg);display:none;flex-direction:column;">
+<div id="wb-vorhaben-overlay" style="position:fixed;top:0;left:0;right:0;bottom:var(--tab-h, 60px);z-index:999;background:var(--c-bg);display:none;flex-direction:column;">
   <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:2px solid var(--c-beruf);background:var(--c-surface);flex-shrink:0;">
     <button onclick="WB.vorhabenListeClose()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--c-muted);padding:0;line-height:1;">&#8249;</button>
     <div style="flex:1;font-size:1rem;font-weight:800;color:var(--c-text);">Vorhaben <span id="wb-vorhaben-welt" style="font-size:0.78rem;font-weight:600;color:var(--c-muted);"></span></div>
