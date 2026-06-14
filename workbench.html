@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.42.7</title>
+<title>WorkBench 5.42.8</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.42.7 · Build 20260614-0820</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.42.8 · Build 20260614-0900</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.42.7</div>
+  <div class="wb-startup-tagline">v5.42.8</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7910,8 +7910,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.42.7',
-  APP_BUILD:   '20260614-0820',
+  APP_VERSION: '5.42.8',
+  APP_BUILD:   '20260614-0900',
 
 
   // ══════════════════════════════════════════════════════
@@ -16642,11 +16642,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const header = document.getElementById('backlog-header');
     const scroll = document.getElementById('backlog-scroll');
     if (!header || !scroll) return;
+    const today = new Date().toISOString().split('T')[0];
     const kwStart = this._kwStartDate();
     const kwEnd = this._kwEndDate();
-    const today = new Date().toISOString().split('T')[0];
-    const kw = typeof this._getCurrentKW === 'function' ? this._getCurrentKW() : '';
-    header.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);">Backlog \u00b7 KW '+kw+'</span></div>';
+    header.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);">Backlog \u00b7 diese Woche</span></div>';
 
     const aufgabenGruppen = [];
     ['pro','priv'].forEach(welt => {
@@ -16672,7 +16671,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const ueberfaellig = alleSchnell.filter(x=>x.date&&x.date<today);
     const heuteS = alleSchnell.filter(x=>x.date===today);
     const geplant = alleSchnell.filter(x=>x.date&&x.date>today);
-    const offenS = alleSchnell.filter(x=>!x.date);
+    const ohneD = alleSchnell.filter(x=>!x.date);
 
     let h = '';
     aufgabenGruppen.forEach(g => {
@@ -16698,7 +16697,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + renderGruppe('\u00dcberf\u00e4llig', ueberfaellig)
         + renderGruppe('Heute', heuteS)
         + renderGruppe('Geplant', geplant)
-        + renderGruppe('Offen', offenS)
+        + renderGruppe('Offen', ohneD)
         + '</div></div>';
     }
     scroll.innerHTML = h || '<div style="text-align:center;padding:32px;color:var(--c-faint);font-size:0.85rem;">Backlog ist leer.</div>';
@@ -19006,6 +19005,33 @@ this.setDirty();
     if (container) { container.innerHTML = ''; container.appendChild(el); }
   },
 
+
+  _schnellVhPickerChange() {
+    const vhSel = document.getElementById('schnell-vh-picker');
+    const aWrap = document.getElementById('schnell-aufgabe-picker-wrap');
+    const aSel = document.getElementById('schnell-aufgabe-picker');
+    if (!vhSel || !aWrap || !aSel) return;
+    const val = vhSel.value;
+    if (!val) { aWrap.style.display = 'none'; return; }
+    const [vhId, welt] = val.split('|');
+    const store = this._vorhabenStore(welt) || [];
+    const vh = store.find(v => v.id === vhId);
+    if (!vh) { aWrap.style.display = 'none'; return; }
+    const kwStart = this._kwStartDate();
+    const kwEnd = this._kwEndDate();
+    const aufgaben = [];
+    (vh.meilensteine||[]).forEach(ms => {
+      (ms.aufgaben||[]).filter(a => !a.done).forEach(a => aufgaben.push({ a, ms }));
+    });
+    let h = '<option value="">\u2013 Direkt ins Vorhaben \u2013</option>';
+    aufgaben.forEach(({ a, ms }) => {
+      const wocheLbl = a.datum && a.datum >= kwStart && a.datum <= kwEnd ? ' \u2605' : '';
+      h += '<option value="' + a.id + '|' + ms.id + '">' + this._esc(a.text) + (a.datum ? ' \u00b7 ' + a.datum : '') + wocheLbl + '</option>';
+    });
+    aSel.innerHTML = h;
+    aWrap.style.display = 'block';
+  },
+
   _quickAdd(prefillDate) {
     const today = new Date().toISOString().split('T')[0];
     // Kleines Sheet aufbauen
@@ -19032,7 +19058,12 @@ this.setDirty();
       + '<div style="margin-top:8px;">'
       + '<select id="schnell-vorhaben-picker" style="width:100%;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">'
       + '<option value="">\u2013 Kein Vorhaben \u2013</option></select></div>'
-      + '<div id="schnell-chaos-offer" style="display:none;margin-top:6px;">'
+      + 
+      + '<div style="margin-bottom:10px;">'
+      + '<label style="font-size:0.78rem;font-weight:600;color:var(--c-muted);display:block;margin-bottom:4px;">Vorhaben (optional)</label>'
+      + '<select id="schnell-vh-picker" onchange="WB._schnellVhPickerChange()" style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"><option value="">\u2013 Kein Vorhaben \u2013</option></select></div>'
+      + '<div id="schnell-aufgabe-picker-wrap" style="display:none;margin-bottom:10px;"><label style="font-size:0.78rem;font-weight:600;color:var(--c-muted);display:block;margin-bottom:4px;">Aufgabe f\u00fcr Checkliste (optional)</label><select id="schnell-aufgabe-picker" style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"><option value="">\u2013 Direkt ins Vorhaben \u2013</option></select></div>'
+'<div id="schnell-chaos-offer" style="display:none;margin-top:6px;">'
       + '<label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:var(--c-muted);cursor:pointer;">'
       + '<input type="checkbox" id="schnell-to-chaos" style="accent-color:var(--c-privat);">'
       + ' Als Chaos-Aufgabe speichern (unter 10 Min)</label></div>'
@@ -19078,6 +19109,22 @@ this.setDirty();
     sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
     document.body.appendChild(sheet);
     setTimeout(() => document.getElementById('wqa-text')?.focus(), 50);
+    // Vorhaben-Picker befüllen
+    setTimeout(() => {
+      const sel = document.getElementById('schnell-vh-picker');
+      if (!sel) return;
+      let optH = '<option value="">\u2013 Kein Vorhaben \u2013</option>';
+      ['pro','priv'].forEach(welt => {
+        const store = this._vorhabenStore(welt) || [];
+        const aktiv = store.filter(v => (v.aktivitaet||'aktiv')==='aktiv');
+        if (!aktiv.length) return;
+        optH += '<optgroup label="\u2500\u2500 '+(welt==='pro'?'Beruf':'Privat')+' \u2500\u2500">';
+        aktiv.forEach(v => { optH += '<option value="'+v.id+'|'+welt+'">'+this._esc(v.titel)+'</option>'; });
+        optH += '</optgroup>';
+      });
+      sel.innerHTML = optH;
+    }, 50);
+
     // Enter speichert
     sheet.querySelector('#wqa-text').addEventListener('keydown', e => {
       if (e.key === 'Enter') WB._quickSave();
@@ -19103,6 +19150,47 @@ this.setDirty();
     const text = document.getElementById('wqa-text')?.value?.trim();
     const date = document.getElementById('wqa-date')?.value || new Date().toISOString().split('T')[0];
     if (!text) { document.getElementById('wqa-text')?.focus(); return; }
+
+    // Vorhaben-Picker Routing
+    const _vhSel = document.getElementById('schnell-vh-picker');
+    const _aSel = document.getElementById('schnell-aufgabe-picker');
+    const _vhVal = _vhSel?.value || '';
+    const _aVal = _aSel?.value || '';
+    if (_vhVal) {
+      const [_vhId, _vhWelt] = _vhVal.split('|');
+      const _vhStore = this._vorhabenStore(_vhWelt) || [];
+      const _vh = _vhStore.find(v => v.id === _vhId);
+      if (_vh) {
+        if (_aVal) {
+          const [_aufgId] = _aVal.split('|');
+          (_vh.meilensteine||[]).forEach(ms => {
+            const a = (ms.aufgaben||[]).find(x => x.id === _aufgId);
+            if (!a) return;
+            if (!a.checklist) a.checklist = [];
+            a.checklist.push({ text, done: false });
+            _vh.geaendert = Date.now();
+          });
+          this.setDirty();
+          document.getElementById('wb-quick-add-sheet')?.remove();
+          this._toast('\u2713 Checklisten-Eintrag in ' + this._esc(_vh.titel));
+          try { this._cbUpdateBadge(); } catch(e) {}
+          return;
+        } else {
+          if (!_vh.meilensteine) _vh.meilensteine = [];
+          if (!_vh.meilensteine.length) _vh.meilensteine.push({ id:'ms_'+Date.now(), titel:'Aufgaben', aufgaben:[] });
+          const _ms = _vh.meilensteine[0];
+          if (!_ms.aufgaben) _ms.aufgaben = [];
+          const _date = document.getElementById('qa-date')?.value || new Date().toISOString().split('T')[0];
+          _ms.aufgaben.push({ id:'a_schnell_'+Date.now(), text, done:false, datum:_date, aktivEnergie:'niedrig', checklist:[], naechsterSchritt:true });
+          _vh.geaendert = Date.now();
+          this.setDirty();
+          document.getElementById('wb-quick-add-sheet')?.remove();
+          this._toast('\u2713 Mikro-Aufgabe in ' + this._esc(_vh.titel));
+          try { this._cbUpdateBadge(); } catch(e) {}
+          return;
+        }
+      }
+    }
     // Welt aus Pill-Auswahl lesen (Fallback: activeWorld)
     const weltVal = this._wqaWelt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
     const db = weltVal === 'pro' ? this.dataPro : this.dataPriv;
