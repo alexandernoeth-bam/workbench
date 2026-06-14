@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.41.1</title>
+<title>WorkBench 5.41.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6149,7 +6149,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.41.1 · Build 20260613-1535</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.41.2 · Build 20260613-1600</div>
     </div>
 
     <!-- Welt -->
@@ -6299,7 +6299,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.41.1</div>
+  <div class="wb-startup-tagline">v5.41.2</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -6369,6 +6369,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
       <!-- NEUE TAGESSEITE v4.1 — drei feste Blöcke -->
       <div id="ck-tagesseite">
       <div id="ck-sv-konto" style="margin:0 14px 8px;"></div>
+      <div id="ck-chaos-block" style="margin:0 14px 8px;"></div>
 
   <!-- Datum-Header -->
   <div id="ck-tag-header">
@@ -6530,6 +6531,11 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
     </section>
 
     <!-- Woche -->
+    <section class="wb-section" id="sec-chaos" aria-label="Chaos-Backlog">
+      <div id="chaos-header" style="padding:12px 14px 0;"></div>
+      <div id="chaos-scroll" style="flex:1;overflow-y:auto;padding:8px 14px;"></div>
+    </section>
+
     <section class="wb-section" id="sec-woche" aria-label="Wochensicht">
       <div id="woche-container">
         <div id="woche-nav">
@@ -6602,6 +6608,18 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
         <polyline points="22 4 12 14.01 9 11.01"/>
       </svg>
       Vorhaben
+    </button>
+
+    <button class="wb-tab" role="tab" aria-selected="false"
+      aria-controls="sec-chaos" id="tab-chaos"
+      onclick="WB.switchTab('chaos', this)" data-label="Chaos">
+      <span class="wb-tab-icon" style="position:relative;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        <span id="chaos-tab-badge" style="display:none;position:absolute;top:-2px;right:-6px;background:#C62828;color:#fff;font-size:8px;font-weight:700;padding:1px 4px;border-radius:6px;min-width:14px;text-align:center;"></span>
+      </span>
+      <span class="wb-tab-label">Chaos</span>
     </button>
 
     <button class="wb-tab" role="tab" aria-selected="false"
@@ -7920,8 +7938,8 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.41.1',
-  APP_BUILD:   '20260613-1535',
+  APP_VERSION: '5.41.2',
+  APP_BUILD:   '20260613-1600',
 
 
   // ══════════════════════════════════════════════════════
@@ -16341,6 +16359,182 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
 
+
+  // ═══ CB1: Chaos-Backlog ═════════════════════════════════
+
+  _cbStore(vorhabenId, welt) {
+    const store = this._vorhabenStore(welt) || [];
+    const vh = store.find(v => v.id === vorhabenId);
+    if (!vh) return null;
+    if (!vh.chaosBacklog) vh.chaosBacklog = [];
+    return vh.chaosBacklog;
+  },
+
+  _cbAlleOffen() {
+    const result = [];
+    ['pro', 'priv'].forEach(welt => {
+      const store = this._vorhabenStore(welt) || [];
+      store.forEach(vh => {
+        const offen = (vh.chaosBacklog || []).filter(cb => !cb.done);
+        if (offen.length) result.push({ vh, offen, welt });
+      });
+    });
+    return result;
+  },
+
+  _cbGesamtZaehler() {
+    return this._cbAlleOffen().reduce((sum, g) => sum + g.offen.length, 0);
+  },
+
+  _cbUpdateBadge() {
+    const badge = document.getElementById('chaos-tab-badge');
+    if (!badge) return;
+    const count = this._cbGesamtZaehler();
+    if (count > 0) { badge.style.display = 'block'; badge.textContent = count; }
+    else { badge.style.display = 'none'; }
+  },
+
+  _cbToggle(vorhabenId, cbId, welt) {
+    const store = this._cbStore(vorhabenId, welt);
+    if (!store) return;
+    const cb = store.find(c => c.id === cbId);
+    if (!cb || cb.done) return;
+    cb.done = true;
+    cb.doneTs = Date.now();
+    this.setDirty();
+    try { this._svPendingSheet = { text: cb.text, quelle: 'chaos' }; this._svShowSheet(cb.text, 'chaos'); } catch(e) {}
+    this._cbUpdateBadge();
+    try { this.renderChaos(); } catch(e) {}
+    try { this._ckRenderChaosBlock(); } catch(e) {}
+  },
+
+  _cbNeuSheet(vorhabenId, welt) {
+    const text = prompt('Mikro-Aufgabe (unter 10 Min):');
+    if (!text?.trim()) return;
+    const minStr = prompt('Gesch\u00e4tzte Minuten (1-10):', '5');
+    const min = Math.min(10, Math.max(1, parseInt(minStr) || 5));
+    const store = this._cbStore(vorhabenId, welt);
+    if (!store) return;
+    store.push({ id: 'cb_' + Date.now(), text: text.trim(), min, done: false, doneTs: null, ts: Date.now() });
+    this.setDirty();
+    this._cbUpdateBadge();
+    try { this.renderChaos(); } catch(e) {}
+    try { this._ckRenderChaosBlock(); } catch(e) {}
+    this._toast('\u2713 Chaos-Aufgabe angelegt');
+  },
+
+  renderChaos() {
+    const header = document.getElementById('chaos-header');
+    const scroll = document.getElementById('chaos-scroll');
+    if (!header || !scroll) return;
+    const gruppen = this._cbAlleOffen();
+    const gesamt = this._cbGesamtZaehler();
+    header.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+        + '<span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);">Chaos-Backlog</span>'
+        + (gesamt > 0 ? '<span style="font-size:10px;font-weight:700;background:rgba(77,95,51,0.12);color:#4D5F33;padding:2px 7px;border-radius:8px;">' + gesamt + ' offen</span>' : '')
+      + '</div>';
+    if (!gruppen.length) {
+      scroll.innerHTML = '<div style="text-align:center;padding:32px 0;color:var(--c-faint);font-size:0.85rem;">Kein Chaos. Gut so.</div>';
+      return;
+    }
+    let h = '';
+    gruppen.forEach(({ vh, offen, welt }) => {
+      const wc = welt === 'pro' ? 'var(--c-beruf)' : '#4D5F33';
+      h += '<div style="background:#F0EEE8;border:0.5px solid rgba(0,0,0,0.12);border-radius:10px;overflow:hidden;margin-bottom:8px;">';
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:0.5px solid rgba(0,0,0,0.08);">'
+        + '<span style="width:7px;height:7px;border-radius:50%;background:' + wc + ';flex-shrink:0;display:inline-block;"></span>'
+        + '<span style="font-size:0.82rem;font-weight:600;flex:1;">' + this._esc(vh.titel) + '</span>'
+        + '<span style="font-size:9px;color:var(--c-faint);">' + offen.length + ' offen</span>'
+        + '<button onclick="WB._cbNeuSheet(&quot;' + vh.id + '&quot;,&quot;' + welt + '&quot;)" style="font-size:11px;background:none;border:none;color:' + wc + ';cursor:pointer;padding:0 2px;font-weight:700;">+ Neu</button>'
+      + '</div>';
+      offen.forEach(cb => {
+        h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:0.5px solid rgba(0,0,0,0.05);">'
+          + '<div onclick="WB._cbToggle(&quot;' + vh.id + '&quot;,&quot;' + cb.id + '&quot;,&quot;' + welt + '&quot;)" style="width:14px;height:14px;border-radius:3px;border:1.5px solid rgba(0,0,0,0.15);background:#fff;flex-shrink:0;cursor:pointer;"></div>'
+          + '<span style="font-size:11px;flex:1;">' + this._esc(cb.text) + '</span>'
+          + (cb.min ? '<span style="font-size:9px;color:#4D5F33;background:rgba(77,95,51,0.1);padding:1px 5px;border-radius:5px;">' + cb.min + ' min</span>' : '')
+        + '</div>';
+      });
+      h += '</div>';
+    });
+    scroll.innerHTML = h;
+  },
+
+  _ckRenderChaosBlock() {
+    const el = document.getElementById('ck-chaos-block');
+    if (!el) return;
+    const gruppen = this._cbAlleOffen();
+    if (!gruppen.length) { el.innerHTML = ''; return; }
+    const gesamt = this._cbGesamtZaehler();
+    let h = '<div style="background:#F0EEE8;border:0.5px solid rgba(0,0,0,0.12);border-radius:10px;overflow:hidden;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:0.5px solid rgba(0,0,0,0.08);">'
+        + '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);">Chaos-Backlog</span>'
+        + '<span style="font-size:10px;font-weight:700;background:rgba(77,95,51,0.12);color:#4D5F33;padding:2px 7px;border-radius:8px;">' + gesamt + ' offen</span>'
+      + '</div>';
+    gruppen.forEach(({ vh, offen, welt }) => {
+      h += '<div style="padding:2px 0;">'
+        + '<div style="font-size:9px;font-weight:700;color:var(--c-faint);padding:5px 10px 3px;text-transform:uppercase;letter-spacing:0.05em;">' + this._esc(vh.titel) + '</div>';
+      offen.forEach(cb => {
+        h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:0.5px solid rgba(0,0,0,0.05);">'
+          + '<div onclick="WB._cbToggle(&quot;' + vh.id + '&quot;,&quot;' + cb.id + '&quot;,&quot;' + welt + '&quot;)" style="width:14px;height:14px;border-radius:3px;border:1.5px solid rgba(0,0,0,0.15);background:#fff;flex-shrink:0;cursor:pointer;"></div>'
+          + '<span style="font-size:11px;flex:1;">' + this._esc(cb.text) + '</span>'
+          + (cb.min ? '<span style="font-size:9px;color:#4D5F33;background:rgba(77,95,51,0.1);padding:1px 5px;border-radius:5px;">' + cb.min + ' min</span>' : '')
+        + '</div>';
+      });
+      h += '</div>';
+    });
+    h += '</div>';
+    el.innerHTML = h;
+  },
+
+  _vhRenderChaosTab(vh, welt) {
+    const backlog = vh.chaosBacklog || [];
+    const offen = backlog.filter(cb => !cb.done);
+    const erledigt = backlog.filter(cb => cb.done);
+    let h = '<div style="padding:12px 0;">';
+    h += '<button onclick="WB._cbNeuSheet(&quot;' + vh.id + '&quot;,&quot;' + welt + '&quot;)" style="width:100%;padding:10px;margin-bottom:10px;border:1px dashed rgba(0,0,0,0.15);background:none;border-radius:8px;font-family:var(--font);font-size:0.85rem;cursor:pointer;color:var(--c-muted);">+ Mikro-Aufgabe hinzuf\u00fcgen (unter 10 Min)</button>';
+    if (!offen.length && !erledigt.length) {
+      h += '<div style="text-align:center;padding:24px 0;color:var(--c-faint);font-size:0.85rem;">Kein Chaos \u2014 alles sauber.</div>';
+    }
+    offen.forEach(cb => {
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:0.5px solid rgba(0,0,0,0.06);">'
+        + '<div onclick="WB._cbToggle(&quot;' + vh.id + '&quot;,&quot;' + cb.id + '&quot;,&quot;' + welt + '&quot;)" style="width:16px;height:16px;border-radius:4px;border:1.5px solid rgba(0,0,0,0.15);background:#fff;flex-shrink:0;cursor:pointer;"></div>'
+        + '<span style="flex:1;font-size:0.88rem;">' + this._esc(cb.text) + '</span>'
+        + (cb.min ? '<span style="font-size:0.72rem;color:#4D5F33;background:rgba(77,95,51,0.1);padding:2px 7px;border-radius:6px;">' + cb.min + ' min</span>' : '')
+      + '</div>';
+    });
+    if (erledigt.length) {
+      h += '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);margin:12px 0 6px;">Erledigt (' + erledigt.length + ')</div>';
+      erledigt.slice(-5).forEach(cb => {
+        h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;opacity:0.5;">'
+          + '<div style="width:16px;height:16px;border-radius:4px;background:var(--c-beruf);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><span style="color:#fff;font-size:10px;">\u2713</span></div>'
+          + '<span style="flex:1;font-size:0.85rem;text-decoration:line-through;color:var(--c-faint);">' + this._esc(cb.text) + '</span>'
+        + '</div>';
+      });
+    }
+    h += '</div>';
+    return h;
+  },
+
+  _schnellFillVorhabenPicker() {
+    const sel = document.getElementById('schnell-vorhaben-picker');
+    if (!sel) return;
+    let h = '<option value="">\u2013 Kein Vorhaben \u2013</option>';
+    ['pro','priv'].forEach(welt => {
+      const store = this._vorhabenStore(welt) || [];
+      const aktiv = store.filter(v => (v.aktivitaet||'aktiv') === 'aktiv');
+      if (!aktiv.length) return;
+      h += '<optgroup label="' + (welt==='pro'?'Beruf':'Privat') + '">';
+      aktiv.forEach(v => { h += '<option value="' + v.id + '|' + welt + '">' + this._esc(v.titel) + '</option>'; });
+      h += '</optgroup>';
+    });
+    sel.innerHTML = h;
+    sel.onchange = () => {
+      const offer = document.getElementById('schnell-chaos-offer');
+      if (offer) offer.style.display = sel.value ? 'block' : 'none';
+    };
+  },
+
   // ═══ SV1: Souveränitäts-Konto ═══════════════════════════
 
   _svLastDay: null,
@@ -16428,6 +16622,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this._svPendingSheet = null;
     try { this._svUpdateHeader(); } catch(e) {}
     try { this._svRenderKonto(); } catch(e) {}
+    try { this._ckRenderChaosBlock(); } catch(e) {}
+    try { this._cbUpdateBadge(); } catch(e) {}
   },
 
   _svRenderKonto() {
@@ -18755,6 +18951,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       + '<div style="display:flex;gap:8px;margin-bottom:14px;">'
       + '<div style="flex:2;">'
       + '<div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;">Datum</div>'
+      + '<div style="margin-top:8px;">'
+      + '<select id="schnell-vorhaben-picker" style="width:100%;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">'
+      + '<option value="">\u2013 Kein Vorhaben \u2013</option></select></div>'
+      + '<div id="schnell-chaos-offer" style="display:none;margin-top:6px;">'
+      + '<label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:var(--c-muted);cursor:pointer;">'
+      + '<input type="checkbox" id="schnell-to-chaos" style="accent-color:var(--c-privat);">'
+      + ' Als Chaos-Aufgabe speichern (unter 10 Min)</label></div>'
+
       + '<input id="wqa-date" type="date" value="' + (prefillDate || today) + '" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">'
       + '</div>'
       + '<div style="flex:1;">'
@@ -18911,6 +19115,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     setTimeout(() => {
       this._wqaSetWelt(itemCtx);
       document.getElementById('wqa-text')?.select();
+      try { this._schnellFillVorhabenPicker(); } catch(e) {}
     }, 50);
   },
 
@@ -19134,6 +19339,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _quickDetailSave(id) {
+    // CB1: Chaos-Transfer prüfen
+    const _cbPicker = document.getElementById('schnell-vorhaben-picker');
+    const _cbToChaos = document.getElementById('schnell-to-chaos')?.checked;
     const text  = document.getElementById('wqa-text')?.value.trim();
     const date  = document.getElementById('wqa-date')?.value;
     const time  = document.getElementById('wqa-time')?.value;
@@ -19194,7 +19402,22 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     if (!item) {
       item = { id: String(Date.now()), text, date: date||new Date().toISOString().split('T')[0], done: false };
-      store.push(item);
+          // CB1: Wenn Chaos-Transfer gewählt
+    if (_cbPicker?.value && _cbToChaos) {
+      const [vhId, vhWelt] = _cbPicker.value.split('|');
+      const cbStore = this._cbStore(vhId, vhWelt);
+      if (cbStore) {
+        cbStore.push({ id:'cb_'+Date.now(), text:item.text, min:5, done:false, doneTs:null, ts:Date.now() });
+        item.vorhabenId = vhId;
+        this.setDirty();
+        this._cbUpdateBadge();
+        document.getElementById('wb-quick-sheet')?.remove();
+        this._toast('\u2713 Direkt ins Chaos-Backlog');
+        this._schnellListeRender();
+        return;
+      }
+    }
+store.push(item);
     } else {
       item.text = text;
       if (date) item.date = date;
@@ -21111,7 +21334,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const _tabOrder = typ === 'thema'
       ? ['aktuell','ressourcen','plan']
       : ['aktuell','plan','ressourcen'];
-    const _tabLbl = { aktuell:'Aktuell', plan:'Plan', ressourcen:'Ressourcen' };
+    const _tabLbl = { aktuell:'Aktuell', plan:'Plan', ressourcen:'Ressourcen', chaos:'Chaos' };
     h += '<div class="vh-tabs">';
     _tabOrder.forEach(t => {
       h += '<button class="vh-tab-btn" data-tab="' + t + '"'
@@ -21429,6 +21652,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
     } // END if (typ === 'projekt')
     h += '</div>'; // Ende vh-tab-plan
+    h += '<div id="vh-tab-chaos" style="display:none;flex-direction:column;"></div>';
 
     // Ressourcen-Tab (leer, wird von _vhRenderRessourcen befüllt)
     h += '<div id="vh-tab-ressourcen" style="display:none;flex:1;overflow-y:auto;'
@@ -21459,7 +21683,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _vhSetTab(tab) {
-    ['aktuell','plan','ressourcen'].forEach(t => {
+    ['aktuell','plan','ressourcen','chaos'].forEach(t => {
       const el = document.getElementById('vh-tab-' + t);
       if (el) el.style.display = t === tab ? 'flex' : 'none';
     });
@@ -21474,6 +21698,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         }
         resEl.style.display = 'flex';
         resEl.style.flexDirection = 'column';
+      }
+    }
+    // Chaos-Tab Content
+    if (tab === 'chaos') {
+      const chaosEl = document.getElementById('vh-tab-chaos');
+      if (chaosEl) {
+        const vId = this._vorhabenDetailId;
+        const w = this._vorhabenDetailWelt;
+        const store = this._vorhabenStore(w) || [];
+        const v = store.find(x => x.id === vId);
+        if (v) chaosEl.innerHTML = this._vhRenderChaosTab(v, w);
       }
     }
   },
@@ -30737,6 +30972,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (id !== 'vorhaben' && _vhOv) _vhOv.style.display = 'none';
     if (id !== 'schnell' && _schOv) _schOv.style.display = 'none';
     // Overlay-Tabs: öffnen Overlay statt Section
+    if (id === 'chaos') {
+      try { this.renderChaos(); } catch(e) {}
+    }
     if (id === 'vorhaben') {
       if (_schOv) _schOv.style.display = 'none';
       this.vorhabenListeOpen();
