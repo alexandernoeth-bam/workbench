@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.42.8 · Build 20260614-0900</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.42.8 · Build 20260614-0910</div>
     </div>
 
     <!-- Welt -->
@@ -7911,7 +7911,7 @@ body.fokus-modus body.fokus-modus
 const WB = {
 
   APP_VERSION: '5.42.8',
-  APP_BUILD:   '20260614-0900',
+  APP_BUILD:   '20260614-0910',
 
 
   // ══════════════════════════════════════════════════════
@@ -19245,6 +19245,10 @@ this.setDirty();
       + (item?.vertraulich ? ' checked' : '') + '>'
       + '<label for="qd-vertraulich" style="font-size:0.85rem;color:var(--c-muted);cursor:pointer;">🔒 Vertraulich</label>'
       + '</div>'
+      + '<div style="margin-bottom:10px;">'
+      + '<label style="font-size:0.78rem;font-weight:600;color:var(--c-muted);display:block;margin-bottom:4px;">Vorhaben (optional)</label>'
+      + '<select id="schnell-vh-picker" onchange="WB._schnellVhPickerChange()" style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"><option value="">\u2013 Kein Vorhaben \u2013</option></select></div>'
+      + '<div id="schnell-aufgabe-picker-wrap" style="display:none;margin-bottom:10px;"><label style="font-size:0.78rem;font-weight:600;color:var(--c-muted);display:block;margin-bottom:4px;">Aufgabe f\u00fcr Checkliste (optional)</label><select id="schnell-aufgabe-picker" style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"><option value="">\u2013 Direkt ins Vorhaben \u2013</option></select></div>'
       + '<div style="display:flex;gap:8px;margin-bottom:10px;">'
       + '<div style="flex:2;"><div style="font-size:0.72rem;color:var(--c-muted);margin-bottom:3px;">Datum</div>'
       + '<input type="date" id="wqa-date" value="' + (item?.date||today) + '" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"></div>'
@@ -19281,6 +19285,22 @@ this.setDirty();
     setTimeout(() => {
       this._wqaSetWelt(itemCtx);
       document.getElementById('wqa-text')?.select();
+    // Vorhaben-Picker befüllen
+    setTimeout(() => {
+      const vhSel = document.getElementById('schnell-vh-picker');
+      if (!vhSel) return;
+      let optH = '<option value="">\u2013 Kein Vorhaben \u2013</option>';
+      ['pro','priv'].forEach(welt => {
+        const store = this._vorhabenStore(welt) || [];
+        const aktiv = store.filter(v => (v.aktivitaet||'aktiv')==='aktiv');
+        if (!aktiv.length) return;
+        optH += '<optgroup label="\u2500\u2500 '+(welt==='pro'?'Beruf':'Privat')+' \u2500\u2500">';
+        aktiv.forEach(v => { optH += '<option value="'+v.id+'|'+welt+'">'+this._esc(v.titel)+'</option>'; });
+        optH += '</optgroup>';
+      });
+      vhSel.innerHTML = optH;
+    }, 50);
+
       try { this._schnellFillVorhabenPicker(); } catch(e) {}
     }, 50);
   },
@@ -19517,6 +19537,47 @@ this.setDirty();
     const recurDays = [];
     if (recur === 'weekly') document.querySelectorAll('.wqa-day:checked').forEach(cb => recurDays.push(+cb.value));
     if (!text) return;
+
+    // Vorhaben-Picker Routing
+    const _vhSel2 = document.getElementById('schnell-vh-picker');
+    const _aSel2 = document.getElementById('schnell-aufgabe-picker');
+    const _vhVal2 = _vhSel2?.value || '';
+    const _aVal2 = _aSel2?.value || '';
+    if (_vhVal2) {
+      const [_vhId2, _vhWelt2] = _vhVal2.split('|');
+      const _vhStore2 = this._vorhabenStore(_vhWelt2) || [];
+      const _vh2 = _vhStore2.find(v => v.id === _vhId2);
+      if (_vh2) {
+        if (_aVal2) {
+          const [_aufgId2] = _aVal2.split('|');
+          (_vh2.meilensteine||[]).forEach(ms => {
+            const a = (ms.aufgaben||[]).find(x => x.id === _aufgId2);
+            if (!a) return;
+            if (!a.checklist) a.checklist = [];
+            a.checklist.push({ text, done: false });
+            _vh2.geaendert = Date.now();
+          });
+          this.setDirty();
+          document.getElementById('wb-quick-sheet')?.remove();
+          this._toast('\u2713 Checklisten-Eintrag in ' + this._esc(_vh2.titel));
+          try { this._cbUpdateBadge(); } catch(e) {}
+          return;
+        } else {
+          if (!_vh2.meilensteine) _vh2.meilensteine = [];
+          if (!_vh2.meilensteine.length) _vh2.meilensteine.push({ id:'ms_'+Date.now(), titel:'Aufgaben', aufgaben:[] });
+          const _ms2 = _vh2.meilensteine[0];
+          if (!_ms2.aufgaben) _ms2.aufgaben = [];
+          const _date2 = document.getElementById('wqa-date')?.value || new Date().toISOString().split('T')[0];
+          _ms2.aufgaben.push({ id:'a_schnell_'+Date.now(), text, done:false, datum:_date2, aktivEnergie:'niedrig', checklist:[], naechsterSchritt:true });
+          _vh2.geaendert = Date.now();
+          this.setDirty();
+          document.getElementById('wb-quick-sheet')?.remove();
+          this._toast('\u2713 Mikro-Aufgabe in ' + this._esc(_vh2.titel));
+          try { this._cbUpdateBadge(); } catch(e) {}
+          return;
+        }
+      }
+    }
 
     const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
 
