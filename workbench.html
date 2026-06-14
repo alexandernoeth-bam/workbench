@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.42.0</title>
+<title>WorkBench 5.42.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6167,6 +6167,8 @@ body.fokus-modus body.fokus-modus
   .ck-pool-tag-schnell { background: rgba(0,0,0,0.06); color: var(--c-faint); }
   .ck-pool-tag-chaos { background: rgba(77,95,51,0.1); color: #4D5F33; }
   .ck-pool-tag-pflicht { background: rgba(10,107,94,0.08); color: var(--c-beruf); }
+
+  .ck-pool-cl-item { padding-left: 28px; }
 </style>
 </head>
 <body>
@@ -6177,7 +6179,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.42.0 · Build 20260613-1815</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.42.2 · Build 20260613-1900</div>
     </div>
 
     <!-- Welt -->
@@ -6327,7 +6329,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.42.0</div>
+  <div class="wb-startup-tagline">v5.42.2</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7971,8 +7973,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.42.0',
-  APP_BUILD:   '20260613-1815',
+  APP_VERSION: '5.42.2',
+  APP_BUILD:   '20260613-1900',
 
 
   // ══════════════════════════════════════════════════════
@@ -11418,12 +11420,10 @@ const WB = {
 
   _triageSelected: [],
   _triageZeiten: {},
-  _triageZeitbloecke: {},
   _triagePrivatFokus: null,
 
   triageOpen() {
     this._triageSelected    = [];
-    this._triageZeitbloecke = {};
     this._triageZeiten      = {};
     this._triagePrivatFokus = null;
     this._triageGoto(0);
@@ -11480,32 +11480,6 @@ const WB = {
     if (step === 2) this._triageRenderBacklog();
     if (step === 3) this._triageRenderPrivatFokus();
     if (step === 4) this._triageRenderConfirm();
-  },
-
-  _triageZeitblockPills(aufgabeId) {
-    const current   = this._triageZeitbloecke[aufgabeId] || '';
-    const isFokus   = this._triageSelected.some(s => s.id === aufgabeId);
-    if (!isFokus) return ''; // Nur bei gewählten Fokus-Aufgaben anzeigen
-    return ['vm','nm'].map(slot => {
-      const lbl    = slot === 'vm' ? '🌅 VM' : '🌞 NM';
-      const active = current === slot;
-      return '<button onclick="event.stopPropagation();WB._triageSetZeitblock(&quot;' + aufgabeId + '&quot;,&quot;' + slot + '&quot;)"'
-        + ' style="padding:3px 8px;border-radius:10px;font-family:var(--font);font-size:0.72rem;cursor:pointer;'
-        + 'border:1.5px solid ' + (active ? 'var(--c-beruf)' : 'var(--c-border)') + ';'
-        + 'background:' + (active ? 'var(--c-beruf)' : 'none') + ';'
-        + 'color:' + (active ? '#fff' : 'var(--c-muted)') + ';flex-shrink:0;">'
-        + lbl + '</button>';
-    }).join('');
-  },
-
-  _triageSetZeitblock(aufgabeId, slot) {
-    if (this._triageZeitbloecke[aufgabeId] === slot) {
-      delete this._triageZeitbloecke[aufgabeId];
-    } else {
-      this._triageZeitbloecke[aufgabeId] = slot;
-    }
-    document.querySelectorAll('[data-triage-id="' + aufgabeId + '"] .triage-pills')
-      .forEach(el => { el.innerHTML = this._triageZeitblockPills(aufgabeId); });
   },
 
   _triageRenderTermine() {
@@ -11593,7 +11567,6 @@ const WB = {
         const nsBadge  = a.naechsterSchritt
           ? '<span style="font-size:0.65rem;color:var(--c-beruf);background:var(--c-beruf-bg);border-radius:6px;padding:1px 5px;margin-left:4px;">→ Nächster Schritt</span>'
           : '';
-        const pills    = this._triageZeitblockPills(a.id);
         gruppenHtml +=
           '<div data-triage-id="' + a.id + '" data-vh-id="' + v.id + '" data-titel="' + this._esc(a.text) + '"'
           + ' style="display:flex;align-items:center;gap:8px;padding:8px 10px;'
@@ -11610,11 +11583,10 @@ const WB = {
             + '<div style="font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + this._esc(a.text) + nsBadge + '</div>'
             + '<div style="font-size:0.72rem;color:var(--c-faint);">' + this._esc(v.titel||'') + '</div>'
           + '</div>'
-          + '<div class="triage-pills" style="display:flex;gap:4px;flex-shrink:0;">' + pills + '</div>'
           + ((() => {
               const isFokus2 = this._triageSelected.some(s => s.id === a.id);
               if (!isFokus2) return '';
-              const curSlot2   = this._triageZeitbloecke[a.id] || '';
+              const curSlot2   = '';
               const vorschlag2 = curSlot2 ? this._triageZeitblockToTime(curSlot2) : '';
               const curZeit2   = this._triageZeiten?.[a.id] || vorschlag2;
               return '<input type="time" value="' + curZeit2 + '"'
@@ -11645,7 +11617,6 @@ const WB = {
       const row = e.target.closest('[data-triage-id]');
       if (!row) return;
       // Pills-Klick ignorieren (haben eigenen Handler)
-      if (e.target.closest('.triage-pills')) return;
       const aufgabeId = row.dataset.triageId;
       const vhId      = row.dataset.vhId;
       // Titel aus data-Attribut holen falls gespeichert
@@ -11668,16 +11639,6 @@ const WB = {
   _triageSetZeit(aufgabeId, zeit) {
     if (!this._triageZeiten) this._triageZeiten = {};
     this._triageZeiten[aufgabeId] = zeit;
-    // Zeitblock automatisch ableiten wenn noch nicht gesetzt
-    if (zeit && !this._triageZeitbloecke[aufgabeId]) {
-      const [h] = zeit.split(':').map(Number);
-      const zr  = this._ckZoneRanges ? this._ckZoneRanges() : null;
-      if (zr) {
-        if (h * 60 < zr.mi.from)      this._triageZeitbloecke[aufgabeId] = 'vm';
-        else if (h * 60 < zr.fe.from) this._triageZeitbloecke[aufgabeId] = 'nm';
-        else                           this._triageZeitbloecke[aufgabeId] = 'ab';
-      }
-    }
   },
 
   _triageToggle(aufgabeId, titel, vorhabenId) {
@@ -11727,7 +11688,6 @@ const WB = {
             + '<div style="font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + this._esc(a.text) + '</div>'
             + '<div style="font-size:0.70rem;color:var(--c-faint);">' + this._esc(v.titel||'') + '</div>'
           + '</div>'
-          + '<div class="triage-pills" style="display:flex;gap:4px;flex-shrink:0;">' + this._triageZeitblockPills(a.id) + '</div>'
           + '</div>'
         ).join('')
       : '<div style="color:var(--c-faint);font-size:0.85rem;padding:8px 0;">Kein Backlog</div>';
@@ -11795,10 +11755,12 @@ const WB = {
     const alle = [
       ...this._triageSelected.map(s => ({
         ...s,
-        zeitblock: this._triageZeitbloecke[s.id] || '',
-        lbl: this._triageZeitbloecke[s.id] === 'vm' ? '🌅' : this._triageZeitbloecke[s.id] === 'nm' ? '🌞' : ''
+        zeitblock: '',
+        lbl: '',
       })),
-      ...(this._triagePrivatFokus ? [{ ...this._triagePrivatFokus, zeitblock:'ab', lbl:'🌙' }] : [])
+      ...(this._triagePrivatFokus
+        ? [{ ...this._triagePrivatFokus, zeitblock:'', lbl:'' }]
+        : [])
     ];
     const itemsHtml = alle.length
       ? alle.map((s, i) =>
@@ -11830,14 +11792,14 @@ const WB = {
           id: s.id, type: s.type, title: s.title,
           meta: s.meta||'', vorhabenId: s.vorhabenId||'',
           ctx: 'pro',
-          zeitblock: this._triageZeitbloecke[s.id] || '',
+          zeitblock: '',
           startTime: this._triageZeiten?.[s.id] || '',
         })),
         ...(this._triagePrivatFokus ? [{
           id: this._triagePrivatFokus.id, type: 'vorhaben-aufgabe',
           title: this._triagePrivatFokus.title, meta: '',
           vorhabenId: this._triagePrivatFokus.vorhabenId || '',
-          ctx: 'priv', zeitblock: 'ab',
+          ctx: 'priv', zeitblock: '',
         }] : [])
       ];
       store[key].fokus = alle;
@@ -16440,6 +16402,31 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         hit.aufgabe.done = true; hit.aufgabe.doneTs = Date.now(); hit.vorhaben.geaendert = Date.now(); this.setDirty();
         this._svPendingSheet = { text: hit.aufgabe.text, quelle: 'aufgabe' }; this._svShowSheet(hit.aufgabe.text, 'aufgabe');
       }
+    } else if (quelle === 'checkliste') {
+      const parts = itemId.replace('cl_','').split('_');
+      const aufgabeId = parts[0];
+      const clIdx = parseInt(parts[1]);
+      ['pro','priv'].forEach(welt => {
+        const store = this._vorhabenStore(welt) || [];
+        store.forEach(vh => {
+          (vh.meilensteine||[]).forEach(ms => {
+            const a = (ms.aufgaben||[]).find(x => x.id === aufgabeId);
+            if (!a || !a.checklist?.[clIdx]) return;
+            if (a.checklist[clIdx].done) return;
+            a.checklist[clIdx].done = true;
+            vh.geaendert = Date.now();
+            this.setDirty();
+            // Auto +1 SV-Konto (kein Sheet)
+            const entries = this._svToday();
+            entries.push({ id:'sv_'+Date.now(), ts:Date.now(), typ:'+', text:a.checklist[clIdx].text||a.text, quelle:'checkliste' });
+            try { this._svUpdateHeader(); } catch(e) {}
+            try { this._svRenderKonto(); } catch(e) {}
+          });
+        });
+      });
+      this._cbUpdateBadge();
+      setTimeout(() => this._ckRenderTagesseite(), 300);
+      return;
     } else if (quelle === 'fokus') {
       const store = this._ritualStore(); const ritual = store && store[this._ritualTodayKey()];
       const fId = itemId.replace('fokus_','');
@@ -16449,6 +16436,23 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
     this._cbUpdateBadge();
     setTimeout(() => this._ckRenderTagesseite(), 400);
+  },
+
+
+  _kwStartDate() {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().split('T')[0];
+  },
+
+  _kwEndDate() {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = day === 0 ? 0 : 7 - day;
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().split('T')[0];
   },
 
   _ckRenderPool(dateStr) {
@@ -16470,6 +16474,27 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         items.push({ id:'fokus_'+(f.id||f.title), text:f.title, ae, done:!!f._done, tag:'vorhaben', quelle:'fokus', obj:f });
       });
     }
+
+    // 1b. Checklisten-Einträge aus Wochen-Fokus-Aufgaben
+    const kwStart = this._kwStartDate();
+    const kwEnd   = this._kwEndDate();
+    ['pro','priv'].forEach(welt => {
+      const store = this._vorhabenStore(welt) || [];
+      store.filter(v => (v.aktivitaet||'aktiv') === 'aktiv').forEach(v => {
+        (v.meilensteine||[]).forEach(ms => {
+          (ms.aufgaben||[]).filter(a => !a.done && a.datum && a.datum >= kwStart && a.datum <= kwEnd && (a.checklist||[]).length > 0)
+            .forEach(a => {
+              const offeneChecks = (a.checklist||[]).filter(c => !c.done);
+              if (!offeneChecks.length) return;
+              items.push({ id:'cl_header_'+a.id, text:a.text, ae:a.aktivEnergie||'mittel', done:false, tag:'vorhaben', meta:v.titel, quelle:'cl_header', isHeader:true, obj:{a,v,welt,ms} });
+              offeneChecks.forEach(c => {
+                const realIdx = (a.checklist||[]).indexOf(c);
+                items.push({ id:'cl_'+a.id+'_'+realIdx, text:c.text, ae:a.aktivEnergie||'mittel', done:false, tag:'vorhaben', meta:v.titel, quelle:'checkliste', aufgabeId:a.id, clIdx:realIdx, obj:{a,v,welt,ms} });
+              });
+            });
+        });
+      });
+    });
 
     // 2. Vorhaben-Aufgaben: datum === dateStr, keine Uhrzeit
     const ritualIds = new Set();
@@ -16529,16 +16554,23 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     el.style.display = 'block';
 
     const renderItems = (gruppe) => gruppe.map(item => {
+      if (item.isHeader) {
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 12px 3px;background:rgba(0,0,0,0.03);">'
+          + '<span style="font-size:0.70rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--c-faint);flex:1;">'
+          + this._esc(item.text) + '</span>'
+          + '<span class="ck-pool-tag ck-pool-tag-vorhaben">' + this._esc(item.meta) + '</span></div>';
+      }
+      const isChecklist = item.quelle === 'checkliste';
       const tagClass = 'ck-pool-tag ck-pool-tag-' + item.tag;
       const tagLabel = item.meta || { vorhaben:'Vorhaben', schnell:'Schnell', chaos:'Chaos', pflicht:'Pflicht', fokus:'Fokus' }[item.tag] || item.tag;
       const doneClass = item.done ? ' done' : '';
-      return '<div class="ck-pool-item">'
+      return '<div class="ck-pool-item' + (isChecklist ? ' ck-pool-cl-item' : '') + '">'
         + '<div class="ck-pool-chk' + (item.done?' ck-pool-chk-done':'') + '"'
           + ' onclick="WB._ckPoolToggle(&quot;' + item.id + '&quot;,&quot;' + item.quelle + '&quot;,&quot;' + (item.obj?.ctx||item.obj?.welt||'') + '&quot;)">'
           + (item.done ? '<span style="color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;width:100%;height:100%;">\u2713</span>' : '')
         + '</div>'
         + '<span class="ck-pool-text' + doneClass + '">' + this._esc(item.text) + '</span>'
-        + '<span class="' + tagClass + '">' + this._esc(tagLabel) + '</span>'
+        + (isChecklist ? '' : '<span class="' + tagClass + '">' + this._esc(tagLabel) + '</span>')
       + '</div>';
     }).join('');
 
@@ -20737,6 +20769,18 @@ store.push(item);
     });
   },
 
+
+  _vhFortschrittAuto(v) {
+    let total = 0, done = 0;
+    (v.meilensteine||[]).forEach(ms => {
+      (ms.aufgaben||[]).forEach(a => { total++; if (a.done) done++; });
+    });
+    if (v.fortschrittManuell !== null && v.fortschrittManuell !== undefined) {
+      return v.fortschrittManuell;
+    }
+    return total > 0 ? Math.round(done/total*100) : 0;
+  },
+
   _vorhabenListeRender() {
     const body = document.getElementById('wb-vorhaben-body');
     if (!body) return;
@@ -20831,6 +20875,7 @@ store.push(item);
           + statusBadge
         + '</div>'
         + '<div class="vh-card-meta">' + meta.join(' · ') + '</div>'
+        + (() => { const pct = this._vhFortschrittAuto(v); return pct > 0 ? '<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">' + '<div style="flex:1;height:3px;background:var(--c-border);border-radius:2px;overflow:hidden;">' + '<div style="width:' + pct + '%;height:100%;background:var(--c-beruf);border-radius:2px;transition:width 300ms ease;"></div>' + '</div>' + '<span style="font-size:0.65rem;font-weight:700;color:var(--c-faint);flex-shrink:0;">' + pct + '%</span>' + '</div>' : ''; })()
         + '</div>';
     };
     bereiche.forEach(bereich => {
