@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.41.0</title>
+<title>WorkBench 5.41.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6133,6 +6133,12 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
     #fokus-rechts { display:none; }
   }
 
+
+  #sv-sheet { animation: sv-slide-in 0.15s ease; }
+  @keyframes sv-slide-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 </style>
 </head>
 <body>
@@ -6143,7 +6149,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.41.0 · Build 20260613-1505</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.41.1 · Build 20260613-1535</div>
     </div>
 
     <!-- Welt -->
@@ -6293,7 +6299,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.41.0</div>
+  <div class="wb-startup-tagline">v5.41.1</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -6334,6 +6340,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
       <span id="wb-section-label">Heute</span>
       <span id="wb-dirty-dot" aria-hidden="true"></span>
     </div>
+      <div id="ck-sv-pill" style="display:none;"></div>
     <div id="wb-world-badge" class="beruf" aria-live="polite">Beruf</div>
     <div id="wb-sync-bar" title="Sync-Status">
       <span id="wb-sync-icon">●</span>
@@ -6361,6 +6368,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 
       <!-- NEUE TAGESSEITE v4.1 — drei feste Blöcke -->
       <div id="ck-tagesseite">
+      <div id="ck-sv-konto" style="margin:0 14px 8px;"></div>
 
   <!-- Datum-Header -->
   <div id="ck-tag-header">
@@ -7912,8 +7920,8 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.41.0',
-  APP_BUILD:   '20260613-1505',
+  APP_VERSION: '5.41.1',
+  APP_BUILD:   '20260613-1535',
 
 
   // ══════════════════════════════════════════════════════
@@ -15216,6 +15224,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const item = store.find(i => i.id === id);
     if (!item) return;
     item.done = !item.done;
+    // SV1: Buchungs-Sheet bei Schnell-Erledigung
+    if (item.done) { this._svPendingSheet = { text: item.text||'Erinnerung', quelle: 'schnell' }; this._svShowSheet(item.text||'Erinnerung', 'schnell'); }
     this.setDirty();
     this._schnellListeRender();
     if (this.activeTab === 'cockpit') this.renderCockpit();
@@ -16120,6 +16130,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!ev) return;
     ev.status = status;
     if (status === 'abgesagt') ev.done = true;
+    // SV1: Buchungs-Sheet bei Termin-Erledigung
+    if (ev.done) { this._svPendingSheet = { text: ev.text||'Termin', quelle: 'termin' }; this._svShowSheet(ev.text||'Termin', 'termin'); }
     this.setDirty();
     try { document.getElementById('edit-overlay')?.classList.remove('open'); } catch(e) {}
     this.renderCockpit();
@@ -16326,6 +16338,144 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     document.execCommand('copy');
     document.body.removeChild(ta);
     this._toast('\U0001f4cb Kontext kopiert');
+  },
+
+
+  // ═══ SV1: Souveränitäts-Konto ═══════════════════════════
+
+  _svLastDay: null,
+  _svPendingSheet: null,
+
+  _svStore() {
+    const db = this.dataPriv;
+    if (!db) return null;
+    if (!db.souveraenitaet) db.souveraenitaet = {};
+    return db.souveraenitaet;
+  },
+
+  _svToday() {
+    const store = this._svStore();
+    if (!store) return [];
+    const today = new Date().toISOString().split('T')[0];
+    if (!store[today]) store[today] = [];
+    return store[today];
+  },
+
+  _svBilanz() {
+    const entries = this._svToday();
+    return entries.reduce((sum, e) => {
+      if (e.typ === '+')  return sum + 1;
+      if (e.typ === '++') return sum + 2;
+      if (e.typ === '-')  return sum - 1;
+      return sum;
+    }, 0);
+  },
+
+  _svReset() {
+    const today = new Date().toISOString().split('T')[0];
+    this._svLastDay = this._svLastDay || today;
+    if (this._svLastDay !== today) {
+      this._svLastDay = today;
+    }
+  },
+
+  _svShowSheet(text, quelle) {
+    document.getElementById('sv-sheet')?.remove();
+    const sheet = document.createElement('div');
+    sheet.id = 'sv-sheet';
+    sheet.style.cssText = 'background:#F0EEE8;border:0.5px solid rgba(0,0,0,0.12);border-radius:8px;overflow:hidden;margin:4px 14px 2px;font-family:var(--font);';
+    sheet.innerHTML =
+      '<div style="font-size:10px;color:var(--c-faint);padding:6px 10px 4px;border-bottom:0.5px solid rgba(0,0,0,0.08);">'
+        + 'Buchung f\u00fcr: <span style="color:var(--c-text);font-weight:500;">'
+        + this._esc(text) + '</span></div>'
+      + '<div style="display:flex;">'
+        + this._svBtn('+', '\u00dcberwindung', '#0A6B5E', 'rgba(10,107,94,0.06)')
+        + this._svBtn('++', 'Termintreu', '#0A6B5E', 'rgba(10,107,94,0.12)')
+        + this._svBtn('\u2212', 'Flucht', '#B87333', 'rgba(184,115,51,0.06)')
+        + this._svBtn('\u00b7', '\u00dcberspr.', '#888', 'transparent')
+      + '</div>';
+    const ck = document.getElementById('ck-tagesseite') || document.body;
+    ck.prepend(sheet);
+    setTimeout(() => { if (document.getElementById('sv-sheet') === sheet) { sheet.remove(); this._svPendingSheet = null; } }, 8000);
+  },
+
+  _svBtn(typ, label, color, bg) {
+    const typAttr = (typ === '\u00b7') ? '' : typ;
+    return '<div onclick="WB._svBuchen(&quot;' + typAttr + '&quot;)"'
+      + ' style="flex:1;padding:8px 4px;text-align:center;cursor:pointer;'
+      + 'border-right:0.5px solid rgba(0,0,0,0.08);background:' + bg + ';">'
+      + '<div style="font-size:13px;font-weight:700;color:' + color + ';">' + typ + '</div>'
+      + '<div style="font-size:9px;color:' + color + ';margin-top:1px;">' + label + '</div>'
+      + '</div>';
+  },
+
+  _svBuchen(typ) {
+    const sheet = document.getElementById('sv-sheet');
+    if (!sheet) return;
+    const pending = this._svPendingSheet;
+    sheet.remove();
+    if (typ && pending) {
+      const entries = this._svToday();
+      entries.push({
+        id: 'sv_' + Date.now(),
+        ts: Date.now(),
+        typ,
+        text: pending.text,
+        quelle: pending.quelle,
+      });
+      this.setDirty();
+    }
+    this._svPendingSheet = null;
+    try { this._svUpdateHeader(); } catch(e) {}
+    try { this._svRenderKonto(); } catch(e) {}
+  },
+
+  _svRenderKonto() {
+    const el = document.getElementById('ck-sv-konto');
+    if (!el) return;
+    const entries = this._svToday();
+    if (!entries.length) { el.innerHTML = ''; return; }
+    const plus  = entries.filter(e => e.typ === '+' || e.typ === '++');
+    const minus = entries.filter(e => e.typ === '-');
+    const badgeH = (e) => {
+      const col = e.typ === '-' ? '#B87333' : '#0A6B5E';
+      const bg  = e.typ === '-' ? 'rgba(184,115,51,0.12)' : e.typ === '++' ? 'rgba(10,107,94,0.22)' : 'rgba(10,107,94,0.12)';
+      return '<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:6px;background:' + bg + ';color:' + col + ';flex-shrink:0;">' + e.typ + '</span>';
+    };
+    const colH = (arr) => arr.map(e =>
+      '<div style="display:flex;align-items:center;gap:5px;padding:3px 0;">'
+      + badgeH(e) + '<span style="font-size:10px;color:var(--c-muted);">' + this._esc(e.text) + '</span></div>'
+    ).join('');
+    const bilanz = this._svBilanz();
+    const bCol = bilanz >= 0 ? '#0A6B5E' : '#B87333';
+    el.innerHTML =
+      '<div style="background:#F0EEE8;border:0.5px solid rgba(0,0,0,0.12);border-radius:10px;overflow:hidden;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px 5px;border-bottom:0.5px solid rgba(0,0,0,0.08);">'
+        + '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);">Souver\u00e4nit\u00e4ts-Konto</span>'
+        + '<span style="font-size:11px;font-weight:700;color:' + bCol + ';background:rgba(10,107,94,0.1);padding:2px 8px;border-radius:8px;">Bilanz: ' + (bilanz>=0?'+':'') + bilanz + '</span>'
+      + '</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;">'
+        + '<div style="padding:6px 8px;border-right:0.5px solid rgba(0,0,0,0.08);">'
+          + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#0A6B5E;margin-bottom:5px;display:flex;align-items:center;gap:4px;"><span style="font-size:11px;">+</span> Einzahlungen</div>'
+          + (plus.length ? colH(plus) : '<div style="font-size:10px;color:var(--c-faint);font-style:italic;">Noch keine</div>')
+        + '</div>'
+        + '<div style="padding:6px 8px;">'
+          + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#B87333;margin-bottom:5px;display:flex;align-items:center;gap:4px;"><span style="font-size:11px;">\u2212</span> Auszahlungen</div>'
+          + (minus.length ? colH(minus) : '<div style="font-size:10px;color:var(--c-faint);font-style:italic;">Noch keine</div>')
+        + '</div>'
+      + '</div>'
+    + '</div>';
+  },
+
+  _svUpdateHeader() {
+    const el = document.getElementById('ck-sv-pill');
+    if (!el) return;
+    const bilanz = this._svBilanz();
+    const entries = this._svToday();
+    if (!entries.length) { el.style.display = 'none'; return; }
+    el.style.display = 'inline-flex';
+    el.style.cssText = 'display:inline-flex;align-items:center;background:rgba(255,255,255,0.92);color:#0A6B5E;font-size:12px;font-weight:700;padding:2px 10px;border-radius:10px;font-family:var(--font);';
+    el.textContent = (bilanz >= 0 ? '+' : '') + bilanz;
   },
 
   _ckRenderTagesseite() {
@@ -18161,6 +18311,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   renderCockpit() {
+    try { this._svReset(); } catch(e) {}
     try { this._ckAutoVerpasst(); } catch(e) {}
     // Datum täglich aktualisieren (App über Nacht offen)
     const todayCheck = new Date();
@@ -18188,6 +18339,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }, 60000);
     // SLS-M2: Logbuch rendern
     try { this._ckRenderVerpasst(); } catch(e) {}
+    try { this._svRenderKonto(); } catch(e) {}
+    try { this._svUpdateHeader(); } catch(e) {}
     try { this._ckRenderLogbuch(); } catch(e) {}
     // Tages-Fokus-Ritual: morgens automatisch, blockiert bis durchlaufen
     this._ritualMaybeOpen();
@@ -19071,6 +19224,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const item = store.find(i => i.id === id);
     if (!item) return;
     item.done = chk.checked;
+    // SV1: Buchungs-Sheet bei Schnell-Erledigung
+    if (item.done) { this._svPendingSheet = { text: item.text||'Aufgabe', quelle: 'schnell' }; this._svShowSheet(item.text||'Aufgabe', 'schnell'); }
     this.setDirty();
     if (item.done) {
       // Sofort ausblenden mit Animation
@@ -24756,6 +24911,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const d     = date || new Date();
     const isDone = this._dutyIsDone(duty, d);
     this._dutySetDone(duty, d, !isDone);
+    // SV1: Buchungs-Sheet bei Pflicht-Erledigung
+    if (!isDone) { this._svPendingSheet = { text: duty.title||duty.name||'Pflicht', quelle: 'pflicht' }; this._svShowSheet(duty.title||duty.name||'Pflicht', 'pflicht'); }
     this.setDirty();
     if (this.activeTab === 'cockpit')     this.renderCockpit();
     if (this.activeTab === 'aufgaben')    this.renderAufgaben();
@@ -26290,6 +26447,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!a) { const hit = this._vorhabenFindAufgabe(aufgabeId); if (hit) { a = hit.aufgabe; vorhaben = hit.vorhaben; } }
     if (!a) return;
     a.done = !a.done;
+    // SV1: Buchungs-Sheet bei Abhaken
+    if (a.done) { this._svPendingSheet = { text: a.text||'Aufgabe', quelle: 'aufgabe' }; this._svShowSheet(a.text||'Aufgabe', 'aufgabe'); }
     // ☐→☑ im Vorhaben-Inhalt nachziehen
     if (vorhaben && a.cbId && vorhaben.inhalt) {
       const tmp = document.createElement('div');
