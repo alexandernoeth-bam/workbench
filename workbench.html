@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.41.8</title>
+<title>WorkBench 5.41.9</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6139,6 +6139,34 @@ body.fokus-modus body.fokus-modus
     from { opacity: 0; transform: translateY(-4px); }
     to   { opacity: 1; transform: translateY(0); }
   }
+
+  /* ── Fließender Pool ──────────────────────────── */
+  #ck-pool-block { margin: 0 14px 12px; background: #EAE7DD; border: 1px solid rgba(0,0,0,0.08); border-radius: 10px; overflow: hidden; }
+  .ck-pool-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 6px; border-bottom: 1px solid rgba(0,0,0,0.08); }
+  .ck-pool-label { font-size: var(--fs-header, 1.00rem); font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--c-muted); }
+  .ck-pool-count { font-size: 0.72rem; font-weight: 700; color: var(--c-faint); background: rgba(0,0,0,0.07); padding: 2px 8px; border-radius: 8px; }
+  .ck-pool-gruppe { border-bottom: 0.5px solid rgba(0,0,0,0.06); }
+  .ck-pool-gruppe:last-child { border-bottom: none; }
+  .ck-pool-gruppe-header { display: flex; align-items: center; gap: 6px; padding: 7px 12px 5px; cursor: pointer; user-select: none; }
+  .ck-pool-gruppe-icon { font-size: 13px; flex-shrink: 0; }
+  .ck-pool-gruppe-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; flex: 1; }
+  .ck-pool-ae-hoch { color: #C62828; }
+  .ck-pool-ae-mittel { color: #B45309; }
+  .ck-pool-ae-niedrig { color: #1B5E20; }
+  .ck-pool-gruppe-count { font-size: 0.68rem; color: var(--c-faint); background: rgba(0,0,0,0.06); padding: 1px 6px; border-radius: 6px; }
+  .ck-pool-gruppe-body { }
+  .ck-pool-gruppe-body.collapsed { display: none; }
+  .ck-pool-item { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 0.5px solid rgba(0,0,0,0.04); cursor: default; }
+  .ck-pool-item:last-child { border-bottom: none; }
+  .ck-pool-chk { width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.15); background: #fff; flex-shrink: 0; cursor: pointer; }
+  .ck-pool-chk-done { background: var(--c-beruf); border-color: var(--c-beruf); display: flex; align-items: center; justify-content: center; }
+  .ck-pool-text { font-size: 0.85rem; flex: 1; color: var(--c-text); }
+  .ck-pool-text.done { text-decoration: line-through; color: var(--c-faint); }
+  .ck-pool-tag { font-size: 0.65rem; font-weight: 600; padding: 1px 6px; border-radius: 5px; flex-shrink: 0; }
+  .ck-pool-tag-vorhaben { background: rgba(10,107,94,0.1); color: var(--c-beruf); }
+  .ck-pool-tag-schnell { background: rgba(0,0,0,0.06); color: var(--c-faint); }
+  .ck-pool-tag-chaos { background: rgba(77,95,51,0.1); color: #4D5F33; }
+  .ck-pool-tag-pflicht { background: rgba(10,107,94,0.08); color: var(--c-beruf); }
 </style>
 </head>
 <body>
@@ -6149,7 +6177,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.41.8 · Build 20260613-1730</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.41.9 · Build 20260613-1800</div>
     </div>
 
     <!-- Welt -->
@@ -6299,7 +6327,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.41.8</div>
+  <div class="wb-startup-tagline">v5.41.9</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -6470,6 +6498,8 @@ body.fokus-modus body.fokus-modus
     </div>
 
     <div id="ck-verpasst" style="display:none;margin:0 14px 12px;"></div>
+
+    <div id="ck-pool-block" style="display:none;"></div>
 
     <div id="ck-logbuch" style="margin:0 14px 12px;padding:10px 12px;background:#F0EEE8;border:1px solid var(--c-border);border-radius:var(--radius-xs);display:none;"></div>
 
@@ -7941,8 +7971,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.41.8',
-  APP_BUILD:   '20260613-1730',
+  APP_VERSION: '5.41.9',
+  APP_BUILD:   '20260613-1800',
 
 
   // ══════════════════════════════════════════════════════
@@ -16363,6 +16393,179 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
 
 
+
+  // ═══ P1: Fließender Pool ════════════════════════════════
+
+  _ckPoolGruppeOffen: { 0: true, 1: true, 2: true },
+
+  _ckPoolToggleGruppe(idx) {
+    if (!this._ckPoolGruppeOffen) this._ckPoolGruppeOffen = {};
+    this._ckPoolGruppeOffen[idx] = !this._ckPoolGruppeOffen[idx];
+    const body = document.getElementById('ck-pool-g' + idx);
+    if (body) body.classList.toggle('collapsed', !this._ckPoolGruppeOffen[idx]);
+  },
+
+  _ckPoolToggle(itemId, quelle, ctx) {
+    const today = new Date().toISOString().split('T')[0];
+    if (quelle === 'schnell') {
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      const q = (db?.quickItems||[]).find(i => i.id === itemId.replace('schnell_',''));
+      if (q && !q.done) {
+        q.done = true; this.setDirty();
+        this._svPendingSheet = { text: q.text, quelle: 'schnell' };
+        this._svShowSheet(q.text, 'schnell');
+      }
+    } else if (quelle === 'chaos') {
+      const cbId = itemId.replace('chaos_','');
+      ['pro','priv'].forEach(welt => {
+        const store = this._vorhabenStore(welt) || [];
+        store.forEach(vh => {
+          const cb = (vh.chaosBacklog||[]).find(c => c.id === cbId);
+          if (cb && !cb.done) { cb.done = true; cb.doneTs = Date.now(); this.setDirty();
+            this._svPendingSheet = { text: cb.text, quelle: 'chaos' }; this._svShowSheet(cb.text, 'chaos'); }
+        });
+      });
+    } else if (quelle === 'pflicht') {
+      const dutyId = itemId.replace('pfl_','');
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!db) return; if (!db.pflichtStatus) db.pflichtStatus = {};
+      db.pflichtStatus[dutyId + '_' + today] = 'erledigt'; this.setDirty();
+      const duty = (this._dutyStore(ctx)||[]).find(d => d.id === dutyId);
+      const name = duty?.title || duty?.name || 'Pflicht';
+      this._svPendingSheet = { text: name, quelle: 'pflicht' }; this._svShowSheet(name, 'pflicht');
+    } else if (quelle === 'vorhaben') {
+      const aufgId = itemId.replace('vh_','');
+      const hit = this._vorhabenFindAufgabe(aufgId);
+      if (hit && !hit.aufgabe.done) {
+        hit.aufgabe.done = true; hit.aufgabe.doneTs = Date.now(); hit.vorhaben.geaendert = Date.now(); this.setDirty();
+        this._svPendingSheet = { text: hit.aufgabe.text, quelle: 'aufgabe' }; this._svShowSheet(hit.aufgabe.text, 'aufgabe');
+      }
+    } else if (quelle === 'fokus') {
+      const store = this._ritualStore(); const ritual = store && store[this._ritualTodayKey()];
+      const fId = itemId.replace('fokus_','');
+      const f = (ritual?.fokus||[]).find(x => x.id === fId || x.title === fId);
+      if (f && !f._done) { f._done = true; this.setDirty();
+        this._svPendingSheet = { text: f.title, quelle: 'aufgabe' }; this._svShowSheet(f.title, 'aufgabe'); }
+    }
+    this._cbUpdateBadge();
+    setTimeout(() => this._ckRenderTagesseite(), 400);
+  },
+
+  _ckRenderPool(dateStr) {
+    const el = document.getElementById('ck-pool-block');
+    if (!el) return;
+    const today = new Date().toISOString().split('T')[0];
+    const items = [];
+
+    // 1. Fokus-Aufgaben ohne Zeitblock
+    if (dateStr === today) {
+      const store = this._ritualStore();
+      const ritual = store && store[this._ritualTodayKey()];
+      (ritual?.fokus || []).forEach(f => {
+        if (f.zeitblock) return;
+        let ae = 'mittel';
+        if (f.type === 'vorhaben-aufgabe' && f.id) {
+          try { const hit = this._vorhabenFindAufgabe(f.id); if (hit) ae = hit.aufgabe.aktivEnergie || 'mittel'; } catch(e) {}
+        }
+        items.push({ id:'fokus_'+(f.id||f.title), text:f.title, ae, done:!!f._done, tag:'vorhaben', quelle:'fokus', obj:f });
+      });
+    }
+
+    // 2. Vorhaben-Aufgaben: datum === dateStr, keine Uhrzeit
+    const ritualIds = new Set();
+    if (dateStr === today) {
+      const store = this._ritualStore();
+      const ritual = store && store[this._ritualTodayKey()];
+      (ritual?.fokus || []).forEach(f => { if (f.id) ritualIds.add(f.id); });
+    }
+    ['pro','priv'].forEach(welt => {
+      const store = this._vorhabenStore(welt) || [];
+      store.filter(v => (v.aktivitaet||'aktiv') === 'aktiv').forEach(v => {
+        (v.meilensteine||[]).forEach(ms => {
+          (ms.aufgaben||[]).filter(a => !a.done && a.datum === dateStr && !a.startTime && !ritualIds.has(a.id))
+            .forEach(a => { items.push({ id:'vh_'+a.id, text:a.text, ae:a.aktivEnergie||'mittel', done:false, tag:'vorhaben', meta:v.titel, quelle:'vorhaben', obj:{a,v,welt} }); });
+        });
+      });
+    });
+
+    // 3. Wochenpflichten ohne Uhrzeit
+    ['pro','priv'].forEach(ctx => {
+      (this._dutyStore(ctx) || []).forEach(d => {
+        if (d.startTime) return;
+        try {
+          const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
+          const inst = insts.find(i => i.date === dateStr);
+          if (!inst || inst.done) return;
+          const pflKey = d.id + '_' + dateStr;
+          const status = (ctx==='pro'?this.dataPro:this.dataPriv)?.pflichtStatus?.[pflKey];
+          if (status) return;
+          items.push({ id:'pfl_'+d.id, text:d.title||d.name||'', ae:d.aktivEnergie||'mittel', done:false, tag:'pflicht', quelle:'pflicht', obj:{d,ctx} });
+        } catch(e) {}
+      });
+    });
+
+    // 4. Schnell-Erinnerungen ohne Uhrzeit
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx==='pro'?this.dataPro:this.dataPriv;
+      (db?.quickItems||[]).filter(q => !q.done && q.date===dateStr && !q.time)
+        .forEach(q => { items.push({ id:'schnell_'+q.id, text:q.text||'', ae:q.aktivEnergie||'mittel', done:false, tag:'schnell', quelle:'schnell', obj:{q,ctx} }); });
+    });
+
+    // 5. Chaos-Backlog (alle offenen)
+    ['pro','priv'].forEach(welt => {
+      const store = this._vorhabenStore(welt) || [];
+      store.forEach(vh => {
+        (vh.chaosBacklog||[]).filter(cb => !cb.done)
+          .forEach(cb => { items.push({ id:'chaos_'+cb.id, text:cb.text, ae:'niedrig', done:false, tag:'chaos', meta:vh.titel, quelle:'chaos', obj:{cb,vh,welt} }); });
+      });
+    });
+
+    if (!items.length) { el.style.display = 'none'; return; }
+
+    const hoch = items.filter(i => i.ae === 'hoch');
+    const mittel = items.filter(i => i.ae === 'mittel' || !i.ae);
+    const niedrig = items.filter(i => i.ae === 'niedrig');
+    const gesamt = items.filter(i => !i.done).length;
+    el.style.display = 'block';
+
+    const renderItems = (gruppe) => gruppe.map(item => {
+      const tagClass = 'ck-pool-tag ck-pool-tag-' + item.tag;
+      const tagLabel = item.meta || { vorhaben:'Vorhaben', schnell:'Schnell', chaos:'Chaos', pflicht:'Pflicht', fokus:'Fokus' }[item.tag] || item.tag;
+      const doneClass = item.done ? ' done' : '';
+      return '<div class="ck-pool-item">'
+        + '<div class="ck-pool-chk' + (item.done?' ck-pool-chk-done':'') + '"'
+          + ' onclick="WB._ckPoolToggle(&quot;' + item.id + '&quot;,&quot;' + item.quelle + '&quot;,&quot;' + (item.obj?.ctx||item.obj?.welt||'') + '&quot;)">'
+          + (item.done ? '<span style="color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;width:100%;height:100%;">\u2713</span>' : '')
+        + '</div>'
+        + '<span class="ck-pool-text' + doneClass + '">' + this._esc(item.text) + '</span>'
+        + '<span class="' + tagClass + '">' + this._esc(tagLabel) + '</span>'
+      + '</div>';
+    }).join('');
+
+    const renderGruppe = (icon, label, cssClass, gruppe, idx) => {
+      if (!gruppe.length) return '';
+      const isOpen = this._ckPoolGruppeOffen?.[idx] !== false;
+      return '<div class="ck-pool-gruppe">'
+        + '<div class="ck-pool-gruppe-header" onclick="WB._ckPoolToggleGruppe(' + idx + ')">'
+          + '<span class="ck-pool-gruppe-icon">' + icon + '</span>'
+          + '<span class="ck-pool-gruppe-label ' + cssClass + '">' + label + '</span>'
+          + '<span class="ck-pool-gruppe-count">' + gruppe.length + '</span>'
+        + '</div>'
+        + '<div class="ck-pool-gruppe-body' + (isOpen?'':' collapsed') + '" id="ck-pool-g' + idx + '">'
+          + renderItems(gruppe)
+        + '</div></div>';
+    };
+
+    el.innerHTML =
+      '<div class="ck-pool-header">'
+        + '<span class="ck-pool-label">Pool \u00b7 ' + (dateStr===today?'Heute':'Morgen') + '</span>'
+        + '<span class="ck-pool-count">' + gesamt + ' offen</span>'
+      + '</div>'
+      + renderGruppe('\u26a1', 'Hohe Energie', 'ck-pool-ae-hoch', hoch, 0)
+      + renderGruppe('\u25ce', 'Mittlere Energie', 'ck-pool-ae-mittel', mittel, 1)
+      + renderGruppe('\u2193', 'Niedrige Energie', 'ck-pool-ae-niedrig', niedrig, 2);
+  },
+
   // ═══ CB1: Chaos-Backlog ═════════════════════════════════
 
   _cbStore(vorhabenId, welt) {
@@ -16856,6 +17059,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     try { this._ckRenderZone('fe', dateStr, isToday); } catch(e) { console.error('ck-zone-fe:', e); }
     try { this._ckRenderZone('ab', dateStr, isToday); } catch(e) { console.error('ck-zone-ab:', e); }
     try { this._ckRenderKleinigkeiten(dateStr, isToday); } catch(e) { console.error('ck-zone-rauschen:', e); }
+    try { this._ckRenderPool(dateStr); } catch(e) {}
     if (isToday) try { this._dutyCheckExperimentsAbgelaufen(); } catch(e) {}
 
     // Timer aktualisieren
