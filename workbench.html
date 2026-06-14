@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.41.9</title>
+<title>WorkBench 5.42.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6177,7 +6177,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.41.9 · Build 20260613-1800</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.42.0 · Build 20260613-1815</div>
     </div>
 
     <!-- Welt -->
@@ -6327,7 +6327,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.41.9</div>
+  <div class="wb-startup-tagline">v5.42.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7971,8 +7971,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.41.9',
-  APP_BUILD:   '20260613-1800',
+  APP_VERSION: '5.42.0',
+  APP_BUILD:   '20260613-1815',
 
 
   // ══════════════════════════════════════════════════════
@@ -17123,12 +17123,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           // Büro-Modus: Vertraulich maskieren
           const evTitle = (this._bueroModus && ev.vertraulich) ? '🔒 Vertraulich' : ev.text;
           const evMeta  = (this._bueroModus && ev.vertraulich) ? '' : metaStr;
-          if (zone === null) {
-            if (!ev.startTime) items.push({ type:'termin', id:String(ev.id), title:evTitle, meta:evMeta, done:!!ev.done, zeit:'', ctx:welt, obj:ev, sort:9999 });
-          } else {
-            if (evZone === zone || (!evZone && zone === 'vm')) {
-              items.push({ type:'termin', id:String(ev.id), title:evTitle, meta:evMeta, done:!!ev.done, zeit:ev.startTime||'', ctx:welt, obj:ev, sort:ev.startTime ? pT(ev.startTime) : 5000 });
-            }
+          // P2: NUR Termine MIT Uhrzeit in passende Zone
+          if (zone !== null && ev.startTime && evZone === zone) {
+            items.push({ type:'termin', id:String(ev.id), title:evTitle, meta:evMeta, done:!!ev.done, zeit:ev.startTime, ctx:welt, obj:ev, sort:pT(ev.startTime) });
           }
         });
     });
@@ -17138,9 +17135,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const store  = this._ritualStore();
       const ritual = store && store[this._ritualTodayKey()];
       (ritual?.fokus || []).forEach(f => {
+        if (!f.zeitblock) return; // P2: kein Zeitblock → Pool
         const fZone = slotToZone[f.zeitblock] || null;
-        const matchesZone = zone === null ? !fZone : fZone === zone;
-        if (matchesZone) {
+        if (zone !== null && fZone === zone) {
           let ae = '';
           if (f.type === 'vorhaben-aufgabe') {
             try {
@@ -17170,14 +17167,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         if (this._bueroModus && vCtx === 'priv') return;
         (v.meilensteine || []).forEach(ms => {
           (ms.aufgaben || [])
-            .filter(a => !a.done && !ritualIds.has(a.id) && !ritualIds.has('title:' + a.text) && (
+            .filter(a => !a.done && a.startTime  // P2: NUR mit Uhrzeit in Zone
+              && !ritualIds.has(a.id) && !ritualIds.has('title:' + a.text) && (
               a.datum === dateStr ||
-              (!a.datum && a.naechsterSchritt && dateStr !== today && zone === 'vm')
+              (!a.datum && a.naechsterSchritt && dateStr !== today)
             ))
             .forEach(a => {
-              const aZone = getZone(a.startTime || '');
-              const matchesZone = zone === null ? !aZone : (aZone === zone || (!aZone && zone === 'vm'));
-              if (matchesZone) {
+              const aZone = getZone(a.startTime);
+              if (zone !== null && aZone === zone) {
                 // Büro-Modus: vertrauliche Aufgaben maskieren
                 const aufgTitel = (this._bueroModus && a.vertraulich) ? '🔒 Vertraulich' : a.text;
                 items.push({ type:'vorhaben', id:a.id, title:aufgTitel, meta:v.titel||'', done:false, zeit:a.startTime||'', ctx:vCtx, obj:{a,v,ms}, ae:a.aktivEnergie||'', sort:pT(a.startTime||'') >= 0 ? pT(a.startTime) : 6000 });
@@ -17200,8 +17197,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           // CK-Lifecycle: Pflicht-Status prüfen
           const _pflKey2 = d.id + '_' + dateStr;
           if (db.pflichtStatus?.[_pflKey2]) return;
-          const dutyZone    = getZone(d.startTime || '') || 'vm';
-          const pflichtZone = zone === null ? false : (dutyZone === zone);
+          const dutyZone = d.startTime ? getZone(d.startTime) : null;
+          if (!dutyZone) return; // P2: keine Uhrzeit → Pool
+          const pflichtZone = zone !== null && dutyZone === zone;
           if (pflichtZone) {
             items.push({ type:'pflicht', id:d.id, title:d.title||d.name||'', meta:dCtx==='pro'?'Beruf':'Privat', done:false, zeit:d.startTime||'', ctx:dCtx, obj:{d,inst}, sort:d.startTime ? pT(d.startTime) : 7000 });
           }
@@ -17216,9 +17214,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       ...(this.dataPro?.quickItems  || []),
       ...(this.dataPriv?.quickItems || []),
     ];
-    allQuick.filter(q => q.date === dateStr).forEach(q => {
-      const qZone = q.time ? getZone(q.time) : null;
-      const matchesZone = zone === null ? !qZone : qZone === zone;
+    allQuick.filter(q => q.date === dateStr && q.time).forEach(q => { // P2: NUR mit Uhrzeit
+      const qZone = getZone(q.time);
+      const matchesZone = zone !== null && qZone === zone;
       const qCtx = _proQIds.has(q.id) ? 'pro' : 'priv';
       // Büro-Modus: Privat ohne vertraulich ausblenden
       if (this._bueroModus && qCtx === 'priv' && !q.vertraulich) return;
