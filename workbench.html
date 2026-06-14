@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.41.6</title>
+<title>WorkBench 5.41.7</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -660,7 +660,7 @@ html, body {
   .ck-z-badge-pflicht { background:var(--c-beruf-bg); color:var(--c-beruf); }
   .ck-energie-badge { font-size:0.78rem; padding:3px 8px; border-radius:12px; font-weight:600; background:var(--c-beruf-bg); color:var(--c-beruf); border:1px solid color-mix(in srgb, var(--c-beruf) 25%, var(--c-border)); white-space:nowrap; flex-shrink:0; }
   .ck-fokus-badge { font-size:0.78rem; padding:3px 8px; border-radius:12px; background:var(--c-bg); color:var(--c-muted); border:1px solid var(--c-border); white-space:nowrap; flex-shrink:0; }
-#ck-smart-btn { font-size:var(--fs-meta); padding:3px 10px; border-radius:var(--radius-xs); border:1px solid var(--c-beruf); background:none; cursor:pointer; font-family:var(--font); color:var(--c-beruf); font-weight:600; }
+
 #ck-aktions-leiste { display:flex; gap:6px; padding:6px 12px; border-top:1px solid var(--c-border); flex-shrink:0; background:var(--c-bg); }
 #ck-aktions-leiste button { padding:8px 14px; border-radius:var(--radius-xs); font-family:var(--font); font-size:0.85rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; white-space:nowrap; background:var(--c-beruf); color:#fff; border:none; }
 #ck-aktions-leiste button:hover { opacity:0.9; }
@@ -677,7 +677,7 @@ html, body {
 #ck-tagesseite .ck-zone-count { font-size: calc(var(--fs-meta) * 0.85) !important; }
 #ck-tagesseite .ck-zone-jetzt-badge { font-size: calc(var(--fs-meta) * 0.8) !important; }
 #ck-tag-sub { font-size: var(--fs-meta) !important; }
-#ck-smart-btn { font-size: var(--fs-meta) !important; }
+
 
 /* Termin-Toggle CSS entfernt v3.46.4 */
 
@@ -6149,7 +6149,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.41.6 · Build 20260613-1650</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.41.7 · Build 20260613-1715</div>
     </div>
 
     <!-- Welt -->
@@ -6299,7 +6299,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.41.6</div>
+  <div class="wb-startup-tagline">v5.41.7</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -6389,7 +6389,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
     <div id="ck-tag-badges" style="margin-top:6px;display:flex;gap:6px;flex-wrap:nowrap;align-items:center;overflow:hidden;">
       <span id="ck-badges-content"></span>
       <span id="ck-reminder-chips" style="display:contents;"></span>
-      <button onclick="WB._ckToggleSmartView()" id="ck-smart-btn" style="margin-left:auto;">Alle Zonen</button>
+      
     </div>
   </div>
 
@@ -7938,8 +7938,8 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.41.6',
-  APP_BUILD:   '20260613-1650',
+  APP_VERSION: '5.41.7',
+  APP_BUILD:   '20260613-1715',
 
 
   // ══════════════════════════════════════════════════════
@@ -16626,6 +16626,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     try { this._cbUpdateBadge(); } catch(e) {}
   },
 
+
+  _svMehrOffen: false,
+
+  _svToggleMehr() {
+    this._svMehrOffen = !this._svMehrOffen;
+    this._svRenderKonto();
+  },
+
   _svRenderKonto() {
     const el = document.getElementById('ck-sv-konto');
     if (!el) return;
@@ -16633,10 +16641,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!entries.length) { el.innerHTML = ''; return; }
     const plus  = entries.filter(e => e.typ === '+' || e.typ === '++');
     const minus = entries.filter(e => e.typ === '-');
+    const plusVis = this._svMehrOffen ? plus : plus.slice(0, 2);
+    const minusVis = this._svMehrOffen ? minus : minus.slice(0, 2);
+    const extraCount = Math.max(0, plus.length - 2) + Math.max(0, minus.length - 2);
     const badgeH = (e) => {
       const col = e.typ === '-' ? '#B87333' : '#0A6B5E';
       const bg  = e.typ === '-' ? 'rgba(184,115,51,0.12)' : e.typ === '++' ? 'rgba(10,107,94,0.22)' : 'rgba(10,107,94,0.12)';
-      return '<span style="font-size:0.82rem;font-weight:700;padding:1px 5px;border-radius:6px;background:' + bg + ';color:' + col + ';flex-shrink:0;">' + e.typ + '</span>';
+      return '<span style="font-size:0.82rem;font-weight:700;padding:1px 5px;border-radius:6px;background:' + bg + ';color:' + col + ';flex-shrink:0;">' + (e.typ==='-'?'\u2212':e.typ) + '</span>';
     };
     const colH = (arr) => arr.map(e =>
       '<div style="display:flex;align-items:center;gap:5px;padding:3px 0;">'
@@ -16644,20 +16655,28 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     ).join('');
     const bilanz = this._svBilanz();
     const bCol = bilanz >= 0 ? '#0A6B5E' : '#B87333';
+    const mehrPill = extraCount > 0 && !this._svMehrOffen
+      ? '<button id="sv-mehr-pill" onclick="WB._svToggleMehr()" style="font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,0.07);color:var(--c-muted);cursor:pointer;border:none;font-family:var(--font);">+ ' + extraCount + ' mehr</button>'
+      : (this._svMehrOffen && extraCount > 0
+        ? '<button id="sv-mehr-pill" onclick="WB._svToggleMehr()" style="font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,0.07);color:var(--c-muted);cursor:pointer;border:none;font-family:var(--font);">\u2212 weniger</button>'
+        : '');
     el.innerHTML =
       '<div style="background:#F0EEE8;border:0.5px solid rgba(0,0,0,0.12);border-radius:10px;overflow:hidden;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px 5px;border-bottom:0.5px solid rgba(0,0,0,0.08);">'
-        + '<span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);">Souver\u00e4nit\u00e4ts-Konto</span>'
-        + '<span style="font-size:0.88rem;font-weight:700;color:' + bCol + ';background:rgba(10,107,94,0.1);padding:2px 8px;border-radius:8px;">Bilanz: ' + (bilanz>=0?'+':'') + bilanz + '</span>'
+        + '<div style="display:flex;align-items:center;gap:6px;">'
+          + '<span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);">Souver\u00e4nit\u00e4ts-Konto</span>'
+          + mehrPill
+        + '</div>'
+        + '<span style="font-size:0.88rem;font-weight:700;color:' + bCol + ';background:rgba(10,107,94,0.1);padding:2px 10px;border-radius:8px;">Bilanz: ' + (bilanz>=0?'+':'') + bilanz + '</span>'
       + '</div>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;">'
         + '<div style="padding:8px 12px;border-right:0.5px solid rgba(0,0,0,0.08);">'
           + '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#0A6B5E;margin-bottom:5px;display:flex;align-items:center;gap:4px;"><span style="font-size:0.95rem;">+</span> Einzahlungen</div>'
-          + (plus.length ? colH(plus) : '<div style="font-size:0.82rem;color:var(--c-faint);font-style:italic;">Noch keine</div>')
+          + (plusVis.length ? colH(plusVis) : '<div style="font-size:0.82rem;color:var(--c-faint);font-style:italic;">Noch keine</div>')
         + '</div>'
         + '<div style="padding:8px 12px;">'
           + '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#B87333;margin-bottom:5px;display:flex;align-items:center;gap:4px;"><span style="font-size:0.95rem;">\u2212</span> Auszahlungen</div>'
-          + (minus.length ? colH(minus) : '<div style="font-size:0.82rem;color:var(--c-faint);font-style:italic;">Noch keine</div>')
+          + (minusVis.length ? colH(minusVis) : '<div style="font-size:0.82rem;color:var(--c-faint);font-style:italic;">Noch keine</div>')
         + '</div>'
       + '</div>'
     + '</div>';
@@ -16741,20 +16760,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         const store  = this._ritualStore();
         const ritual = store && store[this._ritualTodayKey()];
         if (ritual && ritual.done && !ritual.skipped) {
-          const energieLabel = { hoch:'🟢 Energie: Hoch', mittel:'🟡 Energie: Mittel', niedrig:'🔴 Energie: Niedrig' };
-          const fokusTotal = (ritual.fokus || []).length;
-          let badges = '';
-          if (ritual.energie) badges += '<span class="ck-energie-badge">' + (energieLabel[ritual.energie] || ritual.energie) + '</span>';
-          if (fokusTotal > 0) badges += '<span class="ck-fokus-badge">🎯 ' + fokusTotal + ' Fokus geplant</span>';
-          // Rest-Energie: Startkapital minus verbrauchte Energie erledigter Items
-          try {
-            const restE = this._ckBerechneRestEnergie();
-            if (restE !== null) {
-              const col = restE < 20 ? 'var(--c-warn,#E67E22)' : restE < 50 ? '#B45309' : 'var(--c-beruf)';
-              badges += '<span class="ck-fokus-badge" style="color:' + col + ';border-color:' + col + ';">⚡ ' + restE + ' Energie</span>';
-            }
-          } catch(e) {}
-          badgesEl.innerHTML = badges;
+          let badges = ''; // CK-UI-Fix: Energie-Pills entfernt
+          badgesEl.innerHTML = '';
           // badges-content: kein display-Toggle
         } else { badgesEl.innerHTML = ''; }
       } else {
@@ -16791,15 +16798,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
 
     // Smart-View Button synchronisieren
-    const smartBtn = document.getElementById('ck-smart-btn');
-    if (smartBtn) {
-      smartBtn.textContent = this._ckSmartView ? 'Alle Zonen' : 'Smart-View';
-      if (this._ckSmartView) {
-        smartBtn.style.background = ''; smartBtn.style.color = ''; smartBtn.style.border = '';
-      } else {
-        smartBtn.style.background = ''; smartBtn.style.color = ''; smartBtn.style.border = '';
-      }
-    }
 
     // Triage-Banner und Feierabend-Button
     const triageBannerEl = document.getElementById('ck-triage-banner');
@@ -16858,10 +16856,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (isToday) try { this._dutyCheckExperimentsAbgelaufen(); } catch(e) {}
 
     // Timer aktualisieren
-    this._ckUpdateNextTimer();
+    this._ckRenderNextBanner();
     if (!this._ckTimerInterval) {
       this._ckTimerInterval = setInterval(() => {
-        if (this.activeTab === 'cockpit') this._ckUpdateNextTimer();
+        if (this.activeTab === 'cockpit') this._ckRenderNextBanner();
       }, 60000);
     }
 
@@ -17163,66 +17161,47 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this._uiApplyLayout();
   },
 
-  _ckUpdateNextTimer() {
+  _ckRenderNextBanner() {
     const el = document.getElementById('ck-next-timer');
     if (!el) return;
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    if (this._ckDate && this._ckDate !== today) { el.style.display = 'none'; return; }
-    const pT = s => { if (!s) return -1; const [h,m] = s.split(':').map(Number); return h*60+m; };
-    const candidates = [];
-    // Alle Termine aus _evStore() (alle in dataPriv seit Migration)
-    (this._evStore()||[]).filter(e => e.date===today && e.startTime && !e.done).forEach(e => {
-      const min = pT(e.startTime);
-      if (min > nowMin) candidates.push({ title: e.text, min, zeit: e.startTime, icon: '📅' });
-    });
-    (this._vorhabenAlle ? this._vorhabenAlle() : []).forEach(v => {
-      (v.meilensteine||[]).forEach(ms => {
-        (ms.aufgaben||[]).filter(a => !a.done && a.datum===today && a.startTime).forEach(a => {
-          const min = pT(a.startTime);
-          if (min > nowMin) candidates.push({ title: a.text, min, zeit: a.startTime });
-        });
-      });
-    });
+    const today = new Date().toISOString().split('T')[0];
+    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    const kandidaten = [];
     ['pro','priv'].forEach(ctx => {
-      (this._dutyStore(ctx)||[]).forEach(d => {
-        if (!d.startTime) return;
-        const min = pT(d.startTime);
-        if (min <= nowMin) return;
-        try {
-          const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
-          const inst = insts.find(i => i.isToday);
-          if (inst && !inst.done) candidates.push({ title: d.title||d.name||'', min, zeit: d.startTime });
-        } catch(e) {}
-      });
+      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      (db?.customEvents || [])
+        .filter(ev => ev.date === today && !ev.done && ev.startTime
+          && ev.status !== 'abgesagt' && ev.status !== 'verschoben')
+        .forEach(ev => {
+          const pT = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+          const startMin = pT(ev.startTime);
+          if (startMin > nowMin) {
+            kandidaten.push({ text: ev.text, typ: 'Termin', ctx, startMin, diffMin: startMin - nowMin });
+          }
+        });
     });
-    // Schnellerinnerungen beider Welten
-    [[this.dataPriv],[this.dataPro]].forEach(([db]) => {
-      if (!db?.quickItems) return;
-      db.quickItems.filter(q => q.date===today && q.time && !q.done).forEach(q => {
-        const min = pT(q.time);
-        if (min > nowMin) candidates.push({ title: q.text||q.title||'', min, zeit: q.time });
-      });
-    });
-    if (!candidates.length) { el.style.display = 'none'; return; }
-    candidates.sort((a,b) => a.min - b.min);
-    const next = candidates[0];
-    const diff = next.min - nowMin;
-    if (diff <= 0) { el.style.display = 'none'; return; }
-    let countdown = '';
-    if (diff < 60) countdown = 'in ' + diff + ' Min';
-    else { const h = Math.floor(diff/60), m = diff%60; countdown = 'in ' + h + 'h' + (m>0?' '+m+'m':''); }
-    let urgencyColor = 'var(--c-beruf)', urgencyBg = 'var(--c-beruf-bg)';
-    if (diff <= 5) { urgencyColor = 'var(--c-danger)'; urgencyBg = 'var(--c-surface)'; }
-    else if (diff <= 15) { urgencyColor = 'var(--c-warn)'; urgencyBg = 'var(--c-surface)'; }
-    el.style.display = 'flex';
-    el.style.color = urgencyColor;
-    el.style.background = urgencyBg;
-    el.style.borderColor = 'color-mix(in srgb, ' + urgencyColor + ' 20%, var(--c-border))';
-    el.innerHTML = '<span class="ck-timer-icon">\u23f1</span>'
-      + '<span class="ck-timer-title">' + this._esc(next.title) + '</span>'
-      + '<span class="ck-timer-countdown">' + countdown + '</span>';
+    kandidaten.sort((a,b) => a.startMin - b.startMin);
+    const naechstes = kandidaten[0];
+    if (!naechstes) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    const diff = naechstes.diffMin;
+    const diffText = diff < 60 ? 'in ' + diff + ' Min'
+      : 'in ' + Math.floor(diff/60) + 'h' + (diff%60 ? ' ' + (diff%60) + 'm' : '');
+    const weltLbl = naechstes.ctx === 'pro' ? 'Beruf' : 'Privat';
+    el.innerHTML =
+      '<div style="background:rgba(10,107,94,0.07);border:0.5px solid rgba(10,107,94,0.18);'
+        + 'border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:8px;margin:0 14px 8px;">'
+        + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#0A6B5E;margin-bottom:2px;">Als n\u00e4chstes</div>'
+          + '<div style="font-size:12px;font-weight:600;color:var(--c-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+            + this._esc(naechstes.text) + '</div>'
+          + '<div style="font-size:10px;color:var(--c-faint);margin-top:1px;">'
+            + naechstes.typ + ' \u00b7 ' + weltLbl + '</div>'
+        + '</div>'
+        + '<div style="font-size:11px;font-weight:700;color:#0A6B5E;font-family:var(--font-mono);flex-shrink:0;">'
+          + diffText + '</div>'
+        + '<button onclick="WB._ckToggleSmartView()" style="font-size:10px;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid rgba(10,107,94,0.3);background:none;color:#0A6B5E;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:var(--font);">Alle Zonen</button>'
+      + '</div>';
   },
 
   _dutyOpenEdit(ctx, dutyId) {
@@ -17402,15 +17381,6 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _ckToggleSmartView() {
     this._ckSmartView = !this._ckSmartView;
-    const btn = document.getElementById('ck-smart-btn');
-    if (btn) {
-      btn.textContent = this._ckSmartView ? 'Alle Zonen' : 'Smart-View';
-      if (this._ckSmartView) {
-        btn.style.background = ''; btn.style.color = ''; btn.style.border = '';
-      } else {
-        btn.style.background = ''; btn.style.color = ''; btn.style.border = '';
-      }
-    }
     this._ckZoneCollapsed = {};
     this._ckRenderTagesseite();
     // Vorhaben-Panel aktualisieren wenn Zwei-Spalten und kein Detail offen
