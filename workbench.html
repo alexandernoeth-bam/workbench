@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.41.2</title>
+<title>WorkBench 5.41.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6149,7 +6149,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.41.2 · Build 20260613-1600</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.41.3 · Build 20260613-1610</div>
     </div>
 
     <!-- Welt -->
@@ -6299,7 +6299,7 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.41.2</div>
+  <div class="wb-startup-tagline">v5.41.3</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7938,8 +7938,8 @@ body.fokus-modus body.fokus-modus #ck-next-timer     { display: none !important;
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.41.2',
-  APP_BUILD:   '20260613-1600',
+  APP_VERSION: '5.41.3',
+  APP_BUILD:   '20260613-1610',
 
 
   // ══════════════════════════════════════════════════════
@@ -18134,11 +18134,16 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _ckZTerminDone(id, ctx, chk) {
-    const db = this.dataPriv;
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     const ev = (db?.customEvents || []).find(e => String(e.id) === String(id));
     if (!ev) return;
+    const wirdErledigt = chk.checked && !ev.done;
     ev.done = chk.checked;
     this.setDirty();
+    if (wirdErledigt) {
+      this._svPendingSheet = { text: ev.text || 'Termin', quelle: 'termin' };
+      this._svShowSheet(ev.text || 'Termin', 'termin');
+    }
     setTimeout(() => this._ckRenderTagesseite(), 400);
   },
 
