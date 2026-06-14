@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.42.2</title>
+<title>WorkBench 5.42.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6179,7 +6179,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.42.2 · Build 20260613-1900</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.42.3 · Build 20260613-1915</div>
     </div>
 
     <!-- Welt -->
@@ -6329,7 +6329,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.42.2</div>
+  <div class="wb-startup-tagline">v5.42.3</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7973,8 +7973,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.42.2',
-  APP_BUILD:   '20260613-1900',
+  APP_VERSION: '5.42.3',
+  APP_BUILD:   '20260613-1915',
 
 
   // ══════════════════════════════════════════════════════
@@ -8517,27 +8517,23 @@ const WB = {
   },
 
   _wzWeekFinish() {
-    this._wzWeekSaveStep();
+    try { this._wzWeekSaveStep(); } catch(e) {}
     const db  = this.dataPriv;
-    const kw  = this._wzWeekData.kw;
-    if (!db) { this.wzWeekClose(); return; }
-    if (!db.weeklyPlans) db.weeklyPlans = {};
-    db.weeklyPlans[kw] = {
-      ...db.weeklyPlans[kw],
-      ...this._wzWeekData,
-      weekDone:    true,
-      weekDoneTs:  new Date().toISOString(),
-      mode:        this._wzWeekMode,
-    };
-    this.setDirty();
-    this._wzWeekStep = this._wzWeekSteps.length - 1;
-    this._wzWeekRenderStep();
-    const nextBtn = document.getElementById('wz-week-next-btn');
-    if (nextBtn) { nextBtn.textContent = 'Schließen'; nextBtn.onclick = () => this.wzWeekClose(); }
-    const backBtn = document.getElementById('wz-week-back-btn');
-    if (backBtn) backBtn.style.display = 'none';
+    const kw  = this._wzWeekData?.kw;
+    if (db && kw) {
+      if (!db.weeklyPlans) db.weeklyPlans = {};
+      db.weeklyPlans[kw] = {
+        ...db.weeklyPlans[kw],
+        ...this._wzWeekData,
+        weekDone:    true,
+        weekDoneTs:  new Date().toISOString(),
+        mode:        this._wzWeekMode,
+      };
+      this.setDirty();
+    }
     this._toast(this._wzWeekMode === 'plan' ? '✓ Woche geplant!' : '✓ Woche reflektiert!');
-    this._ckRenderAssistantBanner();
+    try { this._ckRenderAssistantBanner(); } catch(e) {}
+    setTimeout(() => this.wzWeekClose(), 800);
   },
 
   // ══════════════════════════════════════════════════════
