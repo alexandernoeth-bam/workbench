@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.42.5</title>
+<title>WorkBench 5.42.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.42.5 · Build 20260613-2015</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.42.6 · Build 20260613-2030</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.42.5</div>
+  <div class="wb-startup-tagline">v5.42.6</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7910,8 +7910,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.42.5',
-  APP_BUILD:   '20260613-2015',
+  APP_VERSION: '5.42.6',
+  APP_BUILD:   '20260613-2030',
 
 
   // ══════════════════════════════════════════════════════
@@ -16554,32 +16554,19 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       h += '</div></div>';
     }
 
-    // Schnell-Erinnerungen mit Untergruppen
+    // Schnell-Erinnerungen — nur heute + ohne Datum im Cockpit
     const alleSchnell = [];
     ['pro','priv'].forEach(ctx2 => {
       const db2 = ctx2==='pro' ? this.dataPro : this.dataPriv;
-      (db2?.quickItems||[]).filter(q => !q.done).forEach(q => alleSchnell.push({ q, ctx:ctx2,
-        weltLabel: ctx2==='pro'?'Beruf':'Privat', weltColor: ctx2==='pro'?'var(--c-beruf)':'#4D5F33' }));
+      (db2?.quickItems||[]).filter(q => !q.done && (q.date === dateStr || !q.date))
+        .forEach(q => alleSchnell.push({ q, ctx:ctx2,
+          weltLabel: ctx2==='pro'?'Beruf':'Privat', weltColor: ctx2==='pro'?'var(--c-beruf)':'#4D5F33' }));
     });
     if (alleSchnell.length) {
-      const ueberfaellig = alleSchnell.filter(x => x.q.date && x.q.date < today);
-      const heuteS = alleSchnell.filter(x => x.q.date === today);
-      const geplant = alleSchnell.filter(x => x.q.date && x.q.date > today);
-      const offen = alleSchnell.filter(x => !x.q.date);
-      h += '<div class="ck-backlog-sektion"><div class="ck-backlog-sektion-header" onclick="WB._ckBacklogToggleSektion(&quot;schnell&quot;)"><span class="ck-backlog-sektion-icon">\u26a1</span><span class="ck-backlog-sektion-label">Schnell-Erinnerungen</span><span style="font-size:0.65rem;font-weight:700;color:var(--c-faint);">'+alleSchnell.length+' offen</span></div><div id="ck-backlog-s-schnell">';
-      const renderSG = (label, gruppe) => {
-        if (!gruppe.length) return '';
-        return '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);padding:5px 12px 3px;">'+label+'</div>'
-          + gruppe.map(({q,ctx:c2,weltLabel:wl,weltColor:wc}) =>
-            '<div class="ck-backlog-simple-item"><div class="ck-backlog-simple-chk" onclick="WB._ckBacklogCheckSchnell(&quot;'+q.id+'&quot;,&quot;'+c2+'&quot;)"></div><span class="ck-backlog-simple-text">'+this._esc(q.text||'')+'</span>'
-            +(q.date&&q.date!==today?'<span style="font-size:0.65rem;color:var(--c-faint);font-family:var(--font-mono);">'+q.date+'</span>':'')
-            +'<span class="ck-backlog-badge" style="background:'+(wc==='var(--c-beruf)'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+wc+';">'+wl+'</span></div>'
-          ).join('');
-      };
-      h += renderSG('\u00dcberf\u00e4llig', ueberfaellig);
-      h += renderSG('Heute', heuteS);
-      h += renderSG('Geplant', geplant);
-      h += renderSG('Offen', offen);
+      h += '<div class="ck-backlog-sektion"><div class="ck-backlog-sektion-header" onclick="WB._ckBacklogToggleSektion(&quot;schnell&quot;)"><span class="ck-backlog-sektion-icon">\u26a1</span><span class="ck-backlog-sektion-label">Schnell-Erinnerungen</span><span style="font-size:0.65rem;font-weight:700;color:var(--c-faint);">'+alleSchnell.length+'</span></div><div id="ck-backlog-s-schnell">';
+      alleSchnell.forEach(({q,ctx:c2,weltLabel:wl,weltColor:wc}) => {
+        h += '<div class="ck-backlog-simple-item"><div class="ck-backlog-simple-chk" onclick="WB._ckBacklogCheckSchnell(&quot;'+q.id+'&quot;,&quot;'+c2+'&quot;)"></div><span class="ck-backlog-simple-text">'+this._esc(q.text||'')+'</span><span class="ck-backlog-badge" style="background:'+(wc==='var(--c-beruf)'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+wc+';">'+wl+'</span></div>';
+      });
       h += '</div></div>';
     }
     el.innerHTML = h;
@@ -16652,37 +16639,66 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const header = document.getElementById('backlog-header');
     const scroll = document.getElementById('backlog-scroll');
     if (!header || !scroll) return;
-    const gruppen = this._cbAlleOffen();
-    const gesamt = this._cbGesamtZaehler();
-    header.innerHTML =
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
-        + '<span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);">Chaos-Backlog</span>'
-        + (gesamt > 0 ? '<span style="font-size:10px;font-weight:700;background:rgba(77,95,51,0.12);color:#4D5F33;padding:2px 7px;border-radius:8px;">' + gesamt + ' offen</span>' : '')
-      + '</div>';
-    if (!gruppen.length) {
-      scroll.innerHTML = '<div style="text-align:center;padding:32px 0;color:var(--c-faint);font-size:0.85rem;">Kein Chaos. Gut so.</div>';
-      return;
-    }
+    const kwStart = this._kwStartDate();
+    const kwEnd = this._kwEndDate();
+    const today = new Date().toISOString().split('T')[0];
+    const kw = typeof this._getCurrentKW === 'function' ? this._getCurrentKW() : '';
+    header.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);">Backlog \u00b7 KW '+kw+'</span></div>';
+
+    const aufgabenGruppen = [];
+    ['pro','priv'].forEach(welt => {
+      const store = this._vorhabenStore(welt) || [];
+      store.filter(v => (v.aktivitaet||'aktiv')==='aktiv').forEach(v => {
+        (v.meilensteine||[]).forEach(ms => {
+          (ms.aufgaben||[]).filter(a => !a.done && a.datum && a.datum>=kwStart && a.datum<=kwEnd && (a.checklist||[]).length>0)
+            .forEach(a => {
+              const checks = a.checklist||[];
+              const doneCnt = checks.filter(c=>c.done).length;
+              const total = checks.length;
+              const offenCl = checks.map((c,i)=>({...c,_idx:i})).filter(c=>!c.done);
+              if (!offenCl.length) return;
+              aufgabenGruppen.push({a,v,welt,ms,doneCnt,total,offen:offenCl,
+                weltColor:welt==='pro'?'var(--c-beruf)':'#4D5F33',
+                weltLabel:welt==='pro'?'Beruf':'Privat'});
+            });
+        });
+      });
+    });
+
+    const alleSchnell = this._quickStoreAlle ? this._quickStoreAlle().filter(q=>!q.done) : [];
+    const ueberfaellig = alleSchnell.filter(x=>x.date&&x.date<today);
+    const heuteS = alleSchnell.filter(x=>x.date===today);
+    const geplant = alleSchnell.filter(x=>x.date&&x.date>today);
+    const offenS = alleSchnell.filter(x=>!x.date);
+
     let h = '';
-    gruppen.forEach(({ vh, offen, welt }) => {
-      const wc = welt === 'pro' ? 'var(--c-beruf)' : '#4D5F33';
-      h += '<div style="background:#F0EEE8;border:0.5px solid rgba(0,0,0,0.12);border-radius:10px;overflow:hidden;margin-bottom:8px;">';
-      h += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:0.5px solid rgba(0,0,0,0.08);">'
-        + '<span style="width:7px;height:7px;border-radius:50%;background:' + wc + ';flex-shrink:0;display:inline-block;"></span>'
-        + '<span style="font-size:0.82rem;font-weight:600;flex:1;">' + this._esc(vh.titel) + '</span>'
-        + '<span style="font-size:9px;color:var(--c-faint);">' + offen.length + ' offen</span>'
-        + '<button onclick="WB._cbNeuSheet(&quot;' + vh.id + '&quot;,&quot;' + welt + '&quot;)" style="font-size:11px;background:none;border:none;color:' + wc + ';cursor:pointer;padding:0 2px;font-weight:700;">+ Neu</button>'
-      + '</div>';
-      offen.forEach(cb => {
-        h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:0.5px solid rgba(0,0,0,0.05);">'
-          + '<div onclick="WB._cbToggle(&quot;' + vh.id + '&quot;,&quot;' + cb.id + '&quot;,&quot;' + welt + '&quot;)" style="width:14px;height:14px;border-radius:3px;border:1.5px solid rgba(0,0,0,0.15);background:#fff;flex-shrink:0;cursor:pointer;"></div>'
-          + '<span style="font-size:11px;flex:1;">' + this._esc(cb.text) + '</span>'
-          + (cb.min ? '<span style="font-size:9px;color:#4D5F33;background:rgba(77,95,51,0.1);padding:1px 5px;border-radius:5px;">' + cb.min + ' min</span>' : '')
-        + '</div>';
+    aufgabenGruppen.forEach(g => {
+      const pct = g.total ? Math.round(g.doneCnt/g.total*100) : 0;
+      h += '<div class="ck-backlog-aufgabe"><div class="ck-backlog-aufgabe-header">'
+        + '<div style="width:7px;height:7px;border-radius:50%;background:'+g.weltColor+';flex-shrink:0;"></div>'
+        + '<span class="ck-backlog-aufgabe-name">'+this._esc(g.a.text)+'</span>'
+        + '<div style="display:flex;align-items:center;gap:5px;"><div style="width:36px;height:3px;background:var(--c-border);border-radius:2px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;border-radius:2px;background:'+g.weltColor+';"></div></div><span style="font-size:0.62rem;font-weight:700;color:'+g.weltColor+';">'+g.doneCnt+'/'+g.total+'</span></div></div>'
+        + '<div class="ck-backlog-aufgabe-meta">'+this._esc(g.v.titel)+' \u00b7 '+g.weltLabel+' \u00b7 '+g.a.datum+'</div>';
+      g.offen.forEach(c => {
+        h += '<div class="ck-backlog-cl-item"><div class="ck-backlog-cl-chk" onclick="WB._ckBacklogCheckCl(&quot;'+g.a.id+'&quot;,'+c._idx+',&quot;'+g.welt+'&quot;)"></div><span class="ck-backlog-cl-text">'+this._esc(c.text)+'</span></div>';
       });
       h += '</div>';
     });
-    scroll.innerHTML = h;
+
+    if (alleSchnell.length) {
+      const renderGruppe = (label, gruppe) => {
+        if (!gruppe.length) return '';
+        return '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);padding:5px 12px 3px;">'+label+'</div>'
+          + gruppe.map(x => '<div class="ck-backlog-simple-item"><div class="ck-backlog-simple-chk" onclick="WB._ckBacklogCheckSchnell(&quot;'+x.id+'&quot;,&quot;'+x._ctx+'&quot;)"></div><span class="ck-backlog-simple-text">'+this._esc(x.text||'')+'</span>'+(x.date&&x.date!==today?'<span style="font-size:0.65rem;color:var(--c-faint);font-family:var(--font-mono);">'+x.date+'</span>':'')+'<span class="ck-backlog-badge" style="background:'+(x._ctx==='pro'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+(x._ctx==='pro'?'var(--c-beruf)':'#4D5F33')+';">'+(x._ctx==='pro'?'Beruf':'Privat')+'</span></div>').join('');
+      };
+      h += '<div class="ck-backlog-sektion"><div class="ck-backlog-sektion-header"><span class="ck-backlog-sektion-icon">\u26a1</span><span class="ck-backlog-sektion-label">Schnell-Erinnerungen</span><span style="font-size:0.65rem;font-weight:700;color:var(--c-faint);">'+alleSchnell.length+' offen</span></div><div>'
+        + renderGruppe('\u00dcberf\u00e4llig', ueberfaellig)
+        + renderGruppe('Heute', heuteS)
+        + renderGruppe('Geplant', geplant)
+        + renderGruppe('Offen', offenS)
+        + '</div></div>';
+    }
+    scroll.innerHTML = h || '<div style="text-align:center;padding:32px;color:var(--c-faint);font-size:0.85rem;">Backlog ist leer.</div>';
   },
 
   _ckRenderChaosBlock() {
@@ -16719,7 +16735,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     let h = '<div style="padding:12px 0;">';
     h += '<button onclick="WB._cbNeuSheet(&quot;' + vh.id + '&quot;,&quot;' + welt + '&quot;)" style="width:100%;padding:10px;margin-bottom:10px;border:1px dashed rgba(0,0,0,0.15);background:none;border-radius:8px;font-family:var(--font);font-size:0.85rem;cursor:pointer;color:var(--c-muted);">+ Mikro-Aufgabe hinzuf\u00fcgen (unter 10 Min)</button>';
     if (!offen.length && !erledigt.length) {
-      h += '<div style="text-align:center;padding:24px 0;color:var(--c-faint);font-size:0.85rem;">Kein Chaos \u2014 alles sauber.</div>';
+      h += '<div style="text-align:center;padding:24px 0;color:var(--c-faint);font-size:0.85rem;">Backlog ist leer.</div>';
     }
     offen.forEach(cb => {
       h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:0.5px solid rgba(0,0,0,0.06);">'
