@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.43.6 · Build 20260615-0935</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.43.6 · Build 20260615-0940</div>
     </div>
 
     <!-- Welt -->
@@ -7911,7 +7911,7 @@ body.fokus-modus body.fokus-modus
 const WB = {
 
   APP_VERSION: '5.43.6',
-  APP_BUILD:   '20260615-0935',
+  APP_BUILD:   '20260615-0940',
 
 
   // ══════════════════════════════════════════════════════
@@ -16093,38 +16093,55 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _evSetStatus(evId, ctx, status) {
-    this._toast('evSetStatus: ' + status + ' / ' + evId + ' / ' + ctx);
     const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     const ev = (db?.customEvents||[]).find(e => String(e.id) === String(evId));
     if (!ev) return;
     ev.status = status;
     if (status === 'abgesagt' || status === 'erledigt') ev.done = true;
-    // SV1: Buchungs-Sheet bei Termin-Erledigung
-    if (ev.done) { this._svPendingSheet = { text: ev.text||'Termin', quelle: 'termin' }; this._svShowSheet(ev.text||'Termin', 'termin'); }
-    
-    // Termin-Flucht-Sheet
+    // SV1: Buchungs-Sheet bei Termin-Erledigung (nur bei erledigt, nicht bei abgesagt/verschoben)
+    if (status === 'erledigt' && ev.done) {
+      this._svPendingSheet = { text: ev.text||'Termin', quelle: 'termin' };
+      this._svShowSheet(ev.text||'Termin', 'termin');
+    }
+    this.setDirty();
+    try { document.getElementById('edit-overlay')?.classList.remove('open'); } catch(e) {}
+    this.renderCockpit();
+    // Flucht-Sheet bei Absagen/Verschieben (DOM-API)
     if (status === 'abgesagt' || status === 'verschoben') {
       const evText = ev.text || 'Termin';
       const aktion = status === 'abgesagt' ? 'abgesagt' : 'verschoben';
       const _tSheet = document.createElement('div');
       _tSheet.id = 'sv-termin-sheet';
       _tSheet.style.cssText = 'position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;font-family:var(--font);';
-      _tSheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:16px 16px 32px;">'
-        + '<div style="font-size:0.72rem;color:var(--c-faint);margin-bottom:8px;">&quot;'+this._esc(evText)+'&quot; wurde '+aktion+'.</div>'
-        + '<div style="font-size:0.92rem;font-weight:600;color:var(--c-text);margin-bottom:14px;">War das eine bewusste Entscheidung?</div>'
-        + '<div style="display:flex;gap:8px;">'
-          + '<button onclick="WB._svTerminSheet(null)" style="flex:1;padding:10px;border-radius:var(--radius-xs);background:none;border:1px solid var(--c-border);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">\u2713 Ja, bewusst</button>'
-          + '<button onclick="WB._svTerminSheet(&quot;-&quot;,&quot;'+this._esc(evText).replace(/"/g,'')+'&quot;)" style="flex:1;padding:10px;border-radius:var(--radius-xs);background:none;border:1px solid #B87333;font-family:var(--font);font-size:0.85rem;color:#B87333;cursor:pointer;">\u2717 Flucht</button>'
-          + '<button onclick="WB._svTerminSheet(undefined)" style="flex:1;padding:10px;border-radius:var(--radius-xs);background:none;border:1px solid var(--c-border);font-family:var(--font);font-size:0.85rem;color:var(--c-faint);cursor:pointer;">\u00dcberspr.</button>'
-        + '</div></div>';
+      _tSheet.onclick = e => { if (e.target === _tSheet) { _tSheet.remove(); } };
+      const _tPanel = document.createElement('div');
+      _tPanel.style.cssText = 'background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:16px 16px 32px;';
+      const _tInfo = document.createElement('div');
+      _tInfo.style.cssText = 'font-size:0.72rem;color:var(--c-faint);margin-bottom:8px;';
+      _tInfo.textContent = '\u201e' + evText + '\u201c wurde ' + aktion + '.';
+      _tPanel.appendChild(_tInfo);
+      const _tQ = document.createElement('div');
+      _tQ.style.cssText = 'font-size:0.92rem;font-weight:600;color:var(--c-text);margin-bottom:14px;';
+      _tQ.textContent = 'War das eine bewusste Entscheidung?';
+      _tPanel.appendChild(_tQ);
+      const _tBtns = document.createElement('div');
+      _tBtns.style.cssText = 'display:flex;gap:8px;';
+      const _mkB = (txt, bdr, clr, fn) => {
+        const b = document.createElement('button');
+        b.textContent = txt;
+        b.style.cssText = 'flex:1;padding:10px;border-radius:var(--radius-xs);background:none;border:1px solid '+bdr+';font-family:var(--font);font-size:0.85rem;color:'+clr+';cursor:pointer;';
+        b.onclick = () => { _tSheet.remove(); if (fn) fn(); };
+        return b;
+      };
+      _tBtns.appendChild(_mkB('\u2713 Ja, bewusst', 'var(--c-border)', 'var(--c-muted)', null));
+      _tBtns.appendChild(_mkB('\u2717 Flucht \u2192 \u22121', '#B87333', '#B87333', () => WB._svTerminSheet('-', evText)));
+      _tBtns.appendChild(_mkB('\u00dcberspr.', 'var(--c-border)', 'var(--c-faint)', null));
+      _tPanel.appendChild(_tBtns);
+      _tSheet.appendChild(_tPanel);
       document.body.appendChild(_tSheet);
-      _tSheet.onclick = e => { if (e.target === _tSheet) WB._svTerminSheet(undefined); };
+    } else {
+      this._toast('\u2713 Status: ' + status);
     }
-
-    this.setDirty();
-    try { document.getElementById('edit-overlay')?.classList.remove('open'); } catch(e) {}
-    this.renderCockpit();
-    this._toast(status === 'abgesagt' ? '\u2715 Termin abgesagt' : '\u2713 Status: ' + status);
   },
 
   _evVerschieben(evId, ctx) {
