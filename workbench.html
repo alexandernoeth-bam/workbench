@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.42.8</title>
+<title>WorkBench 5.42.9</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.42.8 · Build 20260614-0910</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.42.9 · Build 20260615-0810</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.42.8</div>
+  <div class="wb-startup-tagline">v5.42.9</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7910,8 +7910,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.42.8',
-  APP_BUILD:   '20260614-0910',
+  APP_VERSION: '5.42.9',
+  APP_BUILD:   '20260615-0810',
 
 
   // ══════════════════════════════════════════════════════
@@ -16498,7 +16498,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         if (d.startTime) return;
         try {
           const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
-          const inst = insts.find(i => i.date === dateStr);
+          const inst = insts.find(i => (i.date instanceof Date ? i.date.toISOString().split('T')[0] : i.date) === dateStr);
           if (!inst || inst.done) return;
           const db = ctx==='pro' ? this.dataPro : this.dataPriv;
           if (db?.pflichtStatus?.[d.id+'_'+dateStr]) return;
@@ -16667,7 +16667,28 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       });
     });
 
-    const alleSchnell = this._quickStoreAlle ? this._quickStoreAlle().filter(q=>!q.done) : [];
+    
+    // Wochenpflichten (alle offenen dieser Woche)
+    const allePflichten = [];
+    ['pro','priv'].forEach(ctx => {
+      (this._dutyStore(ctx)||[]).forEach(d => {
+        if (d.startTime) return; // hat Uhrzeit → Zone
+        try {
+          // Prüfe ob diese Woche relevant
+          const rel = this._dutyRelevantThisWeek ? this._dutyRelevantThisWeek(d) : true;
+          if (!rel) return;
+          const isDone = this._dutyIsDone ? this._dutyIsDone(d, new Date()) : false;
+          if (isDone) return;
+          allePflichten.push({ d, ctx,
+            weltLabel: ctx==='pro'?'Beruf':'Privat',
+            weltColor: ctx==='pro'?'var(--c-beruf)':'#4D5F33',
+            tage: d.days ? d.days.join(', ') : '',
+          });
+        } catch(e) {}
+      });
+    });
+
+const alleSchnell = this._quickStoreAlle ? this._quickStoreAlle().filter(q=>!q.done) : [];
     const ueberfaellig = alleSchnell.filter(x=>x.date&&x.date<today);
     const heuteS = alleSchnell.filter(x=>x.date===today);
     const geplant = alleSchnell.filter(x=>x.date&&x.date>today);
@@ -16687,7 +16708,20 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       h += '</div>';
     });
 
-    if (alleSchnell.length) {
+    
+    // Wochenpflichten rendern
+    if (allePflichten.length) {
+      h += '<div class="ck-backlog-sektion"><div class="ck-backlog-sektion-header"><span class="ck-backlog-sektion-icon">\u{1f501}</span><span class="ck-backlog-sektion-label">Wochenpflichten</span><span style="font-size:0.65rem;font-weight:700;color:var(--c-faint);">'+allePflichten.length+' offen</span></div><div>';
+      allePflichten.forEach(({d, ctx, weltLabel, weltColor, tage}) => {
+        const name = d.title || d.name || '';
+        h += '<div class="ck-backlog-simple-item"><div class="ck-backlog-simple-chk" onclick="WB._ckBacklogCheckPflicht(&quot;'+d.id+'&quot;,&quot;'+ctx+'&quot;)"></div><span class="ck-backlog-simple-text">'+this._esc(name)+'</span>'
+          + (tage ? '<span style="font-size:0.65rem;color:var(--c-faint);">'+tage+'</span>' : '')
+          + '<span class="ck-backlog-badge" style="background:'+(weltColor==='var(--c-beruf)'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+weltColor+';">'+weltLabel+'</span></div>';
+      });
+      h += '</div></div>';
+    }
+
+if (alleSchnell.length) {
       const renderGruppe = (label, gruppe) => {
         if (!gruppe.length) return '';
         return '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);padding:5px 12px 3px;">'+label+'</div>'
@@ -17228,7 +17262,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       (this._dutyStore(dCtx) || []).forEach(d => {
         try {
           const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
-          const inst  = insts.find(i => i.date === dateStr || (dateStr === today && i.isToday));
+          const inst  = insts.find(i => (i.date instanceof Date ? i.date.toISOString().split('T')[0] : i.date) === dateStr || (dateStr === today && i.isToday));
           if (!inst || inst.done) return;
           // CK-Lifecycle: Pflicht-Status prüfen
           const _pflKey2 = d.id + '_' + dateStr;
