@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.44.2</title>
+<title>WorkBench 5.44.3</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.44.2 · Build 20260615-1020</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.44.3 · Build 20260615-1030</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.44.2</div>
+  <div class="wb-startup-tagline">v5.44.3</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7838,8 +7838,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.44.2',
-  APP_BUILD:   '20260615-1020',
+  APP_VERSION: '5.44.3',
+  APP_BUILD:   '20260615-1030',
 
 
   // ══════════════════════════════════════════════════════
@@ -12153,25 +12153,12 @@ const WB = {
 
   // Auto-Trigger: beim Cockpit-Render aufgerufen
   _ritualMaybeOpen() {
-    // Sync noch nicht abgeschlossen → warten
-    if (!this._syncReadyForDialogs) return;
-    // Beide DBs müssen geladen sein
-    if (!this.dataPriv || !this.dataPro) return;
-    // Drive-Login-Banner sichtbar → Auth-Renewal läuft → warten
-    if (document.getElementById('wb-drive-login-banner')?.classList.contains('visible')) return;
-    // Device-Overlay offen → warten
-    if (document.getElementById('wb-device-overlay')?.classList.contains('open')) return;
-    // Drive noch nicht bereit → warten (aber max. 8 Sekunden nach Start)
-    if (!this._ritualDriveReady) return;
-    // Einmal pro Session öffnen
-    if (this._ritualOpenedToSession) return;
-    // Heute schon erledigt
-    if (this._ritualIsDoneToday()) return;
-    // Dialog schon offen
-    if (document.getElementById('wb-ritual-overlay')?.classList.contains('open')) return;
-    this._ritualOpenedToSession = true;
-    const ts = document.getElementById('ck-tagesseite');
-    if (ts) ts.style.visibility = 'hidden';
+    const store = this._ritualStore();
+    if (!store) return;
+    const key = this._ritualTodayKey();
+    const ritual = store[key];
+    if (ritual?.morgendialogDone || ritual?.morgendialogSkipped) return;
+    if (new Date().getHours() < 5) return;
     this.ritualOpen();
   },
 
@@ -12299,49 +12286,95 @@ const WB = {
     this._ritualGoto(0);
   },
 
-  ritualOpen() {
-    this._ritualSelected   = [];
-    this._ritualFreitexte  = [];
-    this._ritualEnergie    = 'mittel';
-    this._ritualTagestyp   = null;
-    this._ritualIntention  = '';
-    this._ritualZeitbloecke = {};
-    this._ritualBodyBattery = null;
-    this._ritualAutoSelectDone = false;
-    if (this._ritualVorhabenCheck) { clearInterval(this._ritualVorhabenCheck); this._ritualVorhabenCheck = null; }
-    const now = new Date();
-    // SLS-M1: Versäumte Abendreflexion prüfen
-    this._slsNachholNoetig = false;
-    this._slsNachholTyp    = null;
-    this._slsNachholDatum  = null;
-    if (this._settings.slsNachholen !== false) {
-      const gestern = new Date();
-      gestern.setDate(gestern.getDate() - 1);
-      const gestStr = gestern.toISOString().split('T')[0];
-      const gestPlan = this.dataPriv?.dailyPlans?.[gestStr];
-      if (!gestPlan?.eveningDone) {
-        this._slsNachholNoetig = true;
-        this._slsNachholTyp    = 'abend';
-        this._slsNachholDatum  = gestStr;
-      }
-      const dow = now.getDay();
-      if (dow >= 1 && dow <= 2) {
-        const letztenSo = new Date(now);
-        letztenSo.setDate(now.getDate() - dow);
-        const kwSo = this._kwStr ? this._kwStr(letztenSo) : null;
-        const weekPlan = kwSo ? this.dataPriv?.weeklyPlans?.[kwSo] : null;
-        if (!weekPlan?.weekDone && !this._slsNachholNoetig) {
-          this._slsNachholNoetig = true;
-          this._slsNachholTyp    = 'woche';
-        }
-      }
+
+  _ritualStep: 1,
+
+  _ritualRenderMorgen() {
+    const body = document.getElementById('wb-ritual-body');
+    if (!body) return;
+    const today = new Date().toISOString().split('T')[0];
+    const wt = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    const tagName = wt[new Date().getDay()];
+
+    if (this._ritualStep === 1) {
+      body.innerHTML =
+        '<div style="text-align:center;padding:8px 0 16px;">'
+        + '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--c-faint);margin-bottom:4px;">'+tagName+' \u00b7 Guten Morgen</div>'
+        + '<div style="font-size:1.1rem;font-weight:600;color:var(--c-text);margin-bottom:20px;">Wie ist deine Energie heute?</div>'
+        + '<div style="display:flex;flex-direction:column;gap:8px;">'
+          + '<button onclick="WB._ritualSetEnergie(&quot;hoch&quot;)" class="ritual-btn" style="background:rgba(10,107,94,0.08);border-color:rgba(10,107,94,0.3);color:#0A6B5E;">🟢 Hoch \u2014 Ich bin bereit</button>'
+          + '<button onclick="WB._ritualSetEnergie(&quot;mittel&quot;)" class="ritual-btn" style="background:rgba(180,83,9,0.08);border-color:rgba(180,83,9,0.3);color:#B45309;">🟡 Mittel \u2014 Es geht so</button>'
+          + '<button onclick="WB._ritualSetEnergie(&quot;niedrig&quot;)" class="ritual-btn" style="background:rgba(0,0,0,0.04);border-color:rgba(0,0,0,0.15);color:var(--c-muted);">🔴 Niedrig \u2014 Schwerer Start</button>'
+        + '</div></div>'
+        + '<div style="text-align:center;margin-top:16px;"><button onclick="WB._ritualSkip()" style="font-size:0.78rem;color:var(--c-faint);background:none;border:none;cursor:pointer;font-family:var(--font);">\u00dcberspringen</button></div>';
+
+    } else if (this._ritualStep === 2) {
+      const termine = [];
+      (this._evStore()||[]).filter(ev => ev.date===today && ev.status!=='abgesagt').sort((a,b) => (a.startTime||'').localeCompare(b.startTime||'')).forEach(ev => {
+        termine.push({ ev, weltColor:(ev.welt||'priv')==='pro'?'#0A6B5E':'#4D5F33' });
+      });
+
+      body.innerHTML =
+        '<div style="padding:8px 0 16px;">'
+        + '<div style="font-size:1.1rem;font-weight:600;color:var(--c-text);margin-bottom:4px;">Dein Tag auf einen Blick</div>'
+        + '<div style="font-size:0.78rem;color:var(--c-faint);margin-bottom:16px;">'+termine.length+' Termin'+(termine.length!==1?'e':'')+' heute</div>'
+        + (termine.length > 0
+          ? '<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:16px;">'
+            + termine.map(({ev,weltColor}) => '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:8px;">'
+              + '<span style="font-size:0.68rem;font-family:var(--font-mono);color:var(--c-faint);flex-shrink:0;">'+(ev.startTime||'')+'</span>'
+              + '<span style="font-size:0.85rem;flex:1;">'+this._esc(ev.text||'')+'</span>'
+              + '<div style="width:6px;height:6px;border-radius:50%;background:'+weltColor+';flex-shrink:0;"></div></div>').join('')
+            + '</div>'
+          : '<div style="font-size:0.85rem;color:var(--c-faint);text-align:center;padding:16px 0;margin-bottom:16px;">Keine Termine heute \u2600\ufe0f</div>')
+        + '<div style="background:color-mix(in srgb,#0A6B5E 5%,var(--c-surface));border:1px solid rgba(10,107,94,0.15);border-radius:8px;padding:10px 12px;margin-bottom:16px;">'
+          + '<div style="font-size:0.78rem;color:#0A6B5E;font-weight:600;margin-bottom:2px;">💡 Vergiss die Triage nicht</div>'
+          + '<div style="font-size:0.72rem;color:var(--c-muted);">W\u00e4hle deine Aufgaben f\u00fcr heute \u2014 damit du zufrieden sein kannst.</div></div>'
+        + '<button onclick="WB._ritualFinish()" class="ritual-btn primary">Los geht\u0027s \u2192</button>'
+        + '</div>';
+
+    } else if (this._ritualStep === 3) {
+      body.innerHTML = '<div style="text-align:center;padding:24px 0;"><div style="font-size:2rem;margin-bottom:12px;">\u2713</div><div style="font-size:1rem;font-weight:600;color:var(--c-text);">Guten Start!</div></div>';
+      setTimeout(() => this._ritualClose(), 1200);
     }
-    const DAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
-    const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-    const dEl = document.getElementById('ritual-date');
-    if (dEl) dEl.textContent = DAYS[now.getDay()] + ', ' + now.getDate() + '. ' + MONTHS[now.getMonth()];
-    this._ritualGoto(0);
-    document.getElementById('wb-ritual-overlay').classList.add('open');
+  },
+
+  _ritualSkip() {
+    const store = this._ritualStore();
+    const key = this._ritualTodayKey();
+    if (!store[key]) store[key] = {};
+    store[key].morgendialogSkipped = true;
+    this.setDirty();
+    this._ritualClose();
+  },
+
+  _ritualClose() {
+    document.getElementById('wb-ritual-overlay')?.classList.remove('open');
+    const body = document.getElementById('wb-ritual-body');
+    if (body) body.style.display = 'none';
+    const oldCard = document.getElementById('ritual-card');
+    if (oldCard) oldCard.style.display = '';
+    this._ritualStep = 1;
+    try { this._ckRenderTagesseite(); } catch(e) {}
+  },
+
+
+  ritualOpen() {
+    const overlay = document.getElementById('wb-ritual-overlay');
+    if (!overlay) return;
+    // Altes ritual-card verstecken, neuen Body nutzen
+    const oldCard = document.getElementById('ritual-card');
+    if (oldCard) oldCard.style.display = 'none';
+    let body = document.getElementById('wb-ritual-body');
+    if (!body) {
+      body = document.createElement('div');
+      body.id = 'wb-ritual-body';
+      body.style.cssText = 'background:var(--c-surface);border-radius:var(--radius);padding:20px 16px;max-width:480px;width:calc(100% - 32px);margin:0 auto;max-height:85vh;overflow-y:auto;';
+      overlay.appendChild(body);
+    }
+    body.style.display = 'block';
+    overlay.classList.add('open');
+    this._ritualStep = 1;
+    this._ritualRenderMorgen();
   },
 
   // Öffnet Claude-Chat direkt und geht zu Step 2
@@ -13807,16 +13840,15 @@ const WB = {
     });
   },
 
-  _ritualSetEnergie(val) {
-    this._ritualEnergie = val;
-    document.querySelectorAll('.ritual-energie-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.val === val);
-    });
-    const step2 = document.getElementById('ritual-step-2');
-    if (step2 && step2.style.display !== 'none') {
-      this._ritualRenderCandidates();
-      this._ritualUpdateEnergieCounter();
-    }
+  _ritualSetEnergie(energie) {
+    const store = this._ritualStore();
+    const key = this._ritualTodayKey();
+    if (!store[key]) store[key] = {};
+    store[key].energie = energie;
+    store[key].energieTs = Date.now();
+    this.setDirty();
+    this._ritualStep = 2;
+    this._ritualRenderMorgen();
   },
 
   _ritualStep1Weiter() {
@@ -14148,45 +14180,14 @@ const WB = {
 
   // Abschluss: Fokus als mustToday markieren + Tag speichern
   _ritualFinish() {
-    this._ritualSelected.forEach(s => {
-      if (s.type === 'aufgabe') {
-        const n = this._nzStore().find(nz => (nz.planAufgaben || []).some(a => a.id === s.id));
-        const a = n && (n.planAufgaben || []).find(x => x.id === s.id);
-        if (a) a.mustToday = true;
-      } else if (s.type === 'projektaufgabe') {
-        const db = s.ctx === 'pro' ? this.dataPro : this.dataPriv;
-        const p = db && db.projects && db.projects[s.pKey];
-        const t = p && (p.tasks || []).find(x => x.id === s.id);
-        if (t) t.mustToday = true;
-      } else if (s.type === 'termin') {
-        const db = s.ctx === 'pro' ? this.dataPro : this.dataPriv;
-        const ev = db && (db.customEvents || []).find(x => x.id === s.id);
-        if (ev) ev.mustToday = true;
-      }
-      // freitext: nur im Ritual-Eintrag gespeichert (keine Aufgabe angelegt)
-    });
     const store = this._ritualStore();
-    if (store) {
-      store[this._ritualTodayKey()] = {
-        done: true,
-        skipped: false,
-        ts: Date.now(),
-        energie: this._ritualEnergie || null,
-        tagestyp: this._ritualTagestyp || null,
-        bodyBattery: this._ritualBodyBattery || null,
-        fokus: this._ritualSelected.map(s => ({
-          id: s.id, type: s.type, title: s.title,
-          meta: s.meta || '', vorhabenId: s.vorhabenId || '',
-          zeitblock: (this._ritualZeitbloecke || {})[s.id] || '',
-        })),
-      };
-    }
+    const key = this._ritualTodayKey();
+    if (!store[key]) store[key] = {};
+    store[key].morgendialogDone = true;
+    store[key].morgendialogDoneTs = Date.now();
     this.setDirty();
-    document.getElementById('wb-ritual-overlay').classList.remove('open');
-    const ts = document.getElementById('ck-tagesseite');
-    if (ts) ts.style.visibility = 'visible';
-    this.renderCockpit();
-    this._toast(this._ritualSelected.length ? 'Fokus gesetzt — guten Start!' : 'Tag begonnen');
+    this._ritualStep = 3;
+    this._ritualRenderMorgen();
   },
 
   // Aussprung
@@ -16965,6 +16966,16 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const tagTyp = dayInfo.label || '';
     el.innerHTML = '<div style="font-size:17px;font-weight:600;color:var(--c-text);">' + wt[d.getDay()] + ', ' + d.getDate() + '. ' + mo[d.getMonth()] + '</div>'
       + '<div style="font-size:11px;color:var(--c-faint);margin-top:2px;">' + d.getFullYear() + ' · KW' + kw + (tagTyp ? ' · <span style="color:var(--c-beruf);">' + this._esc(tagTyp) + '</span>' : '') + '</div>';
+  },
+
+
+  _ckRenderTriageBanner() {
+    const el = document.getElementById('ck-triage-banner');
+    if (!el) return;
+    el.style.display = 'block';
+    el.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:color-mix(in srgb,var(--c-beruf) 6%,var(--c-surface));border:1px solid rgba(10,107,94,0.15);border-radius:8px;">'
+      + '<div style="font-size:0.80rem;color:var(--c-beruf);">📋 Triage ausstehend</div>'
+      + '<button onclick="WB.triageOpen()" style="font-size:0.75rem;font-weight:600;padding:4px 10px;border-radius:6px;background:var(--c-beruf);color:#fff;border:none;cursor:pointer;font-family:var(--font);">Starten \u2192</button></div>';
   },
 
   _ckRenderNextBanner(dateStr, nowMin) {
