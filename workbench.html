@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.45.0 · Build 20260615-1230</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.45.0 · Build 20260615-1235</div>
     </div>
 
     <!-- Welt -->
@@ -7852,7 +7852,7 @@ body.fokus-modus body.fokus-modus
 const WB = {
 
   APP_VERSION: '5.45.0',
-  APP_BUILD:   '20260615-1230',
+  APP_BUILD:   '20260615-1235',
 
 
   // ══════════════════════════════════════════════════════
@@ -11670,71 +11670,6 @@ const WB = {
       + this._triagebtnBack('WB._triageGoto(3)');
   },
 
-  _triageFinish() {
-    const store = this._ritualStore();
-    const key   = this._ritualTodayKey();
-    if (store) {
-      if (!store[key]) store[key] = {};
-      store[key].doneB = true;
-      store[key].tsB   = Date.now();
-      store[key].done  = true;
-      const alle = [
-        ...this._triageSelected.map(s => ({
-          id: s.id, type: s.type, title: s.title,
-          meta: s.meta||'', vorhabenId: s.vorhabenId||'',
-          ctx: 'pro',
-          zeitblock: '',
-          startTime: this._triageZeiten?.[s.id] || '',
-        })),
-        ...(this._triagePrivatFokus ? [{
-          id: this._triagePrivatFokus.id, type: 'vorhaben-aufgabe',
-          title: this._triagePrivatFokus.title, meta: '',
-          vorhabenId: this._triagePrivatFokus.vorhabenId || '',
-          ctx: 'priv', zeitblock: '',
-        }] : [])
-      ];
-      store[key].fokus = alle;
-
-      // Datum aller Beruf-Fokus-Aufgaben auf heute setzen
-      const todayFix = new Date().toISOString().split('T')[0];
-      // startTime aus _triageZeiten in Aufgabe schreiben
-      this._triageSelected.forEach(s => {
-        if (s.type !== 'vorhaben-aufgabe' || !s.id) return;
-        const zeit = this._triageZeiten?.[s.id];
-        if (!zeit) return;
-        try {
-          const hit = this._vorhabenFindAufgabe(s.id);
-          if (hit) {
-            hit.aufgabe.startTime = zeit;
-            hit.vorhaben.geaendert = Date.now();
-          }
-        } catch(e) {}
-      });
-      alle.filter(f => f.ctx === 'pro' && f.id && f.vorhabenId).forEach(f => {
-        let gesetzt = false;
-        for (const w of ['pro','priv']) {
-          if (gesetzt) break;
-          const vhs = this._vorhabenStore(w) || [];
-          const vh  = vhs.find(v => v.id === f.vorhabenId);
-          if (!vh) continue;
-          for (const ms of (vh.meilensteine||[])) {
-            const a = (ms.aufgaben||[]).find(x => x.id === f.id);
-            if (a) {
-              a.datum = todayFix;
-              delete a.startTime;
-              vh.geaendert = Date.now();
-              gesetzt = true;
-              break;
-            }
-          }
-        }
-      });
-    }
-    this.setDirty();
-    this.triageClose();
-    this.renderCockpit();
-    this._toast(this._triageSelected.length ? '🎯 Fokus gesetzt — guten Start!' : 'Triage abgeschlossen');
-  },
 
   _triageReset() {
     const store = this._ritualStore();
@@ -12394,13 +12329,8 @@ const WB = {
     // Altes ritual-card verstecken, neuen Body nutzen
     const oldCard = document.getElementById('ritual-card');
     if (oldCard) oldCard.style.display = 'none';
-    let body = document.getElementById('wb-ritual-body');
-    if (!body) {
-      body = document.createElement('div');
-      body.id = 'wb-ritual-body';
-      body.style.cssText = 'background:var(--c-surface);border-radius:var(--radius);padding:20px 16px;max-width:480px;width:calc(100% - 32px);margin:0 auto;max-height:85vh;overflow-y:auto;';
-      overlay.appendChild(body);
-    }
+    const body = document.getElementById('wb-ritual-body');
+    if (!body) return;
     body.style.display = 'block';
     overlay.classList.add('open');
     this._ritualStep = 1;
@@ -32164,3 +32094,4 @@ if (new URLSearchParams(location.search).get('wake') === '1') {
 
 
 </html>
+  <div id="wb-ritual-body" style="display:none;background:var(--c-surface);border-radius:var(--radius);padding:20px 16px;max-width:480px;width:calc(100% - 32px);margin:0 auto;max-height:85vh;overflow-y:auto;"></div>
