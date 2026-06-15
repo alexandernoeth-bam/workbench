@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.44.1</title>
+<title>WorkBench 5.44.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.44.1 · Build 20260615-1010</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.44.2 · Build 20260615-1020</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.44.1</div>
+  <div class="wb-startup-tagline">v5.44.2</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7838,8 +7838,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.44.1',
-  APP_BUILD:   '20260615-1010',
+  APP_VERSION: '5.44.2',
+  APP_BUILD:   '20260615-1020',
 
 
   // ══════════════════════════════════════════════════════
@@ -16536,6 +16536,44 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     this._toast('\u2713 Chaos-Aufgabe angelegt');
   },
 
+
+  _blAufgabeOffen: {},
+  _blSektionOffen: {},
+
+  _blToggleAufgabe(aufgabeId, welt) {
+    this._blOpenDetail(aufgabeId, welt);
+  },
+
+  _blToggleSektion(id) {
+    if (!this._blSektionOffen) this._blSektionOffen = {};
+    this._blSektionOffen[id] = this._blSektionOffen[id] === false ? true : false;
+    const el = document.getElementById('bl-s-' + id);
+    if (el) el.style.display = this._blSektionOffen[id] === false ? 'none' : 'block';
+  },
+
+  _blOpenDetail(aufgabeId, welt) {
+    const store = this._vorhabenStore(welt) || [];
+    let vhId = null;
+    store.forEach(vh => {
+      (vh.meilensteine||[]).forEach(ms => {
+        if ((ms.aufgaben||[]).find(a => a.id === aufgabeId)) vhId = vh.id;
+      });
+    });
+    if (vhId) {
+      this.vorhabenOpen(vhId, welt);
+      setTimeout(() => { try { this._vhSetTab('meilensteine'); } catch(e) {} }, 150);
+    }
+  },
+
+  _blDeleteSchnell(id, ctx) {
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    if (!db?.quickItems) return;
+    db.quickItems = db.quickItems.filter(q => q.id !== id);
+    this.setDirty();
+    this.renderBacklog();
+  },
+
+
   renderBacklog() {
     const header = document.getElementById('backlog-header');
     const scroll = document.getElementById('backlog-scroll');
@@ -16543,62 +16581,129 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const today = new Date().toISOString().split('T')[0];
     const kwStart = this._kwStartDate();
     const kwEnd = this._kwEndDate();
-    header.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);">Backlog \u00b7 diese Woche</span></div>';
+    const kwNr = this._getCurrentKW ? this._getCurrentKW() : '';
 
-    const aufgabenGruppen = [];
+    // Alle aktiven Vorhaben-Aufgaben mit Checklisten
+    const aufgabenAlle = [];
     ['pro','priv'].forEach(welt => {
       const store = this._vorhabenStore(welt) || [];
       store.filter(v => (v.aktivitaet||'aktiv')==='aktiv').forEach(v => {
         (v.meilensteine||[]).forEach(ms => {
-          (ms.aufgaben||[]).filter(a => !a.done && (a.checklist||[]).length > 0
-              && ((a.datum && a.datum >= kwStart && a.datum <= kwEnd) || (a.datum && a.datum < kwStart) || !a.datum))
-            .forEach(a => {
-              const checks = a.checklist||[];
-              const doneCnt = checks.filter(c=>c.done).length;
-              const total = checks.length;
-              const offenCl = checks.map((c,i)=>({...c,_idx:i})).filter(c=>!c.done);
-              if (!offenCl.length) return;
-              aufgabenGruppen.push({a,v,welt,ms,doneCnt,total,offen:offenCl,
-                weltColor:welt==='pro'?'var(--c-beruf)':'#4D5F33',
-                weltLabel:welt==='pro'?'Beruf':'Privat'});
-            });
+          (ms.aufgaben||[]).filter(a => !a.done && (a.checklist||[]).length > 0).forEach(a => {
+            const checks = a.checklist||[];
+            const doneCnt = checks.filter(c=>c.done).length;
+            const total = checks.length;
+            const offen = checks.map((c,i)=>({...c,_idx:i})).filter(c=>!c.done);
+            if (!offen.length) return;
+            aufgabenAlle.push({a,v,welt,ms,doneCnt,total,offen,
+              weltColor:welt==='pro'?'#0A6B5E':'#4D5F33',
+              weltLabel:welt==='pro'?'Beruf':'Privat'});
+          });
         });
       });
     });
 
-    const alleSchnell = this._quickStoreAlle ? this._quickStoreAlle().filter(q=>!q.done) : [];
-    const ueberfaellig = alleSchnell.filter(x=>x.date&&x.date<today);
-    const heuteS = alleSchnell.filter(x=>x.date===today);
-    const geplant = alleSchnell.filter(x=>x.date&&x.date>today);
-    const ohneD = alleSchnell.filter(x=>!x.date);
+    const ueberfaellig = aufgabenAlle.filter(g => g.a.datum && g.a.datum < kwStart);
+    const dieseWoche = aufgabenAlle.filter(g => g.a.datum && g.a.datum >= kwStart && g.a.datum <= kwEnd);
+    const naechsteWochen = aufgabenAlle.filter(g => g.a.datum && g.a.datum > kwEnd);
+    const ohneDatum = aufgabenAlle.filter(g => !g.a.datum);
+
+    const getKWHinweis = (datum) => {
+      if (!datum) return '';
+      const d = new Date(datum+'T12:00:00');
+      const soy = new Date(d.getFullYear(),0,1);
+      return 'aus KW'+Math.ceil(((d-soy)/86400000+soy.getDay()+1)/7);
+    };
+
+    const alleSchnell = (this._quickStoreAlle ? this._quickStoreAlle() : []).filter(q => !q.done);
+    const schnellUeber = alleSchnell.filter(x => x.date && x.date < today);
+    const schnellHeute = alleSchnell.filter(x => x.date === today);
+    const schnellGeplant = alleSchnell.filter(x => x.date && x.date > today);
+    const schnellOffen = alleSchnell.filter(x => !x.date);
+    const posteingang = alleSchnell.filter(x => !x.date && !x.vorhabenId);
+
+    header.innerHTML = '<span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);">Backlog \u00b7 KW'+kwNr+'</span>';
+
+    const renderAK = (g, hinweis) => {
+      const pct = g.total ? Math.round(g.doneCnt/g.total*100) : 0;
+      let h = '<div style="border-bottom:0.5px solid rgba(0,0,0,0.06);">'
+        + '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px 4px;cursor:pointer;" onclick="WB._blToggleAufgabe(&quot;'+g.a.id+'&quot;,&quot;'+g.welt+'&quot;)">'
+        + '<div style="width:7px;height:7px;border-radius:50%;background:'+g.weltColor+';flex-shrink:0;"></div>'
+        + '<span style="font-size:0.85rem;font-weight:600;color:var(--c-text);flex:1;">'+this._esc(g.a.text)+'</span>'
+        + '<div style="display:flex;align-items:center;gap:5px;"><div style="width:36px;height:3px;background:var(--c-border);border-radius:2px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;border-radius:2px;background:'+g.weltColor+';"></div></div>'
+        + '<span style="font-size:0.62rem;font-weight:700;color:'+g.weltColor+';">'+g.doneCnt+'/'+g.total+'</span></div></div>'
+        + '<div style="font-size:0.68rem;color:var(--c-faint);padding:0 12px 5px 27px;">'+this._esc(g.v.titel)+' \u00b7 '+g.weltLabel+(g.a.datum?' \u00b7 '+g.a.datum:'')+(hinweis?' <span style="color:#B45309;">'+hinweis+'</span>':'')+'</div>'
+        + '<div>';
+      g.offen.forEach(c => {
+        const typ = c.typ||'schritt';
+        h += '<div style="display:flex;align-items:center;gap:7px;padding:5px 12px 5px 27px;border-bottom:0.5px solid rgba(0,0,0,0.03);">'
+          + '<span style="font-size:0.60rem;font-weight:700;flex-shrink:0;width:14px;text-align:center;color:'+(typ==='reibung'?'#B45309':g.weltColor)+';">'+(typ==='reibung'?'🔧':'\u2192')+'</span>'
+          + '<div style="width:13px;height:13px;border-radius:50%;border:1.5px solid rgba(0,0,0,0.15);background:#fff;flex-shrink:0;cursor:pointer;" onclick="event.stopPropagation();WB._ckBacklogCheckCl(&quot;'+g.a.id+'&quot;,'+c._idx+',&quot;'+g.welt+'&quot;)"></div>'
+          + '<span style="font-size:0.80rem;color:var(--c-text);flex:1;cursor:pointer;" onclick="WB._blOpenDetail(&quot;'+g.a.id+'&quot;,&quot;'+g.welt+'&quot;)">'+this._esc(c.text)+'</span></div>';
+      });
+      h += '</div></div>';
+      return h;
+    };
+
+    const renderSek = (icon, label, hint, inhalt, id, startOpen) => {
+      const isOpen = this._blSektionOffen?.[id] !== false ? (startOpen !== false) : false;
+      return '<div style="margin-bottom:8px;"><div style="display:flex;align-items:center;gap:8px;padding:7px 12px 5px;cursor:pointer;user-select:none;background:rgba(0,0,0,0.03);border-radius:8px 8px 0 0;" onclick="WB._blToggleSektion(&quot;'+id+'&quot;)">'
+        + '<span style="font-size:13px;">'+icon+'</span>'
+        + '<span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);flex:1;">'+label+'</span>'
+        + (hint?'<span style="font-size:0.62rem;color:var(--c-faint);font-style:italic;">'+hint+'</span>':'')
+        + '<span style="font-size:10px;color:var(--c-faint);">\u25be</span></div>'
+        + '<div id="bl-s-'+id+'" style="'+(isOpen?'':'display:none;')+'background:var(--c-surface);border:1px solid var(--c-border);border-top:none;border-radius:0 0 8px 8px;overflow:hidden;">'+inhalt+'</div></div>';
+    };
 
     let h = '';
-    aufgabenGruppen.forEach(g => {
-      const pct = g.total ? Math.round(g.doneCnt/g.total*100) : 0;
-      h += '<div class="ck-backlog-aufgabe"><div class="ck-backlog-aufgabe-header">'
-        + '<div style="width:7px;height:7px;border-radius:50%;background:'+g.weltColor+';flex-shrink:0;"></div>'
-        + '<span class="ck-backlog-aufgabe-name">'+this._esc(g.a.text)+'</span>'
-        + '<div style="display:flex;align-items:center;gap:5px;"><div style="width:36px;height:3px;background:var(--c-border);border-radius:2px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;border-radius:2px;background:'+g.weltColor+';"></div></div><span style="font-size:0.62rem;font-weight:700;color:'+g.weltColor+';">'+g.doneCnt+'/'+g.total+'</span></div></div>'
-        + '<div class="ck-backlog-aufgabe-meta">'+this._esc(g.v.titel)+' \u00b7 '+g.weltLabel+(g.a.datum?' \u00b7 '+g.a.datum:'')+'</div>';
-      g.offen.forEach(c => {
-        h += '<div class="ck-backlog-cl-item"><span style="font-size:0.60rem;font-weight:700;flex-shrink:0;width:14px;text-align:center;color:'+((c.typ||'schritt')==='reibung'?'#B45309':'#0A6B5E')+';">'+((c.typ||'schritt')==='reibung'?'🔧':'\u2192')+'</span><div class="ck-backlog-cl-chk" onclick="WB._ckBacklogCheckCl(&quot;'+g.a.id+'&quot;,'+c._idx+',&quot;'+g.welt+'&quot;)"></div><span class="ck-backlog-cl-text">'+this._esc(c.text)+'</span></div>';
-      });
-      h += '</div>';
-    });
 
-    if (alleSchnell.length) {
-      const renderGruppe = (label, gruppe) => {
-        if (!gruppe.length) return '';
-        return '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);padding:5px 12px 3px;">'+label+'</div>'
-          + gruppe.map(x => '<div class="ck-backlog-simple-item"><div class="ck-backlog-simple-chk" onclick="WB._ckBacklogCheckSchnell(&quot;'+x.id+'&quot;,&quot;'+x._ctx+'&quot;)"></div><span class="ck-backlog-simple-text" style="cursor:pointer;" onclick="event.stopPropagation();WB._quickDetail(&quot;'+x.id+'&quot;)">'+this._esc(x.text||'')+'</span>'+(x.date&&x.date!==today?'<span style="font-size:0.65rem;color:var(--c-faint);font-family:var(--font-mono);">'+x.date+'</span>':'')+'<span class="ck-backlog-badge" style="background:'+(x._ctx==='pro'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+(x._ctx==='pro'?'var(--c-beruf)':'#4D5F33')+';">'+(x._ctx==='pro'?'Beruf':'Privat')+'</span></div>').join('');
-      };
-      h += '<div class="ck-backlog-sektion"><div class="ck-backlog-sektion-header"><span class="ck-backlog-sektion-icon">\u26a1</span><span class="ck-backlog-sektion-label">Schnell-Erinnerungen</span><span style="font-size:0.65rem;font-weight:700;color:var(--c-faint);">'+alleSchnell.length+' offen</span></div><div>'
-        + renderGruppe('\u00dcberf\u00e4llig', ueberfaellig)
-        + renderGruppe('Heute', heuteS)
-        + renderGruppe('Geplant', geplant)
-        + renderGruppe('Offen', ohneD)
-        + '</div></div>';
+    // 1. Überfällig + ohne Datum
+    if (ueberfaellig.length || ohneDatum.length) {
+      const alle = [...ueberfaellig, ...ohneDatum];
+      h += renderSek('\u26a0', '\u00dcberf\u00e4llig', '', alle.map(g => renderAK(g, g.a.datum ? getKWHinweis(g.a.datum) : '')).join(''), 'ueberfaellig', true);
     }
+
+    // 2. Diese Woche
+    if (dieseWoche.length) {
+      h += renderSek('📋', 'Diese Woche \u00b7 KW'+kwNr, '', dieseWoche.map(g => renderAK(g,'')).join(''), 'diesewoche', true);
+    }
+
+    // 3. Nächste Wochen
+    if (naechsteWochen.length) {
+      const nw = naechsteWochen.map(g => '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:0.5px solid rgba(0,0,0,0.05);cursor:pointer;" onclick="WB._blOpenDetail(&quot;'+g.a.id+'&quot;,&quot;'+g.welt+'&quot;)">'
+        + '<div style="width:6px;height:6px;border-radius:50%;background:'+g.weltColor+';opacity:0.5;flex-shrink:0;"></div>'
+        + '<span style="font-size:0.82rem;color:var(--c-muted);flex:1;">'+this._esc(g.a.text)+'</span>'
+        + '<span style="font-size:0.65rem;color:var(--c-faint);font-family:var(--font-mono);">'+g.a.datum+'</span>'
+        + '<span style="font-size:0.60rem;padding:1px 5px;border-radius:4px;font-weight:600;color:#fff;background:'+g.weltColor+';">'+g.weltLabel+'</span></div>').join('');
+      h += renderSek('🔭', 'N\u00e4chste Wochen', '', nw, 'naechste', false);
+    }
+
+    // 4. Posteingang
+    if (posteingang.length) {
+      const pe = posteingang[0];
+      const rest = posteingang.length - 1;
+      const pb = '<div style="padding:8px 12px;"><div style="font-size:0.85rem;color:var(--c-text);margin-bottom:8px;">'+this._esc(pe.text||'')+'</div>'
+        + '<div style="display:flex;gap:6px;"><button onclick="WB._quickAdd()" style="font-size:0.72rem;padding:4px 10px;border-radius:6px;border:1px solid rgba(10,107,94,0.3);background:none;color:#0A6B5E;cursor:pointer;font-family:var(--font);">Zuordnen \u2192</button>'
+        + '<button onclick="WB._blDeleteSchnell(&quot;'+pe.id+'&quot;,&quot;'+pe._ctx+'&quot;)" style="font-size:0.72rem;padding:4px 10px;border-radius:6px;border:1px solid var(--c-border);background:none;color:var(--c-faint);cursor:pointer;font-family:var(--font);">\u2715 l\u00f6schen</button></div></div>'
+        + (rest>0?'<div style="padding:5px 12px;font-size:0.72rem;color:var(--c-faint);font-style:italic;border-top:0.5px dashed rgba(0,0,0,0.08);">\u2500\u2500 '+rest+' weitere \u2500\u2500</div>':'');
+      h += renderSek('📥', 'Posteingang', 'heute 1 verarbeiten', pb, 'posteingang', true);
+    }
+
+    // 5. Schnell-Erinnerungen
+    const renderSG = (label, gruppe) => {
+      if (!gruppe.length) return '';
+      return '<div style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);padding:5px 12px 3px;">'+label+'</div>'
+        + gruppe.map(x => '<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:0.5px solid rgba(0,0,0,0.04);">'
+          + '<div style="width:13px;height:13px;border-radius:50%;border:1.5px solid rgba(0,0,0,0.15);background:#fff;flex-shrink:0;cursor:pointer;" onclick="WB._ckBacklogCheckSchnell(&quot;'+x.id+'&quot;,&quot;'+x._ctx+'&quot;)"></div>'
+          + '<span style="font-size:0.80rem;color:var(--c-text);flex:1;">'+this._esc(x.text||'')+'</span>'
+          + (x.date&&x.date!==today?'<span style="font-size:0.65rem;color:var(--c-faint);font-family:var(--font-mono);">'+x.date+'</span>':'')
+          + '<span style="font-size:0.60rem;padding:1px 5px;border-radius:4px;font-weight:600;background:'+(x._ctx==='pro'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+(x._ctx==='pro'?'#0A6B5E':'#4D5F33')+';">'+(x._ctx==='pro'?'Beruf':'Privat')+'</span></div>').join('');
+    };
+    if (alleSchnell.length) {
+      const sb = renderSG('\u00dcberf\u00e4llig', schnellUeber) + renderSG('Heute', schnellHeute) + renderSG('Geplant', schnellGeplant) + renderSG('Offen', schnellOffen);
+      h += renderSek('\u26a1', 'Schnell-Erinnerungen', '', sb, 'schnell', false);
+    }
+
     scroll.innerHTML = h || '<div style="text-align:center;padding:32px;color:var(--c-faint);font-size:0.85rem;">Backlog ist leer.</div>';
   },
 
