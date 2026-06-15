@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.44.5</title>
+<title>WorkBench 5.44.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.44.5 · Build 20260615-1050</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.44.6 · Build 20260615-1100</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.44.5</div>
+  <div class="wb-startup-tagline">v5.44.6</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7052,7 +7052,20 @@ body.fokus-modus body.fokus-modus
         </div>
         <label style="display:flex;align-items:center;cursor:pointer;gap:8px;">
           <input type="checkbox" id="s-asst-cockpit-show"
-            onchange="WB.saveSetting('assistCockpitShow', this.checked); WB.renderCockpit();"
+            onchange="WB.saveSetting('assistCockpitShow', this.checked); WB.
+    // SYNC-Fix: Sync-State aus geladenen Daten initialisieren
+    if (!this._sync) this._sync = {};
+    ['pro','priv'].forEach(_sCtx => {
+      if (!this._sync[_sCtx]) this._sync[_sCtx] = {};
+      const _sDb = _sCtx==='pro' ? this.dataPro : this.dataPriv;
+      if (_sDb?.settings?._syncLastUpdated && !this._sync[_sCtx].last_updated) {
+        this._sync[_sCtx].last_updated = _sDb.settings._syncLastUpdated;
+      }
+      if (_sDb?.settings?._syncRevision && !this._sync[_sCtx].revision) {
+        this._sync[_sCtx].revision = _sDb.settings._syncRevision;
+      }
+    });
+    renderCockpit();"
             style="width:16px;height:16px;cursor:pointer;accent-color:var(--c-beruf);">
           <span style="font-size:0.82rem;color:var(--c-muted);">Anzeigen</span>
         </label>
@@ -7838,8 +7851,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.44.5',
-  APP_BUILD:   '20260615-1050',
+  APP_VERSION: '5.44.6',
+  APP_BUILD:   '20260615-1100',
 
 
   // ══════════════════════════════════════════════════════
@@ -9639,6 +9652,16 @@ const WB = {
       const token  = this._oauthToken;
       const fileId = await this._oauthFindOrCreateFile(token, ctx);
       const result = this._syncPrepareExport(ctx);
+    // SYNC-Fix: Timestamp+Revision in DB speichern für App-Reload
+    try {
+      const _syncNow = new Date().toISOString();
+      const _syncDb = ctx==='pro' ? this.dataPro : this.dataPriv;
+      if (_syncDb?.settings) {
+        _syncDb.settings._syncLastUpdated = _syncNow;
+        _syncDb.settings._syncRevision = this._sync[ctx]?.revision || 0;
+      }
+    } catch(_se) {}
+
       if (!result) { this._toast('Keine Daten zum Speichern'); return; }
 
       const upload = await fetch(
@@ -9793,27 +9816,37 @@ const WB = {
     }, 60000);
   },
 
-  async _autoRefreshCheck(ctx, token) {
-    const fileId = this._oauthDriveFileIds[ctx];
-    if (!fileId) return;
-
-    // Nur Metadaten laden (kein volles JSON)
-    const r = await fetch(
-      this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime',
-      { headers: { Authorization: 'Bearer ' + token } }
-    );
-    if (!r.ok) return;
-    const meta = await r.json();
-    const driveModified = new Date(meta.modifiedTime).getTime();
-    const localUpdated  = this._sync[ctx]?.last_updated
-      ? new Date(this._sync[ctx].last_updated).getTime()
-      : 0;
-
-    if (driveModified > localUpdated + 30000) { // 30s Puffer
-      console.log('[AutoRefresh] Neue Version in Drive für', ctx, '— lade...');
-      await this.oauthSyncDownload(ctx);
-      this._toast('✓ ' + (ctx==='pro'?'Beruf':'Privat') + ' automatisch aktualisiert');
-    }
+  async _autoRefreshCheck(ctx) {
+    if (!this._sync?.[ctx]?.fileId || !this._sync[ctx]?.token) return;
+    const fileId = this._sync[ctx].fileId;
+    const token = this._sync[ctx].token;
+    try {
+      const r = await fetch(this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime', { headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) return;
+      const meta = await r.json();
+      const driveModified = new Date(meta.modifiedTime).getTime();
+      const localUpdated = this._sync[ctx]?.last_updated ? new Date(this._sync[ctx].last_updated).getTime() : 0;
+      // Nur prüfen wenn lokale Daten vorhanden
+      const hasLocal = ctx === 'pro' ? !!this.dataPro : !!this.dataPriv;
+      if (!hasLocal) return;
+      // Mindest-Puffer 60s
+      if (driveModified > localUpdated + 60000) {
+        const r2 = await fetch(this.DRIVE_API + '/files/' + fileId + '?alt=media', { headers: { Authorization: 'Bearer ' + token } });
+        if (!r2.ok) return;
+        const driveData = await r2.json();
+        const driveRev = driveData?.settings?._syncRevision || 0;
+        const localRev = this._sync[ctx]?.revision || 0;
+        if (driveRev > localRev) {
+          if (this.isDirty) {
+            const ok = confirm('Drive hat eine neuere Version (Rev.' + driveRev + ').\nDu hast lokale \u00c4nderungen.\nTrotzdem von Drive laden?');
+            if (!ok) return;
+          }
+          console.log('[AutoRefresh] Drive Rev.' + driveRev + ' > lokal Rev.' + localRev);
+          await this.oauthSyncDownload(ctx);
+          this._toast('\u2713 ' + (ctx==='pro'?'Beruf':'Privat') + ' aktualisiert (Rev.' + driveRev + ')');
+        }
+      }
+    } catch(e) { console.error('[AutoRefresh]', e); }
   },
 
   // ══════════════════════════════════════════════════════
@@ -31514,7 +31547,7 @@ store.push(item);
         clearTimeout(this._notifQueueTimer);
         this._notifQueueTimer = setTimeout(() => {
           try { this._notifLastBuild = Date.now(); this._notifBuildQueue(); } catch(e) {}
-        }, 5000);
+        }, 3000);
       }
       // Auto-Upload in Drive wenn angemeldet
       if (this._oauthTokenValid()) {
