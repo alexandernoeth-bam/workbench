@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.43.6 · Build 20260615-0945</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.43.6 · Build 20260615-0950</div>
     </div>
 
     <!-- Welt -->
@@ -7911,7 +7911,7 @@ body.fokus-modus body.fokus-modus
 const WB = {
 
   APP_VERSION: '5.43.6',
-  APP_BUILD:   '20260615-0945',
+  APP_BUILD:   '20260615-0950',
 
 
   // ══════════════════════════════════════════════════════
@@ -16093,8 +16093,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _evSetStatus(evId, ctx, status) {
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    const ev = (db?.customEvents||[]).find(e => String(e.id) === String(evId));
+    // Events immer in dataPriv.customEvents
+    const ev = (this._evStore()||[]).find(e => String(e.id) === String(evId));
     if (!ev) return;
     ev.status = status;
     if (status === 'abgesagt' || status === 'erledigt') ev.done = true;
@@ -16145,8 +16145,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
   },
 
   _evVerschieben(evId, ctx) {
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    const ev = (db?.customEvents||[]).find(e => String(e.id) === String(evId));
+    // Events immer in dataPriv.customEvents
+    const ev = (this._evStore()||[]).find(e => String(e.id) === String(evId));
     if (!ev) return;
     const morgen = new Date(); morgen.setDate(morgen.getDate() + 1);
     const neuesDatum = prompt('Neues Datum (JJJJ-MM-TT):', morgen.toISOString().split('T')[0]);
@@ -18373,13 +18373,9 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _ckTerminOptionen(evId, ctx) {
     document.getElementById('ck-termin-opts')?.remove();
-    const db = ctx === 'pro' ? WB.dataPro : WB.dataPriv;
-    const ev = (db?.customEvents||[]).find(e => String(e.id) === String(evId));
-    if (!ev) {
-      const ids = (db?.customEvents||[]).map(e => String(e.id)).join(', ');
-      WB._toast('Nicht gefunden: ' + evId + ' in ' + ctx + ' (' + (db?.customEvents||[]).length + ' Events). IDs: ' + ids.substring(0,100));
-      return;
-    }
+    // Alle Events leben in dataPriv.customEvents (welt-Feld = Zugehörigkeit)
+    const ev = (WB._evStore()||[]).find(e => String(e.id) === String(evId));
+    if (!ev) { WB._toast('Event nicht gefunden'); return; }
     const name = ev.text || 'Termin';
 
     const sheet = document.createElement('div');
