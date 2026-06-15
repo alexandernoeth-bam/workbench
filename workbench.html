@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.45.2</title>
+<title>WorkBench 5.46.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.45.2 · Build 20260615-1300</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.46.0 · Build 20260615-1310</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.45.2</div>
+  <div class="wb-startup-tagline">v5.46.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7851,8 +7851,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.45.2',
-  APP_BUILD:   '20260615-1300',
+  APP_VERSION: '5.46.0',
+  APP_BUILD:   '20260615-1310',
 
 
   // ══════════════════════════════════════════════════════
@@ -16470,9 +16470,10 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _blToggleSektion(id) {
     if (!this._blSektionOffen) this._blSektionOffen = {};
-    this._blSektionOffen[id] = this._blSektionOffen[id] === false ? true : false;
+    const aktuell = id in this._blSektionOffen ? this._blSektionOffen[id] : true;
+    this._blSektionOffen[id] = !aktuell;
     const el = document.getElementById('bl-s-' + id);
-    if (el) el.style.display = this._blSektionOffen[id] === false ? 'none' : 'block';
+    if (el) el.style.display = this._blSektionOffen[id] ? 'block' : 'none';
   },
 
   _blOpenDetail(aufgabeId, welt) {
@@ -16515,45 +16516,72 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const kwStart = this._kwStartDate();
     const kwEnd = this._kwEndDate();
     const kwNr = this._getCurrentKW ? this._getCurrentKW() : '';
-    const aufgabenAlle = [];
+    const aufgabenMitCL = [];
+    const aufgabenOhneCL = [];
     ['pro','priv'].forEach(welt => {
       const store = this._vorhabenStore(welt)||[];
       store.filter(v=>(v.aktivitaet||'aktiv')==='aktiv').forEach(v=>{
         (v.meilensteine||[]).forEach(ms=>{
-          (ms.aufgaben||[]).filter(a=>!a.done&&(a.checklist||[]).length>0).forEach(a=>{
-            const checks=a.checklist||[];const doneCnt=checks.filter(c=>c.done).length;const total=checks.length;
-            const offen=checks.map((c,i)=>({...c,_idx:i})).filter(c=>!c.done);
-            if(!offen.length) return;
-            aufgabenAlle.push({a,v,welt,ms,doneCnt,total,offen,weltColor:welt==='pro'?'var(--c-beruf)':'#4D5F33',weltLabel:welt==='pro'?'Beruf':'Privat'});
+          (ms.aufgaben||[]).filter(a=>!a.done).forEach(a=>{
+            const checks=a.checklist||[];const offenCL=checks.map((c,i)=>({...c,_idx:i})).filter(c=>!c.done);
+            const doneCnt=checks.filter(c=>c.done).length;const total=checks.length;
+            const weltColor=welt==='pro'?'var(--c-beruf)':'#4D5F33';const weltLabel=welt==='pro'?'Beruf':'Privat';
+            if(total>0&&offenCL.length>0) aufgabenMitCL.push({a,v,welt,ms,doneCnt,total,offen:offenCL,weltColor,weltLabel});
+            else if(total===0) aufgabenOhneCL.push({a,v,welt,ms,weltColor,weltLabel});
           });
         });
       });
     });
-    const ueberfaellig=aufgabenAlle.filter(g=>g.a.datum&&g.a.datum<kwStart);
-    const dieseWoche=aufgabenAlle.filter(g=>g.a.datum&&g.a.datum>=kwStart&&g.a.datum<=kwEnd);
-    const naechsteWochen=aufgabenAlle.filter(g=>g.a.datum&&g.a.datum>kwEnd);
-    const ohneDatum=aufgabenAlle.filter(g=>!g.a.datum);
     const alleSchnell=(this._quickStoreAlle?this._quickStoreAlle():[]).filter(q=>!q.done);
+    const schnellOhneDatumOhneVh=alleSchnell.filter(x=>!x.date&&!x.vorhabenId);
+    const akUeberfaellig=aufgabenMitCL.filter(g=>g.a.datum&&g.a.datum<kwStart);
+    const akDieseKW=aufgabenMitCL.filter(g=>g.a.datum&&g.a.datum>=kwStart&&g.a.datum<=kwEnd);
+    const akGeplant=aufgabenMitCL.filter(g=>g.a.datum&&g.a.datum>kwEnd);
+    const akOhneDatum=aufgabenMitCL.filter(g=>!g.a.datum);
     const schnellUeber=alleSchnell.filter(x=>x.date&&x.date<today);
-    const schnellHeute=alleSchnell.filter(x=>x.date===today);
-    const schnellGeplant=alleSchnell.filter(x=>x.date&&x.date>today);
-    const schnellOffen=alleSchnell.filter(x=>!x.date);
-    const posteingang=schnellOffen.filter(x=>!x.vorhabenId);
-    const getKWHinweis=datum=>{if(!datum)return'';const d=new Date(datum+'T12:00:00');const s=new Date(d.getFullYear(),0,1);return'aus KW'+Math.ceil(((d-s)/86400000+s.getDay()+1)/7);};
+    const schnellDieseKW=alleSchnell.filter(x=>x.date&&x.date>=kwStart&&x.date<=kwEnd);
+    const schnellGeplant=alleSchnell.filter(x=>x.date&&x.date>kwEnd);
+    const sortByDatum=arr=>[...arr].sort((a,b)=>{const da=a.a?.datum||a.date||'';const db_=b.a?.datum||b.date||'';return da<db_?-1:da>db_?1:0;});
+
+    const renderSek=(icon,label,hint,body,id,startOpen)=>{
+      if(!this._blSektionOffen) this._blSektionOffen={};
+      const isOpen=id in this._blSektionOffen?this._blSektionOffen[id]!==false:startOpen!==false;
+      return '<div style="margin-bottom:8px;"><div style="display:flex;align-items:center;gap:8px;padding:7px 12px 5px;cursor:pointer;user-select:none;background:rgba(0,0,0,0.03);border-radius:8px 8px 0 0;" onclick="WB._blToggleSektion(&quot;'+id+'&quot;)"><span style="font-size:13px;">'+icon+'</span><span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);flex:1;">'+label+'</span>'+(hint?'<span style="font-size:0.62rem;color:var(--c-faint);font-style:italic;">'+hint+'</span>':'')+'<span style="font-size:10px;color:var(--c-faint);">\u25be</span></div><div id="bl-s-'+id+'" style="'+(isOpen?'':'display:none;')+'background:var(--c-surface);border:1px solid var(--c-border);border-top:none;border-radius:0 0 8px 8px;overflow:hidden;">'+body+'</div></div>';
+    };
+    const renderUGHeader=label=>'<div style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);padding:6px 12px 3px;background:rgba(0,0,0,0.02);border-bottom:0.5px solid rgba(0,0,0,0.05);">'+label+'</div>';
+    const renderAKKompakt=g=>{
+      const pill='<span style="font-size:0.60rem;font-weight:700;padding:2px 7px;border-radius:10px;background:'+g.weltColor+';color:#fff;white-space:nowrap;">'+g.offen.length+' offen</span>';
+      const datumTeil=g.a.datum?'<span style="font-size:0.65rem;color:var(--c-faint);font-family:var(--font-mono);">'+g.a.datum+'</span>':'';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:0.5px solid rgba(0,0,0,0.05);cursor:pointer;" onclick="WB._blOpenDetail(&quot;'+g.a.id+'&quot;,&quot;'+g.welt+'&quot;)"><div style="width:7px;height:7px;border-radius:50%;background:'+g.weltColor+';flex-shrink:0;"></div><span style="font-size:0.95rem;font-weight:600;color:var(--c-text);flex:1;">'+this._esc(g.a.text)+'</span>'+datumTeil+pill+'</div><div style="font-size:0.68rem;color:var(--c-faint);padding:0 12px 6px 27px;">'+this._esc(g.v.titel)+' \u00b7 '+g.weltLabel+'</div>';
+    };
+    const renderSchnell=x=>'<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:0.5px solid rgba(0,0,0,0.04);"><div style="width:13px;height:13px;border-radius:50%;border:1.5px solid rgba(0,0,0,0.15);background:#fff;flex-shrink:0;cursor:pointer;" onclick="WB._ckBacklogCheckSchnell(&quot;'+x.id+'&quot;,&quot;'+x._ctx+'&quot;)"></div><span style="font-size:0.95rem;color:var(--c-text);flex:1;">'+this._esc(x.text||'')+'</span>'+(x.date?'<span style="font-size:0.65rem;color:var(--c-faint);font-family:var(--font-mono);">'+x.date+'</span>':'')+'<span style="font-size:0.60rem;padding:1px 5px;border-radius:4px;font-weight:600;background:'+(x._ctx==='pro'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+(x._ctx==='pro'?'var(--c-beruf)':'#4D5F33')+';">'+(x._ctx==='pro'?'Beruf':'Privat')+'</span></div>';
+    const renderAKOhneCL=g=>'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:0.5px solid rgba(0,0,0,0.05);cursor:pointer;opacity:0.7;" onclick="WB._blOpenDetail(&quot;'+g.a.id+'&quot;,&quot;'+g.welt+'&quot;)"><div style="width:7px;height:7px;border-radius:50%;border:1.5px dashed '+g.weltColor+';flex-shrink:0;"></div><span style="font-size:0.95rem;color:var(--c-text);flex:1;">'+this._esc(g.a.text)+'</span><span style="font-size:0.60rem;padding:1px 5px;border-radius:4px;font-weight:600;background:rgba(0,0,0,0.06);color:var(--c-faint);">keine Checkliste</span></div><div style="font-size:0.68rem;color:var(--c-faint);padding:0 12px 6px 27px;">'+this._esc(g.v.titel)+' \u00b7 '+g.weltLabel+'</div>';
+    const renderPosteingang=x=>'<div style="padding:8px 12px;border-bottom:0.5px solid rgba(0,0,0,0.05);"><div style="font-size:0.95rem;color:var(--c-text);margin-bottom:6px;">'+this._esc(x.text||'')+'</div><div style="display:flex;gap:6px;"><button onclick="WB._blPostZuordnen(&quot;'+x.id+'&quot;,&quot;'+x._ctx+'&quot;)" style="font-size:0.72rem;padding:4px 10px;border-radius:6px;border:1px solid rgba(10,107,94,0.3);background:none;color:var(--c-beruf);cursor:pointer;font-family:var(--font);">Zuordnen \u2192</button><button onclick="WB._blDeleteSchnell(&quot;'+x.id+'&quot;,&quot;'+x._ctx+'&quot;)" style="font-size:0.72rem;padding:4px 10px;border-radius:6px;border:1px solid var(--c-border);background:none;color:var(--c-faint);cursor:pointer;font-family:var(--font);">\u2715 l\u00f6schen</button></div></div>';
+
     header.innerHTML='<span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);">Backlog \u00b7 KW'+kwNr+'</span>';
-    const renderAK=(g,hinweis)=>{const pct=g.total?Math.round(g.doneCnt/g.total*100):0;let h='<div style="border-bottom:0.5px solid rgba(0,0,0,0.06);"><div style="display:flex;align-items:center;gap:8px;padding:8px 12px 4px;cursor:pointer;" onclick="WB._blOpenDetail(&quot;'+g.a.id+'&quot;,&quot;'+g.welt+'&quot;)"><div style="width:7px;height:7px;border-radius:50%;background:'+g.weltColor+';flex-shrink:0;"></div><span style="font-size:0.95rem;font-weight:600;color:var(--c-text);flex:1;">'+this._esc(g.a.text)+'</span><div style="display:flex;align-items:center;gap:5px;"><div style="width:36px;height:3px;background:var(--c-border);border-radius:2px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+g.weltColor+';border-radius:2px;"></div></div><span style="font-size:0.62rem;font-weight:700;color:'+g.weltColor+';">'+g.doneCnt+'/'+g.total+'</span></div></div><div style="font-size:0.68rem;color:var(--c-faint);padding:0 12px 5px 27px;">'+this._esc(g.v.titel)+' \u00b7 '+g.weltLabel+(g.a.datum?' \u00b7 '+g.a.datum:'')+(hinweis?' <span style="color:#B45309;font-style:italic;">'+hinweis+'</span>':'')+'</div>';
-    g.offen.forEach(c=>{const typ=c.typ||'schritt';h+='<div style="display:flex;align-items:center;gap:7px;padding:5px 12px 5px 27px;border-bottom:0.5px solid rgba(0,0,0,0.03);"><span style="font-size:0.60rem;font-weight:700;flex-shrink:0;width:14px;text-align:center;color:'+(typ==='reibung'?'#B45309':g.weltColor)+';">'+(typ==='reibung'?'🔧':'\u2192')+'</span><div style="width:13px;height:13px;border-radius:50%;border:1.5px solid rgba(0,0,0,0.15);background:#fff;flex-shrink:0;cursor:pointer;" onclick="event.stopPropagation();WB._ckBacklogCheckCl(&quot;'+g.a.id+'&quot;,'+c._idx+',&quot;'+g.welt+'&quot;)"></div><span style="font-size:0.95rem;color:var(--c-text);flex:1;cursor:pointer;" onclick="WB._blOpenDetail(&quot;'+g.a.id+'&quot;,&quot;'+g.welt+'&quot;)">'+this._esc(c.text)+'</span></div>';});
-    h+='</div>';return h;};
-    const renderSek=(icon,label,hint,body,id,startOpen)=>{const isOpen=this._blSektionOffen?.[id]!==false?startOpen!==false:false;return'<div style="margin-bottom:8px;"><div style="display:flex;align-items:center;gap:8px;padding:7px 12px 5px;cursor:pointer;user-select:none;background:rgba(0,0,0,0.03);border-radius:8px 8px 0 0;" onclick="WB._blToggleSektion(&quot;'+id+'&quot;)"><span style="font-size:13px;">'+icon+'</span><span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);flex:1;">'+label+'</span>'+(hint?'<span style="font-size:0.62rem;color:var(--c-faint);font-style:italic;">'+hint+'</span>':'')+'<span style="font-size:10px;color:var(--c-faint);">\u25be</span></div><div id="bl-s-'+id+'" style="'+(isOpen?'':'display:none;')+'background:var(--c-surface);border:1px solid var(--c-border);border-top:none;border-radius:0 0 8px 8px;overflow:hidden;">'+body+'</div></div>';};
-    const renderSG=(label,gruppe)=>{if(!gruppe.length)return'';return'<div style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);padding:5px 12px 3px;">'+label+'</div>'+gruppe.map(x=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:0.5px solid rgba(0,0,0,0.04);"><div style="width:13px;height:13px;border-radius:50%;border:1.5px solid rgba(0,0,0,0.15);background:#fff;flex-shrink:0;cursor:pointer;" onclick="WB._ckBacklogCheckSchnell(&quot;'+x.id+'&quot;,&quot;'+x._ctx+'&quot;)"></div><span style="font-size:0.95rem;color:var(--c-text);flex:1;">'+this._esc(x.text||'')+'</span>'+(x.date&&x.date!==today?'<span style="font-size:0.65rem;color:var(--c-faint);font-family:var(--font-mono);">'+x.date+'</span>':'')+'<span style="font-size:0.60rem;padding:1px 5px;border-radius:4px;font-weight:600;background:'+(x._ctx==='pro'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+(x._ctx==='pro'?'var(--c-beruf)':'#4D5F33')+';">'+(x._ctx==='pro'?'Beruf':'Privat')+'</span></div>').join('');};
     let h='';
-    if(ueberfaellig.length){h+=renderSek('\u26a0','\u00dcberf\u00e4llig','',ueberfaellig.map(g=>renderAK(g,getKWHinweis(g.a.datum))).join(''),'ueberfaellig',true);}
-    const dwAlle=[...dieseWoche,...ohneDatum];
-    if(dwAlle.length){h+=renderSek('📋','Diese Woche \u00b7 KW'+kwNr,'',dwAlle.map(g=>renderAK(g,'')).join(''),'diesewoche',true);}
-    if(naechsteWochen.length){const nw=naechsteWochen.map(g=>'<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:0.5px solid rgba(0,0,0,0.05);"><div style="width:6px;height:6px;border-radius:50%;background:'+g.weltColor+';opacity:0.5;flex-shrink:0;"></div><span style="font-size:0.95rem;color:var(--c-muted);flex:1;">'+this._esc(g.a.text)+'</span><span style="font-size:0.65rem;color:var(--c-faint);font-family:var(--font-mono);">'+g.a.datum+'</span><span style="font-size:0.60rem;padding:1px 5px;border-radius:4px;font-weight:600;color:#fff;background:'+g.weltColor+';">'+g.weltLabel+'</span></div>').join('');h+=renderSek('🔭','N\u00e4chste Wochen','',nw,'naechste',false);}
-    if(posteingang.length){const pe=posteingang[0];const rest=posteingang.length-1;const pb='<div style="padding:8px 12px;"><div style="font-size:0.95rem;color:var(--c-text);margin-bottom:8px;">'+this._esc(pe.text||'')+'</div><div style="display:flex;gap:6px;"><button onclick="WB._blPostZuordnen(&quot;'+pe.id+'&quot;,&quot;'+pe._ctx+'&quot;)" style="font-size:0.72rem;padding:4px 10px;border-radius:6px;border:1px solid rgba(10,107,94,0.3);background:none;color:var(--c-beruf);cursor:pointer;font-family:var(--font);">Zuordnen \u2192</button><button onclick="WB._blDeleteSchnell(&quot;'+pe.id+'&quot;,&quot;'+pe._ctx+'&quot;)" style="font-size:0.72rem;padding:4px 10px;border-radius:6px;border:1px solid var(--c-border);background:none;color:var(--c-faint);cursor:pointer;font-family:var(--font);">\u2715 l\u00f6schen</button></div></div>'+(rest>0?'<div style="padding:5px 12px;font-size:0.72rem;color:var(--c-faint);font-style:italic;border-top:0.5px dashed rgba(0,0,0,0.08);">\u2500\u2500 '+rest+' weitere \u2500\u2500</div>':'');h+=renderSek('📥','Posteingang','heute 1 verarbeiten',pb,'posteingang',true);}
-    const schnellBody=renderSG('\u00dcberf\u00e4llig',schnellUeber)+renderSG('Heute',schnellHeute)+renderSG('Geplant',schnellGeplant);
-    if(schnellUeber.length||schnellHeute.length||schnellGeplant.length){h+=renderSek('\u26a1','Schnell-Erinnerungen','',schnellBody,'schnell',false);}
+
+    // 1. VERTEILEN (geschlossen)
+    const vBody=[
+      schnellOhneDatumOhneVh.length?renderUGHeader('Posteingang')+schnellOhneDatumOhneVh.map(renderPosteingang).join(''):'',
+      akOhneDatum.length?renderUGHeader('Backlog \u2013 Datum fehlt')+akOhneDatum.map(g=>renderAKKompakt(g)).join(''):'',
+      aufgabenOhneCL.length?renderUGHeader('Unvollst\u00e4ndig \u2013 Keine Checkliste')+aufgabenOhneCL.map(renderAKOhneCL).join(''):'',
+    ].join('');
+    const vCount=schnellOhneDatumOhneVh.length+akOhneDatum.length+aufgabenOhneCL.length;
+    if(vCount>0) h+=renderSek('📥','Verteilen',vCount+' Eintr\u00e4ge',vBody,'verteilen',false);
+
+    // 2. ÜBERFÄLLIG (offen)
+    const ueItems=sortByDatum([...akUeberfaellig.map(g=>({_type:'ak',...g})),...schnellUeber.map(x=>({_type:'schnell',...x}))]);
+    if(ueItems.length){const body=ueItems.map(x=>x._type==='ak'?renderAKKompakt(x):renderSchnell(x)).join('');h+=renderSek('\u26a0','\u00dcberf\u00e4llig','',body,'ueberfaellig',true);}
+
+    // 3. DIESE KW (offen)
+    const dkItems=sortByDatum([...akDieseKW.map(g=>({_type:'ak',...g})),...schnellDieseKW.map(x=>({_type:'schnell',...x}))]);
+    if(dkItems.length){const body=dkItems.map(x=>x._type==='ak'?renderAKKompakt(x):renderSchnell(x)).join('');h+=renderSek('📋','Diese KW \u00b7 KW'+kwNr,'',body,'diesekw',true);}
+
+    // 4. GEPLANT (geschlossen)
+    const gpItems=sortByDatum([...akGeplant.map(g=>({_type:'ak',...g})),...schnellGeplant.map(x=>({_type:'schnell',...x}))]);
+    if(gpItems.length){const body=gpItems.map(x=>x._type==='ak'?renderAKKompakt(x):renderSchnell(x)).join('');h+=renderSek('🔭','Geplant','',body,'geplant',false);}
+
     scroll.innerHTML=h||'<div style="text-align:center;padding:32px;color:var(--c-faint);font-size:0.85rem;">Backlog ist leer.</div>';
   },
 
@@ -19151,7 +19179,7 @@ this.setDirty();
 
   _quickSave() {
     const text = document.getElementById('wqa-text')?.value?.trim();
-    const date = document.getElementById('wqa-date')?.value || new Date().toISOString().split('T')[0];
+    const date = document.getElementById('wqa-date')?.value || '';
     if (!text) { document.getElementById('wqa-text')?.focus(); return; }
 
     // Vorhaben-Picker Routing
@@ -19212,7 +19240,7 @@ this.setDirty();
     store.push(item);
     this.setDirty();
     document.getElementById('wb-quick-add-sheet')?.remove();
-    this._toast('Angelegt' + (recur ? ' (wiederkehrend)' : '') + (time ? ' um ' + time : ' für ' + date));
+    this._toast('Angelegt' + (recur ? ' (wiederkehrend)' : '') + (time ? ' um ' + time : date ? ' für ' + date : ''));
     this.renderCockpit();
     if (document.getElementById('wb-schnell-overlay')?.style.display === 'flex') this._schnellListeRender();
   },
