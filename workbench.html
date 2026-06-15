@@ -12537,7 +12537,29 @@ const WB = {
         else             { hint.textContent = '🔴 Kritisch \u2014 Schonung heute'; hint.style.color = '#C62828'; }
       });
     }
-    // KI1: Button
+    
+    // Posteingang-Items (quickItems ohne Datum)
+    const _peItems = [];
+    ['pro','priv'].forEach(_peCtx => {
+      const _peDb = _peCtx === 'pro' ? this.dataPro : this.dataPriv;
+      (_peDb?.quickItems||[]).filter(q => !q.done && !q.date).forEach(q => _peItems.push({...q, _ctx:_peCtx}));
+    });
+    if (_peItems.length) {
+      html += '<div style="margin-top:14px;padding:10px 12px;background:color-mix(in srgb,var(--c-beruf) 5%,#F0EEE8);border:1px solid color-mix(in srgb,var(--c-beruf) 15%,var(--c-border));border-radius:var(--radius-xs);">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+        + '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-beruf);">'
+        + '📥 Posteingang (' + _peItems.length + ')</div>'
+        + '<span style="font-size:0.72rem;color:var(--c-faint);">Verteilen oder ignorieren</span></div>';
+      _peItems.forEach(_pe => {
+        html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--c-border);">'
+          + '<span style="flex:1;font-size:0.85rem;">' + this._esc(_pe.text) + '</span>'
+          + '<button onclick="WB._quickDetail(&quot;' + _pe.id + '&quot;)" style="font-size:0.72rem;padding:3px 8px;border:1px solid var(--c-border);border-radius:6px;background:none;color:var(--c-beruf);cursor:pointer;">Verteilen</button>'
+          + '</div>';
+      });
+      html += '</div>';
+    }
+
+// KI1: Button
     const kiC2 = document.getElementById('ritual-step-0');
     if (kiC2 && !kiC2.querySelector('#ritual-ki-btn')) {
       const kb = document.createElement('button');
@@ -19067,87 +19089,47 @@ this.setDirty();
   },
 
   _quickAdd(prefillDate) {
-    const today = new Date().toISOString().split('T')[0];
-    // Kleines Sheet aufbauen
     document.getElementById('wb-quick-add-sheet')?.remove();
     const sheet = document.createElement('div');
     sheet.id = 'wb-quick-add-sheet';
     sheet.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;';
+    sheet.onclick = e => { if (e.target === sheet) sheet.remove(); };
+    const weltPro = this.activeWorld === 'beruf';
     sheet.innerHTML =
-      '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;">'
+      '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
       + '<div style="font-size:0.8rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-muted);">Neue Schnellerinnerung</div>'
       + '<div style="display:flex;gap:4px;">'
       + '<button id="wqa-welt-pro" onclick="WB._wqaSetWelt(\'pro\')" style="font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:20px;border:none;cursor:pointer;'
-      + (this.activeWorld==='beruf' ? 'background:var(--c-beruf);color:#fff;' : 'background:var(--c-border);color:var(--c-muted);')
+      + (weltPro ? 'background:var(--c-beruf);color:#fff;' : 'background:var(--c-border);color:var(--c-muted);')
       + '">Beruf</button>'
       + '<button id="wqa-welt-priv" onclick="WB._wqaSetWelt(\'priv\')" style="font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:20px;border:none;cursor:pointer;'
-      + (this.activeWorld!=='beruf' ? 'background:#7B5EA7;color:#fff;' : 'background:var(--c-border);color:var(--c-muted);')
+      + (!weltPro ? 'background:#7B5EA7;color:#fff;' : 'background:var(--c-border);color:var(--c-muted);')
       + '">Privat</button>'
       + '</div></div>'
-      + '<input id="wqa-text" type="text" placeholder="Was muss erledigt werden?" autofocus style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:10px;">'
-      + '<div style="display:flex;gap:8px;margin-bottom:14px;">'
-      + '<div style="flex:2;">'
-      + '<div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;">Datum</div>'
-      + '<div style="margin-top:8px;">'
-      + '<select id="schnell-vorhaben-picker" style="width:100%;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">'
-      + '<option value="">\u2013 Kein Vorhaben \u2013</option></select></div>'
-      + 
-      + '<div style="margin-bottom:10px;">'
-      + '<label style="font-size:0.78rem;font-weight:600;color:var(--c-muted);display:block;margin-bottom:4px;">Vorhaben (optional)</label>'
-      + '<select id="schnell-vh-picker" onchange="WB._schnellVhPickerChange()" style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"><option value="">\u2013 Kein Vorhaben \u2013</option></select></div>'
-      + '<div id="schnell-aufgabe-picker-wrap" style="display:none;margin-bottom:10px;"><label style="font-size:0.78rem;font-weight:600;color:var(--c-muted);display:block;margin-bottom:4px;">Aufgabe f\u00fcr Checkliste (optional)</label><select id="schnell-aufgabe-picker" style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"><option value="">\u2013 Direkt ins Vorhaben \u2013</option></select></div>'
-'<div id="schnell-chaos-offer" style="display:none;margin-top:6px;">'
-      + '<label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:var(--c-muted);cursor:pointer;">'
-      + '<input type="checkbox" id="schnell-to-chaos" style="accent-color:var(--c-privat);">'
-      + ' Als Chaos-Aufgabe speichern (unter 10 Min)</label></div>'
-
-      + '<input id="wqa-date" type="date" value="' + (prefillDate || today) + '" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">'
-      + '</div>'
-      + '<div style="flex:1;">'
-      + '<div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;">Uhrzeit (optional)</div>'
-      + '<input id="wqa-time" type="time" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);">'
-      + '</div>'
-      + '</div>'
-      + '<div style="margin-bottom:12px;">'
-      + '<div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;font-weight:600;">Wiederholung</div>'
-      + '<select id="wqa-recur" onchange="WB._wqaRecurChange(this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);">'
-      + '<option value="">Einmalig</option>'
-      + '<option value="daily">T&auml;glich</option>'
-      + '<option value="weekly">W&ouml;chentlich</option>'
-      + '<option value="monthly">Monatlich</option>'
-      + '</select>'
-      + '<div id="wqa-recur-hint" style="display:none;font-size:0.72rem;color:var(--c-beruf);margin-top:4px;">Wird als Wochenpflicht gespeichert</div>'
-      + '<div id="wqa-days-row" style="display:none;flex-wrap:wrap;gap:8px;margin-top:8px;">'
-      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="1"> Mo</label>'
-      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="2"> Di</label>'
-      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="3"> Mi</label>'
-      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="4"> Do</label>'
-      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="5"> Fr</label>'
-      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="6"> Sa</label>'
-      + '<label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;"><input type="checkbox" class="wqa-day" value="0"> So</label>'
-      + '</div></div>'
-      + '<div style="margin-bottom:14px;">'
-      + '<div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;font-weight:600;">Aktivierungsenergie</div>'
-      + '<div class="aktiv-pill-grid" id="wqa-aktiv-grid">'
-      + '<div class="aktiv-pill ae-niedrig" onclick="WB._aktivSelect(this,&quot;niedrig&quot;,&quot;wqa-aktiv&quot;)">Niedrig</div>'
-      + '<div class="aktiv-pill ae-mittel active" onclick="WB._aktivSelect(this,&quot;mittel&quot;,&quot;wqa-aktiv&quot;)">Mittel</div>'
-      + '<div class="aktiv-pill ae-hoch" onclick="WB._aktivSelect(this,&quot;hoch&quot;,&quot;wqa-aktiv&quot;)">Hoch</div>'
-      + '<input type="hidden" id="wqa-aktiv" value="mittel">'
-      + '</div></div>'
-      + '<div style="display:flex;gap:8px;">'
-      + '<button onclick="document.getElementById(&quot;wb-quick-add-sheet&quot;).remove()" style="flex:1;padding:11px;background:none;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;cursor:pointer;color:var(--c-muted);">Abbrechen</button>'
-      + '<button onclick="WB._quickSave()" style="flex:2;padding:11px;background:var(--c-beruf);border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.9rem;font-weight:600;cursor:pointer;color:#fff;">Speichern</button>'
-      + '</div>'
-      + '</div>';
-    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
+      + '<input id="wqa-text" type="text" placeholder="Was muss erledigt werden?" autofocus style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.95rem;background:var(--c-bg);color:var(--c-text);margin-bottom:12px;">'
+      + '<div style="margin-bottom:12px;"><div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;font-weight:600;">Vorhaben (optional)</div>'
+      + '<select id="schnell-vh-picker" onchange="WB._schnellVhPickerChange()" style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"><option value="">\u2013 Kein Vorhaben (Posteingang) \u2013</option></select></div>'
+      + '<div id="schnell-aufgabe-picker-wrap" style="display:none;margin-bottom:12px;"><div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;font-weight:600;">Aufgabe f\u00fcr Checkliste (optional)</div>'
+      + '<select id="schnell-aufgabe-picker" style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);"><option value="">\u2013 Direkt ins Vorhaben \u2013</option></select></div>'
+      + '<div style="display:flex;gap:8px;margin-bottom:12px;">'
+      + '<div style="flex:2;"><div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;">Datum (optional)</div>'
+      + '<input id="wqa-date" type="date" value="' + (prefillDate || '') + '" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);"></div>'
+      + '<div style="flex:1;"><div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;">Uhrzeit</div>'
+      + '<input id="wqa-time" type="time" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);"></div></div>'
+      + '<div style="margin-bottom:12px;"><div style="font-size:0.75rem;color:var(--c-muted);margin-bottom:4px;">Notiz (optional)</div>'
+      + '<textarea id="wqa-note" placeholder="Hinweise, Kontext..." rows="2" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.85rem;background:var(--c-bg);color:var(--c-text);resize:vertical;"></textarea></div>'
+      + '<div style="display:flex;gap:8px;margin-top:4px;">'
+      + '<button onclick="document.getElementById(\'wb-quick-add-sheet\')?.remove()" style="flex:1;padding:10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);background:none;font-family:var(--font);font-size:0.88rem;cursor:pointer;color:var(--c-muted);">Abbrechen</button>'
+      + '<button onclick="WB._quickSave()" style="flex:2;padding:10px;border:none;border-radius:var(--radius-xs);background:var(--c-beruf);color:#fff;font-family:var(--font);font-size:0.88rem;font-weight:700;cursor:pointer;">Speichern</button>'
+      + '</div></div>';
     document.body.appendChild(sheet);
+    this._wqaWelt = weltPro ? 'pro' : 'priv';
     setTimeout(() => document.getElementById('wqa-text')?.focus(), 50);
-    // Vorhaben-Picker befüllen
     setTimeout(() => {
       const sel = document.getElementById('schnell-vh-picker');
       if (!sel) return;
-      let optH = '<option value="">\u2013 Kein Vorhaben \u2013</option>';
+      let optH = '<option value="">\u2013 Kein Vorhaben (Posteingang) \u2013</option>';
       ['pro','priv'].forEach(welt => {
         const store = this._vorhabenStore(welt) || [];
         const aktiv = store.filter(v => (v.aktivitaet||'aktiv')==='aktiv');
@@ -19158,12 +19140,9 @@ this.setDirty();
       });
       sel.innerHTML = optH;
     }, 50);
-
-    // Enter speichert
-    sheet.querySelector('#wqa-text').addEventListener('keydown', e => {
-      if (e.key === 'Enter') WB._quickSave();
-    });
+    sheet.querySelector('#wqa-text')?.addEventListener('keydown', e => { if (e.key === 'Enter') WB._quickSave(); });
   },
+
 
   _wqaSetWelt(welt) {
     this._wqaWelt = welt;  // als WB-Property merken — Sheet-ID-unabhängig
