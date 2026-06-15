@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.43.4</title>
+<title>WorkBench 5.43.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.43.4 · Build 20260615-0900</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.43.5 · Build 20260615-0910</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.43.4</div>
+  <div class="wb-startup-tagline">v5.43.5</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7910,8 +7910,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.43.4',
-  APP_BUILD:   '20260615-0900',
+  APP_VERSION: '5.43.5',
+  APP_BUILD:   '20260615-0910',
 
 
   // ══════════════════════════════════════════════════════
@@ -16100,6 +16100,26 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (status === 'abgesagt') ev.done = true;
     // SV1: Buchungs-Sheet bei Termin-Erledigung
     if (ev.done) { this._svPendingSheet = { text: ev.text||'Termin', quelle: 'termin' }; this._svShowSheet(ev.text||'Termin', 'termin'); }
+    
+    // Termin-Flucht-Sheet
+    if (status === 'abgesagt' || status === 'verschoben') {
+      const evText = ev.text || 'Termin';
+      const aktion = status === 'abgesagt' ? 'abgesagt' : 'verschoben';
+      const _tSheet = document.createElement('div');
+      _tSheet.id = 'sv-termin-sheet';
+      _tSheet.style.cssText = 'position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;font-family:var(--font);';
+      _tSheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:16px 16px 32px;">'
+        + '<div style="font-size:0.72rem;color:var(--c-faint);margin-bottom:8px;">&quot;'+this._esc(evText)+'&quot; wurde '+aktion+'.</div>'
+        + '<div style="font-size:0.92rem;font-weight:600;color:var(--c-text);margin-bottom:14px;">War das eine bewusste Entscheidung?</div>'
+        + '<div style="display:flex;gap:8px;">'
+          + '<button onclick="WB._svTerminSheet(null)" style="flex:1;padding:10px;border-radius:var(--radius-xs);background:none;border:1px solid var(--c-border);font-family:var(--font);font-size:0.85rem;color:var(--c-muted);cursor:pointer;">\u2713 Ja, bewusst</button>'
+          + '<button onclick="WB._svTerminSheet(&quot;-&quot;,&quot;'+this._esc(evText).replace(/"/g,'')+'&quot;)" style="flex:1;padding:10px;border-radius:var(--radius-xs);background:none;border:1px solid #B87333;font-family:var(--font);font-size:0.85rem;color:#B87333;cursor:pointer;">\u2717 Flucht</button>'
+          + '<button onclick="WB._svTerminSheet(undefined)" style="flex:1;padding:10px;border-radius:var(--radius-xs);background:none;border:1px solid var(--c-border);font-family:var(--font);font-size:0.85rem;color:var(--c-faint);cursor:pointer;">\u00dcberspr.</button>'
+        + '</div></div>';
+      document.body.appendChild(_tSheet);
+      _tSheet.onclick = e => { if (e.target === _tSheet) WB._svTerminSheet(undefined); };
+    }
+
     this.setDirty();
     try { document.getElementById('edit-overlay')?.classList.remove('open'); } catch(e) {}
     this.renderCockpit();
@@ -16498,7 +16518,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const store = this._vorhabenStore(welt) || [];
       store.filter(v => (v.aktivitaet||'aktiv') === 'aktiv').forEach(v => {
         (v.meilensteine||[]).forEach(ms => {
-          (ms.aufgaben||[]).filter(a => !a.done && a.datum && a.datum >= kwStart && a.datum <= kwEnd && (a.checklist||[]).length > 0)
+          (ms.aufgaben||[]).filter(a => !a.done && (a.checklist||[]).length > 0 && ((a.datum && a.datum >= kwStart && a.datum <= kwEnd) || (a.datum && a.datum < kwStart) || !a.datum))
             .forEach(a => {
               const checks = a.checklist || [];
               const doneCnt = checks.filter(c => c.done).length;
@@ -16674,7 +16694,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const store = this._vorhabenStore(welt) || [];
       store.filter(v => (v.aktivitaet||'aktiv')==='aktiv').forEach(v => {
         (v.meilensteine||[]).forEach(ms => {
-          (ms.aufgaben||[]).filter(a => !a.done && a.datum && a.datum>=kwStart && a.datum<=kwEnd && (a.checklist||[]).length>0)
+          (ms.aufgaben||[]).filter(a => !a.done && (a.checklist||[]).length > 0
+              && ((a.datum && a.datum >= kwStart && a.datum <= kwEnd) || (a.datum && a.datum < kwStart) || !a.datum))
             .forEach(a => {
               const checks = a.checklist||[];
               const doneCnt = checks.filter(c=>c.done).length;
@@ -16689,28 +16710,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       });
     });
 
-    
-    // Wochenpflichten (alle offenen dieser Woche)
-    const allePflichten = [];
-    ['pro','priv'].forEach(ctx => {
-      (this._dutyStore(ctx)||[]).forEach(d => {
-        if (d.startTime) return; // hat Uhrzeit → Zone
-        try {
-          // Prüfe ob diese Woche relevant
-          const rel = this._dutyRelevantThisWeek ? this._dutyRelevantThisWeek(d) : true;
-          if (!rel) return;
-          const isDone = this._dutyIsDone ? this._dutyIsDone(d, new Date()) : false;
-          if (isDone) return;
-          allePflichten.push({ d, ctx,
-            weltLabel: ctx==='pro'?'Beruf':'Privat',
-            weltColor: ctx==='pro'?'var(--c-beruf)':'#4D5F33',
-            tage: d.days ? d.days.join(', ') : '',
-          });
-        } catch(e) {}
-      });
-    });
-
-const alleSchnell = this._quickStoreAlle ? this._quickStoreAlle().filter(q=>!q.done) : [];
+    const alleSchnell = this._quickStoreAlle ? this._quickStoreAlle().filter(q=>!q.done) : [];
     const ueberfaellig = alleSchnell.filter(x=>x.date&&x.date<today);
     const heuteS = alleSchnell.filter(x=>x.date===today);
     const geplant = alleSchnell.filter(x=>x.date&&x.date>today);
@@ -16723,27 +16723,14 @@ const alleSchnell = this._quickStoreAlle ? this._quickStoreAlle().filter(q=>!q.d
         + '<div style="width:7px;height:7px;border-radius:50%;background:'+g.weltColor+';flex-shrink:0;"></div>'
         + '<span class="ck-backlog-aufgabe-name">'+this._esc(g.a.text)+'</span>'
         + '<div style="display:flex;align-items:center;gap:5px;"><div style="width:36px;height:3px;background:var(--c-border);border-radius:2px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;border-radius:2px;background:'+g.weltColor+';"></div></div><span style="font-size:0.62rem;font-weight:700;color:'+g.weltColor+';">'+g.doneCnt+'/'+g.total+'</span></div></div>'
-        + '<div class="ck-backlog-aufgabe-meta">'+this._esc(g.v.titel)+' \u00b7 '+g.weltLabel+' \u00b7 '+g.a.datum+'</div>';
+        + '<div class="ck-backlog-aufgabe-meta">'+this._esc(g.v.titel)+' \u00b7 '+g.weltLabel+(g.a.datum?' \u00b7 '+g.a.datum:'')+'</div>';
       g.offen.forEach(c => {
         h += '<div class="ck-backlog-cl-item"><div class="ck-backlog-cl-chk" onclick="WB._ckBacklogCheckCl(&quot;'+g.a.id+'&quot;,'+c._idx+',&quot;'+g.welt+'&quot;)"></div><span class="ck-backlog-cl-text">'+this._esc(c.text)+'</span></div>';
       });
       h += '</div>';
     });
 
-    
-    // Wochenpflichten rendern
-    if (allePflichten.length) {
-      h += '<div class="ck-backlog-sektion"><div class="ck-backlog-sektion-header"><span class="ck-backlog-sektion-icon">🔁</span><span class="ck-backlog-sektion-label">Wochenpflichten</span><span style="font-size:0.65rem;font-weight:700;color:var(--c-faint);">'+allePflichten.length+' offen</span></div><div>';
-      allePflichten.forEach(({d, ctx, weltLabel, weltColor, tage}) => {
-        const name = d.title || d.name || '';
-        h += '<div class="ck-backlog-simple-item"><div class="ck-backlog-simple-chk" onclick="WB._ckBacklogCheckPflicht(&quot;'+d.id+'&quot;,&quot;'+ctx+'&quot;)"></div><span class="ck-backlog-simple-text">'+this._esc(name)+'</span>'
-          + (tage ? '<span style="font-size:0.65rem;color:var(--c-faint);">'+tage+'</span>' : '')
-          + '<span class="ck-backlog-badge" style="background:'+(weltColor==='var(--c-beruf)'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+weltColor+';">'+weltLabel+'</span></div>';
-      });
-      h += '</div></div>';
-    }
-
-if (alleSchnell.length) {
+    if (alleSchnell.length) {
       const renderGruppe = (label, gruppe) => {
         if (!gruppe.length) return '';
         return '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);padding:5px 12px 3px;">'+label+'</div>'
@@ -16869,6 +16856,19 @@ if (alleSchnell.length) {
     this._svLastDay = this._svLastDay || today;
     if (this._svLastDay !== today) {
       this._svLastDay = today;
+    }
+  },
+
+
+  _svTerminSheet(typ, text) {
+    document.getElementById('sv-termin-sheet')?.remove();
+    if (typ === '-' && text) {
+      const entries = this._svToday();
+      entries.push({ id:'sv_'+Date.now(), ts:Date.now(), typ:'-', text:text, quelle:'termin' });
+      this.setDirty();
+      try { this._svUpdateHeader(); } catch(e) {}
+      try { this._svRenderKonto(); } catch(e) {}
+      this._toast('\u2717 Flucht verbucht \u2014 \u22121');
     }
   },
 
