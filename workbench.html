@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.43.6 · Build 20260615-0920</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.43.6 · Build 20260615-0930</div>
     </div>
 
     <!-- Welt -->
@@ -7911,7 +7911,7 @@ body.fokus-modus body.fokus-modus
 const WB = {
 
   APP_VERSION: '5.43.6',
-  APP_BUILD:   '20260615-0920',
+  APP_BUILD:   '20260615-0930',
 
 
   // ══════════════════════════════════════════════════════
@@ -18362,14 +18362,27 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     const ev = (db?.customEvents||[]).find(e => String(e.id) === String(evId));
     const name = ev?.text || 'Termin';
-    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:16px 16px 24px;">'
-      + '<div style="font-size:0.72rem;color:var(--c-faint);margin-bottom:10px;text-transform:uppercase;font-weight:700;letter-spacing:0.06em;">' + this._esc(name) + '</div>'
-      + '<div style="display:flex;flex-direction:column;gap:8px;">'
-        + '<button onclick="document.getElementById(&quot;ck-termin-opts&quot;).remove();WB._evSetStatus(&quot;'+evId+'&quot;,&quot;'+ctx+'&quot;,&quot;erledigt&quot;)" style="padding:12px;border-radius:var(--radius-xs);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;">\u2713 Erledigt</button>'
-        + '<button onclick="document.getElementById(&quot;ck-termin-opts&quot;).remove();WB._evSetStatus(&quot;'+evId+'&quot;,&quot;'+ctx+'&quot;,&quot;abgesagt&quot;)" style="padding:12px;border-radius:var(--radius-xs);background:none;border:1px solid var(--c-danger,#C62828);color:var(--c-danger,#C62828);font-family:var(--font);font-size:0.88rem;cursor:pointer;">\u2715 Absagen</button>'
-        + '<button onclick="document.getElementById(&quot;ck-termin-opts&quot;).remove();WB._evSetStatus(&quot;'+evId+'&quot;,&quot;'+ctx+'&quot;,&quot;verschoben&quot;)" style="padding:12px;border-radius:var(--radius-xs);background:none;border:1px solid #B87333;color:#B87333;font-family:var(--font);font-size:0.88rem;cursor:pointer;">\u27a1 Verschieben</button>'
-        + '<button onclick="document.getElementById(&quot;ck-termin-opts&quot;).remove()" style="padding:12px;border-radius:var(--radius-xs);background:none;border:1px solid var(--c-border);color:var(--c-faint);font-family:var(--font);font-size:0.85rem;cursor:pointer;">Abbrechen</button>'
-      + '</div></div>';
+    const panel = document.createElement('div');
+    panel.style.cssText = 'background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:16px 16px 24px;';
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:0.72rem;color:var(--c-faint);margin-bottom:10px;text-transform:uppercase;font-weight:700;letter-spacing:0.06em;';
+    label.textContent = name;
+    panel.appendChild(label);
+    const btnWrap = document.createElement('div');
+    btnWrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+    const mkBtn = (text, bg, border, color, action) => {
+      const b = document.createElement('button');
+      b.textContent = text;
+      b.style.cssText = 'padding:12px;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;cursor:pointer;background:'+bg+';border:'+border+';color:'+color+';'+(bg!=='none'?'font-weight:600;':'');
+      b.onclick = () => { sheet.remove(); if (action) action(); };
+      return b;
+    };
+    btnWrap.appendChild(mkBtn('\u2713 Erledigt', 'var(--c-beruf)', 'none', '#fff', () => this._evSetStatus(evId, ctx, 'erledigt')));
+    btnWrap.appendChild(mkBtn('\u2715 Absagen', 'none', '1px solid var(--c-danger,#C62828)', 'var(--c-danger,#C62828)', () => this._evSetStatus(evId, ctx, 'abgesagt')));
+    btnWrap.appendChild(mkBtn('\u27a1 Verschieben', 'none', '1px solid #B87333', '#B87333', () => this._evSetStatus(evId, ctx, 'verschoben')));
+    btnWrap.appendChild(mkBtn('Abbrechen', 'none', '1px solid var(--c-border)', 'var(--c-faint)', null));
+    panel.appendChild(btnWrap);
+    sheet.appendChild(panel);
     document.body.appendChild(sheet);
   },
 
