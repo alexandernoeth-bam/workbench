@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.44.7 · Build 20260615-1150</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.44.7 · Build 20260615-1200</div>
     </div>
 
     <!-- Welt -->
@@ -7852,7 +7852,7 @@ body.fokus-modus body.fokus-modus
 const WB = {
 
   APP_VERSION: '5.44.7',
-  APP_BUILD:   '20260615-1150',
+  APP_BUILD:   '20260615-1200',
 
 
   // ══════════════════════════════════════════════════════
@@ -14044,7 +14044,7 @@ const WB = {
         + '<div style="flex:1;min-width:0;">'
         + '<div style="font-size:0.88rem;font-weight:600;color:var(--c-text);">'
         + charBadge + this._esc(v.titel) + '</div>'
-        + (v.ziel ? '<div style="font-size:0.78rem;color:var(--c-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+        + (v.ziel ? '<div style="font-size:0.78rem;color:var(--c-muted);margin-top:2px;">'
           + this._esc(v.ziel) + '</div>' : '')
         + '</div>'
         + (tageLabel ? '<div style="font-size:0.72rem;font-family:var(--font-mono);flex-shrink:0;color:'
@@ -17076,6 +17076,18 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     return text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
       .map(l => l.replace(/^\d+[\.\)]\s*/, '').replace(/^[-\u2022]\s*/, '').trim())
       .filter(t => t.length > 0);
+  },
+
+
+  _vhEditZiel() {
+    const v = this._vorhabenAktiv();
+    if (!v) return;
+    const neu = prompt('Ziel / Vision bearbeiten:', v.ziel || '');
+    if (neu === null) return;
+    v.ziel = neu;
+    v.geaendert = Date.now();
+    this.setDirty();
+    try { this._vorhabenDetailRender(); } catch(e) {}
   },
 
   _vhImportAufgaben(vhId, welt) {
@@ -21823,7 +21835,7 @@ store.push(item);
     let zeitRel = '\u2014';
     if (geaendert) { const g = new Date(geaendert); g.setHours(0,0,0,0); const diff = Math.round((today2 - g) / 86400000); zeitRel = diff === 0 ? 'heute' : diff === 1 ? 'gestern' : 'vor ' + diff + ' Tagen'; }
     h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--c-border);font-size:0.75rem;color:var(--c-faint);margin-top:4px;">';
-    if (v.ziel) { h += '<span>\ud83c\udfaf ' + this._esc(v.ziel.length > 50 ? v.ziel.slice(0,50) + '\u2026' : v.ziel) + '</span><span>\u00b7</span>'; }
+    if (v.ziel) { h += '<span style="cursor:pointer;" onclick="WB._vhEditZiel()">\ud83c\udfaf ' + this._esc(v.ziel) + '</span><span>\u00b7</span>'; }
     h += '<span>Aktiv: ' + zeitRel + '</span>';
     h += '</div>';
 
@@ -21997,6 +22009,7 @@ store.push(item);
           + '<input type="text" class="vh47-inp" placeholder="Neue Aufgabe…" id="vh-aufg-inp-' + ms.id + '" '
           + 'onkeydown="if(event.key===\'Enter\')WB._vhAufgAdd(&quot;' + ms.id + '&quot;)">'
           + '<button onclick="WB._vhAufgAdd(&quot;' + ms.id + '&quot;)" class="vh47-add-btn">+</button>'
+          + '<button onclick="WB._vhImportAufgaben(&quot;' + v.id + '&quot;,&quot;' + welt + '&quot;)" style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;margin-left:6px;border:1px dashed rgba(10,107,94,0.3);border-radius:6px;background:none;font-family:var(--font);font-size:0.75rem;color:#0A6B5E;cursor:pointer;"><span>📋</span>KI-Import</button>'
           + '</div>';
         h += '</div>';
       }
