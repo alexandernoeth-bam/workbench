@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.45.0</title>
+<title>WorkBench 5.45.1</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.45.0 · Build 20260615-1235</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.45.1 · Build 20260615-1245</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.45.0</div>
+  <div class="wb-startup-tagline">v5.45.1</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7851,8 +7851,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.45.0',
-  APP_BUILD:   '20260615-1235',
+  APP_VERSION: '5.45.1',
+  APP_BUILD:   '20260615-1245',
 
 
   // ══════════════════════════════════════════════════════
@@ -16334,14 +16334,13 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const store = this._vorhabenStore(welt) || [];
       store.filter(v => (v.aktivitaet||'aktiv') === 'aktiv').forEach(v => {
         (v.meilensteine||[]).forEach(ms => {
-          (ms.aufgaben||[]).filter(a => !a.done && (a.checklist||[]).length > 0 && (a.datum === dateStr || !a.datum))
+          (ms.aufgaben||[]).filter(a => !a.done && (a.datum === dateStr || !a.datum))
             .forEach(a => {
               const checks = a.checklist || [];
               const doneCnt = checks.filter(c => c.done).length;
               const total = checks.length;
               const offen = checks.map((c,i) => ({...c, _idx:i})).filter(c => !c.done);
-              if (!offen.length) return;
-              aufgabenGruppen.push({ a, v, welt, ms, doneCnt, total, offen,
+                            aufgabenGruppen.push({ a, v, welt, ms, doneCnt, total, offen,
                 weltColor: welt==='pro' ? 'var(--c-beruf)' : '#4D5F33',
                 weltLabel: welt==='pro' ? 'Beruf' : 'Privat' });
             });
@@ -16549,7 +16548,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const store = this._vorhabenStore(welt) || [];
       store.filter(v => (v.aktivitaet||'aktiv')==='aktiv').forEach(v => {
         (v.meilensteine||[]).forEach(ms => {
-          (ms.aufgaben||[]).filter(a => !a.done && (a.checklist||[]).length > 0).forEach(a => {
+          (ms.aufgaben||[]).filter(a => !a.done).forEach(a => {
             const checks = a.checklist||[];
             const doneCnt = checks.filter(c=>c.done).length;
             const total = checks.length;
@@ -22318,21 +22317,20 @@ store.push(item);
     const extraPanel = document.createElement('div');
     extraPanel.style.cssText = 'padding:14px 16px 0;border-top:1px solid var(--c-border);margin-top:8px;';
     const today3 = new Date().toISOString().split('T')[0];
-    const isNSAuto = !!(a.datum && a.datum <= today3);
-    const isNS = isNSAuto || a.naechsterSchritt === true;
+    const isNS = a.naechsterSchritt === true;
 
     // Toggle
     const toggleId = 'vhas-ns-toggle';
     extraPanel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
       + '<span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--c-muted);">Nächster Schritt</span>'
-      + '<label style="display:flex;align-items:center;gap:8px;cursor:' + (isNSAuto?'default':'pointer') + ';">'
-      + '<input type="checkbox" id="' + toggleId + '"' + (isNS?' checked':'') + (isNSAuto?' disabled':'') + ' '
-      + (isNSAuto ? '' : 'onchange="WB._vhSetNaechsterSchritt(&quot;' + msId + '&quot;,&quot;' + aufgId + '&quot;,this.checked)"')
+      + '<label style="display:flex;align-items:center;gap:8px;cursor:' + 'pointer' + ';">'
+      + '<input type="checkbox" id="' + toggleId + '"' + (isNS?' checked':'') + '' + ' '
+      + 'onchange="WB._vhSetNaechsterSchritt(&quot;' + msId + '&quot;,&quot;' + aufgId + '&quot;,this.checked)"'
       + ' style="width:16px;height:16px;accent-color:var(--c-beruf);">'
       + '<span style="font-size:0.82rem;color:var(--c-text);">' + (isNS ? 'Ja' : 'Nein') + '</span>'
       + '</label>'
       + '</div>'
-      + (isNSAuto ? '<div style="font-size:0.72rem;color:var(--c-faint);margin-bottom:10px;">Automatisch — Datum ändern um zu entfernen</div>' : '');
+
 
     // Verschieben-Dropdown
     const vhFound = this._vorhabenFind(v.id);
