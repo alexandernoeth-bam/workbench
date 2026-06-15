@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.45.1</title>
+<title>WorkBench 5.45.2</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.45.1 · Build 20260615-1245</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.45.2 · Build 20260615-1300</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.45.1</div>
+  <div class="wb-startup-tagline">v5.45.2</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7851,8 +7851,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.45.1',
-  APP_BUILD:   '20260615-1245',
+  APP_VERSION: '5.45.2',
+  APP_BUILD:   '20260615-1300',
 
 
   // ══════════════════════════════════════════════════════
@@ -16325,104 +16325,69 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const el = document.getElementById('ck-backlog-block');
     if (!el) return;
     const today = new Date().toISOString().split('T')[0];
-    const kwStart = this._kwStartDate();
-    const kwEnd = this._kwEndDate();
-
-    // Aufgaben mit Checklisten (diese Woche)
-    const aufgabenGruppen = [];
+    if (!dateStr) dateStr = today;
+    const aufgaben = [];
     ['pro','priv'].forEach(welt => {
       const store = this._vorhabenStore(welt) || [];
-      store.filter(v => (v.aktivitaet||'aktiv') === 'aktiv').forEach(v => {
+      store.filter(v => (v.aktivitaet||'aktiv')==='aktiv').forEach(v => {
         (v.meilensteine||[]).forEach(ms => {
-          (ms.aufgaben||[]).filter(a => !a.done && (a.datum === dateStr || !a.datum))
-            .forEach(a => {
-              const checks = a.checklist || [];
-              const doneCnt = checks.filter(c => c.done).length;
-              const total = checks.length;
-              const offen = checks.map((c,i) => ({...c, _idx:i})).filter(c => !c.done);
-                            aufgabenGruppen.push({ a, v, welt, ms, doneCnt, total, offen,
-                weltColor: welt==='pro' ? 'var(--c-beruf)' : '#4D5F33',
-                weltLabel: welt==='pro' ? 'Beruf' : 'Privat' });
-            });
+          (ms.aufgaben||[]).filter(a => !a.done && a.datum === dateStr && (a.checklist||[]).length > 0).forEach(a => {
+            const checks = a.checklist||[];
+            const doneCnt = checks.filter(c=>c.done).length;
+            const total = checks.length;
+            const offen = checks.map((c,i)=>({...c,_idx:i})).filter(c=>!c.done);
+            if (!offen.length) return;
+            aufgaben.push({a,v,welt,doneCnt,total,offen,weltColor:welt==='pro'?'var(--c-beruf)':'#4D5F33',weltLabel:welt==='pro'?'Beruf':'Privat'});
+          });
         });
       });
     });
-
-    // Wochenpflichten ohne Uhrzeit
     const pflichten = [];
     ['pro','priv'].forEach(ctx => {
       (this._dutyStore(ctx)||[]).forEach(d => {
         if (d.startTime) return;
         try {
           const insts = this._dutyWeekInstances ? this._dutyWeekInstances(d) : [];
-          const inst = insts.find(i => (i.date instanceof Date ? (i.date.getFullYear()+'-'+String(i.date.getMonth()+1).padStart(2,'0')+'-'+String(i.date.getDate()).padStart(2,'0')) : i.date) === dateStr);
+          const inst = insts.find(i => { const iDate = i.date instanceof Date ? i.date.toISOString().split('T')[0] : i.date; return iDate === dateStr; });
           if (!inst || inst.done) return;
           const db = ctx==='pro' ? this.dataPro : this.dataPriv;
           if (db?.pflichtStatus?.[d.id+'_'+dateStr]) return;
-          pflichten.push({ d, ctx, weltLabel: ctx==='pro'?'Beruf':'Privat',
-            weltColor: ctx==='pro'?'var(--c-beruf)':'#4D5F33' });
+          pflichten.push({d,ctx,weltColor:ctx==='pro'?'var(--c-beruf)':'#4D5F33',weltLabel:ctx==='pro'?'Beruf':'Privat'});
         } catch(e) {}
       });
     });
-
-    // Schnell-Erinnerungen ohne Uhrzeit
-    const schnellItems = [];
+    const schnell = [];
     ['pro','priv'].forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
-      (db?.quickItems||[]).filter(q => !q.done && q.date===dateStr && !q.time)
-        .forEach(q => { schnellItems.push({ q, ctx, weltLabel: ctx==='pro'?'Beruf':'Privat',
-          weltColor: ctx==='pro'?'var(--c-beruf)':'#4D5F33' }); });
+      (db?.quickItems||[]).filter(q => !q.done && q.date === dateStr && !q.time).forEach(q => schnell.push({q,ctx,weltColor:ctx==='pro'?'var(--c-beruf)':'#4D5F33',weltLabel:ctx==='pro'?'Beruf':'Privat'}));
     });
-
-    if (!aufgabenGruppen.length && !pflichten.length && !schnellItems.length) { el.style.display='none'; return; }
+    const hatInhalt = aufgaben.length || pflichten.length || schnell.length;
+    if (!hatInhalt) { el.style.display = 'none'; return; }
     el.style.display = 'block';
-    const tagLabel = dateStr===today ? 'Heute' : 'Morgen';
-    const gesamtOffen = aufgabenGruppen.reduce((s,g) => s+g.offen.length, 0) + pflichten.length + schnellItems.length;
-
-    let h = '<div class="ck-backlog-header"><span class="ck-backlog-label">Backlog \u00b7 ' + tagLabel + '</span><span class="ck-backlog-meta">' + gesamtOffen + ' offen</span></div>';
-
-    // Aufgaben-Klammern
-    aufgabenGruppen.forEach(g => {
+    const tagLabel = dateStr === today ? 'Heute' : 'Morgen';
+    const gesamtOffen = aufgaben.reduce((s,g) => s + g.offen.length, 0) + pflichten.length + schnell.length;
+    let h = '<div class="ck-backlog-header"><span class="ck-backlog-label">Backlog \u00b7 '+tagLabel+'</span><span class="ck-backlog-meta">'+gesamtOffen+' offen</span></div>';
+    aufgaben.forEach(g => {
       const pct = g.total ? Math.round(g.doneCnt/g.total*100) : 0;
       const isOpen = this._ckBacklogOffen?.['a_'+g.a.id] !== false;
-      h += '<div class="ck-backlog-aufgabe">'
-        + '<div class="ck-backlog-aufgabe-header" onclick="WB._ckBacklogToggleAufgabe(&quot;'+g.a.id+'&quot;)">'
-          + '<div style="width:7px;height:7px;border-radius:50%;background:'+g.weltColor+';flex-shrink:0;"></div>'
-          + '<span class="ck-backlog-aufgabe-name">'+this._esc(g.a.text)+'</span>'
-          + '<div style="display:flex;align-items:center;gap:5px;">'
-            + '<div style="width:36px;height:3px;background:var(--c-border);border-radius:2px;overflow:hidden;">'
-              + '<div style="width:'+pct+'%;height:100%;border-radius:2px;background:'+g.weltColor+';"></div></div>'
-            + '<span style="font-size:0.62rem;font-weight:700;color:'+g.weltColor+';">'+g.doneCnt+'/'+g.total+'</span>'
-          + '</div></div>'
-        + '<div class="ck-backlog-aufgabe-meta">'+this._esc(g.v.titel)+' \u00b7 '+g.weltLabel+(g.a.datum?' \u00b7 '+g.a.datum:'')+'</div>'
-        + '<div id="ck-backlog-a-'+g.a.id+'"'+(isOpen?'':' style="display:none;"')+'>';
+      h += '<div class="ck-backlog-aufgabe"><div class="ck-backlog-aufgabe-header" onclick="WB._ckBacklogToggleAufgabe(&quot;'+g.a.id+'&quot;)"><div style="width:7px;height:7px;border-radius:50%;background:'+g.weltColor+';flex-shrink:0;"></div><span class="ck-backlog-aufgabe-name">'+this._esc(g.a.text)+'</span><div style="display:flex;align-items:center;gap:5px;"><div style="width:36px;height:3px;background:var(--c-border);border-radius:2px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;border-radius:2px;background:'+g.weltColor+';"></div></div><span style="font-size:0.62rem;font-weight:700;color:'+g.weltColor+';">'+g.doneCnt+'/'+g.total+'</span></div></div><div class="ck-backlog-aufgabe-meta">'+this._esc(g.v.titel)+' \u00b7 '+g.weltLabel+' \u00b7 '+g.a.datum+'</div><div id="ck-backlog-a-'+g.a.id+'"'+(isOpen?'':' style="display:none;"')+'>';
       g.offen.forEach(c => {
-        h += '<div class="ck-backlog-cl-item"><span style="font-size:0.60rem;font-weight:700;flex-shrink:0;width:14px;text-align:center;color:'+((c.typ||'schritt')==='reibung'?'#B45309':'#0A6B5E')+';">'+((c.typ||'schritt')==='reibung'?'🔧':'\u2192')+'</span><div class="ck-backlog-cl-chk" onclick="WB._ckBacklogCheckCl(&quot;'+g.a.id+'&quot;,'+c._idx+',&quot;'+g.welt+'&quot;)"></div><span class="ck-backlog-cl-text">'+this._esc(c.text)+'</span></div>';
+        const typ = c.typ||'schritt';
+        h += '<div class="ck-backlog-cl-item"><span style="font-size:0.60rem;font-weight:700;flex-shrink:0;width:14px;text-align:center;color:'+(typ==='reibung'?'#B45309':'#0A6B5E')+';">'+(typ==='reibung'?'🔧':'\u2192')+'</span><div class="ck-backlog-cl-chk" onclick="WB._ckBacklogCheckCl(&quot;'+g.a.id+'&quot;,'+c._idx+',&quot;'+g.welt+'&quot;)"></div><span class="ck-backlog-cl-text">'+this._esc(c.text)+'</span></div>';
       });
       h += '</div></div>';
     });
-
-    // Wochenpflichten
     if (pflichten.length) {
-      h += '<div class="ck-backlog-sektion"><div class="ck-backlog-sektion-header" onclick="WB._ckBacklogToggleSektion(&quot;pflicht&quot;)"><span class="ck-backlog-sektion-icon">🔁</span><span class="ck-backlog-sektion-label">Wochenpflichten</span><span style="font-size:0.65rem;font-weight:700;color:var(--c-faint);">'+pflichten.length+'</span></div><div id="ck-backlog-s-pflicht">';
+      h += '<div class="ck-backlog-sektion"><div class="ck-backlog-sektion-header"><span class="ck-backlog-sektion-icon">🔁</span><span class="ck-backlog-sektion-label">Wochenpflichten</span><span style="font-size:0.65rem;color:var(--c-faint);">'+pflichten.length+' offen</span></div><div>';
       pflichten.forEach(({d,ctx,weltLabel,weltColor}) => {
-        h += '<div class="ck-backlog-simple-item"><div class="ck-backlog-simple-chk" onclick="WB._ckBacklogCheckPflicht(&quot;'+d.id+'&quot;,&quot;'+ctx+'&quot;)"></div><span class="ck-backlog-simple-text" style="cursor:pointer;">'+this._esc(d.title||d.name||'')+'</span><span class="ck-backlog-badge" style="background:'+(weltColor==='var(--c-beruf)'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+weltColor+';">'+weltLabel+'</span></div>';
+        h += '<div class="ck-backlog-simple-item"><div class="ck-backlog-simple-chk" onclick="WB._ckBacklogCheckPflicht(&quot;'+d.id+'&quot;,&quot;'+ctx+'&quot;)"></div><span class="ck-backlog-simple-text">'+this._esc(d.title||d.name||'')+'</span><span class="ck-backlog-badge" style="background:'+(weltColor==='var(--c-beruf)'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+weltColor+';">'+weltLabel+'</span></div>';
       });
       h += '</div></div>';
     }
-
-    // Schnell-Erinnerungen — nur heute + ohne Datum im Cockpit
-    const alleSchnell = [];
-    ['pro','priv'].forEach(ctx2 => {
-      const db2 = ctx2==='pro' ? this.dataPro : this.dataPriv;
-      (db2?.quickItems||[]).filter(q => !q.done && (q.date === dateStr || !q.date))
-        .forEach(q => alleSchnell.push({ q, ctx:ctx2,
-          weltLabel: ctx2==='pro'?'Beruf':'Privat', weltColor: ctx2==='pro'?'var(--c-beruf)':'#4D5F33' }));
-    });
-    if (alleSchnell.length) {
-      h += '<div class="ck-backlog-sektion"><div class="ck-backlog-sektion-header" onclick="WB._ckBacklogToggleSektion(&quot;schnell&quot;)"><span class="ck-backlog-sektion-icon">\u26a1</span><span class="ck-backlog-sektion-label">Schnell-Erinnerungen</span><span style="font-size:0.65rem;font-weight:700;color:var(--c-faint);">'+alleSchnell.length+'</span></div><div id="ck-backlog-s-schnell">';
-      alleSchnell.forEach(({q,ctx:c2,weltLabel:wl,weltColor:wc}) => {
-        h += '<div class="ck-backlog-simple-item"><div class="ck-backlog-simple-chk" onclick="WB._ckBacklogCheckSchnell(&quot;'+q.id+'&quot;,&quot;'+c2+'&quot;)"></div><span class="ck-backlog-simple-text" style="cursor:pointer;" onclick="event.stopPropagation();WB._quickDetail(&quot;'+q.id+'&quot;)">'+this._esc(q.text||'')+'</span><span class="ck-backlog-badge" style="background:'+(wc==='var(--c-beruf)'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+wc+';">'+wl+'</span></div>';
+    if (schnell.length) {
+      h += '<div class="ck-backlog-sektion"><div class="ck-backlog-sektion-header"><span class="ck-backlog-sektion-icon">\u26a1</span><span class="ck-backlog-sektion-label">Schnell-Erinnerungen</span><span style="font-size:0.65rem;color:var(--c-faint);">'+schnell.length+' offen</span></div><div>';
+      schnell.forEach(({q,ctx,weltLabel,weltColor}) => {
+        h += '<div class="ck-backlog-simple-item"><div class="ck-backlog-simple-chk" onclick="WB._ckBacklogCheckSchnell(&quot;'+q.id+'&quot;,&quot;'+ctx+'&quot;)"></div><span class="ck-backlog-simple-text">'+this._esc(q.text||'')+'</span><span class="ck-backlog-badge" style="background:'+(weltColor==='var(--c-beruf)'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+weltColor+';">'+weltLabel+'</span></div>';
       });
       h += '</div></div>';
     }
@@ -16524,6 +16489,15 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     }
   },
 
+
+  _blPostZuordnen(id, ctx) {
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const q = (db?.quickItems||[]).find(x => x.id === id);
+    if (!q) return;
+    this._quickAdd();
+    setTimeout(() => { const t = document.getElementById('wqa-text'); if (t) { t.value = q.text||''; t.focus(); } }, 150);
+  },
+
   _blDeleteSchnell(id, ctx) {
     const db = ctx==='pro' ? this.dataPro : this.dataPriv;
     if (!db?.quickItems) return;
@@ -16541,130 +16515,46 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const kwStart = this._kwStartDate();
     const kwEnd = this._kwEndDate();
     const kwNr = this._getCurrentKW ? this._getCurrentKW() : '';
-
-    // Alle aktiven Vorhaben-Aufgaben mit Checklisten
     const aufgabenAlle = [];
     ['pro','priv'].forEach(welt => {
-      const store = this._vorhabenStore(welt) || [];
-      store.filter(v => (v.aktivitaet||'aktiv')==='aktiv').forEach(v => {
-        (v.meilensteine||[]).forEach(ms => {
-          (ms.aufgaben||[]).filter(a => !a.done).forEach(a => {
-            const checks = a.checklist||[];
-            const doneCnt = checks.filter(c=>c.done).length;
-            const total = checks.length;
-            const offen = checks.map((c,i)=>({...c,_idx:i})).filter(c=>!c.done);
-            if (!offen.length) return;
-            aufgabenAlle.push({a,v,welt,ms,doneCnt,total,offen,
-              weltColor:welt==='pro'?'#0A6B5E':'#4D5F33',
-              weltLabel:welt==='pro'?'Beruf':'Privat'});
+      const store = this._vorhabenStore(welt)||[];
+      store.filter(v=>(v.aktivitaet||'aktiv')==='aktiv').forEach(v=>{
+        (v.meilensteine||[]).forEach(ms=>{
+          (ms.aufgaben||[]).filter(a=>!a.done&&(a.checklist||[]).length>0).forEach(a=>{
+            const checks=a.checklist||[];const doneCnt=checks.filter(c=>c.done).length;const total=checks.length;
+            const offen=checks.map((c,i)=>({...c,_idx:i})).filter(c=>!c.done);
+            if(!offen.length) return;
+            aufgabenAlle.push({a,v,welt,ms,doneCnt,total,offen,weltColor:welt==='pro'?'var(--c-beruf)':'#4D5F33',weltLabel:welt==='pro'?'Beruf':'Privat'});
           });
         });
       });
     });
-
-    const ueberfaellig = aufgabenAlle.filter(g => g.a.datum && g.a.datum < kwStart);
-    const dieseWoche = aufgabenAlle.filter(g => g.a.datum && g.a.datum >= kwStart && g.a.datum <= kwEnd);
-    const naechsteWochen = aufgabenAlle.filter(g => g.a.datum && g.a.datum > kwEnd);
-    const ohneDatum = aufgabenAlle.filter(g => !g.a.datum);
-
-    const getKWHinweis = (datum) => {
-      if (!datum) return '';
-      const d = new Date(datum+'T12:00:00');
-      const soy = new Date(d.getFullYear(),0,1);
-      return 'aus KW'+Math.ceil(((d-soy)/86400000+soy.getDay()+1)/7);
-    };
-
-    const alleSchnell = (this._quickStoreAlle ? this._quickStoreAlle() : []).filter(q => !q.done);
-    const schnellUeber = alleSchnell.filter(x => x.date && x.date < today);
-    const schnellHeute = alleSchnell.filter(x => x.date === today);
-    const schnellGeplant = alleSchnell.filter(x => x.date && x.date > today);
-    const schnellOffen = alleSchnell.filter(x => !x.date);
-    const posteingang = alleSchnell.filter(x => !x.date && !x.vorhabenId);
-
-    header.innerHTML = '<span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);">Backlog \u00b7 KW'+kwNr+'</span>';
-
-    const renderAK = (g, hinweis) => {
-      const pct = g.total ? Math.round(g.doneCnt/g.total*100) : 0;
-      let h = '<div style="border-bottom:0.5px solid rgba(0,0,0,0.06);">'
-        + '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px 4px;cursor:pointer;" onclick="WB._blToggleAufgabe(&quot;'+g.a.id+'&quot;,&quot;'+g.welt+'&quot;)">'
-        + '<div style="width:7px;height:7px;border-radius:50%;background:'+g.weltColor+';flex-shrink:0;"></div>'
-        + '<span style="font-size:0.95rem;font-weight:600;color:var(--c-text);flex:1;">'+this._esc(g.a.text)+'</span>'
-        + '<div style="display:flex;align-items:center;gap:5px;"><div style="width:36px;height:3px;background:var(--c-border);border-radius:2px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;border-radius:2px;background:'+g.weltColor+';"></div></div>'
-        + '<span style="font-size:0.62rem;font-weight:700;color:'+g.weltColor+';">'+g.doneCnt+'/'+g.total+'</span></div></div>'
-        + '<div style="font-size:0.68rem;color:var(--c-faint);padding:0 12px 5px 27px;">'+this._esc(g.v.titel)+' \u00b7 '+g.weltLabel+(g.a.datum?' \u00b7 '+g.a.datum:'')+(hinweis?' <span style="color:#B45309;">'+hinweis+'</span>':'')+'</div>'
-        + '<div>';
-      g.offen.forEach(c => {
-        const typ = c.typ||'schritt';
-        h += '<div style="display:flex;align-items:center;gap:7px;padding:5px 12px 5px 27px;border-bottom:0.5px solid rgba(0,0,0,0.03);">'
-          + '<span style="font-size:0.60rem;font-weight:700;flex-shrink:0;width:14px;text-align:center;color:'+(typ==='reibung'?'#B45309':g.weltColor)+';">'+(typ==='reibung'?'🔧':'\u2192')+'</span>'
-          + '<div style="width:13px;height:13px;border-radius:50%;border:1.5px solid rgba(0,0,0,0.15);background:#fff;flex-shrink:0;cursor:pointer;" onclick="event.stopPropagation();WB._ckBacklogCheckCl(&quot;'+g.a.id+'&quot;,'+c._idx+',&quot;'+g.welt+'&quot;)"></div>'
-          + '<span style="font-size:0.95rem;color:var(--c-text);flex:1;cursor:pointer;" onclick="WB._blOpenDetail(&quot;'+g.a.id+'&quot;,&quot;'+g.welt+'&quot;)">'+this._esc(c.text)+'</span></div>';
-      });
-      h += '</div></div>';
-      return h;
-    };
-
-    const renderSek = (icon, label, hint, inhalt, id, startOpen) => {
-      const isOpen = this._blSektionOffen?.[id] !== false ? (startOpen !== false) : false;
-      return '<div style="margin-bottom:8px;"><div style="display:flex;align-items:center;gap:8px;padding:7px 12px 5px;cursor:pointer;user-select:none;background:rgba(0,0,0,0.03);border-radius:8px 8px 0 0;" onclick="WB._blToggleSektion(&quot;'+id+'&quot;)">'
-        + '<span style="font-size:13px;">'+icon+'</span>'
-        + '<span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);flex:1;">'+label+'</span>'
-        + (hint?'<span style="font-size:0.62rem;color:var(--c-faint);font-style:italic;">'+hint+'</span>':'')
-        + '<span style="font-size:10px;color:var(--c-faint);">\u25be</span></div>'
-        + '<div id="bl-s-'+id+'" style="'+(isOpen?'':'display:none;')+'background:var(--c-surface);border:1px solid var(--c-border);border-top:none;border-radius:0 0 8px 8px;overflow:hidden;">'+inhalt+'</div></div>';
-    };
-
-    let h = '';
-
-    // 1. Überfällig + ohne Datum
-    if (ueberfaellig.length) {
-      const alle = [...ueberfaellig];
-      h += renderSek('\u26a0', '\u00dcberf\u00e4llig', '', alle.map(g => renderAK(g, g.a.datum ? getKWHinweis(g.a.datum) : '')).join(''), 'ueberfaellig', true);
-    }
-
-    // 2. Diese Woche
-    if (dieseWoche.length || ohneDatum.length) {
-      const dwAlle = [...dieseWoche, ...ohneDatum];
-      h += renderSek('📋', 'Diese Woche \u00b7 KW'+kwNr, '', dwAlle.map(g => renderAK(g,'')).join(''), 'diesewoche', true);
-    }
-
-    // 3. Nächste Wochen
-    if (naechsteWochen.length) {
-      const nw = naechsteWochen.map(g => '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:0.5px solid rgba(0,0,0,0.05);cursor:pointer;" onclick="WB._blOpenDetail(&quot;'+g.a.id+'&quot;,&quot;'+g.welt+'&quot;)">'
-        + '<div style="width:6px;height:6px;border-radius:50%;background:'+g.weltColor+';opacity:0.5;flex-shrink:0;"></div>'
-        + '<span style="font-size:0.95rem;color:var(--c-muted);flex:1;">'+this._esc(g.a.text)+'</span>'
-        + '<span style="font-size:0.65rem;color:var(--c-faint);font-family:var(--font-mono);">'+g.a.datum+'</span>'
-        + '<span style="font-size:0.60rem;padding:1px 5px;border-radius:4px;font-weight:600;color:#fff;background:'+g.weltColor+';">'+g.weltLabel+'</span></div>').join('');
-      h += renderSek('🔭', 'N\u00e4chste Wochen', '', nw, 'naechste', false);
-    }
-
-    // 4. Posteingang
-    if (posteingang.length) {
-      const pe = posteingang[0];
-      const rest = posteingang.length - 1;
-      const pb = '<div style="padding:8px 12px;"><div style="font-size:0.95rem;color:var(--c-text);margin-bottom:8px;">'+this._esc(pe.text||'')+'</div>'
-        + '<div style="display:flex;gap:6px;"><button onclick="WB._quickAdd()" style="font-size:0.72rem;padding:4px 10px;border-radius:6px;border:1px solid rgba(10,107,94,0.3);background:none;color:#0A6B5E;cursor:pointer;font-family:var(--font);">Zuordnen \u2192</button>'
-        + '<button onclick="WB._blDeleteSchnell(&quot;'+pe.id+'&quot;,&quot;'+pe._ctx+'&quot;)" style="font-size:0.72rem;padding:4px 10px;border-radius:6px;border:1px solid var(--c-border);background:none;color:var(--c-faint);cursor:pointer;font-family:var(--font);">\u2715 l\u00f6schen</button></div></div>'
-        + (rest>0?'<div style="padding:5px 12px;font-size:0.72rem;color:var(--c-faint);font-style:italic;border-top:0.5px dashed rgba(0,0,0,0.08);">\u2500\u2500 '+rest+' weitere \u2500\u2500</div>':'');
-      h += renderSek('📥', 'Posteingang', 'heute 1 verarbeiten', pb, 'posteingang', true);
-    }
-
-    // 5. Schnell-Erinnerungen
-    const renderSG = (label, gruppe) => {
-      if (!gruppe.length) return '';
-      return '<div style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);padding:5px 12px 3px;">'+label+'</div>'
-        + gruppe.map(x => '<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:0.5px solid rgba(0,0,0,0.04);">'
-          + '<div style="width:13px;height:13px;border-radius:50%;border:1.5px solid rgba(0,0,0,0.15);background:#fff;flex-shrink:0;cursor:pointer;" onclick="WB._ckBacklogCheckSchnell(&quot;'+x.id+'&quot;,&quot;'+x._ctx+'&quot;)"></div>'
-          + '<span style="font-size:0.95rem;color:var(--c-text);flex:1;">'+this._esc(x.text||'')+'</span>'
-          + (x.date&&x.date!==today?'<span style="font-size:0.65rem;color:var(--c-faint);font-family:var(--font-mono);">'+x.date+'</span>':'')
-          + '<span style="font-size:0.60rem;padding:1px 5px;border-radius:4px;font-weight:600;background:'+(x._ctx==='pro'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+(x._ctx==='pro'?'#0A6B5E':'#4D5F33')+';">'+(x._ctx==='pro'?'Beruf':'Privat')+'</span></div>').join('');
-    };
-    if (alleSchnell.length) {
-      const sb = renderSG('\u00dcberf\u00e4llig', schnellUeber) + renderSG('Heute', schnellHeute) + renderSG('Geplant', schnellGeplant) + renderSG('Offen', schnellOffen);
-      h += renderSek('\u26a1', 'Schnell-Erinnerungen', '', sb, 'schnell', false);
-    }
-
-    scroll.innerHTML = h || '<div style="text-align:center;padding:32px;color:var(--c-faint);font-size:0.85rem;">Backlog ist leer.</div>';
+    const ueberfaellig=aufgabenAlle.filter(g=>g.a.datum&&g.a.datum<kwStart);
+    const dieseWoche=aufgabenAlle.filter(g=>g.a.datum&&g.a.datum>=kwStart&&g.a.datum<=kwEnd);
+    const naechsteWochen=aufgabenAlle.filter(g=>g.a.datum&&g.a.datum>kwEnd);
+    const ohneDatum=aufgabenAlle.filter(g=>!g.a.datum);
+    const alleSchnell=(this._quickStoreAlle?this._quickStoreAlle():[]).filter(q=>!q.done);
+    const schnellUeber=alleSchnell.filter(x=>x.date&&x.date<today);
+    const schnellHeute=alleSchnell.filter(x=>x.date===today);
+    const schnellGeplant=alleSchnell.filter(x=>x.date&&x.date>today);
+    const schnellOffen=alleSchnell.filter(x=>!x.date);
+    const posteingang=schnellOffen.filter(x=>!x.vorhabenId);
+    const getKWHinweis=datum=>{if(!datum)return'';const d=new Date(datum+'T12:00:00');const s=new Date(d.getFullYear(),0,1);return'aus KW'+Math.ceil(((d-s)/86400000+s.getDay()+1)/7);};
+    header.innerHTML='<span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);">Backlog \u00b7 KW'+kwNr+'</span>';
+    const renderAK=(g,hinweis)=>{const pct=g.total?Math.round(g.doneCnt/g.total*100):0;let h='<div style="border-bottom:0.5px solid rgba(0,0,0,0.06);"><div style="display:flex;align-items:center;gap:8px;padding:8px 12px 4px;cursor:pointer;" onclick="WB._blOpenDetail(&quot;'+g.a.id+'&quot;,&quot;'+g.welt+'&quot;)"><div style="width:7px;height:7px;border-radius:50%;background:'+g.weltColor+';flex-shrink:0;"></div><span style="font-size:0.95rem;font-weight:600;color:var(--c-text);flex:1;">'+this._esc(g.a.text)+'</span><div style="display:flex;align-items:center;gap:5px;"><div style="width:36px;height:3px;background:var(--c-border);border-radius:2px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+g.weltColor+';border-radius:2px;"></div></div><span style="font-size:0.62rem;font-weight:700;color:'+g.weltColor+';">'+g.doneCnt+'/'+g.total+'</span></div></div><div style="font-size:0.68rem;color:var(--c-faint);padding:0 12px 5px 27px;">'+this._esc(g.v.titel)+' \u00b7 '+g.weltLabel+(g.a.datum?' \u00b7 '+g.a.datum:'')+(hinweis?' <span style="color:#B45309;font-style:italic;">'+hinweis+'</span>':'')+'</div>';
+    g.offen.forEach(c=>{const typ=c.typ||'schritt';h+='<div style="display:flex;align-items:center;gap:7px;padding:5px 12px 5px 27px;border-bottom:0.5px solid rgba(0,0,0,0.03);"><span style="font-size:0.60rem;font-weight:700;flex-shrink:0;width:14px;text-align:center;color:'+(typ==='reibung'?'#B45309':g.weltColor)+';">'+(typ==='reibung'?'🔧':'\u2192')+'</span><div style="width:13px;height:13px;border-radius:50%;border:1.5px solid rgba(0,0,0,0.15);background:#fff;flex-shrink:0;cursor:pointer;" onclick="event.stopPropagation();WB._ckBacklogCheckCl(&quot;'+g.a.id+'&quot;,'+c._idx+',&quot;'+g.welt+'&quot;)"></div><span style="font-size:0.95rem;color:var(--c-text);flex:1;cursor:pointer;" onclick="WB._blOpenDetail(&quot;'+g.a.id+'&quot;,&quot;'+g.welt+'&quot;)">'+this._esc(c.text)+'</span></div>';});
+    h+='</div>';return h;};
+    const renderSek=(icon,label,hint,body,id,startOpen)=>{const isOpen=this._blSektionOffen?.[id]!==false?startOpen!==false:false;return'<div style="margin-bottom:8px;"><div style="display:flex;align-items:center;gap:8px;padding:7px 12px 5px;cursor:pointer;user-select:none;background:rgba(0,0,0,0.03);border-radius:8px 8px 0 0;" onclick="WB._blToggleSektion(&quot;'+id+'&quot;)"><span style="font-size:13px;">'+icon+'</span><span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--c-faint);flex:1;">'+label+'</span>'+(hint?'<span style="font-size:0.62rem;color:var(--c-faint);font-style:italic;">'+hint+'</span>':'')+'<span style="font-size:10px;color:var(--c-faint);">\u25be</span></div><div id="bl-s-'+id+'" style="'+(isOpen?'':'display:none;')+'background:var(--c-surface);border:1px solid var(--c-border);border-top:none;border-radius:0 0 8px 8px;overflow:hidden;">'+body+'</div></div>';};
+    const renderSG=(label,gruppe)=>{if(!gruppe.length)return'';return'<div style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-faint);padding:5px 12px 3px;">'+label+'</div>'+gruppe.map(x=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:0.5px solid rgba(0,0,0,0.04);"><div style="width:13px;height:13px;border-radius:50%;border:1.5px solid rgba(0,0,0,0.15);background:#fff;flex-shrink:0;cursor:pointer;" onclick="WB._ckBacklogCheckSchnell(&quot;'+x.id+'&quot;,&quot;'+x._ctx+'&quot;)"></div><span style="font-size:0.95rem;color:var(--c-text);flex:1;">'+this._esc(x.text||'')+'</span>'+(x.date&&x.date!==today?'<span style="font-size:0.65rem;color:var(--c-faint);font-family:var(--font-mono);">'+x.date+'</span>':'')+'<span style="font-size:0.60rem;padding:1px 5px;border-radius:4px;font-weight:600;background:'+(x._ctx==='pro'?'rgba(10,107,94,0.1)':'rgba(77,95,51,0.1)')+';color:'+(x._ctx==='pro'?'var(--c-beruf)':'#4D5F33')+';">'+(x._ctx==='pro'?'Beruf':'Privat')+'</span></div>').join('');};
+    let h='';
+    if(ueberfaellig.length){h+=renderSek('\u26a0','\u00dcberf\u00e4llig','',ueberfaellig.map(g=>renderAK(g,getKWHinweis(g.a.datum))).join(''),'ueberfaellig',true);}
+    const dwAlle=[...dieseWoche,...ohneDatum];
+    if(dwAlle.length){h+=renderSek('📋','Diese Woche \u00b7 KW'+kwNr,'',dwAlle.map(g=>renderAK(g,'')).join(''),'diesewoche',true);}
+    if(naechsteWochen.length){const nw=naechsteWochen.map(g=>'<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:0.5px solid rgba(0,0,0,0.05);"><div style="width:6px;height:6px;border-radius:50%;background:'+g.weltColor+';opacity:0.5;flex-shrink:0;"></div><span style="font-size:0.95rem;color:var(--c-muted);flex:1;">'+this._esc(g.a.text)+'</span><span style="font-size:0.65rem;color:var(--c-faint);font-family:var(--font-mono);">'+g.a.datum+'</span><span style="font-size:0.60rem;padding:1px 5px;border-radius:4px;font-weight:600;color:#fff;background:'+g.weltColor+';">'+g.weltLabel+'</span></div>').join('');h+=renderSek('🔭','N\u00e4chste Wochen','',nw,'naechste',false);}
+    if(posteingang.length){const pe=posteingang[0];const rest=posteingang.length-1;const pb='<div style="padding:8px 12px;"><div style="font-size:0.95rem;color:var(--c-text);margin-bottom:8px;">'+this._esc(pe.text||'')+'</div><div style="display:flex;gap:6px;"><button onclick="WB._blPostZuordnen(&quot;'+pe.id+'&quot;,&quot;'+pe._ctx+'&quot;)" style="font-size:0.72rem;padding:4px 10px;border-radius:6px;border:1px solid rgba(10,107,94,0.3);background:none;color:var(--c-beruf);cursor:pointer;font-family:var(--font);">Zuordnen \u2192</button><button onclick="WB._blDeleteSchnell(&quot;'+pe.id+'&quot;,&quot;'+pe._ctx+'&quot;)" style="font-size:0.72rem;padding:4px 10px;border-radius:6px;border:1px solid var(--c-border);background:none;color:var(--c-faint);cursor:pointer;font-family:var(--font);">\u2715 l\u00f6schen</button></div></div>'+(rest>0?'<div style="padding:5px 12px;font-size:0.72rem;color:var(--c-faint);font-style:italic;border-top:0.5px dashed rgba(0,0,0,0.08);">\u2500\u2500 '+rest+' weitere \u2500\u2500</div>':'');h+=renderSek('📥','Posteingang','heute 1 verarbeiten',pb,'posteingang',true);}
+    const schnellBody=renderSG('\u00dcberf\u00e4llig',schnellUeber)+renderSG('Heute',schnellHeute)+renderSG('Geplant',schnellGeplant);
+    if(schnellUeber.length||schnellHeute.length||schnellGeplant.length){h+=renderSek('\u26a1','Schnell-Erinnerungen','',schnellBody,'schnell',false);}
+    scroll.innerHTML=h||'<div style="text-align:center;padding:32px;color:var(--c-faint);font-size:0.85rem;">Backlog ist leer.</div>';
   },
 
   _ckRenderChaosBlock() {
@@ -17069,7 +16959,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!ms.aufgaben) ms.aufgaben = [];
     const kwEnd = this._kwEndDate ? this._kwEndDate() : new Date().toISOString().split('T')[0];
     items.forEach((text, i) => {
-      ms.aufgaben.push({ id:'a_imp_'+Date.now()+'_'+i, text, done:false, datum:kwEnd, aktivEnergie:'mittel', checklist:[], naechsterSchritt:false });
+      ms.aufgaben.push({ id:'a_imp_'+Date.now()+'_'+i, text, done:false, datum:'', aktivEnergie:'mittel', checklist:[], naechsterSchritt:false });
     });
     vh.geaendert = Date.now();
     this.setDirty();
