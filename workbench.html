@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.43.5</title>
+<title>WorkBench 5.43.6</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.43.5 · Build 20260615-0910</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.43.6 · Build 20260615-0920</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.43.5</div>
+  <div class="wb-startup-tagline">v5.43.6</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7910,8 +7910,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.43.5',
-  APP_BUILD:   '20260615-0910',
+  APP_VERSION: '5.43.6',
+  APP_BUILD:   '20260615-0920',
 
 
   // ══════════════════════════════════════════════════════
@@ -16097,7 +16097,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const ev = (db?.customEvents||[]).find(e => String(e.id) === String(evId));
     if (!ev) return;
     ev.status = status;
-    if (status === 'abgesagt') ev.done = true;
+    if (status === 'abgesagt' || status === 'erledigt') ev.done = true;
     // SV1: Buchungs-Sheet bei Termin-Erledigung
     if (ev.done) { this._svPendingSheet = { text: ev.text||'Termin', quelle: 'termin' }; this._svShowSheet(ev.text||'Termin', 'termin'); }
     
@@ -18270,7 +18270,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
         + '</div>'
         + expProgress
         + (item.zeit ? '<div class="ck-z-zeit">' + item.zeit + '</div>' : '')
-        + (item.type === 'termin' || item.type === 'pflicht' || item.type === 'schnell'
+        + (item.type === 'termin' && !item.done
+          ? '<button onclick="event.stopPropagation();WB._ckTerminOptionen(&quot;' + item.id + '&quot;,&quot;' + (item.ctx||'priv') + '&quot;)"'
+            + ' title="Optionen"'
+            + ' style="background:none;border:none;cursor:pointer;font-size:1.0rem;'
+            + 'color:var(--c-faint);padding:2px 6px;flex-shrink:0;line-height:1;">'
+            + '\u22ee</button>'
+          : '')
+        + (item.type === 'pflicht' || item.type === 'schnell'
           ? '<button onclick="event.stopPropagation();WB._notifToggleItem(&quot;'
             + item.type + '&quot;,&quot;' + item.id + '&quot;,&quot;' + (item.ctx||'priv') + '&quot;)"'
             + ' title="Erinnerung ein/aus"'
@@ -18343,6 +18350,27 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     });
 
     return Math.max(0, rest);
+  },
+
+
+  _ckTerminOptionen(evId, ctx) {
+    document.getElementById('ck-termin-opts')?.remove();
+    const sheet = document.createElement('div');
+    sheet.id = 'ck-termin-opts';
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.3);display:flex;align-items:flex-end;font-family:var(--font);';
+    sheet.onclick = e => { if (e.target === sheet) sheet.remove(); };
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const ev = (db?.customEvents||[]).find(e => String(e.id) === String(evId));
+    const name = ev?.text || 'Termin';
+    sheet.innerHTML = '<div style="background:var(--c-surface);width:100%;max-width:480px;margin:0 auto;border-radius:var(--radius) var(--radius) 0 0;padding:16px 16px 24px;">'
+      + '<div style="font-size:0.72rem;color:var(--c-faint);margin-bottom:10px;text-transform:uppercase;font-weight:700;letter-spacing:0.06em;">' + this._esc(name) + '</div>'
+      + '<div style="display:flex;flex-direction:column;gap:8px;">'
+        + '<button onclick="document.getElementById(&quot;ck-termin-opts&quot;).remove();WB._evSetStatus(&quot;'+evId+'&quot;,&quot;'+ctx+'&quot;,&quot;erledigt&quot;)" style="padding:12px;border-radius:var(--radius-xs);background:var(--c-beruf);color:#fff;border:none;font-family:var(--font);font-size:0.88rem;font-weight:600;cursor:pointer;">\u2713 Erledigt</button>'
+        + '<button onclick="document.getElementById(&quot;ck-termin-opts&quot;).remove();WB._evSetStatus(&quot;'+evId+'&quot;,&quot;'+ctx+'&quot;,&quot;abgesagt&quot;)" style="padding:12px;border-radius:var(--radius-xs);background:none;border:1px solid var(--c-danger,#C62828);color:var(--c-danger,#C62828);font-family:var(--font);font-size:0.88rem;cursor:pointer;">\u2715 Absagen</button>'
+        + '<button onclick="document.getElementById(&quot;ck-termin-opts&quot;).remove();WB._evSetStatus(&quot;'+evId+'&quot;,&quot;'+ctx+'&quot;,&quot;verschoben&quot;)" style="padding:12px;border-radius:var(--radius-xs);background:none;border:1px solid #B87333;color:#B87333;font-family:var(--font);font-size:0.88rem;cursor:pointer;">\u27a1 Verschieben</button>'
+        + '<button onclick="document.getElementById(&quot;ck-termin-opts&quot;).remove()" style="padding:12px;border-radius:var(--radius-xs);background:none;border:1px solid var(--c-border);color:var(--c-faint);font-family:var(--font);font-size:0.85rem;cursor:pointer;">Abbrechen</button>'
+      + '</div></div>';
+    document.body.appendChild(sheet);
   },
 
   _ckZTerminDone(id, ctx, chk) {
