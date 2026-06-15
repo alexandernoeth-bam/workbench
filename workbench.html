@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.44.6</title>
+<title>WorkBench 5.44.7</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.44.6 · Build 20260615-1100</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.44.7 · Build 20260615-1110</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.44.6</div>
+  <div class="wb-startup-tagline">v5.44.7</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7851,8 +7851,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.44.6',
-  APP_BUILD:   '20260615-1100',
+  APP_VERSION: '5.44.7',
+  APP_BUILD:   '20260615-1110',
 
 
   // ══════════════════════════════════════════════════════
@@ -9816,20 +9816,17 @@ const WB = {
     }, 60000);
   },
 
-  async _autoRefreshCheck(ctx) {
-    if (!this._sync?.[ctx]?.fileId || !this._sync[ctx]?.token) return;
-    const fileId = this._sync[ctx].fileId;
-    const token = this._sync[ctx].token;
+  async _autoRefreshCheck(ctx, token) {
+    const fileId = this._oauthDriveFileIds?.[ctx];
+    if (!fileId || !token) return;
     try {
       const r = await fetch(this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime', { headers: { Authorization: 'Bearer ' + token } });
       if (!r.ok) return;
       const meta = await r.json();
       const driveModified = new Date(meta.modifiedTime).getTime();
       const localUpdated = this._sync[ctx]?.last_updated ? new Date(this._sync[ctx].last_updated).getTime() : 0;
-      // Nur prüfen wenn lokale Daten vorhanden
       const hasLocal = ctx === 'pro' ? !!this.dataPro : !!this.dataPriv;
       if (!hasLocal) return;
-      // Mindest-Puffer 60s
       if (driveModified > localUpdated + 60000) {
         const r2 = await fetch(this.DRIVE_API + '/files/' + fileId + '?alt=media', { headers: { Authorization: 'Bearer ' + token } });
         if (!r2.ok) return;
@@ -9841,12 +9838,19 @@ const WB = {
             const ok = confirm('Drive hat eine neuere Version (Rev.' + driveRev + ').\nDu hast lokale \u00c4nderungen.\nTrotzdem von Drive laden?');
             if (!ok) return;
           }
-          console.log('[AutoRefresh] Drive Rev.' + driveRev + ' > lokal Rev.' + localRev);
+          console.log('[AutoRefresh] Drive Rev.' + driveRev + ' > lokal Rev.' + localRev + ' \u2014 lade...');
           await this.oauthSyncDownload(ctx);
           this._toast('\u2713 ' + (ctx==='pro'?'Beruf':'Privat') + ' aktualisiert (Rev.' + driveRev + ')');
+        } else {
+          console.log('[AutoRefresh] Drive Rev.' + driveRev + ' \u2264 lokal Rev.' + localRev + ' \u2014 kein Download');
         }
       }
-    } catch(e) { console.error('[AutoRefresh]', e); }
+    } catch(e) {
+      console.warn('[AutoRefresh]', e);
+      if (e.message?.includes('401') || e.message?.includes('403')) {
+        try { this._driveLoginBannerShow(); } catch(_e) {}
+      }
+    }
   },
 
   // ══════════════════════════════════════════════════════
