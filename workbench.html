@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.44.4</title>
+<title>WorkBench 5.44.5</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.44.4 · Build 20260615-1040</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.44.5 · Build 20260615-1050</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.44.4</div>
+  <div class="wb-startup-tagline">v5.44.5</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7838,8 +7838,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.44.4',
-  APP_BUILD:   '20260615-1040',
+  APP_VERSION: '5.44.5',
+  APP_BUILD:   '20260615-1050',
 
 
   // ══════════════════════════════════════════════════════
@@ -16734,6 +16734,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const erledigt = backlog.filter(cb => cb.done);
     let h = '<div style="padding:12px 0;">';
     h += '<button onclick="WB._cbNeuSheet(&quot;' + vh.id + '&quot;,&quot;' + welt + '&quot;)" style="width:100%;padding:10px;margin-bottom:10px;border:1px dashed rgba(0,0,0,0.15);background:none;border-radius:8px;font-family:var(--font);font-size:0.85rem;cursor:pointer;color:var(--c-muted);">+ Mikro-Aufgabe hinzuf\u00fcgen (unter 10 Min)</button>';
+    h += '<button onclick="WB._vhImportAufgaben(&quot;' + vh.id + '&quot;,&quot;' + welt + '&quot;)" style="display:flex;align-items:center;gap:6px;width:100%;padding:9px 12px;margin-top:6px;border:1px dashed rgba(10,107,94,0.3);border-radius:8px;background:none;font-family:var(--font);font-size:0.82rem;color:#0A6B5E;cursor:pointer;"><span>📋</span><span>KI-Liste importieren</span></button>';
     if (!offen.length && !erledigt.length) {
       h += '<div style="text-align:center;padding:24px 0;color:var(--c-faint);font-size:0.85rem;">Backlog ist leer.</div>';
     }
@@ -17030,6 +17031,133 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     cards.innerHTML = h;
   },
 
+
+
+  _parseImportListe(text) {
+    if (!text?.trim()) return [];
+    return text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+      .map(l => l.replace(/^\d+[\.\)]\s*/, '').replace(/^[-\u2022]\s*/, '').trim())
+      .filter(t => t.length > 0);
+  },
+
+  _vhImportAufgaben(vhId, welt) {
+    document.getElementById('wb-import-sheet')?.remove();
+    const sheet = document.createElement('div');
+    sheet.id = 'wb-import-sheet';
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:560;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;font-family:var(--font);';
+    const panel = document.createElement('div');
+    panel.style.cssText = 'background:var(--c-bg);width:100%;max-width:480px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px 16px 28px;';
+    panel.innerHTML = '<div style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--c-faint);margin-bottom:4px;">Aufgaben importieren</div>'
+      + '<div style="font-size:0.82rem;color:var(--c-muted);margin-bottom:12px;">Nummerierte Liste einf\u00fcgen (1. Text, 2. Text, ...)</div>'
+      + '<textarea id="wb-import-textarea" placeholder="1. Erste Aufgabe&#10;2. Zweite Aufgabe&#10;3. Dritte Aufgabe" style="width:100%;height:160px;padding:10px;border:1px solid var(--c-border);border-radius:8px;font-family:var(--font);font-size:0.85rem;background:var(--c-surface);color:var(--c-text);resize:none;box-sizing:border-box;"></textarea>'
+      + '<div id="wb-import-preview" style="margin-top:8px;font-size:0.75rem;color:var(--c-faint);min-height:20px;"></div>'
+      + '<div id="wb-import-btns" style="display:flex;gap:8px;margin-top:12px;"></div>';
+    sheet.appendChild(panel);
+    document.body.appendChild(sheet);
+    // Buttons
+    const btns = panel.querySelector('#wb-import-btns');
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Abbrechen';
+    cancelBtn.style.cssText = 'flex:1;padding:10px;border-radius:8px;border:1px solid var(--c-border);background:none;font-family:var(--font);font-size:0.85rem;color:var(--c-faint);cursor:pointer;';
+    cancelBtn.addEventListener('click', () => sheet.remove());
+    const importBtn = document.createElement('button');
+    importBtn.textContent = 'Importieren \u2713';
+    importBtn.style.cssText = 'flex:2;padding:10px;border-radius:8px;border:none;background:var(--c-beruf);color:#fff;font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;';
+    importBtn.addEventListener('click', () => WB._vhImportAufgabenSave(vhId, welt));
+    btns.appendChild(cancelBtn); btns.appendChild(importBtn);
+    // Live-Preview
+    setTimeout(() => {
+      const ta = document.getElementById('wb-import-textarea');
+      const preview = document.getElementById('wb-import-preview');
+      if (ta && preview) {
+        ta.addEventListener('input', () => { const items = WB._parseImportListe(ta.value); preview.textContent = items.length > 0 ? items.length + ' Eintr\u00e4ge erkannt' : ''; });
+        ta.focus();
+      }
+    }, 100);
+    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
+  },
+
+  _vhImportAufgabenSave(vhId, welt) {
+    const ta = document.getElementById('wb-import-textarea');
+    if (!ta) return;
+    const items = this._parseImportListe(ta.value);
+    if (!items.length) { this._toast('Keine Eintr\u00e4ge erkannt'); return; }
+    const store = this._vorhabenStore(welt) || [];
+    const vh = store.find(v => v.id === vhId);
+    if (!vh) return;
+    if (!vh.meilensteine) vh.meilensteine = [];
+    if (!vh.meilensteine.length) vh.meilensteine.push({ id:'ms_'+Date.now(), titel:'Importierte Aufgaben', aufgaben:[] });
+    const ms = vh.meilensteine[0];
+    if (!ms.aufgaben) ms.aufgaben = [];
+    const kwEnd = this._kwEndDate ? this._kwEndDate() : new Date().toISOString().split('T')[0];
+    items.forEach((text, i) => {
+      ms.aufgaben.push({ id:'a_imp_'+Date.now()+'_'+i, text, done:false, datum:kwEnd, aktivEnergie:'mittel', checklist:[], naechsterSchritt:true });
+    });
+    vh.geaendert = Date.now();
+    this.setDirty();
+    document.getElementById('wb-import-sheet')?.remove();
+    this._toast('\u2713 ' + items.length + ' Aufgaben importiert');
+    try { this._vorhabenDetailRender(); } catch(e) {}
+  },
+
+  _clImportEintraege(aufgabeId, welt) {
+    document.getElementById('wb-import-sheet')?.remove();
+    const sheet = document.createElement('div');
+    sheet.id = 'wb-import-sheet';
+    sheet.style.cssText = 'position:fixed;inset:0;z-index:560;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;font-family:var(--font);';
+    const panel = document.createElement('div');
+    panel.style.cssText = 'background:var(--c-bg);width:100%;max-width:480px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px 16px 28px;';
+    panel.innerHTML = '<div style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--c-faint);margin-bottom:4px;">Checkliste importieren</div>'
+      + '<div style="font-size:0.82rem;color:var(--c-muted);margin-bottom:12px;">Nummerierte Liste einf\u00fcgen</div>'
+      + '<textarea id="wb-import-textarea" placeholder="1. Testf\u00e4lle durchgehen&#10;2. Feedback sammeln&#10;3. Dokumentation aktualisieren" style="width:100%;height:160px;padding:10px;border:1px solid var(--c-border);border-radius:8px;font-family:var(--font);font-size:0.85rem;background:var(--c-surface);color:var(--c-text);resize:none;box-sizing:border-box;"></textarea>'
+      + '<div id="wb-import-preview" style="margin-top:8px;font-size:0.75rem;color:var(--c-faint);min-height:20px;"></div>'
+      + '<div id="wb-import-btns" style="display:flex;gap:8px;margin-top:12px;"></div>';
+    sheet.appendChild(panel);
+    document.body.appendChild(sheet);
+    const btns = panel.querySelector('#wb-import-btns');
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Abbrechen';
+    cancelBtn.style.cssText = 'flex:1;padding:10px;border-radius:8px;border:1px solid var(--c-border);background:none;font-family:var(--font);font-size:0.85rem;color:var(--c-faint);cursor:pointer;';
+    cancelBtn.addEventListener('click', () => sheet.remove());
+    const importBtn = document.createElement('button');
+    importBtn.textContent = 'Importieren \u2713';
+    importBtn.style.cssText = 'flex:2;padding:10px;border-radius:8px;border:none;background:var(--c-beruf);color:#fff;font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;';
+    importBtn.addEventListener('click', () => WB._clImportEintreageSave(aufgabeId, welt));
+    btns.appendChild(cancelBtn); btns.appendChild(importBtn);
+    setTimeout(() => {
+      const ta = document.getElementById('wb-import-textarea');
+      const preview = document.getElementById('wb-import-preview');
+      if (ta && preview) {
+        ta.addEventListener('input', () => { const items = WB._parseImportListe(ta.value); preview.textContent = items.length > 0 ? items.length + ' Eintr\u00e4ge erkannt' : ''; });
+        ta.focus();
+      }
+    }, 100);
+    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
+  },
+
+  _clImportEintreageSave(aufgabeId, welt) {
+    const ta = document.getElementById('wb-import-textarea');
+    if (!ta) return;
+    const items = this._parseImportListe(ta.value);
+    if (!items.length) { this._toast('Keine Eintr\u00e4ge erkannt'); return; }
+    const store = this._vorhabenStore(welt) || [];
+    let found = false;
+    store.forEach(vh => {
+      (vh.meilensteine||[]).forEach(ms => {
+        const a = (ms.aufgaben||[]).find(x => x.id === aufgabeId);
+        if (!a) return;
+        if (!a.checklist) a.checklist = [];
+        items.forEach(text => { a.checklist.push({ text, done:false, typ:'schritt' }); });
+        vh.geaendert = Date.now();
+        found = true;
+      });
+    });
+    if (!found) { this._toast('Aufgabe nicht gefunden'); return; }
+    this.setDirty();
+    document.getElementById('wb-import-sheet')?.remove();
+    this._toast('\u2713 ' + items.length + ' Eintr\u00e4ge importiert');
+    try { this._vorhabenDetailRender(); } catch(e) {}
+  },
 
   _clToggleTyp(aufgabeId, clIdx, welt) {
     if (!aufgabeId) return;
@@ -26351,6 +26479,7 @@ store.push(item);
         + '<div style="display:flex;gap:6px;">'
         + '<input id="ef-chk-new" type="text" placeholder="Neuer Schritt…" style="flex:1;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;background:var(--c-bg);color:var(--c-text);" onkeydown="WB._efChkKey(event)">'
         + '<button onclick="WB._efChkAdd()" style="padding:7px 12px;background:var(--c-beruf);color:#fff;border:none;border-radius:var(--radius-xs);font-family:var(--font);font-size:0.88rem;cursor:pointer;">+</button>'
+      + '<button onclick="WB._clImportEintraege(&quot;' + (efAufgId||'') + '&quot;,&quot;' + (efWelt||'priv') + '&quot;)" style="display:flex;align-items:center;gap:6px;width:100%;padding:8px 12px;margin-top:4px;border:1px dashed rgba(10,107,94,0.3);border-radius:8px;background:none;font-family:var(--font);font-size:0.80rem;color:#0A6B5E;cursor:pointer;"><span>📋</span><span>KI-Liste importieren</span></button>'
         + '</div></div>';
     }
 
