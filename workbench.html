@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.0.0</title>
+  <title>WorkBench 2.0.1</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1515,14 +1515,14 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.0.0</div>
+  <div id="wb-startup-tagline">v2.0.1</div>
 </div>
 
 <div id="wb-app">
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.0.0 · Build 20260616-0930</div>
+    <div id="wb-menu-version">v2.0.1 · Build 20260616-0940</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -1895,8 +1895,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.0.0',
-  APP_BUILD:   '20260616-0930',
+  APP_VERSION: '2.0.1',
+  APP_BUILD:   '20260616-0940',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2012,9 +2012,10 @@ const WB = {
   _ckRenderNextBanner() {
     const area = document.getElementById('ck-next-banner-area');
     if (!area) return;
-    const db    = this.activeWorld === 'beruf' ? this.dataPro : this.dataPriv;
-    const today = this._dStr(new Date());
-    const now   = new Date();
+    // Termine kommen IMMER aus dataPriv
+    const db     = this.dataPriv;
+    const today  = this._dStr(new Date());
+    const now    = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     const events = (db?.customEvents || [])
       .filter(e => e.date === today && e.startTime && !e.done)
@@ -2039,14 +2040,15 @@ const WB = {
   },
 
   _ckRenderTermine() {
-    const el  = document.getElementById('ck-termine-block');
+    const el = document.getElementById('ck-termine-block');
     if (!el) return;
-    const db    = this.activeWorld === 'beruf' ? this.dataPro : this.dataPriv;
-    const today = this._dStr(new Date());
-    const now   = new Date();
+    // Termine kommen IMMER aus dataPriv (alle Termine dort gespeichert)
+    const db     = this.dataPriv;
+    const today  = this._dStr(new Date());
+    const now    = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     const events = (db?.customEvents || [])
-      .filter(e => e.date === today)
+      .filter(e => e.date === today && !e.done)
       .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
     if (!events.length) { el.style.display = 'none'; return; }
     el.style.display = '';
@@ -2059,24 +2061,23 @@ const WB = {
       const eMin = eh * 60 + em;
       const past = e.startTime && eMin < nowMin;
       const isCurrent = e.startTime && eMin <= nowMin
-        && eMin + (e.durationMin || 60) > nowMin;
-      const welt  = e.welt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
-      const color = welt === 'pro' ? 'var(--accent)' : 'var(--accent2)';
-      const badge = welt === 'pro' ? 'beruf' : 'privat';
-      h += '<div class="ck-termin-row" onclick="WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + this._esc(welt) + '&quot;)"'
+        && eMin + this._evtDurationMin(e) > nowMin;
+      const isPrivat = (e.welt === 'priv');
+      const color    = isPrivat ? 'var(--accent2)' : 'var(--accent)';
+      const badge    = isPrivat ? 'privat' : 'beruf';
+      const badgeTxt = isPrivat ? 'Privat' : 'Beruf';
+      h += '<div class="ck-termin-row" onclick="WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)"'
         + (isCurrent ? ' style="background:rgba(10,107,94,0.03)"' : '') + '>'
         + '<div class="ck-tr-dot" style="background:'
         + (past ? 'var(--faint)' : color) + '"></div>'
-        + '<div class="ck-tr-time'
-        + (past ? ' ck-tr-done' : '') + '">'
+        + '<div class="ck-tr-time' + (past ? ' ck-tr-done' : '') + '">'
         + this._esc(e.startTime || '') + '</div>'
-        + '<div class="ck-tr-text'
-        + (past ? ' ck-tr-done' : '')
+        + '<div class="ck-tr-text' + (past ? ' ck-tr-done' : '')
         + (isCurrent ? '" style="font-weight:600' : '') + '">'
         + this._esc(e.text) + '</div>'
         + '<span class="ck-badge ' + badge
         + (past ? '" style="opacity:0.5' : '') + '">'
-        + (badge === 'beruf' ? 'Beruf' : 'Privat') + '</span>'
+        + badgeTxt + '</span>'
         + '</div>';
     });
     el.innerHTML = h;
@@ -2293,9 +2294,11 @@ const WB = {
         + '.\u2013' + kwEndFmt + '.';
     }
 
-    const welten = this._blFilter.welt === 'alle'
-      ? ['pro','priv']
-      : this._blFilter.welt === 'beruf' ? ['pro'] : ['priv'];
+    // Immer beide Welten im Backlog zeigen (Leitbild: Arbeitstag = beide sichtbar)
+    // Welt-Filter nur über expliziten Filter-Button
+    const welten = this._blFilter.welt === 'beruf'  ? ['pro']
+                 : this._blFilter.welt === 'privat' ? ['priv']
+                 : ['pro', 'priv'];
 
     const aufgaben = [];
     const schnell  = [];
@@ -3740,6 +3743,13 @@ const WB = {
     return d + '. ' + (mNames[m-1] || '');
   },
 
+  _evtDurationMin(e) {
+    // Kompatibilität: ältere JSONs haben duration in Stunden (z.B. 1.5 = 90 Min)
+    if (e.durationMin && e.durationMin > 0) return e.durationMin;
+    if (e.duration    && e.duration    > 0) return Math.round(e.duration * 60);
+    return 60;
+  },
+
   // ── Init ─────────────────────────────────────────────
 
   async init() {
@@ -4164,9 +4174,14 @@ const WB = {
 
   /* ── Schnell-Erinnerung ── */
   schnellOpen(id) {
-    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    const item = id ? (db?.quickItems||[]).find(q => q.id === id) : null;
+    let ctx  = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    let db   = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    let item = id ? (db?.quickItems||[]).find(q => q.id === id) : null;
+    if (!item && id) {
+      const otherDb = ctx === 'pro' ? this.dataPriv : this.dataPro;
+      item = (otherDb?.quickItems||[]).find(q => q.id === id);
+      if (item) { ctx = ctx === 'pro' ? 'priv' : 'pro'; db = otherDb; }
+    }
     const body = this._modalWeltTop(item?._ctx || ctx, item?.vertraulich)
       + '<div class="wb-input-group">'
       + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
@@ -4185,8 +4200,13 @@ const WB = {
   /* ── Aufgabe ── */
   aufgabeOpen(vorhabenId, aufgabeId, ctx) {
     ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
+    let db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    let v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
+    if (!v && vorhabenId) {
+      const otherDb = ctx === 'pro' ? this.dataPriv : this.dataPro;
+      v = (otherDb?.vorhaben||[]).find(x => x.id === vorhabenId);
+      if (v) { ctx = ctx === 'pro' ? 'priv' : 'pro'; db = otherDb; }
+    }
     const a  = aufgabeId ? (v?.aufgaben||[]).find(x => x.id === aufgabeId) : null;
     const cl = a?.checklist || [];
     let clHtml = cl.map((c,i) =>
@@ -4238,9 +4258,15 @@ const WB = {
 
   /* ── Termin ── */
   terminOpen(eventId, ctx) {
-    ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    const e  = eventId ? (db?.customEvents||[]).find(x => x.id === eventId) : null;
+    ctx = ctx || 'priv';
+    // Termine können in beiden DBs liegen — beide durchsuchen
+    let db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    let e  = eventId ? (db?.customEvents||[]).find(x => x.id === eventId) : null;
+    if (!e && eventId) {
+      const otherDb = ctx === 'pro' ? this.dataPriv : this.dataPro;
+      e = (otherDb?.customEvents||[]).find(x => x.id === eventId);
+      if (e) { ctx = ctx === 'pro' ? 'priv' : 'pro'; db = otherDb; }
+    }
     const body = this._modalWeltTop(ctx, e?.vertraulich)
       + '<div class="wb-input-group">'
       + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
