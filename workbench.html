@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.1.2</title>
+  <title>WorkBench 2.2.0</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1512,20 +1512,31 @@
     .ft-vl-name  { font-size: 15px; font-weight: 600; color: var(--text); }
     .ft-vl-meta  { font-size: 12px; color: var(--faint); margin-top: 2px; }
     .ft-vl-start { background: var(--accent); color: #fff; border: none; border-radius: var(--radius-sm); padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: var(--font); }
+    /* ── OAuth Banner ── */
+    #wb-oauth-banner { display: none; background: var(--danger); color: #fff; padding: 10px 16px; font-size: 14px; font-weight: 600; align-items: center; gap: 12px; flex-shrink: 0; z-index: 600; }
+    #wb-oauth-banner.visible { display: flex; }
+    #wb-oauth-banner-text { flex: 1; }
+    #wb-oauth-banner-btn { background: #fff; color: var(--danger); border: none; border-radius: var(--radius-sm); padding: 6px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; font-family: var(--font); }
+    #wb-oauth-banner-close { cursor: pointer; font-size: 18px; opacity: 0.7; padding: 0 4px; }
   </style>
 </head>
 <body>
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.1.2</div>
+  <div id="wb-startup-tagline">v2.2.0</div>
 </div>
 
 <div id="wb-app">
+<div id="wb-oauth-banner">
+  <span id="wb-oauth-banner-text">&#9888; Google-Verbindung unterbrochen &mdash; Sync nicht m&ouml;glich</span>
+  <button id="wb-oauth-banner-btn" onclick="WB._oauthReconnect()">Neu verbinden</button>
+  <span id="wb-oauth-banner-close" onclick="WB._oauthBannerDismiss()">&#x2715;</span>
+</div>
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.1.2 · Build 20260616-1020</div>
+    <div id="wb-menu-version">v2.2.0 · Build 20260616-1030</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -1898,8 +1909,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.1.2',
-  APP_BUILD:   '20260616-1020',
+  APP_VERSION: '2.2.0',
+  APP_BUILD:   '20260616-1030',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3629,7 +3640,12 @@ const WB = {
   setDirty() {
     this.isDirty = true;
     clearTimeout(this._saveTimer);
-    this._saveTimer = setTimeout(() => this.idbSaveAll(), 2000);
+    this._saveTimer = setTimeout(async () => {
+      await this.idbSaveAll();
+      if (this._oauthClientId && this._oauthTokenValid()) {
+        await this._syncUploadAll();
+      }
+    }, 2000);
   },
 
   // ── KW-Hilfsfunktionen ───────────────────────────────
@@ -3715,40 +3731,211 @@ const WB = {
     return created.id;
   },
 
+  _now() {
+    return new Date().toISOString();
+  },
+
+  /* ── OAuth Banner ── */
+  _oauthBannerVisible: false,
+
+  _oauthShowBanner(msg) {
+    const banner = document.getElementById('wb-oauth-banner');
+    const text   = document.getElementById('wb-oauth-banner-text');
+    if (!banner) return;
+    if (msg && text) text.innerHTML = '\u26a0 ' + msg;
+    banner.classList.add('visible');
+    this._oauthBannerVisible = true;
+  },
+
+  _oauthHideBanner() {
+    const banner = document.getElementById('wb-oauth-banner');
+    if (banner) banner.classList.remove('visible');
+    this._oauthBannerVisible = false;
+  },
+
+  _oauthBannerDismiss() {
+    this._oauthHideBanner();
+  },
+
+  async _oauthReconnect() {
+    try {
+      this._oauthToken    = null;
+      this._oauthTokenExp = null;
+      const token = await this._oauthGetToken(false);
+      if (token) {
+        this._oauthHideBanner();
+        this._toast('\u2713 Neu verbunden');
+        await this._syncUploadAll();
+      }
+    } catch(e) {
+      this._oauthShowBanner('\u26a0 Verbindung fehlgeschlagen: ' + e.message + ' &mdash; Sync nicht m\u00f6glich');
+    }
+  },
+
+  _oauthCheckToken() {
+    if (!this._oauthClientId) return;
+    if (!this._oauthTokenValid()) {
+      this._oauthShowBanner('\u26a0 Google-Sitzung abgelaufen &mdash; Sync nicht m\u00f6glich');
+    } else {
+      this._oauthHideBanner();
+    }
+  },
+
+  /* ── Merge by Timestamp ── */
+  _mergeArrayById(localArr, driveArr) {
+    const merged = new Map();
+    (driveArr||[]).forEach(item => { merged.set(item.id, { ...item }); });
+    (localArr||[]).forEach(item => {
+      const existing = merged.get(item.id);
+      if (!existing) {
+        merged.set(item.id, { ...item });
+      } else {
+        const localTs = item.updatedAt || item.doneTs || '0';
+        const driveTs = existing.updatedAt || existing.doneTs || '0';
+        if (localTs > driveTs) merged.set(item.id, { ...item });
+      }
+    });
+    return Array.from(merged.values());
+  },
+
+  _mergeDb(localDb, driveDb) {
+    if (!localDb || !driveDb) return driveDb || localDb;
+    const merged = { ...driveDb };
+    const arrayFields = ['quickItems', 'customEvents', 'wochenpflichten', 'ziele', 'checklistVorlagen'];
+    arrayFields.forEach(field => {
+      merged[field] = this._mergeArrayById(localDb[field], driveDb[field]);
+    });
+    const localVh = localDb.vorhaben || [];
+    const driveVh = driveDb.vorhaben || [];
+    const vhMerged = new Map();
+    driveVh.forEach(v => vhMerged.set(v.id, { ...v }));
+    localVh.forEach(v => {
+      const existing = vhMerged.get(v.id);
+      if (!existing) {
+        vhMerged.set(v.id, { ...v });
+      } else {
+        const localTs = v.updatedAt || '0';
+        const driveTs = existing.updatedAt || '0';
+        const base = localTs > driveTs ? { ...v } : { ...existing };
+        base.aufgaben = this._mergeArrayById(v.aufgaben, existing.aufgaben);
+        base.links    = this._mergeArrayById(v.links,    existing.links);
+        vhMerged.set(v.id, base);
+      }
+    });
+    merged.vorhaben = Array.from(vhMerged.values());
+    merged.pflichtStatus = { ...(driveDb.pflichtStatus||{}), ...(localDb.pflichtStatus||{}) };
+    const lm = localDb.wochenMottos || {};
+    const dm = driveDb.wochenMottos || {};
+    merged.wochenMottos = { ...dm };
+    Object.entries(lm).forEach(([kw, items]) => {
+      if (!merged.wochenMottos[kw]) merged.wochenMottos[kw] = items;
+      else merged.wochenMottos[kw] = this._mergeArrayById(items, merged.wochenMottos[kw]);
+    });
+    merged.bewegung = {
+      bewegt:    Math.max(localDb.bewegung?.bewegt    || 0, driveDb.bewegung?.bewegt    || 0),
+      geschoben: Math.max(localDb.bewegung?.geschoben || 0, driveDb.bewegung?.geschoben || 0),
+    };
+    return merged;
+  },
+
+  /* ── Auto-Sync ── */
+  _syncTimer:        null,
+  _syncLastUpload:   0,
+  _syncLastDownload: 0,
+
+  _syncStart() {
+    if (this._syncTimer) clearInterval(this._syncTimer);
+    this._syncTimer = setInterval(() => { this._syncTick(); }, 60000);
+  },
+
+  async _syncTick() {
+    if (!this._oauthClientId) return;
+    if (!this._oauthTokenValid()) {
+      const token = await this._oauthGetToken(true);
+      if (!token) {
+        this._oauthShowBanner('\u26a0 Google-Sitzung abgelaufen &mdash; Auto-Sync pausiert');
+        return;
+      }
+    }
+    this._oauthHideBanner();
+    if (this.isDirty) { await this._syncUploadAll(); }
+    await this._syncCheckDriveNewer();
+  },
+
+  async _syncCheckDriveNewer() {
+    try {
+      const token = await this._oauthGetToken(true);
+      if (!token) return;
+      for (const ctx of ['pro','priv']) {
+        const fileId = this._oauthDriveFileIds[ctx];
+        if (!fileId) continue;
+        const resp = await fetch(this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime',
+          { headers: { Authorization: 'Bearer ' + token } });
+        if (!resp.ok) continue;
+        const meta = await resp.json();
+        const driveTs = new Date(meta.modifiedTime).getTime();
+        if (driveTs > this._syncLastDownload && driveTs > this._syncLastUpload) {
+          await this.oauthSyncDownload(ctx);
+        }
+      }
+    } catch(e) {
+      console.warn('[sync check]', e.message);
+    }
+  },
+
+  async _syncUploadAll() {
+    await this.oauthSyncUpload('pro');
+    await this.oauthSyncUpload('priv');
+  },
+
+  async _syncDownloadAll() {
+    await this.oauthSyncDownload('pro');
+    await this.oauthSyncDownload('priv');
+  },
+
   async oauthSyncUpload(ctx) {
     try {
-      const token  = await this._oauthGetToken(false);
+      const token  = await this._oauthGetToken(true);
+      if (!token) { this._oauthShowBanner('\u26a0 Kein Token &mdash; bitte neu verbinden'); return; }
       const fileId = await this._oauthFindOrCreateFile(token, ctx);
-      const db     = ctx === 'pro' ? this.dataPro : this.dataPriv;
-      if (!db) { this._toast('Keine Daten zum Hochladen'); return; }
-      const payload = JSON.stringify({ data: db, _exported: new Date().toISOString() });
-      await fetch(this.UPLOAD_API + '/files/' + fileId + '?uploadType=media', {
+      const db     = ctx==='pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      const payload = JSON.stringify({ data: db, _exported: new Date().toISOString(), _appVersion: this.APP_VERSION });
+      const resp = await fetch(this.UPLOAD_API + '/files/' + fileId + '?uploadType=media', {
         method:  'PATCH',
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
         body:    payload,
       });
-      this._toast('✓ Hochgeladen: ' + (ctx === 'pro' ? 'Beruf' : 'Privat'));
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      this._oauthHideBanner();
+      this._syncLastUpload = Date.now();
+      this.isDirty = false;
     } catch(e) {
-      this._toast('Upload-Fehler: ' + e.message);
+      this._oauthShowBanner('\u26a0 Upload-Fehler: ' + e.message);
     }
   },
 
   async oauthSyncDownload(ctx) {
     try {
-      const token  = await this._oauthGetToken(false);
+      const token  = await this._oauthGetToken(true);
+      if (!token) { this._oauthShowBanner('\u26a0 Kein Token &mdash; bitte neu verbinden'); return; }
       const fileId = await this._oauthFindOrCreateFile(token, ctx);
-      const resp   = await fetch(this.DRIVE_API + '/files/' + fileId + '?alt=media', {
-        headers: { Authorization: 'Bearer ' + token },
-      });
-      const result = await resp.json();
-      const db = result.data || result;
-      if (ctx === 'pro') this.dataPro  = db;
-      else               this.dataPriv = db;
+      const resp   = await fetch(this.DRIVE_API + '/files/' + fileId + '?alt=media',
+        { headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const result  = await resp.json();
+      const driveDb = result.data || result;
+      const localDb = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const merged  = this._mergeDb(localDb, driveDb);
+      if (ctx==='pro') this.dataPro  = merged;
+      else             this.dataPriv = merged;
       await this.idbSaveAll();
-      this._toast('✓ Heruntergeladen: ' + (ctx === 'pro' ? 'Beruf' : 'Privat'));
+      this._oauthHideBanner();
+      this._syncLastDownload = Date.now();
+      this._toast('\u2713 Synchronisiert: ' + (ctx==='pro' ? 'Beruf' : 'Privat'));
       this.renderSection(this.activeTab);
     } catch(e) {
-      this._toast('Download-Fehler: ' + e.message);
+      this._oauthShowBanner('\u26a0 Sync-Fehler: ' + e.message);
     }
   },
 
@@ -3823,6 +4010,17 @@ const WB = {
 
     const bueroBtn = document.getElementById('wb-buero-btn');
     if (bueroBtn) bueroBtn.classList.toggle('visible', this._weltIstArbeitstag());
+
+    // OAuth Status prüfen
+    this._oauthCheckToken();
+
+    // Beim Start von Drive laden (falls Token vorhanden)
+    if (this._oauthClientId && this._oauthTokenValid()) {
+      try { await this._syncDownloadAll(); } catch(e) { console.warn('[init sync]', e.message); }
+    }
+
+    // Auto-Sync starten
+    this._syncStart();
 
     this.tabSwitch('cockpit');
   },
@@ -4573,9 +4771,9 @@ const WB = {
     if (!db.quickItems) db.quickItems = [];
     if (c.id) {
       const item = db.quickItems.find(x => x.id === c.id);
-      if (item) { item.text = text; item.date = date; }
+      if (item) { item.text = text; item.date = date; item.updatedAt = this._now(); }
     } else {
-      db.quickItems.push({ id:'q_'+Date.now(), text, date, done:false, vertraulich:this._modalGetVertraulich() });
+      db.quickItems.push({ id:'q_'+Date.now(), text, date, done:false, updatedAt:this._now(), vertraulich:this._modalGetVertraulich() });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('\u2713 Schnell-Erinnerung gespeichert');
@@ -4595,9 +4793,9 @@ const WB = {
     if (!v.aufgaben) v.aufgaben = [];
     if (c.aufgabeId) {
       const a = v.aufgaben.find(x => x.id === c.aufgabeId);
-      if (a) { a.text=text; a.datum=datum; a.wichtigkeit=wich; a.checklist=checklist; a.vertraulich=this._modalGetVertraulich(); }
+      if (a) { a.text=text; a.datum=datum; a.wichtigkeit=wich; a.checklist=checklist; a.vertraulich=this._modalGetVertraulich(); a.updatedAt=this._now(); }
     } else {
-      v.aufgaben.push({ id:'a_'+Date.now(), text, datum, wichtigkeit:wich, done:false, checklist, vertraulich:this._modalGetVertraulich() });
+      v.aufgaben.push({ id:'a_'+Date.now(), text, datum, wichtigkeit:wich, done:false, checklist, updatedAt:this._now(), vertraulich:this._modalGetVertraulich() });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('\u2713 Aufgabe gespeichert');
@@ -4617,7 +4815,7 @@ const WB = {
     const db = this.dataPriv;
     if (!db) return;
     if (!db.customEvents) db.customEvents = [];
-    const obj = { text, date, startTime:time, durationMin:dur, vorhabenId:vhId||null, done:false, welt, location:'', vertraulich:this._modalGetVertraulich() };
+    const obj = { text, date, startTime:time, durationMin:dur, vorhabenId:vhId||null, done:false, welt, location:'', updatedAt:this._now(), vertraulich:this._modalGetVertraulich() };
     if (c.eventId) {
       const idx = db.customEvents.findIndex(x => x.id === c.eventId);
       if (idx >= 0) db.customEvents[idx] = { ...db.customEvents[idx], ...obj };
@@ -4638,7 +4836,7 @@ const WB = {
     const activeDays = Array.from(document.querySelectorAll('.wb-day-btn.active')).map(el => parseInt(el.dataset.day, 10)).filter(n => !isNaN(n));
     const taeglich = activeDays.length === 7;
     if (!db.wochenpflichten) db.wochenpflichten = [];
-    const obj = { titel:text, taeglich, wochentage:taeglich?[]:activeDays, vorhabenId:vhId||null, vertraulich:this._modalGetVertraulich() };
+    const obj = { titel:text, taeglich, wochentage:taeglich?[]:activeDays, vorhabenId:vhId||null, updatedAt:this._now(), vertraulich:this._modalGetVertraulich() };
     if (c.id) {
       const p = db.wochenpflichten.find(x => x.id === c.id);
       if (p) Object.assign(p, obj);
@@ -4660,9 +4858,9 @@ const WB = {
     if (!db.ziele) db.ziele = [];
     if (c.id) {
       const z = db.ziele.find(x => x.id === c.id);
-      if (z) { z.titel=text; z.bereich=bereich; z.stichtag=stichtag; }
+      if (z) { z.titel=text; z.bereich=bereich; z.stichtag=stichtag; z.updatedAt=this._now(); }
     } else {
-      db.ziele.push({ id:'z_'+Date.now(), titel:text, bereich, stichtag, trend:'stabil', vertraulich:this._modalGetVertraulich() });
+      db.ziele.push({ id:'z_'+Date.now(), titel:text, bereich, stichtag, trend:'stabil', updatedAt:this._now(), vertraulich:this._modalGetVertraulich() });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('\u2713 Ziel gespeichert');
@@ -4681,9 +4879,9 @@ const WB = {
     if (!v.links) v.links = [];
     if (c.linkId) {
       const l = v.links.find(x => x.id === c.linkId);
-      if (l) { l.url=url; l.titel=titel; l.type=typ; l.tag=tag; }
+      if (l) { l.url=url; l.titel=titel; l.type=typ; l.tag=tag; l.updatedAt=this._now(); }
     } else {
-      v.links.push({ id:'l_'+Date.now(), url, titel, type:typ, tag, vertraulich:this._modalGetVertraulich() });
+      v.links.push({ id:'l_'+Date.now(), url, titel, type:typ, tag, updatedAt:this._now(), vertraulich:this._modalGetVertraulich() });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('\u2713 Link gespeichert');
@@ -4700,9 +4898,9 @@ const WB = {
     if (!db.checklistVorlagen) db.checklistVorlagen = [];
     if (c.id) {
       const v = db.checklistVorlagen.find(x => x.id === c.id);
-      if (v) { v.titel=text; v.schritte=schritte; }
+      if (v) { v.titel=text; v.schritte=schritte; v.updatedAt=this._now(); }
     } else {
-      db.checklistVorlagen.push({ id:'cv_'+Date.now(), titel:text, schritte, vertraulich:this._modalGetVertraulich() });
+      db.checklistVorlagen.push({ id:'cv_'+Date.now(), titel:text, schritte, updatedAt:this._now(), vertraulich:this._modalGetVertraulich() });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('\u2713 Vorlage gespeichert');
