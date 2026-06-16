@@ -9,7 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#0D7A6B">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<title>WorkBench 5.46.4</title>
+<title>WorkBench 5.47.0</title>
 <style>
 
 /* ═══════════════════════════════════════════════════════
@@ -6147,7 +6147,7 @@ body.fokus-modus body.fokus-modus
 
     <div id="wb-menu-header">
       <div id="wb-menu-title">WorkBench</div>
-      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.46.4 · Build 20260616-0700</div>
+      <div id="wb-menu-version" style="font-size:0.7rem;color:var(--c-faint);font-weight:400;font-family:var(--font-mono);">v5.47.0 · Build 20260616-0710</div>
     </div>
 
     <!-- Welt -->
@@ -6297,7 +6297,7 @@ body.fokus-modus body.fokus-modus
 ════════════════════════════════════════ -->
 <div id="wb-startup" role="dialog" aria-modal="true" aria-label="Datenbanken laden">
   <div class="wb-startup-logo">WorkBench</div>
-  <div class="wb-startup-tagline">v5.46.4</div>
+  <div class="wb-startup-tagline">v5.47.0</div>
   <div class="wb-startup-card">
     <h2>Datenbanken laden</h2>
     <p>Wähle deine lokalen JSON-Dateien. Der Browser speichert die Zugriffsrechte für diese Sitzung.</p>
@@ -7851,8 +7851,8 @@ body.fokus-modus body.fokus-modus
 // ─────────────────────────────────────────────────────
 const WB = {
 
-  APP_VERSION: '5.46.4',
-  APP_BUILD:   '20260616-0700',
+  APP_VERSION: '5.47.0',
+  APP_BUILD:   '20260616-0710',
 
 
   // ══════════════════════════════════════════════════════
@@ -8305,7 +8305,7 @@ const WB = {
       const daysToMon = (8 - dow) % 7 || 7;
       nextMon.setDate(now.getDate() + daysToMon);
       const nextSun = new Date(nextMon); nextSun.setDate(nextMon.getDate() + 6);
-      const fmt = d => d.toISOString().split('T')[0];
+      const fmt = d => this._dStr(d);
       const fromStr = fmt(nextMon), toStr = fmt(nextSun);
 
       // Termine nächste Woche
@@ -8673,7 +8673,7 @@ const WB = {
   icsExportOpen() {
     const now   = new Date();
     const later = new Date(); later.setMonth(later.getMonth() + 3);
-    const fmt = d => d.toISOString().split('T')[0];
+    const fmt = d => this._dStr(d);
     const fromEl = document.getElementById('ics-exp-from');
     const toEl   = document.getElementById('ics-exp-to');
     if (fromEl) fromEl.value = fmt(now);
@@ -8840,7 +8840,7 @@ const WB = {
     // Datum: heute bis +4 Wochen
     const now = new Date();
     const later = new Date(); later.setDate(later.getDate() + 28);
-    const fmt = d => d.toISOString().split('T')[0];
+    const fmt = d => this._dStr(d);
     const fromEl = document.getElementById('ics-date-from');
     const toEl   = document.getElementById('ics-date-to');
     if (fromEl) fromEl.value = fmt(now);
@@ -9227,7 +9227,7 @@ const WB = {
 
     const today    = new Date().toISOString().split('T')[0];
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
-    const tomStr   = tomorrow.toISOString().split('T')[0];
+    const tomStr   = this._dStr(tomorrow);
     const now      = Date.now();
     const items    = [];
     const s        = this._settings;
@@ -9421,7 +9421,7 @@ const WB = {
     const evs = (this._evStore()||[]);
     const today = new Date().toISOString().split('T')[0];
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
-    const tomStr = tomorrow.toISOString().split('T')[0];
+    const tomStr = this._dStr(tomorrow);
     const evHeute = evs.filter(e => e.date===today||e.date===tomStr);
     lines.push('Events gesamt: '+evs.length+', heute/morgen: '+evHeute.length);
     evHeute.forEach(e => lines.push('  → '+e.text+' | '+e.date+' '+e.startTime+' | done:'+e.done+' notifAus:'+e.notifAus));
@@ -10782,7 +10782,7 @@ const WB = {
     if (!store.length) return;
     const now   = new Date();
     const hhmm  = now.getHours() * 60 + now.getMinutes();
-    const today = now.toISOString().split('T')[0];
+    const today = this._dStr(now);
 
     for (const r of store) {
       if (!r.aktiv) continue;
@@ -11205,9 +11205,9 @@ const WB = {
     const monday = new Date(today);
     monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
     const days = [];
-    for (let i = 0; i < 7; i++) { const d = new Date(monday); d.setDate(monday.getDate()+i); days.push(d.toISOString().split('T')[0]); }
+    for (let i = 0; i < 7; i++) { const d = new Date(monday); d.setDate(monday.getDate()+i); days.push(this._dStr(d)); }
     const DAY_LBL = ['Mo','Di','Mi','Do','Fr','Sa','So'];
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = this._dStr(today);
     let h = '<div style="padding:0 14px;">';
     days.forEach((dateStr, i) => {
       const events = [];
@@ -11774,7 +11774,7 @@ const WB = {
     const vhAktivHeute = [], vhNichtHeute = [];
     ['pro','priv'].forEach(welt => {
       (this._vorhabenStore(welt)||[]).filter(v=>(v.aktivitaet||'aktiv')==='aktiv').forEach(v => {
-        const g = v.geaendert ? new Date(v.geaendert).toISOString().split('T')[0] : null;
+        const g = v.geaendert ? this._dStr(new Date(v.geaendert)) : null;
         (g === today ? vhAktivHeute : vhNichtHeute).push(v);
       });
     });
@@ -11785,7 +11785,7 @@ const WB = {
       (this._vorhabenStore(welt)||[]).forEach(v => {
         (v.meilensteine||[]).forEach(ms => {
           (ms.aufgaben||[]).forEach(a => {
-            if (a.done && a.doneTs && new Date(a.doneTs).toISOString().split('T')[0] === today) erledigteHeute++;
+            if (a.done && a.doneTs && this._dStr(new Date(a.doneTs)) === today) erledigteHeute++;
           });
         });
       });
@@ -11961,7 +11961,7 @@ const WB = {
     if (!el) return;
     const today    = this._ritualTodayKey();
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
-    const tomStr   = tomorrow.toISOString().split('T')[0];
+    const tomStr   = this._dStr(tomorrow);
     const items = [];
     (this._vorhabenStore('pro')||[]).forEach(v => {
       (v.meilensteine||[]).forEach(ms => {
@@ -12721,7 +12721,7 @@ const WB = {
     const mo  = new Date(now); mo.setDate(now.getDate() - dow + 1);
     const days = Array.from({length: 7}, (_, i) => {
       const d = new Date(mo); d.setDate(mo.getDate() + i);
-      return d.toISOString().split('T')[0];
+      return this._dStr(d);
     });
     const DAYS   = ['Mo','Di','Mi','Do','Fr','Sa','So'];
     const MONTHS = ['Jan','Feb','M\u00e4r','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
@@ -12983,7 +12983,7 @@ const WB = {
     const mo  = new Date(now); mo.setDate(now.getDate() - dow + 1);
     const days = Array.from({length: 7}, (_, i) => {
       const d = new Date(mo); d.setDate(mo.getDate() + i);
-      return d.toISOString().split('T')[0];
+      return this._dStr(d);
     });
     const DAYS = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 
@@ -13342,7 +13342,7 @@ const WB = {
     const entries = this._trEntriesForMetric(metricId);
     const today   = new Date();
     const cutoff  = new Date(today); cutoff.setDate(today.getDate()-range);
-    const cutStr  = cutoff.toISOString().split('T')[0];
+    const cutStr  = this._dStr(cutoff);
     const filtered = entries.filter(e => e.datum >= cutStr);
     if (filtered.length < 2) {
       return '<div style="height:100px;display:flex;align-items:center;justify-content:center;color:var(--c-faint);font-size:0.82rem;">Noch zu wenige Daten f\u00fcr eine Grafik.</div>';
@@ -14677,7 +14677,7 @@ const WB = {
     if (!body) return;
     const today = new Date().toISOString().split('T')[0];
     const in7 = new Date(); in7.setDate(in7.getDate()+7);
-    const in7str = in7.toISOString().split('T')[0];
+    const in7str = this._dStr(in7);
 
     // Plan-Aufgaben
     const planItems = [];
@@ -15209,14 +15209,14 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
 
   _planmodusWochenrueckblick() {
     const now   = new Date();
-    const today = now.toISOString().split('T')[0];
+    const today = this._dStr(now);
     const dow   = now.getDay();
     const daysSinceMon = (dow + 6) % 7;
 
     // Diese Woche
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() - daysSinceMon);
-    const weekStartStr = weekStart.toISOString().split('T')[0];
+    const weekStartStr = this._dStr(weekStart);
 
     const stundensatz = this._stundensatz();
 
@@ -15233,7 +15233,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
           if (!t.done) return;
           // Wann erledigt? doneTs oder date
           const doneDate = t.doneTs
-            ? new Date(t.doneTs).toISOString().split('T')[0]
+            ? this._dStr(new Date(t.doneTs))
             : t.date || '';
           if (doneDate < weekStartStr || doneDate > today) return;
           erledigt.push({t, pKey, ctx});
@@ -15568,7 +15568,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     if (!body) return;
 
     const now   = new Date();
-    const today = now.toISOString().split('T')[0];
+    const today = this._dStr(now);
     const dow   = now.getDay(); // 0=So
     const year  = now.getFullYear();
 
@@ -15580,8 +15580,8 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       d.setDate(now.getDate() - daysSinceMon + i);
       weekDays.push(d);
     }
-    const weekStart = weekDays[0].toISOString().split('T')[0];
-    const weekEnd   = weekDays[6].toISOString().split('T')[0];
+    const weekStart = this._dStr(weekDays[0]);
+    const weekEnd   = this._dStr(weekDays[6]);
     const dayNames  = ['Mo','Di','Mi','Do','Fr','Sa','So'];
     const months    = ['Jan','Feb','Mrz','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 
@@ -15607,7 +15607,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     // ── Wochenüberblick ─────────────────────────────────
     const weekItems = [];
     weekDays.forEach((d, i) => {
-      const ds = d.toISOString().split('T')[0];
+      const ds = this._dStr(d);
       const isToday = ds === today;
       const isPast  = ds < today;
 
@@ -15644,7 +15644,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     });
 
     const weekHtml = weekDays.map((d, i) => {
-      const ds      = d.toISOString().split('T')[0];
+      const ds      = this._dStr(d);
       const isToday = ds === today;
       const isPast  = ds < today;
       const items   = byDay[i] || [];
@@ -15848,7 +15848,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
       const counts = {};
       for (let i = 0; i < days; i++) {
         const d = new Date(startDate); d.setDate(startDate.getDate() + i);
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = this._dStr(d);
         (db.dailyPlans[dateStr]?.logbuch || []).forEach(e => {
           counts[e.tag] = (counts[e.tag] || 0) + 1;
         });
@@ -15947,7 +15947,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const ev = (this._evStore()||[]).find(e => String(e.id) === String(evId));
     if (!ev) return;
     const morgen = new Date(); morgen.setDate(morgen.getDate() + 1);
-    const neuesDatum = prompt('Neues Datum (JJJJ-MM-TT):', morgen.toISOString().split('T')[0]);
+    const neuesDatum = prompt('Neues Datum (JJJJ-MM-TT):', this._dStr(morgen));
     if (!neuesDatum || !neuesDatum.match(/^\d{4}-\d{2}-\d{2}$/)) return;
     ev.status = 'verschoben'; ev.verschobenAuf = neuesDatum;
     const kopie = JSON.parse(JSON.stringify(ev));
@@ -16235,7 +16235,7 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const day = d.getDay();
     const diff = day === 0 ? -6 : 1 - day;
     d.setDate(d.getDate() + diff);
-    return d.toISOString().split('T')[0];
+    return this._dStr(d);
   },
 
   _kwEndDate() {
@@ -16243,8 +16243,17 @@ _backlogAufgabeDetail(aufgabeId, notizId) {
     const day = d.getDay();
     const diff = day === 0 ? 0 : 7 - day;
     d.setDate(d.getDate() + diff);
-    return d.toISOString().split('T')[0];
+    return this._dStr(d);
   },
+
+  _dStr(d) {
+    // Lokale Datumsformatierung — NIEMALS toISOString() für Datumstrings!
+    // toISOString() gibt UTC zurück → in DE (UTC+2) falsches Datum nach Mitternacht.
+    return d.getFullYear() + '-'
+      + String(d.getMonth() + 1).padStart(2, '0') + '-'
+      + String(d.getDate()).padStart(2, '0');
+  },
+
 
 
 
@@ -19992,7 +20001,7 @@ store.push(item);
   _evWzStep1() {
     const today    = new Date().toISOString().split('T')[0];
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
-    const tomStr   = tomorrow.toISOString().split('T')[0];
+    const tomStr   = this._dStr(tomorrow);
 
     const ritStore = this._ritualStore();
     const ritual   = ritStore && ritStore[today];
@@ -22959,7 +22968,7 @@ store.push(item);
     const now   = new Date();
     const h     = now.getHours();
     const s     = this._settings;
-    const today = now.toISOString().split('T')[0];
+    const today = this._dStr(now);
     const dow   = now.getDay();
     const kwStr = this._kwStr(now);
 
@@ -23705,7 +23714,7 @@ store.push(item);
     const addDays = (dateStr, n) => {
       const d = new Date(dateStr);
       d.setDate(d.getDate() + n);
-      return d.toISOString().split('T')[0];
+      return this._dStr(d);
     };
 
     const nextDate = (t) => {
@@ -24614,8 +24623,8 @@ store.push(item);
       entry.experiment = {
         aktiv: true,
         laufzeit: expLaufzeit,
-        startDate: expStart.toISOString().split('T')[0],
-        endDate:   expEnd.toISOString().split('T')[0],
+        startDate: this._dStr(expStart),
+        endDate:   this._dStr(expEnd),
         auswertungGezeigt: false,
       };
     }
@@ -25102,8 +25111,8 @@ store.push(item);
       const laufzeit = duty.experiment.laufzeit;
       const start = new Date(), end = new Date();
       end.setDate(start.getDate() + laufzeit - 1);
-      duty.experiment.startDate         = start.toISOString().split('T')[0];
-      duty.experiment.endDate           = end.toISOString().split('T')[0];
+      duty.experiment.startDate         = this._dStr(start);
+      duty.experiment.endDate           = this._dStr(end);
       duty.experiment.auswertungGezeigt = false;
       this.setDirty();
       this._toast('🔄 Experiment neu gestartet — ' + laufzeit + ' Tage');
@@ -25407,7 +25416,7 @@ store.push(item);
   _dutyCheckReminders() {
     const now   = new Date();
     const nowH  = now.getHours() + now.getMinutes() / 60;
-    const today = now.toISOString().split('T')[0];
+    const today = this._dStr(now);
     const kw    = this._kwStr(now);
 
     ['pro','priv'].forEach(ctx => {
@@ -25460,7 +25469,7 @@ store.push(item);
     if (!this._dutyIsActiveWeek(duty)) return false;
 
     const now   = new Date();
-    const today = now.toISOString().split('T')[0];
+    const today = this._dStr(now);
     const dow   = now.getDay();
     const pad   = n => String(n).padStart(2,'0');
 
@@ -25477,7 +25486,7 @@ store.push(item);
         dow:     (i + 1) % 7,
         isoDay:  i + 1,
         past:    d < new Date(today),
-        isToday: d.toISOString().split('T')[0] === today,
+        isToday: this._dStr(d) === today,
       });
     }
 
@@ -25516,7 +25525,7 @@ store.push(item);
   // ── Ist Pflicht diese Woche noch relevant? ────────────
   _dutyRelevantThisWeek(duty) {
     const now   = new Date();
-    const today = now.toISOString().split('T')[0];
+    const today = this._dStr(now);
     const dow   = now.getDay(); // 0=So, 1=Mo, …, 6=Sa
     const pad   = n => String(n).padStart(2,'0');
     const kw    = this._kwStr(now);
@@ -25536,7 +25545,7 @@ store.push(item);
         dow: (i + 1) % 7,  // 0=So, 1=Mo, …, 6=Sa (ISO-kompatibel)
         isoDay: i + 1,     // 1=Mo, 7=So
         past: d < new Date(today),
-        isToday: d.toISOString().split('T')[0] === today,
+        isToday: this._dStr(d) === today,
       });
     }
 
@@ -25926,7 +25935,7 @@ store.push(item);
 
     const now    = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
-    const today  = now.toISOString().split('T')[0];
+    const today  = this._dStr(now);
     const pT     = s => { const [h,m]=(s||'0:0').split(':').map(Number); return h*60+m; };
 
     // Alle laufenden Events von heute (nicht Besprechungen — die hat Meeting-Banner)
@@ -26001,7 +26010,7 @@ store.push(item);
     if (!banner) return;
     const now    = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
-    const today  = now.toISOString().split('T')[0];
+    const today  = this._dStr(now);
     const pT     = s => { const [h,m]=(s||'0:0').split(':').map(Number); return h*60+m; };
 
     // Nächste Besprechung heute suchen (beide DBs)
@@ -26887,7 +26896,7 @@ store.push(item);
     const today = new Date().toISOString().split('T')[0];
     const todayMs = new Date(today + 'T12:00:00').getTime();
     const in7 = new Date(); in7.setDate(in7.getDate()+7);
-    const in7str = in7.toISOString().split('T')[0];
+    const in7str = this._dStr(in7);
     this._nzStore().filter(n => n.typ === 'plan' && !n.archiv).forEach(notiz => {
       (notiz.planAufgaben || []).filter(a => !a.done).forEach(a => {
         let gruppe = 'irgendwann';
@@ -30435,9 +30444,9 @@ store.push(item);
     _mon.setDate(_now.getDate() - (_dow === 0 ? 6 : _dow - 1));
     _mon.setHours(0,0,0,0);
     const _sun = new Date(_mon); _sun.setDate(_mon.getDate() + 6);
-    const wS = _mon.toISOString().split('T')[0];
-    const wE = _sun.toISOString().split('T')[0];
-    const today = _now.toISOString().split('T')[0];
+    const wS = this._dStr(_mon);
+    const wE = this._dStr(_sun);
+    const today = this._dStr(_now);
 
     // Alle offenen Tasks sammeln
     const all = [];
@@ -30718,14 +30727,14 @@ store.push(item);
     document.getElementById('af-snooze-picker')?.remove();
 
     const now   = new Date();
-    const today = now.toISOString().split('T')[0];
+    const today = this._dStr(now);
     const tom   = new Date(now); tom.setDate(tom.getDate()+1);
-    const tomStr = tom.toISOString().split('T')[0];
+    const tomStr = this._dStr(tom);
     const nextMon = new Date(now);
     const dow = now.getDay();
     const daysToMon = (8 - dow) % 7 || 7;
     nextMon.setDate(now.getDate() + daysToMon);
-    const monStr = nextMon.toISOString().split('T')[0];
+    const monStr = this._dStr(nextMon);
 
     const fmt = d => {
       const [y,m,day] = d.split('-');
@@ -30880,7 +30889,7 @@ store.push(item);
 
   // ── Zeitband ────────────────────────────────────────
   getViewDateStr() {
-    return this.viewDate.toISOString().split('T')[0];
+    return this.this._dStr(viewDate);
   },
 
   shiftDay(d) {
