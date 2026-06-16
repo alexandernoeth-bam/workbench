@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 1.0.0</title>
+  <title>WorkBench 1.1.0</title>
   <link rel="manifest" href="manifest.json">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -157,14 +158,14 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v1.0.0</div>
+  <div id="wb-startup-tagline">v1.1.0</div>
 </div>
 
 <div id="wb-app">
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v1.0.0 · Build 20260616-0700</div>
+    <div id="wb-menu-version">v1.1.0 · Build 20260616-0710</div>
   </div>
 
   <div id="wb-content">
@@ -190,8 +191,27 @@
 <script>
 const WB = {
 
-  APP_VERSION: '1.0.0',
-  APP_BUILD:   '20260616-0700',
+  APP_VERSION: '1.1.0',
+  APP_BUILD:   '20260616-0710',
+
+  IDB_NAME:    'workbench-v2',
+  IDB_VERSION: 3,
+
+  DRIVE_SCOPE: 'https://www.googleapis.com/auth/drive',
+  DRIVE_API:   'https://www.googleapis.com/drive/v3',
+  UPLOAD_API:  'https://www.googleapis.com/upload/drive/v3',
+
+  dataPro:  null,
+  dataPriv: null,
+  activeWorld: 'beruf',
+  isDirty: false,
+
+  _idb: null,
+  _idbDevice: null,
+  _oauthClientId: null,
+  _oauthToken: null,
+  _oauthTokenExp: null,
+  _oauthDriveFileIds: { pro: null, priv: null },
 
   activeTab: 'cockpit',
 
@@ -226,6 +246,199 @@ const WB = {
   renderWoche()    { /* Prompt 6 */ },
   renderZiele()    { /* Prompt 7 */ },
 
+  // ── IDB ──────────────────────────────────────────────
+
+  async idbOpen() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('data')) db.createObjectStore('data');
+        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta');
+      };
+      req.onsuccess = e => { this._idb = e.target.result; resolve(); };
+      req.onerror   = e => reject(e.target.error);
+      req.onblocked = () => resolve();
+    });
+  },
+
+  async idbGet(store, key) {
+    return new Promise((resolve, reject) => {
+      const tx  = this._idb.transaction(store, 'readonly');
+      const req = tx.objectStore(store).get(key);
+      req.onsuccess = e => resolve(e.target.result ?? null);
+      req.onerror   = e => reject(e.target.error);
+    });
+  },
+
+  async idbSet(store, key, val) {
+    return new Promise((resolve, reject) => {
+      const tx  = this._idb.transaction(store, 'readwrite');
+      const req = tx.objectStore(store).put(val, key);
+      req.onsuccess = () => resolve();
+      req.onerror   = e => reject(e.target.error);
+    });
+  },
+
+  async idbLoadAll() {
+    try {
+      const pro  = await this.idbGet('data', 'dataPro');
+      const priv = await this.idbGet('data', 'dataPriv');
+      if (pro)  this.dataPro  = pro;
+      if (priv) this.dataPriv = priv;
+      const clientId = await this.idbGet('meta', 'oauthClientId');
+      if (clientId) this._oauthClientId = clientId;
+      const token    = await this.idbGet('meta', 'oauthToken');
+      const tokenExp = await this.idbGet('meta', 'oauthTokenExp');
+      if (token && tokenExp) { this._oauthToken = token; this._oauthTokenExp = tokenExp; }
+      const driveIdPro  = await this.idbGet('meta', 'driveFileId_pro');
+      const driveIdPriv = await this.idbGet('meta', 'driveFileId_priv');
+      if (driveIdPro)  this._oauthDriveFileIds.pro  = driveIdPro;
+      if (driveIdPriv) this._oauthDriveFileIds.priv = driveIdPriv;
+    } catch(e) {
+      console.error('[IDB] load error:', e);
+    }
+  },
+
+  async idbSaveAll() {
+    try {
+      if (this.dataPro)  await this.idbSet('data', 'dataPro',  this.dataPro);
+      if (this.dataPriv) await this.idbSet('data', 'dataPriv', this.dataPriv);
+      await this.idbSet('meta', 'lastSaved', Date.now());
+      this.isDirty = false;
+    } catch(e) {
+      this._toast('Speicherfehler: ' + e.message);
+    }
+  },
+
+  setDirty() {
+    this.isDirty = true;
+    clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => this.idbSaveAll(), 2000);
+  },
+
+  // ── KW-Hilfsfunktionen (IMMER _dStr verwenden, nie toISOString) ──
+
+  _kwStartDate() {
+    const d = new Date();
+    const day = d.getDay();
+    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+    return this._dStr(d);
+  },
+
+  _kwEndDate() {
+    const d = new Date();
+    const day = d.getDay();
+    d.setDate(d.getDate() + (day === 0 ? 0 : 7 - day));
+    return this._dStr(d);
+  },
+
+  _kwStr(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const kw = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return d.getUTCFullYear() + '-W' + String(kw).padStart(2, '0');
+  },
+
+  _getCurrentKW() {
+    const now = new Date();
+    return this._kwStr(now).split('-W')[1];
+  },
+
+  // ── Google Drive OAuth ────────────────────────────────
+
+  _oauthTokenValid() {
+    return !!(this._oauthToken && this._oauthTokenExp && Date.now() < this._oauthTokenExp);
+  },
+
+  async _oauthGetToken(silent) {
+    if (this._oauthTokenValid()) return this._oauthToken;
+    if (silent) return null;
+    return new Promise((resolve, reject) => {
+      if (!this._oauthClientId) { reject(new Error('Keine Client-ID')); return; }
+      if (!window.google?.accounts?.oauth2) { reject(new Error('Google Identity Services fehlt')); return; }
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: this._oauthClientId,
+        scope:     this.DRIVE_SCOPE,
+        callback:  async (resp) => {
+          if (resp.error) { reject(new Error(resp.error)); return; }
+          this._oauthToken    = resp.access_token;
+          this._oauthTokenExp = Date.now() + (resp.expires_in - 60) * 1000;
+          await this.idbSet('meta', 'oauthToken',    this._oauthToken);
+          await this.idbSet('meta', 'oauthTokenExp', this._oauthTokenExp);
+          resolve(this._oauthToken);
+        },
+      });
+      client.requestAccessToken();
+    });
+  },
+
+  async _oauthFindOrCreateFile(token, ctx) {
+    const filename = ctx === 'pro' ? 'workbench-beruf.json' : 'workbench-privat.json';
+    const cached = this._oauthDriveFileIds[ctx];
+    if (cached) return cached;
+    const search = await fetch(
+      this.DRIVE_API + '/files?q=' + encodeURIComponent("name='" + filename + "' and trashed=false") + '&fields=files(id,name)',
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+    const data = await search.json();
+    if (data.files?.length) {
+      this._oauthDriveFileIds[ctx] = data.files[0].id;
+      await this.idbSet('meta', 'driveFileId_' + ctx, data.files[0].id);
+      return data.files[0].id;
+    }
+    const meta = new Blob([JSON.stringify({ name: filename, mimeType: 'application/json' })], { type: 'application/json' });
+    const create = await fetch(this.UPLOAD_API + '/files?uploadType=multipart', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+      body: (() => { const f = new FormData(); f.append('metadata', meta); f.append('file', new Blob(['{}'], { type: 'application/json' })); return f; })(),
+    });
+    const created = await create.json();
+    this._oauthDriveFileIds[ctx] = created.id;
+    await this.idbSet('meta', 'driveFileId_' + ctx, created.id);
+    return created.id;
+  },
+
+  async oauthSyncUpload(ctx) {
+    try {
+      const token  = await this._oauthGetToken(false);
+      const fileId = await this._oauthFindOrCreateFile(token, ctx);
+      const db     = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      if (!db) { this._toast('Keine Daten zum Hochladen'); return; }
+      const payload = JSON.stringify({ data: db, _exported: new Date().toISOString() });
+      await fetch(this.UPLOAD_API + '/files/' + fileId + '?uploadType=media', {
+        method:  'PATCH',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body:    payload,
+      });
+      this._toast('✓ Hochgeladen: ' + (ctx === 'pro' ? 'Beruf' : 'Privat'));
+    } catch(e) {
+      this._toast('Upload-Fehler: ' + e.message);
+    }
+  },
+
+  async oauthSyncDownload(ctx) {
+    try {
+      const token  = await this._oauthGetToken(false);
+      const fileId = await this._oauthFindOrCreateFile(token, ctx);
+      const resp   = await fetch(this.DRIVE_API + '/files/' + fileId + '?alt=media', {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      const result = await resp.json();
+      const db = result.data || result;
+      if (ctx === 'pro') this.dataPro  = db;
+      else               this.dataPriv = db;
+      await this.idbSaveAll();
+      this._toast('✓ Heruntergeladen: ' + (ctx === 'pro' ? 'Beruf' : 'Privat'));
+      this.renderSection(this.activeTab);
+    } catch(e) {
+      this._toast('Download-Fehler: ' + e.message);
+    }
+  },
+
+  // ── Hilfsfunktionen ──────────────────────────────────
+
   _esc(str) {
     if (!str) return '';
     return String(str)
@@ -255,18 +468,23 @@ const WB = {
       + String(d.getDate()).padStart(2, '0');
   },
 
-  setDirty() {
-    // Wird in Prompt 2 (Datenhaltung) implementiert
-  },
+  // ── Init ─────────────────────────────────────────────
 
-  init() {
+  async init() {
+    // Startup ausblenden
     setTimeout(() => {
       const s = document.getElementById('wb-startup');
-      if (s) {
-        s.style.opacity = '0';
-        setTimeout(() => s.remove(), 300);
-      }
+      if (s) { s.style.opacity = '0'; setTimeout(() => s.remove(), 300); }
     }, 800);
+
+    // IDB öffnen und Daten laden
+    try {
+      await this.idbOpen();
+      await this.idbLoadAll();
+    } catch(e) {
+      console.error('[init] IDB error:', e);
+    }
+
     this.tabSwitch('cockpit');
   },
 
