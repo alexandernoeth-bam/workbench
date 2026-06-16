@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 1.9.0</title>
+  <title>WorkBench 1.9.1</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1284,8 +1284,8 @@
     #s-ov-back svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
     #s-ov-title   { font-size: 16px; font-weight: 700; color: var(--text); flex: 1; }
     #s-ov-version { font-size: 11px; color: var(--faint); font-family: var(--font-mono); }
-    #s-ov-scroll  { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-    .s-card { background: var(--surface); border-radius: var(--radius); border: 1.5px solid var(--border); overflow: hidden; }
+    #s-ov-scroll  { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .s-card { background: var(--surface); border-radius: var(--radius); border: 1.5px solid var(--border); overflow: visible; }
     .s-card-head {
       padding: 10px 14px; background: var(--surface2);
       border-bottom: 1px solid var(--border);
@@ -1308,6 +1308,8 @@
     .s-card-chev.open svg { transform: rotate(90deg); }
     .s-card-body { }
     .s-card-body.collapsed { display: none; }
+    .s-card-head-chev { font-size: 12px; color: var(--faint); transition: transform 0.2s; }
+    .s-card-head-chev.open { transform: rotate(180deg); }
     .s-card.danger-zone { border-color: rgba(192,57,43,0.3); }
     .s-card.danger-zone .s-card-head { color: var(--danger); background: rgba(192,57,43,0.04); border-bottom-color: rgba(192,57,43,0.15); }
     .s-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-bottom: 0.5px solid var(--border); }
@@ -1421,6 +1423,7 @@
     .wb-btn-cancel:hover { background: var(--surface2); }
     .wb-btn-save { background: var(--accent); color: #fff; }
     .wb-btn-delete { background: transparent; color: var(--danger); padding-left: 0; }
+    .wb-btn-dup { background: transparent; color: var(--muted); border: 1.5px solid var(--border); padding: 8px 12px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; }
     @keyframes sv-float { 0% { opacity:1; transform:translateY(0); } 100% { opacity:0; transform:translateY(-28px); } }
     .sv-plus1 { position: fixed; pointer-events: none; z-index: 9999; font-size: 14px; font-weight: 800; color: var(--accent2); animation: sv-float 0.8s ease-out forwards; }
   </style>
@@ -1429,14 +1432,14 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v1.9.0</div>
+  <div id="wb-startup-tagline">v1.9.1</div>
 </div>
 
 <div id="wb-app">
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v1.9.0 · Build 20260616-0910</div>
+    <div id="wb-menu-version">v1.9.1 · Build 20260616-0920</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -1794,8 +1797,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '1.9.0',
-  APP_BUILD:   '20260616-0910',
+  APP_VERSION: '1.9.1',
+  APP_BUILD:   '20260616-0920',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -4009,11 +4012,12 @@ const WB = {
       this.modalClose();
   },
 
-  _modalFooter(showDelete) {
-    return '<div>'
+  _modalFooter(showDelete, showDup) {
+    return '<div style="display:flex;gap:8px;align-items:center;">'
       + (showDelete
-        ? '<button class="wb-btn wb-btn-delete" onclick="WB._modalDelete()">L\u00f6schen</button>'
-        : '')
+        ? '<button class="wb-btn wb-btn-delete" onclick="WB._modalDelete()">L\u00f6schen</button>' : '')
+      + (showDup
+        ? '<button class="wb-btn-dup" onclick="WB._modalDuplicate()">Duplizieren</button>' : '')
       + '</div>'
       + '<div style="display:flex;gap:12px;">'
       + '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
@@ -4161,7 +4165,7 @@ const WB = {
       + this._modalVhOptions(ctx, e?.vorhabenId)
       + '</select></div>';
     this._modalCtx = { type:'termin', eventId, ctx };
-    this.modalOpen(eventId ? 'Termin bearbeiten' : 'Neuer Termin', body, this._modalFooter(!!eventId));
+    this.modalOpen(eventId ? 'Termin bearbeiten' : 'Neuer Termin', body, this._modalFooter(!!eventId, !!eventId));
     this._modalUpdateWeiche();
   },
 
@@ -4176,7 +4180,41 @@ const WB = {
       : 'Ohne Uhrzeit \u2192 nur im Backlog sichtbar (Pull)';
   },
 
-  /* ── Wochenpflicht ── */
+  _modalDuplicate() {
+    const c = this._modalCtx;
+    if (!c || c.type !== 'termin') return;
+    const ctx = this._modalGetWelt();
+    const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const e   = (db?.customEvents||[]).find(x => x.id === c.eventId);
+    if (!e) return;
+    this.modalClose();
+    setTimeout(() => {
+      this._modalCtx = { type:'termin', eventId: null, ctx };
+      const body = this._modalWeltTop(ctx, e.vertraulich)
+        + '<div class="wb-input-group">'
+        + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
+        + ' value="' + this._esc(e.text) + '">'
+        + '</div>'
+        + '<div class="wb-row2">'
+        + '<div class="wb-input-group"><label class="wb-label">Datum</label>'
+        + '<input id="wb-f-date" class="wb-input" type="date" value=""></div>'
+        + '<div class="wb-input-group"><label class="wb-label">Uhrzeit</label>'
+        + '<input id="wb-f-time" class="wb-input" type="time"'
+        + ' value="' + this._esc(e.startTime||'') + '" oninput="WB._modalUpdateWeiche()">'
+        + '</div></div>'
+        + '<div style="display:flex;gap:12px;align-items:flex-end;">'
+        + '<div class="wb-input-group" style="flex:1"><label class="wb-label">Dauer (Min)</label>'
+        + '<input id="wb-f-dur" class="wb-input" type="text"'
+        + ' value="' + this._esc(String(e.durationMin||60)) + '"></div>'
+        + '<div class="wb-weiche-info" id="wb-weiche">Ohne Uhrzeit \u2192 nur im Backlog (Pull)</div></div>'
+        + '<div class="wb-input-group"><label class="wb-label">Vorhaben (optional)</label>'
+        + '<select id="wb-f-vh" class="wb-select"><option value="">Kein Vorhaben</option>'
+        + this._modalVhOptions(ctx, e.vorhabenId)
+        + '</select></div>';
+      this.modalOpen('Termin duplizieren', body, this._modalFooter(false, false));
+      this._modalUpdateWeiche();
+    }, 100);
+  },
   pflichtOpen(id, ctx) {
     ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
     const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
@@ -4593,7 +4631,7 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
   <div id="s-ov-scroll">
 
     <div class="s-card">
-      <div class="s-card-head">Welt &amp; Sichtbarkeit</div>
+      <div class="s-card-head">Welt &amp; Sichtbarkeit<span class="s-card-head-chev open">&#9662;</span></div>
       <div class="s-info-box">
         <strong>Automatische Welt-Regel:</strong><br>
         Mo&ndash;Fr (kein Sondertag) &rarr; Beruf + Privat sichtbar, Beruf als Default<br>
@@ -4610,7 +4648,7 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
     </div>
 
     <div class="s-card">
-      <div class="s-card-head">Google Drive Sync</div>
+      <div class="s-card-head">Google Drive Sync<span class="s-card-head-chev open">&#9662;</span></div>
       <div class="s-sync-block" id="s-sync-status-block">
         <div class="s-sync-icon">
           <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
@@ -4658,7 +4696,7 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
     </div>
 
     <div class="s-card">
-      <div class="s-card-head">Ger&auml;t</div>
+      <div class="s-card-head">Ger&auml;t<span class="s-card-head-chev open">&#9662;</span></div>
       <div class="s-device-grid">
         <div class="s-device-btn" id="s-dev-pixel" onclick="WB._sSetDevice('pixel')">
           <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18" stroke-linecap="round" stroke-width="3"/></svg>
@@ -4681,7 +4719,7 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
     </div>
 
     <div class="s-card">
-      <div class="s-card-head">Darstellung</div>
+      <div class="s-card-head">Darstellung<span class="s-card-head-chev open">&#9662;</span></div>
       <div class="s-row">
         <div class="s-row-label">
           <div class="s-row-title">Dark Mode</div>
@@ -4714,7 +4752,7 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
     </div>
 
     <div class="s-card">
-      <div class="s-card-head">Wochenpflichten</div>
+      <div class="s-card-head">Wochenpflichten<span class="s-card-head-chev open">&#9662;</span></div>
       <div id="s-wp-list"></div>
       <div class="s-row">
         <button class="s-btn primary" style="width:100%;justify-content:center;" onclick="WB._sWpNeu()">+ Wochenpflicht hinzuf&uuml;gen</button>
@@ -4722,7 +4760,7 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
     </div>
 
     <div class="s-card">
-      <div class="s-card-head">Daten</div>
+      <div class="s-card-head">Daten<span class="s-card-head-chev open">&#9662;</span></div>
       <div class="s-row">
         <div class="s-row-label">
           <div class="s-row-title">Daten exportieren</div>
@@ -4741,7 +4779,7 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
     </div>
 
     <div class="s-card danger-zone">
-      <div class="s-card-head">Zur&uuml;cksetzen</div>
+      <div class="s-card-head">Zur&uuml;cksetzen<span class="s-card-head-chev open">&#9662;</span></div>
       <div class="s-row">
         <div class="s-row-label">
           <div class="s-row-title">Alle lokalen Daten l&ouml;schen</div>
