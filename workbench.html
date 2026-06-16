@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.0.2</title>
+  <title>WorkBench 2.1.0</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1515,14 +1515,14 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.0.2</div>
+  <div id="wb-startup-tagline">v2.1.0</div>
 </div>
 
 <div id="wb-app">
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.0.2 · Build 20260616-0950</div>
+    <div id="wb-menu-version">v2.1.0 · Build 20260616-1000</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -1556,7 +1556,7 @@
             <div class="ck-stat-lbl">Geschoben</div>
           </div>
         </div>
-        <div id="ck-world-pill" class="ck-world-pill" onclick="WB.ckToggleWorld()">BERUF</div>
+        <div id="ck-world-pill" class="ck-world-pill" style="display:none">BERUF</div>
       </div>
       <div id="ck-scroll">
         <div id="ck-session-area">
@@ -1895,8 +1895,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.0.2',
-  APP_BUILD:   '20260616-0950',
+  APP_VERSION: '2.1.0',
+  APP_BUILD:   '20260616-1000',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -1908,6 +1908,7 @@ const WB = {
   dataPro:  null,
   dataPriv: null,
   activeWorld: 'beruf',
+  _weltOverride: false,
   isDirty: false,
 
   _idb: null,
@@ -1972,23 +1973,27 @@ const WB = {
     const dayEl = document.getElementById('ck-header-day');
     const subEl = document.getElementById('ck-header-sub');
     if (dayEl) dayEl.textContent = dateStr;
+    const istAT = this._weltIstArbeitstag();
+    const overrideLink = (!istAT && !this._weltOverride)
+      ? ' &nbsp;<a href="#" style="font-size:11px;color:var(--accent);font-weight:600;text-decoration:none;" onclick="event.preventDefault();WB._weltToggleOverride()">Alle anzeigen</a>'
+      : (!istAT && this._weltOverride)
+        ? ' &nbsp;<a href="#" style="font-size:11px;color:var(--faint);font-weight:600;text-decoration:none;" onclick="event.preventDefault();WB._weltToggleOverride()">\u00d7 Nur Privat</a>'
+        : '';
     if (subEl) subEl.innerHTML = now.getFullYear()
       + ' \u00b7 KW ' + kw
-      + ' \u00b7 <span class="ck-tag-badge">Arbeitstag</span>';
-    const db = this.activeWorld === 'beruf'
-      ? this.dataPro : this.dataPriv;
+      + ' \u00b7 <span class="ck-tag-badge">'
+      + (istAT ? 'Arbeitstag' : 'Privattag') + '</span>'
+      + overrideLink;
     const bEl = document.getElementById('ck-stat-bewegt');
     const gEl = document.getElementById('ck-stat-geschoben');
-    if (bEl) bEl.textContent = db?.bewegung?.bewegt    || 0;
-    if (gEl) gEl.textContent = db?.bewegung?.geschoben || 0;
-    const pill = document.getElementById('ck-world-pill');
-    if (pill) pill.textContent =
-      this.activeWorld === 'beruf' ? 'BERUF' : 'PRIVAT';
+    if (bEl) bEl.textContent =
+      (this.dataPro?.bewegung?.bewegt||0) + (this.dataPriv?.bewegung?.bewegt||0);
+    if (gEl) gEl.textContent =
+      (this.dataPro?.bewegung?.geschoben||0) + (this.dataPriv?.bewegung?.geschoben||0);
   },
 
   ckToggleWorld() {
-    this.activeWorld = this.activeWorld === 'beruf' ? 'privat' : 'beruf';
-    this.renderCockpit();
+    // Veraltet — Welt wird jetzt automatisch bestimmt
   },
 
   _ckRenderSession() {
@@ -2086,86 +2091,76 @@ const WB = {
   _ckRenderAufgaben() {
     const mussEl   = document.getElementById('ck-muss-block');
     const sollteEl = document.getElementById('ck-sollte-block');
-    if (!mussEl || !sollteEl) return;
-    const db    = this.activeWorld === 'beruf' ? this.dataPro : this.dataPriv;
+    if (!mussEl||!sollteEl) return;
     const today = this._dStr(new Date());
-
     const aufgaben = [];
-    (db?.vorhaben || [])
-      .filter(v => v.aktiv !== false)
-      .forEach(v => {
-        (v.aufgaben || [])
-          .filter(a => !a.done && a.datum === today)
-          .forEach(a => {
-            const offenCL = (a.checklist || [])
-              .map((c,i) => ({...c, _idx: i}))
-              .filter(c => !c.done);
-            const naechsterSchritt = offenCL.length
-              ? offenCL[0].text : (a.naechsterSchritt || '');
-            aufgaben.push({
-              ...a,
-              _vorhabenTitel: v.titel,
-              _vorhabenId: v.id,
-              _welt: this.activeWorld === 'beruf' ? 'pro' : 'priv',
-              _naechsterSchritt: naechsterSchritt,
-              _offenCount: offenCL.length,
-            });
+    const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
+    welten.forEach(ctx => {
+      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      (db.vorhaben||[]).filter(v => v.aktiv!==false).forEach(v => {
+        (v.aufgaben||[]).filter(a => !a.done && a.datum===today).forEach(a => {
+          if (this._bueroAktiv && ctx==='priv') return;
+          if (this._bueroAktiv && a.vertraulich) return;
+          const offenCL = (a.checklist||[]).filter(c=>!c.done);
+          aufgaben.push({
+            ...a, _ctx: ctx,
+            _vorhabenTitel: v.titel,
+            _vorhabenId: v.id,
+            _naechsterSchritt: offenCL[0]?.text||'',
+            _offenCount: offenCL.length,
           });
+        });
       });
-
-    const muss   = aufgaben.filter(a => a.wichtigkeit === 'hoch');
-    const sollte = aufgaben.filter(a => a.wichtigkeit !== 'hoch');
-
+    });
+    const muss   = aufgaben.filter(a=>a.wichtigkeit==='hoch');
+    const sollte = aufgaben.filter(a=>a.wichtigkeit!=='hoch');
     const renderBlock = (el, label, color, items) => {
-      if (!items.length) { el.style.display = 'none'; return; }
+      if (!items.length) { el.style.display='none'; return; }
       el.style.display = '';
       let h = '<div class="ck-block-head">'
-        + '<span style="width:9px;height:9px;border-radius:2px;'
-        + 'background:' + color + ';display:inline-block;flex-shrink:0"></span>'
+        + '<span style="width:9px;height:9px;border-radius:2px;background:'
+        + color + ';display:inline-block;flex-shrink:0"></span>'
         + '<span class="ck-block-label">' + label + '</span>'
         + '<span class="ck-block-meta">' + items.length + ' offen</span></div>';
       items.forEach(a => {
-        const verschobenCount = a.verschobenZaehler || 0;
-        const warnColor = verschobenCount >= 3 ? 'var(--danger)' : color;
-        const badge = verschobenCount >= 3
-          ? '<span class="ck-badge beruf" style="background:var(--danger)">! Beruf</span>'
-          : '<span class="ck-badge beruf">Beruf</span>';
+        const badge = a._ctx==='pro'
+          ? '<span class="ck-badge beruf">Beruf</span>'
+          : '<span class="ck-badge privat">Privat</span>';
         h += '<div class="ck-aufg-row">'
-          + '<div class="ck-prio-dot" style="background:' + warnColor + '"></div>'
-          + '<div class="ck-aufg-check"'
-          + ' onclick="WB._ckCheckAufgabe(&quot;' + a.id + '&quot;)"></div>'
+          + '<div class="ck-prio-dot" style="background:'
+          + (a.wichtigkeit==='hoch'?'var(--accent)':'var(--accent2)') + '"></div>'
+          + '<div class="ck-aufg-check" onclick="WB._ckCheckAufgabe(&quot;'
+          + this._esc(a.id) + '&quot;,&quot;' + this._esc(a._ctx) + '&quot;)"></div>'
           + '<div class="ck-aufg-body">'
           + '<div class="ck-aufg-text">' + this._esc(a.text) + '</div>'
           + (a._naechsterSchritt
             ? '<div class="ck-aufg-sub">\u2192 ' + this._esc(a._naechsterSchritt) + '</div>' : '')
-          + '<div class="ck-aufg-meta">'
-          + this._esc(a._vorhabenTitel)
+          + '<div class="ck-aufg-meta">' + this._esc(a._vorhabenTitel)
           + (a._offenCount ? ' \u00b7 ' + a._offenCount + ' offen' : '')
-          + (verschobenCount >= 3 ? ' \u00b7 ' + verschobenCount + '\u00d7 verschoben' : '')
           + '</div></div>'
           + badge
-          + '<button style="background:none;border:none;cursor:pointer;color:var(--faint);font-size:16px;padding:2px 6px;" title="Fokus starten" onclick="event.stopPropagation();WB.ftOpenFromAufgabe(&quot;' + this._esc(a.id) + '&quot;,&quot;' + this._esc(a._vorhabenId||'') + '&quot;,&quot;' + this._esc(a._welt) + '&quot;)">&#x23F1;</button>'
+          + '<button style="background:none;border:none;cursor:pointer;color:var(--faint);font-size:16px;padding:2px 6px;" title="Fokus starten"'
+          + ' onclick="event.stopPropagation();WB.ftOpenFromAufgabe(&quot;' + this._esc(a.id) + '&quot;,&quot;' + this._esc(a._vorhabenId||'') + '&quot;,&quot;' + this._esc(a._ctx) + '&quot;)">&#x23F1;</button>'
           + '</div>';
       });
       el.innerHTML = h;
     };
-
     renderBlock(mussEl,   'Muss heute',   'var(--accent)',  muss);
     renderBlock(sollteEl, 'Sollte heute', 'var(--accent2)', sollte);
   },
 
-  _ckCheckAufgabe(aufgabeId) {
-    const db = this.activeWorld === 'beruf'
-      ? this.dataPro : this.dataPriv;
+  _ckCheckAufgabe(aufgabeId, ctx) {
+    ctx = ctx || (this.activeWorld==='beruf' ? 'pro' : 'priv');
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
     if (!db) return;
-    (db.vorhaben || []).forEach(v => {
-      (v.aufgaben || []).forEach(a => {
+    (db.vorhaben||[]).forEach(v => {
+      (v.aufgaben||[]).forEach(a => {
         if (a.id === aufgabeId) {
           a.done   = true;
           a.doneTs = new Date().toISOString();
           if (!db.bewegung) db.bewegung = {};
-          db.bewegung.bewegt =
-            (db.bewegung.bewegt || 0) + 1;
+          db.bewegung.bewegt = (db.bewegung.bewegt||0) + 1;
         }
       });
     });
@@ -2176,51 +2171,50 @@ const WB = {
   _ckRenderPflichten() {
     const el = document.getElementById('ck-pflichten-block');
     if (!el) return;
-    const db  = this.activeWorld === 'beruf' ? this.dataPro : this.dataPriv;
     const now = new Date();
     const today = this._dStr(now);
     const todayDay = now.getDay();
-
-    const pflichten = (db?.wochenpflichten || [])
-      .filter(p => {
-        if (p.taeglich) return true;
-        return (p.wochentage || []).includes(todayDay);
+    const pflichten = [];
+    const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
+    welten.forEach(ctx => {
+      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      (db.wochenpflichten||[]).forEach(p => {
+        if (this._bueroAktiv && ctx==='priv') return;
+        if (!p.taeglich && !(p.wochentage||[]).includes(todayDay)) return;
+        const done = !!db.pflichtStatus?.[today]?.[p.id];
+        pflichten.push({ ...p, _ctx: ctx, done });
       });
-
-    if (!pflichten.length) { el.style.display = 'none'; return; }
+    });
+    if (!pflichten.length) { el.style.display='none'; return; }
     el.style.display = '';
-
-    const erledigt = db?.pflichtStatus?.[today] || {};
-    const doneCount = pflichten.filter(p => erledigt[p.id]).length;
-
+    const doneCount = pflichten.filter(p=>p.done).length;
     let h = '<div class="ck-block-head">'
       + '<span class="ck-block-label">Wochenpflichten heute</span>'
       + '<span class="ck-block-meta">'
       + doneCount + '/' + pflichten.length + ' heute</span></div>';
-
     pflichten.forEach(p => {
-      const done = !!erledigt[p.id];
       h += '<div class="ck-pfl-row">'
-        + '<div class="ck-pfl-check' + (done ? ' done' : '')
-        + '" onclick="WB._ckCheckPflicht(&quot;' + p.id + '&quot;)">'
-        + (done ? '\u2713' : '') + '</div>'
-        + '<div class="ck-pfl-text' + (done ? ' done' : '') + '">'
+        + '<div class="ck-pfl-check' + (p.done?' done':'') + '"'
+        + ' onclick="WB._ckCheckPflicht(&quot;' + this._esc(p.id) + '&quot;,&quot;' + this._esc(p._ctx) + '&quot;)">'
+        + (p.done ? '\u2713' : '') + '</div>'
+        + '<div class="ck-pfl-text' + (p.done?' done':'') + '">'
         + this._esc(p.titel) + '</div>'
         + '<span class="ck-badge pflicht">'
-        + (done ? 'erledigt' : (p.welt === 'pro' ? 'Beruf' : 'Privat'))
+        + (p.done ? 'erledigt' : p._ctx==='pro'?'Beruf':'Privat')
         + '</span></div>';
     });
     el.innerHTML = h;
   },
 
-  _ckCheckPflicht(pflichtId) {
-    const db = this.activeWorld === 'beruf' ? this.dataPro : this.dataPriv;
+  _ckCheckPflicht(pflichtId, ctx) {
+    ctx = ctx || 'priv';
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
     if (!db) return;
     const today = this._dStr(new Date());
     if (!db.pflichtStatus) db.pflichtStatus = {};
     if (!db.pflichtStatus[today]) db.pflichtStatus[today] = {};
-    db.pflichtStatus[today][pflichtId] =
-      !db.pflichtStatus[today][pflichtId];
+    db.pflichtStatus[today][pflichtId] = !db.pflichtStatus[today][pflichtId];
     this.setDirty();
     this._ckRenderPflichten();
   },
@@ -2228,32 +2222,30 @@ const WB = {
   _ckRenderVorhaben() {
     const el = document.getElementById('ck-vorhaben-block');
     if (!el) return;
-    const db = this.activeWorld === 'beruf' ? this.dataPro : this.dataPriv;
-    const fokus = (db?.vorhaben || [])
-      .filter(v => v.fokus && v.aktiv !== false)
-      .slice(0, 3);
-    if (!fokus.length) { el.style.display = 'none'; return; }
+    const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
+    const fokus = [];
+    welten.forEach(ctx => {
+      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      (db?.vorhaben||[]).filter(v => v.fokus && v.aktiv!==false)
+        .forEach(v => fokus.push({...v, _ctx: ctx}));
+    });
+    if (!fokus.length) { el.style.display='none'; return; }
     el.style.display = '';
     let h = '<div class="ck-block-head">'
       + '<span class="ck-block-label">Aktive Vorhaben</span></div>'
       + '<div class="ck-anker-grid">';
-    fokus.forEach(v => {
-      const welt = v.welt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
-      const isPrivat = welt === 'priv';
-      const naechster = (v.aufgaben || [])
-        .filter(a => !a.done)
+    fokus.slice(0,3).forEach(v => {
+      const isPrivat = v._ctx === 'priv';
+      const naechster = (v.aufgaben||[]).filter(a=>!a.done)
         .map(a => {
-          const offenCL = (a.checklist || []).filter(c => !c.done);
+          const offenCL = (a.checklist||[]).filter(c=>!c.done);
           return offenCL.length ? offenCL[0].text : a.naechsterSchritt;
-        })
-        .find(Boolean) || '';
-      h += '<div class="ck-anker-card' + (isPrivat ? ' privat' : '') + '"'
+        }).find(Boolean) || '';
+      h += '<div class="ck-anker-card' + (isPrivat?' privat':'') + '"'
         + ' onclick="WB.tabSwitch(\'vorhaben\')">'
         + '<div class="ck-anker-title">' + this._esc(v.titel) + '</div>'
-        + '<div class="ck-anker-meta">'
-        + (isPrivat ? 'Privat' : 'Beruf') + '</div>'
-        + (naechster
-          ? '<div class="ck-anker-next">\u2192 ' + this._esc(naechster) + '</div>' : '')
+        + '<div class="ck-anker-meta">' + (isPrivat?'Privat':'Beruf') + '</div>'
+        + (naechster ? '<div class="ck-anker-next">\u2192 ' + this._esc(naechster) + '</div>' : '')
         + '</div>';
     });
     h += '</div>';
@@ -2294,11 +2286,10 @@ const WB = {
         + '.\u2013' + kwEndFmt + '.';
     }
 
-    // Immer beide Welten im Backlog zeigen (Leitbild: Arbeitstag = beide sichtbar)
-    // Welt-Filter nur über expliziten Filter-Button
+    // Filter bestimmt welche Welten — Standard: _weltBeideVisible
     const welten = this._blFilter.welt === 'beruf'  ? ['pro']
                  : this._blFilter.welt === 'privat' ? ['priv']
-                 : ['pro', 'priv'];
+                 : this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
 
     const aufgaben = [];
     const schnell  = [];
@@ -2562,7 +2553,8 @@ const WB = {
     const scroll = document.getElementById('vh-scroll');
     if (!scroll) return;
     let h = '';
-    ['pro','priv'].forEach(ctx => {
+    const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
+    welten.forEach(ctx => {
       const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
       const vorhaben = (db?.vorhaben || []).filter(v => v.aktiv !== false);
       if (!vorhaben.length) return;
@@ -2966,10 +2958,11 @@ const WB = {
 
   _abAlleLinks() {
     const links = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-      (db?.vorhaben || []).forEach(v => {
-        (v.links || []).forEach(l => {
+    const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
+    welten.forEach(ctx => {
+      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      (db?.vorhaben||[]).forEach(v => {
+        (v.links||[]).forEach(l => {
           links.push({ ...l, _ctx: ctx, _vorhabenId: v.id, _vorhabenTitel: v.titel });
         });
       });
@@ -3477,9 +3470,10 @@ const WB = {
 
   _ziAlleZiele() {
     const ziele = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-      (db?.ziele || []).forEach(z => { ziele.push({ ...z, _ctx: ctx }); });
+    const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
+    welten.forEach(ctx => {
+      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      (db?.ziele||[]).forEach(z => ziele.push({...z, _ctx:ctx}));
     });
     return ziele;
   },
@@ -5056,18 +5050,28 @@ const WB = {
     if (day === 0 || day === 6) return false;
     const today = this._dStr(d);
     for (const db of [this.dataPro, this.dataPriv]) {
-      const st = (db?.sondertage || []).find(s => s.datum === today);
-      if (st && (st.typ === 'urlaub' || st.typ === 'feiertag' || st.typ === 'urlaub-aktiv')) return false;
+      const st = (db?.sondertage||[]).find(s => s.datum === today);
+      if (st && (st.typ==='urlaub'||st.typ==='feiertag'||st.typ==='urlaub-aktiv')) return false;
     }
     return true;
   },
 
+  _weltBeideVisible() {
+    // Beide Welten sichtbar wenn: Arbeitstag ODER Override ODER Büromodus
+    if (this._bueroAktiv) return true;
+    if (this._weltOverride) return true;
+    return this._weltIstArbeitstag();
+  },
+
+  _weltToggleOverride() {
+    this._weltOverride = !this._weltOverride;
+    this._ckRenderHeader();
+    this.renderSection(this.activeTab);
+  },
+
   _weltInit() {
-    if (this._weltIstArbeitstag()) {
-      this.activeWorld = 'beruf';
-    } else {
-      this.activeWorld = 'privat';
-    }
+    this._weltOverride = false;
+    this.activeWorld = this._weltIstArbeitstag() ? 'beruf' : 'privat';
     this._bueroUpdateUI();
   },
 
