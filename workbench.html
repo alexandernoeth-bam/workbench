@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.2.1</title>
+  <title>WorkBench 2.3.0</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1518,13 +1518,39 @@
     #wb-oauth-banner-text { flex: 1; }
     #wb-oauth-banner-btn { background: #fff; color: var(--danger); border: none; border-radius: var(--radius-sm); padding: 6px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; font-family: var(--font); }
     #wb-oauth-banner-close { cursor: pointer; font-size: 18px; opacity: 0.7; padding: 0 4px; }
+    /* ── Micro-Aufgaben im Cockpit ── */
+    .ck-micro-row { display: flex; align-items: center; gap: 10px; padding: 7px 14px; border-bottom: 0.5px solid var(--border); cursor: pointer; }
+    .ck-micro-row:last-child { border-bottom: none; }
+    .ck-micro-row:hover { background: rgba(0,0,0,0.015); }
+    .ck-micro-chk { width: 17px; height: 17px; border-radius: 4px; border: 2px solid var(--border); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+    .ck-micro-chk.done { background: var(--accent); border-color: var(--accent); color: #fff; font-size: 10px; }
+    .ck-micro-body { flex: 1; min-width: 0; }
+    .ck-micro-text { font-size: 14px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ck-micro-text.done { color: var(--faint); text-decoration: line-through; }
+    .ck-micro-parent { font-size: 11px; color: var(--faint); margin-top: 1px; }
+    .ck-micro-progress { color: var(--accent); font-weight: 600; }
+    .ck-micro-ueberfaellig { color: var(--danger); font-weight: 600; }
+    .ck-quick-row { display: flex; align-items: center; gap: 10px; padding: 7px 14px; border-bottom: 0.5px solid var(--border); cursor: pointer; }
+    .ck-quick-row:last-child { border-bottom: none; }
+    .ck-quick-row:hover { background: rgba(0,0,0,0.015); }
+    .ck-quick-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .ck-quick-text { font-size: 14px; color: var(--text); flex: 1; }
+    .ck-quick-date { font-size: 11px; font-weight: 600; color: var(--warn); white-space: nowrap; }
+    .ck-quick-date.danger { color: var(--danger); }
+    .ck-mehr-row { padding: 6px 14px 8px; font-size: 12px; color: var(--accent); font-weight: 600; cursor: pointer; text-align: center; }
+    .ck-mehr-row:hover { background: rgba(10,107,94,0.04); }
+    .ck-divider { height: 1px; background: var(--border); margin: 0 14px; }
+    #ck-kann-body { display: none; }
+    #ck-kann-chev { transition: transform 0.2s; font-size: 12px; color: var(--faint); }
+    #ck-kann-chev.open { transform: rotate(180deg); }
+    .ck-sek-dot { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
   </style>
 </head>
 <body>
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.2.1</div>
+  <div id="wb-startup-tagline">v2.3.0</div>
 </div>
 
 <div id="wb-app">
@@ -1536,7 +1562,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.2.1 · Build 20260616-1040</div>
+    <div id="wb-menu-version">v2.3.0 · Build 20260616-1050</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -1591,8 +1617,33 @@
         </div>
         <div id="ck-next-banner-area"></div>
         <div id="ck-termine-block" class="ck-block"></div>
-        <div id="ck-muss-block"    class="ck-block"></div>
-        <div id="ck-sollte-block"  class="ck-block"></div>
+        <div class="ck-block" id="ck-muss-block">
+          <div class="ck-block-head">
+            <span class="ck-sek-dot" style="background:var(--accent)"></span>
+            <span class="ck-block-label">Muss heute</span>
+            <span class="ck-block-meta" id="ck-muss-meta"></span>
+          </div>
+          <div id="ck-muss-body"></div>
+        </div>
+
+        <div class="ck-block" id="ck-sollte-block">
+          <div class="ck-block-head">
+            <span class="ck-sek-dot" style="background:var(--warn)"></span>
+            <span class="ck-block-label">Sollte</span>
+            <span class="ck-block-meta" id="ck-sollte-meta"></span>
+          </div>
+          <div id="ck-sollte-body"></div>
+        </div>
+
+        <div class="ck-block" id="ck-kann-block">
+          <div class="ck-block-head" style="cursor:pointer" onclick="WB._ckKannToggle()">
+            <span class="ck-sek-dot" style="background:var(--faint)"></span>
+            <span class="ck-block-label">Kann</span>
+            <span class="ck-block-meta" id="ck-kann-meta"></span>
+            <span id="ck-kann-chev">&#9662;</span>
+          </div>
+          <div id="ck-kann-body"></div>
+        </div>
         <div id="ck-pflichten-block" class="ck-block"></div>
         <div id="ck-vorhaben-block"  class="ck-block"></div>
       </div>
@@ -1909,8 +1960,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.2.1',
-  APP_BUILD:   '20260616-1040',
+  APP_VERSION: '2.3.0',
+  APP_BUILD:   '20260616-1050',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2102,84 +2153,219 @@ const WB = {
     el.innerHTML = h;
   },
 
-  _ckRenderAufgaben() {
-    const mussEl   = document.getElementById('ck-muss-block');
-    const sollteEl = document.getElementById('ck-sollte-block');
-    if (!mussEl||!sollteEl) return;
-    const today = this._dStr(new Date());
-    const aufgaben = [];
+  /* ── Hilfsfunktion: KW-Grenzen ── */
+  _ckKwRange() {
+    const today   = this._dStr(new Date());
+    const kwStart = this._kwStartDate ? this._kwStartDate() : today;
+    const kwEnd   = this._kwEndDate   ? this._kwEndDate()   : today;
+    return { today, kwStart, kwEnd };
+  },
+
+  /* ── Alle Items sammeln (Micros + QuickItems) ── */
+  _ckSammelItems() {
+    const { today, kwStart, kwEnd } = this._ckKwRange();
     const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
+    const muss = [], sollte = [], kann = [];
+
     welten.forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
       if (!db) return;
+
+      // ── Aufgaben → Micros ──
       (db.vorhaben||[]).filter(v => v.aktiv!==false).forEach(v => {
-        (v.aufgaben||[]).filter(a => !a.done && a.datum===today).forEach(a => {
+        (v.aufgaben||[]).filter(a => !a.done).forEach(a => {
           if (this._bueroAktiv && ctx==='priv') return;
           if (this._bueroAktiv && a.vertraulich) return;
-          const offenCL = (a.checklist||[]).filter(c=>!c.done);
-          aufgaben.push({
-            ...a, _ctx: ctx,
-            _vorhabenTitel: v.titel,
-            _vorhabenId: v.id,
-            _naechsterSchritt: offenCL[0]?.text||'',
-            _offenCount: offenCL.length,
-          });
+          const offenCL = (a.checklist||[]).map((c,i)=>({...c,_idx:i})).filter(c=>!c.done);
+          const hatCL   = (a.checklist||[]).length > 0;
+          let sektion = null;
+          if (a.datum === today) sektion = 'muss';
+          else if (a.datum && a.datum < today) sektion = 'sollte';
+          else if (a.datum && a.datum >= kwStart && a.datum <= kwEnd) sektion = 'sollte';
+          else if (a.naechsterSchritt === true || !a.datum) sektion = 'kann';
+          if (!sektion) return;
+          if (hatCL && offenCL.length > 0) {
+            const nextMicro = offenCL[0];
+            const item = {
+              _art:'micro', _ctx:ctx, _sektion:sektion,
+              _aufgabeId:a.id, _aufgabeTxt:a.text,
+              _vorhabenId:v.id, _vorhabenTitel:v.titel,
+              _microIdx:nextMicro._idx, _microText:nextMicro.text,
+              _doneCount:(a.checklist||[]).filter(c=>c.done).length,
+              _totalCount:(a.checklist||[]).length,
+              _offenCount:offenCL.length, _datum:a.datum,
+            };
+            if (sektion==='muss') muss.push(item);
+            else if (sektion==='sollte') sollte.push(item);
+            else kann.push(item);
+          } else if (!hatCL) {
+            const item = {
+              _art:'aufgabe', _ctx:ctx, _sektion:sektion,
+              _aufgabeId:a.id, _aufgabeTxt:a.text,
+              _vorhabenId:v.id, _vorhabenTitel:v.titel, _datum:a.datum,
+            };
+            if (sektion==='muss') muss.push(item);
+            else if (sektion==='sollte') sollte.push(item);
+            else kann.push(item);
+          }
         });
       });
-    });
-    const muss   = aufgaben.filter(a=>a.wichtigkeit==='hoch');
-    const sollte = aufgaben.filter(a=>a.wichtigkeit!=='hoch');
-    const renderBlock = (el, label, color, items) => {
-      if (!items.length) { el.style.display='none'; return; }
-      el.style.display = '';
-      let h = '<div class="ck-block-head">'
-        + '<span style="width:9px;height:9px;border-radius:2px;background:'
-        + color + ';display:inline-block;flex-shrink:0"></span>'
-        + '<span class="ck-block-label">' + label + '</span>'
-        + '<span class="ck-block-meta">' + items.length + ' offen</span></div>';
-      items.forEach(a => {
-        const badge = a._ctx==='pro'
-          ? '<span class="ck-badge beruf">Beruf</span>'
-          : '<span class="ck-badge privat">Privat</span>';
-        h += '<div class="ck-aufg-row">'
-          + '<div class="ck-prio-dot" style="background:'
-          + (a.wichtigkeit==='hoch'?'var(--accent)':'var(--accent2)') + '"></div>'
-          + '<div class="ck-aufg-check" onclick="WB._ckCheckAufgabe(&quot;'
-          + this._esc(a.id) + '&quot;,&quot;' + this._esc(a._ctx) + '&quot;)"></div>'
-          + '<div class="ck-aufg-body">'
-          + '<div class="ck-aufg-text">' + this._esc(a.text) + '</div>'
-          + (a._naechsterSchritt
-            ? '<div class="ck-aufg-sub">\u2192 ' + this._esc(a._naechsterSchritt) + '</div>' : '')
-          + '<div class="ck-aufg-meta">' + this._esc(a._vorhabenTitel)
-          + (a._offenCount ? ' \u00b7 ' + a._offenCount + ' offen' : '')
-          + '</div></div>'
-          + badge
-          + '<button style="background:none;border:none;cursor:pointer;color:var(--faint);font-size:16px;padding:2px 6px;" title="Fokus starten"'
-          + ' onclick="event.stopPropagation();WB.ftOpenFromAufgabe(&quot;' + this._esc(a.id) + '&quot;,&quot;' + this._esc(a._vorhabenId||'') + '&quot;,&quot;' + this._esc(a._ctx) + '&quot;)">&#x23F1;</button>'
-          + '</div>';
+
+      // ── QuickItems ──
+      (db.quickItems||[]).filter(q => !q.done).forEach(q => {
+        if (this._bueroAktiv && ctx==='priv') return;
+        if (this._bueroAktiv && q.vertraulich) return;
+        let sektion = null;
+        if (q.date === today) sektion = 'muss';
+        else if (q.date && q.date < today) sektion = 'sollte';
+        else if (q.date && q.date >= kwStart && q.date <= kwEnd) sektion = 'sollte';
+        else sektion = 'kann';
+        const item = { _art:'quick', _ctx:ctx, _sektion:sektion, _id:q.id, _text:q.text, _date:q.date };
+        if (sektion==='muss') muss.push(item);
+        else if (sektion==='sollte') sollte.push(item);
+        else kann.push(item);
       });
-      el.innerHTML = h;
-    };
-    renderBlock(mussEl,   'Muss heute',   'var(--accent)',  muss);
-    renderBlock(sollteEl, 'Sollte heute', 'var(--accent2)', sollte);
+    });
+
+    return { muss, sollte, kann };
   },
 
-  _ckCheckAufgabe(aufgabeId, ctx) {
-    ctx = ctx || (this.activeWorld==='beruf' ? 'pro' : 'priv');
+  /* ── Render einer Sektion ── */
+  _ckRenderSektion(bodyEl, metaEl, items, sektionId) {
+    if (!bodyEl) return;
+    const micros = items.filter(i => i._art!=='quick');
+    const quicks = items.filter(i => i._art==='quick');
+    const total  = items.length;
+    if (!total) {
+      if (bodyEl.parentElement) bodyEl.parentElement.style.display = 'none';
+      return;
+    }
+    if (bodyEl.parentElement) bodyEl.parentElement.style.display = '';
+    const offen   = this['_ckMehrOffen_' + sektionId] || false;
+    const MAX     = 4;
+    const showAll = offen || total <= MAX;
+    const sichtbar = showAll ? items : items.slice(0, MAX);
+    if (metaEl) {
+      const mc = micros.length, qc = quicks.length;
+      let txt = '';
+      if (mc) txt += mc + ' Micro' + (mc!==1?'s':'');
+      if (mc && qc) txt += ' · ';
+      if (qc) txt += qc + ' Erinnerung' + (qc!==1?'en':'');
+      metaEl.textContent = txt;
+    }
+    let h = '', lastArt = null;
+    sichtbar.forEach(item => {
+      if (lastArt && lastArt !== 'quick' && item._art === 'quick') {
+        h += '<div class="ck-divider"></div>';
+      }
+      lastArt = item._art;
+      if (item._art === 'micro' || item._art === 'aufgabe') {
+        const isMicro = item._art === 'micro';
+        h += '<div class="ck-micro-row"'
+          + ' onclick="WB._ckMicroClick(&quot;' + this._esc(item._vorhabenId) + '&quot;,&quot;' + this._esc(item._aufgabeId) + '&quot;,&quot;' + this._esc(item._ctx) + '&quot;,' + (isMicro ? item._microIdx : -1) + ')">'
+          + '<div class="ck-micro-chk" onclick="event.stopPropagation();WB._ckMicroCheck(&quot;' + this._esc(item._vorhabenId) + '&quot;,&quot;' + this._esc(item._aufgabeId) + '&quot;,&quot;' + this._esc(item._ctx) + '&quot;,' + (isMicro ? item._microIdx : -1) + ')"></div>'
+          + '<div class="ck-micro-body">'
+          + '<div class="ck-micro-text">' + this._esc(isMicro ? item._microText : item._aufgabeTxt) + '</div>'
+          + '<div class="ck-micro-parent">'
+          + (isMicro
+            ? this._esc(item._aufgabeTxt) + ' \u00b7 <span class="ck-micro-progress">' + (item._totalCount - item._offenCount + 1) + '/' + item._totalCount + '</span> \u00b7 ' + this._esc(item._vorhabenTitel)
+            : this._esc(item._vorhabenTitel))
+          + (item._datum && item._datum < this._dStr(new Date())
+            ? ' \u00b7 <span class="ck-micro-ueberfaellig">\u00fcberf\u00e4llig</span>' : '')
+          + '</div></div>'
+          + '<span class="ck-badge ' + (item._ctx==='pro' ? 'beruf' : 'privat') + '">'
+          + (item._ctx==='pro' ? 'Beruf' : 'Privat') + '</span></div>';
+      } else if (item._art === 'quick') {
+        const ueber = item._date && item._date < this._dStr(new Date());
+        const dotColor = ueber ? 'var(--danger)' : 'var(--accent2)';
+        h += '<div class="ck-quick-row" onclick="WB.schnellOpen(&quot;' + this._esc(item._id) + '&quot;)">'
+          + '<div class="ck-quick-dot" style="background:' + dotColor + '"></div>'
+          + '<div class="ck-quick-text">' + this._esc(item._text) + '</div>';
+        if (item._date) {
+          const d = item._date.split('-');
+          h += '<span class="ck-quick-date' + (ueber ? ' danger' : '') + '">' + d[2] + '.' + d[1] + (ueber ? ' !' : '') + '</span>';
+        }
+        h += '<span class="ck-badge ' + (item._ctx==='pro' ? 'beruf' : 'privat') + '">'
+          + (item._ctx==='pro' ? 'Beruf' : 'Privat') + '</span></div>';
+      }
+    });
+    if (!showAll && total > MAX) {
+      const rest = total - MAX;
+      h += '<div class="ck-mehr-row" onclick="WB._ckMehrToggle(\'' + sektionId + '\')">+ ' + rest + ' weitere anzeigen \u25be</div>';
+    }
+    bodyEl.innerHTML = h;
+  },
+
+  /* ── Haupt-Render ── */
+  _ckRenderAufgaben() {
+    const { muss, sollte, kann } = this._ckSammelItems();
+    this._ckRenderSektion(document.getElementById('ck-muss-body'),    document.getElementById('ck-muss-meta'),    muss,   'muss');
+    this._ckRenderSektion(document.getElementById('ck-sollte-body'),  document.getElementById('ck-sollte-meta'),  sollte, 'sollte');
+    this._ckRenderSektion(document.getElementById('ck-kann-body'),    document.getElementById('ck-kann-meta'),    kann,   'kann');
+  },
+
+  _ckMehrOffen_muss:   false,
+  _ckMehrOffen_sollte: false,
+  _ckMehrOffen_kann:   false,
+
+  _ckMehrToggle(id) {
+    this['_ckMehrOffen_' + id] = true;
+    this._ckRenderAufgaben();
+  },
+
+  _ckKannToggle() {
+    const body = document.getElementById('ck-kann-body');
+    const chev = document.getElementById('ck-kann-chev');
+    if (!body) return;
+    const isOpen = body.style.display !== 'none' && body.style.display !== '';
+    body.style.display = isOpen ? 'none' : '';
+    if (chev) chev.classList.toggle('open', !isOpen);
+  },
+
+  _ckMicroCheck(vorhabenId, aufgabeId, ctx, microIdx) {
     const db = ctx==='pro' ? this.dataPro : this.dataPriv;
     if (!db) return;
-    (db.vorhaben||[]).forEach(v => {
-      (v.aufgaben||[]).forEach(a => {
-        if (a.id === aufgabeId) {
-          a.done   = true;
-          a.doneTs = new Date().toISOString();
-          if (!db.bewegung) db.bewegung = {};
-          db.bewegung.bewegt = (db.bewegung.bewegt||0) + 1;
-        }
-      });
-    });
+    const v = (db.vorhaben||[]).find(x => x.id === vorhabenId);
+    if (!v) return;
+    const a = (v.aufgaben||[]).find(x => x.id === aufgabeId);
+    if (!a) return;
+    if (microIdx >= 0 && a.checklist?.[microIdx]) {
+      a.checklist[microIdx].done = true;
+      a.updatedAt = this._now();
+      const allesDone = (a.checklist||[]).every(c => c.done);
+      if (allesDone) { a.done = true; a.updatedAt = this._now(); this._ckBewegt(db); }
+    } else if (microIdx === -1) {
+      a.done = true; a.updatedAt = this._now(); this._ckBewegt(db);
+    }
     this.setDirty();
     this.renderCockpit();
+  },
+
+  _ckMicroClick(vorhabenId, aufgabeId, ctx, microIdx) {
+    this.aufgabeOpen(vorhabenId, aufgabeId, ctx);
+  },
+
+  _ckBewegt(db) {
+    if (!db.bewegung) db.bewegung = { bewegt:0, geschoben:0 };
+    db.bewegung.bewegt = (db.bewegung.bewegt||0) + 1;
+    const el = document.getElementById('ck-stat-bewegt');
+    if (el) el.textContent = (this.dataPro?.bewegung?.bewegt||0) + (this.dataPriv?.bewegung?.bewegt||0);
+  },
+
+  _ckDoneSchnell(id, ctx) {
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    const q = (db.quickItems||[]).find(x => x.id === id);
+    if (q) { q.done = true; q.updatedAt = this._now(); this._ckBewegt(db); }
+    this.setDirty();
+    this.renderCockpit();
+  },
+
+  _ckRenderSchnellHeute() {},
+
+  _ckCheckAufgabe(aufgabeId, ctx) {
+    // Veraltet — _ckMicroCheck verwenden
+    this._ckMicroCheck('', aufgabeId, ctx || 'priv', -1);
   },
 
   _ckRenderPflichten() {
