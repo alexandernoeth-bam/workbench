@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 1.9.1</title>
+  <title>WorkBench 2.0.0</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1426,20 +1426,103 @@
     .wb-btn-dup { background: transparent; color: var(--muted); border: 1.5px solid var(--border); padding: 8px 12px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; }
     @keyframes sv-float { 0% { opacity:1; transform:translateY(0); } 100% { opacity:0; transform:translateY(-28px); } }
     .sv-plus1 { position: fixed; pointer-events: none; z-index: 9999; font-size: 14px; font-weight: 800; color: var(--accent2); animation: sv-float 0.8s ease-out forwards; }
+    /* ── Fokustimer Floating Panel ── */
+    #ft-panel {
+      position: fixed; z-index: 700; bottom: 80px; right: 16px;
+      width: 360px; max-width: calc(100vw - 32px);
+      background: var(--surface); border-radius: var(--radius);
+      border: 1.5px solid var(--border);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+      display: none; flex-direction: column; overflow: hidden;
+    }
+    #ft-panel.open { display: flex; }
+    #ft-header {
+      background: var(--accent); padding: 10px 14px;
+      display: flex; align-items: center; gap: 10px;
+      cursor: grab; flex-shrink: 0;
+    }
+    #ft-drag-icon { color: rgba(255,255,255,0.5); }
+    #ft-drag-icon svg { width: 16px; height: 16px; fill: currentColor; }
+    #ft-title { font-size: 14px; font-weight: 700; color: #fff; flex: 1; }
+    #ft-close { color: rgba(255,255,255,0.6); font-size: 18px; cursor: pointer; line-height: 1; background: none; border: none; }
+    #ft-context {
+      padding: 7px 14px; background: rgba(10,107,94,0.06);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px; color: var(--muted);
+      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+    }
+    #ft-ctx-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+    #ft-timer-area { padding: 18px 14px 14px; text-align: center; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    #ft-time { font-size: 50px; font-weight: 700; color: var(--text); letter-spacing: -2px; line-height: 1; font-variant-numeric: tabular-nums; }
+    #ft-time-sub { font-size: 12px; color: var(--faint); margin-top: 3px; }
+    #ft-bar { height: 4px; background: var(--surface2); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+    #ft-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; width: 0%; transition: width 0.5s linear; }
+    .ft-timer-btns { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+    .ft-tbtn { border: none; border-radius: var(--radius-sm); padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: var(--font); }
+    .ft-tbtn svg { width: 13px; height: 13px; fill: currentColor; }
+    .ft-tbtn.play   { background: var(--accent); color: #fff; }
+    .ft-tbtn.paused { background: var(--surface2); color: var(--muted); }
+    #ft-cl-head { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 0.5px solid var(--border); flex-shrink: 0; }
+    #ft-cl-lbl  { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); flex: 1; }
+    #ft-cl-cnt  { font-size: 12px; color: var(--faint); }
+    #ft-cl-add  { font-size: 12px; color: var(--accent); font-weight: 600; cursor: pointer; }
+    #ft-cl-list { overflow-y: auto; max-height: 220px; }
+    .ft-cl-row  { display: flex; align-items: center; gap: 9px; padding: 8px 14px; border-bottom: 0.5px solid var(--border); }
+    .ft-cl-row:last-child { border-bottom: none; }
+    .ft-cl-chk  { width: 17px; height: 17px; border-radius: 4px; border: 2px solid var(--border); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+    .ft-cl-chk.done { background: var(--accent); border-color: var(--accent); }
+    .ft-cl-chk.done svg { width: 10px; height: 10px; fill: #fff; }
+    .ft-cl-txt  { font-size: 14px; color: var(--text); flex: 1; }
+    .ft-cl-txt.done { color: var(--faint); text-decoration: line-through; }
+    .ft-cl-tag  { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+    .ft-cl-tag.morgen  { background: rgba(180,83,9,0.1); color: var(--warn); }
+    .ft-cl-tag.session { background: rgba(10,107,94,0.1); color: var(--accent); }
+    #ft-sess-btns { display: flex; gap: 7px; padding: 10px 14px; border-top: 1.5px solid var(--border); background: var(--surface2); flex-shrink: 0; }
+    .ft-sb { flex: 1; padding: 8px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 4px; font-family: var(--font); }
+    .ft-sb svg { width: 12px; height: 12px; fill: currentColor; }
+    .ft-sb.finish { background: var(--accent); color: #fff; }
+    .ft-sb.pause  { background: var(--surface); color: var(--muted); border: 1.5px solid var(--border); }
+    .ft-sb.cancel { background: rgba(192,57,43,0.08); color: var(--danger); border: 1.5px solid rgba(192,57,43,0.2); }
+    /* Cockpit Session-Pill */
+    #ck-session-pill { display: none; align-items: center; gap: 10px; padding: 10px 14px; margin: 0 0 10px; background: rgba(10,107,94,0.06); border: 1.5px solid rgba(10,107,94,0.25); border-radius: var(--radius-sm); cursor: pointer; }
+    #ck-session-pill.visible { display: flex; }
+    .csp-icon { width: 30px; height: 30px; border-radius: var(--radius-sm); background: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .csp-icon svg { width: 14px; height: 14px; fill: #fff; }
+    .csp-info { flex: 1; }
+    .csp-name  { font-size: 13px; font-weight: 600; color: var(--text); }
+    .csp-meta  { font-size: 11px; color: var(--muted); }
+    .csp-badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 10px; background: var(--warn); color: #fff; }
+    .csp-resume { font-size: 12px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+    /* Vorlagen-Overlay */
+    #ft-vorlagen-overlay { position: fixed; inset: 0; z-index: 750; background: rgba(26,31,36,0.6); display: none; align-items: flex-end; justify-content: center; }
+    #ft-vorlagen-overlay.open { display: flex; }
+    #ft-vorlagen-sheet { background: var(--surface); width: 100%; max-width: 480px; border-radius: var(--radius) var(--radius) 0 0; max-height: 70vh; display: flex; flex-direction: column; overflow: hidden; }
+    #ft-vl-head { padding: 12px 16px; border-bottom: 1.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    #ft-vl-title { font-size: 15px; font-weight: 700; color: var(--text); }
+    #ft-vl-list  { flex: 1; overflow-y: auto; }
+    .ft-vl-item  { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 0.5px solid var(--border); cursor: pointer; }
+    .ft-vl-item:last-child { border-bottom: none; }
+    .ft-vl-item:hover { background: rgba(0,0,0,0.02); }
+    .ft-vl-icon  { width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .ft-vl-icon svg { width: 18px; height: 18px; fill: #fff; }
+    .ft-vl-info  { flex: 1; }
+    .ft-vl-name  { font-size: 15px; font-weight: 600; color: var(--text); }
+    .ft-vl-meta  { font-size: 12px; color: var(--faint); margin-top: 2px; }
+    .ft-vl-start { background: var(--accent); color: #fff; border: none; border-radius: var(--radius-sm); padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: var(--font); }
   </style>
 </head>
 <body>
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v1.9.1</div>
+  <div id="wb-startup-tagline">v2.0.0</div>
 </div>
 
 <div id="wb-app">
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v1.9.1 · Build 20260616-0920</div>
+    <div id="wb-menu-version">v2.0.0 · Build 20260616-0930</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -1476,7 +1559,22 @@
         <div id="ck-world-pill" class="ck-world-pill" onclick="WB.ckToggleWorld()">BERUF</div>
       </div>
       <div id="ck-scroll">
-        <div id="ck-session-area"></div>
+        <div id="ck-session-area">
+          <div id="ck-session-pill" onclick="WB.ftResume()">
+            <div class="csp-icon">
+              <svg viewBox="0 0 24 24">
+                <rect x="6" y="4" width="4" height="16"/>
+                <rect x="14" y="4" width="4" height="16"/>
+              </svg>
+            </div>
+            <div class="csp-info">
+              <div class="csp-name"></div>
+              <div class="csp-meta"></div>
+            </div>
+            <span class="csp-badge"></span>
+            <span class="csp-resume">&#x25B6; Fortfahren</span>
+          </div>
+        </div>
         <div id="ck-next-banner-area"></div>
         <div id="ck-termine-block" class="ck-block"></div>
         <div id="ck-muss-block"    class="ck-block"></div>
@@ -1797,8 +1895,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '1.9.1',
-  APP_BUILD:   '20260616-0920',
+  APP_VERSION: '2.0.0',
+  APP_BUILD:   '20260616-0930',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2006,6 +2104,7 @@ const WB = {
             aufgaben.push({
               ...a,
               _vorhabenTitel: v.titel,
+              _vorhabenId: v.id,
               _welt: this.activeWorld === 'beruf' ? 'pro' : 'priv',
               _naechsterSchritt: naechsterSchritt,
               _offenCount: offenCL.length,
@@ -2043,7 +2142,9 @@ const WB = {
           + (a._offenCount ? ' \u00b7 ' + a._offenCount + ' offen' : '')
           + (verschobenCount >= 3 ? ' \u00b7 ' + verschobenCount + '\u00d7 verschoben' : '')
           + '</div></div>'
-          + badge + '</div>';
+          + badge
+          + '<button style="background:none;border:none;cursor:pointer;color:var(--faint);font-size:16px;padding:2px 6px;" title="Fokus starten" onclick="event.stopPropagation();WB.ftOpenFromAufgabe(&quot;' + this._esc(a.id) + '&quot;,&quot;' + this._esc(a._vorhabenId||'') + '&quot;,&quot;' + this._esc(a._welt) + '&quot;)">&#x23F1;</button>'
+          + '</div>';
       });
       el.innerHTML = h;
     };
@@ -4550,6 +4651,345 @@ const WB = {
     anim.addEventListener('animationend', () => anim.remove());
   },
 
+  /* ── Fokustimer ── */
+  _ft: {
+    isOpen: false, isRunning: false, isPaused: false,
+    totalSec: 0, remainSec: 0, elapsed: 0,
+    title: '', context: '', checklist: [],
+    sessionId: null, _interval: null,
+    _allDoneRewarded: false,
+  },
+
+  ftOpen(title, contextText, checklist, durationMin) {
+    const ft = this._ft;
+    ft.title    = title || 'Fokus';
+    ft.context  = contextText || '';
+    ft.totalSec = (durationMin || 25) * 60;
+    ft.remainSec= ft.totalSec;
+    ft.elapsed  = 0;
+    ft.isRunning= false;
+    ft.isPaused = false;
+    ft.sessionId= 'ft_' + Date.now();
+    ft._allDoneRewarded = false;
+    ft.checklist= (checklist || []).map(c => ({
+      text: c.text || c, done: c.done || false,
+      rewarded: false, tagMorgen: false, tagSession: false,
+    }));
+    ft.isOpen = true;
+    const panel = document.getElementById('ft-panel');
+    if (panel) panel.classList.add('open');
+    this._ftRender();
+    this._ftMakeDraggable();
+  },
+
+  ftOpenFromAufgabe(aufgabeId, vorhabenId, ctx) {
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
+    const a  = (v?.aufgaben||[]).find(x => x.id === aufgabeId);
+    if (!a) return;
+    this.ftOpen(a.text, v ? v.titel : '', a.checklist || [], 25);
+  },
+
+  ftClose() {
+    this._ftStop();
+    this._ft.isOpen = false;
+    const panel = document.getElementById('ft-panel');
+    if (panel) panel.classList.remove('open');
+  },
+
+  ftToggle() {
+    if (this._ft.isRunning) {
+      this._ftStop();
+      this._ft.isRunning = false;
+    } else {
+      this._ftStart();
+    }
+    this._ftRenderTimerBtn();
+  },
+
+  _ftStart() {
+    const ft = this._ft;
+    ft.isRunning = true;
+    ft.isPaused  = false;
+    ft._interval = setInterval(() => {
+      if (ft.remainSec <= 0) {
+        this._ftStop();
+        this._toast('\u23f1 Zeit abgelaufen!');
+        return;
+      }
+      ft.remainSec--;
+      ft.elapsed++;
+      this._ftRenderTime();
+    }, 1000);
+    this._ftRenderTimerBtn();
+  },
+
+  _ftStop() {
+    if (this._ft._interval) {
+      clearInterval(this._ft._interval);
+      this._ft._interval = null;
+    }
+    this._ft.isRunning = false;
+  },
+
+  ftPause() {
+    this._ftStop();
+    this._ft.isPaused = true;
+    this._ft.isOpen   = false;
+    const panel = document.getElementById('ft-panel');
+    if (panel) panel.classList.remove('open');
+    this._ftUpdateSessionPill();
+    this._toast('Session pausiert');
+  },
+
+  ftResume() {
+    this._ft.isPaused = false;
+    this._ft.isOpen   = true;
+    const panel = document.getElementById('ft-panel');
+    if (panel) panel.classList.add('open');
+    this._ftRender();
+    this._ftStart();
+    this._ftUpdateSessionPill();
+  },
+
+  ftFinish() {
+    this._ftStop();
+    const offen = this._ft.checklist.filter(c => !c.done).length;
+    if (offen > 0) {
+      if (!confirm(offen + ' Punkt(e) noch offen. Trotzdem abschlie\u00dfen?')) return;
+    }
+    this._ft.isPaused = false;
+    this._ft.isOpen   = false;
+    const panel = document.getElementById('ft-panel');
+    if (panel) panel.classList.remove('open');
+    this._ftUpdateSessionPill();
+    this._toast('\u2713 Session abgeschlossen');
+    this.renderSection(this.activeTab);
+  },
+
+  ftCancel() {
+    if (!confirm('Session wirklich abbrechen?')) return;
+    const offen = this._ft.checklist.filter(c => !c.done);
+    if (offen.length > 0) {
+      const convert = confirm(offen.length + ' offene Punkte als Schnell-Erinnerungen speichern?');
+      if (convert) {
+        const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+        const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
+        if (db) {
+          if (!db.quickItems) db.quickItems = [];
+          offen.forEach(c => {
+            db.quickItems.push({
+              id: 'q_'+Date.now()+'_'+Math.random(),
+              text: c.text, date: '', done: false,
+            });
+          });
+          this.setDirty();
+        }
+      }
+    }
+    this._ftStop();
+    this._ft.isPaused = false;
+    this._ft.isOpen   = false;
+    const panel = document.getElementById('ft-panel');
+    if (panel) panel.classList.remove('open');
+    this._ftUpdateSessionPill();
+    this._toast('Session abgebrochen');
+    this.renderSection(this.activeTab);
+  },
+
+  ftClCheck(idx, event) {
+    const ft   = this._ft;
+    const item = ft.checklist[idx];
+    if (!item) return;
+    if (item.done && item.rewarded) {
+      item.done = false;
+    } else if (!item.done) {
+      item.done = true;
+      if (ft.isRunning && !item.rewarded) {
+        item.rewarded = true;
+        const rect = event?.target?.getBoundingClientRect();
+        this._svKontoAddieren(
+          rect ? rect.left : undefined,
+          rect ? rect.top  : undefined
+        );
+      }
+    } else {
+      item.done = false;
+    }
+    this._ftRenderChecklist();
+    this._ftUpdatePflichtStatus();
+  },
+
+  ftClAdd() {
+    const text = prompt('Neuer Punkt:');
+    if (!text?.trim()) return;
+    this._ft.checklist.push({
+      text: text.trim(), done: false, rewarded: false, tagSession: true,
+    });
+    this._ftRenderChecklist();
+  },
+
+  _ftRender() {
+    const ft = this._ft;
+    const titleEl = document.getElementById('ft-title');
+    if (titleEl) titleEl.textContent = ft.title;
+    const ctxEl = document.getElementById('ft-ctx-text');
+    if (ctxEl) ctxEl.textContent = ft.context || 'Kein Kontext';
+    const lblEl = document.getElementById('ft-cl-lbl');
+    if (lblEl) lblEl.textContent = ft.title;
+    this._ftRenderTime();
+    this._ftRenderTimerBtn();
+    this._ftRenderChecklist();
+  },
+
+  _ftRenderTime() {
+    const ft  = this._ft;
+    const rem = Math.max(0, ft.remainSec);
+    const min = Math.floor(rem / 60);
+    const sec = rem % 60;
+    const str = String(min).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+    const el  = document.getElementById('ft-time');
+    if (el) el.textContent = str;
+    const pct = ft.totalSec > 0 ? ((ft.totalSec - rem) / ft.totalSec * 100) : 0;
+    const bar = document.getElementById('ft-bar-fill');
+    if (bar) bar.style.width = pct + '%';
+    const sub = document.getElementById('ft-time-sub');
+    if (sub) {
+      if (ft.isRunning) sub.textContent = 'noch ' + Math.ceil(rem / 60) + ' Min';
+      else if (ft.isPaused) sub.textContent = 'pausiert';
+      else sub.textContent = 'bereit';
+    }
+  },
+
+  _ftRenderTimerBtn() {
+    const ft  = this._ft;
+    const btn = document.getElementById('ft-btn-toggle');
+    if (!btn) return;
+    if (ft.isRunning) {
+      btn.className = 'ft-tbtn play';
+      btn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> L\u00e4uft';
+    } else {
+      btn.className = 'ft-tbtn paused';
+      btn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg> Starten';
+    }
+  },
+
+  _ftRenderChecklist() {
+    const el    = document.getElementById('ft-cl-list');
+    const cntEl = document.getElementById('ft-cl-cnt');
+    if (!el) return;
+    const cl   = this._ft.checklist;
+    const done = cl.filter(c => c.done).length;
+    if (cntEl) cntEl.textContent = done + ' / ' + cl.length + ' erledigt';
+    let h = '';
+    cl.forEach((c, i) => {
+      let tag = '';
+      if (c.tagMorgen)  tag = '<span class="ft-cl-tag morgen">\u2192 morgen fr\u00fch</span>';
+      if (c.tagSession) tag = '<span class="ft-cl-tag session">nur Session</span>';
+      h += '<div class="ft-cl-row">'
+        + '<div class="ft-cl-chk' + (c.done ? ' done' : '') + '"'
+        + ' onclick="WB.ftClCheck(' + i + ',event)">'
+        + (c.done ? '<svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>' : '')
+        + '</div>'
+        + '<div class="ft-cl-txt' + (c.done ? ' done' : '') + '">' + this._esc(c.text) + '</div>'
+        + tag + '</div>';
+    });
+    el.innerHTML = h;
+  },
+
+  _ftUpdatePflichtStatus() {
+    const ft = this._ft;
+    if (!ft._allDoneRewarded && ft.checklist.length > 0 && ft.checklist.every(c => c.done)) {
+      ft._allDoneRewarded = true;
+    }
+  },
+
+  _ftUpdateSessionPill() {
+    const pill = document.getElementById('ck-session-pill');
+    if (!pill) return;
+    const ft = this._ft;
+    if (!ft.isPaused) { pill.classList.remove('visible'); return; }
+    pill.classList.add('visible');
+    const offenCount = ft.checklist.filter(c => !c.done).length;
+    const nameEl = pill.querySelector('.csp-name');
+    const metaEl = pill.querySelector('.csp-meta');
+    const badge  = pill.querySelector('.csp-badge');
+    if (nameEl) nameEl.textContent = ft.title;
+    if (metaEl) metaEl.textContent = 'Pausiert \u00b7 ' + offenCount + ' Punkte offen';
+    if (badge)  badge.textContent  = offenCount + ' offen';
+  },
+
+  _ftMakeDraggable() {
+    const panel  = document.getElementById('ft-panel');
+    const header = document.getElementById('ft-header');
+    if (!panel || !header) return;
+    let startX, startY, startLeft, startBottom;
+    header.onmousedown = (e) => {
+      startX = e.clientX; startY = e.clientY;
+      const rect = panel.getBoundingClientRect();
+      startLeft   = rect.left;
+      startBottom = window.innerHeight - rect.bottom;
+      panel.style.right  = 'auto';
+      panel.style.bottom = startBottom + 'px';
+      panel.style.left   = startLeft + 'px';
+      document.onmousemove = (e2) => {
+        panel.style.left   = (startLeft   + e2.clientX - startX) + 'px';
+        panel.style.bottom = (startBottom - e2.clientY + startY) + 'px';
+      };
+      document.onmouseup = () => {
+        document.onmousemove = null;
+        document.onmouseup   = null;
+      };
+    };
+  },
+
+  ftVorlagenOpen() {
+    this._ftRenderVorlagen();
+    const el = document.getElementById('ft-vorlagen-overlay');
+    if (el) el.classList.add('open');
+  },
+
+  ftVorlagenClose() {
+    const el = document.getElementById('ft-vorlagen-overlay');
+    if (el) el.classList.remove('open');
+  },
+
+  _ftRenderVorlagen() {
+    const el = document.getElementById('ft-vl-list');
+    if (!el) return;
+    const alle = [];
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      (db?.checklistVorlagen||[]).forEach(v => { alle.push({ ...v, _ctx: ctx }); });
+    });
+    if (!alle.length) {
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--faint);font-size:13px;">Noch keine Vorlagen. Lege eine an!</div>';
+      return;
+    }
+    const iconSvg = '<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>';
+    let h = '';
+    alle.forEach(v => {
+      const color = v._ctx === 'pro' ? 'var(--accent)' : 'var(--accent2)';
+      const count = (v.schritte||[]).length;
+      h += '<div class="ft-vl-item">'
+        + '<div class="ft-vl-icon" style="background:' + color + '">' + iconSvg + '</div>'
+        + '<div class="ft-vl-info">'
+        + '<div class="ft-vl-name">' + this._esc(v.titel) + '</div>'
+        + '<div class="ft-vl-meta">' + count + ' Schritte</div></div>'
+        + '<button class="ft-vl-start" onclick="WB.ftStartVorlage(&quot;' + this._esc(v.id) + '&quot;,&quot;' + v._ctx + '&quot;)">\u25b6 Starten</button>'
+        + '</div>';
+    });
+    el.innerHTML = h;
+  },
+
+  ftStartVorlage(id, ctx) {
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const v  = (db?.checklistVorlagen||[]).find(x => x.id === id);
+    if (!v) return;
+    this.ftVorlagenClose();
+    this.ftOpen(v.titel, '', v.schritte || [], 25);
+  },
+
   oauthSignOut() {
     this._oauthToken    = null;
     this._oauthTokenExp = null;
@@ -4794,5 +5234,74 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
 </div>
 
 <input id="s-file-input" type="file" accept=".json" style="display:none" onchange="WB._sFileLoaded(this)">
+<!-- Fokustimer Panel -->
+<div id="ft-panel">
+  <div id="ft-header">
+    <div id="ft-drag-icon">
+      <svg viewBox="0 0 24 24">
+        <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+        <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+        <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+      </svg>
+    </div>
+    <div id="ft-title">Fokus</div>
+    <button id="ft-close" onclick="WB.ftClose()">&#x00D7;</button>
+  </div>
+  <div id="ft-context">
+    <div id="ft-ctx-dot"></div>
+    <span id="ft-ctx-text">Kein Kontext</span>
+  </div>
+  <div id="ft-timer-area">
+    <div id="ft-time">00:00</div>
+    <div id="ft-time-sub">bereit</div>
+    <div id="ft-bar"><div id="ft-bar-fill"></div></div>
+    <div class="ft-timer-btns">
+      <button class="ft-tbtn paused" id="ft-btn-toggle" onclick="WB.ftToggle()">
+        <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+        Starten
+      </button>
+    </div>
+  </div>
+  <div id="ft-cl-head">
+    <span id="ft-cl-lbl">Checkliste</span>
+    <span id="ft-cl-cnt"></span>
+    <span id="ft-cl-add" onclick="WB.ftClAdd()">+ Punkt</span>
+  </div>
+  <div id="ft-cl-list"></div>
+  <div id="ft-sess-btns">
+    <button class="ft-sb finish" onclick="WB.ftFinish()">
+      <svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>
+      Abschlie&szlig;en
+    </button>
+    <button class="ft-sb pause" onclick="WB.ftPause()">
+      <svg viewBox="0 0 24 24">
+        <rect x="6" y="4" width="4" height="16"/>
+        <rect x="14" y="4" width="4" height="16"/>
+      </svg>
+      Pausieren
+    </button>
+    <button class="ft-sb cancel" onclick="WB.ftCancel()">
+      <svg viewBox="0 0 24 24">
+        <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
+        <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      Abbrechen
+    </button>
+  </div>
+</div>
+
+<!-- Vorlagen-Overlay (Bottom Sheet) -->
+<div id="ft-vorlagen-overlay" onclick="WB.ftVorlagenClose()">
+  <div id="ft-vorlagen-sheet" onclick="event.stopPropagation()">
+    <div id="ft-vl-head">
+      <div id="ft-vl-title">Prozess-Vorlagen</div>
+      <div style="display:flex;gap:8px;">
+        <button style="background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);" onclick="WB.vorlageOpen(null)">+ Neue Vorlage</button>
+        <div style="cursor:pointer;color:var(--faint);font-size:20px;line-height:1;padding:2px 4px;" onclick="WB.ftVorlagenClose()">&#x2715;</div>
+      </div>
+    </div>
+    <div id="ft-vl-list"></div>
+  </div>
+</div>
 </body>
 </html>
