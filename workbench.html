@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.1.0</title>
+  <title>WorkBench 2.1.2</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -935,7 +935,8 @@
       flex: 1; display: flex; overflow: hidden;
     }
     #wo-list-days {
-      flex: 1; overflow-y: auto; padding: 14px 16px;
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 14px 16px;
       display: flex; flex-direction: column; gap: 10px;
     }
     .wo-day-block {
@@ -1061,8 +1062,10 @@
       border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.015);
     }
     .wo-cal-pfl-gutter {
-      width: 40px; flex-shrink: 0; display: flex; align-items: center;
-      justify-content: flex-end; padding-right: 5px;
+      width: 40px; flex-shrink: 0;
+    }
+    #wo-cal-pfl-cells {
+      flex: 1; display: flex;
     }
     .wo-cal-pfl-label { font-size: 9px; color: var(--faint); text-transform: uppercase; }
     .wo-cal-pfl-cell {
@@ -1515,14 +1518,14 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.1.0</div>
+  <div id="wb-startup-tagline">v2.1.2</div>
 </div>
 
 <div id="wb-app">
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.1.0 · Build 20260616-1000</div>
+    <div id="wb-menu-version">v2.1.2 · Build 20260616-1020</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -1895,8 +1898,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.1.0',
-  APP_BUILD:   '20260616-1000',
+  APP_VERSION: '2.1.2',
+  APP_BUILD:   '20260616-1020',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2194,9 +2197,9 @@ const WB = {
       + '<span class="ck-block-meta">'
       + doneCount + '/' + pflichten.length + ' heute</span></div>';
     pflichten.forEach(p => {
-      h += '<div class="ck-pfl-row">'
+      h += '<div class="ck-pfl-row" onclick="WB.pflichtOpen(&quot;' + this._esc(p.id) + '&quot;,&quot;' + this._esc(p._ctx) + '&quot;)">'
         + '<div class="ck-pfl-check' + (p.done?' done':'') + '"'
-        + ' onclick="WB._ckCheckPflicht(&quot;' + this._esc(p.id) + '&quot;,&quot;' + this._esc(p._ctx) + '&quot;)">'
+        + ' onclick="event.stopPropagation();WB._ckCheckPflicht(&quot;' + this._esc(p.id) + '&quot;,&quot;' + this._esc(p._ctx) + '&quot;)">'
         + (p.done ? '\u2713' : '') + '</div>'
         + '<div class="ck-pfl-text' + (p.done?' done':'') + '">'
         + this._esc(p.titel) + '</div>'
@@ -3127,9 +3130,9 @@ const WB = {
       if (pflichten.length) {
         h += '<div class="wo-pfl-section">';
         pflichten.forEach(p => {
-          h += '<div class="wo-pfl-row">'
+          h += '<div class="wo-pfl-row" onclick="WB.pflichtOpen(&quot;' + p.id + '&quot;,&quot;' + p._ctx + '&quot;)">'
             + '<div class="wo-pfl-check' + (p.done ? ' done' : '') + '"'
-            + ' onclick="WB._woPflichtToggle(\'' + p.id + '\',\'' + dateStr + '\',\'' + p._ctx + '\')">'
+            + ' onclick="event.stopPropagation();WB._woPflichtToggle(\'' + p.id + '\',\'' + dateStr + '\',\'' + p._ctx + '\')">'
             + (p.done ? '\u2713' : '') + '</div>'
             + '<div class="wo-pfl-text' + (p.done ? ' done' : '') + '">'
             + this._esc(p.titel) + '</div>'
@@ -3283,8 +3286,25 @@ const WB = {
             + this._esc(e.text) + '</div>';
         });
 
-        h += '<div class="' + cls + '" style="height:' + (HOURS*HOUR_H) + 'px;">' + colH + '</div>';
-      });
+        // Wochenpflichten mit startTime im Zeitband
+        const dayOfWeek = d.getDay();
+        ['pro','priv'].forEach(ctx => {
+          const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+          (db?.wochenpflichten||[]).forEach(p => {
+            if (!p.startTime) return;
+            if (!p.taeglich && !(p.wochentage||[]).includes(dayOfWeek)) return;
+            const [ph,pm] = p.startTime.split(':').map(Number);
+            const top2 = ((ph*60+pm) - START_HOUR*60) * HOUR_H / 60;
+            if (top2 < 0 || top2 > HOURS*HOUR_H) return;
+            colH += '<div class="wo-cal-evt" style="top:' + top2
+              + 'px;height:32px;border-left-color:var(--faint);'
+              + 'background:rgba(90,100,114,0.08);opacity:0.8;">'
+              + '<div class="wo-cal-evt-time">' + this._esc(p.startTime) + '</div>'
+              + this._esc(p.titel) + '</div>';
+          });
+        });
+
+        h += '<div class="' + cls + '" style="height:' + (HOURS*HOUR_H) + 'px;">' + colH + '</div>';      });
       cols.innerHTML = h;
     }
 
@@ -3378,7 +3398,23 @@ const WB = {
   },
 
   _woMottoNeu() {
-    this._toast('Motto-Erfassung folgt in einem sp\u00e4teren Update');
+    const text = prompt('Wochenmotto:');
+    if (!text?.trim()) return;
+    const bereich = prompt('Bereich:\ngesund / beruf / privat / allgemein') || 'allgemein';
+    const ctx = bereich === 'beruf' ? 'pro' : 'priv';
+    const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    if (!db.wochenMottos) db.wochenMottos = {};
+    const kw = this._getCurrentKW();
+    if (!db.wochenMottos[kw]) db.wochenMottos[kw] = [];
+    db.wochenMottos[kw].push({
+      id: 'm_' + Date.now(),
+      text: text.trim(),
+      bereich: bereich.trim(),
+    });
+    this.setDirty();
+    this.renderWoche();
+    this._toast('\u2713 Motto gespeichert');
   },
   renderZiele() {
     const alle = this._ziAlleZiele();
@@ -3553,9 +3589,30 @@ const WB = {
       const driveIdPriv = await this.idbGet('meta', 'driveFileId_priv');
       if (driveIdPro)  this._oauthDriveFileIds.pro  = driveIdPro;
       if (driveIdPriv) this._oauthDriveFileIds.priv = driveIdPriv;
+
+      // pflichtStatus Format-Migration (einmalig)
+      ['pro','priv'].forEach(ctx => {
+        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        if (!db?.pflichtStatus) return;
+        const ps = db.pflichtStatus;
+        const firstKey = Object.keys(ps)[0] || '';
+        if (!firstKey.match(/\d{4}-\d{2}-\d{2}$/)) return;
+        const newPs = {};
+        Object.entries(ps).forEach(([key, val]) => {
+          const parts = key.split('_');
+          if (parts.length < 3) return;
+          const datum  = parts[parts.length - 1];
+          const dutyId = parts.slice(0, -1).join('_');
+          if (!newPs[datum]) newPs[datum] = {};
+          newPs[datum][dutyId] = (val === 'erledigt' || val === true);
+        });
+        db.pflichtStatus = newPs;
+      });
     } catch(e) {
       console.error('[IDB] load error:', e);
     }
+    // Nach Format-Migration speichern (außerhalb try um Fehler zu vermeiden)
+    try { await this.idbSaveAll(); } catch(e) {}
   },
 
   async idbSaveAll() {
@@ -4252,16 +4309,11 @@ const WB = {
 
   /* ── Termin ── */
   terminOpen(eventId, ctx) {
-    ctx = ctx || 'priv';
-    // Termine können in beiden DBs liegen — beide durchsuchen
-    let db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    let e  = eventId ? (db?.customEvents||[]).find(x => x.id === eventId) : null;
-    if (!e && eventId) {
-      const otherDb = ctx === 'pro' ? this.dataPriv : this.dataPro;
-      e = (otherDb?.customEvents||[]).find(x => x.id === eventId);
-      if (e) { ctx = ctx === 'pro' ? 'priv' : 'pro'; db = otherDb; }
-    }
-    const body = this._modalWeltTop(ctx, e?.vertraulich)
+    // Termine immer in dataPriv
+    const db = this.dataPriv;
+    const e  = eventId ? (db?.customEvents||[]).find(x => x.id === eventId) : null;
+    const aktuellerCtx = e?.welt || 'priv';
+    const body = this._modalWeltTop(aktuellerCtx, e?.vertraulich)
       + '<div class="wb-input-group">'
       + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
       + ' placeholder="Terminbezeichnung..." value="' + this._esc(e?.text||'') + '">'
@@ -4279,17 +4331,15 @@ const WB = {
       + '<input id="wb-f-dur" class="wb-input" type="text" placeholder="60"'
       + ' value="' + this._esc(String(e?.durationMin||'')) + '">'
       + '</div>'
-      + '<div class="wb-weiche-info" id="wb-weiche">Mit Uhrzeit \u2192 erscheint im Cockpit (Push)</div></div>'
+      + '<div class=\"wb-weiche-info\" id=\"wb-weiche\">Ohne Uhrzeit \u2192 nur im Backlog (Pull)</div></div>'
       + '<div class="wb-input-group"><label class="wb-label">Vorhaben (optional)</label>'
-      + '<select id="wb-f-vh" class="wb-select">'
-      + '<option value="">Kein Vorhaben</option>'
-      + this._modalVhOptions(ctx, e?.vorhabenId)
+      + '<select id="wb-f-vh" class="wb-select"><option value="">Kein Vorhaben</option>'
+      + this._modalVhOptions(aktuellerCtx, e?.vorhabenId)
       + '</select></div>';
-    this._modalCtx = { type:'termin', eventId, ctx };
+    this._modalCtx = { type:'termin', eventId, ctx:'priv' };
     this.modalOpen(eventId ? 'Termin bearbeiten' : 'Neuer Termin', body, this._modalFooter(!!eventId, !!eventId), this._modalCtx);
     this._modalUpdateWeiche();
   },
-
   _modalUpdateWeiche() {
     const timeEl = document.getElementById('wb-f-time');
     const weiche = document.getElementById('wb-weiche');
@@ -4369,7 +4419,7 @@ const WB = {
   },
 
   /* ── Ziel ── */
-   zielOpen(id, ctx) {
+  zielOpen(id, ctx) {
     ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
     const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     const z  = id ? (db?.ziele||[]).find(x => x.id === id) : null;
@@ -4560,11 +4610,14 @@ const WB = {
     const time = document.getElementById('wb-f-time')?.value || '';
     const dur  = parseInt(document.getElementById('wb-f-dur')?.value||'60', 10) || 60;
     const vhId = document.getElementById('wb-f-vh')?.value || '';
-    const ctx  = this._modalGetWelt();
-    const db   = ctx==='pro' ? this.dataPro : this.dataPriv;
+    // Welt aus Pill lesen für Anzeige-Badge
+    const weltPill = document.querySelector('.wb-welt-pill');
+    const welt = weltPill?.classList.contains('privat') ? 'priv' : 'pro';
+    // Immer in dataPriv speichern
+    const db = this.dataPriv;
     if (!db) return;
     if (!db.customEvents) db.customEvents = [];
-    const obj = { text, date, startTime:time, durationMin:dur, vorhabenId:vhId||null, done:false, vertraulich:this._modalGetVertraulich() };
+    const obj = { text, date, startTime:time, durationMin:dur, vorhabenId:vhId||null, done:false, welt, location:'', vertraulich:this._modalGetVertraulich() };
     if (c.eventId) {
       const idx = db.customEvents.findIndex(x => x.id === c.eventId);
       if (idx >= 0) db.customEvents[idx] = { ...db.customEvents[idx], ...obj };
@@ -4582,7 +4635,7 @@ const WB = {
     const ctx  = this._modalGetWelt();
     const db   = ctx==='pro' ? this.dataPro : this.dataPriv;
     if (!db) return;
-    const activeDays = Array.from(document.querySelectorAll('.wb-day-btn.active')).map(el => parseInt(el.dataset.day, 10));
+    const activeDays = Array.from(document.querySelectorAll('.wb-day-btn.active')).map(el => parseInt(el.dataset.day, 10)).filter(n => !isNaN(n));
     const taeglich = activeDays.length === 7;
     if (!db.wochenpflichten) db.wochenpflichten = [];
     const obj = { titel:text, taeglich, wochentage:taeglich?[]:activeDays, vorhabenId:vhId||null, vertraulich:this._modalGetVertraulich() };
