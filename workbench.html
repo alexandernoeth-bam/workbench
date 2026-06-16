@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 1.8.0</title>
+  <title>WorkBench 1.8.1</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1286,7 +1286,28 @@
     #s-ov-version { font-size: 11px; color: var(--faint); font-family: var(--font-mono); }
     #s-ov-scroll  { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
     .s-card { background: var(--surface); border-radius: var(--radius); border: 1.5px solid var(--border); overflow: hidden; }
-    .s-card-head { padding: 10px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+    .s-card-head {
+      padding: 10px 14px; background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--muted);
+      display: flex; align-items: center; gap: 8px;
+      cursor: pointer; user-select: none;
+    }
+    .s-card-head:hover { background: #DDE2E8; }
+    .s-card-head-label { flex: 1; }
+    .s-card-chev {
+      width: 18px; height: 18px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .s-card-chev svg {
+      width: 14px; height: 14px; fill: var(--muted);
+      transition: transform 0.2s;
+    }
+    .s-card-chev.open svg { transform: rotate(90deg); }
+    .s-card-body { }
+    .s-card-body.collapsed { display: none; }
     .s-card.danger-zone { border-color: rgba(192,57,43,0.3); }
     .s-card.danger-zone .s-card-head { color: var(--danger); background: rgba(192,57,43,0.04); border-bottom-color: rgba(192,57,43,0.15); }
     .s-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-bottom: 0.5px solid var(--border); }
@@ -1346,14 +1367,14 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v1.8.0</div>
+  <div id="wb-startup-tagline">v1.8.1</div>
 </div>
 
 <div id="wb-app">
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v1.8.0 · Build 20260616-0850</div>
+    <div id="wb-menu-version">v1.8.1 · Build 20260616-0900</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -1711,8 +1732,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '1.8.0',
-  APP_BUILD:   '20260616-0850',
+  APP_VERSION: '1.8.1',
+  APP_BUILD:   '20260616-0900',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3645,6 +3666,10 @@ const WB = {
   async _sRenderAll() {
     const vEl = document.getElementById('s-ov-version');
     if (vEl) vEl.textContent = 'v' + this.APP_VERSION + ' \u00b7 ' + this.APP_BUILD;
+
+    // Cards kollabierbar machen (einmalig beim ersten Öffnen initialisieren)
+    this._sInitCards();
+
     const cidEl = document.getElementById('s-input-clientid');
     if (cidEl && this._oauthClientId) cidEl.value = this._oauthClientId;
     this._sUpdateSyncStatus();
@@ -3661,6 +3686,72 @@ const WB = {
         ? 'Firmennetzwerk \u00b7 Filepicker'
         : 'workbench-beruf.json \u00b7 Google Drive';
     this._sRenderWp();
+  },
+
+  _sCardState: {},
+
+  _sInitCards() {
+    // Initialisiert alle s-card Elemente mit Kollaps-Logik.
+    // Läuft idempotent — bereits initialisierte Cards werden übersprungen.
+    const scroll = document.getElementById('s-ov-scroll');
+    if (!scroll) return;
+    scroll.querySelectorAll('.s-card').forEach((card, idx) => {
+      // Bereits initialisiert?
+      if (card.dataset.sCardInit) return;
+      card.dataset.sCardInit = '1';
+
+      const head = card.querySelector('.s-card-head');
+      if (!head) return;
+
+      // Label wrappen falls noch nicht geschehen
+      if (!head.querySelector('.s-card-head-label')) {
+        const label = document.createElement('span');
+        label.className = 's-card-head-label';
+        label.innerHTML = head.innerHTML;
+        head.innerHTML = '';
+        head.appendChild(label);
+      }
+
+      // Chevron einfügen
+      const chev = document.createElement('div');
+      chev.className = 's-card-chev open';
+      chev.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg>';
+      head.appendChild(chev);
+
+      // Body-Wrapper: alle Kinder nach head zusammenfassen
+      const body = document.createElement('div');
+      body.className = 's-card-body';
+      const children = Array.from(card.children).filter(c => c !== head);
+      children.forEach(c => body.appendChild(c));
+      card.appendChild(body);
+
+      // State: standardmäßig offen (außer Danger Zone)
+      const isDanger = card.classList.contains('danger-zone');
+      const key = 's-card-' + idx;
+      if (this._sCardState[key] === undefined) {
+        this._sCardState[key] = isDanger ? false : true;
+      }
+      this._sApplyCard(card, key);
+
+      // Click-Handler
+      head.onclick = () => this._sToggleCard(card, key);
+    });
+  },
+
+  _sApplyCard(card, key) {
+    const isOpen = !!this._sCardState[key];
+    const body = card.querySelector('.s-card-body');
+    const chev = card.querySelector('.s-card-chev');
+    if (body) body.classList.toggle('collapsed', !isOpen);
+    if (chev) chev.classList.toggle('open', isOpen);
+    // border-bottom des head nur wenn geöffnet
+    const head = card.querySelector('.s-card-head');
+    if (head) head.style.borderBottom = isOpen ? '' : 'none';
+  },
+
+  _sToggleCard(card, key) {
+    this._sCardState[key] = !this._sCardState[key];
+    this._sApplyCard(card, key);
   },
 
   _sUpdateSyncStatus() {
