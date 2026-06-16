@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 1.8.1</title>
+  <title>WorkBench 1.9.0</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1361,20 +1361,82 @@
     #wb-buero-btn { padding: 4px 10px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 5px; font-family: var(--font); }
     #wb-buero-btn.visible { display: flex; }
     #wb-buero-btn.aktiv   { background: var(--accent); color: #fff; border-color: var(--accent); }
+    /* ── Modal / Dialog System ── */
+    #wb-modal-overlay {
+      position: fixed; inset: 0; z-index: 800;
+      background: rgba(26,31,36,0.6);
+      display: none; align-items: center;
+      justify-content: center; padding: 16px;
+    }
+    #wb-modal-overlay.open { display: flex; }
+    .wb-modal {
+      background: var(--surface); width: 100%;
+      max-width: 420px; border-radius: var(--radius);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      display: flex; flex-direction: column; overflow: hidden;
+      max-height: 90vh;
+    }
+    .wb-modal-header {
+      padding: 14px 16px;
+      border-bottom: 1.5px solid var(--border);
+      display: flex; justify-content: space-between;
+      align-items: center; flex-shrink: 0;
+    }
+    .wb-modal-title { font-weight: 600; font-size: 16px; color: var(--text); }
+    .wb-modal-close { cursor: pointer; color: var(--faint); font-size: 20px; line-height: 1; padding: 4px; }
+    .wb-modal-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; flex: 1; }
+    .wb-modal-footer { padding: 12px 16px; background: var(--bg); border-top: 1.5px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    .wb-input-group { display: flex; flex-direction: column; gap: 6px; }
+    .wb-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .wb-input, .wb-select { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 15px; font-family: var(--font); background: var(--surface); color: var(--text); outline: none; transition: border-color 0.2s; }
+    .wb-input:focus, .wb-select:focus { border-color: var(--accent); }
+    .wb-input-lg { font-size: 18px !important; font-weight: 600; padding: 12px !important; border: none !important; border-bottom: 2px solid var(--border) !important; border-radius: 0 !important; background: transparent !important; }
+    .wb-input-lg:focus { border-bottom-color: var(--accent) !important; outline: none; }
+    .wb-row2 { display: flex; gap: 12px; }
+    .wb-row2 > * { flex: 1; }
+    .wb-dialog-top { display: flex; justify-content: space-between; align-items: center; }
+    .wb-welt-pill { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; cursor: pointer; user-select: none; color: #fff; background: var(--accent); }
+    .wb-welt-pill.privat { background: var(--accent2); }
+    .wb-vertraulich-row { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+    .wb-switch { width: 44px; height: 24px; border-radius: 12px; background: var(--border); position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+    .wb-switch::after { content: ''; position: absolute; width: 20px; height: 20px; border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: left 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+    .wb-switch.on { background: var(--accent); }
+    .wb-switch.on::after { left: 22px; }
+    .wb-micro-list { display: flex; flex-direction: column; gap: 8px; border: 1.5px dashed var(--border); padding: 12px; border-radius: var(--radius-sm); background: var(--bg); }
+    .wb-micro-row { display: flex; align-items: center; gap: 8px; }
+    .wb-micro-drag { cursor: grab; color: var(--faint); font-size: 18px; line-height: 1; user-select: none; }
+    .wb-micro-check { width: 18px; height: 18px; border: 1.5px solid var(--border); border-radius: 4px; background: var(--surface); flex-shrink: 0; }
+    .wb-micro-input { flex: 1; border: none; border-bottom: 1px solid var(--border); border-radius: 0; padding: 4px 0; background: transparent; font-size: 14px; font-family: var(--font); color: var(--text); outline: none; }
+    .wb-micro-input:focus { border-bottom-color: var(--accent); }
+    .wb-micro-del { cursor: pointer; color: var(--faint); font-size: 14px; padding: 4px; }
+    .wb-micro-del:hover { color: var(--danger); }
+    .wb-add-micro { align-self: flex-start; font-size: 12px; color: var(--accent); font-weight: 600; cursor: pointer; padding-top: 4px; }
+    .wb-day-toggles { display: flex; gap: 4px; }
+    .wb-day-btn { flex: 1; text-align: center; padding: 8px 0; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; color: var(--muted); background: var(--surface); font-family: var(--font); }
+    .wb-day-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .wb-weiche-info { flex: 1; font-size: 12px; padding: 8px; border-radius: var(--radius-sm); background: var(--surface2); color: var(--muted); border-left: 3px solid var(--faint); line-height: 1.3; }
+    .wb-weiche-info.push { background: #FDE8E8; color: var(--danger); border-left-color: var(--danger); }
+    .wb-btn { padding: 10px 16px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; border: none; font-family: var(--font); }
+    .wb-btn-cancel { background: transparent; color: var(--muted); }
+    .wb-btn-cancel:hover { background: var(--surface2); }
+    .wb-btn-save { background: var(--accent); color: #fff; }
+    .wb-btn-delete { background: transparent; color: var(--danger); padding-left: 0; }
+    @keyframes sv-float { 0% { opacity:1; transform:translateY(0); } 100% { opacity:0; transform:translateY(-28px); } }
+    .sv-plus1 { position: fixed; pointer-events: none; z-index: 9999; font-size: 14px; font-weight: 800; color: var(--accent2); animation: sv-float 0.8s ease-out forwards; }
   </style>
 </head>
 <body>
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v1.8.1</div>
+  <div id="wb-startup-tagline">v1.9.0</div>
 </div>
 
 <div id="wb-app">
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v1.8.1 · Build 20260616-0900</div>
+    <div id="wb-menu-version">v1.9.0 · Build 20260616-0910</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -1466,7 +1528,7 @@
               <div id="bl-head-title">Backlog</div>
               <div id="bl-head-kw"></div>
             </div>
-            <button class="bl-btn" onclick="WB._blSchnellAdd()">+ Schnell</button>
+            <button class="bl-btn" onclick="WB.schnellOpen(null)">+ Schnell</button>
           </div>
           <div id="bl-scroll"></div>
         </div>
@@ -1732,8 +1794,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '1.8.1',
-  APP_BUILD:   '20260616-0900',
+  APP_VERSION: '1.9.0',
+  APP_BUILD:   '20260616-0910',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -1900,7 +1962,7 @@ const WB = {
       const welt  = e.welt || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
       const color = welt === 'pro' ? 'var(--accent)' : 'var(--accent2)';
       const badge = welt === 'pro' ? 'beruf' : 'privat';
-      h += '<div class="ck-termin-row"'
+      h += '<div class="ck-termin-row" onclick="WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + this._esc(welt) + '&quot;)"'
         + (isCurrent ? ' style="background:rgba(10,107,94,0.03)"' : '') + '>'
         + '<div class="ck-tr-dot" style="background:'
         + (past ? 'var(--faint)' : color) + '"></div>'
@@ -2326,7 +2388,7 @@ const WB = {
       : s._ctx === 'pro'
         ? '<span class="bl-badge beruf">Beruf</span>'
         : '<span class="bl-badge privat">Privat</span>';
-    return '<div class="bl-item">'
+    return '<div class="bl-item" onclick="WB.schnellOpen(&quot;' + this._esc(s.id) + '&quot;)">'
       + '<div class="bl-check round"></div>'
       + '<div style="flex:1">'
       + '<div class="bl-text">' + this._esc(s.text||'') + '</div>'
@@ -2648,38 +2710,11 @@ const WB = {
   },
 
   _vhAufgabeNeu(vorhabenId, ctx) {
-    const text = prompt('Neue Aufgabe:');
-    if (!text?.trim()) return;
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
-    if (!v) return;
-    if (!v.aufgaben) v.aufgaben = [];
-    v.aufgaben.push({
-      id: 'a_' + Date.now(),
-      text: text.trim(), done: false,
-      checklist: [], wichtigkeit: 'mittel',
-    });
-    this.setDirty();
-    this._vhRenderDetail(vorhabenId, ctx);
-    this._toast('\u2713 Aufgabe angelegt');
+    this.aufgabeOpen(vorhabenId, null, ctx);
   },
 
   _vhLinkAdd(vorhabenId, ctx) {
-    const url = prompt('URL:');
-    if (!url?.trim()) return;
-    const titel = prompt('Titel (optional):') || url;
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
-    if (!v) return;
-    if (!v.links) v.links = [];
-    v.links.push({
-      id: 'l_' + Date.now(),
-      url: url.trim(), titel: titel.trim(),
-      type: 'link', tag: 'Sonstiges',
-    });
-    this.setDirty();
-    this._vhRenderTabInfo(v, ctx);
-    this._toast('\u2713 Link gespeichert');
+    this.linkOpen(vorhabenId, null, ctx);
   },
 
   _vhLinkDelete(vorhabenId, ctx, linkId) {
@@ -3235,11 +3270,11 @@ const WB = {
   },
 
   _woTerminNeu() {
-    this._toast('Termin-Erfassung folgt in einem sp\u00e4teren Update');
+    this.terminOpen(null);
   },
 
   _woPflichtNeu() {
-    this._toast('Pflicht-Erfassung folgt in einem sp\u00e4teren Update');
+    this.pflichtOpen(null);
   },
 
   _woMottoNeu() {
@@ -3301,7 +3336,7 @@ const WB = {
           kurs:'auf Kurs', stabil:'stabil',
           rueck:'R\u00fcckstand', erreicht:'erreicht', pause:'pausiert'
         }[z.trend] || z.trend;
-        h += '<div class="zi-item">'
+        h += '<div class="zi-item" onclick="WB.zielOpen(&quot;' + this._esc(z.id) + '&quot;,&quot;' + this._esc(z._ctx) + '&quot;)">'
           + '<div class="zi-dot" style="background:' + b.color + '"></div>'
           + '<div class="zi-text">'
           + '<div class="zi-name">' + this._esc(z.titel) + '</div>'
@@ -3365,23 +3400,7 @@ const WB = {
   },
 
   _ziNeu() {
-    const titel = prompt('Titel des neuen Ziels:');
-    if (!titel?.trim()) return;
-    const bereich = prompt('Lebensbereich:\nkoerper / entw / beruf / sozial / erhol / umgeb') || 'beruf';
-    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    if (!db) return;
-    if (!db.ziele) db.ziele = [];
-    db.ziele.push({
-      id:       'z_' + Date.now(),
-      titel:    titel.trim(),
-      bereich:  bereich.trim(),
-      trend:    'stabil',
-      stichtag: '',
-    });
-    this.setDirty();
-    this.renderZiele();
-    this._toast('\u2713 Ziel angelegt');
+    this.zielOpen(null);
   },
 
   // ── IDB ──────────────────────────────────────────────
@@ -3959,6 +3978,540 @@ const WB = {
     location.reload();
   },
 
+  /* ── Modal Core ── */
+  _modalCtx: null,
+
+  modalOpen(title, bodyHtml, footerHtml, ctx) {
+    this._modalCtx = ctx || {};
+    const o = document.getElementById('wb-modal-overlay');
+    const t = document.getElementById('wb-modal-title');
+    const b = document.getElementById('wb-modal-body');
+    const f = document.getElementById('wb-modal-footer');
+    if (!o||!t||!b||!f) return;
+    t.textContent = title;
+    b.innerHTML   = bodyHtml;
+    f.innerHTML   = footerHtml;
+    o.classList.add('open');
+    setTimeout(() => {
+      const inp = b.querySelector('input,select,textarea');
+      if (inp) inp.focus();
+    }, 50);
+  },
+
+  modalClose() {
+    const o = document.getElementById('wb-modal-overlay');
+    if (o) o.classList.remove('open');
+    this._modalCtx = null;
+  },
+
+  _modalBgClick(e) {
+    if (e.target === document.getElementById('wb-modal-overlay'))
+      this.modalClose();
+  },
+
+  _modalFooter(showDelete) {
+    return '<div>'
+      + (showDelete
+        ? '<button class="wb-btn wb-btn-delete" onclick="WB._modalDelete()">L\u00f6schen</button>'
+        : '')
+      + '</div>'
+      + '<div style="display:flex;gap:12px;">'
+      + '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
+      + '<button class="wb-btn wb-btn-save" onclick="WB._modalSave()">Speichern</button>'
+      + '</div>';
+  },
+
+  _modalWeltTop(ctx, vertraulich) {
+    const weltCls = ctx === 'pro' ? '' : ' privat';
+    const weltTxt = ctx === 'pro' ? 'BERUF' : 'PRIVAT';
+    return '<div class="wb-dialog-top">'
+      + '<div class="wb-welt-pill' + weltCls + '" onclick="WB._modalToggleWelt(this)">'
+      + weltTxt + '</div>'
+      + '<div class="wb-vertraulich-row">Vertraulich'
+      + '<div class="wb-switch' + (vertraulich ? ' on' : '') + '" id="wb-sw-vert"'
+      + ' onclick="this.classList.toggle(\'on\')"></div>'
+      + '</div></div>';
+  },
+
+  _modalToggleWelt(el) {
+    const isPrivat = el.classList.toggle('privat');
+    el.textContent = isPrivat ? 'PRIVAT' : 'BERUF';
+  },
+
+  _modalGetWelt() {
+    const pill = document.querySelector('.wb-welt-pill');
+    return pill?.classList.contains('privat') ? 'priv' : 'pro';
+  },
+
+  _modalGetVertraulich() {
+    return document.getElementById('wb-sw-vert')?.classList.contains('on') || false;
+  },
+
+  _modalVhOptions(ctx, selectedId) {
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    return (db?.vorhaben||[])
+      .filter(v => v.aktiv !== false)
+      .map(v => '<option value="' + this._esc(v.id) + '"'
+        + (v.id === selectedId ? ' selected' : '') + '>'
+        + this._esc(v.titel) + '</option>')
+      .join('');
+  },
+
+  /* ── Schnell-Erinnerung ── */
+  schnellOpen(id) {
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const item = id ? (db?.quickItems||[]).find(q => q.id === id) : null;
+    const body = this._modalWeltTop(item?._ctx || ctx, item?.vertraulich)
+      + '<div class="wb-input-group">'
+      + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
+      + ' placeholder="Was darf nicht vergessen werden?"'
+      + ' value="' + this._esc(item?.text||'') + '">'
+      + '</div>'
+      + '<div class="wb-input-group">'
+      + '<label class="wb-label">F\u00e4llig (optional)</label>'
+      + '<input id="wb-f-date" class="wb-input" type="date"'
+      + ' value="' + this._esc(item?.date||'') + '">'
+      + '</div>';
+    this._modalCtx = { type:'schnell', id, ctx };
+    this.modalOpen('Schnell-Erinnerung', body, this._modalFooter(!!id));
+  },
+
+  /* ── Aufgabe ── */
+  aufgabeOpen(vorhabenId, aufgabeId, ctx) {
+    ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
+    const a  = aufgabeId ? (v?.aufgaben||[]).find(x => x.id === aufgabeId) : null;
+    const cl = a?.checklist || [];
+    let clHtml = cl.map((c,i) =>
+      '<div class="wb-micro-row">'
+      + '<div class="wb-micro-drag">\u2261</div>'
+      + '<div class="wb-micro-check"></div>'
+      + '<input type="text" class="wb-micro-input" data-cl-idx="' + i + '"'
+      + ' value="' + this._esc(c.text||'') + '" placeholder="Schritt...">'
+      + '<div class="wb-micro-del" onclick="this.parentElement.remove()">\u2715</div>'
+      + '</div>'
+    ).join('');
+    const body = this._modalWeltTop(ctx, a?.vertraulich)
+      + '<div class="wb-input-group">'
+      + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
+      + ' placeholder="Aufgabe beschreiben..." value="' + this._esc(a?.text||'') + '">'
+      + '</div>'
+      + '<div class="wb-row2">'
+      + '<div class="wb-input-group"><label class="wb-label">F\u00e4llig</label>'
+      + '<input id="wb-f-date" class="wb-input" type="date" value="' + this._esc(a?.datum||'') + '">'
+      + '</div>'
+      + '<div class="wb-input-group"><label class="wb-label">Wichtigkeit</label>'
+      + '<select id="wb-f-wich" class="wb-select">'
+      + '<option value="hoch"'    + (a?.wichtigkeit==='hoch'   ?' selected':'') + '>Hoch</option>'
+      + '<option value="mittel"'  + (a?.wichtigkeit==='mittel' ?' selected':'') + '>Mittel</option>'
+      + '<option value="niedrig"' + (a?.wichtigkeit==='niedrig'?' selected':'') + '>Niedrig</option>'
+      + '</select></div></div>'
+      + '<div class="wb-input-group">'
+      + '<label class="wb-label" style="color:var(--accent)">N\u00e4chste Schritte (Checkliste)</label>'
+      + '<div class="wb-micro-list" id="wb-micro-list">' + clHtml
+      + '<div class="wb-add-micro" onclick="WB._modalAddMicro()">+ Schritt hinzuf\u00fcgen</div>'
+      + '</div></div>';
+    this._modalCtx = { type:'aufgabe', vorhabenId, aufgabeId, ctx };
+    this.modalOpen(aufgabeId ? 'Aufgabe bearbeiten' : 'Neue Aufgabe', body, this._modalFooter(!!aufgabeId));
+  },
+
+  _modalAddMicro() {
+    const list   = document.getElementById('wb-micro-list');
+    const addBtn = list?.querySelector('.wb-add-micro');
+    if (!list||!addBtn) return;
+    const row = document.createElement('div');
+    row.className = 'wb-micro-row';
+    row.innerHTML = '<div class="wb-micro-drag">\u2261</div>'
+      + '<div class="wb-micro-check"></div>'
+      + '<input type="text" class="wb-micro-input" placeholder="Neuer Schritt...">'
+      + '<div class="wb-micro-del" onclick="this.parentElement.remove()">\u2715</div>';
+    list.insertBefore(row, addBtn);
+    row.querySelector('input').focus();
+  },
+
+  /* ── Termin ── */
+  terminOpen(eventId, ctx) {
+    ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const e  = eventId ? (db?.customEvents||[]).find(x => x.id === eventId) : null;
+    const body = this._modalWeltTop(ctx, e?.vertraulich)
+      + '<div class="wb-input-group">'
+      + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
+      + ' placeholder="Terminbezeichnung..." value="' + this._esc(e?.text||'') + '">'
+      + '</div>'
+      + '<div class="wb-row2">'
+      + '<div class="wb-input-group"><label class="wb-label">Datum</label>'
+      + '<input id="wb-f-date" class="wb-input" type="date" value="' + this._esc(e?.date||'') + '">'
+      + '</div>'
+      + '<div class="wb-input-group"><label class="wb-label">Uhrzeit</label>'
+      + '<input id="wb-f-time" class="wb-input" type="time"'
+      + ' value="' + this._esc(e?.startTime||'') + '" oninput="WB._modalUpdateWeiche()">'
+      + '</div></div>'
+      + '<div style="display:flex;gap:12px;align-items:flex-end;">'
+      + '<div class="wb-input-group" style="flex:1"><label class="wb-label">Dauer (Min)</label>'
+      + '<input id="wb-f-dur" class="wb-input" type="text" placeholder="60"'
+      + ' value="' + this._esc(String(e?.durationMin||'')) + '">'
+      + '</div>'
+      + '<div class="wb-weiche-info" id="wb-weiche">Mit Uhrzeit \u2192 erscheint im Cockpit (Push)</div></div>'
+      + '<div class="wb-input-group"><label class="wb-label">Vorhaben (optional)</label>'
+      + '<select id="wb-f-vh" class="wb-select">'
+      + '<option value="">Kein Vorhaben</option>'
+      + this._modalVhOptions(ctx, e?.vorhabenId)
+      + '</select></div>';
+    this._modalCtx = { type:'termin', eventId, ctx };
+    this.modalOpen(eventId ? 'Termin bearbeiten' : 'Neuer Termin', body, this._modalFooter(!!eventId));
+    this._modalUpdateWeiche();
+  },
+
+  _modalUpdateWeiche() {
+    const timeEl = document.getElementById('wb-f-time');
+    const weiche = document.getElementById('wb-weiche');
+    if (!weiche) return;
+    const hasTime = !!(timeEl?.value);
+    weiche.classList.toggle('push', hasTime);
+    weiche.textContent = hasTime
+      ? 'Mit Uhrzeit \u2192 erscheint im Cockpit (Push)'
+      : 'Ohne Uhrzeit \u2192 nur im Backlog sichtbar (Pull)';
+  },
+
+  /* ── Wochenpflicht ── */
+  pflichtOpen(id, ctx) {
+    ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const p  = id ? (db?.wochenpflichten||[]).find(x => x.id === id) : null;
+    const days    = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+    const dayNums = [1,2,3,4,5,6,0];
+    const activeDays = p?.taeglich ? dayNums : (p?.wochentage || []);
+    let dayHtml = '<div class="wb-day-toggles">';
+    days.forEach((d,i) => {
+      const num = dayNums[i];
+      const act = activeDays.includes(num);
+      dayHtml += '<div class="wb-day-btn' + (act ? ' active' : '') + '"'
+        + ' data-day="' + num + '" onclick="this.classList.toggle(\'active\')">'
+        + d + '</div>';
+    });
+    dayHtml += '</div>';
+    const body = this._modalWeltTop(ctx, p?.vertraulich)
+      + '<div class="wb-input-group">'
+      + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
+      + ' placeholder="Name der Pflicht..." value="' + this._esc(p?.titel||'') + '">'
+      + '</div>'
+      + '<div class="wb-input-group"><label class="wb-label">Wochentage</label>'
+      + dayHtml + '</div>'
+      + '<div class="wb-input-group"><label class="wb-label">Vorhaben (optional)</label>'
+      + '<select id="wb-f-vh" class="wb-select">'
+      + '<option value="">Kein Vorhaben</option>'
+      + this._modalVhOptions(ctx, p?.vorhabenId)
+      + '</select></div>';
+    this._modalCtx = { type:'pflicht', id, ctx };
+    this.modalOpen(id ? 'Wochenpflicht bearbeiten' : 'Neue Wochenpflicht', body, this._modalFooter(!!id));
+  },
+
+  /* ── Ziel ── */
+  zielOpen(id, ctx) {
+    ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const z  = id ? (db?.ziele||[]).find(x => x.id === id) : null;
+    const bereiche = [
+      {v:'koerper',l:'K\u00f6rper \u0026 Gesundheit'},{v:'entw',l:'Entwicklung'},
+      {v:'beruf',l:'Beruf'},{v:'sozial',l:'Soziale Kontakte'},
+      {v:'erhol',l:'Erholung'},{v:'umgeb',l:'Umgebung'},
+    ];
+    const body = this._modalWeltTop(ctx, z?.vertraulich)
+      + '<div class="wb-input-group">'
+      + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
+      + ' placeholder="Ziel / Horizont beschreiben..." value="' + this._esc(z?.titel||'') + '">'
+      + '</div>'
+      + '<div class="wb-row2">'
+      + '<div class="wb-input-group"><label class="wb-label">Lebensbereich</label>'
+      + '<select id="wb-f-bereich" class="wb-select">'
+      + bereiche.map(b => '<option value="' + b.v + '"'
+        + (z?.bereich===b.v?' selected':'') + '>' + b.l + '</option>').join('')
+      + '</select></div>'
+      + '<div class="wb-input-group"><label class="wb-label">Stichtag (optional)</label>'
+      + '<input id="wb-f-date" class="wb-input" type="date" value="' + this._esc(z?.stichtag||'') + '">'
+      + '</div></div>';
+    this._modalCtx = { type:'ziel', id, ctx };
+    this.modalOpen(id ? 'Ziel bearbeiten' : 'Neues Ziel', body, this._modalFooter(!!id));
+  },
+
+  /* ── Link / Ablage ── */
+  linkOpen(vorhabenId, linkId, ctx) {
+    ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
+    const l  = linkId ? (v?.links||[]).find(x => x.id === linkId) : null;
+    const body = this._modalWeltTop(ctx, l?.vertraulich)
+      + '<div class="wb-input-group"><label class="wb-label">URL / Link</label>'
+      + '<input id="wb-f-url" class="wb-input" type="url" placeholder="https://..."'
+      + ' style="font-family:var(--font-mono)" value="' + this._esc(l?.url||'') + '">'
+      + '</div>'
+      + '<div class="wb-input-group"><label class="wb-label">Anzeigename</label>'
+      + '<input id="wb-f-text" class="wb-input" type="text"'
+      + ' placeholder="z.B. Architektur-Entscheidung Confluence"'
+      + ' value="' + this._esc(l?.titel||'') + '">'
+      + '</div>'
+      + '<div class="wb-row2">'
+      + '<div class="wb-input-group"><label class="wb-label">Typ</label>'
+      + '<select id="wb-f-typ" class="wb-select">'
+      + ['gdoc','sp','on','cf','link'].map(t =>
+        '<option value="' + t + '"' + (l?.type===t?' selected':'') + '>'
+        + {gdoc:'Google Doc',sp:'SharePoint',on:'OneNote',cf:'Confluence',link:'Sonstiges'}[t]
+        + '</option>').join('')
+      + '</select></div>'
+      + '<div class="wb-input-group"><label class="wb-label">Tag / Gruppe</label>'
+      + '<input id="wb-f-tag" class="wb-input" type="text" placeholder="z.B. Architektur"'
+      + ' value="' + this._esc(l?.tag||'') + '">'
+      + '</div></div>';
+    this._modalCtx = { type:'link', vorhabenId, linkId, ctx };
+    this.modalOpen(linkId ? 'Link bearbeiten' : 'Link hinzuf\u00fcgen', body, this._modalFooter(!!linkId));
+  },
+
+  /* ── Checklisten-Vorlage ── */
+  vorlageOpen(id) {
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const v   = id ? (db?.checklistVorlagen||[]).find(x => x.id === id) : null;
+    const schritte = v?.schritte || [];
+    let sHtml = schritte.map((s,i) =>
+      '<div class="wb-micro-row">'
+      + '<div class="wb-micro-drag">\u2261</div>'
+      + '<div class="wb-micro-check" style="border-style:dashed;background:transparent"></div>'
+      + '<input type="text" class="wb-micro-input" data-cl-idx="' + i + '"'
+      + ' value="' + this._esc(s.text||'') + '" placeholder="Schritt...">'
+      + '<div class="wb-micro-del" onclick="this.parentElement.remove()">\u2715</div>'
+      + '</div>'
+    ).join('');
+    const body = this._modalWeltTop(ctx, v?.vertraulich)
+      + '<div class="wb-input-group">'
+      + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
+      + ' placeholder="Name der Vorlage..." value="' + this._esc(v?.titel||'') + '">'
+      + '</div>'
+      + '<div class="wb-input-group">'
+      + '<label class="wb-label" style="color:var(--accent)">Standard-Schritte</label>'
+      + '<div class="wb-micro-list" id="wb-micro-list"'
+      + ' style="border-color:var(--accent);background:rgba(10,107,94,0.05)">'
+      + sHtml
+      + '<div class="wb-add-micro" onclick="WB._modalAddMicro()">+ Schritt hinzuf\u00fcgen</div>'
+      + '</div></div>';
+    this._modalCtx = { type:'vorlage', id, ctx };
+    this.modalOpen(id ? 'Vorlage bearbeiten' : 'Neue Checklisten-Vorlage', body, this._modalFooter(!!id));
+  },
+
+  /* ── Speichern / Löschen (Dispatch) ── */
+  _modalSave() {
+    const c = this._modalCtx;
+    if (!c) return;
+    switch(c.type) {
+      case 'schnell':  this._savSchnell(c);  break;
+      case 'aufgabe':  this._savAufgabe(c);  break;
+      case 'termin':   this._savTermin(c);   break;
+      case 'pflicht':  this._savPflicht(c);  break;
+      case 'ziel':     this._savZiel(c);     break;
+      case 'link':     this._savLink(c);     break;
+      case 'vorlage':  this._savVorlage(c);  break;
+    }
+  },
+
+  _modalDelete() {
+    const c = this._modalCtx;
+    if (!c) return;
+    if (!confirm('Wirklich l\u00f6schen?')) return;
+    const db = c.ctx==='pro' ? this.dataPro : this.dataPriv;
+    switch(c.type) {
+      case 'schnell':
+        if (db) db.quickItems = (db.quickItems||[]).filter(x => x.id !== c.id);
+        break;
+      case 'aufgabe': {
+        const v = (db?.vorhaben||[]).find(x => x.id === c.vorhabenId);
+        if (v) v.aufgaben = (v.aufgaben||[]).filter(x => x.id !== c.aufgabeId);
+        break;
+      }
+      case 'termin':
+        if (db) db.customEvents = (db.customEvents||[]).filter(x => x.id !== c.eventId);
+        break;
+      case 'pflicht':
+        if (db) db.wochenpflichten = (db.wochenpflichten||[]).filter(x => x.id !== c.id);
+        break;
+      case 'ziel':
+        if (db) db.ziele = (db.ziele||[]).filter(x => x.id !== c.id);
+        break;
+      case 'link': {
+        const v = (db?.vorhaben||[]).find(x => x.id === c.vorhabenId);
+        if (v) v.links = (v.links||[]).filter(x => x.id !== c.linkId);
+        break;
+      }
+      case 'vorlage':
+        if (db) db.checklistVorlagen = (db.checklistVorlagen||[]).filter(x => x.id !== c.id);
+        break;
+    }
+    this.setDirty();
+    this.modalClose();
+    this.renderSection(this.activeTab);
+  },
+
+  _savSchnell(c) {
+    const text = document.getElementById('wb-f-text')?.value.trim();
+    if (!text) { this._toast('Text fehlt'); return; }
+    const date = document.getElementById('wb-f-date')?.value || '';
+    const ctx  = this._modalGetWelt();
+    const db   = ctx==='pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    if (!db.quickItems) db.quickItems = [];
+    if (c.id) {
+      const item = db.quickItems.find(x => x.id === c.id);
+      if (item) { item.text = text; item.date = date; }
+    } else {
+      db.quickItems.push({ id:'q_'+Date.now(), text, date, done:false, vertraulich:this._modalGetVertraulich() });
+    }
+    this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
+    this._toast('\u2713 Schnell-Erinnerung gespeichert');
+  },
+
+  _savAufgabe(c) {
+    const text = document.getElementById('wb-f-text')?.value.trim();
+    if (!text) { this._toast('Text fehlt'); return; }
+    const datum = document.getElementById('wb-f-date')?.value || '';
+    const wich  = document.getElementById('wb-f-wich')?.value || 'mittel';
+    const ctx   = this._modalGetWelt();
+    const db    = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const v     = (db?.vorhaben||[]).find(x => x.id === c.vorhabenId);
+    if (!v) return;
+    const inputs = document.querySelectorAll('#wb-micro-list .wb-micro-input');
+    const checklist = Array.from(inputs).map(i => i.value.trim()).filter(Boolean).map(t => ({text:t, done:false}));
+    if (!v.aufgaben) v.aufgaben = [];
+    if (c.aufgabeId) {
+      const a = v.aufgaben.find(x => x.id === c.aufgabeId);
+      if (a) { a.text=text; a.datum=datum; a.wichtigkeit=wich; a.checklist=checklist; a.vertraulich=this._modalGetVertraulich(); }
+    } else {
+      v.aufgaben.push({ id:'a_'+Date.now(), text, datum, wichtigkeit:wich, done:false, checklist, vertraulich:this._modalGetVertraulich() });
+    }
+    this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
+    this._toast('\u2713 Aufgabe gespeichert');
+  },
+
+  _savTermin(c) {
+    const text = document.getElementById('wb-f-text')?.value.trim();
+    if (!text) { this._toast('Text fehlt'); return; }
+    const date = document.getElementById('wb-f-date')?.value || '';
+    const time = document.getElementById('wb-f-time')?.value || '';
+    const dur  = parseInt(document.getElementById('wb-f-dur')?.value||'60', 10) || 60;
+    const vhId = document.getElementById('wb-f-vh')?.value || '';
+    const ctx  = this._modalGetWelt();
+    const db   = ctx==='pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    if (!db.customEvents) db.customEvents = [];
+    const obj = { text, date, startTime:time, durationMin:dur, vorhabenId:vhId||null, done:false, vertraulich:this._modalGetVertraulich() };
+    if (c.eventId) {
+      const idx = db.customEvents.findIndex(x => x.id === c.eventId);
+      if (idx >= 0) db.customEvents[idx] = { ...db.customEvents[idx], ...obj };
+    } else {
+      db.customEvents.push({ id:'e_'+Date.now(), ...obj });
+    }
+    this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
+    this._toast('\u2713 Termin gespeichert');
+  },
+
+  _savPflicht(c) {
+    const text = document.getElementById('wb-f-text')?.value.trim();
+    if (!text) { this._toast('Text fehlt'); return; }
+    const vhId = document.getElementById('wb-f-vh')?.value || '';
+    const ctx  = this._modalGetWelt();
+    const db   = ctx==='pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    const activeDays = Array.from(document.querySelectorAll('.wb-day-btn.active')).map(el => parseInt(el.dataset.day, 10));
+    const taeglich = activeDays.length === 7;
+    if (!db.wochenpflichten) db.wochenpflichten = [];
+    const obj = { titel:text, taeglich, wochentage:taeglich?[]:activeDays, vorhabenId:vhId||null, vertraulich:this._modalGetVertraulich() };
+    if (c.id) {
+      const p = db.wochenpflichten.find(x => x.id === c.id);
+      if (p) Object.assign(p, obj);
+    } else {
+      db.wochenpflichten.push({ id:'wp_'+Date.now(), ...obj });
+    }
+    this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
+    this._toast('\u2713 Wochenpflicht gespeichert');
+  },
+
+  _savZiel(c) {
+    const text     = document.getElementById('wb-f-text')?.value.trim();
+    if (!text) { this._toast('Text fehlt'); return; }
+    const bereich  = document.getElementById('wb-f-bereich')?.value || 'beruf';
+    const stichtag = document.getElementById('wb-f-date')?.value || '';
+    const ctx      = this._modalGetWelt();
+    const db       = ctx==='pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    if (!db.ziele) db.ziele = [];
+    if (c.id) {
+      const z = db.ziele.find(x => x.id === c.id);
+      if (z) { z.titel=text; z.bereich=bereich; z.stichtag=stichtag; }
+    } else {
+      db.ziele.push({ id:'z_'+Date.now(), titel:text, bereich, stichtag, trend:'stabil', vertraulich:this._modalGetVertraulich() });
+    }
+    this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
+    this._toast('\u2713 Ziel gespeichert');
+  },
+
+  _savLink(c) {
+    const url   = document.getElementById('wb-f-url')?.value.trim();
+    if (!url) { this._toast('URL fehlt'); return; }
+    const titel = document.getElementById('wb-f-text')?.value.trim() || url;
+    const typ   = document.getElementById('wb-f-typ')?.value || 'link';
+    const tag   = document.getElementById('wb-f-tag')?.value.trim() || 'Sonstiges';
+    const ctx   = this._modalGetWelt();
+    const db    = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const v     = (db?.vorhaben||[]).find(x => x.id === c.vorhabenId);
+    if (!v) return;
+    if (!v.links) v.links = [];
+    if (c.linkId) {
+      const l = v.links.find(x => x.id === c.linkId);
+      if (l) { l.url=url; l.titel=titel; l.type=typ; l.tag=tag; }
+    } else {
+      v.links.push({ id:'l_'+Date.now(), url, titel, type:typ, tag, vertraulich:this._modalGetVertraulich() });
+    }
+    this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
+    this._toast('\u2713 Link gespeichert');
+  },
+
+  _savVorlage(c) {
+    const text = document.getElementById('wb-f-text')?.value.trim();
+    if (!text) { this._toast('Name fehlt'); return; }
+    const ctx  = this._modalGetWelt();
+    const db   = ctx==='pro' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    const inputs = document.querySelectorAll('#wb-micro-list .wb-micro-input');
+    const schritte = Array.from(inputs).map(i => i.value.trim()).filter(Boolean).map(t => ({text:t}));
+    if (!db.checklistVorlagen) db.checklistVorlagen = [];
+    if (c.id) {
+      const v = db.checklistVorlagen.find(x => x.id === c.id);
+      if (v) { v.titel=text; v.schritte=schritte; }
+    } else {
+      db.checklistVorlagen.push({ id:'cv_'+Date.now(), titel:text, schritte, vertraulich:this._modalGetVertraulich() });
+    }
+    this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
+    this._toast('\u2713 Vorlage gespeichert');
+  },
+
+  /* ── Souveränitäts-Konto ── */
+  _svKontoAddieren(x, y) {
+    const db = this.activeWorld === 'beruf' ? this.dataPro : this.dataPriv;
+    if (!db) return;
+    if (!db.bewegung) db.bewegung = { bewegt:0, geschoben:0 };
+    db.bewegung.bewegt = (db.bewegung.bewegt||0) + 1;
+    this.setDirty();
+    const el = document.getElementById('ck-stat-bewegt');
+    if (el) el.textContent = db.bewegung.bewegt;
+    const anim = document.createElement('div');
+    anim.className = 'sv-plus1';
+    anim.textContent = '+1';
+    anim.style.left = (x || window.innerWidth/2) + 'px';
+    anim.style.top  = (y || 100) + 'px';
+    document.body.appendChild(anim);
+    anim.addEventListener('animationend', () => anim.remove());
+  },
+
   oauthSignOut() {
     this._oauthToken    = null;
     this._oauthTokenExp = null;
@@ -4018,6 +4571,17 @@ const WB = {
 
 document.addEventListener('DOMContentLoaded', () => WB.init());
 </script>
+<div id="wb-modal-overlay" onclick="WB._modalBgClick(event)">
+  <div class="wb-modal">
+    <div class="wb-modal-header">
+      <div class="wb-modal-title" id="wb-modal-title"></div>
+      <div class="wb-modal-close" onclick="WB.modalClose()">&#x2715;</div>
+    </div>
+    <div class="wb-modal-body" id="wb-modal-body"></div>
+    <div class="wb-modal-footer" id="wb-modal-footer"></div>
+  </div>
+</div>
+
 <div id="wb-settings-overlay">
   <div id="s-ov-header">
     <div id="s-ov-back" onclick="WB.settingsClose()">
