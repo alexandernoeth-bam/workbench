@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.4.1</title>
+  <title>WorkBench 2.4.2</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1819,7 +1819,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.4.1</div>
+  <div id="wb-startup-tagline">v2.4.2</div>
 </div>
 
 <div id="wb-app">
@@ -1831,7 +1831,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.4.1 · Build 20260617-1000</div>
+    <div id="wb-menu-version">v2.4.2 · Build 20260617-1100</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -1912,7 +1912,7 @@
             <div class="ck-tb-sep"></div>
             <button class="ck-tb-btn" title="Einrücken" onclick="WB._ckExecCmd('indent')" style="font-size:13px;">&#x21E5;</button>
           </div>
-          <div id="ck-editor-area" contenteditable="true" spellcheck="true" onselectionchange="WB._ckOnSelect()" oninput="WB._ckOnInput()"></div>
+          <div id="ck-editor-area" contenteditable="true" spellcheck="true" oninput="WB._ckOnInput()"></div>
           <div id="ck-editor-actions">
             <div id="ck-editor-hint">Text markieren &rarr; Verarbeiten</div>
             <button id="ck-verarbeiten-btn" disabled onclick="WB._ckVerarbeiten()">Verarbeiten</button>
@@ -2277,8 +2277,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.4.1',
-  APP_BUILD:   '20260617-1000',
+  APP_VERSION: '2.4.2',
+  APP_BUILD:   '20260617-1100',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -4355,8 +4355,9 @@ const WB = {
     clearTimeout(this._saveTimer);
     this._saveTimer = setTimeout(async () => {
       await this.idbSaveAll();
-      if (this._oauthClientId && this._oauthTokenValid()) {
-        await this._syncUploadAll();
+      if (this._oauthClientId) {
+        const token = await this._oauthGetTokenSilent();
+        if (token) { await this._syncUploadAll(); }
       }
     }, 2000);
   },
@@ -4415,6 +4416,31 @@ const WB = {
         },
       });
       client.requestAccessToken();
+    });
+  },
+
+  async _oauthGetTokenSilent() {
+    if (this._oauthTokenValid()) return this._oauthToken;
+    if (!this._oauthClientId) return null;
+    if (!window.google?.accounts?.oauth2) return null;
+    return new Promise((resolve) => {
+      try {
+        const client = google.accounts.oauth2.initTokenClient({
+          client_id: this._oauthClientId,
+          scope:     this.DRIVE_SCOPE,
+          prompt:    '',
+          callback:  async (resp) => {
+            if (resp.error || !resp.access_token) { resolve(null); return; }
+            this._oauthToken    = resp.access_token;
+            this._oauthTokenExp = Date.now() + (resp.expires_in - 60) * 1000;
+            await this.idbSet('meta', 'oauthToken',    this._oauthToken);
+            await this.idbSet('meta', 'oauthTokenExp', this._oauthTokenExp);
+            this._oauthHideBanner();
+            resolve(this._oauthToken);
+          },
+        });
+        client.requestAccessToken({ prompt: '' });
+      } catch(e) { resolve(null); }
     });
   },
 
@@ -4572,12 +4598,10 @@ const WB = {
 
   async _syncTick() {
     if (!this._oauthClientId) return;
-    if (!this._oauthTokenValid()) {
-      const token = await this._oauthGetToken(true);
-      if (!token) {
-        this._oauthShowBanner('\u26a0 Google-Sitzung abgelaufen &mdash; Auto-Sync pausiert');
-        return;
-      }
+    const token = await this._oauthGetTokenSilent();
+    if (!token) {
+      this._oauthShowBanner('\u26a0 Google-Sitzung abgelaufen &mdash; Auto-Sync pausiert');
+      return;
     }
     this._oauthHideBanner();
     if (this.isDirty) { await this._syncUploadAll(); }
@@ -4586,15 +4610,19 @@ const WB = {
 
   async _syncCheckDriveNewer() {
     try {
-      const token = await this._oauthGetToken(true);
+      const token = await this._oauthGetTokenSilent();
       if (!token) return;
       for (const ctx of ['pro','priv']) {
-        const fileId = this._oauthDriveFileIds[ctx];
+        let fileId = this._oauthDriveFileIds[ctx];
+        if (!fileId) {
+          try { fileId = await this._oauthFindOrCreateFile(token, ctx); }
+          catch(e) { continue; }
+        }
         if (!fileId) continue;
         const resp = await fetch(this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime',
           { headers: { Authorization: 'Bearer ' + token } });
         if (!resp.ok) continue;
-        const meta = await resp.json();
+        const meta    = await resp.json();
         const driveTs = new Date(meta.modifiedTime).getTime();
         if (driveTs > this._syncLastDownload && driveTs > this._syncLastUpload) {
           await this.oauthSyncDownload(ctx);
@@ -4744,6 +4772,37 @@ const WB = {
     // Auto-Sync starten
     this._syncStart();
 
+    // Wenn kein Token → Sync-Zeitstempel auf jetzt damit kein sofortiger Drive-Download
+    if (!this._oauthClientId || !this._oauthTokenValid()) {
+      this._syncLastUpload   = Date.now();
+      this._syncLastDownload = Date.now();
+    }
+
+    // selectionchange-Listener für Verarbeiten-Button
+    document.addEventListener('selectionchange', () => {
+      const area = document.getElementById('ck-editor-area');
+      if (!area) return;
+      const sel = window.getSelection();
+      const btn = document.getElementById('ck-verarbeiten-btn');
+      if (!sel || sel.isCollapsed) {
+        this._ckSelText = '';
+        if (btn) btn.disabled = true;
+        return;
+      }
+      const anchor = sel.anchorNode;
+      if (!area.contains(anchor)) {
+        this._ckSelText = '';
+        if (btn) btn.disabled = true;
+        return;
+      }
+      const text = sel.toString().trim();
+      this._ckSelText = text;
+      if (text && sel.rangeCount > 0) {
+        this._ckSelRange = sel.getRangeAt(0).cloneRange();
+      }
+      if (btn) btn.disabled = !text;
+    });
+
     // Clean Slate beim Start
     this._ckCleanSlate();
 
@@ -4873,8 +4932,21 @@ const WB = {
     const statEl  = document.getElementById('s-sync-status');
     const valid   = this._oauthTokenValid();
     if (titleEl) titleEl.textContent = valid ? 'Verbunden' : 'Nicht verbunden';
-    if (subEl)   subEl.textContent   = valid ? 'Token g\u00fcltig' : 'Bitte Client-ID eintragen';
-    if (statEl)  statEl.style.display = valid ? 'inline-flex' : 'none';
+    let subTxt = valid ? 'Token g\u00fcltig' : 'Bitte Client-ID eintragen';
+    if (this._syncLastUpload > 0) {
+      const d = new Date(this._syncLastUpload);
+      const h = String(d.getHours()).padStart(2,'0');
+      const m = String(d.getMinutes()).padStart(2,'0');
+      subTxt = 'Zuletzt hochgeladen: ' + h + ':' + m;
+    }
+    if (this._syncLastDownload > this._syncLastUpload) {
+      const d = new Date(this._syncLastDownload);
+      const h = String(d.getHours()).padStart(2,'0');
+      const m = String(d.getMinutes()).padStart(2,'0');
+      subTxt = 'Zuletzt geladen: ' + h + ':' + m;
+    }
+    if (subEl)  subEl.textContent    = subTxt;
+    if (statEl) statEl.style.display = valid ? 'inline-flex' : 'none';
   },
 
   async _sSaveClientId() {
