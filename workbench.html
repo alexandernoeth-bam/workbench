@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.3.7</title>
+  <title>WorkBench 2.3.8</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1724,7 +1724,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.3.7</div>
+  <div id="wb-startup-tagline">v2.3.8</div>
 </div>
 
 <div id="wb-app">
@@ -1736,7 +1736,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.3.7 · Build 20260617-0900</div>
+    <div id="wb-menu-version">v2.3.8 · Build 20260617-0910</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -2152,8 +2152,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.3.7',
-  APP_BUILD:   '20260617-0900',
+  APP_VERSION: '2.3.8',
+  APP_BUILD:   '20260617-0910',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2280,7 +2280,7 @@ const WB = {
     const now    = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     const events = (db?.customEvents || [])
-      .filter(e => e.date === today && e.startTime && !e.done)
+      .filter(e => !e.deleted && e.date === today && e.startTime && !e.done)
       .map(e => {
         const [h, m] = e.startTime.split(':').map(Number);
         return { ...e, startMin: h * 60 + m };
@@ -2310,7 +2310,7 @@ const WB = {
     const now    = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     const events = (db?.customEvents || [])
-      .filter(e => e.date === today && !e.done)
+      .filter(e => !e.deleted && e.date === today && !e.done)
       .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
     if (!events.length) { el.style.display = 'none'; return; }
     el.style.display = '';
@@ -2364,8 +2364,8 @@ const WB = {
       if (!db) return;
 
       // ── Aufgaben → Micros ──
-      (db.vorhaben||[]).filter(v => v.aktiv!==false).forEach(v => {
-        (v.aufgaben||[]).filter(a => !a.done).forEach(a => {
+      (db.vorhaben||[]).filter(v => !v.deleted && v.aktiv!==false).forEach(v => {
+        (v.aufgaben||[]).filter(a => !a.deleted && !a.done).forEach(a => {
           if (this._bueroAktiv && ctx==='priv') return;
           if (this._bueroAktiv && a.vertraulich) return;
           const offenCL = (a.checklist||[]).map((c,i)=>({...c,_idx:i})).filter(c=>!c.done);
@@ -2404,7 +2404,7 @@ const WB = {
       });
 
       // ── QuickItems ──
-      (db.quickItems||[]).filter(q => !q.done).forEach(q => {
+      (db.quickItems||[]).filter(q => !q.deleted && !q.done).forEach(q => {
         if (this._bueroAktiv && ctx==='priv') return;
         if (this._bueroAktiv && q.vertraulich) return;
         let sektion = null;
@@ -2691,10 +2691,10 @@ const WB = {
       const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
       if (!db) return;
       (db.vorhaben || [])
-        .filter(v => v.aktiv !== false)
+        .filter(v => !v.deleted && v.aktiv !== false)
         .forEach(v => {
           (v.aufgaben || [])
-            .filter(a => !a.done && (a.checklist||[]).length > 0)
+            .filter(a => !a.deleted && !a.done && (a.checklist||[]).length > 0)
             .forEach(a => {
               const offen = (a.checklist||[])
                 .map((c,i) => ({...c, _idx: i}))
@@ -2711,7 +2711,7 @@ const WB = {
             });
         });
       (db.quickItems || [])
-        .filter(q => !q.done)
+        .filter(q => !q.deleted && !q.done)
         .forEach(q => schnell.push({...q, _ctx: ctx}));
     });
 
@@ -2850,8 +2850,8 @@ const WB = {
     let alleN = 0, berufN = 0, privatN = 0, ueberN = 0, ohneN = 0;
     ['pro','priv'].forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
-      const qi = (db?.quickItems||[]).filter(q => !q.done);
-      const af = (db?.vorhaben||[]).flatMap(v => (v.aufgaben||[]).filter(a => !a.done));
+      const qi = (db?.quickItems||[]).filter(q => !q.deleted && !q.done);
+      const af = (db?.vorhaben||[]).flatMap(v => (v.aufgaben||[]).filter(a => !a.deleted && !a.done));
       const items = [...qi, ...af];
       items.forEach(i => {
         alleN++;
@@ -3012,6 +3012,16 @@ const WB = {
     this._vhAktivCtx = null;
   },
 
+  _vhDelete(vorhabenId, ctx) {
+    if (!confirm('Vorhaben wirklich löschen?')) return;
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
+    if (v) { v.deleted = true; v.updatedAt = this._now(); }
+    this.setDirty();
+    this._vhCloseDetail();
+    this.renderSection('vorhaben');
+  },
+
   _vhRenderListe() {
     const scroll = document.getElementById('vh-scroll');
     if (!scroll) return;
@@ -3019,7 +3029,7 @@ const WB = {
     const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
     welten.forEach(ctx => {
       const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-      const vorhaben = (db?.vorhaben || []).filter(v => v.aktiv !== false);
+      const vorhaben = (db?.vorhaben || []).filter(v => !v.deleted && v.aktiv !== false);
       if (!vorhaben.length) return;
       const fokus  = vorhaben.filter(v => v.fokus);
       const andere = vorhaben.filter(v => !v.fokus);
@@ -3052,7 +3062,7 @@ const WB = {
     const ueberfaellig = aufgaben.some(a => !a.done && a.datum && a.datum < today);
     const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     const termineCount = (db?.customEvents || [])
-      .filter(e => e.vorhabenId === v.id && !e.done && e.date >= today).length;
+      .filter(e => !e.deleted && e.vorhabenId === v.id && !e.done && e.date >= today).length;
 
     let metaParts = [];
     if (total > 0) {
@@ -3120,7 +3130,7 @@ const WB = {
     const db    = ctx === 'pro' ? this.dataPro : this.dataPriv;
 
     const naechste = (v.aufgaben||[])
-      .filter(a => !a.done && (a.checklist||[]).length > 0)
+      .filter(a => !a.deleted && !a.done && (a.checklist||[]).length > 0)
       .map(a => {
         const offenCL = (a.checklist||[]).filter(c => !c.done);
         return { ...a, _offen: offenCL, _naechster: offenCL[0]?.text || '' };
@@ -3207,7 +3217,7 @@ const WB = {
   _vhRenderTabInfo(v, ctx) {
     const el = document.getElementById('vh-tab-info');
     if (!el) return;
-    const links = v.links || [];
+    const links = (v.links || []).filter(l => !l.deleted);
     const tags  = [...new Set(links.map(l => l.tag || 'Sonstiges'))];
 
     let h = '<div class="vh-tag-filter-row">'
@@ -3429,7 +3439,7 @@ const WB = {
     welten.forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
       (db?.vorhaben||[]).forEach(v => {
-        (v.links||[]).forEach(l => {
+        (v.links||[]).filter(l => !l.deleted).forEach(l => {
           links.push({ ...l, _ctx: ctx, _vorhabenId: v.id, _vorhabenTitel: v.titel });
         });
       });
@@ -3540,7 +3550,7 @@ const WB = {
 
       // Alle Termine aus dataPriv (dort alle gespeichert)
       const events = (this.dataPriv?.customEvents || [])
-        .filter(e => e.date === dateStr && !e.done)
+        .filter(e => !e.deleted && e.date === dateStr && !e.done)
         .map(e => ({ ...e, _ctx: e.welt === 'pro' ? 'pro' : 'priv' }));
       events.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
 
@@ -3549,7 +3559,7 @@ const WB = {
       ['pro','priv'].forEach(ctx => {
         const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
         (db?.wochenpflichten || [])
-          .filter(p => p.taeglich || (p.wochentage||[]).includes(dayOfWeek))
+          .filter(p => !p.deleted && (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)))
           .forEach(p => {
             const done = !!db?.pflichtStatus?.[dateStr]?.[p.id];
             pflichten.push({ ...p, _ctx: ctx, done });
@@ -3686,7 +3696,7 @@ const WB = {
 
         // Termine aus dataPriv
         const events = (this.dataPriv?.customEvents||[])
-          .filter(e => e.date === dateStr && e.startTime && !e.done)
+          .filter(e => !e.deleted && e.date === dateStr && e.startTime && !e.done)
           .map(e => {
             const [eh,em] = e.startTime.split(':').map(Number);
             return { ...e, _ctx: e.welt==='pro' ? 'pro' : 'priv', _startMin: eh*60+em, _endMin: eh*60+em + this._evtDurationMin(e) };
@@ -3822,7 +3832,7 @@ const WB = {
         ['pro','priv'].forEach(ctx => {
           const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
           (db?.wochenpflichten||[])
-            .filter(p => p.taeglich || (p.wochentage||[]).includes(dayOfWeek))
+            .filter(p => !p.deleted && (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)))
             .forEach(p => {
               const done = !!db?.pflichtStatus?.[dateStr]?.[p.id];
               h += '<span class="wo-pfl-chip ' + (done ? 'done' : 'open') + '">'
@@ -3859,7 +3869,7 @@ const WB = {
 
         // Alle Termine aus dataPriv (dort alle gespeichert)
         const events = (this.dataPriv?.customEvents||[])
-          .filter(e => e.date === dateStr && e.startTime && !e.done)
+          .filter(e => !e.deleted && e.date === dateStr && e.startTime && !e.done)
           .map(e => {
             const [eh,em] = e.startTime.split(':').map(Number);
             return {
@@ -4141,7 +4151,7 @@ const WB = {
     const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
     welten.forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
-      (db?.ziele||[]).forEach(z => ziele.push({...z, _ctx:ctx}));
+      (db?.ziele||[]).filter(z => !z.deleted).forEach(z => ziele.push({...z, _ctx:ctx}));
     });
     return ziele;
   },
@@ -4405,17 +4415,26 @@ const WB = {
   /* ── Merge by Timestamp ── */
   _mergeArrayById(localArr, driveArr) {
     const merged = new Map();
+    // Zuerst Drive-Items eintragen
     (driveArr||[]).forEach(item => { merged.set(item.id, { ...item }); });
+    // Dann lokale Items — neueres updatedAt gewinnt
     (localArr||[]).forEach(item => {
       const existing = merged.get(item.id);
       if (!existing) {
+        // Nur lokal vorhanden → übernehmen (auch wenn deleted:true)
         merged.set(item.id, { ...item });
       } else {
         const localTs = item.updatedAt || item.doneTs || '0';
         const driveTs = existing.updatedAt || existing.doneTs || '0';
-        if (localTs > driveTs) merged.set(item.id, { ...item });
+        if (localTs > driveTs) {
+          // Lokal neuer → lokal gewinnt (deleted:true propagiert sich)
+          merged.set(item.id, { ...item });
+        }
+        // Drive neuer → Drive bleibt (deleted:true von Drive propagiert sich)
       }
     });
+    // ALLE Items zurückgeben — auch deleted:true
+    // Render-Funktionen filtern selbst mit !x.deleted
     return Array.from(merged.values());
   },
 
@@ -4955,6 +4974,34 @@ const WB = {
     document.getElementById('s-file-input').click();
   },
 
+  _sBereinigen() {
+    if (!confirm('Gelöschte Einträge älter als 30 Tage permanent entfernen?')) return;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const cutoffStr = cutoff.toISOString();
+    const bereinige = (arr) => (arr||[]).filter(item => {
+      if (!item.deleted) return true;
+      return (item.updatedAt || '0') > cutoffStr;
+    });
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      if (!db) return;
+      db.quickItems        = bereinige(db.quickItems);
+      db.customEvents      = bereinige(db.customEvents);
+      db.wochenpflichten   = bereinige(db.wochenpflichten);
+      db.ziele             = bereinige(db.ziele);
+      db.checklistVorlagen = bereinige(db.checklistVorlagen);
+      (db.vorhaben||[]).forEach(v => {
+        v.aufgaben = bereinige(v.aufgaben);
+        v.links    = bereinige(v.links);
+      });
+      db.vorhaben = bereinige(db.vorhaben);
+    });
+    this.setDirty();
+    this.renderSection(this.activeTab);
+    this._toast('\u2713 Bereinigt');
+  },
+
   _sReset() {
     if (!confirm('Wirklich alle lokalen Daten l\u00f6schen?')) return;
     if (!confirm('Nicht r\u00fckg\u00e4ngig! Sicher?')) return;
@@ -5035,7 +5082,7 @@ const WB = {
   _modalVhOptions(ctx, selectedId) {
     const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     return (db?.vorhaben||[])
-      .filter(v => v.aktiv !== false)
+      .filter(v => !v.deleted && v.aktiv !== false)
       .map(v => '<option value="' + this._esc(v.id) + '"'
         + (v.id === selectedId ? ' selected' : '') + '>'
         + this._esc(v.titel) + '</option>')
@@ -5351,33 +5398,39 @@ const WB = {
   _modalDelete() {
     const c = this._modalCtx;
     if (!c) return;
-    if (!confirm('Wirklich l\u00f6schen?')) return;
+    if (!confirm('Wirklich löschen?')) return;
+
+    const softDelete = (arr, id) => {
+      const item = (arr||[]).find(x => x.id === id);
+      if (item) { item.deleted = true; item.updatedAt = this._now(); }
+    };
+
     const db = c.ctx==='pro' ? this.dataPro : this.dataPriv;
     switch(c.type) {
       case 'schnell':
-        if (db) db.quickItems = (db.quickItems||[]).filter(x => x.id !== c.id);
+        softDelete(db?.quickItems, c.id);
         break;
       case 'aufgabe': {
         const v = (db?.vorhaben||[]).find(x => x.id === c.vorhabenId);
-        if (v) v.aufgaben = (v.aufgaben||[]).filter(x => x.id !== c.aufgabeId);
+        softDelete(v?.aufgaben, c.aufgabeId);
         break;
       }
       case 'termin':
-        if (db) db.customEvents = (db.customEvents||[]).filter(x => x.id !== c.eventId);
+        softDelete(this.dataPriv?.customEvents, c.eventId);
         break;
       case 'pflicht':
-        if (db) db.wochenpflichten = (db.wochenpflichten||[]).filter(x => x.id !== c.id);
+        softDelete(db?.wochenpflichten, c.id);
         break;
       case 'ziel':
-        if (db) db.ziele = (db.ziele||[]).filter(x => x.id !== c.id);
+        softDelete(db?.ziele, c.id);
         break;
       case 'link': {
         const v = (db?.vorhaben||[]).find(x => x.id === c.vorhabenId);
-        if (v) v.links = (v.links||[]).filter(x => x.id !== c.linkId);
+        softDelete(v?.links, c.linkId);
         break;
       }
       case 'vorlage':
-        if (db) db.checklistVorlagen = (db.checklistVorlagen||[]).filter(x => x.id !== c.id);
+        softDelete(db?.checklistVorlagen, c.id);
         break;
     }
     this.setDirty();
@@ -5857,7 +5910,7 @@ const WB = {
     const alle = [];
     ['pro','priv'].forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
-      (db?.checklistVorlagen||[]).forEach(v => { alle.push({ ...v, _ctx: ctx }); });
+      (db?.checklistVorlagen||[]).filter(v => !v.deleted).forEach(v => { alle.push({ ...v, _ctx: ctx }); });
     });
     if (!alle.length) {
       el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--faint);font-size:13px;">Noch keine Vorlagen. Lege eine an!</div>';
@@ -6133,6 +6186,13 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
           <div class="s-row-sub">IndexedDB + Einstellungen &middot; nicht r&uuml;ckg&auml;ngig</div>
         </div>
         <button class="s-btn danger" onclick="WB._sReset()">L&ouml;schen</button>
+      </div>
+      <div class="s-row">
+        <div class="s-row-label">
+          <div class="s-row-title">Gel&ouml;schte Eintr&auml;ge bereinigen</div>
+          <div class="s-row-sub">Entfernt permanent gel&ouml;schte Items (&auml;lter als 30 Tage)</div>
+        </div>
+        <button class="s-btn" onclick="WB._sBereinigen()">Bereinigen</button>
       </div>
     </div>
 
