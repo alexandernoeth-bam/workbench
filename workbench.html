@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.5.1</title>
+  <title>WorkBench 2.5.2</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1897,7 +1897,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.5.1</div>
+  <div id="wb-startup-tagline">v2.5.2</div>
 </div>
 
 <div id="wb-app">
@@ -1909,7 +1909,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.5.1 · Build 20260617-1500</div>
+    <div id="wb-menu-version">v2.5.2 · Build 20260617-1530</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -2339,8 +2339,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.5.1',
-  APP_BUILD:   '20260617-1500',
+  APP_VERSION: '2.5.2',
+  APP_BUILD:   '20260617-1530',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2998,7 +2998,9 @@ const WB = {
         const doneBadge = p.done ? '<span class="ck-badge pflicht">erledigt</span>' : badge;
         h += '<div class="tf-pfl-row" onclick="WB._woPflichtToggle(&quot;' + this._esc(p.id) + '&quot;,&quot;' + today + '&quot;,&quot;' + p._ctx + '&quot;)">'
           + '<div class="tf-pfl-check' + (p.done ? ' done' : '') + '">' + (p.done ? '\u2713' : '') + '</div>'
-          + '<div class="tf-pfl-text' + (p.done ? ' done' : '') + '">' + this._esc(p.titel) + '</div>'
+          + '<div class="tf-pfl-text' + (p.done ? ' done' : '') + '">' + this._esc(p.titel)
+          + (p.startTime ? '<span style="font-size:11px;color:var(--accent);font-weight:700;margin-left:6px;">' + this._esc(p.startTime) + '</span>' : '')
+          + '</div>'
           + doneBadge
           + '<div style="padding:2px 6px;font-size:13px;color:var(--faint);cursor:pointer;" onclick="event.stopPropagation();WB.pflichtOpen(&quot;' + this._esc(p.id) + '&quot;,&quot;' + p._ctx + '&quot;)" title="Bearbeiten">&#x270F;</div>'
           + '</div>';
@@ -3017,7 +3019,9 @@ const WB = {
         const badge = q._ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
         h += '<div class="tf-schnell-row" onclick="WB.schnellOpen(&quot;' + this._esc(q.id) + '&quot;)">'
           + '<div class="tf-schnell-check" onclick="event.stopPropagation();WB._tfSchnellCheck(&quot;' + this._esc(q.id) + '&quot;,&quot;' + q._ctx + '&quot;)"></div>'
-          + '<div class="tf-schnell-text">' + this._esc(q.text) + '</div>'
+          + '<div class="tf-schnell-text">' + this._esc(q.text)
+          + (q.startTime ? '<span style="font-size:11px;color:var(--accent);font-weight:700;margin-left:6px;">' + this._esc(q.startTime) + '</span>' : '')
+          + '</div>'
           + badge + '</div>';
         count++;
       });
@@ -5643,6 +5647,9 @@ const WB = {
       + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
       + ' placeholder="Name der Pflicht..." value="' + this._esc(p?.titel||'') + '">'
       + '</div>'
+      + '<div class="wb-input-group"><label class="wb-label">Uhrzeit (optional)</label>'
+      + '<input id="wb-f-time" class="wb-input" type="time" value="' + this._esc(p?.startTime||'') + '">'
+      + '</div>'
       + '<div class="wb-input-group"><label class="wb-label">Wochentage</label>'
       + dayHtml + '</div>'
       + '<div class="wb-input-group"><label class="wb-label">Vorhaben (optional)</label>'
@@ -5872,16 +5879,17 @@ const WB = {
   },
 
   _savPflicht(c) {
-    const text = document.getElementById('wb-f-text')?.value.trim();
+    const text      = document.getElementById('wb-f-text')?.value.trim();
     if (!text) { this._toast('Text fehlt'); return; }
-    const vhId = document.getElementById('wb-f-vh')?.value || '';
+    const vhId      = document.getElementById('wb-f-vh')?.value || '';
+    const startTime = document.getElementById('wb-f-time')?.value || '';
     const ctx  = this._modalGetWelt();
     const db   = ctx==='pro' ? this.dataPro : this.dataPriv;
     if (!db) return;
     const activeDays = Array.from(document.querySelectorAll('.wb-day-btn.active')).map(el => parseInt(el.dataset.day, 10)).filter(n => !isNaN(n));
     const taeglich = activeDays.length === 7;
     if (!db.wochenpflichten) db.wochenpflichten = [];
-    const obj = { titel:text, taeglich, wochentage:taeglich?[]:activeDays, vorhabenId:vhId||null, updatedAt:this._now(), vertraulich:this._modalGetVertraulich() };
+    const obj = { titel:text, startTime, taeglich, wochentage:taeglich?[]:activeDays, vorhabenId:vhId||null, updatedAt:this._now(), vertraulich:this._modalGetVertraulich() };
     if (c.id) {
       const p = db.wochenpflichten.find(x => x.id === c.id);
       if (p) Object.assign(p, obj);
