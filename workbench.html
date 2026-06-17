@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.5.3</title>
+  <title>WorkBench 2.5.4</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1897,7 +1897,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.5.3</div>
+  <div id="wb-startup-tagline">v2.5.4</div>
 </div>
 
 <div id="wb-app">
@@ -1909,7 +1909,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.5.3 · Build 20260617-1545</div>
+    <div id="wb-menu-version">v2.5.4 · Build 20260617-1600</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -2339,8 +2339,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.5.3',
-  APP_BUILD:   '20260617-1545',
+  APP_VERSION: '2.5.4',
+  APP_BUILD:   '20260617-1600',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3752,7 +3752,15 @@ const WB = {
   },
 
   _abLinkClick(linkId) {
-    this._toast('Link-Details folgen in einem sp\u00e4teren Update');
+    let foundVhId = null, foundCtx = null;
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      (db?.vorhaben||[]).forEach(v => {
+        if ((v.links||[]).find(l => l.id === linkId)) { foundVhId = v.id; foundCtx = ctx; }
+      });
+    });
+    if (foundVhId) { this.linkOpen(foundVhId, linkId, foundCtx); }
+    else { this._toast('Link nicht gefunden'); }
   },
   renderWoche() {
     if (!this._woRefDate) this._woRefDate = new Date();
@@ -5481,7 +5489,7 @@ const WB = {
       + ' value="' + this._esc(item?.startTime||'') + '">'
       + '</div></div>';
     this._modalCtx = { type:'schnell', id, ctx };
-    this.modalOpen('Schnell-Erinnerung', body, this._modalFooter(!!id));
+    this.modalOpen('Schnell-Erinnerung', body, this._modalFooter(!!id, false));
   },
 
   /* ── Aufgabe ── */
@@ -5545,10 +5553,15 @@ const WB = {
 
   /* ── Termin ── */
   terminOpen(eventId, ctx) {
-    // Termine immer in dataPriv
-    const db = this.dataPriv;
-    const e  = eventId ? (db?.customEvents||[]).find(x => x.id === eventId) : null;
-    const aktuellerCtx = e?.welt || 'priv';
+    // Termine zuerst in dataPriv suchen, Fallback dataPro
+    let db = this.dataPriv;
+    let e  = eventId ? (db?.customEvents||[]).find(x => x.id === eventId) : null;
+    if (!e && eventId) {
+      db = this.dataPro;
+      e  = (db?.customEvents||[]).find(x => x.id === eventId);
+    }
+    const aktuellerCtx = e?.welt === 'pro' ? 'pro' : 'priv';
+    ctx = aktuellerCtx;
     const body = this._modalWeltTop(aktuellerCtx, e?.vertraulich)
       + '<div class="wb-input-group">'
       + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
@@ -5670,25 +5683,31 @@ const WB = {
       {v:'beruf',l:'Beruf'},{v:'sozial',l:'Soziale Kontakte'},
       {v:'erhol',l:'Erholung'},{v:'umgeb',l:'Umgebung'},
     ];
+    const trends = [
+      {v:'kurs',l:'\u2197 Auf Kurs'},{v:'stabil',l:'\u2192 Stabil'},
+      {v:'rueck',l:'\u2198 R\u00fcckstand'},{v:'erreicht',l:'\u2713 Erreicht'},
+    ];
     const body = this._modalWeltTop(ctx, z?.vertraulich)
       + '<div class="wb-input-group">'
       + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
-      + ' placeholder="Ziel / Horizont beschreiben..." value="' + this._esc(z?.titel||'') + '">'
+      + ' placeholder="Ziel / Horizont..." value="' + this._esc(z?.titel||'') + '">'
       + '</div>'
       + '<div class="wb-row2">'
       + '<div class="wb-input-group"><label class="wb-label">Lebensbereich</label>'
       + '<select id="wb-f-bereich" class="wb-select">'
-      + bereiche.map(b => '<option value="' + b.v + '"'
-        + (z?.bereich===b.v?' selected':'') + '>' + b.l + '</option>').join('')
+      + bereiche.map(b => '<option value="' + b.v + '"' + (z?.bereich===b.v?' selected':'') + '>' + b.l + '</option>').join('')
       + '</select></div>'
+      + '<div class="wb-input-group"><label class="wb-label">Status / Trend</label>'
+      + '<select id="wb-f-trend" class="wb-select">'
+      + trends.map(t => '<option value="' + t.v + '"' + ((z?.trend||'stabil')===t.v?' selected':'') + '>' + t.l + '</option>').join('')
+      + '</select></div>'
+      + '</div>'
       + '<div class="wb-input-group"><label class="wb-label">Stichtag (optional)</label>'
       + '<input id="wb-f-date" class="wb-input" type="date" value="' + this._esc(z?.stichtag||'') + '">'
-      + '</div></div>';
+      + '</div>';
     this._modalCtx = { type:'ziel', id, ctx };
-    
-    // HIER IST DER FIX: this._modalCtx als 4. Parameter
     this.modalOpen(id ? 'Ziel bearbeiten' : 'Neues Ziel', body, this._modalFooter(!!id, false));
-  }, 
+  },
 
   /* ── Link / Ablage ── */
   linkOpen(vorhabenId, linkId, ctx) {
@@ -5903,6 +5922,7 @@ const WB = {
     const text     = document.getElementById('wb-f-text')?.value.trim();
     if (!text) { this._toast('Text fehlt'); return; }
     const bereich  = document.getElementById('wb-f-bereich')?.value || 'beruf';
+    const trend    = document.getElementById('wb-f-trend')?.value || 'stabil';
     const stichtag = document.getElementById('wb-f-date')?.value || '';
     const ctx      = this._modalGetWelt();
     const db       = ctx==='pro' ? this.dataPro : this.dataPriv;
@@ -5910,9 +5930,9 @@ const WB = {
     if (!db.ziele) db.ziele = [];
     if (c.id) {
       const z = db.ziele.find(x => x.id === c.id);
-      if (z) { z.titel=text; z.bereich=bereich; z.stichtag=stichtag; z.updatedAt=this._now(); }
+      if (z) { z.titel=text; z.bereich=bereich; z.trend=trend; z.stichtag=stichtag; z.updatedAt=this._now(); }
     } else {
-      db.ziele.push({ id:'z_'+Date.now(), titel:text, bereich, stichtag, trend:'stabil', updatedAt:this._now(), vertraulich:this._modalGetVertraulich() });
+      db.ziele.push({ id:'z_'+Date.now(), titel:text, bereich, trend, stichtag, updatedAt:this._now(), vertraulich:this._modalGetVertraulich() });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('\u2713 Ziel gespeichert');
