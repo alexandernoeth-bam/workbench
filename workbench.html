@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.4.9</title>
+  <title>WorkBench 2.4.10</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1853,7 +1853,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.4.9</div>
+  <div id="wb-startup-tagline">v2.4.10</div>
 </div>
 
 <div id="wb-app">
@@ -1865,7 +1865,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.4.9 · Build 20260617-1320</div>
+    <div id="wb-menu-version">v2.4.10 · Build 20260617-1340</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -2303,8 +2303,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.4.9',
-  APP_BUILD:   '20260617-1320',
+  APP_VERSION: '2.4.10',
+  APP_BUILD:   '20260617-1340',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2534,15 +2534,10 @@ const WB = {
 
   _ftStart() {
     const min = this._ftDurMin || 25;
-    // Zeitwerte setzen
     this._ft.totalSec  = min * 60;
     this._ft.remainSec = min * 60;
     this._ft.elapsed   = 0;
-    this._ft.isOpen    = false;
-    // Drawer schließen
-    const drawer = document.getElementById('ft-drawer');
-    if (drawer) drawer.classList.remove('open');
-    // Config-Zeile verstecken, Timer-Leiste zeigen
+    // Config-Zeile verstecken, Timer-Leiste zeigen — Drawer BLEIBT OFFEN
     const cfg = document.getElementById('ft-config-row');
     const tmr = document.getElementById('ft-drawer-timer');
     if (cfg) cfg.classList.add('hidden');
@@ -2554,34 +2549,26 @@ const WB = {
     if (ckBtn)   ckBtn.style.display = 'none';
     if (ckPause) ckPause.classList.add('visible');
     if (ckStop)  ckStop.classList.add('visible');
-    // Fortschrittsbalken zeigen
     const bar = document.getElementById('ck-timer-bar');
     if (bar) bar.classList.add('visible');
-    // Altes Interval stoppen
     if (this._ft._interval) clearInterval(this._ft._interval);
     this._ft.isRunning = true;
     this._ft._interval = setInterval(() => {
       if (this._ft.remainSec <= 0) {
-        // Timer abgelaufen
         clearInterval(this._ft._interval);
         this._ft._interval = null;
         this._ft.isRunning = false;
         this._ftRenderTime();
         this._toast('\u23F1 Zeit abgelaufen!');
-        // Drawer schließen + Checkliste leeren
+        // Drawer schließen + Checkliste leeren + zurücksetzen
         const dr = document.getElementById('ft-drawer');
         if (dr) dr.classList.remove('open');
         this._ft.checklist = [];
         this._ftRenderConfig();
-        // Start-Button wiederherstellen, Pause+Stop verstecken
-        const sb = document.getElementById('ck-timer-btn');
-        const pb = document.getElementById('ck-timer-pause');
-        const tb = document.getElementById('ck-timer-stop');
-        if (sb) sb.style.display = '';
-        if (pb) pb.classList.remove('visible');
-        if (tb) tb.classList.remove('visible');
-        const b2 = document.getElementById('ck-timer-bar');
-        if (b2) b2.classList.remove('visible');
+        const sb = document.getElementById('ck-timer-btn');   if (sb) sb.style.display = '';
+        const pb = document.getElementById('ck-timer-pause'); if (pb) pb.classList.remove('visible');
+        const tb = document.getElementById('ck-timer-stop');  if (tb) tb.classList.remove('visible');
+        const b2 = document.getElementById('ck-timer-bar');   if (b2) b2.classList.remove('visible');
         return;
       }
       this._ft.remainSec--;
