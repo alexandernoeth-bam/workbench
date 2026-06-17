@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.3.4</title>
+  <title>WorkBench 2.3.5</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1677,7 +1677,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.3.4</div>
+  <div id="wb-startup-tagline">v2.3.5</div>
 </div>
 
 <div id="wb-app">
@@ -1689,7 +1689,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.3.4 · Build 20260616-1130</div>
+    <div id="wb-menu-version">v2.3.5 · Build 20260617-0810</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -2095,8 +2095,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.3.4',
-  APP_BUILD:   '20260616-1130',
+  APP_VERSION: '2.3.5',
+  APP_BUILD:   '20260617-0810',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -5041,35 +5041,38 @@ const WB = {
   _modalDuplicate() {
     const c = this._modalCtx;
     if (!c || c.type !== 'termin') return;
-    const ctx = this._modalGetWelt();
-    const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
-    const e   = (db?.customEvents||[]).find(x => x.id === c.eventId);
+    // Termine immer in dataPriv — welt für Badge aus e.welt
+    const db = this.dataPriv;
+    const e  = (db?.customEvents||[]).find(x => x.id === c.eventId);
     if (!e) return;
+    const ctx = e.welt || 'priv';
+    // Snapshot bevor modalClose _modalCtx auf null setzt
+    const snapshot = { text: e.text, startTime: e.startTime, durationMin: e.durationMin, vorhabenId: e.vorhabenId, vertraulich: e.vertraulich, welt: ctx };
     this.modalClose();
     setTimeout(() => {
-      this._modalCtx = { type:'termin', eventId: null, ctx };
-      const body = this._modalWeltTop(ctx, e.vertraulich)
+      this._modalCtx = { type:'termin', eventId: null, ctx:'priv' };
+      const body = this._modalWeltTop(snapshot.welt, snapshot.vertraulich)
         + '<div class="wb-input-group">'
         + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
-        + ' value="' + this._esc(e.text) + '">'
+        + ' value="' + this._esc(snapshot.text) + '">'
         + '</div>'
         + '<div class="wb-row2">'
         + '<div class="wb-input-group"><label class="wb-label">Datum</label>'
         + '<input id="wb-f-date" class="wb-input" type="date" value=""></div>'
         + '<div class="wb-input-group"><label class="wb-label">Uhrzeit</label>'
         + '<input id="wb-f-time" class="wb-input" type="time"'
-        + ' value="' + this._esc(e.startTime||'') + '" oninput="WB._modalUpdateWeiche()">'
+        + ' value="' + this._esc(snapshot.startTime||'') + '" oninput="WB._modalUpdateWeiche()">'
         + '</div></div>'
         + '<div style="display:flex;gap:12px;align-items:flex-end;">'
         + '<div class="wb-input-group" style="flex:1"><label class="wb-label">Dauer (Min)</label>'
         + '<input id="wb-f-dur" class="wb-input" type="text"'
-        + ' value="' + this._esc(String(e.durationMin||60)) + '"></div>'
+        + ' value="' + this._esc(String(snapshot.durationMin||60)) + '"></div>'
         + '<div class="wb-weiche-info" id="wb-weiche">Ohne Uhrzeit \u2192 nur im Backlog (Pull)</div></div>'
         + '<div class="wb-input-group"><label class="wb-label">Vorhaben (optional)</label>'
         + '<select id="wb-f-vh" class="wb-select"><option value="">Kein Vorhaben</option>'
-        + this._modalVhOptions(ctx, e.vorhabenId)
+        + this._modalVhOptions('priv', snapshot.vorhabenId)
         + '</select></div>';
-      this.modalOpen('Termin duplizieren', body, this._modalFooter(false, false), this._modalCtx);
+      this.modalOpen('Termin duplizieren', body, this._modalFooter(false, false));
       this._modalUpdateWeiche();
     }, 100);
   },
