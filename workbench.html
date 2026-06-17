@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.4.5</title>
+  <title>WorkBench 2.4.6</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1741,8 +1741,8 @@
     #ck-kl-head { display:flex; align-items:center; gap:8px; padding:9px 12px; background:var(--surface2); border-bottom:1px solid var(--border); cursor:pointer; user-select:none; }
     #ck-kl-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); flex:1; }
     #ck-kl-count { background:var(--accent); color:#fff; border-radius:10px; padding:1px 8px; font-size:11px; font-weight:700; }
-    #ck-kl-chev { font-size:12px; color:var(--faint); transition:transform 0.2s; }
-    #ck-kl-chev.open { transform:rotate(180deg); }
+    #ck-kl-chev { font-size:12px; color:var(--faint); transition:transform 0.2s; display:inline-block; }
+    #ck-kl-chev.open { transform:rotate(90deg); }
     #ck-kl-body { display:none; }
     #ck-kl-body.open { display:block; }
     .ck-kl-item { display:flex; align-items:flex-start; gap:8px; padding:8px 12px; border-bottom:0.5px solid var(--border); font-size:13px; }
@@ -1853,7 +1853,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.4.5</div>
+  <div id="wb-startup-tagline">v2.4.6</div>
 </div>
 
 <div id="wb-app">
@@ -1865,7 +1865,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.4.5 · Build 20260617-1200</div>
+    <div id="wb-menu-version">v2.4.6 · Build 20260617-1220</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -1928,7 +1928,7 @@
           <div id="ck-kl-head" onclick="WB._ckKlToggle()">
             <span id="ck-kl-label">Heute klassifiziert</span>
             <span id="ck-kl-count">0</span>
-            <span id="ck-kl-chev">&#x25BE;</span>
+            <span id="ck-kl-chev">&#x25B8;</span>
           </div>
           <div id="ck-kl-body"></div>
         </div>
@@ -2329,8 +2329,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.4.5',
-  APP_BUILD:   '20260617-1200',
+  APP_VERSION: '2.4.6',
+  APP_BUILD:   '20260617-1220',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2531,6 +2531,8 @@ const WB = {
   },
 
   _ckTimerOpen() {
+    // Wenn Timer läuft → Panel nicht öffnen
+    if (this._ft.isRunning) return;
     const drawer = document.getElementById('ft-drawer');
     if (drawer) drawer.classList.add('open');
     this._ftRenderConfig();
@@ -2565,6 +2567,9 @@ const WB = {
     this._ft.totalSec  = min * 60;
     this._ft.remainSec = min * 60;
     this._ft.elapsed   = 0;
+    // Drawer schließen — Panel nicht mehr sichtbar
+    const drawer = document.getElementById('ft-drawer');
+    if (drawer) drawer.classList.remove('open');
     // Buttons umschalten: Start verstecken, Pause+Stop zeigen
     const startBtn = document.getElementById('ck-timer-btn');
     const pauseBtn = document.getElementById('ck-timer-pause');
@@ -2581,6 +2586,10 @@ const WB = {
         this._ft.isRunning = false;
         this._ftRenderTime();
         this._toast('\u23F1 Zeit abgelaufen!');
+        // Drawer schließen + Checkliste leeren
+        const dr = document.getElementById('ft-drawer');
+        if (dr) dr.classList.remove('open');
+        this._ft.checklist = [];
         this._ftRenderConfig();
         // Buttons zurücksetzen
         const sb = document.getElementById('ck-timer-btn'); if (sb) sb.style.display = '';
@@ -5982,6 +5991,7 @@ const WB = {
     if (this._ft._interval) { clearInterval(this._ft._interval); this._ft._interval = null; }
     this._ft.isRunning = false;
     this._ft.remainSec = this._ft.totalSec;
+    this._ft.checklist = [];
     const drawer = document.getElementById('ft-drawer');
     if (drawer) drawer.classList.remove('open');
     // Buttons zurücksetzen
