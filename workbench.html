@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.4.8</title>
+  <title>WorkBench 2.4.9</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1733,15 +1733,15 @@
     /* Timer */
     #ck-timer-controls { display:flex; gap:6px; align-items:center; }
     #ck-timer-pause, #ck-timer-stop { width:34px; height:34px; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:var(--surface); color:var(--muted); cursor:pointer; font-size:14px; display:none; align-items:center; justify-content:center; font-family:var(--font); }
-    #ck-timer-pause.visible, #ck-timer-stop.visible { display:flex; }
-    #ck-timer-pause.running { border-color:var(--accent); color:var(--accent); }
+    #ck-timer-pause.visible { display:flex; border-color:var(--accent); color:var(--accent); }
+    #ck-timer-stop.visible  { display:flex; }
     /* Klassifiziert-Block */
     #ck-klassifiziert-block { background:var(--surface); border-radius:var(--radius); border:1.5px solid var(--border); overflow:hidden; display:none; }
     #ck-klassifiziert-block.visible { display:block; }
     #ck-kl-head { display:flex; align-items:center; gap:8px; padding:9px 12px; background:var(--surface2); border-bottom:1px solid var(--border); cursor:pointer; user-select:none; }
     #ck-kl-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); flex:1; }
     #ck-kl-count { background:var(--accent); color:#fff; border-radius:10px; padding:1px 8px; font-size:11px; font-weight:700; }
-    #ck-kl-chev { font-size:12px; color:var(--faint); transition:transform 0.2s; display:inline-block; }
+    #ck-kl-chev { font-size:14px; color:var(--muted); transition:transform 0.2s; display:inline-block; font-style:normal; }
     #ck-kl-chev.open { transform:rotate(90deg); }
     #ck-kl-body { display:none; }
     #ck-kl-body.open { display:block; }
@@ -1853,7 +1853,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.4.8</div>
+  <div id="wb-startup-tagline">v2.4.9</div>
 </div>
 
 <div id="wb-app">
@@ -1865,7 +1865,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.4.8 · Build 20260617-1300</div>
+    <div id="wb-menu-version">v2.4.9 · Build 20260617-1320</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -1917,8 +1917,8 @@
             </div>
             <div id="ck-timer-controls">
               <button id="ck-timer-btn" onclick="WB._ckTimerOpen()">&#x25B6; Start</button>
-              <button id="ck-timer-pause" onclick="WB._ftDrawerPause()" style="display:none">&#x23F8;</button>
-              <button id="ck-timer-stop"  onclick="WB._ftDrawerAbbrechen()" style="display:none">&#x2715;</button>
+              <button id="ck-timer-pause" onclick="WB._ftDrawerPause()">&#x23F8;</button>
+              <button id="ck-timer-stop"  onclick="WB._ftDrawerAbbrechen()">&#x2715;</button>
             </div>
           </div>
           <div id="ck-timer-bar"><div id="ck-timer-bar-fill"></div></div>
@@ -1928,7 +1928,7 @@
           <div id="ck-kl-head" onclick="WB._ckKlToggle()">
             <span id="ck-kl-label">Heute klassifiziert</span>
             <span id="ck-kl-count">0</span>
-            <span id="ck-kl-chev">&#x25B8;</span>
+            <span id="ck-kl-chev">&#x203A;</span>
           </div>
           <div id="ck-kl-body"></div>
         </div>
@@ -2303,8 +2303,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.4.8',
-  APP_BUILD:   '20260617-1300',
+  APP_VERSION: '2.4.9',
+  APP_BUILD:   '20260617-1320',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2534,43 +2534,54 @@ const WB = {
 
   _ftStart() {
     const min = this._ftDurMin || 25;
+    // Zeitwerte setzen
     this._ft.totalSec  = min * 60;
     this._ft.remainSec = min * 60;
     this._ft.elapsed   = 0;
-    this._ft.isOpen    = false; // Panel geschlossen
+    this._ft.isOpen    = false;
     // Drawer schließen
     const drawer = document.getElementById('ft-drawer');
     if (drawer) drawer.classList.remove('open');
-    // Config verstecken, Timer-Leiste zeigen
+    // Config-Zeile verstecken, Timer-Leiste zeigen
     const cfg = document.getElementById('ft-config-row');
     const tmr = document.getElementById('ft-drawer-timer');
     if (cfg) cfg.classList.add('hidden');
     if (tmr) tmr.style.display = 'flex';
-    // Buttons umschalten
-    const startBtn = document.getElementById('ck-timer-btn');
-    const pauseBtn = document.getElementById('ck-timer-pause');
-    const stopBtn  = document.getElementById('ck-timer-stop');
-    if (startBtn) startBtn.style.display = 'none';
-    if (pauseBtn) { pauseBtn.classList.add('visible', 'running'); pauseBtn.innerHTML = '\u23F8'; }
-    if (stopBtn)  stopBtn.classList.add('visible');
-    const bar = document.getElementById('ck-timer-bar'); if (bar) bar.classList.add('visible');
+    // Start-Button verstecken, Pause+Stop einblenden
+    const ckBtn   = document.getElementById('ck-timer-btn');
+    const ckPause = document.getElementById('ck-timer-pause');
+    const ckStop  = document.getElementById('ck-timer-stop');
+    if (ckBtn)   ckBtn.style.display = 'none';
+    if (ckPause) ckPause.classList.add('visible');
+    if (ckStop)  ckStop.classList.add('visible');
+    // Fortschrittsbalken zeigen
+    const bar = document.getElementById('ck-timer-bar');
+    if (bar) bar.classList.add('visible');
+    // Altes Interval stoppen
     if (this._ft._interval) clearInterval(this._ft._interval);
     this._ft.isRunning = true;
     this._ft._interval = setInterval(() => {
       if (this._ft.remainSec <= 0) {
+        // Timer abgelaufen
         clearInterval(this._ft._interval);
+        this._ft._interval = null;
         this._ft.isRunning = false;
         this._ftRenderTime();
         this._toast('\u23F1 Zeit abgelaufen!');
-        this._ft.checklist = [];
-        this._ft.isOpen = false;
+        // Drawer schließen + Checkliste leeren
         const dr = document.getElementById('ft-drawer');
         if (dr) dr.classList.remove('open');
+        this._ft.checklist = [];
         this._ftRenderConfig();
-        const sb = document.getElementById('ck-timer-btn'); if (sb) sb.style.display = '';
-        const pb = document.getElementById('ck-timer-pause'); if (pb) pb.classList.remove('visible', 'running');
-        const tb = document.getElementById('ck-timer-stop');  if (tb) tb.classList.remove('visible');
-        const bar2 = document.getElementById('ck-timer-bar'); if (bar2) bar2.classList.remove('visible');
+        // Start-Button wiederherstellen, Pause+Stop verstecken
+        const sb = document.getElementById('ck-timer-btn');
+        const pb = document.getElementById('ck-timer-pause');
+        const tb = document.getElementById('ck-timer-stop');
+        if (sb) sb.style.display = '';
+        if (pb) pb.classList.remove('visible');
+        if (tb) tb.classList.remove('visible');
+        const b2 = document.getElementById('ck-timer-bar');
+        if (b2) b2.classList.remove('visible');
         return;
       }
       this._ft.remainSec--;
@@ -5916,25 +5927,6 @@ const WB = {
     this._ftStart();
   },
 
-  _ftStart() {
-    const ft = this._ft;
-    ft.isRunning = true;
-    ft.isPaused  = false;
-    ft._interval = setInterval(() => {
-      if (ft.remainSec <= 0) {
-        clearInterval(ft._interval);
-        ft.isRunning = false;
-        this._ftRenderTime();
-        this._toast('\u23F1 Zeit abgelaufen!');
-        return;
-      }
-      ft.remainSec--;
-      ft.elapsed++;
-      this._ftRenderTime();
-    }, 1000);
-    this._ftRenderTime();
-  },
-
   _ftStop() {
     const ft = this._ft;
     if (ft._interval) { clearInterval(ft._interval); ft._interval = null; }
@@ -5944,20 +5936,35 @@ const WB = {
   _ftDrawerPause() {
     const ft = this._ft;
     const panelBtn = document.querySelector('#ft-drawer-timer .ft-drawer-btn');
-    const pauseBtn = document.getElementById('ck-timer-pause');
+    const ckPause  = document.getElementById('ck-timer-pause');
     if (ft.isRunning) {
+      // Pausieren
       if (ft._interval) { clearInterval(ft._interval); ft._interval = null; }
       ft.isRunning = false;
       if (panelBtn) panelBtn.innerHTML = '\u25B6 Weiter';
-      if (pauseBtn) { pauseBtn.innerHTML = '\u25B6'; pauseBtn.classList.remove('running'); }
+      if (ckPause)  { ckPause.innerHTML = '\u25B6'; ckPause.style.borderColor = ''; ckPause.style.color = ''; }
     } else {
+      // Fortsetzen
       ft.isRunning = true;
       ft._interval = setInterval(() => {
-        if (ft.remainSec <= 0) { clearInterval(ft._interval); ft.isRunning = false; this._ftRenderTime(); this._toast('\u23F1 Zeit abgelaufen!'); return; }
+        if (ft.remainSec <= 0) {
+          clearInterval(ft._interval); ft._interval = null;
+          ft.isRunning = false;
+          this._ftRenderTime();
+          this._toast('\u23F1 Zeit abgelaufen!');
+          const dr = document.getElementById('ft-drawer'); if (dr) dr.classList.remove('open');
+          this._ft.checklist = [];
+          this._ftRenderConfig();
+          const sb = document.getElementById('ck-timer-btn');   if (sb) sb.style.display = '';
+          const pb = document.getElementById('ck-timer-pause'); if (pb) pb.classList.remove('visible');
+          const tb = document.getElementById('ck-timer-stop');  if (tb) tb.classList.remove('visible');
+          const b2 = document.getElementById('ck-timer-bar');   if (b2) b2.classList.remove('visible');
+          return;
+        }
         ft.remainSec--; ft.elapsed++; this._ftRenderTime();
       }, 1000);
       if (panelBtn) panelBtn.innerHTML = '\u23F8 Pause';
-      if (pauseBtn) { pauseBtn.innerHTML = '\u23F8'; pauseBtn.classList.add('running'); }
+      if (ckPause)  { ckPause.innerHTML = '\u23F8'; ckPause.style.borderColor = 'var(--accent)'; ckPause.style.color = 'var(--accent)'; }
     }
   },
 
@@ -5967,13 +5974,14 @@ const WB = {
     this._ft.isRunning = false;
     this._ft.remainSec = this._ft.totalSec;
     this._ft.checklist = [];
+    // Drawer schließen
     const drawer = document.getElementById('ft-drawer');
     if (drawer) drawer.classList.remove('open');
-    // Buttons zurücksetzen
-    const startBtn = document.getElementById('ck-timer-btn'); if (startBtn) startBtn.style.display = '';
-    const pauseBtn = document.getElementById('ck-timer-pause'); if (pauseBtn) pauseBtn.classList.remove('visible', 'running');
-    const stopBtn  = document.getElementById('ck-timer-stop');  if (stopBtn)  stopBtn.classList.remove('visible');
-    const bar = document.getElementById('ck-timer-bar'); if (bar) bar.classList.remove('visible');
+    // Start-Button wiederherstellen, Pause+Stop verstecken
+    const sb = document.getElementById('ck-timer-btn');   if (sb) sb.style.display = '';
+    const pb = document.getElementById('ck-timer-pause'); if (pb) pb.classList.remove('visible');
+    const tb = document.getElementById('ck-timer-stop');  if (tb) tb.classList.remove('visible');
+    const bar = document.getElementById('ck-timer-bar');  if (bar) bar.classList.remove('visible');
     this._ftRenderTime();
     this._ftRenderConfig();
   },
