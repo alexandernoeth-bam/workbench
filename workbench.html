@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.6.2</title>
+  <title>WorkBench 2.6.3</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1697,6 +1697,18 @@
     .tf-ev-act-btn { width:26px; height:26px; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:var(--surface); cursor:pointer; font-size:12px; color:var(--muted); display:flex; align-items:center; justify-content:center; font-family:var(--font); }
     .tf-ev-act-btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
     .tf-ev-act-del:hover { background:var(--danger); border-color:var(--danger); }
+    /* ── Papierkorb ── */
+    #s-papierkorb-liste { display:flex; flex-direction:column; gap:0; }
+    .s-pk-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:0.5px solid var(--border); min-height:48px; }
+    .s-pk-item:last-child { border-bottom:none; }
+    .s-pk-body { flex:1; min-width:0; }
+    .s-pk-text { font-size:14px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .s-pk-meta { font-size:11px; color:var(--faint); margin-top:2px; }
+    .s-pk-days { font-size:11px; font-weight:600; color:var(--warn); white-space:nowrap; flex-shrink:0; }
+    .s-pk-days.soon { color:var(--danger); }
+    .s-pk-restore { padding:5px 10px; background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:12px; font-weight:600; color:var(--accent); cursor:pointer; font-family:var(--font); white-space:nowrap; min-height:32px; }
+    .s-pk-restore:hover { background:var(--accent); color:#fff; }
+    .s-pk-empty { padding:20px 14px; font-size:13px; color:var(--faint); text-align:center; font-style:italic; }
     /* ── Vorhaben Pill + Alle-Aufgaben ── */
     .vh-sec-row { display:flex; align-items:center; gap:6px; padding:7px 10px 5px; background:var(--surface2); border-top:0.5px solid var(--border); border-bottom:0.5px solid var(--border); margin-top:4px; }
     .vh-sec-row:first-child { margin-top:0; }
@@ -1957,7 +1969,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.6.2</div>
+  <div id="wb-startup-tagline">v2.6.3</div>
 </div>
 
 <div id="wb-app">
@@ -1969,7 +1981,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.6.2 · Build 20260618-1300</div>
+    <div id="wb-menu-version">v2.6.3 · Build 20260618-1400</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -2402,8 +2414,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.6.2',
-  APP_BUILD:   '20260618-1300',
+  APP_VERSION: '2.6.3',
+  APP_BUILD:   '20260618-1400',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2975,19 +2987,6 @@ const WB = {
     }
   },
 
-  _ckCleanSlate() {
-    const today = this._dStr(new Date());
-    const gd = new Date(); gd.setDate(gd.getDate() - 1);
-    const vvg = new Date(); vvg.setDate(vvg.getDate() - 2);
-    const grenze = this._dStr(vvg);
-    ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
-      if (!db?.tagesprotokoll) return;
-      db.tagesprotokoll = db.tagesprotokoll.filter(e => e.date >= grenze || !e.processed);
-    });
-    this.setDirty();
-  },
-
   _ckActiveSession: null,
 
   _ckResumeSession() {
@@ -3419,7 +3418,7 @@ const WB = {
     if (!confirm('Vorhaben wirklich löschen?')) return;
     const db = ctx==='pro' ? this.dataPro : this.dataPriv;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
-    if (v) { v.deleted = true; v.updatedAt = this._now(); }
+    this._softDelete(v);
     this.setDirty();
     this._vhCloseDetail();
     this.renderSection('vorhaben');
@@ -3775,7 +3774,8 @@ const WB = {
     const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
     if (!v) return;
-    v.links = (v.links||[]).filter(l => l.id !== linkId);
+    const link = (v.links||[]).find(l => l.id === linkId);
+    this._softDelete(link);
     this.setDirty();
     this._vhRenderTabInfo(v, ctx);
     this._toast('Link entfernt');
@@ -5064,7 +5064,7 @@ const WB = {
   _mergeDb(localDb, driveDb) {
     if (!localDb || !driveDb) return driveDb || localDb;
     const merged = { ...driveDb };
-    const arrayFields = ['quickItems', 'customEvents', 'wochenpflichten', 'ziele', 'checklistVorlagen'];
+    const arrayFields = ['quickItems', 'customEvents', 'wochenpflichten', 'ziele', 'checklistVorlagen', 'tagesprotokoll'];
     arrayFields.forEach(field => {
       merged[field] = this._mergeArrayById(localDb[field], driveDb[field]);
     });
@@ -5306,6 +5306,9 @@ const WB = {
       try { await this._syncDownloadAll(); } catch(e) { console.warn('[init sync]', e.message); }
     }
 
+    // Auto-Bereinigung: Items älter als 7 Tage permanent löschen
+    this._sBereinigen();
+
     // Auto-Sync starten
     this._syncStart();
 
@@ -5360,9 +5363,6 @@ const WB = {
       if (btn) btn.disabled = !text;
     });
 
-    // Clean Slate beim Start
-    this._ckCleanSlate();
-
     // Banner alle 60 Sekunden aktualisieren
     setInterval(() => { if (this.activeTab === 'cockpit') this._ckRenderBanner(); }, 60000);
 
@@ -5385,6 +5385,22 @@ const WB = {
     const el = document.getElementById('wb-settings-overlay');
     if (el) el.classList.add('open');
     this._sRenderAll();
+    // Papierkorb-Zähler aktualisieren
+    let pkCount = 0;
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      pkCount += (db?.quickItems||[]).filter(x=>x.deleted).length;
+      pkCount += (db?.customEvents||[]).filter(x=>x.deleted).length;
+      pkCount += (db?.wochenpflichten||[]).filter(x=>x.deleted).length;
+      pkCount += (db?.ziele||[]).filter(x=>x.deleted).length;
+      (db?.vorhaben||[]).forEach(v => {
+        pkCount += (v.aufgaben||[]).filter(x=>x.deleted).length;
+        pkCount += (v.links||[]).filter(x=>x.deleted).length;
+      });
+      pkCount += (db?.vorhaben||[]).filter(x=>x.deleted).length;
+    });
+    const pkCntEl = document.getElementById('s-pk-count');
+    if (pkCntEl) pkCntEl.textContent = pkCount > 0 ? pkCount + ' Items' : 'leer';
   },
 
   settingsClose() {
@@ -5636,7 +5652,8 @@ const WB = {
     if (!confirm('Wochenpflicht l\u00f6schen?')) return;
     const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     if (!db) return;
-    db.wochenpflichten = (db.wochenpflichten||[]).filter(p => p.id !== id);
+    const p = (db.wochenpflichten||[]).find(x => x.id === id);
+    this._softDelete(p);
     this.setDirty();
     this._sRenderWp();
   },
@@ -5695,32 +5712,104 @@ const WB = {
     document.getElementById('s-file-input').click();
   },
 
+  _sPapierkorbOffen: false,
+  _sPapierkorbItems: [],
+
+  _sPapierkorbToggle() {
+    this._sPapierkorbOffen = !this._sPapierkorbOffen;
+    const body = document.getElementById('s-pk-body');
+    const chev = document.getElementById('s-pk-chev');
+    if (body) body.style.display = this._sPapierkorbOffen ? '' : 'none';
+    if (chev) chev.classList.toggle('open', this._sPapierkorbOffen);
+    if (this._sPapierkorbOffen) this._sPapierkorbRender();
+  },
+
+  _sPapierkorbRender() {
+    const liste = document.getElementById('s-papierkorb-liste');
+    const cntEl = document.getElementById('s-pk-count');
+    if (!liste) return;
+    const now = new Date();
+    const typeLabel = { termin:'Termin', schnell:'Schnell-Erinnerung', aufgabe:'Aufgabe', vorhaben:'Vorhaben', pflicht:'Wochenpflicht', ziel:'Ziel', link:'Ressource' };
+    const items = [];
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx==='pro' ? this.dataPro : this.dataPriv; if (!db) return;
+      const addItems = (arr, type, getText) => {
+        (arr||[]).filter(x => x.deleted).forEach(x => {
+          const deletedAt = x.deletedAt || x.updatedAt || '';
+          const daysLeft = deletedAt ? Math.ceil((new Date(deletedAt).getTime() + 7*86400000 - now.getTime()) / 86400000) : 7;
+          items.push({ id:x.id, type, ctx, text:getText(x), deletedAt, daysLeft:Math.max(0,daysLeft), _ref:x });
+        });
+      };
+      addItems(db.quickItems,'schnell',x=>x.text);
+      addItems(db.customEvents,'termin',x=>x.text);
+      addItems(db.wochenpflichten,'pflicht',x=>x.titel||x.text);
+      addItems(db.ziele,'ziel',x=>x.titel||x.text);
+      addItems(db.vorhaben,'vorhaben',x=>x.titel||x.text);
+      (db.vorhaben||[]).forEach(v => { addItems(v.aufgaben||[],'aufgabe',x=>x.text); addItems(v.links||[],'link',x=>x.titel||x.url); });
+    });
+    items.sort((a,b) => (a.deletedAt||'').localeCompare(b.deletedAt||''));
+    if (cntEl) cntEl.textContent = items.length > 0 ? items.length + ' Item' + (items.length!==1?'s':'') : 'leer';
+    if (!items.length) { liste.innerHTML = '<div class="s-pk-empty">Papierkorb ist leer \u2713</div>'; return; }
+    liste.innerHTML = items.map((item,idx) => {
+      const soon = item.daysLeft <= 1;
+      const daysText = item.daysLeft <= 0 ? 'heute' : item.daysLeft === 1 ? 'morgen' : 'in ' + item.daysLeft + ' Tagen';
+      return '<div class="s-pk-item">'
+        + '<div class="s-pk-body"><div class="s-pk-text">' + this._esc(item.text) + '</div>'
+        + '<div class="s-pk-meta">' + (typeLabel[item.type]||item.type) + ' \u00b7 gel&ouml;scht ' + (item.deletedAt ? this._fmtDatum(item.deletedAt.slice(0,10)) : '') + '</div></div>'
+        + '<span class="s-pk-days' + (soon?' soon':'') + '">' + daysText + '</span>'
+        + '<button class="s-pk-restore" onclick="WB._sPapierkorbRestore(' + idx + ')">\u21ba</button>'
+        + '</div>';
+    }).join('');
+    this._sPapierkorbItems = items;
+  },
+
+  _sPapierkorbRestore(idx) {
+    const item = this._sPapierkorbItems[idx]; if (!item) return;
+    item._ref.deleted = false; item._ref.deletedAt = null; item._ref.updatedAt = this._now();
+    this.setDirty(); this._sPapierkorbRender(); this.renderSection(this.activeTab);
+    this._toast('\u21ba ' + item.text + ' wiederhergestellt');
+  },
+
+  _sPapierkorbLeeren() {
+    const items = this._sPapierkorbItems || []; if (!items.length) return;
+    if (!confirm('Alle ' + items.length + ' gel\u00f6schten Items jetzt permanent l\u00f6schen?\n\nDiese Aktion kann nicht r\u00fckg\u00e4ngig gemacht werden.')) return;
+    const bereinige = (arr) => (arr||[]).filter(x => !x.deleted);
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx==='pro' ? this.dataPro : this.dataPriv; if (!db) return;
+      db.quickItems = bereinige(db.quickItems); db.customEvents = bereinige(db.customEvents);
+      db.wochenpflichten = bereinige(db.wochenpflichten); db.ziele = bereinige(db.ziele);
+      db.checklistVorlagen = bereinige(db.checklistVorlagen);
+      (db.vorhaben||[]).forEach(v => { v.aufgaben = bereinige(v.aufgaben); v.links = bereinige(v.links); });
+      db.vorhaben = bereinige(db.vorhaben);
+    });
+    this.setDirty(); this._sPapierkorbRender(); this._toast('\u2713 Papierkorb geleert');
+  },
+
   _sBereinigen() {
-    if (!confirm('Gelöschte Einträge älter als 30 Tage permanent entfernen?')) return;
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 30);
+    cutoff.setDate(cutoff.getDate() - 7);
     const cutoffStr = cutoff.toISOString();
     const bereinige = (arr) => (arr||[]).filter(item => {
       if (!item.deleted) return true;
-      return (item.updatedAt || '0') > cutoffStr;
+      const ts = item.deletedAt || item.updatedAt || '0';
+      return ts > cutoffStr;
     });
+    let count = 0;
     ['pro','priv'].forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
       if (!db) return;
+      const vorher = ['quickItems','customEvents','wochenpflichten','ziele','checklistVorlagen']
+        .reduce((s,f) => s + (db[f]||[]).filter(x=>x.deleted).length, 0);
       db.quickItems        = bereinige(db.quickItems);
       db.customEvents      = bereinige(db.customEvents);
       db.wochenpflichten   = bereinige(db.wochenpflichten);
       db.ziele             = bereinige(db.ziele);
       db.checklistVorlagen = bereinige(db.checklistVorlagen);
-      (db.vorhaben||[]).forEach(v => {
-        v.aufgaben = bereinige(v.aufgaben);
-        v.links    = bereinige(v.links);
-      });
+      (db.vorhaben||[]).forEach(v => { v.aufgaben = bereinige(v.aufgaben); v.links = bereinige(v.links); });
       db.vorhaben = bereinige(db.vorhaben);
+      count += vorher;
     });
-    this.setDirty();
-    this.renderSection(this.activeTab);
-    this._toast('\u2713 Bereinigt');
+    if (count > 0) this.setDirty();
   },
 
   _sReset() {
@@ -6262,6 +6351,13 @@ const WB = {
     }
   },
 
+  _softDelete(item) {
+    if (!item) return;
+    item.deleted   = true;
+    item.deletedAt = this._now();
+    item.updatedAt = this._now();
+  },
+
   _modalDelete() {
     const c = this._modalCtx;
     if (!c) return;
@@ -6269,7 +6365,7 @@ const WB = {
 
     const softDelete = (arr, id) => {
       const item = (arr||[]).find(x => x.id === id);
-      if (item) { item.deleted = true; item.updatedAt = this._now(); }
+      this._softDelete(item);
     };
 
     const db = c.ctx==='pro' ? this.dataPro : this.dataPriv;
@@ -7048,6 +7144,21 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
           <div class="s-row-sub">JSON-Backup wiederherstellen</div>
         </div>
         <button class="s-btn warn" onclick="WB._sImport()">Importieren</button>
+      </div>
+    </div>
+
+    <div class="s-card" id="s-papierkorb-card">
+      <div class="s-card-head" onclick="WB._sPapierkorbToggle()">
+        <span class="s-card-label">&#x1F5D1; Papierkorb</span>
+        <span class="s-card-meta" id="s-pk-count">leer</span>
+        <span class="s-card-chev" id="s-pk-chev">&#x25BE;</span>
+      </div>
+      <div class="s-card-body" id="s-pk-body" style="display:none">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface2);">
+          <span style="font-size:12px;color:var(--faint);flex:1;">Gel&ouml;schte Items werden nach 7&nbsp;Tagen permanent entfernt.</span>
+          <button class="s-btn danger" onclick="WB._sPapierkorbLeeren()">Jetzt leeren</button>
+        </div>
+        <div id="s-papierkorb-liste"></div>
       </div>
     </div>
 
