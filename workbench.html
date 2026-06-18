@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.6.5</title>
+  <title>WorkBench 2.6.6</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1692,6 +1692,24 @@
     .tf-ev-act-btn { width:26px; height:26px; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:var(--surface); cursor:pointer; font-size:12px; color:var(--muted); display:flex; align-items:center; justify-content:center; font-family:var(--font); }
     .tf-ev-act-btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
     .tf-ev-act-del:hover { background:var(--danger); border-color:var(--danger); }
+    /* ── Vorhaben Status-Zustände ── */
+    .vh-status-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; cursor:pointer; border:1.5px solid; font-family:var(--font); background:none; }
+    .vh-status-pill.offen { color:var(--faint); border-color:var(--border); }
+    .vh-status-pill.laeuft { color:var(--accent); border-color:rgba(10,107,94,0.3); background:rgba(10,107,94,0.06); }
+    .vh-status-pill.done { color:#fff; background:var(--accent); border-color:var(--accent); }
+    .vh-status-action { display:inline-flex; align-items:center; padding:3px 9px; border-radius:20px; font-size:10px; font-weight:600; cursor:pointer; border:1.5px solid var(--border); color:var(--faint); font-family:var(--font); background:none; }
+    .vh-status-action:hover { border-color:var(--accent); color:var(--accent); }
+    .vh-prog-wrap { padding:8px 12px; border-bottom:0.5px solid var(--border); background:var(--surface2); flex-shrink:0; }
+    .vh-prog-label { font-size:10px; color:var(--faint); margin-bottom:4px; display:flex; justify-content:space-between; }
+    .vh-prog-bar { height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+    .vh-prog-fill { height:100%; background:var(--accent); border-radius:2px; transition:width 0.3s ease; }
+    .vi-offen { width:14px; height:14px; border-radius:3px; border:2px solid var(--border); background:var(--surface); flex-shrink:0; }
+    .vi-done { width:14px; height:14px; border-radius:3px; background:var(--accent); flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:9px; }
+    .vh-item-done { display:flex; align-items:center; gap:7px; padding:7px 10px; border-bottom:0.5px solid var(--border); opacity:0.6; cursor:pointer; min-height:38px; }
+    .vh-item-done:hover { opacity:0.85; }
+    .vh-name-done { font-size:11px; color:var(--faint); text-decoration:line-through; flex:1; }
+    .vh-done-sec { display:flex; align-items:center; gap:6px; padding:6px 10px 4px; background:var(--surface2); border-top:0.5px solid var(--border); border-bottom:0.5px solid var(--border); margin-top:8px; }
+    .vh-done-sec-lbl { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--faint); flex:1; }
     /* ── Aufgaben Checkbox 3-Zustände ── */
     .aufg-ring { width:20px; height:20px; flex-shrink:0; cursor:pointer; }
     .aufg-ring svg { width:20px; height:20px; }
@@ -1969,7 +1987,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.6.5</div>
+  <div id="wb-startup-tagline">v2.6.6</div>
 </div>
 
 <div id="wb-app">
@@ -1981,7 +1999,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.6.5 · Build 20260618-1530</div>
+    <div id="wb-menu-version">v2.6.6 · Build 20260618-1600</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2407,8 +2425,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.6.5',
-  APP_BUILD:   '20260618-1530',
+  APP_VERSION: '2.6.6',
+  APP_BUILD:   '20260618-1600',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2924,7 +2942,7 @@ const WB = {
         const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
         if (!db) break;
         if (!db.vorhaben) db.vorhaben = [];
-        db.vorhaben.push({ id:'v_'+Date.now(), titel, notiz, aktiv:true, fokus:false, stichtag:'', welt:ctx, aufgaben:[], links:[], updatedAt:this._now() });
+        db.vorhaben.push({ id:'v_'+Date.now(), titel, notiz, status:'aktiv', aktiv:true, fokus:false, stichtag:'', welt:ctx, aufgaben:[], links:[], updatedAt:this._now() });
         this.setDirty(); this._toast('\u2713 Vorhaben: ' + titel.slice(0,30)); break;
       }
       case 'schnell': {
@@ -3244,7 +3262,7 @@ const WB = {
     const items = [];
     ['pro','priv'].forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
-      (db?.vorhaben||[]).filter(v => !v.deleted && v.aktiv!==false).forEach(v => {
+      (db?.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv!==false).forEach(v => {
         (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum === today).forEach(a => {
           const clTotal = (a.checklist||[]).length;
           const clDone  = (a.checklist||[]).filter(c=>c.done).length;
@@ -3277,7 +3295,7 @@ const WB = {
       (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date && q.date < today).forEach(q => {
         items.push({ text:q.text, sub:'Schnell-Erinnerung', date:q.date, id:q.id, _type:'schnell', _ctx:ctx });
       });
-      (db?.vorhaben||[]).filter(v => !v.deleted && v.aktiv!==false).forEach(v => {
+      (db?.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv!==false).forEach(v => {
         (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum && a.datum < today).forEach(a => {
           const clTotal = (a.checklist||[]).length;
           const clDone  = (a.checklist||[]).filter(c=>c.done).length;
@@ -3509,7 +3527,7 @@ const WB = {
     const badge = ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
 
     // Aufgaben nach Vorhaben clustern
-    const vorhaben = (db?.vorhaben||[]).filter(v => !v.deleted && v.aktiv!==false);
+    const vorhaben = (db?.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv!==false);
     const gesamtOffen = vorhaben.reduce((s,v) => s + (v.aufgaben||[]).filter(a => !a.deleted && !a.done).length, 0);
 
     let h = '<div class="vh-alle-head"><div class="vh-alle-title">Alle offenen Aufgaben ' + badge + '</div>'
@@ -3559,6 +3577,55 @@ const WB = {
     return h;
   },
 
+  _vhZustand(v) {
+    if (v.status === 'abgeschlossen') return 'done';
+    if (v.status === 'archiviert')    return 'archiviert';
+    const alle = (v.aufgaben||[]).filter(a => !a.deleted);
+    const done = alle.filter(a => a.done).length;
+    if (alle.length > 0 && done > 0) return 'laeuft';
+    return 'offen';
+  },
+
+  _vhRingIcon(v, size) {
+    const s  = size || 16, cx = s / 2, r = s / 2 - 2;
+    const circ = 2 * Math.PI * r;
+    const alle = (v.aufgaben||[]).filter(a => !a.deleted);
+    const done = alle.filter(a => a.done).length;
+    const pct  = alle.length > 0 ? done / alle.length : 0;
+    const dash = (pct * circ).toFixed(2);
+    const gap  = (circ - pct * circ).toFixed(2);
+    const col  = (v._ctx || v.welt) === 'priv' ? 'var(--accent2)' : 'var(--accent)';
+    return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" style="flex-shrink:0">'
+      + '<circle cx="' + cx + '" cy="' + cx + '" r="' + r + '" fill="none" stroke="var(--border)" stroke-width="2"/>'
+      + '<circle cx="' + cx + '" cy="' + cx + '" r="' + r + '" fill="none" stroke="' + col + '" stroke-width="2"'
+      + ' stroke-dasharray="' + dash + ' ' + gap + '" stroke-linecap="round" transform="rotate(-90 ' + cx + ' ' + cx + ')"/>'
+      + '<circle cx="' + cx + '" cy="' + cx + '" r="' + (r * 0.4).toFixed(1) + '" fill="' + col + '" opacity="0.4"/>'
+      + '</svg>';
+  },
+
+  _vhAbschliessen(vorhabenId, ctx) {
+    if (!confirm('Vorhaben als abgeschlossen markieren?')) return;
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
+    v.status = 'abgeschlossen'; v.aktiv = false; v.abgeschlossenAt = this._now(); v.updatedAt = this._now();
+    this.setDirty(); this.renderSection('vorhaben'); this._toast('\u2713 Vorhaben abgeschlossen');
+  },
+
+  _vhArchivieren(vorhabenId, ctx) {
+    if (!confirm('Vorhaben archivieren?\nEs verschwindet aus der aktiven Liste.')) return;
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
+    v.status = 'archiviert'; v.aktiv = false; v.updatedAt = this._now();
+    this.setDirty(); this._vhCloseDetail(); this.renderSection('vorhaben'); this._toast('Vorhaben archiviert');
+  },
+
+  _vhWiederoeffnen(vorhabenId, ctx) {
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
+    v.status = 'aktiv'; v.aktiv = true; v.updatedAt = this._now();
+    this.setDirty(); this.renderSection('vorhaben'); this._toast('\u21ba Vorhaben wieder ge\u00f6ffnet');
+  },
+
   _vhRenderListe() {
     const scroll = document.getElementById('vh-scroll');
     if (!scroll) return;
@@ -3566,16 +3633,14 @@ const WB = {
     const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
     welten.forEach(ctx => {
       const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-      const vorhaben = (db?.vorhaben || []).filter(v => !v.deleted && v.aktiv !== false);
-      if (!vorhaben.length) return;
-      const fokus  = vorhaben.filter(v => v.fokus);
-      const andere = vorhaben.filter(v => !v.fokus);
+      const alle = (db?.vorhaben || []).filter(v => !v.deleted);
+      const vorhaben = alle.filter(v => v.status !== 'archiviert' && v.status !== 'archiviert' && v.aktiv !== false);
+      const abgeschlossen = alle.filter(v => v.status === 'abgeschlossen' || v.status === 'archiviert');
+      if (!vorhaben.length && !abgeschlossen.length) return;
       const weltLabel = ctx === 'pro' ? 'Beruf' : 'Privat';
-      // Anzahl offener Aufgaben für Pill
       const offenCount = vorhaben.reduce((sum, v) =>
         sum + (v.aufgaben||[]).filter(a => !a.deleted && !a.done).length, 0);
       const pillActive = this._vhAlleFilter === ctx;
-      // Abschnitt-Header mit Pill
       h += '<div class="vh-sec-row">'
         + '<span class="vh-sec-label">' + weltLabel + ' \u2013 Aktiv</span>'
         + (offenCount > 0
@@ -3585,10 +3650,22 @@ const WB = {
             + ' title="Alle offenen Aufgaben anzeigen">' + offenCount + '</span>'
           : '')
         + '</div>';
-      if (fokus.length) {
-        fokus.forEach(v => { h += this._vhRenderCard(v, ctx); });
-      }
+      const fokus  = vorhaben.filter(v => v.fokus);
+      const andere = vorhaben.filter(v => !v.fokus);
+      if (fokus.length) fokus.forEach(v => { h += this._vhRenderCard(v, ctx); });
       andere.forEach(v => { h += this._vhRenderCard(v, ctx); });
+      if (abgeschlossen.length) {
+        h += '<div class="vh-done-sec">'
+          + '<span class="vh-done-sec-lbl">Abgeschlossen</span>'
+          + '<span style="font-size:9px;color:var(--faint);">' + abgeschlossen.length + '</span>'
+          + '</div>';
+        abgeschlossen.forEach(v => {
+          h += '<div class="vh-item-done" onclick="WB._vhOpenDetail(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">'
+            + '<div class="vi-done">\u2713</div>'
+            + '<div class="vh-name-done">' + this._esc(v.titel) + '</div>'
+            + '</div>';
+        });
+      }
     });
     scroll.innerHTML = h ||
       '<div style="padding:16px;color:var(--faint);font-size:13px;">Noch keine Vorhaben.</div>';
@@ -3622,11 +3699,17 @@ const WB = {
     const warnBadge = ueberfaellig
       ? '<span class="vh-badge warn">\u00fcberf\u00e4llig</span>' : '';
 
+    const zustand = this._vhZustand({...v, _ctx: ctx});
+    const statusIcon = zustand === 'done' ? '<div class="vi-done">\u2713</div>'
+      : zustand === 'laeuft' ? this._vhRingIcon({...v, _ctx: ctx}, 16)
+      : '<div class="vi-offen"></div>';
+
     return '<div class="vh-card' + (isActive ? ' active' : '') + '"'
       + ' data-id="' + this._esc(v.id) + '"'
       + ' data-ctx="' + this._esc(ctx) + '"'
       + ' onclick="WB._vhOpenDetail(&quot;' + v.id + '&quot;,&quot;' + ctx + '&quot;)">'
       + '<div class="vh-card-bar ' + bar + '"></div>'
+      + statusIcon
       + '<div class="vh-card-body">'
       + '<div class="vh-card-title">' + this._esc(v.titel) + '</div>'
       + '<div class="vh-card-meta">' + meta + '</div></div>'
@@ -3684,8 +3767,29 @@ const WB = {
       const badge = ctx === 'pro'
         ? '<span class="vh-badge beruf">Beruf</span>'
         : '<span class="vh-badge privat">Privat</span>';
-      subEl.innerHTML = badge
-        + (v.ziel ? '<span>' + this._esc(v.ziel) + '</span>' : '');
+      // Status-Pill + Fortschritt
+      const zustand = this._vhZustand({...v, _ctx: ctx});
+      const alle    = (v.aufgaben||[]).filter(a => !a.deleted);
+      const doneA   = alle.filter(a => a.done).length;
+      const pct     = alle.length > 0 ? Math.round(doneA / alle.length * 100) : 0;
+      const pillLabel = zustand === 'done' ? '\u2713 Abgeschlossen'
+        : zustand === 'laeuft' ? 'L\u00e4uft' : 'Offen';
+      const pillIcon = zustand === 'laeuft' ? this._vhRingIcon({...v, _ctx: ctx}, 12) : '';
+      let statusRow = '<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;align-items:center;">'
+        + '<button class="vh-status-pill ' + zustand + '">' + pillIcon + ' ' + pillLabel + '</button>';
+      if (zustand !== 'done') {
+        statusRow += '<button class="vh-status-action" onclick="WB._vhAbschliessen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">\u2192 Abschlie\u00dfen</button>';
+        statusRow += '<button class="vh-status-action" onclick="WB._vhArchivieren(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">Archivieren</button>';
+      } else {
+        statusRow += '<button class="vh-status-action" onclick="WB._vhWiederoeffnen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">\u21ba Wieder\u00f6ffnen</button>';
+      }
+      statusRow += '</div>';
+      const progBar = alle.length > 0
+        ? '<div class="vh-prog-wrap"><div class="vh-prog-label"><span>Fortschritt</span>'
+          + '<span style="color:var(--accent);font-weight:600;">' + doneA + '/' + alle.length + ' Aufgaben erledigt</span></div>'
+          + '<div class="vh-prog-bar"><div class="vh-prog-fill" style="width:' + pct + '%"></div></div></div>'
+        : '';
+      subEl.innerHTML = badge + (v.ziel ? '<span>' + this._esc(v.ziel) + '</span>' : '') + statusRow + progBar;
     }
     this._vhRenderTabAktuell(v, ctx);
     this._vhRenderTabInfo(v, ctx);
@@ -3822,7 +3926,7 @@ const WB = {
     const v = {
       id: 'v_' + Date.now(),
       titel: titel.trim(),
-      aktiv: true, fokus: false, welt: ctx,
+      status: 'aktiv', aktiv: true, fokus: false, welt: ctx,
       aufgaben: [], links: [],
     };
     db.vorhaben.push(v);
@@ -4916,6 +5020,14 @@ const WB = {
         });
         db.pflichtStatus = newPs;
       });
+
+      // Vorhaben status-Feld Migration
+      ['pro','priv'].forEach(ctx => {
+        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        (db?.vorhaben||[]).forEach(v => {
+          if (!v.status) v.status = v.aktiv !== false ? 'aktiv' : 'abgeschlossen';
+        });
+      });
     } catch(e) {
       console.error('[IDB] load error:', e);
     }
@@ -5960,7 +6072,7 @@ const WB = {
   _modalVhOptions(ctx, selectedId) {
     const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     return (db?.vorhaben||[])
-      .filter(v => !v.deleted && v.aktiv !== false)
+      .filter(v => !v.deleted && v.status !== 'archiviert' && v.status !== 'archiviert' && v.aktiv !== false)
       .map(v => '<option value="' + this._esc(v.id) + '"'
         + (v.id === selectedId ? ' selected' : '') + '>'
         + this._esc(v.titel) + '</option>')
@@ -5969,7 +6081,7 @@ const WB = {
 
   _modalVhOptionsAll(ctx, aktVhId) {
     const db = ctx==='pro' ? this.dataPro : this.dataPriv;
-    return (db?.vorhaben||[]).filter(v => !v.deleted && v.aktiv!==false)
+    return (db?.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv!==false)
       .map(v => '<option value="' + this._esc(v.id) + '"' + (v.id===aktVhId ? ' selected' : '') + '>' + this._esc(v.titel) + '</option>').join('');
   },
 
