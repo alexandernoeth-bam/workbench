@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.7.8</title>
+  <title>WorkBench 2.7.9</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2068,7 +2068,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.7.8</div>
+  <div id="wb-startup-tagline">v2.7.9</div>
 </div>
 
 <div id="wb-app">
@@ -2080,7 +2080,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.7.8 · Build 20260619-0200</div>
+    <div id="wb-menu-version">v2.7.9 · Build 20260619-0230</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2506,8 +2506,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.7.8',
-  APP_BUILD:   '20260619-0200',
+  APP_VERSION: '2.7.9',
+  APP_BUILD:   '20260619-0230',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2867,15 +2867,26 @@ _ftStart() {
     const cb = document.createElement('span');
     cb.setAttribute('data-wb-cb','open');
     cb.style.cssText = 'display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;';
+    cb.setAttribute('onclick', 'WB._ckToggleCheckbox(this)');
     cb.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:1.5px solid var(--border);border-radius:3px;vertical-align:-2px;" data-box="1"></span> ';
-    cb.addEventListener('click', () => {
-      const box = cb.querySelector('[data-box]'); if (!box) return;
-      const isChecked = cb.dataset.wbCb === 'done';
-      if (isChecked) { cb.dataset.wbCb = 'open'; box.style.background = ''; box.textContent = ''; box.style.border = '1.5px solid var(--border)'; }
-      else { cb.dataset.wbCb = 'done'; box.style.background = 'var(--accent)'; box.style.borderColor = 'var(--accent)'; box.style.color = '#fff'; box.style.fontSize = '10px'; box.style.textAlign = 'center'; box.style.lineHeight = '14px'; box.textContent = '\u2713'; }
-    });
     const sel = window.getSelection(); const range = sel?.getRangeAt(0);
     if (range) { range.collapse(false); range.insertNode(cb); range.setStartAfter(cb); sel.removeAllRanges(); sel.addRange(range); }
+  },
+
+  _ckToggleCheckbox(cb) {
+    const box = cb.querySelector('[data-box]'); if (!box) return;
+    const isChecked = cb.dataset.wbCb === 'done';
+    if (isChecked) {
+      cb.dataset.wbCb = 'open';
+      box.style.background = ''; box.textContent = ''; box.style.border = '1.5px solid var(--border)';
+      box.style.color = ''; box.style.fontSize = ''; box.style.textAlign = ''; box.style.lineHeight = '';
+    } else {
+      cb.dataset.wbCb = 'done';
+      box.style.background = 'var(--accent)'; box.style.borderColor = 'var(--accent)';
+      box.style.color = '#fff'; box.style.fontSize = '10px'; box.style.textAlign = 'center';
+      box.style.lineHeight = '14px'; box.textContent = '\u2713';
+    }
+    this._ckSaveEntry();
   },
 
   _ckOnSelect() {
@@ -2972,6 +2983,13 @@ _ftStart() {
     } else {
       this._ckSessionId = 'ck_' + Date.now();
     }
+    // Event-Delegation für Checkboxen (funktioniert auch nach innerHTML-Load aus IDB/Drive)
+    area.removeEventListener('click', this._ckAreaClickHandler);
+    this._ckAreaClickHandler = (e) => {
+      const cb = e.target.closest('[data-wb-cb]');
+      if (cb && area.contains(cb)) { e.preventDefault(); this._ckToggleCheckbox(cb); }
+    };
+    area.addEventListener('click', this._ckAreaClickHandler);
   },
 
   _ckVerarbeiten() {
