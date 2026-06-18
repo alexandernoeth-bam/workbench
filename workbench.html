@@ -1997,6 +1997,21 @@
     #ft-drawer-input { flex:1; padding:7px 10px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:16px; font-family:var(--font); background:var(--surface); color:var(--text); outline:none; min-height:36px; }
     #ft-drawer-input:focus { border-color:var(--accent); }
     #ft-drawer-add { padding:7px 12px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius-sm); font-size:15px; font-weight:600; cursor:pointer; min-height:36px; font-family:var(--font); }
+	#ft-mantra-countdown {
+	padding: 20px 14px;
+	text-align: center;
+	font-size: 1.1rem;
+	font-style: italic;
+	color: var(--accent);
+	line-height: 1.5;
+	font-weight: 500;
+	animation: pulseMantra 2s infinite ease-in-out;
+	}
+	@keyframes pulseMantra {
+	0% { opacity: 0.7; }
+	50% { opacity: 1; }
+	100% { opacity: 0.7; }
+	}
   </style>
 </head>
 <body>
@@ -2669,40 +2684,85 @@ const WB = {
     if (tmr) tmr.style.display = 'none';
   },
 
-  _ftStart() {
-    const min = this._ftDurMin || 25;
-    this._ft.totalSec  = min * 60;
-    this._ft.remainSec = min * 60;
-    this._ft.elapsed   = 0;
-    // Config-Zeile verstecken, Timer-Leiste zeigen — Drawer BLEIBT OFFEN
-    const cfg = document.getElementById('ft-config-row');
-    const tmr = document.getElementById('ft-drawer-timer');
-    if (cfg) cfg.classList.add('hidden');
-    if (tmr) tmr.style.display = 'flex';
-    // Fokus-Button: laufende Zeit anzeigen
-    this._ftUpdateFokusBtn();
-    if (this._ft._interval) clearInterval(this._ft._interval);
-    this._ft.isRunning = true;
-    this._ft._interval = setInterval(() => {
-      if (this._ft.remainSec <= 0) {
-        clearInterval(this._ft._interval);
-        this._ft._interval = null;
-        this._ft.isRunning = false;
-        this._ftRenderTime();
-        this._toast('\u23F1 Zeit abgelaufen!');
-        // Drawer schließen + Checkliste leeren + zurücksetzen
-        const dr = document.getElementById('ft-drawer'); if (dr) dr.classList.remove('open');
-        this._ft.checklist = [];
-        this._ftRenderConfig();
-        this._ftUpdateFokusBtn();
-        return;
+_ftStart() {
+  const min = this._ftDurMin || 25;
+  this._ft.totalSec  = min * 60;
+  this._ft.remainSec = min * 60;
+  this._ft.elapsed   = 0;
+  
+  // 1. Oberflächen-Anpassung: Config verstecken, Timer-Bereich vorbereiten
+  const cfg = document.getElementById('ft-config-row');
+  const tmr = document.getElementById('ft-drawer-timer');
+  if (cfg) cfg.classList.add('hidden');
+  if (tmr) tmr.style.display = 'flex';
+  
+  // Bestehende Intervalle zur Sicherheit löschen
+  if (this._ft._interval) clearInterval(this._ft._interval);
+  
+  // 2. VORSCHALT-SEQUENZ: Leitsatz einblenden
+  const timeDisplay = document.getElementById('ft-drawer-time');
+  const originalTimeColor = timeDisplay ? timeDisplay.style.color : '';
+  
+  // Deinen Leitsatz vorübergehend groß im Zeitfenster anzeigen
+  if (timeDisplay) {
+    timeDisplay.style.fontSize = '1.15rem';
+    timeDisplay.style.fontStyle = 'italic';
+    timeDisplay.style.lineHeight = '1.4';
+    timeDisplay.style.padding = '10px 0';
+    timeDisplay.textContent = '„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“';
+  }
+  
+  // Buttons während des Mantras sperren, um Fehlbedienung zu vermeiden
+  const pauseBtn = document.querySelector('#ft-drawer-timer .ft-drawer-btn');
+  if (pauseBtn) pauseBtn.disabled = true;
+
+  let vorschaltSekunden = 5;
+  this._ft.isRunning = false; // Timer läuft biologisch noch nicht
+  this._ftUpdateFokusBtn();   // Zeigt im Cockpit-Button an, dass das System sich sammelt
+  
+  // Das Vorschalt-Intervall startet
+  this._ft._interval = setInterval(() => {
+    vorschaltSekunden--;
+    
+    // Wenn die 5 Sekunden Leitsatz-Sammeln vorbei sind
+    if (vorschaltSekunden <= 0) {
+      clearInterval(this._ft._interval); // Vorschalt-Intervall stoppen
+      
+      // Anzeige wieder auf die normale Timer-Optik zurücksetzen
+      if (timeDisplay) {
+        timeDisplay.style.fontSize = '22px';
+        timeDisplay.style.fontStyle = 'normal';
+        timeDisplay.style.lineHeight = '';
+        timeDisplay.style.padding = '';
       }
-      this._ft.remainSec--;
-      this._ft.elapsed++;
+      if (pauseBtn) pauseBtn.disabled = false;
+      
+      // 3. DER ECHTE TIMER STARTET JETZT ERST MALIG
+      this._ft.isRunning = true;
       this._ftRenderTime();
       this._ftUpdateFokusBtn();
-    }, 1000);
-  },
+      
+      this._ft._interval = setInterval(() => {
+        if (this._ft.remainSec <= 0) {
+          clearInterval(this._ft._interval);
+          this._ft._interval = null;
+          this._ft.isRunning = false;
+          this._ftRenderTime();
+          this._toast('\u23F1 Zeit abgelaufen!');
+          const dr = document.getElementById('ft-drawer'); if (dr) dr.classList.remove('open');
+          this._ft.checklist = [];
+          this._ftRenderConfig();
+          this._ftUpdateFokusBtn();
+          return;
+        }
+        this._ft.remainSec--;
+        this._ft.elapsed++;
+        this._ftRenderTime();
+        this._ftUpdateFokusBtn();
+      }, 1000);
+    }
+  }, 1000);
+},
 
   _ftUpdateFokusBtn() {
     const btn = document.getElementById('ck-fokus-btn');
