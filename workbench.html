@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.5.6</title>
+  <title>WorkBench 2.5.7</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1692,6 +1692,7 @@
     .vh-item-title { font-size:15px; font-weight:600; color:var(--text); }
     .vh-item-meta  { font-size:12px; color:var(--muted); }
 
+    .tf-ev-row.storniert { opacity:0.7; }
     .tf-ev-actions { display:flex; gap:4px; flex-shrink:0; align-items:center; }
     .tf-ev-act-btn { width:26px; height:26px; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:var(--surface); cursor:pointer; font-size:12px; color:var(--muted); display:flex; align-items:center; justify-content:center; font-family:var(--font); }
     .tf-ev-act-btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
@@ -1934,7 +1935,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.5.6</div>
+  <div id="wb-startup-tagline">v2.5.7</div>
 </div>
 
 <div id="wb-app">
@@ -1946,7 +1947,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.5.6 · Build 20260618-0850</div>
+    <div id="wb-menu-version">v2.5.7 · Build 20260618-0920</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -2378,8 +2379,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.5.6',
-  APP_BUILD:   '20260618-0850',
+  APP_VERSION: '2.5.7',
+  APP_BUILD:   '20260618-0920',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2501,7 +2502,7 @@ const WB = {
     const kandidaten = [];
     // Termine aus dataPriv
     (this.dataPriv?.customEvents||[])
-      .filter(e => !e.deleted && !e.done && e.date === today && e.startTime)
+      .filter(e => !e.deleted && !e.done && !e.storniert && e.date === today && e.startTime)
       .forEach(e => {
         const [h,m] = e.startTime.split(':').map(Number);
         kandidaten.push({ startMin:h*60+m, endMin:h*60+m+this._evtDurationMin(e), title:e.text, type:'Termin', id:e.id });
@@ -3007,49 +3008,75 @@ const WB = {
     const dow    = now.getDay();
     let h = '', count = 0;
 
+    // Events: Termine (inkl. stornierte) + QuickItems mit Uhrzeit + Pflichten mit Uhrzeit
     const events = (this.dataPriv?.customEvents||[])
-      .filter(e => !e.deleted && !e.done && e.date === today)
-      .map(e => ({ ...e, _art: 'termin', _ctx: e.welt==='pro' ? 'pro' : 'priv' }));
-    // QuickItems MIT Uhrzeit → in Termin-Block
+      .filter(e => !e.deleted && e.date === today)
+      .map(e => ({ ...e, _art:'termin', _ctx: e.welt==='pro' ? 'pro' : 'priv' }));
+
+    // QuickItems MIT Uhrzeit → Termin-Block
     ['pro','priv'].forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
       (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && q.startTime).forEach(q => {
         events.push({ id:q.id, text:q.text, startTime:q.startTime, durationMin:15, welt:ctx, _art:'schnell', _ctx:ctx });
       });
     });
+
+    // Wochenpflichten MIT Uhrzeit → Termin-Block (unerledigte)
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      (db?.wochenpflichten||[]).filter(p => !p.deleted && p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
+        const done = !!(db.pflichtStatus?.[today]?.[p.id]);
+        if (done) return;
+        events.push({ id:p.id, text:p.titel, startTime:p.startTime, durationMin:30, welt:ctx, _art:'pflicht', _ctx:ctx });
+      });
+    });
+
     events.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
+
     if (events.length) {
       h += '<div class="tf-sec-sep">Termine</div>';
       events.forEach(e => {
-        const isPriv = e._ctx === 'priv';
-        const color  = isPriv ? 'var(--accent2)' : 'var(--accent)';
-        const badge  = isPriv ? '<span class="ck-badge privat">Privat</span>' : '<span class="ck-badge beruf">Beruf</span>';
+        const isPriv      = e._ctx === 'priv';
+        const color       = isPriv ? 'var(--accent2)' : 'var(--accent)';
+        const badge       = isPriv ? '<span class="ck-badge privat">Privat</span>' : '<span class="ck-badge beruf">Beruf</span>';
+        const isStorniert = !!e.storniert;
         let eMin = 0;
         if (e.startTime) { const [eh,em] = e.startTime.split(':').map(Number); eMin = eh*60+em; }
         const past = e.startTime && eMin < nowMin;
-        const dotColor = past ? 'var(--faint)' : color;
+        const dotColor = (past || isStorniert) ? 'var(--faint)' : color;
         const onclick = e._art === 'schnell'
           ? 'WB.schnellOpen(&quot;' + this._esc(e.id) + '&quot;)'
-          : 'WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)';
-        h += '<div class="tf-ev-row">'
+          : e._art === 'pflicht'
+            ? 'WB.pflichtOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._ctx + '&quot;)'
+            : 'WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)';
+        const suffix = e._art === 'schnell'
+          ? ' <span style="font-size:10px;color:var(--faint)">\u26a1</span>'
+          : e._art === 'pflicht'
+            ? ' <span style="font-size:10px;color:var(--faint)">\uD83D\uDD04</span>'
+            : '';
+        h += '<div class="tf-ev-row' + (isStorniert ? ' storniert' : '') + '">'
           + '<div class="tf-ev-dot" style="background:' + dotColor + '"></div>'
-          + '<div class="tf-ev-time' + (past ? ' past' : '') + '">' + this._esc(e.startTime||'') + '</div>'
-          + '<div class="tf-ev-text' + (past ? ' done' : '') + '" onclick="' + onclick + '" style="flex:1;cursor:pointer;">' + this._esc(e.text)
-          + (e._art==='schnell' ? ' <span style="font-size:10px;color:var(--faint)">\u26a1</span>' : '')
-          + '</div>'
-          + badge
+          + '<div class="tf-ev-time' + ((past || isStorniert) ? ' past' : '') + '">' + this._esc(e.startTime||'') + '</div>'
+          + '<div class="tf-ev-text' + ((past || isStorniert) ? ' done' : '') + '" onclick="' + onclick + '" style="flex:1;cursor:pointer;' + (isStorniert ? 'text-decoration:line-through;color:var(--faint);' : '') + '">'
+          + this._esc(e.text) + suffix + '</div>'
+          + (isStorniert
+            ? '<span class="ck-badge" style="background:var(--surface2);color:var(--faint);border:1px solid var(--border);">Abgesagt</span>'
+            : badge)
           + '<div class="tf-ev-actions">'
-          + '<button class="tf-ev-act-btn" title="Erledigt" onclick="event.stopPropagation();WB._tfTerminDone(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2713</button>'
-          + '<button class="tf-ev-act-btn tf-ev-act-del" title="Absagen" onclick="event.stopPropagation();WB._tfTerminAbsagen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2715</button>'
+          + (!isStorniert
+            ? '<button class="tf-ev-act-btn" title="Erledigt" onclick="event.stopPropagation();WB._tfTerminDone(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2713</button>'
+              + '<button class="tf-ev-act-btn tf-ev-act-del" title="Absagen" onclick="event.stopPropagation();WB._tfTerminAbsagen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2715</button>'
+            : '')
           + '</div></div>';
         count++;
       });
     }
 
+    // Wochenpflichten OHNE Uhrzeit
     const pflichten = [];
     ['pro','priv'].forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
-      (db?.wochenpflichten||[]).filter(p => !p.deleted && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
+      (db?.wochenpflichten||[]).filter(p => !p.deleted && !p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
         const done = !!(db.pflichtStatus?.[today]?.[p.id]);
         pflichten.push({...p, _ctx: ctx, done});
       });
@@ -3061,9 +3088,7 @@ const WB = {
         const doneBadge = p.done ? '<span class="ck-badge pflicht">erledigt</span>' : badge;
         h += '<div class="tf-pfl-row" onclick="WB._woPflichtToggle(&quot;' + this._esc(p.id) + '&quot;,&quot;' + today + '&quot;,&quot;' + p._ctx + '&quot;)">'
           + '<div class="tf-pfl-check' + (p.done ? ' done' : '') + '">' + (p.done ? '\u2713' : '') + '</div>'
-          + '<div class="tf-pfl-text' + (p.done ? ' done' : '') + '">' + this._esc(p.titel)
-          + (p.startTime ? '<span style="font-size:11px;color:var(--accent);font-weight:700;margin-left:6px;">' + this._esc(p.startTime) + '</span>' : '')
-          + '</div>'
+          + '<div class="tf-pfl-text' + (p.done ? ' done' : '') + '">' + this._esc(p.titel) + '</div>'
           + doneBadge
           + '<div style="padding:2px 6px;font-size:13px;color:var(--faint);cursor:pointer;" onclick="event.stopPropagation();WB.pflichtOpen(&quot;' + this._esc(p.id) + '&quot;,&quot;' + p._ctx + '&quot;)" title="Bearbeiten">&#x270F;</div>'
           + '</div>';
@@ -3071,6 +3096,7 @@ const WB = {
       });
     }
 
+    // Schnell-Erinnerungen OHNE Uhrzeit
     const schnell = [];
     ['pro','priv'].forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
@@ -3920,7 +3946,7 @@ const WB = {
 
       // Alle Termine aus dataPriv (dort alle gespeichert)
       const events = (this.dataPriv?.customEvents || [])
-        .filter(e => !e.deleted && e.date === dateStr && !e.done)
+        .filter(e => !e.deleted && e.date === dateStr && (!e.done || e.storniert))
         .map(e => ({ ...e, _art: 'termin', _ctx: e.welt === 'pro' ? 'pro' : 'priv' }));
       // QuickItems mit Uhrzeit in Events einmischen
       ['pro','priv'].forEach(ctx => {
@@ -4080,7 +4106,7 @@ const WB = {
 
         // Termine aus dataPriv + QuickItems mit Uhrzeit
         const events = (this.dataPriv?.customEvents||[])
-          .filter(e => !e.deleted && e.date === dateStr && e.startTime && !e.done)
+          .filter(e => !e.deleted && e.date === dateStr && e.startTime && (!e.done || e.storniert))
           .map(e => {
             const [eh,em] = e.startTime.split(':').map(Number);
             return { ...e, _art:'termin', _ctx: e.welt==='pro' ? 'pro' : 'priv', _startMin: eh*60+em, _endMin: eh*60+em + this._evtDurationMin(e) };
@@ -4260,7 +4286,7 @@ const WB = {
 
         // Alle Termine aus dataPriv (dort alle gespeichert)
         const events = (this.dataPriv?.customEvents||[])
-          .filter(e => !e.deleted && e.date === dateStr && e.startTime && !e.done)
+          .filter(e => !e.deleted && e.date === dateStr && e.startTime && (!e.done || e.storniert))
           .map(e => {
             const [eh,em] = e.startTime.split(':').map(Number);
             return {
@@ -4434,18 +4460,29 @@ const WB = {
   },
 
   _tfTerminAbsagen(id, art) {
-    if (!confirm(art==='schnell' ? 'Erinnerung l\u00f6schen?' : 'Termin absagen?')) return;
+    if (!confirm(art === 'schnell' ? 'Erinnerung absagen?' : 'Termin absagen?')) return;
+    const today = this._dStr(new Date());
     if (art === 'schnell') {
       ['pro','priv'].forEach(ctx => {
         const db = ctx==='pro' ? this.dataPro : this.dataPriv;
         const q  = (db?.quickItems||[]).find(x => x.id === id);
-        if (q) { q.deleted=true; q.updatedAt=this._now(); }
+        if (q) { q.storniert=true; q.done=true; q.updatedAt=this._now(); }
+      });
+    } else if (art === 'pflicht') {
+      ['pro','priv'].forEach(ctx => {
+        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const p  = (db?.wochenpflichten||[]).find(x => x.id === id);
+        if (p) {
+          if (!db.pflichtStatus) db.pflichtStatus = {};
+          if (!db.pflichtStatus[today]) db.pflichtStatus[today] = {};
+          db.pflichtStatus[today][id] = 'storniert';
+        }
       });
     } else {
       const e = (this.dataPriv?.customEvents||[]).find(x => x.id === id);
-      if (e) { e.deleted=true; e.updatedAt=this._now(); }
+      if (e) { e.storniert=true; e.updatedAt=this._now(); }
     }
-    this.setDirty(); this._tfRenderHeute(); this._toast('Gel\u00f6scht');
+    this.setDirty(); this._tfRenderHeute(); this._toast('Termin abgesagt');
   },
 
   _tfSchnellCheck(id, ctx) {
