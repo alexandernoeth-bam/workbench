@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.6.3</title>
+  <title>WorkBench 2.6.4</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1311,9 +1311,6 @@
     #wb-menu-btn { width: 32px; height: 32px; border-radius: var(--radius-sm); background: none; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--muted); flex-shrink: 0; }
     #wb-menu-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
     /* ── Büromodus Button ── */
-    #wb-buero-btn { padding: 4px 10px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 5px; font-family: var(--font); }
-    #wb-buero-btn.visible { display: flex; }
-    #wb-buero-btn.aktiv   { background: var(--accent); color: #fff; border-color: var(--accent); }
     /* ── Modal / Dialog System ── */
     #wb-modal-overlay {
       position: fixed; inset: 0; z-index: 800;
@@ -1496,9 +1493,6 @@
        ══════════════════════════════ */
 
     /* Schritt 3 — Header Büro-Button */
-    #wb-buero-btn { padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface); color: var(--muted); display: none; align-items: center; gap: 5px; white-space: nowrap; min-height: 36px; }
-    #wb-buero-btn.visible { display: flex; }
-    #wb-buero-btn.aktiv { background: var(--accent); color: #fff; border-color: var(--accent); }
     #wb-oauth-banner { font-size: 13px; padding: 10px 12px; display: none; align-items: center; gap: 8px; flex-shrink: 0; }
     #wb-oauth-banner.visible { display: flex; }
 
@@ -1697,6 +1691,11 @@
     .tf-ev-act-btn { width:26px; height:26px; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:var(--surface); cursor:pointer; font-size:12px; color:var(--muted); display:flex; align-items:center; justify-content:center; font-family:var(--font); }
     .tf-ev-act-btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
     .tf-ev-act-del:hover { background:var(--danger); border-color:var(--danger); }
+    /* ── Aufgaben Checkbox 3-Zustände ── */
+    .aufg-ring { width:20px; height:20px; flex-shrink:0; cursor:pointer; }
+    .aufg-ring svg { width:20px; height:20px; }
+    .aufg-chk { width:20px; height:20px; border-radius:5px; border:2px solid var(--border); flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:11px; background:var(--surface); }
+    .aufg-chk.done { background:var(--accent); border-color:var(--accent); color:#fff; }
     /* ── Papierkorb ── */
     #s-papierkorb-liste { display:flex; flex-direction:column; gap:0; }
     .s-pk-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:0.5px solid var(--border); min-height:48px; }
@@ -1969,7 +1968,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.6.3</div>
+  <div id="wb-startup-tagline">v2.6.4</div>
 </div>
 
 <div id="wb-app">
@@ -1981,14 +1980,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.6.3 · Build 20260618-1400</div>
-    <button id="wb-buero-btn" onclick="WB._bueroToggle()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="2" y="7" width="20" height="14" rx="2"/>
-        <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
-      </svg>
-      B&uuml;ro
-    </button>
+    <div id="wb-menu-version">v2.6.4 · Build 20260618-1500</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2414,8 +2406,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.6.3',
-  APP_BUILD:   '20260618-1400',
+  APP_VERSION: '2.6.4',
+  APP_BUILD:   '20260618-1500',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2752,6 +2744,50 @@ const WB = {
     this._ckSaveTimer = setTimeout(() => { this._ckSaveEntry(); }, 1500);
   },
 
+  _aufgabeRing(clDone, clTotal) {
+    const pct = clTotal > 0 ? clDone / clTotal : 0;
+    const r = 8, circ = 2 * Math.PI * r;
+    const dash = pct * circ, gap = circ - dash;
+    return '<svg viewBox="0 0 20 20" class="aufg-ring">'
+      + '<circle cx="10" cy="10" r="' + r + '" fill="none" stroke="var(--border)" stroke-width="2"/>'
+      + '<circle cx="10" cy="10" r="' + r + '" fill="none" stroke="var(--accent)" stroke-width="2"'
+      + ' stroke-dasharray="' + dash.toFixed(2) + ' ' + gap.toFixed(2) + '"'
+      + ' stroke-linecap="round" transform="rotate(-90 10 10)"/>'
+      + '<circle cx="10" cy="10" r="3" fill="var(--accent)" opacity="0.4"/>'
+      + '</svg>';
+  },
+
+  _aufgabeZustand(a) {
+    const cl = a.checklist || [];
+    const clDone = cl.filter(c => c.done).length;
+    if (a.done) return 'done';
+    if (cl.length > 0 && clDone > 0) return 'laeuft';
+    return 'offen';
+  },
+
+  _aufgabeChkHtml(a, vorhabenId, ctx) {
+    const zustand = this._aufgabeZustand(a);
+    const cl = a.checklist || [];
+    const clDone = cl.filter(c => c.done).length;
+    const onclick = 'event.stopPropagation();WB._aufgabeDone(&quot;' + this._esc(vorhabenId) + '&quot;,&quot;' + this._esc(a.id) + '&quot;,&quot;' + ctx + '&quot;)';
+    if (zustand === 'done') {
+      return '<div class="aufg-chk done" onclick="' + onclick + '">\u2713</div>';
+    } else if (zustand === 'laeuft') {
+      return '<div onclick="' + onclick + '">' + this._aufgabeRing(clDone, cl.length) + '</div>';
+    } else {
+      return '<div class="aufg-chk" onclick="' + onclick + '"></div>';
+    }
+  },
+
+  _aufgabeDone(vorhabenId, aufgabeId, ctx) {
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv; if (!db) return;
+    const v = (db.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
+    const a = (v.aufgaben||[]).find(x => x.id === aufgabeId); if (!a) return;
+    a.done = !a.done; a.updatedAt = this._now();
+    if (a.done) (a.checklist||[]).forEach(c => { c.done = true; });
+    this.setDirty(); this.renderSection(this.activeTab);
+  },
+
   _ckSaveEntry() {
     const area = document.getElementById('ck-editor-area'); if (!area) return;
     const html = area.innerHTML?.trim() || '';
@@ -2760,8 +2796,9 @@ const WB = {
     const now   = new Date();
     const ts    = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
     if (!this._ckSessionId) this._ckSessionId = 'ck_' + Date.now();
-    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-    const db  = ctx==='pro' ? this.dataPro : this.dataPriv; if (!db) return;
+    // Cockpit-Editor speichert immer in Privat
+    const ctx = 'priv';
+    const db  = this.dataPriv; if (!db) return;
     if (!db.tagesprotokoll) db.tagesprotokoll = [];
     let entry = db.tagesprotokoll.find(e => e.date === today && e._sessionId === this._ckSessionId);
     if (!entry) {
@@ -2773,24 +2810,21 @@ const WB = {
     // Bestehenden Eintrag immer aktualisieren (auch bei leerem text)
     entry.html = html; entry.text = text; entry.updatedAt = new Date().toISOString();
     this.setDirty();
-    if (text) this._toastMini('\u2713 ' + (ctx === 'pro' ? 'Beruf' : 'Privat'));
   },
 
   _ckLadeHeutigerEintrag() {
     const today = this._dStr(new Date());
     const area  = document.getElementById('ck-editor-area'); if (!area) return;
     let letzter = null;
-    ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
-      (db?.tagesprotokoll||[]).filter(e => e.date === today && !e.deleted).forEach(e => {
-        if (!letzter || (e.ts||'') > (letzter.ts||'')) letzter = e;
-      });
+    // Nur in dataPriv laden
+    const db = this.dataPriv;
+    (db?.tagesprotokoll||[]).filter(e => e.date === today && !e.deleted).forEach(e => {
+      if (!letzter || (e.ts||'') > (letzter.ts||'')) letzter = e;
     });
     if (letzter?.html) {
       area.innerHTML = letzter.html;
       this._ckSessionId = letzter._sessionId || letzter.id;
     } else {
-      // Neu: SessionId vorab setzen
       this._ckSessionId = 'ck_' + Date.now();
     }
   },
@@ -2810,6 +2844,11 @@ const WB = {
 
   _ckDialogClose() {
     const overlay = document.getElementById('ck-dialog-overlay'); if (overlay) overlay.classList.remove('open');
+  },
+
+  _ckSplitText(text) {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    return { titel: lines[0] || '', notiz: lines.slice(1).join('\n').trim() };
   },
 
   _ckDialogKlassify(type) {
@@ -2861,37 +2900,65 @@ const WB = {
     // ── Klassifizierung ──
     switch(type) {
       case 'aufgabe': {
+        const { titel, notiz } = this._ckSplitText(text);
         const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
         const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
         if (!db) break;
         if (!db.quickItems) db.quickItems = [];
-        db.quickItems.push({ id:'q_'+Date.now(), text, date:'', done:false, deleted:false, updatedAt:this._now() });
-        this.setDirty(); this._toast('\u2713 Als Aufgabe gespeichert'); break;
+        db.quickItems.push({ id:'q_'+Date.now(), text:titel, notiz, date:'', done:false, deleted:false, updatedAt:this._now() });
+        this.setDirty(); this._toast('\u2713 Aufgabe: ' + titel.slice(0,30)); break;
       }
       case 'termin':
-        setTimeout(() => { this.terminOpen(null,'priv'); setTimeout(() => { const t = document.getElementById('wb-f-text'); if(t) t.value = text; }, 80); }, 100); break;
+        setTimeout(() => {
+          const { titel, notiz } = this._ckSplitText(text);
+          this.terminOpen(null,'priv');
+          setTimeout(() => {
+            const t = document.getElementById('wb-f-text'); if(t) t.value = titel;
+            const n = document.getElementById('wb-f-notiz'); if(n) n.value = notiz;
+          }, 80);
+        }, 100); break;
       case 'vorhaben': {
+        const { titel, notiz } = this._ckSplitText(text);
         const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
         const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
         if (!db) break;
         if (!db.vorhaben) db.vorhaben = [];
-        db.vorhaben.push({ id:'v_'+Date.now(), titel:text, aktiv:true, fokus:false, notiz:'', stichtag:'', welt:ctx, aufgaben:[], links:[], updatedAt:this._now() });
-        this.setDirty(); this._toast('\u2713 Als Vorhaben angelegt'); break;
+        db.vorhaben.push({ id:'v_'+Date.now(), titel, notiz, aktiv:true, fokus:false, stichtag:'', welt:ctx, aufgaben:[], links:[], updatedAt:this._now() });
+        this.setDirty(); this._toast('\u2713 Vorhaben: ' + titel.slice(0,30)); break;
       }
       case 'schnell': {
+        const { titel, notiz } = this._ckSplitText(text);
         const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
         const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
         if (!db) break;
         if (!db.quickItems) db.quickItems = [];
-        db.quickItems.push({ id:'q_'+Date.now(), text, date:'', done:false, deleted:false, updatedAt:this._now() });
-        this.setDirty(); this._toast('\u2713 Als Schnell-Erinnerung gespeichert'); break;
+        db.quickItems.push({ id:'q_'+Date.now(), text:titel, notiz, date:'', startTime:'', done:false, deleted:false, updatedAt:this._now() });
+        this.setDirty(); this._toast('\u2713 Erinnerung: ' + titel.slice(0,30)); break;
       }
       case 'pflicht':
-        setTimeout(() => { const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv'; this.pflichtOpen(null, ctx); setTimeout(() => { const t = document.getElementById('wb-f-text'); if(t) t.value = text; }, 80); }, 100); break;
+        setTimeout(() => {
+          const { titel } = this._ckSplitText(text);
+          const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
+          this.pflichtOpen(null, ctx);
+          setTimeout(() => { const t = document.getElementById('wb-f-text'); if(t) t.value = titel; }, 80);
+        }, 100); break;
       case 'ziel':
-        setTimeout(() => { const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv'; this.zielOpen(null, ctx); setTimeout(() => { const t = document.getElementById('wb-f-text'); if(t) t.value = text; }, 80); }, 100); break;
+        setTimeout(() => {
+          const { titel } = this._ckSplitText(text);
+          const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
+          this.zielOpen(null, ctx);
+          setTimeout(() => { const t = document.getElementById('wb-f-text'); if(t) t.value = titel; }, 80);
+        }, 100); break;
       case 'ressource':
-        setTimeout(() => { const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv'; this.linkOpen(null, null, ctx); setTimeout(() => { const u = document.getElementById('wb-f-url'); if(u) u.value = text; }, 80); }, 100); break;
+        setTimeout(() => {
+          const { titel, notiz } = this._ckSplitText(text);
+          const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
+          this.linkOpen(null, null, ctx);
+          setTimeout(() => {
+            const u = document.getElementById('wb-f-url'); if(u) u.value = titel;
+            const n = document.getElementById('wb-f-notiz'); if(n) n.value = notiz;
+          }, 80);
+        }, 100); break;
       case 'loeschen': this._toast('Eintrag gel\u00f6scht'); break;
     }
   },
@@ -3189,7 +3256,7 @@ const WB = {
     el.innerHTML = items.map(a => {
       const badge = a._ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
       return '<div class="tf-dead-row" onclick="WB.aufgabeOpen(&quot;' + this._esc(a._vorhabenId) + '&quot;,&quot;' + this._esc(a.id) + '&quot;,&quot;' + a._ctx + '&quot;)">'
-        + '<div class="tf-dead-check"></div>'
+        + this._aufgabeChkHtml(a, a._vorhabenId, a._ctx)
         + '<div class="tf-dead-body"><div class="tf-dead-text">' + this._esc(a.text) + '</div>'
         + '<div class="tf-dead-vh">' + this._esc(a._vorhabenTitel)
         + (a._clTotal > 0 ? ' \u00b7 ' + a._clDone + '/' + a._clTotal : '')
@@ -3227,6 +3294,7 @@ const WB = {
         ? 'WB.schnellOpen(&quot;'+this._esc(item.id)+'&quot;)'
         : 'WB.aufgabeOpen(&quot;'+this._esc(item._vorhabenId)+'&quot;,&quot;'+this._esc(item.id)+'&quot;,&quot;'+item._ctx+'&quot;)';
       return '<div class="tf-ueber-row" onclick="' + onclick + '">'
+        + (item._type === 'aufgabe' ? this._aufgabeChkHtml(item, item._vorhabenId, item._ctx) : '')
         + '<div class="tf-ueber-body"><div class="tf-ueber-text">' + this._esc(item.text) + '</div>'
         + '<div class="tf-ueber-sub">' + this._esc(item.sub)
         + (item._clTotal > 0 ? ' \u00b7 ' + item._clDone + '/' + item._clTotal : '')
@@ -3475,7 +3543,7 @@ const WB = {
         const clDone   = (a.checklist||[]).filter(c=>c.done).length;
         const naechster = (a.checklist||[]).find(c=>!c.done)?.text || '';
         h += '<div class="vh-alle-row" onclick="WB.aufgabeOpen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + this._esc(a.id) + '&quot;,&quot;' + ctx + '&quot;)">'
-          + '<div class="vh-alle-chk"></div>'
+          + this._aufgabeChkHtml(a, v.id, ctx)
           + '<div class="vh-alle-body">'
           + '<div class="vh-alle-txt">' + this._esc(a.text) + '</div>'
           + (naechster ? '<div class="vh-alle-sub-txt">\u2192 ' + this._esc(naechster) + '</div>' : '')
@@ -3645,7 +3713,7 @@ const WB = {
         const clDone  = cl.filter(c => c.done).length;
         const naechster = cl.find(c => !c.done)?.text || '';
         h += '<div class="vh-task-item" onclick="WB.aufgabeOpen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + this._esc(a.id) + '&quot;,&quot;' + this._esc(ctx) + '&quot;)">'
-          + '<div class="vh-task-check' + (a.done ? ' done' : '') + '">' + (a.done ? '\u2713' : '') + '</div>'
+          + this._aufgabeChkHtml(a, v.id, ctx)
           + '<div class="vh-task-body">'
           + '<div class="vh-task-title-row">'
           + '<div class="vh-task-text' + (a.done ? ' done' : '') + '">' + this._esc(a.text) + '</div>'
@@ -5295,8 +5363,7 @@ const WB = {
     await this._sLoadSettings();
     this._weltInit();
 
-    const bueroBtn = document.getElementById('wb-buero-btn');
-    if (bueroBtn) bueroBtn.classList.toggle('visible', this._weltIstArbeitstag());
+    // Büro-Button entfernt
 
     // OAuth Status prüfen
     this._oauthCheckToken();
@@ -6921,21 +6988,9 @@ const WB = {
   /* ── Büromodus ── */
   _bueroAktiv: false,
 
-  _bueroToggle() {
-    this._bueroAktiv = !this._bueroAktiv;
-    this._bueroUpdateUI();
-    this.renderSection(this.activeTab);
-  },
+  _bueroToggle() { /* Button entfernt — no-op */ },
 
-  _bueroUpdateUI() {
-    const btn = document.getElementById('wb-buero-btn');
-    if (btn) {
-      btn.classList.toggle('aktiv', this._bueroAktiv);
-      btn.title = this._bueroAktiv
-        ? 'B\u00fcromodus aktiv \u2013 klicken zum Deaktivieren'
-        : 'B\u00fcromodus aktivieren';
-    }
-  },
+  _bueroUpdateUI() { /* Button entfernt — no-op */ },
 
   _bueroIstPrivatSichtbar() {
     if (this._bueroAktiv) return false;
