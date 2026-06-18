@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.7.2</title>
+  <title>WorkBench 2.7.4</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -770,10 +770,7 @@
       font-size: 16px; font-weight: 600; cursor: pointer; text-align: center;
     }
     /* ── Badge ── */
-    .vh-badge {
-      display: inline-flex; padding: 2px 7px;
-      border-radius: 10px; font-size: 13px; font-weight: 700;
-    }
+    .vh-badge { display:inline-flex; align-items:center; padding:2px 6px; border-radius:8px; font-size:10px; font-weight:700; flex-shrink:0; white-space:nowrap; }
     .vh-badge.beruf  { background: var(--accent);  color: #fff; }
     .vh-badge.privat { background: var(--accent2); color: #fff; }
     .vh-badge.warn   { background: var(--danger);  color: #fff; }
@@ -1749,6 +1746,18 @@
     .vh-ctx-item:last-child { border-bottom:none; }
     .vh-ctx-item:hover { background:var(--surface2); }
     .vh-ctx-item.danger { color:var(--danger); }
+    /* ── Vorhaben Ziel-Verknüpfung ── */
+    .vh-ziel-zeile { display:flex; align-items:center; gap:7px; margin-top:7px; padding-top:7px; border-top:0.5px solid var(--border); }
+    .vh-ziel-ic { font-size:15px; color:var(--faint); flex-shrink:0; }
+    .vh-ziel-text { font-size:14px; color:var(--faint); flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .vh-ziel-text.gesetzt { color:var(--accent); font-weight:600; }
+    .vh-ziel-btn { font-size:13px; font-weight:600; color:var(--accent); background:none; border:none; cursor:pointer; font-family:var(--font); white-space:nowrap; flex-shrink:0; padding:0; }
+    .vh-ziel-btn.loesen { color:var(--faint); }
+    /* ── Vorhaben Welt-Toggle ── */
+    .vh-welt-toggle { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:14px; font-weight:700; cursor:pointer; border:none; font-family:var(--font); flex-shrink:0; }
+    .vh-welt-toggle.beruf { background:var(--accent); color:#fff; }
+    .vh-welt-toggle.privat { background:var(--accent2); color:#fff; }
+    .vh-welt-toggle-arrow { font-size:10px; opacity:0.8; }
     /* ── Vorhaben Status-Zustände ── */
     .vh-status-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid; font-family:var(--font); background:none; }
     .vh-status-pill.offen { color:var(--faint); border-color:var(--border); }
@@ -2060,7 +2069,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.7.2</div>
+  <div id="wb-startup-tagline">v2.7.4</div>
 </div>
 
 <div id="wb-app">
@@ -2072,7 +2081,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.7.2 · Build 20260618-2200</div>
+    <div id="wb-menu-version">v2.7.4 · Build 20260618-2330</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2499,8 +2508,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.7.2',
-  APP_BUILD:   '20260618-2200',
+  APP_VERSION: '2.7.4',
+  APP_BUILD:   '20260618-2330',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3061,7 +3070,7 @@ _ftStart() {
         const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
         if (!db) break;
         if (!db.vorhaben) db.vorhaben = [];
-        db.vorhaben.push({ id:'v_'+Date.now(), titel, notiz, status:'aktiv', charakter:'bereichernd', aktiv:true, fokus:false, stichtag:'', welt:ctx, aufgaben:[], links:[], updatedAt:this._now() });
+        db.vorhaben.push({ id:'v_'+Date.now(), titel, notiz, status:'aktiv', charakter:'bereichernd', zielId:null, aktiv:true, fokus:false, stichtag:'', welt:ctx, aufgaben:[], links:[], updatedAt:this._now() });
         this.setDirty(); this._toast('\u2713 Vorhaben: ' + titel.slice(0,30)); break;
       }
       case 'schnell': {
@@ -3774,6 +3783,58 @@ _ftStart() {
     const menu = document.getElementById('vh-ctx-menu'); if (menu) menu.remove();
   },
 
+  _vhZielVerknuepfen(vorhabenId, ctx) {
+    const db    = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const v     = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
+    const ziele = (db?.ziele||[]).filter(z => !z.deleted);
+    if (!ziele.length) { this._toast('Keine Ziele vorhanden'); return; }
+    const opts = ziele.map(z => '<option value="' + this._esc(z.id) + '">' + this._esc(z.titel) + '</option>').join('');
+    const body = '<div class="wb-input-group"><label class="wb-label">Ziel w\u00e4hlen</label>'
+      + '<select id="wb-f-ziel" class="wb-select"><option value="">-- Bitte w\u00e4hlen --</option>' + opts + '</select></div>';
+    this._modalCtx = { type: 'vhZiel', vorhabenId, ctx };
+    this.modalOpen('Ziel verkn\u00fcpfen', body, this._modalFooter(false, false));
+  },
+
+  _savVhZiel(c) {
+    const zielId = document.getElementById('wb-f-ziel')?.value || '';
+    if (!zielId) { this._toast('Bitte Ziel w\u00e4hlen'); return; }
+    const db = c.ctx==='pro' ? this.dataPro : this.dataPriv;
+    const v  = (db?.vorhaben||[]).find(x => x.id === c.vorhabenId); if (!v) return;
+    v.zielId = zielId; v.updatedAt = this._now();
+    this.setDirty(); this.modalClose();
+    this._vhRenderDetail(c.vorhabenId, c.ctx);
+    this._toast('\u2713 Ziel verkn\u00fcpft');
+  },
+
+  _vhZielLoesen(vorhabenId, ctx) {
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
+    v.zielId = null; v.updatedAt = this._now();
+    this.setDirty(); this._vhRenderDetail(vorhabenId, ctx);
+    this._toast('Ziel gel\u00f6st');
+  },
+
+  _vhWeltToggle(vorhabenId, ctx) {
+    const newCtx  = ctx === 'pro' ? 'priv' : 'pro';
+    const newWelt = newCtx === 'pro' ? 'Beruf' : 'Privat';
+    const oldWelt = ctx   === 'pro' ? 'Beruf' : 'Privat';
+    if (!confirm('Vorhaben von ' + oldWelt + ' nach ' + newWelt + ' verschieben?')) return;
+    const oldDb = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const newDb = newCtx === 'pro' ? this.dataPro : this.dataPriv;
+    if (!oldDb || !newDb) return;
+    const v = (oldDb?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
+    // Soft-delete in alter DB, Kopie in neue DB
+    this._softDelete(v);
+    const copy = { ...v, deleted: false, deletedAt: undefined, welt: newCtx === 'pro' ? 'pro' : 'priv', updatedAt: this._now() };
+    if (!newDb.vorhaben) newDb.vorhaben = [];
+    newDb.vorhaben.push(copy);
+    this.activeWorld = newCtx === 'pro' ? 'beruf' : 'privat';
+    this._vhAktivId  = vorhabenId;
+    this._vhAktivCtx = newCtx;
+    this.setDirty(); this.renderSection('vorhaben');
+    this._toast('\u2713 Nach ' + newWelt + ' verschoben');
+  },
+
   _vhZustand(v) {
     if (v.status === 'abgeschlossen') return 'done';
     if (v.status === 'archiviert')    return 'archiviert';
@@ -4017,21 +4078,45 @@ _ftStart() {
       const statusPill = '<button class="vh-status-pill ' + zustand + '"'
         + ' onclick="WB._vhMenuToggle(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">'
         + pillIcon + pillLabel + '</button>';
+
+      // Zeile 1: Titel + Menü (kein Badge — Welt-Toggle macht das)
       const row1 = '<div class="vh-det-row1">'
         + '<div class="vh-det-title">' + this._esc(v.titel) + '</div>'
-        + badge
         + '<button class="vh-menu-btn" onclick="WB._vhMenuToggle(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">\u22ef</button>'
         + '</div>';
-      const row2 = '<div class="vh-det-row2">' + statusPill + this._vhCharPillHtml(v, v.id, ctx) + '</div>';
-      subEl.innerHTML = row1 + row2;
+
+      // Zeile 2: Welt-Toggle + Status-Pill + Charakter-Pill
+      const weltCls   = ctx === 'pro' ? 'beruf' : 'privat';
+      const weltLabel = ctx === 'pro' ? 'Beruf' : 'Privat';
+      const weltToggle = '<button class="vh-welt-toggle ' + weltCls + '"'
+        + ' onclick="WB._vhWeltToggle(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">'
+        + weltLabel + ' <span class="vh-welt-toggle-arrow">\u21c4</span></button>';
+      const row2 = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;margin-top:5px;">'
+        + weltToggle + statusPill + this._vhCharPillHtml(v, v.id, ctx)
+        + '</div>';
+
+      // Ziel-Zeile
+      const db2  = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const ziel = v.zielId ? (db2?.ziele||[]).find(z => z.id === v.zielId && !z.deleted) : null;
+      const zielHtml = '<div class="vh-ziel-zeile">'
+        + '<span class="vh-ziel-ic">\u25ce</span>'
+        + (ziel
+          ? '<span class="vh-ziel-text gesetzt">' + this._esc(ziel.titel) + '</span>'
+            + '<button class="vh-ziel-btn loesen" onclick="WB._vhZielLoesen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">\u00d7 L\u00f6sen</button>'
+          : '<span class="vh-ziel-text">Kein Ziel verkn\u00fcpft</span>'
+            + '<button class="vh-ziel-btn" onclick="WB._vhZielVerknuepfen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">+ Verkn\u00fcpfen</button>')
+        + '</div>';
+
+      // Fortschrittsbalken
+      const progBar = alle.length > 0
+        ? '<div class="vh-prog-wrap"><div class="vh-prog-label"><span>Fortschritt</span>'
+          + '<span style="color:var(--accent);font-weight:700;">' + doneA + '/' + alle.length + ' erledigt</span></div>'
+          + '<div class="vh-prog-bar"><div class="vh-prog-fill" style="width:' + pct + '%"></div></div></div>'
+        : '';
+
+      subEl.innerHTML = row1 + row2 + zielHtml;
       const progEl = document.getElementById('vh-prog-container');
-      if (progEl) {
-        progEl.innerHTML = alle.length > 0
-          ? '<div class="vh-prog-wrap"><div class="vh-prog-label"><span>Fortschritt</span>'
-            + '<span style="color:var(--accent);font-weight:700;">' + doneA + '/' + alle.length + ' erledigt</span></div>'
-            + '<div class="vh-prog-bar"><div class="vh-prog-fill" style="width:' + pct + '%"></div></div></div>'
-          : '';
-      }
+      if (progEl) progEl.innerHTML = progBar;
     }
     this._vhRenderTabAktuell(v, ctx);
     this._vhRenderTabInfo(v, ctx);
@@ -4204,26 +4289,29 @@ _ftStart() {
     const c = this._modalCtx; if (!c || c.type !== 'vorhaben') return;
     const text = document.getElementById('wb-f-text')?.value.trim();
     if (!text) { this._toast('Titel fehlt'); return; }
-    const db = c.ctx==='pro' ? this.dataPro : this.dataPriv; if (!db) return;
-    const v  = (db?.vorhaben||[]).find(x => x.id === c.id);
-    if (v) {
-      // Welt geändert: Vorhaben in andere DB verschieben
-      if (c.ctx !== this._vhAktivCtx) {
-        const oldDb = this._vhAktivCtx==='pro' ? this.dataPro : this.dataPriv;
-        const moved = (oldDb?.vorhaben||[]).find(x => x.id === c.id);
-        if (moved) {
-          // Soft-delete in alter DB, Kopie in neue DB
-          this._softDelete(moved);
-          const copy = { ...moved, deleted:false, deletedAt:undefined, welt:c.ctx, titel:text, updatedAt:this._now() };
-          if (!db.vorhaben) db.vorhaben = [];
-          db.vorhaben.push(copy);
-        }
-      } else {
-        v.titel = text; v.updatedAt = this._now();
-      }
+
+    // Vorhaben immer aus dem originalen ctx laden (wo es aktuell liegt)
+    const originalCtx = this._vhAktivCtx || c.ctx;
+    const originalDb  = originalCtx==='pro' ? this.dataPro : this.dataPriv;
+    const v = (originalDb?.vorhaben||[]).find(x => x.id === c.id);
+    if (!v) { this._toast('Vorhaben nicht gefunden'); return; }
+
+    if (c.ctx !== originalCtx) {
+      // Welt geändert: soft-delete in alter DB + neue Kopie in Ziel-DB
+      this._softDelete(v);
+      const targetDb = c.ctx==='pro' ? this.dataPro : this.dataPriv;
+      if (!targetDb) return;
+      if (!targetDb.vorhaben) targetDb.vorhaben = [];
+      const copy = { ...v, id: 'v_' + Date.now(), deleted: false, deletedAt: undefined,
+                     welt: c.ctx, titel: text, updatedAt: this._now() };
+      targetDb.vorhaben.push(copy);
+      this._vhAktivId  = copy.id;
+      this._vhAktivCtx = c.ctx;
+    } else {
+      v.titel = text; v.updatedAt = this._now();
     }
+
     this.setDirty(); this.modalClose();
-    this._vhAktivCtx = c.ctx;
     this.renderSection('vorhaben');
     this._toast('\u2713 Vorhaben gespeichert');
   },
@@ -4238,7 +4326,7 @@ _ftStart() {
     const v = {
       id: 'v_' + Date.now(),
       titel: titel.trim(),
-      status: 'aktiv', charakter: 'bereichernd', aktiv: true, fokus: false, welt: ctx,
+      status: 'aktiv', charakter: 'bereichernd', zielId: null, aktiv: true, fokus: false, welt: ctx,
       aufgaben: [], links: [],
     };
     db.vorhaben.push(v);
@@ -5357,12 +5445,13 @@ _ftStart() {
         db.pflichtStatus = newPs;
       });
 
-      // Vorhaben status-Feld + charakter-Feld Migration
+      // Vorhaben status-Feld + charakter-Feld + zielId Migration
       ['pro','priv'].forEach(ctx => {
         const db = ctx==='pro' ? this.dataPro : this.dataPriv;
         (db?.vorhaben||[]).forEach(v => {
           if (!v.status) v.status = v.aktiv !== false ? 'aktiv' : 'abgeschlossen';
           if (!v.charakter) v.charakter = 'bereichernd';
+          if (v.zielId === undefined) v.zielId = null;
         });
       });
     } catch(e) {
@@ -6910,6 +6999,7 @@ _ftStart() {
       case 'ziel':     this._savZiel(c);     break;
       case 'link':     this._savLink(c);     break;
       case 'vorlage':  this._savVorlage(c);  break;
+      case 'vhZiel':   this._savVhZiel(c);   break;
     }
   },
 
