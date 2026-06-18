@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.5.7</title>
+  <title>WorkBench 2.5.8</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1935,7 +1935,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.5.7</div>
+  <div id="wb-startup-tagline">v2.5.8</div>
 </div>
 
 <div id="wb-app">
@@ -1947,7 +1947,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.5.7 · Build 20260618-0920</div>
+    <div id="wb-menu-version">v2.5.8 · Build 20260618-1000</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -2379,8 +2379,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.5.7',
-  APP_BUILD:   '20260618-0920',
+  APP_VERSION: '2.5.8',
+  APP_BUILD:   '20260618-1000',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2735,6 +2735,7 @@ const WB = {
     }
     entry.html = html; entry.text = text; entry.updatedAt = new Date().toISOString();
     this.setDirty();
+    this._toastMini('\u2713 ' + (ctx === 'pro' ? 'Beruf' : 'Privat'));
   },
 
   _ckLadeHeutigerEintrag() {
@@ -2950,10 +2951,13 @@ const WB = {
 
   _ckCleanSlate() {
     const today = this._dStr(new Date());
+    const gd = new Date(); gd.setDate(gd.getDate() - 1);
+    const vvg = new Date(); vvg.setDate(vvg.getDate() - 2);
+    const grenze = this._dStr(vvg);
     ['pro','priv'].forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
       if (!db?.tagesprotokoll) return;
-      db.tagesprotokoll = db.tagesprotokoll.filter(e => e.date === today || !e.processed);
+      db.tagesprotokoll = db.tagesprotokoll.filter(e => e.date >= grenze || !e.processed);
     });
     this.setDirty();
   },
@@ -3149,7 +3153,9 @@ const WB = {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
       (db?.vorhaben||[]).filter(v => !v.deleted && v.aktiv!==false).forEach(v => {
         (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum === today).forEach(a => {
-          items.push({...a, _ctx: ctx, _vorhabenTitel: v.titel, _vorhabenId: v.id});
+          const clTotal = (a.checklist||[]).length;
+          const clDone  = (a.checklist||[]).filter(c=>c.done).length;
+          items.push({...a, _ctx: ctx, _vorhabenTitel: v.titel, _vorhabenId: v.id, _clTotal: clTotal, _clDone: clDone});
         });
       });
     });
@@ -3160,7 +3166,9 @@ const WB = {
       return '<div class="tf-dead-row" onclick="WB.aufgabeOpen(&quot;' + this._esc(a._vorhabenId) + '&quot;,&quot;' + this._esc(a.id) + '&quot;,&quot;' + a._ctx + '&quot;)">'
         + '<div class="tf-dead-check"></div>'
         + '<div class="tf-dead-body"><div class="tf-dead-text">' + this._esc(a.text) + '</div>'
-        + '<div class="tf-dead-vh">' + this._esc(a._vorhabenTitel) + '</div></div>'
+        + '<div class="tf-dead-vh">' + this._esc(a._vorhabenTitel)
+        + (a._clTotal > 0 ? ' \u00b7 ' + a._clDone + '/' + a._clTotal : '')
+        + '</div></div>'
         + badge + '</div>';
     }).join('');
   },
@@ -3178,7 +3186,9 @@ const WB = {
       });
       (db?.vorhaben||[]).filter(v => !v.deleted && v.aktiv!==false).forEach(v => {
         (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum && a.datum < today).forEach(a => {
-          items.push({ text:a.text, sub:'Aufgabe \u00b7 '+v.titel, date:a.datum, id:a.id, _vorhabenId:v.id, _type:'aufgabe', _ctx:ctx });
+          const clTotal = (a.checklist||[]).length;
+          const clDone  = (a.checklist||[]).filter(c=>c.done).length;
+          items.push({ text:a.text, sub:'Aufgabe \u00b7 '+v.titel, date:a.datum, id:a.id, _vorhabenId:v.id, _type:'aufgabe', _ctx:ctx, _clTotal:clTotal, _clDone:clDone });
         });
       });
     });
@@ -3187,14 +3197,15 @@ const WB = {
     if (!items.length) { el.innerHTML = '<div class="tf-empty">Nichts \u00fcberf\u00e4llig \u2713</div>'; return; }
     el.innerHTML = items.map(item => {
       const badge = item._ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
-      const dp = (item.date||'').split('-');
-      const dateFmt = dp.length >= 3 ? dp[2]+'.'+dp[1] : item.date;
+      const dateFmt = this._fmtDatum(item.date);
       const onclick = item._type==='schnell'
         ? 'WB.schnellOpen(&quot;'+this._esc(item.id)+'&quot;)'
         : 'WB.aufgabeOpen(&quot;'+this._esc(item._vorhabenId)+'&quot;,&quot;'+this._esc(item.id)+'&quot;,&quot;'+item._ctx+'&quot;)';
       return '<div class="tf-ueber-row" onclick="' + onclick + '">'
         + '<div class="tf-ueber-body"><div class="tf-ueber-text">' + this._esc(item.text) + '</div>'
-        + '<div class="tf-ueber-sub">' + this._esc(item.sub) + '</div></div>'
+        + '<div class="tf-ueber-sub">' + this._esc(item.sub)
+        + (item._clTotal > 0 ? ' \u00b7 ' + item._clDone + '/' + item._clTotal : '')
+        + '</div></div>'
         + '<div class="tf-ueber-date">' + dateFmt + '</div>'
         + badge + '</div>';
     }).join('');
@@ -3266,7 +3277,7 @@ const WB = {
   },
 
   _blRenderAufgabe(a) {
-    const datum = a.datum ? a.datum.slice(5).replace('-','.') : '';
+    const datum = this._fmtDatum(a.datum);
     const badge = a._ctx === 'pro'
       ? '<span class="bl-badge beruf">Beruf</span>'
       : '<span class="bl-badge privat">Privat</span>';
@@ -3284,7 +3295,7 @@ const WB = {
   },
 
   _blRenderSchnell(s) {
-    const datum = s.date ? s.date.slice(5).replace('-','.') : '';
+    const datum = this._fmtDatum(s.date);
     const verschoben = s.verschobenZaehler || 0;
     const badge = verschoben >= 3
       ? '<span class="bl-badge warn">! ' + (s._ctx==='pro' ? 'Beruf' : 'Privat') + '</span>'
@@ -3486,52 +3497,52 @@ const WB = {
   },
 
   _vhRenderTabAktuell(v, ctx) {
-    const el = document.getElementById('vh-tab-aktuell');
-    if (!el) return;
+    const el = document.getElementById('vh-tab-aktuell'); if (!el) return;
     const today = this._dStr(new Date());
     const db    = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    let h = '';
 
-    const naechste = (v.aufgaben||[])
-      .filter(a => !a.deleted && !a.done && (a.checklist||[]).length > 0)
-      .map(a => {
-        const offenCL = (a.checklist||[]).filter(c => !c.done);
-        return { ...a, _offen: offenCL, _naechster: offenCL[0]?.text || '' };
-      })
-      .filter(a => a._offen.length > 0);
-
-    let h = '<div class="vh-block"><div class="vh-block-head">'
-      + '<span class="vh-block-label">N\u00e4chste Schritte</span>'
-      + '<span class="vh-block-action" onclick="WB._vhAufgabeNeu(\''
-      + v.id + '\',\'' + ctx + '\')">+ Aufgabe</span></div>';
-    if (naechste.length) {
-        naechste.forEach(a => {
-        const datum = a.datum ? a.datum.slice(5).replace('-','.') : '';
-        h += '<div class="vh-task-item" onclick="WB.aufgabeOpen(&quot;' + this._esc(v.id) + '&quot;, &quot;' + this._esc(a.id) + '&quot;, &quot;' + this._esc(ctx) + '&quot;)">'
-          + '<div class="vh-task-check"></div>'
+    // Alle Aufgaben
+    const alle = (v.aufgaben||[]).filter(a => !a.deleted);
+    const doneCount = alle.filter(a => a.done).length;
+    h += '<div class="vh-block">'
+      + '<div class="vh-block-head">'
+      + '<span class="vh-block-label">Alle Aufgaben</span>'
+      + '<span class="vh-block-meta">' + doneCount + '/' + alle.length + ' erledigt</span>'
+      + '<span class="vh-block-action" onclick="WB._vhAufgabeNeu(\'' + v.id + '\',\'' + ctx + '\')">+ Aufgabe</span>'
+      + '</div>';
+    if (alle.length) {
+      alle.forEach(a => {
+        const datum   = this._fmtDatum(a.datum);
+        const cl      = a.checklist || [];
+        const clTotal = cl.length;
+        const clDone  = cl.filter(c => c.done).length;
+        const naechster = cl.find(c => !c.done)?.text || '';
+        h += '<div class="vh-task-item" onclick="WB.aufgabeOpen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + this._esc(a.id) + '&quot;,&quot;' + this._esc(ctx) + '&quot;)">'
+          + '<div class="vh-task-check' + (a.done ? ' done' : '') + '">' + (a.done ? '\u2713' : '') + '</div>'
           + '<div class="vh-task-body">'
           + '<div class="vh-task-title-row">'
-          + '<div class="vh-task-text">' + this._esc(a.text) + '</div>'
-          + '<div class="vh-task-offen">' + a._offen.length + ' offen</div></div>'
-          + (a._naechster ? '<div class="vh-task-sub">\u2192 ' + this._esc(a._naechster) + '</div>' : '')
+          + '<div class="vh-task-text' + (a.done ? ' done' : '') + '">' + this._esc(a.text) + '</div>'
+          + (clTotal > 0 ? '<div class="vh-task-offen">' + clDone + '/' + clTotal + '</div>' : '')
+          + '</div>'
+          + (naechster && !a.done ? '<div class="vh-task-sub">\u2192 ' + this._esc(naechster) + '</div>' : '')
+          + (a.startTime && !a.done ? '<div class="vh-task-sub" style="color:var(--muted)">' + a.startTime + '</div>' : '')
           + '</div>'
           + (datum ? '<div class="vh-task-date">' + datum + '</div>' : '')
           + '</div>';
       });
     } else {
-      h += '<div style="padding:12px 14px;color:var(--faint);font-size:13px;">Keine offenen Schritte.</div>';
+      h += '<div style="padding:12px 14px;color:var(--faint);font-size:13px;">Noch keine Aufgaben.</div>';
     }
     h += '</div>';
 
-    const termine = (db?.customEvents||[])
-      .filter(e => e.vorhabenId === v.id && !e.done && e.date >= today)
-      .sort((a,b) => a.date.localeCompare(b.date)).slice(0, 5);
+    // Termine
+    const termine = (db?.customEvents||[]).filter(e => e.vorhabenId === v.id && !e.deleted && !e.done && e.date >= today).sort((a,b) => a.date.localeCompare(b.date)).slice(0,5);
     if (termine.length) {
-      h += '<div class="vh-block"><div class="vh-block-head">'
-        + '<span class="vh-block-label">Termine</span></div>';
+      h += '<div class="vh-block"><div class="vh-block-head"><span class="vh-block-label">Termine</span></div>';
       termine.forEach(e => {
-        const d = e.date ? e.date.slice(5).replace('-','.') : '';
-        h += '<div class="vh-termin-item">'
-          + '<div class="vh-termin-date">' + d + '</div>'
+        const d = this._fmtDatum(e.date);
+        h += '<div class="vh-termin-item"><div class="vh-termin-date">' + d + '</div>'
           + '<div class="vh-termin-text">' + this._esc(e.text) + '</div>'
           + (e.startTime ? '<div class="vh-termin-time">' + e.startTime + '</div>' : '')
           + '</div>';
@@ -3539,40 +3550,18 @@ const WB = {
       h += '</div>';
     }
 
-    const pflichten = (db?.wochenpflichten||[]).filter(p => p.vorhabenId === v.id);
+    // Wochenpflichten
+    const pflichten = (db?.wochenpflichten||[]).filter(p => p.vorhabenId === v.id && !p.deleted);
     if (pflichten.length) {
       const kwStatus = db?.pflichtStatus?.[today] || {};
-      h += '<div class="vh-block"><div class="vh-block-head">'
-        + '<span class="vh-block-label">Wochenpflichten</span></div>';
+      h += '<div class="vh-block"><div class="vh-block-head"><span class="vh-block-label">Wochenpflichten</span></div>';
       pflichten.forEach(p => {
         const done = !!kwStatus[p.id];
-        h += '<div class="vh-pfl-item">'
-          + '<div class="vh-pfl-check' + (done ? ' done' : '') + '">'
-          + (done ? '\u2713' : '') + '</div>'
-          + '<div class="vh-pfl-text' + (done ? ' done' : '') + '">'
-          + this._esc(p.titel) + '</div></div>';
+        h += '<div class="vh-pfl-item"><div class="vh-pfl-check' + (done ? ' done' : '') + '">' + (done ? '\u2713' : '') + '</div>'
+          + '<div class="vh-pfl-text' + (done ? ' done' : '') + '">' + this._esc(p.titel) + '</div></div>';
       });
       h += '</div>';
     }
-
-    const alle = (v.aufgaben||[]);
-    const doneCount = alle.filter(a => a.done).length;
-    h += '<div class="vh-block"><div class="vh-block-head">'
-      + '<span class="vh-block-label">Alle Aufgaben</span>'
-      + '<span class="vh-block-meta">' + doneCount + '/' + alle.length + ' erledigt</span></div>';
-     alle.forEach(a => {
-      const datum = a.datum ? a.datum.slice(5).replace('-','.') : '';
-      h += '<div class="vh-task-item" onclick="WB.aufgabeOpen(&quot;' + this._esc(v.id) + '&quot;, &quot;' + this._esc(a.id) + '&quot;, &quot;' + this._esc(ctx) + '&quot;)">'
-        + '<div class="vh-task-check' + (a.done ? ' done' : '') + '">'
-        + (a.done ? '\u2713' : '') + '</div>'
-        + '<div class="vh-task-body">'
-        + '<div class="vh-task-text' + (a.done ? ' done' : '') + '">'
-        + this._esc(a.text) + '</div></div>'
-        + (datum ? '<div class="vh-task-date">' + datum + '</div>' : '')
-        + '</div>';
-    });
-    h += '</div>';
-
     el.innerHTML = h;
   },
 
@@ -5089,6 +5078,18 @@ const WB = {
       .replace(/"/g, '&quot;');
   },
 
+  _toastMini(msg) {
+    let el = document.getElementById('wb-toast-mini');
+    if (!el) {
+      el = document.createElement('div'); el.id = 'wb-toast-mini';
+      el.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:rgba(10,107,94,0.85);color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;z-index:9999;pointer-events:none;transition:opacity 0.3s;';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg; el.style.opacity = '1';
+    clearTimeout(this._toastMiniTimer);
+    this._toastMiniTimer = setTimeout(() => { el.style.opacity = '0'; }, 1500);
+  },
+
   _toast(msg, dur) {
     dur = dur || 2500;
     const t = document.createElement('div');
@@ -5100,6 +5101,14 @@ const WB = {
       t.style.opacity = '0';
       setTimeout(() => t.remove(), 200);
     }, dur);
+  },
+
+  _fmtDatum(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T12:00:00');
+    if (isNaN(d.getTime())) return dateStr;
+    const months = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    return d.getDate() + '. ' + months[d.getMonth()];
   },
 
   _dStr(d) {
