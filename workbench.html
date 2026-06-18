@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.6.4</title>
+  <title>WorkBench 2.6.5</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1355,7 +1355,8 @@
     .wb-micro-list { display: flex; flex-direction: column; gap: 8px; border: 1.5px dashed var(--border); padding: 12px; border-radius: var(--radius-sm); background: var(--bg); }
     .wb-micro-row { display: flex; align-items: center; gap: 8px; }
     .wb-micro-drag { cursor: grab; color: var(--faint); font-size: 18px; line-height: 1; user-select: none; }
-    .wb-micro-check { width: 18px; height: 18px; border: 1.5px solid var(--border); border-radius: 4px; background: var(--surface); flex-shrink: 0; }
+    .wb-micro-check { width: 18px; height: 18px; border: 1.5px solid var(--border); border-radius: 4px; background: var(--surface); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+    .wb-micro-check.done { background: var(--accent); border-color: var(--accent); color: #fff; font-size: 11px; }
     .wb-micro-input { flex: 1; border: none; border-bottom: 1px solid var(--border); border-radius: 0; padding: 4px 0; background: transparent; font-size: 14px; font-family: var(--font); color: var(--text); outline: none; }
     .wb-micro-input:focus { border-bottom-color: var(--accent); }
     .wb-micro-del { cursor: pointer; color: var(--faint); font-size: 14px; padding: 4px; }
@@ -1968,7 +1969,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.6.4</div>
+  <div id="wb-startup-tagline">v2.6.5</div>
 </div>
 
 <div id="wb-app">
@@ -1980,7 +1981,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.6.4 · Build 20260618-1500</div>
+    <div id="wb-menu-version">v2.6.5 · Build 20260618-1530</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2406,8 +2407,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.6.4',
-  APP_BUILD:   '20260618-1500',
+  APP_VERSION: '2.6.5',
+  APP_BUILD:   '20260618-1530',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6127,9 +6128,13 @@ const WB = {
     let clHtml = cl.map((c,i) =>
       '<div class="wb-micro-row">'
       + '<div class="wb-micro-drag">\u2261</div>'
-      + '<div class="wb-micro-check"></div>'
-      + '<input type="text" class="wb-micro-input" data-cl-idx="' + i + '"'
-      + ' value="' + this._esc(c.text||'') + '" placeholder="Schritt...">'
+      + '<div class="wb-micro-check' + (c.done ? ' done' : '') + '"'
+      + ' onclick="WB._modalMicroToggle(this,' + i + ')" style="cursor:pointer;'
+      + (c.done ? 'background:var(--accent);border-color:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;' : '')
+      + '">' + (c.done ? '\u2713' : '') + '</div>'
+      + '<input type="text" class="wb-micro-input' + (c.done ? ' done' : '') + '" data-cl-idx="' + i + '"'
+      + ' value="' + this._esc(c.text||'') + '" placeholder="Schritt..."'
+      + (c.done ? ' style="text-decoration:line-through;color:var(--faint);"' : '') + '>'
       + '<div class="wb-micro-del" onclick="this.parentElement.remove()">\u2715</div>'
       + '</div>'
     ).join('');
@@ -6164,11 +6169,23 @@ const WB = {
     const row = document.createElement('div');
     row.className = 'wb-micro-row';
     row.innerHTML = '<div class="wb-micro-drag">\u2261</div>'
-      + '<div class="wb-micro-check"></div>'
+      + '<div class="wb-micro-check" onclick="WB._modalMicroToggle(this,-1)" style="cursor:pointer;"></div>'
       + '<input type="text" class="wb-micro-input" placeholder="Neuer Schritt...">'
       + '<div class="wb-micro-del" onclick="this.parentElement.remove()">\u2715</div>';
     list.insertBefore(row, addBtn);
     row.querySelector('input').focus();
+  },
+
+  _modalMicroToggle(el, idx) {
+    const isDone = el.classList.toggle('done');
+    el.textContent = isDone ? '\u2713' : '';
+    const input = el.nextElementSibling;
+    if (input) {
+      input.style.textDecoration = isDone ? 'line-through' : '';
+      input.style.color = isDone ? 'var(--faint)' : '';
+    }
+    // data-cl-done für _savAufgabe merken
+    el.dataset.done = isDone ? '1' : '0';
   },
 
   /* ── Termin ── */
@@ -6502,7 +6519,14 @@ const WB = {
     const v     = (db?.vorhaben||[]).find(x => x.id === c.vorhabenId);
     if (!v) return;
     const inputs = document.querySelectorAll('#wb-micro-list .wb-micro-input');
-    const checklist = Array.from(inputs).map(i => i.value.trim()).filter(Boolean).map(t => ({text:t, done:false}));
+    const checklist = Array.from(inputs).map(inp => {
+      const text = inp.value.trim();
+      if (!text) return null;
+      // done-Status aus wb-micro-check lesen
+      const chk = inp.previousElementSibling;
+      const done = chk?.classList?.contains('done') || chk?.dataset?.done === '1' || false;
+      return { text, done };
+    }).filter(Boolean);
     if (!v.aufgaben) v.aufgaben = [];
     if (c.aufgabeId) {
       const a = v.aufgaben.find(x => x.id === c.aufgabeId);
