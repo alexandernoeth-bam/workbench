@@ -1996,8 +1996,8 @@ let f45Ok = 0, f45Fail = 0;
 if (content.includes('wb-typ-grid')) { ok('.wb-typ-grid in linkOpen() vorhanden'); f45Ok++; }
 else { fail('.wb-typ-grid fehlt'); f45Fail++; }
 const savLinkSrc = jsCode.match(/  _savLink\([\s\S]*?^  \},/m)?.[0] || '';
-if (savLinkSrc.includes('wb-typ-card.active') || savLinkSrc.includes('wb-typ-card')) { ok('_savLink() liest Typ aus .wb-typ-card'); f45Ok++; }
-else { fail('_savLink() liest Typ nicht aus .wb-typ-card'); f45Fail++; }
+if (savLinkSrc.includes('wb-typ-card') || savLinkSrc.includes("'wb-f-typ'") || savLinkSrc.includes('"wb-f-typ"')) { ok('_savLink() liest Typ'); f45Ok++; }
+else { fail('_savLink() liest Typ nicht'); f45Fail++; }
 if (f45Fail === 0) ok(f45Ok + ' Ablage+Drive-Picker Checks bestanden');
 
 // ══════════════════════════════════════════

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.7.6</title>
+  <title>WorkBench 2.7.7</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1350,6 +1350,8 @@
     .wb-label { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
     .wb-input, .wb-select { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 16px; font-family: var(--font); background: var(--surface); color: var(--text); outline: none; transition: border-color 0.2s; }
     .wb-input:focus, .wb-select:focus { border-color: var(--accent); }
+    .wb-textarea { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 16px; font-family: var(--font); background: var(--surface); color: var(--text); outline: none; transition: border-color 0.2s; }
+    .wb-textarea:focus { border-color: var(--accent); }
     .wb-input-lg { font-size: 18px !important; font-weight: 600; padding: 12px !important; border: none !important; border-bottom: 2px solid var(--border) !important; border-radius: 0 !important; background: transparent !important; }
     .wb-input-lg:focus { border-bottom-color: var(--accent) !important; outline: none; }
     .wb-row2 { display: flex; gap: 12px; }
@@ -2066,7 +2068,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.7.6</div>
+  <div id="wb-startup-tagline">v2.7.7</div>
 </div>
 
 <div id="wb-app">
@@ -2078,7 +2080,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.7.6 · Build 20260619-0010</div>
+    <div id="wb-menu-version">v2.7.7 · Build 20260619-0100</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2504,8 +2506,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.7.6',
-  APP_BUILD:   '20260619-0010',
+  APP_VERSION: '2.7.7',
+  APP_BUILD:   '20260619-0100',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -4139,11 +4141,34 @@ _ftStart() {
       h += '</div>';
     }
     el.innerHTML = h;
+
+    // Notizfeld: textarea nach innerHTML (kein HTML-Escape nötig)
+    const notizWrap = document.createElement('div');
+    notizWrap.className = 'vh-block';
+    notizWrap.innerHTML =
+      '<div class="vh-block-head"><span class="vh-block-label">Notizen</span></div>'
+      + '<textarea id="vh-notiz-area" class="wb-textarea"'
+      + ' placeholder="Freie Notizen zu diesem Vorhaben..."'
+      + ' style="min-height:90px;resize:vertical;">'
+      + this._esc(v.notiz || '')
+      + '</textarea>';
+    el.appendChild(notizWrap);
+
+    const ta = document.getElementById('vh-notiz-area');
+    if (ta) {
+      ta.addEventListener('blur', () => {
+        const db2 = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const v2  = (db2?.vorhaben||[]).find(x => x.id === v.id);
+        if (v2 && v2.notiz !== ta.value) {
+          v2.notiz = ta.value; v2.updatedAt = this._now();
+          this.setDirty();
+        }
+      });
+    }
   },
 
   _vhRenderTabInfo(v, ctx) {
-    const el = document.getElementById('vh-tab-info');
-    if (!el) return;
+    const el = document.getElementById('vh-tab-info'); if (!el) return;
     const links = (v.links || []).filter(l => !l.deleted);
     const tags  = [...new Set(links.map(l => l.tag || 'Sonstiges'))];
 
@@ -4477,10 +4502,15 @@ _ftStart() {
     const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
     welten.forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      // Links in Vorhaben
       (db?.vorhaben||[]).forEach(v => {
         (v.links||[]).filter(l => !l.deleted).forEach(l => {
           links.push({ ...l, _ctx: ctx, _vorhabenId: v.id, _vorhabenTitel: v.titel });
         });
+      });
+      // Links ohne Vorhaben (direkt in db.links)
+      (db?.links||[]).filter(l => !l.deleted).forEach(l => {
+        links.push({ ...l, _ctx: ctx, _vorhabenId: null, _vorhabenTitel: null });
       });
     });
     return links;
@@ -6880,7 +6910,23 @@ _ftStart() {
     const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
     const l  = linkId ? (v?.links||[]).find(x => x.id === linkId) : null;
+
+    // Vorhaben-Dropdown (alle aktiven Vorhaben beider DBs)
+    const alleVh = [];
+    ['pro','priv'].forEach(c => {
+      const d = c==='pro' ? this.dataPro : this.dataPriv;
+      (d?.vorhaben||[]).filter(x => !x.deleted && x.status !== 'archiviert' && x.aktiv !== false)
+        .forEach(x => alleVh.push({ id: x.id, titel: x.titel, ctx: c }));
+    });
+    const selectedVhId = vorhabenId || l?._vorhabenId || '';
+    const vhOpts = '<option value="">-- Kein Vorhaben --</option>'
+      + alleVh.map(x => '<option value="' + this._esc(x.id) + '"'
+        + (x.id === selectedVhId ? ' selected' : '') + '>'
+        + this._esc(x.titel) + ' (' + (x.ctx==='pro'?'Beruf':'Privat') + ')</option>').join('');
+
     const body = this._modalWeltTop(ctx, l?.vertraulich)
+      + '<div class="wb-input-group"><label class="wb-label">Vorhaben</label>'
+      + '<select id="wb-f-vh" class="wb-select">' + vhOpts + '</select></div>'
       + '<div class="wb-input-group"><label class="wb-label">URL / Link</label>'
       + '<input id="wb-f-url" class="wb-input" type="url" placeholder="https://..."'
       + ' style="font-family:var(--font-mono)" value="' + this._esc(l?.url||'') + '">'
@@ -7134,31 +7180,55 @@ _ftStart() {
     const text  = document.getElementById('wb-f-text')?.value.trim() || '';
     const tag   = document.getElementById('wb-f-tag')?.value.trim() || '';
     const notiz = document.getElementById('wb-f-notiz')?.value.trim() || '';
-    // Typ aus aktiver wb-typ-card lesen
-    const typCard = document.querySelector('.wb-typ-card.active');
-    let typ = 'link';
-    if (typCard) {
-      const lbl = (typCard.querySelector('.wb-typ-lbl')?.textContent||'').toLowerCase();
-      if (lbl.includes('google')) typ='gdoc';
-      else if (lbl.includes('share')) typ='sp';
-      else if (lbl.includes('onenote')) typ='on';
-      else if (lbl.includes('conflu')) typ='cf';
-      else if (lbl.includes('datei')) typ='file';
-      else typ='link';
-    }
-    const vhId = document.getElementById('wb-f-vh')?.value || '';
+    const typSel = document.getElementById('wb-f-typ')?.value || 'link';
+    const vhId  = document.getElementById('wb-f-vh')?.value || '';
     if (!text && !url) { this._toast('URL oder Name fehlt'); return; }
-    const ctx = this._modalGetWelt();
-    const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
-    if (!db) return;
-    const targetVhId = vhId || c.vorhabenId;
-    const v = targetVhId ? (db.vorhaben||[]).find(x => x.id === targetVhId) : null;
-    const arr = v ? (v.links = v.links||[]) : (db.links = db.links||[]);
+
+    // Ziel-DB aus Vorhaben oder aktiver Welt bestimmen
+    let targetCtx = this._modalGetWelt();
+    let targetVhId = vhId || c.vorhabenId;
+    let targetDb = null, targetV = null;
+
+    if (targetVhId) {
+      // Vorhaben in beiden DBs suchen
+      for (const ctx of ['pro','priv']) {
+        const d = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const found = (d?.vorhaben||[]).find(x => x.id === targetVhId);
+        if (found) { targetDb = d; targetCtx = ctx; targetV = found; break; }
+      }
+    }
+    if (!targetDb) {
+      targetDb = targetCtx==='pro' ? this.dataPro : this.dataPriv;
+    }
+    if (!targetDb) return;
+
+    const arr = targetV
+      ? (targetV.links = targetV.links||[])
+      : (targetDb.links = targetDb.links||[]);
+
     if (c.linkId) {
-      const item = arr.find(x => x.id === c.linkId);
-      if (item) { item.url=url; item.titel=text; item.type=typ; item.tag=tag; item.notiz=notiz; item.updatedAt=this._now(); }
+      // Bearbeiten: in alter Position suchen
+      let item = arr.find(x => x.id === c.linkId);
+      if (!item) {
+        // Fallback: alte Vorhaben-DB
+        const oldDb = c.ctx==='pro' ? this.dataPro : this.dataPriv;
+        const oldV  = (oldDb?.vorhaben||[]).find(x => x.id === c.vorhabenId);
+        item = (oldV?.links||[]).find(x => x.id === c.linkId);
+        if (!item) item = (oldDb?.links||[]).find(x => x.id === c.linkId);
+        // Wenn Vorhaben gewechselt: aus alter DB entfernen, in neue einfügen
+        if (item && (targetVhId !== c.vorhabenId || targetCtx !== c.ctx)) {
+          this._softDelete(item);
+          arr.push({ id:'l_'+Date.now(), url, titel:text, type:typSel, tag, notiz, updatedAt:this._now() });
+          this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
+          this._toast('\u2713 Ressource gespeichert');
+          return;
+        }
+        if (item) { item.url=url; item.titel=text; item.type=typSel; item.tag=tag; item.notiz=notiz; item.updatedAt=this._now(); }
+      } else {
+        item.url=url; item.titel=text; item.type=typSel; item.tag=tag; item.notiz=notiz; item.updatedAt=this._now();
+      }
     } else {
-      arr.push({ id:'l_'+Date.now(), url, titel:text, type:typ, tag, notiz, updatedAt:this._now() });
+      arr.push({ id:'l_'+Date.now(), url, titel:text, type:typSel, tag, notiz, updatedAt:this._now() });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('\u2713 Ressource gespeichert');
