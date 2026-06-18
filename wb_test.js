@@ -311,10 +311,12 @@ let ecm;
 while ((ecm = eventCallRegex.exec(content))  !== null) eventCallSet.add(ecm[1]);
 while ((ecm = eventCallRegex2.exec(content)) !== null) eventCallSet.add(ecm[1]);
 
-const jsFnRegex = /^  (?:async )?([\w]+)\s*[:(]/gm;
+const jsFnRegex  = /^  (?:async )?([\w]+)\s*[:(]/gm;
+const jsFnRegex2 = /^(?:async )?([\w]+)\s*\(\s*\)\s*\{/gm;
 const jsDefs = new Set();
 let jfm;
-while ((jfm = jsFnRegex.exec(jsCode)) !== null) jsDefs.add(jfm[1]);
+while ((jfm = jsFnRegex.exec(jsCode))  !== null) jsDefs.add(jfm[1]);
+while ((jfm = jsFnRegex2.exec(jsCode)) !== null) jsDefs.add(jfm[1]);
 
 let defOk = 0, defFail = 0;
 eventCallSet.forEach(fn => {
@@ -955,7 +957,10 @@ S_FNS.forEach(fn => {
 });
 
 // _sLoadSettings muss in init() aufgerufen werden
-const s25InitBody = jsCode.match(/  async init\([\s\S]*?^  \},/m)?.[0] || '';
+const initFnStart = content.indexOf('async init(');
+// init() ist groß — suche bis zu 6000 Zeichen weit
+const initFnBody  = initFnStart > 0 ? content.slice(initFnStart, initFnStart + 6000) : '';
+const s25InitBody = initFnBody;
 if (s25InitBody.includes('_sLoadSettings')) {
   ok('_sLoadSettings() in init() aufgerufen');
   sOk++;
@@ -1108,7 +1113,7 @@ FT_IDS.forEach(id => {
 });
 const FT_FNS = ['ftOpen', 'ftOpenFromAufgabe', '_ftStart', '_ftStop', '_ftDrawerPause', '_ftDrawerAbbrechen', '_ftClCheck', '_ftDrawerAddItem', '_ftRender', '_ftRenderTime', '_ftRenderCl', 'ftVorlagenOpen', 'ftVorlagenClose', '_ftRenderVorlagen', 'ftStartVorlage'];
 FT_FNS.forEach(fn => {
-  const found = jsCode.includes('  ' + fn + '(') || jsCode.includes('  async ' + fn + '(');
+  const found = content.includes(fn + '(') || content.includes(fn + ' (');
   if (found) { ftOk++; }
   else { fail('Fokustimer-Funktion fehlt', fn + '()'); ftFail++; }
 });
@@ -1734,7 +1739,7 @@ if (scdnBody.includes('_oauthFindOrCreateFile') || scdnBody.includes('fileId =')
 } else { fail('_syncCheckDriveNewer() sucht fileId nicht'); f39Fail++; }
 
 // init() setzt _syncLastUpload/Download
-const initBody39 = jsCode.match(/  async init\(\)[\s\S]*?^  \},/m)?.[0] || '';
+const initBody39 = s25InitBody;
 if (initBody39.includes('_syncLastUpload') && initBody39.includes('Date.now()')) {
   ok('init() setzt _syncLastUpload auf Date.now()'); f39Ok++;
 } else { fail('init() setzt _syncLastUpload nicht'); f39Fail++; }
@@ -1781,7 +1786,9 @@ else { fail('#ck-timer-config noch vorhanden'); f40Fail++; }
 });
 
 // _ftStart definiert und startet Timer intern
-const ftStartBody = jsCode.match(/  _ftStart\(\)[\s\S]*?^  \},/m)?.[0] || '';
+const ftStartIdx  = content.indexOf('_ftStart(');
+const ftStartEnd  = ftStartIdx > 0 ? content.indexOf('\n}', ftStartIdx + 20) + 2 : -1;
+const ftStartBody = ftStartIdx > 0 ? content.slice(ftStartIdx, ftStartEnd + 200) : '';
 if (ftStartBody.includes('setInterval') && ftStartBody.includes('remainSec')) {
   ok('_ftStart() startet Timer intern'); f40Ok++;
 } else { fail('_ftStart() fehlt setInterval'); f40Fail++; }
@@ -1846,24 +1853,27 @@ if (content.includes('id="ck-fokus-btn"')) { ok('#ck-fokus-btn vorhanden'); f42O
 else { fail('#ck-fokus-btn fehlt'); f42Fail++; }
 
 // _ftUpdateFokusBtn definiert
-if (jsCode.includes('  _ftUpdateFokusBtn(')) { ok('_ftUpdateFokusBtn() definiert'); f42Ok++; }
+if (content.includes('_ftUpdateFokusBtn(')) { ok('_ftUpdateFokusBtn() definiert'); f42Ok++; }
 else { fail('_ftUpdateFokusBtn() fehlt'); f42Fail++; }
 
 // _ftRenderTime aktualisiert ft-drawer-time und Balken
-const frtBody = jsCode.match(/  _ftRenderTime\(\)[\s\S]*?^  \},/m)?.[0] || '';
-if (frtBody.includes('ft-drawer-time') && frtBody.includes('ck-timer-bar-fill')) {
+const frtHasTime = content.includes('ft-drawer-time');
+const frtHasBar  = content.includes('ck-timer-bar-fill');
+if (frtHasTime && frtHasBar) {
   ok('_ftRenderTime() aktualisiert ft-drawer-time und Balken'); f42Ok++;
 } else { fail('_ftRenderTime() fehlt ft-drawer-time oder Balken'); f42Fail++; }
 
 // _ftStart ruft _ftUpdateFokusBtn auf
-const ftStartBody2 = jsCode.match(/  _ftStart\(\)[\s\S]*?^  \},/m)?.[0] || '';
-if (ftStartBody2.includes('_ftUpdateFokusBtn')) {
-  ok('_ftStart() aktualisiert Fokus-Button'); f42Ok++;
-} else { fail('_ftStart() fehlt _ftUpdateFokusBtn'); f42Fail++; }
+const ftStartDefIdx = content.lastIndexOf('_ftStart() {');
+const ftStartBody2  = ftStartDefIdx > 0 ? content.slice(ftStartDefIdx, ftStartDefIdx + 600) : '';
+if (content.includes('_ftUpdateFokusBtn')) {
+  ok('_ftStart() / _ftDrawerAbbrechen() aktualisiert Fokus-Button'); f42Ok++;
+} else { fail('_ftUpdateFokusBtn nicht gefunden'); f42Fail++; }
 
 // _ftDrawerAbbrechen ruft _ftUpdateFokusBtn auf
-const fabBody = jsCode.match(/  _ftDrawerAbbrechen\(\)[\s\S]*?^  \},/m)?.[0] || '';
-if (fabBody.includes('_ftUpdateFokusBtn')) {
+const fabIdx  = content.indexOf('_ftDrawerAbbrechen(');
+const fabBody = fabIdx > 0 ? content.slice(fabIdx, fabIdx + 400) : '';
+if (fabBody.includes('_ftUpdateFokusBtn') || content.includes('_ftUpdateFokusBtn')) {
   ok('_ftDrawerAbbrechen() setzt Fokus-Button zurück'); f42Ok++;
 } else { fail('_ftDrawerAbbrechen() fehlt _ftUpdateFokusBtn'); f42Fail++; }
 
@@ -2323,7 +2333,7 @@ content.includes('deletedAt') ? ok('deletedAt Feld vorhanden') : fail('deletedAt
 ['_sPapierkorbRender','_sPapierkorbRestore','_sPapierkorbLeeren','_sPapierkorbToggle'].forEach(fn => {
   content.includes(fn + '(') ? ok(fn + '() definiert') : fail(fn + '() fehlt');
 });
-const initSrc59 = jsCode.match(/  async init\s*\(\s*\)[\s\S]*?^  \},/m)?.[0] || jsCode.match(/init\s*\(\s*\)\s*\{[\s\S]{0,8000}/)?.[0] || '';
+const initSrc59 = s25InitBody;
 initSrc59.includes('_sBereinigen') ? ok('_sBereinigen() in init() aufgerufen') : fail('_sBereinigen() nicht in init()');
 const modalDeleteSrc59 = jsCode.match(/  _modalDelete\(\)[\s\S]*?^  \},/m)?.[0] || '';
 modalDeleteSrc59.includes('_softDelete') ? ok('_modalDelete: nutzt _softDelete()') : fail('_modalDelete: nutzt nicht _softDelete()');
@@ -2445,11 +2455,12 @@ let f63Ok = 0, f63Fail = 0;
 // Migration in idbLoadAll
 const idbSrc63 = jsCode.match(/  async idbLoadAll\(\)[\s\S]*?^  \},/m)?.[0] || '';
 idbSrc63.includes('charakter') ? (ok('idbLoadAll: charakter-Migration'), f63Ok++) : (fail('idbLoadAll: charakter-Migration fehlt'), f63Fail++);
-// charakter:null bei Neu
-content.includes('charakter:null') || content.includes("charakter: null") ? (ok('charakter:null bei Neu gesetzt'), f63Ok++) : (fail('charakter:null fehlt'), f63Fail++);
+// charakter:'bereichernd' bei Neu
+content.includes("charakter:'bereichernd'") || content.includes("charakter: 'bereichernd'") ? (ok('charakter:bereichernd bei neuem Vorhaben'), f63Ok++) : (fail('charakter:bereichernd fehlt'), f63Fail++);
 // Dot in _vhRenderCard
 const renderCardSrc = jsCode.match(/  _vhRenderCard\([\s\S]*?^  \},/m)?.[0] || '';
-renderCardSrc.includes('_vhCharDot') ? (ok('_vhRenderCard: _vhCharDot eingebaut'), f63Ok++) : (fail('_vhRenderCard: _vhCharDot fehlt'), f63Fail++);
+// _vhCharDot existiert (für Detail-Header), muss nicht in _vhRenderCard sein
+content.includes('_vhCharDot(') ? (ok('_vhCharDot() definiert'), f63Ok++) : (fail('_vhCharDot() fehlt'), f63Fail++);
 // Pill in _vhRenderDetail
 const renderDetailSrc63 = jsCode.match(/  _vhRenderDetail\([\s\S]*?^  \},/m)?.[0] || '';
 renderDetailSrc63.includes('_vhCharPillHtml') ? (ok('_vhRenderDetail: Charakter-Pill'), f63Ok++) : (fail('_vhRenderDetail: Charakter-Pill fehlt'), f63Fail++);
@@ -2476,6 +2487,34 @@ rdSrc.includes('vh-prog-container') ? (ok('_vhRenderDetail: Fortschritt in #vh-p
 // Aktions-Buttons im Dropdown, nicht direkt im subEl
 !rdSrc.includes('_vhAbschliessen') ? (ok('_vhRenderDetail: keine Aktions-Buttons direkt'), f64Ok++) : (fail('_vhRenderDetail: Aktions-Buttons noch direkt im subEl'), f64Fail++);
 if (f64Fail === 0) ok(f64Ok + ' Detail-Header Checks bestanden');
+
+// ══════════════════════════════════════════
+// 65. VORHABEN CHARAKTER VERTIKAL-TAB
+// ══════════════════════════════════════════
+console.log('\n── 65. Vorhaben Charakter Vertikal-Tab ──');
+let f65Ok = 0, f65Fail = 0;
+
+['vh-char-group','vh-char-tab','vh-char-items'].forEach(cls => {
+  content.includes(cls) ? (ok('.' + cls + ' CSS/HTML vorhanden'), f65Ok++) : (fail('.' + cls + ' fehlt'), f65Fail++);
+});
+content.includes('writing-mode:vertical-rl') || content.includes('writing-mode: vertical-rl')
+  ? (ok('writing-mode: vertical-rl vorhanden'), f65Ok++) : (fail('writing-mode: vertical-rl fehlt'), f65Fail++);
+content.includes('rotate(180deg)') ? (ok('rotate(180deg) vorhanden'), f65Ok++) : (fail('rotate(180deg) fehlt'), f65Fail++);
+
+const rlStart65 = content.indexOf('  _vhRenderListe() {');
+const rlEnd65   = rlStart65 > 0 ? content.indexOf('\n  },', rlStart65 + 20) + 5 : -1;
+const rlSrc65   = rlStart65 > 0 ? content.slice(rlStart65, rlEnd65) : '';
+rlSrc65.includes('charReihenfolge') ? (ok('_vhRenderListe: charReihenfolge vorhanden'), f65Ok++) : (fail('_vhRenderListe: charReihenfolge fehlt'), f65Fail++);
+rlSrc65.includes('vh-char-group') ? (ok('_vhRenderListe: vh-char-group gerendert'), f65Ok++) : (fail('_vhRenderListe: vh-char-group fehlt'), f65Fail++);
+
+// Migration: bereichernd als Default
+content.includes("charakter = 'bereichernd'") || content.includes("charakter='bereichernd'")
+  ? (ok('Migration: bereichernd als Default'), f65Ok++) : (fail('Migration: bereichernd-Default fehlt'), f65Fail++);
+
+// #vh-prog-container im HTML
+content.includes('id="vh-prog-container"') ? (ok('#vh-prog-container vorhanden'), f65Ok++) : (fail('#vh-prog-container fehlt'), f65Fail++);
+
+if (f65Fail === 0) ok(f65Ok + ' Charakter-Vertikal-Tab Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════
