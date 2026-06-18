@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.6.1</title>
+  <title>WorkBench 2.6.2</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1957,7 +1957,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.6.1</div>
+  <div id="wb-startup-tagline">v2.6.2</div>
 </div>
 
 <div id="wb-app">
@@ -1969,7 +1969,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.6.1 · Build 20260618-1230</div>
+    <div id="wb-menu-version">v2.6.2 · Build 20260618-1300</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -2402,8 +2402,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.6.1',
-  APP_BUILD:   '20260618-1230',
+  APP_VERSION: '2.6.2',
+  APP_BUILD:   '20260618-1300',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -4113,12 +4113,15 @@ const WB = {
         const onclick = e._art === 'schnell'
           ? 'WB.schnellOpen(&quot;' + this._esc(e.id) + '&quot;)'
           : 'WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)';
+        const isStorniert = !!e.storniert;
+        const dotColor  = isStorniert ? 'var(--faint)' : color;
         h += '<div class="wo-ev-row" style="cursor:pointer"'
           + ' onclick="' + onclick + '">'
-          + '<div class="wo-ev-dot" style="background:' + color + '"></div>'
-          + '<div class="wo-ev-time">' + this._esc(e.startTime || '') + '</div>'
-          + '<div class="wo-ev-text">' + this._esc(e.text) + '</div>'
-          + badge + '</div>';
+          + '<div class="wo-ev-dot" style="background:' + dotColor + '"></div>'
+          + '<div class="wo-ev-time" style="color:' + (isStorniert ? 'var(--faint)' : color) + '">' + this._esc(e.startTime || '') + '</div>'
+          + '<div class="wo-ev-text"' + (isStorniert ? ' style="text-decoration:line-through;color:var(--faint);"' : '') + '>' + this._esc(e.text) + '</div>'
+          + (isStorniert ? '<span class="wo-badge" style="background:var(--surface2);color:var(--faint);border:1px solid var(--border);">Abgesagt</span>' : badge)
+          + '</div>';
       });
 
       if (pflichten.length) {
@@ -4273,7 +4276,8 @@ const WB = {
           colH += '<div class="wo-cal-evt' + (isPriv ? ' privat' : '') + '"'
             + ' onclick="WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)"'
             + ' style="top:' + top + 'px;height:' + Math.max(dur,32) + 'px;'
-            + 'left:calc(' + l + '% + 2px);right:calc(' + r + '% + 2px);cursor:pointer;">'
+            + 'left:calc(' + l + '% + 2px);right:calc(' + r + '% + 2px);cursor:pointer;'
+            + (e.storniert ? 'opacity:0.4;text-decoration:line-through;' : '') + '">'
             + '<div class="wo-cal-evt-time">' + this._esc(e.startTime) + '</div>'
             + '<div class="wo-cal-evt-text">' + this._esc(e.text) + '</div>'
             + '</div>';
@@ -4451,7 +4455,8 @@ const WB = {
           colH += '<div class="wo-cal-evt' + (isPrivat ? ' privat' : '') + '"'
             + ' onclick="WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)"'
             + ' style="top:' + top + 'px;height:' + Math.max(dur,32) + 'px;cursor:pointer;'
-            + 'left:calc(' + l + '% + 2px);right:calc(' + r + '% + 2px);">'
+            + 'left:calc(' + l + '% + 2px);right:calc(' + r + '% + 2px);'
+            + (e.storniert ? 'opacity:0.4;text-decoration:line-through;' : '') + '">'
             + '<div class="wo-cal-evt-time">' + this._esc(e.startTime) + '</div>'
             + this._esc(e.text) + '</div>';
         });
@@ -4596,9 +4601,16 @@ const WB = {
       });
     } else {
       const e = (this.dataPriv?.customEvents||[]).find(x => x.id === id);
-      if (e) { e.storniert=true; e.updatedAt=this._now(); }
+      if (e) { e.storniert=true; e.done=false; e.updatedAt=this._now(); }
     }
     this.setDirty(); this._tfRenderHeute(); this._toast('Termin abgesagt');
+  },
+
+  _terminWiederherstellen(eventId) {
+    const e = (this.dataPriv?.customEvents||[]).find(x => x.id === eventId);
+    if (e) { e.storniert = false; e.updatedAt = this._now(); }
+    this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
+    this._toast('\u2713 Termin wiederhergestellt');
   },
 
   _tfSchnellCheck(id, ctx) {
@@ -6038,7 +6050,18 @@ const WB = {
       + this._modalVhOptions(aktuellerCtx, e?.vorhabenId)
       + '</select></div>';
     this._modalCtx = { type:'termin', eventId, ctx:'priv' };
-    this.modalOpen(eventId ? 'Termin bearbeiten' : 'Neuer Termin', body, this._modalFooter(!!eventId, !!eventId));
+    // Storniert-Banner
+    const storniertBanner = e?.storniert
+      ? '<div style="background:var(--surface2);border-left:3px solid var(--faint);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:8px 10px;font-size:12px;color:var(--muted);margin-bottom:4px;">'
+        + '\u26a0 Dieser Termin wurde abgesagt.</div>'
+      : '';
+    const footer = e?.storniert
+      ? '<div class="wb-modal-footer">'
+        + '<button class="wb-btn" style="color:var(--accent);border-color:var(--accent);" onclick="WB._terminWiederherstellen(&quot;' + this._esc(e?.id||'') + '&quot;)">\u21ba Wiederherstellen</button>'
+        + '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Schlie\u00dfen</button>'
+        + '</div>'
+      : this._modalFooter(!!eventId, !!eventId);
+    this.modalOpen(eventId ? 'Termin bearbeiten' : 'Neuer Termin', storniertBanner + body, footer);
     this._modalUpdateWeiche();
   },
   _modalUpdateWeiche() {
