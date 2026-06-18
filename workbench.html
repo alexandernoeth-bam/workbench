@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.7.7</title>
+  <title>WorkBench 2.7.8</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2068,7 +2068,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.7.7</div>
+  <div id="wb-startup-tagline">v2.7.8</div>
 </div>
 
 <div id="wb-app">
@@ -2080,7 +2080,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.7.7 · Build 20260619-0100</div>
+    <div id="wb-menu-version">v2.7.8 · Build 20260619-0200</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2506,8 +2506,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.7.7',
-  APP_BUILD:   '20260619-0100',
+  APP_VERSION: '2.7.8',
+  APP_BUILD:   '20260619-0200',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -5454,14 +5454,15 @@ _ftStart() {
 
   setDirty() {
     this.isDirty = true;
+    // IDB sofort speichern (kein Datenverlust bei Browser-Close)
+    this.idbSaveAll().catch(e => console.warn('[setDirty IDB]', e));
     clearTimeout(this._saveTimer);
     this._saveTimer = setTimeout(async () => {
-      await this.idbSaveAll();
       if (this._oauthClientId) {
         const token = await this._oauthGetTokenSilent();
         if (token) { await this._syncUploadAll(); }
       }
-    }, 2000);
+    }, 1500);
   },
 
   // ── KW-Hilfsfunktionen ───────────────────────────────
@@ -5646,7 +5647,7 @@ _ftStart() {
   _mergeDb(localDb, driveDb) {
     if (!localDb || !driveDb) return driveDb || localDb;
     const merged = { ...driveDb };
-    const arrayFields = ['quickItems', 'customEvents', 'wochenpflichten', 'ziele', 'checklistVorlagen', 'tagesprotokoll'];
+    const arrayFields = ['quickItems', 'customEvents', 'wochenpflichten', 'ziele', 'checklistVorlagen', 'tagesprotokoll', 'links'];
     arrayFields.forEach(field => {
       merged[field] = this._mergeArrayById(localDb[field], driveDb[field]);
     });
@@ -5661,9 +5662,15 @@ _ftStart() {
       } else {
         const localTs = v.updatedAt || '0';
         const driveTs = existing.updatedAt || '0';
-        const base = localTs > driveTs ? { ...v } : { ...existing };
+        // Immer mergen — neuerer Timestamp gibt Metadaten vor, aber Sub-Arrays immer zusammenführen
+        const base = localTs >= driveTs ? { ...v } : { ...existing };
+        // Sub-Arrays immer bidirektional mergen
         base.aufgaben = this._mergeArrayById(v.aufgaben, existing.aufgaben);
         base.links    = this._mergeArrayById(v.links,    existing.links);
+        // Felder die nur lokal neu gesetzt wurden bevorzugen
+        if (v.notiz && (!existing.notiz || localTs >= driveTs)) base.notiz = v.notiz;
+        if (v.charakter && localTs >= driveTs) base.charakter = v.charakter;
+        if (v.status && localTs >= driveTs) base.status = v.status;
         vhMerged.set(v.id, base);
       }
     });
@@ -5904,15 +5911,16 @@ _ftStart() {
     // OAuth Status prüfen
     this._oauthCheckToken();
 
-    // Sync beim Start: erst Upload wenn lokal neuer, dann Download
+    // Sync beim Start: IMMER erst lokal sichern (Upload), dann Drive holen (Download+Merge)
     if (this._oauthClientId) {
       const token = await this._oauthGetTokenSilent();
       if (token) {
-        const localNewerThanDrive = this._syncLastUpload > this._syncLastDownload;
-        if (this.isDirty || localNewerThanDrive) {
-          try { await this._syncUploadAll(); } catch(e) { console.warn('[init upload]', e.message); }
-        }
+        // Schritt 1: Lokalen Stand zu Drive hochladen (Merge-Basis für Download)
+        try { await this._syncUploadAll(); } catch(e) { console.warn('[init upload]', e.message); }
+        // Schritt 2: Drive herunterladen und mit lokalem Stand mergen
         try { await this._syncDownloadAll(); } catch(e) { console.warn('[init download]', e.message); }
+        // Schritt 3: Gemergten Stand wieder hochladen (Drive hat jetzt besten Stand)
+        try { await this._syncUploadAll(); } catch(e) { console.warn('[init upload2]', e.message); }
       } else {
         this._oauthShowBanner('\u26a0 Bitte Google-Verbindung erneuern');
         this._syncLastUpload = Date.now(); this._syncLastDownload = Date.now();
@@ -5930,21 +5938,29 @@ _ftStart() {
     // Tab sichtbar/unsichtbar: sofort sync
     document.addEventListener('visibilitychange', async () => {
       if (document.visibilityState === 'hidden') {
-        if (this.isDirty) {
-          clearTimeout(this._saveTimer);
-          try {
-            await this.idbSaveAll();
-            if (this._oauthClientId) {
-              const token = await this._oauthGetTokenSilent();
-              if (token) await this._syncUploadAll();
-            }
-          } catch(e) { console.warn('[vis hidden]', e.message); }
-        }
+        // Beim Verstecken: immer IDB speichern + wenn möglich hochladen
+        clearTimeout(this._saveTimer);
+        try {
+          await this.idbSaveAll();
+          if (this._oauthClientId && this.isDirty) {
+            const token = await this._oauthGetTokenSilent();
+            if (token) await this._syncUploadAll();
+          }
+        } catch(e) { console.warn('[vis hidden]', e.message); }
       } else if (document.visibilityState === 'visible') {
-        try { await this._syncTick(); } catch(e) { console.warn('[vis visible]', e.message); }
+        // Beim Wiedererscheinen: Upload wenn dirty, dann Check
+        try {
+          if (this.isDirty) await this._syncUploadAll();
+          await this._syncTick();
+        } catch(e) { console.warn('[vis visible]', e.message); }
       }
     });
-    window.addEventListener('focus', async () => { try { await this._syncTick(); } catch(e) {} });
+    window.addEventListener('focus', async () => {
+      try {
+        if (this.isDirty) await this._syncUploadAll();
+        await this._syncTick();
+      } catch(e) {}
+    });
     window.addEventListener('beforeunload', () => { if (this.isDirty) this.idbSaveAll(); });
 
     // Wenn kein Token → Sync-Zeitstempel auf jetzt damit kein sofortiger Drive-Download

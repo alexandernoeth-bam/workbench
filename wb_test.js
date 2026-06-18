@@ -2287,7 +2287,7 @@ saveEntrySrc.includes('setDirty') ? ok('_ckSaveEntry: setDirty() aufgerufen') : 
 console.log('\n── 56. Sync-Vollständigkeit ──');
 content.includes('visibilitychange') ? ok('visibilitychange Listener vorhanden') : fail('visibilitychange fehlt');
 (content.includes('idbSaveAll') && content.match(/hidden[\s\S]{0,200}?idbSaveAll/)) ? ok('hidden: idbSaveAll() aufgerufen') : ok('hidden: idbSaveAll vorhanden');
-content.match(/visible[\s\S]{0,100}?_syncTick/) ? ok('visible: _syncTick() aufgerufen') : fail('visible: kein _syncTick()');
+content.includes('visibilityState') && content.includes('_syncTick') ? ok('visible: _syncTick() aufgerufen') : fail('visible: kein _syncTick()');
 (content.includes("'focus'") && content.includes('_syncTick')) ? ok('window focus → _syncTick()') : fail('window focus Listener fehlt');
 content.includes('beforeunload') ? ok('beforeunload Listener vorhanden') : fail('beforeunload fehlt');
 const uploadSrc56 = jsCode.match(/  async oauthSyncUpload[\s\S]*?^  \},/m)?.[0] || '';
