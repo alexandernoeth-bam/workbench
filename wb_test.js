@@ -2430,6 +2430,53 @@ uploadAllSrc62.includes('_syncLastDownload')
 
 if (f62Fail === 0) ok(f62Ok + ' Sync-Robustheit Checks bestanden');
 
+// ══════════════════════════════════════════
+// 63. VORHABEN-CHARAKTER
+// ══════════════════════════════════════════
+console.log('\n── 63. Vorhaben-Charakter ──');
+let f63Ok = 0, f63Fail = 0;
+
+['_vhCharDot','_vhCharPillHtml','_vhCharDialog','_vhCharSet'].forEach(fn => {
+  jsCode.includes('  ' + fn + '(') ? (ok(fn + '() definiert'), f63Ok++) : (fail(fn + '() fehlt'), f63Fail++);
+});
+['vh-char-dot','vh-char-pill','vh-char-grid','vh-char-chip'].forEach(cls => {
+  content.includes(cls) ? (ok('.' + cls + ' vorhanden'), f63Ok++) : (fail('.' + cls + ' fehlt'), f63Fail++);
+});
+// Migration in idbLoadAll
+const idbSrc63 = jsCode.match(/  async idbLoadAll\(\)[\s\S]*?^  \},/m)?.[0] || '';
+idbSrc63.includes('charakter') ? (ok('idbLoadAll: charakter-Migration'), f63Ok++) : (fail('idbLoadAll: charakter-Migration fehlt'), f63Fail++);
+// charakter:null bei Neu
+content.includes('charakter:null') || content.includes("charakter: null") ? (ok('charakter:null bei Neu gesetzt'), f63Ok++) : (fail('charakter:null fehlt'), f63Fail++);
+// Dot in _vhRenderCard
+const renderCardSrc = jsCode.match(/  _vhRenderCard\([\s\S]*?^  \},/m)?.[0] || '';
+renderCardSrc.includes('_vhCharDot') ? (ok('_vhRenderCard: _vhCharDot eingebaut'), f63Ok++) : (fail('_vhRenderCard: _vhCharDot fehlt'), f63Fail++);
+// Pill in _vhRenderDetail
+const renderDetailSrc63 = jsCode.match(/  _vhRenderDetail\([\s\S]*?^  \},/m)?.[0] || '';
+renderDetailSrc63.includes('_vhCharPillHtml') ? (ok('_vhRenderDetail: Charakter-Pill'), f63Ok++) : (fail('_vhRenderDetail: Charakter-Pill fehlt'), f63Fail++);
+
+if (f63Fail === 0) ok(f63Ok + ' Vorhaben-Charakter Checks bestanden');
+
+// ══════════════════════════════════════════
+// 64. VORHABEN DETAIL-HEADER LAYOUT
+// ══════════════════════════════════════════
+console.log('\n── 64. Vorhaben Detail-Header ──');
+let f64Ok = 0, f64Fail = 0;
+
+['_vhMenuToggle','_vhMenuClose'].forEach(fn => {
+  jsCode.includes('  ' + fn + '(') ? (ok(fn + '() definiert'), f64Ok++) : (fail(fn + '() fehlt'), f64Fail++);
+});
+['vh-ctx-menu','vh-ctx-item','vh-menu-btn','vh-det-row1','vh-det-row2'].forEach(cls => {
+  content.includes(cls) ? (ok('.' + cls + ' vorhanden'), f64Ok++) : (fail('.' + cls + ' fehlt'), f64Fail++);
+});
+// #vh-prog-container im HTML
+content.includes('id="vh-prog-container"') ? (ok('#vh-prog-container vorhanden'), f64Ok++) : (fail('#vh-prog-container fehlt'), f64Fail++);
+// Fortschrittsbalken nicht mehr direkt in subEl (vh-prog-wrap in renderDetail)
+const rdSrc = jsCode.match(/  _vhRenderDetail\([\s\S]*?^  \},/m)?.[0] || '';
+rdSrc.includes('vh-prog-container') ? (ok('_vhRenderDetail: Fortschritt in #vh-prog-container'), f64Ok++) : (fail('_vhRenderDetail: Fortschritt nicht in #vh-prog-container'), f64Fail++);
+// Aktions-Buttons im Dropdown, nicht direkt im subEl
+!rdSrc.includes('_vhAbschliessen') ? (ok('_vhRenderDetail: keine Aktions-Buttons direkt'), f64Ok++) : (fail('_vhRenderDetail: Aktions-Buttons noch direkt im subEl'), f64Fail++);
+if (f64Fail === 0) ok(f64Ok + ' Detail-Header Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');

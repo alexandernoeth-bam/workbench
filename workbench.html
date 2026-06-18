@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.7.0</title>
+  <title>WorkBench 2.7.1</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1693,6 +1693,17 @@
     .tf-ev-act-btn { width:26px; height:26px; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:var(--surface); cursor:pointer; font-size:14px; color:var(--muted); display:flex; align-items:center; justify-content:center; font-family:var(--font); }
     .tf-ev-act-btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
     .tf-ev-act-del:hover { background:var(--danger); border-color:var(--danger); }
+    /* ── Vorhaben Detail Header ── */
+    .vh-det-row1 { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+    .vh-det-title { font-size:16px; font-weight:700; color:var(--text); flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .vh-det-row2 { display:flex; align-items:center; gap:7px; flex-wrap:nowrap; }
+    .vh-menu-btn { width:32px; height:32px; border-radius:50%; border:1.5px solid var(--border); background:var(--surface); cursor:pointer; font-size:16px; color:var(--muted); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-family:var(--font); }
+    .vh-menu-btn:hover { background:var(--surface2); }
+    .vh-ctx-menu { position:absolute; right:14px; top:48px; background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius-sm); box-shadow:0 4px 12px rgba(0,0,0,0.12); z-index:200; min-width:160px; overflow:hidden; }
+    .vh-ctx-item { padding:12px 16px; font-size:16px; font-weight:600; color:var(--text); cursor:pointer; border-bottom:0.5px solid var(--border); font-family:var(--font); display:block; width:100%; background:none; border-left:none; border-right:none; border-top:none; text-align:left; }
+    .vh-ctx-item:last-child { border-bottom:none; }
+    .vh-ctx-item:hover { background:var(--surface2); }
+    .vh-ctx-item.danger { color:var(--danger); }
     /* ── Vorhaben Charakter ── */
     .vh-char-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:3px; }
     .vh-char-dot.vp { background:#546270; }
@@ -2010,7 +2021,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.7.0</div>
+  <div id="wb-startup-tagline">v2.7.1</div>
 </div>
 
 <div id="wb-app">
@@ -2022,7 +2033,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.7.0 · Build 20260618-2000</div>
+    <div id="wb-menu-version">v2.7.1 · Build 20260618-2100</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2189,6 +2200,7 @@
                 <div id="vh-detail-title" style="color:var(--faint);font-size:16px;">Vorhaben wählen</div>
                 <div id="vh-detail-sub"></div>
               </div>
+              <div id="vh-prog-container"></div>
               <div id="vh-tabs">
                 <div class="vh-tab active" onclick="WB._vhTabSwitch('aktuell',this)">Aktuell</div>
                 <div class="vh-tab" onclick="WB._vhTabSwitch('info',this)">Informationen</div>
@@ -2448,8 +2460,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.7.0',
-  APP_BUILD:   '20260618-2000',
+  APP_VERSION: '2.7.1',
+  APP_BUILD:   '20260618-2100',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3648,6 +3660,35 @@ const WB = {
     this._toast('\u2713 Charakter: ' + (charakter ? charakter.charAt(0).toUpperCase() + charakter.slice(1) : 'entfernt'));
   },
 
+  _vhMenuOffen: false,
+
+  _vhMenuToggle(vorhabenId, ctx) {
+    const existing = document.getElementById('vh-ctx-menu');
+    if (existing) { existing.remove(); return; }
+    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
+    const zustand = this._vhZustand({...v, _ctx: ctx});
+    const menu = document.createElement('div');
+    menu.id = 'vh-ctx-menu'; menu.className = 'vh-ctx-menu';
+    if (zustand !== 'done') {
+      menu.innerHTML =
+        '<button class="vh-ctx-item" onclick="WB._vhMenuClose();WB._vhAbschliessen(\'' + vorhabenId + '\',\'' + ctx + '\')">\u2192 Abschlie\u00dfen</button>'
+        + '<button class="vh-ctx-item" onclick="WB._vhMenuClose();WB._vhOpen(\'' + vorhabenId + '\',\'' + ctx + '\')">Bearbeiten</button>'
+        + '<button class="vh-ctx-item danger" onclick="WB._vhMenuClose();WB._vhArchivieren(\'' + vorhabenId + '\',\'' + ctx + '\')">Archivieren</button>';
+    } else {
+      menu.innerHTML =
+        '<button class="vh-ctx-item" onclick="WB._vhMenuClose();WB._vhWiederoeffnen(\'' + vorhabenId + '\',\'' + ctx + '\')">\u21ba Wieder\u00f6ffnen</button>'
+        + '<button class="vh-ctx-item" onclick="WB._vhMenuClose();WB._vhOpen(\'' + vorhabenId + '\',\'' + ctx + '\')">Bearbeiten</button>';
+    }
+    const header = document.getElementById('vh-detail-header') || document.getElementById('vh-detail-sub')?.closest('.vh-detail-ph');
+    if (header) { header.style.position = 'relative'; header.appendChild(menu); }
+    setTimeout(() => { document.addEventListener('click', WB._vhMenuClose, { once: true }); }, 10);
+  },
+
+  _vhMenuClose() {
+    const menu = document.getElementById('vh-ctx-menu'); if (menu) menu.remove();
+  },
+
   _vhZustand(v) {
     if (v.status === 'abgeschlossen') return 'done';
     if (v.status === 'archiviert')    return 'archiviert';
@@ -3838,33 +3879,45 @@ const WB = {
     if (titleEl) titleEl.textContent = v.titel;
     if (titleHeaderEl) titleHeaderEl.textContent = v.titel || 'Vorhaben';
     if (subEl) {
+      // Welt-Badge
       const badge = ctx === 'pro'
         ? '<span class="vh-badge beruf">Beruf</span>'
         : '<span class="vh-badge privat">Privat</span>';
-      // Status-Pill + Fortschritt
+      // Zustand + Fortschritt
       const zustand = this._vhZustand({...v, _ctx: ctx});
       const alle    = (v.aufgaben||[]).filter(a => !a.deleted);
       const doneA   = alle.filter(a => a.done).length;
       const pct     = alle.length > 0 ? Math.round(doneA / alle.length * 100) : 0;
+      // Status-Pill (nur Status, keine Aktions-Buttons)
       const pillLabel = zustand === 'done' ? '\u2713 Abgeschlossen'
         : zustand === 'laeuft' ? 'L\u00e4uft' : 'Offen';
-      const pillIcon = zustand === 'laeuft' ? this._vhRingIcon({...v, _ctx: ctx}, 12) : '';
-      let statusRow = '<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;align-items:center;">'
-        + '<button class="vh-status-pill ' + zustand + '">' + pillIcon + ' ' + pillLabel + '</button>';
-      if (zustand !== 'done') {
-        statusRow += '<button class="vh-status-action" onclick="WB._vhAbschliessen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">\u2192 Abschlie\u00dfen</button>';
-        statusRow += '<button class="vh-status-action" onclick="WB._vhArchivieren(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">Archivieren</button>';
-      } else {
-        statusRow += '<button class="vh-status-action" onclick="WB._vhWiederoeffnen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">\u21ba Wieder\u00f6ffnen</button>';
+      const pillIcon = zustand === 'laeuft' ? this._vhRingIcon({...v, _ctx: ctx}, 12) + ' ' : '';
+      const statusPill = '<button class="vh-status-pill ' + zustand + '"'
+        + ' onclick="WB._vhMenuToggle(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">'
+        + pillIcon + pillLabel + '</button>';
+      // Zeile 1: Titel + Badge + Menü-Button
+      const row1 = '<div class="vh-det-row1">'
+        + '<div class="vh-det-title">' + this._esc(v.titel) + '</div>'
+        + badge
+        + '<button class="vh-menu-btn" onclick="WB._vhMenuToggle(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">\u22ef</button>'
+        + '</div>';
+      // Zeile 2: Status-Pill + Charakter-Pill
+      const row2 = '<div class="vh-det-row2">'
+        + statusPill
+        + this._vhCharPillHtml(v, v.id, ctx)
+        + '</div>';
+      subEl.innerHTML = row1 + row2;
+      // Fortschrittsbalken SEPARAT in #vh-prog-container
+      const progEl = document.getElementById('vh-prog-container');
+      if (progEl) {
+        progEl.innerHTML = alle.length > 0
+          ? '<div class="vh-prog-wrap">'
+            + '<div class="vh-prog-label"><span>Fortschritt</span>'
+            + '<span style="color:var(--accent);font-weight:700;">' + doneA + '/' + alle.length + ' erledigt</span></div>'
+            + '<div class="vh-prog-bar"><div class="vh-prog-fill" style="width:' + pct + '%"></div></div>'
+            + '</div>'
+          : '';
       }
-      statusRow += this._vhCharPillHtml(v, v.id, ctx);
-      statusRow += '</div>';
-      const progBar = alle.length > 0
-        ? '<div class="vh-prog-wrap"><div class="vh-prog-label"><span>Fortschritt</span>'
-          + '<span style="color:var(--accent);font-weight:600;">' + doneA + '/' + alle.length + ' Aufgaben erledigt</span></div>'
-          + '<div class="vh-prog-bar"><div class="vh-prog-fill" style="width:' + pct + '%"></div></div></div>'
-        : '';
-      subEl.innerHTML = badge + (v.ziel ? '<span>' + this._esc(v.ziel) + '</span>' : '') + statusRow + progBar;
     }
     this._vhRenderTabAktuell(v, ctx);
     this._vhRenderTabInfo(v, ctx);
