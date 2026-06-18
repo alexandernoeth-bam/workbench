@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.5.5</title>
+  <title>WorkBench 2.5.6</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1692,6 +1692,10 @@
     .vh-item-title { font-size:15px; font-weight:600; color:var(--text); }
     .vh-item-meta  { font-size:12px; color:var(--muted); }
 
+    .tf-ev-actions { display:flex; gap:4px; flex-shrink:0; align-items:center; }
+    .tf-ev-act-btn { width:26px; height:26px; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:var(--surface); cursor:pointer; font-size:12px; color:var(--muted); display:flex; align-items:center; justify-content:center; font-family:var(--font); }
+    .tf-ev-act-btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .tf-ev-act-del:hover { background:var(--danger); border-color:var(--danger); }
     /* ── Tagesfokus Akkordeon ── */
     #sec-backlog.wb-section { padding:0!important; display:flex!important; flex-direction:column!important; overflow:hidden!important; }
     #tf-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:10px; display:flex; flex-direction:column; gap:8px; }
@@ -1930,7 +1934,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.5.5</div>
+  <div id="wb-startup-tagline">v2.5.6</div>
 </div>
 
 <div id="wb-app">
@@ -1942,7 +1946,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.5.5 · Build 20260618-0800</div>
+    <div id="wb-menu-version">v2.5.6 · Build 20260618-0850</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -2374,8 +2378,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.5.5',
-  APP_BUILD:   '20260618-0800',
+  APP_VERSION: '2.5.6',
+  APP_BUILD:   '20260618-0850',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2714,20 +2718,21 @@ const WB = {
 
   _ckSaveEntry() {
     const area = document.getElementById('ck-editor-area'); if (!area) return;
+    const html = area.innerHTML?.trim() || '';
     const text = area.innerText?.trim() || ''; if (!text) return;
     const today = this._dStr(new Date());
     const now   = new Date();
     const ts    = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-    const ctx   = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-    const db    = ctx==='pro' ? this.dataPro : this.dataPriv; if (!db) return;
+    if (!this._ckSessionId) this._ckSessionId = 'ck_' + Date.now();
+    const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
+    const db  = ctx==='pro' ? this.dataPro : this.dataPriv; if (!db) return;
     if (!db.tagesprotokoll) db.tagesprotokoll = [];
     let entry = db.tagesprotokoll.find(e => e.date === today && e._sessionId === this._ckSessionId);
     if (!entry) {
-      this._ckSessionId = 'ck_' + Date.now();
-      entry = { id:this._ckSessionId, _sessionId:this._ckSessionId, date:today, ts, html:'', processed:false, deleted:false, updatedAt:new Date().toISOString() };
+      entry = { id:this._ckSessionId, _sessionId:this._ckSessionId, date:today, ts, html:'', text:'', processed:false, deleted:false, processedAs:[], updatedAt:new Date().toISOString() };
       db.tagesprotokoll.push(entry);
     }
-    entry.html = area.innerHTML; entry.text = text; entry.updatedAt = new Date().toISOString();
+    entry.html = html; entry.text = text; entry.updatedAt = new Date().toISOString();
     this.setDirty();
   },
 
@@ -2738,10 +2743,16 @@ const WB = {
     ['pro','priv'].forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
       (db?.tagesprotokoll||[]).filter(e => e.date === today && !e.deleted).forEach(e => {
-        if (!letzter || e.ts > letzter.ts) letzter = e;
+        if (!letzter || (e.ts||'') > (letzter.ts||'')) letzter = e;
       });
     });
-    if (letzter?.html) { area.innerHTML = letzter.html; this._ckSessionId = letzter._sessionId || letzter.id; }
+    if (letzter?.html) {
+      area.innerHTML = letzter.html;
+      this._ckSessionId = letzter._sessionId || letzter.id;
+    } else {
+      // Neu: SessionId vorab setzen
+      this._ckSessionId = 'ck_' + Date.now();
+    }
   },
 
   _ckVerarbeiten() {
@@ -2998,21 +3009,39 @@ const WB = {
 
     const events = (this.dataPriv?.customEvents||[])
       .filter(e => !e.deleted && !e.done && e.date === today)
-      .sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
+      .map(e => ({ ...e, _art: 'termin', _ctx: e.welt==='pro' ? 'pro' : 'priv' }));
+    // QuickItems MIT Uhrzeit → in Termin-Block
+    ['pro','priv'].forEach(ctx => {
+      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && q.startTime).forEach(q => {
+        events.push({ id:q.id, text:q.text, startTime:q.startTime, durationMin:15, welt:ctx, _art:'schnell', _ctx:ctx });
+      });
+    });
+    events.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
     if (events.length) {
       h += '<div class="tf-sec-sep">Termine</div>';
       events.forEach(e => {
-        const isPriv   = e.welt === 'priv';
-        const color    = isPriv ? 'var(--accent2)' : 'var(--accent)';
-        const badge    = isPriv ? '<span class="ck-badge privat">Privat</span>' : '<span class="ck-badge beruf">Beruf</span>';
+        const isPriv = e._ctx === 'priv';
+        const color  = isPriv ? 'var(--accent2)' : 'var(--accent)';
+        const badge  = isPriv ? '<span class="ck-badge privat">Privat</span>' : '<span class="ck-badge beruf">Beruf</span>';
         let eMin = 0;
         if (e.startTime) { const [eh,em] = e.startTime.split(':').map(Number); eMin = eh*60+em; }
         const past = e.startTime && eMin < nowMin;
-        h += '<div class="tf-ev-row" onclick="WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)">'
-          + '<div class="tf-ev-dot" style="background:' + (past ? 'var(--faint)' : color) + '"></div>'
-          + '<div class="tf-ev-time' + (past ? ' past' : '') + '" style="color:' + (past ? 'var(--faint)' : (isPriv ? 'var(--accent2)' : 'var(--accent)')) + '">' + this._esc(e.startTime||'') + '</div>'
-          + '<div class="tf-ev-text' + (past ? ' done' : '') + '">' + this._esc(e.text) + '</div>'
-          + badge + '</div>';
+        const dotColor = past ? 'var(--faint)' : color;
+        const onclick = e._art === 'schnell'
+          ? 'WB.schnellOpen(&quot;' + this._esc(e.id) + '&quot;)'
+          : 'WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)';
+        h += '<div class="tf-ev-row">'
+          + '<div class="tf-ev-dot" style="background:' + dotColor + '"></div>'
+          + '<div class="tf-ev-time' + (past ? ' past' : '') + '">' + this._esc(e.startTime||'') + '</div>'
+          + '<div class="tf-ev-text' + (past ? ' done' : '') + '" onclick="' + onclick + '" style="flex:1;cursor:pointer;">' + this._esc(e.text)
+          + (e._art==='schnell' ? ' <span style="font-size:10px;color:var(--faint)">\u26a1</span>' : '')
+          + '</div>'
+          + badge
+          + '<div class="tf-ev-actions">'
+          + '<button class="tf-ev-act-btn" title="Erledigt" onclick="event.stopPropagation();WB._tfTerminDone(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2713</button>'
+          + '<button class="tf-ev-act-btn tf-ev-act-del" title="Absagen" onclick="event.stopPropagation();WB._tfTerminAbsagen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2715</button>'
+          + '</div></div>';
         count++;
       });
     }
@@ -3045,7 +3074,7 @@ const WB = {
     const schnell = [];
     ['pro','priv'].forEach(ctx => {
       const db = ctx==='pro' ? this.dataPro : this.dataPriv;
-      (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today).forEach(q => schnell.push({...q, _ctx: ctx}));
+      (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && !q.startTime).forEach(q => schnell.push({...q, _ctx: ctx}));
     });
     if (schnell.length) {
       h += '<div class="tf-sec-sep">Schnell-Erinnerungen</div>';
@@ -3892,7 +3921,14 @@ const WB = {
       // Alle Termine aus dataPriv (dort alle gespeichert)
       const events = (this.dataPriv?.customEvents || [])
         .filter(e => !e.deleted && e.date === dateStr && !e.done)
-        .map(e => ({ ...e, _ctx: e.welt === 'pro' ? 'pro' : 'priv' }));
+        .map(e => ({ ...e, _art: 'termin', _ctx: e.welt === 'pro' ? 'pro' : 'priv' }));
+      // QuickItems mit Uhrzeit in Events einmischen
+      ['pro','priv'].forEach(ctx => {
+        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === dateStr && q.startTime).forEach(q => {
+          events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, welt:ctx, _art:'schnell', _ctx:ctx });
+        });
+      });
       events.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
 
       const pflichten = [];
@@ -3932,8 +3968,11 @@ const WB = {
         const badge = e._ctx === 'pro'
           ? '<span class="wo-badge beruf">Beruf</span>'
           : '<span class="wo-badge privat">Privat</span>';
+        const onclick = e._art === 'schnell'
+          ? 'WB.schnellOpen(&quot;' + this._esc(e.id) + '&quot;)'
+          : 'WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)';
         h += '<div class="wo-ev-row" style="cursor:pointer"'
-          + ' onclick="WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)">'
+          + ' onclick="' + onclick + '">'
           + '<div class="wo-ev-dot" style="background:' + color + '"></div>'
           + '<div class="wo-ev-time">' + this._esc(e.startTime || '') + '</div>'
           + '<div class="wo-ev-text">' + this._esc(e.text) + '</div>'
@@ -3961,6 +4000,10 @@ const WB = {
       h += '</div>';
     });
     daysEl.innerHTML = h;
+    requestAnimationFrame(() => {
+      const todayEl = daysEl.querySelector('.wo-day-block.today');
+      if (todayEl) todayEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     this._woRenderMottos('liste');
   },
 
@@ -4035,14 +4078,21 @@ const WB = {
         if (isToday) cls += ' today-col';
         if (isWE)    cls += ' we-col';
 
-        // Termine aus dataPriv
+        // Termine aus dataPriv + QuickItems mit Uhrzeit
         const events = (this.dataPriv?.customEvents||[])
           .filter(e => !e.deleted && e.date === dateStr && e.startTime && !e.done)
           .map(e => {
             const [eh,em] = e.startTime.split(':').map(Number);
-            return { ...e, _ctx: e.welt==='pro' ? 'pro' : 'priv', _startMin: eh*60+em, _endMin: eh*60+em + this._evtDurationMin(e) };
-          })
-          .sort((a,b) => a._startMin - b._startMin);
+            return { ...e, _art:'termin', _ctx: e.welt==='pro' ? 'pro' : 'priv', _startMin: eh*60+em, _endMin: eh*60+em + this._evtDurationMin(e) };
+          });
+        ['pro','priv'].forEach(ctx => {
+          const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+          (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === dateStr && q.startTime).forEach(q => {
+            const [qh,qm] = q.startTime.split(':').map(Number);
+            events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, durationMin:15, welt:ctx, _art:'schnell', _ctx:ctx, _startMin:qh*60+qm, _endMin:qh*60+qm+15 });
+          });
+        });
+        events.sort((a,b) => a._startMin - b._startMin);
 
         // Überlappungen
         const slots = events.map(e => ({ e, col:0, cols:1 }));
@@ -4367,6 +4417,35 @@ const WB = {
     this.renderWoche();
     // Tagesfokus sofort neu rendern
     if (this.activeTab === 'backlog') this._tfRenderHeute();
+  },
+
+  _tfTerminDone(id, art) {
+    if (art === 'schnell') {
+      ['pro','priv'].forEach(ctx => {
+        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const q  = (db?.quickItems||[]).find(x => x.id === id);
+        if (q) { q.done=true; q.updatedAt=this._now(); }
+      });
+    } else {
+      const e = (this.dataPriv?.customEvents||[]).find(x => x.id === id);
+      if (e) { e.done=true; e.updatedAt=this._now(); }
+    }
+    this.setDirty(); this._tfRenderHeute(); this._toast('\u2713 Erledigt');
+  },
+
+  _tfTerminAbsagen(id, art) {
+    if (!confirm(art==='schnell' ? 'Erinnerung l\u00f6schen?' : 'Termin absagen?')) return;
+    if (art === 'schnell') {
+      ['pro','priv'].forEach(ctx => {
+        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const q  = (db?.quickItems||[]).find(x => x.id === id);
+        if (q) { q.deleted=true; q.updatedAt=this._now(); }
+      });
+    } else {
+      const e = (this.dataPriv?.customEvents||[]).find(x => x.id === id);
+      if (e) { e.deleted=true; e.updatedAt=this._now(); }
+    }
+    this.setDirty(); this._tfRenderHeute(); this._toast('Gel\u00f6scht');
   },
 
   _tfSchnellCheck(id, ctx) {
@@ -4931,6 +5010,7 @@ const WB = {
       this._oauthHideBanner();
       this._syncLastUpload = Date.now();
       this.isDirty = false;
+      this._sUpdateSyncStatus();
     } catch(e) {
       this._oauthShowBanner('\u26a0 Upload-Fehler: ' + e.message);
     }
@@ -4953,6 +5033,7 @@ const WB = {
       await this.idbSaveAll();
       this._oauthHideBanner();
       this._syncLastDownload = Date.now();
+      this._sUpdateSyncStatus();
       this._toast('\u2713 Synchronisiert: ' + (ctx==='pro' ? 'Beruf' : 'Privat'));
       this.renderSection(this.activeTab);
     } catch(e) {
@@ -5042,6 +5123,26 @@ const WB = {
 
     // Auto-Sync starten
     this._syncStart();
+
+    // Tab sichtbar/unsichtbar: sofort sync
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'hidden') {
+        if (this.isDirty) {
+          clearTimeout(this._saveTimer);
+          try {
+            await this.idbSaveAll();
+            if (this._oauthClientId) {
+              const token = await this._oauthGetTokenSilent();
+              if (token) await this._syncUploadAll();
+            }
+          } catch(e) { console.warn('[vis hidden]', e.message); }
+        }
+      } else if (document.visibilityState === 'visible') {
+        try { await this._syncTick(); } catch(e) { console.warn('[vis visible]', e.message); }
+      }
+    });
+    window.addEventListener('focus', async () => { try { await this._syncTick(); } catch(e) {} });
+    window.addEventListener('beforeunload', () => { if (this.isDirty) this.idbSaveAll(); });
 
     // Wenn kein Token → Sync-Zeitstempel auf jetzt damit kein sofortiger Drive-Download
     if (!this._oauthClientId || !this._oauthTokenValid()) {
@@ -6013,15 +6114,20 @@ const WB = {
     if (!text) { this._toast('Text fehlt'); return; }
     const date      = document.getElementById('wb-f-date')?.value || '';
     const startTime = document.getElementById('wb-f-time')?.value || '';
-    const ctx  = this._modalGetWelt();
-    const db   = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const ctx = c.ctx || this._modalGetWelt();
+    const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
     if (!db) return;
     if (!db.quickItems) db.quickItems = [];
     if (c.id) {
-      const item = db.quickItems.find(x => x.id === c.id);
-      if (item) { item.text = text; item.date = date; item.startTime = startTime; item.updatedAt = this._now(); }
+      let item = db.quickItems.find(x => x.id === c.id);
+      if (!item) {
+        // Fallback: andere DB
+        const otherDb = ctx==='pro' ? this.dataPriv : this.dataPro;
+        item = (otherDb?.quickItems||[]).find(x => x.id === c.id);
+      }
+      if (item) { item.text=text; item.date=date; item.startTime=startTime; item.updatedAt=this._now(); }
     } else {
-      db.quickItems.push({ id:'q_'+Date.now(), text, date, startTime, done:false, updatedAt:this._now(), vertraulich:this._modalGetVertraulich() });
+      db.quickItems.push({ id:'q_'+Date.now(), text, date, startTime, done:false, deleted:false, updatedAt:this._now(), vertraulich:this._modalGetVertraulich() });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('\u2713 Schnell-Erinnerung gespeichert');
