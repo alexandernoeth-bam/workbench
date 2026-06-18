@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.7.4</title>
+  <title>WorkBench 2.7.5</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -594,9 +594,7 @@
       border-color: var(--accent);
       background: rgba(10,107,94,0.04);
     }
-    .vh-card-bar { width: 4px; flex-shrink: 0; }
-    .vh-card-bar.beruf  { background: var(--accent); }
-    .vh-card-bar.privat { background: var(--accent2); }
+    /* vh-card-bar entfernt — char-tab übernimmt Farbmarkierung */
     .vh-card-body { padding: 9px 11px; flex: 1; min-width: 0; }
     .vh-card-title {
       font-size: 16px; font-weight: 600; color: var(--text);
@@ -604,9 +602,8 @@
     }
     .vh-card-meta { font-size: 14px; color: var(--muted); margin-top: 2px; display: flex; gap: 8px; align-items: center; }
     .vh-card-right {
-      padding: 9px 10px;
       display: flex; flex-direction: column;
-      align-items: flex-end; gap: 4px; flex-shrink: 0;
+      align-items: flex-end; gap: 3px; flex-shrink: 0;
     }
     /* ── Vorhaben Detail ── */
     #vh-detail {
@@ -770,7 +767,7 @@
       font-size: 16px; font-weight: 600; cursor: pointer; text-align: center;
     }
     /* ── Badge ── */
-    .vh-badge { display:inline-flex; align-items:center; padding:2px 6px; border-radius:8px; font-size:10px; font-weight:700; flex-shrink:0; white-space:nowrap; }
+    .vh-badge { display:inline-flex; align-items:center; padding:2px 7px; border-radius:8px; font-size:11px; font-weight:700; white-space:nowrap; flex-shrink:0; }
     .vh-badge.beruf  { background: var(--accent);  color: #fff; }
     .vh-badge.privat { background: var(--accent2); color: #fff; }
     .vh-badge.warn   { background: var(--danger);  color: #fff; }
@@ -2069,7 +2066,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.7.4</div>
+  <div id="wb-startup-tagline">v2.7.5</div>
 </div>
 
 <div id="wb-app">
@@ -2081,7 +2078,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.7.4 · Build 20260618-2330</div>
+    <div id="wb-menu-version">v2.7.5 · Build 20260618-2359</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2239,7 +2236,6 @@
             <button id="vh-detail-back" onclick="WB._vhCloseDetail()">
               <svg viewBox="0 0 24 24"><polyline points="15,18 9,12 15,6"/></svg>
             </button>
-            <div id="vh-detail-title-header">Vorhaben</div>
           </div>
           <div id="vh-detail-content" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
             <div id="vh-alle-container" style="display:none;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
@@ -2508,8 +2504,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.7.4',
-  APP_BUILD:   '20260618-2330',
+  APP_VERSION: '2.7.5',
+  APP_BUILD:   '20260618-2359',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3931,28 +3927,9 @@ _ftStart() {
         const label = charLabel[charakter];
         h += '<div class="vh-char-group">'
           + '<div class="vh-char-tab ' + cls + '">' + label + '</div>'
-          + '<div class="vh-char-items">';
-        items.forEach(v => {
-          const zustand  = this._vhZustand({...v, _ctx: ctx});
-          const offen    = (v.aufgaben||[]).filter(a => !a.deleted && !a.done).length;
-          const gesamt   = (v.aufgaben||[]).filter(a => !a.deleted).length;
-          const isActive = v.id === this._vhAktivId;
-          const badge    = ctx === 'pro'
-            ? '<span class="vh-badge beruf">Beruf</span>'
-            : '<span class="vh-badge privat">Privat</span>';
-          let icon = '';
-          if (zustand === 'done')        icon = '<div class="vi-done">\u2713</div>';
-          else if (zustand === 'laeuft') icon = this._vhRingIcon({...v, _ctx: ctx}, 16);
-          else                           icon = '<div class="vi-offen"></div>';
-          const subText = gesamt > 0 ? offen + '/' + gesamt + ' Aufgaben offen' : 'Keine Aufgaben';
-          h += '<div class="vh-item' + (isActive ? ' active' : '') + '"'
-            + ' onclick="WB._vhOpenDetail(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">'
-            + icon
-            + '<div class="vh-body"><div class="vh-name">' + this._esc(v.titel) + '</div>'
-            + '<div class="vh-sub">' + subText + '</div></div>'
-            + badge + '</div>';
-        });
-        h += '</div></div>';
+          + '<div class="vh-char-items">'
+          + items.map(v => this._vhRenderCard(v, ctx)).join('')
+          + '</div></div>';
       });
 
       if (abgeschlossen.length) {
@@ -3973,43 +3950,26 @@ _ftStart() {
   },
 
   _vhRenderCard(v, ctx) {
-    const isActive = v.id === this._vhAktivId;
-    const bar = ctx === 'pro' ? 'beruf' : 'privat';
+    const isActive    = v.id === this._vhAktivId;
+    const zustand     = this._vhZustand({...v, _ctx: ctx});
+    const statusIcon  = zustand === 'done'
+      ? '<div class="vi-done">\u2713</div>'
+      : zustand === 'laeuft' ? this._vhRingIcon({...v, _ctx: ctx}, 16)
+      : '<div class="vi-offen"></div>';
+    const aufgaben    = (v.aufgaben||[]);
+    const total       = aufgaben.length;
+    const doneCount   = aufgaben.filter(a => a.done).length;
+    const today       = this._dStr(new Date());
+    const ueberfaellig = aufgaben.some(a => !a.done && a.datum && a.datum < today);
+    const meta = total > 0 ? (doneCount + '/' + total + ' Aufgaben offen') : 'Keine Aufgaben';
     const badge = ctx === 'pro'
       ? '<span class="vh-badge beruf">Beruf</span>'
       : '<span class="vh-badge privat">Privat</span>';
-    const aufgaben   = v.aufgaben || [];
-    const total      = aufgaben.length;
-    const doneCount  = aufgaben.filter(a => a.done).length;
-    const offenCount = total - doneCount;
-    const today      = this._dStr(new Date());
-    const ueberfaellig = aufgaben.some(a => !a.done && a.datum && a.datum < today);
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    const termineCount = (db?.customEvents || [])
-      .filter(e => !e.deleted && e.vorhabenId === v.id && !e.done && e.date >= today).length;
-
-    let metaParts = [];
-    if (total > 0) {
-      metaParts.push(doneCount + '/' + total + ' Aufgaben offen');
-    }
-    if (termineCount > 0) {
-      metaParts.push(termineCount + ' Termin' + (termineCount > 1 ? 'e' : ''));
-    }
-    const meta = metaParts.length ? metaParts.join(' · ') : 'Keine Aufgaben';
-
-    const warnBadge = ueberfaellig
-      ? '<span class="vh-badge warn">\u00fcberf\u00e4llig</span>' : '';
-
-    const zustand = this._vhZustand({...v, _ctx: ctx});
-    const statusIcon = zustand === 'done' ? '<div class="vi-done">\u2713</div>'
-      : zustand === 'laeuft' ? this._vhRingIcon({...v, _ctx: ctx}, 16)
-      : '<div class="vi-offen"></div>';
-
+    const warnBadge = ueberfaellig ? '<span class="vh-badge warn">\u00fcberf\u00e4llig</span>' : '';
     return '<div class="vh-card' + (isActive ? ' active' : '') + '"'
       + ' data-id="' + this._esc(v.id) + '"'
       + ' data-ctx="' + this._esc(ctx) + '"'
       + ' onclick="WB._vhOpenDetail(&quot;' + v.id + '&quot;,&quot;' + ctx + '&quot;)">'
-      + '<div class="vh-card-bar ' + bar + '"></div>'
       + statusIcon
       + '<div class="vh-card-body">'
       + '<div class="vh-card-title">' + this._esc(v.titel) + '</div>'
@@ -4059,15 +4019,10 @@ _ftStart() {
     const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     const v  = (db?.vorhaben || []).find(x => x.id === id);
     if (!v) return;
-    const titleEl       = document.getElementById('vh-detail-title');
-    const titleHeaderEl = document.getElementById('vh-detail-title-header');
-    const subEl         = document.getElementById('vh-detail-sub');
+    const titleEl = document.getElementById('vh-detail-title');
+    const subEl   = document.getElementById('vh-detail-sub');
     if (titleEl) titleEl.textContent = v.titel;
-    if (titleHeaderEl) titleHeaderEl.textContent = v.titel || 'Vorhaben';
     if (subEl) {
-      const badge = ctx === 'pro'
-        ? '<span class="vh-badge beruf">Beruf</span>'
-        : '<span class="vh-badge privat">Privat</span>';
       const zustand = this._vhZustand({...v, _ctx: ctx});
       const alle    = (v.aufgaben||[]).filter(a => !a.deleted);
       const doneA   = alle.filter(a => a.done).length;
@@ -4078,22 +4033,6 @@ _ftStart() {
       const statusPill = '<button class="vh-status-pill ' + zustand + '"'
         + ' onclick="WB._vhMenuToggle(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">'
         + pillIcon + pillLabel + '</button>';
-
-      // Zeile 1: Titel + Menü (kein Badge — Welt-Toggle macht das)
-      const row1 = '<div class="vh-det-row1">'
-        + '<div class="vh-det-title">' + this._esc(v.titel) + '</div>'
-        + '<button class="vh-menu-btn" onclick="WB._vhMenuToggle(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">\u22ef</button>'
-        + '</div>';
-
-      // Zeile 2: Welt-Toggle + Status-Pill + Charakter-Pill
-      const weltCls   = ctx === 'pro' ? 'beruf' : 'privat';
-      const weltLabel = ctx === 'pro' ? 'Beruf' : 'Privat';
-      const weltToggle = '<button class="vh-welt-toggle ' + weltCls + '"'
-        + ' onclick="WB._vhWeltToggle(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">'
-        + weltLabel + ' <span class="vh-welt-toggle-arrow">\u21c4</span></button>';
-      const row2 = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;margin-top:5px;">'
-        + weltToggle + statusPill + this._vhCharPillHtml(v, v.id, ctx)
-        + '</div>';
 
       // Ziel-Zeile
       const db2  = ctx==='pro' ? this.dataPro : this.dataPriv;
@@ -4107,16 +4046,27 @@ _ftStart() {
             + '<button class="vh-ziel-btn" onclick="WB._vhZielVerknuepfen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">+ Verkn\u00fcpfen</button>')
         + '</div>';
 
-      // Fortschrittsbalken
-      const progBar = alle.length > 0
-        ? '<div class="vh-prog-wrap"><div class="vh-prog-label"><span>Fortschritt</span>'
-          + '<span style="color:var(--accent);font-weight:700;">' + doneA + '/' + alle.length + ' erledigt</span></div>'
-          + '<div class="vh-prog-bar"><div class="vh-prog-fill" style="width:' + pct + '%"></div></div></div>'
-        : '';
-
-      subEl.innerHTML = row1 + row2 + zielHtml;
+      // Fortschrittsbalken in #vh-prog-container
       const progEl = document.getElementById('vh-prog-container');
-      if (progEl) progEl.innerHTML = progBar;
+      if (progEl) {
+        progEl.innerHTML = alle.length > 0
+          ? '<div class="vh-prog-wrap"><div class="vh-prog-label"><span>Fortschritt</span>'
+            + '<span style="color:var(--accent);font-weight:600;">' + doneA + '/' + alle.length + ' erledigt</span></div>'
+            + '<div class="vh-prog-bar"><div class="vh-prog-fill" style="width:' + pct + '%"></div></div></div>'
+          : '';
+      }
+
+      // Zeile: Welt-Toggle + Status-Pill + Charakter-Pill (kein Titel in subEl)
+      const weltCls   = ctx === 'pro' ? 'beruf' : 'privat';
+      const weltLabel = ctx === 'pro' ? 'Beruf' : 'Privat';
+      const weltToggle = '<button class="vh-welt-toggle ' + weltCls + '"'
+        + ' onclick="WB._vhWeltToggle(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">'
+        + weltLabel + ' <span class="vh-welt-toggle-arrow">\u21c4</span></button>';
+      const row2 = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;margin-bottom:4px;">'
+        + weltToggle + statusPill + this._vhCharPillHtml(v, v.id, ctx)
+        + '</div>';
+
+      subEl.innerHTML = row2 + zielHtml;
     }
     this._vhRenderTabAktuell(v, ctx);
     this._vhRenderTabInfo(v, ctx);

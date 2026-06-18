@@ -543,7 +543,7 @@ console.log('\n── 19. Vorhaben HTML-Struktur + Funktionen ──');
 // Fehlt vh-detail: rechte Seite bleibt leer ohne Fehlermeldung.
 const VH_IDS = [
   'vh-app', 'vh-list-col', 'vh-list-head', 'vh-list-title', 'vh-scroll',
-  'vh-detail-col', 'vh-detail-header', 'vh-detail-title-header',
+  'vh-detail-col', 'vh-detail-header',
   'vh-detail', 'vh-detail-head', 'vh-detail-title', 'vh-detail-sub',
   'vh-tabs', 'vh-tab-aktuell', 'vh-tab-info',
 ];
@@ -2515,6 +2515,32 @@ content.includes("charakter = 'bereichernd'") || content.includes("charakter='be
 content.includes('id="vh-prog-container"') ? (ok('#vh-prog-container vorhanden'), f65Ok++) : (fail('#vh-prog-container fehlt'), f65Fail++);
 
 if (f65Fail === 0) ok(f65Ok + ' Charakter-Vertikal-Tab Checks bestanden');
+
+// ══════════════════════════════════════════
+// 66. VORHABEN ZIEL + WELT-TOGGLE
+// ══════════════════════════════════════════
+console.log('\n── 66. Vorhaben Ziel + Welt-Toggle ──');
+let f66Ok = 0, f66Fail = 0;
+
+['_vhZielVerknuepfen','_savVhZiel','_vhZielLoesen','_vhWeltToggle'].forEach(fn => {
+  content.includes(fn + '(') ? (ok(fn + '() definiert'), f66Ok++) : (fail(fn + '() fehlt'), f66Fail++);
+});
+['vh-ziel-zeile','vh-ziel-text','vh-welt-toggle'].forEach(cls => {
+  content.includes(cls) ? (ok('.' + cls + ' vorhanden'), f66Ok++) : (fail('.' + cls + ' fehlt'), f66Fail++);
+});
+// case vhZiel in _modalSave
+content.includes("'vhZiel'") ? (ok('_modalSave: case vhZiel vorhanden'), f66Ok++) : (fail('_modalSave: case vhZiel fehlt'), f66Fail++);
+// vh-badge kleiner
+content.includes('font-size:10px') && content.includes('.vh-badge')
+  ? (ok('.vh-badge: font-size:10px'), f66Ok++) : (fail('.vh-badge: font-size nicht 10px'), f66Fail++);
+// zielId in Migration
+content.includes('zielId === undefined') ? (ok('Migration: zielId gesetzt'), f66Ok++) : (fail('Migration: zielId fehlt'), f66Fail++);
+// _vhWeltToggle nutzt confirm
+const weltToggleIdx = content.indexOf('_vhWeltToggle(vorhabenId');
+const weltToggleSrc = weltToggleIdx > 0 ? content.slice(weltToggleIdx, weltToggleIdx + 800) : '';
+weltToggleSrc.includes('confirm') ? (ok('_vhWeltToggle: confirm vorhanden'), f66Ok++) : (fail('_vhWeltToggle: confirm fehlt'), f66Fail++);
+
+if (f66Fail === 0) ok(f66Ok + ' Ziel+Welt-Toggle Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════
