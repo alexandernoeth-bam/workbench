@@ -2378,6 +2378,58 @@ const archivFilters = (jsCode.match(/archiviert/g)||[]).length;
 archivFilters >= 5 ? (ok(archivFilters + '× archiviert-Filter vorhanden'), f61Ok++) : (fail('archiviert-Filter zu wenig: ' + archivFilters), f61Fail++);
 if (f61Fail === 0) ok(f61Ok + ' Vorhaben-Zustände Checks bestanden');
 
+// ══════════════════════════════════════════
+// 62. SYNC-ROBUSTHEIT
+// ══════════════════════════════════════════
+console.log('\n── 62. Sync-Robustheit ──');
+let f62Ok = 0, f62Fail = 0;
+
+const mergeArrSrc62 = jsCode.match(/  _mergeArrayById\([\s\S]*?^  \},/m)?.[0] || '';
+(mergeArrSrc62.includes('deleted') && mergeArrSrc62.includes('localTs === driveTs'))
+  ? (ok('_mergeArrayById: deleted-Priorität bei gleichem TS'), f62Ok++)
+  : (fail('_mergeArrayById: keine deleted-Priorität'), f62Fail++);
+mergeArrSrc62.includes('deletedAt')
+  ? (ok('_mergeArrayById: deletedAt als Fallback-TS'), f62Ok++)
+  : (fail('_mergeArrayById: kein deletedAt Fallback'), f62Fail++);
+
+// Direkte Suche im gesamten Content (zuverlässiger)
+content.includes("idbSet('meta', 'lastUpload'")
+  ? (ok('oauthSyncUpload: lastUpload persistiert'), f62Ok++)
+  : (fail('oauthSyncUpload: lastUpload NICHT persistiert'), f62Fail++);
+content.includes("idbSet('meta', 'lastDownload'")
+  ? (ok('oauthSyncDownload: lastDownload persistiert'), f62Ok++)
+  : (fail('oauthSyncDownload: lastDownload NICHT persistiert'), f62Fail++);
+
+const loadFnStart62 = jsCode.indexOf('  async idbLoadAll()');
+const loadFnEnd62   = loadFnStart62 > 0 ? jsCode.indexOf('\n  },', loadFnStart62 + 20) + 5 : -1;
+const idbLoadSrc62  = loadFnStart62 > 0 ? jsCode.slice(loadFnStart62, loadFnEnd62) : '';
+idbLoadSrc62.includes("'lastUpload'")
+  ? (ok('idbLoadAll: lastUpload geladen'), f62Ok++)
+  : (fail('idbLoadAll: lastUpload nicht geladen'), f62Fail++);
+idbLoadSrc62.includes("'lastDownload'")
+  ? (ok('idbLoadAll: lastDownload geladen'), f62Ok++)
+  : (fail('idbLoadAll: lastDownload nicht geladen'), f62Fail++);
+idbLoadSrc62.includes('migrateUpdatedAt')
+  ? (ok('updatedAt Migration in idbLoadAll'), f62Ok++)
+  : (fail('updatedAt Migration fehlt'), f62Fail++);
+
+const mergeDbSrc62 = jsCode.match(/  _mergeDb\([\s\S]*?^  \},/m)?.[0] || '';
+(mergeDbSrc62.includes('mps[date][dutyId]') || mergeDbSrc62.includes('duties'))
+  ? (ok('pflichtStatus: tiefer Merge vorhanden'), f62Ok++)
+  : (fail('pflichtStatus: nur Spread'), f62Fail++);
+
+const uploadAllSrc62 = jsCode.match(/  async _syncUploadAll\([\s\S]*?^  \},/m)?.[0] || '';
+uploadAllSrc62.includes('_syncLastDownload')
+  ? (ok('_syncUploadAll: lastDownload nach Upload aktualisiert'), f62Ok++)
+  : (fail('_syncUploadAll: lastDownload nicht aktualisiert'), f62Fail++);
+
+// Toast nach Upload
+(content.includes('hochgeladen') && content.includes("oauthSyncUpload"))
+  ? (ok('oauthSyncUpload: Toast nach Upload'), f62Ok++)
+  : (fail('oauthSyncUpload: kein Toast'), f62Fail++);
+
+if (f62Fail === 0) ok(f62Ok + ' Sync-Robustheit Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');

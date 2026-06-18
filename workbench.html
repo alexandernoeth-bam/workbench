@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.6.6</title>
+  <title>WorkBench 2.6.7</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1987,7 +1987,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.6.6</div>
+  <div id="wb-startup-tagline">v2.6.7</div>
 </div>
 
 <div id="wb-app">
@@ -1999,7 +1999,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.6.6 · Build 20260618-1600</div>
+    <div id="wb-menu-version">v2.6.7 · Build 20260618-1700</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2425,8 +2425,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.6.6',
-  APP_BUILD:   '20260618-1600',
+  APP_VERSION: '2.6.7',
+  APP_BUILD:   '20260618-1700',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -5002,6 +5002,24 @@ const WB = {
       if (driveIdPro)  this._oauthDriveFileIds.pro  = driveIdPro;
       if (driveIdPriv) this._oauthDriveFileIds.priv = driveIdPriv;
 
+      // lastUpload/lastDownload laden
+      const lastUp = await this.idbGet('meta', 'lastUpload');
+      const lastDn = await this.idbGet('meta', 'lastDownload');
+      if (lastUp) this._syncLastUpload   = parseInt(lastUp)  || 0;
+      if (lastDn) this._syncLastDownload = parseInt(lastDn)  || 0;
+
+      // updatedAt Migration: Items ohne updatedAt bekommen Fallback-Timestamp
+      const OLD_TS = '2020-01-01T00:00:00.000Z';
+      const migrateUpdatedAt = (arr) => { (arr||[]).forEach(item => { if (!item.updatedAt) item.updatedAt = OLD_TS; }); };
+      ['pro','priv'].forEach(ctx => {
+        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        if (!db) return;
+        migrateUpdatedAt(db.quickItems); migrateUpdatedAt(db.customEvents);
+        migrateUpdatedAt(db.wochenpflichten); migrateUpdatedAt(db.ziele);
+        migrateUpdatedAt(db.checklistVorlagen); migrateUpdatedAt(db.tagesprotokoll);
+        (db.vorhaben||[]).forEach(v => { if (!v.updatedAt) v.updatedAt = OLD_TS; migrateUpdatedAt(v.aufgaben); migrateUpdatedAt(v.links); });
+      });
+
       // pflichtStatus Format-Migration (einmalig)
       ['pro','priv'].forEach(ctx => {
         const db = ctx==='pro' ? this.dataPro : this.dataPriv;
@@ -5219,26 +5237,21 @@ const WB = {
   /* ── Merge by Timestamp ── */
   _mergeArrayById(localArr, driveArr) {
     const merged = new Map();
-    // Zuerst Drive-Items eintragen
     (driveArr||[]).forEach(item => { merged.set(item.id, { ...item }); });
-    // Dann lokale Items — neueres updatedAt gewinnt
     (localArr||[]).forEach(item => {
       const existing = merged.get(item.id);
-      if (!existing) {
-        // Nur lokal vorhanden → übernehmen (auch wenn deleted:true)
+      if (!existing) { merged.set(item.id, { ...item }); return; }
+      const localTs = item.updatedAt || item.deletedAt || item.doneTs || '0';
+      const driveTs = existing.updatedAt || existing.deletedAt || existing.doneTs || '0';
+      if (localTs > driveTs) {
         merged.set(item.id, { ...item });
-      } else {
-        const localTs = item.updatedAt || item.doneTs || '0';
-        const driveTs = existing.updatedAt || existing.doneTs || '0';
-        if (localTs > driveTs) {
-          // Lokal neuer → lokal gewinnt (deleted:true propagiert sich)
-          merged.set(item.id, { ...item });
-        }
-        // Drive neuer → Drive bleibt (deleted:true von Drive propagiert sich)
+      } else if (localTs === driveTs) {
+        // Gleicher Timestamp: deleted > done > storniert
+        if (item.deleted && !existing.deleted) merged.set(item.id, { ...item });
+        else if (item.done && !existing.done)       merged.set(item.id, { ...item });
+        else if (item.storniert && !existing.storniert) merged.set(item.id, { ...item });
       }
     });
-    // ALLE Items zurückgeben — auch deleted:true
-    // Render-Funktionen filtern selbst mit !x.deleted
     return Array.from(merged.values());
   },
 
@@ -5267,7 +5280,20 @@ const WB = {
       }
     });
     merged.vorhaben = Array.from(vhMerged.values());
-    merged.pflichtStatus = { ...(driveDb.pflichtStatus||{}), ...(localDb.pflichtStatus||{}) };
+    // pflichtStatus: pro Tag tief mergen
+    const lps = localDb.pflichtStatus || {};
+    const dps = driveDb.pflichtStatus || {};
+    const mps = { ...dps };
+    Object.entries(lps).forEach(([date, duties]) => {
+      if (!mps[date]) {
+        mps[date] = { ...duties };
+      } else {
+        Object.entries(duties).forEach(([dutyId, val]) => {
+          if (val && !mps[date][dutyId]) mps[date][dutyId] = val;
+        });
+      }
+    });
+    merged.pflichtStatus = mps;
     const lm = localDb.wochenMottos || {};
     const dm = driveDb.wochenMottos || {};
     merged.wochenMottos = { ...dm };
@@ -5332,6 +5358,9 @@ const WB = {
   async _syncUploadAll() {
     await this.oauthSyncUpload('pro');
     await this.oauthSyncUpload('priv');
+    // Nach Upload: Download-Timestamp ebenfalls aktualisieren
+    this._syncLastDownload = this._syncLastUpload;
+    await this.idbSet('meta', 'lastDownload', String(this._syncLastDownload));
   },
 
   async _syncDownloadAll() {
@@ -5356,7 +5385,9 @@ const WB = {
       this._oauthHideBanner();
       this._syncLastUpload = Date.now();
       this.isDirty = false;
+      await this.idbSet('meta', 'lastUpload', String(this._syncLastUpload));
       this._sUpdateSyncStatus();
+      this._toast('\u2713 ' + (ctx === 'pro' ? 'Beruf' : 'Privat') + ' hochgeladen');
     } catch(e) {
       this._oauthShowBanner('\u26a0 Upload-Fehler: ' + e.message);
     }
@@ -5379,6 +5410,7 @@ const WB = {
       await this.idbSaveAll();
       this._oauthHideBanner();
       this._syncLastDownload = Date.now();
+      await this.idbSet('meta', 'lastDownload', String(this._syncLastDownload));
       this._sUpdateSyncStatus();
       this._toast('\u2713 Synchronisiert: ' + (ctx==='pro' ? 'Beruf' : 'Privat'));
       this.renderSection(this.activeTab);
@@ -5481,9 +5513,21 @@ const WB = {
     // OAuth Status prüfen
     this._oauthCheckToken();
 
-    // Beim Start von Drive laden (falls Token vorhanden)
-    if (this._oauthClientId && this._oauthTokenValid()) {
-      try { await this._syncDownloadAll(); } catch(e) { console.warn('[init sync]', e.message); }
+    // Sync beim Start: erst Upload wenn lokal neuer, dann Download
+    if (this._oauthClientId) {
+      const token = await this._oauthGetTokenSilent();
+      if (token) {
+        const localNewerThanDrive = this._syncLastUpload > this._syncLastDownload;
+        if (this.isDirty || localNewerThanDrive) {
+          try { await this._syncUploadAll(); } catch(e) { console.warn('[init upload]', e.message); }
+        }
+        try { await this._syncDownloadAll(); } catch(e) { console.warn('[init download]', e.message); }
+      } else {
+        this._oauthShowBanner('\u26a0 Bitte Google-Verbindung erneuern');
+        this._syncLastUpload = Date.now(); this._syncLastDownload = Date.now();
+      }
+    } else {
+      this._syncLastUpload = Date.now(); this._syncLastDownload = Date.now();
     }
 
     // Auto-Bereinigung: Items älter als 7 Tage permanent löschen
