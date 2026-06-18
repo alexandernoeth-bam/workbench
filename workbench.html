@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.5.9</title>
+  <title>WorkBench 2.6.0</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1957,7 +1957,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.5.9</div>
+  <div id="wb-startup-tagline">v2.6.0</div>
 </div>
 
 <div id="wb-app">
@@ -1969,7 +1969,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.5.9 · Build 20260618-1050</div>
+    <div id="wb-menu-version">v2.6.0 · Build 20260618-1200</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -2401,8 +2401,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.5.9',
-  APP_BUILD:   '20260618-1050',
+  APP_VERSION: '2.6.0',
+  APP_BUILD:   '20260618-1200',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3392,22 +3392,26 @@ const WB = {
   _vhDetailOffen: false,
 
   _vhOpenDetail(vorhabenId, ctx) {
+    this._vhAlleFilter = null; // Pill-Modus verlassen
+    document.querySelectorAll('.vh-sec-pill').forEach(p => p.classList.remove('active'));
     this._vhAktivId  = vorhabenId;
     this._vhAktivCtx = ctx;
     this._vhRenderDetail(vorhabenId, ctx);
     const detail = document.getElementById('vh-detail-col');
     if (detail) { detail.classList.add('open'); this._vhDetailOffen = true; }
-    document.querySelectorAll('.vh-item').forEach(el => el.classList.remove('active'));
-    const aktEl = document.querySelector('.vh-item[data-id="' + vorhabenId + '"]');
+    document.querySelectorAll('.vh-card').forEach(el => el.classList.remove('active'));
+    const aktEl = document.querySelector('.vh-card[data-id="' + vorhabenId + '"]');
     if (aktEl) aktEl.classList.add('active');
   },
 
   _vhCloseDetail() {
     const detail = document.getElementById('vh-detail-col');
     if (detail) { detail.classList.remove('open'); this._vhDetailOffen = false; }
-    document.querySelectorAll('.vh-item').forEach(el => el.classList.remove('active'));
-    this._vhAktivId  = null;
-    this._vhAktivCtx = null;
+    document.querySelectorAll('.vh-item,.vh-card').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.vh-sec-pill').forEach(p => p.classList.remove('active'));
+    this._vhAktivId   = null;
+    this._vhAktivCtx  = null;
+    this._vhAlleFilter = null;
   },
 
   _vhDelete(vorhabenId, ctx) {
@@ -3433,35 +3437,56 @@ const WB = {
 
   _vhRenderAlleAufgaben(ctx) {
     const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
-    const alle = [];
-    (db?.vorhaben||[]).filter(v => !v.deleted && v.aktiv!==false).forEach(v => {
-      (v.aufgaben||[]).filter(a => !a.deleted && !a.done).forEach(a => {
-        alle.push({ ...a, _vorhabenTitel:v.titel, _vorhabenId:v.id, _ctx:ctx,
-          _clTotal:(a.checklist||[]).length, _clDone:(a.checklist||[]).filter(c=>c.done).length });
-      });
-    });
-    const mitDatum  = alle.filter(a => a.datum).sort((a,b) => a.datum.localeCompare(b.datum));
-    const ohneDatum = alle.filter(a => !a.datum);
-    const sorted = [...mitDatum, ...ohneDatum];
     const badge = ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
+
+    // Aufgaben nach Vorhaben clustern
+    const vorhaben = (db?.vorhaben||[]).filter(v => !v.deleted && v.aktiv!==false);
+    const gesamtOffen = vorhaben.reduce((s,v) => s + (v.aufgaben||[]).filter(a => !a.deleted && !a.done).length, 0);
+
     let h = '<div class="vh-alle-head"><div class="vh-alle-title">Alle offenen Aufgaben ' + badge + '</div>'
-      + '<div class="vh-alle-sub">' + sorted.length + ' Aufgaben \u00b7 chronologisch</div></div>'
-      + '<div class="vh-alle-hint">Mit Datum \u2192 ohne Datum am Ende</div>';
-    if (!sorted.length) {
+      + '<div class="vh-alle-sub">' + gesamtOffen + ' offen \u00b7 nach Vorhaben</div></div>';
+
+    if (!gesamtOffen) {
       h += '<div style="padding:20px 12px;color:var(--faint);font-size:13px;text-align:center;">Keine offenen Aufgaben \u2713</div>';
-    } else {
+      return h;
+    }
+
+    vorhaben.forEach(v => {
+      const offen = (v.aufgaben||[]).filter(a => !a.deleted && !a.done);
+      if (!offen.length) return;
+
+      // Vorhaben-Header
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 12px 4px;'
+        + 'background:var(--surface2);border-bottom:0.5px solid var(--border);'
+        + 'border-top:0.5px solid var(--border);margin-top:1px;">'
+        + '<span style="font-size:11px;font-weight:700;color:var(--muted);flex:1;'
+        + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + this._esc(v.titel) + '</span>'
+        + '<span style="font-size:10px;color:var(--faint);">' + offen.length + '</span>'
+        + '</div>';
+
+      // Aufgaben sortiert: mit Datum zuerst
+      const mitDatum  = offen.filter(a => a.datum).sort((a,b) => a.datum.localeCompare(b.datum));
+      const ohneDatum = offen.filter(a => !a.datum);
+      const sorted = [...mitDatum, ...ohneDatum];
+
       sorted.forEach(a => {
-        const datum = a.datum ? this._fmtDatum(a.datum) : null;
-        h += '<div class="vh-alle-row" onclick="WB.aufgabeOpen(&quot;' + this._esc(a._vorhabenId) + '&quot;,&quot;' + this._esc(a.id) + '&quot;,&quot;' + a._ctx + '&quot;)">'
+        const datum    = a.datum ? this._fmtDatum(a.datum) : null;
+        const clTotal  = (a.checklist||[]).length;
+        const clDone   = (a.checklist||[]).filter(c=>c.done).length;
+        const naechster = (a.checklist||[]).find(c=>!c.done)?.text || '';
+        h += '<div class="vh-alle-row" onclick="WB.aufgabeOpen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + this._esc(a.id) + '&quot;,&quot;' + ctx + '&quot;)">'
           + '<div class="vh-alle-chk"></div>'
-          + '<div class="vh-alle-body"><div class="vh-alle-txt">' + this._esc(a.text) + '</div>'
-          + '<div class="vh-alle-sub-txt">' + this._esc(a._vorhabenTitel) + '</div></div>'
+          + '<div class="vh-alle-body">'
+          + '<div class="vh-alle-txt">' + this._esc(a.text) + '</div>'
+          + (naechster ? '<div class="vh-alle-sub-txt">\u2192 ' + this._esc(naechster) + '</div>' : '')
+          + '</div>'
           + '<div class="vh-alle-right">'
           + (datum ? '<div class="vh-alle-date">' + datum + '</div>' : '<div class="vh-alle-date kein">\u2013</div>')
-          + (a._clTotal > 0 ? '<div class="vh-alle-cl">' + a._clDone + '/' + a._clTotal + '</div>' : '')
+          + (clTotal > 0 ? '<div class="vh-alle-cl">' + clDone + '/' + clTotal + '</div>' : '')
           + '</div></div>';
       });
-    }
+    });
+
     return h;
   },
 
