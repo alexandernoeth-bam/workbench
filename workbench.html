@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.6.0</title>
+  <title>WorkBench 2.6.1</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1957,7 +1957,7 @@
 
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v2.6.0</div>
+  <div id="wb-startup-tagline">v2.6.1</div>
 </div>
 
 <div id="wb-app">
@@ -1969,7 +1969,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.6.0 · Build 20260618-1200</div>
+    <div id="wb-menu-version">v2.6.1 · Build 20260618-1230</div>
     <button id="wb-buero-btn" onclick="WB._bueroToggle()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -2137,6 +2137,7 @@
             <div id="vh-detail-title-header">Vorhaben</div>
           </div>
           <div id="vh-detail-content" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+            <div id="vh-alle-container" style="display:none;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
             <div id="vh-detail">
               <div id="vh-detail-head">
                 <div id="vh-detail-title" style="color:var(--faint);font-size:15px;">Vorhaben wählen</div>
@@ -2401,8 +2402,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.6.0',
-  APP_BUILD:   '20260618-1200',
+  APP_VERSION: '2.6.1',
+  APP_BUILD:   '20260618-1230',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3581,14 +3582,28 @@ const WB = {
   },
 
   _vhRenderDetail(id, ctx) {
+    const detEl = document.getElementById('vh-detail-col');
+
     // Alle-Aufgaben-Modus wenn Pill geklickt
     if (this._vhAlleFilter) {
-      const detEl = document.getElementById('vh-detail-col');
-      const contentEl = document.getElementById('vh-detail-content') || detEl;
-      if (contentEl) contentEl.innerHTML = this._vhRenderAlleAufgaben(this._vhAlleFilter);
+      // Normales Detail verstecken, Alle-Container zeigen
+      const normalDetail = document.getElementById('vh-detail');
+      const alleEl = document.getElementById('vh-alle-container');
+      if (normalDetail) normalDetail.style.display = 'none';
+      if (alleEl) {
+        alleEl.style.display = '';
+        alleEl.innerHTML = this._vhRenderAlleAufgaben(this._vhAlleFilter);
+      }
       if (detEl) detEl.classList.add('open');
       return;
     }
+
+    // Normaler Vorhaben-Modus: normales Detail zeigen, Alle-Container verstecken
+    const normalDetail = document.getElementById('vh-detail');
+    const alleEl = document.getElementById('vh-alle-container');
+    if (normalDetail) normalDetail.style.display = '';
+    if (alleEl) alleEl.style.display = 'none';
+
     const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
     const v  = (db?.vorhaben || []).find(x => x.id === id);
     if (!v) return;
