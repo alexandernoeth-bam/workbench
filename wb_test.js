@@ -819,7 +819,7 @@ if (rkBody.includes('Math.max') && rkBody.includes('32')) {
 }
 
 // _woView Standardwert 'list'
-if (jsCode.includes("_woView:    'list'") || jsCode.includes("_woView: 'list'") || jsCode.includes('_woView:\'list\'')) {
+if (content.includes("_woView:    'list'") || content.includes("_woView: 'list'") || content.includes("_woView:'list'") || content.includes("_woView:        'list'")) {
   ok("_woView Standardwert 'list'");
   woOk++;
 } else {
@@ -2584,6 +2584,35 @@ content.includes('id="wb-crypto-overlay"')
   ? (ok('workbench.json als Drive-Datei'), f68Ok++) : (fail('workbench.json nicht gefunden'), f68Fail++);
 
 if (f68Fail === 0) ok(f68Ok + ' Sync-v2 Checks bestanden');
+
+// ══════════════════════════════════════════
+// 70. WOCHE MOBILE
+// ══════════════════════════════════════════
+console.log('\n── 70. Woche Mobile ──');
+let f70Ok = 0, f70Fail = 0;
+content.includes('.wb-mobile .wo-cal-btn') ? (ok('.wb-mobile .wo-cal-btn display:none'), f70Ok++) : (fail('.wb-mobile .wo-cal-btn fehlt'), f70Fail++);
+content.includes('.wb-mobile #wo-motto-block') ? (ok('.wb-mobile #wo-motto-block display:none'), f70Ok++) : (fail('.wb-mobile #wo-motto-block fehlt'), f70Fail++);
+content.includes('_woMobileOffset') ? (ok('_woMobileOffset definiert'), f70Ok++) : (fail('_woMobileOffset fehlt'), f70Fail++);
+content.includes('dir < 0') && content.includes('_isMobile') ? (ok('_woNavWeek prüft Mobile + dir<0'), f70Ok++) : (fail('_woNavWeek Mobile-Guard fehlt'), f70Fail++);
+content.includes("_woView = 'list'") && content.includes('_isMobile()') ? (ok('renderWoche setzt Mobile→list'), f70Ok++) : (fail('renderWoche Mobile-Liste fehlt'), f70Fail++);
+if (f70Ok > 0 && f70Fail === 0) ok(f70Ok + ' Woche-Mobile Checks bestanden');
+
+// ══════════════════════════════════════════
+// 71. AUFGABEN-TAB
+// ══════════════════════════════════════════
+console.log('\n── 71. Aufgaben-Tab ──');
+let f71Ok = 0, f71Fail = 0;
+content.includes('id="sec-aufgaben"') ? (ok('#sec-aufgaben vorhanden'), f71Ok++) : (fail('#sec-aufgaben fehlt'), f71Fail++);
+content.includes('id="aufgaben-scroll"') ? (ok('#aufgaben-scroll vorhanden'), f71Ok++) : (fail('#aufgaben-scroll fehlt'), f71Fail++);
+content.includes('renderAufgabenTab') ? (ok('renderAufgabenTab() definiert'), f71Ok++) : (fail('renderAufgabenTab fehlt'), f71Fail++);
+content.includes("case 'aufgaben'") ? (ok("case 'aufgaben' in tabSwitch/renderSection"), f71Ok++) : (fail("case 'aufgaben' fehlt"), f71Fail++);
+content.includes('.at-grp {') || content.includes('.at-grp{') ? (ok('.at-grp CSS vorhanden'), f71Ok++) : (fail('.at-grp CSS fehlt'), f71Fail++);
+content.includes('.at-grp-body') && (content.includes('display:none') || content.includes('display: none')) ? (ok('.at-grp-body display:none'), f71Ok++) : (fail('.at-grp-body display:none fehlt'), f71Fail++);
+content.includes('.at-grp.open .at-grp-body { display:block') || content.includes('.at-grp.open .at-grp-body{display:block') ? (ok('.at-grp.open display:block'), f71Ok++) : (fail('.at-grp.open CSS fehlt'), f71Fail++);
+content.includes('_formatDatumKurz') ? (ok('_formatDatumKurz() definiert'), f71Ok++) : (fail('_formatDatumKurz fehlt'), f71Fail++);
+content.includes('_woPflichtFreqLabel') ? (ok('_woPflichtFreqLabel() definiert'), f71Ok++) : (fail('_woPflichtFreqLabel fehlt'), f71Fail++);
+content.includes('charOrd') && content.includes('bereichernd') ? (ok('Vorhaben nach charOrd sortiert'), f71Ok++) : (fail('charOrd fehlt'), f71Fail++);
+if (f71Ok > 0 && f71Fail === 0) ok(f71Ok + ' Aufgaben-Tab Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════
