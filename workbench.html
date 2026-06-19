@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.3</title>
+  <title>WorkBench 2.9.4</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2090,7 +2090,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.3</div>
+  <div id="wb-startup-tagline">v2.9.4</div>
 </div>
 
 <div id="wb-app">
@@ -2102,7 +2102,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.9.3 · Build 20260619-0900</div>
+    <div id="wb-menu-version">v2.9.4 · Build 20260619-1000</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2541,8 +2541,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.3',
-  APP_BUILD:   '20260619-0900',
+  APP_VERSION: '2.9.4',
+  APP_BUILD:   '20260619-1000',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -5565,10 +5565,13 @@ _ftStart() {
   },
 
   _cryptoKeyFresh() {
+    const pw = sessionStorage.getItem('wb_enc_pw');
+    // Passwort vorhanden → fresh (auch bei falschem Datum / Page-Refresh)
+    if (pw) return true;
+    // Heute schon entsperrt
     const today = this._dStr(new Date());
     const saved = localStorage.getItem('wb_key_date');
-    const pw    = sessionStorage.getItem('wb_enc_pw');
-    return saved === today && !!pw;
+    return saved === today;
   },
 
   _cryptoShowDialog(onSuccess) {
@@ -5584,10 +5587,10 @@ _ftStart() {
   _cryptoOnSuccess: null,
 
   async _cryptoUnlock() {
-    const pw  = document.getElementById('wb-crypto-pw');
-    const err = document.getElementById('wb-crypto-err');
-    const btn = document.getElementById('wb-crypto-btn');
-    const password = pw?.value?.trim() || '';
+    const pwEl  = document.getElementById('wb-crypto-pw');
+    const errEl = document.getElementById('wb-crypto-err');
+    const btn   = document.getElementById('wb-crypto-btn');
+    const password = pwEl?.value?.trim() || '';
     if (!password) return;
     if (btn) { btn.textContent = 'Pr\u00fcfe...'; btn.disabled = true; }
     try {
@@ -5598,8 +5601,8 @@ _ftStart() {
       if (this._cryptoOnSuccess) await this._cryptoOnSuccess();
     } catch(e) {
       sessionStorage.removeItem('wb_enc_pw');
-      if (err) err.style.display = 'block';
-      if (pw)  { pw.value = ''; pw.focus(); }
+      if (errEl) errEl.style.display = 'block';
+      if (pwEl)  { pwEl.value = ''; pwEl.focus(); }
     } finally {
       if (btn) { btn.textContent = 'Entsperren'; btn.disabled = false; }
     }
@@ -5628,7 +5631,7 @@ _ftStart() {
 
   async idbLoad() {
     try {
-      const db     = await this.idbGet('data', 'db');
+      const dbRaw  = await this.idbGet('data', 'db');
       const lastUp = await this.idbGet('meta', 'lastUpload');
       const lastDn = await this.idbGet('meta', 'lastDownload');
       const pend   = await this.idbGet('meta', 'pendingChanges');
@@ -5637,14 +5640,21 @@ _ftStart() {
       if (lastDn) this._syncLastDownload = parseInt(lastDn)  || 0;
       if (pend)   this._pendingChanges   = pend === 'true';
       if (fid)    this._driveFileId      = fid;
-      if (db) {
-        this.db = db;
+      if (dbRaw && dbRaw._version) {
+        // Neue Struktur vorhanden
+        this.db = dbRaw;
       } else {
-        // Alte dataPro/dataPriv laden → Migration
+        // Alte Struktur laden für Migration
         const pro  = await this.idbGet('data', 'dataPro');
         const priv = await this.idbGet('data', 'dataPriv');
-        if (pro || priv) { this.dataPro = pro; this.dataPriv = priv; }
-        else this.db = this._emptyDb();
+        if (pro || priv) {
+          this.dataPro  = pro  || null;
+          this.dataPriv = priv || null;
+          // db bleibt null → Migration läuft in _migrate_v2
+        } else {
+          // Wirklich leer → leere db
+          this.db = this._emptyDb();
+        }
       }
     } catch(e) {
       console.warn('[idbLoad]', e.message);
@@ -5653,7 +5663,17 @@ _ftStart() {
   },
 
   async _migrate_v2() {
-    if (this.db && this.db._version) return;
+    const hasPro  = !!(this.dataPro?.vorhaben || this.dataPro?.quickItems || this.dataPro?.customEvents);
+    const hasPriv = !!(this.dataPriv?.vorhaben || this.dataPriv?.quickItems || this.dataPriv?.customEvents);
+    if (!hasPro && !hasPriv) {
+      // Keine alten Daten → db sicherstellen
+      if (!this.db) this.db = this._emptyDb();
+      if (!this.db._version) this.db._version = 1;
+      return;
+    }
+    // Bereits migriert?
+    if (this.db?._version && this.db?._migratedAt) return;
+    console.log('[migrate_v2] Starte Migration...');
     const pro  = this.dataPro  || {};
     const priv = this.dataPriv || {};
     const mergeById = (arrA, arrB, weltA, weltB) => {
@@ -5685,17 +5705,7 @@ _ftStart() {
     await this.idbSave();
     this.setDirty();
     console.log('[migrate_v2] Migration abgeschlossen');
-  },
-
-  async idbSave() {
-    try {
-      // v2: idbSave() handles this
-      // v2: idbSave() handles this
-      await this.idbSet('meta', 'lastSaved', Date.now());
-      this.isDirty = false;
-    } catch(e) {
-      this._toast('Speicherfehler: ' + e.message);
-    }
+    this._toast('\u2713 Daten migriert');
   },
 
   setDirty() {
@@ -5950,6 +5960,8 @@ _ftStart() {
   },
 
   async _syncUpload() {
+    // Guard: db muss vorhanden sein
+    if (!this.db) { console.warn('[syncUpload] db not ready'); return; }
     try {
       // Kein Passwort → Daten lokal halten, Banner zeigen
       const pw = sessionStorage.getItem('wb_enc_pw');
@@ -6010,13 +6022,20 @@ _ftStart() {
       } else {
         this.db = payload.data || payload;
       }
-      if (!this.db) this.db = this._emptyDb();
-      // updatedAt Migration
+      // db validieren
+      if (!this.db || typeof this.db !== 'object') this.db = this._emptyDb();
+      if (!this.db._version) this.db._version = 1;
       await this._migrate_v2();
       this._syncLastDownload = Date.now();
       await this.idbSave();
       this._oauthHideBanner(); this._sUpdateSyncStatus();
-      this.renderSection(this.activeTab);
+      // UI aktualisieren — auch wenn tabSwitch noch nicht erfolgt ist
+      if (this.activeTab) {
+        this.renderSection(this.activeTab);
+      } else {
+        this.tabSwitch('cockpit');
+      }
+      this._ckLadeHeutigerEintrag();
     } catch(e) {
       console.warn('[syncDownload]', e.message);
       this._oauthShowBanner('\u26a0 Sync-Fehler: ' + e.message);
@@ -6170,17 +6189,20 @@ _ftStart() {
     this._weltInit();
     this._oauthCheckToken();
 
-    // Migration falls nötig
+    // Migration MUSS vor jedem syncUpload laufen
     await this._migrate_v2();
+
+    // db sicherstellen bevor Upload
+    if (!this.db) this.db = this._emptyDb();
 
     // Drive laden — Fehler dürfen App nicht blockieren
     if (this._oauthClientId) {
       try {
-        if (this._pendingChanges || this.isDirty) await this._syncUpload();
+        if ((this._pendingChanges || this.isDirty) && this.db) await this._syncUpload();
       } catch(e) { console.warn('[init upload]', e.message); }
       try { await this._syncDownload(); } catch(e) { console.warn('[init download]', e.message); }
       try {
-        if (this.isDirty) await this._syncUpload();
+        if (this.isDirty && this.db) await this._syncUpload();
       } catch(e) { console.warn('[init upload2]', e.message); }
     }
 
