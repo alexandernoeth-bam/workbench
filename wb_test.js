@@ -2632,6 +2632,48 @@ content.includes('db.notizen')            ? (ok('db.notizen genutzt'),          
 content.includes('gepinnt') && (content.includes('Max. 2') || content.includes('Max. 3')) ? (ok('Pin-Limit gesetzt'), f72Ok++) : (fail('Pin-Limit fehlt'), f72Fail++);
 if (f72Fail === 0) ok(f72Ok + ' Notizen-Tab Checks bestanden');
 
+// ══════════════════════════════════════════
+// 73. NOTIZEN DRAG-REORDER + SHARE-TARGET
+// ══════════════════════════════════════════
+console.log('\n── 73. Notizen Drag-Reorder + Share-Target ──');
+let f73Ok = 0, f73Fail = 0;
+
+// Drag-Reorder
+content.includes('_nzInitDrag(')
+  ? (ok('_nzInitDrag() definiert'), f73Ok++) : (fail('_nzInitDrag() fehlt'), f73Fail++);
+content.includes('_nzMoveItem(')
+  ? (ok('_nzMoveItem() definiert'), f73Ok++) : (fail('_nzMoveItem() fehlt'), f73Fail++);
+content.includes('nz-dragging')
+  ? (ok('.nz-dragging CSS vorhanden'), f73Ok++) : (fail('.nz-dragging fehlt'), f73Fail++);
+content.includes('nz-drag-over')
+  ? (ok('.nz-drag-over CSS vorhanden'), f73Ok++) : (fail('.nz-drag-over fehlt'), f73Fail++);
+content.includes('data-lid=') && content.includes('data-iid=')
+  ? (ok('nz-item hat data-lid + data-iid Attribute'), f73Ok++) : (fail('nz-item data-Attribute fehlen'), f73Fail++);
+// Kein splice() im _nzMoveItem (Soft-Delete-Prinzip)
+const nzMoveStart = jsCode.indexOf('  _nzMoveItem(');
+const nzMoveEnd   = nzMoveStart > 0 ? jsCode.indexOf('\n  },\n', nzMoveStart) : -1;
+const nzMoveBody  = nzMoveStart > 0 && nzMoveEnd > 0 ? jsCode.slice(nzMoveStart, nzMoveEnd) : '';
+!nzMoveBody.includes('.splice(')
+  ? (ok('_nzMoveItem: kein splice() — Array-Rebuild korrekt'), f73Ok++)
+  : (fail('_nzMoveItem: splice() gefunden — verletzt Soft-Delete-Konvention'), f73Fail++);
+// Touch-Support
+content.includes('touchstart') && content.includes('touchmove') && content.includes('touchend')
+  ? (ok('Touch-Events für Drag vorhanden'), f73Ok++) : (fail('Touch-Events fehlen'), f73Fail++);
+
+// Share-Target
+content.includes('_nzHandleShareTarget(')
+  ? (ok('_nzHandleShareTarget() definiert'), f73Ok++) : (fail('_nzHandleShareTarget() fehlt'), f73Fail++);
+content.includes('share_url') && content.includes('share_title')
+  ? (ok('Share-Parameter share_url + share_title ausgelesen'), f73Ok++) : (fail('Share-Parameter fehlen'), f73Fail++);
+content.includes('URLSearchParams')
+  ? (ok('URLSearchParams für Share-Target genutzt'), f73Ok++) : (fail('URLSearchParams fehlt'), f73Fail++);
+content.includes('history.replaceState')
+  ? (ok('history.replaceState() — URL nach Share bereinigt'), f73Ok++) : (fail('history.replaceState() fehlt'), f73Fail++);
+content.includes('_nzHandleShareTarget')
+  ? (ok('_nzHandleShareTarget in _initAfterCrypto aufgerufen'), f73Ok++) : (fail('_nzHandleShareTarget nicht aufgerufen'), f73Fail++);
+
+if (f73Fail === 0) ok(f73Ok + ' Drag-Reorder + Share-Target Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
