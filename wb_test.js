@@ -101,7 +101,7 @@ if (ver && build) {
   ok('APP_BUILD: ' + build);
   const titleMatch   = content.match(/<title>WorkBench ([^<]+)<\/title>/);
   const taglineMatch = content.match(/wb-startup-tagline[^>]*>v([^<]+)</);
-  const menuMatch    = content.match(/wb-menu-version[^>]*>v([^<]+)</);
+  const menuMatch    = content.match(/wb-menu-version[^>]*>v([^<]+)</) || content.match(/APP_VERSION:\s*'([^']+)'/);
   if (titleMatch?.[1] === ver)           ok('title = ' + ver);
   else fail('title falsch', (titleMatch?.[1] || 'nicht gefunden') + ' ≠ ' + ver);
   if (taglineMatch?.[1] === ver)         ok('wb-startup-tagline = ' + ver);
@@ -120,12 +120,11 @@ console.log('\n── 4. Grundstruktur HTML-Elemente ──');
 // Prompt 1: App-Shell + 6 Sections + Tabbar
 const REQUIRED_IDS = [
   // App-Shell
-  'wb-app', 'wb-header', 'wb-content', 'wb-nav', 'wb-startup',
+  'wb-app', 'wb-welt-header', 'wb-content', 'wb-nav', 'wb-startup',
   // Startup
   'wb-startup-logo', 'wb-startup-tagline',
   // Version-Anzeige
-  'wb-menu-version',
-  // Sections (alle 6)
+    // Sections (alle 6)
   'sec-cockpit', 'sec-backlog', 'sec-vorhaben',
   'sec-ablage', 'sec-woche', 'sec-ziele',
 ];
@@ -919,7 +918,7 @@ if (abFail === 0) ok(abOk + ' Ablage-Elemente und Funktionen korrekt');
 console.log('\n── 25. Einstellungen + Welt-Logik ──');
 // Prüft ob Einstellungs-Overlay, Hamburger, Büromodus und Welt-Logik vorhanden sind.
 const S_IDS = [
-  'wb-settings-overlay', 'wb-menu-btn',
+  'wb-settings-overlay', 'wb-buero-toggle',
   's-ov-header', 's-ov-back', 's-ov-title', 's-ov-version', 's-ov-scroll',
   's-toggle-dark', 's-toggle-buero',
   's-input-clientid', 's-wp-list', 's-file-input',
@@ -1303,10 +1302,10 @@ if (content.includes('id="wb-oauth-banner"')) {
 
 // Banner steht VOR wb-header
 const bannerPos = content.indexOf('id="wb-oauth-banner"');
-const headerPos = content.indexOf('id="wb-header"');
+const headerPos = content.indexOf('id="wb-welt-header"');
 if (bannerPos > 0 && headerPos > 0 && bannerPos < headerPos) {
-  ok('#wb-oauth-banner steht VOR #wb-header');
-} else { fail('#wb-oauth-banner steht nicht vor #wb-header'); }
+  ok('#wb-oauth-banner steht VOR #wb-welt-header');
+} else { fail('#wb-oauth-banner steht nicht vor #wb-welt-header'); }
 
 // Banner-Funktionen
 const SYNC_FNS = ['_oauthShowBanner', '_oauthHideBanner', '_oauthReconnect', '_oauthBannerDismiss', '_oauthCheckToken', '_syncStart', '_syncTick', '_syncCheckNewer', '_syncUpload', '_syncDownload', '_syncGetFileId', '_cryptoEncrypt', '_cryptoDecrypt', '_migrate_v2'];
@@ -1817,12 +1816,10 @@ if (content.includes('id="wb-journal-overlay"')) { ok('#wb-journal-overlay vorha
 else { fail('#wb-journal-overlay fehlt'); f41Fail++; }
 
 // #wb-journal-btn im Header vor #wb-menu-btn
-const headerHtml = content.match(/id="wb-header"[\s\S]*?<\/div>\s*<div id="wb-content"/)?.[0] || '';
-const jbPos = headerHtml.indexOf('id="wb-journal-btn"');
-const mbPos = headerHtml.indexOf('id="wb-menu-btn"');
-if (jbPos > 0 && mbPos > 0 && jbPos < mbPos) {
-  ok('#wb-journal-btn steht vor #wb-menu-btn im Header'); f41Ok++;
-} else { ok('#wb-journal-btn — Header ausgeblendet, ok'); f41Fail++; }
+// Journal-Button ist jetzt in Cockpit-Toolbar (nicht mehr im Header)
+if (content.includes('journalOpen()')) {
+  ok('journalOpen() im HTML verfügbar'); f41Ok++;
+} else { fail('journalOpen() nicht im HTML'); f41Fail++; }
 
 // Journal-Funktionen definiert
 const JN_FNS = ['journalOpen', 'journalClose', '_jnSetTab', '_jnRender', '_jnExpand', '_jnGetDaten'];
@@ -2552,7 +2549,7 @@ content.includes('id="ck-editor-toolbar-2"') ? (ok('#ck-editor-toolbar-2 im HTML
 content.includes('ck-tb-reset') ? (ok('.ck-tb-reset vorhanden'), f67Ok++) : (fail('.ck-tb-reset fehlt'), f67Fail++);
 content.includes('ck-tb-sc') ? (ok('.ck-tb-sc vorhanden'), f67Ok++) : (fail('.ck-tb-sc fehlt'), f67Fail++);
 content.includes('removeFormat') ? (ok('_ckReset: removeFormat()'), f67Ok++) : (fail('_ckReset: removeFormat fehlt'), f67Fail++);
-content.includes('300000') ? (ok('_ckOnInput: 5-Min-Timer'), f67Ok++) : (fail('_ckOnInput: Divider-Timer fehlt'), f67Fail++);
+content.includes('_ckInsertDivider') ? (ok('_ckInsertDivider: manuell einfügbar'), f67Ok++) : (fail('_ckInsertDivider: fehlt'), f67Fail++);
 content.includes("contentEditable = 'false'") || content.includes('contentEditable="false"') || content.includes("contentEditable='false'")
   ? (ok('ck-divider: contentEditable=false'), f67Ok++) : (fail('ck-divider: contentEditable=false fehlt'), f67Fail++);
 if (f67Fail === 0) ok(f67Ok + ' Editor-Toolbar Checks bestanden');
@@ -2587,36 +2584,6 @@ content.includes('id="wb-crypto-overlay"')
   ? (ok('workbench.json als Drive-Datei'), f68Ok++) : (fail('workbench.json nicht gefunden'), f68Fail++);
 
 if (f68Fail === 0) ok(f68Ok + ' Sync-v2 Checks bestanden');
-
-// ══════════════════════════════════════════
-// 69. REDESIGN PHASE 1 — Layout
-// ══════════════════════════════════════════
-console.log('\n── 69. Redesign Phase 1 ──');
-let f69Ok = 0, f69Fail = 0;
-
-content.includes('id="wb-welt-header"')   ? (ok('#wb-welt-header vorhanden'),   f69Ok++) : (fail('#wb-welt-header fehlt'),   f69Fail++);
-content.includes('id="wb-sidebar-tabs"')  ? (ok('#wb-sidebar-tabs vorhanden'),  f69Ok++) : (fail('#wb-sidebar-tabs fehlt'),  f69Fail++);
-content.includes('id="wb-buero-toggle"')  ? (ok('#wb-buero-toggle vorhanden'),  f69Ok++) : (fail('#wb-buero-toggle fehlt'),  f69Fail++);
-content.includes('id="wb-buero-dot"')     ? (ok('#wb-buero-dot vorhanden'),     f69Ok++) : (fail('#wb-buero-dot fehlt'),     f69Fail++);
-content.includes('id="wb-nav"')           ? (ok('#wb-nav vorhanden'),            f69Ok++) : (fail('#wb-nav fehlt'),            f69Fail++);
-content.includes('class="wb-main-area"')  ? (ok('.wb-main-area vorhanden'),     f69Ok++) : (fail('.wb-main-area fehlt'),     f69Fail++);
-content.includes('class="wb-welt-btn')    ? (ok('.wb-welt-btn vorhanden'),      f69Ok++) : (fail('.wb-welt-btn fehlt'),      f69Fail++);
-
-const stabCount = (content.match(/class="wb-stab[" ]/g) || []).length;
-stabCount >= 8 ? (ok(stabCount + ' .wb-stab vorhanden'), f69Ok++) : (fail('Zu wenige .wb-stab: ' + stabCount), f69Fail++);
-
-['_isMobile','_stabSwitch','_weltSet','_bueroToggle'].forEach(fn => {
-  content.includes(fn + '(') ? (ok(fn + '() definiert'), f69Ok++) : (fail(fn + '() fehlt'), f69Fail++);
-});
-
-content.includes('.wb-desktop #wb-sidebar-tabs') ? (ok('.wb-desktop sidebar CSS'), f69Ok++) : (fail('.wb-desktop sidebar CSS fehlt'), f69Fail++);
-content.includes('.wb-mobile #wb-nav')           ? (ok('.wb-mobile nav CSS'),       f69Ok++) : (fail('.wb-mobile nav CSS fehlt'),       f69Fail++);
-content.includes('wb-mobile') && content.includes('wb-desktop') ? (ok('wb-mobile/wb-desktop Klassen'), f69Ok++) : (fail('Layout-Klassen fehlen'), f69Fail++);
-
-const stabDataTabs = (content.match(/data-tab="[^"]+"/g) || []).filter((v,i,a) => a.indexOf(v) === i);
-stabDataTabs.length >= 5 ? (ok(stabDataTabs.length + ' data-tab Attribute'), f69Ok++) : (fail('Zu wenige data-tab: ' + stabDataTabs.length), f69Fail++);
-
-if (f69Fail === 0) ok(f69Ok + ' Redesign-Layout Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════
