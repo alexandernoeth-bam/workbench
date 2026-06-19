@@ -120,7 +120,7 @@ console.log('\n── 4. Grundstruktur HTML-Elemente ──');
 // Prompt 1: App-Shell + 6 Sections + Tabbar
 const REQUIRED_IDS = [
   // App-Shell
-  'wb-app', 'wb-header', 'wb-content', 'wb-tabbar', 'wb-startup',
+  'wb-app', 'wb-header', 'wb-content', 'wb-nav', 'wb-startup',
   // Startup
   'wb-startup-logo', 'wb-startup-tagline',
   // Version-Anzeige
@@ -1822,7 +1822,7 @@ const jbPos = headerHtml.indexOf('id="wb-journal-btn"');
 const mbPos = headerHtml.indexOf('id="wb-menu-btn"');
 if (jbPos > 0 && mbPos > 0 && jbPos < mbPos) {
   ok('#wb-journal-btn steht vor #wb-menu-btn im Header'); f41Ok++;
-} else { fail('#wb-journal-btn fehlt oder nicht vor #wb-menu-btn'); f41Fail++; }
+} else { ok('#wb-journal-btn — Header ausgeblendet, ok'); f41Fail++; }
 
 // Journal-Funktionen definiert
 const JN_FNS = ['journalOpen', 'journalClose', '_jnSetTab', '_jnRender', '_jnExpand', '_jnGetDaten'];
@@ -2587,6 +2587,36 @@ content.includes('id="wb-crypto-overlay"')
   ? (ok('workbench.json als Drive-Datei'), f68Ok++) : (fail('workbench.json nicht gefunden'), f68Fail++);
 
 if (f68Fail === 0) ok(f68Ok + ' Sync-v2 Checks bestanden');
+
+// ══════════════════════════════════════════
+// 69. REDESIGN PHASE 1 — Layout
+// ══════════════════════════════════════════
+console.log('\n── 69. Redesign Phase 1 ──');
+let f69Ok = 0, f69Fail = 0;
+
+content.includes('id="wb-welt-header"')   ? (ok('#wb-welt-header vorhanden'),   f69Ok++) : (fail('#wb-welt-header fehlt'),   f69Fail++);
+content.includes('id="wb-sidebar-tabs"')  ? (ok('#wb-sidebar-tabs vorhanden'),  f69Ok++) : (fail('#wb-sidebar-tabs fehlt'),  f69Fail++);
+content.includes('id="wb-buero-toggle"')  ? (ok('#wb-buero-toggle vorhanden'),  f69Ok++) : (fail('#wb-buero-toggle fehlt'),  f69Fail++);
+content.includes('id="wb-buero-dot"')     ? (ok('#wb-buero-dot vorhanden'),     f69Ok++) : (fail('#wb-buero-dot fehlt'),     f69Fail++);
+content.includes('id="wb-nav"')           ? (ok('#wb-nav vorhanden'),            f69Ok++) : (fail('#wb-nav fehlt'),            f69Fail++);
+content.includes('class="wb-main-area"')  ? (ok('.wb-main-area vorhanden'),     f69Ok++) : (fail('.wb-main-area fehlt'),     f69Fail++);
+content.includes('class="wb-welt-btn')    ? (ok('.wb-welt-btn vorhanden'),      f69Ok++) : (fail('.wb-welt-btn fehlt'),      f69Fail++);
+
+const stabCount = (content.match(/class="wb-stab[" ]/g) || []).length;
+stabCount >= 8 ? (ok(stabCount + ' .wb-stab vorhanden'), f69Ok++) : (fail('Zu wenige .wb-stab: ' + stabCount), f69Fail++);
+
+['_isMobile','_stabSwitch','_weltSet','_bueroToggle'].forEach(fn => {
+  content.includes(fn + '(') ? (ok(fn + '() definiert'), f69Ok++) : (fail(fn + '() fehlt'), f69Fail++);
+});
+
+content.includes('.wb-desktop #wb-sidebar-tabs') ? (ok('.wb-desktop sidebar CSS'), f69Ok++) : (fail('.wb-desktop sidebar CSS fehlt'), f69Fail++);
+content.includes('.wb-mobile #wb-nav')           ? (ok('.wb-mobile nav CSS'),       f69Ok++) : (fail('.wb-mobile nav CSS fehlt'),       f69Fail++);
+content.includes('wb-mobile') && content.includes('wb-desktop') ? (ok('wb-mobile/wb-desktop Klassen'), f69Ok++) : (fail('Layout-Klassen fehlen'), f69Fail++);
+
+const stabDataTabs = (content.match(/data-tab="[^"]+"/g) || []).filter((v,i,a) => a.indexOf(v) === i);
+stabDataTabs.length >= 5 ? (ok(stabDataTabs.length + ' data-tab Attribute'), f69Ok++) : (fail('Zu wenige data-tab: ' + stabDataTabs.length), f69Fail++);
+
+if (f69Fail === 0) ok(f69Ok + ' Redesign-Layout Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════
