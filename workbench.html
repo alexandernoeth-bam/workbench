@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.4</title>
+  <title>WorkBench 2.9.5</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2090,7 +2090,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.4</div>
+  <div id="wb-startup-tagline">v2.9.5</div>
 </div>
 
 <div id="wb-app">
@@ -2102,7 +2102,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.9.4 · Build 20260619-1000</div>
+    <div id="wb-menu-version">v2.9.5 · Build 20260619-1100</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2541,8 +2541,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.4',
-  APP_BUILD:   '20260619-1000',
+  APP_VERSION: '2.9.5',
+  APP_BUILD:   '20260619-1100',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2564,7 +2564,7 @@ const WB = {
 
   _idb: null,
   _idbDevice: null,
-  _oauthClientId: null,
+  _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
   _oauthToken: null,
   _oauthTokenExp: null,
   _oauthDriveFileIds: { pro: null, priv: null },
@@ -5631,7 +5631,18 @@ _ftStart() {
 
   async idbLoad() {
     try {
-      const dbRaw  = await this.idbGet('data', 'db');
+      // Client-ID + Token
+      const clientId = await this.idbGet('meta', 'oauthClientId');
+      if (clientId) this._oauthClientId = clientId; // IDB-Wert hat Vorrang
+
+      const token    = await this.idbGet('meta', 'oauthToken');
+      const tokenExp = await this.idbGet('meta', 'oauthTokenExp');
+      if (token && tokenExp) {
+        this._oauthToken    = token;
+        this._oauthTokenExp = tokenExp;
+      }
+
+      // Sync-Timestamps
       const lastUp = await this.idbGet('meta', 'lastUpload');
       const lastDn = await this.idbGet('meta', 'lastDownload');
       const pend   = await this.idbGet('meta', 'pendingChanges');
@@ -5640,19 +5651,22 @@ _ftStart() {
       if (lastDn) this._syncLastDownload = parseInt(lastDn)  || 0;
       if (pend)   this._pendingChanges   = pend === 'true';
       if (fid)    this._driveFileId      = fid;
+
+      // Daten laden
+      const dbRaw = await this.idbGet('data', 'db');
       if (dbRaw && dbRaw._version) {
-        // Neue Struktur vorhanden
+        // Neue Struktur vorhanden → direkt nutzen
         this.db = dbRaw;
       } else {
-        // Alte Struktur laden für Migration
+        // Alte Struktur prüfen → Migration
         const pro  = await this.idbGet('data', 'dataPro');
         const priv = await this.idbGet('data', 'dataPriv');
         if (pro || priv) {
           this.dataPro  = pro  || null;
           this.dataPriv = priv || null;
-          // db bleibt null → Migration läuft in _migrate_v2
+          // db bleibt null → _migrate_v2() wird in _initAfterCrypto() aufgerufen
         } else {
-          // Wirklich leer → leere db
+          // Wirklich leer
           this.db = this._emptyDb();
         }
       }
@@ -6394,11 +6408,14 @@ _ftStart() {
 
   async _sSaveClientId() {
     const el = document.getElementById('s-input-clientid');
-    if (!el) return;
-    const id = el.value.trim();
-    this._oauthClientId = id || null;
+    const id = el?.value?.trim() || '';
+    const DEFAULT_CLIENT_ID = '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com';
+    // Leer → Konstante wiederherstellen
+    this._oauthClientId = id || DEFAULT_CLIENT_ID;
     await this.idbSet('meta', 'oauthClientId', this._oauthClientId);
-    this._toast(id ? '\u2713 Client-ID gespeichert' : 'Client-ID gel\u00f6scht');
+    if (el) el.value = this._oauthClientId;
+    this._toast('\u2713 Client-ID gespeichert');
+    this._sUpdateSyncStatus();
     this._sUpdateSyncStatus();
   },
 
