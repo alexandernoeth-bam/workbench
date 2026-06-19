@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.8.1</title>
+  <title>WorkBench 2.9.0</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1704,6 +1704,20 @@
     .tf-ev-act-btn { width:26px; height:26px; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:var(--surface); cursor:pointer; font-size:14px; color:var(--muted); display:flex; align-items:center; justify-content:center; font-family:var(--font); }
     .tf-ev-act-btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
     .tf-ev-act-del:hover { background:var(--danger); border-color:var(--danger); }
+    /* ── Crypto-Dialog ── */
+    #wb-crypto-overlay { position:fixed; inset:0; z-index:9500; background:rgba(5,10,14,0.85); display:none; align-items:center; justify-content:center; padding:20px; }
+    #wb-crypto-overlay.open { display:flex; }
+    #wb-crypto-box { background:var(--surface); border-radius:var(--radius); border:1.5px solid var(--border); width:100%; max-width:360px; overflow:hidden; }
+    #wb-crypto-head { background:var(--accent); padding:16px 20px; display:flex; align-items:center; gap:10px; }
+    #wb-crypto-head-title { font-size:16px; font-weight:700; color:#fff; }
+    #wb-crypto-body { padding:20px; display:flex; flex-direction:column; gap:14px; }
+    #wb-crypto-desc { font-size:15px; color:var(--muted); line-height:1.5; }
+    #wb-crypto-pw { width:100%; padding:11px 13px; border:2px solid var(--border); border-radius:var(--radius-sm); font-size:16px; font-family:var(--font); background:var(--surface); color:var(--text); outline:none; }
+    #wb-crypto-pw:focus { border-color:var(--accent); }
+    #wb-crypto-err { font-size:15px; color:var(--danger); display:none; font-weight:600; }
+    #wb-crypto-btn { width:100%; padding:12px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius-sm); font-size:16px; font-weight:700; cursor:pointer; font-family:var(--font); }
+    #wb-crypto-btn:hover { opacity:0.9; }
+    #wb-crypto-foot { padding:12px 20px; background:var(--surface2); border-top:1px solid var(--border); font-size:13px; color:var(--faint); text-align:center; }
     /* ── Vorhaben Charakter Vertikal-Tab ── */
     .vh-char-group { display:flex; margin-bottom:0; border-bottom:2px solid var(--border); }
     .vh-char-group:last-of-type { border-bottom:none; }
@@ -2076,7 +2090,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.8.1</div>
+  <div id="wb-startup-tagline">v2.9.0</div>
 </div>
 
 <div id="wb-app">
@@ -2088,7 +2102,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.8.1 · Build 20260619-0400</div>
+    <div id="wb-menu-version">v2.9.0 · Build 20260619-0600</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2527,8 +2541,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.8.1',
-  APP_BUILD:   '20260619-0400',
+  APP_VERSION: '2.9.0',
+  APP_BUILD:   '20260619-0600',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2537,8 +2551,13 @@ const WB = {
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
   UPLOAD_API:  'https://www.googleapis.com/upload/drive/v3',
 
-  dataPro:  null,
-  dataPriv: null,
+  db:              null,
+  dataPro:         null,   // Legacy — nur während Migration
+  dataPriv:        null,   // Legacy — nur während Migration
+  _pendingChanges: false,
+  _pendingTs:      0,
+  _driveFileId:    null,
+  _cryptoKey:      null,
   activeWorld: 'beruf',
   _weltOverride: false,
   isDirty: false,
@@ -2607,7 +2626,7 @@ const WB = {
     const today = this._dStr(new Date());
     const items = [];
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.tagesprotokoll||[]).filter(e => !e.deleted && e.date === today && (e.processedAs||[]).length > 0).forEach(e => {
         (e.processedAs||[]).forEach(p => items.push({ type:p.type, text:p.text||'', ts:e.ts||'', _ctx:ctx }));
       });
@@ -2649,7 +2668,7 @@ const WB = {
 
     const kandidaten = [];
     // Termine aus dataPriv
-    (this.dataPriv?.customEvents||[])
+    (this.db?.customEvents||[])
       .filter(e => !e.deleted && !e.done && !e.storniert && e.date === today && e.startTime)
       .forEach(e => {
         const [h,m] = e.startTime.split(':').map(Number);
@@ -2657,7 +2676,7 @@ const WB = {
       });
     // QuickItems mit startTime
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && q.startTime).forEach(q => {
         const [h,m] = q.startTime.split(':').map(Number);
         kandidaten.push({ startMin:h*60+m, endMin:h*60+m+30, title:q.text, type:'Erinnerung', id:q.id });
@@ -2665,7 +2684,7 @@ const WB = {
     });
     // Wochenpflichten mit startTime
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       const dow = now.getDay();
       (db?.wochenpflichten||[]).filter(p => !p.deleted && p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
         if (db.pflichtStatus?.[today]?.[p.id]) return;
@@ -2675,7 +2694,7 @@ const WB = {
     });
     // Aufgaben mit startTime + datum===today
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.vorhaben||[]).filter(v => !v.deleted).forEach(v => {
         (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum === today && a.startTime).forEach(a => {
           const [h,m] = a.startTime.split(':').map(Number);
@@ -3028,7 +3047,7 @@ _ftStart() {
   },
 
   _aufgabeDone(vorhabenId, aufgabeId, ctx) {
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv; if (!db) return;
+    const db = this.db; if (!db) return;
     const v = (db.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
     const a = (v.aufgaben||[]).find(x => x.id === aufgabeId); if (!a) return;
     a.done = !a.done; a.updatedAt = this._now();
@@ -3046,7 +3065,7 @@ _ftStart() {
     if (!this._ckSessionId) this._ckSessionId = 'ck_' + Date.now();
     // Cockpit-Editor speichert immer in Privat
     const ctx = 'priv';
-    const db  = this.dataPriv; if (!db) return;
+    const db  = this.db; if (!db) return;
     if (!db.tagesprotokoll) db.tagesprotokoll = [];
     let entry = db.tagesprotokoll.find(e => e.date === today && e._sessionId === this._ckSessionId);
     if (!entry) {
@@ -3065,7 +3084,7 @@ _ftStart() {
     const area  = document.getElementById('ck-editor-area'); if (!area) return;
     let letzter = null;
     // Nur in dataPriv laden
-    const db = this.dataPriv;
+    const db = this.db;
     (db?.tagesprotokoll||[]).filter(e => e.date === today && !e.deleted).forEach(e => {
       if (!letzter || (e.ts||'') > (letzter.ts||'')) letzter = e;
     });
@@ -3133,7 +3152,7 @@ _ftStart() {
     // ── Tagesprotokoll-Eintrag: processedAs + processed ──
     if (this._ckSelItemId) {
       ['pro','priv'].forEach(ctx => {
-        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const db = this.db;
         const e  = (db?.tagesprotokoll||[]).find(x => x.id === this._ckSelItemId);
         if (e) {
           e.processed = true;
@@ -3157,7 +3176,7 @@ _ftStart() {
       case 'aufgabe': {
         const { titel, notiz } = this._ckSplitText(text);
         const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
-        const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const db = this.db;
         if (!db) break;
         if (!db.quickItems) db.quickItems = [];
         db.quickItems.push({ id:'q_'+Date.now(), text:titel, notiz, date:'', done:false, deleted:false, updatedAt:this._now() });
@@ -3175,7 +3194,7 @@ _ftStart() {
       case 'vorhaben': {
         const { titel, notiz } = this._ckSplitText(text);
         const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
-        const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const db = this.db;
         if (!db) break;
         if (!db.vorhaben) db.vorhaben = [];
         db.vorhaben.push({ id:'v_'+Date.now(), titel, notiz, status:'aktiv', charakter:'bereichernd', zielId:null, aktiv:true, fokus:false, stichtag:'', welt:ctx, aufgaben:[], links:[], updatedAt:this._now() });
@@ -3184,7 +3203,7 @@ _ftStart() {
       case 'schnell': {
         const { titel, notiz } = this._ckSplitText(text);
         const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
-        const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const db = this.db;
         if (!db) break;
         if (!db.quickItems) db.quickItems = [];
         db.quickItems.push({ id:'q_'+Date.now(), text:titel, notiz, date:'', startTime:'', done:false, deleted:false, updatedAt:this._now() });
@@ -3254,7 +3273,7 @@ _ftStart() {
     const gestern = this._dStr(gd);
     const alle = [];
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.tagesprotokoll||[]).filter(e => !e.deleted).forEach(e => alle.push({ ...e, _ctx: ctx }));
     });
     let gefiltert = [];
@@ -3316,7 +3335,7 @@ _ftStart() {
   },
 
   _ckEnsureDb(ctx) {
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     if (!db) return null;
     if (!db.vorhaben)        db.vorhaben        = [];
     if (!db.customEvents)    db.customEvents    = [];
@@ -3360,13 +3379,13 @@ _ftStart() {
     let h = '', count = 0;
 
     // Events: Termine (inkl. stornierte) + QuickItems mit Uhrzeit + Pflichten mit Uhrzeit
-    const events = (this.dataPriv?.customEvents||[])
+    const events = (this.db?.customEvents||[])
       .filter(e => !e.deleted && e.date === today)
       .map(e => ({ ...e, _art:'termin', _ctx: e.welt==='pro' ? 'pro' : 'priv' }));
 
     // QuickItems MIT Uhrzeit → Termin-Block
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && q.startTime).forEach(q => {
         events.push({ id:q.id, text:q.text, startTime:q.startTime, durationMin:15, welt:ctx, _art:'schnell', _ctx:ctx });
       });
@@ -3374,7 +3393,7 @@ _ftStart() {
 
     // Wochenpflichten MIT Uhrzeit → Termin-Block (unerledigte)
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.wochenpflichten||[]).filter(p => !p.deleted && p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
         const done = !!(db.pflichtStatus?.[today]?.[p.id]);
         if (done) return;
@@ -3426,7 +3445,7 @@ _ftStart() {
     // Wochenpflichten OHNE Uhrzeit
     const pflichten = [];
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.wochenpflichten||[]).filter(p => !p.deleted && !p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
         const done = !!(db.pflichtStatus?.[today]?.[p.id]);
         pflichten.push({...p, _ctx: ctx, done});
@@ -3450,7 +3469,7 @@ _ftStart() {
     // Schnell-Erinnerungen OHNE Uhrzeit
     const schnell = [];
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && !q.startTime).forEach(q => schnell.push({...q, _ctx: ctx}));
     });
     if (schnell.length) {
@@ -3478,7 +3497,7 @@ _ftStart() {
     if (!el) return;
     const items = [];
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.quickItems||[]).filter(q => !q.deleted && !q.done && !q.date && !q.vorhabenId).forEach(q => items.push({...q, _ctx: ctx}));
     });
     if (cntEl) cntEl.textContent = items.length;
@@ -3497,7 +3516,7 @@ _ftStart() {
     const today = this._dStr(new Date());
     const items = [];
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv!==false).forEach(v => {
         (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum === today).forEach(a => {
           const clTotal = (a.checklist||[]).length;
@@ -3527,7 +3546,7 @@ _ftStart() {
     const today = this._dStr(new Date());
     const items = [];
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date && q.date < today).forEach(q => {
         items.push({ text:q.text, sub:'Schnell-Erinnerung', date:q.date, id:q.id, _type:'schnell', _ctx:ctx });
       });
@@ -3565,7 +3584,7 @@ _ftStart() {
     const today = this._dStr(new Date());
     let alleN = 0, berufN = 0, privatN = 0, ueberN = 0, ohneN = 0;
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       const qi = (db?.quickItems||[]).filter(q => !q.deleted && !q.done);
       const af = (db?.vorhaben||[]).flatMap(v => (v.aufgaben||[]).filter(a => !a.deleted && !a.done));
       const items = [...qi, ...af];
@@ -3690,7 +3709,7 @@ _ftStart() {
   _blSchnellAdd() {
     const text = prompt('Neue Schnell-Erinnerung:');
     if (!text?.trim()) return;
-    const db = this.activeWorld === 'beruf' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     if (!db) return;
     if (!db.quickItems) db.quickItems = [];
     db.quickItems.push({
@@ -3739,7 +3758,7 @@ _ftStart() {
 
   _vhDelete(vorhabenId, ctx) {
     if (!confirm('Vorhaben wirklich löschen?')) return;
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
     this._softDelete(v);
     this.setDirty();
@@ -3759,7 +3778,7 @@ _ftStart() {
   },
 
   _vhRenderAlleAufgaben(ctx) {
-    const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const badge = ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
 
     // Aufgaben nach Vorhaben clustern
@@ -3828,7 +3847,7 @@ _ftStart() {
   },
 
   _vhCharDialog(vorhabenId, ctx) {
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
     const c  = v.charakter;
     const chars = [
@@ -3853,7 +3872,7 @@ _ftStart() {
   },
 
   _vhCharSet(vorhabenId, ctx, charakter) {
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
     v.charakter = charakter; v.updatedAt = this._now();
     this.setDirty(); this.modalClose(); this.renderSection('vorhaben');
@@ -3865,7 +3884,7 @@ _ftStart() {
   _vhMenuToggle(vorhabenId, ctx) {
     const existing = document.getElementById('vh-ctx-menu');
     if (existing) { existing.remove(); return; }
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
     const zustand = this._vhZustand({...v, _ctx: ctx});
     const menu = document.createElement('div');
@@ -3892,7 +3911,7 @@ _ftStart() {
   },
 
   _vhZielVerknuepfen(vorhabenId, ctx) {
-    const db    = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v     = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
     const ziele = (db?.ziele||[]).filter(z => !z.deleted);
     if (!ziele.length) { this._toast('Keine Ziele vorhanden'); return; }
@@ -3906,7 +3925,7 @@ _ftStart() {
   _savVhZiel(c) {
     const zielId = document.getElementById('wb-f-ziel')?.value || '';
     if (!zielId) { this._toast('Bitte Ziel w\u00e4hlen'); return; }
-    const db = c.ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === c.vorhabenId); if (!v) return;
     v.zielId = zielId; v.updatedAt = this._now();
     this.setDirty(); this.modalClose();
@@ -3915,7 +3934,7 @@ _ftStart() {
   },
 
   _vhZielLoesen(vorhabenId, ctx) {
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
     v.zielId = null; v.updatedAt = this._now();
     this.setDirty(); this._vhRenderDetail(vorhabenId, ctx);
@@ -3927,8 +3946,8 @@ _ftStart() {
     const newWelt = newCtx === 'pro' ? 'Beruf' : 'Privat';
     const oldWelt = ctx   === 'pro' ? 'Beruf' : 'Privat';
     if (!confirm('Vorhaben von ' + oldWelt + ' nach ' + newWelt + ' verschieben?')) return;
-    const oldDb = ctx === 'pro' ? this.dataPro : this.dataPriv;
-    const newDb = newCtx === 'pro' ? this.dataPro : this.dataPriv;
+    const oldDb = this.db;
+    const newDb = this.db;
     if (!oldDb || !newDb) return;
     const v = (oldDb?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
     // Soft-delete in alter DB, Kopie in neue DB
@@ -3971,7 +3990,7 @@ _ftStart() {
 
   _vhAbschliessen(vorhabenId, ctx) {
     if (!confirm('Vorhaben als abgeschlossen markieren?')) return;
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
     v.status = 'abgeschlossen'; v.aktiv = false; v.abgeschlossenAt = this._now(); v.updatedAt = this._now();
     this.setDirty(); this.renderSection('vorhaben'); this._toast('\u2713 Vorhaben abgeschlossen');
@@ -3979,14 +3998,14 @@ _ftStart() {
 
   _vhArchivieren(vorhabenId, ctx) {
     if (!confirm('Vorhaben archivieren?\nEs verschwindet aus der aktiven Liste.')) return;
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
     v.status = 'archiviert'; v.aktiv = false; v.updatedAt = this._now();
     this.setDirty(); this._vhCloseDetail(); this.renderSection('vorhaben'); this._toast('Vorhaben archiviert');
   },
 
   _vhWiederoeffnen(vorhabenId, ctx) {
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
     v.status = 'aktiv'; v.aktiv = true; v.updatedAt = this._now();
     this.setDirty(); this.renderSection('vorhaben'); this._toast('\u21ba Vorhaben wieder ge\u00f6ffnet');
@@ -4002,7 +4021,7 @@ _ftStart() {
     const charCls   = { verpflichtend: 'vp', bedeutsam: 'bd', bereichernd: 'br' };
 
     welten.forEach(ctx => {
-      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       const alle = (db?.vorhaben || []).filter(v => !v.deleted);
       const aktive = alle.filter(v => v.status !== 'archiviert' && v.aktiv !== false);
       const abgeschlossen = alle.filter(v => v.status === 'abgeschlossen' || v.status === 'archiviert');
@@ -4128,7 +4147,7 @@ _ftStart() {
     if (normalDetail) normalDetail.style.display = '';
     if (alleEl) alleEl.style.display = 'none';
 
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben || []).find(x => x.id === id);
     if (!v) return;
     const titleEl = document.getElementById('vh-detail-title');
@@ -4147,7 +4166,7 @@ _ftStart() {
         + pillIcon + pillLabel + '</button>';
 
       // Ziel-Zeile
-      const db2  = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db2  = this.db;
       const ziel = v.zielId ? (db2?.ziele||[]).find(z => z.id === v.zielId && !z.deleted) : null;
       const zielHtml = '<div class="vh-ziel-zeile">'
         + '<span class="vh-ziel-ic">\u25ce</span>'
@@ -4187,7 +4206,7 @@ _ftStart() {
   _vhRenderTabAktuell(v, ctx) {
     const el = document.getElementById('vh-tab-aktuell'); if (!el) return;
     const today = this._dStr(new Date());
-    const db    = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     let h = '';
 
     // Alle Aufgaben
@@ -4267,7 +4286,7 @@ _ftStart() {
     const ta = document.getElementById('vh-notiz-area');
     if (ta) {
       ta.addEventListener('blur', () => {
-        const db2 = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const db2 = this.db;
         const v2  = (db2?.vorhaben||[]).find(x => x.id === v.id);
         if (v2 && v2.notiz !== ta.value) {
           v2.notiz = ta.value; v2.updatedAt = this._now();
@@ -4330,7 +4349,7 @@ _ftStart() {
 
   _vhLoeschen(vorhabenId, ctx) {
     if (!confirm('Vorhaben wirklich löschen? Alle Aufgaben und Links werden entfernt.')) return;
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
     this._softDelete(v);
     if (this._vhAktivId === vorhabenId) { this._vhAktivId = null; this._vhAktivCtx = null; }
@@ -4340,7 +4359,7 @@ _ftStart() {
   },
 
   _vhBearbeiten(vorhabenId, ctx) {
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
     const body =
       '<div class="wb-input-group">'
@@ -4377,14 +4396,14 @@ _ftStart() {
 
     // Vorhaben immer aus dem originalen ctx laden (wo es aktuell liegt)
     const originalCtx = this._vhAktivCtx || c.ctx;
-    const originalDb  = originalCtx==='pro' ? this.dataPro : this.dataPriv;
+    const originalDb  = this.db;
     const v = (originalDb?.vorhaben||[]).find(x => x.id === c.id);
     if (!v) { this._toast('Vorhaben nicht gefunden'); return; }
 
     if (c.ctx !== originalCtx) {
       // Welt geändert: soft-delete in alter DB + neue Kopie in Ziel-DB
       this._softDelete(v);
-      const targetDb = c.ctx==='pro' ? this.dataPro : this.dataPriv;
+      const targetDb = this.db;
       if (!targetDb) return;
       if (!targetDb.vorhaben) targetDb.vorhaben = [];
       const copy = { ...v, id: 'v_' + Date.now(), deleted: false, deletedAt: undefined,
@@ -4405,7 +4424,7 @@ _ftStart() {
     const titel = prompt('Titel des neuen Vorhabens:');
     if (!titel?.trim()) return;
     const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     if (!db) return;
     if (!db.vorhaben) db.vorhaben = [];
     const v = {
@@ -4429,7 +4448,7 @@ _ftStart() {
   },
 
   _vhLinkDelete(vorhabenId, ctx, linkId) {
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
     if (!v) return;
     const link = (v.links||[]).find(l => l.id === linkId);
@@ -4611,7 +4630,7 @@ _ftStart() {
     const links = [];
     const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
     welten.forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       // Links in Vorhaben
       (db?.vorhaben||[]).forEach(v => {
         (v.links||[]).filter(l => !l.deleted).forEach(l => {
@@ -4655,7 +4674,7 @@ _ftStart() {
   _abLinkClick(linkId) {
     let foundVhId = null, foundCtx = null;
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.vorhaben||[]).forEach(v => {
         if ((v.links||[]).find(l => l.id === linkId)) { foundVhId = v.id; foundCtx = ctx; }
       });
@@ -4730,12 +4749,12 @@ _ftStart() {
       const isFt    = false;
 
       // Alle Termine aus dataPriv (dort alle gespeichert)
-      const events = (this.dataPriv?.customEvents || [])
+      const events = (this.db?.customEvents || [])
         .filter(e => !e.deleted && e.date === dateStr && (!e.done || e.storniert))
         .map(e => ({ ...e, _art: 'termin', _ctx: e.welt === 'pro' ? 'pro' : 'priv' }));
       // QuickItems mit Uhrzeit in Events einmischen
       ['pro','priv'].forEach(ctx => {
-        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const db = this.db;
         (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === dateStr && q.startTime).forEach(q => {
           events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, welt:ctx, _art:'schnell', _ctx:ctx });
         });
@@ -4745,7 +4764,7 @@ _ftStart() {
       const pflichten = [];
       const dayOfWeek = d.getDay();
       ['pro','priv'].forEach(ctx => {
-        const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+        const db = this.db;
         (db?.wochenpflichten || [])
           .filter(p => !p.deleted && (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)))
           .forEach(p => {
@@ -4843,7 +4862,7 @@ _ftStart() {
 
         let pflCount = 0;
         ['pro','priv'].forEach(ctx => {
-          const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+          const db = this.db;
           (db?.wochenpflichten||[]).forEach(p => {
             if (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)) pflCount++;
           });
@@ -4893,14 +4912,14 @@ _ftStart() {
         if (isWE)    cls += ' we-col';
 
         // Termine aus dataPriv + QuickItems mit Uhrzeit
-        const events = (this.dataPriv?.customEvents||[])
+        const events = (this.db?.customEvents||[])
           .filter(e => !e.deleted && e.date === dateStr && e.startTime && (!e.done || e.storniert))
           .map(e => {
             const [eh,em] = e.startTime.split(':').map(Number);
             return { ...e, _art:'termin', _ctx: e.welt==='pro' ? 'pro' : 'priv', _startMin: eh*60+em, _endMin: eh*60+em + this._evtDurationMin(e) };
           });
         ['pro','priv'].forEach(ctx => {
-          const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+          const db = this.db;
           (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === dateStr && q.startTime).forEach(q => {
             const [qh,qm] = q.startTime.split(':').map(Number);
             events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, durationMin:15, welt:ctx, _art:'schnell', _ctx:ctx, _startMin:qh*60+qm, _endMin:qh*60+qm+15 });
@@ -4955,7 +4974,7 @@ _ftStart() {
         // Wochenpflichten mit startTime
         const dayOfWeek = d.getDay();
         ['pro','priv'].forEach(ctx => {
-          const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+          const db = this.db;
           (db?.wochenpflichten||[]).forEach(p => {
             if (!p.startTime) return;
             if (!p.taeglich && !(p.wochentage||[]).includes(dayOfWeek)) return;
@@ -4984,7 +5003,7 @@ _ftStart() {
   _woPflCountDone(dateStr) {
     let done = 0;
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.wochenpflichten||[]).forEach(p => {
         if (db?.pflichtStatus?.[dateStr]?.[p.id]) done++;
       });
@@ -5036,7 +5055,7 @@ _ftStart() {
         if (isToday) cellCls += ' today-col';
         h += '<div class="' + cellCls + '">';
         ['pro','priv'].forEach(ctx => {
-          const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+          const db = this.db;
           (db?.wochenpflichten||[])
             .filter(p => !p.deleted && (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)))
             .forEach(p => {
@@ -5074,7 +5093,7 @@ _ftStart() {
         if (isWE)    cls += ' we-col';
 
         // Alle Termine aus dataPriv (dort alle gespeichert)
-        const events = (this.dataPriv?.customEvents||[])
+        const events = (this.db?.customEvents||[])
           .filter(e => !e.deleted && e.date === dateStr && e.startTime && (!e.done || e.storniert))
           .map(e => {
             const [eh,em] = e.startTime.split(':').map(Number);
@@ -5133,7 +5152,7 @@ _ftStart() {
         // Wochenpflichten mit startTime im Zeitband
         const dayOfWeek = d.getDay();
         ['pro','priv'].forEach(ctx => {
-          const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+          const db = this.db;
           (db?.wochenpflichten||[]).forEach(p => {
             if (!p.startTime) return;
             if (!p.taeglich && !(p.wochentage||[]).includes(dayOfWeek)) return;
@@ -5160,7 +5179,7 @@ _ftStart() {
   _woRenderMottos(view) {
     const mottos = [];
     ['pro','priv'].forEach(ctx => {
-      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       const kw = this._getCurrentKW();
       (db?.wochenMottos?.[kw] || []).forEach(m => {
         mottos.push({ ...m, _ctx: ctx });
@@ -5224,7 +5243,7 @@ _ftStart() {
   },
 
   _woPflichtToggle(pflichtId, dateStr, ctx) {
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     if (!db) return;
     if (!db.pflichtStatus) db.pflichtStatus = {};
     if (!db.pflichtStatus[dateStr]) db.pflichtStatus[dateStr] = {};
@@ -5238,12 +5257,12 @@ _ftStart() {
   _tfTerminDone(id, art) {
     if (art === 'schnell') {
       ['pro','priv'].forEach(ctx => {
-        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const db = this.db;
         const q  = (db?.quickItems||[]).find(x => x.id === id);
         if (q) { q.done=true; q.updatedAt=this._now(); }
       });
     } else {
-      const e = (this.dataPriv?.customEvents||[]).find(x => x.id === id);
+      const e = (this.db?.customEvents||[]).find(x => x.id === id);
       if (e) { e.done=true; e.updatedAt=this._now(); }
     }
     this.setDirty(); this._tfRenderHeute(); this._toast('\u2713 Erledigt');
@@ -5254,13 +5273,13 @@ _ftStart() {
     const today = this._dStr(new Date());
     if (art === 'schnell') {
       ['pro','priv'].forEach(ctx => {
-        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const db = this.db;
         const q  = (db?.quickItems||[]).find(x => x.id === id);
         if (q) { q.storniert=true; q.done=true; q.updatedAt=this._now(); }
       });
     } else if (art === 'pflicht') {
       ['pro','priv'].forEach(ctx => {
-        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const db = this.db;
         const p  = (db?.wochenpflichten||[]).find(x => x.id === id);
         if (p) {
           if (!db.pflichtStatus) db.pflichtStatus = {};
@@ -5269,21 +5288,21 @@ _ftStart() {
         }
       });
     } else {
-      const e = (this.dataPriv?.customEvents||[]).find(x => x.id === id);
+      const e = (this.db?.customEvents||[]).find(x => x.id === id);
       if (e) { e.storniert=true; e.done=false; e.updatedAt=this._now(); }
     }
     this.setDirty(); this._tfRenderHeute(); this._toast('Termin abgesagt');
   },
 
   _terminWiederherstellen(eventId) {
-    const e = (this.dataPriv?.customEvents||[]).find(x => x.id === eventId);
+    const e = (this.db?.customEvents||[]).find(x => x.id === eventId);
     if (e) { e.storniert = false; e.updatedAt = this._now(); }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('\u2713 Termin wiederhergestellt');
   },
 
   _tfSchnellCheck(id, ctx) {
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     if (!db) return;
     const q = (db.quickItems||[]).find(x => x.id === id);
     if (!q) return;
@@ -5310,7 +5329,7 @@ _ftStart() {
     if (!text?.trim()) return;
     const bereich = prompt('Bereich:\ngesund / beruf / privat / allgemein') || 'allgemein';
     const ctx = bereich === 'beruf' ? 'pro' : 'priv';
-    const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     if (!db) return;
     if (!db.wochenMottos) db.wochenMottos = {};
     const kw = this._getCurrentKW();
@@ -5416,7 +5435,7 @@ _ftStart() {
     const ziele = [];
     const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
     welten.forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.ziele||[]).filter(z => !z.deleted).forEach(z => ziele.push({...z, _ctx:ctx}));
     });
     return ziele;
@@ -5508,7 +5527,7 @@ _ftStart() {
       const OLD_TS = '2020-01-01T00:00:00.000Z';
       const migrateUpdatedAt = (arr) => { (arr||[]).forEach(item => { if (!item.updatedAt) item.updatedAt = OLD_TS; }); };
       ['pro','priv'].forEach(ctx => {
-        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const db = this.db;
         if (!db) return;
         migrateUpdatedAt(db.quickItems); migrateUpdatedAt(db.customEvents);
         migrateUpdatedAt(db.wochenpflichten); migrateUpdatedAt(db.ziele);
@@ -5518,7 +5537,7 @@ _ftStart() {
 
       // pflichtStatus Format-Migration (einmalig)
       ['pro','priv'].forEach(ctx => {
-        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const db = this.db;
         if (!db?.pflichtStatus) return;
         const ps = db.pflichtStatus;
         const firstKey = Object.keys(ps)[0] || '';
@@ -5537,7 +5556,7 @@ _ftStart() {
 
       // Vorhaben status-Feld + charakter-Feld + zielId Migration
       ['pro','priv'].forEach(ctx => {
-        const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const db = this.db;
         (db?.vorhaben||[]).forEach(v => {
           if (!v.status) v.status = v.aktiv !== false ? 'aktiv' : 'abgeschlossen';
           if (!v.charakter) v.charakter = 'bereichernd';
@@ -5551,10 +5570,175 @@ _ftStart() {
     try { await this.idbSaveAll(); } catch(e) {}
   },
 
+  _emptyDb() {
+    return {
+      quickItems: [], customEvents: [], wochenpflichten: [],
+      pflichtStatus: {}, tagesprotokoll: [], wochenMottos: {},
+      checklistVorlagen: [], vorhaben: [], ziele: [], links: [],
+      _version: 1, _exportedAt: '',
+    };
+  },
+
+  async _cryptoGetKey(password, salt) {
+    const enc = new TextEncoder();
+    const keyMat = await crypto.subtle.importKey('raw', enc.encode(password), { name:'PBKDF2' }, false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name:'PBKDF2', salt, iterations:100000, hash:'SHA-256' },
+      keyMat, { name:'AES-GCM', length:256 }, true, ['encrypt','decrypt']);
+  },
+
+  async _cryptoEncrypt(data) {
+    const pw = sessionStorage.getItem('wb_enc_pw');
+    if (!pw) throw new Error('Kein Passwort');
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+    const key  = await this._cryptoGetKey(pw, salt);
+    const enc  = new TextEncoder().encode(JSON.stringify(data));
+    const ct   = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, enc);
+    return {
+      salt: btoa(String.fromCharCode(...salt)),
+      iv:   btoa(String.fromCharCode(...iv)),
+      data: btoa(String.fromCharCode(...new Uint8Array(ct))),
+      _encrypted: true,
+    };
+  },
+
+  async _cryptoDecrypt(payload, password) {
+    const salt = Uint8Array.from(atob(payload.salt), c => c.charCodeAt(0));
+    const iv   = Uint8Array.from(atob(payload.iv),   c => c.charCodeAt(0));
+    const ct   = Uint8Array.from(atob(payload.data),  c => c.charCodeAt(0));
+    const key  = await this._cryptoGetKey(password, salt);
+    const dec  = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, ct);
+    return JSON.parse(new TextDecoder().decode(dec));
+  },
+
+  _cryptoKeyFresh() {
+    const today = this._dStr(new Date());
+    const saved = localStorage.getItem('wb_key_date');
+    const pw    = sessionStorage.getItem('wb_enc_pw');
+    return saved === today && !!pw;
+  },
+
+  _cryptoShowDialog(onSuccess) {
+    this._cryptoOnSuccess = onSuccess;
+    const ov = document.getElementById('wb-crypto-overlay');
+    const pw = document.getElementById('wb-crypto-pw');
+    const er = document.getElementById('wb-crypto-err');
+    if (ov) ov.classList.add('open');
+    if (er) er.style.display = 'none';
+    if (pw) { pw.value = ''; setTimeout(() => pw.focus(), 100); }
+  },
+
+  _cryptoOnSuccess: null,
+
+  async _cryptoUnlock() {
+    const pw  = document.getElementById('wb-crypto-pw');
+    const err = document.getElementById('wb-crypto-err');
+    const btn = document.getElementById('wb-crypto-btn');
+    const password = pw?.value?.trim() || '';
+    if (!password) return;
+    if (btn) { btn.textContent = 'Pr\u00fcfe...'; btn.disabled = true; }
+    try {
+      sessionStorage.setItem('wb_enc_pw', password);
+      localStorage.setItem('wb_key_date', this._dStr(new Date()));
+      const ov = document.getElementById('wb-crypto-overlay');
+      if (ov) ov.classList.remove('open');
+      if (this._cryptoOnSuccess) await this._cryptoOnSuccess();
+    } catch(e) {
+      sessionStorage.removeItem('wb_enc_pw');
+      if (err) err.style.display = 'block';
+      if (pw)  { pw.value = ''; pw.focus(); }
+    } finally {
+      if (btn) { btn.textContent = 'Entsperren'; btn.disabled = false; }
+    }
+  },
+
+  _cryptoChangePassword() {
+    const newPw = prompt('Neues Passwort eingeben (mind. 8 Zeichen):');
+    if (!newPw || newPw.length < 8) { this._toast('Passwort zu kurz'); return; }
+    const confirm2 = prompt('Passwort wiederholen:');
+    if (newPw !== confirm2) { this._toast('Passw\u00f6rter stimmen nicht \u00fcberein'); return; }
+    sessionStorage.setItem('wb_enc_pw', newPw);
+    localStorage.setItem('wb_key_date', this._dStr(new Date()));
+    this.setDirty();
+    this._toast('\u2713 Passwort ge\u00e4ndert \u2014 Daten werden neu verschl\u00fcsselt');
+  },
+
+  async idbSave() {
+    try {
+      if (this.db) await this.idbSet('data', 'db', this.db);
+      await this.idbSet('meta', 'lastUpload',   String(this._syncLastUpload));
+      await this.idbSet('meta', 'lastDownload', String(this._syncLastDownload));
+      await this.idbSet('meta', 'pendingChanges', this._pendingChanges ? 'true' : 'false');
+      if (this._driveFileId) await this.idbSet('meta', 'driveFileId', this._driveFileId);
+    } catch(e) { console.warn('[idbSave]', e.message); }
+  },
+
+  async idbLoad() {
+    try {
+      const db     = await this.idbGet('data', 'db');
+      const lastUp = await this.idbGet('meta', 'lastUpload');
+      const lastDn = await this.idbGet('meta', 'lastDownload');
+      const pend   = await this.idbGet('meta', 'pendingChanges');
+      const fid    = await this.idbGet('meta', 'driveFileId');
+      if (lastUp) this._syncLastUpload   = parseInt(lastUp)  || 0;
+      if (lastDn) this._syncLastDownload = parseInt(lastDn)  || 0;
+      if (pend)   this._pendingChanges   = pend === 'true';
+      if (fid)    this._driveFileId      = fid;
+      if (db) {
+        this.db = db;
+      } else {
+        // Alte dataPro/dataPriv laden → Migration
+        const pro  = await this.idbGet('data', 'dataPro');
+        const priv = await this.idbGet('data', 'dataPriv');
+        if (pro || priv) { this.dataPro = pro; this.dataPriv = priv; }
+        else this.db = this._emptyDb();
+      }
+    } catch(e) {
+      console.warn('[idbLoad]', e.message);
+      if (!this.db) this.db = this._emptyDb();
+    }
+  },
+
+  async _migrate_v2() {
+    if (this.db && this.db._version) return;
+    const pro  = this.dataPro  || {};
+    const priv = this.dataPriv || {};
+    const mergeById = (arrA, arrB, weltA, weltB) => {
+      const map = new Map();
+      (arrA||[]).forEach(x => map.set(x.id, { ...x, welt: x.welt||weltA }));
+      (arrB||[]).forEach(x => { if (!map.has(x.id)) map.set(x.id, { ...x, welt: x.welt||weltB }); });
+      return Array.from(map.values());
+    };
+    const psAll = { ...(priv.pflichtStatus||{}) };
+    Object.entries(pro.pflichtStatus||{}).forEach(([date, duties]) => {
+      if (!psAll[date]) psAll[date] = {};
+      Object.assign(psAll[date], duties);
+    });
+    this.db = {
+      quickItems:        priv.quickItems        || [],
+      customEvents:      priv.customEvents      || [],
+      wochenpflichten:   mergeById(priv.wochenpflichten, pro.wochenpflichten, 'priv', 'pro'),
+      pflichtStatus:     psAll,
+      tagesprotokoll:    priv.tagesprotokoll    || [],
+      wochenMottos:      { ...(priv.wochenMottos||{}), ...(pro.wochenMottos||{}) },
+      checklistVorlagen: [...(priv.checklistVorlagen||[]), ...(pro.checklistVorlagen||[])],
+      vorhaben:          mergeById(priv.vorhaben, pro.vorhaben, 'priv', 'pro'),
+      ziele:             mergeById(priv.ziele,    pro.ziele,    'priv', 'pro'),
+      links:             [...(priv.links||[]), ...(pro.links||[])],
+      _version:          1,
+      _migratedAt:       new Date().toISOString(),
+    };
+    this.dataPro = null; this.dataPriv = null;
+    await this.idbSave();
+    this.setDirty();
+    console.log('[migrate_v2] Migration abgeschlossen');
+  },
+
   async idbSaveAll() {
     try {
-      if (this.dataPro)  await this.idbSet('data', 'dataPro',  this.dataPro);
-      if (this.dataPriv) await this.idbSet('data', 'dataPriv', this.dataPriv);
+      // v2: idbSave() handles this
+      // v2: idbSave() handles this
       await this.idbSet('meta', 'lastSaved', Date.now());
       this.isDirty = false;
     } catch(e) {
@@ -5563,16 +5747,10 @@ _ftStart() {
   },
 
   setDirty() {
-    this.isDirty = true;
-    // IDB sofort speichern (kein Datenverlust bei Browser-Close)
-    this.idbSaveAll().catch(e => console.warn('[setDirty IDB]', e));
+    this.isDirty = true; this._pendingTs = Date.now();
+    this.idbSave().catch(e => console.warn('[setDirty IDB]', e));
     clearTimeout(this._saveTimer);
-    this._saveTimer = setTimeout(async () => {
-      if (this._oauthClientId) {
-        const token = await this._oauthGetTokenSilent();
-        if (token) { await this._syncUploadAll(); }
-      }
-    }, 1500);
+    this._saveTimer = setTimeout(async () => { await this._syncUpload(); }, 2000);
   },
 
   // ── KW-Hilfsfunktionen ───────────────────────────────
@@ -5903,7 +6081,7 @@ _ftStart() {
       const token  = await this._oauthGetToken(true);
       if (!token) { this._oauthShowBanner('\u26a0 Kein Token &mdash; bitte neu verbinden'); return; }
       const fileId = await this._oauthFindOrCreateFile(token, ctx);
-      const db     = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       if (!db) return;
       // Lokalen Stand vor Upload nochmals aus IDB sicherstellen
       await this.idbSaveAll();
@@ -5936,10 +6114,9 @@ _ftStart() {
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const result  = await resp.json();
       const driveDb = result.data || result;
-      const localDb = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const localDb = this.db;
       const merged  = this._mergeDb(localDb, driveDb);
-      if (ctx==='pro') this.dataPro  = merged;
-      else             this.dataPriv = merged;
+      this.db = merged;
       await this.idbSaveAll();
       this._oauthHideBanner();
       this._syncLastDownload = Date.now();
@@ -5952,6 +6129,142 @@ _ftStart() {
       console.warn('[download]', e.message);
     }
   },
+
+  async _syncGetFileId(token) {
+    if (this._driveFileId) return this._driveFileId;
+    const q    = encodeURIComponent("name='workbench.json' and trashed=false");
+    const resp = await fetch(this.DRIVE_API + '/files?q=' + q + '&fields=files(id,name)',
+      { headers: { Authorization: 'Bearer ' + token } });
+    const data = await resp.json();
+    if (data.files?.length) {
+      this._driveFileId = data.files[0].id;
+    } else {
+      const cr = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name:'workbench.json', mimeType:'application/json' }),
+      });
+      const cf = await cr.json();
+      this._driveFileId = cf.id;
+    }
+    await this.idbSet('meta', 'driveFileId', this._driveFileId);
+    return this._driveFileId;
+  },
+
+  async _syncUpload() {
+    try {
+      const token = await this._oauthGetTokenSilent();
+      if (!token) {
+        this._pendingChanges = true; await this.idbSave();
+        this._oauthShowBanner('\u26a0 Offline \u2014 \u00c4nderungen ausstehend'); return;
+      }
+      const fileId = await this._syncGetFileId(token);
+      if (!fileId) throw new Error('Keine File-ID');
+      await this.idbSave(); // IDB sichern vor Upload
+      const payload = await this._cryptoEncrypt({
+        data: this.db, _exported: new Date().toISOString(), _appVersion: this.APP_VERSION,
+      });
+      const resp = await fetch(this.UPLOAD_API + '/files/' + fileId + '?uploadType=media', {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      this._syncLastUpload = this._syncLastDownload = Date.now();
+      this._pendingChanges = false; this.isDirty = false;
+      await this.idbSave();
+      this._oauthHideBanner(); this._sUpdateSyncStatus();
+      this._toast('\u2713 Gespeichert');
+    } catch(e) {
+      this._pendingChanges = true; await this.idbSave();
+      this._oauthShowBanner('\u26a0 Speicherfehler: ' + e.message);
+      console.warn('[syncUpload]', e.message);
+    }
+  },
+
+  async _syncDownload() {
+    try {
+      const token = await this._oauthGetTokenSilent();
+      if (!token) { this._oauthShowBanner('\u26a0 Offline'); return; }
+      const fileId = await this._syncGetFileId(token);
+      if (!fileId) return;
+      const resp = await fetch(this.DRIVE_API + '/files/' + fileId + '?alt=media',
+        { headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const payload = await resp.json();
+      if (payload._encrypted) {
+        const pw = sessionStorage.getItem('wb_enc_pw');
+        if (!pw) { this._cryptoShowDialog(async () => { await this._syncDownload(); }); return; }
+        try {
+          const dec = await this._cryptoDecrypt(payload, pw);
+          this.db = dec.data || dec;
+        } catch(e) {
+          sessionStorage.removeItem('wb_enc_pw');
+          this._cryptoShowDialog(async () => { await this._syncDownload(); }); return;
+        }
+      } else {
+        this.db = payload.data || payload;
+      }
+      if (!this.db) this.db = this._emptyDb();
+      // updatedAt Migration
+      await this._migrate_v2();
+      this._syncLastDownload = Date.now();
+      await this.idbSave();
+      this._oauthHideBanner(); this._sUpdateSyncStatus();
+      this.renderSection(this.activeTab);
+    } catch(e) {
+      console.warn('[syncDownload]', e.message);
+      this._oauthShowBanner('\u26a0 Sync-Fehler: ' + e.message);
+    }
+  },
+
+  async _syncCheckNewer() {
+    try {
+      const token = await this._oauthGetTokenSilent(); if (!token) return;
+      const fileId = await this._syncGetFileId(token); if (!fileId) return;
+      const resp = await fetch(this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime',
+        { headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok) return;
+      const meta    = await resp.json();
+      const driveTs = new Date(meta.modifiedTime).getTime();
+      if (driveTs > this._syncLastDownload + 5000) {
+        if (this._pendingChanges || this.isDirty) this._syncConflictDialog('db', driveTs);
+        else await this._syncDownload();
+      }
+    } catch(e) { console.warn('[syncCheckNewer]', e.message); }
+  },
+
+  async _syncTick() {
+    if (!this._oauthClientId) return;
+    const token = await this._oauthGetTokenSilent();
+    if (!token) { this._oauthShowBanner('\u26a0 Google-Sitzung abgelaufen'); return; }
+    this._oauthHideBanner();
+    if (this._pendingChanges || this.isDirty) await this._syncUpload();
+    else await this._syncCheckNewer();
+  },
+
+  _syncConflictDialog(ctx, driveTs) {
+    const driveDate = new Date(driveTs).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+    const choice = confirm(
+      'Konflikt: Ein anderes Ger\u00e4t hat Daten um ' + driveDate + ' ge\u00e4ndert.\n'
+      + 'Du hast lokale \u00c4nderungen.\n\n'
+      + 'OK = Meine \u00c4nderungen hochladen\n'
+      + 'Abbrechen = Drive-Stand laden (\u00c4nderungen verwerfen)'
+    );
+    if (choice) { this._syncUpload(); }
+    else { this._pendingChanges = false; this.isDirty = false; this._syncDownload(); }
+  },
+
+  _syncTimeLabel(ts) {
+    if (!ts) return 'unbekannt';
+    return new Date(ts).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+  },
+
+  async _syncUploadAll() { await this._syncUpload(); },
+  async _syncDownloadAll() { await this._syncDownload(); },
+
+  async oauthSyncUpload(ctx) { await this._syncUpload(); },
+  async oauthSyncDownload(ctx) { await this._syncDownload(); },
 
   // ── Hilfsfunktionen ──────────────────────────────────
 
@@ -6025,121 +6338,74 @@ _ftStart() {
   // ── Init ─────────────────────────────────────────────
 
   async init() {
-  // Startup ausblenden nach exakt 5 Sekunden (5000ms)
-  setTimeout(() => {
-    const s = document.getElementById('wb-startup');
-    if (s) { 
-      s.style.opacity = '0'; 
-      setTimeout(() => s.remove(), 500); // Sanftes Ausblenden
-    }
-  }, 5000);
-
-    // IDB öffnen und Daten laden
     try {
       await this.idbOpen();
-      await this.idbLoadAll();
-    } catch(e) {
-      console.error('[init] IDB error:', e);
-    }
+      await this.idbLoad();
+      if (!this._cryptoKeyFresh()) {
+        this._cryptoShowDialog(async () => { await this._initAfterCrypto(); });
+        return;
+      }
+      await this._initAfterCrypto();
+    } catch(e) { console.error('[init]', e.message); }
+  },
+
+  async _initAfterCrypto() {
+    // Startup-Screen: nach 5s ausblenden
+    setTimeout(() => {
+      const s = document.getElementById('wb-startup');
+      if (s) { s.style.opacity = '0'; setTimeout(() => s.remove(), 500); }
+    }, 5000);
 
     await this._sLoadSettings();
     this._weltInit();
-
-    // Büro-Button entfernt
-
-    // OAuth Status prüfen
     this._oauthCheckToken();
 
-    // Sync beim Start: Upload lokaler Änderungen → dann Drive holen (Merge)
+    // Migration falls nötig
+    await this._migrate_v2();
+
+    // Drive laden
     if (this._oauthClientId) {
-      const token = await this._oauthGetTokenSilent();
-      if (token) {
-        // Schritt 1: Lokalen Stand sichern falls ungespeicherte Änderungen da
-        if (this.isDirty) {
-          try { await this._syncUploadAll(); } catch(e) { console.warn('[init upload]', e.message); }
-        }
-        // Schritt 2: Drive herunterladen und mit lokalem Stand mergen
-        try { await this._syncDownloadAll(); } catch(e) { console.warn('[init download]', e.message); }
-        // Schritt 3: Wenn nach Merge noch dirty (Merge hat lokale Daten) → nochmal hochladen
-        if (this.isDirty) {
-          try { await this._syncUploadAll(); } catch(e) { console.warn('[init upload2]', e.message); }
-        }
-      } else {
-        this._oauthShowBanner('\u26a0 Bitte Google-Verbindung erneuern');
+      if (this._pendingChanges || this.isDirty) {
+        try { await this._syncUpload(); } catch(e) { console.warn('[init upload]', e.message); }
+      }
+      try { await this._syncDownload(); } catch(e) { console.warn('[init download]', e.message); }
+      if (this.isDirty) {
+        try { await this._syncUpload(); } catch(e) { console.warn('[init upload2]', e.message); }
       }
     }
 
-    // Auto-Bereinigung: Items älter als 7 Tage permanent löschen
     this._sBereinigen();
-
-    // Auto-Sync starten
     this._syncStart();
 
-    // Tab sichtbar/unsichtbar: sofort sync
     document.addEventListener('visibilitychange', async () => {
       if (document.visibilityState === 'hidden') {
-        // Beim Verstecken: immer IDB speichern + wenn möglich hochladen
         clearTimeout(this._saveTimer);
-        try {
-          await this.idbSaveAll();
-          if (this._oauthClientId && this.isDirty) {
-            const token = await this._oauthGetTokenSilent();
-            if (token) await this._syncUploadAll();
-          }
-        } catch(e) { console.warn('[vis hidden]', e.message); }
-      } else if (document.visibilityState === 'visible') {
-        // Beim Wiedererscheinen: Upload wenn dirty, dann Check
-        try {
-          if (this.isDirty) await this._syncUploadAll();
-          await this._syncTick();
-        } catch(e) { console.warn('[vis visible]', e.message); }
+        try { await this.idbSave(); if (this.isDirty || this._pendingChanges) await this._syncUpload(); }
+        catch(e) { console.warn('[vis hidden]', e.message); }
+      } else {
+        try { if (this._pendingChanges || this.isDirty) await this._syncUpload(); else await this._syncCheckNewer(); }
+        catch(e) {}
       }
     });
     window.addEventListener('focus', async () => {
-      try {
-        if (this.isDirty) await this._syncUploadAll();
-        await this._syncTick();
-      } catch(e) {}
+      try { if (this._pendingChanges || this.isDirty) await this._syncUpload(); else await this._syncCheckNewer(); } catch(e) {}
     });
-    window.addEventListener('beforeunload', () => { if (this.isDirty) this.idbSaveAll(); });
+    window.addEventListener('beforeunload', async () => { await this.idbSave(); });
 
-    // Wenn kein Token → Sync-Zeitstempel auf jetzt damit kein sofortiger Drive-Download
-    if (!this._oauthClientId || !this._oauthTokenValid()) {
-      this._syncLastUpload   = Date.now();
-      this._syncLastDownload = Date.now();
-    }
-
-    // selectionchange-Listener für Verarbeiten-Button
     document.addEventListener('selectionchange', () => {
-      const area = document.getElementById('ck-editor-area');
-      if (!area) return;
-      const sel = window.getSelection();
-      const btn = document.getElementById('ck-verarbeiten-btn');
-      if (!sel || sel.isCollapsed) {
-        this._ckSelText = '';
-        if (btn) btn.disabled = true;
-        return;
+      const area = document.getElementById('ck-editor-area'); if (!area) return;
+      const sel  = window.getSelection();
+      const btn  = document.getElementById('ck-verarbeiten-btn');
+      if (!sel || sel.isCollapsed || !area.contains(sel.anchorNode)) {
+        this._ckSelText = ''; if (btn) btn.disabled = true; return;
       }
-      const anchor = sel.anchorNode;
-      if (!area.contains(anchor)) {
-        this._ckSelText = '';
-        if (btn) btn.disabled = true;
-        return;
-      }
-      const text = sel.toString().trim();
-      this._ckSelText = text;
-      if (text && sel.rangeCount > 0) {
-        this._ckSelRange = sel.getRangeAt(0).cloneRange();
-      }
+      const text = sel.toString().trim(); this._ckSelText = text;
+      if (text && sel.rangeCount > 0) this._ckSelRange = sel.getRangeAt(0).cloneRange();
       if (btn) btn.disabled = !text;
     });
 
-    // Banner alle 60 Sekunden aktualisieren
     setInterval(() => { if (this.activeTab === 'cockpit') this._ckRenderBanner(); }, 60000);
-
-    // Editor-Inhalt laden
     setTimeout(() => { this._ckLadeHeutigerEintrag(); }, 300);
-
     this.tabSwitch('cockpit');
   },
 
@@ -6159,7 +6425,7 @@ _ftStart() {
     // Papierkorb-Zähler aktualisieren
     let pkCount = 0;
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       pkCount += (db?.quickItems||[]).filter(x=>x.deleted).length;
       pkCount += (db?.customEvents||[]).filter(x=>x.deleted).length;
       pkCount += (db?.wochenpflichten||[]).filter(x=>x.deleted).length;
@@ -6275,20 +6541,11 @@ _ftStart() {
     const subEl   = document.getElementById('s-sync-sub');
     const statEl  = document.getElementById('s-sync-status');
     const valid   = this._oauthTokenValid();
-    if (titleEl) titleEl.textContent = valid ? 'Verbunden' : 'Nicht verbunden';
+    if (titleEl) titleEl.textContent = this._pendingChanges ? '\u26a0 Ausstehend' : valid ? 'Verbunden' : 'Nicht verbunden';
+    if (titleEl) titleEl.style.color = this._pendingChanges ? 'var(--warn)' : '';
     let subTxt = valid ? 'Token g\u00fcltig' : 'Bitte Client-ID eintragen';
-    if (this._syncLastUpload > 0) {
-      const d = new Date(this._syncLastUpload);
-      const h = String(d.getHours()).padStart(2,'0');
-      const m = String(d.getMinutes()).padStart(2,'0');
-      subTxt = 'Zuletzt hochgeladen: ' + h + ':' + m;
-    }
-    if (this._syncLastDownload > this._syncLastUpload) {
-      const d = new Date(this._syncLastDownload);
-      const h = String(d.getHours()).padStart(2,'0');
-      const m = String(d.getMinutes()).padStart(2,'0');
-      subTxt = 'Zuletzt geladen: ' + h + ':' + m;
-    }
+    if (this._pendingChanges) subTxt = '\u00c4nderungen werden hochgeladen sobald Online';
+    else if (this._syncLastUpload > 0) subTxt = 'Zuletzt hochgeladen: ' + this._syncTimeLabel(this._syncLastUpload);
     if (subEl)  subEl.textContent    = subTxt;
     if (statEl) statEl.style.display = valid ? 'inline-flex' : 'none';
   },
@@ -6376,7 +6633,7 @@ _ftStart() {
     if (!el) return;
     const alle = [];
     ['pro','priv'].forEach(ctx => {
-      const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.wochenpflichten || []).forEach(p => { alle.push({ ...p, _ctx: ctx }); });
     });
     if (!alle.length) {
@@ -6410,7 +6667,7 @@ _ftStart() {
       wochentage = (eingabe||'').split(',').map(s => parseInt(s.trim(),10)).filter(n => !isNaN(n) && n >= 0 && n <= 6);
     }
     const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     if (!db) return;
     if (!db.wochenpflichten) db.wochenpflichten = [];
     db.wochenpflichten.push({ id: 'wp_' + Date.now(), titel: titel.trim(), taeglich, wochentage });
@@ -6421,7 +6678,7 @@ _ftStart() {
 
   _sWpDelete(id, ctx) {
     if (!confirm('Wochenpflicht l\u00f6schen?')) return;
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     if (!db) return;
     const p = (db.wochenpflichten||[]).find(x => x.id === id);
     this._softDelete(p);
@@ -6452,7 +6709,7 @@ _ftStart() {
     reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target.result);
-        this.dataPro = data.data || data;
+        this.db = data.data || data;
         await this.idbSaveAll();
         this.renderSection(this.activeTab);
         this._toast('\u2713 Beruf-Daten geladen');
@@ -6465,7 +6722,7 @@ _ftStart() {
   },
 
   _sExport(ctx) {
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     if (!db) { this._toast('Keine Daten'); return; }
     const name = ctx === 'pro' ? 'workbench-beruf.json' : 'workbench-privat.json';
     const blob = new Blob(
@@ -6503,7 +6760,7 @@ _ftStart() {
     const typeLabel = { termin:'Termin', schnell:'Schnell-Erinnerung', aufgabe:'Aufgabe', vorhaben:'Vorhaben', pflicht:'Wochenpflicht', ziel:'Ziel', link:'Ressource' };
     const items = [];
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv; if (!db) return;
+      const db = this.db; if (!db) return;
       const addItems = (arr, type, getText) => {
         (arr||[]).filter(x => x.deleted).forEach(x => {
           const deletedAt = x.deletedAt || x.updatedAt || '';
@@ -6546,7 +6803,7 @@ _ftStart() {
     if (!confirm('Alle ' + items.length + ' gel\u00f6schten Items jetzt permanent l\u00f6schen?\n\nDiese Aktion kann nicht r\u00fckg\u00e4ngig gemacht werden.')) return;
     const bereinige = (arr) => (arr||[]).filter(x => !x.deleted);
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv; if (!db) return;
+      const db = this.db; if (!db) return;
       db.quickItems = bereinige(db.quickItems); db.customEvents = bereinige(db.customEvents);
       db.wochenpflichten = bereinige(db.wochenpflichten); db.ziele = bereinige(db.ziele);
       db.checklistVorlagen = bereinige(db.checklistVorlagen);
@@ -6567,7 +6824,7 @@ _ftStart() {
     });
     let count = 0;
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       if (!db) return;
       const vorher = ['quickItems','customEvents','wochenpflichten','ziele','checklistVorlagen']
         .reduce((s,f) => s + (db[f]||[]).filter(x=>x.deleted).length, 0);
@@ -6661,7 +6918,7 @@ _ftStart() {
   },
 
   _modalVhOptions(ctx, selectedId) {
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     return (db?.vorhaben||[])
       .filter(v => !v.deleted && v.status !== 'archiviert' && v.status !== 'archiviert' && v.aktiv !== false)
       .map(v => '<option value="' + this._esc(v.id) + '"'
@@ -6671,7 +6928,7 @@ _ftStart() {
   },
 
   _modalVhOptionsAll(ctx, aktVhId) {
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     return (db?.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv!==false)
       .map(v => '<option value="' + this._esc(v.id) + '"' + (v.id===aktVhId ? ' selected' : '') + '>' + this._esc(v.titel) + '</option>').join('');
   },
@@ -6790,10 +7047,10 @@ _ftStart() {
 
   schnellOpen(id) {
     let ctx  = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-    let db   = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    let db = this.db;
     let item = id ? (db?.quickItems||[]).find(q => q.id === id) : null;
     if (!item && id) {
-      const otherDb = ctx === 'pro' ? this.dataPriv : this.dataPro;
+      const otherDb = this.db;
       item = (otherDb?.quickItems||[]).find(q => q.id === id);
       if (item) { ctx = ctx === 'pro' ? 'priv' : 'pro'; db = otherDb; }
     }
@@ -6819,10 +7076,10 @@ _ftStart() {
   /* ── Aufgabe ── */
   aufgabeOpen(vorhabenId, aufgabeId, ctx) {
     ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
-    let db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    let db = this.db;
     let v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
     if (!v && vorhabenId) {
-      const otherDb = ctx === 'pro' ? this.dataPriv : this.dataPro;
+      const otherDb = this.db;
       v = (otherDb?.vorhaben||[]).find(x => x.id === vorhabenId);
       if (v) { ctx = ctx === 'pro' ? 'priv' : 'pro'; db = otherDb; }
     }
@@ -6894,10 +7151,10 @@ _ftStart() {
   /* ── Termin ── */
   terminOpen(eventId, ctx) {
     // Termine zuerst in dataPriv suchen, Fallback dataPro
-    let db = this.dataPriv;
+    const db = this.db;
     let e  = eventId ? (db?.customEvents||[]).find(x => x.id === eventId) : null;
     if (!e && eventId) {
-      db = this.dataPro;
+      // db = unified
       e  = (db?.customEvents||[]).find(x => x.id === eventId);
     }
     const aktuellerCtx = e?.welt === 'pro' ? 'pro' : 'priv';
@@ -6955,7 +7212,7 @@ _ftStart() {
     const c = this._modalCtx;
     if (!c || c.type !== 'termin') return;
     // Termine immer in dataPriv — welt für Badge aus e.welt
-    const db = this.dataPriv;
+    const db = this.db;
     const e  = (db?.customEvents||[]).find(x => x.id === c.eventId);
     if (!e) return;
     const ctx = e.welt || 'priv';
@@ -6991,7 +7248,7 @@ _ftStart() {
   },
   pflichtOpen(id, ctx) {
     ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const p  = id ? (db?.wochenpflichten||[]).find(x => x.id === id) : null;
     const days    = ['Mo','Di','Mi','Do','Fr','Sa','So'];
     const dayNums = [1,2,3,4,5,6,0];
@@ -7027,7 +7284,7 @@ _ftStart() {
   /* ── Ziel ── */
   zielOpen(id, ctx) {
     ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const z  = id ? (db?.ziele||[]).find(x => x.id === id) : null;
     const bereiche = [
       {v:'koerper',l:'K\u00f6rper \u0026 Gesundheit'},{v:'entw',l:'Entwicklung'},
@@ -7063,14 +7320,14 @@ _ftStart() {
   /* ── Link / Ablage ── */
   linkOpen(vorhabenId, linkId, ctx) {
     ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
-    const db = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
     const l  = linkId ? (v?.links||[]).find(x => x.id === linkId) : null;
 
     // Vorhaben-Dropdown (alle aktiven Vorhaben beider DBs)
     const alleVh = [];
     ['pro','priv'].forEach(c => {
-      const d = c==='pro' ? this.dataPro : this.dataPriv;
+      const d = this.db;
       (d?.vorhaben||[]).filter(x => !x.deleted && x.status !== 'archiviert' && x.aktiv !== false)
         .forEach(x => alleVh.push({ id: x.id, titel: x.titel, ctx: c }));
     });
@@ -7111,7 +7368,7 @@ _ftStart() {
   /* ── Checklisten-Vorlage ── */
   vorlageOpen(id) {
     const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-    const db  = ctx === 'pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v   = id ? (db?.checklistVorlagen||[]).find(x => x.id === id) : null;
     const schritte = v?.schritte || [];
     let sHtml = schritte.map((s,i) =>
@@ -7172,7 +7429,7 @@ _ftStart() {
       this._softDelete(item);
     };
 
-    const db = c.ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     switch(c.type) {
       case 'schnell':
         softDelete(db?.quickItems, c.id);
@@ -7183,7 +7440,7 @@ _ftStart() {
         break;
       }
       case 'termin':
-        softDelete(this.dataPriv?.customEvents, c.eventId);
+        softDelete(this.db?.customEvents, c.eventId);
         break;
       case 'pflicht':
         softDelete(db?.wochenpflichten, c.id);
@@ -7217,14 +7474,14 @@ _ftStart() {
     const date      = document.getElementById('wb-f-date')?.value || '';
     const startTime = document.getElementById('wb-f-time')?.value || '';
     const ctx = c.ctx || this._modalGetWelt();
-    const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     if (!db) return;
     if (!db.quickItems) db.quickItems = [];
     if (c.id) {
       let item = db.quickItems.find(x => x.id === c.id);
       if (!item) {
         // Fallback: andere DB
-        const otherDb = ctx==='pro' ? this.dataPriv : this.dataPro;
+        const otherDb = this.db;
         item = (otherDb?.quickItems||[]).find(x => x.id === c.id);
       }
       if (item) { item.text=text; item.date=date; item.startTime=startTime; item.updatedAt=this._now(); }
@@ -7241,7 +7498,7 @@ _ftStart() {
     const datum = document.getElementById('wb-f-date')?.value || '';
     const wich  = document.getElementById('wb-f-wich')?.value || 'mittel';
     const ctx   = this._modalGetWelt();
-    const db    = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v     = (db?.vorhaben||[]).find(x => x.id === c.vorhabenId);
     if (!v) return;
     const inputs = document.querySelectorAll('#wb-micro-list .wb-micro-input');
@@ -7275,7 +7532,7 @@ _ftStart() {
     const weltPill = document.querySelector('.wb-welt-pill');
     const welt = weltPill?.classList.contains('privat') ? 'priv' : 'pro';
     // Immer in dataPriv speichern
-    const db = this.dataPriv;
+    const db = this.db;
     if (!db) return;
     if (!db.customEvents) db.customEvents = [];
     const obj = { text, date, startTime:time, durationMin:dur, vorhabenId:vhId||null, done:false, welt, location:'', updatedAt:this._now(), vertraulich:this._modalGetVertraulich() };
@@ -7295,7 +7552,7 @@ _ftStart() {
     const vhId      = document.getElementById('wb-f-vh')?.value || '';
     const startTime = document.getElementById('wb-f-time')?.value || '';
     const ctx  = this._modalGetWelt();
-    const db   = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     if (!db) return;
     const activeDays = Array.from(document.querySelectorAll('.wb-day-btn.active')).map(el => parseInt(el.dataset.day, 10)).filter(n => !isNaN(n));
     const taeglich = activeDays.length === 7;
@@ -7318,7 +7575,7 @@ _ftStart() {
     const trend    = document.getElementById('wb-f-trend')?.value || 'stabil';
     const stichtag = document.getElementById('wb-f-date')?.value || '';
     const ctx      = this._modalGetWelt();
-    const db       = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     if (!db) return;
     if (!db.ziele) db.ziele = [];
     if (c.id) {
@@ -7348,13 +7605,13 @@ _ftStart() {
     if (targetVhId) {
       // Vorhaben in beiden DBs suchen
       for (const ctx of ['pro','priv']) {
-        const d = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const d = this.db;
         const found = (d?.vorhaben||[]).find(x => x.id === targetVhId);
         if (found) { targetDb = d; targetCtx = ctx; targetV = found; break; }
       }
     }
     if (!targetDb) {
-      targetDb = targetCtx==='pro' ? this.dataPro : this.dataPriv;
+      targetDb = this.db;
     }
     if (!targetDb) return;
 
@@ -7367,7 +7624,7 @@ _ftStart() {
       let item = arr.find(x => x.id === c.linkId);
       if (!item) {
         // Fallback: alte Vorhaben-DB
-        const oldDb = c.ctx==='pro' ? this.dataPro : this.dataPriv;
+        const oldDb = this.db;
         const oldV  = (oldDb?.vorhaben||[]).find(x => x.id === c.vorhabenId);
         item = (oldV?.links||[]).find(x => x.id === c.linkId);
         if (!item) item = (oldDb?.links||[]).find(x => x.id === c.linkId);
@@ -7394,7 +7651,7 @@ _ftStart() {
     const text = document.getElementById('wb-f-text')?.value.trim();
     if (!text) { this._toast('Name fehlt'); return; }
     const ctx  = this._modalGetWelt();
-    const db   = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     if (!db) return;
     const inputs = document.querySelectorAll('#wb-micro-list .wb-micro-input');
     const schritte = Array.from(inputs).map(i => i.value.trim()).filter(Boolean).map(t => ({text:t}));
@@ -7537,7 +7794,7 @@ _ftStart() {
     const el = document.getElementById('ft-vl-list'); if (!el) return;
     const alle = [];
     ['pro','priv'].forEach(ctx => {
-      const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+      const db = this.db;
       (db?.checklistVorlagen||[]).filter(v => !v.deleted).forEach(v => alle.push({ ...v, _ctx: ctx }));
     });
     if (!alle.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--faint);font-size:16px;">Keine Vorlagen vorhanden.</div>'; return; }
@@ -7553,7 +7810,7 @@ _ftStart() {
   },
 
   ftStartVorlage(id, ctx) {
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.checklistVorlagen||[]).find(x => x.id === id); if (!v) return;
     this.ftVorlagenClose();
     this._ft.checklist = (v.schritte||[]).map(s => ({ text: s.text||s, done: false }));
@@ -7562,7 +7819,7 @@ _ftStart() {
   },
 
   ftOpenFromAufgabe(vorhabenId, aufgabeId, ctx) {
-    const db = ctx==='pro' ? this.dataPro : this.dataPriv;
+    const db = this.db;
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
     const a  = (v?.aufgaben||[]).find(x => x.id === aufgabeId);
     if (!a) return;
@@ -7605,7 +7862,7 @@ _ftStart() {
       const convert = confirm(offen.length + ' offene Punkte als Schnell-Erinnerungen speichern?');
       if (convert) {
         const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-        const db  = ctx==='pro' ? this.dataPro : this.dataPriv;
+        const db = this.db;
         if (db) {
           if (!db.quickItems) db.quickItems = [];
           offen.forEach(c => {
@@ -7777,7 +8034,7 @@ _ftStart() {
     const day = d.getDay();
     if (day === 0 || day === 6) return false;
     const today = this._dStr(d);
-    for (const db of [this.dataPro, this.dataPriv]) {
+    for (const db of [this.db]) {
       const st = (db?.sondertage||[]).find(s => s.datum === today);
       if (st && (st.typ==='urlaub'||st.typ==='feiertag'||st.typ==='urlaub-aktiv')) return false;
     }
@@ -8142,5 +8399,22 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
     <div id="ft-vl-list"></div>
   </div>
 </div>
+  <div id="wb-crypto-overlay">
+    <div id="wb-crypto-box">
+      <div id="wb-crypto-head">
+        <span style="font-size:22px">&#x1F512;</span>
+        <span id="wb-crypto-head-title">WorkBench entsperren</span>
+      </div>
+      <div id="wb-crypto-body">
+        <div id="wb-crypto-desc">Gib dein Passwort ein um deine Daten zu \u00f6ffnen.</div>
+        <input id="wb-crypto-pw" type="password" placeholder="Passwort..."
+          autocomplete="current-password"
+          onkeydown="if(event.key==='Enter') WB._cryptoUnlock()">
+        <div id="wb-crypto-err">Falsches Passwort &mdash; bitte erneut versuchen.</div>
+        <button id="wb-crypto-btn" onclick="WB._cryptoUnlock()">Entsperren</button>
+      </div>
+      <div id="wb-crypto-foot">Daten werden mit AES-256-GCM verschl&uuml;sselt gespeichert.</div>
+    </div>
+  </div>
 </body>
 </html>
