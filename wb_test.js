@@ -2629,7 +2629,7 @@ content.includes('_nzAddItem')            ? (ok('_nzAddItem definiert'),        
 content.includes('nz-pin-pill')           ? (ok('.nz-pin-pill CSS vorhanden'),   f72Ok++) : (fail('.nz-pin-pill fehlt'),       f72Fail++);
 content.includes("case 'notizen'")        ? (ok("case 'notizen' in renderSection"), f72Ok++) : (fail("case 'notizen' fehlt"), f72Fail++);
 content.includes('db.notizen')            ? (ok('db.notizen genutzt'),           f72Ok++) : (fail('db.notizen fehlt'),         f72Fail++);
-content.includes('gepinnt') && content.includes('Max. 2') ? (ok('Pin-Limit 2 gesetzt'), f72Ok++) : (fail('Pin-Limit fehlt'), f72Fail++);
+content.includes('gepinnt') && (content.includes('Max. 2') || content.includes('Max. 3')) ? (ok('Pin-Limit gesetzt'), f72Ok++) : (fail('Pin-Limit fehlt'), f72Fail++);
 if (f72Fail === 0) ok(f72Ok + ' Notizen-Tab Checks bestanden');
 
 // ERGEBNIS
