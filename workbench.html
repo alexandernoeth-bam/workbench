@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.25</title>
+  <title>WorkBench 2.9.26</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2395,7 +2395,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.25</div>
+  <div id="wb-startup-tagline">v2.9.26</div>
 </div>
 
 <div id="wb-app">
@@ -2996,8 +2996,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.25',
-  APP_BUILD:   '20260620-0300',
+  APP_VERSION: '2.9.26',
+  APP_BUILD:   '20260620-0400',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3370,9 +3370,22 @@ _ftStart() {
     cb.setAttribute('data-wb-cb', 'open');
     cb.setAttribute('data-cb-id', id);
     cb.style.cssText = 'display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;';
-    cb.innerHTML = '<span data-box="1" style="display:inline-block;width:14px;height:14px;border:1.5px solid var(--accent);border-radius:3px;vertical-align:-2px;"></span> ';
-    const sel = window.getSelection(); const range = sel?.getRangeAt(0);
-    if (range) { range.collapse(false); range.insertNode(cb); range.setStartAfter(cb); sel.removeAllRanges(); sel.addRange(range); }
+    cb.innerHTML = '<span data-box="1" style="display:inline-block;width:14px;height:14px;border:1.5px solid var(--accent);border-radius:3px;vertical-align:-2px;flex-shrink:0;"></span>\u00a0';
+
+    const sel = window.getSelection();
+    const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
+    if (range) {
+      range.collapse(false);
+      range.insertNode(cb);
+      // Cursor hinter die Checkbox setzen (auf das non-breaking space)
+      range.setStartAfter(cb);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    // Verhindere dass Backspace die Checkbox löscht wenn Cursor direkt dahinter:
+    // Checkbox erhält tabindex damit sie fokussierbar ist
+    cb.setAttribute('tabindex', '0');
   },
 
   _ckToggleCheckbox(cbEl) {
@@ -3447,12 +3460,13 @@ _ftStart() {
   _ckLastInputTime: 0,
 
   _ckOnInput() {
+    if (this._ckInsertingMedia) return; // kein rekursiver Save beim Bild-Einfügen
     const now = Date.now();
     this._ckLastInputTime = now;
     clearTimeout(this._ckSaveTimer);
-    this._ckSaveTimer = setTimeout(() => {
-      this._ckSaveEntry();
-    }, 1500);
+    this._ckSaveTimer = setTimeout(() => { this._ckSaveEntry(); }, 1500);
+    clearTimeout(this._ckDividerTimer);
+    this._ckDividerTimer = setTimeout(() => { this._ckInsertDivider(); }, 300000);
   },
 
   _ckInsertChar(char) {
@@ -3483,22 +3497,45 @@ _ftStart() {
 
   _ckFoto(source) {
     const inp = document.createElement('input');
-    inp.type    = 'file';
-    inp.accept  = 'image/*';
+    inp.type   = 'file';
+    inp.accept = 'image/*';
     if (source === 'camera') inp.capture = 'environment';
     inp.onchange = async (e) => {
       const file = e.target.files?.[0]; if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const area = document.getElementById('ck-editor-area');
-        if (!area) return;
+      try {
+        // Bild auf max. 800px komprimieren um IDB-Overflow zu vermeiden
+        const bitmapUrl = await new Promise((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = ev => res(ev.target.result);
+          reader.onerror = rej;
+          reader.readAsDataURL(file);
+        });
+        const compressed = await new Promise((res) => {
+          const img = new Image();
+          img.onload = () => {
+            const MAX = 800;
+            const ratio = Math.min(1, MAX / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width  = Math.round(img.width  * ratio);
+            canvas.height = Math.round(img.height * ratio);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            res(canvas.toDataURL('image/jpeg', 0.7));
+          };
+          img.src = bitmapUrl;
+        });
+        const area = document.getElementById('ck-editor-area'); if (!area) return;
         area.focus();
-        const img = '<img src="' + ev.target.result + '" style="max-width:100%;border-radius:6px;margin:4px 0;">';
-        document.execCommand('insertHTML', false, img);
+        // Flag setzen damit oninput keinen rekursiven Save triggert
+        this._ckInsertingMedia = true;
+        document.execCommand('insertHTML', false,
+          '<img src="' + compressed + '" style="max-width:100%;border-radius:6px;margin:4px 0;display:block;">');
+        this._ckInsertingMedia = false;
         this._ckSaveEntry();
         this._toast('\u2713 Bild eingef\u00fcgt');
-      };
-      reader.readAsDataURL(file);
+      } catch(err) {
+        this._ckInsertingMedia = false;
+        this._toast('Fehler beim Bildladen: ' + err.message);
+      }
     };
     inp.click();
   },
@@ -3623,6 +3660,40 @@ _ftStart() {
       if (cb && area.contains(cb)) { e.preventDefault(); this._ckToggleCheckbox(cb); }
     };
     area.addEventListener('click', this._ckAreaClickHandler);
+
+    // Backspace/Delete auf Checkbox: ganze Checkbox entfernen
+    area.removeEventListener('keydown', this._ckKeydownHandler);
+    this._ckKeydownHandler = (e) => {
+      if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+      const sel = window.getSelection(); if (!sel || !sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      // Prüfe ob Cursor direkt vor/nach einer Checkbox sitzt
+      let node = range.startContainer;
+      // Backspace: prüfe vorheriges Geschwister
+      if (e.key === 'Backspace' && range.collapsed) {
+        const prev = range.startOffset > 0
+          ? (node.childNodes?.[range.startOffset - 1] || null)
+          : node.previousSibling;
+        const cb = prev?.nodeType === 1 ? prev.closest('[data-wb-cb]') || (prev.matches?.('[data-wb-cb]') ? prev : null) : null;
+        if (cb && area.contains(cb)) {
+          e.preventDefault();
+          cb.remove();
+          this._ckSaveEntry();
+          return;
+        }
+      }
+      // Delete: prüfe nächstes Geschwister
+      if (e.key === 'Delete' && range.collapsed) {
+        const next = node.childNodes?.[range.startOffset] || node.nextSibling;
+        const cb2 = next?.nodeType === 1 ? (next.matches?.('[data-wb-cb]') ? next : next.closest?.('[data-wb-cb]')) : null;
+        if (cb2 && area.contains(cb2)) {
+          e.preventDefault();
+          cb2.remove();
+          this._ckSaveEntry();
+        }
+      }
+    };
+    area.addEventListener('keydown', this._ckKeydownHandler);
   },
 
   _ckVerarbeiten() {
@@ -6071,7 +6142,7 @@ _ftStart() {
         + ' onclick="event.stopPropagation();WB._nzTogglePin(\'' + this._esc(l.id) + '\')" aria-label="Pinnen">'
         + this._nzSvgIcon('pin', 13)
         + '</button>'
-        + '<button class="nz-menu-btn" onclick="event.stopPropagation()" aria-label="Optionen">&#8943;</button>'
+        + '<button class="nz-menu-btn" onclick="event.stopPropagation();WB._nzBearbeitenDialog(\'' + this._esc(l.id) + '\')" aria-label="Optionen">&#8943;</button>'
         + '<span class="nz-grp-chev">&#9662;</span>'
         + '</div>'
         // Body
