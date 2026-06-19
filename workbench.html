@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.29</title>
+  <title>WorkBench 2.9.30</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2053,6 +2053,10 @@
     .tf-label.heute { color:var(--accent); }
     .tf-count { font-size:13px; font-weight:700; padding:1px 7px; border-radius:10px; background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
     .tf-count.heute { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .tf-done-toggle { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:10px; border:1.5px solid var(--border); background:var(--surface); cursor:pointer; font-size:12px; font-weight:700; color:var(--muted); font-family:var(--font); flex-shrink:0; transition:background 0.15s,color 0.15s; }
+    .tf-done-toggle:hover { background:var(--surface2); }
+    .tf-done-toggle.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .tf-done-toggle.on svg { stroke:#fff; }
     .tf-chev { width:20px; height:20px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
     .tf-chev svg { width:14px; height:14px; fill:var(--muted); transition:transform 0.2s; }
     .tf-chev.open svg { transform:rotate(90deg); }
@@ -2308,7 +2312,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.29</div>
+  <div id="wb-startup-tagline">v2.9.30</div>
 </div>
 
 <div id="wb-app">
@@ -2503,6 +2507,10 @@
             <div class="tf-dot" style="background:var(--accent)"></div>
             <span class="tf-label heute">Heute</span>
             <span class="tf-count heute" id="tf-heute-count">0</span>
+            <button id="tf-done-toggle" class="tf-done-toggle" onclick="event.stopPropagation();WB._tfToggleDone()" title="Erledigte/vergangene einblenden" style="display:none">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span id="tf-done-toggle-lbl">0</span>
+            </button>
             <div class="tf-chev open" id="tf-heute-chev"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></div>
           </div>
           <div class="tf-body open" id="tf-heute-body"></div>
@@ -2919,8 +2927,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.29',
-  APP_BUILD:   '20260619-1800',
+  APP_VERSION: '2.9.30',
+  APP_BUILD:   '20260619-2200',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3892,115 +3900,139 @@ _ftStart() {
     const now    = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     const dow    = now.getDay();
-    let h = '', count = 0;
+    let h = '', count = 0, hiddenCount = 0;
 
-    // Events: Termine (inkl. stornierte) + QuickItems mit Uhrzeit + Pflichten mit Uhrzeit
+    // Events: Termine + QuickItems mit Uhrzeit + Pflichten mit Uhrzeit
     const events = (this.db?.customEvents||[])
       .filter(e => !e.deleted && e.date === today)
       .map(e => ({ ...e, _art:'termin', _ctx: e.welt==='pro' ? 'pro' : 'priv' }));
 
-    // QuickItems MIT Uhrzeit → Termin-Block
-
     (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && q.startTime).forEach(q => {
       events.push({ id:q.id, text:q.text, startTime:q.startTime, durationMin:15, welt:q.welt||'priv', _art:'schnell', _ctx: q.welt || 'priv' });
     });
-  
-
-    // Wochenpflichten MIT Uhrzeit → Termin-Block (unerledigte)
 
     (this.db?.wochenpflichten||[]).filter(p => !p.deleted && p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
       const done = !!(db.pflichtStatus?.[today]?.[p.id]);
       if (done) return;
       events.push({ id:p.id, text:p.titel, startTime:p.startTime, durationMin:30, welt:p.welt||'priv', _art:'pflicht', _ctx: p.welt || 'priv' });
     });
-  
 
     events.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
 
     if (events.length) {
-      h += '<div class="tf-sec-sep">Termine</div>';
+      // Vergangene + stornierte ausblenden wenn !_tfShowDone
+      const visible = [], hidden = [];
       events.forEach(e => {
-        const isPriv      = e._ctx === 'priv';
-        const color       = isPriv ? 'var(--accent2)' : 'var(--accent)';
-        const badge       = isPriv ? '<span class="ck-badge privat">Privat</span>' : '<span class="ck-badge beruf">Beruf</span>';
-        const isStorniert = !!e.storniert;
         let eMin = 0;
         if (e.startTime) { const [eh,em] = e.startTime.split(':').map(Number); eMin = eh*60+em; }
         const past = e.startTime && eMin < nowMin;
-        const dotColor = (past || isStorniert) ? 'var(--faint)' : color;
-        const onclick = e._art === 'schnell'
-          ? 'WB.schnellOpen(&quot;' + this._esc(e.id) + '&quot;)'
-          : e._art === 'pflicht'
-            ? 'WB.pflichtOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._ctx + '&quot;)'
-            : 'WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)';
-        const suffix = e._art === 'schnell'
-          ? ' <span style="font-size:15px;color:var(--faint)">\u26a1</span>'
-          : e._art === 'pflicht'
-            ? ' <span style="font-size:15px;color:var(--faint)">\uD83D\uDD04</span>'
-            : '';
-        h += '<div class="tf-ev-row' + (isStorniert ? ' storniert' : '') + '">'
-          + '<div class="tf-ev-dot" style="background:' + dotColor + '"></div>'
-          + '<div class="tf-ev-time' + ((past || isStorniert) ? ' past' : '') + '">' + this._esc(e.startTime||'') + '</div>'
-          + '<div class="tf-ev-text' + ((past || isStorniert) ? ' done' : '') + '" onclick="' + onclick + '" style="flex:1;cursor:pointer;' + (isStorniert ? 'text-decoration:line-through;color:var(--faint);' : '') + '">'
-          + this._esc(e.text) + suffix + '</div>'
-          + (isStorniert
-            ? '<span class="ck-badge" style="background:var(--surface2);color:var(--faint);border:1px solid var(--border);">Abgesagt</span>'
-            : badge)
-          + '<div class="tf-ev-actions">'
-          + (!isStorniert
-            ? '<button class="tf-ev-act-btn" title="Erledigt" onclick="event.stopPropagation();WB._tfTerminDone(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2713</button>'
-              + '<button class="tf-ev-act-btn tf-ev-act-del" title="Absagen" onclick="event.stopPropagation();WB._tfTerminAbsagen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2715</button>'
-            : '')
-          + '</div></div>';
-        count++;
+        if ((past || !!e.storniert) && !this._tfShowDone) { hidden.push(e); hiddenCount++; }
+        else visible.push(e);
       });
+
+      if (visible.length) {
+        h += '<div class="tf-sec-sep">Termine</div>';
+        visible.forEach(e => {
+          const isPriv      = e._ctx === 'priv';
+          const color       = isPriv ? 'var(--accent2)' : 'var(--accent)';
+          const badge       = isPriv ? '<span class="ck-badge privat">Privat</span>' : '<span class="ck-badge beruf">Beruf</span>';
+          const isStorniert = !!e.storniert;
+          let eMin = 0;
+          if (e.startTime) { const [eh,em] = e.startTime.split(':').map(Number); eMin = eh*60+em; }
+          const past = e.startTime && eMin < nowMin;
+          const dotColor = (past || isStorniert) ? 'var(--faint)' : color;
+          const onclick = e._art === 'schnell'
+            ? 'WB.schnellOpen(&quot;' + this._esc(e.id) + '&quot;)'
+            : e._art === 'pflicht'
+              ? 'WB.pflichtOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._ctx + '&quot;)'
+              : 'WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)';
+          const suffix = e._art === 'schnell'
+            ? ' <span style="font-size:15px;color:var(--faint)">\u26a1</span>'
+            : e._art === 'pflicht'
+              ? ' <span style="font-size:15px;color:var(--faint)">\uD83D\uDD04</span>'
+              : '';
+          h += '<div class="tf-ev-row' + (isStorniert ? ' storniert' : '') + '">'
+            + '<div class="tf-ev-dot" style="background:' + dotColor + '"></div>'
+            + '<div class="tf-ev-time' + ((past || isStorniert) ? ' past' : '') + '">' + this._esc(e.startTime||'') + '</div>'
+            + '<div class="tf-ev-text' + ((past || isStorniert) ? ' done' : '') + '" onclick="' + onclick + '" style="flex:1;cursor:pointer;' + (isStorniert ? 'text-decoration:line-through;color:var(--faint);' : '') + '">'
+            + this._esc(e.text) + suffix + '</div>'
+            + (isStorniert
+              ? '<span class="ck-badge" style="background:var(--surface2);color:var(--faint);border:1px solid var(--border);">Abgesagt</span>'
+              : badge)
+            + '<div class="tf-ev-actions">'
+            + (!isStorniert
+              ? '<button class="tf-ev-act-btn" title="Erledigt" onclick="event.stopPropagation();WB._tfTerminDone(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2713</button>'
+                + '<button class="tf-ev-act-btn tf-ev-act-del" title="Absagen" onclick="event.stopPropagation();WB._tfTerminAbsagen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2715</button>'
+              : '')
+            + '</div></div>';
+          count++;
+        });
+      }
     }
 
     // Wochenpflichten OHNE Uhrzeit
     const pflichten = [];
-
     (this.db?.wochenpflichten||[]).filter(p => !p.deleted && !p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
       const done = !!(db.pflichtStatus?.[today]?.[p.id]);
       pflichten.push({...p, _ctx: p.welt || 'priv', done});
     });
-  
+
     if (pflichten.length) {
-      h += '<div class="tf-sec-sep">Wochenpflichten</div>';
-      pflichten.forEach(p => {
-        const badge = p._ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
-        const doneBadge = p.done ? '<span class="ck-badge pflicht">erledigt</span>' : badge;
-        h += '<div class="tf-pfl-row" onclick="WB._woPflichtToggle(&quot;' + this._esc(p.id) + '&quot;,&quot;' + today + '&quot;,&quot;' + p._ctx + '&quot;)">'
-          + '<div class="tf-pfl-check' + (p.done ? ' done' : '') + '">' + (p.done ? '\u2713' : '') + '</div>'
-          + '<div class="tf-pfl-text' + (p.done ? ' done' : '') + '">' + this._esc(p.titel) + '</div>'
-          + doneBadge
-          + '<div style="padding:2px 6px;font-size:16px;color:var(--faint);cursor:pointer;" onclick="event.stopPropagation();WB.pflichtOpen(&quot;' + this._esc(p.id) + '&quot;,&quot;' + p._ctx + '&quot;)" title="Bearbeiten">&#x270F;</div>'
-          + '</div>';
-        count++;
-      });
+      const visible = pflichten.filter(p => !p.done || this._tfShowDone);
+      hiddenCount += pflichten.filter(p => p.done && !this._tfShowDone).length;
+      if (visible.length) {
+        h += '<div class="tf-sec-sep">Wochenpflichten</div>';
+        visible.forEach(p => {
+          const badge = p._ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
+          const doneBadge = p.done ? '<span class="ck-badge pflicht">erledigt</span>' : badge;
+          h += '<div class="tf-pfl-row" onclick="WB._woPflichtToggle(&quot;' + this._esc(p.id) + '&quot;,&quot;' + today + '&quot;,&quot;' + p._ctx + '&quot;)">'
+            + '<div class="tf-pfl-check' + (p.done ? ' done' : '') + '">' + (p.done ? '\u2713' : '') + '</div>'
+            + '<div class="tf-pfl-text' + (p.done ? ' done' : '') + '">' + this._esc(p.titel) + '</div>'
+            + doneBadge
+            + '<div style="padding:2px 6px;font-size:16px;color:var(--faint);cursor:pointer;" onclick="event.stopPropagation();WB.pflichtOpen(&quot;' + this._esc(p.id) + '&quot;,&quot;' + p._ctx + '&quot;)" title="Bearbeiten">&#x270F;</div>'
+            + '</div>';
+          count++;
+        });
+      }
     }
 
     // Schnell-Erinnerungen OHNE Uhrzeit
     const schnell = [];
+    (this.db?.quickItems||[]).filter(q => !q.deleted && q.date === today && !q.startTime).forEach(q => schnell.push({...q, _ctx: q.welt || 'priv'}));
 
-    (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && !q.startTime).forEach(q => schnell.push({...q, _ctx: q.welt || 'priv'}));
-  
     if (schnell.length) {
-      h += '<div class="tf-sec-sep">Schnell-Erinnerungen</div>';
-      schnell.forEach(q => {
-        const badge = q._ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
-        h += '<div class="tf-schnell-row" onclick="WB.schnellOpen(&quot;' + this._esc(q.id) + '&quot;)">'
-          + '<div class="tf-schnell-check" onclick="event.stopPropagation();WB._tfSchnellCheck(&quot;' + this._esc(q.id) + '&quot;,&quot;' + q._ctx + '&quot;)"></div>'
-          + '<div class="tf-schnell-text">' + this._esc(q.text)
-          + (q.startTime ? '<span style="font-size:15px;color:var(--accent);font-weight:700;margin-left:6px;">' + this._esc(q.startTime) + '</span>' : '')
-          + '</div>'
-          + badge + '</div>';
-        count++;
-      });
+      const visible = schnell.filter(q => !q.done || this._tfShowDone);
+      hiddenCount += schnell.filter(q => q.done && !this._tfShowDone).length;
+      if (visible.length) {
+        h += '<div class="tf-sec-sep">Schnell-Erinnerungen</div>';
+        visible.forEach(q => {
+          const badge = q._ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
+          h += '<div class="tf-schnell-row" onclick="WB.schnellOpen(&quot;' + this._esc(q.id) + '&quot;)">'
+            + '<div class="tf-schnell-check' + (q.done ? ' done' : '') + '" style="' + (q.done ? 'background:var(--accent);border-color:var(--accent)' : '') + '" onclick="event.stopPropagation();WB._tfSchnellCheck(&quot;' + this._esc(q.id) + '&quot;,&quot;' + q._ctx + '&quot;)">'
+            + (q.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '')
+            + '</div>'
+            + '<div class="tf-schnell-text' + (q.done ? ' done' : '') + '">' + this._esc(q.text)
+            + (q.startTime ? '<span style="font-size:15px;color:var(--accent);font-weight:700;margin-left:6px;">' + this._esc(q.startTime) + '</span>' : '')
+            + '</div>'
+            + badge + '</div>';
+          count++;
+        });
+      }
     }
 
-    if (!count) h = '<div class="tf-empty">Keine Eintr\u00e4ge f\u00fcr heute.</div>';
+    if (!count && !hiddenCount) h = '<div class="tf-empty">Keine Eintr\u00e4ge f\u00fcr heute.</div>';
     el.innerHTML = h;
     if (cntEl) cntEl.textContent = count;
+
+    // Toggle-Button aktualisieren
+    const toggleBtn = document.getElementById('tf-done-toggle');
+    const toggleLbl = document.getElementById('tf-done-toggle-lbl');
+    if (toggleBtn) {
+      toggleBtn.style.display = (hiddenCount > 0 || this._tfShowDone) ? 'inline-flex' : 'none';
+      toggleBtn.classList.toggle('on', this._tfShowDone);
+      toggleBtn.title = this._tfShowDone ? 'Erledigte/vergangene verbergen' : 'Erledigte/vergangene einblenden';
+    }
+    if (toggleLbl) toggleLbl.textContent = this._tfShowDone ? '\u2715' : hiddenCount;
   },
 
   _tfRenderPost() {
@@ -4121,6 +4153,15 @@ _ftStart() {
       + ' onclick="WB._blSetChip(\'' + c.v + '\')">'
       + c.l + '<span class="bl-chip-count">' + c.n + '</span></div>'
     ).join('');
+  },
+
+  _tfShowDone: false,
+
+  _tfToggleDone() {
+    this._tfShowDone = !this._tfShowDone;
+    const btn = document.getElementById('tf-done-toggle');
+    if (btn) btn.classList.toggle('on', this._tfShowDone);
+    this._tfRenderHeute();
   },
 
   _blFilter: { welt: 'alle', ansicht: null },
