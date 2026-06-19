@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.30</title>
+  <title>WorkBench 2.9.31</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -349,6 +349,17 @@
 	  position: absolute;
 	  bottom: 24px;
 	}
+    #wb-startup-skip {
+      margin-top: 32px; padding: 10px 28px; border-radius: 20px;
+      border: 1.5px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.1);
+      color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+      font-family: var(--font); letter-spacing: 0.3px;
+    }
+    #wb-startup-skip:hover { background: rgba(255,255,255,0.2); }
+    #wb-startup-countdown {
+      margin-top: 12px; font-size: 13px; color: rgba(255,255,255,0.45);
+      font-family: var(--font);
+    }
 
     /* ── Cockpit Header ── */
     #ck-header {
@@ -2312,7 +2323,9 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.30</div>
+  <div id="wb-startup-tagline">v2.9.31</div>
+  <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
+  <div id="wb-startup-countdown" style="display:none"></div>
 </div>
 
 <div id="wb-app">
@@ -2927,8 +2940,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.30',
-  APP_BUILD:   '20260619-2200',
+  APP_VERSION: '2.9.31',
+  APP_BUILD:   '20260620-0800',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6640,6 +6653,8 @@ _ftStart() {
         if (v.favorit === undefined) v.favorit = false;
         if (v.vertraulich === undefined) v.vertraulich = false;
       });
+      // Neue DB-Felder sicherstellen
+      if (!this.db.mantras) this.db.mantras = [];
     
     } catch(e) {
       console.error('[IDB] load error:', e);
@@ -6653,7 +6668,7 @@ _ftStart() {
       quickItems: [], customEvents: [], wochenpflichten: [],
       pflichtStatus: {}, tagesprotokoll: [], wochenMottos: {},
       checklistVorlagen: [], vorhaben: [], ziele: [], links: [],
-      notizen: [],
+      notizen: [], mantras: [],
       _version: 1, _exportedAt: '',
     };
   },
@@ -6810,6 +6825,7 @@ _ftStart() {
       // Keine alten Daten → db sicherstellen
       if (!this.db) this.db = this._emptyDb();
       if (!this.db._version) this.db._version = 1;
+      if (!this.db.mantras) this.db.mantras = [];
       return;
     }
     // Bereits migriert?
@@ -6952,6 +6968,117 @@ _ftStart() {
 
   _now() {
     return new Date().toISOString();
+  },
+
+  /* ── Mantra-Pool + Startup-Screen ── */
+  MANTRA_HARDCODED: '\u201eEin echter Gentleman steht f\u00fcr Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren \u00dcberzeugung.\u201c',
+  _mantraTimer: null,
+
+  _mantraInit() {
+    // Prüfe ob Mantra-Screen gezeigt werden soll
+    const today    = this._dStr(new Date());
+    const lastDate = localStorage.getItem('wb_mantra_date') || '';
+    const lastSeen = parseInt(localStorage.getItem('wb_mantra_seen') || '0', 10);
+    const now      = Date.now();
+    const minSince = (now - lastSeen) / 60000;
+    const isFirstToday = lastDate !== today;
+    const isLongGap    = lastSeen === 0 || minSince >= 60;
+
+    if (!isFirstToday && !isLongGap) {
+      // Normaler Start — Startup nach 3s ausblenden
+      setTimeout(() => this._mantraHide(), 3000);
+      this._mantraUpdateLastSeen();
+      return;
+    }
+
+    // Mantra-Screen zeigen: zufälligen Satz wählen
+    const pool = this._mantraPool();
+    const satz = this._mantraPickRandom(pool);
+    const mantraEl = document.getElementById('wb-startup-mantra');
+    if (mantraEl) mantraEl.textContent = satz;
+
+    // Skip-Button + Countdown anzeigen
+    const skipBtn   = document.getElementById('wb-startup-skip');
+    const cntdwnEl  = document.getElementById('wb-startup-countdown');
+    if (skipBtn)  skipBtn.style.display  = '';
+    if (cntdwnEl) cntdwnEl.style.display = '';
+
+    // Countdown 5 → 0
+    let remaining = 5;
+    if (cntdwnEl) cntdwnEl.textContent = 'Weiter in ' + remaining + ' s';
+    this._mantraTimer = setInterval(() => {
+      remaining--;
+      if (cntdwnEl) cntdwnEl.textContent = remaining > 0 ? 'Weiter in ' + remaining + ' s' : '';
+      if (remaining <= 0) { this._mantraHide(); }
+    }, 1000);
+
+    // Datum und Seen jetzt setzen
+    this._mantraUpdateLastSeen();
+  },
+
+  _mantraPool() {
+    // Alle Pool-Einträge + hartverdrahtetes Mantra doppelt gewichtet
+    const eintraege = (this.db?.mantras || []).filter(m => !m.deleted).map(m => m.text);
+    return [this.MANTRA_HARDCODED, this.MANTRA_HARDCODED, ...eintraege];
+  },
+
+  _mantraPickRandom(pool) {
+    if (!pool.length) return this.MANTRA_HARDCODED;
+    return pool[Math.floor(Math.random() * pool.length)];
+  },
+
+  _mantraHide() {
+    if (this._mantraTimer) { clearInterval(this._mantraTimer); this._mantraTimer = null; }
+    const s = document.getElementById('wb-startup');
+    if (s) { s.style.opacity = '0'; setTimeout(() => s.remove(), 500); }
+  },
+
+  _mantraSkip() {
+    this._mantraHide();
+  },
+
+  _mantraUpdateLastSeen() {
+    localStorage.setItem('wb_mantra_date', this._dStr(new Date()));
+    localStorage.setItem('wb_mantra_seen', String(Date.now()));
+  },
+
+  // Pool-Verwaltung aus Einstellungen
+  _mantraAdd() {
+    const text = prompt('Neuer Mantra-Satz:');
+    if (!text?.trim()) return;
+    if (!this.db.mantras) this.db.mantras = [];
+    this.db.mantras.push({ id: 'mn_' + Date.now(), text: text.trim() });
+    this.setDirty();
+    this._sRenderMantraPool();
+    this._toast('\u2713 Mantra hinzugef\u00fcgt');
+  },
+
+  _mantraDelete(id) {
+    const m = (this.db?.mantras || []).find(x => x.id === id);
+    if (!m) return;
+    this._softDelete(m);
+    this.setDirty();
+    this._sRenderMantraPool();
+  },
+
+  _sRenderMantraPool() {
+    const el = document.getElementById('s-mantra-pool');
+    if (!el) return;
+    const pool = (this.db?.mantras || []).filter(m => !m.deleted);
+    let h = '<div style="margin-bottom:8px;font-size:13px;color:var(--faint)">Das hartverdrahtete Mantra hat doppelte Gewichtung.</div>';
+    h += '<div style="padding:10px 12px;background:var(--surface2);border-radius:6px;border:1.5px solid var(--border);font-size:14px;font-style:italic;color:var(--muted);margin-bottom:10px">'
+      + this._esc(this.MANTRA_HARDCODED) + ' <span style="font-size:11px;color:var(--faint);font-style:normal">(fest, 2×)</span></div>';
+    if (pool.length) {
+      pool.forEach(m => {
+        h += '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-bottom:6px">'
+          + '<div style="flex:1;font-size:14px;color:var(--text)">' + this._esc(m.text) + '</div>'
+          + '<button onclick="WB._mantraDelete(\'' + this._esc(m.id) + '\')" style="flex-shrink:0;background:none;border:none;color:var(--faint);cursor:pointer;font-size:16px;padding:0 2px">\u00d7</button>'
+          + '</div>';
+      });
+    } else {
+      h += '<div style="font-size:14px;color:var(--faint);font-style:italic">Noch keine weiteren S\u00e4tze.</div>';
+    }
+    el.innerHTML = h;
   },
 
   /* ── OAuth Banner ── */
@@ -7305,12 +7432,13 @@ _ftStart() {
   // ── Init ─────────────────────────────────────────────
 
   async init() {
-    // Startup immer nach max. 8s ausblenden (Sicherheitsnetz)
+    // Startup immer nach max. 10s ausblenden (Sicherheitsnetz — Mantra dauert max. 5s + Fade)
     const hideStartup = () => {
+      if (this._mantraTimer) { clearInterval(this._mantraTimer); this._mantraTimer = null; }
       const s = document.getElementById('wb-startup');
       if (s) { s.style.opacity = '0'; setTimeout(() => s.remove(), 500); }
     };
-    setTimeout(hideStartup, 8000);
+    setTimeout(hideStartup, 10000);
     try {
       await this.idbOpen();
       await this.idbLoad();
@@ -7321,16 +7449,13 @@ _ftStart() {
       await this._initAfterCrypto();
     } catch(e) {
       console.error('[init]', e.message);
-      hideStartup(); // Im Fehlerfall sofort einblenden
+      hideStartup();
     }
   },
 
   async _initAfterCrypto() {
-    // Startup nach 3s ausblenden (unabhängig von Sync)
-    setTimeout(() => {
-      const s = document.getElementById('wb-startup');
-      if (s) { s.style.opacity = '0'; setTimeout(() => s.remove(), 500); }
-    }, 3000);
+    // Startup-Fallback nach 8s (Sicherheitsnetz, bereits in init() gesetzt)
+    // Mantra-Logik wird nach Migration aufgerufen (weiter unten)
 
     await this._sLoadSettings();
     // Layout-Klasse setzen
@@ -7399,6 +7524,12 @@ _ftStart() {
     setTimeout(() => { this._ckLadeHeutigerEintrag(); }, 300);
     this.tabSwitch('cockpit');
     setTimeout(() => this._nzRenderPills(), 400);
+
+    // Mantra-Screen: nach Migration, damit db.mantras verfügbar
+    this._mantraInit();
+
+    // lastSeen bei jeder Interaktion aktualisieren
+    document.addEventListener('click', () => this._mantraUpdateLastSeen(), { passive: true });
   },
 
   /* ── Settings ── */
@@ -7415,6 +7546,7 @@ _ftStart() {
     const el = document.getElementById('wb-settings-overlay');
     if (el) el.classList.add('open');
     this._sRenderAll();
+    this._sRenderMantraPool();
     // Papierkorb-Zähler aktualisieren
     let pkCount = 0;
 
@@ -9326,6 +9458,21 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
         </div>
         <div style="padding:0 14px 10px;font-size:12px;color:var(--faint)">
           Export erstellt eine lokale JSON-Sicherung. Import &uuml;berschreibt alle Daten.
+        </div>
+      </div>
+    </div>
+
+    <div class="s-card">
+      <div class="s-card-head" onclick="WB._sToggle('mantra')">
+        <span class="s-card-label">&#x2728; Mantra-Pool</span>
+        <span class="s-card-chev">&#x25BE;</span>
+      </div>
+      <div class="s-card-body" id="s-mantra-body" style="display:none">
+        <div style="padding:10px 14px 0">
+          <div id="s-mantra-pool"></div>
+        </div>
+        <div style="padding:10px 14px 14px">
+          <button class="s-btn primary" onclick="WB._mantraAdd()">+ Satz hinzuf&uuml;gen</button>
         </div>
       </div>
     </div>
