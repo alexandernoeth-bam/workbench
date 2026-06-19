@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.19</title>
+  <title>WorkBench 2.9.20</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1115,6 +1115,7 @@
     .wb-mobile #wo-view-toggle,
     .wb-mobile .wo-pflicht-btn,
     .wb-mobile [onclick*="_woNeuPflicht"],
+    .wb-mobile [onclick*="_woPflichtNeu"],
     .wb-mobile [onclick*="woKalender"],
     .wb-mobile #wo-motto-block,
     .wb-mobile .wo-motto-wrap { display: none !important; }
@@ -2306,7 +2307,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.19</div>
+  <div id="wb-startup-tagline">v2.9.20</div>
 </div>
 
 <div id="wb-app">
@@ -2840,8 +2841,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.19',
-  APP_BUILD:   '20260619-2200',
+  APP_VERSION: '2.9.20',
+  APP_BUILD:   '20260619-2300',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -5062,26 +5063,31 @@ _ftStart() {
       const isWE    = dow === 0 || dow === 6;
       const isFt    = false;
 
-      // Alle Termine
+      // Alle Termine (nur mit Uhrzeit auf Mobile)
       const events = (this.db?.customEvents || [])
         .filter(e => !e.deleted && e.date === dateStr && (!e.done || e.storniert))
         .map(e => ({ ...e, _art: 'termin', _ctx: e.welt === 'pro' ? 'pro' : 'priv' }));
-      // QuickItems mit Uhrzeit in Events einmischen
+      // QuickItems mit Uhrzeit einmischen (auf Mobile: NUR mit startTime)
       (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === dateStr && q.startTime).forEach(q => {
         events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, welt:q.welt||'priv', _art:'schnell', _ctx: q.welt || 'priv' });
       });
       events.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
 
+      // Pflichten: auf Mobile NICHT anzeigen
       const pflichten = [];
-      const dayOfWeek = d.getDay();
+      if (!this._isMobile()) {
+        const dayOfWeek = d.getDay();
+        (this.db?.wochenpflichten || [])
+          .filter(p => !p.deleted && (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)))
+          .forEach(p => {
+            const done = !!this.db?.pflichtStatus?.[dateStr]?.[p.id];
+            pflichten.push({ ...p, _ctx: p.welt || 'priv', done });
+          });
+      }
 
-      (this.db?.wochenpflichten || [])
-        .filter(p => !p.deleted && (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)))
-        .forEach(p => {
-          const done = !!this.db?.pflichtStatus?.[dateStr]?.[p.id];
-          pflichten.push({ ...p, _ctx: p.welt || 'priv', done });
-        });
-    
+      // Tagnamen: aus dow ableiten (korrekt für Mobile-7-Tage-View)
+      const dowNames = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+      const dayLabel = this._isMobile() ? dowNames[dow] : dayNames[i];
 
       let blockClass = 'wo-day-block';
       if (isToday) blockClass += ' today';
@@ -5095,7 +5101,7 @@ _ftStart() {
       h += '<div class="' + blockClass + '">'
         + '<div class="' + headClass + '">'
         + '<div class="wo-day-name' + (isToday ? ' today' : '') + '">'
-        + dayNames[i] + '</div>'
+        + dayLabel + '</div>'
         + '<div class="wo-day-date">'
         + d.getDate() + '. ' + months[d.getMonth()] + '</div>';
       if (isToday) h += '<span class="wo-badge today">Heute</span>';
