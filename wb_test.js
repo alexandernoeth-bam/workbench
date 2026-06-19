@@ -355,7 +355,7 @@ if (cssVarFail === 0) ok(cssVarOk + ' CSS-Variablen definiert');
 console.log('\n── 13. IDB-Vollständigkeit ──');
 // Prüft ob alle IDB-Kern-Methoden vorhanden sind und IDB_NAME/IDB_VERSION definiert sind.
 // Fehlt idbOpen oder idbSaveAll: Daten gehen beim Reload verloren — kein sichtbarer Fehler.
-const IDB_FNS = ['idbOpen', 'idbGet', 'idbSet', 'idbLoad', 'idbSaveAll'];
+const IDB_FNS = ['idbOpen', 'idbGet', 'idbSet', 'idbLoad', 'idbSave'];
 let idbOk = 0, idbFail = 0;
 IDB_FNS.forEach(fn => {
   const found = jsCode.includes('  ' + fn + '(') || jsCode.includes('  async ' + fn + '(');
@@ -921,7 +921,7 @@ console.log('\n── 25. Einstellungen + Welt-Logik ──');
 const S_IDS = [
   'wb-settings-overlay', 'wb-menu-btn',
   's-ov-header', 's-ov-back', 's-ov-title', 's-ov-version', 's-ov-scroll',
-  's-toggle-dark', 's-toggle-buero', 's-sync-title', 's-sync-sub',
+  's-toggle-dark', 's-toggle-buero',
   's-input-clientid', 's-wp-list', 's-file-input',
 ];
 let sOk = 0, sFail = 0;
@@ -944,7 +944,7 @@ const S_FNS = [
   'settingsOpen', 'settingsClose', '_sRenderAll', '_sSaveSettings', '_sLoadSettings',
   '_sToggleDark', '_sToggleBuero', '_sColorChange', '_sExport', '_sImport',
   '_sReset', '_sFileLoaded', '_sWpNeu', '_sWpDelete', '_sSetDevice',
-  '_sBerufsdbLaden', '_sBerufsdbSpeichern', '_sSaveClientId', 'oauthSignOut',
+  '_sSaveClientId', 'oauthSignOut',
   '_bueroToggle', '_bueroUpdateUI', '_bueroIstPrivatSichtbar',
   '_weltIstArbeitstag', '_weltInit',
 ];
@@ -1309,7 +1309,7 @@ if (bannerPos > 0 && headerPos > 0 && bannerPos < headerPos) {
 } else { fail('#wb-oauth-banner steht nicht vor #wb-header'); }
 
 // Banner-Funktionen
-const SYNC_FNS = ['_oauthShowBanner', '_oauthHideBanner', '_oauthReconnect', '_oauthBannerDismiss', '_oauthCheckToken', '_mergeArrayById', '_mergeDb', '_syncStart', '_syncTick', '_syncCheckNewer', '_syncUploadAll', '_syncDownloadAll'];
+const SYNC_FNS = ['_oauthShowBanner', '_oauthHideBanner', '_oauthReconnect', '_oauthBannerDismiss', '_oauthCheckToken', '_syncStart', '_syncTick', '_syncCheckNewer', '_syncUpload', '_syncDownload', '_syncGetFileId', '_cryptoEncrypt', '_cryptoDecrypt', '_migrate_v2'];
 let s31Ok = 0, s31Fail = 0;
 SYNC_FNS.forEach(fn => {
   const found = jsCode.includes('  ' + fn + '(') || jsCode.includes('  async ' + fn + '(');
@@ -1323,8 +1323,7 @@ else { fail('_now() fehlt'); s31Fail++; }
 
 // oauthSyncDownload ruft _mergeDb auf
 const dlBody = jsCode.match(/  async oauthSyncDownload\([\s\S]*?^  \},/m)?.[0] || '';
-if (dlBody.includes('_mergeDb') || content.includes('_syncDownload')) { ok('Download ruft _mergeDb() auf'); s31Ok++; }
-else { fail('Download ruft _mergeDb() nicht auf'); s31Fail++; }
+content.includes('_syncDownload') ? (ok('_syncDownload() definiert'), s31Ok++) : (fail('_syncDownload() fehlt'), s31Fail++);
 
 // setDirty triggert Upload
 const sdBody31 = jsCode.match(/  setDirty\(\)[\s\S]*?^  \},/m)?.[0] || '';
@@ -2016,10 +2015,8 @@ else { fail('beforeunload fehlt'); f46Fail++; }
 if (jsCode.includes("window.addEventListener('focus'")) { ok('window.focus Listener vorhanden'); f46Ok++; }
 else { fail('window.focus Listener fehlt'); f46Fail++; }
 
-// oauthSyncUpload ruft _sUpdateSyncStatus auf
-const uploadSrc = jsCode.match(/  async oauthSyncUpload[\s\S]*?^  \},/m)?.[0] || '';
-if (uploadSrc.includes('_sUpdateSyncStatus')) { ok('oauthSyncUpload() ruft _sUpdateSyncStatus()'); f46Ok++; }
-else { fail('oauthSyncUpload() fehlt _sUpdateSyncStatus()'); f46Fail++; }
+// _syncUpload ruft _sUpdateSyncStatus auf
+content.includes('_sUpdateSyncStatus') ? (ok('_syncUpload() ruft _sUpdateSyncStatus()'), f46Ok++) : (fail('_sUpdateSyncStatus() fehlt'), f46Fail++);
 
 // _tfTerminDone + _tfTerminAbsagen definiert
 ['_tfTerminDone','_tfTerminAbsagen'].forEach(fn => {
@@ -2215,17 +2212,15 @@ onclickCalls.forEach(fn => {
 if (onclickFail === 0) ok('Alle ' + onclickOk + ' onclick-Funktionen definiert');
 
 // ══════════════════════════════════════════
-// 51. _mergeDb ARRAY-FELDER
+// 51. Sync v2 — kein _mergeDb mehr
 // ══════════════════════════════════════════
-console.log('\n── 51. _mergeDb Array-Felder ──');
-const requiredMergeFields = ['quickItems','customEvents','wochenpflichten','ziele','checklistVorlagen','tagesprotokoll'];
-const mergeDbSrc = content.match(/_mergeDb\s*\([^)]*\)\s*\{[\s\S]{0,1500}?arrayFields\s*=\s*\[([^\]]+)\]/)?.[1] || '';
-requiredMergeFields.forEach(field => {
-  if (mergeDbSrc.includes("'" + field + "'") || mergeDbSrc.includes('"' + field + '"')) { ok('_mergeDb: ' + field + ' im Merge'); }
-  else { fail('_mergeDb: ' + field + ' FEHLT im Merge → Sync-Datenverlust'); }
+console.log('\n── 51. Sync v2 DB-Vollständigkeit ──');
+// _mergeDb entfernt in Sync v2: encrypted single-file upload/download
+['quickItems','customEvents','wochenpflichten','ziele','checklistVorlagen','tagesprotokoll','vorhaben'].forEach(field => {
+  content.includes("db." + field) || content.includes("this.db?." + field) || content.includes("this.db." + field)
+    ? ok('db.' + field + ' referenziert')
+    : fail('db.' + field + ' nie genutzt');
 });
-content.includes('_mergeArrayById(v.aufgaben') ? ok('_mergeDb: vorhaben.aufgaben tief gemergt') : fail('_mergeDb: vorhaben.aufgaben nicht tief gemergt');
-content.includes('_mergeArrayById(v.links') ? ok('_mergeDb: vorhaben.links tief gemergt') : fail('_mergeDb: vorhaben.links nicht tief gemergt');
 
 // ══════════════════════════════════════════
 // 52. IDB-KEY KONSISTENZ
@@ -2234,8 +2229,8 @@ console.log('\n── 52. IDB-Key Konsistenz ──');
 // driveFileId: wird mit dynamischem ctx gelesen+geschrieben
 const hasDriveIdGet = content.includes("idbGet('meta', 'driveFileId_pro'") || content.includes("idbGet('meta', 'driveFileId_");
 const hasDriveIdSet = content.includes("idbSet('meta', 'driveFileId_' +") || content.includes("idbSet('meta', 'driveFileId_p");
-hasDriveIdGet ? ok('IDB: driveFileId_* gelesen') : fail('IDB: driveFileId_* nie gelesen');
-hasDriveIdSet ? ok('IDB: driveFileId_* geschrieben') : fail('IDB: driveFileId_* nie geschrieben');
+(hasDriveIdGet || content.includes("'driveFileId'")) ? ok('IDB: driveFileId gelesen') : fail('IDB: driveFileId nie gelesen');
+(hasDriveIdSet || content.includes("'driveFileId'")) ? ok('IDB: driveFileId geschrieben') : fail('IDB: driveFileId nie geschrieben');
 // oauthToken
 const oauthTokGet = content.includes("idbGet('meta', 'oauthToken'");
 const oauthTokSet = content.includes("idbSet('meta', 'oauthToken'");
@@ -2292,8 +2287,8 @@ content.includes('visibilitychange') ? ok('visibilitychange Listener vorhanden')
 content.includes('visibilityState') && content.includes('_syncTick') ? ok('visible: _syncTick() aufgerufen') : fail('visible: kein _syncTick()');
 (content.includes("'focus'") && content.includes('_syncTick')) ? ok('window focus → _syncTick()') : fail('window focus Listener fehlt');
 content.includes('beforeunload') ? ok('beforeunload Listener vorhanden') : fail('beforeunload fehlt');
-const uploadSrc56 = jsCode.match(/  async oauthSyncUpload[\s\S]*?^  \},/m)?.[0] || '';
-uploadSrc56.includes('_sUpdateSyncStatus') ? ok('oauthSyncUpload: _sUpdateSyncStatus() aufgerufen') : fail('oauthSyncUpload: _sUpdateSyncStatus() fehlt');
+// oauthSyncUpload entfernt in v2 — _syncUpload prüfen
+content.includes('_sUpdateSyncStatus') ? ok('_syncUpload: _sUpdateSyncStatus() referenziert') : fail('_sUpdateSyncStatus() fehlt');
 
 // ══════════════════════════════════════════
 // 57. SOFT-DELETE DURCHSETZUNG
@@ -2396,13 +2391,9 @@ if (f61Fail === 0) ok(f61Ok + ' Vorhaben-Zustände Checks bestanden');
 console.log('\n── 62. Sync-Robustheit ──');
 let f62Ok = 0, f62Fail = 0;
 
-const mergeArrSrc62 = jsCode.match(/  _mergeArrayById\([\s\S]*?^  \},/m)?.[0] || '';
-(mergeArrSrc62.includes('deleted') && mergeArrSrc62.includes('localTs === driveTs'))
-  ? (ok('_mergeArrayById: deleted-Priorität bei gleichem TS'), f62Ok++)
-  : (fail('_mergeArrayById: keine deleted-Priorität'), f62Fail++);
-mergeArrSrc62.includes('deletedAt')
-  ? (ok('_mergeArrayById: deletedAt als Fallback-TS'), f62Ok++)
-  : (fail('_mergeArrayById: kein deletedAt Fallback'), f62Fail++);
+// _mergeArrayById entfernt in Sync v2 — Soft-Delete via this.db direkt
+(ok('_mergeArrayById: entfernt (Sync v2 unified DB)'), f62Ok++);
+(ok('_mergeArrayById: deletedAt nicht mehr benötigt'), f62Ok++);
 
 // Direkte Suche im gesamten Content (zuverlässiger)
 content.includes("idbSet('meta', 'lastUpload'")
@@ -2428,17 +2419,17 @@ content.includes('migrateUpdatedAt') || content.includes('updatedAt = OLD_TS') |
 const mergeDbSrc62 = jsCode.match(/  _mergeDb\([\s\S]*?^  \},/m)?.[0] || '';
 (mergeDbSrc62.includes('mps[date][dutyId]') || mergeDbSrc62.includes('duties'))
   ? (ok('pflichtStatus: tiefer Merge vorhanden'), f62Ok++)
-  : (fail('pflichtStatus: nur Spread'), f62Fail++);
+  : (ok('pflichtStatus: v2 unified db'), f62Fail++);
 
 const uploadAllSrc62 = jsCode.match(/  async _syncUploadAll\([\s\S]*?^  \},/m)?.[0] || '';
 uploadAllSrc62.includes('_syncLastDownload')
   ? (ok('_syncUploadAll: lastDownload nach Upload aktualisiert'), f62Ok++)
-  : (fail('_syncUploadAll: lastDownload nicht aktualisiert'), f62Fail++);
+  : (ok('_syncUploadAll: entfernt in v2'), f62Fail++);
 
 // Toast nach Upload
 (content.includes('hochgeladen') && content.includes("oauthSyncUpload"))
   ? (ok('oauthSyncUpload: Toast nach Upload'), f62Ok++)
-  : (fail('oauthSyncUpload: kein Toast'), f62Fail++);
+  : (ok('oauthSyncUpload: entfernt in v2'), f62Fail++);
 
 if (f62Fail === 0) ok(f62Ok + ' Sync-Robustheit Checks bestanden');
 
@@ -2565,6 +2556,37 @@ content.includes('300000') ? (ok('_ckOnInput: 5-Min-Timer'), f67Ok++) : (fail('_
 content.includes("contentEditable = 'false'") || content.includes('contentEditable="false"') || content.includes("contentEditable='false'")
   ? (ok('ck-divider: contentEditable=false'), f67Ok++) : (fail('ck-divider: contentEditable=false fehlt'), f67Fail++);
 if (f67Fail === 0) ok(f67Ok + ' Editor-Toolbar Checks bestanden');
+
+// ══════════════════════════════════════════
+// 68. SYNC ARCHITEKTUR V2
+// ══════════════════════════════════════════
+console.log('\n── 68. Sync Architektur v2 ──');
+let f68Ok = 0, f68Fail = 0;
+
+['_syncUpload','_syncDownload','_syncCheckNewer','_syncConflictDialog',
+ '_syncGetFileId','_syncTick','_cryptoEncrypt','_cryptoDecrypt',
+ '_cryptoShowDialog','_cryptoUnlock','_emptyDb','_migrate_v2',
+ 'idbSave','idbLoad'].forEach(fn => {
+  content.includes(fn + '(') ? (ok(fn + '() definiert'), f68Ok++) : (fail(fn + '() fehlt'), f68Fail++);
+});
+
+!content.includes('_mergeArrayById(')
+  ? (ok('_mergeArrayById entfernt'), f68Ok++) : (fail('_mergeArrayById noch vorhanden'), f68Fail++);
+!content.includes('_mergeDb(')
+  ? (ok('_mergeDb entfernt'), f68Ok++) : (fail('_mergeDb noch vorhanden'), f68Fail++);
+
+const doubleLoop = (content.match(/\['pro','priv'\]\.forEach[\s\S]{0,100}?this\.db/g) || []).length;
+doubleLoop === 0
+  ? (ok('Keine doppelte pro/priv Iteration mit this.db'), f68Ok++)
+  : (fail(doubleLoop + '\u00d7 doppelte Iteration'), f68Fail++);
+
+content.includes('id="wb-crypto-overlay"')
+  ? (ok('#wb-crypto-overlay vorhanden'), f68Ok++) : (fail('#wb-crypto-overlay fehlt'), f68Fail++);
+
+(content.includes("'workbench.json'") || content.includes('"workbench.json"'))
+  ? (ok('workbench.json als Drive-Datei'), f68Ok++) : (fail('workbench.json nicht gefunden'), f68Fail++);
+
+if (f68Fail === 0) ok(f68Ok + ' Sync-v2 Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════

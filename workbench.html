@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.2</title>
+  <title>WorkBench 2.9.3</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2090,7 +2090,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.2</div>
+  <div id="wb-startup-tagline">v2.9.3</div>
 </div>
 
 <div id="wb-app">
@@ -2102,7 +2102,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.9.2 · Build 20260619-0800</div>
+    <div id="wb-menu-version">v2.9.3 · Build 20260619-0900</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2541,8 +2541,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.2',
-  APP_BUILD:   '20260619-0800',
+  APP_VERSION: '2.9.3',
+  APP_BUILD:   '20260619-0900',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -5519,7 +5519,7 @@ _ftStart() {
       console.error('[IDB] load error:', e);
     }
     // Nach Format-Migration speichern (außerhalb try um Fehler zu vermeiden)
-    try { await this.idbSaveAll(); } catch(e) {}
+    try { await this.idbSave(); } catch(e) {}
   },
 
   _emptyDb() {
@@ -5687,7 +5687,7 @@ _ftStart() {
     console.log('[migrate_v2] Migration abgeschlossen');
   },
 
-  async idbSaveAll() {
+  async idbSave() {
     try {
       // v2: idbSave() handles this
       // v2: idbSave() handles this
@@ -5847,7 +5847,7 @@ _ftStart() {
       if (token) {
         this._oauthHideBanner();
         this._toast('\u2713 Neu verbunden');
-        await this._syncUploadAll();
+        await this._syncUpload();
       }
     } catch(e) {
       this._oauthShowBanner('\u26a0 Verbindung fehlgeschlagen: ' + e.message + ' &mdash; Sync nicht m\u00f6glich');
@@ -5864,84 +5864,7 @@ _ftStart() {
   },
 
   /* ── Merge by Timestamp ── */
-  _mergeArrayById(localArr, driveArr) {
-    const merged = new Map();
-    (driveArr||[]).forEach(item => { merged.set(item.id, { ...item }); });
-    (localArr||[]).forEach(item => {
-      const existing = merged.get(item.id);
-      if (!existing) { merged.set(item.id, { ...item }); return; }
-      const localTs = item.updatedAt || item.deletedAt || item.doneTs || '0';
-      const driveTs = existing.updatedAt || existing.deletedAt || existing.doneTs || '0';
-      if (localTs > driveTs) {
-        merged.set(item.id, { ...item });
-      } else if (localTs === driveTs) {
-        // Gleicher Timestamp: deleted > done > storniert
-        if (item.deleted && !existing.deleted) merged.set(item.id, { ...item });
-        else if (item.done && !existing.done)       merged.set(item.id, { ...item });
-        else if (item.storniert && !existing.storniert) merged.set(item.id, { ...item });
-      }
-    });
-    return Array.from(merged.values());
-  },
 
-  _mergeDb(localDb, driveDb) {
-    if (!localDb || !driveDb) return driveDb || localDb;
-    const merged = { ...driveDb };
-    const arrayFields = ['quickItems', 'customEvents', 'wochenpflichten', 'ziele', 'checklistVorlagen', 'tagesprotokoll', 'links'];
-    arrayFields.forEach(field => {
-      merged[field] = this._mergeArrayById(localDb[field], driveDb[field]);
-    });
-    const localVh = localDb.vorhaben || [];
-    const driveVh = driveDb.vorhaben || [];
-    const vhMerged = new Map();
-    driveVh.forEach(v => vhMerged.set(v.id, { ...v }));
-    localVh.forEach(v => {
-      const existing = vhMerged.get(v.id);
-      if (!existing) {
-        vhMerged.set(v.id, { ...v });
-      } else {
-        const localTs = v.updatedAt || '0';
-        const driveTs = existing.updatedAt || '0';
-        // Immer mergen — neuerer Timestamp gibt Metadaten vor, aber Sub-Arrays immer zusammenführen
-        const base = localTs >= driveTs ? { ...v } : { ...existing };
-        // Sub-Arrays immer bidirektional mergen
-        base.aufgaben = this._mergeArrayById(v.aufgaben, existing.aufgaben);
-        base.links    = this._mergeArrayById(v.links,    existing.links);
-        // Felder die nur lokal neu gesetzt wurden bevorzugen
-        if (v.notiz && (!existing.notiz || localTs >= driveTs)) base.notiz = v.notiz;
-        if (v.charakter && localTs >= driveTs) base.charakter = v.charakter;
-        if (v.status && localTs >= driveTs) base.status = v.status;
-        vhMerged.set(v.id, base);
-      }
-    });
-    merged.vorhaben = Array.from(vhMerged.values());
-    // pflichtStatus: pro Tag tief mergen
-    const lps = localDb.pflichtStatus || {};
-    const dps = driveDb.pflichtStatus || {};
-    const mps = { ...dps };
-    Object.entries(lps).forEach(([date, duties]) => {
-      if (!mps[date]) {
-        mps[date] = { ...duties };
-      } else {
-        Object.entries(duties).forEach(([dutyId, val]) => {
-          if (val && !mps[date][dutyId]) mps[date][dutyId] = val;
-        });
-      }
-    });
-    merged.pflichtStatus = mps;
-    const lm = localDb.wochenMottos || {};
-    const dm = driveDb.wochenMottos || {};
-    merged.wochenMottos = { ...dm };
-    Object.entries(lm).forEach(([kw, items]) => {
-      if (!merged.wochenMottos[kw]) merged.wochenMottos[kw] = items;
-      else merged.wochenMottos[kw] = this._mergeArrayById(items, merged.wochenMottos[kw]);
-    });
-    merged.bewegung = {
-      bewegt:    Math.max(localDb.bewegung?.bewegt    || 0, driveDb.bewegung?.bewegt    || 0),
-      geschoben: Math.max(localDb.bewegung?.geschoben || 0, driveDb.bewegung?.geschoben || 0),
-    };
-    return merged;
-  },
 
   /* ── Auto-Sync ── */
   _syncTimer:        null,
@@ -5962,7 +5885,7 @@ _ftStart() {
     }
     this._oauthHideBanner();
     if (this.isDirty) {
-      await this._syncUploadAll();
+      await this._syncUpload();
     } else {
       await this._syncCheckNewer();
     }
@@ -5994,79 +5917,16 @@ _ftStart() {
       + 'Abbrechen = Drive-Stand laden (\u00e4nderungen verwerfen)'
     );
     if (choice) {
-      this.oauthSyncUpload(ctx);
+      this._syncUpload();
     } else {
       this.isDirty = false;
-      this.oauthSyncDownload(ctx);
+      this._syncDownload();
     }
   },
 
-  async _syncUploadAll() {
-    await this.oauthSyncUpload('pro');
-    await this.oauthSyncUpload('priv');
-    // Nach Upload: Download-Timestamp ebenfalls aktualisieren
-    this._syncLastDownload = this._syncLastUpload;
-    await this.idbSet('meta', 'lastDownload', String(this._syncLastDownload));
-  },
 
-  async _syncDownloadAll() {
-    await this.oauthSyncDownload('pro');
-    await this.oauthSyncDownload('priv');
-  },
 
-  async oauthSyncUpload(ctx) {
-    try {
-      const token  = await this._oauthGetToken(true);
-      if (!token) { this._oauthShowBanner('\u26a0 Kein Token &mdash; bitte neu verbinden'); return; }
-      const fileId = await this._oauthFindOrCreateFile(token, ctx);
-      const db = this.db;
-      if (!db) return;
-      // Lokalen Stand vor Upload nochmals aus IDB sicherstellen
-      await this.idbSaveAll();
-      const payload = JSON.stringify({ data: db, _exported: new Date().toISOString(), _appVersion: this.APP_VERSION });
-      const resp = await fetch(this.UPLOAD_API + '/files/' + fileId + '?uploadType=media', {
-        method:  'PATCH',
-        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body:    payload,
-      });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      this._oauthHideBanner();
-      this._syncLastUpload = Date.now();
-      this.isDirty = false;
-      await this.idbSet('meta', 'lastUpload', String(this._syncLastUpload));
-      this._sUpdateSyncStatus();
-      this._toast('\u2713 ' + (ctx === 'pro' ? 'Beruf' : 'Privat') + ' hochgeladen');
-    } catch(e) {
-      this._oauthShowBanner('\u26a0 Upload-Fehler: ' + e.message);
-      console.warn('[upload]', e.message);
-    }
-  },
 
-  async oauthSyncDownload(ctx) {
-    try {
-      const token  = await this._oauthGetToken(true);
-      if (!token) { this._oauthShowBanner('\u26a0 Kein Token &mdash; bitte neu verbinden'); return; }
-      const fileId = await this._oauthFindOrCreateFile(token, ctx);
-      const resp   = await fetch(this.DRIVE_API + '/files/' + fileId + '?alt=media',
-        { headers: { Authorization: 'Bearer ' + token } });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const result  = await resp.json();
-      const driveDb = result.data || result;
-      const localDb = this.db;
-      const merged  = this._mergeDb(localDb, driveDb);
-      this.db = merged;
-      await this.idbSaveAll();
-      this._oauthHideBanner();
-      this._syncLastDownload = Date.now();
-      await this.idbSet('meta', 'lastDownload', String(this._syncLastDownload));
-      this._sUpdateSyncStatus();
-      this._toast('\u2713 Synchronisiert: ' + (ctx==='pro' ? 'Beruf' : 'Privat'));
-      this.renderSection(this.activeTab);
-    } catch(e) {
-      this._oauthShowBanner('\u26a0 Sync-Fehler: ' + e.message);
-      console.warn('[download]', e.message);
-    }
-  },
 
   async _syncGetFileId(token) {
     if (this._driveFileId) return this._driveFileId;
@@ -6205,11 +6065,7 @@ _ftStart() {
     return new Date(ts).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
   },
 
-  async _syncUploadAll() { await this._syncUpload(); },
-  async _syncDownloadAll() { await this._syncDownload(); },
 
-  async oauthSyncUpload(ctx) { await this._syncUpload(); },
-  async oauthSyncDownload(ctx) { await this._syncDownload(); },
 
   // ── Hilfsfunktionen ──────────────────────────────────
 
@@ -6484,23 +6340,34 @@ _ftStart() {
     if (head) head.style.borderBottom = isOpen ? '' : 'none';
   },
 
+  _sToggle(key) {
+    const bodyId = 's-' + key + '-body';
+    const body = document.getElementById(bodyId);
+    if (body) body.style.display = body.style.display === 'none' ? '' : 'none';
+  },
+
   _sToggleCard(card, key) {
     this._sCardState[key] = !this._sCardState[key];
     this._sApplyCard(card, key);
   },
 
   _sUpdateSyncStatus() {
-    const titleEl = document.getElementById('s-sync-title');
-    const subEl   = document.getElementById('s-sync-sub');
-    const statEl  = document.getElementById('s-sync-status');
-    const valid   = this._oauthTokenValid();
-    if (titleEl) titleEl.textContent = this._pendingChanges ? '\u26a0 Ausstehend' : valid ? 'Verbunden' : 'Nicht verbunden';
-    if (titleEl) titleEl.style.color = this._pendingChanges ? 'var(--warn)' : '';
-    let subTxt = valid ? 'Token g\u00fcltig' : 'Bitte Client-ID eintragen';
-    if (this._pendingChanges) subTxt = '\u00c4nderungen werden hochgeladen sobald Online';
-    else if (this._syncLastUpload > 0) subTxt = 'Zuletzt hochgeladen: ' + this._syncTimeLabel(this._syncLastUpload);
-    if (subEl)  subEl.textContent    = subTxt;
-    if (statEl) statEl.style.display = valid ? 'inline-flex' : 'none';
+    const stateLbl   = document.getElementById('s-sync-state-lbl');
+    const timeLbl    = document.getElementById('s-sync-time-lbl');
+    const headerMeta = document.getElementById('s-sync-status');
+    if (this._pendingChanges) {
+      if (stateLbl) { stateLbl.textContent = '\u26a0 \u00c4nderungen nicht gespeichert'; stateLbl.style.color = 'var(--warn)'; }
+      if (headerMeta) { headerMeta.textContent = 'ausstehend'; headerMeta.style.color = 'var(--warn)'; }
+    } else if (this._syncLastUpload > 0) {
+      if (stateLbl) { stateLbl.textContent = '\u2022 Verbunden \u2014 Online'; stateLbl.style.color = 'var(--accent)'; }
+      if (headerMeta) { headerMeta.textContent = 'Online'; headerMeta.style.color = 'var(--accent)'; }
+    } else {
+      if (stateLbl) { stateLbl.textContent = 'Nicht verbunden'; stateLbl.style.color = 'var(--faint)'; }
+      if (headerMeta) headerMeta.textContent = '';
+    }
+    if (timeLbl && this._syncLastUpload > 0) {
+      timeLbl.textContent = 'Zuletzt: ' + new Date(this._syncLastUpload).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+    }
   },
 
   async _sSaveClientId() {
@@ -6642,17 +6509,10 @@ _ftStart() {
     if (this._settings.device === 'pc-beruf') {
       document.getElementById('s-file-input').click();
     } else {
-      this.oauthSyncDownload('pro');
+      this._syncDownload();
     }
   },
 
-  _sBerufsdbSpeichern() {
-    if (this._settings.device === 'pc-beruf') {
-      this._sExport('pro');
-    } else {
-      this.oauthSyncUpload('pro');
-    }
-  },
 
   _sFileLoaded(input) {
     const file = input.files[0];
@@ -6662,7 +6522,7 @@ _ftStart() {
       try {
         const data = JSON.parse(e.target.result);
         this.db = data.data || data;
-        await this.idbSaveAll();
+        await this.idbSave();
         this.renderSection(this.activeTab);
         this._toast('\u2713 Beruf-Daten geladen');
       } catch(err) {
@@ -6673,23 +6533,40 @@ _ftStart() {
     input.value = '';
   },
 
-  _sExport(ctx) {
-    const db = this.db;
-    if (!db) { this._toast('Keine Daten'); return; }
-    const name = ctx === 'pro' ? 'workbench-beruf.json' : 'workbench-privat.json';
-    const blob = new Blob(
-      [JSON.stringify({ data: db, _exported: new Date().toISOString() }, null, 2)],
-      { type: 'application/json' }
-    );
+  _sExport() {
+    if (!this.db) { this._toast('Keine Daten vorhanden'); return; }
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16);
+    const payload = { data: this.db, _exported: new Date().toISOString(), _appVersion: this.APP_VERSION };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = name;
+    a.download = 'workbench-export-' + stamp + '.json';
     a.click();
     URL.revokeObjectURL(a.href);
+    this._toast('\u2713 Export gespeichert');
   },
 
   _sImport() {
-    document.getElementById('s-file-input').click();
+    if (!confirm('Daten aus Datei laden?\nAktuelle Daten werden \u00fcberschrieben.\nBitte vorher exportieren!')) return;
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.json';
+    inp.onchange = async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      try {
+        const text   = await file.text();
+        const parsed = JSON.parse(text);
+        const db = parsed.data || parsed;
+        if (!db.quickItems && !db.vorhaben && !db.customEvents) {
+          this._toast('Ung\u00fcltiges Dateiformat'); return;
+        }
+        this.db = db;
+        await this.idbSave(); this.setDirty();
+        this.renderSection(this.activeTab);
+        this._toast('\u2713 Daten importiert');
+        this.settingsClose();
+      } catch(e) { this._toast('Fehler: ' + e.message); }
+    };
+    inp.click();
   },
 
   _sPapierkorbOffen: false,
@@ -6792,10 +6669,12 @@ _ftStart() {
   },
 
   _sReset() {
-    if (!confirm('Wirklich alle lokalen Daten l\u00f6schen?')) return;
-    if (!confirm('Nicht r\u00fckg\u00e4ngig! Sicher?')) return;
-    indexedDB.deleteDatabase(this.IDB_NAME);
-    location.reload();
+    if (!confirm('ALLE Daten l\u00f6schen?\nDiese Aktion kann nicht r\u00fcckg\u00e4ngig gemacht werden!\nBitte vorher exportieren!')) return;
+    this.db = this._emptyDb();
+    this.idbSave(); this.setDirty();
+    this.renderSection(this.activeTab);
+    this._toast('Daten zur\u00fcckgesetzt');
+    this.settingsClose();
   },
 
   /* ── Modal Core ── */
@@ -8043,50 +7922,32 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
     </div>
 
     <div class="s-card">
-      <div class="s-card-head">Google Drive Sync<span class="s-card-head-chev open">&#9662;</span></div>
-      <div class="s-sync-block" id="s-sync-status-block">
-        <div class="s-sync-icon">
-          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-        </div>
-        <div class="s-sync-info">
-          <div class="s-sync-title" id="s-sync-title">Nicht verbunden</div>
-          <div class="s-sync-sub" id="s-sync-sub">Bitte Client-ID eintragen</div>
-        </div>
-        <span class="s-status ok" id="s-sync-status" style="display:none">
-          <div class="s-status-dot"></div>Online
-        </span>
+      <div class="s-card-head" onclick="WB._sToggle('sync')">
+        <span class="s-card-label">Google Drive Sync</span>
+        <span class="s-card-meta" id="s-sync-status"></span>
+        <span class="s-card-chev">&#x25BE;</span>
       </div>
-      <div class="s-row">
-        <div class="s-row-label">
-          <div class="s-row-title">Google Client-ID</div>
-          <div class="s-row-sub">OAuth 2.0 &middot; Google Cloud Console</div>
+      <div class="s-card-body" id="s-sync-body">
+        <div id="s-sync-status-box" style="padding:10px 14px;border-bottom:1px solid var(--border)">
+          <div style="font-size:13px;font-weight:600;color:var(--text)" id="s-sync-state-lbl">Prüfe Verbindung...</div>
+          <div style="font-size:12px;color:var(--faint);margin-top:2px" id="s-sync-time-lbl"></div>
         </div>
-      </div>
-      <div class="s-row" style="padding-top:6px;padding-bottom:10px;gap:8px;">
-        <input id="s-input-clientid" class="s-input mono" type="text" placeholder="1234...apps.googleusercontent.com">
-        <button class="s-btn primary" onclick="WB._sSaveClientId()">Speichern</button>
-      </div>
-      <div class="s-row">
-        <div class="s-row-label">
-          <div class="s-row-title">Privat-Datenbank</div>
-          <div class="s-row-sub">workbench-privat.json &middot; Google Drive</div>
+        <div class="s-row" style="padding:6px 14px 10px;gap:8px;">
+          <div class="s-row-label">
+            <div class="s-row-title">Google Client-ID</div>
+            <div class="s-row-sub">OAuth 2.0 &middot; Google Cloud Console</div>
+          </div>
         </div>
-        <button class="s-btn" onclick="WB.oauthSyncDownload('priv')">&darr; Laden</button>
-        <button class="s-btn primary" onclick="WB.oauthSyncUpload('priv')">&uarr; Hochladen</button>
-      </div>
-      <div class="s-row" id="s-row-beruf-db">
-        <div class="s-row-label">
-          <div class="s-row-title">Beruf-Datenbank</div>
-          <div class="s-row-sub" id="s-beruf-db-sub">Firmennetzwerk &middot; Filepicker</div>
+        <div class="s-row" style="padding-top:0;padding-bottom:10px;gap:8px;">
+          <input id="s-input-clientid" class="s-input mono" type="text" placeholder="1234...apps.googleusercontent.com">
+          <button class="s-btn primary" onclick="WB._sSaveClientId()">Speichern</button>
         </div>
-        <button class="s-btn" onclick="WB._sBerufsdbLaden()">&darr; Laden</button>
-        <button class="s-btn primary" onclick="WB._sBerufsdbSpeichern()">&uarr; Speichern</button>
-      </div>
-      <div class="s-row">
-        <div class="s-row-label">
-          <div class="s-row-title">Google-Verbindung trennen</div>
+        <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:8px">
+          <button class="s-btn primary" onclick="WB._syncUpload()">&uarr; Jetzt hochladen</button>
+          <button class="s-btn" onclick="WB._syncDownload()">&darr; Jetzt laden</button>
+          <button class="s-btn" style="margin-top:4px" onclick="WB._cryptoChangePassword()">&#x1F512; Passwort &auml;ndern</button>
+          <button class="s-btn danger" onclick="WB.oauthSignOut()">Abmelden</button>
         </div>
-        <button class="s-btn danger" onclick="WB.oauthSignOut()">Abmelden</button>
       </div>
     </div>
 
@@ -8155,21 +8016,18 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
     </div>
 
     <div class="s-card">
-      <div class="s-card-head">Daten<span class="s-card-head-chev open">&#9662;</span></div>
-      <div class="s-row">
-        <div class="s-row-label">
-          <div class="s-row-title">Daten exportieren</div>
-          <div class="s-row-sub">JSON-Backup herunterladen</div>
-        </div>
-        <button class="s-btn" onclick="WB._sExport('pro')">Beruf</button>
-        <button class="s-btn" onclick="WB._sExport('priv')">Privat</button>
+      <div class="s-card-head" onclick="WB._sToggle('export')">
+        <span class="s-card-label">Export &amp; Import</span>
+        <span class="s-card-chev">&#x25BE;</span>
       </div>
-      <div class="s-row">
-        <div class="s-row-label">
-          <div class="s-row-title">Daten importieren</div>
-          <div class="s-row-sub">JSON-Backup wiederherstellen</div>
+      <div class="s-card-body" id="s-export-body">
+        <div style="padding:10px 14px;display:flex;gap:8px">
+          <button class="s-btn" style="flex:1" onclick="WB._sExport()">&#x2193; Exportieren</button>
+          <button class="s-btn warn" style="flex:1" onclick="WB._sImport()">&#x2191; Importieren</button>
         </div>
-        <button class="s-btn warn" onclick="WB._sImport()">Importieren</button>
+        <div style="padding:0 14px 10px;font-size:12px;color:var(--faint)">
+          Export erstellt eine lokale JSON-Sicherung. Import &uuml;berschreibt alle Daten.
+        </div>
       </div>
     </div>
 
