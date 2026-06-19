@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.33</title>
+  <title>WorkBench 2.9.34</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2323,7 +2323,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.33</div>
+  <div id="wb-startup-tagline">v2.9.34</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2940,8 +2940,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.33',
-  APP_BUILD:   '20260620-1200',
+  APP_VERSION: '2.9.34',
+  APP_BUILD:   '20260620-1400',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -7134,6 +7134,7 @@ _ftStart() {
   _syncTimer:        null,
   _syncLastUpload:   0,
   _syncLastDownload: 0,
+  _syncInitDone:     false,
 
   _syncStart() {
     if (this._syncTimer) clearInterval(this._syncTimer);
@@ -7495,6 +7496,8 @@ _ftStart() {
         if (this.isDirty && this.db) await this._syncUpload();
       } catch(e) { console.warn('[init upload2]', e.message); }
     }
+    // Ab jetzt sind visibilitychange/focus Uploads erlaubt
+    this._syncInitDone = true;
 
     this._sBereinigen();
     this._syncStart();
@@ -7504,8 +7507,8 @@ _ftStart() {
         clearTimeout(this._saveTimer);
         try {
           await this.idbSave();
-          // Nur hochladen wenn Sync bereits einmal erfolgreich war (verhindert Upload mit altem IDB-Stand)
-          if ((this.isDirty || this._pendingChanges) && this._syncLastDownload) {
+          // Upload nur nach abgeschlossenem Init-Sync (verhindert Überschreiben mit altem IDB-Stand)
+          if ((this.isDirty || this._pendingChanges) && this._syncInitDone) {
             await this._syncUpload();
           }
         } catch(e) { console.warn('[vis hidden]', e.message); }
@@ -7517,7 +7520,7 @@ _ftStart() {
     window.addEventListener('focus', async () => {
       try {
         if (this._pendingChanges || this.isDirty) {
-          if (this._syncLastDownload) await this._syncUpload();
+          if (this._syncInitDone) await this._syncUpload();
         } else {
           await this._syncCheckNewer();
         }
@@ -7563,7 +7566,6 @@ _ftStart() {
     const el = document.getElementById('wb-settings-overlay');
     if (el) el.classList.add('open');
     this._sRenderAll();
-    this._sRenderMantraPool();
     // Papierkorb-Zähler aktualisieren
     let pkCount = 0;
 
@@ -7667,9 +7669,10 @@ _ftStart() {
     const chev = card.querySelector('.s-card-chev');
     if (body) body.classList.toggle('collapsed', !isOpen);
     if (chev) chev.classList.toggle('open', isOpen);
-    // border-bottom des head nur wenn geöffnet
     const head = card.querySelector('.s-card-head');
     if (head) head.style.borderBottom = isOpen ? '' : 'none';
+    // Mantra-Pool beim Öffnen rendern
+    if (isOpen && card.id === 's-mantra-card') this._sRenderMantraPool();
   },
 
   _sToggle(key) {
@@ -9479,18 +9482,11 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
       </div>
     </div>
 
-    <div class="s-card">
-      <div class="s-card-head" onclick="WB._sToggle('mantra');WB._sRenderMantraPool()">
-        <span class="s-card-label">&#x2728; Mantra-Pool</span>
-        <span class="s-card-chev">&#x25BE;</span>
-      </div>
-      <div class="s-card-body" id="s-mantra-body" style="display:none">
-        <div style="padding:10px 14px 0">
-          <div id="s-mantra-pool"></div>
-        </div>
-        <div style="padding:10px 14px 14px">
-          <button class="s-btn primary" onclick="WB._mantraAdd()">+ Satz hinzuf&uuml;gen</button>
-        </div>
+    <div class="s-card" id="s-mantra-card">
+      <div class="s-card-head">&#x2728; Mantra-Pool</div>
+      <div id="s-mantra-pool" style="padding:10px 14px 0"></div>
+      <div style="padding:10px 14px 14px">
+        <button class="s-btn primary" onclick="WB._mantraAdd()">+ Satz hinzuf&uuml;gen</button>
       </div>
     </div>
 
