@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.7</title>
+  <title>WorkBench 2.9.8</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2090,7 +2090,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.7</div>
+  <div id="wb-startup-tagline">v2.9.8</div>
 </div>
 
 <div id="wb-app">
@@ -2102,7 +2102,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.9.7 · Build 20260619-1400</div>
+    <div id="wb-menu-version">v2.9.8 · Build 20260619-1500</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2541,8 +2541,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.7',
-  APP_BUILD:   '20260619-1400',
+  APP_VERSION: '2.9.8',
+  APP_BUILD:   '20260619-1500',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2629,7 +2629,7 @@ const WB = {
     const items = [];
 
     (this.db?.tagesprotokoll||[]).filter(e => !e.deleted && e.date === today && (e.processedAs||[]).length > 0).forEach(e => {
-      (e.processedAs||[]).forEach(p => items.push({ type:p.type, text:p.text||'', ts:e.ts||'', _ctx: item.welt || 'priv' }));
+      (e.processedAs||[]).forEach(p => items.push({ type:p.type, text:p.text||'', ts:e.ts||'', _ctx: e.welt || 'priv' }));
     });
   
     items.sort((a,b) => (a.ts||'').localeCompare(b.ts||''));
@@ -3272,7 +3272,7 @@ _ftStart() {
     const gestern = this._dStr(gd);
     const alle = [];
 
-    (this.db?.tagesprotokoll||[]).filter(e => !e.deleted).forEach(e => alle.push({ ...e, _ctx: item.welt || 'priv' }));
+    (this.db?.tagesprotokoll||[]).filter(e => !e.deleted).forEach(e => alle.push({ ...e, _ctx: e.welt || 'priv' }));
   
     let gefiltert = [];
     if (this._jnTab === 'heute')   gefiltert = alle.filter(e => e.date === today);
@@ -3385,7 +3385,7 @@ _ftStart() {
     // QuickItems MIT Uhrzeit → Termin-Block
 
     (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && q.startTime).forEach(q => {
-      events.push({ id:q.id, text:q.text, startTime:q.startTime, durationMin:15, welt:ctx, _art:'schnell', _ctx: item.welt || 'priv' });
+      events.push({ id:q.id, text:q.text, startTime:q.startTime, durationMin:15, welt:q.welt||'priv', _art:'schnell', _ctx: q.welt || 'priv' });
     });
   
 
@@ -3394,7 +3394,7 @@ _ftStart() {
     (this.db?.wochenpflichten||[]).filter(p => !p.deleted && p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
       const done = !!(db.pflichtStatus?.[today]?.[p.id]);
       if (done) return;
-      events.push({ id:p.id, text:p.titel, startTime:p.startTime, durationMin:30, welt:ctx, _art:'pflicht', _ctx: item.welt || 'priv' });
+      events.push({ id:p.id, text:p.titel, startTime:p.startTime, durationMin:30, welt:p.welt||'priv', _art:'pflicht', _ctx: p.welt || 'priv' });
     });
   
 
@@ -3444,7 +3444,7 @@ _ftStart() {
 
     (this.db?.wochenpflichten||[]).filter(p => !p.deleted && !p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
       const done = !!(db.pflichtStatus?.[today]?.[p.id]);
-      pflichten.push({...p, _ctx: item.welt || 'priv', done});
+      pflichten.push({...p, _ctx: p.welt || 'priv', done});
     });
   
     if (pflichten.length) {
@@ -3465,7 +3465,7 @@ _ftStart() {
     // Schnell-Erinnerungen OHNE Uhrzeit
     const schnell = [];
 
-    (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && !q.startTime).forEach(q => schnell.push({...q, _ctx: item.welt || 'priv'}));
+    (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && !q.startTime).forEach(q => schnell.push({...q, _ctx: q.welt || 'priv'}));
   
     if (schnell.length) {
       h += '<div class="tf-sec-sep">Schnell-Erinnerungen</div>';
@@ -3493,7 +3493,7 @@ _ftStart() {
     if (!el) return;
     const items = [];
 
-    (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && !q.date && !q.vorhabenId).forEach(q => items.push({...q, _ctx: item.welt || 'priv'}));
+    (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && !q.date && !q.vorhabenId).forEach(q => items.push({...q, _ctx: q.welt || 'priv'}));
   
     if (cntEl) cntEl.textContent = items.length;
     if (!items.length) { el.innerHTML = '<div class="tf-empty">Posteingang leer \u2713</div>'; return; }
@@ -3516,7 +3516,7 @@ _ftStart() {
       (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum === today).forEach(a => {
         const clTotal = (a.checklist||[]).length;
         const clDone  = (a.checklist||[]).filter(c=>c.done).length;
-        items.push({...a, _ctx: item.welt || 'priv', _vorhabenTitel: v.titel, _vorhabenId: v.id, _clTotal: clTotal, _clDone: clDone});
+        items.push({...a, _ctx: a.welt || 'priv', _vorhabenTitel: v.titel, _vorhabenId: v.id, _clTotal: clTotal, _clDone: clDone});
       });
     });
   
@@ -3543,13 +3543,13 @@ _ftStart() {
     const items = [];
 
     (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date && q.date < today).forEach(q => {
-      items.push({ text:q.text, sub:'Schnell-Erinnerung', date:q.date, id:q.id, _type:'schnell', _ctx: item.welt || 'priv' });
+      items.push({ text:q.text, sub:'Schnell-Erinnerung', date:q.date, id:q.id, _type:'schnell', _ctx: q.welt || 'priv' });
     });
     (this.db?.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv!==false).forEach(v => {
       (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum && a.datum < today).forEach(a => {
         const clTotal = (a.checklist||[]).length;
         const clDone  = (a.checklist||[]).filter(c=>c.done).length;
-        items.push({ text:a.text, sub:'Aufgabe \u00b7 '+v.titel, date:a.datum, id:a.id, _vorhabenId:v.id, _type:'aufgabe', _ctx: item.welt || 'priv', _clTotal:clTotal, _clDone:clDone });
+        items.push({ text:a.text, sub:'Aufgabe \u00b7 '+v.titel, date:a.datum, id:a.id, _vorhabenId:v.id, _type:'aufgabe', _ctx: a.welt || v.welt || 'priv', _clTotal:clTotal, _clDone:clDone });
       });
     });
   
@@ -4738,7 +4738,7 @@ _ftStart() {
       // QuickItems mit Uhrzeit in Events einmischen
 
       (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === dateStr && q.startTime).forEach(q => {
-        events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, welt:ctx, _art:'schnell', _ctx: item.welt || 'priv' });
+        events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, welt:q.welt||'priv', _art:'schnell', _ctx: q.welt || 'priv' });
       });
     
       events.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
@@ -4750,7 +4750,7 @@ _ftStart() {
         .filter(p => !p.deleted && (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)))
         .forEach(p => {
           const done = !!this.db?.pflichtStatus?.[dateStr]?.[p.id];
-          pflichten.push({ ...p, _ctx: item.welt || 'priv', done });
+          pflichten.push({ ...p, _ctx: p.welt || 'priv', done });
         });
     
 
@@ -4902,7 +4902,7 @@ _ftStart() {
 
         (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === dateStr && q.startTime).forEach(q => {
           const [qh,qm] = q.startTime.split(':').map(Number);
-          events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, durationMin:15, welt:ctx, _art:'schnell', _ctx: item.welt || 'priv', _startMin:qh*60+qm, _endMin:qh*60+qm+15 });
+          events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, durationMin:15, welt:q.welt||'priv', _art:'schnell', _ctx: q.welt || 'priv', _startMin:qh*60+qm, _endMin:qh*60+qm+15 });
         });
       
         events.sort((a,b) => a._startMin - b._startMin);
@@ -5157,7 +5157,7 @@ _ftStart() {
 
     const kw = this._getCurrentKW();
     (this.db?.wochenMottos?.[kw] || []).forEach(m => {
-      mottos.push({ ...m, _ctx: item.welt || 'priv' });
+      mottos.push({ ...m, _ctx: m.welt || 'priv' });
     });
   
 
@@ -6508,7 +6508,7 @@ _ftStart() {
     if (!el) return;
     const alle = [];
 
-    (this.db?.wochenpflichten || []).forEach(p => { alle.push({ ...p, _ctx: item.welt || 'priv' }); });
+    (this.db?.wochenpflichten || []).forEach(p => { alle.push({ ...p, _ctx: p.welt || 'priv' }); });
   
     if (!alle.length) {
       el.innerHTML = '<div style="padding:12px 14px;font-size:16px;color:var(--faint);">Noch keine Wochenpflichten.</div>';
@@ -7674,7 +7674,7 @@ _ftStart() {
     const el = document.getElementById('ft-vl-list'); if (!el) return;
     const alle = [];
 
-    (this.db?.checklistVorlagen||[]).filter(v => !v.deleted).forEach(v => alle.push({ ...v, _ctx: item.welt || 'priv' }));
+    (this.db?.checklistVorlagen||[]).filter(v => !v.deleted).forEach(v => alle.push({ ...v, _ctx: v.welt || 'priv' }));
   
     if (!alle.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--faint);font-size:16px;">Keine Vorlagen vorhanden.</div>'; return; }
     el.innerHTML = alle.map(v => {
