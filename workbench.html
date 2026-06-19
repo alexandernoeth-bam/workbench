@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.17</title>
+  <title>WorkBench 2.9.18</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -183,8 +183,11 @@
     .wb-stab.active .wb-stab-icon svg { stroke: var(--accent); }
     .wb-stab-lbl {
       writing-mode: vertical-rl; text-orientation: mixed;
-      transform: rotate(180deg); font-size: 9px; font-weight: 800;
-      text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint);
+      transform: rotate(180deg); font-size: 11px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint);
+    }
+    .wb-stab-body {
+      padding: 14px 7px 14px 6px;
     }
     .wb-stab.active .wb-stab-lbl { color: var(--accent); }
     .wb-stab-sep {
@@ -2115,7 +2118,7 @@
     .ck-divider { display:flex; align-items:center; gap:8px; margin:10px 0; user-select:none; pointer-events:none; }
     .ck-divider-line { flex:1; height:1.5px; background:var(--border); border-radius:1px; }
     .ck-divider-ts { font-size:11px; font-weight:600; color:var(--faint); white-space:nowrap; padding:0 4px; background:var(--surface); font-family:var(--font-mono); }
-    #ck-editor-area { flex:1; padding:10px 12px; font-size:16px; line-height:1.6; color:var(--text); overflow-y:auto; -webkit-overflow-scrolling:touch; outline:none; min-height:120px; }
+    #ck-editor-area { flex:1; padding:10px 12px; font-size:16px; line-height:1.6; color:var(--text); overflow-y:auto; -webkit-overflow-scrolling:touch; outline:none; min-height:200px; }
     #ck-editor-area:empty::before { content:'Eingabe \2014 tippen, aufnehmen, einf\FCgen...'; color:var(--faint); font-style:italic; pointer-events:none; }
     #ck-editor-actions { display:flex; align-items:center; gap:8px; padding:8px 10px; border-top:1px solid var(--border); background:var(--surface2); }
     #ck-editor-hint { font-size:13px; color:var(--faint); flex:1; }
@@ -2248,7 +2251,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.17</div>
+  <div id="wb-startup-tagline">v2.9.18</div>
 </div>
 
 <div id="wb-app">
@@ -2342,7 +2345,7 @@
             <div class="ck-tb-sep"></div>
             <button class="ck-tb-btn" title="Zeitstempel-Trenner einfügen" onclick="WB._ckInsertDivider()" style="font-size:13px;">&#x2015;</button>
           </div>
-          <div id="ck-editor-area" contenteditable="true" spellcheck="true" oninput="WB._ckOnInput()"></div>
+          <div id="ck-editor-area" contenteditable="true" spellcheck="true" oninput="WB._ckOnInput();WB._ckScrollToBottom()"></div>
           <div id="ck-editor-actions">
             <div id="ck-editor-hint">Text markieren &rarr; Klassifizieren</div>
             <button id="ck-verarbeiten-btn" disabled onclick="WB._ckVerarbeiten()">&rarr; Klassifizieren</button>
@@ -2778,8 +2781,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.17',
-  APP_BUILD:   '20260619-2100',
+  APP_VERSION: '2.9.18',
+  APP_BUILD:   '20260619-2130',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2831,7 +2834,8 @@ const WB = {
 
   renderSection(tab) {
     switch(tab) {
-      case 'cockpit':  this.renderCockpit(); this._ckRenderBanner(); break;
+      case 'cockpit': setTimeout(() => { if(this._ckScrollToBottom) this._ckScrollToBottom(); }, 100);
+          this.renderCockpit(); this._ckRenderBanner(); break;
       case 'backlog':  this.renderBacklog();  break;
       case 'vorhaben': this.renderVorhaben(); break;
       case 'ablage':   this.renderAblage();   break;
@@ -3318,6 +3322,15 @@ _ftStart() {
     // Bestehenden Eintrag immer aktualisieren (auch bei leerem text)
     entry.html = html; entry.text = text; entry.updatedAt = new Date().toISOString();
     this.setDirty();
+  },
+
+  _ckScrollToBottom() {
+    const area = document.getElementById('ck-editor-area');
+    if (!area) return;
+    // Letzten 3 Zeilen sichtbar lassen
+    setTimeout(() => {
+      area.scrollTop = Math.max(0, area.scrollHeight - area.clientHeight);
+    }, 50);
   },
 
   _ckLadeHeutigerEintrag() {
@@ -6306,7 +6319,7 @@ _ftStart() {
       } else {
         this.tabSwitch('cockpit');
       }
-      this._ckLadeHeutigerEintrag();
+      this._ckLadeHeutigerEintrag(); setTimeout(() => this._ckScrollToBottom(), 200);
     } catch(e) {
       console.warn('[syncDownload]', e.message);
       this._oauthShowBanner('\u26a0 Sync-Fehler: ' + e.message);
