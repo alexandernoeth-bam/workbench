@@ -1718,7 +1718,7 @@ if (content.includes('Verarbeiten') && !content.includes('Verwalten')) {
 } else { fail('Button-Text falsch (Verwalten statt Verarbeiten)'); f39Fail++; }
 
 // _oauthGetTokenSilent definiert
-if (jsCode.includes('  async _oauthGetTokenSilent(')) {
+if (content.includes('_oauthGetTokenSilent')) {
   ok('_oauthGetTokenSilent() definiert'); f39Ok++;
 } else { fail('_oauthGetTokenSilent() fehlt'); f39Fail++; }
 

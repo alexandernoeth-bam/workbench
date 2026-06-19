@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.20</title>
+  <title>WorkBench 2.9.21</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1164,6 +1164,9 @@
     .at-wk-txt { font-size:15px; color:var(--text); }
     .at-wk-txt.done { color:var(--faint); text-decoration:line-through; }
     .at-wk-freq { font-size:11px; color:var(--faint); }
+    .at-neu-row { padding:6px 13px 8px; background:var(--surface2); border-top:0.5px solid var(--border); }
+    .at-neu-btn { font-size:13px; font-weight:700; color:var(--accent); background:none; border:none; cursor:pointer; padding:2px 0; font-family:var(--font); }
+    .at-neu-btn:hover { text-decoration:underline; }
 
     .wo-vt-btn {
       padding: 5px 12px; font-size: 14px; font-weight: 600;
@@ -2307,7 +2310,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.20</div>
+  <div id="wb-startup-tagline">v2.9.21</div>
 </div>
 
 <div id="wb-app">
@@ -2841,8 +2844,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.20',
-  APP_BUILD:   '20260619-2300',
+  APP_VERSION: '2.9.21',
+  APP_BUILD:   '20260619-2350',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -5753,19 +5756,24 @@ _ftStart() {
         + '</div></div>';
     });
 
-    const mkGrp = (ic, title, cnt, body, id) =>
+    const mkGrp = (ic, title, cnt, body, id, neuFn) =>
       '<div class="at-grp open" id="' + id + '">'
       + '<div class="at-grp-hdr" onclick="this.closest(\'.at-grp\').classList.toggle(\'open\')">'
       + '<span class="at-grp-ic">' + ic + '</span>'
       + '<span class="at-grp-title">' + title + '</span>'
       + '<span class="at-grp-cnt' + (id==='at-grp-aufg' && cnt > 0 ? ' warn' : '') + '">' + cnt + '</span>'
       + '<span class="at-grp-chev">\u25be</span>'
-      + '</div><div class="at-grp-body">' + body + '</div></div>';
+      + '</div>'
+      + (neuFn ? '<div class="at-neu-row"><button class="at-neu-btn" onclick="event.stopPropagation();' + neuFn + '">+ Neu</button></div>' : '')
+      + '<div class="at-grp-body">' + body + '</div></div>';
 
     scroll.innerHTML =
-      mkGrp('\u2611', 'Aufgaben', aufgCount + ' offen', aufgH, 'at-grp-aufg')
-      + mkGrp('\u26a1', 'Schnell-Erinnerungen', schnell.length, schnellH, 'at-grp-sk')
-      + mkGrp('\ud83d\udd01', 'Wochenpflichten', pflichten.length, pflH, 'at-grp-wk');
+      mkGrp('\u2611', 'Aufgaben', aufgCount + ' offen', aufgH, 'at-grp-aufg',
+        'WB.aufgabeOpen(\'\')')
+      + mkGrp('\u26a1', 'Schnell-Erinnerungen', schnell.length, schnellH, 'at-grp-sk',
+        'WB.schnellOpen(\'\')')
+      + mkGrp('\ud83d\udd01', 'Wochenpflichten', pflichten.length, pflH, 'at-grp-wk',
+        'WB._woPflichtNeu()');
   },
 
   renderZiele() {
@@ -6232,29 +6240,8 @@ _ftStart() {
     return !!(this._oauthToken && this._oauthTokenExp && Date.now() < this._oauthTokenExp);
   },
 
-  async _oauthGetToken(silent) {
-    if (this._oauthTokenValid()) return this._oauthToken;
-    if (silent) return null;
-    return new Promise((resolve, reject) => {
-      if (!this._oauthClientId) { reject(new Error('Keine Client-ID')); return; }
-      if (!window.google?.accounts?.oauth2) { reject(new Error('Google Identity Services fehlt')); return; }
-      const client = google.accounts.oauth2.initTokenClient({
-        client_id: this._oauthClientId,
-        scope:     this.DRIVE_SCOPE,
-        callback:  async (resp) => {
-          if (resp.error) { reject(new Error(resp.error)); return; }
-          this._oauthToken    = resp.access_token;
-          this._oauthTokenExp = Date.now() + (resp.expires_in - 60) * 1000;
-          await this.idbSet('meta', 'oauthToken',    this._oauthToken);
-          await this.idbSet('meta', 'oauthTokenExp', this._oauthTokenExp);
-          resolve(this._oauthToken);
-        },
-      });
-      client.requestAccessToken();
-    });
-  },
-
-  async _oauthGetTokenSilent() {
+  async _oauthGetToken(interactive) {
+    // Interaktiver Token-Request — nur bei expliziter User-Aktion
     if (this._oauthTokenValid()) return this._oauthToken;
     if (!this._oauthClientId) return null;
     if (!window.google?.accounts?.oauth2) return null;
@@ -6263,18 +6250,18 @@ _ftStart() {
         const client = google.accounts.oauth2.initTokenClient({
           client_id: this._oauthClientId,
           scope:     this.DRIVE_SCOPE,
-          prompt:    '',
+          prompt:    interactive ? 'consent' : '',
           callback:  async (resp) => {
             if (resp.error || !resp.access_token) { resolve(null); return; }
             this._oauthToken    = resp.access_token;
             this._oauthTokenExp = Date.now() + (resp.expires_in - 60) * 1000;
             await this.idbSet('meta', 'oauthToken',    this._oauthToken);
-            await this.idbSet('meta', 'oauthTokenExp', this._oauthTokenExp);
+            await this.idbSet('meta', 'oauthTokenExp', String(this._oauthTokenExp));
             this._oauthHideBanner();
             resolve(this._oauthToken);
           },
         });
-        client.requestAccessToken({ prompt: '' });
+        client.requestAccessToken({ prompt: interactive ? 'consent' : '' });
       } catch(e) { resolve(null); }
     });
   },
@@ -6524,6 +6511,25 @@ _ftStart() {
     }
   },
 
+  // Interaktive Varianten für Einstellungs-Buttons (erlauben Token-Popup)
+  async _syncUploadInteractive() {
+    const token = await this._oauthGetToken(false);
+    if (!token) {
+      this._oauthShowBanner('\u26a0 Bitte erst mit Google anmelden');
+      return;
+    }
+    await this._syncUpload();
+  },
+
+  async _syncDownloadInteractive() {
+    const token = await this._oauthGetToken(false);
+    if (!token) {
+      this._oauthShowBanner('\u26a0 Bitte erst mit Google anmelden');
+      return;
+    }
+    await this._syncDownload();
+  },
+
   async _syncCheckNewer() {
     try {
       const token = await this._oauthGetTokenSilent(); if (!token) return;
@@ -6673,16 +6679,24 @@ _ftStart() {
     document.body.classList.toggle('wb-desktop', !this._isMobile());
     this._setupSidebarLayout();
     this._weltInit();
-    this._oauthCheckToken();
+
+    // Token aus IDB ist bereits geladen — NICHT oauthCheckToken() aufrufen
+    // (würde auf Mobile ohne User-Gesture scheitern)
+    if (this._oauthTokenValid()) {
+      this._oauthHideBanner();
+    } else if (this._oauthClientId) {
+      // Zeige sanften Hinweis — kein Popup
+      this._oauthShowBanner('\u2139 Bitte in den Einstellungen mit Google verbinden um zu synchronisieren');
+    }
 
     // Migration MUSS vor jedem syncUpload laufen
     await this._migrate_v2();
 
-    // db sicherstellen bevor Upload
+    // db sicherstellen
     if (!this.db) this.db = this._emptyDb();
 
-    // Drive laden — Fehler dürfen App nicht blockieren
-    if (this._oauthClientId) {
+    // Drive laden — nur wenn gültiger Token vorhanden
+    if (this._oauthTokenValid()) {
       try {
         if ((this._pendingChanges || this.isDirty) && this.db) await this._syncUpload();
       } catch(e) { console.warn('[init upload]', e.message); }
@@ -7424,6 +7438,18 @@ _ftStart() {
   aufgabeOpen(vorhabenId, aufgabeId, ctx) {
     const db = this.db; if (!db) { this._toast('Daten nicht geladen'); return; }
     ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
+
+    // Kein Vorhaben angegeben → Picker zeigen
+    if (!vorhabenId) {
+      const alle = (db.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert');
+      const opts = alle.map(v => '<option value="' + this._esc(v.id) + '">' + this._esc(v.titel) + '</option>').join('');
+      const body = '<div class="wb-input-group"><label class="wb-label">Vorhaben wählen</label>'
+        + '<select id="wb-f-vh-pick" class="wb-select"><option value="">-- bitte wählen --</option>' + opts + '</select></div>';
+      this._modalCtx = { type: 'aufgabe-pick' };
+      this.modalOpen('Neue Aufgabe', body,
+        '<button class="wb-btn wb-btn-primary" onclick="const v=document.getElementById(\'wb-f-vh-pick\')?.value;if(v){WB.modalClose();WB.aufgabeOpen(v,\'\');}else{WB._toast(\'Bitte Vorhaben wählen\')}">Weiter</button>');
+      return;
+    }
 
     let v  = (this.db?.vorhaben||[]).find(x => x.id === vorhabenId);
     if (!v && vorhabenId) {
@@ -8556,8 +8582,8 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
           <button class="s-btn primary" onclick="WB._sSaveClientId()">Speichern</button>
         </div>
         <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:8px">
-          <button class="s-btn primary" onclick="WB._syncUpload()">&uarr; Jetzt hochladen</button>
-          <button class="s-btn" onclick="WB._syncDownload()">&darr; Jetzt laden</button>
+          <button class="s-btn primary" onclick="WB._syncUploadInteractive()">&uarr; Jetzt hochladen</button>
+          <button class="s-btn" onclick="WB._syncDownloadInteractive()">&darr; Jetzt laden</button>
           <button class="s-btn" style="margin-top:4px" onclick="WB._cryptoChangePassword()">&#x1F512; Passwort &auml;ndern</button>
           <button class="s-btn danger" onclick="WB.oauthSignOut()">Abmelden</button>
         </div>
