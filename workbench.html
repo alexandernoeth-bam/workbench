@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.1</title>
+  <title>WorkBench 2.9.2</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2090,7 +2090,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.1</div>
+  <div id="wb-startup-tagline">v2.9.2</div>
 </div>
 
 <div id="wb-app">
@@ -2102,7 +2102,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.9.1 · Build 20260619-0700</div>
+    <div id="wb-menu-version">v2.9.2 · Build 20260619-0800</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2541,8 +2541,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.1',
-  APP_BUILD:   '20260619-0700',
+  APP_VERSION: '2.9.2',
+  APP_BUILD:   '20260619-0800',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2625,12 +2625,11 @@ const WB = {
     if (!block || !body) return;
     const today = this._dStr(new Date());
     const items = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.tagesprotokoll||[]).filter(e => !e.deleted && e.date === today && (e.processedAs||[]).length > 0).forEach(e => {
-        (e.processedAs||[]).forEach(p => items.push({ type:p.type, text:p.text||'', ts:e.ts||'', _ctx:ctx }));
-      });
+
+    (db?.tagesprotokoll||[]).filter(e => !e.deleted && e.date === today && (e.processedAs||[]).length > 0).forEach(e => {
+      (e.processedAs||[]).forEach(p => items.push({ type:p.type, text:p.text||'', ts:e.ts||'', _ctx: item.welt || 'priv' }));
     });
+  
     items.sort((a,b) => (a.ts||'').localeCompare(b.ts||''));
     if (!items.length) { block.classList.remove('visible'); return; }
     block.classList.add('visible');
@@ -2675,33 +2674,30 @@ const WB = {
         kandidaten.push({ startMin:h*60+m, endMin:h*60+m+this._evtDurationMin(e), title:e.text, type:'Termin', id:e.id });
       });
     // QuickItems mit startTime
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && q.startTime).forEach(q => {
-        const [h,m] = q.startTime.split(':').map(Number);
-        kandidaten.push({ startMin:h*60+m, endMin:h*60+m+30, title:q.text, type:'Erinnerung', id:q.id });
-      });
+
+    (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && q.startTime).forEach(q => {
+      const [h,m] = q.startTime.split(':').map(Number);
+      kandidaten.push({ startMin:h*60+m, endMin:h*60+m+30, title:q.text, type:'Erinnerung', id:q.id });
     });
+  
     // Wochenpflichten mit startTime
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      const dow = now.getDay();
-      (db?.wochenpflichten||[]).filter(p => !p.deleted && p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
-        if (db.pflichtStatus?.[today]?.[p.id]) return;
-        const [h,m] = p.startTime.split(':').map(Number);
-        kandidaten.push({ startMin:h*60+m, endMin:h*60+m+30, title:p.titel, type:'Wochenpflicht', id:p.id });
-      });
+
+    const dow = now.getDay();
+    (db?.wochenpflichten||[]).filter(p => !p.deleted && p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
+      if (db.pflichtStatus?.[today]?.[p.id]) return;
+      const [h,m] = p.startTime.split(':').map(Number);
+      kandidaten.push({ startMin:h*60+m, endMin:h*60+m+30, title:p.titel, type:'Wochenpflicht', id:p.id });
     });
+  
     // Aufgaben mit startTime + datum===today
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.vorhaben||[]).filter(v => !v.deleted).forEach(v => {
-        (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum === today && a.startTime).forEach(a => {
-          const [h,m] = a.startTime.split(':').map(Number);
-          kandidaten.push({ startMin:h*60+m, endMin:h*60+m+60, title:a.text, type:'Aufgabe', id:a.id });
-        });
+
+    (db?.vorhaben||[]).filter(v => !v.deleted).forEach(v => {
+      (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum === today && a.startTime).forEach(a => {
+        const [h,m] = a.startTime.split(':').map(Number);
+        kandidaten.push({ startMin:h*60+m, endMin:h*60+m+60, title:a.text, type:'Aufgabe', id:a.id });
       });
     });
+  
     kandidaten.sort((a,b) => a.startMin - b.startMin);
 
     const aktuell   = kandidaten.find(k => (k.startMin <= nowMin && k.endMin > nowMin) || (k.startMin > nowMin && k.startMin - nowMin <= 15));
@@ -3151,18 +3147,17 @@ _ftStart() {
 
     // ── Tagesprotokoll-Eintrag: processedAs + processed ──
     if (this._ckSelItemId) {
-      ['pro','priv'].forEach(ctx => {
-        const db = this.db;
-        const e  = (db?.tagesprotokoll||[]).find(x => x.id === this._ckSelItemId);
-        if (e) {
-          e.processed = true;
-          e.updatedAt = this._now();
-          if (type !== 'loeschen') {
-            if (!e.processedAs) e.processedAs = [];
-            e.processedAs.push({ type, text: text.slice(0, 80), createdAt: this._now() });
-          }
+
+      const e  = (db?.tagesprotokoll||[]).find(x => x.id === this._ckSelItemId);
+      if (e) {
+        e.processed = true;
+        e.updatedAt = this._now();
+        if (type !== 'loeschen') {
+          if (!e.processedAs) e.processedAs = [];
+          e.processedAs.push({ type, text: text.slice(0, 80), createdAt: this._now() });
         }
-      });
+      }
+    
       this._ckSelItemId = null;
       this.setDirty();
       this._ckKlRender();
@@ -3272,10 +3267,9 @@ _ftStart() {
     const gd = new Date(); gd.setDate(gd.getDate() - 1);
     const gestern = this._dStr(gd);
     const alle = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.tagesprotokoll||[]).filter(e => !e.deleted).forEach(e => alle.push({ ...e, _ctx: ctx }));
-    });
+
+    (db?.tagesprotokoll||[]).filter(e => !e.deleted).forEach(e => alle.push({ ...e, _ctx: item.welt || 'priv' }));
+  
     let gefiltert = [];
     if (this._jnTab === 'heute')   gefiltert = alle.filter(e => e.date === today);
     else if (this._jnTab === 'gestern') gefiltert = alle.filter(e => e.date === gestern);
@@ -3384,22 +3378,20 @@ _ftStart() {
       .map(e => ({ ...e, _art:'termin', _ctx: e.welt==='pro' ? 'pro' : 'priv' }));
 
     // QuickItems MIT Uhrzeit → Termin-Block
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && q.startTime).forEach(q => {
-        events.push({ id:q.id, text:q.text, startTime:q.startTime, durationMin:15, welt:ctx, _art:'schnell', _ctx:ctx });
-      });
+
+    (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && q.startTime).forEach(q => {
+      events.push({ id:q.id, text:q.text, startTime:q.startTime, durationMin:15, welt:ctx, _art:'schnell', _ctx: item.welt || 'priv' });
     });
+  
 
     // Wochenpflichten MIT Uhrzeit → Termin-Block (unerledigte)
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.wochenpflichten||[]).filter(p => !p.deleted && p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
-        const done = !!(db.pflichtStatus?.[today]?.[p.id]);
-        if (done) return;
-        events.push({ id:p.id, text:p.titel, startTime:p.startTime, durationMin:30, welt:ctx, _art:'pflicht', _ctx:ctx });
-      });
+
+    (db?.wochenpflichten||[]).filter(p => !p.deleted && p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
+      const done = !!(db.pflichtStatus?.[today]?.[p.id]);
+      if (done) return;
+      events.push({ id:p.id, text:p.titel, startTime:p.startTime, durationMin:30, welt:ctx, _art:'pflicht', _ctx: item.welt || 'priv' });
     });
+  
 
     events.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
 
@@ -3444,13 +3436,12 @@ _ftStart() {
 
     // Wochenpflichten OHNE Uhrzeit
     const pflichten = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.wochenpflichten||[]).filter(p => !p.deleted && !p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
-        const done = !!(db.pflichtStatus?.[today]?.[p.id]);
-        pflichten.push({...p, _ctx: ctx, done});
-      });
+
+    (db?.wochenpflichten||[]).filter(p => !p.deleted && !p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
+      const done = !!(db.pflichtStatus?.[today]?.[p.id]);
+      pflichten.push({...p, _ctx: item.welt || 'priv', done});
     });
+  
     if (pflichten.length) {
       h += '<div class="tf-sec-sep">Wochenpflichten</div>';
       pflichten.forEach(p => {
@@ -3468,10 +3459,9 @@ _ftStart() {
 
     // Schnell-Erinnerungen OHNE Uhrzeit
     const schnell = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && !q.startTime).forEach(q => schnell.push({...q, _ctx: ctx}));
-    });
+
+    (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && !q.startTime).forEach(q => schnell.push({...q, _ctx: item.welt || 'priv'}));
+  
     if (schnell.length) {
       h += '<div class="tf-sec-sep">Schnell-Erinnerungen</div>';
       schnell.forEach(q => {
@@ -3496,10 +3486,9 @@ _ftStart() {
     const cntEl = document.getElementById('tf-post-count');
     if (!el) return;
     const items = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.quickItems||[]).filter(q => !q.deleted && !q.done && !q.date && !q.vorhabenId).forEach(q => items.push({...q, _ctx: ctx}));
-    });
+
+    (db?.quickItems||[]).filter(q => !q.deleted && !q.done && !q.date && !q.vorhabenId).forEach(q => items.push({...q, _ctx: item.welt || 'priv'}));
+  
     if (cntEl) cntEl.textContent = items.length;
     if (!items.length) { el.innerHTML = '<div class="tf-empty">Posteingang leer \u2713</div>'; return; }
     el.innerHTML = items.map(q => {
@@ -3515,16 +3504,15 @@ _ftStart() {
     if (!el) return;
     const today = this._dStr(new Date());
     const items = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv!==false).forEach(v => {
-        (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum === today).forEach(a => {
-          const clTotal = (a.checklist||[]).length;
-          const clDone  = (a.checklist||[]).filter(c=>c.done).length;
-          items.push({...a, _ctx: ctx, _vorhabenTitel: v.titel, _vorhabenId: v.id, _clTotal: clTotal, _clDone: clDone});
-        });
+
+    (db?.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv!==false).forEach(v => {
+      (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum === today).forEach(a => {
+        const clTotal = (a.checklist||[]).length;
+        const clDone  = (a.checklist||[]).filter(c=>c.done).length;
+        items.push({...a, _ctx: item.welt || 'priv', _vorhabenTitel: v.titel, _vorhabenId: v.id, _clTotal: clTotal, _clDone: clDone});
       });
     });
+  
     if (cntEl) cntEl.textContent = items.length;
     if (!items.length) { el.innerHTML = '<div class="tf-empty">Keine Projekt-Deadlines heute.</div>'; return; }
     el.innerHTML = items.map(a => {
@@ -3545,19 +3533,18 @@ _ftStart() {
     if (!el) return;
     const today = this._dStr(new Date());
     const items = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date && q.date < today).forEach(q => {
-        items.push({ text:q.text, sub:'Schnell-Erinnerung', date:q.date, id:q.id, _type:'schnell', _ctx:ctx });
-      });
-      (db?.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv!==false).forEach(v => {
-        (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum && a.datum < today).forEach(a => {
-          const clTotal = (a.checklist||[]).length;
-          const clDone  = (a.checklist||[]).filter(c=>c.done).length;
-          items.push({ text:a.text, sub:'Aufgabe \u00b7 '+v.titel, date:a.datum, id:a.id, _vorhabenId:v.id, _type:'aufgabe', _ctx:ctx, _clTotal:clTotal, _clDone:clDone });
-        });
+
+    (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date && q.date < today).forEach(q => {
+      items.push({ text:q.text, sub:'Schnell-Erinnerung', date:q.date, id:q.id, _type:'schnell', _ctx: item.welt || 'priv' });
+    });
+    (db?.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv!==false).forEach(v => {
+      (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum && a.datum < today).forEach(a => {
+        const clTotal = (a.checklist||[]).length;
+        const clDone  = (a.checklist||[]).filter(c=>c.done).length;
+        items.push({ text:a.text, sub:'Aufgabe \u00b7 '+v.titel, date:a.datum, id:a.id, _vorhabenId:v.id, _type:'aufgabe', _ctx: item.welt || 'priv', _clTotal:clTotal, _clDone:clDone });
       });
     });
+  
     items.sort((a,b) => (a.date||'').localeCompare(b.date||''));
     if (cntEl) cntEl.textContent = items.length;
     if (!items.length) { el.innerHTML = '<div class="tf-empty">Nichts \u00fcberf\u00e4llig \u2713</div>'; return; }
@@ -3583,19 +3570,18 @@ _ftStart() {
     if (!bar) return;
     const today = this._dStr(new Date());
     let alleN = 0, berufN = 0, privatN = 0, ueberN = 0, ohneN = 0;
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      const qi = (db?.quickItems||[]).filter(q => !q.deleted && !q.done);
-      const af = (db?.vorhaben||[]).flatMap(v => (v.aufgaben||[]).filter(a => !a.deleted && !a.done));
-      const items = [...qi, ...af];
-      items.forEach(i => {
-        alleN++;
-        if (ctx==='pro') berufN++; else privatN++;
-        const d = i.date || i.datum;
-        if (!d) ohneN++;
-        else if (d < today) ueberN++;
-      });
+
+    const qi = (db?.quickItems||[]).filter(q => !q.deleted && !q.done);
+    const af = (db?.vorhaben||[]).flatMap(v => (v.aufgaben||[]).filter(a => !a.deleted && !a.done));
+    const items = [...qi, ...af];
+    items.forEach(i => {
+      alleN++;
+      if (ctx==='pro') berufN++; else privatN++;
+      const d = i.date || i.datum;
+      if (!d) ohneN++;
+      else if (d < today) ueberN++;
     });
+  
     const chips = [
       { v:'alle',         l:'Alle',       n:alleN,   cls:'' },
       { v:'beruf',        l:'Beruf',      n:berufN,  cls:'' },
@@ -4015,69 +4001,55 @@ _ftStart() {
     const scroll = document.getElementById('vh-scroll');
     if (!scroll) return;
     let h = '';
-    const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
     const charReihenfolge = ['verpflichtend', 'bedeutsam', 'bereichernd'];
     const charLabel = { verpflichtend: 'Verpflicht.', bedeutsam: 'Bedeutsam', bereichernd: 'Bereichernd' };
     const charCls   = { verpflichtend: 'vp', bedeutsam: 'bd', bereichernd: 'br' };
+    const zeigeBeide = this._weltBeideVisible();
 
-    welten.forEach(ctx => {
-      const db = this.db;
-      const alle = (db?.vorhaben || []).filter(v => !v.deleted);
-      const aktive = alle.filter(v => v.status !== 'archiviert' && v.aktiv !== false);
-      const abgeschlossen = alle.filter(v => v.status === 'abgeschlossen' || v.status === 'archiviert');
+    const renderWeltSektion = (ctx, vhListe) => {
+      const aktive       = vhListe.filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv !== false);
+      const abgeschlossen = vhListe.filter(v => !v.deleted && (v.status === 'abgeschlossen' || v.status === 'archiviert'));
       if (!aktive.length && !abgeschlossen.length) return;
-
       const weltLabel  = ctx === 'pro' ? 'Beruf' : 'Privat';
-      const offenCount = aktive.reduce((sum, v) =>
-        sum + (v.aufgaben||[]).filter(a => !a.deleted && !a.done).length, 0);
+      const offenCount = aktive.reduce((sum, v) => sum + (v.aufgaben||[]).filter(a => !a.deleted && !a.done).length, 0);
       const pillActive = this._vhAlleFilter === ctx;
-
       h += '<div class="vh-sec-row">'
         + '<span class="vh-sec-label">' + weltLabel + ' \u2013 Aktiv</span>'
         + (offenCount > 0
           ? '<span class="vh-sec-pill' + (ctx==='priv' ? ' priv' : '') + (pillActive ? ' active' : '') + '"'
-            + ' data-ctx="' + ctx + '"'
-            + ' onclick="WB._vhPillClick(\'' + ctx + '\')"'
+            + ' data-ctx="' + ctx + '" onclick="WB._vhPillClick(\'' + ctx + '\')"'
             + ' title="Alle offenen Aufgaben anzeigen">' + offenCount + '</span>'
           : '')
         + '</div>';
-
-      // Aktive Vorhaben nach Charakter gruppieren
       const gruppen = {};
       charReihenfolge.forEach(c => { gruppen[c] = []; });
-      aktive.forEach(v => {
-        const c = v.charakter || 'bereichernd';
-        if (!gruppen[c]) gruppen[c] = [];
-        gruppen[c].push(v);
-      });
-
+      aktive.forEach(v => { const c = v.charakter || 'bereichernd'; (gruppen[c] = gruppen[c]||[]); gruppen[c].push(v); });
       charReihenfolge.forEach(charakter => {
-        const items = gruppen[charakter];
-        if (!items || !items.length) return;
-        const cls   = charCls[charakter];
-        const label = charLabel[charakter];
+        const items = gruppen[charakter]; if (!items || !items.length) return;
         h += '<div class="vh-char-group">'
-          + '<div class="vh-char-tab ' + cls + '">' + label + '</div>'
+          + '<div class="vh-char-tab ' + charCls[charakter] + '">' + charLabel[charakter] + '</div>'
           + '<div class="vh-char-items">'
           + items.map(v => this._vhRenderCard(v, ctx)).join('')
           + '</div></div>';
       });
-
       if (abgeschlossen.length) {
-        h += '<div class="vh-done-sec">'
-          + '<span class="vh-done-sec-lbl">Abgeschlossen</span>'
-          + '<span style="font-size:13px;color:var(--faint);">' + abgeschlossen.length + '</span>'
-          + '</div>';
+        h += '<div class="vh-done-sec"><span class="vh-done-sec-lbl">Abgeschlossen</span>'
+          + '<span style="font-size:13px;color:var(--faint);">' + abgeschlossen.length + '</span></div>';
         abgeschlossen.forEach(v => {
           h += '<div class="vh-item-done" onclick="WB._vhOpenDetail(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">'
-            + '<div class="vi-done">\u2713</div>'
-            + '<div class="vh-name-done">' + this._esc(v.titel) + '</div>'
-            + '</div>';
+            + '<div class="vi-done">\u2713</div><div class="vh-name-done">' + this._esc(v.titel) + '</div></div>';
         });
       }
-    });
-    scroll.innerHTML = h ||
-      '<div style="padding:16px;color:var(--faint);font-size:16px;">Noch keine Vorhaben.</div>';
+    };
+
+    const allVh = this.db?.vorhaben || [];
+    const vhPro  = allVh.filter(v => v.welt === 'pro'  || v.welt === 'beruf');
+    const vhPriv = allVh.filter(v => v.welt !== 'pro'  && v.welt !== 'beruf');
+
+    if (zeigeBeide) renderWeltSektion('pro', vhPro);
+    renderWeltSektion('priv', vhPriv);
+
+    scroll.innerHTML = h || '<div style="padding:16px;color:var(--faint);font-size:16px;">Noch keine Vorhaben.</div>';
   },
 
   _vhRenderCard(v, ctx) {
@@ -4628,19 +4600,19 @@ _ftStart() {
 
   _abAlleLinks() {
     const links = [];
-    const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
-    welten.forEach(ctx => {
-      const db = this.db;
-      // Links in Vorhaben
-      (db?.vorhaben||[]).forEach(v => {
-        (v.links||[]).filter(l => !l.deleted).forEach(l => {
-          links.push({ ...l, _ctx: ctx, _vorhabenId: v.id, _vorhabenTitel: v.titel });
-        });
+    const zeigeBeide = this._weltBeideVisible();
+    const db = this.db;
+    // Links in Vorhaben
+    (db?.vorhaben||[]).forEach(v => {
+      if (!zeigeBeide && (v.welt === 'pro' || v.welt === 'beruf')) return;
+      (v.links||[]).filter(l => !l.deleted).forEach(l => {
+        links.push({ ...l, _ctx: v.welt || 'priv', _vorhabenId: v.id, _vorhabenTitel: v.titel });
       });
-      // Links ohne Vorhaben (direkt in db.links)
-      (db?.links||[]).filter(l => !l.deleted).forEach(l => {
-        links.push({ ...l, _ctx: ctx, _vorhabenId: null, _vorhabenTitel: null });
-      });
+    });
+    // Links ohne Vorhaben (direkt in db.links)
+    (db?.links||[]).filter(l => !l.deleted).forEach(l => {
+      if (!zeigeBeide && (l.welt === 'pro' || l.welt === 'beruf')) return;
+      links.push({ ...l, _ctx: l.welt || 'priv', _vorhabenId: null, _vorhabenTitel: null });
     });
     return links;
   },
@@ -4673,12 +4645,11 @@ _ftStart() {
 
   _abLinkClick(linkId) {
     let foundVhId = null, foundCtx = null;
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.vorhaben||[]).forEach(v => {
-        if ((v.links||[]).find(l => l.id === linkId)) { foundVhId = v.id; foundCtx = ctx; }
-      });
+
+    (db?.vorhaben||[]).forEach(v => {
+      if ((v.links||[]).find(l => l.id === linkId)) { foundVhId = v.id; foundCtx = ctx; }
     });
+  
     if (foundVhId) { this.linkOpen(foundVhId, linkId, foundCtx); }
     else { this._toast('Link nicht gefunden'); }
   },
@@ -4753,25 +4724,23 @@ _ftStart() {
         .filter(e => !e.deleted && e.date === dateStr && (!e.done || e.storniert))
         .map(e => ({ ...e, _art: 'termin', _ctx: e.welt === 'pro' ? 'pro' : 'priv' }));
       // QuickItems mit Uhrzeit in Events einmischen
-      ['pro','priv'].forEach(ctx => {
-        const db = this.db;
-        (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === dateStr && q.startTime).forEach(q => {
-          events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, welt:ctx, _art:'schnell', _ctx:ctx });
-        });
+
+      (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === dateStr && q.startTime).forEach(q => {
+        events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, welt:ctx, _art:'schnell', _ctx: item.welt || 'priv' });
       });
+    
       events.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
 
       const pflichten = [];
       const dayOfWeek = d.getDay();
-      ['pro','priv'].forEach(ctx => {
-        const db = this.db;
-        (db?.wochenpflichten || [])
-          .filter(p => !p.deleted && (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)))
-          .forEach(p => {
-            const done = !!db?.pflichtStatus?.[dateStr]?.[p.id];
-            pflichten.push({ ...p, _ctx: ctx, done });
-          });
-      });
+
+      (db?.wochenpflichten || [])
+        .filter(p => !p.deleted && (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)))
+        .forEach(p => {
+          const done = !!db?.pflichtStatus?.[dateStr]?.[p.id];
+          pflichten.push({ ...p, _ctx: item.welt || 'priv', done });
+        });
+    
 
       let blockClass = 'wo-day-block';
       if (isToday) blockClass += ' today';
@@ -4861,12 +4830,11 @@ _ftStart() {
         const dayOfWeek = d.getDay();
 
         let pflCount = 0;
-        ['pro','priv'].forEach(ctx => {
-          const db = this.db;
-          (db?.wochenpflichten||[]).forEach(p => {
-            if (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)) pflCount++;
-          });
+
+        (db?.wochenpflichten||[]).forEach(p => {
+          if (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)) pflCount++;
         });
+      
         const donePfl = this._woPflCountDone(dateStr);
 
         let cls = 'wo-cal-dh';
@@ -4918,13 +4886,12 @@ _ftStart() {
             const [eh,em] = e.startTime.split(':').map(Number);
             return { ...e, _art:'termin', _ctx: e.welt==='pro' ? 'pro' : 'priv', _startMin: eh*60+em, _endMin: eh*60+em + this._evtDurationMin(e) };
           });
-        ['pro','priv'].forEach(ctx => {
-          const db = this.db;
-          (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === dateStr && q.startTime).forEach(q => {
-            const [qh,qm] = q.startTime.split(':').map(Number);
-            events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, durationMin:15, welt:ctx, _art:'schnell', _ctx:ctx, _startMin:qh*60+qm, _endMin:qh*60+qm+15 });
-          });
+
+        (db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === dateStr && q.startTime).forEach(q => {
+          const [qh,qm] = q.startTime.split(':').map(Number);
+          events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, durationMin:15, welt:ctx, _art:'schnell', _ctx: item.welt || 'priv', _startMin:qh*60+qm, _endMin:qh*60+qm+15 });
         });
+      
         events.sort((a,b) => a._startMin - b._startMin);
 
         // Überlappungen
@@ -4973,19 +4940,18 @@ _ftStart() {
 
         // Wochenpflichten mit startTime
         const dayOfWeek = d.getDay();
-        ['pro','priv'].forEach(ctx => {
-          const db = this.db;
-          (db?.wochenpflichten||[]).forEach(p => {
-            if (!p.startTime) return;
-            if (!p.taeglich && !(p.wochentage||[]).includes(dayOfWeek)) return;
-            const [ph,pm] = p.startTime.split(':').map(Number);
-            const top2 = ((ph*60+pm) - START_HOUR*60) * HOUR_H / 60;
-            if (top2 < 0 || top2 > HOURS*HOUR_H) return;
-            colH += '<div class="wo-cal-evt" style="top:' + top2 + 'px;height:32px;border-left-color:var(--faint);background:rgba(90,100,114,0.08);opacity:0.8;">'
-              + '<div class="wo-cal-evt-time">' + this._esc(p.startTime) + '</div>'
-              + '<div class="wo-cal-evt-text">' + this._esc(p.titel) + '</div></div>';
-          });
+
+        (db?.wochenpflichten||[]).forEach(p => {
+          if (!p.startTime) return;
+          if (!p.taeglich && !(p.wochentage||[]).includes(dayOfWeek)) return;
+          const [ph,pm] = p.startTime.split(':').map(Number);
+          const top2 = ((ph*60+pm) - START_HOUR*60) * HOUR_H / 60;
+          if (top2 < 0 || top2 > HOURS*HOUR_H) return;
+          colH += '<div class="wo-cal-evt" style="top:' + top2 + 'px;height:32px;border-left-color:var(--faint);background:rgba(90,100,114,0.08);opacity:0.8;">'
+            + '<div class="wo-cal-evt-time">' + this._esc(p.startTime) + '</div>'
+            + '<div class="wo-cal-evt-text">' + this._esc(p.titel) + '</div></div>';
         });
+      
 
         h += '<div class="' + cls + '" style="height:' + (HOURS*HOUR_H) + 'px;">' + colH + '</div>';
       });
@@ -5002,12 +4968,11 @@ _ftStart() {
   /* Hilfsfunktion: erledigte Pflichten für ein Datum zählen */
   _woPflCountDone(dateStr) {
     let done = 0;
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.wochenpflichten||[]).forEach(p => {
-        if (db?.pflichtStatus?.[dateStr]?.[p.id]) done++;
-      });
+
+    (db?.wochenpflichten||[]).forEach(p => {
+      if (db?.pflichtStatus?.[dateStr]?.[p.id]) done++;
     });
+  
     return done;
   },
 
@@ -5054,16 +5019,15 @@ _ftStart() {
         let cellCls = 'wo-cal-pfl-cell';
         if (isToday) cellCls += ' today-col';
         h += '<div class="' + cellCls + '">';
-        ['pro','priv'].forEach(ctx => {
-          const db = this.db;
-          (db?.wochenpflichten||[])
-            .filter(p => !p.deleted && (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)))
-            .forEach(p => {
-              const done = !!db?.pflichtStatus?.[dateStr]?.[p.id];
-              h += '<span class="wo-pfl-chip ' + (done ? 'done' : 'open') + '">'
-                + this._esc(p.titel) + (done ? ' \u2713' : '') + '</span>';
-            });
-        });
+
+        (db?.wochenpflichten||[])
+          .filter(p => !p.deleted && (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)))
+          .forEach(p => {
+            const done = !!db?.pflichtStatus?.[dateStr]?.[p.id];
+            h += '<span class="wo-pfl-chip ' + (done ? 'done' : 'open') + '">'
+              + this._esc(p.titel) + (done ? ' \u2713' : '') + '</span>';
+          });
+      
         h += '</div>';
       });
       pflCells.innerHTML = h;
@@ -5151,21 +5115,20 @@ _ftStart() {
 
         // Wochenpflichten mit startTime im Zeitband
         const dayOfWeek = d.getDay();
-        ['pro','priv'].forEach(ctx => {
-          const db = this.db;
-          (db?.wochenpflichten||[]).forEach(p => {
-            if (!p.startTime) return;
-            if (!p.taeglich && !(p.wochentage||[]).includes(dayOfWeek)) return;
-            const [ph,pm] = p.startTime.split(':').map(Number);
-            const top2 = ((ph*60+pm) - START_HOUR*60) * HOUR_H / 60;
-            if (top2 < 0 || top2 > HOURS*HOUR_H) return;
-            colH += '<div class="wo-cal-evt" style="top:' + top2
-              + 'px;height:32px;border-left-color:var(--faint);'
-              + 'background:rgba(90,100,114,0.08);opacity:0.8;">'
-              + '<div class="wo-cal-evt-time">' + this._esc(p.startTime) + '</div>'
-              + this._esc(p.titel) + '</div>';
-          });
+
+        (db?.wochenpflichten||[]).forEach(p => {
+          if (!p.startTime) return;
+          if (!p.taeglich && !(p.wochentage||[]).includes(dayOfWeek)) return;
+          const [ph,pm] = p.startTime.split(':').map(Number);
+          const top2 = ((ph*60+pm) - START_HOUR*60) * HOUR_H / 60;
+          if (top2 < 0 || top2 > HOURS*HOUR_H) return;
+          colH += '<div class="wo-cal-evt" style="top:' + top2
+            + 'px;height:32px;border-left-color:var(--faint);'
+            + 'background:rgba(90,100,114,0.08);opacity:0.8;">'
+            + '<div class="wo-cal-evt-time">' + this._esc(p.startTime) + '</div>'
+            + this._esc(p.titel) + '</div>';
         });
+      
 
         h += '<div class="' + cls + '" style="height:' + (HOURS*HOUR_H) + 'px;">' + colH + '</div>';      });
       cols.innerHTML = h;
@@ -5178,13 +5141,12 @@ _ftStart() {
 
   _woRenderMottos(view) {
     const mottos = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      const kw = this._getCurrentKW();
-      (db?.wochenMottos?.[kw] || []).forEach(m => {
-        mottos.push({ ...m, _ctx: ctx });
-      });
+
+    const kw = this._getCurrentKW();
+    (db?.wochenMottos?.[kw] || []).forEach(m => {
+      mottos.push({ ...m, _ctx: item.welt || 'priv' });
     });
+  
 
     if (view === 'liste') {
       const titleEl = document.getElementById('wo-lm-title');
@@ -5256,11 +5218,10 @@ _ftStart() {
 
   _tfTerminDone(id, art) {
     if (art === 'schnell') {
-      ['pro','priv'].forEach(ctx => {
-        const db = this.db;
-        const q  = (db?.quickItems||[]).find(x => x.id === id);
-        if (q) { q.done=true; q.updatedAt=this._now(); }
-      });
+
+      const q  = (db?.quickItems||[]).find(x => x.id === id);
+      if (q) { q.done=true; q.updatedAt=this._now(); }
+    
     } else {
       const e = (this.db?.customEvents||[]).find(x => x.id === id);
       if (e) { e.done=true; e.updatedAt=this._now(); }
@@ -5272,21 +5233,19 @@ _ftStart() {
     if (!confirm(art === 'schnell' ? 'Erinnerung absagen?' : 'Termin absagen?')) return;
     const today = this._dStr(new Date());
     if (art === 'schnell') {
-      ['pro','priv'].forEach(ctx => {
-        const db = this.db;
-        const q  = (db?.quickItems||[]).find(x => x.id === id);
-        if (q) { q.storniert=true; q.done=true; q.updatedAt=this._now(); }
-      });
+
+      const q  = (db?.quickItems||[]).find(x => x.id === id);
+      if (q) { q.storniert=true; q.done=true; q.updatedAt=this._now(); }
+    
     } else if (art === 'pflicht') {
-      ['pro','priv'].forEach(ctx => {
-        const db = this.db;
-        const p  = (db?.wochenpflichten||[]).find(x => x.id === id);
-        if (p) {
-          if (!db.pflichtStatus) db.pflichtStatus = {};
-          if (!db.pflichtStatus[today]) db.pflichtStatus[today] = {};
-          db.pflichtStatus[today][id] = 'storniert';
-        }
-      });
+
+      const p  = (db?.wochenpflichten||[]).find(x => x.id === id);
+      if (p) {
+        if (!db.pflichtStatus) db.pflichtStatus = {};
+        if (!db.pflichtStatus[today]) db.pflichtStatus[today] = {};
+        db.pflichtStatus[today][id] = 'storniert';
+      }
+    
     } else {
       const e = (this.db?.customEvents||[]).find(x => x.id === id);
       if (e) { e.storniert=true; e.done=false; e.updatedAt=this._now(); }
@@ -5432,13 +5391,9 @@ _ftStart() {
   ],
 
   _ziAlleZiele() {
-    const ziele = [];
-    const welten = this._weltBeideVisible() ? ['pro','priv'] : ['priv'];
-    welten.forEach(ctx => {
-      const db = this.db;
-      (db?.ziele||[]).filter(z => !z.deleted).forEach(z => ziele.push({...z, _ctx:ctx}));
-    });
-    return ziele;
+    return (this.db?.ziele||[])
+      .filter(z => !z.deleted)
+      .map(z => ({ ...z, _ctx: z.welt || 'priv' }));
   },
 
   _ziToggle(id) {
@@ -5526,43 +5481,40 @@ _ftStart() {
       // updatedAt Migration: Items ohne updatedAt bekommen Fallback-Timestamp
       const OLD_TS = '2020-01-01T00:00:00.000Z';
       const migrateUpdatedAt = (arr) => { (arr||[]).forEach(item => { if (!item.updatedAt) item.updatedAt = OLD_TS; }); };
-      ['pro','priv'].forEach(ctx => {
-        const db = this.db;
-        if (!db) return;
-        migrateUpdatedAt(db.quickItems); migrateUpdatedAt(db.customEvents);
-        migrateUpdatedAt(db.wochenpflichten); migrateUpdatedAt(db.ziele);
-        migrateUpdatedAt(db.checklistVorlagen); migrateUpdatedAt(db.tagesprotokoll);
-        (db.vorhaben||[]).forEach(v => { if (!v.updatedAt) v.updatedAt = OLD_TS; migrateUpdatedAt(v.aufgaben); migrateUpdatedAt(v.links); });
-      });
+
+      if (!db) return;
+      migrateUpdatedAt(db.quickItems); migrateUpdatedAt(db.customEvents);
+      migrateUpdatedAt(db.wochenpflichten); migrateUpdatedAt(db.ziele);
+      migrateUpdatedAt(db.checklistVorlagen); migrateUpdatedAt(db.tagesprotokoll);
+      (db.vorhaben||[]).forEach(v => { if (!v.updatedAt) v.updatedAt = OLD_TS; migrateUpdatedAt(v.aufgaben); migrateUpdatedAt(v.links); });
+    
 
       // pflichtStatus Format-Migration (einmalig)
-      ['pro','priv'].forEach(ctx => {
-        const db = this.db;
-        if (!db?.pflichtStatus) return;
-        const ps = db.pflichtStatus;
-        const firstKey = Object.keys(ps)[0] || '';
-        if (!firstKey.match(/\d{4}-\d{2}-\d{2}$/)) return;
-        const newPs = {};
-        Object.entries(ps).forEach(([key, val]) => {
-          const parts = key.split('_');
-          if (parts.length < 3) return;
-          const datum  = parts[parts.length - 1];
-          const dutyId = parts.slice(0, -1).join('_');
-          if (!newPs[datum]) newPs[datum] = {};
-          newPs[datum][dutyId] = (val === 'erledigt' || val === true);
-        });
-        db.pflichtStatus = newPs;
+
+      if (!db?.pflichtStatus) return;
+      const ps = db.pflichtStatus;
+      const firstKey = Object.keys(ps)[0] || '';
+      if (!firstKey.match(/\d{4}-\d{2}-\d{2}$/)) return;
+      const newPs = {};
+      Object.entries(ps).forEach(([key, val]) => {
+        const parts = key.split('_');
+        if (parts.length < 3) return;
+        const datum  = parts[parts.length - 1];
+        const dutyId = parts.slice(0, -1).join('_');
+        if (!newPs[datum]) newPs[datum] = {};
+        newPs[datum][dutyId] = (val === 'erledigt' || val === true);
       });
+      db.pflichtStatus = newPs;
+    
 
       // Vorhaben status-Feld + charakter-Feld + zielId Migration
-      ['pro','priv'].forEach(ctx => {
-        const db = this.db;
-        (db?.vorhaben||[]).forEach(v => {
-          if (!v.status) v.status = v.aktiv !== false ? 'aktiv' : 'abgeschlossen';
-          if (!v.charakter) v.charakter = 'bereichernd';
-          if (v.zielId === undefined) v.zielId = null;
-        });
+
+      (db?.vorhaben||[]).forEach(v => {
+        if (!v.status) v.status = v.aktiv !== false ? 'aktiv' : 'abgeschlossen';
+        if (!v.charakter) v.charakter = 'bereichernd';
+        if (v.zielId === undefined) v.zielId = null;
       });
+    
     } catch(e) {
       console.error('[IDB] load error:', e);
     }
@@ -6018,32 +5970,18 @@ _ftStart() {
 
   async _syncCheckNewer() {
     try {
-      const token = await this._oauthGetTokenSilent();
-      if (!token) return;
-      for (const ctx of ['pro','priv']) {
-        let fileId = this._oauthDriveFileIds[ctx];
-        if (!fileId) {
-          try { fileId = await this._oauthFindOrCreateFile(token, ctx); }
-          catch(e) { continue; }
-        }
-        if (!fileId) continue;
-        const resp = await fetch(this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime',
-          { headers: { Authorization: 'Bearer ' + token } });
-        if (!resp.ok) continue;
-        const meta    = await resp.json();
-        const driveTs = new Date(meta.modifiedTime).getTime();
-        if (driveTs > this._syncLastDownload + 5000) {
-          if (this.isDirty) {
-            // Konflikt: lokale ungespeicherte Änderungen vs. neueres Drive
-            this._syncConflictDialog(ctx, driveTs);
-          } else {
-            await this.oauthSyncDownload(ctx);
-          }
-        }
+      const token = await this._oauthGetTokenSilent(); if (!token) return;
+      const fileId = await this._syncGetFileId(token); if (!fileId) return;
+      const resp = await fetch(this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime',
+        { headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok) return;
+      const meta    = await resp.json();
+      const driveTs = new Date(meta.modifiedTime).getTime();
+      if (driveTs > this._syncLastDownload + 5000) {
+        if (this._pendingChanges || this.isDirty) this._syncConflictDialog('db', driveTs);
+        else await this._syncDownload();
       }
-    } catch(e) {
-      console.warn('[sync check]', e.message);
-    }
+    } catch(e) { console.warn('[syncCheckNewer]', e.message); }
   },
 
   _syncConflictDialog(ctx, driveTs) {
@@ -6440,18 +6378,17 @@ _ftStart() {
     this._sRenderAll();
     // Papierkorb-Zähler aktualisieren
     let pkCount = 0;
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      pkCount += (db?.quickItems||[]).filter(x=>x.deleted).length;
-      pkCount += (db?.customEvents||[]).filter(x=>x.deleted).length;
-      pkCount += (db?.wochenpflichten||[]).filter(x=>x.deleted).length;
-      pkCount += (db?.ziele||[]).filter(x=>x.deleted).length;
-      (db?.vorhaben||[]).forEach(v => {
-        pkCount += (v.aufgaben||[]).filter(x=>x.deleted).length;
-        pkCount += (v.links||[]).filter(x=>x.deleted).length;
-      });
-      pkCount += (db?.vorhaben||[]).filter(x=>x.deleted).length;
+
+    pkCount += (db?.quickItems||[]).filter(x=>x.deleted).length;
+    pkCount += (db?.customEvents||[]).filter(x=>x.deleted).length;
+    pkCount += (db?.wochenpflichten||[]).filter(x=>x.deleted).length;
+    pkCount += (db?.ziele||[]).filter(x=>x.deleted).length;
+    (db?.vorhaben||[]).forEach(v => {
+      pkCount += (v.aufgaben||[]).filter(x=>x.deleted).length;
+      pkCount += (v.links||[]).filter(x=>x.deleted).length;
     });
+    pkCount += (db?.vorhaben||[]).filter(x=>x.deleted).length;
+  
     const pkCntEl = document.getElementById('s-pk-count');
     if (pkCntEl) pkCntEl.textContent = pkCount > 0 ? pkCount + ' Items' : 'leer';
   },
@@ -6648,10 +6585,9 @@ _ftStart() {
     const el = document.getElementById('s-wp-list');
     if (!el) return;
     const alle = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.wochenpflichten || []).forEach(p => { alle.push({ ...p, _ctx: ctx }); });
-    });
+
+    (db?.wochenpflichten || []).forEach(p => { alle.push({ ...p, _ctx: item.welt || 'priv' }); });
+  
     if (!alle.length) {
       el.innerHTML = '<div style="padding:12px 14px;font-size:16px;color:var(--faint);">Noch keine Wochenpflichten.</div>';
       return;
@@ -6775,22 +6711,22 @@ _ftStart() {
     const now = new Date();
     const typeLabel = { termin:'Termin', schnell:'Schnell-Erinnerung', aufgabe:'Aufgabe', vorhaben:'Vorhaben', pflicht:'Wochenpflicht', ziel:'Ziel', link:'Ressource' };
     const items = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db; if (!db) return;
-      const addItems = (arr, type, getText) => {
-        (arr||[]).filter(x => x.deleted).forEach(x => {
-          const deletedAt = x.deletedAt || x.updatedAt || '';
-          const daysLeft = deletedAt ? Math.ceil((new Date(deletedAt).getTime() + 7*86400000 - now.getTime()) / 86400000) : 7;
-          items.push({ id:x.id, type, ctx, text:getText(x), deletedAt, daysLeft:Math.max(0,daysLeft), _ref:x });
-        });
-      };
-      addItems(db.quickItems,'schnell',x=>x.text);
-      addItems(db.customEvents,'termin',x=>x.text);
-      addItems(db.wochenpflichten,'pflicht',x=>x.titel||x.text);
-      addItems(db.ziele,'ziel',x=>x.titel||x.text);
-      addItems(db.vorhaben,'vorhaben',x=>x.titel||x.text);
-      (db.vorhaben||[]).forEach(v => { addItems(v.aufgaben||[],'aufgabe',x=>x.text); addItems(v.links||[],'link',x=>x.titel||x.url); });
-    });
+
+    const db = this.db; if (!db) return;
+    const addItems = (arr, type, getText) => {
+      (arr||[]).filter(x => x.deleted).forEach(x => {
+        const deletedAt = x.deletedAt || x.updatedAt || '';
+        const daysLeft = deletedAt ? Math.ceil((new Date(deletedAt).getTime() + 7*86400000 - now.getTime()) / 86400000) : 7;
+        items.push({ id:x.id, type, ctx, text:getText(x), deletedAt, daysLeft:Math.max(0,daysLeft), _ref:x });
+      });
+    };
+    addItems(db.quickItems,'schnell',x=>x.text);
+    addItems(db.customEvents,'termin',x=>x.text);
+    addItems(db.wochenpflichten,'pflicht',x=>x.titel||x.text);
+    addItems(db.ziele,'ziel',x=>x.titel||x.text);
+    addItems(db.vorhaben,'vorhaben',x=>x.titel||x.text);
+    (db.vorhaben||[]).forEach(v => { addItems(v.aufgaben||[],'aufgabe',x=>x.text); addItems(v.links||[],'link',x=>x.titel||x.url); });
+  
     items.sort((a,b) => (a.deletedAt||'').localeCompare(b.deletedAt||''));
     if (cntEl) cntEl.textContent = items.length > 0 ? items.length + ' Item' + (items.length!==1?'s':'') : 'leer';
     if (!items.length) { liste.innerHTML = '<div class="s-pk-empty">Papierkorb ist leer \u2713</div>'; return; }
@@ -6818,14 +6754,14 @@ _ftStart() {
     const items = this._sPapierkorbItems || []; if (!items.length) return;
     if (!confirm('Alle ' + items.length + ' gel\u00f6schten Items jetzt permanent l\u00f6schen?\n\nDiese Aktion kann nicht r\u00fckg\u00e4ngig gemacht werden.')) return;
     const bereinige = (arr) => (arr||[]).filter(x => !x.deleted);
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db; if (!db) return;
-      db.quickItems = bereinige(db.quickItems); db.customEvents = bereinige(db.customEvents);
-      db.wochenpflichten = bereinige(db.wochenpflichten); db.ziele = bereinige(db.ziele);
-      db.checklistVorlagen = bereinige(db.checklistVorlagen);
-      (db.vorhaben||[]).forEach(v => { v.aufgaben = bereinige(v.aufgaben); v.links = bereinige(v.links); });
-      db.vorhaben = bereinige(db.vorhaben);
-    });
+
+    const db = this.db; if (!db) return;
+    db.quickItems = bereinige(db.quickItems); db.customEvents = bereinige(db.customEvents);
+    db.wochenpflichten = bereinige(db.wochenpflichten); db.ziele = bereinige(db.ziele);
+    db.checklistVorlagen = bereinige(db.checklistVorlagen);
+    (db.vorhaben||[]).forEach(v => { v.aufgaben = bereinige(v.aufgaben); v.links = bereinige(v.links); });
+    db.vorhaben = bereinige(db.vorhaben);
+  
     this.setDirty(); this._sPapierkorbRender(); this._toast('\u2713 Papierkorb geleert');
   },
 
@@ -6839,20 +6775,19 @@ _ftStart() {
       return ts > cutoffStr;
     });
     let count = 0;
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      if (!db) return;
-      const vorher = ['quickItems','customEvents','wochenpflichten','ziele','checklistVorlagen']
-        .reduce((s,f) => s + (db[f]||[]).filter(x=>x.deleted).length, 0);
-      db.quickItems        = bereinige(db.quickItems);
-      db.customEvents      = bereinige(db.customEvents);
-      db.wochenpflichten   = bereinige(db.wochenpflichten);
-      db.ziele             = bereinige(db.ziele);
-      db.checklistVorlagen = bereinige(db.checklistVorlagen);
-      (db.vorhaben||[]).forEach(v => { v.aufgaben = bereinige(v.aufgaben); v.links = bereinige(v.links); });
-      db.vorhaben = bereinige(db.vorhaben);
-      count += vorher;
-    });
+
+    if (!db) return;
+    const vorher = ['quickItems','customEvents','wochenpflichten','ziele','checklistVorlagen']
+      .reduce((s,f) => s + (db[f]||[]).filter(x=>x.deleted).length, 0);
+    db.quickItems        = bereinige(db.quickItems);
+    db.customEvents      = bereinige(db.customEvents);
+    db.wochenpflichten   = bereinige(db.wochenpflichten);
+    db.ziele             = bereinige(db.ziele);
+    db.checklistVorlagen = bereinige(db.checklistVorlagen);
+    (db.vorhaben||[]).forEach(v => { v.aufgaben = bereinige(v.aufgaben); v.links = bereinige(v.links); });
+    db.vorhaben = bereinige(db.vorhaben);
+    count += vorher;
+  
     if (count > 0) this.setDirty();
   },
 
@@ -7340,13 +7275,10 @@ _ftStart() {
     const v  = (db?.vorhaben||[]).find(x => x.id === vorhabenId);
     const l  = linkId ? (v?.links||[]).find(x => x.id === linkId) : null;
 
-    // Vorhaben-Dropdown (alle aktiven Vorhaben beider DBs)
-    const alleVh = [];
-    ['pro','priv'].forEach(c => {
-      const d = this.db;
-      (d?.vorhaben||[]).filter(x => !x.deleted && x.status !== 'archiviert' && x.aktiv !== false)
-        .forEach(x => alleVh.push({ id: x.id, titel: x.titel, ctx: c }));
-    });
+    // Vorhaben-Dropdown (alle aktiven Vorhaben, welt aus Item)
+    const alleVh = (this.db?.vorhaben||[])
+      .filter(x => !x.deleted && x.status !== 'archiviert' && x.aktiv !== false)
+      .map(x => ({ id: x.id, titel: x.titel, ctx: x.welt === 'pro' || x.welt === 'beruf' ? 'pro' : 'priv' }));
     const selectedVhId = vorhabenId || l?._vorhabenId || '';
     const vhOpts = '<option value="">-- Kein Vorhaben --</option>'
       + alleVh.map(x => '<option value="' + this._esc(x.id) + '"'
@@ -7616,18 +7548,11 @@ _ftStart() {
     // Ziel-DB aus Vorhaben oder aktiver Welt bestimmen
     let targetCtx = this._modalGetWelt();
     let targetVhId = vhId || c.vorhabenId;
-    let targetDb = null, targetV = null;
+    let targetDb = this.db;
+    let targetV = null;
 
     if (targetVhId) {
-      // Vorhaben in beiden DBs suchen
-      for (const ctx of ['pro','priv']) {
-        const d = this.db;
-        const found = (d?.vorhaben||[]).find(x => x.id === targetVhId);
-        if (found) { targetDb = d; targetCtx = ctx; targetV = found; break; }
-      }
-    }
-    if (!targetDb) {
-      targetDb = this.db;
+      targetV = (this.db?.vorhaben||[]).find(x => x.id === targetVhId) || null;
     }
     if (!targetDb) return;
 
@@ -7809,10 +7734,9 @@ _ftStart() {
   _ftRenderVorlagen() {
     const el = document.getElementById('ft-vl-list'); if (!el) return;
     const alle = [];
-    ['pro','priv'].forEach(ctx => {
-      const db = this.db;
-      (db?.checklistVorlagen||[]).filter(v => !v.deleted).forEach(v => alle.push({ ...v, _ctx: ctx }));
-    });
+
+    (db?.checklistVorlagen||[]).filter(v => !v.deleted).forEach(v => alle.push({ ...v, _ctx: item.welt || 'priv' }));
+  
     if (!alle.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--faint);font-size:16px;">Keine Vorlagen vorhanden.</div>'; return; }
     el.innerHTML = alle.map(v => {
       const count = (v.schritte||[]).length;

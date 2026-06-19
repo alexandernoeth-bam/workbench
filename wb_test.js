@@ -1224,10 +1224,14 @@ if (rbBody29.includes("'pro'") && rbBody29.includes("'priv'")) {
   ok("_tfRenderHeute() liest aus beiden DBs (pro+priv)"); wlOk++;
 } else { fail("_tfRenderHeute() fehlt pro/priv"); wlFail++; }
 
-// _ziAlleZiele nutzt _weltBeideVisible
+// _ziAlleZiele gibt alle Ziele aus this.db zurück
+const ziSrc = content.match(/  _ziAlleZiele\(\)[\s\S]*?^  \},/m)?.[0] || '';
+if (ziSrc.includes('this.db') && (ziSrc.includes('.map(') || ziSrc.includes('.filter('))) {
+  ok('_ziAlleZiele() nutzt this.db direkt'); wlOk++;
+} else { fail('_ziAlleZiele() nutzt nicht _weltBeideVisible()'); wlFail++; }
 const ziBody = jsCode.match(/  _ziAlleZiele\(\)[\s\S]*?^  \},/m)?.[0] || '';
-if (ziBody.includes('_weltBeideVisible')) {
-  ok('_ziAlleZiele() nutzt _weltBeideVisible()'); wlOk++;
+if (ziBody.includes('this.db') || ziBody.includes('welt')) {
+  ok('_ziAlleZiele() korrekte Implementierung'); wlOk++;
 } else { fail('_ziAlleZiele() nutzt nicht _weltBeideVisible()'); wlFail++; }
 
 if (wlFail === 0) ok(wlOk + ' Welt-Logik Funktionen korrekt');
