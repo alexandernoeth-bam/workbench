@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.22</title>
+  <title>WorkBench 2.9.23</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1168,6 +1168,41 @@
     .at-neu-btn { font-size:13px; font-weight:700; color:var(--accent); background:none; border:none; cursor:pointer; padding:2px 0; font-family:var(--font); }
     .at-neu-btn:hover { text-decoration:underline; }
 
+    /* ── Notizen-Tab ── */
+    #notizen-scroll { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+    .nz-grp { background:var(--surface); border-radius:10px; border:1.5px solid var(--border); overflow:hidden; }
+    .nz-grp-hdr { display:flex; align-items:center; gap:8px; padding:11px 13px; cursor:pointer; user-select:none; }
+    .nz-grp-hdr:hover { background:var(--surface2); }
+    .nz-grp-ic { font-size:17px; flex-shrink:0; }
+    .nz-grp-title { font-size:15px; font-weight:700; color:var(--text); flex:1; }
+    .nz-grp-cnt { font-size:12px; font-weight:700; padding:2px 8px; border-radius:10px; background:var(--surface2); color:var(--faint); }
+    .nz-pin-btn { width:28px; height:28px; border-radius:50%; border:1.5px solid var(--border); background:none; cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background 0.15s; }
+    .nz-pin-btn.on { background:#fffbe6; border-color:#d4c22a; }
+    .nz-grp-chev { font-size:11px; color:var(--faint); transition:transform 0.15s; }
+    .nz-grp.open .nz-grp-chev { transform:rotate(180deg); }
+    .nz-grp-body { border-top:1px solid var(--border); display:none; }
+    .nz-grp.open .nz-grp-body { display:block; }
+    .nz-item { display:flex; align-items:center; gap:9px; padding:10px 13px; border-bottom:0.5px solid var(--border); }
+    .nz-item:last-child { border-bottom:none; }
+    .nz-chk { width:19px; height:19px; border-radius:4px; border:1.5px solid var(--border); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff; cursor:pointer; }
+    .nz-chk.ck { background:var(--accent); border-color:var(--accent); }
+    .nz-dot { width:7px; height:7px; border-radius:50%; background:var(--accent); flex-shrink:0; margin-left:4px; }
+    .nz-itxt { font-size:15px; color:var(--text); flex:1; }
+    .nz-itxt.dn { text-decoration:line-through; color:var(--faint); }
+    .nz-del { width:24px; height:24px; border:none; background:none; cursor:pointer; font-size:15px; color:var(--faint); display:none; }
+    .nz-item:hover .nz-del { display:flex; align-items:center; justify-content:center; }
+    .nz-add-row { display:flex; align-items:center; gap:8px; padding:8px 13px; border-top:0.5px solid var(--border); background:var(--surface2); }
+    .nz-add-row input { flex:1; border:none; background:none; font-size:14px; color:var(--text); outline:none; font-family:var(--font); }
+    .nz-add-row input::placeholder { color:var(--faint); }
+    .nz-add-btn { font-size:12px; font-weight:700; color:var(--accent); background:none; border:none; cursor:pointer; font-family:var(--font); flex-shrink:0; }
+    .nz-new-list { display:flex; align-items:center; gap:8px; padding:10px 13px; cursor:pointer; color:var(--accent); font-size:14px; font-weight:700; background:var(--surface); border-radius:10px; border:1.5px dashed var(--border); }
+    /* Pin-Pills im Cockpit/Notizblock */
+    .nz-pin-pills { display:flex; gap:7px; flex-wrap:wrap; }
+    .nz-pin-pill { display:inline-flex; align-items:center; gap:5px; background:#fffbe6; border:1.5px solid #d4c22a; border-radius:20px; padding:5px 12px 5px 9px; cursor:pointer; text-decoration:none; }
+    .nz-pin-pill:hover { background:#fff8cc; }
+    .nz-pin-pill-dot { width:8px; height:8px; border-radius:50%; background:var(--accent); flex-shrink:0; }
+    .nz-pin-pill-lbl { font-size:13px; font-weight:700; color:#6a5400; }
+
     .wo-vt-btn {
       padding: 5px 12px; font-size: 14px; font-weight: 600;
       cursor: pointer; border: none;
@@ -2310,7 +2345,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.22</div>
+  <div id="wb-startup-tagline">v2.9.23</div>
 </div>
 
 <div id="wb-app">
@@ -2376,6 +2411,9 @@
         </div>
 
         <div id="ck-editor-block">
+          <div id="nz-pin-pills-bar" style="display:none;padding:8px 12px 6px;border-bottom:1px solid var(--border);background:var(--surface2);">
+            <div class="nz-pin-pills" id="nz-pin-pills-container"></div>
+          </div>
           <div id="ck-editor-toolbar">
             <span class="ck-tb-label">Format</span>
             <button class="ck-tb-btn" title="Fett" onclick="WB._ckExecCmd('bold')"><b>B</b></button>
@@ -2429,6 +2467,13 @@
           </div>
         </div>
       </div>
+    </div>
+    <div id="sec-notizen" class="wb-section" style="display:none;flex-direction:column;">
+      <div style="padding:10px 14px;border-bottom:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <span style="font-size:15px;font-weight:700;color:var(--text)">Notizen</span>
+        <button onclick="WB._nzNeueListeDialog()" style="background:var(--accent);color:#fff;border:none;border-radius:16px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">+ Neue Liste</button>
+      </div>
+      <div id="notizen-scroll"></div>
     </div>
     <div id="sec-backlog" class="wb-section" style="display:none">
 
@@ -2766,6 +2811,10 @@
     <div id="wb-nav">
     <div class="wb-tab active" data-tab="cockpit" onclick="WB.tabSwitch('cockpit')">
       <div class="wb-tab-icon"><svg viewBox="0 0 24 24"><path d="M11 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg></div>
+      <span>Notizblock</span>
+    </div>
+    <div class="wb-tab" data-tab="notizen" onclick="WB.tabSwitch('notizen')">
+      <div class="wb-tab-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
       <span>Notizen</span>
     </div>
     <div class="wb-tab" data-tab="backlog" onclick="WB.tabSwitch('backlog')">
@@ -2791,6 +2840,12 @@
       <div class="wb-stab-body">
         <div class="wb-stab-icon"><svg viewBox="0 0 24 24"><path d="M11 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg></div>
         <span class="wb-stab-lbl">Notizblock</span>
+      </div>
+    </div>
+    <div class="wb-stab" data-tab="notizen" onclick="WB._stabSwitch('notizen',this)">
+      <div class="wb-stab-body">
+        <div class="wb-stab-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+        <span class="wb-stab-lbl">Notizen</span>
       </div>
     </div>
     <div class="wb-stab" data-tab="backlog" onclick="WB._stabSwitch('backlog',this)">
@@ -2844,8 +2899,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.22',
-  APP_BUILD:   '20260620-0010',
+  APP_VERSION: '2.9.23',
+  APP_BUILD:   '20260620-0100',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -2889,7 +2944,7 @@ const WB = {
     });
     const sec = document.getElementById('sec-' + tab);
     if (sec) {
-      const displayVal = { cockpit: 'flex', vorhaben: 'flex', ziele: 'flex', backlog: 'flex', woche: 'flex', ablage: 'flex', aufgaben: 'flex' }[tab] || 'block';
+      const displayVal = { cockpit: 'flex', vorhaben: 'flex', ziele: 'flex', backlog: 'flex', woche: 'flex', ablage: 'flex', aufgaben: 'flex', notizen: 'flex' }[tab] || 'block';
       sec.style.setProperty('display', displayVal, 'important');
     }
     this.renderSection(tab);
@@ -2905,6 +2960,7 @@ const WB = {
       case 'woche':     this.renderWoche();          break;
       case 'ziele':     this.renderZiele();          break;
       case 'aufgaben':  this.renderAufgabenTab();   break;
+      case 'notizen':   this.renderNotizenTab();     break;
     }
   },
 
@@ -5776,6 +5832,166 @@ _ftStart() {
         'WB._woPflichtNeu()');
   },
 
+  // ── Notizen-Tab ──────────────────────────────────────
+
+  _nzDefaultListen() {
+    return [
+      { id:'nz_edeka',  titel:'Einkaufszettel Edeka',    icon:'🛒', typ:'check', items:[], gepinnt:false },
+      { id:'nz_bm',     titel:'Einkaufszettel Baumarkt', icon:'🔧', typ:'check', items:[], gepinnt:false },
+      { id:'nz_sonst',  titel:'Einkaufszettel Sonstige', icon:'🛍️', typ:'check', items:[], gepinnt:false },
+      { id:'nz_urlaub', titel:'Ideen Freizeit / Urlaub', icon:'✈️', typ:'bullet', items:[], gepinnt:false },
+      { id:'nz_gesch',  titel:'Ideen Geschenke',         icon:'🎁', typ:'bullet', items:[], gepinnt:false },
+    ];
+  },
+
+  _nzGetListen() {
+    if (!this.db) return [];
+    if (!this.db.notizen || !this.db.notizen.length) {
+      this.db.notizen = this._nzDefaultListen();
+    }
+    return this.db.notizen.filter(l => !l.deleted);
+  },
+
+  renderNotizenTab() {
+    const scroll = document.getElementById('notizen-scroll');
+    if (!scroll) return;
+    const listen = this._nzGetListen();
+    let h = '';
+    listen.forEach(l => {
+      const offen = l.typ === 'check'
+        ? (l.items||[]).filter(i => !i.done && !i.deleted).length
+        : (l.items||[]).filter(i => !i.deleted).length;
+      const gepinnt = !!l.gepinnt;
+      const itemsH = (l.items||[]).filter(i => !i.deleted).map(i => {
+        if (l.typ === 'check') {
+          return '<div class="nz-item">'
+            + '<div class="nz-chk' + (i.done ? ' ck' : '') + '"'
+            + ' onclick="WB._nzToggleItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\')">'
+            + (i.done ? '\u2713' : '') + '</div>'
+            + '<span class="nz-itxt' + (i.done ? ' dn' : '') + '">' + this._esc(i.text) + '</span>'
+            + '<button class="nz-del" onclick="WB._nzDeleteItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\')">\u00d7</button>'
+            + '</div>';
+        } else {
+          return '<div class="nz-item">'
+            + '<div class="nz-dot"></div>'
+            + '<span class="nz-itxt">' + this._esc(i.text) + '</span>'
+            + '<button class="nz-del" onclick="WB._nzDeleteItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\')">\u00d7</button>'
+            + '</div>';
+        }
+      }).join('');
+      h += '<div class="nz-grp open" id="nzg-' + this._esc(l.id) + '">'
+        + '<div class="nz-grp-hdr" onclick="this.closest(\'.nz-grp\').classList.toggle(\'open\')">'
+        + '<span class="nz-grp-ic">' + l.icon + '</span>'
+        + '<span class="nz-grp-title">' + this._esc(l.titel) + '</span>'
+        + '<span class="nz-grp-cnt">' + offen + '</span>'
+        + '<button class="nz-pin-btn' + (gepinnt ? ' on' : '') + '"'
+        + ' onclick="event.stopPropagation();WB._nzTogglePin(\'' + this._esc(l.id) + '\')"'
+        + ' title="' + (gepinnt ? 'Entfernen' : 'Pinnen') + '">\uD83D\uDCCC</button>'
+        + '<span class="nz-grp-chev">\u25be</span>'
+        + '</div>'
+        + '<div class="nz-grp-body">'
+        + itemsH
+        + '<div class="nz-add-row">'
+        + '<span style="color:var(--faint);font-size:14px">+</span>'
+        + '<input id="nz-add-' + this._esc(l.id) + '" placeholder="Eintrag hinzuf\u00fcgen..." '
+        + 'onkeydown="if(event.key===\'Enter\')WB._nzAddItem(\'' + this._esc(l.id) + '\')">'
+        + '<button class="nz-add-btn" onclick="WB._nzAddItem(\'' + this._esc(l.id) + '\')">OK</button>'
+        + '</div></div></div>';
+    });
+    h += '<div class="nz-new-list" onclick="WB._nzNeueListeDialog()">+ Neue Liste erstellen</div>';
+    scroll.innerHTML = h;
+  },
+
+  _nzTogglePin(listeId) {
+    const listen = this._nzGetListen();
+    const gepinntAnzahl = listen.filter(l => l.gepinnt).length;
+    const l = listen.find(x => x.id === listeId); if (!l) return;
+    if (!l.gepinnt && gepinntAnzahl >= 2) {
+      this._toast('Max. 2 Listen k\u00f6nnen gepinnt werden');
+      return;
+    }
+    l.gepinnt = !l.gepinnt;
+    this.setDirty();
+    this.renderNotizenTab();
+    this._nzRenderPills();
+  },
+
+  _nzRenderPills() {
+    const bar  = document.getElementById('nz-pin-pills-bar');
+    const cont = document.getElementById('nz-pin-pills-container');
+    if (!bar || !cont) return;
+    const gepinnt = this._nzGetListen().filter(l => l.gepinnt);
+    if (!gepinnt.length) { bar.style.display = 'none'; return; }
+    bar.style.display = '';
+    cont.innerHTML = gepinnt.map(l =>
+      '<span class="nz-pin-pill" onclick="WB.tabSwitch(\'notizen\');setTimeout(()=>document.getElementById(\'nzg-' + this._esc(l.id) + '\')?.scrollIntoView({behavior:\'smooth\'}),100)">'
+      + '<span class="nz-pin-pill-dot"></span>'
+      + '<span class="nz-pin-pill-lbl">' + this._esc(l.titel) + '</span>'
+      + '</span>'
+    ).join('');
+  },
+
+  _nzAddItem(listeId) {
+    const input = document.getElementById('nz-add-' + listeId);
+    const text  = input?.value?.trim(); if (!text) return;
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    if (!l.items) l.items = [];
+    l.items.push({ id: 'ni_' + Date.now(), text, done: false, createdAt: this._now() });
+    input.value = '';
+    this.setDirty();
+    this.renderNotizenTab();
+  },
+
+  _nzToggleItem(listeId, itemId) {
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    i.done = !i.done;
+    // Erledigte ans Ende sortieren
+    l.items.sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0));
+    this.setDirty();
+    this.renderNotizenTab();
+  },
+
+  _nzDeleteItem(listeId, itemId) {
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    i.deleted = true;
+    this.setDirty();
+    this.renderNotizenTab();
+  },
+
+  _nzNeueListeDialog() {
+    const icons = ['📝','📋','🛒','🔧','🎁','✈️','💡','⭐','🏠','🎵'];
+    const iconBtns = icons.map(ic =>
+      '<button onclick="document.getElementById(\'nz-new-icon\').value=\'' + ic + '\';document.querySelectorAll(\'.nz-ic-btn\').forEach(b=>b.style.background=\'\');this.style.background=\'var(--surface2)\'" class="nz-ic-btn" style="font-size:22px;border:none;background:none;cursor:pointer;padding:4px 6px;border-radius:6px">' + ic + '</button>'
+    ).join('');
+    const body = '<div class="wb-input-group"><label class="wb-label">Name</label>'
+      + '<input id="nz-new-name" class="wb-input" placeholder="z.B. Leseliste">'
+      + '</div><div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Icon</label>'
+      + '<input id="nz-new-icon" class="wb-input" value="📝" style="font-size:20px;max-width:60px;display:inline-block">'
+      + '<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:6px">' + iconBtns + '</div>'
+      + '</div><div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Typ</label>'
+      + '<select id="nz-new-typ" class="wb-select"><option value="check">Checkliste (mit Häkchen)</option><option value="bullet">Ideenliste (Punkte)</option></select></div>';
+    this._modalCtx = { type: 'nz-neu' };
+    this.modalOpen('Neue Liste', body,
+      '<button class="wb-btn" onclick="WB.modalClose()">Abbrechen</button>'
+      + '<button class="wb-btn wb-btn-primary" onclick="WB._nzNeueSpeichern()">Erstellen</button>');
+    setTimeout(() => document.getElementById('nz-new-name')?.focus(), 100);
+  },
+
+  _nzNeueSpeichern() {
+    const name = document.getElementById('nz-new-name')?.value?.trim();
+    const icon = document.getElementById('nz-new-icon')?.value?.trim() || '📝';
+    const typ  = document.getElementById('nz-new-typ')?.value || 'check';
+    if (!name) { this._toast('Bitte Namen eingeben'); return; }
+    if (!this.db.notizen) this.db.notizen = [];
+    this.db.notizen.push({ id: 'nz_' + Date.now(), titel: name, icon, typ, items: [], gepinnt: false });
+    this.setDirty();
+    this.modalClose();
+    this.renderNotizenTab();
+    this._toast('\u2713 Liste erstellt');
+  },
+
   renderZiele() {
     const db = this.db;
     const alle = this._ziAlleZiele();
@@ -6003,6 +6219,7 @@ _ftStart() {
       quickItems: [], customEvents: [], wochenpflichten: [],
       pflichtStatus: {}, tagesprotokoll: [], wochenMottos: {},
       checklistVorlagen: [], vorhaben: [], ziele: [], links: [],
+      notizen: [],
       _version: 1, _exportedAt: '',
     };
   },
@@ -6512,6 +6729,7 @@ _ftStart() {
         this.tabSwitch('cockpit');
       }
       this._ckLadeHeutigerEintrag(); setTimeout(() => this._ckScrollToBottom(), 200);
+      this._nzRenderPills();
     } catch(e) {
       console.warn('[syncDownload]', e.message);
       this._oauthShowBanner('\u26a0 Sync-Fehler: ' + e.message);
@@ -6746,6 +6964,7 @@ _ftStart() {
     setInterval(() => { if (this.activeTab === 'cockpit') this._ckRenderBanner(); }, 60000);
     setTimeout(() => { this._ckLadeHeutigerEintrag(); }, 300);
     this.tabSwitch('cockpit');
+    setTimeout(() => this._nzRenderPills(), 400);
   },
 
   /* ── Settings ── */

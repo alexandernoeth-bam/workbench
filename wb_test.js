@@ -2614,6 +2614,24 @@ content.includes('_woPflichtFreqLabel') ? (ok('_woPflichtFreqLabel() definiert')
 content.includes('charOrd') && content.includes('bereichernd') ? (ok('Vorhaben nach charOrd sortiert'), f71Ok++) : (fail('charOrd fehlt'), f71Fail++);
 if (f71Ok > 0 && f71Fail === 0) ok(f71Ok + ' Aufgaben-Tab Checks bestanden');
 
+// ══════════════════════════════════════════
+// 72. NOTIZEN-TAB
+// ══════════════════════════════════════════
+console.log('\n── 72. Notizen-Tab ──');
+let f72Ok = 0, f72Fail = 0;
+content.includes('id="sec-notizen"')      ? (ok('#sec-notizen vorhanden'),       f72Ok++) : (fail('#sec-notizen fehlt'),       f72Fail++);
+content.includes('id="notizen-scroll"')   ? (ok('#notizen-scroll vorhanden'),    f72Ok++) : (fail('#notizen-scroll fehlt'),    f72Fail++);
+content.includes('renderNotizenTab')      ? (ok('renderNotizenTab definiert'),   f72Ok++) : (fail('renderNotizenTab fehlt'),   f72Fail++);
+content.includes('_nzTogglePin')          ? (ok('_nzTogglePin definiert'),       f72Ok++) : (fail('_nzTogglePin fehlt'),       f72Fail++);
+content.includes('_nzRenderPills')        ? (ok('_nzRenderPills definiert'),     f72Ok++) : (fail('_nzRenderPills fehlt'),     f72Fail++);
+content.includes('_nzNeueListeDialog')    ? (ok('_nzNeueListeDialog definiert'), f72Ok++) : (fail('_nzNeueListeDialog fehlt'), f72Fail++);
+content.includes('_nzAddItem')            ? (ok('_nzAddItem definiert'),         f72Ok++) : (fail('_nzAddItem fehlt'),         f72Fail++);
+content.includes('nz-pin-pill')           ? (ok('.nz-pin-pill CSS vorhanden'),   f72Ok++) : (fail('.nz-pin-pill fehlt'),       f72Fail++);
+content.includes("case 'notizen'")        ? (ok("case 'notizen' in renderSection"), f72Ok++) : (fail("case 'notizen' fehlt"), f72Fail++);
+content.includes('db.notizen')            ? (ok('db.notizen genutzt'),           f72Ok++) : (fail('db.notizen fehlt'),         f72Fail++);
+content.includes('gepinnt') && content.includes('Max. 2') ? (ok('Pin-Limit 2 gesetzt'), f72Ok++) : (fail('Pin-Limit fehlt'), f72Fail++);
+if (f72Fail === 0) ok(f72Ok + ' Notizen-Tab Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
