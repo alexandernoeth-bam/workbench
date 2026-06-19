@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.6</title>
+  <title>WorkBench 2.9.7</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2090,7 +2090,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.6</div>
+  <div id="wb-startup-tagline">v2.9.7</div>
 </div>
 
 <div id="wb-app">
@@ -2102,7 +2102,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.9.6 · Build 20260619-1200</div>
+    <div id="wb-menu-version">v2.9.7 · Build 20260619-1400</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2541,8 +2541,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.6',
-  APP_BUILD:   '20260619-1200',
+  APP_VERSION: '2.9.7',
+  APP_BUILD:   '20260619-1400',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -5254,9 +5254,9 @@ _ftStart() {
 
       const p  = (this.db?.wochenpflichten||[]).find(x => x.id === id);
       if (p) {
-        if (!db.pflichtStatus) db.pflichtStatus = {};
-        if (!db.pflichtStatus[today]) db.pflichtStatus[today] = {};
-        db.pflichtStatus[today][id] = 'storniert';
+        if (!this.db.pflichtStatus) this.db.pflichtStatus = {};
+        if (!this.db.pflichtStatus[today]) this.db.pflichtStatus[today] = {};
+        this.db.pflichtStatus[today][id] = 'storniert';
       }
     
     } else {
@@ -5496,6 +5496,7 @@ _ftStart() {
       const OLD_TS = '2020-01-01T00:00:00.000Z';
       const migrateUpdatedAt = (arr) => { (arr||[]).forEach(item => { if (!item.updatedAt) item.updatedAt = OLD_TS; }); };
 
+      const db = this.db;
       if (!db) return;
       migrateUpdatedAt(db.quickItems); migrateUpdatedAt(db.customEvents);
       migrateUpdatedAt(db.wochenpflichten); migrateUpdatedAt(db.ziele);
@@ -5506,7 +5507,7 @@ _ftStart() {
       // pflichtStatus Format-Migration (einmalig)
 
       if (!this.db?.pflichtStatus) return;
-      const ps = db.pflichtStatus;
+      const ps = this.db.pflichtStatus;
       const firstKey = Object.keys(ps)[0] || '';
       if (!firstKey.match(/\d{4}-\d{2}-\d{2}$/)) return;
       const newPs = {};
@@ -5518,7 +5519,7 @@ _ftStart() {
         if (!newPs[datum]) newPs[datum] = {};
         newPs[datum][dutyId] = (val === 'erledigt' || val === true);
       });
-      db.pflichtStatus = newPs;
+      this.db.pflichtStatus = newPs;
     
 
       // Vorhaben status-Feld + charakter-Feld + zielId Migration
@@ -6648,7 +6649,7 @@ _ftStart() {
       (arr||[]).filter(x => x.deleted).forEach(x => {
         const deletedAt = x.deletedAt || x.updatedAt || '';
         const daysLeft = deletedAt ? Math.ceil((new Date(deletedAt).getTime() + 7*86400000 - now.getTime()) / 86400000) : 7;
-        items.push({ id:x.id, type, ctx, text:getText(x), deletedAt, daysLeft:Math.max(0,daysLeft), _ref:x });
+        items.push({ id:x.id, type, text:getText(x), deletedAt, daysLeft:Math.max(0,daysLeft), _ref:x });
       });
     };
     addItems(db.quickItems,'schnell',x=>x.text);
@@ -6707,6 +6708,7 @@ _ftStart() {
     });
     let count = 0;
 
+    const db = this.db;
     if (!db) return;
     const vorher = ['quickItems','customEvents','wochenpflichten','ziele','checklistVorlagen']
       .reduce((s,f) => s + (db[f]||[]).filter(x=>x.deleted).length, 0);
