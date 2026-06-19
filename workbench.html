@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.28</title>
+  <title>WorkBench 2.9.29</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -718,215 +718,196 @@
       flex-direction: column !important;
       overflow: hidden !important;
     }
+    /* ── Vorhaben Liste (neu) ── */
     #vh-list {
-      width: 280px; flex-shrink: 0;
+      width: 36%; min-width: 210px; max-width: 290px; flex-shrink: 0;
       display: flex; flex-direction: column;
       border-right: 1.5px solid var(--border);
-      background: var(--surface);
-      height: 100% !important;
-      overflow: hidden !important;
+      background: var(--bg);
+      height: 100% !important; overflow: hidden !important;
     }
-    #vh-list-head {
-      padding: 12px 14px;
-      border-bottom: 1.5px solid var(--border);
-      background: var(--surface2);
-      display: flex; align-items: center; gap: 8px;
+    #vh-list-filters {
+      padding: 6px 10px 5px; border-bottom: 1px solid var(--border);
+      display: flex; gap: 5px; align-items: center; background: var(--surface); flex-shrink: 0;
     }
-    #vh-list-title {
-      font-size: 15px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.07em;
-      color: var(--muted); flex: 1;
+    .vl-filter-btn {
+      padding: 2px 8px; border-radius: 8px; font-size: 11px; font-weight: 700;
+      border: 1.5px solid var(--border); background: none; color: var(--faint);
+      cursor: pointer; font-family: var(--font);
     }
-    #vh-scroll { flex: 1; overflow-y: auto; padding: 8px; }
-    .vh-sec-label {
-      font-size: 13px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.07em;
-      color: var(--faint); padding: 6px 8px 4px;
+    .vl-filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .vl-filter-star { font-size: 14px; color: var(--faint); cursor: pointer; padding: 2px 4px; background: none; border: none; font-family: var(--font); }
+    .vl-filter-star.active { color: #E6A817; }
+    #vh-scroll { flex: 1; overflow-y: auto; padding: 6px 0 10px; }
+    /* Charakter-Gruppe klappbar */
+    .vg-group { margin-bottom: 1px; }
+    .vg-group-hdr { display: flex; align-items: center; padding: 4px 10px 4px 0; cursor: pointer; user-select: none; }
+    .vg-group-hdr:hover { background: rgba(0,0,0,0.03); }
+    .vg-stripe { width: 4px; align-self: stretch; flex-shrink: 0; margin-right: 8px; border-radius: 0 2px 2px 0; }
+    .vg-stripe.vp { background: #546270; }
+    .vg-stripe.bd { background: var(--accent); }
+    .vg-stripe.br { background: var(--accent2); }
+    .vg-group-lbl { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; flex: 1; }
+    .vg-group-lbl.vp { color: #546270; }
+    .vg-group-lbl.bd { color: var(--accent); }
+    .vg-group-lbl.br { color: var(--accent2); }
+    .vg-group-cnt { font-size: 11px; font-weight: 700; color: var(--faint); padding: 1px 6px; border-radius: 8px; background: var(--surface2); margin-right: 5px; }
+    .vg-chev { font-size: 10px; color: var(--faint); transition: transform 0.15s; margin-right: 4px; }
+    .vg-group.open .vg-chev { transform: rotate(90deg); }
+    .vg-body { display: none; }
+    .vg-group.open .vg-body { display: block; }
+    /* Vorhaben-Zeile */
+    .vh-row {
+      display: flex; align-items: center; gap: 7px;
+      padding: 6px 8px 6px 12px; cursor: pointer;
+      border-bottom: 0.5px solid rgba(0,0,0,0.06);
+      min-height: 40px; transition: background 0.1s;
     }
-    .vh-card {
-      display: flex; align-items: stretch;
-      border-radius: var(--radius-sm);
-      border: 1.5px solid var(--border);
-      background: var(--surface);
-      margin-bottom: 6px; cursor: pointer; overflow: hidden;
-    }
-    .vh-card:hover  { border-color: var(--accent); }
-    .vh-card.active {
-      border-color: var(--accent);
-      background: rgba(10,107,94,0.04);
-    }
-    /* vh-card-bar entfernt — char-tab übernimmt Farbmarkierung */
-    .vh-card-body { padding: 9px 11px; flex: 1; min-width: 0; }
-    .vh-card-title {
-      font-size: 16px; font-weight: 600; color: var(--text);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .vh-card-meta { font-size: 14px; color: var(--muted); margin-top: 2px; display: flex; gap: 8px; align-items: center; }
-    .vh-card-right {
-      display: flex; flex-direction: column;
-      align-items: flex-end; gap: 3px; flex-shrink: 0;
-    }
-    /* ── Vorhaben Detail ── */
+    .vh-row:last-child { border-bottom: none; }
+    .vh-row:hover { background: rgba(255,255,255,0.35); }
+    .vh-row.active { background: var(--surface); border-left: 3px solid var(--accent); padding-left: 9px; }
+    .vh-row.paused { opacity: 0.65; }
+    .vh-row-ring { width: 20px; height: 20px; flex-shrink: 0; }
+    .vh-row-body { flex: 1; min-width: 0; }
+    .vh-row-title { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vh-row-meta { font-size: 11px; color: var(--faint); margin-top: 1px; display: flex; gap: 4px; align-items: center; }
+    .vh-row-badge { font-size: 10px; font-weight: 700; padding: 1px 4px; border-radius: 4px; flex-shrink: 0; }
+    .vh-row-badge.b { background: rgba(10,107,94,0.12); color: var(--accent); }
+    .vh-row-badge.p { background: rgba(77,95,51,0.12); color: var(--accent2); }
+    .vh-row-warn { color: var(--warn); font-size: 11px; }
+    .vh-row-star { font-size: 13px; color: #E6A817; flex-shrink: 0; line-height: 1; }
+    .vh-row-right { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+    /* Archiviert-Sektion in Liste */
+    .vh-archiv-hdr { display: flex; align-items: center; gap: 6px; padding: 6px 10px 4px; background: var(--surface2); border-top: 0.5px solid var(--border); border-bottom: 0.5px solid var(--border); margin-top: 6px; cursor: pointer; }
+    .vh-archiv-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--faint); flex: 1; }
+    .vh-archiv-row { display: flex; align-items: center; gap: 7px; padding: 6px 10px; border-bottom: 0.5px solid var(--border); opacity: 0.6; cursor: pointer; min-height: 36px; }
+    .vh-archiv-row:hover { opacity: 0.9; }
+    /* ── Vorhaben Detail (neu) ── */
     #vh-detail {
       flex: 1; display: flex; flex-direction: column;
       overflow: hidden; height: 100% !important;
     }
-    #vh-detail-head {
-      padding: 14px 20px;
-      border-bottom: 1.5px solid var(--border);
+    #vh-detail-hdr {
+      padding: 10px 12px 9px; border-bottom: 1.5px solid var(--border);
       background: var(--surface); flex-shrink: 0;
     }
-    #vh-detail-title {
-      font-size: 20px; font-weight: 700;
-      color: var(--text); letter-spacing: -0.3px;
+    #vh-detail-hdr-row1 { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+    #vh-detail-title { font-size: 16px; font-weight: 700; color: var(--text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vh-hdr-star { font-size: 18px; cursor: pointer; flex-shrink: 0; color: #ccc; background: none; border: none; padding: 0 2px; line-height: 1; font-family: var(--font); transition: color 0.15s; }
+    .vh-hdr-star.on { color: #E6A817; }
+    .vh-hdr-buero {
+      display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px;
+      border-radius: 10px; font-size: 12px; font-weight: 700; border: 1.5px solid var(--border);
+      background: var(--surface2); color: var(--muted); cursor: pointer; flex-shrink: 0; white-space: nowrap; font-family: var(--font);
     }
-    #vh-detail-sub {
-      font-size: 15px; color: var(--muted);
-      margin-top: 3px; display: flex;
-      gap: 12px; align-items: center;
+    .vh-hdr-buero.on { background: rgba(180,83,9,0.1); color: var(--warn); border-color: var(--warn); }
+    .vh-hdr-buero-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+    .vh-hdr-buero.on .vh-hdr-buero-dot { background: var(--warn); }
+    .vh-hdr-del { width: 28px; height: 28px; border-radius: 6px; border: 1.5px solid var(--border); background: none; cursor: pointer; color: var(--faint); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 15px; font-family: var(--font); }
+    .vh-hdr-del:hover { background: rgba(192,57,43,0.1); color: var(--danger); border-color: var(--danger); }
+    /* Pills-Zeile */
+    #vh-detail-pills { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; position: relative; }
+    .vh-pill {
+      display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 10px;
+      font-size: 12px; font-weight: 700; cursor: pointer; border: 1.5px solid var(--border);
+      background: var(--surface2); color: var(--muted); white-space: nowrap; font-family: var(--font);
     }
-    #vh-tabs {
-      display: flex;
-      border-bottom: 1.5px solid var(--border);
-      background: var(--surface);
-      padding: 0 20px; flex-shrink: 0;
+    .vh-pill.beruf   { background: rgba(10,107,94,0.12); color: var(--accent); border-color: rgba(10,107,94,0.3); }
+    .vh-pill.privat  { background: rgba(77,95,51,0.12);  color: var(--accent2); border-color: rgba(77,95,51,0.3); }
+    .vh-pill.s-offen    { color: var(--faint); border-color: var(--border); background: var(--surface2); }
+    .vh-pill.s-laeuft   { background: rgba(10,107,94,0.1); color: var(--accent); border-color: var(--accent); }
+    .vh-pill.s-pausiert { background: rgba(180,83,9,0.1); color: var(--warn); border-color: var(--warn); }
+    .vh-pill.s-erledigt { background: rgba(10,107,94,0.1); color: var(--accent); border-color: var(--accent); }
+    .vh-pill.s-archiviert { background: var(--surface2); color: var(--faint); border-style: dashed; }
+    .vh-pill.char-vp { background: rgba(84,98,112,0.12); color: #546270; border-color: #546270; }
+    .vh-pill.char-bd { background: rgba(10,107,94,0.12); color: var(--accent); border-color: var(--accent); }
+    .vh-pill.char-br { background: rgba(77,95,51,0.12);  color: var(--accent2); border-color: var(--accent2); }
+    .vh-pill.char-none { color: var(--faint); border-style: dashed; }
+    .vh-pill.ziel-set  { background: rgba(84,98,112,0.08); color: #546270; border-color: #546270; }
+    .vh-pill.ziel-leer { color: var(--faint); border-style: dashed; background: none; }
+    /* Status-Dropdown */
+    .vh-status-dd {
+      position: absolute; top: 32px; left: 0; z-index: 200;
+      background: var(--surface); border: 1.5px solid var(--border); border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15); min-width: 160px; overflow: hidden; display: none;
     }
-    .vh-tab {
-      padding: 10px 16px; font-size: 15px; font-weight: 600;
-      color: var(--faint); cursor: pointer;
-      border-bottom: 2.5px solid transparent; margin-bottom: -1.5px;
-    }
-    .vh-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-    #vh-tab-aktuell, #vh-tab-info {
-      flex: 1; overflow-y: auto;
-      padding: 16px 20px;
-      display: flex; flex-direction: column; gap: 12px;
-    }
-    /* ── Vorhaben Blöcke ── */
-    .vh-block {
-      background: var(--surface);
-      border-radius: var(--radius);
-      border: 1.5px solid var(--border);
-      overflow: hidden;
-    }
-    .vh-block-head {
-      display: flex; align-items: center; gap: 8px;
-      padding: 9px 14px;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface2);
-    }
-    .vh-block-label {
-      font-size: 13px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.07em;
-      color: var(--muted); flex: 1;
-    }
-    .vh-block-meta   { font-size: 14px; color: var(--faint); }
-    .vh-block-action {
-      font-size: 14px; color: var(--accent);
-      font-weight: 600; cursor: pointer;
-    }
-    /* ── Task Items ── */
-    .vh-task-item {
-      display: flex; align-items: flex-start; gap: 10px;
-      padding: 9px 14px; border-bottom: 0.5px solid var(--border);
-    }
-    .vh-task-item:last-child { border-bottom: none; }
-    .vh-task-check {
-      width: 17px; height: 17px; border-radius: 4px;
-      border: 2px solid var(--border);
-      flex-shrink: 0; margin-top: 1px; cursor: pointer;
-    }
-    .vh-task-check.done {
-      background: var(--accent); border-color: var(--accent);
-      display: flex; align-items: center; justify-content: center;
-      color: #fff; font-size: 13px;
-    }
-    .vh-task-body { flex: 1; min-width: 0; }
-    .vh-task-title-row { display: flex; align-items: center; gap: 8px; }
-    .vh-task-text  { font-size: 16px; color: var(--text); flex: 1; }
-    .vh-task-text.done { color: var(--faint); text-decoration: line-through; }
-    .vh-task-offen { font-size: 14px; color: var(--faint); flex-shrink: 0; }
-    .vh-task-sub   { font-size: 14px; color: var(--accent); margin-top: 2px; }
-    .vh-task-meta  { font-size: 14px; color: var(--faint); }
-    .vh-task-date  { font-size: 14px; color: var(--faint); }
-    /* ── Termin Items ── */
-    .vh-termin-item {
-      display: flex; align-items: center; gap: 12px;
-      padding: 9px 14px; border-bottom: 0.5px solid var(--border);
-    }
-    .vh-termin-item:last-child { border-bottom: none; }
-    .vh-termin-date { font-size: 15px; font-weight: 700; color: var(--accent); width: 36px; flex-shrink: 0; }
-    .vh-termin-text { font-size: 16px; color: var(--text); flex: 1; }
-    .vh-termin-time { font-size: 15px; color: var(--muted); }
-    /* ── Pflicht Items ── */
-    .vh-pfl-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 9px 14px; border-bottom: 0.5px solid var(--border);
-    }
-    .vh-pfl-item:last-child { border-bottom: none; }
-    .vh-pfl-check {
-      width: 17px; height: 17px; border-radius: 50%;
-      border: 2px solid var(--border); flex-shrink: 0; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; font-size: 13px;
-    }
-    .vh-pfl-check.done { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .vh-pfl-text { font-size: 16px; color: var(--text); flex: 1; }
-    .vh-pfl-text.done { color: var(--faint); text-decoration: line-through; }
-    .vh-pfl-day  { font-size: 14px; color: var(--muted); }
-    /* ── Link Items ── */
-    .vh-tag-filter-row { display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 4px; }
-    .vh-tag-filter {
-      display: inline-flex; padding: 4px 12px;
-      border-radius: 20px; font-size: 14px; font-weight: 600;
-      cursor: pointer; background: var(--surface2);
-      color: var(--muted); border: 1.5px solid var(--border);
-    }
-    .vh-tag-filter.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-    .vh-link-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 14px; border-bottom: 0.5px solid var(--border);
-    }
-    .vh-link-item:last-child { border-bottom: none; }
-    .vh-link-icon {
-      width: 32px; height: 32px; border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0;
-    }
-    .vh-link-icon.gdoc { background: #1A73E8; }
-    .vh-link-icon.sp   { background: #0078D4; }
-    .vh-link-icon.on   { background: #7719AA; }
-    .vh-link-icon.cf   { background: #0052CC; }
-    .vh-link-body { flex: 1; min-width: 0; }
-    .vh-link-title {
-      font-size: 16px; font-weight: 600; color: var(--text);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .vh-link-note { font-size: 14px; color: var(--muted); margin-top: 1px; }
-    .vh-link-open {
-      width: 26px; height: 26px; border-radius: var(--radius-sm);
-      background: var(--surface2);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 15px; cursor: pointer; color: var(--muted); flex-shrink: 0;
-    }
-    .vh-link-actions { display: flex; gap: 6px; flex-shrink: 0; }
-    .vh-link-btn {
-      width: 26px; height: 26px; border-radius: var(--radius-sm);
-      background: var(--surface2);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 15px; cursor: pointer; color: var(--muted);
-    }
-    .vh-drag-hint {
-      margin: 8px; padding: 10px 14px;
-      border: 1.5px dashed var(--border);
-      border-radius: var(--radius-sm);
-      font-size: 15px; color: var(--faint);
-    }
-    .vh-btn-gdoc {
-      width: 100%; padding: 11px;
-      background: var(--accent); color: #fff;
-      border: none; border-radius: var(--radius);
-      font-size: 16px; font-weight: 600; cursor: pointer; text-align: center;
-    }
+    .vh-status-dd.open { display: block; }
+    .vh-sd-item { padding: 8px 12px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text); font-family: var(--font); }
+    .vh-sd-item:hover { background: var(--surface2); }
+    .vh-sd-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    /* Detail-Scroll */
+    #vh-detail-scroll { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+    /* Klappbare Container (vc) */
+    .vc { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .vc-hdr { display: flex; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer; user-select: none; background: var(--surface); }
+    .vc-hdr:hover { background: var(--surface2); }
+    .vc.open .vc-hdr { border-bottom: 1px solid var(--border); }
+    .vc-icon { font-size: 14px; flex-shrink: 0; width: 18px; text-align: center; }
+    .vc-title { font-size: 14px; font-weight: 700; color: var(--text); flex: 1; }
+    .vc-badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 8px; background: var(--surface2); color: var(--faint); border: 1px solid var(--border); }
+    .vc-badge.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .vc-badge.warn   { background: rgba(180,83,9,0.12); color: var(--warn); border-color: var(--warn); }
+    .vc-action { font-size: 11px; font-weight: 700; color: var(--accent); cursor: pointer; padding: 2px 7px; border-radius: 5px; border: 1.5px solid rgba(10,107,94,0.3); background: rgba(10,107,94,0.07); white-space: nowrap; font-family: var(--font); }
+    .vc-chev { font-size: 11px; color: var(--faint); transition: transform 0.15s; flex-shrink: 0; }
+    .vc.open .vc-chev { transform: rotate(90deg); }
+    .vc-body { display: none; }
+    .vc.open .vc-body { display: block; }
+    /* vc: Aufgaben */
+    .vc-task { display: flex; align-items: flex-start; gap: 9px; padding: 8px 12px; border-bottom: 0.5px solid var(--border); cursor: pointer; }
+    .vc-task:last-child { border-bottom: none; }
+    .vc-task:hover { background: rgba(0,0,0,0.02); }
+    .vc-chk { width: 17px; height: 17px; border-radius: 4px; border: 2px solid var(--border); flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; }
+    .vc-chk.done { background: var(--accent); border-color: var(--accent); color: #fff; font-size: 10px; }
+    .vc-task-body { flex: 1; min-width: 0; }
+    .vc-task-txt { font-size: 14px; color: var(--text); }
+    .vc-task-txt.done { color: var(--faint); text-decoration: line-through; }
+    .vc-task-sub { font-size: 12px; color: var(--accent); margin-top: 2px; }
+    .vc-task-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+    .vc-task-date { font-size: 12px; color: var(--faint); }
+    .vc-task-date.warn { color: var(--warn); font-weight: 700; }
+    .vc-task-cl { font-size: 11px; color: var(--faint); }
+    /* vc: Termine */
+    .vc-termin { display: flex; align-items: center; gap: 9px; padding: 8px 12px; border-bottom: 0.5px solid var(--border); }
+    .vc-termin:last-child { border-bottom: none; }
+    .vc-termin-date { font-size: 13px; font-weight: 700; color: var(--accent); width: 40px; flex-shrink: 0; }
+    .vc-termin-text { font-size: 14px; color: var(--text); flex: 1; }
+    .vc-termin-time { font-size: 12px; color: var(--faint); }
+    /* vc: Pflichten */
+    .vc-pflicht { display: flex; align-items: center; gap: 9px; padding: 8px 12px; border-bottom: 0.5px solid var(--border); cursor: pointer; }
+    .vc-pflicht:last-child { border-bottom: none; }
+    .vc-pflicht-chk { width: 17px; height: 17px; border-radius: 50%; border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+    .vc-pflicht-chk.done { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .vc-pflicht-txt { font-size: 14px; color: var(--text); flex: 1; }
+    .vc-pflicht-txt.done { color: var(--faint); text-decoration: line-through; }
+    .vc-pflicht-day { font-size: 12px; color: var(--faint); }
+    /* vc: Links */
+    .vc-link { display: flex; align-items: center; gap: 9px; padding: 8px 12px; border-bottom: 0.5px solid var(--border); cursor: pointer; }
+    .vc-link:last-child { border-bottom: none; }
+    .vc-link-icon { width: 26px; height: 26px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; flex-shrink: 0; }
+    .vc-link-icon.gdoc { background: #1a73e8; }
+    .vc-link-icon.sp   { background: #0078d4; }
+    .vc-link-icon.on   { background: #7719aa; }
+    .vc-link-icon.cf   { background: #0052cc; }
+    .vc-link-icon.link { background: var(--faint); }
+    .vc-link-body { flex: 1; min-width: 0; }
+    .vc-link-title { font-size: 14px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vc-link-note  { font-size: 12px; color: var(--faint); }
+    .vc-link-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .vc-link-btn { width: 24px; height: 24px; border-radius: 5px; background: var(--surface2); border: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--faint); font-family: var(--font); }
+    .vc-link-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .vc-link-btn.del:hover { background: var(--danger); border-color: var(--danger); }
+    /* vc: Ziel */
+    .vc-ziel-row { display: flex; align-items: center; gap: 8px; padding: 9px 12px; }
+    .vc-ziel-text { font-size: 14px; color: var(--faint); flex: 1; font-style: italic; }
+    .vc-ziel-text.set { color: var(--text); font-style: normal; font-weight: 500; }
+    .vc-ziel-btn { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px; border: 1.5px solid var(--border); background: none; cursor: pointer; color: var(--faint); font-family: var(--font); }
+    .vc-ziel-btn.link { color: var(--accent); border-color: rgba(10,107,94,0.3); }
+    .vc-ziel-btn.del  { color: var(--danger); border-color: rgba(192,57,43,0.3); }
+    /* vc: Notizen */
+    .vc-notiz { padding: 10px 12px; }
+    .vc-notiz textarea { width: 100%; min-height: 80px; resize: vertical; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 6px; padding: 8px 10px; font-family: inherit; font-size: 14px; color: var(--text); outline: none; }
+    .vc-notiz textarea:focus { border-color: var(--accent); }
+    .vc-empty { padding: 12px 14px; font-size: 14px; color: var(--faint); }
     /* ── Badge ── */
     .vh-badge { display:inline-flex; align-items:center; padding:2px 7px; border-radius:8px; font-size:11px; font-weight:700; white-space:nowrap; flex-shrink:0; }
     .vh-badge.beruf  { background: var(--accent);  color: #fff; }
@@ -1980,19 +1961,18 @@
     /* ── TEIL A: Vorhaben Mobile-Navigation ── */
     #sec-vorhaben.wb-section { padding:0!important; display:flex!important; flex-direction:column!important; overflow:hidden!important; }
     #vh-app { flex:1; display:flex; overflow:hidden; position:relative; }
-    #vh-list-col { width:100%; display:flex; flex-direction:column; overflow:hidden; flex-shrink:0; }
-    #vh-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:10px 12px; }
+    #vh-list { width:100%; display:flex; flex-direction:column; overflow:hidden; flex-shrink:0; }
+    #vh-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:6px 0 10px; }
     #vh-detail-col { position:fixed; top:0; right:0; bottom:0; width:100%; background:var(--bg); z-index:300; display:flex; flex-direction:column; overflow:hidden; transform:translateX(100%); transition:transform 0.25s ease; }
     #vh-detail-col.open { transform:translateX(0); }
     @media (min-width:600px) {
-      #vh-detail-col { position:relative; transform:none!important; width:55%; border-left:1.5px solid var(--border); z-index:auto; transition:none; }
-      #vh-list-col { width:45%; }
+      #vh-detail-col { position:relative; transform:none!important; width:62%; border-left:1.5px solid var(--border); z-index:auto; transition:none; }
+      #vh-list { width:38%; min-width:210px; max-width:290px; }
       #vh-detail-back { display:none; }
     }
     #vh-detail-header { padding:10px 12px; border-bottom:1.5px solid var(--border); background:var(--surface); display:flex; align-items:center; gap:10px; flex-shrink:0; min-height:48px; }
     #vh-detail-back { width:32px; height:32px; border-radius:var(--radius-sm); background:var(--surface2); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--muted); flex-shrink:0; border:none; }
     #vh-detail-back svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
-    #vh-detail-title-header { font-size:16px; font-weight:700; color:var(--text); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .vh-item { background:var(--surface); border-radius:var(--radius); border:1.5px solid var(--border); padding:12px; margin-bottom:8px; cursor:pointer; min-height:56px; display:flex; flex-direction:column; gap:4px; }
     .vh-item:hover { border-color:var(--accent); }
     .vh-item.active { border-color:var(--accent); }
@@ -2019,24 +1999,12 @@
     #wb-crypto-btn:hover { opacity:0.9; }
     #wb-crypto-foot { padding:12px 20px; background:var(--surface2); border-top:1px solid var(--border); font-size:13px; color:var(--faint); text-align:center; }
     /* ── Vorhaben Charakter Vertikal-Tab ── */
-    .vh-char-group { display:flex; margin-bottom:0; border-bottom:2px solid var(--border); }
-    .vh-char-group:last-of-type { border-bottom:none; }
-    .vh-char-tab { width:22px; flex-shrink:0; display:flex; align-items:center; justify-content:center; writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; cursor:default; border-right:2px solid var(--border); user-select:none; }
-    .vh-char-tab.vp { background:rgba(84,98,112,0.15); color:#546270; border-right-color:#546270; }
-    .vh-char-tab.bd { background:rgba(10,107,94,0.12); color:var(--accent); border-right-color:var(--accent); }
-    .vh-char-tab.br { background:rgba(77,95,51,0.12); color:var(--accent2); border-right-color:var(--accent2); }
-    .vh-char-items { flex:1; min-width:0; }
-    /* ── Vorhaben Charakter Pill/Dot ── */
+    /* vh-char Dialog (Picker bleibt) */
     .vh-char-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:3px; }
     .vh-char-dot.vp { background:#546270; }
     .vh-char-dot.bd { background:var(--accent); }
     .vh-char-dot.br { background:var(--accent2); }
     .vh-char-dot.none { background:var(--border); opacity:0.4; }
-    .vh-char-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:13px; font-weight:600; border:1.5px solid; cursor:pointer; font-family:var(--font); }
-    .vh-char-pill.vp { border-color:#546270; color:#546270; background:rgba(84,98,112,0.08); }
-    .vh-char-pill.bd { border-color:var(--accent); color:var(--accent); background:rgba(10,107,94,0.08); }
-    .vh-char-pill.br { border-color:var(--accent2); color:var(--accent2); background:rgba(77,95,51,0.08); }
-    .vh-char-pill.none { border-color:var(--border); color:var(--faint); background:none; }
     .vh-char-grid { display:flex; gap:7px; }
     .vh-char-chip { flex:1; padding:10px 5px 8px; border-radius:var(--radius-sm); border:2px solid var(--border); cursor:pointer; text-align:center; background:var(--surface); font-family:var(--font); transition:border-color 0.15s,background 0.15s; }
     .vh-char-chip.active-vp { border-color:#546270; background:rgba(84,98,112,0.09); }
@@ -2048,47 +2016,15 @@
     .vh-char-chip.active-bd .vh-char-chip-lbl { color:var(--accent); }
     .vh-char-chip.active-br .vh-char-chip-lbl { color:var(--accent2); }
     .vh-char-chip-sub { font-size:11px; color:var(--faint); margin-top:3px; line-height:1.3; }
-    /* ── Vorhaben Detail Header ── */
-    .vh-det-row1 { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
-    .vh-det-title { font-size:16px; font-weight:700; color:var(--text); flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .vh-det-row2 { display:flex; align-items:center; gap:7px; flex-wrap:nowrap; }
-    .vh-menu-btn { width:32px; height:32px; border-radius:50%; border:1.5px solid var(--border); background:var(--surface); cursor:pointer; font-size:16px; color:var(--muted); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-family:var(--font); }
-    .vh-menu-btn:hover { background:var(--surface2); }
+    /* Context-Menu (für Char-Dialog weiterhin gebraucht) */
     .vh-ctx-menu { position:absolute; right:14px; top:48px; background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius-sm); box-shadow:0 4px 12px rgba(0,0,0,0.12); z-index:200; min-width:160px; overflow:hidden; }
     .vh-ctx-item { padding:12px 16px; font-size:15px; font-weight:600; color:var(--text); cursor:pointer; border-bottom:0.5px solid var(--border); font-family:var(--font); display:block; width:100%; background:none; border-left:none; border-right:none; border-top:none; text-align:left; }
     .vh-ctx-item:last-child { border-bottom:none; }
     .vh-ctx-item:hover { background:var(--surface2); }
     .vh-ctx-item.danger { color:var(--danger); }
-    /* ── Vorhaben Ziel-Verknüpfung ── */
-    .vh-ziel-zeile { display:flex; align-items:center; gap:7px; margin-top:7px; padding-top:7px; border-top:0.5px solid var(--border); }
-    .vh-ziel-ic { font-size:15px; color:var(--faint); flex-shrink:0; }
-    .vh-ziel-text { font-size:14px; color:var(--faint); flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .vh-ziel-text.gesetzt { color:var(--accent); font-weight:600; }
-    .vh-ziel-btn { font-size:13px; font-weight:600; color:var(--accent); background:none; border:none; cursor:pointer; font-family:var(--font); white-space:nowrap; flex-shrink:0; padding:0; }
-    .vh-ziel-btn.loesen { color:var(--faint); }
-    /* ── Vorhaben Welt-Toggle ── */
-    .vh-welt-toggle { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:14px; font-weight:700; cursor:pointer; border:none; font-family:var(--font); flex-shrink:0; }
-    .vh-welt-toggle.beruf { background:var(--accent); color:#fff; }
-    .vh-welt-toggle.privat { background:var(--accent2); color:#fff; }
-    .vh-welt-toggle-arrow { font-size:10px; opacity:0.8; }
-    /* ── Vorhaben Status-Zustände ── */
-    .vh-status-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid; font-family:var(--font); background:none; }
-    .vh-status-pill.offen { color:var(--faint); border-color:var(--border); }
-    .vh-status-pill.laeuft { color:var(--accent); border-color:rgba(10,107,94,0.3); background:rgba(10,107,94,0.06); }
-    .vh-status-pill.done { color:#fff; background:var(--accent); border-color:var(--accent); }
-    .vh-status-action { display:inline-flex; align-items:center; padding:3px 9px; border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid var(--border); color:var(--faint); font-family:var(--font); background:none; }
-    .vh-status-action:hover { border-color:var(--accent); color:var(--accent); }
-    .vh-prog-wrap { padding:8px 12px; border-bottom:0.5px solid var(--border); background:var(--surface2); flex-shrink:0; }
-    .vh-prog-label { font-size:13px; color:var(--faint); margin-bottom:4px; display:flex; justify-content:space-between; }
-    .vh-prog-bar { height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
-    .vh-prog-fill { height:100%; background:var(--accent); border-radius:2px; transition:width 0.3s ease; }
+    /* vi-done/vi-offen für _aufgabeChkHtml (weiterhin gebraucht) */
     .vi-offen { width:14px; height:14px; border-radius:3px; border:2px solid var(--border); background:var(--surface); flex-shrink:0; }
-    .vi-done { width:14px; height:14px; border-radius:3px; background:var(--accent); flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:9px; }
-    .vh-item-done { display:flex; align-items:center; gap:7px; padding:7px 10px; border-bottom:0.5px solid var(--border); opacity:0.6; cursor:pointer; min-height:38px; }
-    .vh-item-done:hover { opacity:0.85; }
-    .vh-name-done { font-size:13px; color:var(--faint); text-decoration:line-through; flex:1; }
-    .vh-done-sec { display:flex; align-items:center; gap:6px; padding:6px 10px 4px; background:var(--surface2); border-top:0.5px solid var(--border); border-bottom:0.5px solid var(--border); margin-top:8px; }
-    .vh-done-sec-lbl { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--faint); flex:1; }
+    .vi-done  { width:14px; height:14px; border-radius:3px; background:var(--accent); flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:9px; }
     /* ── Aufgaben Checkbox 3-Zustände ── */
     .aufg-ring { width:20px; height:20px; flex-shrink:0; cursor:pointer; }
     .aufg-ring svg { width:20px; height:20px; }
@@ -2106,29 +2042,6 @@
     .s-pk-restore { padding:5px 10px; background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:14px; font-weight:600; color:var(--accent); cursor:pointer; font-family:var(--font); white-space:nowrap; min-height:32px; }
     .s-pk-restore:hover { background:var(--accent); color:#fff; }
     .s-pk-empty { padding:20px 14px; font-size:15px; color:var(--faint); text-align:center; font-style:italic; }
-    /* ── Vorhaben Pill + Alle-Aufgaben ── */
-    .vh-sec-row { display:flex; align-items:center; gap:6px; padding:7px 10px 5px; background:var(--surface2); border-top:2px solid var(--border); border-bottom:1px solid var(--border); margin-top:8px; }
-    .vh-sec-row:first-child { margin-top:0; border-top:none; }
-    .vh-sec-label { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); flex:1; }
-    .vh-sec-pill { display:inline-flex; align-items:center; padding:2px 8px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; border:1px solid rgba(10,107,94,0.25); background:rgba(10,107,94,0.10); color:var(--accent); transition:background 0.15s,color 0.15s; }
-    .vh-sec-pill:hover, .vh-sec-pill.active { background:var(--accent); color:#fff; border-color:var(--accent); }
-    .vh-sec-pill.priv { border-color:rgba(77,95,51,0.25); background:rgba(77,95,51,0.10); color:var(--accent2); }
-    .vh-sec-pill.priv:hover, .vh-sec-pill.priv.active { background:var(--accent2); color:#fff; border-color:var(--accent2); }
-    .vh-alle-head { padding:9px 12px; border-bottom:1px solid var(--border); background:var(--surface); flex-shrink:0; }
-    .vh-alle-title { font-size:15px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:6px; }
-    .vh-alle-sub { font-size:13px; color:var(--faint); margin-top:1px; }
-    .vh-alle-hint { padding:5px 12px; font-size:13px; color:var(--faint); font-style:italic; border-bottom:0.5px solid var(--border); background:var(--bg); }
-    .vh-alle-row { display:flex; align-items:flex-start; gap:8px; padding:8px 12px; border-bottom:0.5px solid var(--border); cursor:pointer; min-height:40px; }
-    .vh-alle-row:last-child { border-bottom:none; }
-    .vh-alle-row:hover { background:rgba(0,0,0,0.015); }
-    .vh-alle-chk { width:15px; height:15px; border-radius:3px; border:1.5px solid var(--border); flex-shrink:0; margin-top:1px; }
-    .vh-alle-body { flex:1; min-width:0; }
-    .vh-alle-txt { font-size:14px; color:var(--text); line-height:1.3; }
-    .vh-alle-sub-txt { font-size:13px; color:var(--faint); margin-top:1px; }
-    .vh-alle-right { display:flex; flex-direction:column; align-items:flex-end; gap:2px; flex-shrink:0; }
-    .vh-alle-date { font-size:13px; font-weight:600; color:var(--muted); white-space:nowrap; }
-    .vh-alle-date.kein { color:var(--faint); }
-    .vh-alle-cl { font-size:9px; font-weight:700; padding:1px 4px; border-radius:3px; background:var(--surface2); color:var(--muted); }
     #sec-backlog.wb-section { padding:0!important; display:flex!important; flex-direction:column!important; overflow:hidden!important; }
     #tf-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:10px; display:flex; flex-direction:column; gap:8px; }
     .tf-block { background:var(--surface); border-radius:var(--radius); border:1.5px solid var(--border); overflow:hidden; }
@@ -2140,10 +2053,6 @@
     .tf-label.heute { color:var(--accent); }
     .tf-count { font-size:13px; font-weight:700; padding:1px 7px; border-radius:10px; background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
     .tf-count.heute { background:var(--accent); color:#fff; border-color:var(--accent); }
-    .tf-done-toggle { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:10px; border:1.5px solid var(--border); background:var(--surface); cursor:pointer; font-size:12px; font-weight:700; color:var(--muted); font-family:var(--font); flex-shrink:0; transition:background 0.15s,color 0.15s; }
-    .tf-done-toggle:hover { background:var(--surface2); }
-    .tf-done-toggle.on { background:var(--accent); color:#fff; border-color:var(--accent); }
-    .tf-done-toggle.on svg { stroke:#fff; }
     .tf-chev { width:20px; height:20px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
     .tf-chev svg { width:14px; height:14px; fill:var(--muted); transition:transform 0.2s; }
     .tf-chev.open svg { transform:rotate(90deg); }
@@ -2399,7 +2308,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.28</div>
+  <div id="wb-startup-tagline">v2.9.29</div>
 </div>
 
 <div id="wb-app">
@@ -2594,10 +2503,6 @@
             <div class="tf-dot" style="background:var(--accent)"></div>
             <span class="tf-label heute">Heute</span>
             <span class="tf-count heute" id="tf-heute-count">0</span>
-            <button id="tf-done-toggle" class="tf-done-toggle" onclick="event.stopPropagation();WB._tfToggleDone()" title="Erledigte/vergangene einblenden">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-              <span id="tf-done-toggle-lbl">0</span>
-            </button>
             <div class="tf-chev open" id="tf-heute-chev"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></div>
           </div>
           <div class="tf-body open" id="tf-heute-body"></div>
@@ -2638,13 +2543,20 @@
 
     <div id="sec-vorhaben" class="wb-section" style="display:none">
       <div id="vh-app">
-        <div id="vh-list-col">
-          <div id="vh-list-head">
-            <span id="vh-list-title">Vorhaben</span>
-            <button style="background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:5px 12px;font-size:16px;font-weight:600;cursor:pointer;" onclick="WB._vhNeu()">+ Neu</button>
+        <!-- Linke Spalte: kompakte Liste -->
+        <div id="vh-list">
+          <div id="vh-list-filters">
+            <button class="vl-filter-btn active" data-vf="alle"    onclick="WB._vhSetFilter('alle',this)">Alle</button>
+            <button class="vl-filter-btn"         data-vf="aktiv"   onclick="WB._vhSetFilter('aktiv',this)">Aktiv</button>
+            <button class="vl-filter-btn"         data-vf="pausiert" onclick="WB._vhSetFilter('pausiert',this)">Pausiert</button>
+            <button class="vl-filter-btn"         data-vf="archiv"  onclick="WB._vhSetFilter('archiv',this)">Archiv</button>
+            <span style="flex:1"></span>
+            <button class="vl-filter-star" id="vl-star-btn" onclick="WB._vhToggleStarFilter()" title="Nur Favoriten">★</button>
+            <button style="background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:3px 10px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);" onclick="WB._vhNeu()">+</button>
           </div>
           <div id="vh-scroll"></div>
         </div>
+        <!-- Rechte Spalte: Detail -->
         <div id="vh-detail-col">
           <div id="vh-detail-header">
             <button id="vh-detail-back" onclick="WB._vhCloseDetail()">
@@ -2652,19 +2564,22 @@
             </button>
           </div>
           <div id="vh-detail-content" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
-            <div id="vh-alle-container" style="display:none;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
             <div id="vh-detail">
-              <div id="vh-detail-head">
-                <div id="vh-detail-title" style="color:var(--faint);font-size:16px;">Vorhaben wählen</div>
-                <div id="vh-detail-sub"></div>
+              <!-- Detail-Header -->
+              <div id="vh-detail-hdr">
+                <div id="vh-detail-hdr-row1">
+                  <div id="vh-detail-title" style="color:var(--faint);font-size:15px;">Vorhaben wählen</div>
+                  <button class="vh-hdr-star" id="vh-hdr-star-btn" onclick="WB._vhToggleFavorit()" title="Favorit">★</button>
+                  <div class="vh-hdr-buero" id="vh-hdr-buero-btn" onclick="WB._vhToggleVertraulich()">
+                    <div class="vh-hdr-buero-dot"></div>
+                    <span>Vertraulich</span>
+                  </div>
+                  <button class="vh-hdr-del" onclick="WB._vhDeleteAktiv()" title="Löschen">🗑</button>
+                </div>
+                <div id="vh-detail-pills"></div>
               </div>
-              <div id="vh-prog-container"></div>
-              <div id="vh-tabs">
-                <div class="vh-tab active" onclick="WB._vhTabSwitch('aktuell',this)">Aktuell</div>
-                <div class="vh-tab" onclick="WB._vhTabSwitch('info',this)">Informationen</div>
-              </div>
-              <div id="vh-tab-aktuell"></div>
-              <div id="vh-tab-info" style="display:none"></div>
+              <!-- Klappbare Container -->
+              <div id="vh-detail-scroll"></div>
             </div>
           </div>
         </div>
@@ -3004,8 +2919,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.28',
-  APP_BUILD:   '20260619-1400',
+  APP_VERSION: '2.9.29',
+  APP_BUILD:   '20260619-1800',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3977,7 +3892,7 @@ _ftStart() {
     const now    = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     const dow    = now.getDay();
-    let h = '', count = 0, hiddenCount = 0;
+    let h = '', count = 0;
 
     // Events: Termine (inkl. stornierte) + QuickItems mit Uhrzeit + Pflichten mit Uhrzeit
     const events = (this.db?.customEvents||[])
@@ -3985,137 +3900,107 @@ _ftStart() {
       .map(e => ({ ...e, _art:'termin', _ctx: e.welt==='pro' ? 'pro' : 'priv' }));
 
     // QuickItems MIT Uhrzeit → Termin-Block
+
     (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && q.startTime).forEach(q => {
       events.push({ id:q.id, text:q.text, startTime:q.startTime, durationMin:15, welt:q.welt||'priv', _art:'schnell', _ctx: q.welt || 'priv' });
     });
+  
 
     // Wochenpflichten MIT Uhrzeit → Termin-Block (unerledigte)
+
     (this.db?.wochenpflichten||[]).filter(p => !p.deleted && p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
       const done = !!(db.pflichtStatus?.[today]?.[p.id]);
       if (done) return;
       events.push({ id:p.id, text:p.titel, startTime:p.startTime, durationMin:30, welt:p.welt||'priv', _art:'pflicht', _ctx: p.welt || 'priv' });
     });
+  
 
     events.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
 
     if (events.length) {
-      // Vergangene + stornierte = versteckt wenn !_tfShowDone
-      const visible = [], hidden = [];
+      h += '<div class="tf-sec-sep">Termine</div>';
       events.forEach(e => {
+        const isPriv      = e._ctx === 'priv';
+        const color       = isPriv ? 'var(--accent2)' : 'var(--accent)';
+        const badge       = isPriv ? '<span class="ck-badge privat">Privat</span>' : '<span class="ck-badge beruf">Beruf</span>';
+        const isStorniert = !!e.storniert;
         let eMin = 0;
         if (e.startTime) { const [eh,em] = e.startTime.split(':').map(Number); eMin = eh*60+em; }
         const past = e.startTime && eMin < nowMin;
-        const isDone = past || !!e.storniert;
-        if (isDone && !this._tfShowDone) { hidden.push(e); hiddenCount++; }
-        else visible.push(e);
+        const dotColor = (past || isStorniert) ? 'var(--faint)' : color;
+        const onclick = e._art === 'schnell'
+          ? 'WB.schnellOpen(&quot;' + this._esc(e.id) + '&quot;)'
+          : e._art === 'pflicht'
+            ? 'WB.pflichtOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._ctx + '&quot;)'
+            : 'WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)';
+        const suffix = e._art === 'schnell'
+          ? ' <span style="font-size:15px;color:var(--faint)">\u26a1</span>'
+          : e._art === 'pflicht'
+            ? ' <span style="font-size:15px;color:var(--faint)">\uD83D\uDD04</span>'
+            : '';
+        h += '<div class="tf-ev-row' + (isStorniert ? ' storniert' : '') + '">'
+          + '<div class="tf-ev-dot" style="background:' + dotColor + '"></div>'
+          + '<div class="tf-ev-time' + ((past || isStorniert) ? ' past' : '') + '">' + this._esc(e.startTime||'') + '</div>'
+          + '<div class="tf-ev-text' + ((past || isStorniert) ? ' done' : '') + '" onclick="' + onclick + '" style="flex:1;cursor:pointer;' + (isStorniert ? 'text-decoration:line-through;color:var(--faint);' : '') + '">'
+          + this._esc(e.text) + suffix + '</div>'
+          + (isStorniert
+            ? '<span class="ck-badge" style="background:var(--surface2);color:var(--faint);border:1px solid var(--border);">Abgesagt</span>'
+            : badge)
+          + '<div class="tf-ev-actions">'
+          + (!isStorniert
+            ? '<button class="tf-ev-act-btn" title="Erledigt" onclick="event.stopPropagation();WB._tfTerminDone(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2713</button>'
+              + '<button class="tf-ev-act-btn tf-ev-act-del" title="Absagen" onclick="event.stopPropagation();WB._tfTerminAbsagen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2715</button>'
+            : '')
+          + '</div></div>';
+        count++;
       });
-
-      if (visible.length) {
-        h += '<div class="tf-sec-sep">Termine</div>';
-        visible.forEach(e => {
-          const isPriv      = e._ctx === 'priv';
-          const color       = isPriv ? 'var(--accent2)' : 'var(--accent)';
-          const badge       = isPriv ? '<span class="ck-badge privat">Privat</span>' : '<span class="ck-badge beruf">Beruf</span>';
-          const isStorniert = !!e.storniert;
-          let eMin = 0;
-          if (e.startTime) { const [eh,em] = e.startTime.split(':').map(Number); eMin = eh*60+em; }
-          const past = e.startTime && eMin < nowMin;
-          const dotColor = (past || isStorniert) ? 'var(--faint)' : color;
-          const onclick = e._art === 'schnell'
-            ? 'WB.schnellOpen(&quot;' + this._esc(e.id) + '&quot;)'
-            : e._art === 'pflicht'
-              ? 'WB.pflichtOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._ctx + '&quot;)'
-              : 'WB.terminOpen(&quot;' + this._esc(e.id) + '&quot;,&quot;priv&quot;)';
-          const suffix = e._art === 'schnell'
-            ? ' <span style="font-size:15px;color:var(--faint)">\u26a1</span>'
-            : e._art === 'pflicht'
-              ? ' <span style="font-size:15px;color:var(--faint)">\uD83D\uDD04</span>'
-              : '';
-          h += '<div class="tf-ev-row' + (isStorniert ? ' storniert' : '') + '">'
-            + '<div class="tf-ev-dot" style="background:' + dotColor + '"></div>'
-            + '<div class="tf-ev-time' + ((past || isStorniert) ? ' past' : '') + '">' + this._esc(e.startTime||'') + '</div>'
-            + '<div class="tf-ev-text' + ((past || isStorniert) ? ' done' : '') + '" onclick="' + onclick + '" style="flex:1;cursor:pointer;' + (isStorniert ? 'text-decoration:line-through;color:var(--faint);' : '') + '">'
-            + this._esc(e.text) + suffix + '</div>'
-            + (isStorniert
-              ? '<span class="ck-badge" style="background:var(--surface2);color:var(--faint);border:1px solid var(--border);">Abgesagt</span>'
-              : badge)
-            + '<div class="tf-ev-actions">'
-            + (!isStorniert
-              ? '<button class="tf-ev-act-btn" title="Erledigt" onclick="event.stopPropagation();WB._tfTerminDone(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2713</button>'
-                + '<button class="tf-ev-act-btn tf-ev-act-del" title="Absagen" onclick="event.stopPropagation();WB._tfTerminAbsagen(&quot;' + this._esc(e.id) + '&quot;,&quot;' + e._art + '&quot;)">\u2715</button>'
-              : '')
-            + '</div></div>';
-          count++;
-        });
-      }
     }
 
     // Wochenpflichten OHNE Uhrzeit
     const pflichten = [];
+
     (this.db?.wochenpflichten||[]).filter(p => !p.deleted && !p.startTime && (p.taeglich || (p.wochentage||[]).includes(dow))).forEach(p => {
       const done = !!(db.pflichtStatus?.[today]?.[p.id]);
       pflichten.push({...p, _ctx: p.welt || 'priv', done});
     });
-
+  
     if (pflichten.length) {
-      const visible = pflichten.filter(p => !p.done || this._tfShowDone);
-      const hiddenPfl = pflichten.filter(p => p.done && !this._tfShowDone);
-      hiddenCount += hiddenPfl.length;
-      if (visible.length) {
-        h += '<div class="tf-sec-sep">Wochenpflichten</div>';
-        visible.forEach(p => {
-          const badge = p._ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
-          const doneBadge = p.done ? '<span class="ck-badge pflicht">erledigt</span>' : badge;
-          h += '<div class="tf-pfl-row" onclick="WB._woPflichtToggle(&quot;' + this._esc(p.id) + '&quot;,&quot;' + today + '&quot;,&quot;' + p._ctx + '&quot;)">'
-            + '<div class="tf-pfl-check' + (p.done ? ' done' : '') + '">' + (p.done ? '\u2713' : '') + '</div>'
-            + '<div class="tf-pfl-text' + (p.done ? ' done' : '') + '">' + this._esc(p.titel) + '</div>'
-            + doneBadge
-            + '<div style="padding:2px 6px;font-size:16px;color:var(--faint);cursor:pointer;" onclick="event.stopPropagation();WB.pflichtOpen(&quot;' + this._esc(p.id) + '&quot;,&quot;' + p._ctx + '&quot;)" title="Bearbeiten">&#x270F;</div>'
-            + '</div>';
-          count++;
-        });
-      }
+      h += '<div class="tf-sec-sep">Wochenpflichten</div>';
+      pflichten.forEach(p => {
+        const badge = p._ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
+        const doneBadge = p.done ? '<span class="ck-badge pflicht">erledigt</span>' : badge;
+        h += '<div class="tf-pfl-row" onclick="WB._woPflichtToggle(&quot;' + this._esc(p.id) + '&quot;,&quot;' + today + '&quot;,&quot;' + p._ctx + '&quot;)">'
+          + '<div class="tf-pfl-check' + (p.done ? ' done' : '') + '">' + (p.done ? '\u2713' : '') + '</div>'
+          + '<div class="tf-pfl-text' + (p.done ? ' done' : '') + '">' + this._esc(p.titel) + '</div>'
+          + doneBadge
+          + '<div style="padding:2px 6px;font-size:16px;color:var(--faint);cursor:pointer;" onclick="event.stopPropagation();WB.pflichtOpen(&quot;' + this._esc(p.id) + '&quot;,&quot;' + p._ctx + '&quot;)" title="Bearbeiten">&#x270F;</div>'
+          + '</div>';
+        count++;
+      });
     }
 
     // Schnell-Erinnerungen OHNE Uhrzeit
     const schnell = [];
-    (this.db?.quickItems||[]).filter(q => !q.deleted && q.date === today && !q.startTime).forEach(q => schnell.push({...q, _ctx: q.welt || 'priv'}));
 
+    (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && !q.startTime).forEach(q => schnell.push({...q, _ctx: q.welt || 'priv'}));
+  
     if (schnell.length) {
-      const visible = schnell.filter(q => !q.done || this._tfShowDone);
-      const hiddenSch = schnell.filter(q => q.done && !this._tfShowDone);
-      hiddenCount += hiddenSch.length;
-      if (visible.length) {
-        h += '<div class="tf-sec-sep">Schnell-Erinnerungen</div>';
-        visible.forEach(q => {
-          const badge = q._ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
-          const rowCls = q.done ? ' style="opacity:0.6"' : '';
-          h += '<div class="tf-schnell-row" onclick="WB.schnellOpen(&quot;' + this._esc(q.id) + '&quot;)"' + rowCls + '>'
-            + '<div class="tf-schnell-check' + (q.done ? ' done' : '') + '" style="' + (q.done ? 'background:var(--accent);border-color:var(--accent)' : '') + '" onclick="event.stopPropagation();WB._tfSchnellCheck(&quot;' + this._esc(q.id) + '&quot;,&quot;' + q._ctx + '&quot;)">'
-            + (q.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '')
-            + '</div>'
-            + '<div class="tf-schnell-text' + (q.done ? ' done' : '') + '">' + this._esc(q.text)
-            + (q.startTime ? '<span style="font-size:15px;color:var(--accent);font-weight:700;margin-left:6px;">' + this._esc(q.startTime) + '</span>' : '')
-            + '</div>'
-            + badge + '</div>';
-          count++;
-        });
-      }
+      h += '<div class="tf-sec-sep">Schnell-Erinnerungen</div>';
+      schnell.forEach(q => {
+        const badge = q._ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
+        h += '<div class="tf-schnell-row" onclick="WB.schnellOpen(&quot;' + this._esc(q.id) + '&quot;)">'
+          + '<div class="tf-schnell-check" onclick="event.stopPropagation();WB._tfSchnellCheck(&quot;' + this._esc(q.id) + '&quot;,&quot;' + q._ctx + '&quot;)"></div>'
+          + '<div class="tf-schnell-text">' + this._esc(q.text)
+          + (q.startTime ? '<span style="font-size:15px;color:var(--accent);font-weight:700;margin-left:6px;">' + this._esc(q.startTime) + '</span>' : '')
+          + '</div>'
+          + badge + '</div>';
+        count++;
+      });
     }
 
     if (!count) h = '<div class="tf-empty">Keine Eintr\u00e4ge f\u00fcr heute.</div>';
     el.innerHTML = h;
     if (cntEl) cntEl.textContent = count;
-
-    // Toggle-Button: Anzahl ausgeblendeter Items anzeigen
-    const toggleBtn = document.getElementById('tf-done-toggle');
-    const toggleLbl = document.getElementById('tf-done-toggle-lbl');
-    if (toggleBtn) {
-      toggleBtn.style.display = hiddenCount > 0 || this._tfShowDone ? 'inline-flex' : 'none';
-      toggleBtn.classList.toggle('on', this._tfShowDone);
-      toggleBtn.title = this._tfShowDone ? 'Erledigte/vergangene verbergen' : 'Erledigte/vergangene einblenden';
-    }
-    if (toggleLbl) toggleLbl.textContent = this._tfShowDone ? '\u2715' : hiddenCount;
   },
 
   _tfRenderPost() {
@@ -4238,15 +4123,6 @@ _ftStart() {
     ).join('');
   },
 
-  _tfShowDone: false,
-
-  _tfToggleDone() {
-    this._tfShowDone = !this._tfShowDone;
-    const btn = document.getElementById('tf-done-toggle');
-    if (btn) btn.classList.toggle('on', this._tfShowDone);
-    this._tfRenderHeute();
-  },
-
   _blFilter: { welt: 'alle', ansicht: null },
 
   _blSetChip(welt) {
@@ -4360,7 +4236,7 @@ _ftStart() {
   renderVorhaben() {
     this._vhRenderListe();
     if (this._vhAktivId) {
-      this._vhRenderDetail(this._vhAktivId, this._vhAktivCtx);
+      this._vhRenderDetail(this._vhAktivId);
     }
   },
 
@@ -4369,47 +4245,33 @@ _ftStart() {
   _vhDetailOffen: false,
 
   _vhOpenDetail(vorhabenId, ctx) {
-    this._vhAlleFilter = null; // Pill-Modus verlassen
-    document.querySelectorAll('.vh-sec-pill').forEach(p => p.classList.remove('active'));
     this._vhAktivId  = vorhabenId;
-    this._vhAktivCtx = ctx;
-    this._vhRenderDetail(vorhabenId, ctx);
+    this._vhAktivCtx = ctx || 'priv';
+    this._vhRenderDetail(vorhabenId);
     const detail = document.getElementById('vh-detail-col');
     if (detail) { detail.classList.add('open'); this._vhDetailOffen = true; }
-    document.querySelectorAll('.vh-card').forEach(el => el.classList.remove('active'));
-    const aktEl = document.querySelector('.vh-card[data-id="' + vorhabenId + '"]');
+    document.querySelectorAll('.vh-row').forEach(el => el.classList.remove('active'));
+    const aktEl = document.querySelector('.vh-row[data-id="' + vorhabenId + '"]');
     if (aktEl) aktEl.classList.add('active');
   },
 
   _vhCloseDetail() {
     const detail = document.getElementById('vh-detail-col');
     if (detail) { detail.classList.remove('open'); this._vhDetailOffen = false; }
-    document.querySelectorAll('.vh-item,.vh-card').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.vh-sec-pill').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.vh-row').forEach(el => el.classList.remove('active'));
     this._vhAktivId   = null;
     this._vhAktivCtx  = null;
-    this._vhAlleFilter = null;
   },
 
-  _vhDelete(vorhabenId, ctx) {
-    if (!confirm('Vorhaben wirklich löschen?')) return;
-    const db = this.db;
-    const v  = (this.db?.vorhaben||[]).find(x => x.id === vorhabenId);
+  _vhDelete(vorhabenId) {
+    if (!confirm('Vorhaben wirklich l\u00f6schen?')) return;
+    const v = (this.db?.vorhaben||[]).find(x => x.id === vorhabenId);
+    if (!v) return;
     this._softDelete(v);
     this.setDirty();
     this._vhCloseDetail();
     this.renderSection('vorhaben');
-  },
-
-  _vhAlleFilter: null,
-
-  _vhPillClick(ctx) {
-    this._vhAlleFilter = this._vhAlleFilter === ctx ? null : ctx;
-    document.querySelectorAll('.vh-sec-pill').forEach(p => {
-      p.classList.remove('active');
-      if (p.dataset.ctx === this._vhAlleFilter) p.classList.add('active');
-    });
-    this._vhRenderDetail(null, null);
+    this._toast('Vorhaben gel\u00f6scht');
   },
 
   _vhRenderAlleAufgaben(ctx) {
@@ -4564,15 +4426,14 @@ _ftStart() {
     const v  = (this.db?.vorhaben||[]).find(x => x.id === c.vorhabenId); if (!v) return;
     v.zielId = zielId; v.updatedAt = this._now();
     this.setDirty(); this.modalClose();
-    this._vhRenderDetail(c.vorhabenId, c.ctx);
+    this._vhRenderDetail(c.vorhabenId);
     this._toast('\u2713 Ziel verkn\u00fcpft');
   },
 
   _vhZielLoesen(vorhabenId, ctx) {
-    const db = this.db;
-    const v  = (this.db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
+    const v = (this.db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
     v.zielId = null; v.updatedAt = this._now();
-    this.setDirty(); this._vhRenderDetail(vorhabenId, ctx);
+    this.setDirty(); this._vhRenderDetail(vorhabenId);
     this._toast('Ziel gel\u00f6st');
   },
 
@@ -4581,29 +4442,77 @@ _ftStart() {
     const newWelt = newCtx === 'pro' ? 'Beruf' : 'Privat';
     const oldWelt = ctx   === 'pro' ? 'Beruf' : 'Privat';
     if (!confirm('Vorhaben von ' + oldWelt + ' nach ' + newWelt + ' verschieben?')) return;
-    const oldDb = this.db;
-    const newDb = this.db;
-    if (!oldDb || !newDb) return;
-    const v = (oldDb?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
-    // Soft-delete in alter DB, Kopie in neue DB
-    this._softDelete(v);
-    const copy = { ...v, deleted: false, deletedAt: undefined, welt: newCtx === 'pro' ? 'pro' : 'priv', updatedAt: this._now() };
-    if (!newDb.vorhaben) newDb.vorhaben = [];
-    newDb.vorhaben.push(copy);
-    this.activeWorld = newCtx === 'pro' ? 'beruf' : 'privat';
-    this._vhAktivId  = vorhabenId;
+    const v = (this.db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
+    v.welt = newCtx === 'pro' ? 'pro' : 'priv'; v.updatedAt = this._now();
     this._vhAktivCtx = newCtx;
     this.setDirty(); this.renderSection('vorhaben');
     this._toast('\u2713 Nach ' + newWelt + ' verschoben');
   },
 
-  _vhZustand(v) {
-    if (v.status === 'abgeschlossen') return 'done';
-    if (v.status === 'archiviert')    return 'archiviert';
+  _vhStatus(v) {
+    // Manueller Status hat Vorrang
+    if (v.status === 'archiviert')   return 'archiviert';
+    if (v.status === 'abgeschlossen') return 'abgeschlossen';
+    if (v.status === 'pausiert')     return 'pausiert';
+    if (v.status === 'laeuft')       return 'laeuft';
+    if (v.status === 'offen')        return 'offen';
+    // Legacy: ableiten aus Aufgaben
     const alle = (v.aufgaben||[]).filter(a => !a.deleted);
     const done = alle.filter(a => a.done).length;
     if (alle.length > 0 && done > 0) return 'laeuft';
     return 'offen';
+  },
+
+  // Legacy-Kompatibilität für bestehende Aufrufe
+  _vhZustand(v) {
+    const s = this._vhStatus(v);
+    if (s === 'abgeschlossen') return 'done';
+    if (s === 'laeuft')        return 'laeuft';
+    return 'offen';
+  },
+
+  _vhSetStatus(vorhabenId, newStatus) {
+    const v = (this.db?.vorhaben||[]).find(x => x.id === vorhabenId); if (!v) return;
+    v.status = newStatus;
+    v.aktiv  = (newStatus !== 'archiviert' && newStatus !== 'abgeschlossen');
+    if (newStatus === 'abgeschlossen') v.abgeschlossenAt = this._now();
+    v.updatedAt = this._now();
+    this.setDirty();
+    this._vhRenderListe();
+    this._vhRenderDetail(vorhabenId);
+    const lbl = { offen:'Offen', laeuft:'Läuft', pausiert:'Pausiert', abgeschlossen:'Abgeschlossen', archiviert:'Archiviert' };
+    this._toast('\u2713 Status: ' + (lbl[newStatus] || newStatus));
+    // Dropdown schließen
+    document.querySelectorAll('.vh-status-dd').forEach(d => d.classList.remove('open'));
+  },
+
+  _vhToggleFavorit() {
+    const v = (this.db?.vorhaben||[]).find(x => x.id === this._vhAktivId); if (!v) return;
+    v.favorit = !v.favorit; v.updatedAt = this._now();
+    this.setDirty();
+    const btn = document.getElementById('vh-hdr-star-btn');
+    if (btn) btn.classList.toggle('on', !!v.favorit);
+    this._vhRenderListe();
+    this._toast(v.favorit ? '\u2605 Als Favorit markiert' : '\u2606 Favorit entfernt');
+  },
+
+  _vhToggleVertraulich() {
+    const v = (this.db?.vorhaben||[]).find(x => x.id === this._vhAktivId); if (!v) return;
+    v.vertraulich = !v.vertraulich; v.updatedAt = this._now();
+    this.setDirty();
+    const btn = document.getElementById('vh-hdr-buero-btn');
+    if (btn) btn.classList.toggle('on', !!v.vertraulich);
+    this._toast(v.vertraulich ? '\uD83D\uDD12 Vertraulich — im B\u00fcro-Modus verborgen' : 'Nicht mehr vertraulich');
+  },
+
+  _vhDeleteAktiv() {
+    if (!this._vhAktivId) return;
+    this._vhDelete(this._vhAktivId);
+  },
+
+  _vhToggleStatusDD() {
+    const dd = document.getElementById('vh-status-dd');
+    if (dd) dd.classList.toggle('open');
   },
 
   _vhRingIcon(v, size) {
@@ -4646,94 +4555,145 @@ _ftStart() {
     this.setDirty(); this.renderSection('vorhaben'); this._toast('\u21ba Vorhaben wieder ge\u00f6ffnet');
   },
 
+  _vhFilter: 'alle',
+  _vhStarFilter: false,
+
+  _vhSetFilter(val, el) {
+    this._vhFilter = val;
+    document.querySelectorAll('.vl-filter-btn').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+    this._vhRenderListe();
+  },
+
+  _vhToggleStarFilter() {
+    this._vhStarFilter = !this._vhStarFilter;
+    const btn = document.getElementById('vl-star-btn');
+    if (btn) btn.classList.toggle('active', this._vhStarFilter);
+    this._vhRenderListe();
+  },
+
   _vhRenderListe() {
     const scroll = document.getElementById('vh-scroll');
     if (!scroll) return;
-    let h = '';
     const charReihenfolge = ['verpflichtend', 'bedeutsam', 'bereichernd'];
-    const charLabel = { verpflichtend: 'Verpflicht.', bedeutsam: 'Bedeutsam', bereichernd: 'Bereichernd' };
+    const charLabel = { verpflichtend: 'Verpflichtend', bedeutsam: 'Bedeutsam', bereichernd: 'Bereichernd' };
     const charCls   = { verpflichtend: 'vp', bedeutsam: 'bd', bereichernd: 'br' };
-    const zeigeBeide = this._weltBeideVisible();
+    const today = this._dStr(new Date());
 
-    const renderWeltSektion = (ctx, vhListe) => {
-      const aktive       = vhListe.filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv !== false);
-      const abgeschlossen = vhListe.filter(v => !v.deleted && (v.status === 'abgeschlossen' || v.status === 'archiviert'));
-      if (!aktive.length && !abgeschlossen.length) return;
-      const weltLabel  = ctx === 'pro' ? 'Beruf' : 'Privat';
-      const offenCount = aktive.reduce((sum, v) => sum + (v.aufgaben||[]).filter(a => !a.deleted && !a.done).length, 0);
-      const pillActive = this._vhAlleFilter === ctx;
-      h += '<div class="vh-sec-row">'
-        + '<span class="vh-sec-label">' + weltLabel + ' \u2013 Aktiv</span>'
-        + (offenCount > 0
-          ? '<span class="vh-sec-pill' + (ctx==='priv' ? ' priv' : '') + (pillActive ? ' active' : '') + '"'
-            + ' data-ctx="' + ctx + '" onclick="WB._vhPillClick(\'' + ctx + '\')"'
-            + ' title="Alle offenen Aufgaben anzeigen">' + offenCount + '</span>'
-          : '')
-        + '</div>';
-      const gruppen = {};
-      charReihenfolge.forEach(c => { gruppen[c] = []; });
-      aktive.forEach(v => { const c = v.charakter || 'bereichernd'; (gruppen[c] = gruppen[c]||[]); gruppen[c].push(v); });
-      charReihenfolge.forEach(charakter => {
-        const items = gruppen[charakter]; if (!items || !items.length) return;
-        h += '<div class="vh-char-group">'
-          + '<div class="vh-char-tab ' + charCls[charakter] + '">' + charLabel[charakter] + '</div>'
-          + '<div class="vh-char-items">'
-          + items.map(v => this._vhRenderCard(v, ctx)).join('')
-          + '</div></div>';
-      });
-      if (abgeschlossen.length) {
-        h += '<div class="vh-done-sec"><span class="vh-done-sec-lbl">Abgeschlossen</span>'
-          + '<span style="font-size:13px;color:var(--faint);">' + abgeschlossen.length + '</span></div>';
-        abgeschlossen.forEach(v => {
-          h += '<div class="vh-item-done" onclick="WB._vhOpenDetail(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">'
-            + '<div class="vi-done">\u2713</div><div class="vh-name-done">' + this._esc(v.titel) + '</div></div>';
-        });
-      }
+    // Welt-Filter
+    const weltFilter = v => {
+      const w = this.activeWorld;
+      if (w === 'beide') return true;
+      if (w === 'beruf') return v.welt === 'pro' || v.welt === 'beruf';
+      return v.welt !== 'pro' && v.welt !== 'beruf';
+    };
+    // Status-Filter
+    const statusFilter = v => {
+      const s = this._vhStatus(v);
+      if (this._vhFilter === 'aktiv')    return s !== 'pausiert' && s !== 'archiviert' && s !== 'abgeschlossen';
+      if (this._vhFilter === 'pausiert') return s === 'pausiert';
+      if (this._vhFilter === 'archiv')   return s === 'archiviert' || s === 'abgeschlossen';
+      return true; // alle
     };
 
-    const allVh = this.db?.vorhaben || [];
-    const vhPro  = allVh.filter(v => v.welt === 'pro'  || v.welt === 'beruf');
-    const vhPriv = allVh.filter(v => v.welt !== 'pro'  && v.welt !== 'beruf');
+    let allVh = (this.db?.vorhaben || []).filter(v => !v.deleted && weltFilter(v) && statusFilter(v));
+    if (this._vhStarFilter) allVh = allVh.filter(v => !!v.favorit);
+    // Büro-Modus: vertrauliche Vorhaben ausblenden
+    if (this._settings?.bueroModus) allVh = allVh.filter(v => !v.vertraulich);
 
-    if (zeigeBeide) renderWeltSektion('pro', vhPro);
-    renderWeltSektion('priv', vhPriv);
+    // Aktive (nicht archiviert/abgeschlossen) nach Charakter gruppieren
+    const aktive = allVh.filter(v => {
+      const s = this._vhStatus(v);
+      return s !== 'archiviert' && s !== 'abgeschlossen';
+    });
+    const archiviert = allVh.filter(v => {
+      const s = this._vhStatus(v);
+      return s === 'archiviert' || s === 'abgeschlossen';
+    });
 
-    scroll.innerHTML = h || '<div style="padding:16px;color:var(--faint);font-size:16px;">Noch keine Vorhaben.</div>';
+    let h = '';
+
+    // Charakter-Gruppen
+    charReihenfolge.forEach(charakter => {
+      const items = aktive.filter(v => (v.charakter || 'bereichernd') === charakter);
+      if (!items.length) return;
+      const grpId = 'vg-' + charakter;
+      const isOpen = this._vhGrpOpen[charakter] !== false; // default open
+      h += '<div class="vg-group' + (isOpen ? ' open' : '') + '" id="' + grpId + '">'
+        + '<div class="vg-group-hdr" onclick="WB._vhGrpToggle(\'' + charakter + '\')">'
+        + '<div class="vg-stripe ' + charCls[charakter] + '"></div>'
+        + '<span class="vg-group-lbl ' + charCls[charakter] + '">' + charLabel[charakter] + '</span>'
+        + '<span class="vg-group-cnt">' + items.length + '</span>'
+        + '<span class="vg-chev">›</span></div>'
+        + '<div class="vg-body">'
+        + items.map(v => this._vhRenderRow(v, today)).join('')
+        + '</div></div>';
+    });
+
+    // Archiviert/Abgeschlossen
+    if (archiviert.length) {
+      const archId = 'vg-archiv';
+      const isOpen = this._vhGrpOpen['archiv'] === true;
+      h += '<div class="vg-group' + (isOpen ? ' open' : '') + '" id="' + archId + '">'
+        + '<div class="vg-group-hdr" onclick="WB._vhGrpToggle(\'archiv\')">'
+        + '<div class="vg-stripe" style="background:var(--faint)"></div>'
+        + '<span class="vg-group-lbl" style="color:var(--faint)">Abgeschlossen / Archiv</span>'
+        + '<span class="vg-group-cnt">' + archiviert.length + '</span>'
+        + '<span class="vg-chev">›</span></div>'
+        + '<div class="vg-body">'
+        + archiviert.map(v => this._vhRenderRow(v, today)).join('')
+        + '</div></div>';
+    }
+
+    if (!h) h = '<div style="padding:16px;color:var(--faint);font-size:14px;">Keine Vorhaben gefunden.</div>';
+    scroll.innerHTML = h;
   },
 
-  _vhRenderCard(v, ctx) {
-    const isActive    = v.id === this._vhAktivId;
-    const zustand     = this._vhZustand({...v, _ctx: ctx});
-    const statusIcon  = zustand === 'done'
-      ? '<div class="vi-done">\u2713</div>'
-      : zustand === 'laeuft' ? this._vhRingIcon({...v, _ctx: ctx}, 16)
-      : '<div class="vi-offen"></div>';
-    const aufgaben    = (v.aufgaben||[]);
-    const total       = aufgaben.length;
-    const doneCount   = aufgaben.filter(a => a.done).length;
-    const today       = this._dStr(new Date());
-    const ueberfaellig = aufgaben.some(a => !a.done && a.datum && a.datum < today);
-    const meta = total > 0 ? (doneCount + '/' + total + ' Aufgaben offen') : 'Keine Aufgaben';
+  _vhGrpOpen: {},
+  _vhGrpToggle(charakter) {
+    const grpId = 'vg-' + charakter;
+    const el = document.getElementById(grpId);
+    if (!el) return;
+    const nowOpen = el.classList.toggle('open');
+    this._vhGrpOpen[charakter] = nowOpen;
+  },
+
+  _vhRenderRow(v, today) {
+    const isActive = v.id === this._vhAktivId;
+    const status   = this._vhStatus(v);
+    const isPaused = status === 'pausiert';
+    const ctx = (v.welt === 'pro' || v.welt === 'beruf') ? 'pro' : 'priv';
     const badge = ctx === 'pro'
-      ? '<span class="vh-badge beruf">Beruf</span>'
-      : '<span class="vh-badge privat">Privat</span>';
-    const warnBadge = ueberfaellig ? '<span class="vh-badge warn">\u00fcberf\u00e4llig</span>' : '';
-    return '<div class="vh-card' + (isActive ? ' active' : '') + '"'
+      ? '<span class="vh-row-badge b">Beruf</span>'
+      : '<span class="vh-row-badge p">Privat</span>';
+    const aufgaben = (v.aufgaben || []).filter(a => !a.deleted);
+    const offen    = aufgaben.filter(a => !a.done).length;
+    const ueber    = aufgaben.some(a => !a.done && a.datum && a.datum < today);
+    const ringHtml = isPaused
+      ? '<svg class="vh-row-ring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="14" fill="none" stroke="var(--border)" stroke-width="2" stroke-dasharray="4 4"/><text x="18" y="23" text-anchor="middle" font-size="10" fill="var(--faint)">⏸</text></svg>'
+      : this._vhRingIcon({...v, _ctx: ctx}, 20);
+    const starHtml = v.favorit ? '<span class="vh-row-star">★</span>' : '';
+    const metaText = offen > 0 ? offen + ' offen' : (status === 'abgeschlossen' ? 'abgeschlossen' : status === 'archiviert' ? 'archiviert' : 'offen');
+    return '<div class="vh-row' + (isActive ? ' active' : '') + (isPaused ? ' paused' : '') + '"'
       + ' data-id="' + this._esc(v.id) + '"'
-      + ' data-ctx="' + this._esc(ctx) + '"'
-      + ' onclick="WB._vhOpenDetail(&quot;' + v.id + '&quot;,&quot;' + ctx + '&quot;)">'
-      + statusIcon
-      + '<div class="vh-card-body">'
-      + '<div class="vh-card-title">' + this._esc(v.titel) + '</div>'
-      + '<div class="vh-card-meta">' + meta + '</div></div>'
-      + '<div class="vh-card-right">' + badge + warnBadge + '</div></div>';
+      + ' onclick="WB._vhOpenDetail(\'' + this._esc(v.id) + '\',\'' + ctx + '\')">'
+      + ringHtml
+      + '<div class="vh-row-body">'
+      + '<div class="vh-row-title">' + this._esc(v.titel) + '</div>'
+      + '<div class="vh-row-meta">'
+      + '<span>' + metaText + '</span>'
+      + badge
+      + (ueber ? '<span class="vh-row-warn">⚠</span>' : '')
+      + '</div></div>'
+      + '<div class="vh-row-right">' + starHtml + '</div>'
+      + '</div>';
   },
 
   _vhOpen(id, ctx) {
     this._vhAktivId  = id;
     this._vhAktivCtx = ctx;
     this._vhRenderListe();
-    this._vhRenderDetail(id, ctx);
+    this._vhRenderDetail(id);
   },
 
   _vhTabSwitch(tab, el) {
@@ -4745,229 +4705,205 @@ _ftStart() {
     if (el) el.classList.add('active');
   },
 
-  _vhRenderDetail(id, ctx) {
-    const db = this.db;
-    const detEl = document.getElementById('vh-detail-col');
-
-    // Alle-Aufgaben-Modus wenn Pill geklickt
-    if (this._vhAlleFilter) {
-      // Normales Detail verstecken, Alle-Container zeigen
-      const normalDetail = document.getElementById('vh-detail');
-      const alleEl = document.getElementById('vh-alle-container');
-      if (normalDetail) normalDetail.style.display = 'none';
-      if (alleEl) {
-        alleEl.style.display = '';
-        alleEl.innerHTML = this._vhRenderAlleAufgaben(this._vhAlleFilter);
-      }
-      if (detEl) detEl.classList.add('open');
-      return;
-    }
-
-    // Normaler Vorhaben-Modus: normales Detail zeigen, Alle-Container verstecken
-    const normalDetail = document.getElementById('vh-detail');
-    const alleEl = document.getElementById('vh-alle-container');
-    if (normalDetail) normalDetail.style.display = '';
-    if (alleEl) alleEl.style.display = 'none';
-
-
-    const v  = (this.db?.vorhaben || []).find(x => x.id === id);
+  _vhRenderDetail(id) {
+    const v = (this.db?.vorhaben||[]).find(x => x.id === id);
     if (!v) return;
+    const ctx = (v.welt === 'pro' || v.welt === 'beruf') ? 'pro' : 'priv';
+    this._vhAktivCtx = ctx;
+
+    // Titel
     const titleEl = document.getElementById('vh-detail-title');
-    const subEl   = document.getElementById('vh-detail-sub');
-    if (titleEl) titleEl.textContent = v.titel;
-    if (subEl) {
-      const zustand = this._vhZustand({...v, _ctx: ctx});
-      const alle    = (v.aufgaben||[]).filter(a => !a.deleted);
-      const doneA   = alle.filter(a => a.done).length;
-      const pct     = alle.length > 0 ? Math.round(doneA / alle.length * 100) : 0;
-      const pillLabel = zustand === 'done' ? '\u2713 Abgeschlossen'
-        : zustand === 'laeuft' ? 'L\u00e4uft' : 'Offen';
-      const pillIcon = zustand === 'laeuft' ? this._vhRingIcon({...v, _ctx: ctx}, 12) + ' ' : '';
-      const statusPill = '<button class="vh-status-pill ' + zustand + '"'
-        + ' onclick="WB._vhMenuToggle(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">'
-        + pillIcon + pillLabel + '</button>';
+    if (titleEl) { titleEl.textContent = v.titel; titleEl.style.color = ''; titleEl.style.fontSize = ''; }
 
-      // Ziel-Zeile
-      const db2  = this.db;
-      const ziel = v.zielId ? (db2?.ziele||[]).find(z => z.id === v.zielId && !z.deleted) : null;
-      const zielHtml = '<div class="vh-ziel-zeile">'
-        + '<span class="vh-ziel-ic">\u25ce</span>'
-        + (ziel
-          ? '<span class="vh-ziel-text gesetzt">' + this._esc(ziel.titel) + '</span>'
-            + '<button class="vh-ziel-btn loesen" onclick="WB._vhZielLoesen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">\u00d7 L\u00f6sen</button>'
-          : '<span class="vh-ziel-text">Kein Ziel verkn\u00fcpft</span>'
-            + '<button class="vh-ziel-btn" onclick="WB._vhZielVerknuepfen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">+ Verkn\u00fcpfen</button>')
-        + '</div>';
+    // Stern + Vertraulich aktualisieren
+    const starBtn = document.getElementById('vh-hdr-star-btn');
+    if (starBtn) starBtn.classList.toggle('on', !!v.favorit);
+    const bueroBtn = document.getElementById('vh-hdr-buero-btn');
+    if (bueroBtn) bueroBtn.classList.toggle('on', !!v.vertraulich);
 
-      // Fortschrittsbalken in #vh-prog-container
-      const progEl = document.getElementById('vh-prog-container');
-      if (progEl) {
-        progEl.innerHTML = alle.length > 0
-          ? '<div class="vh-prog-wrap"><div class="vh-prog-label"><span>Fortschritt</span>'
-            + '<span style="color:var(--accent);font-weight:600;">' + doneA + '/' + alle.length + ' erledigt</span></div>'
-            + '<div class="vh-prog-bar"><div class="vh-prog-fill" style="width:' + pct + '%"></div></div></div>'
-          : '';
-      }
+    // Pills
+    const pillsEl = document.getElementById('vh-detail-pills');
+    if (pillsEl) {
+      const status  = this._vhStatus(v);
+      const weltCls = ctx === 'pro' ? 'beruf' : 'privat';
+      const weltLbl = ctx === 'pro' ? 'Beruf \u21c4' : 'Privat \u21c4';
+      const sLabels = { offen:'\u25cb Offen', laeuft:'\u25b6 L\u00e4uft', pausiert:'\u23f8 Pausiert', abgeschlossen:'\u2713 Abgeschlossen', archiviert:'\u2713 Archiviert' };
+      const sLbl = sLabels[status] || '\u25cb Offen';
+      const charCls   = { verpflichtend:'char-vp', bedeutsam:'char-bd', bereichernd:'char-br' };
+      const charLabel = { verpflichtend:'\u2699 Verpflichtend', bedeutsam:'\u25c8 Bedeutsam', bereichernd:'\u2736 Bereichernd' };
+      const ziel = v.zielId ? (this.db?.ziele||[]).find(z => z.id === v.zielId && !z.deleted) : null;
+      const zielLbl = ziel ? '\u25ce ' + ziel.titel : '\u25ce Kein Ziel';
+      const zielCls = ziel ? 'ziel-set' : 'ziel-leer';
 
-      // Zeile: Welt-Toggle + Status-Pill + Charakter-Pill (kein Titel in subEl)
-      const weltCls   = ctx === 'pro' ? 'beruf' : 'privat';
-      const weltLabel = ctx === 'pro' ? 'Beruf' : 'Privat';
-      const weltToggle = '<button class="vh-welt-toggle ' + weltCls + '"'
-        + ' onclick="WB._vhWeltToggle(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">'
-        + weltLabel + ' <span class="vh-welt-toggle-arrow">\u21c4</span></button>';
-      const row2 = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;margin-bottom:4px;">'
-        + weltToggle + statusPill + this._vhCharPillHtml(v, v.id, ctx)
-        + '</div>';
-
-      subEl.innerHTML = row2 + zielHtml;
+      pillsEl.innerHTML =
+        '<span class="vh-pill ' + weltCls + '" onclick="WB._vhWeltToggle(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">' + weltLbl + '</span>'
+        + '<span class="vh-pill s-' + status + '" onclick="WB._vhToggleStatusDD()" style="position:relative;">'
+        + sLbl + ' \u25be'
+        + '<div class="vh-status-dd" id="vh-status-dd">'
+        + '<div class="vh-sd-item" onclick="WB._vhSetStatus(\'' + this._esc(v.id) + '\',\'offen\')"><div class="vh-sd-dot" style="background:var(--faint)"></div>Offen</div>'
+        + '<div class="vh-sd-item" onclick="WB._vhSetStatus(\'' + this._esc(v.id) + '\',\'laeuft\')"><div class="vh-sd-dot" style="background:var(--accent)"></div>L\u00e4uft</div>'
+        + '<div class="vh-sd-item" onclick="WB._vhSetStatus(\'' + this._esc(v.id) + '\',\'pausiert\')"><div class="vh-sd-dot" style="background:var(--warn)"></div>Pausiert</div>'
+        + '<div class="vh-sd-item" onclick="WB._vhSetStatus(\'' + this._esc(v.id) + '\',\'abgeschlossen\')"><div class="vh-sd-dot" style="background:var(--accent)"></div>\u2713 Abgeschlossen</div>'
+        + '<div class="vh-sd-item" onclick="WB._vhSetStatus(\'' + this._esc(v.id) + '\',\'archiviert\')"><div class="vh-sd-dot" style="background:var(--border)"></div>Archiviert</div>'
+        + '</div></span>'
+        + '<span class="vh-pill ' + (charCls[v.charakter] || 'char-none') + '" onclick="WB._vhCharDialog(\'' + this._esc(v.id) + '\',\'' + ctx + '\')">'
+        + (charLabel[v.charakter] || 'Charakter \u25be') + '</span>'
+        + '<span class="vh-pill ' + zielCls + '" onclick="' + (ziel ? 'WB._vhZielLoesen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)' : 'WB._vhZielVerknuepfen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)') + '">'
+        + this._esc(zielLbl.substring(0, 30)) + (zielLbl.length > 30 ? '\u2026' : '') + (ziel ? ' \u00d7' : ' +') + '</span>';
     }
-    this._vhRenderTabAktuell(v, ctx);
-    this._vhRenderTabInfo(v, ctx);
+
+    // Klappbare Container rendern
+    this._vhRenderContainers(v, ctx);
   },
 
-  _vhRenderTabAktuell(v, ctx) {
-    const el = document.getElementById('vh-tab-aktuell'); if (!el) return;
-    const today = this._dStr(new Date());
-    const db = this.db;
-    let h = '';
+  _vcOpen: {},
 
-    // Alle Aufgaben
+  _vhRenderContainers(v, ctx) {
+    const scroll = document.getElementById('vh-detail-scroll');
+    if (!scroll) return;
+    const today = this._dStr(new Date());
+
+    const vcBlock = (id, icon, title, badge, badgeCls, actionHtml, bodyHtml, defaultOpen) => {
+      const isOpen = this._vcOpen[id] !== undefined ? this._vcOpen[id] : defaultOpen;
+      return '<div class="vc' + (isOpen ? ' open' : '') + '" id="vc-' + id + '">'
+        + '<div class="vc-hdr" onclick="WB._vcToggle(\'' + id + '\')">'
+        + '<span class="vc-icon">' + icon + '</span>'
+        + '<span class="vc-title">' + title + '</span>'
+        + (badge !== null ? '<span class="vc-badge' + (badgeCls ? ' ' + badgeCls : '') + '">' + badge + '</span>' : '')
+        + (actionHtml || '')
+        + '<span class="vc-chev">\u203a</span></div>'
+        + '<div class="vc-body">' + bodyHtml + '</div></div>';
+    };
+
+    // ── Aufgaben ──
     const alle = (v.aufgaben||[]).filter(a => !a.deleted);
-    const doneCount = alle.filter(a => a.done).length;
-    h += '<div class="vh-block">'
-      + '<div class="vh-block-head">'
-      + '<span class="vh-block-label">Alle Aufgaben</span>'
-      + '<span class="vh-block-meta">' + doneCount + '/' + alle.length + ' erledigt</span>'
-      + '<span class="vh-block-action" onclick="WB._vhAufgabeNeu(\'' + v.id + '\',\'' + ctx + '\')">+ Aufgabe</span>'
-      + '</div>';
+    const offen = alle.filter(a => !a.done);
+    const aufgBadgeCls = offen.length > 0 ? 'active' : '';
+    let aufgH = '';
     if (alle.length) {
-      alle.forEach(a => {
-        const datum   = this._fmtDatum(a.datum);
-        const cl      = a.checklist || [];
-        const clTotal = cl.length;
-        const clDone  = cl.filter(c => c.done).length;
+      offen.forEach(a => {
+        const cl = a.checklist || [];
+        const clTotal = cl.length; const clDone = cl.filter(c => c.done).length;
         const naechster = cl.find(c => !c.done)?.text || '';
-        h += '<div class="vh-task-item" onclick="WB.aufgabeOpen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + this._esc(a.id) + '&quot;,&quot;' + this._esc(ctx) + '&quot;)">'
+        const datum = a.datum ? this._fmtDatum(a.datum) : null;
+        const isOver = a.datum && a.datum < today;
+        aufgH += '<div class="vc-task" onclick="WB.aufgabeOpen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + this._esc(a.id) + '&quot;,&quot;' + ctx + '&quot;)">'
           + this._aufgabeChkHtml(a, v.id, ctx)
-          + '<div class="vh-task-body">'
-          + '<div class="vh-task-title-row">'
-          + '<div class="vh-task-text' + (a.done ? ' done' : '') + '">' + this._esc(a.text) + '</div>'
-          + (clTotal > 0 ? '<div class="vh-task-offen">' + clDone + '/' + clTotal + '</div>' : '')
+          + '<div class="vc-task-body">'
+          + '<div class="vc-task-txt">' + this._esc(a.text) + '</div>'
+          + (naechster ? '<div class="vc-task-sub">\u2192 ' + this._esc(naechster) + '</div>' : '')
           + '</div>'
-          + (naechster && !a.done ? '<div class="vh-task-sub">\u2192 ' + this._esc(naechster) + '</div>' : '')
-          + (a.startTime && !a.done ? '<div class="vh-task-sub" style="color:var(--muted)">' + a.startTime + '</div>' : '')
-          + '</div>'
-          + (datum ? '<div class="vh-task-date">' + datum + '</div>' : '')
-          + '</div>';
+          + '<div class="vc-task-right">'
+          + (datum ? '<span class="vc-task-date' + (isOver ? ' warn' : '') + '">' + datum + '</span>' : '')
+          + (clTotal > 0 ? '<span class="vc-task-cl">' + clDone + '/' + clTotal + '</span>' : '')
+          + '</div></div>';
+      });
+      // Erledigte
+      alle.filter(a => a.done).forEach(a => {
+        aufgH += '<div class="vc-task" onclick="WB.aufgabeOpen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + this._esc(a.id) + '&quot;,&quot;' + ctx + '&quot;)">'
+          + this._aufgabeChkHtml(a, v.id, ctx)
+          + '<div class="vc-task-body"><div class="vc-task-txt done">' + this._esc(a.text) + '</div></div>'
+          + '<div class="vc-task-right"><span class="vc-task-date">erledigt</span></div></div>';
       });
     } else {
-      h += '<div style="padding:12px 14px;color:var(--faint);font-size:16px;">Noch keine Aufgaben.</div>';
+      aufgH = '<div class="vc-empty">Noch keine Aufgaben.</div>';
     }
-    h += '</div>';
+    const aufgAction = '<span class="vc-action" onclick="event.stopPropagation();WB._vhAufgabeNeu(\'' + v.id + '\',\'' + ctx + '\')">+ Aufgabe</span>';
 
-    // Termine
+    // ── Termine ──
     const termine = (this.db?.customEvents||[]).filter(e => e.vorhabenId === v.id && !e.deleted && !e.done && e.date >= today).sort((a,b) => a.date.localeCompare(b.date)).slice(0,5);
-    if (termine.length) {
-      h += '<div class="vh-block"><div class="vh-block-head"><span class="vh-block-label">Termine</span></div>';
-      termine.forEach(e => {
-        const d = this._fmtDatum(e.date);
-        h += '<div class="vh-termin-item"><div class="vh-termin-date">' + d + '</div>'
-          + '<div class="vh-termin-text">' + this._esc(e.text) + '</div>'
-          + (e.startTime ? '<div class="vh-termin-time">' + e.startTime + '</div>' : '')
-          + '</div>';
-      });
-      h += '</div>';
-    }
+    let terminH = termine.length
+      ? termine.map(e => '<div class="vc-termin"><div class="vc-termin-date">' + this._fmtDatum(e.date) + '</div><div class="vc-termin-text">' + this._esc(e.text) + '</div>' + (e.startTime ? '<div class="vc-termin-time">' + e.startTime + '</div>' : '') + '</div>').join('')
+      : '<div class="vc-empty">Keine zuk\u00fcnftigen Termine.</div>';
 
-    // Wochenpflichten
+    // ── Wochenpflichten ──
     const pflichten = (this.db?.wochenpflichten||[]).filter(p => p.vorhabenId === v.id && !p.deleted);
-    if (pflichten.length) {
-      const kwStatus = this.db?.pflichtStatus?.[today] || {};
-      h += '<div class="vh-block"><div class="vh-block-head"><span class="vh-block-label">Wochenpflichten</span></div>';
-      pflichten.forEach(p => {
-        const done = !!kwStatus[p.id];
-        h += '<div class="vh-pfl-item"><div class="vh-pfl-check' + (done ? ' done' : '') + '">' + (done ? '\u2713' : '') + '</div>'
-          + '<div class="vh-pfl-text' + (done ? ' done' : '') + '">' + this._esc(p.titel) + '</div></div>';
-      });
-      h += '</div>';
-    }
-    el.innerHTML = h;
+    const kwStatus = this.db?.pflichtStatus?.[today] || {};
+    let pflH = pflichten.length
+      ? pflichten.map(p => { const done = !!kwStatus[p.id]; return '<div class="vc-pflicht" onclick="WB._woPflichtToggle(&quot;' + this._esc(p.id) + '&quot;,&quot;' + today + '&quot;,&quot;' + ctx + '&quot;)"><div class="vc-pflicht-chk' + (done ? ' done' : '') + '">' + (done ? '\u2713' : '') + '</div><div class="vc-pflicht-txt' + (done ? ' done' : '') + '">' + this._esc(p.titel) + '</div></div>'; }).join('')
+      : '<div class="vc-empty">Keine Wochenpflichten verkn\u00fcpft.</div>';
 
-    // Notizfeld: textarea nach innerHTML (kein HTML-Escape nötig)
-    const notizWrap = document.createElement('div');
-    notizWrap.className = 'vh-block';
-    notizWrap.innerHTML =
-      '<div class="vh-block-head"><span class="vh-block-label">Notizen</span></div>'
-      + '<textarea id="vh-notiz-area" class="wb-textarea"'
-      + ' placeholder="Freie Notizen zu diesem Vorhaben..."'
-      + ' style="min-height:90px;resize:vertical;">'
-      + this._esc(v.notiz || '')
-      + '</textarea>';
-    el.appendChild(notizWrap);
+    // ── Ziel-Zuordnung ──
+    const ziel = v.zielId ? (this.db?.ziele||[]).find(z => z.id === v.zielId && !z.deleted) : null;
+    const zielH = '<div class="vc-ziel-row">'
+      + '<span style="font-size:15px;color:var(--faint)">\u25ce</span>'
+      + '<span class="vc-ziel-text' + (ziel ? ' set' : '') + '">' + (ziel ? this._esc(ziel.titel) : 'Kein Ziel verkn\u00fcpft') + '</span>'
+      + (ziel
+        ? '<button class="vc-ziel-btn del" onclick="WB._vhZielLoesen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">\u00d7 L\u00f6sen</button>'
+        : '<button class="vc-ziel-btn link" onclick="WB._vhZielVerknuepfen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + ctx + '&quot;)">+ Verkn\u00fcpfen</button>')
+      + '</div>';
 
+    // ── Links ──
+    const links = (v.links || []).filter(l => !l.deleted);
+    let linksH = links.length
+      ? links.map(l => {
+          const typeClass = l.type || 'link';
+          const typeLabel = { gdoc:'G', sp:'SP', on:'ON', cf:'CF' }[typeClass] || '\uD83D\uDD17';
+          return '<div class="vc-link">'
+            + '<div class="vc-link-icon ' + typeClass + '">' + typeLabel + '</div>'
+            + '<div class="vc-link-body">'
+            + '<div class="vc-link-title">' + this._esc(l.titel || l.url) + '</div>'
+            + (l.notiz ? '<div class="vc-link-note">' + this._esc(l.notiz) + '</div>' : '')
+            + '</div>'
+            + '<div class="vc-link-actions">'
+            + '<button class="vc-link-btn" onclick="window.open(\'' + this._esc(l.url) + '\',\'_blank\')">\u2197</button>'
+            + '<button class="vc-link-btn del" onclick="WB._vhLinkDelete(\'' + this._esc(v.id) + '\',\'' + ctx + '\',\'' + this._esc(l.id) + '\')">\u2715</button>'
+            + '</div></div>';
+        }).join('')
+      : '<div class="vc-empty">Noch keine Links.</div>';
+    const linksAction = '<span class="vc-action" onclick="event.stopPropagation();WB._vhLinkAdd(\'' + v.id + '\',\'' + ctx + '\')">+ Link</span>';
+
+    scroll.innerHTML =
+      vcBlock('aufgaben', '\u2611', 'Aufgaben', offen.length + ' offen', aufgBadgeCls, aufgAction, aufgH, true)
+      + vcBlock('termine', '\uD83D\uDCC5', 'Termine', termine.length || null, termine.length ? 'active' : '', '<span class="vc-action" onclick="event.stopPropagation();WB.terminOpen(null,&quot;' + ctx + '&quot;)">+ Termin</span>', terminH, true)
+      + vcBlock('pflichten', '\uD83D\uDD04', 'Wochenpflichten', pflichten.length || null, '', '', pflH, true)
+      + vcBlock('ziel', '\u25CE', 'Ziel-Zuordnung', null, '', '', zielH, true)
+      + vcBlock('links', '\uD83D\uDD17', 'Links & Ablage', links.length || null, '', linksAction, linksH, false);
+
+    // Notizen als letzter Container — mit Textarea (DOM-Methode)
+    const notizOffen = this._vcOpen['notizen'] !== undefined ? this._vcOpen['notizen'] : false;
+    const notizDiv = document.createElement('div');
+    notizDiv.className = 'vc' + (notizOffen ? ' open' : '');
+    notizDiv.id = 'vc-notizen';
+    notizDiv.innerHTML = '<div class="vc-hdr" onclick="WB._vcToggle(\'notizen\')">'
+      + '<span class="vc-icon">\uD83D\uDCDD</span>'
+      + '<span class="vc-title">Notizen</span>'
+      + '<span class="vc-chev">\u203a</span></div>'
+      + '<div class="vc-body"><div class="vc-notiz">'
+      + '<textarea id="vh-notiz-area" placeholder="Freie Notizen zu diesem Vorhaben..."></textarea>'
+      + '</div></div>';
+    scroll.appendChild(notizDiv);
     const ta = document.getElementById('vh-notiz-area');
     if (ta) {
+      ta.value = v.notiz || '';
       ta.addEventListener('blur', () => {
-        const db2 = this.db;
-        const v2  = (db2?.vorhaben||[]).find(x => x.id === v.id);
-        if (v2 && v2.notiz !== ta.value) {
-          v2.notiz = ta.value; v2.updatedAt = this._now();
-          this.setDirty();
+        const v2 = (this.db?.vorhaben||[]).find(x => x.id === v.id);
+        if (v2 && v2.notiz !== ta.value) { v2.notiz = ta.value; v2.updatedAt = this._now(); this.setDirty(); }
+      });
+    }
+
+    // Dropdown schließen bei Klick außerhalb
+    setTimeout(() => {
+      document.addEventListener('click', function closeDD(e) {
+        if (!e.target.closest('[onclick*="_vhToggleStatusDD"]')) {
+          const dd = document.getElementById('vh-status-dd');
+          if (dd) dd.classList.remove('open');
         }
-      });
-    }
+      }, { once: true });
+    }, 100);
   },
 
-  _vhRenderTabInfo(v, ctx) {
-    const el = document.getElementById('vh-tab-info'); if (!el) return;
-    const links = (v.links || []).filter(l => !l.deleted);
-    const tags  = [...new Set(links.map(l => l.tag || 'Sonstiges'))];
-
-    let h = '<div class="vh-tag-filter-row">'
-      + '<span class="vh-tag-filter active">Alle</span>';
-    tags.forEach(t => {
-      h += '<span class="vh-tag-filter">' + this._esc(t) + '</span>';
-    });
-    h += '<span class="vh-tag-filter">+ Tag</span></div>';
-
-    if (tags.length) {
-      const grouped = {};
-      links.forEach(l => {
-        const t = l.tag || 'Sonstiges';
-        if (!grouped[t]) grouped[t] = [];
-        grouped[t].push(l);
-      });
-      Object.entries(grouped).forEach(([tag, items]) => {
-        h += '<div class="vh-block"><div class="vh-block-head">'
-          + '<span class="vh-block-label">' + this._esc(tag) + '</span>'
-          + '<span class="vh-block-action" onclick="WB._vhLinkAdd(\''
-          + v.id + '\',\'' + ctx + '\')">+ Link</span></div>';
-        items.forEach(l => {
-          const typeClass = l.type || 'link';
-          const typeLabel = { gdoc:'G', sp:'SP', on:'ON', cf:'CF' }[typeClass] || '\u{1F517}';
-          h += '<div class="vh-link-item">'
-            + '<div class="vh-link-icon ' + typeClass + '">' + typeLabel + '</div>'
-            + '<div class="vh-link-body">'
-            + '<div class="vh-link-title">' + this._esc(l.titel || l.url) + '</div>'
-            + (l.notiz ? '<div class="vh-link-note">' + this._esc(l.notiz) + '</div>' : '')
-            + '</div>'
-            + '<div class="vh-link-actions">'
-            + '<div class="vh-link-btn" onclick="window.open(\'' + this._esc(l.url) + '\',\'_blank\')">\u2197</div>'
-            + '<div class="vh-link-btn" onclick="WB._vhLinkDelete(\'' + v.id + '\',\'' + ctx + '\',\'' + l.id + '\')">\u2715</div>'
-            + '</div></div>';
-        });
-        h += '</div>';
-      });
-    } else {
-      h += '<div class="vh-drag-hint">Link hierher ziehen oder + Link tippen</div>';
-    }
-
-    h += '<button class="vh-btn-gdoc" onclick="WB._vhGdocNeu(\''
-      + v.id + '\',\'' + ctx + '\')">'
-      + '+ Neues Google Doc erstellen und verkn\u00fcpfen</button>';
-
-    el.innerHTML = h;
+  _vcToggle(id) {
+    const el = document.getElementById('vc-' + id);
+    if (!el) return;
+    const nowOpen = el.classList.toggle('open');
+    this._vcOpen[id] = nowOpen;
   },
+
+  // Legacy-Methoden die noch von Buttons aufgerufen werden
+  _vhRenderTabAktuell(v, ctx) { this._vhRenderContainers(v, ctx); },
+  _vhRenderTabInfo(v, ctx)    { /* jetzt in _vhRenderContainers integriert */ },
+  _vhTabSwitch() { /* nicht mehr gebraucht */ },
 
   _vhLoeschen(vorhabenId, ctx) {
     if (!confirm('Vorhaben wirklich löschen? Alle Aufgaben und Links werden entfernt.')) return;
@@ -5053,8 +4989,9 @@ _ftStart() {
     const v = {
       id: 'v_' + Date.now(),
       titel: titel.trim(),
-      status: 'aktiv', charakter: 'bereichernd', zielId: null, aktiv: true, fokus: false, welt: ctx,
-      aufgaben: [], links: [],
+      status: 'offen', charakter: 'bereichernd', zielId: null, aktiv: true,
+      favorit: false, vertraulich: false,
+      welt: ctx, aufgaben: [], links: [], updatedAt: this._now(),
     };
     db.vorhaben.push(v);
     this.setDirty();
@@ -5063,21 +5000,20 @@ _ftStart() {
   },
 
   _vhAufgabeNeu(vorhabenId, ctx) {
-    this.aufgabeOpen(vorhabenId, null, ctx);
+    this.aufgabeOpen(vorhabenId, null, ctx || this._vhAktivCtx || 'priv');
   },
 
   _vhLinkAdd(vorhabenId, ctx) {
-    this.linkOpen(vorhabenId, null, ctx);
+    this.linkOpen(vorhabenId, null, ctx || this._vhAktivCtx || 'priv');
   },
 
   _vhLinkDelete(vorhabenId, ctx, linkId) {
-    const db = this.db;
-    const v  = (this.db?.vorhaben||[]).find(x => x.id === vorhabenId);
+    const v = (this.db?.vorhaben||[]).find(x => x.id === vorhabenId);
     if (!v) return;
     const link = (v.links||[]).find(l => l.id === linkId);
     this._softDelete(link);
     this.setDirty();
-    this._vhRenderTabInfo(v, ctx);
+    this._vhRenderDetail(vorhabenId);
     this._toast('Link entfernt');
   },
 
@@ -6656,9 +6592,12 @@ _ftStart() {
       // Vorhaben status-Feld + charakter-Feld + zielId Migration
 
       (this.db?.vorhaben||[]).forEach(v => {
-        if (!v.status) v.status = v.aktiv !== false ? 'aktiv' : 'abgeschlossen';
+        if (!v.status) v.status = v.aktiv !== false ? 'offen' : 'abgeschlossen';
+        if (v.status === 'aktiv') v.status = 'offen'; // Legacy-Status normalisieren
         if (!v.charakter) v.charakter = 'bereichernd';
         if (v.zielId === undefined) v.zielId = null;
+        if (v.favorit === undefined) v.favorit = false;
+        if (v.vertraulich === undefined) v.vertraulich = false;
       });
     
     } catch(e) {
