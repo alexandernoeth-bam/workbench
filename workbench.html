@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.14</title>
+  <title>WorkBench 2.9.15</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2249,7 +2249,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.14</div>
+  <div id="wb-startup-tagline">v2.9.15</div>
 </div>
 
 <div id="wb-app">
@@ -2695,6 +2695,9 @@
 
   </div><!-- /wb-content -->
 
+
+  </div><!-- /wb-main-area -->
+
   <div id="wb-sidebar-tabs">
     <div class="wb-stab active" data-tab="cockpit" onclick="WB._stabSwitch('cockpit',this)">
       <div class="wb-stab-body">
@@ -2749,8 +2752,6 @@
     </div>
   </div><!-- /wb-sidebar-tabs -->
 
-  </div><!-- /wb-main-area -->
-
   <div id="wb-nav">
     <div class="wb-tab active" data-tab="cockpit" onclick="WB.tabSwitch('cockpit')">
       <div class="wb-tab-icon"><svg viewBox="0 0 24 24"><path d="M11 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg></div>
@@ -2777,8 +2778,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.14',
-  APP_BUILD:   '20260619-1900',
+  APP_VERSION: '2.9.15',
+  APP_BUILD:   '20260619-2000',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6459,6 +6460,7 @@ _ftStart() {
     // Layout-Klasse setzen
     document.body.classList.toggle('wb-mobile', this._isMobile());
     document.body.classList.toggle('wb-desktop', !this._isMobile());
+    this._setupSidebarLayout();
     this._weltInit();
     this._oauthCheckToken();
 
@@ -8160,6 +8162,43 @@ _ftStart() {
     if (dot) dot.classList.toggle('on', !!this._settings?.bueroModus);
   },
 
+
+  _setupSidebarLayout() {
+    const sidebar = document.getElementById('wb-sidebar-tabs');
+    const mainArea = document.querySelector('.wb-main-area');
+    if (!sidebar || !mainArea) return;
+    // Sidebar in main-area verschieben falls nicht schon dort
+    if (sidebar.parentElement !== mainArea) {
+      mainArea.appendChild(sidebar);
+    }
+    // Inline-Styles setzen die garantiert greifen
+    mainArea.style.display = 'flex';
+    mainArea.style.flexDirection = 'row';
+    mainArea.style.flex = '1';
+    mainArea.style.minHeight = '0';
+    mainArea.style.overflow = 'hidden';
+    const content = document.getElementById('wb-content');
+    if (content) {
+      content.style.flex = '1';
+      content.style.minWidth = '0';
+      content.style.minHeight = '0';
+      content.style.overflowY = 'auto';
+      content.style.overflowX = 'hidden';
+    }
+    if (!this._isMobile()) {
+      sidebar.style.display = 'flex';
+      sidebar.style.flexDirection = 'column';
+      sidebar.style.width = '56px';
+      sidebar.style.minWidth = '56px';
+      sidebar.style.flexShrink = '0';
+      sidebar.style.overflowY = 'auto';
+      sidebar.style.paddingTop = '4px';
+      sidebar.style.position = 'relative';
+      sidebar.style.zIndex = '1';
+    } else {
+      sidebar.style.display = 'none';
+    }
+  },
   _isMobile() {
     const d = this._settings?.device || 'mac';
     return d === 'pixel' || d === 'ipad';
