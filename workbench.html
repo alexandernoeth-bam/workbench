@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.8.0</title>
+  <title>WorkBench 2.8.1</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2076,7 +2076,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.8.0</div>
+  <div id="wb-startup-tagline">v2.8.1</div>
 </div>
 
 <div id="wb-app">
@@ -2088,7 +2088,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.8.0 · Build 20260619-0300</div>
+    <div id="wb-menu-version">v2.8.1 · Build 20260619-0400</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2527,8 +2527,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.8.0',
-  APP_BUILD:   '20260619-0300',
+  APP_VERSION: '2.8.1',
+  APP_BUILD:   '20260619-0400',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -5831,11 +5831,14 @@ _ftStart() {
       return;
     }
     this._oauthHideBanner();
-    if (this.isDirty) { await this._syncUploadAll(); }
-    await this._syncCheckDriveNewer();
+    if (this.isDirty) {
+      await this._syncUploadAll();
+    } else {
+      await this._syncCheckNewer();
+    }
   },
 
-  async _syncCheckDriveNewer() {
+  async _syncCheckNewer() {
     try {
       const token = await this._oauthGetTokenSilent();
       if (!token) return;
@@ -5851,12 +5854,34 @@ _ftStart() {
         if (!resp.ok) continue;
         const meta    = await resp.json();
         const driveTs = new Date(meta.modifiedTime).getTime();
-        if (driveTs > this._syncLastDownload && driveTs > this._syncLastUpload) {
-          await this.oauthSyncDownload(ctx);
+        if (driveTs > this._syncLastDownload + 5000) {
+          if (this.isDirty) {
+            // Konflikt: lokale ungespeicherte Änderungen vs. neueres Drive
+            this._syncConflictDialog(ctx, driveTs);
+          } else {
+            await this.oauthSyncDownload(ctx);
+          }
         }
       }
     } catch(e) {
       console.warn('[sync check]', e.message);
+    }
+  },
+
+  _syncConflictDialog(ctx, driveTs) {
+    const driveDate = new Date(driveTs).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+    const weltName  = ctx === 'pro' ? 'Beruf' : 'Privat';
+    const choice = confirm(
+      'Konflikt (' + weltName + '): Ein anderes Ger\u00e4t hat Daten um '
+      + driveDate + ' ge\u00e4ndert.\nDu hast lokale \u00c4nderungen.\n\n'
+      + 'OK = Meine \u00c4nderungen hochladen (Drive \u00fcberschreiben)\n'
+      + 'Abbrechen = Drive-Stand laden (\u00e4nderungen verwerfen)'
+    );
+    if (choice) {
+      this.oauthSyncUpload(ctx);
+    } else {
+      this.isDirty = false;
+      this.oauthSyncDownload(ctx);
     }
   },
 
@@ -5880,6 +5905,8 @@ _ftStart() {
       const fileId = await this._oauthFindOrCreateFile(token, ctx);
       const db     = ctx==='pro' ? this.dataPro : this.dataPriv;
       if (!db) return;
+      // Lokalen Stand vor Upload nochmals aus IDB sicherstellen
+      await this.idbSaveAll();
       const payload = JSON.stringify({ data: db, _exported: new Date().toISOString(), _appVersion: this.APP_VERSION });
       const resp = await fetch(this.UPLOAD_API + '/files/' + fileId + '?uploadType=media', {
         method:  'PATCH',
@@ -5895,6 +5922,7 @@ _ftStart() {
       this._toast('\u2713 ' + (ctx === 'pro' ? 'Beruf' : 'Privat') + ' hochgeladen');
     } catch(e) {
       this._oauthShowBanner('\u26a0 Upload-Fehler: ' + e.message);
+      console.warn('[upload]', e.message);
     }
   },
 
@@ -5921,6 +5949,7 @@ _ftStart() {
       this.renderSection(this.activeTab);
     } catch(e) {
       this._oauthShowBanner('\u26a0 Sync-Fehler: ' + e.message);
+      console.warn('[download]', e.message);
     }
   },
 
@@ -6021,22 +6050,23 @@ _ftStart() {
     // OAuth Status prüfen
     this._oauthCheckToken();
 
-    // Sync beim Start: IMMER erst lokal sichern (Upload), dann Drive holen (Download+Merge)
+    // Sync beim Start: Upload lokaler Änderungen → dann Drive holen (Merge)
     if (this._oauthClientId) {
       const token = await this._oauthGetTokenSilent();
       if (token) {
-        // Schritt 1: Lokalen Stand zu Drive hochladen (Merge-Basis für Download)
-        try { await this._syncUploadAll(); } catch(e) { console.warn('[init upload]', e.message); }
+        // Schritt 1: Lokalen Stand sichern falls ungespeicherte Änderungen da
+        if (this.isDirty) {
+          try { await this._syncUploadAll(); } catch(e) { console.warn('[init upload]', e.message); }
+        }
         // Schritt 2: Drive herunterladen und mit lokalem Stand mergen
         try { await this._syncDownloadAll(); } catch(e) { console.warn('[init download]', e.message); }
-        // Schritt 3: Gemergten Stand wieder hochladen (Drive hat jetzt besten Stand)
-        try { await this._syncUploadAll(); } catch(e) { console.warn('[init upload2]', e.message); }
+        // Schritt 3: Wenn nach Merge noch dirty (Merge hat lokale Daten) → nochmal hochladen
+        if (this.isDirty) {
+          try { await this._syncUploadAll(); } catch(e) { console.warn('[init upload2]', e.message); }
+        }
       } else {
         this._oauthShowBanner('\u26a0 Bitte Google-Verbindung erneuern');
-        this._syncLastUpload = Date.now(); this._syncLastDownload = Date.now();
       }
-    } else {
-      this._syncLastUpload = Date.now(); this._syncLastDownload = Date.now();
     }
 
     // Auto-Bereinigung: Items älter als 7 Tage permanent löschen

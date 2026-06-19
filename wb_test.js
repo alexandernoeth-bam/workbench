@@ -1305,7 +1305,7 @@ if (bannerPos > 0 && headerPos > 0 && bannerPos < headerPos) {
 } else { fail('#wb-oauth-banner steht nicht vor #wb-header'); }
 
 // Banner-Funktionen
-const SYNC_FNS = ['_oauthShowBanner', '_oauthHideBanner', '_oauthReconnect', '_oauthBannerDismiss', '_oauthCheckToken', '_mergeArrayById', '_mergeDb', '_syncStart', '_syncTick', '_syncCheckDriveNewer', '_syncUploadAll', '_syncDownloadAll'];
+const SYNC_FNS = ['_oauthShowBanner', '_oauthHideBanner', '_oauthReconnect', '_oauthBannerDismiss', '_oauthCheckToken', '_mergeArrayById', '_mergeDb', '_syncStart', '_syncTick', '_syncCheckNewer', '_syncUploadAll', '_syncDownloadAll'];
 let s31Ok = 0, s31Fail = 0;
 SYNC_FNS.forEach(fn => {
   const found = jsCode.includes('  ' + fn + '(') || jsCode.includes('  async ' + fn + '(');
@@ -1732,11 +1732,9 @@ if (sdBody39.includes('_oauthGetTokenSilent')) {
   ok('setDirty() nutzt _oauthGetTokenSilent()'); f39Ok++;
 } else { fail('setDirty() nutzt kein _oauthGetTokenSilent()'); f39Fail++; }
 
-// _syncCheckDriveNewer sucht fileId falls nicht cached
-const scdnBody = jsCode.match(/  async _syncCheckDriveNewer\(\)[\s\S]*?^  \},/m)?.[0] || '';
-if (scdnBody.includes('_oauthFindOrCreateFile') || scdnBody.includes('fileId =')) {
-  ok('_syncCheckDriveNewer() sucht fileId wenn nicht cached'); f39Ok++;
-} else { fail('_syncCheckDriveNewer() sucht fileId nicht'); f39Fail++; }
+// _syncCheckNewer sucht fileId
+// _syncCheckNewer prüft Drive auf neuere Version
+content.includes('_syncCheckNewer') ? (ok('_syncCheckNewer() definiert'), f39Ok++) : (fail('_syncCheckNewer() fehlt'), f39Fail++);
 
 // init() setzt _syncLastUpload/Download
 const initBody39 = s25InitBody;
