@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.0</title>
+  <title>WorkBench 2.9.1</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2090,7 +2090,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.0</div>
+  <div id="wb-startup-tagline">v2.9.1</div>
 </div>
 
 <div id="wb-app">
@@ -2102,7 +2102,7 @@
 
   <div id="wb-header">
     <div id="wb-header-title">WorkBench</div>
-    <div id="wb-menu-version">v2.9.0 · Build 20260619-0600</div>
+    <div id="wb-menu-version">v2.9.1 · Build 20260619-0700</div>
     <button id="wb-journal-btn" onclick="WB.journalOpen()" title="Journal" style="width:32px;height:32px;border-radius:var(--radius-sm);background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:16px;">&#x1F4D3;</button>
     <button id="wb-menu-btn" onclick="WB.settingsOpen()">
       <svg viewBox="0 0 24 24">
@@ -2541,8 +2541,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.0',
-  APP_BUILD:   '20260619-0600',
+  APP_VERSION: '2.9.1',
+  APP_BUILD:   '20260619-0700',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6153,6 +6153,13 @@ _ftStart() {
 
   async _syncUpload() {
     try {
+      // Kein Passwort → Daten lokal halten, Banner zeigen
+      const pw = sessionStorage.getItem('wb_enc_pw');
+      if (!pw) {
+        this._pendingChanges = true; await this.idbSave();
+        this._oauthShowBanner('\u26a0 Bitte Passwort eingeben um zu synchronisieren');
+        return;
+      }
       const token = await this._oauthGetTokenSilent();
       if (!token) {
         this._pendingChanges = true; await this.idbSave();
@@ -6338,6 +6345,12 @@ _ftStart() {
   // ── Init ─────────────────────────────────────────────
 
   async init() {
+    // Startup immer nach max. 8s ausblenden (Sicherheitsnetz)
+    const hideStartup = () => {
+      const s = document.getElementById('wb-startup');
+      if (s) { s.style.opacity = '0'; setTimeout(() => s.remove(), 500); }
+    };
+    setTimeout(hideStartup, 8000);
     try {
       await this.idbOpen();
       await this.idbLoad();
@@ -6346,15 +6359,18 @@ _ftStart() {
         return;
       }
       await this._initAfterCrypto();
-    } catch(e) { console.error('[init]', e.message); }
+    } catch(e) {
+      console.error('[init]', e.message);
+      hideStartup(); // Im Fehlerfall sofort einblenden
+    }
   },
 
   async _initAfterCrypto() {
-    // Startup-Screen: nach 5s ausblenden
+    // Startup nach 3s ausblenden (unabhängig von Sync)
     setTimeout(() => {
       const s = document.getElementById('wb-startup');
       if (s) { s.style.opacity = '0'; setTimeout(() => s.remove(), 500); }
-    }, 5000);
+    }, 3000);
 
     await this._sLoadSettings();
     this._weltInit();
@@ -6363,15 +6379,15 @@ _ftStart() {
     // Migration falls nötig
     await this._migrate_v2();
 
-    // Drive laden
+    // Drive laden — Fehler dürfen App nicht blockieren
     if (this._oauthClientId) {
-      if (this._pendingChanges || this.isDirty) {
-        try { await this._syncUpload(); } catch(e) { console.warn('[init upload]', e.message); }
-      }
+      try {
+        if (this._pendingChanges || this.isDirty) await this._syncUpload();
+      } catch(e) { console.warn('[init upload]', e.message); }
       try { await this._syncDownload(); } catch(e) { console.warn('[init download]', e.message); }
-      if (this.isDirty) {
-        try { await this._syncUpload(); } catch(e) { console.warn('[init upload2]', e.message); }
-      }
+      try {
+        if (this.isDirty) await this._syncUpload();
+      } catch(e) { console.warn('[init upload2]', e.message); }
     }
 
     this._sBereinigen();
