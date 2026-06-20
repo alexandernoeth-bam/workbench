@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.51</title>
+  <title>WorkBench 2.9.52</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2365,7 +2365,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.51</div>
+  <div id="wb-startup-tagline">v2.9.52</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2532,12 +2532,15 @@
           <div id="ck-dialog-buttons">
             <button class="ck-d-btn primary" onclick="WB._ckDialogKlassify('aufgabe')">Aufgabe</button>
             <button class="ck-d-btn" onclick="WB._ckDialogKlassify('termin')">Termin</button>
-            <button class="ck-d-btn" onclick="WB._ckDialogKlassify('vorhaben')">Vorhaben</button>
             <button class="ck-d-btn" onclick="WB._ckDialogKlassify('schnell')">Schnell</button>
-            <button class="ck-d-btn" onclick="WB._ckDialogKlassify('pflicht')">Pflicht</button>
-            <button class="ck-d-btn" onclick="WB._ckDialogKlassify('ziel')">Ziel</button>
-            <button class="ck-d-btn" onclick="WB._ckDialogKlassify('ressource')">Ressource</button>
+            <button class="ck-d-btn" onclick="WB._ckNotizenSubDialog()">Notiz</button>
             <button class="ck-d-btn danger" onclick="WB._ckDialogKlassify('loeschen')">L&ouml;schen</button>
+          </div>
+          <!-- Sub-Dialog: Notiz-Ziel wählen -->
+          <div id="ck-notiz-subdialog" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+            <div style="font-size:12px;font-weight:700;color:var(--faint);margin-bottom:8px">In welche Notizliste?</div>
+            <div id="ck-notiz-listen" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto"></div>
+            <button class="ck-d-btn primary" onclick="WB._ckDialogKlassify('notiz-neu')" style="margin-top:8px;width:100%">+ Neue Liste anlegen</button>
           </div>
         </div>
       </div>
@@ -2987,8 +2990,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.51',
-  APP_BUILD:   '20260621-1530',
+  APP_VERSION: '2.9.52',
+  APP_BUILD:   '20260621-1600',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3829,8 +3832,30 @@ _ftStart() {
     const overlay = document.getElementById('ck-dialog-overlay'); if (overlay) overlay.classList.add('open');
   },
 
+  _ckNotizenSubDialog() {
+    const sub = document.getElementById('ck-notiz-subdialog');
+    const listenEl = document.getElementById('ck-notiz-listen');
+    if (!sub || !listenEl) return;
+    // Listen rendern
+    const listen = this._nzGetListen();
+    if (listen.length) {
+      listenEl.innerHTML = listen.map(l => {
+        const offen = (l.items||[]).filter(i => !i.deleted && !i.done).length;
+        return '<button class="ck-d-btn" style="text-align:left;width:100%;justify-content:flex-start;gap:8px"'
+          + ' onclick="WB._ckDialogKlassify(\'notiz:\' + \'' + this._esc(l.id) + '\')">'
+          + '<span>' + this._esc(l.titel) + '</span>'
+          + '<span style="font-size:11px;color:var(--faint);margin-left:auto">' + offen + ' Eintr.</span>'
+          + '</button>';
+      }).join('');
+    } else {
+      listenEl.innerHTML = '<div style="font-size:13px;color:var(--faint);font-style:italic">Noch keine Listen vorhanden</div>';
+    }
+    sub.style.display = sub.style.display === 'none' ? '' : 'none';
+  },
+
   _ckDialogClose() {
     const overlay = document.getElementById('ck-dialog-overlay'); if (overlay) overlay.classList.remove('open');
+    const sub = document.getElementById('ck-notiz-subdialog'); if (sub) sub.style.display = 'none';
   },
 
   _ckSplitText(text) {
@@ -3884,12 +3909,9 @@ _ftStart() {
     // ── Aktuellen Editor-Eintrag speichern ──
     this._ckSaveEntry();
 
-    // ── Klassifizierung ──
     switch(type) {
       case 'aufgabe': {
         const { titel, notiz } = this._ckSplitText(text);
-        const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
-
         if (!db) break;
         if (!db.quickItems) db.quickItems = [];
         db.quickItems.push({ id:'q_'+Date.now(), text:titel, notiz, date:'', done:false, deleted:false, updatedAt:this._now() });
@@ -3904,49 +3926,46 @@ _ftStart() {
             const n = document.getElementById('wb-f-notiz'); if(n) n.value = notiz;
           }, 80);
         }, 100); break;
-      case 'vorhaben': {
-        const { titel, notiz } = this._ckSplitText(text);
-        const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
-
-        if (!db) break;
-        if (!db.vorhaben) db.vorhaben = [];
-        db.vorhaben.push({ id:'v_'+Date.now(), titel, notiz, status:'aktiv', charakter:'bereichernd', zielId:null, aktiv:true, fokus:false, stichtag:'', welt:ctx, aufgaben:[], links:[], updatedAt:this._now() });
-        this.setDirty(); this._toast('\u2713 Vorhaben: ' + titel.slice(0,30)); break;
-      }
       case 'schnell': {
         const { titel, notiz } = this._ckSplitText(text);
-        const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
-
         if (!db) break;
         if (!db.quickItems) db.quickItems = [];
         db.quickItems.push({ id:'q_'+Date.now(), text:titel, notiz, date:'', startTime:'', done:false, deleted:false, updatedAt:this._now() });
         this.setDirty(); this._toast('\u2713 Erinnerung: ' + titel.slice(0,30)); break;
       }
-      case 'pflicht':
-        setTimeout(() => {
-          const { titel } = this._ckSplitText(text);
-          const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
-          this.pflichtOpen(null, ctx);
-          setTimeout(() => { const t = document.getElementById('wb-f-text'); if(t) t.value = titel; }, 80);
-        }, 100); break;
-      case 'ziel':
-        setTimeout(() => {
-          const { titel } = this._ckSplitText(text);
-          const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
-          this.zielOpen(null, ctx);
-          setTimeout(() => { const t = document.getElementById('wb-f-text'); if(t) t.value = titel; }, 80);
-        }, 100); break;
-      case 'ressource':
-        setTimeout(() => {
-          const { titel, notiz } = this._ckSplitText(text);
-          const ctx = this.activeWorld==='beruf' ? 'pro' : 'priv';
-          this.linkOpen(null, null, ctx);
-          setTimeout(() => {
-            const u = document.getElementById('wb-f-url'); if(u) u.value = titel;
-            const n = document.getElementById('wb-f-notiz'); if(n) n.value = notiz;
-          }, 80);
-        }, 100); break;
-      case 'loeschen': this._toast('Eintrag gel\u00f6scht'); break;
+      case 'notiz-neu': {
+        // Neue Liste anlegen mit Text als erstem Eintrag
+        if (!db) break;
+        if (!db.notizen) db.notizen = [];
+        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+        const titel = lines[0] || text.slice(0,40);
+        const items = lines.slice(1).map(l => ({ id: 'ni_' + Date.now() + Math.random(), text: l, done: false }));
+        if (!items.length) items.push({ id: 'ni_' + Date.now(), text: titel, done: false });
+        const neueId = 'nz_' + Date.now();
+        db.notizen.push({ id: neueId, titel, typ: 'check', farbe: 'c-weiss', items, gepinnt: false });
+        this.setDirty();
+        this._toast('\u2713 Neue Notizliste \u201e' + titel.slice(0,25) + '\u201c angelegt');
+        break;
+      }
+      default: {
+        // 'notiz:LISTEN_ID' — Text als neuen Eintrag in bestehende Liste
+        if (type.startsWith('notiz:')) {
+          const listeId = type.slice(6);
+          const l = this._nzGetListen().find(x => x.id === listeId);
+          if (l && db) {
+            if (!l.items) l.items = [];
+            const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
+            lines.forEach(line => {
+              l.items.push({ id: 'ni_' + Date.now() + Math.random(), text: line, done: false });
+            });
+            this.setDirty();
+            this._toast('\u2713 ' + lines.length + ' Eintrag in \u201e' + l.titel + '\u201c');
+          }
+        } else if (type === 'loeschen') {
+          this._toast('Eintrag gel\u00f6scht');
+        }
+        break;
+      }
     }
   },
 

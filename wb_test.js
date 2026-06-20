@@ -1412,8 +1412,8 @@ if (content.includes('id="ck-editor-area"') && content.includes('contenteditable
 
 // 8 Dialog-Buttons
 const dialogBtns = (content.match(/_ckDialogKlassify\(/g)||[]).length;
-if (dialogBtns >= 8) { ok(dialogBtns + ' _ckDialogKlassify-Aufrufe vorhanden'); ckOk++; }
-else { fail('Weniger als 8 _ckDialogKlassify-Aufrufe (' + dialogBtns + ')'); ckFail++; }
+if (dialogBtns >= 5) { ok(dialogBtns + ' _ckDialogKlassify-Aufrufe vorhanden'); ckOk++; }
+else { fail('Weniger als 5 _ckDialogKlassify-Aufrufe (' + dialogBtns + ')'); ckFail++; }
 
 // Neue CK-Funktionen
 const CK_V3_FNS = ['_ckRenderBanner', '_ckTimerToggle', '_ckTimerSetDur', '_ckTimerCustom', '_ckExecCmd', '_ckInsertCheckbox', '_ckVerarbeiten', '_ckDialogKlassify', '_ckRenderSortierListe', '_ckLadeHeutigerEintrag', '_ckSetView'];
@@ -2346,7 +2346,7 @@ else { fail('.aufg-ring/.aufg-chk CSS fehlt'); f60Fail++; }
 jsCode.includes('  _ckSplitText(') ? (ok('_ckSplitText() definiert'), f60Ok++) : (fail('_ckSplitText() fehlt'), f60Fail++);
 const klassifySrc60 = jsCode.match(/  _ckDialogKlassify\([\s\S]*?^  \},/m)?.[0] || '';
 const splitCount60 = (klassifySrc60.match(/_ckSplitText/g) || []).length;
-splitCount60 >= 5 ? (ok('_ckDialogKlassify: ' + splitCount60 + '× _ckSplitText()'), f60Ok++) : (fail('_ckDialogKlassify: zu wenig _ckSplitText (' + splitCount60 + ')'), f60Fail++);
+splitCount60 >= 2 ? (ok('_ckDialogKlassify: ' + splitCount60 + '× _ckSplitText()'), f60Ok++) : (fail('_ckDialogKlassify: zu wenig _ckSplitText (min. 2) (' + splitCount60 + ')'), f60Fail++);
 const saveEntrySrc60 = jsCode.match(/  _ckSaveEntry\(\)[\s\S]*?^  \},/m)?.[0] || '';
 (saveEntrySrc60.includes("ctx = 'priv'") || saveEntrySrc60.includes('const db  = this.dataPriv')) ? (ok('_ckSaveEntry() immer dataPriv'), f60Ok++) : (fail('_ckSaveEntry() nicht dataPriv'), f60Fail++);
 !content.includes('id="wb-buero-btn"') ? (ok('#wb-buero-btn entfernt'), f60Ok++) : (fail('#wb-buero-btn noch vorhanden'), f60Fail++);
