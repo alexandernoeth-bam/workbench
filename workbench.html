@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.47</title>
+  <title>WorkBench 2.9.49</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2365,7 +2365,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.47</div>
+  <div id="wb-startup-tagline">v2.9.49</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2516,7 +2516,7 @@
               Tagesfokus
             </button>
           </div>
-          <div id="ck-editor-area" contenteditable="true" spellcheck="true" oninput="WB._ckOnInput();WB._ckScrollToBottom()"></div>
+          <div id="ck-editor-area" contenteditable="true" spellcheck="true" oninput="WB._ckOnInput()"></div>
           <div id="ck-editor-actions">
             <div id="ck-editor-hint">Text markieren &rarr; Klassifizieren</div>
             <button id="ck-verarbeiten-btn" disabled onclick="WB._ckVerarbeiten()">&rarr; Klassifizieren</button>
@@ -2987,8 +2987,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.47',
-  APP_BUILD:   '20260621-1200',
+  APP_VERSION: '2.9.49',
+  APP_BUILD:   '20260621-1400',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3004,7 +3004,7 @@ const WB = {
   _pendingTs:      0,
   _driveFileId:    null,
   _cryptoKey:      null,
-  activeWorld: 'beruf',
+  activeWorld: 'beide',
   _weltOverride: false,
   isDirty: false,
 
@@ -3452,9 +3452,16 @@ _ftStart() {
 
   _ckOnInput() {
     if (this._ckInsertingMedia) return;
-    this._ckLastInputTime = Date.now();
-    clearTimeout(this._ckSaveTimer);
-    this._ckSaveTimer = setTimeout(() => { this._ckSaveEntry(); }, 1500);
+    if (this._ckOnInputBusy) return; // Rekursions-Schutz
+    this._ckOnInputBusy = true;
+    try {
+      this._ckLastInputTime = Date.now();
+      clearTimeout(this._ckSaveTimer);
+      this._ckSaveTimer = setTimeout(() => { this._ckSaveEntry(); }, 1500);
+      this._ckScrollToBottom();
+    } finally {
+      this._ckOnInputBusy = false;
+    }
   },
 
   _ckInsertChar(char) {
@@ -3513,13 +3520,15 @@ _ftStart() {
         });
         const area = document.getElementById('ck-editor-area'); if (!area) return;
         area.focus();
-        // Flag setzen damit oninput keinen rekursiven Save triggert
         this._ckInsertingMedia = true;
         document.execCommand('insertHTML', false,
           '<img src="' + compressed + '" style="max-width:100%;border-radius:6px;margin:4px 0;display:block;">');
-        this._ckInsertingMedia = false;
-        this._ckSaveEntry();
-        this._toast('\u2713 Bild eingef\u00fcgt');
+        // Flag erst nach nächstem Event-Cycle zurücksetzen
+        setTimeout(() => {
+          this._ckInsertingMedia = false;
+          this._ckSaveEntry();
+          this._toast('\u2713 Bild eingefügt');
+        }, 100);
       } catch(err) {
         this._ckInsertingMedia = false;
         this._toast('Fehler beim Bildladen: ' + err.message);
@@ -5409,18 +5418,23 @@ _ftStart() {
 
   _abAlleLinks() {
     const links = [];
-    const zeigeBeide = this._weltBeideVisible();
+    const welt = this.activeWorld;
+    const weltFilter = (item) => {
+      if (welt === 'beide') return true;
+      if (welt === 'beruf') return item.welt === 'pro' || item.welt === 'beruf';
+      return item.welt !== 'pro' && item.welt !== 'beruf';
+    };
     const db = this.db;
     // Links in Vorhaben
     (this.db?.vorhaben||[]).forEach(v => {
-      if (!zeigeBeide && (v.welt === 'pro' || v.welt === 'beruf')) return;
+      if (!weltFilter(v)) return;
       (v.links||[]).filter(l => !l.deleted).forEach(l => {
         links.push({ ...l, _ctx: v.welt || 'priv', _vorhabenId: v.id, _vorhabenTitel: v.titel });
       });
     });
     // Links ohne Vorhaben (direkt in db.links)
     (this.db?.links||[]).filter(l => !l.deleted).forEach(l => {
-      if (!zeigeBeide && (l.welt === 'pro' || l.welt === 'beruf')) return;
+      if (!weltFilter(l)) return;
       links.push({ ...l, _ctx: l.welt || 'priv', _vorhabenId: null, _vorhabenTitel: null });
     });
     return links;
@@ -9770,7 +9784,8 @@ _ftStart() {
 
   _weltInit() {
     this._weltOverride = false;
-    this.activeWorld = this._weltIstArbeitstag() ? 'beruf' : 'privat';
+    // Standard: 'beide' — User wählt explizit per Button
+    this.activeWorld = 'beide';
     this._bueroUpdateUI();
     // Header-Toggle synchronisieren
     const welt = this.activeWorld || 'beide';
