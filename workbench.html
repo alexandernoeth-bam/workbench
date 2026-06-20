@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.44</title>
+  <title>WorkBench 2.9.46</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2365,7 +2365,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.44</div>
+  <div id="wb-startup-tagline">v2.9.46</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2998,8 +2998,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.44',
-  APP_BUILD:   '20260621-1000',
+  APP_VERSION: '2.9.46',
+  APP_BUILD:   '20260621-1130',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3592,47 +3592,58 @@ _ftStart() {
     const dow   = now.getDay();
     const ts    = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
 
-    const lines = [];
+    // Alle Einträge in einem Array sammeln mit optionalem startTime für Sortierung
+    const timed   = []; // haben eine Uhrzeit → chronologisch
+    const untimed = []; // keine Uhrzeit → am Ende
 
-    // Trenner
-    lines.push({ type: 'divider', ts });
-
-    // Termine (nur zukünftige, nicht vergangene)
-    const termine = (db.customEvents || [])
+    // Termine (nur zukünftige)
+    (db.customEvents || [])
       .filter(e => !e.deleted && !e.storniert && e.date === today)
       .filter(e => {
         if (!e.startTime) return true;
         const [h,m] = e.startTime.split(':').map(Number);
         return h * 60 + m >= nowMin;
       })
-      .sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
-    termine.forEach(e => {
-      lines.push({ type: 'event', text: (e.startTime ? e.startTime + ' ' : '') + e.text });
-    });
+      .forEach(e => {
+        const entry = { type: 'event', sym: '○', text: (e.startTime ? e.startTime + '  ' : '') + e.text, startTime: e.startTime || null };
+        e.startTime ? timed.push(entry) : untimed.push(entry);
+      });
 
-    // Schnell-Erinnerungen (offen, heute, kein Überfällig-Filter da kein Datum)
+    // Schnell-Erinnerungen (offen, heute)
     (db.quickItems || [])
       .filter(q => !q.deleted && !q.done && q.date === today)
-      .forEach(q => lines.push({ type: 'task', text: q.text }));
+      .forEach(q => {
+        const entry = { type: 'task', sym: '☐', text: (q.startTime ? q.startTime + '  ' : '') + q.text, startTime: q.startTime || null };
+        q.startTime ? timed.push(entry) : untimed.push(entry);
+      });
 
     // Wochenpflichten (heute fällig, nicht erledigt)
     (db.wochenpflichten || [])
       .filter(p => !p.deleted && (p.taeglich || (p.wochentage||[]).includes(dow)))
       .filter(p => !(db.pflichtStatus?.[today]?.[p.id]))
-      .forEach(p => lines.push({ type: 'repeat', text: p.titel }));
-
-    // Aufgaben aus Vorhaben (fällig heute oder ohne Datum, nicht erledigt)
-    (db.vorhaben || []).filter(v => !v.deleted).forEach(v => {
-      (v.aufgaben || []).filter(a => !a.deleted && !a.done && (!a.datum || a.datum >= today)).forEach(a => {
-        lines.push({ type: 'task', text: a.text, checklist: (a.checklist||[]).filter(c => !c.done) });
+      .forEach(p => {
+        const entry = { type: 'repeat', sym: '∞', text: (p.startTime ? p.startTime + '  ' : '') + p.titel, startTime: p.startTime || null };
+        p.startTime ? timed.push(entry) : untimed.push(entry);
       });
+
+    // Aufgaben aus Vorhaben — NUR wenn Datum === heute (nicht alle offenen!)
+    (db.vorhaben || []).filter(v => !v.deleted).forEach(v => {
+      (v.aufgaben || [])
+        .filter(a => !a.deleted && !a.done && a.datum === today)
+        .forEach(a => {
+          untimed.push({ type: 'task', text: a.text, checklist: (a.checklist||[]).filter(c => !c.done) });
+        });
     });
 
-    if (lines.length === 1) { this._toast('Keine offenen Einträge für heute'); return; }
+    // Zeitgesteuerte chronologisch sortieren
+    timed.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
 
-    // HTML aufbauen und einfügen
+    const allLines = [...timed, ...untimed];
+
+    if (!allLines.length) { this._toast('Keine offenen Einträge für heute'); return; }
+
+    // HTML aufbauen
     area.focus();
-    // Trenner
     const divEl = document.createElement('div');
     divEl.className = 'ck-divider'; divEl.contentEditable = 'false';
     divEl.innerHTML = '<div class="ck-divider-line"></div>';
@@ -3641,7 +3652,7 @@ _ftStart() {
     tsEl.className = 'ck-divider-ts'; tsEl.textContent = ts + ' — Tagesfokus';
     area.appendChild(tsEl);
 
-    lines.slice(1).forEach(l => {
+    allLines.forEach(l => {
       if (l.type === 'event') {
         const p = document.createElement('p');
         p.textContent = '○ ' + l.text;
@@ -3651,9 +3662,8 @@ _ftStart() {
         p.textContent = '∞ ' + l.text;
         area.appendChild(p);
       } else if (l.type === 'task') {
-        // Checkbox-Element
         const wrap = document.createElement('div');
-        wrap.style.cssText = 'display:flex;align-items:flex-start;gap:6px;margin:2px 0;';
+        wrap.style.cssText = 'display:flex;align-items:flex-start;gap:5px;margin:2px 0;';
         const chk = document.createElement('input');
         chk.type = 'checkbox'; chk.style.cssText = 'margin-top:3px;flex-shrink:0;accent-color:var(--accent);';
         chk.addEventListener('change', () => {
@@ -3679,7 +3689,7 @@ _ftStart() {
             });
             const subTxt = document.createElement('span');
             subTxt.style.fontSize = '13px'; subTxt.style.color = 'var(--faint)';
-            subTxt.textContent = '↳ ' + c.text;
+            subTxt.textContent = '\u21b3 ' + c.text;
             sub.appendChild(subChk); sub.appendChild(subTxt);
             area.appendChild(sub);
           });
