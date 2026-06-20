@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.36</title>
+  <title>WorkBench 2.9.37</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2323,7 +2323,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.36</div>
+  <div id="wb-startup-tagline">v2.9.37</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2937,8 +2937,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.36',
-  APP_BUILD:   '20260620-2000',
+  APP_VERSION: '2.9.37',
+  APP_BUILD:   '20260620-2130',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -7191,22 +7191,52 @@ _ftStart() {
 
 
   async _syncGetFileId(token) {
-    if (this._driveFileId) return this._driveFileId;
-    const q    = encodeURIComponent("name='workbench.json' and trashed=false");
-    const resp = await fetch(this.DRIVE_API + '/files?q=' + q + '&fields=files(id,name)',
-      { headers: { Authorization: 'Bearer ' + token } });
-    const data = await resp.json();
-    if (data.files?.length) {
-      this._driveFileId = data.files[0].id;
-    } else {
-      const cr = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name:'workbench.json', mimeType:'application/json' }),
-      });
-      const cf = await cr.json();
-      this._driveFileId = cf.id;
+    // Gecachte ID prüfen — erst validieren ob Datei noch existiert
+    if (this._driveFileId) {
+      try {
+        const check = await fetch(this.DRIVE_API + '/files/' + this._driveFileId + '?fields=id,trashed',
+          { headers: { Authorization: 'Bearer ' + token } });
+        if (check.ok) {
+          const meta = await check.json();
+          if (!meta.trashed) return this._driveFileId; // ID gültig
+        }
+        // ID ungültig (404 oder gelöscht) — Cache leeren und neu suchen
+        console.warn('[syncGetFileId] gecachte ID ungültig, suche neu');
+        this._driveFileId = null;
+        await this.idbSet('meta', 'driveFileId', null);
+      } catch(e) {
+        // Netzwerkfehler — mit gecachter ID weitermachen
+        return this._driveFileId;
+      }
     }
+
+    // Drive nach workbench.json durchsuchen
+    const q    = encodeURIComponent("name='workbench.json' and trashed=false");
+    const resp = await fetch(this.DRIVE_API + '/files?q=' + q + '&fields=files(id,name,modifiedTime)&orderBy=modifiedTime+desc',
+      { headers: { Authorization: 'Bearer ' + token } });
+    if (!resp.ok) throw new Error('Drive-Suche fehlgeschlagen: HTTP ' + resp.status);
+    const data = await resp.json();
+
+    if (data.files?.length) {
+      // Neueste workbench.json nehmen
+      this._driveFileId = data.files[0].id;
+      await this.idbSet('meta', 'driveFileId', this._driveFileId);
+      if (data.files.length > 1) {
+        console.warn('[syncGetFileId] ' + data.files.length + ' workbench.json gefunden — nutze neueste:', data.files[0].modifiedTime);
+      }
+      return this._driveFileId;
+    }
+
+    // Keine Datei gefunden — NUR dann neue anlegen
+    console.warn('[syncGetFileId] keine workbench.json in Drive — lege neue an');
+    const cr = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'workbench.json', mimeType: 'application/json' }),
+    });
+    if (!cr.ok) throw new Error('Datei anlegen fehlgeschlagen: HTTP ' + cr.status);
+    const cf = await cr.json();
+    this._driveFileId = cf.id;
     await this.idbSet('meta', 'driveFileId', this._driveFileId);
     return this._driveFileId;
   },
@@ -7235,11 +7265,24 @@ _ftStart() {
       const payload = await this._cryptoEncrypt({
         data: this.db, _exported: new Date().toISOString(), _appVersion: this.APP_VERSION,
       });
-      const resp = await fetch(this.UPLOAD_API + '/files/' + fileId + '?uploadType=media', {
+      let resp = await fetch(this.UPLOAD_API + '/files/' + fileId + '?uploadType=media', {
         method: 'PATCH',
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      // Bei 404: ID-Cache leeren und einmal mit neuer ID retry
+      if (resp.status === 404) {
+        console.warn('[syncUpload] 404 — ID-Cache leeren, retry');
+        this._driveFileId = null;
+        await this.idbSet('meta', 'driveFileId', null);
+        const newFileId = await this._syncGetFileId(token);
+        if (!newFileId) throw new Error('Keine File-ID nach Retry');
+        resp = await fetch(this.UPLOAD_API + '/files/' + newFileId + '?uploadType=media', {
+          method: 'PATCH',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       this._syncLastUpload = this._syncLastDownload = Date.now();
       this._pendingChanges = false; this.isDirty = false;
