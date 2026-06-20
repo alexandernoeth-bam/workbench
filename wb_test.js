@@ -2923,6 +2923,42 @@ reconnectSrc.includes('select_account')
 
 if (f79Fail === 0) ok(f79Ok + ' Gerätespezifischer PW-Dialog Checks bestanden');
 
+// ══════════════════════════════════════════
+// 80. BUJO-EDITOR
+// ══════════════════════════════════════════
+console.log('\n── 80. BuJo-Editor ──');
+let f80Ok = 0, f80Fail = 0;
+
+content.includes('ck-bujo-toolbar') ? (ok('#ck-bujo-toolbar vorhanden'), f80Ok++) : (fail('#ck-bujo-toolbar fehlt'), f80Fail++);
+content.includes('_ckBuJoChar(') ? (ok('_ckBuJoChar() definiert'), f80Ok++) : (fail('_ckBuJoChar() fehlt'), f80Fail++);
+content.includes('_ckBuJoCheckbox(') ? (ok('_ckBuJoCheckbox() definiert'), f80Ok++) : (fail('_ckBuJoCheckbox() fehlt'), f80Fail++);
+content.includes('_ckLadeTagesfokus(') ? (ok('_ckLadeTagesfokus() definiert'), f80Ok++) : (fail('_ckLadeTagesfokus() fehlt'), f80Fail++);
+
+// Auto-Trenner-Timer entfernt
+const onInputSrc = jsCode.match(/  _ckOnInput\([\s\S]*?^  \},/m)?.[0] || '';
+!onInputSrc.includes('_ckInsertDivider')
+  ? (ok('_ckOnInput: kein Auto-Trenner-Timer'), f80Ok++)
+  : (fail('_ckOnInput: Auto-Trenner-Timer noch vorhanden'), f80Fail++);
+
+// Trenner: nur Linie + hh:mm (kein Sandwich)
+const divSrc = jsCode.match(/  _ckInsertDivider\([\s\S]*?^  \},/m)?.[0] || '';
+!divSrc.includes('ck-divider-line"></div><span')
+  ? (ok('_ckInsertDivider: kein Sandwich-Layout'), f80Ok++)
+  : (fail('_ckInsertDivider: Sandwich-Layout noch vorhanden'), f80Fail++);
+divSrc.includes('ck-divider-ts')
+  ? (ok('_ckInsertDivider: hh:mm als eigene Zeile'), f80Ok++)
+  : (fail('_ckInsertDivider: kein ck-divider-ts'), f80Fail++);
+
+// _ckLadeTagesfokus: lädt Termine, Pflichten, Tasks + Checklisten
+const fokSrc = jsCode.match(/  _ckLadeTagesfokus\([\s\S]*?^  \},/m)?.[0] || '';
+fokSrc.includes('customEvents') ? (ok('_ckLadeTagesfokus: Termine'), f80Ok++) : (fail('_ckLadeTagesfokus: keine Termine'), f80Fail++);
+fokSrc.includes('wochenpflichten') ? (ok('_ckLadeTagesfokus: Pflichten'), f80Ok++) : (fail('_ckLadeTagesfokus: keine Pflichten'), f80Fail++);
+fokSrc.includes('checklist') ? (ok('_ckLadeTagesfokus: Checklisten-Unterpunkte'), f80Ok++) : (fail('_ckLadeTagesfokus: keine Checklisten'), f80Fail++);
+// Kein Überfällig-Filter (nur heutige/offene)
+fokSrc.includes('nowMin') ? (ok('_ckLadeTagesfokus: vergangene Termine gefiltert'), f80Ok++) : (fail('_ckLadeTagesfokus: kein Zeit-Filter'), f80Fail++);
+
+if (f80Fail === 0) ok(f80Ok + ' BuJo-Editor Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
