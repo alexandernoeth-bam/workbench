@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.37</title>
+  <title>WorkBench 2.9.38</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1196,7 +1196,9 @@
     .nz-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); flex-shrink:0; margin:0 3px; }
     .nz-itxt { font-size:14px; color:var(--text); flex:1; }
     .nz-itxt.dn { text-decoration:line-through; color:var(--faint); }
-    .nz-drag { color:var(--faint); cursor:grab; flex-shrink:0; }
+    .nz-drag { color:var(--faint); cursor:grab; flex-shrink:0; touch-action:none; }
+    .nz-item.nz-dragging { opacity:0.4; }
+    .nz-item.nz-drag-over { border-top:2px solid var(--accent); }
     .nz-del-btn { width:22px; height:22px; border:none; background:none; cursor:pointer; color:var(--faint); font-size:15px; display:none; align-items:center; justify-content:center; flex-shrink:0; }
     .nz-item:hover .nz-del-btn { display:flex; }
     .nz-add-row { display:flex; align-items:center; gap:7px; padding:7px 12px; border-top:0.5px solid rgba(0,0,0,.08); background:rgba(0,0,0,.02); }
@@ -2323,7 +2325,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.37</div>
+  <div id="wb-startup-tagline">v2.9.38</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2937,8 +2939,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.37',
-  APP_BUILD:   '20260620-2130',
+  APP_VERSION: '2.9.38',
+  APP_BUILD:   '20260620-2200',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6158,7 +6160,7 @@ _ftStart() {
             + (i.done ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '')
             + '</div>'
           : '<div class="nz-dot"></div>';
-        return '<div class="nz-item">' + cb
+        return '<div class="nz-item" data-lid="' + this._esc(l.id) + '" data-iid="' + this._esc(i.id) + '">' + cb
           + '<span class="nz-itxt' + (i.done ? ' dn' : '') + '">' + this._esc(i.text) + '</span>'
           + '<svg class="nz-drag" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>'
           + '<button class="nz-del-btn" onclick="WB._nzDeleteItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\')">\u00d7</button>'
@@ -6203,6 +6205,77 @@ _ftStart() {
       + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
       + 'Neue Liste erstellen</div>';
     scroll.innerHTML = h;
+    this._nzInitDrag(scroll);
+  },
+
+  _nzInitDrag(scroll) {
+    let dragItem = null, dragLid = null, dragIid = null;
+    const getItem = el => el.closest('.nz-item');
+
+    // ── Mouse Drag ──
+    scroll.addEventListener('mousedown', e => {
+      if (!e.target.closest('.nz-drag')) return;
+      const item = getItem(e.target); if (!item) return;
+      dragItem = item; dragLid = item.dataset.lid; dragIid = item.dataset.iid;
+      dragItem.classList.add('nz-dragging');
+      e.preventDefault();
+    });
+    scroll.addEventListener('mousemove', e => {
+      if (!dragItem) return;
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const over = el && getItem(el);
+      scroll.querySelectorAll('.nz-drag-over').forEach(x => x.classList.remove('nz-drag-over'));
+      if (over && over !== dragItem && over.dataset.lid === dragLid) over.classList.add('nz-drag-over');
+    });
+    scroll.addEventListener('mouseup', e => {
+      if (!dragItem) return;
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const over = el && getItem(el);
+      if (over && over !== dragItem && over.dataset.lid === dragLid) this._nzMoveItem(dragLid, dragIid, over.dataset.iid);
+      dragItem.classList.remove('nz-dragging');
+      scroll.querySelectorAll('.nz-drag-over').forEach(x => x.classList.remove('nz-drag-over'));
+      dragItem = null; dragLid = null; dragIid = null;
+    });
+
+    // ── Touch Drag (Pixel) ──
+    let touchOver = null;
+    scroll.addEventListener('touchstart', e => {
+      if (!e.target.closest('.nz-drag')) return;
+      const item = getItem(e.target); if (!item) return;
+      dragItem = item; dragLid = item.dataset.lid; dragIid = item.dataset.iid;
+      dragItem.classList.add('nz-dragging');
+    }, { passive: true });
+    scroll.addEventListener('touchmove', e => {
+      if (!dragItem) return;
+      const t = e.touches[0];
+      const el = document.elementFromPoint(t.clientX, t.clientY);
+      const over = el && getItem(el);
+      scroll.querySelectorAll('.nz-drag-over').forEach(x => x.classList.remove('nz-drag-over'));
+      touchOver = null;
+      if (over && over !== dragItem && over.dataset.lid === dragLid) { over.classList.add('nz-drag-over'); touchOver = over; }
+      e.preventDefault();
+    }, { passive: false });
+    scroll.addEventListener('touchend', () => {
+      if (!dragItem) return;
+      if (touchOver && touchOver !== dragItem && touchOver.dataset.lid === dragLid) this._nzMoveItem(dragLid, dragIid, touchOver.dataset.iid);
+      dragItem.classList.remove('nz-dragging');
+      scroll.querySelectorAll('.nz-drag-over').forEach(x => x.classList.remove('nz-drag-over'));
+      dragItem = null; dragLid = null; dragIid = null; touchOver = null;
+    });
+  },
+
+  _nzMoveItem(listeId, fromIid, toIid) {
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    const allItems = l.items || [];
+    const fromIdx = allItems.findIndex(i => i.id === fromIid);
+    const toIdx   = allItems.findIndex(i => i.id === toIid);
+    if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+    const moved = allItems[fromIdx];
+    const reordered = allItems.filter((_, idx) => idx !== fromIdx);
+    const insertAt  = reordered.findIndex(i => i.id === toIid);
+    l.items = [...reordered.slice(0, insertAt), moved, ...reordered.slice(insertAt)];
+    this.setDirty();
+    this.renderNotizenTab();
   },
 
   _nzSetFarbe(listeId, farbe) {
