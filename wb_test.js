@@ -2634,6 +2634,26 @@ content.includes('gepinnt') && (content.includes('Max. 2') || content.includes('
 if (f72Fail === 0) ok(f72Ok + ' Notizen-Tab Checks bestanden');
 
 // ══════════════════════════════════════════
+// 73. NOTIZEN DRAG-REORDER
+// ══════════════════════════════════════════
+console.log('\n── 73. Notizen Drag-Reorder ──');
+let f73Ok = 0, f73Fail = 0;
+
+content.includes('_nzInitDrag(') ? (ok('_nzInitDrag() definiert'), f73Ok++) : (fail('_nzInitDrag() fehlt'), f73Fail++);
+content.includes('_nzMoveItem(') ? (ok('_nzMoveItem() definiert'), f73Ok++) : (fail('_nzMoveItem() fehlt'), f73Fail++);
+content.includes('nz-dragging')  ? (ok('.nz-dragging CSS vorhanden'), f73Ok++) : (fail('.nz-dragging fehlt'), f73Fail++);
+content.includes('nz-drag-over') ? (ok('.nz-drag-over CSS vorhanden'), f73Ok++) : (fail('.nz-drag-over fehlt'), f73Fail++);
+content.includes('data-lid=') && content.includes('data-iid=')
+  ? (ok('nz-item hat data-lid + data-iid'), f73Ok++) : (fail('data-lid/data-iid fehlen'), f73Fail++);
+content.includes('touchstart') && content.includes('touchmove') && content.includes('touchend')
+  ? (ok('Touch-Events für Drag vorhanden'), f73Ok++) : (fail('Touch-Events fehlen'), f73Fail++);
+const nzMoveSrc = jsCode.match(/  _nzMoveItem\([\s\S]*?^  \},/m)?.[0] || '';
+!nzMoveSrc.includes('.splice(')
+  ? (ok('_nzMoveItem: kein splice()'), f73Ok++) : (fail('_nzMoveItem: splice() gefunden'), f73Fail++);
+
+if (f73Fail === 0) ok(f73Ok + ' Drag-Reorder Checks bestanden');
+
+// ══════════════════════════════════════════
 // 74. TAGESFOKUS DONE-TOGGLE
 // ══════════════════════════════════════════
 console.log('\n── 74. Tagesfokus Done-Toggle ──');
@@ -2788,7 +2808,56 @@ syncDlSrc2.includes('_oauthGetToken(false)')
   ? (ok('_syncDownload: Token-Refresh via _oauthGetToken(false)'), f76Ok++)
   : (fail('_syncDownload: kein Token-Refresh'), f76Fail++);
 
+// _nzHandleShareTarget
+content.includes('_nzHandleShareTarget(')
+  ? (ok('_nzHandleShareTarget() definiert'), f76Ok++) : (fail('_nzHandleShareTarget() fehlt'), f76Fail++);
+content.includes('share_url') && content.includes('share_title')
+  ? (ok('Share-Parameter share_url + share_title'), f76Ok++) : (fail('Share-Parameter fehlen'), f76Fail++);
+content.includes('URLSearchParams')
+  ? (ok('URLSearchParams für Share-Target'), f76Ok++) : (fail('URLSearchParams fehlt'), f76Fail++);
+content.includes('history.replaceState')
+  ? (ok('history.replaceState() — URL nach Share bereinigt'), f76Ok++) : (fail('history.replaceState() fehlt'), f76Fail++);
+
 if (f76Fail === 0) ok(f76Ok + ' Mantra-Pool + Startup Checks bestanden');
+
+// ══════════════════════════════════════════
+// 77. SYNC FILE-ID ROBUSTHEIT
+// ══════════════════════════════════════════
+console.log('\n── 77. Sync File-ID Robustheit ──');
+let f77Ok = 0, f77Fail = 0;
+
+const syncGetFileSrc = jsCode.match(/  async _syncGetFileId\([\s\S]*?^  \},/m)?.[0] || '';
+
+// ID-Validierung: gecachte ID wird per API geprüft
+syncGetFileSrc.includes('trashed')
+  ? (ok('_syncGetFileId: gecachte ID wird auf trashed geprüft'), f77Ok++)
+  : (fail('_syncGetFileId: keine ID-Validierung'), f77Fail++);
+
+// Bei ungültiger ID: Cache leeren
+syncGetFileSrc.includes('_driveFileId = null')
+  ? (ok('_syncGetFileId: ID-Cache wird bei Fehler geleert'), f77Ok++)
+  : (fail('_syncGetFileId: ID-Cache wird nicht geleert'), f77Fail++);
+
+// Suche nach neuester Datei (orderBy modifiedTime)
+syncGetFileSrc.includes('modifiedTime')
+  ? (ok('_syncGetFileId: Suche sortiert nach modifiedTime'), f77Ok++)
+  : (fail('_syncGetFileId: kein modifiedTime-Sort'), f77Fail++);
+
+// Warnung bei mehreren Dateien
+syncGetFileSrc.includes('files.length > 1')
+  ? (ok('_syncGetFileId: Warnung bei mehreren workbench.json'), f77Ok++)
+  : (fail('_syncGetFileId: keine Warnung bei Duplikaten'), f77Fail++);
+
+// _syncUpload: 404-Retry mit neuer ID
+const syncUpSrc77 = jsCode.match(/  async _syncUpload\([\s\S]*?^  \},/m)?.[0] || '';
+syncUpSrc77.includes('404')
+  ? (ok('_syncUpload: 404-Retry mit neuer File-ID'), f77Ok++)
+  : (fail('_syncUpload: kein 404-Retry'), f77Fail++);
+syncUpSrc77.includes('_driveFileId = null')
+  ? (ok('_syncUpload: ID-Cache bei 404 geleert'), f77Ok++)
+  : (fail('_syncUpload: ID-Cache wird bei 404 nicht geleert'), f77Fail++);
+
+if (f77Fail === 0) ok(f77Ok + ' Sync File-ID Robustheit Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════

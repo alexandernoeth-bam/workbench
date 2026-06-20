@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.38</title>
+  <title>WorkBench 2.9.39</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2325,7 +2325,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.38</div>
+  <div id="wb-startup-tagline">v2.9.39</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2939,8 +2939,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.38',
-  APP_BUILD:   '20260620-2200',
+  APP_VERSION: '2.9.39',
+  APP_BUILD:   '20260620-2300',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -7151,6 +7151,32 @@ _ftStart() {
     el.innerHTML = h;
   },
 
+  _nzHandleShareTarget() {
+    const params = new URLSearchParams(window.location.search);
+    const url    = params.get('share_url')   || '';
+    const title  = params.get('share_title') || '';
+    const text   = params.get('share_text')  || '';
+    if (!url && !text) return;
+    // URL aus dem Browser-Verlauf entfernen
+    try { history.replaceState({}, '', window.location.pathname); } catch(e) {}
+    if (!this.db) return;
+    if (!this.db.notizen) this.db.notizen = [];
+    // Ziel-Liste: erste Liste namens "Ablage" oder "Eingang" oder erste vorhandene
+    let liste = this.db.notizen.find(l => !l.deleted && /ablage|eingang/i.test(l.titel));
+    if (!liste) liste = this.db.notizen.find(l => !l.deleted);
+    if (!liste) {
+      liste = { id: 'nz_' + Date.now(), titel: 'Ablage', typ: 'idea', farbe: 'c-blau', items: [], gepinnt: false };
+      this.db.notizen.unshift(liste);
+    }
+    if (!liste.items) liste.items = [];
+    const label   = title || text || url;
+    const eintrag = url ? label + ' — ' + url : label;
+    liste.items.unshift({ id: 'ni_' + Date.now(), text: eintrag.trim(), done: false });
+    this.setDirty();
+    this.tabSwitch('notizen');
+    this._toast('\u2713 Link in "' + liste.titel + '" gespeichert');
+  },
+
   /* ── OAuth Banner ── */
   _oauthBannerVisible: false,
 
@@ -7672,6 +7698,9 @@ _ftStart() {
     setTimeout(() => { this._ckLadeHeutigerEintrag(); }, 300);
     this.tabSwitch('cockpit');
     setTimeout(() => this._nzRenderPills(), 400);
+
+    // Web Share Target: URL-Parameter verarbeiten
+    setTimeout(() => this._nzHandleShareTarget(), 600);
 
     // Mantra-Screen: nach Migration, damit db.mantras verfügbar
     this._mantraInit();
