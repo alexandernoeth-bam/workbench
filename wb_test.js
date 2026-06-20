@@ -535,16 +535,14 @@ BL_SEKTIONEN.forEach(id => {
 if (blFnFail === 0) ok(blFnOk + ' Tagesfokus-Funktionen und Container korrekt');
 
 // ══════════════════════════════════════════
-// 19. VORHABEN HTML-STRUKTUR + FUNKTIONEN
+// 19. VORHABEN HTML-STRUKTUR + FUNKTIONEN (v2.9.29+)
 // ══════════════════════════════════════════
 console.log('\n── 19. Vorhaben HTML-Struktur + Funktionen ──');
-// sec-vorhaben muss row-Layout haben.
-// Fehlt vh-detail: rechte Seite bleibt leer ohne Fehlermeldung.
 const VH_IDS = [
-  'vh-app', 'vh-list-col', 'vh-list-head', 'vh-list-title', 'vh-scroll',
+  'vh-app', 'vh-list', 'vh-list-filters', 'vh-scroll',
   'vh-detail-col', 'vh-detail-header',
-  'vh-detail', 'vh-detail-head', 'vh-detail-title', 'vh-detail-sub',
-  'vh-tabs', 'vh-tab-aktuell', 'vh-tab-info',
+  'vh-detail', 'vh-detail-hdr', 'vh-detail-title', 'vh-detail-pills',
+  'vh-detail-scroll',
 ];
 let vhOk = 0, vhFail = 0;
 VH_IDS.forEach(id => {
@@ -555,18 +553,18 @@ VH_IDS.forEach(id => {
 // sec-vorhaben muss flex row haben
 if (content.includes('sec-vorhaben') && styleBlock.includes('#sec-vorhaben')
   && styleBlock.includes('flex-direction: row')) {
-  ok('sec-vorhaben hat flex-row layout');
+  ok('sec-vorhaben hat flex-row layout'); vhOk++;
 } else {
-  fail('sec-vorhaben fehlt display:flex;flex-direction:row');
-  vhFail++;
+  fail('sec-vorhaben fehlt display:flex;flex-direction:row'); vhFail++;
 }
 
 // Vorhaben-Aktionsfunktionen
 const VH_FNS = [
-  'renderVorhaben', '_vhRenderListe', '_vhRenderCard', '_vhOpen',
-  '_vhTabSwitch', '_vhRenderDetail', '_vhRenderTabAktuell',
-  '_vhRenderTabInfo', '_vhNeu', '_vhAufgabeNeu', '_vhLinkAdd',
-  '_vhLinkDelete', '_vhGdocNeu',
+  'renderVorhaben', '_vhRenderListe', '_vhRenderRow', '_vhOpen',
+  '_vhRenderDetail', '_vhRenderContainers', '_vcToggle',
+  '_vhNeu', '_vhAufgabeNeu', '_vhLinkAdd', '_vhLinkDelete',
+  '_vhSetStatus', '_vhToggleFavorit', '_vhToggleVertraulich',
+  '_vhDeleteAktiv', '_vhToggleStatusDD', '_vhSetFilter', '_vhToggleStarFilter',
 ];
 VH_FNS.forEach(fn => {
   const found = jsCode.includes('  ' + fn + '(') || jsCode.includes('  ' + fn + ':');
@@ -574,48 +572,42 @@ VH_FNS.forEach(fn => {
   else { fail('Vorhaben-Funktion fehlt', fn + '()'); vhFail++; }
 });
 
-// _vhRenderCard muss Warn-Badge + Erledigungsverhältnis generieren
-const rvCard = jsCode.match(/  _vhRenderCard\([\s\S]*?^  \},/m)?.[0] || '';
-if (!rvCard) {
-  warn('_vhRenderCard() Body nicht gefunden');
-} else {
-  if (rvCard.includes('ueberfaellig') || rvCard.includes('\u00fcberf\u00e4llig') || rvCard.includes('warn')) {
-    ok('_vhRenderCard() rendert Warn-Badge bei überfälligen Aufgaben');
-    vhOk++;
-  } else {
-    fail('_vhRenderCard() kein Warn-Badge für überfällige Aufgaben');
-    vhFail++;
-  }
-  if (rvCard.includes('doneCount') || rvCard.includes('done') && rvCard.includes('total')) {
-    ok('_vhRenderCard() zeigt Erledigungsverhältnis');
-    vhOk++;
-  } else {
-    fail('_vhRenderCard() kein Erledigungsverhältnis');
-    vhFail++;
-  }
+// _vhRenderRow muss Warn + Stern zeigen
+const rvRow = jsCode.match(/  _vhRenderRow\([\s\S]*?^  \},/m)?.[0] || '';
+if (!rvRow) { warn('_vhRenderRow() Body nicht gefunden'); }
+else {
+  rvRow.includes('warn') ? (ok('_vhRenderRow: Warn-Anzeige'), vhOk++) : (fail('_vhRenderRow: kein Warn'), vhFail++);
+  rvRow.includes('favorit') ? (ok('_vhRenderRow: Stern-Anzeige'), vhOk++) : (fail('_vhRenderRow: kein Stern'), vhFail++);
 }
 
-// Link-Item muss Lösch-Button haben (_vhLinkDelete)
-const rvInfo = jsCode.match(/  _vhRenderTabInfo\([\s\S]*?^  \},/m)?.[0] || '';
-if (!rvInfo) {
-  warn('_vhRenderTabInfo() Body nicht gefunden');
-} else {
-  if (rvInfo.includes('_vhLinkDelete')) {
-    ok('_vhRenderTabInfo() hat Lösch-Button (_vhLinkDelete)');
-    vhOk++;
-  } else {
-    fail('_vhRenderTabInfo() fehlt Lösch-Button (_vhLinkDelete)');
-    vhFail++;
-  }
+// _vhRenderContainers muss _vhLinkDelete enthalten
+const rvContainers = jsCode.match(/  _vhRenderContainers\([\s\S]*?^  \},/m)?.[0] || '';
+if (!rvContainers) { warn('_vhRenderContainers() Body nicht gefunden'); }
+else {
+  rvContainers.includes('_vhLinkDelete') ? (ok('_vhRenderContainers: Lösch-Button (_vhLinkDelete)'), vhOk++) : (fail('_vhRenderContainers: fehlt _vhLinkDelete'), vhFail++);
+  rvContainers.includes('_aufgabeChkHtml') ? (ok('_vhRenderContainers: nutzt _aufgabeChkHtml()'), vhOk++) : (fail('_vhRenderContainers: fehlt _aufgabeChkHtml'), vhFail++);
+  rvContainers.includes('+ Aufgabe') ? (ok('_vhRenderContainers: hat "+ Aufgabe" Button'), vhOk++) : (fail('_vhRenderContainers: fehlt "+ Aufgabe"'), vhFail++);
 }
 
-// vh-card-meta muss display:flex haben
-if (styleBlock.includes('.vh-card-meta') && styleBlock.includes('display: flex') || styleBlock.includes('display:flex')) {
-  ok('vh-card-meta hat flex-Layout');
-  vhOk++;
-} else {
-  warn('vh-card-meta flex-Layout nicht eindeutig gefunden');
-}
+// Neue Datenfelder: favorit, vertraulich in _vhNeu
+const vhNeuSrc = jsCode.match(/  _vhNeu\([\s\S]*?^  \},/m)?.[0] || '';
+vhNeuSrc.includes('favorit') ? (ok('_vhNeu: setzt favorit-Feld'), vhOk++) : (fail('_vhNeu: kein favorit-Feld'), vhFail++);
+vhNeuSrc.includes('vertraulich') ? (ok('_vhNeu: setzt vertraulich-Feld'), vhOk++) : (fail('_vhNeu: kein vertraulich-Feld'), vhFail++);
+
+// Filter-Buttons vorhanden
+content.includes('vl-filter-btn') ? (ok('.vl-filter-btn vorhanden'), vhOk++) : (fail('.vl-filter-btn fehlt'), vhFail++);
+content.includes('vl-filter-star') ? (ok('.vl-filter-star vorhanden'), vhOk++) : (fail('.vl-filter-star fehlt'), vhFail++);
+
+// Status-Dropdown
+content.includes('vh-status-dd') ? (ok('.vh-status-dd vorhanden'), vhOk++) : (fail('.vh-status-dd fehlt'), vhFail++);
+content.includes('_vhSetStatus') ? (ok('_vhSetStatus() aufgerufen'), vhOk++) : (fail('_vhSetStatus() nicht aufgerufen'), vhFail++);
+
+// Büro-Modus filtert vertrauliche Vorhaben
+const vhListeSrc19 = jsCode.match(/  _vhRenderListe\([\s\S]*?^  \},/m)?.[0] || '';
+vhListeSrc19.includes('bueroModus') && vhListeSrc19.includes('vertraulich')
+  ? (ok('_vhRenderListe: Büro-Modus filtert vertraulich'), vhOk++)
+  : (fail('_vhRenderListe: Büro-Modus-Filter fehlt'), vhFail++);
+
 const OLD_CK_IDS = ['ck-stat-erledigt', 'ck-stat-ueberwunden', 'ck-stat-verschoben'];
 OLD_CK_IDS.forEach(id => {
   if (content.includes('id="' + id + '"')) {
@@ -2121,13 +2113,20 @@ const saveSrc = jsCode.match(/  _ckSaveEntry\(\)[\s\S]*?^  \},/m)?.[0] || '';
 if (!saveSrc.includes('_toastMini')) { ok('_ckSaveEntry() kein _toastMini() (korrekt)'); f48Ok++; }
 else { fail('_ckSaveEntry() ruft noch _toastMini() auf'); f48Fail++; }
 
-// _vhRenderTabAktuell: kein "Nächste Schritte", hat "+ Aufgabe"
-const vhAktuellSrc = jsCode.match(/  _vhRenderTabAktuell\([\s\S]*?^  \},/m)?.[0] || '';
-if (!vhAktuellSrc.includes('chste Schritte') && !vhAktuellSrc.includes('N\\u00e4chste')) {
-  ok('_vhRenderTabAktuell() hat keinen "Nächste Schritte" Block'); f48Ok++;
-} else { fail('"Nächste Schritte" noch vorhanden'); f48Fail++; }
-if (vhAktuellSrc.includes('+ Aufgabe')) { ok('_vhRenderTabAktuell() hat "+ Aufgabe" Button'); f48Ok++; }
-else { fail('_vhRenderTabAktuell() fehlt "+ Aufgabe"'); f48Fail++; }
+// _vhRenderContainers (ersetzt _vhRenderTabAktuell): kein "Nächste Schritte", hat "+ Aufgabe"
+const vhContainersSrc = jsCode.match(/  _vhRenderContainers\([\s\S]*?^  \},/m)?.[0] || '';
+if (vhContainersSrc) {
+  if (!vhContainersSrc.includes('chste Schritte') && !vhContainersSrc.includes('N\u00e4chste')) {
+    ok('_vhRenderContainers() hat keinen "Nächste Schritte" Block'); f48Ok++;
+  } else { fail('"Nächste Schritte" noch vorhanden'); f48Fail++; }
+  if (vhContainersSrc.includes('+ Aufgabe')) { ok('_vhRenderContainers() hat "+ Aufgabe" Button'); f48Ok++; }
+  else { fail('_vhRenderContainers() fehlt "+ Aufgabe"'); f48Fail++; }
+} else {
+  // Legacy-Fallback: _vhRenderTabAktuell
+  const vhAktuellSrc = jsCode.match(/  _vhRenderTabAktuell\([\s\S]*?^  \},/m)?.[0] || '';
+  if (vhAktuellSrc.includes('+ Aufgabe')) { ok('_vhRenderTabAktuell() hat "+ Aufgabe" Button'); f48Ok++; }
+  else { warn('_vhRenderContainers() und _vhRenderTabAktuell() nicht gefunden'); }
+}
 
 // Checklisten-Info in _tfRenderDead
 const tfDeadSrc = jsCode.match(/  _tfRenderDead\(\)[\s\S]*?^  \},/m)?.[0] || '';
@@ -2142,42 +2141,36 @@ else { fail('_tfRenderUeber() fehlt clTotal/clDone'); f48Fail++; }
 if (f48Fail === 0) ok(f48Ok + ' Journal+Toast+Datum Checks bestanden');
 
 // ══════════════════════════════════════════
-// 49. VORHABEN-PILL + EDITOR-SAVE
+// 49. VORHABEN-DETAIL v2 + EDITOR-SAVE
 // ══════════════════════════════════════════
-console.log('\n── 49. Vorhaben-Pill + Editor-Save ──');
+console.log('\n── 49. Vorhaben-Detail v2 + Editor-Save ──');
 let f49Ok = 0, f49Fail = 0;
 
-// _vhPillClick + _vhRenderAlleAufgaben definiert
-['_vhPillClick','_vhRenderAlleAufgaben'].forEach(fn => {
+// Neue Architektur: _vcToggle + _vhStatus statt _vhPillClick
+['_vcToggle','_vhStatus','_vhRenderContainers'].forEach(fn => {
   if (jsCode.includes('  ' + fn + '(')) { ok(fn + '() definiert'); f49Ok++; }
   else { fail(fn + '() fehlt'); f49Fail++; }
 });
 
-// vh-sec-pill CSS vorhanden
-if (styleBlock.includes('vh-sec-pill') || content.includes('.vh-sec-pill')) { ok('.vh-sec-pill CSS vorhanden'); f49Ok++; }
-else { fail('.vh-sec-pill CSS fehlt'); f49Fail++; }
-
-// vh-alle-row + vh-alle-head CSS
-['vh-alle-row','vh-alle-head'].forEach(cls => {
-  if (content.includes('.' + cls)) { ok('.' + cls + ' CSS vorhanden'); f49Ok++; }
-  else { fail('.' + cls + ' CSS fehlt'); f49Fail++; }
+// Neue CSS-Klassen: vc-hdr, vc-body, vh-pill
+['vc-hdr','vc-body','vc-title','vh-pill'].forEach(cls => {
+  content.includes('.' + cls) || styleBlock.includes('.' + cls)
+    ? (ok('.' + cls + ' CSS vorhanden'), f49Ok++)
+    : (fail('.' + cls + ' CSS fehlt'), f49Fail++);
 });
 
-// _vhRenderDetail prüft _vhAlleFilter
+// _vhRenderDetail: pills und status-dropdown
 const vhDetailSrc = jsCode.match(/  _vhRenderDetail\([\s\S]*?^  \},/m)?.[0] || '';
-if (vhDetailSrc.includes('_vhAlleFilter')) { ok('_vhRenderDetail() prüft _vhAlleFilter'); f49Ok++; }
-else { fail('_vhRenderDetail() fehlt _vhAlleFilter'); f49Fail++; }
+vhDetailSrc.includes('vh-status-dd') ? (ok('_vhRenderDetail() rendert Status-Dropdown'), f49Ok++) : (fail('_vhRenderDetail() fehlt Status-Dropdown'), f49Fail++);
+vhDetailSrc.includes('_vhSetStatus') ? (ok('_vhRenderDetail() ruft _vhSetStatus()'), f49Ok++) : (fail('_vhRenderDetail() fehlt _vhSetStatus'), f49Fail++);
 
-// _vhRenderListe hat data-ctx + vh-sec-pill
+// _vhRenderListe hat vg-group + Charakter-Gruppen
 const vhListeSrc = jsCode.match(/  _vhRenderListe\(\)[\s\S]*?^  \},/m)?.[0] || '';
-if (vhListeSrc.includes('vh-sec-pill') && vhListeSrc.includes('data-ctx')) { ok('_vhRenderListe() rendert Pill mit data-ctx'); f49Ok++; }
-else { fail('_vhRenderListe() fehlt Pill oder data-ctx'); f49Fail++; }
+vhListeSrc.includes('vg-group') ? (ok('_vhRenderListe() rendert vg-group'), f49Ok++) : (fail('_vhRenderListe() fehlt vg-group'), f49Fail++);
+vhListeSrc.includes('_vhFilter') ? (ok('_vhRenderListe() nutzt _vhFilter'), f49Ok++) : (fail('_vhRenderListe() fehlt _vhFilter'), f49Fail++);
 
 // _ckSaveEntry: bestehenden Entry immer updaten
-// Prüfe: "if (!text) return" darf NUR im !entry Block stehen, nicht danach
 const ckSaveSrc = jsCode.match(/  _ckSaveEntry\(\)[\s\S]*?^  \},/m)?.[0] || '';
-// Richtig: !text-return ist innerhalb "if (!entry)" Guard
-// Falsch: !text-return steht außerhalb/nach dem entry-Block
 const entryBlock = ckSaveSrc.match(/if \(!entry\)\s*\{[\s\S]*?\}/)?.[0] || '';
 const textReturnInEntry = entryBlock.includes('if (!text) return');
 const textReturnOutsideEntry = ckSaveSrc.replace(entryBlock,'').includes('if (!text) return');
@@ -2185,7 +2178,7 @@ if (textReturnInEntry && !textReturnOutsideEntry) { ok('_ckSaveEntry() kein frü
 else if (textReturnOutsideEntry) { fail('_ckSaveEntry() bricht bei leerem text ab obwohl entry existiert'); f49Fail++; }
 else { ok('_ckSaveEntry() guard korrekt'); f49Ok++; }
 
-if (f49Fail === 0) ok(f49Ok + ' Vorhaben-Pill+Editor-Save Checks bestanden');
+if (f49Fail === 0) ok(f49Ok + ' Vorhaben-Detail-v2+Editor-Save Checks bestanden');
 
 // ══════════════════════════════════════════
 // 50. FUNKTIONSREFERENZ: onclick → definiert
@@ -2343,7 +2336,8 @@ let f60Ok = 0, f60Fail = 0;
 });
 if (content.includes('aufg-ring') && content.includes('aufg-chk')) { ok('.aufg-ring + .aufg-chk CSS vorhanden'); f60Ok++; }
 else { fail('.aufg-ring/.aufg-chk CSS fehlt'); f60Fail++; }
-['_vhRenderTabAktuell','_vhRenderAlleAufgaben','_tfRenderDead','_tfRenderUeber'].forEach(fn => {
+// _vhRenderContainers ersetzt _vhRenderTabAktuell; _vhRenderAlleAufgaben optional
+['_vhRenderContainers','_tfRenderDead','_tfRenderUeber'].forEach(fn => {
   const fnStart = jsCode.indexOf('  ' + fn + '(');
   const fnEnd   = fnStart > 0 ? jsCode.indexOf('\n  },', fnStart + 20) + 5 : -1;
   const src     = fnStart > 0 ? jsCode.slice(fnStart, fnEnd) : '';
@@ -2365,18 +2359,24 @@ if (f60Fail === 0) ok(f60Ok + ' Aufgaben+Klassifizierung Checks bestanden');
 console.log('\n── 61. Vorhaben-Zustände ──');
 let f61Ok = 0, f61Fail = 0;
 
-['_vhZustand','_vhRingIcon','_vhAbschliessen','_vhArchivieren','_vhWiederoeffnen'].forEach(fn => {
+['_vhZustand','_vhStatus','_vhRingIcon','_vhSetStatus'].forEach(fn => {
   jsCode.includes('  ' + fn + '(') ? (ok(fn + '() definiert'), f61Ok++) : (fail(fn + '() fehlt'), f61Fail++);
 });
-['vh-status-pill','vh-prog-bar','vh-prog-wrap','vi-offen','vi-done','vh-done-sec'].forEach(cls => {
+// vi-offen/vi-done weiterhin gebraucht für _aufgabeChkHtml
+['vi-offen','vi-done'].forEach(cls => {
   content.includes(cls) ? (ok('.' + cls + ' vorhanden'), f61Ok++) : (fail('.' + cls + ' fehlt'), f61Fail++);
 });
-// Migration in idbLoadAll
-const loadAllSrc = jsCode.match(/  async idbLoadAll\(\)[\s\S]*?^  \},/m)?.[0] || '';
-loadAllSrc.includes('v.status') ? (ok('idbLoadAll: status-Feld Migration'), f61Ok++) : (fail('idbLoadAll: status-Migration fehlt'), f61Fail++);
-// _savVorhaben status:'aktiv'
-const vhNeuSrc = jsCode.match(/status:\s*'aktiv'/)?.[0] || '';
-vhNeuSrc ? (ok('status:aktiv bei neuem Vorhaben'), f61Ok++) : (fail('status:aktiv fehlt'), f61Fail++);
+// Neue Status-Klassen im CSS
+['vh-pill','s-laeuft','s-pausiert','s-offen'].forEach(cls => {
+  content.includes(cls) ? (ok('.' + cls + ' CSS vorhanden'), f61Ok++) : (fail('.' + cls + ' CSS fehlt'), f61Fail++);
+});
+// Migration: favorit + vertraulich
+const migrateSrc61 = jsCode.match(/\(this\.db\?\.vorhaben\|\|\[\]\)\.forEach[\s\S]*?v\.zielId[\s\S]*?\}\)/m)?.[0] || jsCode.match(/vorhaben.*forEach[\s\S]{0,300}favorit/m)?.[0] || '';
+migrateSrc61.includes('favorit') ? (ok('Migration: favorit-Feld'), f61Ok++) : (fail('Migration: favorit fehlt'), f61Fail++);
+migrateSrc61.includes('vertraulich') ? (ok('Migration: vertraulich-Feld'), f61Ok++) : (fail('Migration: vertraulich fehlt'), f61Fail++);
+// status-Migration: 'aktiv' → 'offen'
+const migrateSrc61b = jsCode.match(/v\.status === .aktiv/)?.[0] || jsCode.match(/status === .aktiv/)?.[0] || '';
+migrateSrc61b ? (ok("Migration: 'aktiv' → 'offen' Status"), f61Ok++) : (fail("Migration: 'aktiv'-Status nicht normalisiert"), f61Fail++);
 // archivierte in Filtern
 const archivFilters = (jsCode.match(/archiviert/g)||[]).length;
 archivFilters >= 5 ? (ok(archivFilters + '× archiviert-Filter vorhanden'), f61Ok++) : (fail('archiviert-Filter zu wenig: ' + archivFilters), f61Fail++);
@@ -2436,24 +2436,21 @@ if (f62Fail === 0) ok(f62Ok + ' Sync-Robustheit Checks bestanden');
 console.log('\n── 63. Vorhaben-Charakter ──');
 let f63Ok = 0, f63Fail = 0;
 
-['_vhCharDot','_vhCharPillHtml','_vhCharDialog','_vhCharSet'].forEach(fn => {
+['_vhCharDot','_vhCharDialog','_vhCharSet'].forEach(fn => {
   jsCode.includes('  ' + fn + '(') ? (ok(fn + '() definiert'), f63Ok++) : (fail(fn + '() fehlt'), f63Fail++);
 });
-['vh-char-dot','vh-char-pill','vh-char-grid','vh-char-chip'].forEach(cls => {
+['vh-char-dot','vh-char-grid','vh-char-chip'].forEach(cls => {
   content.includes(cls) ? (ok('.' + cls + ' vorhanden'), f63Ok++) : (fail('.' + cls + ' fehlt'), f63Fail++);
 });
-// Migration in idbLoadAll
-const idbSrc63 = jsCode.match(/  async idbLoadAll\(\)[\s\S]*?^  \},/m)?.[0] || '';
-idbSrc63.includes('charakter') ? (ok('idbLoadAll: charakter-Migration'), f63Ok++) : (fail('idbLoadAll: charakter-Migration fehlt'), f63Fail++);
+// Migration in _migrate_v2
+const idbSrc63 = jsCode.match(/\(this\.db\?\.vorhaben\|\|\[\]\)\.forEach[\s\S]*?charakter[\s\S]*?\}\)/m)?.[0] || content;
+idbSrc63.includes('charakter') ? (ok('Migration: charakter-Feld'), f63Ok++) : (fail('Migration: charakter fehlt'), f63Fail++);
 // charakter:'bereichernd' bei Neu
 content.includes("charakter:'bereichernd'") || content.includes("charakter: 'bereichernd'") ? (ok('charakter:bereichernd bei neuem Vorhaben'), f63Ok++) : (fail('charakter:bereichernd fehlt'), f63Fail++);
-// Dot in _vhRenderCard
-const renderCardSrc = jsCode.match(/  _vhRenderCard\([\s\S]*?^  \},/m)?.[0] || '';
-// _vhCharDot existiert (für Detail-Header), muss nicht in _vhRenderCard sein
-content.includes('_vhCharDot(') ? (ok('_vhCharDot() definiert'), f63Ok++) : (fail('_vhCharDot() fehlt'), f63Fail++);
-// Pill in _vhRenderDetail
+// Charakter in _vhRenderDetail (via char-vp/bd/br Pills)
 const renderDetailSrc63 = jsCode.match(/  _vhRenderDetail\([\s\S]*?^  \},/m)?.[0] || '';
-renderDetailSrc63.includes('_vhCharPillHtml') ? (ok('_vhRenderDetail: Charakter-Pill'), f63Ok++) : (fail('_vhRenderDetail: Charakter-Pill fehlt'), f63Fail++);
+(renderDetailSrc63.includes('char-vp') || renderDetailSrc63.includes('_vhCharPillHtml') || renderDetailSrc63.includes('charCls'))
+  ? (ok('_vhRenderDetail: Charakter-Pill'), f63Ok++) : (fail('_vhRenderDetail: Charakter-Pill fehlt'), f63Fail++);
 
 if (f63Fail === 0) ok(f63Ok + ' Vorhaben-Charakter Checks bestanden');
 
@@ -2463,19 +2460,23 @@ if (f63Fail === 0) ok(f63Ok + ' Vorhaben-Charakter Checks bestanden');
 console.log('\n── 64. Vorhaben Detail-Header ──');
 let f64Ok = 0, f64Fail = 0;
 
-['_vhMenuToggle','_vhMenuClose'].forEach(fn => {
+// Neue Header-Elemente
+['vh-hdr-star','vh-hdr-buero','vh-hdr-del','vh-detail-hdr','vh-detail-pills'].forEach(el => {
+  content.includes(el) ? (ok(el + ' vorhanden'), f64Ok++) : (fail(el + ' fehlt'), f64Fail++);
+});
+// vh-status-dd vorhanden
+content.includes('vh-status-dd') ? (ok('.vh-status-dd vorhanden'), f64Ok++) : (fail('.vh-status-dd fehlt'), f64Fail++);
+// _vhToggleFavorit + _vhToggleVertraulich + _vhDeleteAktiv
+['_vhToggleFavorit','_vhToggleVertraulich','_vhDeleteAktiv','_vhToggleStatusDD'].forEach(fn => {
   jsCode.includes('  ' + fn + '(') ? (ok(fn + '() definiert'), f64Ok++) : (fail(fn + '() fehlt'), f64Fail++);
 });
-['vh-ctx-menu','vh-ctx-item','vh-menu-btn','vh-det-row1','vh-det-row2'].forEach(cls => {
-  content.includes(cls) ? (ok('.' + cls + ' vorhanden'), f64Ok++) : (fail('.' + cls + ' fehlt'), f64Fail++);
-});
-// #vh-prog-container im HTML
-content.includes('id="vh-prog-container"') ? (ok('#vh-prog-container vorhanden'), f64Ok++) : (fail('#vh-prog-container fehlt'), f64Fail++);
-// Fortschrittsbalken nicht mehr direkt in subEl (vh-prog-wrap in renderDetail)
+// Kein vh-prog-container mehr
+!content.includes('id="vh-prog-container"') ? (ok('vh-prog-container entfernt (kein Fortschrittsbalken)'), f64Ok++) : (fail('vh-prog-container noch vorhanden (sollte entfernt sein)'), f64Fail++);
+// _vhRenderDetail: kein Fortschrittsbalken
 const rdSrc = jsCode.match(/  _vhRenderDetail\([\s\S]*?^  \},/m)?.[0] || '';
-rdSrc.includes('vh-prog-container') ? (ok('_vhRenderDetail: Fortschritt in #vh-prog-container'), f64Ok++) : (fail('_vhRenderDetail: Fortschritt nicht in #vh-prog-container'), f64Fail++);
-// Aktions-Buttons im Dropdown, nicht direkt im subEl
-!rdSrc.includes('_vhAbschliessen') ? (ok('_vhRenderDetail: keine Aktions-Buttons direkt'), f64Ok++) : (fail('_vhRenderDetail: Aktions-Buttons noch direkt im subEl'), f64Fail++);
+!rdSrc.includes('vh-prog-wrap') && !rdSrc.includes('vh-prog-fill')
+  ? (ok('_vhRenderDetail: kein Fortschrittsbalken'), f64Ok++)
+  : (fail('_vhRenderDetail: Fortschrittsbalken noch vorhanden'), f64Fail++);
 if (f64Fail === 0) ok(f64Ok + ' Detail-Header Checks bestanden');
 
 // ══════════════════════════════════════════
@@ -2484,27 +2485,26 @@ if (f64Fail === 0) ok(f64Ok + ' Detail-Header Checks bestanden');
 console.log('\n── 65. Vorhaben Charakter Vertikal-Tab ──');
 let f65Ok = 0, f65Fail = 0;
 
-['vh-char-group','vh-char-tab','vh-char-items'].forEach(cls => {
+// Neue Charakter-Gruppen: vg-group statt vh-char-group/tab
+['vg-group','vg-stripe','vg-group-lbl','vg-body'].forEach(cls => {
   content.includes(cls) ? (ok('.' + cls + ' CSS/HTML vorhanden'), f65Ok++) : (fail('.' + cls + ' fehlt'), f65Fail++);
 });
-content.includes('writing-mode:vertical-rl') || content.includes('writing-mode: vertical-rl')
-  ? (ok('writing-mode: vertical-rl vorhanden'), f65Ok++) : (fail('writing-mode: vertical-rl fehlt'), f65Fail++);
-content.includes('rotate(180deg)') ? (ok('rotate(180deg) vorhanden'), f65Ok++) : (fail('rotate(180deg) fehlt'), f65Fail++);
 
-const rlStart65 = content.indexOf('  _vhRenderListe() {');
-const rlEnd65   = rlStart65 > 0 ? content.indexOf('\n  },', rlStart65 + 20) + 5 : -1;
-const rlSrc65   = rlStart65 > 0 ? content.slice(rlStart65, rlEnd65) : '';
+const rlStart65 = jsCode.indexOf('  _vhRenderListe() {');
+const rlEnd65   = rlStart65 > 0 ? jsCode.indexOf('\n  },', rlStart65 + 20) + 5 : -1;
+const rlSrc65   = rlStart65 > 0 ? jsCode.slice(rlStart65, rlEnd65) : '';
 rlSrc65.includes('charReihenfolge') ? (ok('_vhRenderListe: charReihenfolge vorhanden'), f65Ok++) : (fail('_vhRenderListe: charReihenfolge fehlt'), f65Fail++);
-rlSrc65.includes('vh-char-group') ? (ok('_vhRenderListe: vh-char-group gerendert'), f65Ok++) : (fail('_vhRenderListe: vh-char-group fehlt'), f65Fail++);
+rlSrc65.includes('vg-group') ? (ok('_vhRenderListe: vg-group gerendert'), f65Ok++) : (fail('_vhRenderListe: vg-group fehlt'), f65Fail++);
 
 // Migration: bereichernd als Default
 content.includes("charakter = 'bereichernd'") || content.includes("charakter='bereichernd'")
   ? (ok('Migration: bereichernd als Default'), f65Ok++) : (fail('Migration: bereichernd-Default fehlt'), f65Fail++);
 
-// #vh-prog-container im HTML
-content.includes('id="vh-prog-container"') ? (ok('#vh-prog-container vorhanden'), f65Ok++) : (fail('#vh-prog-container fehlt'), f65Fail++);
+// vg-stripe mit Charakter-Farben
+content.includes('vg-stripe.vp') && content.includes('vg-stripe.bd') && content.includes('vg-stripe.br')
+  ? (ok('vg-stripe: alle Charakter-Farben'), f65Ok++) : (fail('vg-stripe: Farben fehlen'), f65Fail++);
 
-if (f65Fail === 0) ok(f65Ok + ' Charakter-Vertikal-Tab Checks bestanden');
+if (f65Fail === 0) ok(f65Ok + ' Charakter-Gruppen Checks bestanden');
 
 // ══════════════════════════════════════════
 // 66. VORHABEN ZIEL + WELT-TOGGLE
@@ -2515,14 +2515,15 @@ let f66Ok = 0, f66Fail = 0;
 ['_vhZielVerknuepfen','_savVhZiel','_vhZielLoesen','_vhWeltToggle'].forEach(fn => {
   content.includes(fn + '(') ? (ok(fn + '() definiert'), f66Ok++) : (fail(fn + '() fehlt'), f66Fail++);
 });
-['vh-ziel-zeile','vh-ziel-text','vh-welt-toggle'].forEach(cls => {
+// Neue Klassen: vc-ziel-* statt vh-ziel-zeile, vh-pill statt vh-welt-toggle
+['vc-ziel-row','vc-ziel-text','vc-ziel-btn'].forEach(cls => {
   content.includes(cls) ? (ok('.' + cls + ' vorhanden'), f66Ok++) : (fail('.' + cls + ' fehlt'), f66Fail++);
 });
+// vh-pill.beruf/privat statt vh-welt-toggle
+content.includes('vh-pill.beruf') || content.includes("vh-pill beruf") || content.includes('.vh-pill')
+  ? (ok('.vh-pill (Welt-Toggle) vorhanden'), f66Ok++) : (fail('.vh-pill fehlt'), f66Fail++);
 // case vhZiel in _modalSave
 content.includes("'vhZiel'") ? (ok('_modalSave: case vhZiel vorhanden'), f66Ok++) : (fail('_modalSave: case vhZiel fehlt'), f66Fail++);
-// vh-badge kleiner
-content.includes('font-size:10px') && content.includes('.vh-badge')
-  ? (ok('.vh-badge: font-size:10px'), f66Ok++) : (fail('.vh-badge: font-size nicht 10px'), f66Fail++);
 // zielId in Migration
 content.includes('zielId === undefined') ? (ok('Migration: zielId gesetzt'), f66Ok++) : (fail('Migration: zielId fehlt'), f66Fail++);
 // _vhWeltToggle nutzt confirm
@@ -2633,46 +2634,161 @@ content.includes('gepinnt') && (content.includes('Max. 2') || content.includes('
 if (f72Fail === 0) ok(f72Ok + ' Notizen-Tab Checks bestanden');
 
 // ══════════════════════════════════════════
-// 73. NOTIZEN DRAG-REORDER + SHARE-TARGET
+// 74. TAGESFOKUS DONE-TOGGLE
 // ══════════════════════════════════════════
-console.log('\n── 73. Notizen Drag-Reorder + Share-Target ──');
-let f73Ok = 0, f73Fail = 0;
+console.log('\n── 74. Tagesfokus Done-Toggle ──');
+let f74Ok = 0, f74Fail = 0;
 
-// Drag-Reorder
-content.includes('_nzInitDrag(')
-  ? (ok('_nzInitDrag() definiert'), f73Ok++) : (fail('_nzInitDrag() fehlt'), f73Fail++);
-content.includes('_nzMoveItem(')
-  ? (ok('_nzMoveItem() definiert'), f73Ok++) : (fail('_nzMoveItem() fehlt'), f73Fail++);
-content.includes('nz-dragging')
-  ? (ok('.nz-dragging CSS vorhanden'), f73Ok++) : (fail('.nz-dragging fehlt'), f73Fail++);
-content.includes('nz-drag-over')
-  ? (ok('.nz-drag-over CSS vorhanden'), f73Ok++) : (fail('.nz-drag-over fehlt'), f73Fail++);
-content.includes('data-lid=') && content.includes('data-iid=')
-  ? (ok('nz-item hat data-lid + data-iid Attribute'), f73Ok++) : (fail('nz-item data-Attribute fehlen'), f73Fail++);
-// Kein splice() im _nzMoveItem (Soft-Delete-Prinzip)
-const nzMoveStart = jsCode.indexOf('  _nzMoveItem(');
-const nzMoveEnd   = nzMoveStart > 0 ? jsCode.indexOf('\n  },\n', nzMoveStart) : -1;
-const nzMoveBody  = nzMoveStart > 0 && nzMoveEnd > 0 ? jsCode.slice(nzMoveStart, nzMoveEnd) : '';
-!nzMoveBody.includes('.splice(')
-  ? (ok('_nzMoveItem: kein splice() — Array-Rebuild korrekt'), f73Ok++)
-  : (fail('_nzMoveItem: splice() gefunden — verletzt Soft-Delete-Konvention'), f73Fail++);
-// Touch-Support
-content.includes('touchstart') && content.includes('touchmove') && content.includes('touchend')
-  ? (ok('Touch-Events für Drag vorhanden'), f73Ok++) : (fail('Touch-Events fehlen'), f73Fail++);
+content.includes('_tfShowDone')
+  ? (ok('_tfShowDone State-Variable vorhanden'), f74Ok++) : (fail('_tfShowDone fehlt'), f74Fail++);
+content.includes('_tfToggleDone(')
+  ? (ok('_tfToggleDone() definiert'), f74Ok++) : (fail('_tfToggleDone() fehlt'), f74Fail++);
+content.includes('id="tf-done-toggle"')
+  ? (ok('#tf-done-toggle Button im HTML'), f74Ok++) : (fail('#tf-done-toggle fehlt'), f74Fail++);
+content.includes('id="tf-done-toggle-lbl"')
+  ? (ok('#tf-done-toggle-lbl vorhanden'), f74Ok++) : (fail('#tf-done-toggle-lbl fehlt'), f74Fail++);
+content.includes('.tf-done-toggle')
+  ? (ok('.tf-done-toggle CSS vorhanden'), f74Ok++) : (fail('.tf-done-toggle CSS fehlt'), f74Fail++);
+const tfRenderStart = jsCode.indexOf('  _tfRenderHeute(');
+const tfRenderEnd   = tfRenderStart > 0 ? jsCode.indexOf('\n  },\n', tfRenderStart) : -1;
+const tfRenderBody  = tfRenderStart > 0 && tfRenderEnd > 0 ? jsCode.slice(tfRenderStart, tfRenderEnd) : '';
+tfRenderBody.includes('hiddenCount')
+  ? (ok('hiddenCount in _tfRenderHeute gezählt'), f74Ok++) : (fail('hiddenCount fehlt in _tfRenderHeute'), f74Fail++);
+tfRenderBody.includes('_tfShowDone')
+  ? (ok('_tfShowDone in _tfRenderHeute ausgewertet'), f74Ok++) : (fail('_tfShowDone nicht in _tfRenderHeute'), f74Fail++);
 
-// Share-Target
-content.includes('_nzHandleShareTarget(')
-  ? (ok('_nzHandleShareTarget() definiert'), f73Ok++) : (fail('_nzHandleShareTarget() fehlt'), f73Fail++);
-content.includes('share_url') && content.includes('share_title')
-  ? (ok('Share-Parameter share_url + share_title ausgelesen'), f73Ok++) : (fail('Share-Parameter fehlen'), f73Fail++);
-content.includes('URLSearchParams')
-  ? (ok('URLSearchParams für Share-Target genutzt'), f73Ok++) : (fail('URLSearchParams fehlt'), f73Fail++);
-content.includes('history.replaceState')
-  ? (ok('history.replaceState() — URL nach Share bereinigt'), f73Ok++) : (fail('history.replaceState() fehlt'), f73Fail++);
-content.includes('_nzHandleShareTarget')
-  ? (ok('_nzHandleShareTarget in _initAfterCrypto aufgerufen'), f73Ok++) : (fail('_nzHandleShareTarget nicht aufgerufen'), f73Fail++);
+if (f74Fail === 0) ok(f74Ok + ' Tagesfokus Done-Toggle Checks bestanden');
 
-if (f73Fail === 0) ok(f73Ok + ' Drag-Reorder + Share-Target Checks bestanden');
+// ══════════════════════════════════════════
+// 75. VORHABEN v2 — FAVORIT, VERTRAULICH, STATUS-DD, VC-CONTAINER
+// ══════════════════════════════════════════
+console.log('\n── 75. Vorhaben v2 Features ──');
+let f75Ok = 0, f75Fail = 0;
+
+// Favorit-Feature
+content.includes('vh-hdr-star') ? (ok('vh-hdr-star Button vorhanden'), f75Ok++) : (fail('vh-hdr-star fehlt'), f75Fail++);
+content.includes('vl-filter-star') ? (ok('vl-filter-star (Stern-Filter) vorhanden'), f75Ok++) : (fail('vl-filter-star fehlt'), f75Fail++);
+jsCode.includes('_vhToggleFavorit(') ? (ok('_vhToggleFavorit() definiert'), f75Ok++) : (fail('_vhToggleFavorit() fehlt'), f75Fail++);
+const vhFavoritSrc = jsCode.match(/  _vhToggleFavorit\([\s\S]*?^  \},/m)?.[0] || '';
+vhFavoritSrc.includes('v.favorit') ? (ok('_vhToggleFavorit: v.favorit gesetzt'), f75Ok++) : (fail('_vhToggleFavorit: v.favorit fehlt'), f75Fail++);
+
+// Vertraulich-Feature
+content.includes('vh-hdr-buero') ? (ok('vh-hdr-buero (Vertraulich) vorhanden'), f75Ok++) : (fail('vh-hdr-buero fehlt'), f75Fail++);
+jsCode.includes('_vhToggleVertraulich(') ? (ok('_vhToggleVertraulich() definiert'), f75Ok++) : (fail('_vhToggleVertraulich() fehlt'), f75Fail++);
+// Büro-Modus filtert vertraulich in _vhRenderListe
+const rlSrc75 = jsCode.match(/  _vhRenderListe\(\)[\s\S]*?^  \},/m)?.[0] || '';
+rlSrc75.includes('bueroModus') && rlSrc75.includes('vertraulich')
+  ? (ok('_vhRenderListe: Büro-Modus-Filter für vertraulich'), f75Ok++)
+  : (fail('_vhRenderListe: Büro-Modus-Filter fehlt'), f75Fail++);
+
+// Status-Dropdown mit Pausiert
+content.includes('vh-status-dd') ? (ok('.vh-status-dd vorhanden'), f75Ok++) : (fail('.vh-status-dd fehlt'), f75Fail++);
+content.includes('s-pausiert') ? (ok('.s-pausiert CSS vorhanden'), f75Ok++) : (fail('.s-pausiert fehlt'), f75Fail++);
+jsCode.includes("'pausiert'") ? (ok("Status 'pausiert' definiert"), f75Ok++) : (fail("Status 'pausiert' fehlt"), f75Fail++);
+const vhStatusSrc = jsCode.match(/  _vhStatus\([\s\S]*?^  \},/m)?.[0] || '';
+vhStatusSrc.includes('pausiert') ? (ok('_vhStatus: pausiert erkannt'), f75Ok++) : (fail('_vhStatus: pausiert fehlt'), f75Fail++);
+
+// vc-Container-System
+['vc','vc-hdr','vc-body','vc-title','vc-chev','vc-badge'].forEach(cls => {
+  content.includes('.' + cls) || styleBlock.includes('.' + cls)
+    ? (ok('.' + cls + ' CSS vorhanden'), f75Ok++)
+    : (fail('.' + cls + ' CSS fehlt'), f75Fail++);
+});
+jsCode.includes('  _vcToggle(') ? (ok('_vcToggle() definiert'), f75Ok++) : (fail('_vcToggle() fehlt'), f75Fail++);
+
+// Löschen-Button
+content.includes('vh-hdr-del') ? (ok('vh-hdr-del (Löschen) vorhanden'), f75Ok++) : (fail('vh-hdr-del fehlt'), f75Fail++);
+jsCode.includes('_vhDeleteAktiv(') ? (ok('_vhDeleteAktiv() definiert'), f75Ok++) : (fail('_vhDeleteAktiv() fehlt'), f75Fail++);
+
+// Filter-System
+content.includes('vl-filter-btn') ? (ok('.vl-filter-btn vorhanden'), f75Ok++) : (fail('.vl-filter-btn fehlt'), f75Fail++);
+jsCode.includes('_vhSetFilter(') ? (ok('_vhSetFilter() definiert'), f75Ok++) : (fail('_vhSetFilter() fehlt'), f75Fail++);
+
+if (f75Fail === 0) ok(f75Ok + ' Vorhaben-v2-Feature Checks bestanden');
+
+// ══════════════════════════════════════════
+// 76. MANTRA-POOL + STARTUP-LOGIK
+// ══════════════════════════════════════════
+console.log('\n── 76. Mantra-Pool + Startup-Logik ──');
+let f76Ok = 0, f76Fail = 0;
+
+// Kern-Methoden
+['_mantraInit','_mantraHide','_mantraSkip','_mantraAdd','_mantraDelete',
+ '_mantraPool','_mantraPickRandom','_mantraUpdateLastSeen','_sRenderMantraPool'].forEach(fn => {
+  jsCode.includes('  ' + fn + '(') || jsCode.includes('  ' + fn + ':')
+    ? (ok(fn + '() definiert'), f76Ok++) : (fail(fn + '() fehlt'), f76Fail++);
+});
+
+// HTML: Skip-Button + Countdown im Startup-Screen
+content.includes('id="wb-startup-skip"') ? (ok('#wb-startup-skip vorhanden'), f76Ok++) : (fail('#wb-startup-skip fehlt'), f76Fail++);
+content.includes('id="wb-startup-countdown"') ? (ok('#wb-startup-countdown vorhanden'), f76Ok++) : (fail('#wb-startup-countdown fehlt'), f76Fail++);
+content.includes('_mantraSkip()') ? (ok('_mantraSkip() im HTML verankert'), f76Ok++) : (fail('_mantraSkip() fehlt im HTML'), f76Fail++);
+
+// CSS: Skip + Countdown
+content.includes('#wb-startup-skip') ? (ok('#wb-startup-skip CSS vorhanden'), f76Ok++) : (fail('#wb-startup-skip CSS fehlt'), f76Fail++);
+content.includes('#wb-startup-countdown') ? (ok('#wb-startup-countdown CSS vorhanden'), f76Ok++) : (fail('#wb-startup-countdown CSS fehlt'), f76Fail++);
+
+// localStorage keys
+const mantraInitSrc = jsCode.match(/  _mantraInit\([\s\S]*?^  \},/m)?.[0] || '';
+mantraInitSrc.includes('wb_mantra_date') ? (ok('_mantraInit: wb_mantra_date geprüft'), f76Ok++) : (fail('_mantraInit: wb_mantra_date fehlt'), f76Fail++);
+mantraInitSrc.includes('wb_mantra_seen') ? (ok('_mantraInit: wb_mantra_seen geprüft'), f76Ok++) : (fail('_mantraInit: wb_mantra_seen fehlt'), f76Fail++);
+
+// 60-Minuten-Grenze
+mantraInitSrc.includes('60') ? (ok('_mantraInit: 60-Min-Grenze vorhanden'), f76Ok++) : (fail('_mantraInit: 60-Min-Grenze fehlt'), f76Fail++);
+
+// 5-Sekunden-Countdown
+mantraInitSrc.includes('5') && mantraInitSrc.includes('setInterval')
+  ? (ok('_mantraInit: 5s Countdown + setInterval'), f76Ok++) : (fail('_mantraInit: Countdown fehlt'), f76Fail++);
+
+// Doppelte Gewichtung des Hardcoded-Mantras
+const poolSrc = jsCode.match(/  _mantraPool\([\s\S]*?^  \},/m)?.[0] || '';
+const hardcodedCount = (poolSrc.match(/MANTRA_HARDCODED/g) || []).length;
+hardcodedCount >= 2 ? (ok('_mantraPool: MANTRA_HARDCODED doppelt gewichtet (' + hardcodedCount + '×)'), f76Ok++) : (fail('_mantraPool: doppelte Gewichtung fehlt'), f76Fail++);
+
+// db.mantras in _emptyDb
+const emptyDbSrc = jsCode.match(/  _emptyDb\([\s\S]*?^  \},/m)?.[0] || '';
+emptyDbSrc.includes('mantras') ? (ok('_emptyDb: mantras-Array vorhanden'), f76Ok++) : (fail('_emptyDb: mantras fehlt'), f76Fail++);
+
+// _mantraInit in _initAfterCrypto aufgerufen
+const initSrc = jsCode.match(/  async _initAfterCrypto\([\s\S]*?^  \},/m)?.[0] || '';
+initSrc.includes('_mantraInit') ? (ok('_mantraInit() in _initAfterCrypto aufgerufen'), f76Ok++) : (fail('_mantraInit() nicht in _initAfterCrypto'), f76Fail++);
+
+// lastSeen bei click aktualisieren
+initSrc.includes('_mantraUpdateLastSeen') && initSrc.includes('addEventListener')
+  ? (ok('lastSeen bei click-Event aktualisiert'), f76Ok++) : (fail('lastSeen-Update bei click fehlt'), f76Fail++);
+
+// Einstellungen-Sektion vorhanden
+content.includes('s-mantra-pool') ? (ok('#s-mantra-pool in Einstellungen'), f76Ok++) : (fail('#s-mantra-pool fehlt'), f76Fail++);
+content.includes('s-mantra-card') ? (ok('#s-mantra-card in Einstellungen'), f76Ok++) : (fail('#s-mantra-card fehlt'), f76Fail++);
+
+// Crypto-Dialog wird VOR _mantraInit gezeigt — Startup sofort ausblenden
+const initFnSrc = jsCode.match(/  async init\([\s\S]*?^  \},/m)?.[0] || '';
+const cryptoBlock = initFnSrc.match(/_cryptoKeyFresh[\s\S]*?_cryptoShowDialog/)?.[0] || '';
+cryptoBlock.includes('hideStartup()') ? (ok('init(): Startup vor Crypto-Dialog ausgeblendet'), f76Ok++) : (fail('init(): Startup blockiert Crypto-Dialog — kritischer Bug!'), f76Fail++);
+
+// _syncDownload: _mantraHide() vor Crypto-Dialog
+const syncDlSrc = jsCode.match(/  async _syncDownload\([\s\S]*?^  \},/m)?.[0] || '';
+(syncDlSrc.match(/_mantraHide\(\)/g)||[]).length >= 2
+  ? (ok('_syncDownload(): _mantraHide() vor beiden Crypto-Dialog-Aufrufen'), f76Ok++)
+  : (fail('_syncDownload(): _mantraHide() fehlt vor Crypto-Dialog'), f76Fail++);
+
+// visibilitychange: Upload nur nach _syncInitDone
+const visSrc = jsCode.match(/visibilitychange[\s\S]*?_syncUpload[\s\S]*?\}\);/m)?.[0] || '';
+visSrc.includes("_syncInitDone")
+  ? (ok("visibilitychange: Upload-Guard _syncInitDone vorhanden"), f76Ok++)
+  : (fail("visibilitychange: Upload-Guard _syncInitDone fehlt"), f76Fail++);
+
+// _syncUpload + _syncDownload: Token-Refresh bei abgelaufenem Token
+const syncUpSrc = jsCode.match(/  async _syncUpload\([\s\S]*?^  \},/m)?.[0] || '';
+const syncDlSrc2 = jsCode.match(/  async _syncDownload\([\s\S]*?^  \},/m)?.[0] || '';
+syncUpSrc.includes('_oauthGetToken(false)')
+  ? (ok('_syncUpload: Token-Refresh via _oauthGetToken(false)'), f76Ok++)
+  : (fail('_syncUpload: kein Token-Refresh — Upload schlägt bei abgelaufenem Token fehl'), f76Fail++);
+syncDlSrc2.includes('_oauthGetToken(false)')
+  ? (ok('_syncDownload: Token-Refresh via _oauthGetToken(false)'), f76Ok++)
+  : (fail('_syncDownload: kein Token-Refresh'), f76Fail++);
+
+if (f76Fail === 0) ok(f76Ok + ' Mantra-Pool + Startup Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════

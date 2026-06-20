@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.35</title>
+  <title>WorkBench 2.9.36</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2323,7 +2323,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.35</div>
+  <div id="wb-startup-tagline">v2.9.36</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2395,6 +2395,7 @@
             <div id="ck-header-day" style="font-size:16px;font-weight:700;color:var(--text);"></div>
             <div id="ck-header-sub" style="font-size:16px;color:var(--muted);margin-top:1px;"></div>
           </div>
+          <button id="ck-journal-btn" onclick="WB.journalOpen()" title="Journal" style="margin-right:6px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);font-family:var(--font);">&#x1F4D3;</button>
           <button id="ck-fokus-btn" onclick="WB._ckTimerOpen()">&#x1F551; Fokus</button>
         </div>
 
@@ -2413,10 +2414,6 @@
           </div>
           <!-- Medien-Buttons: nur auf Mobile -->
           <div id="ck-media-bar" style="display:none;gap:6px;padding:7px 10px;border-bottom:1px solid var(--border);background:var(--surface2);">
-            <button class="ck-media-btn" onclick="WB._ckSprache()" title="Sprache eingeben">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-              Sprache
-            </button>
             <button class="ck-media-btn" onclick="WB._ckFoto('gallery')" title="Foto aus Galerie">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
               Foto
@@ -2852,7 +2849,7 @@
     <div id="wb-nav">
     <div class="wb-tab active" data-tab="cockpit" onclick="WB.tabSwitch('cockpit')">
       <div class="wb-tab-icon"><svg viewBox="0 0 24 24"><path d="M11 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg></div>
-      <span>Notizblock</span>
+      <span>Eingang</span>
     </div>
     <div class="wb-tab" data-tab="notizen" onclick="WB.tabSwitch('notizen')">
       <div class="wb-tab-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
@@ -2880,7 +2877,7 @@
     <div class="wb-stab active" data-tab="cockpit" onclick="WB._stabSwitch('cockpit',this)">
       <div class="wb-stab-body">
         <div class="wb-stab-icon"><svg viewBox="0 0 24 24"><path d="M11 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg></div>
-        <span class="wb-stab-lbl">Notizblock</span>
+        <span class="wb-stab-lbl">Eingang</span>
       </div>
     </div>
     <div class="wb-stab" data-tab="notizen" onclick="WB._stabSwitch('notizen',this)">
@@ -2940,8 +2937,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.35',
-  APP_BUILD:   '20260620-1600',
+  APP_VERSION: '2.9.36',
+  APP_BUILD:   '20260620-2000',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -7475,13 +7472,24 @@ _ftStart() {
     this._setupSidebarLayout();
     this._weltInit();
 
-    // Token aus IDB ist bereits geladen — NICHT oauthCheckToken() aufrufen
-    // (würde auf Mobile ohne User-Gesture scheitern)
-    if (this._oauthTokenValid()) {
-      this._oauthHideBanner();
-    } else if (this._oauthClientId) {
-      // Zeige sanften Hinweis — kein Popup
-      this._oauthShowBanner('\u2139 Bitte in den Einstellungen mit Google verbinden um zu synchronisieren');
+    // Token-Refresh beim Start — silent, kein Popup
+    // Auch wenn der gecachte Token abgelaufen ist, versuchen wir ihn zu erneuern
+    if (this._oauthClientId) {
+      if (this._oauthTokenValid()) {
+        this._oauthHideBanner();
+      } else {
+        // Stiller Token-Refresh versuchen (kein Popup, kein User-Gesture nötig)
+        try {
+          const refreshed = await this._oauthGetToken(false);
+          if (refreshed) {
+            this._oauthHideBanner();
+          } else {
+            this._oauthShowBanner('\u2139 Offline \u2014 Bitte in Einstellungen neu verbinden');
+          }
+        } catch(e) {
+          this._oauthShowBanner('\u2139 Offline \u2014 Bitte in Einstellungen neu verbinden');
+        }
+      }
     }
 
     // Migration MUSS vor jedem syncUpload laufen
@@ -7490,7 +7498,7 @@ _ftStart() {
     // db sicherstellen
     if (!this.db) this.db = this._emptyDb();
 
-    // Drive laden — nur wenn gültiger Token vorhanden
+    // Drive laden — immer versuchen (Token wurde ggf. oben erneuert)
     if (this._oauthTokenValid()) {
       try {
         if ((this._pendingChanges || this.isDirty) && this.db) await this._syncUpload();
