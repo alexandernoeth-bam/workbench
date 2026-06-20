@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.49</title>
+  <title>WorkBench 2.9.50</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2365,7 +2365,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.49</div>
+  <div id="wb-startup-tagline">v2.9.50</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2987,8 +2987,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.49',
-  APP_BUILD:   '20260621-1400',
+  APP_VERSION: '2.9.50',
+  APP_BUILD:   '20260621-1500',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -7039,6 +7039,7 @@ _ftStart() {
       });
       // Neue DB-Felder sicherstellen
       if (!this.db.mantras) this.db.mantras = [];
+      if (!this.db.sondertage) this.db.sondertage = [];
     
     } catch(e) {
       console.error('[IDB] load error:', e);
@@ -7052,7 +7053,7 @@ _ftStart() {
       quickItems: [], customEvents: [], wochenpflichten: [],
       pflichtStatus: {}, tagesprotokoll: [], wochenMottos: {},
       checklistVorlagen: [], vorhaben: [], ziele: [], links: [],
-      notizen: [], mantras: [],
+      notizen: [], mantras: [], sondertage: [],
       _version: 1, _exportedAt: '',
     };
   },
@@ -7497,6 +7498,58 @@ _ftStart() {
     this.setDirty();
     this.tabSwitch('notizen');
     this._toast('\u2713 Link in "' + liste.titel + '" gespeichert');
+  },
+
+  /* ── Sondertage ── */
+
+  _sStAdd() {
+    const datum = document.getElementById('s-st-datum')?.value;
+    const typ   = document.getElementById('s-st-typ')?.value || 'urlaub';
+    const name  = document.getElementById('s-st-name')?.value?.trim() || '';
+    if (!datum) { this._toast('\u26a0 Bitte Datum wählen'); return; }
+    if (!this.db.sondertage) this.db.sondertage = [];
+    if (this.db.sondertage.find(s => s.datum === datum && !s.deleted)) {
+      this._toast('\u26a0 Dieser Tag ist bereits eingetragen'); return;
+    }
+    this.db.sondertage.push({ id: 'st_' + Date.now(), datum, typ, name });
+    this.setDirty();
+    this._sRenderSondertage();
+    const nameEl = document.getElementById('s-st-name');
+    if (nameEl) nameEl.value = '';
+    this._toast('\u2713 Sondertag gespeichert');
+  },
+
+  _sStDelete(id) {
+    const st = (this.db?.sondertage||[]).find(s => s.id === id);
+    if (!st) return;
+    this._softDelete(st);
+    this.setDirty();
+    this._sRenderSondertage();
+  },
+
+  _sRenderSondertage() {
+    const el = document.getElementById('s-st-liste');
+    if (!el) return;
+    const liste = (this.db?.sondertage||[]).filter(s => !s.deleted)
+      .sort((a,b) => a.datum.localeCompare(b.datum));
+    if (!liste.length) {
+      el.innerHTML = '<div style="font-size:14px;color:var(--faint);font-style:italic;padding:4px 0 8px">Keine Sondertage eingetragen.</div>';
+      return;
+    }
+    const typIcons  = { urlaub:'\uD83C\uDFD6', feiertag:'\uD83C\uDF89', auszeit:'\uD83E\uDDD8', krank:'\uD83E\uDD12' };
+    const typLabel  = { urlaub:'Urlaub', feiertag:'Feiertag', auszeit:'Auszeit', krank:'Krank' };
+    el.innerHTML = liste.map(s => {
+      const d   = new Date(s.datum + 'T00:00:00');
+      const lbl = d.toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' });
+      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid var(--border)">'
+        + '<span style="font-size:16px;flex-shrink:0">' + (typIcons[s.typ] || '\uD83D\uDCC5') + '</span>'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:13px;font-weight:700;color:var(--text)">' + this._esc(lbl) + '</div>'
+        + '<div style="font-size:12px;color:var(--faint)">' + (typLabel[s.typ]||s.typ) + (s.name ? ' \u00b7 ' + this._esc(s.name) : '') + '</div>'
+        + '</div>'
+        + '<button onclick="WB._sStDelete(\'' + this._esc(s.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--faint);font-size:16px;padding:0 2px;flex-shrink:0">\u00d7</button>'
+        + '</div>';
+    }).join('');
   },
 
   /* ── OAuth Banner ── */
@@ -8067,6 +8120,7 @@ _ftStart() {
     const el = document.getElementById('wb-settings-overlay');
     if (el) el.classList.add('open');
     this._sRenderAll();
+    this._sRenderSondertage();
     // Papierkorb-Zähler aktualisieren
     let pkCount = 0;
 
@@ -8174,6 +8228,8 @@ _ftStart() {
     if (head) head.style.borderBottom = isOpen ? '' : 'none';
     // Mantra-Pool beim Öffnen rendern
     if (isOpen && card.id === 's-mantra-card') this._sRenderMantraPool();
+    // Sondertage beim Öffnen rendern
+    if (isOpen && card.id === 's-sondertage-card') this._sRenderSondertage();
   },
 
   _sToggle(key) {
@@ -9990,6 +10046,33 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
       <div style="padding:10px 14px 14px">
         <button class="s-btn primary" onclick="WB._mantraAdd()">+ Satz hinzuf&uuml;gen</button>
       </div>
+    </div>
+
+    <div class="s-card" id="s-sondertage-card">
+      <div class="s-card-head">&#x1F4C5; Sondertage</div>
+      <div style="padding:10px 14px 6px">
+        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+          <div style="flex:1;min-width:120px">
+            <div style="font-size:11px;font-weight:700;color:var(--faint);margin-bottom:4px">Datum</div>
+            <input type="date" id="s-st-datum" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:6px 8px;font-size:14px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
+          </div>
+          <div style="flex:1;min-width:120px">
+            <div style="font-size:11px;font-weight:700;color:var(--faint);margin-bottom:4px">Typ</div>
+            <select id="s-st-typ" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:6px 8px;font-size:14px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
+              <option value="urlaub">🏖 Urlaub</option>
+              <option value="feiertag">🎉 Feiertag</option>
+              <option value="auszeit">🧘 Auszeit</option>
+              <option value="krank">🤒 Krank</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:120px">
+            <div style="font-size:11px;font-weight:700;color:var(--faint);margin-bottom:4px">Name (optional)</div>
+            <input type="text" id="s-st-name" placeholder="z.B. Weihnachten" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:6px 8px;font-size:14px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
+          </div>
+        </div>
+        <button class="s-btn primary" onclick="WB._sStAdd()" style="margin-top:10px">+ Sondertag hinzuf&uuml;gen</button>
+      </div>
+      <div id="s-st-liste" style="padding:0 14px 10px"></div>
     </div>
 
     <div class="s-card" id="s-papierkorb-card">

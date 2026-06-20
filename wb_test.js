@@ -2959,6 +2959,32 @@ fokSrc.includes('nowMin') ? (ok('_ckLadeTagesfokus: vergangene Termine gefiltert
 
 if (f80Fail === 0) ok(f80Ok + ' BuJo-Editor Checks bestanden');
 
+// ══════════════════════════════════════════
+// 81. SONDERTAGE
+// ══════════════════════════════════════════
+console.log('\n── 81. Sondertage ──');
+let f81Ok = 0, f81Fail = 0;
+
+content.includes('s-sondertage-card') ? (ok('#s-sondertage-card vorhanden'), f81Ok++) : (fail('#s-sondertage-card fehlt'), f81Fail++);
+content.includes('s-st-datum') ? (ok('#s-st-datum Datepicker vorhanden'), f81Ok++) : (fail('#s-st-datum fehlt'), f81Fail++);
+content.includes('s-st-typ') ? (ok('#s-st-typ Typ-Select vorhanden'), f81Ok++) : (fail('#s-st-typ fehlt'), f81Fail++);
+content.includes('s-st-liste') ? (ok('#s-st-liste vorhanden'), f81Ok++) : (fail('#s-st-liste fehlt'), f81Fail++);
+jsCode.includes('_sStAdd(') ? (ok('_sStAdd() definiert'), f81Ok++) : (fail('_sStAdd() fehlt'), f81Fail++);
+jsCode.includes('_sStDelete(') ? (ok('_sStDelete() definiert'), f81Ok++) : (fail('_sStDelete() fehlt'), f81Fail++);
+jsCode.includes('_sRenderSondertage(') ? (ok('_sRenderSondertage() definiert'), f81Ok++) : (fail('_sRenderSondertage() fehlt'), f81Fail++);
+// db.sondertage in _emptyDb
+const emptyDbSrc81 = jsCode.match(/  _emptyDb\([\s\S]*?^  \},/m)?.[0] || '';
+emptyDbSrc81.includes('sondertage') ? (ok('_emptyDb: sondertage Array'), f81Ok++) : (fail('_emptyDb: sondertage fehlt'), f81Fail++);
+// Typ-Optionen
+content.includes('urlaub') && content.includes('feiertag') && content.includes('auszeit') && content.includes('krank')
+  ? (ok('Alle 4 Sondertag-Typen vorhanden'), f81Ok++) : (fail('Sondertag-Typen fehlen'), f81Fail++);
+// Duplikat-Schutz
+const sStAddSrc = jsCode.match(/  _sStAdd\([\s\S]*?^  \},/m)?.[0] || '';
+sStAddSrc.includes('bereits eingetragen') || sStAddSrc.includes('find(s => s.datum')
+  ? (ok('_sStAdd: Duplikat-Schutz vorhanden'), f81Ok++) : (fail('_sStAdd: kein Duplikat-Schutz'), f81Fail++);
+
+if (f81Fail === 0) ok(f81Ok + ' Sondertage Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
