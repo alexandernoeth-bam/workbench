@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.52</title>
+  <title>WorkBench 2.9.54</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2365,7 +2365,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.52</div>
+  <div id="wb-startup-tagline">v2.9.54</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2990,8 +2990,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.52',
-  APP_BUILD:   '20260621-1600',
+  APP_VERSION: '2.9.54',
+  APP_BUILD:   '20260621-1800',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3821,7 +3821,12 @@ _ftStart() {
 
   _ckVerarbeiten() {
     const sel = window.getSelection(); if (!sel || sel.isCollapsed) return;
-    this._ckSelText = sel.toString().trim(); if (!this._ckSelText) return;
+    let rawText = sel.toString().trim(); if (!rawText) return;
+    // BuJo-Zeichen am Zeilenanfang entfernen (• ○ — > ! × ∞ und Whitespace danach)
+    rawText = rawText.split('\n').map(line =>
+      line.replace(/^[\u2022\u25CB\u2014\u00D7\u221E>!]\s*/, '').trim()
+    ).filter(Boolean).join('\n');
+    this._ckSelText = rawText; if (!this._ckSelText) return;
     if (sel.rangeCount > 0) this._ckSelRange = sel.getRangeAt(0).cloneRange();
     // Aktuellen Session-Eintrag als Referenz setzen
     if (!this._ckSelItemId && this._ckSessionId) {
@@ -6316,15 +6321,45 @@ _ftStart() {
     const s = size || 16;
     const st = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
     const icons = {
-      cart:  `<svg width="${s}" height="${s}" viewBox="0 0 24 24" ${st}><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>`,
-      tools: `<svg width="${s}" height="${s}" viewBox="0 0 24 24" ${st}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
-      bag:   `<svg width="${s}" height="${s}" viewBox="0 0 24 24" ${st}><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`,
-      idea:  `<svg width="${s}" height="${s}" viewBox="0 0 24 24" ${st}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
-      gift:  `<svg width="${s}" height="${s}" viewBox="0 0 24 24" ${st}><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>`,
-      note:  `<svg width="${s}" height="${s}" viewBox="0 0 24 24" ${st}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
-      pin:   `<svg width="${s}" height="${s}" viewBox="0 0 24 24" ${st}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+      // Bestehende
+      cart:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>',
+      tools:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+      bag:     '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
+      idea:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+      gift:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>',
+      note:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+      pin:     '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+      // Neue Icons
+      star:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+      heart:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+      book:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+      camera:  '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+      music:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+      plane:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.14h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.68a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z"/></svg>',
+      home:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+      sport:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l4.24 4.24"/><path d="M14.83 9.17l4.24-4.24"/><path d="M14.83 14.83l4.24 4.24"/><path d="M9.17 14.83l-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg>',
+      food:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>',
+      money:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+      health:  '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+      user:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+      target:  '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+      clock:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+      sun:     '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
+      leaf:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M17 8C8 10 5.9 16.17 3.82 22L5 21c1-3 4-6 8-7"/><path d="M21.39 11.39C20.91 7.62 18.1 4.57 14.55 3.28A12.42 12.42 0 0 0 3 4.27a9 9 0 0 1 15.35 9.72"/></svg>',
+      flag:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>',
+      lock:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+      mail:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>',
+      phone:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
     };
     return icons[icon] || icons.note;
+  },
+
+  _nzSetFarbe(listeId, farbe) {
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    l.farbe = farbe;
+    this.setDirty();
+    this.renderNotizenTab();
+    this._nzRenderPills();
   },
 
   _nzCntLabel(l) {
@@ -6368,7 +6403,7 @@ _ftStart() {
             + '</div>'
           : '<div class="nz-dot"></div>';
         return '<div class="nz-item" data-lid="' + this._esc(l.id) + '" data-iid="' + this._esc(i.id) + '">' + cb
-          + '<span class="nz-itxt' + (i.done ? ' dn' : '') + '">' + this._esc(i.text) + '</span>'
+          + '<span class="nz-itxt' + (i.done ? ' dn' : '') + '" ondblclick="WB._nzEditItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\',this)">' + this._esc(i.text) + '</span>'
           + '<svg class="nz-drag" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>'
           + '<button class="nz-del-btn" onclick="WB._nzDeleteItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\')">\u00d7</button>'
           + '</div>';
@@ -6611,12 +6646,29 @@ _ftStart() {
     this.renderNotizenTab();
   },
 
-  _nzSetFarbe(listeId, farbe) {
+  _nzEditItem(listeId, itemId, spanEl) {
     const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
-    l.farbe = farbe;
-    this.setDirty();
-    this.renderNotizenTab();
-    this._nzRenderPills();
+    const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    // Inline-Input erstellen
+    const input = document.createElement('input');
+    input.value = i.text;
+    input.style.cssText = 'flex:1;border:none;border-bottom:1.5px solid var(--accent);background:transparent;font-size:14px;color:var(--text);font-family:var(--font);outline:none;padding:0;width:100%';
+    spanEl.replaceWith(input);
+    input.focus();
+    input.select();
+    const save = () => {
+      const newText = input.value.trim();
+      if (newText && newText !== i.text) {
+        i.text = newText; i.updatedAt = this._now();
+        this.setDirty();
+      }
+      this.renderNotizenTab();
+    };
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); save(); }
+      if (e.key === 'Escape') { this.renderNotizenTab(); }
+    });
   },
 
   _nzTogglePin(listeId) {
@@ -6775,7 +6827,7 @@ _ftStart() {
 
   _nzBearbeitenDialog(listeId) {
     const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
-    const iconOpts = ['cart','tools','bag','idea','gift','note'].map(ic =>
+    const iconOpts = ['note','cart','tools','bag','idea','gift','star','heart','book','camera','music','plane','home','sport','food','money','health','user','target','clock','sun','leaf','flag','lock','mail','phone'].map(ic =>
       '<button onclick="document.getElementById(\'nz-e-icon\').value=\'' + ic + '\';document.querySelectorAll(\'.nz-ic-btn\').forEach(b=>b.style.background=\'\');this.style.background=\'var(--surface2)\'" class="nz-ic-btn" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1.5px solid var(--border);border-radius:8px;background:none;cursor:pointer;color:var(--accent)">'
       + this._nzSvgIcon(ic, 18) + '</button>'
     ).join('');
@@ -6808,7 +6860,7 @@ _ftStart() {
   },
 
   _nzNeueListeDialog() {
-    const iconOpts = ['note','cart','tools','bag','idea','gift'].map(ic =>
+    const iconOpts = ['note','cart','tools','bag','idea','gift','star','heart','book','camera','music','plane','home','sport','food','money','health','user','target','clock','sun','leaf','flag','lock','mail','phone'].map(ic =>
       '<button onclick="document.getElementById(\'nz-new-icon\').value=\'' + ic + '\';document.querySelectorAll(\'.nz-ic-btn-new\').forEach(b=>b.style.background=\'\');this.style.background=\'var(--surface2)\'" class="nz-ic-btn-new" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1.5px solid var(--border);border-radius:8px;background:none;cursor:pointer;color:var(--accent)">'
       + this._nzSvgIcon(ic, 18) + '</button>'
     ).join('');
