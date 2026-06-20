@@ -2882,7 +2882,7 @@ const mobSrc = jsCode.match(/  _nzRenderMobile\([\s\S]*?^  \},/m)?.[0] || '';
 
 // Desktop: max. 2 Vorschau-Items
 const deskSrc = jsCode.match(/  _nzRenderDesktop\([\s\S]*?^  \},/m)?.[0] || '';
-deskSrc.includes('slice(0, 2)') ? (ok('_nzRenderDesktop: max. 2 Vorschau-Items'), f78Ok++) : (fail('_nzRenderDesktop: kein slice(0,2)'), f78Fail++);
+deskSrc.includes('slice(0, 3)') ? (ok('_nzRenderDesktop: max. 3 Vorschau-Items'), f78Ok++) : (fail('_nzRenderDesktop: kein slice(0,3)'), f78Fail++);
 
 // renderNotizenTab: _isMobile() Verzweigung
 const rnSrc = jsCode.match(/  renderNotizenTab\([\s\S]*?^  \},/m)?.[0] || '';

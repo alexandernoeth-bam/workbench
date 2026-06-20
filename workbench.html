@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.40</title>
+  <title>WorkBench 2.9.41</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1214,7 +1214,7 @@
     /* ── Notizen Desktop: Post-it Kacheln ── */
     .nz-postit-section-lbl { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:var(--faint); padding:0 2px 8px; }
     .nz-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:10px; margin-bottom:16px; }
-    .nz-postit { border-radius:2px 2px 8px 8px; box-shadow:2px 3px 8px rgba(0,0,0,0.18),0 1px 2px rgba(0,0,0,0.10); cursor:pointer; overflow:hidden; transition:transform 0.12s,box-shadow 0.12s; position:relative; }
+    .nz-postit { border-radius:2px 2px 8px 8px; box-shadow:2px 3px 8px rgba(0,0,0,0.18),0 1px 2px rgba(0,0,0,0.10); cursor:pointer; overflow:hidden; transition:transform 0.12s,box-shadow 0.12s; position:relative; min-height:130px; display:flex; flex-direction:column; }
     .nz-postit:hover { transform:translateY(-2px) rotate(0.3deg); box-shadow:4px 6px 16px rgba(0,0,0,0.22); }
     .nz-postit::before { content:''; display:block; height:6px; background:rgba(0,0,0,0.08); width:40%; margin:0 auto; border-radius:0 0 3px 3px; }
     .nz-postit.c-gelb  { background:#FFF59D; } .nz-postit.c-blau  { background:#B3E5FC; }
@@ -1232,6 +1232,8 @@
     .nz-postit-dot { width:6px; height:6px; border-radius:50%; background:rgba(0,0,0,0.25); flex-shrink:0; }
     .nz-postit-txt { font-size:12px; color:#222; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.4; }
     .nz-postit-txt.dn { color:#888; text-decoration:line-through; }
+    .nz-postit-placeholder { opacity:0.25; }
+    .nz-postit-line { height:10px; background:rgba(0,0,0,0.15); border-radius:3px; width:70%; margin-left:18px; }
     .nz-postit-more { font-size:10px; color:rgba(0,0,0,0.4); padding:2px 10px 8px; font-style:italic; }
     .nz-postit-empty { font-size:11px; color:rgba(0,0,0,0.35); padding:4px 10px 10px; font-style:italic; }
     .nz-postit-new { border-radius:2px 2px 8px 8px; border:2px dashed rgba(0,0,0,0.2); background:rgba(255,255,255,0.35); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:16px 10px; cursor:pointer; min-height:110px; font-size:12px; color:var(--faint); transition:background 0.15s; }
@@ -2352,7 +2354,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.40</div>
+  <div id="wb-startup-tagline">v2.9.41</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2966,8 +2968,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.40',
-  APP_BUILD:   '20260621-0100',
+  APP_VERSION: '2.9.41',
+  APP_BUILD:   '20260621-0300',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6257,8 +6259,8 @@ _ftStart() {
       const pinHtml = l.gepinnt ? '<span class="nz-postit-pin">📌</span>' : '';
       const cntLbl = offen > 0 ? offen + '' : items.length + '';
 
-      // Max. 2 Vorschau-Items
-      const preview = items.slice(0, 2).map(i => {
+      // Max. 3 Vorschau-Items
+      const preview = items.slice(0, 3).map(i => {
         const chk = l.typ === 'check'
           ? '<div class="nz-postit-chk' + (i.done ? ' done' : '') + '">' + (i.done ? '\u2713' : '') + '</div>'
           : '<div class="nz-postit-dot"></div>';
@@ -6266,9 +6268,15 @@ _ftStart() {
           + '<span class="nz-postit-txt' + (i.done ? ' dn' : '') + '">' + this._esc(i.text) + '</span></div>';
       }).join('');
 
-      const moreCount = items.length - 2;
+      const moreCount = items.length - 3;
       const moreHtml  = moreCount > 0 ? '<div class="nz-postit-more">+' + moreCount + ' weitere</div>' : '';
-      const emptyHtml = items.length === 0 ? '<div class="nz-postit-empty">Noch keine Eintr\u00e4ge</div>' : '';
+      // Leere Kachel: 3 leere Zeilen als Platzhalter
+      const emptyLines = items.length < 3
+        ? Array(3 - items.length).fill('<div class="nz-postit-item nz-postit-placeholder"><div class="nz-postit-line"></div></div>').join('')
+        : '';
+      const emptyHtml = items.length === 0
+        ? '<div class="nz-postit-empty">Noch keine Eintr\u00e4ge</div>' + emptyLines
+        : emptyLines;
 
       return '<div class="nz-postit ' + farbe + '" onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')" id="nzg-' + this._esc(l.id) + '">'
         + '<div class="nz-postit-hdr">'
@@ -6303,9 +6311,56 @@ _ftStart() {
 
   // Öffnet eine Kachel als Detail-Overlay (Desktop)
   _nzKachelOpen(listeId) {
-    // Einfach zur normalen mobilen Ansicht wechseln im Modal
     const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
-    this._nzBearbeitenDialog(listeId);
+    this._nzKachelListeId = listeId;
+    this._nzKachelRender();
+  },
+
+  _nzKachelListeId: null,
+
+  _nzKachelRender() {
+    const listeId = this._nzKachelListeId;
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    const items = (l.items || []).filter(i => !i.deleted);
+
+    // Items rendern
+    const itemsH = items.map(i => {
+      const cb = l.typ === 'check'
+        ? '<div class="nz-chk' + (i.done ? ' ck' : '') + '"'
+          + ' onclick="WB._nzToggleItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\');WB._nzKachelRender()">'
+          + (i.done ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '')
+          + '</div>'
+        : '<div class="nz-dot"></div>';
+      return '<div class="nz-item" data-lid="' + this._esc(l.id) + '" data-iid="' + this._esc(i.id) + '">' + cb
+        + '<span class="nz-itxt' + (i.done ? ' dn' : '') + '">' + this._esc(i.text) + '</span>'
+        + '<button class="nz-del-btn" onclick="WB._nzDeleteItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\');WB._nzKachelRender()">\u00d7</button>'
+        + '</div>';
+    }).join('') || '<div style="padding:10px 14px;font-size:14px;color:var(--faint);font-style:italic">Noch keine Eintr\u00e4ge</div>';
+
+    const body = '<div style="display:flex;flex-direction:column;gap:0">'
+      + itemsH
+      + '<div class="nz-add-row" style="border-top:1px solid var(--border);margin-top:4px">'
+      + '<span style="color:var(--faint);font-size:13px">+</span>'
+      + '<input id="nz-kadd-' + this._esc(l.id) + '" placeholder="Eintrag hinzuf\u00fcgen..."'
+      + ' onkeydown="if(event.key===\'Enter\'){WB._nzAddItem(\'' + this._esc(l.id) + '\');WB._nzKachelRender()}"'
+      + ' style="flex:1;border:none;background:none;font-size:14px;color:var(--text);outline:none;font-family:var(--font);">'
+      + '<button class="nz-add-ok" onclick="WB._nzAddItem(\'' + this._esc(l.id) + '\');WB._nzKachelRender()">OK</button>'
+      + '</div></div>';
+
+    const footer = '<button style="font-size:13px;font-weight:700;color:var(--faint);background:none;border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;cursor:pointer;font-family:var(--font)" onclick="WB.modalClose()">Schlie\u00dfen</button>'
+      + '<button style="font-size:13px;font-weight:700;color:var(--faint);background:none;border:none;cursor:pointer;font-family:var(--font)" onclick="WB.modalClose();WB._nzBearbeitenDialog(\'' + this._esc(l.id) + '\')">&#9998; Einstellungen</button>';
+
+    this.modalOpen(
+      (l.icon ? '' : '\uD83D\uDCDD ') + l.titel,
+      body,
+      footer
+    );
+
+    // Fokus auf Input setzen
+    setTimeout(() => {
+      const inp = document.getElementById('nz-kadd-' + l.id);
+      if (inp) inp.focus();
+    }, 150);
   },
 
   // Mappt Notiz-Farben auf Post-it Farben
