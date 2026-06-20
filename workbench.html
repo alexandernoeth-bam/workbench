@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.39</title>
+  <title>WorkBench 2.9.40</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1210,6 +1210,33 @@
     .nz-action-btn { font-size:11px; font-weight:700; padding:3px 9px; border-radius:8px; border:1.5px solid rgba(0,0,0,.15); background:none; cursor:pointer; font-family:var(--font); color:var(--muted); display:flex; align-items:center; gap:4px; }
     .nz-action-btn.danger { color:var(--danger); border-color:var(--danger); }
     .nz-new-list { display:flex; align-items:center; gap:8px; padding:10px 12px; cursor:pointer; color:var(--accent); font-size:13px; font-weight:700; background:var(--surface); border-radius:10px; border:1.5px dashed var(--border); }
+
+    /* ── Notizen Desktop: Post-it Kacheln ── */
+    .nz-postit-section-lbl { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:var(--faint); padding:0 2px 8px; }
+    .nz-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:10px; margin-bottom:16px; }
+    .nz-postit { border-radius:2px 2px 8px 8px; box-shadow:2px 3px 8px rgba(0,0,0,0.18),0 1px 2px rgba(0,0,0,0.10); cursor:pointer; overflow:hidden; transition:transform 0.12s,box-shadow 0.12s; position:relative; }
+    .nz-postit:hover { transform:translateY(-2px) rotate(0.3deg); box-shadow:4px 6px 16px rgba(0,0,0,0.22); }
+    .nz-postit::before { content:''; display:block; height:6px; background:rgba(0,0,0,0.08); width:40%; margin:0 auto; border-radius:0 0 3px 3px; }
+    .nz-postit.c-gelb  { background:#FFF59D; } .nz-postit.c-blau  { background:#B3E5FC; }
+    .nz-postit.c-gruen { background:#C8E6C9; } .nz-postit.c-rosa  { background:#FFCCBC; }
+    .nz-postit.c-lila  { background:#E1BEE7; } .nz-postit.c-weiss { background:#F5F5F5; }
+    .nz-postit-hdr { display:flex; align-items:center; gap:6px; padding:8px 10px 5px; }
+    .nz-postit-icon { font-size:14px; flex-shrink:0; }
+    .nz-postit-title { font-size:13px; font-weight:800; color:#1a1a1a; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .nz-postit-cnt { font-size:10px; font-weight:700; padding:1px 5px; border-radius:6px; background:rgba(0,0,0,0.1); color:#333; flex-shrink:0; }
+    .nz-postit-pin { font-size:12px; flex-shrink:0; }
+    .nz-postit-preview { padding:2px 10px 4px; }
+    .nz-postit-item { display:flex; align-items:center; gap:6px; padding:3px 0; }
+    .nz-postit-chk { width:12px; height:12px; border-radius:3px; border:1.5px solid rgba(0,0,0,0.25); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:8px; background:rgba(255,255,255,0.5); }
+    .nz-postit-chk.done { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .nz-postit-dot { width:6px; height:6px; border-radius:50%; background:rgba(0,0,0,0.25); flex-shrink:0; }
+    .nz-postit-txt { font-size:12px; color:#222; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.4; }
+    .nz-postit-txt.dn { color:#888; text-decoration:line-through; }
+    .nz-postit-more { font-size:10px; color:rgba(0,0,0,0.4); padding:2px 10px 8px; font-style:italic; }
+    .nz-postit-empty { font-size:11px; color:rgba(0,0,0,0.35); padding:4px 10px 10px; font-style:italic; }
+    .nz-postit-new { border-radius:2px 2px 8px 8px; border:2px dashed rgba(0,0,0,0.2); background:rgba(255,255,255,0.35); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:16px 10px; cursor:pointer; min-height:110px; font-size:12px; color:var(--faint); transition:background 0.15s; }
+    .nz-postit-new:hover { background:rgba(255,255,255,0.5); }
+    .nz-postit-new-icon { font-size:22px; opacity:0.4; }
     /* Pills im Cockpit */
     .nz-pin-pills { display:flex; gap:7px; flex-wrap:wrap; }
     .nz-pin-pill { display:inline-flex; align-items:center; gap:5px; border-radius:20px; padding:5px 12px 5px 9px; cursor:pointer; border:1.5px solid; }
@@ -2325,7 +2352,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.39</div>
+  <div id="wb-startup-tagline">v2.9.40</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2939,8 +2966,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.39',
-  APP_BUILD:   '20260620-2300',
+  APP_VERSION: '2.9.40',
+  APP_BUILD:   '20260621-0100',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6139,21 +6166,27 @@ _ftStart() {
   renderNotizenTab() {
     const scroll = document.getElementById('notizen-scroll');
     if (!scroll) return;
+    if (this._isMobile()) {
+      this._nzRenderMobile(scroll);
+    } else {
+      this._nzRenderDesktop(scroll);
+    }
+  },
+
+  _nzRenderMobile(scroll) {
     const listen = this._nzGetListen();
     let h = '';
     listen.forEach(l => {
-      const farbe = l.farbe || 'c-weiss';
-      const cntLbl = this._nzCntLabel(l);
-      const gepinnt = !!l.gepinnt;
+      const farbe    = l.farbe || 'c-weiss';
+      const gepinnt  = !!l.gepinnt;
+      const items    = (l.items || []).filter(i => !i.deleted);
+      const offen    = items.filter(i => !i.done).length;
+      const cntLbl   = offen > 0 ? offen + ' offen' : items.length + '';
+      const cntCls   = offen > 0 ? ' has' : '';
+      const pinHtml  = gepinnt ? '<span style="font-size:12px;flex-shrink:0">📌</span>' : '';
 
-      // Farbwahl-Dots
-      const colorDots = this._NZ_COLORS.map(c =>
-        '<div class="nz-cdot ' + c + '" title="' + (this._NZ_COLOR_LABELS[c]||c) + '"'
-        + ' onclick="event.stopPropagation();WB._nzSetFarbe(\'' + this._esc(l.id) + '\',\'' + c + '\')"></div>'
-      ).join('');
-
-      // Einträge
-      const itemsH = (l.items||[]).filter(i => !i.deleted).map(i => {
+      // Items
+      const itemsH = items.map(i => {
         const cb = l.typ === 'check'
           ? '<div class="nz-chk' + (i.done ? ' ck' : '') + '"'
             + ' onclick="WB._nzToggleItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\')">'
@@ -6167,21 +6200,25 @@ _ftStart() {
           + '</div>';
       }).join('');
 
-      const pinOnColor = gepinnt ? 'currentColor' : '#ccc';
-      h += '<div class="nz-grp open ' + farbe + '" id="nzg-' + this._esc(l.id) + '">'
-        // Header
+      // Farbwahl-Dots
+      const colorDots = this._NZ_COLORS.map(c =>
+        '<div class="nz-cdot ' + c + '"'
+        + ' onclick="event.stopPropagation();WB._nzSetFarbe(\'' + this._esc(l.id) + '\',\'' + c + '\')"></div>'
+      ).join('');
+
+      // Mobile: standardmäßig IMMER zugeklappt (kein 'open')
+      h += '<div class="nz-grp ' + farbe + '" id="nzg-' + this._esc(l.id) + '">'
         + '<div class="nz-grp-hdr" onclick="this.closest(\'.nz-grp\').classList.toggle(\'open\')">'
-        + '<span style="color:var(--accent);display:flex;align-items:center">' + this._nzSvgIcon(l.icon||'note') + '</span>'
+        + '<span style="color:var(--accent);display:flex;align-items:center">' + this._nzSvgIcon(l.icon || 'note') + '</span>'
         + '<span class="nz-grp-title">' + this._esc(l.titel) + '</span>'
-        + '<span class="nz-grp-cnt">' + cntLbl + '</span>'
+        + pinHtml
+        + '<span class="nz-grp-cnt' + cntCls + '">' + cntLbl + '</span>'
         + '<button class="nz-pin-btn' + (gepinnt ? ' on' : '') + '"'
         + ' onclick="event.stopPropagation();WB._nzTogglePin(\'' + this._esc(l.id) + '\')" aria-label="Pinnen">'
-        + this._nzSvgIcon('pin', 13)
-        + '</button>'
+        + this._nzSvgIcon('pin', 13) + '</button>'
         + '<button class="nz-menu-btn" onclick="event.stopPropagation();WB._nzBearbeitenDialog(\'' + this._esc(l.id) + '\')" aria-label="Optionen">&#8943;</button>'
         + '<span class="nz-grp-chev">&#9662;</span>'
         + '</div>'
-        // Body
         + '<div class="nz-grp-body">'
         + '<div class="nz-color-row">' + colorDots + '</div>'
         + itemsH
@@ -6206,6 +6243,75 @@ _ftStart() {
       + 'Neue Liste erstellen</div>';
     scroll.innerHTML = h;
     this._nzInitDrag(scroll);
+  },
+
+  _nzRenderDesktop(scroll) {
+    const listen  = this._nzGetListen();
+    const gepinnt = listen.filter(l => !!l.gepinnt);
+    const normal  = listen.filter(l => !l.gepinnt);
+
+    const renderKachel = l => {
+      const farbe  = this._nzPostItFarbe(l.farbe || 'c-weiss');
+      const items  = (l.items || []).filter(i => !i.deleted);
+      const offen  = items.filter(i => !i.done).length;
+      const pinHtml = l.gepinnt ? '<span class="nz-postit-pin">📌</span>' : '';
+      const cntLbl = offen > 0 ? offen + '' : items.length + '';
+
+      // Max. 2 Vorschau-Items
+      const preview = items.slice(0, 2).map(i => {
+        const chk = l.typ === 'check'
+          ? '<div class="nz-postit-chk' + (i.done ? ' done' : '') + '">' + (i.done ? '\u2713' : '') + '</div>'
+          : '<div class="nz-postit-dot"></div>';
+        return '<div class="nz-postit-item">' + chk
+          + '<span class="nz-postit-txt' + (i.done ? ' dn' : '') + '">' + this._esc(i.text) + '</span></div>';
+      }).join('');
+
+      const moreCount = items.length - 2;
+      const moreHtml  = moreCount > 0 ? '<div class="nz-postit-more">+' + moreCount + ' weitere</div>' : '';
+      const emptyHtml = items.length === 0 ? '<div class="nz-postit-empty">Noch keine Eintr\u00e4ge</div>' : '';
+
+      return '<div class="nz-postit ' + farbe + '" onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')" id="nzg-' + this._esc(l.id) + '">'
+        + '<div class="nz-postit-hdr">'
+        + '<span class="nz-postit-icon">' + (l.icon ? this._nzSvgIcon(l.icon, 14) : '📝') + '</span>'
+        + '<span class="nz-postit-title">' + this._esc(l.titel) + '</span>'
+        + pinHtml
+        + '<span class="nz-postit-cnt">' + cntLbl + '</span>'
+        + '</div>'
+        + '<div class="nz-postit-preview">' + preview + '</div>'
+        + moreHtml + emptyHtml
+        + '</div>';
+    };
+
+    let h = '';
+    if (gepinnt.length) {
+      h += '<div class="nz-postit-section-lbl">\uD83D\uDCCC Gepinnt</div>';
+      h += '<div class="nz-grid">' + gepinnt.map(renderKachel).join('') + '</div>';
+    }
+    if (normal.length) {
+      h += '<div class="nz-postit-section-lbl">Alle Listen</div>';
+      h += '<div class="nz-grid">'
+        + normal.map(renderKachel).join('')
+        + '<div class="nz-postit-new" onclick="WB._nzNeueListeDialog()">'
+        + '<span class="nz-postit-new-icon">+</span>Neue Liste</div>'
+        + '</div>';
+    } else {
+      h += '<div class="nz-grid"><div class="nz-postit-new" onclick="WB._nzNeueListeDialog()">'
+        + '<span class="nz-postit-new-icon">+</span>Neue Liste</div></div>';
+    }
+    scroll.innerHTML = h;
+  },
+
+  // Öffnet eine Kachel als Detail-Overlay (Desktop)
+  _nzKachelOpen(listeId) {
+    // Einfach zur normalen mobilen Ansicht wechseln im Modal
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    this._nzBearbeitenDialog(listeId);
+  },
+
+  // Mappt Notiz-Farben auf Post-it Farben
+  _nzPostItFarbe(farbe) {
+    const map = { 'c-gelb':'c-gelb', 'c-gruen':'c-gruen', 'c-blau':'c-blau', 'c-rosa':'c-rosa', 'c-weiss':'c-weiss' };
+    return map[farbe] || 'c-weiss';
   },
 
   _nzInitDrag(scroll) {
@@ -7652,6 +7758,7 @@ _ftStart() {
     }
     // Ab jetzt sind visibilitychange/focus Uploads erlaubt
     this._syncInitDone = true;
+    this._toast('\u2705 Einsatzbereit');
 
     this._sBereinigen();
     this._syncStart();

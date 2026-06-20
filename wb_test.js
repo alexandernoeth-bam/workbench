@@ -2859,6 +2859,40 @@ syncUpSrc77.includes('_driveFileId = null')
 
 if (f77Fail === 0) ok(f77Ok + ' Sync File-ID Robustheit Checks bestanden');
 
+// ══════════════════════════════════════════
+// 78. NOTIZEN MOBILE/DESKTOP SPLIT
+// ══════════════════════════════════════════
+console.log('\n── 78. Notizen Mobile/Desktop Split ──');
+let f78Ok = 0, f78Fail = 0;
+
+jsCode.includes('_nzRenderMobile(') ? (ok('_nzRenderMobile() definiert'), f78Ok++) : (fail('_nzRenderMobile() fehlt'), f78Fail++);
+jsCode.includes('_nzRenderDesktop(') ? (ok('_nzRenderDesktop() definiert'), f78Ok++) : (fail('_nzRenderDesktop() fehlt'), f78Fail++);
+jsCode.includes('_nzPostItFarbe(') ? (ok('_nzPostItFarbe() definiert'), f78Ok++) : (fail('_nzPostItFarbe() fehlt'), f78Fail++);
+
+// Mobile: kein 'open' class by default
+const mobSrc = jsCode.match(/  _nzRenderMobile\([\s\S]*?^  \},/m)?.[0] || '';
+!mobSrc.includes("'nz-grp open") && !mobSrc.includes('"nz-grp open')
+  ? (ok('_nzRenderMobile: kein open class — alle zugeklappt'), f78Ok++)
+  : (fail('_nzRenderMobile: open class gefunden — Listen nicht zugeklappt'), f78Fail++);
+
+// Desktop: Post-it CSS
+['nz-postit','nz-postit-hdr','nz-postit-preview','nz-postit-cnt','nz-grid'].forEach(cls => {
+  content.includes(cls) ? (ok('.' + cls + ' vorhanden'), f78Ok++) : (fail('.' + cls + ' fehlt'), f78Fail++);
+});
+
+// Desktop: max. 2 Vorschau-Items
+const deskSrc = jsCode.match(/  _nzRenderDesktop\([\s\S]*?^  \},/m)?.[0] || '';
+deskSrc.includes('slice(0, 2)') ? (ok('_nzRenderDesktop: max. 2 Vorschau-Items'), f78Ok++) : (fail('_nzRenderDesktop: kein slice(0,2)'), f78Fail++);
+
+// renderNotizenTab: _isMobile() Verzweigung
+const rnSrc = jsCode.match(/  renderNotizenTab\([\s\S]*?^  \},/m)?.[0] || '';
+rnSrc.includes('_isMobile()') ? (ok('renderNotizenTab: _isMobile() Verzweigung'), f78Ok++) : (fail('renderNotizenTab: kein _isMobile()'), f78Fail++);
+
+// Einsatzbereit-Toast
+jsCode.includes('Einsatzbereit') ? (ok('Einsatzbereit-Toast vorhanden'), f78Ok++) : (fail('Einsatzbereit-Toast fehlt'), f78Fail++);
+
+if (f78Fail === 0) ok(f78Ok + ' Notizen Split Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
