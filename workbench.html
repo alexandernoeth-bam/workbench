@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.41</title>
+  <title>WorkBench 2.9.42</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2354,7 +2354,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.41</div>
+  <div id="wb-startup-tagline">v2.9.42</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2968,8 +2968,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.41',
-  APP_BUILD:   '20260621-0300',
+  APP_VERSION: '2.9.42',
+  APP_BUILD:   '20260621-0600',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -7360,18 +7360,39 @@ _ftStart() {
     this._oauthHideBanner();
   },
 
-  async _oauthReconnect() {
+  _oauthReconnect() {
+    // WICHTIG: direkt im User-Gesture aufrufen (kein await davor) damit
+    // der Browser den Popup nicht blockiert
+    this._oauthToken    = null;
+    this._oauthTokenExp = null;
+    if (!window.google?.accounts?.oauth2) {
+      this._oauthShowBanner('\u26a0 Google-Bibliothek nicht geladen \u2014 Seite neu laden');
+      return;
+    }
     try {
-      this._oauthToken    = null;
-      this._oauthTokenExp = null;
-      const token = await this._oauthGetToken(false);
-      if (token) {
-        this._oauthHideBanner();
-        this._toast('\u2713 Neu verbunden');
-        await this._syncUpload();
-      }
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: this._oauthClientId,
+        scope:     this.DRIVE_SCOPE,
+        prompt:    'select_account',
+        callback:  async (resp) => {
+          if (resp.error || !resp.access_token) {
+            this._oauthShowBanner('\u26a0 Anmeldung fehlgeschlagen: ' + (resp.error || 'Unbekannt'));
+            return;
+          }
+          this._oauthToken    = resp.access_token;
+          this._oauthTokenExp = Date.now() + (resp.expires_in - 60) * 1000;
+          await this.idbSet('meta', 'oauthToken',    this._oauthToken);
+          await this.idbSet('meta', 'oauthTokenExp', String(this._oauthTokenExp));
+          this._oauthHideBanner();
+          this._toast('\u2713 Verbunden \u2014 synchronisiere...');
+          try { await this._syncDownload(); } catch(e) {}
+          try { await this._syncUpload(); }  catch(e) {}
+          this._toast('\u2705 Einsatzbereit');
+        },
+      });
+      client.requestAccessToken({ prompt: 'select_account' });
     } catch(e) {
-      this._oauthShowBanner('\u26a0 Verbindung fehlgeschlagen: ' + e.message + ' &mdash; Sync nicht m\u00f6glich');
+      this._oauthShowBanner('\u26a0 Verbindung fehlgeschlagen: ' + e.message);
     }
   },
 
