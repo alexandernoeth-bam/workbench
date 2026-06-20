@@ -2893,6 +2893,36 @@ jsCode.includes('Einsatzbereit') ? (ok('Einsatzbereit-Toast vorhanden'), f78Ok++
 
 if (f78Fail === 0) ok(f78Ok + ' Notizen Split Checks bestanden');
 
+// ══════════════════════════════════════════
+// 79. GERÄTESPEZIFISCHER PW-DIALOG
+// ══════════════════════════════════════════
+console.log('\n── 79. Gerätespezifischer PW-Dialog ──');
+let f79Ok = 0, f79Fail = 0;
+
+const cryptoFreshSrc = jsCode.match(/  _cryptoKeyFresh\([\s\S]*?^  \},/m)?.[0] || '';
+// Mobile: kein wb_key_date-Fallback
+cryptoFreshSrc.includes('isMobileDevice') && cryptoFreshSrc.includes('return false')
+  ? (ok('_cryptoKeyFresh: Mobile ignoriert wb_key_date'), f79Ok++)
+  : (fail('_cryptoKeyFresh: kein Mobile-spezifischer PW-Zwang'), f79Fail++);
+// UA-Fallback wenn Settings noch nicht geladen
+cryptoFreshSrc.includes('navigator.userAgent')
+  ? (ok('_cryptoKeyFresh: UA-Fallback vor Settings-Load'), f79Ok++)
+  : (fail('_cryptoKeyFresh: kein UA-Fallback'), f79Fail++);
+// Desktop: wb_key_date bleibt gültig
+cryptoFreshSrc.includes('wb_key_date')
+  ? (ok('_cryptoKeyFresh: Desktop nutzt wb_key_date'), f79Ok++)
+  : (fail('_cryptoKeyFresh: wb_key_date fehlt'), f79Fail++);
+// _oauthReconnect: direkt synchron (kein async) für User-Gesture
+const reconnectSrc = jsCode.match(/  _oauthReconnect\([\s\S]*?^  \},/m)?.[0] || '';
+!reconnectSrc.startsWith('  async _oauthReconnect')
+  ? (ok('_oauthReconnect: synchron — User-Gesture bleibt erhalten'), f79Ok++)
+  : (fail('_oauthReconnect: async — User-Gesture geht verloren'), f79Fail++);
+reconnectSrc.includes('select_account')
+  ? (ok('_oauthReconnect: prompt select_account'), f79Ok++)
+  : (fail('_oauthReconnect: kein select_account prompt'), f79Fail++);
+
+if (f79Fail === 0) ok(f79Ok + ' Gerätespezifischer PW-Dialog Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');

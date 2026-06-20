@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.42</title>
+  <title>WorkBench 2.9.43</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2354,7 +2354,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.42</div>
+  <div id="wb-startup-tagline">v2.9.43</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2968,8 +2968,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.42',
-  APP_BUILD:   '20260621-0600',
+  APP_VERSION: '2.9.43',
+  APP_BUILD:   '20260621-0800',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6939,9 +6939,17 @@ _ftStart() {
 
   _cryptoKeyFresh() {
     const pw = sessionStorage.getItem('wb_enc_pw');
-    // Passwort vorhanden → fresh (auch bei falschem Datum / Page-Refresh)
+    // Passwort in sessionStorage → immer fresh
     if (pw) return true;
-    // Heute schon entsperrt
+    // Mobile (Pixel/iPad): sessionStorage wird bei PWA-Neustart geleert
+    // → kein wb_key_date-Fallback, immer PW-Dialog zeigen
+    // Gerät aus Settings oder direkt per UA ermitteln (Settings evtl. noch nicht geladen)
+    const deviceSetting = this._settings?.device;
+    const isMobileDevice = deviceSetting
+      ? (deviceSetting === 'pixel' || deviceSetting === 'ipad')
+      : /Android|iPad|iPhone/i.test(navigator.userAgent);
+    if (isMobileDevice) return false;
+    // Desktop: einmal täglich entsperrt reicht
     const today = this._dStr(new Date());
     const saved = localStorage.getItem('wb_key_date');
     return saved === today;
