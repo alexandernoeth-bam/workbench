@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.61</title>
+  <title>WorkBench 2.9.62</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2375,7 +2375,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.61</div>
+  <div id="wb-startup-tagline">v2.9.62</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -3017,8 +3017,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.61',
-  APP_BUILD:   '20260621-2400',
+  APP_VERSION: '2.9.62',
+  APP_BUILD:   '20260621-2130',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6587,7 +6587,7 @@ _ftStart() {
         + '<button class="nz-pin-btn' + (gepinnt ? ' on' : '') + '"'
         + ' onclick="event.stopPropagation();WB._nzTogglePin(\'' + this._esc(l.id) + '\')" aria-label="Pinnen">'
         + this._nzSvgIcon('pin', 13) + '</button>'
-        + '<button class="nz-menu-btn" onclick="event.stopPropagation();WB._nzMenuOpen(\'' + this._esc(l.id) + '\',this)" aria-label="Optionen">&#8943;</button>'
+        + '<button class="nz-menu-btn" onclick="event.stopPropagation();WB._nzBearbeitenDialog(\'' + this._esc(l.id) + '\')" aria-label="Optionen">&#8943;</button>'
         + '<span class="nz-grp-chev">&#9662;</span>'
         + '</div>'
         + '<div class="nz-grp-body">'
@@ -6660,7 +6660,6 @@ _ftStart() {
         : emptyLines;
 
       return '<div class="nz-postit ' + farbe + '" onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')" id="nzg-' + this._esc(l.id) + '" style="position:relative">'
-        + '<button class="nz-postit-menu-btn" onclick="event.stopPropagation();WB._nzMenuOpen(\'' + this._esc(l.id) + '\',this)" title="Aktionen">&#x22EF;</button>'
         + '<div class="nz-postit-hdr">'
         + '<span class="nz-postit-icon">' + (l.icon ? this._nzSvgIcon(l.icon, 14) : '📝') + '</span>'
         + '<span class="nz-postit-title">' + this._esc(l.titel) + '</span>'
@@ -7048,18 +7047,39 @@ _ftStart() {
   },
 
   _nzBearbeitenDialog(listeId) {
-    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    // Auch in gelöschten suchen (für Archiv-Tab)
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     const iconOpts = ['note','cart','tools','bag','idea','gift','star','heart','book','camera','music','plane','home','sport','food','money','health','user','target','clock','sun','leaf','flag','lock','mail','phone'].map(ic =>
       '<button onclick="document.getElementById(\'nz-e-icon\').value=\'' + ic + '\';document.querySelectorAll(\'.nz-ic-btn\').forEach(b=>b.style.background=\'\');this.style.background=\'var(--surface2)\'" class="nz-ic-btn" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1.5px solid var(--border);border-radius:8px;background:none;cursor:pointer;color:var(--accent)">'
       + this._nzSvgIcon(ic, 18) + '</button>'
     ).join('');
+
+    const curZustand = l.zustand || 'aktuell';
+    const zustandOpts = [
+      { v:'aktuell',   l:'Aktuell (kein Merkmal)' },
+      { v:'parkplatz', l:'Parkplatz' },
+      { v:'kompass',   l:'Kompass' },
+    ].map(o => '<option value="' + o.v + '"' + (curZustand === o.v ? ' selected' : '') + '>' + o.l + '</option>').join('');
+
     const body = '<div class="wb-input-group"><label class="wb-label">Name</label>'
       + '<input id="nz-e-name" class="wb-input" value="' + this._esc(l.titel) + '"></div>'
       + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Icon</label>'
       + '<input id="nz-e-icon" type="hidden" value="' + this._esc(l.icon||'note') + '">'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">' + iconOpts + '</div></div>'
       + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Typ</label>'
-      + '<select id="nz-e-typ" class="wb-select"><option value="check"' + (l.typ==='check'?' selected':'') + '>Checkliste</option><option value="bullet"' + (l.typ==='bullet'?' selected':'') + '>Ideenliste</option></select></div>';
+      + '<select id="nz-e-typ" class="wb-select">'
+      + '<option value="check"' + (l.typ==='check'?' selected':'') + '>Checkliste</option>'
+      + '<option value="bullet"' + (l.typ==='bullet'?' selected':'') + '>Ideenliste</option>'
+      + '<option value="freitext"' + (l.typ==='freitext'?' selected':'') + '>Freitext</option>'
+      + '</select></div>'
+      + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Zustand</label>'
+      + '<select id="nz-e-zustand" class="wb-select">' + zustandOpts + '</select></div>'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding:10px 0;border-top:1px solid var(--border)">'
+      + '<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;flex:1">'
+      + '<input type="checkbox" id="nz-e-gepinnt"' + (l.gepinnt ? ' checked' : '') + ' style="width:17px;height:17px;accent-color:var(--accent)"> Gepinnt</label>'
+      + '<button onclick="WB._nzDeleteListe(\'' + this._esc(listeId) + '\');WB.modalClose()" style="padding:5px 12px;border-radius:8px;border:1.5px solid #C0392B;background:none;color:#C0392B;cursor:pointer;font-size:13px;font-weight:700;font-family:var(--font)">Löschen</button>'
+      + '</div>';
+
     this._modalCtx = { type:'nz-edit', id: listeId };
     this.modalOpen('Liste bearbeiten', body,
       '<button class="wb-btn" onclick="WB.modalClose()">Abbrechen</button>'
@@ -7068,12 +7088,19 @@ _ftStart() {
   },
 
   _nzBearbeitenSpeichern(listeId) {
-    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
-    const name = document.getElementById('nz-e-name')?.value?.trim();
-    const icon = document.getElementById('nz-e-icon')?.value || 'note';
-    const typ  = document.getElementById('nz-e-typ')?.value || 'check';
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const name    = document.getElementById('nz-e-name')?.value?.trim();
+    const icon    = document.getElementById('nz-e-icon')?.value || 'note';
+    const typ     = document.getElementById('nz-e-typ')?.value || 'check';
+    const zustand = document.getElementById('nz-e-zustand')?.value || 'aktuell';
+    const gepinnt = document.getElementById('nz-e-gepinnt')?.checked || false;
     if (!name) { this._toast('Bitte Namen eingeben'); return; }
-    l.titel = name; l.icon = icon; l.typ = typ;
+    l.titel   = name;
+    l.icon    = icon;
+    l.typ     = typ;
+    l.gepinnt = gepinnt;
+    l.updatedAt = this._now();
+    if (zustand === 'aktuell') { delete l.zustand; } else { l.zustand = zustand; }
     this.setDirty();
     this.modalClose();
     this.renderNotizenTab();
