@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.60</title>
+  <title>WorkBench 2.9.61</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2375,7 +2375,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.60</div>
+  <div id="wb-startup-tagline">v2.9.61</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -3017,8 +3017,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.60',
-  APP_BUILD:   '20260621-2359',
+  APP_VERSION: '2.9.61',
+  APP_BUILD:   '20260621-2400',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -8735,7 +8735,7 @@ _ftStart() {
     if (!el) return;
     const alle = [];
 
-    (this.db?.wochenpflichten || []).forEach(p => { alle.push({ ...p, _ctx: p.welt || 'priv' }); });
+    (this.db?.wochenpflichten || []).filter(p => !p.deleted).forEach(p => { alle.push({ ...p, _ctx: p.welt || 'priv' }); });
   
     if (!alle.length) {
       el.innerHTML = '<div style="padding:12px 14px;font-size:16px;color:var(--faint);">Noch keine Wochenpflichten.</div>';
@@ -8778,13 +8778,27 @@ _ftStart() {
   },
 
   _sWpDelete(id, ctx) {
-    if (!confirm('Wochenpflicht l\u00f6schen?')) return;
-    const db = this.db;
-    if (!db) return;
+    const db = this.db; if (!db) return;
     const p = (db.wochenpflichten||[]).find(x => x.id === id);
+    if (!p) return;
+    // confirm() funktioniert auf iOS PWA nicht zuverlässig → eigener Dialog
+    this.modalOpen(
+      'Wochenpflicht l\u00f6schen?',
+      '<div style="font-size:14px;color:var(--text);padding:4px 0">' + this._esc(p.titel) + '</div>',
+      '<button style="padding:6px 16px;border-radius:8px;border:1.5px solid var(--border);background:none;cursor:pointer;font-family:var(--font);font-size:13px" onclick="WB.modalClose()">Abbrechen</button>'
+      + '<button style="padding:6px 16px;border-radius:8px;border:none;background:#C0392B;color:#fff;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700;margin-left:8px" onclick="WB._sWpDeleteConfirm(\'' + this._esc(id) + '\')">Löschen</button>'
+    );
+  },
+
+  _sWpDeleteConfirm(id) {
+    const db = this.db; if (!db) return;
+    const p = (db.wochenpflichten||[]).find(x => x.id === id);
+    if (!p) { this.modalClose(); return; }
     this._softDelete(p);
     this.setDirty();
+    this.modalClose();
     this._sRenderWp();
+    this._toast('\u2713 Wochenpflicht gel\u00f6scht');
   },
 
   _sBerufsdbLaden() {
