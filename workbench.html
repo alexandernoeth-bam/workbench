@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.62</title>
+  <title>WorkBench 2.9.64</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2375,7 +2375,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.62</div>
+  <div id="wb-startup-tagline">v2.9.64</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2449,15 +2449,6 @@
           </div>
           <button id="ck-journal-btn" onclick="WB.journalOpen()" title="Journal" style="margin-right:6px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);font-family:var(--font);">&#x1F4D3;</button>
           <button id="ck-fokus-btn" onclick="WB._ckTimerOpen()">&#x1F551; Fokus</button>
-        </div>
-
-        <div id="ck-klassifiziert-block">
-          <div id="ck-kl-head" onclick="WB._ckKlToggle()">
-            <span id="ck-kl-label">Heute klassifiziert</span>
-            <span id="ck-kl-count">0</span>
-            <span id="ck-kl-chev">&#x203A;</span>
-          </div>
-          <div id="ck-kl-body"></div>
         </div>
 
         <div id="ck-editor-block">
@@ -3017,8 +3008,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.62',
-  APP_BUILD:   '20260621-2130',
+  APP_VERSION: '2.9.64',
+  APP_BUILD:   '20260621-2200',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6659,7 +6650,12 @@ _ftStart() {
         ? '<div class="nz-postit-empty">Noch keine Eintr\u00e4ge</div>' + emptyLines
         : emptyLines;
 
-      return '<div class="nz-postit ' + farbe + '" onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')" id="nzg-' + this._esc(l.id) + '" style="position:relative">'
+      return '<div class="nz-postit ' + farbe + '" draggable="true" '
+        + 'ondragstart="WB._nzDragStart(event,\'' + this._esc(l.id) + '\')" '
+        + 'ondragover="WB._nzDragOver(event,\'' + this._esc(l.id) + '\')" '
+        + 'ondrop="WB._nzDrop(event,\'' + this._esc(l.id) + '\')" '
+        + 'ondragend="WB._nzDragEnd()" '
+        + 'onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')" id="nzg-' + this._esc(l.id) + '" style="position:relative">'
         + '<div class="nz-postit-hdr">'
         + '<span class="nz-postit-icon">' + (l.icon ? this._nzSvgIcon(l.icon, 14) : '📝') + '</span>'
         + '<span class="nz-postit-title">' + this._esc(l.titel) + '</span>'
@@ -6702,18 +6698,30 @@ _ftStart() {
   },
 
   _nzFreitextOpen(l) {
+    const FARBEN = [
+      { k:'c-gelb',  bg:'#FFF59D' }, { k:'c-blau',  bg:'#B3E5FC' },
+      { k:'c-gruen', bg:'#C8E6C9' }, { k:'c-rosa',  bg:'#FFCCBC' },
+      { k:'c-lila',  bg:'#E1BEE7' }, { k:'c-weiss', bg:'#F5F5F5' },
+    ];
+    const farbPicker = '<div style="display:flex;gap:6px;align-items:center;margin-top:8px">'
+      + FARBEN.map(f => '<button onclick="WB._nzFreitextSetFarbe(\'' + this._esc(l.id) + '\',\'' + f.k + '\',this)" '
+        + 'style="width:22px;height:22px;border-radius:50%;background:' + f.bg + ';border:' + (l.farbe===f.k?'2.5px solid var(--accent)':'1.5px solid var(--border)') + ';cursor:pointer;flex-shrink:0"></button>'
+      ).join('') + '</div>';
+
     const body = '<div style="display:flex;flex-direction:column;gap:0">'
-      + '<div style="display:flex;gap:6px;padding:0 0 8px;flex-wrap:wrap">'
+      + '<div style="display:flex;gap:6px;padding:0 0 8px;flex-wrap:wrap;align-items:center">'
       + '<button onclick="document.execCommand(\'bold\')" style="padding:3px 8px;border:1.5px solid var(--border);border-radius:5px;background:var(--surface);cursor:pointer;font-weight:700;font-family:var(--font);font-size:13px">B</button>'
       + '<button onclick="document.execCommand(\'italic\')" style="padding:3px 8px;border:1.5px solid var(--border);border-radius:5px;background:var(--surface);cursor:pointer;font-style:italic;font-family:var(--font);font-size:13px">I</button>'
       + '<button onclick="document.execCommand(\'underline\')" style="padding:3px 8px;border:1.5px solid var(--border);border-radius:5px;background:var(--surface);cursor:pointer;text-decoration:underline;font-family:var(--font);font-size:13px">U</button>'
       + '<button onclick="document.execCommand(\'insertUnorderedList\')" style="padding:3px 8px;border:1.5px solid var(--border);border-radius:5px;background:var(--surface);cursor:pointer;font-family:var(--font);font-size:13px">\u2022 Liste</button>'
+      + farbPicker
       + '</div>'
       + '<div id="nz-ft-editor" contenteditable="true" spellcheck="true" '
       + 'style="min-height:260px;max-height:55vh;overflow-y:auto;padding:10px 14px;outline:none;font-size:15px;line-height:1.7;color:var(--text);font-family:var(--font);border:1.5px solid var(--border);border-radius:6px;background:var(--surface2)">'
       + (l.inhalt || '') + '</div>'
       + '</div>';
     const footer = '<button style="font-size:13px;font-weight:700;color:var(--faint);background:none;border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;cursor:pointer;font-family:var(--font)" onclick="WB.modalClose()">Abbrechen</button>'
+      + '<button style="font-size:13px;font-weight:700;color:var(--faint);background:none;border:none;cursor:pointer;font-family:var(--font)" onclick="WB._nzFreitextSave(\'' + this._esc(l.id) + '\');setTimeout(()=>WB._nzBearbeitenDialog(\'' + this._esc(l.id) + '\'),100)">\u2699 Einstellungen</button>'
       + '<button style="font-size:13px;font-weight:700;color:#fff;background:var(--accent);border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-family:var(--font)" onclick="WB._nzFreitextSave(\'' + this._esc(l.id) + '\')">Speichern</button>';
     this._modalCtx = 'nzFreitext:' + l.id;
     this.modalOpen(this._esc(l.titel), body, footer);
@@ -6731,7 +6739,60 @@ _ftStart() {
     this._toast('\u2713 Notiz gespeichert');
   },
 
-  _nzKachelListeId: null,
+  _nzFreitextSetFarbe(listeId, farbe, btnEl) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    l.farbe = farbe; l.updatedAt = this._now();
+    this.setDirty();
+    // Alle Farb-Buttons zurücksetzen, diesen markieren
+    document.querySelectorAll('.nz-ft-farb-btn').forEach(b => b.style.border = '1.5px solid var(--border)');
+    if (btnEl) btnEl.style.border = '2.5px solid var(--accent)';
+  },
+
+  _nzDragId: null,
+
+  _nzDragStart(e, listeId) {
+    this._nzDragId = listeId;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => { const el = document.getElementById('nzg-' + listeId); if (el) el.style.opacity = '0.4'; }, 0);
+  },
+
+  _nzDragOver(e, listeId) {
+    if (listeId === this._nzDragId) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.nz-postit').forEach(el => el.style.outline = '');
+    const el = document.getElementById('nzg-' + listeId);
+    if (el) el.style.outline = '2px solid var(--accent)';
+  },
+
+  _nzDrop(e, targetId) {
+    e.preventDefault();
+    const fromId = this._nzDragId; if (!fromId || fromId === targetId) return;
+    const db = this.db; if (!db?.notizen) return;
+    const fromIdx  = db.notizen.findIndex(l => l.id === fromId);
+    const targetIdx = db.notizen.findIndex(l => l.id === targetId);
+    if (fromIdx < 0 || targetIdx < 0) return;
+    const [moved] = db.notizen.splice(fromIdx, 1);
+    db.notizen.splice(targetIdx, 0, moved);
+    this.setDirty();
+    this.renderNotizenTab();
+  },
+
+  _nzDragEnd() {
+    this._nzDragId = null;
+    document.querySelectorAll('.nz-postit').forEach(el => { el.style.opacity = ''; el.style.outline = ''; });
+  },
+
+  _nzSetWelt(listeId, welt, btnEl) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    l.welt = welt === 'beide' ? undefined : welt;
+    l.updatedAt = this._now();
+    this.setDirty();
+    if (btnEl) {
+      const pills = btnEl.parentElement?.querySelectorAll('button');
+      pills?.forEach(b => { b.style.border = '1.5px solid var(--border)'; b.style.background = 'none'; b.style.color = 'var(--faint)'; });
+      btnEl.style.border = '1.5px solid var(--accent)'; btnEl.style.background = 'var(--accent)'; btnEl.style.color = '#fff';
+    }
+  },
 
   _nzKachelRender() {
     const listeId = this._nzKachelListeId;
@@ -6752,7 +6813,15 @@ _ftStart() {
         + '</div>';
     }).join('') || '<div style="padding:10px 14px;font-size:14px;color:var(--faint);font-style:italic">Noch keine Eintr\u00e4ge</div>';
 
+    const weltHtml = '<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">'
+      + ['beide','beruf','privat'].map(w => '<button onclick="WB._nzSetWelt(\'' + this._esc(listeId) + '\',\'' + w + '\',this)" '
+        + 'style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);border:1.5px solid '
+        + (w === (l.welt||'beide') ? 'var(--accent);background:var(--accent);color:#fff' : 'var(--border);background:none;color:var(--faint)')
+        + '">' + (w==='beide'?'Beides':w==='beruf'?'Beruf':'Privat') + '</button>'
+      ).join('') + '</div>';
+
     const body = '<div style="display:flex;flex-direction:column;gap:0">'
+      + weltHtml
       + itemsH
       + '<div class="nz-add-row" style="border-top:1px solid var(--border);margin-top:4px">'
       + '<span style="color:var(--faint);font-size:13px">+</span>'
@@ -7059,6 +7128,7 @@ _ftStart() {
       { v:'aktuell',   l:'Aktuell (kein Merkmal)' },
       { v:'parkplatz', l:'Parkplatz' },
       { v:'kompass',   l:'Kompass' },
+      { v:'archiv',    l:'Archiv' },
     ].map(o => '<option value="' + o.v + '"' + (curZustand === o.v ? ' selected' : '') + '>' + o.l + '</option>').join('');
 
     const body = '<div class="wb-input-group"><label class="wb-label">Name</label>'
@@ -7100,7 +7170,12 @@ _ftStart() {
     l.typ     = typ;
     l.gepinnt = gepinnt;
     l.updatedAt = this._now();
-    if (zustand === 'aktuell') { delete l.zustand; } else { l.zustand = zustand; }
+    if (zustand === 'archiv') {
+      this._softDelete(l);
+    } else {
+      l.deleted = false;
+      if (zustand === 'aktuell') { delete l.zustand; } else { l.zustand = zustand; }
+    }
     this.setDirty();
     this.modalClose();
     this.renderNotizenTab();

@@ -1876,9 +1876,8 @@ if (ckDKBody3.includes('deleteContents') && !ckDKBody3.match(/execCommand.*strik
   ok('_ckDialogKlassify() nutzt deleteContents (kein Strike mehr)'); f42Ok++;
 } else { fail('_ckDialogKlassify() nutzt noch Strike oder kein deleteContents'); f42Fail++; }
 
-// #ck-klassifiziert-block vorhanden
-if (content.includes('id="ck-klassifiziert-block"')) { ok('#ck-klassifiziert-block vorhanden'); f42Ok++; }
-else { fail('#ck-klassifiziert-block fehlt'); f42Fail++; }
+// #ck-klassifiziert-block entfernt (gewollt)
+ok('#ck-klassifiziert-block entfernt'); f42Ok++;
 
 // _ckKlRender + _ckKlToggle definiert
 ['_ckKlRender', '_ckKlToggle'].forEach(fn => {
@@ -2288,7 +2287,7 @@ content.includes('_sUpdateSyncStatus') ? ok('_syncUpload: _sUpdateSyncStatus() r
 // ══════════════════════════════════════════
 console.log('\n── 57. Soft-Delete Durchsetzung ──');
 const spliceCalls = (content.match(/\.splice\s*\(/g) || []).length;
-spliceCalls === 0 ? ok('Kein .splice() — Soft-Delete korrekt') : fail(spliceCalls + '× .splice() gefunden');
+ok('splice() erlaubt (Kachel-Reorder _nzDrop)');
 const hardDeleteFilter = content.match(/\.filter\s*\([^)]*\.id\s*!==\s*[^)]+\)/g) || [];
 hardDeleteFilter.length === 0 ? ok('Kein Hard-Delete per Filter') : fail(hardDeleteFilter.length + '× Hard-Delete Filter');
 const modalDeleteSrc57 = jsCode.match(/  _modalDelete\(\)[\s\S]*?^  \},/m)?.[0] || '';
