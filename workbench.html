@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.64</title>
+  <title>WorkBench 2.9.67</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1331,6 +1331,7 @@
     .wo-badge.today   { background: var(--accent); color: #fff; }
     .wo-badge.we      { background: var(--surface2); color: var(--faint); }
     .wo-badge.ft      { background: rgba(180,83,9,0.15); color: var(--warn); }
+    .wo-cal-dh.ft-col { background: rgba(180,83,9,0.06); }
     .wo-ev-row {
       display: flex; align-items: center; gap: 10px;
       padding: 8px 14px; border-bottom: 0.5px solid var(--border);
@@ -2375,7 +2376,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.64</div>
+  <div id="wb-startup-tagline">v2.9.67</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -3008,8 +3009,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.64',
-  APP_BUILD:   '20260621-2200',
+  APP_VERSION: '2.9.67',
+  APP_BUILD:   '20260621-2300',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -5627,7 +5628,9 @@ _ftStart() {
       const isToday = dateStr === today;
       const dow     = d.getDay(); // 0=So,1=Mo,...
       const isWE    = dow === 0 || dow === 6;
-      const isFt    = false;
+      // Sondertage aus db
+      const st = (this.db?.sondertage||[]).find(s => s.datum === dateStr && !s.deleted);
+      const isFt = !!st;
 
       // Alle Termine (nur mit Uhrzeit auf Mobile)
       const events = (this.db?.customEvents || [])
@@ -5672,7 +5675,11 @@ _ftStart() {
         + d.getDate() + '. ' + months[d.getMonth()] + '</div>';
       if (isToday) h += '<span class="wo-badge today">Heute</span>';
       if (isWE)    h += '<span class="wo-badge we">WE</span>';
-      if (isFt)    h += '<span class="wo-badge ft">Feiertag</span>';
+      if (st) {
+        const stLabels = { urlaub:'\uD83C\uDFD6 Urlaub', feiertag:'\uD83C\uDF89 Feiertag', auszeit:'\uD83E\uDDD8 Auszeit', krank:'\uD83E\uDD12 Krank', dienstreise:'\u2708 Dienstreise', urlaubsreise:'\uD83D\uDDFA Urlaubsreise' };
+        const stLbl = stLabels[st.typ] || st.typ;
+        h += '<span class="wo-badge ft">' + stLbl + (st.name ? ' \u00b7 ' + this._esc(st.name) : '') + '</span>';
+      }
       h += '</div>';
 
       events.forEach(e => {
@@ -5703,8 +5710,7 @@ _ftStart() {
             + (p.done ? '\u2713' : '') + '</div>'
             + '<div class="wo-pfl-text' + (p.done ? ' done' : '') + '">'
             + this._esc(p.titel) + '</div>'
-            + '<span class="wo-badge pflicht">'
-            + (p.done ? 'Pflicht \u2713' : 'Pflicht') + '</span></div>';
+            + '</div>';
         });
         h += '</div>';
       }
@@ -5742,25 +5748,20 @@ _ftStart() {
         const isToday   = dateStr === today;
         const isWE      = i >= 5;
         const dayOfWeek = d.getDay();
-
-        let pflCount = 0;
-
-        (this.db?.wochenpflichten||[]).forEach(p => {
-          if (p.taeglich || (p.wochentage||[]).includes(dayOfWeek)) pflCount++;
-        });
-      
-        const donePfl = this._woPflCountDone(dateStr);
+        // Sondertag
+        const st = (this.db?.sondertage||[]).find(s => s.datum === dateStr && !s.deleted);
 
         let cls = 'wo-cal-dh';
         if (isToday) cls += ' today-col';
         if (isWE)    cls += ' we-col';
+        if (st)      cls += ' ft-col';
+
+        const stLabels = { urlaub:'\uD83C\uDFD6', feiertag:'\uD83C\uDF89', auszeit:'\uD83E\uDDD8', krank:'\uD83E\uDD12', dienstreise:'\u2708\uFE0F', urlaubsreise:'\uD83D\uDDFA' };
 
         h += '<div class="' + cls + '">'
           + '<div class="wo-dh-name' + (isToday ? ' today' : '') + '">' + dayLetters[i] + '</div>'
           + '<div class="wo-dh-num' + (isToday ? ' today' : '') + '">' + d.getDate() + '</div>'
-          + (pflCount > 0
-            ? '<div><span class="wo-dh-pfl-badge" onclick="WB._woCalPflClick(&quot;' + dateStr + '&quot;)">' + donePfl + '/' + pflCount + ' Pfl</span></div>'
-            : '')
+          + (st ? '<div><span class="wo-dh-badge ft" title="' + this._esc(st.name||st.typ) + '">' + (stLabels[st.typ]||'📅') + '</span></div>' : '')
           + (isWE ? '<div><span class="wo-dh-badge we">WE</span></div>' : '')
           + '</div>';
       });
@@ -6375,6 +6376,18 @@ _ftStart() {
       liste = this.db.notizen.filter(l => !l.deleted && l.zustand === zustand);
     }
 
+    // Welt-Filter (activeWorld)
+    const welt = this.activeWorld;
+    if (welt && welt !== 'beide') {
+      liste = liste.filter(l => {
+        const lw = l.welt;
+        if (!lw) return true; // 'beide' = kein Feld gesetzt
+        if (welt === 'beruf')  return lw === 'beruf'  || lw === 'pro';
+        if (welt === 'privat') return lw === 'privat' || lw === 'priv';
+        return true;
+      });
+    }
+
     // Volltextsuche
     if (this._nzSuche) {
       const q = this._nzSuche.toLowerCase();
@@ -6708,6 +6721,13 @@ _ftStart() {
         + 'style="width:22px;height:22px;border-radius:50%;background:' + f.bg + ';border:' + (l.farbe===f.k?'2.5px solid var(--accent)':'1.5px solid var(--border)') + ';cursor:pointer;flex-shrink:0"></button>'
       ).join('') + '</div>';
 
+    const weltHtmlFt = '<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">'
+      + ['beide','beruf','privat'].map(w => '<button onclick="WB._nzSetWelt(\'' + this._esc(l.id) + '\',\'' + w + '\',this)" '
+        + 'style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);border:1.5px solid '
+        + (w === (l.welt||'beide') ? 'var(--accent);background:var(--accent);color:#fff' : 'var(--border);background:none;color:var(--faint)')
+        + '">' + (w==='beide'?'Beides':w==='beruf'?'Beruf':'Privat') + '</button>'
+      ).join('') + '</div>';
+
     const body = '<div style="display:flex;flex-direction:column;gap:0">'
       + '<div style="display:flex;gap:6px;padding:0 0 8px;flex-wrap:wrap;align-items:center">'
       + '<button onclick="document.execCommand(\'bold\')" style="padding:3px 8px;border:1.5px solid var(--border);border-radius:5px;background:var(--surface);cursor:pointer;font-weight:700;font-family:var(--font);font-size:13px">B</button>'
@@ -6716,6 +6736,7 @@ _ftStart() {
       + '<button onclick="document.execCommand(\'insertUnorderedList\')" style="padding:3px 8px;border:1.5px solid var(--border);border-radius:5px;background:var(--surface);cursor:pointer;font-family:var(--font);font-size:13px">\u2022 Liste</button>'
       + farbPicker
       + '</div>'
+      + weltHtmlFt
       + '<div id="nz-ft-editor" contenteditable="true" spellcheck="true" '
       + 'style="min-height:260px;max-height:55vh;overflow-y:auto;padding:10px 14px;outline:none;font-size:15px;line-height:1.7;color:var(--text);font-family:var(--font);border:1.5px solid var(--border);border-radius:6px;background:var(--surface2)">'
       + (l.inhalt || '') + '</div>'
@@ -7990,8 +8011,8 @@ _ftStart() {
       el.innerHTML = '<div style="font-size:14px;color:var(--faint);font-style:italic;padding:4px 0 8px">Keine Sondertage eingetragen.</div>';
       return;
     }
-    const typIcons  = { urlaub:'\uD83C\uDFD6', feiertag:'\uD83C\uDF89', auszeit:'\uD83E\uDDD8', krank:'\uD83E\uDD12' };
-    const typLabel  = { urlaub:'Urlaub', feiertag:'Feiertag', auszeit:'Auszeit', krank:'Krank' };
+    const typIcons  = { urlaub:'\uD83C\uDFD6', feiertag:'\uD83C\uDF89', auszeit:'\uD83E\uDDD8', krank:'\uD83E\uDD12', dienstreise:'\u2708\uFE0F', urlaubsreise:'\uD83D\uDDFA' };
+    const typLabel  = { urlaub:'Urlaub', feiertag:'Feiertag', auszeit:'Auszeit', krank:'Krank', dienstreise:'Dienstreise', urlaubsreise:'Urlaubsreise' };
     el.innerHTML = liste.map(s => {
       const d   = new Date(s.datum + 'T00:00:00');
       const lbl = d.toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' });
@@ -10570,7 +10591,9 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
             <div style="font-size:11px;font-weight:700;color:var(--faint);margin-bottom:4px">Typ</div>
             <select id="s-st-typ" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:6px 8px;font-size:14px;background:var(--surface2);color:var(--text);font-family:var(--font);outline:none">
               <option value="urlaub">🏖 Urlaub</option>
+              <option value="urlaubsreise">🗺 Urlaubsreise</option>
               <option value="feiertag">🎉 Feiertag</option>
+              <option value="dienstreise">✈ Dienstreise</option>
               <option value="auszeit">🧘 Auszeit</option>
               <option value="krank">🤒 Krank</option>
             </select>
