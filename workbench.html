@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.57</title>
+  <title>WorkBench 2.9.58</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -182,8 +182,7 @@
     }
     .wb-stab.active .wb-stab-icon svg { stroke: var(--accent); }
     .wb-stab-lbl {
-      writing-mode: vertical-rl; text-orientation: mixed;
-      transform: rotate(180deg);
+      writing-mode: vertical-lr; text-orientation: mixed;
       font-size: 11px; font-weight: 800;
       text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint);
     }
@@ -2367,7 +2366,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.57</div>
+  <div id="wb-startup-tagline">v2.9.58</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2992,8 +2991,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.57',
-  APP_BUILD:   '20260621-2200',
+  APP_VERSION: '2.9.58',
+  APP_BUILD:   '20260621-2300',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -7672,36 +7671,56 @@ _ftStart() {
   /* ── Navigation Tab-Sichtbarkeit ── */
 
   _ALL_TABS: [
-    { id: 'cockpit',      label: 'Eingang' },
-    { id: 'notizen',      label: 'Notizen' },
-    { id: 'backlog',      label: 'Tagesplan' },
-    { id: 'aufgaben',     label: 'Aufgaben' },
-    { id: 'vorhaben',     label: 'Vorhaben' },
-    { id: 'ablage',       label: 'Ablage' },
-    { id: 'woche',        label: 'Woche' },
-    { id: 'ziele',        label: 'Ziele' },
+    { id: 'cockpit',  label: 'Eingang',   pixel: true  },
+    { id: 'notizen',  label: 'Notizen',   pixel: true  },
+    { id: 'backlog',  label: 'Tagesplan', pixel: true  },
+    { id: 'aufgaben', label: 'Aufgaben',  pixel: true  },
+    { id: 'vorhaben', label: 'Vorhaben',  pixel: true  },
+    { id: 'woche',    label: 'Woche',     pixel: true  },
+    { id: 'ablage',   label: 'Ablage',    pixel: false },
+    { id: 'ziele',    label: 'Ziele',     pixel: false },
   ],
 
   _sRenderNavTabs() {
     const el = document.getElementById('s-nav-tabs-list'); if (!el) return;
-    const device  = this._settings.device || 'mac';
-    const visible = this._settings.tabsVisible?.[device] || [];
-    el.innerHTML = this._ALL_TABS.map(t => {
-      const checked = visible.includes(t.id);
-      return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:0.5px solid var(--border)">'
+    const visiblePixel = this._settings.tabsVisible?.pixel || [];
+    const visibleMac   = this._settings.tabsVisible?.mac   || [];
+
+    // Pixel-Tabs (nur pixel:true auswählbar)
+    const pixelTabs = this._ALL_TABS.filter(t => t.pixel);
+    // PC-Tabs (alle)
+    const macTabs   = this._ALL_TABS;
+
+    let h = '<div style="font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">📱 Pixel</div>';
+    h += pixelTabs.map(t => {
+      const checked = visiblePixel.includes(t.id);
+      return '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:0.5px solid var(--border)">'
         + '<label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;font-size:14px">'
-        + '<input type="checkbox" data-tab-id="' + t.id + '"' + (checked ? ' checked' : '') + ' style="width:17px;height:17px;accent-color:var(--accent);flex-shrink:0">'
+        + '<input type="checkbox" data-device="pixel" data-tab-id="' + t.id + '"' + (checked ? ' checked' : '') + ' style="width:17px;height:17px;accent-color:var(--accent);flex-shrink:0">'
         + t.label + '</label></div>';
     }).join('');
+
+    h += '<div style="font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;margin:14px 0 6px">🖥 PC / iPad</div>';
+    h += macTabs.map(t => {
+      const checked = visibleMac.includes(t.id);
+      return '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:0.5px solid var(--border)">'
+        + '<label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;font-size:14px">'
+        + '<input type="checkbox" data-device="mac" data-tab-id="' + t.id + '"' + (checked ? ' checked' : '') + ' style="width:17px;height:17px;accent-color:var(--accent);flex-shrink:0">'
+        + t.label + '</label></div>';
+    }).join('');
+
+    el.innerHTML = h;
   },
 
   _sNavSave() {
     const el = document.getElementById('s-nav-tabs-list'); if (!el) return;
-    const device = this._settings.device || 'mac';
-    const checked = Array.from(el.querySelectorAll('input[data-tab-id]:checked')).map(i => i.dataset.tabId);
-    if (checked.length < 1) { this._toast('\u26a0 Mind. 1 Tab muss aktiv sein'); return; }
+    const pixelChecked = Array.from(el.querySelectorAll('input[data-device="pixel"]:checked')).map(i => i.dataset.tabId);
+    const macChecked   = Array.from(el.querySelectorAll('input[data-device="mac"]:checked')).map(i => i.dataset.tabId);
+    if (pixelChecked.length < 1 || macChecked.length < 1) { this._toast('\u26a0 Mind. 1 Tab pro Gerät aktiv'); return; }
     if (!this._settings.tabsVisible) this._settings.tabsVisible = {};
-    this._settings.tabsVisible[device] = checked;
+    this._settings.tabsVisible.pixel = pixelChecked;
+    this._settings.tabsVisible.mac   = macChecked;
+    this._settings.tabsVisible.ipad  = macChecked; // iPad gleich wie PC
     this._sSaveSettings();
     this._sApplyTabVisibility();
     this._toast('\u2713 Navigation gespeichert');
