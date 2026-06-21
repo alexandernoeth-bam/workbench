@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.59</title>
+  <title>WorkBench 2.9.60</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2375,7 +2375,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.59</div>
+  <div id="wb-startup-tagline">v2.9.60</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2564,10 +2564,18 @@
       </div>
       <!-- Zustand-Filter-Tabs -->
       <div id="nz-filter-tabs" style="display:flex;gap:0;border-bottom:1.5px solid var(--border);background:var(--surface);flex-shrink:0;">
-        <button class="nz-ztab active" data-zustand="aktuell"  onclick="WB._nzSetZustand('aktuell')">Aktuell</button>
-        <button class="nz-ztab"        data-zustand="parkplatz" onclick="WB._nzSetZustand('parkplatz')">🅿 Parkplatz</button>
-        <button class="nz-ztab"        data-zustand="kompass"   onclick="WB._nzSetZustand('kompass')">🧭 Kompass</button>
-        <button class="nz-ztab"        data-zustand="archiv"    onclick="WB._nzSetZustand('archiv')">Archiv</button>
+        <button class="nz-ztab active" data-zustand="aktuell"  onclick="WB._nzSetZustand('aktuell')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>Aktuell
+        </button>
+        <button class="nz-ztab" data-zustand="parkplatz" onclick="WB._nzSetZustand('parkplatz')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg>Parkplatz
+        </button>
+        <button class="nz-ztab" data-zustand="kompass" onclick="WB._nzSetZustand('kompass')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:4px"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>Kompass
+        </button>
+        <button class="nz-ztab" data-zustand="archiv" onclick="WB._nzSetZustand('archiv')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:4px"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archiv
+        </button>
       </div>
       <div id="notizen-scroll"></div>
     </div>
@@ -3009,8 +3017,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.59',
-  APP_BUILD:   '20260621-2330',
+  APP_VERSION: '2.9.60',
+  APP_BUILD:   '20260621-2359',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6364,13 +6372,17 @@ _ftStart() {
     if (!this.db.notizen || !this.db.notizen.length) {
       this.db.notizen = this._nzDefaultListen();
     }
-    // Migration: zustand-Feld setzen falls fehlt
-    this.db.notizen.forEach(l => { if (!l.zustand) l.zustand = 'aktuell'; });
 
     const zustand = this._nzZustand;
-    let liste = zustand === 'archiv'
-      ? this.db.notizen.filter(l => !!l.deleted)
-      : this.db.notizen.filter(l => !l.deleted && l.zustand === zustand);
+    let liste;
+    if (zustand === 'archiv') {
+      liste = this.db.notizen.filter(l => !!l.deleted);
+    } else if (zustand === 'aktuell') {
+      // Aktuell = kein expliziter Zustand ODER zustand fehlt/ist 'aktuell'
+      liste = this.db.notizen.filter(l => !l.deleted && (!l.zustand || l.zustand === 'aktuell'));
+    } else {
+      liste = this.db.notizen.filter(l => !l.deleted && l.zustand === zustand);
+    }
 
     // Volltextsuche
     if (this._nzSuche) {
@@ -6442,7 +6454,11 @@ _ftStart() {
       this._softDelete(l);
     } else {
       l.deleted = false;
-      l.zustand = zustand;
+      if (zustand === 'aktuell') {
+        delete l.zustand; // aktuell = kein Merkmal
+      } else {
+        l.zustand = zustand;
+      }
     }
     l.updatedAt = this._now();
     this.setDirty();
@@ -6464,18 +6480,25 @@ _ftStart() {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     const menu = document.createElement('div');
     menu.className = 'nz-ctx-menu';
+    const SVG = (path) => '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0">' + path + '</svg>';
     const items = [
-      { z:'aktuell',   icon:'✅', label:'Aktuell' },
-      { z:'parkplatz', icon:'🅿',  label:'Parkplatz' },
-      { z:'kompass',   icon:'🧭', label:'Kompass' },
-      { z:'archiv',    icon:'📦', label:'Archivieren' },
-    ].filter(i => i.z !== this._nzZustand || this._nzZustand === 'archiv');
+      { z:'aktuell',   svg: SVG('<polyline points="20 6 9 17 4 12"/>'),                                              label:'Aktuell' },
+      { z:'parkplatz', svg: SVG('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/>'), label:'Parkplatz' },
+      { z:'kompass',   svg: SVG('<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>'), label:'Kompass' },
+      { z:'archiv',    svg: SVG('<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/>'), label:'Archivieren' },
+    ].filter(i => i.z !== this._nzZustand);
 
-    const pinLabel = l.gepinnt ? '📌 Unpin' : '📌 Pinnen';
-    menu.innerHTML = '<div class="nz-ctx-item" onclick="WB._nzTogglePin(\'' + this._esc(listeId) + '\');WB._nzMenuClose()">' + pinLabel + '</div>'
-      + items.map(i => '<div class="nz-ctx-item" onclick="WB._nzSetZustandItem(\'' + this._esc(listeId) + '\',\'' + i.z + '\')">' + i.icon + ' ' + i.label + '</div>').join('')
-      + '<div class="nz-ctx-item" onclick="WB._nzBearbeitenDialog(\'' + this._esc(listeId) + '\');WB._nzMenuClose()">✏️ Bearbeiten</div>'
-      + '<div class="nz-ctx-item danger" onclick="WB._nzDeleteListe(\'' + this._esc(listeId) + '\');WB._nzMenuClose()">🗑 Löschen</div>';
+    const pinSvg = l.gepinnt
+      ? SVG('<line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17H19V13L17 7H7L5 13Z"/><line x1="12" y1="7" x2="12" y2="3"/>')
+      : SVG('<line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17H19V13L17 7H7L5 13Z"/><line x1="12" y1="7" x2="12" y2="3"/>');
+    const pinLabel = l.gepinnt ? 'Unpin' : 'Pinnen';
+    const editSvg  = SVG('<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>');
+    const delSvg   = SVG('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>');
+
+    menu.innerHTML = '<div class="nz-ctx-item" style="display:flex;align-items:center;gap:8px" onclick="WB._nzTogglePin(\'' + this._esc(listeId) + '\');WB._nzMenuClose()">' + pinSvg + pinLabel + '</div>'
+      + items.map(i => '<div class="nz-ctx-item" style="display:flex;align-items:center;gap:8px" onclick="WB._nzSetZustandItem(\'' + this._esc(listeId) + '\',\'' + i.z + '\')">' + i.svg + ' ' + i.label + '</div>').join('')
+      + '<div class="nz-ctx-item" style="display:flex;align-items:center;gap:8px" onclick="WB._nzBearbeitenDialog(\'' + this._esc(listeId) + '\');WB._nzMenuClose()">' + editSvg + ' Bearbeiten</div>'
+      + '<div class="nz-ctx-item danger" style="display:flex;align-items:center;gap:8px" onclick="WB._nzDeleteListe(\'' + this._esc(listeId) + '\');WB._nzMenuClose()">' + delSvg + ' L\u00f6schen</div>';
 
     // Positionieren
     const rect = btnEl.getBoundingClientRect();
@@ -7083,7 +7106,10 @@ _ftStart() {
     const typ  = document.getElementById('nz-new-typ')?.value || 'check';
     if (!name) { this._toast('Bitte Namen eingeben'); return; }
     if (!this.db.notizen) this.db.notizen = [];
-    this.db.notizen.push({ id:'nz_'+Date.now(), titel:name, icon, typ, farbe:'c-weiss', items:[], gepinnt:false, zustand: this._nzZustand === 'archiv' ? 'aktuell' : this._nzZustand, updatedAt: this._now() });
+    const neuerZustand = (this._nzZustand === 'aktuell' || this._nzZustand === 'archiv') ? undefined : this._nzZustand;
+    const neueNotiz = { id:'nz_'+Date.now(), titel:name, icon, typ, farbe:'c-weiss', items:[], gepinnt:false, updatedAt: this._now() };
+    if (neuerZustand) neueNotiz.zustand = neuerZustand;
+    this.db.notizen.push(neueNotiz);
     this.setDirty();
     this.modalClose();
     this.renderNotizenTab();
