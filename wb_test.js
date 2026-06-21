@@ -43,7 +43,7 @@ function warn(name, detail) {
 
 // ── Extraktion ────────────────────────────────────────
 const scriptStart = content.indexOf('<script>');
-const scriptEnd   = content.lastIndexOf('</script>');
+const scriptEnd   = content.indexOf('</script>', scriptStart);
 const htmlBefore  = content.slice(0, scriptStart);
 const htmlAfter   = content.slice(scriptEnd + 9);
 const jsCode      = scriptStart >= 0 && scriptEnd >= 0
@@ -61,7 +61,10 @@ console.log('══════════════════════�
 // ══════════════════════════════════════════
 console.log('── 1. JavaScript Syntax ──');
 try {
-  new Function(jsCode);
+  // new Function() kann keine Top-Level-const/let/class parsen
+  // Stattdessen: Script-Wrapper verwenden
+  const wrapped = '(function(){\n' + jsCode + '\n})';
+  new Function('return ' + wrapped)();
   ok('JS-Syntax fehlerfrei');
 } catch(e) {
   fail('JS-Syntax', e.message.split('\n')[0]);

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.54</title>
+  <title>WorkBench 2.9.55</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -182,10 +182,12 @@
     }
     .wb-stab.active .wb-stab-icon svg { stroke: var(--accent); }
     .wb-stab-lbl {
-      writing-mode: vertical-rl; text-orientation: mixed;
-      transform: rotate(180deg); font-size: 11px; font-weight: 800;
-      text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint);
+      font-size: 10px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.04em; color: var(--faint);
+      display: flex; flex-direction: column; align-items: center;
+      line-height: 1.1; gap: 0;
     }
+    .wb-stab-lbl span { display: block; }
     .wb-stab-body {
       padding: 14px 7px 14px 6px;
     }
@@ -2365,7 +2367,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.54</div>
+  <div id="wb-startup-tagline">v2.9.55</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2990,8 +2992,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.54',
-  APP_BUILD:   '20260621-1800',
+  APP_VERSION: '2.9.55',
+  APP_BUILD:   '20260621-2000',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3032,9 +3034,13 @@ const WB = {
     // !important nötig weil sec-vorhaben/sec-backlog/sec-ziele display:flex !important im CSS haben
     document.querySelectorAll('.wb-section').forEach(s => {
       s.style.setProperty('display', 'none', 'important');
+      s.style.setProperty('height', '0', 'important');
+      s.style.setProperty('overflow', 'hidden', 'important');
     });
     const sec = document.getElementById('sec-' + tab);
     if (sec) {
+      sec.style.removeProperty('height');
+      sec.style.removeProperty('overflow');
       const displayVal = { cockpit: 'flex', vorhaben: 'flex', ziele: 'flex', backlog: 'flex', woche: 'flex', ablage: 'flex', aufgaben: 'flex', notizen: 'flex' }[tab] || 'block';
       sec.style.setProperty('display', displayVal, 'important');
     }
@@ -3346,6 +3352,24 @@ _ftStart() {
   _ckSelItemId: null,
   _ckSessionId: null,
   _ckSaveTimer: null,
+  _ckLastDay:   null,
+
+  _ckCheckNewDay() {
+    const today = this._dStr(new Date());
+    if (!this._ckLastDay) { this._ckLastDay = today; return; }
+    if (this._ckLastDay === today) return;
+    const oldDay = this._ckLastDay;
+    this._ckLastDay = today;
+    const db = this.db; if (!db) return;
+    (db.tagesprotokoll||[]).filter(e => e.date === oldDay && !e.deleted && !e.archived).forEach(e => {
+      e.archived = true; e.archivedAt = this._now();
+    });
+    this.setDirty();
+    const area = document.getElementById('ck-editor-area');
+    if (area) area.innerHTML = '';
+    setTimeout(() => { this._ckLadeHeutigerEintrag(); }, 200);
+    this._toast('\uD83D\uDCC5 Neuer Tag \u2014 Eingang archiviert');
+  },
 
   _ckSetView(view) { /* Sortier-Modus entfernt */ },
 
@@ -3997,7 +4021,12 @@ _ftStart() {
     this._jnTab = tab;
     document.querySelectorAll('.jn-tab').forEach(t => {
       const tl = t.textContent.toLowerCase().trim();
-      t.classList.toggle('active', (tab === 'heute' && tl === 'heute') || (tab === 'gestern' && tl === 'gestern') || (tab === 'kw' && tl === 'diese kw'));
+      t.classList.toggle('active',
+        (tab === 'heute'   && tl === 'heute')   ||
+        (tab === 'gestern' && tl === 'gestern') ||
+        (tab === 'kw'      && tl === 'diese kw') ||
+        (tab === 'alle'    && tl === 'alles')
+      );
     });
     this._jnRender();
   },
@@ -4013,9 +4042,10 @@ _ftStart() {
     (this.db?.tagesprotokoll||[]).filter(e => !e.deleted).forEach(e => alle.push({ ...e, _ctx: e.welt || 'priv' }));
   
     let gefiltert = [];
-    if (this._jnTab === 'heute')   gefiltert = alle.filter(e => e.date === today);
+    if      (this._jnTab === 'heute')   gefiltert = alle.filter(e => e.date === today);
     else if (this._jnTab === 'gestern') gefiltert = alle.filter(e => e.date === gestern);
-    else gefiltert = alle.filter(e => e.date >= kwStart && e.date <= kwEnd);
+    else if (this._jnTab === 'alle')    gefiltert = alle; // alle Tage
+    else                                gefiltert = alle.filter(e => e.date >= kwStart && e.date <= kwEnd);
     gefiltert.sort((a,b) => ((a.date||'')+(a.ts||'')).localeCompare((b.date||'')+(b.ts||'')));
     return { gefiltert, today, gestern, kwStart };
   },
@@ -6362,6 +6392,14 @@ _ftStart() {
     this._nzRenderPills();
   },
 
+  _nzGrpState: {}, // welche Gruppen sind offen (Mobile)
+
+  _nzGrpToggle(listeId) {
+    this._nzGrpState[listeId] = !this._nzGrpState[listeId];
+    const grp = document.getElementById('nzg-' + listeId);
+    if (grp) grp.classList.toggle('open', !!this._nzGrpState[listeId]);
+  },
+
   _nzCntLabel(l) {
     const active = (l.items||[]).filter(i => !i.deleted);
     if (l.typ === 'check') {
@@ -6415,9 +6453,10 @@ _ftStart() {
         + ' onclick="event.stopPropagation();WB._nzSetFarbe(\'' + this._esc(l.id) + '\',\'' + c + '\')"></div>'
       ).join('');
 
-      // Mobile: standardmäßig IMMER zugeklappt (kein 'open')
-      h += '<div class="nz-grp ' + farbe + '" id="nzg-' + this._esc(l.id) + '">'
-        + '<div class="nz-grp-hdr" onclick="this.closest(\'.nz-grp\').classList.toggle(\'open\')">'
+      // Mobile: State aus _nzGrpState (standardmäßig zu, nach Bearbeiten offen bleiben)
+      const isOpen = !!this._nzGrpState[l.id];
+      h += '<div class="nz-grp ' + farbe + (isOpen ? ' open' : '') + '" id="nzg-' + this._esc(l.id) + '">'
+        + '<div class="nz-grp-hdr" onclick="WB._nzGrpToggle(\'' + this._esc(l.id) + '\')">'
         + '<span style="color:var(--accent);display:flex;align-items:center">' + this._nzSvgIcon(l.icon || 'note') + '</span>'
         + '<span class="nz-grp-title">' + this._esc(l.titel) + '</span>'
         + pinHtml
@@ -6662,6 +6701,8 @@ _ftStart() {
         i.text = newText; i.updatedAt = this._now();
         this.setDirty();
       }
+      // Gruppe offen lassen nach Bearbeiten
+      this._nzGrpState[listeId] = true;
       this.renderNotizenTab();
     };
     input.addEventListener('blur', save);
@@ -6786,15 +6827,26 @@ _ftStart() {
   },
 
   _nzAddItem(listeId) {
-    const input = document.getElementById('nz-add-' + listeId);
-    const text  = input?.value?.trim(); if (!text) return;
+    // iOS/iPad: blur kann den Wert leeren bevor onclick greift
+    // Daher Wert aus allen möglichen Quellen lesen
+    const input = document.getElementById('nz-add-' + listeId)
+      || document.querySelector('[id^="nz-kadd-' + listeId + '"]');
+    const text = input?.value?.trim() || '';
+    if (!text) { if (input) input.focus(); return; }
     const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
     if (!l.items) l.items = [];
     l.items.push({ id: 'ni_' + Date.now(), text, done: false, createdAt: this._now() });
-    input.value = '';
+    if (input) input.value = '';
     this.setDirty();
+    // Gruppe offen lassen nach Hinzufügen
+    this._nzGrpState[listeId] = true;
     this.renderNotizenTab();
     this._nzRenderPills();
+    // iOS: Fokus nach render zurücksetzen
+    setTimeout(() => {
+      const newInput = document.getElementById('nz-add-' + listeId);
+      if (newInput) newInput.focus();
+    }, 100);
   },
 
   _nzToggleItem(listeId, itemId) {
@@ -8162,9 +8214,17 @@ _ftStart() {
       if (btn) btn.disabled = !text;
     });
 
-    setInterval(() => { if (this.activeTab === 'cockpit') this._ckRenderBanner(); }, 60000);
+    setInterval(() => {
+      if (this.activeTab === 'cockpit') this._ckRenderBanner();
+      this._ckCheckNewDay();
+    }, 60000);
     setTimeout(() => { this._ckLadeHeutigerEintrag(); }, 300);
     this.tabSwitch('cockpit');
+    // Sidebar-Labels: jeden Buchstaben in eigenes <span> (gestapelt)
+    document.querySelectorAll('.wb-stab-lbl').forEach(el => {
+      const text = el.textContent.trim();
+      el.innerHTML = text.split('').map(ch => '<span>' + ch + '</span>').join('');
+    });
     setTimeout(() => this._nzRenderPills(), 400);
 
     // Web Share Target: URL-Parameter verarbeiten
@@ -10295,6 +10355,7 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
     <div class="jn-tab active" onclick="WB._jnSetTab('heute')">Heute</div>
     <div class="jn-tab" onclick="WB._jnSetTab('gestern')">Gestern</div>
     <div class="jn-tab" onclick="WB._jnSetTab('kw')">Diese KW</div>
+    <div class="jn-tab" onclick="WB._jnSetTab('alle')">Alles</div>
   </div>
   <div id="jn-scroll"></div>
 </div>
