@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.58</title>
+  <title>WorkBench 2.9.59</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1163,6 +1163,15 @@
 
     /* ── Notizen-Tab ── */
     #notizen-scroll { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+    .nz-ztab { flex:1; padding:8px 4px; border:none; background:none; font-size:12px; font-weight:700; color:var(--faint); cursor:pointer; font-family:var(--font); border-bottom:2.5px solid transparent; transition:color 0.15s,border-color 0.15s; white-space:nowrap; }
+    .nz-ztab.active { color:var(--accent); border-bottom-color:var(--accent); background:rgba(10,107,94,0.04); }
+    .nz-ztab:hover:not(.active) { color:var(--muted); }
+    .nz-ctx-menu { background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.18);min-width:180px;overflow:hidden; }
+    .nz-ctx-item { padding:10px 14px;font-size:14px;cursor:pointer;color:var(--text);font-family:var(--font); }
+    .nz-ctx-item:hover { background:var(--surface2); }
+    .nz-ctx-item.danger { color:#C0392B; }
+    .nz-postit-menu-btn { position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.06);border:none;border-radius:5px;width:24px;height:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;opacity:0;transition:opacity 0.15s; }
+    .nz-postit:hover .nz-postit-menu-btn { opacity:1; }
     .nz-grp { border-radius:10px; border:1.5px solid rgba(0,0,0,.1); overflow:hidden; }
     .nz-grp.c-gelb  { background:#fffbe6; border-color:#d4c22a; }
     .nz-grp.c-gruen { background:#eaf7ea; border-color:#7dbc7d; }
@@ -2366,7 +2375,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.58</div>
+  <div id="wb-startup-tagline">v2.9.59</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2547,9 +2556,18 @@
       </div>
     </div>
     <div id="sec-notizen" class="wb-section" style="display:none;flex-direction:column;">
-      <div style="padding:10px 14px;border-bottom:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-        <span style="font-size:15px;font-weight:700;color:var(--text)">Notizen</span>
-        <button onclick="WB._nzNeueListeDialog()" style="background:var(--accent);color:#fff;border:none;border-radius:16px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">+ Neue Liste</button>
+      <!-- Header: Suche + Neue Liste -->
+      <div style="padding:8px 12px;border-bottom:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:8px;flex-shrink:0;">
+        <input id="nz-suche" type="search" placeholder="🔍 Suchen..." oninput="WB._nzSucheInput(this.value)"
+          style="flex:1;border:1.5px solid var(--border);border-radius:20px;padding:5px 12px;font-size:14px;background:var(--surface2);color:var(--text);outline:none;font-family:var(--font)">
+        <button onclick="WB._nzNeueListeDialog()" style="background:var(--accent);color:#fff;border:none;border-radius:16px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);flex-shrink:0">+ Neu</button>
+      </div>
+      <!-- Zustand-Filter-Tabs -->
+      <div id="nz-filter-tabs" style="display:flex;gap:0;border-bottom:1.5px solid var(--border);background:var(--surface);flex-shrink:0;">
+        <button class="nz-ztab active" data-zustand="aktuell"  onclick="WB._nzSetZustand('aktuell')">Aktuell</button>
+        <button class="nz-ztab"        data-zustand="parkplatz" onclick="WB._nzSetZustand('parkplatz')">🅿 Parkplatz</button>
+        <button class="nz-ztab"        data-zustand="kompass"   onclick="WB._nzSetZustand('kompass')">🧭 Kompass</button>
+        <button class="nz-ztab"        data-zustand="archiv"    onclick="WB._nzSetZustand('archiv')">Archiv</button>
       </div>
       <div id="notizen-scroll"></div>
     </div>
@@ -2991,8 +3009,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.58',
-  APP_BUILD:   '20260621-2300',
+  APP_VERSION: '2.9.59',
+  APP_BUILD:   '20260621-2330',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6338,12 +6356,34 @@ _ftStart() {
     ];
   },
 
+  _nzZustand: 'aktuell', // aktuell | parkplatz | kompass | archiv
+  _nzSuche:   '',        // Volltextsuche
+
   _nzGetListen() {
     if (!this.db) return [];
     if (!this.db.notizen || !this.db.notizen.length) {
       this.db.notizen = this._nzDefaultListen();
     }
-    return this.db.notizen.filter(l => !l.deleted);
+    // Migration: zustand-Feld setzen falls fehlt
+    this.db.notizen.forEach(l => { if (!l.zustand) l.zustand = 'aktuell'; });
+
+    const zustand = this._nzZustand;
+    let liste = zustand === 'archiv'
+      ? this.db.notizen.filter(l => !!l.deleted)
+      : this.db.notizen.filter(l => !l.deleted && l.zustand === zustand);
+
+    // Volltextsuche
+    if (this._nzSuche) {
+      const q = this._nzSuche.toLowerCase();
+      liste = liste.filter(l =>
+        (l.titel||'').toLowerCase().includes(q) ||
+        (l.items||[]).some(i => (i.text||'').toLowerCase().includes(q)) ||
+        (l.inhalt||'').toLowerCase().includes(q)
+      );
+    }
+
+    // Gepinnte oben
+    return liste.sort((a, b) => (b.gepinnt ? 1 : 0) - (a.gepinnt ? 1 : 0));
   },
 
   _nzSvgIcon(icon, size) {
@@ -6381,6 +6421,67 @@ _ftStart() {
       phone:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
     };
     return icons[icon] || icons.note;
+  },
+
+  _nzSetZustand(zustand) {
+    this._nzZustand = zustand;
+    document.querySelectorAll('.nz-ztab').forEach(b =>
+      b.classList.toggle('active', b.dataset.zustand === zustand)
+    );
+    this.renderNotizenTab();
+  },
+
+  _nzSucheInput(val) {
+    this._nzSuche = val.trim();
+    this.renderNotizenTab();
+  },
+
+  _nzSetZustandItem(listeId, zustand) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    if (zustand === 'archiv') {
+      this._softDelete(l);
+    } else {
+      l.deleted = false;
+      l.zustand = zustand;
+    }
+    l.updatedAt = this._now();
+    this.setDirty();
+    this.renderNotizenTab();
+    this._nzMenuClose();
+    this._toast('\u2713 ' + this._nzZustandLabel(zustand));
+  },
+
+  _nzZustandLabel(z) {
+    return { aktuell:'Aktuell', parkplatz:'Auf den Parkplatz', kompass:'In den Kompass', archiv:'Archiviert' }[z] || z;
+  },
+
+  _nzMenuClose() {
+    document.querySelectorAll('.nz-ctx-menu').forEach(m => m.remove());
+  },
+
+  _nzMenuOpen(listeId, btnEl) {
+    this._nzMenuClose();
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const menu = document.createElement('div');
+    menu.className = 'nz-ctx-menu';
+    const items = [
+      { z:'aktuell',   icon:'✅', label:'Aktuell' },
+      { z:'parkplatz', icon:'🅿',  label:'Parkplatz' },
+      { z:'kompass',   icon:'🧭', label:'Kompass' },
+      { z:'archiv',    icon:'📦', label:'Archivieren' },
+    ].filter(i => i.z !== this._nzZustand || this._nzZustand === 'archiv');
+
+    const pinLabel = l.gepinnt ? '📌 Unpin' : '📌 Pinnen';
+    menu.innerHTML = '<div class="nz-ctx-item" onclick="WB._nzTogglePin(\'' + this._esc(listeId) + '\');WB._nzMenuClose()">' + pinLabel + '</div>'
+      + items.map(i => '<div class="nz-ctx-item" onclick="WB._nzSetZustandItem(\'' + this._esc(listeId) + '\',\'' + i.z + '\')">' + i.icon + ' ' + i.label + '</div>').join('')
+      + '<div class="nz-ctx-item" onclick="WB._nzBearbeitenDialog(\'' + this._esc(listeId) + '\');WB._nzMenuClose()">✏️ Bearbeiten</div>'
+      + '<div class="nz-ctx-item danger" onclick="WB._nzDeleteListe(\'' + this._esc(listeId) + '\');WB._nzMenuClose()">🗑 Löschen</div>';
+
+    // Positionieren
+    const rect = btnEl.getBoundingClientRect();
+    menu.style.cssText = 'position:fixed;z-index:9000;top:' + (rect.bottom + 4) + 'px;right:' + (window.innerWidth - rect.right) + 'px';
+    document.body.appendChild(menu);
+    setTimeout(() => document.addEventListener('click', this._nzMenuClose.bind(this), { once: true }), 10);
   },
 
   _nzSetFarbe(listeId, farbe) {
@@ -6463,7 +6564,7 @@ _ftStart() {
         + '<button class="nz-pin-btn' + (gepinnt ? ' on' : '') + '"'
         + ' onclick="event.stopPropagation();WB._nzTogglePin(\'' + this._esc(l.id) + '\')" aria-label="Pinnen">'
         + this._nzSvgIcon('pin', 13) + '</button>'
-        + '<button class="nz-menu-btn" onclick="event.stopPropagation();WB._nzBearbeitenDialog(\'' + this._esc(l.id) + '\')" aria-label="Optionen">&#8943;</button>'
+        + '<button class="nz-menu-btn" onclick="event.stopPropagation();WB._nzMenuOpen(\'' + this._esc(l.id) + '\',this)" aria-label="Optionen">&#8943;</button>'
         + '<span class="nz-grp-chev">&#9662;</span>'
         + '</div>'
         + '<div class="nz-grp-body">'
@@ -6535,7 +6636,8 @@ _ftStart() {
         ? '<div class="nz-postit-empty">Noch keine Eintr\u00e4ge</div>' + emptyLines
         : emptyLines;
 
-      return '<div class="nz-postit ' + farbe + '" onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')" id="nzg-' + this._esc(l.id) + '">'
+      return '<div class="nz-postit ' + farbe + '" onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')" id="nzg-' + this._esc(l.id) + '" style="position:relative">'
+        + '<button class="nz-postit-menu-btn" onclick="event.stopPropagation();WB._nzMenuOpen(\'' + this._esc(l.id) + '\',this)" title="Aktionen">&#x22EF;</button>'
         + '<div class="nz-postit-hdr">'
         + '<span class="nz-postit-icon">' + (l.icon ? this._nzSvgIcon(l.icon, 14) : '📝') + '</span>'
         + '<span class="nz-postit-title">' + this._esc(l.titel) + '</span>'
@@ -6981,7 +7083,7 @@ _ftStart() {
     const typ  = document.getElementById('nz-new-typ')?.value || 'check';
     if (!name) { this._toast('Bitte Namen eingeben'); return; }
     if (!this.db.notizen) this.db.notizen = [];
-    this.db.notizen.push({ id:'nz_'+Date.now(), titel:name, icon, typ, farbe:'c-weiss', items:[], gepinnt:false });
+    this.db.notizen.push({ id:'nz_'+Date.now(), titel:name, icon, typ, farbe:'c-weiss', items:[], gepinnt:false, zustand: this._nzZustand === 'archiv' ? 'aktuell' : this._nzZustand, updatedAt: this._now() });
     this.setDirty();
     this.modalClose();
     this.renderNotizenTab();

@@ -2988,6 +2988,45 @@ sStAddSrc.includes('bereits eingetragen') || sStAddSrc.includes('find(s => s.dat
 
 if (f81Fail === 0) ok(f81Ok + ' Sondertage Checks bestanden');
 
+// ══════════════════════════════════════════
+// 82. NOTIZEN ZUSTAND-KONZEPT
+// ══════════════════════════════════════════
+console.log('\n── 82. Notizen Zustand-Konzept ──');
+let f82Ok = 0, f82Fail = 0;
+
+// State-Variablen
+content.includes('_nzZustand') ? (ok('_nzZustand State vorhanden'), f82Ok++) : (fail('_nzZustand fehlt'), f82Fail++);
+content.includes('_nzSuche') ? (ok('_nzSuche State vorhanden'), f82Ok++) : (fail('_nzSuche fehlt'), f82Fail++);
+
+// Filter-Methoden
+['_nzSetZustand','_nzSucheInput','_nzSetZustandItem','_nzMenuOpen','_nzMenuClose','_nzZustandLabel'].forEach(fn => {
+  jsCode.includes('  ' + fn + '(') ? (ok(fn + '() definiert'), f82Ok++) : (fail(fn + '() fehlt'), f82Fail++);
+});
+
+// Filter-Tabs HTML
+['nz-ztab','nz-filter-tabs'].forEach(cls => {
+  content.includes(cls) ? (ok('.' + cls + ' vorhanden'), f82Ok++) : (fail('.' + cls + ' fehlt'), f82Fail++);
+});
+
+// Zustand-Werte
+['aktuell','parkplatz','kompass','archiv'].forEach(z => {
+  content.includes("'" + z + "'") ? (ok("Zustand '" + z + "' vorhanden"), f82Ok++) : (fail("Zustand '" + z + "' fehlt"), f82Fail++);
+});
+
+// Suche-Input
+content.includes('nz-suche') ? (ok('#nz-suche Suchfeld vorhanden'), f82Ok++) : (fail('#nz-suche fehlt'), f82Fail++);
+
+// Drei-Punkt-Menü CSS
+content.includes('nz-ctx-menu') ? (ok('.nz-ctx-menu CSS vorhanden'), f82Ok++) : (fail('.nz-ctx-menu fehlt'), f82Fail++);
+content.includes('nz-postit-menu-btn') ? (ok('.nz-postit-menu-btn vorhanden'), f82Ok++) : (fail('.nz-postit-menu-btn fehlt'), f82Fail++);
+
+// Migration in _nzGetListen
+const nzGetSrc = jsCode.match(/  _nzGetListen\([\s\S]*?^  \},/m)?.[0] || '';
+nzGetSrc.includes('zustand') ? (ok('_nzGetListen: zustand-Filter'), f82Ok++) : (fail('_nzGetListen: kein zustand-Filter'), f82Fail++);
+nzGetSrc.includes('gepinnt') ? (ok('_nzGetListen: gepinnte oben'), f82Ok++) : (fail('_nzGetListen: kein Pin-Sort'), f82Fail++);
+
+if (f82Fail === 0) ok(f82Ok + ' Notizen Zustand-Konzept Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
