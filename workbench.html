@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.79</title>
+  <title>WorkBench 2.9.80</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2383,7 +2383,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.79</div>
+  <div id="wb-startup-tagline">v2.9.80</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2603,36 +2603,6 @@
             <div class="tf-chev open" id="tf-heute-chev"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></div>
           </div>
           <div class="tf-body open" id="tf-heute-body"></div>
-        </div>
-
-        <div class="tf-block" id="tf-post-block">
-          <div class="tf-head" onclick="WB._tfToggle('post')">
-            <div class="tf-dot" style="background:var(--faint)"></div>
-            <span class="tf-label">Aufgaben</span>
-            <span class="tf-count" id="tf-post-count">0</span>
-            <div class="tf-chev" id="tf-post-chev"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></div>
-          </div>
-          <div class="tf-body" id="tf-post-body"></div>
-        </div>
-
-        <div class="tf-block" id="tf-dead-block">
-          <div class="tf-head" onclick="WB._tfToggle('dead')">
-            <div class="tf-dot" style="background:var(--accent2)"></div>
-            <span class="tf-label">Projekt-Deadlines heute</span>
-            <span class="tf-count" id="tf-dead-count">0</span>
-            <div class="tf-chev" id="tf-dead-chev"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></div>
-          </div>
-          <div class="tf-body" id="tf-dead-body"></div>
-        </div>
-
-        <div class="tf-block" id="tf-ueber-block">
-          <div class="tf-head" onclick="WB._tfToggle('ueber')">
-            <div class="tf-dot" style="background:var(--muted)"></div>
-            <span class="tf-label">&Uuml;berf&auml;llig</span>
-            <span class="tf-count" id="tf-ueber-count">0</span>
-            <div class="tf-chev" id="tf-ueber-chev"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></div>
-          </div>
-          <div class="tf-body" id="tf-ueber-body"></div>
         </div>
 
       </div>
@@ -3016,8 +2986,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.79',
-  APP_BUILD:   '20260622-1600',
+  APP_VERSION: '2.9.80',
+  APP_BUILD:   '20260622-1700',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -4139,9 +4109,6 @@ _ftStart() {
 
   renderBacklog() {
     this._tfRenderHeute();
-    this._tfRenderPost();
-    this._tfRenderDead();
-    this._tfRenderUeber();
     const sub = document.getElementById('tf-header-sub');
     const d = new Date();
     const months = ['Jan','Feb','M\u00e4r','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
@@ -9467,6 +9434,7 @@ _ftStart() {
     if (!this.db.aufgaben) this.db.aufgaben = [];
     const qi = this.db.quickItems;
     if (!qi || !qi.length) return;
+    let count = 0;
     qi.forEach(q => {
       if (this.db.aufgaben.find(a => a._migratedFromQuick === q.id || a.id === q.id)) return;
       this.db.aufgaben.push({
@@ -9477,10 +9445,15 @@ _ftStart() {
         updatedAt: q.updatedAt || this._now(),
         _migratedFromQuick: q.id,
       });
+      count++;
     });
-    const count = qi.length;
     this.db.quickItems = [];
-    if (count) console.log('[migrate] quickItems → aufgaben:', count);
+    if (count) {
+      console.log('[migrate] quickItems → aufgaben:', count);
+      // Migrierte Daten müssen hochgeladen werden
+      this.isDirty = true;
+      this._pendingChanges = true;
+    }
   },
 
   /* ── Freie Aufgaben (ohne Vorhaben) ── */

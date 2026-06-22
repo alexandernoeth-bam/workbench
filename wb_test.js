@@ -471,9 +471,7 @@ console.log('\n── 17. Backlog HTML-Struktur ──');
 const BACKLOG_IDS = [
   'bl-chip-bar', 'tf-scroll',
   'tf-heute-block', 'tf-heute-count', 'tf-heute-chev', 'tf-heute-body',
-  'tf-post-block',  'tf-post-count',  'tf-post-chev',  'tf-post-body',
-  'tf-dead-block',  'tf-dead-count',  'tf-dead-chev',  'tf-dead-body',
-  'tf-ueber-block', 'tf-ueber-count', 'tf-ueber-chev', 'tf-ueber-body',
+  // tf-post/dead/ueber entfernt (Fokus-Tab zeigt nur Heute)
 ];
 let blIdOk = 0, blIdFail = 0;
 BACKLOG_IDS.forEach(id => {
@@ -1896,20 +1894,20 @@ if (content.includes('Tagesfokus') && content.includes('data-tab="backlog"')) {
 } else { fail('Tab-Label "Tagesfokus" fehlt'); f43Fail++; }
 
 // 4 Container vorhanden
-['tf-heute-body','tf-post-body','tf-dead-body','tf-ueber-body'].forEach(id => {
+['tf-heute-body'].forEach(id => {
   if (content.includes('id="' + id + '"')) { ok('#' + id + ' vorhanden'); f43Ok++; }
   else { fail('#' + id + ' fehlt'); f43Fail++; }
 });
 
 // _tfToggle + alle 4 Render-Funktionen
-['_tfToggle','_tfRenderHeute','_tfRenderPost','_tfRenderDead','_tfRenderUeber'].forEach(fn => {
+['_tfToggle','_tfRenderHeute'].forEach(fn => {
   if (jsCode.includes('  ' + fn + '(')) { ok(fn + '() definiert'); f43Ok++; }
   else { fail(fn + '() fehlt'); f43Fail++; }
 });
 
 // renderBacklog ruft alle 4 auf
 const rb43 = jsCode.match(/  renderBacklog\(\)[\s\S]*?^  \},/m)?.[0] || '';
-['_tfRenderHeute','_tfRenderPost','_tfRenderDead','_tfRenderUeber'].forEach(fn => {
+['_tfRenderHeute'].forEach(fn => {
   if (rb43.includes(fn)) { f43Ok++; }
   else { fail('renderBacklog() ruft ' + fn + '() nicht auf'); f43Fail++; }
 });
