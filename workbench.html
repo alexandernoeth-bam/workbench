@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.80</title>
+  <title>WorkBench 2.9.81</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2383,7 +2383,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.80</div>
+  <div id="wb-startup-tagline">v2.9.81</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2986,8 +2986,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.80',
-  APP_BUILD:   '20260622-1700',
+  APP_VERSION: '2.9.81',
+  APP_BUILD:   '20260622-2000',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -4108,6 +4108,8 @@ _ftStart() {
   // ── Stub-Render für spätere Prompts ──────────────────
 
   renderBacklog() {
+    // Sicherheitsnetz: noch nicht migrierte quickItems abfangen
+    if (this.db?.quickItems?.length) this._migrateQuickItems();
     this._tfRenderHeute();
     const sub = document.getElementById('tf-header-sub');
     const d = new Date();
@@ -6232,6 +6234,8 @@ _ftStart() {
   renderAufgabenTab() {
     const scroll = document.getElementById('aufgaben-scroll');
     if (!scroll) return;
+    // Sicherheitsnetz: noch nicht migrierte quickItems direkt hier abfangen
+    if (this.db?.quickItems?.length) this._migrateQuickItems();
     const db    = this.db;
     const today = this._dStr(new Date());
     const welt  = this.activeWorld;
@@ -9432,16 +9436,27 @@ _ftStart() {
   _migrateQuickItems() {
     if (!this.db) return;
     if (!this.db.aufgaben) this.db.aufgaben = [];
+    // Auch quickItems die als leeres Array vorhanden aber nicht migriert sind
     const qi = this.db.quickItems;
     if (!qi || !qi.length) return;
     let count = 0;
     qi.forEach(q => {
-      if (this.db.aufgaben.find(a => a._migratedFromQuick === q.id || a.id === q.id)) return;
+      // Duplikat-Check: ID oder _migratedFromQuick
+      const exists = this.db.aufgaben.find(a =>
+        a._migratedFromQuick === q.id || a.id === q.id
+      );
+      if (exists) return;
       this.db.aufgaben.push({
-        id: q.id, text: q.text, notiz: q.notiz || '',
-        datum: q.date || q.datum || '', startTime: q.startTime || '',
-        done: !!q.done, deleted: !!q.deleted, storniert: !!q.storniert,
-        welt: q.welt || null, vorhabenId: null,
+        id: q.id,
+        text: q.text || '',
+        notiz: q.notiz || '',
+        datum: q.date || q.datum || '',
+        startTime: q.startTime || '',
+        done: !!q.done,
+        deleted: !!q.deleted,
+        storniert: !!q.storniert,
+        welt: q.welt || null,
+        vorhabenId: null,
         updatedAt: q.updatedAt || this._now(),
         _migratedFromQuick: q.id,
       });
@@ -9449,10 +9464,11 @@ _ftStart() {
     });
     this.db.quickItems = [];
     if (count) {
-      console.log('[migrate] quickItems → aufgaben:', count);
-      // Migrierte Daten müssen hochgeladen werden
+      console.log('[migrate] ' + count + ' quickItems → aufgaben migriert');
       this.isDirty = true;
       this._pendingChanges = true;
+      // Sofort speichern
+      this.idbSave().catch(e => console.warn('[migrate save]', e));
     }
   },
 
