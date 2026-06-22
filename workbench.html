@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.72</title>
+  <title>WorkBench 2.9.73</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2376,7 +2376,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.72</div>
+  <div id="wb-startup-tagline">v2.9.73</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -3009,8 +3009,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.72',
-  APP_BUILD:   '20260622-0930',
+  APP_VERSION: '2.9.73',
+  APP_BUILD:   '20260622-1000',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -8055,11 +8055,24 @@ _ftStart() {
   /* ── OAuth Banner ── */
   _oauthBannerVisible: false,
 
+  _oauthShowBannerMitLaden() {
+    const banner = document.getElementById('wb-oauth-banner');
+    const text   = document.getElementById('wb-oauth-banner-text');
+    const btn    = document.getElementById('wb-oauth-banner-btn');
+    if (!banner) return;
+    if (text) text.innerHTML = '\u26a0 Google-Sitzung abgelaufen &mdash; Daten nicht aktuell';
+    if (btn)  { btn.textContent = 'Jetzt laden'; btn.onclick = () => WB._oauthReconnect(); }
+    banner.classList.add('visible');
+    this._oauthBannerVisible = true;
+  },
+
   _oauthShowBanner(msg) {
     const banner = document.getElementById('wb-oauth-banner');
     const text   = document.getElementById('wb-oauth-banner-text');
+    const btn    = document.getElementById('wb-oauth-banner-btn');
     if (!banner) return;
     if (msg && text) text.innerHTML = '\u26a0 ' + msg;
+    if (btn) { btn.textContent = 'Neu verbinden'; btn.onclick = () => WB._oauthReconnect(); }
     banner.classList.add('visible');
     this._oauthBannerVisible = true;
   },
@@ -8098,10 +8111,14 @@ _ftStart() {
           await this.idbSet('meta', 'oauthToken',    this._oauthToken);
           await this.idbSet('meta', 'oauthTokenExp', String(this._oauthTokenExp));
           this._oauthHideBanner();
-          this._toast('\u2713 Verbunden \u2014 synchronisiere...');
-          try { await this._syncDownload(); } catch(e) {}
-          try { await this._syncUpload(); }  catch(e) {}
-          this._toast('\u2705 Einsatzbereit');
+          this._toast('\u2713 Verbunden \u2014 lade aktuellen Stand...');
+          // Erst Download (Drive ist autoritativ), dann nur wenn nötig Upload
+          try { await this._syncDownload(); } catch(e) { console.warn('[reconnect download]', e); }
+          if (this.isDirty || this._pendingChanges) {
+            try { await this._syncUpload(); } catch(e) { console.warn('[reconnect upload]', e); }
+          }
+          this._syncInitDone = true;
+          this._toast('\u2705 Stand aktuell');
         },
       });
       client.requestAccessToken({ prompt: 'select_account' });
@@ -8508,21 +8525,19 @@ _ftStart() {
     this._weltInit();
 
     // Token-Refresh beim Start — silent, kein Popup
-    // Auch wenn der gecachte Token abgelaufen ist, versuchen wir ihn zu erneuern
     if (this._oauthClientId) {
       if (this._oauthTokenValid()) {
         this._oauthHideBanner();
       } else {
-        // Stiller Token-Refresh versuchen (kein Popup, kein User-Gesture nötig)
+        // Stiller Refresh versuchen (Desktop-Chrome unterstützt das, iOS/iPad nicht)
         try {
           const refreshed = await this._oauthGetToken(false);
-          if (refreshed) {
-            this._oauthHideBanner();
-          } else {
-            this._oauthShowBanner('\u2139 Offline \u2014 Bitte in Einstellungen neu verbinden');
+          if (!refreshed) {
+            // Kein stiller Token möglich → Banner mit "Jetzt laden" Button für User-Gesture
+            this._oauthShowBannerMitLaden();
           }
         } catch(e) {
-          this._oauthShowBanner('\u2139 Offline \u2014 Bitte in Einstellungen neu verbinden');
+          this._oauthShowBannerMitLaden();
         }
       }
     }
@@ -8553,8 +8568,8 @@ _ftStart() {
     } else {
       this._syncInitDone = true;
       if (this._oauthClientId) {
-        this._oauthShowBanner('\u26a0 Nicht mit Google verbunden \u2014 bitte in Einstellungen anmelden');
-        setTimeout(() => this._toast('\u26a0 Nicht synchronisiert'), 3500);
+        // Banner wurde bereits oben gesetzt (mit "Jetzt laden" Button)
+        // kein zusätzlicher Toast nötig — Banner ist sichtbarer
       } else {
         setTimeout(() => this._toast('\u2705 Einsatzbereit'), 3500);
       }
