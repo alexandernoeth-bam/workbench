@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.76</title>
+  <title>WorkBench 2.9.77</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2376,7 +2376,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.76</div>
+  <div id="wb-startup-tagline">v2.9.77</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2601,7 +2601,7 @@
         <div class="tf-block" id="tf-post-block">
           <div class="tf-head" onclick="WB._tfToggle('post')">
             <div class="tf-dot" style="background:var(--faint)"></div>
-            <span class="tf-label">Posteingang</span>
+            <span class="tf-label">Aufgaben</span>
             <span class="tf-count" id="tf-post-count">0</span>
             <div class="tf-chev" id="tf-post-chev"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></div>
           </div>
@@ -3009,8 +3009,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.76',
-  APP_BUILD:   '20260622-1300',
+  APP_VERSION: '2.9.77',
+  APP_BUILD:   '20260622-1400',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6338,7 +6338,7 @@ _ftStart() {
     scroll.innerHTML =
       mkGrp('\u2611', 'Aufgaben', aufgCount + ' offen', aufgH, 'at-grp-aufg',
         'WB.aufgabeOpen(\'\')')
-      + mkGrp('\u26a1', 'Schnell-Erinnerungen', schnell.length, schnellH, 'at-grp-sk',
+      + mkGrp('\u2611', 'Aufgaben', schnell.length, schnellH, 'at-grp-sk',
         'WB.schnellOpen(\'\')')
       + mkGrp('\ud83d\udd01', 'Wochenpflichten', pflichten.length, pflH, 'at-grp-wk',
         'WB._woPflichtNeu()');
@@ -7488,30 +7488,7 @@ _ftStart() {
       if (!this.db.mantras) this.db.mantras = [];
       if (!this.db.sondertage) this.db.sondertage = [];
       if (!this.db.aufgaben) this.db.aufgaben = [];
-      // Migration: quickItems → db.aufgaben (freie Aufgaben ohne Vorhaben)
-      if (this.db.quickItems && this.db.quickItems.length > 0) {
-        this.db.quickItems.forEach(q => {
-          // Nur wenn nicht bereits migriert
-          if (!this.db.aufgaben.find(a => a._migratedFromQuick === q.id)) {
-            this.db.aufgaben.push({
-              id: q.id,
-              text: q.text,
-              notiz: q.notiz || '',
-              datum: q.date || '',
-              startTime: q.startTime || '',
-              done: !!q.done,
-              deleted: !!q.deleted,
-              storniert: !!q.storniert,
-              welt: q.welt || null,
-              vorhabenId: null,
-              updatedAt: q.updatedAt || this._now(),
-              _migratedFromQuick: q.id,
-            });
-          }
-        });
-        this.db.quickItems = []; // geleert nach Migration
-        console.log('[migrate] quickItems → aufgaben:', this.db.aufgaben.length);
-      }
+      this._migrateQuickItems();
     
     } catch(e) {
       console.error('[IDB] load error:', e);
@@ -7691,6 +7668,10 @@ _ftStart() {
       if (!this.db) this.db = this._emptyDb();
       if (!this.db._version) this.db._version = 1;
       if (!this.db.mantras) this.db.mantras = [];
+      if (!this.db.sondertage) this.db.sondertage = [];
+      if (!this.db.aufgaben) this.db.aufgaben = [];
+      // quickItems → aufgaben Migration (auch wenn dataPro/dataPriv leer)
+      this._migrateQuickItems();
       return;
     }
     // Bereits migriert?
@@ -7724,6 +7705,7 @@ _ftStart() {
       _migratedAt:       new Date().toISOString(),
     };
     this.dataPro = null; this.dataPriv = null;
+    this._migrateQuickItems(); // quickItems aus alter Migration → aufgaben
     await this.idbSave();
     this.setDirty();
     console.log('[migrate_v2] Migration abgeschlossen');
@@ -9435,6 +9417,27 @@ _ftStart() {
     });
     btn.style.border = '1.5px solid var(--accent)'; btn.style.background = 'var(--accent)'; btn.style.color = '#fff';
     btn.dataset.active = '1';
+  },
+
+  _migrateQuickItems() {
+    if (!this.db) return;
+    if (!this.db.aufgaben) this.db.aufgaben = [];
+    const qi = this.db.quickItems;
+    if (!qi || !qi.length) return;
+    qi.forEach(q => {
+      if (this.db.aufgaben.find(a => a._migratedFromQuick === q.id || a.id === q.id)) return;
+      this.db.aufgaben.push({
+        id: q.id, text: q.text, notiz: q.notiz || '',
+        datum: q.date || q.datum || '', startTime: q.startTime || '',
+        done: !!q.done, deleted: !!q.deleted, storniert: !!q.storniert,
+        welt: q.welt || null, vorhabenId: null,
+        updatedAt: q.updatedAt || this._now(),
+        _migratedFromQuick: q.id,
+      });
+    });
+    const count = qi.length;
+    this.db.quickItems = [];
+    if (count) console.log('[migrate] quickItems → aufgaben:', count);
   },
 
   /* ── Freie Aufgaben (ohne Vorhaben) ── */
