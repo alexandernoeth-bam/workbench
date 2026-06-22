@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.73</title>
+  <title>WorkBench 2.9.74</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1409,10 +1409,10 @@
     #wo-cal-scroll-y { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
     #wo-cal-grid { display: flex; min-width: 560px; }
     #wo-cal-cols { flex: 1; display: flex; }
-    .wo-cal-col { flex: 1; min-width: 80px; border-left: 1px solid var(--border); position: relative; }
-    .wo-cal-col.today-col { background: rgba(10,107,94,0.015); }
-    .wo-cal-col.we-col    { background: rgba(0,0,0,0.01); }
-    .wo-h-line { height: 52px; border-bottom: 1px solid rgba(0,0,0,0.05); }
+    .wo-cal-col { flex: 1; min-width: 80px; border-left: 1px solid var(--border); position: relative; background: #fff; }
+    .wo-cal-col.today-col { background: rgba(10,107,94,0.04); }
+    .wo-cal-col.we-col    { background: #f8f9fa; }
+    .wo-h-line { height: 52px; border-bottom: 1px solid rgba(0,0,0,0.06); }
     .wo-hour-lbl { height: 52px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 2px 5px 0 0; font-size: 13px; color: var(--faint); font-weight: 600; }
     .wo-cal-evt { position: absolute; left: 2px; right: 2px; border-radius: 4px; padding: 2px 5px; font-size: 13px; font-weight: 600; cursor: pointer; overflow: hidden; border-left: 3px solid var(--accent); background: rgba(10,107,94,0.12); color: var(--text); min-height: 32px; }
     .wo-cal-evt.privat { border-left-color: var(--accent2); background: rgba(77,95,51,0.12); }
@@ -2376,7 +2376,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.73</div>
+  <div id="wb-startup-tagline">v2.9.74</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -3009,8 +3009,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.73',
-  APP_BUILD:   '20260622-1000',
+  APP_VERSION: '2.9.74',
+  APP_BUILD:   '20260622-1100',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -4185,7 +4185,9 @@ _ftStart() {
       events.forEach(e => {
         let eMin = 0;
         if (e.startTime) { const [eh,em] = e.startTime.split(':').map(Number); eMin = eh*60+em; }
-        const past = e.startTime && eMin < nowMin;
+        // Pflichten mit Uhrzeit: Zeit = Startzeit, nicht Fälligkeit → nie als "vergangen" ausblenden
+        const isPflicht = e._art === 'pflicht';
+        const past = !isPflicht && e.startTime && eMin < nowMin;
         if ((past || !!e.storniert) && !this._tfShowDone) { hidden.push(e); hiddenCount++; }
         else visible.push(e);
       });
@@ -5757,11 +5759,13 @@ _ftStart() {
         if (st)      cls += ' ft-col';
 
         const stLabels = { urlaub:'\uD83C\uDFD6', feiertag:'\uD83C\uDF89', auszeit:'\uD83E\uDDD8', krank:'\uD83E\uDD12', dienstreise:'\u2708\uFE0F', urlaubsreise:'\uD83D\uDDFA' };
+        const typLabel = { urlaub:'Urlaub', feiertag:'Feiertag', auszeit:'Auszeit', krank:'Krank', dienstreise:'Dienstreise', urlaubsreise:'Urlaubsreise' };
 
         h += '<div class="' + cls + '">'
           + '<div class="wo-dh-name' + (isToday ? ' today' : '') + '">' + dayLetters[i] + '</div>'
           + '<div class="wo-dh-num' + (isToday ? ' today' : '') + '">' + d.getDate() + '</div>'
-          + (st ? '<div><span class="wo-dh-badge ft" title="' + this._esc(st.name||st.typ) + '">' + (stLabels[st.typ]||'📅') + '</span></div>' : '')
+          + (st ? '<div><span class="wo-dh-badge ft" title="' + this._esc(st.name||st.typ) + '" style="max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px">'
+            + (stLabels[st.typ]||'📅') + ' ' + this._esc(st.name || (typLabel[st.typ]||st.typ)) + '</span></div>' : '')
           + (isWE ? '<div><span class="wo-dh-badge we">WE</span></div>' : '')
           + '</div>';
       });
