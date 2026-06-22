@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.88</title>
+  <title>WorkBench 2.9.89</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -878,13 +878,11 @@
     .vc-task-date { font-size: 12px; color: var(--faint); }
     .vc-task-date.warn { color: var(--warn); font-weight: 700; }
     .vc-task-cl { font-size: 11px; color: var(--faint); }
-    .vc-cl-toggle { display:inline-flex;align-items:center;gap:3px;font-size:12px;color:var(--accent);cursor:pointer;font-weight:700;margin-top:3px;user-select:none; }
-    .vc-cl-list { display:none;margin-top:4px;padding-left:2px; }
+    .vc-cl-toggle { display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--accent);cursor:pointer;font-weight:700;margin-top:4px;user-select:none; }
+    .vc-cl-list { display:none;margin-top:5px;padding-left:2px; }
     .vc-cl-list.open { display:block; }
-    .vc-cl-item { display:flex;align-items:center;gap:7px;padding:3px 0;font-size:13px;color:var(--faint); }
-    .vc-cl-item.done { text-decoration:line-through;opacity:0.5; }
-    .vc-cl-dot { width:6px;height:6px;border-radius:50%;background:var(--border);flex-shrink:0; }
-    .vc-cl-dot.done { background:var(--accent); }
+    .vc-cl-item { display:flex;align-items:center;gap:8px;padding:4px 0;font-size:14px;color:var(--text); }
+    .vc-cl-item.done { text-decoration:line-through;color:var(--faint);opacity:0.6; }
     /* vc: Termine */
     .vc-termin { display: flex; align-items: center; gap: 9px; padding: 8px 12px; border-bottom: 0.5px solid var(--border); }
     .vc-termin:last-child { border-bottom: none; }
@@ -2390,7 +2388,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.88</div>
+  <div id="wb-startup-tagline">v2.9.89</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2993,8 +2991,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.88',
-  APP_BUILD:   '20260622-2345',
+  APP_VERSION: '2.9.89',
+  APP_BUILD:   '20260623-0000',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -4239,9 +4237,9 @@ _ftStart() {
                 + this._esc(c.text) + '</label>').join('')
               + '</div>';
           }
-          h += '<div class="tf-schnell-row" onclick="WB.aufgabeOpen(&quot;'+this._esc(a._vhId)+'&quot;,&quot;'+this._esc(a.id)+'&quot;)">'
-            + '<div class="tf-schnell-check" onclick="event.stopPropagation();WB._vhAufgabeDone(&quot;'+this._esc(a._vhId)+'&quot;,&quot;'+this._esc(a.id)+'&quot;)"></div>'
-            + '<div class="tf-schnell-text" style="flex:1">' + this._esc(a.text) + clHtml + '</div>'
+          h += '<div class="tf-schnell-row" style="align-items:flex-start" onclick="WB.aufgabeOpen(&quot;'+this._esc(a._vhId)+'&quot;,&quot;'+this._esc(a.id)+'&quot;)">'
+            + '<div class="tf-schnell-check" style="margin-top:2px;flex-shrink:0" onclick="event.stopPropagation();WB._vhAufgabeDone(&quot;'+this._esc(a._vhId)+'&quot;,&quot;'+this._esc(a.id)+'&quot;)"></div>'
+            + '<div style="flex:1;min-width:0"><div class="tf-schnell-text" style="flex:none">' + this._esc(a.text) + '</div>' + clHtml + '</div>'
             + '</div>';
           count++;
         });
@@ -9594,6 +9592,7 @@ _ftStart() {
       + '</div></div>';
     this._modalCtx = { type:'aufgabe', vorhabenId, aufgabeId, ctx };
     this.modalOpen(aufgabeId ? 'Aufgabe bearbeiten' : 'Neue Aufgabe', body, this._modalFooter(!!aufgabeId, false));
+    setTimeout(() => this._initMicroDrag(document.getElementById('wb-micro-list')), 50);
   },
 
   _modalAddMicro() {
@@ -9602,12 +9601,51 @@ _ftStart() {
     if (!list||!addBtn) return;
     const row = document.createElement('div');
     row.className = 'wb-micro-row';
+    row.draggable = true;
     row.innerHTML = '<div class="wb-micro-drag">\u2261</div>'
       + '<div class="wb-micro-check" onclick="WB._modalMicroToggle(this,-1)" style="cursor:pointer;"></div>'
       + '<input type="text" class="wb-micro-input" placeholder="Neuer Schritt...">'
       + '<div class="wb-micro-del" onclick="this.parentElement.remove()">\u2715</div>';
     list.insertBefore(row, addBtn);
+    this._initMicroDrag(list);
     row.querySelector('input').focus();
+  },
+
+  _initMicroDrag(list) {
+    if (!list) return;
+    let dragging = null;
+    list.querySelectorAll('.wb-micro-row').forEach(row => {
+      row.draggable = true;
+      const handle = row.querySelector('.wb-micro-drag');
+      if (handle) {
+        handle.onmousedown = () => { row.draggable = true; };
+        // Touch support
+        handle.ontouchstart = (e) => {
+          dragging = row;
+          row.style.opacity = '0.5';
+          e.preventDefault();
+        };
+      }
+      row.ondragstart = (e) => {
+        dragging = row;
+        e.dataTransfer.effectAllowed = 'move';
+        setTimeout(() => row.style.opacity = '0.4', 0);
+      };
+      row.ondragend = () => {
+        if (dragging) dragging.style.opacity = '';
+        dragging = null;
+        list.querySelectorAll('.wb-micro-row').forEach(r => r.classList.remove('drag-over'));
+      };
+      row.ondragover = (e) => {
+        e.preventDefault();
+        if (!dragging || dragging === row) return;
+        const rows = [...list.querySelectorAll('.wb-micro-row')];
+        const idx  = rows.indexOf(row);
+        const from = rows.indexOf(dragging);
+        if (from < idx) list.insertBefore(dragging, row.nextSibling);
+        else            list.insertBefore(dragging, row);
+      };
+    });
   },
 
   _modalMicroToggle(el, idx) {
