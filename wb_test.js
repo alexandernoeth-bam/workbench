@@ -2044,10 +2044,10 @@ if (tfHeuteSrc.includes('storniert') && !tfHeuteSrc.match(/!e\.done && e\.date/)
   ok('_tfRenderHeute() schließt stornierte ein'); f47Ok++;
 } else { warn('_tfRenderHeute() storniert-Handling nicht eindeutig'); }
 
-// Wochenpflichten mit startTime im events-Array (_art:'pflicht')
-if (tfHeuteSrc.includes("_art:'pflicht'") || tfHeuteSrc.includes('_art: \'pflicht\'')) {
-  ok('_tfRenderHeute() hat Pflichten im events-Array (_art:pflicht)'); f47Ok++;
-} else { fail('_tfRenderHeute() fehlt _art:pflicht im events-Array'); f47Fail++; }
+// Wochenpflichten im Zeitband (art:'pflicht')
+if (tfHeuteSrc.includes("art:'pflicht'") || tfHeuteSrc.includes("_art:'pflicht'")) {
+  ok('_tfRenderHeute() hat Pflichten im Zeitband'); f47Ok++;
+} else { fail('_tfRenderHeute() fehlt Pflichten im Zeitband'); f47Fail++; }
 
 // Pflichten-Sektion nur ohne startTime
 if (tfHeuteSrc.includes('!p.startTime')) { ok('Pflichten-Sektion filtert nur !p.startTime'); f47Ok++; }
