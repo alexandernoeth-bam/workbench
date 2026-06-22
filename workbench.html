@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.92</title>
+  <title>WorkBench 2.9.93</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2388,7 +2388,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.92</div>
+  <div id="wb-startup-tagline">v2.9.93</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2991,8 +2991,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.92',
-  APP_BUILD:   '20260623-0130',
+  APP_VERSION: '2.9.93',
+  APP_BUILD:   '20260623-0200',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6345,11 +6345,27 @@ _ftStart() {
     const mkEA = a => {
       const d = getDatum(a);
       const isOverdue = d && d < today;
-      const dateLbl = d ? (isOverdue ? '\u26a0 ' : '') + this._formatDatumKurz(d) : '\u2014';
-      return '<div class="at-sk-row" style="border-left:3px solid ' + (d?'transparent':'var(--accent)') + (isOverdue?';border-left-color:var(--warn)':'') + '" onclick="WB.schnellOpen(&quot;'+this._esc(a.id)+'&quot;)">'
-        + '<div class="at-sk-chk" onclick="event.stopPropagation();WB._tfSchnellCheck(&quot;'+this._esc(a.id)+'&quot;)"></div>'
-        + '<div style="flex:1;font-size:14px;color:var(--text)">' + this._esc(a.text) + '</div>'
-        + '<div style="font-size:11px;color:' + (isOverdue?'var(--warn)':'var(--faint)') + ';font-weight:'+(isOverdue?'700':'400')+';white-space:nowrap;margin-left:8px">' + dateLbl + '</div>'
+      const dateLbl = d ? (isOverdue ? '\u26a0 ' : '') + this._formatDatumKurz(d) : '';
+      const cl = a.checklist || a.checkliste || [];
+      const clTotal = cl.length;
+      const clDone  = cl.filter(c => c.done).length;
+      const clId    = 'eacl-' + a.id;
+      const clToggle = clTotal > 0
+        ? '<span class="vc-cl-toggle" onclick="event.stopPropagation();var el=document.getElementById(\'' + clId + '\');el.classList.toggle(\'open\');this.querySelector(\'.vc-cl-chev\').textContent=el.classList.contains(\'open\')?\'\u25be\':\'\u25b8\'">'
+          + '<span class="vc-cl-chev">\u25b8</span>' + clDone + '/' + clTotal + '</span>'
+          + '<div class="vc-cl-list" id="' + clId + '">'
+          + cl.map(c => '<label class="vc-cl-item' + (c.done?' done':'') + '" style="cursor:default">'
+            + '<input type="checkbox"' + (c.done?' checked':'') + ' disabled style="width:14px;height:14px;accent-color:var(--accent);flex-shrink:0">'
+            + this._esc(c.text) + '</label>').join('')
+          + '</div>'
+        : '';
+      return '<div class="at-item" style="border-left:3px solid ' + (d?'transparent':'var(--accent)') + (isOverdue?';border-left-color:var(--warn)':'') + '" onclick="WB.schnellOpen(&quot;'+this._esc(a.id)+'&quot;)">'
+        + '<div class="at-chk" onclick="event.stopPropagation();WB._tfSchnellCheck(&quot;'+this._esc(a.id)+'&quot;)"></div>'
+        + '<div class="at-body">'
+        + '<div class="at-txt">' + this._esc(a.text) + clToggle + '</div>'
+        + (clTotal > 0 ? '<div class="vc-cl-list"' + clToggle.split('<div class="vc-cl-list"')[1] : '')
+        + '</div>'
+        + (dateLbl ? '<div class="at-date' + (isOverdue?' over':'') + '">' + dateLbl + '</div>' : '')
         + '</div>';
     };
     if (einzelOhneDatum.length) schnellH += einzelOhneDatum.map(mkEA).join('');
