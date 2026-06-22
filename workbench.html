@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.81</title>
+  <title>WorkBench 2.9.82</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -878,6 +878,13 @@
     .vc-task-date { font-size: 12px; color: var(--faint); }
     .vc-task-date.warn { color: var(--warn); font-weight: 700; }
     .vc-task-cl { font-size: 11px; color: var(--faint); }
+    .vc-cl-toggle { display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--accent);cursor:pointer;font-weight:700;margin-top:3px;user-select:none; }
+    .vc-cl-list { display:none;margin-top:4px;padding-left:4px;border-left:2px solid var(--border); }
+    .vc-cl-list.open { display:block; }
+    .vc-cl-item { display:flex;align-items:center;gap:6px;padding:2px 0;font-size:13px;color:var(--faint); }
+    .vc-cl-item.done { text-decoration:line-through;opacity:0.5; }
+    .vc-cl-dot { width:6px;height:6px;border-radius:50%;background:var(--border);flex-shrink:0; }
+    .vc-cl-dot.done { background:var(--accent); }
     /* vc: Termine */
     .vc-termin { display: flex; align-items: center; gap: 9px; padding: 8px 12px; border-bottom: 0.5px solid var(--border); }
     .vc-termin:last-child { border-bottom: none; }
@@ -2383,7 +2390,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.81</div>
+  <div id="wb-startup-tagline">v2.9.82</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2986,8 +2993,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.81',
-  APP_BUILD:   '20260622-2000',
+  APP_VERSION: '2.9.82',
+  APP_BUILD:   '20260622-2100',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -5080,16 +5087,30 @@ _ftStart() {
         const naechster = cl.find(c => !c.done)?.text || '';
         const datum = a.datum ? this._fmtDatum(a.datum) : null;
         const isOver = a.datum && a.datum < today;
-        aufgH += '<div class="vc-task" onclick="WB.aufgabeOpen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + this._esc(a.id) + '&quot;,&quot;' + ctx + '&quot;)">'
+        const clId = 'vcl-' + v.id + '-' + a.id;
+        let clHtml = '';
+        if (clTotal > 0) {
+          clHtml = '<div class="vc-cl-toggle" onclick="event.stopPropagation();var el=document.getElementById(\'' + clId + '\');el.classList.toggle(\'open\');this.querySelector(\'.vc-cl-chev\').textContent=el.classList.contains(\'open\')?\'\u25be\':\'\u25b8\'">'
+            + '<span class="vc-cl-chev">\u25b8</span>'
+            + clDone + '/' + clTotal + ' Schritte'
+            + '</div>'
+            + '<div class="vc-cl-list" id="' + clId + '">'
+            + cl.map(c => '<div class="vc-cl-item' + (c.done?' done':'') + '">'
+              + '<div class="vc-cl-dot' + (c.done?' done':'') + '"></div>'
+              + this._esc(c.text) + '</div>').join('')
+            + '</div>';
+        }
+        aufgH += '<div class="vc-task">'
+          + '<div onclick="WB.aufgabeOpen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + this._esc(a.id) + '&quot;,&quot;' + ctx + '&quot;)" style="display:flex;align-items:flex-start;gap:9px;flex:1;min-width:0;cursor:pointer">'
           + this._aufgabeChkHtml(a, v.id, ctx)
           + '<div class="vc-task-body">'
           + '<div class="vc-task-txt">' + this._esc(a.text) + '</div>'
-          + (naechster ? '<div class="vc-task-sub">\u2192 ' + this._esc(naechster) + '</div>' : '')
+          + clHtml
           + '</div>'
           + '<div class="vc-task-right">'
           + (datum ? '<span class="vc-task-date' + (isOver ? ' warn' : '') + '">' + datum + '</span>' : '')
-          + (clTotal > 0 ? '<span class="vc-task-cl">' + clDone + '/' + clTotal + '</span>' : '')
-          + '</div></div>';
+          + '</div></div>'
+          + '</div>';
       });
       // Erledigte
       alle.filter(a => a.done).forEach(a => {
@@ -6234,8 +6255,10 @@ _ftStart() {
   renderAufgabenTab() {
     const scroll = document.getElementById('aufgaben-scroll');
     if (!scroll) return;
-    // Sicherheitsnetz: noch nicht migrierte quickItems direkt hier abfangen
+    // Sicherheitsnetz: noch nicht migrierte quickItems abfangen
     if (this.db?.quickItems?.length) this._migrateQuickItems();
+    // Zusätzlich: quickItems die noch nicht migriert wurden direkt einbeziehen
+    // (Schutz gegen Race Conditions beim Sync)
     const db    = this.db;
     const today = this._dStr(new Date());
     const welt  = this.activeWorld;
@@ -6290,14 +6313,21 @@ _ftStart() {
         return a.date.localeCompare(b.date);
       });
     // BLOCK 2: Einzelaufgaben (freie Aufgaben ohne Vorhaben)
-    const einzelRoh = (db?.aufgaben||[])
-      .filter(a => !a.deleted && !a.done && !a.vorhabenId && weltFilter(a));
+    // quickItems als Fallback falls Migration noch nicht abgeschlossen
+    const alleFreien = [
+      ...(db?.aufgaben||[]).filter(a => !a.deleted && !a.done && !a.vorhabenId && weltFilter(a)),
+      ...(db?.quickItems||[]).filter(q => !q.deleted && !q.done && weltFilter({...q, welt: q.welt||null})),
+    ];
+    // Duplikate entfernen (falls teilmigriert)
+    const seenIds = new Set();
+    const einzelRoh = alleFreien.filter(a => { if (seenIds.has(a.id)) return false; seenIds.add(a.id); return true; });
 
     // Ohne Datum zuerst, dann mit Datum sortiert
-    const einzelOhneDatum = einzelRoh.filter(a => !a.datum && !a.date)
+    const getDatum = a => a.datum || a.date || '';
+    const einzelOhneDatum = einzelRoh.filter(a => !getDatum(a))
       .sort((a,b) => (a.text||'').localeCompare(b.text||''));
-    const einzelMitDatum  = einzelRoh.filter(a => !!(a.datum||a.date))
-      .sort((a,b) => (a.datum||a.date||'').localeCompare(b.datum||b.date||''));
+    const einzelMitDatum  = einzelRoh.filter(a => !!getDatum(a))
+      .sort((a,b) => getDatum(a).localeCompare(getDatum(b)));
 
     let schnellH = '';
     const mkEA = a => {
