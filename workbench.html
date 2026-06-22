@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.84</title>
+  <title>WorkBench 2.9.85</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2390,7 +2390,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.84</div>
+  <div id="wb-startup-tagline">v2.9.85</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2993,8 +2993,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.84',
-  APP_BUILD:   '20260622-2200',
+  APP_VERSION: '2.9.85',
+  APP_BUILD:   '20260622-2230',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6293,11 +6293,25 @@ _ftStart() {
         aufgCount++;
         const isOver  = a.datum && a.datum < today;
         const dateStr = a.datum ? this._formatDatumKurz(a.datum) : '';
-        const nextStep = (a.checkliste||[]).find(c => !c.done);
+        const cl = a.checklist || a.checkliste || [];
+        const clTotal = cl.length;
+        const clDone  = cl.filter(c => c.done).length;
+        const clId    = 'atcl-' + v.id + '-' + a.id;
+        let clHtml = '';
+        if (clTotal > 0) {
+          clHtml = '<div class="vc-cl-toggle" onclick="event.stopPropagation();var el=document.getElementById(\'' + clId + '\');el.classList.toggle(\'open\');this.querySelector(\'.vc-cl-chev\').textContent=el.classList.contains(\'open\')?\'\u25be\':\'\u25b8\'">'
+            + '<span class="vc-cl-chev">\u25b8</span>'
+            + clDone + '/' + clTotal + ' Schritte</div>'
+            + '<div class="vc-cl-list" id="' + clId + '">'
+            + cl.map(c => '<div class="vc-cl-item' + (c.done ? ' done' : '') + '">'
+              + '<div class="vc-cl-dot' + (c.done ? ' done' : '') + '"></div>'
+              + this._esc(c.text) + '</div>').join('')
+            + '</div>';
+        }
         aufgH += '<div class="at-item" onclick="WB.aufgabeOpen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + this._esc(a.id) + '&quot;)">'
           + '<div class="at-chk"></div><div class="at-body">'
           + '<div class="at-txt">' + this._esc(a.text) + '</div>'
-          + (nextStep ? '<div class="at-sub">\u2192 ' + this._esc(nextStep.text) + '</div>' : '')
+          + clHtml
           + '</div>'
           + (dateStr ? '<div class="at-date' + (isOver ? ' over' : '') + '">' + dateStr + '</div>' : '')
           + '</div>';
@@ -7986,7 +8000,27 @@ _ftStart() {
     this._toast('\u2713 Link in "' + liste.titel + '" gespeichert');
   },
 
-  /* ── Navigation Tab-Sichtbarkeit ── */
+  _sDebugMigration() {
+    const el = document.getElementById('s-debug-output'); if (!el) return;
+    const db = this.db;
+    const qi = db?.quickItems || [];
+    const auf = db?.aufgaben || [];
+    let out = 'quickItems: ' + qi.length + '\n';
+    qi.slice(0,5).forEach(q => out += '  - ' + q.text + '\n');
+    out += 'aufgaben (frei): ' + auf.filter(a=>!a.vorhabenId).length + '\n';
+    auf.filter(a=>!a.vorhabenId).slice(0,5).forEach(a => out += '  - ' + a.text + '\n');
+    if (qi.length > 0) {
+      this._migrateQuickItems();
+      out += '\n→ Migration ausgeführt! ' + (db?.aufgaben||[]).filter(a=>!a.vorhabenId).length + ' freie Aufgaben\n';
+      this.setDirty();
+      setTimeout(() => this._syncUpload(), 500);
+      out += '→ Upload gestartet\n';
+    } else {
+      out += '\n→ Keine quickItems vorhanden\n';
+    }
+    el.textContent = out;
+    this.renderAufgabenTab();
+  },
 
   _ALL_TABS: [
     { id: 'cockpit',  label: 'Eingang',   pixel: true  },
@@ -10769,6 +10803,14 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
       <div id="s-mantra-pool" style="padding:10px 14px 0"></div>
       <div style="padding:10px 14px 14px">
         <button class="s-btn primary" onclick="WB._mantraAdd()">+ Satz hinzuf&uuml;gen</button>
+      </div>
+    </div>
+
+    <div class="s-card" id="s-debug-card">
+      <div class="s-card-head">🔧 Debug</div>
+      <div style="padding:10px 14px 14px">
+        <button class="s-btn" onclick="WB._sDebugMigration()" style="margin-bottom:8px;width:100%">quickItems → Aufgaben migrieren</button>
+        <div id="s-debug-output" style="font-size:12px;font-family:monospace;color:var(--faint);white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
       </div>
     </div>
 
