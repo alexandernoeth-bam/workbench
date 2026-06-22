@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.82</title>
+  <title>WorkBench 2.9.83</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2390,7 +2390,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.82</div>
+  <div id="wb-startup-tagline">v2.9.83</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2993,8 +2993,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.82',
-  APP_BUILD:   '20260622-2100',
+  APP_VERSION: '2.9.83',
+  APP_BUILD:   '20260622-2130',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -6304,23 +6304,11 @@ _ftStart() {
       });
     });
 
-    // BLOCK 2: Schnell-Erinnerungen
-    const schnell = (db?.aufgaben||[]).filter(a => !a.vorhabenId)
-      .filter(q => !q.deleted && !q.done && weltFilter(q))
-      .sort((a, b) => {
-        if (!a.date && !b.date) return 0;
-        if (!a.date) return 1; if (!b.date) return -1;
-        return a.date.localeCompare(b.date);
-      });
-    // BLOCK 2: Einzelaufgaben (freie Aufgaben ohne Vorhaben)
-    // quickItems als Fallback falls Migration noch nicht abgeschlossen
-    const alleFreien = [
-      ...(db?.aufgaben||[]).filter(a => !a.deleted && !a.done && !a.vorhabenId && weltFilter(a)),
-      ...(db?.quickItems||[]).filter(q => !q.deleted && !q.done && weltFilter({...q, welt: q.welt||null})),
-    ];
-    // Duplikate entfernen (falls teilmigriert)
-    const seenIds = new Set();
-    const einzelRoh = alleFreien.filter(a => { if (seenIds.has(a.id)) return false; seenIds.add(a.id); return true; });
+    // BLOCK 2: Einzelaufgaben (freie Aufgaben + quickItems-Fallback)
+    const aufgabenFreie = (db?.aufgaben||[]).filter(a => !a.vorhabenId && !a.deleted && !a.done && weltFilter(a));
+    const quickFallback = (db?.quickItems||[]).filter(q => !q.deleted && !q.done && weltFilter({welt: q.welt||null}));
+    const seenFa = new Set(aufgabenFreie.map(a => a.id));
+    const einzelRoh = [...aufgabenFreie, ...quickFallback.filter(q => !seenFa.has(q.id))];
 
     // Ohne Datum zuerst, dann mit Datum sortiert
     const getDatum = a => a.datum || a.date || '';
@@ -6331,7 +6319,7 @@ _ftStart() {
 
     let schnellH = '';
     const mkEA = a => {
-      const d = a.datum || a.date || '';
+      const d = getDatum(a);
       const isOverdue = d && d < today;
       const dateLbl = d ? (isOverdue ? '\u26a0 ' : '') + this._formatDatumKurz(d) : '\u2014';
       return '<div class="at-sk-row" style="border-left:3px solid ' + (d?'transparent':'var(--accent)') + (isOverdue?';border-left-color:var(--warn)':'') + '" onclick="WB.schnellOpen(&quot;'+this._esc(a.id)+'&quot;)">'
@@ -6340,9 +6328,7 @@ _ftStart() {
         + '<div style="font-size:11px;color:' + (isOverdue?'var(--warn)':'var(--faint)') + ';font-weight:'+(isOverdue?'700':'400')+';white-space:nowrap;margin-left:8px">' + dateLbl + '</div>'
         + '</div>';
     };
-    if (einzelOhneDatum.length) {
-      schnellH += einzelOhneDatum.map(mkEA).join('');
-    }
+    if (einzelOhneDatum.length) schnellH += einzelOhneDatum.map(mkEA).join('');
     if (einzelMitDatum.length) {
       schnellH += '<div style="font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:0.06em;padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px">Mit Datum</div>';
       schnellH += einzelMitDatum.map(mkEA).join('');
@@ -8387,9 +8373,12 @@ _ftStart() {
       } else {
         this.db = payload.data || payload;
       }
-      // db validieren
+      // db validieren + SOFORT quickItems migrieren (vor idbSave und vor Render)
       if (!this.db || typeof this.db !== 'object') this.db = this._emptyDb();
       if (!this.db._version) this.db._version = 1;
+      if (!this.db.aufgaben) this.db.aufgaben = [];
+      // quickItems JETZT migrieren — direkt nach Download, bevor etwas gespeichert/gerendert wird
+      this._migrateQuickItems();
       await this._migrate_v2();
       this._syncLastDownload = Date.now();
       await this.idbSave();
