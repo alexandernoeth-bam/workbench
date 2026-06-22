@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.85</title>
+  <title>WorkBench 2.9.87</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -878,10 +878,10 @@
     .vc-task-date { font-size: 12px; color: var(--faint); }
     .vc-task-date.warn { color: var(--warn); font-weight: 700; }
     .vc-task-cl { font-size: 11px; color: var(--faint); }
-    .vc-cl-toggle { display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--accent);cursor:pointer;font-weight:700;margin-top:3px;user-select:none; }
-    .vc-cl-list { display:none;margin-top:4px;padding-left:4px;border-left:2px solid var(--border); }
+    .vc-cl-toggle { display:inline-flex;align-items:center;gap:3px;font-size:12px;color:var(--accent);cursor:pointer;font-weight:700;margin-top:3px;user-select:none; }
+    .vc-cl-list { display:none;margin-top:4px;padding-left:2px; }
     .vc-cl-list.open { display:block; }
-    .vc-cl-item { display:flex;align-items:center;gap:6px;padding:2px 0;font-size:13px;color:var(--faint); }
+    .vc-cl-item { display:flex;align-items:center;gap:7px;padding:3px 0;font-size:13px;color:var(--faint); }
     .vc-cl-item.done { text-decoration:line-through;opacity:0.5; }
     .vc-cl-dot { width:6px;height:6px;border-radius:50%;background:var(--border);flex-shrink:0; }
     .vc-cl-dot.done { background:var(--accent); }
@@ -2390,7 +2390,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.85</div>
+  <div id="wb-startup-tagline">v2.9.87</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2993,8 +2993,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.85',
-  APP_BUILD:   '20260622-2230',
+  APP_VERSION: '2.9.87',
+  APP_BUILD:   '20260622-2330',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -4224,9 +4224,24 @@ _ftStart() {
         const vg = vhHeute[vid];
         h += '<div style="font-size:11px;font-weight:700;color:var(--faint);padding:5px 4px 3px;border-left:2.5px solid var(--accent2);margin-bottom:3px">' + this._esc(vg.titel) + '</div>';
         vg.aufgaben.forEach(a => {
-          h += '<div class="tf-schnell-row" style="border-left:none" onclick="WB.aufgabeOpen(&quot;'+this._esc(a._vhId)+'&quot;,&quot;'+this._esc(a.id)+'&quot;)">'
+          const cl = a.checklist || a.checkliste || [];
+          const clTotal = cl.length;
+          const clDone  = cl.filter(c => c.done).length;
+          const clId    = 'tfcl-' + a.id;
+          let clHtml = '';
+          if (clTotal > 0) {
+            clHtml = '<div class="vc-cl-toggle" onclick="event.stopPropagation();var el=document.getElementById(\'' + clId + '\');el.classList.toggle(\'open\');this.querySelector(\'.vc-cl-chev\').textContent=el.classList.contains(\'open\')?\'\u25be\':\'\u25b8\'">'
+              + '<span class="vc-cl-chev">\u25b8</span>'
+              + clDone + '/' + clTotal + ' Schritte</div>'
+              + '<div class="vc-cl-list" id="' + clId + '">'
+              + cl.map(c => '<label class="vc-cl-item' + (c.done ? ' done' : '') + '" style="cursor:default">'
+                + '<input type="checkbox"' + (c.done ? ' checked' : '') + ' disabled style="width:13px;height:13px;accent-color:var(--accent);flex-shrink:0">'
+                + this._esc(c.text) + '</label>').join('')
+              + '</div>';
+          }
+          h += '<div class="tf-schnell-row" onclick="WB.aufgabeOpen(&quot;'+this._esc(a._vhId)+'&quot;,&quot;'+this._esc(a.id)+'&quot;)">'
             + '<div class="tf-schnell-check" onclick="event.stopPropagation();WB._vhAufgabeDone(&quot;'+this._esc(a._vhId)+'&quot;,&quot;'+this._esc(a.id)+'&quot;)"></div>'
-            + '<div class="tf-schnell-text">' + this._esc(a.text) + '</div>'
+            + '<div class="tf-schnell-text" style="flex:1">' + this._esc(a.text) + clHtml + '</div>'
             + '</div>';
           count++;
         });
@@ -5095,9 +5110,9 @@ _ftStart() {
             + clDone + '/' + clTotal + ' Schritte'
             + '</div>'
             + '<div class="vc-cl-list" id="' + clId + '">'
-            + cl.map(c => '<div class="vc-cl-item' + (c.done?' done':'') + '">'
-              + '<div class="vc-cl-dot' + (c.done?' done':'') + '"></div>'
-              + this._esc(c.text) + '</div>').join('')
+            + cl.map(c => '<label class="vc-cl-item' + (c.done ? ' done' : '') + '" style="cursor:default">'
+              + '<input type="checkbox"' + (c.done ? ' checked' : '') + ' disabled style="width:13px;height:13px;accent-color:var(--accent);flex-shrink:0">'
+              + this._esc(c.text) + '</label>').join('')
             + '</div>';
         }
         aufgH += '<div class="vc-task">'
@@ -6303,9 +6318,9 @@ _ftStart() {
             + '<span class="vc-cl-chev">\u25b8</span>'
             + clDone + '/' + clTotal + ' Schritte</div>'
             + '<div class="vc-cl-list" id="' + clId + '">'
-            + cl.map(c => '<div class="vc-cl-item' + (c.done ? ' done' : '') + '">'
-              + '<div class="vc-cl-dot' + (c.done ? ' done' : '') + '"></div>'
-              + this._esc(c.text) + '</div>').join('')
+            + cl.map(c => '<label class="vc-cl-item' + (c.done ? ' done' : '') + '" style="cursor:default">'
+              + '<input type="checkbox"' + (c.done ? ' checked' : '') + ' disabled style="width:13px;height:13px;accent-color:var(--accent);flex-shrink:0">'
+              + this._esc(c.text) + '</label>').join('')
             + '</div>';
         }
         aufgH += '<div class="at-item" onclick="WB.aufgabeOpen(&quot;' + this._esc(v.id) + '&quot;,&quot;' + this._esc(a.id) + '&quot;)">'
@@ -7705,20 +7720,18 @@ _ftStart() {
     const hasPro  = !!(this.dataPro?.vorhaben || this.dataPro?.quickItems || this.dataPro?.customEvents);
     const hasPriv = !!(this.dataPriv?.vorhaben || this.dataPriv?.quickItems || this.dataPriv?.customEvents);
     if (!hasPro && !hasPriv) {
-      // Keine alten Daten → db sicherstellen
       if (!this.db) this.db = this._emptyDb();
       if (!this.db._version) this.db._version = 1;
       if (!this.db.mantras) this.db.mantras = [];
       if (!this.db.sondertage) this.db.sondertage = [];
       if (!this.db.aufgaben) this.db.aufgaben = [];
-      // quickItems → aufgaben Migration (auch wenn dataPro/dataPriv leer)
-      this._migrateQuickItems();
+      // KEINE automatische Migration — nur über Debug-Button
       return;
     }
-    // Bereits migriert? Aber quickItems könnten noch drin sein
+    // Bereits migriert?
     if (this.db?._version && this.db?._migratedAt) {
       if (!this.db.aufgaben) this.db.aufgaben = [];
-      this._migrateQuickItems(); // sicher: tut nichts wenn quickItems leer
+      // KEINE automatische Migration — nur über Debug-Button
       return;
     }
     console.log('[migrate_v2] Starte Migration...');
@@ -8005,20 +8018,33 @@ _ftStart() {
     const db = this.db;
     const qi = db?.quickItems || [];
     const auf = db?.aufgaben || [];
-    let out = 'quickItems: ' + qi.length + '\n';
-    qi.slice(0,5).forEach(q => out += '  - ' + q.text + '\n');
-    out += 'aufgaben (frei): ' + auf.filter(a=>!a.vorhabenId).length + '\n';
-    auf.filter(a=>!a.vorhabenId).slice(0,5).forEach(a => out += '  - ' + a.text + '\n');
-    if (qi.length > 0) {
-      this._migrateQuickItems();
-      out += '\n→ Migration ausgeführt! ' + (db?.aufgaben||[]).filter(a=>!a.vorhabenId).length + ' freie Aufgaben\n';
-      this.setDirty();
-      setTimeout(() => this._syncUpload(), 500);
-      out += '→ Upload gestartet\n';
-    } else {
-      out += '\n→ Keine quickItems vorhanden\n';
-    }
+    let out = '=== ROHZUSTAND ===\n';
+    out += 'quickItems: ' + qi.length + '\n';
+    qi.forEach(q => out += '  [' + (q.done?'X':' ') + '] ' + (q.welt||'?') + ' | ' + q.text + '\n');
+    out += '\naufgaben (frei): ' + auf.filter(a=>!a.vorhabenId).length + '\n';
+    auf.filter(a=>!a.vorhabenId).forEach(a => out += '  [' + (a.done?'X':' ') + '] ' + a.text + '\n');
     el.textContent = out;
+  },
+
+  _sDebugExport() {
+    if (!this.db) { this._toast('Keine Daten'); return; }
+    // Unverschlüsselter Export des Rohzustands
+    const payload = JSON.stringify({ quickItems: this.db.quickItems||[], aufgaben: this.db.aufgaben||[], _exported: new Date().toISOString() }, null, 2);
+    const blob = new Blob([payload], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'wb-debug-' + new Date().toISOString().slice(0,16).replace(/[:.]/g,'-') + '.json';
+    a.click(); URL.revokeObjectURL(a.href);
+    this._toast('\u2713 Debug-Export heruntergeladen');
+  },
+
+  _sDebugMigrateAndUpload() {
+    const el = document.getElementById('s-debug-output'); if (!el) return;
+    const qi = this.db?.quickItems || [];
+    if (!qi.length) { el.textContent += '\n→ Keine quickItems zum Migrieren'; return; }
+    this._migrateQuickItems();
+    this.setDirty();
+    el.textContent += '\n→ ' + (this.db?.aufgaben||[]).filter(a=>!a.vorhabenId).length + ' freie Aufgaben nach Migration';
+    setTimeout(() => { this._syncUpload(); el.textContent += '\n→ Upload gestartet'; }, 500);
     this.renderAufgabenTab();
   },
 
@@ -8408,12 +8434,11 @@ _ftStart() {
       } else {
         this.db = payload.data || payload;
       }
-      // db validieren + SOFORT quickItems migrieren (vor idbSave und vor Render)
+      // db validieren
       if (!this.db || typeof this.db !== 'object') this.db = this._emptyDb();
       if (!this.db._version) this.db._version = 1;
       if (!this.db.aufgaben) this.db.aufgaben = [];
-      // quickItems JETZT migrieren — direkt nach Download, bevor etwas gespeichert/gerendert wird
-      this._migrateQuickItems();
+      // KEINE automatische Migration hier — _sDebugMigration zeigt Rohzustand
       await this._migrate_v2();
       this._syncLastDownload = Date.now();
       await this.idbSave();
@@ -10808,9 +10833,11 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
 
     <div class="s-card" id="s-debug-card">
       <div class="s-card-head">🔧 Debug</div>
-      <div style="padding:10px 14px 14px">
-        <button class="s-btn" onclick="WB._sDebugMigration()" style="margin-bottom:8px;width:100%">quickItems → Aufgaben migrieren</button>
-        <div id="s-debug-output" style="font-size:12px;font-family:monospace;color:var(--faint);white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
+      <div style="padding:10px 14px 14px;display:flex;flex-direction:column;gap:8px">
+        <button class="s-btn" onclick="WB._sDebugMigration()">1. Rohzustand anzeigen</button>
+        <button class="s-btn" onclick="WB._sDebugExport()">2. Unverschlüsselt exportieren</button>
+        <button class="s-btn primary" onclick="WB._sDebugMigrateAndUpload()">3. Migrieren + Upload</button>
+        <div id="s-debug-output" style="font-size:12px;font-family:monospace;color:var(--faint);white-space:pre-wrap;max-height:300px;overflow-y:auto;background:var(--surface2);padding:8px;border-radius:6px;margin-top:4px"></div>
       </div>
     </div>
 
