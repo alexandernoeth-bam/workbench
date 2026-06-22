@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.87</title>
+  <title>WorkBench 2.9.88</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2390,7 +2390,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.87</div>
+  <div id="wb-startup-tagline">v2.9.88</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2993,8 +2993,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.87',
-  APP_BUILD:   '20260622-2330',
+  APP_VERSION: '2.9.88',
+  APP_BUILD:   '20260622-2345',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -8013,41 +8013,6 @@ _ftStart() {
     this._toast('\u2713 Link in "' + liste.titel + '" gespeichert');
   },
 
-  _sDebugMigration() {
-    const el = document.getElementById('s-debug-output'); if (!el) return;
-    const db = this.db;
-    const qi = db?.quickItems || [];
-    const auf = db?.aufgaben || [];
-    let out = '=== ROHZUSTAND ===\n';
-    out += 'quickItems: ' + qi.length + '\n';
-    qi.forEach(q => out += '  [' + (q.done?'X':' ') + '] ' + (q.welt||'?') + ' | ' + q.text + '\n');
-    out += '\naufgaben (frei): ' + auf.filter(a=>!a.vorhabenId).length + '\n';
-    auf.filter(a=>!a.vorhabenId).forEach(a => out += '  [' + (a.done?'X':' ') + '] ' + a.text + '\n');
-    el.textContent = out;
-  },
-
-  _sDebugExport() {
-    if (!this.db) { this._toast('Keine Daten'); return; }
-    // Unverschlüsselter Export des Rohzustands
-    const payload = JSON.stringify({ quickItems: this.db.quickItems||[], aufgaben: this.db.aufgaben||[], _exported: new Date().toISOString() }, null, 2);
-    const blob = new Blob([payload], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = 'wb-debug-' + new Date().toISOString().slice(0,16).replace(/[:.]/g,'-') + '.json';
-    a.click(); URL.revokeObjectURL(a.href);
-    this._toast('\u2713 Debug-Export heruntergeladen');
-  },
-
-  _sDebugMigrateAndUpload() {
-    const el = document.getElementById('s-debug-output'); if (!el) return;
-    const qi = this.db?.quickItems || [];
-    if (!qi.length) { el.textContent += '\n→ Keine quickItems zum Migrieren'; return; }
-    this._migrateQuickItems();
-    this.setDirty();
-    el.textContent += '\n→ ' + (this.db?.aufgaben||[]).filter(a=>!a.vorhabenId).length + ' freie Aufgaben nach Migration';
-    setTimeout(() => { this._syncUpload(); el.textContent += '\n→ Upload gestartet'; }, 500);
-    this.renderAufgabenTab();
-  },
-
   _ALL_TABS: [
     { id: 'cockpit',  label: 'Eingang',   pixel: true  },
     { id: 'notizen',  label: 'Notizen',   pixel: true  },
@@ -10828,16 +10793,6 @@ document.addEventListener('DOMContentLoaded', () => WB.init());
       <div id="s-mantra-pool" style="padding:10px 14px 0"></div>
       <div style="padding:10px 14px 14px">
         <button class="s-btn primary" onclick="WB._mantraAdd()">+ Satz hinzuf&uuml;gen</button>
-      </div>
-    </div>
-
-    <div class="s-card" id="s-debug-card">
-      <div class="s-card-head">🔧 Debug</div>
-      <div style="padding:10px 14px 14px;display:flex;flex-direction:column;gap:8px">
-        <button class="s-btn" onclick="WB._sDebugMigration()">1. Rohzustand anzeigen</button>
-        <button class="s-btn" onclick="WB._sDebugExport()">2. Unverschlüsselt exportieren</button>
-        <button class="s-btn primary" onclick="WB._sDebugMigrateAndUpload()">3. Migrieren + Upload</button>
-        <div id="s-debug-output" style="font-size:12px;font-family:monospace;color:var(--faint);white-space:pre-wrap;max-height:300px;overflow-y:auto;background:var(--surface2);padding:8px;border-radius:6px;margin-top:4px"></div>
       </div>
     </div>
 
