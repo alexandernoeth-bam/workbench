@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.69</title>
+  <title>WorkBench 2.9.70</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2376,7 +2376,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.69</div>
+  <div id="wb-startup-tagline">v2.9.70</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -3009,8 +3009,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.69',
-  APP_BUILD:   '20260621-2340',
+  APP_VERSION: '2.9.70',
+  APP_BUILD:   '20260622-0800',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -7704,6 +7704,7 @@ _ftStart() {
   setDirty() {
     this.isDirty = true; this._pendingTs = Date.now();
     this.idbSave().catch(e => console.warn('[setDirty IDB]', e));
+    if (!this._syncInitDone) return; // Kein Upload vor abgeschlossenem Init-Sync
     clearTimeout(this._saveTimer);
     this._saveTimer = setTimeout(async () => { await this._syncUpload(); }, 2000);
   },
@@ -8165,19 +8166,14 @@ _ftStart() {
 
   _syncConflictDialog(ctx, driveTs) {
     const driveDate = new Date(driveTs).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
-    const weltName  = ctx === 'pro' ? 'Beruf' : 'Privat';
-    const choice = confirm(
-      'Konflikt (' + weltName + '): Ein anderes Ger\u00e4t hat Daten um '
-      + driveDate + ' ge\u00e4ndert.\nDu hast lokale \u00c4nderungen.\n\n'
-      + 'OK = Meine \u00c4nderungen hochladen (Drive \u00fcberschreiben)\n'
-      + 'Abbrechen = Drive-Stand laden (\u00e4nderungen verwerfen)'
-    );
-    if (choice) {
-      this._syncUpload();
-    } else {
-      this.isDirty = false;
-      this._syncDownload();
-    }
+    const body = '<div style="font-size:14px;line-height:1.6;color:var(--text)">'
+      + 'Ein anderes Ger\u00e4t hat Daten um <strong>' + driveDate + '</strong> ge\u00e4ndert.<br>'
+      + 'Du hast ebenfalls lokale \u00c4nderungen.</div>';
+    const footer = '<button style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:none;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700" '
+      + 'onclick="WB.isDirty=false;WB._pendingChanges=false;WB._syncDownload();WB.modalClose()">Drive laden</button>'
+      + '<button style="padding:6px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700;margin-left:8px" '
+      + 'onclick="WB._syncUpload();WB.modalClose()">Meine hochladen</button>';
+    this.modalOpen('\u26a0\uFE0F Sync-Konflikt', body, footer);
   },
 
 
@@ -8535,15 +8531,25 @@ _ftStart() {
     // db sicherstellen
     if (!this.db) this.db = this._emptyDb();
 
-    // Drive laden — immer versuchen (Token wurde ggf. oben erneuert)
+    // ── Startup-Sync: Drive ist beim Start autoritativ ──
+    // Reihenfolge: 1) Download (Drive-Stand laden), 2) nur wenn lokal neuer → Upload
     if (this._oauthTokenValid()) {
       try {
-        if ((this._pendingChanges || this.isDirty) && this.db) await this._syncUpload();
-      } catch(e) { console.warn('[init upload]', e.message); }
-      try { await this._syncDownload(); } catch(e) { console.warn('[init download]', e.message); }
-      try {
-        if (this.isDirty && this.db) await this._syncUpload();
-      } catch(e) { console.warn('[init upload2]', e.message); }
+        // Immer erst herunterladen — lokale IDB kann auf anderem Gerät veraltet sein
+        console.log('[init] Startup-Download von Drive...');
+        await this._syncDownload();
+        // Nach Download: falls noch dirty (z.B. Offline-Änderungen die neuer sind als Drive) → hochladen
+        if ((this.isDirty || this._pendingChanges) && this.db) {
+          console.log('[init] Lokale Änderungen vorhanden nach Download → Upload');
+          await this._syncUpload();
+        }
+      } catch(e) {
+        console.warn('[init sync]', e.message);
+        // Netzwerkfehler → lokale IDB nutzen, upload wenn dirty
+        if ((this.isDirty || this._pendingChanges) && this.db) {
+          try { await this._syncUpload(); } catch(e2) { console.warn('[init upload fallback]', e2.message); }
+        }
+      }
     }
     // Ab jetzt sind visibilitychange/focus Uploads erlaubt
     this._syncInitDone = true;
@@ -8554,26 +8560,32 @@ _ftStart() {
 
     document.addEventListener('visibilitychange', async () => {
       if (document.visibilityState === 'hidden') {
+        // App geht in Hintergrund → sofort sichern und hochladen
         clearTimeout(this._saveTimer);
         try {
           await this.idbSave();
-          // Upload nur nach abgeschlossenem Init-Sync (verhindert Überschreiben mit altem IDB-Stand)
           if ((this.isDirty || this._pendingChanges) && this._syncInitDone) {
             await this._syncUpload();
           }
         } catch(e) { console.warn('[vis hidden]', e.message); }
       } else {
-        try { if (this._pendingChanges || this.isDirty) await this._syncUpload(); else await this._syncCheckNewer(); }
-        catch(e) {}
+        // App kommt in Vordergrund → erst prüfen ob Drive neuer ist
+        if (!this._syncInitDone) return;
+        try {
+          if (this.isDirty || this._pendingChanges) {
+            // Eigene Änderungen vorhanden: erst syncCheckNewer (Konflikt-Dialog), dann ggf. upload
+            await this._syncCheckNewer();
+          } else {
+            // Keine eigenen Änderungen: einfach neuesten Stand holen
+            await this._syncCheckNewer();
+          }
+        } catch(e) { console.warn('[vis visible]', e.message); }
       }
     });
     window.addEventListener('focus', async () => {
+      if (!this._syncInitDone) return;
       try {
-        if (this._pendingChanges || this.isDirty) {
-          if (this._syncInitDone) await this._syncUpload();
-        } else {
-          await this._syncCheckNewer();
-        }
+        await this._syncCheckNewer();
       } catch(e) {}
     });
     window.addEventListener('beforeunload', async () => { await this.idbSave(); });
