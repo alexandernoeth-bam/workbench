@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.74</title>
+  <title>WorkBench 2.9.76</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2376,7 +2376,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.74</div>
+  <div id="wb-startup-tagline">v2.9.76</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2534,7 +2534,7 @@
           <div id="ck-dialog-buttons">
             <button class="ck-d-btn primary" onclick="WB._ckDialogKlassify('aufgabe')">Aufgabe</button>
             <button class="ck-d-btn" onclick="WB._ckDialogKlassify('termin')">Termin</button>
-            <button class="ck-d-btn" onclick="WB._ckDialogKlassify('schnell')">Schnell</button>
+            <button class="ck-d-btn" onclick="WB._ckDialogKlassify('schnell')">Aufgabe</button>
             <button class="ck-d-btn" onclick="WB._ckNotizenSubDialog()">Notiz</button>
             <button class="ck-d-btn danger" onclick="WB._ckDialogKlassify('loeschen')">L&ouml;schen</button>
           </div>
@@ -3009,8 +3009,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.74',
-  APP_BUILD:   '20260622-1100',
+  APP_VERSION: '2.9.76',
+  APP_BUILD:   '20260622-1300',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3115,7 +3115,7 @@ const WB = {
     if (!items.length) { block.classList.remove('visible'); return; }
     block.classList.add('visible');
     if (count) count.textContent = items.length;
-    const typeLabel = { aufgabe:'Aufgabe', termin:'Termin', vorhaben:'Vorhaben', schnell:'Schnell', pflicht:'Pflicht', ziel:'Ziel', ressource:'Ressource', loeschen:'Gel\u00f6scht' };
+    const typeLabel = { aufgabe:'Aufgabe', termin:'Termin', vorhaben:'Vorhaben', schnell:'Aufgabe', pflicht:'Pflicht', ziel:'Ziel', ressource:'Ressource', loeschen:'Gel\u00f6scht' };
     body.innerHTML = items.map(item =>
       '<div class="ck-kl-item"><span class="ck-kl-arrow">\u2192</span>'
       + '<div class="ck-kl-content"><div class="ck-kl-text">' + this._esc(item.text) + '</div></div>'
@@ -3653,7 +3653,7 @@ _ftStart() {
       });
 
     // Schnell-Erinnerungen (offen, heute)
-    (db.quickItems || [])
+    (db.aufgaben || [])
       .filter(q => !q.deleted && !q.done && q.date === today)
       .forEach(q => {
         const timeStr = q.startTime ? ' (' + q.startTime + ')' : '';
@@ -3959,8 +3959,8 @@ _ftStart() {
       case 'aufgabe': {
         const { titel, notiz } = this._ckSplitText(text);
         if (!db) break;
-        if (!db.quickItems) db.quickItems = [];
-        db.quickItems.push({ id:'q_'+Date.now(), text:titel, notiz, date:'', done:false, deleted:false, updatedAt:this._now() });
+        if (!db.aufgaben) db.aufgaben = [];
+        db.aufgaben.push({ id:'q_'+Date.now(), text:titel, notiz, date:'', done:false, deleted:false, updatedAt:this._now() });
         this.setDirty(); this._toast('\u2713 Aufgabe: ' + titel.slice(0,30)); break;
       }
       case 'termin':
@@ -3975,8 +3975,8 @@ _ftStart() {
       case 'schnell': {
         const { titel, notiz } = this._ckSplitText(text);
         if (!db) break;
-        if (!db.quickItems) db.quickItems = [];
-        db.quickItems.push({ id:'q_'+Date.now(), text:titel, notiz, date:'', startTime:'', done:false, deleted:false, updatedAt:this._now() });
+        if (!db.aufgaben) db.aufgaben = [];
+        db.aufgaben.push({ id:'q_'+Date.now(), text:titel, notiz, date:'', startTime:'', done:false, deleted:false, updatedAt:this._now() });
         this.setDirty(); this._toast('\u2713 Erinnerung: ' + titel.slice(0,30)); break;
       }
       case 'notiz-neu': {
@@ -4073,7 +4073,7 @@ _ftStart() {
     if (!gefiltert.length) { scroll.innerHTML = '<div class="jn-empty">Keine Eintr\u00e4ge f\u00fcr diesen Zeitraum.</div>'; return; }
     const groups = new Map();
     gefiltert.forEach(e => { if (!groups.has(e.date)) groups.set(e.date, []); groups.get(e.date).push(e); });
-    const typeLabel = { aufgabe:'\u2713 Aufgabe', termin:'\uD83D\uDCC5 Termin', vorhaben:'\uD83D\uDCA1 Vorhaben', schnell:'\u26A1 Schnell', pflicht:'\uD83D\uDD04 Pflicht', ziel:'\uD83C\uDFAF Ziel', ressource:'\uD83D\uDD17 Ressource', loeschen:'\uD83D\uDDD1 Gel\u00f6scht' };
+    const typeLabel = { aufgabe:'\u2713 Aufgabe', termin:'\uD83D\uDCC5 Termin', vorhaben:'\uD83D\uDCA1 Vorhaben', schnell:'\u2611 Aufgabe', pflicht:'\uD83D\uDD04 Pflicht', ziel:'\uD83C\uDFAF Ziel', ressource:'\uD83D\uDD17 Ressource', loeschen:'\uD83D\uDDD1 Gel\u00f6scht' };
     let html = '';
     groups.forEach((eintraege, date) => {
       const d = new Date(date + 'T12:00:00');
@@ -4167,7 +4167,7 @@ _ftStart() {
       .filter(e => !e.deleted && e.date === today)
       .map(e => ({ ...e, _art:'termin', _ctx: e.welt==='pro' ? 'pro' : 'priv' }));
 
-    (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === today && q.startTime).forEach(q => {
+    (this.db?.aufgaben||[]).filter(q => !q.deleted && !q.done && (q.datum||q.date) === today && q.startTime && !q.vorhabenId).forEach(q => {
       events.push({ id:q.id, text:q.text, startTime:q.startTime, durationMin:15, welt:q.welt||'priv', _art:'schnell', _ctx: q.welt || 'priv' });
     });
 
@@ -4260,13 +4260,13 @@ _ftStart() {
 
     // Schnell-Erinnerungen OHNE Uhrzeit
     const schnell = [];
-    (this.db?.quickItems||[]).filter(q => !q.deleted && q.date === today && !q.startTime).forEach(q => schnell.push({...q, _ctx: q.welt || 'priv'}));
+    (this.db?.aufgaben||[]).filter(q => !q.deleted && (q.datum||q.date) === today && !q.startTime && !q.vorhabenId).forEach(q => schnell.push({...q, _ctx: q.welt || 'priv'}));
 
     if (schnell.length) {
       const visible = schnell.filter(q => !q.done || this._tfShowDone);
       hiddenCount += schnell.filter(q => q.done && !this._tfShowDone).length;
       if (visible.length) {
-        h += '<div class="tf-sec-sep">Schnell-Erinnerungen</div>';
+        h += '<div class="tf-sec-sep">Aufgaben</div>';
         visible.forEach(q => {
           const badge = q._ctx==='pro' ? '<span class="ck-badge beruf">Beruf</span>' : '<span class="ck-badge privat">Privat</span>';
           h += '<div class="tf-schnell-row" onclick="WB.schnellOpen(&quot;' + this._esc(q.id) + '&quot;)">'
@@ -4304,7 +4304,7 @@ _ftStart() {
     if (!el) return;
     const items = [];
 
-    (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && !q.date && !q.vorhabenId).forEach(q => items.push({...q, _ctx: q.welt || 'priv'}));
+    (this.db?.aufgaben||[]).filter(q => !q.deleted && !q.done && !q.datum && !q.date && !q.vorhabenId).forEach(q => items.push({...q, _ctx: q.welt || 'priv'}));
   
     if (cntEl) cntEl.textContent = items.length;
     if (!items.length) { el.innerHTML = '<div class="tf-empty">Posteingang leer \u2713</div>'; return; }
@@ -4353,8 +4353,8 @@ _ftStart() {
     const today = this._dStr(new Date());
     const items = [];
 
-    (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date && q.date < today).forEach(q => {
-      items.push({ text:q.text, sub:'Schnell-Erinnerung', date:q.date, id:q.id, _type:'schnell', _ctx: q.welt || 'priv' });
+    (this.db?.aufgaben||[]).filter(q => !q.deleted && !q.done && (q.datum||q.date) && (q.datum||q.date) < today && !q.vorhabenId).forEach(q => {
+      items.push({ text:q.text, sub:'Aufgabe', date:q.date, id:q.id, _type:'schnell', _ctx: q.welt || 'priv' });
     });
     (this.db?.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert' && v.aktiv!==false).forEach(v => {
       (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum && a.datum < today).forEach(a => {
@@ -4390,7 +4390,7 @@ _ftStart() {
     const today = this._dStr(new Date());
     let alleN = 0, berufN = 0, privatN = 0, ueberN = 0, ohneN = 0;
 
-    const qi = (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done);
+    const qi = (this.db?.aufgaben||[]).filter(q => !q.deleted && !q.done && !q.vorhabenId);
     const af = (this.db?.vorhaben||[]).flatMap(v => (v.aufgaben||[]).filter(a => !a.deleted && !a.done));
     const items = [...qi, ...af];
     items.forEach(i => {
@@ -4525,8 +4525,8 @@ _ftStart() {
     if (!text?.trim()) return;
     const db = this.db;
     if (!db) return;
-    if (!db.quickItems) db.quickItems = [];
-    db.quickItems.push({
+    if (!db.aufgaben) db.aufgaben = [];
+    db.aufgaben.push({
       id: String(Date.now()),
       text: text.trim(),
       date: '',
@@ -5639,7 +5639,7 @@ _ftStart() {
         .filter(e => !e.deleted && e.date === dateStr && (!e.done || e.storniert))
         .map(e => ({ ...e, _art: 'termin', _ctx: e.welt === 'pro' ? 'pro' : 'priv' }));
       // QuickItems mit Uhrzeit einmischen (auf Mobile: NUR mit startTime)
-      (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === dateStr && q.startTime).forEach(q => {
+      (this.db?.aufgaben||[]).filter(q => !q.deleted && !q.done && (q.datum||q.date) === dateStr && q.startTime && !q.vorhabenId).forEach(q => {
         events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, welt:q.welt||'priv', _art:'schnell', _ctx: q.welt || 'priv' });
       });
       events.sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
@@ -5806,7 +5806,7 @@ _ftStart() {
             return { ...e, _art:'termin', _ctx: e.welt==='pro' ? 'pro' : 'priv', _startMin: eh*60+em, _endMin: eh*60+em + this._evtDurationMin(e) };
           });
 
-        (this.db?.quickItems||[]).filter(q => !q.deleted && !q.done && q.date === dateStr && q.startTime).forEach(q => {
+        (this.db?.aufgaben||[]).filter(q => !q.deleted && !q.done && (q.datum||q.date) === dateStr && q.startTime && !q.vorhabenId).forEach(q => {
           const [qh,qm] = q.startTime.split(':').map(Number);
           events.push({ id:q.id, text:q.text+' \u26a1', startTime:q.startTime, durationMin:15, welt:q.welt||'priv', _art:'schnell', _ctx: q.welt || 'priv', _startMin:qh*60+qm, _endMin:qh*60+qm+15 });
         });
@@ -6145,7 +6145,7 @@ _ftStart() {
   _tfTerminDone(id, art) {
     if (art === 'schnell') {
 
-      const q  = (this.db?.quickItems||[]).find(x => x.id === id);
+      const q  = (this.db?.aufgaben||[]).find(x => x.id === id);
       if (q) { q.done=true; q.updatedAt=this._now(); }
     
     } else {
@@ -6160,7 +6160,7 @@ _ftStart() {
     const today = this._dStr(new Date());
     if (art === 'schnell') {
 
-      const q  = (this.db?.quickItems||[]).find(x => x.id === id);
+      const q  = (this.db?.aufgaben||[]).find(x => x.id === id);
       if (q) { q.storniert=true; q.done=true; q.updatedAt=this._now(); }
     
     } else if (art === 'pflicht') {
@@ -6189,7 +6189,7 @@ _ftStart() {
   _tfSchnellCheck(id, ctx) {
     const db = this.db;
     if (!db) return;
-    const q = (db.quickItems||[]).find(x => x.id === id);
+    const q = (db.aufgaben||[]).find(x => x.id === id);
     if (!q) return;
     q.done = true; q.updatedAt = this._now();
     this.setDirty();
@@ -6290,7 +6290,7 @@ _ftStart() {
     });
 
     // BLOCK 2: Schnell-Erinnerungen
-    const schnell = (db?.quickItems||[])
+    const schnell = (db?.aufgaben||[]).filter(a => !a.vorhabenId)
       .filter(q => !q.deleted && !q.done && weltFilter(q))
       .sort((a, b) => {
         if (!a.date && !b.date) return 0;
@@ -7487,6 +7487,31 @@ _ftStart() {
       // Neue DB-Felder sicherstellen
       if (!this.db.mantras) this.db.mantras = [];
       if (!this.db.sondertage) this.db.sondertage = [];
+      if (!this.db.aufgaben) this.db.aufgaben = [];
+      // Migration: quickItems → db.aufgaben (freie Aufgaben ohne Vorhaben)
+      if (this.db.quickItems && this.db.quickItems.length > 0) {
+        this.db.quickItems.forEach(q => {
+          // Nur wenn nicht bereits migriert
+          if (!this.db.aufgaben.find(a => a._migratedFromQuick === q.id)) {
+            this.db.aufgaben.push({
+              id: q.id,
+              text: q.text,
+              notiz: q.notiz || '',
+              datum: q.date || '',
+              startTime: q.startTime || '',
+              done: !!q.done,
+              deleted: !!q.deleted,
+              storniert: !!q.storniert,
+              welt: q.welt || null,
+              vorhabenId: null,
+              updatedAt: q.updatedAt || this._now(),
+              _migratedFromQuick: q.id,
+            });
+          }
+        });
+        this.db.quickItems = []; // geleert nach Migration
+        console.log('[migrate] quickItems → aufgaben:', this.db.aufgaben.length);
+      }
     
     } catch(e) {
       console.error('[IDB] load error:', e);
@@ -7500,7 +7525,7 @@ _ftStart() {
       quickItems: [], customEvents: [], wochenpflichten: [],
       pflichtStatus: {}, tagesprotokoll: [], wochenMottos: {},
       checklistVorlagen: [], vorhaben: [], ziele: [], links: [],
-      notizen: [], mantras: [], sondertage: [],
+      notizen: [], mantras: [], sondertage: [], aufgaben: [],
       _version: 1, _exportedAt: '',
     };
   },
@@ -8668,7 +8693,7 @@ _ftStart() {
     // Papierkorb-Zähler aktualisieren
     let pkCount = 0;
 
-    pkCount += (this.db?.quickItems||[]).filter(x=>x.deleted).length;
+    pkCount += (this.db?.aufgaben||[]).filter(x=>x.deleted && !x.vorhabenId).length;
     pkCount += (this.db?.customEvents||[]).filter(x=>x.deleted).length;
     pkCount += (this.db?.wochenpflichten||[]).filter(x=>x.deleted).length;
     pkCount += (this.db?.ziele||[]).filter(x=>x.deleted).length;
@@ -9072,7 +9097,7 @@ _ftStart() {
     const cntEl = document.getElementById('s-pk-count');
     if (!liste) return;
     const now = new Date();
-    const typeLabel = { termin:'Termin', schnell:'Schnell-Erinnerung', aufgabe:'Aufgabe', vorhaben:'Vorhaben', pflicht:'Wochenpflicht', ziel:'Ziel', link:'Ressource' };
+    const typeLabel = { termin:'Termin', schnell:'Aufgabe', aufgabe:'Aufgabe', vorhaben:'Vorhaben', pflicht:'Wochenpflicht', ziel:'Ziel', link:'Ressource' };
     const items = [];
 
     const db = this.db; if (!db) return;
@@ -9363,34 +9388,74 @@ _ftStart() {
   },
 
   schnellOpen(id) {
-    let db = this.db; if (!db) { this._toast('Daten nicht geladen'); return; }
-    let ctx  = this.activeWorld === 'beruf' ? 'pro' : 'priv';
-    let item = id ? (this.db?.quickItems||[]).find(q => q.id === id) : null;
-    if (!item && id) {
-      const otherDb = this.db;
-      item = (otherDb?.quickItems||[]).find(q => q.id === id);
-      if (item) { ctx = ctx === 'pro' ? 'priv' : 'pro'; db = otherDb; }
-    }
-    const body = this._modalWeltTop(item?._ctx || ctx, item?.vertraulich)
+    // Alias für freieAufgabeOpen (Rückwärtskompatibilität)
+    this.freieAufgabeOpen(id);
+  },
+
+  freieAufgabeOpen(id) {
+    const db = this.db; if (!db) { this._toast('Daten nicht geladen'); return; }
+    const item = id ? (db.aufgaben||[]).find(q => q.id === id) : null;
+    const welt = item?.welt || null;
+    const weltHtml = '<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">'
+      + ['beide','beruf','privat'].map(w => '<button onclick="WB._faSetWelt(this,\'' + w + '\')" data-welt="' + w + '" '
+        + 'style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);border:1.5px solid '
+        + ((!welt && w==='beide') || welt===w || (welt==='pro'&&w==='beruf') || (welt==='priv'&&w==='privat')
+          ? 'var(--accent);background:var(--accent);color:#fff'
+          : 'var(--border);background:none;color:var(--faint)')
+        + '">' + (w==='beide'?'Beides':w==='beruf'?'Beruf':'Privat') + '</button>'
+      ).join('') + '</div>';
+
+    const vorhaben = (db.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert');
+    const vhOpts = '<option value="">— Freie Aufgabe —</option>'
+      + vorhaben.map(v => '<option value="' + this._esc(v.id) + '"'
+        + (item?.vorhabenId === v.id ? ' selected' : '') + '>' + this._esc(v.titel) + '</option>').join('');
+
+    const body = weltHtml
       + '<div class="wb-input-group">'
       + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
-      + ' placeholder="Was darf nicht vergessen werden?"'
-      + ' value="' + this._esc(item?.text||'') + '">'
+      + ' placeholder="Was soll erledigt werden?" value="' + this._esc(item?.text||'') + '">'
       + '</div>'
       + '<div class="wb-row2">'
       + '<div class="wb-input-group"><label class="wb-label">F\u00e4llig (optional)</label>'
-      + '<input id="wb-f-date" class="wb-input" type="date"'
-      + ' value="' + this._esc(item?.date||'') + '">'
+      + '<input id="wb-f-date" class="wb-input" type="date" value="' + this._esc(item?.datum||item?.date||'') + '">'
       + '</div>'
       + '<div class="wb-input-group"><label class="wb-label">Uhrzeit (optional)</label>'
-      + '<input id="wb-f-time" class="wb-input" type="time"'
-      + ' value="' + this._esc(item?.startTime||'') + '">'
-      + '</div></div>';
-    this._modalCtx = { type:'schnell', id, ctx };
-    this.modalOpen('Schnell-Erinnerung', body, this._modalFooter(!!id, false));
+      + '<input id="wb-f-time" class="wb-input" type="time" value="' + this._esc(item?.startTime||'') + '">'
+      + '</div></div>'
+      + '<div class="wb-input-group"><label class="wb-label">Vorhaben (optional)</label>'
+      + '<select id="wb-f-vh" class="wb-select">' + vhOpts + '</select></div>';
+
+    this._modalCtx = { type:'freieAufgabe', id };
+    this.modalOpen(id ? 'Aufgabe bearbeiten' : 'Neue Aufgabe', body, this._modalFooter(!!id, false));
   },
 
-  /* ── Aufgabe ── */
+  _faSetWelt(btn, welt) {
+    btn.closest('div').querySelectorAll('button').forEach(b => {
+      b.style.border = '1.5px solid var(--border)'; b.style.background = 'none'; b.style.color = 'var(--faint)';
+    });
+    btn.style.border = '1.5px solid var(--accent)'; btn.style.background = 'var(--accent)'; btn.style.color = '#fff';
+    btn.dataset.active = '1';
+  },
+
+  /* ── Freie Aufgaben (ohne Vorhaben) ── */
+
+  _getFreieAufgaben() {
+    return (this.db?.aufgaben || []).filter(a => !a.vorhabenId);
+  },
+
+  _freieAufgabeSave(id, data) {
+    const db = this.db; if (!db) return;
+    if (!db.aufgaben) db.aufgaben = [];
+    if (id) {
+      const a = db.aufgaben.find(x => x.id === id);
+      if (a) Object.assign(a, data, { updatedAt: this._now() });
+    } else {
+      db.aufgaben.push({ id: 'fa_' + Date.now(), vorhabenId: null, done: false, deleted: false, updatedAt: this._now(), ...data });
+    }
+    this.setDirty();
+  },
+
+  /* ── Aufgabe in Vorhaben ── */
   aufgabeOpen(vorhabenId, aufgabeId, ctx) {
     const db = this.db; if (!db) { this._toast('Daten nicht geladen'); return; }
     ctx = ctx || (this.activeWorld === 'beruf' ? 'pro' : 'priv');
@@ -9728,6 +9793,7 @@ _ftStart() {
     const c = this._modalCtx;
     if (!c) return;
     switch(c.type) {
+      case 'freieAufgabe': this._savFreieAufgabe(c); break;
       case 'schnell':  this._savSchnell(c);  break;
       case 'aufgabe':  this._savAufgabe(c);  break;
       case 'termin':   this._savTermin(c);   break;
@@ -9758,8 +9824,11 @@ _ftStart() {
 
     const db = this.db;
     switch(c.type) {
+      case 'freieAufgabe':
+        softDelete(this.db?.aufgaben, c.id);
+        break;
       case 'schnell':
-        softDelete(this.db?.quickItems, c.id);
+        softDelete(this.db?.aufgaben, c.id);
         break;
       case 'aufgabe': {
         const v = (this.db?.vorhaben||[]).find(x => x.id === c.vorhabenId);
@@ -9795,28 +9864,30 @@ _ftStart() {
     this.renderSection(this.activeTab);
   },
 
-  _savSchnell(c) {
+  _savFreieAufgabe(c) {
     const text      = document.getElementById('wb-f-text')?.value.trim();
     if (!text) { this._toast('Text fehlt'); return; }
-    const date      = document.getElementById('wb-f-date')?.value || '';
+    const datum     = document.getElementById('wb-f-date')?.value || '';
     const startTime = document.getElementById('wb-f-time')?.value || '';
-    const ctx = c.ctx || this._modalGetWelt();
-    const db = this.db;
-    if (!db) return;
-    if (!db.quickItems) db.quickItems = [];
+    const vhId      = document.getElementById('wb-f-vh')?.value || null;
+    // Welt aus aktiven Pill-Buttons lesen
+    const weltBtn   = document.querySelector('[data-active="1"][data-welt]');
+    const welt      = weltBtn ? (weltBtn.dataset.welt === 'beide' ? null : weltBtn.dataset.welt) : null;
+    const db = this.db; if (!db) return;
+    if (!db.aufgaben) db.aufgaben = [];
     if (c.id) {
-      let item = db.quickItems.find(x => x.id === c.id);
-      if (!item) {
-        // Fallback: andere DB
-        const otherDb = this.db;
-        item = (otherDb?.quickItems||[]).find(x => x.id === c.id);
-      }
-      if (item) { item.text=text; item.date=date; item.startTime=startTime; item.updatedAt=this._now(); }
+      const a = db.aufgaben.find(x => x.id === c.id);
+      if (a) { a.text=text; a.datum=datum; a.startTime=startTime; a.welt=welt; a.vorhabenId=vhId||null; a.updatedAt=this._now(); }
     } else {
-      db.quickItems.push({ id:'q_'+Date.now(), text, date, startTime, done:false, deleted:false, updatedAt:this._now(), vertraulich:this._modalGetVertraulich() });
+      db.aufgaben.push({ id:'fa_'+Date.now(), text, datum, startTime, welt, vorhabenId:vhId||null, done:false, deleted:false, updatedAt:this._now() });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
-    this._toast('\u2713 Schnell-Erinnerung gespeichert');
+    this._toast('\u2713 Aufgabe gespeichert');
+  },
+
+  _savSchnell(c) {
+    // Alias für _savFreieAufgabe
+    this._savFreieAufgabe({ ...c, type:'freieAufgabe' });
   },
 
   _savAufgabe(c) {
@@ -10186,9 +10257,9 @@ _ftStart() {
         const ctx = this.activeWorld === 'beruf' ? 'pro' : 'priv';
         const db = this.db;
         if (db) {
-          if (!db.quickItems) db.quickItems = [];
+          if (!db.aufgaben) db.aufgaben = [];
           offen.forEach(c => {
-            db.quickItems.push({
+            db.aufgaben.push({
               id: 'q_'+Date.now()+'_'+Math.random(),
               text: c.text, date: '', done: false,
             });

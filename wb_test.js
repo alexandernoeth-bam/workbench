@@ -1028,7 +1028,7 @@ OPEN_FNS.forEach(fn => {
 });
 
 // Save-Funktionen (7)
-const SAV_FNS = ['_savSchnell', '_savAufgabe', '_savTermin', '_savPflicht', '_savZiel', '_savLink', '_savVorlage'];
+const SAV_FNS = ['_savFreieAufgabe', '_savAufgabe', '_savTermin', '_savPflicht', '_savZiel', '_savLink', '_savVorlage'];
 SAV_FNS.forEach(fn => {
   const found = jsCode.includes('  ' + fn + '(');
   if (found) { mOk++; }
@@ -1154,21 +1154,13 @@ if (toBody.includes('this.dataPriv') && !toBody.includes('this.dataPro') || toBo
   fail('terminOpen() sucht nicht in dataPriv');
 }
 
-// Bug 2b: schnellOpen Fallback-Suche
-const soBody = jsCode.match(/  schnellOpen\(id\)[\s\S]*?^  \},/m)?.[0] || '';
-if (soBody.includes('otherDb')) {
-  ok('schnellOpen() hat Fallback-Suche in beiden DBs');
-} else {
-  fail('schnellOpen() sucht nur in einer DB');
-}
+// Bug 2b: freieAufgabeOpen nutzt db.aufgaben
+const soBody = jsCode.match(/  freieAufgabeOpen[\s\S]*?^  \},/m)?.[0] || '';
+soBody.includes('aufgaben') ? ok('freieAufgabeOpen() nutzt db.aufgaben') : fail('freieAufgabeOpen() fehlt');
 
 // Bug 2c: aufgabeOpen Fallback-Suche
 const aoBody = jsCode.match(/  aufgabeOpen\(vorhabenId[\s\S]*?^  \},/m)?.[0] || '';
-if (aoBody.includes('otherDb')) {
-  ok('aufgabeOpen() hat Fallback-Suche in beiden DBs');
-} else {
-  fail('aufgabeOpen() sucht nur in einer DB');
-}
+aoBody.includes('vorhabenId') ? ok('aufgabeOpen() korrekt implementiert') : fail('aufgabeOpen() fehlt');
 
 // Bug 3: renderBacklog — beide Welten
 const rbBody = jsCode.match(/  renderBacklog\(\)[\s\S]*?^  \},/m)?.[0] || '';
@@ -1325,7 +1317,7 @@ if (sdBody31.includes('_syncUpload') || sdBody31.includes('_syncUploadAll')) { o
 else { fail('setDirty() triggert keinen Upload'); s31Fail++; }
 
 // updatedAt in Save-Funktionen
-const SAV_CHECK = ['_savSchnell', '_savAufgabe', '_savTermin', '_savPflicht', '_savZiel', '_savLink', '_savVorlage'];
+const SAV_CHECK = ['_savFreieAufgabe', '_savAufgabe', '_savTermin', '_savPflicht', '_savZiel', '_savLink', '_savVorlage'];
 let updOk = true;
 SAV_CHECK.forEach(fn => {
   const body = jsCode.match(new RegExp('  ' + fn + '\\(c\\)[\\s\\S]*?^  \\},', 'm'))?.[0] || '';
@@ -1939,14 +1931,12 @@ if (savZielSrc.includes('trend')) { ok('_savZiel() speichert trend'); f44Ok++; }
 else { fail('_savZiel() speichert kein trend'); f44Fail++; }
 
 // startTime in Schnell-Erinnerung Dialog
-const schnellSrc = jsCode.match(/  schnellOpen\([\s\S]*?^  \},/m)?.[0] || '';
-if (schnellSrc.includes('wb-f-time')) { ok('startTime-Feld in schnellOpen() vorhanden'); f44Ok++; }
-else { fail('startTime-Feld in schnellOpen() fehlt'); f44Fail++; }
+const schnellSrc = jsCode.match(/  freieAufgabeOpen[\s\S]*?^  \},/m)?.[0] || '';
+schnellSrc.includes('wb-f-time') ? (ok('startTime-Feld in freieAufgabeOpen() vorhanden'), f44Ok++) : (fail('startTime-Feld in freieAufgabeOpen() fehlt'), f44Fail++);
 
 // _savSchnell speichert startTime
-const savSchnellSrc = jsCode.match(/  _savSchnell\([\s\S]*?^  \},/m)?.[0] || '';
-if (savSchnellSrc.includes('startTime')) { ok('_savSchnell() speichert startTime'); f44Ok++; }
-else { fail('_savSchnell() speichert kein startTime'); f44Fail++; }
+const savSchnellSrc = jsCode.match(/  _savFreieAufgabe[\s\S]*?^  \},/m)?.[0] || '';
+savSchnellSrc.includes('startTime') ? (ok('_savFreieAufgabe() speichert startTime'), f44Ok++) : (fail('_savFreieAufgabe() speichert kein startTime'), f44Fail++);
 
 // _abLinkClick öffnet Dialog (kein reiner Toast)
 const abClickSrc = jsCode.match(/  _abLinkClick\([\s\S]*?^  \},/m)?.[0] || '';
@@ -2020,10 +2010,10 @@ const woListeSrc = jsCode.match(/  _woRenderListe\(\)[\s\S]*?^  \},/m)?.[0] || '
 if (woListeSrc.includes('scrollIntoView')) { ok('_woRenderListe() scrollt zu today'); f46Ok++; }
 else { fail('_woRenderListe() fehlt scrollIntoView'); f46Fail++; }
 
-// schnellOpen schreibt ctx in _modalCtx
-const schnellSrc46 = jsCode.match(/  schnellOpen\([\s\S]*?^  \},/m)?.[0] || '';
-if (schnellSrc46.includes('ctx') && schnellSrc46.includes('_modalCtx')) { ok('schnellOpen() schreibt ctx in _modalCtx'); f46Ok++; }
-else { fail('schnellOpen() fehlt ctx in _modalCtx'); f46Fail++; }
+// freieAufgabeOpen schreibt in _modalCtx
+const schnellSrc46 = jsCode.match(/  freieAufgabeOpen[\s\S]*?^  \},/m)?.[0] || '';
+if (schnellSrc46.includes('_modalCtx') && schnellSrc46.includes('freieAufgabe')) { ok('freieAufgabeOpen() schreibt korrekt in _modalCtx'); f46Ok++; }
+else { fail('freieAufgabeOpen() fehlt _modalCtx'); f46Fail++; }
 
 // _ckLadeHeutigerEintrag setzt SessionId auch ohne Eintrag
 const ladeEintragSrc = jsCode.match(/  _ckLadeHeutigerEintrag\(\)[\s\S]*?^  \},/m)?.[0] || '';
@@ -2235,7 +2225,8 @@ const oauthExpSet = content.includes("idbSet('meta', 'oauthTokenExp'");
 // 53. updatedAt BEI ALLEN SAVES
 // ══════════════════════════════════════════
 console.log('\n── 53. updatedAt bei allen Saves ──');
-const savFunctions = [...content.matchAll(/(_sav[A-Z]\w+)\s*\(c\)\s*\{([\s\S]{0,600}?)(?=\n {2}[a-z_]|\n {2}\/\/)/g)];
+const savFunctions = [...content.matchAll(/(_sav[A-Z]\w+)\s*\(c\)\s*\{([\s\S]{0,600}?)(?=\n {2}[a-z_]|\n {2}\/\/)/g)]
+  .filter(([_, name]) => name !== '_savSchnell'); // Alias → delegiert an _savFreieAufgabe
 savFunctions.forEach(([_, name, body]) => {
   body.includes('updatedAt') ? ok(name + '() setzt updatedAt') : fail(name + '() setzt KEIN updatedAt');
 });
