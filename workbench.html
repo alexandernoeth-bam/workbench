@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.70</title>
+  <title>WorkBench 2.9.71</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2376,7 +2376,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.70</div>
+  <div id="wb-startup-tagline">v2.9.71</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -3009,8 +3009,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.70',
-  APP_BUILD:   '20260622-0800',
+  APP_VERSION: '2.9.71',
+  APP_BUILD:   '20260622-0900',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -8322,7 +8322,9 @@ _ftStart() {
       this._syncLastDownload = Date.now();
       await this.idbSave();
       this._oauthHideBanner(); this._sUpdateSyncStatus();
-      // UI aktualisieren — auch wenn tabSwitch noch nicht erfolgt ist
+      const syncTime = new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+      console.log('[syncDownload] erfolgreich um ' + syncTime);
+      // UI aktualisieren
       if (this.activeTab) {
         this.renderSection(this.activeTab);
       } else {
@@ -8532,28 +8534,31 @@ _ftStart() {
     if (!this.db) this.db = this._emptyDb();
 
     // ── Startup-Sync: Drive ist beim Start autoritativ ──
-    // Reihenfolge: 1) Download (Drive-Stand laden), 2) nur wenn lokal neuer → Upload
     if (this._oauthTokenValid()) {
       try {
-        // Immer erst herunterladen — lokale IDB kann auf anderem Gerät veraltet sein
         console.log('[init] Startup-Download von Drive...');
         await this._syncDownload();
-        // Nach Download: falls noch dirty (z.B. Offline-Änderungen die neuer sind als Drive) → hochladen
         if ((this.isDirty || this._pendingChanges) && this.db) {
-          console.log('[init] Lokale Änderungen vorhanden nach Download → Upload');
+          console.log('[init] Lokale Änderungen → Upload');
           await this._syncUpload();
         }
+        this._syncInitDone = true;
+        this._toast('\u2705 Einsatzbereit \u2014 Stand aktuell');
       } catch(e) {
         console.warn('[init sync]', e.message);
-        // Netzwerkfehler → lokale IDB nutzen, upload wenn dirty
-        if ((this.isDirty || this._pendingChanges) && this.db) {
-          try { await this._syncUpload(); } catch(e2) { console.warn('[init upload fallback]', e2.message); }
-        }
+        this._syncInitDone = true;
+        this._toast('\u26a0 Offline \u2014 lokaler Stand');
+      }
+    } else {
+      // Kein Token → nur lokaler Stand
+      this._syncInitDone = true;
+      if (this._oauthClientId) {
+        this._oauthShowBanner('\u26a0 Nicht mit Google verbunden \u2014 bitte in Einstellungen anmelden');
+        this._toast('\u26a0 Nicht synchronisiert');
+      } else {
+        this._toast('\u2705 Einsatzbereit');
       }
     }
-    // Ab jetzt sind visibilitychange/focus Uploads erlaubt
-    this._syncInitDone = true;
-    this._toast('\u2705 Einsatzbereit');
 
     this._sBereinigen();
     this._syncStart();
@@ -8875,14 +8880,21 @@ _ftStart() {
   },
 
   _sApplyTabVisibility() {
-    const device = this._settings.device || 'mac';
-    const visible = this._settings.tabsVisible?.[device] || [];
-    // Mobile Tabs (wb-tab)
+    // Gerät automatisch erkennen — nicht aus Settings (könnten falsch sein)
+    const ua = navigator.userAgent;
+    const isPixel  = this._settings.device === 'pixel' || /Android/i.test(ua);
+    const isIPad   = this._settings.device === 'ipad'  || /iPad/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+    const configKey = isPixel ? 'pixel' : 'mac';
+    const defaultVisible = isPixel
+      ? ['cockpit','notizen','backlog','aufgaben','vorhaben','woche']
+      : ['cockpit','notizen','backlog','aufgaben','vorhaben','ablage','woche','ziele'];
+    const visible = this._settings.tabsVisible?.[configKey] || defaultVisible;
+    // Mobile Tabs (wb-tab) — nur Pixel
     document.querySelectorAll('.wb-tab[data-tab]').forEach(el => {
       const tab = el.dataset.tab;
       el.style.display = (visible.includes(tab) || tab === 'einstellungen') ? '' : 'none';
     });
-    // Desktop Stabs (wb-stab)
+    // Desktop Stabs (wb-stab) — PC und iPad
     document.querySelectorAll('.wb-stab[data-tab]').forEach(el => {
       const tab = el.dataset.tab;
       el.style.display = (visible.includes(tab) || tab === 'einstellungen') ? '' : 'none';
