@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.90</title>
+  <title>WorkBench 2.9.92</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2388,7 +2388,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.90</div>
+  <div id="wb-startup-tagline">v2.9.92</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2991,8 +2991,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.90',
-  APP_BUILD:   '20260623-0030',
+  APP_VERSION: '2.9.92',
+  APP_BUILD:   '20260623-0130',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -4148,21 +4148,21 @@ _ftStart() {
     const timed = [];
 
     // Termine
-    (this.db?.customEvents||[]).filter(e => !e.deleted && e.date === today && e.startTime).forEach(e => {
+    (this.db?.customEvents||[]).filter(e => !e.deleted && e.date === today && e.startTime && this._itemVisible(e)).forEach(e => {
       const [eh,em] = e.startTime.split(':').map(Number);
       timed.push({ id:e.id, text:e.text, startTime:e.startTime, startMin:eh*60+em,
         art:'termin', ctx:e.welt==='pro'?'pro':'priv', storniert:!!e.storniert, done:!!e.done });
     });
 
     // Aufgaben mit Uhrzeit
-    (this.db?.aufgaben||[]).filter(q => !q.deleted && !q.done && (q.datum||q.date)===today && q.startTime && !q.vorhabenId).forEach(q => {
+    (this.db?.aufgaben||[]).filter(q => !q.deleted && !q.done && (q.datum||q.date)===today && q.startTime && !q.vorhabenId && this._itemVisible(q)).forEach(q => {
       const [qh,qm] = q.startTime.split(':').map(Number);
       timed.push({ id:q.id, text:q.text, startTime:q.startTime, startMin:qh*60+qm,
         art:'aufgabe', ctx:q.welt||'priv', storniert:false, done:false });
     });
 
     // Pflichten mit Uhrzeit
-    (this.db?.wochenpflichten||[]).filter(p => !p.deleted && p.startTime && (p.taeglich||(p.wochentage||[]).includes(dow))).forEach(p => {
+    (this.db?.wochenpflichten||[]).filter(p => !p.deleted && p.startTime && (p.taeglich||(p.wochentage||[]).includes(dow)) && this._itemVisible(p)).forEach(p => {
       if (db.pflichtStatus?.[today]?.[p.id]) return;
       const [ph,pm] = p.startTime.split(':').map(Number);
       timed.push({ id:p.id, text:p.titel, startTime:p.startTime, startMin:ph*60+pm,
@@ -4207,7 +4207,7 @@ _ftStart() {
 
     // ── 2. VORHABEN · Fällig heute ──────────────────────────
     const vhHeute = {};
-    (this.db?.vorhaben||[]).filter(v => !v.deleted).forEach(v => {
+    (this.db?.vorhaben||[]).filter(v => !v.deleted && this._itemVisible(v)).forEach(v => {
       (v.aufgaben||[]).filter(a => !a.deleted && !a.done && a.datum===today).forEach(a => {
         if (!vhHeute[v.id]) vhHeute[v.id] = { titel:v.titel, aufgaben:[] };
         vhHeute[v.id].aufgaben.push({ ...a, _vhId:v.id });
@@ -4250,10 +4250,10 @@ _ftStart() {
     const ohneZeit = [];
 
     // Aufgaben ohne Datum und Vorhaben-Aufgaben ohne Zeit
-    (this.db?.aufgaben||[]).filter(q => !q.deleted && !q.done && (q.datum||q.date)===today && !q.startTime && !q.vorhabenId).forEach(q => {
+    (this.db?.aufgaben||[]).filter(q => !q.deleted && !q.done && (q.datum||q.date)===today && !q.startTime && !q.vorhabenId && this._itemVisible(q)).forEach(q => {
       ohneZeit.push({ id:q.id, text:q.text, art:'aufgabe', ctx:q.welt||'priv', done:false });
     });
-    (this.db?.wochenpflichten||[]).filter(p => !p.deleted && !p.startTime && (p.taeglich||(p.wochentage||[]).includes(dow))).forEach(p => {
+    (this.db?.wochenpflichten||[]).filter(p => !p.deleted && !p.startTime && (p.taeglich||(p.wochentage||[]).includes(dow)) && this._itemVisible(p)).forEach(p => {
       const done = !!(db.pflichtStatus?.[today]?.[p.id]);
       ohneZeit.push({ id:p.id, text:p.titel, art:'pflicht', ctx:p.welt||'priv', done });
     });
@@ -4895,6 +4895,7 @@ _ftStart() {
 
     // Welt-Filter
     const weltFilter = v => {
+      if (!this._itemVisible(v)) return false;
       const w = this.activeWorld;
       if (w === 'beide') return true;
       if (w === 'beruf') return v.welt === 'pro' || v.welt === 'beruf';
@@ -6274,12 +6275,7 @@ _ftStart() {
     // (Schutz gegen Race Conditions beim Sync)
     const db    = this.db;
     const today = this._dStr(new Date());
-    const welt  = this.activeWorld;
-    const weltFilter = (item) => {
-      if (welt === 'beide') return true;
-      if (welt === 'beruf') return item.welt === 'pro' || item.welt === 'beruf';
-      return item.welt === 'priv' || item.welt === 'privat';
-    };
+    const weltFilter = (item) => this._itemVisible(item);
     const charOrd = { verpflichtend: 0, bedeutsam: 1, bereichernd: 2 };
 
     // BLOCK 1: Aufgaben aus Vorhaben
@@ -9448,6 +9444,19 @@ _ftStart() {
       + vorhaben.map(v => '<option value="' + this._esc(v.id) + '"'
         + (item?.vorhabenId === v.id ? ' selected' : '') + '>' + this._esc(v.titel) + '</option>').join('');
 
+    const cl = item?.checklist || [];
+    const clHtml = cl.map((c,i) =>
+      '<div class="wb-micro-row">'
+      + '<div class="wb-micro-drag">\u2261</div>'
+      + '<div class="wb-micro-check' + (c.done ? ' done' : '') + '" onclick="WB._modalMicroToggle(this,' + i + ')" style="cursor:pointer;'
+      + (c.done ? 'background:var(--accent);border-color:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;' : '') + '">'
+      + (c.done ? '\u2713' : '') + '</div>'
+      + '<input type="text" class="wb-micro-input' + (c.done ? ' done' : '') + '" data-cl-idx="' + i + '" value="' + this._esc(c.text||'') + '" placeholder="Schritt..."'
+      + (c.done ? ' style="text-decoration:line-through;color:var(--faint);"' : '') + '>'
+      + '<div class="wb-micro-del" onclick="this.parentElement.remove()">\u2715</div>'
+      + '</div>'
+    ).join('');
+
     const body = weltHtml
       + '<div class="wb-input-group">'
       + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
@@ -9461,10 +9470,15 @@ _ftStart() {
       + '<input id="wb-f-time" class="wb-input" type="time" value="' + this._esc(item?.startTime||'') + '">'
       + '</div></div>'
       + '<div class="wb-input-group"><label class="wb-label">Vorhaben (optional)</label>'
-      + '<select id="wb-f-vh" class="wb-select">' + vhOpts + '</select></div>';
+      + '<select id="wb-f-vh" class="wb-select">' + vhOpts + '</select></div>'
+      + '<div class="wb-input-group"><label class="wb-label" style="color:var(--accent)">N\u00e4chste Schritte (optional)</label>'
+      + '<div class="wb-micro-list" id="wb-micro-list">' + clHtml
+      + '<div class="wb-add-micro" onclick="WB._modalAddMicro()">+ Schritt hinzuf\u00fcgen</div>'
+      + '</div></div>';
 
     this._modalCtx = { type:'freieAufgabe', id };
     this.modalOpen(id ? 'Aufgabe bearbeiten' : 'Neue Aufgabe', body, this._modalFooter(!!id, false));
+    setTimeout(() => this._initMicroDrag(document.getElementById('wb-micro-list')), 50);
   },
 
   _faSetWelt(btn, welt) {
@@ -9514,7 +9528,27 @@ _ftStart() {
     }
   },
 
-  /* ── Freie Aufgaben (ohne Vorhaben) ── */
+  // ── Zentrale Filter-Methoden ─────────────────────────
+  // Gibt false wenn Item im aktuellen Modus nicht sichtbar sein soll
+  _itemVisible(item) {
+    const buero = !!this._settings?.bueroModus;
+    const welt  = this.activeWorld; // 'beide' | 'beruf' | 'privat'
+    const iw    = item?.welt || null; // 'pro'|'beruf'|'priv'|'privat'|null
+    const isPriv = iw === 'priv' || iw === 'privat';
+    const isBeruf = iw === 'pro' || iw === 'beruf';
+
+    // Büro-Modus: privates ausblenden + vertrauliches ausblenden
+    if (buero) {
+      if (isPriv) return false;
+      if (item?.vertraulich) return false;
+      // welt=null (Beides) bleibt sichtbar im Büro-Modus
+    }
+
+    // Welt-Filter
+    if (welt === 'beruf')  return isBeruf || (!isPriv && !isBeruf); // beruf + beide
+    if (welt === 'privat') return isPriv  || (!isPriv && !isBeruf); // privat + beide
+    return true; // 'beide'
+  },
 
   _getFreieAufgaben() {
     return (this.db?.aufgaben || []).filter(a => !a.vorhabenId);
@@ -9990,13 +10024,19 @@ _ftStart() {
     // Welt aus aktiven Pill-Buttons lesen
     const weltBtn   = document.querySelector('[data-active="1"][data-welt]');
     const welt      = weltBtn ? (weltBtn.dataset.welt === 'beide' ? null : weltBtn.dataset.welt) : null;
+    const inputs = document.querySelectorAll('#wb-micro-list .wb-micro-input');
+    const checklist = Array.from(inputs).map(inp => {
+      const text = inp.value.trim(); if (!text) return null;
+      const chk = inp.previousElementSibling;
+      return { text, done: chk?.classList?.contains('done') || chk?.dataset?.done === '1' || false };
+    }).filter(Boolean);
     const db = this.db; if (!db) return;
     if (!db.aufgaben) db.aufgaben = [];
     if (c.id) {
       const a = db.aufgaben.find(x => x.id === c.id);
-      if (a) { a.text=text; a.datum=datum; a.startTime=startTime; a.welt=welt; a.vorhabenId=vhId||null; a.updatedAt=this._now(); }
+      if (a) { a.text=text; a.datum=datum; a.startTime=startTime; a.welt=welt; a.vorhabenId=vhId||null; a.checklist=checklist; a.updatedAt=this._now(); }
     } else {
-      db.aufgaben.push({ id:'fa_'+Date.now(), text, datum, startTime, welt, vorhabenId:vhId||null, done:false, deleted:false, updatedAt:this._now() });
+      db.aufgaben.push({ id:'fa_'+Date.now(), text, datum, startTime, welt, vorhabenId:vhId||null, checklist, done:false, deleted:false, updatedAt:this._now() });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('\u2713 Aufgabe gespeichert');
