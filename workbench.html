@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.3</title>
+  <title>WorkBench 3.0.5</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -722,7 +722,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.3</div>
+  <div id="wb-startup-tagline">v3.0.5</div>
 </div>
 
 <!-- Modal -->
@@ -788,7 +788,7 @@
 
     <div class="s-card">
       <div class="s-card-head">Version</div>
-      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.3</div></div>
+      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.5</div></div>
     </div>
 
     <div class="s-card">
@@ -886,7 +886,7 @@
 
   <div id="wb-welt-header">
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.3</span>
+    <span id="wb-menu-version">v3.0.5</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1040,8 +1040,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.3',
-  APP_BUILD:   '20260623-2300',
+  APP_VERSION: '3.0.5',
+  APP_BUILD:   '20260623-2345',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3383,6 +3383,133 @@ const WB = {
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
   },
 
+  async _migrateFromOldDb() {
+    // Nur einmal ausfuehren (Guard)
+    if (await this.idbGet('meta','slimMigrationDone') === 'true') return;
+    console.log('[slimMigrate] Suche alte WorkBench-IDB...');
+    try {
+      const oldDb = await new Promise((resolve, reject) => {
+        const req = indexedDB.open('workbench-v2', 3);
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror   = e => reject(e.target.error);
+        req.onblocked = () => reject(new Error('blocked'));
+      });
+      const oldData = await new Promise((resolve, reject) => {
+        const tx  = oldDb.transaction('data', 'readonly');
+        const req = tx.objectStore('data').get('db');
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror   = e => reject(e.target.error);
+      });
+      oldDb.close();
+      if (!oldData) {
+        await this.idbSet('meta','slimMigrationDone','true');
+        console.log('[slimMigrate] Keine alten Daten gefunden.');
+        return;
+      }
+
+      console.log('[slimMigrate] Alte Daten gefunden, starte Migration...');
+      let migrated = 0;
+
+      // 1) customEvents übernehmen
+      const oldEvents = oldData.customEvents || [];
+      const existIds  = new Set((this.db.customEvents||[]).map(e => e.id));
+      oldEvents.forEach(e => {
+        if (!e.id || existIds.has(e.id)) return;
+        this.db.customEvents.push({ ...e });
+        migrated++;
+      });
+
+      // 2) Notizen übernehmen
+      if (!this.db.notizen) this.db.notizen = [];
+      const existNzIds = new Set(this.db.notizen.map(n => n.id));
+      const oldNotizen = oldData.notizen || [];
+      oldNotizen.forEach(n => {
+        if (!n.id || existNzIds.has(n.id)) return;
+        // zustand-Feld übernehmen (aktuell/parkplatz/kompass/archiv)
+        this.db.notizen.push({ ...n });
+        migrated++;
+      });
+
+      // 3) Vorhaben → Notizen (je eine Checklisten-Notiz)
+      const oldVorhaben = oldData.vorhaben || [];
+      oldVorhaben.forEach(v => {
+        if (v.deleted) return;
+        const nzId = 'nz_vh_' + v.id;
+        if (existNzIds.has(nzId)) return;
+        const aufgaben = (oldData.aufgaben || []).filter(a => a.vorhabenId === v.id && !a.deleted);
+        const items = aufgaben.map(a => ({
+          id:   'i_' + a.id,
+          text: a.text || a.titel || '(Aufgabe)',
+          done: !!a.done,
+          deleted: false,
+        }));
+        this.db.notizen.push({
+          id:        nzId,
+          titel:     v.titel || 'Vorhaben',
+          typ:       'check',
+          farbe:     'c-weiss',
+          icon:      'list',
+          items,
+          gepinnt:   false,
+          welt:      v.welt === 'pro' ? 'beruf' : v.welt === 'priv' ? 'privat' : 'beide',
+          zustand:   'aktuell',
+          inhalt:    v.beschreibung || '',
+          updatedAt: this._now(),
+          _migratedFromVorhaben: v.id,
+        });
+        migrated++;
+      });
+
+      // 4) Wochenpflichten → 2 Notizen (beruf + privat)
+      const oldPflichten = oldData.wochenpflichten || [];
+      const berufPfl  = oldPflichten.filter(p => !p.deleted && p.welt === 'pro');
+      const privatPfl = oldPflichten.filter(p => !p.deleted && p.welt !== 'pro');
+
+      const addPflichtNotiz = (pflichten, welt, titel, nzId) => {
+        if (!pflichten.length) return;
+        if (existNzIds.has(nzId)) return;
+        const items = pflichten.map(p => ({
+          id:   'i_' + p.id,
+          text: p.text || p.titel || '(Pflicht)',
+          done: false,
+          deleted: false,
+        }));
+        this.db.notizen.push({
+          id:        nzId,
+          titel,
+          typ:       'check',
+          farbe:     'c-weiss',
+          icon:      'list',
+          items,
+          gepinnt:   false,
+          welt,
+          zustand:   'aktuell',
+          inhalt:    '',
+          updatedAt: this._now(),
+          _migratedFromPflichten: true,
+        });
+        migrated++;
+      };
+      addPflichtNotiz(berufPfl,  'beruf',  'Berufliche Wochenpflichten',  'nz_pfl_pro');
+      addPflichtNotiz(privatPfl, 'privat', 'Private Wochenpflichten',     'nz_pfl_priv');
+
+      // 5) wochenMottos übernehmen
+      if (oldData.wochenMottos) {
+        this.db.wochenMottos = { ...oldData.wochenMottos, ...(this.db.wochenMottos||{}) };
+      }
+
+      await this.idbSet('meta','slimMigrationDone','true');
+      await this.idbSave();
+      this.setDirty();
+      console.log('[slimMigrate] Migration abgeschlossen, ' + migrated + ' Objekte migriert.');
+      if (migrated > 0) this._toast('\u2705 ' + migrated + ' Eintr\u00e4ge aus alter WorkBench migriert');
+    } catch (err) {
+      console.warn('[slimMigrate] Fehler oder keine alte DB:', err.message || err);
+      // Fehler = keine alte DB → Guard setzen damit nicht jedes Mal versucht wird
+      try { await this.idbSet('meta','slimMigrationDone','true'); } catch(_) {}
+    }
+  },
+
   // ── IDB ──
   async idbOpen() {
     return new Promise((resolve, reject) => {
@@ -3416,80 +3543,103 @@ const WB = {
     });
   },
 
-  async idbLoadAll() {
+  async idbLoad() {
     try {
-      const pro  = await this.idbGet('data', 'dataPro');
-      const priv = await this.idbGet('data', 'dataPriv');
-      if (pro)  this.dataPro  = pro;
-      if (priv) this.dataPriv = priv;
-      const clientId = await this.idbGet('meta', 'oauthClientId');
-      if (clientId) this._oauthClientId = clientId;
-      const token    = await this.idbGet('meta', 'oauthToken');
-      const tokenExp = await this.idbGet('meta', 'oauthTokenExp');
-      if (token && tokenExp) { this._oauthToken = token; this._oauthTokenExp = tokenExp; }
-      const driveIdPro  = await this.idbGet('meta', 'driveFileId_pro');
-      const driveIdPriv = await this.idbGet('meta', 'driveFileId_priv');
-      if (driveIdPro)  this._oauthDriveFileIds.pro  = driveIdPro;
-      if (driveIdPriv) this._oauthDriveFileIds.priv = driveIdPriv;
+      const clientId=await this.idbGet('meta','oauthClientId'); if(clientId) this._oauthClientId=clientId;
+      const token=await this.idbGet('meta','oauthToken');
+      const tokenExp=await this.idbGet('meta','oauthTokenExp');
+      if(token&&tokenExp){this._oauthToken=token;this._oauthTokenExp=parseInt(tokenExp)||0;}
+      const lastUp=await this.idbGet('meta','lastUpload');
+      const lastDn=await this.idbGet('meta','lastDownload');
+      const pend=await this.idbGet('meta','pendingChanges');
+      const fid=await this.idbGet('meta','driveFileId');
+      if(lastUp) this._syncLastUpload=parseInt(lastUp)||0;
+      if(lastDn) this._syncLastDownload=parseInt(lastDn)||0;
+      if(pend)   this._pendingChanges=pend==='true';
+      if(fid)    this._driveFileId=fid;
+      const dbRaw=await this.idbGet('data','db');
+      if(dbRaw&&dbRaw._version) {
+        this.db=dbRaw;
+        this._ensureDbFields();
+      } else {
+        this.db=this._emptyDb();
+      }
+    } catch(e) {
+      console.warn('[idbLoad]',e.message);
+      if(!this.db) this.db=this._emptyDb();
+    }
+  },
 
-      // lastUpload/lastDownload laden
-      const lastUp = await this.idbGet('meta', 'lastUpload');
-      const lastDn = await this.idbGet('meta', 'lastDownload');
-      if (lastUp) this._syncLastUpload   = parseInt(lastUp)  || 0;
-      if (lastDn) this._syncLastDownload = parseInt(lastDn)  || 0;
+  async idbSave() {
+    try {
+      if(this.db) await this.idbSet('data','db',this.db);
+      await this.idbSet('meta','lastUpload',String(this._syncLastUpload));
+      await this.idbSet('meta','lastDownload',String(this._syncLastDownload));
+      await this.idbSet('meta','pendingChanges',this._pendingChanges?'true':'false');
+      if(this._driveFileId) await this.idbSet('meta','driveFileId',this._driveFileId);
+    } catch(e){console.warn('[idbSave]',e.message);}
+  },
 
-      // updatedAt Migration: Items ohne updatedAt bekommen Fallback-Timestamp
-      const OLD_TS = '2020-01-01T00:00:00.000Z';
-      const migrateUpdatedAt = (arr) => { (arr||[]).forEach(item => { if (!item.updatedAt) item.updatedAt = OLD_TS; }); };
-
-      const db = this.db;
-      if (!db) return;
-      migrateUpdatedAt(db.quickItems); migrateUpdatedAt(db.customEvents);
-      migrateUpdatedAt(db.wochenpflichten); migrateUpdatedAt(db.ziele);
-      migrateUpdatedAt(db.checklistVorlagen); migrateUpdatedAt(db.tagesprotokoll);
-      (db.vorhaben||[]).forEach(v => { if (!v.updatedAt) v.updatedAt = OLD_TS; migrateUpdatedAt(v.aufgaben); migrateUpdatedAt(v.links); });
-    
-
-      // pflichtStatus Format-Migration (einmalig)
-
-      if (!this.db?.pflichtStatus) return;
-      const ps = this.db.pflichtStatus;
-      const firstKey = Object.keys(ps)[0] || '';
-      if (!firstKey.match(/\d{4}-\d{2}-\d{2}$/)) return;
-      const newPs = {};
-      Object.entries(ps).forEach(([key, val]) => {
-        const parts = key.split('_');
-        if (parts.length < 3) return;
-        const datum  = parts[parts.length - 1];
-        const dutyId = parts.slice(0, -1).join('_');
-        if (!newPs[datum]) newPs[datum] = {};
-        newPs[datum][dutyId] = (val === 'erledigt' || val === true);
-      });
-      this.db.pflichtStatus = newPs;
-    
-
-      // Vorhaben status-Feld + charakter-Feld + zielId Migration
-
-      (this.db?.vorhaben||[]).forEach(v => {
-        if (!v.status) v.status = v.aktiv !== false ? 'offen' : 'abgeschlossen';
-        if (v.status === 'aktiv') v.status = 'offen'; // Legacy-Status normalisieren
-        if (!v.charakter) v.charakter = 'bereichernd';
-        if (v.zielId === undefined) v.zielId = null;
-        if (v.favorit === undefined) v.favorit = false;
-        if (v.vertraulich === undefined) v.vertraulich = false;
-      });
-      // Neue DB-Felder sicherstellen
+  async _migrate_v2() {
+    const hasPro  = !!(this.dataPro?.vorhaben || this.dataPro?.quickItems || this.dataPro?.customEvents);
+    const hasPriv = !!(this.dataPriv?.vorhaben || this.dataPriv?.quickItems || this.dataPriv?.customEvents);
+    if (!hasPro && !hasPriv) {
+      if (!this.db) this.db = this._emptyDb();
+      if (!this.db._version) this.db._version = 1;
       if (!this.db.mantras) this.db.mantras = [];
       if (!this.db.sondertage) this.db.sondertage = [];
       if (!this.db.aufgaben) this.db.aufgaben = [];
-      if (!this.db.wissensnetzwerk) this.db.wissensnetzwerk = [];
-      this._migrateQuickItems();
-    
-    } catch(e) {
-      console.error('[IDB] load error:', e);
+      // KEINE automatische Migration — nur über Debug-Button
+      return;
     }
-    // Nach Format-Migration speichern (außerhalb try um Fehler zu vermeiden)
-    try { await this.idbSave(); } catch(e) {}
+    // Bereits migriert?
+    if (this.db?._version && this.db?._migratedAt) {
+      if (!this.db.aufgaben) this.db.aufgaben = [];
+      // KEINE automatische Migration — nur über Debug-Button
+      return;
+    }
+    console.log('[migrate_v2] Starte Migration...');
+    const pro  = this.dataPro  || {};
+    const priv = this.dataPriv || {};
+    const mergeById = (arrA, arrB, weltA, weltB) => {
+      const map = new Map();
+      (arrA||[]).forEach(x => map.set(x.id, { ...x, welt: x.welt||weltA }));
+      (arrB||[]).forEach(x => { if (!map.has(x.id)) map.set(x.id, { ...x, welt: x.welt||weltB }); });
+      return Array.from(map.values());
+    };
+    const psAll = { ...(priv.pflichtStatus||{}) };
+    Object.entries(pro.pflichtStatus||{}).forEach(([date, duties]) => {
+      if (!psAll[date]) psAll[date] = {};
+      Object.assign(psAll[date], duties);
+    });
+    this.db = {
+      quickItems:        priv.quickItems        || [],
+      customEvents:      priv.customEvents      || [],
+      wochenpflichten:   mergeById(priv.wochenpflichten, pro.wochenpflichten, 'priv', 'pro'),
+      pflichtStatus:     psAll,
+      tagesprotokoll:    priv.tagesprotokoll    || [],
+      wochenMottos:      { ...(priv.wochenMottos||{}), ...(pro.wochenMottos||{}) },
+      checklistVorlagen: [...(priv.checklistVorlagen||[]), ...(pro.checklistVorlagen||[])],
+      vorhaben:          mergeById(priv.vorhaben, pro.vorhaben, 'priv', 'pro'),
+      ziele:             mergeById(priv.ziele,    pro.ziele,    'priv', 'pro'),
+      links:             [...(priv.links||[]), ...(pro.links||[])],
+      _version:          1,
+      _migratedAt:       new Date().toISOString(),
+    };
+    this.dataPro = null; this.dataPriv = null;
+    this._migrateQuickItems(); // quickItems aus alter Migration → aufgaben
+    await this.idbSave();
+    this.setDirty();
+    console.log('[migrate_v2] Migration abgeschlossen');
+    this._toast('\u2713 Daten migriert');
+  },
+
+  setDirty() {
+    this.isDirty=true; this._pendingTs=Date.now();
+    this.idbSave().catch(e=>console.warn('[setDirty IDB]',e));
+    if(!this._syncInitDone) return;
+    clearTimeout(this._saveTimer);
+    this._saveTimer=setTimeout(async()=>{await this._syncUpload();},2000);
   },
 
   _emptyDb() {
@@ -3983,14 +4133,6 @@ const WB = {
   _kwEndDate()   { const d=new Date();const day=d.getDay();d.setDate(d.getDate()+(day===0?0:7-day));return this._dStr(d); },
   _getCurrentKW() { return this._kwStr(new Date()).split('-W')[1]; },
 
-  setDirty() {
-    this.isDirty=true; this._pendingTs=Date.now();
-    this.idbSave().catch(e=>console.warn('[setDirty IDB]',e));
-    if(!this._syncInitDone) return;
-    clearTimeout(this._saveTimer);
-    this._saveTimer=setTimeout(async()=>{await this._syncUpload();},2000);
-  },
-
 };
 
 // Start
@@ -4002,20 +4144,15 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
   <div id="wb-crypto-overlay">
-    <div id="wb-crypto-box">
-      <div id="wb-crypto-head">
-        <span style="font-size:22px">&#x1F512;</span>
-        <span id="wb-crypto-head-title">WorkBench entsperren</span>
-      </div>
-      <div id="wb-crypto-body">
-        <div id="wb-crypto-desc">Gib dein Passwort ein um deine Daten zu \u00f6ffnen.</div>
-        <input id="wb-crypto-pw" type="password" placeholder="Passwort..."
-          autocomplete="current-password"
-          onkeydown="if(event.key==='Enter') WB._cryptoUnlock()">
-        <div id="wb-crypto-err">Falsches Passwort &mdash; bitte erneut versuchen.</div>
-        <button id="wb-crypto-btn" onclick="WB._cryptoUnlock()">Entsperren</button>
-      </div>
-      <div id="wb-crypto-foot">Daten werden mit AES-256-GCM verschl&uuml;sselt gespeichert.</div>
+    <div class="wb-crypto-box">
+      <div class="wb-crypto-title">🔒 WorkBench entsperren</div>
+      <div class="wb-crypto-sub">Gib dein Passwort ein um deine Daten zu öffnen.</div>
+      <input id="wb-crypto-pw" type="password" placeholder="Passwort..."
+        autocomplete="current-password"
+        onkeydown="if(event.key==='Enter') WB._cryptoUnlock()">
+      <div id="wb-crypto-err">Falsches Passwort — bitte erneut versuchen.</div>
+      <button id="wb-crypto-btn" onclick="WB._cryptoUnlock()">Entsperren</button>
+      <div style="font-size:12px;color:var(--faint);margin-top:12px;">AES-256-GCM verschlüsselt</div>
     </div>
   </div>
 </body>
