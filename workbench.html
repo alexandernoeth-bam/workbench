@@ -913,7 +913,8 @@
             <span id="ts-pins-count" class="ts-section-count">0</span>
           </div>
         </div>
-        <div id="ts-pins-wrap"></div>
+        <div id="ts-deadline-banner-wrap" style="display:none;padding:8px 12px 0;"></div>
+    <div id="ts-pins-wrap"></div>
 
         <div class="ts-section" style="padding-bottom:0;">
           <div class="ts-section-head">
@@ -1333,7 +1334,40 @@ const WB = {
     return false;
   },
 
+
+  _tsRenderDeadlineBanner() {
+    const wrap = document.getElementById('ts-deadline-banner-wrap');
+    if (!wrap) return;
+    const today = this._dStr(new Date());
+    const todayD = new Date(today);
+    const deadlines = (this.db?.customEvents||[]).filter(e =>
+      e.isDeadline && !e.deleted && !e.done
+    );
+    const banners = [];
+    deadlines.forEach(e => {
+      if (!e.date) return;
+      const dDate = new Date(e.date);
+      const diffMs = dDate - todayD;
+      const diffDays = Math.round(diffMs / 86400000);
+      const remind = e.remindDaysBefore !== undefined ? e.remindDaysBefore : 1;
+      if (remind < 0) return; // Keine Erinnerung
+      if (diffDays < 0) return; // Vergangenheit
+      if (diffDays <= remind) {
+        let label = diffDays === 0 ? 'f\u00e4llig heute'
+          : diffDays === 1 ? 'f\u00e4llig morgen'
+          : 'f\u00e4llig in ' + diffDays + ' Tagen';
+        banners.push('<div class="ts-deadline-banner" onclick="WB.terminOpen(\'' + this._esc(e.id) + '\')" style="cursor:pointer;">'
+          + '<div class="ts-deadline-banner-title">\uD83D\uDEA9 Deadline-Erinnerung</div>'
+          + this._esc(e.text) + ' \u00b7 <span style="font-weight:600;">' + label + '</span>'
+          + '</div>');
+      }
+    });
+    wrap.innerHTML = banners.join('');
+    wrap.style.display = banners.length ? 'block' : 'none';
+  },
+
   _tsRenderZeitband() {
+    this._tsRenderDeadlineBanner();
     const band  = document.getElementById('ts-zeitband');
     const label = document.getElementById('ts-heute-label');
     if (!band) return;
@@ -1352,6 +1386,9 @@ const WB = {
         return true;
       })
       .sort((a,b) => {
+        // Deadlines immer ans Ende
+        if (a.isDeadline && !b.isDeadline) return 1;
+        if (!a.isDeadline && b.isDeadline) return -1;
         const ta = a.startTime || '99:99';
         const tb = b.startTime || '99:99';
         return ta.localeCompare(tb);
@@ -1370,38 +1407,58 @@ const WB = {
     let h = '';
 
     events.forEach((e, idx) => {
-      const [eh, em] = (e.startTime || '').split(':').map(Number);
-      const eMin = eh * 60 + (em || 0);
+      const isDeadline = !!e.isDeadline;
       const welt = e.welt === 'pro' ? 'beruf' : 'privat';
+      const [eh, em] = (e.startTime || '').split(':').map(Number);
+      const eMin = isDeadline ? 99*60 : (eh * 60 + (em || 0));
 
-      // Jetzt-Linie einfügen
-      if (!nowInserted && e.startTime && eMin > nowMin) {
+      // Jetzt-Linie vor dem nächsten zukünftigen Termin
+      if (!nowInserted && !isDeadline && e.startTime && eMin > nowMin) {
         nowInserted = true;
         h += '<div class="ts-now-row"><div class="ts-now-dot"></div><div class="ts-now-line"></div><div class="ts-now-lbl">' + nowStr + '</div></div>';
       }
 
-      const isStorniert = !!e.storniert;
-      const opacity = e.startTime && eMin < nowMin && !isStorniert ? ' style="opacity:0.55;"' : '';
-      h += '<div class="ts-zt-row"' + opacity + ' onclick="WB.terminOpen(\'' + this._esc(e.id) + '\')">';
-      h += '<div class="ts-zt-time">' + (e.startTime || '') + '</div>';
-      h += '<div class="ts-zt-bar ' + welt + '"></div>';
-      h += '<div class="ts-zt-body">';
-      h += '<div class="ts-zt-title' + (isStorniert ? ' ts-storniert' : '') + '">' + this._esc(e.text) + (isStorniert ? '<span class="ts-storniert-badge">Abgesagt</span>' : '') + '</div>';
-      const durMin = this._evtDurationMin(e);
-      const meta = [];
-      meta.push('<span class="ts-welt-dot ' + welt + '"></span>');
-      meta.push(welt === 'beruf' ? 'Beruf' : 'Privat');
-      if (durMin) meta.push(durMin + ' Min');
-      if (e.location) meta.push(this._esc(e.location));
-      h += '<div class="ts-zt-meta">' + meta.join(' \u00b7 ') + '</div>';
-      h += '</div>';
-      if (!isStorniert && !e.done) {
-        h += '<div class="ts-zt-actions">'
-          + '<button class="ts-zt-act-btn" onclick="event.stopPropagation();WB._tfTerminDone(&quot;' + this._esc(e.id) + '&quot;,&quot;termin&quot;)">\u2713</button>'
-          + '<button class="ts-zt-act-btn ts-zt-act-del" onclick="event.stopPropagation();WB._tfTerminAbsagen(&quot;' + this._esc(e.id) + '&quot;,&quot;termin&quot;)">\u2715</button>'
-          + '</div>';
+      if (isDeadline) {
+        // ── Deadline-Zeile ──
+        const isDone = !!e.done;
+        h += '<div class="ts-deadline-row' + (isDone ? ' ts-deadline-done' : '') + '" onclick="WB.terminOpen(\'' + this._esc(e.id) + '\')">';
+        h += '<div class="ts-deadline-icon">\uD83D\uDEA9</div>';
+        h += '<div class="ts-deadline-bar"></div>';
+        h += '<div class="ts-deadline-body">';
+        h += '<div class="ts-deadline-title' + (isDone ? ' ts-storniert' : '') + '">' + this._esc(e.text) + '</div>';
+        h += '<div class="ts-deadline-meta">Deadline · fällig heute</div>';
+        h += '</div>';
+        if (!isDone) {
+          h += '<div class="ts-zt-actions">'
+            + '<button class="ts-zt-act-btn" onclick="event.stopPropagation();WB._tfTerminDone(&quot;' + this._esc(e.id) + '&quot;,&quot;termin&quot;)">\u2713</button>'
+            + '</div>';
+        }
+        h += '</div>';
+      } else {
+        // ── Termin-Zeile ──
+        const isStorniert = !!e.storniert;
+        const opacity = e.startTime && eMin < nowMin && !isStorniert ? ' style="opacity:0.55;"' : '';
+        h += '<div class="ts-zt-row"' + opacity + ' onclick="WB.terminOpen(\'' + this._esc(e.id) + '\')">';
+        h += '<div class="ts-zt-time">' + (e.startTime || '') + '</div>';
+        h += '<div class="ts-zt-bar ' + welt + '"></div>';
+        h += '<div class="ts-zt-body">';
+        h += '<div class="ts-zt-title' + (isStorniert ? ' ts-storniert' : '') + '">' + this._esc(e.text) + (isStorniert ? '<span class="ts-storniert-badge">Abgesagt</span>' : '') + '</div>';
+        const durMin = this._evtDurationMin(e);
+        const meta = [];
+        meta.push('<span class="ts-welt-dot ' + welt + '"></span>');
+        meta.push(welt === 'beruf' ? 'Beruf' : 'Privat');
+        if (durMin) meta.push(durMin + ' Min');
+        if (e.location) meta.push(this._esc(e.location));
+        h += '<div class="ts-zt-meta">' + meta.join(' \u00b7 ') + '</div>';
+        h += '</div>';
+        if (!isStorniert && !e.done) {
+          h += '<div class="ts-zt-actions">'
+            + '<button class="ts-zt-act-btn" onclick="event.stopPropagation();WB._tfTerminDone(&quot;' + this._esc(e.id) + '&quot;,&quot;termin&quot;)">\u2713</button>'
+            + '<button class="ts-zt-act-btn ts-zt-act-del" onclick="event.stopPropagation();WB._tfTerminAbsagen(&quot;' + this._esc(e.id) + '&quot;,&quot;termin&quot;)">\u2715</button>'
+            + '</div>';
+        }
+        h += '</div>';
       }
-      h += '</div>';
     });
 
     if (!nowInserted) {
@@ -3232,6 +3289,18 @@ const WB = {
     this.setDirty(); this._tsRenderZeitband(); this._toast('Termin abgesagt');
   },
 
+  _terminToggleTyp(isDeadline) {
+    const tBtn = document.getElementById('wb-toggle-termin');
+    const dBtn = document.getElementById('wb-toggle-deadline');
+    const tF   = document.getElementById('wb-termin-fields');
+    const dF   = document.getElementById('wb-deadline-fields');
+    if (tBtn) tBtn.classList.toggle('active', !isDeadline);
+    if (dBtn) dBtn.classList.toggle('active',  isDeadline);
+    if (tF)   tF.style.display   = isDeadline ? 'none'  : 'block';
+    if (dF)   dF.style.display   = isDeadline ? 'block' : 'none';
+    if (!isDeadline) this._modalUpdateWeiche();
+  },
+
   terminOpen(eventId, ctx) {
     const db = this.db;
     const e  = eventId ? (this.db?.customEvents||[]).find(x => x.id === eventId) : null;
@@ -3296,17 +3365,26 @@ const WB = {
     const text = document.getElementById('wb-f-text')?.value.trim();
     if (!text) { this._toast('Text fehlt'); return; }
     const date = document.getElementById('wb-f-date')?.value || '';
-    const time = document.getElementById('wb-f-time')?.value || '';
-    const dur  = parseInt(document.getElementById('wb-f-dur')?.value||'60', 10) || 60;
-    // Welt aus Pill lesen für Anzeige-Badge
+    const isDeadline = document.getElementById('wb-toggle-deadline')?.classList.contains('active') || false;
     const weltPill = document.querySelector('.wb-welt-pill');
     const welt = weltPill?.classList.contains('privat') ? 'priv' : 'pro';
     const vertraulich = this._modalGetVertraulich();
-    // obj definieren
-    const obj = {
-      text, date, startTime: time, durationMin: dur,
-      welt, vertraulich, updatedAt: this._now(),
-    };
+    let obj;
+    if (isDeadline) {
+      const remindVal = document.getElementById('wb-f-remind')?.value ?? '1';
+      obj = {
+        text, date, isDeadline: true, startTime: '', durationMin: 0,
+        remindDaysBefore: parseInt(remindVal, 10),
+        welt, vertraulich, updatedAt: this._now(),
+      };
+    } else {
+      const time = document.getElementById('wb-f-time')?.value || '';
+      const dur  = parseInt(document.getElementById('wb-f-dur')?.value||'60', 10) || 60;
+      obj = {
+        text, date, isDeadline: false, startTime: time, durationMin: dur,
+        welt, vertraulich, updatedAt: this._now(),
+      };
+    }
     if (!db.customEvents) db.customEvents = [];
     if (c.eventId) {
       const idx = db.customEvents.findIndex(x => x.id === c.eventId);
@@ -3315,7 +3393,7 @@ const WB = {
       db.customEvents.push({ id:'e_'+Date.now(), ...obj });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
-    this._toast('\u2713 Termin gespeichert');
+    this._toast(isDeadline ? '\uD83D\uDEA9 Deadline gespeichert' : '\u2713 Termin gespeichert');
   },
 
   // ── Einstellungen ────────────────────────────────────
