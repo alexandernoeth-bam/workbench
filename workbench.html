@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.9</title>
+  <title>WorkBench 3.1.0</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -723,7 +723,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.9</div>
+  <div id="wb-startup-tagline">v3.1.0</div>
 </div>
 
 <!-- Modal -->
@@ -789,7 +789,7 @@
 
     <div class="s-card">
       <div class="s-card-head">Version</div>
-      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.9</div></div>
+      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.1.0</div></div>
     </div>
 
     <div class="s-card">
@@ -887,7 +887,7 @@
 
   <div id="wb-welt-header">
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.9</span>
+    <span id="wb-menu-version">v3.1.0</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1041,8 +1041,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.9',
-  APP_BUILD:   '20260624-0230',
+  APP_VERSION: '3.1.0',
+  APP_BUILD:   '20260624-0300',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3775,6 +3775,27 @@ const WB = {
     this._toast('\u2713 Daten migriert');
   },
 
+  _softDelete(item) {
+    if (item) { item.deleted = true; item.updatedAt = this._now(); }
+  },
+
+  _migrateQuickItems() {
+    // quickItems (Legacy) → aufgaben als freie Aufgaben
+    const qi = this.db?.quickItems;
+    if (!qi || !qi.length) return;
+    if (!this.db.aufgaben) this.db.aufgaben = [];
+    const existIds = new Set(this.db.aufgaben.map(a => a.id));
+    qi.forEach(q => {
+      if (!q.id || existIds.has(q.id)) return;
+      this.db.aufgaben.push({
+        id: q.id, text: q.text || q.titel || '', done: !!q.done,
+        deleted: !!q.deleted, vorhabenId: null, welt: q.welt || 'priv',
+        updatedAt: q.updatedAt || this._now(),
+      });
+    });
+    this.db.quickItems = [];
+  },
+
   setDirty() {
     this.isDirty=true; this._pendingTs=Date.now();
     this.idbSave().catch(e=>console.warn('[setDirty IDB]',e));
@@ -4072,7 +4093,6 @@ const WB = {
       if (payload._encrypted) {
         const pw = sessionStorage.getItem('wb_enc_pw');
         if (!pw) {
-          this._mantraHide(); // Startup-Screen weg bevor Crypto-Dialog erscheint
           this._cryptoShowDialog(async () => { await this._syncDownload(); }); return;
         }
         try {
@@ -4080,7 +4100,6 @@ const WB = {
           this.db = dec.data || dec;
         } catch(e) {
           sessionStorage.removeItem('wb_enc_pw');
-          this._mantraHide(); // Startup-Screen weg bevor Crypto-Dialog erscheint
           this._cryptoShowDialog(async () => { await this._syncDownload(); }); return;
         }
       } else {
@@ -4101,9 +4120,8 @@ const WB = {
       if (this.activeTab) {
         this.renderSection(this.activeTab);
       } else {
-        this.tabSwitch('cockpit');
+        this.tabSwitch('tagessicht');
       }
-      this._ckLadeHeutigerEintrag(); setTimeout(() => this._ckScrollToBottom(), 200);
       this._nzRenderPills();
     } catch(e) {
       console.warn('[syncDownload]', e.message);
