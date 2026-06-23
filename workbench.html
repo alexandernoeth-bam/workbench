@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.7</title>
+  <title>WorkBench 3.0.8</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -251,6 +251,7 @@
     .wb-btn-save { background: var(--accent); color: #fff; border-color: var(--accent); }
     .wb-btn-cancel { color: var(--faint); }
     .wb-btn-delete { color: var(--danger); border-color: var(--danger); }
+    .wb-btn-dup { padding: 7px 14px; border-radius: 8px; border: 1.5px solid var(--border); background: none; font-size: 14px; font-weight: 700; cursor: pointer; font-family: var(--font); color: var(--text); }
     .wb-input { width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 15px; font-family: var(--font); background: var(--bg); color: var(--text); }
     .wb-input:focus { outline: none; border-color: var(--accent); }
     .wb-input-lg { font-size: 16px; font-weight: 600; }
@@ -722,7 +723,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.7</div>
+  <div id="wb-startup-tagline">v3.0.8</div>
 </div>
 
 <!-- Modal -->
@@ -788,7 +789,7 @@
 
     <div class="s-card">
       <div class="s-card-head">Version</div>
-      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.7</div></div>
+      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.8</div></div>
     </div>
 
     <div class="s-card">
@@ -886,7 +887,7 @@
 
   <div id="wb-welt-header">
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.7</span>
+    <span id="wb-menu-version">v3.0.8</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1040,8 +1041,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.7',
-  APP_BUILD:   '20260624-0100',
+  APP_VERSION: '3.0.8',
+  APP_BUILD:   '20260624-0200',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3202,7 +3203,7 @@ const WB = {
       const e = (this.db?.customEvents||[]).find(x => x.id === id);
       if (e) { e.done=true; e.updatedAt=this._now(); }
     }
-    this.setDirty(); this._tfRenderHeute(); this._toast('\u2713 Erledigt');
+    this.setDirty(); this._tsRenderZeitband(); this._toast('\u2713 Erledigt');
   },
 
   _tfTerminAbsagen(id, art) {
@@ -3226,7 +3227,7 @@ const WB = {
       const e = (this.db?.customEvents||[]).find(x => x.id === id);
       if (e) { e.storniert=true; e.done=false; e.updatedAt=this._now(); }
     }
-    this.setDirty(); this._tfRenderHeute(); this._toast('Termin abgesagt');
+    this.setDirty(); this._tsRenderZeitband(); this._toast('Termin abgesagt');
   },
 
   terminOpen(eventId, ctx) {
@@ -3298,9 +3299,12 @@ const WB = {
     // Welt aus Pill lesen für Anzeige-Badge
     const weltPill = document.querySelector('.wb-welt-pill');
     const welt = weltPill?.classList.contains('privat') ? 'priv' : 'pro';
-    // Immer in dataPriv speichern
-
-    if (!db) return;
+    const vertraulich = this._modalGetVertraulich();
+    // obj definieren
+    const obj = {
+      text, date, startTime: time, durationMin: dur,
+      welt, vertraulich, updatedAt: this._now(),
+    };
     if (!db.customEvents) db.customEvents = [];
     if (c.eventId) {
       const idx = db.customEvents.findIndex(x => x.id === c.eventId);
@@ -4210,13 +4214,7 @@ const WB = {
 
   _oauthBannerDismiss() { this._oauthHideBanner(); },
 
-  async _oauthReconnect() {
-    try {
-      this._oauthToken=null; this._oauthTokenExp=null;
-      const token=await this._oauthGetToken(false);
-      if(token){this._oauthHideBanner();this._toast('\u2713 Neu verbunden');await this._syncUpload();}
-    } catch(e){this._oauthShowBanner('\u26a0 Verbindung fehlgeschlagen: '+e.message);}
-  },
+
 
   oauthSignOut() {
     this._oauthToken=null; this._oauthTokenExp=null;
@@ -4286,7 +4284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         autocomplete="current-password"
         onkeydown="if(event.key==='Enter') WB._cryptoUnlock()">
       <div id="wb-crypto-err">Falsches Passwort — bitte erneut versuchen.</div>
-      <button id="wb-crypto-btn" onclick="WB._cryptoUnlock()">Entsperren</button>
+      <button id="wb-crypto-btn" type="button" onclick="WB._cryptoUnlock()">Entsperren</button>
       <div style="font-size:12px;color:var(--faint);margin-top:12px;">AES-256-GCM verschlüsselt</div>
     </div>
   </div>
