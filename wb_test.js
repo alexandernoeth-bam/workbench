@@ -1144,13 +1144,9 @@ if ((ckBanBody2.includes('this.dataPriv') || ckBanBody2.includes('this.db')) && 
   fail('_ckRenderBanner() fehlt db-Nutzung');
 }
 
-// Bug 2: terminOpen sucht in dataPriv (Termine immer dort)
+// terminOpen nutzt unified db.customEvents
 const toBody = jsCode.match(/  terminOpen\(eventId[\s\S]*?^  \},/m)?.[0] || '';
-if (toBody.includes('this.dataPriv') && !toBody.includes('this.dataPro') || toBody.includes('otherDb') || toBody.includes('Fallback')) {
-  ok('terminOpen() liest aus this.dataPriv (korrekt)');
-} else {
-  fail('terminOpen() sucht nicht in dataPriv');
-}
+toBody.includes('customEvents') ? ok('terminOpen() nutzt db.customEvents (unified)') : fail('terminOpen() fehlt customEvents');
 
 // Bug 2b: freieAufgabeOpen nutzt db.aufgaben
 const soBody = jsCode.match(/  freieAufgabeOpen[\s\S]*?^  \},/m)?.[0] || '';
@@ -1941,11 +1937,9 @@ const abClickSrc = jsCode.match(/  _abLinkClick\([\s\S]*?^  \},/m)?.[0] || '';
 if (abClickSrc.includes('linkOpen(')) { ok('_abLinkClick() öffnet linkOpen() Dialog'); f44Ok++; }
 else { fail('_abLinkClick() öffnet keinen Dialog'); f44Fail++; }
 
-// terminOpen sucht zuerst in dataPriv
+// terminOpen nutzt unified db.customEvents
 const termOpenSrc = jsCode.match(/  terminOpen\([\s\S]*?^  \},/m)?.[0] || '';
-if (termOpenSrc.includes('dataPriv') && (termOpenSrc.includes('Fallback') || termOpenSrc.includes('dataPro'))) {
-  ok('terminOpen() sucht in dataPriv + dataPro Fallback'); f44Ok++;
-} else { fail('terminOpen() hat keinen dataPro Fallback'); f44Fail++; }
+termOpenSrc.includes('customEvents') ? (ok('terminOpen() nutzt db.customEvents'), f44Ok++) : (fail('terminOpen() fehlt customEvents'), f44Fail++);
 
 // startTime in Wochenpflicht-Dialog
 const pflichtSrc = jsCode.match(/  pflichtOpen\([\s\S]*?^  \},/m)?.[0] || '';

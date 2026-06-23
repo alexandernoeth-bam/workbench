@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.93</title>
+  <title>WorkBench 2.9.94</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2388,7 +2388,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.93</div>
+  <div id="wb-startup-tagline">v2.9.94</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -2991,8 +2991,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.93',
-  APP_BUILD:   '20260623-0200',
+  APP_VERSION: '2.9.94',
+  APP_BUILD:   '20260623-0830',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -9712,15 +9712,12 @@ _ftStart() {
 
   /* ── Termin ── */
   terminOpen(eventId, ctx) {
-    // Termine zuerst in dataPriv suchen, Fallback dataPro
     const db = this.db;
-    let e  = eventId ? (this.db?.customEvents||[]).find(x => x.id === eventId) : null;
-    if (!e && eventId) {
-      // db = unified
-      e  = (this.db?.customEvents||[]).find(x => x.id === eventId);
-    }
-    const aktuellerCtx = e?.welt === 'pro' ? 'pro' : 'priv';
-    ctx = aktuellerCtx;
+    const e  = eventId ? (this.db?.customEvents||[]).find(x => x.id === eventId) : null;
+    // Bestehender Termin: seine Welt laden. Neuer Termin: aktive Welt nutzen
+    const aktuellerCtx = e
+      ? (e.welt === 'pro' ? 'pro' : 'priv')
+      : (this.activeWorld === 'beruf' ? 'pro' : ctx || 'priv');
     const body = this._modalWeltTop(aktuellerCtx, e?.vertraulich)
       + '<div class="wb-input-group">'
       + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
@@ -9744,7 +9741,7 @@ _ftStart() {
       + '<select id="wb-f-vh" class="wb-select"><option value="">Kein Vorhaben</option>'
       + this._modalVhOptions(aktuellerCtx, e?.vorhabenId)
       + '</select></div>';
-    this._modalCtx = { type:'termin', eventId, ctx:'priv' };
+    this._modalCtx = { type:'termin', eventId, ctx: aktuellerCtx };
     // Storniert-Banner
     const storniertBanner = e?.storniert
       ? '<div style="background:var(--surface2);border-left:3px solid var(--faint);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:8px 10px;font-size:16px;color:var(--muted);margin-bottom:4px;">'
