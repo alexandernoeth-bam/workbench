@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.6</title>
+  <title>WorkBench 3.0.7</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -722,7 +722,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.6</div>
+  <div id="wb-startup-tagline">v3.0.7</div>
 </div>
 
 <!-- Modal -->
@@ -788,7 +788,7 @@
 
     <div class="s-card">
       <div class="s-card-head">Version</div>
-      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.6</div></div>
+      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.7</div></div>
     </div>
 
     <div class="s-card">
@@ -886,7 +886,7 @@
 
   <div id="wb-welt-header">
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.6</span>
+    <span id="wb-menu-version">v3.0.7</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1040,8 +1040,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.6',
-  APP_BUILD:   '20260624-0030',
+  APP_VERSION: '3.0.7',
+  APP_BUILD:   '20260624-0100',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3157,6 +3157,78 @@ const WB = {
     }
   },
 
+  _modalDuplicate() {
+    const c = this._modalCtx;
+    if (!c || c.type !== 'termin') return;
+    // Termine immer in dataPriv — welt für Badge aus e.welt
+    const db = this.db;
+    const e  = (this.db?.customEvents||[]).find(x => x.id === c.eventId);
+    if (!e) return;
+    const ctx = e.welt || 'priv';
+    // Snapshot bevor modalClose _modalCtx auf null setzt
+    const snapshot = { text: e.text, startTime: e.startTime, durationMin: e.durationMin, vertraulich: e.vertraulich, welt: ctx };
+    this.modalClose();
+    setTimeout(() => {
+      this._modalCtx = { type:'termin', eventId: null, ctx:'priv' };
+      const body = this._modalWeltTop(snapshot.welt, snapshot.vertraulich)
+        + '<div class="wb-input-group">'
+        + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
+        + ' value="' + this._esc(snapshot.text) + '">'
+        + '</div>'
+        + '<div class="wb-row2">'
+        + '<div class="wb-input-group"><label class="wb-label">Datum</label>'
+        + '<input id="wb-f-date" class="wb-input" type="date" value=""></div>'
+        + '<div class="wb-input-group"><label class="wb-label">Uhrzeit</label>'
+        + '<input id="wb-f-time" class="wb-input" type="time"'
+        + ' value="' + this._esc(snapshot.startTime||'') + '" oninput="WB._modalUpdateWeiche()">'
+        + '</div></div>'
+        + '<div style="display:flex;gap:12px;align-items:flex-end;">'
+        + '<div class="wb-input-group" style="flex:1"><label class="wb-label">Dauer (Min)</label>'
+        + '<input id="wb-f-dur" class="wb-input" type="text"'
+        + ' value="' + this._esc(String(snapshot.durationMin||60)) + '"></div>'
+        + '<div class="wb-weiche-info" id="wb-weiche">Ohne Uhrzeit \u2192 nur im Backlog (Pull)</div></div>'
+      this.modalOpen('Termin duplizieren', body, this._modalFooter(false, false));
+      this._modalUpdateWeiche();
+    }, 100);
+  },
+
+  _tfTerminDone(id, art) {
+    if (art === 'schnell') {
+
+      const q  = (this.db?.aufgaben||[]).find(x => x.id === id);
+      if (q) { q.done=true; q.updatedAt=this._now(); }
+    
+    } else {
+      const e = (this.db?.customEvents||[]).find(x => x.id === id);
+      if (e) { e.done=true; e.updatedAt=this._now(); }
+    }
+    this.setDirty(); this._tfRenderHeute(); this._toast('\u2713 Erledigt');
+  },
+
+  _tfTerminAbsagen(id, art) {
+    if (!confirm(art === 'schnell' ? 'Erinnerung absagen?' : 'Termin absagen?')) return;
+    const today = this._dStr(new Date());
+    if (art === 'schnell') {
+
+      const q  = (this.db?.aufgaben||[]).find(x => x.id === id);
+      if (q) { q.storniert=true; q.done=true; q.updatedAt=this._now(); }
+    
+    } else if (art === 'pflicht') {
+
+      const p  = (this.db?.wochenpflichten||[]).find(x => x.id === id);
+      if (p) {
+        if (!this.db.pflichtStatus) this.db.pflichtStatus = {};
+        if (!this.db.pflichtStatus[today]) this.db.pflichtStatus[today] = {};
+        this.db.pflichtStatus[today][id] = 'storniert';
+      }
+    
+    } else {
+      const e = (this.db?.customEvents||[]).find(x => x.id === id);
+      if (e) { e.storniert=true; e.done=false; e.updatedAt=this._now(); }
+    }
+    this.setDirty(); this._tfRenderHeute(); this._toast('Termin abgesagt');
+  },
+
   terminOpen(eventId, ctx) {
     const db = this.db;
     const e  = eventId ? (this.db?.customEvents||[]).find(x => x.id === eventId) : null;
@@ -3412,12 +3484,17 @@ const WB = {
 
   _modalBgClick(e) { if(e.target===document.getElementById('wb-modal-overlay')) this.modalClose(); },
 
-  _modalFooter(showDelete) {
-    return (showDelete?'<button class="wb-btn wb-btn-delete" onclick="WB._modalDelete()">L\u00f6schen</button>':'<div></div>')
-      +'<div style="display:flex;gap:8px;">'
-      +'<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
-      +'<button class="wb-btn wb-btn-save" onclick="WB._modalSave()">Speichern</button>'
-      +'</div>';
+  _modalFooter(showDelete, showDup) {
+    return '<div style="display:flex;gap:8px;align-items:center;">'
+      + (showDelete
+        ? '<button class="wb-btn wb-btn-delete" onclick="WB._modalDelete()">L\u00f6schen</button>' : '')
+      + (showDup
+        ? '<button class="wb-btn-dup" onclick="WB._modalDuplicate()">Duplizieren</button>' : '')
+      + '</div>'
+      + '<div style="display:flex;gap:12px;">'
+      + '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
+      + '<button class="wb-btn wb-btn-save" onclick="WB._modalSave()">Speichern</button>'
+      + '</div>';
   },
 
   _modalToggleWelt(el) {
