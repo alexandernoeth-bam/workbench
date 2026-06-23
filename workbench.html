@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.1</title>
+  <title>WorkBench 3.0.2</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -456,7 +456,7 @@
     .nz-bearbeit-body { padding: 14px 16px; }
 
     /* ── WOCHE-TAB ── */
-    #sec-woche { padding: 0 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; }
+    #sec-woche { padding: 0 !important; overflow: hidden !important; flex-direction: column !important; }
     .wo-header { background: var(--surface); border-bottom: 1.5px solid var(--border); padding: 10px 14px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     .wo-nav-btn { background: none; border: 1.5px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 14px; cursor: pointer; font-family: var(--font); color: var(--text); }
     .wo-nav-btn:hover { background: var(--surface2); }
@@ -597,7 +597,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.1</div>
+  <div id="wb-startup-tagline">v3.0.2</div>
 </div>
 
 <!-- Crypto -->
@@ -675,7 +675,7 @@
 
     <div class="s-card">
       <div class="s-card-head">Version</div>
-      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.1</div></div>
+      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.2</div></div>
     </div>
 
     <div class="s-card">
@@ -773,7 +773,7 @@
 
   <div id="wb-welt-header">
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.1</span>
+    <span id="wb-menu-version">v3.0.2</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -929,8 +929,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.1',
-  APP_BUILD:   '20260623-2100',
+  APP_VERSION: '3.0.2',
+  APP_BUILD:   '20260623-2200',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1119,7 +1119,13 @@ const WB = {
     this.activeTab = tab;
     ['tagessicht','notizen','woche'].forEach(t => {
       const el = document.getElementById('sec-' + t);
-      if (el) el.style.display = t === tab ? '' : 'none';
+      if (!el) return;
+      if (t !== tab) {
+        el.style.display = 'none';
+      } else {
+        // woche braucht flex, andere '' (CSS-Default)
+        el.style.display = t === 'woche' ? 'flex' : '';
+      }
     });
     // Bottom-nav
     document.querySelectorAll('#wb-nav .wb-tab').forEach(el => {
@@ -2392,7 +2398,7 @@ const WB = {
     console.log('[slimMigrate] Suche alte WorkBench-IDB...');
     try {
       const oldDb = await new Promise((resolve, reject) => {
-        const req = indexedDB.open('workbench-db', 3);
+        const req = indexedDB.open('workbench-v2', 3);
         req.onsuccess = e => resolve(e.target.result);
         req.onerror   = e => reject(e.target.error);
         req.onblocked = () => reject(new Error('blocked'));

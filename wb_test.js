@@ -296,7 +296,7 @@ jsCode.includes('_terminWiederherstellen') ? ok('_terminWiederherstellen() vorha
 console.log('\n── 20. Migration von alter WorkBench-IDB ──');
 jsCode.includes('_migrateFromOldDb')   ? ok('_migrateFromOldDb() definiert')  : fail('_migrateFromOldDb fehlt');
 jsCode.includes('slimMigrationDone')   ? ok('Guard slimMigrationDone vorhanden') : fail('Guard fehlt — Migration läuft jedes Mal');
-jsCode.includes("'workbench-db'")      ? ok("Alte IDB 'workbench-db' wird geöffnet") : fail("Referenz auf 'workbench-db' fehlt");
+jsCode.includes("'workbench-v2'")      ? ok("Alte IDB 'workbench-v2' wird geöffnet") : fail("Referenz auf 'workbench-v2' fehlt (alte IDB-Name)");
 jsCode.includes('_migratedFromVorhaben') ? ok('Vorhaben→Notiz Migration markiert') : fail('Vorhaben-Migration fehlt');
 jsCode.includes('_migratedFromPflichten') ? ok('Pflichten→Notiz Migration markiert') : fail('Pflichten-Migration fehlt');
 jsCode.includes('await this._migrateFromOldDb()') ? ok('Migration in Init aufgerufen') : fail('Migration wird nicht aufgerufen');
