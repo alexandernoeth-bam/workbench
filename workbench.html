@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.16</title>
+  <title>WorkBench 3.0.17</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -725,7 +725,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.16</div>
+  <div id="wb-startup-tagline">v3.0.17</div>
 </div>
 
 <!-- Modal -->
@@ -889,7 +889,7 @@
 
   <div id="wb-welt-header">
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.16</span>
+    <span id="wb-menu-version">v3.0.17</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1044,8 +1044,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.16',
-  APP_BUILD:   '20260624-1000',
+  APP_VERSION: '3.0.17',
+  APP_BUILD:   '20260624-1100',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3303,33 +3303,49 @@ const WB = {
   terminOpen(eventId, ctx) {
     const db = this.db;
     const e  = eventId ? (this.db?.customEvents||[]).find(x => x.id === eventId) : null;
-    // Bestehender Termin: seine Welt laden. Neuer Termin: aktive Welt nutzen
+    const isDeadline = !!(e?.isDeadline);
     const aktuellerCtx = e
       ? (e.welt === 'pro' ? 'pro' : 'priv')
       : (this.activeWorld === 'beruf' ? 'pro' : ctx || 'priv');
-    const body = this._modalWeltTop(aktuellerCtx, e?.vertraulich)
-      + '<div class="wb-input-group">'
-      + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
-      + ' placeholder="Terminbezeichnung..." value="' + this._esc(e?.text||'') + '">'
-      + '</div>'
+
+    const toggle = '<div class="wb-type-toggle">'
+      + '<button type="button" class="wb-type-toggle-btn' + (!isDeadline ? ' active' : '') + '" id="wb-toggle-termin" onclick="WB._terminToggleTyp(false)">\u23f2 Termin</button>'
+      + '<button type="button" class="wb-type-toggle-btn' + ( isDeadline ? ' active' : '') + '" id="wb-toggle-deadline" onclick="WB._terminToggleTyp(true)">\uD83D\uDEA9 Deadline</button>'
+      + '</div>';
+
+    const terminFelder = '<div id="wb-termin-fields" style="display:' + (isDeadline ? 'none' : 'block') + '">'
       + '<div class="wb-row2">'
-      + '<div class="wb-input-group"><label class="wb-label">Datum</label>'
-      + '<input id="wb-f-date" class="wb-input" type="date" value="' + this._esc(e?.date||'') + '">'
-      + '</div>'
       + '<div class="wb-input-group"><label class="wb-label">Uhrzeit</label>'
       + '<input id="wb-f-time" class="wb-input" type="time"'
-      + ' value="' + this._esc(e?.startTime||'') + '" oninput="WB._modalUpdateWeiche()">'
-      + '</div></div>'
-      + '<div style="display:flex;gap:12px;align-items:flex-end;">'
-      + '<div class="wb-input-group" style="flex:1"><label class="wb-label">Dauer (Min)</label>'
+      + ' value="' + this._esc(e?.startTime||'') + '" oninput="WB._modalUpdateWeiche()"></div>'
+      + '<div class="wb-input-group"><label class="wb-label">Dauer (Min)</label>'
       + '<input id="wb-f-dur" class="wb-input" type="text" placeholder="60"'
-      + ' value="' + this._esc(String(e?.durationMin||'')) + '">'
-      + '</div>'
-      + '<div class=\"wb-weiche-info\" id=\"wb-weiche\">Ohne Uhrzeit \u2192 nur im Backlog (Pull)</div></div>'
+      + ' value="' + this._esc(String(e?.durationMin||'')) + '"></div></div>'
+      + '<div class="wb-weiche-info" id="wb-weiche">Ohne Uhrzeit \u2192 nur im Backlog</div>'
+      + '</div>';
+
+    const remind = e?.remindDaysBefore !== undefined ? String(e.remindDaysBefore) : '1';
+    const remindOpts = [['0','Am selben Tag'],['1','1 Tag vorher'],['3','3 Tage vorher'],['7','1 Woche vorher'],['-1','Keine']];
+    const deadlineFelder = '<div id="wb-deadline-fields" style="display:' + (isDeadline ? 'block' : 'none') + '">'
+      + '<div class="wb-input-group"><label class="wb-label">Erinnerung</label>'
+      + '<select id="wb-f-remind" class="wb-input">'
+      + remindOpts.map(function(o){ return '<option value="' + o[0] + '"' + (remind===o[0]?' selected':'') + '>' + o[1] + '</option>'; }).join('')
+      + '</select></div></div>';
+
+    const body = this._modalWeltTop(aktuellerCtx, e?.vertraulich)
+      + toggle
+      + '<div class="wb-input-group">'
+      + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
+      + ' placeholder="Bezeichnung..." value="' + this._esc(e?.text||'') + '"></div>'
+      + '<div class="wb-input-group"><label class="wb-label">Datum</label>'
+      + '<input id="wb-f-date" class="wb-input" type="date" value="' + this._esc(e?.date||'') + '"></div>'
+      + terminFelder
+      + deadlineFelder;
+
     this._modalCtx = { type:'termin', eventId, ctx: aktuellerCtx };
-    // Storniert-Banner
+
     const storniertBanner = e?.storniert
-      ? '<div style="background:var(--surface2);border-left:3px solid var(--faint);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:8px 10px;font-size:16px;color:var(--muted);margin-bottom:4px;">'
+      ? '<div style="background:var(--surface2);border-left:3px solid var(--faint);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:8px 10px;font-size:14px;color:var(--muted);margin-bottom:4px;">'
         + '\u26a0 Dieser Termin wurde abgesagt.</div>'
       : '';
     const footer = e?.storniert
@@ -3338,9 +3354,12 @@ const WB = {
         + '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Schlie\u00dfen</button>'
         + '</div>'
       : this._modalFooter(!!eventId, !!eventId);
-    this.modalOpen(eventId ? 'Termin bearbeiten' : 'Neuer Termin', storniertBanner + body, footer);
-    this._modalUpdateWeiche();
+
+    this.modalOpen(eventId ? 'Termin / Deadline' : 'Neuer Termin / Deadline', storniertBanner + body, footer);
+    if (!isDeadline) this._terminToggleTyp(false);
+    else             this._terminToggleTyp(true);
   },
+
   _modalUpdateWeiche() {
     const timeEl = document.getElementById('wb-f-time');
     const weiche = document.getElementById('wb-weiche');
