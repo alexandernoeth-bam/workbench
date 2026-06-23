@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.2</title>
+  <title>WorkBench 3.0.3</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -558,20 +558,145 @@
     .nz-typ-btn { flex: 1; padding: 7px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: var(--font); color: var(--faint); background: var(--bg); text-align: center; }
     .nz-typ-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(10,107,94,0.06); }
 
-    /* ── Notizen Kategorie-Tabs ── */
-    .nz-ztab { display: flex; align-items: center; gap: 5px; padding: 8px 14px; font-size: 12px; font-weight: 700; color: var(--faint); background: none; border: none; border-bottom: 2.5px solid transparent; cursor: pointer; font-family: var(--font); white-space: nowrap; flex-shrink: 0; }
-    .nz-ztab:hover { color: var(--text); background: rgba(0,0,0,0.04); }
-    .nz-ztab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(10,107,94,0.05); }
-    .nz-ztab span { font-size: 10px; opacity: 0.7; margin-left: 2px; }
-    /* Zustand-Badge in Kacheln */
-    .nz-zustand-badge { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 2px 7px; letter-spacing: 0.04em; }
-    .nz-zustand-badge.parkplatz { background: rgba(77,95,51,0.12); color: var(--accent2); }
-    .nz-zustand-badge.kompass   { background: rgba(10,107,94,0.12); color: var(--accent); }
-    .nz-zustand-badge.archiv    { background: var(--surface2); color: var(--faint); }
-    /* Zustand-Auswahl im Kachel-Detail */
-    .nz-zustand-row { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface2); flex-wrap: wrap; }
-    .nz-zustand-btn { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: var(--font); border: 1.5px solid var(--border); color: var(--faint); background: none; }
-    .nz-zustand-btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+    /* ── Notizen-Tab ── */
+    #notizen-scroll { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+    .nz-ztab { flex:1; padding:8px 4px; border:none; background:none; font-size:12px; font-weight:700; color:var(--faint); cursor:pointer; font-family:var(--font); border-bottom:2.5px solid transparent; transition:color 0.15s,border-color 0.15s; white-space:nowrap; }
+    .nz-ztab.active { color:var(--accent); border-bottom-color:var(--accent); background:rgba(10,107,94,0.04); }
+    .nz-ztab:hover:not(.active) { color:var(--muted); }
+    .nz-ctx-menu { background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.18);min-width:180px;overflow:hidden; }
+    .nz-ctx-item { padding:10px 14px;font-size:14px;cursor:pointer;color:var(--text);font-family:var(--font); }
+    .nz-ctx-item:hover { background:var(--surface2); }
+    .nz-ctx-item.danger { color:#C0392B; }
+    .nz-postit-menu-btn { position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.06);border:none;border-radius:5px;width:24px;height:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;opacity:0;transition:opacity 0.15s; }
+    .nz-postit:hover .nz-postit-menu-btn { opacity:1; }
+    .nz-grp { border-radius:10px; border:1.5px solid rgba(0,0,0,.1); overflow:hidden; }
+    .nz-grp.c-gelb  { background:#fffbe6; border-color:#d4c22a; }
+    .nz-grp.c-gruen { background:#eaf7ea; border-color:#7dbc7d; }
+    .nz-grp.c-blau  { background:#e8f2fb; border-color:#7aaed6; }
+    .nz-grp.c-rosa  { background:#fce8f0; border-color:#d87aaa; }
+    .nz-grp.c-weiss { background:var(--surface); border-color:var(--border); }
+    .nz-grp-hdr { display:flex; align-items:center; gap:7px; padding:10px 12px; cursor:pointer; user-select:none; }
+    .nz-grp-hdr:hover { filter:brightness(0.97); }
+    .nz-grp-title { font-size:14px; font-weight:700; color:var(--text); flex:1; }
+    .nz-grp-cnt { font-size:11px; font-weight:700; padding:2px 7px; border-radius:8px; background:rgba(0,0,0,.07); color:var(--muted); }
+    .nz-pin-btn { width:26px; height:26px; border-radius:50%; border:1.5px solid rgba(0,0,0,.15); background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .nz-pin-btn.on { background:rgba(255,255,255,.6); border-color:#d4c22a; }
+    .nz-menu-btn { width:26px; height:26px; border:none; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:17px; flex-shrink:0; line-height:1; }
+    .nz-grp-chev { font-size:11px; color:var(--faint); transition:transform 0.15s; }
+    .nz-grp.open .nz-grp-chev { transform:rotate(180deg); }
+    .nz-grp-body { border-top:1px solid rgba(0,0,0,.08); display:none; }
+    .nz-grp.open .nz-grp-body { display:block; }
+    /* Farbwahl */
+    .nz-color-row { display:flex; gap:6px; padding:7px 12px 6px; border-bottom:0.5px solid rgba(0,0,0,.08); }
+    .nz-cdot { width:20px; height:20px; border-radius:50%; border:1.5px solid rgba(0,0,0,.2); cursor:pointer; flex-shrink:0; transition:transform 0.12s; }
+    .nz-cdot:hover { transform:scale(1.15); }
+    .nz-cdot.c-gelb  { background:#fffbe6; border-color:#d4c22a; }
+    .nz-cdot.c-gruen { background:#eaf7ea; border-color:#7dbc7d; }
+    .nz-cdot.c-blau  { background:#e8f2fb; border-color:#7aaed6; }
+    .nz-cdot.c-rosa  { background:#fce8f0; border-color:#d87aaa; }
+    .nz-cdot.c-weiss { background:#fff; border-color:rgba(0,0,0,.2); }
+    /* Einträge */
+    .nz-item { display:flex; align-items:center; gap:8px; padding:7px 12px; border-bottom:0.5px solid rgba(0,0,0,.07); }
+    .nz-item:last-child { border-bottom:none; }
+    .nz-chk { width:18px; height:18px; border-radius:4px; border:1.5px solid rgba(0,0,0,.2); flex-shrink:0; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+    .nz-chk.ck { background:var(--accent); border-color:var(--accent); }
+    .nz-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); flex-shrink:0; margin:0 3px; }
+    .nz-itxt { font-size:14px; color:var(--text); flex:1; }
+    .nz-itxt.dn { text-decoration:line-through; color:var(--faint); }
+    .nz-drag { color:var(--faint); cursor:grab; flex-shrink:0; touch-action:none; }
+    .nz-item.nz-dragging { opacity:0.4; }
+    .nz-item.nz-drag-over { border-top:2px solid var(--accent); }
+    .nz-del-btn { width:22px; height:22px; border:none; background:none; cursor:pointer; color:var(--faint); font-size:15px; display:none; align-items:center; justify-content:center; flex-shrink:0; }
+    .nz-item:hover .nz-del-btn { display:flex; }
+    .nz-add-row { display:flex; align-items:center; gap:7px; padding:7px 12px; border-top:0.5px solid rgba(0,0,0,.08); background:rgba(0,0,0,.02); }
+    .nz-add-row input { flex:1; border:none; background:none; font-size:13px; color:var(--text); outline:none; font-family:var(--font); }
+    .nz-add-row input::placeholder { color:var(--faint); }
+    .nz-add-ok { font-size:12px; font-weight:700; color:var(--accent); background:none; border:none; cursor:pointer; font-family:var(--font); }
+    /* Aktions-Zeile (Bearbeiten/Löschen) */
+    .nz-actions { display:flex; gap:6px; padding:6px 12px 8px; }
+    .nz-action-btn { font-size:11px; font-weight:700; padding:3px 9px; border-radius:8px; border:1.5px solid rgba(0,0,0,.15); background:none; cursor:pointer; font-family:var(--font); color:var(--muted); display:flex; align-items:center; gap:4px; }
+    .nz-action-btn.danger { color:var(--danger); border-color:var(--danger); }
+    .nz-new-list { display:flex; align-items:center; gap:8px; padding:10px 12px; cursor:pointer; color:var(--accent); font-size:13px; font-weight:700; background:var(--surface); border-radius:10px; border:1.5px dashed var(--border); }
+
+    /* ── Notizen Desktop: Post-it Kacheln ── */
+    .nz-postit-section-lbl { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:var(--faint); padding:0 2px 8px; }
+    .nz-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:10px; margin-bottom:16px; }
+    .nz-postit { border-radius:2px 2px 8px 8px; box-shadow:2px 3px 8px rgba(0,0,0,0.18),0 1px 2px rgba(0,0,0,0.10); cursor:pointer; overflow:hidden; transition:transform 0.12s,box-shadow 0.12s; position:relative; min-height:130px; display:flex; flex-direction:column; }
+    .nz-postit:hover { transform:translateY(-2px) rotate(0.3deg); box-shadow:4px 6px 16px rgba(0,0,0,0.22); }
+    .nz-postit::before { content:''; display:block; height:6px; background:rgba(0,0,0,0.08); width:40%; margin:0 auto; border-radius:0 0 3px 3px; }
+    .nz-postit.c-gelb  { background:#FFF59D; } .nz-postit.c-blau  { background:#B3E5FC; }
+    .nz-postit.c-gruen { background:#C8E6C9; } .nz-postit.c-rosa  { background:#FFCCBC; }
+    .nz-postit.c-lila  { background:#E1BEE7; } .nz-postit.c-weiss { background:#F5F5F5; }
+    .nz-postit-hdr { display:flex; align-items:center; gap:6px; padding:8px 10px 5px; }
+    .nz-postit-icon { font-size:14px; flex-shrink:0; }
+    .nz-postit-title { font-size:13px; font-weight:800; color:#1a1a1a; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .nz-postit-cnt { font-size:10px; font-weight:700; padding:1px 5px; border-radius:6px; background:rgba(0,0,0,0.1); color:#333; flex-shrink:0; }
+    .nz-postit-pin { font-size:12px; flex-shrink:0; }
+    .nz-postit-preview { padding:2px 10px 4px; }
+    .nz-postit-item { display:flex; align-items:center; gap:6px; padding:3px 0; }
+    .nz-postit-chk { width:12px; height:12px; border-radius:3px; border:1.5px solid rgba(0,0,0,0.25); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:8px; background:rgba(255,255,255,0.5); }
+    .nz-postit-chk.done { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .nz-postit-dot { width:6px; height:6px; border-radius:50%; background:rgba(0,0,0,0.25); flex-shrink:0; }
+    .nz-postit-txt { font-size:12px; color:#222; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.4; }
+    .nz-postit-txt.dn { color:#888; text-decoration:line-through; }
+    .nz-postit-placeholder { opacity:0.25; }
+    .nz-postit-line { height:10px; background:rgba(0,0,0,0.15); border-radius:3px; width:70%; margin-left:18px; }
+    .nz-postit-more { font-size:10px; color:rgba(0,0,0,0.4); padding:2px 10px 8px; font-style:italic; }
+    .nz-postit-empty { font-size:11px; color:rgba(0,0,0,0.35); padding:4px 10px 10px; font-style:italic; }
+    .nz-postit-new { border-radius:2px 2px 8px 8px; border:2px dashed rgba(0,0,0,0.2); background:rgba(255,255,255,0.35); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:16px 10px; cursor:pointer; min-height:110px; font-size:12px; color:var(--faint); transition:background 0.15s; }
+    .nz-postit-new:hover { background:rgba(255,255,255,0.5); }
+    .nz-postit-new-icon { font-size:22px; opacity:0.4; }
+    /* Pills im Cockpit */
+    .nz-pin-pills { display:flex; gap:7px; flex-wrap:wrap; }
+    .nz-pin-pill { display:inline-flex; align-items:center; gap:5px; border-radius:20px; padding:5px 12px 5px 9px; cursor:pointer; border:1.5px solid; }
+    .nz-pin-pill.c-gelb  { background:#fffbe6; border-color:#d4c22a; }
+    .nz-pin-pill.c-gruen { background:#eaf7ea; border-color:#7dbc7d; }
+    .nz-pin-pill.c-blau  { background:#e8f2fb; border-color:#7aaed6; }
+    .nz-pin-pill.c-rosa  { background:#fce8f0; border-color:#d87aaa; }
+    .nz-pin-pill.c-weiss { background:#fff; border-color:rgba(0,0,0,.2); }
+    .nz-pill-dot { width:8px; height:8px; border-radius:50%; background:var(--accent); flex-shrink:0; }
+    .nz-pill-lbl { font-size:12px; font-weight:700; color:var(--muted); }
+    .nz-pill-cnt { font-size:11px; font-weight:700; color:var(--faint); }
+    /* Schwebendes Overlay */
+    #nz-float-overlay { display:none; position:absolute; inset:0; background:rgba(0,0,0,.45); z-index:300; border-radius:inherit; align-items:center; justify-content:center; padding:12px; }
+    #nz-float-overlay.open { display:flex; }
+    #nz-float-box { border-radius:12px; border:1.5px solid rgba(0,0,0,.15); width:100%; max-height:340px; display:flex; flex-direction:column; overflow:hidden; }
+    .nz-float-hdr { display:flex; align-items:center; gap:7px; padding:10px 12px; border-bottom:1px solid rgba(0,0,0,.1); flex-shrink:0; }
+    .nz-float-title { font-size:14px; font-weight:700; color:var(--text); flex:1; }
+    .nz-float-cnt { font-size:11px; font-weight:700; padding:2px 7px; border-radius:8px; background:rgba(0,0,0,.07); color:var(--muted); }
+    .nz-float-close { font-size:11px; font-weight:700; padding:4px 9px; border-radius:8px; border:1.5px solid rgba(0,0,0,.2); background:rgba(255,255,255,.7); cursor:pointer; font-family:var(--font); color:var(--muted); }
+    .nz-float-body { overflow-y:auto; flex:1; }
+    .nz-float-item { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:0.5px solid rgba(0,0,0,.07); }
+    .nz-float-item:last-child { border-bottom:none; }
+    .nz-float-chk { width:18px; height:18px; border-radius:4px; border:1.5px solid rgba(0,0,0,.2); flex-shrink:0; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+    .nz-float-chk.ck { background:var(--accent); border-color:var(--accent); }
+    .nz-float-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); flex-shrink:0; margin:0 3px; }
+    .nz-float-txt { font-size:14px; color:var(--text); flex:1; }
+    .nz-float-txt.dn { text-decoration:line-through; color:var(--faint); }
+    .nz-float-add { display:flex; align-items:center; gap:7px; padding:7px 12px; border-top:0.5px solid rgba(0,0,0,.08); flex-shrink:0; }
+    .nz-float-add input { flex:1; border:none; background:none; font-size:13px; color:var(--text); outline:none; font-family:var(--font); }
+    .nz-float-add input::placeholder { color:var(--faint); }
+    .nz-float-add-ok { font-size:12px; font-weight:700; color:var(--accent); background:none; border:none; cursor:pointer; font-family:var(--font); }
+
+    .wo-vt-btn {
+      padding: 5px 12px; font-size: 14px; font-weight: 600;
+      cursor: pointer; border: none;
+      background: var(--surface); color: var(--muted);
+      white-space: nowrap; display: flex; align-items: center; gap: 4px;
+    }
+    .wo-vt-btn.active { background: var(--accent); color: #fff; }
+    #wo-content {
+      flex: 1; overflow: hidden; display: flex; flex-direction: column;
+    }
+    /* ── Liste ── */
+    #wo-list-view {
+      flex: 1; display: flex; overflow: hidden;
+    }
+    #wo-list-days {
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 14px 16px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
 
     /* Freitext Editor */
     .nz-toolbar { display: flex; gap: 5px; flex-wrap: wrap; padding: 8px; background: var(--surface2); border-bottom: 1px solid var(--border); }
@@ -597,19 +722,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.2</div>
-</div>
-
-<!-- Crypto -->
-<div id="wb-crypto-overlay">
-  <div class="wb-crypto-box">
-    <div class="wb-crypto-title">WorkBench</div>
-    <div class="wb-crypto-sub">Passwort zum Entsperren eingeben</div>
-    <input id="wb-crypto-pw" type="password" placeholder="Passwort..." autocomplete="current-password"
-      onkeydown="if(event.key==='Enter')WB._cryptoUnlock()">
-    <div id="wb-crypto-err">Falsches Passwort — bitte erneut versuchen</div>
-    <button id="wb-crypto-btn" onclick="WB._cryptoUnlock()">Entsperren</button>
-  </div>
+  <div id="wb-startup-tagline">v3.0.3</div>
 </div>
 
 <!-- Modal -->
@@ -675,7 +788,7 @@
 
     <div class="s-card">
       <div class="s-card-head">Version</div>
-      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.2</div></div>
+      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.3</div></div>
     </div>
 
     <div class="s-card">
@@ -773,7 +886,7 @@
 
   <div id="wb-welt-header">
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.2</span>
+    <span id="wb-menu-version">v3.0.3</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -810,32 +923,30 @@
       </div>
 
       <!-- Notizen -->
-      <div id="sec-notizen" style="display:none;">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px 6px;border-bottom:1.5px solid var(--border);background:var(--surface);flex-shrink:0;">
-          <span style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--faint);">Notizen</span>
-          <button class="ts-add-btn" onclick="WB._nzNeueListeDialog()">+ Neu</button>
-        </div>
-        <!-- Kategorie-Tabs -->
-        <div id="nz-ztab-bar" style="display:flex;gap:0;border-bottom:1.5px solid var(--border);background:var(--surface2);flex-shrink:0;overflow-x:auto;">
-          <button class="nz-ztab active" data-zustand="aktuell"   onclick="WB._nzSetZustand('aktuell')">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Aktuell <span id="nz-cnt-aktuell"></span>
-          </button>
-          <button class="nz-ztab" data-zustand="parkplatz" onclick="WB._nzSetZustand('parkplatz')">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg>Parkplatz <span id="nz-cnt-parkplatz"></span>
-          </button>
-          <button class="nz-ztab" data-zustand="kompass" onclick="WB._nzSetZustand('kompass')">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>Kompass <span id="nz-cnt-kompass"></span>
-          </button>
-          <button class="nz-ztab" data-zustand="archiv" onclick="WB._nzSetZustand('archiv')">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>Archiv <span id="nz-cnt-archiv"></span>
-          </button>
-        </div>
-        <input id="nz-suche" type="search" placeholder="Suche...">
-        <div id="nz-pin-pills-bar" style="display:none;">
-          <div class="nz-pin-pills" id="nz-pin-pills-container"></div>
-        </div>
-        <div id="notizen-scroll" style="padding:10px 12px;"></div>
+    <div id="sec-notizen" class="wb-section" style="display:none;flex-direction:column;">
+      <!-- Header: Suche + Neue Liste -->
+      <div style="padding:8px 12px;border-bottom:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:8px;flex-shrink:0;">
+        <input id="nz-suche" type="search" placeholder="🔍 Suchen..." oninput="WB._nzSucheInput(this.value)"
+          style="flex:1;border:1.5px solid var(--border);border-radius:20px;padding:5px 12px;font-size:14px;background:var(--surface2);color:var(--text);outline:none;font-family:var(--font)">
+        <button onclick="WB._nzNeueListeDialog()" style="background:var(--accent);color:#fff;border:none;border-radius:16px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);flex-shrink:0">+ Neu</button>
       </div>
+      <!-- Zustand-Filter-Tabs -->
+      <div id="nz-filter-tabs" style="display:flex;gap:0;border-bottom:1.5px solid var(--border);background:var(--surface);flex-shrink:0;">
+        <button class="nz-ztab active" data-zustand="aktuell"  onclick="WB._nzSetZustand('aktuell')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>Aktuell <span id="nz-cnt-aktuell" style="font-size:10px;opacity:0.7;margin-left:2px"></span>
+        </button>
+        <button class="nz-ztab" data-zustand="parkplatz" onclick="WB._nzSetZustand('parkplatz')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg>Parkplatz <span id="nz-cnt-parkplatz" style="font-size:10px;opacity:0.7;margin-left:2px"></span>
+        </button>
+        <button class="nz-ztab" data-zustand="kompass" onclick="WB._nzSetZustand('kompass')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:4px"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>Kompass <span id="nz-cnt-kompass" style="font-size:10px;opacity:0.7;margin-left:2px"></span>
+        </button>
+        <button class="nz-ztab" data-zustand="archiv" onclick="WB._nzSetZustand('archiv')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:4px"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archiv <span id="nz-cnt-archiv" style="font-size:10px;opacity:0.7;margin-left:2px"></span>
+        </button>
+      </div>
+      <div id="notizen-scroll"></div>
+    </div>
 
       <!-- Woche -->
       <div id="sec-woche" class="wb-section" style="display:none;padding:0;">
@@ -929,8 +1040,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.2',
-  APP_BUILD:   '20260623-2200',
+  APP_VERSION: '3.0.3',
+  APP_BUILD:   '20260623-2300',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1809,21 +1920,928 @@ const WB = {
       + '</div>';
     this.modalOpen('Neue Liste', body, footer);
   },
-  _nzZustand: 'aktuell', // aktuell | parkplatz | kompass | archiv
-  _nzNeuTyp: 'check',
+  // ── Notizen-Tab ──────────────────────────────────────
 
-  _nzNeueListeSave() {
-    const inp = document.getElementById('wb-nz-neu-titel');
-    const titel = inp?.value?.trim(); if (!titel) { this._toast('Titel fehlt'); return; }
+  _NZ_COLORS: ['c-gelb','c-gruen','c-blau','c-rosa','c-weiss'],
+  _NZ_COLOR_LABELS: { 'c-gelb':'Gelb','c-gruen':'Grün','c-blau':'Blau','c-rosa':'Rosa','c-weiss':'Weiß' },
+
+  _nzDefaultListen() {
+    return [
+      { id:'nz_edeka',  titel:'Einkaufszettel Edeka',    icon:'cart',    typ:'check',  farbe:'c-gelb',  items:[], gepinnt:false },
+      { id:'nz_bm',     titel:'Einkaufszettel Baumarkt', icon:'tools',   typ:'check',  farbe:'c-weiss', items:[], gepinnt:false },
+      { id:'nz_sonst',  titel:'Einkaufszettel Sonstige', icon:'bag',     typ:'check',  farbe:'c-weiss', items:[], gepinnt:false },
+      { id:'nz_urlaub', titel:'Ideen Freizeit / Urlaub', icon:'idea',    typ:'bullet', farbe:'c-blau',  items:[], gepinnt:false },
+      { id:'nz_gesch',  titel:'Ideen Geschenke',         icon:'gift',    typ:'bullet', farbe:'c-gruen', items:[], gepinnt:false },
+    ];
+  },
+
+  _nzZustand: 'aktuell', // aktuell | parkplatz | kompass | archiv
+  _nzSuche:   '',        // Volltextsuche
+
+  _nzGetListen() {
+    if (!this.db) return [];
+    if (!this.db.notizen || !this.db.notizen.length) {
+      this.db.notizen = this._nzDefaultListen();
+    }
+
+    const zustand = this._nzZustand;
+    let liste;
+    if (zustand === 'archiv') {
+      liste = this.db.notizen.filter(l => !!l.deleted);
+    } else if (zustand === 'aktuell') {
+      // Aktuell = kein expliziter Zustand ODER zustand fehlt/ist 'aktuell'
+      liste = this.db.notizen.filter(l => !l.deleted && (!l.zustand || l.zustand === 'aktuell'));
+    } else {
+      liste = this.db.notizen.filter(l => !l.deleted && l.zustand === zustand);
+    }
+
+    // Welt-Filter (activeWorld)
+    const welt = this.activeWorld;
+    if (welt && welt !== 'beide') {
+      liste = liste.filter(l => {
+        const lw = l.welt;
+        if (!lw) return true; // 'beide' = kein Feld gesetzt
+        if (welt === 'beruf')  return lw === 'beruf'  || lw === 'pro';
+        if (welt === 'privat') return lw === 'privat' || lw === 'priv';
+        return true;
+      });
+    }
+
+    // Volltextsuche
+    if (this._nzSuche) {
+      const q = this._nzSuche.toLowerCase();
+      liste = liste.filter(l =>
+        (l.titel||'').toLowerCase().includes(q) ||
+        (l.items||[]).some(i => (i.text||'').toLowerCase().includes(q)) ||
+        (l.inhalt||'').toLowerCase().includes(q)
+      );
+    }
+
+    // Gepinnte oben
+    return liste.sort((a, b) => (b.gepinnt ? 1 : 0) - (a.gepinnt ? 1 : 0));
+  },
+
+  _nzSvgIcon(icon, size) {
+    const s = size || 16;
+    const st = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+    const icons = {
+      // Bestehende
+      cart:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>',
+      tools:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+      bag:     '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
+      idea:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+      gift:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>',
+      note:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+      pin:     '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+      // Neue Icons
+      star:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+      heart:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+      book:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+      camera:  '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+      music:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+      plane:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.14h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.68a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z"/></svg>',
+      home:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+      sport:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l4.24 4.24"/><path d="M14.83 9.17l4.24-4.24"/><path d="M14.83 14.83l4.24 4.24"/><path d="M9.17 14.83l-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg>',
+      food:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>',
+      money:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+      health:  '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+      user:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+      target:  '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+      clock:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+      sun:     '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
+      leaf:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M17 8C8 10 5.9 16.17 3.82 22L5 21c1-3 4-6 8-7"/><path d="M21.39 11.39C20.91 7.62 18.1 4.57 14.55 3.28A12.42 12.42 0 0 0 3 4.27a9 9 0 0 1 15.35 9.72"/></svg>',
+      flag:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>',
+      lock:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+      mail:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>',
+      phone:   '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+    };
+    return icons[icon] || icons.note;
+  },
+
+  _nzUpdateCounts() {
+    const db = this.db; if (!db?.notizen) return;
+    const welt = this.activeWorld;
+    const weltOk = l => {
+      if (!welt || welt === 'beide') return true;
+      const lw = l.welt;
+      if (!lw) return true;
+      if (welt === 'beruf')  return lw === 'beruf' || lw === 'pro';
+      if (welt === 'privat') return lw === 'privat' || lw === 'priv';
+      return true;
+    };
+    const counts = {
+      aktuell:   db.notizen.filter(l => !l.deleted && (!l.zustand || l.zustand === 'aktuell') && weltOk(l)).length,
+      parkplatz: db.notizen.filter(l => !l.deleted && l.zustand === 'parkplatz' && weltOk(l)).length,
+      kompass:   db.notizen.filter(l => !l.deleted && l.zustand === 'kompass'   && weltOk(l)).length,
+      archiv:    db.notizen.filter(l => !!l.deleted                             && weltOk(l)).length,
+    };
+    ['aktuell','parkplatz','kompass','archiv'].forEach(z => {
+      const el = document.getElementById('nz-cnt-' + z);
+      if (el) el.textContent = '(' + counts[z] + ')';
+    });
+  },
+
+  _nzSetZustand(zustand) {
+    this._nzZustand = zustand;
+    document.querySelectorAll('.nz-ztab').forEach(b =>
+      b.classList.toggle('active', b.dataset.zustand === zustand)
+    );
+    this.renderNotizenTab();
+  },
+
+  _nzSucheInput(val) {
+    this._nzSuche = val.trim();
+    this.renderNotizenTab();
+  },
+
+  _nzSetZustandItem(listeId, zustand) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    if (zustand === 'archiv') {
+      this._softDelete(l);
+    } else {
+      l.deleted = false;
+      if (zustand === 'aktuell') {
+        delete l.zustand; // aktuell = kein Merkmal
+      } else {
+        l.zustand = zustand;
+      }
+    }
+    l.updatedAt = this._now();
+    this.setDirty();
+    this.renderNotizenTab();
+    this._nzMenuClose();
+    this._toast('\u2713 ' + this._nzZustandLabel(zustand));
+  },
+
+  _nzZustandLabel(z) {
+    return { aktuell:'Aktuell', parkplatz:'Auf den Parkplatz', kompass:'In den Kompass', archiv:'Archiviert' }[z] || z;
+  },
+
+  _nzMenuClose() {
+    document.querySelectorAll('.nz-ctx-menu').forEach(m => m.remove());
+  },
+
+  _nzMenuOpen(listeId, btnEl) {
+    this._nzMenuClose();
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const menu = document.createElement('div');
+    menu.className = 'nz-ctx-menu';
+    const SVG = (path) => '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0">' + path + '</svg>';
+    const items = [
+      { z:'aktuell',   svg: SVG('<polyline points="20 6 9 17 4 12"/>'),                                              label:'Aktuell' },
+      { z:'parkplatz', svg: SVG('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/>'), label:'Parkplatz' },
+      { z:'kompass',   svg: SVG('<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>'), label:'Kompass' },
+      { z:'archiv',    svg: SVG('<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/>'), label:'Archivieren' },
+    ].filter(i => i.z !== this._nzZustand);
+
+    const pinSvg = l.gepinnt
+      ? SVG('<line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17H19V13L17 7H7L5 13Z"/><line x1="12" y1="7" x2="12" y2="3"/>')
+      : SVG('<line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17H19V13L17 7H7L5 13Z"/><line x1="12" y1="7" x2="12" y2="3"/>');
+    const pinLabel = l.gepinnt ? 'Unpin' : 'Pinnen';
+    const editSvg  = SVG('<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>');
+    const delSvg   = SVG('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>');
+
+    menu.innerHTML = '<div class="nz-ctx-item" style="display:flex;align-items:center;gap:8px" onclick="WB._nzTogglePin(\'' + this._esc(listeId) + '\');WB._nzMenuClose()">' + pinSvg + pinLabel + '</div>'
+      + items.map(i => '<div class="nz-ctx-item" style="display:flex;align-items:center;gap:8px" onclick="WB._nzSetZustandItem(\'' + this._esc(listeId) + '\',\'' + i.z + '\')">' + i.svg + ' ' + i.label + '</div>').join('')
+      + '<div class="nz-ctx-item" style="display:flex;align-items:center;gap:8px" onclick="WB._nzBearbeitenDialog(\'' + this._esc(listeId) + '\');WB._nzMenuClose()">' + editSvg + ' Bearbeiten</div>'
+      + '<div class="nz-ctx-item danger" style="display:flex;align-items:center;gap:8px" onclick="WB._nzDeleteListe(\'' + this._esc(listeId) + '\');WB._nzMenuClose()">' + delSvg + ' L\u00f6schen</div>';
+
+    // Positionieren
+    const rect = btnEl.getBoundingClientRect();
+    menu.style.cssText = 'position:fixed;z-index:9000;top:' + (rect.bottom + 4) + 'px;right:' + (window.innerWidth - rect.right) + 'px';
+    document.body.appendChild(menu);
+    setTimeout(() => document.addEventListener('click', this._nzMenuClose.bind(this), { once: true }), 10);
+  },
+
+  _nzSetFarbe(listeId, farbe) {
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    l.farbe = farbe;
+    this.setDirty();
+    this.renderNotizenTab();
+    this._nzRenderPills();
+  },
+
+  _nzGrpState: {}, // welche Gruppen sind offen (Mobile)
+
+  _nzGrpToggle(listeId) {
+    this._nzGrpState[listeId] = !this._nzGrpState[listeId];
+    const grp = document.getElementById('nzg-' + listeId);
+    if (grp) grp.classList.toggle('open', !!this._nzGrpState[listeId]);
+  },
+
+  _nzCntLabel(l) {
+    const active = (l.items||[]).filter(i => !i.deleted);
+    if (l.typ === 'check') {
+      const erledigt = active.filter(i => i.done).length;
+      const total    = active.length;
+      return total ? (erledigt + '/' + total) : '0/0';
+    }
+    return String(active.length);
+  },
+
+  renderNotizenTab() {
+    const scroll = document.getElementById('notizen-scroll');
+    if (!scroll) return;
+    this._nzUpdateCounts();
+    if (this._isMobile()) {
+      this._nzRenderMobile(scroll);
+    } else {
+      this._nzRenderDesktop(scroll);
+    }
+  },
+
+  _nzRenderMobile(scroll) {
+    const listen = this._nzGetListen();
+    let h = '';
+    listen.forEach(l => {
+      const farbe    = l.farbe || 'c-weiss';
+      const gepinnt  = !!l.gepinnt;
+      const items    = (l.items || []).filter(i => !i.deleted);
+      const offen    = items.filter(i => !i.done).length;
+      const cntLbl   = offen > 0 ? offen + ' offen' : items.length + '';
+      const cntCls   = offen > 0 ? ' has' : '';
+      const pinHtml  = gepinnt ? '<span style="font-size:12px;flex-shrink:0">📌</span>' : '';
+
+      // Items
+      const itemsH = items.map(i => {
+        const cb = l.typ === 'check'
+          ? '<div class="nz-chk' + (i.done ? ' ck' : '') + '"'
+            + ' onclick="WB._nzToggleItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\')">'
+            + (i.done ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '')
+            + '</div>'
+          : '<div class="nz-dot"></div>';
+        return '<div class="nz-item" data-lid="' + this._esc(l.id) + '" data-iid="' + this._esc(i.id) + '">' + cb
+          + '<span class="nz-itxt' + (i.done ? ' dn' : '') + '" ondblclick="WB._nzEditItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\',this)">' + this._esc(i.text) + '</span>'
+          + '<svg class="nz-drag" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>'
+          + '<button class="nz-del-btn" onclick="WB._nzDeleteItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\')">\u00d7</button>'
+          + '</div>';
+      }).join('');
+
+      // Farbwahl-Dots
+      const colorDots = this._NZ_COLORS.map(c =>
+        '<div class="nz-cdot ' + c + '"'
+        + ' onclick="event.stopPropagation();WB._nzSetFarbe(\'' + this._esc(l.id) + '\',\'' + c + '\')"></div>'
+      ).join('');
+
+      // Mobile: State aus _nzGrpState (standardmäßig zu, nach Bearbeiten offen bleiben)
+      const isOpen = !!this._nzGrpState[l.id];
+      h += '<div class="nz-grp ' + farbe + (isOpen ? ' open' : '') + '" id="nzg-' + this._esc(l.id) + '">'
+        + '<div class="nz-grp-hdr" onclick="WB._nzGrpToggle(\'' + this._esc(l.id) + '\')">'
+        + '<span style="color:var(--accent);display:flex;align-items:center">' + this._nzSvgIcon(l.icon || 'note') + '</span>'
+        + '<span class="nz-grp-title">' + this._esc(l.titel) + '</span>'
+        + pinHtml
+        + '<span class="nz-grp-cnt' + cntCls + '">' + cntLbl + '</span>'
+        + '<button class="nz-pin-btn' + (gepinnt ? ' on' : '') + '"'
+        + ' onclick="event.stopPropagation();WB._nzTogglePin(\'' + this._esc(l.id) + '\')" aria-label="Pinnen">'
+        + this._nzSvgIcon('pin', 13) + '</button>'
+        + '<button class="nz-menu-btn" onclick="event.stopPropagation();WB._nzBearbeitenDialog(\'' + this._esc(l.id) + '\')" aria-label="Optionen">&#8943;</button>'
+        + '<span class="nz-grp-chev">&#9662;</span>'
+        + '</div>'
+        + '<div class="nz-grp-body">'
+        + '<div class="nz-color-row">' + colorDots + '</div>'
+        + itemsH
+        + '<div class="nz-add-row">'
+        + '<span style="color:var(--faint);font-size:13px">+</span>'
+        + '<input id="nz-add-' + this._esc(l.id) + '" placeholder="Eintrag hinzuf\u00fcgen..."'
+        + ' onkeydown="if(event.key===\'Enter\')WB._nzAddItem(\'' + this._esc(l.id) + '\')">'
+        + '<button class="nz-add-ok" onclick="WB._nzAddItem(\'' + this._esc(l.id) + '\')">OK</button>'
+        + '</div>'
+        + '<div class="nz-actions">'
+        + '<button class="nz-action-btn" onclick="WB._nzBearbeitenDialog(\'' + this._esc(l.id) + '\')">'
+        + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>'
+        + ' Bearbeiten</button>'
+        + '<button class="nz-action-btn danger" onclick="WB._nzDeleteListe(\'' + this._esc(l.id) + '\')">'
+        + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>'
+        + ' L\u00f6schen</button>'
+        + '</div>'
+        + '</div></div>';
+    });
+    h += '<div class="nz-new-list" onclick="WB._nzNeueListeDialog()">'
+      + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+      + 'Neue Liste erstellen</div>';
+    scroll.innerHTML = h;
+    this._nzInitDrag(scroll);
+  },
+
+  _nzRenderDesktop(scroll) {
+    const listen  = this._nzGetListen();
+    const gepinnt = listen.filter(l => !!l.gepinnt);
+    const normal  = listen.filter(l => !l.gepinnt);
+
+    const renderKachel = l => {
+      const farbe  = this._nzPostItFarbe(l.farbe || 'c-weiss');
+      const items  = (l.items || []).filter(i => !i.deleted);
+      const offen  = items.filter(i => !i.done).length;
+      const pinHtml = l.gepinnt ? '<span class="nz-postit-pin">📌</span>' : '';
+      const cntLbl = offen > 0 ? offen + '' : items.length + '';
+
+      // Max. 3 Vorschau-Items
+      let preview = '';
+      if (l.typ === 'freitext') {
+        // HTML-Inhalt als Plain-Text-Vorschau
+        const tmp = document.createElement('div');
+        tmp.innerHTML = l.inhalt || '';
+        const txt = tmp.textContent || '';
+        const lines = txt.split('\n').map(s => s.trim()).filter(Boolean);
+        preview = lines.slice(0, 3).map(line =>
+          '<div class="nz-postit-item"><span class="nz-postit-txt">' + this._esc(line) + '</span></div>'
+        ).join('');
+      } else {
+        preview = items.slice(0, 3).map(i => {
+          const chk = l.typ === 'check'
+            ? '<div class="nz-postit-chk' + (i.done ? ' done' : '') + '">' + (i.done ? '\u2713' : '') + '</div>'
+            : '<div class="nz-postit-dot"></div>';
+          return '<div class="nz-postit-item">' + chk
+            + '<span class="nz-postit-txt' + (i.done ? ' dn' : '') + '">' + this._esc(i.text) + '</span></div>';
+        }).join('');
+      }
+
+      const moreCount = items.length - 3;
+      const moreHtml  = moreCount > 0 ? '<div class="nz-postit-more">+' + moreCount + ' weitere</div>' : '';
+      // Leere Kachel: 3 leere Zeilen als Platzhalter
+      const emptyLines = items.length < 3
+        ? Array(3 - items.length).fill('<div class="nz-postit-item nz-postit-placeholder"><div class="nz-postit-line"></div></div>').join('')
+        : '';
+      const emptyHtml = items.length === 0
+        ? '<div class="nz-postit-empty">Noch keine Eintr\u00e4ge</div>' + emptyLines
+        : emptyLines;
+
+      return '<div class="nz-postit ' + farbe + '" draggable="true" '
+        + 'ondragstart="WB._nzDragStart(event,\'' + this._esc(l.id) + '\')" '
+        + 'ondragover="WB._nzDragOver(event,\'' + this._esc(l.id) + '\')" '
+        + 'ondrop="WB._nzDrop(event,\'' + this._esc(l.id) + '\')" '
+        + 'ondragend="WB._nzDragEnd()" '
+        + 'onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')" id="nzg-' + this._esc(l.id) + '" style="position:relative">'
+        + '<div class="nz-postit-hdr">'
+        + '<span class="nz-postit-icon">' + (l.icon ? this._nzSvgIcon(l.icon, 14) : '📝') + '</span>'
+        + '<span class="nz-postit-title">' + this._esc(l.titel) + '</span>'
+        + pinHtml
+        + '<span class="nz-postit-cnt">' + cntLbl + '</span>'
+        + '</div>'
+        + '<div class="nz-postit-preview">' + preview + '</div>'
+        + moreHtml + emptyHtml
+        + '</div>';
+    };
+
+    let h = '';
+    if (gepinnt.length) {
+      h += '<div class="nz-postit-section-lbl">\uD83D\uDCCC Gepinnt</div>';
+      h += '<div class="nz-grid">' + gepinnt.map(renderKachel).join('') + '</div>';
+    }
+    if (normal.length) {
+      h += '<div class="nz-postit-section-lbl">Alle Listen</div>';
+      h += '<div class="nz-grid">'
+        + normal.map(renderKachel).join('')
+        + '<div class="nz-postit-new" onclick="WB._nzNeueListeDialog()">'
+        + '<span class="nz-postit-new-icon">+</span>Neue Liste</div>'
+        + '</div>';
+    } else {
+      h += '<div class="nz-grid"><div class="nz-postit-new" onclick="WB._nzNeueListeDialog()">'
+        + '<span class="nz-postit-new-icon">+</span>Neue Liste</div></div>';
+    }
+    scroll.innerHTML = h;
+  },
+
+  // Öffnet eine Kachel als Detail-Overlay (Desktop)
+  _nzKachelOpen(listeId) {
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    if (l.typ === 'freitext') {
+      this._nzFreitextOpen(l);
+    } else {
+      this._nzKachelListeId = listeId;
+      this._nzKachelRender();
+    }
+  },
+
+  _nzFreitextOpen(l) {
+    const FARBEN = [
+      { k:'c-gelb',  bg:'#FFF59D' }, { k:'c-blau',  bg:'#B3E5FC' },
+      { k:'c-gruen', bg:'#C8E6C9' }, { k:'c-rosa',  bg:'#FFCCBC' },
+      { k:'c-lila',  bg:'#E1BEE7' }, { k:'c-weiss', bg:'#F5F5F5' },
+    ];
+    const farbPicker = '<div style="display:flex;gap:6px;align-items:center;margin-top:8px">'
+      + FARBEN.map(f => '<button onclick="WB._nzFreitextSetFarbe(\'' + this._esc(l.id) + '\',\'' + f.k + '\',this)" '
+        + 'style="width:22px;height:22px;border-radius:50%;background:' + f.bg + ';border:' + (l.farbe===f.k?'2.5px solid var(--accent)':'1.5px solid var(--border)') + ';cursor:pointer;flex-shrink:0"></button>'
+      ).join('') + '</div>';
+
+    const weltHtmlFt = '<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">'
+      + ['beide','beruf','privat'].map(w => '<button onclick="WB._nzSetWelt(\'' + this._esc(l.id) + '\',\'' + w + '\',this)" '
+        + 'style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);border:1.5px solid '
+        + (w === (l.welt||'beide') ? 'var(--accent);background:var(--accent);color:#fff' : 'var(--border);background:none;color:var(--faint)')
+        + '">' + (w==='beide'?'Beides':w==='beruf'?'Beruf':'Privat') + '</button>'
+      ).join('') + '</div>';
+
+    const body = '<div style="display:flex;flex-direction:column;gap:0">'
+      + '<div style="display:flex;gap:6px;padding:0 0 8px;flex-wrap:wrap;align-items:center">'
+      + '<button onclick="document.execCommand(\'bold\')" style="padding:3px 8px;border:1.5px solid var(--border);border-radius:5px;background:var(--surface);cursor:pointer;font-weight:700;font-family:var(--font);font-size:13px">B</button>'
+      + '<button onclick="document.execCommand(\'italic\')" style="padding:3px 8px;border:1.5px solid var(--border);border-radius:5px;background:var(--surface);cursor:pointer;font-style:italic;font-family:var(--font);font-size:13px">I</button>'
+      + '<button onclick="document.execCommand(\'underline\')" style="padding:3px 8px;border:1.5px solid var(--border);border-radius:5px;background:var(--surface);cursor:pointer;text-decoration:underline;font-family:var(--font);font-size:13px">U</button>'
+      + '<button onclick="document.execCommand(\'insertUnorderedList\')" style="padding:3px 8px;border:1.5px solid var(--border);border-radius:5px;background:var(--surface);cursor:pointer;font-family:var(--font);font-size:13px">\u2022 Liste</button>'
+      + farbPicker
+      + '</div>'
+      + weltHtmlFt
+      + '<div id="nz-ft-editor" contenteditable="true" spellcheck="true" '
+      + 'style="min-height:260px;max-height:55vh;overflow-y:auto;padding:10px 14px;outline:none;font-size:15px;line-height:1.7;color:var(--text);font-family:var(--font);border:1.5px solid var(--border);border-radius:6px;background:var(--surface2)">'
+      + (l.inhalt || '') + '</div>'
+      + '</div>';
+    const footer = '<button style="font-size:13px;font-weight:700;color:var(--faint);background:none;border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;cursor:pointer;font-family:var(--font)" onclick="WB.modalClose()">Abbrechen</button>'
+      + '<button style="font-size:13px;font-weight:700;color:var(--faint);background:none;border:none;cursor:pointer;font-family:var(--font)" onclick="WB._nzFreitextSave(\'' + this._esc(l.id) + '\');setTimeout(()=>WB._nzBearbeitenDialog(\'' + this._esc(l.id) + '\'),100)">\u2699 Einstellungen</button>'
+      + '<button style="font-size:13px;font-weight:700;color:#fff;background:var(--accent);border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-family:var(--font)" onclick="WB._nzFreitextSave(\'' + this._esc(l.id) + '\')">Speichern</button>';
+    this._modalCtx = 'nzFreitext:' + l.id;
+    this.modalOpen(this._esc(l.titel), body, footer);
+    setTimeout(() => { const ed = document.getElementById('nz-ft-editor'); if (ed) ed.focus(); }, 100);
+  },
+
+  _nzFreitextSave(listeId) {
+    const ed = document.getElementById('nz-ft-editor'); if (!ed) return;
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    l.inhalt = ed.innerHTML;
+    l.updatedAt = this._now();
+    this.setDirty();
+    this.modalClose();
+    this.renderNotizenTab();
+    this._toast('\u2713 Notiz gespeichert');
+  },
+
+  _nzFreitextSetFarbe(listeId, farbe, btnEl) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    l.farbe = farbe; l.updatedAt = this._now();
+    this.setDirty();
+    // Alle Farb-Buttons zurücksetzen, diesen markieren
+    document.querySelectorAll('.nz-ft-farb-btn').forEach(b => b.style.border = '1.5px solid var(--border)');
+    if (btnEl) btnEl.style.border = '2.5px solid var(--accent)';
+  },
+
+  _nzDragId: null,
+
+  _nzDragStart(e, listeId) {
+    this._nzDragId = listeId;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => { const el = document.getElementById('nzg-' + listeId); if (el) el.style.opacity = '0.4'; }, 0);
+  },
+
+  _nzDragOver(e, listeId) {
+    if (listeId === this._nzDragId) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.nz-postit').forEach(el => el.style.outline = '');
+    const el = document.getElementById('nzg-' + listeId);
+    if (el) el.style.outline = '2px solid var(--accent)';
+  },
+
+  _nzDrop(e, targetId) {
+    e.preventDefault();
+    const fromId = this._nzDragId; if (!fromId || fromId === targetId) return;
+    const db = this.db; if (!db?.notizen) return;
+    const fromIdx  = db.notizen.findIndex(l => l.id === fromId);
+    const targetIdx = db.notizen.findIndex(l => l.id === targetId);
+    if (fromIdx < 0 || targetIdx < 0) return;
+    const [moved] = db.notizen.splice(fromIdx, 1);
+    db.notizen.splice(targetIdx, 0, moved);
+    this.setDirty();
+    this.renderNotizenTab();
+  },
+
+  _nzDragEnd() {
+    this._nzDragId = null;
+    document.querySelectorAll('.nz-postit').forEach(el => { el.style.opacity = ''; el.style.outline = ''; });
+  },
+
+  _nzSetWelt(listeId, welt, btnEl) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    l.welt = welt === 'beide' ? undefined : welt;
+    l.updatedAt = this._now();
+    this.setDirty();
+    if (btnEl) {
+      const pills = btnEl.parentElement?.querySelectorAll('button');
+      pills?.forEach(b => { b.style.border = '1.5px solid var(--border)'; b.style.background = 'none'; b.style.color = 'var(--faint)'; });
+      btnEl.style.border = '1.5px solid var(--accent)'; btnEl.style.background = 'var(--accent)'; btnEl.style.color = '#fff';
+    }
+  },
+
+  _nzKachelRender() {
+    const listeId = this._nzKachelListeId;
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    const items = (l.items || []).filter(i => !i.deleted);
+
+    // Items rendern
+    const itemsH = items.map(i => {
+      const cb = l.typ === 'check'
+        ? '<div class="nz-chk' + (i.done ? ' ck' : '') + '"'
+          + ' onclick="WB._nzToggleItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\');WB._nzKachelRender()">'
+          + (i.done ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '')
+          + '</div>'
+        : '<div class="nz-dot"></div>';
+      return '<div class="nz-item" data-lid="' + this._esc(l.id) + '" data-iid="' + this._esc(i.id) + '">' + cb
+        + '<span class="nz-itxt' + (i.done ? ' dn' : '') + '">' + this._esc(i.text) + '</span>'
+        + '<button class="nz-del-btn" onclick="WB._nzDeleteItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\');WB._nzKachelRender()">\u00d7</button>'
+        + '</div>';
+    }).join('') || '<div style="padding:10px 14px;font-size:14px;color:var(--faint);font-style:italic">Noch keine Eintr\u00e4ge</div>';
+
+    const weltHtml = '<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">'
+      + ['beide','beruf','privat'].map(w => '<button onclick="WB._nzSetWelt(\'' + this._esc(listeId) + '\',\'' + w + '\',this)" '
+        + 'style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);border:1.5px solid '
+        + (w === (l.welt||'beide') ? 'var(--accent);background:var(--accent);color:#fff' : 'var(--border);background:none;color:var(--faint)')
+        + '">' + (w==='beide'?'Beides':w==='beruf'?'Beruf':'Privat') + '</button>'
+      ).join('') + '</div>';
+
+    const body = '<div style="display:flex;flex-direction:column;gap:0">'
+      + weltHtml
+      + itemsH
+      + '<div class="nz-add-row" style="border-top:1px solid var(--border);margin-top:4px">'
+      + '<span style="color:var(--faint);font-size:13px">+</span>'
+      + '<input id="nz-kadd-' + this._esc(l.id) + '" placeholder="Eintrag hinzuf\u00fcgen..."'
+      + ' onkeydown="if(event.key===\'Enter\'){WB._nzAddItem(\'' + this._esc(l.id) + '\');WB._nzKachelRender()}"'
+      + ' style="flex:1;border:none;background:none;font-size:14px;color:var(--text);outline:none;font-family:var(--font);">'
+      + '<button class="nz-add-ok" onclick="WB._nzAddItem(\'' + this._esc(l.id) + '\');WB._nzKachelRender()">OK</button>'
+      + '</div></div>';
+
+    const footer = '<button style="font-size:13px;font-weight:700;color:var(--faint);background:none;border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;cursor:pointer;font-family:var(--font)" onclick="WB.modalClose()">Schlie\u00dfen</button>'
+      + '<button style="font-size:13px;font-weight:700;color:var(--faint);background:none;border:none;cursor:pointer;font-family:var(--font)" onclick="WB.modalClose();WB._nzBearbeitenDialog(\'' + this._esc(l.id) + '\')">&#9998; Einstellungen</button>';
+
+    this.modalOpen(
+      (l.icon ? '' : '\uD83D\uDCDD ') + l.titel,
+      body,
+      footer
+    );
+
+    // Fokus auf Input setzen
+    setTimeout(() => {
+      const inp = document.getElementById('nz-kadd-' + l.id);
+      if (inp) inp.focus();
+    }, 150);
+  },
+
+  // Mappt Notiz-Farben auf Post-it Farben
+  _nzPostItFarbe(farbe) {
+    const map = { 'c-gelb':'c-gelb', 'c-gruen':'c-gruen', 'c-blau':'c-blau', 'c-rosa':'c-rosa', 'c-weiss':'c-weiss' };
+    return map[farbe] || 'c-weiss';
+  },
+
+  _nzInitDrag(scroll) {
+    let dragItem = null, dragLid = null, dragIid = null;
+    const getItem = el => el.closest('.nz-item');
+
+    // ── Mouse Drag ──
+    scroll.addEventListener('mousedown', e => {
+      if (!e.target.closest('.nz-drag')) return;
+      const item = getItem(e.target); if (!item) return;
+      dragItem = item; dragLid = item.dataset.lid; dragIid = item.dataset.iid;
+      dragItem.classList.add('nz-dragging');
+      e.preventDefault();
+    });
+    scroll.addEventListener('mousemove', e => {
+      if (!dragItem) return;
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const over = el && getItem(el);
+      scroll.querySelectorAll('.nz-drag-over').forEach(x => x.classList.remove('nz-drag-over'));
+      if (over && over !== dragItem && over.dataset.lid === dragLid) over.classList.add('nz-drag-over');
+    });
+    scroll.addEventListener('mouseup', e => {
+      if (!dragItem) return;
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const over = el && getItem(el);
+      if (over && over !== dragItem && over.dataset.lid === dragLid) this._nzMoveItem(dragLid, dragIid, over.dataset.iid);
+      dragItem.classList.remove('nz-dragging');
+      scroll.querySelectorAll('.nz-drag-over').forEach(x => x.classList.remove('nz-drag-over'));
+      dragItem = null; dragLid = null; dragIid = null;
+    });
+
+    // ── Touch Drag (Pixel) ──
+    let touchOver = null;
+    scroll.addEventListener('touchstart', e => {
+      if (!e.target.closest('.nz-drag')) return;
+      const item = getItem(e.target); if (!item) return;
+      dragItem = item; dragLid = item.dataset.lid; dragIid = item.dataset.iid;
+      dragItem.classList.add('nz-dragging');
+    }, { passive: true });
+    scroll.addEventListener('touchmove', e => {
+      if (!dragItem) return;
+      const t = e.touches[0];
+      const el = document.elementFromPoint(t.clientX, t.clientY);
+      const over = el && getItem(el);
+      scroll.querySelectorAll('.nz-drag-over').forEach(x => x.classList.remove('nz-drag-over'));
+      touchOver = null;
+      if (over && over !== dragItem && over.dataset.lid === dragLid) { over.classList.add('nz-drag-over'); touchOver = over; }
+      e.preventDefault();
+    }, { passive: false });
+    scroll.addEventListener('touchend', () => {
+      if (!dragItem) return;
+      if (touchOver && touchOver !== dragItem && touchOver.dataset.lid === dragLid) this._nzMoveItem(dragLid, dragIid, touchOver.dataset.iid);
+      dragItem.classList.remove('nz-dragging');
+      scroll.querySelectorAll('.nz-drag-over').forEach(x => x.classList.remove('nz-drag-over'));
+      dragItem = null; dragLid = null; dragIid = null; touchOver = null;
+    });
+  },
+
+  _nzMoveItem(listeId, fromIid, toIid) {
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    const allItems = l.items || [];
+    const fromIdx = allItems.findIndex(i => i.id === fromIid);
+    const toIdx   = allItems.findIndex(i => i.id === toIid);
+    if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+    const moved = allItems[fromIdx];
+    const reordered = allItems.filter((_, idx) => idx !== fromIdx);
+    const insertAt  = reordered.findIndex(i => i.id === toIid);
+    l.items = [...reordered.slice(0, insertAt), moved, ...reordered.slice(insertAt)];
+    this.setDirty();
+    this.renderNotizenTab();
+  },
+
+  _nzEditItem(listeId, itemId, spanEl) {
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    // Inline-Input erstellen
+    const input = document.createElement('input');
+    input.value = i.text;
+    input.style.cssText = 'flex:1;border:none;border-bottom:1.5px solid var(--accent);background:transparent;font-size:14px;color:var(--text);font-family:var(--font);outline:none;padding:0;width:100%';
+    spanEl.replaceWith(input);
+    input.focus();
+    input.select();
+    const save = () => {
+      const newText = input.value.trim();
+      if (newText && newText !== i.text) {
+        i.text = newText; i.updatedAt = this._now();
+        this.setDirty();
+      }
+      // Gruppe offen lassen nach Bearbeiten
+      this._nzGrpState[listeId] = true;
+      this.renderNotizenTab();
+    };
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); save(); }
+      if (e.key === 'Escape') { this.renderNotizenTab(); }
+    });
+  },
+
+  _nzTogglePin(listeId) {
+    const listen = this._nzGetListen();
+    const gepinntAnzahl = listen.filter(l => l.gepinnt).length;
+    const l = listen.find(x => x.id === listeId); if (!l) return;
+    if (!l.gepinnt && gepinntAnzahl >= 3) {
+      this._toast('Max. 3 Listen k\u00f6nnen gepinnt werden');
+      return;
+    }
+    l.gepinnt = !l.gepinnt;
+    this.setDirty();
+    this.renderNotizenTab();
+    this._nzRenderPills();
+  },
+
+  _nzRenderPills() {
+    const bar  = document.getElementById('nz-pin-pills-bar');
+    const cont = document.getElementById('nz-pin-pills-container');
+    if (!bar || !cont) return;
+    const gepinnt = this._nzGetListen().filter(l => l.gepinnt);
+    if (!gepinnt.length) { bar.style.display = 'none'; return; }
+    bar.style.display = '';
+    cont.innerHTML = gepinnt.map(l => {
+      const cntLbl = l.typ === 'check' ? this._nzCntLabel(l) : '';
+      return '<span class="nz-pin-pill ' + (l.farbe||'c-gelb') + '"'
+        + ' onclick="WB._nzFloatOpen(\'' + this._esc(l.id) + '\')">'
+        + '<span class="nz-pill-dot"></span>'
+        + '<span class="nz-pill-lbl">' + this._esc(l.titel) + '</span>'
+        + (cntLbl ? '<span class="nz-pill-cnt">' + cntLbl + '</span>' : '')
+        + '</span>';
+    }).join('');
+  },
+
+  _nzCurrentFloatId: null,
+
+  _nzFloatOpen(listeId) {
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    this._nzCurrentFloatId = listeId;
+    const ov    = document.getElementById('nz-float-overlay');
+    const box   = document.getElementById('nz-float-box');
+    const icon  = document.getElementById('nz-float-icon');
+    const title = document.getElementById('nz-float-title');
+    const cnt   = document.getElementById('nz-float-cnt');
+    const body  = document.getElementById('nz-float-body');
+    const addRow= document.getElementById('nz-float-add-row');
+    const input = document.getElementById('nz-float-input');
+    if (!ov) return;
+    // Farbe ans Box
+    if (box) {
+      box.className = 'nz-float-box';
+      const fg = l.farbe || 'c-gelb';
+      const bgMap = { 'c-gelb':'#fffbe6','c-gruen':'#eaf7ea','c-blau':'#e8f2fb','c-rosa':'#fce8f0','c-weiss':'#fff' };
+      const boMap = { 'c-gelb':'#d4c22a','c-gruen':'#7dbc7d','c-blau':'#7aaed6','c-rosa':'#d87aaa','c-weiss':'rgba(0,0,0,.15)' };
+      box.style.background = bgMap[fg] || '#fff';
+      box.style.borderColor = boMap[fg] || '#ccc';
+    }
+    if (icon) icon.innerHTML = '<span style="color:var(--accent)">' + this._nzSvgIcon(l.icon||'note', 15) + '</span>';
+    if (title) title.textContent = l.titel;
+    if (cnt) cnt.textContent = this._nzCntLabel(l);
+    if (addRow) addRow.style.display = 'flex';
+    if (input) { input.value = ''; }
+    this._nzFloatRenderBody();
+    ov.classList.add('open');
+  },
+
+  _nzFloatRenderBody() {
+    const listeId = this._nzCurrentFloatId; if (!listeId) return;
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    const body = document.getElementById('nz-float-body'); if (!body) return;
+    const cnt  = document.getElementById('nz-float-cnt');
+    if (cnt) cnt.textContent = this._nzCntLabel(l);
+    const items = (l.items||[]).filter(i => !i.deleted);
+    if (!items.length) { body.innerHTML = '<div style="padding:12px;color:var(--faint);font-size:13px;text-align:center">Noch keine Eintr\u00e4ge</div>'; return; }
+    body.innerHTML = items.map(i => {
+      const cb = l.typ === 'check'
+        ? '<div class="nz-float-chk' + (i.done ? ' ck' : '') + '"'
+          + ' onclick="WB._nzFloatToggle(\'' + this._esc(i.id) + '\')">'
+          + (i.done ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '')
+          + '</div>'
+        : '<div class="nz-float-dot"></div>';
+      return '<div class="nz-float-item">' + cb
+        + '<span class="nz-float-txt' + (i.done ? ' dn' : '') + '">' + this._esc(i.text) + '</span>'
+        + '</div>';
+    }).join('');
+  },
+
+  _nzFloatToggle(itemId) {
+    const l = this._nzGetListen().find(x => x.id === this._nzCurrentFloatId); if (!l) return;
+    const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    i.done = !i.done;
+    l.items.sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0));
+    this.setDirty();
+    this._nzFloatRenderBody();
+    this._nzRenderPills();
+  },
+
+  _nzFloatAdd() {
+    const input = document.getElementById('nz-float-input');
+    const text  = input?.value?.trim(); if (!text) return;
+    const l = this._nzGetListen().find(x => x.id === this._nzCurrentFloatId); if (!l) return;
+    if (!l.items) l.items = [];
+    l.items.push({ id: 'ni_' + Date.now(), text, done: false, createdAt: this._now() });
+    input.value = '';
+    this.setDirty();
+    this._nzFloatRenderBody();
+    this._nzRenderPills();
+  },
+
+  _nzFloatClose() {
+    const ov = document.getElementById('nz-float-overlay');
+    if (ov) ov.classList.remove('open');
+    this._nzCurrentFloatId = null;
+    if (this.activeTab === 'notizen') this.renderNotizenTab();
+  },
+
+  _nzAddItem(listeId) {
+    // iOS/iPad: blur kann den Wert leeren bevor onclick greift
+    // Daher Wert aus allen möglichen Quellen lesen
+    const input = document.getElementById('nz-add-' + listeId)
+      || document.querySelector('[id^="nz-kadd-' + listeId + '"]');
+    const text = input?.value?.trim() || '';
+    if (!text) { if (input) input.focus(); return; }
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    if (!l.items) l.items = [];
+    l.items.push({ id: 'ni_' + Date.now(), text, done: false, createdAt: this._now() });
+    if (input) input.value = '';
+    this.setDirty();
+    // Gruppe offen lassen nach Hinzufügen
+    this._nzGrpState[listeId] = true;
+    this.renderNotizenTab();
+    this._nzRenderPills();
+    // iOS: Fokus nach render zurücksetzen
+    setTimeout(() => {
+      const newInput = document.getElementById('nz-add-' + listeId);
+      if (newInput) newInput.focus();
+    }, 100);
+  },
+
+  _nzToggleItem(listeId, itemId) {
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    i.done = !i.done;
+    l.items.sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0));
+    this.setDirty();
+    this.renderNotizenTab();
+    this._nzRenderPills();
+  },
+
+  _nzDeleteItem(listeId, itemId) {
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    this._softDelete(i);
+    this.setDirty();
+    this.renderNotizenTab();
+    this._nzRenderPills();
+  },
+
+  _nzDeleteListe(listeId) {
+    if (!confirm('Diese Liste und alle Eintr\u00e4ge l\u00f6schen?')) return;
+    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    this._softDelete(l);
+    this.setDirty();
+    this.renderNotizenTab();
+    this._nzRenderPills();
+  },
+
+  _nzBearbeitenDialog(listeId) {
+    // Auch in gelöschten suchen (für Archiv-Tab)
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const iconOpts = ['note','cart','tools','bag','idea','gift','star','heart','book','camera','music','plane','home','sport','food','money','health','user','target','clock','sun','leaf','flag','lock','mail','phone'].map(ic =>
+      '<button onclick="document.getElementById(\'nz-e-icon\').value=\'' + ic + '\';document.querySelectorAll(\'.nz-ic-btn\').forEach(b=>b.style.background=\'\');this.style.background=\'var(--surface2)\'" class="nz-ic-btn" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1.5px solid var(--border);border-radius:8px;background:none;cursor:pointer;color:var(--accent)">'
+      + this._nzSvgIcon(ic, 18) + '</button>'
+    ).join('');
+
+    const curZustand = l.zustand || 'aktuell';
+    const zustandOpts = [
+      { v:'aktuell',   l:'Aktuell (kein Merkmal)' },
+      { v:'parkplatz', l:'Parkplatz' },
+      { v:'kompass',   l:'Kompass' },
+      { v:'archiv',    l:'Archiv' },
+    ].map(o => '<option value="' + o.v + '"' + (curZustand === o.v ? ' selected' : '') + '>' + o.l + '</option>').join('');
+
+    const body = '<div class="wb-input-group"><label class="wb-label">Name</label>'
+      + '<input id="nz-e-name" class="wb-input" value="' + this._esc(l.titel) + '"></div>'
+      + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Icon</label>'
+      + '<input id="nz-e-icon" type="hidden" value="' + this._esc(l.icon||'note') + '">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">' + iconOpts + '</div></div>'
+      + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Typ</label>'
+      + '<select id="nz-e-typ" class="wb-select">'
+      + '<option value="check"' + (l.typ==='check'?' selected':'') + '>Checkliste</option>'
+      + '<option value="bullet"' + (l.typ==='bullet'?' selected':'') + '>Ideenliste</option>'
+      + '<option value="freitext"' + (l.typ==='freitext'?' selected':'') + '>Freitext</option>'
+      + '</select></div>'
+      + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Zustand</label>'
+      + '<select id="nz-e-zustand" class="wb-select">' + zustandOpts + '</select></div>'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding:10px 0;border-top:1px solid var(--border)">'
+      + '<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;flex:1">'
+      + '<input type="checkbox" id="nz-e-gepinnt"' + (l.gepinnt ? ' checked' : '') + ' style="width:17px;height:17px;accent-color:var(--accent)"> Gepinnt</label>'
+      + '<button onclick="WB._nzDeleteListe(\'' + this._esc(listeId) + '\');WB.modalClose()" style="padding:5px 12px;border-radius:8px;border:1.5px solid #C0392B;background:none;color:#C0392B;cursor:pointer;font-size:13px;font-weight:700;font-family:var(--font)">Löschen</button>'
+      + '</div>';
+
+    this._modalCtx = { type:'nz-edit', id: listeId };
+    this.modalOpen('Liste bearbeiten', body,
+      '<button class="wb-btn" onclick="WB.modalClose()">Abbrechen</button>'
+      + '<button class="wb-btn wb-btn-primary" onclick="WB._nzBearbeitenSpeichern(\'' + this._esc(listeId) + '\')">Speichern</button>');
+    setTimeout(() => document.getElementById('nz-e-name')?.focus(), 100);
+  },
+
+  _nzBearbeitenSpeichern(listeId) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const name    = document.getElementById('nz-e-name')?.value?.trim();
+    const icon    = document.getElementById('nz-e-icon')?.value || 'note';
+    const typ     = document.getElementById('nz-e-typ')?.value || 'check';
+    const zustand = document.getElementById('nz-e-zustand')?.value || 'aktuell';
+    const gepinnt = document.getElementById('nz-e-gepinnt')?.checked || false;
+    if (!name) { this._toast('Bitte Namen eingeben'); return; }
+    l.titel   = name;
+    l.icon    = icon;
+    l.typ     = typ;
+    l.gepinnt = gepinnt;
+    l.updatedAt = this._now();
+    if (zustand === 'archiv') {
+      this._softDelete(l);
+    } else {
+      l.deleted = false;
+      if (zustand === 'aktuell') { delete l.zustand; } else { l.zustand = zustand; }
+    }
+    this.setDirty();
+    this.modalClose();
+    this.renderNotizenTab();
+    this._nzRenderPills();
+    this._toast('\u2713 Gespeichert');
+  },
+
+  _nzNeueListeDialog() {
+    const iconOpts = ['note','cart','tools','bag','idea','gift','star','heart','book','camera','music','plane','home','sport','food','money','health','user','target','clock','sun','leaf','flag','lock','mail','phone'].map(ic =>
+      '<button onclick="document.getElementById(\'nz-new-icon\').value=\'' + ic + '\';document.querySelectorAll(\'.nz-ic-btn-new\').forEach(b=>b.style.background=\'\');this.style.background=\'var(--surface2)\'" class="nz-ic-btn-new" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1.5px solid var(--border);border-radius:8px;background:none;cursor:pointer;color:var(--accent)">'
+      + this._nzSvgIcon(ic, 18) + '</button>'
+    ).join('');
+    const body = '<div class="wb-input-group"><label class="wb-label">Name</label>'
+      + '<input id="nz-new-name" class="wb-input" placeholder="z.B. Leseliste"></div>'
+      + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Icon</label>'
+      + '<input id="nz-new-icon" type="hidden" value="note">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">' + iconOpts + '</div></div>'
+      + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Typ</label>'
+      + '<select id="nz-new-typ" class="wb-select"><option value="check">Checkliste</option><option value="bullet">Ideenliste</option><option value="freitext">Freitext</option></select></div>';
+    this._modalCtx = { type:'nz-neu' };
+    this.modalOpen('Neue Liste', body,
+      '<button class="wb-btn" onclick="WB.modalClose()">Abbrechen</button>'
+      + '<button class="wb-btn wb-btn-primary" onclick="WB._nzNeueSpeichern()">Erstellen</button>');
+    setTimeout(() => document.getElementById('nz-new-name')?.focus(), 100);
+  },
+
+  _nzNeueSpeichern() {
+    const name = document.getElementById('nz-new-name')?.value?.trim();
+    const icon = document.getElementById('nz-new-icon')?.value || 'note';
+    const typ  = document.getElementById('nz-new-typ')?.value || 'check';
+    if (!name) { this._toast('Bitte Namen eingeben'); return; }
     if (!this.db.notizen) this.db.notizen = [];
-    const welt = this.activeWorld === 'beruf' ? 'beruf' : this.activeWorld === 'privat' ? 'privat' : undefined;
-    this.db.notizen.push({ id:'nz_'+Date.now(), titel, typ:this._nzNeuTyp, farbe:'c-weiss', icon:'note', items:[], gepinnt:false, welt, inhalt:'', updatedAt:this._now() });
-    this.setDirty(); this.modalClose(); this.renderNotizenTab();
+    const neuerZustand = (this._nzZustand === 'aktuell' || this._nzZustand === 'archiv') ? undefined : this._nzZustand;
+    const neueNotiz = { id:'nz_'+Date.now(), titel:name, icon, typ, farbe:'c-weiss', items:[], gepinnt:false, updatedAt: this._now() };
+    if (neuerZustand) neueNotiz.zustand = neuerZustand;
+    this.db.notizen.push(neueNotiz);
+    this.setDirty();
+    this.modalClose();
+    this.renderNotizenTab();
     this._toast('\u2713 Liste erstellt');
   },
 
-  // Suche
-  _nzSuche() { this.renderNotizenTab(); },
 
   // ── WOCHE ────────────────────────────────────────────
   _woView:   'list',
@@ -2081,54 +3099,84 @@ const WB = {
   },
 
   // ── TERMIN ───────────────────────────────────────────
-  terminOpen(eventId) {
-    const e = eventId ? (this.db?.customEvents||[]).find(x=>x.id===eventId) : null;
-    const aktuellerCtx = e ? (e.welt==='pro'?'pro':'priv') : (this.activeWorld==='beruf'?'pro':'priv');
-
-    const weltCls = aktuellerCtx==='pro'?'':'privat';
-    const weltTxt = aktuellerCtx==='pro'?'BERUF':'PRIVAT';
-    const weltPill = '<div class="wb-welt-pill '+weltCls+'" onclick="WB._modalToggleWelt(this)">'+weltTxt+'</div>';
-
-    const body = '<div class="wb-dialog-top">' + weltPill + '</div>'
-      + '<div class="wb-input-group"><input id="wb-f-text" class="wb-input wb-input-lg" type="text" placeholder="Terminbezeichnung..." value="' + this._esc(e?.text||'') + '"></div>'
-      + '<div class="wb-row2">'
-      + '<div class="wb-input-group"><label class="wb-label">Datum</label><input id="wb-f-date" class="wb-input" type="date" value="' + this._esc(e?.date||'') + '"></div>'
-      + '<div class="wb-input-group"><label class="wb-label">Uhrzeit</label><input id="wb-f-time" class="wb-input" type="time" value="' + this._esc(e?.startTime||'') + '"></div>'
+  terminOpen(eventId, ctx) {
+    const db = this.db;
+    const e  = eventId ? (this.db?.customEvents||[]).find(x => x.id === eventId) : null;
+    // Bestehender Termin: seine Welt laden. Neuer Termin: aktive Welt nutzen
+    const aktuellerCtx = e
+      ? (e.welt === 'pro' ? 'pro' : 'priv')
+      : (this.activeWorld === 'beruf' ? 'pro' : ctx || 'priv');
+    const body = this._modalWeltTop(aktuellerCtx, e?.vertraulich)
+      + '<div class="wb-input-group">'
+      + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
+      + ' placeholder="Terminbezeichnung..." value="' + this._esc(e?.text||'') + '">'
       + '</div>'
-      + '<div class="wb-input-group"><label class="wb-label">Dauer (Minuten, optional)</label><input id="wb-f-dur" class="wb-input" type="number" min="5" step="5" placeholder="z.\u202fB. 60" value="' + this._esc(String(e?.durationMin||'')) + '"></div>'
-      + (e?.storniert ? '<div style="background:var(--surface2);border-left:3px solid var(--faint);border-radius:0 6px 6px 0;padding:8px 10px;font-size:14px;color:var(--muted);margin-bottom:8px;">\u26a0 Abgesagt</div>' : '');
-
-    this._modalCtx = { type:'termin', eventId };
-
+      + '<div class="wb-row2">'
+      + '<div class="wb-input-group"><label class="wb-label">Datum</label>'
+      + '<input id="wb-f-date" class="wb-input" type="date" value="' + this._esc(e?.date||'') + '">'
+      + '</div>'
+      + '<div class="wb-input-group"><label class="wb-label">Uhrzeit</label>'
+      + '<input id="wb-f-time" class="wb-input" type="time"'
+      + ' value="' + this._esc(e?.startTime||'') + '" oninput="WB._modalUpdateWeiche()">'
+      + '</div></div>'
+      + '<div style="display:flex;gap:12px;align-items:flex-end;">'
+      + '<div class="wb-input-group" style="flex:1"><label class="wb-label">Dauer (Min)</label>'
+      + '<input id="wb-f-dur" class="wb-input" type="text" placeholder="60"'
+      + ' value="' + this._esc(String(e?.durationMin||'')) + '">'
+      + '</div>'
+      + '<div class=\"wb-weiche-info\" id=\"wb-weiche\">Ohne Uhrzeit \u2192 nur im Backlog (Pull)</div></div>'
+    this._modalCtx = { type:'termin', eventId, ctx: aktuellerCtx };
+    // Storniert-Banner
+    const storniertBanner = e?.storniert
+      ? '<div style="background:var(--surface2);border-left:3px solid var(--faint);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:8px 10px;font-size:16px;color:var(--muted);margin-bottom:4px;">'
+        + '\u26a0 Dieser Termin wurde abgesagt.</div>'
+      : '';
     const footer = e?.storniert
-      ? '<button class="wb-btn" style="color:var(--accent);border-color:var(--accent);" onclick="WB._terminWiederherstellen(&quot;' + this._esc(e?.id||'') + '&quot;)">\u21ba Wiederherstellen</button>'
+      ? '<div class="wb-modal-footer">'
+        + '<button class="wb-btn" style="color:var(--accent);border-color:var(--accent);" onclick="WB._terminWiederherstellen(&quot;' + this._esc(e?.id||'') + '&quot;)">\u21ba Wiederherstellen</button>'
         + '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Schlie\u00dfen</button>'
-      : this._modalFooter(!!eventId);
-    this.modalOpen(eventId ? 'Termin bearbeiten' : 'Neuer Termin', body, footer);
+        + '</div>'
+      : this._modalFooter(!!eventId, !!eventId);
+    this.modalOpen(eventId ? 'Termin bearbeiten' : 'Neuer Termin', storniertBanner + body, footer);
+    this._modalUpdateWeiche();
+  },
+  _modalUpdateWeiche() {
+    const timeEl = document.getElementById('wb-f-time');
+    const weiche = document.getElementById('wb-weiche');
+    if (!weiche) return;
+    const hasTime = !!(timeEl?.value);
+    weiche.classList.toggle('push', hasTime);
+    weiche.textContent = hasTime
+      ? 'Mit Uhrzeit \u2192 erscheint im Cockpit (Push)'
+      : 'Ohne Uhrzeit \u2192 nur im Backlog sichtbar (Pull)';
   },
 
   _terminWiederherstellen(eventId) {
-    const e = (this.db?.customEvents||[]).find(x=>x.id===eventId); if(!e) return;
-    e.storniert = false; e.updatedAt = this._now();
+    const e = (this.db?.customEvents||[]).find(x => x.id === eventId);
+    if (e) { e.storniert = false; e.updatedAt = this._now(); }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('\u2713 Termin wiederhergestellt');
   },
 
   _savTermin(c) {
-    const db=this.db; if(!db){this._toast('Daten nicht geladen');return;}
-    const text=document.getElementById('wb-f-text')?.value.trim(); if(!text){this._toast('Text fehlt');return;}
-    const date=document.getElementById('wb-f-date')?.value||'';
-    const time=document.getElementById('wb-f-time')?.value||'';
-    const dur=parseInt(document.getElementById('wb-f-dur')?.value||'0')||0;
-    const weltPill=document.querySelector('.wb-welt-pill');
-    const welt=weltPill?.classList.contains('privat')?'priv':'pro';
-    if(!db.customEvents) db.customEvents=[];
-    const obj={text,date,startTime:time,durationMin:dur||undefined,done:false,welt,updatedAt:this._now()};
-    if(c.eventId) {
-      const idx=db.customEvents.findIndex(x=>x.id===c.eventId);
-      if(idx>=0) db.customEvents[idx]={...db.customEvents[idx],...obj};
+    const db = this.db; if (!db) { this._toast('Daten nicht geladen'); return; }
+    const text = document.getElementById('wb-f-text')?.value.trim();
+    if (!text) { this._toast('Text fehlt'); return; }
+    const date = document.getElementById('wb-f-date')?.value || '';
+    const time = document.getElementById('wb-f-time')?.value || '';
+    const dur  = parseInt(document.getElementById('wb-f-dur')?.value||'60', 10) || 60;
+    // Welt aus Pill lesen für Anzeige-Badge
+    const weltPill = document.querySelector('.wb-welt-pill');
+    const welt = weltPill?.classList.contains('privat') ? 'priv' : 'pro';
+    // Immer in dataPriv speichern
+
+    if (!db) return;
+    if (!db.customEvents) db.customEvents = [];
+    if (c.eventId) {
+      const idx = db.customEvents.findIndex(x => x.id === c.eventId);
+      if (idx >= 0) db.customEvents[idx] = { ...db.customEvents[idx], ...obj };
     } else {
-      db.customEvents.push({id:'e_'+Date.now(),...obj});
+      db.customEvents.push({ id:'e_'+Date.now(), ...obj });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('\u2713 Termin gespeichert');
@@ -2335,388 +3383,511 @@ const WB = {
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
   },
 
-  // ── IDB ──────────────────────────────────────────────
+  // ── IDB ──
   async idbOpen() {
-    return new Promise((resolve,reject)=>{
-      const req=indexedDB.open(this.IDB_NAME,this.IDB_VERSION);
-      req.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains('data'))db.createObjectStore('data');if(!db.objectStoreNames.contains('meta'))db.createObjectStore('meta');};
-      req.onsuccess=e=>{this._idb=e.target.result;resolve();};
-      req.onerror=e=>reject(e.target.error);
-      req.onblocked=()=>resolve();
-    });
-  },
-
-  async idbGet(store,key) {
-    return new Promise((resolve,reject)=>{
-      const tx=this._idb.transaction(store,'readonly');
-      const req=tx.objectStore(store).get(key);
-      req.onsuccess=e=>resolve(e.target.result??null);
-      req.onerror=e=>reject(e.target.error);
-    });
-  },
-
-  async idbSet(store,key,val) {
-    return new Promise((resolve,reject)=>{
-      const tx=this._idb.transaction(store,'readwrite');
-      const req=tx.objectStore(store).put(val,key);
-      req.onsuccess=()=>resolve();
-      req.onerror=e=>reject(e.target.error);
-    });
-  },
-
-  async idbLoad() {
-    try {
-      const clientId=await this.idbGet('meta','oauthClientId'); if(clientId) this._oauthClientId=clientId;
-      const token=await this.idbGet('meta','oauthToken');
-      const tokenExp=await this.idbGet('meta','oauthTokenExp');
-      if(token&&tokenExp){this._oauthToken=token;this._oauthTokenExp=parseInt(tokenExp)||0;}
-      const lastUp=await this.idbGet('meta','lastUpload');
-      const lastDn=await this.idbGet('meta','lastDownload');
-      const pend=await this.idbGet('meta','pendingChanges');
-      const fid=await this.idbGet('meta','driveFileId');
-      if(lastUp) this._syncLastUpload=parseInt(lastUp)||0;
-      if(lastDn) this._syncLastDownload=parseInt(lastDn)||0;
-      if(pend)   this._pendingChanges=pend==='true';
-      if(fid)    this._driveFileId=fid;
-      const dbRaw=await this.idbGet('data','db');
-      if(dbRaw&&dbRaw._version) {
-        this.db=dbRaw;
-        this._ensureDbFields();
-      } else {
-        this.db=this._emptyDb();
-      }
-    } catch(e) {
-      console.warn('[idbLoad]',e.message);
-      if(!this.db) this.db=this._emptyDb();
-    }
-  },
-
-  // ── Migration von alter WorkBench-DB ────────────────
-  async _migrateFromOldDb() {
-    // Nur einmal ausfuehren (Guard)
-    if (await this.idbGet('meta','slimMigrationDone') === 'true') return;
-    console.log('[slimMigrate] Suche alte WorkBench-IDB...');
-    try {
-      const oldDb = await new Promise((resolve, reject) => {
-        const req = indexedDB.open('workbench-v2', 3);
-        req.onsuccess = e => resolve(e.target.result);
-        req.onerror   = e => reject(e.target.error);
-        req.onblocked = () => reject(new Error('blocked'));
-      });
-      const oldData = await new Promise((resolve, reject) => {
-        const tx  = oldDb.transaction('data', 'readonly');
-        const req = tx.objectStore('data').get('db');
-        req.onsuccess = e => resolve(e.target.result);
-        req.onerror   = e => reject(e.target.error);
-      });
-      oldDb.close();
-      if (!oldData) {
-        await this.idbSet('meta','slimMigrationDone','true');
-        console.log('[slimMigrate] Keine alten Daten gefunden.');
-        return;
-      }
-
-      console.log('[slimMigrate] Alte Daten gefunden, starte Migration...');
-      let migrated = 0;
-
-      // 1) customEvents übernehmen
-      const oldEvents = oldData.customEvents || [];
-      const existIds  = new Set((this.db.customEvents||[]).map(e => e.id));
-      oldEvents.forEach(e => {
-        if (!e.id || existIds.has(e.id)) return;
-        this.db.customEvents.push({ ...e });
-        migrated++;
-      });
-
-      // 2) Notizen übernehmen
-      if (!this.db.notizen) this.db.notizen = [];
-      const existNzIds = new Set(this.db.notizen.map(n => n.id));
-      const oldNotizen = oldData.notizen || [];
-      oldNotizen.forEach(n => {
-        if (!n.id || existNzIds.has(n.id)) return;
-        // zustand-Feld übernehmen (aktuell/parkplatz/kompass/archiv)
-        this.db.notizen.push({ ...n });
-        migrated++;
-      });
-
-      // 3) Vorhaben → Notizen (je eine Checklisten-Notiz)
-      const oldVorhaben = oldData.vorhaben || [];
-      oldVorhaben.forEach(v => {
-        if (v.deleted) return;
-        const nzId = 'nz_vh_' + v.id;
-        if (existNzIds.has(nzId)) return;
-        const aufgaben = (oldData.aufgaben || []).filter(a => a.vorhabenId === v.id && !a.deleted);
-        const items = aufgaben.map(a => ({
-          id:   'i_' + a.id,
-          text: a.text || a.titel || '(Aufgabe)',
-          done: !!a.done,
-          deleted: false,
-        }));
-        this.db.notizen.push({
-          id:        nzId,
-          titel:     v.titel || 'Vorhaben',
-          typ:       'check',
-          farbe:     'c-weiss',
-          icon:      'list',
-          items,
-          gepinnt:   false,
-          welt:      v.welt === 'pro' ? 'beruf' : v.welt === 'priv' ? 'privat' : 'beide',
-          zustand:   'aktuell',
-          inhalt:    v.beschreibung || '',
-          updatedAt: this._now(),
-          _migratedFromVorhaben: v.id,
-        });
-        migrated++;
-      });
-
-      // 4) Wochenpflichten → 2 Notizen (beruf + privat)
-      const oldPflichten = oldData.wochenpflichten || [];
-      const berufPfl  = oldPflichten.filter(p => !p.deleted && p.welt === 'pro');
-      const privatPfl = oldPflichten.filter(p => !p.deleted && p.welt !== 'pro');
-
-      const addPflichtNotiz = (pflichten, welt, titel, nzId) => {
-        if (!pflichten.length) return;
-        if (existNzIds.has(nzId)) return;
-        const items = pflichten.map(p => ({
-          id:   'i_' + p.id,
-          text: p.text || p.titel || '(Pflicht)',
-          done: false,
-          deleted: false,
-        }));
-        this.db.notizen.push({
-          id:        nzId,
-          titel,
-          typ:       'check',
-          farbe:     'c-weiss',
-          icon:      'list',
-          items,
-          gepinnt:   false,
-          welt,
-          zustand:   'aktuell',
-          inhalt:    '',
-          updatedAt: this._now(),
-          _migratedFromPflichten: true,
-        });
-        migrated++;
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('data')) db.createObjectStore('data');
+        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta');
       };
-      addPflichtNotiz(berufPfl,  'beruf',  'Berufliche Wochenpflichten',  'nz_pfl_pro');
-      addPflichtNotiz(privatPfl, 'privat', 'Private Wochenpflichten',     'nz_pfl_priv');
-
-      // 5) wochenMottos übernehmen
-      if (oldData.wochenMottos) {
-        this.db.wochenMottos = { ...oldData.wochenMottos, ...(this.db.wochenMottos||{}) };
-      }
-
-      await this.idbSet('meta','slimMigrationDone','true');
-      await this.idbSave();
-      this.setDirty();
-      console.log('[slimMigrate] Migration abgeschlossen, ' + migrated + ' Objekte migriert.');
-      if (migrated > 0) this._toast('\u2705 ' + migrated + ' Eintr\u00e4ge aus alter WorkBench migriert');
-    } catch (err) {
-      console.warn('[slimMigrate] Fehler oder keine alte DB:', err.message || err);
-      // Fehler = keine alte DB → Guard setzen damit nicht jedes Mal versucht wird
-      try { await this.idbSet('meta','slimMigrationDone','true'); } catch(_) {}
-    }
+      req.onsuccess = e => { this._idb = e.target.result; resolve(); };
+      req.onerror   = e => reject(e.target.error);
+      req.onblocked = () => resolve();
+    });
   },
 
-  async idbSave() {
+  async idbGet(store, key) {
+    return new Promise((resolve, reject) => {
+      const tx  = this._idb.transaction(store, 'readonly');
+      const req = tx.objectStore(store).get(key);
+      req.onsuccess = e => resolve(e.target.result ?? null);
+      req.onerror   = e => reject(e.target.error);
+    });
+  },
+
+  async idbSet(store, key, val) {
+    return new Promise((resolve, reject) => {
+      const tx  = this._idb.transaction(store, 'readwrite');
+      const req = tx.objectStore(store).put(val, key);
+      req.onsuccess = () => resolve();
+      req.onerror   = e => reject(e.target.error);
+    });
+  },
+
+  async idbLoadAll() {
     try {
-      if(this.db) await this.idbSet('data','db',this.db);
-      await this.idbSet('meta','lastUpload',String(this._syncLastUpload));
-      await this.idbSet('meta','lastDownload',String(this._syncLastDownload));
-      await this.idbSet('meta','pendingChanges',this._pendingChanges?'true':'false');
-      if(this._driveFileId) await this.idbSet('meta','driveFileId',this._driveFileId);
-    } catch(e){console.warn('[idbSave]',e.message);}
+      const pro  = await this.idbGet('data', 'dataPro');
+      const priv = await this.idbGet('data', 'dataPriv');
+      if (pro)  this.dataPro  = pro;
+      if (priv) this.dataPriv = priv;
+      const clientId = await this.idbGet('meta', 'oauthClientId');
+      if (clientId) this._oauthClientId = clientId;
+      const token    = await this.idbGet('meta', 'oauthToken');
+      const tokenExp = await this.idbGet('meta', 'oauthTokenExp');
+      if (token && tokenExp) { this._oauthToken = token; this._oauthTokenExp = tokenExp; }
+      const driveIdPro  = await this.idbGet('meta', 'driveFileId_pro');
+      const driveIdPriv = await this.idbGet('meta', 'driveFileId_priv');
+      if (driveIdPro)  this._oauthDriveFileIds.pro  = driveIdPro;
+      if (driveIdPriv) this._oauthDriveFileIds.priv = driveIdPriv;
+
+      // lastUpload/lastDownload laden
+      const lastUp = await this.idbGet('meta', 'lastUpload');
+      const lastDn = await this.idbGet('meta', 'lastDownload');
+      if (lastUp) this._syncLastUpload   = parseInt(lastUp)  || 0;
+      if (lastDn) this._syncLastDownload = parseInt(lastDn)  || 0;
+
+      // updatedAt Migration: Items ohne updatedAt bekommen Fallback-Timestamp
+      const OLD_TS = '2020-01-01T00:00:00.000Z';
+      const migrateUpdatedAt = (arr) => { (arr||[]).forEach(item => { if (!item.updatedAt) item.updatedAt = OLD_TS; }); };
+
+      const db = this.db;
+      if (!db) return;
+      migrateUpdatedAt(db.quickItems); migrateUpdatedAt(db.customEvents);
+      migrateUpdatedAt(db.wochenpflichten); migrateUpdatedAt(db.ziele);
+      migrateUpdatedAt(db.checklistVorlagen); migrateUpdatedAt(db.tagesprotokoll);
+      (db.vorhaben||[]).forEach(v => { if (!v.updatedAt) v.updatedAt = OLD_TS; migrateUpdatedAt(v.aufgaben); migrateUpdatedAt(v.links); });
+    
+
+      // pflichtStatus Format-Migration (einmalig)
+
+      if (!this.db?.pflichtStatus) return;
+      const ps = this.db.pflichtStatus;
+      const firstKey = Object.keys(ps)[0] || '';
+      if (!firstKey.match(/\d{4}-\d{2}-\d{2}$/)) return;
+      const newPs = {};
+      Object.entries(ps).forEach(([key, val]) => {
+        const parts = key.split('_');
+        if (parts.length < 3) return;
+        const datum  = parts[parts.length - 1];
+        const dutyId = parts.slice(0, -1).join('_');
+        if (!newPs[datum]) newPs[datum] = {};
+        newPs[datum][dutyId] = (val === 'erledigt' || val === true);
+      });
+      this.db.pflichtStatus = newPs;
+    
+
+      // Vorhaben status-Feld + charakter-Feld + zielId Migration
+
+      (this.db?.vorhaben||[]).forEach(v => {
+        if (!v.status) v.status = v.aktiv !== false ? 'offen' : 'abgeschlossen';
+        if (v.status === 'aktiv') v.status = 'offen'; // Legacy-Status normalisieren
+        if (!v.charakter) v.charakter = 'bereichernd';
+        if (v.zielId === undefined) v.zielId = null;
+        if (v.favorit === undefined) v.favorit = false;
+        if (v.vertraulich === undefined) v.vertraulich = false;
+      });
+      // Neue DB-Felder sicherstellen
+      if (!this.db.mantras) this.db.mantras = [];
+      if (!this.db.sondertage) this.db.sondertage = [];
+      if (!this.db.aufgaben) this.db.aufgaben = [];
+      if (!this.db.wissensnetzwerk) this.db.wissensnetzwerk = [];
+      this._migrateQuickItems();
+    
+    } catch(e) {
+      console.error('[IDB] load error:', e);
+    }
+    // Nach Format-Migration speichern (außerhalb try um Fehler zu vermeiden)
+    try { await this.idbSave(); } catch(e) {}
   },
 
-  // ── Crypto ───────────────────────────────────────────
+  _emptyDb() {
+    return {
+      quickItems: [], customEvents: [], wochenpflichten: [],
+      pflichtStatus: {}, tagesprotokoll: [], wochenMottos: {},
+      checklistVorlagen: [], vorhaben: [], ziele: [], links: [],
+      notizen: [], mantras: [], sondertage: [], aufgaben: [],
+      wissensnetzwerk: [],
+      _version: 1, _exportedAt: '',
+    };
+  },
+
+
+  // ── Crypto ──
+  async _cryptoGetKey(password, salt) {
+    const enc = new TextEncoder();
+    const keyMat = await crypto.subtle.importKey('raw', enc.encode(password), { name:'PBKDF2' }, false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name:'PBKDF2', salt, iterations:100000, hash:'SHA-256' },
+      keyMat, { name:'AES-GCM', length:256 }, true, ['encrypt','decrypt']);
+  },
+
+  async _cryptoEncrypt(data) {
+    const pw = sessionStorage.getItem('wb_enc_pw');
+    if (!pw) throw new Error('Kein Passwort');
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+    const key  = await this._cryptoGetKey(pw, salt);
+    const enc  = new TextEncoder().encode(JSON.stringify(data));
+    const ct   = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, enc);
+    return {
+      salt: btoa(String.fromCharCode(...salt)),
+      iv:   btoa(String.fromCharCode(...iv)),
+      data: btoa(String.fromCharCode(...new Uint8Array(ct))),
+      _encrypted: true,
+    };
+  },
+
+  async _cryptoDecrypt(payload, password) {
+    const salt = Uint8Array.from(atob(payload.salt), c => c.charCodeAt(0));
+    const iv   = Uint8Array.from(atob(payload.iv),   c => c.charCodeAt(0));
+    const ct   = Uint8Array.from(atob(payload.data),  c => c.charCodeAt(0));
+    const key  = await this._cryptoGetKey(password, salt);
+    const dec  = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, ct);
+    return JSON.parse(new TextDecoder().decode(dec));
+  },
+
   _cryptoKeyFresh() {
-    const pw=sessionStorage.getItem('wb_enc_pw'); if(pw) return true;
-    const ua=navigator.userAgent;
-    const d=this._settings?.device;
-    const isMobile=d?(d==='pixel'||d==='ipad'):/Android|iPad|iPhone/i.test(ua);
-    if(isMobile) return false;
-    const today=this._dStr(new Date());
-    return localStorage.getItem('wb_key_date')===today;
+    const pw = sessionStorage.getItem('wb_enc_pw');
+    // Passwort in sessionStorage → immer fresh
+    if (pw) return true;
+    // Mobile (Pixel/iPad): sessionStorage wird bei PWA-Neustart geleert
+    // → kein wb_key_date-Fallback, immer PW-Dialog zeigen
+    // Gerät aus Settings oder direkt per UA ermitteln (Settings evtl. noch nicht geladen)
+    const deviceSetting = this._settings?.device;
+    const isMobileDevice = deviceSetting
+      ? (deviceSetting === 'pixel' || deviceSetting === 'ipad')
+      : /Android|iPad|iPhone/i.test(navigator.userAgent);
+    if (isMobileDevice) return false;
+    // Desktop: einmal täglich entsperrt reicht
+    const today = this._dStr(new Date());
+    const saved = localStorage.getItem('wb_key_date');
+    return saved === today;
   },
 
   _cryptoShowDialog(onSuccess) {
-    this._cryptoOnSuccess=onSuccess;
-    const ov=document.getElementById('wb-crypto-overlay');
-    const pw=document.getElementById('wb-crypto-pw');
-    const er=document.getElementById('wb-crypto-err');
-    if(ov) ov.classList.add('open');
-    if(er) er.style.display='none';
-    if(pw){pw.value='';setTimeout(()=>pw.focus(),100);}
+    this._cryptoOnSuccess = onSuccess;
+    const ov = document.getElementById('wb-crypto-overlay');
+    const pw = document.getElementById('wb-crypto-pw');
+    const er = document.getElementById('wb-crypto-err');
+    if (ov) ov.classList.add('open');
+    if (er) er.style.display = 'none';
+    if (pw) { pw.value = ''; setTimeout(() => pw.focus(), 100); }
   },
+
   _cryptoOnSuccess: null,
 
   async _cryptoUnlock() {
-    const pwEl=document.getElementById('wb-crypto-pw');
-    const errEl=document.getElementById('wb-crypto-err');
-    const btn=document.getElementById('wb-crypto-btn');
-    const password=pwEl?.value?.trim()||''; if(!password) return;
-    if(btn){btn.textContent='Pr\u00fcfe...';btn.disabled=true;}
+    const pwEl  = document.getElementById('wb-crypto-pw');
+    const errEl = document.getElementById('wb-crypto-err');
+    const btn   = document.getElementById('wb-crypto-btn');
+    const password = pwEl?.value?.trim() || '';
+    if (!password) return;
+    if (btn) { btn.textContent = 'Pr\u00fcfe...'; btn.disabled = true; }
     try {
-      sessionStorage.setItem('wb_enc_pw',password);
-      localStorage.setItem('wb_key_date',this._dStr(new Date()));
-      document.getElementById('wb-crypto-overlay')?.classList.remove('open');
-      if(this._cryptoOnSuccess) await this._cryptoOnSuccess();
+      sessionStorage.setItem('wb_enc_pw', password);
+      localStorage.setItem('wb_key_date', this._dStr(new Date()));
+      const ov = document.getElementById('wb-crypto-overlay');
+      if (ov) ov.classList.remove('open');
+      if (this._cryptoOnSuccess) await this._cryptoOnSuccess();
     } catch(e) {
       sessionStorage.removeItem('wb_enc_pw');
-      if(errEl) errEl.style.display='block';
-      if(pwEl){pwEl.value='';pwEl.focus();}
+      if (errEl) errEl.style.display = 'block';
+      if (pwEl)  { pwEl.value = ''; pwEl.focus(); }
     } finally {
-      if(btn){btn.textContent='Entsperren';btn.disabled=false;}
+      if (btn) { btn.textContent = 'Entsperren'; btn.disabled = false; }
     }
   },
 
   _cryptoChangePassword() {
-    const newPw=prompt('Neues Passwort (mind. 8 Zeichen):'); if(!newPw||newPw.length<8){this._toast('Passwort zu kurz');return;}
-    const c2=prompt('Wiederholen:'); if(newPw!==c2){this._toast('Passw\u00f6rter stimmen nicht \u00fcberein');return;}
-    sessionStorage.setItem('wb_enc_pw',newPw); localStorage.setItem('wb_key_date',this._dStr(new Date()));
-    this.setDirty(); this._toast('\u2713 Passwort ge\u00e4ndert');
+    const newPw = prompt('Neues Passwort eingeben (mind. 8 Zeichen):');
+    if (!newPw || newPw.length < 8) { this._toast('Passwort zu kurz'); return; }
+    const confirm2 = prompt('Passwort wiederholen:');
+    if (newPw !== confirm2) { this._toast('Passw\u00f6rter stimmen nicht \u00fcberein'); return; }
+    sessionStorage.setItem('wb_enc_pw', newPw);
+    localStorage.setItem('wb_key_date', this._dStr(new Date()));
+    this.setDirty();
+    this._toast('\u2713 Passwort ge\u00e4ndert \u2014 Daten werden neu verschl\u00fcsselt');
   },
 
-  async _cryptoGetKey(password,salt) {
-    const enc=new TextEncoder();
-    const keyMat=await crypto.subtle.importKey('raw',enc.encode(password),{name:'PBKDF2'},false,['deriveKey']);
-    return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},keyMat,{name:'AES-GCM',length:256},true,['encrypt','decrypt']);
-  },
 
-  async _cryptoEncrypt(data) {
-    const pw=sessionStorage.getItem('wb_enc_pw'); if(!pw) throw new Error('Kein Passwort');
-    const salt=crypto.getRandomValues(new Uint8Array(16));
-    const iv=crypto.getRandomValues(new Uint8Array(12));
-    const key=await this._cryptoGetKey(pw,salt);
-    const enc=new TextEncoder().encode(JSON.stringify(data));
-    const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc);
-    return{salt:btoa(String.fromCharCode(...salt)),iv:btoa(String.fromCharCode(...iv)),data:btoa(String.fromCharCode(...new Uint8Array(ct))),_encrypted:true};
-  },
+  // ── Sync ──
+  _syncTimer:        null,
+  _syncLastUpload:   0,
+  _syncLastDownload: 0,
+  _syncInitDone:     false,
 
-  async _cryptoDecrypt(payload,password) {
-    const salt=Uint8Array.from(atob(payload.salt),c=>c.charCodeAt(0));
-    const iv=Uint8Array.from(atob(payload.iv),c=>c.charCodeAt(0));
-    const ct=Uint8Array.from(atob(payload.data),c=>c.charCodeAt(0));
-    const key=await this._cryptoGetKey(password,salt);
-    const dec=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,ct);
-    return JSON.parse(new TextDecoder().decode(dec));
-  },
-
-  // ── Sync ─────────────────────────────────────────────
   _syncStart() {
-    if(this._syncTimer) clearInterval(this._syncTimer);
-    this._syncTimer=setInterval(()=>this._syncTick(),60000);
+    if (this._syncTimer) clearInterval(this._syncTimer);
+    this._syncTimer = setInterval(() => { this._syncTick(); }, 60000);
   },
 
   async _syncTick() {
-    if(!this._oauthClientId) return;
-    const token=await this._oauthGetTokenSilent(); if(!token){this._oauthShowBanner('\u26a0 Google-Sitzung abgelaufen');return;}
+    if (!this._oauthClientId) return;
+    const token = await this._oauthGetTokenSilent();
+    if (!token) {
+      this._oauthShowBanner('\u26a0 Google-Sitzung abgelaufen &mdash; Auto-Sync pausiert');
+      return;
+    }
     this._oauthHideBanner();
-    if(this.isDirty||this._pendingChanges) await this._syncUpload(); else await this._syncCheckNewer();
+    if (this.isDirty) {
+      await this._syncUpload();
+    } else {
+      await this._syncCheckNewer();
+    }
   },
 
   async _syncCheckNewer() {
     try {
-      const token=await this._oauthGetTokenSilent(); if(!token) return;
-      const fileId=await this._syncGetFileId(token); if(!fileId) return;
-      const resp=await fetch(this.DRIVE_API+'/files/'+fileId+'?fields=modifiedTime',{headers:{Authorization:'Bearer '+token}});
-      if(!resp.ok) return;
-      const meta=await resp.json();
-      const driveTs=new Date(meta.modifiedTime).getTime();
-      if(driveTs>this._syncLastDownload+5000) {
-        if(this._pendingChanges||this.isDirty) this._syncConflictDialog(driveTs);
+      const token = await this._oauthGetTokenSilent(); if (!token) return;
+      const fileId = await this._syncGetFileId(token); if (!fileId) return;
+      const resp = await fetch(this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime',
+        { headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok) return;
+      const meta    = await resp.json();
+      const driveTs = new Date(meta.modifiedTime).getTime();
+      if (driveTs > this._syncLastDownload + 5000) {
+        if (this._pendingChanges || this.isDirty) this._syncConflictDialog('db', driveTs);
         else await this._syncDownload();
       }
-    } catch(e){console.warn('[syncCheckNewer]',e.message);}
+    } catch(e) { console.warn('[syncCheckNewer]', e.message); }
   },
 
-  _syncConflictDialog(driveTs) {
-    const dd=new Date(driveTs).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-    const body='<div style="font-size:14px;line-height:1.6;color:var(--text)">Ein anderes Ger\u00e4t hat Daten um <strong>'+dd+'</strong> ge\u00e4ndert.<br>Du hast ebenfalls lokale \u00c4nderungen.</div>';
-    const footer='<button class="wb-btn" onclick="WB.isDirty=false;WB._pendingChanges=false;WB._syncDownload();WB.modalClose()">Drive laden</button>'
-      +'<button class="wb-btn wb-btn-save" onclick="WB._syncUpload();WB.modalClose()">Meine hochladen</button>';
-    this.modalOpen('\u26a0\uFE0F Sync-Konflikt',body,footer);
+  _syncConflictDialog(ctx, driveTs) {
+    const driveDate = new Date(driveTs).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+    const body = '<div style="font-size:14px;line-height:1.6;color:var(--text)">'
+      + 'Ein anderes Ger\u00e4t hat Daten um <strong>' + driveDate + '</strong> ge\u00e4ndert.<br>'
+      + 'Du hast ebenfalls lokale \u00c4nderungen.</div>';
+    const footer = '<button style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:none;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700" '
+      + 'onclick="WB.isDirty=false;WB._pendingChanges=false;WB._syncDownload();WB.modalClose()">Drive laden</button>'
+      + '<button style="padding:6px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700;margin-left:8px" '
+      + 'onclick="WB._syncUpload();WB.modalClose()">Meine hochladen</button>';
+    this.modalOpen('\u26a0\uFE0F Sync-Konflikt', body, footer);
   },
+
+
+
+
 
   async _syncGetFileId(token) {
-    if(this._driveFileId) {
+    // Gecachte ID prüfen — erst validieren ob Datei noch existiert
+    if (this._driveFileId) {
       try {
-        const check=await fetch(this.DRIVE_API+'/files/'+this._driveFileId+'?fields=id,trashed',{headers:{Authorization:'Bearer '+token}});
-        if(check.ok){const meta=await check.json();if(!meta.trashed)return this._driveFileId;}
-        this._driveFileId=null; await this.idbSet('meta','driveFileId',null);
-      } catch(e){return this._driveFileId;}
+        const check = await fetch(this.DRIVE_API + '/files/' + this._driveFileId + '?fields=id,trashed',
+          { headers: { Authorization: 'Bearer ' + token } });
+        if (check.ok) {
+          const meta = await check.json();
+          if (!meta.trashed) return this._driveFileId; // ID gültig
+        }
+        // ID ungültig (404 oder gelöscht) — Cache leeren und neu suchen
+        console.warn('[syncGetFileId] gecachte ID ungültig, suche neu');
+        this._driveFileId = null;
+        await this.idbSet('meta', 'driveFileId', null);
+      } catch(e) {
+        // Netzwerkfehler — mit gecachter ID weitermachen
+        return this._driveFileId;
+      }
     }
-    const q=encodeURIComponent("name='workbench.json' and trashed=false");
-    const resp=await fetch(this.DRIVE_API+'/files?q='+q+'&fields=files(id,name,modifiedTime)&orderBy=modifiedTime+desc',{headers:{Authorization:'Bearer '+token}});
-    if(!resp.ok) throw new Error('Drive-Suche fehlgeschlagen');
-    const data=await resp.json();
-    if(data.files?.length){this._driveFileId=data.files[0].id;await this.idbSet('meta','driveFileId',this._driveFileId);return this._driveFileId;}
-    const cr=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({name:'workbench.json',mimeType:'application/json'})});
-    if(!cr.ok) throw new Error('Datei anlegen fehlgeschlagen');
-    const cf=await cr.json(); this._driveFileId=cf.id; await this.idbSet('meta','driveFileId',this._driveFileId);
+
+    // Drive nach workbench.json durchsuchen
+    const q    = encodeURIComponent("name='workbench.json' and trashed=false");
+    const resp = await fetch(this.DRIVE_API + '/files?q=' + q + '&fields=files(id,name,modifiedTime)&orderBy=modifiedTime+desc',
+      { headers: { Authorization: 'Bearer ' + token } });
+    if (!resp.ok) throw new Error('Drive-Suche fehlgeschlagen: HTTP ' + resp.status);
+    const data = await resp.json();
+
+    if (data.files?.length) {
+      // Neueste workbench.json nehmen
+      this._driveFileId = data.files[0].id;
+      await this.idbSet('meta', 'driveFileId', this._driveFileId);
+      if (data.files.length > 1) {
+        console.warn('[syncGetFileId] ' + data.files.length + ' workbench.json gefunden — nutze neueste:', data.files[0].modifiedTime);
+      }
+      return this._driveFileId;
+    }
+
+    // Keine Datei gefunden — NUR dann neue anlegen
+    console.warn('[syncGetFileId] keine workbench.json in Drive — lege neue an');
+    const cr = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'workbench.json', mimeType: 'application/json' }),
+    });
+    if (!cr.ok) throw new Error('Datei anlegen fehlgeschlagen: HTTP ' + cr.status);
+    const cf = await cr.json();
+    this._driveFileId = cf.id;
+    await this.idbSet('meta', 'driveFileId', this._driveFileId);
     return this._driveFileId;
   },
 
   async _syncUpload() {
-    if(!this.db){console.warn('[syncUpload] db not ready');return;}
+    // Guard: db muss vorhanden sein
+    if (!this.db) { console.warn('[syncUpload] db not ready'); return; }
     try {
-      const pw=sessionStorage.getItem('wb_enc_pw');
-      if(!pw){this._pendingChanges=true;await this.idbSave();this._oauthShowBanner('\u26a0 Passwort fehlt');return;}
-      let token=await this._oauthGetTokenSilent();
-      if(!token) token=await this._oauthGetToken(false);
-      if(!token){this._pendingChanges=true;await this.idbSave();this._oauthShowBanner('\u26a0 Offline');return;}
-      const fileId=await this._syncGetFileId(token); if(!fileId) throw new Error('Keine File-ID');
+      // Kein Passwort → Daten lokal halten, Banner zeigen
+      const pw = sessionStorage.getItem('wb_enc_pw');
+      if (!pw) {
+        this._pendingChanges = true; await this.idbSave();
+        this._oauthShowBanner('\u26a0 Bitte Passwort eingeben um zu synchronisieren');
+        return;
+      }
+      // Token: erst gecacht prüfen, dann still erneuern (kein Popup)
+      let token = await this._oauthGetTokenSilent();
+      if (!token) token = await this._oauthGetToken(false);
+      if (!token) {
+        this._pendingChanges = true; await this.idbSave();
+        this._oauthShowBanner('\u26a0 Offline \u2014 \u00c4nderungen ausstehend'); return;
+      }
+      const fileId = await this._syncGetFileId(token);
+      if (!fileId) throw new Error('Keine File-ID');
+      await this.idbSave(); // IDB sichern vor Upload
+      const payload = await this._cryptoEncrypt({
+        data: this.db, _exported: new Date().toISOString(), _appVersion: this.APP_VERSION,
+      });
+      let resp = await fetch(this.UPLOAD_API + '/files/' + fileId + '?uploadType=media', {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      // Bei 404: ID-Cache leeren und einmal mit neuer ID retry
+      if (resp.status === 404) {
+        console.warn('[syncUpload] 404 — ID-Cache leeren, retry');
+        this._driveFileId = null;
+        await this.idbSet('meta', 'driveFileId', null);
+        const newFileId = await this._syncGetFileId(token);
+        if (!newFileId) throw new Error('Keine File-ID nach Retry');
+        resp = await fetch(this.UPLOAD_API + '/files/' + newFileId + '?uploadType=media', {
+          method: 'PATCH',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      this._syncLastUpload = this._syncLastDownload = Date.now();
+      this._pendingChanges = false; this.isDirty = false;
       await this.idbSave();
-      const payload=await this._cryptoEncrypt({data:this.db,_exported:new Date().toISOString(),_appVersion:this.APP_VERSION});
-      let resp=await fetch(this.UPLOAD_API+'/files/'+fileId+'?uploadType=media',{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      if(resp.status===404){this._driveFileId=null;await this.idbSet('meta','driveFileId',null);const nfId=await this._syncGetFileId(token);resp=await fetch(this.UPLOAD_API+'/files/'+nfId+'?uploadType=media',{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(payload)});}
-      if(!resp.ok) throw new Error('HTTP '+resp.status);
-      this._syncLastUpload=this._syncLastDownload=Date.now(); this._pendingChanges=false; this.isDirty=false;
-      await this.idbSave(); this._oauthHideBanner(); this._sUpdateSyncStatus();
+      this._oauthHideBanner(); this._sUpdateSyncStatus();
       this._toast('\u2713 Gespeichert');
-    } catch(e){this._pendingChanges=true;await this.idbSave();this._oauthShowBanner('\u26a0 Speicherfehler: '+e.message);console.warn('[syncUpload]',e.message);}
+    } catch(e) {
+      this._pendingChanges = true; await this.idbSave();
+      this._oauthShowBanner('\u26a0 Speicherfehler: ' + e.message);
+      console.warn('[syncUpload]', e.message);
+    }
   },
 
   async _syncDownload() {
     try {
-      let token=await this._oauthGetTokenSilent();
-      if(!token) token=await this._oauthGetToken(false);
-      if(!token){this._oauthShowBanner('\u26a0 Offline');return;}
-      const fileId=await this._syncGetFileId(token); if(!fileId) return;
-      const resp=await fetch(this.DRIVE_API+'/files/'+fileId+'?alt=media',{headers:{Authorization:'Bearer '+token}});
-      if(!resp.ok) throw new Error('HTTP '+resp.status);
-      const payload=await resp.json();
-      if(payload._encrypted) {
-        const pw=sessionStorage.getItem('wb_enc_pw');
-        if(!pw){this._cryptoShowDialog(async()=>{await this._syncDownload();});return;}
-        try{const dec=await this._cryptoDecrypt(payload,pw);this.db=dec.data||dec;}
-        catch(e){sessionStorage.removeItem('wb_enc_pw');this._cryptoShowDialog(async()=>{await this._syncDownload();});return;}
+      // Token: erst gecacht prüfen, dann still erneuern (kein Popup)
+      let token = await this._oauthGetTokenSilent();
+      if (!token) token = await this._oauthGetToken(false);
+      if (!token) { this._oauthShowBanner('\u26a0 Offline'); return; }
+      const fileId = await this._syncGetFileId(token);
+      if (!fileId) return;
+      const resp = await fetch(this.DRIVE_API + '/files/' + fileId + '?alt=media',
+        { headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const payload = await resp.json();
+      if (payload._encrypted) {
+        const pw = sessionStorage.getItem('wb_enc_pw');
+        if (!pw) {
+          this._mantraHide(); // Startup-Screen weg bevor Crypto-Dialog erscheint
+          this._cryptoShowDialog(async () => { await this._syncDownload(); }); return;
+        }
+        try {
+          const dec = await this._cryptoDecrypt(payload, pw);
+          this.db = dec.data || dec;
+        } catch(e) {
+          sessionStorage.removeItem('wb_enc_pw');
+          this._mantraHide(); // Startup-Screen weg bevor Crypto-Dialog erscheint
+          this._cryptoShowDialog(async () => { await this._syncDownload(); }); return;
+        }
       } else {
-        this.db=payload.data||payload;
+        this.db = payload.data || payload;
       }
-      if(!this.db||typeof this.db!=='object') this.db=this._emptyDb();
-      this._ensureDbFields();
-      this._syncLastDownload=Date.now(); await this.idbSave();
+      // db validieren
+      if (!this.db || typeof this.db !== 'object') this.db = this._emptyDb();
+      if (!this.db._version) this.db._version = 1;
+      if (!this.db.aufgaben) this.db.aufgaben = [];
+      // KEINE automatische Migration hier — _sDebugMigration zeigt Rohzustand
+      await this._migrate_v2();
+      this._syncLastDownload = Date.now();
+      await this.idbSave();
       this._oauthHideBanner(); this._sUpdateSyncStatus();
-      if(this.activeTab) this.renderSection(this.activeTab);
+      const syncTime = new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+      console.log('[syncDownload] erfolgreich um ' + syncTime);
+      // UI aktualisieren
+      if (this.activeTab) {
+        this.renderSection(this.activeTab);
+      } else {
+        this.tabSwitch('cockpit');
+      }
+      this._ckLadeHeutigerEintrag(); setTimeout(() => this._ckScrollToBottom(), 200);
       this._nzRenderPills();
-    } catch(e){console.warn('[syncDownload]',e.message);this._oauthShowBanner('\u26a0 Sync-Fehler: '+e.message);}
+    } catch(e) {
+      console.warn('[syncDownload]', e.message);
+      this._oauthShowBanner('\u26a0 Sync-Fehler: ' + e.message);
+    }
   },
 
+  // Interaktive Varianten für Einstellungs-Buttons (erlauben Token-Popup)
   async _syncUploadInteractive() {
-    const token=await this._oauthGetToken(false);
-    if(!token){this._oauthShowBanner('\u26a0 Bitte erst mit Google anmelden');return;}
+    const token = await this._oauthGetToken(false);
+    if (!token) {
+      this._oauthShowBanner('\u26a0 Bitte erst mit Google anmelden');
+      return;
+    }
     await this._syncUpload();
   },
 
   async _syncDownloadInteractive() {
-    const token=await this._oauthGetToken(false);
-    if(!token){this._oauthShowBanner('\u26a0 Bitte erst mit Google anmelden');return;}
+    const token = await this._oauthGetToken(false);
+    if (!token) {
+      this._oauthShowBanner('\u26a0 Bitte erst mit Google anmelden');
+      return;
+    }
     await this._syncDownload();
   },
 
-  // ── OAuth ────────────────────────────────────────────
+  async _syncCheckNewer() {
+    try {
+      const token = await this._oauthGetTokenSilent(); if (!token) return;
+      const fileId = await this._syncGetFileId(token); if (!fileId) return;
+      const resp = await fetch(this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime',
+        { headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok) return;
+      const meta    = await resp.json();
+      const driveTs = new Date(meta.modifiedTime).getTime();
+      if (driveTs > this._syncLastDownload + 5000) {
+        if (this._pendingChanges || this.isDirty) this._syncConflictDialog('db', driveTs);
+        else await this._syncDownload();
+      }
+    } catch(e) { console.warn('[syncCheckNewer]', e.message); }
+  },
+
+  async _syncTick() {
+    if (!this._oauthClientId) return;
+    const token = await this._oauthGetTokenSilent();
+    if (!token) { this._oauthShowBanner('\u26a0 Google-Sitzung abgelaufen'); return; }
+    this._oauthHideBanner();
+    if (this._pendingChanges || this.isDirty) await this._syncUpload();
+    else await this._syncCheckNewer();
+  },
+
+  _syncConflictDialog(ctx, driveTs) {
+    const driveDate = new Date(driveTs).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+    const choice = confirm(
+      'Konflikt: Ein anderes Ger\u00e4t hat Daten um ' + driveDate + ' ge\u00e4ndert.\n'
+      + 'Du hast lokale \u00c4nderungen.\n\n'
+      + 'OK = Meine \u00c4nderungen hochladen\n'
+      + 'Abbrechen = Drive-Stand laden (\u00c4nderungen verwerfen)'
+    );
+    if (choice) { this._syncUpload(); }
+    else { this._pendingChanges = false; this.isDirty = false; this._syncDownload(); }
+  },
+
+  _syncTimeLabel(ts) {
+    if (!ts) return 'unbekannt';
+    return new Date(ts).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+  },
+
+
+
+  // ── Hilfsfunktionen ──────────────────────────────────
+
+
+  // ── OAuth ──
+
   _oauthTokenValid() { return !!(this._oauthToken&&this._oauthTokenExp&&Date.now()<this._oauthTokenExp); },
 
   async _oauthGetToken(interactive) {
@@ -2830,5 +4001,22 @@ document.addEventListener('DOMContentLoaded', () => {
   if(s) s.addEventListener('input', ()=>WB._nzSuche());
 });
 </script>
+  <div id="wb-crypto-overlay">
+    <div id="wb-crypto-box">
+      <div id="wb-crypto-head">
+        <span style="font-size:22px">&#x1F512;</span>
+        <span id="wb-crypto-head-title">WorkBench entsperren</span>
+      </div>
+      <div id="wb-crypto-body">
+        <div id="wb-crypto-desc">Gib dein Passwort ein um deine Daten zu \u00f6ffnen.</div>
+        <input id="wb-crypto-pw" type="password" placeholder="Passwort..."
+          autocomplete="current-password"
+          onkeydown="if(event.key==='Enter') WB._cryptoUnlock()">
+        <div id="wb-crypto-err">Falsches Passwort &mdash; bitte erneut versuchen.</div>
+        <button id="wb-crypto-btn" onclick="WB._cryptoUnlock()">Entsperren</button>
+      </div>
+      <div id="wb-crypto-foot">Daten werden mit AES-256-GCM verschl&uuml;sselt gespeichert.</div>
+    </div>
+  </div>
 </body>
 </html>

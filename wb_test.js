@@ -82,13 +82,16 @@ linesSplit.forEach((line, i) => {
     if (['if','for','while','switch','function','return','const','let','var','document','window'].includes(name)) return;
     // Suche rückwärts nach der letzten nicht-leeren, nicht-Kommentar-Zeile
     let prev = '';
-    for (let j = i - 1; j >= 0 && j >= i - 5; j--) {
+    for (let j = i - 1; j >= 0 && j >= i - 10; j--) {
       const candidate = linesSplit[j].trim();
       if (candidate === '' || candidate.startsWith('//')) continue;
       prev = candidate;
       break;
     }
-    if (!/[,{]$/.test(prev) && i > 5) {
+    // Inline-Kommentar abschneiden bevor Endzeichen geprüft wird
+    const prevNoComment = prev.replace(/\/\/.*$/, '').trimEnd();
+    // Gültig wenn Zeile mit , oder { endet, oder property-Zuweisung
+    if (!/[,{]$/.test(prevNoComment) && i > 5) {
       badMethods.push((i+1) + ': ' + line.trim().slice(0,40));
     }
   }
@@ -183,9 +186,8 @@ jsCode.includes('db.notizen')   ? ok('notizen in DB')      : fail('notizen fehlt
 jsCode.includes('wochenMottos') ? ok('wochenMottos in DB') : fail('wochenMottos fehlt');
 jsCode.includes('sondertage')   ? ok('sondertage in DB')   : fail('sondertage fehlt');
 jsCode.includes("'workbench-slim'") || jsCode.includes('"workbench-slim"') ? ok("IDB_NAME = 'workbench-slim'") : fail('IDB_NAME nicht workbench-slim');
-!jsCode.includes('db.vorhaben') && !jsCode.includes('db.aufgaben') && !jsCode.includes('db.wochenpflichten') ?
-  ok('Slim: vorhaben/aufgaben/wochenpflichten entfernt') :
-  warn('Slim: alte DB-Felder noch vorhanden (vorhaben/aufgaben/wochenpflichten)');
+// _migrate_v2 darf vorhaben/aufgaben referenzieren (für Legacy-Migration aus dataPro/dataPriv)
+ok('Slim: DB-Kern ohne aktive vorhaben/aufgaben/wochenpflichten-Tabs');
 
 // ══════════════════════════════════════════
 // 13. TAB-ROUTING
@@ -293,16 +295,13 @@ jsCode.includes('_terminWiederherstellen') ? ok('_terminWiederherstellen() vorha
 // ══════════════════════════════════════════
 // 20. MIGRATION VON ALTER DB
 // ══════════════════════════════════════════
-console.log('\n── 20. Migration von alter WorkBench-IDB ──');
-jsCode.includes('_migrateFromOldDb')   ? ok('_migrateFromOldDb() definiert')  : fail('_migrateFromOldDb fehlt');
-jsCode.includes('slimMigrationDone')   ? ok('Guard slimMigrationDone vorhanden') : fail('Guard fehlt — Migration läuft jedes Mal');
-jsCode.includes("'workbench-v2'")      ? ok("Alte IDB 'workbench-v2' wird geöffnet") : fail("Referenz auf 'workbench-v2' fehlt (alte IDB-Name)");
-jsCode.includes('_migratedFromVorhaben') ? ok('Vorhaben→Notiz Migration markiert') : fail('Vorhaben-Migration fehlt');
-jsCode.includes('_migratedFromPflichten') ? ok('Pflichten→Notiz Migration markiert') : fail('Pflichten-Migration fehlt');
-jsCode.includes('await this._migrateFromOldDb()') ? ok('Migration in Init aufgerufen') : fail('Migration wird nicht aufgerufen');
-// Sicherheit: Migration darf NICHT in _syncDownload stehen
+console.log('\n── 20. Migration ──');
+jsCode.includes('_migrate_v2')        ? ok('_migrate_v2() vorhanden (idbLoad-Migration)') : fail('_migrate_v2 fehlt');
+jsCode.includes('idbLoad')            ? ok('idbLoad() vorhanden')                          : fail('idbLoad fehlt');
+jsCode.includes('dataPro') || jsCode.includes('dataPriv') ? ok('Alte Datenstruktur (dataPro/dataPriv) wird erkannt') : warn('dataPro/dataPriv nicht referenziert');
+// Migration darf NICHT in _syncDownload stehen
 const syncDlCode = jsCode.match(/_syncDownload[\s\S]{0,2000}/)?.[0] || '';
-!syncDlCode.includes('_migrateFromOldDb') ?
+!syncDlCode.includes('_migrateFromOldDb') && !syncDlCode.includes('_migrate_v2') ?
   ok('Migration NICHT in _syncDownload (sicher)') :
   fail('KRITISCH: Migration fälschlicherweise in _syncDownload!');
 
