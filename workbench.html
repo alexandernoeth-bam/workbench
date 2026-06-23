@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.5</title>
+  <title>WorkBench 3.0.6</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -722,7 +722,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.5</div>
+  <div id="wb-startup-tagline">v3.0.6</div>
 </div>
 
 <!-- Modal -->
@@ -788,7 +788,7 @@
 
     <div class="s-card">
       <div class="s-card-head">Version</div>
-      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.5</div></div>
+      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.6</div></div>
     </div>
 
     <div class="s-card">
@@ -886,7 +886,7 @@
 
   <div id="wb-welt-header">
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.5</span>
+    <span id="wb-menu-version">v3.0.6</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1040,8 +1040,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.5',
-  APP_BUILD:   '20260623-2345',
+  APP_VERSION: '3.0.6',
+  APP_BUILD:   '20260624-0030',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3099,6 +3099,64 @@ const WB = {
   },
 
   // ── TERMIN ───────────────────────────────────────────
+  _modalWeltTop(ctx, vertraulich) {
+    const weltCls = ctx === 'pro' ? '' : ' privat';
+    const weltTxt = ctx === 'pro' ? 'BERUF' : 'PRIVAT';
+    return '<div class="wb-dialog-top">'
+      + '<div class="wb-welt-pill' + weltCls + '" onclick="WB._modalToggleWelt(this)">'
+      + weltTxt + '</div>'
+      + '<div class="wb-vertraulich-row">Vertraulich'
+      + '<div class="wb-switch' + (vertraulich ? ' on' : '') + '" id="wb-sw-vert"'
+      + ' onclick="this.classList.toggle(\'on\')"></div>'
+      + '</div></div>';
+  },
+
+  _modalGetVertraulich() {
+    return document.getElementById('wb-sw-vert')?.classList.contains('on') || false;
+  },
+
+  _modalVhOptions(ctx, selectedId) { return ''; },
+
+  _oauthReconnect() {
+    // WICHTIG: direkt im User-Gesture aufrufen (kein await davor) damit
+    // der Browser den Popup nicht blockiert
+    this._oauthToken    = null;
+    this._oauthTokenExp = null;
+    if (!window.google?.accounts?.oauth2) {
+      this._oauthShowBanner('\u26a0 Google-Bibliothek nicht geladen \u2014 Seite neu laden');
+      return;
+    }
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: this._oauthClientId,
+        scope:     this.DRIVE_SCOPE,
+        prompt:    'select_account',
+        callback:  async (resp) => {
+          if (resp.error || !resp.access_token) {
+            this._oauthShowBanner('\u26a0 Anmeldung fehlgeschlagen: ' + (resp.error || 'Unbekannt'));
+            return;
+          }
+          this._oauthToken    = resp.access_token;
+          this._oauthTokenExp = Date.now() + (resp.expires_in - 60) * 1000;
+          await this.idbSet('meta', 'oauthToken',    this._oauthToken);
+          await this.idbSet('meta', 'oauthTokenExp', String(this._oauthTokenExp));
+          this._oauthHideBanner();
+          this._toast('\u2713 Verbunden \u2014 lade aktuellen Stand...');
+          // Erst Download (Drive ist autoritativ), dann nur wenn nötig Upload
+          try { await this._syncDownload(); } catch(e) { console.warn('[reconnect download]', e); }
+          if (this.isDirty || this._pendingChanges) {
+            try { await this._syncUpload(); } catch(e) { console.warn('[reconnect upload]', e); }
+          }
+          this._syncInitDone = true;
+          this._toast('\u2705 Stand aktuell');
+        },
+      });
+      client.requestAccessToken({ prompt: 'select_account' });
+    } catch(e) {
+      this._oauthShowBanner('\u26a0 Verbindung fehlgeschlagen: ' + e.message);
+    }
+  },
+
   terminOpen(eventId, ctx) {
     const db = this.db;
     const e  = eventId ? (this.db?.customEvents||[]).find(x => x.id === eventId) : null;
