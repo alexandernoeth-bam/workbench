@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.0</title>
+  <title>WorkBench 3.0.1</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -558,6 +558,21 @@
     .nz-typ-btn { flex: 1; padding: 7px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: var(--font); color: var(--faint); background: var(--bg); text-align: center; }
     .nz-typ-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(10,107,94,0.06); }
 
+    /* ── Notizen Kategorie-Tabs ── */
+    .nz-ztab { display: flex; align-items: center; gap: 5px; padding: 8px 14px; font-size: 12px; font-weight: 700; color: var(--faint); background: none; border: none; border-bottom: 2.5px solid transparent; cursor: pointer; font-family: var(--font); white-space: nowrap; flex-shrink: 0; }
+    .nz-ztab:hover { color: var(--text); background: rgba(0,0,0,0.04); }
+    .nz-ztab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(10,107,94,0.05); }
+    .nz-ztab span { font-size: 10px; opacity: 0.7; margin-left: 2px; }
+    /* Zustand-Badge in Kacheln */
+    .nz-zustand-badge { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 2px 7px; letter-spacing: 0.04em; }
+    .nz-zustand-badge.parkplatz { background: rgba(77,95,51,0.12); color: var(--accent2); }
+    .nz-zustand-badge.kompass   { background: rgba(10,107,94,0.12); color: var(--accent); }
+    .nz-zustand-badge.archiv    { background: var(--surface2); color: var(--faint); }
+    /* Zustand-Auswahl im Kachel-Detail */
+    .nz-zustand-row { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface2); flex-wrap: wrap; }
+    .nz-zustand-btn { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: var(--font); border: 1.5px solid var(--border); color: var(--faint); background: none; }
+    .nz-zustand-btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+
     /* Freitext Editor */
     .nz-toolbar { display: flex; gap: 5px; flex-wrap: wrap; padding: 8px; background: var(--surface2); border-bottom: 1px solid var(--border); }
     .nz-tb-btn { padding: 4px 8px; border: 1.5px solid var(--border); border-radius: 5px; background: var(--surface); cursor: pointer; font-size: 13px; font-family: var(--font); color: var(--text); }
@@ -582,7 +597,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.0</div>
+  <div id="wb-startup-tagline">v3.0.1</div>
 </div>
 
 <!-- Crypto -->
@@ -660,7 +675,7 @@
 
     <div class="s-card">
       <div class="s-card-head">Version</div>
-      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.0</div></div>
+      <div class="s-row"><div class="s-row-title">WorkBench Slim</div><div id="s-ov-version" style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">v3.0.1</div></div>
     </div>
 
     <div class="s-card">
@@ -758,7 +773,7 @@
 
   <div id="wb-welt-header">
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.0</span>
+    <span id="wb-menu-version">v3.0.1</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -799,6 +814,21 @@
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px 6px;border-bottom:1.5px solid var(--border);background:var(--surface);flex-shrink:0;">
           <span style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--faint);">Notizen</span>
           <button class="ts-add-btn" onclick="WB._nzNeueListeDialog()">+ Neu</button>
+        </div>
+        <!-- Kategorie-Tabs -->
+        <div id="nz-ztab-bar" style="display:flex;gap:0;border-bottom:1.5px solid var(--border);background:var(--surface2);flex-shrink:0;overflow-x:auto;">
+          <button class="nz-ztab active" data-zustand="aktuell"   onclick="WB._nzSetZustand('aktuell')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Aktuell <span id="nz-cnt-aktuell"></span>
+          </button>
+          <button class="nz-ztab" data-zustand="parkplatz" onclick="WB._nzSetZustand('parkplatz')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg>Parkplatz <span id="nz-cnt-parkplatz"></span>
+          </button>
+          <button class="nz-ztab" data-zustand="kompass" onclick="WB._nzSetZustand('kompass')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>Kompass <span id="nz-cnt-kompass"></span>
+          </button>
+          <button class="nz-ztab" data-zustand="archiv" onclick="WB._nzSetZustand('archiv')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>Archiv <span id="nz-cnt-archiv"></span>
+          </button>
         </div>
         <input id="nz-suche" type="search" placeholder="Suche...">
         <div id="nz-pin-pills-bar" style="display:none;">
@@ -899,8 +929,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.0',
-  APP_BUILD:   '20260623-2030',
+  APP_VERSION: '3.0.1',
+  APP_BUILD:   '20260623-2100',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -988,6 +1018,7 @@ const WB = {
 
     if (!this.db) this.db = this._emptyDb();
     this._ensureDbFields();
+    await this._migrateFromOldDb(); // Einmalige Migration von alter WorkBench-IDB
 
     if (this._oauthTokenValid()) {
       try {
@@ -1277,7 +1308,12 @@ const WB = {
     if (!this.db.notizen || !this.db.notizen.length) {
       this.db.notizen = this._nzDefaultListen().map(l => ({ ...l, updatedAt: this._now() }));
     }
-    let listen = this.db.notizen.filter(l => !l.deleted);
+    const zustand = this._nzZustand || 'aktuell';
+    let listen = this.db.notizen.filter(l => {
+      if (l.deleted) return false;
+      const z = l.zustand || 'aktuell';
+      return z === zustand;
+    });
     // Weltfilter
     if (this.activeWorld !== 'beide') {
       listen = listen.filter(l => {
@@ -1299,12 +1335,41 @@ const WB = {
         return false;
       });
     }
-    // Gepinnte zuerst
+    // Gepinnte zuerst (nur in Aktuell sinnvoll)
     listen.sort((a,b) => (b.gepinnt?1:0) - (a.gepinnt?1:0));
     return listen;
   },
 
-  _nzUpdateCounts() {},
+  _nzSetZustand(z) {
+    this._nzZustand = z;
+    document.querySelectorAll('.nz-ztab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.zustand === z);
+    });
+    this.renderNotizenTab();
+  },
+
+  _nzUpdateCounts() {
+    const db = this.db;
+    if (!db?.notizen) return;
+    const weltOk = l => {
+      if (this.activeWorld === 'beide') return true;
+      const w = l.welt || 'beide';
+      if (w === 'beide') return true;
+      if (this.activeWorld === 'beruf')  return w === 'beruf';
+      if (this.activeWorld === 'privat') return w !== 'beruf';
+      return true;
+    };
+    const cnt = {
+      aktuell:   db.notizen.filter(l => !l.deleted && (!l.zustand || l.zustand==='aktuell') && weltOk(l)).length,
+      parkplatz: db.notizen.filter(l => !l.deleted && l.zustand==='parkplatz' && weltOk(l)).length,
+      kompass:   db.notizen.filter(l => !l.deleted && l.zustand==='kompass'   && weltOk(l)).length,
+      archiv:    db.notizen.filter(l => !l.deleted && l.zustand==='archiv'    && weltOk(l)).length,
+    };
+    ['aktuell','parkplatz','kompass','archiv'].forEach(z => {
+      const el = document.getElementById('nz-cnt-' + z);
+      if (el) el.textContent = cnt[z] > 0 ? cnt[z] : '';
+    });
+  },
 
   _nzRenderPills() {
     const bar  = document.getElementById('nz-pin-pills-bar');
@@ -1323,6 +1388,7 @@ const WB = {
   renderNotizenTab() {
     const scroll = document.getElementById('notizen-scroll');
     if (!scroll) return;
+    this._nzUpdateCounts();
     this._nzRenderPills();
     if (this._isMobile()) {
       this._nzRenderMobile(scroll);
@@ -1378,7 +1444,9 @@ const WB = {
         + '<button class="nz-action-btn danger" onclick="WB._nzDeleteListe(\'' + this._esc(l.id) + '\')">L\u00f6schen</button>'
         + '</div></div></div>';
     });
-    h += '<div class="nz-new-list" onclick="WB._nzNeueListeDialog()">+ Neue Liste</div>';
+    if (this._nzZustand === 'aktuell') {
+      h += '<div class="nz-new-list" onclick="WB._nzNeueListeDialog()">+ Neue Liste</div>';
+    }
     scroll.innerHTML = h;
   },
 
@@ -1427,9 +1495,10 @@ const WB = {
       h += '<div class="nz-postit-section-lbl">\uD83D\uDCCC Gepinnt</div>';
       h += '<div class="nz-grid">' + gepinnt.map(renderK).join('') + '</div>';
     }
-    h += '<div class="nz-postit-section-lbl">Alle Listen</div>';
+    const zustandLabels = { aktuell:'Aktuell', parkplatz:'Auf dem Parkplatz', kompass:'Kompass', archiv:'Archiv' };
+    h += '<div class="nz-postit-section-lbl">' + (zustandLabels[this._nzZustand]||'Listen') + '</div>';
     h += '<div class="nz-grid">' + normal.map(renderK).join('')
-      + '<div class="nz-postit-new" onclick="WB._nzNeueListeDialog()"><span class="nz-postit-new-icon">+</span>Neue Liste</div>'
+      + (this._nzZustand === 'aktuell' ? '<div class="nz-postit-new" onclick="WB._nzNeueListeDialog()"><span class="nz-postit-new-icon">+</span>Neue Liste</div>' : '')
       + '</div>';
     scroll.innerHTML = h;
   },
@@ -1558,6 +1627,16 @@ const WB = {
       + '<button style="padding:3px 9px;border-radius:20px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--danger);" onclick="WB._nzDeleteListe(\'' + listeId + '\');WB._nzKachelClose()">L\u00f6schen</button>'
       + '</div>';
 
+    // Zustand-Row
+    const zustandLabels = { aktuell:'Aktuell', parkplatz:'Parkplatz', kompass:'Kompass', archiv:'Archiv' };
+    const curZustand = l.zustand || 'aktuell';
+    const zustandRow = '<div class="nz-zustand-row">'
+      + '<span style="font-size:11px;font-weight:700;color:var(--faint);margin-right:6px;align-self:center;">Ablage:</span>'
+      + Object.keys(zustandLabels).map(z =>
+          '<button class="nz-zustand-btn' + (curZustand===z?' active':'') + '" onclick="WB._nzSetListeZustand(\'' + listeId + '\',\'' + z + '\')">' + zustandLabels[z] + '</button>'
+        ).join('')
+      + '</div>';
+
     const itemsH = items.map(i => {
       const cb = l.typ === 'check'
         ? '<div class="nz-chk' + (i.done?' ck':'') + '" onclick="WB._nzToggleItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\')">'
@@ -1570,7 +1649,7 @@ const WB = {
         + '</div>';
     }).join('');
     const itemsEl = document.getElementById('nz-kachel-items');
-    if (itemsEl) itemsEl.innerHTML = worldRow + itemsH;
+    if (itemsEl) itemsEl.innerHTML = worldRow + zustandRow + itemsH;
 
     // Farb-Row im Footer
     const footEl = document.getElementById('nz-kachel-foot');
@@ -1599,6 +1678,15 @@ const WB = {
     this._nzKachelRender();
     if (this.activeTab==='notizen') this.renderNotizenTab();
     if (this.activeTab==='tagessicht') this._tsRenderPins();
+  },
+
+  _nzSetListeZustand(listeId, zustand) {
+    const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
+    l.zustand = zustand === 'aktuell' ? undefined : zustand;
+    l.updatedAt = this._now();
+    this.setDirty();
+    this._nzKachelRender();
+    this._nzUpdateCounts();
   },
 
   _nzKachelSetWelt(listeId, welt, btnEl) {
@@ -1715,6 +1803,7 @@ const WB = {
       + '</div>';
     this.modalOpen('Neue Liste', body, footer);
   },
+  _nzZustand: 'aktuell', // aktuell | parkplatz | kompass | archiv
   _nzNeuTyp: 'check',
 
   _nzNeueListeSave() {
@@ -2000,6 +2089,7 @@ const WB = {
       + '<div class="wb-input-group"><label class="wb-label">Datum</label><input id="wb-f-date" class="wb-input" type="date" value="' + this._esc(e?.date||'') + '"></div>'
       + '<div class="wb-input-group"><label class="wb-label">Uhrzeit</label><input id="wb-f-time" class="wb-input" type="time" value="' + this._esc(e?.startTime||'') + '"></div>'
       + '</div>'
+      + '<div class="wb-input-group"><label class="wb-label">Dauer (Minuten, optional)</label><input id="wb-f-dur" class="wb-input" type="number" min="5" step="5" placeholder="z.\u202fB. 60" value="' + this._esc(String(e?.durationMin||'')) + '"></div>'
       + (e?.storniert ? '<div style="background:var(--surface2);border-left:3px solid var(--faint);border-radius:0 6px 6px 0;padding:8px 10px;font-size:14px;color:var(--muted);margin-bottom:8px;">\u26a0 Abgesagt</div>' : '');
 
     this._modalCtx = { type:'termin', eventId };
@@ -2023,10 +2113,11 @@ const WB = {
     const text=document.getElementById('wb-f-text')?.value.trim(); if(!text){this._toast('Text fehlt');return;}
     const date=document.getElementById('wb-f-date')?.value||'';
     const time=document.getElementById('wb-f-time')?.value||'';
+    const dur=parseInt(document.getElementById('wb-f-dur')?.value||'0')||0;
     const weltPill=document.querySelector('.wb-welt-pill');
     const welt=weltPill?.classList.contains('privat')?'priv':'pro';
     if(!db.customEvents) db.customEvents=[];
-    const obj={text,date,startTime:time,done:false,welt,location:'',updatedAt:this._now()};
+    const obj={text,date,startTime:time,durationMin:dur||undefined,done:false,welt,updatedAt:this._now()};
     if(c.eventId) {
       const idx=db.customEvents.findIndex(x=>x.id===c.eventId);
       if(idx>=0) db.customEvents[idx]={...db.customEvents[idx],...obj};
@@ -2291,6 +2382,134 @@ const WB = {
     } catch(e) {
       console.warn('[idbLoad]',e.message);
       if(!this.db) this.db=this._emptyDb();
+    }
+  },
+
+  // ── Migration von alter WorkBench-DB ────────────────
+  async _migrateFromOldDb() {
+    // Nur einmal ausfuehren (Guard)
+    if (await this.idbGet('meta','slimMigrationDone') === 'true') return;
+    console.log('[slimMigrate] Suche alte WorkBench-IDB...');
+    try {
+      const oldDb = await new Promise((resolve, reject) => {
+        const req = indexedDB.open('workbench-db', 3);
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror   = e => reject(e.target.error);
+        req.onblocked = () => reject(new Error('blocked'));
+      });
+      const oldData = await new Promise((resolve, reject) => {
+        const tx  = oldDb.transaction('data', 'readonly');
+        const req = tx.objectStore('data').get('db');
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror   = e => reject(e.target.error);
+      });
+      oldDb.close();
+      if (!oldData) {
+        await this.idbSet('meta','slimMigrationDone','true');
+        console.log('[slimMigrate] Keine alten Daten gefunden.');
+        return;
+      }
+
+      console.log('[slimMigrate] Alte Daten gefunden, starte Migration...');
+      let migrated = 0;
+
+      // 1) customEvents übernehmen
+      const oldEvents = oldData.customEvents || [];
+      const existIds  = new Set((this.db.customEvents||[]).map(e => e.id));
+      oldEvents.forEach(e => {
+        if (!e.id || existIds.has(e.id)) return;
+        this.db.customEvents.push({ ...e });
+        migrated++;
+      });
+
+      // 2) Notizen übernehmen
+      if (!this.db.notizen) this.db.notizen = [];
+      const existNzIds = new Set(this.db.notizen.map(n => n.id));
+      const oldNotizen = oldData.notizen || [];
+      oldNotizen.forEach(n => {
+        if (!n.id || existNzIds.has(n.id)) return;
+        // zustand-Feld übernehmen (aktuell/parkplatz/kompass/archiv)
+        this.db.notizen.push({ ...n });
+        migrated++;
+      });
+
+      // 3) Vorhaben → Notizen (je eine Checklisten-Notiz)
+      const oldVorhaben = oldData.vorhaben || [];
+      oldVorhaben.forEach(v => {
+        if (v.deleted) return;
+        const nzId = 'nz_vh_' + v.id;
+        if (existNzIds.has(nzId)) return;
+        const aufgaben = (oldData.aufgaben || []).filter(a => a.vorhabenId === v.id && !a.deleted);
+        const items = aufgaben.map(a => ({
+          id:   'i_' + a.id,
+          text: a.text || a.titel || '(Aufgabe)',
+          done: !!a.done,
+          deleted: false,
+        }));
+        this.db.notizen.push({
+          id:        nzId,
+          titel:     v.titel || 'Vorhaben',
+          typ:       'check',
+          farbe:     'c-weiss',
+          icon:      'list',
+          items,
+          gepinnt:   false,
+          welt:      v.welt === 'pro' ? 'beruf' : v.welt === 'priv' ? 'privat' : 'beide',
+          zustand:   'aktuell',
+          inhalt:    v.beschreibung || '',
+          updatedAt: this._now(),
+          _migratedFromVorhaben: v.id,
+        });
+        migrated++;
+      });
+
+      // 4) Wochenpflichten → 2 Notizen (beruf + privat)
+      const oldPflichten = oldData.wochenpflichten || [];
+      const berufPfl  = oldPflichten.filter(p => !p.deleted && p.welt === 'pro');
+      const privatPfl = oldPflichten.filter(p => !p.deleted && p.welt !== 'pro');
+
+      const addPflichtNotiz = (pflichten, welt, titel, nzId) => {
+        if (!pflichten.length) return;
+        if (existNzIds.has(nzId)) return;
+        const items = pflichten.map(p => ({
+          id:   'i_' + p.id,
+          text: p.text || p.titel || '(Pflicht)',
+          done: false,
+          deleted: false,
+        }));
+        this.db.notizen.push({
+          id:        nzId,
+          titel,
+          typ:       'check',
+          farbe:     'c-weiss',
+          icon:      'list',
+          items,
+          gepinnt:   false,
+          welt,
+          zustand:   'aktuell',
+          inhalt:    '',
+          updatedAt: this._now(),
+          _migratedFromPflichten: true,
+        });
+        migrated++;
+      };
+      addPflichtNotiz(berufPfl,  'beruf',  'Berufliche Wochenpflichten',  'nz_pfl_pro');
+      addPflichtNotiz(privatPfl, 'privat', 'Private Wochenpflichten',     'nz_pfl_priv');
+
+      // 5) wochenMottos übernehmen
+      if (oldData.wochenMottos) {
+        this.db.wochenMottos = { ...oldData.wochenMottos, ...(this.db.wochenMottos||{}) };
+      }
+
+      await this.idbSet('meta','slimMigrationDone','true');
+      await this.idbSave();
+      this.setDirty();
+      console.log('[slimMigrate] Migration abgeschlossen, ' + migrated + ' Objekte migriert.');
+      if (migrated > 0) this._toast('\u2705 ' + migrated + ' Eintr\u00e4ge aus alter WorkBench migriert');
+    } catch (err) {
+      console.warn('[slimMigrate] Fehler oder keine alte DB:', err.message || err);
+      // Fehler = keine alte DB → Guard setzen damit nicht jedes Mal versucht wird
+      try { await this.idbSet('meta','slimMigrationDone','true'); } catch(_) {}
     }
   },
 
