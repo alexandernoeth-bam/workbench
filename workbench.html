@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.98</title>
+  <title>WorkBench 2.9.99</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -363,7 +363,8 @@
     }
 
     /* ══ WISSEN-TAB ══════════════════════════════════════════════════════ */
-    #sec-wissen.wb-section { padding:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;height:100%!important; }
+    #sec-wissen.wb-section { padding:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;position:absolute!important;inset:0!important; }
+    body.wissen-active #wb-content { overflow:hidden!important;display:flex!important;flex-direction:column!important;position:relative!important; }
     #wissen-app { display:flex;flex-direction:column;flex:1;height:100%;overflow:hidden;background:var(--bg); }
     #wissen-header { display:flex;align-items:center;gap:8px;padding:8px 12px;background:#2C3E50;flex-shrink:0; }
     #wissen-sicht-tabs { display:flex;gap:2px;flex:1; }
@@ -2470,7 +2471,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.98</div>
+  <div id="wb-startup-tagline">v2.9.99</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -3151,8 +3152,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.98',
-  APP_BUILD:   '20260623-1230',
+  APP_VERSION: '2.9.99',
+  APP_BUILD:   '20260623-1300',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3183,6 +3184,8 @@ const WB = {
 
   tabSwitch(tab) {
     this.activeTab = tab;
+    // Wissen-active Klasse für CSS-Selector
+    document.body.classList.toggle('wissen-active', tab === 'wissen');
     // Bottom-Nav + Sidebar sync
     document.querySelectorAll('.wb-tab').forEach(t => {
       t.classList.toggle('active', t.dataset.tab === tab);
@@ -3200,7 +3203,7 @@ const WB = {
     if (sec) {
       sec.style.removeProperty('height');
       sec.style.removeProperty('overflow');
-      const displayVal = { cockpit: 'flex', vorhaben: 'flex', ziele: 'flex', backlog: 'flex', woche: 'flex', ablage: 'flex', aufgaben: 'flex', notizen: 'flex' }[tab] || 'block';
+      const displayVal = { cockpit:'flex', vorhaben:'flex', ziele:'flex', backlog:'flex', woche:'flex', ablage:'flex', aufgaben:'flex', notizen:'flex', wissen:'flex' }[tab] || 'block';
       sec.style.setProperty('display', displayVal, 'important');
     }
     this.renderSection(tab);
@@ -9931,15 +9934,6 @@ _ftStart() {
   freieAufgabeOpen(id) {
     const db = this.db; if (!db) { this._toast('Daten nicht geladen'); return; }
     const item = id ? (db.aufgaben||[]).find(q => q.id === id) : null;
-    const welt = item?.welt || null;
-    const weltHtml = '<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">'
-      + ['beide','beruf','privat'].map(w => '<button onclick="WB._faSetWelt(this,\'' + w + '\')" data-welt="' + w + '" '
-        + 'style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);border:1.5px solid '
-        + ((!welt && w==='beide') || welt===w || (welt==='pro'&&w==='beruf') || (welt==='priv'&&w==='privat')
-          ? 'var(--accent);background:var(--accent);color:#fff'
-          : 'var(--border);background:none;color:var(--faint)')
-        + '">' + (w==='beide'?'Beides':w==='beruf'?'Beruf':'Privat') + '</button>'
-      ).join('') + '</div>';
 
     const vorhaben = (db.vorhaben||[]).filter(v => !v.deleted && v.status !== 'archiviert');
     const vhOpts = '<option value="">— Freie Aufgabe —</option>'
@@ -9959,7 +9953,10 @@ _ftStart() {
       + '</div>'
     ).join('');
 
-    const body = weltHtml
+    const body = this._modalWeltTop(
+        item ? (item.welt==='pro'?'pro':item.welt==='priv'?'priv':'priv') : (this.activeWorld==='beruf'?'pro':'priv'),
+        item?.vertraulich
+      )
       + '<div class="wb-input-group">'
       + '<input id="wb-f-text" class="wb-input wb-input-lg" type="text"'
       + ' placeholder="Was soll erledigt werden?" value="' + this._esc(item?.text||'') + '">'
@@ -10523,9 +10520,8 @@ _ftStart() {
     const datum     = document.getElementById('wb-f-date')?.value || '';
     const startTime = document.getElementById('wb-f-time')?.value || '';
     const vhId      = document.getElementById('wb-f-vh')?.value || null;
-    // Welt aus aktiven Pill-Buttons lesen
-    const weltBtn   = document.querySelector('[data-active="1"][data-welt]');
-    const welt      = weltBtn ? (weltBtn.dataset.welt === 'beide' ? null : weltBtn.dataset.welt) : null;
+    const welt      = this._modalGetWelt() === 'pro' ? 'pro' : 'priv';
+    const vertraulich = this._modalGetVertraulich();
     const inputs = document.querySelectorAll('#wb-micro-list .wb-micro-input');
     const checklist = Array.from(inputs).map(inp => {
       const text = inp.value.trim(); if (!text) return null;
@@ -10536,9 +10532,9 @@ _ftStart() {
     if (!db.aufgaben) db.aufgaben = [];
     if (c.id) {
       const a = db.aufgaben.find(x => x.id === c.id);
-      if (a) { a.text=text; a.datum=datum; a.startTime=startTime; a.welt=welt; a.vorhabenId=vhId||null; a.checklist=checklist; a.updatedAt=this._now(); }
+      if (a) { a.text=text; a.datum=datum; a.startTime=startTime; a.welt=welt; a.vertraulich=vertraulich; a.vorhabenId=vhId||null; a.checklist=checklist; a.updatedAt=this._now(); }
     } else {
-      db.aufgaben.push({ id:'fa_'+Date.now(), text, datum, startTime, welt, vorhabenId:vhId||null, checklist, done:false, deleted:false, updatedAt:this._now() });
+      db.aufgaben.push({ id:'fa_'+Date.now(), text, datum, startTime, welt, vertraulich, vorhabenId:vhId||null, checklist, done:false, deleted:false, updatedAt:this._now() });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('\u2713 Aufgabe gespeichert');
