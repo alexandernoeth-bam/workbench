@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 2.9.100</title>
+  <title>WorkBench 2.9.101</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2471,7 +2471,7 @@
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
   <div id="wb-startup-mantra">„Ein echter Gentleman steht für Klarheit, Wahrheit, Einfachheit aus seiner tiefsten inneren Überzeugung.“</div>
-  <div id="wb-startup-tagline">v2.9.100</div>
+  <div id="wb-startup-tagline">v2.9.101</div>
   <button id="wb-startup-skip" onclick="WB._mantraSkip()" style="display:none">Weiter</button>
   <div id="wb-startup-countdown" style="display:none"></div>
 </div>
@@ -3152,8 +3152,8 @@
 <script>
 const WB = {
 
-  APP_VERSION: '2.9.100',
-  APP_BUILD:   '20260623-1330',
+  APP_VERSION: '2.9.101',
+  APP_BUILD:   '20260623-1400',
 
   IDB_NAME:    'workbench-v2',
   IDB_VERSION: 3,
@@ -3184,21 +3184,32 @@ const WB = {
 
   tabSwitch(tab) {
     this.activeTab = tab;
-    // Wissen-active Klasse für CSS-Selector
     document.body.classList.toggle('wissen-active', tab === 'wissen');
+    // wb-content Layout je nach Tab
+    const wbContent = document.getElementById('wb-content');
+    if (wbContent) {
+      if (tab === 'wissen') {
+        wbContent.style.setProperty('overflow', 'hidden', 'important');
+        wbContent.style.setProperty('display', 'flex', 'important');
+        wbContent.style.setProperty('flex-direction', 'column', 'important');
+        wbContent.style.setProperty('height', '100%', 'important');
+      } else {
+        wbContent.style.removeProperty('overflow');
+        wbContent.style.removeProperty('display');
+        wbContent.style.removeProperty('flex-direction');
+        wbContent.style.removeProperty('height');
+      }
+    }
     // Bottom-Nav + Sidebar sync
-    document.querySelectorAll('.wb-tab').forEach(t => {
-      t.classList.toggle('active', t.dataset.tab === tab);
-    });
-    document.querySelectorAll('.wb-stab').forEach(t => {
-      t.classList.toggle('active', t.dataset.tab === tab);
-    });
-    // !important nötig weil sec-vorhaben/sec-backlog/sec-ziele display:flex !important im CSS haben
+    document.querySelectorAll('.wb-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.wb-stab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    // Alle Sections ausblenden
     document.querySelectorAll('.wb-section').forEach(s => {
       s.style.setProperty('display', 'none', 'important');
       s.style.setProperty('height', '0', 'important');
       s.style.setProperty('overflow', 'hidden', 'important');
     });
+    // Aktive Section einblenden
     const sec = document.getElementById('sec-' + tab);
     if (sec) {
       sec.style.removeProperty('height');
