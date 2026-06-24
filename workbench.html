@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.17</title>
+  <title>WorkBench 3.0.18</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -725,7 +725,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.17</div>
+  <div id="wb-startup-tagline">v3.0.18</div>
 </div>
 
 <!-- Modal -->
@@ -889,7 +889,7 @@
 
   <div id="wb-welt-header">
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.17</span>
+    <span id="wb-menu-version">v3.0.18</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1044,8 +1044,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.17',
-  APP_BUILD:   '20260624-1100',
+  APP_VERSION: '3.0.18',
+  APP_BUILD:   '20260624-1200',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3121,8 +3121,15 @@ const WB = {
 
   _woNavWeek(dir) {
     if (this._isMobile()) {
-      if (dir<0) return;
-      this._woMobileOffset = (this._woMobileOffset||0) + 7;
+      if (dir === 0) {
+        // Heute: Reset auf aktuelle Woche
+        this._woMobileOffset = 0;
+      } else {
+        const newOffset = (this._woMobileOffset||0) + dir*7;
+        // Nicht weiter als 4 Wochen in die Vergangenheit
+        if (newOffset < -28) return;
+        this._woMobileOffset = newOffset;
+      }
       this.renderSection('woche'); return;
     }
     if (dir===0) { this._woRefDate=null; this.renderWoche(); return; }
