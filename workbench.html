@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.25</title>
+  <title>WorkBench 3.0.27</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -143,6 +143,9 @@
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
+    }
+    body.woche-active #wb-content {
+      overflow: hidden;
     }
 
     /* ── Desktop Sidebar ── */
@@ -770,7 +773,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.25</div>
+  <div id="wb-startup-tagline">v3.0.27</div>
 </div>
 
 <!-- Modal -->
@@ -938,7 +941,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.25</span>
+    <span id="wb-menu-version">v3.0.27</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1095,8 +1098,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.25',
-  APP_BUILD:   '20260624-2330',
+  APP_VERSION: '3.0.27',
+  APP_BUILD:   '20260624-2400',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1285,9 +1288,8 @@ const WB = {
   // ── Tab-Navigation ───────────────────────────────────
   tabSwitch(tab) {
     this.activeTab = tab;
-    // #wb-content overflow: woche braucht hidden damit flex:1 korrekt greift
-    const wbContent = document.getElementById('wb-content');
-    if (wbContent) wbContent.style.overflowY = tab === 'woche' ? 'hidden' : 'auto';
+    // body.woche-active → CSS übernimmt overflow:hidden auf #wb-content
+    document.body.classList.toggle('woche-active', tab === 'woche');
     ['tagessicht','notizen','woche'].forEach(t => {
       const el = document.getElementById('sec-' + t);
       if (!el) return;
@@ -1790,7 +1792,9 @@ const WB = {
     const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
     const i = (l.items||[]).find(x=>x.id===itemId); if(!i) return;
     i.done = !i.done; l.updatedAt = this._now();
-    this.setDirty(); this.renderNotizenTab();
+    this.setDirty();
+    this._nzKachelRender();
+    this.renderNotizenTab();
     if (this.activeTab === 'tagessicht') this._tsRenderPins();
   },
 
