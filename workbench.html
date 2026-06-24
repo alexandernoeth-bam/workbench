@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.22</title>
+  <title>WorkBench 3.0.23</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -315,7 +315,7 @@
     .ts-add-btn { background: var(--accent); color: #fff; border: none; border-radius: 5px; font-size: 11px; font-weight: 700; padding: 3px 8px; cursor: pointer; font-family: var(--font); }
 
     /* Angepinnte Notizen */
-    .ts-pins { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 0 14px 10px; }
+    .ts-pins { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 14px 10px; }
     .ts-pin { border-radius: var(--radius-sm); padding: 8px 8px; min-height: 80px; border: 1.5px solid rgba(0,0,0,0.1); cursor: pointer; position: relative; overflow: hidden; }
     .ts-pin:hover { filter: brightness(0.96); }
     .ts-pin.c-gelb  { background: #FFF9C4; border-color: #F1C40F; }
@@ -462,7 +462,7 @@
     .nz-bearbeit-body { padding: 14px 16px; }
 
     /* ── WOCHE-TAB ── */
-    #sec-woche { padding: 0 !important; overflow: hidden !important; flex-direction: column !important; }
+    #sec-woche { padding: 0 !important; overflow: hidden !important; flex-direction: column !important; display: flex !important; height: 100% !important; }
     .wo-header { background: var(--surface); border-bottom: 1.5px solid var(--border); padding: 10px 14px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     .wo-nav-btn { background: none; border: 1.5px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 14px; cursor: pointer; font-family: var(--font); color: var(--text); }
     .wo-nav-btn:hover { background: var(--surface2); }
@@ -720,6 +720,8 @@
     /* ── Misc ── */
     input[type="color"] { width: 36px; height: 28px; border: none; border-radius: 4px; padding: 0; cursor: pointer; background: none; }
     .wb-section { padding: 12px; min-height: 100%; }
+
+    .nz-check-pill { font-size:10px; font-weight:800; background:var(--accent); color:#fff; border-radius:10px; padding:1px 6px; margin-right:4px; flex-shrink:0; white-space:nowrap; }
     .nz-done-sep { display:flex; align-items:center; gap:8px; margin:10px 0 4px; }
     .nz-done-sep span { font-size:10px; font-weight:700; color:var(--faint); text-transform:uppercase; letter-spacing:.06em; }
     .nz-done-sep::before, .nz-done-sep::after { content:""; flex:1; height:1px; background:var(--border); }
@@ -727,7 +729,7 @@
     .wb-desktop .nz-grid { grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .wb-desktop .nz-postit { min-height: 160px; max-height: 200px; overflow: hidden; padding: 10px 12px; }
     .wb-desktop .nz-postit-title { font-size: 13px; }
-    .wb-desktop .ts-pins { grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .wb-desktop .ts-pins { grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .wb-desktop .ts-pin { min-height: 140px; max-height: 180px; overflow: hidden; padding: 10px 12px; }
     .wb-desktop .ts-pin-title { font-size: 13px; }
 
@@ -754,7 +756,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.22</div>
+  <div id="wb-startup-tagline">v3.0.23</div>
 </div>
 
 <!-- Modal -->
@@ -918,7 +920,7 @@
 
   <div id="wb-welt-header">
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.22</span>
+    <span id="wb-menu-version">v3.0.23</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1075,8 +1077,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.22',
-  APP_BUILD:   '20260624-1900',
+  APP_VERSION: '3.0.23',
+  APP_BUILD:   '20260624-2100',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1327,7 +1329,7 @@ const WB = {
     let h = '<div class="ts-pins">';
     gepinnt.forEach(l => {
       const farbe = this._nzPostItFarbe(l.farbe || 'c-weiss');
-      const items = (l.items || []).filter(i => !i.deleted);
+      const items = (l.items || []).filter(i => !i.deleted && !i.done);
       if (l.typ === 'freitext') {
         const tmp = document.createElement('div'); tmp.innerHTML = l.inhalt || '';
         const txt = (tmp.textContent || '').slice(0, 100);
@@ -1670,7 +1672,7 @@ const WB = {
       const items  = (l.items||[]).filter(i=>!i.deleted);
       const offen  = items.filter(i=>!i.done).length;
       const pinH   = l.gepinnt ? '<span class="nz-postit-pin">\uD83D\uDCCC</span>' : '';
-      const cntLbl = offen > 0 ? offen + '' : items.length + '';
+      const cntLbl = l.typ==='check' ? (offen+'/'+items.length) : (items.length+'');
       let preview = '';
       if (l.typ === 'freitext') {
         const tmp = document.createElement('div'); tmp.innerHTML = l.inhalt || '';
@@ -1697,7 +1699,7 @@ const WB = {
         + '<div class="nz-postit-hdr">'
         + '<span class="nz-postit-icon">' + this._nzSvgIcon(l.icon||'note') + '</span>'
         + '<span class="nz-postit-title">' + this._esc(l.titel) + '</span>' + pinH
-        + '<span class="nz-postit-cnt">' + cntLbl + '</span>'
+        + '<span class="nz-postit-cnt' + (l.typ==='check'?' nz-check-pill':'') + '">' + cntLbl + '</span>'
         + '</div>'
         + '<div>' + preview + '</div>' + moreH + emptyH + '</div>';
     };
@@ -2330,7 +2332,7 @@ const WB = {
       const items  = (l.items || []).filter(i => !i.deleted);
       const offen  = items.filter(i => !i.done).length;
       const pinHtml = l.gepinnt ? '<span class="nz-postit-pin">📌</span>' : '';
-      const cntLbl = offen > 0 ? offen + '' : items.length + '';
+      const cntLbl = l.typ==='check' ? (offen+'/'+items.length) : (items.length+'');
 
       // Max. 3 Vorschau-Items
       let preview = '';
@@ -2373,7 +2375,7 @@ const WB = {
         + '<span class="nz-postit-icon">' + (l.icon ? this._nzSvgIcon(l.icon, 14) : '📝') + '</span>'
         + '<span class="nz-postit-title">' + this._esc(l.titel) + '</span>'
         + pinHtml
-        + '<span class="nz-postit-cnt">' + cntLbl + '</span>'
+        + '<span class="nz-postit-cnt' + (l.typ==='check'?' nz-check-pill':'') + '">' + cntLbl + '</span>'
         + '</div>'
         + '<div class="nz-postit-preview">' + preview + '</div>'
         + moreHtml + emptyHtml
@@ -3086,7 +3088,7 @@ const WB = {
     if (listEl) listEl.style.display = 'none';
     if (calEl)  calEl.style.display  = 'none';
     if (!monEl) return;
-    monEl.style.display = 'block';
+    monEl.style.display = 'block'; monEl.style.height = '100%';
 
     const ref   = this._woMonDate ? new Date(this._woMonDate) : new Date();
     const year  = ref.getFullYear();
@@ -3243,7 +3245,8 @@ const WB = {
     }
 
     const scroll=document.getElementById('wo-cal-scroll-y');
-    if(scroll) scroll.scrollTop=6*52;
+    const nowHour = new Date().getHours();
+    if(scroll) scroll.scrollTop = Math.max(0, (nowHour - 1) * 52);
   },
 
   _woSetView(view) {
