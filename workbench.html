@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.19</title>
+  <title>WorkBench 3.0.20</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -725,6 +725,23 @@
     .wb-desktop .ts-pins { grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .wb-desktop .ts-pin { min-height: 140px; max-height: 180px; overflow: hidden; padding: 10px 12px; }
     .wb-desktop .ts-pin-title { font-size: 13px; }
+
+    /* ── Monatsansicht ── */
+    .wo-mon-grid { display:grid; grid-template-columns:repeat(7,1fr); border-top:1px solid var(--border); border-left:1px solid var(--border); }
+    .wo-mon-dh { text-align:center; font-size:11px; font-weight:700; color:var(--faint); padding:5px 0; background:var(--surface2); border-right:1px solid var(--border); border-bottom:1px solid var(--border); text-transform:uppercase; letter-spacing:.04em; }
+    .wo-mon-cell { min-height:88px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:3px; cursor:default; overflow:hidden; }
+    .wb-mobile .wo-mon-cell { min-height:52px; }
+    .wo-mon-cell.other-month { background:var(--surface2); opacity:.55; }
+    .wo-mon-cell.today { background:rgba(56,115,208,.07); }
+    .wo-mon-cell.we { background:rgba(0,0,0,.015); }
+    .wo-mon-num { font-size:11px; font-weight:700; color:var(--faint); line-height:1.8; }
+    .wo-mon-num.today { display:inline-flex; width:20px; height:20px; background:var(--accent); color:#fff; border-radius:50%; align-items:center; justify-content:center; font-size:10px; }
+    .wo-mon-evt { font-size:10px; padding:1px 4px; border-radius:3px; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+    .wo-mon-evt.beruf { background:var(--accent); color:#fff; }
+    .wo-mon-evt.privat { background:var(--accent2,#58D68D); color:#fff; }
+    .wo-mon-evt.deadline { background:none; border:1.5px solid var(--accent); color:var(--accent); font-weight:700; }
+    .wo-mon-more { font-size:9px; color:var(--faint); padding:0 2px; }
+    .wo-cal-deadline { font-size:10px; background:rgba(56,115,208,.1); border-left:2px solid var(--accent); color:var(--accent); padding:1px 4px; margin:1px 0; border-radius:3px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
   </style>
 </head>
 <body>
@@ -732,7 +749,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.19</div>
+  <div id="wb-startup-tagline">v3.0.20</div>
 </div>
 
 <!-- Modal -->
@@ -896,7 +913,7 @@
 
   <div id="wb-welt-header">
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.19</span>
+    <span id="wb-menu-version">v3.0.20</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -971,12 +988,14 @@
           <button class="wo-nav-btn" id="wo-btn-next" onclick="WB._woNavWeek(1)">&#8250;</button>
           <div class="wo-view-btns">
             <button id="wo-btn-list" class="wo-view-btn active" onclick="WB._woSetView('list')">Liste</button>
-            <button id="wo-btn-cal"  class="wo-view-btn" onclick="WB._woSetView('cal')">Kalender</button>
+            <button id="wo-btn-cal"  class="wo-view-btn" onclick="WB._woSetView('cal')">Woche</button>
+            <button id="wo-btn-mon"  class="wo-view-btn" onclick="WB._woSetView('mon')">Monat</button>
           </div>
           <button class="wo-add-btn" onclick="WB.terminOpen(null)">+ Termin</button>
         </div>
         <div class="wo-scroll">
           <div id="wo-list-view" style="display:flex;"></div>
+          <div id="wo-mon-view" style="display:none;"></div>
           <div id="wo-cal-view" style="display:none;flex-direction:column;">
             <div class="wo-cal-head-row">
               <div class="wo-cal-gutter-head"></div>
@@ -1051,8 +1070,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.19',
-  APP_BUILD:   '20260624-1300',
+  APP_VERSION: '3.0.20',
+  APP_BUILD:   '20260624-1500',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2917,6 +2936,7 @@ const WB = {
   renderWoche() {
     this._woRenderHeader();
     if (this._woView === 'list') { this._woRenderListe(); }
+    else if (this._woView === 'mon') { this._woRenderMonat(); }
     else { this._woRenderKalender(); }
   },
 
@@ -3031,6 +3051,85 @@ const WB = {
     });
   },
 
+
+  _woMonDate: null,
+
+  _woRenderMonat() {
+    const listEl = document.getElementById('wo-list-view');
+    const calEl  = document.getElementById('wo-cal-view');
+    const monEl  = document.getElementById('wo-mon-view');
+    if (listEl) listEl.style.display = 'none';
+    if (calEl)  calEl.style.display  = 'none';
+    if (!monEl) return;
+    monEl.style.display = 'block';
+
+    const ref   = this._woMonDate ? new Date(this._woMonDate) : new Date();
+    const year  = ref.getFullYear();
+    const month = ref.getMonth();
+    const today = this._dStr(new Date());
+    const mN    = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    const dayN  = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+
+    const titleEl = document.getElementById('wo-header-title');
+    if (titleEl) titleEl.textContent = mN[month] + ' ' + year;
+    const subEl = document.getElementById('wo-header-sub');
+    if (subEl) subEl.textContent = '';
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay  = new Date(year, month+1, 0);
+    let startDow = firstDay.getDay();
+    startDow = startDow === 0 ? 6 : startDow - 1;
+
+    const cells = [];
+    for (let i = 0; i < startDow; i++) {
+      const d = new Date(year, month, 1-(startDow-i));
+      cells.push({d, otherMonth:true});
+    }
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      cells.push({d: new Date(year, month, i), otherMonth:false});
+    }
+    while (cells.length % 7 !== 0) {
+      const last = cells[cells.length-1].d;
+      const next = new Date(last); next.setDate(last.getDate()+1);
+      cells.push({d:next, otherMonth:true});
+    }
+
+    let h = '<div class="wo-mon-grid">';
+    dayN.forEach(n => { h += '<div class="wo-mon-dh">' + n + '</div>'; });
+    cells.forEach(({d, otherMonth}) => {
+      const ds   = this._dStr(d);
+      const isT  = ds === today;
+      const dow  = d.getDay();
+      const isWE = dow===0||dow===6;
+      const evts = (this.db?.customEvents||[])
+        .filter(ev => !ev.deleted && ev.date===ds)
+        .filter(ev => {
+          const w=ev.welt||'priv';
+          if(this.activeWorld==='beruf'&&w!=='pro')  return false;
+          if(this.activeWorld==='privat'&&w!=='priv') return false;
+          return true;
+        })
+        .sort((a,b)=>(a.startTime||'99:99').localeCompare(b.startTime||'99:99'));
+      let cls='wo-mon-cell'+(otherMonth?' other-month':'')+(isT?' today':'')+(isWE?' we':'');
+      h += '<div class="'+cls+'" onclick="WB.terminOpen(null)">';
+      h += '<div class="wo-mon-num'+(isT?' today':'')+'">' + d.getDate() + '</div>';
+      const MAX = this._isMobile() ? 1 : 3;
+      evts.slice(0,MAX).forEach(ev => {
+        const welt = ev.welt==='pro'?'beruf':'privat';
+        const isDL = !!ev.isDeadline;
+        const shrt = t => t.length>10?t.slice(0,9)+'\u2026':t;
+        const lbl  = isDL
+          ? '\uD83D\uDEA9 ' + this._esc(shrt(ev.text))
+          : (ev.startTime?ev.startTime.slice(0,5)+' ':'') + this._esc(shrt(ev.text));
+        h += '<div class="wo-mon-evt '+(isDL?'deadline':welt)+'" onclick="event.stopPropagation();WB.terminOpen(&quot;'+this._esc(ev.id)+'&quot;)">'+lbl+'</div>';
+      });
+      if(evts.length>MAX) h+='<div class="wo-mon-more">+'+(evts.length-MAX)+'</div>';
+      h += '</div>';
+    });
+    h += '</div>';
+    monEl.innerHTML = h;
+  },
+
   _woRenderKalender() {
     const listEl = document.getElementById('wo-list-view');
     const calEl  = document.getElementById('wo-cal-view');
@@ -3083,7 +3182,7 @@ const WB = {
         const isWE= i>=5;
         let cls = 'wo-cal-col'+(isT?' today-col':'')+(isWE?' we-col':'');
         const events = (this.db?.customEvents||[])
-          .filter(e=>!e.deleted&&e.date===ds&&e.startTime)
+          .filter(e=>!e.deleted&&e.date===ds&&!e.isDeadline&&e.startTime)
           .filter(e=>{const w=e.welt||'priv';if(this.activeWorld==='beruf'&&w!=='pro')return false;if(this.activeWorld==='privat'&&w!=='priv')return false;return true;})
           .map(e=>{const[eh,em]=e.startTime.split(':').map(Number); return{...e,_ctx:e.welt==='pro'?'beruf':'privat',_startMin:eh*60+em,_endMin:eh*60+em+this._evtDurationMin(e)};});
         events.sort((a,b)=>a._startMin-b._startMin);
@@ -3092,7 +3191,8 @@ const WB = {
         const slots=events.map(e=>({e,col:0,cols:1}));
         for(let a=0;a<slots.length;a++) for(let b=a+1;b<slots.length;b++) { if(slots[b].e._startMin<slots[a].e._endMin){slots[b].col=slots[a].col+1;slots[a].cols=Math.max(slots[a].cols,slots[b].col+1);slots[b].cols=slots[a].cols;} }
 
-        let colH='';
+        const _dls=(this.db?.customEvents||[]).filter(ev=>!ev.deleted&&ev.isDeadline&&!ev.done&&ev.date===ds);
+        let colH=_dls.map(dl=>'<div class="wo-cal-deadline" onclick="event.stopPropagation();WB.terminOpen(&quot;'+this._esc(dl.id)+'&quot;)" title="'+this._esc(dl.text)+'">\uD83D\uDEA9 '+this._esc(dl.text.length>16?dl.text.slice(0,15)+'\u2026':dl.text)+'</div>').join('');
         for(let hr=0;hr<HOURS;hr++) colH+='<div class="wo-h-line"></div>';
 
         if (isT) {
@@ -3123,6 +3223,7 @@ const WB = {
     this._woView = view;
     document.getElementById('wo-btn-list')?.classList.toggle('active', view==='list');
     document.getElementById('wo-btn-cal')?.classList.toggle('active',  view==='cal');
+    document.getElementById('wo-btn-mon')?.classList.toggle('active',  view==='mon');
     this.renderWoche();
   },
 
@@ -3138,6 +3239,11 @@ const WB = {
         this._woMobileOffset = newOffset;
       }
       this.renderSection('woche'); return;
+    }
+    if (this._woView === 'mon') {
+      if (dir===0) { this._woMonDate=null; }
+      else { if(!this._woMonDate) this._woMonDate=new Date(); this._woMonDate.setMonth(this._woMonDate.getMonth()+dir); }
+      this.renderWoche(); return;
     }
     if (dir===0) { this._woRefDate=null; this.renderWoche(); return; }
     if (!this._woRefDate) this._woRefDate = new Date();
