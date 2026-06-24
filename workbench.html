@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.41</title>
+  <title>WorkBench 3.0.42</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -929,6 +929,66 @@
     .ts-zt-row.running .ts-zt-time { color:#7c3aed; font-weight:700; }
     .ts-running-badge { font-size:10px; font-weight:700; color:#7c3aed; background:rgba(139,92,246,.12); padding:2px 7px; border-radius:8px; margin-left:6px; vertical-align:middle; white-space:nowrap; }
     .ts-zt-row.running { border-left:2.5px solid rgba(139,92,246,.5); }
+    /* ── Heute Split: Kachel-Panel + Notizen-Panel ── */
+    .ts-split-top { flex-direction:row !important; overflow:hidden; border-bottom:none !important; }
+    #ts-kachel-panel { width:34%; flex-shrink:0; border-right:1.5px solid var(--border); background:var(--surface2); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:10px; min-height:0; }
+    #ts-kachel-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--faint); font-size:11px; text-align:center; opacity:.5; }
+    #ts-kachel-empty svg { stroke:var(--faint); fill:none; }
+    #ts-kachel-detail { display:none; flex-direction:column; width:100%; border-radius:10px; border:1.5px solid var(--border); overflow:hidden; box-shadow:2px 4px 12px rgba(0,0,0,.12); }
+    #ts-kachel-detail.open { display:flex; }
+    #ts-kachel-detail.c-gelb    { background:#FFF9C4; border-color:#F1C40F; }
+    #ts-kachel-detail.c-gruen   { background:#D5F5E3; border-color:#58D68D; }
+    #ts-kachel-detail.c-blau    { background:#D6EAF8; border-color:#5DADE2; }
+    #ts-kachel-detail.c-rosa    { background:#FDEBD0; border-color:#E59866; }
+    #ts-kachel-detail.c-lila    { background:#E8D5F0; border-color:#A569BD; }
+    #ts-kachel-detail.c-tuerkis { background:#C8F0EC; border-color:#45B7AA; }
+    #ts-kachel-detail.c-weiss   { background:#fff;    border-color:rgba(0,0,0,.15); }
+    .ts-kd-head { display:flex; align-items:center; gap:6px; padding:7px 9px; border-bottom:1px solid rgba(0,0,0,.1); flex-shrink:0; }
+    .ts-kd-back { padding:2px 7px; border:1.5px solid rgba(0,0,0,.15); border-radius:4px; background:rgba(255,255,255,.5); font-size:10px; font-weight:700; cursor:pointer; color:var(--muted); font-family:var(--font); }
+    .ts-kd-title { font-size:12px; font-weight:800; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ts-kd-cnt { font-size:9px; font-weight:700; padding:1px 5px; border-radius:5px; background:rgba(0,0,0,.1); color:var(--muted); white-space:nowrap; }
+    .ts-kd-settings { padding:2px 5px; border:1.5px solid rgba(0,0,0,.15); border-radius:4px; background:rgba(255,255,255,.4); font-size:11px; cursor:pointer; color:var(--faint); font-family:var(--font); }
+    .ts-kd-body { flex:1; overflow-y:auto; padding:5px 9px; }
+    .ts-kd-item { display:flex; align-items:flex-start; gap:6px; padding:4px 2px; border-bottom:.5px solid rgba(0,0,0,.08); cursor:pointer; }
+    .ts-kd-item:last-child { border-bottom:none; }
+    .ts-kd-chk { width:14px; height:14px; border-radius:3px; border:1.5px solid rgba(0,0,0,.2); flex-shrink:0; margin-top:2px; display:flex; align-items:center; justify-content:center; font-size:9px; color:#fff; background:rgba(255,255,255,.4); cursor:pointer; }
+    .ts-kd-chk.done { background:var(--accent); border-color:var(--accent); }
+    .ts-kd-txt { font-size:12px; color:var(--text); line-height:1.4; }
+    .ts-kd-txt.done { text-decoration:line-through; color:var(--faint); }
+    .ts-kd-foot { display:flex; align-items:center; gap:5px; padding:5px 9px; border-top:1px solid rgba(0,0,0,.08); flex-shrink:0; background:rgba(255,255,255,.2); }
+    .ts-kd-plus { font-size:13px; color:var(--faint); }
+    .ts-kd-inp { flex:1; border:none; background:none; outline:none; font-size:12px; font-family:var(--font); color:var(--text); }
+    .ts-kd-ok { font-size:11px; font-weight:700; color:var(--accent); cursor:pointer; }
+    /* Notizen-Panel rechts */
+    #ts-notizen-panel { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; padding:8px 10px; gap:6px; }
+    #ts-notizen-grid { display:flex; flex-direction:column; gap:6px; flex:1; min-height:0; overflow:hidden; }
+    .ts-nz-group { display:flex; flex-direction:column; gap:3px; }
+    .ts-nz-group-lbl { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); padding-left:1px; }
+    .ts-nz-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; }
+    .ts-nz-mini { aspect-ratio:1/1; border-radius:7px; border:1.5px solid var(--border); padding:7px; cursor:pointer; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; transition:transform .1s,box-shadow .1s; }
+    .ts-nz-mini:hover { transform:translateY(-1px); box-shadow:0 3px 10px rgba(0,0,0,.13); }
+    .ts-nz-mini.active { box-shadow:0 0 0 2.5px var(--accent); }
+    .ts-nz-mini.c-gelb    { background:#FFF9C4; border-color:#F1C40F; }
+    .ts-nz-mini.c-gruen   { background:#D5F5E3; border-color:#58D68D; }
+    .ts-nz-mini.c-blau    { background:#D6EAF8; border-color:#5DADE2; }
+    .ts-nz-mini.c-rosa    { background:#FDEBD0; border-color:#E59866; }
+    .ts-nz-mini.c-lila    { background:#E8D5F0; border-color:#A569BD; }
+    .ts-nz-mini.c-tuerkis { background:#C8F0EC; border-color:#45B7AA; }
+    .ts-nz-mini.c-weiss   { background:#fff;    border-color:rgba(0,0,0,.15); }
+    .ts-nz-mini-top { display:flex; flex-direction:column; gap:2px; }
+    .ts-nz-mini-title { font-size:11px; font-weight:800; color:var(--text); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3; }
+    .ts-nz-mini-preview { font-size:10px; color:var(--muted); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; opacity:.8; line-height:1.3; }
+    .ts-nz-mini-pills { display:flex; gap:3px; flex-wrap:wrap; }
+    .ts-nz-mini-pill { font-size:8px; font-weight:800; padding:1px 4px; border-radius:4px; white-space:nowrap; }
+    .ts-nz-mini-pill.cnt { background:rgba(0,0,0,.1); color:var(--muted); }
+    .ts-nz-mini-pill.beruf { background:rgba(10,107,94,.15); color:var(--accent); }
+    .ts-nz-mini-pill.privat { background:rgba(77,95,51,.15); color:var(--accent2); }
+    /* Mobile: kein Split, altes Layout */
+    .wb-mobile .ts-split-top { flex-direction:column !important; }
+    .wb-mobile #ts-kachel-panel { display:none; }
+    .wb-mobile #ts-notizen-panel { padding:0; }
+    .wb-mobile #ts-notizen-grid { overflow-y:auto; }
+    .wb-mobile .ts-nz-mini { aspect-ratio:auto; min-height:60px; }
   </style>
 </head>
 <body>
@@ -936,7 +996,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.41</div>
+  <div id="wb-startup-tagline">v3.0.42</div>
 </div>
 
 <!-- Modal -->
@@ -1104,7 +1164,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.41</span>
+    <span id="wb-menu-version">v3.0.42</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1121,18 +1181,33 @@
       <div id="sec-tagessicht" class="wb-section" style="display:none;padding:0;flex-direction:column;">
         <!-- Tagesheader -->
         <div id="ts-tagesheader"></div>
-        <!-- Obere Hälfte: Angepinnte Notizen -->
-        <div class="ts-split-top">
-          <div class="ts-section" style="padding-bottom:0;flex-shrink:0;">
-            <div class="ts-section-head">
-              <div class="ts-section-icon"><svg viewBox="0 0 24 24"><path d="M12 2L15 9H22L16 13.5L18 21L12 17L6 21L8 13.5L2 9H9Z" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-              Angepinnte Notizen
-              <div class="ts-section-line"></div>
-              <span id="ts-pins-count" class="ts-section-count">0</span>
+        <!-- Obere Hälfte: horizontal geteilt -->
+        <div class="ts-split-top" style="display:flex;flex-direction:row;overflow:hidden;border-bottom:none;">
+          <!-- Links 1/3: Kachel-Panel -->
+          <div id="ts-kachel-panel">
+            <div id="ts-kachel-empty">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="12" y2="13"/></svg>
+              <span>Notiz antippen</span>
+            </div>
+            <div id="ts-kachel-detail">
+              <div class="ts-kd-head">
+                <button class="ts-kd-back" onclick="WB._tsKachelClose()">&#8592;</button>
+                <span class="ts-kd-title" id="ts-kd-title"></span>
+                <span class="ts-kd-cnt" id="ts-kd-cnt"></span>
+                <button class="ts-kd-settings" onclick="WB._tsKachelSettings()">&#9881;</button>
+              </div>
+              <div class="ts-kd-body" id="ts-kd-body"></div>
+              <div class="ts-kd-foot">
+                <span class="ts-kd-plus">+</span>
+                <input id="ts-kd-inp" onkeydown="if(event.key==='Enter')WB._tsKachelAdd()" class="ts-kd-inp" placeholder="Eintrag hinzuf&#252;gen...">
+                <span class="ts-kd-ok" onclick="WB._tsKachelAdd()">OK</span>
+              </div>
             </div>
           </div>
-          <div id="ts-deadline-banner-wrap" style="display:none;padding:8px 12px 0;"></div>
-          <div id="ts-pins-wrap"></div>
+          <!-- Rechts 2/3: Kompakte Notizen Grid -->
+          <div id="ts-notizen-panel">
+            <div id="ts-notizen-grid"></div>
+          </div>
         </div>
         <!-- Untere Hälfte: Zeitband -->
         <div class="ts-split-bottom">
@@ -1362,8 +1437,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.41',
-  APP_BUILD:   '20260625-1600',
+  APP_VERSION: '3.0.42',
+  APP_BUILD:   '20260625-1800',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1637,7 +1712,7 @@ const WB = {
 
   _tsRender() {
     this._tsRenderTagesheader();
-    this._tsRenderPins();
+    this._tsRenderNotizenKompakt();
     this._tsRenderZeitband();
   },
 
@@ -1671,6 +1746,137 @@ const WB = {
     h += '</div>';
     el.innerHTML = h;
   },
+
+  // ── Heute: kompakte Notizen + Kachel-Panel ──────────────────────────
+  _tsKachelCurrentId: null,
+
+  _tsRenderNotizenKompakt() {
+    const grid = document.getElementById('ts-notizen-grid');
+    if (!grid) return;
+    const zustandOrder = ['aktuell','parkplatz','kompass'];
+    const zustandLabel = { aktuell:'Aktuell', parkplatz:'Parkplatz', kompass:'Kompass' };
+    const gepinnt = (this.db?.notizen||[]).filter(l => !l.deleted && l.gepinnt && this._tsNotizenWorldOk(l));
+    // Nach Zustand gruppieren
+    const groups = {};
+    gepinnt.forEach(l => {
+      const z = l.zustand || 'aktuell';
+      if (!groups[z]) groups[z] = [];
+      groups[z].push(l);
+    });
+    let h = '';
+    zustandOrder.forEach(z => {
+      if (!groups[z] || !groups[z].length) return;
+      h += '<div class="ts-nz-group">';
+      h += '<div class="ts-nz-group-lbl">' + zustandLabel[z] + '</div>';
+      h += '<div class="ts-nz-grid">';
+      groups[z].forEach(l => {
+        const farbe = this._nzPostItFarbe(l.farbe || 'c-weiss');
+        const allItems = (l.items||[]).filter(i => !i.deleted);
+        const doneItems = allItems.filter(i => i.done);
+        const preview = l.typ === 'freitext'
+          ? ((l.items||[]).find(i => !i.deleted)?.text || '')
+          : (allItems[0]?.text || '');
+        const cntPill = l.typ === 'check' && allItems.length
+          ? '<span class="ts-nz-mini-pill cnt">' + doneItems.length + '/' + allItems.length + '</span>'
+          : '';
+        const weltPill = l.welt === 'beruf' || l.welt === 'pro'
+          ? '<span class="ts-nz-mini-pill beruf">B</span>'
+          : l.welt === 'privat' || l.welt === 'priv'
+          ? '<span class="ts-nz-mini-pill privat">P</span>' : '';
+        const isActive = this._tsKachelCurrentId === l.id ? ' active' : '';
+        h += '<div class="ts-nz-mini ' + farbe + isActive + '"'
+          + ' onclick="WB._tsKachelOpen(\'' + this._esc(l.id) + '\')"'
+          + ' id="ts-mini-' + this._esc(l.id) + '">';
+        h += '<div class="ts-nz-mini-top">';
+        h += '<div class="ts-nz-mini-title">' + this._esc(l.titel) + '</div>';
+        if (preview) h += '<div class="ts-nz-mini-preview">' + this._esc(preview) + '</div>';
+        h += '</div>';
+        h += '<div class="ts-nz-mini-pills">' + cntPill + weltPill + '</div>';
+        h += '</div>';
+      });
+      h += '</div></div>';
+    });
+    if (!h) h = '<div style="padding:12px;font-size:11px;color:var(--faint);">Keine angepinnten Notizen</div>';
+    grid.innerHTML = h;
+    // Falls Kachel offen war, re-render
+    if (this._tsKachelCurrentId) this._tsKachelOpen(this._tsKachelCurrentId, true);
+  },
+
+  _tsKachelOpen(listeId, silent) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId && !x.deleted);
+    if (!l) return;
+    this._tsKachelCurrentId = listeId;
+    // Mini-Kachel active-State
+    document.querySelectorAll('.ts-nz-mini').forEach(el => el.classList.remove('active'));
+    const miniEl = document.getElementById('ts-mini-' + listeId);
+    if (miniEl) miniEl.classList.add('active');
+    // Detail-Panel füllen
+    document.getElementById('ts-kd-title').textContent = l.titel;
+    const allItems = (l.items||[]).filter(i => !i.deleted);
+    const doneItems = allItems.filter(i => i.done);
+    const cnt = l.typ === 'check' ? doneItems.length + '/' + allItems.length : '–';
+    document.getElementById('ts-kd-cnt').textContent = cnt;
+    // Farbe übernehmen
+    const farbe = this._nzPostItFarbe(l.farbe || 'c-weiss');
+    const detail = document.getElementById('ts-kachel-detail');
+    detail.className = 'open ' + farbe;
+    // Body rendern
+    const body = document.getElementById('ts-kd-body');
+    if (l.typ === 'freitext') {
+      const txt = allItems[0]?.text || '';
+      body.innerHTML = '<div style="padding:6px 2px;font-size:12px;color:var(--text);line-height:1.5;white-space:pre-wrap;">' + this._esc(txt) + '</div>';
+    } else {
+      const openItems = allItems.filter(i => !i.done);
+      const doneItemsList = allItems.filter(i => i.done);
+      let bh = openItems.map(i =>
+        '<div class="ts-kd-item"><div class="ts-kd-chk" data-wb-cb="' + this._esc(listeId) + '|' + this._esc(i.id) + '"></div>'
+        + '<span class="ts-kd-txt">' + this._esc(i.text) + '</span></div>'
+      ).join('');
+      if (doneItemsList.length) {
+        bh += '<div style="font-size:9px;font-weight:800;text-transform:uppercase;color:var(--faint);padding:6px 2px 2px;letter-spacing:.06em;">Erledigt</div>';
+        bh += doneItemsList.map(i =>
+          '<div class="ts-kd-item"><div class="ts-kd-chk done" data-wb-cb="' + this._esc(listeId) + '|' + this._esc(i.id) + '">&#10003;</div>'
+          + '<span class="ts-kd-txt done">' + this._esc(i.text) + '</span></div>'
+        ).join('');
+      }
+      body.innerHTML = bh;
+    }
+    document.getElementById('ts-kachel-empty').style.display = 'none';
+  },
+
+  _tsKachelClose() {
+    this._tsKachelCurrentId = null;
+    document.getElementById('ts-kachel-detail').className = '';
+    document.getElementById('ts-kachel-empty').style.display = 'flex';
+    document.querySelectorAll('.ts-nz-mini').forEach(el => el.classList.remove('active'));
+  },
+
+  _tsKachelSettings() {
+    if (this._tsKachelCurrentId) this._nzBearbeitenDialog(this._tsKachelCurrentId);
+  },
+
+  _tsKachelAdd() {
+    const inp = document.getElementById('ts-kd-inp'); if (!inp) return;
+    const text = inp.value.trim(); if (!text) return;
+    const l = (this.db?.notizen||[]).find(x => x.id === this._tsKachelCurrentId); if (!l) return;
+    if (!l.items) l.items = [];
+    l.items.push({ id:'i_'+Date.now(), text, done:false, deleted:false });
+    l.updatedAt = this._now();
+    this.setDirty();
+    inp.value = '';
+    this._tsKachelOpen(this._tsKachelCurrentId, true);
+    this._tsRenderNotizenKompakt();
+  },
+
+  // _tsNotizenWorldOk: Welt-Filter für Notizen
+  _tsNotizenWorldOk(l) {
+    if (this.activeWorld === 'beide') return true;
+    const w = l.welt || 'beide';
+    if (this.activeWorld === 'beruf')  return w === 'beruf'  || w === 'pro';
+    if (this.activeWorld === 'privat') return w === 'privat' || w === 'priv';
+    return true;
+  },
+
 
   _tsRenderPins() {
     const wrap  = document.getElementById('ts-pins-wrap');
