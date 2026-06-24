@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.32</title>
+  <title>WorkBench 3.0.33</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -786,7 +786,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.32</div>
+  <div id="wb-startup-tagline">v3.0.33</div>
 </div>
 
 <!-- Modal -->
@@ -954,7 +954,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.32</span>
+    <span id="wb-menu-version">v3.0.33</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1116,8 +1116,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.32',
-  APP_BUILD:   '20260625-0400',
+  APP_VERSION: '3.0.33',
+  APP_BUILD:   '20260625-0500',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3097,14 +3097,16 @@ const WB = {
     const year  = ref.getFullYear();
     const month = ref.getMonth();
     const today = this._dStr(new Date());
-    const mN = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-    const dayN = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+    const mN    = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August',
+                   'September','Oktober','November','Dezember'];
+    const dayN  = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 
     const titleEl = document.getElementById('wo-header-title');
     if (titleEl) titleEl.textContent = mN[month] + ' ' + year;
     const subEl = document.getElementById('wo-header-sub');
     if (subEl) subEl.textContent = '';
 
+    // Zellen aufbauen
     const firstDay = new Date(year, month, 1);
     const lastDay  = new Date(year, month+1, 0);
     let startDow = firstDay.getDay();
@@ -3112,72 +3114,73 @@ const WB = {
 
     const cells = [];
     for (let i = 0; i < startDow; i++) {
-      const d = new Date(year, month, 1-(startDow-i));
-      cells.push({d, otherMonth:true});
+      cells.push({ d: new Date(year, month, 1-(startDow-i)), otherMonth:true });
     }
     for (let i = 1; i <= lastDay.getDate(); i++) {
-      cells.push({d: new Date(year, month, i), otherMonth:false});
+      cells.push({ d: new Date(year, month, i), otherMonth:false });
     }
     while (cells.length % 7 !== 0) {
       const last = cells[cells.length-1].d;
       const next = new Date(last); next.setDate(last.getDate()+1);
-      cells.push({d:next, otherMonth:true});
+      cells.push({ d: next, otherMonth:true });
     }
+    const numRows = cells.length / 7;
 
-    const getEvts = (ds) => (this.db?.customEvents||[])
-      .filter(ev => !ev.deleted && ev.date===ds)
-      .filter(ev => {
-        const w=ev.welt||'priv';
-        if(this.activeWorld==='beruf'&&w!=='pro')  return false;
-        if(this.activeWorld==='privat'&&w!=='priv') return false;
-        return true;
-      })
-      .sort((a,b)=>(a.startTime||'99:99').localeCompare(b.startTime||'99:99'));
+    // Termine + Sondertage pro Zelle
+    const sondertageAll = (this.db?.sondertage||[]).filter(s=>!s.deleted);
+    const stLabels = { urlaub:'\uD83C\uDFD6 Urlaub', feiertag:'\uD83C\uDF89 Feiertag',
+                       auszeit:'\u23F8 Auszeit', krank:'\uD83E\uDD12 Krank',
+                       dienstreise:'\u2708 Dienstreise' };
 
-    const cellEvts = cells.map(({d}) => getEvts(this._dStr(d)));
-    const numRows  = cells.length / 7;
+    const getCellData = (ds) => {
+      const evts = (this.db?.customEvents||[])
+        .filter(ev => !ev.deleted && ev.date===ds)
+        .filter(ev => {
+          const w=ev.welt||'priv';
+          if (this.activeWorld==='beruf'  && w!=='pro')  return false;
+          if (this.activeWorld==='privat' && w!=='priv') return false;
+          return true;
+        })
+        .sort((a,b)=>(a.startTime||'99:99').localeCompare(b.startTime||'99:99'));
+      const deadlines = evts.filter(ev=>ev.isDeadline);
+      const termine   = evts.filter(ev=>!ev.isDeadline);
+      const sonder    = sondertageAll.filter(s=>s.datum===ds);
+      return { deadlines, termine, sonder, total: evts.length + sonder.length };
+    };
 
-    // Verfügbare Höhe messen (wo-scroll Höhe minus Header-Row ~30px)
-    const availH = scroll ? scroll.clientHeight - 34 : numRows * 120;
-    // Mindesthöhe pro Zeile basierend auf max Einträgen in der Zeile
-    const ITEM_H    = 24;   // px pro Eintrag
-    const HEAD_H    = 26;   // px für Tageszahl
-    const FONT_SIZE = 13;   // px Schriftgröße
+    const cellData = cells.map(({d}) => getCellData(this._dStr(d)));
 
-    // Pro Zeile: max Einträge berechnen
-    const rowMaxEvts = [];
-    for (let row = 0; row < numRows; row++) {
-      let mx = 0;
-      for (let col = 0; col < 7; col++) mx = Math.max(mx, cellEvts[row*7+col].length);
-      rowMaxEvts.push(mx);
-    }
-    // Gewichtete Verteilung: Zeilen mit mehr Einträgen bekommen mehr Platz
-    const totalWeight = rowMaxEvts.reduce((s, n) => s + Math.max(1, n), 0);
-    const minRowH = Math.max(80, Math.floor(availH / numRows));
-    const rowHeights = rowMaxEvts.map(n => {
-      const weighted = Math.floor(availH * Math.max(1,n) / totalWeight);
-      return Math.max(minRowH, HEAD_H + n * ITEM_H);
-    });
+    // Verfügbare Höhe messen
+    const HEADER_H = 34;  // px für Wochentag-Kopfzeile
+    const DAY_H    = 26;  // px für Tageszahl-Zeile
+    const ITEM_H   = 22;  // px pro Eintrag
+    const avail    = scroll ? Math.max(scroll.clientHeight - HEADER_H, numRows * 100) : numRows * 120;
+    const rowH     = Math.floor(avail / numRows);  // GLEICHE Höhe für alle Zeilen
+    const fits     = Math.max(1, Math.floor((rowH - DAY_H) / ITEM_H));
 
-    // Termine pro Wochentag-Spalte (Pill im Header)
-    const colTotals = Array(7).fill(0);
-    cells.forEach(({otherMonth}, ci) => {
-      if (!otherMonth) colTotals[ci % 7] += cellEvts[ci].length;
-    });
+    // monEl-Höhe setzen = genau avail + header
+    monEl.style.height = (avail + HEADER_H) + 'px';
 
-    // Inline CSS für Zeilenhöhen
-    const rowCSS = rowHeights.map((h, i) =>
-      `.wm-r${i}{height:${h}px;min-height:${h}px;}`
-    ).join('');
+    // Inline-CSS: einheitliche Zeilenhöhe
+    let h = '<style>.wm-cell{height:' + rowH + 'px;min-height:' + rowH + 'px;}'
+      + '.wo-mon-evt{font-size:13px;line-height:1.3;}'
+      + '.wo-mon-st{font-size:12px;font-weight:700;padding:1px 5px;border-radius:3px;'
+      + 'background:var(--accent2,#e8f4fd);color:var(--accent);margin-bottom:2px;'
+      + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;cursor:pointer;}'
+      + '.wo-day-pill{display:inline-flex;align-items:center;justify-content:center;'
+      + 'background:var(--accent);color:#fff;border-radius:9px;font-size:10px;font-weight:800;'
+      + 'padding:0 5px;min-width:17px;height:16px;margin-left:5px;vertical-align:middle;}'
+      + '</style>';
 
-    let h = `<style>${rowCSS}.wo-mon-evt{font-size:${FONT_SIZE}px;}</style>`;
     h += '<div class="wo-mon-grid">';
 
-    // Header-Zeile mit Spalten-Pills
+    // Header-Zeile: Wochentag + Monatssumme
     dayN.forEach((n, i) => {
-      const tot = colTotals[i];
+      const colTotal = cellData
+        .filter((_, ci) => ci % 7 === i && !cells[ci].otherMonth)
+        .reduce((sum, d) => sum + d.total, 0);
       h += '<div class="wo-mon-dh">' + n
-        + (tot > 0 ? ' <span class="wo-mon-col-pill">' + tot + '</span>' : '')
+        + (colTotal > 0 ? ' <span class="wo-mon-col-pill">' + colTotal + '</span>' : '')
         + '</div>';
     });
 
@@ -3187,37 +3190,63 @@ const WB = {
       const isT  = ds === today;
       const dow  = d.getDay();
       const isWE = dow===0||dow===6;
-      const evts = cellEvts[ci];
-      const row  = Math.floor(ci / 7);
-      const rowH = rowHeights[row];
-      // Wieviele passen rein? (Höhe - HEAD_H) / ITEM_H, min 1
-      const fits = Math.max(1, Math.floor((rowH - HEAD_H) / ITEM_H));
+      const { deadlines, termine, sonder, total } = cellData[ci];
 
-      let cls = 'wo-mon-cell wm-r' + row
+      let cls = 'wo-mon-cell wm-cell'
         + (otherMonth ? ' other-month' : '')
         + (isT        ? ' today'       : '')
         + (isWE       ? ' we'          : '');
-      h += '<div class="' + cls + '" onclick="WB.terminOpen(null)">';
-      h += '<div class="wo-mon-num' + (isT ? ' today' : '') + '">' + d.getDate() + '</div>';
 
-      evts.slice(0, fits).forEach(ev => {
-        const welt = ev.welt==='pro' ? 'beruf' : 'privat';
-        const isDL = !!ev.isDeadline;
-        const maxC = Math.max(8, Math.floor((scroll ? scroll.clientWidth/7 : 140) / 7));
-        const shrt = t => t.length > maxC ? t.slice(0, maxC-1) + '\u2026' : t;
-        const lbl  = isDL
-          ? '\uD83D\uDEA9 ' + this._esc(shrt(ev.text))
-          : (ev.startTime ? ev.startTime.slice(0,5)+' ' : '') + this._esc(shrt(ev.text));
-        h += '<div class="wo-mon-evt ' + (isDL ? 'deadline' : welt)
-          + '" onclick="event.stopPropagation();WB.terminOpen(&quot;' + this._esc(ev.id) + '&quot;)">' + lbl + '</div>';
+      h += '<div class="' + cls + '" onclick="WB.terminOpen(null)">';
+
+      // Tageszahl + Pill Anzahl Einträge
+      h += '<div class="wo-mon-num' + (isT ? ' today' : '') + '">'
+        + d.getDate()
+        + (total > 0 && !otherMonth
+            ? ' <span class="wo-day-pill">' + total + '</span>'
+            : '')
+        + '</div>';
+
+      let shown = 0;
+      const shrt = t => t.length > 15 ? t.slice(0,14)+'\u2026' : t;
+
+      // 1. Sondertage (ganz oben)
+      sonder.forEach(st => {
+        if (shown >= fits) return;
+        const lbl = stLabels[st.typ] || st.typ;
+        h += '<div class="wo-mon-st" onclick="event.stopPropagation()" title="'
+          + this._esc(st.name||lbl) + '">'
+          + lbl + (st.name ? ' ' + this._esc(shrt(st.name)) : '') + '</div>';
+        shown++;
       });
-      if (evts.length > fits) h += '<div class="wo-mon-more">+' + (evts.length - fits) + '</div>';
+
+      // 2. Deadlines
+      deadlines.forEach(ev => {
+        if (shown >= fits) return;
+        h += '<div class="wo-mon-evt deadline"'
+          + ' onclick="event.stopPropagation();WB.terminOpen(&quot;' + this._esc(ev.id) + '&quot;)">'
+          + '\uD83D\uDEA9 ' + this._esc(shrt(ev.text)) + '</div>';
+        shown++;
+      });
+
+      // 3. Normale Termine
+      termine.forEach(ev => {
+        if (shown >= fits) return;
+        const welt = ev.welt==='pro' ? 'beruf' : 'privat';
+        const lbl  = (ev.startTime ? ev.startTime.slice(0,5)+' ' : '') + this._esc(shrt(ev.text));
+        h += '<div class="wo-mon-evt ' + welt + '"'
+          + ' onclick="event.stopPropagation();WB.terminOpen(&quot;' + this._esc(ev.id) + '&quot;)">'
+          + lbl + '</div>';
+        shown++;
+      });
+
+      const remaining = total - shown;
+      if (remaining > 0) h += '<div class="wo-mon-more">+' + remaining + '</div>';
       h += '</div>';
     });
+
     h += '</div>';
     monEl.innerHTML = h;
-    // Grid-Höhe exakt setzen damit kein Leerraum
-    monEl.style.height = rowHeights.reduce((a,b) => a+b, 0) + 34 + 'px';
   },
 
   _woRenderKalender() {
