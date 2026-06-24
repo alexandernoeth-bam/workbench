@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.20</title>
+  <title>WorkBench 3.0.21</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -505,7 +505,7 @@
     .wo-lm-add:hover { color: var(--accent); border-color: var(--accent); }
 
     /* Kalenderansicht */
-    #wo-cal-view { flex-direction: column; display: none; }
+    #wo-cal-view { flex-direction: column; display: none; height: 100%; }
     .wo-cal-head-row { display: flex; flex-shrink: 0; border-bottom: 1.5px solid var(--border); background: var(--surface); }
     .wo-cal-gutter-head { width: 44px; flex-shrink: 0; }
     #wo-cal-day-headers { flex: 1; display: flex; }
@@ -729,8 +729,8 @@
     /* ── Monatsansicht ── */
     .wo-mon-grid { display:grid; grid-template-columns:repeat(7,1fr); border-top:1px solid var(--border); border-left:1px solid var(--border); }
     .wo-mon-dh { text-align:center; font-size:11px; font-weight:700; color:var(--faint); padding:5px 0; background:var(--surface2); border-right:1px solid var(--border); border-bottom:1px solid var(--border); text-transform:uppercase; letter-spacing:.04em; }
-    .wo-mon-cell { min-height:88px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:3px; cursor:default; overflow:hidden; }
-    .wb-mobile .wo-mon-cell { min-height:52px; }
+    .wo-mon-cell { min-height:120px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:4px; cursor:default; overflow:hidden; }
+    .wb-mobile .wo-mon-cell { min-height:70px; }
     .wo-mon-cell.other-month { background:var(--surface2); opacity:.55; }
     .wo-mon-cell.today { background:rgba(56,115,208,.07); }
     .wo-mon-cell.we { background:rgba(0,0,0,.015); }
@@ -749,7 +749,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.20</div>
+  <div id="wb-startup-tagline">v3.0.21</div>
 </div>
 
 <!-- Modal -->
@@ -913,7 +913,7 @@
 
   <div id="wb-welt-header">
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.20</span>
+    <span id="wb-menu-version">v3.0.21</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1070,8 +1070,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.20',
-  APP_BUILD:   '20260624-1500',
+  APP_VERSION: '3.0.21',
+  APP_BUILD:   '20260624-1700',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2853,6 +2853,17 @@ const WB = {
       + '</select></div>'
       + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Zustand</label>'
       + '<select id="nz-e-zustand" class="wb-select">' + zustandOpts + '</select></div>'
+      + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Farbe</label>'
+      + '<div class="nz-farb-row">'
+      + this._NZ_COLORS.map(function(fc) {
+          var bm = {'c-gelb':'#FFF9C4','c-gruen':'#D5F5E3','c-blau':'#D6EAF8','c-rosa':'#FDEBD0','c-weiss':'#fff'};
+          var isActive = (l.farbe||'c-weiss') === fc;
+          return '<div class="nz-farb-btn' + (isActive?' active':'') + '"'
+            + ' style="background:' + (bm[fc]||'#fff') + ';border-color:' + (isActive?'var(--text)':'var(--border)') + ';"'
+            + ' onclick="(function(el,v){el.parentNode.querySelectorAll(\'.nz-farb-btn\').forEach(function(b){b.style.borderColor=\'var(--border)\';b.classList.remove(\'active\')});el.style.borderColor=\'var(--text)\';el.classList.add(\'active\');document.getElementById(\'nz-e-farbe\').value=v})(this,\'' + fc + '\')"></div>';
+        }).join('')
+      + '</div>'
+      + '<input type="hidden" id="nz-e-farbe" value="' + this._esc(l.farbe||'c-weiss') + '"></div>'
       + '<div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding:10px 0;border-top:1px solid var(--border)">'
       + '<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;flex:1">'
       + '<input type="checkbox" id="nz-e-gepinnt"' + (l.gepinnt ? ' checked' : '') + ' style="width:17px;height:17px;accent-color:var(--accent)"> Gepinnt</label>'
@@ -2873,10 +2884,12 @@ const WB = {
     const typ     = document.getElementById('nz-e-typ')?.value || 'check';
     const zustand = document.getElementById('nz-e-zustand')?.value || 'aktuell';
     const gepinnt = document.getElementById('nz-e-gepinnt')?.checked || false;
+    const farbe   = document.getElementById('nz-e-farbe')?.value || 'c-weiss';
     if (!name) { this._toast('Bitte Namen eingeben'); return; }
     l.titel   = name;
     l.icon    = icon;
     l.typ     = typ;
+    l.farbe   = farbe;
     l.gepinnt = gepinnt;
     l.updatedAt = this._now();
     if (zustand === 'archiv') {
@@ -3133,7 +3146,9 @@ const WB = {
   _woRenderKalender() {
     const listEl = document.getElementById('wo-list-view');
     const calEl  = document.getElementById('wo-cal-view');
+    const monEl  = document.getElementById('wo-mon-view');
     if (listEl) listEl.style.display = 'none';
+    if (monEl)  monEl.style.display  = 'none';
     if (calEl)  calEl.style.display  = 'flex';
 
     const days       = this._woGetWeekDays();
@@ -3216,7 +3231,7 @@ const WB = {
     }
 
     const scroll=document.getElementById('wo-cal-scroll-y');
-    if(scroll) scroll.scrollTop=1*52;
+    if(scroll) scroll.scrollTop=6*52;
   },
 
   _woSetView(view) {
