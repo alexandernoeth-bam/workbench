@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.30</title>
+  <title>WorkBench 3.0.31</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -752,6 +752,9 @@
 
 
     .ts-pins-group-lbl { font-size:10px; font-weight:800; color:var(--faint); text-transform:uppercase; letter-spacing:.06em; padding:8px 14px 2px; }
+
+    .wo-mon-col-pill { display:inline-flex; align-items:center; justify-content:center; background:var(--accent); color:#fff; border-radius:8px; font-size:9px; font-weight:800; padding:0 5px; min-width:16px; height:15px; margin-left:4px; vertical-align:middle; }
+
     /* ── Desktop Grid Overrides ── */
     .wb-desktop .nz-grid { grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .wb-desktop .nz-postit { min-height: 160px; max-height: 200px; overflow: hidden; padding: 10px 12px; }
@@ -783,7 +786,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.30</div>
+  <div id="wb-startup-tagline">v3.0.31</div>
 </div>
 
 <!-- Modal -->
@@ -951,7 +954,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.30</span>
+    <span id="wb-menu-version">v3.0.31</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1113,8 +1116,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.30',
-  APP_BUILD:   '20260625-0200',
+  APP_VERSION: '3.0.31',
+  APP_BUILD:   '20260625-0300',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3093,8 +3096,8 @@ const WB = {
     const year  = ref.getFullYear();
     const month = ref.getMonth();
     const today = this._dStr(new Date());
-    const mN    = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-    const dayN  = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+    const mN = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    const dayN = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 
     const titleEl = document.getElementById('wo-header-title');
     if (titleEl) titleEl.textContent = mN[month] + ' ' + year;
@@ -3120,36 +3123,81 @@ const WB = {
       cells.push({d:next, otherMonth:true});
     }
 
-    let h = '<div class="wo-mon-grid">';
-    dayN.forEach(n => { h += '<div class="wo-mon-dh">' + n + '</div>'; });
-    cells.forEach(({d, otherMonth}) => {
+    // Termine pro Zelle vorberechnen
+    const getEvts = (ds) => (this.db?.customEvents||[])
+      .filter(ev => !ev.deleted && ev.date===ds)
+      .filter(ev => {
+        const w=ev.welt||'priv';
+        if(this.activeWorld==='beruf'&&w!=='pro')  return false;
+        if(this.activeWorld==='privat'&&w!=='priv') return false;
+        return true;
+      })
+      .sort((a,b)=>(a.startTime||'99:99').localeCompare(b.startTime||'99:99'));
+
+    const cellEvts = cells.map(({d}) => getEvts(this._dStr(d)));
+
+    // Maximale Termineanzahl pro Zeile (Woche) berechnen
+    const numRows = cells.length / 7;
+    const MAX = this._isMobile() ? 1 : 3;
+    const rowHeights = [];
+    for (let row = 0; row < numRows; row++) {
+      let maxInRow = 0;
+      for (let col = 0; col < 7; col++) {
+        maxInRow = Math.max(maxInRow, cellEvts[row*7+col].length);
+      }
+      // Mindestens MAX Einträge Platz, aber so viele wie nötig
+      const shown = Math.min(maxInRow, MAX + 2); // max +2 extra zeigen
+      const h = Math.max(this._isMobile() ? 60 : 90, 30 + shown * 22);
+      rowHeights.push(h);
+    }
+
+    // Termine pro Wochentag-Spalte (für Pill im Header)
+    const colTotals = Array(7).fill(0);
+    cells.forEach(({otherMonth}, idx) => {
+      if (!otherMonth) colTotals[idx % 7] += cellEvts[idx].length;
+    });
+
+    // Dynamisches CSS für Zeilenhöhen
+    const rowStyle = rowHeights.map((h, i) =>
+      `.wo-mon-row-${i} { height: ${h}px; min-height: ${h}px; }`
+    ).join(' ');
+
+    let h = '<style>' + rowStyle + '</style><div class="wo-mon-grid">';
+
+    // Header mit Termineanzahl-Pill
+    dayN.forEach((n, i) => {
+      const total = colTotals[i];
+      h += '<div class="wo-mon-dh">' + n
+        + (total > 0 ? ' <span class="wo-mon-col-pill">' + total + '</span>' : '')
+        + '</div>';
+    });
+
+    // Zellen
+    cells.forEach(({d, otherMonth}, ci) => {
       const ds   = this._dStr(d);
       const isT  = ds === today;
       const dow  = d.getDay();
       const isWE = dow===0||dow===6;
-      const evts = (this.db?.customEvents||[])
-        .filter(ev => !ev.deleted && ev.date===ds)
-        .filter(ev => {
-          const w=ev.welt||'priv';
-          if(this.activeWorld==='beruf'&&w!=='pro')  return false;
-          if(this.activeWorld==='privat'&&w!=='priv') return false;
-          return true;
-        })
-        .sort((a,b)=>(a.startTime||'99:99').localeCompare(b.startTime||'99:99'));
-      let cls='wo-mon-cell'+(otherMonth?' other-month':'')+(isT?' today':'')+(isWE?' we':'');
-      h += '<div class="'+cls+'" onclick="WB.terminOpen(null)">';
-      h += '<div class="wo-mon-num'+(isT?' today':'')+'">' + d.getDate() + '</div>';
-      const MAX = this._isMobile() ? 1 : 3;
-      evts.slice(0,MAX).forEach(ev => {
-        const welt = ev.welt==='pro'?'beruf':'privat';
+      const evts = cellEvts[ci];
+      const row  = Math.floor(ci / 7);
+      let cls = 'wo-mon-cell wo-mon-row-' + row
+        + (otherMonth ? ' other-month' : '')
+        + (isT        ? ' today'       : '')
+        + (isWE       ? ' we'          : '');
+      h += '<div class="' + cls + '" onclick="WB.terminOpen(null)">';
+      h += '<div class="wo-mon-num' + (isT ? ' today' : '') + '">' + d.getDate() + '</div>';
+      evts.slice(0, MAX + 2).forEach(ev => {
+        const welt = ev.welt==='pro' ? 'beruf' : 'privat';
         const isDL = !!ev.isDeadline;
-        const shrt = t => t.length>10?t.slice(0,9)+'\u2026':t;
+        const shrt = t => t.length>13 ? t.slice(0,12)+'\u2026' : t;
         const lbl  = isDL
           ? '\uD83D\uDEA9 ' + this._esc(shrt(ev.text))
-          : (ev.startTime?ev.startTime.slice(0,5)+' ':'') + this._esc(shrt(ev.text));
-        h += '<div class="wo-mon-evt '+(isDL?'deadline':welt)+'" onclick="event.stopPropagation();WB.terminOpen(&quot;'+this._esc(ev.id)+'&quot;)">'+lbl+'</div>';
+          : (ev.startTime ? ev.startTime.slice(0,5)+' ' : '') + this._esc(shrt(ev.text));
+        h += '<div class="wo-mon-evt ' + (isDL ? 'deadline' : welt)
+          + '" onclick="event.stopPropagation();WB.terminOpen(&quot;' + this._esc(ev.id) + '&quot;)">' + lbl + '</div>';
       });
-      if(evts.length>MAX) h+='<div class="wo-mon-more">+'+(evts.length-MAX)+'</div>';
+      const remaining = evts.length - (MAX + 2);
+      if (remaining > 0) h += '<div class="wo-mon-more">+' + remaining + '</div>';
       h += '</div>';
     });
     h += '</div>';
