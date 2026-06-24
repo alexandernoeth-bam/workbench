@@ -379,6 +379,37 @@ console.log('\n── 26. Slim-Prüfung: entfernte Features ──');
 !jsCode.includes('renderAufgabenTab')   ? ok('renderAufgabenTab entfernt') : fail('renderAufgabenTab noch vorhanden');
 !jsCode.includes('_vhOpenDetail')       ? ok('Vorhaben-Detail entfernt')   : fail('_vhOpenDetail noch vorhanden');
 
+
+// ══════════════════════════════════════════
+// 27. DEADLINE-FEATURE
+// ══════════════════════════════════════════
+console.log('\n── 27. Deadline-Feature ──');
+jsCode.includes('_tsRenderDeadlineBanner') ? ok('_tsRenderDeadlineBanner()') : fail('_tsRenderDeadlineBanner fehlt');
+jsCode.includes('_terminToggleTyp')        ? ok('_terminToggleTyp()')        : fail('_terminToggleTyp fehlt');
+content.includes('ts-deadline-banner-wrap')? ok('ts-deadline-banner-wrap im HTML') : fail('ts-deadline-banner-wrap fehlt');
+jsCode.includes('ts-deadline-row')         ? ok('ts-deadline-row gerendert') : fail('ts-deadline-row fehlt');
+jsCode.includes('isDeadline: true')        ? ok('isDeadline:true in _savTermin') : fail('isDeadline fehlt');
+jsCode.includes('wb-f-remind')             ? ok('wb-f-remind Select')        : fail('wb-f-remind fehlt');
+jsCode.includes('remindDaysBefore')        ? ok('remindDaysBefore in DB')    : fail('remindDaysBefore fehlt');
+jsCode.includes('isDeadline && !b.isDeadline') ? ok('Deadlines ans Sortierende') : fail('Deadline-Sort fehlt');
+
+
+// ══════════════════════════════════════════
+// 28. WIKI-COCKPIT
+// ══════════════════════════════════════════
+console.log('\n── 28. Wiki-Cockpit ──');
+jsCode.includes('_wkRender()')         ? ok('_wkRender() definiert')        : fail('_wkRender fehlt');
+jsCode.includes('_wkSave()')           ? ok('_wkSave() definiert')           : fail('_wkSave fehlt');
+jsCode.includes('_wkDelete()')         ? ok('_wkDelete() definiert')         : fail('_wkDelete fehlt');
+jsCode.includes('_wkOpenModal')        ? ok('_wkOpenModal definiert')        : fail('_wkOpenModal fehlt');
+jsCode.includes('_wkFilteredNodes')    ? ok('_wkFilteredNodes definiert')    : fail('_wkFilteredNodes fehlt');
+jsCode.includes('wissensnetzwerk')     ? ok('wissensnetzwerk in DB')         : fail('wissensnetzwerk fehlt');
+content.includes('id="sec-wiki"')      ? ok('sec-wiki HTML vorhanden')       : fail('sec-wiki fehlt');
+content.includes('id="wk-overlay"')   ? ok('wk-overlay Modal vorhanden')    : fail('wk-overlay fehlt');
+content.includes('id="wk-grid"')       ? ok('wk-grid vorhanden')             : fail('wk-grid fehlt');
+content.includes('data-tab="wiki"')    ? ok('Wiki Tab in Nav')               : fail('Wiki Tab fehlt');
+content.includes('.wk-kachel')          ? ok('wk-kachel CSS')                 : fail('wk-kachel CSS fehlt');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
