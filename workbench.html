@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.31</title>
+  <title>WorkBench 3.0.32</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -766,14 +766,14 @@
     /* ── Monatsansicht ── */
     .wo-mon-grid { display:grid; grid-template-columns:repeat(7,1fr); border-top:1px solid var(--border); border-left:1px solid var(--border); }
     .wo-mon-dh { text-align:center; font-size:11px; font-weight:700; color:var(--faint); padding:5px 0; background:var(--surface2); border-right:1px solid var(--border); border-bottom:1px solid var(--border); text-transform:uppercase; letter-spacing:.04em; }
-    .wo-mon-cell { min-height:120px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:4px; cursor:default; overflow:hidden; }
+    .wo-mon-cell { min-height:60px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:4px; cursor:default; overflow:hidden; }
     .wb-mobile .wo-mon-cell { min-height:60px; }
     .wo-mon-cell.other-month { background:var(--surface2); opacity:.55; }
     .wo-mon-cell.today { background:rgba(56,115,208,.07); }
     .wo-mon-cell.we { background:rgba(0,0,0,.015); }
     .wo-mon-num { font-size:11px; font-weight:700; color:var(--faint); line-height:1.8; }
     .wo-mon-num.today { display:inline-flex; width:20px; height:20px; background:var(--accent); color:#fff; border-radius:50%; align-items:center; justify-content:center; font-size:10px; }
-    .wo-mon-evt { font-size:10px; padding:1px 4px; border-radius:3px; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+    .wo-mon-evt { font-size:13px; padding:1px 4px; border-radius:3px; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
     .wo-mon-evt.beruf { background:var(--accent); color:#fff; }
     .wo-mon-evt.privat { background:var(--accent2,#58D68D); color:#fff; }
     .wo-mon-evt.deadline { background:none; border:1.5px solid var(--accent); color:var(--accent); font-weight:700; }
@@ -786,7 +786,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.31</div>
+  <div id="wb-startup-tagline">v3.0.32</div>
 </div>
 
 <!-- Modal -->
@@ -954,7 +954,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.31</span>
+    <span id="wb-menu-version">v3.0.32</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1116,8 +1116,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.31',
-  APP_BUILD:   '20260625-0300',
+  APP_VERSION: '3.0.32',
+  APP_BUILD:   '20260625-0400',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3087,10 +3087,11 @@ const WB = {
     const listEl = document.getElementById('wo-list-view');
     const calEl  = document.getElementById('wo-cal-view');
     const monEl  = document.getElementById('wo-mon-view');
+    const scroll = document.querySelector('.wo-scroll');
     if (listEl) listEl.style.display = 'none';
     if (calEl)  calEl.style.display  = 'none';
     if (!monEl) return;
-    monEl.style.display = 'block'; monEl.style.height = '100%';
+    monEl.style.display = 'block';
 
     const ref   = this._woMonDate ? new Date(this._woMonDate) : new Date();
     const year  = ref.getFullYear();
@@ -3123,7 +3124,6 @@ const WB = {
       cells.push({d:next, otherMonth:true});
     }
 
-    // Termine pro Zelle vorberechnen
     const getEvts = (ds) => (this.db?.customEvents||[])
       .filter(ev => !ev.deleted && ev.date===ds)
       .filter(ev => {
@@ -3135,40 +3135,49 @@ const WB = {
       .sort((a,b)=>(a.startTime||'99:99').localeCompare(b.startTime||'99:99'));
 
     const cellEvts = cells.map(({d}) => getEvts(this._dStr(d)));
+    const numRows  = cells.length / 7;
 
-    // Maximale Termineanzahl pro Zeile (Woche) berechnen
-    const numRows = cells.length / 7;
-    const MAX = this._isMobile() ? 1 : 3;
-    const rowHeights = [];
+    // Verfügbare Höhe messen (wo-scroll Höhe minus Header-Row ~30px)
+    const availH = scroll ? scroll.clientHeight - 34 : numRows * 120;
+    // Mindesthöhe pro Zeile basierend auf max Einträgen in der Zeile
+    const ITEM_H    = 24;   // px pro Eintrag
+    const HEAD_H    = 26;   // px für Tageszahl
+    const FONT_SIZE = 13;   // px Schriftgröße
+
+    // Pro Zeile: max Einträge berechnen
+    const rowMaxEvts = [];
     for (let row = 0; row < numRows; row++) {
-      let maxInRow = 0;
-      for (let col = 0; col < 7; col++) {
-        maxInRow = Math.max(maxInRow, cellEvts[row*7+col].length);
-      }
-      // Mindestens MAX Einträge Platz, aber so viele wie nötig
-      const shown = Math.min(maxInRow, MAX + 2); // max +2 extra zeigen
-      const h = Math.max(this._isMobile() ? 60 : 90, 30 + shown * 22);
-      rowHeights.push(h);
+      let mx = 0;
+      for (let col = 0; col < 7; col++) mx = Math.max(mx, cellEvts[row*7+col].length);
+      rowMaxEvts.push(mx);
     }
-
-    // Termine pro Wochentag-Spalte (für Pill im Header)
-    const colTotals = Array(7).fill(0);
-    cells.forEach(({otherMonth}, idx) => {
-      if (!otherMonth) colTotals[idx % 7] += cellEvts[idx].length;
+    // Gewichtete Verteilung: Zeilen mit mehr Einträgen bekommen mehr Platz
+    const totalWeight = rowMaxEvts.reduce((s, n) => s + Math.max(1, n), 0);
+    const minRowH = Math.max(80, Math.floor(availH / numRows));
+    const rowHeights = rowMaxEvts.map(n => {
+      const weighted = Math.floor(availH * Math.max(1,n) / totalWeight);
+      return Math.max(minRowH, HEAD_H + n * ITEM_H);
     });
 
-    // Dynamisches CSS für Zeilenhöhen
-    const rowStyle = rowHeights.map((h, i) =>
-      `.wo-mon-row-${i} { height: ${h}px; min-height: ${h}px; }`
-    ).join(' ');
+    // Termine pro Wochentag-Spalte (Pill im Header)
+    const colTotals = Array(7).fill(0);
+    cells.forEach(({otherMonth}, ci) => {
+      if (!otherMonth) colTotals[ci % 7] += cellEvts[ci].length;
+    });
 
-    let h = '<style>' + rowStyle + '</style><div class="wo-mon-grid">';
+    // Inline CSS für Zeilenhöhen
+    const rowCSS = rowHeights.map((h, i) =>
+      `.wm-r${i}{height:${h}px;min-height:${h}px;}`
+    ).join('');
 
-    // Header mit Termineanzahl-Pill
+    let h = `<style>${rowCSS}.wo-mon-evt{font-size:${FONT_SIZE}px;}</style>`;
+    h += '<div class="wo-mon-grid">';
+
+    // Header-Zeile mit Spalten-Pills
     dayN.forEach((n, i) => {
-      const total = colTotals[i];
+      const tot = colTotals[i];
       h += '<div class="wo-mon-dh">' + n
-        + (total > 0 ? ' <span class="wo-mon-col-pill">' + total + '</span>' : '')
+        + (tot > 0 ? ' <span class="wo-mon-col-pill">' + tot + '</span>' : '')
         + '</div>';
     });
 
@@ -3180,28 +3189,35 @@ const WB = {
       const isWE = dow===0||dow===6;
       const evts = cellEvts[ci];
       const row  = Math.floor(ci / 7);
-      let cls = 'wo-mon-cell wo-mon-row-' + row
+      const rowH = rowHeights[row];
+      // Wieviele passen rein? (Höhe - HEAD_H) / ITEM_H, min 1
+      const fits = Math.max(1, Math.floor((rowH - HEAD_H) / ITEM_H));
+
+      let cls = 'wo-mon-cell wm-r' + row
         + (otherMonth ? ' other-month' : '')
         + (isT        ? ' today'       : '')
         + (isWE       ? ' we'          : '');
       h += '<div class="' + cls + '" onclick="WB.terminOpen(null)">';
       h += '<div class="wo-mon-num' + (isT ? ' today' : '') + '">' + d.getDate() + '</div>';
-      evts.slice(0, MAX + 2).forEach(ev => {
+
+      evts.slice(0, fits).forEach(ev => {
         const welt = ev.welt==='pro' ? 'beruf' : 'privat';
         const isDL = !!ev.isDeadline;
-        const shrt = t => t.length>13 ? t.slice(0,12)+'\u2026' : t;
+        const maxC = Math.max(8, Math.floor((scroll ? scroll.clientWidth/7 : 140) / 7));
+        const shrt = t => t.length > maxC ? t.slice(0, maxC-1) + '\u2026' : t;
         const lbl  = isDL
           ? '\uD83D\uDEA9 ' + this._esc(shrt(ev.text))
           : (ev.startTime ? ev.startTime.slice(0,5)+' ' : '') + this._esc(shrt(ev.text));
         h += '<div class="wo-mon-evt ' + (isDL ? 'deadline' : welt)
           + '" onclick="event.stopPropagation();WB.terminOpen(&quot;' + this._esc(ev.id) + '&quot;)">' + lbl + '</div>';
       });
-      const remaining = evts.length - (MAX + 2);
-      if (remaining > 0) h += '<div class="wo-mon-more">+' + remaining + '</div>';
+      if (evts.length > fits) h += '<div class="wo-mon-more">+' + (evts.length - fits) + '</div>';
       h += '</div>';
     });
     h += '</div>';
     monEl.innerHTML = h;
+    // Grid-Höhe exakt setzen damit kein Leerraum
+    monEl.style.height = rowHeights.reduce((a,b) => a+b, 0) + 34 + 'px';
   },
 
   _woRenderKalender() {
