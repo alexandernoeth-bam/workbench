@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.39</title>
+  <title>WorkBench 3.0.41</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -923,6 +923,12 @@
     .wb-desktop .ts-th-datum { font-size:14px; font-weight:600; color:var(--muted); }
     .wb-desktop .ts-th-kw { font-size:11px; font-weight:700; background:var(--surface2); color:var(--faint); padding:2px 8px; border-radius:7px; }
     .wb-desktop .ts-th-sondertag { font-size:11px; font-weight:700; color:#1d4ed8; background:#dbeafe; padding:2px 8px; border-radius:7px; }
+    /* Laufender Termin - Variante A */
+    .ts-zt-row.running { background:rgba(139,92,246,.04); }
+    .ts-zt-row.running .ts-zt-bar { background:#8b5cf6 !important; }
+    .ts-zt-row.running .ts-zt-time { color:#7c3aed; font-weight:700; }
+    .ts-running-badge { font-size:10px; font-weight:700; color:#7c3aed; background:rgba(139,92,246,.12); padding:2px 7px; border-radius:8px; margin-left:6px; vertical-align:middle; white-space:nowrap; }
+    .ts-zt-row.running { border-left:2.5px solid rgba(139,92,246,.5); }
   </style>
 </head>
 <body>
@@ -930,7 +936,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.39</div>
+  <div id="wb-startup-tagline">v3.0.41</div>
 </div>
 
 <!-- Modal -->
@@ -1098,7 +1104,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.39</span>
+    <span id="wb-menu-version">v3.0.41</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1356,8 +1362,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.39',
-  APP_BUILD:   '20260625-1400',
+  APP_VERSION: '3.0.41',
+  APP_BUILD:   '20260625-1600',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1845,12 +1851,19 @@ const WB = {
       } else {
         // ── Termin-Zeile ──
         const isStorniert = !!e.storniert;
-        const opacity = e.startTime && eMin < nowMin && !isStorniert ? ' style="opacity:0.55;"' : '';
-        h += '<div class="ts-zt-row"' + opacity + ' onclick="WB.terminOpen(\'' + this._esc(e.id) + '\')">';
+        const durMin2 = this._evtDurationMin(e);
+        const endMin  = eMin + (durMin2 || 60);
+        const isRunning = !isStorniert && !e.done && e.startTime && eMin <= nowMin && nowMin < endMin;
+        const remainMin = isRunning ? endMin - nowMin : 0;
+        const opacity = e.startTime && eMin < nowMin && !isRunning && !isStorniert ? ' style="opacity:0.55;"' : '';
+        const runCls  = isRunning ? ' running' : '';
+        h += '<div class="ts-zt-row' + runCls + '"' + opacity + ' onclick="WB.terminOpen(\'' + this._esc(e.id) + '\')">';
         h += '<div class="ts-zt-time">' + (e.startTime || '') + '</div>';
         h += '<div class="ts-zt-bar ' + welt + '"></div>';
         h += '<div class="ts-zt-body">';
-        h += '<div class="ts-zt-title' + (isStorniert ? ' ts-storniert' : '') + '">' + this._esc(e.text) + (isStorniert ? '<span class="ts-storniert-badge">Abgesagt</span>' : '') + '</div>';
+        h += '<div class="ts-zt-title' + (isStorniert ? ' ts-storniert' : '') + '">' + this._esc(e.text) + (isStorniert ? '<span class="ts-storniert-badge">Abgesagt</span>' : '')
+          + (isRunning ? '<span class="ts-running-badge">\u25b6 l\u00e4uft \u00b7 noch ' + remainMin + '\u202fMin</span>' : '')
+          + '</div>';
         const durMin = this._evtDurationMin(e);
         const meta = [];
         meta.push('<span class="ts-welt-dot ' + welt + '"></span>');
@@ -1869,9 +1882,6 @@ const WB = {
       }
     });
 
-    if (!nowInserted) {
-      h += '<div class="ts-now-row"><div class="ts-now-dot"></div><div class="ts-now-line"></div><div class="ts-now-lbl">' + nowStr + '</div></div>';
-    }
 
     band.innerHTML = h;
   },
@@ -2713,7 +2723,7 @@ const WB = {
 
   // Öffnet eine Kachel als Detail-Overlay (Desktop)
   _nzKachelOpen(listeId) {
-    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId && !x.deleted); if (!l) return;
     if (l.typ === 'freitext') {
       this._nzFreitextOpen(l);
     } else {
