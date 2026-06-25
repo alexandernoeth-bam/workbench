@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.55</title>
+  <title>WorkBench 3.0.56</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -534,7 +534,7 @@
       display: flex; flex-direction: column; min-height: 0;
       transition: width .2s ease;
     }
-    #nz-detail-panel.open { width: 320px; }
+    #nz-detail-panel.open { width: 30%; min-width: 280px; }
     .nz-dp-head {
       display: flex; align-items: center; gap: 7px;
       padding: 9px 11px; border-bottom: 1px solid rgba(0,0,0,.1);
@@ -915,8 +915,8 @@
     .ts-kd-inp { flex:1; border:none; background:none; outline:none; font-size:12px; font-family:var(--font); color:var(--text); }
     .ts-kd-ok { font-size:11px; font-weight:700; color:var(--accent); cursor:pointer; }
     /* Notizen-Panel rechts */
-    #ts-notizen-panel { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; padding:8px 10px; gap:6px; }
-    #ts-notizen-grid { display:flex; flex-direction:column; gap:6px; flex:1; min-height:0; overflow-y:auto; }
+    #ts-notizen-panel { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; padding:0; gap:0; position:relative; }
+    #ts-notizen-grid { flex:1; overflow-y:auto; padding:8px 10px; display:flex; flex-direction:column; gap:6px; }
     .ts-nz-group { display:flex; flex-direction:column; gap:3px; }
     .ts-nz-group-lbl { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); padding-left:1px; }
     #ts-notizen-panel .ts-nz-grid { display:flex !important; flex-direction:row !important; flex-wrap:wrap !important; direction:rtl; gap:5px; width:100%; min-width:0; }
@@ -959,7 +959,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.55</div>
+  <div id="wb-startup-tagline">v3.0.56</div>
 </div>
 
 <!-- Modal -->
@@ -1127,7 +1127,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.55</span>
+    <span id="wb-menu-version">v3.0.56</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1162,13 +1162,19 @@
               <div class="ts-kd-body" id="ts-kd-body"></div>
               <div class="ts-kd-foot" id="ts-kd-foot">
                 <span class="ts-kd-plus">+</span>
-                <input id="ts-kd-inp" onkeydown="if(event.key==='Enter')WB._tsKachelAdd()" class="ts-kd-inp" placeholder="Eintrag hinzuf&#252;gen...">
+                <input id="ts-kd-inp" onkeydown="if(event.key==='Enter')WB._tsKachelAdd()" class="ts-kd-inp" placeholder="Checklistenpunkt hinzuf&#252;gen...">
                 <span class="ts-kd-ok" onclick="WB._tsKachelAdd()">OK</span>
               </div>
             </div>
           </div>
           <!-- Rechts 2/3: Kompakte Notizen Grid -->
           <div id="ts-notizen-panel">
+            <!-- Temporär pinnen: Suchzeile -->
+            <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface);">
+              <input id="ts-heute-search" type="search" placeholder="📍 Notiz für heute suchen..." oninput="WB._tsHeutePinSearch(this.value)"
+                style="flex:1;border:1.5px solid var(--border);border-radius:14px;padding:3px 10px;font-size:12px;background:var(--surface2);color:var(--text);outline:none;font-family:var(--font);">
+              <div id="ts-heute-search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;z-index:500;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.12);"></div>
+            </div>
             <div id="ts-notizen-grid"></div>
           </div>
         </div>
@@ -1366,8 +1372,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.55',
-  APP_BUILD:   '20260626-0430',
+  APP_VERSION: '3.0.56',
+  APP_BUILD:   '20260626-0600',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1729,8 +1735,9 @@ const WB = {
     if (!grid) return;
     const zustandOrder = ['aktuell','parkplatz','kompass'];
     const zustandLabel = { aktuell:'Fokus', parkplatz:'Parkplatz', kompass:'Kompass' };
-    const gepinnt = (this.db?.notizen||[]).filter(l => !l.deleted && l.gepinnt && this._tsNotizenWorldOk(l));
-    // Nach Zustand gruppieren — Aktuell-Kacheln immer zuerst
+    const gepinnt   = (this.db?.notizen||[]).filter(l => !l.deleted && l.gepinnt    && this._tsNotizenWorldOk(l));
+    const heutePins = (this.db?.notizen||[]).filter(l => !l.deleted && l.heutePin   && !l.gepinnt && this._tsNotizenWorldOk(l));
+    // Nach Zustand gruppieren
     const groups = {};
     gepinnt.forEach(l => {
       const z = l.zustand || 'aktuell';
@@ -1738,60 +1745,67 @@ const WB = {
       groups[z].push(l);
     });
     let h = '';
+    // Heute-Pins zuerst (eigene Gruppe, temporär)
+    if (heutePins.length) {
+      h += '<div class="ts-nz-group">';
+      h += '<div class="ts-nz-group-lbl" style="display:flex;align-items:center;gap:4px;">📍 Heute<span style="font-size:9px;color:var(--faint);font-weight:400;margin-left:4px;">temporär</span></div>';
+      h += '<div class="ts-nz-grid" style="display:flex;flex-direction:row;flex-wrap:wrap;direction:rtl;gap:5px;width:100%;">';
+      heutePins.forEach(l => { h += this._tsMiniKachelHtml(l); });
+      h += '</div></div>';
+    }
+    // Gepinnte nach Zustand
     zustandOrder.forEach(z => {
       if (!groups[z] || !groups[z].length) return;
       h += '<div class="ts-nz-group">';
       h += '<div class="ts-nz-group-lbl">' + zustandLabel[z] + '</div>';
-      h += '<div class="ts-nz-grid" style="display:flex;flex-direction:row;flex-wrap:nowrap;direction:rtl;gap:5px;width:100%;">';
-      groups[z].forEach(l => {
-        const farbe = l.farbe || 'c-weiss';
-        const allItems = (l.items||[]).filter(i => !i.deleted);
-        const doneItems = allItems.filter(i => i.done);
-        const preview = l.typ === 'freitext'
-          ? (() => { const tmp = document.createElement('div'); tmp.innerHTML = l.inhalt || ''; return tmp.textContent.trim().slice(0,80); })()
-          : (allItems[0]?.text || '');
-        const cntPill = l.typ === 'check' && allItems.length
-          ? '<span class="ts-nz-mini-pill cnt">' + doneItems.length + '/' + allItems.length + '</span>'
-          : '';
-        const weltPill = l.welt === 'beruf' || l.welt === 'pro'
-          ? '<span class="ts-nz-mini-pill beruf">Beruf</span>'
-          : l.welt === 'privat' || l.welt === 'priv'
-          ? '<span class="ts-nz-mini-pill privat">Privat</span>' : '';
-        const isActive = this._tsKachelCurrentId === l.id ? ' active' : '';
-        h += '<div class="ts-nz-mini ' + farbe + isActive + '"'
-          + ' onclick="WB._tsKachelOpen(\'' + this._esc(l.id) + '\')"'
-          + ' id="ts-mini-' + this._esc(l.id) + '">';
-        h += '<div class="ts-nz-mini-top">';
-        h += '<div class="ts-nz-mini-title">' + this._esc(l.titel) + '</div>';
-        if (preview) h += '<div class="ts-nz-mini-preview">' + this._esc(preview) + '</div>';
-        h += '</div>';
-        h += '<div class="ts-nz-mini-pills">' + cntPill + weltPill + '</div>';
-        h += '</div>';
-      });
+      h += '<div class="ts-nz-grid" style="display:flex;flex-direction:row;flex-wrap:wrap;direction:rtl;gap:5px;width:100%;">';
+      groups[z].forEach(l => { h += this._tsMiniKachelHtml(l); });
       h += '</div></div>';
     });
     if (!h) h = '<div style="padding:12px;font-size:11px;color:var(--faint);">Keine angepinnten Notizen</div>';
     grid.innerHTML = h;
-    // Quadratische Kacheln: Breite messen, Höhe = Breite setzen (5 Kacheln je Gruppe)
+    // Quadratische Kacheln
     requestAnimationFrame(() => {
       const panel = document.getElementById('ts-notizen-panel');
       if (!panel) return;
-      const gridEls = panel.querySelectorAll('.ts-nz-grid');
-      gridEls.forEach(gridEl => {
+      panel.querySelectorAll('.ts-nz-grid').forEach(gridEl => {
         const items = gridEl.querySelectorAll('.ts-nz-mini');
-        const cols = 4;
-        const gap = 5;
-        const totalW = gridEl.offsetWidth;
-        const cellW = Math.floor((totalW - gap*(cols-1)) / cols);
-        items.forEach(el => {
-          el.style.width = cellW + 'px';
-          el.style.height = cellW + 'px';
-          el.style.minHeight = 'unset';
-        });
+        const cols = 4, gap = 5;
+        const cellW = Math.floor((gridEl.offsetWidth - gap*(cols-1)) / cols);
+        items.forEach(el => { el.style.width = cellW + 'px'; el.style.height = cellW + 'px'; el.style.minHeight = 'unset'; });
       });
     });
-    // Falls Kachel offen war, re-render
     if (this._tsKachelCurrentId) this._tsKachelOpen(this._tsKachelCurrentId, true);
+  },
+
+  _tsMiniKachelHtml(l) {
+    const farbe = l.farbe || 'c-weiss';
+    const allItems  = (l.items||[]).filter(i => !i.deleted);
+    const doneItems = allItems.filter(i => i.done);
+    const preview = (() => { const tmp = document.createElement('div'); tmp.innerHTML = l.inhalt || ''; return tmp.textContent.trim().slice(0,80); })()
+      || (allItems[0]?.text || '');
+    const cntPill = allItems.length
+      ? '<span class="ts-nz-mini-pill cnt">' + doneItems.length + '/' + allItems.length + '</span>' : '';
+    const weltPill = l.welt === 'beruf' || l.welt === 'pro'
+      ? '<span class="ts-nz-mini-pill beruf">Beruf</span>'
+      : l.welt === 'privat' || l.welt === 'priv'
+      ? '<span class="ts-nz-mini-pill privat">Privat</span>' : '';
+    // heutePin: × Button zum Entfernen
+    const heutePinBtn = l.heutePin
+      ? '<span onclick="event.stopPropagation();WB._tsHeutePinRemove(\'' + this._esc(l.id) + '\')" '
+        + 'style="position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.2);'
+        + 'display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;color:var(--text)">×</span>' : '';
+    const isActive = this._tsKachelCurrentId === l.id ? ' active' : '';
+    return '<div class="ts-nz-mini ' + farbe + isActive + '" style="position:relative;"'
+      + ' onclick="WB._tsKachelOpen(\'' + this._esc(l.id) + '\')"'
+      + ' id="ts-mini-' + this._esc(l.id) + '">'
+      + heutePinBtn
+      + '<div class="ts-nz-mini-top">'
+      + '<div class="ts-nz-mini-title">' + this._esc(l.titel) + '</div>'
+      + (preview ? '<div class="ts-nz-mini-preview">' + this._esc(preview) + '</div>' : '')
+      + '</div>'
+      + '<div class="ts-nz-mini-pills">' + cntPill + weltPill + '</div>'
+      + '</div>';
   },
 
   _tsKachelOpen(listeId, silent) {
@@ -1812,46 +1826,17 @@ const WB = {
     const farbe = this._nzPostItFarbe(l.farbe || 'c-weiss');
     const detail = document.getElementById('ts-kachel-detail');
     detail.className = 'open ' + farbe;
-    // Body rendern — typ-abhängig
+    // Body rendern — Hybrid: Checkliste OBEN + Freitext UNTEN (immer beide sichtbar)
     const body = document.getElementById('ts-kd-body');
     const foot = document.getElementById('ts-kd-foot');
-    if (l.typ === 'freitext') {
-      // Freitext: contenteditable, speichert in l.inhalt
-      const inhalt = l.inhalt || '';
-      body.innerHTML = '<div id="ts-kd-ft" contenteditable="true" spellcheck="true"'
-        + ' oninput="WB._tsKdFreitextInput()"'
-        + ' style="outline:none;font-size:14px;line-height:1.6;color:var(--text);'
-        + 'font-family:var(--font);padding:4px 2px;min-height:60px;white-space:pre-wrap;">'
-        + inhalt + '</div>';
-      // Footer ausblenden — Freitext hat keinen Item-Input
-      if (foot) foot.style.display = 'none';
-    } else if (l.typ === 'liste' || l.typ === 'bullet') {
-      // Aufzählung: Bullet-Punkte, keine Checkboxen, kein done-State
-      let bh = allItems.map(i =>
-        '<div class="ts-kd-item" style="gap:8px;">'
-        + '<div style="width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0;margin-top:6px;"></div>'
-        + '<span class="ts-kd-txt">' + this._esc(i.text) + '</span></div>'
-      ).join('');
-      body.innerHTML = bh || '<div style="font-size:13px;color:var(--faint);padding:8px 2px;">Noch keine Einträge</div>';
-      if (foot) foot.style.display = '';
-    } else {
-      // Checkliste: Checkboxen mit done-State
-      const openItems = allItems.filter(i => !i.done);
-      const doneItemsList = allItems.filter(i => i.done);
-      let bh = openItems.map(i =>
-        '<div class="ts-kd-item"><div class="ts-kd-chk" onclick="event.stopPropagation();WB._tsKdCbToggle(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')"></div>'
-        + '<span class="ts-kd-txt">' + this._esc(i.text) + '</span></div>'
-      ).join('');
-      if (doneItemsList.length) {
-        bh += '<div style="font-size:9px;font-weight:800;text-transform:uppercase;color:var(--faint);padding:6px 2px 2px;letter-spacing:.06em;">Erledigt</div>';
-        bh += doneItemsList.map(i =>
-          '<div class="ts-kd-item"><div class="ts-kd-chk done" onclick="event.stopPropagation();WB._tsKdCbToggle(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')">&#10003;</div>'
-          + '<span class="ts-kd-txt done">' + this._esc(i.text) + '</span></div>'
-        ).join('');
-      }
-      body.innerHTML = bh || '<div style="font-size:13px;color:var(--faint);padding:8px 2px;">Noch keine Einträge</div>';
-      if (foot) foot.style.display = '';
-    }
+    if (body) body.innerHTML = this._renderHybridBody(l, listeId, 'ts');
+    if (foot) foot.style.display = '';
+    // Zähler aktualisieren
+    const allItems2 = (l.items||[]).filter(i => !i.deleted);
+    const doneItems2 = allItems2.filter(i => i.done);
+    const cnt2 = allItems2.length ? doneItems2.length + '/' + allItems2.length : '';
+    const cntEl2 = document.getElementById('ts-kd-cnt');
+    if (cntEl2) { cntEl2.textContent = cnt2; }
     document.getElementById('ts-kachel-empty').style.display = 'none';
   },
 
@@ -2795,6 +2780,92 @@ const WB = {
     this.renderNotizenTab();
   },
 
+  _tsHeutePinSearch(q) {
+    const res = document.getElementById('ts-heute-search-results');
+    if (!res) return;
+    if (!q.trim()) { res.style.display = 'none'; return; }
+    const lower = q.toLowerCase();
+    const matches = (this.db?.notizen||[]).filter(l =>
+      !l.deleted && !l.gepinnt && !l.heutePin &&
+      this._tsNotizenWorldOk(l) &&
+      ((l.titel||'').toLowerCase().includes(lower) || (l.inhalt||'').toLowerCase().includes(lower))
+    ).slice(0, 8);
+    if (!matches.length) { res.style.display = 'none'; return; }
+    res.innerHTML = matches.map(l =>
+      '<div onclick="WB._tsHeutePinAdd(\'' + this._esc(l.id) + '\')" '
+      + 'style="padding:7px 12px;cursor:pointer;font-size:13px;border-bottom:.5px solid var(--border);display:flex;align-items:center;gap:8px;" '
+      + 'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+      + '<div style="width:10px;height:10px;border-radius:3px;flex-shrink:0;background:' + ({'c-gelb':'#FFF9C4','c-gruen':'#D5F5E3','c-blau':'#D6EAF8','c-rosa':'#FDEBD0','c-lila':'#E8D5F0','c-tuerkis':'#C8F0EC','c-weiss':'#E4E8EC'}[l.farbe||'c-weiss']||'#E4E8EC') + '"></div>'
+      + '<span>' + this._esc(l.titel) + '</span>'
+      + (l.zustand ? '<span style="font-size:10px;color:var(--faint);margin-left:auto">' + l.zustand + '</span>' : '')
+      + '</div>'
+    ).join('');
+    res.style.display = 'block';
+  },
+
+  _tsHeutePinAdd(listeId) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    l.heutePin = true;
+    l.updatedAt = this._now();
+    this.setDirty();
+    // Suchfeld leeren + Dropdown schließen
+    const inp = document.getElementById('ts-heute-search');
+    const res = document.getElementById('ts-heute-search-results');
+    if (inp) inp.value = '';
+    if (res) res.style.display = 'none';
+    this._tsRenderNotizenKompakt();
+    this._toast('📍 ' + l.titel + ' für heute angezeigt');
+  },
+
+  _tsHeutePinRemove(listeId) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    l.heutePin = false;
+    l.updatedAt = this._now();
+    this.setDirty();
+    if (this._tsKachelCurrentId === listeId) this._tsKachelClose();
+    this._tsRenderNotizenKompakt();
+  },
+
+  // ── Gemeinsamer Hybrid-Body-Render (Heute-Tab + Notizen-Detail-Panel) ──
+  // Checkliste OBEN (immer sichtbar) + Freitext UNTEN (immer sichtbar)
+  _renderHybridBody(l, listeId, ctx) {
+    // ctx = 'ts' (Heute-Tab) oder 'nz' (Notizen-Panel)
+    const cbFn  = ctx === 'ts' ? '_tsKdCbToggle'   : '_nzDetailCbToggle';
+    const ftId  = ctx === 'ts' ? 'ts-kd-ft'        : 'nz-dp-ft';
+    const ftFn  = ctx === 'ts' ? '_tsKdFreitextInput' : '_nzDetailFreitextInput';
+
+    const allItems   = (l.items||[]).filter(i => !i.deleted);
+    const openItems  = allItems.filter(i => !i.done);
+    const doneItems  = allItems.filter(i =>  i.done);
+
+    // Sektion 1: Checkliste
+    let checkH = '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);padding:6px 2px 4px;">Checkliste</div>';
+    if (openItems.length || doneItems.length) {
+      checkH += openItems.map(i =>
+        '<div class="ts-kd-item"><div class="ts-kd-chk" onclick="event.stopPropagation();WB.' + cbFn + '(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')"></div>'
+        + '<span class="ts-kd-txt">' + this._esc(i.text) + '</span></div>'
+      ).join('');
+      if (doneItems.length) {
+        checkH += '<div style="font-size:9px;font-weight:800;text-transform:uppercase;color:var(--faint);padding:6px 2px 2px;letter-spacing:.06em;">Erledigt</div>';
+        checkH += doneItems.map(i =>
+          '<div class="ts-kd-item"><div class="ts-kd-chk done" onclick="event.stopPropagation();WB.' + cbFn + '(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')">&#10003;</div>'
+          + '<span class="ts-kd-txt done">' + this._esc(i.text) + '</span></div>'
+        ).join('');
+      }
+    } else {
+      checkH += '<div style="font-size:12px;color:var(--faint);padding:3px 2px 4px;font-style:italic;">Noch keine Eintr&#228;ge</div>';
+    }
+
+    // Sektion 2: Freitext
+    const ftH = '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);padding:8px 2px 4px;border-top:1px solid rgba(0,0,0,.1);margin-top:6px;">Freitext</div>'
+      + '<div id="' + ftId + '" contenteditable="true" spellcheck="true"'
+      + ' oninput="WB.' + ftFn + '()"'
+      + ' style="outline:none;font-size:14px;line-height:1.6;color:var(--text);font-family:var(--font);padding:4px 2px;min-height:60px;">'
+      + (l.inhalt || '') + '</div>';
+
+    return checkH + ftH;
+  },
+
   _nzDetailRenderMeta(l) {
     const id = this._esc(l.id);
     const farbMap = [
@@ -2929,49 +3000,25 @@ const WB = {
     const cntEl   = document.getElementById('nz-dp-cnt');
     if (titleEl) titleEl.textContent = l.titel;
     if (cntEl)   { cntEl.textContent = cnt; cntEl.style.display = cnt ? '' : 'none'; }
-    // Farbe auf Panel-Header anwenden
+    // Farbe auf Panel-Header UND Body/Foot anwenden
     const farbBg = { 'c-gelb':'#FFF9C4','c-gruen':'#D5F5E3','c-blau':'#D6EAF8','c-rosa':'#FDEBD0','c-lila':'#E8D5F0','c-tuerkis':'#C8F0EC','c-weiss':'#fff' };
+    const bg = farbBg[l.farbe||'c-weiss'] || '#fff';
     const headEl = document.querySelector('#nz-detail-panel .nz-dp-head');
-    if (headEl) headEl.style.background = farbBg[l.farbe||'c-weiss'] || '#fff';
+    if (headEl) headEl.style.background = bg;
+    const bodyEl2 = document.getElementById('nz-dp-body');
+    if (bodyEl2) bodyEl2.style.background = bg;
+    const footEl2 = document.getElementById('nz-dp-foot');
+    if (footEl2) footEl2.style.background = bg;
 
     // Meta-Bereich rendern
     const metaEl = document.getElementById('nz-dp-meta');
     if (metaEl) metaEl.innerHTML = this._nzDetailRenderMeta(l);
 
-    // Body rendern
+    // Body rendern — Hybrid: Checkliste oben + Freitext unten
     const body = document.getElementById('nz-dp-body');
     const foot = document.getElementById('nz-dp-foot');
-    if (!body) return;
-    if (l.typ === 'freitext') {
-      body.innerHTML = '<div id="nz-dp-ft" contenteditable="true" spellcheck="true"'
-        + ' oninput="WB._nzDetailFreitextInput()"'
-        + ' style="outline:none;font-size:14px;line-height:1.6;color:var(--text);font-family:var(--font);padding:4px 2px;min-height:80px;">'
-        + (l.inhalt || '') + '</div>';
-      if (foot) foot.style.display = 'none';
-    } else if (l.typ === 'liste' || l.typ === 'bullet') {
-      body.innerHTML = allItems.map(i =>
-        '<div class="ts-kd-item">'
-        + '<div style="width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0;margin-top:6px;"></div>'
-        + '<span class="ts-kd-txt">' + this._esc(i.text) + '</span></div>'
-      ).join('') || '<div style="font-size:13px;color:var(--faint);padding:8px 2px;">Noch keine Einträge</div>';
-      if (foot) foot.style.display = '';
-    } else {
-      const openItems = allItems.filter(i => !i.done);
-      const doneList  = allItems.filter(i => i.done);
-      let bh = openItems.map(i =>
-        '<div class="ts-kd-item"><div class="ts-kd-chk" onclick="event.stopPropagation();WB._nzDetailCbToggle(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')"></div>'
-        + '<span class="ts-kd-txt">' + this._esc(i.text) + '</span></div>'
-      ).join('');
-      if (doneList.length) {
-        bh += '<div style="font-size:9px;font-weight:800;text-transform:uppercase;color:var(--faint);padding:6px 2px 2px;letter-spacing:.06em;">Erledigt</div>';
-        bh += doneList.map(i =>
-          '<div class="ts-kd-item"><div class="ts-kd-chk done" onclick="event.stopPropagation();WB._nzDetailCbToggle(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')">&#10003;</div>'
-          + '<span class="ts-kd-txt done">' + this._esc(i.text) + '</span></div>'
-        ).join('');
-      }
-      body.innerHTML = bh || '<div style="font-size:13px;color:var(--faint);padding:8px 2px;">Noch keine Einträge</div>';
-      if (foot) foot.style.display = '';
-    }
+    if (body) body.innerHTML = this._renderHybridBody(l, listeId, 'nz');
+    if (foot) foot.style.display = '';
     if (!silent) {
       const inp = document.getElementById('nz-dp-inp');
       if (inp) inp.value = '';
@@ -5051,6 +5098,8 @@ const WB = {
         this.db=dbRaw;
         this._ensureDbFields();
         this._migrateWissensnetzwerk(); // einmalig, nur hier — nie in _syncDownload
+        // heutePin ist temporär — beim Start löschen
+        (this.db.notizen||[]).forEach(n => { if(n.heutePin) { n.heutePin = false; } });
       } else {
         this.db=this._emptyDb();
       }

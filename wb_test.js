@@ -430,8 +430,9 @@ let f29Ok = 0, f29Fail = 0;
   : (fail('ts-kd-chk: data-wb-cb noch vorhanden → Checkboxen nicht klickbar'), f29Fail++);
 content.includes('_tsKdCbToggle(')
   ? (ok('_tsKdCbToggle() definiert'), f29Ok++) : (fail('_tsKdCbToggle() fehlt'), f29Fail++);
-content.includes('WB._tsKdCbToggle(')
-  ? (ok('_tsKdCbToggle im onclick-Attribut verankert'), f29Ok++) : (fail('_tsKdCbToggle nicht im onclick'), f29Fail++);
+// Hybrid-Render: _renderHybridBody ersetzt direkten onclick
+content.includes('_renderHybridBody(')
+  ? (ok('_renderHybridBody() definiert (Hybrid-Render)'), f29Ok++) : (fail('_renderHybridBody() fehlt'), f29Fail++);
 
 // Schriftgrößen linke Kachel
 content.includes('.ts-kd-title') && content.includes('font-size:14px')
@@ -453,8 +454,8 @@ content.includes('display:flex !important') && content.includes('flex-wrap:wrap 
 (!content.includes('>B</span>') && !content.includes("pill beruf\">B<"))
   ? (ok('Keine einbuchstabige Welt-Pill "B" mehr'), f29Ok++) : (fail('"B"-Pill noch vorhanden'), f29Fail++);
 
-// JS-Sizing: 5 Spalten
-content.includes('const cols = 4;')
+// JS-Sizing: 4 Spalten in _tsMiniKachelHtml oder _tsRenderNotizenKompakt
+(content.includes('const cols = 4') || content.includes('cols = 4,'))
   ? (ok('JS-Sizing: 4 Spalten'), f29Ok++) : (fail('JS-Sizing: nicht 4 Spalten'), f29Fail++);
 
 if (f29Fail === 0) ok(f29Ok + ' Kachel-Detail Checks bestanden');
@@ -502,37 +503,40 @@ if (f30Fail === 0) ok(f30Ok + ' Farbmap & Büro-Modus Checks bestanden');
 console.log('\n── 31. Notiz-Typ Rendering ──');
 let f31Ok = 0, f31Fail = 0;
 
-// Freitext: muss l.inhalt verwenden, nicht items[0].text
+// Hybrid: _renderHybridBody ist die zentrale Render-Funktion
+content.includes('_renderHybridBody(')
+  ? (ok('_renderHybridBody() definiert (Hybrid-Architektur)'), f31Ok++) : (fail('_renderHybridBody() fehlt'), f31Fail++);
+
+// Freitext: muss l.inhalt verwenden
 content.includes('l.inhalt')
-  ? (ok('Freitext-Rendering: l.inhalt verwendet'), f31Ok++) : (fail('Freitext: l.inhalt nicht verwendet'), f31Fail++);
-// Freitext: contenteditable im kachel-detail
+  ? (ok('Freitext: l.inhalt verwendet'), f31Ok++) : (fail('Freitext: l.inhalt nicht verwendet'), f31Fail++);
+// Freitext: contenteditable vorhanden
 content.includes('ts-kd-ft') && content.includes('contenteditable')
   ? (ok('Freitext: contenteditable #ts-kd-ft vorhanden'), f31Ok++) : (fail('Freitext: kein contenteditable Editor'), f31Fail++);
 // Freitext: _tsKdFreitextSave handler
 content.includes('_tsKdFreitextSave')
   ? (ok('_tsKdFreitextSave() definiert'), f31Ok++) : (fail('_tsKdFreitextSave() fehlt'), f31Fail++);
-// Freitext: Footer (ts-kd-foot) hat id für show/hide
+// Footer (ts-kd-foot) hat id
 content.includes('id="ts-kd-foot"')
   ? (ok('#ts-kd-foot hat id'), f31Ok++) : (fail('#ts-kd-foot fehlt id'), f31Fail++);
-// Freitext: foot.style.display = none bei freitext
-content.includes("foot.style.display = 'none'") || content.includes('foot.style.display="none"')
-  ? (ok('Footer bei Freitext ausgeblendet'), f31Ok++) : (fail('Footer bei Freitext nicht ausgeblendet'), f31Fail++);
+// Hybrid: Footer ist immer sichtbar (kein display:none mehr bei Freitext)
+content.includes("foot.style.display = ''") || content.includes('foot.style.display=\'\'')
+  ? (ok('Footer im Hybrid-Render immer sichtbar'), f31Ok++) : (fail('Footer-Anzeige fehlt'), f31Fail++);
 
-// Liste/Bullet: eigener Branch ohne Checkboxen
-const listeIdx = content.indexOf("l.typ === 'liste'");
-const listeSrc = listeIdx >= 0 ? content.slice(listeIdx, listeIdx + 300) : '';
-(content.includes("l.typ === 'liste'") || content.includes("l.typ === 'bullet'"))
-  ? (ok("Eigener Branch für typ==='liste'"), f31Ok++) : (fail("Kein Branch für typ==='liste'"), f31Fail++);
-// Liste darf keine ts-kd-chk Checkboxen rendern
-!listeSrc.includes('ts-kd-chk')
-  ? (ok('Liste-Branch: keine Checkboxen'), f31Ok++) : (fail('Liste-Branch rendert Checkboxen (falsch)'), f31Fail++);
+// Checkliste: ts-kd-chk Checkboxen im Hybrid
+const hybridIdx = content.indexOf('_renderHybridBody(l, listeId, ctx)');
+const hybridSrc = hybridIdx >= 0 ? content.slice(hybridIdx, hybridIdx + 1200) : '';
+hybridSrc.includes('ts-kd-chk')
+  ? (ok('Hybrid: ts-kd-chk Checkboxen im Body'), f31Ok++) : (fail('Hybrid: keine Checkboxen'), f31Fail++);
+hybridSrc.includes('Checkliste') && hybridSrc.includes('Freitext')
+  ? (ok('Hybrid: Sektion "Checkliste" + "Freitext" vorhanden'), f31Ok++) : (fail('Hybrid: Sektions-Label fehlen'), f31Fail++);
 
 // Mini-Kachel Freitext-Preview aus l.inhalt
 (content.includes('tmp.innerHTML = l.inhalt') || content.includes("l.inhalt || ''"))
   ? (ok('Mini-Kachel: Freitext-Preview aus l.inhalt'), f31Ok++) : (fail('Mini-Kachel: Freitext-Preview nicht aus l.inhalt'), f31Fail++);
 
 // 4 Spalten
-content.includes('const cols = 4;')
+(content.includes('const cols = 4') || content.includes('cols = 4,'))
   ? (ok('JS-Sizing: 4 Spalten'), f31Ok++) : (fail('JS-Sizing: nicht 4 Spalten'), f31Fail++);
 
 if (f31Fail === 0) ok(f31Ok + ' Notiz-Typ Rendering Checks bestanden');
@@ -723,6 +727,58 @@ content.includes('.nz-sb-badge')
   ? (ok('.nz-sb-badge vorhanden (Lesbarkeit)'), f35Ok++) : (fail('.nz-sb-badge fehlt'), f35Fail++);
 
 if (f35Fail === 0) ok(f35Ok + ' Detail-Meta/Filter Checks bestanden');
+
+// ══════════════════════════════════════════
+// 36. HYBRID-NOTIZ + HEUT-PIN + PANEL-BREITE
+// ══════════════════════════════════════════
+console.log('\n── 36. Hybrid, HeutePin, Panel-Breite ──');
+let f36Ok = 0, f36Fail = 0;
+
+// Panel 30% Breite
+content.includes('#nz-detail-panel.open { width: 30%')
+  ? (ok('Detail-Panel: 30% Breite'), f36Ok++) : (fail('Detail-Panel: nicht 30% Breite'), f36Fail++);
+
+// Body in Notizfarbe
+content.includes("bodyEl2.style.background = bg")
+  ? (ok('Detail-Panel: Body in Notizfarbe'), f36Ok++) : (fail('Detail-Panel: Body ohne Notizfarbe'), f36Fail++);
+
+// Hybrid-Body
+content.includes('_renderHybridBody(')
+  ? (ok('_renderHybridBody() definiert'), f36Ok++) : (fail('_renderHybridBody() fehlt'), f36Fail++);
+const hybIdx2 = content.indexOf('_renderHybridBody(l, listeId, ctx)');
+const hybSrc2 = hybIdx2 >= 0 ? content.slice(hybIdx2, hybIdx2+1500) : '';
+hybSrc2.includes("ctx === 'ts'") && hybSrc2.includes('nz-dp-ft')
+  ? (ok('_renderHybridBody: ctx-Parameter (ts/nz)'), f36Ok++) : (fail('_renderHybridBody: kein ctx-Parameter'), f36Fail++);
+hybSrc2.includes('Checkliste') && hybSrc2.includes('Freitext')
+  ? (ok('Hybrid: beide Sektionen "Checkliste" + "Freitext"'), f36Ok++) : (fail('Hybrid: Sektionen fehlen'), f36Fail++);
+
+// heutePin: temporäres Pinnen
+content.includes('heutePin')
+  ? (ok('heutePin Feld verwendet'), f36Ok++) : (fail('heutePin fehlt'), f36Fail++);
+content.includes('_tsHeutePinAdd(')
+  ? (ok('_tsHeutePinAdd() definiert'), f36Ok++) : (fail('_tsHeutePinAdd() fehlt'), f36Fail++);
+content.includes('_tsHeutePinRemove(')
+  ? (ok('_tsHeutePinRemove() definiert'), f36Ok++) : (fail('_tsHeutePinRemove() fehlt'), f36Fail++);
+content.includes('_tsHeutePinSearch(')
+  ? (ok('_tsHeutePinSearch() definiert'), f36Ok++) : (fail('_tsHeutePinSearch() fehlt'), f36Fail++);
+
+// heutePin beim Start löschen (Session-scoped)
+const idbLIdx2 = content.indexOf('async idbLoad()');
+const idbLSrc2 = idbLIdx2 >= 0 ? content.slice(idbLIdx2, idbLIdx2+1800) : '';
+idbLSrc2.includes('heutePin')
+  ? (ok('heutePin: beim Start gelöscht (idbLoad)'), f36Ok++) : (fail('heutePin: kein Start-Reset in idbLoad'), f36Fail++);
+
+// Heute-Suchzeile im HTML
+content.includes('id="ts-heute-search"')
+  ? (ok('#ts-heute-search Suchleiste im HTML'), f36Ok++) : (fail('#ts-heute-search fehlt'), f36Fail++);
+content.includes('id="ts-heute-search-results"')
+  ? (ok('#ts-heute-search-results Dropdown im HTML'), f36Ok++) : (fail('#ts-heute-search-results fehlt'), f36Fail++);
+
+// _tsMiniKachelHtml ausgelagert
+content.includes('_tsMiniKachelHtml(')
+  ? (ok('_tsMiniKachelHtml() ausgelagert (DRY)'), f36Ok++) : (fail('_tsMiniKachelHtml() fehlt'), f36Fail++);
+
+if (f36Fail === 0) ok(f36Ok + ' Hybrid/HeutePin/Panel Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════
