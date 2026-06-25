@@ -410,6 +410,47 @@ content.includes('id="wk-grid"')       ? ok('wk-grid vorhanden')             : f
 content.includes('data-tab="wiki"')    ? ok('Wiki Tab in Nav')               : fail('Wiki Tab fehlt');
 content.includes('.wk-kachel')          ? ok('wk-kachel CSS')                 : fail('wk-kachel CSS fehlt');
 
+// ══════════════════════════════════════════
+// 29. HEUTE-TAB KACHEL-DETAIL INTERAKTIVITÄT
+// ══════════════════════════════════════════
+console.log('\n── 29. Heute-Tab Kachel-Detail ──');
+let f29Ok = 0, f29Fail = 0;
+
+// Checkboxen: kein data-wb-cb mehr (war der Bug), sondern onclick mit _tsKdCbToggle
+!content.includes('data-wb-cb=')
+  ? (ok('ts-kd-chk: kein data-wb-cb (Delegate-Bug behoben)'), f29Ok++)
+  : (fail('ts-kd-chk: data-wb-cb noch vorhanden → Checkboxen nicht klickbar'), f29Fail++);
+content.includes('_tsKdCbToggle(')
+  ? (ok('_tsKdCbToggle() definiert'), f29Ok++) : (fail('_tsKdCbToggle() fehlt'), f29Fail++);
+content.includes('WB._tsKdCbToggle(')
+  ? (ok('_tsKdCbToggle im onclick-Attribut verankert'), f29Ok++) : (fail('_tsKdCbToggle nicht im onclick'), f29Fail++);
+
+// Schriftgrößen linke Kachel
+content.includes('.ts-kd-title') && content.includes('font-size:14px')
+  ? (ok('.ts-kd-title: font-size 14px'), f29Ok++) : (fail('.ts-kd-title: font-size nicht 14px'), f29Fail++);
+content.includes('.ts-kd-txt') && (content.match(/\.ts-kd-txt\s*\{[^}]*font-size:14px/) || content.includes('ts-kd-txt { font-size:14px'))
+  ? (ok('.ts-kd-txt: font-size 14px'), f29Ok++) : (fail('.ts-kd-txt: font-size nicht 14px'), f29Fail++);
+
+// Checkbox-Größe
+content.includes('.ts-kd-chk') && content.includes('width:17px')
+  ? (ok('.ts-kd-chk: width 17px (größer)'), f29Ok++) : (fail('.ts-kd-chk: width nicht 17px'), f29Fail++);
+
+// Mini-Kacheln: flex statt grid
+content.includes('display:flex !important') && content.includes('flex-wrap:nowrap !important')
+  ? (ok('ts-nz-grid: display:flex + nowrap'), f29Ok++) : (fail('ts-nz-grid: kein flex/nowrap'), f29Fail++);
+
+// Welt-Pill ausgeschrieben
+(content.includes('>Beruf</span>') && content.includes('>Privat</span>'))
+  ? (ok('Welt-Pill: "Beruf"/"Privat" ausgeschrieben'), f29Ok++) : (fail('Welt-Pill noch abgekürzt'), f29Fail++);
+(!content.includes('>B</span>') && !content.includes("pill beruf\">B<"))
+  ? (ok('Keine einbuchstabige Welt-Pill "B" mehr'), f29Ok++) : (fail('"B"-Pill noch vorhanden'), f29Fail++);
+
+// JS-Sizing: 5 Spalten
+content.includes('const cols = 5;')
+  ? (ok('JS-Sizing: 5 Spalten'), f29Ok++) : (fail('JS-Sizing: nicht 5 Spalten'), f29Fail++);
+
+if (f29Fail === 0) ok(f29Ok + ' Kachel-Detail Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
