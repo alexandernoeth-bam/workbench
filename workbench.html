@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.49</title>
+  <title>WorkBench 3.0.50</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1004,7 +1004,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.49</div>
+  <div id="wb-startup-tagline">v3.0.50</div>
 </div>
 
 <!-- Modal -->
@@ -1172,7 +1172,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.49</span>
+    <span id="wb-menu-version">v3.0.50</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1205,7 +1205,7 @@
                 <button class="ts-kd-settings" onclick="WB._tsKachelSettings()">&#9881;</button>
               </div>
               <div class="ts-kd-body" id="ts-kd-body"></div>
-              <div class="ts-kd-foot">
+              <div class="ts-kd-foot" id="ts-kd-foot">
                 <span class="ts-kd-plus">+</span>
                 <input id="ts-kd-inp" onkeydown="if(event.key==='Enter')WB._tsKachelAdd()" class="ts-kd-inp" placeholder="Eintrag hinzuf&#252;gen...">
                 <span class="ts-kd-ok" onclick="WB._tsKachelAdd()">OK</span>
@@ -1445,8 +1445,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.49',
-  APP_BUILD:   '20260625-2345',
+  APP_VERSION: '3.0.50',
+  APP_BUILD:   '20260626-0015',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1783,13 +1783,13 @@ const WB = {
       if (!groups[z] || !groups[z].length) return;
       h += '<div class="ts-nz-group">';
       h += '<div class="ts-nz-group-lbl">' + zustandLabel[z] + '</div>';
-      h += '<div class="ts-nz-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;width:100%;direction:rtl;">';
+      h += '<div class="ts-nz-grid" style="display:flex;flex-direction:row;flex-wrap:nowrap;direction:rtl;gap:5px;width:100%;">';
       groups[z].forEach(l => {
         const farbe = l.farbe || 'c-weiss';
         const allItems = (l.items||[]).filter(i => !i.deleted);
         const doneItems = allItems.filter(i => i.done);
         const preview = l.typ === 'freitext'
-          ? ((l.items||[]).find(i => !i.deleted)?.text || '')
+          ? (() => { const tmp = document.createElement('div'); tmp.innerHTML = l.inhalt || ''; return tmp.textContent.trim().slice(0,80); })()
           : (allItems[0]?.text || '');
         const cntPill = l.typ === 'check' && allItems.length
           ? '<span class="ts-nz-mini-pill cnt">' + doneItems.length + '/' + allItems.length + '</span>'
@@ -1820,7 +1820,7 @@ const WB = {
       const gridEls = panel.querySelectorAll('.ts-nz-grid');
       gridEls.forEach(gridEl => {
         const items = gridEl.querySelectorAll('.ts-nz-mini');
-        const cols = 5;
+        const cols = 4;
         const gap = 5;
         const totalW = gridEl.offsetWidth;
         const cellW = Math.floor((totalW - gap*(cols-1)) / cols);
@@ -1853,12 +1853,30 @@ const WB = {
     const farbe = this._nzPostItFarbe(l.farbe || 'c-weiss');
     const detail = document.getElementById('ts-kachel-detail');
     detail.className = 'open ' + farbe;
-    // Body rendern
+    // Body rendern — typ-abhängig
     const body = document.getElementById('ts-kd-body');
+    const foot = document.getElementById('ts-kd-foot');
     if (l.typ === 'freitext') {
-      const txt = allItems[0]?.text || '';
-      body.innerHTML = '<div style="padding:6px 2px;font-size:12px;color:var(--text);line-height:1.5;white-space:pre-wrap;">' + this._esc(txt) + '</div>';
+      // Freitext: contenteditable, speichert in l.inhalt
+      const inhalt = l.inhalt || '';
+      body.innerHTML = '<div id="ts-kd-ft" contenteditable="true" spellcheck="true"'
+        + ' oninput="WB._tsKdFreitextSave()"'
+        + ' style="outline:none;font-size:14px;line-height:1.6;color:var(--text);'
+        + 'font-family:var(--font);padding:4px 2px;min-height:60px;white-space:pre-wrap;">'
+        + inhalt + '</div>';
+      // Footer ausblenden — Freitext hat keinen Item-Input
+      if (foot) foot.style.display = 'none';
+    } else if (l.typ === 'liste' || l.typ === 'bullet') {
+      // Aufzählung: Bullet-Punkte, keine Checkboxen, kein done-State
+      let bh = allItems.map(i =>
+        '<div class="ts-kd-item" style="gap:8px;">'
+        + '<div style="width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0;margin-top:6px;"></div>'
+        + '<span class="ts-kd-txt">' + this._esc(i.text) + '</span></div>'
+      ).join('');
+      body.innerHTML = bh || '<div style="font-size:13px;color:var(--faint);padding:8px 2px;">Noch keine Einträge</div>';
+      if (foot) foot.style.display = '';
     } else {
+      // Checkliste: Checkboxen mit done-State
       const openItems = allItems.filter(i => !i.done);
       const doneItemsList = allItems.filter(i => i.done);
       let bh = openItems.map(i =>
@@ -1872,7 +1890,8 @@ const WB = {
           + '<span class="ts-kd-txt done">' + this._esc(i.text) + '</span></div>'
         ).join('');
       }
-      body.innerHTML = bh;
+      body.innerHTML = bh || '<div style="font-size:13px;color:var(--faint);padding:8px 2px;">Noch keine Einträge</div>';
+      if (foot) foot.style.display = '';
     }
     document.getElementById('ts-kachel-empty').style.display = 'none';
   },
@@ -1912,7 +1931,14 @@ const WB = {
     if (this.activeTab === 'notizen') this.renderNotizenTab();
   },
 
-  // _tsNotizenWorldOk: Welt-Filter für Notizen im Heute-Tab
+  _tsKdFreitextSave() {
+    const l = (this.db?.notizen||[]).find(x => x.id === this._tsKachelCurrentId); if (!l) return;
+    const ed = document.getElementById('ts-kd-ft'); if (!ed) return;
+    l.inhalt = ed.innerHTML;
+    l.updatedAt = this._now();
+    this.setDirty();
+    this._tsRenderNotizenKompakt();
+  },
   _tsNotizenWorldOk(l) {
     const w = l.welt || 'beide';
     const isBeruf = w === 'beruf' || w === 'pro';

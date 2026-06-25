@@ -446,8 +446,8 @@ content.includes('display:flex !important') && content.includes('flex-wrap:nowra
   ? (ok('Keine einbuchstabige Welt-Pill "B" mehr'), f29Ok++) : (fail('"B"-Pill noch vorhanden'), f29Fail++);
 
 // JS-Sizing: 5 Spalten
-content.includes('const cols = 5;')
-  ? (ok('JS-Sizing: 5 Spalten'), f29Ok++) : (fail('JS-Sizing: nicht 5 Spalten'), f29Fail++);
+content.includes('const cols = 4;')
+  ? (ok('JS-Sizing: 4 Spalten'), f29Ok++) : (fail('JS-Sizing: nicht 4 Spalten'), f29Fail++);
 
 if (f29Fail === 0) ok(f29Ok + ' Kachel-Detail Checks bestanden');
 
@@ -487,6 +487,47 @@ ivSrc.includes('vertraulich')
   : (fail('_itemVisible: vertraulich-Check fehlt'), f30Fail++);
 
 if (f30Fail === 0) ok(f30Ok + ' Farbmap & Büro-Modus Checks bestanden');
+
+// ══════════════════════════════════════════
+// 31. NOTIZ-TYP RENDERING (FREITEXT / LISTE / CHECK)
+// ══════════════════════════════════════════
+console.log('\n── 31. Notiz-Typ Rendering ──');
+let f31Ok = 0, f31Fail = 0;
+
+// Freitext: muss l.inhalt verwenden, nicht items[0].text
+content.includes('l.inhalt')
+  ? (ok('Freitext-Rendering: l.inhalt verwendet'), f31Ok++) : (fail('Freitext: l.inhalt nicht verwendet'), f31Fail++);
+// Freitext: contenteditable im kachel-detail
+content.includes('ts-kd-ft') && content.includes('contenteditable')
+  ? (ok('Freitext: contenteditable #ts-kd-ft vorhanden'), f31Ok++) : (fail('Freitext: kein contenteditable Editor'), f31Fail++);
+// Freitext: _tsKdFreitextSave handler
+content.includes('_tsKdFreitextSave')
+  ? (ok('_tsKdFreitextSave() definiert'), f31Ok++) : (fail('_tsKdFreitextSave() fehlt'), f31Fail++);
+// Freitext: Footer (ts-kd-foot) hat id für show/hide
+content.includes('id="ts-kd-foot"')
+  ? (ok('#ts-kd-foot hat id'), f31Ok++) : (fail('#ts-kd-foot fehlt id'), f31Fail++);
+// Freitext: foot.style.display = none bei freitext
+content.includes("foot.style.display = 'none'") || content.includes('foot.style.display="none"')
+  ? (ok('Footer bei Freitext ausgeblendet'), f31Ok++) : (fail('Footer bei Freitext nicht ausgeblendet'), f31Fail++);
+
+// Liste/Bullet: eigener Branch ohne Checkboxen
+const listeIdx = content.indexOf("l.typ === 'liste'");
+const listeSrc = listeIdx >= 0 ? content.slice(listeIdx, listeIdx + 300) : '';
+(content.includes("l.typ === 'liste'") || content.includes("l.typ === 'bullet'"))
+  ? (ok("Eigener Branch für typ==='liste'"), f31Ok++) : (fail("Kein Branch für typ==='liste'"), f31Fail++);
+// Liste darf keine ts-kd-chk Checkboxen rendern
+!listeSrc.includes('ts-kd-chk')
+  ? (ok('Liste-Branch: keine Checkboxen'), f31Ok++) : (fail('Liste-Branch rendert Checkboxen (falsch)'), f31Fail++);
+
+// Mini-Kachel Freitext-Preview aus l.inhalt
+(content.includes('tmp.innerHTML = l.inhalt') || content.includes("l.inhalt || ''"))
+  ? (ok('Mini-Kachel: Freitext-Preview aus l.inhalt'), f31Ok++) : (fail('Mini-Kachel: Freitext-Preview nicht aus l.inhalt'), f31Fail++);
+
+// 4 Spalten
+content.includes('const cols = 4;')
+  ? (ok('JS-Sizing: 4 Spalten'), f31Ok++) : (fail('JS-Sizing: nicht 4 Spalten'), f31Fail++);
+
+if (f31Fail === 0) ok(f31Ok + ' Notiz-Typ Rendering Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════
