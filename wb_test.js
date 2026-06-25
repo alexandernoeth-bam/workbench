@@ -678,6 +678,52 @@ nzGetListenSrc.includes('_nzZeit')       ? (ok('_nzGetListen: Zeitachse-Filter')
 
 if (f34Fail === 0) ok(f34Ok + ' Phase-B Checks bestanden');
 
+// ══════════════════════════════════════════
+// 35. DETAIL-PANEL META + FILTER-LOGIK
+// ══════════════════════════════════════════
+console.log('\n── 35. Detail-Panel Meta & Filter ──');
+let f35Ok = 0, f35Fail = 0;
+
+// CSS
+content.includes('.nz-dp-meta {')         ? (ok('.nz-dp-meta CSS'), f35Ok++)          : (fail('.nz-dp-meta CSS fehlt'), f35Fail++);
+content.includes('.nz-dp-farb-dot')       ? (ok('.nz-dp-farb-dot CSS'), f35Ok++)      : (fail('.nz-dp-farb-dot fehlt'), f35Fail++);
+content.includes('.nz-dp-welt-btn')       ? (ok('.nz-dp-welt-btn CSS'), f35Ok++)      : (fail('.nz-dp-welt-btn fehlt'), f35Fail++);
+content.includes('.nz-dp-deadline-days')  ? (ok('.nz-dp-deadline-days CSS'), f35Ok++) : (fail('.nz-dp-deadline-days fehlt'), f35Fail++);
+content.includes('.nz-dp-toggle')         ? (ok('.nz-dp-toggle CSS'), f35Ok++)        : (fail('.nz-dp-toggle fehlt'), f35Fail++);
+
+// HTML: Meta-Div
+content.includes('id="nz-dp-meta"')      ? (ok('#nz-dp-meta HTML vorhanden'), f35Ok++) : (fail('#nz-dp-meta fehlt'), f35Fail++);
+
+// JS-Funktionen
+content.includes('_nzDetailRenderMeta(') ? (ok('_nzDetailRenderMeta() definiert'), f35Ok++)  : (fail('_nzDetailRenderMeta() fehlt'), f35Fail++);
+content.includes('_nzDetailDeadlineDays') ? (ok('_nzDetailDeadlineDays() definiert'), f35Ok++) : (fail('_nzDetailDeadlineDays() fehlt'), f35Fail++);
+content.includes('_nzDetailSetFarbe(')   ? (ok('_nzDetailSetFarbe() definiert'), f35Ok++)    : (fail('_nzDetailSetFarbe() fehlt'), f35Fail++);
+content.includes('_nzDetailSetWelt(')    ? (ok('_nzDetailSetWelt() definiert'), f35Ok++)     : (fail('_nzDetailSetWelt() fehlt'), f35Fail++);
+content.includes('_nzDetailSetTags(')    ? (ok('_nzDetailSetTags() definiert'), f35Ok++)     : (fail('_nzDetailSetTags() fehlt'), f35Fail++);
+content.includes('_nzDetailSetLink(')    ? (ok('_nzDetailSetLink() definiert'), f35Ok++)     : (fail('_nzDetailSetLink() fehlt'), f35Fail++);
+content.includes('_nzDetailSetDeadline') ? (ok('_nzDetailSetDeadline() definiert'), f35Ok++) : (fail('_nzDetailSetDeadline() fehlt'), f35Fail++);
+content.includes('_nzDetailToggleVert(') ? (ok('_nzDetailToggleVert() definiert'), f35Ok++)  : (fail('_nzDetailToggleVert() fehlt'), f35Fail++);
+
+// Deadline: Arbeitstage für Beruf
+const dlFnIdx = content.indexOf('_nzDetailDeadlineDays(dlStr,');
+const dlFnSrc = dlFnIdx >= 0 ? content.slice(dlFnIdx, dlFnIdx + 900) : '';
+dlFnSrc.includes('Arbeitstage') && dlFnSrc.includes('Tage')
+  ? (ok('Deadline: Arbeitstage (Beruf) vs Kalendertage'), f35Ok++) : (fail('Deadline-Unterscheidung fehlt'), f35Fail++);
+
+// Filter: Zustand ignorieren bei Tag/Zeit aktiv
+const filterIdx = content.lastIndexOf('_nzGetListen() {');
+const filterSrc = filterIdx >= 0 ? content.slice(filterIdx, filterIdx + 600) : '';
+filterSrc.includes('hasSecondaryFilter')
+  ? (ok('_nzGetListen: Zustand ignoriert bei Tag/Zeit-Filter'), f35Ok++) : (fail('hasSecondaryFilter-Logik fehlt'), f35Fail++);
+filterSrc.includes('_nzActiveTag') && filterSrc.includes('_nzZeit')
+  ? (ok('_nzGetListen: hasSecondaryFilter prüft Tag+Zeit'), f35Ok++) : (fail('hasSecondaryFilter unvollständig'), f35Fail++);
+
+// Badge-Lesbarkeit
+content.includes('.nz-sb-badge')
+  ? (ok('.nz-sb-badge vorhanden (Lesbarkeit)'), f35Ok++) : (fail('.nz-sb-badge fehlt'), f35Fail++);
+
+if (f35Fail === 0) ok(f35Ok + ' Detail-Meta/Filter Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
