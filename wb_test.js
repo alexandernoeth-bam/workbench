@@ -979,6 +979,65 @@ content.includes('-webkit-line-clamp:6')
 
 if (f40Fail === 0) ok(f40Ok + ' Drive/Links/Kacheln Checks bestanden');
 
+// ══════════════════════════════════════════
+// 41. FIXES: PIN-ICON, COLS, ARCHIV, VOLLBILD, NETZWERK
+// ══════════════════════════════════════════
+console.log('\n── 41. Pin/Archiv/Vollbild/Netzwerk ──');
+let f41Ok = 0, f41Fail = 0;
+
+// Fix 1: Kein Pin-Icon in Kachel-Header
+const renderDesktopIdx = content.lastIndexOf('_nzRenderDesktop(scroll)');
+const renderDesktopSrc = renderDesktopIdx >= 0 ? content.slice(renderDesktopIdx, renderDesktopIdx+500) : '';
+(renderDesktopSrc.includes("pinHtml = ''") || renderDesktopSrc.includes('pinHtml = "";'))
+  ? (ok('Pin-Icon im Header entfernt'), f41Ok++) : (fail('Pin-Icon noch im Header'), f41Fail++);
+
+// Fix 2: Dynamische Spaltenanzahl
+content.includes('auto-fill') && content.includes('minmax(180px')
+  ? (ok('Grid: auto-fill/minmax (dynamisch)'), f41Ok++) : (fail('Grid: noch feste Spaltenanzahl'), f41Fail++);
+
+// Fix 3: Archiv öffnet Detail
+const detailOpenIdx = content.indexOf('_nzDetailOpen(listeId, silent)');
+const detailOpenSrc = detailOpenIdx >= 0 ? content.slice(detailOpenIdx, detailOpenIdx+200) : '';
+!detailOpenSrc.includes('!x.deleted')
+  ? (ok('_nzDetailOpen: Archiv öffenbar'), f41Ok++) : (fail('_nzDetailOpen: blockiert deleted'), f41Fail++);
+// Archivieren entfernt Pin
+const softDelIdx = content.indexOf('_softDelete(item)');
+const softDelSrc = softDelIdx >= 0 ? content.slice(softDelIdx, softDelIdx+200) : '';
+softDelSrc.includes('gepinnt') && softDelSrc.includes('heutePin')
+  ? (ok('_softDelete: entfernt Pin+HeutePin'), f41Ok++) : (fail('_softDelete: Pin bleibt beim Archivieren'), f41Fail++);
+
+// Fix 4: Pin-Limit global (db.notizen, nicht gefilterte Liste)
+const pinTogIdx3 = content.lastIndexOf('_nzTogglePin(listeId)');
+const pinTogSrc3 = pinTogIdx3 >= 0 ? content.slice(pinTogIdx3, pinTogIdx3+300) : '';
+pinTogSrc3.includes('this.db.notizen') && !pinTogSrc3.includes('_nzGetListen()')
+  ? (ok('Pin-Limit: global (db.notizen)'), f41Ok++) : (fail('Pin-Limit: noch gefilterte Liste'), f41Fail++);
+
+// Fix 5: Vollbild
+content.includes('id="nz-fullscreen"')
+  ? (ok('#nz-fullscreen HTML'), f41Ok++) : (fail('#nz-fullscreen fehlt'), f41Fail++);
+content.includes('_nzFullscreenOpen(')
+  ? (ok('_nzFullscreenOpen() definiert'), f41Ok++) : (fail('_nzFullscreenOpen() fehlt'), f41Fail++);
+content.includes('_nzFullscreenClose()')
+  ? (ok('_nzFullscreenClose() definiert'), f41Ok++) : (fail('_nzFullscreenClose() fehlt'), f41Fail++);
+content.includes('nz-fs-close')
+  ? (ok('Vollbild: Schließen-Button'), f41Ok++) : (fail('Vollbild: kein Schließen-Button'), f41Fail++);
+
+// Fix 6: Netzwerk-Tab
+content.includes('id="sec-netzwerk"')
+  ? (ok('#sec-netzwerk HTML'), f41Ok++) : (fail('#sec-netzwerk fehlt'), f41Fail++);
+content.includes("'netzwerk'")
+  ? (ok('netzwerk in tabSwitch'), f41Ok++) : (fail('netzwerk nicht in tabSwitch'), f41Fail++);
+content.includes('_nzNetRender()')
+  ? (ok('_nzNetRender() definiert'), f41Ok++) : (fail('_nzNetRender() fehlt'), f41Fail++);
+content.includes('_nzNetNodeClick(')
+  ? (ok('_nzNetNodeClick() definiert'), f41Ok++) : (fail('_nzNetNodeClick() fehlt'), f41Fail++);
+const netIdx = content.lastIndexOf('_nzNetRender()');
+const netSrc = netIdx >= 0 ? content.slice(netIdx, netIdx+4000) : '';
+netSrc.includes('backlinks') && netSrc.includes('force')
+  ? (ok('Netzwerk: Force-Layout mit Backlinks'), f41Ok++) : (fail('Netzwerk: kein Force-Layout'), f41Fail++);
+
+if (f41Fail === 0) ok(f41Ok + ' Pin/Archiv/Vollbild/Netzwerk Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');

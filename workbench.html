@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.62</title>
+  <title>WorkBench 3.0.63</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -598,7 +598,16 @@
     .nz-sb-btn.active .nz-sb-badge { background: rgba(10,107,94,.25); color: var(--accent); }
     .nz-sb-tag .nz-sb-badge { font-size: 11px; font-weight: 700; }
 
-    /* Mobile: Sidebar ausgeblendet, Detail-Panel als Overlay */
+    /* Vollbild-Overlay für Notizen */
+    #nz-fullscreen { display:none; position:fixed; inset:0; z-index:2000; background:var(--surface); flex-direction:column; }
+    #nz-fullscreen.open { display:flex; }
+    .nz-fs-head { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1.5px solid var(--border); flex-shrink:0; background:var(--surface); }
+    .nz-fs-title { font-size:18px; font-weight:800; color:var(--text); flex:1; }
+    .nz-fs-close { padding:5px 12px; border:1.5px solid var(--border); border-radius:8px; background:none; cursor:pointer; font-size:13px; font-weight:700; color:var(--muted); font-family:var(--font); }
+    .nz-fs-close:hover { border-color:var(--accent); color:var(--accent); }
+    .nz-fs-body { flex:1; overflow-y:auto; padding:20px 32px; max-width:900px; margin:0 auto; width:100%; }
+    .nz-fs-section-lbl { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); padding:10px 0 6px; }
+    .nz-fs-ft { outline:none; font-size:16px; line-height:1.7; color:var(--text); font-family:var(--font); min-height:200px; width:100%; }
     .wb-mobile #nz-sidebar { display: none; }
     .wb-mobile #nz-detail-panel { display: none; }
 
@@ -883,7 +892,7 @@
     .wo-mon-col-pill { display:inline-flex; align-items:center; justify-content:center; background:var(--accent); color:#fff; border-radius:8px; font-size:9px; font-weight:800; padding:0 5px; min-width:16px; height:15px; margin-left:4px; vertical-align:middle; }
 
     /* ── Desktop Grid Overrides ── */
-    .wb-desktop .nz-grid { grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .wb-desktop .nz-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
     .wb-desktop .nz-postit { min-height: 160px; max-height: 200px; overflow: hidden; padding: 10px 12px; }
     .wb-desktop .nz-postit-title { font-size: 13px; }
     .wb-desktop .ts-pins { grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -1000,7 +1009,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.62</div>
+  <div id="wb-startup-tagline">v3.0.63</div>
 </div>
 
 <!-- Modal -->
@@ -1153,6 +1162,15 @@
   </div>
 </div>
 
+<!-- Vollbild-Notiz-Overlay -->
+<div id="nz-fullscreen">
+  <div class="nz-fs-head" id="nz-fs-head">
+    <span class="nz-fs-title" id="nz-fs-title"></span>
+    <button class="nz-fs-close" onclick="WB._nzFullscreenClose()">✕ Schließen</button>
+  </div>
+  <div class="nz-fs-body" id="nz-fs-body"></div>
+</div>
+
 <!-- App -->
 <div id="wb-app">
 
@@ -1168,7 +1186,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.62</span>
+    <span id="wb-menu-version">v3.0.63</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1301,6 +1319,7 @@
             <button class="nz-dp-back" onclick="WB._nzDetailClose()">←</button>
             <span class="nz-dp-title" id="nz-dp-title"></span>
             <span class="nz-dp-cnt" id="nz-dp-cnt"></span>
+            <button class="nz-dp-settings" onclick="WB._nzFullscreenOpen(WB._nzDetailId)" title="Vollbild">⛶</button>
             <button class="nz-dp-settings" onclick="WB._nzDetailSettings()" title="Einstellungen">⚙</button>
           </div>
           <!-- Meta-Bereich: Farbe, Welt, Tags, Link, Vertraulich, Deadline -->
@@ -1336,6 +1355,30 @@
     </div>
 
       <!-- Wiki -->
+      <!-- Netzwerk -->
+      <div id="sec-netzwerk" class="wb-section" style="display:none;flex-direction:column;">
+        <div style="padding:10px 14px;border-bottom:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><line x1="7" y1="11.5" x2="17" y2="6"/><line x1="7" y1="12.5" x2="17" y2="18"/></svg>
+          <span style="font-size:13px;font-weight:800;color:var(--text);">Notiznetzwerk</span>
+          <span id="nz-net-info" style="font-size:11px;color:var(--faint);margin-left:4px;"></span>
+          <div style="margin-left:auto;display:flex;gap:6px;">
+            <button onclick="WB._nzNetRender()" style="padding:3px 10px;border:1.5px solid var(--border);border-radius:8px;background:none;font-size:11px;font-weight:700;cursor:pointer;color:var(--muted);font-family:var(--font);">↺ Neu</button>
+          </div>
+        </div>
+        <div style="flex:1;overflow:hidden;position:relative;">
+          <svg id="nz-net-svg" style="width:100%;height:100%;">
+            <defs>
+              <marker id="nz-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L7,3 z" fill="var(--accent)" opacity=".6"/>
+              </marker>
+            </defs>
+            <g id="nz-net-edges"></g>
+            <g id="nz-net-nodes"></g>
+          </svg>
+          <div id="nz-net-tooltip" style="display:none;position:absolute;background:var(--text);color:var(--surface);border-radius:8px;padding:8px 12px;font-size:12px;pointer-events:none;max-width:200px;z-index:50;line-height:1.5;"></div>
+        </div>
+      </div>
+
       <!-- Woche -->
       <div id="sec-woche" class="wb-section" style="display:none;padding:0;">
         <div class="wo-header">
@@ -1387,6 +1430,12 @@
           <span class="wb-stab-lbl">Notizen</span>
         </div>
       </div>
+      <div class="wb-stab" data-tab="netzwerk" onclick="WB._stabSwitch('netzwerk',this)">
+        <div class="wb-stab-body">
+          <div class="wb-stab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><line x1="7" y1="11.5" x2="17" y2="6"/><line x1="7" y1="12.5" x2="17" y2="18"/></svg></div>
+          <span class="wb-stab-lbl">Netzwerk</span>
+        </div>
+      </div>
       <div class="wb-stab" data-tab="woche" onclick="WB._stabSwitch('woche',this)">
         <div class="wb-stab-body">
           <div class="wb-stab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg></div>
@@ -1430,8 +1479,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.62',
-  APP_BUILD:   '20260626-1430',
+  APP_VERSION: '3.0.63',
+  APP_BUILD:   '20260626-1600',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1669,7 +1718,7 @@ const WB = {
     this.activeTab = tab;
     // body.woche-active → CSS übernimmt overflow:hidden auf #wb-content
     document.body.classList.toggle('woche-active', tab === 'woche');
-    ['tagessicht','notizen','woche'].forEach(t => {
+    ['tagessicht','notizen','netzwerk','woche'].forEach(t => {
       const el = document.getElementById('sec-' + t);
       if (!el) return;
       if (t !== tab) {
@@ -1700,6 +1749,7 @@ const WB = {
     switch(tab) {
       case 'tagessicht': this._tsRender();          break;
       case 'notizen':    this.renderNotizenTab();   break;
+      case 'netzwerk':   this._nzNetRender();       break;
       case 'woche':      this.renderWoche();        break;
     }
   },
@@ -2974,7 +3024,142 @@ const WB = {
     this._nzDetailOpen(listeId, true); this.renderNotizenTab();
   },
 
-  // ── Gemeinsamer Hybrid-Body-Render (Heute-Tab + Notizen-Detail-Panel) ──
+  // ── Netzwerk-Visualisierung ──────────────────────────
+  _nzNetRender() {
+    const svg       = document.getElementById('nz-net-svg'); if (!svg) return;
+    const edgesG    = document.getElementById('nz-net-edges');
+    const nodesG    = document.getElementById('nz-net-nodes');
+    const tooltip   = document.getElementById('nz-net-tooltip');
+    const infoEl    = document.getElementById('nz-net-info');
+    if (!edgesG || !nodesG) return;
+
+    const allNz = (this.db?.notizen||[]).filter(l => !l.deleted);
+    const linked = allNz.filter(l => (l.backlinks||[]).length > 0);
+    const isolated = allNz.filter(l => !(l.backlinks||[]).length);
+
+    if (infoEl) infoEl.textContent = allNz.length + ' Notizen · ' + linked.length + ' verknüpft';
+
+    // Farb-Map
+    const farbBg = { 'c-gelb':'#FFF9C4','c-gruen':'#D5F5E3','c-blau':'#D6EAF8','c-rosa':'#FDEBD0','c-lila':'#E8D5F0','c-tuerkis':'#C8F0EC','c-weiss':'#fff' };
+    const farbBd = { 'c-gelb':'#F1C40F','c-gruen':'#58D68D','c-blau':'#5DADE2','c-rosa':'#E59866','c-lila':'#A569BD','c-tuerkis':'#45B7AA','c-weiss':'rgba(0,0,0,.15)' };
+
+    // Collect unique edges (bidirectional → once)
+    const seen = new Set();
+    const edges = [];
+    allNz.forEach(l => {
+      (l.backlinks||[]).forEach(bid => {
+        const key = [l.id, bid].sort().join('|');
+        if (!seen.has(key)) { seen.add(key); edges.push([l.id, bid]); }
+      });
+    });
+
+    // Simple force layout — place nodes, iterate
+    const W = svg.clientWidth  || 700;
+    const H = svg.clientHeight || 500;
+    const NODE_W = 110, NODE_H = 44, PADDING = 24;
+
+    const positions = {};
+    // Initial: circle layout
+    allNz.forEach((l, i) => {
+      const angle = (i / allNz.length) * 2 * Math.PI;
+      const r = Math.min(W, H) * 0.35;
+      positions[l.id] = { x: W/2 + r * Math.cos(angle), y: H/2 + r * Math.sin(angle), vx:0, vy:0 };
+    });
+
+    // Simple spring simulation (50 iterations)
+    for (let iter = 0; iter < 60; iter++) {
+      // Repulsion between all nodes
+      allNz.forEach(a => { allNz.forEach(b => {
+        if (a.id === b.id) return;
+        const pa = positions[a.id], pb = positions[b.id];
+        const dx = pa.x - pb.x, dy = pa.y - pb.y;
+        const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+        const force = 8000 / (dist * dist);
+        pa.vx += (dx/dist) * force; pa.vy += (dy/dist) * force;
+      }); });
+      // Attraction along edges
+      edges.forEach(([aid, bid]) => {
+        const pa = positions[aid], pb = positions[bid];
+        if (!pa || !pb) return;
+        const dx = pb.x - pa.x, dy = pb.y - pa.y;
+        const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+        const force = (dist - 180) * 0.04;
+        pa.vx += (dx/dist)*force; pa.vy += (dy/dist)*force;
+        pb.vx -= (dx/dist)*force; pb.vy -= (dy/dist)*force;
+      });
+      // Center gravity
+      allNz.forEach(l => {
+        const p = positions[l.id];
+        p.vx += (W/2 - p.x) * 0.005; p.vy += (H/2 - p.y) * 0.005;
+      });
+      // Apply velocity + dampen + clamp
+      allNz.forEach(l => {
+        const p = positions[l.id];
+        p.x = Math.max(PADDING + NODE_W/2, Math.min(W - PADDING - NODE_W/2, p.x + p.vx));
+        p.y = Math.max(PADDING + NODE_H/2, Math.min(H - PADDING - NODE_H/2, p.y + p.vy));
+        p.vx *= 0.7; p.vy *= 0.7;
+      });
+    }
+
+    // Render edges
+    edgesG.innerHTML = edges.map(([aid, bid]) => {
+      const pa = positions[aid], pb = positions[bid];
+      if (!pa || !pb) return '';
+      return '<path d="M' + pa.x + ',' + pa.y + ' Q' + ((pa.x+pb.x)/2) + ',' + ((pa.y+pb.y)/2 - 30) + ' ' + pb.x + ',' + pb.y + '"'
+        + ' fill="none" stroke="var(--accent)" stroke-width="1.5" opacity=".45" marker-end="url(#nz-arrow)"/>';
+    }).join('');
+
+    // Render nodes
+    nodesG.innerHTML = allNz.map(l => {
+      const p = positions[l.id];
+      const bg = farbBg[l.farbe||'c-weiss'] || '#fff';
+      const bd = farbBd[l.farbe||'c-weiss'] || 'rgba(0,0,0,.15)';
+      const isIso = !(l.backlinks||[]).length;
+      const linkCnt = (l.backlinks||[]).length;
+      const titleClip = l.titel.length > 14 ? l.titel.slice(0,13) + '…' : l.titel;
+      const dashArr = isIso ? 'stroke-dasharray="4,2"' : '';
+      const g = '<g class="nz-net-node" style="cursor:pointer;" transform="translate(' + (p.x - NODE_W/2) + ',' + (p.y - NODE_H/2) + ')"'
+        + ' onclick="WB._nzNetNodeClick(\'' + this._esc(l.id) + '\')"'
+        + ' onmouseenter="WB._nzNetHover(event,\'' + this._esc(l.id) + '\')"'
+        + ' onmouseleave="WB._nzNetLeave()">'
+        + '<rect width="' + NODE_W + '" height="' + NODE_H + '" rx="7" fill="' + bg + '" stroke="' + bd + '" stroke-width="1.5" ' + dashArr + ' filter="url(#nz-shadow)"/>'
+        + '<text x="' + (NODE_W/2) + '" y="17" text-anchor="middle" font-size="11" font-weight="800" fill="var(--text)" font-family="var(--font)">' + this._esc(titleClip) + '</text>'
+        + (linkCnt ? '<circle cx="' + (NODE_W - 10) + '" cy="10" r="9" fill="var(--accent)"/>'
+          + '<text x="' + (NODE_W - 10) + '" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#fff" font-family="var(--font)">' + linkCnt + '</text>' : '')
+        + (l.zustand ? '<text x="' + (NODE_W/2) + '" y="33" text-anchor="middle" font-size="9" fill="var(--faint)" font-family="var(--font)">' + l.zustand + '</text>'
+          : '<text x="' + (NODE_W/2) + '" y="33" text-anchor="middle" font-size="9" fill="var(--faint)" font-family="var(--font)">aktuell</text>')
+        + '</g>';
+      return g;
+    }).join('');
+  },
+
+  _nzNetNodeClick(listeId) {
+    // Zur Notiz navigieren: Notizen-Tab öffnen + Detail-Panel
+    this.tabSwitch('notizen');
+    setTimeout(() => this._nzDetailOpen(listeId), 100);
+  },
+
+  _nzNetHover(e, listeId) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const tt = document.getElementById('nz-net-tooltip'); if (!tt) return;
+    const linked = (l.backlinks||[]).map(bid => {
+      const b = (this.db.notizen||[]).find(x => x.id === bid);
+      return b ? b.titel : '?';
+    });
+    tt.innerHTML = '<strong>' + this._esc(l.titel) + '</strong>'
+      + (l.tags?.length ? '<div style="margin-top:3px;font-size:10px;opacity:.7;">' + l.tags.join(' ') + '</div>' : '')
+      + (linked.length ? '<div style="margin-top:4px;font-size:10px;">🔗 ' + linked.map(t => this._esc(t)).join(', ') + '</div>' : '<div style="margin-top:4px;font-size:10px;opacity:.5;">Keine Verknüpfungen</div>');
+    const svg = document.getElementById('nz-net-svg');
+    const rect = svg?.getBoundingClientRect() || {left:0,top:0};
+    tt.style.left = (e.clientX - rect.left + 12) + 'px';
+    tt.style.top  = (e.clientY - rect.top  + 12) + 'px';
+    tt.style.display = 'block';
+  },
+
+  _nzNetLeave() {
+    const tt = document.getElementById('nz-net-tooltip');
+    if (tt) tt.style.display = 'none';
+  },
   // Checkliste OBEN (immer sichtbar) + Freitext UNTEN (immer sichtbar)
   _renderHybridBody(l, listeId, ctx) {
     // ctx = 'ts' (Heute-Tab) oder 'nz' (Notizen-Panel)
@@ -3383,9 +3568,83 @@ const WB = {
     if (hint) hint.style.display = 'block';
   },
 
+  _nzFullscreenOpen(listeId) {
+    if (!listeId) return;
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    this._nzFullscreenId = listeId;
+    const overlay = document.getElementById('nz-fullscreen');
+    const head    = document.getElementById('nz-fs-head');
+    const title   = document.getElementById('nz-fs-title');
+    const body    = document.getElementById('nz-fs-body');
+    if (!overlay || !body) return;
+
+    const farbBg = { 'c-gelb':'#FFF9C4','c-gruen':'#D5F5E3','c-blau':'#D6EAF8','c-rosa':'#FDEBD0','c-lila':'#E8D5F0','c-tuerkis':'#C8F0EC','c-weiss':'#fff' };
+    const bg = farbBg[l.farbe||'c-weiss'] || '#fff';
+    if (head) head.style.background = bg;
+    if (title) title.textContent = l.titel;
+
+    const allItems  = (l.items||[]).filter(i => !i.deleted);
+    const openItems = allItems.filter(i => !i.done);
+    const doneItems = allItems.filter(i =>  i.done);
+
+    let h = '';
+    // Checkliste
+    if (allItems.length > 0 || true) {
+      h += '<div class="nz-fs-section-lbl">Checkliste</div>';
+      h += openItems.map(i =>
+        '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:.5px solid rgba(0,0,0,.07);">'
+        + '<div class="ts-kd-chk" onclick="WB._nzDetailCbToggle(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\');WB._nzFullscreenOpen(\'' + this._esc(listeId) + '\')"></div>'
+        + '<span style="font-size:15px;color:var(--text);">' + this._esc(i.text) + '</span></div>'
+      ).join('');
+      if (doneItems.length) {
+        h += '<div class="nz-fs-section-lbl">Erledigt</div>';
+        h += doneItems.map(i =>
+          '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:.5px solid rgba(0,0,0,.07);">'
+          + '<div class="ts-kd-chk done" onclick="WB._nzDetailCbToggle(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\');WB._nzFullscreenOpen(\'' + this._esc(listeId) + '\')">✓</div>'
+          + '<span style="font-size:15px;color:var(--faint);text-decoration:line-through;">' + this._esc(i.text) + '</span></div>'
+        ).join('');
+      }
+      if (!openItems.length && !doneItems.length) {
+        h += '<div style="font-size:14px;color:var(--faint);font-style:italic;padding:8px 0;">Noch keine Einträge</div>';
+      }
+    }
+    // Freitext
+    h += '<div class="nz-fs-section-lbl" style="margin-top:16px;">Freitext</div>';
+    h += '<div class="nz-fs-ft" contenteditable="true" spellcheck="true"'
+      + ' style="background:' + bg + ';border-radius:8px;padding:12px;min-height:200px;"'
+      + ' oninput="WB._nzFsFreitextInput()">'
+      + this._linkifyHtml(l.inhalt || '') + '</div>';
+    body.innerHTML = h;
+    body.style.background = 'var(--surface2)';
+    overlay.classList.add('open');
+  },
+
+  _nzFsFreitextInput() {
+    clearTimeout(this._nzFsTimer);
+    this._nzFsTimer = setTimeout(() => {
+      const l = (this.db?.notizen||[]).find(x => x.id === this._nzFullscreenId); if (!l) return;
+      const ed = document.querySelector('#nz-fs-body .nz-fs-ft'); if (!ed) return;
+      l.inhalt = ed.innerHTML;
+      l.updatedAt = this._now();
+      this.setDirty();
+    }, 1500);
+  },
+
+  _nzFullscreenClose() {
+    document.getElementById('nz-fullscreen')?.classList.remove('open');
+    this._nzFullscreenId = null;
+    // Detail-Panel aktualisieren
+    if (this._nzDetailId) this._nzDetailOpen(this._nzDetailId, true);
+    this.renderNotizenTab();
+  },
+
+  _nzFullscreenId: null,
+  _nzFsTimer: null,
+
   // ── Notizen Detail-Panel (identisch zu Heute-Tab) ────────────────
   _nzDetailOpen(listeId, silent) {
-    const l = (this.db?.notizen||[]).find(x => x.id === listeId && !x.deleted);
+    // Archivierte Notizen auch öffnen (deleted=true)
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId);
     if (!l) return;
     this._nzDetailId = listeId;
     // Panel öffnen
@@ -3680,7 +3939,7 @@ const WB = {
       const farbe  = this._nzPostItFarbe(l.farbe || 'c-weiss');
       const items  = (l.items || []).filter(i => !i.deleted);
       const offen  = items.filter(i => !i.done).length;
-      const pinHtml = l.gepinnt ? '<span class="nz-postit-pin">📌</span>' : '';
+      const pinHtml = ''; // Pin-Icon im Header entfernt — steht bereits im "Gepinnt"-Abschnitt
       const done  = items.filter(i=>i.done).length;
       const cntLbl = l.typ==='check' ? (done+'/'+items.length) : (items.length+'');
 
@@ -4084,17 +4343,18 @@ const WB = {
   },
 
   _nzTogglePin(listeId) {
-    const listen = this._nzGetListen();
-    const gepinntAnzahl = listen.filter(l => l.gepinnt).length;
-    const l = listen.find(x => x.id === listeId); if (!l) return;
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const gepinntAnzahl = (this.db.notizen||[]).filter(x => !x.deleted && x.gepinnt).length;
     if (!l.gepinnt && gepinntAnzahl >= 4) {
       this._toast('⚠ Maximal 4 Notizen anpinnen');
       return;
     }
     l.gepinnt = !l.gepinnt;
+    l.updatedAt = this._now();
     this.setDirty();
     this.renderNotizenTab();
     this._nzRenderPills();
+    if (this.activeTab === 'tagessicht') this._tsRenderNotizenKompakt();
   },
 
   _nzRenderPills() {
@@ -5583,7 +5843,13 @@ const WB = {
   },
 
   _softDelete(item) {
-    if (item) { item.deleted = true; item.updatedAt = this._now(); }
+    if (item) {
+      item.deleted    = true;
+      item.gepinnt    = false; // Archivierte Notizen nie gepinnt
+      item.heutePin   = false;
+      item.heutePinDate = null;
+      item.updatedAt  = this._now();
+    }
   },
 
   _migrateQuickItems() {
