@@ -626,6 +626,58 @@ const syncDlSrc = syncDlIdx >= 0 ? content.slice(syncDlIdx, syncDlIdx + 2000) : 
 
 if (f33Fail === 0) ok(f33Ok + ' Tagesheader/Running/Migration Checks bestanden');
 
+// ══════════════════════════════════════════
+// 34. PHASE B: NOTIZEN SIDEBAR + DETAIL-PANEL + TAGS/LINK
+// ══════════════════════════════════════════
+console.log('\n── 34. Phase B: Sidebar, Detail-Panel, Tags ──');
+let f34Ok = 0, f34Fail = 0;
+
+// Sidebar HTML
+content.includes('id="nz-sidebar"')      ? (ok('#nz-sidebar vorhanden'), f34Ok++)      : (fail('#nz-sidebar fehlt'), f34Fail++);
+content.includes('id="nz-sb-tags"')      ? (ok('#nz-sb-tags vorhanden'), f34Ok++)      : (fail('#nz-sb-tags fehlt'), f34Fail++);
+content.includes('id="nz-layout"')       ? (ok('#nz-layout vorhanden'), f34Ok++)       : (fail('#nz-layout fehlt'), f34Fail++);
+content.includes('id="nz-main"')         ? (ok('#nz-main vorhanden'), f34Ok++)         : (fail('#nz-main fehlt'), f34Fail++);
+
+// Detail-Panel HTML
+content.includes('id="nz-detail-panel"') ? (ok('#nz-detail-panel vorhanden'), f34Ok++) : (fail('#nz-detail-panel fehlt'), f34Fail++);
+content.includes('id="nz-dp-body"')      ? (ok('#nz-dp-body vorhanden'), f34Ok++)      : (fail('#nz-dp-body fehlt'), f34Fail++);
+content.includes('id="nz-dp-foot"')      ? (ok('#nz-dp-foot vorhanden'), f34Ok++)      : (fail('#nz-dp-foot fehlt'), f34Fail++);
+
+// Detail-Panel CSS
+content.includes('#nz-detail-panel')     ? (ok('#nz-detail-panel CSS vorhanden'), f34Ok++) : (fail('#nz-detail-panel CSS fehlt'), f34Fail++);
+content.includes('#nz-detail-panel.open') ? (ok('#nz-detail-panel.open CSS vorhanden'), f34Ok++) : (fail('#nz-detail-panel.open CSS fehlt'), f34Fail++);
+content.includes('.nz-postit-selected')  ? (ok('.nz-postit-selected CSS vorhanden'), f34Ok++) : (fail('.nz-postit-selected CSS fehlt'), f34Fail++);
+
+// JS-Funktionen
+content.includes('_nzDetailOpen(')       ? (ok('_nzDetailOpen() definiert'), f34Ok++)  : (fail('_nzDetailOpen() fehlt'), f34Fail++);
+content.includes('_nzDetailClose()')     ? (ok('_nzDetailClose() definiert'), f34Ok++) : (fail('_nzDetailClose() fehlt'), f34Fail++);
+content.includes('_nzDetailAdd()')       ? (ok('_nzDetailAdd() definiert'), f34Ok++)   : (fail('_nzDetailAdd() fehlt'), f34Fail++);
+content.includes('_nzDetailCbToggle(')   ? (ok('_nzDetailCbToggle() definiert'), f34Ok++) : (fail('_nzDetailCbToggle() fehlt'), f34Fail++);
+content.includes('_nzDetailFreitextInput') ? (ok('_nzDetailFreitextInput() definiert'), f34Ok++) : (fail('_nzDetailFreitextInput() fehlt'), f34Fail++);
+content.includes('_nzSetZeit(')          ? (ok('_nzSetZeit() definiert'), f34Ok++)     : (fail('_nzSetZeit() fehlt'), f34Fail++);
+content.includes('_nzSetTag(')           ? (ok('_nzSetTag() definiert'), f34Ok++)      : (fail('_nzSetTag() fehlt'), f34Fail++);
+content.includes('_nzRenderSidebarTags') ? (ok('_nzRenderSidebarTags() definiert'), f34Ok++) : (fail('_nzRenderSidebarTags() fehlt'), f34Fail++);
+
+// Desktop routing: _nzKachelOpen → _nzDetailOpen (nicht mehr Modal)
+const nzOpenIdx = content.lastIndexOf('_nzKachelOpen(listeId)');
+const nzOpenSrc = nzOpenIdx >= 0 ? content.slice(nzOpenIdx, nzOpenIdx + 300) : '';
+nzOpenSrc.includes('_nzDetailOpen')      ? (ok('_nzKachelOpen → _nzDetailOpen auf Desktop'), f34Ok++) : (fail('_nzKachelOpen nutzt nicht _nzDetailOpen'), f34Fail++);
+nzOpenSrc.includes('_isMobile()')        ? (ok('_nzKachelOpen: Mobile-Fallback via _isMobile()'), f34Ok++) : (fail('_nzKachelOpen: kein Mobile-Fallback'), f34Fail++);
+
+// Tags + Link im Bearbeiten-Dialog
+content.includes('id="nz-e-tags"')       ? (ok('#nz-e-tags im Bearbeiten-Dialog'), f34Ok++) : (fail('#nz-e-tags fehlt'), f34Fail++);
+content.includes('id="nz-e-link"')       ? (ok('#nz-e-link im Bearbeiten-Dialog'), f34Ok++) : (fail('#nz-e-link fehlt'), f34Fail++);
+content.includes('l.tags    =')          ? (ok('l.tags wird gespeichert'), f34Ok++)    : (fail('l.tags wird nicht gespeichert'), f34Fail++);
+content.includes('l.link    =')          ? (ok('l.link wird gespeichert'), f34Ok++)    : (fail('l.link wird nicht gespeichert'), f34Fail++);
+
+// Zeitachse-Filter in _nzGetListen
+const nzGetListenIdx = content.lastIndexOf('_nzGetListen() {');
+const nzGetListenSrc = nzGetListenIdx >= 0 ? content.slice(nzGetListenIdx, nzGetListenIdx + 2000) : '';
+nzGetListenSrc.includes('_nzActiveTag')  ? (ok('_nzGetListen: Tag-Filter'), f34Ok++)   : (fail('_nzGetListen: Tag-Filter fehlt'), f34Fail++);
+nzGetListenSrc.includes('_nzZeit')       ? (ok('_nzGetListen: Zeitachse-Filter'), f34Ok++) : (fail('_nzGetListen: Zeitachse-Filter fehlt'), f34Fail++);
+
+if (f34Fail === 0) ok(f34Ok + ' Phase-B Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
