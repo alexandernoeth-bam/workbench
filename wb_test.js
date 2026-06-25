@@ -1123,6 +1123,57 @@ content.includes('_tsMobileSheetClose()">') || content.includes("_tsMobileSheetC
 
 if (f43Fail === 0) ok(f43Ok + ' Mobile Sheet Checks bestanden');
 
+// ══════════════════════════════════════════
+// 44. TERMINE-HEADER + NOTIZEN MOBILE SHEET
+// ══════════════════════════════════════════
+console.log('\n── 44. Termine-Header & Notizen Sheet ──');
+let f44Ok = 0, f44Fail = 0;
+
+// Termine: Liste-Button entfernt
+!content.includes('>Liste<') || content.includes('wb-btn-list')
+  ? (ok('Termine: Liste-Button entfernt'), f44Ok++) : (fail('Termine: Liste-Button noch da'), f44Fail++);
+// KW-Header: einzeiliger Block auf Mobile
+content.includes('id="wo-header-wrap"')
+  ? (ok('wo-header-wrap für Mobile-KW'), f44Ok++) : (fail('wo-header-wrap fehlt'), f44Fail++);
+content.includes('.wb-mobile #wo-header-wrap')
+  ? (ok('Mobile wo-header-wrap: flex-row'), f44Ok++) : (fail('Mobile wo-header-wrap CSS fehlt'), f44Fail++);
+// Spaltenköpfe: größere font-size + today circle
+content.includes('.wo-dh-name.today')
+  ? (ok('wo-dh-name.today CSS'), f44Ok++) : (fail('wo-dh-name.today fehlt'), f44Fail++);
+
+// Notizen Mobile Sheet HTML
+content.includes('id="nz-mobile-sheet"')
+  ? (ok('#nz-mobile-sheet HTML'), f44Ok++) : (fail('#nz-mobile-sheet fehlt'), f44Fail++);
+content.includes('id="nz-mobile-sheet-backdrop"')
+  ? (ok('#nz-mobile-sheet-backdrop HTML'), f44Ok++) : (fail('#nz-mobile-sheet-backdrop fehlt'), f44Fail++);
+content.includes('id="nz-ms-body"') && content.includes('id="nz-ms-actions"')
+  ? (ok('nz-ms-body + nz-ms-actions'), f44Ok++) : (fail('nz-ms-body/actions fehlen'), f44Fail++);
+content.includes('id="nz-ms-meta"')
+  ? (ok('nz-ms-meta Einstellungen'), f44Ok++) : (fail('nz-ms-meta fehlt'), f44Fail++);
+
+// JS
+content.includes('_nzMobileSheetOpen(')
+  ? (ok('_nzMobileSheetOpen() definiert'), f44Ok++) : (fail('_nzMobileSheetOpen() fehlt'), f44Fail++);
+content.includes('_nzMobileSheetClose()')
+  ? (ok('_nzMobileSheetClose() definiert'), f44Ok++) : (fail('_nzMobileSheetClose() fehlt'), f44Fail++);
+content.includes('_nzMsTogglePin(')
+  ? (ok('_nzMsTogglePin() definiert'), f44Ok++) : (fail('_nzMsTogglePin() fehlt'), f44Fail++);
+content.includes('_nzMsToggleHeute(')
+  ? (ok('_nzMsToggleHeute() definiert'), f44Ok++) : (fail('_nzMsToggleHeute() fehlt'), f44Fail++);
+content.includes('_nzMsDuplizieren(')
+  ? (ok('_nzMsDuplizieren() definiert'), f44Ok++) : (fail('_nzMsDuplizieren() fehlt'), f44Fail++);
+content.includes('_nzMsToggleMeta(')
+  ? (ok('_nzMsToggleMeta() Einstellungen'), f44Ok++) : (fail('_nzMsToggleMeta() fehlt'), f44Fail++);
+content.includes('_nzMsActionsHtml(')
+  ? (ok('_nzMsActionsHtml() definiert'), f44Ok++) : (fail('_nzMsActionsHtml() fehlt'), f44Fail++);
+// _nzKachelOpen: mobile → sheet
+const kachelIdx = content.lastIndexOf('_nzKachelOpen(listeId)');
+const kachelSrc = kachelIdx >= 0 ? content.slice(kachelIdx, kachelIdx+300) : '';
+kachelSrc.includes('_isMobile()') && kachelSrc.includes('_nzMobileSheetOpen')
+  ? (ok('_nzKachelOpen: Mobile → Sheet'), f44Ok++) : (fail('_nzKachelOpen: kein Mobile-Zweig'), f44Fail++);
+
+if (f44Fail === 0) ok(f44Ok + ' Termine-Header & Notizen-Sheet Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
