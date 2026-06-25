@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.52</title>
+  <title>WorkBench 3.0.53</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -379,6 +379,23 @@
     .ts-no-events { font-size: 13px; color: var(--faint); padding: 10px 14px; font-style: italic; }
     .ts-storniert { text-decoration: line-through; color: var(--faint); }
     .ts-storniert-badge { font-size: 10px; color: var(--faint); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
+
+    /* ── Tagesheader ── */
+    #ts-tagesheader { background: var(--surface); border-bottom: 1.5px solid var(--border); flex-shrink: 0; }
+    .ts-th-wrap { display: flex; align-items: center; gap: 8px; padding: 8px 14px; }
+    .ts-th-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+    .ts-th-wochentag { font-size: 15px; font-weight: 800; color: var(--text); }
+    .ts-th-sep { font-size: 14px; color: var(--border); }
+    .ts-th-datum { font-size: 14px; color: var(--muted); }
+    .ts-th-kw { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+    .ts-th-sondertag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(241,196,15,.18); color: #856404; border: 1px solid rgba(241,196,15,.4); }
+    /* Mobile: Links Wochentag+Datum, rechts KW+Sondertag */
+    .ts-th-left { display: flex; flex-direction: column; gap: 1px; flex: 1; }
+    .ts-th-right { display: flex; align-items: center; gap: 6px; }
+
+    /* ── Laufender Termin ── */
+    .ts-zt-row.running { background: rgba(142,68,173,.07); border-left: 3px solid #8E44AD; border-radius: 4px; }
+    .ts-running-badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 700; color: #8E44AD; background: rgba(142,68,173,.12); border: 1px solid rgba(142,68,173,.25); border-radius: 8px; padding: 1px 7px; margin-left: 6px; white-space: nowrap; }
 
     /* ── NOTIZEN-TAB ── */
     #sec-notizen { padding: 0; }
@@ -857,7 +874,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.52</div>
+  <div id="wb-startup-tagline">v3.0.53</div>
 </div>
 
 <!-- Modal -->
@@ -1025,7 +1042,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.52</span>
+    <span id="wb-menu-version">v3.0.53</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1205,8 +1222,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.52',
-  APP_BUILD:   '20260626-0200',
+  APP_VERSION: '3.0.53',
+  APP_BUILD:   '20260626-0230',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1346,43 +1363,46 @@ const WB = {
     if (!this.db.wochenMottos)  this.db.wochenMottos  = {};
     if (!this.db.sondertage)    this.db.sondertage    = [];
     if (!this.db._version)      this.db._version      = 1;
-    // ── Migration: wissensnetzwerk[] → notizen[] ──────────────
-    if (this.db.wissensnetzwerk && this.db.wissensnetzwerk.length > 0) {
-      const existingIds = new Set((this.db.notizen||[]).map(n => n.id));
-      let migrated = 0;
-      this.db.wissensnetzwerk.forEach(wk => {
-        if (wk.deleted) return;
-        const newId = existingIds.has(wk.id) ? 'nz_wk_' + wk.id : wk.id;
-        if (existingIds.has(newId)) return; // schon migriert
-        existingIds.add(newId);
-        this.db.notizen.push({
-          id:          newId,
-          titel:       wk.titel   || 'Ohne Titel',
-          typ:         'freitext',
-          farbe:       'c-weiss',
-          icon:        'note',
-          items:       [],
-          inhalt:      wk.inhalt  || '',
-          tags:        wk.tags    || [],
-          link:        wk.link    || '',
-          ts:          wk.ts      || Date.now(),
-          geaendert:   wk.geaendert || '',
-          welt:        wk.welt === 'privat' ? 'privat' : (wk.welt === 'beruf' ? 'beruf' : undefined),
-          zustand:     undefined,
-          gepinnt:     false,
-          vertraulich: false,
-          deleted:     false,
-          updatedAt:   new Date().toISOString(),
-        });
-        migrated++;
+  },
+
+  _migrateWissensnetzwerk() {
+    // Einmalige Migration: wissensnetzwerk[] → notizen[]
+    // Läuft NUR aus idbLoad(), nie aus _syncDownload() oder _ensureDbFields()
+    if (!this.db.wissensnetzwerk || this.db.wissensnetzwerk.length === 0) return;
+    const existingIds = new Set((this.db.notizen||[]).map(n => n.id));
+    let migrated = 0;
+    this.db.wissensnetzwerk.forEach(wk => {
+      if (wk.deleted) return;
+      const newId = existingIds.has(wk.id) ? 'nz_wk_' + wk.id : wk.id;
+      if (existingIds.has(newId)) return; // bereits migriert
+      existingIds.add(newId);
+      this.db.notizen.push({
+        id:          newId,
+        titel:       wk.titel     || 'Ohne Titel',
+        typ:         'freitext',
+        farbe:       'c-weiss',
+        icon:        'note',
+        items:       [],
+        inhalt:      wk.inhalt    || '',
+        tags:        wk.tags      || [],
+        link:        wk.link      || '',
+        ts:          wk.ts        || Date.now(),
+        geaendert:   wk.geaendert || '',
+        welt:        wk.welt === 'privat' ? 'privat' : (wk.welt === 'beruf' ? 'beruf' : undefined),
+        zustand:     undefined,
+        gepinnt:     false,
+        vertraulich: false,
+        deleted:     false,
+        updatedAt:   new Date().toISOString(),
       });
-      if (migrated > 0) {
-        console.log('[migration] wissensnetzwerk→notizen:', migrated, 'Einträge migriert');
-        this.setDirty();
-      }
-      // Altlast entfernen
-      delete this.db.wissensnetzwerk;
+      migrated++;
+    });
+    if (migrated > 0) {
+      console.log('[migration] wissensnetzwerk→notizen:', migrated, 'Einträge migriert');
+      this.setDirty();
     }
+    // Altlast bereinigen
+    delete this.db.wissensnetzwerk;
   },
 
   // ── Layout ───────────────────────────────────────────
@@ -4576,6 +4596,7 @@ const WB = {
       if(dbRaw&&dbRaw._version) {
         this.db=dbRaw;
         this._ensureDbFields();
+        this._migrateWissensnetzwerk(); // einmalig, nur hier — nie in _syncDownload
       } else {
         this.db=this._emptyDb();
       }

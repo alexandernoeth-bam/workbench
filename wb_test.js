@@ -575,6 +575,57 @@ content.includes('flex-wrap:wrap !important')
 
 if (f32Fail === 0) ok(f32Ok + ' Debounce/Vertraulich/Zeitband-Büro Checks bestanden');
 
+// ══════════════════════════════════════════
+// 33. TAGESHEADER CSS + RUNNING-BADGE + MIGRATIONS-ISOLATION
+// ══════════════════════════════════════════
+console.log('\n── 33. Tagesheader, Running-Badge, Migration ──');
+let f33Ok = 0, f33Fail = 0;
+
+// Bug 1a: Tagesheader CSS-Klassen vorhanden
+content.includes('#ts-tagesheader')
+  ? (ok('#ts-tagesheader CSS vorhanden'), f33Ok++) : (fail('#ts-tagesheader CSS fehlt'), f33Fail++);
+content.includes('.ts-th-wrap')
+  ? (ok('.ts-th-wrap CSS vorhanden'), f33Ok++) : (fail('.ts-th-wrap CSS fehlt'), f33Fail++);
+content.includes('.ts-th-kw')
+  ? (ok('.ts-th-kw Pill CSS vorhanden'), f33Ok++) : (fail('.ts-th-kw CSS fehlt'), f33Fail++);
+content.includes('.ts-th-wochentag')
+  ? (ok('.ts-th-wochentag CSS vorhanden'), f33Ok++) : (fail('.ts-th-wochentag CSS fehlt'), f33Fail++);
+content.includes('.ts-th-dot')
+  ? (ok('.ts-th-dot CSS vorhanden'), f33Ok++) : (fail('.ts-th-dot CSS fehlt'), f33Fail++);
+
+// Bug 1b: Running-Badge CSS vorhanden
+content.includes('.ts-zt-row.running')
+  ? (ok('.ts-zt-row.running CSS vorhanden'), f33Ok++) : (fail('.ts-zt-row.running CSS fehlt'), f33Fail++);
+content.includes('.ts-running-badge')
+  ? (ok('.ts-running-badge CSS vorhanden'), f33Ok++) : (fail('.ts-running-badge CSS fehlt'), f33Fail++);
+
+// Bug 2: Migration nur in idbLoad, nicht in _ensureDbFields
+const ensureIdx = content.indexOf('_ensureDbFields() {');
+const ensureSrc = ensureIdx >= 0 ? content.slice(ensureIdx, ensureIdx + 400) : '';
+!ensureSrc.includes('wissensnetzwerk')
+  ? (ok('_ensureDbFields: kein wissensnetzwerk-Code (Migration ausgelagert)'), f33Ok++)
+  : (fail('_ensureDbFields: enthält noch Migration-Code'), f33Fail++);
+
+// _migrateWissensnetzwerk als eigene Funktion
+content.includes('_migrateWissensnetzwerk()')
+  ? (ok('_migrateWissensnetzwerk() definiert'), f33Ok++) : (fail('_migrateWissensnetzwerk() fehlt'), f33Fail++);
+
+// Aufruf nur in idbLoad
+const idbLoadIdx = content.indexOf('async idbLoad()');
+const idbLoadSrc = idbLoadIdx >= 0 ? content.slice(idbLoadIdx, idbLoadIdx + 1500) : '';
+idbLoadSrc.includes('_migrateWissensnetzwerk()')
+  ? (ok('_migrateWissensnetzwerk nur in idbLoad aufgerufen'), f33Ok++)
+  : (fail('_migrateWissensnetzwerk nicht in idbLoad'), f33Fail++);
+
+// _syncDownload darf _migrateWissensnetzwerk NICHT aufrufen
+const syncDlIdx = content.indexOf('async _syncDownload(');
+const syncDlSrc = syncDlIdx >= 0 ? content.slice(syncDlIdx, syncDlIdx + 2000) : '';
+!syncDlSrc.includes('_migrateWissensnetzwerk')
+  ? (ok('_syncDownload: kein _migrateWissensnetzwerk-Aufruf (Datensicherheit)'), f33Ok++)
+  : (fail('_syncDownload ruft _migrateWissensnetzwerk auf — Daten-Verlust-Risiko!'), f33Fail++);
+
+if (f33Fail === 0) ok(f33Ok + ' Tagesheader/Running/Migration Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
