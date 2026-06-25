@@ -397,18 +397,26 @@ jsCode.includes('isDeadline && !b.isDeadline') ? ok('Deadlines ans Sortierende')
 // ══════════════════════════════════════════
 // 28. WIKI-COCKPIT
 // ══════════════════════════════════════════
-console.log('\n── 28. Wiki-Cockpit ──');
-jsCode.includes('_wkRender()')         ? ok('_wkRender() definiert')        : fail('_wkRender fehlt');
-jsCode.includes('_wkSave()')           ? ok('_wkSave() definiert')           : fail('_wkSave fehlt');
-jsCode.includes('_wkDelete()')         ? ok('_wkDelete() definiert')         : fail('_wkDelete fehlt');
-jsCode.includes('_wkOpenModal')        ? ok('_wkOpenModal definiert')        : fail('_wkOpenModal fehlt');
-jsCode.includes('_wkFilteredNodes')    ? ok('_wkFilteredNodes definiert')    : fail('_wkFilteredNodes fehlt');
-jsCode.includes('wissensnetzwerk')     ? ok('wissensnetzwerk in DB')         : fail('wissensnetzwerk fehlt');
-content.includes('id="sec-wiki"')      ? ok('sec-wiki HTML vorhanden')       : fail('sec-wiki fehlt');
-content.includes('id="wk-overlay"')   ? ok('wk-overlay Modal vorhanden')    : fail('wk-overlay fehlt');
-content.includes('id="wk-grid"')       ? ok('wk-grid vorhanden')             : fail('wk-grid fehlt');
-content.includes('data-tab="wiki"')    ? ok('Wiki Tab in Nav')               : fail('Wiki Tab fehlt');
-content.includes('.wk-kachel')          ? ok('wk-kachel CSS')                 : fail('wk-kachel CSS fehlt');
+console.log('\n── 28. Wiki-Migration & Fokus-Limit ──');
+// Wiki-Tab ist entfernt — keine _wk* Funktionen mehr
+!jsCode.includes('_wkRender()')      ? ok('_wkRender entfernt (Wiki migriert)') : fail('_wkRender noch vorhanden');
+!jsCode.includes('_wkSave()')        ? ok('_wkSave entfernt')                   : fail('_wkSave noch vorhanden');
+!content.includes('id="sec-wiki"')   ? ok('sec-wiki HTML entfernt')             : fail('sec-wiki HTML noch vorhanden');
+!content.includes('data-tab="wiki"') ? ok('Wiki-Tab aus Nav entfernt')          : fail('Wiki-Tab noch in Nav');
+// Migration wissensnetzwerk → notizen in _ensureDbFields
+content.includes('wissensnetzwerk') && content.includes('_ensureDbFields')
+  ? ok('wissensnetzwerk-Migration in _ensureDbFields') : fail('Migration fehlt');
+content.includes('nz_wk_')
+  ? ok('ID-Conflict-Handling bei Migration (nz_wk_)') : fail('ID-Conflict-Handling fehlt');
+content.includes("delete this.db.wissensnetzwerk")
+  ? ok('Altlast-Bereinigung: wissensnetzwerk wird gelöscht') : fail('wissensnetzwerk wird nicht gelöscht');
+// Fokus-Limit
+content.includes('Fokus-Limit') && content.includes('aktuellCount >= 3')
+  ? ok('Fokus-Limit 3 implementiert') : fail('Fokus-Limit fehlt');
+content.includes('_nzSetListeZustand') && content.includes('aktuellCount >= 3')
+  ? ok('Fokus-Limit in _nzSetListeZustand') : fail('Fokus-Limit nicht in _nzSetListeZustand');
+content.includes('_nzBearbeitenSpeichern') && content.includes('war_aktuell')
+  ? ok('Fokus-Limit in _nzBearbeitenSpeichern') : fail('Fokus-Limit nicht in _nzBearbeitenSpeichern');
 
 // ══════════════════════════════════════════
 // 29. HEUTE-TAB KACHEL-DETAIL INTERAKTIVITÄT
