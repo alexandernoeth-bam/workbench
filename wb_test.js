@@ -840,7 +840,7 @@ content.includes('_driveNewSheet()')
 
 // Drive API: Dateitypen
 const driveSearchIdx = content.indexOf('_drivePickerSearch(q)');
-const driveSearchSrc = driveSearchIdx >= 0 ? content.slice(driveSearchIdx, driveSearchIdx+1200) : '';
+const driveSearchSrc = driveSearchIdx >= 0 ? content.slice(driveSearchIdx, driveSearchIdx+2000) : '';
 driveSearchSrc.includes('google-apps.document') && driveSearchSrc.includes('google-apps.spreadsheet')
   ? (ok('Drive: Docs + Sheets in Suche'), f37Ok++) : (fail('Drive: Dateitypen fehlen'), f37Fail++);
 driveSearchSrc.includes('application/pdf')
