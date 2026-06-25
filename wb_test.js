@@ -451,6 +451,43 @@ content.includes('const cols = 5;')
 
 if (f29Fail === 0) ok(f29Ok + ' Kachel-Detail Checks bestanden');
 
+// ══════════════════════════════════════════
+// 30. FARBMAP + BÜRO-MODUS FILTER
+// ══════════════════════════════════════════
+console.log('\n── 30. Farbmap & Büro-Modus ──');
+let f30Ok = 0, f30Fail = 0;
+
+// Bug 1: c-lila + c-tuerkis müssen in beiden _nzPostItFarbe Maps stehen
+const lila1 = content.includes("'c-lila':'nz-lila'") || content.includes('"c-lila":"nz-lila"');
+const lila2 = content.includes("'c-lila':'c-lila'")  || content.includes('"c-lila":"c-lila"');
+(lila1 && lila2) ? (ok('c-lila in beiden Farb-Maps'), f30Ok++) : (fail('c-lila fehlt in Farb-Map(s)'), f30Fail++);
+
+const tuerk1 = content.includes("'c-tuerkis':'nz-tuerkis'") || content.includes('"c-tuerkis":"nz-tuerkis"');
+const tuerk2 = content.includes("'c-tuerkis':'c-tuerkis'")  || content.includes('"c-tuerkis":"c-tuerkis"');
+(tuerk1 && tuerk2) ? (ok('c-tuerkis in beiden Farb-Maps'), f30Ok++) : (fail('c-tuerkis fehlt in Farb-Map(s)'), f30Fail++);
+
+// Bug 2: _tsNotizenWorldOk muss bueroModus + vertraulich prüfen
+const nzWorldOkIdx = content.indexOf('_tsNotizenWorldOk(l) {');
+const nzWorldOkSrc = nzWorldOkIdx >= 0 ? content.slice(nzWorldOkIdx, nzWorldOkIdx + 500) : '';
+nzWorldOkSrc.includes('bueroModus')
+  ? (ok('_tsNotizenWorldOk: bueroModus-Check vorhanden'), f30Ok++)
+  : (fail('_tsNotizenWorldOk: bueroModus-Check fehlt'), f30Fail++);
+nzWorldOkSrc.includes('vertraulich')
+  ? (ok('_tsNotizenWorldOk: vertraulich-Check vorhanden'), f30Ok++)
+  : (fail('_tsNotizenWorldOk: vertraulich-Check fehlt'), f30Fail++);
+
+// _itemVisible (letzte Definition) muss bueroModus + vertraulich prüfen
+const ivIdx = content.lastIndexOf('_itemVisible(item)');
+const ivSrc  = ivIdx >= 0 ? content.slice(ivIdx, ivIdx + 600) : '';
+ivSrc.includes('bueroModus')
+  ? (ok('_itemVisible: bueroModus-Check vorhanden'), f30Ok++)
+  : (fail('_itemVisible: bueroModus-Check fehlt'), f30Fail++);
+ivSrc.includes('vertraulich')
+  ? (ok('_itemVisible: vertraulich-Check vorhanden'), f30Ok++)
+  : (fail('_itemVisible: vertraulich-Check fehlt'), f30Fail++);
+
+if (f30Fail === 0) ok(f30Ok + ' Farbmap & Büro-Modus Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');

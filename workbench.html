@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.48</title>
+  <title>WorkBench 3.0.49</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1004,7 +1004,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.48</div>
+  <div id="wb-startup-tagline">v3.0.49</div>
 </div>
 
 <!-- Modal -->
@@ -1172,7 +1172,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.48</span>
+    <span id="wb-menu-version">v3.0.49</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1445,8 +1445,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.48',
-  APP_BUILD:   '20260625-2330',
+  APP_VERSION: '3.0.49',
+  APP_BUILD:   '20260625-2345',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1627,6 +1627,13 @@ const WB = {
     if (!item) return false;
     if (item.deleted) return false;
     const w = item.welt || 'priv';
+    const isBeruf = w === 'pro' || w === 'beruf';
+    const isPriv  = w === 'priv' || w === 'privat';
+    // Büro-Modus: nur Beruf sichtbar, vertraulich niemals
+    if (this._settings?.bueroModus) {
+      if (isPriv) return false;
+      if (item.vertraulich) return false;
+    }
     if (this.activeWorld === 'beruf'  && w !== 'pro')  return false;
     if (this.activeWorld === 'privat' && w !== 'priv') return false;
     return true;
@@ -1905,12 +1912,19 @@ const WB = {
     if (this.activeTab === 'notizen') this.renderNotizenTab();
   },
 
-  // _tsNotizenWorldOk: Welt-Filter für Notizen
+  // _tsNotizenWorldOk: Welt-Filter für Notizen im Heute-Tab
   _tsNotizenWorldOk(l) {
-    if (this.activeWorld === 'beide') return true;
     const w = l.welt || 'beide';
-    if (this.activeWorld === 'beruf')  return w === 'beruf'  || w === 'pro';
-    if (this.activeWorld === 'privat') return w === 'privat' || w === 'priv';
+    const isBeruf = w === 'beruf' || w === 'pro';
+    const isPriv  = w === 'privat' || w === 'priv';
+    // Büro-Modus: nur Beruf sichtbar, vertraulich niemals
+    if (this._settings?.bueroModus) {
+      if (isPriv) return false;
+      if (l.vertraulich) return false;
+    }
+    if (this.activeWorld === 'beide') return true;
+    if (this.activeWorld === 'beruf')  return isBeruf || (!isPriv && !isBeruf);
+    if (this.activeWorld === 'privat') return isPriv  || (!isPriv && !isBeruf);
     return true;
   },
 
@@ -1979,11 +1993,18 @@ const WB = {
   },
 
   _tsNotizenWorldOk(l) {
-    if (this.activeWorld === 'beide') return true;
     const w = l.welt || 'beide';
+    const isBeruf = w === 'beruf' || w === 'pro';
+    const isPriv  = w === 'privat' || w === 'priv';
+    // Büro-Modus: nur Beruf sichtbar, vertraulich niemals
+    if (this._settings?.bueroModus) {
+      if (isPriv) return false;
+      if (l.vertraulich) return false;
+    }
+    if (this.activeWorld === 'beide') return true;
     if (w === 'beide') return true;
-    if (this.activeWorld === 'beruf'  && w === 'beruf')  return true;
-    if (this.activeWorld === 'privat' && w !== 'beruf')  return true;
+    if (this.activeWorld === 'beruf'  && isBeruf) return true;
+    if (this.activeWorld === 'privat' && isPriv)  return true;
     return false;
   },
 
@@ -2137,7 +2158,7 @@ const WB = {
   _nzFtListeId: null,
 
   _nzPostItFarbe(k) {
-    const map = { 'c-gelb':'nz-gelb','c-blau':'nz-blau','c-gruen':'nz-gruen','c-rosa':'nz-rosa','c-weiss':'nz-weiss' };
+    const map = { 'c-gelb':'nz-gelb','c-blau':'nz-blau','c-gruen':'nz-gruen','c-rosa':'nz-rosa','c-weiss':'nz-weiss','c-lila':'nz-lila','c-tuerkis':'nz-tuerkis' };
     return map[k] || 'nz-weiss';
   },
 
@@ -3189,7 +3210,7 @@ const WB = {
 
   // Mappt Notiz-Farben auf Post-it Farben
   _nzPostItFarbe(farbe) {
-    const map = { 'c-gelb':'c-gelb', 'c-gruen':'c-gruen', 'c-blau':'c-blau', 'c-rosa':'c-rosa', 'c-weiss':'c-weiss' };
+    const map = { 'c-gelb':'c-gelb', 'c-gruen':'c-gruen', 'c-blau':'c-blau', 'c-rosa':'c-rosa', 'c-weiss':'c-weiss', 'c-lila':'c-lila', 'c-tuerkis':'c-tuerkis' };
     return map[farbe] || 'c-weiss';
   },
 
