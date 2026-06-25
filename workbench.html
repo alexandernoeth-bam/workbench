@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.50</title>
+  <title>WorkBench 3.0.51</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -961,10 +961,10 @@
     .ts-kd-ok { font-size:11px; font-weight:700; color:var(--accent); cursor:pointer; }
     /* Notizen-Panel rechts */
     #ts-notizen-panel { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; padding:8px 10px; gap:6px; }
-    #ts-notizen-grid { display:flex; flex-direction:column; gap:6px; flex:1; min-height:0; overflow:hidden; }
+    #ts-notizen-grid { display:flex; flex-direction:column; gap:6px; flex:1; min-height:0; overflow-y:auto; }
     .ts-nz-group { display:flex; flex-direction:column; gap:3px; }
     .ts-nz-group-lbl { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); padding-left:1px; }
-    #ts-notizen-panel .ts-nz-grid { display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important; direction:rtl; gap:5px; width:100%; min-width:0; }
+    #ts-notizen-panel .ts-nz-grid { display:flex !important; flex-direction:row !important; flex-wrap:wrap !important; direction:rtl; gap:5px; width:100%; min-width:0; }
     #ts-notizen-panel .ts-nz-mini {  border-radius:7px; direction:ltr; border:1.5px solid var(--border); padding:7px; cursor:pointer; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; transition:transform .1s,box-shadow .1s; flex-shrink:0; }
     .ts-nz-mini:hover { transform:translateY(-1px); box-shadow:0 3px 10px rgba(0,0,0,.13); }
     .ts-nz-mini.active { box-shadow:0 0 0 2.5px var(--accent); }
@@ -990,7 +990,7 @@
     .wb-mobile #ts-notizen-panel { padding:6px 8px; overflow-y:auto; }
     .wb-mobile #ts-notizen-grid { display:flex; flex-direction:column; gap:6px; overflow-y:auto; width:100%; }
     .wb-mobile .ts-nz-group { width:100%; }
-    .wb-mobile #ts-notizen-panel .ts-nz-grid { display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important; direction:rtl; width:100% !important; }
+    .wb-mobile #ts-notizen-panel .ts-nz-grid { display:flex !important; flex-direction:row !important; flex-wrap:wrap !important; direction:rtl; width:100% !important; }
     .wb-mobile #ts-notizen-panel .ts-nz-mini {  }
     .wb-mobile #ts-notizen-grid { overflow-y:auto; gap:8px; }
     /* ts-nz-mini aspect-ratio kept as 1/1 on mobile */
@@ -1004,7 +1004,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.50</div>
+  <div id="wb-startup-tagline">v3.0.51</div>
 </div>
 
 <!-- Modal -->
@@ -1172,7 +1172,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.50</span>
+    <span id="wb-menu-version">v3.0.51</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1445,8 +1445,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.50',
-  APP_BUILD:   '20260626-0015',
+  APP_VERSION: '3.0.51',
+  APP_BUILD:   '20260626-0100',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1860,7 +1860,7 @@ const WB = {
       // Freitext: contenteditable, speichert in l.inhalt
       const inhalt = l.inhalt || '';
       body.innerHTML = '<div id="ts-kd-ft" contenteditable="true" spellcheck="true"'
-        + ' oninput="WB._tsKdFreitextSave()"'
+        + ' oninput="WB._tsKdFreitextInput()"'
         + ' style="outline:none;font-size:14px;line-height:1.6;color:var(--text);'
         + 'font-family:var(--font);padding:4px 2px;min-height:60px;white-space:pre-wrap;">'
         + inhalt + '</div>';
@@ -1931,13 +1931,32 @@ const WB = {
     if (this.activeTab === 'notizen') this.renderNotizenTab();
   },
 
+  _tsKdFreitextInput() {
+    // Debounce: 1.5s nach letzter Eingabe speichern, Editor NICHT neu rendern
+    clearTimeout(this._tsKdFtTimer);
+    this._tsKdFtTimer = setTimeout(() => { this._tsKdFreitextSave(); }, 1500);
+  },
+
   _tsKdFreitextSave() {
     const l = (this.db?.notizen||[]).find(x => x.id === this._tsKachelCurrentId); if (!l) return;
     const ed = document.getElementById('ts-kd-ft'); if (!ed) return;
     l.inhalt = ed.innerHTML;
     l.updatedAt = this._now();
     this.setDirty();
-    this._tsRenderNotizenKompakt();
+    // Mini-Kachel-Preview aktualisieren OHNE den Editor neu zu rendern
+    // Nur die betroffene Mini-Kachel-Vorschau patchen
+    const tmp = document.createElement('div');
+    tmp.innerHTML = l.inhalt;
+    const previewText = tmp.textContent.trim().slice(0, 80);
+    const miniEl = document.getElementById('ts-mini-' + this._tsKachelCurrentId);
+    if (miniEl) {
+      const prev = miniEl.querySelector('.ts-nz-mini-preview');
+      if (prev) prev.textContent = previewText;
+      else if (previewText) {
+        const top = miniEl.querySelector('.ts-nz-mini-top');
+        if (top) top.insertAdjacentHTML('beforeend', '<div class="ts-nz-mini-preview">' + this._esc(previewText) + '</div>');
+      }
+    }
   },
   _tsNotizenWorldOk(l) {
     const w = l.welt || 'beide';
@@ -2085,6 +2104,13 @@ const WB = {
       .filter(e => !e.deleted && e.date === today)
       .filter(e => {
         const w = e.welt || 'priv';
+        const isBeruf = w === 'pro' || w === 'beruf';
+        const isPriv  = w === 'priv' || w === 'privat';
+        // Büro-Modus: nur Beruf, vertraulich nie
+        if (this._settings?.bueroModus) {
+          if (isPriv) return false;
+          if (e.vertraulich) return false;
+        }
         if (this.activeWorld === 'beruf'  && w !== 'pro')  return false;
         if (this.activeWorld === 'privat' && w !== 'priv') return false;
         return true;
@@ -3548,6 +3574,8 @@ const WB = {
       + '<div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding:10px 0;border-top:1px solid var(--border)">'
       + '<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;flex:1">'
       + '<input type="checkbox" id="nz-e-gepinnt"' + (l.gepinnt ? ' checked' : '') + ' style="width:17px;height:17px;accent-color:var(--accent)"> Gepinnt</label>'
+      + '<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;flex:1">'
+      + '<input type="checkbox" id="nz-e-vertraulich"' + (l.vertraulich ? ' checked' : '') + ' style="width:17px;height:17px;accent-color:#C0392B"> Vertraulich</label>'
       + '<button onclick="WB._nzDeleteListe(\'' + this._esc(listeId) + '\');WB.modalClose()" style="padding:5px 12px;border-radius:8px;border:1.5px solid #C0392B;background:none;color:#C0392B;cursor:pointer;font-size:13px;font-weight:700;font-family:var(--font)">Löschen</button>'
       + '</div>';
 
@@ -3581,6 +3609,7 @@ const WB = {
     const typ     = document.getElementById('nz-e-typ')?.value || 'check';
     const zustand = document.getElementById('nz-e-zustand')?.value || 'aktuell';
     const gepinnt = document.getElementById('nz-e-gepinnt')?.checked || false;
+    const vertraulich = document.getElementById('nz-e-vertraulich')?.checked || false;
     const farbe    = document.getElementById('nz-e-farbe')?.value || 'c-weiss';
     const deadline = document.getElementById('nz-e-deadline')?.value || '';
 
@@ -3591,6 +3620,7 @@ const WB = {
     l.farbe    = farbe;
     l.deadline = deadline || null;
     l.gepinnt = gepinnt;
+    l.vertraulich = vertraulich;
     l.updatedAt = this._now();
     if (zustand === 'archiv') {
       this._softDelete(l);

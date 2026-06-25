@@ -436,8 +436,8 @@ content.includes('.ts-kd-chk') && content.includes('width:17px')
   ? (ok('.ts-kd-chk: width 17px (größer)'), f29Ok++) : (fail('.ts-kd-chk: width nicht 17px'), f29Fail++);
 
 // Mini-Kacheln: flex statt grid
-content.includes('display:flex !important') && content.includes('flex-wrap:nowrap !important')
-  ? (ok('ts-nz-grid: display:flex + nowrap'), f29Ok++) : (fail('ts-nz-grid: kein flex/nowrap'), f29Fail++);
+content.includes('display:flex !important') && content.includes('flex-wrap:wrap !important')
+  ? (ok('ts-nz-grid: display:flex + wrap (scrollbar)'), f29Ok++) : (fail('ts-nz-grid: kein flex/wrap'), f29Fail++);
 
 // Welt-Pill ausgeschrieben
 (content.includes('>Beruf</span>') && content.includes('>Privat</span>'))
@@ -528,6 +528,44 @@ content.includes('const cols = 4;')
   ? (ok('JS-Sizing: 4 Spalten'), f31Ok++) : (fail('JS-Sizing: nicht 4 Spalten'), f31Fail++);
 
 if (f31Fail === 0) ok(f31Ok + ' Notiz-Typ Rendering Checks bestanden');
+
+// ══════════════════════════════════════════
+// 32. FREITEXT-DEBOUNCE / VERTRAULICH / ZEITBAND-BÜRO
+// ══════════════════════════════════════════
+console.log('\n── 32. Debounce, Vertraulich, Zeitband-Büro ──');
+let f32Ok = 0, f32Fail = 0;
+
+// Bug 2: Freitext-Input debounced, kein sofortiger re-render
+content.includes('_tsKdFreitextInput')
+  ? (ok('_tsKdFreitextInput Debounce-Handler vorhanden'), f32Ok++) : (fail('_tsKdFreitextInput fehlt'), f32Fail++);
+content.includes('_tsKdFtTimer') && content.includes('clearTimeout')
+  ? (ok('Debounce: clearTimeout + _tsKdFtTimer'), f32Ok++) : (fail('Kein Debounce-Timer'), f32Fail++);
+// Freitext-Save darf NICHT _tsRenderNotizenKompakt aufrufen (würde Editor-Fokus zerstören)
+const ftSaveIdx = content.indexOf('_tsKdFreitextSave()');
+const ftSaveSrc = ftSaveIdx >= 0 ? content.slice(ftSaveIdx, ftSaveIdx + 600) : '';
+!ftSaveSrc.includes('_tsRenderNotizenKompakt')
+  ? (ok('_tsKdFreitextSave: kein _tsRenderNotizenKompakt (kein Fokus-Verlust)'), f32Ok++)
+  : (fail('_tsKdFreitextSave ruft _tsRenderNotizenKompakt auf → Fokus-Verlust'), f32Fail++);
+
+// Bug 3: Vertraulich-Checkbox im Bearbeiten-Dialog
+content.includes('nz-e-vertraulich')
+  ? (ok('Vertraulich-Checkbox #nz-e-vertraulich im Dialog'), f32Ok++) : (fail('Vertraulich-Checkbox fehlt'), f32Fail++);
+content.includes('l.vertraulich = vertraulich')
+  ? (ok('_nzBearbeitenSpeichern: vertraulich wird gespeichert'), f32Ok++) : (fail('vertraulich wird nicht gespeichert'), f32Fail++);
+
+// Bug 4: Zeitband filtert nach Büro-Modus
+const zbIdx = content.indexOf('_tsRenderZeitband() {');
+const zbSrc = zbIdx >= 0 ? content.slice(zbIdx, zbIdx + 3000) : '';
+zbSrc.includes('bueroModus')
+  ? (ok('_tsRenderZeitband: bueroModus-Check vorhanden'), f32Ok++) : (fail('_tsRenderZeitband: bueroModus fehlt'), f32Fail++);
+zbSrc.includes('isPriv') && zbSrc.includes('return false')
+  ? (ok('_tsRenderZeitband: private Termine werden ausgeblendet'), f32Ok++) : (fail('_tsRenderZeitband: isPriv-Check fehlt'), f32Fail++);
+
+// Bug 1: Grid scrollbar (wrap statt nowrap)
+content.includes('flex-wrap:wrap !important')
+  ? (ok('ts-nz-grid: flex-wrap:wrap (scrollbar)'), f32Ok++) : (fail('ts-nz-grid: kein wrap'), f32Fail++);
+
+if (f32Fail === 0) ok(f32Ok + ' Debounce/Vertraulich/Zeitband-Büro Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════
