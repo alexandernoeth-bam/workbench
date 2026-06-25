@@ -800,6 +800,60 @@ content.includes('_tsMiniKachelHtml(')
 
 if (f36Fail === 0) ok(f36Ok + ' Hybrid/HeutePin/Panel Checks bestanden');
 
+// ══════════════════════════════════════════
+// 37. GOOGLE DRIVE PICKER
+// ══════════════════════════════════════════
+console.log('\n── 37. Google Drive Picker ──');
+let f37Ok = 0, f37Fail = 0;
+
+// Scope erweitert
+content.includes('drive.readonly')
+  ? (ok('DRIVE_SCOPE: drive.readonly enthalten'), f37Ok++) : (fail('DRIVE_SCOPE: drive.readonly fehlt'), f37Fail++);
+
+// HTML
+content.includes('id="nz-drive-picker"')
+  ? (ok('#nz-drive-picker HTML vorhanden'), f37Ok++) : (fail('#nz-drive-picker fehlt'), f37Fail++);
+content.includes('id="nz-drive-results"')
+  ? (ok('#nz-drive-results HTML vorhanden'), f37Ok++) : (fail('#nz-drive-results fehlt'), f37Fail++);
+content.includes('id="nz-drive-search-inp"')
+  ? (ok('#nz-drive-search-inp vorhanden'), f37Ok++) : (fail('#nz-drive-search-inp fehlt'), f37Fail++);
+
+// CSS
+content.includes('.nz-drive-btn')
+  ? (ok('.nz-drive-btn CSS'), f37Ok++) : (fail('.nz-drive-btn CSS fehlt'), f37Fail++);
+content.includes('#nz-drive-picker')
+  ? (ok('#nz-drive-picker CSS'), f37Ok++) : (fail('#nz-drive-picker CSS fehlt'), f37Fail++);
+
+// JS-Funktionen
+content.includes('_drivePickerOpen(')
+  ? (ok('_drivePickerOpen() definiert'), f37Ok++) : (fail('_drivePickerOpen() fehlt'), f37Fail++);
+content.includes('_drivePickerClose()')
+  ? (ok('_drivePickerClose() definiert'), f37Ok++) : (fail('_drivePickerClose() fehlt'), f37Fail++);
+content.includes('_drivePickerSearch(')
+  ? (ok('_drivePickerSearch() definiert'), f37Ok++) : (fail('_drivePickerSearch() fehlt'), f37Fail++);
+content.includes('_drivePickerSelect(')
+  ? (ok('_drivePickerSelect() definiert'), f37Ok++) : (fail('_drivePickerSelect() fehlt'), f37Fail++);
+content.includes('_driveNewDoc()')
+  ? (ok('_driveNewDoc() definiert'), f37Ok++) : (fail('_driveNewDoc() fehlt'), f37Fail++);
+content.includes('_driveNewSheet()')
+  ? (ok('_driveNewSheet() definiert'), f37Ok++) : (fail('_driveNewSheet() fehlt'), f37Fail++);
+
+// Drive API: Dateitypen
+const driveSearchIdx = content.indexOf('_drivePickerSearch(q)');
+const driveSearchSrc = driveSearchIdx >= 0 ? content.slice(driveSearchIdx, driveSearchIdx+1200) : '';
+driveSearchSrc.includes('google-apps.document') && driveSearchSrc.includes('google-apps.spreadsheet')
+  ? (ok('Drive: Docs + Sheets in Suche'), f37Ok++) : (fail('Drive: Dateitypen fehlen'), f37Fail++);
+driveSearchSrc.includes('application/pdf')
+  ? (ok('Drive: PDF in Suche'), f37Ok++) : (fail('Drive: PDF fehlt'), f37Fail++);
+driveSearchSrc.includes('webViewLink')
+  ? (ok('Drive: webViewLink in Ergebnissen'), f37Ok++) : (fail('Drive: webViewLink fehlt'), f37Fail++);
+
+// Drive-Button neben Link-Feld
+content.includes("_drivePickerOpen(")
+  ? (ok('Drive-Button im Link-Feld verankert'), f37Ok++) : (fail('Drive-Button fehlt im Link-Feld'), f37Fail++);
+
+if (f37Fail === 0) ok(f37Ok + ' Drive-Picker Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.57</title>
+  <title>WorkBench 3.0.58</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -561,6 +561,25 @@
     .nz-dp-tag-inp { flex: 1; border: none; background: none; outline: none; font-size: 12px; font-family: var(--font); color: var(--text); min-width: 0; }
     .nz-dp-link-inp { flex: 1; border: none; background: none; outline: none; font-size: 12px; font-family: var(--font); color: var(--accent); min-width: 0; text-decoration: underline; }
     .nz-dp-link-inp::placeholder { color: var(--faint); text-decoration: none; font-style: italic; }
+
+    /* Drive Picker */
+    .nz-drive-btn { padding: 2px 6px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; font-size: 11px; color: var(--muted); flex-shrink: 0; white-space: nowrap; }
+    .nz-drive-btn:hover { border-color: var(--accent); color: var(--accent); }
+    #nz-drive-picker { display:none; position:absolute; right:0; top:100%; width:min(320px,90vw); background:var(--surface); border:1.5px solid var(--border); border-radius:10px; z-index:300; box-shadow:0 6px 24px rgba(0,0,0,.18); overflow:hidden; }
+    #nz-drive-picker.open { display:flex; flex-direction:column; }
+    .nz-drive-search-row { display:flex; align-items:center; gap:6px; padding:8px 10px; border-bottom:1px solid var(--border); background:var(--surface2); }
+    .nz-drive-search-inp { flex:1; border:1.5px solid var(--border); border-radius:8px; padding:4px 8px; font-size:12px; font-family:var(--font); background:var(--surface); color:var(--text); outline:none; }
+    .nz-drive-search-inp:focus { border-color:var(--accent); }
+    .nz-drive-results { max-height:200px; overflow-y:auto; }
+    .nz-drive-item { display:flex; align-items:center; gap:8px; padding:7px 10px; cursor:pointer; border-bottom:.5px solid var(--border); font-size:12px; }
+    .nz-drive-item:hover { background:var(--surface2); }
+    .nz-drive-item:last-child { border-bottom:none; }
+    .nz-drive-icon { font-size:14px; flex-shrink:0; width:18px; text-align:center; }
+    .nz-drive-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); }
+    .nz-drive-footer { display:flex; gap:0; border-top:1px solid var(--border); background:var(--surface2); }
+    .nz-drive-new-btn { flex:1; padding:7px 10px; font-size:11px; font-weight:700; cursor:pointer; border:none; background:none; color:var(--accent); font-family:var(--font); text-align:left; }
+    .nz-drive-new-btn:hover { background:rgba(10,107,94,.06); }
+    .nz-drive-empty { padding:12px 10px; font-size:12px; color:var(--faint); font-style:italic; text-align:center; }
     .nz-dp-toggle { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: var(--font); border: 1.5px solid var(--border); background: none; color: var(--muted); }
     .nz-dp-toggle.on { border-color: #C0392B; background: #C0392B; color: #fff; }
     .nz-dp-deadline-inp { border: none; background: none; outline: none; font-size: 12px; font-family: var(--font); color: var(--text); cursor: pointer; }
@@ -963,7 +982,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.57</div>
+  <div id="wb-startup-tagline">v3.0.58</div>
 </div>
 
 <!-- Modal -->
@@ -1131,7 +1150,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.57</span>
+    <span id="wb-menu-version">v3.0.58</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1262,7 +1281,22 @@
             <button class="nz-dp-settings" onclick="WB._nzDetailSettings()" title="Einstellungen">⚙</button>
           </div>
           <!-- Meta-Bereich: Farbe, Welt, Tags, Link, Vertraulich, Deadline -->
-          <div class="nz-dp-meta" id="nz-dp-meta"></div>
+          <div class="nz-dp-meta" id="nz-dp-meta" style="position:relative;">
+            <!-- Drive-Picker Dropdown (absolut) -->
+            <div id="nz-drive-picker">
+              <div class="nz-drive-search-row">
+                <input id="nz-drive-search-inp" class="nz-drive-search-inp" placeholder="🔍 Datei suchen..." oninput="WB._drivePickerSearch(this.value)">
+                <button onclick="WB._drivePickerClose()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--faint);">×</button>
+              </div>
+              <div class="nz-drive-results" id="nz-drive-results">
+                <div class="nz-drive-empty">Tippe um zu suchen...</div>
+              </div>
+              <div class="nz-drive-footer">
+                <button class="nz-drive-new-btn" onclick="WB._driveNewDoc()">📄 Neues Google Doc</button>
+                <button class="nz-drive-new-btn" onclick="WB._driveNewSheet()">📊 Neues Google Sheet</button>
+              </div>
+            </div>
+          </div>
           <div class="nz-dp-body" id="nz-dp-body"></div>
           <div class="nz-dp-foot" id="nz-dp-foot">
             <span class="nz-dp-plus">+</span>
@@ -1370,13 +1404,13 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.57',
-  APP_BUILD:   '20260626-0800',
+  APP_VERSION: '3.0.58',
+  APP_BUILD:   '20260626-0930',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
   UPLOAD_API:  'https://www.googleapis.com/upload/drive/v3',
-  DRIVE_SCOPE: 'https://www.googleapis.com/auth/drive.file',
+  DRIVE_SCOPE: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly',
   DEFAULT_CLIENT_ID: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
 
   // ── State ────────────────────────────────────────────
@@ -2920,7 +2954,8 @@ const WB = {
       +   ' onchange="WB._nzDetailSetTags(\'' + id + '\',this.value)"></div>'
       + '<div class="nz-dp-meta-row"><span class="nz-dp-meta-lbl">Link</span>'
       +   '<input class="nz-dp-link-inp" type="url" placeholder="https://..." value="' + this._esc(linkVal) + '"'
-      +   ' onchange="WB._nzDetailSetLink(\'' + id + '\',this.value)"></div>'
+      +   ' onchange="WB._nzDetailSetLink(\'' + id + '\',this.value)">'
+      +   '<button class="nz-drive-btn" onclick="WB._drivePickerOpen(\'' + id + '\')" title="Google Drive durchsuchen">Drive …</button></div>'
       + '<div class="nz-dp-meta-row"><span class="nz-dp-meta-lbl">Deadline</span>'
       +   '<input class="nz-dp-deadline-inp" type="date" value="' + this._esc(dl) + '"'
       +   ' onchange="WB._nzDetailSetDeadline(\'' + id + '\',this.value)">'
@@ -3066,6 +3101,98 @@ const WB = {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     l.vertraulich = !l.vertraulich; l.updatedAt = this._now(); this.setDirty();
     this._nzDetailOpen(listeId, true); this.renderNotizenTab();
+  },
+
+  // ── Google Drive Picker ──────────────────────────────────────────
+  _drivePickerListeId: null,
+  _drivePickerTimer:   null,
+
+  _drivePickerOpen(listeId) {
+    this._drivePickerListeId = listeId;
+    const picker = document.getElementById('nz-drive-picker');
+    if (!picker) return;
+    picker.classList.add('open');
+    setTimeout(() => document.getElementById('nz-drive-search-inp')?.focus(), 50);
+    // Klick außerhalb schließt
+    setTimeout(() => {
+      const close = (e) => {
+        if (!picker.contains(e.target)) { this._drivePickerClose(); document.removeEventListener('click', close); }
+      };
+      document.addEventListener('click', close);
+    }, 100);
+  },
+
+  _drivePickerClose() {
+    document.getElementById('nz-drive-picker')?.classList.remove('open');
+    const inp = document.getElementById('nz-drive-search-inp');
+    if (inp) inp.value = '';
+    this._drivePickerListeId = null;
+  },
+
+  async _drivePickerSearch(q) {
+    clearTimeout(this._drivePickerTimer);
+    const res = document.getElementById('nz-drive-results');
+    if (!res) return;
+    if (!q.trim()) {
+      res.innerHTML = '<div class="nz-drive-empty">Tippe um zu suchen...</div>';
+      return;
+    }
+    res.innerHTML = '<div class="nz-drive-empty">Suche...</div>';
+    this._drivePickerTimer = setTimeout(async () => {
+      try {
+        const token = await this._oauthGetToken(false);
+        if (!token) { res.innerHTML = '<div class="nz-drive-empty">Bitte zuerst mit Google verbinden.</div>'; return; }
+        const mimeFilter = [
+          "mimeType='application/vnd.google-apps.document'",
+          "mimeType='application/vnd.google-apps.spreadsheet'",
+          "mimeType='application/pdf'",
+        ].join(' or ');
+        const query = encodeURIComponent(`name contains '${q.replace(/'/g,"\\'")}' and (${mimeFilter}) and trashed=false`);
+        const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,mimeType,webViewLink,modifiedTime)&pageSize=10&orderBy=modifiedTime+desc`;
+        const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+        if (!r.ok) throw new Error('Drive API: ' + r.status);
+        const data = await r.json();
+        const files = data.files || [];
+        if (!files.length) {
+          res.innerHTML = '<div class="nz-drive-empty">Keine Dateien gefunden</div>';
+          return;
+        }
+        const icons = {
+          'application/vnd.google-apps.document':    '📄',
+          'application/vnd.google-apps.spreadsheet': '📊',
+          'application/pdf':                         '📕',
+        };
+        res.innerHTML = files.map(f =>
+          '<div class="nz-drive-item" onclick="WB._drivePickerSelect(\'' + this._esc(f.id) + '\',\'' + this._esc(f.webViewLink) + '\',\'' + this._esc(f.name) + '\')">'
+          + '<span class="nz-drive-icon">' + (icons[f.mimeType] || '📁') + '</span>'
+          + '<span class="nz-drive-name">' + this._esc(f.name) + '</span>'
+          + '</div>'
+        ).join('');
+      } catch(e) {
+        res.innerHTML = '<div class="nz-drive-empty">Fehler: ' + this._esc(e.message) + '</div>';
+      }
+    }, 400);
+  },
+
+  _drivePickerSelect(fileId, webViewLink, name) {
+    const listeId = this._drivePickerListeId; if (!listeId) return;
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    l.link = webViewLink;
+    l.updatedAt = this._now();
+    this.setDirty();
+    this._drivePickerClose();
+    this._nzDetailOpen(listeId, true);
+    this._toast('🔗 ' + name + ' verknüpft');
+  },
+
+  _driveNewDoc() {
+    window.open('https://docs.new', '_blank');
+    this._drivePickerClose();
+  },
+
+  _driveNewSheet() {
+    window.open('https://sheets.new', '_blank');
+    this._drivePickerClose();
   },
 
   // ── Notizen Detail-Panel (identisch zu Heute-Tab) ────────────────
