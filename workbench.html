@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.56</title>
+  <title>WorkBench 3.0.57</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -497,7 +497,7 @@
     .nz-kachel-add { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: var(--font); }
 
     /* ── Notizen Tab: Dreispalten-Layout ── */
-    #nz-layout { display: flex; flex-direction: row; flex: 1; min-height: 0; overflow: hidden; }
+    #nz-layout { display: flex; flex-direction: row; flex: 1; min-height: 0; overflow: hidden; position: relative; }
 
     /* Linke Sidebar */
     #nz-sidebar {
@@ -529,12 +529,16 @@
 
     /* Rechtes Detail-Panel */
     #nz-detail-panel {
-      width: 0; flex-shrink: 0; overflow: hidden;
+      position: absolute; right: 0; top: 0; bottom: 0;
+      width: 0; overflow: hidden;
       border-left: 1.5px solid var(--border);
-      display: flex; flex-direction: column; min-height: 0;
+      display: flex; flex-direction: column;
       transition: width .2s ease;
+      z-index: 100;
+      background: var(--surface);
+      box-shadow: -4px 0 20px rgba(0,0,0,.12);
     }
-    #nz-detail-panel.open { width: 30%; min-width: 280px; }
+    #nz-detail-panel.open { width: 60%; }
     .nz-dp-head {
       display: flex; align-items: center; gap: 7px;
       padding: 9px 11px; border-bottom: 1px solid rgba(0,0,0,.1);
@@ -959,7 +963,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.56</div>
+  <div id="wb-startup-tagline">v3.0.57</div>
 </div>
 
 <!-- Modal -->
@@ -1127,7 +1131,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.56</span>
+    <span id="wb-menu-version">v3.0.57</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1169,12 +1173,6 @@
           </div>
           <!-- Rechts 2/3: Kompakte Notizen Grid -->
           <div id="ts-notizen-panel">
-            <!-- Temporär pinnen: Suchzeile -->
-            <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface);">
-              <input id="ts-heute-search" type="search" placeholder="📍 Notiz für heute suchen..." oninput="WB._tsHeutePinSearch(this.value)"
-                style="flex:1;border:1.5px solid var(--border);border-radius:14px;padding:3px 10px;font-size:12px;background:var(--surface2);color:var(--text);outline:none;font-family:var(--font);">
-              <div id="ts-heute-search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;z-index:500;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.12);"></div>
-            </div>
             <div id="ts-notizen-grid"></div>
           </div>
         </div>
@@ -1372,8 +1370,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.56',
-  APP_BUILD:   '20260626-0600',
+  APP_VERSION: '3.0.57',
+  APP_BUILD:   '20260626-0800',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1733,36 +1731,26 @@ const WB = {
   _tsRenderNotizenKompakt() {
     const grid = document.getElementById('ts-notizen-grid');
     if (!grid) return;
-    const zustandOrder = ['aktuell','parkplatz','kompass'];
-    const zustandLabel = { aktuell:'Fokus', parkplatz:'Parkplatz', kompass:'Kompass' };
-    const gepinnt   = (this.db?.notizen||[]).filter(l => !l.deleted && l.gepinnt    && this._tsNotizenWorldOk(l));
-    const heutePins = (this.db?.notizen||[]).filter(l => !l.deleted && l.heutePin   && !l.gepinnt && this._tsNotizenWorldOk(l));
-    // Nach Zustand gruppieren
-    const groups = {};
-    gepinnt.forEach(l => {
-      const z = l.zustand || 'aktuell';
-      if (!groups[z]) groups[z] = [];
-      groups[z].push(l);
-    });
+    const heutePins = (this.db?.notizen||[]).filter(l => !l.deleted && l.heutePin && this._tsNotizenWorldOk(l));
+    const gepinnt   = (this.db?.notizen||[]).filter(l => !l.deleted && l.gepinnt  && !l.heutePin && this._tsNotizenWorldOk(l));
     let h = '';
-    // Heute-Pins zuerst (eigene Gruppe, temporär)
+    // Gruppe 1: Temporär (heutePin)
     if (heutePins.length) {
       h += '<div class="ts-nz-group">';
-      h += '<div class="ts-nz-group-lbl" style="display:flex;align-items:center;gap:4px;">📍 Heute<span style="font-size:9px;color:var(--faint);font-weight:400;margin-left:4px;">temporär</span></div>';
+      h += '<div class="ts-nz-group-lbl">⏱ Temporär</div>';
       h += '<div class="ts-nz-grid" style="display:flex;flex-direction:row;flex-wrap:wrap;direction:rtl;gap:5px;width:100%;">';
       heutePins.forEach(l => { h += this._tsMiniKachelHtml(l); });
       h += '</div></div>';
     }
-    // Gepinnte nach Zustand
-    zustandOrder.forEach(z => {
-      if (!groups[z] || !groups[z].length) return;
+    // Gruppe 2: Fokus (gepinnt)
+    if (gepinnt.length) {
       h += '<div class="ts-nz-group">';
-      h += '<div class="ts-nz-group-lbl">' + zustandLabel[z] + '</div>';
+      h += '<div class="ts-nz-group-lbl">★ Fokus</div>';
       h += '<div class="ts-nz-grid" style="display:flex;flex-direction:row;flex-wrap:wrap;direction:rtl;gap:5px;width:100%;">';
-      groups[z].forEach(l => { h += this._tsMiniKachelHtml(l); });
+      gepinnt.forEach(l => { h += this._tsMiniKachelHtml(l); });
       h += '</div></div>';
-    });
-    if (!h) h = '<div style="padding:12px;font-size:11px;color:var(--faint);">Keine angepinnten Notizen</div>';
+    }
+    if (!h) h = '<div style="padding:12px;font-size:11px;color:var(--faint);">Keine Notizen für heute — Notizen anpinnen oder temporär hinzufügen</div>';
     grid.innerHTML = h;
     // Quadratische Kacheln
     requestAnimationFrame(() => {
@@ -2390,7 +2378,7 @@ const WB = {
   _nzTogglePin(listeId) {
     const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
     const gepinnt = (this.db.notizen||[]).filter(x=>!x.deleted&&x.gepinnt);
-    if (!l.gepinnt && gepinnt.length >= 3) { this._toast('Max. 3 Notizen anpinnen'); return; }
+    if (!l.gepinnt && gepinnt.length >= 4) { this._toast('⚠ Maximal 4 Notizen anpinnen'); return; }
     l.gepinnt = !l.gepinnt; l.updatedAt = this._now();
     this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
     this._tsRenderTagesheader();
@@ -2805,16 +2793,14 @@ const WB = {
 
   _tsHeutePinAdd(listeId) {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const heutePins = (this.db.notizen||[]).filter(x => !x.deleted && x.heutePin);
+    if (heutePins.length >= 2) { this._toast('⚠ Maximal 2 temporäre Heute-Notizen'); return; }
     l.heutePin = true;
+    l.heutePinDate = this._dStr(new Date());
     l.updatedAt = this._now();
     this.setDirty();
-    // Suchfeld leeren + Dropdown schließen
-    const inp = document.getElementById('ts-heute-search');
-    const res = document.getElementById('ts-heute-search-results');
-    if (inp) inp.value = '';
-    if (res) res.style.display = 'none';
     this._tsRenderNotizenKompakt();
-    this._toast('📍 ' + l.titel + ' für heute angezeigt');
+    this._toast('⏱ ' + l.titel + ' für heute angezeigt');
   },
 
   _tsHeutePinRemove(listeId) {
@@ -2906,6 +2892,26 @@ const WB = {
         : '<span class="nz-dp-deadline-days ' + cls + '">' + info.days + ' ' + info.unit + ' noch</span>';
     }
 
+    const isPin   = !!l.gepinnt;
+    const isHeute = !!l.heutePin;
+
+    // Backlinks: andere Notizen die mit dieser verknüpft sind
+    const allNz   = (this.db?.notizen||[]).filter(n => !n.deleted && n.id !== l.id);
+    const linked  = (l.backlinks||[]).map(bid => allNz.find(n => n.id === bid)).filter(Boolean);
+    const linkedH = linked.length
+      ? linked.map(n => '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 8px;border-radius:10px;'
+          + 'border:1.5px solid var(--border);font-size:11px;background:var(--surface);margin:2px 2px 0 0;">'
+          + '<span onclick="WB._nzDetailOpen(\'' + this._esc(n.id) + '\')" style="cursor:pointer;color:var(--accent)">↗ ' + this._esc(n.titel) + '</span>'
+          + '<span onclick="WB._nzDetailBlRemove(\'' + id + '\',\'' + this._esc(n.id) + '\')" style="cursor:pointer;color:var(--faint);margin-left:2px;font-size:13px;line-height:1;">×</span>'
+          + '</span>').join('')
+      : '<span style="font-size:11px;color:var(--faint);font-style:italic;">Keine</span>';
+
+    // Backlink-Suche
+    const blSearchH = '<input id="nz-dp-bl-search" class="nz-dp-tag-inp" placeholder="Notiz verknüpfen..." '
+      + 'oninput="WB._nzDetailBlSearch(this.value,\'' + id + '\')" '
+      + 'style="flex:1;font-size:11px;">'
+      + '<div id="nz-dp-bl-results" style="display:none;position:absolute;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;z-index:200;max-height:150px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.12);left:68px;right:10px;top:calc(100% + 2px);"></div>';
+
     return ''
       + '<div class="nz-dp-meta-row"><span class="nz-dp-meta-lbl">Farbe</span>' + farbDots + '</div>'
       + '<div class="nz-dp-meta-row"><span class="nz-dp-meta-lbl">Welt</span>' + weltBtns + '</div>'
@@ -2919,9 +2925,17 @@ const WB = {
       +   '<input class="nz-dp-deadline-inp" type="date" value="' + this._esc(dl) + '"'
       +   ' onchange="WB._nzDetailSetDeadline(\'' + id + '\',this.value)">'
       +   dlDays + '</div>'
-      + '<div class="nz-dp-meta-row"><span class="nz-dp-meta-lbl">Optionen</span>'
-      +   '<button class="nz-dp-toggle' + (isVert ? ' on' : '') + '"'
-      +   ' onclick="WB._nzDetailToggleVert(\'' + id + '\')">🔒 Vertraulich</button></div>';
+      + '<div class="nz-dp-meta-row" style="flex-wrap:wrap;gap:4px;"><span class="nz-dp-meta-lbl">Optionen</span>'
+      +   '<button class="nz-dp-toggle' + (isVert  ? ' on' : '') + '" onclick="WB._nzDetailToggleVert(\'' + id + '\')">🔒 Vertraulich</button>'
+      +   '<button class="nz-dp-toggle' + (isPin   ? ' on' : '') + '" style="' + (isPin ? 'border-color:var(--accent);background:var(--accent);' : '') + '" onclick="WB._nzDetailTogglePin(\'' + id + '\')">📌 Fokus</button>'
+      +   '<button class="nz-dp-toggle' + (isHeute ? ' on' : '') + '" style="' + (isHeute ? 'border-color:#8E44AD;background:#8E44AD;' : '') + '" onclick="WB._nzDetailToggleHeute(\'' + id + '\')">⏱ Heute</button>'
+      + '</div>'
+      + '<div class="nz-dp-meta-row" style="flex-wrap:wrap;align-items:flex-start;position:relative;"><span class="nz-dp-meta-lbl" style="margin-top:4px;">Verknüpft</span>'
+      +   '<div style="flex:1;min-width:0;">'
+      +     '<div style="display:flex;flex-wrap:wrap;">' + linkedH + '</div>'
+      +     '<div style="display:flex;align-items:center;gap:4px;margin-top:4px;position:relative;">' + blSearchH + '</div>'
+      +   '</div>'
+      + '</div>';
   },
 
   _nzDetailDeadlineDays(dlStr, welt) {
@@ -2972,6 +2986,80 @@ const WB = {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     l.deadline = dl || null; l.updatedAt = this._now(); this.setDirty();
     this._nzDetailOpen(listeId, true); this.renderNotizenTab();
+  },
+
+  _nzDetailTogglePin(listeId) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const gepinnt = (this.db.notizen||[]).filter(x => !x.deleted && x.gepinnt);
+    if (!l.gepinnt && gepinnt.length >= 4) { this._toast('⚠ Maximal 4 Notizen anpinnen'); return; }
+    l.gepinnt = !l.gepinnt; l.updatedAt = this._now(); this.setDirty();
+    this._nzDetailOpen(listeId, true); this.renderNotizenTab();
+    if (this.activeTab === 'tagessicht') this._tsRenderNotizenKompakt();
+  },
+
+  _nzDetailToggleHeute(listeId) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    if (!l.heutePin) {
+      const heutePins = (this.db.notizen||[]).filter(x => !x.deleted && x.heutePin);
+      if (heutePins.length >= 2) { this._toast('⚠ Maximal 2 temporäre Heute-Notizen'); return; }
+      l.heutePin = true;
+      l.heutePinDate = this._dStr(new Date());
+    } else {
+      l.heutePin = false; l.heutePinDate = null;
+    }
+    l.updatedAt = this._now(); this.setDirty();
+    this._nzDetailOpen(listeId, true); this.renderNotizenTab();
+    if (this.activeTab === 'tagessicht') this._tsRenderNotizenKompakt();
+  },
+
+  _nzDetailBlSearch(q, listeId) {
+    const res = document.getElementById('nz-dp-bl-results');
+    if (!res) return;
+    if (!q.trim()) { res.style.display = 'none'; return; }
+    const lower = q.toLowerCase();
+    const cur = (this.db?.notizen||[]).find(x => x.id === listeId);
+    const alreadyLinked = new Set(cur?.backlinks||[]);
+    const matches = (this.db?.notizen||[]).filter(l =>
+      !l.deleted && l.id !== listeId && !alreadyLinked.has(l.id) &&
+      (l.titel||'').toLowerCase().includes(lower)
+    ).slice(0, 6);
+    if (!matches.length) { res.style.display = 'none'; return; }
+    res.innerHTML = matches.map(n =>
+      '<div onclick="WB._nzDetailBlAdd(\'' + this._esc(listeId) + '\',\'' + this._esc(n.id) + '\')" '
+      + 'style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:.5px solid var(--border);" '
+      + 'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+      + this._esc(n.titel) + '</div>'
+    ).join('');
+    res.style.display = 'block';
+  },
+
+  _nzDetailBlAdd(fromId, toId) {
+    const from = (this.db?.notizen||[]).find(x => x.id === fromId); if (!from) return;
+    const to   = (this.db?.notizen||[]).find(x => x.id === toId);   if (!to)   return;
+    // Bidirektional
+    if (!from.backlinks) from.backlinks = [];
+    if (!to.backlinks)   to.backlinks   = [];
+    if (!from.backlinks.includes(toId))   from.backlinks.push(toId);
+    if (!to.backlinks.includes(fromId))   to.backlinks.push(fromId);
+    from.updatedAt = to.updatedAt = this._now();
+    this.setDirty();
+    // Suchfeld leeren
+    const inp = document.getElementById('nz-dp-bl-search');
+    const res = document.getElementById('nz-dp-bl-results');
+    if (inp) inp.value = '';
+    if (res) res.style.display = 'none';
+    this._nzDetailOpen(fromId, true);
+  },
+
+  _nzDetailBlRemove(fromId, toId) {
+    const from = (this.db?.notizen||[]).find(x => x.id === fromId); if (!from) return;
+    const to   = (this.db?.notizen||[]).find(x => x.id === toId);
+    // Bidirektional entfernen
+    if (from.backlinks) from.backlinks = from.backlinks.filter(id => id !== toId);
+    if (to?.backlinks)  to.backlinks   = to.backlinks.filter(id => id !== fromId);
+    from.updatedAt = this._now(); if (to) to.updatedAt = this._now();
+    this.setDirty();
+    this._nzDetailOpen(fromId, true);
   },
 
   _nzDetailToggleVert(listeId) {
@@ -3683,8 +3771,8 @@ const WB = {
     const listen = this._nzGetListen();
     const gepinntAnzahl = listen.filter(l => l.gepinnt).length;
     const l = listen.find(x => x.id === listeId); if (!l) return;
-    if (!l.gepinnt && gepinntAnzahl >= 3) {
-      this._toast('Max. 3 Listen k\u00f6nnen gepinnt werden');
+    if (!l.gepinnt && gepinntAnzahl >= 4) {
+      this._toast('⚠ Maximal 4 Notizen anpinnen');
       return;
     }
     l.gepinnt = !l.gepinnt;
@@ -5098,8 +5186,13 @@ const WB = {
         this.db=dbRaw;
         this._ensureDbFields();
         this._migrateWissensnetzwerk(); // einmalig, nur hier — nie in _syncDownload
-        // heutePin ist temporär — beim Start löschen
-        (this.db.notizen||[]).forEach(n => { if(n.heutePin) { n.heutePin = false; } });
+        // heutePin: zurücksetzen bei Tageswechsel (nicht Session-Ende)
+        const today = this._dStr(new Date());
+        (this.db.notizen||[]).forEach(n => {
+          if (n.heutePin && n.heutePinDate && n.heutePinDate !== today) {
+            n.heutePin = false; n.heutePinDate = null;
+          }
+        });
       } else {
         this.db=this._emptyDb();
       }

@@ -734,9 +734,9 @@ if (f35Fail === 0) ok(f35Ok + ' Detail-Meta/Filter Checks bestanden');
 console.log('\n── 36. Hybrid, HeutePin, Panel-Breite ──');
 let f36Ok = 0, f36Fail = 0;
 
-// Panel 30% Breite
-content.includes('#nz-detail-panel.open { width: 30%')
-  ? (ok('Detail-Panel: 30% Breite'), f36Ok++) : (fail('Detail-Panel: nicht 30% Breite'), f36Fail++);
+// Panel 60% floating
+content.includes('#nz-detail-panel.open { width: 60%')
+  ? (ok('Detail-Panel: 60% floating'), f36Ok++) : (fail('Detail-Panel: nicht 60% floating'), f36Fail++);
 
 // Body in Notizfarbe
 content.includes("bodyEl2.style.background = bg")
@@ -750,33 +750,53 @@ const hybSrc2 = hybIdx2 >= 0 ? content.slice(hybIdx2, hybIdx2+1500) : '';
 hybSrc2.includes("ctx === 'ts'") && hybSrc2.includes('nz-dp-ft')
   ? (ok('_renderHybridBody: ctx-Parameter (ts/nz)'), f36Ok++) : (fail('_renderHybridBody: kein ctx-Parameter'), f36Fail++);
 hybSrc2.includes('Checkliste') && hybSrc2.includes('Freitext')
-  ? (ok('Hybrid: beide Sektionen "Checkliste" + "Freitext"'), f36Ok++) : (fail('Hybrid: Sektionen fehlen'), f36Fail++);
+  ? (ok('Hybrid: beide Sektionen'), f36Ok++) : (fail('Hybrid: Sektionen fehlen'), f36Fail++);
 
-// heutePin: temporäres Pinnen
+// heutePin: Tageswechsel-Reset + Limit 2
 content.includes('heutePin')
   ? (ok('heutePin Feld verwendet'), f36Ok++) : (fail('heutePin fehlt'), f36Fail++);
+content.includes('heutePinDate')
+  ? (ok('heutePinDate: Tages-Reset'), f36Ok++) : (fail('heutePinDate fehlt'), f36Fail++);
 content.includes('_tsHeutePinAdd(')
   ? (ok('_tsHeutePinAdd() definiert'), f36Ok++) : (fail('_tsHeutePinAdd() fehlt'), f36Fail++);
 content.includes('_tsHeutePinRemove(')
   ? (ok('_tsHeutePinRemove() definiert'), f36Ok++) : (fail('_tsHeutePinRemove() fehlt'), f36Fail++);
-content.includes('_tsHeutePinSearch(')
-  ? (ok('_tsHeutePinSearch() definiert'), f36Ok++) : (fail('_tsHeutePinSearch() fehlt'), f36Fail++);
 
-// heutePin beim Start löschen (Session-scoped)
+// heutePin Tageswechsel-Reset in idbLoad
 const idbLIdx2 = content.indexOf('async idbLoad()');
 const idbLSrc2 = idbLIdx2 >= 0 ? content.slice(idbLIdx2, idbLIdx2+1800) : '';
-idbLSrc2.includes('heutePin')
-  ? (ok('heutePin: beim Start gelöscht (idbLoad)'), f36Ok++) : (fail('heutePin: kein Start-Reset in idbLoad'), f36Fail++);
+(idbLSrc2.includes('heutePinDate') && idbLSrc2.includes('!== today'))
+  ? (ok('heutePin: Tageswechsel-Reset in idbLoad'), f36Ok++) : (fail('heutePin: kein Tageswechsel-Reset'), f36Fail++);
 
-// Heute-Suchzeile im HTML
-content.includes('id="ts-heute-search"')
-  ? (ok('#ts-heute-search Suchleiste im HTML'), f36Ok++) : (fail('#ts-heute-search fehlt'), f36Fail++);
-content.includes('id="ts-heute-search-results"')
-  ? (ok('#ts-heute-search-results Dropdown im HTML'), f36Ok++) : (fail('#ts-heute-search-results fehlt'), f36Fail++);
+// Pin-Limit 4
+const pinTogIdx2 = content.indexOf('_nzTogglePin(listeId)');
+const pinTogSrc2 = pinTogIdx2 >= 0 ? content.slice(pinTogIdx2, pinTogIdx2+300) : '';
+pinTogSrc2.includes('>= 4')
+  ? (ok('Pin-Limit: 4'), f36Ok++) : (fail('Pin-Limit: nicht 4'), f36Fail++);
 
-// _tsMiniKachelHtml ausgelagert
+// Heute-Tab: zwei Gruppen
+(content.includes('Temporär') && content.includes('Fokus'))
+  ? (ok('Heute-Tab: Gruppen Temporär + Fokus'), f36Ok++) : (fail('Heute-Tab: Gruppen fehlen'), f36Fail++);
+
+// Keine Suchleiste
+!content.includes('id="ts-heute-search"')
+  ? (ok('Suchleiste entfernt'), f36Ok++) : (fail('Suchleiste noch vorhanden'), f36Fail++);
+
+// Backlinks
+content.includes('_nzDetailBlAdd(') && content.includes('_nzDetailBlRemove(')
+  ? (ok('Backlink-Funktionen definiert'), f36Ok++) : (fail('Backlink-Funktionen fehlen'), f36Fail++);
+const blAddIdx2 = content.indexOf('_nzDetailBlAdd(fromId,');
+const blAddSrc2 = blAddIdx2 >= 0 ? content.slice(blAddIdx2, blAddIdx2+400) : '';
+blAddSrc2.includes('from.backlinks') && blAddSrc2.includes('to.backlinks')
+  ? (ok('Backlinks: bidirektional'), f36Ok++) : (fail('Backlinks: nicht bidirektional'), f36Fail++);
+
+// Toggle Fokus + Heute im Meta
+content.includes('_nzDetailTogglePin(') && content.includes('_nzDetailToggleHeute(')
+  ? (ok('Meta: Toggle Fokus + Heute'), f36Ok++) : (fail('Meta: Toggle fehlen'), f36Fail++);
+
+// _tsMiniKachelHtml
 content.includes('_tsMiniKachelHtml(')
-  ? (ok('_tsMiniKachelHtml() ausgelagert (DRY)'), f36Ok++) : (fail('_tsMiniKachelHtml() fehlt'), f36Fail++);
+  ? (ok('_tsMiniKachelHtml() ausgelagert'), f36Ok++) : (fail('_tsMiniKachelHtml() fehlt'), f36Fail++);
 
 if (f36Fail === 0) ok(f36Ok + ' Hybrid/HeutePin/Panel Checks bestanden');
 
