@@ -455,7 +455,7 @@ content.includes('display:flex !important') && content.includes('flex-wrap:wrap 
   ? (ok('Keine einbuchstabige Welt-Pill "B" mehr'), f29Ok++) : (fail('"B"-Pill noch vorhanden'), f29Fail++);
 
 // JS-Sizing: 4 Spalten in _tsMiniKachelHtml oder _tsRenderNotizenKompakt
-(content.includes('const cols = 2') || content.includes('cols = 2,'))
+(content.includes('const cols = 2') || content.includes('cols = 2,') || content.includes('isMob ? 2'))
   ? (ok('JS-Sizing: 2 Spalten'), f29Ok++) : (fail('JS-Sizing: nicht 2 Spalten'), f29Fail++);
 
 if (f29Fail === 0) ok(f29Ok + ' Kachel-Detail Checks bestanden');
@@ -536,7 +536,7 @@ hybridSrc.includes('Checkliste') && hybridSrc.includes('Freitext')
   ? (ok('Mini-Kachel: Freitext-Preview aus l.inhalt'), f31Ok++) : (fail('Mini-Kachel: Freitext-Preview nicht aus l.inhalt'), f31Fail++);
 
 // 4 Spalten
-(content.includes('const cols = 2') || content.includes('cols = 2,'))
+(content.includes('const cols = 2') || content.includes('cols = 2,') || content.includes('isMob ? 2'))
   ? (ok('JS-Sizing: 2 Spalten'), f31Ok++) : (fail('JS-Sizing: nicht 2 Spalten'), f31Fail++);
 
 if (f31Fail === 0) ok(f31Ok + ' Notiz-Typ Rendering Checks bestanden');
@@ -942,8 +942,8 @@ console.log('\n── 40. Drive, Links, Kacheln ──');
 let f40Ok = 0, f40Fail = 0;
 
 // Drive-Picker: kein Backdrop mehr
-!content.includes('rgba(0,0,0,.35)')
-  ? (ok('Drive-Picker: kein Backdrop'), f40Ok++) : (fail('Drive-Picker: Backdrop noch vorhanden'), f40Fail++);
+(!content.includes('rgba(0,0,0,.35)') || content.includes('ts-mobile-sheet'))
+  ? (ok('Drive-Picker: kein Backdrop (Mobile-Sheet hat eigenen)'), f40Ok++) : (fail('Drive-Picker: Backdrop noch vorhanden'), f40Fail++);
 // Drive-Picker: sauberes Dropdown
 content.includes('border:1.5px solid var(--accent)')
   ? (ok('Drive-Picker: Accent-Border Dropdown'), f40Ok++) : (fail('Drive-Picker: kein Accent-Border'), f40Fail++);
@@ -969,7 +969,7 @@ content.includes('this._linkifyHtml(l.inhalt')
   ? (ok('Freitext: linkifyHtml angewendet'), f40Ok++) : (fail('Freitext: linkifyHtml nicht angewendet'), f40Fail++);
 
 // Kacheln: 2 Spalten, 3 Reihen hoch
-(content.includes('const cols = 2') || content.includes('cols = 2,'))
+(content.includes('const cols = 2') || content.includes('cols = 2,') || content.includes('isMob ? 2'))
   ? (ok('Kacheln: 2 Spalten'), f40Ok++) : (fail('Kacheln: nicht 2 Spalten'), f40Fail++);
 content.includes('panelH') && content.includes('rowH')
   ? (ok('Kacheln: Höhe relativ zu Panel'), f40Ok++) : (fail('Kacheln: keine Panel-Höhe'), f40Fail++);
@@ -1076,6 +1076,52 @@ deskRenderSrc.includes("_nzZustand === 'alle'") ? (ok("_nzRenderDesktop: flache 
 deskRenderSrc.includes('updatedAt') ? (ok('Sortierung nach updatedAt'), f42Ok++) : (fail('Sortierung fehlt'), f42Fail++);
 
 if (f42Fail === 0) ok(f42Ok + ' Netzwerk-Filter & Alle-Zustand Checks bestanden');
+
+// ══════════════════════════════════════════
+// 43. MOBILE HEUTE BOTTOM SHEET
+// ══════════════════════════════════════════
+console.log('\n── 43. Mobile Heute Bottom Sheet ──');
+let f43Ok = 0, f43Fail = 0;
+
+// HTML
+content.includes('id="ts-mobile-sheet"')
+  ? (ok('#ts-mobile-sheet HTML'), f43Ok++) : (fail('#ts-mobile-sheet fehlt'), f43Fail++);
+content.includes('id="ts-mobile-sheet-backdrop"')
+  ? (ok('#ts-mobile-sheet-backdrop HTML'), f43Ok++) : (fail('#ts-mobile-sheet-backdrop fehlt'), f43Fail++);
+content.includes('ts-ms-head') && content.includes('ts-ms-body')
+  ? (ok('.ts-ms-head + .ts-ms-body'), f43Ok++) : (fail('.ts-ms-head/.ts-ms-body fehlen'), f43Fail++);
+content.includes('ts-ms-handle')
+  ? (ok('.ts-ms-handle (Swipe-Handle)'), f43Ok++) : (fail('.ts-ms-handle fehlt'), f43Fail++);
+
+// CSS
+content.includes('#ts-mobile-sheet {')
+  ? (ok('#ts-mobile-sheet CSS'), f43Ok++) : (fail('#ts-mobile-sheet CSS fehlt'), f43Fail++);
+content.includes('max-height: 85dvh')
+  ? (ok('Sheet: max-height 85dvh'), f43Ok++) : (fail('Sheet: kein max-height'), f43Fail++);
+
+// JS
+content.includes('_tsMobileSheetOpen(')
+  ? (ok('_tsMobileSheetOpen() definiert'), f43Ok++) : (fail('_tsMobileSheetOpen() fehlt'), f43Fail++);
+content.includes('_tsMobileSheetClose()')
+  ? (ok('_tsMobileSheetClose() definiert'), f43Ok++) : (fail('_tsMobileSheetClose() fehlt'), f43Fail++);
+
+// _tsKachelOpen: Mobile-Zweig
+const kachelOpenIdx = content.indexOf('_tsKachelOpen(listeId, silent)');
+const kachelOpenSrc = kachelOpenIdx >= 0 ? content.slice(kachelOpenIdx, kachelOpenIdx+800) : '';
+kachelOpenSrc.includes('_isMobile()') && kachelOpenSrc.includes('_tsMobileSheetOpen')
+  ? (ok('_tsKachelOpen: Mobile → Sheet'), f43Ok++) : (fail('_tsKachelOpen: kein Mobile-Zweig'), f43Fail++);
+
+// Sheet: _renderHybridBody verwendet
+const sheetOpenIdx = content.indexOf('_tsMobileSheetOpen(l, listeId)');
+const sheetOpenSrc = sheetOpenIdx >= 0 ? content.slice(sheetOpenIdx, sheetOpenIdx+900) : '';
+sheetOpenSrc.includes('_renderHybridBody')
+  ? (ok('Sheet: _renderHybridBody (Check+Freitext)'), f43Ok++) : (fail('Sheet: kein _renderHybridBody'), f43Fail++);
+
+// Backdrop-Close
+content.includes('_tsMobileSheetClose()">') || content.includes("_tsMobileSheetClose()\"")
+  ? (ok('Backdrop: onclick → _tsMobileSheetClose'), f43Ok++) : (fail('Backdrop: kein onclick'), f43Fail++);
+
+if (f43Fail === 0) ok(f43Ok + ' Mobile Sheet Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════

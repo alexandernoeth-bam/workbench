@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.64</title>
+  <title>WorkBench 3.0.65</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -612,6 +612,26 @@
     .nz-net-tb { padding:2px 9px; border:1.5px solid var(--border); border-radius:10px; font-size:11px; font-weight:700; cursor:pointer; background:none; color:var(--muted); font-family:var(--font); transition:all .1s; }
     .nz-net-tb:hover { border-color:var(--accent); color:var(--accent); }
     .nz-net-tb.on { border-color:var(--accent); background:var(--accent); color:#fff; }
+    /* Mobile Heute-Tab: Bottom Sheet für Kachel-Detail */
+    #ts-mobile-sheet {
+      display: none;
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 1500;
+      background: var(--surface);
+      border-radius: 16px 16px 0 0;
+      box-shadow: 0 -4px 32px rgba(0,0,0,.22);
+      flex-direction: column;
+      max-height: 85dvh;
+    }
+    #ts-mobile-sheet.open { display: flex; }
+    #ts-mobile-sheet-backdrop { display:none; position:fixed; inset:0; z-index:1499; background:rgba(0,0,0,.35); }
+    #ts-mobile-sheet-backdrop.open { display: block; }
+    .ts-ms-handle { width:36px; height:4px; background:var(--border); border-radius:2px; margin:10px auto 4px; flex-shrink:0; }
+    .ts-ms-head { display:flex; align-items:center; gap:8px; padding:6px 14px 8px; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .ts-ms-title { font-size:16px; font-weight:800; color:var(--text); flex:1; }
+    .ts-ms-cnt   { font-size:12px; font-weight:700; padding:2px 7px; border-radius:5px; background:rgba(0,0,0,.09); color:var(--muted); }
+    .ts-ms-close { padding:4px 12px; border:1.5px solid var(--border); border-radius:6px; background:none; cursor:pointer; font-size:13px; font-weight:700; color:var(--muted); font-family:var(--font); }
+    .ts-ms-body  { flex:1; overflow-y:auto; padding:8px 14px 80px; min-height:0; }
+
     .wb-mobile #nz-sidebar { display: none; }
     .wb-mobile #nz-detail-panel { display: none; }
 
@@ -998,6 +1018,7 @@
     .wb-mobile #ts-kachel-panel { display:none; }
     .wb-mobile #ts-notizen-panel { padding:6px 8px; overflow-y:auto; }
     .wb-mobile #ts-notizen-grid { display:flex; flex-direction:column; gap:6px; overflow-y:auto; width:100%; }
+    .wb-mobile .ts-nz-grid { direction:ltr !important; } /* Mobile: links nach rechts */
     .wb-mobile .ts-nz-group { width:100%; }
     .wb-mobile #ts-notizen-panel .ts-nz-grid { display:flex !important; flex-direction:row !important; flex-wrap:wrap !important; direction:rtl; width:100% !important; }
     .wb-mobile #ts-notizen-panel .ts-nz-mini {  }
@@ -1013,7 +1034,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.64</div>
+  <div id="wb-startup-tagline">v3.0.65</div>
 </div>
 
 <!-- Modal -->
@@ -1166,6 +1187,18 @@
   </div>
 </div>
 
+<!-- Mobile Heute Bottom Sheet -->
+<div id="ts-mobile-sheet-backdrop" onclick="WB._tsMobileSheetClose()"></div>
+<div id="ts-mobile-sheet">
+  <div class="ts-ms-handle"></div>
+  <div class="ts-ms-head" id="ts-ms-head">
+    <span class="ts-ms-title" id="ts-ms-title"></span>
+    <span class="ts-ms-cnt"   id="ts-ms-cnt"></span>
+    <button class="ts-ms-close" onclick="WB._tsMobileSheetClose()">✕</button>
+  </div>
+  <div class="ts-ms-body" id="ts-ms-body"></div>
+</div>
+
 <!-- Vollbild-Notiz-Overlay -->
 <div id="nz-fullscreen">
   <div class="nz-fs-head" id="nz-fs-head">
@@ -1190,7 +1223,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.64</span>
+    <span id="wb-menu-version">v3.0.65</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1493,8 +1526,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.64',
-  APP_BUILD:   '20260626-1730',
+  APP_VERSION: '3.0.65',
+  APP_BUILD:   '20260626-1900',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1880,16 +1913,17 @@ const WB = {
     requestAnimationFrame(() => {
       const panel = document.getElementById('ts-notizen-panel');
       if (!panel) return;
+      const isMob = this._isMobile();
+      const cols = isMob ? 2 : 2;
       const panelH = panel.offsetHeight;
-      const rowH = Math.floor((panelH - 60) / 3); // 3 Zeilen, 60px für Gruppen-Labels
+      const rowH = isMob ? 160 : Math.max(Math.floor((panelH - 60) / 3), 120);
       panel.querySelectorAll('.ts-nz-grid').forEach(gridEl => {
         const items = gridEl.querySelectorAll('.ts-nz-mini');
-        const cols = 2, gap = 6;
+        const gap = 6;
         const cellW = Math.floor((gridEl.offsetWidth - gap) / cols);
-        const cellH = Math.max(rowH, 120); // min 120px
         items.forEach(el => {
           el.style.width  = cellW + 'px';
-          el.style.height = cellH + 'px';
+          el.style.height = rowH + 'px';
           el.style.minHeight = 'unset';
         });
       });
@@ -1935,7 +1969,14 @@ const WB = {
     document.querySelectorAll('.ts-nz-mini').forEach(el => el.classList.remove('active'));
     const miniEl = document.getElementById('ts-mini-' + listeId);
     if (miniEl) miniEl.classList.add('active');
-    // Detail-Panel füllen
+
+    // Mobile: Bottom Sheet statt linkes Panel
+    if (this._isMobile()) {
+      this._tsMobileSheetOpen(l, listeId);
+      return;
+    }
+
+    // Desktop: Detail-Panel füllen
     document.getElementById('ts-kd-title').textContent = l.titel;
     const allItems = (l.items||[]).filter(i => !i.deleted);
     const doneItems = allItems.filter(i => i.done);
@@ -1957,6 +1998,48 @@ const WB = {
     const cntEl2 = document.getElementById('ts-kd-cnt');
     if (cntEl2) { cntEl2.textContent = cnt2; }
     document.getElementById('ts-kachel-empty').style.display = 'none';
+  },
+
+  _tsMobileSheetOpen(l, listeId) {
+    const sheet    = document.getElementById('ts-mobile-sheet');
+    const backdrop = document.getElementById('ts-mobile-sheet-backdrop');
+    const title    = document.getElementById('ts-ms-title');
+    const cnt      = document.getElementById('ts-ms-cnt');
+    const head     = document.getElementById('ts-ms-head');
+    const body     = document.getElementById('ts-ms-body');
+    if (!sheet || !body) return;
+
+    // Farbe auf Header anwenden
+    const farbBg = { 'c-gelb':'#FFF9C4','c-gruen':'#D5F5E3','c-blau':'#D6EAF8','c-rosa':'#FDEBD0','c-lila':'#E8D5F0','c-tuerkis':'#C8F0EC','c-weiss':'#fff' };
+    const bg = farbBg[l.farbe||'c-weiss'] || '#fff';
+    if (head) head.style.background = bg;
+    if (body) body.style.background = bg;
+
+    // Titel + Zähler
+    if (title) title.textContent = l.titel;
+    const allItems = (l.items||[]).filter(i => !i.deleted);
+    const doneItems = allItems.filter(i => i.done);
+    if (cnt) cnt.textContent = allItems.length ? doneItems.length + '/' + allItems.length : '';
+
+    // Hybrid-Body rendern (ctx='ts' damit ts-kd-inp etc. korrekt sind)
+    body.innerHTML = this._renderHybridBody(l, listeId, 'ts');
+
+    // Sheet öffnen
+    sheet.classList.add('open');
+    backdrop.classList.add('open');
+    // Fokus auf Freitext verzögert setzen
+    setTimeout(() => {
+      const ft = document.getElementById('ts-kd-ft');
+      if (ft) ft.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 300);
+  },
+
+  _tsMobileSheetClose() {
+    document.getElementById('ts-mobile-sheet')?.classList.remove('open');
+    document.getElementById('ts-mobile-sheet-backdrop')?.classList.remove('open');
+    // Kachel-Auswahl aufheben
+    document.querySelectorAll('.ts-nz-mini').forEach(el => el.classList.remove('active'));
+    this._tsKachelCurrentId = null;
   },
 
   _tsKachelClose() {
