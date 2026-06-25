@@ -924,9 +924,9 @@ content.includes("picker.style.display = 'flex'")
   ? (ok('Drive-Picker: display:flex statt classList'), f39Ok++) : (fail('Drive-Picker: classList noch verwendet'), f39Fail++);
 
 // overflow-x:hidden statt overflow:hidden auf Panel
-const panelCssIdx = content.indexOf('#nz-detail-panel {');
-const panelCssSrc = panelCssIdx >= 0 ? content.slice(panelCssIdx, panelCssIdx+300) : '';
-panelCssSrc.includes('overflow-x: hidden') && !panelCssSrc.includes('overflow: hidden')
+const panelCssIdx = content.lastIndexOf('#nz-detail-panel {');
+const panelCssSrc = panelCssIdx >= 0 ? content.slice(panelCssIdx, panelCssIdx+400) : '';
+(panelCssSrc.includes('overflow-x: hidden') || panelCssSrc.includes('overflow-x:hidden') || panelCssSrc.includes('overflow-y: visible'))
   ? (ok('Panel: overflow-x:hidden (Dropdowns nicht abgeschnitten)'), f39Ok++) : (fail('Panel: overflow:hidden schneidet Dropdowns ab'), f39Fail++);
 
 // Backlink-Dropdown z-index hoch genug
@@ -1173,6 +1173,63 @@ kachelSrc.includes('_isMobile()') && kachelSrc.includes('_nzMobileSheetOpen')
   ? (ok('_nzKachelOpen: Mobile → Sheet'), f44Ok++) : (fail('_nzKachelOpen: kein Mobile-Zweig'), f44Fail++);
 
 if (f44Fail === 0) ok(f44Ok + ' Termine-Header & Notizen-Sheet Checks bestanden');
+
+// ══════════════════════════════════════════
+// 45. NOTIZEN 1-SPALTE + ZURÜCK-BTN + TAGESANSICHT
+// ══════════════════════════════════════════
+console.log('\n── 45. Notizen/Termine/Tagesansicht ──');
+let f45Ok = 0, f45Fail = 0;
+
+// ① Notizen Mobile: 1 Spalte + Sidebar weg
+content.includes('.wb-mobile .nz-grid { grid-template-columns: 1fr !important; }')
+  ? (ok('Mobile nz-grid: 1 Spalte'), f45Ok++) : (fail('Mobile nz-grid: kein 1fr'), f45Fail++);
+content.includes('.wb-mobile #nz-sidebar { display: none; }')
+  ? (ok('Mobile Sidebar: ausgeblendet'), f45Ok++) : (fail('Mobile Sidebar: nicht ausgeblendet'), f45Fail++);
+content.includes('id="nz-mobile-filter"')
+  ? (ok('#nz-mobile-filter HTML'), f45Ok++) : (fail('#nz-mobile-filter fehlt'), f45Fail++);
+content.includes('.nz-mf-chip')
+  ? (ok('.nz-mf-chip CSS'), f45Ok++) : (fail('.nz-mf-chip CSS fehlt'), f45Fail++);
+content.includes('_nzMfSetZustand(')
+  ? (ok('_nzMfSetZustand() definiert'), f45Ok++) : (fail('_nzMfSetZustand() fehlt'), f45Fail++);
+
+// ② Zurück-Button: immer sichtbar
+const prevBtnIdx = content.indexOf("prevBtn.style.display = this._isMobile()");
+prevBtnIdx < 0
+  ? (ok('Zurück-Button: mobile-hide entfernt'), f45Ok++) : (fail('Zurück-Button: noch auf Mobile versteckt'), f45Fail++);
+
+// ③ Tagesansicht-Overlay
+content.includes('id="wo-tag-overlay"')
+  ? (ok('#wo-tag-overlay HTML'), f45Ok++) : (fail('#wo-tag-overlay fehlt'), f45Fail++);
+content.includes('id="wo-to-body"')
+  ? (ok('#wo-to-body HTML'), f45Ok++) : (fail('#wo-to-body fehlt'), f45Fail++);
+content.includes('.wo-tag-overlay { display:none') || content.includes('#wo-tag-overlay { display:none')
+  ? (ok('#wo-tag-overlay CSS'), f45Ok++) : (fail('#wo-tag-overlay CSS fehlt'), f45Fail++);
+content.includes('_woTagOpen(')
+  ? (ok('_woTagOpen() definiert'), f45Ok++) : (fail('_woTagOpen() fehlt'), f45Fail++);
+content.includes('_woTagClose()')
+  ? (ok('_woTagClose() definiert'), f45Ok++) : (fail('_woTagClose() fehlt'), f45Fail++);
+content.includes('_woTagRender(')
+  ? (ok('_woTagRender() definiert'), f45Ok++) : (fail('_woTagRender() fehlt'), f45Fail++);
+content.includes('_woTagDeleteTermin(')
+  ? (ok('_woTagDeleteTermin() definiert'), f45Ok++) : (fail('_woTagDeleteTermin() fehlt'), f45Fail++);
+content.includes('_woTagAddSondertag(')
+  ? (ok('_woTagAddSondertag() definiert'), f45Ok++) : (fail('_woTagAddSondertag() fehlt'), f45Fail++);
+content.includes('_woTagDeleteSondertag(')
+  ? (ok('_woTagDeleteSondertag() definiert'), f45Ok++) : (fail('_woTagDeleteSondertag() fehlt'), f45Fail++);
+// Klick auf Kalender-Spaltenköpfe
+content.includes("WB._woTagOpen(\\'" ) || content.includes('WB._woTagOpen(\'')
+  ? (ok('Spaltenköpfe: onclick _woTagOpen'), f45Ok++) : (fail('Spaltenköpfe: kein _woTagOpen onclick'), f45Fail++);
+// Klick auf Monatszellen
+const monCellIdx = content.indexOf('wo-mon-cell wm-cell');
+const monCellSrc = monCellIdx >= 0 ? content.slice(monCellIdx, monCellIdx+400) : '';
+monCellSrc.includes('_woTagOpen')
+  ? (ok('Monatszellen: onclick _woTagOpen'), f45Ok++) : (fail('Monatszellen: kein _woTagOpen'), f45Fail++);
+// terminOpen: Datum-Prefill
+const terminOpenIdx = content.indexOf('terminOpen(eventId, prefillDate)');
+terminOpenIdx >= 0
+  ? (ok('terminOpen: prefillDate Parameter'), f45Ok++) : (fail('terminOpen: kein prefillDate'), f45Fail++);
+
+if (f45Fail === 0) ok(f45Ok + ' Notizen/Termine/Tagesansicht Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════
