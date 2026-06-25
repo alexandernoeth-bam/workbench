@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.61</title>
+  <title>WorkBench 3.0.62</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -972,9 +972,9 @@
     #ts-notizen-panel .ts-nz-mini.c-lila    { background:#E8D5F0 !important; border-color:#A569BD !important; }
     #ts-notizen-panel .ts-nz-mini.c-tuerkis { background:#C8F0EC !important; border-color:#45B7AA !important; }
     #ts-notizen-panel .ts-nz-mini.c-weiss   { background:#fff    !important; border-color:rgba(0,0,0,.15) !important; }
-    .ts-nz-mini-top { display:flex; flex-direction:column; gap:2px; }
+    .ts-nz-mini-top { display:flex; flex-direction:column; gap:3px; flex:1; min-height:0; }
     .ts-nz-mini-title { font-size:14px; font-weight:800; color:var(--text); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3; }
-    .ts-nz-mini-preview { font-size:13px; color:var(--muted); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; opacity:.8; line-height:1.3; }
+    .ts-nz-mini-preview { font-size:13px; color:var(--muted); overflow:hidden; display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; opacity:.8; line-height:1.4; flex:1; }
     .ts-nz-mini-pills { display:flex; gap:3px; flex-wrap:wrap; }
     .ts-nz-mini-pill { font-size:11px; font-weight:800; padding:2px 7px; border-radius:6px; white-space:nowrap; }
     .ts-nz-mini-pill.cnt { background:rgba(0,0,0,.1); color:var(--muted); }
@@ -1000,7 +1000,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.61</div>
+  <div id="wb-startup-tagline">v3.0.62</div>
 </div>
 
 <!-- Modal -->
@@ -1168,7 +1168,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.61</span>
+    <span id="wb-menu-version">v3.0.62</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1304,25 +1304,23 @@
             <button class="nz-dp-settings" onclick="WB._nzDetailSettings()" title="Einstellungen">⚙</button>
           </div>
           <!-- Meta-Bereich: Farbe, Welt, Tags, Link, Vertraulich, Deadline -->
-          <div class="nz-dp-meta" id="nz-dp-meta"></div>
-          <!-- Drive-Picker Dropdown (kompaktes Overlay über dem Panel) -->
-          <div id="nz-drive-picker" style="display:none;position:absolute;inset:0;z-index:500;background:rgba(0,0,0,.35);align-items:flex-start;justify-content:center;padding:16px;">
-            <div style="background:var(--surface);border-radius:12px;width:100%;max-height:380px;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.25);overflow:hidden;">
-              <div class="nz-drive-search-row">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--faint);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input id="nz-drive-search-inp" class="nz-drive-search-inp" placeholder="Datei in Google Drive suchen..." oninput="WB._drivePickerSearch(this.value)" style="flex:1;">
-                <button onclick="WB._drivePickerClose()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--faint);padding:0 2px;line-height:1;">×</button>
-              </div>
-              <div class="nz-drive-results" id="nz-drive-results" style="flex:1;overflow-y:auto;min-height:80px;max-height:220px;">
-                <div class="nz-drive-empty">Tippe um zu suchen...</div>
-              </div>
-              <div class="nz-drive-footer" style="border-top:1px solid var(--border);">
-                <button class="nz-drive-new-btn" onclick="WB._driveNewDoc()">📄 Neues Google Doc erstellen</button>
-                <button class="nz-drive-new-btn" onclick="WB._driveNewSheet()">📊 Neues Google Sheet erstellen</button>
-              </div>
-              <div id="nz-drive-new-hint" style="display:none;padding:8px 12px;font-size:11px;color:var(--muted);background:rgba(10,107,94,.06);border-top:1px solid var(--border);">
-                📋 Kopiere die URL aus dem neuen Tab und füge sie als Link ein.
-              </div>
+          <div class="nz-dp-meta" id="nz-dp-meta" style="position:relative;overflow:visible;"></div>
+          <!-- Drive-Picker Dropdown (kompaktes Dropdown unter dem Link-Feld) -->
+          <div id="nz-drive-picker" style="display:none;position:absolute;left:0;right:0;top:0;z-index:500;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.18);flex-direction:column;overflow:hidden;">
+            <div class="nz-drive-search-row">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--faint);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input id="nz-drive-search-inp" class="nz-drive-search-inp" placeholder="Datei in Google Drive suchen..." oninput="WB._drivePickerSearch(this.value)" style="flex:1;">
+              <button onclick="WB._drivePickerClose()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--faint);padding:0 2px;line-height:1;">×</button>
+            </div>
+            <div class="nz-drive-results" id="nz-drive-results" style="overflow-y:auto;max-height:200px;">
+              <div class="nz-drive-empty">Tippe um zu suchen...</div>
+            </div>
+            <div class="nz-drive-footer" style="border-top:1px solid var(--border);">
+              <button class="nz-drive-new-btn" onclick="WB._driveNewDoc()">📄 Neues Google Doc</button>
+              <button class="nz-drive-new-btn" onclick="WB._driveNewSheet()">📊 Neues Google Sheet</button>
+            </div>
+            <div id="nz-drive-new-hint" style="display:none;padding:8px 12px;font-size:11px;color:var(--muted);background:rgba(10,107,94,.06);border-top:1px solid var(--border);">
+              📋 Kopiere die URL aus dem neuen Tab und füge sie hier als Link ein.
             </div>
           </div>
           <div class="nz-dp-body" id="nz-dp-body"></div>
@@ -1432,8 +1430,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.61',
-  APP_BUILD:   '20260626-1330',
+  APP_VERSION: '3.0.62',
+  APP_BUILD:   '20260626-1430',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1814,15 +1812,22 @@ const WB = {
     }
     if (!h) h = '<div style="padding:12px;font-size:11px;color:var(--faint);">Keine Notizen für heute — Notizen anpinnen oder temporär hinzufügen</div>';
     grid.innerHTML = h;
-    // Quadratische Kacheln
+    // Quadratische Kacheln — 2 pro Zeile, Höhe = 1/3 des verfügbaren Bereichs
     requestAnimationFrame(() => {
       const panel = document.getElementById('ts-notizen-panel');
       if (!panel) return;
+      const panelH = panel.offsetHeight;
+      const rowH = Math.floor((panelH - 60) / 3); // 3 Zeilen, 60px für Gruppen-Labels
       panel.querySelectorAll('.ts-nz-grid').forEach(gridEl => {
         const items = gridEl.querySelectorAll('.ts-nz-mini');
-        const cols = 4, gap = 5;
-        const cellW = Math.floor((gridEl.offsetWidth - gap*(cols-1)) / cols);
-        items.forEach(el => { el.style.width = cellW + 'px'; el.style.height = cellW + 'px'; el.style.minHeight = 'unset'; });
+        const cols = 2, gap = 6;
+        const cellW = Math.floor((gridEl.offsetWidth - gap) / cols);
+        const cellH = Math.max(rowH, 120); // min 120px
+        items.forEach(el => {
+          el.style.width  = cellW + 'px';
+          el.style.height = cellH + 'px';
+          el.style.minHeight = 'unset';
+        });
       });
     });
     if (this._tsKachelCurrentId) this._tsKachelOpen(this._tsKachelCurrentId, true);
@@ -3024,12 +3029,12 @@ const WB = {
       + '<span class="hb-add-ok" onclick="WB.' + addFn + '()">OK</span>'
       + '</div>';
 
-    // Sektion 2: Freitext
+    // Sektion 2: Freitext — URLs als Links rendern
     const ftH = '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);padding:8px 2px 4px;border-top:1px solid rgba(0,0,0,.1);margin-top:4px;">Freitext</div>'
       + '<div id="' + ftId + '" contenteditable="true" spellcheck="true"'
       + ' oninput="WB.' + ftFn + '()"'
       + ' style="outline:none;font-size:14px;line-height:1.6;color:var(--text);font-family:var(--font);padding:4px 2px;min-height:60px;">'
-      + (l.inhalt || '') + '</div>';
+      + this._linkifyHtml(l.inhalt || '') + '</div>';
 
     return checkH + ftH;
   },
@@ -3095,8 +3100,12 @@ const WB = {
       +   '<input class="nz-dp-tag-inp" placeholder="#tag1 #tag2" value="' + this._esc(tagsVal) + '"'
       +   ' onchange="WB._nzDetailSetTags(\'' + id + '\',this.value)"></div>'
       + '<div class="nz-dp-meta-row"><span class="nz-dp-meta-lbl">Link</span>'
-      +   '<input class="nz-dp-link-inp" type="url" placeholder="https://..." value="' + this._esc(linkVal) + '"'
-      +   ' onchange="WB._nzDetailSetLink(\'' + id + '\',this.value)">'
+      +   (linkVal
+          ? '<a href="' + this._esc(linkVal) + '" target="_blank" rel="noopener" '
+          +   'style="flex:1;font-size:12px;color:var(--accent);text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">'
+          +   '↗ ' + this._esc(linkVal.replace(/^https?:\/\//,'').split('/')[0]) + '</a>'
+          : '<span style="flex:1;font-size:12px;color:var(--faint);font-style:italic;">Kein Link</span>')
+      +   '<button class="nz-drive-btn" onclick="WB._nzDetailEditLink(\'' + id + '\')" style="margin-left:4px;">✏</button>'
       +   '<button class="nz-drive-btn" onclick="WB._drivePickerOpen(\'' + id + '\')" title="Google Drive durchsuchen">Drive …</button></div>'
       + '<div class="nz-dp-meta-row"><span class="nz-dp-meta-lbl">Deadline</span>'
       +   '<input class="nz-dp-deadline-inp" type="date" value="' + this._esc(dl) + '"'
@@ -3135,6 +3144,24 @@ const WB = {
     }
     const ms = target - today;
     return { days: Math.round(ms / 86400000), unit: 'Tage' };
+  },
+
+  // URLs im Freitext als klickbare Links markieren
+  _linkifyHtml(html) {
+    if (!html) return html;
+    return html.replace(/(?<!['"=])(https?:\/\/[^\s<>"']+)/g,
+      '<a href="$1" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;">$1</a>'
+    );
+  },
+
+  _nzDetailEditLink(listeId) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const url = prompt('Link eingeben (oder leer lassen zum Entfernen):', l.link || '');
+    if (url === null) return;
+    l.link = url.trim();
+    l.updatedAt = this._now();
+    this.setDirty();
+    this._nzDetailOpen(listeId, true);
   },
 
   _nzDetailSetFarbe(listeId, farbe) {
@@ -3256,6 +3283,16 @@ const WB = {
     this._drivePickerListeId = listeId;
     const picker = document.getElementById('nz-drive-picker');
     if (!picker) return;
+    // Positioniere Picker unterhalb des Link-Feldes
+    const panel = document.getElementById('nz-detail-panel');
+    const meta  = document.getElementById('nz-dp-meta');
+    if (panel && meta) {
+      const panelRect = panel.getBoundingClientRect();
+      const metaRect  = meta.getBoundingClientRect();
+      picker.style.top  = (metaRect.bottom - panelRect.top) + 'px';
+      picker.style.left = '0';
+      picker.style.right = '0';
+    }
     picker.style.display = 'flex';
     const res = document.getElementById('nz-drive-results');
     if (res) res.innerHTML = '<div class="nz-drive-empty">Tippe um zu suchen...</div>';

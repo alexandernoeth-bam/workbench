@@ -455,8 +455,8 @@ content.includes('display:flex !important') && content.includes('flex-wrap:wrap 
   ? (ok('Keine einbuchstabige Welt-Pill "B" mehr'), f29Ok++) : (fail('"B"-Pill noch vorhanden'), f29Fail++);
 
 // JS-Sizing: 4 Spalten in _tsMiniKachelHtml oder _tsRenderNotizenKompakt
-(content.includes('const cols = 4') || content.includes('cols = 4,'))
-  ? (ok('JS-Sizing: 4 Spalten'), f29Ok++) : (fail('JS-Sizing: nicht 4 Spalten'), f29Fail++);
+(content.includes('const cols = 2') || content.includes('cols = 2,'))
+  ? (ok('JS-Sizing: 2 Spalten'), f29Ok++) : (fail('JS-Sizing: nicht 2 Spalten'), f29Fail++);
 
 if (f29Fail === 0) ok(f29Ok + ' Kachel-Detail Checks bestanden');
 
@@ -536,8 +536,8 @@ hybridSrc.includes('Checkliste') && hybridSrc.includes('Freitext')
   ? (ok('Mini-Kachel: Freitext-Preview aus l.inhalt'), f31Ok++) : (fail('Mini-Kachel: Freitext-Preview nicht aus l.inhalt'), f31Fail++);
 
 // 4 Spalten
-(content.includes('const cols = 4') || content.includes('cols = 4,'))
-  ? (ok('JS-Sizing: 4 Spalten'), f31Ok++) : (fail('JS-Sizing: nicht 4 Spalten'), f31Fail++);
+(content.includes('const cols = 2') || content.includes('cols = 2,'))
+  ? (ok('JS-Sizing: 2 Spalten'), f31Ok++) : (fail('JS-Sizing: nicht 2 Spalten'), f31Fail++);
 
 if (f31Fail === 0) ok(f31Ok + ' Notiz-Typ Rendering Checks bestanden');
 
@@ -934,6 +934,50 @@ content.includes('z-index:500') || content.includes('z-index: 500')
   ? (ok('Backlink-Dropdown: z-index 500'), f39Ok++) : (fail('Backlink-Dropdown: z-index zu niedrig'), f39Fail++);
 
 if (f39Fail === 0) ok(f39Ok + ' Filter/Drive/Backlink Checks bestanden');
+
+// ══════════════════════════════════════════
+// 40. DRIVE-PICKER + LINKS + KACHEL-GRÖSSE
+// ══════════════════════════════════════════
+console.log('\n── 40. Drive, Links, Kacheln ──');
+let f40Ok = 0, f40Fail = 0;
+
+// Drive-Picker: kein Backdrop mehr
+!content.includes('rgba(0,0,0,.35)')
+  ? (ok('Drive-Picker: kein Backdrop'), f40Ok++) : (fail('Drive-Picker: Backdrop noch vorhanden'), f40Fail++);
+// Drive-Picker: sauberes Dropdown
+content.includes('border:1.5px solid var(--accent)')
+  ? (ok('Drive-Picker: Accent-Border Dropdown'), f40Ok++) : (fail('Drive-Picker: kein Accent-Border'), f40Fail++);
+// Drive-Picker: dynamische Positionierung
+content.includes('metaRect.bottom - panelRect.top')
+  ? (ok('Drive-Picker: dynamische Position'), f40Ok++) : (fail('Drive-Picker: keine dyn. Position'), f40Fail++);
+
+// Links klickbar: Link-Feld als <a>
+content.includes('target="_blank"') && content.includes('↗')
+  ? (ok('Link-Feld: klickbarer <a>-Tag mit ↗'), f40Ok++) : (fail('Link-Feld: kein klickbarer Link'), f40Fail++);
+// Edit-Button für Link
+content.includes('_nzDetailEditLink(')
+  ? (ok('_nzDetailEditLink() definiert'), f40Ok++) : (fail('_nzDetailEditLink() fehlt'), f40Fail++);
+// Linkify Freitext
+content.includes('_linkifyHtml(')
+  ? (ok('_linkifyHtml() definiert'), f40Ok++) : (fail('_linkifyHtml() fehlt'), f40Fail++);
+const lfIdx = content.indexOf('_linkifyHtml(html)');
+const lfSrc = lfIdx >= 0 ? content.slice(lfIdx, lfIdx+300) : '';
+lfSrc.includes('https?') && lfSrc.includes('target="_blank"')
+  ? (ok('_linkifyHtml: URLs → <a target=_blank>'), f40Ok++) : (fail('_linkifyHtml: Regex fehlt'), f40Fail++);
+// Linkify im Freitext-Render angewendet
+content.includes('this._linkifyHtml(l.inhalt')
+  ? (ok('Freitext: linkifyHtml angewendet'), f40Ok++) : (fail('Freitext: linkifyHtml nicht angewendet'), f40Fail++);
+
+// Kacheln: 2 Spalten, 3 Reihen hoch
+(content.includes('const cols = 2') || content.includes('cols = 2,'))
+  ? (ok('Kacheln: 2 Spalten'), f40Ok++) : (fail('Kacheln: nicht 2 Spalten'), f40Fail++);
+content.includes('panelH') && content.includes('rowH')
+  ? (ok('Kacheln: Höhe relativ zu Panel'), f40Ok++) : (fail('Kacheln: keine Panel-Höhe'), f40Fail++);
+// line-clamp erhöht
+content.includes('-webkit-line-clamp:6')
+  ? (ok('Preview: line-clamp 6'), f40Ok++) : (fail('Preview: line-clamp nicht 6'), f40Fail++);
+
+if (f40Fail === 0) ok(f40Ok + ' Drive/Links/Kacheln Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════
