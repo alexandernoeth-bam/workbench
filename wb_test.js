@@ -1038,6 +1038,45 @@ netSrc.includes('backlinks') && netSrc.includes('force')
 
 if (f41Fail === 0) ok(f41Ok + ' Pin/Archiv/Vollbild/Netzwerk Checks bestanden');
 
+// ══════════════════════════════════════════
+// 42. NETZWERK-FILTER + ALLE-ZUSTAND
+// ══════════════════════════════════════════
+console.log('\n── 42. Netzwerk-Filter & Alle-Zustand ──');
+let f42Ok = 0, f42Fail = 0;
+
+// Netzwerk: Weltfilter
+content.includes('_nzNetSetWelt(') ? (ok('_nzNetSetWelt() definiert'), f42Ok++) : (fail('_nzNetSetWelt() fehlt'), f42Fail++);
+content.includes('_nzNetWelt') ? (ok('_nzNetWelt State vorhanden'), f42Ok++) : (fail('_nzNetWelt fehlt'), f42Fail++);
+content.includes('nz-net-welt-beide') ? (ok('Weltfilter Buttons im HTML'), f42Ok++) : (fail('Weltfilter Buttons fehlen'), f42Fail++);
+// weltOk in _nzNetRender
+const netRenderIdx = content.lastIndexOf('_nzNetRender() {');
+const netRenderSrc = netRenderIdx >= 0 ? content.slice(netRenderIdx, netRenderIdx+600) : '';
+netRenderSrc.includes('weltOk') ? (ok('_nzNetRender: weltOk Filter'), f42Ok++) : (fail('_nzNetRender: kein weltOk'), f42Fail++);
+
+// Netzwerk: Ohne-Verbindungen Toggle
+content.includes('_nzNetToggleOhne(') ? (ok('_nzNetToggleOhne() definiert'), f42Ok++) : (fail('_nzNetToggleOhne() fehlt'), f42Fail++);
+content.includes('_nzNetOhne') ? (ok('_nzNetOhne State vorhanden'), f42Ok++) : (fail('_nzNetOhne fehlt'), f42Fail++);
+content.includes('nz-net-ohne-btn') ? (ok('Ohne-Verbindungen Button im HTML'), f42Ok++) : (fail('nz-net-ohne-btn fehlt'), f42Fail++);
+// Default: true (isolierte anzeigen, default an)
+const netStateIdx = content.indexOf('_nzNetOhne:');
+const netStateSrc = netStateIdx >= 0 ? content.slice(netStateIdx, netStateIdx+30) : '';
+netStateSrc.includes('true') ? (ok('_nzNetOhne: default true (an)'), f42Ok++) : (fail('_nzNetOhne: nicht default true'), f42Fail++);
+
+// Alle Zustand: Button + Count
+content.includes('data-zustand="alle"') ? (ok('Alle-Button in Sidebar'), f42Ok++) : (fail('Alle-Button fehlt'), f42Fail++);
+content.includes('nz-cnt-alle') ? (ok('nz-cnt-alle Badge vorhanden'), f42Ok++) : (fail('nz-cnt-alle fehlt'), f42Fail++);
+// _nzGetListen: alle Zweig
+const getListenIdx = content.lastIndexOf("_nzGetListen() {");
+const getListenSrc = getListenIdx >= 0 ? content.slice(getListenIdx, getListenIdx+600) : '';
+getListenSrc.includes("zustand === 'alle'") ? (ok("_nzGetListen: 'alle' Zweig"), f42Ok++) : (fail("_nzGetListen: kein 'alle'"), f42Fail++);
+// _nzRenderDesktop: flache Liste bei "alle"
+const deskRenderIdx = content.lastIndexOf('_nzRenderDesktop(scroll)');
+const deskRenderSrc = deskRenderIdx >= 0 ? content.slice(deskRenderIdx, deskRenderIdx+4000) : '';
+deskRenderSrc.includes("_nzZustand === 'alle'") ? (ok("_nzRenderDesktop: flache Liste bei 'alle'"), f42Ok++) : (fail("_nzRenderDesktop: kein 'alle'"), f42Fail++);
+deskRenderSrc.includes('updatedAt') ? (ok('Sortierung nach updatedAt'), f42Ok++) : (fail('Sortierung fehlt'), f42Fail++);
+
+if (f42Fail === 0) ok(f42Ok + ' Netzwerk-Filter & Alle-Zustand Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
