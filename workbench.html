@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.58</title>
+  <title>WorkBench 3.0.59</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -931,8 +931,26 @@
     .ts-kd-item:last-child { border-bottom:none; }
     .ts-kd-chk { width:17px; height:17px; border-radius:4px; border:1.5px solid rgba(0,0,0,.25); flex-shrink:0; margin-top:2px; display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff; background:rgba(255,255,255,.4); cursor:pointer; }
     .ts-kd-chk.done { background:var(--accent); border-color:var(--accent); }
-    .ts-kd-txt { font-size:14px; color:var(--text); line-height:1.4; }
+    .ts-kd-txt { font-size:14px; color:var(--text); line-height:1.4; flex:1; }
     .ts-kd-txt.done { text-decoration:line-through; color:var(--faint); }
+    /* Hybrid item actions: edit/delete/drag */
+    .hb-item { display:flex; align-items:center; gap:6px; padding:5px 2px; border-bottom:.5px solid rgba(0,0,0,.08); }
+    .hb-item:last-child { border-bottom:none; }
+    .hb-drag { cursor:grab; color:var(--faint); flex-shrink:0; opacity:.5; touch-action:none; }
+    .hb-drag:hover { opacity:1; }
+    .hb-item.hb-dragging { opacity:.3; }
+    .hb-item.hb-drag-over { border-top:2px solid var(--accent); }
+    .hb-txt { flex:1; font-size:14px; color:var(--text); line-height:1.4; min-width:0; word-break:break-word; }
+    .hb-txt.done { text-decoration:line-through; color:var(--faint); }
+    .hb-txt[contenteditable="true"] { outline:none; background:rgba(0,0,0,.04); border-radius:3px; padding:1px 3px; }
+    .hb-del { flex-shrink:0; cursor:pointer; color:var(--faint); font-size:14px; opacity:.4; padding:0 2px; display:none; }
+    .hb-item:hover .hb-del { display:block; }
+    .hb-del:hover { opacity:1; color:var(--danger); }
+    /* Checkliste Footer direkt im Body */
+    .hb-add-row { display:flex; align-items:center; gap:5px; padding:6px 2px 2px; margin-top:2px; }
+    .hb-add-inp { flex:1; border:none; background:none; outline:none; font-size:13px; font-family:var(--font); color:var(--text); }
+    .hb-add-inp::placeholder { color:var(--faint); }
+    .hb-add-ok { font-size:11px; font-weight:700; color:var(--accent); cursor:pointer; }
     .ts-kd-foot { display:flex; align-items:center; gap:5px; padding:5px 9px; border-top:1px solid rgba(0,0,0,.08); flex-shrink:0; background:rgba(255,255,255,.2); }
     .ts-kd-plus { font-size:13px; color:var(--faint); }
     .ts-kd-inp { flex:1; border:none; background:none; outline:none; font-size:12px; font-family:var(--font); color:var(--text); }
@@ -982,7 +1000,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.58</div>
+  <div id="wb-startup-tagline">v3.0.59</div>
 </div>
 
 <!-- Modal -->
@@ -1150,7 +1168,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.58</span>
+    <span id="wb-menu-version">v3.0.59</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1404,8 +1422,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.58',
-  APP_BUILD:   '20260626-0930',
+  APP_VERSION: '3.0.59',
+  APP_BUILD:   '20260626-1100',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1852,7 +1870,7 @@ const WB = {
     const body = document.getElementById('ts-kd-body');
     const foot = document.getElementById('ts-kd-foot');
     if (body) body.innerHTML = this._renderHybridBody(l, listeId, 'ts');
-    if (foot) foot.style.display = '';
+    if (foot) foot.style.display = 'none'; // Add-Row ist im Body
     // Zähler aktualisieren
     const allItems2 = (l.items||[]).filter(i => !i.deleted);
     const doneItems2 = allItems2.filter(i => i.done);
@@ -2846,38 +2864,117 @@ const WB = {
     this._tsRenderNotizenKompakt();
   },
 
+  _nzHybridItemDrop(e, listeId, toItemId, ctx) {
+    e.preventDefault();
+    const drag = this._nzItemDragId;
+    if (!drag || drag.listeId !== listeId || drag.itemId === toItemId) return;
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l || !l.items) return;
+    const fi = l.items.findIndex(x => x.id === drag.itemId);
+    const ti = l.items.findIndex(x => x.id === toItemId);
+    if (fi < 0 || ti < 0) return;
+    const [moved] = l.items.splice(fi, 1);
+    l.items.splice(ti, 0, moved);
+    l.updatedAt = this._now();
+    this.setDirty();
+    if (ctx === 'ts') { this._tsKachelOpen(listeId, true); this._tsRenderNotizenKompakt(); }
+    else { this._nzDetailOpen(listeId, true); this.renderNotizenTab(); }
+  },
+
+  _nzHybridItemEdit(el, listeId, itemId, ctx) {
+    // Inline-Edit: doppelklick macht Span editierbar
+    el.contentEditable = 'true';
+    el.focus();
+    // Cursor ans Ende
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+    const save = () => {
+      el.contentEditable = 'false';
+      const text = el.textContent.trim();
+      if (!text) return;
+      const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+      const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+      i.text = text; l.updatedAt = this._now(); this.setDirty();
+      if (ctx === 'ts') { this._tsKachelOpen(listeId, true); }
+      else { this._nzDetailOpen(listeId, true); this.renderNotizenTab(); }
+    };
+    el.onblur = save;
+    el.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } if (e.key === 'Escape') { el.contentEditable = 'false'; } };
+  },
+
+  _tsKdItemDelete(listeId, itemId) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    i.deleted = true; l.updatedAt = this._now(); this.setDirty();
+    this._tsKachelOpen(listeId, true); this._tsRenderNotizenKompakt();
+  },
+
+  _nzDetailItemDelete(listeId, itemId) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    i.deleted = true; l.updatedAt = this._now(); this.setDirty();
+    this._nzDetailOpen(listeId, true); this.renderNotizenTab();
+  },
+
   // ── Gemeinsamer Hybrid-Body-Render (Heute-Tab + Notizen-Detail-Panel) ──
   // Checkliste OBEN (immer sichtbar) + Freitext UNTEN (immer sichtbar)
   _renderHybridBody(l, listeId, ctx) {
     // ctx = 'ts' (Heute-Tab) oder 'nz' (Notizen-Panel)
-    const cbFn  = ctx === 'ts' ? '_tsKdCbToggle'   : '_nzDetailCbToggle';
-    const ftId  = ctx === 'ts' ? 'ts-kd-ft'        : 'nz-dp-ft';
+    const cbFn  = ctx === 'ts' ? '_tsKdCbToggle'     : '_nzDetailCbToggle';
+    const delFn = ctx === 'ts' ? '_tsKdItemDelete'   : '_nzDetailItemDelete';
+    const addFn = ctx === 'ts' ? '_tsKachelAdd'      : '_nzDetailAdd';
+    const ftId  = ctx === 'ts' ? 'ts-kd-ft'          : 'nz-dp-ft';
     const ftFn  = ctx === 'ts' ? '_tsKdFreitextInput' : '_nzDetailFreitextInput';
+    const addInpId = ctx === 'ts' ? 'ts-kd-inp' : 'nz-dp-inp';
 
-    const allItems   = (l.items||[]).filter(i => !i.deleted);
-    const openItems  = allItems.filter(i => !i.done);
-    const doneItems  = allItems.filter(i =>  i.done);
+    const dragSvg = '<svg class="hb-drag" width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><circle cx="4" cy="3" r="1.2"/><circle cx="4" cy="8" r="1.2"/><circle cx="4" cy="13" r="1.2"/><circle cx="8" cy="3" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="8" cy="13" r="1.2"/></svg>';
 
-    // Sektion 1: Checkliste
+    const allItems  = (l.items||[]).filter(i => !i.deleted);
+    const openItems = allItems.filter(i => !i.done);
+    const doneItems = allItems.filter(i =>  i.done);
+
+    const renderItem = (i, draggable, isDone) => {
+      const chk = isDone
+        ? '<div class="ts-kd-chk done" onclick="event.stopPropagation();WB.' + cbFn + '(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')">&#10003;</div>'
+        : '<div class="ts-kd-chk" onclick="event.stopPropagation();WB.' + cbFn + '(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')"></div>';
+      const drag = draggable
+        ? ' draggable="true"'
+          + ' ondragstart="WB._nzItemDragStart(event,\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')"'
+          + ' ondragover="event.preventDefault();this.classList.add(\'hb-drag-over\')"'
+          + ' ondragleave="this.classList.remove(\'hb-drag-over\')"'
+          + ' ondrop="this.classList.remove(\'hb-drag-over\');WB._nzHybridItemDrop(event,\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\',\'' + ctx + '\')"' : '';
+      return '<div class="hb-item"' + drag + '>'
+        + (draggable ? dragSvg : '<span style="width:12px;flex-shrink:0;"></span>')
+        + chk
+        + '<span class="hb-txt' + (isDone ? ' done' : '') + '"'
+          + ' ondblclick="WB._nzHybridItemEdit(this,\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\',\'' + ctx + '\')">'
+          + this._esc(i.text) + '</span>'
+        + '<span class="hb-del" onclick="event.stopPropagation();WB.' + delFn + '(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')">×</span>'
+        + '</div>';
+    };
+
+    // Sektion 1: Checkliste + Add-Row direkt darunter
     let checkH = '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);padding:6px 2px 4px;">Checkliste</div>';
-    if (openItems.length || doneItems.length) {
-      checkH += openItems.map(i =>
-        '<div class="ts-kd-item"><div class="ts-kd-chk" onclick="event.stopPropagation();WB.' + cbFn + '(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')"></div>'
-        + '<span class="ts-kd-txt">' + this._esc(i.text) + '</span></div>'
-      ).join('');
-      if (doneItems.length) {
-        checkH += '<div style="font-size:9px;font-weight:800;text-transform:uppercase;color:var(--faint);padding:6px 2px 2px;letter-spacing:.06em;">Erledigt</div>';
-        checkH += doneItems.map(i =>
-          '<div class="ts-kd-item"><div class="ts-kd-chk done" onclick="event.stopPropagation();WB.' + cbFn + '(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')">&#10003;</div>'
-          + '<span class="ts-kd-txt done">' + this._esc(i.text) + '</span></div>'
-        ).join('');
-      }
-    } else {
+    checkH += openItems.map(i => renderItem(i, true, false)).join('');
+    if (doneItems.length) {
+      checkH += '<div style="font-size:9px;font-weight:800;text-transform:uppercase;color:var(--faint);padding:6px 2px 2px;letter-spacing:.06em;">Erledigt</div>';
+      checkH += doneItems.map(i => renderItem(i, false, true)).join('');
+    }
+    if (!openItems.length && !doneItems.length) {
       checkH += '<div style="font-size:12px;color:var(--faint);padding:3px 2px 4px;font-style:italic;">Noch keine Eintr&#228;ge</div>';
     }
+    // Add-Row direkt unter Checkliste
+    checkH += '<div class="hb-add-row">'
+      + '<span style="font-size:13px;color:var(--faint);">+</span>'
+      + '<input id="' + addInpId + '" class="hb-add-inp" placeholder="Checklistenpunkt hinzuf&#252;gen..."'
+      + ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();WB.' + addFn + '()}">'
+      + '<span class="hb-add-ok" onclick="WB.' + addFn + '()">OK</span>'
+      + '</div>';
 
     // Sektion 2: Freitext
-    const ftH = '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);padding:8px 2px 4px;border-top:1px solid rgba(0,0,0,.1);margin-top:6px;">Freitext</div>'
+    const ftH = '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);padding:8px 2px 4px;border-top:1px solid rgba(0,0,0,.1);margin-top:4px;">Freitext</div>'
       + '<div id="' + ftId + '" contenteditable="true" spellcheck="true"'
       + ' oninput="WB.' + ftFn + '()"'
       + ' style="outline:none;font-size:14px;line-height:1.6;color:var(--text);font-family:var(--font);padding:4px 2px;min-height:60px;">'
@@ -2940,12 +3037,6 @@ const WB = {
           + '</span>').join('')
       : '<span style="font-size:11px;color:var(--faint);font-style:italic;">Keine</span>';
 
-    // Backlink-Suche
-    const blSearchH = '<input id="nz-dp-bl-search" class="nz-dp-tag-inp" placeholder="Notiz verknüpfen..." '
-      + 'oninput="WB._nzDetailBlSearch(this.value,\'' + id + '\')" '
-      + 'style="flex:1;font-size:11px;">'
-      + '<div id="nz-dp-bl-results" style="display:none;position:absolute;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;z-index:200;max-height:150px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.12);left:68px;right:10px;top:calc(100% + 2px);"></div>';
-
     return ''
       + '<div class="nz-dp-meta-row"><span class="nz-dp-meta-lbl">Farbe</span>' + farbDots + '</div>'
       + '<div class="nz-dp-meta-row"><span class="nz-dp-meta-lbl">Welt</span>' + weltBtns + '</div>'
@@ -2965,10 +3056,13 @@ const WB = {
       +   '<button class="nz-dp-toggle' + (isPin   ? ' on' : '') + '" style="' + (isPin ? 'border-color:var(--accent);background:var(--accent);' : '') + '" onclick="WB._nzDetailTogglePin(\'' + id + '\')">📌 Fokus</button>'
       +   '<button class="nz-dp-toggle' + (isHeute ? ' on' : '') + '" style="' + (isHeute ? 'border-color:#8E44AD;background:#8E44AD;' : '') + '" onclick="WB._nzDetailToggleHeute(\'' + id + '\')">⏱ Heute</button>'
       + '</div>'
-      + '<div class="nz-dp-meta-row" style="flex-wrap:wrap;align-items:flex-start;position:relative;"><span class="nz-dp-meta-lbl" style="margin-top:4px;">Verknüpft</span>'
-      +   '<div style="flex:1;min-width:0;">'
-      +     '<div style="display:flex;flex-wrap:wrap;">' + linkedH + '</div>'
-      +     '<div style="display:flex;align-items:center;gap:4px;margin-top:4px;position:relative;">' + blSearchH + '</div>'
+      + '<div class="nz-dp-meta-row" style="align-items:flex-start;flex-direction:column;gap:4px;"><span class="nz-dp-meta-lbl" style="margin-top:0;">Verknüpft</span>'
+      +   '<div style="display:flex;flex-wrap:wrap;gap:4px;width:100%;">' + linkedH + '</div>'
+      +   '<div style="display:flex;align-items:center;gap:4px;position:relative;width:100%;margin-top:2px;">'
+      +     '<input id="nz-dp-bl-search" class="nz-dp-tag-inp" placeholder="+ Notiz verknüpfen..." '
+      +     'oninput="WB._nzDetailBlSearch(this.value,\'' + id + '\')" '
+      +     'style="flex:1;font-size:12px;border:1.5px solid var(--border);border-radius:8px;padding:3px 8px;background:var(--surface);outline:none;">'
+      +     '<div id="nz-dp-bl-results" style="display:none;position:absolute;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;z-index:400;max-height:160px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.15);left:0;right:0;top:calc(100% + 4px);"></div>'
       +   '</div>'
       + '</div>';
   },
@@ -3233,7 +3327,8 @@ const WB = {
     const body = document.getElementById('nz-dp-body');
     const foot = document.getElementById('nz-dp-foot');
     if (body) body.innerHTML = this._renderHybridBody(l, listeId, 'nz');
-    if (foot) foot.style.display = '';
+    // Footer ausblenden — Add-Row ist jetzt direkt im Body unter Checkliste
+    if (foot) foot.style.display = 'none';
     if (!silent) {
       const inp = document.getElementById('nz-dp-inp');
       if (inp) inp.value = '';

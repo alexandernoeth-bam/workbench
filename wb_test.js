@@ -519,15 +519,15 @@ content.includes('_tsKdFreitextSave')
 // Footer (ts-kd-foot) hat id
 content.includes('id="ts-kd-foot"')
   ? (ok('#ts-kd-foot hat id'), f31Ok++) : (fail('#ts-kd-foot fehlt id'), f31Fail++);
-// Hybrid: Footer ist immer sichtbar (kein display:none mehr bei Freitext)
-content.includes("foot.style.display = ''") || content.includes('foot.style.display=\'\'')
-  ? (ok('Footer im Hybrid-Render immer sichtbar'), f31Ok++) : (fail('Footer-Anzeige fehlt'), f31Fail++);
+// Hybrid: Footer ist jetzt im Body (Add-Row direkt unter Checkliste)
+content.includes("foot.style.display = 'none'")
+  ? (ok('Footer im Hybrid: ausgeblendet (Add-Row im Body)'), f31Ok++) : (fail('Footer-Anzeige nicht korrekt'), f31Fail++);
 
-// Checkliste: ts-kd-chk Checkboxen im Hybrid
+// Hybrid: hb-item + hb-add-row
 const hybridIdx = content.indexOf('_renderHybridBody(l, listeId, ctx)');
-const hybridSrc = hybridIdx >= 0 ? content.slice(hybridIdx, hybridIdx + 1200) : '';
-hybridSrc.includes('ts-kd-chk')
-  ? (ok('Hybrid: ts-kd-chk Checkboxen im Body'), f31Ok++) : (fail('Hybrid: keine Checkboxen'), f31Fail++);
+const hybridSrc = hybridIdx >= 0 ? content.slice(hybridIdx, hybridIdx + 4000) : '';
+hybridSrc.includes('hb-item') && hybridSrc.includes('hb-add-row')
+  ? (ok('Hybrid: hb-item + hb-add-row'), f31Ok++) : (fail('Hybrid: neue Item-Klassen fehlen'), f31Fail++);
 hybridSrc.includes('Checkliste') && hybridSrc.includes('Freitext')
   ? (ok('Hybrid: Sektion "Checkliste" + "Freitext" vorhanden'), f31Ok++) : (fail('Hybrid: Sektions-Label fehlen'), f31Fail++);
 
@@ -746,10 +746,10 @@ content.includes("bodyEl2.style.background = bg")
 content.includes('_renderHybridBody(')
   ? (ok('_renderHybridBody() definiert'), f36Ok++) : (fail('_renderHybridBody() fehlt'), f36Fail++);
 const hybIdx2 = content.indexOf('_renderHybridBody(l, listeId, ctx)');
-const hybSrc2 = hybIdx2 >= 0 ? content.slice(hybIdx2, hybIdx2+1500) : '';
+const hybSrc2 = hybIdx2 >= 0 ? content.slice(hybIdx2, hybIdx2+4000) : '';
 hybSrc2.includes("ctx === 'ts'") && hybSrc2.includes('nz-dp-ft')
   ? (ok('_renderHybridBody: ctx-Parameter (ts/nz)'), f36Ok++) : (fail('_renderHybridBody: kein ctx-Parameter'), f36Fail++);
-hybSrc2.includes('Checkliste') && hybSrc2.includes('Freitext')
+hybSrc2.includes('hb-item') && hybSrc2.includes('hb-add-row')
   ? (ok('Hybrid: beide Sektionen'), f36Ok++) : (fail('Hybrid: Sektionen fehlen'), f36Fail++);
 
 // heutePin: Tageswechsel-Reset + Limit 2
@@ -853,6 +853,45 @@ content.includes("_drivePickerOpen(")
   ? (ok('Drive-Button im Link-Feld verankert'), f37Ok++) : (fail('Drive-Button fehlt im Link-Feld'), f37Fail++);
 
 if (f37Fail === 0) ok(f37Ok + ' Drive-Picker Checks bestanden');
+
+// ══════════════════════════════════════════
+// 38. HYBRID CHECKLIST: EDIT/DELETE/DRAG + BACKLINK
+// ══════════════════════════════════════════
+console.log('\n── 38. Hybrid Checklist & Backlink ──');
+let f38Ok = 0, f38Fail = 0;
+
+// CSS neue Klassen
+content.includes('.hb-item {') ? (ok('.hb-item CSS'), f38Ok++) : (fail('.hb-item CSS fehlt'), f38Fail++);
+content.includes('.hb-drag {') ? (ok('.hb-drag CSS'), f38Ok++) : (fail('.hb-drag CSS fehlt'), f38Fail++);
+content.includes('.hb-del {')  ? (ok('.hb-del CSS'), f38Ok++)  : (fail('.hb-del CSS fehlt'), f38Fail++);
+content.includes('.hb-add-row {') ? (ok('.hb-add-row CSS'), f38Ok++) : (fail('.hb-add-row CSS fehlt'), f38Fail++);
+content.includes('.hb-txt {')  ? (ok('.hb-txt CSS'), f38Ok++)  : (fail('.hb-txt CSS fehlt'), f38Fail++);
+
+// Neue Hilfsfunktionen
+content.includes('_nzHybridItemDrop(')  ? (ok('_nzHybridItemDrop() definiert'), f38Ok++)  : (fail('_nzHybridItemDrop() fehlt'), f38Fail++);
+content.includes('_nzHybridItemEdit(')  ? (ok('_nzHybridItemEdit() definiert'), f38Ok++)  : (fail('_nzHybridItemEdit() fehlt'), f38Fail++);
+content.includes('_tsKdItemDelete(')    ? (ok('_tsKdItemDelete() definiert'), f38Ok++)    : (fail('_tsKdItemDelete() fehlt'), f38Fail++);
+content.includes('_nzDetailItemDelete(')? (ok('_nzDetailItemDelete() definiert'), f38Ok++) : (fail('_nzDetailItemDelete() fehlt'), f38Fail++);
+
+// Drag in Hybrid-Body vorhanden
+const hybIdx38 = content.indexOf('_renderHybridBody(l, listeId, ctx)');
+const hybSrc38 = hybIdx38 >= 0 ? content.slice(hybIdx38, hybIdx38+4000) : '';
+hybSrc38.includes('ondragstart') && hybSrc38.includes('_nzHybridItemDrop')
+  ? (ok('Hybrid: Drag-and-Drop in Items'), f38Ok++) : (fail('Hybrid: kein Drag-and-Drop'), f38Fail++);
+hybSrc38.includes('_nzHybridItemEdit')
+  ? (ok('Hybrid: Inline-Edit (dblclick)'), f38Ok++) : (fail('Hybrid: kein Inline-Edit'), f38Fail++);
+hybSrc38.includes('hb-del')
+  ? (ok('Hybrid: Delete-Button in Items'), f38Ok++) : (fail('Hybrid: kein Delete-Button'), f38Fail++);
+hybSrc38.includes('hb-add-row')
+  ? (ok('Hybrid: Add-Row direkt unter Checkliste'), f38Ok++) : (fail('Hybrid: Add-Row fehlt'), f38Fail++);
+
+// Backlink: verbesserte Darstellung
+const blMetaIdx = content.indexOf('Verknüpft');
+const blMetaSrc = blMetaIdx >= 0 ? content.slice(blMetaIdx, blMetaIdx+500) : '';
+blMetaSrc.includes('flex-wrap:wrap') ? (ok('Backlink: flex-wrap für Chips'), f38Ok++) : (fail('Backlink: kein flex-wrap'), f38Fail++);
+content.includes('nz-dp-bl-results') ? (ok('Backlink: Dropdown vorhanden'), f38Ok++) : (fail('Backlink: Dropdown fehlt'), f38Fail++);
+
+if (f38Fail === 0) ok(f38Ok + ' Hybrid-Checklist & Backlink Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════
