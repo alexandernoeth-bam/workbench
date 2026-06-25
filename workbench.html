@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.59</title>
+  <title>WorkBench 3.0.60</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -530,7 +530,7 @@
     /* Rechtes Detail-Panel */
     #nz-detail-panel {
       position: absolute; right: 0; top: 0; bottom: 0;
-      width: 0; overflow: hidden;
+      width: 0; overflow-x: hidden; overflow-y: visible;
       border-left: 1.5px solid var(--border);
       display: flex; flex-direction: column;
       transition: width .2s ease;
@@ -1000,7 +1000,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.59</div>
+  <div id="wb-startup-tagline">v3.0.60</div>
 </div>
 
 <!-- Modal -->
@@ -1168,7 +1168,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.59</span>
+    <span id="wb-menu-version">v3.0.60</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1259,6 +1259,11 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
               Archiv <span class="nz-sb-badge" id="nz-cnt-archiv"></span>
             </button>
+            <div class="nz-sb-sep" style="margin:4px 0;"></div>
+            <button class="nz-sb-btn" data-filter="offene-checklisten" onclick="WB._nzToggleOffeneChecklisten()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="5" width="4" height="4" rx="1"/><line x1="9" y1="7" x2="20" y2="7"/><rect x="3" y="13" width="4" height="4" rx="1"/><line x1="9" y1="15" x2="20" y2="15"/></svg>
+              Offene Checklisten <span class="nz-sb-badge" id="nz-cnt-offene-cl"></span>
+            </button>
           </div>
           <div class="nz-sb-sep"></div>
           <!-- Sektion 2: Tags -->
@@ -1299,20 +1304,19 @@
             <button class="nz-dp-settings" onclick="WB._nzDetailSettings()" title="Einstellungen">⚙</button>
           </div>
           <!-- Meta-Bereich: Farbe, Welt, Tags, Link, Vertraulich, Deadline -->
-          <div class="nz-dp-meta" id="nz-dp-meta" style="position:relative;">
-            <!-- Drive-Picker Dropdown (absolut) -->
-            <div id="nz-drive-picker">
-              <div class="nz-drive-search-row">
-                <input id="nz-drive-search-inp" class="nz-drive-search-inp" placeholder="🔍 Datei suchen..." oninput="WB._drivePickerSearch(this.value)">
-                <button onclick="WB._drivePickerClose()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--faint);">×</button>
-              </div>
-              <div class="nz-drive-results" id="nz-drive-results">
-                <div class="nz-drive-empty">Tippe um zu suchen...</div>
-              </div>
-              <div class="nz-drive-footer">
-                <button class="nz-drive-new-btn" onclick="WB._driveNewDoc()">📄 Neues Google Doc</button>
-                <button class="nz-drive-new-btn" onclick="WB._driveNewSheet()">📊 Neues Google Sheet</button>
-              </div>
+          <div class="nz-dp-meta" id="nz-dp-meta"></div>
+          <!-- Drive-Picker Dropdown (außerhalb Meta, absolut im Panel) -->
+          <div id="nz-drive-picker" style="position:absolute;right:0;top:0;bottom:0;width:100%;z-index:500;display:none;flex-direction:column;background:var(--surface);border-left:1.5px solid var(--border);">
+            <div class="nz-drive-search-row">
+              <input id="nz-drive-search-inp" class="nz-drive-search-inp" placeholder="🔍 Datei suchen..." oninput="WB._drivePickerSearch(this.value)">
+              <button onclick="WB._drivePickerClose()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--faint);padding:0 4px;">×</button>
+            </div>
+            <div class="nz-drive-results" id="nz-drive-results" style="flex:1;overflow-y:auto;">
+              <div class="nz-drive-empty">Tippe um zu suchen...</div>
+            </div>
+            <div class="nz-drive-footer">
+              <button class="nz-drive-new-btn" onclick="WB._driveNewDoc()">📄 Neues Google Doc</button>
+              <button class="nz-drive-new-btn" onclick="WB._driveNewSheet()">📊 Neues Google Sheet</button>
             </div>
           </div>
           <div class="nz-dp-body" id="nz-dp-body"></div>
@@ -1422,8 +1426,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.59',
-  APP_BUILD:   '20260626-1100',
+  APP_VERSION: '3.0.60',
+  APP_BUILD:   '20260626-1230',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2193,6 +2197,7 @@ const WB = {
   _nzActiveTag:     null,   // Sidebar Tag-Filter
   _nzZeit:          'alle', // Sidebar Zeitachse: 'woche'|'monat'|'alle'
   _nzDetailId:      null,   // Detail-Panel aktive ID
+  _nzOffeneCL:      false,  // Filter: nur Notizen mit offenen Checklistenpunkten
   _nzDragId: null,
   _nzFtListeId: null,
 
@@ -2717,6 +2722,24 @@ const WB = {
       );
     }
 
+    // Offene-Checklisten-Filter (zustandsübergreifend)
+    if (this._nzOffeneCL) {
+      liste = (this.db.notizen||[]).filter(l =>
+        !l.deleted &&
+        (l.items||[]).some(i => !i.deleted && !i.done)
+      );
+      // Welt-Filter weiterhin anwenden
+      if (welt && welt !== 'beide') {
+        liste = liste.filter(l => {
+          const lw = l.welt;
+          if (!lw) return true;
+          if (welt === 'beruf')  return lw === 'beruf'  || lw === 'pro';
+          if (welt === 'privat') return lw === 'privat' || lw === 'priv';
+          return true;
+        });
+      }
+    }
+
     // Tag-Filter
     if (this._nzActiveTag) {
       liste = liste.filter(l => (l.tags||[]).includes(this._nzActiveTag));
@@ -2791,17 +2814,39 @@ const WB = {
       const el = document.getElementById('nz-cnt-' + z);
       if (el) el.textContent = '(' + counts[z] + ')';
     });
+    // Offene Checklisten Count
+    const offeneCLCount = db.notizen.filter(l =>
+      !l.deleted && weltOk(l) && (l.items||[]).some(i => !i.deleted && !i.done)
+    ).length;
+    const elOCL = document.getElementById('nz-cnt-offene-cl');
+    if (elOCL) elOCL.textContent = '(' + offeneCLCount + ')';
   },
 
   _nzSetZustand(zustand) {
     this._nzZustand = zustand;
+    this._nzOffeneCL = false; // Offene-CL-Filter zurücksetzen
     // Sidebar-Buttons synchronisieren
     document.querySelectorAll('#nz-sidebar .nz-sb-btn[data-zustand]').forEach(b =>
       b.classList.toggle('active', b.dataset.zustand === zustand)
     );
+    document.querySelectorAll('#nz-sidebar .nz-sb-btn[data-filter="offene-checklisten"]').forEach(b =>
+      b.classList.remove('active')
+    );
     // Legacy Tab-Buttons (falls noch vorhanden)
     document.querySelectorAll('.nz-ztab').forEach(b =>
       b.classList.toggle('active', b.dataset.zustand === zustand)
+    );
+    this.renderNotizenTab();
+  },
+
+  _nzToggleOffeneChecklisten() {
+    this._nzOffeneCL = !this._nzOffeneCL;
+    // Zustand-Buttons deaktivieren wenn Offene-CL aktiv (zustandsübergreifend)
+    document.querySelectorAll('#nz-sidebar .nz-sb-btn[data-zustand]').forEach(b =>
+      b.classList.toggle('active', !this._nzOffeneCL && b.dataset.zustand === this._nzZustand)
+    );
+    document.querySelectorAll('#nz-sidebar .nz-sb-btn[data-filter="offene-checklisten"]').forEach(b =>
+      b.classList.toggle('active', this._nzOffeneCL)
     );
     this.renderNotizenTab();
   },
@@ -3058,11 +3103,11 @@ const WB = {
       + '</div>'
       + '<div class="nz-dp-meta-row" style="align-items:flex-start;flex-direction:column;gap:4px;"><span class="nz-dp-meta-lbl" style="margin-top:0;">Verknüpft</span>'
       +   '<div style="display:flex;flex-wrap:wrap;gap:4px;width:100%;">' + linkedH + '</div>'
-      +   '<div style="display:flex;align-items:center;gap:4px;position:relative;width:100%;margin-top:2px;">'
-      +     '<input id="nz-dp-bl-search" class="nz-dp-tag-inp" placeholder="+ Notiz verknüpfen..." '
+      +   '<div style="position:relative;width:100%;margin-top:2px;">'
+      +     '<input id="nz-dp-bl-search" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:4px 8px;font-size:12px;font-family:var(--font);background:var(--surface);color:var(--text);outline:none;" placeholder="+ Notiz verknüpfen..." '
       +     'oninput="WB._nzDetailBlSearch(this.value,\'' + id + '\')" '
-      +     'style="flex:1;font-size:12px;border:1.5px solid var(--border);border-radius:8px;padding:3px 8px;background:var(--surface);outline:none;">'
-      +     '<div id="nz-dp-bl-results" style="display:none;position:absolute;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;z-index:400;max-height:160px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.15);left:0;right:0;top:calc(100% + 4px);"></div>'
+      +     'onfocus="this.style.borderColor=\'var(--accent)\'" onblur="this.style.borderColor=\'var(--border)\'">'
+      +     '<div id="nz-dp-bl-results" style="display:none;position:absolute;background:var(--surface);border:1.5px solid var(--accent);border-radius:8px;z-index:500;max-height:180px;overflow-y:auto;box-shadow:0 6px 20px rgba(0,0,0,.2);left:0;right:0;top:calc(100% + 2px);"></div>'
       +   '</div>'
       + '</div>';
   },
@@ -3205,19 +3250,15 @@ const WB = {
     this._drivePickerListeId = listeId;
     const picker = document.getElementById('nz-drive-picker');
     if (!picker) return;
-    picker.classList.add('open');
+    picker.style.display = 'flex';
+    const res = document.getElementById('nz-drive-results');
+    if (res) res.innerHTML = '<div class="nz-drive-empty">Tippe um zu suchen...</div>';
     setTimeout(() => document.getElementById('nz-drive-search-inp')?.focus(), 50);
-    // Klick außerhalb schließt
-    setTimeout(() => {
-      const close = (e) => {
-        if (!picker.contains(e.target)) { this._drivePickerClose(); document.removeEventListener('click', close); }
-      };
-      document.addEventListener('click', close);
-    }, 100);
   },
 
   _drivePickerClose() {
-    document.getElementById('nz-drive-picker')?.classList.remove('open');
+    const picker = document.getElementById('nz-drive-picker');
+    if (picker) picker.style.display = 'none';
     const inp = document.getElementById('nz-drive-search-inp');
     if (inp) inp.value = '';
     this._drivePickerListeId = null;

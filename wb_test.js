@@ -893,6 +893,48 @@ content.includes('nz-dp-bl-results') ? (ok('Backlink: Dropdown vorhanden'), f38O
 
 if (f38Fail === 0) ok(f38Ok + ' Hybrid-Checklist & Backlink Checks bestanden');
 
+// ══════════════════════════════════════════
+// 39. OFFENE-CL-FILTER + DRIVE-FIX + BACKLINK-FIX
+// ══════════════════════════════════════════
+console.log('\n── 39. Filter, Drive, Backlink ──');
+let f39Ok = 0, f39Fail = 0;
+
+// Offene Checklisten Filter
+content.includes('_nzToggleOffeneChecklisten()')
+  ? (ok('_nzToggleOffeneChecklisten() definiert'), f39Ok++) : (fail('_nzToggleOffeneChecklisten() fehlt'), f39Fail++);
+content.includes('_nzOffeneCL')
+  ? (ok('_nzOffeneCL State vorhanden'), f39Ok++) : (fail('_nzOffeneCL fehlt'), f39Fail++);
+content.includes('data-filter="offene-checklisten"')
+  ? (ok('Offene-CL Sidebar-Button im HTML'), f39Ok++) : (fail('Offene-CL Button fehlt'), f39Fail++);
+content.includes('nz-cnt-offene-cl')
+  ? (ok('nz-cnt-offene-cl Badge vorhanden'), f39Ok++) : (fail('nz-cnt-offene-cl fehlt'), f39Fail++);
+const oclIdx = content.indexOf('this._nzOffeneCL');
+const oclSrc = oclIdx >= 0 ? content.slice(oclIdx, oclIdx+300) : '';
+// Check filter in _nzGetListen
+content.includes('some(i => !i.deleted && !i.done)')
+  ? (ok('Offene-CL: Filter-Logik korrekt'), f39Ok++) : (fail('Offene-CL: Filter-Logik fehlt'), f39Fail++);
+
+// Drive-Picker Fix: außerhalb Meta
+const drivePickerHtml = content.indexOf('id="nz-drive-picker"');
+const drivePickerSrc = drivePickerHtml >= 0 ? content.slice(drivePickerHtml-100, drivePickerHtml+50) : '';
+// Drive-Picker sollte NICHT innerhalb nz-dp-meta innerHTML sein
+!content.includes('nz-dp-meta">\n            <!-- Drive-Picker')
+  ? (ok('Drive-Picker: außerhalb nz-dp-meta'), f39Ok++) : (fail('Drive-Picker: noch innerhalb nz-dp-meta'), f39Fail++);
+content.includes("picker.style.display = 'flex'")
+  ? (ok('Drive-Picker: display:flex statt classList'), f39Ok++) : (fail('Drive-Picker: classList noch verwendet'), f39Fail++);
+
+// overflow-x:hidden statt overflow:hidden auf Panel
+const panelCssIdx = content.indexOf('#nz-detail-panel {');
+const panelCssSrc = panelCssIdx >= 0 ? content.slice(panelCssIdx, panelCssIdx+300) : '';
+panelCssSrc.includes('overflow-x: hidden') && !panelCssSrc.includes('overflow: hidden')
+  ? (ok('Panel: overflow-x:hidden (Dropdowns nicht abgeschnitten)'), f39Ok++) : (fail('Panel: overflow:hidden schneidet Dropdowns ab'), f39Fail++);
+
+// Backlink-Dropdown z-index hoch genug
+content.includes('z-index:500') || content.includes('z-index: 500')
+  ? (ok('Backlink-Dropdown: z-index 500'), f39Ok++) : (fail('Backlink-Dropdown: z-index zu niedrig'), f39Fail++);
+
+if (f39Fail === 0) ok(f39Ok + ' Filter/Drive/Backlink Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
