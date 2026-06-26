@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.75</title>
+  <title>WorkBench 3.0.76</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -621,7 +621,23 @@
     .nz-fs-close:hover { border-color:var(--accent); color:var(--accent); }
     .nz-fs-body { flex:1; overflow-y:auto; padding:20px 32px; max-width:900px; margin:0 auto; width:100%; }
     .nz-fs-section-lbl { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); padding:10px 0 6px; }
-    .nz-fs-ft { outline:none; font-size:16px; line-height:1.7; color:var(--text); font-family:var(--font); min-height:200px; width:100%; }
+    /* Freitext Formatierungs-Toolbar */
+    .ft-toolbar { display:none; align-items:center; gap:2px; padding:4px 6px; background:var(--surface2); border-bottom:1px solid var(--border); border-radius:6px 6px 0 0; flex-shrink:0; flex-wrap:wrap; }
+    .ft-toolbar.visible { display:flex; }
+    .ft-tb-btn { padding:3px 7px; border:1.5px solid transparent; border-radius:5px; background:none; cursor:pointer; font-size:13px; font-weight:700; color:var(--text); font-family:var(--font); line-height:1; transition:background .1s; }
+    .ft-tb-btn:hover { background:var(--border); }
+    .ft-tb-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .ft-tb-sep { width:1px; height:16px; background:var(--border); margin:0 3px; flex-shrink:0; }
+    .ft-tb-label { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--faint); padding:0 4px; }
+    /* Tabellen im Freitext */
+    .nz-ft-area table { border-collapse:collapse; width:100%; margin:6px 0; font-size:13px; }
+    .nz-ft-area th { background:var(--surface2); font-weight:800; border:1.5px solid var(--border); padding:5px 8px; text-align:left; }
+    .nz-ft-area td { border:1px solid var(--border); padding:4px 8px; min-width:60px; vertical-align:top; }
+    .nz-ft-area td:focus, .nz-ft-area th:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+    /* Freitext-Container für Toolbar + Editor */
+    .ft-wrap { display:flex; flex-direction:column; border:1.5px solid var(--border); border-radius:6px; overflow:hidden; transition:border-color .15s; }
+    .ft-wrap:focus-within { border-color:var(--accent); }
+    .nz-ft-area { outline:none; font-size:14px; line-height:1.6; color:var(--text); font-family:var(--font); padding:8px; min-height:80px; overflow-x:auto; }
     /* Netzwerk Toolbar Buttons */
     .nz-net-tb { padding:2px 9px; border:1.5px solid var(--border); border-radius:10px; font-size:11px; font-weight:700; cursor:pointer; background:none; color:var(--muted); font-family:var(--font); transition:all .1s; }
     .nz-net-tb:hover { border-color:var(--accent); color:var(--accent); }
@@ -1088,7 +1104,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.75</div>
+  <div id="wb-startup-tagline">v3.0.76</div>
 </div>
 
 <!-- Modal -->
@@ -1181,6 +1197,10 @@
       <div class="s-row">
         <div><div class="s-row-title">Dark Mode</div><div class="s-row-sub">Dunkles Farbschema</div></div>
         <div id="s-toggle-dark" class="s-toggle" onclick="WB._sToggleDark()"></div>
+      </div>
+      <div class="s-row">
+        <div><div class="s-row-title">Tabellen auf Mobile bearbeitbar</div><div class="s-row-sub">Tabellen im Freitext auf dem Pixel/iPad editieren</div></div>
+        <div id="s-toggle-mobile-table" class="s-toggle" onclick="WB._sToggleMobileTable()"></div>
       </div>
       <div class="s-row">
         <div><div class="s-row-title">Farbe Beruf</div><div class="s-row-sub">Akzentfarbe f&uuml;r Beruf</div></div>
@@ -1303,7 +1323,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.75</span>
+    <span id="wb-menu-version">v3.0.76</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1615,8 +1635,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.75',
-  APP_BUILD:   '20260627-0200',
+  APP_VERSION: '3.0.76',
+  APP_BUILD:   '20260627-0300',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1639,11 +1659,12 @@ const WB = {
   _syncInitDone:     false,
   _pendingChanges:   false,
   _settings: {
-    bueroModus: false,
-    device:       'mac',
-    darkMode:     false,
-    colorBeruf:   '#0A6B5E',
-    colorPrivat:  '#4D5F33',
+    bueroModus:      false,
+    device:          'mac',
+    darkMode:        false,
+    colorBeruf:      '#0A6B5E',
+    colorPrivat:     '#4D5F33',
+    mobileTableEdit: false,
   },
   _modalCtx: null,
   _saveTimer: null,
@@ -3221,7 +3242,72 @@ const WB = {
     this._nzDetailOpen(listeId, true); this.renderNotizenTab();
   },
 
-  // ── Tagesansicht-Overlay ─────────────────────────────
+  // ── Freitext-Toolbar ─────────────────────────────────
+  _ftShowToolbar(editorEl) {
+    const wrap = editorEl?.closest('.ft-wrap');
+    if (!wrap) return;
+    const tb = wrap.querySelector('.ft-toolbar');
+    if (tb) { tb.classList.add('visible'); this._ftUpdateToolbarState(wrap); }
+  },
+  _ftHideToolbar(editorEl) {
+    setTimeout(() => {
+      const wrap = editorEl?.closest('.ft-wrap');
+      if (!wrap) return;
+      if (wrap.contains(document.activeElement)) return;
+      wrap.querySelector('.ft-toolbar')?.classList.remove('visible');
+    }, 150);
+  },
+  _ftUpdateToolbarState(wrap) {
+    if (!wrap) return;
+    ['bold','italic','underline'].forEach(cmd => {
+      const btn = wrap.querySelector('[data-cmd="' + cmd + '"]');
+      if (btn) btn.classList.toggle('active', document.queryCommandState(cmd));
+    });
+  },
+  _ftExec(cmd, value) {
+    document.execCommand(cmd, false, value || null);
+    const wrap = document.activeElement?.closest?.('.ft-wrap');
+    if (wrap) this._ftUpdateToolbarState(wrap);
+  },
+  _ftTableDialog(editorId) {
+    const body = '<div style="display:flex;flex-direction:column;gap:12px;padding:4px 0;">'
+      + '<div style="display:flex;align-items:center;gap:12px;">'
+      +   '<label style="font-size:13px;font-weight:700;color:var(--text);width:70px;">Spalten</label>'
+      +   '<input id="ft-tbl-cols" type="number" min="1" max="8" value="3" class="wb-input" style="width:80px;"></div>'
+      + '<div style="display:flex;align-items:center;gap:12px;">'
+      +   '<label style="font-size:13px;font-weight:700;color:var(--text);width:70px;">Zeilen</label>'
+      +   '<input id="ft-tbl-rows" type="number" min="1" max="20" value="3" class="wb-input" style="width:80px;"></div>'
+      + '<div style="display:flex;align-items:center;gap:8px;">'
+      +   '<input type="checkbox" id="ft-tbl-head" checked style="width:16px;height:16px;">'
+      +   '<label for="ft-tbl-head" style="font-size:13px;color:var(--text);">Kopfzeile</label></div></div>';
+    const footer = '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
+      + '<button class="wb-btn wb-btn-save" onclick="WB._ftInsertTable(\'' + editorId + '\')">Einf&uuml;gen</button>';
+    this.modalOpen('Tabelle einfügen', body, footer);
+  },
+  _ftInsertTable(editorId) {
+    const cols = parseInt(document.getElementById('ft-tbl-cols')?.value) || 3;
+    const rows = parseInt(document.getElementById('ft-tbl-rows')?.value) || 3;
+    this.modalClose();
+    const ed = document.getElementById(editorId); if (!ed) return;
+    ed.focus();
+    let html = '<table><thead><tr>'
+      + Array.from({length: cols}, (_,i) => '<th>Spalte ' + (i+1) + '</th>').join('')
+      + '</tr></thead><tbody>';
+    for (let r = 0; r < rows; r++) {
+      html += '<tr>' + Array.from({length: cols}, () => '<td><br></td>').join('') + '</tr>';
+    }
+    html += '</tbody></table><p><br></p>';
+    document.execCommand('insertHTML', false, html);
+    ed.querySelectorAll('td, th').forEach(cell => { cell.contentEditable = 'true'; });
+  },
+  _sToggleMobileTable() {
+    this._settings.mobileTableEdit = !this._settings.mobileTableEdit;
+    document.getElementById('s-toggle-mobile-table')?.classList.toggle('on', this._settings.mobileTableEdit);
+    this._sSaveSettings();
+    this._toast(this._settings.mobileTableEdit ? '✅ Tabellen auf Mobile bearbeitbar' : 'Tabellen auf Mobile read-only');
+  },
+
+    // ── Tagesansicht-Overlay ─────────────────────────────
   _woTagDate: null,
 
   _woTagOpen(dateStr) {
@@ -3503,12 +3589,34 @@ const WB = {
       + '<span class="hb-add-ok" onclick="WB.' + addFn + '()">OK</span>'
       + '</div>';
 
-    // Sektion 2: Freitext — URLs als Links rendern
+    // Sektion 2: Freitext mit Toolbar
+    const isDesktop = !this._isMobile();
+    const mobileTableOk = this._settings?.mobileTableEdit;
+    const tableBtn = (isDesktop || mobileTableOk)
+      ? '<button class="ft-tb-btn" onmousedown="event.preventDefault();WB._ftTableDialog(\'' + ftId + '\')" title="Tabelle einfügen">⊞</button>'
+      : '';
+    const toolbar = '<div class="ft-toolbar">'
+      + '<span class="ft-tb-label">Format</span>'
+      + '<button class="ft-tb-btn" data-cmd="bold"      onmousedown="event.preventDefault();WB._ftExec(\'bold\')"      title="Fett"><b>B</b></button>'
+      + '<button class="ft-tb-btn" data-cmd="italic"    onmousedown="event.preventDefault();WB._ftExec(\'italic\')"    title="Kursiv"><i>I</i></button>'
+      + '<button class="ft-tb-btn" data-cmd="underline" onmousedown="event.preventDefault();WB._ftExec(\'underline\')" title="Unterstrichen"><u>U</u></button>'
+      + '<div class="ft-tb-sep"></div>'
+      + '<button class="ft-tb-btn" onmousedown="event.preventDefault();WB._ftExec(\'insertUnorderedList\')" title="Aufzählung">•≡</button>'
+      + '<button class="ft-tb-btn" onmousedown="event.preventDefault();WB._ftExec(\'insertOrderedList\')"   title="Nummerierung">1≡</button>'
+      + '<div class="ft-tb-sep"></div>'
+      + '<button class="ft-tb-btn" onmousedown="event.preventDefault();WB._ftExec(\'indent\')"  title="Einrücken">→</button>'
+      + '<button class="ft-tb-btn" onmousedown="event.preventDefault();WB._ftExec(\'outdent\')" title="Ausrücken">←</button>'
+      + (tableBtn ? '<div class="ft-tb-sep"></div>' + tableBtn : '')
+      + '</div>';
+
     const ftH = '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);padding:8px 2px 4px;border-top:1px solid rgba(0,0,0,.1);margin-top:4px;">Freitext</div>'
-      + '<div id="' + ftId + '" contenteditable="true" spellcheck="true"'
-      + ' oninput="WB.' + ftFn + '()"'
-      + ' style="outline:none;font-size:14px;line-height:1.6;color:var(--text);font-family:var(--font);padding:4px 2px;min-height:60px;">'
-      + this._linkifyHtml(l.inhalt || '') + '</div>';
+      + '<div class="ft-wrap nz-ft-area">'
+      + toolbar
+      + '<div id="' + ftId + '" class="nz-ft-area" contenteditable="true" spellcheck="true"'
+      + ' onfocus="WB._ftShowToolbar(this)" onblur="WB._ftHideToolbar(this)"'
+      + ' oninput="WB.' + ftFn + '()">'
+      + this._linkifyHtml(l.inhalt || '') + '</div>'
+      + '</div>';
 
     return checkH + ftH;
   },
@@ -5961,6 +6069,7 @@ const WB = {
     document.documentElement.style.setProperty('--accent',  this._settings.colorBeruf||'#0A6B5E');
     document.documentElement.style.setProperty('--accent2', this._settings.colorPrivat||'#4D5F33');
     if(this._settings.darkMode) document.documentElement.setAttribute('data-theme','dark');
+    document.getElementById('s-toggle-mobile-table')?.classList.toggle('on', !!this._settings.mobileTableEdit);
   },
 
   // Sondertage
