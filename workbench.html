@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.90</title>
+  <title>WorkBench 3.0.91</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1132,7 +1132,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.90</div>
+  <div id="wb-startup-tagline">v3.0.91</div>
 </div>
 
 <!-- Modal -->
@@ -1384,7 +1384,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.90</span>
+    <span id="wb-menu-version">v3.0.91</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1709,8 +1709,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.90',
-  APP_BUILD:   '20260627-1600',
+  APP_VERSION: '3.0.91',
+  APP_BUILD:   '20260627-1700',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3590,10 +3590,15 @@ const WB = {
     this._nzCtxClose();
     if (!listeId) return;
     this._confirm('Liste wirklich löschen?', () => {
-      const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
-      this._softDelete(l);
+      const arr = this.db?.notizen;
+      if (!arr) return;
+      const idx = arr.findIndex(x => x.id === listeId);
+      if (idx < 0) return;
+      arr.splice(idx, 1); // Aus Array entfernen — kein soft-delete
       if (this._nzDetailId === listeId) document.getElementById('nz-detail-panel')?.classList.remove('open');
-      this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
+      this.setDirty();
+      this.renderNotizenTab();
+      this._nzRenderPills();
       if (this.activeTab === 'tagessicht') this._tsRenderPins();
       this._toast('🗑 Gelöscht');
     });
