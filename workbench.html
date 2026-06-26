@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.79</title>
+  <title>WorkBench 3.0.82</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1119,7 +1119,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.79</div>
+  <div id="wb-startup-tagline">v3.0.82</div>
 </div>
 
 <!-- Modal -->
@@ -1357,7 +1357,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.79</span>
+    <span id="wb-menu-version">v3.0.82</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1670,8 +1670,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.79',
-  APP_BUILD:   '20260627-0500',
+  APP_VERSION: '3.0.82',
+  APP_BUILD:   '20260627-0800',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1764,7 +1764,10 @@ const WB = {
     if (this._oauthTokenValid()) {
       try {
         await this._syncDownload();
-        if ((this.isDirty || this._pendingChanges) && this.db) await this._syncUpload();
+        // Nach Download Dirty-Flags zurücksetzen — Drive-Stand ist autoritativ beim Start
+        this.isDirty = false;
+        this._pendingChanges = false;
+        await this.idbSet('meta', 'pendingChanges', 'false');
         this._syncInitDone = true;
         setTimeout(() => this._toast('✅ Stand aktuell'), 3500);
       } catch(e) {
@@ -1784,7 +1787,8 @@ const WB = {
     document.addEventListener('visibilitychange', async () => {
       if (document.visibilityState === 'hidden') {
         clearTimeout(this._saveTimer);
-        try { await this.idbSave(); if ((this.isDirty||this._pendingChanges)&&this._syncInitDone) await this._syncUpload(); } catch(e) {}
+        // KEIN Upload wenn Konflikt-Dialog offen — verhindert ungewolltes Überschreiben
+        try { await this.idbSave(); if ((this.isDirty||this._pendingChanges)&&this._syncInitDone&&!this._syncConflictPending) await this._syncUpload(); } catch(e) {}
       } else {
         if (!this._syncInitDone) return;
         try { await this._syncCheckNewer(); } catch(e) {}
@@ -2832,12 +2836,13 @@ const WB = {
   },
 
   _nzDeleteListe(listeId) {
-    if (!confirm('Liste l\u00f6schen?')) return;
-    const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
-    l.deleted = true; l.updatedAt = this._now();
-    this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
-    if (this.activeTab === 'tagessicht') this._tsRenderPins();
-    this._toast('\u2713 Liste gel\u00f6scht');
+    this._confirm('Liste löschen?', () => {
+      const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
+      l.deleted = true; l.updatedAt = this._now();
+      this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
+      if (this.activeTab === 'tagessicht') this._tsRenderPins();
+      this._toast('\u2713 Liste gel\u00f6scht');
+    });
   },
 
   _nzSetWelt(listeId, welt) {
@@ -3456,13 +3461,13 @@ const WB = {
 
   _ftTableDel() {
     const tbl = this._ftCurrentTable; if (!tbl) return;
-    if (!confirm('Tabelle löschen?')) return;
-    tbl.remove();
-    document.getElementById('ft-table-menu')?.classList.remove('open');
-    this._ftCurrentTable = null; this._ftCurrentCell = null;
-    // Speichern: aktuellen Editor finden
-    const ed = document.querySelector('[id$="-ft"].nz-ft-area, #nz-dp-ft, #ts-kd-ft, #nz-fs-ft');
-    if (ed) this._ftSaveFromEditor(ed);
+    this._confirm('Tabelle löschen?', () => {
+      tbl.remove();
+      document.getElementById('ft-table-menu')?.classList.remove('open');
+      this._ftCurrentTable = null; this._ftCurrentCell = null;
+      const ed = document.querySelector('#nz-dp-ft, #ts-kd-ft, #nz-fs-ft');
+      if (ed) this._ftSaveFromEditor(ed);
+    });
   },
 
   _ftSaveFromTable(tbl) {
@@ -3480,6 +3485,42 @@ const WB = {
     document.getElementById('s-toggle-mobile-table')?.classList.toggle('on', this._settings.mobileTableEdit);
     this._sSaveSettings();
     this._toast(this._settings.mobileTableEdit ? '✅ Tabellen auf Mobile bearbeitbar' : 'Tabellen auf Mobile read-only');
+  },
+
+  // ── Native Dialog-Ersatz ─────────────────────────────
+  _confirm(msg, onOk, onCancel) {
+    const body = '<div style="font-size:14px;line-height:1.6;color:var(--text);padding:4px 0;">' + this._esc(msg) + '</div>';
+    const footer = '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose();WB._confirmCancel()">Abbrechen</button>'
+      + '<button class="wb-btn wb-btn-save" style="background:#C0392B;border-color:#C0392B;" onclick="WB.modalClose();WB._confirmOk()">OK</button>';
+    this._confirmOkFn     = onOk     || null;
+    this._confirmCancelFn = onCancel || null;
+    const overlay = document.getElementById('wb-modal-overlay');
+    if (overlay) overlay.onclick = null; // Kein Backdrop-Schließen bei Bestätigungen
+    this.modalOpen('Bestätigung', body, footer);
+  },
+  _confirmOkFn:     null,
+  _confirmCancelFn: null,
+  _confirmOk()     { if (this._confirmOkFn)     { const fn=this._confirmOkFn;     this._confirmOkFn=null;     fn(); } },
+  _confirmCancel() { if (this._confirmCancelFn) { const fn=this._confirmCancelFn; this._confirmCancelFn=null; fn(); } },
+
+  _prompt(label, defaultVal, onOk) {
+    const body = '<div style="display:flex;flex-direction:column;gap:10px;padding:4px 0;">'
+      + '<div style="font-size:13px;color:var(--text);">' + this._esc(label) + '</div>'
+      + '<input id="wb-prompt-inp" class="wb-input" value="' + this._esc(defaultVal||'') + '" style="font-size:14px;"></div>';
+    const footer = '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
+      + '<button class="wb-btn wb-btn-save" onclick="WB._promptOk()">OK</button>';
+    this._promptOkFn = onOk || null;
+    this.modalOpen('Eingabe', body, footer);
+    setTimeout(() => {
+      const inp = document.getElementById('wb-prompt-inp');
+      if (inp) { inp.focus(); inp.select(); inp.onkeydown = e => { if(e.key==='Enter') WB._promptOk(); }; }
+    }, 50);
+  },
+  _promptOkFn: null,
+  _promptOk() {
+    const val = document.getElementById('wb-prompt-inp')?.value ?? '';
+    this.modalClose();
+    if (this._promptOkFn) { const fn=this._promptOkFn; this._promptOkFn=null; fn(val); }
   },
 
     // ── Tagesansicht-Overlay ─────────────────────────────
@@ -3553,22 +3594,25 @@ const WB = {
 
   _woTagDeleteTermin(eventId, dateStr) {
     const ev = (this.db?.customEvents||[]).find(e => e.id === eventId); if (!ev) return;
-    if (!confirm('Termin "' + (ev.text||ev.title||'') + '" löschen?')) return;
-    ev.deleted = true; ev.updatedAt = this._now();
-    this.setDirty();
-    this._woTagRender(dateStr);
-    this.renderWoche();
+    this._confirm('Termin "' + (ev.text||ev.title||'') + '" löschen?', () => {
+      ev.deleted = true; ev.updatedAt = this._now();
+      this.setDirty();
+      this._woTagRender(dateStr);
+      this.renderWoche();
+    });
   },
 
   _woTagAddSondertag(dateStr, typ) {
-    const name = prompt((typ==='urlaub'?'Urlaub':typ==='feiertag'?'Feiertag':typ==='auszeit'?'Auszeit':'Krank') + ' – Name/Beschreibung:') || typ;
-    if (!this.db.sondertage) this.db.sondertage = [];
-    // Existing löschen
-    this.db.sondertage.filter(s=>s.datum===dateStr&&!s.deleted).forEach(s=>s.deleted=true);
-    this.db.sondertage.push({ id:'st_'+Date.now(), datum:dateStr, typ, name, updatedAt:this._now() });
-    this.setDirty();
-    this._woTagRender(dateStr);
-    this.renderWoche();
+    const label = typ==='urlaub'?'Urlaub':typ==='feiertag'?'Feiertag':typ==='auszeit'?'Auszeit':'Krank';
+    this._prompt(label + ' – Name/Beschreibung:', typ, (name) => {
+      if (!name) name = typ;
+      if (!this.db.sondertage) this.db.sondertage = [];
+      this.db.sondertage.filter(s=>s.datum===dateStr&&!s.deleted).forEach(s=>s.deleted=true);
+      this.db.sondertage.push({ id:'st_'+Date.now(), datum:dateStr, typ, name, updatedAt:this._now() });
+      this.setDirty();
+      this._woTagRender(dateStr);
+      this.renderWoche();
+    });
   },
 
   _woTagDeleteSondertag(stId, dateStr) {
@@ -3913,12 +3957,12 @@ const WB = {
 
   _nzDetailEditLink(listeId) {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
-    const url = prompt('Link eingeben (oder leer lassen zum Entfernen):', l.link || '');
-    if (url === null) return;
-    l.link = url.trim();
-    l.updatedAt = this._now();
-    this.setDirty();
-    this._nzDetailOpen(listeId, true);
+    this._prompt('Link eingeben (oder leer lassen zum Entfernen):', l.link || '', (url) => {
+      l.link = url.trim() || null;
+      l.updatedAt = this._now();
+      this.setDirty();
+      this._nzDetailOpen(listeId, true);
+    });
   },
 
   _nzDetailSetFarbe(listeId, farbe) {
@@ -5266,12 +5310,13 @@ const WB = {
   },
 
   _nzDeleteListe(listeId) {
-    if (!confirm('Diese Liste und alle Eintr\u00e4ge l\u00f6schen?')) return;
-    const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
-    this._softDelete(l);
-    this.setDirty();
-    this.renderNotizenTab();
-    this._nzRenderPills();
+    this._confirm('Diese Liste und alle Einträge löschen?', () => {
+      const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
+      this._softDelete(l);
+      this.setDirty();
+      this.renderNotizenTab();
+      this._nzRenderPills();
+    });
   },
 
   _nzBearbeitenDialog(listeId) {
@@ -5919,11 +5964,12 @@ const WB = {
           await this.idbSet('meta', 'oauthTokenExp', String(this._oauthTokenExp));
           this._oauthHideBanner();
           this._toast('\u2713 Verbunden \u2014 lade aktuellen Stand...');
-          // Erst Download (Drive ist autoritativ), dann nur wenn nötig Upload
+          // Download (Drive ist autoritativ) — kein automatischer Upload danach
           try { await this._syncDownload(); } catch(e) { console.warn('[reconnect download]', e); }
-          if (this.isDirty || this._pendingChanges) {
-            try { await this._syncUpload(); } catch(e) { console.warn('[reconnect upload]', e); }
-          }
+          // Dirty-Flags zurücksetzen — Drive-Stand ist jetzt die Wahrheit
+          this.isDirty = false;
+          this._pendingChanges = false;
+          await this.idbSet('meta', 'pendingChanges', 'false');
           this._syncInitDone = true;
           this._toast('\u2705 Stand aktuell');
         },
@@ -5983,27 +6029,24 @@ const WB = {
   },
 
   _tfTerminAbsagen(id, art) {
-    if (!confirm(art === 'schnell' ? 'Erinnerung absagen?' : 'Termin absagen?')) return;
-    const today = this._dStr(new Date());
-    if (art === 'schnell') {
-
-      const q  = (this.db?.aufgaben||[]).find(x => x.id === id);
-      if (q) { q.storniert=true; q.done=true; q.updatedAt=this._now(); }
-    
-    } else if (art === 'pflicht') {
-
-      const p  = (this.db?.wochenpflichten||[]).find(x => x.id === id);
-      if (p) {
-        if (!this.db.pflichtStatus) this.db.pflichtStatus = {};
-        if (!this.db.pflichtStatus[today]) this.db.pflichtStatus[today] = {};
-        this.db.pflichtStatus[today][id] = 'storniert';
+    this._confirm(art === 'schnell' ? 'Erinnerung absagen?' : 'Termin absagen?', () => {
+      const today = this._dStr(new Date());
+      if (art === 'schnell') {
+        const q = (this.db?.aufgaben||[]).find(x => x.id === id);
+        if (q) { q.storniert=true; q.done=true; q.updatedAt=this._now(); }
+      } else if (art === 'pflicht') {
+        const p = (this.db?.wochenpflichten||[]).find(x => x.id === id);
+        if (p) {
+          if (!this.db.pflichtStatus) this.db.pflichtStatus = {};
+          if (!this.db.pflichtStatus[today]) this.db.pflichtStatus[today] = {};
+          this.db.pflichtStatus[today][id] = 'storniert';
+        }
+      } else {
+        const e = (this.db?.customEvents||[]).find(x => x.id === id);
+        if (e) { e.storniert=true; e.done=false; e.updatedAt=this._now(); }
       }
-    
-    } else {
-      const e = (this.db?.customEvents||[]).find(x => x.id === id);
-      if (e) { e.storniert=true; e.done=false; e.updatedAt=this._now(); }
-    }
-    this.setDirty(); this._tsRenderZeitband(); this._toast('Termin abgesagt');
+      this.setDirty(); this._tsRenderZeitband(); this._toast('Termin abgesagt');
+    });
   },
 
   _terminToggleTyp(isDeadline) {
@@ -6310,7 +6353,10 @@ const WB = {
 
   modalClose() {
     document.getElementById('wb-modal-overlay')?.classList.remove('open');
-    this._modalCtx=null;
+    // Backdrop-Klick nach jedem Schließen wieder aktivieren
+    const overlay = document.getElementById('wb-modal-overlay');
+    if (overlay && !overlay.onclick) overlay.onclick = (e) => WB._modalBgClick(e);
+    this._modalCtx = null;
   },
 
   _modalBgClick(e) { if(e.target===document.getElementById('wb-modal-overlay')) this.modalClose(); },
@@ -6342,11 +6388,12 @@ const WB = {
 
   _modalDelete() {
     const c=this._modalCtx; if(!c) return;
-    if(!confirm('Wirklich l\u00f6schen?')) return;
-    if(c.type==='termin') {
-      const e=(this.db?.customEvents||[]).find(x=>x.id===c.eventId); if(e){e.deleted=true;e.updatedAt=this._now();}
-    }
-    this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
+    this._confirm('Wirklich löschen?', () => {
+      if(c.type==='termin') {
+        const e=(this.db?.customEvents||[]).find(x=>x.id===c.eventId); if(e){e.deleted=true;e.updatedAt=this._now();}
+      }
+      this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
+    });
   },
 
   async _migrateFromOldDb() {
@@ -6676,7 +6723,9 @@ const WB = {
     this.idbSave().catch(e=>console.warn('[setDirty IDB]',e));
     if(!this._syncInitDone) return;
     clearTimeout(this._saveTimer);
-    this._saveTimer=setTimeout(async()=>{await this._syncUpload();},2000);
+    this._saveTimer=setTimeout(async()=>{
+      if (!this._syncConflictPending) await this._syncUpload();
+    },2000);
   },
 
   _emptyDb() {
@@ -6778,14 +6827,16 @@ const WB = {
   },
 
   _cryptoChangePassword() {
-    const newPw = prompt('Neues Passwort eingeben (mind. 8 Zeichen):');
-    if (!newPw || newPw.length < 8) { this._toast('Passwort zu kurz'); return; }
-    const confirm2 = prompt('Passwort wiederholen:');
-    if (newPw !== confirm2) { this._toast('Passw\u00f6rter stimmen nicht \u00fcberein'); return; }
-    sessionStorage.setItem('wb_enc_pw', newPw);
-    localStorage.setItem('wb_key_date', this._dStr(new Date()));
-    this.setDirty();
-    this._toast('\u2713 Passwort ge\u00e4ndert \u2014 Daten werden neu verschl\u00fcsselt');
+    this._prompt('Neues Passwort eingeben (mind. 8 Zeichen):', '', (newPw) => {
+      if (!newPw || newPw.length < 8) { this._toast('Passwort zu kurz'); return; }
+      this._prompt('Passwort wiederholen:', '', (confirm2) => {
+        if (newPw !== confirm2) { this._toast('Passwörter stimmen nicht überein'); return; }
+        sessionStorage.setItem('wb_enc_pw', newPw);
+        localStorage.setItem('wb_key_date', this._dStr(new Date()));
+        this.setDirty();
+        this._toast('✓ Passwort geändert — Daten werden neu verschlüsselt');
+      });
+    });
   },
 
 
@@ -6802,6 +6853,7 @@ const WB = {
 
   async _syncTick() {
     if (!this._oauthClientId) return;
+    if (this._syncConflictPending) return; // Konflikt-Dialog offen — kein Auto-Upload
     if (!this._oauthTokenValid()) {
       this._oauthShowBannerSync();
       return;
@@ -6830,16 +6882,22 @@ const WB = {
     } catch(e) { console.warn('[syncCheckNewer]', e.message); }
   },
 
+  _syncConflictPending: false,
+
   _syncConflictDialog(ctx, driveTs) {
+    this._syncConflictPending = true;
     const driveDate = new Date(driveTs).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
-    const body = '<div style="font-size:14px;line-height:1.6;color:var(--text)">'
+    const body = '<div style="font-size:14px;line-height:1.6;color:var(--text);">'
       + 'Ein anderes Ger\u00e4t hat Daten um <strong>' + driveDate + '</strong> ge\u00e4ndert.<br>'
-      + 'Du hast ebenfalls lokale \u00c4nderungen.</div>';
-    const footer = '<button style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:none;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700" '
-      + 'onclick="WB.isDirty=false;WB._pendingChanges=false;WB._syncDownload();WB.modalClose()">Drive laden</button>'
-      + '<button style="padding:6px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700;margin-left:8px" '
-      + 'onclick="WB._syncUpload();WB.modalClose()">Meine hochladen</button>';
-    this.modalOpen('\u26a0\uFE0F Sync-Konflikt', body, footer);
+      + 'Du hast ebenfalls lokale \u00c4nderungen.<br><br>'
+      + '<strong>Bitte entscheide \u2014 dieser Dialog muss best\u00e4tigt werden.</strong></div>';
+    const footer = '<button style="padding:8px 16px;border-radius:8px;border:1.5px solid var(--accent);background:none;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700;color:var(--accent);" '
+      + 'onclick="WB._syncConflictPending=false;WB.isDirty=false;WB._pendingChanges=false;WB._syncDownload();WB.modalClose()">\u2b07 Drive laden (lokale \u00c4nderungen verwerfen)</button>'
+      + '<button style="padding:8px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700;margin-left:8px;" '
+      + 'onclick="WB._syncConflictPending=false;WB._syncUpload();WB.modalClose()">\u2b06 Meine hochladen (Drive \u00fcberschreiben)</button>';
+    this.modalOpen('\u26a0\ufe0f Sync-Konflikt', body, footer);
+    const overlay = document.getElementById('wb-modal-overlay');
+    if (overlay) overlay.onclick = null;
   },
 
 
@@ -7047,16 +7105,22 @@ const WB = {
     else await this._syncCheckNewer();
   },
 
+  _syncConflictPending: false,
+
   _syncConflictDialog(ctx, driveTs) {
+    this._syncConflictPending = true;
     const driveDate = new Date(driveTs).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
-    const choice = confirm(
-      'Konflikt: Ein anderes Ger\u00e4t hat Daten um ' + driveDate + ' ge\u00e4ndert.\n'
-      + 'Du hast lokale \u00c4nderungen.\n\n'
-      + 'OK = Meine \u00c4nderungen hochladen\n'
-      + 'Abbrechen = Drive-Stand laden (\u00c4nderungen verwerfen)'
-    );
-    if (choice) { this._syncUpload(); }
-    else { this._pendingChanges = false; this.isDirty = false; this._syncDownload(); }
+    const body = '<div style="font-size:14px;line-height:1.6;color:var(--text);">'
+      + 'Ein anderes Ger\u00e4t hat Daten um <strong>' + driveDate + '</strong> ge\u00e4ndert.<br>'
+      + 'Du hast ebenfalls lokale \u00c4nderungen.<br><br>'
+      + '<strong>Bitte entscheide \u2014 dieser Dialog muss best\u00e4tigt werden.</strong></div>';
+    const footer = '<button style="padding:8px 16px;border-radius:8px;border:1.5px solid var(--accent);background:none;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700;color:var(--accent);" '
+      + 'onclick="WB._syncConflictPending=false;WB.isDirty=false;WB._pendingChanges=false;WB._syncDownload();WB.modalClose()">\u2b07 Drive laden (lokale \u00c4nderungen verwerfen)</button>'
+      + '<button style="padding:8px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700;margin-left:8px;" '
+      + 'onclick="WB._syncConflictPending=false;WB._syncUpload();WB.modalClose()">\u2b06 Meine hochladen (Drive \u00fcberschreiben)</button>';
+    this.modalOpen('\u26a0\ufe0f Sync-Konflikt', body, footer);
+    const overlay = document.getElementById('wb-modal-overlay');
+    if (overlay) overlay.onclick = null;
   },
 
   _syncTimeLabel(ts) {
@@ -7106,7 +7170,7 @@ const WB = {
   },
 
   async _oauthReconnectAndSync() {
-    // Mit User-Geste: interaktiver Token-Request → dann sofort Sync
+    // Mit User-Geste: interaktiver Token-Request → dann Download (Drive ist autoritativ)
     const btn = document.getElementById('wb-oauth-banner-btn');
     if (btn) { btn.textContent = '⏳ Verbinde...'; btn.disabled = true; }
     try {
@@ -7114,9 +7178,13 @@ const WB = {
       if (token) {
         this._oauthHideBanner();
         await this._syncDownload();
-        if (this.isDirty || this._pendingChanges) await this._syncUpload();
-        this._toast('✅ Synchronisiert');
+        // Nach Download: Dirty-Flags zurücksetzen — Drive-Stand ist jetzt die Wahrheit
+        // KEIN automatischer Upload — der User hat explizit Download gewählt
+        this.isDirty = false;
+        this._pendingChanges = false;
+        await this.idbSet('meta', 'pendingChanges', 'false');
         this._syncInitDone = true;
+        this._toast('✅ Synchronisiert');
       } else {
         this._oauthShowBanner('Verbindung fehlgeschlagen — bitte erneut versuchen');
       }
