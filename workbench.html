@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.84</title>
+  <title>WorkBench 3.0.85</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1122,7 +1122,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.84</div>
+  <div id="wb-startup-tagline">v3.0.85</div>
 </div>
 
 <!-- Modal -->
@@ -1360,7 +1360,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.84</span>
+    <span id="wb-menu-version">v3.0.85</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1685,8 +1685,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.84',
-  APP_BUILD:   '20260627-1000',
+  APP_VERSION: '3.0.85',
+  APP_BUILD:   '20260627-1100',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3026,10 +3026,14 @@ const WB = {
     if (hasSecondaryFilter) {
       liste = this.db.notizen.filter(l => !l.deleted);
     } else if (zustand === 'alle') {
-      // Alle ohne Archiv (deleted)
-      liste = this.db.notizen.filter(l => !l.deleted);
+      // Alle ohne Archiv und ohne deleted
+      liste = this.db.notizen.filter(l => !l.deleted && l.zustand !== 'archiv');
     } else if (zustand === 'archiv') {
-      liste = this.db.notizen.filter(l => !!l.deleted);
+      // Archiv: zustand='archiv' oder (alt: deleted=true)
+      liste = this.db.notizen.filter(l => !l.deleted && l.zustand === 'archiv');
+      // Rückwärtskompatibilität: früher als deleted gespeichert
+      const altArchiv = this.db.notizen.filter(l => !!l.deleted && !l.zustand);
+      liste = [...liste, ...altArchiv];
     } else if (zustand === 'aktuell') {
       liste = this.db.notizen.filter(l => !l.deleted && (!l.zustand || l.zustand === 'aktuell'));
     } else {
@@ -4072,7 +4076,8 @@ const WB = {
 
   _nzDeArchivieren(listeId) {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
-    l.zustand = 'aktuell';
+    delete l.zustand;         // Aktuell = kein zustand-Feld
+    l.deleted = false;        // Rückwärtskompatibilität: alt als deleted gespeichert
     l.updatedAt = this._now();
     this.setDirty();
     this._nzDetailOpen(listeId, true);
@@ -4473,7 +4478,13 @@ const WB = {
   _nzSetZustandItem(listeId, zustand) {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     if (zustand === 'archiv') {
-      this._softDelete(l);
+      // Archiv: zustand setzen, NICHT löschen — damit die Notiz noch geöffnet werden kann
+      l.zustand    = 'archiv';
+      l.deleted    = false;
+      // Pins beim Archivieren immer entfernen
+      l.gepinnt    = false;
+      l.heutePin   = false;
+      l.heutePinDate = null;
     } else {
       l.deleted = false;
       if (zustand === 'aktuell') {
@@ -4962,7 +4973,8 @@ const WB = {
   },
 
   _nzKachelOpen(listeId) {
-    const l = (this.db?.notizen||[]).find(x => x.id === listeId && !x.deleted); if (!l) return;
+    // Archivierte Notizen (zustand='archiv' oder alt: deleted=true) ebenfalls öffnen
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     if (!this._isMobile()) {
       this._nzDetailOpen(listeId);
       return;
@@ -7175,7 +7187,12 @@ const WB = {
       if (!this.db || typeof this.db !== 'object') this.db = this._emptyDb();
       if (!this.db._version) this.db._version = 1;
       if (!this.db.aufgaben) this.db.aufgaben = [];
-      // KEINE automatische Migration hier — _sDebugMigration zeigt Rohzustand
+      // Migration: gepinnte Archiv-Notizen entpinnen (darf nie so sein)
+    (this.db.notizen||[]).forEach(l => {
+      if ((l.zustand === 'archiv' || (l.deleted && !l.zustand)) && (l.gepinnt || l.heutePin)) {
+        l.gepinnt = false; l.heutePin = false; l.heutePinDate = null;
+      }
+    });
       await this._migrate_v2();
       this._syncLastDownload = Date.now();
       await this.idbSave();

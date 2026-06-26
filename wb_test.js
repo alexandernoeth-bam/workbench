@@ -1172,7 +1172,7 @@ content.includes('_nzMsActionsHtml(')
   ? (ok('_nzMsActionsHtml() definiert'), f44Ok++) : (fail('_nzMsActionsHtml() fehlt'), f44Fail++);
 // _nzKachelOpen: mobile → sheet
 const kachelIdx = content.lastIndexOf('_nzKachelOpen(listeId)');
-const kachelSrc = kachelIdx >= 0 ? content.slice(kachelIdx, kachelIdx+300) : '';
+const kachelSrc = kachelIdx >= 0 ? content.slice(kachelIdx, kachelIdx+500) : '';
 kachelSrc.includes('_isMobile()') && kachelSrc.includes('_nzMobileSheetOpen')
   ? (ok('_nzKachelOpen: Mobile → Sheet'), f44Ok++) : (fail('_nzKachelOpen: kein Mobile-Zweig'), f44Fail++);
 
