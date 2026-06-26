@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.83</title>
+  <title>WorkBench 3.0.84</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1122,7 +1122,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.83</div>
+  <div id="wb-startup-tagline">v3.0.84</div>
 </div>
 
 <!-- Modal -->
@@ -1360,7 +1360,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.83</span>
+    <span id="wb-menu-version">v3.0.84</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1685,8 +1685,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.83',
-  APP_BUILD:   '20260627-0900',
+  APP_VERSION: '3.0.84',
+  APP_BUILD:   '20260627-1000',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2527,7 +2527,8 @@ const WB = {
   _NZ_COLORS: ['c-gelb','c-gruen','c-blau','c-rosa','c-lila','c-tuerkis','c-weiss'],
   _nzGrpState: {},
   _nzKachelListeId: null,
-  _nzActiveTag:     null,   // Sidebar Tag-Filter
+  _nzActiveTag:     null,   // Sidebar Tag-Filter (erstes aktives Tag, Rückwärtskompatibilität)
+  _nzActiveTags:    new Set(), // Alle aktiven Tags für UND-Verknüpfung
   _nzZeit:          'alle', // Sidebar Zeitachse: 'woche'|'monat'|'alle'
   _nzDetailId:      null,   // Detail-Panel aktive ID
   _nzOffeneCL:      false,  // Filter: nur Notizen mit offenen Checklistenpunkten
@@ -3020,7 +3021,7 @@ const WB = {
 
     const zustand = this._nzZustand;
     // Zustand-Filter nur anwenden wenn KEIN Tag- oder Zeitachse-Filter aktiv
-    const hasSecondaryFilter = !!this._nzActiveTag || (this._nzZeit && this._nzZeit !== 'alle');
+    const hasSecondaryFilter = (this._nzActiveTags?.size > 0 || !!this._nzActiveTag) || (this._nzZeit && this._nzZeit !== 'alle');
     let liste;
     if (hasSecondaryFilter) {
       liste = this.db.notizen.filter(l => !l.deleted);
@@ -3075,8 +3076,13 @@ const WB = {
       }
     }
 
-    // Tag-Filter
-    if (this._nzActiveTag) {
+    // Tag-Filter: UND-Verknüpfung — Notiz muss ALLE aktiven Tags haben
+    if (this._nzActiveTags && this._nzActiveTags.size > 0) {
+      liste = liste.filter(l =>
+        [...this._nzActiveTags].every(tag => (l.tags||[]).includes(tag))
+      );
+    } else if (this._nzActiveTag) {
+      // Fallback: alter Einzeltag-Filter
       liste = liste.filter(l => (l.tags||[]).includes(this._nzActiveTag));
     }
 
@@ -3183,6 +3189,8 @@ const WB = {
   _nzSetZustand(zustand) {
     this._nzZustand = zustand;
     this._nzOffeneCL = false;
+    this._nzActiveTags = new Set();
+    this._nzActiveTag  = null;
     // Sidebar-Buttons synchronisieren
     document.querySelectorAll('#nz-sidebar .nz-sb-btn[data-zustand]').forEach(b =>
       b.classList.toggle('active', b.dataset.zustand === zustand)
@@ -3216,8 +3224,20 @@ const WB = {
     this.renderNotizenTab();
   },
 
+  _nzClearTags() {
+    this._nzActiveTags = new Set();
+    this._nzActiveTag  = null;
+    this._nzRenderSidebarTags();
+    this.renderNotizenTab();
+  },
+
   _nzSetTag(tag) {
-    this._nzActiveTag = this._nzActiveTag === tag ? null : tag;
+    if (this._nzActiveTags.has(tag)) {
+      this._nzActiveTags.delete(tag);
+    } else {
+      this._nzActiveTags.add(tag);
+    }
+    this._nzActiveTag = this._nzActiveTags.size > 0 ? [...this._nzActiveTags][0] : null;
     this._nzRenderSidebarTags();
     this.renderNotizenTab();
   },
@@ -4558,13 +4578,22 @@ const WB = {
       container.innerHTML = '<div class="nz-sb-empty">Keine Tags</div>';
       return;
     }
-    container.innerHTML = tags.map(([tag, cnt]) =>
-      '<button class="nz-sb-tag' + (this._nzActiveTag === tag ? ' active' : '') + '"'
+    const activeTags = this._nzActiveTags || new Set();
+    const andLabel = activeTags.size > 1
+      ? '<div style="font-size:10px;font-weight:800;color:var(--accent);padding:2px 6px 4px;letter-spacing:.05em;">UND-Filter aktiv (' + activeTags.size + ' Tags)</div>'
+      : '';
+    container.innerHTML = andLabel + tags.map(([tag, cnt]) =>
+      '<button class="nz-sb-tag' + (activeTags.has(tag) ? ' active' : '') + '"'
       + ' onclick="WB._nzSetTag(\'' + this._esc(tag) + '\')">'
       + '<span>' + this._esc(tag) + '</span>'
+      + (activeTags.has(tag) && activeTags.size > 1 ? '<span style="font-size:9px;opacity:.7;">✓</span>' : '')
       + '<span class="nz-sb-badge">' + cnt + '</span>'
       + '</button>'
     ).join('');
+    // "Alle abwählen" wenn mehrere aktiv
+    if (activeTags.size > 1) {
+      container.innerHTML += '<button style="font-size:11px;color:var(--faint);background:none;border:none;cursor:pointer;padding:4px 6px;font-family:var(--font);" onclick="WB._nzClearTags()">✕ Alle abwählen</button>';
+    }
   },
 
   _nzRenderMobile(scroll) {
