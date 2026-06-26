@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.69</title>
+  <title>WorkBench 3.0.70</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -102,29 +102,32 @@
     /* ── OAuth-Banner ── */
     #wb-oauth-banner {
       display: none;
-      background: var(--warn);
+      background: #1A6B3C;
       color: #fff;
-      padding: 8px 14px;
+      padding: 10px 14px;
       font-size: 13px;
       font-weight: 600;
-      gap: 8px;
+      gap: 10px;
       align-items: center;
       flex-shrink: 0;
     }
     #wb-oauth-banner.visible { display: flex; }
-    #wb-oauth-banner-text { flex: 1; }
+    #wb-oauth-banner-text { flex: 1; font-size: 13px; }
     #wb-oauth-banner-btn {
-      background: rgba(255,255,255,0.2);
-      border: 1px solid rgba(255,255,255,0.4);
-      color: #fff;
-      border-radius: 5px;
-      padding: 3px 10px;
-      font-size: 12px;
-      font-weight: 700;
+      background: #fff;
+      border: none;
+      color: #1A6B3C;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 800;
       cursor: pointer;
       font-family: var(--font);
+      white-space: nowrap;
+      flex-shrink: 0;
     }
-    #wb-oauth-banner-close { cursor: pointer; opacity: 0.7; font-size: 16px; }
+    #wb-oauth-banner-btn:disabled { opacity: .6; cursor: default; }
+    #wb-oauth-banner-close { cursor: pointer; opacity: 0.7; font-size: 16px; flex-shrink: 0; }
 
     /* ── Main-Area ── */
     .wb-main-area {
@@ -1084,7 +1087,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.69</div>
+  <div id="wb-startup-tagline">v3.0.70</div>
 </div>
 
 <!-- Modal -->
@@ -1299,7 +1302,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.69</span>
+    <span id="wb-menu-version">v3.0.70</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1610,8 +1613,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.69',
-  APP_BUILD:   '20260626-2300',
+  APP_VERSION: '3.0.70',
+  APP_BUILD:   '20260626-2330',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1687,35 +1690,34 @@ const WB = {
 
     if (this._oauthClientId) {
       if (this._oauthTokenValid()) {
+        // IDB-Token noch gültig → sofort sync
         this._oauthHideBanner();
       } else {
-        try {
-          const refreshed = await this._oauthGetToken(false);
-          if (!refreshed) this._oauthShowBanner('\u2139 Bitte mit Google verbinden um zu synchronisieren');
-        } catch(e) {
-          this._oauthShowBanner('\u2139 Bitte mit Google verbinden um zu synchronisieren');
-        }
+        // Token fehlt oder abgelaufen → KEIN silent request (scheitert auf Safari/iPad ohne Geste)
+        // Stattdessen: klaren Banner mit Sync-Button zeigen
+        this._oauthShowBannerSync();
       }
     }
 
     if (!this.db) this.db = this._emptyDb();
     this._ensureDbFields();
-    await this._migrateFromOldDb(); // Einmalige Migration von alter WorkBench-IDB
+    await this._migrateFromOldDb();
 
     if (this._oauthTokenValid()) {
       try {
         await this._syncDownload();
         if ((this.isDirty || this._pendingChanges) && this.db) await this._syncUpload();
         this._syncInitDone = true;
-        setTimeout(() => this._toast('\u2705 Stand aktuell'), 3500);
+        setTimeout(() => this._toast('✅ Stand aktuell'), 3500);
       } catch(e) {
         console.warn('[init sync]', e.message);
         this._syncInitDone = true;
-        setTimeout(() => this._toast('\u26a0 Offline \u2014 lokaler Stand'), 3500);
+        setTimeout(() => this._toast('⚠ Offline — lokaler Stand'), 3500);
       }
     } else {
       this._syncInitDone = true;
-      if (!this._oauthClientId) setTimeout(() => this._toast('\u2705 Einsatzbereit'), 3500);
+      if (!this._oauthClientId) setTimeout(() => this._toast('✅ Einsatzbereit'), 3500);
+      // Kein Toast wenn Banner sichtbar — Banner ist Erklärung genug
     }
 
     this._syncStart();
@@ -6517,9 +6519,8 @@ const WB = {
 
   async _syncTick() {
     if (!this._oauthClientId) return;
-    const token = await this._oauthGetTokenSilent();
-    if (!token) {
-      this._oauthShowBanner('\u26a0 Google-Sitzung abgelaufen &mdash; Auto-Sync pausiert');
+    if (!this._oauthTokenValid()) {
+      this._oauthShowBannerSync();
       return;
     }
     this._oauthHideBanner();
@@ -6810,11 +6811,45 @@ const WB = {
 
   async _oauthGetTokenSilent() { return this._oauthTokenValid()?this._oauthToken:null; },
 
+  _oauthShowBannerSync() {
+    // Zeigt deutlichen Banner mit Sync-Button — kein silent OAuth-Request (scheitert auf Safari ohne Geste)
+    const banner = document.getElementById('wb-oauth-banner');
+    const text   = document.getElementById('wb-oauth-banner-text');
+    const btn    = document.getElementById('wb-oauth-banner-btn');
+    if (!banner) return;
+    if (text) text.innerHTML = '☁ Lokaler Stand &mdash; nicht mit Drive synchronisiert';
+    if (btn)  { btn.textContent = 'Jetzt synchronisieren'; btn.onclick = () => WB._oauthReconnectAndSync(); }
+    banner.classList.add('visible');
+  },
+
+  async _oauthReconnectAndSync() {
+    // Mit User-Geste: interaktiver Token-Request → dann sofort Sync
+    const btn = document.getElementById('wb-oauth-banner-btn');
+    if (btn) { btn.textContent = '⏳ Verbinde...'; btn.disabled = true; }
+    try {
+      const token = await this._oauthGetToken(true);
+      if (token) {
+        this._oauthHideBanner();
+        await this._syncDownload();
+        if (this.isDirty || this._pendingChanges) await this._syncUpload();
+        this._toast('✅ Synchronisiert');
+        this._syncInitDone = true;
+      } else {
+        this._oauthShowBanner('Verbindung fehlgeschlagen — bitte erneut versuchen');
+      }
+    } catch(e) {
+      this._oauthShowBanner('Fehler: ' + e.message);
+    }
+    if (btn) { btn.disabled = false; }
+  },
+
   _oauthShowBanner(msg) {
     const banner=document.getElementById('wb-oauth-banner');
     const text=document.getElementById('wb-oauth-banner-text');
+    const btn=document.getElementById('wb-oauth-banner-btn');
     if(!banner) return;
-    if(msg&&text) text.innerHTML='\u26a0 '+msg;
+    if(msg&&text) text.innerHTML='⚠ '+msg;
+    if(btn) { btn.textContent='Neu verbinden'; btn.onclick=()=>WB._oauthReconnect(); btn.disabled=false; }
     banner.classList.add('visible');
   },
 
