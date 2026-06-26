@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.82</title>
+  <title>WorkBench 3.0.83</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -677,7 +677,10 @@
     .ts-ms-close { padding:4px 12px; border:1.5px solid var(--border); border-radius:6px; background:none; cursor:pointer; font-size:13px; font-weight:700; color:var(--muted); font-family:var(--font); }
     .ts-ms-body  { flex:1; overflow-y:auto; padding:8px 14px 80px; min-height:0; }
 
-    /* Tagesansicht-Overlay */
+    /* Tag-Autocomplete Dropdown */
+    .nz-tag-dropdown { position:absolute; z-index:500; background:var(--surface); border:1.5px solid var(--border); border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.15); padding:4px; max-height:200px; overflow-y:auto; min-width:160px; }
+    .nz-tag-opt { padding:6px 10px; font-size:12px; font-weight:700; cursor:pointer; border-radius:5px; color:var(--text); font-family:var(--font); display:block; }
+    .nz-tag-opt:hover { background:var(--surface2); color:var(--accent); }
     #wo-tag-overlay { display:none; position:fixed; inset:0; z-index:1800; flex-direction:column; background:var(--surface); }
     #wo-tag-overlay.open { display:flex; }
     .wo-to-head { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1.5px solid var(--border); background:var(--surface); flex-shrink:0; }
@@ -1119,7 +1122,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.82</div>
+  <div id="wb-startup-tagline">v3.0.83</div>
 </div>
 
 <!-- Modal -->
@@ -1357,7 +1360,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.82</span>
+    <span id="wb-menu-version">v3.0.83</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1467,20 +1470,32 @@
             <div id="nz-sb-tags"></div>
           </div>
           <div class="nz-sb-sep"></div>
-          <!-- Sektion 3: Zeitachse -->
+          <!-- Sektion 3: Deadline-Filter -->
           <div class="nz-sb-section">
-            <div class="nz-sb-title">Zeitachse</div>
+            <div class="nz-sb-title">Deadline</div>
+            <button class="nz-sb-btn active" data-zeit="alle" onclick="WB._nzSetZeit('alle')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Alle anzeigen
+            </button>
+            <button class="nz-sb-btn" data-zeit="heute" onclick="WB._nzSetZeit('heute')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Heute
+            </button>
             <button class="nz-sb-btn" data-zeit="woche" onclick="WB._nzSetZeit('woche')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               Diese Woche
             </button>
-            <button class="nz-sb-btn" data-zeit="monat" onclick="WB._nzSetZeit('monat')">
+            <button class="nz-sb-btn" data-zeit="4wochen" onclick="WB._nzSetZeit('4wochen')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
-              Diesen Monat
+              Nächste 4 Wochen
             </button>
-            <button class="nz-sb-btn active" data-zeit="alle" onclick="WB._nzSetZeit('alle')">
+            <button class="nz-sb-btn" data-zeit="spaeter" onclick="WB._nzSetZeit('spaeter')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              Alle anzeigen
+              Später
+            </button>
+            <button class="nz-sb-btn" data-zeit="ueberfaellig" onclick="WB._nzSetZeit('ueberfaellig')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span style="color:#C0392B;">Überfällig</span>
             </button>
           </div>
         </div>
@@ -1670,8 +1685,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.82',
-  APP_BUILD:   '20260627-0800',
+  APP_VERSION: '3.0.83',
+  APP_BUILD:   '20260627-0900',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3065,11 +3080,30 @@ const WB = {
       liste = liste.filter(l => (l.tags||[]).includes(this._nzActiveTag));
     }
 
-    // Zeitachse-Filter (ts = Unix-ms Timestamp)
+    // Deadline-Filter (basiert auf l.deadline, nicht l.ts)
     if (this._nzZeit && this._nzZeit !== 'alle') {
-      const now = Date.now();
-      const ms = this._nzZeit === 'woche' ? 7*24*3600*1000 : 30*24*3600*1000;
-      liste = liste.filter(l => l.ts && (now - l.ts) <= ms);
+      const today = this._dStr(new Date());
+      const d4w   = this._dStr(new Date(Date.now() + 28*24*3600*1000));
+      const dWoche = this._dStr(new Date(Date.now() + 7*24*3600*1000));
+      // Archiv immer ausfiltern bei Deadline-Ansicht
+      liste = liste.filter(l => l.zustand !== 'archiv');
+      switch (this._nzZeit) {
+        case 'heute':
+          liste = liste.filter(l => l.deadline === today);
+          break;
+        case 'woche':
+          liste = liste.filter(l => l.deadline && l.deadline >= today && l.deadline <= dWoche);
+          break;
+        case '4wochen':
+          liste = liste.filter(l => l.deadline && l.deadline >= today && l.deadline <= d4w);
+          break;
+        case 'spaeter':
+          liste = liste.filter(l => l.deadline && l.deadline > d4w);
+          break;
+        case 'ueberfaellig':
+          liste = liste.filter(l => l.deadline && l.deadline < today);
+          break;
+      }
     }
 
     // Gepinnte oben
@@ -3487,7 +3521,55 @@ const WB = {
     this._toast(this._settings.mobileTableEdit ? '✅ Tabellen auf Mobile bearbeitbar' : 'Tabellen auf Mobile read-only');
   },
 
-  // ── Native Dialog-Ersatz ─────────────────────────────
+  // ── Tag-Autocomplete ─────────────────────────────────
+  _nzTagAcInput(inp, listeId) {
+    // Alle vorhandenen Tags aus der DB sammeln
+    const allTags = [...new Set(
+      (this.db?.notizen||[]).filter(l=>!l.deleted)
+        .flatMap(l => l.tags||[])
+    )].sort();
+
+    // Letztes Wort nach Leerzeichen = was gerade getippt wird
+    const val   = inp.value;
+    const parts = val.split(/\s+/);
+    const last  = parts[parts.length - 1];
+
+    const dd = document.getElementById('nz-tag-ac-' + listeId);
+    if (!dd) return;
+
+    if (!last || last.length < 1) { dd.style.display = 'none'; return; }
+
+    const matches = allTags.filter(t =>
+      t.toLowerCase().startsWith(last.replace(/^#/,'').toLowerCase()) &&
+      !parts.slice(0,-1).includes(t) // nicht nochmal einfügen
+    );
+
+    if (!matches.length) { dd.style.display = 'none'; return; }
+
+    dd.innerHTML = matches.map(t =>
+      '<div class="nz-tag-opt" onmousedown="event.preventDefault();WB._nzTagAcSelect(this,' +
+      'document.getElementById(\'nz-tag-ac-' + listeId + '\').previousElementSibling,\'' + this._esc(listeId) + '\')">' +
+      this._esc(t) + '</div>'
+    ).join('');
+    dd.style.display = 'block';
+  },
+
+  _nzTagAcSelect(optEl, inp, listeId) {
+    if (!inp) return;
+    const tag  = optEl.textContent.trim();
+    const val  = inp.value;
+    const parts = val.split(/\s+/);
+    parts[parts.length - 1] = tag;
+    inp.value = parts.join(' ') + ' ';
+    inp.focus();
+    this._nzTagAcClose();
+    // Sofort speichern
+    this._nzDetailSetTags(listeId, inp.value);
+  },
+
+  _nzTagAcClose() {
+    document.querySelectorAll('.nz-tag-dropdown').forEach(d => d.style.display = 'none');
+  },
   _confirm(msg, onOk, onCancel) {
     const body = '<div style="font-size:14px;line-height:1.6;color:var(--text);padding:4px 0;">' + this._esc(msg) + '</div>';
     const footer = '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose();WB._confirmCancel()">Abbrechen</button>'
@@ -3842,6 +3924,16 @@ const WB = {
 
   _nzDetailRenderMeta(l) {
     const id = this._esc(l.id);
+
+    // Archiv-Banner: Notiz ist archiviert → De-archivieren anbieten
+    let archivBanner = '';
+    if (l.zustand === 'archiv') {
+      archivBanner = '<div style="background:#FEF3C7;border:1.5px solid #F59E0B;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
+        + '<span style="font-size:13px;font-weight:600;color:#92400E;flex:1;">📦 Diese Notiz ist archiviert</span>'
+        + '<button onclick="WB._nzDeArchivieren(\'' + id + '\')" style="padding:4px 12px;border:none;border-radius:6px;background:#F59E0B;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);">De-archivieren</button>'
+        + '</div>';
+    }
+
     const farbMap = [
       { k:'c-gelb',   bg:'#FFF9C4', border:'#F1C40F' },
       { k:'c-gruen',  bg:'#D5F5E3', border:'#58D68D' },
@@ -3894,12 +3986,15 @@ const WB = {
           + '</span>').join('')
       : '<span style="font-size:11px;color:var(--faint);font-style:italic;">Keine</span>';
 
-    return ''
+    return archivBanner + ''
       + '<div class="nz-dp-meta-row"><span class="nz-dp-meta-lbl">Farbe</span>' + farbDots + '</div>'
       + '<div class="nz-dp-meta-row"><span class="nz-dp-meta-lbl">Welt</span>' + weltBtns + '</div>'
       + '<div class="nz-dp-meta-row"><span class="nz-dp-meta-lbl">Tags</span>'
-      +   '<input class="nz-dp-tag-inp" placeholder="#tag1 #tag2" value="' + this._esc(tagsVal) + '"'
-      +   ' onchange="WB._nzDetailSetTags(\'' + id + '\',this.value)"></div>'
+      +   '<div style="position:relative;flex:1;"><input class="nz-dp-tag-inp" placeholder="#tag1 #tag2" value="' + this._esc(tagsVal) + '"'
+      +   ' onchange="WB._nzDetailSetTags(\'' + id + '\',this.value)"'
+      +   ' oninput="WB._nzTagAcInput(this,\'' + id + '\')"'
+      +   ' onblur="setTimeout(()=>WB._nzTagAcClose(),150)">'
+      +   '<div id="nz-tag-ac-' + id + '" class="nz-tag-dropdown" style="display:none;top:100%;left:0;"></div></div></div>'
       + '<div class="nz-dp-meta-row"><span class="nz-dp-meta-lbl">Link</span>'
       +   (linkVal
           ? '<a href="' + this._esc(linkVal) + '" target="_blank" rel="noopener" '
@@ -3953,6 +4048,16 @@ const WB = {
     return html.replace(/(?<!['"=])(https?:\/\/[^\s<>"']+)/g,
       '<a href="$1" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;">$1</a>'
     );
+  },
+
+  _nzDeArchivieren(listeId) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    l.zustand = 'aktuell';
+    l.updatedAt = this._now();
+    this.setDirty();
+    this._nzDetailOpen(listeId, true);
+    this.renderNotizenTab();
+    this._toast('✓ Notiz wieder auf Aktuell');
   },
 
   _nzDetailEditLink(listeId) {

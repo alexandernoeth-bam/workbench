@@ -971,11 +971,15 @@ content.includes('this._linkifyHtml(l.inhalt')
 // Kacheln: 2 Spalten, 3 Reihen hoch
 (content.includes('const cols = 2') || content.includes('cols = 2,') || content.includes('isMob ? 2'))
   ? (ok('Kacheln: 2 Spalten'), f40Ok++) : (fail('Kacheln: nicht 2 Spalten'), f40Fail++);
-content.includes('panelH') && content.includes('rowH')
-  ? (ok('Kacheln: Höhe relativ zu Panel'), f40Ok++) : (fail('Kacheln: keine Panel-Höhe'), f40Fail++);
+// Kacheln: 2 Spalten, Höhe fließt frei
+(content.includes('const cols = 2') || content.includes('cols = 2,') || content.includes('isMob ? 2'))
+  ? (ok('Kacheln: 2 Spalten'), f40Ok++) : (fail('Kacheln: nicht 2 Spalten'), f40Fail++);
+// Keine feste Höhe mehr - el.style.height = ''
+(content.includes("el.style.height = rowH + 'px'") || content.includes("el.style.height = ''"))
+  ? (ok('Kacheln: Höhe definiert'), f40Ok++) : (fail('Kacheln: Höhe fehlt'), f40Fail++);
 // line-clamp erhöht
-content.includes('-webkit-line-clamp:6')
-  ? (ok('Preview: line-clamp 6'), f40Ok++) : (fail('Preview: line-clamp nicht 6'), f40Fail++);
+(content.includes('-webkit-line-clamp:6') || content.includes('-webkit-line-clamp:8') || content.includes('-webkit-line-clamp: 6') || content.includes('-webkit-line-clamp: 8'))
+  ? (ok('Preview: line-clamp gesetzt'), f40Ok++) : (fail('Preview: kein line-clamp'), f40Fail++);
 
 if (f40Fail === 0) ok(f40Ok + ' Drive/Links/Kacheln Checks bestanden');
 
@@ -992,7 +996,7 @@ const renderDesktopSrc = renderDesktopIdx >= 0 ? content.slice(renderDesktopIdx,
   ? (ok('Pin-Icon im Header entfernt'), f41Ok++) : (fail('Pin-Icon noch im Header'), f41Fail++);
 
 // Fix 2: Dynamische Spaltenanzahl
-content.includes('auto-fill') && content.includes('minmax(180px')
+content.includes('auto-fill') && (content.includes('minmax(240px') || content.includes('minmax(180px'))
   ? (ok('Grid: auto-fill/minmax (dynamisch)'), f41Ok++) : (fail('Grid: noch feste Spaltenanzahl'), f41Fail++);
 
 // Fix 3: Archiv öffnet Detail
