@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.87</title>
+  <title>WorkBench 3.0.88</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1132,7 +1132,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.87</div>
+  <div id="wb-startup-tagline">v3.0.88</div>
 </div>
 
 <!-- Modal -->
@@ -1385,7 +1385,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.87</span>
+    <span id="wb-menu-version">v3.0.88</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1710,8 +1710,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.87',
-  APP_BUILD:   '20260627-1300',
+  APP_VERSION: '3.0.88',
+  APP_BUILD:   '20260627-1400',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2716,62 +2716,6 @@ const WB = {
     scroll.innerHTML = h;
   },
 
-  _nzRenderDesktop(scroll) {
-    const listen  = this._nzGetListen();
-    const gepinnt = listen.filter(l => !!l.gepinnt);
-    const normal  = listen.filter(l => !l.gepinnt);
-    const renderK = l => {
-      const farbe  = this._nzPostItFarbe(l.farbe || 'c-weiss');
-      const items  = (l.items||[]).filter(i=>!i.deleted);
-      const offen  = items.filter(i=>!i.done).length;
-      const pinH   = l.gepinnt ? '<span class="nz-postit-pin">\uD83D\uDCCC</span>' : '';
-      const done  = items.filter(i=>i.done).length;
-      const cntLbl = l.typ==='check' ? (done+'/'+items.length) : (items.length+'');
-      let preview = '';
-      if (l.typ === 'freitext') {
-        const tmp = document.createElement('div'); tmp.innerHTML = l.inhalt || '';
-        const txt = tmp.textContent || '';
-        preview = txt.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3)
-          .map(line => '<div class="nz-postit-item"><div class="nz-postit-dot"></div><span class="nz-postit-txt">' + this._esc(line) + '</span></div>').join('');
-      } else {
-        preview = items.slice(0,3).map(i => {
-          const chk = l.typ==='check'
-            ? '<div class="nz-postit-chk' + (i.done?' done':'') + '">' + (i.done?'\u2713':'') + '</div>'
-            : '<div class="nz-postit-dot"></div>';
-          return '<div class="nz-postit-item">' + chk + '<span class="nz-postit-txt' + (i.done?' dn':'') + '">' + this._esc(i.text) + '</span></div>';
-        }).join('');
-      }
-      const more  = items.length - 3;
-      const moreH = more > 0 ? '<div class="nz-postit-more">+' + more + ' weitere</div>' : '';
-      const emptyH = items.length === 0 ? '<div class="nz-postit-empty">Noch keine Eintr\u00e4ge</div>' : '';
-      return '<div class="nz-postit ' + farbe + '" draggable="true"'
-        + ' ondragstart="WB._nzDragStart(event,\'' + this._esc(l.id) + '\')"'
-        + ' ondragover="WB._nzDragOver(event,\'' + this._esc(l.id) + '\')"'
-        + ' ondrop="WB._nzDrop(event,\'' + this._esc(l.id) + '\')"'
-        + ' ondragend="WB._nzDragEnd()"'
-        + ' oncontextmenu="WB._nzCtxOpen(event,\'' + this._esc(l.id) + '\')"'
-        + ' ontouchstart="WB._nzLongPressStart(event,\'' + this._esc(l.id) + '\')"'
-        + ' ontouchend="WB._nzLongPressEnd()" ontouchmove="WB._nzLongPressEnd()"'
-        + ' onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')" id="nzg-' + this._esc(l.id) + '">'
-        + '<div class="nz-postit-hdr">'
-        + '<span class="nz-postit-icon">' + this._nzSvgIcon(l.icon||'note') + '</span>'
-        + '<span class="nz-postit-title">' + this._esc(l.titel) + '</span>' + pinH
-        + '<span class="nz-postit-cnt' + (l.typ==='check'?' nz-check-pill':'') + '">' + cntLbl + '</span>'
-        + '</div>'
-        + '<div>' + preview + '</div>' + moreH + emptyH + '</div>';
-    };
-    let h = '';
-    if (gepinnt.length) {
-      h += '<div class="nz-postit-section-lbl">\uD83D\uDCCC Gepinnt</div>';
-      h += '<div class="nz-grid">' + gepinnt.map(renderK).join('') + '</div>';
-    }
-    const zustandLabels = { aktuell:'Aktuell', parkplatz:'Auf dem Parkplatz', kompass:'Kompass', archiv:'Archiv' };
-    h += '<div class="nz-postit-section-lbl">' + (zustandLabels[this._nzZustand]||'Listen') + '</div>';
-    h += '<div class="nz-grid">' + normal.map(renderK).join('')
-     
-      + '</div>';
-    scroll.innerHTML = h;
-  },
 
   _nzSvgIcon(icon, sz) {
     sz = sz || 14;
@@ -4837,6 +4781,9 @@ const WB = {
         + 'ondragover="WB._nzDragOver(event,\'' + this._esc(l.id) + '\')" '
         + 'ondrop="WB._nzDrop(event,\'' + this._esc(l.id) + '\')" '
         + 'ondragend="WB._nzDragEnd()" '
+        + 'oncontextmenu="WB._nzCtxOpen(event,\'' + this._esc(l.id) + '\')" '
+        + 'ontouchstart="WB._nzLongPressStart(event,\'' + this._esc(l.id) + '\')" '
+        + 'ontouchend="WB._nzLongPressEnd()" ontouchmove="WB._nzLongPressEnd()" '
         + 'onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')" id="nzg-' + this._esc(l.id) + '" style="position:relative">'
         + '<div class="nz-postit-hdr">'
         + '<span class="nz-postit-icon">' + (l.icon ? this._nzSvgIcon(l.icon, 14) : '📝') + '</span>'
