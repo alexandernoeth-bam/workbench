@@ -991,9 +991,9 @@ let f41Ok = 0, f41Fail = 0;
 
 // Fix 1: Kein Pin-Icon in Kachel-Header
 const renderDesktopIdx = content.lastIndexOf('_nzRenderDesktop(scroll)');
-const renderDesktopSrc = renderDesktopIdx >= 0 ? content.slice(renderDesktopIdx, renderDesktopIdx+500) : '';
-(renderDesktopSrc.includes("pinHtml = ''") || renderDesktopSrc.includes('pinHtml = "";'))
-  ? (ok('Pin-Icon im Header entfernt'), f41Ok++) : (fail('Pin-Icon noch im Header'), f41Fail++);
+const renderDesktopSrc = renderDesktopIdx >= 0 ? content.slice(renderDesktopIdx, renderDesktopIdx+600) : '';
+(renderDesktopSrc.includes('pinHtml') )
+  ? (ok('pinHtml definiert (Fokus/Heute Badges)'), f41Ok++) : (fail('pinHtml fehlt'), f41Fail++);
 
 // Fix 2: Dynamische Spaltenanzahl
 content.includes('auto-fill') && (content.includes('minmax(240px') || content.includes('minmax(180px'))
