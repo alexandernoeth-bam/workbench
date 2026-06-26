@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.88</title>
+  <title>WorkBench 3.0.90</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1132,7 +1132,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.88</div>
+  <div id="wb-startup-tagline">v3.0.90</div>
 </div>
 
 <!-- Modal -->
@@ -1163,8 +1163,7 @@
   </div>
 </div>
 
-<!-- Notizen Kontext-Menü -->
-<div id="nz-ctx-menu" class="nz-ctx-menu" style="display:none"></div>
+<!-- Notizen Kontext-Menü → siehe weiter unten bei #nz-ctx-menu -->
 
 <!-- Freitext-Overlay (Desktop) -->
 <div id="nz-ft-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:6500;"
@@ -1385,7 +1384,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.88</span>
+    <span id="wb-menu-version">v3.0.90</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1710,8 +1709,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.88',
-  APP_BUILD:   '20260627-1400',
+  APP_VERSION: '3.0.90',
+  APP_BUILD:   '20260627-1600',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3531,47 +3530,55 @@ const WB = {
   _nzCtxOpen(e, listeId) {
     e.preventDefault();
     e.stopPropagation();
-    this._nzCtxId = listeId;
     const menu = document.getElementById('nz-ctx-menu');
     if (!menu) return;
 
-    // Aktuellen Zustand markieren
+    // listeId direkt in Button-onclicks einbetten — kein State mehr nötig
+    const id = this._esc(listeId);
     const l = (this.db?.notizen||[]).find(x => x.id === listeId);
     const curZ = l?.zustand || 'aktuell';
-    ['aktuell','parkplatz','kompass','archiv'].forEach(z => {
-      const btn = document.getElementById('nz-ctx-' + z);
-      if (btn) btn.classList.toggle('is-current', curZ === z);
-    });
+
+    menu.innerHTML =
+      '<div class="nz-ctx-section">Zustand</div>'
+      + ['aktuell','parkplatz','kompass','archiv'].map(z =>
+          '<button class="nz-ctx-btn' + (curZ===z?' is-current':'') + '" onclick="WB._nzCtxSetZustand(\'' + id + '\',\'' + z + '\')">'
+          + (z==='aktuell'?'✓ Aktuell':z==='parkplatz'?'🅿 Parkplatz':z==='kompass'?'🧭 Kompass':'📦 Archiv')
+          + '</button>'
+        ).join('')
+      + '<div class="nz-ctx-sep"></div>'
+      + '<div class="nz-ctx-section">Sortierung</div>'
+      + '<button class="nz-ctx-btn" onclick="WB._nzCtxMove(\'' + id + '\',-1)">↑ Nach oben</button>'
+      + '<button class="nz-ctx-btn" onclick="WB._nzCtxMove(\'' + id + '\',1)">↓ Nach unten</button>'
+      + '<div class="nz-ctx-sep"></div>'
+      + '<button class="nz-ctx-btn danger" onclick="WB._nzCtxDelete(\'' + id + '\')">🗑 Löschen</button>';
 
     // Position
-    const x = Math.min(e.clientX || e.touches?.[0]?.clientX || 0, window.innerWidth  - 210);
-    const y = Math.min(e.clientY || e.touches?.[0]?.clientY || 0, window.innerHeight - 300);
+    const x = Math.min(e.clientX || 100, window.innerWidth  - 220);
+    const y = Math.min(e.clientY || 100, window.innerHeight - 260);
     menu.style.left = x + 'px';
     menu.style.top  = y + 'px';
     menu.classList.add('open');
 
     // Schließen bei Klick außerhalb
+    const close = (ev) => {
+      if (!menu.contains(ev.target)) {
+        menu.classList.remove('open');
+        document.removeEventListener('mousedown', close);
+        document.removeEventListener('touchstart', close);
+      }
+    };
     setTimeout(() => {
-      const close = (ev) => {
-        if (!menu.contains(ev.target)) {
-          menu.classList.remove('open');
-          document.removeEventListener('click', close);
-          document.removeEventListener('touchstart', close);
-        }
-      };
-      document.addEventListener('click', close);
+      document.addEventListener('mousedown', close);
       document.addEventListener('touchstart', close);
-    }, 10);
+    }, 50);
   },
 
   _nzCtxClose() {
     document.getElementById('nz-ctx-menu')?.classList.remove('open');
-    this._nzCtxId = null;
   },
 
-  _nzCtxSetZustand(zustand) {
-    const listeId = this._nzCtxId; this._nzCtxClose();
-    if (!listeId) return;
+  _nzCtxSetZustand(listeId, zustand) {
+    this._nzCtxClose();
     this._nzSetZustandItem(listeId, zustand);
     this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
     if (this.activeTab === 'tagessicht') this._tsRenderPins();
@@ -3579,8 +3586,8 @@ const WB = {
     this._toast('→ ' + (labels[zustand]||zustand));
   },
 
-  _nzCtxDelete() {
-    const listeId = this._nzCtxId; this._nzCtxClose();
+  _nzCtxDelete(listeId) {
+    this._nzCtxClose();
     if (!listeId) return;
     this._confirm('Liste wirklich löschen?', () => {
       const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
@@ -3592,25 +3599,20 @@ const WB = {
     });
   },
 
-  _nzCtxMove(dir) {
-    const listeId = this._nzCtxId; this._nzCtxClose();
+  _nzCtxMove(listeId, dir) {
+    this._nzCtxClose();
     if (!listeId) return;
-    const liste = this._nzGetListen(); // aktuell angezeigte Liste
+    const liste = this._nzGetListen();
     const idx = liste.findIndex(l => l.id === listeId);
     if (idx < 0) return;
     const newIdx = idx + dir;
     if (newIdx < 0 || newIdx >= liste.length) { this._toast('Bereits am Rand'); return; }
-    // _sortOrder der beiden tauschen
-    const a = liste[idx], b = liste[newIdx];
-    // Wenn noch kein _sortOrder: Positionsindex als Startwert
     liste.forEach((l, i) => { if (l._sortOrder === undefined) l._sortOrder = i * 10; });
+    const a = liste[idx], b = liste[newIdx];
     const aO = a._sortOrder, bO = b._sortOrder;
-    a._sortOrder = bO;
-    b._sortOrder = aO;
-    a.updatedAt = this._now();
-    b.updatedAt = this._now();
-    this.setDirty();
-    this.renderNotizenTab();
+    a._sortOrder = bO; b._sortOrder = aO;
+    a.updatedAt = this._now(); b.updatedAt = this._now();
+    this.setDirty(); this.renderNotizenTab();
   },
 
   // Long-Press für Mobile
