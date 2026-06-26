@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.85</title>
+  <title>WorkBench 3.0.86</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -677,6 +677,16 @@
     .ts-ms-close { padding:4px 12px; border:1.5px solid var(--border); border-radius:6px; background:none; cursor:pointer; font-size:13px; font-weight:700; color:var(--muted); font-family:var(--font); }
     .ts-ms-body  { flex:1; overflow-y:auto; padding:8px 14px 80px; min-height:0; }
 
+    /* Notiz-Kontextmenü (Rechtsklick / Long-Press) */
+    #nz-ctx-menu { display:none; position:fixed; z-index:4000; background:var(--surface); border:1.5px solid var(--border); border-radius:10px; box-shadow:0 4px 24px rgba(0,0,0,.2); padding:4px; min-width:190px; }
+    #nz-ctx-menu.open { display:flex; flex-direction:column; gap:1px; }
+    .nz-ctx-section { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--faint); padding:6px 10px 3px; }
+    .nz-ctx-btn { display:flex; align-items:center; gap:8px; padding:7px 12px; border:none; background:none; cursor:pointer; font-size:13px; font-family:var(--font); color:var(--text); border-radius:6px; text-align:left; width:100%; }
+    .nz-ctx-btn:hover { background:var(--surface2); }
+    .nz-ctx-btn.is-current { background:rgba(10,107,94,.1); color:var(--accent); font-weight:700; }
+    .nz-ctx-btn.danger { color:#C0392B; }
+    .nz-ctx-btn.danger:hover { background:rgba(192,57,43,.08); }
+    .nz-ctx-sep { height:1px; background:var(--border); margin:3px 6px; }
     /* Tag-Autocomplete Dropdown */
     .nz-tag-dropdown { position:absolute; z-index:500; background:var(--surface); border:1.5px solid var(--border); border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.15); padding:4px; max-height:200px; overflow-y:auto; min-width:160px; }
     .nz-tag-opt { padding:6px 10px; font-size:12px; font-weight:700; cursor:pointer; border-radius:5px; color:var(--text); font-family:var(--font); display:block; }
@@ -1122,7 +1132,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.85</div>
+  <div id="wb-startup-tagline">v3.0.86</div>
 </div>
 
 <!-- Modal -->
@@ -1290,6 +1300,21 @@
   <button class="ft-tm-btn danger" onclick="WB._ftTableDel()">🗑 Tabelle löschen</button>
 </div>
 
+<!-- Notiz-Kontextmenü -->
+<div id="nz-ctx-menu">
+  <div class="nz-ctx-section">Zustand</div>
+  <button class="nz-ctx-btn" id="nz-ctx-aktuell"   onclick="WB._nzCtxSetZustand('aktuell')">✓ Aktuell</button>
+  <button class="nz-ctx-btn" id="nz-ctx-parkplatz" onclick="WB._nzCtxSetZustand('parkplatz')">🅿 Parkplatz</button>
+  <button class="nz-ctx-btn" id="nz-ctx-kompass"   onclick="WB._nzCtxSetZustand('kompass')">🧭 Kompass</button>
+  <button class="nz-ctx-btn" id="nz-ctx-archiv"    onclick="WB._nzCtxSetZustand('archiv')">📦 Archiv</button>
+  <div class="nz-ctx-sep"></div>
+  <div class="nz-ctx-section">Sortierung</div>
+  <button class="nz-ctx-btn" id="nz-ctx-up"   onclick="WB._nzCtxMove(-1)">↑ Nach oben</button>
+  <button class="nz-ctx-btn" id="nz-ctx-down" onclick="WB._nzCtxMove(1)">↓ Nach unten</button>
+  <div class="nz-ctx-sep"></div>
+  <button class="nz-ctx-btn danger" onclick="WB._nzCtxDelete()">🗑 Löschen</button>
+</div>
+
 <!-- Tagesansicht-Overlay -->
 <div id="wo-tag-overlay">
   <div class="wo-to-head">
@@ -1360,7 +1385,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.85</span>
+    <span id="wb-menu-version">v3.0.86</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1685,8 +1710,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.85',
-  APP_BUILD:   '20260627-1100',
+  APP_VERSION: '3.0.86',
+  APP_BUILD:   '20260627-1200',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2724,6 +2749,9 @@ const WB = {
         + ' ondragover="WB._nzDragOver(event,\'' + this._esc(l.id) + '\')"'
         + ' ondrop="WB._nzDrop(event,\'' + this._esc(l.id) + '\')"'
         + ' ondragend="WB._nzDragEnd()"'
+        + ' oncontextmenu="WB._nzCtxOpen(event,\'' + this._esc(l.id) + '\')"'
+        + ' ontouchstart="WB._nzLongPressStart(event,\'' + this._esc(l.id) + '\')"'
+        + ' ontouchend="WB._nzLongPressEnd()" ontouchmove="WB._nzLongPressEnd()"'
         + ' onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')" id="nzg-' + this._esc(l.id) + '">'
         + '<div class="nz-postit-hdr">'
         + '<span class="nz-postit-icon">' + this._nzSvgIcon(l.icon||'note') + '</span>'
@@ -2740,7 +2768,7 @@ const WB = {
     const zustandLabels = { aktuell:'Aktuell', parkplatz:'Auf dem Parkplatz', kompass:'Kompass', archiv:'Archiv' };
     h += '<div class="nz-postit-section-lbl">' + (zustandLabels[this._nzZustand]||'Listen') + '</div>';
     h += '<div class="nz-grid">' + normal.map(renderK).join('')
-      + (this._nzZustand === 'aktuell' ? '<div class="nz-postit-new" onclick="WB._nzNeueListeDialog()"><span class="nz-postit-new-icon">+</span>Neue Liste</div>' : '')
+     
       + '</div>';
     scroll.innerHTML = h;
   },
@@ -2852,12 +2880,13 @@ const WB = {
   },
 
   _nzDeleteListe(listeId) {
-    this._confirm('Liste löschen?', () => {
+    this._confirm('Liste wirklich löschen?', () => {
       const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
-      l.deleted = true; l.updatedAt = this._now();
+      this._softDelete(l);
       this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
+      if (this._nzDetailId === listeId) document.getElementById('nz-detail-panel')?.classList.remove('open');
       if (this.activeTab === 'tagessicht') this._tsRenderPins();
-      this._toast('\u2713 Liste gel\u00f6scht');
+      this._toast('🗑 Liste gelöscht');
     });
   },
 
@@ -3116,8 +3145,14 @@ const WB = {
       }
     }
 
-    // Gepinnte oben
-    return liste.sort((a, b) => (b.gepinnt ? 1 : 0) - (a.gepinnt ? 1 : 0));
+    // Gepinnte oben, dann manuelle Sortierung via _sortOrder
+    return liste.sort((a, b) => {
+      if (!!b.gepinnt !== !!a.gepinnt) return (b.gepinnt ? 1 : 0) - (a.gepinnt ? 1 : 0);
+      const aO = a._sortOrder ?? 9999;
+      const bO = b._sortOrder ?? 9999;
+      if (aO !== bO) return aO - bO;
+      return (b.updatedAt||'').localeCompare(a.updatedAt||'');
+    });
   },
 
   _nzSvgIcon(icon, size) {
@@ -3545,7 +3580,104 @@ const WB = {
     this._toast(this._settings.mobileTableEdit ? '✅ Tabellen auf Mobile bearbeitbar' : 'Tabellen auf Mobile read-only');
   },
 
-  // ── Tag-Autocomplete ─────────────────────────────────
+  // ── Notiz-Kontextmenü ────────────────────────────────
+  _nzCtxId: null,
+  _nzCtxLongTimer: null,
+
+  _nzCtxOpen(e, listeId) {
+    e.preventDefault();
+    e.stopPropagation();
+    this._nzCtxId = listeId;
+    const menu = document.getElementById('nz-ctx-menu');
+    if (!menu) return;
+
+    // Aktuellen Zustand markieren
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId);
+    const curZ = l?.zustand || 'aktuell';
+    ['aktuell','parkplatz','kompass','archiv'].forEach(z => {
+      const btn = document.getElementById('nz-ctx-' + z);
+      if (btn) btn.classList.toggle('is-current', curZ === z);
+    });
+
+    // Position
+    const x = Math.min(e.clientX || e.touches?.[0]?.clientX || 0, window.innerWidth  - 210);
+    const y = Math.min(e.clientY || e.touches?.[0]?.clientY || 0, window.innerHeight - 300);
+    menu.style.left = x + 'px';
+    menu.style.top  = y + 'px';
+    menu.classList.add('open');
+
+    // Schließen bei Klick außerhalb
+    setTimeout(() => {
+      const close = (ev) => {
+        if (!menu.contains(ev.target)) {
+          menu.classList.remove('open');
+          document.removeEventListener('click', close);
+          document.removeEventListener('touchstart', close);
+        }
+      };
+      document.addEventListener('click', close);
+      document.addEventListener('touchstart', close);
+    }, 10);
+  },
+
+  _nzCtxClose() {
+    document.getElementById('nz-ctx-menu')?.classList.remove('open');
+    this._nzCtxId = null;
+  },
+
+  _nzCtxSetZustand(zustand) {
+    const listeId = this._nzCtxId; this._nzCtxClose();
+    if (!listeId) return;
+    this._nzSetZustandItem(listeId, zustand);
+    this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
+    if (this.activeTab === 'tagessicht') this._tsRenderPins();
+    const labels = { aktuell:'Aktuell', parkplatz:'Parkplatz', kompass:'Kompass', archiv:'Archiv' };
+    this._toast('→ ' + (labels[zustand]||zustand));
+  },
+
+  _nzCtxDelete() {
+    const listeId = this._nzCtxId; this._nzCtxClose();
+    if (!listeId) return;
+    this._confirm('Liste wirklich löschen?', () => {
+      const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+      this._softDelete(l);
+      if (this._nzDetailId === listeId) document.getElementById('nz-detail-panel')?.classList.remove('open');
+      this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
+      if (this.activeTab === 'tagessicht') this._tsRenderPins();
+      this._toast('🗑 Gelöscht');
+    });
+  },
+
+  _nzCtxMove(dir) {
+    const listeId = this._nzCtxId; this._nzCtxClose();
+    if (!listeId) return;
+    const liste = this._nzGetListen();
+    const idx = liste.findIndex(l => l.id === listeId);
+    if (idx < 0) return;
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= liste.length) return;
+    // Sortierreihenfolge: _sortOrder Feld
+    const a = liste[idx], b = liste[newIdx];
+    const aO = a._sortOrder ?? idx;
+    const bO = b._sortOrder ?? newIdx;
+    a._sortOrder = bO;
+    b._sortOrder = aO;
+    a.updatedAt = this._now();
+    b.updatedAt = this._now();
+    this.setDirty();
+    this.renderNotizenTab();
+  },
+
+  // Long-Press für Mobile
+  _nzLongPressStart(e, listeId) {
+    this._nzCtxLongTimer = setTimeout(() => {
+      this._nzCtxOpen(e, listeId);
+    }, 500);
+  },
+  _nzLongPressEnd() {
+    clearTimeout(this._nzCtxLongTimer);
+    this._nzCtxLongTimer = null;
+  },
   _nzTagAcInput(inp, listeId) {
     // Alle vorhandenen Tags aus der DB sammeln
     const allTags = [...new Set(
@@ -4747,7 +4879,6 @@ const WB = {
       const sortedAll = [...listen].sort((a,b) => (b.updatedAt||'').localeCompare(a.updatedAt||''));
       h += '<div class="nz-grid">'
         + sortedAll.map(renderKachel).join('')
-        + '<div class="nz-postit-new" onclick="WB._nzNeueListeDialog()"><span class="nz-postit-new-icon">+</span>Neue Liste</div>'
         + '</div>';
     } else {
     if (gepinnt.length) {
@@ -4758,12 +4889,7 @@ const WB = {
       h += '<div class="nz-postit-section-lbl">Alle Listen</div>';
       h += '<div class="nz-grid">'
         + normal.map(renderKachel).join('')
-        + '<div class="nz-postit-new" onclick="WB._nzNeueListeDialog()">'
-        + '<span class="nz-postit-new-icon">+</span>Neue Liste</div>'
         + '</div>';
-    } else {
-      h += '<div class="nz-grid"><div class="nz-postit-new" onclick="WB._nzNeueListeDialog()">'
-        + '<span class="nz-postit-new-icon">+</span>Neue Liste</div></div>';
     }
     } // end else (nicht "alle")
     scroll.innerHTML = h;
