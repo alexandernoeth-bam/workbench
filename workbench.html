@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.72</title>
+  <title>WorkBench 3.0.74</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1046,7 +1046,7 @@
     #ts-notizen-grid { flex:1; overflow-y:auto; padding:8px 10px; display:flex; flex-direction:column; gap:6px; }
     .ts-nz-group { display:flex; flex-direction:column; gap:3px; }
     .ts-nz-group-lbl { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); padding-left:1px; }
-    #ts-notizen-panel .ts-nz-grid { display:flex !important; flex-direction:row !important; flex-wrap:wrap !important; direction:rtl; gap:5px; width:100%; min-width:0; }
+    #ts-notizen-panel .ts-nz-grid { display:flex !important; flex-direction:row !important; flex-wrap:wrap !important; direction:rtl; gap:6px; width:100%; min-width:0; align-items:flex-start; }
     #ts-notizen-panel .ts-nz-mini {  border-radius:7px; direction:ltr; border:1.5px solid var(--border); padding:7px; cursor:pointer; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; transition:transform .1s,box-shadow .1s; flex-shrink:0; }
     .ts-nz-mini:hover { transform:translateY(-1px); box-shadow:0 3px 10px rgba(0,0,0,.13); }
     .ts-nz-mini.active { box-shadow:0 0 0 2.5px var(--accent); }
@@ -1058,9 +1058,9 @@
     #ts-notizen-panel .ts-nz-mini.c-lila    { background:#E8D5F0 !important; border-color:#A569BD !important; }
     #ts-notizen-panel .ts-nz-mini.c-tuerkis { background:#C8F0EC !important; border-color:#45B7AA !important; }
     #ts-notizen-panel .ts-nz-mini.c-weiss   { background:#fff    !important; border-color:rgba(0,0,0,.15) !important; }
-    .ts-nz-mini-top { display:flex; flex-direction:column; gap:3px; flex:1; min-height:0; }
-    .ts-nz-mini-title { font-size:14px; font-weight:800; color:var(--text); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3; }
-    .ts-nz-mini-preview { font-size:13px; color:var(--muted); overflow:hidden; display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; opacity:.8; line-height:1.4; flex:1; }
+    .ts-nz-mini-top { display:flex; flex-direction:column; gap:3px; flex:1; min-height:0; overflow:hidden; }
+    .ts-nz-mini-title { font-size:14px; font-weight:800; color:var(--text); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3; flex-shrink:0; }
+    .ts-nz-mini-preview { font-size:12px; color:var(--muted); overflow:hidden; display:-webkit-box; -webkit-line-clamp:8; -webkit-box-orient:vertical; opacity:.85; line-height:1.45; flex:1; min-height:0; }
     .ts-nz-mini-pills { display:flex; gap:3px; flex-wrap:wrap; }
     .ts-nz-mini-pill { font-size:11px; font-weight:800; padding:2px 7px; border-radius:6px; white-space:nowrap; }
     .ts-nz-mini-pill.cnt { background:rgba(0,0,0,.1); color:var(--muted); }
@@ -1087,7 +1087,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.72</div>
+  <div id="wb-startup-tagline">v3.0.74</div>
 </div>
 
 <!-- Modal -->
@@ -1302,7 +1302,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.72</span>
+    <span id="wb-menu-version">v3.0.74</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1613,8 +1613,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.72',
-  APP_BUILD:   '20260627-0015',
+  APP_VERSION: '3.0.74',
+  APP_BUILD:   '20260627-0130',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1995,14 +1995,14 @@ const WB = {
     }
     if (!h) h = '<div style="padding:12px;font-size:11px;color:var(--faint);">Keine Notizen für heute — Notizen anpinnen oder temporär hinzufügen</div>';
     grid.innerHTML = h;
-    // Quadratische Kacheln — 2 pro Zeile, Höhe = 1/3 des verfügbaren Bereichs
+    // Kacheln: 2 Spalten, feste Höhe = 1/3 Panelhöhe (alle gleich groß)
     requestAnimationFrame(() => {
       const panel = document.getElementById('ts-notizen-panel');
       if (!panel) return;
       const isMob = this._isMobile();
-      const cols = isMob ? 2 : 2;
+      const cols = 2;
       const panelH = panel.offsetHeight;
-      const rowH = isMob ? 160 : Math.max(Math.floor((panelH - 60) / 3), 120);
+      const rowH = isMob ? 160 : Math.max(Math.floor((panelH - 60) / 3), 140);
       panel.querySelectorAll('.ts-nz-grid').forEach(gridEl => {
         const items = gridEl.querySelectorAll('.ts-nz-mini');
         const gap = 6;
@@ -2011,6 +2011,7 @@ const WB = {
           el.style.width  = cellW + 'px';
           el.style.height = rowH + 'px';
           el.style.minHeight = 'unset';
+          el.style.overflow = 'hidden';
         });
       });
     });
@@ -2020,16 +2021,23 @@ const WB = {
   _tsMiniKachelHtml(l) {
     const farbe = l.farbe || 'c-weiss';
     const allItems  = (l.items||[]).filter(i => !i.deleted);
-    const doneItems = allItems.filter(i => i.done);
-    const preview = (() => { const tmp = document.createElement('div'); tmp.innerHTML = l.inhalt || ''; return tmp.textContent.trim().slice(0,80); })()
-      || (allItems[0]?.text || '');
+    const openItems = allItems.filter(i => !i.done);
+    const doneItems = allItems.filter(i =>  i.done);
+
+    // Vorschau: Checklistenpunkte + Freitext kombiniert
+    let previewLines = [];
+    openItems.forEach(i => previewLines.push('☐ ' + i.text));
+    if (doneItems.length) previewLines.push('☑ ' + doneItems.length + ' erledigt');
+    const ftText = (() => { const t = document.createElement('div'); t.innerHTML = l.inhalt||''; return t.textContent.trim(); })();
+    if (ftText) previewLines.push(ftText);
+    const preview = previewLines.join('\n');
+
     const cntPill = allItems.length
       ? '<span class="ts-nz-mini-pill cnt">' + doneItems.length + '/' + allItems.length + '</span>' : '';
     const weltPill = l.welt === 'beruf' || l.welt === 'pro'
       ? '<span class="ts-nz-mini-pill beruf">Beruf</span>'
       : l.welt === 'privat' || l.welt === 'priv'
       ? '<span class="ts-nz-mini-pill privat">Privat</span>' : '';
-    // heutePin: × Button zum Entfernen
     const heutePinBtn = l.heutePin
       ? '<span onclick="event.stopPropagation();WB._tsHeutePinRemove(\'' + this._esc(l.id) + '\')" '
         + 'style="position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.2);'
@@ -2043,7 +2051,7 @@ const WB = {
       + '<div class="ts-nz-mini-title">' + this._esc(l.titel) + '</div>'
       + (preview ? '<div class="ts-nz-mini-preview">' + this._esc(preview) + '</div>' : '')
       + '</div>'
-      + '<div class="ts-nz-mini-pills">' + cntPill + weltPill + '</div>'
+      + '<div class="ts-nz-mini-pills" style="flex-shrink:0;">' + cntPill + weltPill + '</div>'
       + '</div>';
   },
 
