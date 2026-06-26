@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.76</title>
+  <title>WorkBench 3.0.79</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -102,7 +102,7 @@
     /* ── OAuth-Banner ── */
     #wb-oauth-banner {
       display: none;
-      background: #1A6B3C;
+      background: #B45309;
       color: #fff;
       padding: 10px 14px;
       font-size: 13px;
@@ -116,7 +116,7 @@
     #wb-oauth-banner-btn {
       background: #fff;
       border: none;
-      color: #1A6B3C;
+      color: #B45309;
       border-radius: 8px;
       padding: 6px 14px;
       font-size: 13px;
@@ -543,14 +543,14 @@
 
     /* Rechtes Detail-Panel */
     #nz-detail-panel {
-      position: absolute; right: 0; top: 0; bottom: 0;
+      position: absolute; left: 0; top: 0; bottom: 0;
       width: 0; overflow-x: hidden; overflow-y: visible;
-      border-left: 1.5px solid var(--border);
+      border-right: 1.5px solid var(--border);
       display: flex; flex-direction: column;
       transition: width .2s ease;
       z-index: 100;
       background: var(--surface);
-      box-shadow: -4px 0 20px rgba(0,0,0,.12);
+      box-shadow: 4px 0 20px rgba(0,0,0,.12);
     }
     #nz-detail-panel.open { width: 60%; }
     .nz-dp-head {
@@ -612,15 +612,22 @@
     .nz-sb-btn.active .nz-sb-badge { background: rgba(10,107,94,.25); color: var(--accent); }
     .nz-sb-tag .nz-sb-badge { font-size: 11px; font-weight: 700; }
 
-    /* Netzwerk-Vollbild-Overlay für Notizen */
-    #nz-fullscreen { display:none; position:fixed; inset:0; z-index:2000; background:var(--surface); flex-direction:column; }
+    /* Vollbild-Notiz */
+    #nz-fullscreen { display:none; position:fixed; inset:0; z-index:2000; background:var(--surface); flex-direction:row; }
     #nz-fullscreen.open { display:flex; }
-    .nz-fs-head { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1.5px solid var(--border); flex-shrink:0; background:var(--surface); }
+    #nz-fs-sidebar { width:0; overflow:hidden; border-right:1.5px solid var(--border); display:flex; flex-direction:column; transition:width .2s ease; background:var(--surface2); flex-shrink:0; }
+    #nz-fs-sidebar.open { width:280px; }
+    #nz-fs-sidebar-content { width:280px; display:flex; flex-direction:column; padding:10px; gap:6px; overflow-y:auto; }
+    #nz-fs-main { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .nz-fs-head { display:flex; align-items:center; gap:8px; padding:10px 16px; border-bottom:1.5px solid var(--border); flex-shrink:0; background:var(--surface); }
     .nz-fs-title { font-size:18px; font-weight:800; color:var(--text); flex:1; }
     .nz-fs-close { padding:5px 12px; border:1.5px solid var(--border); border-radius:8px; background:none; cursor:pointer; font-size:13px; font-weight:700; color:var(--muted); font-family:var(--font); }
     .nz-fs-close:hover { border-color:var(--accent); color:var(--accent); }
-    .nz-fs-body { flex:1; overflow-y:auto; padding:20px 32px; max-width:900px; margin:0 auto; width:100%; }
+    .nz-fs-meta-btn { padding:5px 10px; border:1.5px solid var(--border); border-radius:8px; background:none; cursor:pointer; font-size:13px; color:var(--muted); font-family:var(--font); }
+    .nz-fs-meta-btn.on { border-color:var(--accent); background:var(--accent); color:#fff; }
+    .nz-fs-body { flex:1; overflow-y:auto; padding:16px 32px; max-width:900px; margin:0 auto; width:100%; }
     .nz-fs-section-lbl { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); padding:10px 0 6px; }
+    .nz-fs-ft { outline:none; font-size:15px; line-height:1.7; color:var(--text); font-family:var(--font); min-height:200px; width:100%; }
     /* Freitext Formatierungs-Toolbar */
     .ft-toolbar { display:none; align-items:center; gap:2px; padding:4px 6px; background:var(--surface2); border-bottom:1px solid var(--border); border-radius:6px 6px 0 0; flex-shrink:0; flex-wrap:wrap; }
     .ft-toolbar.visible { display:flex; }
@@ -630,7 +637,15 @@
     .ft-tb-sep { width:1px; height:16px; background:var(--border); margin:0 3px; flex-shrink:0; }
     .ft-tb-label { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--faint); padding:0 4px; }
     /* Tabellen im Freitext */
-    .nz-ft-area table { border-collapse:collapse; width:100%; margin:6px 0; font-size:13px; }
+    .nz-ft-area table { border-collapse:collapse; width:100%; margin:6px 0; font-size:13px; cursor:default; }
+    /* Tabellen-Kontext-Menü */
+    #ft-table-menu { display:none; position:fixed; z-index:3000; background:var(--surface); border:1.5px solid var(--border); border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,.18); padding:4px; min-width:200px; }
+    #ft-table-menu.open { display:flex; flex-direction:column; gap:1px; }
+    .ft-tm-btn { display:flex; align-items:center; gap:8px; padding:7px 10px; border:none; background:none; cursor:pointer; font-size:13px; font-family:var(--font); color:var(--text); border-radius:6px; text-align:left; width:100%; }
+    .ft-tm-btn:hover { background:var(--surface2); }
+    .ft-tm-btn.danger { color:#C0392B; }
+    .ft-tm-btn.danger:hover { background:rgba(192,57,43,.08); }
+    .ft-tm-sep { height:1px; background:var(--border); margin:3px 6px; }
     .nz-ft-area th { background:var(--surface2); font-weight:800; border:1.5px solid var(--border); padding:5px 8px; text-align:left; }
     .nz-ft-area td { border:1px solid var(--border); padding:4px 8px; min-width:60px; vertical-align:top; }
     .nz-ft-area td:focus, .nz-ft-area th:focus { outline:2px solid var(--accent); outline-offset:-1px; }
@@ -974,9 +989,9 @@
 
     /* ── Heute Split-Pane ── */
     #sec-tagessicht { flex-direction:column; }
-    /* Heute-Tab: neues Layout — Links volle Höhe | Rechts 50/50 */
-    .ts-main-row { display:flex; flex-direction:row; flex:1; min-height:0; overflow:hidden; }
-    #ts-kachel-panel { width:44%; flex-shrink:0; border-right:1.5px solid var(--border); background:var(--surface2); display:flex; flex-direction:column; min-height:0; padding:0; }
+    /* Heute-Tab: Kacheln links, Detail rechts */
+    .ts-main-row { display:flex; flex-direction:row-reverse; flex:1; min-height:0; overflow:hidden; }
+    #ts-kachel-panel { width:56%; flex-shrink:0; border-left:1.5px solid var(--border); background:var(--surface2); display:flex; flex-direction:column; min-height:0; padding:0; }
     .ts-rechts-col { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
     #ts-notizen-panel { flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; padding:0; gap:0; position:relative; border-bottom:1.5px solid var(--border); }
     #ts-notizen-grid { flex:1; overflow-y:auto; padding:8px 10px; display:flex; flex-direction:column; gap:6px; }
@@ -1104,7 +1119,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.76</div>
+  <div id="wb-startup-tagline">v3.0.79</div>
 </div>
 
 <!-- Modal -->
@@ -1261,6 +1276,17 @@
   </div>
 </div>
 
+<!-- Tabellen-Kontext-Menü -->
+<div id="ft-table-menu">
+  <button class="ft-tm-btn" onclick="WB._ftColAdd()">➕ Spalte rechts einfügen</button>
+  <button class="ft-tm-btn" onclick="WB._ftColDel()">➖ Aktuelle Spalte löschen</button>
+  <div class="ft-tm-sep"></div>
+  <button class="ft-tm-btn" onclick="WB._ftRowAdd()">➕ Zeile darunter einfügen</button>
+  <button class="ft-tm-btn" onclick="WB._ftRowDel()">➖ Aktuelle Zeile löschen</button>
+  <div class="ft-tm-sep"></div>
+  <button class="ft-tm-btn danger" onclick="WB._ftTableDel()">🗑 Tabelle löschen</button>
+</div>
+
 <!-- Tagesansicht-Overlay -->
 <div id="wo-tag-overlay">
   <div class="wo-to-head">
@@ -1301,11 +1327,19 @@
 
 <!-- Vollbild-Notiz-Overlay -->
 <div id="nz-fullscreen">
-  <div class="nz-fs-head" id="nz-fs-head">
-    <span class="nz-fs-title" id="nz-fs-title"></span>
-    <button class="nz-fs-close" onclick="WB._nzFullscreenClose()">✕ Schließen</button>
+  <!-- Links: Meta-Sidebar (eingeklappt) -->
+  <div id="nz-fs-sidebar">
+    <div id="nz-fs-sidebar-content"></div>
   </div>
-  <div class="nz-fs-body" id="nz-fs-body"></div>
+  <!-- Rechts: Haupt-Editor -->
+  <div id="nz-fs-main">
+    <div class="nz-fs-head" id="nz-fs-head">
+      <button class="nz-fs-meta-btn" id="nz-fs-meta-toggle" onclick="WB._nzFsToggleMeta()" title="Einstellungen">☰ Einstellungen</button>
+      <span class="nz-fs-title" id="nz-fs-title"></span>
+      <button class="nz-fs-close" onclick="WB._nzFullscreenClose()">✕ Schließen</button>
+    </div>
+    <div class="nz-fs-body" id="nz-fs-body"></div>
+  </div>
 </div>
 
 <!-- App -->
@@ -1323,7 +1357,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.76</span>
+    <span id="wb-menu-version">v3.0.79</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1353,6 +1387,7 @@
                 <button class="ts-kd-back" onclick="WB._tsKachelClose()">&#8592;</button>
                 <span class="ts-kd-title" id="ts-kd-title"></span>
                 <span class="ts-kd-cnt" id="ts-kd-cnt"></span>
+                <button class="ts-kd-settings" onclick="WB._nzFullscreenOpen(WB._tsKachelCurrentId)" title="Vollbild">⛶</button>
                 <button class="ts-kd-settings" onclick="WB._tsKachelSettings()">&#9881;</button>
               </div>
               <div class="ts-kd-body" id="ts-kd-body"></div>
@@ -1635,8 +1670,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.76',
-  APP_BUILD:   '20260627-0300',
+  APP_VERSION: '3.0.79',
+  APP_BUILD:   '20260627-0500',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2106,7 +2141,11 @@ const WB = {
     // Body rendern — Hybrid: Checkliste OBEN + Freitext UNTEN (immer beide sichtbar)
     const body = document.getElementById('ts-kd-body');
     const foot = document.getElementById('ts-kd-foot');
-    if (body) body.innerHTML = this._renderHybridBody(l, listeId, 'ts');
+    if (body) {
+      body.innerHTML = this._renderHybridBody(l, listeId, 'ts');
+      const ft = body.querySelector('#ts-kd-ft');
+      if (ft) requestAnimationFrame(() => this._ftBindTableMenu(ft));
+    }
     if (foot) foot.style.display = 'none'; // Add-Row ist im Body
     // Zähler aktualisieren
     const allItems2 = (l.items||[]).filter(i => !i.deleted);
@@ -3290,15 +3329,151 @@ const WB = {
     this.modalClose();
     const ed = document.getElementById(editorId); if (!ed) return;
     ed.focus();
-    let html = '<table><thead><tr>'
-      + Array.from({length: cols}, (_,i) => '<th>Spalte ' + (i+1) + '</th>').join('')
+    let html = '<table data-wb-table="1"><thead><tr>'
+      + Array.from({length: cols}, (_,i) => '<th contenteditable="true">Spalte ' + (i+1) + '</th>').join('')
       + '</tr></thead><tbody>';
     for (let r = 0; r < rows; r++) {
-      html += '<tr>' + Array.from({length: cols}, () => '<td><br></td>').join('') + '</tr>';
+      html += '<tr>' + Array.from({length: cols}, () => '<td contenteditable="true"><br></td>').join('') + '</tr>';
     }
     html += '</tbody></table><p><br></p>';
     document.execCommand('insertHTML', false, html);
-    ed.querySelectorAll('td, th').forEach(cell => { cell.contentEditable = 'true'; });
+    // Click-Handler für Kontext-Menü auf dieser Tabelle
+    this._ftBindTableMenu(ed);
+    this._ftSaveFromEditor(ed);
+  },
+
+  _ftCurrentCell: null,
+  _ftCurrentTable: null,
+
+  _ftBindTableMenu(editorEl) {
+    editorEl.querySelectorAll('table[data-wb-table]').forEach(tbl => {
+      if (tbl._ftMenuBound) return;
+      tbl._ftMenuBound = true;
+      tbl.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        this._ftOpenTableMenu(e, tbl);
+      });
+      tbl.addEventListener('click', (e) => {
+        const cell = e.target.closest('td, th');
+        if (cell) {
+          this._ftCurrentCell  = cell;
+          this._ftCurrentTable = tbl;
+        }
+      });
+    });
+    // Auch auf bestehende Tabellen (ohne data-wb-table) anwenden
+    editorEl.querySelectorAll('table').forEach(tbl => {
+      if (tbl._ftMenuBound) return;
+      tbl.dataset.wbTable = '1';
+      tbl._ftMenuBound = true;
+      tbl.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        this._ftOpenTableMenu(e, tbl);
+      });
+      tbl.addEventListener('click', (e) => {
+        const cell = e.target.closest('td, th');
+        if (cell) { this._ftCurrentCell = cell; this._ftCurrentTable = tbl; }
+      });
+    });
+  },
+
+  _ftOpenTableMenu(e, tbl) {
+    const menu = document.getElementById('ft-table-menu'); if (!menu) return;
+    this._ftCurrentTable = tbl;
+    this._ftCurrentCell  = e.target.closest('td, th') || tbl.querySelector('td, th');
+    menu.classList.add('open');
+    const x = Math.min(e.clientX, window.innerWidth  - 220);
+    const y = Math.min(e.clientY, window.innerHeight - 220);
+    menu.style.left = x + 'px';
+    menu.style.top  = y + 'px';
+    // Klick außerhalb schließt Menü
+    setTimeout(() => {
+      const close = (ev) => {
+        if (!menu.contains(ev.target)) { menu.classList.remove('open'); document.removeEventListener('click', close); }
+      };
+      document.addEventListener('click', close);
+    }, 10);
+  },
+
+  _ftColAdd() {
+    const tbl = this._ftCurrentTable; if (!tbl) return;
+    const cell = this._ftCurrentCell;
+    const colIdx = cell ? [...cell.parentElement.children].indexOf(cell) : 0;
+    tbl.querySelectorAll('tr').forEach(row => {
+      const ref = row.children[colIdx + 1] || null;
+      const isHead = row.closest('thead');
+      const newCell = document.createElement(isHead ? 'th' : 'td');
+      newCell.contentEditable = 'true';
+      newCell.innerHTML = '<br>';
+      row.insertBefore(newCell, ref);
+    });
+    document.getElementById('ft-table-menu')?.classList.remove('open');
+    this._ftSaveFromTable(tbl);
+  },
+
+  _ftColDel() {
+    const tbl = this._ftCurrentTable; if (!tbl) return;
+    const cell = this._ftCurrentCell; if (!cell) return;
+    const colIdx = [...cell.parentElement.children].indexOf(cell);
+    const colCount = tbl.querySelector('tr')?.children.length || 0;
+    if (colCount <= 1) { this._toast('Mindestens 1 Spalte erforderlich'); return; }
+    tbl.querySelectorAll('tr').forEach(row => {
+      if (row.children[colIdx]) row.children[colIdx].remove();
+    });
+    document.getElementById('ft-table-menu')?.classList.remove('open');
+    this._ftSaveFromTable(tbl);
+  },
+
+  _ftRowAdd() {
+    const tbl = this._ftCurrentTable; if (!tbl) return;
+    const cell = this._ftCurrentCell;
+    const row = cell?.closest('tr');
+    if (!row) return;
+    const colCount = row.children.length;
+    const newRow = document.createElement('tr');
+    for (let i = 0; i < colCount; i++) {
+      const td = document.createElement('td');
+      td.contentEditable = 'true'; td.innerHTML = '<br>';
+      newRow.appendChild(td);
+    }
+    row.parentElement.insertBefore(newRow, row.nextSibling);
+    document.getElementById('ft-table-menu')?.classList.remove('open');
+    this._ftSaveFromTable(tbl);
+  },
+
+  _ftRowDel() {
+    const tbl = this._ftCurrentTable; if (!tbl) return;
+    const cell = this._ftCurrentCell; if (!cell) return;
+    const row = cell.closest('tr');
+    if (!row) return;
+    const tbody = tbl.querySelector('tbody');
+    const rows = tbody ? tbody.querySelectorAll('tr').length : 0;
+    if (rows <= 1 && row.closest('tbody')) { this._toast('Mindestens 1 Zeile erforderlich'); return; }
+    row.remove();
+    document.getElementById('ft-table-menu')?.classList.remove('open');
+    this._ftSaveFromTable(tbl);
+  },
+
+  _ftTableDel() {
+    const tbl = this._ftCurrentTable; if (!tbl) return;
+    if (!confirm('Tabelle löschen?')) return;
+    tbl.remove();
+    document.getElementById('ft-table-menu')?.classList.remove('open');
+    this._ftCurrentTable = null; this._ftCurrentCell = null;
+    // Speichern: aktuellen Editor finden
+    const ed = document.querySelector('[id$="-ft"].nz-ft-area, #nz-dp-ft, #ts-kd-ft, #nz-fs-ft');
+    if (ed) this._ftSaveFromEditor(ed);
+  },
+
+  _ftSaveFromTable(tbl) {
+    const ed = tbl.closest('[contenteditable="true"]');
+    if (ed) this._ftSaveFromEditor(ed);
+  },
+
+  _ftSaveFromEditor(ed) {
+    if (!ed) return;
+    // Trigger oninput um Debounce-Save auszulösen
+    ed.dispatchEvent(new Event('input', { bubbles: true }));
   },
   _sToggleMobileTable() {
     this._settings.mobileTableEdit = !this._settings.mobileTableEdit;
@@ -3541,8 +3716,8 @@ const WB = {
     const cbFn  = ctx === 'ts' ? '_tsKdCbToggle'     : '_nzDetailCbToggle';
     const delFn = ctx === 'ts' ? '_tsKdItemDelete'   : '_nzDetailItemDelete';
     const addFn = ctx === 'ts' ? '_tsKachelAdd'      : '_nzDetailAdd';
-    const ftId  = ctx === 'ts' ? 'ts-kd-ft'          : 'nz-dp-ft';
-    const ftFn  = ctx === 'ts' ? '_tsKdFreitextInput' : '_nzDetailFreitextInput';
+    const ftId  = ctx === 'ts' ? 'ts-kd-ft' : ctx === 'fs' ? 'nz-fs-ft' : 'nz-dp-ft';
+    const ftFn  = ctx === 'ts' ? '_tsKdFreitextInput' : ctx === 'fs' ? '_nzFsFreitextInput' : '_nzDetailFreitextInput';
     const addInpId = ctx === 'ts' ? 'ts-kd-inp' : 'nz-dp-inp';
 
     const dragSvg = '<svg class="hb-drag" width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><circle cx="4" cy="3" r="1.2"/><circle cx="4" cy="8" r="1.2"/><circle cx="4" cy="13" r="1.2"/><circle cx="8" cy="3" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="8" cy="13" r="1.2"/></svg>';
@@ -3969,68 +4144,53 @@ const WB = {
     if (!listeId) return;
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     this._nzFullscreenId = listeId;
-    const overlay = document.getElementById('nz-fullscreen');
-    const head    = document.getElementById('nz-fs-head');
-    const title   = document.getElementById('nz-fs-title');
-    const body    = document.getElementById('nz-fs-body');
+    const overlay  = document.getElementById('nz-fullscreen');
+    const head     = document.getElementById('nz-fs-head');
+    const title    = document.getElementById('nz-fs-title');
+    const body     = document.getElementById('nz-fs-body');
+    const sidebar  = document.getElementById('nz-fs-sidebar');
+    const sContent = document.getElementById('nz-fs-sidebar-content');
+    const metaBtn  = document.getElementById('nz-fs-meta-toggle');
     if (!overlay || !body) return;
-
     const farbBg = { 'c-gelb':'#FFF9C4','c-gruen':'#D5F5E3','c-blau':'#D6EAF8','c-rosa':'#FDEBD0','c-lila':'#E8D5F0','c-tuerkis':'#C8F0EC','c-weiss':'#fff' };
     const bg = farbBg[l.farbe||'c-weiss'] || '#fff';
-    if (head) head.style.background = bg;
+    if (head)  head.style.background = bg;
     if (title) title.textContent = l.titel;
-
-    const allItems  = (l.items||[]).filter(i => !i.deleted);
-    const openItems = allItems.filter(i => !i.done);
-    const doneItems = allItems.filter(i =>  i.done);
-
-    let h = '';
-    // Checkliste
-    if (allItems.length > 0 || true) {
-      h += '<div class="nz-fs-section-lbl">Checkliste</div>';
-      h += openItems.map(i =>
-        '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:.5px solid rgba(0,0,0,.07);">'
-        + '<div class="ts-kd-chk" onclick="WB._nzDetailCbToggle(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\');WB._nzFullscreenOpen(\'' + this._esc(listeId) + '\')"></div>'
-        + '<span style="font-size:15px;color:var(--text);">' + this._esc(i.text) + '</span></div>'
-      ).join('');
-      if (doneItems.length) {
-        h += '<div class="nz-fs-section-lbl">Erledigt</div>';
-        h += doneItems.map(i =>
-          '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:.5px solid rgba(0,0,0,.07);">'
-          + '<div class="ts-kd-chk done" onclick="WB._nzDetailCbToggle(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\');WB._nzFullscreenOpen(\'' + this._esc(listeId) + '\')">✓</div>'
-          + '<span style="font-size:15px;color:var(--faint);text-decoration:line-through;">' + this._esc(i.text) + '</span></div>'
-        ).join('');
-      }
-      if (!openItems.length && !doneItems.length) {
-        h += '<div style="font-size:14px;color:var(--faint);font-style:italic;padding:8px 0;">Noch keine Einträge</div>';
-      }
-    }
-    // Freitext
-    h += '<div class="nz-fs-section-lbl" style="margin-top:16px;">Freitext</div>';
-    h += '<div class="nz-fs-ft" contenteditable="true" spellcheck="true"'
-      + ' style="background:' + bg + ';border-radius:8px;padding:12px;min-height:200px;"'
-      + ' oninput="WB._nzFsFreitextInput()">'
-      + this._linkifyHtml(l.inhalt || '') + '</div>';
-    body.innerHTML = h;
-    body.style.background = 'var(--surface2)';
+    if (sidebar) sidebar.classList.remove('open');
+    if (metaBtn) metaBtn.classList.remove('on');
+    if (sContent) sContent.innerHTML = this._nzDetailRenderMeta(l);
+    body.innerHTML = this._renderHybridBody(l, listeId, 'fs');
+    body.style.background = bg;
+    const ft = body.querySelector('#nz-fs-ft');
+    if (ft) requestAnimationFrame(() => this._ftBindTableMenu(ft));
     overlay.classList.add('open');
+  },
+
+  _nzFsToggleMeta() {
+    const sidebar = document.getElementById('nz-fs-sidebar');
+    const btn     = document.getElementById('nz-fs-meta-toggle');
+    if (!sidebar) return;
+    const open = sidebar.classList.toggle('open');
+    btn?.classList.toggle('on', open);
+    if (open) {
+      const l = (this.db?.notizen||[]).find(x => x.id === this._nzFullscreenId);
+      const sContent = document.getElementById('nz-fs-sidebar-content');
+      if (l && sContent) sContent.innerHTML = this._nzDetailRenderMeta(l);
+    }
   },
 
   _nzFsFreitextInput() {
     clearTimeout(this._nzFsTimer);
     this._nzFsTimer = setTimeout(() => {
       const l = (this.db?.notizen||[]).find(x => x.id === this._nzFullscreenId); if (!l) return;
-      const ed = document.querySelector('#nz-fs-body .nz-fs-ft'); if (!ed) return;
-      l.inhalt = ed.innerHTML;
-      l.updatedAt = this._now();
-      this.setDirty();
+      const ed = document.getElementById('nz-fs-ft'); if (!ed) return;
+      l.inhalt = ed.innerHTML; l.updatedAt = this._now(); this.setDirty();
     }, 1500);
   },
 
   _nzFullscreenClose() {
     document.getElementById('nz-fullscreen')?.classList.remove('open');
     this._nzFullscreenId = null;
-    // Detail-Panel aktualisieren
     if (this._nzDetailId) this._nzDetailOpen(this._nzDetailId, true);
     this.renderNotizenTab();
   },
@@ -4076,8 +4236,12 @@ const WB = {
     // Body rendern — Hybrid: Checkliste oben + Freitext unten
     const body = document.getElementById('nz-dp-body');
     const foot = document.getElementById('nz-dp-foot');
-    if (body) body.innerHTML = this._renderHybridBody(l, listeId, 'nz');
-    // Footer ausblenden — Add-Row ist jetzt direkt im Body unter Checkliste
+    if (body) {
+      body.innerHTML = this._renderHybridBody(l, listeId, 'nz');
+      // Tabellen-Menü binden
+      const ft = body.querySelector('#nz-dp-ft');
+      if (ft) requestAnimationFrame(() => this._ftBindTableMenu(ft));
+    }
     if (foot) foot.style.display = 'none';
     if (!silent) {
       const inp = document.getElementById('nz-dp-inp');
