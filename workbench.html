@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.50</title>
+  <title>WorkBench 3.0.52</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -964,8 +964,8 @@
     #ts-notizen-grid { display:flex; flex-direction:column; gap:6px; flex:1; min-height:0; overflow:hidden; }
     .ts-nz-group { display:flex; flex-direction:column; gap:3px; }
     .ts-nz-group-lbl { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); padding-left:1px; }
-    #ts-notizen-panel .ts-nz-grid { display:grid !important; grid-template-columns:repeat(3,1fr) !important; gap:5px; width:100%; min-width:0; }
-    #ts-notizen-panel .ts-nz-mini {  border-radius:7px; direction:ltr; border:1.5px solid var(--border); padding:7px; cursor:pointer; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; transition:transform .1s,box-shadow .1s; }
+    #ts-notizen-panel .ts-nz-grid { display:grid !important; grid-template-columns:repeat(6,1fr) !important; gap:4px; width:100%; min-width:0; }
+    #ts-notizen-panel .ts-nz-mini { border-radius:7px; direction:ltr; border:1.5px solid var(--border); padding:7px; cursor:pointer; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; transition:transform .1s,box-shadow .1s; }
     .ts-nz-mini:hover { transform:translateY(-1px); box-shadow:0 3px 10px rgba(0,0,0,.13); }
     .ts-nz-mini.active { box-shadow:0 0 0 2.5px var(--accent); }
     /* Mini-Kachel Farben — hochspezifisch damit keine anderen .c-* Regeln überschreiben */
@@ -1004,7 +1004,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.50</div>
+  <div id="wb-startup-tagline">v3.0.52</div>
 </div>
 
 <!-- Modal -->
@@ -1172,7 +1172,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.50</span>
+    <span id="wb-menu-version">v3.0.52</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" data-welt="beide" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" data-welt="beruf" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1445,8 +1445,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.50',
-  APP_BUILD:   '20260627-1700',
+  APP_VERSION: '3.0.52',
+  APP_BUILD:   '20260627-1900',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1576,6 +1576,7 @@ const WB = {
     setTimeout(hideS, 2500);
     this.tabSwitch('tagessicht');
     this._autoWeltCheck(true);
+    setTimeout(() => this._tsResizeMiniKacheln(), 100);
     this._tsStartTimer();
     this._nzRenderPills();
   },
@@ -1862,22 +1863,8 @@ const WB = {
     if (!h) h = '<div style="padding:12px;font-size:11px;color:var(--faint);">Keine angepinnten Notizen</div>';
     grid.innerHTML = h;
     // Quadratische Kacheln: Breite messen, Höhe = Breite setzen
-    requestAnimationFrame(() => {
-      const panel = document.getElementById('ts-notizen-panel');
-      if (!panel) return;
-      const gridEls = panel.querySelectorAll('.ts-nz-grid');
-      gridEls.forEach(gridEl => {
-        const cols = 6;
-        const gap = 4;
-        const totalW = gridEl.offsetWidth;
-        const cellW = Math.floor((totalW - gap*(cols-1)) / cols);
-        gridEl.querySelectorAll('.ts-nz-mini').forEach(el => {
-          el.style.width = cellW + 'px';
-          el.style.height = cellW + 'px';
-          el.style.minHeight = 'unset';
-        });
-      });
-    });
+    // Quadratische Kacheln: robust mit Retry falls offsetWidth noch 0
+    this._tsResizeMiniKacheln();
     // Falls Kachel offen war, re-render
     if (this._tsKachelCurrentId) this._tsKachelOpen(this._tsKachelCurrentId, true);
   },
@@ -1922,6 +1909,27 @@ const WB = {
       body.innerHTML = bh;
     }
     document.getElementById('ts-kachel-empty').style.display = 'none';
+  },
+
+  _tsResizeMiniKacheln() {
+    const _try = (n) => {
+      const panel = document.getElementById('ts-notizen-panel');
+      if (!panel) return;
+      const grids = panel.querySelectorAll('.ts-nz-grid');
+      let ok = false;
+      grids.forEach(g => {
+        const w = g.offsetWidth || panel.offsetWidth;
+        if (w < 10) return;
+        const cw = Math.floor((w - 4*5) / 6);
+        g.querySelectorAll('.ts-nz-mini').forEach(el => {
+          el.style.width = cw+'px'; el.style.height = cw+'px';
+          el.style.minHeight = 'unset'; el.style.flexShrink = '0';
+        });
+        ok = true;
+      });
+      if (!ok && n < 8) setTimeout(() => _try(n+1), 80);
+    };
+    requestAnimationFrame(() => _try(0));
   },
 
   _tsKachelClose() {
