@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.48</title>
+  <title>WorkBench 3.0.49</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1004,7 +1004,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.48</div>
+  <div id="wb-startup-tagline">v3.0.49</div>
 </div>
 
 <!-- Modal -->
@@ -1172,7 +1172,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.48</span>
+    <span id="wb-menu-version">v3.0.49</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" data-welt="beide" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" data-welt="beruf" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1445,8 +1445,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.48',
-  APP_BUILD:   '20260626-0030',
+  APP_VERSION: '3.0.49',
+  APP_BUILD:   '20260626-0100',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1622,26 +1622,28 @@ const WB = {
   // Nur beim Start gesetzt — manueller Override bleibt bis Mitternacht
   _autoWeltCheck(isStartup) {
     const now = new Date();
-    const dow = now.getDay(); // 0=So, 1=Mo..5=Fr, 6=Sa
-    const h   = now.getHours();
-    const min = now.getMinutes();
-    const nowMin = h * 60 + min;
+    const dow = now.getDay();
+    const nowMin = now.getHours()*60 + now.getMinutes();
     const isWeekday = dow >= 1 && dow <= 5;
     const isWorkTime = isWeekday && nowMin >= 5*60 && nowMin < 16*60;
-    // Sondertag heute?
     const ds = this._dStr(now);
     const hasSondertag = isWeekday && (this.db?.sondertage||[])
-      .some(s => !s.deleted && s.datum === ds &&
+      .some(s => !s.deleted && s.datum===ds &&
         ['urlaub','krank','auszeit','dienstreise'].includes(s.typ));
     const autoWelt = (isWorkTime && !hasSondertag) ? 'beruf' : 'privat';
     if (isStartup) {
-      // Beim Start: immer setzen, kein Override
       this._autoWeltManual = false;
-      this._doWeltSet(autoWelt);
     }
-    // Mitternacht: Override zurücksetzen
-    if (!isStartup && !this._autoWeltManual) {
-      this._doWeltSet(autoWelt);
+    if (!this._autoWeltManual) {
+      // Nur setzen wenn sich was geändert hat
+      if (this.activeWorld !== autoWelt) {
+        this._weltSet(autoWelt, null);
+      } else {
+        // Button-UI korrekt setzen ohne renderSection
+        document.querySelectorAll('.wb-welt-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.welt === autoWelt);
+        });
+      }
     }
   },
 
