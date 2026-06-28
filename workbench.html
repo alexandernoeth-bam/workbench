@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.58</title>
+  <title>WorkBench 3.0.59</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1024,7 +1024,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.58</div>
+  <div id="wb-startup-tagline">v3.0.59</div>
 </div>
 
 <!-- Modal -->
@@ -1192,7 +1192,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.58</span>
+    <span id="wb-menu-version">v3.0.59</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" data-welt="beide" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" data-welt="beruf" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1277,6 +1277,9 @@
         </button>
         <button class="nz-ztab" data-zustand="archiv" onclick="WB._nzSetZustand('archiv')">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:4px"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>Archiv <span id="nz-cnt-archiv" style="font-size:10px;opacity:0.7;margin-left:2px"></span>
+        </button>
+        <button class="nz-ztab" data-zustand="gateway" onclick="WB._nzSetZustand('gateway')">
+          ?? Gateway <span id="nz-cnt-gateway" style="font-size:10px;opacity:0.7;margin-left:2px"></span>
         </button>
       </div>
       <div id="notizen-scroll"></div>
@@ -1470,8 +1473,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.58',
-  APP_BUILD:   '20260628-1000',
+  APP_VERSION: '3.0.59',
+  APP_BUILD:   '20260628-1100',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2709,7 +2712,9 @@ const WB = {
 
     const zustand = this._nzZustand;
     let liste;
-    if (zustand === 'archiv') {
+    if (zustand === 'gateway') {
+      liste = (this.db?.notizen||[]).filter(l => !l.deleted && l.isGateway);
+    } else if (zustand === 'archiv') {
       liste = this.db.notizen.filter(l => !!l.deleted);
     } else if (zustand === 'aktuell') {
       // Aktuell = kein expliziter Zustand ODER zustand fehlt/ist 'aktuell'
@@ -2797,8 +2802,9 @@ const WB = {
       parkplatz: db.notizen.filter(l => !l.deleted && l.zustand === 'parkplatz' && weltOk(l)).length,
       kompass:   db.notizen.filter(l => !l.deleted && l.zustand === 'kompass'   && weltOk(l)).length,
       archiv:    db.notizen.filter(l => !!l.deleted                             && weltOk(l)).length,
+      gateway:   db.notizen.filter(l => !l.deleted && l.isGateway && weltOk(l)).length,
     };
-    ['aktuell','parkplatz','kompass','archiv'].forEach(z => {
+    ['aktuell','parkplatz','kompass','archiv','gateway'].forEach(z => {
       const el = document.getElementById('nz-cnt-' + z);
       if (el) el.textContent = '(' + counts[z] + ')';
     });
