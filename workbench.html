@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.61</title>
+  <title>WorkBench 3.0.62</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1019,6 +1019,36 @@
     /* Gateway Felder im Bearbeiten-Dialog */
     #nz-gateway-fields { display:none; flex-direction:column; gap:8px; margin-top:10px; padding:10px; background:rgba(245,158,11,.06); border-radius:6px; border:1.5px solid rgba(245,158,11,.25); }
     #nz-gateway-fields.visible { display:flex; }
+    /* ── Freitext Vollbild ── */
+    #nz-ft-overlay.vollbild { align-items: stretch; justify-content: stretch; padding: 0; }
+    #nz-ft-overlay.vollbild > div { width: 100% !important; max-height: 100% !important; border-radius: 0 !important; height: 100dvh; }
+    /* ── Tabellen im Freitext ── */
+    #nz-ft-editor table { border-collapse:collapse; width:100%; margin:8px 0; }
+    #nz-ft-editor table td, #nz-ft-editor table th { border:1.5px solid var(--border); padding:5px 8px; min-width:60px; }
+    #nz-ft-editor table th { background:var(--surface2); font-weight:700; }
+    /* ── Tabellen-Kontextmenü ── */
+    #nz-table-ctx { position:fixed; background:var(--surface); border:1.5px solid var(--border); border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.15); z-index:9000; display:none; flex-direction:column; min-width:180px; overflow:hidden; }
+    #nz-table-ctx.open { display:flex; }
+    .nz-ctx-item { padding:8px 14px; font-size:13px; cursor:pointer; color:var(--text); }
+    .nz-ctx-item:hover { background:var(--surface2); }
+    .nz-ctx-item.danger { color:#dc2626; }
+    .nz-ctx-sep { height:1px; background:var(--border); margin:2px 0; }
+    /* ── Notizen Detail Panel (Desktop) ── */
+    #nz-detail-panel { position:fixed; top:0; left:0; width:340px; height:100dvh; background:var(--surface); border-right:1.5px solid var(--border); box-shadow:4px 0 20px rgba(0,0,0,.12); z-index:5000; display:none; flex-direction:column; transform:translateX(-100%); transition:transform .25s ease; }
+    #nz-detail-panel.open { display:flex; transform:translateX(0); }
+    .nz-dp-head { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1.5px solid var(--border); flex-shrink:0; }
+    .nz-dp-title { font-size:14px; font-weight:800; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .nz-dp-body { flex:1; overflow-y:auto; padding:8px 12px; }
+    .nz-dp-foot { padding:8px 12px; border-top:1.5px solid var(--border); display:flex; gap:6px; flex-shrink:0; }
+    /* ── Deadline Filter ── */
+    .nz-dl-filter-bar { display:flex; gap:5px; flex-wrap:wrap; padding:6px 10px; border-bottom:1px solid var(--border); background:var(--surface); flex-shrink:0; }
+    .nz-dl-filter-btn { padding:3px 10px; border-radius:20px; border:1.5px solid var(--border); background:none; font-size:11px; font-weight:700; cursor:pointer; color:var(--faint); font-family:var(--font); }
+    .nz-dl-filter-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+    /* ── Tag Autocomplete ── */
+    #nz-tag-dropdown { position:absolute; background:var(--surface); border:1.5px solid var(--border); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.12); z-index:8000; max-height:160px; overflow-y:auto; display:none; min-width:160px; }
+    #nz-tag-dropdown.open { display:block; }
+    .nz-tag-opt { padding:6px 12px; font-size:13px; cursor:pointer; }
+    .nz-tag-opt:hover { background:var(--surface2); }
   </style>
 </head>
 <body>
@@ -1026,7 +1056,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.61</div>
+  <div id="wb-startup-tagline">v3.0.62</div>
 </div>
 
 <!-- Modal -->
@@ -1068,13 +1098,25 @@
       <input id="nz-ft-titel" class="wb-input" style="flex:1;font-size:16px;font-weight:700;" placeholder="Titel...">
       <button class="wb-modal-close" onclick="WB._nzFreitextClose()">&#x2715;</button>
     </div>
-    <div class="nz-toolbar" style="flex-shrink:0;">
-      <button class="nz-tb-btn" onclick="document.execCommand('bold')" style="font-weight:700">B</button>
-      <button class="nz-tb-btn" onclick="document.execCommand('italic')" style="font-style:italic">I</button>
-      <button class="nz-tb-btn" onclick="document.execCommand('underline')" style="text-decoration:underline">U</button>
-      <button class="nz-tb-btn" onclick="document.execCommand('insertUnorderedList')">&#8226; Liste</button>
+    <div class="nz-toolbar" style="flex-shrink:0;display:flex;flex-wrap:wrap;gap:3px;padding:6px 10px;background:var(--surface2);border-bottom:1px solid var(--border);">
+      <button class="nz-tb-btn" onclick="document.execCommand('bold')" title="Fett" style="font-weight:700">B</button>
+      <button class="nz-tb-btn" onclick="document.execCommand('italic')" title="Kursiv" style="font-style:italic">I</button>
+      <button class="nz-tb-btn" onclick="document.execCommand('underline')" title="Unterstrichen" style="text-decoration:underline">U</button>
+      <span style="width:1px;background:var(--border);margin:2px 3px;"></span>
+      <button class="nz-tb-btn" onclick="document.execCommand('insertUnorderedList')" title="Liste">&#8226; Liste</button>
+      <button class="nz-tb-btn" onclick="document.execCommand('insertOrderedList')" title="Nummeriert">1. Liste</button>
+      <button class="nz-tb-btn" onclick="document.execCommand('indent')" title="Einr&uuml;cken">&#8677;</button>
+      <button class="nz-tb-btn" onclick="document.execCommand('outdent')" title="Ausr&uuml;cken">&#8676;</button>
+      <span style="width:1px;background:var(--border);margin:2px 3px;"></span>
+      <button class="nz-tb-btn" onclick="WB._nzInsertTable()" title="Tabelle einf&uuml;gen">&#x22EE;&#x22EE; Tabelle</button>
+      <button class="nz-tb-btn" onclick="document.execCommand('formatBlock',false,'h3')" title="&Uuml;berschrift">H3</button>
+      <button class="nz-tb-btn" onclick="document.execCommand('formatBlock',false,'p')" title="Absatz">P</button>
+      <span style="flex:1;"></span>
+      <button class="nz-tb-btn" onclick="WB._nzVollbild()" title="Vollbild" id="nz-ft-vollbild-btn">&#x26F6;</button>
     </div>
-    <div id="nz-ft-editor" contenteditable="true" spellcheck="true"></div>
+    <div id="nz-ft-editor" contenteditable="true" spellcheck="true"
+      oncontextmenu="WB._nzTableContextMenu(event)"
+      style="flex:1;overflow-y:auto;padding:12px 16px;font-size:14px;line-height:1.6;outline:none;"></div>
     <div style="padding:10px 16px;border-top:1.5px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;">
       <button class="wb-btn wb-btn-cancel" onclick="WB._nzFreitextClose()">Abbrechen</button>
       <button class="wb-btn wb-btn-save" onclick="WB._nzFreitextSave()">Speichern</button>
@@ -1194,7 +1236,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.61</span>
+    <span id="wb-menu-version">v3.0.62</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" data-welt="beide" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" data-welt="beruf" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1282,6 +1324,14 @@
         <button class="nz-ztab" data-zustand="gateway" onclick="WB._nzSetZustand('gateway')">
           ?? Gateway <span id="nz-cnt-gateway" style="font-size:10px;opacity:0.7;margin-left:2px"></span>
         </button>
+      </div>
+      <div class="nz-dl-filter-bar" id="nz-dl-filter-bar" style="display:none;">
+        <button class="nz-dl-filter-btn active" data-filter="alle" onclick="WB._nzSetDeadlineFilter('alle')">Alle</button>
+        <button class="nz-dl-filter-btn" data-filter="faellig" onclick="WB._nzSetDeadlineFilter('faellig')" style="color:#dc2626;">Überfällig</button>
+        <button class="nz-dl-filter-btn" data-filter="heute" onclick="WB._nzSetDeadlineFilter('heute')">Heute</button>
+        <button class="nz-dl-filter-btn" data-filter="woche" onclick="WB._nzSetDeadlineFilter('woche')">Diese Woche</button>
+        <button class="nz-dl-filter-btn" data-filter="monat" onclick="WB._nzSetDeadlineFilter('monat')">Nächste 4 Wochen</button>
+        <button class="nz-dl-filter-btn" data-filter="spaeter" onclick="WB._nzSetDeadlineFilter('spaeter')">Später</button>
       </div>
       <div id="notizen-scroll"></div>
     </div>
@@ -1476,8 +1526,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.61',
-  APP_BUILD:   '20260628-1600',
+  APP_VERSION: '3.0.62',
+  APP_BUILD:   '20260628-1500',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2295,6 +2345,9 @@ const WB = {
     document.querySelectorAll('.nz-ztab').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.zustand === z);
     });
+    // Deadline-Filter nur bei bestimmten Zuständen zeigen
+    const dlBar = document.getElementById('nz-dl-filter-bar');
+    if (dlBar) dlBar.style.display = (z==='aktuell'||z==='parkplatz'||z==='kompass') ? '' : 'none';
     this.renderNotizenTab();
   },
 
@@ -2387,6 +2440,7 @@ const WB = {
         + '<button class="nz-add-ok" onclick="WB._nzAddItem(\'' + this._esc(l.id) + '\')">OK</button>'
         + '</div>'
         + '<div class="nz-actions">'
+        + (isArchiv ? '<button class="nz-action-btn" onclick="event.stopPropagation();WB._nzDeArchivieren(\'' + this._esc(l.id) + '\')" style="color:var(--accent);font-weight:800;">↩ Wiederherstellen</button>' : '')
         + '<button class="nz-action-btn danger" onclick="WB._nzDeleteListe(\'' + this._esc(l.id) + '\')">L\u00f6schen</button>'
         + '</div></div></div>';
     });
@@ -2726,6 +2780,10 @@ const WB = {
       liste = this.db.notizen.filter(l => !l.deleted && l.zustand === zustand);
     }
 
+    // Deadline-Filter
+    if (this._nzDeadlineFilter && this._nzDeadlineFilter !== 'alle') {
+      liste = liste.filter(l => this._nzDeadlineFilterOk(l));
+    }
     // Welt-Filter (activeWorld)
     const welt = this.activeWorld;
     if (welt && welt !== 'beide') {
@@ -3681,6 +3739,8 @@ const WB = {
     const zustand = document.getElementById('nz-e-zustand')?.value || 'aktuell';
     const gepinnt = document.getElementById('nz-e-gepinnt')?.checked || false;
     const farbe    = document.getElementById('nz-e-farbe')?.value || 'c-weiss';
+    const tagsRaw  = document.getElementById('nz-e-tags')?.value || '';
+    const tags     = tagsRaw.split(',').map(t=>t.trim()).filter(Boolean);
     const deadline = document.getElementById('nz-e-deadline')?.value || '';
     const isGateway   = document.getElementById('nz-e-isgateway')?.checked || false;
     const gatewayDate  = document.getElementById('nz-gw-date')?.value || '';
@@ -3693,6 +3753,7 @@ const WB = {
     l.typ     = typ;
     l.farbe    = farbe;
     l.deadline = deadline || null;
+    l.tags = tags;
     l.isGateway         = isGateway || false;
     if (isGateway) {
       l.gatewayDate       = gatewayDate || null;
@@ -3825,7 +3886,7 @@ const WB = {
         .sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
 
       let blockCls = 'wo-day-block' + (isToday?' today':'') + (isWE?' we':'') + (st?' ft':'');
-      h += '<div class="' + blockCls + '">';
+      h += '<div class="' + blockCls + '" onclick="WB._woTagOverlay(\''+dateStr+'\')" style="cursor:pointer;">';
       h += '<div class="wo-day-head' + (isToday?' today':'') + '">';
       h += '<div class="wo-day-name">' + (this._isMobile()?dayN[dow]:dayN[dow]) + '</div>';
       h += '<div class="wo-day-date">' + d.getDate() + '. ' + mN[d.getMonth()] + '</div>';
@@ -5267,6 +5328,196 @@ const WB = {
     }).join('');
   },
 
+  // ── Freitext: Vollbild ─────────────────────────────────────────────
+  _nzVollbild() {
+    const ov = document.getElementById('nz-ft-overlay');
+    if (!ov) return;
+    ov.classList.toggle('vollbild');
+    const btn = document.getElementById('nz-ft-vollbild-btn');
+    if (btn) btn.textContent = ov.classList.contains('vollbild') ? '⊠' : '⛶';
+  },
+
+  // ── Freitext: Tabelle einfügen ──────────────────────────────────────
+  _nzInsertTable(rows, cols) {
+    rows = rows || 3; cols = cols || 3;
+    let html = '<table><tbody>';
+    for (let r=0; r<rows; r++) {
+      html += '<tr>';
+      for (let c=0; c<cols; c++) {
+        html += r===0 ? '<th><br></th>' : '<td><br></td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table><p><br></p>';
+    document.execCommand('insertHTML', false, html);
+  },
+
+  // ── Freitext: Tabellen-Kontextmenü ─────────────────────────────────
+  _nzTableContextMenu(e) {
+    const td = e.target.closest('td,th');
+    if (!td) return;
+    e.preventDefault();
+    this._nzCtxCell = td;
+    const menu = document.getElementById('nz-table-ctx');
+    if (!menu) return;
+    menu.style.left = Math.min(e.clientX, window.innerWidth-200) + 'px';
+    menu.style.top  = Math.min(e.clientY, window.innerHeight-200) + 'px';
+    menu.classList.add('open');
+    const close = (ev) => { if (!menu.contains(ev.target)) { menu.classList.remove('open'); document.removeEventListener('click', close); } };
+    setTimeout(() => document.addEventListener('click', close), 50);
+  },
+
+  _nzTableCmd(cmd) {
+    document.getElementById('nz-table-ctx')?.classList.remove('open');
+    const cell = this._nzCtxCell;
+    if (!cell) return;
+    const table = cell.closest('table');
+    const row = cell.closest('tr');
+    const cellIdx = Array.from(row.cells).indexOf(cell);
+    const rowIdx = Array.from(table.rows).indexOf(row);
+    if (cmd === 'addRowAfter' || cmd === 'addRowBefore') {
+      const cols = row.cells.length;
+      const newRow = table.insertRow(cmd === 'addRowAfter' ? rowIdx+1 : rowIdx);
+      for (let i=0; i<cols; i++) { const td = newRow.insertCell(); td.innerHTML = '<br>'; }
+    } else if (cmd === 'addColAfter' || cmd === 'addColBefore') {
+      Array.from(table.rows).forEach(r => {
+        const td = r.insertCell(cmd === 'addColAfter' ? cellIdx+1 : cellIdx);
+        td.innerHTML = '<br>';
+      });
+    } else if (cmd === 'deleteRow') {
+      if (table.rows.length > 1) row.remove();
+    } else if (cmd === 'deleteCol') {
+      if (row.cells.length > 1) Array.from(table.rows).forEach(r => { if (r.cells[cellIdx]) r.deleteCell(cellIdx); });
+    } else if (cmd === 'deleteTable') {
+      table.remove();
+    }
+  },
+
+  // ── Deadline-Filter ─────────────────────────────────────────────────
+  _nzDeadlineFilter: 'alle',
+
+  _nzSetDeadlineFilter(f) {
+    this._nzDeadlineFilter = f;
+    document.querySelectorAll('.nz-dl-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter===f));
+    this._nzRenderDesktop(document.getElementById('notizen-scroll'));
+  },
+
+  _nzDeadlineFilterOk(l) {
+    if (this._nzDeadlineFilter === 'alle') return true;
+    const dl = l.deadline;
+    if (!dl) return this._nzDeadlineFilter !== 'faellig' && this._nzDeadlineFilter !== 'heute' && this._nzDeadlineFilter !== 'woche' && this._nzDeadlineFilter !== 'monat';
+    const today = new Date(); today.setHours(0,0,0,0);
+    const d = new Date(dl); d.setHours(0,0,0,0);
+    const diff = Math.ceil((d-today)/86400000);
+    if (this._nzDeadlineFilter === 'faellig') return diff < 0;
+    if (this._nzDeadlineFilter === 'heute')   return diff === 0;
+    if (this._nzDeadlineFilter === 'woche')   return diff >= 0 && diff <= 7;
+    if (this._nzDeadlineFilter === 'monat')   return diff >= 0 && diff <= 28;
+    if (this._nzDeadlineFilter === 'spaeter') return diff > 28;
+    return true;
+  },
+
+  // ── Tag Autocomplete ────────────────────────────────────────────────
+  _nzAllTags() {
+    const tags = new Set();
+    (this.db?.notizen||[]).forEach(n => (n.tags||[]).forEach(t => tags.add(t)));
+    return [...tags].sort();
+  },
+
+  _nzTagAutocomplete(inp, e) {
+    const val = inp.value.split(',').pop().trim();
+    const dd = document.getElementById('nz-tag-dropdown');
+    if (!dd) return;
+    if (!val || val.length < 1) { dd.classList.remove('open'); return; }
+    const matches = this._nzAllTags().filter(t => t.toLowerCase().startsWith(val.toLowerCase()) && !inp.value.split(',').map(s=>s.trim()).includes(t));
+    if (!matches.length) { dd.classList.remove('open'); return; }
+    const rect = inp.getBoundingClientRect();
+    dd.style.left = rect.left + 'px';
+    dd.style.top  = (rect.bottom+4) + 'px';
+    dd.style.width = rect.width + 'px';
+    dd.innerHTML = matches.slice(0,8).map(t =>
+      '<div class="nz-tag-opt" onclick="WB._nzTagSelect(\'' + this._esc(t) + '\',document.getElementById(\'nz-e-tags\'))">' + this._esc(t) + '</div>'
+    ).join('');
+    dd.classList.add('open');
+  },
+
+  _nzTagSelect(tag, inp) {
+    if (!inp) return;
+    const parts = inp.value.split(',').map(s=>s.trim()).filter(Boolean);
+    parts.pop();
+    parts.push(tag);
+    inp.value = parts.join(', ') + ', ';
+    document.getElementById('nz-tag-dropdown')?.classList.remove('open');
+    inp.focus();
+  },
+
+  // ── Archiv de-archivieren ───────────────────────────────────────────
+  _nzDeArchivieren(listeId) {
+    const l = (this.db?.notizen||[]).find(x => x.id===listeId);
+    if (!l) return;
+    l.deleted = false;
+    l.zustand = 'aktuell';
+    l.updatedAt = this._now();
+    this.setDirty();
+    this.renderNotizenTab();
+    this._nzRenderPills();
+    this._toast('Wiederhergestellt');
+  },
+
+  // ── Custom Confirm/Prompt ────────────────────────────────────────────
+  _customConfirm(msg, onYes, onNo) {
+    const body = '<p style="font-size:14px;color:var(--text);line-height:1.5;margin:0 0 8px;">' + this._esc(msg) + '</p>';
+    const footer = '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose();'+( onNo ? 'WB._customNo()' : '')+'" >Abbrechen</button>'
+      + '<button class="wb-btn wb-btn-save" style="background:#dc2626;border-color:#dc2626;" onclick="WB.modalClose();WB._customYes()">OK</button>';
+    this._customYesFn = onYes;
+    this._customNoFn  = onNo;
+    this.modalOpen('Bestätigung', body, footer);
+  },
+  _customYes() { if (this._customYesFn) { this._customYesFn(); this._customYesFn=null; } },
+  _customNo()  { if (this._customNoFn)  { this._customNoFn();  this._customNoFn=null;  } },
+
+  _customPrompt(msg, defaultVal, onOk) {
+    const body = '<p style="font-size:14px;color:var(--text);margin:0 0 10px;">'+this._esc(msg)+'</p>'
+      + '<input id="custom-prompt-inp" class="wb-input" value="'+this._esc(defaultVal||'')+'" style="width:100%;">';
+    const footer = '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
+      + '<button class="wb-btn wb-btn-save" onclick="WB._customPromptOk()">OK</button>';
+    this._customPromptFn = onOk;
+    this.modalOpen('Eingabe', body, footer);
+    setTimeout(()=>document.getElementById('custom-prompt-inp')?.select(),80);
+  },
+  _customPromptOk() {
+    const val = document.getElementById('custom-prompt-inp')?.value;
+    this.modalClose();
+    if (this._customPromptFn) { this._customPromptFn(val); this._customPromptFn=null; }
+  },
+
+  // ── Tagesansicht Overlay ─────────────────────────────────────────
+  _woTagOverlay(datum) {
+    const d = new Date(datum);
+    const tN = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    const mN = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    const ds = this._dStr(d);
+    const sonder = (this.db?.sondertage||[]).filter(s=>!s.deleted&&s.datum===ds);
+    const events = (this.db?.customEvents||[]).filter(e=>!e.deleted&&e.datum===ds).sort((a,b)=>(a.zeit||'').localeCompare(b.zeit||''));
+    let body = '<div style="font-size:15px;font-weight:800;margin-bottom:10px;">'+tN[d.getDay()]+', '+d.getDate()+'. '+mN[d.getMonth()]+' '+d.getFullYear()+'</div>';
+    if (sonder.length) {
+      body += '<div style="margin-bottom:8px;">';
+      sonder.forEach(s => { body += '<div style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(245,158,11,.12);color:#b45309;margin-bottom:4px;">'+this._esc(s.typ)+(s.bezeichnung?' · '+this._esc(s.bezeichnung):'')+'</div>'; });
+      body += '</div>';
+    }
+    if (!events.length) { body += '<div style="color:var(--faint);font-size:13px;">Keine Termine</div>'; }
+    events.forEach(e => {
+      body += '<div style="display:flex;gap:8px;padding:6px 0;border-bottom:.5px solid var(--border);cursor:pointer;" onclick="WB.terminOpen(\''+this._esc(e.id)+'\')">';
+      body += '<div style="font-size:12px;font-family:monospace;color:var(--faint);padding-top:2px;min-width:38px;">'+(e.zeit||'')+'</div>';
+      body += '<div style="flex:1;"><div style="font-size:13px;font-weight:700;">'+this._esc(e.titel)+'</div>';
+      if (e.dauer) body += '<div style="font-size:11px;color:var(--faint);">'+e.dauer+' Min</div>';
+      body += '</div></div>';
+    });
+    const footer = '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Schließen</button>'
+      + '<button class="wb-btn wb-btn-save" onclick="WB.modalClose();WB.terminOpen(null,\''+datum+'\');">+ Termin</button>';
+    this.modalOpen(tN[d.getDay()]+' · '+d.getDate()+'. '+mN[d.getMonth()], body, footer);
+  },
+
   setDirty() {
     this.isDirty=true; this._pendingTs=Date.now();
     this.idbSave().catch(e=>console.warn('[setDirty IDB]',e));
@@ -5779,5 +6030,20 @@ document.addEventListener('DOMContentLoaded', () => {
       <div style="font-size:12px;color:var(--faint);margin-top:12px;">AES-256-GCM verschlüsselt</div>
     </div>
   </div>
+
+<!-- Tabellen-Kontextmenü -->
+<div id="nz-table-ctx">
+  <div class="nz-ctx-item" onclick="WB._nzTableCmd('addRowAfter')">Zeile einfügen (unten)</div>
+  <div class="nz-ctx-item" onclick="WB._nzTableCmd('addRowBefore')">Zeile einfügen (oben)</div>
+  <div class="nz-ctx-item" onclick="WB._nzTableCmd('addColAfter')">Spalte einfügen (rechts)</div>
+  <div class="nz-ctx-item" onclick="WB._nzTableCmd('addColBefore')">Spalte einfügen (links)</div>
+  <div class="nz-ctx-sep"></div>
+  <div class="nz-ctx-item danger" onclick="WB._nzTableCmd('deleteRow')">Zeile löschen</div>
+  <div class="nz-ctx-item danger" onclick="WB._nzTableCmd('deleteCol')">Spalte löschen</div>
+  <div class="nz-ctx-item danger" onclick="WB._nzTableCmd('deleteTable')">Tabelle löschen</div>
+</div>
+
+<!-- Tag Autocomplete Dropdown -->
+<div id="nz-tag-dropdown"></div>
 </body>
 </html>
