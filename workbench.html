@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.62</title>
+  <title>WorkBench 3.0.63</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1056,7 +1056,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.62</div>
+  <div id="wb-startup-tagline">v3.0.63</div>
 </div>
 
 <!-- Modal -->
@@ -1236,7 +1236,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.62</span>
+    <span id="wb-menu-version">v3.0.63</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" data-welt="beide" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" data-welt="beruf" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1526,8 +1526,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.62',
-  APP_BUILD:   '20260628-1500',
+  APP_VERSION: '3.0.63',
+  APP_BUILD:   '20260628-1600',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1561,16 +1561,6 @@ const WB = {
   _syncTimer: null,
 
   // ── DB-Struktur ──────────────────────────────────────
-  _emptyDb() {
-    return {
-      customEvents:  [],
-      notizen:       [],
-      wochenMottos:  {},
-      sondertage:    [],
-      _version:      1,
-      _exportedAt:   '',
-    };
-  },
 
   // ── Init ─────────────────────────────────────────────
   async init() {
@@ -1751,14 +1741,6 @@ const WB = {
     this.renderSection(this.activeTab);
   },
 
-  _itemVisible(item) {
-    if (!item) return false;
-    if (item.deleted) return false;
-    const w = item.welt || 'priv';
-    if (this.activeWorld === 'beruf'  && w !== 'pro')  return false;
-    if (this.activeWorld === 'privat' && w !== 'priv') return false;
-    return true;
-  },
 
   // ── Tab-Navigation ───────────────────────────────────
   tabSwitch(tab) {
@@ -1822,39 +1804,6 @@ const WB = {
     }, 60000);
   },
 
-  _tsRenderTagesheader() {
-    const el = document.getElementById('ts-tagesheader');
-    if (!el) return;
-    const d = new Date();
-    const wdN = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
-    const mN  = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-    const wt  = wdN[d.getDay()];
-    const day = d.getDate();
-    const mon = mN[d.getMonth()];
-    const year= d.getFullYear();
-    const tmp = new Date(Date.UTC(year, d.getMonth(), day));
-    tmp.setUTCDate(tmp.getUTCDate() + 4 - (tmp.getUTCDay()||7));
-    const kw  = Math.ceil((((tmp - Date.UTC(tmp.getUTCFullYear(),0,1)) / 86400000) + 1) / 7);
-    const today  = this._dStr(d);
-    const sonder = (this.db?.sondertage||[]).find(s => !s.deleted && s.datum === today);
-    const stLbl  = { urlaub:'\uD83C\uDFD6\u00a0Urlaub', feiertag:'\uD83C\uDF89\u00a0Feiertag', auszeit:'\u23F8\u00a0Auszeit', krank:'\uD83E\uDD12\u00a0Krank', dienstreise:'\u2708\u00a0Dienstreise' };
-    const st = sonder ? '<span class="ts-th-sonder">' + this._esc((stLbl[sonder.typ]||sonder.typ) + (sonder.name ? ' \u00b7 ' + sonder.name : '')) + '</span>' : '';
-    const kwS = '<span class="ts-th-kw">KW\u00a0' + kw + '</span>';
-    const datStr = day + '. ' + mon + ' ' + year;
-    el.innerHTML =
-      '<div class="ts-th-mobile">'
-      + '<div class="ts-th-m-left"><span class="ts-th-m-wt">' + wt + '</span><span class="ts-th-m-date">' + datStr + '</span></div>'
-      + '<div class="ts-th-m-right">' + kwS + st + '</div>'
-      + '</div>'
-      + '<div class="ts-th-desktop">'
-      + '<div class="ts-th-d-dot"></div>'
-      + '<span class="ts-th-d-wt">' + wt + '</span>'
-      + '<span class="ts-th-d-sep">&middot;</span>'
-      + '<span class="ts-th-d-date">' + datStr + '</span>'
-      + '<span class="ts-th-d-kw">KW\u00a0' + kw + '</span>'
-      + (sonder ? '<span class="ts-th-d-sonder">' + this._esc((stLbl[sonder.typ]||sonder.typ)+(sonder.name?' \u00b7 '+sonder.name:'')) + '</span>' : '')
-      + '</div>';
-  },
 
   _tsRender() {
     this._tsRenderTagesheader();
@@ -2060,13 +2009,6 @@ const WB = {
   },
 
   // _tsNotizenWorldOk: Welt-Filter für Notizen
-  _tsNotizenWorldOk(l) {
-    if (this.activeWorld === 'beide') return true;
-    const w = l.welt || 'beide';
-    if (this.activeWorld === 'beruf')  return w === 'beruf'  || w === 'pro';
-    if (this.activeWorld === 'privat') return w === 'privat' || w === 'priv';
-    return true;
-  },
 
 
   _tsRenderPins() {
@@ -2290,103 +2232,11 @@ const WB = {
   _nzDragId: null,
   _nzFtListeId: null,
 
-  _nzPostItFarbe(k) {
-    const map = { 'c-gelb':'nz-gelb','c-blau':'nz-blau','c-gruen':'nz-gruen','c-rosa':'nz-rosa','c-weiss':'nz-weiss' };
-    return map[k] || 'nz-weiss';
-  },
 
-  _nzDefaultListen() {
-    return [
-      { id:'nz_edeka',  titel:'Einkaufszettel Edeka',    icon:'cart',    typ:'check',  farbe:'c-gelb',  items:[], gepinnt:false, welt:undefined },
-      { id:'nz_bm',     titel:'Einkaufszettel Baumarkt', icon:'tools',   typ:'check',  farbe:'c-weiss', items:[], gepinnt:false, welt:undefined },
-      { id:'nz_ideen',  titel:'Ideen',                   icon:'star',    typ:'liste',  farbe:'c-blau',  items:[], gepinnt:false, welt:undefined },
-    ];
-  },
 
-  _nzGetListen() {
-    if (!this.db) return [];
-    if (!this.db.notizen || !this.db.notizen.length) {
-      this.db.notizen = this._nzDefaultListen().map(l => ({ ...l, updatedAt: this._now() }));
-    }
-    const zustand = this._nzZustand || 'aktuell';
-    let listen = this.db.notizen.filter(l => {
-      if (l.deleted) return false;
-      const z = l.zustand || 'aktuell';
-      return z === zustand;
-    });
-    // Weltfilter
-    if (this.activeWorld !== 'beide') {
-      listen = listen.filter(l => {
-        const w = l.welt || 'beide';
-        if (w === 'beide') return true;
-        if (this.activeWorld === 'beruf')  return w === 'beruf';
-        if (this.activeWorld === 'privat') return w !== 'beruf';
-        return true;
-      });
-    }
-    // Suche
-    const suchEl = document.getElementById('nz-suche');
-    const q = suchEl?.value?.trim().toLowerCase() || '';
-    if (q) {
-      listen = listen.filter(l => {
-        if (l.titel?.toLowerCase().includes(q)) return true;
-        if ((l.items||[]).some(i => i.text?.toLowerCase().includes(q))) return true;
-        if ((l.inhalt||'').toLowerCase().includes(q)) return true;
-        return false;
-      });
-    }
-    // Gepinnte zuerst (nur in Aktuell sinnvoll)
-    listen.sort((a,b) => (b.gepinnt?1:0) - (a.gepinnt?1:0));
-    return listen;
-  },
 
-  _nzSetZustand(z) {
-    this._nzZustand = z;
-    document.querySelectorAll('.nz-ztab').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.zustand === z);
-    });
-    // Deadline-Filter nur bei bestimmten Zuständen zeigen
-    const dlBar = document.getElementById('nz-dl-filter-bar');
-    if (dlBar) dlBar.style.display = (z==='aktuell'||z==='parkplatz'||z==='kompass') ? '' : 'none';
-    this.renderNotizenTab();
-  },
 
-  _nzUpdateCounts() {
-    const db = this.db;
-    if (!db?.notizen) return;
-    const weltOk = l => {
-      if (this.activeWorld === 'beide') return true;
-      const w = l.welt || 'beide';
-      if (w === 'beide') return true;
-      if (this.activeWorld === 'beruf')  return w === 'beruf';
-      if (this.activeWorld === 'privat') return w !== 'beruf';
-      return true;
-    };
-    const cnt = {
-      aktuell:   db.notizen.filter(l => !l.deleted && (!l.zustand || l.zustand==='aktuell') && weltOk(l)).length,
-      parkplatz: db.notizen.filter(l => !l.deleted && l.zustand==='parkplatz' && weltOk(l)).length,
-      kompass:   db.notizen.filter(l => !l.deleted && l.zustand==='kompass'   && weltOk(l)).length,
-      archiv:    db.notizen.filter(l => !l.deleted && l.zustand==='archiv'    && weltOk(l)).length,
-    };
-    ['aktuell','parkplatz','kompass','archiv'].forEach(z => {
-      const el = document.getElementById('nz-cnt-' + z);
-      if (el) el.textContent = cnt[z] > 0 ? cnt[z] : '';
-    });
-  },
 
-  _nzRenderPills() {
-    const bar  = document.getElementById('nz-pin-pills-bar');
-    const cont = document.getElementById('nz-pin-pills-container');
-    if (!bar || !cont) return;
-    const gepinnt = (this.db?.notizen||[]).filter(l => !l.deleted && l.gepinnt);
-    if (!gepinnt.length) { bar.style.display = 'none'; return; }
-    bar.style.display = '';
-    cont.innerHTML = gepinnt.map(l => {
-      const farbe = l.farbe || 'c-weiss';
-      return '<div class="nz-pin-pill ' + farbe + '" onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')">'
-        + '\uD83D\uDCCC ' + this._esc(l.titel) + '</div>';
-    }).join('');
-  },
 
   renderNotizenTab() {
     const scroll = document.getElementById('notizen-scroll');
@@ -2396,171 +2246,12 @@ const WB = {
     this._nzRenderDesktop(scroll);
   },
 
-  _nzRenderMobile(scroll) {
-    const listen = this._nzGetListen();
-    let h = '';
-    listen.forEach(l => {
-      const farbe   = l.farbe || 'c-weiss';
-      const gepinnt = !!l.gepinnt;
-      const items   = (l.items||[]).filter(i=>!i.deleted);
-      const offen   = items.filter(i=>!i.done).length;
-      const cntLbl  = offen > 0 ? offen + ' offen' : items.length + '';
-      const cntCls  = offen > 0 ? ' has' : '';
-      const isOpen  = !!this._nzGrpState[l.id];
-      const colorDots = this._NZ_COLORS.map(c =>
-        '<div class="nz-cdot ' + c + '" onclick="event.stopPropagation();WB._nzSetFarbe(\'' + this._esc(l.id) + '\',\'' + c + '\')"></div>'
-      ).join('');
-      const itemsH = items.map(i => {
-        const cb = l.typ === 'check'
-          ? '<div class="nz-chk' + (i.done?' ck':'') + '" onclick="WB._nzToggleItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\')">'
-            + (i.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '')
-            + '</div>'
-          : '<div class="nz-dot"></div>';
-        return '<div class="nz-item">' + cb
-          + '<span class="nz-itxt' + (i.done?' dn':'') + '" ondblclick="WB._nzEditItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\',this)">' + this._esc(i.text) + '</span>'
-          + '<button class="nz-del-btn" onclick="WB._nzDeleteItem(\'' + this._esc(l.id) + '\',\'' + this._esc(i.id) + '\')">\u00d7</button>'
-          + '</div>';
-      }).join('');
-      h += '<div class="nz-grp ' + farbe + (isOpen?' open':'') + '" id="nzg-' + this._esc(l.id) + '">'
-        + '<div class="nz-grp-hdr" onclick="WB._nzGrpToggle(\'' + this._esc(l.id) + '\')">'
-        + '<span class="nz-grp-title">' + this._esc(l.titel) + '</span>'
-        + (gepinnt ? '<span style="font-size:13px">\uD83D\uDCCC</span>' : '')
-        + '<span class="nz-grp-cnt' + cntCls + '">' + cntLbl + '</span>'
-        + '<button class="nz-pin-btn' + (gepinnt?' on':'') + '" onclick="event.stopPropagation();WB._nzTogglePin(\'' + this._esc(l.id) + '\')" aria-label="Pinnen">'
-        + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"/></svg>'
-        + '</button>'
-        + '<button class="nz-menu-btn" onclick="event.stopPropagation();WB._nzBearbeitenDialog(\'' + this._esc(l.id) + '\')">&#8943;</button>'
-        + '<span class="nz-grp-chev">&#9662;</span>'
-        + '</div>'
-        + '<div class="nz-grp-body">'
-        + '<div class="nz-color-row">' + colorDots + '</div>'
-        + itemsH
-        + '<div class="nz-add-row">'
-        + '<input id="nz-add-' + this._esc(l.id) + '" placeholder="Eintrag..." onkeydown="if(event.key===\'Enter\')WB._nzAddItem(\'' + this._esc(l.id) + '\')">'
-        + '<button class="nz-add-ok" onclick="WB._nzAddItem(\'' + this._esc(l.id) + '\')">OK</button>'
-        + '</div>'
-        + '<div class="nz-actions">'
-        + (isArchiv ? '<button class="nz-action-btn" onclick="event.stopPropagation();WB._nzDeArchivieren(\'' + this._esc(l.id) + '\')" style="color:var(--accent);font-weight:800;">↩ Wiederherstellen</button>' : '')
-        + '<button class="nz-action-btn danger" onclick="WB._nzDeleteListe(\'' + this._esc(l.id) + '\')">L\u00f6schen</button>'
-        + '</div></div></div>';
-    });
-    if (this._nzZustand === 'aktuell') {
-      h += '<div class="nz-new-list" onclick="WB._nzNeueListeDialog()">+ Neue Liste</div>';
-    }
-    scroll.innerHTML = h;
-  },
 
-  _nzRenderDesktop(scroll) {
-    const listen  = this._nzGetListen();
-    const gepinnt = listen.filter(l => !!l.gepinnt);
-    const normal  = listen.filter(l => !l.gepinnt);
-    const renderK = l => {
-      const farbe  = this._nzPostItFarbe(l.farbe || 'c-weiss');
-      const items  = (l.items||[]).filter(i=>!i.deleted);
-      const offen  = items.filter(i=>!i.done).length;
-      const pinH   = l.gepinnt ? '<span class="nz-postit-pin">\uD83D\uDCCC</span>' : '';
-      const done  = items.filter(i=>i.done).length;
-      const cntLbl = l.typ==='check' ? (done+'/'+items.length) : (items.length+'');
-      let preview = '';
-      if (l.typ === 'freitext') {
-        const tmp = document.createElement('div'); tmp.innerHTML = l.inhalt || '';
-        const txt = tmp.textContent || '';
-        preview = txt.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3)
-          .map(line => '<div class="nz-postit-item"><div class="nz-postit-dot"></div><span class="nz-postit-txt">' + this._esc(line) + '</span></div>').join('');
-      } else {
-        preview = items.slice(0,3).map(i => {
-          const chk = l.typ==='check'
-            ? '<div class="nz-postit-chk' + (i.done?' done':'') + '">' + (i.done?'\u2713':'') + '</div>'
-            : '<div class="nz-postit-dot"></div>';
-          return '<div class="nz-postit-item">' + chk + '<span class="nz-postit-txt' + (i.done?' dn':'') + '">' + this._esc(i.text) + '</span></div>';
-        }).join('');
-      }
-      const more  = items.length - 3;
-      const moreH = more > 0 ? '<div class="nz-postit-more">+' + more + ' weitere</div>' : '';
-      const emptyH = items.length === 0 ? '<div class="nz-postit-empty">Noch keine Eintr\u00e4ge</div>' : '';
-      return '<div class="nz-postit ' + farbe + '" draggable="true"'
-        + ' ondragstart="WB._nzDragStart(event,\'' + this._esc(l.id) + '\')"'
-        + ' ondragover="WB._nzDragOver(event,\'' + this._esc(l.id) + '\')"'
-        + ' ondrop="WB._nzDrop(event,\'' + this._esc(l.id) + '\')"'
-        + ' ondragend="WB._nzDragEnd()"'
-        + ' onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')" id="nzg-' + this._esc(l.id) + '">'
-        + '<div class="nz-postit-hdr">'
-        + '<span class="nz-postit-icon">' + this._nzSvgIcon(l.icon||'note') + '</span>'
-        + '<span class="nz-postit-title">' + this._esc(l.titel) + '</span>' + pinH
-        + '<span class="nz-postit-cnt' + (l.typ==='check'?' nz-check-pill':'') + '">' + cntLbl + '</span>'
-        + '</div>'
-        + '<div>' + preview + '</div>' + moreH + emptyH + '</div>';
-    };
-    let h = '';
-    if (gepinnt.length) {
-      h += '<div class="nz-postit-section-lbl">\uD83D\uDCCC Gepinnt</div>';
-      h += '<div class="nz-grid">' + gepinnt.map(renderK).join('') + '</div>';
-    }
-    const zustandLabels = { aktuell:'Aktuell', parkplatz:'Auf dem Parkplatz', kompass:'Kompass', archiv:'Archiv' };
-    h += '<div class="nz-postit-section-lbl">' + (zustandLabels[this._nzZustand]||'Listen') + '</div>';
-    h += '<div class="nz-grid">' + normal.map(renderK).join('')
-      + (this._nzZustand === 'aktuell' ? '<div class="nz-postit-new" onclick="WB._nzNeueListeDialog()"><span class="nz-postit-new-icon">+</span>Neue Liste</div>' : '')
-      + '</div>';
-    scroll.innerHTML = h;
-  },
 
-  _nzSvgIcon(icon, sz) {
-    sz = sz || 14;
-    const icons = {
-      cart: '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>',
-      tools: '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
-      star: '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
-      note: '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
-      pin: '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"/></svg>',
-      bag: '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
-      list: '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
-      edit: '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
-    };
-    return icons[icon] || icons.note;
-  },
 
-  _nzGrpToggle(id) {
-    this._nzGrpState[id] = !this._nzGrpState[id];
-    const el = document.getElementById('nzg-' + id);
-    if (el) el.classList.toggle('open', !!this._nzGrpState[id]);
-  },
 
-  _nzTogglePin(listeId) {
-    const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
-    const gepinnt = (this.db.notizen||[]).filter(x=>!x.deleted&&x.gepinnt);
-    if (!l.gepinnt && gepinnt.length >= 3) { this._toast('Max. 3 Notizen anpinnen'); return; }
-    l.gepinnt = !l.gepinnt; l.updatedAt = this._now();
-    this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
-    this._tsRenderTagesheader();
-    if (this.activeTab === 'tagessicht') this._tsRenderPins();
-  },
 
-  _nzAddItem(listeId) {
-    const inp = document.getElementById('nz-add-' + listeId); if (!inp) return;
-    const text = inp.value.trim(); if (!text) return;
-    const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
-    if (!l.items) l.items = [];
-    l.items.push({ id:'i_'+Date.now(), text, done:false, deleted:false });
-    l.updatedAt = this._now();
-    inp.value = '';
-    this.setDirty(); this.renderNotizenTab();
-  },
 
-  _nzDuplizieren(listeId) {
-    const orig = (this.db?.notizen||[]).find(x => x.id === listeId);
-    if (!orig) return;
-    const neu = JSON.parse(JSON.stringify(orig));
-    neu.id        = 'nz_' + Date.now();
-    neu.titel     = orig.titel + ' (Kopie)';
-    neu.gepinnt   = false;
-    neu.updatedAt = this._now();
-    if (neu.items) neu.items.forEach(it => { it.done = false; });
-    if (!this.db.notizen) this.db.notizen = [];
-    this.db.notizen.push(neu);
-    this.setDirty();
-    this.renderNotizenTab();
-    this._toast('\u2713 Notiz dupliziert');
-  },
 
   _nzToggleVertraulich(listeId) {
     const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
@@ -2571,66 +2262,13 @@ const WB = {
     this.renderNotizenTab();
   },
 
-  _nzToggleItem(listeId, itemId) {
-    const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
-    const i = (l.items||[]).find(x=>x.id===itemId); if(!i) return;
-    i.done = !i.done; l.updatedAt = this._now();
-    this.setDirty();
-    this._nzKachelRender();
-    this.renderNotizenTab();
-    if (this.activeTab === 'tagessicht') this._tsRenderPins();
-  },
 
-  _nzDeleteItem(listeId, itemId) {
-    const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
-    const i = (l.items||[]).find(x=>x.id===itemId); if(!i) return;
-    i.deleted = true; l.updatedAt = this._now();
-    this.setDirty(); this.renderNotizenTab();
-  },
 
-  _nzEditItem(listeId, itemId, el) {
-    const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
-    const i = (l.items||[]).find(x=>x.id===itemId); if(!i) return;
-    const old = el.textContent;
-    el.contentEditable = 'true'; el.focus();
-    const sel = window.getSelection(); sel.selectAllChildren(el);
-    const done = () => {
-      el.contentEditable = 'false';
-      const nw = el.textContent.trim();
-      if (nw && nw !== old) { i.text = nw; l.updatedAt = this._now(); this.setDirty(); }
-      else el.textContent = old;
-    };
-    el.onblur = done;
-    el.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); done(); } };
-  },
 
-  _nzSetFarbe(listeId, farbe) {
-    const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
-    l.farbe = farbe; l.updatedAt = this._now();
-    this.setDirty(); this.renderNotizenTab();
-  },
 
-  _nzDeleteListe(listeId) {
-    if (!confirm('Liste l\u00f6schen?')) return;
-    const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
-    l.deleted = true; l.updatedAt = this._now();
-    this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
-    if (this.activeTab === 'tagessicht') this._tsRenderPins();
-    this._toast('\u2713 Liste gel\u00f6scht');
-  },
 
-  _nzSetWelt(listeId, welt) {
-    const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
-    l.welt = welt === 'beide' ? undefined : welt; l.updatedAt = this._now();
-    this.setDirty();
-  },
 
   // Drag Desktop
-  _nzDragStart(e, id) { this._nzDragId = id; e.dataTransfer.effectAllowed='move'; setTimeout(()=>{const el=document.getElementById('nzg-'+id);if(el)el.style.opacity='0.4';},0); },
-  _nzDragOver(e, id) { if(id===this._nzDragId)return; e.preventDefault(); e.dataTransfer.dropEffect='move'; document.querySelectorAll('.nz-postit').forEach(el=>el.style.outline=''); const el=document.getElementById('nzg-'+id); if(el)el.style.outline='2px solid var(--accent)'; },
-  _nzDrop(e, toId) { e.preventDefault(); const fr=this._nzDragId; if(!fr||fr===toId)return; const nz=this.db?.notizen; if(!nz)return; const fi=nz.findIndex(l=>l.id===fr); const ti=nz.findIndex(l=>l.id===toId); if(fi<0||ti<0)return; const[m]=nz.splice(fi,1); nz.splice(ti,0,m); this.setDirty(); this.renderNotizenTab(); },
-  _nzDragEnd() { this._nzDragId=null; document.querySelectorAll('.nz-postit').forEach(el=>{el.style.opacity='';el.style.outline='';}); },
-
 
   _nzKachelAdd() {
     const inp = document.getElementById('nz-kachel-inp'); if(!inp) return;
@@ -2669,26 +2307,7 @@ const WB = {
   },
 
   // Freitext
-  _nzFreitextOpen(l) {
-    this._nzFtListeId = l.id;
-    const titEl = document.getElementById('nz-ft-titel'); if(titEl) titEl.value = l.titel || '';
-    const ed = document.getElementById('nz-ft-editor'); if(ed) { ed.innerHTML = l.inhalt || ''; ed.focus(); }
-    document.getElementById('nz-ft-overlay').style.display = 'flex';
-    setTimeout(() => ed?.focus(), 80);
-  },
 
-  _nzFreitextSave() {
-    const listeId = this._nzFtListeId; if(!listeId) return;
-    const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
-    const titEl = document.getElementById('nz-ft-titel');
-    const ed    = document.getElementById('nz-ft-editor');
-    if (titEl) l.titel  = titEl.value.trim() || l.titel;
-    if (ed)    l.inhalt = ed.innerHTML;
-    l.updatedAt = this._now();
-    this.setDirty();
-    this._nzFreitextClose();
-    this._toast('\u2713 Notiz gespeichert');
-  },
 
   _nzFreitextClose() {
     document.getElementById('nz-ft-overlay').style.display = 'none';
@@ -2724,25 +2343,6 @@ const WB = {
     this.setDirty();
   },
 
-  _nzMenuClose() { const m = document.getElementById('nz-ctx-menu'); if(m) m.style.display='none'; },
-
-  _nzNeueListeDialog() {
-    const body = '<div class="wb-input-group"><label class="wb-label">Titel</label>'
-      + '<input id="wb-nz-neu-titel" class="wb-input wb-input-lg" placeholder="Name der Liste..."></div>'
-      + '<div class="wb-input-group"><label class="wb-label">Typ</label>'
-      + '<div class="nz-typ-row">'
-      + '<button class="nz-typ-btn active" onclick="document.querySelectorAll(\'.nz-typ-btn\').forEach(b=>b.classList.remove(\'active\'));this.classList.add(\'active\');WB._nzNeuTyp=\'check\'">Checkliste</button>'
-      + '<button class="nz-typ-btn" onclick="document.querySelectorAll(\'.nz-typ-btn\').forEach(b=>b.classList.remove(\'active\'));this.classList.add(\'active\');WB._nzNeuTyp=\'liste\'">Aufz\u00e4hlung</button>'
-      + '<button class="nz-typ-btn" onclick="document.querySelectorAll(\'.nz-typ-btn\').forEach(b=>b.classList.remove(\'active\'));this.classList.add(\'active\');WB._nzNeuTyp=\'freitext\'">Freitext</button>'
-      + '</div></div>';
-    this._nzNeuTyp = 'check';
-    this._modalCtx = 'nzNeu';
-    const footer = '<div></div><div style="display:flex;gap:8px;">'
-      + '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
-      + '<button class="wb-btn wb-btn-save" onclick="WB._nzNeueListeSave()">Erstellen</button>'
-      + '</div>';
-    this.modalOpen('Neue Liste', body, footer);
-  },
   // ── Notizen-Tab ──────────────────────────────────────
 
   _NZ_COLORS: ['c-gelb','c-gruen','c-blau','c-rosa','c-lila','c-tuerkis','c-weiss'],
@@ -5678,17 +5278,6 @@ const WB = {
     } catch(e) { console.warn('[syncCheckNewer]', e.message); }
   },
 
-  _syncConflictDialog(ctx, driveTs) {
-    const driveDate = new Date(driveTs).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
-    const body = '<div style="font-size:14px;line-height:1.6;color:var(--text)">'
-      + 'Ein anderes Ger\u00e4t hat Daten um <strong>' + driveDate + '</strong> ge\u00e4ndert.<br>'
-      + 'Du hast ebenfalls lokale \u00c4nderungen.</div>';
-    const footer = '<button style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:none;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700" '
-      + 'onclick="WB.isDirty=false;WB._pendingChanges=false;WB._syncDownload();WB.modalClose()">Drive laden</button>'
-      + '<button style="padding:6px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700;margin-left:8px" '
-      + 'onclick="WB._syncUpload();WB.modalClose()">Meine hochladen</button>';
-    this.modalOpen('\u26a0\uFE0F Sync-Konflikt', body, footer);
-  },
 
 
 
