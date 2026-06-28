@@ -525,7 +525,7 @@ content.includes("foot.style.display = 'none'")
 
 // Hybrid: hb-item + hb-add-row
 const hybridIdx = content.indexOf('_renderHybridBody(l, listeId, ctx)');
-const hybridSrc = hybridIdx >= 0 ? content.slice(hybridIdx, hybridIdx + 4000) : '';
+const hybridSrc = hybridIdx >= 0 ? content.slice(hybridIdx, hybridIdx + 12000) : '';
 hybridSrc.includes('hb-item') && hybridSrc.includes('hb-add-row')
   ? (ok('Hybrid: hb-item + hb-add-row'), f31Ok++) : (fail('Hybrid: neue Item-Klassen fehlen'), f31Fail++);
 hybridSrc.includes('Checkliste') && hybridSrc.includes('Freitext')
@@ -746,7 +746,7 @@ content.includes("bodyEl2.style.background = bg")
 content.includes('_renderHybridBody(')
   ? (ok('_renderHybridBody() definiert'), f36Ok++) : (fail('_renderHybridBody() fehlt'), f36Fail++);
 const hybIdx2 = content.indexOf('_renderHybridBody(l, listeId, ctx)');
-const hybSrc2 = hybIdx2 >= 0 ? content.slice(hybIdx2, hybIdx2+4000) : '';
+const hybSrc2 = hybIdx2 >= 0 ? content.slice(hybIdx2, hybIdx2+12000) : '';
 hybSrc2.includes("ctx === 'ts'") && hybSrc2.includes('nz-dp-ft')
   ? (ok('_renderHybridBody: ctx-Parameter (ts/nz)'), f36Ok++) : (fail('_renderHybridBody: kein ctx-Parameter'), f36Fail++);
 hybSrc2.includes('hb-item') && hybSrc2.includes('hb-add-row')
@@ -875,7 +875,7 @@ content.includes('_nzDetailItemDelete(')? (ok('_nzDetailItemDelete() definiert')
 
 // Drag in Hybrid-Body vorhanden
 const hybIdx38 = content.indexOf('_renderHybridBody(l, listeId, ctx)');
-const hybSrc38 = hybIdx38 >= 0 ? content.slice(hybIdx38, hybIdx38+4000) : '';
+const hybSrc38 = hybIdx38 >= 0 ? content.slice(hybIdx38, hybIdx38+12000) : '';
 hybSrc38.includes('ondragstart') && hybSrc38.includes('_nzHybridItemDrop')
   ? (ok('Hybrid: Drag-and-Drop in Items'), f38Ok++) : (fail('Hybrid: kein Drag-and-Drop'), f38Fail++);
 hybSrc38.includes('_nzHybridItemEdit')

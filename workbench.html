@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.93</title>
+  <title>WorkBench 3.0.94</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1147,7 +1147,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.93</div>
+  <div id="wb-startup-tagline">v3.0.94</div>
 </div>
 
 <!-- Modal -->
@@ -1399,7 +1399,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.93</span>
+    <span id="wb-menu-version">v3.0.94</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1561,6 +1561,7 @@
           <div class="nz-dp-head">
             <button class="nz-dp-back" onclick="WB._nzDetailClose()">←</button>
             <span class="nz-dp-title" id="nz-dp-title"></span>
+            <span id="nz-dp-gw-badge" style="display:none;"></span>
             <span class="nz-dp-cnt" id="nz-dp-cnt"></span>
             <button class="nz-dp-settings" onclick="WB._nzFullscreenOpen(WB._nzDetailId)" title="Vollbild">⛶</button>
             <button class="nz-dp-settings" onclick="WB._nzDetailSettings()" title="Einstellungen">⚙</button>
@@ -1727,8 +1728,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.93',
-  APP_BUILD:   '20260627-1900',
+  APP_VERSION: '3.0.94',
+  APP_BUILD:   '20260628-0100',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2966,6 +2967,26 @@ const WB = {
     this.setDirty();
   },
 
+  _nzGwSetStatus(listeId, status, ctx) {
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    l.gatewayStatus = status;
+    l.updatedAt = this._now();
+    this.setDirty();
+    // Panel neu rendern
+    if (ctx === 'nz') {
+      const body = document.getElementById('nz-dp-body');
+      if (body) { body.innerHTML = this._renderHybridBody(l, listeId, 'nz'); }
+      this._nzDetailOpen(listeId, true);
+    } else if (ctx === 'ts') {
+      this._tsKachelOpen(listeId, true);
+    } else if (ctx === 'fs') {
+      const body = document.getElementById('nz-fs-body');
+      if (body) { body.innerHTML = this._renderHybridBody(l, listeId, 'fs'); }
+    }
+    this.renderNotizenTab();
+    this._toast(status === 'erreicht' ? '✅ Gateway erreicht' : status === 'abgebrochen' ? '❌ Gateway abgebrochen' : '🚦 Gateway offen');
+  },
+
   _nzToggleGwFields() {
     const typ = document.getElementById('nz-e-typ')?.value;
     const el  = document.getElementById('nz-gw-fields');
@@ -2977,8 +2998,10 @@ const WB = {
     const gs = l.gatewayStatus || 'offen';
     if (gs === 'erreicht')    return 'done';
     if (gs === 'abgebrochen') return 'aborted';
+    // Prüfdatum = deadline
+    const pruefDatum = l.deadline || l.gatewayDate; // Fallback für alte Einträge
     const today = this._dStr(new Date());
-    return l.gatewayDate && l.gatewayDate < today ? 'overdue' : 'open';
+    return pruefDatum && pruefDatum < today ? 'overdue' : 'open';
   },
 
   _nzGwBadgeHtml(l) {
@@ -3995,13 +4018,42 @@ const WB = {
   },
   // Checkliste OBEN (immer sichtbar) + Freitext UNTEN (immer sichtbar)
   _renderHybridBody(l, listeId, ctx) {
-    // ctx = 'ts' (Heute-Tab) oder 'nz' (Notizen-Panel)
+    // ctx = 'ts' (Heute-Tab) oder 'nz' (Notizen-Panel) oder 'fs' (Vollbild)
     const cbFn  = ctx === 'ts' ? '_tsKdCbToggle'     : '_nzDetailCbToggle';
     const delFn = ctx === 'ts' ? '_tsKdItemDelete'   : '_nzDetailItemDelete';
     const addFn = ctx === 'ts' ? '_tsKachelAdd'      : '_nzDetailAdd';
     const ftId  = ctx === 'ts' ? 'ts-kd-ft' : ctx === 'fs' ? 'nz-fs-ft' : 'nz-dp-ft';
     const ftFn  = ctx === 'ts' ? '_tsKdFreitextInput' : ctx === 'fs' ? '_nzFsFreitextInput' : '_nzDetailFreitextInput';
     const addInpId = ctx === 'ts' ? 'ts-kd-inp' : 'nz-dp-inp';
+
+    // ③ Gateway-Klappbereich (eingeklappt bei Start)
+    let gwSection = '';
+    if (l.typ === 'gateway') {
+      const gs = this._nzGwStatus(l);
+      const gsColors = { open:'#2980B9', overdue:'#C0392B', done:'#27AE60', aborted:'#999' };
+      const gsLabels = { open:'Offen', overdue:'⚠ Fällig!', done:'✅ Erreicht', aborted:'❌ Abgebrochen' };
+      const accentColor = gsColors[gs] || '#2980B9';
+      const gwId = 'gw-body-' + this._esc(listeId);
+      gwSection = '<div style="border:1.5px solid ' + accentColor + ';border-radius:8px;margin-bottom:8px;overflow:hidden;">'
+        + '<button onclick="var b=document.getElementById(\'' + gwId + '\');b.style.display=b.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'.gw-arrow\').textContent=b.style.display===\'none\'?\'▶\':\'▼\';"'
+        + ' style="width:100%;display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:' + accentColor + '18;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:800;color:' + accentColor + ';">'
+        + '<span class="gw-arrow">▶</span>'
+        + '🚦 Gateway-Details'
+        + '<span style="margin-left:auto;font-size:11px;font-weight:700;padding:1px 7px;border-radius:8px;background:' + accentColor + '30;color:' + accentColor + ';">' + (gsLabels[gs]||'') + '</span>'
+        + '</button>'
+        + '<div id="' + gwId + '" style="display:none;padding:10px 14px;background:' + accentColor + '06;">'
+        + (l.gatewayCondition ? '<div style="margin-bottom:6px;"><span style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--faint);letter-spacing:.06em;">🎯 Bedingung</span><div style="font-size:13px;color:var(--text);margin-top:2px;">' + this._esc(l.gatewayCondition) + '</div></div>' : '')
+        + (l.gatewayConsequence ? '<div style="margin-bottom:6px;"><span style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--faint);letter-spacing:.06em;">⚡ Konsequenz</span><div style="font-size:13px;color:var(--text);margin-top:2px;">' + this._esc(l.gatewayConsequence) + '</div></div>' : '')
+        + '<div style="display:flex;gap:6px;margin-top:6px;">'
+        + ['offen','erreicht','abgebrochen'].map(s =>
+            '<button onclick="WB._nzGwSetStatus(\'' + this._esc(listeId) + '\',\'' + s + '\',\'' + ctx + '\')" style="padding:4px 12px;border-radius:8px;border:1.5px solid ' + (l.gatewayStatus===s||(!l.gatewayStatus&&s==='offen')?accentColor:'var(--border)') + ';background:' + (l.gatewayStatus===s||(!l.gatewayStatus&&s==='offen')?accentColor+'20':'none') + ';font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);color:' + (l.gatewayStatus===s||(!l.gatewayStatus&&s==='offen')?accentColor:'var(--muted)') + ';">'
+            + (s==='offen'?'Offen':s==='erreicht'?'✅ Erreicht':'❌ Abgebrochen')
+            + '</button>'
+          ).join('')
+        + '</div>'
+        + '</div>'
+        + '</div>';
+    }
 
     const dragSvg = '<svg class="hb-drag" width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><circle cx="4" cy="3" r="1.2"/><circle cx="4" cy="8" r="1.2"/><circle cx="4" cy="13" r="1.2"/><circle cx="8" cy="3" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="8" cy="13" r="1.2"/></svg>';
 
@@ -4076,7 +4128,7 @@ const WB = {
       + this._linkifyHtml(l.inhalt || '') + '</div>'
       + '</div>';
 
-    return checkH + ftH;
+    return gwSection + checkH + ftH;
   },
 
   _nzDetailRenderMeta(l) {
@@ -4524,8 +4576,21 @@ const WB = {
     const cnt = l.typ === 'check' ? doneItems.length + '/' + allItems.length : '';
     const titleEl = document.getElementById('nz-dp-title');
     const cntEl   = document.getElementById('nz-dp-cnt');
+    const gwBadgeEl = document.getElementById('nz-dp-gw-badge');
     if (titleEl) titleEl.textContent = l.titel;
     if (cntEl)   { cntEl.textContent = cnt; cntEl.style.display = cnt ? '' : 'none'; }
+    // Gateway-Badge im Header
+    if (gwBadgeEl) {
+      if (l.typ === 'gateway') {
+        const gs = this._nzGwStatus(l);
+        const gwColors = { open:'#2980B9', overdue:'#C0392B', done:'#27AE60', aborted:'#999' };
+        gwBadgeEl.textContent = '🚦';
+        gwBadgeEl.title = gs === 'overdue' ? '⚠ Gateway fällig!' : gs === 'done' ? 'Erreicht' : gs === 'aborted' ? 'Abgebrochen' : 'Gateway offen';
+        gwBadgeEl.style.cssText = 'display:inline-flex;align-items:center;padding:2px 6px;border-radius:5px;font-size:13px;background:' + gwColors[gs] + '20;color:' + gwColors[gs] + ';border:1.5px solid ' + gwColors[gs] + ';margin-left:4px;flex-shrink:0;';
+      } else {
+        gwBadgeEl.style.display = 'none';
+      }
+    }
     // Farbe auf Panel-Header UND Body/Foot anwenden
     const farbBg = { 'c-gelb':'#FFF9C4','c-gruen':'#D5F5E3','c-blau':'#D6EAF8','c-rosa':'#FDEBD0','c-lila':'#E8D5F0','c-tuerkis':'#C8F0EC','c-weiss':'#fff' };
     const bg = farbBg[l.farbe||'c-weiss'] || '#fff';
@@ -5595,8 +5660,6 @@ const WB = {
       + '<option value="gateway"'  + (l.typ==='gateway'  ?' selected':'') + '>🚦 Gateway</option>'
       + '</select></div>'
       + '<div id="nz-gw-fields"' + (l.typ==='gateway'?' class="visible"':'') + '>'
-      + '<div class="wb-input-group" style="margin-top:8px"><label class="wb-label">📅 Prüfdatum</label>'
-      + '<input type="date" id="nz-gw-date" class="wb-input" value="' + this._esc(l.gatewayDate||'') + '"></div>'
       + '<div class="wb-input-group" style="margin-top:8px"><label class="wb-label">🎯 Bedingung (messbar)</label>'
       + '<input id="nz-gw-condition" class="wb-input" placeholder="z.B. Gewicht &lt; 98,0 kg" value="' + this._esc(l.gatewayCondition||'') + '"></div>'
       + '<div class="wb-input-group" style="margin-top:8px"><label class="wb-label">⚡ Konsequenz bei Nichterreichen</label>'
@@ -5607,6 +5670,7 @@ const WB = {
       + '<option value="erreicht"'    + ((l.gatewayStatus||'')==='erreicht'         ?' selected':'') + '>✅ Erreicht</option>'
       + '<option value="abgebrochen"' + ((l.gatewayStatus||'')==='abgebrochen'      ?' selected':'') + '>❌ Abgebrochen</option>'
       + '</select></div>'
+      + '<p style="font-size:11px;color:var(--faint);margin:6px 0 0;">📅 Das Prüfdatum wird über das Deadline-Feld gesetzt.</p>'
       + '</div>'
       + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Zustand</label>'
       + '<select id="nz-e-zustand" class="wb-select">' + zustandOpts + '</select></div>'
@@ -5697,7 +5761,7 @@ const WB = {
     l.link    = link || '';
     // Gateway-Felder
     if (typ === 'gateway') {
-      l.gatewayDate        = document.getElementById('nz-gw-date')?.value        || null;
+      l.gatewayDate        = deadline || null; // Prüfdatum = Deadline
       l.gatewayCondition   = document.getElementById('nz-gw-condition')?.value   || '';
       l.gatewayConsequence = document.getElementById('nz-gw-consequence')?.value || '';
       l.gatewayStatus      = document.getElementById('nz-gw-status')?.value      || 'offen';
