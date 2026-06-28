@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.57</title>
+  <title>WorkBench 3.0.58</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -997,6 +997,26 @@
     /* wb-mobile ts-split-top max-height handled in base mobile rule */
     .wb-mobile #ts-notizen-grid { overflow-y:auto; }
     /* ts-nz-mini aspect-ratio kept as 1/1 on mobile */
+    /* ── Gateway Notizen ── */
+    .nz-gateway-badge { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px; margin-left:6px; vertical-align:middle; }
+    .nz-gateway-badge.offen    { background:rgba(234,179,8,.15);  color:#b45309; border:1px solid rgba(234,179,8,.4); }
+    .nz-gateway-badge.faellig  { background:rgba(239,68,68,.15);  color:#dc2626; border:1px solid rgba(239,68,68,.4); }
+    .nz-gateway-badge.bestanden{ background:rgba(34,197,94,.15);  color:#15803d; border:1px solid rgba(34,197,94,.4); }
+    .nz-gateway-badge.abgebrochen{ background:rgba(107,114,128,.15); color:#4b5563; border:1px solid rgba(107,114,128,.4); }
+    .nz-kachel-gateway { background:#fffbeb; border-left:4px solid #f59e0b !important; }
+    .nz-kachel-gateway.faellig { background:#fef2f2; border-left-color:#ef4444 !important; }
+    .nz-gateway-panel { background:rgba(245,158,11,.06); border:1.5px solid rgba(245,158,11,.3); border-radius:8px; padding:10px 12px; margin:8px 0; display:flex; flex-direction:column; gap:7px; }
+    .nz-gw-row { display:flex; align-items:flex-start; gap:8px; font-size:13px; }
+    .nz-gw-label { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); min-width:90px; padding-top:1px; }
+    .nz-gw-value { color:var(--text); flex:1; line-height:1.4; }
+    .nz-gw-status-btns { display:flex; gap:6px; margin-top:4px; }
+    .nz-gw-status-btn { padding:4px 12px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; border:1.5px solid var(--border); background:none; color:var(--faint); font-family:var(--font); }
+    .nz-gw-status-btn.active-offen     { background:#fef3c7; border-color:#f59e0b; color:#b45309; }
+    .nz-gw-status-btn.active-bestanden { background:#dcfce7; border-color:#22c55e; color:#15803d; }
+    .nz-gw-status-btn.active-abgebrochen{ background:#f3f4f6; border-color:#6b7280; color:#374151; }
+    /* Gateway Felder im Bearbeiten-Dialog */
+    #nz-gateway-fields { display:none; flex-direction:column; gap:8px; margin-top:10px; padding:10px; background:rgba(245,158,11,.06); border-radius:6px; border:1.5px solid rgba(245,158,11,.25); }
+    #nz-gateway-fields.visible { display:flex; }
   </style>
 </head>
 <body>
@@ -1004,7 +1024,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.57</div>
+  <div id="wb-startup-tagline">v3.0.58</div>
 </div>
 
 <!-- Modal -->
@@ -1172,7 +1192,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.57</span>
+    <span id="wb-menu-version">v3.0.58</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" data-welt="beide" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" data-welt="beruf" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1190,6 +1210,11 @@
         <!-- Tagesheader -->
         <div id="ts-tagesheader"></div>
         <!-- Obere Hälfte: horizontal geteilt -->
+        <!-- Gateway Section -->
+        <div id="ts-gateway-wrap" style="display:none;flex-shrink:0;border-bottom:1.5px solid var(--border);">
+          <div style="padding:5px 12px 3px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);display:flex;align-items:center;gap:6px;">🚪 Anstehende Gateways</div>
+          <div id="ts-gateway-list"></div>
+        </div>
         <div class="ts-split-top">
           <!-- Links 1/3: Kachel-Panel -->
           <div id="ts-kachel-panel">
@@ -1445,8 +1470,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.57',
-  APP_BUILD:   '20260627-2350',
+  APP_VERSION: '3.0.58',
+  APP_BUILD:   '20260628-1000',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1777,6 +1802,7 @@ const WB = {
 
   _tsRender() {
     this._tsRenderTagesheader();
+    this._gwRenderHeuteSection();
     this._tsRenderNotizenKompakt();
     this._tsRenderZeitband();
   },
@@ -3230,7 +3256,30 @@ const WB = {
       + '">\uD83D\uDD12 Vertraulich</button>'
       + '</div>';
 
+    // ── Gateway-Panel ──
+    let gwPanel = '';
+    if (l.isGateway) {
+      const _gwToday = this._dStr(new Date());
+      const _gwDate = l.gatewayDate || '';
+      const _gwFaellig = _gwDate && _gwDate <= _gwToday && (l.gatewayStatus||'offen') === 'offen';
+      const _gwDays = _gwDate ? Math.ceil((new Date(_gwDate)-new Date())/86400000) : null;
+      const _gwDayStr = _gwDays===null?'': _gwDays<0?' ('+Math.abs(_gwDays)+' Tage überfällig)': _gwDays===0?' (heute!)':' (noch '+_gwDays+' Tage)';
+      gwPanel = '<div class="nz-gateway-panel">';
+      gwPanel += '<div class="nz-gw-row"><span class="nz-gw-label">?? Prüfdatum</span><span class="nz-gw-value">' + this._esc(_gwDate||'–') + _gwDayStr + '</span></div>';
+      gwPanel += '<div class="nz-gw-row"><span class="nz-gw-label">⚖ Bedingung</span><span class="nz-gw-value">' + this._esc(l.gatewayCondition||'–') + '</span></div>';
+      gwPanel += '<div class="nz-gw-row"><span class="nz-gw-label">?? Konsequenz</span><span class="nz-gw-value">' + this._esc(l.gatewayConsequence||'–') + '</span></div>';
+      gwPanel += '<div class="nz-gw-status-btns">';
+      const _gwStati = ['offen','bestanden','abgebrochen'];
+      const _gwLbls = {offen:'Offen',bestanden:'Bestanden',abgebrochen:'Abgebrochen'};
+      const _gwCur = l.gatewayStatus || 'offen';
+      _gwStati.forEach(st => {
+        const cls = _gwCur===st ? ' active-'+st : '';
+        gwPanel += '<button class="nz-gw-status-btn'+cls+'" onclick="WB._gwSetStatus(\''+this._esc(l.id)+'\',\''+st+'\')">' + _gwLbls[st] + '</button>';
+      });
+      gwPanel += '</div></div>';
+    }
     const body = '<div style="display:flex;flex-direction:column;gap:0">'
+      + gwPanel
       + weltHtml
       + vertHtml
       + itemsH
@@ -3560,6 +3609,21 @@ const WB = {
       + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Deadline (optional)</label>'
       + '<input type="date" id="nz-e-deadline" class="wb-input" value="' + this._esc(l.deadline||'') + '">'
       + '</div>'
+      + '<div style="margin-top:10px;">'
+      + '<label class="wb-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">'
+      + '<input type="checkbox" id="nz-e-isgateway" style="width:16px;height:16px;accent-color:var(--accent);"'
+      + (l.isGateway ? ' checked' : '') + '>'
+      + '<span style="font-weight:800;">🚪 Gateway (strategischer Meilenstein)</span></label>'
+      + '</div>'
+      + '<div id="nz-gateway-fields"'
+      + (l.isGateway ? ' class="visible"' : '') + '>'
+      + '<div class="wb-input-group"><label class="wb-label">📅 Prüfdatum</label>'
+      + '<input type="date" id="nz-gw-date" class="wb-input" value="' + this._esc(l.gatewayDate||'') + '"></div>'
+      + '<div class="wb-input-group"><label class="wb-label">⚖ Bedingung (messbar)</label>'
+      + '<input type="text" id="nz-gw-condition" class="wb-input" placeholder="z.B. Gewicht < 98,0 kg" value="' + this._esc(l.gatewayCondition||'') + '"></div>'
+      + '<div class="wb-input-group"><label class="wb-label">🔴 Konsequenz bei Nichterreichen</label>'
+      + '<input type="text" id="nz-gw-consequence" class="wb-input" placeholder="z.B. Projekt beenden" value="' + this._esc(l.gatewayConsequence||'') + '"></div>'
+      + '</div>'
       + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Farbe</label>'
       + '<div class="nz-farb-row">'
       + this._NZ_COLORS.map(function(fc) {
@@ -3609,6 +3673,10 @@ const WB = {
     const gepinnt = document.getElementById('nz-e-gepinnt')?.checked || false;
     const farbe    = document.getElementById('nz-e-farbe')?.value || 'c-weiss';
     const deadline = document.getElementById('nz-e-deadline')?.value || '';
+    const isGateway   = document.getElementById('nz-e-isgateway')?.checked || false;
+    const gatewayDate  = document.getElementById('nz-gw-date')?.value || '';
+    const gatewayCondition  = document.getElementById('nz-gw-condition')?.value?.trim() || '';
+    const gatewayConsequence= document.getElementById('nz-gw-consequence')?.value?.trim() || '';
 
     if (!name) { this._toast('Bitte Namen eingeben'); return; }
     l.titel   = name;
@@ -3616,6 +3684,16 @@ const WB = {
     l.typ     = typ;
     l.farbe    = farbe;
     l.deadline = deadline || null;
+    l.isGateway         = isGateway || false;
+    if (isGateway) {
+      l.gatewayDate       = gatewayDate || null;
+      l.gatewayCondition  = gatewayCondition || '';
+      l.gatewayConsequence= gatewayConsequence || '';
+      if (!l.gatewayStatus) l.gatewayStatus = 'offen';
+    } else {
+      delete l.gatewayDate; delete l.gatewayCondition;
+      delete l.gatewayConsequence; delete l.gatewayStatus;
+    }
     l.gepinnt = gepinnt;
     l.updatedAt = this._now();
     if (zustand === 'archiv') {
@@ -5135,6 +5213,49 @@ const WB = {
     this._wkCloseModal();
     this._wkRender();
     this._toast('Knoten gelöscht');
+  },
+
+  // ── Gateway ───────────────────────────────────────────────────────
+  _gwSetStatus(listeId, status) {
+    const l = (this.db?.notizen||[]).find(x => x.id===listeId);
+    if (!l) return;
+    l.gatewayStatus = status;
+    l.updatedAt = this._now();
+    this.setDirty();
+    this._nzKachelListeId = listeId;
+    this._nzKachelRender();
+    this.renderNotizenTab();
+  },
+
+  _gwGetAll() {
+    return (this.db?.notizen||[])
+      .filter(n => !n.deleted && n.isGateway)
+      .sort((a,b) => (a.gatewayDate||'').localeCompare(b.gatewayDate||''));
+  },
+
+  _gwRenderHeuteSection() {
+    const gateways = this._gwGetAll().filter(n => {
+      const today = this._dStr(new Date());
+      const daysLeft = n.gatewayDate ? Math.ceil((new Date(n.gatewayDate)-new Date())/86400000) : 999;
+      return (n.gatewayStatus||'offen') === 'offen' && daysLeft <= 30;
+    });
+    const wrap = document.getElementById('ts-gateway-list');
+    if (!wrap) return;
+    if (!gateways.length) { wrap.style.display='none'; return; }
+    wrap.style.display = '';
+    const today = this._dStr(new Date());
+    wrap.innerHTML = gateways.map(n => {
+      const isFaellig = n.gatewayDate && n.gatewayDate <= today;
+      const daysLeft = n.gatewayDate ? Math.ceil((new Date(n.gatewayDate)-new Date())/86400000) : null;
+      const dstr = daysLeft===null?'': daysLeft<0?' • '+Math.abs(daysLeft)+' Tage überfällig': daysLeft===0?' • heute!':' • noch '+daysLeft+' Tage';
+      return '<div class="ts-zt-row' + (isFaellig?' running':'') + '" onclick="WB._nzKachelOpen(\''+this._esc(n.id)+'\')" style="cursor:pointer;">'
+        + '<div class="ts-zt-time" style="font-size:11px;color:var(--faint);padding-top:6px;font-family:monospace;">' + (n.gatewayDate||'').slice(5).replace('-','.') + '</div>'
+        + '<div class="zt-b"></div>'
+        + '<div class="zt-body" style="padding:5px 0;">'
+        + '<div style="font-size:13px;font-weight:700;color:var(--text);">🚪 ' + this._esc(n.titel) + (isFaellig ? ' <span class="nz-gateway-badge faellig">Prüfen!</span>' : '') + '</div>'
+        + '<div style="font-size:11px;color:var(--faint);">' + this._esc(n.gatewayCondition||'') + dstr + '</div>'
+        + '</div></div>';
+    }).join('');
   },
 
   setDirty() {
