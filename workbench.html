@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.94</title>
+  <title>WorkBench 3.0.96</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1147,7 +1147,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.94</div>
+  <div id="wb-startup-tagline">v3.0.96</div>
 </div>
 
 <!-- Modal -->
@@ -1399,7 +1399,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.94</span>
+    <span id="wb-menu-version">v3.0.96</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1728,8 +1728,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.94',
-  APP_BUILD:   '20260628-0100',
+  APP_VERSION: '3.0.96',
+  APP_BUILD:   '20260628-0300',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2967,9 +2967,21 @@ const WB = {
     this.setDirty();
   },
 
-  _nzGwSetStatus(listeId, status, ctx) {
+  _nzGwSaveField(listeId, field, value, ctx) {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
-    l.gatewayStatus = status;
+    l[field] = value;
+    l.updatedAt = this._now();
+    clearTimeout(this._nzGwSaveTimer);
+    this._nzGwSaveTimer = setTimeout(() => {
+      this.setDirty();
+      // Badge in Header aktualisieren wenn nz-context
+      if (ctx === 'nz') this._nzDetailOpen(listeId, true);
+      this.renderNotizenTab();
+    }, 1000);
+  },
+  _nzGwSaveTimer: null,
+
+  _nzGwSetStatus(listeId, status, ctx) {
     l.updatedAt = this._now();
     this.setDirty();
     // Panel neu rendern
@@ -3022,6 +3034,7 @@ const WB = {
       + '<button class="nz-typ-btn active" onclick="document.querySelectorAll(\'.nz-typ-btn\').forEach(b=>b.classList.remove(\'active\'));this.classList.add(\'active\');WB._nzNeuTyp=\'check\'">Checkliste</button>'
       + '<button class="nz-typ-btn" onclick="document.querySelectorAll(\'.nz-typ-btn\').forEach(b=>b.classList.remove(\'active\'));this.classList.add(\'active\');WB._nzNeuTyp=\'liste\'">Aufz\u00e4hlung</button>'
       + '<button class="nz-typ-btn" onclick="document.querySelectorAll(\'.nz-typ-btn\').forEach(b=>b.classList.remove(\'active\'));this.classList.add(\'active\');WB._nzNeuTyp=\'freitext\'">Freitext</button>'
+      + '<button class="nz-typ-btn" onclick="document.querySelectorAll(\'.nz-typ-btn\').forEach(b=>b.classList.remove(\'active\'));this.classList.add(\'active\');WB._nzNeuTyp=\'gateway\'">&#x1F6A6; Gateway</button>'
       + '</div></div>';
     this._nzNeuTyp = 'check';
     this._modalCtx = 'nzNeu';
@@ -3031,6 +3044,22 @@ const WB = {
       + '</div>';
     this.modalOpen('Neue Liste', body, footer);
   },
+
+  _nzNeueListeSave() {
+    const name = document.getElementById('wb-nz-neu-titel')?.value?.trim();
+    if (!name) { this._toast('Bitte Titel eingeben'); return; }
+    const typ  = this._nzNeuTyp || 'check';
+    const icon = typ === 'gateway' ? 'gateway' : 'note';
+    if (!this.db.notizen) this.db.notizen = [];
+    const neuerZustand = (this._nzZustand === 'alle' || this._nzZustand === 'archiv' || this._nzZustand === 'gateway') ? undefined : this._nzZustand;
+    const neueNotiz = { id:'nz_'+Date.now(), titel:name, icon, typ, farbe:'c-weiss', items:[], gepinnt:false, updatedAt:this._now() };
+    if (neuerZustand) neueNotiz.zustand = neuerZustand;
+    if (typ === 'gateway') neueNotiz.gatewayStatus = 'offen';
+    this.db.notizen.push(neueNotiz);
+    this.setDirty(); this.modalClose(); this.renderNotizenTab();
+    this._toast('✓ ' + (typ === 'gateway' ? 'Gateway' : 'Liste') + ' erstellt');
+  },
+
   // ── Notizen-Tab ──────────────────────────────────────
 
   _NZ_COLORS: ['c-gelb','c-gruen','c-blau','c-rosa','c-lila','c-tuerkis','c-weiss'],
@@ -3178,6 +3207,7 @@ const WB = {
       idea:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
       gift:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>',
       note:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+      gateway: '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="22"/></svg>',
       pin:     '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
       // Neue Icons
       star:    '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' + st + '><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
@@ -4033,7 +4063,9 @@ const WB = {
       const gsColors = { open:'#2980B9', overdue:'#C0392B', done:'#27AE60', aborted:'#999' };
       const gsLabels = { open:'Offen', overdue:'⚠ Fällig!', done:'✅ Erreicht', aborted:'❌ Abgebrochen' };
       const accentColor = gsColors[gs] || '#2980B9';
-      const gwId = 'gw-body-' + this._esc(listeId);
+      const gwId  = 'gw-body-' + this._esc(listeId);
+      const inpS  = 'width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;font-family:var(--font);background:var(--surface);color:var(--text);outline:none;margin-top:3px;';
+      const lbl   = (txt) => '<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--faint);letter-spacing:.06em;margin-top:8px;">' + txt + '</div>';
       gwSection = '<div style="border:1.5px solid ' + accentColor + ';border-radius:8px;margin-bottom:8px;overflow:hidden;">'
         + '<button onclick="var b=document.getElementById(\'' + gwId + '\');b.style.display=b.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'.gw-arrow\').textContent=b.style.display===\'none\'?\'▶\':\'▼\';"'
         + ' style="width:100%;display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:' + accentColor + '18;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:800;color:' + accentColor + ';">'
@@ -4042,14 +4074,23 @@ const WB = {
         + '<span style="margin-left:auto;font-size:11px;font-weight:700;padding:1px 7px;border-radius:8px;background:' + accentColor + '30;color:' + accentColor + ';">' + (gsLabels[gs]||'') + '</span>'
         + '</button>'
         + '<div id="' + gwId + '" style="display:none;padding:10px 14px;background:' + accentColor + '06;">'
-        + (l.gatewayCondition ? '<div style="margin-bottom:6px;"><span style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--faint);letter-spacing:.06em;">🎯 Bedingung</span><div style="font-size:13px;color:var(--text);margin-top:2px;">' + this._esc(l.gatewayCondition) + '</div></div>' : '')
-        + (l.gatewayConsequence ? '<div style="margin-bottom:6px;"><span style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--faint);letter-spacing:.06em;">⚡ Konsequenz</span><div style="font-size:13px;color:var(--text);margin-top:2px;">' + this._esc(l.gatewayConsequence) + '</div></div>' : '')
-        + '<div style="display:flex;gap:6px;margin-top:6px;">'
-        + ['offen','erreicht','abgebrochen'].map(s =>
-            '<button onclick="WB._nzGwSetStatus(\'' + this._esc(listeId) + '\',\'' + s + '\',\'' + ctx + '\')" style="padding:4px 12px;border-radius:8px;border:1.5px solid ' + (l.gatewayStatus===s||(!l.gatewayStatus&&s==='offen')?accentColor:'var(--border)') + ';background:' + (l.gatewayStatus===s||(!l.gatewayStatus&&s==='offen')?accentColor+'20':'none') + ';font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);color:' + (l.gatewayStatus===s||(!l.gatewayStatus&&s==='offen')?accentColor:'var(--muted)') + ';">'
-            + (s==='offen'?'Offen':s==='erreicht'?'✅ Erreicht':'❌ Abgebrochen')
-            + '</button>'
-          ).join('')
+        // Bedingung — editierbar
+        + lbl('🎯 Bedingung (messbar)')
+        + '<input style="' + inpS + '" placeholder="z.B. Gewicht &lt; 98,0 kg" value="' + this._esc(l.gatewayCondition||'') + '"'
+        + ' oninput="WB._nzGwSaveField(\'' + this._esc(listeId) + '\',\'gatewayCondition\',this.value,\'' + ctx + '\')">'
+        // Konsequenz — editierbar
+        + lbl('⚡ Konsequenz bei Nichterreichen')
+        + '<input style="' + inpS + '" placeholder="z.B. Projekt beenden" value="' + this._esc(l.gatewayConsequence||'') + '"'
+        + ' oninput="WB._nzGwSaveField(\'' + this._esc(listeId) + '\',\'gatewayConsequence\',this.value,\'' + ctx + '\')">'
+        // Status-Buttons
+        + lbl('Status')
+        + '<div style="display:flex;gap:6px;margin-top:5px;">'
+        + ['offen','erreicht','abgebrochen'].map(s => {
+            const isActive = l.gatewayStatus===s || (!l.gatewayStatus && s==='offen');
+            return '<button onclick="WB._nzGwSetStatus(\'' + this._esc(listeId) + '\',\'' + s + '\',\'' + ctx + '\')" style="padding:4px 12px;border-radius:8px;border:1.5px solid ' + (isActive?accentColor:'var(--border)') + ';background:' + (isActive?accentColor+'20':'none') + ';font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);color:' + (isActive?accentColor:'var(--muted)') + ';">'
+              + (s==='offen'?'Offen':s==='erreicht'?'✅ Erreicht':'❌ Abgebrochen')
+              + '</button>';
+          }).join('')
         + '</div>'
         + '</div>'
         + '</div>';
@@ -4910,7 +4951,7 @@ const WB = {
         + 'ontouchend="WB._nzLongPressEnd()" ontouchmove="WB._nzLongPressEnd()" '
         + 'onclick="WB._nzKachelOpen(\'' + this._esc(l.id) + '\')" id="nzg-' + this._esc(l.id) + '" style="position:relative">'
         + '<div class="nz-postit-hdr">'
-        + '<span class="nz-postit-icon">' + (l.icon ? this._nzSvgIcon(l.icon, 14) : (l.typ==='gateway' ? '🚦' : '📝')) + '</span>'
+        + '<span class="nz-postit-icon">' + (l.typ==='gateway' ? this._nzSvgIcon('gateway', 14) : (l.icon ? this._nzSvgIcon(l.icon, 14) : '📝')) + '</span>'
         + '<span class="nz-postit-title">' + this._esc(l.titel) + '</span>'
         + pinHtml
         + '<span class="nz-postit-cnt' + (l.typ==='check'?' nz-check-pill':'') + '">' + cntLbl + '</span>'
@@ -5765,9 +5806,11 @@ const WB = {
       l.gatewayCondition   = document.getElementById('nz-gw-condition')?.value   || '';
       l.gatewayConsequence = document.getElementById('nz-gw-consequence')?.value || '';
       l.gatewayStatus      = document.getElementById('nz-gw-status')?.value      || 'offen';
+      if (!l.icon || l.icon === 'note') l.icon = 'gateway'; // Auto-Icon
     } else {
       delete l.gatewayDate; delete l.gatewayCondition;
       delete l.gatewayConsequence; delete l.gatewayStatus;
+      if (l.icon === 'gateway') l.icon = 'note'; // Icon zurücksetzen wenn kein Gateway mehr
     }
     l.updatedAt = this._now();
     if (zustand === 'archiv') {
