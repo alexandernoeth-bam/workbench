@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.1.08</title>
+  <title>WorkBench 3.1.09</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1287,7 +1287,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.1.08</div>
+  <div id="wb-startup-tagline">v3.1.09</div>
 </div>
 
 <!-- Modal -->
@@ -1539,7 +1539,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.1.08</span>
+    <span id="wb-menu-version">v3.1.09</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1866,8 +1866,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.1.08',
-  APP_BUILD:   '20260629-1500',
+  APP_VERSION: '3.1.09',
+  APP_BUILD:   '20260629-1600',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2206,9 +2206,10 @@ const WB = {
   _ckDateBadge(dateStr) {
     if (!dateStr) return '';
     const today = this._dStr(new Date());
-    if (dateStr < today) return '<span class="ck-date-badge red">Überfällig</span>';
-    if (dateStr === today) return '<span class="ck-date-badge">Heute</span>';
-    return '<span class="ck-date-badge">' + dateStr.slice(5).replace('-','.') + '</span>';
+    const fmt = s => { const [y,m,d]=s.split('-'); return d+'.'+m+'.'+y; };
+    if (dateStr < today) return '<span class="ck-date-badge red">'+fmt(dateStr)+'</span>';
+    if (dateStr === today) return '<span class="ck-date-badge" style="background:rgba(0,130,138,.1);color:#00828a;">Heute</span>';
+    return '<span class="ck-date-badge">'+fmt(dateStr)+'</span>';
   },
 
   // ── Säule 1: Themen-Radar ────────────────────────────
@@ -2278,14 +2279,20 @@ const WB = {
       ? '<div class="ck-task-list">'+aufgaben.slice(0,8).map(i => {
           const s=i.status??(i.done?2:0);
           const sub=(i.subitems||[]).filter(si=>!si.deleted);
-          const subH=sub.length
-            ? '<div class="ck-subtasks">'+sub.map(si=>{
+          const hasToggle = sub.length > 0;
+          const toggleId  = 'ck-sub-' + l.id + '-' + i.id;
+          const toggleBtn = hasToggle
+            ? '<span class="ck-toggle-sub" onclick="(function(el){var d=document.getElementById(\''+toggleId+'\');d.style.display=d.style.display===\'none\'?\'\':\'none\';el.textContent=d.style.display===\'none\'?\'▶\':\'▼\';})(this)" style="font-size:9px;color:#64748b;cursor:pointer;padding:0 3px;flex-shrink:0;">▼</span>'
+            : '<span style="width:14px;flex-shrink:0;"></span>';
+          const subH = sub.length
+            ? '<div class="ck-subtasks" id="'+toggleId+'">'+sub.map(si=>{
                 const ss=si.status??(si.done?2:0);
                 return '<div class="ck-task-row">'+this._ckCbHtml('notiz-subitem',l.id+'__'+i.id+'__'+si.id,ss)
                   +'<span class="ck-task-text'+(ss===2?' done-text':'')+'">'+this._esc(si.text)+'</span></div>';
               }).join('')+'</div>'
             : '';
-          return '<div style="margin-bottom:2px;"><div class="ck-task-row'+(i.deadline&&i.deadline<today?' overdue':'')+(i.deadline===today?' today-task':'')+'"><div>'+this._ckCbHtml('notiz-item',l.id+'__'+i.id,s)+'</div>'
+          return '<div style="margin-bottom:4px;">'
+            +'<div class="ck-task-row'+(i.deadline&&i.deadline<today?' overdue':'')+(i.deadline===today?' today-task':'')+'"><div style="display:flex;align-items:center;">'+toggleBtn+this._ckCbHtml('notiz-item',l.id+'__'+i.id,s)+'</div>'
             +'<div style="flex:1"><span class="ck-task-text'+(s===2?' done-text':'')+'">'+this._esc(i.text)+'</span>'
             +(i.deadline?this._ckDateBadge(i.deadline):'')+'</div></div>'+subH+'</div>';
         }).join('')+(aufgaben.length>8?'<div class="ck-empty-msg">+ '+(aufgaben.length-8)+' weitere</div>':'')+'</div>'
@@ -2293,8 +2300,14 @@ const WB = {
     const freitextRaw=(l.inhalt||'').replace(/<[^>]+>/g,'').trim().slice(0,300);
     const notizBody=freitextRaw?'<div class="ck-freitext">'+this._esc(freitextRaw)+'</div>':'<div class="ck-empty-msg">Kein Freitext</div>';
     const _ckHdrClick = 'WB.tabSwitch(\'notizen\');WB._nzDetailOpen(\'' + id + '\')';
-    return '<div class="ck-theme-card '+prioCls+'">'
+    return '<div class="ck-theme-card '+prioCls+'">'  
+      // Header — klickbar
       +'<div class="ck-theme-hdr" onclick="'+_ckHdrClick+'">'
+      +'<span class="ck-theme-title">'+this._esc(l.titel)+'</span>'
+      +this._ckPillHtml(statusLabel, l.themaStatus==='aktiv')
+      +'</div>'
+      // Sektionen vertikal AUSSERHALB des Headers
+      +'<div class="ck-subsections">'
       +'<details class="ck-section"><summary class="ck-sec-hdr"><span>Gateways</span>'+gwPill+'</summary><div class="ck-sec-body">'+gwBody+'</div></details>'
       +'<details class="ck-section"><summary class="ck-sec-hdr"><span>Termine</span>'
       +this._ckPillHtml(termineHeute.length?termineHeute.length+' heute':termineAlle.length?termineAlle.length+' gesamt':'keine',termineHeute.length>0)
@@ -2303,7 +2316,8 @@ const WB = {
       +this._ckPillHtml(offenCnt+'/'+aufgaben.length,offenCnt>0)+'</summary><div class="ck-sec-body">'+aufgabenBody+'</div></details>'
       +'<details class="ck-section"><summary class="ck-sec-hdr"><span>Notizen</span>'
       +this._ckPillHtml(freitextRaw?'Inhalt vorhanden':'leer',false)+'</summary><div class="ck-sec-body">'+notizBody+'</div></details>'
-      +'</div></div>';
+      +'</div>'
+      +'</div>';
   },
 
   // ── Säule 2: Tages-Radar ─────────────────────────────
@@ -3905,6 +3919,18 @@ const WB = {
     this.renderNotizenTab();
   },
 
+  _nzCtxSetThema(listeId, themaId) {
+    this._nzCtxClose();
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    l.themaId = themaId || null;
+    l.updatedAt = this._now();
+    this.setDirty();
+    this.renderNotizenTab();
+    if (this.activeTab === 'tagessicht') this._ckRenderAll();
+    const thema = themaId ? (this.db?.notizen||[]).find(x => x.id === themaId) : null;
+    this._toast(thema ? '🎯 Zugeordnet: ' + thema.titel : 'Thema entfernt');
+  },
+
   _nzCtxSetThemaPrio(listeId, prio) {
     this._nzCtxClose();
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
@@ -4279,6 +4305,20 @@ const WB = {
         + '<div class="nz-ctx-sep"></div>'
         + '<button class="nz-ctx-btn danger" onclick="WB._nzCtxDelete(\'' + id + '\')">🗑 Löschen</button>';
     } else {
+      // Thema-Zuordnung: alle vorhandenen Themen anbieten
+      const themen = (this.db?.notizen||[]).filter(x => !x.deleted && x.typ==='thema')
+        .sort((a,b) => ((a.themaPrio||9)-(b.themaPrio||9)));
+      const curThemaId = l.themaId || null;
+      const themaSection = themen.length
+        ? '<div class="nz-ctx-section" style="margin-top:4px;">🎯 Thema zuordnen</div>'
+          + themen.map(t =>
+              '<button class="nz-ctx-btn' + (curThemaId===t.id?' is-current':'') + '" onclick="WB._nzCtxSetThema(\'' + id + '\',\'' + this._esc(t.id) + '\')">'
+              + '▸ ' + this._esc(t.titel.slice(0,28))
+              + '</button>'
+            ).join('')
+          + (curThemaId ? '<button class="nz-ctx-btn" onclick="WB._nzCtxSetThema(\'' + id + '\',\'\')">✕ Kein Thema</button>' : '')
+          + '<div class="nz-ctx-sep"></div>'
+        : '';
       menu.innerHTML =
         '<div class="nz-ctx-section">Zustand</div>'
         + ['eingang','aktuell','parkplatz','kompass','archiv'].map(z =>
@@ -4287,6 +4327,7 @@ const WB = {
             + '</button>'
           ).join('')
         + '<div class="nz-ctx-sep"></div>'
+        + themaSection
         + '<div class="nz-ctx-section">Sortierung</div>'
         + '<button class="nz-ctx-btn" onclick="WB._nzCtxMove(\'' + id + '\',-1)">↑ Nach oben</button>'
         + '<button class="nz-ctx-btn" onclick="WB._nzCtxMove(\'' + id + '\',1)">↓ Nach unten</button>'
@@ -4758,7 +4799,7 @@ const WB = {
         + '<span class="hb-txt' + (isDone ? ' done' : '') + '"'
           + ' ondblclick="WB._nzHybridItemEdit(this,\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\',\'' + ctx + '\')">'
           + this._esc(i.text) + '</span>'
-        + (i.deadline ? '<span class="hb-item-deadline' + (i.deadline < this._dStr(new Date()) ? ' red' : '') + '" onclick="WB._nzItemDeadlineEdit(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\',event)">' + i.deadline.slice(5).replace('-','.') + '</span>' : '<span class="hb-add-sub-btn" onclick="WB._nzItemDeadlineEdit(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\',event)" title="Datum">📅</span>')
+        + (i.deadline ? '<span class="hb-item-deadline' + (i.deadline < this._dStr(new Date()) ? ' red' : '') + '" onclick="WB._nzItemDeadlineEdit(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\',event)">' + (d=>{const[y,m,dd]=d.split('-');return dd+'.'+m+'.'+y;})(i.deadline) + '</span>' : '<span class="hb-add-sub-btn" onclick="WB._nzItemDeadlineEdit(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\',event)" title="Datum">📅</span>')
         + (l.typ==='thema' ? '<span class="hb-add-sub-btn" onclick="WB._nzSubitemAddRow(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\',\'' + ctx + '\')" title="Unteraufgabe">⤷</span>' : '')
         + '<span class="hb-del" onclick="event.stopPropagation();WB.' + delFn + '(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')">×</span>'
         + '</div>'
