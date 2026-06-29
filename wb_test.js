@@ -1235,6 +1235,34 @@ terminOpenIdx >= 0
 
 if (f45Fail === 0) ok(f45Ok + ' Notizen/Termine/Tagesansicht Checks bestanden');
 
+// ── Kategorie 47: Archiv-Zustand Konsistenz ──────────────────────────────────
+console.log('\n── 47. Archiv-Zustand Konsistenz ──');
+let f47Ok = 0, f47Fail = 0;
+
+// _nzBearbeitenSpeichern darf für archiv NICHT _softDelete verwenden
+const speichernIdx = content.indexOf('_nzBearbeitenSpeichern(listeId)');
+const speichernSrc = speichernIdx >= 0 ? content.slice(speichernIdx, speichernIdx+1500) : '';
+const archivBlockIdx = speichernSrc.indexOf("zustand === 'archiv'");
+const archivBlock = archivBlockIdx >= 0 ? speichernSrc.slice(archivBlockIdx, archivBlockIdx+200) : '';
+!archivBlock.includes('_softDelete')
+  ? (ok('_nzBearbeitenSpeichern: kein _softDelete für archiv'), f47Ok++)
+  : (fail('_nzBearbeitenSpeichern: nutzt noch _softDelete für archiv — Bug!'), f47Fail++);
+
+// _nzSetZustandItem muss l.zustand='archiv' setzen, nicht deleted=true
+const sziIdx = content.indexOf('_nzSetZustandItem(listeId, zustand) {');
+const sziSrc = sziIdx >= 0 ? content.slice(sziIdx, sziIdx+400) : '';
+sziSrc.includes("'archiv'") && sziSrc.includes('l.zustand')
+  ? (ok('_nzSetZustandItem: setzt zustand=archiv korrekt'), f47Ok++)
+  : (fail('_nzSetZustandItem: setzt zustand=archiv NICHT'), f47Fail++);
+
+// _nzGetListen archiv-Zweig muss !l.deleted && l.zustand==='archiv' filtern
+const glSrc = content.slice(content.indexOf('_nzGetListen() {'), content.indexOf('_nzGetListen() {') + 2000);
+glSrc.includes("!l.deleted && l.zustand === 'archiv'")
+  ? (ok('_nzGetListen: archiv-Filter korrekt'), f47Ok++)
+  : (fail('_nzGetListen: archiv-Filter fehlt'), f47Fail++);
+
+if (f47Fail === 0) ok(f47Ok + ' Archiv-Konsistenz Checks bestanden');
+
 // ERGEBNIS
 // ══════════════════════════════════════════
 console.log('\n═══════════════════════════════════════════');
@@ -1252,3 +1280,4 @@ if (errors.length > 0) {
   console.log('\n→ Alle Tests bestanden. Datei kann hochgeladen werden.');
   process.exit(0);
 }
+
