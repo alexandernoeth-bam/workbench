@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.98</title>
+  <title>WorkBench 3.0.99</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1149,7 +1149,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.98</div>
+  <div id="wb-startup-tagline">v3.0.99</div>
 </div>
 
 <!-- Modal -->
@@ -1401,7 +1401,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.98</span>
+    <span id="wb-menu-version">v3.0.99</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1735,8 +1735,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.98',
-  APP_BUILD:   '20260628-1100',
+  APP_VERSION: '3.0.99',
+  APP_BUILD:   '20260628-1200',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -7459,6 +7459,17 @@ const WB = {
         l.gepinnt = false; l.heutePin = false; l.heutePinDate = null;
       }
     });
+      // Migration: Auto-Farbe für bestehende Notizen (einmalig, nur wenn farbeManual nicht gesetzt)
+      const _farbeMigKey = 'autoFarbeMigDone_v1';
+      const _farbeMigDone = await this.idbGet('meta', _farbeMigKey).catch(() => null);
+      if (!_farbeMigDone) {
+        let changed = 0;
+        (this.db.notizen||[]).forEach(l => {
+          if (!l.farbeManual) { this._nzAutoFarbe(l); changed++; }
+        });
+        if (changed > 0) { console.log('[migration] Auto-Farbe auf', changed, 'Notizen gesetzt'); }
+        await this.idbSet('meta', _farbeMigKey, 'true').catch(() => {});
+      }
       await this._migrate_v2();
       this._syncLastDownload = Date.now();
       await this.idbSave();
