@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.1.07</title>
+  <title>WorkBench 3.1.08</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1287,7 +1287,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.1.07</div>
+  <div id="wb-startup-tagline">v3.1.08</div>
 </div>
 
 <!-- Modal -->
@@ -1539,7 +1539,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.1.07</span>
+    <span id="wb-menu-version">v3.1.08</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1866,8 +1866,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.1.07',
-  APP_BUILD:   '20260629-1400',
+  APP_VERSION: '3.1.08',
+  APP_BUILD:   '20260629-1500',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2292,7 +2292,6 @@ const WB = {
       : '<div class="ck-empty-msg">Keine Aufgaben <span onclick="WB.tabSwitch(&quot;notizen&quot;);WB._nzDetailOpen(&quot;'+id+'&quot;)" style="color:#00828a;cursor:pointer;">→ Bearbeiten</span></div>';
     const freitextRaw=(l.inhalt||'').replace(/<[^>]+>/g,'').trim().slice(0,300);
     const notizBody=freitextRaw?'<div class="ck-freitext">'+this._esc(freitextRaw)+'</div>':'<div class="ck-empty-msg">Kein Freitext</div>';
-    return '<div class="ck-theme-card '+prioCls+'">'
     const _ckHdrClick = 'WB.tabSwitch(\'notizen\');WB._nzDetailOpen(\'' + id + '\')';
     return '<div class="ck-theme-card '+prioCls+'">'
       +'<div class="ck-theme-hdr" onclick="'+_ckHdrClick+'">'
@@ -4838,11 +4837,13 @@ const WB = {
       { k:'c-weiss',  bg:'#fff',    border:'#C8D0D8' },
     ];
     const curFarbe = l.farbe || 'c-weiss';
-    const farbDots = farbMap.map(f =>
-      '<div class="nz-dp-farb-dot' + (curFarbe === f.k ? ' active' : '') + '"'
-      + ' style="background:' + f.bg + ';border-color:' + (curFarbe === f.k ? '#1A1F24' : 'transparent') + ';border-width:' + (curFarbe === f.k ? '2px' : '1.5px') + ';border-style:solid;"'
-      + ' onclick="WB._nzDetailSetFarbe(\'' + id + '\',\'' + f.k + '\')"></div>'
-    ).join('');
+    // farbDots entfernt (kein Farbpicker mehr) — zustandSel stattdessen
+    const zustandOpts = ['eingang','aktuell','parkplatz','kompass','archiv'];
+    const zustandLabels = { eingang:'Eingang', aktuell:'Aktuell', parkplatz:'Im Blick', kompass:'Handakten', archiv:'Archiv' };
+    const curZustand = l.zustand || 'aktuell';
+    const zustandSel = '<select class="wb-select" style="font-size:12px;padding:2px 6px;" onchange="WB._nzSetZustandItem(\'' + id + '\',this.value);this.blur();">'
+      + zustandOpts.map(z => '<option value="' + z + '"' + (curZustand===z?' selected':'') + '>' + (zustandLabels[z]||z) + '</option>').join('')
+      + '</select>';
 
     const curWelt = l.welt || 'beide';
     const weltBtns = ['beide','beruf','privat'].map(w =>
