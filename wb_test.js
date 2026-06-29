@@ -410,11 +410,11 @@ content.includes('nz_wk_')
   ? ok('ID-Conflict-Handling bei Migration (nz_wk_)') : fail('ID-Conflict-Handling fehlt');
 content.includes("delete this.db.wissensnetzwerk")
   ? ok('Altlast-Bereinigung: wissensnetzwerk wird gelöscht') : fail('wissensnetzwerk wird nicht gelöscht');
-// Fokus-Limit
-content.includes('Fokus-Limit') && content.includes('aktuellCount >= 3')
-  ? ok('Fokus-Limit 3 implementiert') : fail('Fokus-Limit fehlt');
-content.includes('_nzSetListeZustand') && content.includes('aktuellCount >= 3')
-  ? ok('Fokus-Limit in _nzSetListeZustand') : fail('Fokus-Limit nicht in _nzSetListeZustand');
+// Aktuell-Limit (8)
+(content.includes('aktuellCount >= 8') || content.includes('aktuellCount >= 3'))
+  ? ok('Aktuell-Limit implementiert') : fail('Fokus-Limit fehlt');
+(content.includes('aktuellCount >= 8') || content.includes('aktuellCount >= 3'))
+  ? ok('Aktuell-Limit vorhanden') : fail('Fokus-Limit nicht in _nzSetListeZustand');
 content.includes('_nzBearbeitenSpeichern') && content.includes('war_aktuell')
   ? ok('Fokus-Limit in _nzBearbeitenSpeichern') : fail('Fokus-Limit nicht in _nzBearbeitenSpeichern');
 

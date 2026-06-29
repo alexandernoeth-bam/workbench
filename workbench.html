@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.96</title>
+  <title>WorkBench 3.0.97</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -392,6 +392,8 @@
     .ts-th-datum { font-size: 14px; color: var(--muted); }
     .ts-th-kw { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
     .ts-th-sondertag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(241,196,15,.18); color: #856404; border: 1px solid rgba(241,196,15,.4); }
+    .ts-th-inbox { font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 10px; background: rgba(10,107,94,.12); color: var(--accent); border: 1.5px solid var(--accent); cursor: pointer; transition: background .1s; }
+    .ts-th-inbox:hover { background: var(--accent); color: #fff; }
     /* Mobile: Links Wochentag+Datum, rechts KW+Sondertag */
     .ts-th-left { display: flex; flex-direction: column; gap: 1px; flex: 1; }
     .ts-th-right { display: flex; align-items: center; gap: 6px; }
@@ -1147,7 +1149,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.96</div>
+  <div id="wb-startup-tagline">v3.0.97</div>
 </div>
 
 <!-- Modal -->
@@ -1399,7 +1401,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.96</span>
+    <span id="wb-menu-version">v3.0.97</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1480,6 +1482,10 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
               Alle <span class="nz-sb-badge" id="nz-cnt-alle"></span>
             </button>
+            <button class="nz-sb-btn" data-zustand="eingang" onclick="WB._nzSetZustand('eingang')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+              Eingang <span class="nz-sb-badge" id="nz-cnt-eingang"></span>
+            </button>
             <button class="nz-sb-btn" data-zustand="aktuell" onclick="WB._nzSetZustand('aktuell')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
               Aktuell <span class="nz-sb-badge" id="nz-cnt-aktuell"></span>
@@ -1546,7 +1552,8 @@
         <div id="nz-main">
           <!-- Mobile Filter-Chips (nur auf Pixel sichtbar) -->
           <div id="nz-mobile-filter">
-            <button class="nz-mf-chip active" data-zustand="alle" onclick="WB._nzMfSetZustand('alle')">Alle</button>
+            <button class="nz-mf-chip active" data-zustand="alle"    onclick="WB._nzMfSetZustand('alle')">Alle</button>
+            <button class="nz-mf-chip"        data-zustand="eingang" onclick="WB._nzMfSetZustand('eingang')">📥 Eingang</button>
             <button class="nz-mf-chip"        data-zustand="aktuell" onclick="WB._nzMfSetZustand('aktuell')">Aktuell</button>
             <button class="nz-mf-chip"        data-zustand="parkplatz" onclick="WB._nzMfSetZustand('parkplatz')">Im Blick</button>
             <button class="nz-mf-chip"        data-zustand="kompass"   onclick="WB._nzMfSetZustand('kompass')">Handakten</button>
@@ -1728,8 +1735,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.96',
-  APP_BUILD:   '20260628-0300',
+  APP_VERSION: '3.0.97',
+  APP_BUILD:   '20260628-1000',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2079,10 +2086,19 @@ const WB = {
         + (sonder ? '<span class="ts-th-sondertag">' + (stL[sonder.typ]||sonder.typ) + (sonder.name?' '+this._esc(sonder.name):'') + '</span>' : '')
         + '</div>';
     } else {
+      // Eingang-Zähler (weltabhängig)
+      const welt = this.activeWorld;
+      const eingangCnt = (this.db?.notizen||[]).filter(l => {
+        if (l.deleted || l.zustand !== 'eingang') return false;
+        if (welt === 'beruf')  return l.welt === 'beruf'  || l.welt === 'pro';
+        if (welt === 'privat') return l.welt === 'privat' || l.welt === 'priv';
+        return true;
+      }).length;
       h += '<div class="ts-th-dot"></div><span class="ts-th-wochentag">' + wt + '</span>'
         + '<span class="ts-th-sep">\u00b7</span><span class="ts-th-datum">' + now.getDate() + '. ' + mN[now.getMonth()] + ' ' + now.getFullYear() + '</span>'
         + '<span class="ts-th-kw">KW ' + kw + '</span>'
-        + (sonder ? '<span class="ts-th-sondertag">' + (stL[sonder.typ]||sonder.typ) + (sonder.name?' '+this._esc(sonder.name):'') + '</span>' : '');
+        + (sonder ? '<span class="ts-th-sondertag">' + (stL[sonder.typ]||sonder.typ) + (sonder.name?' '+this._esc(sonder.name):'') + '</span>' : '')
+        + (eingangCnt > 0 ? '<button class="ts-th-inbox" onclick="WB.tabSwitch(\'notizen\');WB._nzSetZustand(\'eingang\')" title="Offene Eingang-Notizen">📥 Eingang ' + eingangCnt + '</button>' : '');
     }
     h += '</div>';
     el.innerHTML = h;
@@ -2886,7 +2902,7 @@ const WB = {
       const aktuellCount = (this.db?.notizen||[]).filter(n =>
         !n.deleted && (!n.zustand || n.zustand === 'aktuell') && n.id !== listeId
       ).length;
-      if (aktuellCount >= 3) {
+      if (aktuellCount >= 8) {
         this._toast('⚠ Fokus-Limit von 3 Kacheln erreicht. Bitte parke zuerst ein Thema.');
         return;
       }
@@ -2999,8 +3015,21 @@ const WB = {
     this._toast(status === 'erreicht' ? '✅ Gateway erreicht' : status === 'abgebrochen' ? '❌ Gateway abgebrochen' : '🚦 Gateway offen');
   },
 
+  // Auto-Farbe je Zustand (nur wenn farbeManual !== true)
+  _nzAutoFarbe(l) {
+    if (l.farbeManual) return; // Manuell gesetzt — nicht anfassen
+    const z = l.zustand || 'eingang';
+    const today = this._dStr(new Date());
+    // Rot: Fokus (gepinnt), Deadline überschritten, Gateway fällig/überfällig
+    const isRot = l.gepinnt
+      || (l.deadline && l.deadline <= today)
+      || (l.typ === 'gateway' && (l.gatewayStatus === 'offen') && l.deadline && l.deadline <= today);
+    if (isRot) { l.farbe = 'c-rosa'; return; }
+    const map = { eingang:'c-weiss', aktuell:'c-gelb', parkplatz:'c-gelb', kompass:'c-blau', archiv:'c-weiss' };
+    if (map[z]) l.farbe = map[z];
+  },
+
   _nzToggleGwFields() {
-    const typ = document.getElementById('nz-e-typ')?.value;
     const el  = document.getElementById('nz-gw-fields');
     if (el) el.classList.toggle('visible', typ === 'gateway');
   },
@@ -3051,10 +3080,10 @@ const WB = {
     const typ  = this._nzNeuTyp || 'check';
     const icon = typ === 'gateway' ? 'gateway' : 'note';
     if (!this.db.notizen) this.db.notizen = [];
-    const neuerZustand = (this._nzZustand === 'alle' || this._nzZustand === 'archiv' || this._nzZustand === 'gateway') ? undefined : this._nzZustand;
-    const neueNotiz = { id:'nz_'+Date.now(), titel:name, icon, typ, farbe:'c-weiss', items:[], gepinnt:false, updatedAt:this._now() };
-    if (neuerZustand) neueNotiz.zustand = neuerZustand;
+    const neuerZustand = (this._nzZustand === 'alle' || this._nzZustand === 'archiv' || this._nzZustand === 'gateway') ? 'eingang' : this._nzZustand;
+    const neueNotiz = { id:'nz_'+Date.now(), titel:name, icon, typ, farbe:'c-weiss', items:[], gepinnt:false, zustand: neuerZustand, updatedAt:this._now() };
     if (typ === 'gateway') neueNotiz.gatewayStatus = 'offen';
+    this._nzAutoFarbe(neueNotiz); // Auto-Farbe je Zustand
     this.db.notizen.push(neueNotiz);
     this.setDirty(); this.modalClose(); this.renderNotizenTab();
     this._toast('✓ ' + (typ === 'gateway' ? 'Gateway' : 'Liste') + ' erstellt');
@@ -3093,6 +3122,8 @@ const WB = {
     } else if (zustand === 'alle') {
       // Alle ohne Archiv und ohne deleted
       liste = this.db.notizen.filter(l => !l.deleted && l.zustand !== 'archiv');
+    } else if (zustand === 'eingang') {
+      liste = this.db.notizen.filter(l => !l.deleted && (l.zustand === 'eingang' || (!l.zustand && false)));
     } else if (zustand === 'archiv') {
       // Archiv: zustand='archiv' oder (alt: deleted=true)
       liste = this.db.notizen.filter(l => !l.deleted && l.zustand === 'archiv');
@@ -3265,6 +3296,9 @@ const WB = {
     const alleCount = db.notizen.filter(l => !l.deleted && weltOk(l)).length;
     const elAlle = document.getElementById('nz-cnt-alle');
     if (elAlle) elAlle.textContent = '(' + alleCount + ')';
+    const eingangCount = db.notizen.filter(l => !l.deleted && l.zustand === 'eingang' && weltOk(l)).length;
+    const elEingang = document.getElementById('nz-cnt-eingang');
+    if (elEingang) elEingang.textContent = '(' + eingangCount + ')';
     const gwCount = db.notizen.filter(l => !l.deleted && l.typ==='gateway' && weltOk(l)).length;
     const elGw = document.getElementById('nz-cnt-gateway');
     if (elGw) elGw.textContent = '(' + gwCount + ')';
@@ -3642,9 +3676,9 @@ const WB = {
 
     menu.innerHTML =
       '<div class="nz-ctx-section">Zustand</div>'
-      + ['aktuell','parkplatz','kompass','archiv'].map(z =>
+      + ['eingang','aktuell','parkplatz','kompass','archiv'].map(z =>
           '<button class="nz-ctx-btn' + (curZ===z?' is-current':'') + '" onclick="WB._nzCtxSetZustand(\'' + id + '\',\'' + z + '\')">'
-          + (z==='aktuell'?'✓ Aktuell':z==='parkplatz'?'👁 Im Blick':z==='kompass'?'📋 Handakten':'📦 Archiv')
+          + (z==='eingang'?'📥 Eingang':z==='aktuell'?'✓ Aktuell':z==='parkplatz'?'👁 Im Blick':z==='kompass'?'📋 Handakten':'📦 Archiv')
           + '</button>'
         ).join('')
       + '<div class="nz-ctx-sep"></div>'
@@ -4323,7 +4357,9 @@ const WB = {
 
   _nzDetailSetFarbe(listeId, farbe) {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
-    l.farbe = farbe; l.updatedAt = this._now(); this.setDirty();
+    l.farbe = farbe;
+    l.farbeManual = true; // Manuell gesetzt — Auto-Farbe deaktiviert
+    l.updatedAt = this._now(); this.setDirty();
     this._nzDetailOpen(listeId, true); this.renderNotizenTab();
   },
 
@@ -4717,21 +4753,20 @@ const WB = {
   _nzSetZustandItem(listeId, zustand) {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     if (zustand === 'archiv') {
-      // Archiv: zustand setzen, NICHT löschen — damit die Notiz noch geöffnet werden kann
       l.zustand    = 'archiv';
       l.deleted    = false;
-      // Pins beim Archivieren immer entfernen
       l.gepinnt    = false;
       l.heutePin   = false;
       l.heutePinDate = null;
     } else {
       l.deleted = false;
       if (zustand === 'aktuell') {
-        delete l.zustand; // aktuell = kein Merkmal
+        delete l.zustand;
       } else {
         l.zustand = zustand;
       }
     }
+    this._nzAutoFarbe(l); // Auto-Farbe nach Zustandswechsel
     l.updatedAt = this._now();
     this.setDirty();
     this.renderNotizenTab();
@@ -5786,7 +5821,7 @@ const WB = {
       const aktuellCount = (this.db?.notizen||[]).filter(n =>
         !n.deleted && (!n.zustand || n.zustand === 'aktuell') && n.id !== listeId
       ).length;
-      if (aktuellCount >= 3) {
+      if (aktuellCount >= 8) {
         this._toast('⚠ Fokus-Limit von 3 Kacheln erreicht. Bitte parke zuerst ein Thema.');
         return;
       }
