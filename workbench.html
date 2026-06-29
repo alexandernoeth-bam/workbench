@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.1.02</title>
+  <title>WorkBench 3.1.04</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -679,6 +679,9 @@
     .ts-ms-close { padding:4px 12px; border:1.5px solid var(--border); border-radius:6px; background:none; cursor:pointer; font-size:13px; font-weight:700; color:var(--muted); font-family:var(--font); }
     .ts-ms-body  { flex:1; overflow-y:auto; padding:8px 14px 80px; min-height:0; }
 
+    /* Thema-Notizen im Grid */
+    .nz-postit.nz-thema-card { border-left: 4px solid #00828a !important; }
+
     /* Gateway-Notizen */
     .nz-postit.gateway-open     { border-left: 4px solid #2980B9 !important; }
     .nz-postit.gateway-overdue  { border-left: 4px solid #C0392B !important; animation: gw-pulse 2s ease-in-out infinite; }
@@ -1229,7 +1232,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.1.02</div>
+  <div id="wb-startup-tagline">v3.1.04</div>
 </div>
 
 <!-- Modal -->
@@ -1481,7 +1484,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.1.02</span>
+    <span id="wb-menu-version">v3.1.04</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1564,6 +1567,9 @@
             </button>
             <button class="nz-sb-btn" data-zustand="gateway" onclick="WB._nzSetZustand('gateway')">
               🚦 Gateways <span class="nz-sb-badge" id="nz-cnt-gateway"></span>
+            </button>
+            <button class="nz-sb-btn" data-zustand="thema" onclick="WB._nzSetZustand('thema')">
+              🎯 Themen <span class="nz-sb-badge" id="nz-cnt-thema"></span>
             </button>
             <div class="nz-sb-sep" style="margin:4px 0;"></div>
             <button class="nz-sb-btn" data-filter="offene-checklisten" onclick="WB._nzToggleOffeneChecklisten()">
@@ -1795,8 +1801,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.1.02',
-  APP_BUILD:   '20260629-0900',
+  APP_VERSION: '3.1.04',
+  APP_BUILD:   '20260629-1100',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2102,6 +2108,13 @@ const WB = {
     } else if (type === 'event') {
       const e = (this.db?.customEvents||[]).find(x => x.id === id);
       if (e) { e.done = next===2; e.status = next; e.updatedAt = this._now(); }
+    } else if (type === 'notiz-subitem') {
+      // Format: notizenId__itemId__subitemId
+      const [nId, iId, sId] = id.split('__');
+      const l  = (this.db?.notizen||[]).find(x => x.id === nId);
+      const it = l && (l.items||[]).find(x => x.id === iId);
+      const si = it && (it.subitems||[]).find(x => x.id === sId);
+      if (si) { si.done = next===2; si.status = next; si.updatedAt = this._now(); }
     } else if (type === 'notiz-item') {
       const [nId, iId] = id.split('__');
       const l = (this.db?.notizen||[]).find(x => x.id === nId);
@@ -2140,30 +2153,22 @@ const WB = {
     if (!body) return;
     const today = this._dStr(new Date());
     const db = this.db||{};
-
     const themen = (db.notizen||[]).filter(l =>
-      !l.deleted && l.zustand !== 'archiv' && l.zustand !== 'eingang' && this._ckWeltOk(l)
-    );
+      !l.deleted && l.typ === 'thema' && l.zustand !== 'archiv' && this._ckWeltOk(l)
+    ).sort((a,b) => ((a.themaPrio||9)-(b.themaPrio||9)) || (a.titel||'').localeCompare(b.titel||''));
     if (cnt) cnt.textContent = '(' + themen.length + ')';
-
-    const prioCls = (l) => {
-      if (l.gepinnt) return 1;
-      if (!l.zustand || l.zustand==='aktuell') return 2;
-      if (l.zustand==='parkplatz') return 3;
-      return 4;
-    };
-    themen.sort((a,b) => prioCls(a)-prioCls(b));
-
-    if (!themen.length) { body.innerHTML='<div class="ck-empty-msg">Keine aktiven Themen</div>'; return; }
-
+    if (!themen.length) {
+      body.innerHTML = '<div class="ck-empty-msg" style="padding:20px;text-align:center;">🎯 Noch keine Themen<br><br><span onclick="WB._nzNeueListeDialog()" style="color:#00828a;cursor:pointer;font-weight:700;">+ Neues Thema erstellen</span></div>';
+      return;
+    }
     const groups = [
-      { label:'▲ Fokus & Aktuell', prios:[1,2], color:'#ef4444', cls:'prio-1' },
-      { label:'► Im Blick',        prios:[3],   color:'#f59e0b', cls:'prio-2' },
-      { label:'▼ Handakten',       prios:[4],   color:'#3b82f6', cls:'prio-3' },
+      { prio:1, label:'▲ PRIO 1 THEMEN', color:'#ef4444', cls:'prio-1' },
+      { prio:2, label:'► PRIO 2 THEMEN', color:'#f59e0b', cls:'prio-2' },
+      { prio:3, label:'▼ PRIO 3 THEMEN', color:'#3b82f6', cls:'prio-3' },
     ];
-    let h='';
+    let h = '';
     groups.forEach(g => {
-      const items = themen.filter(l => g.prios.includes(prioCls(l)));
+      const items = themen.filter(l => (l.themaPrio||2) === g.prio);
       if (!items.length) return;
       h += '<div class="ck-prio-title" style="color:'+g.color+'">'+g.label+' ('+items.length+')</div>';
       items.forEach(l => { h += this._ckThemeCard(l, today, g.cls); });
@@ -2172,51 +2177,69 @@ const WB = {
   },
 
   _ckThemeCard(l, today, prioCls) {
-    const id     = this._esc(l.id);
-    const items  = (l.items||[]).filter(i=>!i.deleted);
-    const offen  = items.filter(i=>!i.done).length;
-    const overdue = l.deadline && l.deadline < today;
-
-    let pill = overdue ? this._ckPillHtml('⚠ Überfällig', true)
-      : l.gepinnt ? this._ckPillHtml('★ Fokus', false)
-      : l.zustand==='parkplatz' ? this._ckPillHtml('Im Blick', false)
-      : l.zustand==='kompass'   ? this._ckPillHtml('Handakten', false)
-      : this._ckPillHtml('Aktuell', false);
-
-    const termineHeute = (this.db?.customEvents||[]).filter(e =>
-      !e.deleted && e.date===today && !e.isDeadline && this._ckWeltOk(e) &&
-      (e.themaId===l.id)
-    );
-
-    const aufgabenHtml = items.length
-      ? '<div class="ck-task-list">' + items.slice(0,7).map(i => {
-          const s = i.status ?? (i.done?2:0);
-          return '<div class="ck-task-row">'
-            + this._ckCbHtml('notiz-item', l.id+'__'+i.id, s)
-            + '<span class="ck-task-text'+(s===2?' done-text':'')+'">'+this._esc(i.text)+'</span>'
-            + '</div>';
-        }).join('') + (items.length>7?'<div class="ck-empty-msg">+ '+(items.length-7)+' weitere</div>':'') + '</div>'
-      : '<div class="ck-empty-msg">Keine Einträge</div>';
-
-    const freitextRaw = (l.inhalt||'').replace(/<[^>]+>/g,'').trim().slice(0,200);
-    const freitextHtml = freitextRaw
-      ? '<div class="ck-freitext">'+this._esc(freitextRaw)+'</div>'
-      : '<div class="ck-empty-msg">Kein Freitext</div>';
-
-    const termineHtml = termineHeute.length
-      ? termineHeute.map(e=>'<div style="font-size:11px;color:#64748b;">🕒 '+(e.startTime||'')+' '+this._esc(e.text||'')+'</div>').join('')
-      : '<div class="ck-empty-msg">Keine Termine heute</div>';
-
+    const id = this._esc(l.id);
+    const db = this.db||{};
+    const gateways     = (db.notizen||[]).filter(x => !x.deleted && x.typ==='gateway' && x.themaId===l.id);
+    const termineAlle  = (db.customEvents||[]).filter(e => !e.deleted && !e.storniert && e.themaId===l.id);
+    const termineHeute = termineAlle.filter(e => e.date===today);
+    const aufgaben     = (l.items||[]).filter(i => !i.deleted);
+    const offenCnt     = aufgaben.filter(i => !i.done).length;
+    const statusLabel  = { aktiv:'Aktiv', wartend:'Wartend', pausiert:'Pausiert' }[l.themaStatus||'aktiv']||'Aktiv';
+    const gwOverdue    = gateways.filter(g => this._nzGwStatus(g)==='overdue').length;
+    const gwNext       = gateways.filter(g=>g.deadline).sort((a,b)=>(a.deadline||'').localeCompare(b.deadline||''))[0];
+    const gwPill       = gwOverdue>0 ? this._ckPillHtml('⚠ GW fällig!',true)
+                       : gwNext ? this._ckPillHtml('GW1: '+gwNext.deadline.slice(5).replace('-','.'),false)
+                       : this._ckPillHtml('Kein Gateway',false);
+    const gwBody = gateways.length
+      ? gateways.map(g => {
+          const gs=this._nzGwStatus(g);
+          const gc={open:'#3b82f6',overdue:'#ef4444',done:'#00828a',aborted:'#94a3b8'}[gs]||'#94a3b8';
+          return '<div class="ck-task-row"><span style="width:8px;height:8px;border-radius:50%;background:'+gc+';flex-shrink:0;margin-top:4px;"></span>'
+            +'<span class="ck-task-text" style="font-size:12px;">'+this._esc(g.titel)
+            +(g.deadline?'<span class="ck-date-badge'+(g.deadline<today?' red':'')+'">'+g.deadline.slice(5).replace('-','.')+'</span>':'')
+            +'</span></div>';
+        }).join('')
+      : '<div class="ck-empty-msg">Keine Gateways</div>';
+    const termineBody = termineAlle.length
+      ? termineAlle.slice(0,5).map(e => {
+          const isT=e.date===today;
+          return '<div class="ck-task-row"><span style="font-size:11px;color:'+(isT?'#00828a':'#64748b')+';">🕒 '+(e.startTime?e.startTime+' ':'')+this._esc(e.text||'')
+            +(e.date&&!isT?' <span class="ck-date-badge">'+e.date.slice(5).replace('-','.')+'</span>':'')
+            +(isT?' <span class="ck-date-badge" style="background:rgba(0,130,138,.1);color:#00828a;">Heute</span>':'')
+            +'</span></div>';
+        }).join('')
+      : '<div class="ck-empty-msg">Keine Termine</div>';
+    const aufgabenBody = aufgaben.length
+      ? '<div class="ck-task-list">'+aufgaben.slice(0,8).map(i => {
+          const s=i.status??(i.done?2:0);
+          const sub=(i.subitems||[]).filter(si=>!si.deleted);
+          const subH=sub.length
+            ? '<div class="ck-subtasks">'+sub.map(si=>{
+                const ss=si.status??(si.done?2:0);
+                return '<div class="ck-task-row">'+this._ckCbHtml('notiz-subitem',l.id+'__'+i.id+'__'+si.id,ss)
+                  +'<span class="ck-task-text'+(ss===2?' done-text':'')+'">'+this._esc(si.text)+'</span></div>';
+              }).join('')+'</div>'
+            : '';
+          return '<div style="margin-bottom:2px;"><div class="ck-task-row'+(i.deadline&&i.deadline<today?' overdue':'')+(i.deadline===today?' today-task':'')+'"><div>'+this._ckCbHtml('notiz-item',l.id+'__'+i.id,s)+'</div>'
+            +'<div style="flex:1"><span class="ck-task-text'+(s===2?' done-text':'')+'">'+this._esc(i.text)+'</span>'
+            +(i.deadline?this._ckDateBadge(i.deadline):'')+'</div></div>'+subH+'</div>';
+        }).join('')+(aufgaben.length>8?'<div class="ck-empty-msg">+ '+(aufgaben.length-8)+' weitere</div>':'')+'</div>'
+      : '<div class="ck-empty-msg">Keine Aufgaben <span onclick="WB.tabSwitch(&quot;notizen&quot;);WB._nzDetailOpen(&quot;'+id+'&quot;)" style="color:#00828a;cursor:pointer;">→ Bearbeiten</span></div>';
+    const freitextRaw=(l.inhalt||'').replace(/<[^>]+>/g,'').trim().slice(0,300);
+    const notizBody=freitextRaw?'<div class="ck-freitext">'+this._esc(freitextRaw)+'</div>':'<div class="ck-empty-msg">Kein Freitext</div>';
     return '<div class="ck-theme-card '+prioCls+'">'
-      + '<div class="ck-theme-hdr" onclick="WB.tabSwitch(\'notizen\');WB._nzKachelOpen(\''+id+'\')">'
-      + '<span class="ck-theme-title">'+this._esc(l.titel)+'</span>'
-      + (l.deadline ? this._ckDateBadge(l.deadline) : '')
-      + pill + '</div>'
-      + '<div class="ck-subsections">'
-      + '<details class="ck-section"><summary class="ck-sec-hdr"><span>Termine</span>'+this._ckPillHtml(termineHeute.length?termineHeute.length+' heute':'keine',false)+'</summary><div class="ck-sec-body">'+termineHtml+'</div></details>'
-      + '<details class="ck-section"'+(items.length?' open':'')+'><summary class="ck-sec-hdr"><span>Aufgaben</span>'+this._ckPillHtml(offen+'/'+items.length, overdue&&offen>0)+'</summary><div class="ck-sec-body">'+aufgabenHtml+'</div></details>'
-      + '<details class="ck-section"><summary class="ck-sec-hdr"><span>Notiz</span>'+this._ckPillHtml(freitextRaw?'vorhanden':'leer',false)+'</summary><div class="ck-sec-body">'+freitextHtml+'</div></details>'
-      + '</div></div>';
+    const _ckHdrClick = 'WB.tabSwitch(\'notizen\');WB._nzDetailOpen(\'' + id + '\')';
+    return '<div class="ck-theme-card '+prioCls+'">'
+      +'<div class="ck-theme-hdr" onclick="'+_ckHdrClick+'">'
+      +'<details class="ck-section"><summary class="ck-sec-hdr"><span>Gateways</span>'+gwPill+'</summary><div class="ck-sec-body">'+gwBody+'</div></details>'
+      +'<details class="ck-section"><summary class="ck-sec-hdr"><span>Termine</span>'
+      +this._ckPillHtml(termineHeute.length?termineHeute.length+' heute':termineAlle.length?termineAlle.length+' gesamt':'keine',termineHeute.length>0)
+      +'</summary><div class="ck-sec-body">'+termineBody+'</div></details>'
+      +'<details class="ck-section"'+(aufgaben.length?' open':'')+'><summary class="ck-sec-hdr"><span>Aufgaben</span>'
+      +this._ckPillHtml(offenCnt+'/'+aufgaben.length,offenCnt>0)+'</summary><div class="ck-sec-body">'+aufgabenBody+'</div></details>'
+      +'<details class="ck-section"><summary class="ck-sec-hdr"><span>Notizen</span>'
+      +this._ckPillHtml(freitextRaw?'Inhalt vorhanden':'leer',false)+'</summary><div class="ck-sec-body">'+notizBody+'</div></details>'
+      +'</div></div>';
   },
 
   // ── Säule 2: Tages-Radar ─────────────────────────────
@@ -2231,11 +2254,20 @@ const WB = {
     const heute        = [];
     const routinen     = [];
 
-    // Notizen mit Deadline
+    // Notizen mit Deadline + Themen-Items mit Deadline
     (db.notizen||[]).filter(l => !l.deleted && this._ckWeltOk(l) && l.deadline).forEach(l => {
       const entry = { text:l.titel, source:l.titel, id:l.id, type:'notiz', date:l.deadline, status:l.status??0 };
       if (l.deadline === today) heute.push(entry);
       else if (l.deadline < today) ueberfaellig.push(entry);
+    });
+
+    // Themen-Aufgaben (items mit deadline)
+    (db.notizen||[]).filter(l => !l.deleted && l.typ==='thema' && this._ckWeltOk(l)).forEach(l => {
+      (l.items||[]).filter(i => !i.deleted && !i.done && i.deadline).forEach(i => {
+        const entry = { text:i.text, source:l.titel, id:l.id+'__'+i.id, type:'notiz-item', date:i.deadline, status:i.status??0 };
+        if (i.deadline === today) heute.push(entry);
+        else if (i.deadline < today) ueberfaellig.push(entry);
+      });
     });
 
     // HeutePin-Notizen (★ Heute)
@@ -3325,8 +3357,11 @@ const WB = {
   },
 
   _nzToggleGwFields() {
-    const el  = document.getElementById('nz-gw-fields');
-    if (el) el.classList.toggle('visible', typ === 'gateway');
+    const typ = document.getElementById('nz-e-typ')?.value;
+    const gw  = document.getElementById('nz-gw-fields');
+    const th  = document.getElementById('nz-thema-fields');
+    if (gw) gw.classList.toggle('visible', typ === 'gateway');
+    if (th) th.style.display = typ === 'thema' ? '' : 'none';
   },
 
   _nzGwStatus(l) {
@@ -3359,6 +3394,7 @@ const WB = {
       + '<button class="nz-typ-btn" onclick="document.querySelectorAll(\'.nz-typ-btn\').forEach(b=>b.classList.remove(\'active\'));this.classList.add(\'active\');WB._nzNeuTyp=\'liste\'">Aufz\u00e4hlung</button>'
       + '<button class="nz-typ-btn" onclick="document.querySelectorAll(\'.nz-typ-btn\').forEach(b=>b.classList.remove(\'active\'));this.classList.add(\'active\');WB._nzNeuTyp=\'freitext\'">Freitext</button>'
       + '<button class="nz-typ-btn" onclick="document.querySelectorAll(\'.nz-typ-btn\').forEach(b=>b.classList.remove(\'active\'));this.classList.add(\'active\');WB._nzNeuTyp=\'gateway\'">&#x1F6A6; Gateway</button>'
+      + '<button class="nz-typ-btn" onclick="document.querySelectorAll(\'.nz-typ-btn\').forEach(b=>b.classList.remove(\'active\'));this.classList.add(\'active\');WB._nzNeuTyp=\'thema\'">🎯 Thema</button>'
       + '</div></div>';
     this._nzNeuTyp = 'check';
     this._modalCtx = 'nzNeu';
@@ -3373,11 +3409,12 @@ const WB = {
     const name = document.getElementById('wb-nz-neu-titel')?.value?.trim();
     if (!name) { this._toast('Bitte Titel eingeben'); return; }
     const typ  = this._nzNeuTyp || 'check';
-    const icon = typ === 'gateway' ? 'gateway' : 'note';
+    const icon = typ === 'gateway' ? 'gateway' : typ === 'thema' ? 'target' : 'note';
     if (!this.db.notizen) this.db.notizen = [];
     const neuerZustand = (this._nzZustand === 'alle' || this._nzZustand === 'archiv' || this._nzZustand === 'gateway') ? 'eingang' : this._nzZustand;
     const neueNotiz = { id:'nz_'+Date.now(), titel:name, icon, typ, farbe:'c-weiss', items:[], gepinnt:false, zustand: neuerZustand, updatedAt:this._now() };
     if (typ === 'gateway') neueNotiz.gatewayStatus = 'offen';
+    if (typ === 'thema')   { neueNotiz.themaPrio = 2; neueNotiz.themaStatus = 'aktiv'; neueNotiz.inhalt = ''; }
     this._nzAutoFarbe(neueNotiz); // Auto-Farbe je Zustand
     this.db.notizen.push(neueNotiz);
     this.setDirty(); this.modalClose(); this.renderNotizenTab();
@@ -3426,10 +3463,13 @@ const WB = {
       const altArchiv = this.db.notizen.filter(l => !!l.deleted && !l.zustand);
       liste = [...liste, ...altArchiv];
     } else if (zustand === 'gateway') {
-      // Alle Gateways aller Zustände — chronologisch nach gatewayDate
       liste = this.db.notizen.filter(l => !l.deleted && l.typ === 'gateway');
-      liste = liste.sort((a,b) => (a.gatewayDate||'9999').localeCompare(b.gatewayDate||'9999'));
-      return liste; // Eigene Sortierung, kein weiteres Filtern
+      liste = liste.sort((a,b) => (a.gatewayDate||a.deadline||'9999').localeCompare(b.gatewayDate||b.deadline||'9999'));
+      return liste;
+    } else if (zustand === 'thema') {
+      liste = this.db.notizen.filter(l => !l.deleted && l.typ === 'thema');
+      liste = liste.sort((a,b) => ((a.themaPrio||9)-(b.themaPrio||9)));
+      return liste;
     } else if (zustand === 'aktuell') {
       liste = this.db.notizen.filter(l => !l.deleted && (!l.zustand || l.zustand === 'aktuell'));
     } else {
@@ -3595,6 +3635,9 @@ const WB = {
     const gwCount = db.notizen.filter(l => !l.deleted && l.typ==='gateway' && weltOk(l)).length;
     const elGw = document.getElementById('nz-cnt-gateway');
     if (elGw) elGw.textContent = '(' + gwCount + ')';
+    const thCount = db.notizen.filter(l => !l.deleted && l.typ==='thema' && weltOk(l)).length;
+    const elTh = document.getElementById('nz-cnt-thema');
+    if (elTh) elTh.textContent = '(' + thCount + ')';
   },
 
   _nzSetZustand(zustand) {
@@ -3633,6 +3676,25 @@ const WB = {
       b.classList.toggle('active', b.dataset.zeit === zeit)
     );
     this.renderNotizenTab();
+  },
+
+  _nzCtxSetThemaPrio(listeId, prio) {
+    this._nzCtxClose();
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    l.themaPrio = prio; l.updatedAt = this._now();
+    this.setDirty(); this.renderNotizenTab();
+    if (this.activeTab === 'tagessicht') this._ckRenderAll();
+    this._toast('Prio ' + prio + ' gesetzt');
+  },
+
+  _nzCtxSetThemaStatus(listeId, status) {
+    this._nzCtxClose();
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    l.themaStatus = status; l.updatedAt = this._now();
+    this.setDirty(); this.renderNotizenTab();
+    if (this.activeTab === 'tagessicht') this._ckRenderAll();
+    const labels = { aktiv:'Aktiv', wartend:'Wartend', pausiert:'Pausiert' };
+    this._toast('Status: ' + (labels[status]||status));
   },
 
   _nzClearTags() {
@@ -3962,24 +4024,48 @@ const WB = {
     const menu = document.getElementById('nz-ctx-menu');
     if (!menu) return;
 
-    // listeId direkt in Button-onclicks einbetten — kein State mehr nötig
     const id = this._esc(listeId);
     const l = (this.db?.notizen||[]).find(x => x.id === listeId);
     const curZ = l?.zustand || 'aktuell';
+    const isThema = l?.typ === 'thema';
 
-    menu.innerHTML =
-      '<div class="nz-ctx-section">Zustand</div>'
-      + ['eingang','aktuell','parkplatz','kompass','archiv'].map(z =>
-          '<button class="nz-ctx-btn' + (curZ===z?' is-current':'') + '" onclick="WB._nzCtxSetZustand(\'' + id + '\',\'' + z + '\')">'
-          + (z==='eingang'?'📥 Eingang':z==='aktuell'?'✓ Aktuell':z==='parkplatz'?'👁 Im Blick':z==='kompass'?'📋 Handakten':'📦 Archiv')
-          + '</button>'
-        ).join('')
-      + '<div class="nz-ctx-sep"></div>'
-      + '<div class="nz-ctx-section">Sortierung</div>'
-      + '<button class="nz-ctx-btn" onclick="WB._nzCtxMove(\'' + id + '\',-1)">↑ Nach oben</button>'
-      + '<button class="nz-ctx-btn" onclick="WB._nzCtxMove(\'' + id + '\',1)">↓ Nach unten</button>'
-      + '<div class="nz-ctx-sep"></div>'
-      + '<button class="nz-ctx-btn danger" onclick="WB._nzCtxDelete(\'' + id + '\')">🗑 Löschen</button>';
+    if (isThema) {
+      // Themen bekommen Prio-Menü statt Zustand-Menü
+      const curP = l.themaPrio || 2;
+      menu.innerHTML =
+        '<div class="nz-ctx-section">Priorität</div>'
+        + [1,2,3].map(p =>
+            '<button class="nz-ctx-btn' + (curP===p?' is-current':'') + '" onclick="WB._nzCtxSetThemaPrio(\'' + id + '\',' + p + ')">'
+            + (p===1?'▲ Prio 1':p===2?'► Prio 2':'▼ Prio 3')
+            + '</button>'
+          ).join('')
+        + '<div class="nz-ctx-section" style="margin-top:4px;">Status</div>'
+        + ['aktiv','wartend','pausiert'].map(s =>
+            '<button class="nz-ctx-btn' + ((l.themaStatus||'aktiv')===s?' is-current':'') + '" onclick="WB._nzCtxSetThemaStatus(\'' + id + '\',\'' + s + '\')">'
+            + (s==='aktiv'?'● Aktiv':s==='wartend'?'⏸ Wartend':'⏹ Pausiert')
+            + '</button>'
+          ).join('')
+        + '<div class="nz-ctx-sep"></div>'
+        + '<div class="nz-ctx-section">Sortierung</div>'
+        + '<button class="nz-ctx-btn" onclick="WB._nzCtxMove(\'' + id + '\',-1)">↑ Nach oben</button>'
+        + '<button class="nz-ctx-btn" onclick="WB._nzCtxMove(\'' + id + '\',1)">↓ Nach unten</button>'
+        + '<div class="nz-ctx-sep"></div>'
+        + '<button class="nz-ctx-btn danger" onclick="WB._nzCtxDelete(\'' + id + '\')">🗑 Löschen</button>';
+    } else {
+      menu.innerHTML =
+        '<div class="nz-ctx-section">Zustand</div>'
+        + ['eingang','aktuell','parkplatz','kompass','archiv'].map(z =>
+            '<button class="nz-ctx-btn' + (curZ===z?' is-current':'') + '" onclick="WB._nzCtxSetZustand(\'' + id + '\',\'' + z + '\')">'
+            + (z==='eingang'?'📥 Eingang':z==='aktuell'?'✓ Aktuell':z==='parkplatz'?'👁 Im Blick':z==='kompass'?'📋 Handakten':'📦 Archiv')
+            + '</button>'
+          ).join('')
+        + '<div class="nz-ctx-sep"></div>'
+        + '<div class="nz-ctx-section">Sortierung</div>'
+        + '<button class="nz-ctx-btn" onclick="WB._nzCtxMove(\'' + id + '\',-1)">↑ Nach oben</button>'
+        + '<button class="nz-ctx-btn" onclick="WB._nzCtxMove(\'' + id + '\',1)">↓ Nach unten</button>'
+        + '<div class="nz-ctx-sep"></div>'
+        + '<button class="nz-ctx-btn danger" onclick="WB._nzCtxDelete(\'' + id + '\')">🗑 Löschen</button>';
+    }
 
     // Position
     const x = Math.min(e.clientX || 100, window.innerWidth  - 220);
@@ -5068,7 +5154,7 @@ const WB = {
   },
 
   _nzZustandLabel(z) {
-    return { aktuell:'Aktuell', parkplatz:'Im Blick', kompass:'Handakten', archiv:'Archiviert' }[z] || z;
+    return { aktuell:'Aktuell', eingang:'Eingang', parkplatz:'Im Blick', kompass:'Handakten', archiv:'Archiviert', gateway:'Gateway', thema:'Thema' }[z] || z;
   },
 
   _nzMenuClose() {
@@ -5268,8 +5354,14 @@ const WB = {
         : emptyLines;
 
       const gwClass  = l.typ === 'gateway' ? ' gateway-' + this._nzGwStatus(l) : '';
+      const themaClass = l.typ === 'thema' ? ' nz-thema-card' : '';
       const gwBadge  = this._nzGwBadgeHtml(l);
-      return '<div class="nz-postit ' + farbe + gwClass + '" draggable="true" '
+      const themaBadge = l.typ === 'thema'
+        ? '<span style="font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;background:rgba(0,130,138,.1);color:#00828a;border:1px solid rgba(0,130,138,.2);">'
+          + (l.themaStatus==='wartend'?'Wartend':l.themaStatus==='pausiert'?'Pausiert':'Aktiv')
+          + ' · P' + (l.themaPrio||2) + '</span>'
+        : '';
+      return '<div class="nz-postit ' + farbe + gwClass + themaClass + '" draggable="true" '
         + 'ondragstart="WB._nzDragStart(event,\'' + this._esc(l.id) + '\')" '
         + 'ondragover="WB._nzDragOver(event,\'' + this._esc(l.id) + '\')" '
         + 'ondrop="WB._nzDrop(event,\'' + this._esc(l.id) + '\')" '
@@ -5287,6 +5379,7 @@ const WB = {
         + (l.typ==='gateway' ? '<div style="padding:0 10px 4px;">' + gwBadge
             + (l.gatewayCondition ? '<div style="font-size:11px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + this._esc(l.gatewayCondition) + '</div>' : '')
             + '</div>' : '')
+        + (l.typ==='thema' ? '<div style="padding:0 10px 4px;">' + themaBadge + '</div>' : '')
         + '<div class="nz-postit-preview">' + preview + '</div>'
         + moreHtml + emptyHtml
         + '</div>';
@@ -6027,7 +6120,23 @@ const WB = {
       + '<option value="bullet"'   + (l.typ==='bullet'   ?' selected':'') + '>Ideenliste</option>'
       + '<option value="freitext"' + (l.typ==='freitext' ?' selected':'') + '>Freitext</option>'
       + '<option value="gateway"'  + (l.typ==='gateway'  ?' selected':'') + '>🚦 Gateway</option>'
+      + '<option value="thema"'    + (l.typ==='thema'    ?' selected':'') + '>🎯 Thema</option>'
       + '</select></div>'
+      + (l.typ==='thema' || document.getElementById('nz-e-typ')?.value==='thema' ? '' : '')  // handled via toggle
+      + '<div id="nz-thema-fields" style="' + (l.typ==='thema'?'':'display:none;') + 'margin-top:8px;padding:10px 12px;background:rgba(0,130,138,.06);border:1.5px solid #00828a40;border-radius:8px;">'
+      + '<div class="wb-input-group"><label class="wb-label">Priorität</label>'
+      + '<select id="nz-t-prio" class="wb-select">'
+      + '<option value="1"' + ((l.themaPrio||2)===1?' selected':'') + '>▲ Prio 1 (Kritisch)</option>'
+      + '<option value="2"' + ((l.themaPrio||2)===2?' selected':'') + '>► Prio 2 (Wichtig)</option>'
+      + '<option value="3"' + ((l.themaPrio||2)===3?' selected':'') + '>▼ Prio 3 (Normal)</option>'
+      + '</select></div>'
+      + '<div class="wb-input-group" style="margin-top:8px"><label class="wb-label">Status</label>'
+      + '<select id="nz-t-status" class="wb-select">'
+      + '<option value="aktiv"'   + ((l.themaStatus||'aktiv')==='aktiv'  ?' selected':'') + '>Aktiv</option>'
+      + '<option value="wartend"' + ((l.themaStatus||'')==='wartend'?' selected':'') + '>Wartend</option>'
+      + '<option value="pausiert"'+ ((l.themaStatus||'')==='pausiert'?' selected':'') + '>Pausiert</option>'
+      + '</select></div>'
+      + '</div>'
       + '<div id="nz-gw-fields"' + (l.typ==='gateway'?' class="visible"':'') + '>'
       + '<div class="wb-input-group" style="margin-top:8px"><label class="wb-label">🎯 Bedingung (messbar)</label>'
       + '<input id="nz-gw-condition" class="wb-input" placeholder="z.B. Gewicht &lt; 98,0 kg" value="' + this._esc(l.gatewayCondition||'') + '"></div>'
@@ -6040,6 +6149,11 @@ const WB = {
       + '<option value="abgebrochen"' + ((l.gatewayStatus||'')==='abgebrochen'      ?' selected':'') + '>❌ Abgebrochen</option>'
       + '</select></div>'
       + '<p style="font-size:11px;color:var(--faint);margin:6px 0 0;">📅 Das Prüfdatum wird über das Deadline-Feld gesetzt.</p>'
+      + '<div class="wb-input-group" style="margin-top:8px"><label class="wb-label">🎯 Thema zuordnen</label>'
+      + '<select id="nz-gw-thema" class="wb-select">'
+      + '<option value="">— Kein Thema —</option>'
+      + (this.db?.notizen||[]).filter(x=>!x.deleted&&x.typ==='thema').map(t=>'<option value="'+this._esc(t.id)+'"'+(l.themaId===t.id?' selected':'')+'>'+this._esc(t.titel)+'</option>').join('')
+      + '</select></div>'
       + '</div>'
       + '<div class="wb-input-group" style="margin-top:10px"><label class="wb-label">Zustand</label>'
       + '<select id="nz-e-zustand" class="wb-select">' + zustandOpts + '</select></div>'
@@ -6128,17 +6242,22 @@ const WB = {
     l.vertraulich = vertraulich;
     l.tags    = tagsRaw.split(/\s+/).filter(t => t.startsWith('#') && t.length > 1);
     l.link    = link || '';
-    // Gateway-Felder
+    // Gateway-Felder + Thema-Felder
     if (typ === 'gateway') {
-      l.gatewayDate        = deadline || null; // Prüfdatum = Deadline
+      l.gatewayDate        = deadline || null;
       l.gatewayCondition   = document.getElementById('nz-gw-condition')?.value   || '';
       l.gatewayConsequence = document.getElementById('nz-gw-consequence')?.value || '';
       l.gatewayStatus      = document.getElementById('nz-gw-status')?.value      || 'offen';
-      if (!l.icon || l.icon === 'note') l.icon = 'gateway'; // Auto-Icon
+      l.themaId            = document.getElementById('nz-gw-thema')?.value       || null;
+      if (!l.icon || l.icon === 'note') l.icon = 'gateway';
+    } else if (typ === 'thema') {
+      l.themaPrio   = parseInt(document.getElementById('nz-t-prio')?.value   || '2', 10);
+      l.themaStatus = document.getElementById('nz-t-status')?.value || 'aktiv';
+      if (!l.icon || l.icon === 'note') l.icon = 'target';
     } else {
       delete l.gatewayDate; delete l.gatewayCondition;
       delete l.gatewayConsequence; delete l.gatewayStatus;
-      if (l.icon === 'gateway') l.icon = 'note'; // Icon zurücksetzen wenn kein Gateway mehr
+      if (l.icon === 'gateway') l.icon = 'note';
     }
     l.updatedAt = this._now();
     if (zustand === 'archiv') {
@@ -6809,6 +6928,16 @@ const WB = {
       + remindOpts.map(function(o){ return '<option value="' + o[0] + '"' + (remind===o[0]?' selected':'') + '>' + o[1] + '</option>'; }).join('')
       + '</select></div></div>';
 
+    // Thema-Zuordnung
+    const themen = (this.db?.notizen||[]).filter(l => !l.deleted && l.typ==='thema').sort((a,b)=>(a.themaPrio||9)-(b.themaPrio||9));
+    const themaSelect = themen.length
+      ? '<div class="wb-input-group"><label class="wb-label">🎯 Thema zuordnen</label>'
+        + '<select id="wb-f-thema" class="wb-input">'
+        + '<option value="">— Kein Thema —</option>'
+        + themen.map(t => '<option value="'+this._esc(t.id)+'"'+(e?.themaId===t.id?' selected':'')+'>'+this._esc(t.titel)+'</option>').join('')
+        + '</select></div>'
+      : '';
+
     const body = this._modalWeltTop(aktuellerCtx, e?.vertraulich)
       + toggle
       + '<div class="wb-input-group">'
@@ -6816,6 +6945,7 @@ const WB = {
       + ' placeholder="Bezeichnung..." value="' + this._esc(e?.text||'') + '"></div>'
       + '<div class="wb-input-group"><label class="wb-label">Datum</label>'
       + '<input id="wb-f-date" class="wb-input" type="date" value="' + this._esc(e?.date||'') + '"></div>'
+      + themaSelect
       + terminFelder
       + deadlineFelder;
 
@@ -6886,12 +7016,13 @@ const WB = {
         welt, vertraulich, updatedAt: this._now(),
       };
     }
+    const themaId = document.getElementById('wb-f-thema')?.value || null;
     if (!db.customEvents) db.customEvents = [];
     if (c.eventId) {
       const idx = db.customEvents.findIndex(x => x.id === c.eventId);
-      if (idx >= 0) db.customEvents[idx] = { ...db.customEvents[idx], ...obj };
+      if (idx >= 0) db.customEvents[idx] = { ...db.customEvents[idx], ...obj, themaId: themaId||db.customEvents[idx].themaId||null };
     } else {
-      db.customEvents.push({ id:'e_'+Date.now(), ...obj });
+      db.customEvents.push({ id:'e_'+Date.now(), ...obj, themaId });
     }
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast(isDeadline ? '\uD83D\uDEA9 Deadline gespeichert' : '\u2713 Termin gespeichert');
