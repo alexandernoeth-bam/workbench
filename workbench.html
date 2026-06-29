@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.1.04</title>
+  <title>WorkBench 3.1.05</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1176,6 +1176,16 @@
     /* Hybrid item actions: edit/delete/drag */
     .hb-item { display:flex; align-items:center; gap:6px; padding:5px 2px; border-bottom:.5px solid rgba(0,0,0,.08); }
     .hb-item:last-child { border-bottom:none; }
+    .hb-subitems { margin-left:28px; border-left:2px solid var(--border); padding-left:8px; }
+    .hb-subitem { display:flex; align-items:center; gap:6px; padding:3px 2px; font-size:12px; }
+    .hb-subitem:hover .hb-del { display:block; }
+    .hb-sub-add { display:flex; align-items:center; gap:5px; padding:2px 2px; }
+    .hb-sub-add input { flex:1; border:none; border-bottom:1px solid var(--border); padding:2px 0; font-family:var(--font); font-size:12px; background:none; outline:none; color:var(--text); }
+    .hb-sub-add input:focus { border-bottom-color:var(--accent); }
+    .hb-add-sub-btn { font-size:10px; color:var(--faint); cursor:pointer; padding:1px 4px; border-radius:4px; border:none; background:none; font-family:var(--font); white-space:nowrap; }
+    .hb-add-sub-btn:hover { background:var(--surface2); color:var(--accent); }
+    .hb-item-deadline { font-size:10px; padding:1px 5px; border-radius:4px; background:var(--surface2); color:var(--muted); border:1px solid var(--border); margin-left:2px; cursor:pointer; white-space:nowrap; }
+    .hb-item-deadline.red { background:rgba(192,57,43,.08); color:#C0392B; border-color:rgba(192,57,43,.2); }
     .hb-drag { cursor:grab; color:var(--faint); flex-shrink:0; opacity:.5; touch-action:none; }
     .hb-drag:hover { opacity:1; }
     .hb-item.hb-dragging { opacity:.3; }
@@ -1232,7 +1242,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.1.04</div>
+  <div id="wb-startup-tagline">v3.1.05</div>
 </div>
 
 <!-- Modal -->
@@ -1484,7 +1494,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.1.04</span>
+    <span id="wb-menu-version">v3.1.05</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1801,8 +1811,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.1.04',
-  APP_BUILD:   '20260629-1100',
+  APP_VERSION: '3.1.05',
+  APP_BUILD:   '20260629-1200',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -3356,6 +3366,163 @@ const WB = {
     if (map[z]) l.farbe = map[z];
   },
 
+  // ── Unteraufgaben (Subitems) ─────────────────────────
+  _nzRenderSubitems(l, i, ctx, cbFn, delFn) {
+    if (l.typ !== 'thema') return '';
+    const sub = (i.subitems||[]).filter(s => !s.deleted);
+    if (!sub.length) return '';
+    const cbF  = cbFn  || (ctx==='ts' ? '_tsKdCbToggle' : '_nzDetailCbToggle');
+    const delF = delFn || (ctx==='ts' ? '_tsKdItemDelete' : '_nzDetailItemDelete');
+    const lid = this._esc(l.id);
+    const iid = this._esc(i.id);
+    return '<div class="hb-subitems">'
+      + sub.map(s => {
+          const sid   = this._esc(s.id);
+          const ss    = s.status ?? (s.done ? 2 : 0);
+          const chkS  = ss===2
+            ? '<div class="ts-kd-chk done" style="width:14px;height:14px;font-size:9px;" onclick="WB._nzSubitemCbToggle(\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">&#10003;</div>'
+            : ss===1
+            ? '<div class="ts-kd-chk" style="width:14px;height:14px;font-size:9px;border-color:var(--accent);color:var(--accent);" onclick="WB._nzSubitemCbToggle(\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">\/</div>'
+            : '<div class="ts-kd-chk" style="width:14px;height:14px;" onclick="WB._nzSubitemCbToggle(\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')"></div>';
+          return '<div class="hb-subitem">'
+            + chkS
+            + '<span class="hb-txt' + (ss===2?' done':'') + '" style="font-size:12px;" ondblclick="WB._nzSubitemEdit(this,\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">' + this._esc(s.text) + '</span>'
+            + (s.deadline ? '<span class="hb-item-deadline' + (s.deadline<this._dStr(new Date())?' red':'') + '">' + s.deadline.slice(5).replace('-','.') + '</span>' : '')
+            + '<span class="hb-del" onclick="WB._nzSubitemDelete(\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">\u00d7</span>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+  },
+
+  _nzSubitemAddRow(listeId, itemId, ctx) {
+    // Zeige Eingabefeld direkt unter den Subitems
+    const iid   = itemId;
+    const rowId = 'sub-add-' + listeId + '-' + itemId;
+    // Falls schon offen: fokussieren
+    const existing = document.getElementById(rowId);
+    if (existing) { existing.querySelector('input')?.focus(); return; }
+    // Finde das hb-item dieses Items und füge Zeile danach ein
+    const parent = document.querySelector('[data-itemid="' + itemId + '"]') || (() => {
+      // Fallback: suche via Subitem-Container
+      const allItems = document.querySelectorAll('.hb-item');
+      for (const el of allItems) {
+        if (el.querySelector('.hb-txt')?.textContent) {
+          const l = (this.db?.notizen||[]).find(x => x.id === listeId);
+          const i = (l?.items||[]).find(x => x.id === itemId);
+          if (i && el.querySelector('.hb-txt')?.textContent.trim() === i.text.trim()) return el;
+        }
+      }
+      return null;
+    })();
+    // Neue Zeile anhängen
+    const row = document.createElement('div');
+    row.id = rowId;
+    row.className = 'hb-subitems';
+    row.innerHTML = '<div class="hb-sub-add"><span style="font-size:10px;color:var(--faint);">⤷</span>'
+      + '<input placeholder="Unteraufgabe..." autofocus>'
+      + '<span class="hb-add-sub-btn" style="color:var(--accent);" onclick="WB._nzSubitemSave(\'' + this._esc(listeId) + '\',\'' + this._esc(itemId) + '\',this.previousElementSibling,\'' + ctx + '\')">OK</span>'
+      + '<span class="hb-add-sub-btn" onclick="this.closest(\'.hb-subitems\').remove()">✕</span>'
+      + '</div>';
+    const inp = row.querySelector('input');
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); this._nzSubitemSave(listeId, itemId, inp, ctx); }
+      if (e.key === 'Escape') row.remove();
+    });
+    // Einfügen nach dem Item oder dessen Subitem-Block
+    if (parent) {
+      let insertAfter = parent;
+      const nextSib = parent.nextElementSibling;
+      if (nextSib?.classList.contains('hb-subitems')) insertAfter = nextSib;
+      insertAfter.insertAdjacentElement('afterend', row);
+    }
+    inp.focus();
+  },
+
+  _nzSubitemSave(listeId, itemId, inp, ctx) {
+    const text = inp.value.trim(); if (!text) return;
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    if (!i.subitems) i.subitems = [];
+    i.subitems.push({ id:'si_'+Date.now(), text, done:false, deleted:false, status:0 });
+    l.updatedAt = this._now();
+    this.setDirty();
+    inp.value = '';
+    // Re-render
+    if (ctx === 'nz') { this._nzDetailOpen(listeId, true); this.renderNotizenTab(); }
+    else if (ctx === 'fs') { const b=document.getElementById('nz-fs-body'); if(b) b.innerHTML=this._renderHybridBody(l,listeId,'fs'); }
+    else { this._tsKachelOpen(listeId, true); }
+    if (this.activeTab === 'tagessicht') this._ckRenderAll();
+  },
+
+  _nzSubitemCbToggle(listeId, itemId, subitemId) {
+    const l  = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const i  = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    const si = (i.subitems||[]).find(x => x.id === subitemId); if (!si) return;
+    const s  = si.status ?? (si.done ? 2 : 0);
+    const ns = (s + 1) % 3;
+    si.status = ns; si.done = ns === 2; si.updatedAt = this._now();
+    l.updatedAt = this._now();
+    this.setDirty();
+    this._nzDetailOpen(listeId, true);
+    this.renderNotizenTab();
+    if (this.activeTab === 'tagessicht') this._ckRenderAll();
+  },
+
+  _nzSubitemEdit(el, listeId, itemId, subitemId) {
+    const l  = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const i  = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    const si = (i.subitems||[]).find(x => x.id === subitemId); if (!si) return;
+    const old = si.text;
+    const inp = document.createElement('input');
+    inp.value = old;
+    inp.style.cssText = 'border:none;border-bottom:1px solid var(--accent);font-size:12px;font-family:var(--font);background:none;outline:none;width:100%;';
+    el.replaceWith(inp);
+    inp.focus(); inp.select();
+    const commit = () => {
+      const nv = inp.value.trim();
+      if (nv && nv !== old) { si.text = nv; l.updatedAt = this._now(); this.setDirty(); }
+      this._nzDetailOpen(listeId, true);
+      this.renderNotizenTab();
+    };
+    inp.addEventListener('blur', commit);
+    inp.addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); commit(); } if (e.key==='Escape') { inp.value=old; commit(); } });
+  },
+
+  _nzSubitemDelete(listeId, itemId, subitemId) {
+    const l  = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const i  = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    const si = (i.subitems||[]).find(x => x.id === subitemId); if (!si) return;
+    si.deleted = true; l.updatedAt = this._now();
+    this.setDirty();
+    this._nzDetailOpen(listeId, true);
+    this.renderNotizenTab();
+    if (this.activeTab === 'tagessicht') this._ckRenderAll();
+  },
+
+  _nzItemDeadlineEdit(listeId, itemId, event) {
+    event.stopPropagation();
+    const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    // Inline date picker
+    const inp = document.createElement('input');
+    inp.type = 'date';
+    inp.value = i.deadline || '';
+    inp.style.cssText = 'font-size:11px;border:1px solid var(--accent);border-radius:4px;padding:1px 4px;font-family:var(--font);background:var(--surface);cursor:pointer;';
+    const target = event.currentTarget;
+    target.replaceWith(inp);
+    inp.focus(); inp.showPicker?.();
+    const commit = () => {
+      i.deadline = inp.value || null;
+      l.updatedAt = this._now();
+      this.setDirty();
+      this._nzDetailOpen(listeId, true);
+      this.renderNotizenTab();
+      if (this.activeTab === 'tagessicht') this._ckRenderAll();
+    };
+    inp.addEventListener('change', commit);
+    inp.addEventListener('blur', () => setTimeout(commit, 100));
+  },
+
   _nzToggleGwFields() {
     const typ = document.getElementById('nz-e-typ')?.value;
     const gw  = document.getElementById('nz-gw-fields');
@@ -4531,8 +4698,11 @@ const WB = {
         + '<span class="hb-txt' + (isDone ? ' done' : '') + '"'
           + ' ondblclick="WB._nzHybridItemEdit(this,\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\',\'' + ctx + '\')">'
           + this._esc(i.text) + '</span>'
+        + (i.deadline ? '<span class="hb-item-deadline' + (i.deadline < this._dStr(new Date()) ? ' red' : '') + '" onclick="WB._nzItemDeadlineEdit(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\',event)">' + i.deadline.slice(5).replace('-','.') + '</span>' : '<span class="hb-add-sub-btn" onclick="WB._nzItemDeadlineEdit(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\',event)" title="Datum">📅</span>')
+        + (l.typ==='thema' ? '<span class="hb-add-sub-btn" onclick="WB._nzSubitemAddRow(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\',\'' + ctx + '\')" title="Unteraufgabe">⤷</span>' : '')
         + '<span class="hb-del" onclick="event.stopPropagation();WB.' + delFn + '(\'' + this._esc(listeId) + '\',\'' + this._esc(i.id) + '\')">×</span>'
-        + '</div>';
+        + '</div>'
+        + this._nzRenderSubitems(l, i, ctx, cbFn, delFn);
     };
 
     // Sektion 1: Checkliste + Add-Row direkt darunter
