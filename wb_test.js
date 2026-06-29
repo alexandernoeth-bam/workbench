@@ -284,7 +284,7 @@ jsCode.includes('_savTermin')      ? ok('_savTermin() definiert')  : fail('_savT
 jsCode.includes("'wb-f-text'") || jsCode.includes('"wb-f-text"') ? ok('Titelfeld wb-f-text') : fail('Titelfeld fehlt');
 jsCode.includes("'wb-f-date'") || jsCode.includes('"wb-f-date"') ? ok('Datumsfeld wb-f-date') : fail('Datumsfeld fehlt');
 jsCode.includes("'wb-f-time'") || jsCode.includes('"wb-f-time"') ? ok('Uhrzeitfeld wb-f-time') : fail('Uhrzeitfeld fehlt');
-jsCode.includes("'wb-f-dur'")  || jsCode.includes('"wb-f-dur"')  ? ok('Dauerfeld wb-f-dur vorhanden') : fail('Dauerfeld wb-f-dur fehlt');
+jsCode.includes("'wb-f-bis'")  || jsCode.includes('"wb-f-bis"')  ? ok('Bis-Feld wb-f-bis vorhanden') : fail('Bis-Feld wb-f-bis fehlt');
 jsCode.includes('durationMin') ? ok('durationMin wird gespeichert') : fail('durationMin fehlt in _savTermin');
 // Kein Vorhaben-Dropdown im Slim-Termin-Dialog
 !(jsCode.includes("'wb-f-vh'") || jsCode.includes('"wb-f-vh"')) ?
