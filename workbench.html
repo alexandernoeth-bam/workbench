@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.0.99</title>
+  <title>WorkBench 3.1.00</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1149,7 +1149,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.0.99</div>
+  <div id="wb-startup-tagline">v3.1.00</div>
 </div>
 
 <!-- Modal -->
@@ -1401,7 +1401,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.0.99</span>
+    <span id="wb-menu-version">v3.1.00</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1735,8 +1735,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.0.99',
-  APP_BUILD:   '20260628-1200',
+  APP_VERSION: '3.1.00',
+  APP_BUILD:   '20260628-1300',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2607,42 +2607,6 @@ const WB = {
     ];
   },
 
-  _nzGetListen() {
-    if (!this.db) return [];
-    if (!this.db.notizen || !this.db.notizen.length) {
-      this.db.notizen = this._nzDefaultListen().map(l => ({ ...l, updatedAt: this._now() }));
-    }
-    const zustand = this._nzZustand || 'aktuell';
-    let listen = this.db.notizen.filter(l => {
-      if (l.deleted) return false;
-      const z = l.zustand || 'aktuell';
-      return z === zustand;
-    });
-    // Weltfilter
-    if (this.activeWorld !== 'beide') {
-      listen = listen.filter(l => {
-        const w = l.welt || 'beide';
-        if (w === 'beide') return true;
-        if (this.activeWorld === 'beruf')  return w === 'beruf';
-        if (this.activeWorld === 'privat') return w !== 'beruf';
-        return true;
-      });
-    }
-    // Suche
-    const suchEl = document.getElementById('nz-suche');
-    const q = suchEl?.value?.trim().toLowerCase() || '';
-    if (q) {
-      listen = listen.filter(l => {
-        if (l.titel?.toLowerCase().includes(q)) return true;
-        if ((l.items||[]).some(i => i.text?.toLowerCase().includes(q))) return true;
-        if ((l.inhalt||'').toLowerCase().includes(q)) return true;
-        return false;
-      });
-    }
-    // Gepinnte zuerst (nur in Aktuell sinnvoll)
-    listen.sort((a,b) => (b.gepinnt?1:0) - (a.gepinnt?1:0));
-    return listen;
-  },
 
   _nzSetZustand(z) {
     this._nzZustand = z;
@@ -3280,7 +3244,7 @@ const WB = {
       aktuell:   db.notizen.filter(l => !l.deleted && (!l.zustand || l.zustand === 'aktuell') && weltOk(l)).length,
       parkplatz: db.notizen.filter(l => !l.deleted && l.zustand === 'parkplatz' && weltOk(l)).length,
       kompass:   db.notizen.filter(l => !l.deleted && l.zustand === 'kompass'   && weltOk(l)).length,
-      archiv:    db.notizen.filter(l => (!l.deleted && l.zustand === 'archiv') || (!!l.deleted && !l.zustand) && weltOk(l)).length,
+      archiv:    db.notizen.filter(l => ((!l.deleted && l.zustand === 'archiv') || (!!l.deleted && !l.zustand)) && weltOk(l)).length,
       eingang:   db.notizen.filter(l => !l.deleted && l.zustand === 'eingang'   && weltOk(l)).length,
     };
     ['aktuell','parkplatz','kompass','archiv','eingang'].forEach(z => {
