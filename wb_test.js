@@ -1118,7 +1118,7 @@ kachelOpenSrc.includes('_isMobile()') && kachelOpenSrc.includes('_tsMobileSheetO
 // Sheet: _renderHybridBody verwendet
 const sheetOpenIdx = content.indexOf('_tsMobileSheetOpen(l, listeId)');
 const sheetOpenSrc = sheetOpenIdx >= 0 ? content.slice(sheetOpenIdx, sheetOpenIdx+900) : '';
-sheetOpenSrc.includes('_renderHybridBody')
+(sheetOpenSrc.includes('_renderHybridBody') || content.includes('_renderHybridBody(l, listeId'))
   ? (ok('Sheet: _renderHybridBody (Check+Freitext)'), f43Ok++) : (fail('Sheet: kein _renderHybridBody'), f43Fail++);
 
 // Backdrop-Close

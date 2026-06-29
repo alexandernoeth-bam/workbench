@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.1.06</title>
+  <title>WorkBench 3.1.07</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1215,17 +1215,21 @@
     .ts-kd-txt { font-size:14px; color:var(--text); line-height:1.4; flex:1; }
     .ts-kd-txt.done { text-decoration:line-through; color:var(--faint); }
     /* Hybrid item actions: edit/delete/drag */
-    .hb-item { display:flex; align-items:center; gap:6px; padding:5px 2px; border-bottom:.5px solid rgba(0,0,0,.08); }
+    .hb-item { display:flex; align-items:flex-start; gap:8px; padding:7px 2px; border-bottom:.5px solid rgba(0,0,0,.08); font-size:14px; }
     .hb-item:last-child { border-bottom:none; }
     .hb-subitems { margin-left:28px; border-left:2px solid var(--border); padding-left:8px; }
-    .hb-subitem { display:flex; align-items:center; gap:6px; padding:3px 2px; font-size:12px; }
+    .hb-subitem { display:flex; align-items:center; gap:6px; padding:5px 2px; font-size:13px; cursor:grab; }
+    .hb-subitem:active { cursor:grabbing; opacity:.7; }
+    .hb-subitem.hb-sub-dragging { opacity:.3; }
+    .hb-subitem.hb-sub-drag-over { border-top:2px solid var(--accent); }
     .hb-subitem:hover .hb-del { display:block; }
-    .hb-sub-add { display:flex; align-items:center; gap:5px; padding:2px 2px; }
-    .hb-sub-add input { flex:1; border:none; border-bottom:1px solid var(--border); padding:2px 0; font-family:var(--font); font-size:12px; background:none; outline:none; color:var(--text); }
+    .hb-sub-drag-handle { color:var(--faint); font-size:12px; cursor:grab; flex-shrink:0; padding:0 2px; }
+    .hb-sub-add { display:flex; align-items:center; gap:5px; padding:4px 2px; }
+    .hb-sub-add input { flex:1; border:none; border-bottom:1px solid var(--border); padding:3px 0; font-family:var(--font); font-size:13px; background:none; outline:none; color:var(--text); }
     .hb-sub-add input:focus { border-bottom-color:var(--accent); }
-    .hb-add-sub-btn { font-size:10px; color:var(--faint); cursor:pointer; padding:1px 4px; border-radius:4px; border:none; background:none; font-family:var(--font); white-space:nowrap; }
+    .hb-add-sub-btn { font-size:11px; color:var(--faint); cursor:pointer; padding:2px 5px; border-radius:4px; border:none; background:none; font-family:var(--font); white-space:nowrap; }
     .hb-add-sub-btn:hover { background:var(--surface2); color:var(--accent); }
-    .hb-item-deadline { font-size:10px; padding:1px 5px; border-radius:4px; background:var(--surface2); color:var(--muted); border:1px solid var(--border); margin-left:2px; cursor:pointer; white-space:nowrap; }
+    .hb-item-deadline { font-size:11px; padding:1px 5px; border-radius:4px; background:var(--surface2); color:var(--muted); border:1px solid var(--border); margin-left:2px; cursor:pointer; white-space:nowrap; }
     .hb-item-deadline.red { background:rgba(192,57,43,.08); color:#C0392B; border-color:rgba(192,57,43,.2); }
     .hb-drag { cursor:grab; color:var(--faint); flex-shrink:0; opacity:.5; touch-action:none; }
     .hb-drag:hover { opacity:1; }
@@ -1283,7 +1287,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.1.06</div>
+  <div id="wb-startup-tagline">v3.1.07</div>
 </div>
 
 <!-- Modal -->
@@ -1535,7 +1539,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.1.06</span>
+    <span id="wb-menu-version">v3.1.07</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1862,8 +1866,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.1.06',
-  APP_BUILD:   '20260629-1300',
+  APP_VERSION: '3.1.07',
+  APP_BUILD:   '20260629-1400',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2430,7 +2434,7 @@ const WB = {
         const w   = e.welt||'priv';
         const cls = e.isDeadline?'deadline-ev':(w==='pro'||w==='beruf')?'beruf':(w==='priv'||w==='privat')?'privat':'';
         const dur = e.durationMin ? ' <span style="color:#64748b;font-size:10px;">('+e.durationMin+'min)</span>' : '';
-        return '<div class="ck-event-block '+cls+'"><strong>'+e.startTime+'</strong> '+this._esc(e.text||e.titel||'')+dur+'</div>';
+        return '<div class="ck-event-block '+cls+'" style="cursor:pointer;" onclick="WB.terminOpen(\''+this._esc(e.id)+'\')"><strong>'+e.startTime+'</strong> '+this._esc(e.text||e.titel||'')+dur+'</div>';
       }).join('');
       html += '</div></div>';
     }
@@ -2619,43 +2623,16 @@ const WB = {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId && !x.deleted);
     if (!l) return;
     this._tsKachelCurrentId = listeId;
-    // Mini-Kachel active-State
-    document.querySelectorAll('.ts-nz-mini').forEach(el => el.classList.remove('active'));
-    const miniEl = document.getElementById('ts-mini-' + listeId);
-    if (miniEl) miniEl.classList.add('active');
 
-    // Mobile: Bottom Sheet statt linkes Panel
+    // Mobile: Bottom Sheet
     if (this._isMobile()) {
       this._tsMobileSheetOpen(l, listeId);
       return;
     }
 
-    // Desktop: Detail-Panel füllen
-    document.getElementById('ts-kd-title').textContent = l.titel;
-    const allItems = (l.items||[]).filter(i => !i.deleted);
-    const doneItems = allItems.filter(i => i.done);
-    const cnt = l.typ === 'check' ? doneItems.length + '/' + allItems.length : '–';
-    document.getElementById('ts-kd-cnt').textContent = cnt;
-    // Farbe übernehmen
-    const farbe = this._nzPostItFarbe(l.farbe || 'c-weiss');
-    const detail = document.getElementById('ts-kachel-detail');
-    detail.className = 'open ' + farbe;
-    // Body rendern — Hybrid: Checkliste OBEN + Freitext UNTEN (immer beide sichtbar)
-    const body = document.getElementById('ts-kd-body');
-    const foot = document.getElementById('ts-kd-foot');
-    if (body) {
-      body.innerHTML = this._renderHybridBody(l, listeId, 'ts');
-      const ft = body.querySelector('#ts-kd-ft');
-      if (ft) requestAnimationFrame(() => this._ftBindTableMenu(ft));
-    }
-    if (foot) foot.style.display = 'none'; // Add-Row ist im Body
-    // Zähler aktualisieren
-    const allItems2 = (l.items||[]).filter(i => !i.deleted);
-    const doneItems2 = allItems2.filter(i => i.done);
-    const cnt2 = allItems2.length ? doneItems2.length + '/' + allItems2.length : '';
-    const cntEl2 = document.getElementById('ts-kd-cnt');
-    if (cntEl2) { cntEl2.textContent = cnt2; }
-    document.getElementById('ts-kachel-empty').style.display = 'none';
+    // Desktop: Im Notizen-Tab öffnen (Cockpit hat kein eigenes Detail-Panel mehr)
+    this.tabSwitch('notizen');
+    setTimeout(() => { this._nzDetailOpen(listeId); }, 50);
   },
 
   _tsMobileSheetOpen(l, listeId) {
@@ -3422,24 +3399,27 @@ const WB = {
     if (l.typ !== 'thema') return '';
     const sub = (i.subitems||[]).filter(s => !s.deleted);
     if (!sub.length) return '';
-    const cbF  = cbFn  || (ctx==='ts' ? '_tsKdCbToggle' : '_nzDetailCbToggle');
-    const delF = delFn || (ctx==='ts' ? '_tsKdItemDelete' : '_nzDetailItemDelete');
     const lid = this._esc(l.id);
     const iid = this._esc(i.id);
-    return '<div class="hb-subitems">'
+    return '<div class="hb-subitems" id="hb-sub-' + lid + '-' + iid + '">'
       + sub.map(s => {
-          const sid   = this._esc(s.id);
-          const ss    = s.status ?? (s.done ? 2 : 0);
-          const chkS  = ss===2
-            ? '<div class="ts-kd-chk done" style="width:14px;height:14px;font-size:9px;" onclick="WB._nzSubitemCbToggle(\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">&#10003;</div>'
+          const sid = this._esc(s.id);
+          const ss  = s.status ?? (s.done ? 2 : 0);
+          const chkS = ss===2
+            ? '<div class="ts-kd-chk done" style="width:15px;height:15px;font-size:9px;flex-shrink:0;" onclick="WB._nzSubitemCbToggle(\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">&#10003;</div>'
             : ss===1
-            ? '<div class="ts-kd-chk" style="width:14px;height:14px;font-size:9px;border-color:var(--accent);color:var(--accent);" onclick="WB._nzSubitemCbToggle(\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">\/</div>'
-            : '<div class="ts-kd-chk" style="width:14px;height:14px;" onclick="WB._nzSubitemCbToggle(\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')"></div>';
-          return '<div class="hb-subitem">'
+            ? '<div class="ts-kd-chk" style="width:15px;height:15px;font-size:9px;border-color:var(--accent);color:var(--accent);flex-shrink:0;" onclick="WB._nzSubitemCbToggle(\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">\/</div>'
+            : '<div class="ts-kd-chk" style="width:15px;height:15px;flex-shrink:0;" onclick="WB._nzSubitemCbToggle(\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')"></div>';
+          return '<div class="hb-subitem" draggable="true"'
+            + ' ondragstart="WB._nzSubitemDragStart(event,\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')"'
+            + ' ondragover="event.preventDefault();this.classList.add(\'hb-sub-drag-over\')"'
+            + ' ondragleave="this.classList.remove(\'hb-sub-drag-over\')"'
+            + ' ondrop="this.classList.remove(\'hb-sub-drag-over\');WB._nzSubitemDrop(event,\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">'
+            + '<span class="hb-sub-drag-handle">⠿</span>'
             + chkS
-            + '<span class="hb-txt' + (ss===2?' done':'') + '" style="font-size:12px;" ondblclick="WB._nzSubitemEdit(this,\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">' + this._esc(s.text) + '</span>'
+            + '<span class="hb-txt' + (ss===2?' done':'') + '" style="font-size:13px;flex:1;" ondblclick="WB._nzSubitemEdit(this,\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">' + this._esc(s.text) + '</span>'
             + (s.deadline ? '<span class="hb-item-deadline' + (s.deadline<this._dStr(new Date())?' red':'') + '">' + s.deadline.slice(5).replace('-','.') + '</span>' : '')
-            + '<span class="hb-del" onclick="WB._nzSubitemDelete(\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">\u00d7</span>'
+            + '<span class="hb-del" onclick="WB._nzSubitemDelete(\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">×</span>'
             + '</div>';
         }).join('')
       + '</div>';
@@ -3503,6 +3483,33 @@ const WB = {
     else if (ctx === 'fs') { const b=document.getElementById('nz-fs-body'); if(b) b.innerHTML=this._renderHybridBody(l,listeId,'fs'); }
     else { this._tsKachelOpen(listeId, true); }
     if (this.activeTab === 'tagessicht') this._ckRenderAll();
+  },
+
+  _nzSubitemDragId: null,
+
+  _nzSubitemDragStart(event, listeId, itemId, subitemId) {
+    this._nzSubitemDragId = { listeId, itemId, subitemId };
+    event.dataTransfer.effectAllowed = 'move';
+  },
+
+  _nzSubitemDrop(event, listeId, itemId, targetSubitemId) {
+    event.preventDefault();
+    const drag = this._nzSubitemDragId;
+    if (!drag || drag.subitemId === targetSubitemId) return;
+    if (drag.listeId !== listeId || drag.itemId !== itemId) return;
+    const l  = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
+    const i  = (l.items||[]).find(x => x.id === itemId); if (!i) return;
+    const sub = i.subitems||[];
+    const fromIdx = sub.findIndex(s => s.id === drag.subitemId);
+    const toIdx   = sub.findIndex(s => s.id === targetSubitemId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = sub.splice(fromIdx, 1);
+    sub.splice(toIdx, 0, moved);
+    l.updatedAt = this._now();
+    this.setDirty();
+    this._nzSubitemDragId = null;
+    this._nzDetailOpen(listeId, true);
+    this.renderNotizenTab();
   },
 
   _nzSubitemCbToggle(listeId, itemId, subitemId) {
@@ -3633,6 +3640,9 @@ const WB = {
     const neueNotiz = { id:'nz_'+Date.now(), titel:name, icon, typ, farbe:'c-weiss', items:[], gepinnt:false, zustand: neuerZustand, updatedAt:this._now() };
     if (typ === 'gateway') neueNotiz.gatewayStatus = 'offen';
     if (typ === 'thema')   { neueNotiz.themaPrio = 2; neueNotiz.themaStatus = 'aktiv'; neueNotiz.inhalt = ''; }
+    // Auto-Tags
+    if (typ === 'thema')   neueNotiz.tags = ['#Thema'];
+    if (typ === 'gateway') neueNotiz.tags = ['#Gateway'];
     this._nzAutoFarbe(neueNotiz); // Auto-Farbe je Zustand
     this.db.notizen.push(neueNotiz);
     this.setDirty(); this.modalClose(); this.renderNotizenTab();
@@ -6556,6 +6566,9 @@ const WB = {
     l.gepinnt = gepinnt;
     l.vertraulich = vertraulich;
     l.tags    = tagsRaw.split(/\s+/).filter(t => t.startsWith('#') && t.length > 1);
+    // Auto-Tags für Thema/Gateway sicherstellen
+    if (typ === 'thema'   && !l.tags.includes('#Thema'))   l.tags.push('#Thema');
+    if (typ === 'gateway' && !l.tags.includes('#Gateway')) l.tags.push('#Gateway');
     l.link    = link || '';
     // Gateway-Felder + Thema-Felder
     if (typ === 'gateway') {
@@ -8205,7 +8218,17 @@ const WB = {
         l.gepinnt = false; l.heutePin = false; l.heutePinDate = null;
       }
     });
-      // Migration: Alle Notizen auf weiß (einmaliges Reset des Farbschemas)
+      // Migration: Auto-Tags für bestehende Themen/Gateways
+      const _autoTagMigKey = 'autoTagMig_v1';
+      const _autoTagDone = await this.idbGet('meta', _autoTagMigKey).catch(() => null);
+      if (!_autoTagDone) {
+        (this.db.notizen||[]).forEach(l => {
+          if (!l.tags) l.tags = [];
+          if (l.typ === 'thema'   && !l.tags.includes('#Thema'))   l.tags.push('#Thema');
+          if (l.typ === 'gateway' && !l.tags.includes('#Gateway')) l.tags.push('#Gateway');
+        });
+        await this.idbSet('meta', _autoTagMigKey, 'true').catch(() => {});
+      }
       const _petrolMigKey = 'petrolColorMig_v1';
       const _petrolDone = await this.idbGet('meta', _petrolMigKey).catch(() => null);
       if (!_petrolDone) {
