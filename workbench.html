@@ -729,7 +729,19 @@ const WB = {
     }
     const nowStr = new Date().getHours().toString().padStart(2,'0')+':'+new Date().getMinutes().toString().padStart(2,'0');
     const termine = (db.customEvents||[]).filter(e=>!e.deleted&&!e.storniert&&e.date===today&&e.startTime&&this._weltOk(e)).sort((a,b)=>a.startTime.localeCompare(b.startTime));
-    const laufend = termine.filter(e=>e.startTime<=nowStr&&(e.endTime||'23:59')>nowStr);
+    const laufend = termine.filter(e=>{
+      if (!e.startTime) return false;
+      if (e.startTime > nowStr) return false;
+      if (e.endTime) return e.endTime > nowStr;
+      // WB4: durationMin als Fallback
+      if (e.durationMin > 0) {
+        const [h,m] = e.startTime.split(':').map(Number);
+        const endM = h*60 + m + e.durationMin;
+        const endStr = String(Math.floor(endM/60)).padStart(2,'0')+':'+String(endM%60).padStart(2,'0');
+        return endStr > nowStr;
+      }
+      return false; // kein endTime, kein durationMin → nicht laufend
+    });
     const kommend = termine.filter(e=>e.startTime>nowStr);
     const jetztItems = [...laufend.slice(0,1),...kommend.slice(0,1)];
     if (termine.length) {
@@ -795,7 +807,7 @@ const WB = {
 
   _ht5Toggle(id) {
     const all=[...(this.db.aufgaben||[]),...(this.db.themen||[]).flatMap(t=>t.aufgaben||[])];
-    const a=all.find(x=>x.id===id); if(a){a.erledigt=!a.erledigt;a.updatedAt=this._now();this.setDirty();this._ht5Render();}
+    const a=all.find(x=>x.id===id); if(a){a.erledigt=!a.erledigt;a.status=a.erledigt?'erledigt':'offen';a.updatedAt=this._now();this.setDirty();this.renderSection(this.activeTab);}
   },
 
   _ht5Hinweise() {
@@ -910,7 +922,7 @@ const WB = {
     aufgaben.forEach(a=>{
       const isR=this._isRoutineHeute(a);
       h+='<div class="wb5-aufg-item" onclick="WB._aufgabeDetail(\''+this._esc(a.id)+'\')">'
-        +'<span class="wb5-grip">&#8942;&#8942;</span><div class="wb5-cb"></div>'
+        +'<span class="wb5-grip">&#8942;&#8942;</span>'+'<div class="wb5-cb" onclick="event.stopPropagation();WB._ht5Toggle(\''+this._esc(a.id)+'\')" ></div>'
         +'<span class="wb5-aufg-text">'+this._esc(a.titel||a.text||'')+'</span>'
         +'<div class="wb5-aufg-tags">'
         +(a.typ?'<span class="wb5-atag wb5-at-a">'+this._esc(a.typ)+'</span>':'')
@@ -981,7 +993,12 @@ const WB = {
     if(termine.length){
       h+='<div class="wb5-termin-card">';
       termine.forEach(e=>{
-        const isL=ds===today&&e.startTime<=nowStr&&(e.endTime||'23:59')>nowStr;const wRaw2=(e.welt||'b');const w=wRaw2==='privat'||wRaw2==='priv'?'p':wRaw2==='beruf'||wRaw2==='pro'?'b':wRaw2;
+        const isL=ds===today&&(()=>{
+        if(!e.startTime||e.startTime>nowStr)return false;
+        if(e.endTime)return e.endTime>nowStr;
+        if(e.durationMin>0){const[h,m]=e.startTime.split(':').map(Number);const eM=h*60+m+e.durationMin;return(String(Math.floor(eM/60)).padStart(2,'0')+':'+String(eM%60).padStart(2,'0'))>nowStr;}
+        return false;
+      })();const wRaw2=(e.welt||'b');const w=wRaw2==='privat'||wRaw2==='priv'?'p':wRaw2==='beruf'||wRaw2==='pro'?'b':wRaw2;
         h+='<div class="wb5-termin-row" onclick="WB._te5OpenTermin(\''+this._esc(e.id)+'\')">'
           +'<div class="wb5-tr-bar wb5-tr-bar-'+(isL?'l':w)+'"></div>'
           +'<div style="flex:1;min-width:0;"><div class="wb5-tr-name">'+this._esc(e.text)+'</div><div class="wb5-tr-time">'+(e.startTime||'')+(e.endTime?' \u2013 '+e.endTime:'')+'</div></div>'
@@ -2482,7 +2499,10 @@ const WB = {
     if(window.google?.accounts?.oauth2) try{google.accounts.oauth2.revoke(this._oauthToken,()=>{});}catch(e){}
     this._oauthShowBanner('\u2139 Abgemeldet \u2014 Bitte neu verbinden');
     this._toast('\u2713 Abgemeldet');
-  },
+  }
+,
+
+
 
   // ── Helpers ──────────────────────────────────────────
   _esc(str) { if(!str)return''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
