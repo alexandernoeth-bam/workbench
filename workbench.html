@@ -600,15 +600,20 @@
 const WB = {
   APP_VERSION:    '5.0.0',
   APP_BUILD:      '20260630-1800',
-  IDB_NAME:       'workbench5',
+  IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
 
   db: {
     themen:       [],
     aufgaben:     [],
+    gateways:     [],
     customEvents: [],
     sondertage:   [],
+    wochenpflichten: [], pflichtStatus: {}, tagesprotokoll: [],
+    notizen: [], wissensnetzwerk: [], vorhaben: [], ziele: [],
+    links: [], quickItems: [], checklistVorlagen: [], mantras: [],
+    wochenMottos: {}, _version: 2, _exportedAt: '',
     fokusTypen:   [
       { id:'konzept',     label:'Konzept',     items:['Ziel definieren','Struktur skizzieren','Kernaussagen formulieren','Review einplanen'] },
       { id:'besprechung', label:'Besprechung', items:['Agenda pr\u00fcfen','Teilnehmer informieren','Protokoll f\u00fchren','Aktionspunkte festhalten'] },
@@ -701,8 +706,10 @@ const WB = {
   },
 
   _weltOk(item) {
-    if (this._settings.bueroModus && (item.welt||'b')==='p') return false;
-    const w = item.welt||'b';
+    // WB4-Kompatibilität: welt kann 'b'/'p' (WB5) oder 'beruf'/'privat'/'pro'/'priv' (WB4) sein
+    const wRaw = item.welt || 'b';
+    const w = wRaw==='beruf'||wRaw==='pro' ? 'b' : wRaw==='privat'||wRaw==='priv' ? 'p' : wRaw;
+    if (this._settings.bueroModus && w==='p') return false;
     if (this.activeWorld==='beruf'  && w!=='b') return false;
     if (this.activeWorld==='privat' && w!=='p') return false;
     return true;
@@ -728,7 +735,7 @@ const WB = {
     if (termine.length) {
       h += '<div class="wb5-card"><div class="wb5-card-hdr"><span class="wb5-card-title">Jetzt</span><span class="wb5-card-badge">'+jetztItems.length+' von '+termine.length+'</span></div>';
       jetztItems.forEach(e => {
-        const isL=laufend.includes(e); const w=(e.welt||'b')==='p'?'p':'b';
+        const isL=laufend.includes(e); const wRaw2=(e.welt||'b');const w=wRaw2==='privat'||wRaw2==='priv'?'p':wRaw2==='beruf'||wRaw2==='pro'?'b':wRaw2;
         h += '<div class="wb5-termin-item" onclick="WB._te5OpenTermin(\''+this._esc(e.id)+'\')">'
           +'<div class="wb5-t-bar wb5-t-bar-'+(isL?'l':w)+'"></div>'
           +'<div style="flex:1;min-width:0;"><div class="wb5-t-name">'+this._esc(e.text)+'</div>'
@@ -742,8 +749,8 @@ const WB = {
       ...(db.themen||[]).filter(t=>!t.deleted&&t.status==='aktiv'&&(t.prio||3)<=2)
         .flatMap(t=>(t.aufgaben||[]).filter(a=>!a.deleted&&!a.erledigt&&this._weltOk(t)&&(a.deadline===today||a.heutePin||this._isRoutineHeute(a))))
     ];
-    const offen = aufgabenHeute.filter(a=>!a.erledigt);
-    const erledigt = aufgabenHeute.filter(a=>a.erledigt);
+    const offen = aufgabenHeute.filter(a=>!a.erledigt&&a.status!=='erledigt');
+    const erledigt = aufgabenHeute.filter(a=>a.erledigt||a.status==='erledigt');
     h += '<div class="wb5-card"><div class="wb5-card-hdr"><span class="wb5-card-title">Heute erledigen</span>'
       +'<span class="wb5-card-badge">'+offen.length+' offen'+(erledigt.length?' &middot; '+erledigt.length+' erledigt':'')+'</span></div>';
     erledigt.forEach(a => {
@@ -817,7 +824,7 @@ const WB = {
     const el=document.getElementById('wb5-themen'); if(!el) return;
     const db=this.db||{}; const themen=(db.themen||[]).filter(t=>!t.deleted&&this._weltOk(t));
     const aktiv=themen.filter(t=>t.status!=='erledigt');
-    const freieAufg=(db.aufgaben||[]).filter(a=>!a.deleted&&this._weltOk(a));
+    const freieAufg=(db.aufgaben||[]).filter(a=>!a.deleted&&!a.themaId&&this._weltOk(a));
     const gruppen={};
     aktiv.forEach(t=>{const g=t.oberthema||'_frei';if(!gruppen[g])gruppen[g]=[];gruppen[g].push(t);});
     const sortT=arr=>arr.sort((a,b)=>{const sA=a.status==='aktiv'?0:1;const sB=b.status==='aktiv'?0:1;if(sA!==sB)return sA-sB;return(a.prio||3)-(b.prio||3);});
@@ -974,7 +981,7 @@ const WB = {
     if(termine.length){
       h+='<div class="wb5-termin-card">';
       termine.forEach(e=>{
-        const isL=ds===today&&e.startTime<=nowStr&&(e.endTime||'23:59')>nowStr;const w=(e.welt||'b')==='p'?'p':'b';
+        const isL=ds===today&&e.startTime<=nowStr&&(e.endTime||'23:59')>nowStr;const wRaw2=(e.welt||'b');const w=wRaw2==='privat'||wRaw2==='priv'?'p':wRaw2==='beruf'||wRaw2==='pro'?'b':wRaw2;
         h+='<div class="wb5-termin-row" onclick="WB._te5OpenTermin(\''+this._esc(e.id)+'\')">'
           +'<div class="wb5-tr-bar wb5-tr-bar-'+(isL?'l':w)+'"></div>'
           +'<div style="flex:1;min-width:0;"><div class="wb5-tr-name">'+this._esc(e.text)+'</div><div class="wb5-tr-time">'+(e.startTime||'')+(e.endTime?' \u2013 '+e.endTime:'')+'</div></div>'
@@ -1155,7 +1162,7 @@ const WB = {
     h+='</div><div class="wb5-timer-custom"><span class="wb5-timer-custom-lbl">Eigene Zeit</span>'
       +'<input class="wb5-timer-custom-input" type="number" min="1" max="240" placeholder="\u2014" oninput="WB._fk5CustomTimer(this.value)">'
       +'<span style="font-size:13px;color:var(--muted);font-weight:600;">Min</span></div>';
-    const heute=[...(this.db.aufgaben||[]).filter(a=>!a.deleted&&!a.erledigt&&this._weltOk(a)),...(this.db.themen||[]).filter(t=>!t.deleted&&t.status==='aktiv').flatMap(t=>(t.aufgaben||[]).filter(a=>!a.deleted&&!a.erledigt&&this._weltOk(t)))].slice(0,5);
+    const heute=[...(this.db.aufgaben||[]).filter(a=>!a.deleted&&!a.erledigt&&a.status!=='erledigt'&&!a.themaId&&this._weltOk(a)),...(this.db.themen||[]).filter(t=>!t.deleted&&t.status==='aktiv').flatMap(t=>(t.aufgaben||[]).filter(a=>!a.deleted&&!a.erledigt&&a.status!=='erledigt'&&this._weltOk(t)))].slice(0,5);
     h+='<div class="wb5-sec-lbl">Aufgabe</div><div class="wb5-aufg-select">';
     if(heute.length){heute.forEach(a=>{const sel=this._fkSelectedAufgabe===a.id;h+='<div class="wb5-aufg-sel-item'+(sel?' selected':'')+'" onclick="WB._fk5SelectAufg(\''+this._esc(a.id)+'\')">'+'<div class="wb5-dot wb5-dot-'+((a.welt||'b')==='p'?'p':'b')+'"></div><span style="flex:1;font-size:14px;font-weight:500;color:var(--text);min-width:0;word-break:break-word;">'+this._esc(a.titel||a.text||'')+'</span>'+(sel?'<span class="wb5-sel-check">&#10003;</span>':'')+'</div>';});}
     else h+='<div style="padding:12px;font-size:13px;color:var(--faint);">Keine offenen Aufgaben</div>';
@@ -1261,6 +1268,209 @@ const WB = {
     this.setDirty();this.modalClose();this.renderSection(this.activeTab);
   },
 
+  // ── WB5: Gateways aus Root-Level in Themen einbinden ──
+  _wb5MergeGateways() {
+    if (!this.db) return;
+    // Gateways von Root-Level in Themen einbinden (WB4-Kompatibilität)
+    const rootGws = this.db.gateways || [];
+    (this.db.themen || []).forEach(t => {
+      if (!t.gateways) t.gateways = [];
+      rootGws.filter(g => g.themaId === t.id && !g.deleted).forEach(g => {
+        if (!t.gateways.find(x => x.id === g.id)) {
+          t.gateways.push({
+            id: g.id, titel: g.titel, pruefDatum: g.pruefDatum,
+            status: g.gatewayStatus || 'offen',
+            bedingung: g.gatewayCondition || '',
+            konsequenz: g.gatewayConsequence || '',
+            istWert: g.istWert, sollWert: g.sollWert,
+            istWertLabel: g.istWertLabel,
+            reihenfolge: g.reihenfolge || 0,
+            updatedAt: g.updatedAt || '',
+          });
+        }
+      });
+      t.gateways.sort((a,b) => (a.reihenfolge||0)-(b.reihenfolge||0));
+    });
+    // Aufgaben von Root-Level mit themaId in Themen einbinden (WB4-Kompatibilität)
+    const rootAufg = (this.db.aufgaben || []).filter(a => a.themaId && !a.deleted);
+    (this.db.themen || []).forEach(t => {
+      if (!t.aufgaben) t.aufgaben = [];
+      rootAufg.filter(a => a.themaId === t.id).forEach(a => {
+        if (!t.aufgaben.find(x => x.id === a.id)) {
+          t.aufgaben.push({
+            id: a.id, titel: a.titel || a.text || '',
+            text: a.text || a.titel || '',
+            typ: a.typ || 'aufgabe',
+            status: a.status || 'offen',
+            erledigt: a.erledigt || (a.status === 'erledigt'),
+            deadline: a.deadline || '',
+            welt: a.welt || 'b',
+            prio: a.prio || 3,
+            reihenfolge: a.reihenfolge || 0,
+            wiederholung: a.wiederholung || null,
+            heutePin: a.heutePin || false,
+            deleted: a.deleted || false,
+            updatedAt: a.updatedAt || '',
+          });
+        }
+      });
+      t.aufgaben.sort((a,b) => (a.reihenfolge||0)-(b.reihenfolge||0));
+    });
+  },
+
+
+  // ── WB4-Migrations (Daten-Kompatibilität) ──
+  _ensureDbFields() {
+    if (!this.db) return;
+    if (!this.db.customEvents)  this.db.customEvents  = [];
+    if (!this.db.notizen)       this.db.notizen       = [];
+    if (!this.db.wochenMottos)  this.db.wochenMottos  = {};
+    if (!this.db.sondertage)    this.db.sondertage    = [];
+    if (!this.db._version)      this.db._version      = 1;
+      // WB4 Collections
+    if (!Array.isArray(this.db.themen))   this.db.themen   = [];
+    if (!Array.isArray(this.db.gateways)) this.db.gateways = [];
+    if (!Array.isArray(this.db.aufgaben) || !this.db.aufgaben.every?.(a => a._wb4 !== undefined)) {
+      if (!Array.isArray(this.db.aufgaben)) this.db.aufgaben = [];
+    }
+    if (!this.db.ckKlappZustand || typeof this.db.ckKlappZustand !== 'object') {
+      this.db.ckKlappZustand = {};
+    }
+  },
+
+  _migrateToV4() {
+    if (!this.db) return;
+    // Bereits migriert?
+    if (this.db._version >= 2) return;
+    let dirty = false;
+
+    // Alte notizen[] → themen[] / gateways[] migrieren
+    if (Array.isArray(this.db.notizen) && this.db.notizen.length > 0) {
+      if (!this.db.themen)   this.db.themen   = [];
+      if (!this.db.gateways) this.db.gateways = [];
+
+      this.db.notizen.forEach(n => {
+        if (!n || n.deleted) return;
+        if (n.typ === 'thema') {
+          // Nur wenn noch nicht in themen[]
+          if (!this.db.themen.find(t => t.id === n.id)) {
+            this.db.themen.push({
+              id:          n.id,
+              titel:       n.titel || n.name || 'Unbenanntes Thema',
+              prio:        n.themaPrio || 2,
+              status:      n.themaStatus || 'aktiv',
+              welt:        n.welt || 'beruf',
+              beschreibung: n.inhalt || '',
+              updatedAt:   n.updatedAt || new Date().toISOString(),
+              deleted:     false,
+            });
+            dirty = true;
+          }
+        } else if (n.typ === 'gateway') {
+          if (!this.db.gateways.find(g => g.id === n.id)) {
+            this.db.gateways.push({
+              id:                n.id,
+              themaId:           n.themaId || null,
+              titel:             n.titel || n.name || 'Gateway',
+              pruefDatum:        n.deadline || n.gatewayDate || null,
+              gatewayStatus:     n.gatewayStatus || 'offen',
+              gatewayCondition:  n.gatewayCondition || '',
+              gatewayConsequence:n.gatewayConsequence || '',
+              istWert:           '',
+              sollWert:          '',
+              istWertLabel:      '',
+              reihenfolge:       0,
+              updatedAt:         n.updatedAt || new Date().toISOString(),
+              deleted:           false,
+            });
+            dirty = true;
+          }
+        }
+        // Sonstige Notiz-Typen (check, freitext, idea) → nicht migriert
+        // Sie bleiben in notizen[] für manuellen Export
+      });
+    }
+
+    // Alte aufgaben[] (WB3 Format) → aufgaben[] (WB4 Format)
+    if (Array.isArray(this.db.aufgaben)) {
+      // WB4 aufgaben haben ein 'wb4' Flag
+      const alteAufgaben = this.db.aufgaben.filter(a => !a._wb4);
+      if (alteAufgaben.length > 0) {
+        const neueAufgaben = alteAufgaben.map(a => ({
+          id:              a.id,
+          titel:           a.titel || a.text || 'Aufgabe',
+          themaId:         a.vorhabenId || null,
+          zeitBudgetMin:   a.zeitBudgetMin || 0,
+          reihenfolge:     a.pos || 0,
+          status:          a.done ? 'erledigt' : 'offen',
+          items:           (a.checklist || []).map(c => ({
+            id: c.id || ('si_' + Math.random().toString(36).slice(2,8)),
+            titel: c.text || c.titel || '',
+            status: c.done ? 2 : 0,
+            datum: null,
+          })),
+          wiederholung:    null,
+          linkUrl:         '',
+          linkLabel:       '',
+          updatedAt:       a.updatedAt || new Date().toISOString(),
+          deleted:         a.deleted || false,
+          _wb4:            true,
+        }));
+        this.db.aufgaben = [
+          ...neueAufgaben,
+          ...this.db.aufgaben.filter(a => a._wb4),
+        ];
+        dirty = true;
+      }
+    }
+
+    this.db._version = 2;
+    if (dirty) {
+      this.setDirty();
+      console.log('[WB4] Migration v1→v2 abgeschlossen.');
+    }
+  },
+
+  _migrateWissensnetzwerk() {
+    // Einmalige Migration: wissensnetzwerk[] → notizen[]
+    // Läuft NUR aus idbLoad(), nie aus _syncDownload() oder _ensureDbFields()
+    if (!this.db.wissensnetzwerk || this.db.wissensnetzwerk.length === 0) return;
+    const existingIds = new Set((this.db.notizen||[]).map(n => n.id));
+    let migrated = 0;
+    this.db.wissensnetzwerk.forEach(wk => {
+      if (wk.deleted) return;
+      const newId = existingIds.has(wk.id) ? 'nz_wk_' + wk.id : wk.id;
+      if (existingIds.has(newId)) return; // bereits migriert
+      existingIds.add(newId);
+      this.db.notizen.push({
+        id:          newId,
+        titel:       wk.titel     || 'Ohne Titel',
+        typ:         'freitext',
+        farbe:       'c-weiss',
+        icon:        'note',
+        items:       [],
+        inhalt:      wk.inhalt    || '',
+        tags:        wk.tags      || [],
+        link:        wk.link      || '',
+        ts:          wk.ts        || Date.now(),
+        geaendert:   wk.geaendert || '',
+        welt:        wk.welt === 'privat' ? 'privat' : (wk.welt === 'beruf' ? 'beruf' : undefined),
+        zustand:     undefined,
+        gepinnt:     false,
+        vertraulich: false,
+        deleted:     false,
+        updatedAt:   new Date().toISOString(),
+      });
+      migrated++;
+    });
+    if (migrated > 0) {
+      console.log('[migration] wissensnetzwerk→notizen:', migrated, 'Einträge migriert');
+      this.setDirty();
+    }
+    // Altlast bereinigen
+    delete this.db.wissensnetzwerk;
+  },
+
   // ── setDirty & KW ──────────────────────────────────
   setDirty() {
     this.isDirty=true;clearTimeout(this._saveTimer);
@@ -1292,8 +1502,9 @@ const WB = {
     const body = document.getElementById('s-sync-body');
     const chev = document.getElementById('s-sync-chev');
     if (!body) return;
-    const open = body.classList.toggle('ck4-hidden');
-    if (chev) chev.style.transform = open ? '' : 'rotate(90deg)';
+    const isOpen = body.style.display !== 'none' && body.style.display !== '';
+    body.style.display = isOpen ? 'none' : 'block';
+    if (chev) chev.style.transform = isOpen ? '' : 'rotate(90deg)';
   },
   _sUpdateSyncStatus() {
     const stEl=document.getElementById('s-sync-state-lbl');
@@ -1491,8 +1702,8 @@ const WB = {
   async idbLoad() {
     try {
       const clientId=await this.idbGet('meta','oauthClientId');
-      this._oauthClientId = clientId || this.DEFAULT_CLIENT_ID;
-      if (!clientId && this.DEFAULT_CLIENT_ID) await this.idbSet('meta','oauthClientId', this.DEFAULT_CLIENT_ID);
+      this._oauthClientId = clientId || '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com';
+      if (!clientId) await this.idbSet('meta','oauthClientId', this._oauthClientId);
       const token=await this.idbGet('meta','oauthToken');
       const tokenExp=await this.idbGet('meta','oauthTokenExp');
       if(token&&tokenExp){this._oauthToken=token;this._oauthTokenExp=parseInt(tokenExp)||0;}
@@ -1509,6 +1720,7 @@ const WB = {
         this.db=dbRaw;
         this._ensureDbFields();
         this._migrateToV4();
+        this._wb5MergeGateways();
         this._migrateWissensnetzwerk(); // einmalig, nur hier — nie in _syncDownload
         // heutePin: zurücksetzen bei Tageswechsel (nicht Session-Ende)
         const today = this._dStr(new Date());
