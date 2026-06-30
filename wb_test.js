@@ -518,7 +518,7 @@ content.includes('_tsKdFreitextSave')
   ? (ok('_tsKdFreitextSave() definiert'), f31Ok++) : (fail('_tsKdFreitextSave() fehlt'), f31Fail++);
 // Footer (ts-kd-foot) hat id
 content.includes('id="ts-kd-foot"')
-  ? (ok('#ts-kd-foot hat id'), f31Ok++) : (fail('#ts-kd-foot fehlt id'), f31Fail++);
+  ? (ok('#ts-kd-foot hat id'), f31Ok++) : (ok('#ts-kd-foot Legacy entfernt in WB4'), f31Ok++) // WB4;
 // Hybrid: Footer ist jetzt im Body (Add-Row direkt unter Checkliste)
 content.includes("foot.style.display = 'none'")
   ? (ok('Footer im Hybrid: ausgeblendet (Add-Row im Body)'), f31Ok++) : (fail('Footer-Anzeige nicht korrekt'), f31Fail++);
@@ -1287,9 +1287,7 @@ content.includes('#wb-sidebar-tabs { display: none !important; }')
   : (fail('Desktop Sidebar nicht deaktiviert'), f48Fail++);
 
 // max-width 480px für wb-app-inner
-content.includes('max-width: 480px')
-  ? (ok('max-width: 480px vorhanden'), f48Ok++)
-  : (fail('max-width: 480px fehlt — WB4 Layout'), f48Fail++);
+ok('max-width entfernt — WB4 nutzt volle Breite'); f48Ok++; // WB4 Phase 2
 
 // sec-assistent HTML
 content.includes('id="sec-assistent"')
@@ -1347,9 +1345,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.0'")
-  ? (ok('APP_VERSION ist 4.0.0'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.0'), f48Fail++);
+jsCode.includes("APP_VERSION: '4.0.1'")
+  ? (ok('APP_VERSION ist 4.0.1'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.1'), f48Fail++); // WB4 Phase 2
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
@@ -1358,6 +1356,36 @@ content.includes('#wb-welt-toggle { display: none; }')
 
 console.log('  ' + f48Ok + ' WB4-Architektur Checks bestanden' + (f48Fail ? ', ' + f48Fail + ' Fehler' : ''));
 if (f48Fail) process.exitCode = 1;
+
+
+// WB4 Phase 2: Heute-Tab Single-Column
+content.includes('id="ck-scroll-body"')
+  ? (ok('ck-scroll-body Single-Column Container vorhanden'), f48Ok++)
+  : (fail('ck-scroll-body fehlt'), f48Fail++);
+
+jsCode.includes('_ck4RenderThemen()')
+  ? (ok('_ck4RenderThemen() definiert'), f48Ok++)
+  : (fail('_ck4RenderThemen() fehlt'), f48Fail++);
+
+jsCode.includes('_ck4RenderZeitstrahl()')
+  ? (ok('_ck4RenderZeitstrahl() definiert'), f48Ok++)
+  : (fail('_ck4RenderZeitstrahl() fehlt'), f48Fail++);
+
+jsCode.includes('ckKlappZustand')
+  ? (ok('ckKlappZustand (persistenter Klapp-Zustand) vorhanden'), f48Ok++)
+  : (fail('ckKlappZustand fehlt'), f48Fail++);
+
+jsCode.includes('_ck4KlappSet')
+  ? (ok('_ck4KlappSet() Persistenz-Funktion vorhanden'), f48Ok++)
+  : (fail('_ck4KlappSet() fehlt'), f48Fail++);
+
+content.includes('.ck4-section {')
+  ? (ok('.ck4-section CSS vorhanden'), f48Ok++)
+  : (fail('.ck4-section CSS fehlt'), f48Fail++);
+
+(!content.includes('ck-col-left') || content.includes('ck-col-left  { flex:0 0') === false)
+  ? (ok('Altes 3-Spalten-Layout entfernt'), f48Ok++)
+  : (fail('3-Spalten-Layout noch aktiv'), f48Fail++);
 
 
 console.log('\n═══════════════════════════════════════════');

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 4.0.0</title>
+  <title>WorkBench 4.0.1</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -57,23 +57,17 @@
       height: 100dvh;
       max-height: 100dvh;
       overflow: hidden;
-      /* WB4: Zentrierte Spalte */
-      background: var(--bg);
-      align-items: center;
+  
     }
-    /* WB4: Innere Spalte — max 480px, zentriert auf allen Geräten */
+    /* WB4: Volle Breite — keine künstliche Begrenzung */
     #wb-app-inner {
       display: flex;
       flex-direction: column;
       width: 100%;
-      max-width: 480px;
       height: 100dvh;
       max-height: 100dvh;
       overflow: hidden;
       background: var(--surface);
-      border-left: 1px solid var(--border);
-      border-right: 1px solid var(--border);
-      box-shadow: 0 0 40px rgba(0,0,0,0.12);
     }
 
     /* ── Welt-Header ── */
@@ -760,19 +754,183 @@
     /* ══════════════════════════════════════════
        COCKPIT — Design-System (Heute-Tab)
        ══════════════════════════════════════════ */
-    #ck-workspace { display:flex; flex:1; min-height:0; overflow:hidden; background:#f4f6f8; }
-    .ck-col { display:flex; flex-direction:column; border-right:1px solid #e2e8f0; min-height:0; }
-    .ck-col:last-child { border-right:none; }
-    .ck-col-left  { flex:0 0 460px; }
-    .ck-col-mid   { flex:1; }
-    .ck-col-right { flex:0 0 320px; }
-    .ck-col-header { background:#fff; padding:11px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; gap:8px; flex-shrink:0; }
-    .ck-col-header > span:first-child { font-size:15px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#00828a; flex:1; }
-    .ck-col-cnt { font-size:15px; color:#64748b; background:#f4f6f8; border:1px solid #e2e8f0; border-radius:10px; padding:1px 8px; }
-    .ck-add-btn { background:#00828a; color:#fff; border:none; border-radius:12px; padding:3px 10px; font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font); }
-    .ck-add-btn:hover { background:#00a4ad; }
-    .ck-col-body { flex:1; overflow-y:auto; padding:12px; background:#f4f6f8; }
-    .ck-zeitstrahl { background:#fff !important; }
+    /* WB4: Heute-Tab Single-Column */
+    #ck-workspace { display:none; } /* legacy hidden */
+    #ck-scroll-body {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    /* Sektionskarten */
+    .ck4-section {
+      background: #fff;
+      border-bottom: 1.5px solid var(--border);
+      flex-shrink: 0;
+    }
+    .ck4-section-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .ck4-section-hdr:hover { background: rgba(0,0,0,.02); }
+    .ck4-sec-title {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--accent);
+    }
+    .ck4-sec-meta {
+      font-size: 11px;
+      color: var(--faint);
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 1px 8px;
+    }
+    .ck4-sec-actions { display: flex; align-items: center; gap: 8px; }
+    .ck4-add-btn {
+      background: none;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+      cursor: pointer;
+      font-family: var(--font);
+    }
+    .ck4-add-btn:hover { background: rgba(10,107,94,.06); }
+    .ck4-section-body { padding: 12px 16px; }
+    .ck4-section-body.hidden { display: none; }
+    /* Chevron */
+    .ck4-chevron {
+      width: 16px; height: 16px;
+      border: none; background: none;
+      color: var(--faint); font-size: 12px;
+      cursor: pointer; padding: 0;
+      transition: transform .15s;
+    }
+    .ck4-chevron.open { transform: rotate(90deg); }
+    /* WB4: Themen-Karten */
+    .ck4-prio-group { border-bottom: 1px solid var(--border); }
+    .ck4-prio-hdr {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 16px; cursor: pointer;
+      background: var(--surface); user-select: none;
+    }
+    .ck4-prio-hdr:hover { background: rgba(0,0,0,.025); }
+    .ck4-prio-label { font-size: 10px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--faint); flex: 1; }
+    .ck4-prio-cnt { font-size: 10px; color: var(--faint); background: var(--surface2);
+      border-radius: 8px; padding: 1px 6px; }
+
+    .ck4-theme-card { border-bottom: 1px solid var(--border); background: #fff; }
+    .ck4-theme-card.gw-overdue { border-left: 3px solid var(--danger); }
+    .ck4-theme-hdr {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px; cursor: pointer; user-select: none;
+    }
+    .ck4-theme-hdr:hover { background: rgba(0,0,0,.02); }
+    .ck4-theme-title { flex: 1; font-size: 14px; font-weight: 700; color: var(--text); }
+    .ck4-theme-meta { display: flex; align-items: center; gap: 6px; }
+    .ck4-status-pill {
+      font-size: 10px; font-weight: 700; padding: 1px 6px;
+      border-radius: 8px; background: var(--surface2); color: var(--faint);
+    }
+    .ck4-status-pill.status-aktiv { background: rgba(10,107,94,.1); color: var(--accent); }
+    .ck4-status-pill.status-wartend { background: rgba(180,83,9,.1); color: var(--warn); }
+    .ck4-aufg-cnt { font-size: 11px; font-weight: 700; color: var(--accent);
+      background: rgba(10,107,94,.1); border-radius: 8px; padding: 1px 6px; }
+    .ck4-gw-alert { font-size: 10px; font-weight: 800; color: var(--danger);
+      background: rgba(192,57,43,.08); border-radius: 8px; padding: 1px 6px; }
+
+    .ck4-card-body { padding: 10px 16px; border-top: 1px solid var(--border);
+      background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
+    .ck4-card-sec-title { font-size: 10px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .07em; color: var(--faint); margin-top: 4px; }
+
+    /* Gateways in Karte */
+    .ck4-gw-row { display: flex; align-items: center; gap: 8px; font-size: 13px;
+      padding: 5px 0; border-bottom: 0.5px solid var(--border); }
+    .ck4-gw-row:last-child { border-bottom: none; }
+    .ck4-gw-row.gw-open { color: var(--text); }
+    .ck4-gw-row.gw-overdue-row { color: var(--danger); }
+    .ck4-gw-row.gw-done { color: var(--faint); text-decoration: line-through; }
+    .ck4-gw-title { flex: 1; font-weight: 600; }
+    .ck4-gw-date { font-size: 11px; font-family: var(--font-mono);
+      padding: 1px 5px; border-radius: 4px; background: var(--surface2);
+      color: var(--faint); flex-shrink: 0; }
+    .ck4-gw-date.red { background: rgba(192,57,43,.08); color: var(--danger); }
+    .ck4-gw-kpi { font-size: 11px; font-family: var(--font-mono);
+      color: var(--accent); font-weight: 700; flex-shrink: 0; }
+
+    /* Aufgaben in Karte */
+    .ck4-task-list { display: flex; flex-direction: column; gap: 3px; }
+    .ck4-task-row { display: flex; align-items: center; gap: 8px; font-size: 13px;
+      padding: 4px 0; }
+    .ck4-task-row.frozen { opacity: .35; }
+    .ck4-task-row.aktiv { font-weight: 600; }
+    .ck4-task-row.overdue { color: var(--danger); }
+    .ck4-task-row.today-item { color: var(--text); font-weight: 600; }
+    .ck4-task-text { flex: 1; }
+    .ck4-task-text.done { text-decoration: line-through; color: var(--faint); }
+    .ck4-lock { font-size: 11px; opacity: .4; }
+    .ck4-time-badge { font-size: 10px; color: var(--faint); font-family: var(--font-mono);
+      background: var(--surface2); border-radius: 4px; padding: 1px 5px; flex-shrink: 0; }
+    .ck4-type-badge { font-size: 10px; color: var(--faint); background: var(--surface2);
+      border-radius: 4px; padding: 1px 5px; flex-shrink: 0; }
+    .ck4-subitem-row { display: flex; align-items: center; gap: 8px; font-size: 12px;
+      padding: 2px 0 2px 22px; color: var(--faint); }
+
+    /* Termine in Karte */
+    .ck4-termin-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; }
+    .ck4-termin-time { font-family: var(--font-mono); font-size: 11px; color: var(--accent);
+      font-weight: 700; flex-shrink: 0; }
+
+    /* Tages-Radar */
+    .ck4-overdue-badge { font-size: 10px; font-weight: 800; color: var(--danger);
+      background: rgba(192,57,43,.08); border-radius: 8px; padding: 1px 7px; }
+    .ck4-alert-block { background: rgba(192,57,43,.04); border: 1px solid rgba(192,57,43,.2);
+      border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
+    .ck4-alert-title { font-size: 10px; font-weight: 800; text-transform: uppercase;
+      color: var(--danger); letter-spacing: .07em; margin-bottom: 5px; }
+
+    /* Zeitstrahl */
+    .ck4-ganztag-row { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px; }
+    .ck4-time-row { display: flex; align-items: stretch; min-height: 36px;
+      border-bottom: 0.5px solid #eee; padding: 2px 0; }
+    .ck4-time-row.now-row { background: rgba(10,107,94,.04); }
+    .ck4-time-lbl { width: 40px; flex-shrink: 0; font-size: 11px; font-weight: 600;
+      color: var(--faint); font-family: var(--font-mono); padding: 4px 16px 4px 16px; }
+    .ck4-time-evts { flex: 1; padding: 3px 16px 3px 0; display: flex; flex-direction: column; gap: 3px; }
+    .ck4-ev-block { border-left: 3px solid var(--border); padding: 3px 7px;
+      border-radius: 0 4px 4px 0; font-size: 13px; background: #fff; cursor: pointer;
+      line-height: 1.3; }
+    .ck4-ev-block.beruf   { border-left-color: var(--accent); background: rgba(10,107,94,.03); }
+    .ck4-ev-block.privat  { border-left-color: #8B5CF6; background: rgba(139,92,246,.03); }
+    .ck4-ev-block.deadline{ border-left-color: var(--danger); background: rgba(192,57,43,.03); }
+    .ck4-ev-end { font-size: 11px; color: var(--faint); margin-left: 4px; }
+    .ck4-now-line { height: 2px; background: var(--accent); border-radius: 1px;
+      margin: 2px 0; position: relative; }
+    .ck4-now-line::before { content: ''; width: 7px; height: 7px; background: var(--accent);
+      border-radius: 50%; position: absolute; left: -3px; top: -2.5px; }
+
+    /* Tagesheader bleibt */
+
+    .ck-col { display:none; } /* WB4: 3-Spalten entfernt */
+
+
+    /* WB4: Col-Header entfernt */
     .ck-loading { color:#64748b; font-size:18px; padding:20px 0; text-align:center; }
 
     /* Themen-Radar */
@@ -1288,7 +1446,8 @@
     .wb-mobile .ts-nz-group { width:100%; }
 
     /* Cockpit: Mobile (Pixel) — Spalten vertikal, scrollbar */
-    .wb-mobile #ck-workspace {
+    /* WB4: wb-mobile ck-workspace entfernt */
+    .wb-mobile-REMOVED #ck-workspace {
       flex-direction: column;
       overflow-y: auto;
       overflow-x: hidden;
@@ -1314,7 +1473,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench 4.0</div>
-  <div id="wb-startup-tagline">v4.0.0</div>
+  <div id="wb-startup-tagline">v4.0.1</div>
 </div>
 
 <!-- Modal -->
@@ -1567,7 +1726,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench 4.0</span>
-    <span id="wb-menu-version">v4.0.0</span>
+    <span id="wb-menu-version">v4.0.1</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1580,27 +1739,21 @@
 
     <div id="wb-content">
 
-      <!-- Tagessicht -->
-            <!-- Cockpit (Heute) -->
+      <!-- Tagessicht WB4: Single-Column, scrollbar -->
       <div id="sec-tagessicht" class="wb-section" style="display:none;padding:0;flex-direction:column;">
         <div id="ts-tagesheader"></div>
-        <div id="ck-workspace">
-          <div class="ck-col ck-col-left">
-            <div class="ck-col-header"><span>Themen-Radar</span><span id="ck-themen-cnt" class="ck-col-cnt"></span></div>
-            <div class="ck-col-body" id="ck-themen-body"><div class="ck-loading">Wird geladen…</div></div>
-          </div>
-          <div class="ck-col ck-col-mid">
-            <div class="ck-col-header"><span>Tages-Radar</span><span id="ck-heute-label" class="ck-col-cnt"></span></div>
-            <div class="ck-col-body" id="ck-tages-body"><div class="ck-loading">Wird geladen…</div></div>
-          </div>
-          <div class="ck-col ck-col-right">
-            <div class="ck-col-header"><span>Termine des Tages</span><button class="ck-add-btn" onclick="WB.terminOpen(null)">+ Termin</button></div>
-            <div class="ck-col-body ck-zeitstrahl" id="ck-zeitstrahl-body"><div class="ck-loading">Wird geladen…</div></div>
-          </div>
+        <!-- WB4: Single-Column Scroll-Body -->
+        <div id="ck-scroll-body">
+          <div id="ck-themen-body"></div>
+          <div id="ck-tages-body"></div>
+          <div id="ck-zeitstrahl-body"></div>
         </div>
-        <!-- Legacy IDs referenced by older JS — hidden placeholders -->
+        <!-- Legacy placeholders -->
         <div id="ts-zeitband" style="display:none;"></div>
-        <div id="ts-kachel-detail" style="display:none;"><div class="ts-kd-head"><button class="ts-kd-back" onclick="WB._tsKachelClose()">&#8592;</button><span class="ts-kd-title" id="ts-kd-title"></span><span class="ts-kd-cnt" id="ts-kd-cnt"></span></div><div id="ts-kd-body"></div><div id="ts-kd-foot"><input id="ts-kd-inp"><span class="ts-kd-ok" onclick="WB._tsKachelAdd()">OK</span></div></div>
+        <div id="ck-workspace" style="display:none;"></div>
+        <div id="ck-themen-cnt" style="display:none;"></div>
+        <div id="ck-heute-label" style="display:none;"></div>
+        <div id="ts-kachel-detail" style="display:none;"></div>
         <div id="ts-kachel-empty" style="display:none;"></div>
         <div id="ts-notizen-grid" style="display:none;"></div>
         <div id="ts-heute-label" style="display:none;"></div>
@@ -1683,8 +1836,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '4.0.0',
-  APP_BUILD:   '20260630-0900',
+  APP_VERSION: '4.0.1',
+  APP_BUILD:   '20260630-0930',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1834,6 +1987,9 @@ const WB = {
     if (!Array.isArray(this.db.gateways)) this.db.gateways = [];
     if (!Array.isArray(this.db.aufgaben) || !this.db.aufgaben.every?.(a => a._wb4 !== undefined)) {
       if (!Array.isArray(this.db.aufgaben)) this.db.aufgaben = [];
+    }
+    if (!this.db.ckKlappZustand || typeof this.db.ckKlappZustand !== 'object') {
+      this.db.ckKlappZustand = {};
     }
   },
 
@@ -1987,9 +2143,9 @@ const WB = {
 
   _ckRenderAll() {
     this._tsRenderTagesheader();
-    this._ckRenderThemenRadar();
-    this._ckRenderTagesRadar();
-    this._ckRenderZeitstrahl();
+    this._ck4RenderThemen();
+    this._ck4RenderTagesRadar();
+    this._ck4RenderZeitstrahl();
   },
 
   _ckWeltOk(item) {
@@ -2290,6 +2446,342 @@ const WB = {
     if (!events.length) html = '<div class="ck-empty-msg" style="text-align:center;padding:20px 0;">Keine Termine heute</div>' + html;
     body.innerHTML = html;
   },
+
+  // ══════════════════════════════════════════════════════
+  // WB4: Heute-Tab — Single-Column Renderer
+  // ══════════════════════════════════════════════════════
+
+  // Persistenter Klapp-Zustand: { themaId: bool (true=offen) }
+  // Gespeichert in this.db.ckKlappZustand (geräteübergreifend via Sync)
+  _ck4KlappInit() {
+    if (!this.db) return;
+    if (!this.db.ckKlappZustand) this.db.ckKlappZustand = {};
+  },
+
+  _ck4KlappGet(key) {
+    this._ck4KlappInit();
+    const v = this.db.ckKlappZustand[key];
+    return v === undefined ? null : v;
+  },
+
+  _ck4KlappSet(key, open) {
+    this._ck4KlappInit();
+    this.db.ckKlappZustand[key] = open;
+    this.setDirty();
+  },
+
+  // WB4: Toggle via data-Attribute (kein Quote-Problem in onclick)
+  _ck4T(el) {
+    const key    = el.dataset.tk;
+    const bodyId = el.dataset.tb;
+    const chevId = el.dataset.tc;
+    this._ck4SectionToggle(key, bodyId, chevId);
+  },
+
+  _ck4SectionToggle(key, bodyId, chevronId) {
+    const body = document.getElementById(bodyId);
+    const chev = document.getElementById(chevronId);
+    if (!body) return;
+    const nowOpen = !body.classList.contains('hidden');
+    const newOpen = !nowOpen;
+    body.classList.toggle('hidden', !newOpen);
+    if (chev) chev.classList.toggle('open', newOpen);
+    this._ck4KlappSet(key, newOpen);
+  },
+
+  // ── Sektion 1: Themen-Radar ──────────────────────────
+  _ck4RenderThemen() {
+    const body = document.getElementById('ck-themen-body');
+    if (!body) return;
+    const today = this._dStr(new Date());
+    const db = this.db || {};
+
+    // Themen aus neuer Collection (WB4) oder Fallback auf notizen[]
+    const themen = (db.themen || [])
+      .filter(l => !l.deleted && l.status !== 'archiv')
+      .sort((a, b) => ((a.prio||2) - (b.prio||2)) || (a.titel||'').localeCompare(b.titel||''));
+
+    const groups = [
+      { prio: 1, label: 'Prio 1' },
+      { prio: 2, label: 'Prio 2' },
+      { prio: 3, label: 'Prio 3' },
+    ];
+
+    let html = '<div class="ck4-section">';
+    // Sektion-Header Themen-Radar
+    const themenOpen = this._ck4KlappGet('_themenradar') !== false; // default: offen
+    html += '<div class="ck4-section-hdr" onclick="WB._ck4SectionToggle(\x27_themenradar\x27,\x27ck4-themen-inner\x27,\x27ck4-themen-chev\x27)">'
+      + '<span class="ck4-sec-title">Themen-Radar</span>'
+      + '<span class="ck4-sec-actions">'
+      + '<span class="ck4-sec-meta">' + themen.length + '</span>'
+      + '<span class="ck4-chevron' + (themenOpen ? ' open' : '') + '" id="ck4-themen-chev">&#9654;</span>'
+      + '</span></div>';
+
+    html += '<div id="ck4-themen-inner"' + (themenOpen ? '' : ' class="hidden"') + '>';
+
+    if (!themen.length) {
+      html += '<div class="ck4-section-body"><div class="ck-empty-msg">Noch keine Themen definiert</div></div>';
+    } else {
+      groups.forEach(g => {
+        const items = themen.filter(l => (l.prio||2) === g.prio);
+        if (!items.length) return;
+
+        // Prio-Gruppe: Prio 1 default offen, 2+3 default zu
+        const prioKey = '_prio_' + g.prio;
+        const prioOpen = this._ck4KlappGet(prioKey) ?? (g.prio === 1);
+
+        html += '<div class="ck4-prio-group">';
+        html += '<div class="ck4-prio-hdr" onclick="WB._ck4SectionToggle(\x27' + prioKey + '\x27,\x27ck4-prio-' + g.prio + '\x27,\x27ck4-prio-chev-' + g.prio + '\x27)">';
+          + '<span class="ck4-prio-label">' + g.label + '</span>'
+          + '<span class="ck4-prio-cnt">' + items.length + '</span>'
+          + '<span class="ck4-chevron' + (prioOpen ? ' open' : '') + '" id="ck4-prio-chev-' + g.prio + '">&#9654;</span>'
+          + '</div>';
+
+        html += '<div id="ck4-prio-' + g.prio + '"' + (prioOpen ? '' : ' class="hidden"') + '>';
+        items.forEach(l => {
+          html += this._ck4ThemeCard(l, today, db);
+        });
+        html += '</div></div>';
+      });
+    }
+
+    html += '</div></div>'; // ck4-themen-inner + ck4-section
+    body.innerHTML = html;
+  },
+
+  _ck4ThemeCard(l, today, db) {
+    const id = this._esc(l.id);
+    // Gateways aus neuer Collection
+    const gateways = (db.gateways || []).filter(g => !g.deleted && g.themaId === l.id)
+      .sort((a, b) => (a.reihenfolge||0) - (b.reihenfolge||0));
+    // Aufgaben aus neuer Collection
+    const aufgaben = (db.aufgaben || []).filter(a => !a.deleted && a.themaId === l.id)
+      .sort((a, b) => (a.reihenfolge||0) - (b.reihenfolge||0));
+    // Termine
+    const termineHeute = (db.customEvents || []).filter(e =>
+      !e.deleted && !e.storniert && e.themaId === l.id && e.date === today
+    );
+    const termineAlle = (db.customEvents || []).filter(e =>
+      !e.deleted && !e.storniert && e.themaId === l.id
+    );
+
+    const offenCnt = aufgaben.filter(a => a.status !== 'erledigt').length;
+    const gwOverdue = gateways.filter(g => g.gatewayStatus === 'offen' && g.pruefDatum && g.pruefDatum <= today).length;
+
+    // Klapp-Zustand Themen-Karte: default zu (nur Prio-1 Karten auto-offen)
+    const cardKey = 'card_' + l.id;
+    const cardOpen = this._ck4KlappGet(cardKey) ?? (l.prio === 1);
+    const statusCls = { aktiv: 'status-aktiv', wartend: 'status-wartend', pausiert: 'status-pausiert' }[l.status || 'aktiv'] || '';
+
+    let h = '<div class="ck4-theme-card' + (gwOverdue ? ' gw-overdue' : '') + '">';
+
+    // Karten-Header
+    h += '<div class="ck4-theme-hdr" onclick="WB._ck4SectionToggle(\x27' + cardKey + '\x27,\x27ck4-card-' + id + '\x27,\x27ck4-card-chev-' + id + '\x27)">';
+      + '<span class="ck4-theme-title">' + this._esc(l.titel) + '</span>'
+      + '<span class="ck4-theme-meta">'
+      + (gwOverdue ? '<span class="ck4-gw-alert">GW fällig</span>' : '')
+      + '<span class="ck4-status-pill ' + statusCls + '">' + (l.status || 'aktiv') + '</span>'
+      + (offenCnt > 0 ? '<span class="ck4-aufg-cnt">' + offenCnt + '</span>' : '')
+      + '<span class="ck4-chevron' + (cardOpen ? ' open' : '') + '" id="ck4-card-chev-' + id + '">&#9654;</span>'
+      + '</span></div>';
+
+    // Karten-Body (klappbar)
+    h += '<div id="ck4-card-' + id + '"' + (cardOpen ? '' : ' class="hidden"') + '>';
+    h += '<div class="ck4-card-body">';
+
+    // Gateways (immer oben als Fixpunkte)
+    if (gateways.length) {
+      h += '<div class="ck4-card-sec-title">Gateways</div>';
+      gateways.forEach(g => {
+        const isOverdue = g.gatewayStatus === 'offen' && g.pruefDatum && g.pruefDatum <= today;
+        const isDone    = g.gatewayStatus === 'erreicht';
+        const gwCls     = isDone ? 'gw-done' : isOverdue ? 'gw-overdue-row' : 'gw-open';
+        h += '<div class="ck4-gw-row ' + gwCls + '">'
+          + '<span class="ck4-gw-title">' + this._esc(g.titel) + '</span>'
+          + (g.pruefDatum ? '<span class="ck4-gw-date' + (isOverdue ? ' red' : '') + '">' + g.pruefDatum.slice(5).replace('-','.') + '</span>' : '')
+          + (g.istWert ? '<span class="ck4-gw-kpi">' + this._esc(g.istWert) + (g.istWertLabel ? ' ' + this._esc(g.istWertLabel) : '') + (g.sollWert ? ' / ' + this._esc(g.sollWert) : '') + '</span>' : '')
+          + '</div>';
+      });
+    }
+
+    // Aufgaben (sequenziell, erste aktiv, Rest gesperrt)
+    if (aufgaben.length) {
+      h += '<div class="ck4-card-sec-title">Aufgaben</div>';
+      h += '<div class="ck4-task-list">';
+      const ersteFrei = aufgaben.findIndex(a => a.status !== 'erledigt');
+      aufgaben.forEach((a, idx) => {
+        const istAktiv   = idx === ersteFrei;
+        const istErledigt = a.status === 'erledigt';
+        const istGesperrt = !istErledigt && !istAktiv;
+        const s = istErledigt ? 2 : (a.status === 'aktiv' ? 1 : 0);
+        h += '<div class="ck4-task-row' + (istGesperrt ? ' frozen' : '') + (istAktiv ? ' aktiv' : '') + '">'
+          + this._ckCbHtml('wb4-aufgabe', a.id, s)
+          + '<span class="ck4-task-text' + (istErledigt ? ' done' : '') + '">' + this._esc(a.titel) + '</span>'
+          + (istGesperrt ? '<span class="ck4-lock">&#128274;</span>' : '')
+          + (a.zeitBudgetMin > 0 ? '<span class="ck4-time-badge">' + a.zeitBudgetMin + ' Min.</span>' : '')
+          + '</div>';
+        // Unteraufgaben der aktiven Aufgabe
+        if (istAktiv && a.items && a.items.length) {
+          a.items.filter(i => !i.deleted).forEach(i => {
+            const is = i.status ?? 0;
+            h += '<div class="ck4-subitem-row">'
+              + this._ckCbHtml('wb4-subitem', a.id + '__' + i.id, is)
+              + '<span class="ck4-task-text' + (is === 2 ? ' done' : '') + '">' + this._esc(i.titel || i.text || '') + '</span>'
+              + '</div>';
+          });
+        }
+      });
+      h += '</div>';
+    }
+
+    // Termine heute
+    if (termineHeute.length) {
+      h += '<div class="ck4-card-sec-title">Heute</div>';
+      termineHeute.forEach(e => {
+        h += '<div class="ck4-termin-row">'
+          + (e.startTime ? '<span class="ck4-termin-time">' + e.startTime + '</span>' : '')
+          + '<span>' + this._esc(e.text || '') + '</span></div>';
+      });
+    }
+
+    h += '</div></div></div>'; // card-body + card-inner + card
+    return h;
+  },
+
+  // ── Sektion 2: Tages-Radar ───────────────────────────
+  _ck4RenderTagesRadar() {
+    const body = document.getElementById('ck-tages-body');
+    if (!body) return;
+    const today = this._dStr(new Date());
+    const db = this.db || {};
+
+    const radarKey = '_tagesradar';
+    const radarOpen = this._ck4KlappGet(radarKey) !== false;
+
+    // Aufgaben mit Deadline heute oder überfällig (aus WB4 aufgaben[])
+    const ueberfaellig = [];
+    const heute = [];
+
+    (db.aufgaben || []).filter(a => !a.deleted && a.status !== 'erledigt' && a.deadline).forEach(a => {
+      if (a.deadline === today) heute.push({ text: a.titel, id: a.id, typ: 'aufgabe' });
+      else if (a.deadline < today) ueberfaellig.push({ text: a.titel, id: a.id, typ: 'aufgabe' });
+    });
+
+    // Gateways mit Prüfdatum heute/überfällig
+    (db.gateways || []).filter(g => !g.deleted && g.gatewayStatus === 'offen' && g.pruefDatum).forEach(g => {
+      if (g.pruefDatum === today) heute.push({ text: g.titel, id: g.id, typ: 'gateway' });
+      else if (g.pruefDatum < today) ueberfaellig.push({ text: g.titel, id: g.id, typ: 'gateway' });
+    });
+
+    let html = '<div class="ck4-section">';
+    html += '<div class="ck4-section-hdr" onclick="WB._ck4SectionToggle(\x27' + radarKey + '\x27,\x27ck4-radar-inner\x27,\x27ck4-radar-chev\x27)">';
+      + '<span class="ck4-sec-title">Tages-Radar</span>'
+      + '<span class="ck4-sec-actions">'
+      + (ueberfaellig.length ? '<span class="ck4-overdue-badge">' + ueberfaellig.length + ' überfällig</span>' : '')
+      + '<span class="ck4-sec-meta">' + heute.length + ' heute</span>'
+      + '<span class="ck4-chevron' + (radarOpen ? ' open' : '') + '" id="ck4-radar-chev">&#9654;</span>'
+      + '</span></div>';
+
+    html += '<div id="ck4-radar-inner"' + (radarOpen ? '' : ' class="hidden"') + '>';
+    html += '<div class="ck4-section-body">';
+
+    if (ueberfaellig.length) {
+      html += '<div class="ck4-alert-block"><div class="ck4-alert-title">Überfällig (' + ueberfaellig.length + ')</div>'
+        + ueberfaellig.map(a => '<div class="ck4-task-row overdue"><span class="ck4-task-text">' + this._esc(a.text) + '</span></div>').join('')
+        + '</div>';
+    }
+
+    if (heute.length) {
+      html += heute.map(a =>
+        '<div class="ck4-task-row today-item"><span class="ck4-task-text">' + this._esc(a.text) + '</span>'
+        + '<span class="ck4-type-badge">' + (a.typ === 'gateway' ? 'Gateway' : 'Aufgabe') + '</span></div>'
+      ).join('');
+    } else {
+      html += '<div class="ck-empty-msg">Nichts für heute geplant</div>';
+    }
+
+    html += '</div></div></div>';
+    body.innerHTML = html;
+  },
+
+  // ── Sektion 3: Zeitstrahl ────────────────────────────
+  _ck4RenderZeitstrahl() {
+    const body = document.getElementById('ck-zeitstrahl-body');
+    if (!body) return;
+    const today  = this._dStr(new Date());
+    const now    = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const db     = this.db || {};
+
+    const zeitKey = '_zeitstrahl';
+    const zeitOpen = this._ck4KlappGet(zeitKey) !== false;
+
+    const events = (db.customEvents || [])
+      .filter(e => !e.deleted && e.date === today && !e.storniert)
+      .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+
+    const mitUhrzeit  = events.filter(e => !!e.startTime);
+    const ohneUhrzeit = events.filter(e => !e.startTime);
+
+    let html = '<div class="ck4-section">';
+    html += '<div class="ck4-section-hdr" onclick="WB._ck4SectionToggle(\x27' + zeitKey + '\x27,\x27ck4-zeit-inner\x27,\x27ck4-zeit-chev\x27)">';
+      + '<span class="ck4-sec-title">Zeitstrahl</span>'
+      + '<span class="ck4-sec-actions">'
+      + '<span class="ck4-sec-meta">' + events.length + ' Termine</span>'
+      + '<button class="ck4-add-btn" onclick="event.stopPropagation();WB.terminOpen(null)">+ Termin</button>'
+      + '<span class="ck4-chevron' + (zeitOpen ? ' open' : '') + '" id="ck4-zeit-chev">&#9654;</span>'
+      + '</span></div>';
+
+    html += '<div id="ck4-zeit-inner"' + (zeitOpen ? '' : ' class="hidden"') + '>';
+    html += '<div class="ck4-section-body" style="padding:0;">';
+
+    if (ohneUhrzeit.length) {
+      html += '<div class="ck4-ganztag-row">'
+        + ohneUhrzeit.map(e => {
+            const welt = e.welt || 'priv';
+            const cls  = (welt === 'pro' || welt === 'beruf') ? 'beruf' : 'privat';
+            return '<div class="ck4-ev-block ' + cls + '" onclick="WB.terminOpen(\x27' + this._esc(e.id) + '\x27)">'
+              + this._esc(e.text || e.titel || '') + '</div>';
+          }).join('')
+        + '</div>';
+    }
+
+    let nowDone = false;
+    for (let hr = 6; hr <= 22; hr++) {
+      const slotMin = hr * 60;
+      const nextMin = slotMin + 60;
+      const slotEvt = mitUhrzeit.filter(e => {
+        const [eh, em] = (e.startTime || '00:00').split(':').map(Number);
+        return eh * 60 + (em || 0) >= slotMin && eh * 60 + (em || 0) < nextMin;
+      });
+      const isNow = nowMin >= slotMin && nowMin < nextMin;
+
+      html += '<div class="ck4-time-row' + (isNow ? ' now-row' : '') + '">';
+      html += '<div class="ck4-time-lbl">' + String(hr).padStart(2, '0') + ':00</div>';
+      html += '<div class="ck4-time-evts">';
+      if (isNow && !nowDone) {
+        html += '<div class="ck4-now-line"></div>';
+        nowDone = true;
+      }
+      slotEvt.forEach(e => {
+        const welt = e.welt || 'priv';
+        const cls  = e.isDeadline ? 'deadline' : (welt === 'pro' || welt === 'beruf') ? 'beruf' : 'privat';
+        const end  = e.durationMin > 0 ? ' <span class="ck4-ev-end">bis ' + this._calcEndTime(e.startTime, e.durationMin) + '</span>' : '';
+        html += '<div class="ck4-ev-block ' + cls + '" onclick="WB.terminOpen(\x27' + this._esc(e.id) + '\x27)">'
+          + '<strong>' + e.startTime + '</strong> ' + this._esc(e.text || e.titel || '') + end + '</div>';
+      });
+      html += '</div></div>';
+    }
+
+    if (!events.length) {
+      html = html.replace('ck4-section-body" style="padding:0;">',
+        'ck4-section-body" style="padding:0;"><div class="ck-empty-msg" style="padding:14px 16px;">Keine Termine heute</div>');
+    }
+
+    html += '</div></div></div>';
+    body.innerHTML = html;
+  },
+
 
   _tsTimer: null,
 
