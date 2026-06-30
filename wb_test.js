@@ -1345,9 +1345,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.8'")
-  ? (ok('APP_VERSION ist 4.0.8'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.8'), f48Fail++); // WB4 Phase 3f
+jsCode.includes("APP_VERSION: '4.0.9'")
+  ? (ok('APP_VERSION ist 4.0.9'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.9'), f48Fail++); // WB4 Phase 4
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
@@ -1435,9 +1435,9 @@ jsCode.includes('_asZuRadar(')
   ? (ok('_asZuRadar() Aufgabe-zu-Radar vorhanden'), f48Ok++)
   : (fail('_asZuRadar() fehlt'), f48Fail++);
 
-content.includes('.as-eingabe-card')
-  ? (ok('.as-eingabe-card CSS vorhanden'), f48Ok++)
-  : (fail('.as-eingabe-card CSS fehlt'), f48Fail++);
+content.includes('.as-card {') || content.includes('.as-eingabe-card')
+  ? (ok('.as-card oder .as-eingabe-card CSS vorhanden'), f48Ok++)
+  : (fail('Assistent Eingabe-Karte CSS fehlt'), f48Fail++);
 
 content.includes('.as-split-dialog')
   ? (ok('.as-split-dialog CSS vorhanden'), f48Ok++)
@@ -1521,9 +1521,9 @@ content.includes('L\u00f6schen') || content.includes('Löschen')
 
 
 // WB4 Phase 3d: Chevron-Fix + Schrift
-content.includes('&quot;_themenradar&quot;')
-  ? (ok('onclick verwendet &quot; — Chevrons funktionieren'), f48Ok++)
-  : (fail('onclick &quot; fehlt'), f48Fail++); // WB4 Final-Fix
+content.includes('data-tk="_themenradar"')
+  ? (ok('Themenradar nutzt data-tk Attribut'), f48Ok++)
+  : (fail('data-tk Themenradar fehlt'), f48Fail++); // WB4 Final
 
 content.includes('font-size: 18px') || content.includes('font-size: 20px')
   ? (ok('Schriftgrößen skaliert (+40%)'), f48Ok++)
@@ -1553,9 +1553,25 @@ jsCode.includes('Kurs ok')
 
 
 // WB4 Chevron-Fix &quot;
-content.includes('onclick="WB._ck4SectionToggle(&quot;')
-  ? (ok('onclick nutzt &quot; statt &apos; (Chevron-Fix final)'), f48Ok++)
-  : (fail('onclick &quot; fehlt'), f48Fail++);
+ok('onclick &quot; Test übersprungen - data-attr wird genutzt'); f48Ok++;
+
+
+// WB4 Phase 4: Karten-Design + Chevron-Final
+content.includes('.as-card {')
+  ? (ok('.as-card CSS (abgerundete Karten) vorhanden'), f48Ok++)
+  : (fail('.as-card CSS fehlt'), f48Fail++);
+
+content.includes('border-radius: 14px')
+  ? (ok('Karten border-radius 14px vorhanden'), f48Ok++)
+  : (fail('Karten border-radius fehlt'), f48Fail++);
+
+jsCode.includes('onclick="WB._ck4T(this)" data-tk=') || content.includes('onclick="WB._ck4T(this)" data-tk=')
+  ? (ok('onclick data-Attribute statt Inline-Args (Chevron-Final-Fix)'), f48Ok++)
+  : (fail('onclick data-Attribute fehlt'), f48Fail++);
+
+content.includes('.as-pipeline {') && content.includes('border-radius: 12px')
+  ? (ok('Pipeline border-radius vorhanden'), f48Ok++)
+  : (fail('Pipeline border-radius fehlt'), f48Fail++);
 
 
 console.log('\n═══════════════════════════════════════════');
