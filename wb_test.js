@@ -1345,9 +1345,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.9'")
-  ? (ok('APP_VERSION ist 4.0.9'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.9'), f48Fail++); // WB4 Phase 4
+jsCode.includes("APP_VERSION: '4.0.10'")
+  ? (ok('APP_VERSION ist 4.0.10'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.10'), f48Fail++); // WB4 Phase 4b
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
@@ -1572,6 +1572,24 @@ jsCode.includes('onclick="WB._ck4T(this)" data-tk=') || content.includes('onclic
 content.includes('.as-pipeline {') && content.includes('border-radius: 12px')
   ? (ok('Pipeline border-radius vorhanden'), f48Ok++)
   : (fail('Pipeline border-radius fehlt'), f48Fail++);
+
+
+// WB4 4.0.10 Fixes
+jsCode.includes('_fmtDDMM')
+  ? (ok('_fmtDDMM() Datum TT.MM. Format vorhanden'), f48Ok++)
+  : (fail('_fmtDDMM() fehlt'), f48Fail++);
+
+jsCode.includes('ae-thema')
+  ? (ok('Aufgabe-Dialog: Thema-Zuordnung vorhanden'), f48Ok++)
+  : (fail('Aufgabe-Dialog Thema fehlt'), f48Fail++);
+
+jsCode.includes('ae-wdh')
+  ? (ok('Aufgabe-Dialog: Wiederholung vorhanden'), f48Ok++)
+  : (fail('Aufgabe-Dialog Wiederholung fehlt'), f48Fail++);
+
+jsCode.includes('gw-naechstes')
+  ? (ok('Gateway: Nächstes-GW Markierung vorhanden'), f48Ok++)
+  : (fail('Gateway Nächstes-GW fehlt'), f48Fail++);
 
 
 console.log('\n═══════════════════════════════════════════');

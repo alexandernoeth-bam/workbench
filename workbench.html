@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 4.0.9</title>
+  <title>WorkBench 4.0.10</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -911,9 +911,9 @@
     .ck4-time-row { display: flex; align-items: stretch; min-height: 36px;
       border-bottom: 0.5px solid #eee; padding: 2px 0; }
     .ck4-time-row.now-row { background: rgba(10,107,94,.04); }
-    .ck4-time-lbl { width: 40px; flex-shrink: 0; font-size: 15px; font-weight: 600;
-      color: var(--faint); font-family: var(--font-mono); padding: 4px 16px 4px 16px; }
-    .ck4-time-evts { flex: 1; padding: 3px 16px 3px 4px; display: flex; flex-direction: column; gap: 3px; }
+    .ck4-time-lbl { width: 60px; min-width: 60px; flex-shrink: 0; font-size: 12px; font-weight: 600;
+      color: var(--faint); font-family: var(--font-mono); padding: 4px 6px 4px 16px; }
+    .ck4-time-evts { flex: 1; padding: 3px 16px 3px 2px; display: flex; flex-direction: column; gap: 3px; }
     .ck4-ev-block { border-left: 3px solid var(--border); padding: 5px 9px;
       border-radius: 0 4px 4px 0; font-size: 16px; background: #fff; cursor: pointer;
       line-height: 1.3; }
@@ -1792,7 +1792,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench 4.0</div>
-  <div id="wb-startup-tagline">v4.0.9</div>
+  <div id="wb-startup-tagline">v4.0.10</div>
 </div>
 
 <!-- Modal -->
@@ -2045,7 +2045,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench 4.0</span>
-    <span id="wb-menu-version">v4.0.9</span>
+    <span id="wb-menu-version">v4.0.10</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -2155,8 +2155,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '4.0.9',
-  APP_BUILD:   '20260630-1400',
+  APP_VERSION: '4.0.10',
+  APP_BUILD:   '20260630-1430',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2477,7 +2477,7 @@ const WB = {
     html += '<div class="as-card-header">'
       + '<span class="as-card-title"><span class="as-card-title-dot"></span>Globaler Aufgaben-Pool'
       + '<span class="as-card-cnt">' + poolAufgaben.length + '</span></span>'
-      + '<button class="as-card-add-btn" onclick="WB._asNeueAufgabe(null)">+ NEU</button>'
+      /* + NEU Button entfernt laut Feedback */
       + '</div>';
 
     if (!poolAufgaben.length) {
@@ -2541,126 +2541,105 @@ const WB = {
     });
   },
 
-  // ── Eine Pipeline (Thema) rendern — 1:1 Mockup ────────────
+  // ── Pipeline rendern — Gateways/Aufgaben als farbige Kacheln ──
   _asPipeline(t, db) {
     const id    = this._esc(t.id);
     const key   = 'as_pip_' + t.id;
     const open  = this._ck4KlappGet(key) ?? (t.prio === 1);
     const today = this._dStr(new Date());
 
-    const gateways = (db.gateways || [])
-      .filter(g => !g.deleted && g.themaId === t.id)
-      .sort((a, b) => (a.reihenfolge||0) - (b.reihenfolge||0));
-
-    const aufgaben = (db.aufgaben || [])
-      .filter(a => !a.deleted && a.themaId === t.id)
-      .sort((a, b) => (a.reihenfolge||0) - (b.reihenfolge||0));
+    const gateways = (db.gateways||[])
+      .filter(g => !g.deleted && g.themaId===t.id)
+      .sort((a,b) => (a.reihenfolge||0)-(b.reihenfolge||0));
+    const aufgaben = (db.aufgaben||[])
+      .filter(a => !a.deleted && a.themaId===t.id)
+      .sort((a,b) => (a.reihenfolge||0)-(b.reihenfolge||0));
 
     const gwOverdue = gateways.filter(g =>
-      g.gatewayStatus === 'offen' && g.pruefDatum && g.pruefDatum <= today
-    ).length;
-    const gwDone = gateways.filter(g => g.gatewayStatus === 'erreicht').length;
+      g.gatewayStatus==='offen' && g.pruefDatum && g.pruefDatum<=today).length;
+    const gwDone = gateways.filter(g=>g.gatewayStatus==='erreicht').length;
+    const badgeCls = t.prio===1?'':t.prio===2?' p2':' p3';
+    const prioLabel = 'Prio\u00a0'+(t.prio||2);
 
-    // Prio-Klasse für farbigen linken Rand
-    const prioCls = t.prio === 1 ? ' prio-1' : t.prio === 2 ? ' prio-2' : ' prio-3';
-    const badgeCls = t.prio === 1 ? '' : t.prio === 2 ? ' p2' : ' p3';
-    const prioLabel = 'Prio ' + (t.prio || 2);
-
-    // Status-Badge für geschlossene Pipeline
     let statusBadge = '';
-    if (gwOverdue > 0) statusBadge = '<span class="as-gw-warn">GW fällig</span>';
-    else if (gwDone === gateways.length && gateways.length > 0)
-      statusBadge = '<span class="as-prio-badge" style="background:rgba(39,174,96,.12);color:#27AE60;">✓ Kurs ok</span>';
+    if (gwOverdue>0) statusBadge='<span class="as-gw-warn">GW f\u00e4llig</span>';
+    else if (gwDone===gateways.length&&gateways.length>0)
+      statusBadge='<span class="as-prio-badge" style="background:rgba(39,174,96,.12);color:#27AE60;">\u2713\u00a0Kurs ok</span>';
 
-    let h = '<div class="as-pipeline' + prioCls + '">';
+    const prioCls = t.prio===1?' prio-1':t.prio===2?' prio-2':' prio-3';
+    let h = '<div class="as-pipeline'+prioCls+'">';
 
     // Pipeline-Header
-    h += '<div class="as-pipeline-hdr" onclick="WB._ck4T(this)" data-tk="' + key + '" data-tb="as-pip-' + id + '" data-tc="as-pip-ch-' + id + '">';
-    h += '<span class="as-pipeline-name">' + this._esc(t.titel) + '</span>';
+    h += '<div class="as-pipeline-hdr" onclick="WB._ck4T(this)" data-tk="'+key+'" data-tb="as-pip-'+id+'" data-tc="as-pip-ch-'+id+'">';
+    h += '<span class="as-pipeline-name">'+this._esc(t.titel)+'</span>';
     h += '<span class="as-pipeline-meta">';
-    if (statusBadge) h += statusBadge;
-    h += '<span class="as-prio-badge' + badgeCls + '">' + prioLabel + '</span>';
-    h += '<button class="as-sec-add" onclick="event.stopPropagation();WB._asThemaDialog(&quot;' + id + '&quot;)" title="Thema bearbeiten" style="font-size:15px;">&#8943;</button>';
-    h += '</span>';
-    h += '<span class="as-chevron' + (open ? ' open' : '') + '" id="as-pip-ch-' + id + '">&#9654;</span>';
-    h += '</div>';
+    if(statusBadge) h+=statusBadge;
+    h+='<span class="as-prio-badge'+badgeCls+'">'+prioLabel+'</span>';
+    h+='<button class="as-sec-add" onclick="event.stopPropagation();WB._asThemaDialog(&quot;'+id+'&quot;)" title="Bearbeiten" style="font-size:13px;">&#8943;</button>';
+    h+='</span>';
+    h+='<span class="as-chevron'+(open?' open':'')+'" id="as-pip-ch-'+id+'">&#9654;</span>';
+    h+='</div>';
 
-    // Pipeline-Body
-    h += '<div id="as-pip-' + id + '" class="as-pipeline-body' + (open ? '' : ' ck4-hidden') + '">';
+    h+='<div id="as-pip-'+id+'" class="as-pipeline-body'+(open?'':' ck4-hidden')+'">';
 
-    // Gateways oben als Fixpunkte (Mockup-Style)
-    if (gateways.length) {
-      gateways.forEach(g => {
-        const isOv = g.gatewayStatus === 'offen' && g.pruefDatum && g.pruefDatum <= today;
-        const isDn = g.gatewayStatus === 'erreicht';
-        const gwCls = isDn ? ' done' : isOv ? ' overdue' : '';
+    // Gateways als farbige Kacheln
+    gateways.forEach((g, idx_g) => {
+      const isOv = g.gatewayStatus==='offen' && g.pruefDatum && g.pruefDatum<=today;
+      const isDn = g.gatewayStatus==='erreicht';
+      // Aktuelles GW (erstes offene) = rot, nächstes (nach aktuellem) = blau, erledigte = grün
+      const firstOpen = gateways.findIndex(x=>x.gatewayStatus!=='erreicht');
+      const isAktiv = idx_g===firstOpen && !isDn;
+      const isNaechstes = idx_g===firstOpen+1 && !isDn;
+      const gwCls = isDn?' gw-done':isAktiv?' overdue':isNaechstes?' gw-naechstes':'';
+      const gwBg  = isDn?'rgba(39,174,96,.04)':isAktiv?'rgba(192,57,43,.05)':isNaechstes?'rgba(52,152,219,.05)':'rgba(0,0,0,.015)';
+      const gwBdr = isDn?'#27AE60':isAktiv?'var(--danger)':'#3498DB';
 
-        h += '<div class="as-gw-row' + gwCls + '" onclick="event.stopPropagation();WB._asGwDialog(&quot;' + this._esc(g.id) + '&quot;)">';
-        // Hauptzeile: Titel + Datum + KPI
-        h += '<div class="as-gw-main">';
-        h += '<span class="as-gw-title">' + this._esc(g.titel) + '</span>';
-        if (g.pruefDatum) {
-          h += '<span class="as-gw-date' + (isOv ? ' red' : '') + '">Prüfdatum: '
-            + g.pruefDatum.slice(5).replace('-', '.') + '</span>';
-        }
-        // KPI: IST inline editierbar + Soll
-        h += '<span class="as-gw-kpi-wrap">';
-        h += '<input class="as-gw-kpi-inp" type="text" value="' + this._esc(g.istWert || '') + '"'
-          + ' placeholder="Ist"'
-          + ' onchange="WB._asGwIstWert(&apos;' + this._esc(g.id) + '&apos;,this.value)"'
-          + ' onclick="event.stopPropagation()">';
-        if (g.sollWert) {
-          h += '<span class="as-gw-kpi-lbl">/ ' + this._esc(g.sollWert)
-            + (g.istWertLabel ? ' ' + this._esc(g.istWertLabel) : '') + '</span>';
-        }
-        h += '</span>';
-        h += '<button class="as-sec-add" onclick="event.stopPropagation();WB._asGwDialog(&quot;' + this._esc(g.id) + '&quot;)" style="font-size:13px;">&#8943;</button>';
-        h += '</div>';
-        // Sub-Zeilen: Bedingung + Konsequenz direkt sichtbar (Mockup!)
-        if (g.gatewayCondition) {
-          h += '<div class="as-gw-sub"><strong>Bedingung:</strong> ' + this._esc(g.gatewayCondition) + '</div>';
-        }
-        if (g.gatewayConsequence) {
-          h += '<div class="as-gw-sub"><strong>Konsequenz:</strong> ' + this._esc(g.gatewayConsequence) + '</div>';
-        }
-        h += '</div>';
-      });
-      if (aufgaben.length) h += '<div class="as-gw-divider"></div>';
-    }
+      h+='<div class="as-gw-row" style="border-left-color:'+gwBdr+';background:'+gwBg+';" onclick="event.stopPropagation();WB._asGwDialog(&quot;'+this._esc(g.id)+'&quot;)">';
+      h+='<div class="as-gw-main">';
+      h+='<span class="as-gw-title" style="color:'+(isAktiv?'var(--danger)':isDn?'#27AE60':'var(--text)')+'">'+this._esc(g.titel)+'</span>';
+      if(g.pruefDatum) h+='<span class="as-gw-date'+(isOv?' red':'')+'">Pr\u00fcfdatum: '+this._fmtDDMM(g.pruefDatum)+'</span>';
+      h+='<span class="as-gw-kpi-wrap">';
+      h+='<input class="as-gw-kpi-inp" type="text" value="'+this._esc(g.istWert||'')+'" placeholder="Ist"'
+        +' onchange="WB._asGwIstWert(&quot;'+this._esc(g.id)+'&quot;,this.value)"'
+        +' onclick="event.stopPropagation()">';
+      if(g.sollWert) h+='<span class="as-gw-kpi-lbl">/ '+this._esc(g.sollWert)+(g.istWertLabel?'\u00a0'+this._esc(g.istWertLabel):'')+' </span>';
+      h+='</span>';
+      h+='<button class="as-sec-add" onclick="event.stopPropagation();WB._asGwDialog(&quot;'+this._esc(g.id)+'&quot;)" style="font-size:12px;">&#8943;</button>';
+      h+='</div>';
+      if(g.gatewayCondition)   h+='<div class="as-gw-sub"><strong>Bedingung:</strong> '+this._esc(g.gatewayCondition)+'</div>';
+      if(g.gatewayConsequence) h+='<div class="as-gw-sub"><strong>Konsequenz:</strong> '+this._esc(g.gatewayConsequence)+'</div>';
+      h+='</div>';
+    });
 
-    // Aufgaben-Kette (sequenziell, Mockup-Style mit Typ-Badge)
-    if (!aufgaben.length) {
-      h += '<div class="as-pool-item" style="color:var(--faint);font-style:italic;font-size:16px;">Keine Aufgaben</div>';
+    // Trennlinie Gateways/Aufgaben
+    if(gateways.length&&aufgaben.length) h+='<div class="as-gw-divider"></div>';
+
+    // Aufgaben
+    if(!aufgaben.length) {
+      h+='<div class="as-pool-item" style="color:var(--faint);font-style:italic;font-size:15px;">Keine Aufgaben</div>';
     } else {
-      const ersteFrei = aufgaben.findIndex(a => a.status !== 'erledigt');
-      aufgaben.forEach((a, idx) => {
-        const isAkt = idx === ersteFrei;
-        const isErl = a.status === 'erledigt';
-        const isGes = !isErl && !isAkt;
-        const s     = isErl ? 2 : a.status === 'aktiv' ? 1 : 0;
-
-        // Typ aus Titel ableiten: [Link](url) → LINK, sonst Aufgabe
-        const isLink = /\[.+\]\(.+\)/.test(a.titel);
-        const typLabel = isLink ? 'Link' : a.wiederholung ? 'Routine' : 'Aufgabe';
-
-        h += '<div class="as-chain-item' + (isGes ? ' frozen' : isAkt ? ' aktiv' : '') + '">';
-        h += this._ckCbHtml('wb4-aufgabe', a.id, s);
-        h += '<span class="as-chain-text' + (isErl ? ' done' : '') + '">' + this._asLinkify(a.titel) + '</span>';
-        h += '<span class="as-chain-type">' + typLabel + '</span>';
-        if (a.zeitBudgetMin > 0) h += '<span class="as-chain-budget">' + a.zeitBudgetMin + ' Min.</span>';
-        if (isGes) {
-          h += '<span class="as-chain-lock">&#128274;</span>';
-        } else if (isAkt) {
-          h += '<button class="as-sec-add" onclick="event.stopPropagation();WB._asAufgabeEdit(&quot;' + this._esc(a.id) + '&quot;)" style="font-size:13px;">&#8943;</button>';
-          h += '<button class="as-radar-btn" onclick="event.stopPropagation();WB._asZuRadar(&quot;' + this._esc(a.id) + '&quot;)">→ Radar</button>';
+      const ersteFrei = aufgaben.findIndex(a=>a.status!=='erledigt');
+      aufgaben.forEach((a,idx_a) => {
+        const isAkt=idx_a===ersteFrei, isErl=a.status==='erledigt', isGes=!isErl&&!isAkt;
+        const s=isErl?2:a.status==='aktiv'?1:0;
+        const isLink=/\[.+\]\(.+\)/.test(a.titel);
+        const typLabel=isLink?'Link':a.wiederholung?'Routine':'Aufgabe';
+        h+='<div class="as-chain-item'+(isGes?' frozen':isAkt?' aktiv':'')+'">';
+        h+=this._ckCbHtml('wb4-aufgabe',a.id,s);
+        h+='<span class="as-chain-text'+(isErl?' done':'')+'">'+this._asLinkify(a.titel)+'</span>';
+        h+='<span class="as-chain-type">'+typLabel+'</span>';
+        if(a.zeitBudgetMin>0) h+='<span class="as-chain-budget">'+a.zeitBudgetMin+'\u00a0Min.</span>';
+        if(isGes) {
+          h+='<span class="as-chain-lock">&#128274;</span>';
+        } else if(isAkt) {
+          h+='<button class="as-sec-add" onclick="event.stopPropagation();WB._asAufgabeEdit(&quot;'+this._esc(a.id)+'&quot;)" style="font-size:12px;">&#8943;</button>';
+          h+='<button class="as-radar-btn" onclick="event.stopPropagation();WB._asZuRadar(&quot;'+this._esc(a.id)+'&quot;)">\u2192\u00a0Radar</button>';
         }
-        h += '</div>';
+        h+='</div>';
       });
     }
 
-    // + Aufgabe hinzufügen
-    h += '<button class="as-chain-neue-btn" onclick="WB._asNeueAufgabe(&quot;' + id + '&quot;)">+ Aufgabe hinzufügen</button>';
-    h += '</div></div>';
+    h+='</div></div>';
     return h;
   },
 
@@ -2736,16 +2715,34 @@ const WB = {
   _asAufgabeEdit(id) {
     const a = (this.db?.aufgaben||[]).find(x => x.id === id);
     if (!a) return;
+    const themenList = (this.db?.themen||[]).filter(t=>!t.deleted&&t.status!=='archiv');
     const body = '<div class="wb-input-group"><label class="wb-label">Titel</label>'
       + '<input id="ae-titel" class="wb-input" type="text" value="' + this._esc(a.titel||'') + '"></div>'
-      + '<div class="wb-input-group"><label class="wb-label">Zeitbudget (Minuten)</label>'
-      + '<input id="ae-min" class="wb-input" type="number" min="0" step="5" value="' + (a.zeitBudgetMin||0) + '"></div>'
-      + '<div class="wb-input-group"><label class="wb-label">Status</label>'
+      + '<div style="display:flex;gap:10px;"><div class="wb-input-group" style="flex:1;"><label class="wb-label">Status</label>'
       + '<select id="ae-status" class="wb-input">'
       + '<option value="offen"'    + ((a.status||'offen')==='offen'    ?' selected':'') + '>Offen</option>'
       + '<option value="aktiv"'    + (a.status==='aktiv'    ?' selected':'') + '>Aktiv</option>'
       + '<option value="erledigt"' + (a.status==='erledigt' ?' selected':'') + '>Erledigt</option>'
-      + '</select></div>';
+      + '</select></div>'
+      + '<div class="wb-input-group" style="flex:1;"><label class="wb-label">Zeitbudget (Min)</label>'
+      + '<input id="ae-min" class="wb-input" type="number" min="0" step="5" value="' + (a.zeitBudgetMin||0) + '"></div></div>'
+      + '<div class="wb-input-group"><label class="wb-label">Thema (optional)</label>'
+      + '<select id="ae-thema" class="wb-input">'
+      + '<option value=""' + (!a.themaId?' selected':'') + '>Kein Thema (Pool)</option>'
+      + themenList.map(t=>'<option value="'+this._esc(t.id)+'"'+(a.themaId===t.id?' selected':'')+'>'+this._esc(t.titel)+'</option>').join('')
+      + '</select></div>'
+      + '<div class="wb-input-group"><label class="wb-label">Wiederholung</label>'
+      + '<select id="ae-wdh" class="wb-input">'
+      + '<option value=""' + (!a.wiederholung?' selected':'') + '>Keine (Einmalig)</option>'
+      + '<option value="woechentlich"' + (a.wiederholung?.typ==='woechentlich'?' selected':'') + '>Wöchentlich</option>'
+      + '<option value="monatlich"'    + (a.wiederholung?.typ==='monatlich'?' selected':'') + '>Monatlich</option>'
+      + '<option value="jaehrlich"'    + (a.wiederholung?.typ==='jaehrlich'?' selected':'') + '>Jährlich</option>'
+      + '</select></div>'
+      + '<div class="wb-input-group"><label class="wb-label">Welt</label>'
+      + '<div style="display:flex;gap:8px;">'
+      + '<button id="ae-welt-beruf"  class="nz-welt-btn' + ((a.welt||'beruf')==='beruf' ?' active':'') + '" onclick="WB._asAufgabeWelt(&quot;beruf&quot;)">Beruf</button>'
+      + '<button id="ae-welt-privat" class="nz-welt-btn' + ((a.welt||'')==='privat'?' active':'') + '" onclick="WB._asAufgabeWelt(&quot;privat&quot;)">Privat</button>'
+      + '</div></div>';
     this.modalOpen('Aufgabe bearbeiten', body,
       '<button class="wb-btn wb-btn-delete" onclick="WB._asAufgabeDelete(&quot;' + this._esc(id) + '&quot;)">Löschen</button>'
       + '<div style="display:flex;gap:8px;">'
@@ -2758,10 +2755,16 @@ const WB = {
   _asAufgabeEditSpeichern(id) {
     const a = (this.db?.aufgaben||[]).find(x => x.id === id);
     if (!a) return;
-    a.titel        = document.getElementById('ae-titel')?.value.trim() || a.titel;
-    a.zeitBudgetMin= parseInt(document.getElementById('ae-min')?.value||'0')||0;
-    a.status       = document.getElementById('ae-status')?.value || a.status;
-    a.updatedAt    = this._now();
+    a.titel         = document.getElementById('ae-titel')?.value.trim() || a.titel;
+    a.zeitBudgetMin = parseInt(document.getElementById('ae-min')?.value||'0')||0;
+    a.status        = document.getElementById('ae-status')?.value || a.status;
+    const newThema  = document.getElementById('ae-thema')?.value || null;
+    if (newThema !== undefined) { a.themaId = newThema || null; }
+    const wdh = document.getElementById('ae-wdh')?.value || '';
+    a.wiederholung  = wdh ? { typ: wdh } : null;
+    const weltBtn   = document.querySelector('#ae-welt-beruf.active, #ae-welt-privat.active');
+    if (weltBtn) a.welt = weltBtn.id.replace('ae-welt-', '');
+    a.updatedAt     = this._now();
     this.setDirty(); this.modalClose(); this._asRender();
     if (this.activeTab === 'tagessicht') this._ckRenderAll();
   },
@@ -2846,7 +2849,7 @@ const WB = {
           + (this.db?.gateways || []).filter(g => !g.deleted && g.themaId === t.id).map(g =>
               '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border);">'
               + '<span style="flex:1;font-size:18px;font-weight:600;">' + this._esc(g.titel) + '</span>'
-              + (g.pruefDatum ? '<span style="font-size:15px;color:var(--faint);font-family:var(--font-mono);">' + g.pruefDatum.slice(5).replace('-','.') + '</span>' : '')
+              + (g.pruefDatum ? '<span style="font-size:15px;color:var(--faint);font-family:var(--font-mono);">' + this._fmtDDMM(g.pruefDatum) + '</span>' : '')
               + '<button class="as-sec-add" onclick="WB.modalClose();setTimeout(()=>WB._asGwDialog(&quot;' + this._esc(g.id) + '&quot;),120)">&#8943;</button>'
               + '</div>'
             ).join('')
@@ -2868,6 +2871,13 @@ const WB = {
       + '</div>';
 
     this.modalOpen(titel, body, footer);
+  },
+
+  _asAufgabeWelt(welt) {
+    ['beruf','privat'].forEach(w => {
+      const btn = document.getElementById('ae-welt-' + w);
+      if (btn) btn.classList.toggle('active', w === welt);
+    });
   },
 
   _asThemaWeltToggle(welt) {
@@ -3147,7 +3157,7 @@ const WB = {
     const gwOverdue    = gateways.filter(g => this._nzGwStatus(g)==='overdue').length;
     const gwNext       = gateways.filter(g=>g.deadline).sort((a,b)=>(a.deadline||'').localeCompare(b.deadline||''))[0];
     const gwPill       = gwOverdue>0 ? this._ckPillHtml('⚠ GW fällig!',true)
-                       : gwNext ? this._ckPillHtml('GW1: '+gwNext.deadline.slice(5).replace('-','.'),false)
+                       : gwNext ? this._ckPillHtml('GW1: '+this._fmtDDMM(gwNext.deadline),false)
                        : this._ckPillHtml('Kein Gateway',false);
     const gwBody = gateways.length
       ? gateways.map(g => {
@@ -3155,7 +3165,7 @@ const WB = {
           const gc={open:'#3b82f6',overdue:'#ef4444',done:'#00828a',aborted:'#94a3b8'}[gs]||'#94a3b8';
           return '<div class="ck-task-row"><span style="width:8px;height:8px;border-radius:50%;background:'+gc+';flex-shrink:0;margin-top:4px;"></span>'
             +'<span class="ck-task-text" style="font-size:24px;">'+this._esc(g.titel)
-            +(g.deadline?'<span class="ck-date-badge'+(g.deadline<today?' red':'')+'">'+g.deadline.slice(5).replace('-','.')+'</span>':'')
+            +(g.deadline?'<span class="ck-date-badge'+(g.deadline<today?' red':'')+'">'+this._fmtDDMM(g.deadline)+'</span>':'')
             +'</span></div>';
         }).join('')
       : '<div class="ck-empty-msg">Keine Gateways</div>';
@@ -3163,7 +3173,7 @@ const WB = {
       ? termineAlle.slice(0,5).map(e => {
           const isT=e.date===today;
           return '<div class="ck-task-row"><span style="font-size:21px;color:'+(isT?'#00828a':'#64748b')+';">🕒 '+(e.startTime?e.startTime+' ':'')+this._esc(e.text||'')
-            +(e.date&&!isT?' <span class="ck-date-badge">'+e.date.slice(5).replace('-','.')+'</span>':'')
+            +(e.date&&!isT?' <span class="ck-date-badge">'+this._fmtDDMM(e.date)+'</span>':'')
             +(isT?' <span class="ck-date-badge" style="background:rgba(0,130,138,.1);color:#00828a;">Heute</span>':'')
             +'</span></div>';
         }).join('')
@@ -3478,7 +3488,7 @@ const WB = {
     let h = '<div class="ck4-theme-card' + (gwOverdue ? ' gw-overdue' : '') + '">';
 
     // Karten-Header
-    h += '<div class="ck4-theme-hdr" onclick="WB._ck4T(this)" data-tk="' + cardKey + '" data-tb="ck4-card-' + id + '" data-tc="ck4-card-chev-' + id + '">';
+    h += '<div class="ck4-theme-hdr" onclick="WB._ck4T(this)" data-tk="' + cardKey + '" data-tb="ck4-card-' + id + '" data-tc="ck4-card-chev-' + id + '">'
       + '<span class="ck4-theme-title">' + this._esc(l.titel) + '</span>'
       + '<span class="ck4-theme-meta">'
       + (gwOverdue ? '<span class="ck4-gw-alert">GW fällig</span>' : '')
@@ -3500,7 +3510,7 @@ const WB = {
         const gwCls     = isDone ? 'gw-done' : isOverdue ? 'gw-overdue-row' : 'gw-open';
         h += '<div class="ck4-gw-row ' + gwCls + '">'
           + '<span class="ck4-gw-title">' + this._esc(g.titel) + '</span>'
-          + (g.pruefDatum ? '<span class="ck4-gw-date' + (isOverdue ? ' red' : '') + '">' + g.pruefDatum.slice(5).replace('-','.') + '</span>' : '')
+          + (g.pruefDatum ? '<span class="ck4-gw-date' + (isOverdue ? ' red' : '') + '">' + this._fmtDDMM(g.pruefDatum) + '</span>' : '')
           + (g.istWert ? '<span class="ck4-gw-kpi">' + this._esc(g.istWert) + (g.istWertLabel ? ' ' + this._esc(g.istWertLabel) : '') + (g.sollWert ? ' / ' + this._esc(g.sollWert) : '') + '</span>' : '')
           + '</div>';
       });
@@ -3576,7 +3586,7 @@ const WB = {
     });
 
     let html = '<div class="ck4-section">';
-    html += '<div class="ck4-section-hdr" onclick="WB._ck4T(this)" data-tk="' + radarKey + '" data-tb="ck4-radar-inner" data-tc="ck4-radar-chev">';
+    html += '<div class="ck4-section-hdr" onclick="WB._ck4T(this)" data-tk="' + radarKey + '" data-tb="ck4-radar-inner" data-tc="ck4-radar-chev">'
       + '<span class="ck4-sec-title">Tages-Radar</span>'
       + '<span class="ck4-sec-actions">'
       + (ueberfaellig.length ? '<span class="ck4-overdue-badge">' + ueberfaellig.length + ' überfällig</span>' : '')
@@ -4697,7 +4707,7 @@ const WB = {
             + '<span class="hb-sub-drag-handle">⠿</span>'
             + chkS
             + '<span class="hb-txt' + (ss===2?' done':'') + '" style="font-size:18px;flex:1;" ondblclick="WB._nzSubitemEdit(this,\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">' + this._esc(s.text) + '</span>'
-            + (s.deadline ? '<span class="hb-item-deadline' + (s.deadline<this._dStr(new Date())?' red':'') + '">' + s.deadline.slice(5).replace('-','.') + '</span>' : '')
+            + (s.deadline ? '<span class="hb-item-deadline' + (s.deadline<this._dStr(new Date())?' red':'') + '">' + this._fmtDDMM(s.deadline) + '</span>' : '')
             + '<span class="hb-del" onclick="WB._nzSubitemDelete(\'' + lid + '\',\'' + iid + '\',\'' + sid + '\')">×</span>'
             + '</div>';
         }).join('')
@@ -9882,6 +9892,7 @@ const WB = {
   _now() { return new Date().toISOString(); },
 
   _dStr(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); },
+  _fmtDDMM(s) { if(!s) return ''; const p=s.split('-'); return p[2]+'.'+p[1]+'.'; },
 
   _fmtShort(dateStr) {
     if(!dateStr) return '';
