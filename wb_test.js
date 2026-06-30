@@ -465,7 +465,7 @@ fixedOverlays.forEach(id => {
 // ══════════════════════════════════════════
 console.log('\n── 32. Required Properties ──');
 // Alle this.GROSSBUCHSTABEN Referenzen müssen als Property definiert sein
-const requiredProps = ['IDB_NAME','IDB_VERSION','DRIVE_SCOPE','APP_VERSION','APP_BUILD'];
+const requiredProps = ['IDB_NAME','IDB_VERSION','DRIVE_SCOPE','DRIVE_API','UPLOAD_API','APP_VERSION','APP_BUILD'];
 requiredProps.forEach(prop => {
   const defined = new RegExp(prop + '\\s*:').test(jsCode);
   const used    = jsCode.includes('this.' + prop);
@@ -638,6 +638,23 @@ content.includes('id="wb5-ov-edit-btn"')  ? ok('Bearbeiten-Button im Thema-Overl
 jsCode.includes('wb5-ov-edit-btn')         ? ok('Bearbeiten-Button in _tm5OpenOverlay verlinkt') : fail('Bearbeiten-Button nicht in JS verlinkt');
 jsCode.includes('_gw5Edit(')              ? ok('_gw5Edit() vorhanden')         : fail('_gw5Edit() fehlt');
 jsCode.includes('_gw5SaveEdit(')          ? ok('_gw5SaveEdit() vorhanden')     : fail('_gw5SaveEdit() fehlt');
+
+
+// ══════════════════════════════════════════
+// 47. CRYPTO-KEYCHECK KORREKT
+// ══════════════════════════════════════════
+console.log('\n── 47. Crypto-KeyCheck ──');
+// _cryptoKeyFresh darf NICHT nur wb_key_date prüfen
+// wb_key_date allein reicht nicht: nach Browser-Neustart ist sessionStorage leer
+const kfStart=jsCode.indexOf('_cryptoKeyFresh() {');const kfEnd=jsCode.indexOf('\n  },',kfStart+10);const keyFreshFn=kfStart>=0?jsCode.slice(kfStart,kfEnd):'';
+// wb_key_date darf nur in Kommentaren vorkommen, nicht im aktiven Code
+const keyFreshCode = keyFreshFn.replace(/\/\/[^\n]*/g,''); // Kommentare entfernen
+!keyFreshCode.includes('wb_key_date') ?
+  ok('_cryptoKeyFresh nutzt kein wb_key_date-Fallback (sessionStorage ist die Wahrheit)') :
+  fail('_cryptoKeyFresh nutzt wb_key_date im aktiven Code — Dialog erscheint nach Browser-Neustart nicht!');
+keyFreshFn.includes('wb_enc_pw') ?
+  ok('_cryptoKeyFresh prüft wb_enc_pw in sessionStorage') :
+  fail('_cryptoKeyFresh prüft wb_enc_pw nicht');
 
 // ══════════════════════════════════════════
 // ERGEBNIS
