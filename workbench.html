@@ -1343,6 +1343,25 @@ const WB = {
     s.deleted=true; s.updatedAt=this._now();
     this.setDirty(); this._sRenderSondertage(); this.renderSection(this.activeTab);
   },
+
+  async _sLoadSettings() {
+    try {
+      const raw=await this.idbGet('meta','wbSettings');
+      if(raw) Object.assign(this._settings,JSON.parse(raw));
+    } catch(e){}
+    document.documentElement.style.setProperty('--accent',  '#0A6B5E');
+    document.documentElement.style.setProperty('--accent2', '#4D5F33');
+  },
+
+  async _sSaveSettings() { await this.idbSet('meta','wbSettings',JSON.stringify(this._settings)); },
+
+  async _sSaveClientId() {
+    const el=document.getElementById('s-input-clientid');if(!el)return;
+    const val=el.value.trim();if(!val)return;
+    await this.idbSet('meta','oauthClientId',val);
+    this._oauthClientId=val;this._sUpdateSyncStatus();this._toast('\u2713 Client-ID gespeichert');
+  },
+
   // ── Modal (aus WB4) ──
   modalOpen(title, bodyHtml, footerHtml) {
     const o=document.getElementById('wb-modal-overlay');
@@ -2163,16 +2182,7 @@ const WB = {
 
 
 
-  // ── Hilfsfunktionen ──────────────────────────────────
-
-
-  
-  async _sSaveClientId() {
-    const el=document.getElementById('s-input-clientid');if(!el)return;
-    const val=el.value.trim();if(!val)return;
-    await this.idbSet('meta','oauthClientId',val);
-    this._oauthClientId=val;this._sUpdateSyncStatus();this._toast('\u2713 Client-ID gespeichert');
-  },
+  // ── Hilfsfunktionen ──────────────────────────────────,
 
 // ── OAuth ──
 
