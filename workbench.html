@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.0.2</title>
+  <title>WorkBench 5.0.3</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -369,7 +369,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.0.2 · Build 20260630-2000</div>
+    <div id="wb-startup-tagline">v5.0.3 · Build 20260630-2015</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -675,8 +675,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.0.2',
-  APP_BUILD:      '20260630-2000',
+  APP_VERSION:    '5.0.3',
+  APP_BUILD:      '20260630-2015',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -2605,6 +2605,50 @@ const WB = {
   _oauthBannerDismiss() { this._oauthHideBanner(); },
 
 
+
+
+  _oauthReconnect() {
+    // WICHTIG: direkt im User-Gesture aufrufen (kein await davor) damit
+    // der Browser den Popup nicht blockiert
+    this._oauthToken    = null;
+    this._oauthTokenExp = null;
+    if (!window.google?.accounts?.oauth2) {
+      this._oauthShowBanner('\u26a0 Google-Bibliothek nicht geladen \u2014 Seite neu laden');
+      return;
+    }
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: this._oauthClientId,
+        scope:     this.DRIVE_SCOPE,
+        prompt:    'select_account',
+        callback:  async (resp) => {
+          if (resp.error || !resp.access_token) {
+            this._oauthShowBanner('\u26a0 Anmeldung fehlgeschlagen: ' + (resp.error || 'Unbekannt'));
+            return;
+          }
+          this._oauthToken    = resp.access_token;
+          this._oauthTokenExp = Date.now() + (resp.expires_in - 60) * 1000;
+          await this.idbSet('meta', 'oauthToken',    this._oauthToken);
+          await this.idbSet('meta', 'oauthTokenExp', String(this._oauthTokenExp));
+          this._oauthHideBanner();
+          this._toast('\u2713 Verbunden \u2014 lade aktuellen Stand...');
+          // Download (Drive ist autoritativ) — kein automatischer Upload danach
+          try { await this._syncDownload(); } catch(e) { console.warn('[reconnect download]', e); }
+          // Dirty-Flags zurücksetzen — Drive-Stand ist jetzt die Wahrheit
+          this.isDirty = false;
+          this._pendingChanges = false;
+          await this.idbSet('meta', 'pendingChanges', 'false');
+          this._syncInitDone = true;
+          this._toast('\u2705 Stand aktuell');
+        },
+      });
+      client.requestAccessToken({ prompt: 'select_account' });
+    } catch(e) {
+      this._oauthShowBanner('\u26a0 Verbindung fehlgeschlagen: ' + e.message);
+    }
+  },
+
+  _modalBgClick(e) { if(e.target===document.getElementById('wb-modal-overlay')) this.modalClose(); },
 
   oauthSignOut() {
     this._oauthToken=null; this._oauthTokenExp=null;
