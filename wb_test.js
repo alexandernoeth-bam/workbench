@@ -215,6 +215,7 @@ jsCode.includes('_oauthShowBanner')      ? ok('_oauthShowBanner() vorhanden')   
 jsCode.includes('_oauthReconnectAndSync') ? ok('_oauthReconnectAndSync() vorhanden') : fail('_oauthReconnectAndSync() fehlt');
 jsCode.includes('oauthSignOut')          ? ok('oauthSignOut() vorhanden')          : fail('oauthSignOut() fehlt');
 jsCode.includes('347268246401') || jsCode.includes('_oauthClientId') ? ok('OAuth Client-ID vorhanden') : fail('OAuth Client-ID fehlt');
+jsCode.includes('DRIVE_SCOPE') && jsCode.includes('googleapis.com/auth/drive') ? ok('DRIVE_SCOPE definiert') : fail('DRIVE_SCOPE fehlt — OAuth schlägt lautlos fehl');
 
 // ══════════════════════════════════════════
 // 16. EINSTELLUNGEN
@@ -459,6 +460,22 @@ fixedOverlays.forEach(id => {
   wbAppHtml.includes('id="' + id + '"') ? ok(id + ' innerhalb #wb-app') : fail(id + ' außerhalb #wb-app!');
 });
 
+
+// ══════════════════════════════════════════
+// 32. REQUIRED PROPERTIES (this.XYZ Referenzen)
+// ══════════════════════════════════════════
+console.log('\n── 32. Required Properties ──');
+// Alle this.GROSSBUCHSTABEN Referenzen müssen als Property definiert sein
+const requiredProps = ['IDB_NAME','IDB_VERSION','DRIVE_SCOPE','APP_VERSION','APP_BUILD'];
+requiredProps.forEach(prop => {
+  const defined = new RegExp(prop + '\\s*:').test(jsCode);
+  const used    = jsCode.includes('this.' + prop);
+  if (used && !defined) fail(prop + ' wird verwendet (this.' + prop + ') aber nicht definiert!');
+  else if (defined) ok(prop + ' definiert und verwendbar');
+  else ok(prop + ' nicht verwendet (OK)');
+});
+// _oauthClientId muss gesetzt sein
+jsCode.includes('_oauthClientId:') ? ok('_oauthClientId als Property definiert') : fail('_oauthClientId fehlt');
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
