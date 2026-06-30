@@ -253,8 +253,9 @@ jsCode.includes('_isMobile') ? ok('_isMobile() definiert') : fail('_isMobile() f
 content.includes('id="wb-app"')    ? ok('#wb-app vorhanden')    : fail('#wb-app fehlt');
 content.includes('wb-bottom-nav')  ? ok('#wb-bottom-nav vorhanden') : fail('#wb-bottom-nav fehlt');
 content.includes('100dvh')         ? ok('100dvh für mobile Höhe') : fail('100dvh fehlt');
+content.includes('max-width:min(480px') || content.includes('max-width: min(480px') ||
 content.includes('max-width:480px') || content.includes('max-width: 480px') ?
-  ok('max-width: 480px (Mobile-First)') : fail('max-width: 480px fehlt');
+  ok('max-width begrenzt (Mobile-First)') : fail('max-width Begrenzung fehlt');
 styleBlock.includes('flex-wrap') ? ok('flex-wrap für Mobile-Safety') : fail('flex-wrap fehlt');
 styleBlock.includes('word-break') ? ok('word-break für lange Texte') : fail('word-break fehlt');
 styleBlock.includes('min-width') ? ok('min-width Schutz vorhanden') : fail('min-width fehlt');
@@ -535,6 +536,50 @@ jsCode.includes('_oauthHideBanner()') ? ok('_oauthHideBanner() aufgerufen') : fa
 const reconnectCode = jsCode.match(/_oauthReconnectAndSync[\s\S]{0,800}/)?.[0]||'';
 reconnectCode.includes('_oauthHideBanner') ? ok('_oauthReconnectAndSync ruft _oauthHideBanner auf') : fail('_oauthReconnectAndSync ruft _oauthHideBanner NICHT auf — Banner bleibt nach Login!');
 reconnectCode.includes('_sUpdateSyncStatus') ? ok('_sUpdateSyncStatus nach Login aufgerufen') : fail('_sUpdateSyncStatus fehlt nach Login');
+
+
+// ══════════════════════════════════════════
+// 37. DUPLIZIEREN
+// ══════════════════════════════════════════
+console.log('\n── 37. Duplizieren ──');
+jsCode.includes('_te5DuplizierenTermin(') ? ok('_te5DuplizierenTermin() vorhanden') : fail('_te5DuplizierenTermin() fehlt');
+jsCode.includes('_duplizierenAufgabe(')   ? ok('_duplizierenAufgabe() vorhanden')   : fail('_duplizierenAufgabe() fehlt');
+jsCode.includes('_duplizierenThema(')     ? ok('_duplizierenThema() vorhanden')      : fail('_duplizierenThema() fehlt');
+// Buttons in Dialogen
+jsCode.includes('_te5DuplizierenTermin') && content.includes('Duplizieren') ? ok('Duplizieren-Button in Termin-Dialog') : fail('Duplizieren-Button in Termin-Dialog fehlt');
+
+// ══════════════════════════════════════════
+// 38. AUFGABEN-FELDER & OVERLAY-REFRESH
+// ══════════════════════════════════════════
+console.log('\n── 38. Aufgaben-Felder & Overlay-Refresh ──');
+jsCode.includes('wb5-na-typ')  ? ok('Typ-Feld in Aufgaben-Dialog') : fail('Typ-Feld fehlt in Aufgaben-Dialog');
+jsCode.includes('wb5-na-wdh')  ? ok('Wiederholung in Aufgaben-Dialog') : fail('Wiederholung fehlt in Aufgaben-Dialog');
+jsCode.includes('wiederholung=wdh?{typ:wdh') ? ok('Wiederholung wird gespeichert') : fail('Wiederholung wird nicht gespeichert');
+// Overlay-Refresh nach Aufgabe anlegen
+jsCode.includes('_tm5RenderOverlayBody') && jsCode.includes('_na5ThemaId=null') ?
+  ok('Overlay-Refresh nach Aufgabe im Thema') : fail('Overlay-Refresh fehlt — Aufgabe erscheint erst nach Reload');
+
+// ══════════════════════════════════════════
+// 39. WELT-PILL STATT PUNKT
+// ══════════════════════════════════════════
+console.log('\n── 39. Welt-Pill ──');
+jsCode.includes('_weltPill(')     ? ok('_weltPill() Hilfsfunktion vorhanden') : fail('_weltPill() fehlt');
+content.includes('wb5-welt-pill') ? ok('wb5-welt-pill CSS vorhanden')         : fail('wb5-welt-pill CSS fehlt');
+content.includes('wb5-welt-pill-b') ? ok('wb5-welt-pill-b (Beruf) CSS')       : fail('wb5-welt-pill-b fehlt');
+content.includes('wb5-welt-pill-p') ? ok('wb5-welt-pill-p (Privat) CSS')      : fail('wb5-welt-pill-p fehlt');
+
+// ══════════════════════════════════════════
+// 40. SYNC-DOWNLOAD KORREKT
+// ══════════════════════════════════════════
+console.log('\n── 40. Sync-Download ──');
+// _syncDownload Inhalts-Check via indexOf (Funktion kann >5000 Zeichen sein)
+const syncDlStart = jsCode.indexOf('async _syncDownload()');
+const syncDlEnd   = jsCode.indexOf('\n  },', syncDlStart + 100);
+const syncDlFn    = syncDlStart >= 0 ? jsCode.slice(syncDlStart, syncDlEnd) : '';
+syncDlFn.includes('_wb5MergeGateways') ? ok('_wb5MergeGateways nach Download aufgerufen') : fail('_wb5MergeGateways fehlt in _syncDownload!');
+syncDlFn.includes('_ensureDbFields')   ? ok('_ensureDbFields nach Download aufgerufen')    : fail('_ensureDbFields fehlt in _syncDownload');
+!syncDlFn.includes('tabSwitch(')       ? ok('kein tabSwitch() in _syncDownload (WB5-kompatibel)') : fail('tabSwitch() in _syncDownload — WB5 nutzt showTab()!');
+!syncDlFn.includes('_nzRenderPills')   ? ok('kein _nzRenderPills() in _syncDownload (WB5)')       : warn('_nzRenderPills in _syncDownload — Notizen-Tab existiert in WB5 nicht');
 
 // ══════════════════════════════════════════
 // ERGEBNIS
