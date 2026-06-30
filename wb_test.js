@@ -438,7 +438,7 @@ content.includes('_renderHybridBody(')
 content.includes('.ts-kd-title') && content.includes('font-size:14px')
   ? (ok('.ts-kd-title: font-size 14px'), f29Ok++) : (fail('.ts-kd-title: font-size nicht 14px'), f29Fail++);
 content.includes('.ts-kd-txt')
-  ? (ok('.ts-kd-txt vorhanden (WB4: font-size skaliert)'), f29Ok++) : (fail('.ts-kd-txt fehlt'), f29Fail++);
+  ? (ok('.ts-kd-txt vorhanden'), f29Ok++) : (fail('.ts-kd-txt fehlt'), f29Fail++);
 
 // Checkbox-Größe
 content.includes('.ts-kd-chk') && content.includes('width:17px')
@@ -1345,9 +1345,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.12'")
-  ? (ok('APP_VERSION ist 4.0.12'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.12'), f48Fail++); // WB4 Phase 5
+jsCode.includes("APP_VERSION: '4.0.13'")
+  ? (ok('APP_VERSION ist 4.0.13'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.13'), f48Fail++); // WB4 Phase 5b
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
@@ -1650,6 +1650,16 @@ jsCode.includes('wochentage') && jsCode.includes('tagHeute')
 jsCode.includes('ae-items-list')
   ? (ok('Unteraufgaben-Liste im Dialog vorhanden'), f48Ok++)
   : (fail('ae-items-list fehlt'), f48Fail++);
+
+
+// WB4 4.0.13: Heute-Tab Card-CSS korrekt
+content.includes('border-radius: 14px') && content.includes('gap: 12px')
+  ? (ok('Heute-Tab: ck4-section border-radius:14px + gap:12px'), f48Ok++)
+  : (fail('Heute-Tab Card-CSS fehlt'), f48Fail++);
+
+content.includes('padding: 12px 12px 80px')
+  ? (ok('ck-scroll-body: padding 12px korrekt'), f48Ok++)
+  : (fail('ck-scroll-body padding fehlt'), f48Fail++);
 
 
 console.log('\n═══════════════════════════════════════════');
