@@ -695,6 +695,16 @@ jsCode.includes('wb5-wt-btn')     ? ok('wb5-wt-btn (Wochentag-Buttons) vorhanden
 jsCode.includes("dataset.wt")     ? ok('dataset.wt für Wochentag-Wert genutzt')                 : fail('dataset.wt fehlt — Wochentage werden nicht gespeichert');
 content.includes('wb5-wt-row')    ? ok('wb5-wt-row CSS vorhanden')                              : fail('wb5-wt-row CSS fehlt');
 
+
+// ══════════════════════════════════════════
+// 51. THEMEN-TAB: FREIE AUFGABE + OVERFLOW
+// ══════════════════════════════════════════
+console.log('\n── 51. Themen-Tab Freie Aufgabe + Modal ──');
+jsCode.includes('+ Freie Aufgabe') ? ok('+ Freie Aufgabe Button im Themen-Tab') : fail('+ Freie Aufgabe Button fehlt im Themen-Tab');
+// #wb-app darf kein overflow:hidden haben (Modal würde abgeschnitten)
+const appCss = styleBlock.match(/#wb-app\s*\{([^}]+)}/)?.[1]||'';
+!appCss.includes('overflow:hidden') ? ok('#wb-app kein overflow:hidden — Modal sichtbar') : fail('#wb-app hat overflow:hidden — Modal/Settings werden abgeschnitten!');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
