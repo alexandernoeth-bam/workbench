@@ -263,15 +263,20 @@ styleBlock.includes('min-width') ? ok('min-width Schutz vorhanden') : fail('min-
 // ══════════════════════════════════════════
 console.log('\n── 19. Bottom-Nav Icons ──');
 // Kein Emoji-Fallback — nur Tabler Icons oder echte SVG
-['ti-sun','ti-layout-list','ti-calendar','ti-player-play'].forEach(icon => {
-  content.includes(icon) ? ok(icon + ' vorhanden') : fail(icon + ' fehlt — kein Emoji-Fallback!');
+// SVG-basierte Icons prüfen (kein Tabler-Webfont mehr)
+['M12 2v2m0 16v2','rect x="3" y="5"','rect x="4" y="5"','M7 4v16'].forEach((path,i) => {
+  const names=['Sonne (Heute)','Liste (Themen)','Kalender (Termine)','Play (Fokus)'];
+  content.includes(path) ? ok('SVG-Icon vorhanden: '+names[i]) : fail('SVG-Icon fehlt: '+names[i]);
 });
-content.includes('tabler-icons') || content.includes('@tabler') ?
-  ok('Tabler Icons CSS geladen') : fail('Tabler Icons CSS fehlt');
+// Inline SVG Icons (kein CDN-Abhängigkeit)
+content.includes('<svg') && (content.match(/<svg/g)||[]).length >= 4 ?
+  ok('Icons als inline SVG vorhanden (' + (content.match(/<svg/g)||[]).length + ' SVGs)') :
+  fail('Inline SVG Icons fehlen');
 // Keine Emoji-Entitäten im Nav
-const navSection = content.match(/<div id="wb-bottom-nav">([\s\S]*?)<\/div>\s*<!-- /)?.[1] || '';
-const emojiInNav = navSection.match(/&#\d{4,5};/g) || [];
-emojiInNav.length === 0 ? ok('Keine Emoji-Entities im Bottom-Nav') : fail('Emoji-Entities im Bottom-Nav: ' + emojiInNav.join(', '));
+// Settings-Button im Header
+content.includes('wb-header-settings') ? ok('Settings-Button im Header vorhanden') : fail('Settings-Button im Header fehlt');
+// Kein Gear-Float-Button mehr
+!content.includes('id="wb-menu-btn"') ? ok('Floating Gear-Button entfernt') : warn('Floating Gear-Button noch vorhanden');
 
 // ══════════════════════════════════════════
 // 20. HEUTE-TAB
@@ -350,10 +355,14 @@ jsCode.includes('_fkTimerSecs')       ? ok('Timer-State _fkTimerSecs vorhanden')
 // ══════════════════════════════════════════
 console.log('\n── 24. Sondertage ──');
 jsCode.includes('_sRenderSondertage') ? ok('_sRenderSondertage() definiert') : fail('_sRenderSondertage() fehlt');
-jsCode.includes('_sSondertageNeu')    ? ok('_sSondertageNeu() definiert')    : fail('_sSondertageNeu() fehlt');
-jsCode.includes('_sSondertageSave')   ? ok('_sSondertageSave() definiert')   : fail('_sSondertageSave() fehlt');
-jsCode.includes('_sSondertageDelete') ? ok('_sSondertageDelete() definiert') : fail('_sSondertageDelete() fehlt');
-content.includes('s-sondertage-list') ? ok('#s-sondertage-list HTML vorhanden') : fail('#s-sondertage-list fehlt');
+// Sondertage jetzt im Termine-Tab
+jsCode.includes('_te5AddSondertag')    ? ok('_te5AddSondertag() definiert')    : fail('_te5AddSondertag() fehlt');
+jsCode.includes('_te5SaveSondertag')   ? ok('_te5SaveSondertag() definiert')   : fail('_te5SaveSondertag() fehlt');
+jsCode.includes('_te5DeleteSondertag') ? ok('_te5DeleteSondertag() definiert') : fail('_te5DeleteSondertag() fehlt');
+// Sondertage sind im Termine-Tab, nicht mehr in Einstellungen-HTML
+!content.slice(0, content.indexOf('<script>')).includes('s-sondertage-list') ?
+  ok('s-sondertage-list aus Einstellungen-HTML entfernt') :
+  fail('s-sondertage-list noch im Einstellungen-HTML');
 // Sondertage-Render muss s-st-row nutzen (nicht s-row für Layout)
 jsCode.includes('s-st-row') ? ok('s-st-row CSS-Klasse in Sondertage-Render') : fail('s-st-row fehlt — Sondertage-Layout kaputt');
 // Sondertage-Render muss s-st-text und s-st-del nutzen
@@ -431,6 +440,24 @@ jsCode.includes('_cryptoDecrypt') ? ok('_cryptoDecrypt() definiert') : fail('_cr
 jsCode.includes('_cryptoUnlock')  ? ok('_cryptoUnlock() definiert')  : fail('_cryptoUnlock() fehlt');
 jsCode.includes('_cryptoChangePassword') ? ok('_cryptoChangePassword() definiert') : fail('_cryptoChangePassword() fehlt');
 content.includes('wb-crypto-overlay') ? ok('#wb-crypto-overlay vorhanden') : fail('#wb-crypto-overlay fehlt');
+
+// ══════════════════════════════════════════
+// 31. OVERLAYS IN #WB-APP (480px Breite)
+// ══════════════════════════════════════════
+console.log('\n── 31. Overlays in #wb-app ──');
+// Alle position:fixed Overlays müssen position:absolute sein (innerhalb #wb-app)
+const fixedOverlays = ['wb-crypto-overlay','wb-modal-overlay','wb-settings-overlay','wb5-fokus-screen','wb-toast'];
+fixedOverlays.forEach(id => {
+  const cssMatch = styleBlock.match(new RegExp('#' + id + '[^{]*\\{([^}]+)'));
+  if(!cssMatch){ fail(id + ': CSS nicht gefunden'); return; }
+  const css = cssMatch[1];
+  !css.includes('position:fixed') ? ok(id + ': position:absolute (nicht fixed)') : fail(id + ': noch position:fixed — bricht aus #wb-app heraus!');
+});
+// Crypto/Modal/Settings/Fokus innerhalb #wb-app
+const wbAppHtml = content.slice(content.indexOf('<div id="wb-app">'), content.indexOf('\n<script>'));
+fixedOverlays.forEach(id => {
+  wbAppHtml.includes('id="' + id + '"') ? ok(id + ' innerhalb #wb-app') : fail(id + ' außerhalb #wb-app!');
+});
 
 // ══════════════════════════════════════════
 // ERGEBNIS
