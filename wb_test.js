@@ -750,6 +750,26 @@ const freieCtx = freieIdx >= 0 ? jsCode.slice(freieIdx, freieIdx+600) : '';
 freieCtx.includes('a.typ')      ? ok('Typ in freien Aufgaben angezeigt')      : fail('Typ fehlt in freier Aufgaben-Übersicht');
 freieCtx.includes('a.deadline') || freieCtx.includes('fmtDDMM') ? ok('Deadline in freien Aufgaben angezeigt') : fail('Deadline fehlt in freier Aufgaben-Übersicht');
 
+
+// ══════════════════════════════════════════
+// 56. TERMIN LÖSCHEN + SOFTDELETE
+// ══════════════════════════════════════════
+console.log('\n── 56. Termin Löschen ──');
+// _te5DelTermin muss zuerst das Objekt suchen, dann _softDelete(item) aufrufen
+const delTerminFn = jsCode.match(/_te5DelTermin\(id\)[^,]+,/)?.[0]||'';
+delTerminFn.includes('.find(') ? ok('_te5DelTermin sucht Objekt vor _softDelete') : fail('_te5DelTermin übergibt Array an _softDelete — Termin wird nicht gelöscht!');
+!delTerminFn.includes('_softDelete(this.db.customEvents,') ? ok('_softDelete korrekt aufgerufen (nicht mit Array+ID)') : fail('_softDelete(array,id) falsch — muss _softDelete(item) sein!');
+
+// ══════════════════════════════════════════
+// 57. WOCHENTAGE IM BEARBEITEN-DIALOG
+// ══════════════════════════════════════════
+console.log('\n── 57. Wochentage in _aufgabeDetail ──');
+jsCode.includes('wb5-ad-tage-wrap') ? ok('Wochentage-Bereich in _aufgabeDetail vorhanden') : fail('Wochentage-Bereich fehlt in _aufgabeDetail');
+jsCode.includes('_ad5WdhChange(')   ? ok('_ad5WdhChange() für Wochentage-Toggle')           : fail('_ad5WdhChange() fehlt');
+jsCode.includes('_ad5WtToggle(')    ? ok('_ad5WtToggle() für einzelne Wochentage')           : fail('_ad5WtToggle() fehlt');
+jsCode.includes('wb5-ad-tage-row')  ? ok('wb5-ad-tage-row für Wochentag-Buttons')            : fail('wb5-ad-tage-row fehlt');
+jsCode.includes('wtAd')             ? ok('_aufgabeSave liest Wochentage aus Detail-Dialog')   : fail('_aufgabeSave liest keine Wochentage aus Detail');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════

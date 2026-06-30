@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.1.8</title>
+  <title>WorkBench 5.1.9</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -375,7 +375,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.1.8 · Build 20260701-0300</div>
+    <div id="wb-startup-tagline">v5.1.9 · Build 20260701-0315</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -682,8 +682,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.1.8',
-  APP_BUILD:      '20260701-0300',
+  APP_VERSION:    '5.1.9',
+  APP_BUILD:      '20260701-0315',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -1495,7 +1495,7 @@ const WB = {
 
   _te5OpenTermin(id) { this._terminDialog(id); },
 
-  _te5DelTermin(id) { this._softDelete(this.db.customEvents,id);this.setDirty();this.modalClose();this._te5Render(); },
+  _te5DelTermin(id) { const e=(this.db.customEvents||[]).find(x=>x.id===id);this._softDelete(e);this.setDirty();this.modalClose();this._te5Render(); },
 
   _terminDialog(eventId) {
     const db = this.db;
@@ -1873,8 +1873,12 @@ const WB = {
       +'<div class="wb-input-group"><span class="wb-label">Deadline</span>'
       +'<input id="wb5-ad-deadline" class="wb-input" type="date" value="'+(a.deadline||'')+'"></div>'
       +'<div class="wb-input-group"><span class="wb-label">Wiederholung</span>'
-      +'<select id="wb5-ad-wdh" class="wb-select">'+wdhA.map(w=>'<option value="'+w.v+'"'+(curWdhA===w.v?' selected':'')+'>'+w.l+'</option>').join('')+'</select></div>'
+      +'<select id="wb5-ad-wdh" class="wb-select" onchange="WB._ad5WdhChange(this.value)">'+wdhA.map(w=>'<option value="'+w.v+'"'+(curWdhA===w.v?' selected':'')+'>'+w.l+'</option>').join('')+'</select></div>'
       +'</div>'
+      +'<div id="wb5-ad-tage-wrap" style="display:none;" class="wb-input-group"><span class="wb-label">Wochentage</span>'
+      +'<div class="wb5-wt-row" id="wb5-ad-tage-row">'
+      +[{v:1,l:'Mo'},{v:2,l:'Di'},{v:3,l:'Mi'},{v:4,l:'Do'},{v:5,l:'Fr'},{v:6,l:'Sa'},{v:0,l:'So'}].map(t=>'<button type="button" class="wb5-wt-btn'+(( (a.wiederholung?.wochentage||[]).includes(t.v))?'  active':'')+'" data-wt="'+t.v+'" onclick="WB._ad5WtToggle(this)">'+t.l+'</button>').join('')
+      +'</div></div>'
       +'<div class="wb-input-group"><span class="wb-label">Bereich</span>'
       +'<div class="wb5-welt-toggle">'
       +'<button class="wb5-welt-opt'+(curWeltA==='b'?' active-b':'')+'" id="wb5-ad-b" onclick="WB._ad5Welt(\x27b\x27)"><div class="wb5-dot wb5-dot-b"></div>Beruf</button>'
@@ -1892,6 +1896,12 @@ const WB = {
       +'</div></div>';
     this._ad5WeltSel=curWeltA;
     this.modalOpen(a.titel||a.text||'Aufgabe', bodyFull, foot);
+    // Wochentage-Bereich init
+    setTimeout(()=>{
+      const curWdh=a.wiederholung?.typ||'';
+      const wrap=document.getElementById('wb5-ad-tage-wrap');
+      if(wrap) wrap.style.display=(curWdh==='wöchentlich'?'':'none');
+    },50);
   },
 
 
@@ -1911,7 +1921,10 @@ const WB = {
     a.deadline=document.getElementById('wb5-ad-deadline')?.value||'';
     a.typ=document.getElementById('wb5-ad-typ')?.value||a.typ||'aufgabe';
     const wdhV=document.getElementById('wb5-ad-wdh')?.value||'';
-    a.wiederholung=wdhV?{typ:wdhV,wochentage:[],datum:'',naechstFaellig:''}:null;
+    const wtAd=wdhV==='wöchentlich'
+      ?[...document.querySelectorAll('#wb5-ad-tage-row .wb5-wt-btn.active')].map(b=>parseInt(b.dataset.wt))
+      :[];
+    a.wiederholung=wdhV?{typ:wdhV,wochentage:wtAd,datum:'',naechstFaellig:''}:null;
     if(this._ad5WeltSel) a.welt=this._ad5WeltSel;
     a.notiz=document.getElementById('wb5-ad-notiz')?.value.trim()||a.notiz||'';
     // Thema-Zuordnung ändern
