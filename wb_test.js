@@ -1345,9 +1345,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.2'")
-  ? (ok('APP_VERSION ist 4.0.2'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.2'), f48Fail++); // WB4 Phase 2
+jsCode.includes("APP_VERSION: '4.0.3'")
+  ? (ok('APP_VERSION ist 4.0.3'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.3'), f48Fail++); // WB4 Phase 3
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
@@ -1404,6 +1404,52 @@ content.includes('.ck4-overlap')
 jsCode.includes('ts-th-inbox') === false
   ? (ok('Eingang-Pill aus Header entfernt'), f48Ok++)
   : (fail('Eingang-Pill noch im Header'), f48Fail++);
+
+
+// WB4 Phase 3: Assistent-Tab
+jsCode.includes('_asPipeline(')
+  ? (ok('_asPipeline() definiert'), f48Ok++)
+  : (fail('_asPipeline() fehlt'), f48Fail++);
+
+jsCode.includes('_asEingabeCheck()')
+  ? (ok('_asEingabeCheck() 60min-Split vorhanden'), f48Ok++)
+  : (fail('_asEingabeCheck() fehlt'), f48Fail++);
+
+jsCode.includes('_asSplitSpeichern(')
+  ? (ok('_asSplitSpeichern() Zerlegungs-Mentor vorhanden'), f48Ok++)
+  : (fail('_asSplitSpeichern() fehlt'), f48Fail++);
+
+jsCode.includes('_asLinkify(')
+  ? (ok('_asLinkify() Markdown-Links vorhanden'), f48Ok++)
+  : (fail('_asLinkify() fehlt'), f48Fail++);
+
+jsCode.includes('_asGwIstWert(')
+  ? (ok('_asGwIstWert() IST-Wert inline vorhanden'), f48Ok++)
+  : (fail('_asGwIstWert() fehlt'), f48Fail++);
+
+jsCode.includes('_asNeuesThema()')
+  ? (ok('_asNeuesThema() Dialog vorhanden'), f48Ok++)
+  : (fail('_asNeuesThema() fehlt'), f48Fail++);
+
+jsCode.includes('_asZuRadar(')
+  ? (ok('_asZuRadar() Aufgabe-zu-Radar vorhanden'), f48Ok++)
+  : (fail('_asZuRadar() fehlt'), f48Fail++);
+
+content.includes('.as-eingabe-card')
+  ? (ok('.as-eingabe-card CSS vorhanden'), f48Ok++)
+  : (fail('.as-eingabe-card CSS fehlt'), f48Fail++);
+
+content.includes('.as-split-dialog')
+  ? (ok('.as-split-dialog CSS vorhanden'), f48Ok++)
+  : (fail('.as-split-dialog CSS fehlt'), f48Fail++);
+
+content.includes('.as-pipeline')
+  ? (ok('.as-pipeline CSS vorhanden'), f48Ok++)
+  : (fail('.as-pipeline CSS fehlt'), f48Fail++);
+
+content.includes('.as-gw-kpi-inp')
+  ? (ok('.as-gw-kpi-inp IST-Wert Eingabe CSS vorhanden'), f48Ok++)
+  : (fail('.as-gw-kpi-inp CSS fehlt'), f48Fail++);
 
 
 console.log('\n═══════════════════════════════════════════');
