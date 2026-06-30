@@ -503,6 +503,39 @@ jsCode.includes('_wb5InitAfter')     ? ok('_wb5InitAfter() als Post-Crypto-Init 
 // _cryptoShowDialog muss wb-crypto-input nutzen (nicht wb-crypto-pw)
 !jsCode.includes("getElementById('wb-crypto-pw')") ? ok('_cryptoShowDialog nutzt wb-crypto-input') : fail('_cryptoShowDialog sucht wb-crypto-pw — Element heißt wb-crypto-input!');
 
+
+// ══════════════════════════════════════════
+// 35. DIALOGE: NEU + BEARBEITEN
+// ══════════════════════════════════════════
+console.log('\n── 35. Dialoge: Neu + Bearbeiten ──');
+// Thema
+jsCode.includes('_themaDialog(')    ? ok('_themaDialog() vorhanden (Neu+Bearbeiten)') : fail('_themaDialog() fehlt');
+jsCode.includes('_thd5Save(')       ? ok('_thd5Save() vorhanden')  : fail('_thd5Save() fehlt');
+jsCode.includes('_thd5Delete(')     ? ok('_thd5Delete() vorhanden') : fail('_thd5Delete() fehlt');
+// Termin
+jsCode.includes('_terminDialog(')   ? ok('_terminDialog() vorhanden (Neu+Bearbeiten)') : fail('_terminDialog() fehlt');
+jsCode.includes('_te5DSave(')       ? ok('_te5DSave() vorhanden')   : fail('_te5DSave() fehlt');
+// Aufgabe
+jsCode.includes('_aufgabeSave(')    ? ok('_aufgabeSave() vorhanden') : fail('_aufgabeSave() fehlt');
+// Fokus-Checklisten
+jsCode.includes('_fk5NeuTyp()')     ? ok('_fk5NeuTyp() vorhanden')       : fail('_fk5NeuTyp() fehlt');
+jsCode.includes('_fk5TypSave()')    ? ok('_fk5TypSave() vorhanden')       : fail('_fk5TypSave() fehlt');
+jsCode.includes('_fk5EditTypDialog') ? ok('_fk5EditTypDialog() vorhanden') : fail('_fk5EditTypDialog() fehlt');
+jsCode.includes('_fk5TypDelete(')   ? ok('_fk5TypDelete() vorhanden')     : fail('_fk5TypDelete() fehlt');
+// addNew() für alle Tabs
+jsCode.includes("activeTab==='themen')  this._themaDialog") ? ok('addNew() → Thema-Dialog') : fail('addNew() für Themen-Tab fehlt');
+jsCode.includes("activeTab==='fokus')   this._fk5NeuTyp")   ? ok('addNew() → Fokus-Checkliste') : fail('addNew() für Fokus-Tab fehlt');
+
+// ══════════════════════════════════════════
+// 36. OAUTH BANNER-FLOW
+// ══════════════════════════════════════════
+console.log('\n── 36. OAuth Banner-Flow ──');
+jsCode.includes('_oauthHideBanner()') ? ok('_oauthHideBanner() aufgerufen') : fail('_oauthHideBanner() fehlt');
+// _oauthReconnectAndSync muss HideBanner aufrufen wenn Token da
+const reconnectCode = jsCode.match(/_oauthReconnectAndSync[\s\S]{0,800}/)?.[0]||'';
+reconnectCode.includes('_oauthHideBanner') ? ok('_oauthReconnectAndSync ruft _oauthHideBanner auf') : fail('_oauthReconnectAndSync ruft _oauthHideBanner NICHT auf — Banner bleibt nach Login!');
+reconnectCode.includes('_sUpdateSyncStatus') ? ok('_sUpdateSyncStatus nach Login aufgerufen') : fail('_sUpdateSyncStatus fehlt nach Login');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
