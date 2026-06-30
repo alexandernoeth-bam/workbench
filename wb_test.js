@@ -1345,9 +1345,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.11'")
-  ? (ok('APP_VERSION ist 4.0.11'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.11'), f48Fail++); // WB4 Phase 4c
+jsCode.includes("APP_VERSION: '4.0.12'")
+  ? (ok('APP_VERSION ist 4.0.12'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.12'), f48Fail++); // WB4 Phase 5
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
@@ -1620,6 +1620,36 @@ jsCode.includes("label:'N") && jsCode.includes("label:'GW (aktuell)")
 jsCode.includes("typ:          'aufgabe'")
   ? (ok('DB-Schema: typ-Feld in Aufgaben vorhanden'), f48Ok++)
   : (fail('DB-Schema typ fehlt'), f48Fail++);
+
+
+// WB4 4.0.12
+content.includes('border-radius: 14px') && content.includes('gap: 12px')
+  ? (ok('Heute-Tab: Card-Sektionen mit border-radius + gap'), f48Ok++)
+  : (fail('Heute-Tab Card-Sektionen fehlen'), f48Fail++);
+
+jsCode.includes('_asSubitemAdd')
+  ? (ok('Unteraufgaben: _asSubitemAdd vorhanden'), f48Ok++)
+  : (fail('_asSubitemAdd fehlt'), f48Fail++);
+
+jsCode.includes('_asSubitemToggle') && jsCode.includes('_asSubitemDel')
+  ? (ok('Unteraufgaben: Toggle + Delete vorhanden'), f48Ok++)
+  : (fail('Unteraufgaben-Funktionen fehlen'), f48Fail++);
+
+jsCode.includes('_asAufgabeMoveUp') && jsCode.includes('_asAufgabeMoveDown')
+  ? (ok('Aufgaben-Sortierung: MoveUp + MoveDown vorhanden'), f48Ok++)
+  : (fail('Aufgaben-Sortierung fehlt'), f48Fail++);
+
+jsCode.includes('_isRoutineHeuteFällig')
+  ? (ok('Routine-Aufgaben im Tages-Radar: _isRoutineHeuteFällig vorhanden'), f48Ok++)
+  : (fail('_isRoutineHeuteFällig fehlt'), f48Fail++);
+
+jsCode.includes('wochentage') && jsCode.includes('tagHeute')
+  ? (ok('Wochentag-Prüfung für Routinen vorhanden'), f48Ok++)
+  : (fail('Wochentag-Prüfung fehlt'), f48Fail++);
+
+jsCode.includes('ae-items-list')
+  ? (ok('Unteraufgaben-Liste im Dialog vorhanden'), f48Ok++)
+  : (fail('ae-items-list fehlt'), f48Fail++);
 
 
 console.log('\n═══════════════════════════════════════════');
