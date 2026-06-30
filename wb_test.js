@@ -327,7 +327,7 @@ jsCode.includes('settingsClose') ? ok('settingsClose() definiert') : fail('setti
 jsCode.includes('_sLoadSettings') ? ok('_sLoadSettings() definiert') : fail('_sLoadSettings fehlt');
 jsCode.includes('_sSaveSettings') ? ok('_sSaveSettings() definiert') : fail('_sSaveSettings fehlt');
 jsCode.includes('darkMode') ? ok('Dark-Mode in Settings') : fail('darkMode fehlt');
-jsCode.includes('_sSetDevice') ? ok('_sSetDevice() definiert') : fail('_sSetDevice fehlt');
+!jsCode.includes('_sSetDevice') ? ok('_sSetDevice entfernt (WB5-Ready)') : fail('_sSetDevice noch vorhanden');
 // Keine Wochenpflichten in Einstellungen-HTML (Migration darf den Begriff enthalten)
 const settingsHtml = content.match(/id="wb-settings-overlay"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/)?.[0] || '';
 !settingsHtml.includes('Wochenpflichten') ?
@@ -365,7 +365,7 @@ console.log('\n── 25. Sondertage & Wochenmottos ──');
 jsCode.includes('sondertage')   ? ok('sondertage in DB')       : fail('sondertage fehlt');
 jsCode.includes('wochenMottos') ? ok('wochenMottos in DB')     : fail('wochenMottos fehlt');
 jsCode.includes('_sRenderSondertage') ? ok('_sRenderSondertage()') : fail('_sRenderSondertage fehlt');
-jsCode.includes('_sRenderMottos')     ? ok('_sRenderMottos()')     : fail('_sRenderMottos fehlt');
+!jsCode.includes('_sRenderMottos') ? ok('_sRenderMottos entfernt (WB5-Ready)') : fail('_sRenderMottos noch vorhanden');
 
 // ══════════════════════════════════════════
 // 26. NICHT VORHANDENE FEATURES (Slim)
@@ -1343,9 +1343,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.16'")
-  ? (ok('APP_VERSION ist 4.0.16'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.16'), f48Fail++); // WB4 Phase 6
+jsCode.includes("APP_VERSION: '4.0.17'")
+  ? (ok('APP_VERSION ist 4.0.17'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.17'), f48Fail++); // WB4 Phase 6b
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
