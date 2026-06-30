@@ -1345,9 +1345,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.7'")
-  ? (ok('APP_VERSION ist 4.0.7'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.7'), f48Fail++); // WB4 Phase 3e
+jsCode.includes("APP_VERSION: '4.0.8'")
+  ? (ok('APP_VERSION ist 4.0.8'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.8'), f48Fail++); // WB4 Phase 3f
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
@@ -1521,9 +1521,9 @@ content.includes('L\u00f6schen') || content.includes('Löschen')
 
 
 // WB4 Phase 3d: Chevron-Fix + Schrift
-content.includes('&apos;_themenradar&apos;')
-  ? (ok('onclick verwendet &apos; statt \\x27 (Chevron-Fix)'), f48Ok++)
-  : (fail('onclick &apos; fehlt — Chevrons funktionieren nicht'), f48Fail++);
+content.includes('&quot;_themenradar&quot;')
+  ? (ok('onclick verwendet &quot; — Chevrons funktionieren'), f48Ok++)
+  : (fail('onclick &quot; fehlt'), f48Fail++); // WB4 Final-Fix
 
 content.includes('font-size: 18px') || content.includes('font-size: 20px')
   ? (ok('Schriftgrößen skaliert (+40%)'), f48Ok++)
@@ -1550,6 +1550,12 @@ jsCode.includes('Bedingung:') && jsCode.includes('as-gw-sub')
 jsCode.includes('Kurs ok')
   ? (ok('Status-Badge: Kurs ok vorhanden'), f48Ok++)
   : (fail('Status-Badge fehlt'), f48Fail++);
+
+
+// WB4 Chevron-Fix &quot;
+content.includes('onclick="WB._ck4SectionToggle(&quot;')
+  ? (ok('onclick nutzt &quot; statt &apos; (Chevron-Fix final)'), f48Ok++)
+  : (fail('onclick &quot; fehlt'), f48Fail++);
 
 
 console.log('\n═══════════════════════════════════════════');
