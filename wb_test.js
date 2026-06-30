@@ -675,13 +675,25 @@ wb4Only.forEach(fn => {
 // ══════════════════════════════════════════
 console.log('\n── 49. Mindest-Schriftgröße 12px ──');
 const allCssSizes = (styleBlock.match(/font-size:(\d+)px/g)||[]).map(s=>parseInt(s.replace('font-size:','').replace('px','')));
-const tooSmallCss = allCssSizes.filter(s=>s<12);
-if(tooSmallCss.length===0) ok('CSS: alle Schriftgrößen ≥ 12px (' + allCssSizes.length + ' geprüft)');
-else fail('CSS: ' + tooSmallCss.length + ' Schriftgrößen unter 12px: ' + [...new Set(tooSmallCss)].sort((a,b)=>a-b).join('px, ') + 'px');
+const tooSmallCss = allCssSizes.filter(s=>s<14);
+if(tooSmallCss.length===0) ok('CSS: alle Schriftgrößen ≥ 14px (' + allCssSizes.length + ' geprüft)');
+else fail('CSS: ' + tooSmallCss.length + ' Schriftgrößen unter 14px: ' + [...new Set(tooSmallCss)].sort((a,b)=>a-b).join('px, ') + 'px');
 const allJsSizes = (jsCode.match(/font-size:(\d+)px/g)||[]).map(s=>parseInt(s.replace('font-size:','').replace('px','')));
-const tooSmallJs = allJsSizes.filter(s=>s<12);
-if(tooSmallJs.length===0) ok('JS inline: alle Schriftgrößen ≥ 12px (' + allJsSizes.length + ' geprüft)');
-else fail('JS inline: ' + tooSmallJs.length + ' Schriftgrößen unter 12px: ' + [...new Set(tooSmallJs)].sort((a,b)=>a-b).join('px, ') + 'px');
+const tooSmallJs = allJsSizes.filter(s=>s<14);
+if(tooSmallJs.length===0) ok('JS inline: alle Schriftgrößen ≥ 14px (' + allJsSizes.length + ' geprüft)');
+else fail('JS inline: ' + tooSmallJs.length + ' Schriftgrößen unter 14px: ' + [...new Set(tooSmallJs)].sort((a,b)=>a-b).join('px, ') + 'px');
+
+
+// ══════════════════════════════════════════
+// 50. WIEDERHOLUNG: WOCHENTAGE-AUSWAHL
+// ══════════════════════════════════════════
+console.log('\n── 50. Wiederholung Wochentage ──');
+jsCode.includes('_na5WdhChange(') ? ok('_na5WdhChange() vorhanden — Wochentage ein/ausblenden') : fail('_na5WdhChange() fehlt');
+jsCode.includes('_na5WtToggle(')  ? ok('_na5WtToggle() vorhanden — Wochentag toggeln')         : fail('_na5WtToggle() fehlt');
+jsCode.includes('wb5-na-tage-wrap') ? ok('wb5-na-tage-wrap vorhanden (Wochentage-Bereich)')     : fail('wb5-na-tage-wrap fehlt');
+jsCode.includes('wb5-wt-btn')     ? ok('wb5-wt-btn (Wochentag-Buttons) vorhanden')              : fail('wb5-wt-btn fehlt');
+jsCode.includes("dataset.wt")     ? ok('dataset.wt für Wochentag-Wert genutzt')                 : fail('dataset.wt fehlt — Wochentage werden nicht gespeichert');
+content.includes('wb5-wt-row')    ? ok('wb5-wt-row CSS vorhanden')                              : fail('wb5-wt-row CSS fehlt');
 
 // ══════════════════════════════════════════
 // ERGEBNIS
