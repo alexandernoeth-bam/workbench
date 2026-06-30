@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.1.7</title>
+  <title>WorkBench 5.1.8</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -375,7 +375,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.1.7 · Build 20260701-0230</div>
+    <div id="wb-startup-tagline">v5.1.8 · Build 20260701-0300</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -682,8 +682,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.1.7',
-  APP_BUILD:      '20260701-0230',
+  APP_VERSION:    '5.1.8',
+  APP_BUILD:      '20260701-0300',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -895,11 +895,6 @@ const WB = {
     const erledigt = aufgabenHeute.filter(a=>a.erledigt||a.status==='erledigt');
     h += '<div class="wb5-card"><div class="wb5-card-hdr"><span class="wb5-card-title">Heute erledigen</span>'
       +'<span class="wb5-card-badge">'+offen.length+' offen'+(erledigt.length?' &middot; '+erledigt.length+' erledigt':'')+'</span></div>';
-    erledigt.forEach(a => {
-      h += '<div class="wb5-item"><div class="wb5-cb done" onclick="event.stopPropagation();WB._ht5Toggle(\''+this._esc(a.id)+'\')"></div>'
-        +''+this._weltPill(a.welt)
-        +'<span class="wb5-item-text done">'+this._esc(a.titel||a.text||'')+'</span></div>';
-    });
     if (offen.length) {
       offen.forEach(a => {
         const isR=this._isRoutineHeute(a); const isPrio1=(a.prio||3)===1;
@@ -916,6 +911,13 @@ const WB = {
     } else {
       h += '<div style="padding:16px 12px;font-size:14px;color:var(--faint);text-align:center;">Alles erledigt &#10003;</div>';
     }
+    // Erledigte unten anzeigen
+    erledigt.forEach(a => {
+      h += '<div class="wb5-item"><div class="wb5-cb done" onclick="event.stopPropagation();WB._ht5Toggle(\''+this._esc(a.id)+'\')"></div>'
+        +''+this._weltPill(a.welt)
+        +'<span class="wb5-item-text done">'+this._esc(a.titel||a.text||'')+'</span></div>';
+    });
+
     h += '</div>';
     const hinweise = this._ht5Hinweise();
     if (hinweise.length) {
@@ -1223,9 +1225,10 @@ const WB = {
       h+='<div class="wb5-freie-item" onclick="WB._aufgabeDetail(\''+this._esc(a.id)+'\')">'
         +'<div class="wb5-cb" onclick="event.stopPropagation();WB._ht5Toggle(\x27'+this._esc(a.id)+'\x27)"></div>'+this._weltPill(a.welt)
         +'<span class="wb5-freie-text">'+this._esc(a.titel||a.text||'')+'</span>'
+        +(a.typ&&a.typ!=='aufgabe'?'<span class="wb5-atag" style="background:var(--surface2);color:var(--muted);">'+a.typ+'</span>':'')
         +(isUe?'<span class="wb5-atag wb5-at-ue">&uuml;berf&auml;llig</span>':'')
-        +(isFaellig&&!isUe?'<span class="wb5-atag wb5-at-dl">'+this._fmtDDMM(a.deadline)+'</span>':'')
-        +(isR?'<span class="wb5-atag wb5-at-r">&#x21BB;</span>':'')+'</div>';
+        +(a.deadline&&!isUe?'<span class="wb5-atag wb5-at-dl">'+this._fmtDDMM(a.deadline)+'</span>':'')
+        +(isR?'<span class="wb5-atag wb5-at-r">&#x21BB; Routine</span>':'')+'</div>';
     });
     h+='</div></div>';
     const erledigte=(db.themen||[]).filter(t=>!t.deleted&&t.status==='erledigt'&&this._weltOk(t));
@@ -1790,11 +1793,13 @@ const WB = {
       +'<button class="wb5-welt-opt active-b" id="wb5-na-b" onclick="WB._na5SetWelt(\x27b\x27)"><div class="wb5-dot wb5-dot-b"></div>Beruf</button>'
       +'<button class="wb5-welt-opt" id="wb5-na-p" onclick="WB._na5SetWelt(\x27p\x27)"><div class="wb5-dot wb5-dot-p"></div>Privat</button>'
       +'</div></div>';
+    const body2=body+'<div class="wb-input-group"><span class="wb-label">Notiz (optional)</span>'
+      +'<textarea id="wb5-na-notiz" class="wb-textarea" rows="2" placeholder="Kontext, Links, Details..."></textarea></div>';
     const foot='<div style="display:flex;gap:8px;">'
       +'<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
       +'<button class="wb-btn wb-btn-save" onclick="WB._na5Save()">Speichern</button></div>';
     this._modalCtx='aufgabe-neu';this._na5Welt='b';this._na5ThemaId=this._na5ThemaId||null;
-    this.modalOpen('Neue Aufgabe',body,foot);
+    this.modalOpen('Neue Aufgabe',body2,foot);
     if(this._na5ThemaId){const sel=document.getElementById('wb5-na-thema');if(sel)sel.value=this._na5ThemaId;}
   },
 
@@ -1824,7 +1829,8 @@ const WB = {
       ?[...document.querySelectorAll('#wb5-na-tage-wrap .wb5-wt-btn.active')].map(b=>parseInt(b.dataset.wt))
       :[];
     const wiederholung=wdh?{typ:wdh,wochentage:wt,datum:'',naechstFaellig:''}:null;
-    const aufg={id:'a_'+Date.now(),titel:text,prio,deadline,welt,typ,wiederholung,erledigt:false,updatedAt:this._now()};
+    const notiz=document.getElementById('wb5-na-notiz')?.value.trim()||'';
+    const aufg={id:'a_'+Date.now(),titel:text,prio,deadline,welt,typ,wiederholung,notiz,erledigt:false,updatedAt:this._now()};
     const selThema=document.getElementById('wb5-na-thema');
     const themaIdSel=selThema?.value||this._na5ThemaId||null;
     if(themaIdSel){
@@ -1874,6 +1880,9 @@ const WB = {
       +'<button class="wb5-welt-opt'+(curWeltA==='b'?' active-b':'')+'" id="wb5-ad-b" onclick="WB._ad5Welt(\x27b\x27)"><div class="wb5-dot wb5-dot-b"></div>Beruf</button>'
       +'<button class="wb5-welt-opt'+(curWeltA==='p'?' active-p':'')+'" id="wb5-ad-p" onclick="WB._ad5Welt(\x27p\x27)"><div class="wb5-dot wb5-dot-p"></div>Privat</button>'
       +'</div></div>';
+    const bodyFull=body
+      +'<div class="wb-input-group"><span class="wb-label">Notiz (optional)</span>'
+      +'<textarea id="wb5-ad-notiz" class="wb-textarea" rows="2">'+this._esc(a.notiz||'')+'</textarea></div>';
     const foot = '<div style="display:flex;gap:8px;justify-content:space-between;width:100%;">'
       +'<div style="display:flex;gap:6px;"><button class="wb-btn wb-btn-danger" onclick="WB._aufgabeDelete(\x27'+this._esc(id)+'\x27)">Löschen</button>'
       +'<button class="wb-btn" style="background:var(--surface2);" onclick="WB._duplizierenAufgabe(\x27'+this._esc(id)+'\x27)">Duplizieren</button></div>'
@@ -1882,7 +1891,7 @@ const WB = {
       +'<button class="wb-btn wb-btn-save" onclick="WB._aufgabeSave(\x27'+this._esc(id)+'\x27)">Speichern</button>'
       +'</div></div>';
     this._ad5WeltSel=curWeltA;
-    this.modalOpen(a.titel||a.text||'Aufgabe', body, foot);
+    this.modalOpen(a.titel||a.text||'Aufgabe', bodyFull, foot);
   },
 
 
@@ -1904,6 +1913,7 @@ const WB = {
     const wdhV=document.getElementById('wb5-ad-wdh')?.value||'';
     a.wiederholung=wdhV?{typ:wdhV,wochentage:[],datum:'',naechstFaellig:''}:null;
     if(this._ad5WeltSel) a.welt=this._ad5WeltSel;
+    a.notiz=document.getElementById('wb5-ad-notiz')?.value.trim()||a.notiz||'';
     // Thema-Zuordnung ändern
     const newThemaId=document.getElementById('wb5-ad-thema')?.value||'';
     if(newThemaId && newThemaId!==a.themaId) {

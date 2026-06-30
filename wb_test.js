@@ -715,6 +715,41 @@ jsCode.includes('wb5-ad-thema') ? ok('Thema-Select in _aufgabeDetail') : fail('T
 jsCode.includes('themaIdSel')   ? ok('_na5Save liest Thema aus Select') : fail('_na5Save liest Thema nicht aus Select');
 jsCode.includes('newThemaId')   ? ok('_aufgabeSave verarbeitet Thema-Wechsel') : fail('Thema-Wechsel in _aufgabeSave fehlt');
 
+
+// ══════════════════════════════════════════
+// 53. AUFGABEN-DIALOG VOLLSTÄNDIG
+// ══════════════════════════════════════════
+console.log('\n── 53. Aufgaben-Dialog Felder ──');
+jsCode.includes('wb5-na-notiz')  ? ok('Notiz-Feld in _aufgabeNeu')     : fail('Notiz-Feld fehlt in _aufgabeNeu');
+jsCode.includes('wb5-ad-notiz')  ? ok('Notiz-Feld in _aufgabeDetail')  : fail('Notiz-Feld fehlt in _aufgabeDetail');
+jsCode.includes('wb5-na-thema')  ? ok('Thema-Select in _aufgabeNeu')   : fail('Thema-Select fehlt');
+jsCode.includes('wb5-ad-thema')  ? ok('Thema-Select in _aufgabeDetail') : fail('Thema-Select fehlt in Detail');
+jsCode.includes('wb5-na-wdh')    ? ok('Wiederholung in _aufgabeNeu')   : fail('Wiederholung fehlt');
+jsCode.includes('wb5-na-tage-wrap') ? ok('Wochentage-Bereich vorhanden') : fail('Wochentage-Bereich fehlt');
+
+// ══════════════════════════════════════════
+// 54. HEUTE-TAB SORTIERUNG
+// ══════════════════════════════════════════
+console.log('\n── 54. Heute-Tab Sortierung ──');
+// Im _ht5Render: offen.forEach muss VOR erledigt.forEach kommen
+const htStart = jsCode.indexOf('  _ht5Render() {');
+const htEnd   = jsCode.indexOf('\n  },', htStart + 50);
+const htFn    = htStart >= 0 ? jsCode.slice(htStart, htEnd) : '';
+const idxOffen = htFn.indexOf('offen.forEach');
+const idxErl   = htFn.indexOf('erledigt.forEach');
+(idxOffen > 0 && idxErl > 0 && idxOffen < idxErl) ?
+  ok('Sortierung korrekt: offen vor erledigt') :
+  fail('Sortierung falsch: erledigte erscheinen vor offenen Aufgaben!');
+
+// ══════════════════════════════════════════
+// 55. FREIE AUFGABEN: TYP + DEADLINE
+// ══════════════════════════════════════════
+console.log('\n── 55. Freie Aufgaben Anzeige ──');
+const freieIdx = jsCode.indexOf('wb5-freie-item');
+const freieCtx = freieIdx >= 0 ? jsCode.slice(freieIdx, freieIdx+600) : '';
+freieCtx.includes('a.typ')      ? ok('Typ in freien Aufgaben angezeigt')      : fail('Typ fehlt in freier Aufgaben-Übersicht');
+freieCtx.includes('a.deadline') || freieCtx.includes('fmtDDMM') ? ok('Deadline in freien Aufgaben angezeigt') : fail('Deadline fehlt in freier Aufgaben-Übersicht');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
