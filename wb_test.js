@@ -705,6 +705,16 @@ jsCode.includes('+ Freie Aufgabe') ? ok('+ Freie Aufgabe Button im Themen-Tab') 
 const appCss = styleBlock.match(/#wb-app\s*\{([^}]+)}/)?.[1]||'';
 !appCss.includes('overflow:hidden') ? ok('#wb-app kein overflow:hidden — Modal sichtbar') : fail('#wb-app hat overflow:hidden — Modal/Settings werden abgeschnitten!');
 
+
+// ══════════════════════════════════════════
+// 52. THEMA-ZUORDNUNG BEI AUFGABEN
+// ══════════════════════════════════════════
+console.log('\n── 52. Thema-Zuordnung Aufgaben ──');
+jsCode.includes('wb5-na-thema') ? ok('Thema-Select in _aufgabeNeu') : fail('Thema-Select fehlt in _aufgabeNeu');
+jsCode.includes('wb5-ad-thema') ? ok('Thema-Select in _aufgabeDetail') : fail('Thema-Select fehlt in _aufgabeDetail');
+jsCode.includes('themaIdSel')   ? ok('_na5Save liest Thema aus Select') : fail('_na5Save liest Thema nicht aus Select');
+jsCode.includes('newThemaId')   ? ok('_aufgabeSave verarbeitet Thema-Wechsel') : fail('Thema-Wechsel in _aufgabeSave fehlt');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════

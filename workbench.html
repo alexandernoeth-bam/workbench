@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.1.6</title>
+  <title>WorkBench 5.1.7</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -375,7 +375,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.1.6 · Build 20260701-0200</div>
+    <div id="wb-startup-tagline">v5.1.7 · Build 20260701-0230</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -682,8 +682,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.1.6',
-  APP_BUILD:      '20260701-0200',
+  APP_VERSION:    '5.1.7',
+  APP_BUILD:      '20260701-0230',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -1761,18 +1761,25 @@ const WB = {
     const typen=[{v:'aufgabe',l:'Aufgabe'},{v:'konzept',l:'Konzept'},{v:'recherche',l:'Recherche'},{v:'routine',l:'Routine'},{v:'link',l:'Link'}];
     const wdh=[{v:'',l:'Keine'},{v:'wöchentlich',l:'Wöchentlich'},{v:'monatlich',l:'Monatlich'},{v:'jährlich',l:'Jährlich'}];
     const tage=[{v:1,l:'Mo'},{v:2,l:'Di'},{v:3,l:'Mi'},{v:4,l:'Do'},{v:5,l:'Fr'},{v:6,l:'Sa'},{v:0,l:'So'}];
+    const themen=(this.db.themen||[]).filter(t=>!t.deleted&&t.status!=='erledigt');
     const body=
       '<div class="wb-input-group"><span class="wb-label">Titel</span>'
       +'<input id="wb5-na-text" class="wb-input" type="text" placeholder="Was muss getan werden?"></div>'
       +'<div class="wb5-input-row">'
+      +'<div class="wb-input-group"><span class="wb-label">Thema (optional)</span>'
+      +'<select id="wb5-na-thema" class="wb-select"><option value="">Keine Zuordnung</option>'
+      +themen.map(t=>'<option value="'+t.id+'">'+this._esc(t.titel)+'</option>').join('')
+      +'</select></div>'
       +'<div class="wb-input-group"><span class="wb-label">Typ</span>'
       +'<select id="wb5-na-typ" class="wb-select">'+typen.map(t=>'<option value="'+t.v+'">'+t.l+'</option>').join('')+'</select></div>'
-      +'<div class="wb-input-group"><span class="wb-label">Priorität</span>'
-      +'<select id="wb5-na-prio" class="wb-select"><option value="1">Prio 1</option><option value="2">Prio 2</option><option value="3" selected>Prio 3</option></select></div>'
       +'</div>'
       +'<div class="wb5-input-row">'
+      +'<div class="wb-input-group"><span class="wb-label">Priorität</span>'
+      +'<select id="wb5-na-prio" class="wb-select"><option value="1">Prio 1</option><option value="2">Prio 2</option><option value="3" selected>Prio 3</option></select></div>'
       +'<div class="wb-input-group"><span class="wb-label">Deadline</span>'
       +'<input id="wb5-na-deadline" class="wb-input" type="date"></div>'
+      +'</div>'
+      +'<div class="wb5-input-row">'
       +'<div class="wb-input-group"><span class="wb-label">Wiederholung</span>'
       +'<select id="wb5-na-wdh" class="wb-select" onchange="WB._na5WdhChange(this.value)">'+wdh.map(w=>'<option value="'+w.v+'">'+w.l+'</option>').join('')+'</select></div>'
       +'</div>'
@@ -1786,7 +1793,9 @@ const WB = {
     const foot='<div style="display:flex;gap:8px;">'
       +'<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
       +'<button class="wb-btn wb-btn-save" onclick="WB._na5Save()">Speichern</button></div>';
-    this._modalCtx='aufgabe-neu';this._na5Welt='b';this.modalOpen('Neue Aufgabe',body,foot);
+    this._modalCtx='aufgabe-neu';this._na5Welt='b';this._na5ThemaId=this._na5ThemaId||null;
+    this.modalOpen('Neue Aufgabe',body,foot);
+    if(this._na5ThemaId){const sel=document.getElementById('wb5-na-thema');if(sel)sel.value=this._na5ThemaId;}
   },
 
   _na5WdhChange(val) {
@@ -1816,8 +1825,13 @@ const WB = {
       :[];
     const wiederholung=wdh?{typ:wdh,wochentage:wt,datum:'',naechstFaellig:''}:null;
     const aufg={id:'a_'+Date.now(),titel:text,prio,deadline,welt,typ,wiederholung,erledigt:false,updatedAt:this._now()};
-    if(this._na5ThemaId){const t=(this.db.themen||[]).find(x=>x.id===this._na5ThemaId);if(t){if(!t.aufgaben)t.aufgaben=[];t.aufgaben.push(aufg);}}
-    else{if(!this.db.aufgaben)this.db.aufgaben=[];this.db.aufgaben.push(aufg);}
+    const selThema=document.getElementById('wb5-na-thema');
+    const themaIdSel=selThema?.value||this._na5ThemaId||null;
+    if(themaIdSel){
+      const t=(this.db.themen||[]).find(x=>x.id===themaIdSel);
+      if(t){if(!t.aufgaben)t.aufgaben=[];aufg.themaId=themaIdSel;t.aufgaben.push(aufg);}
+      else{if(!this.db.aufgaben)this.db.aufgaben=[];this.db.aufgaben.push(aufg);}
+    } else {if(!this.db.aufgaben)this.db.aufgaben=[];this.db.aufgaben.push(aufg);}
     this._na5ThemaId=null;this.setDirty();this.modalClose();
     // Thema-Overlay neu rendern falls offen
     const ov=document.getElementById('wb5-thema-overlay');
@@ -1835,9 +1849,14 @@ const WB = {
     const typenA=[{v:'aufgabe',l:'Aufgabe'},{v:'konzept',l:'Konzept'},{v:'recherche',l:'Recherche'},{v:'routine',l:'Routine'},{v:'link',l:'Link'}];
     const wdhA=[{v:'',l:'Keine'},{v:'wöchentlich',l:'Wöchentlich'},{v:'monatlich',l:'Monatlich'},{v:'jährlich',l:'Jährlich'}];
     const curTypA=a.typ||'aufgabe'; const curWdhA=a.wiederholung?.typ||''; const curWeltA=a.welt||'b';
+    const themenA=(this.db.themen||[]).filter(t=>!t.deleted&&t.status!=='erledigt');
     const body =
       '<div class="wb-input-group"><span class="wb-label">Titel</span>'
       +'<input id="wb5-ad-titel" class="wb-input" type="text" value="'+this._esc(a.titel||a.text||'')+'"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Thema (optional)</span>'
+      +'<select id="wb5-ad-thema" class="wb-select"><option value="">Keine Zuordnung</option>'
+      +themenA.map(t=>'<option value="'+t.id+'"'+(a.themaId===t.id?' selected':'')+'>'+this._esc(t.titel)+'</option>').join('')
+      +'</select></div>'
       +'<div class="wb5-input-row">'
       +'<div class="wb-input-group"><span class="wb-label">Typ</span>'
       +'<select id="wb5-ad-typ" class="wb-select">'+typenA.map(t=>'<option value="'+t.v+'"'+(curTypA===t.v?' selected':'')+'>'+t.l+'</option>').join('')+'</select></div>'
@@ -1885,6 +1904,20 @@ const WB = {
     const wdhV=document.getElementById('wb5-ad-wdh')?.value||'';
     a.wiederholung=wdhV?{typ:wdhV,wochentage:[],datum:'',naechstFaellig:''}:null;
     if(this._ad5WeltSel) a.welt=this._ad5WeltSel;
+    // Thema-Zuordnung ändern
+    const newThemaId=document.getElementById('wb5-ad-thema')?.value||'';
+    if(newThemaId && newThemaId!==a.themaId) {
+      // Aus altem Thema entfernen
+      if(a.themaId){const ot=(this.db.themen||[]).find(x=>x.id===a.themaId);if(ot)ot.aufgaben=(ot.aufgaben||[]).filter(x=>x.id!==a.id);}
+      // In neues Thema einfügen
+      const nt=(this.db.themen||[]).find(x=>x.id===newThemaId);
+      if(nt){if(!nt.aufgaben)nt.aufgaben=[];a.themaId=newThemaId;nt.aufgaben.push(a);
+        this.db.aufgaben=(this.db.aufgaben||[]).filter(x=>x.id!==a.id);}
+    } else if(!newThemaId && a.themaId) {
+      // Thema entfernen → in freie Aufgaben
+      const ot=(this.db.themen||[]).find(x=>x.id===a.themaId);if(ot)ot.aufgaben=(ot.aufgaben||[]).filter(x=>x.id!==a.id);
+      a.themaId=null;if(!this.db.aufgaben)this.db.aufgaben=[];this.db.aufgaben.push(a);
+    }
     a.updatedAt=this._now();
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('✓ Aufgabe gespeichert');
