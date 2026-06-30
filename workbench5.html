@@ -1,0 +1,2312 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>WorkBench 5.0.0</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --accent:   #0A6B5E;
+      --petrol:   #085048;
+      --bg:       #EEF2F4;
+      --surface:  #F4F8F9;
+      --surface2: #E4EDF0;
+      --text:     #1A2328;
+      --faint:    #8A9BA8;
+      --muted:    #5A6E7A;
+      --border:   #CDD8DE;
+      --danger:   #C0392B;
+      --warn:     #B5681A;
+      --lila:     #5A3DB8;
+      --privat:   #4A7A5E;
+      --font:     -apple-system, 'Inter', 'Segoe UI', sans-serif;
+      --font-mono: 'Courier New', monospace;
+      --radius:   12px;
+    }
+    html, body { height:100%; overflow:hidden; font-family:var(--font); background:var(--bg); color:var(--text); -webkit-tap-highlight-color:transparent; }
+    #wb-app { display:flex; flex-direction:column; height:100dvh; max-height:100dvh; overflow:hidden; max-width:480px; margin:0 auto; position:relative; }
+    /* Startup */
+    #wb-startup { position:fixed; inset:0; background:var(--accent); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; transition:opacity .3s; }
+    #wb-startup.hidden { opacity:0; pointer-events:none; }
+    #wb-startup-logo { font-size:52px; font-weight:900; color:#fff; letter-spacing:-.02em; }
+    #wb-startup-tagline { font-size:13px; color:rgba(255,255,255,.6); margin-top:6px; font-family:var(--font-mono); }
+    /* Header */
+    #wb-header { background:var(--petrol); padding:13px 14px 11px; flex-shrink:0; display:flex; align-items:center; gap:10px; }
+    #wb-header-title { font-size:17px; font-weight:700; color:#fff; flex:1; }
+    #wb-header-add { display:flex; align-items:center; gap:5px; padding:6px 13px; border-radius:20px; background:rgba(255,255,255,.2); border:1.5px solid rgba(255,255,255,.35); color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); }
+    .wb-welt-filter { display:flex; gap:3px; background:rgba(0,0,0,.2); border-radius:20px; padding:3px; }
+    .wb-welt-btn { padding:4px 10px; border-radius:16px; font-size:12px; font-weight:600; border:none; cursor:pointer; font-family:var(--font); color:rgba(255,255,255,.65); background:none; }
+    .wb-welt-btn.active { background:#fff; color:var(--petrol); }
+    /* OAuth Banner */
+    #wb-oauth-banner { background:rgba(192,57,43,.9); color:#fff; padding:10px 14px; display:none; flex-shrink:0; flex-direction:column; gap:6px; font-size:13px; }
+    #wb-oauth-banner.visible { display:flex; }
+    #wb-oauth-banner-btn { align-self:flex-start; background:#fff; color:var(--danger); border:none; border-radius:6px; padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font); }
+    /* Content */
+    #wb-content { flex:1; overflow:hidden; display:flex; flex-direction:column; position:relative; }
+    .wb5-screen { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+    /* Bottom Nav */
+    #wb-bottom-nav { background:#fff; border-top:1.5px solid var(--border); padding:6px 0 max(10px,env(safe-area-inset-bottom)); display:flex; flex-shrink:0; }
+    .wb-nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:5px 0; border:none; background:none; cursor:pointer; font-family:var(--font); }
+    .wb-nav-icon { font-size:22px; color:var(--faint); line-height:1; }
+    .wb-nav-icon.active { color:var(--accent); }
+    .wb-nav-label { font-size:10px; font-weight:600; color:var(--faint); text-transform:uppercase; letter-spacing:.05em; }
+    .wb-nav-label.active { color:var(--accent); }
+    .wb-nav-dot { width:4px; height:4px; border-radius:50%; background:var(--accent); margin-top:1px; }
+    /* Crypto */
+    #wb-crypto-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:8000; }
+    #wb-crypto-overlay.open { display:flex; }
+    #wb-crypto-box { background:#fff; border-radius:14px; padding:28px 24px; width:min(340px,92vw); display:flex; flex-direction:column; gap:14px; }
+    #wb-crypto-title { font-size:16px; font-weight:800; color:var(--text); }
+    #wb-crypto-sub { font-size:13px; color:var(--muted); line-height:1.5; }
+    #wb-crypto-input { width:100%; padding:11px 13px; border:1.5px solid var(--border); border-radius:10px; font-size:14px; font-family:var(--font); color:var(--text); outline:none; }
+    #wb-crypto-input:focus { border-color:var(--accent); }
+    #wb-crypto-btn { background:var(--accent); color:#fff; border:none; border-radius:10px; padding:12px; font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font); }
+    #wb-crypto-err { font-size:12px; color:var(--danger); display:none; }
+    #wb-crypto-err.visible { display:block; }
+    /* Modal */
+    #wb-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:7000; padding:16px; }
+    #wb-modal-overlay.open { display:flex; }
+    #wb-modal-box { background:#fff; border-radius:14px; width:min(440px,100%); max-height:90vh; display:flex; flex-direction:column; overflow:hidden; }
+    #wb-modal-head { padding:14px 16px; background:var(--petrol); display:flex; align-items:center; gap:10px; flex-shrink:0; border-radius:14px 14px 0 0; }
+    #wb-modal-title { font-size:15px; font-weight:700; color:#fff; flex:1; }
+    #wb-modal-close { width:26px; height:26px; border-radius:50%; background:rgba(255,255,255,.2); border:none; color:#fff; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    #wb-modal-body { padding:16px; overflow-y:auto; flex:1; }
+    #wb-modal-foot { padding:12px 16px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; flex-shrink:0; }
+    .wb-btn { padding:8px 16px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); border:none; }
+    .wb-btn-cancel { background:var(--surface2); color:var(--muted); }
+    .wb-btn-save { background:var(--accent); color:#fff; }
+    .wb-btn-danger { background:var(--danger); color:#fff; }
+    .wb-input-group { display:flex; flex-direction:column; gap:5px; margin-bottom:12px; }
+    .wb-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+    .wb-input { padding:10px 12px; border:1.5px solid var(--border); border-radius:10px; font-size:14px; font-family:var(--font); color:var(--text); background:#F8FAFB; outline:none; width:100%; }
+    .wb-input:focus { border-color:var(--accent); background:#fff; }
+    .wb-select { padding:10px 12px; border:1.5px solid var(--border); border-radius:10px; font-size:14px; font-family:var(--font); color:var(--text); background:#F8FAFB; width:100%; outline:none; }
+    /* Toast */
+    #wb-toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.8); color:#fff; padding:9px 18px; border-radius:20px; font-size:13px; font-weight:600; z-index:9000; opacity:0; transition:opacity .25s; pointer-events:none; white-space:nowrap; }
+    #wb-toast.show { opacity:1; }
+    /* Settings */
+    #wb-settings-overlay { position:fixed; inset:0; background:var(--bg); z-index:6000; display:none; flex-direction:column; overflow:hidden; }
+    #wb-settings-overlay.open { display:flex; }
+    .s-head { background:var(--accent); padding:13px 16px 11px; display:flex; align-items:center; gap:10px; flex-shrink:0; }
+    .s-head-title { font-size:17px; font-weight:700; color:#fff; flex:1; }
+    .s-head-close { width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,.2); border:none; color:#fff; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    #s-ov-scroll { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px; }
+    .s-card { background:#fff; border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; }
+    .s-card-head { padding:10px 14px; background:var(--surface); border-bottom:1px solid var(--border); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--accent); }
+    .s-row { padding:11px 14px; border-bottom:1px solid #EDF1F3; display:flex; align-items:center; gap:10px; font-size:14px; }
+    .s-row:last-child { border-bottom:none; }
+    .s-row-title { font-size:14px; font-weight:600; color:var(--text); flex:1; }
+    .s-input { padding:9px 12px; border:1.5px solid var(--border); border-radius:9px; font-size:13px; font-family:var(--font); color:var(--text); background:#F8FAFB; outline:none; width:100%; }
+    .s-input:focus { border-color:var(--accent); }
+    .s-input.mono { font-family:var(--font-mono); font-size:12px; }
+    .s-btn { display:block; width:100%; padding:11px; border-radius:9px; border:1.5px solid var(--border); background:#F8FAFB; font-size:14px; font-weight:700; color:var(--text); cursor:pointer; font-family:var(--font); text-align:center; }
+    .s-btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .s-btn.danger { color:var(--danger); border-color:rgba(192,57,43,.3); }
+    .s-st-row { padding:10px 14px; border-bottom:1px solid #EDF1F3; display:flex; align-items:center; gap:10px; font-size:14px; }
+    .s-st-row:last-child { border-bottom:none; }
+    .s-st-text { flex:1; color:var(--text); }
+    .s-st-del { padding:4px 10px; border-radius:6px; border:1.5px solid rgba(192,57,43,.3); background:none; color:var(--danger); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font); }
+    /* WB5 gemeinsame Elemente */
+    .wb5-card { background:#fff; border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; }
+    .wb5-card-hdr { padding:9px 12px; display:flex; align-items:center; gap:8px; background:var(--surface); border-bottom:1px solid var(--border); }
+    .wb5-card-title { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--accent); flex:1; }
+    .wb5-card-badge { font-size:11px; font-weight:700; color:var(--muted); background:var(--surface2); border-radius:8px; padding:2px 8px; }
+    .wb5-badge { font-size:10px; font-weight:700; padding:2px 7px; border-radius:5px; white-space:nowrap; }
+    .wb5-badge-p1 { background:#FDECEA; color:var(--danger); }
+    .wb5-badge-p2 { background:#FDF3E7; color:var(--warn); }
+    .wb5-badge-p3 { background:var(--surface2); color:var(--muted); }
+    .wb5-badge-gw { background:#EDE8F8; color:var(--lila); }
+    .wb5-badge-aktiv { background:#E6F2F0; color:var(--accent); }
+    .wb5-badge-pausiert { background:var(--surface2); color:var(--muted); }
+    .wb5-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .wb5-dot-b { background:var(--accent); }
+    .wb5-dot-p { background:var(--privat); }
+    .wb5-cb { width:18px; height:18px; border-radius:5px; border:1.5px solid var(--border); flex-shrink:0; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+    .wb5-cb.done { background:var(--accent); border-color:var(--accent); }
+    .wb5-cb.done::after { content:''; width:9px; height:5px; border-left:1.5px solid #fff; border-bottom:1.5px solid #fff; transform:rotate(-45deg) translateY(-1px); display:block; }
+    .wb5-tag { font-size:10px; font-weight:700; padding:2px 6px; border-radius:5px; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; flex-shrink:0; }
+    .wb5-tag-p1 { background:#FDECEA; color:var(--danger); }
+    .wb5-tag-p2 { background:#FDF3E7; color:var(--warn); }
+    .wb5-tag-r  { background:#E6F2F0; color:var(--accent); }
+    .wb5-tag-gw { background:#EDE8F8; color:var(--lila); }
+    .wb5-tag-th { background:var(--surface2); color:var(--muted); font-size:9px; }
+    .wb5-item { padding:10px 12px; border-bottom:1px solid #EDF1F3; display:flex; align-items:center; gap:8px; flex-wrap:wrap; cursor:pointer; }
+    .wb5-item:last-child { border-bottom:none; }
+    .wb5-item-text { flex:1; min-width:100px; font-size:14px; font-weight:500; color:var(--text); line-height:1.3; word-break:break-word; }
+    .wb5-item-text.done { text-decoration:line-through; color:var(--faint); }
+    .wb5-item-meta { font-size:12px; color:var(--muted); white-space:nowrap; flex-shrink:0; }
+    .wb5-erl-btn { display:flex; align-items:center; justify-content:center; gap:6px; padding:10px; background:none; border:1.5px dashed var(--border); border-radius:var(--radius); cursor:pointer; font-family:var(--font); font-size:13px; font-weight:600; color:var(--faint); width:100%; }
+    .wb5-add-btn { display:flex; align-items:center; justify-content:center; gap:6px; padding:10px; background:none; border:1.5px dashed var(--border); border-radius:8px; cursor:pointer; font-family:var(--font); font-size:13px; font-weight:600; color:var(--faint); width:100%; }
+    .wb5-chev { font-size:13px; color:var(--faint); flex-shrink:0; transition:transform .2s; }
+    .wb5-atag { font-size:9px; font-weight:700; padding:2px 5px; border-radius:4px; white-space:nowrap; flex-shrink:0; }
+    .wb5-at-r  { background:#E6F2F0; color:var(--accent); }
+    .wb5-at-dl { background:#FDF3E7; color:var(--warn); }
+    .wb5-at-ue { background:#FDECEA; color:var(--danger); }
+    .wb5-at-k  { background:#EDE8F8; color:var(--lila); }
+    .wb5-at-a  { background:var(--surface2); color:var(--muted); }
+    .wb5-grip { font-size:16px; color:var(--faint); flex-shrink:0; cursor:grab; }
+    .wb5-sec-lbl { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--faint); display:flex; align-items:center; gap:6px; }
+    .wb5-sec-lbl::after { content:''; flex:1; height:1px; background:var(--border); }
+    /* Heute */
+    #wb5-heute { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px; position:relative; }
+    .wb5-deadline { background:#FDECEA; border:1px solid rgba(192,57,43,.25); border-left:4px solid var(--danger); border-radius:var(--radius); padding:10px 14px; display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+    .wb5-deadline-text { flex:1; min-width:100px; font-size:13px; font-weight:600; color:var(--danger); line-height:1.35; word-break:break-word; }
+    .wb5-deadline-tag { font-size:10px; font-weight:800; color:#fff; background:var(--danger); border-radius:5px; padding:2px 7px; flex-shrink:0; }
+    .wb5-termin-item { padding:10px 12px; border-bottom:1px solid #EDF1F3; display:flex; align-items:stretch; gap:9px; cursor:pointer; flex-wrap:wrap; }
+    .wb5-termin-item:last-child { border-bottom:none; }
+    .wb5-t-bar { width:3px; border-radius:2px; flex-shrink:0; min-height:22px; }
+    .wb5-t-bar-b { background:var(--accent); }
+    .wb5-t-bar-p { background:var(--privat); }
+    .wb5-t-bar-l { background:var(--warn); }
+    .wb5-t-name { font-size:14px; font-weight:600; color:var(--text); line-height:1.3; word-break:break-word; }
+    .wb5-t-time { font-size:12px; color:var(--muted); font-family:var(--font-mono); margin-top:1px; }
+    .wb5-laufend { font-size:10px; font-weight:700; color:var(--warn); background:#FDF3E7; border-radius:4px; padding:2px 6px; flex-shrink:0; }
+    .wb5-fokus-card { background:#F5F2FD; border-radius:var(--radius); border:1px solid rgba(90,61,184,.2); border-left:4px solid var(--lila); overflow:hidden; }
+    .wb5-fokus-hdr { padding:9px 12px; display:flex; align-items:center; gap:7px; border-bottom:1px solid rgba(90,61,184,.12); }
+    .wb5-fokus-title { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--lila); flex:1; }
+    .wb5-fokus-item { padding:10px 12px; border-bottom:1px solid rgba(90,61,184,.1); display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap; }
+    .wb5-fokus-item:last-child { border-bottom:none; }
+    .wb5-fokus-dot { width:7px; height:7px; border-radius:50%; background:var(--lila); flex-shrink:0; margin-top:4px; }
+    .wb5-fokus-text { flex:1; min-width:100px; font-size:13px; color:#3D2880; line-height:1.4; word-break:break-word; }
+    .wb5-fokus-action { font-size:11px; font-weight:700; color:var(--lila); background:rgba(90,61,184,.1); border-radius:5px; padding:2px 8px; white-space:nowrap; flex-shrink:0; cursor:pointer; }
+    .wb5-scroll-hint { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.55); color:#fff; border-radius:20px; padding:5px 12px; font-size:12px; font-weight:600; pointer-events:none; opacity:0; transition:opacity .3s; white-space:nowrap; }
+    .wb5-scroll-hint.visible { opacity:1; }
+    /* Themen */
+    #wb5-themen { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }
+    .wb5-gruppe-lbl { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--faint); padding:4px 2px 2px; display:flex; align-items:center; gap:6px; }
+    .wb5-gruppe-lbl::after { content:''; flex:1; height:1px; background:var(--border); }
+    .wb5-thema-card { background:#fff; border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; cursor:pointer; }
+    .wb5-thema-card.pausiert { opacity:.45; }
+    .wb5-thema-card.prio-1 { border-left:4px solid var(--danger); }
+    .wb5-thema-card.prio-2 { border-left:4px solid var(--warn); }
+    .wb5-thema-card.prio-3 { border-left:4px solid var(--faint); }
+    .wb5-thema-hdr { padding:11px 12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .wb5-thema-name { flex:1; min-width:100px; font-size:15px; font-weight:700; color:var(--text); word-break:break-word; }
+    .wb5-thema-meta { display:flex; align-items:center; gap:5px; flex-wrap:wrap; flex-shrink:0; }
+    .wb5-freie-card { background:#fff; border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; }
+    .wb5-freie-hdr { padding:11px 12px; display:flex; align-items:center; gap:8px; cursor:pointer; flex-wrap:wrap; }
+    .wb5-freie-title { flex:1; min-width:80px; font-size:15px; font-weight:700; color:var(--text); }
+    .wb5-collapsible { overflow:hidden; max-height:0; transition:max-height .3s ease; border-top:0 solid #EDF1F3; }
+    .wb5-collapsible.open { max-height:800px; border-top-width:1px; }
+    .wb5-freie-item { padding:10px 12px; border-bottom:1px solid #EDF1F3; display:flex; align-items:center; gap:8px; cursor:pointer; flex-wrap:wrap; }
+    .wb5-freie-item:last-child { border-bottom:none; }
+    .wb5-freie-text { flex:1; min-width:100px; font-size:14px; font-weight:500; color:var(--text); word-break:break-word; }
+    /* Thema-Overlay */
+    .wb5-overlay { position:absolute; inset:0; background:rgba(0,0,0,.45); display:flex; flex-direction:column; justify-content:flex-end; z-index:100; opacity:0; pointer-events:none; transition:opacity .2s; }
+    .wb5-overlay.open { opacity:1; pointer-events:all; }
+    .wb5-overlay-panel { background:#fff; border-radius:20px 20px 0 0; height:92%; display:flex; flex-direction:column; overflow:hidden; transform:translateY(100%); transition:transform .25s ease; }
+    .wb5-overlay.open .wb5-overlay-panel { transform:translateY(0); }
+    .wb5-overlay-hdr { background:var(--petrol); padding:13px 14px 11px; display:flex; align-items:center; gap:10px; flex-shrink:0; border-radius:20px 20px 0 0; }
+    .wb5-overlay-title { font-size:16px; font-weight:700; color:#fff; flex:1; min-width:0; word-break:break-word; }
+    .wb5-overlay-close { width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,.2); border:none; color:#fff; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .wb5-overlay-meta { padding:9px 14px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px; flex-shrink:0; flex-wrap:wrap; }
+    .wb5-overlay-scroll { flex:1; overflow-y:auto; padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+    .wb5-gw-block { border-radius:10px; border:1.5px solid rgba(90,61,184,.3); background:#F5F2FD; overflow:hidden; cursor:pointer; }
+    .wb5-gw-hdr { padding:9px 11px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+    .wb5-gw-pill { font-size:9px; font-weight:800; text-transform:uppercase; color:#fff; background:var(--lila); border-radius:4px; padding:2px 6px; flex-shrink:0; }
+    .wb5-gw-name { flex:1; min-width:80px; font-size:13px; font-weight:700; color:#3D2880; word-break:break-word; }
+    .wb5-gw-date { font-size:10px; font-family:var(--font-mono); color:var(--lila); background:rgba(90,61,184,.12); border-radius:4px; padding:2px 5px; white-space:nowrap; }
+    .wb5-gw-body { overflow:hidden; max-height:0; transition:max-height .2s ease; border-top:0 solid rgba(90,61,184,.15); }
+    .wb5-gw-body.open { max-height:200px; border-top-width:1px; }
+    .wb5-gw-body-inner { padding:8px 11px 10px; font-size:12px; color:#5A4A90; font-style:italic; line-height:1.5; }
+    .wb5-next-gw { background:#F5F2FD; border-radius:10px; border:1px solid rgba(90,61,184,.2); padding:9px 11px; font-size:12px; color:#5A4A90; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .wb5-aufg-lbl { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); }
+    .wb5-aufg-item { background:#F8FAFB; border-radius:8px; border:1px solid var(--border); padding:9px 11px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; cursor:pointer; }
+    .wb5-aufg-item + .wb5-aufg-item { margin-top:5px; }
+    .wb5-aufg-text { flex:1; min-width:100px; font-size:14px; font-weight:500; color:var(--text); word-break:break-word; }
+    .wb5-aufg-tags { display:flex; gap:4px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+    .wb5-erl-aufg-btn { display:flex; align-items:center; gap:6px; padding:8px 0; font-family:var(--font); font-size:12px; font-weight:600; color:var(--faint); background:none; border:none; cursor:pointer; }
+    /* Termine */
+    #wb5-termine { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+    .wb5-tab-sw { background:#fff; border-bottom:1px solid var(--border); padding:0 12px; display:flex; align-items:center; gap:6px; flex-shrink:0; }
+    .wb5-ts-btn { padding:11px 10px; font-size:13px; font-weight:700; border:none; background:none; cursor:pointer; font-family:var(--font); color:var(--muted); border-bottom:3px solid transparent; }
+    .wb5-ts-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+    #wb5-woche { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+    .wb5-week-nav { background:#fff; border-bottom:1px solid var(--border); padding:9px 12px; display:flex; align-items:center; gap:6px; flex-shrink:0; }
+    .wb5-week-nav-btn { width:30px; height:30px; border-radius:50%; border:1px solid var(--border); background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--muted); }
+    .wb5-week-lbl { flex:1; text-align:center; font-size:13px; font-weight:700; color:var(--text); }
+    .wb5-days-strip { display:flex; background:#fff; border-bottom:1.5px solid var(--border); flex-shrink:0; }
+    .wb5-day-tab { flex:1; padding:7px 3px 6px; display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer; border-bottom:3px solid transparent; }
+    .wb5-day-tab.active { border-bottom-color:var(--accent); }
+    .wb5-day-name { font-size:9px; font-weight:700; text-transform:uppercase; color:var(--faint); letter-spacing:.04em; }
+    .wb5-day-tab.active .wb5-day-name { color:var(--accent); }
+    .wb5-day-num { font-size:14px; font-weight:700; color:var(--text); }
+    .wb5-day-tab.active .wb5-day-num { color:var(--accent); }
+    .wb5-day-tab.today-d .wb5-day-num { background:var(--accent); color:#fff; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; font-size:12px; }
+    .wb5-day-dot { width:4px; height:4px; border-radius:50%; background:var(--accent); opacity:0; }
+    .wb5-day-tab.has-items .wb5-day-dot { opacity:1; }
+    .wb5-day-tab.urlaub-d .wb5-day-name { color:var(--lila); }
+    #wb5-woche-content { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }
+    .wb5-tag-hdr { display:flex; align-items:center; gap:8px; padding:2px 0 4px; flex-wrap:wrap; }
+    .wb5-tag-datum { font-size:13px; font-weight:700; color:var(--text); }
+    .wb5-termin-card { background:#fff; border-radius:10px; border:1px solid var(--border); overflow:hidden; }
+    .wb5-termin-row { padding:9px 12px; border-bottom:1px solid #EDF1F3; display:flex; align-items:stretch; gap:9px; cursor:pointer; flex-wrap:wrap; }
+    .wb5-termin-row:last-child { border-bottom:none; }
+    .wb5-tr-bar { width:3px; border-radius:2px; flex-shrink:0; min-height:22px; }
+    .wb5-tr-bar-b { background:var(--accent); } .wb5-tr-bar-p { background:var(--privat); } .wb5-tr-bar-l { background:var(--warn); }
+    .wb5-tr-name { font-size:14px; font-weight:600; color:var(--text); line-height:1.3; word-break:break-word; }
+    .wb5-tr-time { font-size:11px; color:var(--muted); font-family:var(--font-mono); margin-top:1px; }
+    .wb5-laufend-pill { font-size:10px; font-weight:700; color:var(--warn); background:#FDF3E7; border-radius:4px; padding:2px 5px; flex-shrink:0; }
+    .wb5-beruf-dot { width:8px; height:8px; border-radius:50%; background:var(--accent); }
+    .wb5-empty-day { padding:16px 12px; font-size:13px; color:var(--faint); text-align:center; background:#fff; border-radius:10px; border:1px dashed var(--border); }
+    /* Monat */
+    .wb5-legende { display:flex; gap:10px; flex-wrap:wrap; }
+    .wb5-leg-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); font-weight:600; }
+    .wb5-leg-dot { width:7px; height:7px; border-radius:50%; }
+    .wb5-cal-grid { background:#fff; border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; }
+    .wb5-cal-head { display:grid; grid-template-columns:repeat(7,1fr); background:var(--surface); border-bottom:1px solid var(--border); }
+    .wb5-cal-hcell { padding:7px 0; text-align:center; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--faint); }
+    .wb5-cal-body { display:grid; grid-template-columns:repeat(7,1fr); }
+    .wb5-cal-cell { min-height:48px; padding:4px 3px; border-right:0.5px solid #EDF1F3; border-bottom:0.5px solid #EDF1F3; cursor:pointer; transition:background .1s; }
+    .wb5-cal-cell:nth-child(7n) { border-right:none; }
+    .wb5-cal-cell:hover { background:#F0F6F5; }
+    .wb5-cal-cell.other { opacity:.35; }
+    .wb5-cal-cell.today-cell { background:rgba(10,107,94,.05); }
+    .wb5-cal-cell.urlaub-cell { background:rgba(90,61,184,.06); }
+    .wb5-cal-cell.selected { background:rgba(10,107,94,.1); outline:2px solid var(--accent); outline-offset:-2px; }
+    .wb5-cal-num { font-size:12px; font-weight:600; color:var(--text); line-height:1; margin-bottom:3px; }
+    .wb5-cal-cell.today-cell .wb5-cal-num { background:var(--accent); color:#fff; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:11px; }
+    .wb5-cal-dots { display:flex; gap:2px; flex-wrap:wrap; }
+    .wb5-cal-dot { width:4px; height:4px; border-radius:50%; }
+    .wb5-cal-ev { font-size:8px; font-weight:700; border-radius:3px; padding:1px 3px; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
+    .wb5-cal-ev-u { background:rgba(90,61,184,.12); color:var(--lila); }
+    .wb5-day-detail { background:#fff; border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; display:none; }
+    .wb5-day-detail.open { display:block; }
+    .wb5-dd-hdr { padding:9px 12px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .wb5-dd-datum { flex:1; font-size:13px; font-weight:700; color:var(--text); }
+    .wb5-dd-close { width:22px; height:22px; border-radius:50%; border:1px solid var(--border); background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--muted); }
+    .wb5-ddb { font-size:10px; font-weight:700; padding:2px 7px; border-radius:5px; }
+    .wb5-ddb-h { background:#E6F2F0; color:var(--accent); }
+    .wb5-ddb-u { background:#EDE8F8; color:var(--lila); }
+    .wb5-heute-btn { padding:6px 10px; border-radius:8px; border:1.5px solid var(--accent); background:#E6F2F0; font-size:12px; font-weight:700; color:var(--accent); cursor:pointer; font-family:var(--font); display:none; }
+    .wb5-heute-btn.visible { display:block; }
+    .wb5-month-title-btn { display:flex; align-items:center; gap:5px; padding:9px 10px; font-size:13px; font-weight:700; color:var(--text); border:none; background:none; cursor:pointer; font-family:var(--font); flex:1; }
+    .wb5-mon-nav-btn { width:28px; height:28px; border-radius:50%; border:1px solid var(--border); background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px; color:var(--muted); }
+    .wb5-picker-overlay { position:absolute; inset:0; background:rgba(0,0,0,.45); z-index:50; display:flex; flex-direction:column; justify-content:flex-end; opacity:0; pointer-events:none; transition:opacity .2s; }
+    .wb5-picker-overlay.open { opacity:1; pointer-events:all; }
+    .wb5-picker-panel { background:#fff; border-radius:20px 20px 0 0; transform:translateY(100%); transition:transform .25s ease; }
+    .wb5-picker-overlay.open .wb5-picker-panel { transform:translateY(0); }
+    .wb5-picker-hdr { padding:13px 14px 10px; display:flex; align-items:center; border-bottom:1px solid var(--border); }
+    .wb5-picker-title { flex:1; font-size:15px; font-weight:700; color:var(--text); }
+    .wb5-picker-close { width:26px; height:26px; border-radius:50%; background:var(--surface2); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px; color:var(--muted); }
+    .wb5-year-row { display:flex; align-items:center; gap:8px; padding:11px 14px; border-bottom:1px solid #EDF1F3; }
+    .wb5-year-nav { width:30px; height:30px; border-radius:50%; border:1px solid var(--border); background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--muted); }
+    .wb5-year-lbl { flex:1; text-align:center; font-size:17px; font-weight:800; color:var(--text); }
+    .wb5-picker-months { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; padding:11px 14px 16px; }
+    .wb5-pm-btn { padding:11px 5px; border-radius:9px; border:1.5px solid var(--border); background:none; cursor:pointer; font-family:var(--font); font-size:13px; font-weight:700; color:var(--muted); }
+    .wb5-pm-btn.cur { border-color:var(--accent); background:#E6F2F0; color:var(--accent); }
+    .wb5-pm-btn.tod { background:var(--accent); color:#fff; border-color:var(--accent); }
+    /* Termin Dialog */
+    .wb5-termin-typ-row { display:flex; gap:5px; flex-wrap:wrap; }
+    .wb5-typ-btn { padding:6px 11px; border-radius:20px; font-size:12px; font-weight:700; border:1.5px solid var(--border); background:none; cursor:pointer; font-family:var(--font); color:var(--muted); }
+    .wb5-typ-btn.active { border-color:var(--accent); background:#E6F2F0; color:var(--accent); }
+    .wb5-typ-btn.active.urlaub { border-color:var(--lila); background:#EDE8F8; color:var(--lila); }
+    .wb5-welt-toggle { display:flex; gap:6px; }
+    .wb5-welt-opt { flex:1; padding:8px; border-radius:8px; border:1.5px solid var(--border); background:none; cursor:pointer; font-family:var(--font); font-size:13px; font-weight:600; color:var(--muted); display:flex; align-items:center; justify-content:center; gap:6px; }
+    .wb5-welt-opt.active-b { border-color:var(--accent); background:#E6F2F0; color:var(--accent); }
+    .wb5-welt-opt.active-p { border-color:var(--privat); background:#EBF4EE; color:var(--privat); }
+    .wb5-range-hint { font-size:12px; color:var(--muted); background:#EDE8F8; border-radius:6px; padding:7px 10px; display:flex; align-items:center; gap:6px; }
+    .wb5-input-row { display:flex; gap:8px; }
+    .wb5-input-row .wb-input-group { flex:1; }
+    /* Fokus */
+    #wb5-fokus { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px; }
+    .wb5-timer-row { display:flex; gap:6px; }
+    .wb5-timer-btn { flex:1; padding:11px 4px; background:#fff; border:1.5px solid var(--border); border-radius:10px; cursor:pointer; font-family:var(--font); display:flex; flex-direction:column; align-items:center; gap:2px; }
+    .wb5-timer-btn.active { border-color:var(--accent); background:#E6F2F0; }
+    .wb5-timer-min { font-size:17px; font-weight:800; color:var(--text); }
+    .wb5-timer-btn.active .wb5-timer-min { color:var(--accent); }
+    .wb5-timer-lbl { font-size:9px; font-weight:600; color:var(--faint); text-transform:uppercase; }
+    .wb5-timer-btn.active .wb5-timer-lbl { color:var(--accent); }
+    .wb5-timer-custom { display:flex; align-items:center; gap:8px; background:#fff; border-radius:10px; border:1.5px solid var(--border); padding:10px 13px; }
+    .wb5-timer-custom-lbl { font-size:13px; color:var(--muted); font-weight:600; flex:1; }
+    .wb5-timer-custom-input { width:60px; padding:6px 9px; border:1.5px solid var(--border); border-radius:7px; font-size:15px; font-weight:700; font-family:var(--font); color:var(--text); text-align:center; background:#F8FAFB; outline:none; }
+    .wb5-timer-custom-input:focus { border-color:var(--accent); }
+    .wb5-aufg-select { background:#fff; border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; }
+    .wb5-aufg-sel-item { padding:11px 12px; border-bottom:1px solid #EDF1F3; display:flex; align-items:center; gap:8px; cursor:pointer; flex-wrap:wrap; }
+    .wb5-aufg-sel-item:last-child { border-bottom:none; }
+    .wb5-aufg-sel-item.selected { background:#E6F2F0; }
+    .wb5-sel-check { font-size:16px; color:var(--accent); }
+    .wb5-template-card { background:#fff; border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; }
+    .wb5-template-hdr { padding:9px 12px; display:flex; align-items:center; gap:8px; border-bottom:1px solid #EDF1F3; }
+    .wb5-template-name { flex:1; font-size:14px; font-weight:700; color:var(--text); }
+    .wb5-template-edit { font-size:12px; font-weight:600; color:var(--accent); background:none; border:none; cursor:pointer; font-family:var(--font); }
+    .wb5-template-item { padding:8px 12px; border-bottom:0.5px solid #EDF1F3; font-size:13px; color:var(--muted); display:flex; align-items:center; gap:8px; }
+    .wb5-template-item:last-child { border-bottom:none; }
+    .wb5-template-item::before { content:'·'; color:var(--faint); font-size:14px; }
+    .wb5-start-btn { background:var(--accent); color:#fff; border:none; border-radius:var(--radius); padding:14px; font-size:15px; font-weight:800; cursor:pointer; font-family:var(--font); width:100%; display:flex; align-items:center; justify-content:center; gap:9px; }
+    /* Fokus-Screen */
+    #wb5-fokus-screen { position:fixed; inset:0; background:var(--petrol); z-index:5000; display:flex; flex-direction:column; opacity:0; pointer-events:none; transition:opacity .3s; }
+    #wb5-fokus-screen.open { opacity:1; pointer-events:all; }
+    .wb5-fs-hdr { padding:20px 16px 8px; }
+    .wb5-fs-aufgabe { font-size:13px; font-weight:600; color:rgba(255,255,255,.65); }
+    .wb5-fs-timer-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; }
+    .wb5-fs-timer { font-size:66px; font-weight:800; color:#fff; font-family:var(--font-mono); letter-spacing:.05em; }
+    .wb5-fs-timer-lbl { font-size:11px; font-weight:600; color:rgba(255,255,255,.4); text-transform:uppercase; letter-spacing:.08em; }
+    .wb5-fs-checklist { background:rgba(255,255,255,.08); border-radius:var(--radius); margin:0 14px; overflow:hidden; }
+    .wb5-fs-item { padding:11px 13px; border-bottom:1px solid rgba(255,255,255,.08); display:flex; align-items:center; gap:10px; cursor:pointer; flex-wrap:wrap; }
+    .wb5-fs-item:last-child { border-bottom:none; }
+    .wb5-fs-cb { width:20px; height:20px; border-radius:5px; border:2px solid rgba(255,255,255,.35); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+    .wb5-fs-cb.done { background:rgba(255,255,255,.9); border-color:#fff; }
+    .wb5-fs-cb.done::after { content:''; width:10px; height:6px; border-left:2px solid var(--petrol); border-bottom:2px solid var(--petrol); transform:rotate(-45deg) translateY(-1px); display:block; }
+    .wb5-fs-text { flex:1; min-width:80px; font-size:14px; font-weight:500; color:#fff; word-break:break-word; }
+    .wb5-fs-text.done { text-decoration:line-through; color:rgba(255,255,255,.35); }
+    .wb5-fs-next { margin:10px 14px 0; background:rgba(255,255,255,.07); border-radius:8px; padding:9px 12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .wb5-fs-nt-lbl { font-size:10px; font-weight:800; text-transform:uppercase; color:rgba(255,255,255,.4); letter-spacing:.06em; flex-shrink:0; }
+    .wb5-fs-nt-name { font-size:13px; font-weight:600; color:rgba(255,255,255,.8); flex:1; min-width:60px; word-break:break-word; }
+    .wb5-fs-nt-time { font-size:12px; font-family:var(--font-mono); color:rgba(255,255,255,.5); }
+    .wb5-fs-actions { display:flex; gap:10px; padding:13px 14px; flex-shrink:0; }
+    .wb5-fs-pause { flex:1; padding:12px; border-radius:10px; border:1.5px solid rgba(255,255,255,.3); background:rgba(255,255,255,.1); color:#fff; font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font); }
+    .wb5-fs-stop { flex:1; padding:12px; border-radius:10px; border:1.5px solid rgba(192,57,43,.5); background:rgba(192,57,43,.15); color:#E05A4A; font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font); }
+  </style>
+</head>
+<body>
+<div id="wb-app">
+  <div id="wb-startup">
+    <div id="wb-startup-logo">WB5</div>
+    <div id="wb-startup-tagline">v5.0.0 &middot; Build 20260630-1800</div>
+  </div>
+  <div id="wb-oauth-banner">
+    <div>Google Drive Sync nicht verbunden</div>
+    <button id="wb-oauth-banner-btn" onclick="WB._oauthReconnectAndSync()">Jetzt verbinden</button>
+    <button style="align-self:flex-end;background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:12px;" onclick="WB._oauthBannerDismiss()">Sp&auml;ter</button>
+  </div>
+  <div id="wb-header">
+    <span id="wb-header-title">Heute</span>
+    <div class="wb-welt-filter">
+      <button class="wb-welt-btn active" onclick="WB.setWelt('beide',this)">Beide</button>
+      <button class="wb-welt-btn" onclick="WB.setWelt('beruf',this)">Beruf</button>
+      <button class="wb-welt-btn" onclick="WB.setWelt('privat',this)">Privat</button>
+    </div>
+    <button id="wb-header-add" onclick="WB.addNew()">+ Neu</button>
+  </div>
+  <div id="wb-content">
+    <!-- HEUTE -->
+    <div id="wb5-heute-tab" class="wb5-screen">
+      <div id="wb5-heute"></div>
+      <div class="wb5-scroll-hint" id="wb5-scroll-hint">&#8595; Mehr</div>
+    </div>
+    <!-- THEMEN -->
+    <div id="wb5-themen-tab" class="wb5-screen" style="display:none;">
+      <div id="wb5-themen"></div>
+      <div class="wb5-overlay" id="wb5-thema-overlay">
+        <div class="wb5-overlay-panel">
+          <div class="wb5-overlay-hdr">
+            <span class="wb5-overlay-title" id="wb5-ov-title">Thema</span>
+            <button class="wb5-overlay-close" onclick="WB._tm5CloseOverlay()">&#x2715;</button>
+          </div>
+          <div class="wb5-overlay-meta" id="wb5-ov-meta"></div>
+          <div class="wb5-overlay-scroll" id="wb5-ov-body"></div>
+        </div>
+      </div>
+    </div>
+    <!-- TERMINE -->
+    <div id="wb5-termine-tab" class="wb5-screen" style="display:none;">
+      <div id="wb5-termine">
+        <div class="wb5-tab-sw">
+          <button class="wb5-ts-btn active" id="wb5-btn-woche" onclick="WB._te5SetView('woche')">Woche</button>
+          <button class="wb5-ts-btn" id="wb5-btn-monat" onclick="WB._te5SetView('monat')">Monat</button>
+        </div>
+        <div id="wb5-woche">
+          <div class="wb5-week-nav">
+            <button class="wb5-week-nav-btn" onclick="WB._te5NavWeek(-1)">&#8249;</button>
+            <span class="wb5-week-lbl" id="wb5-week-lbl">KW 27</span>
+            <button class="wb5-week-nav-btn" onclick="WB._te5NavWeek(1)">&#8250;</button>
+          </div>
+          <div class="wb5-days-strip" id="wb5-days-strip"></div>
+          <div id="wb5-woche-content"></div>
+        </div>
+        <div id="wb5-monat" style="display:none;flex:1;overflow-y:auto;padding:12px;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;gap:6px;background:#fff;border-bottom:1px solid var(--border);padding:0 12px;margin:-12px -12px 0;flex-shrink:0;">
+            <button class="wb5-heute-btn" id="wb5-heute-cal-btn" onclick="WB._te5GoToday()">Heute</button>
+            <button class="wb5-month-title-btn" onclick="WB._te5OpenPicker()">
+              <span id="wb5-month-lbl">Juli 2026</span>
+              <span style="font-size:11px;color:var(--faint);">&#8964;</span>
+            </button>
+            <button class="wb5-mon-nav-btn" onclick="WB._te5ChangeMonth(-1)">&#8249;</button>
+            <button class="wb5-mon-nav-btn" onclick="WB._te5ChangeMonth(1)">&#8250;</button>
+          </div>
+          <div class="wb5-legende" style="margin-top:10px;">
+            <div class="wb5-leg-item"><div class="wb5-leg-dot" style="background:var(--accent);"></div>Beruf</div>
+            <div class="wb5-leg-item"><div class="wb5-leg-dot" style="background:var(--privat);"></div>Privat</div>
+            <div class="wb5-leg-item"><div class="wb5-leg-dot" style="background:var(--lila);"></div>Urlaub</div>
+          </div>
+          <div class="wb5-cal-grid">
+            <div class="wb5-cal-head">
+              <div class="wb5-cal-hcell">Mo</div><div class="wb5-cal-hcell">Di</div><div class="wb5-cal-hcell">Mi</div>
+              <div class="wb5-cal-hcell">Do</div><div class="wb5-cal-hcell">Fr</div>
+              <div class="wb5-cal-hcell">Sa</div><div class="wb5-cal-hcell">So</div>
+            </div>
+            <div class="wb5-cal-body" id="wb5-cal-body"></div>
+          </div>
+          <div class="wb5-day-detail" id="wb5-day-detail">
+            <div class="wb5-dd-hdr">
+              <span class="wb5-dd-datum" id="wb5-dd-datum"></span>
+              <span class="wb5-ddb" id="wb5-dd-badge"></span>
+              <button class="wb5-dd-close" onclick="WB._te5CloseDetail()">&#x2715;</button>
+            </div>
+            <div id="wb5-dd-content"></div>
+          </div>
+          <div class="wb5-picker-overlay" id="wb5-picker-overlay">
+            <div class="wb5-picker-panel">
+              <div class="wb5-picker-hdr">
+                <span class="wb5-picker-title">Monat w&auml;hlen</span>
+                <button class="wb5-picker-close" onclick="WB._te5ClosePicker()">&#x2715;</button>
+              </div>
+              <div class="wb5-year-row">
+                <button class="wb5-year-nav" onclick="WB._te5PickerYear(-1)">&#8249;</button>
+                <span class="wb5-year-lbl" id="wb5-picker-year">2026</span>
+                <button class="wb5-year-nav" onclick="WB._te5PickerYear(1)">&#8250;</button>
+              </div>
+              <div class="wb5-picker-months" id="wb5-picker-months"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- FOKUS -->
+    <div id="wb5-fokus-tab" class="wb5-screen" style="display:none;">
+      <div id="wb5-fokus"></div>
+    </div>
+  </div>
+  <div id="wb-bottom-nav">
+    <button class="wb-nav-btn" onclick="WB.showTab('heute')">
+      <span class="wb-nav-icon active" id="wbn-heute">&#9728;</span>
+      <span class="wb-nav-label active" id="wbnl-heute">Heute</span>
+      <div class="wb-nav-dot" id="wbnd-heute"></div>
+    </button>
+    <button class="wb-nav-btn" onclick="WB.showTab('themen')">
+      <span class="wb-nav-icon" id="wbn-themen">&#9776;</span>
+      <span class="wb-nav-label" id="wbnl-themen">Themen</span>
+      <div class="wb-nav-dot" id="wbnd-themen" style="display:none;"></div>
+    </button>
+    <button class="wb-nav-btn" onclick="WB.showTab('termine')">
+      <span class="wb-nav-icon" id="wbn-termine">&#128197;</span>
+      <span class="wb-nav-label" id="wbnl-termine">Termine</span>
+      <div class="wb-nav-dot" id="wbnd-termine" style="display:none;"></div>
+    </button>
+    <button class="wb-nav-btn" onclick="WB.showTab('fokus')">
+      <span class="wb-nav-icon" id="wbn-fokus">&#9654;</span>
+      <span class="wb-nav-label" id="wbnl-fokus">Fokus</span>
+      <div class="wb-nav-dot" id="wbnd-fokus" style="display:none;"></div>
+    </button>
+  </div>
+  <!-- Settings Button im Menu -->
+  <div id="wb-menu-btn" style="position:fixed;bottom:65px;right:10px;z-index:500;">
+    <button onclick="WB.settingsOpen()" style="background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;">&#9881;</button>
+  </div>
+</div>
+
+<!-- Crypto -->
+<div id="wb-crypto-overlay">
+  <div id="wb-crypto-box">
+    <div id="wb-crypto-title">Passwort eingeben</div>
+    <div id="wb-crypto-sub">Deine Daten sind verschl&uuml;sselt.</div>
+    <input id="wb-crypto-input" type="password" placeholder="Passwort" onkeydown="if(event.key==='Enter')WB._cryptoUnlock()">
+    <div id="wb-crypto-err">Falsches Passwort</div>
+    <button id="wb-crypto-btn" onclick="WB._cryptoUnlock()">Entsperren</button>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="wb-modal-overlay">
+  <div id="wb-modal-box">
+    <div id="wb-modal-head">
+      <span id="wb-modal-title">Dialog</span>
+      <button id="wb-modal-close" onclick="WB.modalClose()">&#x2715;</button>
+    </div>
+    <div id="wb-modal-body"></div>
+    <div id="wb-modal-foot"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="wb-toast"></div>
+
+<!-- Settings -->
+<div id="wb-settings-overlay">
+  <div class="s-head">
+    <div class="s-head-title">Einstellungen</div>
+    <button class="s-head-close" onclick="WB.settingsClose()">&#x2715;</button>
+  </div>
+  <div id="s-ov-scroll">
+    <div class="s-card">
+      <div class="s-card-head">Version</div>
+      <div class="s-row">
+        <div class="s-row-title">WorkBench 5</div>
+        <div id="s-ov-version" style="font-size:12px;color:var(--faint);font-family:var(--font-mono);">v5.0.0</div>
+      </div>
+    </div>
+    <div class="s-card">
+      <div class="s-card-head" onclick="WB._sToggleSync()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+        Google Drive Sync
+        <span id="s-sync-chev" style="font-size:11px;color:var(--faint);transition:transform .15s;">&#9654;</span>
+      </div>
+      <div id="s-sync-body" style="display:none;">
+        <div style="padding:10px 14px 4px;">
+          <div id="s-sync-state-lbl" style="font-size:14px;font-weight:600;color:var(--text);">Pr&uuml;fe Verbindung...</div>
+          <div id="s-sync-time-lbl" style="font-size:12px;color:var(--faint);margin-top:2px;"></div>
+        </div>
+        <div class="s-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+          <div class="s-row-title">Google Client-ID</div>
+          <input id="s-input-clientid" class="s-input mono" type="text" placeholder="1234...apps.googleusercontent.com">
+          <button class="s-btn primary" onclick="WB._sSaveClientId()">Speichern</button>
+        </div>
+        <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:6px;">
+          <button class="s-btn primary" onclick="WB._syncUploadInteractive()">&uarr; Jetzt hochladen</button>
+          <button class="s-btn" onclick="WB._syncDownloadInteractive()">&darr; Jetzt laden</button>
+          <button class="s-btn" onclick="WB._cryptoChangePassword()">&#x1F512; Passwort &auml;ndern</button>
+          <button class="s-btn danger" onclick="WB.oauthSignOut()">Abmelden</button>
+        </div>
+      </div>
+    </div>
+    <div class="s-card">
+      <div class="s-card-head">Sondertage</div>
+      <div id="s-sondertage-list" style="padding:8px 14px;"></div>
+      <div style="padding:0 14px 12px;">
+        <button class="s-btn" onclick="WB._sSondertageNeu()">+ Sondertag</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Fokus-Screen -->
+<div id="wb5-fokus-screen">
+  <div class="wb5-fs-hdr">
+    <div class="wb5-fs-aufgabe" id="wb5-fs-aufgabe-name">Fokus l&auml;uft</div>
+  </div>
+  <div class="wb5-fs-timer-wrap">
+    <div class="wb5-fs-timer" id="wb5-fs-timer">45:00</div>
+    <div class="wb5-fs-timer-lbl">verbleibend</div>
+  </div>
+  <div class="wb5-fs-checklist" id="wb5-fs-checklist"></div>
+  <div class="wb5-fs-next" id="wb5-fs-next" style="display:none;">
+    <span class="wb5-fs-nt-lbl">N&auml;chster</span>
+    <span class="wb5-fs-nt-name" id="wb5-fs-nt-name"></span>
+    <span class="wb5-fs-nt-time" id="wb5-fs-nt-time"></span>
+  </div>
+  <div class="wb5-fs-actions">
+    <button class="wb5-fs-pause" id="wb5-fs-pause-btn" onclick="WB._fk5Pause()">&#9646;&#9646; Pause</button>
+    <button class="wb5-fs-stop" onclick="WB._fk5Stop()">&#x2715; Abbrechen</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+const WB = {
+  APP_VERSION:    '5.0.0',
+  APP_BUILD:      '20260630-1800',
+  IDB_NAME:       'workbench5',
+  IDB_VERSION:    1,
+  _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
+
+  db: {
+    themen:       [],
+    aufgaben:     [],
+    customEvents: [],
+    sondertage:   [],
+    fokusTypen:   [
+      { id:'konzept',     label:'Konzept',     items:['Ziel definieren','Struktur skizzieren','Kernaussagen formulieren','Review einplanen'] },
+      { id:'besprechung', label:'Besprechung', items:['Agenda pr\u00fcfen','Teilnehmer informieren','Protokoll f\u00fchren','Aktionspunkte festhalten'] },
+      { id:'analyse',     label:'Analyse',     items:['Daten sichten','Hypothese formulieren','Auswertung','Fazit dokumentieren'] },
+    ],
+  },
+  activeTab:        'heute',
+  activeWorld:      'beide',
+  isDirty:          false,
+  _idb:             null,
+  _settings:        { bueroModus: false },
+  _syncTimer:       null,
+  _syncLastUpload:  0,
+  _syncLastDownload:0,
+  _syncInitDone:    false,
+  _syncConflictPending: false,
+  _oauthToken:      null,
+  _oauthTokenExp:   0,
+  _driveFileId:     null,
+  _cryptoOnSuccess: null,
+  _modalCtx:        null,
+  _fkSelectedMin:   45,
+  _fkTimer:         null,
+  _fkTimerSecs:     0,
+  _fkRunning:       false,
+  _fkSelectedAufgabe: null,
+  _fkSelectedTyp:   null,
+  _teView:          'woche',
+  _teWeekRef:       null,
+  _teActiveDay:     null,
+  _teMonthYear:     new Date().getFullYear(),
+  _teMonthMonth:    new Date().getMonth(),
+  _tePickerYear:    new Date().getFullYear(),
+  _saveTimer:       null,
+  _na5Welt:         'b',
+  _na5ThemaId:      null,
+  _te5NeuTyp:       'termin',
+  _te5NeuWelt:      'b',
+
+  async init() {
+    const hideStartup = () => {
+      const s = document.getElementById('wb-startup');
+      if (s) { s.classList.add('hidden'); setTimeout(() => s.style.display='none', 350); }
+    };
+    try { await this.idbOpen(); await this.idbLoad(); } catch(e) { console.error('[WB5]',e); }
+    await this._sLoadSettings();
+    this._teActiveDay = this._dStr(new Date());
+    this.showTab('heute');
+    this._syncStart();
+    hideStartup();
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState==='hidden' && this.isDirty) await this.idbSave();
+    });
+    window.addEventListener('beforeunload', async () => { await this.idbSave(); });
+  },
+
+  showTab(tab) {
+    ['heute','themen','termine','fokus'].forEach(t => {
+      const el = document.getElementById('wb5-'+t+'-tab');
+      if (el) el.style.display = t===tab ? 'flex' : 'none';
+      document.getElementById('wbn-'+t)?.classList.toggle('active', t===tab);
+      document.getElementById('wbnl-'+t)?.classList.toggle('active', t===tab);
+      const dot = document.getElementById('wbnd-'+t);
+      if (dot) dot.style.display = t===tab ? 'block' : 'none';
+    });
+    this.activeTab = tab;
+    const titles = {heute:'Heute',themen:'Themen',termine:'Termine',fokus:'Fokus'};
+    const ht = document.getElementById('wb-header-title');
+    if (ht) ht.textContent = titles[tab]||tab;
+    this.renderSection(tab);
+  },
+
+  renderSection(tab) {
+    if (tab==='heute')   this._ht5Render();
+    if (tab==='themen')  this._tm5Render();
+    if (tab==='termine') this._te5Render();
+    if (tab==='fokus')   this._fk5Render();
+  },
+
+  setWelt(welt, btn) {
+    this.activeWorld = welt;
+    document.querySelectorAll('.wb-welt-btn').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
+    this.renderSection(this.activeTab);
+  },
+
+  addNew() {
+    if (this.activeTab==='heute'||this.activeTab==='themen') this._aufgabeNeu();
+    if (this.activeTab==='termine') this._terminNeu();
+  },
+
+  _weltOk(item) {
+    if (this._settings.bueroModus && (item.welt||'b')==='p') return false;
+    const w = item.welt||'b';
+    if (this.activeWorld==='beruf'  && w!=='b') return false;
+    if (this.activeWorld==='privat' && w!=='p') return false;
+    return true;
+  },
+
+  // ── HEUTE ─────────────────────────────────────────
+  _ht5Render() {
+    const el = document.getElementById('wb5-heute'); if (!el) return;
+    const today = this._dStr(new Date()); const db = this.db||{};
+    let h = '';
+    const deadlines = [
+      ...(db.aufgaben||[]).filter(a=>!a.deleted&&!a.erledigt&&a.deadline===today&&this._weltOk(a)),
+      ...(db.themen||[]).flatMap(t=>(t.aufgaben||[]).filter(a=>!a.deleted&&!a.erledigt&&a.deadline===today&&this._weltOk(t)))
+    ];
+    if (deadlines.length) {
+      h += '<div class="wb5-deadline"><span class="wb5-deadline-text">'+this._esc(deadlines[0].titel||deadlines[0].text||'')+'</span><span class="wb5-deadline-tag">f&auml;llig heute</span></div>';
+    }
+    const nowStr = new Date().getHours().toString().padStart(2,'0')+':'+new Date().getMinutes().toString().padStart(2,'0');
+    const termine = (db.customEvents||[]).filter(e=>!e.deleted&&!e.storniert&&e.date===today&&e.startTime&&this._weltOk(e)).sort((a,b)=>a.startTime.localeCompare(b.startTime));
+    const laufend = termine.filter(e=>e.startTime<=nowStr&&(e.endTime||'23:59')>nowStr);
+    const kommend = termine.filter(e=>e.startTime>nowStr);
+    const jetztItems = [...laufend.slice(0,1),...kommend.slice(0,1)];
+    if (termine.length) {
+      h += '<div class="wb5-card"><div class="wb5-card-hdr"><span class="wb5-card-title">Jetzt</span><span class="wb5-card-badge">'+jetztItems.length+' von '+termine.length+'</span></div>';
+      jetztItems.forEach(e => {
+        const isL=laufend.includes(e); const w=(e.welt||'b')==='p'?'p':'b';
+        h += '<div class="wb5-termin-item" onclick="WB._te5OpenTermin(\''+this._esc(e.id)+'\')">'
+          +'<div class="wb5-t-bar wb5-t-bar-'+(isL?'l':w)+'"></div>'
+          +'<div style="flex:1;min-width:0;"><div class="wb5-t-name">'+this._esc(e.text)+'</div>'
+          +'<div class="wb5-t-time">'+(e.startTime||'')+(e.endTime?' \u2013 '+e.endTime:'')+'</div></div>'
+          +(isL?'<span class="wb5-laufend">&#9654; l&auml;uft</span>':'')+'</div>';
+      });
+      h += '</div>';
+    }
+    const aufgabenHeute = [
+      ...(db.aufgaben||[]).filter(a=>!a.deleted&&this._weltOk(a)&&(a.deadline===today||a.heutePin||this._isRoutineHeute(a))),
+      ...(db.themen||[]).filter(t=>!t.deleted&&t.status==='aktiv'&&(t.prio||3)<=2)
+        .flatMap(t=>(t.aufgaben||[]).filter(a=>!a.deleted&&!a.erledigt&&this._weltOk(t)&&(a.deadline===today||a.heutePin||this._isRoutineHeute(a))))
+    ];
+    const offen = aufgabenHeute.filter(a=>!a.erledigt);
+    const erledigt = aufgabenHeute.filter(a=>a.erledigt);
+    h += '<div class="wb5-card"><div class="wb5-card-hdr"><span class="wb5-card-title">Heute erledigen</span>'
+      +'<span class="wb5-card-badge">'+offen.length+' offen'+(erledigt.length?' &middot; '+erledigt.length+' erledigt':'')+'</span></div>';
+    erledigt.forEach(a => {
+      h += '<div class="wb5-item"><div class="wb5-cb done" onclick="event.stopPropagation();WB._ht5Toggle(\''+this._esc(a.id)+'\')"></div>'
+        +'<div class="wb5-dot wb5-dot-'+((a.welt||'b')==='p'?'p':'b')+'"></div>'
+        +'<span class="wb5-item-text done">'+this._esc(a.titel||a.text||'')+'</span></div>';
+    });
+    if (offen.length) {
+      offen.forEach(a => {
+        const isR=this._isRoutineHeute(a); const isPrio1=(a.prio||3)===1;
+        h += '<div class="wb5-item" onclick="WB._aufgabeDetail(\''+this._esc(a.id)+'\')">'
+          +'<div class="wb5-cb" onclick="event.stopPropagation();WB._ht5Toggle(\''+this._esc(a.id)+'\')"></div>'
+          +'<div class="wb5-dot wb5-dot-'+((a.welt||'b')==='p'?'p':'b')+'"></div>'
+          +'<span class="wb5-item-text">'+this._esc(a.titel||a.text||'')+'</span>'
+          +(isPrio1?'<span class="wb5-tag wb5-tag-p1">Prio 1</span>':'')
+          +(isR?'<span class="wb5-tag wb5-tag-r">&#x21BB; Routine</span>':'')
+          +(a.deadline===today&&!isR?'<span class="wb5-tag wb5-tag-p2">f&auml;llig</span>':'')
+          +(a.themaId?'<span class="wb5-tag wb5-tag-th">'+this._esc(this._themaName(a.themaId))+'</span>':'')
+          +'</div>';
+      });
+    } else {
+      h += '<div style="padding:16px 12px;font-size:13px;color:var(--faint);text-align:center;">Alles erledigt &#10003;</div>';
+    }
+    h += '</div>';
+    const hinweise = this._ht5Hinweise();
+    if (hinweise.length) {
+      h += '<div class="wb5-fokus-card"><div class="wb5-fokus-hdr"><span style="font-size:14px;">&#129504;</span><span class="wb5-fokus-title">Fokus empfohlen</span></div>';
+      hinweise.forEach(hw => {
+        h += '<div class="wb5-fokus-item"><div class="wb5-fokus-dot"></div>'
+          +'<span class="wb5-fokus-text">'+this._esc(hw.text)+'</span>'
+          +'<span class="wb5-fokus-action" onclick="WB.showTab(\'themen\')">Ansehen &rarr;</span></div>';
+      });
+      h += '</div>';
+    }
+    el.innerHTML = h;
+    const hint = document.getElementById('wb5-scroll-hint');
+    if (hint) {
+      el.onscroll = () => { const atB=el.scrollHeight-el.scrollTop<=el.clientHeight+20; hint.classList.toggle('visible',!atB&&el.scrollHeight>el.clientHeight); };
+      setTimeout(()=>{ if(el.scrollHeight>el.clientHeight) hint.classList.add('visible'); },100);
+    }
+  },
+
+  _ht5Toggle(id) {
+    const all=[...(this.db.aufgaben||[]),...(this.db.themen||[]).flatMap(t=>t.aufgaben||[])];
+    const a=all.find(x=>x.id===id); if(a){a.erledigt=!a.erledigt;a.updatedAt=this._now();this.setDirty();this._ht5Render();}
+  },
+
+  _ht5Hinweise() {
+    const today=this._dStr(new Date()); const hinweise=[];
+    (this.db.themen||[]).filter(t=>!t.deleted&&t.status==='aktiv').forEach(t=>{
+      const gw=(t.gateways||[]).find(g=>!g.deleted&&g.status!=='erreicht'&&g.pruefDatum);
+      if(gw){const days=Math.round((new Date(gw.pruefDatum)-new Date(today))/86400000);const offenCnt=(t.aufgaben||[]).filter(a=>!a.deleted&&!a.erledigt).length;if(days<=14&&offenCnt>0)hinweise.push({text:t.titel+' \u2014 Gateway in '+days+' Tagen, '+offenCnt+' Aufgaben offen',themaId:t.id});}
+      if(t.updatedAt&&(t.prio||3)===1){const ds=Math.round((new Date()-new Date(t.updatedAt))/86400000);if(ds>=7)hinweise.push({text:t.titel+' \u2014 Prio 1, seit '+ds+' Tagen keine Aktivit\u00e4t',themaId:t.id});}
+    });
+    return hinweise.slice(0,2);
+  },
+
+  _isRoutineHeute(a) {
+    if(!a.wiederholung||!a.wiederholung.typ) return false;
+    const w=a.wiederholung; const today=new Date(); const dow=today.getDay();
+    if(w.typ==='w\u00f6chentlich') return (w.wochentage||[]).includes(dow);
+    if(w.typ==='monatlich'){const d=parseInt((w.datum||'').split('-')[2]||'1');return today.getDate()===d;}
+    if(w.typ==='j\u00e4hrlich'){const[,m,d]=(w.datum||'--').split('-');return today.getMonth()+1===parseInt(m)&&today.getDate()===parseInt(d);}
+    return false;
+  },
+
+  _themaName(id) { return (this.db.themen||[]).find(t=>t.id===id)?.titel||''; },
+
+  // ── THEMEN ─────────────────────────────────────────
+  _tm5Render() {
+    const el=document.getElementById('wb5-themen'); if(!el) return;
+    const db=this.db||{}; const themen=(db.themen||[]).filter(t=>!t.deleted&&this._weltOk(t));
+    const aktiv=themen.filter(t=>t.status!=='erledigt');
+    const freieAufg=(db.aufgaben||[]).filter(a=>!a.deleted&&this._weltOk(a));
+    const gruppen={};
+    aktiv.forEach(t=>{const g=t.oberthema||'_frei';if(!gruppen[g])gruppen[g]=[];gruppen[g].push(t);});
+    const sortT=arr=>arr.sort((a,b)=>{const sA=a.status==='aktiv'?0:1;const sB=b.status==='aktiv'?0:1;if(sA!==sB)return sA-sB;return(a.prio||3)-(b.prio||3);});
+    let h='';
+    const gKeys=Object.keys(gruppen).filter(k=>k!=='_frei').sort();
+    if(gruppen['_frei'])gKeys.push('_frei');
+    gKeys.forEach(g=>{
+      if(g!=='_frei') h+='<div class="wb5-gruppe-lbl">'+this._esc(g)+'</div>';
+      else if(gKeys.filter(k=>k!=='_frei').length>0) h+='<div class="wb5-gruppe-lbl" style="margin-top:4px;">Sonstiges</div>';
+      sortT(gruppen[g]).forEach(t=>{
+        const gwBald=(t.gateways||[]).find(g2=>!g2.deleted&&g2.status!=='erreicht'&&g2.pruefDatum);
+        const isPausiert=t.status==='pausiert';
+        h+='<div class="wb5-thema-card prio-'+(t.prio||3)+(isPausiert?' pausiert':'')+'" onclick="WB._tm5OpenOverlay(\''+this._esc(t.id)+'\')">'
+          +'<div class="wb5-thema-hdr"><span class="wb5-thema-name">'+this._esc(t.titel)+'</span>'
+          +'<div class="wb5-thema-meta">'
+          +'<span class="wb5-badge wb5-badge-p'+(t.prio||3)+'">Prio '+(t.prio||3)+'</span>'
+          +(gwBald?'<span class="wb5-badge wb5-badge-gw">GW '+this._fmtDDMM(gwBald.pruefDatum)+'</span>':'')
+          +'<span class="wb5-badge '+(isPausiert?'wb5-badge-pausiert':'wb5-badge-aktiv')+'">'+(t.status||'aktiv')+'</span>'
+          +'</div><span class="wb5-chev">&#8250;</span></div></div>';
+      });
+    });
+    h+='<div class="wb5-gruppe-lbl" style="margin-top:4px;">Freie Aufgaben</div>';
+    const offenF=freieAufg.filter(a=>!a.erledigt);
+    const ueberfF=offenF.filter(a=>a.deadline&&a.deadline<this._dStr(new Date()));
+    const faelligF=offenF.filter(a=>a.deadline===this._dStr(new Date()));
+    h+='<div class="wb5-freie-card"><div class="wb5-freie-hdr" id="wb5-freie-hdr">'
+      +'<span class="wb5-freie-title">Freie Aufgaben</span>'
+      +'<div class="wb5-thema-meta"><span class="wb5-badge wb5-badge-p3">'+offenF.length+' offen</span>'
+      +(ueberfF.length?'<span class="wb5-badge wb5-badge-p1">'+ueberfF.length+' &uuml;berf&auml;llig</span>':'')
+      +(faelligF.length?'<span class="wb5-badge wb5-badge-p2">'+faelligF.length+' f&auml;llig</span>':'')
+      +'</div><span class="wb5-chev" id="wb5-freie-chev">&#8964;</span></div>'
+      +'<div class="wb5-collapsible" id="wb5-freie-body">';
+    offenF.forEach(a=>{
+      const isR=this._isRoutineHeute(a);const isUe=a.deadline&&a.deadline<this._dStr(new Date());const isFaellig=a.deadline===this._dStr(new Date());
+      h+='<div class="wb5-freie-item" onclick="WB._aufgabeDetail(\''+this._esc(a.id)+'\')">'
+        +'<div class="wb5-cb"></div><div class="wb5-dot wb5-dot-'+((a.welt||'b')==='p'?'p':'b')+'"></div>'
+        +'<span class="wb5-freie-text">'+this._esc(a.titel||a.text||'')+'</span>'
+        +(isUe?'<span class="wb5-atag wb5-at-ue">&uuml;berf&auml;llig</span>':'')
+        +(isFaellig&&!isUe?'<span class="wb5-atag wb5-at-dl">'+this._fmtDDMM(a.deadline)+'</span>':'')
+        +(isR?'<span class="wb5-atag wb5-at-r">&#x21BB;</span>':'')+'</div>';
+    });
+    h+='</div></div>';
+    const erledigte=(db.themen||[]).filter(t=>!t.deleted&&t.status==='erledigt'&&this._weltOk(t));
+    if(erledigte.length) h+='<button class="wb5-erl-btn" onclick="WB._toast(\'Erledigte Themen \u2014 kommt bald\')">&#128065; Erledigte Themen anzeigen ('+erledigte.length+')</button>';
+    el.innerHTML=h;
+    const hdr=document.getElementById('wb5-freie-hdr');
+    const body=document.getElementById('wb5-freie-body');
+    const chev=document.getElementById('wb5-freie-chev');
+    if(hdr&&body)hdr.addEventListener('click',()=>{body.classList.toggle('open');if(chev)chev.style.transform=body.classList.contains('open')?'rotate(180deg)':'';});
+  },
+
+  _tm5OpenOverlay(themaId) {
+    const t=(this.db.themen||[]).find(x=>x.id===themaId); if(!t) return;
+    const ov=document.getElementById('wb5-thema-overlay'); if(!ov) return;
+    document.getElementById('wb5-ov-title').textContent=t.titel;
+    const meta=document.getElementById('wb5-ov-meta');
+    meta.innerHTML='<span class="wb5-badge wb5-badge-p'+(t.prio||3)+'">Prio '+(t.prio||3)+'</span>'
+      +'<span class="wb5-badge wb5-badge-aktiv">'+(t.status||'aktiv')+'</span>'
+      +(t.oberthema?'<span class="wb5-badge wb5-badge-p3">'+this._esc(t.oberthema)+'</span>':'');
+    this._tm5RenderOverlayBody(t);
+    ov.classList.add('open');
+  },
+
+  _tm5RenderOverlayBody(t) {
+    const body=document.getElementById('wb5-ov-body'); if(!body) return;
+    let h='';
+    const gws=(t.gateways||[]).filter(g=>!g.deleted).sort((a,b)=>(a.reihenfolge||0)-(b.reihenfolge||0));
+    const aktGw=gws.find(g=>g.status!=='erreicht');
+    if(aktGw){
+      h+='<div class="wb5-gw-block" id="wb5-gw-block"><div class="wb5-gw-hdr">'
+        +'<span class="wb5-gw-pill">Aktuelles GW</span>'
+        +'<span class="wb5-gw-name">'+this._esc(aktGw.titel)+'</span>'
+        +(aktGw.pruefDatum?'<span class="wb5-gw-date">'+this._fmtDDMM(aktGw.pruefDatum)+'</span>':'')
+        +'<span class="wb5-chev" id="wb5-gw-chev">&#8964;</span></div>'
+        +'<div class="wb5-gw-body" id="wb5-gw-body"><div class="wb5-gw-body-inner">'
+        +(aktGw.bedingung?'<div><strong style="font-style:normal;color:var(--text);">Bedingung:</strong> '+this._esc(aktGw.bedingung)+'</div>':'')
+        +(aktGw.konsequenz?'<div><strong style="font-style:normal;color:var(--text);">Konsequenz:</strong> '+this._esc(aktGw.konsequenz)+'</div>':'')
+        +(aktGw.istWert!==undefined?'<div><strong style="font-style:normal;color:var(--text);">IST:</strong> '+this._esc(String(aktGw.istWert))+(aktGw.sollWert?' / '+this._esc(String(aktGw.sollWert)):'')+'</div>':'')
+        +'</div></div></div>';
+    }
+    const aufgaben=(t.aufgaben||[]).filter(a=>!a.deleted&&!a.erledigt).sort((a,b)=>(a.reihenfolge||0)-(b.reihenfolge||0));
+    h+='<div class="wb5-aufg-lbl">Aufgaben</div>';
+    aufgaben.forEach(a=>{
+      const isR=this._isRoutineHeute(a);
+      h+='<div class="wb5-aufg-item" onclick="WB._aufgabeDetail(\''+this._esc(a.id)+'\')">'
+        +'<span class="wb5-grip">&#8942;&#8942;</span><div class="wb5-cb"></div>'
+        +'<span class="wb5-aufg-text">'+this._esc(a.titel||a.text||'')+'</span>'
+        +'<div class="wb5-aufg-tags">'
+        +(a.typ?'<span class="wb5-atag wb5-at-a">'+this._esc(a.typ)+'</span>':'')
+        +(a.deadline?'<span class="wb5-atag wb5-at-dl">'+this._fmtDDMM(a.deadline)+'</span>':'')
+        +(isR?'<span class="wb5-atag wb5-at-r">&#x21BB;</span>':'')
+        +'</div></div>';
+    });
+    if(!aufgaben.length) h+='<div style="font-size:13px;color:var(--faint);padding:8px 0;">Keine offenen Aufgaben</div>';
+    h+='<button class="wb5-erl-aufg-btn">&#128065; Erledigte anzeigen</button>';
+    h+='<button class="wb5-add-btn" onclick="WB._aufgabeNeuFuerThema(\''+this._esc(t.id)+'\')">+ Aufgabe hinzuf&uuml;gen</button>';
+    const naechstesGw=gws.filter(g=>g!==aktGw&&g.status!=='erreicht')[0];
+    if(naechstesGw) h+='<div class="wb5-next-gw">&#127987; <span><strong style="color:#3D2880;">N&auml;chstes Gateway:</strong> '+this._esc(naechstesGw.titel)+(naechstesGw.pruefDatum?' \u2014 '+this._fmtDDMM(naechstesGw.pruefDatum):'')+'</span></div>';
+    body.innerHTML=h;
+    const gwBlock=document.getElementById('wb5-gw-block');const gwBody=document.getElementById('wb5-gw-body');const gwChev=document.getElementById('wb5-gw-chev');
+    if(gwBlock&&gwBody)gwBlock.addEventListener('click',()=>{gwBody.classList.toggle('open');if(gwChev)gwChev.style.transform=gwBody.classList.contains('open')?'rotate(180deg)':'';});
+  },
+
+  _tm5CloseOverlay() { document.getElementById('wb5-thema-overlay')?.classList.remove('open'); },
+
+  // ── TERMINE ────────────────────────────────────────
+  _te5Render() { if(this._teView==='woche') this._te5RenderWoche(); else this._te5RenderMonat(); },
+
+  _te5SetView(view) {
+    this._teView=view;
+    document.getElementById('wb5-woche').style.display=view==='woche'?'flex':'none';
+    document.getElementById('wb5-monat').style.display=view==='monat'?'flex':'none';
+    document.getElementById('wb5-btn-woche').classList.toggle('active',view==='woche');
+    document.getElementById('wb5-btn-monat').classList.toggle('active',view==='monat');
+    this._te5Render();
+  },
+
+  _te5RenderWoche() {
+    const ref=this._teWeekRef||new Date();
+    const dow=ref.getDay();const monday=new Date(ref);monday.setDate(ref.getDate()-(dow===0?6:dow-1));
+    const days=Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return d;});
+    const today=this._dStr(new Date());const DAYS=['Mo','Di','Mi','Do','Fr','Sa','So'];
+    const MONTHS_S=['Jan','Feb','M\u00e4r','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+    const kw=this._kwStr(monday).split('-W')[1];
+    const kwEl=document.getElementById('wb5-week-lbl');
+    if(kwEl)kwEl.textContent='KW '+kw+' \u00b7 '+monday.getDate()+'. '+MONTHS_S[monday.getMonth()]+' \u2013 '+days[6].getDate()+'. '+MONTHS_S[days[6].getMonth()];
+    const strip=document.getElementById('wb5-days-strip');
+    if(strip){
+      const active=this._teActiveDay||today;
+      strip.innerHTML=days.map((d,i)=>{
+        const ds=this._dStr(d);
+        const hasItems=(this.db.customEvents||[]).some(e=>!e.deleted&&e.date===ds);
+        const isSonder=(this.db.sondertage||[]).some(s=>!s.deleted&&s.datum===ds);
+        return '<div class="wb5-day-tab'+(ds===today?' today-d':'')+(ds===active?' active':'')+(hasItems?' has-items':'')+(isSonder?' urlaub-d':'')+'" onclick="WB._te5SelectDay(\''+ds+'\')">'
+          +'<span class="wb5-day-name">'+DAYS[i]+'</span><span class="wb5-day-num">'+d.getDate()+'</span><div class="wb5-day-dot"></div></div>';
+      }).join('');
+    }
+    this._te5RenderDayContent(this._teActiveDay||today);
+  },
+
+  _te5SelectDay(ds) { this._teActiveDay=ds; this._te5RenderWoche(); },
+
+  _te5RenderDayContent(ds) {
+    const el=document.getElementById('wb5-woche-content'); if(!el) return;
+    const MONTHS_L=['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    const DAYS_L=['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    const d=new Date(ds);const today=this._dStr(new Date());
+    const sonder=(this.db.sondertage||[]).find(s=>!s.deleted&&s.datum===ds);
+    const nowStr=new Date().getHours().toString().padStart(2,'0')+':'+new Date().getMinutes().toString().padStart(2,'0');
+    const termine=(this.db.customEvents||[]).filter(e=>!e.deleted&&!e.storniert&&e.date===ds&&this._weltOk(e)).sort((a,b)=>(a.startTime||'').localeCompare(b.startTime||''));
+    let h='<div class="wb5-tag-hdr"><span class="wb5-tag-datum">'+DAYS_L[d.getDay()]+', '+d.getDate()+'. '+MONTHS_L[d.getMonth()]+'</span>'
+      +(ds===today?'<span class="wb5-badge wb5-badge-aktiv">heute</span>':'')
+      +(sonder?'<span class="wb5-badge wb5-badge-gw">'+this._esc(sonder.name||sonder.typ)+'</span>':'')+'</div>';
+    if(termine.length){
+      h+='<div class="wb5-termin-card">';
+      termine.forEach(e=>{
+        const isL=ds===today&&e.startTime<=nowStr&&(e.endTime||'23:59')>nowStr;const w=(e.welt||'b')==='p'?'p':'b';
+        h+='<div class="wb5-termin-row" onclick="WB._te5OpenTermin(\''+this._esc(e.id)+'\')">'
+          +'<div class="wb5-tr-bar wb5-tr-bar-'+(isL?'l':w)+'"></div>'
+          +'<div style="flex:1;min-width:0;"><div class="wb5-tr-name">'+this._esc(e.text)+'</div><div class="wb5-tr-time">'+(e.startTime||'')+(e.endTime?' \u2013 '+e.endTime:'')+'</div></div>'
+          +(isL?'<span class="wb5-laufend-pill">&#9654; l&auml;uft</span>':'')+'</div>';
+      });
+      h+='</div>';
+    } else { h+='<div class="wb5-empty-day">Keine Termine</div>'; }
+    el.innerHTML=h;
+  },
+
+  _te5NavWeek(dir) {
+    if(!this._teWeekRef)this._teWeekRef=new Date();
+    this._teWeekRef.setDate(this._teWeekRef.getDate()+dir*7);
+    this._teActiveDay=this._dStr(this._teWeekRef);
+    this._te5RenderWoche();
+  },
+
+  _te5RenderMonat() {
+    const year=this._teMonthYear;const month=this._teMonthMonth;const today=this._dStr(new Date());
+    const MONTHS_S=['Jan','Feb','M\u00e4r','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+    const lbl=document.getElementById('wb5-month-lbl');if(lbl)lbl.textContent=MONTHS_S[month]+' '+year;
+    const hb=document.getElementById('wb5-heute-cal-btn');
+    const isCur=year===new Date().getFullYear()&&month===new Date().getMonth();
+    if(hb)hb.classList.toggle('visible',!isCur);
+    const firstDay=new Date(year,month,1);const daysInMonth=new Date(year,month+1,0).getDate();
+    let startDow=firstDay.getDay();startDow=startDow===0?6:startDow-1;
+    const prevDays=new Date(year,month,0).getDate();
+    const totalCells=Math.ceil((startDow+daysInMonth)/7)*7;
+    let h='';
+    for(let i=0;i<totalCells;i++){
+      let day,m,y,other=false;
+      if(i<startDow){day=prevDays-startDow+1+i;m=month-1;y=year;if(m<0){m=11;y--;}other=true;}
+      else if(i>=startDow+daysInMonth){day=i-startDow-daysInMonth+1;m=month+1;y=year;if(m>11){m=0;y++;}other=true;}
+      else{day=i-startDow+1;m=month;y=year;}
+      const ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+      const isToday=ds===today;
+      const sonder=(this.db.sondertage||[]).find(s=>!s.deleted&&s.datum===ds);
+      const evts=(this.db.customEvents||[]).filter(e=>!e.deleted&&e.date===ds&&this._weltOk(e));
+      let cls='wb5-cal-cell'+(other?' other':'')+(isToday?' today-cell':'')+(sonder?' urlaub-cell':'');
+      h+='<div class="'+cls+'" onclick="WB._te5OpenDay(\''+ds+'\',this)">'
+        +'<div class="wb5-cal-num">'+day+'</div>'
+        +(sonder?'<div class="wb5-cal-ev wb5-cal-ev-u">'+this._esc(sonder.typ)+'</div>':'')
+        +(!sonder&&evts.length?'<div class="wb5-cal-dots">'+evts.slice(0,3).map(e=>'<div class="wb5-cal-dot" style="background:'+((e.welt||'b')==='p'?'var(--privat)':'var(--accent)')+'"></div>').join('')+'</div>':'')
+        +'</div>';
+    }
+    const calBody=document.getElementById('wb5-cal-body');if(calBody)calBody.innerHTML=h;
+  },
+
+  _te5OpenDay(ds,cell) {
+    document.querySelectorAll('.wb5-cal-cell').forEach(c=>c.classList.remove('selected'));
+    cell?.classList.add('selected');
+    const detail=document.getElementById('wb5-day-detail');if(!detail)return;
+    detail.classList.add('open');
+    const d=new Date(ds);
+    const DAYS=['So','Mo','Di','Mi','Do','Fr','Sa'];
+    const MONTHS=['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    const ddD=document.getElementById('wb5-dd-datum');if(ddD)ddD.textContent=DAYS[d.getDay()]+', '+d.getDate()+'. '+MONTHS[d.getMonth()];
+    const today=this._dStr(new Date());const sonder=(this.db.sondertage||[]).find(s=>!s.deleted&&s.datum===ds);
+    const badge=document.getElementById('wb5-dd-badge');
+    if(badge){if(ds===today){badge.textContent='heute';badge.className='wb5-ddb wb5-ddb-h';}else if(sonder){badge.textContent=this._esc(sonder.name||sonder.typ);badge.className='wb5-ddb wb5-ddb-u';}else{badge.textContent='';badge.className='wb5-ddb';}}
+    const termine=(this.db.customEvents||[]).filter(e=>!e.deleted&&!e.storniert&&e.date===ds&&this._weltOk(e)).sort((a,b)=>(a.startTime||'').localeCompare(b.startTime||''));
+    const ddC=document.getElementById('wb5-dd-content');
+    if(ddC){if(!termine.length){ddC.innerHTML='<div class="wb5-empty-day">Keine Termine</div>';}
+      else ddC.innerHTML=termine.map(e=>'<div class="wb5-termin-row" onclick="WB._te5OpenTermin(\''+this._esc(e.id)+'\')"><div class="wb5-tr-bar wb5-tr-bar-'+((e.welt||'b')==='p'?'p':'b')+'"></div><div style="flex:1;min-width:0;"><div class="wb5-tr-name">'+this._esc(e.text)+'</div><div class="wb5-tr-time">'+(e.startTime||'')+(e.endTime?' \u2013 '+e.endTime:'')+'</div></div></div>').join('');}
+  },
+
+  _te5CloseDetail() { document.getElementById('wb5-day-detail')?.classList.remove('open');document.querySelectorAll('.wb5-cal-cell').forEach(c=>c.classList.remove('selected')); },
+
+  _te5ChangeMonth(dir) {
+    this._teMonthMonth+=dir;
+    if(this._teMonthMonth>11){this._teMonthMonth=0;this._teMonthYear++;}
+    if(this._teMonthMonth<0){this._teMonthMonth=11;this._teMonthYear--;}
+    this._te5RenderMonat();
+  },
+
+  _te5GoToday() { this._teMonthYear=new Date().getFullYear();this._teMonthMonth=new Date().getMonth();this._te5RenderMonat(); },
+
+  _te5OpenPicker() { this._tePickerYear=this._teMonthYear;this._te5RenderPickerMonths();document.getElementById('wb5-picker-overlay')?.classList.add('open'); },
+  _te5ClosePicker() { document.getElementById('wb5-picker-overlay')?.classList.remove('open'); },
+  _te5PickerYear(dir) { this._tePickerYear+=dir;this._te5RenderPickerMonths(); },
+
+  _te5RenderPickerMonths() {
+    const el=document.getElementById('wb5-picker-months');const yl=document.getElementById('wb5-picker-year');
+    if(yl)yl.textContent=this._tePickerYear;
+    const M=['Jan','Feb','M\u00e4r','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+    const tM=new Date().getMonth();const tY=new Date().getFullYear();
+    if(el)el.innerHTML=M.map((m,i)=>{
+      const isCur=this._tePickerYear===this._teMonthYear&&i===this._teMonthMonth;
+      const isTod=this._tePickerYear===tY&&i===tM;
+      return '<button class="wb5-pm-btn'+(isTod?' tod':isCur?' cur':'')+'" onclick="WB._te5SelectMonth('+i+')">'+m+'</button>';
+    }).join('');
+  },
+
+  _te5SelectMonth(month) { this._teMonthMonth=month;this._teMonthYear=this._tePickerYear;this._te5ClosePicker();this._te5RenderMonat(); },
+
+  _te5OpenTermin(id) {
+    const e=(this.db.customEvents||[]).find(x=>x.id===id); if(!e) return;
+    const body='<div class="wb-input-group"><strong style="font-size:15px;">'+this._esc(e.text)+'</strong></div>'
+      +(e.startTime?'<div class="wb-input-group"><span class="wb-label">Zeit</span><div>'+e.startTime+(e.endTime?' \u2013 '+e.endTime:'')+'</div></div>':'')
+      +(e.notiz?'<div class="wb-input-group"><span class="wb-label">Notiz</span><div>'+this._esc(e.notiz)+'</div></div>':'');
+    const foot='<div style="display:flex;gap:8px;"><button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Schlie\u00dfen</button><button class="wb-btn wb-btn-danger" onclick="WB._te5DelTermin(\''+this._esc(id)+'\')">L\u00f6schen</button></div>';
+    this.modalOpen(e.text,body,foot);
+  },
+
+  _te5DelTermin(id) { this._softDelete(this.db.customEvents,id);this.setDirty();this.modalClose();this._te5Render(); },
+
+  _terminNeu() {
+    const today=this._dStr(new Date());
+    const body='<div class="wb-input-group"><span class="wb-label">Typ</span>'
+      +'<div class="wb5-termin-typ-row">'
+      +'<button class="wb5-typ-btn active" onclick="WB._te5SetTyp(\'termin\',this)">Termin</button>'
+      +'<button class="wb5-typ-btn" onclick="WB._te5SetTyp(\'ganztag\',this)">Ganztag</button>'
+      +'<button class="wb5-typ-btn urlaub" onclick="WB._te5SetTyp(\'urlaub\',this)">Urlaub</button>'
+      +'<button class="wb5-typ-btn" onclick="WB._te5SetTyp(\'dienstreise\',this)">Dienstreise</button>'
+      +'<button class="wb5-typ-btn" onclick="WB._te5SetTyp(\'feiertag\',this)">Feiertag</button>'
+      +'</div></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Titel</span><input id="wb5-nt-text" class="wb-input" type="text" placeholder="z.B. Meeting"></div>'
+      +'<div id="wb5-nt-zeit-row"><div class="wb5-input-row">'
+      +'<div class="wb-input-group"><span class="wb-label">Datum</span><input id="wb5-nt-datum" class="wb-input" type="date" value="'+today+'"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Von</span><input id="wb5-nt-von" class="wb-input" type="time" value="09:00"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Bis</span><input id="wb5-nt-bis" class="wb-input" type="time" value="10:00"></div>'
+      +'</div></div>'
+      +'<div id="wb5-nt-range-row" style="display:none;">'
+      +'<div class="wb5-input-row"><div class="wb-input-group"><span class="wb-label">Von</span><input id="wb5-nt-von-d" class="wb-input" type="date" value="'+today+'"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Bis</span><input id="wb5-nt-bis-d" class="wb-input" type="date" value="'+today+'"></div></div>'
+      +'<div class="wb5-range-hint">&#x2139; Erstellt automatisch alle Tage im Zeitraum</div></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Notiz (optional)</span><input id="wb5-nt-notiz" class="wb-input" type="text" placeholder="Raum, Link..."></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Bereich</span>'
+      +'<div class="wb5-welt-toggle">'
+      +'<button class="wb5-welt-opt active-b" id="wb5-nt-b" onclick="WB._te5SetWelt(\'b\')"><div class="wb5-dot wb5-dot-b"></div>Beruf</button>'
+      +'<button class="wb5-welt-opt" id="wb5-nt-p" onclick="WB._te5SetWelt(\'p\')"><div class="wb5-dot wb5-dot-p"></div>Privat</button>'
+      +'</div></div>';
+    const foot='<div style="display:flex;gap:8px;"><button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button><button class="wb-btn wb-btn-save" onclick="WB._te5Save()">Speichern</button></div>';
+    this._modalCtx='termin-neu';this._te5NeuTyp='termin';this._te5NeuWelt='b';
+    this.modalOpen('Neuer Termin',body,foot);
+  },
+
+  _te5SetTyp(typ,btn) {
+    this._te5NeuTyp=typ;
+    document.querySelectorAll('.wb5-typ-btn').forEach(b=>b.classList.remove('active'));btn?.classList.add('active');
+    const isRange=typ==='urlaub'||typ==='dienstreise';
+    const zt=document.getElementById('wb5-nt-zeit-row');const rt=document.getElementById('wb5-nt-range-row');
+    if(zt)zt.style.display=isRange?'none':'block';if(rt)rt.style.display=isRange?'block':'none';
+  },
+
+  _te5SetWelt(w) {
+    this._te5NeuWelt=w;
+    document.getElementById('wb5-nt-b')?.classList.toggle('active-b',w==='b');
+    document.getElementById('wb5-nt-p')?.classList.toggle('active-p',w==='p');
+  },
+
+  _te5Save() {
+    const text=document.getElementById('wb5-nt-text')?.value.trim();if(!text){this._toast('Bitte Titel eingeben');return;}
+    const typ=this._te5NeuTyp||'termin';const welt=this._te5NeuWelt||'b';
+    const notiz=document.getElementById('wb5-nt-notiz')?.value.trim()||'';
+    const isRange=typ==='urlaub'||typ==='dienstreise';
+    if(isRange){
+      const vonD=document.getElementById('wb5-nt-von-d')?.value;const bisD=document.getElementById('wb5-nt-bis-d')?.value;
+      if(!vonD||!bisD){this._toast('Bitte Zeitraum w\u00e4hlen');return;}
+      if(!this.db.sondertage)this.db.sondertage=[];
+      const start=new Date(vonD);const end=new Date(bisD);const d=new Date(start);
+      while(d<=end){this.db.sondertage.push({id:'st_'+Date.now()+'_'+d.getDate(),datum:this._dStr(d),typ,name:text,welt,updatedAt:this._now()});d.setDate(d.getDate()+1);}
+    } else {
+      const datum=document.getElementById('wb5-nt-datum')?.value;if(!datum){this._toast('Bitte Datum w\u00e4hlen');return;}
+      const von=document.getElementById('wb5-nt-von')?.value;const bis=document.getElementById('wb5-nt-bis')?.value;
+      if(!this.db.customEvents)this.db.customEvents=[];
+      this.db.customEvents.push({id:'ev_'+Date.now(),text,date:datum,startTime:von||'',endTime:bis||'',typ,welt,notiz,updatedAt:this._now()});
+    }
+    this.setDirty();this.modalClose();this._te5Render();this._toast('\u2713 Gespeichert');
+  },
+
+  // ── FOKUS ──────────────────────────────────────────
+  _fk5Render() {
+    const el=document.getElementById('wb5-fokus');if(!el)return;
+    const timers=[25,45,60,90];
+    let h='<div class="wb5-sec-lbl">Timer</div><div class="wb5-timer-row">';
+    timers.forEach(t=>{h+='<button class="wb5-timer-btn'+(this._fkSelectedMin===t?' active':'')+'" onclick="WB._fk5SetTimer('+t+',this)"><span class="wb5-timer-min">'+t+'</span><span class="wb5-timer-lbl">Min</span></button>';});
+    h+='</div><div class="wb5-timer-custom"><span class="wb5-timer-custom-lbl">Eigene Zeit</span>'
+      +'<input class="wb5-timer-custom-input" type="number" min="1" max="240" placeholder="\u2014" oninput="WB._fk5CustomTimer(this.value)">'
+      +'<span style="font-size:13px;color:var(--muted);font-weight:600;">Min</span></div>';
+    const heute=[...(this.db.aufgaben||[]).filter(a=>!a.deleted&&!a.erledigt&&this._weltOk(a)),...(this.db.themen||[]).filter(t=>!t.deleted&&t.status==='aktiv').flatMap(t=>(t.aufgaben||[]).filter(a=>!a.deleted&&!a.erledigt&&this._weltOk(t)))].slice(0,5);
+    h+='<div class="wb5-sec-lbl">Aufgabe</div><div class="wb5-aufg-select">';
+    if(heute.length){heute.forEach(a=>{const sel=this._fkSelectedAufgabe===a.id;h+='<div class="wb5-aufg-sel-item'+(sel?' selected':'')+'" onclick="WB._fk5SelectAufg(\''+this._esc(a.id)+'\')">'+'<div class="wb5-dot wb5-dot-'+((a.welt||'b')==='p'?'p':'b')+'"></div><span style="flex:1;font-size:14px;font-weight:500;color:var(--text);min-width:0;word-break:break-word;">'+this._esc(a.titel||a.text||'')+'</span>'+(sel?'<span class="wb5-sel-check">&#10003;</span>':'')+'</div>';});}
+    else h+='<div style="padding:12px;font-size:13px;color:var(--faint);">Keine offenen Aufgaben</div>';
+    h+='</div>';
+    const typen=this.db.fokusTypen||[];const selTyp=this._fkSelectedTyp||(typen[0]?.id);
+    h+='<div class="wb5-sec-lbl">Checkliste</div>';
+    if(typen.length){
+      h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">';
+      typen.forEach(t=>{h+='<button class="wb5-typ-btn'+(selTyp===t.id?' active':'')+'" onclick="WB._fk5SetTyp(\''+this._esc(t.id)+'\')">'+this._esc(t.label)+'</button>';});
+      h+='</div>';
+      const typ=typen.find(t=>t.id===selTyp);
+      if(typ){h+='<div class="wb5-template-card"><div class="wb5-template-hdr"><span class="wb5-template-name">'+this._esc(typ.label)+'</span><button class="wb5-template-edit" onclick="WB._toast(\'Bearbeiten \u2014 kommt bald\')">Bearbeiten</button></div>';(typ.items||[]).forEach(item=>{h+='<div class="wb5-template-item">'+this._esc(item)+'</div>';});h+='</div>';}
+    }
+    h+='<button class="wb5-start-btn" onclick="WB._fk5Start()">&#9654; Fokus starten &middot; '+this._fkSelectedMin+' Min</button>';
+    el.innerHTML=h;
+  },
+
+  _fk5SetTimer(min,btn) {
+    this._fkSelectedMin=min;
+    document.querySelectorAll('.wb5-timer-btn').forEach(b=>b.classList.remove('active'));btn?.classList.add('active');
+  },
+
+  _fk5CustomTimer(val) {
+    const v=Math.min(240,Math.max(1,parseInt(val)||1));this._fkSelectedMin=v;
+    document.querySelectorAll('.wb5-timer-btn').forEach(b=>b.classList.remove('active'));
+  },
+
+  _fk5SelectAufg(id) { this._fkSelectedAufgabe=id;this._fk5Render(); },
+  _fk5SetTyp(id) { this._fkSelectedTyp=id;this._fk5Render(); },
+
+  _fk5Start() {
+    const screen=document.getElementById('wb5-fokus-screen');if(!screen)return;
+    const aufgName=document.getElementById('wb5-fs-aufgabe-name');
+    if(aufgName&&this._fkSelectedAufgabe){const a=[...(this.db.aufgaben||[]),...(this.db.themen||[]).flatMap(t=>t.aufgaben||[])].find(x=>x.id===this._fkSelectedAufgabe);if(a)aufgName.textContent=a.titel||a.text||'Fokus';}
+    const typId=this._fkSelectedTyp||(this.db.fokusTypen||[])[0]?.id;const typ=(this.db.fokusTypen||[]).find(t=>t.id===typId);
+    const cl=document.getElementById('wb5-fs-checklist');
+    if(cl&&typ)cl.innerHTML=(typ.items||[]).map(item=>'<div class="wb5-fs-item" onclick="WB._fk5ToggleCheck(this)"><div class="wb5-fs-cb"></div><span class="wb5-fs-text">'+this._esc(item)+'</span></div>').join('');
+    this._fkTimerSecs=this._fkSelectedMin*60;this._fk5UpdateTimer();this._fkRunning=true;
+    if(this._fkTimer)clearInterval(this._fkTimer);
+    this._fkTimer=setInterval(()=>{if(!this._fkRunning)return;if(this._fkTimerSecs>0){this._fkTimerSecs--;this._fk5UpdateTimer();}else{clearInterval(this._fkTimer);this._fk5Stop();}},1000);
+    const today=this._dStr(new Date());const nowStr=new Date().getHours().toString().padStart(2,'0')+':'+new Date().getMinutes().toString().padStart(2,'0');
+    const naechster=(this.db.customEvents||[]).filter(e=>!e.deleted&&!e.storniert&&e.date===today&&e.startTime>nowStr).sort((a,b)=>a.startTime.localeCompare(b.startTime))[0];
+    const fsNext=document.getElementById('wb5-fs-next');
+    if(naechster&&fsNext){document.getElementById('wb5-fs-nt-name').textContent=naechster.text;document.getElementById('wb5-fs-nt-time').textContent=naechster.startTime;fsNext.style.display='flex';}
+    screen.classList.add('open');
+  },
+
+  _fk5UpdateTimer() {
+    const el=document.getElementById('wb5-fs-timer');if(!el)return;
+    const m=Math.floor(this._fkTimerSecs/60);const s=this._fkTimerSecs%60;
+    el.textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+  },
+
+  _fk5Pause() { this._fkRunning=!this._fkRunning;const btn=document.getElementById('wb5-fs-pause-btn');if(btn)btn.textContent=this._fkRunning?'\u23f8 Pause':'\u25b6 Weiter'; },
+  _fk5Stop() { clearInterval(this._fkTimer);this._fkRunning=false;document.getElementById('wb5-fokus-screen')?.classList.remove('open'); },
+  _fk5ToggleCheck(item) { item.querySelector('.wb5-fs-cb')?.classList.toggle('done');item.querySelector('.wb5-fs-text')?.classList.toggle('done'); },
+
+  // ── AUFGABEN ───────────────────────────────────────
+  _aufgabeNeu() {
+    const body='<div class="wb-input-group"><span class="wb-label">Titel</span><input id="wb5-na-text" class="wb-input" type="text" placeholder="Was muss getan werden?"></div>'
+      +'<div class="wb5-input-row"><div class="wb-input-group"><span class="wb-label">Priorit\u00e4t</span><select id="wb5-na-prio" class="wb-select"><option value="1">Prio 1</option><option value="2">Prio 2</option><option value="3" selected>Prio 3</option></select></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Deadline</span><input id="wb5-na-deadline" class="wb-input" type="date"></div></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Bereich</span><div class="wb5-welt-toggle">'
+      +'<button class="wb5-welt-opt active-b" id="wb5-na-b" onclick="WB._na5SetWelt(\'b\')"><div class="wb5-dot wb5-dot-b"></div>Beruf</button>'
+      +'<button class="wb5-welt-opt" id="wb5-na-p" onclick="WB._na5SetWelt(\'p\')"><div class="wb5-dot wb5-dot-p"></div>Privat</button>'
+      +'</div></div>';
+    const foot='<div style="display:flex;gap:8px;"><button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button><button class="wb-btn wb-btn-save" onclick="WB._na5Save()">Speichern</button></div>';
+    this._modalCtx='aufgabe-neu';this._na5Welt='b';this.modalOpen('Neue Aufgabe',body,foot);
+  },
+
+  _aufgabeNeuFuerThema(themaId) { this._na5ThemaId=themaId;this._aufgabeNeu(); },
+
+  _na5SetWelt(w) {
+    this._na5Welt=w;
+    document.getElementById('wb5-na-b')?.classList.toggle('active-b',w==='b');
+    document.getElementById('wb5-na-p')?.classList.toggle('active-p',w==='p');
+  },
+
+  _na5Save() {
+    const text=document.getElementById('wb5-na-text')?.value.trim();if(!text){this._toast('Bitte Titel eingeben');return;}
+    const prio=parseInt(document.getElementById('wb5-na-prio')?.value)||3;
+    const deadline=document.getElementById('wb5-na-deadline')?.value||'';
+    const welt=this._na5Welt||'b';
+    const aufg={id:'a_'+Date.now(),titel:text,prio,deadline,welt,typ:'aufgabe',erledigt:false,updatedAt:this._now()};
+    if(this._na5ThemaId){const t=(this.db.themen||[]).find(x=>x.id===this._na5ThemaId);if(t){if(!t.aufgaben)t.aufgaben=[];t.aufgaben.push(aufg);}}
+    else{if(!this.db.aufgaben)this.db.aufgaben=[];this.db.aufgaben.push(aufg);}
+    this._na5ThemaId=null;this.setDirty();this.modalClose();this.renderSection(this.activeTab);this._toast('\u2713 Aufgabe gespeichert');
+  },
+
+  _aufgabeDetail(id) {
+    const all=[...(this.db.aufgaben||[]),...(this.db.themen||[]).flatMap(t=>t.aufgaben||[])];
+    const a=all.find(x=>x.id===id);if(!a)return;
+    const body='<div style="font-size:15px;font-weight:600;margin-bottom:12px;">'+this._esc(a.titel||a.text||'')+'</div>'
+      +(a.deadline?'<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Deadline: '+this._fmtDDMM(a.deadline)+'</div>':'')
+      +'<div style="display:flex;gap:8px;"><button class="wb-btn wb-btn-danger" onclick="WB._aufgabeDelete(\''+this._esc(id)+'\')">L\u00f6schen</button><button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Schlie\u00dfen</button></div>';
+    this.modalOpen(a.titel||a.text||'Aufgabe',body,'<div></div>');
+  },
+
+  _aufgabeDelete(id) {
+    const idx=(this.db.aufgaben||[]).findIndex(x=>x.id===id);
+    if(idx>=0){this.db.aufgaben[idx].deleted=true;this.db.aufgaben[idx].updatedAt=this._now();}
+    else{(this.db.themen||[]).forEach(t=>{const ti=(t.aufgaben||[]).findIndex(a=>a.id===id);if(ti>=0){t.aufgaben[ti].deleted=true;t.aufgaben[ti].updatedAt=this._now();}});}
+    this.setDirty();this.modalClose();this.renderSection(this.activeTab);
+  },
+
+  // ── setDirty & KW ──────────────────────────────────
+  setDirty() {
+    this.isDirty=true;clearTimeout(this._saveTimer);
+    this._saveTimer=setTimeout(async()=>{if(!this._syncConflictPending)try{await this._syncUpload();}catch(e){}},5000);
+  },
+
+  _kwStr(d) {
+    const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const dayNum=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-dayNum);
+    const yearStart=new Date(Date.UTC(dt.getUTCFullYear(),0,1));const weekNo=Math.ceil((((dt-yearStart)/86400000)+1)/7);
+    return dt.getUTCFullYear()+'-W'+String(weekNo).padStart(2,'0');
+  },
+  _kwEndDate() { const d=new Date();const day=d.getDay();d.setDate(d.getDate()+(day===0?0:7-day));return this._dStr(d); },
+
+
+  // ── Settings (aus WB4) ──
+  settingsOpen() {
+    const el=document.getElementById('wb-settings-overlay'); if(el) el.classList.add('open');
+    const vEl=document.getElementById('s-ov-version'); if(vEl) vEl.textContent='v'+this.APP_VERSION+' \u00b7 '+this.APP_BUILD;
+    const cidEl=document.getElementById('s-input-clientid'); if(cidEl&&this._oauthClientId) cidEl.value=this._oauthClientId;
+    this._sUpdateSyncStatus();
+    document.getElementById('s-toggle-dark')?.classList.toggle('on',!!this._settings.darkMode);
+    this._sRenderSondertage();
+    const kwEl=document.getElementById('s-motto-kw'); if(kwEl) kwEl.textContent=this._getCurrentKW();
+  },
+  settingsClose() {
+    document.getElementById('wb-settings-overlay')?.classList.remove('open');
+  },
+  _sToggleSync() {
+    const body = document.getElementById('s-sync-body');
+    const chev = document.getElementById('s-sync-chev');
+    if (!body) return;
+    const open = body.classList.toggle('ck4-hidden');
+    if (chev) chev.style.transform = open ? '' : 'rotate(90deg)';
+  },
+  _sUpdateSyncStatus() {
+    const stEl=document.getElementById('s-sync-state-lbl');
+    const tmEl=document.getElementById('s-sync-time-lbl');
+    if(this._pendingChanges) {
+      if(stEl){stEl.textContent='\u26a0 \u00c4nderungen nicht gespeichert';stEl.style.color='var(--warn)';}
+    } else if(this._syncLastUpload>0) {
+      if(stEl){stEl.textContent='\u2022 Verbunden \u2014 Online';stEl.style.color='var(--accent)';}
+    } else {
+      if(stEl){stEl.textContent='Nicht verbunden';stEl.style.color='var(--faint)';}
+    }
+    if(tmEl&&this._syncLastUpload>0) tmEl.textContent='Zuletzt: '+new Date(this._syncLastUpload).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  },
+  _sRenderSondertage() {
+    const el=document.getElementById('s-sondertage-list'); if(!el) return;
+    const items=(this.db?.sondertage||[]).filter(s=>!s.deleted).sort((a,b)=>a.datum.localeCompare(b.datum));
+    if(!items.length){el.innerHTML='<div style="font-size:14px;color:var(--faint);font-style:italic;">Keine Sondertage definiert</div>';return;}
+    const stLabels={urlaub:'Urlaub',feiertag:'Feiertag',auszeit:'Auszeit',krank:'Krank',dienstreise:'Dienstreise'};
+    el.innerHTML=items.map(s=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);">'
+      +'<span style="font-size:13px;font-weight:700;color:var(--text);flex:1;">'+this._esc(s.datum)+' \u00b7 '+(stLabels[s.typ]||s.typ)+(s.name?' \u2014 '+this._esc(s.name):'')+'</span>'
+      +'<button class="s-btn danger" onclick="WB._sSondertageDelete(\''+this._esc(s.id)+'\')">L\u00f6schen</button>'
+      +'</div>').join('');
+  },
+  _sSondertageNeu() {
+    const typen=['urlaub','feiertag','auszeit','krank','dienstreise'];
+    const body='<div class="wb-input-group"><label class="wb-label">Datum</label><input id="wb-f-date" class="wb-input" type="date"></div>'
+      +'<div class="wb-input-group"><label class="wb-label">Typ</label>'
+      +'<select id="wb-f-st-typ" class="wb-select">'+typen.map(t=>'<option value="'+t+'">'+t+'</option>').join('')+'</select></div>'
+      +'<div class="wb-input-group"><label class="wb-label">Name (optional)</label><input id="wb-f-text" class="wb-input" placeholder="z.B. Weihnachten"></div>';
+    this._modalCtx='sondertag';
+    const footer='<div></div><div style="display:flex;gap:8px;">'
+      +'<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
+      +'<button class="wb-btn wb-btn-save" onclick="WB._sSondertageSave()">Speichern</button>'
+      +'</div>';
+    this.modalOpen('Sondertag','<div class="wb-modal-body">'+body+'</div>',footer);
+  },
+  _sSondertageSave() {
+    const datum=document.getElementById('wb-f-date')?.value; if(!datum){this._toast('Datum fehlt');return;}
+    const typ=document.getElementById('wb-f-st-typ')?.value||'urlaub';
+    const name=document.getElementById('wb-f-text')?.value.trim()||'';
+    if(!this.db.sondertage) this.db.sondertage=[];
+    this.db.sondertage.push({id:'st_'+Date.now(),datum,typ,name,deleted:false,updatedAt:this._now()});
+    this.setDirty(); this.modalClose(); this._sRenderSondertage(); this.renderSection(this.activeTab);
+    this._toast('\u2713 Sondertag gespeichert');
+  },
+  _sSondertageDelete(id) {
+    const s=(this.db?.sondertage||[]).find(x=>x.id===id); if(!s) return;
+    s.deleted=true; s.updatedAt=this._now();
+    this.setDirty(); this._sRenderSondertage(); this.renderSection(this.activeTab);
+  },
+  // ── Modal (aus WB4) ──
+  modalOpen(title, bodyHtml, footerHtml) {
+    const o=document.getElementById('wb-modal-overlay');
+    const t=document.getElementById('wb-modal-title');
+    const b=document.getElementById('wb-modal-body');
+    const f=document.getElementById('wb-modal-footer');
+    if(!o||!t||!b||!f) return;
+    t.textContent=title; b.innerHTML=bodyHtml; f.innerHTML=footerHtml;
+    o.classList.add('open');
+    setTimeout(()=>{ const inp=b.querySelector('input,select,textarea'); if(inp) inp.focus(); },50);
+  },
+  modalClose() {
+    document.getElementById('wb-modal-overlay')?.classList.remove('open');
+    // Backdrop-Klick nach jedem Schließen wieder aktivieren
+    const overlay = document.getElementById('wb-modal-overlay');
+    if (overlay && !overlay.onclick) overlay.onclick = (e) => WB._modalBgClick(e);
+    this._modalCtx = null;
+  },
+  // ── Utilities (aus WB4) ──
+  _softDelete(item) {
+    if (item) {
+      item.deleted    = true;
+      item.gepinnt    = false; // Archivierte Notizen nie gepinnt
+      item.heutePin   = false;
+      item.heutePinDate = null;
+      item.updatedAt  = this._now();
+    }
+  },
+  _emptyDb() {
+    return {
+      // ── WB4: Neue Collections ──
+      themen:   [],   // typ:'thema' — Lebensthemen / Pipelines
+      aufgaben: [],   // Aufgaben mit Unteraufgaben + Wiederholung
+      gateways: [],   // Meilensteine mit KPIs
+      // ── Termine & Kalender (unverändert) ──
+      customEvents: [], wochenpflichten: [], pflichtStatus: {},
+      tagesprotokoll: [], wochenMottos: {}, sondertage: [],
+      // ── Legacy (leer, für Kompatibilität beim Laden alter Daten) ──
+      notizen: [], wissensnetzwerk: [], vorhaben: [], ziele: [],
+      links: [], quickItems: [], checklistVorlagen: [], mantras: [],
+      _version: 2, _exportedAt: '',
+    };
+  },
+  _itemVisible(item) {
+    const buero = !!this._settings?.bueroModus;
+    const welt  = this.activeWorld; // 'beide' | 'beruf' | 'privat'
+    const iw    = item?.welt || null; // 'pro'|'beruf'|'priv'|'privat'|null
+    const isPriv = iw === 'priv' || iw === 'privat';
+    const isBeruf = iw === 'pro' || iw === 'beruf';
+
+    // Büro-Modus: privates ausblenden + vertrauliches ausblenden
+    if (buero) {
+      if (isPriv) return false;
+      if (item?.vertraulich) return false;
+      // welt=null (Beides) bleibt sichtbar im Büro-Modus
+    }
+
+    // Welt-Filter
+    if (welt === 'beruf')  return isBeruf || (!isPriv && !isBeruf); // beruf + beide
+    if (welt === 'privat') return isPriv  || (!isPriv && !isBeruf); // privat + beide
+    return true; // 'beide'
+  },
+  _ckWeltOk(item) {
+    const w = item.welt || 'beide';
+    const aw = this.activeWorld;
+    if (aw === 'beruf')  return w==='pro' || w==='beruf'  || w==='beide';
+    if (aw === 'privat') return w==='priv'|| w==='privat' || w==='beide';
+    return true;
+  },
+  _esc(str) { if(!str)return''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
+  _toast(msg, dur) {
+    dur=dur||2500;
+    const t=document.createElement('div');
+    t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1A1F24;color:#fff;padding:8px 16px;border-radius:20px;font-size:17px;font-weight:600;z-index:9999;pointer-events:none;opacity:0;transition:opacity 0.2s;white-space:nowrap;';
+    t.textContent=msg; document.body.appendChild(t);
+    requestAnimationFrame(()=>{t.style.opacity='1';});
+    setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),200);},dur);
+  },
+  _now() { return new Date().toISOString(); },
+  _dStr(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); },
+  _fmtDDMM(s) { if(!s) return ''; const p=s.split('-'); return p[2]+'.'+p[1]+'.'; },
+  _evtDurationMin(e) {
+    if(e.durationMin&&e.durationMin>0) return e.durationMin;
+    if(e.duration   &&e.duration   >0) return Math.round(e.duration*60);
+    return 60;
+  },
+  _getCurrentKW() { return this._kwStr(new Date()).split('-W')[1]; },
+  _isMobile() {
+    // WB4: Kein geräteabhängiges Layout mehr — unified für alle Geräte
+    // Behalten für Kompatibilität mit altem Code der noch _isMobile() prüft
+    const d = this._settings?.device || 'mac';
+    return d === 'pixel' || d === 'ipad';
+  },// ── IDB ──
+  async idbOpen() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(this.IDB_NAME, this.IDB_VERSION);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('data')) db.createObjectStore('data');
+        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta');
+      };
+      req.onsuccess = e => { this._idb = e.target.result; resolve(); };
+      req.onerror   = e => reject(e.target.error);
+      req.onblocked = () => resolve();
+    });
+  },
+
+  async idbGet(store, key) {
+    return new Promise((resolve, reject) => {
+      const tx  = this._idb.transaction(store, 'readonly');
+      const req = tx.objectStore(store).get(key);
+      req.onsuccess = e => resolve(e.target.result ?? null);
+      req.onerror   = e => reject(e.target.error);
+    });
+  },
+
+  async idbSet(store, key, val) {
+    return new Promise((resolve, reject) => {
+      const tx  = this._idb.transaction(store, 'readwrite');
+      const req = tx.objectStore(store).put(val, key);
+      req.onsuccess = () => resolve();
+      req.onerror   = e => reject(e.target.error);
+    });
+  },
+
+  async idbLoad() {
+    try {
+      const clientId=await this.idbGet('meta','oauthClientId');
+      this._oauthClientId = clientId || this.DEFAULT_CLIENT_ID;
+      if (!clientId && this.DEFAULT_CLIENT_ID) await this.idbSet('meta','oauthClientId', this.DEFAULT_CLIENT_ID);
+      const token=await this.idbGet('meta','oauthToken');
+      const tokenExp=await this.idbGet('meta','oauthTokenExp');
+      if(token&&tokenExp){this._oauthToken=token;this._oauthTokenExp=parseInt(tokenExp)||0;}
+      const lastUp=await this.idbGet('meta','lastUpload');
+      const lastDn=await this.idbGet('meta','lastDownload');
+      const pend=await this.idbGet('meta','pendingChanges');
+      const fid=await this.idbGet('meta','driveFileId');
+      if(lastUp) this._syncLastUpload=parseInt(lastUp)||0;
+      if(lastDn) this._syncLastDownload=parseInt(lastDn)||0;
+      if(pend)   this._pendingChanges=pend==='true';
+      if(fid)    this._driveFileId=fid;
+      const dbRaw=await this.idbGet('data','db');
+      if(dbRaw&&dbRaw._version) {
+        this.db=dbRaw;
+        this._ensureDbFields();
+        this._migrateToV4();
+        this._migrateWissensnetzwerk(); // einmalig, nur hier — nie in _syncDownload
+        // heutePin: zurücksetzen bei Tageswechsel (nicht Session-Ende)
+        const today = this._dStr(new Date());
+        (this.db.notizen||[]).forEach(n => {
+          if (n.heutePin && n.heutePinDate && n.heutePinDate !== today) {
+            n.heutePin = false; n.heutePinDate = null;
+          }
+        });
+      } else {
+        this.db=this._emptyDb();
+      }
+    } catch(e) {
+      console.warn('[idbLoad]',e.message);
+      if(!this.db) this.db=this._emptyDb();
+    }
+  },
+
+  async idbSave() {
+    try {
+      if(this.db) await this.idbSet('data','db',this.db);
+      await this.idbSet('meta','lastUpload',String(this._syncLastUpload));
+      await this.idbSet('meta','lastDownload',String(this._syncLastDownload));
+      await this.idbSet('meta','pendingChanges',this._pendingChanges?'true':'false');
+      if(this._driveFileId) await this.idbSet('meta','driveFileId',this._driveFileId);
+    } catch(e){console.warn('[idbSave]',e.message);}
+  },
+
+  async _migrate_v2() {
+    const hasPro  = !!(this.dataPro?.vorhaben || this.dataPro?.quickItems || this.dataPro?.customEvents);
+    const hasPriv = !!(this.dataPriv?.vorhaben || this.dataPriv?.quickItems || this.dataPriv?.customEvents);
+    if (!hasPro && !hasPriv) {
+      if (!this.db) this.db = this._emptyDb();
+      if (!this.db._version) this.db._version = 1;
+      if (!this.db.mantras) this.db.mantras = [];
+      if (!this.db.sondertage) this.db.sondertage = [];
+      if (!this.db.aufgaben) this.db.aufgaben = [];
+      // KEINE automatische Migration — nur über Debug-Button
+      return;
+    }
+    // Bereits migriert?
+    if (this.db?._version && this.db?._migratedAt) {
+      if (!this.db.aufgaben) this.db.aufgaben = [];
+      // KEINE automatische Migration — nur über Debug-Button
+      return;
+    }
+    console.log('[migrate_v2] Starte Migration...');
+    const pro  = this.dataPro  || {};
+    const priv = this.dataPriv || {};
+    const mergeById = (arrA, arrB, weltA, weltB) => {
+      const map = new Map();
+      (arrA||[]).forEach(x => map.set(x.id, { ...x, welt: x.welt||weltA }));
+      (arrB||[]).forEach(x => { if (!map.has(x.id)) map.set(x.id, { ...x, welt: x.welt||weltB }); });
+      return Array.from(map.values());
+    };
+    const psAll = { ...(priv.pflichtStatus||{}) };
+    Object.entries(pro.pflichtStatus||{}).forEach(([date, duties]) => {
+      if (!psAll[date]) psAll[date] = {};
+      Object.assign(psAll[date], duties);
+    });
+    this.db = {
+      quickItems:        priv.quickItems        || [],
+      customEvents:      priv.customEvents      || [],
+      wochenpflichten:   mergeById(priv.wochenpflichten, pro.wochenpflichten, 'priv', 'pro'),
+      pflichtStatus:     psAll,
+      tagesprotokoll:    priv.tagesprotokoll    || [],
+      wochenMottos:      { ...(priv.wochenMottos||{}), ...(pro.wochenMottos||{}) },
+      checklistVorlagen: [...(priv.checklistVorlagen||[]), ...(pro.checklistVorlagen||[])],
+      vorhaben:          mergeById(priv.vorhaben, pro.vorhaben, 'priv', 'pro'),
+      ziele:             mergeById(priv.ziele,    pro.ziele,    'priv', 'pro'),
+      links:             [...(priv.links||[]), ...(pro.links||[])],
+      _version:          1,
+      _migratedAt:       new Date().toISOString(),
+    };
+    this.dataPro = null; this.dataPriv = null;
+    this._migrateQuickItems(); // quickItems aus alter Migration → aufgaben
+    this._migrateToV4(); // WB4: notizen[] → themen[]/gateways[]
+    await this.idbSave();
+    this.setDirty();
+    console.log('[migrate_v2] Migration abgeschlossen');
+    this._toast('\u2713 Daten migriert');
+  },
+
+  _softDelete(item) {
+    if (item) {
+      item.deleted    = true;
+      item.gepinnt    = false; // Archivierte Notizen nie gepinnt
+      item.heutePin   = false;
+      item.heutePinDate = null;
+      item.updatedAt  = this._now();
+    }
+  },
+
+  _migrateQuickItems() {
+    // quickItems (Legacy) → aufgaben als freie Aufgaben
+    const qi = this.db?.quickItems;
+    if (!qi || !qi.length) return;
+    if (!this.db.aufgaben) this.db.aufgaben = [];
+    const existIds = new Set(this.db.aufgaben.map(a => a.id));
+    qi.forEach(q => {
+      if (!q.id || existIds.has(q.id)) return;
+      this.db.aufgaben.push({
+        id: q.id, text: q.text || q.titel || '', done: !!q.done,
+        deleted: !!q.deleted, vorhabenId: null, welt: q.welt || 'priv',
+        updatedAt: q.updatedAt || this._now(),
+      });
+    });
+    this.db.quickItems = [];
+  },
+
+  _itemVisible(item) {
+    const buero = !!this._settings?.bueroModus;
+    const welt  = this.activeWorld; // 'beide' | 'beruf' | 'privat'
+    const iw    = item?.welt || null; // 'pro'|'beruf'|'priv'|'privat'|null
+    const isPriv = iw === 'priv' || iw === 'privat';
+    const isBeruf = iw === 'pro' || iw === 'beruf';
+
+    // Büro-Modus: privates ausblenden + vertrauliches ausblenden
+    if (buero) {
+      if (isPriv) return false;
+      if (item?.vertraulich) return false;
+      // welt=null (Beides) bleibt sichtbar im Büro-Modus
+    }
+
+    // Welt-Filter
+    if (welt === 'beruf')  return isBeruf || (!isPriv && !isBeruf); // beruf + beide
+    if (welt === 'privat') return isPriv  || (!isPriv && !isBeruf); // privat + beide
+    return true; // 'beide'
+  },
+
+  _bueroToggle() {
+    this._settings.bueroModus = !this._settings.bueroModus;
+    const dot = document.getElementById('wb-buero-dot');
+    if (dot) dot.classList.toggle('on', this._settings.bueroModus);
+    this._sSaveSettings();
+    this.renderSection(this.activeTab);
+    this._toast(this._settings.bueroModus ? '\u2022 B\u00fcro-Modus aktiv' : 'B\u00fcro-Modus deaktiviert');
+  },
+
+  _bueroUpdateUI() {
+    const dot = document.getElementById('wb-buero-dot');
+    if (dot) dot.classList.toggle('on', !!this._settings?.bueroModus);
+  },
+
+  setDirty() {
+    this.isDirty=true; this._pendingTs=Date.now();
+    this.idbSave().catch(e=>console.warn('[setDirty IDB]',e));
+    if(!this._syncInitDone) return;
+    clearTimeout(this._saveTimer);
+    this._saveTimer=setTimeout(async()=>{
+      if (!this._syncConflictPending) await this._syncUpload();
+    },2000);
+  },
+
+  _emptyDb() {
+    return {
+      // ── WB4: Neue Collections ──
+      themen:   [],   // typ:'thema' — Lebensthemen / Pipelines
+      aufgaben: [],   // Aufgaben mit Unteraufgaben + Wiederholung
+      gateways: [],   // Meilensteine mit KPIs
+      // ── Termine & Kalender (unverändert) ──
+      customEvents: [], wochenpflichten: [], pflichtStatus: {},
+      tagesprotokoll: [], wochenMottos: {}, sondertage: [],
+      // ── Legacy (leer, für Kompatibilität beim Laden alter Daten) ──
+      notizen: [], wissensnetzwerk: [], vorhaben: [], ziele: [],
+      links: [], quickItems: [], checklistVorlagen: [], mantras: [],
+      _version: 2, _exportedAt: '',
+    };
+  },
+
+  // WB4: Migration von v1 (notizen/netzwerk) → v2 (themen/aufgaben/gateways)
+  _migrateToV4() {
+    if (!this.db) return;
+    // Bereits migriert?
+    if (this.db._version >= 2) return;
+    let dirty = false;
+
+    // Alte notizen[] → themen[] / gateways[] migrieren
+    if (Array.isArray(this.db.notizen) && this.db.notizen.length > 0) {
+      if (!this.db.themen)   this.db.themen   = [];
+      if (!this.db.gateways) this.db.gateways = [];
+
+      this.db.notizen.forEach(n => {
+        if (!n || n.deleted) return;
+        if (n.typ === 'thema') {
+          // Nur wenn noch nicht in themen[]
+          if (!this.db.themen.find(t => t.id === n.id)) {
+            this.db.themen.push({
+              id:          n.id,
+              titel:       n.titel || n.name || 'Unbenanntes Thema',
+              prio:        n.themaPrio || 2,
+              status:      n.themaStatus || 'aktiv',
+              welt:        n.welt || 'beruf',
+              beschreibung: n.inhalt || '',
+              updatedAt:   n.updatedAt || new Date().toISOString(),
+              deleted:     false,
+            });
+            dirty = true;
+          }
+        } else if (n.typ === 'gateway') {
+          if (!this.db.gateways.find(g => g.id === n.id)) {
+            this.db.gateways.push({
+              id:                n.id,
+              themaId:           n.themaId || null,
+              titel:             n.titel || n.name || 'Gateway',
+              pruefDatum:        n.deadline || n.gatewayDate || null,
+              gatewayStatus:     n.gatewayStatus || 'offen',
+              gatewayCondition:  n.gatewayCondition || '',
+              gatewayConsequence:n.gatewayConsequence || '',
+              istWert:           '',
+              sollWert:          '',
+              istWertLabel:      '',
+              reihenfolge:       0,
+              updatedAt:         n.updatedAt || new Date().toISOString(),
+              deleted:           false,
+            });
+            dirty = true;
+          }
+        }
+        // Sonstige Notiz-Typen (check, freitext, idea) → nicht migriert
+        // Sie bleiben in notizen[] für manuellen Export
+      });
+    }
+
+    // Alte aufgaben[] (WB3 Format) → aufgaben[] (WB4 Format)
+    if (Array.isArray(this.db.aufgaben)) {
+      // WB4 aufgaben haben ein 'wb4' Flag
+      const alteAufgaben = this.db.aufgaben.filter(a => !a._wb4);
+      if (alteAufgaben.length > 0) {
+        const neueAufgaben = alteAufgaben.map(a => ({
+          id:              a.id,
+          titel:           a.titel || a.text || 'Aufgabe',
+          themaId:         a.vorhabenId || null,
+          zeitBudgetMin:   a.zeitBudgetMin || 0,
+          reihenfolge:     a.pos || 0,
+          status:          a.done ? 'erledigt' : 'offen',
+          items:           (a.checklist || []).map(c => ({
+            id: c.id || ('si_' + Math.random().toString(36).slice(2,8)),
+            titel: c.text || c.titel || '',
+            status: c.done ? 2 : 0,
+            datum: null,
+          })),
+          wiederholung:    null,
+          linkUrl:         '',
+          linkLabel:       '',
+          updatedAt:       a.updatedAt || new Date().toISOString(),
+          deleted:         a.deleted || false,
+          _wb4:            true,
+        }));
+        this.db.aufgaben = [
+          ...neueAufgaben,
+          ...this.db.aufgaben.filter(a => a._wb4),
+        ];
+        dirty = true;
+      }
+    }
+
+    this.db._version = 2;
+    if (dirty) {
+      this.setDirty();
+      console.log('[WB4] Migration v1→v2 abgeschlossen.');
+    }
+  },
+
+
+  // ── Crypto ──
+  async _cryptoGetKey(password, salt) {
+    const enc = new TextEncoder();
+    const keyMat = await crypto.subtle.importKey('raw', enc.encode(password), { name:'PBKDF2' }, false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name:'PBKDF2', salt, iterations:100000, hash:'SHA-256' },
+      keyMat, { name:'AES-GCM', length:256 }, true, ['encrypt','decrypt']);
+  },
+
+  async _cryptoEncrypt(data) {
+    const pw = sessionStorage.getItem('wb_enc_pw');
+    if (!pw) throw new Error('Kein Passwort');
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+    const key  = await this._cryptoGetKey(pw, salt);
+    const enc  = new TextEncoder().encode(JSON.stringify(data));
+    const ct   = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, enc);
+    return {
+      salt: btoa(String.fromCharCode(...salt)),
+      iv:   btoa(String.fromCharCode(...iv)),
+      data: btoa(String.fromCharCode(...new Uint8Array(ct))),
+      _encrypted: true,
+    };
+  },
+
+  async _cryptoDecrypt(payload, password) {
+    const salt = Uint8Array.from(atob(payload.salt), c => c.charCodeAt(0));
+    const iv   = Uint8Array.from(atob(payload.iv),   c => c.charCodeAt(0));
+    const ct   = Uint8Array.from(atob(payload.data),  c => c.charCodeAt(0));
+    const key  = await this._cryptoGetKey(password, salt);
+    const dec  = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, ct);
+    return JSON.parse(new TextDecoder().decode(dec));
+  },
+
+  _cryptoKeyFresh() {
+    const pw = sessionStorage.getItem('wb_enc_pw');
+    // Passwort in sessionStorage → immer fresh
+    if (pw) return true;
+    // Mobile (Pixel/iPad): sessionStorage wird bei PWA-Neustart geleert
+    // → kein wb_key_date-Fallback, immer PW-Dialog zeigen
+    // Gerät aus Settings oder direkt per UA ermitteln (Settings evtl. noch nicht geladen)
+    const deviceSetting = this._settings?.device;
+    const isMobileDevice = deviceSetting
+      ? (deviceSetting === 'pixel' || deviceSetting === 'ipad')
+      : /Android|iPad|iPhone/i.test(navigator.userAgent);
+    if (isMobileDevice) return false;
+    // Desktop: einmal täglich entsperrt reicht
+    const today = this._dStr(new Date());
+    const saved = localStorage.getItem('wb_key_date');
+    return saved === today;
+  },
+
+  _cryptoShowDialog(onSuccess) {
+    this._cryptoOnSuccess = onSuccess;
+    const ov = document.getElementById('wb-crypto-overlay');
+    const pw = document.getElementById('wb-crypto-pw');
+    const er = document.getElementById('wb-crypto-err');
+    if (ov) ov.classList.add('open');
+    if (er) er.style.display = 'none';
+    if (pw) { pw.value = ''; setTimeout(() => pw.focus(), 100); }
+  },
+
+  _cryptoOnSuccess: null,
+
+  async _cryptoUnlock() {
+    const pwEl  = document.getElementById('wb-crypto-pw');
+    const errEl = document.getElementById('wb-crypto-err');
+    const btn   = document.getElementById('wb-crypto-btn');
+    const password = pwEl?.value?.trim() || '';
+    if (!password) return;
+    if (btn) { btn.textContent = 'Pr\u00fcfe...'; btn.disabled = true; }
+    try {
+      sessionStorage.setItem('wb_enc_pw', password);
+      localStorage.setItem('wb_key_date', this._dStr(new Date()));
+      const ov = document.getElementById('wb-crypto-overlay');
+      if (ov) ov.classList.remove('open');
+      if (this._cryptoOnSuccess) await this._cryptoOnSuccess();
+    } catch(e) {
+      sessionStorage.removeItem('wb_enc_pw');
+      if (errEl) errEl.style.display = 'block';
+      if (pwEl)  { pwEl.value = ''; pwEl.focus(); }
+    } finally {
+      if (btn) { btn.textContent = 'Entsperren'; btn.disabled = false; }
+    }
+  },
+
+  _cryptoChangePassword() {
+    this._prompt('Neues Passwort eingeben (mind. 8 Zeichen):', '', (newPw) => {
+      if (!newPw || newPw.length < 8) { this._toast('Passwort zu kurz'); return; }
+      this._prompt('Passwort wiederholen:', '', (confirm2) => {
+        if (newPw !== confirm2) { this._toast('Passwörter stimmen nicht überein'); return; }
+        sessionStorage.setItem('wb_enc_pw', newPw);
+        localStorage.setItem('wb_key_date', this._dStr(new Date()));
+        this.setDirty();
+        this._toast('✓ Passwort geändert — Daten werden neu verschlüsselt');
+      });
+    });
+  },
+
+
+  // ── Sync ──
+  _syncTimer:        null,
+  _syncLastUpload:   0,
+  _syncLastDownload: 0,
+  _syncInitDone:     false,
+
+  _syncStart() {
+    if (this._syncTimer) clearInterval(this._syncTimer);
+    this._syncTimer = setInterval(() => { this._syncTick(); }, 60000);
+  },
+
+  async _syncTick() {
+    if (!this._oauthClientId) return;
+    if (this._syncConflictPending) return; // Konflikt-Dialog offen — kein Auto-Upload
+    if (!this._oauthTokenValid()) {
+      this._oauthShowBannerSync();
+      return;
+    }
+    this._oauthHideBanner();
+    if (this.isDirty) {
+      await this._syncUpload();
+    } else {
+      await this._syncCheckNewer();
+    }
+  },
+
+  async _syncCheckNewer() {
+    try {
+      const token = await this._oauthGetTokenSilent(); if (!token) return;
+      const fileId = await this._syncGetFileId(token); if (!fileId) return;
+      const resp = await fetch(this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime',
+        { headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok) return;
+      const meta    = await resp.json();
+      const driveTs = new Date(meta.modifiedTime).getTime();
+      if (driveTs > this._syncLastDownload + 5000) {
+        if (this._pendingChanges || this.isDirty) this._syncConflictDialog('db', driveTs);
+        else await this._syncDownload();
+      }
+    } catch(e) { console.warn('[syncCheckNewer]', e.message); }
+  },
+
+  _syncConflictPending: false,
+
+
+
+
+
+  async _syncGetFileId(token) {
+    // Gecachte ID prüfen — erst validieren ob Datei noch existiert
+    if (this._driveFileId) {
+      try {
+        const check = await fetch(this.DRIVE_API + '/files/' + this._driveFileId + '?fields=id,trashed',
+          { headers: { Authorization: 'Bearer ' + token } });
+        if (check.ok) {
+          const meta = await check.json();
+          if (!meta.trashed) return this._driveFileId; // ID gültig
+        }
+        // ID ungültig (404 oder gelöscht) — Cache leeren und neu suchen
+        console.warn('[syncGetFileId] gecachte ID ungültig, suche neu');
+        this._driveFileId = null;
+        await this.idbSet('meta', 'driveFileId', null);
+      } catch(e) {
+        // Netzwerkfehler — mit gecachter ID weitermachen
+        return this._driveFileId;
+      }
+    }
+
+    // Drive nach workbench.json durchsuchen
+    const q    = encodeURIComponent("name='workbench.json' and trashed=false");
+    const resp = await fetch(this.DRIVE_API + '/files?q=' + q + '&fields=files(id,name,modifiedTime)&orderBy=modifiedTime+desc',
+      { headers: { Authorization: 'Bearer ' + token } });
+    if (!resp.ok) throw new Error('Drive-Suche fehlgeschlagen: HTTP ' + resp.status);
+    const data = await resp.json();
+
+    if (data.files?.length) {
+      // Neueste workbench.json nehmen
+      this._driveFileId = data.files[0].id;
+      await this.idbSet('meta', 'driveFileId', this._driveFileId);
+      if (data.files.length > 1) {
+        console.warn('[syncGetFileId] ' + data.files.length + ' workbench.json gefunden — nutze neueste:', data.files[0].modifiedTime);
+      }
+      return this._driveFileId;
+    }
+
+    // Keine Datei gefunden — NUR dann neue anlegen
+    console.warn('[syncGetFileId] keine workbench.json in Drive — lege neue an');
+    const cr = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'workbench.json', mimeType: 'application/json' }),
+    });
+    if (!cr.ok) throw new Error('Datei anlegen fehlgeschlagen: HTTP ' + cr.status);
+    const cf = await cr.json();
+    this._driveFileId = cf.id;
+    await this.idbSet('meta', 'driveFileId', this._driveFileId);
+    return this._driveFileId;
+  },
+
+  async _syncUpload() {
+    // Guard: db muss vorhanden sein
+    if (!this.db) { console.warn('[syncUpload] db not ready'); return; }
+    try {
+      // Kein Passwort → Daten lokal halten, Banner zeigen
+      const pw = sessionStorage.getItem('wb_enc_pw');
+      if (!pw) {
+        this._pendingChanges = true; await this.idbSave();
+        this._oauthShowBanner('\u26a0 Bitte Passwort eingeben um zu synchronisieren');
+        return;
+      }
+      // Token: erst gecacht prüfen, dann still erneuern (kein Popup)
+      let token = await this._oauthGetTokenSilent();
+      if (!token) token = await this._oauthGetToken(false);
+      if (!token) {
+        this._pendingChanges = true; await this.idbSave();
+        this._oauthShowBanner('\u26a0 Offline \u2014 \u00c4nderungen ausstehend'); return;
+      }
+      const fileId = await this._syncGetFileId(token);
+      if (!fileId) throw new Error('Keine File-ID');
+      await this.idbSave(); // IDB sichern vor Upload
+      const payload = await this._cryptoEncrypt({
+        data: this.db, _exported: new Date().toISOString(), _appVersion: this.APP_VERSION,
+      });
+      let resp = await fetch(this.UPLOAD_API + '/files/' + fileId + '?uploadType=media', {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      // Bei 404: ID-Cache leeren und einmal mit neuer ID retry
+      if (resp.status === 404) {
+        console.warn('[syncUpload] 404 — ID-Cache leeren, retry');
+        this._driveFileId = null;
+        await this.idbSet('meta', 'driveFileId', null);
+        const newFileId = await this._syncGetFileId(token);
+        if (!newFileId) throw new Error('Keine File-ID nach Retry');
+        resp = await fetch(this.UPLOAD_API + '/files/' + newFileId + '?uploadType=media', {
+          method: 'PATCH',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      this._syncLastUpload = this._syncLastDownload = Date.now();
+      this._pendingChanges = false; this.isDirty = false;
+      await this.idbSave();
+      this._oauthHideBanner(); this._sUpdateSyncStatus();
+      this._toast('\u2713 Gespeichert');
+    } catch(e) {
+      this._pendingChanges = true; await this.idbSave();
+      this._oauthShowBanner('\u26a0 Speicherfehler: ' + e.message);
+      console.warn('[syncUpload]', e.message);
+    }
+  },
+
+  async _syncDownload() {
+    try {
+      // Token: erst gecacht prüfen, dann still erneuern (kein Popup)
+      let token = await this._oauthGetTokenSilent();
+      if (!token) token = await this._oauthGetToken(false);
+      if (!token) { this._oauthShowBanner('\u26a0 Offline'); return; }
+      const fileId = await this._syncGetFileId(token);
+      if (!fileId) return;
+      const resp = await fetch(this.DRIVE_API + '/files/' + fileId + '?alt=media',
+        { headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const payload = await resp.json();
+      if (payload._encrypted) {
+        const pw = sessionStorage.getItem('wb_enc_pw');
+        if (!pw) {
+          this._cryptoShowDialog(async () => { await this._syncDownload(); }); return;
+        }
+        try {
+          const dec = await this._cryptoDecrypt(payload, pw);
+          this.db = dec.data || dec;
+        } catch(e) {
+          sessionStorage.removeItem('wb_enc_pw');
+          this._cryptoShowDialog(async () => { await this._syncDownload(); }); return;
+        }
+      } else {
+        this.db = payload.data || payload;
+      }
+      // db validieren
+      if (!this.db || typeof this.db !== 'object') this.db = this._emptyDb();
+      if (!this.db._version) this.db._version = 1;
+      if (!this.db.aufgaben) this.db.aufgaben = [];
+      // Migration: gepinnte Archiv-Notizen entpinnen (darf nie so sein)
+    (this.db.notizen||[]).forEach(l => {
+      if ((l.zustand === 'archiv' || (l.deleted && !l.zustand)) && (l.gepinnt || l.heutePin)) {
+        l.gepinnt = false; l.heutePin = false; l.heutePinDate = null;
+      }
+    });
+      // Migration: Auto-Tags für bestehende Themen/Gateways
+      const _autoTagMigKey = 'autoTagMig_v1';
+      const _autoTagDone = await this.idbGet('meta', _autoTagMigKey).catch(() => null);
+      if (!_autoTagDone) {
+        (this.db.notizen||[]).forEach(l => {
+          if (!l.tags) l.tags = [];
+          if (l.typ === 'thema'   && !l.tags.includes('#Thema'))   l.tags.push('#Thema');
+          if (l.typ === 'gateway' && !l.tags.includes('#Gateway')) l.tags.push('#Gateway');
+        });
+        await this.idbSet('meta', _autoTagMigKey, 'true').catch(() => {});
+      }
+      const _petrolMigKey = 'petrolColorMig_v1';
+      const _petrolDone = await this.idbGet('meta', _petrolMigKey).catch(() => null);
+      if (!_petrolDone) {
+        (this.db.notizen||[]).forEach(l => {
+          l.farbe = 'c-weiss';
+          l.farbeManual = false;
+        });
+        await this.idbSet('meta', _petrolMigKey, 'true').catch(() => {});
+        console.log('[migration] Alle Notizen auf weiß zurückgesetzt');
+      }
+      const _farbeMigKey = 'autoFarbeMigDone_v1';
+      const _farbeMigDone = await this.idbGet('meta', _farbeMigKey).catch(() => null);
+      if (!_farbeMigDone) {
+        let changed = 0;
+        (this.db.notizen||[]).forEach(l => {
+          if (!l.farbeManual) { this._nzAutoFarbe(l); changed++; }
+        });
+        if (changed > 0) { console.log('[migration] Auto-Farbe auf', changed, 'Notizen gesetzt'); }
+        await this.idbSet('meta', _farbeMigKey, 'true').catch(() => {});
+      }
+      await this._migrate_v2();
+      this._syncLastDownload = Date.now();
+      await this.idbSave();
+      this._oauthHideBanner(); this._sUpdateSyncStatus();
+      const syncTime = new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+      console.log('[syncDownload] erfolgreich um ' + syncTime);
+      // UI aktualisieren
+      if (this.activeTab) {
+        this.renderSection(this.activeTab);
+      } else {
+        this.tabSwitch('tagessicht');
+      }
+      this._nzRenderPills();
+    } catch(e) {
+      console.warn('[syncDownload]', e.message);
+      this._oauthShowBanner('\u26a0 Sync-Fehler: ' + e.message);
+    }
+  },
+
+  // Interaktive Varianten für Einstellungs-Buttons (erlauben Token-Popup)
+  async _syncUploadInteractive() {
+    const token = await this._oauthGetToken(false);
+    if (!token) {
+      this._oauthShowBanner('\u26a0 Bitte erst mit Google anmelden');
+      return;
+    }
+    await this._syncUpload();
+  },
+
+  async _syncDownloadInteractive() {
+    const token = await this._oauthGetToken(false);
+    if (!token) {
+      this._oauthShowBanner('\u26a0 Bitte erst mit Google anmelden');
+      return;
+    }
+    await this._syncDownload();
+  },
+
+  async _syncCheckNewer() {
+    try {
+      const token = await this._oauthGetTokenSilent(); if (!token) return;
+      const fileId = await this._syncGetFileId(token); if (!fileId) return;
+      const resp = await fetch(this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime',
+        { headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok) return;
+      const meta    = await resp.json();
+      const driveTs = new Date(meta.modifiedTime).getTime();
+      if (driveTs > this._syncLastDownload + 5000) {
+        if (this._pendingChanges || this.isDirty) this._syncConflictDialog('db', driveTs);
+        else await this._syncDownload();
+      }
+    } catch(e) { console.warn('[syncCheckNewer]', e.message); }
+  },
+
+  async _syncTick() {
+    if (!this._oauthClientId) return;
+    const token = await this._oauthGetTokenSilent();
+    if (!token) { this._oauthShowBanner('\u26a0 Google-Sitzung abgelaufen'); return; }
+    this._oauthHideBanner();
+    if (this._pendingChanges || this.isDirty) await this._syncUpload();
+    else await this._syncCheckNewer();
+  },
+
+  _syncConflictPending: false,
+
+  _syncConflictDialog(ctx, driveTs) {
+    this._syncConflictPending = true;
+    const driveDate = new Date(driveTs).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+    const body = '<div style="font-size:16px;line-height:1.6;color:var(--text);">'
+      + 'Ein anderes Ger\u00e4t hat Daten um <strong>' + driveDate + '</strong> ge\u00e4ndert.<br>'
+      + 'Du hast ebenfalls lokale \u00c4nderungen.<br><br>'
+      + '<strong>Bitte entscheide \u2014 dieser Dialog muss best\u00e4tigt werden.</strong></div>';
+    const footer = '<button style="padding:8px 16px;border-radius:8px;border:1.5px solid var(--accent);background:none;cursor:pointer;font-family:var(--font);font-size:14px;font-weight:700;color:var(--accent);" '
+      + 'onclick="WB._syncConflictPending=false;WB.isDirty=false;WB._pendingChanges=false;WB._syncDownload();WB.modalClose()">\u2b07 Drive laden (lokale \u00c4nderungen verwerfen)</button>'
+      + '<button style="padding:8px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:var(--font);font-size:14px;font-weight:700;margin-left:8px;" '
+      + 'onclick="WB._syncConflictPending=false;WB._syncUpload();WB.modalClose()">\u2b06 Meine hochladen (Drive \u00fcberschreiben)</button>';
+    this.modalOpen('\u26a0\ufe0f Sync-Konflikt', body, footer);
+    const overlay = document.getElementById('wb-modal-overlay');
+    if (overlay) overlay.onclick = null;
+  },
+
+  _syncTimeLabel(ts) {
+    if (!ts) return 'unbekannt';
+    return new Date(ts).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+  },
+
+
+
+  // ── Hilfsfunktionen ──────────────────────────────────
+
+
+  
+  async _sSaveClientId() {
+    const el=document.getElementById('s-input-clientid');if(!el)return;
+    const val=el.value.trim();if(!val)return;
+    await this.idbSet('meta','oauthClientId',val);
+    this._oauthClientId=val;this._sUpdateSyncStatus();this._toast('\u2713 Client-ID gespeichert');
+  },
+
+// ── OAuth ──
+
+  _oauthTokenValid() { return !!(this._oauthToken&&this._oauthTokenExp&&Date.now()<this._oauthTokenExp); },
+
+  async _oauthGetToken(interactive) {
+    if(this._oauthTokenValid()) return this._oauthToken;
+    if(!this._oauthClientId||!window.google?.accounts?.oauth2) return null;
+    return new Promise(resolve=>{
+      try {
+        const client=google.accounts.oauth2.initTokenClient({client_id:this._oauthClientId,scope:this.DRIVE_SCOPE,prompt:interactive?'consent':'',
+          callback:async resp=>{
+            if(resp.error||!resp.access_token){resolve(null);return;}
+            this._oauthToken=resp.access_token; this._oauthTokenExp=Date.now()+(resp.expires_in-60)*1000;
+            await this.idbSet('meta','oauthToken',this._oauthToken);
+            await this.idbSet('meta','oauthTokenExp',String(this._oauthTokenExp));
+            this._oauthHideBanner(); resolve(this._oauthToken);
+          }
+        });
+        client.requestAccessToken({prompt:interactive?'consent':''});
+      } catch(e){resolve(null);}
+    });
+  },
+
+  async _oauthGetTokenSilent() { return this._oauthTokenValid()?this._oauthToken:null; },
+
+  _oauthShowBannerSync() {
+    // Zeigt deutlichen Banner mit Sync-Button — kein silent OAuth-Request (scheitert auf Safari ohne Geste)
+    const banner = document.getElementById('wb-oauth-banner');
+    const text   = document.getElementById('wb-oauth-banner-text');
+    const btn    = document.getElementById('wb-oauth-banner-btn');
+    if (!banner) return;
+    if (text) text.innerHTML = '☁ Lokaler Stand &mdash; nicht mit Drive synchronisiert';
+    if (btn)  { btn.textContent = 'Jetzt synchronisieren'; btn.onclick = () => WB._oauthReconnectAndSync(); }
+    banner.classList.add('visible');
+  },
+
+  async _oauthReconnectAndSync() {
+    // Mit User-Geste: interaktiver Token-Request → dann Download (Drive ist autoritativ)
+    const btn = document.getElementById('wb-oauth-banner-btn');
+    if (btn) { btn.textContent = '⏳ Verbinde...'; btn.disabled = true; }
+    try {
+      const token = await this._oauthGetToken(true);
+      if (token) {
+        this._oauthHideBanner();
+        await this._syncDownload();
+        // Nach Download: Dirty-Flags zurücksetzen — Drive-Stand ist jetzt die Wahrheit
+        // KEIN automatischer Upload — der User hat explizit Download gewählt
+        this.isDirty = false;
+        this._pendingChanges = false;
+        await this.idbSet('meta', 'pendingChanges', 'false');
+        this._syncInitDone = true;
+        this._toast('✅ Synchronisiert');
+      } else {
+        this._oauthShowBanner('Verbindung fehlgeschlagen — bitte erneut versuchen');
+      }
+    } catch(e) {
+      this._oauthShowBanner('Fehler: ' + e.message);
+    }
+    if (btn) { btn.disabled = false; }
+  },
+
+  _oauthShowBanner(msg) {
+    const banner=document.getElementById('wb-oauth-banner');
+    const text=document.getElementById('wb-oauth-banner-text');
+    const btn=document.getElementById('wb-oauth-banner-btn');
+    if(!banner) return;
+    if(msg&&text) text.innerHTML='⚠ '+msg;
+    if(btn) { btn.textContent='Neu verbinden'; btn.onclick=()=>WB._oauthReconnect(); btn.disabled=false; }
+    banner.classList.add('visible');
+  },
+
+  _oauthHideBanner() {
+    document.getElementById('wb-oauth-banner')?.classList.remove('visible');
+  },
+
+  _oauthBannerDismiss() { this._oauthHideBanner(); },
+
+
+
+  oauthSignOut() {
+    this._oauthToken=null; this._oauthTokenExp=null;
+    this.idbSet('meta','oauthToken',null); this.idbSet('meta','oauthTokenExp',null);
+    if(window.google?.accounts?.oauth2) try{google.accounts.oauth2.revoke(this._oauthToken,()=>{});}catch(e){}
+    this._oauthShowBanner('\u2139 Abgemeldet \u2014 Bitte neu verbinden');
+    this._toast('\u2713 Abgemeldet');
+  },
+
+  // ── Helpers ──────────────────────────────────────────
+  _esc(str) { if(!str)return''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
+
+  _toast(msg, dur) {
+    dur=dur||2500;
+    const t=document.createElement('div');
+    t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1A1F24;color:#fff;padding:8px 16px;border-radius:20px;font-size:17px;font-weight:600;z-index:9999;pointer-events:none;opacity:0;transition:opacity 0.2s;white-space:nowrap;';
+    t.textContent=msg; document.body.appendChild(t);
+    requestAnimationFrame(()=>{t.style.opacity='1';});
+    setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),200);},dur);
+  },
+
+  _now() { return new Date().toISOString(); },
+
+  _dStr(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); },
+  _fmtDDMM(s) { if(!s) return ''; const p=s.split('-'); return p[2]+'.'+p[1]+'.'; },
+
+  _fmtShort(dateStr) {
+    if(!dateStr) return '';
+    const parts=dateStr.split('-');
+    const d=parseInt(parts[2],10), m=parseInt(parts[1],10);
+    const mN=['Jan','Feb','M\u00e4r','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+    return d+'. '+(mN[m-1]||'');
+  },
+
+  _evtDurationMin(e) {
+    if(e.durationMin&&e.durationMin>0) return e.durationMin;
+    if(e.duration   &&e.duration   >0) return Math.round(e.duration*60);
+    return 60;
+  },
+
+  _kwStr(date) {
+    const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
+    d.setUTCDate(d.getUTCDate()+4-(d.getUTCDay()||7));
+    const ys=new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    const kw=Math.ceil((((d-ys)/86400000)+1)/7);
+    return d.getUTCFullYear()+'-W'+String(kw).padStart(2,'0');
+  },
+
+  _kwStartDate() { const d=new Date();const day=d.getDay();d.setDate(d.getDate()+(day===0?-6:1-day));return this._dStr(d); },
+  _kwEndDate()   { const d=new Date();const day=d.getDay();d.setDate(d.getDate()+(day===0?0:7-day));return this._dStr(d); },
+  _getCurrentKW() { return this._kwStr(new Date()).split('-W')[1]; },
+
+};
+
+window.addEventListener('DOMContentLoaded', () => WB.init());
+</script>
+</body>
+</html>
