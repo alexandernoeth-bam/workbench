@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.0.5</title>
+  <title>WorkBench 5.0.6</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -369,7 +369,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.0.5 · Build 20260630-2045</div>
+    <div id="wb-startup-tagline">v5.0.6 · Build 20260630-2100</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -675,8 +675,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.0.5',
-  APP_BUILD:      '20260630-2045',
+  APP_VERSION:    '5.0.6',
+  APP_BUILD:      '20260630-2100',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -736,7 +736,31 @@ const WB = {
       const s = document.getElementById('wb-startup');
       if (s) { s.classList.add('hidden'); setTimeout(() => s.style.display='none', 350); }
     };
-    try { await this.idbOpen(); await this.idbLoad(); } catch(e) { console.error('[WB5]',e); }
+    try {
+      await this.idbOpen();
+      await this.idbLoad();
+      // Crypto-Check: Passwort nötig?
+      if (!this._cryptoKeyFresh()) {
+        hideStartup();
+        this._cryptoShowDialog(async () => { await this._wb5InitAfter(); });
+        return;
+      }
+      await this._wb5InitAfter();
+    } catch(e) {
+      console.error('[WB5]', e);
+      hideStartup();
+    }
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState==='hidden' && this.isDirty) await this.idbSave();
+    });
+    window.addEventListener('beforeunload', async () => { await this.idbSave(); });
+  },
+
+  async _wb5InitAfter() {
+    const hideStartup = () => {
+      const s = document.getElementById('wb-startup');
+      if (s) { s.classList.add('hidden'); setTimeout(() => s.style.display='none', 350); }
+    };
     await this._sLoadSettings();
     this._teActiveDay = this._dStr(new Date());
     this.showTab('heute');
@@ -885,7 +909,21 @@ const WB = {
 
   _ht5Toggle(id) {
     const all=[...(this.db.aufgaben||[]),...(this.db.themen||[]).flatMap(t=>t.aufgaben||[])];
-    const a=all.find(x=>x.id===id); if(a){a.erledigt=!a.erledigt;a.status=a.erledigt?'erledigt':'offen';a.updatedAt=this._now();this.setDirty();this.renderSection(this.activeTab);}
+    const a=all.find(x=>x.id===id);
+    if(a){
+      a.erledigt=!a.erledigt;a.status=a.erledigt?'erledigt':'offen';a.updatedAt=this._now();this.setDirty();
+      // Collapsible-State merken vor Render
+      const body=document.getElementById('wb5-freie-body');
+      const wasOpen = body?.classList.contains('open');
+      this.renderSection(this.activeTab);
+      // State wiederherstellen
+      if(wasOpen){
+        const b2=document.getElementById('wb5-freie-body');
+        const c2=document.getElementById('wb5-freie-chev');
+        if(b2)b2.classList.add('open');
+        if(c2)c2.style.transform='rotate(180deg)';
+      }
+    }
   },
 
   _ht5Hinweise() {
@@ -1640,14 +1678,15 @@ const WB = {
   _sUpdateSyncStatus() {
     const stEl=document.getElementById('s-sync-state-lbl');
     const tmEl=document.getElementById('s-sync-time-lbl');
+    const lastSync = Math.max(this._syncLastUpload||0, this._syncLastDownload||0);
     if(this._pendingChanges) {
-      if(stEl){stEl.textContent='\u26a0 \u00c4nderungen nicht gespeichert';stEl.style.color='var(--warn)';}
-    } else if(this._syncLastUpload>0) {
-      if(stEl){stEl.textContent='\u2022 Verbunden \u2014 Online';stEl.style.color='var(--accent)';}
+      if(stEl){stEl.textContent='⚠ Änderungen nicht gespeichert';stEl.style.color='var(--warn)';}
+    } else if(this._oauthTokenValid()) {
+      if(stEl){stEl.textContent='• Verbunden — Online';stEl.style.color='var(--accent)';}
     } else {
-      if(stEl){stEl.textContent='Nicht verbunden';stEl.style.color='var(--faint)';}
+      if(stEl){stEl.textContent='Nicht verbunden';stEl.style.color='var(--muted)';}
     }
-    if(tmEl&&this._syncLastUpload>0) tmEl.textContent='Zuletzt: '+new Date(this._syncLastUpload).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    if(tmEl) tmEl.textContent = lastSync>0 ? 'Zuletzt: '+this._syncTimeLabel(lastSync) : '';
   },
   _sRenderSondertage() {
     const el=document.getElementById('s-sondertage-list'); if(!el) return;
@@ -1710,7 +1749,7 @@ const WB = {
     const o=document.getElementById('wb-modal-overlay');
     const t=document.getElementById('wb-modal-title');
     const b=document.getElementById('wb-modal-body');
-    const f=document.getElementById('wb-modal-footer');
+    const f=document.getElementById('wb-modal-foot');
     if(!o||!t||!b||!f) return;
     t.textContent=title; b.innerHTML=bodyHtml; f.innerHTML=footerHtml;
     o.classList.add('open');
@@ -2171,7 +2210,7 @@ const WB = {
   _cryptoShowDialog(onSuccess) {
     this._cryptoOnSuccess = onSuccess;
     const ov = document.getElementById('wb-crypto-overlay');
-    const pw = document.getElementById('wb-crypto-pw');
+    const pw = document.getElementById('wb-crypto-input');
     const er = document.getElementById('wb-crypto-err');
     if (ov) ov.classList.add('open');
     if (er) er.style.display = 'none';
@@ -2181,7 +2220,7 @@ const WB = {
   _cryptoOnSuccess: null,
 
   async _cryptoUnlock() {
-    const pwEl  = document.getElementById('wb-crypto-pw');
+    const pwEl  = document.getElementById('wb-crypto-input');
     const errEl = document.getElementById('wb-crypto-err');
     const btn   = document.getElementById('wb-crypto-btn');
     const password = pwEl?.value?.trim() || '';

@@ -476,6 +476,33 @@ requiredProps.forEach(prop => {
 });
 // _oauthClientId muss gesetzt sein
 jsCode.includes('_oauthClientId:') ? ok('_oauthClientId als Property definiert') : fail('_oauthClientId fehlt');
+
+// ══════════════════════════════════════════
+// 33. MODAL ID-KONSISTENZ
+// ══════════════════════════════════════════
+console.log('\n── 33. Modal ID-Konsistenz ──');
+// modalOpen() muss dieselben IDs nutzen wie das HTML
+const modalIds = ['wb-modal-overlay','wb-modal-title','wb-modal-body','wb-modal-foot'];
+modalIds.forEach(id => {
+  const inHtml = content.includes('id="' + id + '"');
+  const inJs   = jsCode.includes("'" + id + "'");
+  if(inHtml && inJs) ok(id + ' in HTML und JS konsistent');
+  else if(inHtml && !inJs) warn(id + ' im HTML aber nicht in modalOpen() JS');
+  else if(!inHtml && inJs) fail(id + ' in JS referenziert aber nicht im HTML!');
+});
+// Kein wb-modal-footer (alter Name)
+!jsCode.includes('wb-modal-footer') ? ok('wb-modal-footer nicht verwendet (korrekter Name: wb-modal-foot)') : fail('wb-modal-footer verwendet — muss wb-modal-foot heißen');
+
+// ══════════════════════════════════════════
+// 34. CRYPTO-INIT FLOW
+// ══════════════════════════════════════════
+console.log('\n── 34. Crypto-Init Flow ──');
+jsCode.includes('_cryptoKeyFresh()') ? ok('_cryptoKeyFresh() in init() aufgerufen') : fail('_cryptoKeyFresh() fehlt in init()');
+jsCode.includes('_cryptoShowDialog') ? ok('_cryptoShowDialog() vorhanden') : fail('_cryptoShowDialog() fehlt');
+jsCode.includes('_wb5InitAfter')     ? ok('_wb5InitAfter() als Post-Crypto-Init vorhanden') : fail('_wb5InitAfter() fehlt');
+// _cryptoShowDialog muss wb-crypto-input nutzen (nicht wb-crypto-pw)
+!jsCode.includes("getElementById('wb-crypto-pw')") ? ok('_cryptoShowDialog nutzt wb-crypto-input') : fail('_cryptoShowDialog sucht wb-crypto-pw — Element heißt wb-crypto-input!');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
