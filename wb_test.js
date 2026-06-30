@@ -669,6 +669,20 @@ wb4Only.forEach(fn => {
   !sdFn.includes(fn) ? ok(fn + ' nicht in _syncDownload') : fail(fn + ' in _syncDownload — WB4-Funktion fehlt in WB5!');
 });
 
+
+// ══════════════════════════════════════════
+// 49. MINDEST-SCHRIFTGRÖSSE 12px
+// ══════════════════════════════════════════
+console.log('\n── 49. Mindest-Schriftgröße 12px ──');
+const allCssSizes = (styleBlock.match(/font-size:(\d+)px/g)||[]).map(s=>parseInt(s.replace('font-size:','').replace('px','')));
+const tooSmallCss = allCssSizes.filter(s=>s<12);
+if(tooSmallCss.length===0) ok('CSS: alle Schriftgrößen ≥ 12px (' + allCssSizes.length + ' geprüft)');
+else fail('CSS: ' + tooSmallCss.length + ' Schriftgrößen unter 12px: ' + [...new Set(tooSmallCss)].sort((a,b)=>a-b).join('px, ') + 'px');
+const allJsSizes = (jsCode.match(/font-size:(\d+)px/g)||[]).map(s=>parseInt(s.replace('font-size:','').replace('px','')));
+const tooSmallJs = allJsSizes.filter(s=>s<12);
+if(tooSmallJs.length===0) ok('JS inline: alle Schriftgrößen ≥ 12px (' + allJsSizes.length + ' geprüft)');
+else fail('JS inline: ' + tooSmallJs.length + ' Schriftgrößen unter 12px: ' + [...new Set(tooSmallJs)].sort((a,b)=>a-b).join('px, ') + 'px');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
