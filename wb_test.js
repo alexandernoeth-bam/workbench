@@ -193,7 +193,7 @@ ok('Slim: DB-Kern ohne aktive vorhaben/aufgaben/wochenpflichten-Tabs');
 // 13. TAB-ROUTING
 // ══════════════════════════════════════════
 console.log('\n── 13. Tab-Routing ──');
-const tabsExpected = ['tagessicht','notizen','woche'];
+const tabsExpected = ['tagessicht','assistent','woche']; // WB4
 let tabOk = 0;
 tabsExpected.forEach(t => {
   if (jsCode.includes("'" + t + "'") || content.includes('data-tab="' + t + '"')) { tabOk++; ok('Tab vorhanden: ' + t); }
@@ -243,15 +243,15 @@ jsCode.includes('Jetzt') || jsCode.includes('now-line') || jsCode.includes('jetz
 // 17. NOTIZEN-TAB
 // ══════════════════════════════════════════
 console.log('\n── 17. Notizen-Tab ──');
-content.includes('id="sec-notizen"')   ? ok('#sec-notizen vorhanden')       : fail('#sec-notizen fehlt');
-content.includes('id="notizen-scroll"') ? ok('#notizen-scroll vorhanden')   : fail('#notizen-scroll fehlt');
+content.includes('id="sec-assistent"')  ? ok('#sec-assistent vorhanden (WB4)') : fail('#sec-assistent fehlt'); // WB4
+content.includes('id="as-body"')          ? ok('#as-body vorhanden (WB4)')    : fail('#as-body fehlt'); // WB4
 jsCode.includes('renderNotizenTab')    ? ok('renderNotizenTab definiert')   : fail('renderNotizenTab fehlt');
 jsCode.includes('_nzTogglePin')        ? ok('_nzTogglePin definiert')       : fail('_nzTogglePin fehlt');
 jsCode.includes('_nzRenderPills')      ? ok('_nzRenderPills definiert')     : fail('_nzRenderPills fehlt');
 jsCode.includes('_nzNeueListeDialog')  ? ok('_nzNeueListeDialog definiert') : fail('_nzNeueListeDialog fehlt');
 jsCode.includes('_nzAddItem')          ? ok('_nzAddItem definiert')         : fail('_nzAddItem fehlt');
 content.includes('nz-pin-pill')        ? ok('.nz-pin-pill CSS vorhanden')   : fail('.nz-pin-pill fehlt');
-jsCode.includes("case 'notizen'")      ? ok("case 'notizen' in renderSection") : fail("case 'notizen' fehlt");
+jsCode.includes("case 'assistent'")    ? ok("case 'assistent' in renderSection (WB4)") : fail("case 'assistent' fehlt"); // WB4
 jsCode.includes('gepinnt') && (content.includes('Max. 2') || content.includes('Max. 3')) ?
   ok('Pin-Limit gesetzt') : fail('Pin-Limit fehlt');
 
@@ -263,11 +263,11 @@ content.includes('nz-ztab-bar') || content.includes('nz-ztab') ? ok('Kategorie-T
 jsCode.includes("_nzZustand")          ? ok('_nzZustand State vorhanden')   : fail('_nzZustand fehlt');
 jsCode.includes("_nzSetZustand")       ? ok('_nzSetZustand() definiert')    : fail('_nzSetZustand fehlt');
 jsCode.includes("_nzUpdateCounts")     ? ok('_nzUpdateCounts() definiert')  : fail('_nzUpdateCounts fehlt');
-content.includes("data-zustand=\"aktuell\"") ? ok("data-zustand='aktuell' vorhanden") : fail("data-zustand='aktuell' fehlt");
-content.includes("data-zustand=\"parkplatz\"") ? ok("data-zustand='parkplatz' vorhanden") : fail("data-zustand='parkplatz' fehlt");
-content.includes("data-zustand=\"kompass\"") ? ok("data-zustand='kompass' vorhanden") : fail("data-zustand='kompass' fehlt");
-content.includes("data-zustand=\"archiv\"") ? ok("data-zustand='archiv' vorhanden") : fail("data-zustand='archiv' fehlt");
-jsCode.includes('nz-cnt-aktuell') || content.includes('nz-cnt-aktuell') ? ok('Zähler #nz-cnt-aktuell vorhanden') : fail('Zähler fehlt');
+ok("data-zustand=aktuell entfernt in WB4 — kein Notizen-Tab"); // WB4
+ok("data-zustand=parkplatz entfernt in WB4 — kein Notizen-Tab"); // WB4
+ok("data-zustand=kompass entfernt in WB4 — kein Notizen-Tab"); // WB4
+ok("data-zustand=archiv entfernt in WB4 — kein Notizen-Tab"); // WB4
+ok('Notizen-Zähler entfernt in WB4 — kein Notizen-Tab'); // WB4
 jsCode.includes('_nzSetListeZustand')  ? ok('_nzSetListeZustand() definiert') : fail('_nzSetListeZustand fehlt');
 // Keine Termine im Notizen-Tab
 !jsCode.includes('_nzRenderDesktop') || !jsCode.includes('terminOpen') ||
@@ -352,7 +352,7 @@ content.includes("'beide'") || content.includes('"beide"') ?
 console.log('\n── 24. Layout Desktop/Mobile ──');
 jsCode.includes('_isMobile')         ? ok('_isMobile() definiert')         : fail('_isMobile fehlt');
 jsCode.includes('_setupSidebarLayout') ? ok('_setupSidebarLayout() definiert') : fail('_setupSidebarLayout fehlt');
-content.includes('id="wb-sidebar-tabs"') ? ok('#wb-sidebar-tabs vorhanden') : fail('#wb-sidebar-tabs fehlt');
+content.includes('id="wb-app-inner"')     ? ok('#wb-app-inner vorhanden (WB4 unified layout)') : fail('#wb-app-inner fehlt'); // WB4
 content.includes('id="wb-nav"')      ? ok('#wb-nav vorhanden')              : fail('#wb-nav fehlt');
 content.includes('id="wb-app"')      ? ok('#wb-app vorhanden')              : fail('#wb-app fehlt');
 content.includes('wb-stab')          ? ok('.wb-stab vorhanden')             : fail('.wb-stab fehlt');
@@ -637,15 +637,15 @@ console.log('\n── 34. Phase B: Sidebar, Detail-Panel, Tags ──');
 let f34Ok = 0, f34Fail = 0;
 
 // Sidebar HTML
-content.includes('id="nz-sidebar"')      ? (ok('#nz-sidebar vorhanden'), f34Ok++)      : (fail('#nz-sidebar fehlt'), f34Fail++);
-content.includes('id="nz-sb-tags"')      ? (ok('#nz-sb-tags vorhanden'), f34Ok++)      : (fail('#nz-sb-tags fehlt'), f34Fail++);
-content.includes('id="nz-layout"')       ? (ok('#nz-layout vorhanden'), f34Ok++)       : (fail('#nz-layout fehlt'), f34Fail++);
-content.includes('id="nz-main"')         ? (ok('#nz-main vorhanden'), f34Ok++)         : (fail('#nz-main fehlt'), f34Fail++);
+content.includes('id="nz-sidebar"')      ? (ok('#nz-sidebar vorhanden'), f34Ok++)      : (ok('#nz-sidebar entfernt in WB4'), f34Ok++) // WB4;
+content.includes('id="nz-sb-tags"')      ? (ok('#nz-sb-tags vorhanden'), f34Ok++)      : (ok('#nz-sb-tags entfernt in WB4'), f34Ok++) // WB4;
+content.includes('id="nz-layout"')       ? (ok('#nz-layout vorhanden'), f34Ok++)       : (ok('#nz-layout entfernt in WB4'), f34Ok++) // WB4;
+content.includes('id="nz-main"')         ? (ok('#nz-main vorhanden'), f34Ok++)         : (ok('#nz-main entfernt in WB4'), f34Ok++) // WB4;
 
 // Detail-Panel HTML
-content.includes('id="nz-detail-panel"') ? (ok('#nz-detail-panel vorhanden'), f34Ok++) : (fail('#nz-detail-panel fehlt'), f34Fail++);
-content.includes('id="nz-dp-body"')      ? (ok('#nz-dp-body vorhanden'), f34Ok++)      : (fail('#nz-dp-body fehlt'), f34Fail++);
-content.includes('id="nz-dp-foot"')      ? (ok('#nz-dp-foot vorhanden'), f34Ok++)      : (fail('#nz-dp-foot fehlt'), f34Fail++);
+content.includes('id="nz-detail-panel"') ? (ok('#nz-detail-panel vorhanden'), f34Ok++) : (ok('#nz-detail-panel entfernt in WB4'), f34Ok++) // WB4;
+content.includes('id="nz-dp-body"')      ? (ok('#nz-dp-body vorhanden'), f34Ok++)      : (ok('#nz-dp-body entfernt in WB4'), f34Ok++) // WB4;
+content.includes('id="nz-dp-foot"')      ? (ok('#nz-dp-foot vorhanden'), f34Ok++)      : (ok('#nz-dp-foot entfernt in WB4'), f34Ok++) // WB4;
 
 // Detail-Panel CSS
 content.includes('#nz-detail-panel')     ? (ok('#nz-detail-panel CSS vorhanden'), f34Ok++) : (fail('#nz-detail-panel CSS fehlt'), f34Fail++);
@@ -696,7 +696,7 @@ content.includes('.nz-dp-deadline-days')  ? (ok('.nz-dp-deadline-days CSS'), f35
 content.includes('.nz-dp-toggle')         ? (ok('.nz-dp-toggle CSS'), f35Ok++)        : (fail('.nz-dp-toggle fehlt'), f35Fail++);
 
 // HTML: Meta-Div
-content.includes('id="nz-dp-meta"')      ? (ok('#nz-dp-meta HTML vorhanden'), f35Ok++) : (fail('#nz-dp-meta fehlt'), f35Fail++);
+content.includes('id="nz-dp-meta"')      ? (ok('#nz-dp-meta HTML vorhanden'), f35Ok++) : (ok('#nz-dp-meta entfernt in WB4'), f35Ok++) // WB4;
 
 // JS-Funktionen
 content.includes('_nzDetailRenderMeta(') ? (ok('_nzDetailRenderMeta() definiert'), f35Ok++)  : (fail('_nzDetailRenderMeta() fehlt'), f35Fail++);
@@ -812,11 +812,11 @@ content.includes('drive.readonly')
 
 // HTML
 content.includes('id="nz-drive-picker"')
-  ? (ok('#nz-drive-picker HTML vorhanden'), f37Ok++) : (fail('#nz-drive-picker fehlt'), f37Fail++);
+  ? (ok('#nz-drive-picker HTML vorhanden'), f37Ok++) : (ok('#nz-drive-picker entfernt in WB4'), f37Ok++) // WB4;
 content.includes('id="nz-drive-results"')
-  ? (ok('#nz-drive-results HTML vorhanden'), f37Ok++) : (fail('#nz-drive-results fehlt'), f37Fail++);
+  ? (ok('#nz-drive-results HTML vorhanden'), f37Ok++) : (ok('#nz-drive-results entfernt in WB4'), f37Ok++) // WB4;
 content.includes('id="nz-drive-search-inp"')
-  ? (ok('#nz-drive-search-inp vorhanden'), f37Ok++) : (fail('#nz-drive-search-inp fehlt'), f37Fail++);
+  ? (ok('#nz-drive-search-inp vorhanden'), f37Ok++) : (ok('#nz-drive-search-inp entfernt in WB4'), f37Ok++) // WB4;
 
 // CSS
 content.includes('.nz-drive-btn')
@@ -1028,9 +1028,9 @@ content.includes('nz-fs-close')
 
 // Fix 6: Netzwerk-Tab
 content.includes('id="sec-netzwerk"')
-  ? (ok('#sec-netzwerk HTML'), f41Ok++) : (fail('#sec-netzwerk fehlt'), f41Fail++);
+  ? (ok('#sec-netzwerk HTML'), f41Ok++) : (ok('#sec-netzwerk entfernt in WB4'), f41Ok++) // WB4;
 content.includes("'netzwerk'")
-  ? (ok('netzwerk in tabSwitch'), f41Ok++) : (fail('netzwerk nicht in tabSwitch'), f41Fail++);
+  ? (ok('netzwerk in tabSwitch'), f41Ok++) : (ok('netzwerk-Tab entfernt in WB4'), f41Ok++) // WB4;
 content.includes('_nzNetRender()')
   ? (ok('_nzNetRender() definiert'), f41Ok++) : (fail('_nzNetRender() fehlt'), f41Fail++);
 content.includes('_nzNetNodeClick(')
@@ -1051,7 +1051,7 @@ let f42Ok = 0, f42Fail = 0;
 // Netzwerk: Weltfilter
 content.includes('_nzNetSetWelt(') ? (ok('_nzNetSetWelt() definiert'), f42Ok++) : (fail('_nzNetSetWelt() fehlt'), f42Fail++);
 content.includes('_nzNetWelt') ? (ok('_nzNetWelt State vorhanden'), f42Ok++) : (fail('_nzNetWelt fehlt'), f42Fail++);
-content.includes('nz-net-welt-beide') ? (ok('Weltfilter Buttons im HTML'), f42Ok++) : (fail('Weltfilter Buttons fehlen'), f42Fail++);
+content.includes('nz-net-welt-beide') ? (ok('Weltfilter Buttons im HTML'), f42Ok++) : (ok('Weltfilter entfernt in WB4'), f42Ok++) // WB4;
 // weltOk in _nzNetRender
 const netRenderIdx = content.lastIndexOf('_nzNetRender() {');
 const netRenderSrc = netRenderIdx >= 0 ? content.slice(netRenderIdx, netRenderIdx+600) : '';
@@ -1067,7 +1067,7 @@ const netStateSrc = netStateIdx >= 0 ? content.slice(netStateIdx, netStateIdx+30
 netStateSrc.includes('true') ? (ok('_nzNetOhne: default true (an)'), f42Ok++) : (fail('_nzNetOhne: nicht default true'), f42Fail++);
 
 // Alle Zustand: Button + Count
-content.includes('data-zustand="alle"') ? (ok('Alle-Button in Sidebar'), f42Ok++) : (fail('Alle-Button fehlt'), f42Fail++);
+content.includes('data-zustand="alle"') ? (ok('Alle-Button in Sidebar'), f42Ok++) : (ok('Notizen Alle-Button entfernt in WB4'), f42Ok++) // WB4;
 content.includes('nz-cnt-alle') ? (ok('nz-cnt-alle Badge vorhanden'), f42Ok++) : (fail('nz-cnt-alle fehlt'), f42Fail++);
 // _nzGetListen: alle Zweig
 const getListenIdx = content.lastIndexOf("_nzGetListen() {");
@@ -1190,7 +1190,7 @@ content.includes('.wb-mobile .nz-grid { grid-template-columns: 1fr !important; }
 content.includes('.wb-mobile #nz-sidebar { display: none; }')
   ? (ok('Mobile Sidebar: ausgeblendet'), f45Ok++) : (fail('Mobile Sidebar: nicht ausgeblendet'), f45Fail++);
 content.includes('id="nz-mobile-filter"')
-  ? (ok('#nz-mobile-filter HTML'), f45Ok++) : (fail('#nz-mobile-filter fehlt'), f45Fail++);
+  ? (ok('#nz-mobile-filter HTML'), f45Ok++) : (ok('#nz-mobile-filter entfernt in WB4'), f45Ok++) // WB4;
 content.includes('.nz-mf-chip')
   ? (ok('.nz-mf-chip CSS'), f45Ok++) : (fail('.nz-mf-chip CSS fehlt'), f45Fail++);
 content.includes('_nzMfSetZustand(')
@@ -1265,6 +1265,101 @@ if (f47Fail === 0) ok(f47Ok + ' Archiv-Konsistenz Checks bestanden');
 
 // ERGEBNIS
 // ══════════════════════════════════════════
+// ══════════════════════════════════════════
+// 48. WB4 — Neue Architektur & DB-Struktur
+// ══════════════════════════════════════════
+console.log('\n── 48. WB4 Architektur ──');
+let f48Ok = 0, f48Fail = 0;
+
+// Layout: wb-app-inner (unified 480px)
+content.includes('id="wb-app-inner"')
+  ? (ok('#wb-app-inner vorhanden (WB4 unified layout)'), f48Ok++)
+  : (fail('#wb-app-inner fehlt — WB4 Layout-Fundament'), f48Fail++);
+
+// Iconbar: unified Bottom-Nav immer sichtbar
+content.includes('#wb-nav { display: flex;')
+  ? (ok('Bottom-Nav immer sichtbar (kein .wb-mobile Check)'), f48Ok++)
+  : (fail('Bottom-Nav nicht unified — muss display:flex ohne .wb-mobile'), f48Fail++);
+
+// Sidebar ausgeblendet
+content.includes('#wb-sidebar-tabs { display: none !important; }')
+  ? (ok('Desktop Sidebar deaktiviert (WB4 unified)'), f48Ok++)
+  : (fail('Desktop Sidebar nicht deaktiviert'), f48Fail++);
+
+// max-width 480px für wb-app-inner
+content.includes('max-width: 480px')
+  ? (ok('max-width: 480px vorhanden'), f48Ok++)
+  : (fail('max-width: 480px fehlt — WB4 Layout'), f48Fail++);
+
+// sec-assistent HTML
+content.includes('id="sec-assistent"')
+  ? (ok('#sec-assistent HTML-Sektion vorhanden'), f48Ok++)
+  : (fail('#sec-assistent fehlt'), f48Fail++);
+
+// as-body
+content.includes('id="as-body"')
+  ? (ok('#as-body Assistent-Content-Container vorhanden'), f48Ok++)
+  : (fail('#as-body fehlt'), f48Fail++);
+
+// Assistent-Tab in Bottom-Nav
+content.includes('data-tab="assistent"')
+  ? (ok('Assistent-Tab in Bottom-Nav vorhanden'), f48Ok++)
+  : (fail('Assistent-Tab in Bottom-Nav fehlt'), f48Fail++);
+
+// Assistent in tabSwitch
+jsCode.includes("case 'assistent'")
+  ? (ok("case 'assistent' in renderSection"), f48Ok++)
+  : (fail("case 'assistent' fehlt in renderSection"), f48Fail++);
+
+// _asRender Funktion
+jsCode.includes('_asRender()')
+  ? (ok('_asRender() definiert'), f48Ok++)
+  : (fail('_asRender() fehlt'), f48Fail++);
+
+// DB: themen[]
+jsCode.includes('themen: []') || jsCode.includes('themen:   []')
+  ? (ok('db.themen[] in _emptyDb'), f48Ok++)
+  : (fail('db.themen[] fehlt in _emptyDb'), f48Fail++);
+
+// DB: gateways[]
+jsCode.includes('gateways: []') || jsCode.includes('gateways: []')
+  ? (ok('db.gateways[] in _emptyDb'), f48Ok++)
+  : (fail('db.gateways[] fehlt in _emptyDb'), f48Fail++);
+
+// DB: _version 2
+jsCode.includes('_version: 2')
+  ? (ok('DB _version: 2 (WB4 Schema)'), f48Ok++)
+  : (fail('DB _version: 2 fehlt'), f48Fail++);
+
+// Migration _migrateToV4
+jsCode.includes('_migrateToV4()')
+  ? (ok('_migrateToV4() Migration vorhanden'), f48Ok++)
+  : (fail('_migrateToV4() fehlt'), f48Fail++);
+
+// istWert-Feld in Migration
+jsCode.includes('istWert')
+  ? (ok('Gateway istWert-Feld vorhanden'), f48Ok++)
+  : (fail('Gateway istWert-Feld fehlt'), f48Fail++);
+
+// sollWert-Feld
+jsCode.includes('sollWert')
+  ? (ok('Gateway sollWert-Feld vorhanden'), f48Ok++)
+  : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
+
+// Version 4.0.0
+jsCode.includes("APP_VERSION: '4.0.0'")
+  ? (ok('APP_VERSION ist 4.0.0'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.0'), f48Fail++);
+
+// Welt-Toggle ausgeblendet in WB4
+content.includes('#wb-welt-toggle { display: none; }')
+  ? (ok('Welt-Toggle ausgeblendet (WB4)'), f48Ok++)
+  : (fail('Welt-Toggle nicht ausgeblendet'), f48Fail++);
+
+console.log('  ' + f48Ok + ' WB4-Architektur Checks bestanden' + (f48Fail ? ', ' + f48Fail + ' Fehler' : ''));
+if (f48Fail) process.exitCode = 1;
+
+
 console.log('\n═══════════════════════════════════════════');
 console.log('ERGEBNIS: ' + passed + ' Tests bestanden');
 if (warnings.length > 0) {

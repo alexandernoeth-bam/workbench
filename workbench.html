@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 3.1.11</title>
+  <title>WorkBench 4.0.0</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -57,6 +57,23 @@
       height: 100dvh;
       max-height: 100dvh;
       overflow: hidden;
+      /* WB4: Zentrierte Spalte */
+      background: var(--bg);
+      align-items: center;
+    }
+    /* WB4: Innere Spalte — max 480px, zentriert auf allen Geräten */
+    #wb-app-inner {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      max-width: 480px;
+      height: 100dvh;
+      max-height: 100dvh;
+      overflow: hidden;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      box-shadow: 0 0 40px rgba(0,0,0,0.12);
     }
 
     /* ── Welt-Header ── */
@@ -67,8 +84,11 @@
       gap: 10px;
       padding: 8px 14px;
       flex-shrink: 0;
-      min-height: 46px;
+      min-height: 40px;
     }
+    /* WB4: Welt-Toggle ausgeblendet */
+    #wb-welt-toggle { display: none; }
+    #wb-buero-toggle { display: none; }
     #wb-welt-logo {
       font-size: 14px;
       font-weight: 800;
@@ -129,10 +149,10 @@
     #wb-oauth-banner-btn:disabled { opacity: .6; cursor: default; }
     #wb-oauth-banner-close { cursor: pointer; opacity: 0.7; font-size: 16px; flex-shrink: 0; }
 
-    /* ── Main-Area ── */
+    /* ── Main-Area ── WB4: nur column, kein Sidebar */
     .wb-main-area {
       display: flex;
-      flex-direction: row;
+      flex-direction: column;
       flex: 1;
       min-height: 0;
       overflow: hidden;
@@ -153,22 +173,9 @@
       overflow: hidden;
     }
 
-    /* ── Desktop Sidebar ── */
-    #wb-sidebar-tabs {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      width: 60px;
-      min-width: 60px;
-      flex-shrink: 0;
-      overflow-y: auto;
-      overflow-x: visible;
-      padding-top: 4px;
-      position: relative;
-      z-index: 1;
-    }
-    .wb-mobile #wb-sidebar-tabs { display: none; }
-    .wb-stab { position: relative; width: 54px; margin-bottom: 3px; cursor: pointer; }
+    /* ── Desktop Sidebar — WB4: entfernt, unified Bottom-Nav ── */
+    #wb-sidebar-tabs { display: none !important; }
+    .wb-stab { display: none; } /* WB4: unified Bottom-Nav */
     .wb-stab-body {
       background: var(--surface2); border: 1.5px solid var(--border);
       border-left: none; border-radius: 0 8px 8px 0;
@@ -194,8 +201,8 @@
     .wb-stab-sep { width: 36px; height: 1.5px; background: var(--border); opacity: 0.6; margin: 4px 8px 4px auto; }
 
     /* ── Mobile Bottom-Nav ── */
-    #wb-nav { display: none; }
-    .wb-mobile #wb-nav { display: flex; background: var(--surface); border-top: 2px solid var(--border); flex-shrink: 0; }
+    /* WB4: Bottom-Nav immer sichtbar (unified, kein Mobile-Check) */
+    #wb-nav { display: flex; background: var(--surface); border-top: 2px solid var(--border); flex-shrink: 0; }
     .wb-tab {
       font-size: 10px; font-weight: 700; color: var(--faint); text-align: center;
       flex: 1; text-transform: uppercase; letter-spacing: 0.04em;
@@ -404,7 +411,8 @@
 
     /* ── NOTIZEN-TAB ── */
     .nz-postit-selected { box-shadow: 0 0 0 2.5px var(--accent) !important; }
-    #sec-notizen { padding: 0; }
+    #sec-notizen { padding: 0; } /* WB4: bleibt als Fallback */
+    #sec-assistent { padding: 0; }
     #nz-layout { flex: 1; min-height: 0; }
     #notizen-scroll { padding: 10px 12px; }
 
@@ -1305,8 +1313,8 @@
 
 <!-- Startup -->
 <div id="wb-startup">
-  <div id="wb-startup-logo">WorkBench</div>
-  <div id="wb-startup-tagline">v3.1.11</div>
+  <div id="wb-startup-logo">WorkBench 4.0</div>
+  <div id="wb-startup-tagline">v4.0.0</div>
 </div>
 
 <!-- Modal -->
@@ -1545,6 +1553,7 @@
 
 <!-- App -->
 <div id="wb-app">
+<div id="wb-app-inner">
 
   <div id="wb-oauth-banner">
     <span id="wb-oauth-banner-text">&#9888; Google-Verbindung unterbrochen &mdash; Sync nicht m&ouml;glich</span>
@@ -1557,8 +1566,8 @@
       <div id="wb-buero-dot"></div>
       <span id="wb-buero-lbl">Büro</span>
     </div>
-    <span id="wb-welt-logo">WorkBench</span>
-    <span id="wb-menu-version">v3.1.11</span>
+    <span id="wb-welt-logo">WorkBench 4.0</span>
+    <span id="wb-menu-version">v4.0.0</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1599,190 +1608,11 @@
         <div id="ts-heute-search-results" style="display:none;"></div>
       </div>
 
-      <!-- Notizen -->
-    <div id="sec-notizen" class="wb-section" style="display:none;flex-direction:column;">
-      <!-- Header: Suche + View-Toggle + Neu -->
-      <div style="padding:8px 12px;border-bottom:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:8px;flex-shrink:0;">
-        <input id="nz-suche" type="search" placeholder="🔍 Suchen..." oninput="WB._nzSucheInput(this.value)"
-          style="flex:1;border:1.5px solid var(--border);border-radius:20px;padding:5px 12px;font-size:14px;background:var(--surface2);color:var(--text);outline:none;font-family:var(--font)">
-        <div class="nz-view-toggle">
-          <button class="nz-view-toggle-btn active" data-view="tags" onclick="WB._nzSetView('tags')">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-            Tags
-          </button>
-          <button class="nz-view-toggle-btn" data-view="zustand" onclick="WB._nzSetView('zustand')">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-            Zustand
-          </button>
-        </div>
-        <button onclick="WB._nzNeueListeDialog()" style="background:#00828a;color:#fff;border:none;border-radius:16px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);flex-shrink:0">+ Neu</button>
-      </div>
-      <!-- Dreispalten-Layout -->
-      <div id="nz-layout">
 
-        <!-- Linke Sidebar -->
-        <div id="nz-sidebar">
-          <!-- Sektion 1: Zustand -->
-          <div class="nz-sb-section">
-            <div class="nz-sb-title">Zustand</div>
-            <button class="nz-sb-btn active" data-zustand="alle" onclick="WB._nzSetZustand('alle')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-              Alle <span class="nz-sb-badge" id="nz-cnt-alle"></span>
-            </button>
-            <button class="nz-sb-btn" data-zustand="eingang" onclick="WB._nzSetZustand('eingang')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-              Eingang <span class="nz-sb-badge" id="nz-cnt-eingang"></span>
-            </button>
-            <button class="nz-sb-btn" data-zustand="aktuell" onclick="WB._nzSetZustand('aktuell')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              Aktuell <span class="nz-sb-badge" id="nz-cnt-aktuell"></span>
-            </button>
-            <button class="nz-sb-btn" data-zustand="parkplatz" onclick="WB._nzSetZustand('parkplatz')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              Im Blick <span class="nz-sb-badge" id="nz-cnt-parkplatz"></span>
-            </button>
-            <button class="nz-sb-btn" data-zustand="kompass" onclick="WB._nzSetZustand('kompass')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-              Handakten <span class="nz-sb-badge" id="nz-cnt-kompass"></span>
-            </button>
-            <button class="nz-sb-btn" data-zustand="archiv" onclick="WB._nzSetZustand('archiv')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-              Archiv <span class="nz-sb-badge" id="nz-cnt-archiv"></span>
-            </button>
-            <button class="nz-sb-btn" data-zustand="gateway" onclick="WB._nzSetZustand('gateway')">
-              🚦 Gateways <span class="nz-sb-badge" id="nz-cnt-gateway"></span>
-            </button>
-            <button class="nz-sb-btn" data-zustand="thema" onclick="WB._nzSetZustand('thema')">
-              🎯 Themen <span class="nz-sb-badge" id="nz-cnt-thema"></span>
-            </button>
-            <div class="nz-sb-sep" style="margin:4px 0;"></div>
-            <button class="nz-sb-btn" data-filter="offene-checklisten" onclick="WB._nzToggleOffeneChecklisten()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="5" width="4" height="4" rx="1"/><line x1="9" y1="7" x2="20" y2="7"/><rect x="3" y="13" width="4" height="4" rx="1"/><line x1="9" y1="15" x2="20" y2="15"/></svg>
-              Offene Checklisten <span class="nz-sb-badge" id="nz-cnt-offene-cl"></span>
-            </button>
-          </div>
-          <div class="nz-sb-sep"></div>
-          <!-- Sektion 2: Tags -->
-          <div class="nz-sb-section">
-            <div class="nz-sb-title">Tags</div>
-            <div id="nz-sb-tags"></div>
-          </div>
-          <div class="nz-sb-sep"></div>
-          <!-- Sektion 3: Deadline-Filter -->
-          <div class="nz-sb-section">
-            <div class="nz-sb-title">Deadline</div>
-            <button class="nz-sb-btn active" data-zeit="alle" onclick="WB._nzSetZeit('alle')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              Alle anzeigen
-            </button>
-            <button class="nz-sb-btn" data-zeit="heute" onclick="WB._nzSetZeit('heute')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              Heute
-            </button>
-            <button class="nz-sb-btn" data-zeit="woche" onclick="WB._nzSetZeit('woche')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              Diese Woche
-            </button>
-            <button class="nz-sb-btn" data-zeit="4wochen" onclick="WB._nzSetZeit('4wochen')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
-              Nächste 4 Wochen
-            </button>
-            <button class="nz-sb-btn" data-zeit="spaeter" onclick="WB._nzSetZeit('spaeter')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              Später
-            </button>
-            <button class="nz-sb-btn" data-zeit="ueberfaellig" onclick="WB._nzSetZeit('ueberfaellig')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              <span style="color:#C0392B;">Überfällig</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Mittleres Grid -->
-        <div id="nz-main">
-          <!-- Mobile Filter-Chips (nur auf Pixel sichtbar) -->
-          <div id="nz-mobile-filter">
-            <button class="nz-mf-chip active" data-zustand="alle"    onclick="WB._nzMfSetZustand('alle')">Alle</button>
-            <button class="nz-mf-chip"        data-zustand="eingang" onclick="WB._nzMfSetZustand('eingang')">📥 Eingang</button>
-            <button class="nz-mf-chip"        data-zustand="aktuell" onclick="WB._nzMfSetZustand('aktuell')">Aktuell</button>
-            <button class="nz-mf-chip"        data-zustand="parkplatz" onclick="WB._nzMfSetZustand('parkplatz')">Im Blick</button>
-            <button class="nz-mf-chip"        data-zustand="kompass"   onclick="WB._nzMfSetZustand('kompass')">Handakten</button>
-            <button class="nz-mf-chip"        data-zustand="archiv"    onclick="WB._nzMfSetZustand('archiv')">Archiv</button>
-            <button class="nz-mf-chip"        data-filter="offen-cl"   onclick="WB._nzMfToggleOffenCL()">☑ Offene</button>
-          </div>
-          <div id="notizen-scroll"></div>
-        </div>
-
-        <!-- Rechtes Detail-Panel (ausgeklappt per JS) -->
-        <div id="nz-detail-panel">
-          <div class="nz-dp-head">
-            <button class="nz-dp-back" onclick="WB._nzDetailClose()">←</button>
-            <span class="nz-dp-title" id="nz-dp-title"></span>
-            <span id="nz-dp-gw-badge" style="display:none;"></span>
-            <span class="nz-dp-cnt" id="nz-dp-cnt"></span>
-            <button class="nz-dp-settings" onclick="WB._nzFullscreenOpen(WB._nzDetailId)" title="Vollbild">⛶</button>
-            <button class="nz-dp-settings" onclick="WB._nzDetailSettings()" title="Einstellungen">⚙</button>
-          </div>
-          <!-- Meta-Bereich: Farbe, Welt, Tags, Link, Vertraulich, Deadline -->
-          <div class="nz-dp-meta" id="nz-dp-meta" style="position:relative;overflow:visible;"></div>
-          <!-- Drive-Picker Dropdown (kompaktes Dropdown unter dem Link-Feld) -->
-          <div id="nz-drive-picker" style="display:none;position:absolute;left:0;right:0;top:0;z-index:500;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.18);flex-direction:column;overflow:hidden;">
-            <div class="nz-drive-search-row">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--faint);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input id="nz-drive-search-inp" class="nz-drive-search-inp" placeholder="Datei in Google Drive suchen..." oninput="WB._drivePickerSearch(this.value)" style="flex:1;">
-              <button onclick="WB._drivePickerClose()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--faint);padding:0 2px;line-height:1;">×</button>
-            </div>
-            <div class="nz-drive-results" id="nz-drive-results" style="overflow-y:auto;max-height:200px;">
-              <div class="nz-drive-empty">Tippe um zu suchen...</div>
-            </div>
-            <div class="nz-drive-footer" style="border-top:1px solid var(--border);">
-              <button class="nz-drive-new-btn" onclick="WB._driveNewDoc()">📄 Neues Google Doc</button>
-              <button class="nz-drive-new-btn" onclick="WB._driveNewSheet()">📊 Neues Google Sheet</button>
-            </div>
-            <div id="nz-drive-new-hint" style="display:none;padding:8px 12px;font-size:11px;color:var(--muted);background:rgba(10,107,94,.06);border-top:1px solid var(--border);">
-              📋 Kopiere die URL aus dem neuen Tab und füge sie hier als Link ein.
-            </div>
-          </div>
-          <div class="nz-dp-body" id="nz-dp-body"></div>
-          <div class="nz-dp-foot" id="nz-dp-foot">
-            <span class="nz-dp-plus">+</span>
-            <input id="nz-dp-inp" class="nz-dp-inp" placeholder="Eintrag hinzufügen..."
-              onkeydown="if(event.key==='Enter')WB._nzDetailAdd()">
-            <span class="nz-dp-ok" onclick="WB._nzDetailAdd()">OK</span>
-          </div>
-        </div>
-
-      </div><!-- /nz-layout -->
-    </div>
-
-      <!-- Wiki -->
-      <!-- Netzwerk -->
-      <div id="sec-netzwerk" class="wb-section" style="display:none;flex-direction:column;">
-        <div style="padding:8px 14px;border-bottom:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><line x1="7" y1="11.5" x2="17" y2="6"/><line x1="7" y1="12.5" x2="17" y2="18"/></svg>
-          <span style="font-size:13px;font-weight:800;color:var(--text);">Notiznetzwerk</span>
-          <span id="nz-net-info" style="font-size:11px;color:var(--faint);margin-left:2px;"></span>
-          <div style="display:flex;gap:5px;margin-left:8px;align-items:center;">
-            <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);">Welt</span>
-            <button id="nz-net-welt-beide"  class="nz-net-tb on" onclick="WB._nzNetSetWelt('beide')">Beides</button>
-            <button id="nz-net-welt-beruf"  class="nz-net-tb"    onclick="WB._nzNetSetWelt('beruf')">Beruf</button>
-            <button id="nz-net-welt-privat" class="nz-net-tb"    onclick="WB._nzNetSetWelt('privat')">Privat</button>
-          </div>
-          <div style="width:1px;height:16px;background:var(--border);"></div>
-          <button id="nz-net-ohne-btn" class="nz-net-tb on" onclick="WB._nzNetToggleOhne()">Ohne Verbindungen</button>
-          <button onclick="WB._nzNetRender()" style="margin-left:auto;padding:3px 10px;border:1.5px solid var(--border);border-radius:8px;background:none;font-size:11px;font-weight:700;cursor:pointer;color:var(--muted);font-family:var(--font);">↺ Neu</button>
-        </div>
-        <div style="flex:1;overflow:hidden;position:relative;">
-          <svg id="nz-net-svg" style="width:100%;height:100%;">
-            <defs>
-              <marker id="nz-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
-                <path d="M0,0 L0,6 L7,3 z" fill="var(--accent)" opacity=".6"/>
-              </marker>
-            </defs>
-            <g id="nz-net-edges"></g>
-            <g id="nz-net-nodes"></g>
-          </svg>
-          <div id="nz-net-tooltip" style="display:none;position:absolute;background:var(--text);color:var(--surface);border-radius:8px;padding:8px 12px;font-size:12px;pointer-events:none;max-width:200px;z-index:50;line-height:1.5;"></div>
+      <!-- Assistent (WB4) -->
+      <div id="sec-assistent" class="wb-section" style="display:none;flex-direction:column;flex:1;min-height:0;">
+        <div id="as-body" style="flex:1;overflow-y:auto;padding:14px 14px 0;display:flex;flex-direction:column;gap:0;">
+          <div style="padding:40px 20px;text-align:center;color:var(--faint);font-size:13px;">Assistent wird geladen…</div>
         </div>
       </div>
 
@@ -1822,71 +1652,39 @@
 
     </div><!-- /wb-content -->
 
-    <!-- Desktop Sidebar -->
-    <div id="wb-sidebar-tabs">
-      <div class="wb-stab" data-tab="tagessicht" onclick="WB._stabSwitch('tagessicht',this)">
-        <div class="wb-stab-body">
-          <div class="wb-stab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></div>
-          <span class="wb-stab-lbl">Heute</span>
-        </div>
-      </div>
-      <div class="wb-stab" data-tab="notizen" onclick="WB._stabSwitch('notizen',this)">
-        <div class="wb-stab-body">
-          <div class="wb-stab-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
-          <span class="wb-stab-lbl">Notizen</span>
-        </div>
-      </div>
-      <div class="wb-stab" data-tab="netzwerk" onclick="WB._stabSwitch('netzwerk',this)">
-        <div class="wb-stab-body">
-          <div class="wb-stab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><line x1="7" y1="11.5" x2="17" y2="6"/><line x1="7" y1="12.5" x2="17" y2="18"/></svg></div>
-          <span class="wb-stab-lbl">Netzwerk</span>
-        </div>
-      </div>
-      <div class="wb-stab" data-tab="woche" onclick="WB._stabSwitch('woche',this)">
-        <div class="wb-stab-body">
-          <div class="wb-stab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg></div>
-          <span class="wb-stab-lbl">Termine</span>
-        </div>
-      </div>
-      <div class="wb-stab-sep"></div>
-      <div class="wb-stab" data-tab="einstellungen" onclick="WB.settingsOpen()">
-        <div class="wb-stab-body">
-          <div class="wb-stab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
-          <span class="wb-stab-lbl">Einstell.</span>
-        </div>
-      </div>
-    </div>
 
   </div><!-- /wb-main-area -->
 
-  <!-- Mobile Bottom Nav -->
+
+  <!-- WB4: Unified Bottom-Nav (Pixel + PC identisch) -->
   <div id="wb-nav">
     <div class="wb-tab active" data-tab="tagessicht" onclick="WB.tabSwitch('tagessicht')">
-      <div class="wb-tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></div>
+      <div class="wb-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></div>
       <span>Heute</span>
     </div>
-    <div class="wb-tab" data-tab="notizen" onclick="WB.tabSwitch('notizen')">
-      <div class="wb-tab-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
-      <span>Notizen</span>
+    <div class="wb-tab" data-tab="assistent" onclick="WB.tabSwitch('assistent')">
+      <div class="wb-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><line x1="14" y1="17" x2="21" y2="17"/><line x1="17.5" y1="13.5" x2="17.5" y2="20.5"/></svg></div>
+      <span>Assistent</span>
     </div>
     <div class="wb-tab" data-tab="woche" onclick="WB.tabSwitch('woche')">
-      <div class="wb-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M8 18h.01M12 18h.01"/></svg></div>
+      <div class="wb-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
       <span>Termine</span>
     </div>
     <div class="wb-tab" data-tab="mehr" onclick="WB.settingsOpen()">
-      <div class="wb-tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+      <div class="wb-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l-.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
       <span>Mehr</span>
     </div>
   </div>
 
+</div><!-- /wb-app-inner -->
 </div><!-- /wb-app -->
 
 <script>
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '3.1.11',
-  APP_BUILD:   '20260629-1730',
+  APP_VERSION: '4.0.0',
+  APP_BUILD:   '20260630-0900',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -1974,6 +1772,7 @@ const WB = {
 
     if (!this.db) this.db = this._emptyDb();
     this._ensureDbFields();
+    this._migrateToV4();
     await this._migrateFromOldDb();
 
     if (this._oauthTokenValid()) {
@@ -2030,6 +1829,12 @@ const WB = {
     if (!this.db.wochenMottos)  this.db.wochenMottos  = {};
     if (!this.db.sondertage)    this.db.sondertage    = [];
     if (!this.db._version)      this.db._version      = 1;
+      // WB4 Collections
+    if (!Array.isArray(this.db.themen))   this.db.themen   = [];
+    if (!Array.isArray(this.db.gateways)) this.db.gateways = [];
+    if (!Array.isArray(this.db.aufgaben) || !this.db.aufgaben.every?.(a => a._wb4 !== undefined)) {
+      if (!Array.isArray(this.db.aufgaben)) this.db.aufgaben = [];
+    }
   },
 
   _migrateWissensnetzwerk() {
@@ -2074,24 +1879,19 @@ const WB = {
 
   // ── Layout ───────────────────────────────────────────
   _isMobile() {
+    // WB4: Kein geräteabhängiges Layout mehr — unified für alle Geräte
+    // Behalten für Kompatibilität mit altem Code der noch _isMobile() prüft
     const d = this._settings?.device || 'mac';
     return d === 'pixel' || d === 'ipad';
   },
 
   _setupSidebarLayout() {
-    const sidebar  = document.getElementById('wb-sidebar-tabs');
+    // WB4: Kein Sidebar mehr — unified Layout auf allen Geräten
+    // wb-app-inner liefert die 480px Zentrierung via CSS
     const mainArea = document.querySelector('.wb-main-area');
-    if (!sidebar || !mainArea) return;
-    if (sidebar.parentElement !== mainArea) mainArea.appendChild(sidebar);
-    mainArea.style.cssText = 'display:flex;flex-direction:row;flex:1;min-height:0;overflow:hidden;';
+    if (mainArea) mainArea.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;';
     const content = document.getElementById('wb-content');
     if (content) content.style.cssText = 'flex:1;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;';
-    if (this._isMobile()) {
-      document.getElementById('wb-app').style.cssText = 'display:flex;flex-direction:column;height:100dvh;max-height:100dvh;overflow:hidden;';
-      sidebar.style.display = 'none';
-    } else {
-      sidebar.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;width:60px;min-width:60px;flex-shrink:0;overflow-y:auto;overflow-x:visible;padding-top:4px;position:relative;z-index:1;';
-    }
   },
 
   // ── Welt ────────────────────────────────────────────
@@ -2128,7 +1928,7 @@ const WB = {
     this.activeTab = tab;
     // body.woche-active → CSS übernimmt overflow:hidden auf #wb-content
     document.body.classList.toggle('woche-active', tab === 'woche');
-    ['tagessicht','notizen','netzwerk','woche'].forEach(t => {
+    ['tagessicht','assistent','woche'].forEach(t => {
       const el = document.getElementById('sec-' + t);
       if (!el) return;
       if (t !== tab) {
@@ -2158,10 +1958,26 @@ const WB = {
   renderSection(tab) {
     switch(tab) {
       case 'tagessicht': this._tsRender(); this._ckRenderAll(); break;
-      case 'notizen':    this.renderNotizenTab();   break;
-      case 'netzwerk':   this._nzNetRender();       break;
-      case 'woche':      this.renderWoche();        break;
+      case 'assistent':  this._asRender(); break;
+      case 'woche':      this.renderWoche(); break;
     }
+  },
+
+
+  // WB4: Stub-Funktionen für entfernte Notizen-Features
+  _nzStub() { /* WB4: Notizen-Tab entfernt */ },
+  _nzStubSetZustand() { /* WB4: Notizen-Zustand entfernt */ },
+  _nzRenderPills() { /* WB4: Notizen-Tabs entfernt */ },
+  _nzUpdateCounts() { /* WB4: Notizen-Counts entfernt */ },
+  _nzSuche() { /* WB4: Notizen-Suche entfernt */ },
+  _nzSucheInput() { /* WB4: Notizen-Suche entfernt */ },
+  _nzSetZeit() { /* WB4: Notizen-Zeit entfernt */ },
+
+  // WB4: Assistent-Render Stub (Phase 3 wird das befüllen)
+  _asRender() {
+    const body = document.getElementById('as-body');
+    if (!body) return;
+    body.innerHTML = '<div style="padding:32px 16px;color:var(--faint);font-size:13px;text-align:center;">Assistent — coming in Phase 3</div>';
   },
 
   // ── TAGESSICHT ───────────────────────────────────────
@@ -2315,7 +2131,7 @@ const WB = {
             +'<div style="flex:1"><span class="ck-task-text'+(s===2?' done-text':'')+'">'+this._esc(i.text)+'</span>'
             +(i.deadline?this._ckDateBadge(i.deadline):'')+'</div></div>'+subH+'</div>';
         }).join('')+(aufgaben.length>8?'<div class="ck-empty-msg">+ '+(aufgaben.length-8)+' weitere</div>':'')+'</div>'
-      : '<div class="ck-empty-msg">Keine Aufgaben <span onclick="WB.tabSwitch(&quot;notizen&quot;);WB._nzDetailOpen(&quot;'+id+'&quot;)" style="color:#00828a;cursor:pointer;">→ Bearbeiten</span></div>';
+      : '<div class="ck-empty-msg">Keine Aufgaben <span onclick="WB.tabSwitch(&quot;assistent&quot;);WB._nzDetailOpen(&quot;'+id+'&quot;)" style="color:#00828a;cursor:pointer;">→ Bearbeiten</span></div>';
     const freitextRaw=(l.inhalt||'').replace(/<[^>]+>/g,'').trim().slice(0,300);
     const notizBody=freitextRaw?'<div class="ck-freitext">'+this._esc(freitextRaw)+'</div>':'<div class="ck-empty-msg">Kein Freitext</div>';
     const _ckHdrClick = 'WB.tabSwitch(\'notizen\');WB._nzDetailOpen(\'' + id + '\')';
@@ -2417,7 +2233,7 @@ const WB = {
     // Eingang
     const eingangCnt = (db.notizen||[]).filter(l=>!l.deleted&&l.zustand==='eingang'&&this._ckWeltOk(l)).length;
     if (eingangCnt>0) {
-      h += '<div class="ck-hint-box" style="margin-top:8px"><div class="ck-hint-title">📥 Eingang</div><div class="ck-hint-text"><strong>'+eingangCnt+'</strong> Notizen warten auf Einordnung. <span onclick="WB.tabSwitch(\'notizen\');WB._nzSetZustand(\'eingang\')" style="color:#00828a;cursor:pointer;font-weight:700;">Öffnen →</span></div></div>';
+      h += '<div class="ck-hint-box" style="margin-top:8px"><div class="ck-hint-title">📥 Eingang</div><div class="ck-hint-text"><strong>'+eingangCnt+'</strong> Notizen warten auf Einordnung. <span onclick="WB.tabSwitch(\'notizen\');WB._nzStubSetZustand(\'eingang\')" style="color:#00828a;cursor:pointer;font-weight:700;">Öffnen →</span></div></div>';
     }
 
     body.innerHTML = h;
@@ -2558,7 +2374,7 @@ const WB = {
         + '<span class="ts-th-sep">\u00b7</span><span class="ts-th-datum">' + now.getDate() + '. ' + mN[now.getMonth()] + ' ' + now.getFullYear() + '</span>'
         + '<span class="ts-th-kw">KW ' + kw + '</span>'
         + (sonder ? '<span class="ts-th-sondertag">' + (stL[sonder.typ]||sonder.typ) + (sonder.name?' '+this._esc(sonder.name):'') + '</span>' : '')
-        + (eingangCnt > 0 ? '<button class="ts-th-inbox" onclick="WB.tabSwitch(\'notizen\');WB._nzSetZustand(\'eingang\')" title="Offene Eingang-Notizen">📥 Eingang ' + eingangCnt + '</button>' : '');
+        + (eingangCnt > 0 ? '<button class="ts-th-inbox" onclick="WB.tabSwitch(\'notizen\');WB._nzStubSetZustand(\'eingang\')" title="Offene Eingang-Notizen">📥 Eingang ' + eingangCnt + '</button>' : '');
     }
     h += '</div>';
     el.innerHTML = h;
@@ -2663,7 +2479,7 @@ const WB = {
     }
 
     // Desktop: Im Notizen-Tab öffnen (Cockpit hat kein eigenes Detail-Panel mehr)
-    this.tabSwitch('notizen');
+    this.tabSwitch('assistent');
     setTimeout(() => { this._nzDetailOpen(listeId); }, 50);
   },
 
@@ -2741,7 +2557,7 @@ const WB = {
     this.setDirty();
     this._tsKachelOpen(listeId, true);
     this._tsRenderNotizenKompakt();
-    if (this.activeTab === 'notizen') this.renderNotizenTab();
+    if (this.activeTab === 'assistent') this._nzStub();
   },
 
   _tsKdFreitextInput() {
@@ -3046,7 +2862,7 @@ const WB = {
     document.querySelectorAll('.nz-ztab').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.zustand === z);
     });
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzUpdateCounts() {
@@ -3086,7 +2902,7 @@ const WB = {
     }).join('');
   },
 
-  renderNotizenTab() {
+  renderNotizenTab_REMOVED() {
     const scroll = document.getElementById('notizen-scroll');
     if (!scroll) return;
     this._nzUpdateCounts();
@@ -3174,7 +2990,7 @@ const WB = {
     const gepinnt = (this.db.notizen||[]).filter(x=>!x.deleted&&x.gepinnt);
     if (!l.gepinnt && gepinnt.length >= 4) { this._toast('⚠ Maximal 4 Notizen anpinnen'); return; }
     l.gepinnt = !l.gepinnt; l.updatedAt = this._now();
-    this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
+    this.setDirty(); this._nzStub(); this._nzRenderPills();
     this._tsRenderTagesheader();
     if (this.activeTab === 'tagessicht') this._tsRenderPins();
   },
@@ -3187,7 +3003,7 @@ const WB = {
     l.items.push({ id:'i_'+Date.now(), text, done:false, deleted:false });
     l.updatedAt = this._now();
     inp.value = '';
-    this.setDirty(); this.renderNotizenTab();
+    this.setDirty(); this._nzStub();
   },
 
   _nzDuplizieren(listeId) {
@@ -3202,7 +3018,7 @@ const WB = {
     if (!this.db.notizen) this.db.notizen = [];
     this.db.notizen.push(neu);
     this.setDirty();
-    this.renderNotizenTab();
+    this._nzStub();
     this._toast('\u2713 Notiz dupliziert');
   },
 
@@ -3212,7 +3028,7 @@ const WB = {
     l.updatedAt = this._now();
     this.setDirty();
     this._nzKachelRender();
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzToggleItem(listeId, itemId) {
@@ -3221,7 +3037,7 @@ const WB = {
     i.done = !i.done; l.updatedAt = this._now();
     this.setDirty();
     this._nzKachelRender();
-    this.renderNotizenTab();
+    this._nzStub();
     if (this.activeTab === 'tagessicht') this._tsRenderPins();
   },
 
@@ -3229,7 +3045,7 @@ const WB = {
     const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
     const i = (l.items||[]).find(x=>x.id===itemId); if(!i) return;
     i.deleted = true; l.updatedAt = this._now();
-    this.setDirty(); this.renderNotizenTab();
+    this.setDirty(); this._nzStub();
   },
 
   _nzEditItem(listeId, itemId, el) {
@@ -3251,14 +3067,14 @@ const WB = {
   _nzSetFarbe(listeId, farbe) {
     const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
     l.farbe = farbe; l.updatedAt = this._now();
-    this.setDirty(); this.renderNotizenTab();
+    this.setDirty(); this._nzStub();
   },
 
   _nzDeleteListe(listeId) {
     this._confirm('Liste wirklich löschen?', () => {
       const l = (this.db?.notizen||[]).find(x=>x.id===listeId); if(!l) return;
       this._softDelete(l);
-      this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
+      this.setDirty(); this._nzStub(); this._nzRenderPills();
       if (this._nzDetailId === listeId) document.getElementById('nz-detail-panel')?.classList.remove('open');
       if (this.activeTab === 'tagessicht') this._tsRenderPins();
       this._toast('🗑 Liste gelöscht');
@@ -3274,7 +3090,7 @@ const WB = {
   // Drag Desktop
   _nzDragStart(e, id) { this._nzDragId = id; e.dataTransfer.effectAllowed='move'; setTimeout(()=>{const el=document.getElementById('nzg-'+id);if(el)el.style.opacity='0.4';},0); },
   _nzDragOver(e, id) { if(id===this._nzDragId)return; e.preventDefault(); e.dataTransfer.dropEffect='move'; document.querySelectorAll('.nz-postit').forEach(el=>el.style.outline=''); const el=document.getElementById('nzg-'+id); if(el)el.style.outline='2px solid var(--accent)'; },
-  _nzDrop(e, toId) { e.preventDefault(); const fr=this._nzDragId; if(!fr||fr===toId)return; const nz=this.db?.notizen; if(!nz)return; const fi=nz.findIndex(l=>l.id===fr); const ti=nz.findIndex(l=>l.id===toId); if(fi<0||ti<0)return; const[m]=nz.splice(fi,1); nz.splice(ti,0,m); this.setDirty(); this.renderNotizenTab(); },
+  _nzDrop(e, toId) { e.preventDefault(); const fr=this._nzDragId; if(!fr||fr===toId)return; const nz=this.db?.notizen; if(!nz)return; const fi=nz.findIndex(l=>l.id===fr); const ti=nz.findIndex(l=>l.id===toId); if(fi<0||ti<0)return; const[m]=nz.splice(fi,1); nz.splice(ti,0,m); this.setDirty(); this._nzStub(); },
   _nzDragEnd() { this._nzDragId=null; document.querySelectorAll('.nz-postit').forEach(el=>{el.style.opacity='';el.style.outline='';}); },
 
 
@@ -3288,7 +3104,7 @@ const WB = {
     inp.value = '';
     this.setDirty();
     this._nzKachelRender();
-    if (this.activeTab==='notizen') this.renderNotizenTab();
+    if (this.activeTab==='assistent') this._nzStub();
     if (this.activeTab==='tagessicht') this._tsRenderPins();
   },
 
@@ -3320,7 +3136,7 @@ const WB = {
   _nzKachelClose() {
     document.getElementById('nz-kachel-overlay').classList.remove('open');
     this._nzKachelListeId = null;
-    if (this.activeTab==='notizen') this.renderNotizenTab();
+    if (this.activeTab==='assistent') this._nzStub();
     if (this.activeTab==='tagessicht') this._tsRenderPins();
   },
 
@@ -3349,7 +3165,7 @@ const WB = {
   _nzFreitextClose() {
     document.getElementById('nz-ft-overlay').style.display = 'none';
     this._nzFtListeId = null;
-    if (this.activeTab==='notizen') this.renderNotizenTab();
+    if (this.activeTab==='assistent') this._nzStub();
     if (this.activeTab==='tagessicht') this._tsRenderPins();
     this._nzRenderPills();
   },
@@ -3360,7 +3176,7 @@ const WB = {
     const inp = document.getElementById('wb-nz-titel');
     if (inp && inp.value.trim()) l.titel = inp.value.trim();
     l.updatedAt = this._now();
-    this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
+    this.setDirty(); this._nzStub(); this._nzRenderPills();
     if (this.activeTab==='tagessicht') this._tsRenderPins();
   },
 
@@ -3389,7 +3205,7 @@ const WB = {
       this.setDirty();
       // Badge in Header aktualisieren wenn nz-context
       if (ctx === 'nz') this._nzDetailOpen(listeId, true);
-      this.renderNotizenTab();
+      this._nzStub();
     }, 1000);
   },
   _nzGwSaveTimer: null,
@@ -3408,7 +3224,7 @@ const WB = {
       const body = document.getElementById('nz-fs-body');
       if (body) { body.innerHTML = this._renderHybridBody(l, listeId, 'fs'); }
     }
-    this.renderNotizenTab();
+    this._nzStub();
     this._toast(status === 'erreicht' ? '✅ Gateway erreicht' : status === 'abgebrochen' ? '❌ Gateway abgebrochen' : '🚦 Gateway offen');
   },
 
@@ -3511,7 +3327,7 @@ const WB = {
     this.setDirty();
     inp.value = '';
     // Re-render
-    if (ctx === 'nz') { this._nzDetailOpen(listeId, true); this.renderNotizenTab(); }
+    if (ctx === 'nz') { this._nzDetailOpen(listeId, true); this._nzStub(); }
     else if (ctx === 'fs') { const b=document.getElementById('nz-fs-body'); if(b) b.innerHTML=this._renderHybridBody(l,listeId,'fs'); }
     else { this._tsKachelOpen(listeId, true); }
     if (this.activeTab === 'tagessicht') this._ckRenderAll();
@@ -3541,7 +3357,7 @@ const WB = {
     this.setDirty();
     this._nzSubitemDragId = null;
     this._nzDetailOpen(listeId, true);
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzSubitemCbToggle(listeId, itemId, subitemId) {
@@ -3554,7 +3370,7 @@ const WB = {
     l.updatedAt = this._now();
     this.setDirty();
     this._nzDetailOpen(listeId, true);
-    this.renderNotizenTab();
+    this._nzStub();
     if (this.activeTab === 'tagessicht') this._ckRenderAll();
   },
 
@@ -3572,7 +3388,7 @@ const WB = {
       const nv = inp.value.trim();
       if (nv && nv !== old) { si.text = nv; l.updatedAt = this._now(); this.setDirty(); }
       this._nzDetailOpen(listeId, true);
-      this.renderNotizenTab();
+      this._nzStub();
     };
     inp.addEventListener('blur', commit);
     inp.addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); commit(); } if (e.key==='Escape') { inp.value=old; commit(); } });
@@ -3585,7 +3401,7 @@ const WB = {
     si.deleted = true; l.updatedAt = this._now();
     this.setDirty();
     this._nzDetailOpen(listeId, true);
-    this.renderNotizenTab();
+    this._nzStub();
     if (this.activeTab === 'tagessicht') this._ckRenderAll();
   },
 
@@ -3606,7 +3422,7 @@ const WB = {
       l.updatedAt = this._now();
       this.setDirty();
       this._nzDetailOpen(listeId, true);
-      this.renderNotizenTab();
+      this._nzStub();
       if (this.activeTab === 'tagessicht') this._ckRenderAll();
     };
     inp.addEventListener('change', commit);
@@ -3677,7 +3493,7 @@ const WB = {
     if (typ === 'gateway') neueNotiz.tags = ['#Gateway'];
     this._nzAutoFarbe(neueNotiz); // Auto-Farbe je Zustand
     this.db.notizen.push(neueNotiz);
-    this.setDirty(); this.modalClose(); this.renderNotizenTab();
+    this.setDirty(); this.modalClose(); this._nzStub();
     this._toast('✓ ' + (typ === 'gateway' ? 'Gateway' : 'Liste') + ' erstellt');
   },
 
@@ -3915,7 +3731,7 @@ const WB = {
     document.querySelectorAll('.nz-ztab').forEach(b =>
       b.classList.toggle('active', b.dataset.zustand === zustand)
     );
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzToggleOffeneChecklisten() {
@@ -3927,7 +3743,7 @@ const WB = {
     document.querySelectorAll('#nz-sidebar .nz-sb-btn[data-filter="offene-checklisten"]').forEach(b =>
       b.classList.toggle('active', this._nzOffeneCL)
     );
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzSetZeit(zeit) {
@@ -3935,7 +3751,7 @@ const WB = {
     document.querySelectorAll('#nz-sidebar .nz-sb-btn[data-zeit]').forEach(b =>
       b.classList.toggle('active', b.dataset.zeit === zeit)
     );
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzCtxSetThema(listeId, themaId) {
@@ -3944,7 +3760,7 @@ const WB = {
     l.themaId = themaId || null;
     l.updatedAt = this._now();
     this.setDirty();
-    this.renderNotizenTab();
+    this._nzStub();
     if (this.activeTab === 'tagessicht') this._ckRenderAll();
     const thema = themaId ? (this.db?.notizen||[]).find(x => x.id === themaId) : null;
     this._toast(thema ? '🎯 Zugeordnet: ' + thema.titel : 'Thema entfernt');
@@ -3954,7 +3770,7 @@ const WB = {
     this._nzCtxClose();
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     l.themaPrio = prio; l.updatedAt = this._now();
-    this.setDirty(); this.renderNotizenTab();
+    this.setDirty(); this._nzStub();
     if (this.activeTab === 'tagessicht') this._ckRenderAll();
     this._toast('Prio ' + prio + ' gesetzt');
   },
@@ -3963,7 +3779,7 @@ const WB = {
     this._nzCtxClose();
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     l.themaStatus = status; l.updatedAt = this._now();
-    this.setDirty(); this.renderNotizenTab();
+    this.setDirty(); this._nzStub();
     if (this.activeTab === 'tagessicht') this._ckRenderAll();
     const labels = { aktiv:'Aktiv', wartend:'Wartend', pausiert:'Pausiert' };
     this._toast('Status: ' + (labels[status]||status));
@@ -3973,7 +3789,7 @@ const WB = {
     this._nzActiveTags = new Set();
     this._nzActiveTag  = null;
     this._nzRenderSidebarTags();
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzSetTag(tag) {
@@ -3984,7 +3800,7 @@ const WB = {
     }
     this._nzActiveTag = this._nzActiveTags.size > 0 ? [...this._nzActiveTags][0] : null;
     this._nzRenderSidebarTags();
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _tsHeutePinSearch(q) {
@@ -4044,7 +3860,7 @@ const WB = {
     l.updatedAt = this._now();
     this.setDirty();
     if (ctx === 'ts') { this._tsKachelOpen(listeId, true); this._tsRenderNotizenKompakt(); }
-    else { this._nzDetailOpen(listeId, true); this.renderNotizenTab(); }
+    else { this._nzDetailOpen(listeId, true); this._nzStub(); }
   },
 
   _nzHybridItemEdit(el, listeId, itemId, ctx) {
@@ -4065,7 +3881,7 @@ const WB = {
       const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
       i.text = text; l.updatedAt = this._now(); this.setDirty();
       if (ctx === 'ts') { this._tsKachelOpen(listeId, true); }
-      else { this._nzDetailOpen(listeId, true); this.renderNotizenTab(); }
+      else { this._nzDetailOpen(listeId, true); this._nzStub(); }
     };
     el.onblur = save;
     el.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } if (e.key === 'Escape') { el.contentEditable = 'false'; } };
@@ -4082,7 +3898,7 @@ const WB = {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
     i.deleted = true; l.updatedAt = this._now(); this.setDirty();
-    this._nzDetailOpen(listeId, true); this.renderNotizenTab();
+    this._nzDetailOpen(listeId, true); this._nzStub();
   },
 
   // ── Freitext-Toolbar ─────────────────────────────────
@@ -4382,7 +4198,7 @@ const WB = {
   _nzCtxSetZustand(listeId, zustand) {
     this._nzCtxClose();
     this._nzSetZustandItem(listeId, zustand);
-    this.setDirty(); this.renderNotizenTab(); this._nzRenderPills();
+    this.setDirty(); this._nzStub(); this._nzRenderPills();
     if (this.activeTab === 'tagessicht') this._tsRenderPins();
     const labels = { aktuell:'Aktuell', parkplatz:'Im Blick', kompass:'Handakten', archiv:'Archiv' };
     this._toast('→ ' + (labels[zustand]||zustand));
@@ -4399,7 +4215,7 @@ const WB = {
       arr.splice(idx, 1); // Aus Array entfernen — kein soft-delete
       if (this._nzDetailId === listeId) document.getElementById('nz-detail-panel')?.classList.remove('open');
       this.setDirty();
-      this.renderNotizenTab();
+      this._nzStub();
       this._nzRenderPills();
       if (this.activeTab === 'tagessicht') this._tsRenderPins();
       this._toast('🗑 Gelöscht');
@@ -4419,7 +4235,7 @@ const WB = {
     const aO = a._sortOrder, bO = b._sortOrder;
     a._sortOrder = bO; b._sortOrder = aO;
     a.updatedAt = this._now(); b.updatedAt = this._now();
-    this.setDirty(); this.renderNotizenTab();
+    this.setDirty(); this._nzStub();
   },
 
   // Long-Press für Mobile
@@ -4623,14 +4439,14 @@ const WB = {
       const btn = document.getElementById('nz-net-welt-' + w);
       if (btn) btn.classList.toggle('on', w === welt);
     });
-    this._nzNetRender();
+    /* WB4: nzNet entfernt */;
   },
 
   _nzNetToggleOhne() {
     this._nzNetOhne = !this._nzNetOhne;
     const btn = document.getElementById('nz-net-ohne-btn');
     if (btn) btn.classList.toggle('on', this._nzNetOhne);
-    this._nzNetRender();
+    /* WB4: nzNet entfernt */;
   },
   _nzNetRender() {
     const svg     = document.getElementById('nz-net-svg'); if (!svg) return;
@@ -4901,7 +4717,7 @@ const WB = {
     const zustandOpts = ['eingang','aktuell','parkplatz','kompass','archiv'];
     const zustandLabels = { eingang:'Eingang', aktuell:'Aktuell', parkplatz:'Im Blick', kompass:'Handakten', archiv:'Archiv' };
     const curZustand = l.zustand || 'aktuell';
-    const zustandSel = '<select class="wb-select" style="font-size:12px;padding:2px 6px;" onchange="WB._nzSetZustandItem(\'' + id + '\',this.value);this.blur();">'
+    const zustandSel = '<select class="wb-select" style="font-size:12px;padding:2px 6px;" onchange="WB._nzStubSetZustandItem(\'' + id + '\',this.value);this.blur();">'
       + zustandOpts.map(z => '<option value="' + z + '"' + (curZustand===z?' selected':'') + '>' + (zustandLabels[z]||z) + '</option>').join('')
       + '</select>';
 
@@ -5012,7 +4828,7 @@ const WB = {
     l.updatedAt = this._now();
     this.setDirty();
     this._nzDetailOpen(listeId, true);
-    this.renderNotizenTab();
+    this._nzStub();
     this._toast('✓ Notiz wieder auf Aktuell');
   },
 
@@ -5034,14 +4850,14 @@ const WB = {
   _nzDetailSetWelt(listeId, welt) {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     l.welt = welt === 'beide' ? undefined : welt; l.updatedAt = this._now(); this.setDirty();
-    this._nzDetailOpen(listeId, true); this.renderNotizenTab();
+    this._nzDetailOpen(listeId, true); this._nzStub();
   },
 
   _nzDetailSetTags(listeId, raw) {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     l.tags = raw.trim().split(/\s+/).filter(t => t.startsWith('#') && t.length > 1);
     l.updatedAt = this._now(); this.setDirty();
-    this._nzDetailOpen(listeId, true); this.renderNotizenTab();
+    this._nzDetailOpen(listeId, true); this._nzStub();
   },
 
   _nzDetailSetLink(listeId, link) {
@@ -5053,7 +4869,7 @@ const WB = {
   _nzDetailSetDeadline(listeId, dl) {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     l.deadline = dl || null; l.updatedAt = this._now(); this.setDirty();
-    this._nzDetailOpen(listeId, true); this.renderNotizenTab();
+    this._nzDetailOpen(listeId, true); this._nzStub();
   },
 
   _nzDetailTogglePin(listeId) {
@@ -5061,7 +4877,7 @@ const WB = {
     const gepinnt = (this.db.notizen||[]).filter(x => !x.deleted && x.gepinnt);
     if (!l.gepinnt && gepinnt.length >= 4) { this._toast('⚠ Maximal 4 Notizen anpinnen'); return; }
     l.gepinnt = !l.gepinnt; l.updatedAt = this._now(); this.setDirty();
-    this._nzDetailOpen(listeId, true); this.renderNotizenTab();
+    this._nzDetailOpen(listeId, true); this._nzStub();
     if (this.activeTab === 'tagessicht') this._tsRenderNotizenKompakt();
   },
 
@@ -5076,7 +4892,7 @@ const WB = {
       l.heutePin = false; l.heutePinDate = null;
     }
     l.updatedAt = this._now(); this.setDirty();
-    this._nzDetailOpen(listeId, true); this.renderNotizenTab();
+    this._nzDetailOpen(listeId, true); this._nzStub();
     if (this.activeTab === 'tagessicht') this._tsRenderNotizenKompakt();
   },
 
@@ -5133,7 +4949,7 @@ const WB = {
   _nzDetailToggleVert(listeId) {
     const l = (this.db?.notizen||[]).find(x => x.id === listeId); if (!l) return;
     l.vertraulich = !l.vertraulich; l.updatedAt = this._now(); this.setDirty();
-    this._nzDetailOpen(listeId, true); this.renderNotizenTab();
+    this._nzDetailOpen(listeId, true); this._nzStub();
   },
 
   // ── Google Drive Picker ──────────────────────────────────────────
@@ -5296,7 +5112,7 @@ const WB = {
     document.getElementById('nz-fullscreen')?.classList.remove('open');
     this._nzFullscreenId = null;
     if (this._nzDetailId) this._nzDetailOpen(this._nzDetailId, true);
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzFullscreenId: null,
@@ -5389,7 +5205,7 @@ const WB = {
     this.setDirty();
     inp.value = '';
     this._nzDetailOpen(this._nzDetailId, true);
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzDetailCbToggle(listeId, itemId) {
@@ -5399,7 +5215,7 @@ const WB = {
     l.updatedAt = this._now();
     this.setDirty();
     this._nzDetailOpen(listeId, true);
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzDetailFreitextInput() {
@@ -5415,7 +5231,7 @@ const WB = {
 
   _nzSucheInput(val) {
     this._nzSuche = val.trim();
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzSetZustandItem(listeId, zustand) {
@@ -5437,7 +5253,7 @@ const WB = {
     this._nzAutoFarbe(l); // Auto-Farbe nach Zustandswechsel
     l.updatedAt = this._now();
     this.setDirty();
-    this.renderNotizenTab();
+    this._nzStub();
     this._nzMenuClose();
     this._toast('\u2713 ' + this._nzZustandLabel(zustand));
   },
@@ -5461,7 +5277,7 @@ const WB = {
     const l = this._nzGetListen().find(x => x.id === listeId); if (!l) return;
     l.farbe = farbe;
     this.setDirty();
-    this.renderNotizenTab();
+    this._nzStub();
     this._nzRenderPills();
   },
 
@@ -5483,7 +5299,7 @@ const WB = {
     return String(active.length);
   },
 
-  renderNotizenTab() {
+  _nzStub() {
     const scroll = document.getElementById('notizen-scroll');
     if (!scroll) return;
     this._nzUpdateCounts();
@@ -5695,7 +5511,7 @@ const WB = {
     document.querySelectorAll('.nz-view-toggle-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.view === view);
     });
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzRenderTagGroups(listen, renderKachel) {
@@ -5798,7 +5614,7 @@ const WB = {
     this._nzOffeneCL = false;
     document.querySelectorAll('#nz-mobile-filter .nz-mf-chip').forEach(b => b.classList.remove('active'));
     document.querySelector('#nz-mobile-filter [data-zustand="' + zustand + '"]')?.classList.add('active');
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzMfToggleOffenCL() {
@@ -5806,7 +5622,7 @@ const WB = {
     document.querySelectorAll('#nz-mobile-filter .nz-mf-chip[data-zustand]').forEach(b => b.classList.remove('active'));
     const btn = document.querySelector('#nz-mobile-filter [data-filter="offen-cl"]');
     if (btn) btn.classList.toggle('active', this._nzOffeneCL);
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzMobileSheetOpen(l, listeId) {
@@ -5914,7 +5730,7 @@ const WB = {
     l.gepinnt = !l.gepinnt; l.updatedAt = this._now(); this.setDirty();
     const actions = document.getElementById('nz-ms-actions');
     if (actions) actions.innerHTML = this._nzMsActionsHtml(l, listeId);
-    this.renderNotizenTab();
+    this._nzStub();
     if (this.activeTab === 'tagessicht') this._tsRenderNotizenKompakt();
   },
 
@@ -5930,7 +5746,7 @@ const WB = {
     l.updatedAt = this._now(); this.setDirty();
     const actions = document.getElementById('nz-ms-actions');
     if (actions) actions.innerHTML = this._nzMsActionsHtml(l, listeId);
-    this.renderNotizenTab();
+    this._nzStub();
     if (this.activeTab === 'tagessicht') this._tsRenderNotizenKompakt();
   },
 
@@ -5946,7 +5762,7 @@ const WB = {
     if (body) body.style.background = bg;
     const meta = document.getElementById('nz-ms-meta');
     if (meta && this._nzMsMetaOpen) meta.innerHTML = this._nzMsMetaRender(l, listeId);
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzMsSetWelt(listeId, welt) {
@@ -5954,7 +5770,7 @@ const WB = {
     l.welt = welt === 'beide' ? undefined : welt; l.updatedAt = this._now(); this.setDirty();
     const meta = document.getElementById('nz-ms-meta');
     if (meta && this._nzMsMetaOpen) meta.innerHTML = this._nzMsMetaRender(l, listeId);
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzMsSetDeadline(listeId, dl) {
@@ -5962,7 +5778,7 @@ const WB = {
     l.deadline = dl || null; l.updatedAt = this._now(); this.setDirty();
     const meta = document.getElementById('nz-ms-meta');
     if (meta && this._nzMsMetaOpen) meta.innerHTML = this._nzMsMetaRender(l, listeId);
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzMsToggleVert(listeId) {
@@ -5970,7 +5786,7 @@ const WB = {
     l.vertraulich = !l.vertraulich; l.updatedAt = this._now(); this.setDirty();
     const meta = document.getElementById('nz-ms-meta');
     if (meta && this._nzMsMetaOpen) meta.innerHTML = this._nzMsMetaRender(l, listeId);
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzMsDuplizieren(listeId) {
@@ -5984,7 +5800,7 @@ const WB = {
     this.db.notizen.push(copy);
     this.setDirty();
     this._nzMobileSheetClose();
-    this.renderNotizenTab();
+    this._nzStub();
     this._toast('⎘ Kopie erstellt');
   },
 
@@ -6052,7 +5868,7 @@ const WB = {
     l.updatedAt = this._now();
     this.setDirty();
     this.modalClose();
-    this.renderNotizenTab();
+    this._nzStub();
     this._toast('\u2713 Notiz gespeichert');
   },
 
@@ -6091,7 +5907,7 @@ const WB = {
     const [moved] = db.notizen.splice(fromIdx, 1);
     db.notizen.splice(targetIdx, 0, moved);
     this.setDirty();
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzDragEnd() {
@@ -6134,7 +5950,7 @@ const WB = {
     l.updatedAt = this._now();
     this.setDirty();
     this._nzKachelRender();
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzKachelRender() {
@@ -6291,7 +6107,7 @@ const WB = {
     const insertAt  = reordered.findIndex(i => i.id === toIid);
     l.items = [...reordered.slice(0, insertAt), moved, ...reordered.slice(insertAt)];
     this.setDirty();
-    this.renderNotizenTab();
+    this._nzStub();
   },
 
   _nzEditItem(listeId, itemId, spanEl) {
@@ -6312,12 +6128,12 @@ const WB = {
       }
       // Gruppe offen lassen nach Bearbeiten
       this._nzGrpState[listeId] = true;
-      this.renderNotizenTab();
+      this._nzStub();
     };
     input.addEventListener('blur', save);
     input.addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); save(); }
-      if (e.key === 'Escape') { this.renderNotizenTab(); }
+      if (e.key === 'Escape') { this._nzStub(); }
     });
   },
 
@@ -6331,7 +6147,7 @@ const WB = {
     l.gepinnt = !l.gepinnt;
     l.updatedAt = this._now();
     this.setDirty();
-    this.renderNotizenTab();
+    this._nzStub();
     this._nzRenderPills();
     if (this.activeTab === 'tagessicht') this._tsRenderNotizenKompakt();
   },
@@ -6433,7 +6249,7 @@ const WB = {
     const ov = document.getElementById('nz-float-overlay');
     if (ov) ov.classList.remove('open');
     this._nzCurrentFloatId = null;
-    if (this.activeTab === 'notizen') this.renderNotizenTab();
+    if (this.activeTab === 'assistent') this._nzStub();
   },
 
   _nzAddItem(listeId) {
@@ -6450,7 +6266,7 @@ const WB = {
     this.setDirty();
     // Gruppe offen lassen nach Hinzufügen
     this._nzGrpState[listeId] = true;
-    this.renderNotizenTab();
+    this._nzStub();
     this._nzRenderPills();
     // iOS: Fokus nach render zurücksetzen
     setTimeout(() => {
@@ -6465,7 +6281,7 @@ const WB = {
     i.done = !i.done;
     l.items.sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0));
     this.setDirty();
-    this.renderNotizenTab();
+    this._nzStub();
     this._nzRenderPills();
   },
 
@@ -6474,7 +6290,7 @@ const WB = {
     const i = (l.items||[]).find(x => x.id === itemId); if (!i) return;
     this._softDelete(i);
     this.setDirty();
-    this.renderNotizenTab();
+    this._nzStub();
     this._nzRenderPills();
   },
 
@@ -6484,7 +6300,7 @@ const WB = {
       this._softDelete(l);
       if (this._nzDetailId === listeId) document.getElementById('nz-detail-panel')?.classList.remove('open');
       this.setDirty();
-      this.renderNotizenTab();
+      this._nzStub();
       this._nzRenderPills();
     });
   },
@@ -6590,7 +6406,7 @@ const WB = {
     if (copy.items) copy.items.forEach((it, idx) => { it.done = false; it.id = 'i_' + Date.now() + '_' + idx; });
     if (!this.db.notizen) this.db.notizen = [];
     this.db.notizen.push(copy);
-    this.setDirty(); this.modalClose(); this.renderNotizenTab();
+    this.setDirty(); this.modalClose(); this._nzStub();
     this._toast('\u2713 Notiz dupliziert');
   },
 
@@ -6662,7 +6478,7 @@ const WB = {
     this._nzAutoFarbe(l);
     this.setDirty();
     this.modalClose();
-    this.renderNotizenTab();
+    this._nzStub();
     this._nzRenderPills();
     this._toast('\u2713 Gespeichert');
   },
@@ -6698,7 +6514,7 @@ const WB = {
     this.db.notizen.push(neueNotiz);
     this.setDirty();
     this.modalClose();
-    this.renderNotizenTab();
+    this._nzStub();
     this._toast('\u2713 Liste erstellt');
   },
 
@@ -7837,6 +7653,7 @@ const WB = {
       if(dbRaw&&dbRaw._version) {
         this.db=dbRaw;
         this._ensureDbFields();
+        this._migrateToV4();
         this._migrateWissensnetzwerk(); // einmalig, nur hier — nie in _syncDownload
         // heutePin: zurücksetzen bei Tageswechsel (nicht Session-Ende)
         const today = this._dStr(new Date());
@@ -7912,6 +7729,7 @@ const WB = {
     };
     this.dataPro = null; this.dataPriv = null;
     this._migrateQuickItems(); // quickItems aus alter Migration → aufgaben
+    this._migrateToV4(); // WB4: notizen[] → themen[]/gateways[]
     await this.idbSave();
     this.setDirty();
     console.log('[migrate_v2] Migration abgeschlossen');
@@ -7991,13 +7809,111 @@ const WB = {
 
   _emptyDb() {
     return {
-      quickItems: [], customEvents: [], wochenpflichten: [],
-      pflichtStatus: {}, tagesprotokoll: [], wochenMottos: {},
-      checklistVorlagen: [], vorhaben: [], ziele: [], links: [],
-      notizen: [], mantras: [], sondertage: [], aufgaben: [],
-      wissensnetzwerk: [],
-      _version: 1, _exportedAt: '',
+      // ── WB4: Neue Collections ──
+      themen:   [],   // typ:'thema' — Lebensthemen / Pipelines
+      aufgaben: [],   // Aufgaben mit Unteraufgaben + Wiederholung
+      gateways: [],   // Meilensteine mit KPIs
+      // ── Termine & Kalender (unverändert) ──
+      customEvents: [], wochenpflichten: [], pflichtStatus: {},
+      tagesprotokoll: [], wochenMottos: {}, sondertage: [],
+      // ── Legacy (leer, für Kompatibilität beim Laden alter Daten) ──
+      notizen: [], wissensnetzwerk: [], vorhaben: [], ziele: [],
+      links: [], quickItems: [], checklistVorlagen: [], mantras: [],
+      _version: 2, _exportedAt: '',
     };
+  },
+
+  // WB4: Migration von v1 (notizen/netzwerk) → v2 (themen/aufgaben/gateways)
+  _migrateToV4() {
+    if (!this.db) return;
+    // Bereits migriert?
+    if (this.db._version >= 2) return;
+    let dirty = false;
+
+    // Alte notizen[] → themen[] / gateways[] migrieren
+    if (Array.isArray(this.db.notizen) && this.db.notizen.length > 0) {
+      if (!this.db.themen)   this.db.themen   = [];
+      if (!this.db.gateways) this.db.gateways = [];
+
+      this.db.notizen.forEach(n => {
+        if (!n || n.deleted) return;
+        if (n.typ === 'thema') {
+          // Nur wenn noch nicht in themen[]
+          if (!this.db.themen.find(t => t.id === n.id)) {
+            this.db.themen.push({
+              id:          n.id,
+              titel:       n.titel || n.name || 'Unbenanntes Thema',
+              prio:        n.themaPrio || 2,
+              status:      n.themaStatus || 'aktiv',
+              beschreibung: n.inhalt || '',
+              updatedAt:   n.updatedAt || new Date().toISOString(),
+              deleted:     false,
+            });
+            dirty = true;
+          }
+        } else if (n.typ === 'gateway') {
+          if (!this.db.gateways.find(g => g.id === n.id)) {
+            this.db.gateways.push({
+              id:                n.id,
+              themaId:           n.themaId || null,
+              titel:             n.titel || n.name || 'Gateway',
+              pruefDatum:        n.deadline || n.gatewayDate || null,
+              gatewayStatus:     n.gatewayStatus || 'offen',
+              gatewayCondition:  n.gatewayCondition || '',
+              gatewayConsequence:n.gatewayConsequence || '',
+              istWert:           '',
+              sollWert:          '',
+              istWertLabel:      '',
+              reihenfolge:       0,
+              updatedAt:         n.updatedAt || new Date().toISOString(),
+              deleted:           false,
+            });
+            dirty = true;
+          }
+        }
+        // Sonstige Notiz-Typen (check, freitext, idea) → nicht migriert
+        // Sie bleiben in notizen[] für manuellen Export
+      });
+    }
+
+    // Alte aufgaben[] (WB3 Format) → aufgaben[] (WB4 Format)
+    if (Array.isArray(this.db.aufgaben)) {
+      // WB4 aufgaben haben ein 'wb4' Flag
+      const alteAufgaben = this.db.aufgaben.filter(a => !a._wb4);
+      if (alteAufgaben.length > 0) {
+        const neueAufgaben = alteAufgaben.map(a => ({
+          id:              a.id,
+          titel:           a.titel || a.text || 'Aufgabe',
+          themaId:         a.vorhabenId || null,
+          zeitBudgetMin:   a.zeitBudgetMin || 0,
+          reihenfolge:     a.pos || 0,
+          status:          a.done ? 'erledigt' : 'offen',
+          items:           (a.checklist || []).map(c => ({
+            id: c.id || ('si_' + Math.random().toString(36).slice(2,8)),
+            titel: c.text || c.titel || '',
+            status: c.done ? 2 : 0,
+            datum: null,
+          })),
+          wiederholung:    null,
+          linkUrl:         '',
+          linkLabel:       '',
+          updatedAt:       a.updatedAt || new Date().toISOString(),
+          deleted:         a.deleted || false,
+          _wb4:            true,
+        }));
+        this.db.aufgaben = [
+          ...neueAufgaben,
+          ...this.db.aufgaben.filter(a => a._wb4),
+        ];
+        dirty = true;
+      }
+    }
+
+    this.db._version = 2;
+    if (dirty) {
+      this.setDirty();
+      console.log('[WB4] Migration v1→v2 abgeschlossen.');
+    }
   },
 
 
