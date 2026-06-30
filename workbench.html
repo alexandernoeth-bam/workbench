@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 4.0.1</title>
+  <title>WorkBench 4.0.2</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -924,6 +924,41 @@
       margin: 2px 0; position: relative; }
     .ck4-now-line::before { content: ''; width: 7px; height: 7px; background: var(--accent);
       border-radius: 50%; position: absolute; left: -3px; top: -2.5px; }
+    /* WB4: Zeitstrahl — Deadline-Zeile oben */
+    .ck4-deadline-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(192,57,43,.04);
+      border-left: 3px solid var(--danger);
+      color: var(--danger);
+      font-size: 13px;
+    }
+    .ck4-deadline-row svg { flex-shrink: 0; stroke: var(--danger); }
+    .ck4-deadline-text { flex: 1; font-weight: 600; }
+    .ck4-deadline-badge {
+      font-size: 10px;
+      font-weight: 800;
+      background: rgba(192,57,43,.1);
+      border-radius: 6px;
+      padding: 2px 7px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    /* WB4: Zeitstrahl — Overlap-Grid */
+    .ck4-time-evts.ck4-overlap {
+      display: grid;
+      gap: 3px;
+    }
+    .ck4-time-evts:not(.ck4-overlap) {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
 
     /* Tagesheader bleibt */
 
@@ -1473,7 +1508,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench 4.0</div>
-  <div id="wb-startup-tagline">v4.0.1</div>
+  <div id="wb-startup-tagline">v4.0.2</div>
 </div>
 
 <!-- Modal -->
@@ -1726,7 +1761,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench 4.0</span>
-    <span id="wb-menu-version">v4.0.1</span>
+    <span id="wb-menu-version">v4.0.2</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -1836,8 +1871,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '4.0.1',
-  APP_BUILD:   '20260630-0930',
+  APP_VERSION: '4.0.2',
+  APP_BUILD:   '20260630-1000',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2704,7 +2739,7 @@ const WB = {
     body.innerHTML = html;
   },
 
-  // ── Sektion 3: Zeitstrahl ────────────────────────────
+  // ── Sektion 3: Zeitstrahl (WB4 — Deadlines oben, Overlap-Spalten) ──
   _ck4RenderZeitstrahl() {
     const body = document.getElementById('ck-zeitstrahl-body');
     if (!body) return;
@@ -2713,21 +2748,31 @@ const WB = {
     const nowMin = now.getHours() * 60 + now.getMinutes();
     const db     = this.db || {};
 
-    const zeitKey = '_zeitstrahl';
+    const zeitKey  = '_zeitstrahl';
     const zeitOpen = this._ck4KlappGet(zeitKey) !== false;
 
-    const events = (db.customEvents || [])
+    // Alle heutigen Termine (keine Deadlines als Events)
+    const alleEvents = (db.customEvents || [])
       .filter(e => !e.deleted && e.date === today && !e.storniert)
       .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
 
-    const mitUhrzeit  = events.filter(e => !!e.startTime);
-    const ohneUhrzeit = events.filter(e => !e.startTime);
+    const deadlineEvents = alleEvents.filter(e => e.isDeadline);
+    const normalEvents   = alleEvents.filter(e => !e.isDeadline);
+    const mitUhrzeit     = normalEvents.filter(e => !!e.startTime);
+    const ohneUhrzeit    = normalEvents.filter(e => !e.startTime);
 
+    // Deadlines aus customEvents + ggf. aus db.aufgaben/gateways
+    const alleDeadlines = [...deadlineEvents];
+    // Gateway-Deadlines heute
+    (db.gateways || []).filter(g => !g.deleted && g.gatewayStatus === 'offen' && g.pruefDatum === today)
+      .forEach(g => alleDeadlines.push({ id: g.id, text: g.titel, _isGw: true }));
+
+    // Sektion-Header
     let html = '<div class="ck4-section">';
-    html += '<div class="ck4-section-hdr" onclick="WB._ck4SectionToggle(\x27' + zeitKey + '\x27,\x27ck4-zeit-inner\x27,\x27ck4-zeit-chev\x27)">';
+    html += '<div class="ck4-section-hdr" onclick="WB._ck4SectionToggle(\x27' + zeitKey + '\x27,\x27ck4-zeit-inner\x27,\x27ck4-zeit-chev\x27)">'
       + '<span class="ck4-sec-title">Zeitstrahl</span>'
       + '<span class="ck4-sec-actions">'
-      + '<span class="ck4-sec-meta">' + events.length + ' Termine</span>'
+      + '<span class="ck4-sec-meta">' + normalEvents.length + ' Termine</span>'
       + '<button class="ck4-add-btn" onclick="event.stopPropagation();WB.terminOpen(null)">+ Termin</button>'
       + '<span class="ck4-chevron' + (zeitOpen ? ' open' : '') + '" id="ck4-zeit-chev">&#9654;</span>'
       + '</span></div>';
@@ -2735,6 +2780,19 @@ const WB = {
     html += '<div id="ck4-zeit-inner"' + (zeitOpen ? '' : ' class="hidden"') + '>';
     html += '<div class="ck4-section-body" style="padding:0;">';
 
+    // ── Deadlines oben als kompakte Zeile ──
+    if (alleDeadlines.length) {
+      alleDeadlines.forEach(e => {
+        const onclick = e._isGw ? '' : ' onclick="WB.terminOpen(\x27' + this._esc(e.id) + '\x27)" style="cursor:pointer;"';
+        html += '<div class="ck4-deadline-row"' + onclick + '>'
+          + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+          + '<span class="ck4-deadline-text">' + this._esc(e.text || '') + '</span>'
+          + '<span class="ck4-deadline-badge">fällig heute</span>'
+          + '</div>';
+      });
+    }
+
+    // ── Ganztägige Termine ──
     if (ohneUhrzeit.length) {
       html += '<div class="ck4-ganztag-row">'
         + ohneUhrzeit.map(e => {
@@ -2746,36 +2804,74 @@ const WB = {
         + '</div>';
     }
 
+    // ── Overlap-Erkennung ──
+    // Für jeden Termin: Startminute + Endminute berechnen
+    const evtMins = mitUhrzeit.map(e => {
+      const [eh, em] = (e.startTime || '00:00').split(':').map(Number);
+      const startM = eh * 60 + (em || 0);
+      const endM   = startM + (e.durationMin > 0 ? e.durationMin : 60);
+      return { e, startM, endM, col: 0, cols: 1 };
+    });
+
+    // Spalten-Zuweisung: greedy overlap detection
+    for (let i = 0; i < evtMins.length; i++) {
+      const usedCols = new Set();
+      for (let j = 0; j < i; j++) {
+        if (evtMins[j].startM < evtMins[i].endM && evtMins[j].endM > evtMins[i].startM) {
+          usedCols.add(evtMins[j].col);
+        }
+      }
+      let col = 0;
+      while (usedCols.has(col)) col++;
+      evtMins[i].col = col;
+    }
+    // Max-Spalten pro Slot berechnen
+    const maxCols = evtMins.reduce((m, x) => Math.max(m, x.col + 1), 1);
+
+    // ── Stunden-Slots rendern ──
     let nowDone = false;
     for (let hr = 6; hr <= 22; hr++) {
       const slotMin = hr * 60;
       const nextMin = slotMin + 60;
-      const slotEvt = mitUhrzeit.filter(e => {
-        const [eh, em] = (e.startTime || '00:00').split(':').map(Number);
-        return eh * 60 + (em || 0) >= slotMin && eh * 60 + (em || 0) < nextMin;
-      });
-      const isNow = nowMin >= slotMin && nowMin < nextMin;
+      const slotEvt = evtMins.filter(x => x.startM >= slotMin && x.startM < nextMin);
+      const isNow   = nowMin >= slotMin && nowMin < nextMin;
+
+      // Maximale Spalten in diesem Slot
+      const slotMaxCols = slotEvt.reduce((m, x) => Math.max(m, x.col + 1), 1);
 
       html += '<div class="ck4-time-row' + (isNow ? ' now-row' : '') + '">';
       html += '<div class="ck4-time-lbl">' + String(hr).padStart(2, '0') + ':00</div>';
-      html += '<div class="ck4-time-evts">';
+
+      if (slotMaxCols > 1) {
+        // Overlap: Grid mit Spalten
+        html += '<div class="ck4-time-evts ck4-overlap" style="grid-template-columns:repeat(' + slotMaxCols + ',1fr);">';
+      } else {
+        html += '<div class="ck4-time-evts">';
+      }
+
       if (isNow && !nowDone) {
-        html += '<div class="ck4-now-line"></div>';
+        html += '<div class="ck4-now-line"' + (slotMaxCols > 1 ? ' style="grid-column:1/-1;"' : '') + '></div>';
         nowDone = true;
       }
-      slotEvt.forEach(e => {
+
+      slotEvt.forEach(x => {
+        const e   = x.e;
         const welt = e.welt || 'priv';
-        const cls  = e.isDeadline ? 'deadline' : (welt === 'pro' || welt === 'beruf') ? 'beruf' : 'privat';
-        const end  = e.durationMin > 0 ? ' <span class="ck4-ev-end">bis ' + this._calcEndTime(e.startTime, e.durationMin) + '</span>' : '';
-        html += '<div class="ck4-ev-block ' + cls + '" onclick="WB.terminOpen(\x27' + this._esc(e.id) + '\x27)">'
-          + '<strong>' + e.startTime + '</strong> ' + this._esc(e.text || e.titel || '') + end + '</div>';
+        const cls  = (welt === 'pro' || welt === 'beruf') ? 'beruf' : 'privat';
+        const end  = e.durationMin > 0
+          ? ' <span class="ck4-ev-end">bis ' + this._calcEndTime(e.startTime, e.durationMin) + '</span>'
+          : '';
+        const colStyle = slotMaxCols > 1 ? ' style="grid-column:' + (x.col + 1) + ';"' : '';
+        html += '<div class="ck4-ev-block ' + cls + '"' + colStyle + ' onclick="WB.terminOpen(\x27' + this._esc(e.id) + '\x27)">'
+          + '<strong>' + e.startTime + '</strong> ' + this._esc(e.text || e.titel || '') + end
+          + '</div>';
       });
+
       html += '</div></div>';
     }
 
-    if (!events.length) {
-      html = html.replace('ck4-section-body" style="padding:0;">',
-        'ck4-section-body" style="padding:0;"><div class="ck-empty-msg" style="padding:14px 16px;">Keine Termine heute</div>');
+    if (!normalEvents.length && !alleDeadlines.length) {
+      html += '<div class="ck-empty-msg" style="padding:14px 16px;">Keine Termine heute</div>';
     }
 
     html += '</div></div></div>';
@@ -2854,19 +2950,12 @@ const WB = {
         + (sonder ? '<span class="ts-th-sondertag">' + (stL[sonder.typ]||sonder.typ) + (sonder.name?' '+this._esc(sonder.name):'') + '</span>' : '')
         + '</div>';
     } else {
-      // Eingang-Zähler (weltabhängig)
-      const welt = this.activeWorld;
-      const eingangCnt = (this.db?.notizen||[]).filter(l => {
-        if (l.deleted || l.zustand !== 'eingang') return false;
-        if (welt === 'beruf')  return l.welt === 'beruf'  || l.welt === 'pro';
-        if (welt === 'privat') return l.welt === 'privat' || l.welt === 'priv';
-        return true;
-      }).length;
+      /* WB4: Eingang-Zähler entfernt */
       h += '<div class="ts-th-dot"></div><span class="ts-th-wochentag">' + wt + '</span>'
         + '<span class="ts-th-sep">\u00b7</span><span class="ts-th-datum">' + now.getDate() + '. ' + mN[now.getMonth()] + ' ' + now.getFullYear() + '</span>'
         + '<span class="ts-th-kw">KW ' + kw + '</span>'
         + (sonder ? '<span class="ts-th-sondertag">' + (stL[sonder.typ]||sonder.typ) + (sonder.name?' '+this._esc(sonder.name):'') + '</span>' : '')
-        + (eingangCnt > 0 ? '<button class="ts-th-inbox" onclick="WB.tabSwitch(\'notizen\');WB._nzStubSetZustand(\'eingang\')" title="Offene Eingang-Notizen">📥 Eingang ' + eingangCnt + '</button>' : '');
+        /* WB4: Eingang-Pill entfernt */
     }
     h += '</div>';
     el.innerHTML = h;
@@ -3176,34 +3265,9 @@ const WB = {
 
 
   _tsRenderDeadlineBanner() {
+    // WB4: Deadline-Banner unten entfernt — Deadlines werden im Zeitstrahl oben angezeigt
     const wrap = document.getElementById('ts-deadline-banner-wrap');
-    if (!wrap) return;
-    const today = this._dStr(new Date());
-    const todayD = new Date(today);
-    const deadlines = (this.db?.customEvents||[]).filter(e =>
-      e.isDeadline && !e.deleted && !e.done
-    );
-    const banners = [];
-    deadlines.forEach(e => {
-      if (!e.date) return;
-      const dDate = new Date(e.date);
-      const diffMs = dDate - todayD;
-      const diffDays = Math.round(diffMs / 86400000);
-      const remind = e.remindDaysBefore !== undefined ? e.remindDaysBefore : 1;
-      if (remind < 0) return; // Keine Erinnerung
-      if (diffDays < 0) return; // Vergangenheit
-      if (diffDays <= remind) {
-        let label = diffDays === 0 ? 'f\u00e4llig heute'
-          : diffDays === 1 ? 'f\u00e4llig morgen'
-          : 'f\u00e4llig in ' + diffDays + ' Tagen';
-        banners.push('<div class="ts-deadline-banner" onclick="WB.terminOpen(\'' + this._esc(e.id) + '\')" style="cursor:pointer;">'
-          + '<div class="ts-deadline-banner-title">\uD83D\uDEA9 Deadline-Erinnerung</div>'
-          + this._esc(e.text) + ' \u00b7 <span style="font-weight:600;">' + label + '</span>'
-          + '</div>');
-      }
-    });
-    wrap.innerHTML = banners.join('');
-    wrap.style.display = banners.length ? 'block' : 'none';
+    if (wrap) { wrap.innerHTML = ''; wrap.style.display = 'none'; }
   },
 
   _tsRenderZeitband() {

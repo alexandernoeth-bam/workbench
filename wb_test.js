@@ -1345,9 +1345,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.1'")
-  ? (ok('APP_VERSION ist 4.0.1'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.1'), f48Fail++); // WB4 Phase 2
+jsCode.includes("APP_VERSION: '4.0.2'")
+  ? (ok('APP_VERSION ist 4.0.2'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.2'), f48Fail++); // WB4 Phase 2
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
@@ -1386,6 +1386,24 @@ content.includes('.ck4-section {')
 (!content.includes('ck-col-left') || content.includes('ck-col-left  { flex:0 0') === false)
   ? (ok('Altes 3-Spalten-Layout entfernt'), f48Ok++)
   : (fail('3-Spalten-Layout noch aktiv'), f48Fail++);
+
+
+// WB4: Zeitstrahl Fixes
+content.includes('.ck4-deadline-row')
+  ? (ok('.ck4-deadline-row CSS vorhanden (Deadlines oben)'), f48Ok++)
+  : (fail('.ck4-deadline-row CSS fehlt'), f48Fail++);
+
+jsCode.includes('alleDeadlines')
+  ? (ok('Deadline-Sammlung im Zeitstrahl vorhanden'), f48Ok++)
+  : (fail('Deadline-Sammlung fehlt'), f48Fail++);
+
+content.includes('.ck4-overlap')
+  ? (ok('.ck4-overlap Grid-CSS vorhanden (Überlappende Termine)'), f48Ok++)
+  : (fail('.ck4-overlap CSS fehlt'), f48Fail++);
+
+jsCode.includes('ts-th-inbox') === false
+  ? (ok('Eingang-Pill aus Header entfernt'), f48Ok++)
+  : (fail('Eingang-Pill noch im Header'), f48Fail++);
 
 
 console.log('\n═══════════════════════════════════════════');
