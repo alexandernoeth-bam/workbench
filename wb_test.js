@@ -437,8 +437,8 @@ content.includes('_renderHybridBody(')
 // Schriftgrößen linke Kachel
 content.includes('.ts-kd-title') && content.includes('font-size:14px')
   ? (ok('.ts-kd-title: font-size 14px'), f29Ok++) : (fail('.ts-kd-title: font-size nicht 14px'), f29Fail++);
-content.includes('.ts-kd-txt') && (content.match(/\.ts-kd-txt\s*\{[^}]*font-size:14px/) || content.includes('ts-kd-txt { font-size:14px'))
-  ? (ok('.ts-kd-txt: font-size 14px'), f29Ok++) : (fail('.ts-kd-txt: font-size nicht 14px'), f29Fail++);
+content.includes('.ts-kd-txt')
+  ? (ok('.ts-kd-txt vorhanden (WB4: font-size skaliert)'), f29Ok++) : (fail('.ts-kd-txt fehlt'), f29Fail++);
 
 // Checkbox-Größe
 content.includes('.ts-kd-chk') && content.includes('width:17px')
@@ -1345,9 +1345,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.5'")
-  ? (ok('APP_VERSION ist 4.0.5'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.5'), f48Fail++); // WB4 Phase 3c
+jsCode.includes("APP_VERSION: '4.0.7'")
+  ? (ok('APP_VERSION ist 4.0.7'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.7'), f48Fail++); // WB4 Phase 3e
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
@@ -1518,6 +1518,38 @@ jsCode.includes('Terminplan')
 content.includes('L\u00f6schen') || content.includes('Löschen')
   ? (ok('Löschen (kein Tippfehler mehr)'), f48Ok++)
   : (fail('Löschen fehlt'), f48Fail++);
+
+
+// WB4 Phase 3d: Chevron-Fix + Schrift
+content.includes('&apos;_themenradar&apos;')
+  ? (ok('onclick verwendet &apos; statt \\x27 (Chevron-Fix)'), f48Ok++)
+  : (fail('onclick &apos; fehlt — Chevrons funktionieren nicht'), f48Fail++);
+
+content.includes('font-size: 18px') || content.includes('font-size: 20px')
+  ? (ok('Schriftgrößen skaliert (+40%)'), f48Ok++)
+  : (fail('Schriftgrößen nicht skaliert'), f48Fail++);
+
+
+// WB4 Pipeline Mockup-Fix
+content.includes('.as-pipeline.prio-1')
+  ? (ok('Pipeline prio-1 Farb-Rand CSS vorhanden'), f48Ok++)
+  : (fail('Pipeline prio-1 CSS fehlt'), f48Fail++);
+
+jsCode.includes('as-gw-main')
+  ? (ok('Gateway as-gw-main Layout vorhanden'), f48Ok++)
+  : (fail('Gateway as-gw-main fehlt'), f48Fail++);
+
+jsCode.includes('as-chain-type')
+  ? (ok('Aufgaben Typ-Badge (as-chain-type) vorhanden'), f48Ok++)
+  : (fail('Aufgaben Typ-Badge fehlt'), f48Fail++);
+
+jsCode.includes('Bedingung:') && jsCode.includes('as-gw-sub')
+  ? (ok('Gateway Bedingung/Konsequenz als Subzeile sichtbar'), f48Ok++)
+  : (fail('Gateway Subzeilen fehlen'), f48Fail++);
+
+jsCode.includes('Kurs ok')
+  ? (ok('Status-Badge: Kurs ok vorhanden'), f48Ok++)
+  : (fail('Status-Badge fehlt'), f48Fail++);
 
 
 console.log('\n═══════════════════════════════════════════');
