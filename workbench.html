@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.0.9</title>
+  <title>WorkBench 5.1.0</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -372,7 +372,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.0.9 · Build 20260630-2315</div>
+    <div id="wb-startup-tagline">v5.1.0 · Build 20260630-2350</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -402,6 +402,7 @@
         <div class="wb5-overlay-panel">
           <div class="wb5-overlay-hdr">
             <span class="wb5-overlay-title" id="wb5-ov-title">Thema</span>
+            <button id="wb5-ov-edit-btn" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:3px 10px;font-size:12px;color:#fff;cursor:pointer;margin-right:4px;">Bearbeiten</button>
             <button class="wb5-overlay-close" onclick="WB._tm5CloseOverlay()">&#x2715;</button>
           </div>
           <div class="wb5-overlay-meta" id="wb5-ov-meta"></div>
@@ -678,8 +679,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.0.9',
-  APP_BUILD:      '20260630-2315',
+  APP_VERSION:    '5.1.0',
+  APP_BUILD:      '20260630-2350',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -971,6 +972,50 @@ const WB = {
 
   // ── THEMEN ─────────────────────────────────────────
 
+
+  _gw5Edit(gwId, themaId) {
+    const t=(this.db.themen||[]).find(x=>x.id===themaId); if(!t) return;
+    const gw=(t.gateways||[]).find(g=>g.id===gwId); if(!gw) return;
+    const body =
+      '<div class="wb-input-group"><span class="wb-label">Titel</span>'
+      +'<input id="wb5-gw-titel" class="wb-input" type="text" value="'+this._esc(gw.titel)+'"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Prüf-Datum</span>'
+      +'<input id="wb5-gw-datum" class="wb-input" type="date" value="'+(gw.pruefDatum||'')+'"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Bedingung</span>'
+      +'<input id="wb5-gw-bedingung" class="wb-input" type="text" value="'+this._esc(gw.bedingung||'')+'"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Konsequenz</span>'
+      +'<input id="wb5-gw-konsequenz" class="wb-input" type="text" value="'+this._esc(gw.konsequenz||'')+'"></div>'
+      +'<div class="wb5-input-row">'
+      +'<div class="wb-input-group"><span class="wb-label">IST</span>'
+      +'<input id="wb5-gw-ist" class="wb-input" type="text" value="'+this._esc(gw.istWert||'')+'"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">SOLL</span>'
+      +'<input id="wb5-gw-soll" class="wb-input" type="text" value="'+this._esc(gw.sollWert||'')+'"></div>'
+      +'</div>';
+    const foot='<div style="display:flex;gap:8px;justify-content:space-between;width:100%;">'
+      +'<button class="wb-btn wb-btn-danger" onclick="WB._gw5Delete(\x27'+gwId+'\x27,\x27'+themaId+'\x27)">Löschen</button>'
+      +'<div style="display:flex;gap:6px;">'
+      +'<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
+      +'<button class="wb-btn wb-btn-save" onclick="WB._gw5SaveEdit(\x27'+gwId+'\x27,\x27'+themaId+'\x27)">Speichern</button>'
+      +'</div></div>';
+    this.modalOpen('Gateway bearbeiten', body, foot);
+  },
+
+  _gw5SaveEdit(gwId, themaId) {
+    const t=(this.db.themen||[]).find(x=>x.id===themaId); if(!t) return;
+    const gw=(t.gateways||[]).find(g=>g.id===gwId); if(!gw) return;
+    gw.titel=document.getElementById('wb5-gw-titel')?.value.trim()||gw.titel;
+    gw.pruefDatum=document.getElementById('wb5-gw-datum')?.value||'';
+    gw.bedingung=document.getElementById('wb5-gw-bedingung')?.value.trim()||'';
+    gw.konsequenz=document.getElementById('wb5-gw-konsequenz')?.value.trim()||'';
+    gw.istWert=document.getElementById('wb5-gw-ist')?.value.trim()||'';
+    gw.sollWert=document.getElementById('wb5-gw-soll')?.value.trim()||'';
+    gw.updatedAt=this._now();
+    this.setDirty(); this.modalClose();
+    const t2=(this.db.themen||[]).find(x=>x.id===themaId);
+    if(t2) this._tm5RenderOverlayBody(t2);
+    this._toast('✓ Gateway gespeichert');
+  },
+
   _gw5Neu(themaId) {
     const body =
       '<div class="wb-input-group"><span class="wb-label">Titel / Meilenstein</span>'
@@ -1089,42 +1134,46 @@ const WB = {
 
   _te5DuplizierenTermin(id) {
     const e=(this.db.customEvents||[]).find(x=>x.id===id); if(!e) return;
-    const neu={...e, id:'ev_'+Date.now(), text:e.text+' (Kopie)', updatedAt:this._now()};
+    const neu={...e, id:'ev_'+Date.now(), updatedAt:this._now()};
     if(!this.db.customEvents) this.db.customEvents=[];
     this.db.customEvents.push(neu);
-    this.setDirty(); this.modalClose(); this._te5Render();
-    this._toast('✓ Termin dupliziert');
+    this.setDirty();
+    this.modalClose();
+    setTimeout(()=>this._terminDialog(neu.id), 50);
+    this._toast('Kopie angelegt — bitte Datum anpassen');
   },
 
   _duplizierenAufgabe(id) {
     const all=[...(this.db.aufgaben||[]),...(this.db.themen||[]).flatMap(t=>t.aufgaben||[])];
     const a=all.find(x=>x.id===id); if(!a) return;
-    const neu={...a, id:'a_'+Date.now(), titel:(a.titel||a.text||'')+(a.titel?' (Kopie)':''), text:(a.text||a.titel||'')+'', erledigt:false, updatedAt:this._now()};
-    // In dasselbe Ziel speichern
-    if(a.themaId) {
+    const neu={...a, id:'a_'+Date.now(), erledigt:false, updatedAt:this._now()};
+    if(a.themaId){
       const t=(this.db.themen||[]).find(x=>x.id===a.themaId);
       if(t){if(!t.aufgaben)t.aufgaben=[];t.aufgaben.push(neu);}
     } else {
-      if(!this.db.aufgaben) this.db.aufgaben=[];
+      if(!this.db.aufgaben)this.db.aufgaben=[];
       this.db.aufgaben.push(neu);
     }
-    this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
-    this._toast('✓ Aufgabe dupliziert');
+    this.setDirty();
+    this.modalClose();
+    setTimeout(()=>this._aufgabeDetail(neu.id), 50);
+    this._toast('Kopie angelegt');
   },
 
   _duplizierenThema(themaId) {
     const t=(this.db.themen||[]).find(x=>x.id===themaId); if(!t) return;
     const neu={...t,
       id:'th_'+Date.now(),
-      titel:t.titel+' (Kopie)',
       gateways:[],
-      aufgaben:(t.aufgaben||[]).map(a=>({...a,id:'a_'+Date.now()+Math.random().toString(36).slice(2),erledigt:false,updatedAt:this._now()})),
+      aufgaben:(t.aufgaben||[]).map(a=>({...a, id:'a_'+Date.now()+'_'+Math.random().toString(36).slice(2), erledigt:false, updatedAt:this._now()})),
       updatedAt:this._now()
     };
-    if(!this.db.themen) this.db.themen=[];
+    if(!this.db.themen)this.db.themen=[];
     this.db.themen.push(neu);
-    this.setDirty(); this.modalClose(); this._tm5CloseOverlay(); this._tm5Render();
-    this._toast('✓ Thema dupliziert');
+    this.setDirty();
+    this.modalClose();
+    setTimeout(()=>this._themaDialog(neu.id), 50);
+    this._toast('Kopie angelegt');
   },
 
   _tm5Render() {
@@ -1167,7 +1216,7 @@ const WB = {
     offenF.forEach(a=>{
       const isR=this._isRoutineHeute(a);const isUe=a.deadline&&a.deadline<this._dStr(new Date());const isFaellig=a.deadline===this._dStr(new Date());
       h+='<div class="wb5-freie-item" onclick="WB._aufgabeDetail(\''+this._esc(a.id)+'\')">'
-        +'<div class="wb5-cb" onclick="event.stopPropagation();WB._ht5Toggle(\x27'+this._esc(a.id)+'\x27)"></div><div class="wb5-dot wb5-dot-'+((a.welt||'b')==='p'?'p':'b')+'"></div>'
+        +'<div class="wb5-cb" onclick="event.stopPropagation();WB._ht5Toggle(\x27'+this._esc(a.id)+'\x27)"></div>'+this._weltPill(a.welt)
         +'<span class="wb5-freie-text">'+this._esc(a.titel||a.text||'')+'</span>'
         +(isUe?'<span class="wb5-atag wb5-at-ue">&uuml;berf&auml;llig</span>':'')
         +(isFaellig&&!isUe?'<span class="wb5-atag wb5-at-dl">'+this._fmtDDMM(a.deadline)+'</span>':'')
@@ -1187,6 +1236,9 @@ const WB = {
     const t=(this.db.themen||[]).find(x=>x.id===themaId); if(!t) return;
     const ov=document.getElementById('wb5-thema-overlay'); if(!ov) return;
     document.getElementById('wb5-ov-title').textContent=t.titel;
+    // Bearbeiten-Button im Header
+    const editBtn=document.getElementById('wb5-ov-edit-btn');
+    if(editBtn){ editBtn.onclick=()=>WB._themaDialog(themaId); }
     const meta=document.getElementById('wb5-ov-meta');
     meta.innerHTML='<span class="wb5-badge wb5-badge-p'+(t.prio||3)+'">Prio '+(t.prio||3)+'</span>'
       +'<span class="wb5-badge wb5-badge-aktiv">'+(t.status||'aktiv')+'</span>'
@@ -1205,6 +1257,7 @@ const WB = {
         +'<span class="wb5-gw-pill">Aktuelles GW</span>'
         +'<span class="wb5-gw-name">'+this._esc(aktGw.titel)+'</span>'
         +(aktGw.pruefDatum?'<span class="wb5-gw-date">'+this._fmtDDMM(aktGw.pruefDatum)+'</span>':'')
+        +'<button style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:11px;cursor:pointer;" onclick="event.stopPropagation();WB._gw5Edit(\x27'+aktGw.id+'\x27,\x27'+t.id+'\x27)">Bearb.</button>'
         +'<span class="wb5-chev" id="wb5-gw-chev">&#8964;</span></div>'
         +'<div class="wb5-gw-body" id="wb5-gw-body"><div class="wb5-gw-body-inner">'
         +(aktGw.bedingung?'<div><strong style="font-style:normal;color:var(--text);">Bedingung:</strong> '+this._esc(aktGw.bedingung)+'</div>':'')
@@ -2028,8 +2081,13 @@ const WB = {
 
   // ── setDirty & KW ──────────────────────────────────
   setDirty() {
-    this.isDirty=true;clearTimeout(this._saveTimer);
-    this._saveTimer=setTimeout(async()=>{if(!this._syncConflictPending)try{await this._syncUpload();}catch(e){}},5000);
+    this.isDirty=true;
+    this._pendingChanges=true;
+    clearTimeout(this._saveTimer);
+    this._saveTimer=setTimeout(async()=>{
+      await this.idbSave();
+      if(!this._syncConflictPending&&this._syncInitDone)try{await this._syncUpload();}catch(e){}
+    },3000);
   },
 
   _kwStr(d) {
@@ -2356,15 +2414,7 @@ const WB = {
     this._toast('\u2713 Daten migriert');
   },
 
-  _softDelete(item) {
-    if (item) {
-      item.deleted    = true;
-      item.gepinnt    = false; // Archivierte Notizen nie gepinnt
-      item.heutePin   = false;
-      item.heutePinDate = null;
-      item.updatedAt  = this._now();
-    }
-  },
+
 
   _migrateQuickItems() {
     // quickItems (Legacy) → aufgaben als freie Aufgaben
@@ -2383,25 +2433,7 @@ const WB = {
     this.db.quickItems = [];
   },
 
-  _itemVisible(item) {
-    const buero = !!this._settings?.bueroModus;
-    const welt  = this.activeWorld; // 'beide' | 'beruf' | 'privat'
-    const iw    = item?.welt || null; // 'pro'|'beruf'|'priv'|'privat'|null
-    const isPriv = iw === 'priv' || iw === 'privat';
-    const isBeruf = iw === 'pro' || iw === 'beruf';
 
-    // Büro-Modus: privates ausblenden + vertrauliches ausblenden
-    if (buero) {
-      if (isPriv) return false;
-      if (item?.vertraulich) return false;
-      // welt=null (Beides) bleibt sichtbar im Büro-Modus
-    }
-
-    // Welt-Filter
-    if (welt === 'beruf')  return isBeruf || (!isPriv && !isBeruf); // beruf + beide
-    if (welt === 'privat') return isPriv  || (!isPriv && !isBeruf); // privat + beide
-    return true; // 'beide'
-  },
 
   _bueroToggle() {
     this._settings.bueroModus = !this._settings.bueroModus;
@@ -2417,125 +2449,12 @@ const WB = {
     if (dot) dot.classList.toggle('on', !!this._settings?.bueroModus);
   },
 
-  setDirty() {
-    this.isDirty=true; this._pendingTs=Date.now();
-    this.idbSave().catch(e=>console.warn('[setDirty IDB]',e));
-    if(!this._syncInitDone) return;
-    clearTimeout(this._saveTimer);
-    this._saveTimer=setTimeout(async()=>{
-      if (!this._syncConflictPending) await this._syncUpload();
-    },2000);
-  },
 
-  _emptyDb() {
-    return {
-      // ── WB4: Neue Collections ──
-      themen:   [],   // typ:'thema' — Lebensthemen / Pipelines
-      aufgaben: [],   // Aufgaben mit Unteraufgaben + Wiederholung
-      gateways: [],   // Meilensteine mit KPIs
-      // ── Termine & Kalender (unverändert) ──
-      customEvents: [], wochenpflichten: [], pflichtStatus: {},
-      tagesprotokoll: [], wochenMottos: {}, sondertage: [],
-      // ── Legacy (leer, für Kompatibilität beim Laden alter Daten) ──
-      notizen: [], wissensnetzwerk: [], vorhaben: [], ziele: [],
-      links: [], quickItems: [], checklistVorlagen: [], mantras: [],
-      _version: 2, _exportedAt: '',
-    };
-  },
+
+
 
   // WB4: Migration von v1 (notizen/netzwerk) → v2 (themen/aufgaben/gateways)
-  _migrateToV4() {
-    if (!this.db) return;
-    // Bereits migriert?
-    if (this.db._version >= 2) return;
-    let dirty = false;
 
-    // Alte notizen[] → themen[] / gateways[] migrieren
-    if (Array.isArray(this.db.notizen) && this.db.notizen.length > 0) {
-      if (!this.db.themen)   this.db.themen   = [];
-      if (!this.db.gateways) this.db.gateways = [];
-
-      this.db.notizen.forEach(n => {
-        if (!n || n.deleted) return;
-        if (n.typ === 'thema') {
-          // Nur wenn noch nicht in themen[]
-          if (!this.db.themen.find(t => t.id === n.id)) {
-            this.db.themen.push({
-              id:          n.id,
-              titel:       n.titel || n.name || 'Unbenanntes Thema',
-              prio:        n.themaPrio || 2,
-              status:      n.themaStatus || 'aktiv',
-              welt:        n.welt || 'beruf',
-              beschreibung: n.inhalt || '',
-              updatedAt:   n.updatedAt || new Date().toISOString(),
-              deleted:     false,
-            });
-            dirty = true;
-          }
-        } else if (n.typ === 'gateway') {
-          if (!this.db.gateways.find(g => g.id === n.id)) {
-            this.db.gateways.push({
-              id:                n.id,
-              themaId:           n.themaId || null,
-              titel:             n.titel || n.name || 'Gateway',
-              pruefDatum:        n.deadline || n.gatewayDate || null,
-              gatewayStatus:     n.gatewayStatus || 'offen',
-              gatewayCondition:  n.gatewayCondition || '',
-              gatewayConsequence:n.gatewayConsequence || '',
-              istWert:           '',
-              sollWert:          '',
-              istWertLabel:      '',
-              reihenfolge:       0,
-              updatedAt:         n.updatedAt || new Date().toISOString(),
-              deleted:           false,
-            });
-            dirty = true;
-          }
-        }
-        // Sonstige Notiz-Typen (check, freitext, idea) → nicht migriert
-        // Sie bleiben in notizen[] für manuellen Export
-      });
-    }
-
-    // Alte aufgaben[] (WB3 Format) → aufgaben[] (WB4 Format)
-    if (Array.isArray(this.db.aufgaben)) {
-      // WB4 aufgaben haben ein 'wb4' Flag
-      const alteAufgaben = this.db.aufgaben.filter(a => !a._wb4);
-      if (alteAufgaben.length > 0) {
-        const neueAufgaben = alteAufgaben.map(a => ({
-          id:              a.id,
-          titel:           a.titel || a.text || 'Aufgabe',
-          themaId:         a.vorhabenId || null,
-          zeitBudgetMin:   a.zeitBudgetMin || 0,
-          reihenfolge:     a.pos || 0,
-          status:          a.done ? 'erledigt' : 'offen',
-          items:           (a.checklist || []).map(c => ({
-            id: c.id || ('si_' + Math.random().toString(36).slice(2,8)),
-            titel: c.text || c.titel || '',
-            status: c.done ? 2 : 0,
-            datum: null,
-          })),
-          wiederholung:    null,
-          linkUrl:         '',
-          linkLabel:       '',
-          updatedAt:       a.updatedAt || new Date().toISOString(),
-          deleted:         a.deleted || false,
-          _wb4:            true,
-        }));
-        this.db.aufgaben = [
-          ...neueAufgaben,
-          ...this.db.aufgaben.filter(a => a._wb4),
-        ];
-        dirty = true;
-      }
-    }
-
-    this.db._version = 2;
-    if (dirty) {
-      this.setDirty();
-      console.log('[WB4] Migration v1→v2 abgeschlossen.');
-    }
-  },
 
 
   // ── Crypto ──
@@ -2894,30 +2813,9 @@ const WB = {
     await this._syncDownload();
   },
 
-  async _syncCheckNewer() {
-    try {
-      const token = await this._oauthGetTokenSilent(); if (!token) return;
-      const fileId = await this._syncGetFileId(token); if (!fileId) return;
-      const resp = await fetch(this.DRIVE_API + '/files/' + fileId + '?fields=modifiedTime',
-        { headers: { Authorization: 'Bearer ' + token } });
-      if (!resp.ok) return;
-      const meta    = await resp.json();
-      const driveTs = new Date(meta.modifiedTime).getTime();
-      if (driveTs > this._syncLastDownload + 5000) {
-        if (this._pendingChanges || this.isDirty) this._syncConflictDialog('db', driveTs);
-        else await this._syncDownload();
-      }
-    } catch(e) { console.warn('[syncCheckNewer]', e.message); }
-  },
 
-  async _syncTick() {
-    if (!this._oauthClientId) return;
-    const token = await this._oauthGetTokenSilent();
-    if (!token) { this._oauthShowBanner('\u26a0 Google-Sitzung abgelaufen'); return; }
-    this._oauthHideBanner();
-    if (this._pendingChanges || this.isDirty) await this._syncUpload();
-    else await this._syncCheckNewer();
-  },
+
+
 
   _syncConflictPending: false,
 
@@ -3075,53 +2973,20 @@ const WB = {
     if(window.google?.accounts?.oauth2) try{google.accounts.oauth2.revoke(this._oauthToken,()=>{});}catch(e){}
     this._oauthShowBanner('\u2139 Abgemeldet \u2014 Bitte neu verbinden');
     this._toast('\u2713 Abgemeldet');
-  }
-,
+  },
 
 
 
   // ── Helpers ──────────────────────────────────────────
-  _esc(str) { if(!str)return''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
 
-  _toast(msg, dur) {
-    dur=dur||2500;
-    const t=document.createElement('div');
-    t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1A1F24;color:#fff;padding:8px 16px;border-radius:20px;font-size:17px;font-weight:600;z-index:9999;pointer-events:none;opacity:0;transition:opacity 0.2s;white-space:nowrap;';
-    t.textContent=msg; document.body.appendChild(t);
-    requestAnimationFrame(()=>{t.style.opacity='1';});
-    setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),200);},dur);
-  },
 
-  _now() { return new Date().toISOString(); },
 
-  _dStr(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); },
-  _fmtDDMM(s) { if(!s) return ''; const p=s.split('-'); return p[2]+'.'+p[1]+'.'; },
 
-  _fmtShort(dateStr) {
-    if(!dateStr) return '';
-    const parts=dateStr.split('-');
-    const d=parseInt(parts[2],10), m=parseInt(parts[1],10);
-    const mN=['Jan','Feb','M\u00e4r','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
-    return d+'. '+(mN[m-1]||'');
-  },
 
-  _evtDurationMin(e) {
-    if(e.durationMin&&e.durationMin>0) return e.durationMin;
-    if(e.duration   &&e.duration   >0) return Math.round(e.duration*60);
-    return 60;
-  },
-
-  _kwStr(date) {
-    const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
-    d.setUTCDate(d.getUTCDate()+4-(d.getUTCDay()||7));
-    const ys=new Date(Date.UTC(d.getUTCFullYear(),0,1));
-    const kw=Math.ceil((((d-ys)/86400000)+1)/7);
-    return d.getUTCFullYear()+'-W'+String(kw).padStart(2,'0');
-  },
 
   _kwStartDate() { const d=new Date();const day=d.getDay();d.setDate(d.getDate()+(day===0?-6:1-day));return this._dStr(d); },
-  _kwEndDate()   { const d=new Date();const day=d.getDay();d.setDate(d.getDate()+(day===0?0:7-day));return this._dStr(d); },
-  _getCurrentKW() { return this._kwStr(new Date()).split('-W')[1]; },
+
+
 
 };
 

@@ -78,7 +78,7 @@ linesSplit.forEach((line, i) => {
     const name = line.trim().split(/[\s(]/)[0].replace(/^async\s+/, '');
     if (['if','for','while','switch','function','return','const','let','var','document','window'].includes(name)) return;
     let prev = '';
-    for (let j = i - 1; j >= 0 && j >= i - 10; j--) {
+    for (let j = i - 1; j >= 0 && j >= i - 20; j--) {
       const candidate = linesSplit[j].trim();
       if (candidate === '' || candidate.startsWith('//')) continue;
       prev = candidate; break;
@@ -616,6 +616,28 @@ console.log('\n── 44. Volle Breite ──');
 !content.includes('max-width:480px') && !content.includes('max-width: 480px') && !content.includes('max-width:min(480px') ?
   ok('Kein max-width auf #wb-app — volle Breite') :
   fail('max-width begrenzt die App-Breite — soll entfernt sein');
+
+
+// ══════════════════════════════════════════
+// 45. DUPLIKATE-FREIHEIT
+// ══════════════════════════════════════════
+console.log('\n── 45. Keine doppelten Funktionen ──');
+const fnDefs = jsCode.match(/^\s{2}(?:async\s+)?([a-zA-Z_]\w*)\s*[\(&]/gm)||[];
+const fnNames = fnDefs.map(l=>l.trim().replace(/^async\s+/,'').split(/[\s\(&]/)[0]);
+const counts = {};
+fnNames.forEach(n=>{counts[n]=(counts[n]||0)+1;});
+const dupes = Object.entries(counts).filter(([n,c])=>c>1).map(([n])=>n);
+if(dupes.length===0) ok('Keine doppelten Funktionen im WB-Objekt');
+else dupes.slice(0,5).forEach(n=>fail('Doppelte Funktion: '+n+' — nur erstes Vorkommen wird ausgeführt!'));
+
+// ══════════════════════════════════════════
+// 46. THEMA/GATEWAY BEARBEITEN
+// ══════════════════════════════════════════
+console.log('\n── 46. Thema/Gateway Bearbeiten ──');
+content.includes('id="wb5-ov-edit-btn"')  ? ok('Bearbeiten-Button im Thema-Overlay HTML') : fail('Bearbeiten-Button fehlt im Thema-Overlay!');
+jsCode.includes('wb5-ov-edit-btn')         ? ok('Bearbeiten-Button in _tm5OpenOverlay verlinkt') : fail('Bearbeiten-Button nicht in JS verlinkt');
+jsCode.includes('_gw5Edit(')              ? ok('_gw5Edit() vorhanden')         : fail('_gw5Edit() fehlt');
+jsCode.includes('_gw5SaveEdit(')          ? ok('_gw5SaveEdit() vorhanden')     : fail('_gw5SaveEdit() fehlt');
 
 // ══════════════════════════════════════════
 // ERGEBNIS
