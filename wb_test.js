@@ -1345,9 +1345,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.4'")
-  ? (ok('APP_VERSION ist 4.0.4'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.4'), f48Fail++); // WB4 Phase 3b
+jsCode.includes("APP_VERSION: '4.0.5'")
+  ? (ok('APP_VERSION ist 4.0.5'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.5'), f48Fail++); // WB4 Phase 3c
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
@@ -1488,6 +1488,36 @@ jsCode.includes('themenWB4')
 jsCode.includes('welt:') && jsCode.includes('as-th-welt-beruf')
   ? (ok('welt-Feld in Thema-Speicherlogik vorhanden'), f48Ok++)
   : (fail('welt-Feld fehlt'), f48Fail++);
+
+
+// WB4: Bugfixes Phase 3c
+content.includes('.ck4-hidden { display: none')
+  ? (ok('.ck4-hidden CSS vorhanden (generelles hidden)'), f48Ok++)
+  : (fail('.ck4-hidden CSS fehlt'), f48Fail++);
+
+jsCode.includes("'ck4-hidden'")
+  ? (ok('_ck4SectionToggle nutzt ck4-hidden'), f48Ok++)
+  : (fail('_ck4SectionToggle nutzt noch altes hidden'), f48Fail++);
+
+jsCode.includes('_asAufgabeEdit(')
+  ? (ok('_asAufgabeEdit() Dialog vorhanden'), f48Ok++)
+  : (fail('_asAufgabeEdit() fehlt'), f48Fail++);
+
+jsCode.includes('isRunning') && jsCode.includes('ck4-running-badge')
+  ? (ok('Laufende Termine: isRunning + ck4-running-badge'), f48Ok++)
+  : (fail('Laufende Termine fehlen'), f48Fail++);
+
+content.includes('.ck4-running-badge')
+  ? (ok('.ck4-running-badge CSS (lila Termin-Badge) vorhanden'), f48Ok++)
+  : (fail('.ck4-running-badge CSS fehlt'), f48Fail++);
+
+jsCode.includes('Terminplan')
+  ? (ok('Zeitstrahl umbenannt zu Terminplan'), f48Ok++)
+  : (fail('Terminplan-Umbenennung fehlt'), f48Fail++);
+
+content.includes('L\u00f6schen') || content.includes('Löschen')
+  ? (ok('Löschen (kein Tippfehler mehr)'), f48Ok++)
+  : (fail('Löschen fehlt'), f48Fail++);
 
 
 console.log('\n═══════════════════════════════════════════');
