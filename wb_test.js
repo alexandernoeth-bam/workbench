@@ -656,6 +656,19 @@ keyFreshFn.includes('wb_enc_pw') ?
   ok('_cryptoKeyFresh prüft wb_enc_pw in sessionStorage') :
   fail('_cryptoKeyFresh prüft wb_enc_pw nicht');
 
+
+// ══════════════════════════════════════════
+// 48. KEINE WB4-FUNKTIONEN IN SYNCDOWNLOAD
+// ══════════════════════════════════════════
+console.log('\n── 48. Keine WB4-Funktionen in _syncDownload ──');
+const sdStart = jsCode.indexOf('async _syncDownload()');
+const sdEnd   = jsCode.indexOf('\n  },', sdStart + 100);
+const sdFn    = sdStart >= 0 ? jsCode.slice(sdStart, sdEnd) : '';
+const wb4Only = ['_nzAutoFarbe','_nzRenderPills','_nzRenderAll','tabSwitch','_tsKachelOpen'];
+wb4Only.forEach(fn => {
+  !sdFn.includes(fn) ? ok(fn + ' nicht in _syncDownload') : fail(fn + ' in _syncDownload — WB4-Funktion fehlt in WB5!');
+});
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
