@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.1.9</title>
+  <title>WorkBench 5.2.0</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -375,7 +375,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.1.9 · Build 20260701-0315</div>
+    <div id="wb-startup-tagline">v5.2.0 · Build 20260701-0400</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -391,8 +391,18 @@
     </div>
     <button id="wb-header-add" onclick="WB.addNew()">+ Neu</button>
     <button id="wb-header-settings" onclick="WB.settingsOpen()" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);border-radius:50%;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    <button class="wb-nav-btn" onclick="WB.showTab('wandel')">
+      <span class="wb-nav-icon" id="wbn-wandel"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+      <span class="wb-nav-label" id="wbnl-wandel">Wandel</span>
+      <div class="wb-nav-dot" id="wbnd-wandel" style="display:none;"></div>
+    </button>
   </div>
   <div id="wb-content">
+    <!-- WANDEL -->
+    <div id="wb5-wandel-tab" style="display:none;flex-direction:column;height:100%;overflow-y:auto;">
+      <div id="wb5-wa-content" style="padding:12px;"></div>
+    </div>
+
     <!-- HEUTE -->
     <div id="wb5-heute-tab" class="wb5-screen">
       <div id="wb5-heute"></div>
@@ -682,8 +692,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.1.9',
-  APP_BUILD:      '20260701-0315',
+  APP_VERSION:    '5.2.0',
+  APP_BUILD:      '20260701-0400',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -701,6 +711,7 @@ const WB = {
     notizen: [], wissensnetzwerk: [], vorhaben: [], ziele: [],
     links: [], quickItems: [], checklistVorlagen: [], mantras: [],
     wochenMottos: {}, _version: 2, _exportedAt: '',
+    wandel:       [],
     fokusTypen:   [
       { id:'konzept',     label:'Konzept',     items:['Ziel definieren','Struktur skizzieren','Kernaussagen formulieren','Review einplanen'] },
       { id:'besprechung', label:'Besprechung', items:['Agenda pr\u00fcfen','Teilnehmer informieren','Protokoll f\u00fchren','Aktionspunkte festhalten'] },
@@ -790,7 +801,7 @@ const WB = {
   },
 
   showTab(tab) {
-    ['heute','themen','termine','fokus'].forEach(t => {
+    ['heute','themen','termine','fokus','wandel'].forEach(t => {
       const el = document.getElementById('wb5-'+t+'-tab');
       if (el) el.style.display = t===tab ? 'flex' : 'none';
       document.getElementById('wbn-'+t)?.classList.toggle('active', t===tab);
@@ -799,7 +810,7 @@ const WB = {
       if (dot) dot.style.display = t===tab ? 'block' : 'none';
     });
     this.activeTab = tab;
-    const titles = {heute:'Heute',themen:'Themen',termine:'Termine',fokus:'Fokus'};
+    const titles = {heute:'Heute',themen:'Themen',termine:'Termine',fokus:'Fokus',wandel:'Wandel'};
     const ht = document.getElementById('wb-header-title');
     if (ht) ht.textContent = titles[tab]||tab;
     this.renderSection(tab);
@@ -810,6 +821,7 @@ const WB = {
     if (tab==='themen')  this._tm5Render();
     if (tab==='termine') this._te5Render();
     if (tab==='fokus')   this._fk5Render();
+    if (tab==='wandel')  this._wa5Render();
   },
 
   setWelt(welt, btn) {
@@ -824,6 +836,7 @@ const WB = {
     if (this.activeTab==='themen')  this._themaDialog(null);
     if (this.activeTab==='termine') this._terminNeu();
     if (this.activeTab==='fokus')   this._fk5NeuTyp();
+    if (this.activeTab==='wandel')  this._wa5Neu();
   },
 
 
@@ -1801,6 +1814,173 @@ const WB = {
     this._modalCtx='aufgabe-neu';this._na5Welt='b';this._na5ThemaId=this._na5ThemaId||null;
     this.modalOpen('Neue Aufgabe',body2,foot);
     if(this._na5ThemaId){const sel=document.getElementById('wb5-na-thema');if(sel)sel.value=this._na5ThemaId;}
+  },
+
+
+  // ══════════════════════════════════════════
+  // WANDEL-TAB
+  // ══════════════════════════════════════════
+  _wa5Render() {
+    const el = document.getElementById('wb5-wa-content'); if(!el) return;
+    const eintraege = (this.db.wandel||[])
+      .filter(e=>!e.deleted && this._weltOk({welt:e.welt}))
+      .sort((a,b)=>b.ts.localeCompare(a.ts));
+    if(!eintraege.length) {
+      el.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:14px;">Noch keine Einträge.<br>Klick auf + Neu um zu beginnen.</div>';
+      return;
+    }
+    // Nach Datum gruppieren
+    const gruppen = {};
+    eintraege.forEach(e => {
+      const datum = e.ts.slice(0,10);
+      if(!gruppen[datum]) gruppen[datum]=[];
+      gruppen[datum].push(e);
+    });
+    const heute = this._dStr(new Date());
+    const gestern = this._dStr(new Date(Date.now()-86400000));
+    const MONTHS=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    let h='';
+    Object.keys(gruppen).sort((a,b)=>b.localeCompare(a)).forEach(datum=>{
+      const d=new Date(datum+'T12:00:00');
+      const label=datum===heute?'Heute — '+d.getDate()+'. '+MONTHS[d.getMonth()]+' '+d.getFullYear()
+        :datum===gestern?'Gestern — '+d.getDate()+'. '+MONTHS[d.getMonth()]+' '+d.getFullYear()
+        :d.getDate()+'. '+MONTHS[d.getMonth()]+' '+d.getFullYear();
+      h+='<div class="wa-datum-label">'+label+'</div>';
+      gruppen[datum].forEach(e=>{
+        const zeit=e.ts.slice(11,16);
+        const pill=this._weltPill(e.welt);
+        h+='<div class="wa-eintrag" id="wae-'+e.id+'" onclick="WB._wa5Click(this,\x27'+e.id+'\x27)">'
+          +'<div class="wa-hdr"><span class="wa-zeit">'+zeit+'</span>'+pill
+          +'<div class="wa-hdr-actions">'
+          +'<button class="wa-action-btn" onclick="event.stopPropagation();WB._wa5Edit(\x27'+e.id+'\x27)">Bearbeiten</button>'
+          +'<button class="wa-action-btn danger" onclick="event.stopPropagation();WB._wa5Delete(\x27'+e.id+'\x27)">Löschen</button>'
+          +'</div></div>'
+          +'<div class="wa-body" id="wab-'+e.id+'">'+e.html+'</div>'
+          +'<div class="wa-editor" id="waed-'+e.id+'">'
+          +this._wa5Toolbar('waf-'+e.id)
+          +'<div class="wa-welt-row">'
+          +'<button class="wb5-welt-opt'+(( this._weltNorm(e.welt)==='b')?' active-b':'')+'" id="waw-b-'+e.id+'" onclick="event.stopPropagation();WB._wa5Welt(\x27'+e.id+'\x27,\x27b\x27)"><div class="wb5-dot wb5-dot-b"></div>Beruf</button>'
+          +'<button class="wb5-welt-opt'+(( this._weltNorm(e.welt)==='p')?' active-p':'')+'" id="waw-p-'+e.id+'" onclick="event.stopPropagation();WB._wa5Welt(\x27'+e.id+'\x27,\x27p\x27)"><div class="wb5-dot wb5-dot-p"></div>Privat</button>'
+          +'</div>'
+          +'<div class="wa-field" contenteditable="true" id="waf-'+e.id+'" onclick="event.stopPropagation()">'+e.html+'</div>'
+          +'<div class="wa-save-row">'
+          +'<button class="wb-btn wb-btn-cancel" onclick="event.stopPropagation();WB._wa5Close(\x27'+e.id+'\x27)">Schließen</button>'
+          +'<button class="wb-btn wb-btn-save" onclick="event.stopPropagation();WB._wa5Save(\x27'+e.id+'\x27)">Speichern</button>'
+          +'</div></div></div>';
+      });
+    });
+    el.innerHTML=h;
+  },
+
+  _wa5Toolbar(fieldId) {
+    const cmds=[
+      {cmd:'bold',label:'<b>B</b>',title:'Fett'},
+      {cmd:'underline',label:'<u>U</u>',title:'Unterstrichen'},
+      {cmd:'italic',label:'<i>I</i>',title:'Kursiv'},
+      {sep:true},
+      {cmd:'insertUnorderedList',label:'•≡',title:'Bullet-Liste'},
+      {cmd:'insertOrderedList',label:'1≡',title:'Nummerierte Liste'},
+      {sep:true},
+      {cmd:'indent',label:'→',title:'Einrücken'},
+      {cmd:'outdent',label:'←',title:'Ausrücken'},
+    ];
+    return '<div class="wa-toolbar">'
+      +cmds.map(c=>c.sep?'<div class="wa-tb-sep"></div>'
+        :'<button type="button" class="wa-tb-btn" title="'+c.title+'" onclick="event.stopPropagation();document.getElementById(\x27'+fieldId+'\x27).focus();document.execCommand(\x27'+c.cmd+'\x27,false,null)">'+c.label+'</button>'
+      ).join('')+'</div>';
+  },
+
+  _wa5Click(el, id) {
+    const isAktiv = el.classList.contains('aktiv');
+    document.querySelectorAll('.wa-eintrag.aktiv').forEach(e=>e.classList.remove('aktiv'));
+    if(!isAktiv) el.classList.add('aktiv');
+  },
+
+  _wa5Edit(id) {
+    const el=document.getElementById('wae-'+id); if(!el) return;
+    document.querySelectorAll('.wa-eintrag.aktiv').forEach(e=>e.classList.remove('aktiv'));
+    el.classList.add('aktiv');
+    setTimeout(()=>document.getElementById('waf-'+id)?.focus(),50);
+  },
+
+  _wa5Save(id) {
+    const e=(this.db.wandel||[]).find(x=>x.id===id); if(!e) return;
+    const field=document.getElementById('waf-'+id); if(!field) return;
+    e.html=field.innerHTML; e.updatedAt=this._now();
+    document.getElementById('wab-'+id).innerHTML=e.html;
+    document.getElementById('wae-'+id)?.classList.remove('aktiv');
+    this.setDirty(); this._toast('✓ Eintrag gespeichert');
+  },
+
+  _wa5Close(id) {
+    document.getElementById('wae-'+id)?.classList.remove('aktiv');
+  },
+
+  _wa5Delete(id) {
+    const e=(this.db.wandel||[]).find(x=>x.id===id); if(!e) return;
+    if(!confirm('Eintrag löschen?')) return;
+    e.deleted=true; e.updatedAt=this._now();
+    this.setDirty(); this._wa5Render();
+    this._toast('Eintrag gelöscht');
+  },
+
+  _wa5Welt(id, welt) {
+    const e=(this.db.wandel||[]).find(x=>x.id===id); if(!e) return;
+    e.welt=welt;
+    document.getElementById('waw-b-'+id)?.classList.toggle('active-b', welt==='b');
+    document.getElementById('waw-p-'+id)?.classList.toggle('active-p', welt==='p');
+  },
+
+  _wa5Neu() {
+    // Neu-Box im Tab anzeigen
+    const el=document.getElementById('wb5-wa-content'); if(!el) return;
+    // Wenn schon offen → fokussieren
+    const existing=document.getElementById('wa-neu-box');
+    if(existing){ existing.querySelector('.wa-field')?.focus(); return; }
+    const welt='b';
+    const neuHtml='<div class="wa-neu-box sichtbar" id="wa-neu-box">'
+      +this._wa5Toolbar('wa-neu-field')
+      +'<div class="wa-welt-row">'
+      +'<button class="wb5-welt-opt active-b" id="wa-neu-b" onclick="WB._wa5NeuWelt(\x27b\x27)"><div class="wb5-dot wb5-dot-b"></div>Beruf</button>'
+      +'<button class="wb5-welt-opt" id="wa-neu-p" onclick="WB._wa5NeuWelt(\x27p\x27)"><div class="wb5-dot wb5-dot-p"></div>Privat</button>'
+      +'</div>'
+      +'<div class="wa-field" contenteditable="true" id="wa-neu-field" placeholder="Was bewegst du heute..."></div>'
+      +'<div class="wa-save-row">'
+      +'<button class="wb-btn wb-btn-cancel" onclick="WB._wa5NeuClose()">Abbrechen</button>'
+      +'<button class="wb-btn wb-btn-save" onclick="WB._wa5NeuSave()">Speichern</button>'
+      +'</div></div>';
+    el.insertAdjacentHTML('afterbegin', neuHtml);
+    this._wa5NeuWelt='b';
+    setTimeout(()=>document.getElementById('wa-neu-field')?.focus(),50);
+  },
+
+  _wa5NeuWelt(w) {
+    this._wa5NeuWelt=w;
+    document.getElementById('wa-neu-b')?.classList.toggle('active-b',w==='b');
+    document.getElementById('wa-neu-p')?.classList.toggle('active-p',w==='p');
+  },
+
+  _wa5NeuSave() {
+    const field=document.getElementById('wa-neu-field'); if(!field) return;
+    const html=field.innerHTML.trim();
+    if(!html||html==='<br>'){ this._toast('Bitte Text eingeben'); return; }
+    if(!this.db.wandel) this.db.wandel=[];
+    const now=new Date();
+    const ts=this._dStr(now)+'T'+now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0')+':00';
+    this.db.wandel.push({id:'w_'+Date.now(),ts,html,welt:this._wa5NeuWelt||'b',updatedAt:this._now()});
+    this.setDirty();
+    this._wa5NeuClose();
+    this._wa5Render();
+    this._toast('✓ Eintrag gespeichert');
+  },
+
+  _wa5NeuClose() {
+    document.getElementById('wa-neu-box')?.remove();
+  },
+
+  _weltNorm(welt) {
+    const w=welt||'b';
+    return w==='beruf'||w==='pro'?'b':w==='privat'||w==='priv'?'p':w;
   },
 
   _na5WdhChange(val) {

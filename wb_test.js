@@ -770,6 +770,22 @@ jsCode.includes('_ad5WtToggle(')    ? ok('_ad5WtToggle() für einzelne Wochentag
 jsCode.includes('wb5-ad-tage-row')  ? ok('wb5-ad-tage-row für Wochentag-Buttons')            : fail('wb5-ad-tage-row fehlt');
 jsCode.includes('wtAd')             ? ok('_aufgabeSave liest Wochentage aus Detail-Dialog')   : fail('_aufgabeSave liest keine Wochentage aus Detail');
 
+
+// ══════════════════════════════════════════
+// 58. WANDEL-TAB
+// ══════════════════════════════════════════
+console.log('\n── 58. Wandel-Tab ──');
+content.includes('id="wb5-wandel-tab"') ? ok('wb5-wandel-tab HTML vorhanden') : fail('wb5-wandel-tab fehlt');
+content.includes('wbnl-wandel')         ? ok('Wandel im Bottom-Nav')           : fail('Wandel-Button im Nav fehlt');
+jsCode.includes('_wa5Render()')         ? ok('_wa5Render() definiert')         : fail('_wa5Render() fehlt');
+jsCode.includes('_wa5Neu()')            ? ok('_wa5Neu() definiert')            : fail('_wa5Neu() fehlt');
+jsCode.includes('_wa5Save(')           ? ok('_wa5Save() definiert')            : fail('_wa5Save() fehlt');
+jsCode.includes('_wa5Delete(')         ? ok('_wa5Delete() definiert')          : fail('_wa5Delete() fehlt');
+jsCode.includes('_wa5Welt(')           ? ok('_wa5Welt() — Welt-Zuordnung')     : fail('_wa5Welt() fehlt');
+jsCode.includes("'wandel'")            ? ok("showTab('wandel') verknüpft")     : fail("wandel nicht in showTab");
+jsCode.includes('db.wandel')           ? ok('wandel[] im DB-Schema')           : fail('wandel[] fehlt im DB-Schema');
+jsCode.includes('_wa5Toolbar(')        ? ok('_wa5Toolbar() — Formatierungs-Toolbar') : fail('_wa5Toolbar() fehlt');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
