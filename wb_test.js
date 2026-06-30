@@ -253,9 +253,7 @@ jsCode.includes('_isMobile') ? ok('_isMobile() definiert') : fail('_isMobile() f
 content.includes('id="wb-app"')    ? ok('#wb-app vorhanden')    : fail('#wb-app fehlt');
 content.includes('wb-bottom-nav')  ? ok('#wb-bottom-nav vorhanden') : fail('#wb-bottom-nav fehlt');
 content.includes('100dvh')         ? ok('100dvh für mobile Höhe') : fail('100dvh fehlt');
-content.includes('max-width:min(480px') || content.includes('max-width: min(480px') ||
-content.includes('max-width:480px') || content.includes('max-width: 480px') ?
-  ok('max-width begrenzt (Mobile-First)') : fail('max-width Begrenzung fehlt');
+ok('max-width wird separat in Kat. 44 geprüft');
 styleBlock.includes('flex-wrap') ? ok('flex-wrap für Mobile-Safety') : fail('flex-wrap fehlt');
 styleBlock.includes('word-break') ? ok('word-break für lange Texte') : fail('word-break fehlt');
 styleBlock.includes('min-width') ? ok('min-width Schutz vorhanden') : fail('min-width fehlt');
@@ -580,6 +578,44 @@ syncDlFn.includes('_wb5MergeGateways') ? ok('_wb5MergeGateways nach Download auf
 syncDlFn.includes('_ensureDbFields')   ? ok('_ensureDbFields nach Download aufgerufen')    : fail('_ensureDbFields fehlt in _syncDownload');
 !syncDlFn.includes('tabSwitch(')       ? ok('kein tabSwitch() in _syncDownload (WB5-kompatibel)') : fail('tabSwitch() in _syncDownload — WB5 nutzt showTab()!');
 !syncDlFn.includes('_nzRenderPills')   ? ok('kein _nzRenderPills() in _syncDownload (WB5)')       : warn('_nzRenderPills in _syncDownload — Notizen-Tab existiert in WB5 nicht');
+
+
+// ══════════════════════════════════════════
+// 41. OAUTH BANNER SOFORT
+// ══════════════════════════════════════════
+console.log('\n── 41. OAuth Banner-Start ──');
+// Banner muss sofort in _wb5InitAfter gezeigt werden, nicht erst nach 60s
+const iaStart=jsCode.indexOf('async _wb5InitAfter()');const iaEnd=jsCode.indexOf('\n  },',iaStart+50);const initAfterCode=iaStart>=0?jsCode.slice(iaStart,iaEnd):'';
+initAfterCode.includes('_oauthTokenValid') ? ok('_oauthTokenValid in _wb5InitAfter — Banner sofort') : fail('Banner-Check fehlt in _wb5InitAfter — erscheint erst nach 60s!');
+initAfterCode.includes('_oauthShowBanner') ? ok('_oauthShowBanner in _wb5InitAfter aufgerufen')      : fail('_oauthShowBanner fehlt in _wb5InitAfter');
+// Banner-Button muss _oauthReconnect() nutzen (synchron, kein await = kein Popup-Block)
+content.includes('onclick="WB._oauthReconnect()">') ? ok('Banner-Button → _oauthReconnect() (synchron)') : fail('Banner-Button nutzt nicht _oauthReconnect() — Popup kann geblockt werden!');
+
+// ══════════════════════════════════════════
+// 42. GATEWAY-VERWALTUNG
+// ══════════════════════════════════════════
+console.log('\n── 42. Gateway-Verwaltung ──');
+jsCode.includes('_gw5Neu(')    ? ok('_gw5Neu() vorhanden')    : fail('_gw5Neu() fehlt — kein Gateway +Neu!');
+jsCode.includes('_gw5Save(')   ? ok('_gw5Save() vorhanden')   : fail('_gw5Save() fehlt');
+jsCode.includes('_gw5Delete(') ? ok('_gw5Delete() vorhanden') : fail('_gw5Delete() fehlt');
+jsCode.includes('+ Gateway')   ? ok('+ Gateway Button im Overlay') : fail('+ Gateway Button fehlt im Overlay');
+
+// ══════════════════════════════════════════
+// 43. AUFGABEN-DIALOG VOLLSTÄNDIG
+// ══════════════════════════════════════════
+console.log('\n── 43. Aufgaben-Dialog vollständig ──');
+jsCode.includes('wb5-ad-typ')  ? ok('Typ-Feld in Aufgaben-Bearbeiten')           : fail('Typ-Feld fehlt in _aufgabeDetail');
+jsCode.includes('wb5-ad-wdh')  ? ok('Wiederholung in Aufgaben-Bearbeiten')       : fail('Wiederholung fehlt in _aufgabeDetail');
+jsCode.includes('wb5-ad-b')    ? ok('Beruf/Privat in Aufgaben-Bearbeiten')        : fail('Welt-Toggle fehlt in _aufgabeDetail');
+jsCode.includes('_ad5Welt(')   ? ok('_ad5Welt() vorhanden')                      : fail('_ad5Welt() fehlt');
+
+// ══════════════════════════════════════════
+// 44. VOLLE BREITE (kein max-width)
+// ══════════════════════════════════════════
+console.log('\n── 44. Volle Breite ──');
+!content.includes('max-width:480px') && !content.includes('max-width: 480px') && !content.includes('max-width:min(480px') ?
+  ok('Kein max-width auf #wb-app — volle Breite') :
+  fail('max-width begrenzt die App-Breite — soll entfernt sein');
 
 // ══════════════════════════════════════════
 // ERGEBNIS

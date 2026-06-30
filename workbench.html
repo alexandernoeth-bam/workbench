@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.0.8</title>
+  <title>WorkBench 5.0.9</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,7 +28,7 @@
       --radius:   12px;
     }
     html, body { height:100%; overflow:hidden; font-family:var(--font); background:var(--bg); color:var(--text); -webkit-tap-highlight-color:transparent; }
-    #wb-app { display:flex; flex-direction:column; height:100dvh; max-height:100dvh; overflow:hidden; max-width:min(480px,100vw); margin:0 auto; position:relative; }
+    #wb-app { display:flex; flex-direction:column; height:100dvh; max-height:100dvh; overflow:hidden; position:relative; }
     /* Startup */
     #wb-startup { position:fixed; inset:0; background:var(--accent); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; transition:opacity .3s; }
     #wb-startup.hidden { opacity:0; pointer-events:none; }
@@ -372,11 +372,11 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.0.8 · Build 20260630-2200</div>
+    <div id="wb-startup-tagline">v5.0.9 · Build 20260630-2315</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
-    <button id="wb-oauth-banner-btn" onclick="WB._oauthReconnectAndSync()">Jetzt verbinden</button>
+    <button id="wb-oauth-banner-btn" onclick="WB._oauthReconnect()">Jetzt verbinden</button>
     <button style="align-self:flex-end;background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:12px;" onclick="WB._oauthBannerDismiss()">Sp&auml;ter</button>
   </div>
   <div id="wb-header">
@@ -678,8 +678,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.0.8',
-  APP_BUILD:      '20260630-2200',
+  APP_VERSION:    '5.0.9',
+  APP_BUILD:      '20260630-2315',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -767,8 +767,16 @@ const WB = {
     await this._sLoadSettings();
     this._teActiveDay = this._dStr(new Date());
     this.showTab('heute');
-    this._syncStart();
     hideStartup();
+    // Banner sofort zeigen wenn kein gültiger Token
+    if (!this._oauthTokenValid()) {
+      this._oauthShowBanner();
+    } else {
+      // Token gültig → sofort synchronisieren
+      try { await this._syncDownload(); } catch(e) { console.warn('[init sync]', e); }
+      this._syncInitDone = true;
+    }
+    this._syncStart();
     document.addEventListener('visibilitychange', async () => {
       if (document.visibilityState==='hidden' && this.isDirty) await this.idbSave();
     });
@@ -962,6 +970,58 @@ const WB = {
   _themaName(id) { return (this.db.themen||[]).find(t=>t.id===id)?.titel||''; },
 
   // ── THEMEN ─────────────────────────────────────────
+
+  _gw5Neu(themaId) {
+    const body =
+      '<div class="wb-input-group"><span class="wb-label">Titel / Meilenstein</span>'
+      +'<input id="wb5-gw-titel" class="wb-input" type="text" placeholder="z.B. Prototyp fertig"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Prüf-Datum</span>'
+      +'<input id="wb5-gw-datum" class="wb-input" type="date"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Bedingung (was muss gelten?)</span>'
+      +'<input id="wb5-gw-bedingung" class="wb-input" type="text" placeholder="z.B. 3 Kundentests abgeschlossen"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Konsequenz (wenn nicht erreicht)</span>'
+      +'<input id="wb5-gw-konsequenz" class="wb-input" type="text" placeholder="z.B. Projekt pausieren"></div>'
+      +'<div class="wb5-input-row">'
+      +'<div class="wb-input-group"><span class="wb-label">IST-Wert</span>'
+      +'<input id="wb5-gw-ist" class="wb-input" type="text" placeholder="0"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">SOLL-Wert</span>'
+      +'<input id="wb5-gw-soll" class="wb-input" type="text" placeholder="100%"></div>'
+      +'</div>';
+    const foot='<div style="display:flex;gap:8px;">'
+      +'<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
+      +'<button class="wb-btn wb-btn-save" onclick="WB._gw5Save(\x27'+themaId+'\x27)">Speichern</button></div>';
+    this.modalOpen('Neues Gateway', body, foot);
+  },
+
+  _gw5Save(themaId) {
+    const titel=document.getElementById('wb5-gw-titel')?.value.trim();
+    if(!titel){this._toast('Bitte Titel eingeben');return;}
+    const t=(this.db.themen||[]).find(x=>x.id===themaId); if(!t) return;
+    if(!t.gateways) t.gateways=[];
+    t.gateways.push({
+      id:'gw_'+Date.now(), titel,
+      pruefDatum:document.getElementById('wb5-gw-datum')?.value||'',
+      bedingung:document.getElementById('wb5-gw-bedingung')?.value.trim()||'',
+      konsequenz:document.getElementById('wb5-gw-konsequenz')?.value.trim()||'',
+      istWert:document.getElementById('wb5-gw-ist')?.value.trim()||'',
+      sollWert:document.getElementById('wb5-gw-soll')?.value.trim()||'',
+      status:'offen', reihenfolge:t.gateways.length, updatedAt:this._now()
+    });
+    this.setDirty(); this.modalClose();
+    const t2=(this.db.themen||[]).find(x=>x.id===themaId);
+    if(t2) this._tm5RenderOverlayBody(t2);
+    this._toast('\u2713 Gateway gespeichert');
+  },
+
+  _gw5Delete(gwId, themaId) {
+    const t=(this.db.themen||[]).find(x=>x.id===themaId); if(!t) return;
+    const gw=(t.gateways||[]).find(g=>g.id===gwId); if(gw){gw.deleted=true;gw.updatedAt=this._now();}
+    this.setDirty(); this.modalClose();
+    const t2=(this.db.themen||[]).find(x=>x.id===themaId);
+    if(t2) this._tm5RenderOverlayBody(t2);
+    this._toast('Gateway gelöscht');
+  },
+
   _themaDialog(themaId) {
     const t = themaId ? (this.db.themen||[]).find(x=>x.id===themaId) : null;
     const titel = t ? 'Thema bearbeiten' : 'Neues Thema';
@@ -1167,7 +1227,8 @@ const WB = {
     });
     if(!aufgaben.length) h+='<div style="font-size:13px;color:var(--faint);padding:8px 0;">Keine offenen Aufgaben</div>';
     h+='<button class="wb5-erl-aufg-btn">&#128065; Erledigte anzeigen</button>';
-    h+='<button class="wb5-add-btn" onclick="WB._aufgabeNeuFuerThema(\''+this._esc(t.id)+'\')">+ Aufgabe hinzuf&uuml;gen</button>';
+    h+='<button class="wb5-add-btn" onclick="WB._aufgabeNeuFuerThema(\''+this._esc(t.id)+'\')">+ Aufgabe</button>';
+    h+='<button class="wb5-add-btn" style="border-color:var(--lila);color:var(--lila);" onclick="WB._gw5Neu(\x27'+this._esc(t.id)+'\x27)">+ Gateway</button>';
     const naechstesGw=gws.filter(g=>g!==aktGw&&g.status!=='erreicht')[0];
     if(naechstesGw) h+='<div class="wb5-next-gw">&#127987; <span><strong style="color:#3D2880;">N&auml;chstes Gateway:</strong> '+this._esc(naechstesGw.titel)+(naechstesGw.pruefDatum?' \u2014 '+this._fmtDDMM(naechstesGw.pruefDatum):'')+'</span></div>';
     body.innerHTML=h;
@@ -1697,15 +1758,29 @@ const WB = {
   _aufgabeDetail(id) {
     const all=[...(this.db.aufgaben||[]),...(this.db.themen||[]).flatMap(t=>t.aufgaben||[])];
     const a=all.find(x=>x.id===id); if(!a) return;
+    const typenA=[{v:'aufgabe',l:'Aufgabe'},{v:'konzept',l:'Konzept'},{v:'recherche',l:'Recherche'},{v:'routine',l:'Routine'},{v:'link',l:'Link'}];
+    const wdhA=[{v:'',l:'Keine'},{v:'wöchentlich',l:'Wöchentlich'},{v:'monatlich',l:'Monatlich'},{v:'jährlich',l:'Jährlich'}];
+    const curTypA=a.typ||'aufgabe'; const curWdhA=a.wiederholung?.typ||''; const curWeltA=a.welt||'b';
     const body =
       '<div class="wb-input-group"><span class="wb-label">Titel</span>'
       +'<input id="wb5-ad-titel" class="wb-input" type="text" value="'+this._esc(a.titel||a.text||'')+'"></div>'
       +'<div class="wb5-input-row">'
+      +'<div class="wb-input-group"><span class="wb-label">Typ</span>'
+      +'<select id="wb5-ad-typ" class="wb-select">'+typenA.map(t=>'<option value="'+t.v+'"'+(curTypA===t.v?' selected':'')+'>'+t.l+'</option>').join('')+'</select></div>'
       +'<div class="wb-input-group"><span class="wb-label">Priorität</span>'
       +'<select id="wb5-ad-prio" class="wb-select"><option value="1"'+(a.prio===1?' selected':'')+'>Prio 1</option><option value="2"'+(a.prio===2?' selected':'')+'>Prio 2</option><option value="3"'+((a.prio||3)===3?' selected':'')+'>Prio 3</option></select></div>'
+      +'</div>'
+      +'<div class="wb5-input-row">'
       +'<div class="wb-input-group"><span class="wb-label">Deadline</span>'
       +'<input id="wb5-ad-deadline" class="wb-input" type="date" value="'+(a.deadline||'')+'"></div>'
-      +'</div>';
+      +'<div class="wb-input-group"><span class="wb-label">Wiederholung</span>'
+      +'<select id="wb5-ad-wdh" class="wb-select">'+wdhA.map(w=>'<option value="'+w.v+'"'+(curWdhA===w.v?' selected':'')+'>'+w.l+'</option>').join('')+'</select></div>'
+      +'</div>'
+      +'<div class="wb-input-group"><span class="wb-label">Bereich</span>'
+      +'<div class="wb5-welt-toggle">'
+      +'<button class="wb5-welt-opt'+(curWeltA==='b'?' active-b':'')+'" id="wb5-ad-b" onclick="WB._ad5Welt(\x27b\x27)"><div class="wb5-dot wb5-dot-b"></div>Beruf</button>'
+      +'<button class="wb5-welt-opt'+(curWeltA==='p'?' active-p':'')+'" id="wb5-ad-p" onclick="WB._ad5Welt(\x27p\x27)"><div class="wb5-dot wb5-dot-p"></div>Privat</button>'
+      +'</div></div>';
     const foot = '<div style="display:flex;gap:8px;justify-content:space-between;width:100%;">'
       +'<div style="display:flex;gap:6px;"><button class="wb-btn wb-btn-danger" onclick="WB._aufgabeDelete(\x27'+this._esc(id)+'\x27)">Löschen</button>'
       +'<button class="wb-btn" style="background:var(--surface2);" onclick="WB._duplizierenAufgabe(\x27'+this._esc(id)+'\x27)">Duplizieren</button></div>'
@@ -1713,7 +1788,15 @@ const WB = {
       +'<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
       +'<button class="wb-btn wb-btn-save" onclick="WB._aufgabeSave(\x27'+this._esc(id)+'\x27)">Speichern</button>'
       +'</div></div>';
+    this._ad5WeltSel=curWeltA;
     this.modalOpen(a.titel||a.text||'Aufgabe', body, foot);
+  },
+
+
+  _ad5Welt(w) {
+    this._ad5WeltSel=w;
+    document.getElementById('wb5-ad-b')?.classList.toggle('active-b',w==='b');
+    document.getElementById('wb5-ad-p')?.classList.toggle('active-p',w==='p');
   },
 
   _aufgabeSave(id) {
@@ -1724,6 +1807,10 @@ const WB = {
     a.titel=titel; a.text=titel;
     a.prio=parseInt(document.getElementById('wb5-ad-prio')?.value)||3;
     a.deadline=document.getElementById('wb5-ad-deadline')?.value||'';
+    a.typ=document.getElementById('wb5-ad-typ')?.value||a.typ||'aufgabe';
+    const wdhV=document.getElementById('wb5-ad-wdh')?.value||'';
+    a.wiederholung=wdhV?{typ:wdhV,wochentage:[],datum:'',naechstFaellig:''}:null;
+    if(this._ad5WeltSel) a.welt=this._ad5WeltSel;
     a.updatedAt=this._now();
     this.setDirty(); this.modalClose(); this.renderSection(this.activeTab);
     this._toast('✓ Aufgabe gespeichert');
