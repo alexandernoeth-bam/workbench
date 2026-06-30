@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0A6B5E">
-  <title>WorkBench 4.0.3</title>
+  <title>WorkBench 4.0.4</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -1840,7 +1840,7 @@
 <!-- Startup -->
 <div id="wb-startup">
   <div id="wb-startup-logo">WorkBench 4.0</div>
-  <div id="wb-startup-tagline">v4.0.3</div>
+  <div id="wb-startup-tagline">v4.0.4</div>
 </div>
 
 <!-- Modal -->
@@ -2093,7 +2093,7 @@
       <span id="wb-buero-lbl">Büro</span>
     </div>
     <span id="wb-welt-logo">WorkBench 4.0</span>
-    <span id="wb-menu-version">v4.0.3</span>
+    <span id="wb-menu-version">v4.0.4</span>
     <div id="wb-welt-toggle">
       <button class="wb-welt-btn active" onclick="WB._weltSet('beide',this)">Beide</button>
       <button class="wb-welt-btn" onclick="WB._weltSet('beruf',this)">Beruf</button>
@@ -2203,8 +2203,8 @@
 const WB = {
 
   // ── Konstanten ──────────────────────────────────────
-  APP_VERSION: '4.0.3',
-  APP_BUILD:   '20260630-1100',
+  APP_VERSION: '4.0.4',
+  APP_BUILD:   '20260630-1130',
   IDB_NAME:    'workbench-slim',
   IDB_VERSION: 1,
   DRIVE_API:   'https://www.googleapis.com/drive/v3',
@@ -2616,6 +2616,7 @@ const WB = {
     h += '<span class="as-pipeline-meta">';
     if (gwOverdue) h += '<span class="as-gw-warn">GW fällig</span>';
     h += '<span class="as-prio-badge' + prioCls + '">' + prioLabel + '</span>';
+    h += '<button class="as-sec-add" onclick="event.stopPropagation();WB._asThemaDialog(\x27' + id + '\x27)" style="font-size:11px;" title="Thema bearbeiten">&#8943;</button>';
     h += '</span>';
     h += '<span class="as-chevron' + (open ? ' open' : '') + '" id="as-pip-ch-' + id + '">&#9654;</span>';
     h += '</div>';
@@ -2792,40 +2793,155 @@ const WB = {
   },
 
   // ── Neues Thema Dialog ─────────────────────────────────
-  _asNeuesThema() {
-    this.modalOpen('Neues Thema',
-      '<div style="display:flex;flex-direction:column;gap:10px;">'
-      + '<label style="font-size:12px;font-weight:700;color:var(--faint);">Titel</label>'
-      + '<input id="as-th-titel" class="wb-input" type="text" placeholder="Themen-Titel">'
-      + '<label style="font-size:12px;font-weight:700;color:var(--faint);">Priorität</label>'
+  // WB4: Thema-Dialog — Neu und Bearbeiten
+  _asThemaDialog(themaId) {
+    const t = themaId ? (this.db?.themen || []).find(x => x.id === themaId) : null;
+    const titel = t ? 'Thema bearbeiten' : 'Neues Thema';
+
+    const body = '<div class="wb-input-group">'
+      + '<label class="wb-label">Titel</label>'
+      + '<input id="as-th-titel" class="wb-input" type="text" placeholder="Themen-Titel" value="' + this._esc(t?.titel || '') + '"></div>'
+
+      + '<div style="display:flex;gap:10px;">'
+      + '<div class="wb-input-group" style="flex:1;">'
+      + '<label class="wb-label">Priorität</label>'
       + '<select id="as-th-prio" class="wb-input">'
-      + '<option value="1">Prio 1 — Hoch</option>'
-      + '<option value="2" selected>Prio 2 — Mittel</option>'
-      + '<option value="3">Prio 3 — Niedrig</option>'
-      + '</select></div>',
-      '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
-      + '<button class="wb-btn" onclick="WB._asThemaSpeichern()">Speichern</button>'
-    );
+      + '<option value="1"' + ((t?.prio||2)===1?' selected':'') + '>Prio 1 — Hoch</option>'
+      + '<option value="2"' + ((t?.prio||2)===2?' selected':'') + '>Prio 2 — Mittel</option>'
+      + '<option value="3"' + ((t?.prio||2)===3?' selected':'') + '>Prio 3 — Niedrig</option>'
+      + '</select></div>'
+      + '<div class="wb-input-group" style="flex:1;">'
+      + '<label class="wb-label">Status</label>'
+      + '<select id="as-th-status" class="wb-input">'
+      + '<option value="aktiv"'   + ((t?.status||'aktiv')==='aktiv'   ?' selected':'') + '>Aktiv</option>'
+      + '<option value="wartend"' + ((t?.status||'')==='wartend' ?' selected':'') + '>Wartend</option>'
+      + '<option value="pausiert"'+ ((t?.status||'')==='pausiert'?' selected':'') + '>Pausiert</option>'
+      + '</select></div></div>'
+
+      + '<div class="wb-input-group"><label class="wb-label">Welt</label>'
+      + '<div style="display:flex;gap:8px;">'
+      + '<button id="as-th-welt-beruf"  class="nz-welt-btn' + ((t?.welt||'beruf')==='beruf' ?' active':'') + '" onclick="WB._asThemaWeltToggle(\x27beruf\x27)">Beruf</button>'
+      + '<button id="as-th-welt-privat" class="nz-welt-btn' + ((t?.welt||'')==='privat'?' active':'') + '" onclick="WB._asThemaWeltToggle(\x27privat\x27)">Privat</button>'
+      + '<button id="as-th-welt-beide"  class="nz-welt-btn' + ((t?.welt||'')==='beide' ?' active':'') + '" onclick="WB._asThemaWeltToggle(\x27beide\x27)">Beide</button>'
+      + '</div></div>'
+
+      + '<div class="wb-input-group"><label class="wb-label">Beschreibung / Notiz</label>'
+      + '<textarea id="as-th-beschr" class="wb-input" rows="3" placeholder="Ziel, Kontext, Notizen…" style="resize:vertical;">' + this._esc(t?.beschreibung || '') + '</textarea></div>'
+
+      + (t ? '<div class="wb-input-group"><label class="wb-label">Gateways ('
+          + (this.db?.gateways || []).filter(g => !g.deleted && g.themaId === t.id).length + ')</label>'
+          + '<div style="display:flex;flex-direction:column;gap:4px;">'
+          + (this.db?.gateways || []).filter(g => !g.deleted && g.themaId === t.id).map(g =>
+              '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border);">'
+              + '<span style="flex:1;font-size:13px;font-weight:600;">' + this._esc(g.titel) + '</span>'
+              + (g.pruefDatum ? '<span style="font-size:11px;color:var(--faint);font-family:var(--font-mono);">' + g.pruefDatum.slice(5).replace('-','.') + '</span>' : '')
+              + '<button class="as-sec-add" onclick="WB.modalClose();setTimeout(()=>WB._asGwDialog(\x27' + this._esc(g.id) + '\x27),120)">&#8943;</button>'
+              + '</div>'
+            ).join('')
+          + '</div>'
+          + '<button class="as-chain-neue-btn" style="margin:6px 0 0;" onclick="WB.modalClose();setTimeout(()=>WB._asNeuesGateway(\x27' + this._esc(t.id) + '\x27),120)">+ Gateway hinzufügen</button>'
+          + '</div>' : '')
+
+      + (t ? '<div class="wb-input-group"><label class="wb-label">Aufgaben ('
+          + (this.db?.aufgaben || []).filter(a => !a.deleted && a.themaId === t.id).length + ')</label>'
+          + '<button class="as-chain-neue-btn" style="margin:0;" onclick="WB.modalClose();setTimeout(()=>WB._asNeueAufgabe(\x27' + this._esc(t.id) + '\x27),120)">+ Aufgabe hinzufügen</button>'
+          + '</div>' : '');
+
+    const footer = (t
+      ? '<button class="wb-btn wb-btn-delete" onclick="WB._asThemaLoeschen(\x27' + this._esc(t?.id||'') + '\x27)">Öschen</button>'
+      : '<span></span>')
+      + '<div style="display:flex;gap:8px;">'
+      + '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
+      + '<button class="wb-btn" onclick="WB._asThemaSpeichern(\x27' + (themaId || '') + '\x27)">Speichern</button>'
+      + '</div>';
+
+    this.modalOpen(titel, body, footer);
   },
 
-  _asThemaSpeichern() {
-    const titel = document.getElementById('as-th-titel')?.value.trim();
-    const prio  = parseInt(document.getElementById('as-th-prio')?.value || '2');
+  _asThemaWeltToggle(welt) {
+    ['beruf','privat','beide'].forEach(w => {
+      const btn = document.getElementById('as-th-welt-' + w);
+      if (btn) btn.classList.toggle('active', w === welt);
+    });
+  },
+
+  _asNeuesThema() { this._asThemaDialog(null); },
+
+  _asThemaSpeichern(themaId) {
+    const titel   = document.getElementById('as-th-titel')?.value.trim();
+    const prio    = parseInt(document.getElementById('as-th-prio')?.value || '2');
+    const status  = document.getElementById('as-th-status')?.value || 'aktiv';
+    const beschr  = document.getElementById('as-th-beschr')?.value.trim() || '';
+    const weltBtn = document.querySelector('#as-th-welt-beruf.active,#as-th-welt-privat.active,#as-th-welt-beide.active');
+    const welt    = weltBtn?.id.replace('as-th-welt-', '') || 'beruf';
     if (!titel) { this._toast('Bitte Titel eingeben'); return; }
     if (!this.db) return;
     if (!Array.isArray(this.db.themen)) this.db.themen = [];
-    this.db.themen.push({
-      id:          't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-      titel:       titel,
-      prio:        prio,
-      status:      'aktiv',
-      beschreibung:'',
-      updatedAt:   this._now(),
-      deleted:     false,
+    if (themaId) {
+      const t = this.db.themen.find(x => x.id === themaId);
+      if (t) { t.titel = titel; t.prio = prio; t.status = status; t.welt = welt; t.beschreibung = beschr; t.updatedAt = this._now(); }
+    } else {
+      this.db.themen.push({
+        id:          't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        titel, prio, status, welt, beschreibung: beschr,
+        updatedAt:   this._now(), deleted: false,
+      });
+    }
+    this.setDirty(); this.modalClose(); this._asRender();
+    if (this.activeTab === 'tagessicht') this._ckRenderAll();
+  },
+
+  _asThemaLoeschen(themaId) {
+    const t = (this.db?.themen || []).find(x => x.id === themaId);
+    if (!t) return;
+    if (!confirm('Thema "' + (t.titel || '') + '" löschen? Aufgaben und Gateways bleiben erhalten.')) return;
+    t.deleted = true; t.updatedAt = this._now();
+    this.setDirty(); this.modalClose(); this._asRender();
+    if (this.activeTab === 'tagessicht') this._ckRenderAll();
+  },
+
+  _asNeuesGateway(themaId) {
+    const thema = themaId ? (this.db?.themen || []).find(x => x.id === themaId) : null;
+    const body = '<div class="wb-input-group"><label class="wb-label">Titel</label>'
+      + '<input id="gw-neu-titel" class="wb-input" type="text" placeholder="Gateway-Bezeichnung"></div>'
+      + '<div class="wb-input-group"><label class="wb-label">Prüfdatum</label>'
+      + '<input id="gw-neu-datum" class="wb-input" type="date"></div>'
+      + '<div class="wb-input-group"><label class="wb-label">Bedingung (Soll-Zustand)</label>'
+      + '<input id="gw-neu-cond" class="wb-input" placeholder="z.B. Gewicht &lt; 98 kg"></div>'
+      + '<div class="wb-input-group"><label class="wb-label">Konsequenz bei Verfehlung</label>'
+      + '<input id="gw-neu-cons" class="wb-input" placeholder="z.B. Urlaub verschieben"></div>'
+      + '<div style="display:flex;gap:8px;" class="wb-input-group"><div style="flex:1;"><label class="wb-label">Soll-Wert</label>'
+      + '<input id="gw-neu-soll" class="wb-input" placeholder="z.B. 98"></div>'
+      + '<div style="width:80px;"><label class="wb-label">Einheit</label>'
+      + '<input id="gw-neu-lbl" class="wb-input" placeholder="z.B. kg"></div></div>';
+
+    const footer = '<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
+      + '<button class="wb-btn" onclick="WB._asGwNeuSpeichern(\x27' + (themaId || '') + '\x27)">Speichern</button>';
+
+    this.modalOpen((thema ? 'Gateway in „' + thema.titel + '“' : 'Neues Gateway'), body, footer);
+  },
+
+  _asGwNeuSpeichern(themaId) {
+    const titel = document.getElementById('gw-neu-titel')?.value.trim();
+    if (!titel) { this._toast('Bitte Titel eingeben'); return; }
+    if (!this.db) return;
+    if (!Array.isArray(this.db.gateways)) this.db.gateways = [];
+    this.db.gateways.push({
+      id:                'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      themaId:           themaId || null,
+      titel,
+      pruefDatum:        document.getElementById('gw-neu-datum')?.value || null,
+      gatewayStatus:     'offen',
+      gatewayCondition:  document.getElementById('gw-neu-cond')?.value.trim() || '',
+      gatewayConsequence:document.getElementById('gw-neu-cons')?.value.trim() || '',
+      istWert:           '',
+      sollWert:          document.getElementById('gw-neu-soll')?.value.trim() || '',
+      istWertLabel:      document.getElementById('gw-neu-lbl')?.value.trim() || '',
+      reihenfolge:       (this.db.gateways.filter(g => !g.deleted && g.themaId === themaId).length),
+      updatedAt:         this._now(),
+      deleted:           false,
     });
-    this.setDirty();
-    this.modalClose();
-    this._asRender();
+    this.setDirty(); this.modalClose(); this._asRender();
     if (this.activeTab === 'tagessicht') this._ckRenderAll();
   },
 
@@ -2870,16 +2986,27 @@ const WB = {
   _asGwSpeichern(gwId) {
     const g = (this.db?.gateways || []).find(x => x.id === gwId);
     if (!g) return;
-    g.titel              = document.getElementById('gw-titel')?.value.trim() || g.titel;
-    g.pruefDatum         = document.getElementById('gw-datum')?.value || null;
-    g.gatewayCondition   = document.getElementById('gw-cond')?.value.trim() || '';
-    g.sollWert           = document.getElementById('gw-soll')?.value.trim() || '';
-    g.istWertLabel       = document.getElementById('gw-lbl')?.value.trim() || '';
-    g.gatewayStatus      = document.getElementById('gw-status')?.value || 'offen';
-    g.updatedAt          = this._now();
+    g.titel               = document.getElementById('gw-titel')?.value.trim() || g.titel;
+    g.pruefDatum          = document.getElementById('gw-datum')?.value || null;
+    g.gatewayCondition    = document.getElementById('gw-cond')?.value.trim() || '';
+    g.gatewayConsequence  = document.getElementById('gw-cons')?.value.trim() || '';
+    g.istWert             = document.getElementById('gw-ist')?.value.trim() || '';
+    g.sollWert            = document.getElementById('gw-soll')?.value.trim() || '';
+    g.istWertLabel        = document.getElementById('gw-lbl')?.value.trim() || '';
+    g.gatewayStatus       = document.getElementById('gw-status')?.value || 'offen';
+    g.updatedAt           = this._now();
     this.setDirty();
     this.modalClose();
     this._asRender();
+    if (this.activeTab === 'tagessicht') this._ckRenderAll();
+  },
+
+  _asGwLoeschen(gwId) {
+    const g = (this.db?.gateways || []).find(x => x.id === gwId);
+    if (!g) return;
+    if (!confirm('Gateway "' + (g.titel || '') + '" löschen?')) return;
+    g.deleted = true; g.updatedAt = this._now();
+    this.setDirty(); this.modalClose(); this._asRender();
     if (this.activeTab === 'tagessicht') this._ckRenderAll();
   },
 
@@ -8438,8 +8565,10 @@ const WB = {
       + remindOpts.map(function(o){ return '<option value="' + o[0] + '"' + (remind===o[0]?' selected':'') + '>' + o[1] + '</option>'; }).join('')
       + '</select></div></div>';
 
-    // Thema-Zuordnung
-    const themen = (this.db?.notizen||[]).filter(l => !l.deleted && l.typ==='thema').sort((a,b)=>(a.themaPrio||9)-(b.themaPrio||9));
+    // Thema-Zuordnung (WB4: aus db.themen[], nicht mehr db.notizen[])
+    const themenWB4 = (this.db?.themen||[]).filter(l => !l.deleted && l.status !== 'archiv').sort((a,b)=>(a.prio||9)-(b.prio||9));
+    const themenAlt = (this.db?.notizen||[]).filter(l => !l.deleted && l.typ==='thema').sort((a,b)=>(a.themaPrio||9)-(b.themaPrio||9));
+    const themen = themenWB4.length ? themenWB4 : themenAlt;
     const themaSelect = themen.length
       ? '<div class="wb-input-group"><label class="wb-label">🎯 Thema zuordnen</label>'
         + '<select id="wb-f-thema" class="wb-input">'
@@ -9129,6 +9258,7 @@ const WB = {
               titel:       n.titel || n.name || 'Unbenanntes Thema',
               prio:        n.themaPrio || 2,
               status:      n.themaStatus || 'aktiv',
+              welt:        n.welt || 'beruf',
               beschreibung: n.inhalt || '',
               updatedAt:   n.updatedAt || new Date().toISOString(),
               deleted:     false,

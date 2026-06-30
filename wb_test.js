@@ -1345,9 +1345,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.3'")
-  ? (ok('APP_VERSION ist 4.0.3'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.3'), f48Fail++); // WB4 Phase 3
+jsCode.includes("APP_VERSION: '4.0.4'")
+  ? (ok('APP_VERSION ist 4.0.4'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.4'), f48Fail++); // WB4 Phase 3b
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
@@ -1450,6 +1450,44 @@ content.includes('.as-pipeline')
 content.includes('.as-gw-kpi-inp')
   ? (ok('.as-gw-kpi-inp IST-Wert Eingabe CSS vorhanden'), f48Ok++)
   : (fail('.as-gw-kpi-inp CSS fehlt'), f48Fail++);
+
+
+// WB4 Phase 3b: Thema-Dialog vollständig
+jsCode.includes('_asThemaDialog(')
+  ? (ok('_asThemaDialog() vollständiger Thema-Dialog vorhanden'), f48Ok++)
+  : (fail('_asThemaDialog() fehlt'), f48Fail++);
+
+jsCode.includes('_asThemaWeltToggle(')
+  ? (ok('_asThemaWeltToggle() Welt-Auswahl vorhanden'), f48Ok++)
+  : (fail('_asThemaWeltToggle() fehlt'), f48Fail++);
+
+jsCode.includes('_asThemaLoeschen(')
+  ? (ok('_asThemaLoeschen() vorhanden'), f48Ok++)
+  : (fail('_asThemaLoeschen() fehlt'), f48Fail++);
+
+jsCode.includes('_asNeuesGateway(')
+  ? (ok('_asNeuesGateway() Dialog vorhanden'), f48Ok++)
+  : (fail('_asNeuesGateway() fehlt'), f48Fail++);
+
+jsCode.includes('_asGwNeuSpeichern(')
+  ? (ok('_asGwNeuSpeichern() vorhanden'), f48Ok++)
+  : (fail('_asGwNeuSpeichern() fehlt'), f48Fail++);
+
+jsCode.includes('_asGwLoeschen(')
+  ? (ok('_asGwLoeschen() vorhanden'), f48Ok++)
+  : (fail('_asGwLoeschen() fehlt'), f48Fail++);
+
+jsCode.includes('gatewayConsequence') && jsCode.includes('gw-cons')
+  ? (ok('gatewayConsequence im Gateway-Dialog vorhanden'), f48Ok++)
+  : (fail('gatewayConsequence im Dialog fehlt'), f48Fail++);
+
+jsCode.includes('themenWB4')
+  ? (ok('terminOpen nutzt db.themen[] (WB4)'), f48Ok++)
+  : (fail('terminOpen nutzt noch db.notizen[] für Themen'), f48Fail++);
+
+jsCode.includes('welt:') && jsCode.includes('as-th-welt-beruf')
+  ? (ok('welt-Feld in Thema-Speicherlogik vorhanden'), f48Ok++)
+  : (fail('welt-Feld fehlt'), f48Fail++);
 
 
 console.log('\n═══════════════════════════════════════════');
