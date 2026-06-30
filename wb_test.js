@@ -1345,9 +1345,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.13'")
-  ? (ok('APP_VERSION ist 4.0.13'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.13'), f48Fail++); // WB4 Phase 5b
+jsCode.includes("APP_VERSION: '4.0.14'")
+  ? (ok('APP_VERSION ist 4.0.14'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.14'), f48Fail++); // WB4 Phase 5c
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
@@ -1660,6 +1660,20 @@ content.includes('border-radius: 14px') && content.includes('gap: 12px')
 content.includes('padding: 12px 12px 80px')
   ? (ok('ck-scroll-body: padding 12px korrekt'), f48Ok++)
   : (fail('ck-scroll-body padding fehlt'), f48Fail++);
+
+
+// WB4 4.0.14: Mobile-Safe
+content.includes('flex-wrap: wrap') && content.includes('min-width: 100px')
+  ? (ok('Mobile-Safe: flex-wrap + min-width in flex-Elementen'), f48Ok++)
+  : (fail('Mobile-Safe flex-wrap fehlt'), f48Fail++);
+
+content.includes('word-break: break-word')
+  ? (ok('Mobile-Safe: word-break:break-word vorhanden'), f48Ok++)
+  : (fail('word-break:break-word fehlt'), f48Fail++);
+
+jsCode.includes('flex-direction:column;gap:5px') || jsCode.includes('flex-direction: column')
+  ? (ok('_asGwKachel: column-Layout (mobile-safe)'), f48Ok++)
+  : (fail('_asGwKachel Layout fehlt'), f48Fail++);
 
 
 console.log('\n═══════════════════════════════════════════');
