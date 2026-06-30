@@ -1345,9 +1345,9 @@ jsCode.includes('sollWert')
   : (fail('Gateway sollWert-Feld fehlt'), f48Fail++);
 
 // Version 4.0.0
-jsCode.includes("APP_VERSION: '4.0.10'")
-  ? (ok('APP_VERSION ist 4.0.10'), f48Ok++)
-  : (fail('APP_VERSION ist nicht 4.0.10'), f48Fail++); // WB4 Phase 4b
+jsCode.includes("APP_VERSION: '4.0.11'")
+  ? (ok('APP_VERSION ist 4.0.11'), f48Ok++)
+  : (fail('APP_VERSION ist nicht 4.0.11'), f48Fail++); // WB4 Phase 4c
 
 // Welt-Toggle ausgeblendet in WB4
 content.includes('#wb-welt-toggle { display: none; }')
@@ -1535,16 +1535,16 @@ content.includes('.as-pipeline.prio-1')
   ? (ok('Pipeline prio-1 Farb-Rand CSS vorhanden'), f48Ok++)
   : (fail('Pipeline prio-1 CSS fehlt'), f48Fail++);
 
-jsCode.includes('as-gw-main')
-  ? (ok('Gateway as-gw-main Layout vorhanden'), f48Ok++)
-  : (fail('Gateway as-gw-main fehlt'), f48Fail++);
+jsCode.includes('_asGwKachel')
+  ? (ok('Gateway _asGwKachel ersetzt as-gw-main'), f48Ok++)
+  : (fail('Gateway Kachel-Renderer fehlt'), f48Fail++);
 
 jsCode.includes('as-chain-type')
   ? (ok('Aufgaben Typ-Badge (as-chain-type) vorhanden'), f48Ok++)
   : (fail('Aufgaben Typ-Badge fehlt'), f48Fail++);
 
-jsCode.includes('Bedingung:') && jsCode.includes('as-gw-sub')
-  ? (ok('Gateway Bedingung/Konsequenz als Subzeile sichtbar'), f48Ok++)
+jsCode.includes('Bedingung:') && jsCode.includes('gatewayCondition')
+  ? (ok('Gateway Bedingung/Konsequenz vorhanden'), f48Ok++)
   : (fail('Gateway Subzeilen fehlen'), f48Fail++);
 
 jsCode.includes('Kurs ok')
@@ -1587,9 +1587,39 @@ jsCode.includes('ae-wdh')
   ? (ok('Aufgabe-Dialog: Wiederholung vorhanden'), f48Ok++)
   : (fail('Aufgabe-Dialog Wiederholung fehlt'), f48Fail++);
 
-jsCode.includes('gw-naechstes')
-  ? (ok('Gateway: Nächstes-GW Markierung vorhanden'), f48Ok++)
+jsCode.includes('naechstes') && jsCode.includes('_asGwKachel')
+  ? (ok('Gateway: Nächstes-GW via _asGwKachel'), f48Ok++)
   : (fail('Gateway Nächstes-GW fehlt'), f48Fail++);
+
+
+// WB4 4.0.11: Aufgaben-Typ + Wiederholung + GW-Kacheln
+jsCode.includes('ae-typ')
+  ? (ok('Aufgabentyp-Select (konzept/termin/link/routine) vorhanden'), f48Ok++)
+  : (fail('ae-typ fehlt'), f48Fail++);
+
+jsCode.includes('_asWdhChange')
+  ? (ok('Wiederholungs-Toggle _asWdhChange vorhanden'), f48Ok++)
+  : (fail('_asWdhChange fehlt'), f48Fail++);
+
+jsCode.includes('wochentage') && jsCode.includes('intervallWochen')
+  ? (ok('Wiederholung: wochentage + intervallWochen im Schema'), f48Ok++)
+  : (fail('Wiederholungs-Schema unvollständig'), f48Fail++);
+
+jsCode.includes('intervallMonate') && jsCode.includes('naechstFaellig')
+  ? (ok('Wiederholung: monatlich + naechstFaellig vorhanden'), f48Ok++)
+  : (fail('Wiederholung monatlich fehlt'), f48Fail++);
+
+jsCode.includes('_asGwKachel')
+  ? (ok('_asGwKachel Gateway-Kachel-Renderer vorhanden'), f48Ok++)
+  : (fail('_asGwKachel fehlt'), f48Fail++);
+
+jsCode.includes("label:'N") && jsCode.includes("label:'GW (aktuell)")
+  ? (ok('GW-Kacheln: aktuell/nächstes Labels vorhanden'), f48Ok++)
+  : (fail('GW-Kacheln Labels fehlen'), f48Fail++);
+
+jsCode.includes("typ:          'aufgabe'")
+  ? (ok('DB-Schema: typ-Feld in Aufgaben vorhanden'), f48Ok++)
+  : (fail('DB-Schema typ fehlt'), f48Fail++);
 
 
 console.log('\n═══════════════════════════════════════════');
