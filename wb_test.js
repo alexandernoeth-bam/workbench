@@ -933,6 +933,41 @@ jsCode.includes('_ht5JetztToggle') ? ok('_ht5JetztToggle vorhanden') : fail('_ht
 // JETZT-Header hat onclick
 jsCode.includes('wb5-jetzt-chev') ? ok('wb5-jetzt-chev Pfeil vorhanden') : fail('wb5-jetzt-chev fehlt');
 
+
+// ══════════════════════════════════════════
+// 73. ID-KONSISTENZ BEI OBERTHEMA-GRUPPEN
+// ══════════════════════════════════════════
+console.log('\n── 73. Oberthema ID-Konsistenz ──');
+// Die ID die per onclick übergeben wird muss identisch sein mit der gesetzten div-id
+const tmFnStart = jsCode.indexOf('  _tm5Render() {');
+const tmFnEnd   = jsCode.indexOf('_tm5RenderOverlayBody', tmFnStart);
+const tmFn = jsCode.slice(tmFnStart, tmFnEnd);
+// ID gesetzt mit _esc(g)?
+const idUsesEsc      = tmFn.includes("wbog-'+this._esc(g)");
+const idUsesEncode   = tmFn.includes("'wbog-'+encodeURIComponent(g)");
+// onclick übergibt _esc(g)?
+const clickUsesEsc   = tmFn.includes("_esc(g)+'\\x27,this)") || tmFn.includes("_esc(g)+\'\\x27");
+const clickUsesEncode= tmFn.includes('encodeURIComponent(g)') && tmFn.includes('_tm5ToggleOber');
+// _tm5ToggleOber getElementById
+const togFnStart = jsCode.indexOf('_tm5ToggleOber(ober');
+const togFnEnd   = jsCode.indexOf('\n  },', togFnStart+50);
+const togFn = jsCode.slice(togFnStart, togFnEnd);
+const togUsesEsc    = togFn.includes("_esc(ober)");
+const togUsesEncode = togFn.includes('encodeURIComponent(ober)');
+// Konsistenzcheck
+const consistent = (idUsesEsc && clickUsesEsc && togUsesEsc) || (idUsesEncode && clickUsesEncode && togUsesEncode);
+consistent ? ok('Oberthema ID, onclick und getElementById nutzen identisches Encoding') :
+  fail('Oberthema Encoding-Mismatch: ID='+( idUsesEsc?'esc':idUsesEncode?'encode':'?')+' onclick='+(clickUsesEsc?'esc':clickUsesEncode?'encode':'?')+' toggle='+(togUsesEsc?'esc':togUsesEncode?'encode':'?'));
+
+// ══════════════════════════════════════════
+// 74. ALLE-BUTTON IM THEMEN-TAB
+// ══════════════════════════════════════════
+console.log('\n── 74. Alle-Button im Themen-Tab ──');
+const tm5FnStart2 = jsCode.indexOf('  _tm5Render() {');
+const tm5FnEnd2   = jsCode.indexOf('_tm5RenderOverlayBody', tm5FnStart2);
+const tm5Fn2 = jsCode.slice(tm5FnStart2, tm5FnEnd2);
+tm5Fn2.includes('_avOpen') ? ok('Alle-Button (_avOpen) in _tm5Render vorhanden') : fail('Alle-Button fehlt in _tm5Render!');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
