@@ -1404,6 +1404,58 @@ avFn.includes('const filtered=') ? ok('Tag-Filterung auf Aufgaben angewendet') :
 // Startzeit ohne (optional)
 !detFn.includes('Startzeit (optional)') ? ok('Startzeit ohne (optional) in _aufgabeDetail') : fail('Startzeit hat noch (optional)!');
 
+
+// ══════════════════════════════════════════
+// 96. DIV-BILANZ IN DIALOG-FUNKTIONEN
+// ══════════════════════════════════════════
+console.log('\n── 96. Div-Bilanz Dialog-Funktionen ──');
+
+function countDivBalance(fnCode) {
+  // Zählt <div (öffnend) vs </div> (schließend) in JS-String-Literalen
+  // Extrahiert alle String-Inhalte aus dem JS-Code
+  const opens  = (fnCode.match(/<div[\s>"]/g)||[]).length;
+  const closes = (fnCode.match(/<\/div>/g)||[]).length;
+  return { opens, closes, balance: opens - closes };
+}
+
+// _aufgabeDetail
+const adStart = jsCode.indexOf('  _aufgabeDetail(id)');
+const adEnd   = jsCode.indexOf('\n  },', adStart+50);
+const adFn    = jsCode.slice(adStart, adEnd);
+const adBal   = countDivBalance(adFn);
+adBal.balance === 0
+  ? ok('_aufgabeDetail Div-Bilanz ausgeglichen: ' + adBal.opens + ' opens = ' + adBal.closes + ' closes')
+  : fail('_aufgabeDetail Div-Bilanz UNAUSGEGLICHEN: ' + adBal.opens + ' opens vs ' + adBal.closes + ' closes ('+adBal.balance+') — Speichern/Löschen kaputt!');
+
+// _aufgabeNeu
+const anStart = jsCode.indexOf('  _aufgabeNeu(');
+const anEnd   = jsCode.indexOf('\n  },', anStart+50);
+const anFn    = jsCode.slice(anStart, anEnd);
+const anBal   = countDivBalance(anFn);
+anBal.balance === 0
+  ? ok('_aufgabeNeu Div-Bilanz ausgeglichen: ' + anBal.opens + ' opens = ' + anBal.closes + ' closes')
+  : fail('_aufgabeNeu Div-Bilanz UNAUSGEGLICHEN: ' + anBal.opens + ' opens vs ' + anBal.closes + ' closes ('+anBal.balance+') — Dialog kaputt!');
+
+// _terminDialog
+const tdStart = jsCode.indexOf('  _terminDialog(');
+const tdEnd   = jsCode.indexOf('\n  },', tdStart+50);
+const tdFn    = jsCode.slice(tdStart, tdEnd);
+const tdBal   = countDivBalance(tdFn);
+tdBal.balance === 0
+  ? ok('_terminDialog Div-Bilanz ausgeglichen: ' + tdBal.opens + ' opens = ' + tdBal.closes + ' closes')
+  : fail('_terminDialog Div-Bilanz UNAUSGEGLICHEN: ' + tdBal.opens + ' opens vs ' + tdBal.closes + ' closes ('+tdBal.balance+') — Dialog kaputt!');
+
+// _tm5RenderOverlayBody
+const ovStart = jsCode.indexOf('  _tm5RenderOverlayBody(t) {');
+const ovEnd   = jsCode.indexOf('\n  },', ovStart+50);
+const ovFn    = jsCode.slice(ovStart, ovEnd);
+const ovBal   = countDivBalance(ovFn);
+// Overlay baut DOM-Elemente per appendChild — Bilanz muss nicht 0 sein,
+// aber grobe Abweichungen (>5) sind verdächtig
+Math.abs(ovBal.balance) <= 10
+  ? ok('_tm5RenderOverlayBody Div-Bilanz akzeptabel: ' + ovBal.opens + ' opens, ' + ovBal.closes + ' closes')
+  : fail('_tm5RenderOverlayBody Div-Bilanz stark unausgeglichen: ' + ovBal.balance);
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
