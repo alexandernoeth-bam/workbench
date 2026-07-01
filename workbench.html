@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.3.1</title>
+  <title>WorkBench 5.3.2</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -451,7 +451,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.3.1 · Build 20260701-1130</div>
+    <div id="wb-startup-tagline">v5.3.2 · Build 20260701-1200</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -810,8 +810,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.3.1',
-  APP_BUILD:      '20260701-1130',
+  APP_VERSION:    '5.3.2',
+  APP_BUILD:      '20260701-1200',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -1431,6 +1431,30 @@ const WB = {
     const body=document.getElementById('wb5-freie-body');
     const chev=document.getElementById('wb5-freie-chev');
     if(hdr&&body)hdr.addEventListener('click',()=>{body.classList.toggle('open');if(chev)chev.style.transform=body.classList.contains('open')?'rotate(180deg)':'';});
+  },
+
+
+  _ovSaveNotiz() {
+    const t=this._ovActiveThema; if(!t) return;
+    const el=document.getElementById('wb5-ov-notiz');
+    if(el){ t.notiz=(el.innerHTML||'').trim(); t.updatedAt=this._now(); this.setDirty(); }
+  },
+
+  _ovLinkToggleEdit(id) {
+    const view=document.getElementById('wb5-ovl-'+id+'-view');
+    const edit=document.getElementById('wb5-ovl-'+id+'-edit');
+    if(!view||!edit) return;
+    const isEdit=edit.style.display!=='none';
+    view.style.display=isEdit?'':'none';
+    edit.style.display=isEdit?'none':'';
+  },
+
+  _ovLinkSave(id) {
+    const t=this._ovActiveThema; if(!t) return;
+    const url=(document.getElementById('wb5-ovl-'+id+'-input')?.value||'').trim();
+    if(id==='doku') t.linkDoku=url; else t.linkWeb=url;
+    t.updatedAt=this._now(); this.setDirty();
+    this._tm5RenderOverlayBody(t);
   },
 
   _tm5OpenOverlay(themaId) {
@@ -2109,6 +2133,20 @@ const WB = {
       });
     });
     el.innerHTML=h;
+  },
+
+
+  _waInsertCheckbox(fieldId) {
+    const el=document.getElementById(fieldId); if(!el) return; el.focus();
+    document.execCommand('insertHTML',false,'<input type="checkbox" onclick="this.checked=!this.checked"> ');
+  },
+
+  _waInsertLink(fieldId) {
+    const url=prompt('URL eingeben:','https://');
+    if(!url||url==='https://') return;
+    const el=document.getElementById(fieldId); if(!el) return; el.focus();
+    const label=url.replace(/^https?:\/\//,'').substring(0,40);
+    document.execCommand('insertHTML',false,'<a href="'+url+'" target="_blank" onclick="window.open(this.href);return false;">'+label+'</a> ');
   },
 
   _wa5Toolbar(fieldId) {

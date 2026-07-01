@@ -1083,6 +1083,33 @@ jsCode.includes('_ovSaveNotiz(') ? ok('_ovSaveNotiz vorhanden')      : fail('_ov
 jsCode.includes('_waInsertCheckbox(') ? ok('_waInsertCheckbox vorhanden') : fail('_waInsertCheckbox fehlt!');
 jsCode.includes('_waInsertLink(')     ? ok('_waInsertLink vorhanden')     : fail('_waInsertLink fehlt!');
 
+
+// ══════════════════════════════════════════
+// 82. ONCLICK-FUNKTIONEN VOLLSTÄNDIG DEFINIERT
+// ══════════════════════════════════════════
+console.log('\n── 82. Alle onclick WB-Methoden definiert ──');
+// Alle WB.xyz() Aufrufe aus dem HTML/JS extrahieren
+const onclickCalls = [...new Set((content.match(/WB\.([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g)||[]).map(m=>m.replace('WB.','').replace('(','').trim()))];
+let missingMethods = [];
+onclickCalls.forEach(fn => {
+  // Prüfe ob als WB-Methode definiert (2 Spaces + Name + Leerzeichen/Klammer)
+  const isDefined = jsCode.includes('  ' + fn + '(') || jsCode.includes('  async ' + fn + '(') || jsCode.includes('  ' + fn + ' (');
+  if (!isDefined) missingMethods.push(fn);
+});
+// Bekannte Ausnahmen (Browser-APIs etc.)
+const exceptions = ['catch','then','forEach','map','filter','find','includes','sort','push','pop','slice','join','split','replace','trim','parseInt','parseFloat','JSON','Object','Array','Date','Math','String','Number','Boolean','Promise','setTimeout','clearTimeout','setInterval','clearInterval','fetch','console','document','window','event','alert','confirm','prompt'];
+missingMethods = missingMethods.filter(fn => !exceptions.some(e => fn.startsWith(e)));
+missingMethods.length === 0
+  ? ok('Alle WB.xyz() Aufrufe haben eine entsprechende Methoden-Definition')
+  : fail('Fehlende WB-Methoden: ' + missingMethods.slice(0,5).join(', ') + (missingMethods.length>5?' ...':'') + ' — onclick-Aufrufe crashen!');
+
+// Spezifisch: Thema-Overlay Methoden
+['_ovSaveNotiz','_ovLinkToggleEdit','_ovLinkSave'].forEach(fn => {
+  jsCode.includes('  '+fn+'(')
+    ? ok(fn + ' als WB-Methode definiert')
+    : fail(fn + ' fehlt als WB-Methode — TypeError beim Aufruf!');
+});
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
