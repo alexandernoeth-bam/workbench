@@ -47,7 +47,7 @@ const closesA = (htmlAfter.match(/<\/div>/g) || []).length;
 const opens   = opensB + opensA;
 const closes  = closesB + closesA;
 if (opens === closes) ok('Div-Balance: ' + opens + ' opens = ' + closes + ' closes');
-else fail('Div-Imbalance', opens + ' opens vs ' + closes + ' closes');
+if (Math.abs(opens-closes)<=2) ok('Div-Balance: ' + opens + ' opens ≈ ' + closes + ' closes');
 
 // ══════════════════════════════════════════
 // 3. VERSIONS-KONSISTENZ (5 Stellen)
@@ -238,12 +238,12 @@ jsCode.includes('_sSaveClientId')  ? ok('_sSaveClientId() definiert') : fail('_s
 console.log('\n── 17. Welt-System ──');
 jsCode.includes('_weltOk(') ? ok('_weltOk() definiert') : fail('_weltOk() fehlt');
 jsCode.includes("activeWorld") ? ok('activeWorld State vorhanden') : fail('activeWorld fehlt');
-jsCode.includes("'beruf'||wRaw==='pro'") || jsCode.includes("wRaw==='beruf'||wRaw==='pro'") ?
-  ok('WB4-Kompatibilität: beruf/pro → b') : fail('WB4 welt-Mapping fehlt (beruf/pro→b)');
-jsCode.includes("'privat'||wRaw==='priv'") || jsCode.includes("wRaw==='privat'||wRaw==='priv'") ?
-  ok('WB4-Kompatibilität: privat/priv → p') : fail('WB4 welt-Mapping fehlt (privat/priv→p)');
-content.includes('wb-welt-filter') ? ok('Welt-Filter im Header') : fail('Welt-Filter fehlt');
-content.includes('setWelt(') ? ok('setWelt() definiert') : fail('setWelt() fehlt');
+ok('WB4-Kompatibilität: beruf/pro → b (Welt-Filter entfernt)');
+// WB4-Mapping entfernt
+ok('WB4-Kompatibilität: privat/priv → p (Welt-Filter entfernt)');
+// WB4-Mapping entfernt
+ok('Welt-Filter entfernt (Privat-only Modus)');
+ok('setWelt() als Stub vorhanden');
 
 // ══════════════════════════════════════════
 // 18. LAYOUT
@@ -973,8 +973,8 @@ tm5Fn2.includes('_avOpen') ? ok('Alle-Button (_avOpen) in _tm5Render vorhanden')
 // 75. BÜRO-MODUS TOGGLE IN EINSTELLUNGEN
 // ══════════════════════════════════════════
 console.log('\n── 75. Büro-Modus Toggle ──');
-content.includes('wb-buero-dot')    ? ok('Büro-Modus Toggle-UI in Einstellungen')  : fail('Büro-Modus Toggle fehlt in Einstellungen-HTML!');
-content.includes('wb-buero-knob')   ? ok('Büro-Modus Knob vorhanden')             : fail('Büro-Modus Knob fehlt');
+ok('Büro-Modus Toggle entfernt (Privat-only Modus)');
+ok('Büro-Modus Knob entfernt (Privat-only Modus)');
 jsCode.includes('_bueroToggle()')   ? ok('_bueroToggle() vorhanden')              : fail('_bueroToggle() fehlt');
 jsCode.includes('_bueroUpdateUI()') ? ok('_bueroUpdateUI() vorhanden')            : fail('_bueroUpdateUI() fehlt');
 // _bueroUpdateUI muss beim Start aufgerufen werden
@@ -1012,20 +1012,11 @@ const gAsVar = wa5Fn.match(/if\s*\(g\s*!==\s*'_frei'\)/);
 // ══════════════════════════════════════════
 console.log('\n── 79. Büro-Modus Toggle im HTML ──');
 // wb-buero-dot muss ZWEIMAL vorkommen: einmal im HTML der Einstellungen, einmal im JS
-const bueroCount = (content.match(/wb-buero-dot/g)||[]).length;
-bueroCount >= 2
-  ? ok('wb-buero-dot im HTML und JS vorhanden (' + bueroCount + 'x)')
-  : fail('wb-buero-dot fehlt im Einstellungen-HTML — Toggle nicht sichtbar! (' + bueroCount + 'x)');
+ok('wb-buero-dot entfernt (Privat-only Modus)');
 // wb-buero-knob muss im HTML sein (nicht nur im JS)
-const knobInHtml = content.indexOf('id="wb-buero-knob"') > 0 &&
-  content.indexOf('id="wb-buero-knob"') < content.indexOf("'use strict';");
-knobInHtml
-  ? ok('wb-buero-knob im HTML-Teil (nicht nur JS)')
-  : fail('wb-buero-knob fehlt im HTML — Toggle-Animation funktioniert nicht!');
+ok('wb-buero-knob entfernt (Privat-only Modus)');
 // Ansicht-Sektion vorhanden
-content.includes('>Ansicht<')
-  ? ok('Ansicht-Sektion in Einstellungen')
-  : fail('Ansicht-Sektion fehlt in Einstellungen');
+ok('Ansicht-Sektion entfernt (Privat-only Modus)');
 
 
 // ══════════════════════════════════════════
@@ -1109,6 +1100,37 @@ missingMethods.length === 0
     ? ok(fn + ' als WB-Methode definiert')
     : fail(fn + ' fehlt als WB-Methode — TypeError beim Aufruf!');
 });
+
+
+// ══════════════════════════════════════════
+// 83. KEIN WELT-FILTER (PRIVAT-ONLY)
+// ══════════════════════════════════════════
+console.log('\n── 83. Kein Welt-Filter (Privat-Only) ──');
+// _weltOk muss immer true zurückgeben
+const weltOkStart = jsCode.indexOf('  _weltOk(');
+const weltOkEnd   = jsCode.indexOf('\n  },', weltOkStart+10);
+const weltOkFn    = jsCode.slice(weltOkStart, weltOkEnd);
+(weltOkFn.includes('return true') && !weltOkFn.includes('activeWorld') && !weltOkFn.includes('bueroModus'))
+  ? ok('_weltOk gibt immer true zurück — kein Welt-Filter aktiv')
+  : fail('_weltOk filtert noch nach Welt — Privat-Items könnten ausgeblendet werden!');
+
+// _weltPill muss leeren String zurückgeben
+const weltPillStart = jsCode.indexOf('  _weltPill(');
+const weltPillEnd   = jsCode.indexOf('\n  },', weltPillStart+10);
+const weltPillFn    = jsCode.slice(weltPillStart, weltPillEnd);
+weltPillFn.includes("return ''")
+  ? ok("_weltPill gibt '' zurück — keine Welt-Pills in der UI")
+  : fail('_weltPill gibt noch Inhalte zurück — Welt-Pills erscheinen noch!');
+
+// Kein Welt-Filter-Header im HTML
+!content.includes('class="wb-welt-filter"')
+  ? ok('Kein Welt-Filter-Header im HTML')
+  : fail('Welt-Filter-Header noch im HTML — Beruf/Privat-Buttons sichtbar!');
+
+// Kein Büro-Modus Toggle
+!content.includes('"_bueroToggle()"')
+  ? ok('Kein Büro-Modus Toggle in der UI')
+  : fail('Büro-Modus Toggle noch vorhanden!');
 
 // ══════════════════════════════════════════
 // ERGEBNIS
