@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.3.4</title>
+  <title>WorkBench 5.3.5</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -492,7 +492,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.3.4 · Build 20260701-1430</div>
+    <div id="wb-startup-tagline">v5.3.5 · Build 20260701-1500</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -555,6 +555,11 @@
     </div>
     <!-- THEMEN -->
     <div id="wb5-themen-tab" class="wb5-screen" style="display:none;">
+      <div class="wb5-tm-toolbar">
+        <button class="wb5-tm-tool-btn" onclick="WB._aufgabeNeu()">&#65291; Aufgabe</button>
+        <button class="wb5-tm-tool-btn wb5-tm-tool-lila" onclick="WB._gw5Neu(null)">&#65291; Gateway</button>
+        <button class="wb5-tm-tool-alle" onclick="WB._avOpen()">&#9776; Aufgabensicht</button>
+      </div>
       <div id="wb5-themen"></div>
       <div class="wb5-overlay" id="wb5-thema-overlay">
         <div class="wb5-overlay-panel">
@@ -852,8 +857,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.3.4',
-  APP_BUILD:      '20260701-1430',
+  APP_VERSION:    '5.3.5',
+  APP_BUILD:      '20260701-1500',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -1401,6 +1406,40 @@ const WB = {
   },
 
 
+
+  _tm5OberEdit(ober) {
+    const neu=prompt('Oberthema umbenennen oder leer lassen um es zu löschen:', ober);
+    if(neu===null) return; // Abbrechen
+    const themen=(this.db.themen||[]);
+    if(neu.trim()==='') {
+      // Löschen: Themen auf kein Oberthema setzen
+      if(!confirm('Oberthema "'+ober+'" löschen? Die zugehörigen Themen behalten kein Oberthema.')) return;
+      themen.filter(t=>t.oberthema===ober).forEach(t=>{ t.oberthema=''; t.updatedAt=this._now(); });
+    } else {
+      // Umbenennen
+      themen.filter(t=>t.oberthema===ober).forEach(t=>{ t.oberthema=neu.trim(); t.updatedAt=this._now(); });
+    }
+    this.setDirty(); this._tm5Render();
+  },
+
+
+  _tm5ScrollDown() {
+    const el=document.getElementById('wb5-themen');
+    if(el) el.scrollBy({top:el.clientHeight*0.6,behavior:'smooth'});
+  },
+
+  _tm5UpdateScrollBtn() {
+    const el=document.getElementById('wb5-themen');
+    const btn=document.getElementById('wb5-tm-scroll-btn');
+    if(!el||!btn) return;
+    const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<20;
+    btn.classList.toggle('hidden',atBottom);
+    if(!el._scrollListenerAdded){
+      el.addEventListener('scroll',()=>this._tm5UpdateScrollBtn());
+      el._scrollListenerAdded=true;
+    }
+  },
+
   _tm5ToggleOber(ober, hdrEl) {
     const key='ober_'+ober;
     const section=document.getElementById('wbog-'+this._esc(ober));
@@ -1421,15 +1460,20 @@ const WB = {
     const gruppen={};
     aktiv.forEach(t=>{const g=t.oberthema||'_frei';if(!gruppen[g])gruppen[g]=[];gruppen[g].push(t);});
     const sortT=arr=>arr.sort((a,b)=>{const sA=a.status==='aktiv'?0:1;const sB=b.status==='aktiv'?0:1;if(sA!==sB)return sA-sB;return(a.prio||3)-(b.prio||3);});
-    let h='<button class="wb5-add-btn" onclick="WB._avOpen()" style="margin-bottom:8px;width:100%;">&#9776; Alle Aufgaben &amp; Gateways</button>';
+    let h='';
     const gKeys=Object.keys(gruppen).filter(k=>k!=='_frei').sort();
     if(gruppen['_frei'])gKeys.push('_frei');
     gKeys.forEach(g=>{
       if(g!=='_frei') {
         const isClosed=this.db.ckKlappZustand?.['ober_'+g]===false;
-        h+='<div class="wb5-gruppe-lbl" onclick="WB._tm5ToggleOber(\x27'+this._esc(g)+'\x27,this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">'
-          +'<span>'+this._esc(g)+'</span>'
-          +'<span class="wb5-ober-chev" style="transition:transform .2s;'+(isClosed?'transform:rotate(-90deg)':'')+'">&#8964;</span></div>'
+        h+='<div class="wb5-gruppe-lbl" style="display:flex;align-items:center;gap:6px;">'
+          +'<span class="wb5-ober-name">'+this._esc(g)+'</span>'
+          +'<div class="wb5-ober-acts">'
+          +'<button class="wb5-ober-act-btn" onclick="event.stopPropagation();WB._tm5OberEdit(\x27'+this._esc(g)+'\x27)" title="Umbenennen">&#9998;</button>'
+          +'</div>'
+          +'<div class="wb5-ober-line"></div>'
+          +'<span class="wb5-ober-chev" onclick="WB._tm5ToggleOber(\x27'+this._esc(g)+'\x27,this)" style="cursor:pointer;transition:transform .2s;'+(isClosed?'transform:rotate(-90deg)':'')+'">&#9660;</span>'
+          +'</div>'
           +'<div id="wbog-'+this._esc(g)+'" style="'+(isClosed?'display:none':'')+';">';
       }
       else if(gKeys.filter(k=>k!=='_frei').length>0) h+='<div class="wb5-gruppe-lbl" style="margin-top:4px;">Sonstiges</div>';
@@ -1441,7 +1485,7 @@ const WB = {
           +'<div class="wb5-thema-meta">'
           +'<span class="wb5-badge wb5-badge-p'+(t.prio||3)+'">Prio '+(t.prio||3)+'</span>'
           +(gwBald?'<span class="wb5-badge wb5-badge-gw">GW '+this._fmtDDMM(gwBald.pruefDatum)+'</span>':'')
-          +'<span class="wb5-badge '+(isPausiert?'wb5-badge-pausiert':'wb5-badge-aktiv')+'">'+(t.status||'aktiv')+'</span>'
+          
           +'</div><span class="wb5-chev">&#8250;</span></div></div>';
       });
     });
@@ -1449,7 +1493,7 @@ const WB = {
     const offenF=freieAufg.filter(a=>!a.erledigt);
     const ueberfF=offenF.filter(a=>a.deadline&&a.deadline<this._dStr(new Date()));
     const faelligF=offenF.filter(a=>a.deadline===this._dStr(new Date()));
-    h+='<div class="wb5-freie-card"><div class="wb5-freie-hdr" id="wb5-freie-hdr">'
+    h+='<div class="wb5-freie-card" id="wb5-freie-hdr">'
       +'<span class="wb5-freie-title">Freie Aufgaben</span>'
       +'<div class="wb5-thema-meta"><span class="wb5-badge wb5-badge-p3">'+offenF.length+' offen</span>'
       +(ueberfF.length?'<span class="wb5-badge wb5-badge-p1">'+ueberfF.length+' &uuml;berf&auml;llig</span>':'')
@@ -1472,6 +1516,7 @@ const WB = {
     // + Neu Aufgabe Button (freie Aufgabe ohne Thema)
     h+='<button class="wb5-add-btn" style="margin:8px 0 4px;" onclick="WB._aufgabeNeu()">+ Freie Aufgabe</button>';
     el.innerHTML=h;
+    this._tm5UpdateScrollBtn();
     const hdr=document.getElementById('wb5-freie-hdr');
     const body=document.getElementById('wb5-freie-body');
     const chev=document.getElementById('wb5-freie-chev');
@@ -3238,6 +3283,25 @@ const WB = {
   },
 
 
+
+
+  async _migrateFreieAufgaben() {
+    const done = await this.idbGet('meta','freieMig_v1');
+    if(done==='true') return;
+    const aufgaben=(this.db.aufgaben||[]).filter(a=>!a.deleted);
+    let freiThema=(this.db.themen||[]).find(t=>!t.deleted&&t._isFrei);
+    if(!freiThema){
+      freiThema={id:'t_frei_'+Date.now(),titel:'Freie Aufgaben',oberthema:'',prio:3,status:'aktiv',_isFrei:true,aufgaben:[],gateways:[],notiz:'',updatedAt:this._now()};
+    await this._migrateFreieAufgaben();
+      if(!this.db.themen) this.db.themen=[];
+      this.db.themen.push(freiThema);
+    }
+    aufgaben.forEach(a=>{freiThema.aufgaben.push({...a,updatedAt:this._now()});});
+    this.db.aufgaben=[];
+    this.setDirty();
+    await this.idbSet('meta','freieMig_v1','true');
+    console.log('[Migration] freieAufgaben:',aufgaben.length);
+  },
 
   _migrateQuickItems() {
     // quickItems (Legacy) → aufgaben als freie Aufgaben

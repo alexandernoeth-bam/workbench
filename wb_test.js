@@ -966,7 +966,7 @@ console.log('\n── 74. Alle-Button im Themen-Tab ──');
 const tm5FnStart2 = jsCode.indexOf('  _tm5Render() {');
 const tm5FnEnd2   = jsCode.indexOf('_tm5RenderOverlayBody', tm5FnStart2);
 const tm5Fn2 = jsCode.slice(tm5FnStart2, tm5FnEnd2);
-tm5Fn2.includes('_avOpen') ? ok('Alle-Button (_avOpen) in _tm5Render vorhanden') : fail('Alle-Button fehlt in _tm5Render!');
+jsCode.includes('_avOpen') ? ok('Alle-Button (_avOpen) vorhanden (Toolbar)') : fail('_avOpen fehlt!');
 
 
 // ══════════════════════════════════════════
@@ -1167,6 +1167,29 @@ renderFn.includes('wb5-ov-a') ? ok('Aufgaben-Row hat wb5-ov-a class') : fail('wb
 
 
 
+
+
+// ══════════════════════════════════════════
+// 86. THEMEN-TAB REDESIGN
+// ══════════════════════════════════════════
+console.log('\n── 86. Themen-Tab Redesign ──');
+// Toolbar vorhanden
+content.includes('wb5-tm-toolbar') ? ok('Themen-Toolbar vorhanden') : fail('wb5-tm-toolbar fehlt!');
+content.includes('Aufgabensicht')  ? ok('Aufgabensicht-Button vorhanden') : fail('Aufgabensicht-Button fehlt!');
+// Migration vorhanden
+jsCode.includes('_migrateFreieAufgaben') ? ok('_migrateFreieAufgaben Migration vorhanden') : fail('_migrateFreieAufgaben fehlt — Freie Aufgaben werden nie migriert!');
+jsCode.includes('freieMig_v1') ? ok('freieMig_v1 Flag vorhanden') : fail('freieMig_v1 Flag fehlt — Migration wird jedes Mal ausgeführt!');
+// Oberthema-Edit
+jsCode.includes('_tm5OberEdit(') ? ok('_tm5OberEdit vorhanden') : fail('_tm5OberEdit fehlt — Oberthema nicht editierbar!');
+// Scroll-Button
+content.includes('wb5-tm-scroll-btn') ? ok('Scroll-Button im Themen-Tab') : fail('Scroll-Button fehlt!');
+// Kein großer Alle-Aufgaben Block
+const tm5Start = jsCode.indexOf('  _tm5Render() {');
+const tm5End   = jsCode.indexOf('\n  _tm5RenderOverlayBody', tm5Start);
+const tm5Fn    = jsCode.slice(tm5Start, tm5End);
+!tm5Fn.includes('Alle Aufgaben &amp; Gateways')
+  ? ok('Kein großer Alle-Aufgaben Block in _tm5Render')
+  : fail('Großer Alle-Aufgaben Block noch vorhanden!');
 
 // ══════════════════════════════════════════
 // ERGEBNIS
