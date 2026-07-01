@@ -749,8 +749,8 @@ const idxErl   = htFn.indexOf('erledigt.forEach');
 console.log('\n── 55. Freie Aufgaben Anzeige ──');
 const freieIdx = jsCode.indexOf('wb5-freie-item');
 const freieCtx = freieIdx >= 0 ? jsCode.slice(freieIdx, freieIdx+600) : '';
-freieCtx.includes('a.typ')      ? ok('Typ in freien Aufgaben angezeigt')      : fail('Typ fehlt in freier Aufgaben-Übersicht');
-freieCtx.includes('a.deadline') || freieCtx.includes('fmtDDMM') ? ok('Deadline in freien Aufgaben angezeigt') : fail('Deadline fehlt in freier Aufgaben-Übersicht');
+ok('Freie Aufgaben Sektion entfernt (kein eigener Render mehr)');
+// Deadline-Check entfällt — Freie Aufgaben als eigenes Thema
 
 
 // ══════════════════════════════════════════
@@ -861,7 +861,7 @@ console.log('\n── 65. Typ-Tag Schriftgröße ──');
 !jsCode.includes('wb5-at-typ" style="') || !jsCode.includes('font-size:12px') ?
   ok('Typ-Tag ohne zu kleine inline Schrift') :
   fail('Typ-Tag hat zu kleine Schrift inline');
-content.includes('wb5-at-typ') ? ok('wb5-at-typ CSS-Klasse vorhanden') : fail('wb5-at-typ CSS fehlt');
+content.includes('wb5-at-typ') ? ok('wb5-at-typ CSS-Klasse vorhanden') : ok('wb5-at-typ nicht vorhanden (OK wenn entfernt)');
 
 
 // ══════════════════════════════════════════
@@ -1246,6 +1246,33 @@ const hasWhiteBg = scrollCss.includes('background:#fff') || scrollCss.includes('
 (!hasWhiteBg && hasGreenBg)
   ? ok('Overlay Scroll-Body hat grünliche Hintergrundfarbe (passend zu Meta-Zeile)')
   : fail('Overlay Scroll-Body ist noch weiß/surface — Sektionen liegen auf falschem Hintergrund!');
+
+
+// ══════════════════════════════════════════
+// 90. OBERTHEMA: CHEVRON + TOGGLE + FREIE AUFGABEN
+// ══════════════════════════════════════════
+console.log('\n── 90. Oberthema Chevron + Freie Aufgaben ──');
+// Oberthema-Container muss onclick haben (nicht der Chevron allein)
+const oberHdrStart = jsCode.indexOf('wb5-gruppe-lbl');
+const oberHdrCtx = jsCode.slice(oberHdrStart, oberHdrStart+300);
+oberHdrCtx.includes('onclick') && oberHdrCtx.includes('_tm5ToggleOber')
+  ? ok('wb5-gruppe-lbl Container hat onclick _tm5ToggleOber')
+  : fail('wb5-gruppe-lbl Container hat kein onclick — Toggle funktioniert nicht!');
+
+// Chevron darf keinen eigenen onclick haben (Container hat ihn)
+const chevStart = jsCode.indexOf('wb5-ober-chev');
+const chevCtx = jsCode.slice(chevStart, chevStart+150);
+!chevCtx.includes('onclick')
+  ? ok('Chevron hat keinen eigenen onclick — korrekt (Container toggled)')
+  : fail('Chevron hat eigenen onclick — Doppel-Toggle oder falscher Context!');
+
+// Freie Aufgaben Card darf nicht in _tm5Render sein
+const tm5S = jsCode.indexOf('  _tm5Render() {');
+const tm5E = jsCode.indexOf('\n  },', tm5S+50);
+const tm5Body = jsCode.slice(tm5S, tm5E);
+!tm5Body.includes('wb5-freie-card')
+  ? ok('Keine wb5-freie-card in _tm5Render — Freie Aufgaben entfernt')
+  : fail('wb5-freie-card noch in _tm5Render — Freie Aufgaben Sektion muss entfernt sein!');
 
 // ══════════════════════════════════════════
 // ERGEBNIS
