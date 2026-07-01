@@ -892,6 +892,47 @@ console.log('\n── 68. JETZT klappbar ──');
 jsCode.includes('_ht5JetztToggle') ? ok('_ht5JetztToggle() vorhanden') : fail('_ht5JetztToggle() fehlt — JETZT nicht klappbar');
 jsCode.includes('wb5-jetzt-body')  ? ok('wb5-jetzt-body vorhanden')    : fail('wb5-jetzt-body fehlt');
 
+
+// ══════════════════════════════════════════
+// 69. STATUS-CB IN ALLEN LISTEN
+// ══════════════════════════════════════════
+console.log('\n── 69. _statusCb in allen Listen ──');
+// wb5-cb done darf nirgends mehr hartcodiert sein
+const badCbDone = (content.match(/wb5-cb done/g)||[]).length;
+badCbDone===0 ? ok('Kein hartcodiertes wb5-cb done — _statusCb wird überall genutzt') :
+  fail('wb5-cb done noch ' + badCbDone + 'x hartcodiert — Status-Checkbox-Icon fehlt!');
+
+// ══════════════════════════════════════════
+// 70. SYNC: _syncConflictPending GUARD
+// ══════════════════════════════════════════
+console.log('\n── 70. Sync-Upload Guard ──');
+const upStart=jsCode.indexOf('async _syncUpload()');
+const upEnd=jsCode.indexOf('\n  },',upStart+50);
+const upFn=jsCode.slice(upStart,upEnd);
+upFn.includes('_syncConflictPending') ? ok('_syncUpload prüft _syncConflictPending') : fail('_syncUpload lädt hoch obwohl Konflikt-Dialog offen!');
+
+// ══════════════════════════════════════════
+// 71. AUFGABEN/GATEWAY GESAMTSICHT
+// ══════════════════════════════════════════
+console.log('\n── 71. Aufgaben/Gateway Gesamtsicht ──');
+content.includes('wb5-av-overlay') ? ok('wb5-av-overlay HTML vorhanden') : fail('wb5-av-overlay fehlt');
+jsCode.includes('_avOpen()')    ? ok('_avOpen() vorhanden')    : fail('_avOpen() fehlt');
+jsCode.includes('_avClose()')   ? ok('_avClose() vorhanden')   : fail('_avClose() fehlt');
+jsCode.includes('_avRender()')  ? ok('_avRender() vorhanden')  : fail('_avRender() fehlt');
+jsCode.includes('_avRenderGW(') ? ok('_avRenderGW() vorhanden') : fail('_avRenderGW() fehlt');
+jsCode.includes('_avSetGrp(')  ? ok('Gruppierung wählbar')     : fail('_avSetGrp() fehlt');
+jsCode.includes('_avSetSort(')  ? ok('Sortierung wählbar')     : fail('_avSetSort() fehlt');
+jsCode.includes('_avToggleErl(')? ok('Erledigte togglebar')    : fail('_avToggleErl() fehlt');
+
+// ══════════════════════════════════════════
+// 72. JETZT KLAPPBAR
+// ══════════════════════════════════════════
+console.log('\n── 72. JETZT klappbar ──');
+jsCode.includes('wb5-jetzt-body') ? ok('wb5-jetzt-body erzeugt') : fail('wb5-jetzt-body fehlt — JETZT nicht klappbar');
+jsCode.includes('_ht5JetztToggle') ? ok('_ht5JetztToggle vorhanden') : fail('_ht5JetztToggle fehlt');
+// JETZT-Header hat onclick
+jsCode.includes('wb5-jetzt-chev') ? ok('wb5-jetzt-chev Pfeil vorhanden') : fail('wb5-jetzt-chev fehlt');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.2.5</title>
+  <title>WorkBench 5.2.6</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -402,13 +402,56 @@
     .wa-field:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(10,107,94,.1); }
     .wa-welt-row { display:flex; gap:8px; margin-top:8px; margin-bottom:6px; }
     .wa-save-row { display:flex; gap:8px; margin-top:10px; justify-content:flex-end; align-items:center; }
-    .wa-neu-box { background:#fff; border:2px dashed var(--accent); border-radius:12px; padding:12px 14px 14px; margin-bottom:16px; }</style>
+    .wa-neu-box { background:#fff; border:2px dashed var(--accent); border-radius:12px; padding:12px 14px 14px; margin-bottom:16px; }
+    /* ── Aufgaben/Gateway Gesamtsicht ── */
+    #wb5-av-overlay { position:absolute; inset:0; background:var(--surface); z-index:5000; display:none; flex-direction:column; }
+    #wb5-av-overlay.open { display:flex; }
+    .av-hdr { background:var(--accent); color:#fff; padding:12px 16px; display:flex; align-items:center; gap:10px; flex-shrink:0; }
+    .av-hdr-title { font-size:17px; font-weight:700; flex:1; }
+    .av-close { background:rgba(255,255,255,.15); border:1.5px solid rgba(255,255,255,.3); color:#fff; border-radius:16px; padding:4px 14px; font-size:14px; cursor:pointer; }
+    .av-tabs { display:flex; background:#fff; border-bottom:2px solid var(--border); padding:0 12px; flex-shrink:0; }
+    .av-tab { padding:9px 16px; font-size:14px; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; color:var(--muted); margin-bottom:-2px; }
+    .av-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+    .av-toolbar { background:#fff; border-bottom:1px solid var(--border); padding:8px 12px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; flex-shrink:0; }
+    .av-tb-grp { display:flex; gap:3px; align-items:center; }
+    .av-tb-lbl { font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-right:2px; }
+    .av-tb-btn { background:var(--surface); border:1.5px solid var(--border); border-radius:7px; padding:4px 10px; font-size:14px; cursor:pointer; color:var(--text); transition:all .12s; }
+    .av-tb-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .av-tb-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .av-tb-sep { width:1px; height:20px; background:var(--border); }
+    .av-list { flex:1; overflow-y:auto; padding:10px 12px; }
+    .av-grp-hdr { display:flex; align-items:center; gap:8px; padding:8px 2px 4px; margin-top:6px; }
+    .av-grp-hdr:first-child { margin-top:0; }
+    .av-grp-title { font-size:14px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; }
+    .av-grp-count { font-size:14px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:1px 7px; color:var(--muted); }
+    .av-grp-line { flex:1; height:1px; background:var(--border); }
+    .av-row { background:#fff; border:1px solid var(--border); border-radius:10px; padding:9px 12px; display:flex; align-items:flex-start; gap:9px; margin-bottom:6px; cursor:pointer; transition:box-shadow .12s; }
+    .av-row:hover { box-shadow:0 2px 8px rgba(0,0,0,.08); }
+    .av-row-body { flex:1; min-width:0; }
+    .av-row-titel { font-size:14px; font-weight:500; line-height:1.4; }
+    .av-row-titel.done { color:var(--muted); text-decoration:line-through; }
+    .av-row-meta { display:flex; flex-wrap:wrap; gap:3px; margin-top:4px; }
+    .av-tag { font-size:14px; font-weight:600; padding:2px 6px; border-radius:5px; white-space:nowrap; }
+    .av-tag-thema { background:#E8F5F3; color:var(--accent); }
+    .av-tag-typ { background:var(--surface); color:var(--muted); border:1px solid var(--border); }
+    .av-tag-dl { background:#FEF3E2; color:#E08C1A; }
+    .av-tag-p1 { background:#FCECEA; color:#C0392B; }
+    .av-tag-erl { background:#F0F4F6; color:var(--muted); }
+    .av-gw-row { background:#fff; border:1px solid var(--border); border-left:4px solid var(--lila); border-radius:10px; padding:9px 12px; margin-bottom:6px; cursor:pointer; transition:box-shadow .12s; }
+    .av-gw-row:hover { box-shadow:0 2px 8px rgba(0,0,0,.08); }
+    .av-gw-hdr { display:flex; align-items:center; gap:8px; }
+    .av-gw-pill { background:var(--lila); color:#fff; font-size:11px; font-weight:700; padding:2px 7px; border-radius:5px; flex-shrink:0; }
+    .av-gw-titel { font-size:14px; font-weight:600; flex:1; min-width:0; }
+    .av-gw-datum { font-size:14px; color:var(--muted); flex-shrink:0; }
+    .av-gw-meta { display:flex; gap:5px; margin-top:5px; flex-wrap:wrap; }
+    .av-erl-btn { background:none; border:1.5px dashed var(--border); border-radius:7px; padding:4px 10px; font-size:14px; cursor:pointer; color:var(--muted); }
+    .av-erl-btn.active { background:var(--surface); color:var(--text); border-style:solid; }</style>
 </head>
 <body>
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.2.5 · Build 20260701-0730</div>
+    <div id="wb-startup-tagline">v5.2.6 · Build 20260701-0830</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -429,6 +472,39 @@
     <!-- WANDEL -->
     <div id="wb5-wandel-tab" style="display:none;flex-direction:column;flex:1;overflow-y:auto;">
       <div id="wb5-wa-content" style="padding:12px;"></div>
+    </div>
+
+
+    <!-- AUFGABEN/GATEWAY GESAMTSICHT -->
+    <div id="wb5-av-overlay">
+      <div class="av-hdr">
+        <span class="av-hdr-title">Alle Aufgaben &amp; Gateways</span>
+        <button class="av-close" onclick="WB._avClose()">&#x2715; Schließen</button>
+      </div>
+      <div class="av-tabs">
+        <div class="av-tab active" id="av-tab-a" onclick="WB._avSetTab('aufgaben',this)">Aufgaben</div>
+        <div class="av-tab" id="av-tab-g" onclick="WB._avSetTab('gateways',this)">Gateways</div>
+      </div>
+      <div class="av-toolbar">
+        <div class="av-tb-grp">
+          <span class="av-tb-lbl">Gruppe</span>
+          <button class="av-tb-btn active" onclick="WB._avSetGrp('thema',this)">Thema</button>
+          <button class="av-tb-btn" onclick="WB._avSetGrp('status',this)">Status</button>
+          <button class="av-tb-btn" onclick="WB._avSetGrp('typ',this)">Typ</button>
+          <button class="av-tb-btn" onclick="WB._avSetGrp('datum',this)">Datum</button>
+          <button class="av-tb-btn" onclick="WB._avSetGrp('keine',this)">Keine</button>
+        </div>
+        <div class="av-tb-sep"></div>
+        <div class="av-tb-grp">
+          <span class="av-tb-lbl">Sort</span>
+          <button class="av-tb-btn active" onclick="WB._avSetSort('prio',this)">Prio</button>
+          <button class="av-tb-btn" onclick="WB._avSetSort('datum',this)">Datum</button>
+          <button class="av-tb-btn" onclick="WB._avSetSort('titel',this)">A–Z</button>
+        </div>
+        <div class="av-tb-sep"></div>
+        <button class="av-erl-btn" id="av-erl-btn" onclick="WB._avToggleErl()">+ Erledigte</button>
+      </div>
+      <div class="av-list" id="av-list"></div>
     </div>
 
     <!-- HEUTE -->
@@ -725,8 +801,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.2.5',
-  APP_BUILD:      '20260701-0730',
+  APP_VERSION:    '5.2.6',
+  APP_BUILD:      '20260701-0830',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -938,7 +1014,7 @@ const WB = {
     const kommend = termine.filter(e=>e.startTime>nowStr);
     const jetztItems = [...laufend.slice(0,1),...kommend.slice(0,1)];
     if (termine.length) {
-      h += '<div class="wb5-card"><div class="wb5-card-hdr"><span class="wb5-card-title">Jetzt</span><span class="wb5-card-badge">'+jetztItems.length+' von '+termine.length+'</span></div>';
+      h += '<div class="wb5-card"><div class="wb5-card-hdr" onclick="WB._ht5JetztToggle()" style="cursor:pointer;"><span class="wb5-card-title">Jetzt</span><span class="wb5-card-badge">'+jetztItems.length+' von '+termine.length+'</span><span id="wb5-jetzt-chev" style="margin-left:auto;transition:transform .2s;">&#8964;</span></div><div id="wb5-jetzt-body">';
       jetztItems.forEach(e => {
         const isL=laufend.includes(e); const wRaw2=(e.welt||'b');const w=wRaw2==='privat'||wRaw2==='priv'?'p':wRaw2==='beruf'||wRaw2==='pro'?'b':wRaw2;
         h += '<div class="wb5-termin-item" onclick="WB._te5OpenTermin(\''+this._esc(e.id)+'\')">'
@@ -947,7 +1023,7 @@ const WB = {
           +'<div class="wb5-t-time">'+(e.startTime||'')+(e.endTime?' \u2013 '+e.endTime:'')+'</div></div>'
           +(isL?'<span class="wb5-laufend">&#9654; l&auml;uft</span>':'')+'</div>';
       });
-      h += '</div>';
+      h += '</div></div>'; // Ende wb5-jetzt-body
     }
     const aufgabenHeute = [
       ...(db.aufgaben||[]).filter(a=>!a.deleted&&this._weltOk(a)&&(a.deadline===today||a.heutePin||this._isRoutineHeute(a))),
@@ -976,9 +1052,7 @@ const WB = {
     }
     // Erledigte unten anzeigen
     erledigt.forEach(a => {
-      h += '<div class="wb5-item"><div class="wb5-cb done" onclick="event.stopPropagation();WB._ht5Toggle(\''+this._esc(a.id)+'\')"></div>'
-        +''+this._weltPill(a.welt)
-        +'<span class="wb5-item-text done">'+this._esc(a.titel||a.text||'')+'</span></div>';
+      h += '<div class="wb5-item">'+this._statusCb(a,true)+this._weltPill(a.welt)+'<span class="wb5-item-text done">'+this._esc(a.titel||a.text||'')+'</span></div>';
     });
 
     h += '</div>';
@@ -1273,7 +1347,7 @@ const WB = {
 
   _tm5ToggleOber(ober, hdrEl) {
     const key='ober_'+ober;
-    const section=document.getElementById('wbog-'+ober);
+    const section=document.getElementById('wbog-'+encodeURIComponent(ober));
     if(!section) return;
     const isOpen=section.style.display!=='none';
     section.style.display=isOpen?'none':'';
@@ -1300,7 +1374,7 @@ const WB = {
         h+='<div class="wb5-gruppe-lbl" onclick="WB._tm5ToggleOber(\x27'+this._esc(g)+'\x27,this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">'
           +'<span>'+this._esc(g)+'</span>'
           +'<span class="wb5-ober-chev" style="transition:transform .2s;'+(isClosed?'transform:rotate(-90deg)':'')+'">&#8964;</span></div>'
-          +'<div id="wbog-'+this._esc(g)+'" style="'+(isClosed?'display:none':'')+';">';
+          +'<div id="wbog-'+encodeURIComponent(g)+'" style="'+(isClosed?'display:none':'')+';">';
       }
       else if(gKeys.filter(k=>k!=='_frei').length>0) h+='<div class="wb5-gruppe-lbl" style="margin-top:4px;">Sonstiges</div>';
       sortT(gruppen[g]).forEach(t=>{
@@ -2089,6 +2163,145 @@ const WB = {
   _weltNorm(welt) {
     const w=welt||'b';
     return w==='beruf'||w==='pro'?'b':w==='privat'||w==='priv'?'p':w;
+  },
+
+
+  // ══════════════════════════════════════════
+  // AUFGABEN/GATEWAY GESAMTSICHT
+  // ══════════════════════════════════════════
+  _avGrp: 'thema',
+  _avSort: 'prio',
+  _avTab: 'aufgaben',
+  _avShowErl: false,
+
+  _avOpen() {
+    const ov=document.getElementById('wb5-av-overlay');
+    if(ov) { ov.classList.add('open'); this._avRender(); }
+  },
+
+  _avClose() {
+    document.getElementById('wb5-av-overlay')?.classList.remove('open');
+  },
+
+  _avSetTab(tab, el) {
+    this._avTab=tab;
+    document.querySelectorAll('.av-tab').forEach(t=>t.classList.remove('active'));
+    el.classList.add('active');
+    this._avRender();
+  },
+
+  _avSetGrp(grp, el) {
+    this._avGrp=grp;
+    document.querySelectorAll('.av-tb-grp .av-tb-btn').forEach(b=>{
+      if(['Thema','Status','Typ','Datum','Keine'].includes(b.textContent)) b.classList.remove('active');
+    });
+    el.classList.add('active');
+    this._avRender();
+  },
+
+  _avSetSort(sort, el) {
+    this._avSort=sort;
+    document.querySelectorAll('.av-tb-grp .av-tb-btn').forEach(b=>{
+      if(['Prio','Datum','A–Z'].includes(b.textContent)) b.classList.remove('active');
+    });
+    el.classList.add('active');
+    this._avRender();
+  },
+
+  _avToggleErl() {
+    this._avShowErl=!this._avShowErl;
+    const btn=document.getElementById('av-erl-btn');
+    if(btn){ btn.textContent=this._avShowErl?'✓ Erledigte':'+ Erledigte'; btn.classList.toggle('active',this._avShowErl); }
+    this._avRender();
+  },
+
+  _avRender() {
+    const el=document.getElementById('av-list'); if(!el) return;
+    if(this._avTab==='gateways') { this._avRenderGW(el); return; }
+    // Alle Aufgaben sammeln
+    const all=[
+      ...(this.db.aufgaben||[]).filter(a=>!a.deleted&&this._weltOk(a)),
+      ...(this.db.themen||[]).filter(t=>!t.deleted).flatMap(t=>(t.aufgaben||[]).filter(a=>!a.deleted&&this._weltOk(t)))
+    ];
+    // Filter Erledigte
+    const aufg=this._avShowErl?all:all.filter(a=>a.status!=='erledigt'&&!a.erledigt);
+    // Sortierung
+    const sorted=[...aufg].sort((a,b)=>{
+      if(this._avSort==='prio') return (a.prio||3)-(b.prio||3);
+      if(this._avSort==='datum') return (a.deadline||'zzz').localeCompare(b.deadline||'zzz');
+      return (a.titel||a.text||'').localeCompare(b.titel||b.text||'');
+    });
+    // Gruppierung
+    let gruppen={};
+    const grpKey=(a)=>{
+      if(this._avGrp==='thema') return a.themaId?this._themaName(a.themaId):'Freie Aufgaben';
+      if(this._avGrp==='status') return a.status||'offen';
+      if(this._avGrp==='typ') return a.typ||'aufgabe';
+      if(this._avGrp==='datum') return a.deadline||'Kein Datum';
+      return 'Alle';
+    };
+    sorted.forEach(a=>{ const k=grpKey(a); if(!gruppen[k])gruppen[k]=[]; gruppen[k].push(a); });
+    const heute=this._dStr(new Date());
+    let h='';
+    if(!sorted.length){ h='<div style="text-align:center;padding:32px;color:var(--muted);">Keine Aufgaben</div>'; el.innerHTML=h; return; }
+    Object.keys(gruppen).sort().forEach(grp=>{
+      const items=gruppen[grp];
+      h+='<div class="av-grp-hdr"><span class="av-grp-title">'+this._esc(grp)+'</span>'
+        +'<span class="av-grp-count">'+items.length+'</span><div class="av-grp-line"></div></div>';
+      items.forEach(a=>{
+        const isErl=a.status==='erledigt'||a.erledigt;
+        const isDl=a.deadline&&a.deadline<heute;
+        h+='<div class="av-row" onclick="WB._avClose();WB._aufgabeDetail(\x27'+this._esc(a.id)+'\x27)">'
+          +this._statusCb(a,true)
+          +'<div class="av-row-body">'
+          +'<div class="av-row-titel'+(isErl?' done':'')+'">'+this._esc(a.titel||a.text||'')+'</div>'
+          +'<div class="av-row-meta">'
+          +(a.themaId?'<span class="av-tag av-tag-thema">'+this._esc(this._themaName(a.themaId))+'</span>':'')
+          +(a.typ&&a.typ!=='aufgabe'?'<span class="av-tag av-tag-typ">'+a.typ+'</span>':'')
+          +(a.prio===1?'<span class="av-tag av-tag-p1">Prio 1</span>':'')
+          +(isDl?'<span class="av-tag av-tag-dl">'+this._fmtDDMM(a.deadline)+'</span>':'')
+          +(a.deadline&&!isDl?'<span class="av-tag av-tag-typ">'+this._fmtDDMM(a.deadline)+'</span>':'')
+          +this._weltPill(a.welt)
+          +(isErl?'<span class="av-tag av-tag-erl">Erledigt</span>':'')
+          +'</div></div></div>';
+      });
+    });
+    el.innerHTML=h;
+  },
+
+  _avRenderGW(el) {
+    const alle=(this.db.themen||[]).flatMap(t=>
+      (t.gateways||[]).filter(g=>!g.deleted).map(g=>({...g,themaId:t.id,themaTitel:t.titel}))
+    );
+    const akt=alle.filter(g=>g.status!=='erreicht');
+    const err=alle.filter(g=>g.status==='erreicht');
+    let h='';
+    if(!akt.length&&(!this._avShowErl||!err.length)){
+      h='<div style="text-align:center;padding:32px;color:var(--muted);">Keine Gateways</div>';
+      el.innerHTML=h; return;
+    }
+    const renderGW=(g,badge,color)=>{
+      return '<div class="av-gw-row" style="border-left-color:'+color+';" onclick="WB._avClose();WB._gw5Edit(\x27'+this._esc(g.id)+'\x27,\x27'+this._esc(g.themaId)+'\x27)">'
+        +'<div class="av-gw-hdr">'
+        +'<span class="av-gw-pill" style="background:'+color+';">'+badge+'</span>'
+        +'<span class="av-gw-titel">'+this._esc(g.titel||'')+'</span>'
+        +(g.pruefDatum?'<span class="av-gw-datum">'+this._fmtDDMM(g.pruefDatum)+'</span>':'')
+        +'</div>'
+        +'<div class="av-gw-meta">'
+        +'<span class="av-tag av-tag-thema">'+this._esc(g.themaTitel||'')+'</span>'
+        +(g.istWert?'<span class="av-tag av-tag-typ">IST: '+this._esc(g.istWert)+'</span>':'')
+        +(g.sollWert?'<span class="av-tag av-tag-typ">SOLL: '+this._esc(g.sollWert)+'</span>':'')
+        +'</div></div>';
+    };
+    if(akt.length){
+      h+='<div class="av-grp-hdr"><span class="av-grp-title">Aktiv</span><span class="av-grp-count">'+akt.length+'</span><div class="av-grp-line"></div></div>';
+      akt.forEach(g=>{ h+=renderGW(g,'GW','var(--lila)'); });
+    }
+    if(this._avShowErl&&err.length){
+      h+='<div class="av-grp-hdr" style="margin-top:8px;"><span class="av-grp-title">Erreicht</span><span class="av-grp-count">'+err.length+'</span><div class="av-grp-line"></div></div>';
+      err.forEach(g=>{ h+=renderGW(g,'✓','var(--muted)'); });
+    }
+    el.innerHTML=h;
   },
 
   _na5WdhChange(val) {
@@ -3046,6 +3259,7 @@ const WB = {
   },
 
   async _syncUpload() {
+    if (this._syncConflictPending) { console.warn('[syncUpload] Konflikt-Dialog offen'); return; }
     // Guard: db muss vorhanden sein
     if (!this.db) { console.warn('[syncUpload] db not ready'); return; }
     try {
