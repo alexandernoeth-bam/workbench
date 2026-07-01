@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.2.4</title>
+  <title>WorkBench 5.2.5</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -408,7 +408,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.2.4 · Build 20260701-0630</div>
+    <div id="wb-startup-tagline">v5.2.5 · Build 20260701-0730</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -725,8 +725,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.2.4',
-  APP_BUILD:      '20260701-0630',
+  APP_VERSION:    '5.2.5',
+  APP_BUILD:      '20260701-0730',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -899,6 +899,16 @@ const WB = {
   },
 
   // ── HEUTE ─────────────────────────────────────────
+
+  _ht5JetztToggle() {
+    const body=document.getElementById('wb5-jetzt-body');
+    const chev=document.getElementById('wb5-jetzt-chev');
+    if(!body) return;
+    const isOpen=body.style.display!=='none';
+    body.style.display=isOpen?'none':'';
+    if(chev) chev.style.transform=isOpen?'rotate(-90deg)':'';
+  },
+
   _ht5Render() {
     const el = document.getElementById('wb5-heute'); if (!el) return;
     const today = this._dStr(new Date()); const db = this.db||{};
@@ -1012,9 +1022,10 @@ const WB = {
     const all=[...(this.db.aufgaben||[]),...(this.db.themen||[]).flatMap(t=>t.aufgaben||[])];
     const a=all.find(x=>x.id===id);
     if(a){
-      const cycle=['offen','in_arbeit','pausiert','erledigt'];
-      const cur=a.status&&cycle.includes(a.status)?a.status:(a.erledigt?'erledigt':'offen');
-      const next=cycle[(cycle.indexOf(cur)+1)%cycle.length];
+      const cycle=['offen','in_arbeit','erledigt'];
+      const cur=a.status&&['offen','in_arbeit','pausiert','erledigt'].includes(a.status)?a.status:(a.erledigt?'erledigt':'offen');
+      const curIdx=cycle.includes(cur)?cycle.indexOf(cur):0;
+      const next=cycle[(curIdx+1)%cycle.length];
       a.status=next; a.erledigt=(next==='erledigt'); a.updatedAt=this._now(); this.setDirty();
       // Collapsible-State merken vor Render
       const body=document.getElementById('wb5-freie-body');
@@ -1262,14 +1273,14 @@ const WB = {
 
   _tm5ToggleOber(ober, hdrEl) {
     const key='ober_'+ober;
-    const section=hdrEl.nextElementSibling;
+    const section=document.getElementById('wbog-'+ober);
     if(!section) return;
     const isOpen=section.style.display!=='none';
     section.style.display=isOpen?'none':'';
     const chev=hdrEl.querySelector('.wb5-ober-chev');
     if(chev) chev.style.transform=isOpen?'rotate(-90deg)':'';
     if(!this.db.ckKlappZustand) this.db.ckKlappZustand={};
-    this.db.ckKlappZustand[key]=!isOpen;
+    this.db.ckKlappZustand[key]=isOpen?false:undefined;
   },
 
   _tm5Render() {
@@ -1284,7 +1295,13 @@ const WB = {
     const gKeys=Object.keys(gruppen).filter(k=>k!=='_frei').sort();
     if(gruppen['_frei'])gKeys.push('_frei');
     gKeys.forEach(g=>{
-      if(g!=='_frei') h+='<div class="wb5-gruppe-lbl">'+this._esc(g)+'</div>';
+      if(g!=='_frei') {
+        const isClosed=this.db.ckKlappZustand?.['ober_'+g]===false;
+        h+='<div class="wb5-gruppe-lbl" onclick="WB._tm5ToggleOber(\x27'+this._esc(g)+'\x27,this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">'
+          +'<span>'+this._esc(g)+'</span>'
+          +'<span class="wb5-ober-chev" style="transition:transform .2s;'+(isClosed?'transform:rotate(-90deg)':'')+'">&#8964;</span></div>'
+          +'<div id="wbog-'+this._esc(g)+'" style="'+(isClosed?'display:none':'')+';">';
+      }
       else if(gKeys.filter(k=>k!=='_frei').length>0) h+='<div class="wb5-gruppe-lbl" style="margin-top:4px;">Sonstiges</div>';
       sortT(gruppen[g]).forEach(t=>{
         const gwBald=(t.gateways||[]).find(g2=>!g2.deleted&&g2.status!=='erreicht'&&g2.pruefDatum);
@@ -1312,7 +1329,7 @@ const WB = {
     offenF.forEach(a=>{
       const isR=this._isRoutineHeute(a);const isUe=a.deadline&&a.deadline<this._dStr(new Date());const isFaellig=a.deadline===this._dStr(new Date());
       h+='<div class="wb5-freie-item" onclick="WB._aufgabeDetail(\''+this._esc(a.id)+'\')">'
-        +'+this._statusCb(a,true)+'+this._weltPill(a.welt)
+        +this._statusCb(a,true)+this._weltPill(a.welt)
         +'<span class="wb5-freie-text">'+this._esc(a.titel||a.text||'')+'</span>'
         +(a.typ&&a.typ!=='aufgabe'?'<span class="wb5-atag wb5-at-typ">'+a.typ+'</span>':'')
         +(isUe?'<span class="wb5-atag wb5-at-ue">&uuml;berf&auml;llig</span>':'')
@@ -1875,7 +1892,7 @@ const WB = {
       +'<div class="wb-input-group"><span class="wb-label">Startzeit (optional)</span>'
       +'<input id="wb5-na-startzeit" class="wb-input" type="time"></div>'
       +'<div class="wb-input-group"><span class="wb-label">Dauer</span>'
-      +'<select id="wb5-na-dauer" class="wb-select"><option value="15">15 Min</option><option value="30" selected>30 Min</option><option value="45">45 Min</option><option value="60">1 Std</option><option value="90">1,5 Std</option><option value="120">2 Std</option><option value="0">Keine</option></select></div>'
+      +'<input id="wb5-na-dauer" class="wb-input" type="number" min="0" max="480" value="30" list="wb5-dauer-list">'
       +'</div>'
       +'<div class="wb5-input-row">'
       +'<div class="wb-input-group"><span class="wb-label">Wiederholung</span>'
@@ -1958,6 +1975,7 @@ const WB = {
           +'<button class="wb-btn wb-btn-save" onclick="event.stopPropagation();WB._wa5Save(\x27'+e.id+'\x27)">Speichern</button>'
           +'</div></div></div>';
       });
+      if(g!=='_frei') h+='</div>';
     });
     el.innerHTML=h;
   },
@@ -2156,7 +2174,7 @@ const WB = {
       +'<div class="wb-input-group"><span class="wb-label">Startzeit (optional)</span>'
       +'<input id="wb5-ad-startzeit" class="wb-input" type="time" value="'+(a.startzeit||'')+'"></div>'
       +'<div class="wb-input-group"><span class="wb-label">Dauer</span>'
-      +'<select id="wb5-ad-dauer" class="wb-select"><option value="15"'+(a.dauer===15?' selected':'')+'>15 Min</option><option value="30"'+((a.dauer||30)===30?' selected':'')+'>30 Min</option><option value="45"'+(a.dauer===45?' selected':'')+'>45 Min</option><option value="60"'+(a.dauer===60?' selected':'')+'>1 Std</option><option value="90"'+(a.dauer===90?' selected':'')+'>1,5 Std</option><option value="120"'+(a.dauer===120?' selected':'')+'>2 Std</option><option value="0"'+(a.dauer===0?' selected':'')+'>Keine</option></select></div>'
+      +'<input id="wb5-ad-dauer" class="wb-input" type="number" min="0" max="480" value="'+(a.dauer||30)+'" list="wb5-dauer-list">'
       +'</div>'
       +'<div class="wb5-input-row">'
       +'<div class="wb-input-group"><span class="wb-label">Wiederholung</span>'
@@ -2609,6 +2627,7 @@ const WB = {
       // ── Legacy (leer, für Kompatibilität beim Laden alter Daten) ──
       notizen: [], wissensnetzwerk: [], vorhaben: [], ziele: [],
       links: [], quickItems: [], checklistVorlagen: [], mantras: [],
+      wandel: [], fokusTypen: [],
       _version: 2, _exportedAt: '',
     };
   },

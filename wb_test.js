@@ -826,7 +826,7 @@ jsCode.includes('wb5-cb-progress') ? ok('wb5-cb-progress CSS-Klasse vorhanden') 
 jsCode.includes('wb5-cb-paused')   ? ok('wb5-cb-paused CSS-Klasse vorhanden')   : fail('wb5-cb-paused fehlt');
 jsCode.includes('wb5-ad-status')   ? ok('Status-Dropdown in _aufgabeDetail')    : fail('Status-Dropdown fehlt in Detail');
 // Status-Zyklus in _ht5Toggle
-jsCode.includes("cycle=['offen','in_arbeit','pausiert','erledigt']") ? ok('Status-Zyklus in _ht5Toggle') : fail('Status-Zyklus fehlt in _ht5Toggle');
+jsCode.includes("cycle=['offen','in_arbeit'") ? ok('Status-Zyklus in _ht5Toggle') : fail('Status-Zyklus fehlt in _ht5Toggle');
 
 // ══════════════════════════════════════════
 // 62. AUFGABEN: STARTZEIT + DAUER
@@ -836,7 +836,7 @@ jsCode.includes('wb5-na-startzeit') ? ok('Startzeit-Feld in _aufgabeNeu')    : f
 jsCode.includes('wb5-na-dauer')     ? ok('Dauer-Select in _aufgabeNeu')      : fail('Dauer fehlt in _aufgabeNeu');
 jsCode.includes('wb5-ad-startzeit') ? ok('Startzeit-Feld in _aufgabeDetail') : fail('Startzeit fehlt in _aufgabeDetail');
 jsCode.includes('wb5-ad-dauer')     ? ok('Dauer-Select in _aufgabeDetail')   : fail('Dauer fehlt in _aufgabeDetail');
-jsCode.includes('selected>30 Min') ? ok('Dauer-Default 30 Min') : fail('Dauer-Default 30 Min fehlt');
+jsCode.includes('wb5-na-dauer') && (jsCode.includes('value="30"') || jsCode.includes("value='30'")) ? ok('Dauer-Default 30 Min') : fail('Dauer-Default 30 Min fehlt');
 
 // ══════════════════════════════════════════
 // 63. NOTIZ: CONTENTEDITABLE + TOOLBAR
@@ -862,6 +862,35 @@ console.log('\n── 65. Typ-Tag Schriftgröße ──');
   ok('Typ-Tag ohne zu kleine inline Schrift') :
   fail('Typ-Tag hat zu kleine Schrift inline');
 content.includes('wb5-at-typ') ? ok('wb5-at-typ CSS-Klasse vorhanden') : fail('wb5-at-typ CSS fehlt');
+
+
+// ══════════════════════════════════════════
+// 66. STATUS-CB KORREKT EINGEBETTET
+// ══════════════════════════════════════════
+console.log('\n── 66. _statusCb Einbettung ──');
+// _statusCb darf nicht als String-Literal enden: '+this._statusCb(...)+' = Bug
+const badPattern = "'+this._statusCb";
+const allOccurrences = jsCode.split(badPattern).length - 1;
+// Jedes Vorkommen muss korrekt verkettet sein — kein )+' direkt nach _statusCb-Aufruf
+const wrongEmbed = (jsCode.match(/'\+this\._statusCb\([^)]+\)\+'/g)||[]);
+wrongEmbed.length===0 ? ok('_statusCb korrekt eingebettet (kein +\'...\'+ Wrapper-Bug)') : fail('_statusCb als String-Literal eingebettet: '+wrongEmbed.length+' Vorkommen — Checkbox wird als Text gerendert!');
+
+// ══════════════════════════════════════════
+// 67. EMPTYDB VOLLSTÄNDIG
+// ══════════════════════════════════════════
+console.log('\n── 67. _emptyDb vollständig ──');
+const emptyStart=jsCode.indexOf('_emptyDb()');
+const emptyEnd=jsCode.indexOf('\n  },',emptyStart+50);
+const emptyFn=jsCode.slice(emptyStart,emptyEnd);
+emptyFn.includes('wandel')     ? ok('wandel[] in _emptyDb') : fail('wandel[] fehlt in _emptyDb — Wandel-Tab wird nicht synchronisiert!');
+emptyFn.includes('fokusTypen') ? ok('fokusTypen[] in _emptyDb') : fail('fokusTypen[] fehlt in _emptyDb');
+
+// ══════════════════════════════════════════
+// 68. JETZT KLAPPBAR
+// ══════════════════════════════════════════
+console.log('\n── 68. JETZT klappbar ──');
+jsCode.includes('_ht5JetztToggle') ? ok('_ht5JetztToggle() vorhanden') : fail('_ht5JetztToggle() fehlt — JETZT nicht klappbar');
+jsCode.includes('wb5-jetzt-body')  ? ok('wb5-jetzt-body vorhanden')    : fail('wb5-jetzt-body fehlt');
 
 // ══════════════════════════════════════════
 // ERGEBNIS
