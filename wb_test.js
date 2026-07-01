@@ -788,6 +788,32 @@ jsCode.includes("'wandel'")            ? ok("showTab('wandel') verknüpft")     
 jsCode.includes('db.wandel')           ? ok('wandel[] im DB-Schema')           : fail('wandel[] fehlt im DB-Schema');
 jsCode.includes('_wa5Toolbar(')        ? ok('_wa5Toolbar() — Formatierungs-Toolbar') : fail('_wa5Toolbar() fehlt');
 
+
+// ══════════════════════════════════════════
+// 59. WB4-MIGRATION: TEXT→TITEL + THEMAID
+// ══════════════════════════════════════════
+console.log('\n── 59. WB4-Migration text→titel ──');
+const ensureFn = jsCode.match(/_ensureDbFields[\s\S]{0,4000}/)?.[0]||'';
+ensureFn.includes('a.titel = a.text') || ensureFn.includes('a.titel=a.text') ? ok('text→titel Migration in _ensureDbFields') : fail('text→titel Migration fehlt — WB4-Aufgaben crashen bei filter/find auf titel!');
+ensureFn.includes('themaId === null') || ensureFn.includes('themaId===null') ? ok('themaId:null→undefined bereinigt') : fail('themaId:null nicht bereinigt');
+
+// ══════════════════════════════════════════
+// 60. SYNC-KONFLIKT-DIALOG
+// ══════════════════════════════════════════
+console.log('\n── 60. Sync-Konflikt-Dialog ──');
+jsCode.includes('_syncConflictDialog(') ? ok('_syncConflictDialog() vorhanden') : fail('_syncConflictDialog() fehlt');
+jsCode.includes('_syncConflictPending') ? ok('_syncConflictPending Flag vorhanden') : fail('_syncConflictPending fehlt');
+jsCode.includes('_syncCheckNewer(')     ? ok('_syncCheckNewer() vorhanden')     : fail('_syncCheckNewer() fehlt');
+// _syncCheckNewer muss modifiedTime mit _syncLastDownload vergleichen
+const cnStart=jsCode.indexOf('async _syncCheckNewer(');const cnEnd=jsCode.indexOf('\n  },',cnStart+50);const checkNewerFn=cnStart>=0?jsCode.slice(cnStart,cnEnd):'';
+checkNewerFn.includes('modifiedTime') ? ok('modifiedTime-Vergleich in _syncCheckNewer') : fail('modifiedTime-Vergleich fehlt — kein Konflikt-Erkennung!');
+checkNewerFn.includes('_syncLastDownload') ? ok('_syncLastDownload als Vergleichsbasis') : fail('_syncLastDownload nicht genutzt');
+// _syncTick muss _syncConflictPending prüfen
+const tickFn = jsCode.match(/async _syncTick[\s\S]{0,400}/)?.[0]||'';
+tickFn.includes('_syncConflictPending') ? ok('_syncTick prüft _syncConflictPending') : fail('_syncTick lädt hoch obwohl Konflikt-Dialog offen!');
+// visibilitychange → _syncCheckNewer
+jsCode.includes('_syncCheckNewer()') && jsCode.includes('visibilitychange') ? ok('visibilitychange triggert _syncCheckNewer') : fail('visibilitychange triggert kein _syncCheckNewer');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
