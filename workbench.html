@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.4.17</title>
+  <title>WorkBench 5.4.18</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -522,7 +522,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.4.17 · Build 20260701-2300</div>
+    <div id="wb-startup-tagline">v5.4.18 · Build 20260701-2315</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -887,8 +887,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.4.17',
-  APP_BUILD:      '20260701-2300',
+  APP_VERSION:    '5.4.18',
+  APP_BUILD:      '20260701-2315',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -2873,28 +2873,23 @@ const WB = {
 
   _aufgabeDelete(id) {
     if(!confirm('Aufgabe wirklich löschen?')) return;
+    // Aufgabe in ALLEN Orten löschen (kann in db.aufgaben UND t.aufgaben liegen)
+    let found=false;
     const idx=(this.db.aufgaben||[]).findIndex(x=>x.id===id);
     if(idx>=0){
       this.db.aufgaben[idx].deleted=true;
       this.db.aufgaben[idx].updatedAt=this._now();
-  
-    } else {
-      let found=false;
-      (this.db.themen||[]).forEach(t=>{const ti=(t.aufgaben||[]).findIndex(a=>a.id===id);if(ti>=0){t.aufgaben[ti].deleted=true;t.aufgaben[ti].updatedAt=this._now();found=true;}});
-      if(!found){this._toast('⚠ Aufgabe nicht gefunden: '+id);return;}
+      found=true;
     }
+    (this.db.themen||[]).forEach(t=>{
+      const ti=(t.aufgaben||[]).findIndex(a=>a.id===id);
+      if(ti>=0){t.aufgaben[ti].deleted=true;t.aufgaben[ti].updatedAt=this._now();found=true;}
+    });
+    if(!found){this._toast('⚠ Aufgabe nicht gefunden: '+id);return;}
     this.idbSave();
     this.setDirty();
     this.modalClose();
-    // DEBUG: Prüfe ob deleted korrekt gesetzt
-    const dbgA=(this.db.aufgaben||[]).find(x=>x.id===id);
-    const dbgT=(this.db.themen||[]).flatMap(t=>t.aufgaben||[]).find(x=>x.id===id);
-    console.log('[D1] db.aufgaben deleted:', dbgA?.deleted, 'thema.aufgaben deleted:', dbgT?.deleted);
-    console.log('[D2] _ovActiveThema nach modalClose:', this._ovActiveThema?.titel, 'id:', this._ovActiveThema?.id);
     this._refreshAfterAufgabe();
-    // DEBUG: Prüfe was im Overlay-Body steht
-    const dbgBody=document.getElementById('wb5-ov-body');
-    console.log('[D3] ov-body Aufgaben nach Refresh:', dbgBody?.querySelectorAll('.wb5-ov-a').length, 'sichtbar');
     this._toast('✓ Aufgabe gelöscht');
   },
 
