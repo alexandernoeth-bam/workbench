@@ -1481,6 +1481,24 @@ ovFn97.includes("gwOpen?'':' hide'") && ovFn97.includes("nOpen?'':' hide'")
   ? ok('sec-body bekommt hide-Klasse wenn zugeklappt')
   : fail('sec-body hide fehlt — Inhalt trotzdem sichtbar!');
 
+
+// ══════════════════════════════════════════
+// 98. THEMA-CARD: AUFGABEN-PILL
+// ══════════════════════════════════════════
+console.log('\n── 98. Thema-Card Aufgaben-Pill ──');
+const tm5Start98 = jsCode.indexOf('  _tm5Render() {');
+const tm5End98   = jsCode.indexOf('\n  },', tm5Start98+50);
+const tm5Fn98  = jsCode.slice(tm5Start98, tm5End98);
+tm5Fn98.includes('offenCount') && tm5Fn98.includes('wb5-aufg-pill')
+  ? ok('Thema-Card hat Aufgaben-Pill (offenCount + wb5-aufg-pill)')
+  : fail('Thema-Card hat keine Aufgaben-Pill — offenCount oder wb5-aufg-pill fehlt!');
+tm5Fn98.includes('offenCount>0')
+  ? ok('Pill nur bei offenCount > 0 angezeigt')
+  : fail('Pill wird immer angezeigt — auch bei 0 offenen Aufgaben!');
+content.includes('wb5-aufg-pill')
+  ? ok('wb5-aufg-pill CSS vorhanden')
+  : fail('wb5-aufg-pill CSS fehlt!');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════

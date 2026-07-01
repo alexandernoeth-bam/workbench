@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.4.22</title>
+  <title>WorkBench 5.4.24</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -516,13 +516,14 @@
     .av-tag-filter-sel { border:1.5px solid var(--border); border-radius:8px; padding:4px 10px; font-size:14px; font-family:var(--font); background:#fff; color:var(--text); cursor:pointer; }
     .av-tag-filter-sel:focus { outline:none; border-color:var(--accent); }
     .av-tag-clear { background:none; border:none; font-size:14px; color:var(--faint); cursor:pointer; padding:4px 6px; border-radius:6px; }
-    .av-tag-clear:hover { color:var(--accent); background:var(--surface); }</style>
+    .av-tag-clear:hover { color:var(--accent); background:var(--surface); }
+    .wb5-aufg-pill { background:#E8F5F3; color:#0A6B5E; font-size:14px; font-weight:700; padding:2px 9px; border-radius:20px; flex-shrink:0; }</style>
 </head>
 <body>
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.4.22 · Build 20260702-0030</div>
+    <div id="wb-startup-tagline">v5.4.24 · Build 20260702-0120</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -887,8 +888,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.4.22',
-  APP_BUILD:      '20260702-0030',
+  APP_VERSION:    '5.4.24',
+  APP_BUILD:      '20260702-0120',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -1349,7 +1350,7 @@ const WB = {
       +'</div></div>';
     const foot = '<div style="display:flex;gap:8px;justify-content:space-between;width:100%;">'
       +(t?'<div style="display:flex;gap:6px;"><button class="wb-btn wb-btn-danger" onclick="WB._thd5Delete(\''+t.id+'\')">Löschen</button>'
-        +'<button class="wb-btn" style="background:var(--surface2);" onclick="WB._duplizierenThema(\''+t.id+'\')">Duplizieren</button></div>':'<div></div>')
+        +'<button class="wb-btn" style="background:var(--surface2);" onclick="WB._duplizierenThema(\''+t.id+'\')">Duplizieren</button></div>':'')
       +'<div style="display:flex;gap:6px;">'
       +'<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
       +'<button class="wb-btn wb-btn-save" onclick="WB._thd5Save(\''+(themaId||'')+'\')">Speichern</button>'
@@ -1510,12 +1511,15 @@ const WB = {
       sortT(gruppen[g]).forEach(t=>{
         const gwBald=(t.gateways||[]).find(g2=>!g2.deleted&&g2.status!=='erreicht'&&g2.pruefDatum);
         const isPausiert=t.status==='pausiert';
+        // Offene Aufgaben zählen (aus t.aufgaben + db.aufgaben mit themaId)
+        const aufgT=[...(t.aufgaben||[]),...(this.db.aufgaben||[]).filter(a=>a.themaId===t.id)];
+        const offenCount=aufgT.filter(a=>!a.deleted&&a.status!=='erledigt'&&!a.erledigt).length;
         h+='<div class="wb5-thema-card prio-'+(t.prio||3)+(isPausiert?' pausiert':'')+'" onclick="WB._tm5OpenOverlay(\''+this._esc(t.id)+'\')">'
           +'<div class="wb5-thema-hdr"><span class="wb5-thema-name">'+this._esc(t.titel)+'</span>'
           +'<div class="wb5-thema-meta">'
+          +(offenCount>0?'<span class="wb5-aufg-pill">'+offenCount+' offen</span>':'')
           +'<span class="wb5-badge wb5-badge-p'+(t.prio||3)+'">Prio '+(t.prio||3)+'</span>'
           +(gwBald?'<span class="wb5-badge wb5-badge-gw">GW '+this._fmtDDMM(gwBald.pruefDatum)+'</span>':'')
-          
           +'</div><span class="wb5-chev">&#8250;</span></div></div>';
       });
       if(g!=='_frei') h+='</div>'; // schließt wbog-div
@@ -2229,7 +2233,7 @@ const WB = {
       +'</select></div>'
       +'<div class="wb-input-group"><span class="wb-label">Typ</span>'
       +'<select id="wb5-na-typ" class="wb-select">'+typen.map(t=>'<option value="'+t.v+'">'+t.l+'</option>').join('')+'</select></div>'
-      +'</div></div>'
+      +'</div>'
       +'<div class="wb5-input-row">'
       +'<div class="wb-input-group"><span class="wb-label">Priorität</span>'
       +'<select id="wb5-na-prio" class="wb-select"><option value="1">Prio 1</option><option value="2">Prio 2</option><option value="3" selected>Prio 3</option></select></div>'
@@ -2241,7 +2245,7 @@ const WB = {
       +'<input id="wb5-na-startzeit" class="wb-input" type="time"></div>'
       +'<div class="wb-input-group"><span class="wb-label">Dauer</span>'
       +'<input id="wb5-na-dauer" class="wb-input" type="number" min="0" max="480" value="30" list="wb5-dauer-list">'
-      +'</div>'
+      +'</div></div>'
       +'<div class="wb5-input-row">'
       +'<div class="wb-input-group"><span class="wb-label">Wiederholung</span>'
       +'<select id="wb5-na-wdh" class="wb-select" onchange="WB._na5WdhChange(this.value)">'+wdh.map(w=>'<option value="'+w.v+'">'+w.l+'</option>').join('')+'</select></div>'
@@ -4020,6 +4024,7 @@ const WB = {
 
 };
 
+window.addEventListener('DOMContentLoaded', () => WB.init());
 window.addEventListener('DOMContentLoaded', () => WB.init());
 </script>
 </body>
