@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.2.3</title>
+  <title>WorkBench 5.2.4</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -408,7 +408,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.2.3 · Build 20260701-0530</div>
+    <div id="wb-startup-tagline">v5.2.4 · Build 20260701-0630</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -725,8 +725,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.2.3',
-  APP_BUILD:      '20260701-0530',
+  APP_VERSION:    '5.2.4',
+  APP_BUILD:      '20260701-0630',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -990,11 +990,32 @@ const WB = {
     }
   },
 
+
+  _statusCb(a, stopProp) {
+    const s=a.status&&['offen','in_arbeit','pausiert','erledigt'].includes(a.status)?a.status:(a.erledigt?'erledigt':'offen');
+    const id=this._esc(a.id);
+    const ev=stopProp?'event.stopPropagation();':'';
+    if(s==='offen')
+      return '<div class="wb5-cb" onclick="'+ev+'WB._ht5Toggle(\x27'+id+'\x27)" title="Offen"></div>';
+    if(s==='in_arbeit')
+      return '<div class="wb5-cb wb5-cb-progress" onclick="'+ev+'WB._ht5Toggle(\x27'+id+'\x27)" title="In Arbeit">'
+        +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></div>';
+    if(s==='pausiert')
+      return '<div class="wb5-cb wb5-cb-paused" onclick="'+ev+'WB._ht5Toggle(\x27'+id+'\x27)" title="Pausiert">'
+        +'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="5" y="4" width="4" height="16" rx="1"/><rect x="15" y="4" width="4" height="16" rx="1"/></svg></div>';
+    // erledigt
+    return '<div class="wb5-cb wb5-cb-done" onclick="'+ev+'WB._ht5Toggle(\x27'+id+'\x27)" title="Erledigt">'
+      +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>';
+  },
+
   _ht5Toggle(id) {
     const all=[...(this.db.aufgaben||[]),...(this.db.themen||[]).flatMap(t=>t.aufgaben||[])];
     const a=all.find(x=>x.id===id);
     if(a){
-      a.erledigt=!a.erledigt;a.status=a.erledigt?'erledigt':'offen';a.updatedAt=this._now();this.setDirty();
+      const cycle=['offen','in_arbeit','pausiert','erledigt'];
+      const cur=a.status&&cycle.includes(a.status)?a.status:(a.erledigt?'erledigt':'offen');
+      const next=cycle[(cycle.indexOf(cur)+1)%cycle.length];
+      a.status=next; a.erledigt=(next==='erledigt'); a.updatedAt=this._now(); this.setDirty();
       // Collapsible-State merken vor Render
       const body=document.getElementById('wb5-freie-body');
       const wasOpen = body?.classList.contains('open');
@@ -1136,7 +1157,9 @@ const WB = {
       '<div class="wb-input-group"><span class="wb-label">Titel</span>'
       +'<input id="wb5-thd-titel" class="wb-input" type="text" placeholder="Thema-Name" value="'+this._esc(t?.titel||'')+'"></div>'
       +'<div class="wb-input-group"><span class="wb-label">Oberthema (optional)</span>'
-      +'<input id="wb5-thd-ober" class="wb-input" type="text" placeholder="z.B. Karriere, Familie..." value="'+this._esc(t?.oberthema||'')+'"></div>'
+      +'<div style="display:flex;gap:6px;align-items:center;">'
+      +'<input id="wb5-thd-ober" class="wb-input" type="text" list="wb5-ober-list" placeholder="Neu eingeben oder wählen..." value="'+this._esc(t?.oberthema||'')+'"></div>'
+      +'<datalist id="wb5-ober-list">'+[...new Set((this.db.themen||[]).filter(x=>!x.deleted&&x.oberthema).map(x=>x.oberthema))].map(o=>'<option value="'+this._esc(o)+'">').join('')+'</datalist>'
       +'<div class="wb5-input-row">'
       +'<div class="wb-input-group"><span class="wb-label">Priorität</span>'
       +'<select id="wb5-thd-prio" class="wb-select">'+prios.map(p=>'<option value="'+p.v+'"'+(String(t?.prio||3)===p.v?' selected':'')+'>'+p.l+'</option>').join('')+'</select></div>'
@@ -1236,6 +1259,19 @@ const WB = {
     this._toast('Kopie angelegt');
   },
 
+
+  _tm5ToggleOber(ober, hdrEl) {
+    const key='ober_'+ober;
+    const section=hdrEl.nextElementSibling;
+    if(!section) return;
+    const isOpen=section.style.display!=='none';
+    section.style.display=isOpen?'none':'';
+    const chev=hdrEl.querySelector('.wb5-ober-chev');
+    if(chev) chev.style.transform=isOpen?'rotate(-90deg)':'';
+    if(!this.db.ckKlappZustand) this.db.ckKlappZustand={};
+    this.db.ckKlappZustand[key]=!isOpen;
+  },
+
   _tm5Render() {
     const el=document.getElementById('wb5-themen'); if(!el) return;
     const db=this.db||{}; const themen=(db.themen||[]).filter(t=>!t.deleted&&this._weltOk(t));
@@ -1276,9 +1312,9 @@ const WB = {
     offenF.forEach(a=>{
       const isR=this._isRoutineHeute(a);const isUe=a.deadline&&a.deadline<this._dStr(new Date());const isFaellig=a.deadline===this._dStr(new Date());
       h+='<div class="wb5-freie-item" onclick="WB._aufgabeDetail(\''+this._esc(a.id)+'\')">'
-        +'<div class="wb5-cb" onclick="event.stopPropagation();WB._ht5Toggle(\x27'+this._esc(a.id)+'\x27)"></div>'+this._weltPill(a.welt)
+        +'+this._statusCb(a,true)+'+this._weltPill(a.welt)
         +'<span class="wb5-freie-text">'+this._esc(a.titel||a.text||'')+'</span>'
-        +(a.typ&&a.typ!=='aufgabe'?'<span class="wb5-atag" style="background:var(--surface2);color:var(--muted);">'+a.typ+'</span>':'')
+        +(a.typ&&a.typ!=='aufgabe'?'<span class="wb5-atag wb5-at-typ">'+a.typ+'</span>':'')
         +(isUe?'<span class="wb5-atag wb5-at-ue">&uuml;berf&auml;llig</span>':'')
         +(a.deadline&&!isUe?'<span class="wb5-atag wb5-at-dl">'+this._fmtDDMM(a.deadline)+'</span>':'')
         +(isR?'<span class="wb5-atag wb5-at-r">&#x21BB; Routine</span>':'')+'</div>';
@@ -1836,6 +1872,12 @@ const WB = {
       +'<input id="wb5-na-deadline" class="wb-input" type="date"></div>'
       +'</div>'
       +'<div class="wb5-input-row">'
+      +'<div class="wb-input-group"><span class="wb-label">Startzeit (optional)</span>'
+      +'<input id="wb5-na-startzeit" class="wb-input" type="time"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Dauer</span>'
+      +'<select id="wb5-na-dauer" class="wb-select"><option value="15">15 Min</option><option value="30" selected>30 Min</option><option value="45">45 Min</option><option value="60">1 Std</option><option value="90">1,5 Std</option><option value="120">2 Std</option><option value="0">Keine</option></select></div>'
+      +'</div>'
+      +'<div class="wb5-input-row">'
       +'<div class="wb-input-group"><span class="wb-label">Wiederholung</span>'
       +'<select id="wb5-na-wdh" class="wb-select" onchange="WB._na5WdhChange(this.value)">'+wdh.map(w=>'<option value="'+w.v+'">'+w.l+'</option>').join('')+'</select></div>'
       +'</div>'
@@ -1847,7 +1889,15 @@ const WB = {
       +'<button class="wb5-welt-opt" id="wb5-na-p" onclick="WB._na5SetWelt(\x27p\x27)"><div class="wb5-dot wb5-dot-p"></div>Privat</button>'
       +'</div></div>';
     const body2=body+'<div class="wb-input-group"><span class="wb-label">Notiz (optional)</span>'
-      +'<textarea id="wb5-na-notiz" class="wb-textarea" rows="2" placeholder="Kontext, Links, Details..."></textarea></div>';
+      +'<div class="wa-toolbar" style="margin-bottom:4px;">'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-na-notiz\x27).focus();document.execCommand(\x27bold\x27)"><b>B</b></button>'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-na-notiz\x27).focus();document.execCommand(\x27underline\x27)"><u>U</u></button>'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-na-notiz\x27).focus();document.execCommand(\x27italic\x27)"><i>I</i></button>'
+      +'<div class="wa-tb-sep"></div>'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-na-notiz\x27).focus();document.execCommand(\x27insertUnorderedList\x27)">•≡</button>'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-na-notiz\x27).focus();document.execCommand(\x27insertOrderedList\x27)">1≡</button>'
+      +'</div>'
+      +'<div id="wb5-na-notiz" class="wa-field" contenteditable="true" style="min-height:80px;font-family:var(--font);"></div></div>';
     const foot='<div style="display:flex;gap:8px;">'
       +'<button class="wb-btn wb-btn-cancel" onclick="WB.modalClose()">Abbrechen</button>'
       +'<button class="wb-btn wb-btn-save" onclick="WB._na5Save()">Speichern</button></div>';
@@ -2049,8 +2099,10 @@ const WB = {
       ?[...document.querySelectorAll('#wb5-na-tage-wrap .wb5-wt-btn.active')].map(b=>parseInt(b.dataset.wt))
       :[];
     const wiederholung=wdh?{typ:wdh,wochentage:wt,datum:'',naechstFaellig:''}:null;
-    const notiz=document.getElementById('wb5-na-notiz')?.value.trim()||'';
-    const aufg={id:'a_'+Date.now(),titel:text,prio,deadline,welt,typ,wiederholung,notiz,erledigt:false,updatedAt:this._now()};
+    const notiz=document.getElementById('wb5-na-notiz')?.innerHTML.trim()||'';
+    const startzeit=document.getElementById('wb5-na-startzeit')?.value||'';
+    const dauer=parseInt(document.getElementById('wb5-na-dauer')?.value)||30;
+    const aufg={id:'a_'+Date.now(),titel:text,prio,deadline,welt,typ,wiederholung,notiz,startzeit,dauer,erledigt:false,status:'offen',updatedAt:this._now()};
     const selThema=document.getElementById('wb5-na-thema');
     const themaIdSel=selThema?.value||this._na5ThemaId||null;
     if(themaIdSel){
@@ -2086,12 +2138,27 @@ const WB = {
       +'<div class="wb5-input-row">'
       +'<div class="wb-input-group"><span class="wb-label">Typ</span>'
       +'<select id="wb5-ad-typ" class="wb-select">'+typenA.map(t=>'<option value="'+t.v+'"'+(curTypA===t.v?' selected':'')+'>'+t.l+'</option>').join('')+'</select></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Status</span>'
+      +'<select id="wb5-ad-status" class="wb-select">'
+      +'<option value="offen"'+((a.status||'offen')==='offen'?' selected':'')+'>Offen</option>'
+      +'<option value="in_arbeit"'+(a.status==='in_arbeit'?' selected':'')+'>In Arbeit</option>'
+      +'<option value="pausiert"'+(a.status==='pausiert'?' selected':'')+'>Pausiert</option>'
+      +'<option value="erledigt"'+(a.status==='erledigt'?' selected':'')+'>Erledigt</option>'
+      +'</select></div>'
       +'<div class="wb-input-group"><span class="wb-label">Priorität</span>'
       +'<select id="wb5-ad-prio" class="wb-select"><option value="1"'+(a.prio===1?' selected':'')+'>Prio 1</option><option value="2"'+(a.prio===2?' selected':'')+'>Prio 2</option><option value="3"'+((a.prio||3)===3?' selected':'')+'>Prio 3</option></select></div>'
       +'</div>'
       +'<div class="wb5-input-row">'
       +'<div class="wb-input-group"><span class="wb-label">Deadline</span>'
       +'<input id="wb5-ad-deadline" class="wb-input" type="date" value="'+(a.deadline||'')+'"></div>'
+      +'</div>'
+      +'<div class="wb5-input-row">'
+      +'<div class="wb-input-group"><span class="wb-label">Startzeit (optional)</span>'
+      +'<input id="wb5-ad-startzeit" class="wb-input" type="time" value="'+(a.startzeit||'')+'"></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Dauer</span>'
+      +'<select id="wb5-ad-dauer" class="wb-select"><option value="15"'+(a.dauer===15?' selected':'')+'>15 Min</option><option value="30"'+((a.dauer||30)===30?' selected':'')+'>30 Min</option><option value="45"'+(a.dauer===45?' selected':'')+'>45 Min</option><option value="60"'+(a.dauer===60?' selected':'')+'>1 Std</option><option value="90"'+(a.dauer===90?' selected':'')+'>1,5 Std</option><option value="120"'+(a.dauer===120?' selected':'')+'>2 Std</option><option value="0"'+(a.dauer===0?' selected':'')+'>Keine</option></select></div>'
+      +'</div>'
+      +'<div class="wb5-input-row">'
       +'<div class="wb-input-group"><span class="wb-label">Wiederholung</span>'
       +'<select id="wb5-ad-wdh" class="wb-select" onchange="WB._ad5WdhChange(this.value)">'+wdhA.map(w=>'<option value="'+w.v+'"'+(curWdhA===w.v?' selected':'')+'>'+w.l+'</option>').join('')+'</select></div>'
       +'</div>'
@@ -2106,7 +2173,15 @@ const WB = {
       +'</div></div>';
     const bodyFull=body
       +'<div class="wb-input-group"><span class="wb-label">Notiz (optional)</span>'
-      +'<textarea id="wb5-ad-notiz" class="wb-textarea" rows="2">'+this._esc(a.notiz||'')+'</textarea></div>';
+      +'<div class="wa-toolbar" style="margin-bottom:4px;">'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ad-notiz\x27).focus();document.execCommand(\x27bold\x27)"><b>B</b></button>'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ad-notiz\x27).focus();document.execCommand(\x27underline\x27)"><u>U</u></button>'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ad-notiz\x27).focus();document.execCommand(\x27italic\x27)"><i>I</i></button>'
+      +'<div class="wa-tb-sep"></div>'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ad-notiz\x27).focus();document.execCommand(\x27insertUnorderedList\x27)">•≡</button>'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ad-notiz\x27).focus();document.execCommand(\x27insertOrderedList\x27)">1≡</button>'
+      +'</div>'
+      +'<div id="wb5-ad-notiz" class="wa-field" contenteditable="true" style="min-height:80px;font-family:var(--font);">'+( a.notiz||'')+'</div></div>';
     const foot = '<div style="display:flex;gap:8px;justify-content:space-between;width:100%;">'
       +'<div style="display:flex;gap:6px;"><button class="wb-btn wb-btn-danger" onclick="WB._aufgabeDelete(\x27'+this._esc(id)+'\x27)">Löschen</button>'
       +'<button class="wb-btn" style="background:var(--surface2);" onclick="WB._duplizierenAufgabe(\x27'+this._esc(id)+'\x27)">Duplizieren</button></div>'
@@ -2146,7 +2221,11 @@ const WB = {
       :[];
     a.wiederholung=wdhV?{typ:wdhV,wochentage:wtAd,datum:'',naechstFaellig:''}:null;
     if(this._ad5WeltSel) a.welt=this._ad5WeltSel;
-    a.notiz=document.getElementById('wb5-ad-notiz')?.value.trim()||a.notiz||'';
+    a.startzeit=document.getElementById('wb5-ad-startzeit')?.value||a.startzeit||'';
+    a.dauer=parseInt(document.getElementById('wb5-ad-dauer')?.value)||a.dauer||30;
+    a.notiz=document.getElementById('wb5-ad-notiz')?.innerHTML.trim()||a.notiz||'';
+    const newStatus=document.getElementById('wb5-ad-status')?.value||a.status||'offen';
+    a.status=newStatus; a.erledigt=(newStatus==='erledigt');
     // Thema-Zuordnung ändern
     const newThemaId=document.getElementById('wb5-ad-thema')?.value||'';
     if(newThemaId && newThemaId!==a.themaId) {

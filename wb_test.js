@@ -814,6 +814,55 @@ tickFn.includes('_syncConflictPending') ? ok('_syncTick prüft _syncConflictPend
 // visibilitychange → _syncCheckNewer
 jsCode.includes('_syncCheckNewer()') && jsCode.includes('visibilitychange') ? ok('visibilitychange triggert _syncCheckNewer') : fail('visibilitychange triggert kein _syncCheckNewer');
 
+
+// ══════════════════════════════════════════
+// 61. AUFGABEN: STATUS + CHECKBOXEN
+// ══════════════════════════════════════════
+console.log('\n── 61. Aufgaben Status + Checkboxen ──');
+jsCode.includes('_statusCb(') ? ok('_statusCb() Hilfsfunktion vorhanden') : fail('_statusCb() fehlt — Status-Checkboxen nicht gerendert');
+jsCode.includes("'in_arbeit'") ? ok("Status 'in_arbeit' vorhanden") : fail("Status 'in_arbeit' fehlt");
+jsCode.includes("'pausiert'") ? ok("Status 'pausiert' vorhanden") : fail("Status 'pausiert' fehlt");
+jsCode.includes('wb5-cb-progress') ? ok('wb5-cb-progress CSS-Klasse vorhanden') : fail('wb5-cb-progress fehlt');
+jsCode.includes('wb5-cb-paused')   ? ok('wb5-cb-paused CSS-Klasse vorhanden')   : fail('wb5-cb-paused fehlt');
+jsCode.includes('wb5-ad-status')   ? ok('Status-Dropdown in _aufgabeDetail')    : fail('Status-Dropdown fehlt in Detail');
+// Status-Zyklus in _ht5Toggle
+jsCode.includes("cycle=['offen','in_arbeit','pausiert','erledigt']") ? ok('Status-Zyklus in _ht5Toggle') : fail('Status-Zyklus fehlt in _ht5Toggle');
+
+// ══════════════════════════════════════════
+// 62. AUFGABEN: STARTZEIT + DAUER
+// ══════════════════════════════════════════
+console.log('\n── 62. Aufgaben Startzeit + Dauer ──');
+jsCode.includes('wb5-na-startzeit') ? ok('Startzeit-Feld in _aufgabeNeu')    : fail('Startzeit fehlt in _aufgabeNeu');
+jsCode.includes('wb5-na-dauer')     ? ok('Dauer-Select in _aufgabeNeu')      : fail('Dauer fehlt in _aufgabeNeu');
+jsCode.includes('wb5-ad-startzeit') ? ok('Startzeit-Feld in _aufgabeDetail') : fail('Startzeit fehlt in _aufgabeDetail');
+jsCode.includes('wb5-ad-dauer')     ? ok('Dauer-Select in _aufgabeDetail')   : fail('Dauer fehlt in _aufgabeDetail');
+jsCode.includes('selected>30 Min') ? ok('Dauer-Default 30 Min') : fail('Dauer-Default 30 Min fehlt');
+
+// ══════════════════════════════════════════
+// 63. NOTIZ: CONTENTEDITABLE + TOOLBAR
+// ══════════════════════════════════════════
+console.log('\n── 63. Notiz contenteditable ──');
+jsCode.includes("'wb5-na-notiz'") && jsCode.includes('contenteditable') ? ok('Notiz als contenteditable in _aufgabeNeu') : fail('Notiz nicht als contenteditable');
+jsCode.includes("'wb5-ad-notiz'") && jsCode.includes('contenteditable') ? ok('Notiz als contenteditable in _aufgabeDetail') : fail('Notiz nicht als contenteditable in Detail');
+jsCode.includes("'wb5-na-notiz')?.innerHTML") || jsCode.includes("'wb5-na-notiz').innerHTML") ? ok('_na5Save liest innerHTML') : fail('_na5Save liest value statt innerHTML!');
+
+// ══════════════════════════════════════════
+// 64. OBERTHEMA: DATALIST + KLAPPBAR
+// ══════════════════════════════════════════
+console.log('\n── 64. Oberthema Datalist + klappbar ──');
+jsCode.includes('wb5-ober-list') ? ok('Oberthema als Datalist (Dropdown+frei)') : fail('Oberthema Datalist fehlt');
+jsCode.includes('_tm5ToggleOber(') ? ok('_tm5ToggleOber() — Oberthema klappbar') : fail('_tm5ToggleOber() fehlt');
+
+// ══════════════════════════════════════════
+// 65. BUG: TYP-TAG SCHRIFTGRÖSSE
+// ══════════════════════════════════════════
+console.log('\n── 65. Typ-Tag Schriftgröße ──');
+// wb5-at-typ darf keinen inline font-size kleiner als 14px haben
+!jsCode.includes('wb5-at-typ" style="') || !jsCode.includes('font-size:12px') ?
+  ok('Typ-Tag ohne zu kleine inline Schrift') :
+  fail('Typ-Tag hat zu kleine Schrift inline');
+content.includes('wb5-at-typ') ? ok('wb5-at-typ CSS-Klasse vorhanden') : fail('wb5-at-typ CSS fehlt');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
