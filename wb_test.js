@@ -1292,6 +1292,29 @@ noWhite91
   ? ok('Overlay Meta hat keine weiße/surface Farbe')
   : fail('Overlay Meta ist noch weiß — soll farbigen Hintergrund haben!');
 
+
+// ══════════════════════════════════════════
+// 92. OBERTHEMA: WBOG-DIV SCHLIESSEN + KEINE DOPPELTE LINIE
+// ══════════════════════════════════════════
+console.log('\n── 92. Oberthema wbog-div + Linie ──');
+// wbog-div muss nach t-forEach geschlossen werden
+const tm5S92 = jsCode.indexOf('  _tm5Render() {');
+const tm5E92 = jsCode.indexOf('\n  },', tm5S92+50);
+const tm5Fn92 = jsCode.slice(tm5S92, tm5E92);
+tm5Fn92.includes("wbog-") && tm5Fn92.includes("schließt wbog-div")
+  ? ok("wbog-div wird korrekt geschlossen (schließt wbog-div Kommentar vorhanden)")
+  : fail("wbog-div wird nie geschlossen — alle Gruppen klappen gemeinsam!");
+
+// Keine doppelte Linie: wb5-gruppe-lbl::after darf nicht vorhanden sein
+!content.includes('wb5-gruppe-lbl::after')
+  ? ok('Keine doppelte Linie (wb5-gruppe-lbl::after entfernt)')
+  : fail('wb5-gruppe-lbl::after noch vorhanden — doppelte Trennlinie im Oberthema-Header!');
+
+// wb5-ober-line CSS muss vorhanden sein (die echte Linie)
+content.includes('wb5-ober-line')
+  ? ok('wb5-ober-line CSS vorhanden')
+  : fail('wb5-ober-line CSS fehlt — Oberthema-Linie nicht sichtbar!');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
