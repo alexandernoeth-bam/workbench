@@ -1027,6 +1027,62 @@ content.includes('>Ansicht<')
   ? ok('Ansicht-Sektion in Einstellungen')
   : fail('Ansicht-Sektion fehlt in Einstellungen');
 
+
+// ══════════════════════════════════════════
+// 80. WOCHENTAGE ID-KONSISTENZ
+// ══════════════════════════════════════════
+console.log('\n── 80. Wochentage ID-Konsistenz ──');
+// _na5Save muss #wb5-na-tage-row suchen (nicht -wrap)
+const na5SaveStart = jsCode.indexOf('  _na5Save() {');
+const na5SaveEnd   = jsCode.indexOf('\n  },', na5SaveStart+50);
+const na5SaveFn    = jsCode.slice(na5SaveStart, na5SaveEnd);
+na5SaveFn.includes('#wb5-na-tage-row .wb5-wt-btn.active')
+  ? ok('_na5Save sucht #wb5-na-tage-row — korrekt')
+  : fail('_na5Save sucht falsches Element für Wochentage — werden nie gespeichert!');
+
+// _aufgabeSave muss #wb5-ad-tage-row suchen
+const adSaveStart = jsCode.indexOf('  _aufgabeSave(id)');
+const adSaveEnd   = jsCode.indexOf('\n  },', adSaveStart+50);
+const adSaveFn    = jsCode.slice(adSaveStart, adSaveEnd);
+adSaveFn.includes('#wb5-ad-tage-row .wb5-wt-btn.active')
+  ? ok('_aufgabeSave sucht #wb5-ad-tage-row — korrekt')
+  : fail('_aufgabeSave sucht falsches Element für Wochentage!');
+
+// _isRoutineHeute muss täglich erkennen
+const routineStart = jsCode.indexOf('  _isRoutineHeute(a)');
+const routineEnd   = jsCode.indexOf('\n  },', routineStart+50);
+const routineFn    = jsCode.slice(routineStart, routineEnd);
+routineFn.includes("typ==='täglich'")
+  ? ok("_isRoutineHeute erkennt 'täglich'")
+  : fail("_isRoutineHeute erkennt 'täglich' nicht — tägliche Routinen erscheinen nie in Heute!");
+routineFn.includes("typ==='wöchentlich'")
+  ? ok("_isRoutineHeute erkennt 'wöchentlich'")
+  : fail("_isRoutineHeute erkennt 'wöchentlich' nicht!");
+
+
+// ══════════════════════════════════════════
+// 81. NOTIZFELDER: CONTENTEDITABLE
+// ══════════════════════════════════════════
+console.log('\n── 81. Notizfelder contenteditable ──');
+// Termin-Notiz muss contenteditable sein (nicht mehr input type=text)
+jsCode.includes('wb5-td-notiz') && !jsCode.includes('"wb5-td-notiz" class="wb-input" type="text"')
+  ? ok('Termin-Notiz ist contenteditable (kein input type=text)')
+  : fail('Termin-Notiz ist noch input type=text — kein Rich-Text!');
+// _te5DSave muss innerHTML lesen
+const te5dFnStart = jsCode.indexOf('  _te5DSave(eventId)');
+const te5dFnEnd   = jsCode.indexOf('\n  },', te5dFnStart+50);
+const te5dFn      = jsCode.slice(te5dFnStart, te5dFnEnd);
+te5dFn.includes("'wb5-td-notiz')?.innerHTML")
+  ? ok('_te5DSave liest notiz als innerHTML')
+  : fail('_te5DSave liest notiz als value — HTML-Inhalt geht verloren!');
+// Thema-Overlay hat Notiz + Links
+jsCode.includes('wb5-ov-notiz') ? ok('Thema-Overlay hat Notizfeld') : fail('Thema-Overlay Notizfeld fehlt!');
+jsCode.includes('_ovLinkSave(')  ? ok('_ovLinkSave vorhanden')       : fail('_ovLinkSave fehlt!');
+jsCode.includes('_ovSaveNotiz(') ? ok('_ovSaveNotiz vorhanden')      : fail('_ovSaveNotiz fehlt!');
+// wa-Hilfsfunktionen
+jsCode.includes('_waInsertCheckbox(') ? ok('_waInsertCheckbox vorhanden') : fail('_waInsertCheckbox fehlt!');
+jsCode.includes('_waInsertLink(')     ? ok('_waInsertLink vorhanden')     : fail('_waInsertLink fehlt!');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════

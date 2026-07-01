@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.2.9</title>
+  <title>WorkBench 5.3.1</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -451,7 +451,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.2.9 · Build 20260701-1045</div>
+    <div id="wb-startup-tagline">v5.3.1 · Build 20260701-1130</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -810,8 +810,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.2.9',
-  APP_BUILD:      '20260701-1045',
+  APP_VERSION:    '5.3.1',
+  APP_BUILD:      '20260701-1130',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -1138,6 +1138,7 @@ const WB = {
   _isRoutineHeute(a) {
     if(!a.wiederholung||!a.wiederholung.typ) return false;
     const w=a.wiederholung; const today=new Date(); const dow=today.getDay();
+    if(w.typ==='täglich') return true;
     if(w.typ==='wöchentlich') return (w.wochentage||[]).includes(dow);
     if(w.typ==='monatlich'){const d=parseInt((w.datum||'').split('-')[2]||'1');return today.getDate()===d;}
     if(w.typ==='jährlich'){const[,m,d]=(w.datum||'--').split('-');return today.getMonth()+1===parseInt(m)&&today.getDate()===parseInt(d);}
@@ -1435,6 +1436,7 @@ const WB = {
   _tm5OpenOverlay(themaId) {
     const t=(this.db.themen||[]).find(x=>x.id===themaId); if(!t) return;
     const ov=document.getElementById('wb5-thema-overlay'); if(!ov) return;
+    this._ovActiveThema=t;
     document.getElementById('wb5-ov-title').textContent=t.titel;
     // Bearbeiten-Button im Header
     const editBtn=document.getElementById('wb5-ov-edit-btn');
@@ -1485,11 +1487,55 @@ const WB = {
     const naechstesGw=gws.filter(g=>g!==aktGw&&g.status!=='erreicht')[0];
     if(naechstesGw) h+='<div class="wb5-next-gw">&#127987; <span><strong style="color:#3D2880;">N&auml;chstes Gateway:</strong> '+this._esc(naechstesGw.titel)+(naechstesGw.pruefDatum?' \u2014 '+this._fmtDDMM(naechstesGw.pruefDatum):'')+'</span></div>';
     body.innerHTML=h;
+    // ── Notiz + Links an Body anhängen ──
+    const notizWrap=document.createElement('div');
+    notizWrap.innerHTML='<div class="wb5-ov-sec-label" style="margin:12px 14px 6px;">Notiz</div>'
+      +'<div class="wb5-ov-notiz-wrap">'
+      +'<div class="wa-toolbar" style="margin-bottom:4px;">'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ov-notiz\x27).focus();document.execCommand(\x27bold\x27)"><b>B</b></button>'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ov-notiz\x27).focus();document.execCommand(\x27underline\x27)"><u>U</u></button>'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ov-notiz\x27).focus();document.execCommand(\x27italic\x27)"><i>I</i></button>'
+      +'<div class="wa-tb-sep"></div>'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ov-notiz\x27).focus();document.execCommand(\x27insertUnorderedList\x27)">•≡</button>'
+      +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ov-notiz\x27).focus();document.execCommand(\x27insertOrderedList\x27)">1≡</button>'
+      +'<button type="button" class="wa-tb-btn" onclick="WB._waInsertCheckbox(\x27wb5-ov-notiz\x27)">☑</button>'
+      +'<button type="button" class="wa-tb-btn" onclick="WB._waInsertLink(\x27wb5-ov-notiz\x27)">&#128279;</button>'
+      +'</div>'
+      +'<div id="wb5-ov-notiz" class="wa-field" contenteditable="true" style="min-height:80px;font-family:var(--font);">'+(t.notiz||'')+'</div></div>';
+    body.appendChild(notizWrap);
+    const lDoku=t.linkDoku||''; const lWeb=t.linkWeb||'';
+    const mkLink=(id,label,icon,col,url)=>{
+      const short=url?url.replace(/^https?:\/\//,'').substring(0,42)+(url.length>46?'...':''):'';
+      const d=document.createElement('div');
+      d.innerHTML='<div class="wb5-ov-link-card">'
+        +'<div class="wb5-ov-link-hdr">'
+        +'<div class="wb5-ov-link-icon" style="background:'+col+';"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="'+(id==='doku'?'#4285F4':'#0A6B5E')+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+icon+'</svg></div>'
+        +'<span class="wb5-ov-link-label">'+label+'</span>'
+        +'<button class="wb5-ov-link-edit-btn" onclick="WB._ovLinkToggleEdit(\x27'+id+'\x27)">✎ Ändern</button>'
+        +'</div>'
+        +'<div id="wb5-ovl-'+id+'-view">'
+        +(url?'<div class="wb5-ov-link-row"><a class="wb5-ov-link-url" href="'+url+'" target="_blank" onclick="event.stopPropagation();window.open(this.href);return false;">'+short+'</a><button class="wb5-ov-link-open" onclick="window.open(\x27'+url+'\x27)">↗</button></div>'
+             :'<div class="wb5-ov-link-empty">Noch kein Link — auf „Ändern“ tippen</div>')
+        +'</div>'
+        +'<div id="wb5-ovl-'+id+'-edit" style="display:none;">'
+        +'<div class="wb5-ov-link-edit-row">'
+        +'<input id="wb5-ovl-'+id+'-input" class="wb5-ov-link-input" type="url" placeholder="https://..." value="'+url+'">'
+        +'<button class="wb5-ov-link-save" onclick="WB._ovLinkSave(\x27'+id+'\x27)">✓</button>'
+        +'<button class="wb5-ov-link-cancel" onclick="WB._ovLinkToggleEdit(\x27'+id+'\x27)">✕</button>'
+        +'</div></div></div>';
+      return d;
+    };
+    const linksWrap=document.createElement('div');
+    linksWrap.innerHTML='<div class="wb5-ov-sec-label" style="margin:0 14px 6px;">Links</div>';
+    linksWrap.appendChild(mkLink('doku','Meine Dokumentation','<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>','#E8F0FE',lDoku));
+    linksWrap.appendChild(mkLink('web','Offizielle Homepage','<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>','#E8F5F3',lWeb));
+    body.appendChild(linksWrap);
     const gwBlock=document.getElementById('wb5-gw-block');const gwBody=document.getElementById('wb5-gw-body');const gwChev=document.getElementById('wb5-gw-chev');
     if(gwBlock&&gwBody)gwBlock.addEventListener('click',()=>{gwBody.classList.toggle('open');if(gwChev)gwChev.style.transform=gwBody.classList.contains('open')?'rotate(180deg)':'';});
   },
 
-  _tm5CloseOverlay() { document.getElementById('wb5-thema-overlay')?.classList.remove('open'); },
+  _tm5CloseOverlay() {
+    this._ovSaveNotiz(); document.getElementById('wb5-thema-overlay')?.classList.remove('open'); },
 
   // ── TERMINE ────────────────────────────────────────
   _te5Render() { if(this._teView==='woche') this._te5RenderWoche(); else this._te5RenderMonat(); },
@@ -1717,7 +1763,8 @@ const WB = {
       +'</div>'
       +'<div class="wb5-range-hint">ℹ Erstellt automatisch alle Tage im Zeitraum</div></div>'
       +'<div class="wb-input-group"><span class="wb-label">Notiz (optional)</span>'
-      +'<input id="wb5-td-notiz" class="wb-input" type="text" placeholder="Raum, Link..." value="'+this._esc(e?.notiz||'')+'"></div>'
+      +'<div class="wa-toolbar" style="margin-bottom:4px;">'+'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-td-notiz\x27).focus();document.execCommand(\x27bold\x27)"><b>B</b></button>'+'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-td-notiz\x27).focus();document.execCommand(\x27underline\x27)"><u>U</u></button>'+'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-td-notiz\x27).focus();document.execCommand(\x27italic\x27)"><i>I</i></button>'+'<div class="wa-tb-sep"></div>'+'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-td-notiz\x27).focus();document.execCommand(\x27insertUnorderedList\x27)">•≡</button>'+'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-td-notiz\x27).focus();document.execCommand(\x27insertOrderedList\x27)">1≡</button>'+'<button type="button" class="wa-tb-btn" onclick="WB._waInsertCheckbox(\x27wb5-td-notiz\x27)">☑</button>'+'<button type="button" class="wa-tb-btn" onclick="WB._waInsertLink(\x27wb5-td-notiz\x27)">&#128279;</button>'+'</div>'
+      +'<div id="wb5-td-notiz" class="wa-field" contenteditable="true" style="min-height:60px;font-family:var(--font);">'+(e?.notiz||'')+'</div>'
       +'<div class="wb-input-group"><span class="wb-label">Bereich</span>'
       +'<div class="wb5-welt-toggle">'
       +'<button class="wb5-welt-opt'+(curWelt==='b'?' active-b':'')+'" id="wb5-td-b" onclick="WB._te5DWelt(\x27b\x27)"><div class="wb5-dot wb5-dot-b"></div>Beruf</button>'
@@ -1759,7 +1806,7 @@ const WB = {
     if(!text){ this._toast('Bitte Titel eingeben'); return; }
     const typ   = this._te5DTypSelected||'termin';
     const welt  = this._te5DWeltSelected||'b';
-    const notiz = document.getElementById('wb5-td-notiz')?.value.trim()||'';
+    const notiz = document.getElementById('wb5-td-notiz')?.innerHTML.trim()||'';
     const isRange = typ==='urlaub'||typ==='dienstreise';
 
     if(isRange) {
@@ -2337,7 +2384,7 @@ const WB = {
     const wdh=document.getElementById('wb5-na-wdh')?.value||'';
     const welt=this._na5Welt||'b';
     const wt=wdh==='wöchentlich'
-      ?[...document.querySelectorAll('#wb5-na-tage-wrap .wb5-wt-btn.active')].map(b=>parseInt(b.dataset.wt))
+      ?[...document.querySelectorAll('#wb5-na-tage-row .wb5-wt-btn.active')].map(b=>parseInt(b.dataset.wt))
       :[];
     const wiederholung=wdh?{typ:wdh,wochentage:wt,datum:'',naechstFaellig:''}:null;
     const notiz=document.getElementById('wb5-na-notiz')?.innerHTML.trim()||'';
