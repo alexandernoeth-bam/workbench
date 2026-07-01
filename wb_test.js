@@ -968,6 +968,44 @@ const tm5FnEnd2   = jsCode.indexOf('_tm5RenderOverlayBody', tm5FnStart2);
 const tm5Fn2 = jsCode.slice(tm5FnStart2, tm5FnEnd2);
 tm5Fn2.includes('_avOpen') ? ok('Alle-Button (_avOpen) in _tm5Render vorhanden') : fail('Alle-Button fehlt in _tm5Render!');
 
+
+// ══════════════════════════════════════════
+// 75. BÜRO-MODUS TOGGLE IN EINSTELLUNGEN
+// ══════════════════════════════════════════
+console.log('\n── 75. Büro-Modus Toggle ──');
+content.includes('wb-buero-dot')    ? ok('Büro-Modus Toggle-UI in Einstellungen')  : fail('Büro-Modus Toggle fehlt in Einstellungen-HTML!');
+content.includes('wb-buero-knob')   ? ok('Büro-Modus Knob vorhanden')             : fail('Büro-Modus Knob fehlt');
+jsCode.includes('_bueroToggle()')   ? ok('_bueroToggle() vorhanden')              : fail('_bueroToggle() fehlt');
+jsCode.includes('_bueroUpdateUI()') ? ok('_bueroUpdateUI() vorhanden')            : fail('_bueroUpdateUI() fehlt');
+// _bueroUpdateUI muss beim Start aufgerufen werden
+const initAfterFn = jsCode.slice(jsCode.indexOf('async _wb5InitAfter()'), jsCode.indexOf('async _wb5InitAfter()')+2000);
+initAfterFn.includes('_bueroUpdateUI') ? ok('_bueroUpdateUI beim Start aufgerufen') : fail('_bueroUpdateUI fehlt im Start — Toggle-Status wird nicht angezeigt!');
+
+// ══════════════════════════════════════════
+// 76. _ad5WtToggle + _ad5WdhChange DEFINIERT
+// ══════════════════════════════════════════
+console.log('\n── 76. Aufgaben-Dialog Wochentage ──');
+/\s_ad5WtToggle\s*\(/.test(jsCode)  ? ok('_ad5WtToggle als WB-Methode definiert')  : fail('_ad5WtToggle nicht definiert — onclick crash!');
+/\s_ad5WdhChange\s*\(/.test(jsCode) ? ok('_ad5WdhChange als WB-Methode definiert') : fail('_ad5WdhChange nicht definiert — onclick crash!');
+
+// ══════════════════════════════════════════
+// 77. _te5DSave DOPPEL-SUBMIT GUARD
+// ══════════════════════════════════════════
+console.log('\n── 77. Termin Doppel-Submit Guard ──');
+const te5SaveFn = jsCode.slice(jsCode.indexOf('_te5DSave(eventId)'), jsCode.indexOf('_te5DSave(eventId)')+200);
+te5SaveFn.includes('_te5Saving') ? ok('_te5DSave hat Doppel-Submit Guard') : fail('_te5DSave kein Guard — Termine werden mehrfach gespeichert!');
+
+// ══════════════════════════════════════════
+// 78. _wa5Render: KEIN FREIES g
+// ══════════════════════════════════════════
+console.log('\n── 78. _wa5Render kein freies g ──');
+const wa5Start = jsCode.indexOf('  _wa5Render()');
+const wa5End   = jsCode.indexOf('\n  },', wa5Start+50);
+const wa5Fn    = jsCode.slice(wa5Start, wa5End);
+// g darf nicht als freie Variable vorkommen (nur in forEach-Parametern)
+const gAsVar = wa5Fn.match(/if\s*\(g\s*!==\s*'_frei'\)/);
+!gAsVar ? ok('_wa5Render hat kein freies g — kein ReferenceError') : fail('_wa5Render: if(g!==_frei) gefunden — ReferenceError beim Rendern!');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════

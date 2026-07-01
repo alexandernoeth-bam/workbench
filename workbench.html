@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.2.7</title>
+  <title>WorkBench 5.2.8</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -451,7 +451,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.2.7 · Build 20260701-0900</div>
+    <div id="wb-startup-tagline">v5.2.8 · Build 20260701-1000</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -801,8 +801,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.2.7',
-  APP_BUILD:      '20260701-0900',
+  APP_VERSION:    '5.2.8',
+  APP_BUILD:      '20260701-1000',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -910,6 +910,7 @@ const WB = {
       this._syncInitDone = true;
     }
     this._syncStart();
+    this._bueroUpdateUI();
     document.addEventListener('visibilitychange', async () => {
       if (document.visibilityState==='hidden' && this.isDirty) await this.idbSave();
     });
@@ -1744,6 +1745,7 @@ const WB = {
   },
 
   _te5DSave(eventId) {
+    if(this._te5Saving) return; this._te5Saving=true; setTimeout(()=>{this._te5Saving=false;},2000);
     const text  = document.getElementById('wb5-td-text')?.value.trim();
     if(!text){ this._toast('Bitte Titel eingeben'); return; }
     const typ   = this._te5DTypSelected||'termin';
@@ -2049,7 +2051,6 @@ const WB = {
           +'<button class="wb-btn wb-btn-save" onclick="event.stopPropagation();WB._wa5Save(\x27'+e.id+'\x27)">Speichern</button>'
           +'</div></div></div>';
       });
-      if(g!=='_frei') h+='</div>';
     });
     el.innerHTML=h;
   },
@@ -2435,6 +2436,14 @@ const WB = {
     document.getElementById('wb5-ad-b')?.classList.toggle('active-b',w==='b');
     document.getElementById('wb5-ad-p')?.classList.toggle('active-p',w==='p');
   },
+
+
+  _ad5WdhChange(val) {
+    const wrap=document.getElementById('wb5-ad-tage-wrap');
+    if(wrap) wrap.style.display=(val==='wöchentlich'?'':'none');
+  },
+
+  _ad5WtToggle(btn) { btn.classList.toggle('active'); },
 
   _aufgabeSave(id) {
     const all=[...(this.db.aufgaben||[]),...(this.db.themen||[]).flatMap(t=>t.aufgaben||[])];
@@ -3052,16 +3061,18 @@ const WB = {
 
   _bueroToggle() {
     this._settings.bueroModus = !this._settings.bueroModus;
-    const dot = document.getElementById('wb-buero-dot');
-    if (dot) dot.classList.toggle('on', this._settings.bueroModus);
+    this._bueroUpdateUI();
     this._sSaveSettings();
     this.renderSection(this.activeTab);
-    this._toast(this._settings.bueroModus ? '\u2022 B\u00fcro-Modus aktiv' : 'B\u00fcro-Modus deaktiviert');
+    this._toast(this._settings.bueroModus ? '• Büro-Modus aktiv — Privat ausgeblendet' : 'Büro-Modus deaktiviert');
   },
 
   _bueroUpdateUI() {
-    const dot = document.getElementById('wb-buero-dot');
-    if (dot) dot.classList.toggle('on', !!this._settings?.bueroModus);
+    const active = !!this._settings?.bueroModus;
+    const dot  = document.getElementById('wb-buero-dot');
+    const knob = document.getElementById('wb-buero-knob');
+    if(dot)  dot.style.background  = active ? 'var(--accent)' : 'var(--border)';
+    if(knob) knob.style.left       = active ? '18px' : '2px';
   },
 
 
