@@ -946,7 +946,7 @@ const tmFn = jsCode.slice(tmFnStart, tmFnEnd);
 const idUsesEsc      = tmFn.includes("wbog-'+this._esc(g)");
 const idUsesEncode   = tmFn.includes("'wbog-'+encodeURIComponent(g)");
 // onclick übergibt _esc(g)?
-const clickUsesEsc   = tmFn.includes("_esc(g)+'\\x27,this)") || tmFn.includes("_esc(g)+\'\\x27");
+const clickUsesEsc   = tmFn.includes('_tm5ToggleOber') && tmFn.includes('_esc(g)');
 const clickUsesEncode= tmFn.includes('encodeURIComponent(g)') && tmFn.includes('_tm5ToggleOber');
 // _tm5ToggleOber getElementById
 const togFnStart = jsCode.indexOf('_tm5ToggleOber(ober');
