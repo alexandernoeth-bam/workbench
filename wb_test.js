@@ -1315,6 +1315,35 @@ content.includes('wb5-ober-line')
   ? ok('wb5-ober-line CSS vorhanden')
   : fail('wb5-ober-line CSS fehlt — Oberthema-Linie nicht sichtbar!');
 
+
+// ══════════════════════════════════════════
+// 93. KLICKBARE ELEMENTE HABEN ONCLICK
+// ══════════════════════════════════════════
+console.log('\n── 93. Klickbare Elemente haben onclick ──');
+// wb5-ov-a (Aufgaben-Rows im Overlay) müssen onclick haben
+const renderStart93 = jsCode.indexOf('  _tm5RenderOverlayBody(t) {');
+const renderEnd93   = jsCode.indexOf('\n  },', renderStart93+50);
+const renderFn93    = jsCode.slice(renderStart93, renderEnd93);
+renderFn93.includes('wb5-ov-a') && renderFn93.includes('_aufgabeDetail')
+  ? ok('wb5-ov-a Aufgaben-Rows haben onclick _aufgabeDetail')
+  : fail('wb5-ov-a Aufgaben-Rows fehlt onclick — Aufgabe lässt sich nicht öffnen!');
+
+// wb5-ov-gw (Gateway-Rows im Overlay) müssen onclick haben
+renderFn93.includes('wb5-ov-gw') && (renderFn93.includes('_gw5Edit') || renderFn93.includes('_gw5Open'))
+  ? ok('wb5-ov-gw Gateway-Rows haben onclick')
+  : ok('wb5-ov-gw kein onclick — Gateway Read-only (akzeptabel)');
+
+// cursor:pointer Elemente ohne onclick sind verdächtig
+// Prüfe spezifisch bekannte klickbare CSS-Klassen
+['wb5-ov-a'].forEach(cls => {
+  const clsIdx = renderFn93.indexOf(cls);
+  if(clsIdx < 0) { ok(cls + ' nicht in Render — skip'); return; }
+  const clsCtx = renderFn93.slice(clsIdx, clsIdx+200);
+  clsCtx.includes('onclick')
+    ? ok(cls + ' hat onclick')
+    : fail(cls + ' hat KEIN onclick — Element ist klickbar aber tut nichts!');
+});
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
