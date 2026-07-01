@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.3.2</title>
+  <title>WorkBench 5.3.3</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -203,13 +203,13 @@
     /* Thema-Overlay */
     .wb5-overlay { position:absolute; inset:0; background:rgba(0,0,0,.45); display:flex; flex-direction:column; justify-content:flex-end; z-index:100; opacity:0; pointer-events:none; transition:opacity .2s; }
     .wb5-overlay.open { opacity:1; pointer-events:all; }
-    .wb5-overlay-panel { background:#fff; border-radius:20px 20px 0 0; height:92%; display:flex; flex-direction:column; overflow:hidden; transform:translateY(100%); transition:transform .25s ease; }
+    .wb5-overlay-panel { background:#fff; position:relative; border-radius:20px 20px 0 0; height:92%; display:flex; flex-direction:column; overflow:hidden; transform:translateY(100%); transition:transform .25s ease; }
     .wb5-overlay.open .wb5-overlay-panel { transform:translateY(0); }
     .wb5-overlay-hdr { background:var(--petrol); padding:13px 14px 11px; display:flex; align-items:center; gap:10px; flex-shrink:0; border-radius:20px 20px 0 0; }
     .wb5-overlay-title { font-size:16px; font-weight:700; color:#fff; flex:1; min-width:0; word-break:break-word; }
     .wb5-overlay-close { width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,.2); border:none; color:#fff; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
     .wb5-overlay-meta { padding:9px 14px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px; flex-shrink:0; flex-wrap:wrap; }
-    .wb5-overlay-scroll { flex:1; overflow-y:auto; padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+    .wb5-overlay-scroll { flex:1; overflow-y:auto; padding:12px 14px 56px; display:flex; flex-direction:column; gap:10px; }
     .wb5-gw-block { border-radius:10px; border:1.5px solid rgba(90,61,184,.3); background:#F5F2FD; overflow:hidden; cursor:pointer; }
     .wb5-gw-hdr { padding:9px 11px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
     .wb5-gw-pill { font-size:14px; font-weight:800; text-transform:uppercase; color:#fff; background:var(--lila); border-radius:4px; padding:2px 6px; flex-shrink:0; }
@@ -445,13 +445,54 @@
     .av-gw-datum { font-size:14px; color:var(--muted); flex-shrink:0; }
     .av-gw-meta { display:flex; gap:5px; margin-top:5px; flex-wrap:wrap; }
     .av-erl-btn { background:none; border:1.5px dashed var(--border); border-radius:7px; padding:4px 10px; font-size:14px; cursor:pointer; color:var(--muted); }
-    .av-erl-btn.active { background:var(--surface); color:var(--text); border-style:solid; }</style>
+    .av-erl-btn.active { background:var(--surface); color:var(--text); border-style:solid; }
+    /* ── Overlay Sektionen (klappbar) ── */
+    .wb5-ov-sec { background:#fff; border-radius:12px; margin-bottom:10px; border:1px solid var(--border); overflow:hidden; }
+    .wb5-ov-sec-hdr { display:flex; align-items:center; gap:8px; padding:9px 12px; cursor:pointer; user-select:none; background:#fff; }
+    .wb5-ov-sec-hdr:hover { background:#F8FAFB; }
+    .wb5-ov-sec-lbl { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); flex:1; }
+    .wb5-ov-sec-badge { font-size:14px; font-weight:700; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:1px 7px; color:var(--muted); }
+    .wb5-ov-sec-add { background:none; border:none; font-size:19px; line-height:1; cursor:pointer; padding:0 3px; color:var(--muted); flex-shrink:0; }
+    .wb5-ov-sec-add:hover { color:var(--accent); }
+    .wb5-ov-sec-add.lila:hover { color:var(--lila); }
+    .wb5-ov-sec-chev { font-size:14px; color:var(--faint); transition:transform .2s; flex-shrink:0; }
+    .wb5-ov-sec-chev.open { transform:rotate(180deg); }
+    .wb5-ov-sec-body { border-top:1px solid var(--border); }
+    .wb5-ov-sec-body.hide { display:none; }
+    /* Aufgaben-Items im Overlay */
+    .wb5-ov-a { display:flex; align-items:center; gap:8px; padding:6px 12px; border-bottom:1px solid var(--border); cursor:pointer; }
+    .wb5-ov-a:last-child { border-bottom:none; }
+    .wb5-ov-a:hover { background:var(--surface); }
+    .wb5-ov-a-txt { font-size:14px; flex:1; line-height:1.3; }
+    .wb5-ov-a-txt.done { color:var(--faint); text-decoration:line-through; }
+    .wb5-ov-erl { display:flex; align-items:center; gap:6px; padding:6px 12px; font-size:14px; color:var(--faint); cursor:pointer; border-top:1px solid var(--border); }
+    .wb5-ov-erl:hover { color:var(--muted); background:var(--surface); }
+    /* Gateway-Items im Overlay */
+    .wb5-ov-gw { display:flex; align-items:center; gap:9px; padding:7px 12px; border-bottom:1px solid var(--border); cursor:pointer; }
+    .wb5-ov-gw:last-child { border-bottom:none; }
+    .wb5-ov-gw:hover { background:var(--surface); }
+    .wb5-ov-gw-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .wb5-ov-gw-t { font-size:14px; flex:1; font-weight:500; }
+    .wb5-ov-gw-d { font-size:14px; font-weight:700; color:var(--lila); flex-shrink:0; }
+    /* Notiz im Overlay */
+    .wb5-ov-notiz-body { padding:8px 10px 10px; }
+    /* Schwebender Scroll-Pfeil */
+    .wb5-ov-scroll-btn {
+      position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
+      width:36px; height:36px; border-radius:50%;
+      background:rgba(26,35,40,.70); border:none; color:#fff;
+      font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+      backdrop-filter:blur(4px); box-shadow:0 3px 12px rgba(0,0,0,.25);
+      transition:opacity .2s, background .15s; z-index:20;
+    }
+    .wb5-ov-scroll-btn:hover { background:var(--accent); }
+    .wb5-ov-scroll-btn.hidden { opacity:0; pointer-events:none; }</style>
 </head>
 <body>
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.3.2 · Build 20260701-1300</div>
+    <div id="wb-startup-tagline">v5.3.3 · Build 20260701-1400</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -524,6 +565,7 @@
           </div>
           <div class="wb5-overlay-meta" id="wb5-ov-meta"></div>
           <div class="wb5-overlay-scroll" id="wb5-ov-body"></div>
+          <button class="wb5-ov-scroll-btn hidden" id="wb5-ov-scroll-btn" onclick="WB._ovScrollDown()">&#8595;</button>
         </div>
       </div>
     </div>
@@ -810,8 +852,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.3.2',
-  APP_BUILD:      '20260701-1300',
+  APP_VERSION:    '5.3.3',
+  APP_BUILD:      '20260701-1400',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -1193,6 +1235,9 @@ const WB = {
     this._toast('✓ Gateway gespeichert');
   },
 
+
+  _gw5New(themaId) { this._gw5Neu(themaId); },
+
   _gw5Neu(themaId) {
     const body =
       '<div class="wb-input-group"><span class="wb-label">Titel / Meilenstein</span>'
@@ -1434,6 +1479,44 @@ const WB = {
   },
 
 
+
+  _ovToggleSec(id) {
+    const b=document.getElementById('wb5-ovs-'+id+'-body');
+    const c=document.getElementById('wb5-ovs-'+id+'-chev');
+    if(!b) return;
+    b.classList.toggle('hide');
+    if(c) c.classList.toggle('open',!b.classList.contains('hide'));
+    this._ovUpdateScrollBtn();
+  },
+
+  _ovToggleErl() {
+    const b=document.getElementById('wb5-ovs-erl-body');
+    const l=document.getElementById('wb5-ovs-erl-lbl');
+    if(!b) return;
+    const open=b.style.display!=='none';
+    b.style.display=open?'none':'';
+    if(l) l.textContent=open?l.textContent.replace('ausblenden','anzeigen').replace(/^\d+/,m=>m):l.textContent;
+    this._ovUpdateScrollBtn();
+  },
+
+  _ovUpdateScrollBtn() {
+    const body=document.getElementById('wb5-ov-body');
+    const btn =document.getElementById('wb5-ov-scroll-btn');
+    if(!body||!btn) return;
+    const atBottom=body.scrollHeight-body.scrollTop-body.clientHeight<20;
+    btn.classList.toggle('hidden', atBottom);
+    // Scroll-Listener einmalig anhängen
+    if(!body._scrollListenerAdded){
+      body.addEventListener('scroll',()=>this._ovUpdateScrollBtn());
+      body._scrollListenerAdded=true;
+    }
+  },
+
+  _ovScrollDown() {
+    const body=document.getElementById('wb5-ov-body');
+    if(body) body.scrollBy({top:body.clientHeight*0.6,behavior:'smooth'});
+  },
+
   _ovSaveNotiz() {
     const t=this._ovActiveThema; if(!t) return;
     const el=document.getElementById('wb5-ov-notiz');
@@ -1475,47 +1558,92 @@ const WB = {
 
   _tm5RenderOverlayBody(t) {
     const body=document.getElementById('wb5-ov-body'); if(!body) return;
-    let h='';
-    const gws=(t.gateways||[]).filter(g=>!g.deleted).sort((a,b)=>(a.reihenfolge||0)-(b.reihenfolge||0));
-    const aktGw=gws.find(g=>g.status!=='erreicht');
-    if(aktGw){
-      h+='<div class="wb5-gw-block" id="wb5-gw-block"><div class="wb5-gw-hdr">'
-        +'<span class="wb5-gw-pill">Aktuelles GW</span>'
-        +'<span class="wb5-gw-name">'+this._esc(aktGw.titel)+'</span>'
-        +(aktGw.pruefDatum?'<span class="wb5-gw-date">'+this._fmtDDMM(aktGw.pruefDatum)+'</span>':'')
-        +'<button style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:14px;cursor:pointer;" onclick="event.stopPropagation();WB._gw5Edit(\x27'+aktGw.id+'\x27,\x27'+t.id+'\x27)">Bearb.</button>'
-        +'<span class="wb5-chev" id="wb5-gw-chev">&#8964;</span></div>'
-        +'<div class="wb5-gw-body" id="wb5-gw-body"><div class="wb5-gw-body-inner">'
-        +(aktGw.bedingung?'<div><strong style="font-style:normal;color:var(--text);">Bedingung:</strong> '+this._esc(aktGw.bedingung)+'</div>':'')
-        +(aktGw.konsequenz?'<div><strong style="font-style:normal;color:var(--text);">Konsequenz:</strong> '+this._esc(aktGw.konsequenz)+'</div>':'')
-        +(aktGw.istWert!==undefined?'<div><strong style="font-style:normal;color:var(--text);">IST:</strong> '+this._esc(String(aktGw.istWert))+(aktGw.sollWert?' / '+this._esc(String(aktGw.sollWert)):'')+'</div>':'')
-        +'</div></div></div>';
-    }
-    const aufgaben=(t.aufgaben||[]).filter(a=>!a.deleted&&!a.erledigt).sort((a,b)=>(a.reihenfolge||0)-(b.reihenfolge||0));
-    h+='<div class="wb5-aufg-lbl">Aufgaben</div>';
-    aufgaben.forEach(a=>{
-      const isR=this._isRoutineHeute(a);
-      h+='<div class="wb5-aufg-item" onclick="WB._aufgabeDetail(\''+this._esc(a.id)+'\')">'
-        +'<span class="wb5-grip">&#8942;&#8942;</span>'+'<div class="wb5-cb" onclick="event.stopPropagation();WB._ht5Toggle(\''+this._esc(a.id)+'\')" ></div>'
-        +'<span class="wb5-aufg-text">'+this._esc(a.titel||a.text||'')+'</span>'
-        +'<div class="wb5-aufg-tags">'
-        +(a.typ?'<span class="wb5-atag wb5-at-a">'+this._esc(a.typ)+'</span>':'')
-        +(a.deadline?'<span class="wb5-atag wb5-at-dl">'+this._fmtDDMM(a.deadline)+'</span>':'')
-        +(isR?'<span class="wb5-atag wb5-at-r">&#x21BB;</span>':'')
-        +'</div></div>';
+    body.innerHTML='';
+
+    // ── Hilfsfunktion: Section toggler ──
+    const togSec=(id)=>{
+      const b=document.getElementById('wb5-ovs-'+id+'-body');
+      const c=document.getElementById('wb5-ovs-'+id+'-chev');
+      if(!b) return;
+      b.classList.toggle('hide');
+      if(c) c.classList.toggle('open',!b.classList.contains('hide'));
+      this._ovUpdateScrollBtn();
+    };
+
+    // ── AUFGABEN ──
+    const aufg=(t.aufgaben||[]).filter(a=>!a.deleted);
+    const offen=aufg.filter(a=>a.status!=='erledigt'&&!a.erledigt);
+    const erl  =aufg.filter(a=>a.status==='erledigt'||a.erledigt);
+    const aSec=document.createElement('div');
+    aSec.className='wb5-ov-sec';
+    let aH='<div class="wb5-ov-sec-hdr" onclick="WB._ovToggleSec(\x27a\x27)">'
+      +'<span class="wb5-ov-sec-lbl">Aufgaben</span>'
+      +'<span class="wb5-ov-sec-badge">'+offen.length+' offen</span>'
+      +'<button class="wb5-ov-sec-add" onclick="event.stopPropagation();WB._aufgabeNeu(\x27'+this._esc(t.id)+'\x27)">&#65291;</button>'
+      +'<span class="wb5-ov-sec-chev open" id="wb5-ovs-a-chev">&#8964;</span>'
+      +'</div>'
+      +'<div class="wb5-ov-sec-body" id="wb5-ovs-a-body">';
+    offen.forEach(a=>{
+      const isDl=a.deadline&&a.deadline<this._dStr(new Date());
+      aH+=this._statusCb(a,true)
+        +'<span class="wb5-ov-a-txt">'+this._esc(a.titel||a.text||'')+'</span>'
+        +(a.deadline?'<span class="wb5-aufg-dl'+(isDl?' fällig':'')+'">'+this._fmtDDMM(a.deadline)+'</span>':'')
+        +'</div>';
+      aH='<div class="wb5-ov-a">'+aH;
     });
-    if(!aufgaben.length) h+='<div style="font-size:14px;color:var(--faint);padding:8px 0;">Keine offenen Aufgaben</div>';
-    h+='<button class="wb5-erl-aufg-btn">&#128065; Erledigte anzeigen</button>';
-    h+='<button class="wb5-add-btn" onclick="WB._aufgabeNeuFuerThema(\''+this._esc(t.id)+'\')">+ Aufgabe</button>';
-    h+='<button class="wb5-add-btn" style="border-color:var(--lila);color:var(--lila);" onclick="WB._gw5Neu(\x27'+this._esc(t.id)+'\x27)">+ Gateway</button>';
-    const naechstesGw=gws.filter(g=>g!==aktGw&&g.status!=='erreicht')[0];
-    if(naechstesGw) h+='<div class="wb5-next-gw">&#127987; <span><strong style="color:#3D2880;">N&auml;chstes Gateway:</strong> '+this._esc(naechstesGw.titel)+(naechstesGw.pruefDatum?' \u2014 '+this._fmtDDMM(naechstesGw.pruefDatum):'')+'</span></div>';
-    body.innerHTML=h;
-    // ── Notiz + Links an Body anhängen ──
-    const notizWrap=document.createElement('div');
-    notizWrap.innerHTML='<div class="wb5-ov-sec-label" style="margin:12px 14px 6px;">Notiz</div>'
-      +'<div class="wb5-ov-notiz-wrap">'
-      +'<div class="wa-toolbar" style="margin-bottom:4px;">'
+    if(!offen.length) aH+='<div style="padding:8px 12px;font-size:14px;color:var(--faint);">Keine offenen Aufgaben</div>';
+    if(erl.length){
+      aH+='<div class="wb5-ov-erl" onclick="WB._ovToggleErl()">'
+        +'<span>&#128065;</span><span id="wb5-ovs-erl-lbl">'+erl.length+' erledigte anzeigen</span></div>'
+        +'<div id="wb5-ovs-erl-body" style="display:none;">';
+      erl.forEach(a=>{
+        aH+='<div class="wb5-ov-a" style="opacity:.55;">'
+          +this._statusCb(a,true)
+          +'<span class="wb5-ov-a-txt done">'+this._esc(a.titel||a.text||'')+'</span></div>';
+      });
+      aH+='</div>';
+    }
+    aH+='</div>'; // sec-body
+    aSec.innerHTML=aH;
+    body.appendChild(aSec);
+
+    // ── GATEWAYS ──
+    const gws=(t.gateways||[]).filter(g=>!g.deleted);
+    const gSec=document.createElement('div');
+    gSec.className='wb5-ov-sec';
+    let gH='<div class="wb5-ov-sec-hdr" onclick="WB._ovToggleSec(\x27g\x27)">'
+      +'<span class="wb5-ov-sec-lbl">Gateways</span>'
+      +'<span class="wb5-ov-sec-badge">'+gws.length+'</span>'
+      +'<button class="wb5-ov-sec-add lila" onclick="event.stopPropagation();WB._gw5New(\x27'+this._esc(t.id)+'\x27)">&#65291;</button>'
+      +'<span class="wb5-ov-sec-chev open" id="wb5-ovs-g-chev">&#8964;</span>'
+      +'</div>'
+      +'<div class="wb5-ov-sec-body" id="wb5-ovs-g-body">';
+    if(gws.length){
+      gws.forEach(g=>{
+        const aktiv=g.status!=='erreicht';
+        gH+='<div class="wb5-ov-gw" onclick="WB._gw5Edit(\x27'+this._esc(g.id)+'\x27,\x27'+this._esc(t.id)+'\x27)">'
+          +'<div class="wb5-ov-gw-dot" style="background:'+(aktiv?'var(--lila)':'var(--faint)')+'"></div>'
+          +'<span class="wb5-ov-gw-t">'+this._esc(g.titel||'')+'</span>'
+          +(g.pruefDatum?'<span class="wb5-ov-gw-d">'+this._fmtDDMM(g.pruefDatum)+'</span>':'')
+          +'</div>';
+      });
+    } else {
+      gH+='<div style="padding:8px 12px;font-size:14px;color:var(--faint);">Keine Gateways</div>';
+    }
+    gH+='</div>'; // sec-body
+    gSec.innerHTML=gH;
+    body.appendChild(gSec);
+
+    // ── NOTIZ ──
+    const nSec=document.createElement('div');
+    nSec.className='wb5-ov-sec';
+    nSec.style.marginBottom='10px';
+    nSec.innerHTML='<div class="wb5-ov-sec-hdr" onclick="WB._ovToggleSec(\x27n\x27)">'
+      +'<span class="wb5-ov-sec-lbl">Notiz</span>'
+      +'<span class="wb5-ov-sec-chev open" id="wb5-ovs-n-chev">&#8964;</span>'
+      +'</div>'
+      +'<div class="wb5-ov-sec-body" id="wb5-ovs-n-body">'
+      +'<div class="wa-toolbar" style="margin:0;border-bottom:1px solid var(--border);padding:5px 8px;">'
       +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ov-notiz\x27).focus();document.execCommand(\x27bold\x27)"><b>B</b></button>'
       +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ov-notiz\x27).focus();document.execCommand(\x27underline\x27)"><u>U</u></button>'
       +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ov-notiz\x27).focus();document.execCommand(\x27italic\x27)"><i>I</i></button>'
@@ -1525,38 +1653,15 @@ const WB = {
       +'<button type="button" class="wa-tb-btn" onclick="WB._waInsertCheckbox(\x27wb5-ov-notiz\x27)">☑</button>'
       +'<button type="button" class="wa-tb-btn" onclick="WB._waInsertLink(\x27wb5-ov-notiz\x27)">&#128279;</button>'
       +'</div>'
-      +'<div id="wb5-ov-notiz" class="wa-field" contenteditable="true" style="min-height:80px;font-family:var(--font);">'+(t.notiz||'')+'</div></div>';
-    body.appendChild(notizWrap);
-    const lDoku=t.linkDoku||''; const lWeb=t.linkWeb||'';
-    const mkLink=(id,label,icon,col,url)=>{
-      const short=url?url.replace(/^https?:\/\//,'').substring(0,42)+(url.length>46?'...':''):'';
-      const d=document.createElement('div');
-      d.innerHTML='<div class="wb5-ov-link-card">'
-        +'<div class="wb5-ov-link-hdr">'
-        +'<div class="wb5-ov-link-icon" style="background:'+col+';"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="'+(id==='doku'?'#4285F4':'#0A6B5E')+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+icon+'</svg></div>'
-        +'<span class="wb5-ov-link-label">'+label+'</span>'
-        +'<button class="wb5-ov-link-edit-btn" onclick="WB._ovLinkToggleEdit(\x27'+id+'\x27)">✎ Ändern</button>'
-        +'</div>'
-        +'<div id="wb5-ovl-'+id+'-view">'
-        +(url?'<div class="wb5-ov-link-row"><a class="wb5-ov-link-url" href="'+url+'" target="_blank" onclick="event.stopPropagation();window.open(this.href);return false;">'+short+'</a><button class="wb5-ov-link-open" onclick="window.open(\x27'+url+'\x27)">↗</button></div>'
-             :'<div class="wb5-ov-link-empty">Noch kein Link — auf „Ändern“ tippen</div>')
-        +'</div>'
-        +'<div id="wb5-ovl-'+id+'-edit" style="display:none;">'
-        +'<div class="wb5-ov-link-edit-row">'
-        +'<input id="wb5-ovl-'+id+'-input" class="wb5-ov-link-input" type="url" placeholder="https://..." value="'+url+'">'
-        +'<button class="wb5-ov-link-save" onclick="WB._ovLinkSave(\x27'+id+'\x27)">✓</button>'
-        +'<button class="wb5-ov-link-cancel" onclick="WB._ovLinkToggleEdit(\x27'+id+'\x27)">✕</button>'
-        +'</div></div></div>';
-      return d;
-    };
-    const linksWrap=document.createElement('div');
-    linksWrap.innerHTML='<div class="wb5-ov-sec-label" style="margin:0 14px 6px;">Links</div>';
-    linksWrap.appendChild(mkLink('doku','Meine Dokumentation','<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>','#E8F0FE',lDoku));
-    linksWrap.appendChild(mkLink('web','Offizielle Homepage','<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>','#E8F5F3',lWeb));
-    body.appendChild(linksWrap);
-    const gwBlock=document.getElementById('wb5-gw-block');const gwBody=document.getElementById('wb5-gw-body');const gwChev=document.getElementById('wb5-gw-chev');
-    if(gwBlock&&gwBody)gwBlock.addEventListener('click',()=>{gwBody.classList.toggle('open');if(gwChev)gwChev.style.transform=gwBody.classList.contains('open')?'rotate(180deg)':'';});
+      +'<div class="wb5-ov-notiz-body">'
+      +'<div id="wb5-ov-notiz" class="wa-field" contenteditable="true" style="min-height:70px;font-family:var(--font);">'+(t.notiz||'')+'</div>'
+      +'</div></div>';
+    body.appendChild(nSec);
+
+    // Scroll-Button initialisieren
+    setTimeout(()=>this._ovUpdateScrollBtn(), 50);
   },
+
 
   _tm5CloseOverlay() {
     this._ovSaveNotiz(); document.getElementById('wb5-thema-overlay')?.classList.remove('open'); },

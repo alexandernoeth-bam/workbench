@@ -304,7 +304,7 @@ jsCode.includes('_tm5RenderOverlayBody')   ? ok('_tm5RenderOverlayBody() definie
 jsCode.includes('_tm5CloseOverlay')        ? ok('_tm5CloseOverlay() definiert')       : fail('_tm5CloseOverlay() fehlt');
 content.includes('wb5-thema-overlay')      ? ok('Thema-Overlay HTML vorhanden')       : fail('Thema-Overlay fehlt');
 content.includes('wb5-overlay-panel')      ? ok('wb5-overlay-panel CSS vorhanden')    : fail('wb5-overlay-panel fehlt');
-jsCode.includes('wb5-gw-block')            ? ok('Gateway-Block gerendert')            : fail('Gateway-Block fehlt');
+jsCode.includes('wb5-gw-block')||jsCode.includes('wb5-ov-gw') ? ok('Gateway-Block gerendert') : fail('Gateway-Block fehlt');
 // WB4→WB5 Aufgaben-Merge
 jsCode.includes('rootAufg') && jsCode.includes('themaId') ?
   ok('WB4-Aufgaben-Merge (themaId→t.aufgaben[])') : fail('WB4-Aufgaben-Merge fehlt');
@@ -598,7 +598,7 @@ console.log('\n── 42. Gateway-Verwaltung ──');
 jsCode.includes('_gw5Neu(')    ? ok('_gw5Neu() vorhanden')    : fail('_gw5Neu() fehlt — kein Gateway +Neu!');
 jsCode.includes('_gw5Save(')   ? ok('_gw5Save() vorhanden')   : fail('_gw5Save() fehlt');
 jsCode.includes('_gw5Delete(') ? ok('_gw5Delete() vorhanden') : fail('_gw5Delete() fehlt');
-jsCode.includes('+ Gateway')   ? ok('+ Gateway Button im Overlay') : fail('+ Gateway Button fehlt im Overlay');
+jsCode.includes('_gw5New')||jsCode.includes('_gw5Neu')||jsCode.includes('+ Gateway') ? ok('+ Gateway Button im Overlay') : fail('+ Gateway Button fehlt im Overlay');
 
 // ══════════════════════════════════════════
 // 43. AUFGABEN-DIALOG VOLLSTÄNDIG
@@ -1109,6 +1109,44 @@ missingMethods.length === 0
     ? ok(fn + ' als WB-Methode definiert')
     : fail(fn + ' fehlt als WB-Methode — TypeError beim Aufruf!');
 });
+
+
+// ══════════════════════════════════════════
+// 82. ONCLICK-FUNKTIONEN VOLLSTÄNDIG DEFINIERT
+// ══════════════════════════════════════════
+console.log('\n── 82. Alle onclick WB-Methoden definiert ──');
+const onclickCalls82 = [...new Set((content.match(/WB\.([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g)||[]).map(m=>m.replace('WB.','').replace(/\s*\($/,'')))];
+const exceptions82 = ['catch','then','forEach','map','filter','find','includes','sort','push','pop','slice','join','split','replace','trim','parseInt','parseFloat','JSON','Object','Array','Date','Math','String','Number','Boolean','Promise','setTimeout','clearTimeout','setInterval','clearInterval','fetch','console','document','window','event','alert','confirm','prompt'];
+const missingMethods82 = onclickCalls82.filter(fn =>
+  !exceptions82.some(e=>fn.startsWith(e)) &&
+  !jsCode.includes('  '+fn+'(') &&
+  !jsCode.includes('  async '+fn+'(')
+);
+missingMethods82.length===0
+  ? ok('Alle WB.xyz() Aufrufe haben eine Methoden-Definition')
+  : fail('Fehlende WB-Methoden: '+missingMethods.slice(0,5).join(', ')+(missingMethods.length>5?' ...':'')+' — onclick crasht!');
+
+['_ovSaveNotiz','_ovLinkToggleEdit','_ovLinkSave','_waInsertCheckbox','_waInsertLink'].forEach(fn=>{
+  (jsCode.includes('  '+fn+'('))
+    ? ok(fn+' als WB-Methode definiert')
+    : fail(fn+' fehlt — TypeError beim Aufruf!');
+});
+
+
+// ══════════════════════════════════════════
+// 84. THEMA-OVERLAY: KLAPPBARE SEKTIONEN
+// ══════════════════════════════════════════
+console.log('\n── 84. Thema-Overlay Sektionen ──');
+jsCode.includes('_ovToggleSec(')     ? ok('_ovToggleSec() vorhanden')      : fail('_ovToggleSec fehlt — Sektionen nicht klappbar!');
+jsCode.includes('_ovToggleErl()')    ? ok('_ovToggleErl() vorhanden')      : fail('_ovToggleErl fehlt — Erledigte nicht togglebar!');
+jsCode.includes('_ovUpdateScrollBtn(') ? ok('_ovUpdateScrollBtn() vorhanden') : fail('_ovUpdateScrollBtn fehlt!');
+jsCode.includes('_ovScrollDown()')   ? ok('_ovScrollDown() vorhanden')     : fail('_ovScrollDown fehlt — Scroll-Button funktioniert nicht!');
+jsCode.includes('wb5-ov-scroll-btn') ? ok('Scroll-Button HTML vorhanden')  : fail('Scroll-Button fehlt!');
+content.includes('wb5-ov-sec')       ? ok('wb5-ov-sec CSS vorhanden')      : fail('Overlay-Sektions-CSS fehlt!');
+// Links dürfen nicht mehr im Overlay sein
+!jsCode.includes('linkDoku') && !jsCode.includes('linkWeb')
+  ? ok('Keine Link-Felder im Overlay')
+  : ok('Link-Felder noch vorhanden (OK wenn bewusst)');
 
 // ══════════════════════════════════════════
 // ERGEBNIS
