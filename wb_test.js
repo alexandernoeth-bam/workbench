@@ -671,19 +671,22 @@ wb4Only.forEach(fn => {
 
 
 // ══════════════════════════════════════════
-// 49. MINDEST-SCHRIFTGRÖSSE 12px
+// 49. MINDEST-SCHRIFTGRÖSSE 14px
 // ══════════════════════════════════════════
-console.log('\n── 49. Mindest-Schriftgröße 12px ──');
+console.log('\n── 49. Mindest-Schriftgröße 14px ──');
 const allCssSizes = (styleBlock.match(/font-size:(\d+)px/g)||[]).map(s=>parseInt(s.replace('font-size:','').replace('px','')));
-// Nav-Labels dürfen 11px sein (5 Tabs auf Mobile passen sonst nicht)
-// wb-nav-label ist Ausnahme — alle anderen müssen ≥14px sein
-const tooSmallCss = allCssSizes.filter(s=>s<14).filter(s=>s!==11);
-if(tooSmallCss.length===0) ok('CSS: alle Schriftgrößen ≥ 14px (Nav-Label 11px erlaubt)');
+const tooSmallCss = allCssSizes.filter(s=>s<14);
+if(tooSmallCss.length===0) ok('CSS: alle Schriftgrößen ≥ 14px (' + allCssSizes.length + ' geprüft)');
 else fail('CSS: ' + tooSmallCss.length + ' Schriftgrößen unter 14px: ' + [...new Set(tooSmallCss)].sort((a,b)=>a-b).join('px, ') + 'px');
 const allJsSizes = (jsCode.match(/font-size:(\d+)px/g)||[]).map(s=>parseInt(s.replace('font-size:','').replace('px','')));
 const tooSmallJs = allJsSizes.filter(s=>s<14);
 if(tooSmallJs.length===0) ok('JS inline: alle Schriftgrößen ≥ 14px (' + allJsSizes.length + ' geprüft)');
 else fail('JS inline: ' + tooSmallJs.length + ' Schriftgrößen unter 14px: ' + [...new Set(tooSmallJs)].sort((a,b)=>a-b).join('px, ') + 'px');
+// HTML-Template: auch inline styles prüfen
+const allHtmlSizes = (content.match(/font-size:(\d+)px/g)||[]).map(s=>parseInt(s.replace('font-size:','').replace('px','')));
+const tooSmallHtml = allHtmlSizes.filter(s=>s<14);
+if(tooSmallHtml.length===0) ok('HTML inline: alle Schriftgrößen ≥ 14px (' + allHtmlSizes.length + ' geprüft)');
+else fail('HTML inline: ' + tooSmallHtml.length + ' Schriftgrößen unter 14px: ' + [...new Set(tooSmallHtml)].sort((a,b)=>a-b).join('px, ') + 'px');
 
 
 // ══════════════════════════════════════════
