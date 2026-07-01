@@ -702,7 +702,7 @@ content.includes('wb5-wt-row')    ? ok('wb5-wt-row CSS vorhanden')              
 // 51. THEMEN-TAB: FREIE AUFGABE + OVERFLOW
 // ══════════════════════════════════════════
 console.log('\n── 51. Themen-Tab Freie Aufgabe + Modal ──');
-jsCode.includes('+ Freie Aufgabe') ? ok('+ Freie Aufgabe Button im Themen-Tab') : fail('+ Freie Aufgabe Button fehlt im Themen-Tab');
+!jsCode.includes('+ Freie Aufgabe') ? ok('+ Freie Aufgabe Button korrekt entfernt') : fail('+ Freie Aufgabe Button noch vorhanden — soll entfernt sein!');
 // #wb-app darf kein overflow:hidden haben (Modal würde abgeschnitten)
 const appCss = styleBlock.match(/#wb-app\s*\{([^}]+)}/)?.[1]||'';
 !appCss.includes('overflow:hidden') ? ok('#wb-app kein overflow:hidden — Modal sichtbar') : fail('#wb-app hat overflow:hidden — Modal/Settings werden abgeschnitten!');
@@ -1202,6 +1202,36 @@ const metaCss = content.match(/\.wb5-overlay-meta\s*\{[^}]+\}/)?.[0] || '';
 !metaCss.includes('background:var(--surface)') && !metaCss.includes('background:#fff')
   ? ok('Overlay Meta-Zeile hat grünliche Hintergrundfarbe (nicht surface/weiß)')
   : fail('Overlay Meta-Zeile hat noch surface/weiße Farbe — passt nicht zum Header!');
+
+
+// ══════════════════════════════════════════
+// 88. THEMEN-TAB: TOOLBAR + CARDS + FREIE AUFGABEN
+// ══════════════════════════════════════════
+console.log('\n── 88. Themen-Tab Toolbar + Cards ──');
+// Toolbar-Button muss echte Button-Optik haben (background:#fff, font-family)
+const tbCss = content.match(/\.wb5-tm-tool-btn\s*\{[^}]+\}/)?.[0]||'';
+tbCss.includes('background:#fff') || tbCss.includes("background:#")
+  ? ok('Toolbar-Button hat Hintergrundfarbe (echte Button-Optik)')
+  : fail('Toolbar-Button hat kein background — sieht nicht wie Button aus!');
+
+// border-left darf nicht mehr an Thema-Cards sein
+const noBorderLeft = !content.match(/wb5-thema-card\.prio-[123][^}]*border-left:\s*[^;]+;/);
+noBorderLeft
+  ? ok('Keine border-left Prio-Farben an Thema-Cards')
+  : fail('border-left noch an Thema-Cards — Linksbalken erscheint!');
+
+// + Freie Aufgabe Button darf nicht in _tm5Render sein
+const tm5Start88 = jsCode.indexOf('  _tm5Render() {');
+const tm5End88   = jsCode.indexOf('_tm5RenderOverlayBody', tm5Start88);
+const tm5Fn88    = jsCode.slice(tm5Start88, tm5End88);
+!tm5Fn88.includes('Freie Aufgabe</button>')
+  ? ok('Kein + Freie Aufgabe Button in _tm5Render')
+  : fail('+ Freie Aufgabe Button noch vorhanden — muss entfernt werden!');
+
+// Freie Aufgaben aus _isFrei-Thema
+tm5Fn88.includes('_isFrei')
+  ? ok('Freie Aufgaben Zählung aus _isFrei-Thema')
+  : fail('Freie Aufgaben Zählung noch aus db.aufgaben — falsche Anzahl nach Migration!');
 
 // ══════════════════════════════════════════
 // ERGEBNIS

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.3.6</title>
+  <title>WorkBench 5.3.7</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -186,9 +186,9 @@
     .wb5-gruppe-lbl::after { content:''; flex:1; height:1px; background:var(--border); }
     .wb5-thema-card { background:#fff; border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; cursor:pointer; }
     .wb5-thema-card.pausiert { opacity:.45; }
-    .wb5-thema-card.prio-1 { border-left:4px solid var(--danger); }
-    .wb5-thema-card.prio-2 { border-left:4px solid var(--warn); }
-    .wb5-thema-card.prio-3 { border-left:4px solid var(--faint); }
+    .wb5-thema-card.prio-1 {}
+    .wb5-thema-card.prio-2 {}
+    .wb5-thema-card.prio-3 {}
     .wb5-thema-hdr { padding:11px 12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
     .wb5-thema-name { flex:1; min-width:100px; font-size:15px; font-weight:700; color:var(--text); word-break:break-word; }
     .wb5-thema-meta { display:flex; align-items:center; gap:5px; flex-wrap:wrap; flex-shrink:0; }
@@ -486,13 +486,28 @@
       transition:opacity .2s, background .15s; z-index:20;
     }
     .wb5-ov-scroll-btn:hover { background:var(--accent); }
-    .wb5-ov-scroll-btn.hidden { opacity:0; pointer-events:none; }</style>
+    .wb5-ov-scroll-btn.hidden { opacity:0; pointer-events:none; }
+    .wb5-tm-toolbar { background:#fff; border-bottom:1px solid var(--border); padding:6px 12px; display:flex; align-items:center; gap:6px; flex-shrink:0; }
+    .wb5-tm-tool-btn { background:#fff; border:1.5px solid var(--border); border-radius:8px; padding:5px 12px; font-size:14px; color:var(--text); cursor:pointer; font-family:var(--font); font-weight:500; }
+    .wb5-tm-tool-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .wb5-tm-tool-lila:hover { border-color:var(--lila) !important; color:var(--lila) !important; }
+    .wb5-tm-tool-alle { background:none; border:none; font-size:14px; color:var(--faint); cursor:pointer; margin-left:auto; padding:4px 6px; border-radius:6px; font-family:var(--font); }
+    .wb5-tm-tool-alle:hover { color:var(--accent); background:var(--surface); }
+    .wb5-tm-scroll-btn { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); width:34px; height:34px; border-radius:50%; background:rgba(26,35,40,.72); border:none; color:#fff; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(0,0,0,.22); transition:opacity .2s,background .15s; z-index:20; }
+    .wb5-tm-scroll-btn:hover { background:var(--accent); }
+    .wb5-tm-scroll-btn.hidden { opacity:0; pointer-events:none; }
+    .wb5-ober-name { font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.07em; white-space:nowrap; }
+    .wb5-ober-acts { display:flex; gap:3px; opacity:0; transition:opacity .15s; }
+    .wb5-gruppe-lbl:hover .wb5-ober-acts { opacity:1; }
+    .wb5-ober-act-btn { background:none; border:1px solid var(--border); border-radius:5px; padding:1px 6px; font-size:14px; color:var(--muted); cursor:pointer; }
+    .wb5-ober-act-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .wb5-ober-line { flex:1; height:1px; background:var(--border); }</style>
 </head>
 <body>
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.3.6 · Build 20260701-1530</div>
+    <div id="wb-startup-tagline">v5.3.7 · Build 20260701-1600</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -857,8 +872,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.3.6',
-  APP_BUILD:      '20260701-1530',
+  APP_VERSION:    '5.3.7',
+  APP_BUILD:      '20260701-1600',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -1456,7 +1471,7 @@ const WB = {
     const el=document.getElementById('wb5-themen'); if(!el) return;
     const db=this.db||{}; const themen=(db.themen||[]).filter(t=>!t.deleted&&this._weltOk(t));
     const aktiv=themen.filter(t=>t.status!=='erledigt');
-    const freieAufg=(db.aufgaben||[]).filter(a=>!a.deleted&&!a.themaId&&this._weltOk(a));
+    const freieAufg=((db.themen||[]).find(t=>!t.deleted&&t._isFrei)?.aufgaben||db.aufgaben||[]).filter(a=>!a.deleted);
     const gruppen={};
     aktiv.forEach(t=>{const g=t.oberthema||'_frei';if(!gruppen[g])gruppen[g]=[];gruppen[g].push(t);});
     const sortT=arr=>arr.sort((a,b)=>{const sA=a.status==='aktiv'?0:1;const sB=b.status==='aktiv'?0:1;if(sA!==sB)return sA-sB;return(a.prio||3)-(b.prio||3);});
@@ -1514,7 +1529,7 @@ const WB = {
     const erledigte=(db.themen||[]).filter(t=>!t.deleted&&t.status==='erledigt'&&this._weltOk(t));
     if(erledigte.length) h+='<button class="wb5-erl-btn" onclick="WB._toast(\'Erledigte Themen \u2014 kommt bald\')">&#128065; Erledigte Themen anzeigen ('+erledigte.length+')</button>';
     // + Neu Aufgabe Button (freie Aufgabe ohne Thema)
-    h+='<button class="wb5-add-btn" style="margin:8px 0 4px;" onclick="WB._aufgabeNeu()">+ Freie Aufgabe</button>';
+
     el.innerHTML=h;
     this._tm5UpdateScrollBtn();
     const hdr=document.getElementById('wb5-freie-hdr');
