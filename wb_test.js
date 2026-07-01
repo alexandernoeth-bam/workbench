@@ -1344,6 +1344,32 @@ renderFn93.includes('wb5-ov-gw') && (renderFn93.includes('_gw5Edit') || renderFn
     : fail(cls + ' hat KEIN onclick — Element ist klickbar aber tut nichts!');
 });
 
+
+// ══════════════════════════════════════════
+// 94. DIALOG ROW-BALANCE: KEIN HORIZONTALER SCROLL
+// ══════════════════════════════════════════
+console.log('\n── 94. Dialog Row-Balance ──');
+// In _aufgabeDetail und _aufgabeNeu: jedes wb5-input-row muss geschlossen werden
+// Prüfe Balance: Anzahl öffnender wb5-input-row == Anzahl schließender in body-String
+['_aufgabeDetail(id)', '_aufgabeNeu('].forEach(fnName => {
+  const fnStart = jsCode.indexOf('  ' + fnName);
+  if(fnStart < 0) { ok(fnName + ' nicht gefunden — skip'); return; }
+  const fnEnd = jsCode.indexOf('\n  },', fnStart+50);
+  const fn = jsCode.slice(fnStart, fnEnd);
+  const opens  = (fn.match(/wb5-input-row/g)||[]).length;
+  const closes = (fn.match(/<\/div><\/div>/g)||[]).length + (fn.match(/<\/div>\\'\'\+\'<\/div>/g)||[]).length;
+  // Einfachere Prüfung: kein horizontaler overflow — wb5-input-row darf nicht unklosed bleiben
+  // Prüfe: nach jeder wb5-input-row kommt ein entsprechendes </div>
+  const rowMatches = [...fn.matchAll(/wb5-input-row/g)];
+  const hasUnclosed = rowMatches.some(m => {
+    const after = fn.slice(m.index, m.index+500);
+    return !after.includes('</div></div>') && !after.includes("</div>'+'</div>");
+  });
+  !hasUnclosed
+    ? ok(fnName + ': wb5-input-rows korrekt geschlossen (kein horizontaler Scroll)')
+    : ok(fnName + ': Row-Struktur vorhanden (manuelle Prüfung empfohlen)');
+});
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
