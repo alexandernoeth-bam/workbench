@@ -1457,6 +1457,27 @@ Math.abs(ovBal.balance) <= 10
   ? ok('_tm5RenderOverlayBody Div-Bilanz akzeptabel: ' + ovBal.opens + ' opens, ' + ovBal.closes + ' closes')
   : fail('_tm5RenderOverlayBody Div-Bilanz stark unausgeglichen: ' + ovBal.balance);
 
+
+// ══════════════════════════════════════════
+// 97. OVERLAY: SEKTIONEN ZUGEKLAPPT WENN LEER
+// ══════════════════════════════════════════
+console.log('\n── 97. Overlay Sektionen zugeklappt wenn leer ──');
+const ovStart97 = jsCode.indexOf('  _tm5RenderOverlayBody(t) {');
+const ovEnd97   = jsCode.indexOf('\n  },', ovStart97+50);
+const ovFn97    = jsCode.slice(ovStart97, ovEnd97);
+// Gateways: gwOpen Variable vorhanden
+ovFn97.includes('gwOpen') && ovFn97.includes("gwOpen?' open':''")
+  ? ok('Gateways: zugeklappt wenn keine Gateways (gwOpen)')
+  : fail('Gateways: kein gwOpen — Sektion immer aufgeklappt!');
+// Notiz: nOpen Variable vorhanden
+ovFn97.includes('nOpen') && ovFn97.includes("nOpen?' open':''")
+  ? ok('Notiz: zugeklappt wenn leer (nOpen)')
+  : fail('Notiz: kein nOpen — Sektion immer aufgeklappt!');
+// sec-body hide
+ovFn97.includes("gwOpen?'':' hide'") && ovFn97.includes("nOpen?'':' hide'")
+  ? ok('sec-body bekommt hide-Klasse wenn zugeklappt')
+  : fail('sec-body hide fehlt — Inhalt trotzdem sichtbar!');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
