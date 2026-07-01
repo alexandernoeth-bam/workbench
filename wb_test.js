@@ -1233,6 +1233,20 @@ tm5Fn88.includes('_isFrei')
   ? ok('Freie Aufgaben Zählung aus _isFrei-Thema')
   : fail('Freie Aufgaben Zählung noch aus db.aufgaben — falsche Anzahl nach Migration!');
 
+
+// ══════════════════════════════════════════
+// 89. OVERLAY SCROLL-BODY HINTERGRUNDFARBE
+// ══════════════════════════════════════════
+console.log('\n── 89. Overlay Scroll-Body Farbe ──');
+// wb5-overlay-scroll darf nicht background:#fff oder background:var(--surface) haben
+// Soll gleiche Farbe wie Meta-Zeile haben (#C2E0DC)
+const scrollCss = content.match(/\.wb5-overlay-scroll\s*\{[^}]+\}/)?.[0] || '';
+const hasGreenBg = scrollCss.includes('#C2E0DC') || scrollCss.includes('#DDE4E8') || scrollCss.includes('#EBF0F2');
+const hasWhiteBg = scrollCss.includes('background:#fff') || scrollCss.includes('background:var(--surface)') || scrollCss.includes('background:white');
+(!hasWhiteBg && hasGreenBg)
+  ? ok('Overlay Scroll-Body hat grünliche Hintergrundfarbe (passend zu Meta-Zeile)')
+  : fail('Overlay Scroll-Body ist noch weiß/surface — Sektionen liegen auf falschem Hintergrund!');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
