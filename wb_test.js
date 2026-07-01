@@ -1148,6 +1148,26 @@ content.includes('wb5-ov-sec')       ? ok('wb5-ov-sec CSS vorhanden')      : fai
   ? ok('Keine Link-Felder im Overlay')
   : ok('Link-Felder noch vorhanden (OK wenn bewusst)');
 
+
+// ══════════════════════════════════════════
+// 85. OVERLAY AUFGABEN-ROW HTML-AUFBAU
+// ══════════════════════════════════════════
+console.log('\n── 85. Overlay Aufgaben-Row HTML ──');
+// offen.forEach darf NICHT aH='<div>'+aH verwenden (prepend-Bug)
+// Korrekt ist: aH+='<div class="wb5-ov-a">'+content+'</div>'
+const renderFnStart = jsCode.indexOf('  _tm5RenderOverlayBody(t) {');
+const renderFnEnd   = jsCode.indexOf('\n  },', renderFnStart+100);
+const renderFn      = jsCode.slice(renderFnStart, renderFnEnd);
+// Der Prepend-Bug: aH = '<div...>' + aH nach einem aH+=
+const prependBug = renderFn.match(/aH\s*=\s*'<div[^']*>'\s*\+\s*aH/);
+!prependBug
+  ? ok('Kein Prepend-Bug in Aufgaben-Row (aH = div+aH)')
+  : fail('Prepend-Bug: aH=div+aH nach aH+= — Aufgaben-Items werden falsch gerendert!');
+renderFn.includes('wb5-ov-a') ? ok('Aufgaben-Row hat wb5-ov-a class') : fail('wb5-ov-a fehlt in Aufgaben-Row');
+
+
+
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
