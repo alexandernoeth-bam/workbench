@@ -1274,6 +1274,24 @@ const tm5Body = jsCode.slice(tm5S, tm5E);
   ? ok('Keine wb5-freie-card in _tm5Render — Freie Aufgaben entfernt')
   : fail('wb5-freie-card noch in _tm5Render — Freie Aufgaben Sektion muss entfernt sein!');
 
+
+// ══════════════════════════════════════════
+// 91. OVERLAY: META + SCROLL GLEICHE FARBE
+// ══════════════════════════════════════════
+console.log('\n── 91. Overlay Meta + Scroll Farbe konsistent ──');
+const metaCss91  = content.match(/\.wb5-overlay-meta\s*\{[^}]+\}/)?.[0] || '';
+const scrollCss91 = content.match(/\.wb5-overlay-scroll\s*\{[^}]+\}/)?.[0] || '';
+const metaBg91   = (metaCss91.match(/background:\s*([^;]+)/)||[])[1]?.trim();
+const scrollBg91 = (scrollCss91.match(/background:\s*([^;]+)/)||[])[1]?.trim();
+(metaBg91 && scrollBg91 && metaBg91 === scrollBg91)
+  ? ok('Overlay Meta + Scroll haben gleiche Hintergrundfarbe: ' + metaBg91)
+  : fail('Overlay Meta (' + metaBg91 + ') und Scroll (' + scrollBg91 + ') haben unterschiedliche Farben!');
+// Keine weiße/surface Farbe
+const noWhite91 = !metaCss91.includes('background:#fff') && !metaCss91.includes('background:var(--surface)');
+noWhite91
+  ? ok('Overlay Meta hat keine weiße/surface Farbe')
+  : fail('Overlay Meta ist noch weiß — soll farbigen Hintergrund haben!');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
