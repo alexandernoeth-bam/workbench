@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.4.14</title>
+  <title>WorkBench 5.4.15</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -522,7 +522,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.4.14 · Build 20260701-2215</div>
+    <div id="wb-startup-tagline">v5.4.15 · Build 20260701-2230</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -887,8 +887,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.4.14',
-  APP_BUILD:      '20260701-2215',
+  APP_VERSION:    '5.4.15',
+  APP_BUILD:      '20260701-2230',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -1647,7 +1647,11 @@ const WB = {
     };
 
     // ── AUFGABEN ──
-    const aufg=(t.aufgaben||[]).filter(a=>!a.deleted);
+    // Aufgaben aus t.aufgaben UND aus db.aufgaben mit passender themaId
+    const aufg=[
+      ...(t.aufgaben||[]).filter(a=>!a.deleted),
+      ...(this.db.aufgaben||[]).filter(a=>!a.deleted&&a.themaId===t.id)
+    ];
     const offen=aufg.filter(a=>a.status!=='erledigt'&&!a.erledigt);
     const erl  =aufg.filter(a=>a.status==='erledigt'||a.erledigt);
     const aSec=document.createElement('div');
@@ -2850,7 +2854,7 @@ const WB = {
 
 
   _refreshAfterAufgabe() {
-    console.log('[Refresh] activeTab:', this.activeTab, '_ovActiveThema:', this._ovActiveThema?.titel);
+
     this.renderSection(this.activeTab);
     // Heute-Tab neu rendern (Aufgaben erscheinen/verschwinden)
     if(this.activeTab!=='heute') this._ht5Render();
@@ -2867,25 +2871,16 @@ const WB = {
     if(idx>=0){
       this.db.aufgaben[idx].deleted=true;
       this.db.aufgaben[idx].updatedAt=this._now();
-      console.log('[Delete] db.aufgaben gelöscht:', id);
+  
     } else {
       let found=false;
-      (this.db.themen||[]).forEach(t=>{
-        const ti=(t.aufgaben||[]).findIndex(a=>a.id===id);
-        if(ti>=0){
-          t.aufgaben[ti].deleted=true;
-          t.aufgaben[ti].updatedAt=this._now();
-          found=true;
-          console.log('[Delete] thema.aufgaben gelöscht:', id, 'in Thema:', t.titel);
-        }
-      });
+      (this.db.themen||[]).forEach(t=>{const ti=(t.aufgaben||[]).findIndex(a=>a.id===id);if(ti>=0){t.aufgaben[ti].deleted=true;t.aufgaben[ti].updatedAt=this._now();found=true;}});
       if(!found){this._toast('⚠ Aufgabe nicht gefunden: '+id);return;}
     }
-    // Sofort speichern
-    this.idbSave().then(()=>console.log('[Delete] idbSave done'));
+    this.idbSave();
     this.setDirty();
     this.modalClose();
-    console.log('[Delete] _ovActiveThema:', this._ovActiveThema?.titel);
+
     this._refreshAfterAufgabe();
     this._toast('✓ Aufgabe gelöscht');
   },
