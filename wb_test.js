@@ -1006,6 +1006,27 @@ const wa5Fn    = jsCode.slice(wa5Start, wa5End);
 const gAsVar = wa5Fn.match(/if\s*\(g\s*!==\s*'_frei'\)/);
 !gAsVar ? ok('_wa5Render hat kein freies g — kein ReferenceError') : fail('_wa5Render: if(g!==_frei) gefunden — ReferenceError beim Rendern!');
 
+
+// ══════════════════════════════════════════
+// 79. BÜRO-MODUS TOGGLE IM EINSTELLUNGEN-HTML
+// ══════════════════════════════════════════
+console.log('\n── 79. Büro-Modus Toggle im HTML ──');
+// wb-buero-dot muss ZWEIMAL vorkommen: einmal im HTML der Einstellungen, einmal im JS
+const bueroCount = (content.match(/wb-buero-dot/g)||[]).length;
+bueroCount >= 2
+  ? ok('wb-buero-dot im HTML und JS vorhanden (' + bueroCount + 'x)')
+  : fail('wb-buero-dot fehlt im Einstellungen-HTML — Toggle nicht sichtbar! (' + bueroCount + 'x)');
+// wb-buero-knob muss im HTML sein (nicht nur im JS)
+const knobInHtml = content.indexOf('id="wb-buero-knob"') > 0 &&
+  content.indexOf('id="wb-buero-knob"') < content.indexOf("'use strict';");
+knobInHtml
+  ? ok('wb-buero-knob im HTML-Teil (nicht nur JS)')
+  : fail('wb-buero-knob fehlt im HTML — Toggle-Animation funktioniert nicht!');
+// Ansicht-Sektion vorhanden
+content.includes('>Ansicht<')
+  ? ok('Ansicht-Sektion in Einstellungen')
+  : fail('Ansicht-Sektion fehlt in Einstellungen');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
