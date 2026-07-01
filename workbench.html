@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.4.15</title>
+  <title>WorkBench 5.4.16</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -522,7 +522,7 @@
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.4.15 · Build 20260701-2230</div>
+    <div id="wb-startup-tagline">v5.4.16 · Build 20260701-2245</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -887,8 +887,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.4.15',
-  APP_BUILD:      '20260701-2230',
+  APP_VERSION:    '5.4.16',
+  APP_BUILD:      '20260701-2245',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -1648,10 +1648,12 @@ const WB = {
 
     // ── AUFGABEN ──
     // Aufgaben aus t.aufgaben UND aus db.aufgaben mit passender themaId
-    const aufg=[
-      ...(t.aufgaben||[]).filter(a=>!a.deleted),
-      ...(this.db.aufgaben||[]).filter(a=>!a.deleted&&a.themaId===t.id)
-    ];
+    // Aufgaben aus t.aufgaben + db.aufgaben (mit themaId), Duplikate via ID entfernen
+    const aufgMap=new Map();
+    [...(t.aufgaben||[]),...(this.db.aufgaben||[]).filter(a=>a.themaId===t.id)]
+      .filter(a=>!a.deleted)
+      .forEach(a=>aufgMap.set(a.id,a));
+    const aufg=[...aufgMap.values()];
     const offen=aufg.filter(a=>a.status!=='erledigt'&&!a.erledigt);
     const erl  =aufg.filter(a=>a.status==='erledigt'||a.erledigt);
     const aSec=document.createElement('div');
@@ -2859,7 +2861,11 @@ const WB = {
     // Heute-Tab neu rendern (Aufgaben erscheinen/verschwinden)
     if(this.activeTab!=='heute') this._ht5Render();
     // Thema-Overlay neu rendern falls offen
-    if(this._ovActiveThema) this._tm5RenderOverlayBody(this._ovActiveThema);
+    if(this._ovActiveThema) {
+      // Frisches Objekt aus DB holen damit Änderungen sicher sichtbar sind
+      const freshT=(this.db.themen||[]).find(x=>x.id===this._ovActiveThema.id)||this._ovActiveThema;
+      this._tm5RenderOverlayBody(freshT);
+    }
     // Aufgabensicht (wb5-av-overlay) neu rendern falls offen
     const avOv=document.getElementById('wb5-av-overlay');
     if(avOv && avOv.classList.contains('open')) this._avRender();
