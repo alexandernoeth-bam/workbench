@@ -1191,6 +1191,18 @@ const tm5Fn    = jsCode.slice(tm5Start, tm5End);
   ? ok('Kein großer Alle-Aufgaben Block in _tm5Render')
   : fail('Großer Alle-Aufgaben Block noch vorhanden!');
 
+
+// ══════════════════════════════════════════
+// 87. OVERLAY META-ZEILE FARBE
+// ══════════════════════════════════════════
+console.log('\n── 87. Overlay Meta-Zeile Farbe ──');
+// wb5-overlay-meta darf nicht background:var(--surface) haben
+// (wäre weiß/hellgrau — soll grünlich sein passend zum Header)
+const metaCss = content.match(/\.wb5-overlay-meta\s*\{[^}]+\}/)?.[0] || '';
+!metaCss.includes('background:var(--surface)') && !metaCss.includes('background:#fff')
+  ? ok('Overlay Meta-Zeile hat grünliche Hintergrundfarbe (nicht surface/weiß)')
+  : fail('Overlay Meta-Zeile hat noch surface/weiße Farbe — passt nicht zum Header!');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════
