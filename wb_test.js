@@ -1400,6 +1400,7 @@ const avFn    = jsCode.slice(avStart, avEnd);
 avFn.includes('av-tag-filter') ? ok('Tag-Filter Dropdown in _avRender') : fail('Tag-Filter fehlt in _avRender!');
 avFn.includes('_avSetTagFilter') ? ok('_avSetTagFilter in _avRender') : fail('_avSetTagFilter fehlt!');
 avFn.includes('const filtered=') ? ok('Tag-Filterung auf Aufgaben angewendet') : fail('filtered Variable fehlt — Filter hat keinen Effekt!');
+avFn.includes('filtered.filter') || avFn.includes('filtered:') ? ok('aufg verwendet filtered (nicht all)') : fail('aufg ignoriert filtered — Tag-Filter hat keinen Effekt!');
 
 // Startzeit ohne (optional)
 !detFn.includes('Startzeit (optional)') ? ok('Startzeit ohne (optional) in _aufgabeDetail') : fail('Startzeit hat noch (optional)!');
