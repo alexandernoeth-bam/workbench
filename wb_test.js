@@ -1370,6 +1370,40 @@ console.log('\n── 94. Dialog Row-Balance ──');
     : ok(fnName + ': Row-Struktur vorhanden (manuelle Prüfung empfohlen)');
 });
 
+
+// ══════════════════════════════════════════
+// 95. TAGS: CHIP-EINGABE + GLOBALE DB + TAG-FILTER
+// ══════════════════════════════════════════
+console.log('\n── 95. Tags: Chip-Eingabe + Filter ──');
+// db.tags in _emptyDb
+const emptyDbStart = jsCode.indexOf('  _emptyDb()');
+const emptyDbEnd   = jsCode.indexOf('\n  },', emptyDbStart+50);
+const emptyDbFn    = jsCode.slice(emptyDbStart, emptyDbEnd);
+emptyDbFn.includes('tags:') ? ok('db.tags[] in _emptyDb vorhanden') : fail('db.tags[] fehlt in _emptyDb!');
+
+// Tag-Methoden vorhanden
+['_tagInputHTML','_tagKeydown','_tagAdd','_tagRemove','_tagSuggest','_tagHideSug','_tagGetCurrent','_avSetTagFilter'].forEach(fn=>{
+  jsCode.includes('  '+fn+'(') ? ok(fn+' als WB-Methode vorhanden') : fail(fn+' fehlt — Tag-Feature kaputt!');
+});
+
+// Tags-Feld in _aufgabeDetail
+const detStart = jsCode.indexOf('  _aufgabeDetail(id)');
+const detEnd   = jsCode.indexOf('\n  },', detStart+50);
+const detFn    = jsCode.slice(detStart, detEnd);
+detFn.includes('wb5-ad-tags') ? ok('Tags-Feld in _aufgabeDetail vorhanden') : fail('Tags-Feld fehlt in _aufgabeDetail!');
+detFn.includes('_tagInputHTML') ? ok('_tagInputHTML in _aufgabeDetail aufgerufen') : fail('_tagInputHTML nicht in _aufgabeDetail!');
+
+// Tag-Filter in _avRender
+const avStart = jsCode.indexOf('  _avRender(');
+const avEnd   = jsCode.indexOf('\n  },', avStart+50);
+const avFn    = jsCode.slice(avStart, avEnd);
+avFn.includes('av-tag-filter') ? ok('Tag-Filter Dropdown in _avRender') : fail('Tag-Filter fehlt in _avRender!');
+avFn.includes('_avSetTagFilter') ? ok('_avSetTagFilter in _avRender') : fail('_avSetTagFilter fehlt!');
+avFn.includes('const filtered=') ? ok('Tag-Filterung auf Aufgaben angewendet') : fail('filtered Variable fehlt — Filter hat keinen Effekt!');
+
+// Startzeit ohne (optional)
+!detFn.includes('Startzeit (optional)') ? ok('Startzeit ohne (optional) in _aufgabeDetail') : fail('Startzeit hat noch (optional)!');
+
 // ══════════════════════════════════════════
 // ERGEBNIS
 // ══════════════════════════════════════════

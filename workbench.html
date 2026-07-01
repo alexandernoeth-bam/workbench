@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>WorkBench 5.4.3</title>
+  <title>WorkBench 5.4.4</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -501,13 +501,28 @@
     .wb5-gruppe-lbl:hover .wb5-ober-acts { opacity:1; }
     .wb5-ober-act-btn { background:none; border:1px solid var(--border); border-radius:5px; padding:1px 6px; font-size:14px; color:var(--muted); cursor:pointer; }
     .wb5-ober-act-btn:hover { border-color:var(--accent); color:var(--accent); }
-    .wb5-ober-line { flex:1; height:1px; background:var(--border); }</style>
+    .wb5-ober-line { flex:1; height:1px; background:var(--border); }
+    .wb5-tag-input-wrap { display:flex; flex-wrap:wrap; gap:4px; align-items:center; padding:6px 8px; border:1.5px solid var(--border); border-radius:8px; background:#fff; min-height:36px; cursor:text; position:relative; }
+    .wb5-tag-input-wrap:focus-within { border-color:var(--accent); }
+    .wb5-tag-chip { display:inline-flex; align-items:center; gap:4px; background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:2px 8px 2px 10px; font-size:14px; color:var(--text); white-space:nowrap; }
+    .wb5-tag-chip-del { background:none; border:none; cursor:pointer; color:var(--muted); font-size:14px; padding:0 0 0 2px; line-height:1; }
+    .wb5-tag-chip-del:hover { color:var(--danger,#C0392B); }
+    .wb5-tag-text-input { border:none; outline:none; font-size:14px; font-family:var(--font); min-width:80px; flex:1; background:transparent; }
+    .wb5-tag-suggestions { position:absolute; top:calc(100% + 2px); left:0; background:#fff; border:1.5px solid var(--border); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.1); z-index:200; max-height:140px; overflow-y:auto; min-width:140px; }
+    .wb5-tag-sug-item { padding:6px 12px; font-size:14px; cursor:pointer; }
+    .wb5-tag-sug-item:hover { background:var(--surface); color:var(--accent); }
+    .av-tag-chip { display:inline-block; background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:1px 8px; font-size:14px; color:var(--muted); margin-right:3px; }
+    .av-tag-filter { display:flex; align-items:center; gap:6px; padding:6px 0 8px; }
+    .av-tag-filter-sel { border:1.5px solid var(--border); border-radius:8px; padding:4px 10px; font-size:14px; font-family:var(--font); background:#fff; color:var(--text); cursor:pointer; }
+    .av-tag-filter-sel:focus { outline:none; border-color:var(--accent); }
+    .av-tag-clear { background:none; border:none; font-size:14px; color:var(--faint); cursor:pointer; padding:4px 6px; border-radius:6px; }
+    .av-tag-clear:hover { color:var(--accent); background:var(--surface); }</style>
 </head>
 <body>
 <div id="wb-app">
   <div id="wb-startup">
     <div id="wb-startup-logo">WB5</div>
-    <div id="wb-startup-tagline">v5.4.3 · Build 20260701-1830</div>
+    <div id="wb-startup-tagline">v5.4.4 · Build 20260701-1900</div>
   </div>
   <div id="wb-oauth-banner">
     <div>Google Drive Sync nicht verbunden</div>
@@ -872,8 +887,8 @@
 <script>
 'use strict';
 const WB = {
-  APP_VERSION:    '5.4.3',
-  APP_BUILD:      '20260701-1830',
+  APP_VERSION:    '5.4.4',
+  APP_BUILD:      '20260701-1900',
   IDB_NAME:       'workbench-slim',
   IDB_VERSION:    1,
   _oauthClientId: '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com',
@@ -1952,6 +1967,9 @@ const WB = {
       +'<div class="wb-input-group"><span class="wb-label">Bis</span><input id="wb5-td-bisd" class="wb-input" type="date" value="'+(e?.date||today)+'"></div>'
       +'</div>'
       +'<div class="wb5-range-hint">ℹ Erstellt automatisch alle Tage im Zeitraum</div></div>'
+      +'<div class="wb-input-group"><span class="wb-label">Tags</span>'
+      +this._tagInputHTML('wb5-na-tags', [])
+      +'</div>'
       +'<div class="wb-input-group"><span class="wb-label">Notiz (optional)</span>'
       +'<div class="wa-toolbar" style="margin-bottom:4px;">'+'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-td-notiz\x27).focus();document.execCommand(\x27bold\x27)"><b>B</b></button>'+'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-td-notiz\x27).focus();document.execCommand(\x27underline\x27)"><u>U</u></button>'+'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-td-notiz\x27).focus();document.execCommand(\x27italic\x27)"><i>I</i></button>'+'<div class="wa-tb-sep"></div>'+'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-td-notiz\x27).focus();document.execCommand(\x27insertUnorderedList\x27)">•≡</button>'+'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-td-notiz\x27).focus();document.execCommand(\x27insertOrderedList\x27)">1≡</button>'+'<button type="button" class="wa-tb-btn" onclick="WB._waInsertCheckbox(\x27wb5-td-notiz\x27)">☑</button>'+'<button type="button" class="wa-tb-btn" onclick="WB._waInsertLink(\x27wb5-td-notiz\x27)">&#128279;</button>'+'</div>'
       +'<div id="wb5-td-notiz" class="wa-field" contenteditable="true" style="min-height:60px;font-family:var(--font);">'+(e?.notiz||'')+'</div>'
@@ -2211,7 +2229,7 @@ const WB = {
       +'<input id="wb5-na-deadline" class="wb-input" type="date"></div>'
       +'</div>'
       +'<div class="wb5-input-row">'
-      +'<div class="wb-input-group"><span class="wb-label">Startzeit (optional)</span>'
+      +'<div class="wb-input-group"><span class="wb-label">Startzeit</span>'
       +'<input id="wb5-na-startzeit" class="wb-input" type="time"></div>'
       +'<div class="wb-input-group"><span class="wb-label">Dauer</span>'
       +'<input id="wb5-na-dauer" class="wb-input" type="number" min="0" max="480" value="30" list="wb5-dauer-list">'
@@ -2227,7 +2245,10 @@ const WB = {
 
 
 
-    const body2=body+'<div class="wb-input-group"><span class="wb-label">Notiz (optional)</span>'
+    const body2=body+'<div class="wb-input-group"><span class="wb-label">Tags</span>'
+      +this._tagInputHTML('wb5-na-tags', [])
+      +'</div>'
+      +'<div class="wb-input-group"><span class="wb-label">Notiz (optional)</span>'
       +'<div class="wa-toolbar" style="margin-bottom:4px;">'
       +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-na-notiz\x27).focus();document.execCommand(\x27bold\x27)"><b>B</b></button>'
       +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-na-notiz\x27).focus();document.execCommand(\x27underline\x27)"><u>U</u></button>'
@@ -2435,6 +2456,12 @@ const WB = {
   _avTab: 'aufgaben',
   _avShowErl: false,
 
+
+  _avSetTagFilter(tag) {
+    this._avTagFilter=tag||'';
+    this._avRender();
+  },
+
   _avOpen() {
     const ov=document.getElementById('wb5-av-overlay');
     if(ov) { ov.classList.add('open'); this._avRender(); }
@@ -2479,6 +2506,18 @@ const WB = {
   _avRender() {
     const el=document.getElementById('av-list'); if(!el) return;
     if(this._avTab==='gateways') { this._avRenderGW(el); return; }
+    const allTags=[...new Set([
+      ...(this.db.aufgaben||[]).flatMap(a=>a.tags||[]),
+      ...(this.db.themen||[]).flatMap(t=>(t.aufgaben||[]).flatMap(a=>a.tags||[]))
+    ])].sort();
+    const curTagF=this._avTagFilter||'';
+    const filterHtml='<div class="av-tag-filter">'
+      +'<select class="av-tag-filter-sel" onchange="WB._avSetTagFilter(this.value)">'
+      +'<option value="">Alle Tags</option>'
+      +allTags.map(t=>'<option value="'+this._esc(t)+'"'+(curTagF===t?' selected':'')+'>'+this._esc(t)+'</option>').join('')
+      +'</select>'
+      +(curTagF?'<button class="av-tag-clear" onclick="WB._avSetTagFilter(\x27\x27)">&#x2715; Filter aufheben</button>':'')
+      +'</div>';
     // Alle Aufgaben sammeln
     const all=[
       ...(this.db.aufgaben||[]).filter(a=>!a.deleted&&this._weltOk(a)),
@@ -2503,7 +2542,8 @@ const WB = {
     };
     sorted.forEach(a=>{ const k=grpKey(a); if(!gruppen[k])gruppen[k]=[]; gruppen[k].push(a); });
     const heute=this._dStr(new Date());
-    let h='';
+    const filtered=curTagF?all.filter(a=>(a.tags||[]).includes(curTagF)):all;
+    let h=filterHtml+'';
     if(!sorted.length){ h='<div style="text-align:center;padding:32px;color:var(--muted);">Keine Aufgaben</div>'; el.innerHTML=h; return; }
     Object.keys(gruppen).sort().forEach(grp=>{
       const items=gruppen[grp];
@@ -2592,6 +2632,7 @@ const WB = {
       :[];
     const wiederholung=wdh?{typ:wdh,wochentage:wt,datum:'',naechstFaellig:''}:null;
     const notiz=document.getElementById('wb5-na-notiz')?.innerHTML.trim()||'';
+    const tags=this._tagGetCurrent('wb5-na-tags');
     const startzeit=document.getElementById('wb5-na-startzeit')?.value||'';
     const dauer=parseInt(document.getElementById('wb5-na-dauer')?.value)||30;
     const aufg={id:'a_'+Date.now(),titel:text,prio,deadline,welt,typ,wiederholung,notiz,startzeit,dauer,erledigt:false,status:'offen',updatedAt:this._now()};
@@ -2611,6 +2652,70 @@ const WB = {
     }
     this.renderSection(this.activeTab);
     this._toast('✓ Aufgabe gespeichert');
+  },
+
+
+  _tagInputHTML(fieldId, currentTags) {
+    const chips=(currentTags||[]).map(t=>'<span class="wb5-tag-chip" data-tag="'+this._esc(t)+'">'+this._esc(t)+'<button type="button" class="wb5-tag-chip-del" onclick="WB._tagRemove(\x27'+fieldId+'\x27,\x27'+this._esc(t)+'\x27)">&#x2715;</button></span>').join('');
+    return '<div class="wb5-tag-input-wrap" id="'+fieldId+'-wrap" onclick="document.getElementById(\x27'+fieldId+'\x27).focus()">'+chips
+      +'<input id="'+fieldId+'" class="wb5-tag-text-input" type="text" placeholder="Tag..." autocomplete="off"'
+      +' onkeydown="WB._tagKeydown(event,\x27'+fieldId+'\x27)"'
+      +' oninput="WB._tagSuggest(\x27'+fieldId+'\x27)"'
+      +' onblur="WB._tagHideSug(\x27'+fieldId+'\x27)">'
+      +'<div id="'+fieldId+'-sug" class="wb5-tag-suggestions" style="display:none;"></div>'
+      +'</div>';
+  },
+
+  _tagKeydown(e, fieldId) {
+    const inp=document.getElementById(fieldId); if(!inp) return;
+    if(e.key==='Enter'||e.key===','||e.key===' ') {
+      e.preventDefault();
+      const val=inp.value.trim().replace(/^#/,'');
+      if(val) { this._tagAdd(fieldId,val); inp.value=''; this._tagHideSug(fieldId); }
+    } else if(e.key==='Backspace'&&!inp.value) {
+      const chips=[...(document.getElementById(fieldId+'-wrap')?.querySelectorAll('.wb5-tag-chip')||[])];
+      if(chips.length) this._tagRemove(fieldId, chips[chips.length-1].dataset.tag);
+    }
+  },
+
+  _tagAdd(fieldId, tag) {
+    const wrap=document.getElementById(fieldId+'-wrap'); if(!wrap) return;
+    const existing=[...wrap.querySelectorAll('.wb5-tag-chip')].map(c=>c.dataset.tag);
+    if(existing.includes(tag)) return;
+    const inp=document.getElementById(fieldId);
+    const chip=document.createElement('span');
+    chip.className='wb5-tag-chip'; chip.dataset.tag=tag;
+    chip.innerHTML=this._esc(tag)+'<button type="button" class="wb5-tag-chip-del" onclick="WB._tagRemove(\x27'+fieldId+'\x27,\x27'+this._esc(tag)+'\x27)">&#x2715;</button>';
+    wrap.insertBefore(chip,inp);
+    if(!this.db.tags) this.db.tags=[];
+    if(!this.db.tags.includes(tag)){ this.db.tags.push(tag); this.setDirty(); }
+  },
+
+  _tagRemove(fieldId, tag) {
+    const wrap=document.getElementById(fieldId+'-wrap'); if(!wrap) return;
+    const chip=[...wrap.querySelectorAll('.wb5-tag-chip')].find(c=>c.dataset.tag===tag);
+    if(chip) chip.remove();
+  },
+
+  _tagSuggest(fieldId) {
+    const inp=document.getElementById(fieldId); if(!inp) return;
+    const sug=document.getElementById(fieldId+'-sug'); if(!sug) return;
+    const val=inp.value.trim().replace(/^#/,'').toLowerCase();
+    if(!val){ sug.style.display='none'; return; }
+    const existing=[...(document.getElementById(fieldId+'-wrap')?.querySelectorAll('.wb5-tag-chip')||[])].map(c=>c.dataset.tag);
+    const matches=(this.db.tags||[]).filter(t=>t.toLowerCase().includes(val)&&!existing.includes(t));
+    if(!matches.length){ sug.style.display='none'; return; }
+    sug.innerHTML=matches.slice(0,8).map(t=>'<div class="wb5-tag-sug-item" onmousedown="event.preventDefault();WB._tagAdd(\x27'+fieldId+'\x27,\x27'+this._esc(t)+'\x27);document.getElementById(\x27'+fieldId+'\x27).value=\x27\x27;WB._tagHideSug(\x27'+fieldId+'\x27)">'+this._esc(t)+'</div>').join('');
+    sug.style.display='block';
+  },
+
+  _tagHideSug(fieldId) {
+    setTimeout(()=>{ const s=document.getElementById(fieldId+'-sug'); if(s) s.style.display='none'; },150);
+  },
+
+  _tagGetCurrent(fieldId) {
+    const wrap=document.getElementById(fieldId+'-wrap');
+    return [...(wrap?.querySelectorAll('.wb5-tag-chip')||[])].map(c=>c.dataset.tag);
   },
 
   _aufgabeDetail(id) {
@@ -2645,7 +2750,7 @@ const WB = {
       +'<input id="wb5-ad-deadline" class="wb-input" type="date" value="'+(a.deadline||'')+'"></div>'
       +'</div></div>'
       +'<div class="wb5-input-row">'
-      +'<div class="wb-input-group"><span class="wb-label">Startzeit (optional)</span>'
+      +'<div class="wb-input-group"><span class="wb-label">Startzeit</span>'
       +'<input id="wb5-ad-startzeit" class="wb-input" type="time" value="'+(a.startzeit||'')+'"></div>'
       +'<div class="wb-input-group"><span class="wb-label">Dauer</span>'
       +'<input id="wb5-ad-dauer" class="wb-input" type="number" min="0" max="480" value="'+(a.dauer||30)+'" list="wb5-dauer-list">'
@@ -2663,6 +2768,9 @@ const WB = {
 
 
     const bodyFull=body
+      +'<div class="wb-input-group"><span class="wb-label">Tags</span>'
+      +this._tagInputHTML('wb5-ad-tags', a.tags||[])
+      +'</div>'
       +'<div class="wb-input-group"><span class="wb-label">Notiz (optional)</span>'
       +'<div class="wa-toolbar" style="margin-bottom:4px;">'
       +'<button type="button" class="wa-tb-btn" onclick="document.getElementById(\x27wb5-ad-notiz\x27).focus();document.execCommand(\x27bold\x27)"><b>B</b></button>'
@@ -2723,6 +2831,7 @@ const WB = {
     a.startzeit=document.getElementById('wb5-ad-startzeit')?.value||a.startzeit||'';
     a.dauer=parseInt(document.getElementById('wb5-ad-dauer')?.value)||a.dauer||30;
     a.notiz=document.getElementById('wb5-ad-notiz')?.innerHTML.trim()||a.notiz||'';
+    a.tags=this._tagGetCurrent('wb5-ad-tags');
     const newStatus=document.getElementById('wb5-ad-status')?.value||a.status||'offen';
     a.status=newStatus; a.erledigt=(newStatus==='erledigt');
     // Thema-Zuordnung ändern
@@ -2822,6 +2931,7 @@ const WB = {
     if (!this.db.wandel) this.db.wandel = [];
     if (!this.db.fokusTypen) this.db.fokusTypen = [];
     // WB4-Migration: text→titel für alle Aufgaben normalisieren
+    if(!this.db.tags) this.db.tags=[];
     const _allAufg = [...(this.db.aufgaben||[]), ...(this.db.themen||[]).flatMap(t=>t.aufgaben||[])];
     _allAufg.forEach(a => {
       if (!a.titel && a.text) a.titel = a.text;
@@ -3106,6 +3216,7 @@ const WB = {
       customEvents: [], wochenpflichten: [], pflichtStatus: {},
       tagesprotokoll: [], wochenMottos: {}, sondertage: [],
       // ── Legacy (leer, für Kompatibilität beim Laden alter Daten) ──
+      tags: [],
       notizen: [], wissensnetzwerk: [], vorhaben: [], ziele: [],
       links: [], quickItems: [], checklistVorlagen: [], mantras: [],
       wandel: [], fokusTypen: [],
