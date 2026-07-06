@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.43</title>
+<title>WorkAssist v1.5.44</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1136,6 +1136,12 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 .rte-content details.collapsible-block {
   border: 1px solid var(--border); border-radius: 6px;
   margin: 6px 0; background: var(--bg);
+  cursor: default;
+}
+.rte-content details.collapsible-block.selected {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+  background: var(--teal-xlight);
 }
 .rte-content details.collapsible-block > summary {
   padding: 6px 10px; cursor: pointer; font-weight: 600;
@@ -1180,7 +1186,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.43</div>
+    <div class="start-version">v1.5.44</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -1945,7 +1951,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.43';
+const APP_VERSION = '1.5.44';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -2358,27 +2364,75 @@ function rteWissenKeydown(e) {
 }
 
 function initWissenRtePaste() {
-  // paste-Event: HTML-Inhalt korrekt einfügen inkl. collapsible-blocks
   const rte = document.getElementById('wissen-notiz-rte');
   if (!rte || rte._pasteInitialized) return;
   rte._pasteInitialized = true;
 
-  rte.addEventListener('paste', function(e) {
-    // Prüfe ob HTML-Daten vorhanden (für collapsible-blocks wichtig)
-    const html = e.clipboardData?.getData('text/html');
-    if (!html || !html.includes('collapsible-block')) return;
-    // Enthält collapsible-block HTML → sicher als HTML einfügen
+  // ── Block-Selektion via Klick auf details-Rand ────────────────────────
+  // Klick auf <details> selbst (nicht auf summary/content) → Block selektieren
+  rte.addEventListener('click', function(e) {
+    const details = e.target.closest?.('details.collapsible-block');
+    if (!details) {
+      // Klick außerhalb → alle Selektionen aufheben
+      rte.querySelectorAll('details.collapsible-block.selected')
+        .forEach(d => d.classList.remove('selected'));
+      return;
+    }
+    // Klick auf summary oder content → normale Interaktion
+    if (e.target.closest('summary') || e.target.closest('.collapsible-content')) return;
+
+    // Klick auf Rand des details → Block selektieren
     e.preventDefault();
+    rte.querySelectorAll('details.collapsible-block.selected')
+      .forEach(d => d.classList.remove('selected'));
+    details.classList.add('selected');
+
+    // Browser-Selection auf den ganzen Block setzen (für Strg+C/X)
+    const range = document.createRange();
+    range.selectNode(details);
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    range.deleteContents();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
 
-    // HTML parsen + bereinigen
+  // ── Strg+X / Strg+C auf selektiertem Block ───────────────────────────
+  rte.addEventListener('keydown', function(e) {
+    const selected = rte.querySelector('details.collapsible-block.selected');
+    if (!selected) return;
+
+    if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+      e.preventDefault();
+      // In Clipboard kopieren (HTML)
+      _clipboardBlock = selected.outerHTML;
+      // Block aus DOM entfernen + Anker-P falls leer davor/danach bereinigen
+      const prev = selected.previousElementSibling;
+      const next = selected.nextElementSibling;
+      selected.remove();
+      // Leere Anker-Ps bereinigen wenn benachbart
+      if (prev?.textContent.trim() === '' || prev?.textContent === '\u200B') {/* behalten */}
+      showToast('Block ausgeschnitten – Strg+V zum Einfügen');
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+      e.preventDefault();
+      _clipboardBlock = selected.outerHTML;
+      showToast('Block kopiert – Strg+V zum Einfügen');
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Delete') {
+      e.preventDefault();
+      selected.remove();
+      showToast('Block gelöscht');
+    }
+  });
+
+  // ── Strg+V: eigenen Clipboard-Block einfügen ─────────────────────────
+  rte.addEventListener('keydown', function(e) {
+    if (!((e.ctrlKey || e.metaKey) && e.key === 'v')) return;
+    if (!_clipboardBlock) return; // Kein Block im internen Clipboard
+    e.preventDefault();
+
     const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-
-    // summary.contentEditable = false restaurieren
+    tmp.innerHTML = _clipboardBlock;
+    // summary.contentEditable + ondblclick restaurieren
     tmp.querySelectorAll('details.collapsible-block summary').forEach(s => {
       s.contentEditable = 'false';
       s.ondblclick = function(ev) {
@@ -2388,17 +2442,63 @@ function initWissenRtePaste() {
       };
     });
 
-    // Nodes einfügen
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+
     const frag = document.createDocumentFragment();
+    // Anker vor + nach dem eingefügten Block
+    const vorP = document.createElement('p');
+    vorP.appendChild(document.createTextNode('\u200B'));
+    const nachP = document.createElement('p');
+    nachP.appendChild(document.createTextNode('\u200B'));
+    frag.appendChild(vorP);
     Array.from(tmp.childNodes).forEach(n => frag.appendChild(n.cloneNode(true)));
+    frag.appendChild(nachP);
     range.insertNode(frag);
 
     // Cursor ans Ende
+    const newRange = document.createRange();
+    newRange.setStart(nachP, 0);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+    showToast('Block eingefügt');
+  });
+
+  // ── paste-Event: HTML-Daten mit collapsible-block ────────────────────
+  rte.addEventListener('paste', function(e) {
+    const html = e.clipboardData?.getData('text/html');
+    if (!html || !html.includes('collapsible-block')) return;
+    e.preventDefault();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    tmp.querySelectorAll('details.collapsible-block summary').forEach(s => {
+      s.contentEditable = 'false';
+      s.ondblclick = function(ev) {
+        ev.preventDefault();
+        const neu = prompt('Abschnittstitel:', s.textContent);
+        if (neu !== null) s.textContent = neu.trim() || s.textContent;
+      };
+    });
+
+    const frag = document.createDocumentFragment();
+    Array.from(tmp.childNodes).forEach(n => frag.appendChild(n.cloneNode(true)));
+    range.insertNode(frag);
     range.collapse(false);
     sel.removeAllRanges();
     sel.addRange(range);
   });
 }
+
+// Interner Block-Clipboard
+let _clipboardBlock = null;
 
 // ── COLLAPSIBLE BLOCKS ────────────────────────────────────────────────────
 function rteWissenMakeCollapsible() {
