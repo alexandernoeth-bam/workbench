@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.44</title>
+<title>WorkAssist v1.5.45</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1144,21 +1144,22 @@ textarea.field-input { resize: vertical; min-height: 70px; }
   background: var(--teal-xlight);
 }
 .rte-content details.collapsible-block > summary {
-  padding: 6px 10px; cursor: pointer; font-weight: 600;
+  padding: 6px 10px; cursor: default; font-weight: 600;
   list-style: none; display: flex; align-items: center; gap: 6px;
-  font-size: 13px; color: var(--text);
-  user-select: none;
-}
-.rte-content details.collapsible-block > summary::before {
-  content: '▶'; font-size: 9px; color: var(--text-dim);
-  transition: transform 0.15s; display: inline-block;
-}
-.rte-content details.collapsible-block[open] > summary::before {
-  transform: rotate(90deg);
+  font-size: 13px; color: var(--text); user-select: none;
 }
 .rte-content details.collapsible-block > summary::-webkit-details-marker { display: none; }
+.rte-content .collapsible-toggle-btn {
+  font-size: 9px; color: var(--text-dim); cursor: pointer;
+  width: 16px; text-align: center; flex-shrink: 0;
+  padding: 2px; border-radius: 3px; transition: background 0.1s;
+}
+.rte-content .collapsible-toggle-btn:hover { background: var(--border); }
+.rte-content .collapsible-title { flex: 1; cursor: default; }
+.rte-content .collapsible-title:hover { color: var(--teal-dark); }
 .rte-content details.collapsible-block .collapsible-content {
   padding: 6px 12px 10px; border-top: 1px solid var(--border);
+  min-height: 32px; /* Immer klickbar auch wenn leer */
 }
 </style>
 </head>
@@ -1186,7 +1187,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.44</div>
+    <div class="start-version">v1.5.45</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -1951,7 +1952,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.44';
+const APP_VERSION = '1.5.45';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -2435,10 +2436,20 @@ function initWissenRtePaste() {
     // summary.contentEditable + ondblclick restaurieren
     tmp.querySelectorAll('details.collapsible-block summary').forEach(s => {
       s.contentEditable = 'false';
-      s.ondblclick = function(ev) {
+      s.addEventListener('click', ev => ev.preventDefault());
+      // Pfeil-Button Funktionalität restaurieren
+      const tb = s.querySelector('.collapsible-toggle-btn');
+      if (tb) tb.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const det = tb.closest('details');
+        if (det) { det.open = !det.open; tb.innerHTML = det.open ? '▼' : '▶'; }
+      });
+      // Titel-Span Doppelklick restaurieren
+      const ts = s.querySelector('.collapsible-title');
+      if (ts) ts.ondblclick = function(ev) {
         ev.preventDefault();
-        const neu = prompt('Abschnittstitel:', s.textContent);
-        if (neu !== null) s.textContent = neu.trim() || s.textContent;
+        const neu = prompt('Abschnittstitel:', ts.textContent);
+        if (neu !== null) ts.textContent = neu.trim() || ts.textContent;
       };
     });
 
@@ -2481,10 +2492,20 @@ function initWissenRtePaste() {
     tmp.innerHTML = html;
     tmp.querySelectorAll('details.collapsible-block summary').forEach(s => {
       s.contentEditable = 'false';
-      s.ondblclick = function(ev) {
+      s.addEventListener('click', ev => ev.preventDefault());
+      // Pfeil-Button Funktionalität restaurieren
+      const tb = s.querySelector('.collapsible-toggle-btn');
+      if (tb) tb.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const det = tb.closest('details');
+        if (det) { det.open = !det.open; tb.innerHTML = det.open ? '▼' : '▶'; }
+      });
+      // Titel-Span Doppelklick restaurieren
+      const ts = s.querySelector('.collapsible-title');
+      if (ts) ts.ondblclick = function(ev) {
         ev.preventDefault();
-        const neu = prompt('Abschnittstitel:', s.textContent);
-        if (neu !== null) s.textContent = neu.trim() || s.textContent;
+        const neu = prompt('Abschnittstitel:', ts.textContent);
+        if (neu !== null) ts.textContent = neu.trim() || ts.textContent;
       };
     });
 
@@ -2525,15 +2546,36 @@ function rteWissenMakeCollapsible() {
   details.className = 'collapsible-block';
   details.open = true;
 
-  // Summary: NICHT contenteditable – Doppelklick zum Umbenennen
+  // Summary: NICHT contenteditable, KEIN natives Toggle über summary-Klick
   const summary = document.createElement('summary');
   summary.contentEditable = 'false';
-  summary.textContent = blockEls[0].textContent.trim() || 'Abschnitt';
-  summary.ondblclick = function(e) {
+  // Klick auf summary → Toggle verhindern (natives <details>-Verhalten)
+  summary.addEventListener('click', e => e.preventDefault());
+
+  // Pfeil-Button für Toggle (links im summary)
+  const toggleBtn = document.createElement('span');
+  toggleBtn.className = 'collapsible-toggle-btn';
+  toggleBtn.innerHTML = '▶';
+  toggleBtn.title = 'Auf-/Zuklappen';
+  toggleBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const det = toggleBtn.closest('details');
+    if (det) { det.open = !det.open; toggleBtn.innerHTML = det.open ? '▼' : '▶'; }
+  });
+
+  // Titel-Text
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'collapsible-title';
+  titleSpan.textContent = blockEls[0].textContent.trim() || 'Abschnitt';
+  titleSpan.title = 'Doppelklick zum Umbenennen';
+  titleSpan.ondblclick = function(e) {
     e.preventDefault();
-    const neu = prompt('Abschnittstitel:', summary.textContent);
-    if (neu !== null) summary.textContent = neu.trim() || summary.textContent;
+    const neu = prompt('Abschnittstitel:', titleSpan.textContent);
+    if (neu !== null) titleSpan.textContent = neu.trim() || titleSpan.textContent;
   };
+
+  summary.appendChild(toggleBtn);
+  summary.appendChild(titleSpan);
 
   // Content: editierbar, Blocks 1..n
   const content = document.createElement('div');
@@ -2542,8 +2584,12 @@ function rteWissenMakeCollapsible() {
   for (let i = 1; i < blockEls.length; i++) {
     content.appendChild(blockEls[i].cloneNode(true));
   }
-  // Mindestens einen leeren Absatz im Content
-  if (!content.textContent.trim()) content.appendChild(document.createElement('p'));
+  // Mindestens einen echten Absatz im Content damit Cursor hineinkommt
+  if (content.children.length === 0) {
+    const emptyP = document.createElement('p');
+    emptyP.innerHTML = '<br>'; // <br> statt ZWS – Browser fokussiert das zuverlässig
+    content.appendChild(emptyP);
+  }
 
   details.appendChild(summary);
   details.appendChild(content);
