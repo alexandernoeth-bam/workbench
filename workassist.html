@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.46</title>
+<title>WorkAssist v1.5.45</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1132,35 +1132,35 @@ textarea.field-input { resize: vertical; min-height: 70px; }
   height: 100vh; border-radius: 0;
 }
 
-/* ── COLLAPSIBLE BLOCKS im RTE (cb-block) ───────────────────────────────── */
-.cb-block {
+/* ── COLLAPSIBLE BLOCKS im RTE ─────────────────────────────────────────── */
+.rte-content details.collapsible-block {
   border: 1px solid var(--border); border-radius: 6px;
   margin: 6px 0; background: var(--bg);
+  cursor: default;
 }
-.cb-block.cb-selected {
-  outline: 2px solid var(--teal); outline-offset: 1px;
+.rte-content details.collapsible-block.selected {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
   background: var(--teal-xlight);
 }
-.cb-header {
-  display: flex; align-items: center; gap: 6px;
-  padding: 7px 10px; cursor: pointer; user-select: none;
-  font-weight: 600; font-size: 13px; color: var(--text);
-  border-radius: 6px 6px 0 0;
+.rte-content details.collapsible-block > summary {
+  padding: 6px 10px; cursor: default; font-weight: 600;
+  list-style: none; display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--text); user-select: none;
 }
-.cb-block[data-open="true"] .cb-header { border-radius: 6px 6px 0 0; }
-.cb-header:hover { background: rgba(0,137,123,0.06); }
-.cb-chevron {
-  font-size: 10px; color: var(--text-dim); flex-shrink: 0;
-  width: 14px; text-align: center; display: inline-block;
-  transition: transform 0.15s;
+.rte-content details.collapsible-block > summary::-webkit-details-marker { display: none; }
+.rte-content .collapsible-toggle-btn {
+  font-size: 9px; color: var(--text-dim); cursor: pointer;
+  width: 16px; text-align: center; flex-shrink: 0;
+  padding: 2px; border-radius: 3px; transition: background 0.1s;
 }
-.cb-block[data-open="false"] .cb-chevron { transform: rotate(-90deg); }
-.cb-title { flex: 1; }
-.cb-content {
+.rte-content .collapsible-toggle-btn:hover { background: var(--border); }
+.rte-content .collapsible-title { flex: 1; cursor: default; }
+.rte-content .collapsible-title:hover { color: var(--teal-dark); }
+.rte-content details.collapsible-block .collapsible-content {
   padding: 6px 12px 10px; border-top: 1px solid var(--border);
-  min-height: 36px; outline: none;
+  min-height: 32px; /* Immer klickbar auch wenn leer */
 }
-.cb-block[data-open="false"] .cb-content { display: none; }
 </style>
 </head>
 <body>
@@ -1187,7 +1187,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.46</div>
+    <div class="start-version">v1.5.45</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -1952,7 +1952,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.46';
+const APP_VERSION = '1.5.45';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -2306,174 +2306,62 @@ function toggleWissenVollbild() {
 // ── Ende WISSEN VOLLBILD ──────────────────────────────────────────────────
 
 function rteWissenKeydown(e) {
+  // Nur Enter-Tasten behandeln
   if (e.key !== 'Enter') return;
+
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
+
+  // Prüfen ob Cursor in einem collapsible-block ist
   let node = range.commonAncestorContainer;
   if (node.nodeType === 3) node = node.parentElement;
 
-  // In cb-content? → Enter korrekt handhaben
-  const inContent = node.closest?.('.cb-content');
-  if (!inContent) return;
+  // In summary? → Enter/Shift+Enter beides verhindern (summary nicht editierbar)
+  const inSummary = node.closest?.('summary');
+  if (inSummary) { e.preventDefault(); return; }
+
+  // In collapsible-content?
+  const inContent = node.closest?.('.collapsible-content');
+  if (!inContent) return; // Normales Verhalten außerhalb
 
   e.preventDefault();
+
   if (e.shiftKey) {
-    // Shift+Enter → <br>
+    // Shift+Enter → <br> einfügen (Zeilenumbruch ohne neuen Block)
     const br = document.createElement('br');
     range.deleteContents();
     range.insertNode(br);
-    const nr = document.createRange();
-    nr.setStartAfter(br); nr.collapse(true);
-    sel.removeAllRanges(); sel.addRange(nr);
+    // Cursor nach br setzen
+    const newRange = document.createRange();
+    newRange.setStartAfter(br);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
   } else {
-    // Enter → neuer <p>
+    // Enter → neuen <p> im collapsible-content einfügen
     const p = document.createElement('p');
-    p.innerHTML = '<br>';
+    p.appendChild(document.createTextNode('\u200B'));
     range.deleteContents();
-    let cur = range.commonAncestorContainer;
-    if (cur.nodeType === 3) cur = cur.parentElement;
-    while (cur.parentElement !== inContent) {
-      cur = cur.parentElement;
-      if (!cur || cur === inContent) break;
+    // Füge p nach aktuellem Block ein
+    let currentBlock = range.commonAncestorContainer;
+    if (currentBlock.nodeType === 3) currentBlock = currentBlock.parentElement;
+    // Finde direktes Kind von collapsible-content
+    while (currentBlock.parentElement !== inContent) {
+      currentBlock = currentBlock.parentElement;
+      if (!currentBlock || currentBlock === inContent) break;
     }
-    if (cur && cur !== inContent) inContent.insertBefore(p, cur.nextSibling);
-    else inContent.appendChild(p);
-    const nr = document.createRange();
-    nr.setStart(p, 0); nr.collapse(true);
-    sel.removeAllRanges(); sel.addRange(nr);
-  }
-}
-
-// ── COLLAPSIBLE BLOCKS (cb-block) ─────────────────────────────────────────
-let _clipboardBlock = null;
-
-function cbMakeBlock(title, contentNodes) {
-  // Baut ein cb-block div-Element
-  const block = document.createElement('div');
-  block.className = 'cb-block';
-  block.setAttribute('data-open', 'true');
-  block.setAttribute('contenteditable', 'false');
-
-  // Header (nicht editierbar, Klick = Toggle)
-  const header = document.createElement('div');
-  header.className = 'cb-header';
-
-  const chevron = document.createElement('span');
-  chevron.className = 'cb-chevron';
-  chevron.textContent = '▼';
-
-  const titleSpan = document.createElement('span');
-  titleSpan.className = 'cb-title';
-  titleSpan.textContent = title || 'Abschnitt';
-
-  header.appendChild(chevron);
-  header.appendChild(titleSpan);
-  header.addEventListener('click', function(e) {
-    e.stopPropagation();
-    // Doppelklick → umbenennen
-    if (e.detail === 2) {
-      const neu = prompt('Abschnittstitel:', titleSpan.textContent);
-      if (neu !== null) titleSpan.textContent = neu.trim() || titleSpan.textContent;
-      return;
+    if (currentBlock && currentBlock !== inContent) {
+      inContent.insertBefore(p, currentBlock.nextSibling);
+    } else {
+      inContent.appendChild(p);
     }
-    // Einfachklick → toggle
-    const isOpen = block.getAttribute('data-open') === 'true';
-    block.setAttribute('data-open', isOpen ? 'false' : 'true');
-    chevron.textContent = isOpen ? '▶' : '▼';
-  });
-
-  // Content (editierbar)
-  const content = document.createElement('div');
-  content.className = 'cb-content';
-  content.contentEditable = 'true';
-  if (contentNodes && contentNodes.length > 0) {
-    contentNodes.forEach(n => content.appendChild(n.cloneNode(true)));
-  } else {
-    const p = document.createElement('p');
-    p.innerHTML = '<br>';
-    content.appendChild(p);
+    const newRange = document.createRange();
+    newRange.setStart(p, 0);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
   }
-
-  block.appendChild(header);
-  block.appendChild(content);
-  return block;
-}
-
-function rteWissenMakeCollapsible() {
-  const rte = document.getElementById('wissen-notiz-rte');
-  if (!rte) return;
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || !sel.toString().trim()) {
-    showToast('Bitte zuerst Text markieren'); return;
-  }
-  const range = sel.getRangeAt(0);
-
-  // Direkte Kind-Elemente des RTE im markierten Bereich
-  const blockEls = Array.from(rte.childNodes).filter(n =>
-    n.nodeType === 1 && range.intersectsNode(n)
-  );
-  if (blockEls.length === 0) { showToast('Keine Textblöcke gefunden'); return; }
-
-  const title = blockEls[0].textContent.trim() || 'Abschnitt';
-  const contentNodes = blockEls.slice(1);
-
-  const block = cbMakeBlock(title, contentNodes);
-
-  // Anker vor dem Block wenn erster Eintrag
-  const ref = blockEls[0];
-  if (!ref.previousElementSibling) {
-    const vor = document.createElement('p');
-    vor.innerHTML = '<br>';
-    rte.insertBefore(vor, ref);
-  }
-
-  // Block einfügen
-  rte.insertBefore(block, ref);
-
-  // Anker nach dem Block
-  const nach = document.createElement('p');
-  nach.innerHTML = '<br>';
-  rte.insertBefore(nach, ref);
-
-  // Alte Elemente entfernen
-  blockEls.forEach(el => el.remove());
-
-  // Cursor in Content setzen
-  const firstP = block.querySelector('.cb-content p');
-  if (firstP) {
-    const nr = document.createRange();
-    nr.setStart(firstP, 0); nr.collapse(true);
-    sel.removeAllRanges(); sel.addRange(nr);
-  }
-  showToast('✓ Einklappbarer Block – Klick: auf/zu | Doppelklick: Umbenennen');
-}
-
-function rteWissenUnmakeCollapsible() {
-  const rte = document.getElementById('wissen-notiz-rte');
-  if (!rte) return;
-
-  // Selektierten Block oder Block unter Cursor finden
-  const selected = rte.querySelector('.cb-block.cb-selected');
-  const sel = window.getSelection();
-  let block = selected;
-  if (!block && sel && sel.rangeCount > 0) {
-    let node = sel.getRangeAt(0).commonAncestorContainer;
-    if (node.nodeType === 3) node = node.parentElement;
-    block = node.closest?.('.cb-block');
-  }
-  if (!block) { showToast('Kein Block ausgewählt'); return; }
-
-  const titleText = block.querySelector('.cb-title')?.textContent || '';
-  const content = block.querySelector('.cb-content');
-  const frag = document.createDocumentFragment();
-  const titelP = document.createElement('p');
-  titelP.textContent = titleText;
-  frag.appendChild(titelP);
-  if (content) Array.from(content.childNodes).forEach(c => frag.appendChild(c.cloneNode(true)));
-  block.parentElement.insertBefore(frag, block);
-  block.remove();
-  showToast('Block aufgelöst');
 }
 
 function initWissenRtePaste() {
@@ -2481,94 +2369,292 @@ function initWissenRtePaste() {
   if (!rte || rte._pasteInitialized) return;
   rte._pasteInitialized = true;
 
-  // Klick auf cb-block Rand → selektieren (nicht Header/Content)
+  // ── Block-Selektion via Klick auf details-Rand ────────────────────────
+  // Klick auf <details> selbst (nicht auf summary/content) → Block selektieren
   rte.addEventListener('click', function(e) {
-    const block = e.target.closest?.('.cb-block');
-    // Alle Selektionen aufheben
-    rte.querySelectorAll('.cb-block.cb-selected').forEach(b => b.classList.remove('cb-selected'));
-    if (!block) return;
-    // Klick auf Header oder Content → nicht selektieren (normales Verhalten)
-    if (e.target.closest('.cb-header') || e.target.closest('.cb-content')) return;
-    // Klick auf Rand → Block selektieren
-    block.classList.add('cb-selected');
+    const details = e.target.closest?.('details.collapsible-block');
+    if (!details) {
+      // Klick außerhalb → alle Selektionen aufheben
+      rte.querySelectorAll('details.collapsible-block.selected')
+        .forEach(d => d.classList.remove('selected'));
+      return;
+    }
+    // Klick auf summary oder content → normale Interaktion
+    if (e.target.closest('summary') || e.target.closest('.collapsible-content')) return;
+
+    // Klick auf Rand des details → Block selektieren
+    e.preventDefault();
+    rte.querySelectorAll('details.collapsible-block.selected')
+      .forEach(d => d.classList.remove('selected'));
+    details.classList.add('selected');
+
+    // Browser-Selection auf den ganzen Block setzen (für Strg+C/X)
+    const range = document.createRange();
+    range.selectNode(details);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
   });
 
-  // Strg+X / Strg+C / Strg+V / Strg+Delete
+  // ── Strg+X / Strg+C auf selektiertem Block ───────────────────────────
   rte.addEventListener('keydown', function(e) {
-    if (!e.ctrlKey && !e.metaKey) return;
-    const selected = rte.querySelector('.cb-block.cb-selected');
+    const selected = rte.querySelector('details.collapsible-block.selected');
+    if (!selected) return;
 
-    if (e.key === 'x' && selected) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
       e.preventDefault();
+      // In Clipboard kopieren (HTML)
       _clipboardBlock = selected.outerHTML;
+      // Block aus DOM entfernen + Anker-P falls leer davor/danach bereinigen
+      const prev = selected.previousElementSibling;
+      const next = selected.nextElementSibling;
       selected.remove();
+      // Leere Anker-Ps bereinigen wenn benachbart
+      if (prev?.textContent.trim() === '' || prev?.textContent === '\u200B') {/* behalten */}
       showToast('Block ausgeschnitten – Strg+V zum Einfügen');
     }
-    if (e.key === 'c' && selected) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
       e.preventDefault();
       _clipboardBlock = selected.outerHTML;
       showToast('Block kopiert – Strg+V zum Einfügen');
     }
-    if (e.key === 'Delete' && selected) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Delete') {
       e.preventDefault();
       selected.remove();
       showToast('Block gelöscht');
     }
-    if (e.key === 'v' && _clipboardBlock) {
-      e.preventDefault();
-      const tmp = document.createElement('div');
-      tmp.innerHTML = _clipboardBlock;
-      const newBlock = tmp.firstElementChild;
-      if (!newBlock) return;
-      // Event-Listener restaurieren
-      cbRestoreBlock(newBlock);
-      const sel2 = window.getSelection();
-      const range2 = sel2?.rangeCount > 0 ? sel2.getRangeAt(0) : null;
-      if (range2) {
-        range2.deleteContents();
-        const vor = document.createElement('p'); vor.innerHTML = '<br>';
-        const nach = document.createElement('p'); nach.innerHTML = '<br>';
-        range2.insertNode(nach);
-        range2.insertNode(newBlock);
-        range2.insertNode(vor);
-        const nr = document.createRange();
-        nr.setStart(nach, 0); nr.collapse(true);
-        sel2.removeAllRanges(); sel2.addRange(nr);
-      }
-      showToast('Block eingefügt');
-    }
+  });
+
+  // ── Strg+V: eigenen Clipboard-Block einfügen ─────────────────────────
+  rte.addEventListener('keydown', function(e) {
+    if (!((e.ctrlKey || e.metaKey) && e.key === 'v')) return;
+    if (!_clipboardBlock) return; // Kein Block im internen Clipboard
+    e.preventDefault();
+
+    const tmp = document.createElement('div');
+    tmp.innerHTML = _clipboardBlock;
+    // summary.contentEditable + ondblclick restaurieren
+    tmp.querySelectorAll('details.collapsible-block summary').forEach(s => {
+      s.contentEditable = 'false';
+      s.addEventListener('click', ev => ev.preventDefault());
+      // Pfeil-Button Funktionalität restaurieren
+      const tb = s.querySelector('.collapsible-toggle-btn');
+      if (tb) tb.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const det = tb.closest('details');
+        if (det) { det.open = !det.open; tb.innerHTML = det.open ? '▼' : '▶'; }
+      });
+      // Titel-Span Doppelklick restaurieren
+      const ts = s.querySelector('.collapsible-title');
+      if (ts) ts.ondblclick = function(ev) {
+        ev.preventDefault();
+        const neu = prompt('Abschnittstitel:', ts.textContent);
+        if (neu !== null) ts.textContent = neu.trim() || ts.textContent;
+      };
+    });
+
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+
+    const frag = document.createDocumentFragment();
+    // Anker vor + nach dem eingefügten Block
+    const vorP = document.createElement('p');
+    vorP.appendChild(document.createTextNode('\u200B'));
+    const nachP = document.createElement('p');
+    nachP.appendChild(document.createTextNode('\u200B'));
+    frag.appendChild(vorP);
+    Array.from(tmp.childNodes).forEach(n => frag.appendChild(n.cloneNode(true)));
+    frag.appendChild(nachP);
+    range.insertNode(frag);
+
+    // Cursor ans Ende
+    const newRange = document.createRange();
+    newRange.setStart(nachP, 0);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+    showToast('Block eingefügt');
+  });
+
+  // ── paste-Event: HTML-Daten mit collapsible-block ────────────────────
+  rte.addEventListener('paste', function(e) {
+    const html = e.clipboardData?.getData('text/html');
+    if (!html || !html.includes('collapsible-block')) return;
+    e.preventDefault();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    tmp.querySelectorAll('details.collapsible-block summary').forEach(s => {
+      s.contentEditable = 'false';
+      s.addEventListener('click', ev => ev.preventDefault());
+      // Pfeil-Button Funktionalität restaurieren
+      const tb = s.querySelector('.collapsible-toggle-btn');
+      if (tb) tb.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const det = tb.closest('details');
+        if (det) { det.open = !det.open; tb.innerHTML = det.open ? '▼' : '▶'; }
+      });
+      // Titel-Span Doppelklick restaurieren
+      const ts = s.querySelector('.collapsible-title');
+      if (ts) ts.ondblclick = function(ev) {
+        ev.preventDefault();
+        const neu = prompt('Abschnittstitel:', ts.textContent);
+        if (neu !== null) ts.textContent = neu.trim() || ts.textContent;
+      };
+    });
+
+    const frag = document.createDocumentFragment();
+    Array.from(tmp.childNodes).forEach(n => frag.appendChild(n.cloneNode(true)));
+    range.insertNode(frag);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
   });
 }
 
-function cbRestoreBlock(block) {
-  // Header-Click-Listener nach paste/load restaurieren
-  const header = block.querySelector('.cb-header');
-  const chevron = block.querySelector('.cb-chevron');
-  const titleSpan = block.querySelector('.cb-title');
-  if (!header) return;
-  // Alten Listener entfernen (clone trick)
-  const newHeader = header.cloneNode(true);
-  header.parentNode.replaceChild(newHeader, header);
-  newHeader.addEventListener('click', function(e) {
-    e.stopPropagation();
-    if (e.detail === 2) {
-      const ts = newHeader.querySelector('.cb-title');
-      const neu = prompt('Abschnittstitel:', ts?.textContent || '');
-      if (neu !== null && ts) ts.textContent = neu.trim() || ts.textContent;
-      return;
+// Interner Block-Clipboard
+let _clipboardBlock = null;
+
+// ── COLLAPSIBLE BLOCKS ────────────────────────────────────────────────────
+function rteWissenMakeCollapsible() {
+  const rte = document.getElementById('wissen-notiz-rte');
+  if (!rte) return;
+
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !sel.toString().trim()) {
+    showToast('Bitte zuerst Text markieren'); return;
+  }
+  const range = sel.getRangeAt(0);
+
+  // Alle betroffenen direkten Block-Kinder des RTE sammeln
+  const blockEls = [];
+  Array.from(rte.childNodes).forEach(node => {
+    if (node.nodeType === 1 && range.intersectsNode(node)) {
+      blockEls.push(node);
     }
-    const isOpen = block.getAttribute('data-open') === 'true';
-    block.setAttribute('data-open', isOpen ? 'false' : 'true');
-    const chev = newHeader.querySelector('.cb-chevron');
-    if (chev) chev.textContent = isOpen ? '▶' : '▼';
   });
-  // Content editierbar setzen
-  const content = block.querySelector('.cb-content');
-  if (content) content.contentEditable = 'true';
+  if (blockEls.length === 0) { showToast('Keine Textblöcke gefunden'); return; }
+
+  // Details-Element bauen
+  const details = document.createElement('details');
+  details.className = 'collapsible-block';
+  details.open = true;
+
+  // Summary: NICHT contenteditable, KEIN natives Toggle über summary-Klick
+  const summary = document.createElement('summary');
+  summary.contentEditable = 'false';
+  // Klick auf summary → Toggle verhindern (natives <details>-Verhalten)
+  summary.addEventListener('click', e => e.preventDefault());
+
+  // Pfeil-Button für Toggle (links im summary)
+  const toggleBtn = document.createElement('span');
+  toggleBtn.className = 'collapsible-toggle-btn';
+  toggleBtn.innerHTML = '▶';
+  toggleBtn.title = 'Auf-/Zuklappen';
+  toggleBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const det = toggleBtn.closest('details');
+    if (det) { det.open = !det.open; toggleBtn.innerHTML = det.open ? '▼' : '▶'; }
+  });
+
+  // Titel-Text
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'collapsible-title';
+  titleSpan.textContent = blockEls[0].textContent.trim() || 'Abschnitt';
+  titleSpan.title = 'Doppelklick zum Umbenennen';
+  titleSpan.ondblclick = function(e) {
+    e.preventDefault();
+    const neu = prompt('Abschnittstitel:', titleSpan.textContent);
+    if (neu !== null) titleSpan.textContent = neu.trim() || titleSpan.textContent;
+  };
+
+  summary.appendChild(toggleBtn);
+  summary.appendChild(titleSpan);
+
+  // Content: editierbar, Blocks 1..n
+  const content = document.createElement('div');
+  content.className = 'collapsible-content';
+  content.contentEditable = 'true';
+  for (let i = 1; i < blockEls.length; i++) {
+    content.appendChild(blockEls[i].cloneNode(true));
+  }
+  // Mindestens einen echten Absatz im Content damit Cursor hineinkommt
+  if (content.children.length === 0) {
+    const emptyP = document.createElement('p');
+    emptyP.innerHTML = '<br>'; // <br> statt ZWS – Browser fokussiert das zuverlässig
+    content.appendChild(emptyP);
+  }
+
+  details.appendChild(summary);
+  details.appendChild(content);
+
+  // Cursor-Anker: leerer Absatz VOR dem Block wenn erster Eintrag
+  const vorAnker = document.createElement('p');
+  vorAnker.appendChild(document.createTextNode('\u200B'));
+
+  // Cursor-Anker NACH dem Block
+  const anker = document.createElement('p');
+  anker.appendChild(document.createTextNode('\u200B'));
+
+  // Ersetze im RTE
+  const ref = blockEls[0];
+  const istErster = ref.previousElementSibling === null;
+  if (istErster) rte.insertBefore(vorAnker, ref); // Anker VOR Block
+  rte.insertBefore(details, ref);
+  rte.insertBefore(anker, ref); // Anker NACH Block
+  blockEls.forEach(el => el.remove());
+
+  // Cursor auf Anker setzen
+  const newRange = document.createRange();
+  newRange.setStart(anker, 0);
+  newRange.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(newRange);
+
+  showToast('✓ Einklappbarer Block erstellt – Doppelklick auf Titel zum Umbenennen');
+}
+
+function rteWissenUnmakeCollapsible() {
+  // Block auflösen: Details → normale Absätze
+  const rte = document.getElementById('wissen-notiz-rte');
+  if (!rte) return;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+
+  // Nächsten details-Block vom Cursor aufwärts finden
+  let node = sel.getRangeAt(0).commonAncestorContainer;
+  while (node && node !== rte) {
+    if (node.tagName === 'DETAILS' && node.classList.contains('collapsible-block')) break;
+    node = node.parentElement;
+  }
+  if (!node || node === rte) { showToast('Cursor nicht in einem einklappbaren Block'); return; }
+
+  // Inhalt extrahieren
+  const summary = node.querySelector('summary');
+  const contentDiv = node.querySelector('.collapsible-content');
+  const frag = document.createDocumentFragment();
+
+  // Titel als normalen Absatz
+  const titelP = document.createElement('p');
+  titelP.textContent = summary?.textContent || '';
+  frag.appendChild(titelP);
+
+  // Inhalt als normale Absätze
+  if (contentDiv) {
+    Array.from(contentDiv.childNodes).forEach(c => frag.appendChild(c.cloneNode(true)));
+  }
+
+  node.parentElement.insertBefore(frag, node);
+  node.remove();
+  showToast('Block aufgelöst');
 }
 // ── Ende COLLAPSIBLE BLOCKS ───────────────────────────────────────────────
-
-
 
 // ── SIDEBAR TOGGLE ────────────────────────────────────────────────────────
 function toggleSidebar() {
@@ -2829,8 +2915,15 @@ function openWissenModal(id) {
   document.getElementById('wissen-url').value     = w ? (w.url||'') : '';
   document.getElementById('wissen-tags').value    = w ? (w.tags||[]).join(', ') : '';
   document.getElementById('wissen-notiz-rte').innerHTML = w ? rteLinksErkennen(w.notiz||'') : '';
-  // cb-blocks: Header-Listener nach Laden restaurieren
-  document.querySelectorAll('#wissen-notiz-rte .cb-block').forEach(b => cbRestoreBlock(b));
+  // collapsible-blocks: summary.contentEditable + ondblclick restaurieren
+  document.querySelectorAll('#wissen-notiz-rte details.collapsible-block summary').forEach(s => {
+    s.contentEditable = 'false';
+    s.ondblclick = function(ev) {
+      ev.preventDefault();
+      const neu = prompt('Abschnittstitel:', s.textContent);
+      if (neu !== null) s.textContent = neu.trim() || s.textContent;
+    };
+  });
   // Paste-Handler initialisieren (einmalig)
   initWissenRtePaste();
 
