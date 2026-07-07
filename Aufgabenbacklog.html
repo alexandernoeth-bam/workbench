@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aufgabenbacklog v1.1.4</title>
+<title>Aufgabenbacklog v1.1.5</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -482,7 +482,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.1.4</div>
+    <div class="start-version">v1.1.5</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -538,7 +538,7 @@ textarea.form-control.vorgaben-textarea {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <div class="topbar-title">
       Aufgabenbacklog
-      <span class="version-pill">v1.1.4</span>
+      <span class="version-pill">v1.1.5</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -900,7 +900,7 @@ textarea.form-control.vorgaben-textarea {
 /* ═══════════════════════════════════════════════════════
    KONSTANTEN & GLOBALE VARIABLEN
 ═══════════════════════════════════════════════════════ */
-const APP_VERSION  = '1.1.4';
+const APP_VERSION  = '1.1.5';
 const LS_KEY       = 'aufgabenbacklog_db';
 const DB_FILENAME  = 'Backlog.json';
 
@@ -1942,7 +1942,9 @@ function setBulkTyp(typ) {
 
 function bulkZeileParsieren(zeile) {
   // Format: Titel, Dauer, Tag, Beschreibung, Datum (TT.MM.JJJJ)
+  // Felder sind optional — leere Felder (auch nur Leerzeichen) werden als leer behandelt
   if (!zeile.trim()) return null;
+
   const teile = zeile.split(',').map(t => t.trim());
   const titel = teile[0] || '';
   if (!titel) return { fehler: 'Kein Titel', zeile };
@@ -1957,24 +1959,31 @@ function bulkZeileParsieren(zeile) {
     else { return { fehler: 'Ungültige Dauer: "' + dauerRaw + '"', zeile }; }
   } else { dauerDefault = true; }
 
-  // Tag (Feld 2) — leer = null
+  // Tag (Feld 2) — leer oder nur Leerzeichen = null
   const tagRaw = teile.length > 2 ? teile[2] : '';
   const tag = tagRaw || null;
 
   // Beschreibung (Feld 3) — leer = ''
   const beschreibung = teile.length > 3 ? teile[3] : '';
 
-  // Datum (Feld 4) — leer = null, Format TT.MM.JJJJ
+  // Datum: letztes Feld prüfen ob es TT.MM.JJJJ ist
+  // Damit funktioniert auch: Titel, Dauer, , Datum (ohne Beschreibung)
   let datum = null;
-  const datumRaw = teile.length > 4 ? teile[4] : '';
+  const datumMuster = /^\d{2}\.\d{2}\.\d{4}$/;
+  // Prüfe Feld 4 (normal) und Feld 3 (wenn Beschreibung fehlt)
+  let datumRaw = '';
+  if (teile.length > 4 && datumMuster.test(teile[4])) {
+    datumRaw = teile[4];
+  } else if (teile.length > 3 && datumMuster.test(teile[3])) {
+    datumRaw = teile[3];
+  } else if (teile.length > 4 && teile[4]) {
+    return { fehler: 'Ungültiges Datum: "' + teile[4] + '" (Format: TT.MM.JJJJ)', zeile };
+  } else if (teile.length > 3 && teile[3] && !beschreibung && datumMuster.test(teile[3]) === false && teile[3].includes('.')) {
+    return { fehler: 'Ungültiges Datum: "' + teile[3] + '" (Format: TT.MM.JJJJ)', zeile };
+  }
   if (datumRaw) {
-    if (/^\d{2}\.\d{2}\.\d{4}$/.test(datumRaw)) {
-      // TT.MM.JJJJ → JJJJ-MM-TT (internes Format)
-      const [dd, mm, yyyy] = datumRaw.split('.');
-      datum = yyyy + '-' + mm + '-' + dd;
-    } else {
-      return { fehler: 'Ungültiges Datum: "' + datumRaw + '" (Format: TT.MM.JJJJ)', zeile };
-    }
+    const [dd, mm, yyyy] = datumRaw.split('.');
+    datum = yyyy + '-' + mm + '-' + dd;
   }
 
   return { ok: true, titel, dauer, dauerDefault, tag, beschreibung, datum };
