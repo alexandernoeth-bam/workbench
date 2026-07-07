@@ -1,5 +1,5 @@
-// WorkBench Service Worker v5.39.2 · Build 20260613-1000
-const BUILD = '20260613-1000';
+// Aufgabenbacklog Service Worker v1.1.2 · Build 20260707-1322
+const BUILD = '20260707-1322';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -17,13 +17,12 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Notification-Click
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(clients.openWindow('/'));
+  e.waitUntil(clients.openWindow('/workbench/Aufgabenbacklog.html'));
 });
 
-// Fetch: Network-first, kein Cache
+// Network-first, kein Cache (Backlog.json soll immer aktuell sein)
 self.addEventListener('fetch', e => {
   e.respondWith(
     fetch(e.request).catch(() => caches.match(e.request))
