@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aufgabenbacklog v1.1.5</title>
+<title>Aufgabenbacklog v1.1.6</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -467,6 +467,45 @@ textarea.form-control.vorgaben-textarea {
 .bulk-typ-label { font-size: 0.76rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .bulk-type-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: 1; max-width: 220px; }
 
+
+/* ══════════════════════════════════════
+   GRUPPIERUNG
+══════════════════════════════════════ */
+.group-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px 5px;
+  font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--p400);
+  border-bottom: 1px solid var(--border);
+  background: var(--p50);
+}
+.group-count {
+  margin-left: auto; font-size: 0.67rem; font-weight: 600;
+  color: var(--muted); text-transform: none; letter-spacing: 0;
+}
+.group-select {
+  padding: 5px 10px; border-radius: 99px;
+  border: 1px solid var(--p300); background: var(--p50);
+  color: var(--p600); font-size: 0.74rem; font-weight: 600;
+  cursor: pointer; font-family: inherit; outline: none;
+  margin-left: auto;
+}
+
+/* ══════════════════════════════════════
+   AUTO-LÖSCHEN
+══════════════════════════════════════ */
+.delete-countdown {
+  font-size: 0.62rem; color: var(--danger); font-weight: 600;
+  background: #fde8e8; padding: 1px 6px; border-radius: 99px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.autodelete-banner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; background: #fff3e0;
+  border-bottom: 1px solid #ffe0b2;
+  font-size: 0.73rem; color: var(--warn);
+}
+
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 </style>
@@ -482,7 +521,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.1.5</div>
+    <div class="start-version">v1.1.6</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -538,7 +577,7 @@ textarea.form-control.vorgaben-textarea {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <div class="topbar-title">
       Aufgabenbacklog
-      <span class="version-pill">v1.1.5</span>
+      <span class="version-pill">v1.1.6</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -570,6 +609,12 @@ textarea.form-control.vorgaben-textarea {
       </button>
       <select id="tag-filter-select" class="filter-tab" style="border-radius:99px;padding:5px 10px;cursor:pointer;" onchange="setTagFilter(this.value)">
         <option value="">🏷 Alle Tags</option>
+      </select>
+      <select id="group-select" class="group-select" onchange="setGruppierung(this.value)">
+        <option value="">⊞ Keine</option>
+        <option value="datum">📅 Datum</option>
+        <option value="tag">🏷 Tag</option>
+        <option value="typ">🏠 Typ</option>
       </select>
     </div>
     <div class="task-list" id="task-list">
@@ -900,7 +945,7 @@ textarea.form-control.vorgaben-textarea {
 /* ═══════════════════════════════════════════════════════
    KONSTANTEN & GLOBALE VARIABLEN
 ═══════════════════════════════════════════════════════ */
-const APP_VERSION  = '1.1.5';
+const APP_VERSION  = '1.1.6';
 const LS_KEY       = 'aufgabenbacklog_db';
 const DB_FILENAME  = 'Backlog.json';
 
@@ -910,6 +955,29 @@ let pendingChanges = false;
 let currentFilter  = 'alle';
 let currentTyp     = 'privat';
 let currentTagFilter = '';
+let currentGruppierung = '';
+
+function setGruppierung(wert) {
+  currentGruppierung = wert;
+  renderListe();
+}
+
+function autoLoeschenErledigt() {
+  const jetzt = Date.now();
+  const limit48h = 48 * 60 * 60 * 1000;
+  const vorher = DB.aufgaben.length;
+  DB.aufgaben = DB.aufgaben.filter(a => {
+    if (!a.erledigt) return true;
+    if (!a.geaendert) return true;
+    const geaendertMs = new Date(a.geaendert.replace(' ', 'T')).getTime();
+    return (jetzt - geaendertMs) < limit48h;
+  });
+  const geloescht = vorher - DB.aufgaben.length;
+  if (geloescht > 0) {
+    saveDB();
+    console.log('Auto-Löschen: ' + geloescht + ' erledigte Aufgabe(n) entfernt (> 48h)');
+  }
+}
 
 function aktualisiereTagVorschlaege() {
   const tags = [...new Set(DB.aufgaben.map(a => a.tag).filter(Boolean))].sort();
@@ -1204,6 +1272,7 @@ function zeigStartFehler(msg) {
 
 async function ladeUndStarte() {
   await loadDB();
+  autoLoeschenErledigt();
   document.getElementById('start-overlay').classList.remove('open');
   startAutoSave();
   renderListe();
@@ -1860,18 +1929,82 @@ function renderListe() {
     emptyState.style.display = '';
   } else {
     emptyState.style.display = 'none';
-    sichtbar.forEach(a => {
-      container.insertAdjacentHTML('beforeend', renderAufgabe(a));
-    });
-  }
 
-  // Aufgeklappte Zeilen wiederherstellen
-  document.querySelectorAll('.task-row').forEach(row => {
-    row.addEventListener('click', function() {}); // placeholder
-  });
+    // Auto-Löschen Banner bei Erledigt-Ansicht
+    if (currentFilter === 'erledigt') {
+      container.insertAdjacentHTML('beforeend',
+        '<div class="autodelete-banner">' +
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
+        ' Erledigte Aufgaben werden nach 48 Stunden automatisch gelöscht</div>'
+      );
+    }
+
+    if (!currentGruppierung) {
+      sichtbar.forEach(a => { container.insertAdjacentHTML('beforeend', renderAufgabe(a)); });
+    } else {
+      const gruppen = gruppiereAufgaben(sichtbar, currentGruppierung);
+      gruppen.forEach(gruppe => {
+        container.insertAdjacentHTML('beforeend',
+          '<div class="group-header">' + gruppe.icon + escHtml(gruppe.label) +
+          '<span class="group-count">' + gruppe.aufgaben.length +
+          ' Aufgabe' + (gruppe.aufgaben.length !== 1 ? 'n' : '') + '</span></div>'
+        );
+        gruppe.aufgaben.forEach(a => { container.insertAdjacentHTML('beforeend', renderAufgabe(a)); });
+      });
+    }
+  }
 
   aktualisiereExportBadge();
   aktualisiereFilterZaehler();
+}
+
+function gruppiereAufgaben(aufgaben, modus) {
+  const heute    = today();
+  const morgen   = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const wocheEnd = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const iKal  = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+  const iTag  = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>';
+  const iPriv = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+  const iBeruf= '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>';
+  const iNone = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+
+  if (modus === 'datum') {
+    const buckets = {}, order = [];
+    aufgaben.forEach(a => {
+      let key, label, icon;
+      if (!a.datum)                          { key='z_ohne'; label='Ohne Datum'; icon=iNone; }
+      else if (a.datum === heute)            { key='a_heute'; label='Heute · '+formatDatum(heute); icon=iKal; }
+      else if (a.datum === morgen)           { key='b_morgen'; label='Morgen · '+formatDatum(morgen); icon=iKal; }
+      else if (a.datum > heute && a.datum <= wocheEnd) { key='c_woche'; label='Diese Woche'; icon=iKal; }
+      else if (a.datum > wocheEnd)           { key='d_'+a.datum; label=formatDatum(a.datum); icon=iKal; }
+      else                                   { key='z_ohne'; label='Ohne Datum'; icon=iNone; }
+      if (!buckets[key]) { buckets[key]={ label, icon, aufgaben:[] }; order.push(key); }
+      buckets[key].aufgaben.push(a);
+    });
+    return order.map(k => buckets[k]);
+  }
+
+  if (modus === 'tag') {
+    const buckets = {}, order = [];
+    aufgaben.forEach(a => {
+      const key = a.tag || 'z_ohne';
+      if (!buckets[key]) { buckets[key]={ label: a.tag||'Ohne Tag', icon: a.tag?iTag:iNone, aufgaben:[] }; order.push(key); }
+      buckets[key].aufgaben.push(a);
+    });
+    order.sort((a,b) => a==='z_ohne' ? 1 : b==='z_ohne' ? -1 : a.localeCompare(b));
+    return order.map(k => buckets[k]);
+  }
+
+  if (modus === 'typ') {
+    const gruppen = [];
+    const beruf  = aufgaben.filter(a => a.typ === 'beruf');
+    const privat = aufgaben.filter(a => a.typ === 'privat');
+    if (beruf.length)  gruppen.push({ label:'Beruflich', icon:iBeruf, aufgaben:beruf });
+    if (privat.length) gruppen.push({ label:'Privat',    icon:iPriv,  aufgaben:privat });
+    return gruppen;
+  }
+
+  return [{ label:'', icon:'', aufgaben }];
 }
 
 function aktualisiereFilterZaehler() {
