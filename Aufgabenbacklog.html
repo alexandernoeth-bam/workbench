@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aufgabenbacklog v1.1.6</title>
+<title>Aufgabenbacklog v1.1.7</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -506,6 +506,40 @@ textarea.form-control.vorgaben-textarea {
   font-size: 0.73rem; color: var(--warn);
 }
 
+
+/* ══════════════════════════════════════
+   VORLAGEN
+══════════════════════════════════════ */
+.vorlage-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--p50);
+  cursor: pointer; transition: border-color .15s, background .15s;
+}
+.vorlage-item:hover { border-color: var(--p400); background: var(--p100); }
+.vorlage-item.selected { border-color: var(--p500); background: var(--p100); }
+.vorlage-body { flex: 1; min-width: 0; }
+.vorlage-titel { font-size: 0.85rem; font-weight: 600; margin-bottom: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vorlage-meta { font-size: 0.72rem; color: var(--muted); display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.vorlage-actions { display: flex; gap: 5px; flex-shrink: 0; }
+
+.vorlage-banner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 11px; background: #fef3c7;
+  border: 1px solid #fde68a; border-radius: 8px;
+  font-size: 0.79rem; color: #92400e; cursor: pointer;
+  font-weight: 600; transition: background .15s;
+}
+.vorlage-banner:hover { background: #fde68a; }
+
+.btn-template { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+
+.vorlagen-leer {
+  text-align: center; padding: 20px; color: var(--muted);
+  font-size: 0.82rem;
+}
+
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 </style>
@@ -521,7 +555,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.1.6</div>
+    <div class="start-version">v1.1.7</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -577,7 +611,7 @@ textarea.form-control.vorgaben-textarea {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <div class="topbar-title">
       Aufgabenbacklog
-      <span class="version-pill">v1.1.6</span>
+      <span class="version-pill">v1.1.7</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -585,6 +619,9 @@ textarea.form-control.vorgaben-textarea {
       <div class="save-dot" id="save-dot"></div>
       <span id="save-label">–</span>
     </div>
+    <button class="btn-icon" onclick="openVorlagenOverlay()" title="Vorlagen verwalten">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    </button>
     <button class="btn-icon" onclick="window.open('https://calendar.google.com','_blank')" title="Google Kalender öffnen">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><rect x="7" y="14" width="3" height="3" rx="0.5" fill="currentColor" stroke="none"/></svg>
     </button>
@@ -608,13 +645,13 @@ textarea.form-control.vorgaben-textarea {
         Erledigt anzeigen
       </button>
       <select id="tag-filter-select" class="filter-tab" style="border-radius:99px;padding:5px 10px;cursor:pointer;" onchange="setTagFilter(this.value)">
-        <option value="">🏷 Alle Tags</option>
+        <option value="">Alle Tags</option>
       </select>
       <select id="group-select" class="group-select" onchange="setGruppierung(this.value)">
-        <option value="">⊞ Keine</option>
-        <option value="datum">📅 Datum</option>
-        <option value="tag">🏷 Tag</option>
-        <option value="typ">🏠 Typ</option>
+        <option value="">Keine Gruppierung</option>
+        <option value="datum">Datum</option>
+        <option value="tag">Tag</option>
+        <option value="typ">Typ</option>
       </select>
     </div>
     <div class="task-list" id="task-list">
@@ -668,6 +705,12 @@ textarea.form-control.vorgaben-textarea {
     </div>
     <div class="overlay-body">
       <input type="hidden" id="aufgabe-edit-id">
+      <!-- Vorlage-Banner (nur sichtbar wenn Vorlagen vorhanden) -->
+      <div class="vorlage-banner" id="vorlage-banner" onclick="openVorlageAuswahl()" style="display:none;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+        <span style="flex:1;">Aus Vorlage starten</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
       <div class="form-group">
         <label class="form-label">Titel <span class="req">*</span></label>
         <input class="form-control" type="text" id="aufgabe-titel" placeholder="Was ist zu tun?">
@@ -729,6 +772,10 @@ textarea.form-control.vorgaben-textarea {
       <button class="btn btn-primary btn-sm" onclick="aufgabeSpeichern()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         <span id="aufgabe-btn-label">Hinzufügen</span>
+      </button>
+      <button class="btn btn-template btn-sm" id="btn-als-vorlage" onclick="vorlageAusAufgabe()" style="display:none;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+        Als Vorlage
       </button>
       <button class="btn btn-dup btn-sm" id="btn-aufgabe-dup" onclick="aufgabeDuplizierenAusOverlay()" style="display:none;">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -937,6 +984,130 @@ textarea.form-control.vorgaben-textarea {
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════
+     OVERLAY: VORLAGEN VERWALTEN
+═══════════════════════════════════════════════════════ -->
+<div class="overlay-bg" id="overlay-vorlagen" onclick="handleOverlayBgClick(event,'overlay-vorlagen')">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-header">
+      <div class="overlay-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Vorlagen verwalten
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-vorlagen')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Schließen
+      </button>
+    </div>
+    <div class="overlay-body" id="vorlagen-liste-container">
+      <!-- wird von renderVorlagenListe() befüllt -->
+    </div>
+    <div class="overlay-footer">
+      <button class="btn btn-primary btn-sm" onclick="vorlageNeuAnlegen()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Neue Vorlage anlegen
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-vorlagen')">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     OVERLAY: VORLAGE BEARBEITEN
+═══════════════════════════════════════════════════════ -->
+<div class="overlay-bg" id="overlay-vorlage-edit" onclick="handleOverlayBgClick(event,'overlay-vorlage-edit')">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-header">
+      <div class="overlay-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span id="vorlage-edit-titel-label">Vorlage bearbeiten</span>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-vorlage-edit')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Schließen
+      </button>
+    </div>
+    <div class="overlay-body">
+      <input type="hidden" id="vorlage-edit-id">
+      <div class="form-group">
+        <label class="form-label">Titel <span class="req">*</span></label>
+        <input class="form-control" type="text" id="vorlage-edit-titel-input" placeholder="Vorlagenname">
+        <div class="form-error" id="err-vorlage-titel">Bitte einen Titel eingeben.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Beschreibung <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <textarea class="form-control" id="vorlage-edit-beschreibung" placeholder="Details …" style="min-height:60px;"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Typ <span class="req">*</span></label>
+        <div class="type-toggle">
+          <button class="type-btn active" id="vorlage-typ-privat" onclick="setVorlageTyp('privat')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Privat
+          </button>
+          <button class="type-btn" id="vorlage-typ-beruf" onclick="setVorlageTyp('beruf')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+            Beruflich
+          </button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          Tag <span style="font-weight:400;color:var(--muted)">(optional)</span>
+        </label>
+        <input class="form-control" type="text" id="vorlage-edit-tag" list="tag-vorschlaege" placeholder="z.B. DATEV, Familie …" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Dauer (Minuten) <span class="req">*</span></label>
+        <select class="form-control" id="vorlage-edit-dauer" onchange="onVorlageDauerChange()">
+          <option value="15">15</option><option value="30">30</option>
+          <option value="45">45</option><option value="60" selected>60</option>
+          <option value="90">90</option><option value="120">120</option>
+          <option value="180">180</option><option value="240">240</option>
+          <option value="manuell">── Manuell ──</option>
+        </select>
+        <input class="form-control" type="number" id="vorlage-edit-dauer-manuell" min="1" max="479" placeholder="Minuten (1–479)" style="display:none;margin-top:6px;">
+      </div>
+    </div>
+    <div class="overlay-footer">
+      <button class="btn btn-primary btn-sm" onclick="vorlageSpeichern()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Speichern
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-vorlage-edit')">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     OVERLAY: VORLAGE AUSWÄHLEN
+═══════════════════════════════════════════════════════ -->
+<div class="overlay-bg" id="overlay-vorlage-auswahl" onclick="handleOverlayBgClick(event,'overlay-vorlage-auswahl')">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-header">
+      <div class="overlay-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Vorlage auswählen
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-vorlage-auswahl')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Schließen
+      </button>
+    </div>
+    <div class="overlay-body">
+      <div class="form-hint" style="margin-bottom:4px;">Tippe auf eine Vorlage um das Formular vorzubefüllen.</div>
+      <div id="vorlage-auswahl-liste"></div>
+    </div>
+    <div class="overlay-footer">
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-vorlage-auswahl')">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -945,7 +1116,7 @@ textarea.form-control.vorgaben-textarea {
 /* ═══════════════════════════════════════════════════════
    KONSTANTEN & GLOBALE VARIABLEN
 ═══════════════════════════════════════════════════════ */
-const APP_VERSION  = '1.1.6';
+const APP_VERSION  = '1.1.7';
 const LS_KEY       = 'aufgabenbacklog_db';
 const DB_FILENAME  = 'Backlog.json';
 
@@ -956,6 +1127,217 @@ let currentFilter  = 'alle';
 let currentTyp     = 'privat';
 let currentTagFilter = '';
 let currentGruppierung = '';
+
+/* ═══════════════════════════════════════════════════════
+   VORLAGEN
+═══════════════════════════════════════════════════════ */
+let currentVorlageTyp = 'privat';
+
+function setVorlageTyp(typ) {
+  currentVorlageTyp = typ;
+  document.getElementById('vorlage-typ-privat').classList.toggle('active', typ === 'privat');
+  document.getElementById('vorlage-typ-beruf').classList.toggle('active', typ === 'beruf');
+}
+
+function onVorlageDauerChange() {
+  const sel = document.getElementById('vorlage-edit-dauer');
+  const man = document.getElementById('vorlage-edit-dauer-manuell');
+  man.style.display = sel.value === 'manuell' ? 'block' : 'none';
+}
+
+function getVorlageDauer() {
+  const sel = document.getElementById('vorlage-edit-dauer');
+  if (sel.value === 'manuell') {
+    const v = parseInt(document.getElementById('vorlage-edit-dauer-manuell').value, 10);
+    return (v > 0 && v < 480) ? v : null;
+  }
+  return parseInt(sel.value, 10);
+}
+
+function openVorlagenOverlay() {
+  renderVorlagenListe();
+  openOverlay('overlay-vorlagen');
+}
+
+function renderVorlagenListe() {
+  const container = document.getElementById('vorlagen-liste-container');
+  if (!container) return;
+  if (!DB.vorlagen || DB.vorlagen.length === 0) {
+    container.innerHTML = '<div class="vorlagen-leer">Noch keine Vorlagen gespeichert.<br>Lege eine neue an oder speichere eine Aufgabe als Vorlage.</div>';
+    return;
+  }
+  container.innerHTML = DB.vorlagen.map(v => {
+    const typChip = v.typ === 'privat'
+      ? '<span class="chip chip-privat" style="font-size:0.65rem;"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> Privat</span>'
+      : '<span class="chip chip-beruf" style="font-size:0.65rem;"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg> Beruflich</span>';
+    const tagChip = v.tag
+      ? '<span class="chip chip-tag" style="font-size:0.65rem;"><svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> ' + escHtml(v.tag) + '</span>' : '';
+    return '<div class="vorlage-item">' +
+      '<div class="vorlage-body">' +
+        '<div class="vorlage-titel">' + escHtml(v.titel) + '</div>' +
+        '<div class="vorlage-meta">' + typChip +
+          '<span class="chip chip-dauer" style="font-size:0.65rem;">' + v.dauer + ' min</span>' +
+          tagChip +
+        '</div>' +
+      '</div>' +
+      '<div class="vorlage-actions">' +
+        '<button class="btn btn-outline btn-sm" onclick="vorlageBearbeiten(\'' + v.id + '\')">' +
+          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+        '</button>' +
+        '<button class="btn btn-danger-ghost btn-sm" onclick="vorlageLoeschen(\'' + v.id + '\')">' +
+          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function vorlageNeuAnlegen() {
+  document.getElementById('vorlage-edit-id').value = '';
+  document.getElementById('vorlage-edit-titel-input').value = '';
+  document.getElementById('vorlage-edit-beschreibung').value = '';
+  document.getElementById('vorlage-edit-tag').value = '';
+  document.getElementById('vorlage-edit-dauer').value = '60';
+  document.getElementById('vorlage-edit-dauer-manuell').style.display = 'none';
+  document.getElementById('vorlage-edit-titel-label').textContent = 'Neue Vorlage';
+  document.getElementById('err-vorlage-titel').classList.remove('visible');
+  setVorlageTyp('privat');
+  openOverlay('overlay-vorlage-edit');
+}
+
+function vorlageBearbeiten(id) {
+  const v = DB.vorlagen.find(x => x.id === id);
+  if (!v) return;
+  document.getElementById('vorlage-edit-id').value = id;
+  document.getElementById('vorlage-edit-titel-input').value = v.titel || '';
+  document.getElementById('vorlage-edit-beschreibung').value = v.beschreibung || '';
+  document.getElementById('vorlage-edit-tag').value = v.tag || '';
+  document.getElementById('vorlage-edit-titel-label').textContent = 'Vorlage bearbeiten';
+  document.getElementById('err-vorlage-titel').classList.remove('visible');
+  setVorlageTyp(v.typ || 'privat');
+  const dauerOpts = [15,30,45,60,90,120,180,240];
+  const sel = document.getElementById('vorlage-edit-dauer');
+  if (dauerOpts.includes(v.dauer)) {
+    sel.value = String(v.dauer);
+    document.getElementById('vorlage-edit-dauer-manuell').style.display = 'none';
+  } else {
+    sel.value = 'manuell';
+    document.getElementById('vorlage-edit-dauer-manuell').style.display = 'block';
+    document.getElementById('vorlage-edit-dauer-manuell').value = v.dauer;
+  }
+  openOverlay('overlay-vorlage-edit');
+}
+
+function vorlageSpeichern() {
+  const titel = document.getElementById('vorlage-edit-titel-input').value.trim();
+  const dauer = getVorlageDauer();
+  const errEl = document.getElementById('err-vorlage-titel');
+  if (!titel) { errEl.classList.add('visible'); return; }
+  errEl.classList.remove('visible');
+
+  const id = document.getElementById('vorlage-edit-id').value;
+  const obj = {
+    id: id || uid(),
+    titel,
+    typ: currentVorlageTyp,
+    beschreibung: document.getElementById('vorlage-edit-beschreibung').value.trim(),
+    tag: document.getElementById('vorlage-edit-tag').value.trim() || null,
+    dauer: dauer || 60
+  };
+
+  if (id) {
+    const idx = DB.vorlagen.findIndex(x => x.id === id);
+    if (idx !== -1) DB.vorlagen[idx] = obj;
+  } else {
+    DB.vorlagen.push(obj);
+  }
+
+  closeOverlay('overlay-vorlage-edit');
+  renderVorlagenListe();
+  saveDB();
+  showToast('✓ Vorlage gespeichert');
+}
+
+function vorlageLoeschen(id) {
+  if (!confirm('Vorlage wirklich löschen?')) return;
+  DB.vorlagen = DB.vorlagen.filter(x => x.id !== id);
+  renderVorlagenListe();
+  saveDB();
+  showToast('Vorlage gelöscht');
+}
+
+function openVorlageAuswahl() {
+  const container = document.getElementById('vorlage-auswahl-liste');
+  if (!DB.vorlagen || DB.vorlagen.length === 0) {
+    container.innerHTML = '<div class="vorlagen-leer">Noch keine Vorlagen vorhanden.</div>';
+  } else {
+    container.innerHTML = DB.vorlagen.map(v => {
+      const typChip = v.typ === 'privat'
+        ? '<span class="chip chip-privat" style="font-size:0.65rem;">Privat</span>'
+        : '<span class="chip chip-beruf" style="font-size:0.65rem;">Beruflich</span>';
+      const tagChip = v.tag ? '<span class="chip chip-tag" style="font-size:0.65rem;">' + escHtml(v.tag) + '</span>' : '';
+      return '<div class="vorlage-item" onclick="vorlageAnwenden(\'' + v.id + '\')">' +
+        '<div class="vorlage-body">' +
+          '<div class="vorlage-titel">' + escHtml(v.titel) + '</div>' +
+          '<div class="vorlage-meta">' + typChip +
+            '<span class="chip chip-dauer" style="font-size:0.65rem;">' + v.dauer + ' min</span>' +
+            tagChip +
+          '</div>' +
+        '</div>' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--p400)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>' +
+      '</div>';
+    }).join('');
+  }
+  openOverlay('overlay-vorlage-auswahl');
+}
+
+function vorlageAnwenden(id) {
+  const v = DB.vorlagen.find(x => x.id === id);
+  if (!v) return;
+  document.getElementById('aufgabe-titel').value = v.titel || '';
+  document.getElementById('aufgabe-beschreibung').value = v.beschreibung || '';
+  document.getElementById('aufgabe-tag').value = v.tag || '';
+  setTyp(v.typ || 'privat');
+  const dauerOpts = [15,30,45,60,90,120,180,240];
+  const sel = document.getElementById('aufgabe-dauer');
+  if (dauerOpts.includes(v.dauer)) {
+    sel.value = String(v.dauer);
+    document.getElementById('aufgabe-dauer-manuell').style.display = 'none';
+  } else {
+    sel.value = 'manuell';
+    document.getElementById('aufgabe-dauer-manuell').style.display = 'block';
+    document.getElementById('aufgabe-dauer-manuell').value = v.dauer;
+  }
+  closeOverlay('overlay-vorlage-auswahl');
+  showToast('✓ Vorlage angewendet');
+}
+
+function vorlageAusAufgabe() {
+  const titel = document.getElementById('aufgabe-titel').value.trim();
+  if (!titel) { showToast('Bitte zuerst einen Titel eingeben.', true); return; }
+  const dauerOpts = [15,30,45,60,90,120,180,240];
+  const sel = document.getElementById('aufgabe-dauer');
+  let dauer = 60;
+  if (sel.value === 'manuell') {
+    dauer = parseInt(document.getElementById('aufgabe-dauer-manuell').value, 10) || 60;
+  } else {
+    dauer = parseInt(sel.value, 10);
+  }
+  DB.vorlagen.push({
+    id: uid(), titel,
+    typ: currentTyp,
+    beschreibung: document.getElementById('aufgabe-beschreibung').value.trim(),
+    tag: document.getElementById('aufgabe-tag').value.trim() || null,
+    dauer
+  });
+  saveDB();
+  showToast('✓ Als Vorlage gespeichert');
+}
+
+function aktualisierVorlagenBanner() {
+  const banner = document.getElementById('vorlage-banner');
+  if (banner) banner.style.display = DB.vorlagen && DB.vorlagen.length > 0 ? 'flex' : 'none';
+}
 
 function setGruppierung(wert) {
   currentGruppierung = wert;
@@ -988,7 +1370,7 @@ function aktualisiereTagVorschlaege() {
   const sel = document.getElementById('tag-filter-select');
   if (sel) {
     const current = sel.value;
-    sel.innerHTML = '<option value="">🏷 Alle Tags</option>' +
+    sel.innerHTML = '<option value="">Alle Tags</option>' +
       tags.map(t => '<option value="' + escHtml(t) + '"' + (t === current ? ' selected' : '') + '>' + escHtml(t) + '</option>').join('');
   }
 }
@@ -999,7 +1381,7 @@ function setTagFilter(tag) {
 }
 
 function emptyDB() {
-  return { version: APP_VERSION, aufgaben: [], planungsvorgaben: '' };
+  return { version: APP_VERSION, aufgaben: [], planungsvorgaben: '', vorlagen: [] };
 }
 let DB = emptyDB();
 
@@ -1130,6 +1512,7 @@ async function loadDB() {
       if (data && Array.isArray(data.aufgaben)) {
         DB = data;
         if (!DB.planungsvorgaben) DB.planungsvorgaben = '';
+        if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
         return;
       }
     } catch(e) {}
@@ -1140,6 +1523,7 @@ async function loadDB() {
       DB = JSON.parse(raw);
       if (!Array.isArray(DB.aufgaben)) DB.aufgaben = [];
       if (!DB.planungsvorgaben) DB.planungsvorgaben = '';
+      if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
     }
   } catch(e) { DB = emptyDB(); }
 }
@@ -1253,6 +1637,7 @@ function importierenMobile(event) {
       if (!Array.isArray(parsed.aufgaben)) { zeigStartFehler('Ungültige Datei.'); return; }
       DB = parsed;
       if (!DB.planungsvorgaben) DB.planungsvorgaben = '';
+      if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
       fileHandle = null;
       document.getElementById('start-overlay').classList.remove('open');
       startAutoSave();
@@ -1351,6 +1736,9 @@ function aufgabeFormularLeeren() {
   if (planBtn) planBtn.style.display = 'none';
   const delBtn = document.getElementById('btn-aufgabe-del');
   if (delBtn) delBtn.style.display = 'none';
+  const alsVorlageBtn = document.getElementById('btn-als-vorlage');
+  if (alsVorlageBtn) alsVorlageBtn.style.display = 'none';
+  aktualisierVorlagenBanner();
   setTyp('privat');
 }
 
@@ -1382,6 +1770,9 @@ function aufgabeBearbeiten(id) {
   if (planBtn) planBtn.style.display = '';
   const delBtn = document.getElementById('btn-aufgabe-del');
   if (delBtn) delBtn.style.display = '';
+  const alsVorlageBtn = document.getElementById('btn-als-vorlage');
+  if (alsVorlageBtn) alsVorlageBtn.style.display = '';
+  aktualisierVorlagenBanner();
   openOverlay('overlay-aufgabe');
 }
 
@@ -2063,6 +2454,7 @@ function openBulkOverlay() {
   document.getElementById('bulk-count-label').textContent = '';
   document.getElementById('btn-bulk-import').disabled = true;
   document.getElementById('bulk-import-label').textContent = 'Importieren';
+  aktualisierVorlagenBanner();
   openOverlay('overlay-bulk');
 }
 
@@ -2157,7 +2549,7 @@ function bulkVorschauAktualisieren() {
         ? '<span class="chip chip-default">60 min (Standard)</span>'
         : r.dauer + ' min';
       const tagZelle = r.tag
-        ? '<span class="chip chip-tag" style="font-size:0.66rem;">🏷 ' + escHtml(r.tag) + '</span>'
+        ? '<span class="chip chip-tag" style="font-size:0.66rem;"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> ' + escHtml(r.tag) + '</span>'
         : '<span style="color:var(--muted);font-style:italic;font-size:0.74rem;">–</span>';
       const datumZelle = r.datum
         ? formatDatumDE(r.datum)
