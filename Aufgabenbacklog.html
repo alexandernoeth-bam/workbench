@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aufgabenbacklog v1.1.1</title>
+<style>
+/* ═══════════════════════════════════════════════════════
+   RESET & VARIABLEN
+═══════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --p900: #0b2527; --p800: #113033; --p700: #1a4d52;
+  --p600: #1f6168; --p500: #25757e; --p400: #3a9aa5;
+  --p300: #6bbec8; --p100: #d0eef2; --p50:  #eaf6f8;
+  --bg: #f0f7f8; --surface: #ffffff;
+  --border: #c5e2e6; --text: #0b2527; --muted: #4a7a81;
+  --danger: #c0392b; --ok: #1a7a4a; --warn: #b35c00;
+  --radius: 10px; --shadow: 0 1px 6px rgba(11,37,39,0.09);
+  --bottom-h: 64px;
+}
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; font-size: 15px;
+  padding-bottom: var(--bottom-h);
+}
+
+/* ═══════════════════════════════════════════════════════
+   TOPBAR
+═══════════════════════════════════════════════════════ */
+.topbar {
+  background: var(--p700); padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 8px rgba(11,37,39,0.22);
+}
+.topbar-left { display: flex; align-items: center; gap: 9px; }
+.topbar-title {
+  font-size: 0.98rem; font-weight: 700; color: #fff;
+  display: flex; align-items: center; gap: 8px; letter-spacing: -.01em;
+}
+.version-pill {
+  font-size: 0.62rem; background: var(--p900); color: var(--p300);
+  padding: 2px 8px; border-radius: 99px; font-weight: 600; letter-spacing: .04em;
+}
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.save-status {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.71rem; color: rgba(255,255,255,0.65);
+}
+.save-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--p300); }
+.save-dot.error { background: #ff6b6b; }
+.btn-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 7px; border: none; cursor: pointer;
+  background: rgba(255,255,255,0.13); color: #fff;
+  transition: background .15s; flex-shrink: 0;
+}
+.btn-icon:hover { background: rgba(255,255,255,0.22); }
+
+/* ═══════════════════════════════════════════════════════
+   PAGE
+═══════════════════════════════════════════════════════ */
+.page { width: 100%; padding: 12px 12px 0; display: flex; flex-direction: column; gap: 10px; }
+
+/* ═══════════════════════════════════════════════════════
+   CARD
+═══════════════════════════════════════════════════════ */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════
+   FILTER-PILLS
+═══════════════════════════════════════════════════════ */
+.filter-bar {
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+}
+.filter-tab {
+  padding: 5px 13px; border-radius: 99px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); font-size: 0.75rem;
+  font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s;
+  display: flex; align-items: center; gap: 4px;
+}
+.filter-tab:hover { border-color: var(--p400); color: var(--p600); }
+.filter-tab.active { background: var(--p700); border-color: var(--p700); color: #fff; }
+.filter-tab.tab-erledigt { border-style: dashed; }
+.filter-tab.tab-erledigt.active { border-style: solid; }
+
+/* ═══════════════════════════════════════════════════════
+   KOMPAKTLISTE
+═══════════════════════════════════════════════════════ */
+.task-list { display: flex; flex-direction: column; }
+.task-row { border-bottom: 1px solid var(--border); }
+.task-row:last-child { border-bottom: none; }
+.task-row.hidden { display: none; }
+
+.task-main {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px; min-height: 44px;
+  cursor: pointer; user-select: none; transition: background .12s;
+}
+.task-main:hover { background: var(--p100); }
+
+.task-check {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid var(--border); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .15s; background: transparent;
+}
+.task-check.checked { background: var(--ok); border-color: var(--ok); }
+
+.task-title-text {
+  flex: 1; font-size: 0.86rem; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.task-title-text.done { text-decoration: line-through; color: var(--muted); font-weight: 400; }
+
+.task-chips { display: flex; align-items: center; gap: 4px; flex-shrink: 0; flex-wrap: nowrap; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 99px;
+  font-size: 0.67rem; font-weight: 700; white-space: nowrap;
+}
+.chip-privat   { background: var(--p100); color: var(--p700); }
+.chip-beruf    { background: #ebe8f8; color: #5638b8; }
+.chip-dauer    { background: #f0f0f0; color: #555; }
+.chip-offen    { background: #f0f0f0; color: #888; }
+.chip-erledigt { background: rgba(26,122,74,.12); color: var(--ok); }
+.chip-datum    { background: #fff3e0; color: var(--warn); border: 1px solid #ffe0b2; }
+.chip-admin    { background: #f3e8ff; color: #6d28d9; border: 1px solid #ddd6fe; }
+.chip-tag      { background: #f3e8ff; color: #6d28d9; border: 1px solid #ddd6fe; }
+
+
+.chevron { flex-shrink: 0; color: var(--muted); transition: transform .2s; }
+
+/* Aufgeklappt */
+
+
+/* Admin-Checkbox in Liste */
+.admin-check-wrap {
+  display: none; align-items: center; padding: 6px 12px;
+  gap: 8px; background: #f3e8ff; border-bottom: 1px solid #ddd6fe;
+  font-size: 0.78rem; color: #6d28d9; font-weight: 600;
+}
+.admin-check-wrap.visible { display: flex; }
+.admin-check-wrap input[type=checkbox] { accent-color: #6d28d9; width: 16px; height: 16px; }
+
+/* Leere Liste */
+.empty-state {
+  padding: 40px 20px; text-align: center; color: var(--muted); font-size: 0.85rem;
+}
+
+/* ═══════════════════════════════════════════════════════
+   BOTTOM BAR
+═══════════════════════════════════════════════════════ */
+.bottom-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: var(--bottom-h); background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 12px; z-index: 100;
+  box-shadow: 0 -2px 10px rgba(11,37,39,0.08);
+}
+.bottom-bar-inner { display: flex; gap: 10px; width: 100%; max-width: 500px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px; padding: 10px 16px; border-radius: 8px; border: none;
+  cursor: pointer; font-size: 0.83rem; font-weight: 600;
+  font-family: inherit; transition: filter .15s; white-space: nowrap;
+}
+.btn:hover { filter: brightness(.91); }
+.btn:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+.btn-primary   { background: var(--p600); color: #fff; flex: 1; }
+.btn-secondary { background: var(--p50); color: var(--p700); border: 1px solid var(--border); flex: 1; }
+.btn-outline   { background: transparent; border: 1px solid var(--border); color: var(--p700); }
+.btn-danger-ghost { background: transparent; border: 1px solid var(--border); color: var(--danger); }
+.btn-dup { background: #f3e8ff; color: #6d28d9; border: 1px solid #ddd6fe; }
+.btn-sm  { padding: 5px 11px; font-size: 0.75rem; border-radius: 6px; flex: unset; }
+.btn-xs  { padding: 3px 8px;  font-size: 0.71rem; border-radius: 5px; flex: unset; }
+.btn-purple { background: #7c3aed; color: #fff; }
+
+.export-wrap { position: relative; flex: 1; display: flex; }
+.export-wrap .btn { width: 100%; }
+.export-badge {
+  position: absolute; top: -7px; right: -7px;
+  background: #d32f2f; color: #fff;
+  font-size: 0.63rem; font-weight: 800;
+  min-width: 18px; height: 18px; border-radius: 99px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px; border: 2px solid var(--surface);
+  pointer-events: none;
+}
+.export-badge.hidden { display: none; }
+
+/* ═══════════════════════════════════════════════════════
+   OVERLAYS (gemeinsam)
+═══════════════════════════════════════════════════════ */
+.overlay-bg {
+  position: fixed; inset: 0; background: rgba(11,37,39,0.52);
+  z-index: 400; display: flex; align-items: flex-end; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.overlay-bg.visible { opacity: 1; pointer-events: all; }
+.overlay-sheet {
+  background: var(--surface); border-radius: 16px 16px 0 0;
+  width: 100%; max-width: 720px;
+  box-shadow: 0 -4px 32px rgba(11,37,39,0.18);
+  transform: translateY(30px); transition: transform .22s;
+  display: flex; flex-direction: column; max-height: 92vh;
+}
+.overlay-bg.visible .overlay-sheet { transform: translateY(0); }
+.overlay-handle {
+  width: 36px; height: 4px; background: var(--border);
+  border-radius: 99px; margin: 11px auto 0; flex-shrink: 0;
+}
+.overlay-header {
+  padding: 13px 16px 11px; display: flex; align-items: center;
+  justify-content: space-between; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.overlay-title {
+  font-size: 0.93rem; font-weight: 700; color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+}
+.overlay-body {
+  padding: 15px 16px; display: flex; flex-direction: column;
+  gap: 12px; overflow-y: auto; flex: 1;
+}
+.overlay-footer {
+  padding: 11px 16px 15px; display: flex; gap: 8px;
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════
+   FORMULAR
+═══════════════════════════════════════════════════════ */
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-label {
+  font-size: 0.74rem; font-weight: 600; color: var(--muted);
+  display: flex; align-items: center; gap: 4px;
+}
+.req { color: var(--p400); }
+.form-control {
+  background: var(--p50); border: 1px solid var(--border);
+  border-radius: 7px; padding: 9px 12px; color: var(--text);
+  font-size: 0.86rem; font-family: inherit; outline: none; width: 100%;
+  transition: border-color .15s, background .15s;
+}
+.form-control:focus { border-color: var(--p400); background: #fff; }
+textarea.form-control { resize: vertical; min-height: 140px; }
+.form-hint { font-size: 0.7rem; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.form-error { font-size: 0.7rem; color: var(--danger); margin-top: 2px; display: none; }
+.form-error.visible { display: block; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.type-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.type-btn {
+  padding: 9px 10px; border-radius: 7px; border: 1.5px solid var(--border);
+  background: var(--p50); color: var(--muted); cursor: pointer;
+  font-size: 0.81rem; font-weight: 600; text-align: center;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-family: inherit; transition: all .15s;
+}
+.type-btn.active { border-color: var(--p500); color: var(--p700); background: var(--p100); }
+
+.date-locked {
+  background: var(--p50); border: 1px solid var(--border); border-radius: 7px;
+  padding: 9px 13px; display: flex; align-items: center; gap: 8px;
+  font-size: 0.84rem; color: var(--p700); font-weight: 600;
+}
+.date-locked-note { font-size: 0.69rem; color: var(--muted); font-weight: 400; margin-left: auto; }
+
+.dauer-computed {
+  background: var(--p100); border-radius: 7px; padding: 9px 13px;
+  font-size: 0.81rem; color: var(--p700); font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+}
+.dauer-computed-val { margin-left: auto; font-size: 0.96rem; color: var(--p600); font-weight: 700; }
+
+/* Planungsvorgaben-Textarea — spezifischer Selektor schlägt textarea.form-control */
+textarea.form-control.vorgaben-textarea {
+  min-height: 820px; font-size: 0.82rem; line-height: 1.6;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+/* Planungsvorgaben-Overlay: eigene Sheet-Klasse für größere Darstellung */
+.overlay-sheet-vorgaben {
+  background: var(--surface); border-radius: 16px 16px 0 0;
+  width: 100%; max-width: 720px;
+  box-shadow: 0 -4px 32px rgba(11,37,39,0.18);
+  transform: translateY(30px); transition: transform .22s;
+  display: flex; flex-direction: column; max-height: 98vh;
+}
+.overlay-bg.visible .overlay-sheet-vorgaben { transform: translateY(0); }
+
+/* Adminblock-Auswahl */
+.admin-list { display: flex; flex-direction: column; gap: 6px; }
+.admin-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: var(--p50);
+  cursor: pointer; transition: border-color .15s;
+}
+.admin-item.selected { border-color: #7c3aed; background: #f3e8ff; }
+.admin-item input[type=checkbox] { accent-color: #7c3aed; width: 16px; height: 16px; flex-shrink: 0; }
+.admin-item-title { flex: 1; font-size: 0.84rem; font-weight: 600; }
+.admin-item-dauer { font-size: 0.74rem; color: var(--muted); font-weight: 600; }
+.admin-summe {
+  background: #ede9fe; border-radius: 7px; padding: 8px 12px;
+  font-size: 0.82rem; color: #6d28d9; font-weight: 700;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.admin-summe-val { font-size: 0.96rem; }
+.admin-empty { font-size: 0.82rem; color: var(--muted); text-align: center; padding: 16px; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: calc(var(--bottom-h) + 10px); left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--p800); color: #fff; padding: 9px 20px;
+  border-radius: 99px; font-size: 0.8rem; font-weight: 600;
+  z-index: 600; opacity: 0; transition: opacity .25s, transform .25s;
+  pointer-events: none; white-space: nowrap; max-width: 90vw;
+}
+.toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.error { background: var(--danger); }
+
+/* ═══════════════════════════════════════════════════════
+   STARTBILDSCHIRM
+═══════════════════════════════════════════════════════ */
+.start-overlay {
+  display: none; position: fixed; inset: 0; z-index: 600;
+  background: var(--bg); align-items: center; justify-content: center;
+}
+.start-overlay.open { display: flex; }
+.start-card {
+  background: var(--surface); border-radius: 14px;
+  box-shadow: 0 8px 40px rgba(11,37,39,0.14);
+  padding: 38px 34px; width: 440px; max-width: 95vw; text-align: center;
+}
+.start-logo {
+  font-size: 1.3rem; font-weight: 800; color: var(--p700);
+  margin-bottom: 4px; display: flex; align-items: center;
+  justify-content: center; gap: 10px;
+}
+.start-version { font-size: 0.67rem; color: var(--muted); margin-bottom: 26px; letter-spacing: .05em; }
+.start-desc { font-size: 0.81rem; color: var(--muted); line-height: 1.7; margin-bottom: 20px; }
+.start-path {
+  font-size: 0.71rem; color: var(--muted); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 8px 12px; margin-bottom: 20px; word-break: break-all; text-align: left;
+}
+.start-path strong {
+  color: var(--p600); display: block; margin-bottom: 3px;
+  font-size: 0.64rem; text-transform: uppercase; letter-spacing: .06em;
+}
+.start-actions { display: flex; flex-direction: column; gap: 8px; }
+.btn-start-primary {
+  padding: 12px 20px; background: var(--p700); color: #fff;
+  border-radius: 8px; font-size: 0.86rem; font-weight: 700;
+  cursor: pointer; border: none; font-family: inherit;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: background .15s;
+}
+.btn-start-primary:hover { background: var(--p800); }
+.btn-start-secondary {
+  padding: 10px 20px; background: transparent; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 8px; font-size: 0.81rem;
+  cursor: pointer; font-family: inherit; transition: border-color .15s, color .15s;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.btn-start-secondary:hover { border-color: var(--p400); color: var(--p600); }
+.start-hint { font-size: 0.68rem; color: var(--muted); margin-top: 14px; line-height: 1.6; text-align: left; }
+.start-reconnect-name {
+  font-size: 0.81rem; font-weight: 600; color: var(--p700);
+  background: var(--p50); border: 1px solid var(--p100); border-radius: 7px;
+  padding: 9px 13px; margin-bottom: 14px; word-break: break-all; text-align: left;
+}
+.start-error {
+  margin-top: 12px; padding: 8px 12px; background: #fde8e8;
+  color: var(--danger); border-radius: 7px; font-size: 0.74rem; text-align: left;
+}
+.spin { animation: spin 1.2s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════════ */
+@media (min-width: 600px) {
+  .overlay-bg { align-items: center; }
+  .overlay-sheet { border-radius: 14px; max-width: 480px; margin: 0 16px; max-height: 85vh; }
+  .overlay-sheet-vorgaben { border-radius: 14px; max-width: 720px; margin: 0 16px; max-height: 97vh; }
+}
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     STARTBILDSCHIRM
+═══════════════════════════════════════════════════════ -->
+<div class="start-overlay open" id="start-overlay">
+  <div class="start-card">
+    <div class="start-logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Aufgabenbacklog
+    </div>
+    <div class="start-version">v1.1.1</div>
+    <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
+      <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
+      <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
+    </div>
+    <div id="start-reconnect" style="display:none;">
+      <div class="start-desc" style="margin-bottom:10px;">Zuletzt geöffnete Datei:</div>
+      <div class="start-reconnect-name" id="start-reconnect-name"></div>
+      <div class="start-actions">
+        <button class="btn-start-primary" onclick="reconnectMitBerechtigung()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Diese Datei öffnen
+        </button>
+        <button class="btn-start-secondary" onclick="zeigeVollenDialog()">Andere Datei wählen …</button>
+      </div>
+    </div>
+    <div id="start-dialog-content">
+      <div class="start-desc">Deine Aufgaben werden in <strong>Backlog.json</strong> gespeichert.<br>Wähle eine vorhandene Datei oder lege eine neue an.</div>
+      <div class="start-path">
+        <strong>Empfohlener Speicherort</strong>
+        Backlog.json (z. B. Google Drive / OneDrive)
+      </div>
+      <div class="start-actions">
+        <button class="btn-start-primary" onclick="startDateiOeffnen()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Vorhandene Backlog.json öffnen
+        </button>
+        <button class="btn-start-secondary" onclick="startDateiNeuAnlegen()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Neue Backlog.json anlegen
+        </button>
+        <button class="btn-start-secondary" onclick="document.getElementById('mobile-file-input').click()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          JSON importieren (Mobile / iPad)
+        </button>
+        <input type="file" id="mobile-file-input" accept=".json,application/json" style="display:none" onchange="importierenMobile(event)">
+        <button class="btn-start-secondary" onclick="startOhneFile()">Ohne Datei starten (nur Browser-Speicher)</button>
+      </div>
+      <div class="start-hint">
+        <strong>Vorhandene Datei:</strong> Wähle deine bestehende Backlog.json (Chrome / Edge / Chrome iPad).<br>
+        <strong>JSON importieren:</strong> Für Mobile – Datei aus der Files-App wählen.<br>
+        <strong>Neue Datei:</strong> Erstellt eine leere Backlog.json.
+      </div>
+    </div>
+    <div class="start-error" id="start-error" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     TOPBAR
+═══════════════════════════════════════════════════════ -->
+<div class="topbar">
+  <div class="topbar-left">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <div class="topbar-title">
+      Aufgabenbacklog
+      <span class="version-pill">v1.1.1</span>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="save-status">
+      <div class="save-dot" id="save-dot"></div>
+      <span id="save-label">–</span>
+    </div>
+    <button class="btn-icon" onclick="window.open('https://calendar.google.com','_blank')" title="Google Kalender öffnen">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><rect x="7" y="14" width="3" height="3" rx="0.5" fill="currentColor" stroke="none"/></svg>
+    </button>
+    <button class="btn-icon" onclick="openVorgabenOverlay()" title="Planungsvorgaben">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SEITE
+═══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="card">
+    <div class="filter-bar" id="filter-bar">
+      <button class="filter-tab active" data-filter="alle">Alle</button>
+      <button class="filter-tab" data-filter="privat">Privat</button>
+      <button class="filter-tab" data-filter="beruf">Beruflich</button>
+      <button class="filter-tab tab-erledigt" data-filter="erledigt">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Erledigt anzeigen
+      </button>
+      <select id="tag-filter-select" class="filter-tab" style="border-radius:99px;padding:5px 10px;cursor:pointer;" onchange="setTagFilter(this.value)">
+        <option value="">🏷 Alle Tags</option>
+      </select>
+    </div>
+    <div class="task-list" id="task-list">
+      <div class="empty-state" id="empty-state">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:10px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <div>Keine Aufgaben vorhanden.</div>
+        <div style="margin-top:4px;font-size:0.78rem;">Tippe auf <strong>+ Aufgabe</strong> um zu beginnen.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     BOTTOM BAR
+═══════════════════════════════════════════════════════ -->
+<div class="bottom-bar">
+  <div class="bottom-bar-inner">
+    <button class="btn btn-primary" onclick="aufgabeFormularLeeren();openOverlay('overlay-aufgabe')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Aufgabe
+    </button>
+    <div class="export-wrap">
+      <button class="btn btn-secondary" id="btn-ics-export" onclick="icsExportieren()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        ICS Export
+      </button>
+      <span class="export-badge hidden" id="export-badge">0</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     OVERLAY: NEUE AUFGABE
+═══════════════════════════════════════════════════════ -->
+<div class="overlay-bg" id="overlay-aufgabe" onclick="handleOverlayBgClick(event,'overlay-aufgabe')">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-header">
+      <div class="overlay-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        <span id="overlay-aufgabe-titel">Neue Aufgabe</span>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-aufgabe')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Schließen
+      </button>
+    </div>
+    <div class="overlay-body">
+      <input type="hidden" id="aufgabe-edit-id">
+      <div class="form-group">
+        <label class="form-label">Titel <span class="req">*</span></label>
+        <input class="form-control" type="text" id="aufgabe-titel" placeholder="Was ist zu tun?">
+        <div class="form-error" id="err-titel">Bitte einen Titel eingeben.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Beschreibung <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <textarea class="form-control" id="aufgabe-beschreibung" placeholder="Details, Notizen …"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Typ <span class="req">*</span></label>
+        <div class="type-toggle">
+          <button class="type-btn active" id="typ-privat" onclick="setTyp('privat')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Privat
+          </button>
+          <button class="type-btn" id="typ-beruf" onclick="setTyp('beruf')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+            Beruflich
+          </button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Datum <span style="font-weight:400;color:var(--muted)">(optional)</span>
+        </label>
+        <input class="form-control" type="date" id="aufgabe-datum">
+        <div class="form-hint">Ohne Datum: ungeplant angelegt — später über „Planen" terminieren.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          Tag <span style="font-weight:400;color:var(--muted)">(optional)</span>
+        </label>
+        <input class="form-control" type="text" id="aufgabe-tag" list="tag-vorschlaege" placeholder="z.B. DATEV, Familie, Gesundheit …" autocomplete="off">
+        <datalist id="tag-vorschlaege"></datalist>
+        <div class="form-hint">Freitext — bestehende Tags werden als Vorschlag angeboten.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Dauer (Minuten) <span class="req">*</span></label>
+        <select class="form-control" id="aufgabe-dauer" onchange="onDauerChange()">
+          <option value="15">15</option>
+          <option value="30">30</option>
+          <option value="45">45</option>
+          <option value="60" selected>60</option>
+          <option value="90">90</option>
+          <option value="120">120</option>
+          <option value="180">180</option>
+          <option value="240">240</option>
+          <option value="manuell">── Manuell ──</option>
+        </select>
+        <input class="form-control" type="number" id="aufgabe-dauer-manuell" min="1" max="479" placeholder="Minuten (1–479)" style="display:none;margin-top:6px;">
+        <div class="form-error" id="err-dauer">Bitte eine gültige Dauer eingeben (1–479 min).</div>
+        <div class="form-hint">Wird aus Start- und Endzeit errechnet wenn geplant.</div>
+      </div>
+    </div>
+    <div class="overlay-footer">
+      <button class="btn btn-primary btn-sm" onclick="aufgabeSpeichern()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <span id="aufgabe-btn-label">Hinzufügen</span>
+      </button>
+      <button class="btn btn-dup btn-sm" id="btn-aufgabe-dup" onclick="aufgabeDuplizierenAusOverlay()" style="display:none;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Duplizieren
+      </button>
+      <button class="btn btn-outline btn-sm" id="btn-aufgabe-plan" onclick="planAusOverlay()" style="display:none;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Planen
+      </button>
+      <button class="btn btn-danger-ghost btn-sm" id="btn-aufgabe-del" onclick="aufgabeLoeschenAusOverlay()" style="display:none;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        Löschen
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-aufgabe')">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     OVERLAY: PLANEN
+═══════════════════════════════════════════════════════ -->
+<div class="overlay-bg" id="overlay-plan" onclick="handleOverlayBgClick(event,'overlay-plan')">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-header">
+      <div class="overlay-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Zeitpunkt planen
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-plan')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Schließen
+      </button>
+    </div>
+    <div class="overlay-body">
+      <input type="hidden" id="plan-aufgabe-id">
+      <div class="form-group">
+        <label class="form-label">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Datum <span class="req">*</span>
+        </label>
+        <input class="form-control" type="date" id="plan-datum">
+        <div class="form-hint">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--p400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Beim Speichern wird auf den heutigen Tag gesetzt — Vorausplanung wird überschrieben.
+        </div>
+      </div>
+      <div class="row2">
+        <div class="form-group">
+          <label class="form-label">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Startzeit <span class="req">*</span>
+          </label>
+          <input class="form-control" type="time" id="plan-start" onchange="berechnePlanDauer('start')">
+        </div>
+        <div class="form-group">
+          <label class="form-label">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Endzeit <span class="req">*</span>
+          </label>
+          <input class="form-control" type="time" id="plan-ende" onchange="berechnePlanDauer()">
+        </div>
+      </div>
+      <div class="dauer-computed">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Errechnete Dauer
+        <span class="dauer-computed-val" id="plan-dauer-anzeige">– min</span>
+      </div>
+      <div class="form-error" id="err-plan" style="display:none;">Endzeit muss nach Startzeit liegen (max 479 min).</div>
+    </div>
+    <div class="overlay-footer">
+      <button class="btn btn-primary btn-sm" onclick="planSpeichern()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Speichern
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-plan')">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     OVERLAY: ADMINBLOCK
+═══════════════════════════════════════════════════════ -->
+<div class="overlay-bg" id="overlay-admin" onclick="handleOverlayBgClick(event,'overlay-admin')">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-header">
+      <div class="overlay-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 14 11 16 15 12"/></svg>
+        Adminblock planen
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-admin')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Schließen
+      </button>
+    </div>
+    <div class="overlay-body">
+      <div class="form-hint" style="padding:6px 0;">1. Aufgaben ≤ 45 min auswählen und Startzeit setzen → <strong>Speichern</strong>. 2. Danach <strong>ICS exportieren</strong>.</div>
+      <div class="admin-list" id="admin-aufgaben-liste">
+        <div class="admin-empty">Keine Aufgaben ≤ 45 min vorhanden.</div>
+      </div>
+      <div class="admin-summe" id="admin-summe-anzeige" style="display:none;">
+        <span>Gesamtdauer</span>
+        <span class="admin-summe-val" id="admin-summe-val">0 min</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Startzeit Adminblock <span class="req">*</span>
+        </label>
+        <input class="form-control" type="time" id="admin-startzeit" value="09:00">
+      </div>
+      <div class="form-hint" id="admin-endzeit-info" style="display:none;padding:4px 0;"></div>
+    </div>
+    <div class="overlay-footer">
+      <button class="btn btn-primary btn-sm" id="btn-admin-speichern" onclick="adminblockSpeichern()" disabled>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Speichern
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-admin')">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     OVERLAY: PLANUNGSVORGABEN
+═══════════════════════════════════════════════════════ -->
+<div class="overlay-bg" id="overlay-vorgaben" onclick="handleOverlayBgClick(event,'overlay-vorgaben')">
+  <div class="overlay-sheet-vorgaben">
+    <div class="overlay-handle"></div>
+    <div class="overlay-header">
+      <div class="overlay-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Planungsvorgaben
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-vorgaben')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Schließen
+      </button>
+    </div>
+    <div class="overlay-body">
+      <div class="form-group">
+        <label class="form-label">Deine Planungsvorgaben (editierbar)</label>
+        <textarea class="form-control vorgaben-textarea" id="vorgaben-text" placeholder="Trage hier deine persönlichen Planungsvorgaben ein …"></textarea>
+      </div>
+    </div>
+    <div class="overlay-footer">
+      <button class="btn btn-primary btn-sm" onclick="vorgabenSpeichern()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Speichern
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-vorgaben')">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════
+   KONSTANTEN & GLOBALE VARIABLEN
+═══════════════════════════════════════════════════════ */
+const APP_VERSION  = '1.1.1';
+const LS_KEY       = 'aufgabenbacklog_db';
+const DB_FILENAME  = 'Backlog.json';
+
+let fileHandle     = null;
+let autoSaveTimer  = null;
+let pendingChanges = false;
+let currentFilter  = 'alle';
+let currentTyp     = 'privat';
+let currentTagFilter = '';
+
+function aktualisiereTagVorschlaege() {
+  const tags = [...new Set(DB.aufgaben.map(a => a.tag).filter(Boolean))].sort();
+  const datalist = document.getElementById('tag-vorschlaege');
+  if (datalist) {
+    datalist.innerHTML = tags.map(t => '<option value="' + escHtml(t) + '">').join('');
+  }
+  const sel = document.getElementById('tag-filter-select');
+  if (sel) {
+    const current = sel.value;
+    sel.innerHTML = '<option value="">🏷 Alle Tags</option>' +
+      tags.map(t => '<option value="' + escHtml(t) + '"' + (t === current ? ' selected' : '') + '>' + escHtml(t) + '</option>').join('');
+  }
+}
+
+function setTagFilter(tag) {
+  currentTagFilter = tag;
+  renderListe();
+}
+
+function emptyDB() {
+  return { version: APP_VERSION, aufgaben: [], planungsvorgaben: '' };
+}
+let DB = emptyDB();
+
+/* ═══════════════════════════════════════════════════════
+   HILFSFUNKTIONEN
+═══════════════════════════════════════════════════════ */
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatDatum(isoDate) {
+  if (!isoDate) return '';
+  const [y, m, d] = isoDate.split('-');
+  return d + '.' + m + '.' + y;
+}
+
+function formatDateTime() {
+  const n = new Date();
+  const pad = x => String(x).padStart(2, '0');
+  return pad(n.getDate()) + pad(n.getMonth()+1) + n.getFullYear() +
+         '_' + pad(n.getHours()) + pad(n.getMinutes());
+}
+
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '') + ' visible';
+  setTimeout(() => { t.className = 'toast' + (isError ? ' error' : ''); }, 2800);
+}
+
+/* ═══════════════════════════════════════════════════════
+   FILE SYSTEM ACCESS API
+═══════════════════════════════════════════════════════ */
+function fsApiVerfuegbar() {
+  return ('showOpenFilePicker' in window);
+}
+
+function setSaveStatus(status, text) {
+  const dot   = document.getElementById('save-dot');
+  const label = document.getElementById('save-label');
+  if (!dot || !label) return;
+  dot.className = 'save-dot' + (status === 'error' ? ' error' : '');
+  label.textContent = text;
+}
+
+async function schreibeDatei(handle, daten) {
+  const writable = await handle.createWritable();
+  await writable.write(JSON.stringify(daten, null, 2));
+  await writable.close();
+}
+
+async function leseDatei(handle) {
+  const file = await handle.getFile();
+  const text = await file.text();
+  return JSON.parse(text);
+}
+
+async function handleSpeichern(handle) {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('aufgabenbacklog', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('handles');
+    req.onsuccess = e => {
+      const db = e.target.result;
+      const tx = db.transaction('handles', 'readwrite');
+      tx.objectStore('handles').put(handle, 'filehandle');
+      tx.oncomplete = () => resolve();
+      tx.onerror    = () => reject(tx.error);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function handleLaden() {
+  return new Promise(resolve => {
+    try {
+      const req = indexedDB.open('aufgabenbacklog', 1);
+      req.onupgradeneeded = e => {
+        try { e.target.result.createObjectStore('handles'); } catch(e2) {}
+      };
+      req.onsuccess = e => {
+        try {
+          const db  = e.target.result;
+          const tx  = db.transaction('handles', 'readonly');
+          const get = tx.objectStore('handles').get('filehandle');
+          get.onsuccess = () => resolve(get.result || null);
+          get.onerror   = () => resolve(null);
+        } catch(e2) { resolve(null); }
+      };
+      req.onerror = () => resolve(null);
+    } catch(e) { resolve(null); }
+  });
+}
+
+async function saveDB() {
+  DB.version = APP_VERSION;
+  pendingChanges = true;
+  setSaveStatus('pending', 'Nicht gespeichert');
+  function lsSet(data) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
+  }
+  if (fileHandle) {
+    try {
+      await schreibeDatei(fileHandle, DB);
+      pendingChanges = false;
+      const fname = fileHandle.name || DB_FILENAME;
+      setSaveStatus('ok', 'Gespeichert · ' + fname);
+      lsSet(DB);
+    } catch(e) {
+      setSaveStatus('error', 'Speicher-Fehler');
+      lsSet(DB);
+    }
+  } else {
+    lsSet(DB);
+    pendingChanges = false;
+    setSaveStatus('ok', 'Browser-Speicher');
+  }
+  aktualisiereExportBadge();
+}
+
+async function loadDB() {
+  if (fileHandle) {
+    try {
+      const data = await leseDatei(fileHandle);
+      if (data && Array.isArray(data.aufgaben)) {
+        DB = data;
+        if (!DB.planungsvorgaben) DB.planungsvorgaben = '';
+        return;
+      }
+    } catch(e) {}
+  }
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      DB = JSON.parse(raw);
+      if (!Array.isArray(DB.aufgaben)) DB.aufgaben = [];
+      if (!DB.planungsvorgaben) DB.planungsvorgaben = '';
+    }
+  } catch(e) { DB = emptyDB(); }
+}
+
+function startAutoSave() {
+  if (autoSaveTimer) clearInterval(autoSaveTimer);
+  autoSaveTimer = setInterval(() => { if (pendingChanges) saveDB(); }, 120000);
+}
+
+/* ═══════════════════════════════════════════════════════
+   STARTBILDSCHIRM LOGIK
+═══════════════════════════════════════════════════════ */
+async function autoReconnect() {
+  const overlay   = document.getElementById('start-overlay');
+  const loading   = document.getElementById('start-loading');
+  const content   = document.getElementById('start-dialog-content');
+  const reconnect = document.getElementById('start-reconnect');
+
+  function zeigeContent() {
+    if (loading)   loading.style.display   = 'none';
+    if (reconnect) reconnect.style.display = 'none';
+    if (content)   content.style.display   = '';
+    if (overlay)   overlay.classList.add('open');
+  }
+
+  if (!fsApiVerfuegbar()) { zeigeContent(); setSaveStatus('pending', 'Keine Datei'); return; }
+
+  if (overlay) overlay.classList.add('open');
+  if (loading) loading.style.display = '';
+  if (content) content.style.display = 'none';
+  if (reconnect) reconnect.style.display = 'none';
+
+  let handle;
+  try { handle = await handleLaden(); } catch(e) { zeigeContent(); return; }
+  if (loading) loading.style.display = 'none';
+  if (!handle) { zeigeContent(); setSaveStatus('pending', 'Keine Datei'); return; }
+
+  let perm;
+  try { perm = await handle.queryPermission({ mode: 'readwrite' }); }
+  catch(e) { zeigeContent(); return; }
+
+  if (perm === 'granted') {
+    fileHandle = handle;
+    overlay.classList.remove('open');
+    await ladeUndStarte();
+    return;
+  }
+
+  const nameEl = document.getElementById('start-reconnect-name');
+  if (nameEl) nameEl.textContent = '📄 ' + (handle.name || DB_FILENAME);
+  if (reconnect) reconnect.style.display = '';
+  window._pendingHandle = handle;
+}
+
+async function reconnectMitBerechtigung() {
+  const handle = window._pendingHandle;
+  if (!handle) { zeigeVollenDialog(); return; }
+  try {
+    const neu = await handle.requestPermission({ mode: 'readwrite' });
+    if (neu === 'granted') {
+      fileHandle = handle;
+      document.getElementById('start-overlay').classList.remove('open');
+      await ladeUndStarte();
+    } else { zeigeVollenDialog(); }
+  } catch(e) { zeigeVollenDialog(); }
+}
+
+function zeigeVollenDialog() {
+  document.getElementById('start-reconnect').style.display = 'none';
+  document.getElementById('start-dialog-content').style.display = '';
+}
+
+async function startDateiOeffnen() {
+  if (!fsApiVerfuegbar()) { zeigStartFehler('Chrome oder Edge erforderlich für Datei-Zugriff.'); return; }
+  try {
+    const handles = await window.showOpenFilePicker({
+      types: [{ description: 'Backlog Daten', accept: { 'application/json': ['.json'] } }],
+      multiple: false
+    });
+    if (handles && handles.length > 0) {
+      fileHandle = handles[0];
+      await fileHandle.requestPermission({ mode: 'readwrite' });
+      await handleSpeichern(fileHandle);
+      await ladeUndStarte();
+    }
+  } catch(e) { if (e.name !== 'AbortError') zeigStartFehler('Fehler: ' + e.message); }
+}
+
+async function startDateiNeuAnlegen() {
+  if (!fsApiVerfuegbar()) { zeigStartFehler('Chrome oder Edge erforderlich.'); return; }
+  try {
+    fileHandle = await window.showSaveFilePicker({
+      suggestedName: DB_FILENAME,
+      types: [{ description: 'Backlog Daten', accept: { 'application/json': ['.json'] } }]
+    });
+    await schreibeDatei(fileHandle, emptyDB());
+    await handleSpeichern(fileHandle);
+    await ladeUndStarte();
+  } catch(e) { if (e.name !== 'AbortError') zeigStartFehler('Fehler: ' + e.message); }
+}
+
+function startOhneFile() { fileHandle = null; ladeUndStarte(); }
+
+function importierenMobile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!Array.isArray(parsed.aufgaben)) { zeigStartFehler('Ungültige Datei.'); return; }
+      DB = parsed;
+      if (!DB.planungsvorgaben) DB.planungsvorgaben = '';
+      fileHandle = null;
+      document.getElementById('start-overlay').classList.remove('open');
+      startAutoSave();
+      renderListe();
+      aktualisiereExportBadge();
+      setSaveStatus('ok', 'Importiert · ' + file.name + ' (Browser-Speicher)');
+      showToast('✓ ' + DB.aufgaben.length + ' Aufgaben importiert');
+    } catch(err) { zeigStartFehler('JSON-Fehler: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+function zeigStartFehler(msg) {
+  const el = document.getElementById('start-error');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+
+async function ladeUndStarte() {
+  await loadDB();
+  document.getElementById('start-overlay').classList.remove('open');
+  startAutoSave();
+  renderListe();
+  aktualisiereExportBadge();
+  const fname = fileHandle ? fileHandle.name : null;
+  setSaveStatus('ok', fname ? 'Gespeichert · ' + fname : 'Browser-Speicher');
+}
+
+/* ═══════════════════════════════════════════════════════
+   OVERLAY STEUERUNG
+═══════════════════════════════════════════════════════ */
+function openOverlay(id) {
+  document.getElementById(id).classList.add('visible');
+}
+
+function closeOverlay(id) {
+  document.getElementById(id).classList.remove('visible');
+}
+
+function handleOverlayBgClick(e, id) {
+  if (e.target === document.getElementById(id)) closeOverlay(id);
+}
+
+/* ═══════════════════════════════════════════════════════
+   FILTER
+═══════════════════════════════════════════════════════ */
+function setFilter(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.filter === filter);
+  });
+  renderListe();
+}
+
+/* ═══════════════════════════════════════════════════════
+   AUFGABE FORMULAR
+═══════════════════════════════════════════════════════ */
+function setTyp(typ) {
+  currentTyp = typ;
+  document.getElementById('typ-privat').classList.toggle('active', typ === 'privat');
+  document.getElementById('typ-beruf').classList.toggle('active', typ === 'beruf');
+}
+
+function onDauerChange() {
+  const sel = document.getElementById('aufgabe-dauer');
+  const man = document.getElementById('aufgabe-dauer-manuell');
+  man.style.display = sel.value === 'manuell' ? 'block' : 'none';
+}
+
+function getDauerWert() {
+  const sel = document.getElementById('aufgabe-dauer');
+  if (sel.value === 'manuell') {
+    const v = parseInt(document.getElementById('aufgabe-dauer-manuell').value, 10);
+    return (v > 0 && v < 480) ? v : null;
+  }
+  return parseInt(sel.value, 10);
+}
+
+function aufgabeFormularLeeren() {
+  document.getElementById('aufgabe-edit-id').value = '';
+  document.getElementById('aufgabe-titel').value = '';
+  document.getElementById('aufgabe-beschreibung').value = '';
+  document.getElementById('aufgabe-datum').value = '';
+  document.getElementById('aufgabe-tag').value = '';
+  aktualisiereTagVorschlaege();
+  document.getElementById('aufgabe-dauer').value = '60';
+  document.getElementById('aufgabe-dauer-manuell').style.display = 'none';
+  document.getElementById('aufgabe-dauer-manuell').value = '';
+  document.getElementById('err-titel').classList.remove('visible');
+  document.getElementById('err-dauer').classList.remove('visible');
+  document.getElementById('overlay-aufgabe-titel').textContent = 'Neue Aufgabe';
+  document.getElementById('aufgabe-btn-label').textContent = 'Hinzufügen';
+  const dupBtn = document.getElementById('btn-aufgabe-dup');
+  if (dupBtn) dupBtn.style.display = 'none';
+  const planBtn = document.getElementById('btn-aufgabe-plan');
+  if (planBtn) planBtn.style.display = 'none';
+  const delBtn = document.getElementById('btn-aufgabe-del');
+  if (delBtn) delBtn.style.display = 'none';
+  setTyp('privat');
+}
+
+function aufgabeBearbeiten(id) {
+  const a = DB.aufgaben.find(x => x.id === id);
+  if (!a) return;
+  document.getElementById('aufgabe-edit-id').value = id;
+  document.getElementById('aufgabe-titel').value = a.titel || '';
+  document.getElementById('aufgabe-beschreibung').value = a.beschreibung || '';
+  document.getElementById('aufgabe-datum').value = a.datum || '';
+  document.getElementById('aufgabe-tag').value = a.tag || '';
+  aktualisiereTagVorschlaege();
+  setTyp(a.typ || 'privat');
+  const dauerOpts = [15,30,45,60,90,120,180,240];
+  const sel = document.getElementById('aufgabe-dauer');
+  if (dauerOpts.includes(a.dauer)) {
+    sel.value = String(a.dauer);
+    document.getElementById('aufgabe-dauer-manuell').style.display = 'none';
+  } else {
+    sel.value = 'manuell';
+    document.getElementById('aufgabe-dauer-manuell').style.display = 'block';
+    document.getElementById('aufgabe-dauer-manuell').value = a.dauer || '';
+  }
+  document.getElementById('overlay-aufgabe-titel').textContent = 'Aufgabe bearbeiten';
+  document.getElementById('aufgabe-btn-label').textContent = 'Speichern';
+  const dupBtn = document.getElementById('btn-aufgabe-dup');
+  if (dupBtn) dupBtn.style.display = '';
+  const planBtn = document.getElementById('btn-aufgabe-plan');
+  if (planBtn) planBtn.style.display = '';
+  const delBtn = document.getElementById('btn-aufgabe-del');
+  if (delBtn) delBtn.style.display = '';
+  openOverlay('overlay-aufgabe');
+}
+
+function aufgabeSpeichern() {
+  const titel = document.getElementById('aufgabe-titel').value.trim();
+  const dauer = getDauerWert();
+  let ok = true;
+  if (!titel) { document.getElementById('err-titel').classList.add('visible'); ok = false; }
+  else { document.getElementById('err-titel').classList.remove('visible'); }
+  if (!dauer) { document.getElementById('err-dauer').classList.add('visible'); ok = false; }
+  else { document.getElementById('err-dauer').classList.remove('visible'); }
+  if (!ok) return;
+
+  const editId = document.getElementById('aufgabe-edit-id').value;
+  const jetzt  = new Date().toISOString().slice(0, 16).replace('T', ' ');
+
+  if (editId) {
+    const idx = DB.aufgaben.findIndex(x => x.id === editId);
+    if (idx !== -1) {
+      DB.aufgaben[idx].titel        = titel;
+      DB.aufgaben[idx].beschreibung = document.getElementById('aufgabe-beschreibung').value.trim();
+      DB.aufgaben[idx].typ          = currentTyp;
+      DB.aufgaben[idx].datum        = document.getElementById('aufgabe-datum').value || null;
+      DB.aufgaben[idx].tag          = document.getElementById('aufgabe-tag').value.trim() || null;
+      DB.aufgaben[idx].dauer        = dauer;
+      DB.aufgaben[idx].geaendert    = jetzt;
+    }
+    showToast('✓ Aufgabe aktualisiert');
+  } else {
+    DB.aufgaben.push({
+      id: uid(), titel, typ: currentTyp,
+      beschreibung: document.getElementById('aufgabe-beschreibung').value.trim(),
+      datum: document.getElementById('aufgabe-datum').value || null,
+      tag: document.getElementById('aufgabe-tag').value.trim() || null,
+      startzeit: null, endzeit: null, dauer,
+      erledigt: false, adminblock: false,
+      geaendert: jetzt
+    });
+    showToast('✓ Aufgabe hinzugefügt');
+  }
+
+  closeOverlay('overlay-aufgabe');
+  aufgabeFormularLeeren();
+  saveDB().then(() => renderListe());
+}
+
+/* ═══════════════════════════════════════════════════════
+   AUFGABE LÖSCHEN / ERLEDIGEN
+═══════════════════════════════════════════════════════ */
+function aufgabeLoeschen(id) {
+  if (!confirm('Aufgabe wirklich löschen?')) return;
+  DB.aufgaben = DB.aufgaben.filter(x => x.id !== id);
+  saveDB().then(() => renderListe());
+  showToast('Aufgabe gelöscht');
+}
+
+function aufgabeDuplizieren(id) {
+  const a = DB.aufgaben.find(x => x.id === id);
+  if (!a) return;
+  const jetzt = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const kopie = Object.assign({}, a, {
+    id: uid(),
+    titel: a.titel + ' (Kopie)',
+    erledigt: false,
+    adminblock: false,
+    datum: null,
+    startzeit: null,
+    endzeit: null,
+    geaendert: jetzt
+  });
+  DB.aufgaben.unshift(kopie);
+  saveDB().then(() => renderListe());
+  showToast('✓ Aufgabe dupliziert');
+}
+
+function aufgabeDuplizierenAusOverlay() {
+  const id = document.getElementById('aufgabe-edit-id').value;
+  if (!id) return;
+  closeOverlay('overlay-aufgabe');
+  aufgabeFormularLeeren();
+  aufgabeDuplizieren(id);
+}
+
+function planAusOverlay() {
+  const id = document.getElementById('aufgabe-edit-id').value;
+  if (!id) return;
+  closeOverlay('overlay-aufgabe');
+  openPlanOverlay(id);
+}
+
+function aufgabeLoeschenAusOverlay() {
+  const id = document.getElementById('aufgabe-edit-id').value;
+  if (!id) return;
+  closeOverlay('overlay-aufgabe');
+  aufgabeFormularLeeren();
+  aufgabeLoeschen(id);
+}
+
+function aufgabeToggleErledigt(id) {
+  const a = DB.aufgaben.find(x => x.id === id);
+  if (!a) return;
+  a.erledigt = !a.erledigt;
+  a.geaendert = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  saveDB().then(() => renderListe());
+}
+
+/* ═══════════════════════════════════════════════════════
+   PLANEN OVERLAY
+═══════════════════════════════════════════════════════ */
+function openPlanOverlay(id) {
+  const a = DB.aufgaben.find(x => x.id === id);
+  if (!a) return;
+  document.getElementById('plan-aufgabe-id').value = id;
+  document.getElementById('plan-datum').value = a.datum || today();
+  const startzeit = a.startzeit || '09:00';
+  document.getElementById('plan-start').value = startzeit;
+  // Endzeit: gespeicherte nehmen ODER aus Startzeit + Dauer errechnen
+  if (a.endzeit) {
+    document.getElementById('plan-ende').value = a.endzeit;
+  } else {
+    const [h, m] = startzeit.split(':').map(Number);
+    const endMin  = h * 60 + m + (a.dauer || 60);
+    const pad     = x => String(x).padStart(2, '0');
+    document.getElementById('plan-ende').value = pad(Math.floor(endMin / 60) % 24) + ':' + pad(endMin % 60);
+  }
+  document.getElementById('err-plan').style.display = 'none';
+  berechnePlanDauer();
+  openOverlay('overlay-plan');
+}
+
+function berechnePlanDauer(quelleGeaendert) {
+  const startEl  = document.getElementById('plan-start');
+  const endeEl   = document.getElementById('plan-ende');
+  const anzeige  = document.getElementById('plan-dauer-anzeige');
+  const err      = document.getElementById('err-plan');
+  const s = startEl.value;
+  const e = endeEl.value;
+
+  // Wenn Startzeit geändert wurde und eine Aufgaben-ID bekannt ist:
+  // Endzeit automatisch aus Startzeit + gespeicherter Dauer setzen
+  if (quelleGeaendert === 'start' && s) {
+    const aufgabeId = document.getElementById('plan-aufgabe-id').value;
+    const a = aufgabeId ? DB.aufgaben.find(x => x.id === aufgabeId) : null;
+    if (a && a.dauer) {
+      const [sh, sm] = s.split(':').map(Number);
+      const endMin   = sh * 60 + sm + a.dauer;
+      const pad      = x => String(x).padStart(2, '0');
+      endeEl.value   = pad(Math.floor(endMin / 60) % 24) + ':' + pad(endMin % 60);
+    }
+  }
+
+  // Dauer aus Start und Ende anzeigen
+  const sNeu = startEl.value;
+  const eNeu = endeEl.value;
+  if (!sNeu || !eNeu) { anzeige.textContent = '– min'; return; }
+  const [sh2, sm2] = sNeu.split(':').map(Number);
+  const [eh2, em2] = eNeu.split(':').map(Number);
+  const diff = (eh2 * 60 + em2) - (sh2 * 60 + sm2);
+  if (diff <= 0 || diff >= 480) {
+    anzeige.textContent = '– min';
+    err.style.display = 'block';
+  } else {
+    anzeige.textContent = diff + ' min';
+    err.style.display = 'none';
+  }
+}
+
+function planSpeichern() {
+  const id    = document.getElementById('plan-aufgabe-id').value;
+  const start = document.getElementById('plan-start').value;
+  const ende  = document.getElementById('plan-ende').value;
+  const a     = DB.aufgaben.find(x => x.id === id);
+  if (!a || !start || !ende) return;
+
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = ende.split(':').map(Number);
+  const diff = (eh * 60 + em) - (sh * 60 + sm);
+  if (diff <= 0 || diff >= 480) {
+    document.getElementById('err-plan').style.display = 'block';
+    return;
+  }
+
+  // Datum immer auf heute überschreiben
+  a.datum     = today();
+  a.startzeit = start;
+  a.endzeit   = ende;
+  a.dauer     = diff;
+  a.geaendert = new Date().toISOString().slice(0, 16).replace('T', ' ');
+
+  closeOverlay('overlay-plan');
+  saveDB().then(() => renderListe());
+  showToast('✓ Zeitpunkt gespeichert');
+}
+
+/* ═══════════════════════════════════════════════════════
+   EXPORT BADGE
+═══════════════════════════════════════════════════════ */
+function aktualisiereExportBadge() {
+  const heute = today();
+  const count = DB.aufgaben.filter(a =>
+    !a.erledigt && !a.adminblock && a.datum === heute && a.startzeit
+  ).length;
+  const adminCount = DB.aufgaben.filter(a =>
+    !a.erledigt && a.adminblock
+  ).length;
+  const total = count + (adminCount > 0 ? 1 : 0); // Adminblock als 1 Termin zählen
+  const badge = document.getElementById('export-badge');
+  if (!badge) return;
+  if (total > 0) {
+    badge.textContent = total;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   ICS EXPORT
+═══════════════════════════════════════════════════════ */
+function icsDateiErzeugen(events) {
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Aufgabenbacklog//DE',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH'
+  ];
+  events.forEach(ev => {
+    lines.push('BEGIN:VEVENT');
+    lines.push('UID:' + ev.uid + '@aufgabenbacklog');
+    lines.push('DTSTAMP:' + ev.dtstamp);
+    lines.push('DTSTART:' + ev.dtstart);
+    lines.push('DTEND:' + ev.dtend);
+    lines.push('SUMMARY:' + ev.summary);
+    if (ev.description) lines.push('DESCRIPTION:' + ev.description.replace(/\n/g, '\\n'));
+    if (ev.classPrivat) lines.push('CLASS:PRIVATE');
+    lines.push('BEGIN:VALARM');
+    lines.push('TRIGGER:-PT5M');
+    lines.push('ACTION:DISPLAY');
+    lines.push('DESCRIPTION:Erinnerung: ' + ev.summary);
+    lines.push('END:VALARM');
+    lines.push('END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+
+function isoZuIcs(datum, zeit) {
+  // datum: "2026-07-07", zeit: "09:00" → "20260707T090000"
+  const d = datum.replace(/-/g, '');
+  const t = zeit.replace(':', '') + '00';
+  return d + 'T' + t;
+}
+
+function addMinuten(datum, zeit, min) {
+  const [h, m] = zeit.split(':').map(Number);
+  const total = h * 60 + m + min;
+  const nh = Math.floor(total / 60) % 24;
+  const nm = total % 60;
+  const pad = x => String(x).padStart(2, '0');
+  return datum.replace(/-/g, '') + 'T' + pad(nh) + pad(nm) + '00';
+}
+
+function icsExportieren() {
+  const heute = today();
+  const zuExportieren = DB.aufgaben.filter(a =>
+    !a.erledigt && a.datum === heute && a.startzeit
+  );
+
+  if (zuExportieren.length === 0) {
+    showToast('Keine geplanten Aufgaben für heute.', true);
+    return;
+  }
+
+  const dtstamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z';
+
+  // Normale Aufgaben (kein Adminblock)
+  const normaleAufgaben = zuExportieren.filter(a => !a.adminblock);
+  const adminAufgaben   = zuExportieren.filter(a => a.adminblock);
+
+  const events = normaleAufgaben.map(a => ({
+    uid: a.id + '-' + Date.now(),
+    dtstamp,
+    dtstart: isoZuIcs(a.datum, a.startzeit),
+    dtend: addMinuten(a.datum, a.startzeit, a.dauer),
+    summary: a.titel,
+    description: a.beschreibung || '',
+    classPrivat: a.typ === 'privat'
+  }));
+
+  // Adminblock: ein VEVENT mit Summe der Dauern + Spiegelstrich-Beschreibung
+  if (adminAufgaben.length > 0) {
+    const startzeit   = adminAufgaben[0].startzeit;
+    const summeDauer  = adminAufgaben.reduce((acc, a) => acc + a.dauer, 0);
+    const beschreibung = adminAufgaben.map(a => {
+      let zeile = '- ' + a.titel;
+      if (a.beschreibung && a.beschreibung.trim()) {
+        const zeilen = a.beschreibung.trim().split('\n');
+        zeile += zeilen.map(z => '\n     ' + z.trim()).join('');
+      }
+      return zeile;
+    }).join('\n');
+
+    events.push({
+      uid: 'adminblock-' + Date.now(),
+      dtstamp,
+      dtstart: isoZuIcs(heute, startzeit),
+      dtend: addMinuten(heute, startzeit, summeDauer),
+      summary: 'Adminblock',
+      description: beschreibung,
+      classPrivat: false
+    });
+  }
+
+  const icsText = icsDateiErzeugen(events);
+  const blob    = new Blob([icsText], { type: 'text/calendar;charset=utf-8' });
+  const url     = URL.createObjectURL(blob);
+  const link    = document.createElement('a');
+  link.href     = url;
+  link.download = 'Backlogplanung_' + formatDateTime() + '.ics';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  // Alle exportierten Aufgaben (normale + Adminblock) als erledigt markieren
+  const jetzt = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  zuExportieren.forEach(a => {
+    a.erledigt    = true;
+    a.adminblock  = false;
+    a.geaendert   = jetzt;
+  });
+
+  saveDB().then(() => renderListe());
+  showToast('✓ ICS exportiert · ' + zuExportieren.length + ' Aufgabe(n) erledigt');
+}
+
+/* ═══════════════════════════════════════════════════════
+   ADMINBLOCK
+═══════════════════════════════════════════════════════ */
+function openAdminOverlay() {
+  const eligible = DB.aufgaben.filter(a => !a.erledigt && a.dauer <= 45);
+  const liste = document.getElementById('admin-aufgaben-liste');
+  liste.innerHTML = '';
+
+  if (eligible.length === 0) {
+    liste.innerHTML = '<div class="admin-empty">Keine offenen Aufgaben ≤ 45 min vorhanden.</div>';
+    document.getElementById('admin-summe-anzeige').style.display = 'none';
+    document.getElementById('btn-admin-speichern').disabled = true;
+    openOverlay('overlay-admin');
+    return;
+  }
+
+  eligible.forEach(a => {
+    const item = document.createElement('div');
+    item.className = 'admin-item';
+    item.dataset.id = a.id;
+    item.innerHTML =
+      '<input type="checkbox" onchange="adminCheckboxChange()">' +
+      '<span class="admin-item-title">' + escHtml(a.titel) + '</span>' +
+      '<span class="admin-item-dauer">' + a.dauer + ' min</span>';
+    item.addEventListener('click', function(e) {
+      if (e.target.type === 'checkbox') return;
+      const cb = this.querySelector('input[type=checkbox]');
+      cb.checked = !cb.checked;
+      adminCheckboxChange();
+    });
+    liste.appendChild(item);
+  });
+
+  document.getElementById('admin-summe-anzeige').style.display = 'none';
+  document.getElementById('admin-endzeit-info').style.display = 'none';
+  document.getElementById('btn-admin-speichern').disabled = true;
+  openOverlay('overlay-admin');
+}
+
+function adminCheckboxChange() {
+  const items = document.querySelectorAll('#admin-aufgaben-liste .admin-item');
+  let summe = 0;
+  items.forEach(item => {
+    const cb = item.querySelector('input[type=checkbox]');
+    item.classList.toggle('selected', cb.checked);
+    if (cb.checked) {
+      summe += parseInt(item.querySelector('.admin-item-dauer').textContent, 10);
+    }
+  });
+
+  const summeEl    = document.getElementById('admin-summe-anzeige');
+  const summeVal   = document.getElementById('admin-summe-val');
+  const endzeitInfo= document.getElementById('admin-endzeit-info');
+  const btnSpeich  = document.getElementById('btn-admin-speichern');
+  const startzeit  = document.getElementById('admin-startzeit').value;
+
+  if (summe > 0) {
+    summeEl.style.display = 'flex';
+    summeVal.textContent  = summe + ' min';
+    btnSpeich.disabled    = false;
+    if (startzeit) {
+      const [h, m] = startzeit.split(':').map(Number);
+      const end    = h * 60 + m + summe;
+      const eh     = Math.floor(end / 60) % 24;
+      const em     = end % 60;
+      const pad    = x => String(x).padStart(2, '0');
+      endzeitInfo.textContent = 'Adminblock: ' + startzeit + ' – ' + pad(eh) + ':' + pad(em);
+      endzeitInfo.style.display = 'block';
+    }
+  } else {
+    summeEl.style.display     = 'none';
+    endzeitInfo.style.display = 'none';
+    btnSpeich.disabled        = true;
+  }
+}
+
+function adminblockSpeichern() {
+  const items = document.querySelectorAll('#admin-aufgaben-liste .admin-item');
+  const selected = [];
+  items.forEach(item => {
+    const cb = item.querySelector('input[type=checkbox]');
+    if (cb.checked) {
+      const id = item.dataset.id;
+      const a  = DB.aufgaben.find(x => x.id === id);
+      if (a) selected.push(a);
+    }
+  });
+
+  if (selected.length === 0) { showToast('Keine Aufgaben ausgewählt.', true); return; }
+
+  const startzeit = document.getElementById('admin-startzeit').value;
+  if (!startzeit) { showToast('Bitte Startzeit angeben.', true); return; }
+
+  const heute = today();
+  const jetzt = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const [h, m] = startzeit.split(':').map(Number);
+  const pad = x => String(x).padStart(2, '0');
+
+  selected.forEach(a => {
+    a.datum      = heute;
+    a.startzeit  = startzeit;
+    const endMin = h * 60 + m + a.dauer;
+    a.endzeit    = pad(Math.floor(endMin / 60) % 24) + ':' + pad(endMin % 60);
+    a.geaendert  = jetzt;
+    a.adminblock = true;
+  });
+
+  closeOverlay('overlay-admin');
+  saveDB().then(() => {
+    renderListe();
+    showToast('✓ Adminblock gespeichert — ' + selected.length + ' Aufgabe(n) im nächsten ICS Export');
+  });
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   PLANUNGSVORGABEN
+═══════════════════════════════════════════════════════ */
+function openVorgabenOverlay() {
+  document.getElementById('vorgaben-text').value = DB.planungsvorgaben || '';
+  openOverlay('overlay-vorgaben');
+}
+
+function vorgabenSpeichern() {
+  DB.planungsvorgaben = document.getElementById('vorgaben-text').value;
+  saveDB();
+  closeOverlay('overlay-vorgaben');
+  showToast('✓ Planungsvorgaben gespeichert');
+}
+
+/* ═══════════════════════════════════════════════════════
+   RENDERN
+═══════════════════════════════════════════════════════ */
+function escHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function svgCheck() {
+  return '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+}
+function svgKal() {
+  return '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+}
+
+function renderAufgabe(a) {
+  const isPrivat   = a.typ === 'privat';
+  const typChip    = isPrivat
+    ? '<span class="chip chip-privat"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> Privat</span>'
+    : '<span class="chip chip-beruf"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg> Beruflich</span>';
+
+  const datumChip  = a.datum
+    ? '<span class="chip chip-datum">' + svgKal() + ' ' + formatDatum(a.datum) + '</span>' : '';
+  const tagChip    = a.tag
+    ? '<span class="chip chip-tag"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> ' + escHtml(a.tag) + '</span>' : '';
+
+  return '<div class="task-row' + (a.erledigt ? ' erledigt-row' : '') + '" id="row-' + a.id + '">' +
+    '<div class="task-main" onclick="aufgabeBearbeiten(\'' + a.id + '\')">' +
+      '<div class="task-check' + (a.erledigt ? ' checked' : '') + '" onclick="event.stopPropagation();aufgabeToggleErledigt(\'' + a.id + '\')">' +
+        (a.erledigt ? svgCheck() : '') +
+      '</div>' +
+      '<span class="task-title-text' + (a.erledigt ? ' done' : '') + '">' + escHtml(a.titel) + '</span>' +
+      '<div class="task-chips">' +
+        tagChip +
+        datumChip +
+        '<span class="chip chip-dauer">' + a.dauer + ' min</span>' +
+        typChip +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderListe() {
+  const container  = document.getElementById('task-list');
+  const emptyState = document.getElementById('empty-state');
+
+  // Sortierung: letzte Änderung absteigend
+  const sorted = [...DB.aufgaben].sort((a, b) => {
+    const da = a.geaendert || '';
+    const db2 = b.geaendert || '';
+    return db2.localeCompare(da);
+  });
+
+  // Filter anwenden
+  let sichtbar = sorted.filter(a => {
+    if (currentFilter === 'erledigt') return a.erledigt;
+    if (currentFilter === 'privat')   return !a.erledigt && a.typ === 'privat';
+    if (currentFilter === 'beruf')    return !a.erledigt && a.typ === 'beruf';
+    return !a.erledigt; // 'alle' = offene
+  });
+
+  // Tag-Filter zusätzlich anwenden
+  if (currentTagFilter) {
+    sichtbar = sichtbar.filter(a => a.tag === currentTagFilter);
+  }
+
+  aktualisiereTagVorschlaege();
+
+  // Existierende Zeilen außer empty-state entfernen
+  Array.from(container.children).forEach(child => {
+    if (child.id !== 'empty-state') child.remove();
+  });
+
+  if (sichtbar.length === 0) {
+    emptyState.style.display = '';
+  } else {
+    emptyState.style.display = 'none';
+    sichtbar.forEach(a => {
+      container.insertAdjacentHTML('beforeend', renderAufgabe(a));
+    });
+  }
+
+  // Aufgeklappte Zeilen wiederherstellen
+  document.querySelectorAll('.task-row').forEach(row => {
+    row.addEventListener('click', function() {}); // placeholder
+  });
+
+  aktualisiereExportBadge();
+  aktualisiereFilterZaehler();
+}
+
+function aktualisiereFilterZaehler() {
+  const alle    = DB.aufgaben.filter(a => !a.erledigt).length;
+  const privat  = DB.aufgaben.filter(a => !a.erledigt && a.typ === 'privat').length;
+  const beruf   = DB.aufgaben.filter(a => !a.erledigt && a.typ === 'beruf').length;
+  const erledigt= DB.aufgaben.filter(a => a.erledigt).length;
+
+  document.querySelectorAll('.filter-tab').forEach(t => {
+    const f = t.dataset.filter;
+    if (f === 'alle')     t.textContent = 'Alle (' + alle + ')';
+    if (f === 'privat')   t.textContent = 'Privat (' + privat + ')';
+    if (f === 'beruf')    t.textContent = 'Beruflich (' + beruf + ')';
+    if (f === 'erledigt') {
+      // Erledigt-Tab hat ein SVG-Icon, wir setzen nur den Text-Teil neu
+      t.innerHTML = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Erledigt (' + erledigt + ')';
+    }
+  });
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   EVENT LISTENER
+═══════════════════════════════════════════════════════ */
+document.getElementById('filter-bar').addEventListener('click', function(e) {
+  const tab = e.target.closest('.filter-tab');
+  if (tab) setFilter(tab.dataset.filter);
+});
+
+// Overlay-Vorgaben über den Info-Button öffnen (Funktion bereits im HTML)
+// Adminblock via ICS-Export-Button-Rechtsklick oder separatem Einstieg
+// → Adminblock Button direkt neben ICS Export oder per Kontextmenü?
+// Per Implementierungsentscheidung: Adminblock über langen Klick auf ICS-Button
+// Einfachere Lösung: Adminblock-Button im Filter-Bereich
+document.getElementById('filter-bar').insertAdjacentHTML('beforeend',
+  '<button class="filter-tab" style="margin-left:auto;border-color:#ddd6fe;color:#6d28d9;" onclick="openAdminOverlay()">' +
+  '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 14 11 16 15 12"/></svg>' +
+  ' Adminblock</button>'
+);
+
+/* ═══════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════ */
+setSaveStatus('pending', 'Verbinde …');
+autoReconnect();
+</script>
+</body></html>
