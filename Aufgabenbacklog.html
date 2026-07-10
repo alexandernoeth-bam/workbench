@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aufgabenbacklog v1.2.3</title>
+<title>Aufgabenbacklog v1.2.4</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -637,7 +637,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.2.3</div>
+    <div class="start-version">v1.2.4</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -673,6 +673,10 @@ textarea.form-control.vorgaben-textarea {
           JSON importieren (Mobile / iPad)
         </button>
         <input type="file" id="mobile-file-input" accept=".json,application/json" style="display:none" onchange="importierenMobile(event)">
+        <button class="btn-start-secondary" onclick="jsonExportieren()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          JSON exportieren (Backup / Sync)
+        </button>
         <button class="btn-start-secondary" onclick="startOhneFile()">Ohne Datei starten (nur Browser-Speicher)</button>
       </div>
       <div class="start-hint">
@@ -693,7 +697,7 @@ textarea.form-control.vorgaben-textarea {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <div class="topbar-title">
       Aufgabenbacklog
-      <span class="version-pill">v1.2.3</span>
+      <span class="version-pill">v1.2.4</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -701,6 +705,9 @@ textarea.form-control.vorgaben-textarea {
       <div class="save-dot" id="save-dot"></div>
       <span id="save-label">–</span>
     </div>
+    <button class="btn-icon" onclick="jsonExportieren()" title="JSON exportieren (Backup)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    </button>
     <button class="btn-icon" onclick="openProjekteScreen()" title="Projekte">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
     </button>
@@ -1304,7 +1311,7 @@ textarea.form-control.vorgaben-textarea {
 /* ═══════════════════════════════════════════════════════
    KONSTANTEN & GLOBALE VARIABLEN
 ═══════════════════════════════════════════════════════ */
-const APP_VERSION  = '1.2.3';
+const APP_VERSION  = '1.2.4';
 const LS_KEY       = 'aufgabenbacklog_db';
 const DB_FILENAME  = 'Backlog.json';
 
@@ -1983,6 +1990,28 @@ async function startDateiNeuAnlegen() {
 }
 
 function startOhneFile() { fileHandle = null; ladeUndStarte(); }
+
+function jsonExportieren() {
+  const jetzt   = new Date();
+  const pad     = x => String(x).padStart(2, '0');
+  const dateiname = 'Backlog_' +
+    jetzt.getFullYear() +
+    pad(jetzt.getMonth() + 1) +
+    pad(jetzt.getDate()) + '_' +
+    pad(jetzt.getHours()) +
+    pad(jetzt.getMinutes()) + '.json';
+
+  const blob = new Blob([JSON.stringify(DB, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href     = url;
+  link.download = dateiname;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  showToast('✓ JSON exportiert · ' + dateiname);
+}
 
 function importierenMobile(event) {
   const file = event.target.files[0];
