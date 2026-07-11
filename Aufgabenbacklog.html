@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aufgabenbacklog v1.4.8</title>
+<title>Aufgabenbacklog v1.5.0</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -819,7 +819,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.4.8</div>
+    <div class="start-version">v1.5.0</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -879,7 +879,7 @@ textarea.form-control.vorgaben-textarea {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <div class="topbar-title">
       Aufgabenbacklog
-      <span class="version-pill">v1.4.8</span>
+      <span class="version-pill">v1.5.0</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -1888,51 +1888,48 @@ function notizVorlesen() {
     return;
   }
 
-  // Text aus Textarea oder Render-View holen und Markdown bereinigen
-  const titel  = document.getElementById('notiz-edit-titel')?.value || '';
-  const inhalt = document.getElementById('notiz-textarea')?.value   || '';
+  // Text direkt aus DB holen (sicher, egal ob Textarea sichtbar oder nicht)
+  const id    = document.getElementById('notiz-edit-id')?.value || '';
+  const n     = id ? DB.notizen.find(x => x.id === id) : null;
+  const titel = document.getElementById('notiz-edit-titel')?.value || (n?.titel || '');
+  const inhalt = n?.inhalt || document.getElementById('notiz-textarea')?.value || '';
+
   const bereinigt = (titel + '.\n\n' + inhalt)
-    .replace(/^#{1,2} /gm, '')       // Überschriften
-    .replace(/\*\*/g, '')             // Fett
-    .replace(/^- \[x\] /gim, '')     // erledigte Checkboxen
-    .replace(/^- \[ \] /gm, '')      // offene Checkboxen
-    .replace(/^- /gm, '')            // Listenpunkte
-    .replace(/---+/g, '')            // Trenner
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // Links → nur Text
-    .replace(/\|[-| :]+\|/g, '')     // Tabellen-Trennzeilen
-    .replace(/\|/g, ' ')             // Tabellen-Pipes
+    .replace(/^#{1,2} /gm, '')
+    .replace(/\*\*/g, '')
+    .replace(/^- \[x\] /gim, '')
+    .replace(/^- \[ \] /gm, '')
+    .replace(/^- /gm, '')
+    .replace(/---+/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\|[-| :]+\|/g, '')
+    .replace(/\|/g, ' ')
     .trim();
 
   if (!bereinigt) { showToast('Kein Text zum Vorlesen.'); return; }
 
-  // Workaround für Android-Abbruch bei langen Texten:
-  // Text in Absätze aufteilen und nacheinander vorlesen
-  const absaetze = bereinigt.split(/\n{2,}/).filter(s => s.trim());
+  // Text in Absätze aufteilen (Android-Workaround gegen 15s-Abbruch)
+  const absaetze = bereinigt.split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
 
   let idx = 0;
+  const btn = document.getElementById('btn-vorlesen');
+
   const sprechNaechsten = () => {
-    if (idx >= absaetze.length || !window.speechSynthesis.speaking === false) {
-      if (idx >= absaetze.length) {
-        document.getElementById('btn-vorlesen').style.background = 'rgba(255,255,255,0.13)';
-        return;
-      }
+    if (idx >= absaetze.length) {
+      btn.style.background = 'rgba(255,255,255,0.13)';
+      return;
     }
-    const utt = new SpeechSynthesisUtterance(absaetze[idx]);
-    utt.lang  = 'de-DE';
-    utt.rate  = 0.95;
-    utt.onend = () => { idx++; sprechNaechsten(); };
-    utt.onerror = () => {
-      document.getElementById('btn-vorlesen').style.background = 'rgba(255,255,255,0.13)';
-    };
+    const utt  = new SpeechSynthesisUtterance(absaetze[idx]);
+    utt.lang   = 'de-DE';
+    utt.rate   = 0.95;
+    utt.onend  = () => { idx++; sprechNaechsten(); };
+    utt.onerror = () => { btn.style.background = 'rgba(255,255,255,0.13)'; };
     window.speechSynthesis.speak(utt);
-    idx++;
   };
 
-  // Button-Farbe als Indikator
-  document.getElementById('btn-vorlesen').style.background = 'rgba(255,255,255,0.35)';
-  // Workaround: kurze Pause vor Start (Android-Bug)
+  btn.style.background = 'rgba(255,255,255,0.35)';
   window.speechSynthesis.cancel();
-  setTimeout(() => sprechNaechsten(), 100);
+  setTimeout(sprechNaechsten, 100);
 }
 
 function notizNeu() {
