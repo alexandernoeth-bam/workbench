@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aufgabenbacklog v1.4.1</title>
+<title>Aufgabenbacklog v1.4.2</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -818,7 +818,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.4.1</div>
+    <div class="start-version">v1.4.2</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -878,7 +878,7 @@ textarea.form-control.vorgaben-textarea {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <div class="topbar-title">
       Aufgabenbacklog
-      <span class="version-pill">v1.4.1</span>
+      <span class="version-pill">v1.4.2</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -1542,6 +1542,13 @@ textarea.form-control.vorgaben-textarea {
       <input class="notiz-tag-input-ed" type="text" id="notiz-edit-tag" list="tag-vorschlaege" placeholder="Tag …" autocomplete="off">
       <span class="notiz-edit-datum" id="notiz-edit-datum">–</span>
     </div>
+    <!-- Unterseiten-Chip: fest im Header, immer sichtbar für Oberseiten -->
+    <div id="notiz-usz-zeile" style="display:none;padding:5px 16px 8px;border-bottom:1px solid var(--border);">
+      <button class="chip-unterseiten" id="notiz-usz-chip-toolbar" onclick="openUnterseitenSheet(document.getElementById('notiz-edit-id').value)">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        <span id="notiz-usz-chip-label">Unterseiten</span>
+      </button>
+    </div>
     <div id="notiz-unterseite-von" style="display:none;font-size:0.65rem;color:var(--muted);padding:3px 16px 8px;border-bottom:1px solid var(--border);align-items:center;gap:5px;">
       <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       <span id="notiz-unterseite-von-text">Unterseite von: –</span>
@@ -1574,12 +1581,6 @@ textarea.form-control.vorgaben-textarea {
     </button>
     <button class="ntb" onclick="ntbTabelle()" title="Tabelle">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-    </button>
-    <div class="ntb-sep"></div>
-    <!-- Unterseiten-Chip — nur für Oberseiten sichtbar -->
-    <button class="chip-unterseiten" id="notiz-usz-chip-toolbar" style="display:none;margin-left:4px;" onclick="openUnterseitenSheet(document.getElementById('notiz-edit-id').value)">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-      Unterseiten
     </button>
     <div class="ntb-sep"></div>
     <button class="ntb" onclick="notizLoeschen()" title="Notiz löschen" id="btn-notiz-del" style="display:none;color:var(--danger);">
@@ -1752,19 +1753,14 @@ function notizChkBadge(inhalt) {
 }
 
 function aktualisiereUszChipToolbar(notizId) {
-  // Chip in Toolbar nur für Oberseiten anzeigen
   const n = DB.notizen.find(x => x.id === notizId);
   const isOberseite = n && !n.parentId;
-  const unterseiten = isOberseite ? DB.notizen.filter(x => x.parentId === notizId) : [];
-  let chip = document.getElementById('notiz-usz-chip-toolbar');
-  if (!chip) return;
-  if (isOberseite) {
-    chip.style.display = 'inline-flex';
-    chip.textContent   = '';
-    chip.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> ' +
-      unterseiten.length + ' Unterseite' + (unterseiten.length !== 1 ? 'n' : '');
-  } else {
-    chip.style.display = 'none';
+  const uszZeile = document.getElementById('notiz-usz-zeile');
+  const uszLabel = document.getElementById('notiz-usz-chip-label');
+  if (uszZeile) uszZeile.style.display = isOberseite ? 'block' : 'none';
+  if (isOberseite && uszLabel) {
+    const usz = DB.notizen.filter(x => x.parentId === notizId);
+    uszLabel.textContent = usz.length + ' Unterseite' + (usz.length !== 1 ? 'n' : '');
   }
 }
 
@@ -1894,18 +1890,15 @@ function notizOeffnen(id) {
     vonTxt.textContent = 'Unterseite von: ' + (ob ? ob.titel : '');
   }
 
-  // Unterseiten-Chip: direkt hier setzen ohne Hilfsfunktion
-  const chip = document.getElementById('notiz-usz-chip-toolbar');
-  if (chip) {
+  // Unterseiten-Chip im Header ein-/ausblenden
+  const uszZeile = document.getElementById('notiz-usz-zeile');
+  const uszLabel = document.getElementById('notiz-usz-chip-label');
+  if (uszZeile) {
     const isOberseite = !n.parentId;
-    if (isOberseite) {
+    uszZeile.style.display = isOberseite ? 'block' : 'none';
+    if (isOberseite && uszLabel) {
       const usz = DB.notizen.filter(x => x.parentId === id);
-      chip.style.display = 'inline-flex';
-      chip.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> ' +
-        usz.length + ' Unterseite' + (usz.length !== 1 ? 'n' : '');
-      chip.onclick = function() { openUnterseitenSheet(id); };
-    } else {
-      chip.style.display = 'none';
+      uszLabel.textContent = usz.length + ' Unterseite' + (usz.length !== 1 ? 'n' : '');
     }
   }
 
