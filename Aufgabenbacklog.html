@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aufgabenbacklog v1.3.9</title>
+<title>Aufgabenbacklog v1.4.0</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -818,7 +818,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.3.9</div>
+    <div class="start-version">v1.4.0</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -878,7 +878,7 @@ textarea.form-control.vorgaben-textarea {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <div class="topbar-title">
       Aufgabenbacklog
-      <span class="version-pill">v1.3.9</span>
+      <span class="version-pill">v1.4.0</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -1865,37 +1865,45 @@ function notizOeffnen(id) {
   const n = DB.notizen.find(x => x.id === id);
   if (!n) return;
 
-  // Falls Oberseite mit lastOpenedId direkt dorthin
+  // lastOpened: nur wenn explizit eine Unterseite existiert
   if (!n.parentId && n.lastOpenedId) {
     const last = DB.notizen.find(x => x.id === n.lastOpenedId);
-    if (last) { notizOeffnen(n.lastOpenedId); return; }
+    if (last && last.id !== id) { notizOeffnen(n.lastOpenedId); return; }
   }
 
-  document.getElementById('notiz-edit-id').value        = id;
-  document.getElementById('notiz-edit-parentid').value  = n.parentId || '';
-  document.getElementById('notiz-edit-titel').value     = n.titel || '';
-  document.getElementById('notiz-edit-tag').value       = n.tag || '';
-  document.getElementById('notiz-textarea').value       = n.inhalt || '';
-  document.getElementById('notiz-edit-datum').textContent = n.geaendert ? n.geaendert.slice(0,10).split('-').reverse().join('.') : '';
-  document.getElementById('btn-notiz-del').style.display = '';
+  // Felder befüllen
+  const setVal = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val || ''; };
+  setVal('notiz-edit-id',       id);
+  setVal('notiz-edit-parentid', n.parentId || '');
+  setVal('notiz-edit-titel',    n.titel || '');
+  setVal('notiz-edit-tag',      n.tag || '');
+  setVal('notiz-textarea',      n.inhalt || '');
 
-  const vonEl  = document.getElementById('notiz-unterseite-von');
+  const datumEl = document.getElementById('notiz-edit-datum');
+  if (datumEl) datumEl.textContent = n.geaendert ? n.geaendert.slice(0,10).split('-').reverse().join('.') : '';
+
+  const delBtn = document.getElementById('btn-notiz-del');
+  if (delBtn) delBtn.style.display = '';
+
+  // Unterseite-von Label
+  const vonEl = document.getElementById('notiz-unterseite-von');
+  if (vonEl) vonEl.style.display = n.parentId ? 'flex' : 'none';
   const vonTxt = document.getElementById('notiz-unterseite-von-text');
-  if (n.parentId) {
-    const eltern = DB.notizen.find(x => x.id === n.parentId);
-    if (vonEl)  vonEl.style.display = 'flex';
-    if (vonTxt) vonTxt.textContent  = 'Unterseite von: ' + (eltern ? eltern.titel : '');
-  } else {
-    if (vonEl) vonEl.style.display = 'none';
-  }
-
-  aktualisiereUszChipToolbar(id);
-
-  if (n.parentId) {
+  if (vonTxt && n.parentId) {
     const ob = DB.notizen.find(x => x.id === n.parentId);
-    if (ob) { ob.lastOpenedId = id; saveDB(); }
+    vonTxt.textContent = 'Unterseite von: ' + (ob ? ob.titel : '');
   }
 
+  // Chip + lastOpened (separat, kein Fehler wenn nicht klappt)
+  try { aktualisiereUszChipToolbar(id); } catch(e) {}
+  try {
+    if (n.parentId) {
+      const ob = DB.notizen.find(x => x.id === n.parentId);
+      if (ob) { ob.lastOpenedId = id; saveDB(); }
+    }
+  } catch(e) {}
+
+  // View + Screen
   notizZeigeEdit();
   document.getElementById('screen-notizen').classList.remove('active');
   document.getElementById('screen-notiz-editor').classList.add('active');
