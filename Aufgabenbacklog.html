@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aufgabenbacklog v1.2.4</title>
+<title>Aufgabenbacklog v1.2.5</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -622,6 +622,136 @@ textarea.form-control.vorgaben-textarea {
 .proj-aufg-titel.done { text-decoration: line-through; color: var(--muted); }
 .section-label-proj { font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--p400); padding: 8px 12px 6px; border-bottom: 1px solid var(--border); background: var(--p50); display: flex; align-items: center; justify-content: space-between; }
 
+
+/* ══════════════════════════════════════
+   NOTIZEN
+══════════════════════════════════════ */
+.screen-notiz {
+  display: none; flex-direction: column;
+  position: fixed; inset: 0; z-index: 200;
+  background: var(--bg);
+}
+.screen-notiz.active { display: flex; }
+
+/* Übersicht */
+.notiz-search {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 99px; padding: 7px 13px; margin: 0;
+}
+.notiz-search input {
+  border: none; background: transparent; font-family: inherit;
+  font-size: 0.84rem; color: var(--text); flex: 1; outline: none;
+}
+.notiz-tag-filter {
+  display: flex; gap: 6px; flex-wrap: nowrap;
+  overflow-x: auto; padding-bottom: 2px;
+}
+.notiz-tag-filter::-webkit-scrollbar { display: none; }
+.notiz-tag-pill {
+  padding: 4px 12px; border-radius: 99px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted); font-size: 0.73rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap; font-family: inherit;
+  flex-shrink: 0;
+}
+.notiz-tag-pill.active { background: var(--p700); border-color: var(--p700); color: #fff; }
+.notiz-tag-pill.has-tag { background: #f3e8ff; border-color: #ddd6fe; color: #6d28d9; }
+.notiz-tag-pill.has-tag.active { background: #6d28d9; border-color: #6d28d9; color: #fff; }
+
+.notiz-karte {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 11px 13px; cursor: pointer; transition: border-color .15s;
+}
+.notiz-karte:hover { border-color: var(--p400); }
+.notiz-karte-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.notiz-karte-titel { font-size: 0.88rem; font-weight: 700; flex: 1; }
+.notiz-karte-datum { font-size: 0.66rem; color: var(--muted); white-space: nowrap; }
+.notiz-karte-preview { font-size: 0.74rem; color: var(--muted); line-height: 1.5; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.notiz-leer { text-align: center; padding: 48px 20px; color: var(--muted); font-size: 0.83rem; line-height: 1.6; }
+
+/* Editor */
+.notiz-editor-header {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.notiz-titel-input {
+  width: 100%; border: none; outline: none;
+  font-size: 1.05rem; font-weight: 700; color: var(--text);
+  font-family: inherit; padding: 13px 16px 4px; background: transparent;
+}
+.notiz-titel-input::placeholder { color: var(--muted); font-weight: 400; }
+.notiz-meta-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 16px 10px;
+}
+.notiz-tag-input-ed {
+  border: none; outline: none; font-size: 0.77rem;
+  font-family: inherit; color: var(--p600); background: transparent; flex: 1;
+}
+.notiz-tag-input-ed::placeholder { color: var(--muted); }
+.notiz-edit-datum { font-size: 0.66rem; color: var(--muted); white-space: nowrap; }
+
+/* Toolbar */
+.notiz-toolbar {
+  display: flex; align-items: center; gap: 2px;
+  padding: 5px 8px; background: var(--p50);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; overflow-x: auto;
+}
+.notiz-toolbar::-webkit-scrollbar { display: none; }
+.ntb { display: flex; align-items: center; justify-content: center;
+  min-width: 32px; height: 32px; border-radius: 6px; border: 1px solid transparent;
+  background: transparent; cursor: pointer; font-family: inherit;
+  font-size: 0.78rem; font-weight: 700; color: var(--text); flex-shrink: 0; }
+.ntb:hover { background: var(--surface); border-color: var(--border); }
+.ntb-sep { width: 1px; height: 20px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
+
+/* View Toggle */
+.notiz-view-toggle {
+  display: flex; gap: 3px; background: rgba(255,255,255,0.15);
+  border-radius: 7px; padding: 2px;
+}
+.nvt-btn { padding: 3px 9px; border-radius: 5px; border: none; cursor: pointer;
+  font-size: 0.7rem; font-weight: 700; font-family: inherit;
+  background: transparent; color: rgba(255,255,255,0.7); }
+.nvt-btn.active { background: rgba(255,255,255,0.25); color: #fff; }
+
+/* Textarea + Render */
+.notiz-textarea {
+  flex: 1; padding: 14px 16px;
+  font-family: 'Menlo','Consolas','Courier New', monospace;
+  font-size: 0.85rem; line-height: 1.75;
+  border: none; outline: none; resize: none;
+  color: var(--text); background: var(--surface);
+}
+.notiz-render-view {
+  flex: 1; overflow-y: auto; padding: 14px 16px;
+  font-size: 0.88rem; line-height: 1.75;
+  background: var(--surface); color: var(--text);
+}
+.notiz-render-view h1 {
+  font-size: 1.2rem; font-weight: 800; color: var(--p700);
+  margin: 14px 0 6px; border-bottom: 2px solid var(--p100); padding-bottom: 4px;
+}
+.notiz-render-view h1:first-child { margin-top: 0; }
+.notiz-render-view h2 { font-size: 1rem; font-weight: 700; color: var(--p600); margin: 12px 0 4px; }
+.notiz-render-view p { margin: 3px 0; }
+.notiz-render-view ul { padding-left: 18px; margin: 4px 0; }
+.notiz-render-view li { margin: 2px 0; line-height: 1.6; }
+.notiz-render-view hr { border: none; border-top: 2px solid var(--border); margin: 14px 0; }
+.notiz-render-view strong { font-weight: 700; }
+.notiz-render-view a { color: var(--p500); text-decoration: underline; }
+.notiz-render-view table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 0.83rem; }
+.notiz-render-view th { background: var(--p50); color: var(--p700); font-weight: 700; padding: 6px 10px; border: 1px solid var(--border); text-align: left; }
+.notiz-render-view td { padding: 6px 10px; border: 1px solid var(--border); }
+.notiz-render-view tr:nth-child(even) td { background: var(--p50); }
+.notiz-check-zeile { display: flex; align-items: flex-start; gap: 8px; margin: 3px 0; }
+.notiz-check-zeile input[type=checkbox] { margin-top: 3px; accent-color: var(--p600); flex-shrink: 0; cursor: pointer; }
+.notiz-check-zeile label { cursor: pointer; flex: 1; line-height: 1.5; }
+.notiz-check-zeile.erledigt label { text-decoration: line-through; color: var(--muted); }
+
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 </style>
@@ -637,7 +767,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.2.4</div>
+    <div class="start-version">v1.2.5</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -697,7 +827,7 @@ textarea.form-control.vorgaben-textarea {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <div class="topbar-title">
       Aufgabenbacklog
-      <span class="version-pill">v1.2.4</span>
+      <span class="version-pill">v1.2.5</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -714,8 +844,8 @@ textarea.form-control.vorgaben-textarea {
     <button class="btn-icon" onclick="openVorlagenOverlay()" title="Vorlagen verwalten">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
     </button>
-    <button class="btn-icon" onclick="window.open('https://calendar.google.com','_blank')" title="Google Kalender öffnen">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><rect x="7" y="14" width="3" height="3" rx="0.5" fill="currentColor" stroke="none"/></svg>
+    <button class="btn-icon" onclick="openNotizenScreen()" title="Notizen">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
     </button>
     <button class="btn-icon" onclick="openVorgabenOverlay()" title="Planungsvorgaben">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -1303,6 +1433,108 @@ textarea.form-control.vorgaben-textarea {
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN: NOTIZEN-ÜBERSICHT
+═══════════════════════════════════════════════════════ -->
+<div class="screen-notiz" id="screen-notizen">
+  <div class="projekt-topbar">
+    <button class="btn-back" onclick="closeNotizenScreen()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Zurück
+    </button>
+    <div class="projekt-topbar-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+      Notizen
+    </div>
+    <div style="width:60px;"></div>
+  </div>
+  <div class="projekt-body" style="gap:8px;">
+    <div class="notiz-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="notiz-suche" placeholder="In Notizen suchen …" oninput="renderNotizenListe()">
+    </div>
+    <div class="notiz-tag-filter" id="notiz-tag-filter-bar">
+      <!-- wird von renderNotizenTagFilter() befüllt -->
+    </div>
+    <div id="notizen-liste-body">
+      <!-- wird von renderNotizenListe() befüllt -->
+    </div>
+  </div>
+  <div class="projekt-bottom">
+    <div class="bottom-bar-inner">
+      <button class="btn btn-primary" onclick="notizNeu()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Neue Notiz
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN: NOTIZ-EDITOR
+═══════════════════════════════════════════════════════ -->
+<div class="screen-notiz" id="screen-notiz-editor" style="background:var(--surface);">
+  <div class="projekt-topbar">
+    <button class="btn-back" onclick="notizEditorZurueck()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Notizen
+    </button>
+    <div class="notiz-view-toggle">
+      <button class="nvt-btn active" id="nvt-edit" onclick="notizZeigeEdit()">Bearbeiten</button>
+      <button class="nvt-btn" id="nvt-preview" onclick="notizZeigeVorschau()">Vorschau</button>
+    </div>
+    <button class="btn-icon" onclick="notizSpeichern()" title="Speichern">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </button>
+  </div>
+  <!-- Titel + Meta -->
+  <div class="notiz-editor-header">
+    <input class="notiz-titel-input" type="text" id="notiz-edit-titel" placeholder="Titel der Notiz …">
+    <div class="notiz-meta-row">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--p400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      <input class="notiz-tag-input-ed" type="text" id="notiz-edit-tag" list="tag-vorschlaege" placeholder="Tag …" autocomplete="off">
+      <span class="notiz-edit-datum" id="notiz-edit-datum">–</span>
+    </div>
+  </div>
+  <!-- Toolbar -->
+  <div class="notiz-toolbar" id="notiz-toolbar">
+    <button class="ntb" onclick="ntbInsert('# ','',true)" title="Überschrift 1"><b>H1</b></button>
+    <button class="ntb" onclick="ntbInsert('## ','',true)" title="Überschrift 2"><b>H2</b></button>
+    <div class="ntb-sep"></div>
+    <button class="ntb" onclick="ntbWrap('**','**')" title="Fett"><b>B</b></button>
+    <div class="ntb-sep"></div>
+    <button class="ntb" onclick="ntbInsert('- ','',true)" title="Liste">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg>
+    </button>
+    <button class="ntb" onclick="ntbInsert('- [ ] ','',true)" title="Checkbox">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="3"/><polyline points="8 12 11 15 16 9"/></svg>
+    </button>
+    <div class="ntb-sep"></div>
+    <button class="ntb" onclick="ntbEinruecken()" title="Einrücken">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><polyline points="8 9 11 12 8 15" fill="none"/></svg>
+    </button>
+    <button class="ntb" onclick="ntbAusruecken()" title="Ausrücken">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><polyline points="11 9 8 12 11 15" fill="none"/></svg>
+    </button>
+    <div class="ntb-sep"></div>
+    <button class="ntb" onclick="ntbInsert('\n---\n','')" title="Trenner">─</button>
+    <button class="ntb" onclick="ntbLink()" title="Link">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    </button>
+    <button class="ntb" onclick="ntbTabelle()" title="Tabelle">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+    </button>
+    <div class="ntb-sep"></div>
+    <button class="ntb" onclick="notizLoeschen()" title="Notiz löschen" id="btn-notiz-del" style="display:none;color:var(--danger);">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+    </button>
+  </div>
+  <!-- Edit / Render -->
+  <input type="hidden" id="notiz-edit-id">
+  <textarea class="notiz-textarea" id="notiz-textarea" placeholder="Notiz schreiben …&#10;&#10;Tipp: Toolbar-Buttons fügen Formatierung ein."></textarea>
+  <div class="notiz-render-view" id="notiz-render-view" style="display:none;"></div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -1311,7 +1543,7 @@ textarea.form-control.vorgaben-textarea {
 /* ═══════════════════════════════════════════════════════
    KONSTANTEN & GLOBALE VARIABLEN
 ═══════════════════════════════════════════════════════ */
-const APP_VERSION  = '1.2.4';
+const APP_VERSION  = '1.2.5';
 const LS_KEY       = 'aufgabenbacklog_db';
 const DB_FILENAME  = 'Backlog.json';
 
@@ -1324,6 +1556,279 @@ let currentTagFilter = '';
 /* ═══════════════════════════════════════════════════════
    PROJEKTVERWALTUNG
 ═══════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════
+   NOTIZEN
+═══════════════════════════════════════════════════════ */
+let currentNotizTag = '';
+
+function openNotizenScreen() {
+  currentNotizTag = '';
+  renderNotizenTagFilter();
+  renderNotizenListe();
+  document.getElementById('screen-notizen').classList.add('active');
+  document.getElementById('screen-notiz-editor').classList.remove('active');
+}
+
+function closeNotizenScreen() {
+  document.getElementById('screen-notizen').classList.remove('active');
+  document.getElementById('screen-notiz-editor').classList.remove('active');
+}
+
+function renderNotizenTagFilter() {
+  const bar = document.getElementById('notiz-tag-filter-bar');
+  if (!bar) return;
+  const tags = [...new Set(DB.notizen.map(n => n.tag).filter(Boolean))].sort();
+  bar.innerHTML = '<button class="notiz-tag-pill' + (!currentNotizTag ? ' active' : '') + '" onclick="setNotizTagFilter(\'\')">Alle</button>' +
+    tags.map(t => '<button class="notiz-tag-pill has-tag' + (currentNotizTag === t ? ' active' : '') + '" onclick="setNotizTagFilter(\'' + escHtml(t) + '\')">' + escHtml(t) + '</button>').join('');
+}
+
+function setNotizTagFilter(tag) {
+  currentNotizTag = tag;
+  renderNotizenTagFilter();
+  renderNotizenListe();
+}
+
+function renderNotizenListe() {
+  const body  = document.getElementById('notizen-liste-body');
+  const suche = (document.getElementById('notiz-suche')?.value || '').toLowerCase().trim();
+  if (!body) return;
+
+  let liste = [...DB.notizen].sort((a,b) => (b.geaendert||'').localeCompare(a.geaendert||''));
+  if (currentNotizTag) liste = liste.filter(n => n.tag === currentNotizTag);
+  if (suche) liste = liste.filter(n =>
+    (n.titel||'').toLowerCase().includes(suche) ||
+    (n.inhalt||'').toLowerCase().includes(suche)
+  );
+
+  if (liste.length === 0) {
+    body.innerHTML = '<div class="notiz-leer">' + (suche ? 'Keine Notizen gefunden.' : 'Noch keine Notizen.<br>Tippe auf „Neue Notiz".') + '</div>';
+    return;
+  }
+
+  body.innerHTML = liste.map(n => {
+    const tagChip = n.tag ? '<span class="chip chip-tag" style="font-size:0.65rem;">' + escHtml(n.tag) + '</span>' : '';
+    const preview = (n.inhalt || '').replace(/^#{1,2} .+$/gm,'').replace(/\*\*/g,'').replace(/- \[[ x]\] /gi,'').replace(/^- /gm,'').trim().slice(0,120);
+    const datum   = n.geaendert ? n.geaendert.slice(0,10).split('-').reverse().join('.') : '';
+    return '<div class="notiz-karte" onclick="notizOeffnen(\'' + n.id + '\')">' +
+      '<div class="notiz-karte-header">' +
+        '<div class="notiz-karte-titel">' + escHtml(n.titel || 'Ohne Titel') + '</div>' +
+        '<div class="notiz-karte-datum">' + escHtml(datum) + '</div>' +
+      '</div>' +
+      (preview ? '<div class="notiz-karte-preview">' + escHtml(preview) + '</div>' : '') +
+      (tagChip ? '<div>' + tagChip + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+function notizNeu() {
+  document.getElementById('notiz-edit-id').value   = '';
+  document.getElementById('notiz-edit-titel').value = '';
+  document.getElementById('notiz-edit-tag').value  = '';
+  document.getElementById('notiz-textarea').value  = '';
+  document.getElementById('notiz-edit-datum').textContent = 'Neu';
+  document.getElementById('btn-notiz-del').style.display = 'none';
+  notizZeigeEdit();
+  document.getElementById('screen-notizen').classList.remove('active');
+  document.getElementById('screen-notiz-editor').classList.add('active');
+  document.getElementById('notiz-edit-titel').focus();
+}
+
+function notizOeffnen(id) {
+  const n = DB.notizen.find(x => x.id === id);
+  if (!n) return;
+  document.getElementById('notiz-edit-id').value    = id;
+  document.getElementById('notiz-edit-titel').value = n.titel || '';
+  document.getElementById('notiz-edit-tag').value   = n.tag || '';
+  document.getElementById('notiz-textarea').value   = n.inhalt || '';
+  document.getElementById('notiz-edit-datum').textContent = n.geaendert ? n.geaendert.slice(0,10).split('-').reverse().join('.') : '';
+  document.getElementById('btn-notiz-del').style.display = '';
+  notizZeigeEdit();
+  document.getElementById('screen-notizen').classList.remove('active');
+  document.getElementById('screen-notiz-editor').classList.add('active');
+}
+
+function notizEditorZurueck() {
+  document.getElementById('screen-notiz-editor').classList.remove('active');
+  document.getElementById('screen-notizen').classList.add('active');
+  renderNotizenTagFilter();
+  renderNotizenListe();
+}
+
+function notizSpeichern() {
+  const titel  = document.getElementById('notiz-edit-titel').value.trim();
+  const inhalt = document.getElementById('notiz-textarea').value;
+  const tag    = document.getElementById('notiz-edit-tag').value.trim() || null;
+  const jetzt  = new Date().toISOString().slice(0,16).replace('T',' ');
+  const id     = document.getElementById('notiz-edit-id').value;
+
+  const obj = { id: id || uid(), titel: titel || 'Ohne Titel', inhalt, tag, geaendert: jetzt };
+
+  if (id) {
+    const idx = DB.notizen.findIndex(x => x.id === id);
+    if (idx !== -1) DB.notizen[idx] = obj;
+  } else {
+    document.getElementById('notiz-edit-id').value = obj.id;
+    document.getElementById('btn-notiz-del').style.display = '';
+    DB.notizen.unshift(obj);
+  }
+  document.getElementById('notiz-edit-datum').textContent = jetzt.slice(0,10).split('-').reverse().join('.');
+  saveDB();
+  showToast('✓ Notiz gespeichert');
+}
+
+function notizLoeschen() {
+  const id = document.getElementById('notiz-edit-id').value;
+  if (!id) return;
+  const n = DB.notizen.find(x => x.id === id);
+  if (!confirm('Notiz "' + (n?.titel || 'Ohne Titel') + '" löschen?')) return;
+  DB.notizen = DB.notizen.filter(x => x.id !== id);
+  saveDB().then(() => notizEditorZurueck());
+  showToast('Notiz gelöscht');
+}
+
+/* ── View Toggle ── */
+function notizZeigeEdit() {
+  document.getElementById('notiz-textarea').style.display    = 'block';
+  document.getElementById('notiz-render-view').style.display = 'none';
+  document.getElementById('notiz-toolbar').style.display     = 'flex';
+  document.getElementById('nvt-edit').classList.add('active');
+  document.getElementById('nvt-preview').classList.remove('active');
+}
+
+function notizZeigeVorschau() {
+  const inhalt = document.getElementById('notiz-textarea').value;
+  document.getElementById('notiz-render-view').innerHTML = renderMarkdown(inhalt);
+  document.getElementById('notiz-textarea').style.display    = 'none';
+  document.getElementById('notiz-render-view').style.display = 'block';
+  document.getElementById('notiz-toolbar').style.display     = 'none';
+  document.getElementById('nvt-preview').classList.add('active');
+  document.getElementById('nvt-edit').classList.remove('active');
+}
+
+/* ── Markdown-Renderer ── */
+function renderMarkdown(text) {
+  if (!text) return '<span style="color:var(--muted);font-style:italic;">Leer</span>';
+  const lines = text.split('\n');
+  let html = '';
+  let inUl = false;
+
+  const closeUl = () => { if (inUl) { html += '</ul>'; inUl = false; } };
+
+  const inlineRender = s => s
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+  // Tabellen-Erkennung
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    // Tabelle: Zeile mit | und nächste Zeile mit |---|
+    if (line.includes('|') && lines[i+1] && /^\|[-|: ]+\|/.test(lines[i+1])) {
+      closeUl();
+      const headers = line.split('|').filter((_,j,a) => j>0 && j<a.length-1).map(h => '<th>' + escHtml(h.trim()) + '</th>');
+      html += '<table><thead><tr>' + headers.join('') + '</tr></thead><tbody>';
+      i += 2; // überspringe Header + Separator
+      while (i < lines.length && lines[i].includes('|')) {
+        const cells = lines[i].split('|').filter((_,j,a) => j>0 && j<a.length-1).map(c => '<td>' + inlineRender(escHtml(c.trim())) + '</td>');
+        html += '<tr>' + cells.join('') + '</tr>';
+        i++;
+      }
+      html += '</tbody></table>';
+      continue;
+    }
+    if (/^# (.+)/.test(line))        { closeUl(); html += '<h1>' + inlineRender(escHtml(line.slice(2))) + '</h1>'; }
+    else if (/^## (.+)/.test(line))  { closeUl(); html += '<h2>' + inlineRender(escHtml(line.slice(3))) + '</h2>'; }
+    else if (/^---+$/.test(line))    { closeUl(); html += '<hr>'; }
+    else if (/^- \[x\] (.+)/i.test(line)) {
+      closeUl();
+      const id = 'nchk-' + i;
+      html += '<div class="notiz-check-zeile erledigt"><input type="checkbox" checked id="' + id + '"><label for="' + id + '">' + inlineRender(escHtml(line.replace(/^- \[x\] /i,''))) + '</label></div>';
+    }
+    else if (/^- \[ \] (.+)/.test(line)) {
+      closeUl();
+      const id = 'nchk-' + i;
+      html += '<div class="notiz-check-zeile"><input type="checkbox" id="' + id + '"><label for="' + id + '">' + inlineRender(escHtml(line.replace(/^- \[ \] /,''))) + '</label></div>';
+    }
+    else if (/^( {2,}|- )/.test(line)) {
+      if (!inUl) { html += '<ul>'; inUl = true; }
+      const indent = line.match(/^( +)/)?.[1]?.length || 0;
+      const txt    = line.replace(/^[ ]*- ?/,'');
+      html += '<li style="margin-left:' + Math.min(indent*8,48) + 'px">' + inlineRender(escHtml(txt)) + '</li>';
+    }
+    else if (line.trim() === '') { closeUl(); html += '<p style="margin:4px 0;height:6px;"></p>'; }
+    else { closeUl(); html += '<p>' + inlineRender(escHtml(line)) + '</p>'; }
+    i++;
+  }
+  closeUl();
+  return html;
+}
+
+/* ── Toolbar-Funktionen ── */
+function ntbGetTa() { return document.getElementById('notiz-textarea'); }
+
+function ntbInsert(vor, nach, zeilenAnfang) {
+  const ta = ntbGetTa(); if (!ta) return;
+  const s = ta.selectionStart, e = ta.selectionEnd;
+  const val = ta.value;
+  let insertPos = s;
+  if (zeilenAnfang) {
+    insertPos = val.lastIndexOf('\n', s - 1) + 1;
+  }
+  ta.value = val.slice(0, insertPos) + vor + val.slice(insertPos);
+  ta.selectionStart = ta.selectionEnd = insertPos + vor.length + (s - insertPos);
+  ta.focus();
+}
+
+function ntbWrap(vor, nach) {
+  const ta = ntbGetTa(); if (!ta) return;
+  const s = ta.selectionStart, e = ta.selectionEnd;
+  const sel = ta.value.slice(s, e) || 'Text';
+  ta.value = ta.value.slice(0, s) + vor + sel + nach + ta.value.slice(e);
+  ta.selectionStart = s + vor.length;
+  ta.selectionEnd   = s + vor.length + sel.length;
+  ta.focus();
+}
+
+function ntbEinruecken() {
+  const ta = ntbGetTa(); if (!ta) return;
+  const s = ta.selectionStart;
+  const lineStart = ta.value.lastIndexOf('\n', s - 1) + 1;
+  ta.value = ta.value.slice(0, lineStart) + '  ' + ta.value.slice(lineStart);
+  ta.selectionStart = ta.selectionEnd = s + 2;
+  ta.focus();
+}
+
+function ntbAusruecken() {
+  const ta = ntbGetTa(); if (!ta) return;
+  const s = ta.selectionStart;
+  const lineStart = ta.value.lastIndexOf('\n', s - 1) + 1;
+  if (ta.value.slice(lineStart, lineStart + 2) === '  ') {
+    ta.value = ta.value.slice(0, lineStart) + ta.value.slice(lineStart + 2);
+    ta.selectionStart = ta.selectionEnd = Math.max(lineStart, s - 2);
+  }
+  ta.focus();
+}
+
+function ntbLink() {
+  const ta = ntbGetTa(); if (!ta) return;
+  const s = ta.selectionStart, e = ta.selectionEnd;
+  const sel = ta.value.slice(s, e) || 'Linktext';
+  const url = prompt('URL eingeben:') || 'https://';
+  const insert = '[' + sel + '](' + url + ')';
+  ta.value = ta.value.slice(0, s) + insert + ta.value.slice(e);
+  ta.selectionStart = ta.selectionEnd = s + insert.length;
+  ta.focus();
+}
+
+function ntbTabelle() {
+  const ta = ntbGetTa(); if (!ta) return;
+  const template = '\n| Spalte 1 | Spalte 2 | Spalte 3 |\n|---|---|---|\n| Zelle | Zelle | Zelle |\n';
+  const s = ta.selectionStart;
+  ta.value = ta.value.slice(0, s) + template + ta.value.slice(s);
+  ta.selectionStart = ta.selectionEnd = s + template.length;
+  ta.focus();
+}
 
 function openProjekteScreen() {
   renderProjekteListe();
@@ -1743,7 +2248,7 @@ function setTagFilter(tag) {
 }
 
 function emptyDB() {
-  return { version: APP_VERSION, aufgaben: [], planungsvorgaben: '', vorlagen: [], projekte: [] };
+  return { version: APP_VERSION, aufgaben: [], planungsvorgaben: '', vorlagen: [], projekte: [], notizen: [] };
 }
 let DB = emptyDB();
 
@@ -1876,6 +2381,7 @@ async function loadDB() {
         if (!DB.planungsvorgaben) DB.planungsvorgaben = '';
         if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
         if (!Array.isArray(DB.projekte)) DB.projekte = [];
+        if (!Array.isArray(DB.notizen)) DB.notizen = [];
         return;
       }
     } catch(e) {}
@@ -1888,6 +2394,7 @@ async function loadDB() {
       if (!DB.planungsvorgaben) DB.planungsvorgaben = '';
       if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
       if (!Array.isArray(DB.projekte)) DB.projekte = [];
+      if (!Array.isArray(DB.notizen)) DB.notizen = [];
     }
   } catch(e) { DB = emptyDB(); }
 }
@@ -2025,6 +2532,7 @@ function importierenMobile(event) {
       if (!DB.planungsvorgaben) DB.planungsvorgaben = '';
       if (!Array.isArray(DB.vorlagen)) DB.vorlagen = [];
       if (!Array.isArray(DB.projekte)) DB.projekte = [];
+      if (!Array.isArray(DB.notizen)) DB.notizen = [];
       fileHandle = null;
       document.getElementById('start-overlay').classList.remove('open');
       startAutoSave();
