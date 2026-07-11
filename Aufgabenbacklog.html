@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aufgabenbacklog v1.3.1</title>
+<title>Aufgabenbacklog v1.3.3</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -818,7 +818,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.3.1</div>
+    <div class="start-version">v1.3.3</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -878,7 +878,7 @@ textarea.form-control.vorgaben-textarea {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <div class="topbar-title">
       Aufgabenbacklog
-      <span class="version-pill">v1.3.1</span>
+      <span class="version-pill">v1.3.3</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -1658,8 +1658,20 @@ function renderNotizenTagFilter() {
   const bar = document.getElementById('notiz-tag-filter-bar');
   if (!bar) return;
   const tags = [...new Set(DB.notizen.map(n => n.tag).filter(Boolean))].sort();
-  bar.innerHTML = '<button class="notiz-tag-pill' + (!currentNotizTag ? ' active' : '') + '" onclick="setNotizTagFilter(\'\')">Alle</button>' +
-    tags.map(t => '<button class="notiz-tag-pill has-tag' + (currentNotizTag === t ? ' active' : '') + '" onclick="setNotizTagFilter(\'' + escHtml(t) + '\')">' + escHtml(t) + '</button>').join('');
+  // Buttons via createElement statt innerHTML-String (vermeidet Escape-Probleme)
+  bar.innerHTML = '';
+  const alleBtn = document.createElement('button');
+  alleBtn.className = 'notiz-tag-pill' + (!currentNotizTag ? ' active' : '');
+  alleBtn.textContent = 'Alle';
+  alleBtn.onclick = () => setNotizTagFilter('');
+  bar.appendChild(alleBtn);
+  tags.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'notiz-tag-pill has-tag' + (currentNotizTag === t ? ' active' : '');
+    btn.textContent = t;
+    btn.onclick = () => setNotizTagFilter(t);
+    bar.appendChild(btn);
+  });
 }
 
 function setNotizTagFilter(tag) {
@@ -1700,7 +1712,7 @@ function renderNotizenListe() {
     // Unterseiten-Chip
     const unterseiten = DB.notizen.filter(x => x.parentId === n.id);
     const uszChip =
-      '<span class="chip-unterseiten" data-usznid="' + escHtml(n.id) + '" onclick="event.stopPropagation();openUnterseitenSheet(this.dataset.usznid)">' +
+      '<span class="chip-unterseiten" data-usznid="' + escHtml(n.id) + '" onclick="event.stopPropagation();notizOeffnen(this.dataset.usznid);openUnterseitenSheet(this.dataset.usznid)">' +
         '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>' +
         (unterseiten.length > 0 ? unterseiten.length + ' Unterseite' + (unterseiten.length !== 1 ? 'n' : '') : '+ Unterseite') + '</span>';
 
