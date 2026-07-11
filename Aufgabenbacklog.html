@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aufgabenbacklog v1.4.6</title>
+<title>Aufgabenbacklog v1.4.7</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -819,7 +819,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.4.6</div>
+    <div class="start-version">v1.4.7</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -879,7 +879,7 @@ textarea.form-control.vorgaben-textarea {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <div class="topbar-title">
       Aufgabenbacklog
-      <span class="version-pill">v1.4.6</span>
+      <span class="version-pill">v1.4.7</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -1925,7 +1925,18 @@ function notizOeffnen(id) {
     vonTxt.textContent = 'Unterseite von: ' + (ob ? ob.titel : '');
   }
 
-  // Unterseiten-Chip im Header ein-/ausblenden
+  // lastOpened merken
+  if (n.parentId) {
+    const ob = DB.notizen.find(x => x.id === n.parentId);
+    if (ob) { ob.lastOpenedId = id; saveDB(); }
+  }
+
+  // Screen + View
+  notizZeigeEdit();
+  document.getElementById('screen-notizen').classList.remove('active');
+  document.getElementById('screen-notiz-editor').classList.add('active');
+
+  // Unterseiten-Chip NACH screen-Wechsel setzen (sicherstellt dass Element sichtbar ist)
   const uszZeile = document.getElementById('notiz-usz-zeile');
   const uszLabel = document.getElementById('notiz-usz-chip-label');
   if (uszZeile) {
@@ -1936,16 +1947,6 @@ function notizOeffnen(id) {
       uszLabel.textContent = usz.length + ' Unterseite' + (usz.length !== 1 ? 'n' : '');
     }
   }
-
-  // lastOpened merken
-  if (n.parentId) {
-    const ob = DB.notizen.find(x => x.id === n.parentId);
-    if (ob) { ob.lastOpenedId = id; saveDB(); }
-  }
-
-  notizZeigeEdit();
-  document.getElementById('screen-notizen').classList.remove('active');
-  document.getElementById('screen-notiz-editor').classList.add('active');
 }
 function notizEditorZurueck() {
   document.getElementById('screen-notiz-editor').classList.remove('active');
