@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Backlog v1.5.7</title>
+<title>Backlog v1.6.1</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -823,6 +823,160 @@ textarea.form-control.vorgaben-textarea {
 .status-pausiert  { border-color: var(--muted); cursor: default !important; }
 .status-verworfen { border-color: var(--muted); cursor: default !important; }
 
+
+/* ══════════════════════════════════════
+   KLEMMBRETT
+══════════════════════════════════════ */
+.screen-kb {
+  display: none; flex-direction: column;
+  position: fixed; inset: 0; z-index: 300;
+  background: var(--p700);
+}
+.screen-kb.active { display: flex; }
+.kb-topbar {
+  background: var(--p700); padding: 11px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0; box-shadow: 0 2px 8px rgba(11,37,39,0.3);
+}
+.kb-body {
+  flex: 1; overflow-y: auto;
+  background: var(--p700);
+  padding: 12px 8px 28px;
+  display: flex; justify-content: center;
+}
+.klemmbrett {
+  width: 100%;
+  background: var(--p50);
+  border-radius: 4px 4px 6px 6px;
+  box-shadow: 0 4px 24px rgba(0,20,25,0.45), 0 1px 4px rgba(0,20,25,0.2);
+  position: relative;
+  overflow: hidden;
+}
+/* Klemme */
+.kb-clip-area {
+  position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+  width: 80px; display: flex; flex-direction: column; align-items: center; z-index: 2;
+}
+.kb-clip-top {
+  width: 80px; height: 18px;
+  background: var(--p400);
+  border-radius: 6px 6px 0 0;
+  box-shadow: 0 -2px 4px rgba(0,20,25,0.3);
+  display: flex; align-items: center; justify-content: center;
+}
+.kb-clip-hole {
+  width: 16px; height: 10px;
+  background: var(--p700); border-radius: 50%;
+  border: 2px solid var(--p500);
+}
+.kb-clip-bar {
+  width: 48px; height: 12px;
+  background: var(--p500);
+  border-radius: 0 0 4px 4px;
+}
+/* Header */
+.kb-header {
+  padding: 28px 18px 12px;
+  border-bottom: 2px solid var(--p100);
+}
+.kb-titel { font-size: 1.1rem; font-weight: 800; color: var(--text); font-family: 'Georgia', serif; }
+.kb-meta { font-size: 0.72rem; color: var(--muted); margin-top: 3px; display: flex; gap: 10px; }
+.kb-fortschritt { font-size: 0.72rem; font-weight: 700; color: var(--muted); margin-top: 2px; }
+/* Zeilen */
+.kb-gruppe-label {
+  padding: 8px 18px 4px;
+  font-size: 0.67rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--p400);
+  border-top: 1px solid var(--p100); margin-top: 4px;
+}
+.kb-zeile {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 8px 18px; cursor: pointer;
+  transition: background .1s; min-height: 30px;
+}
+.kb-zeile:hover { background: var(--p100); }
+.kb-zeile.done { opacity: 0.5; }
+.kb-check {
+  width: 22px; height: 22px; border-radius: 4px;
+  border: 2px solid var(--p400);
+  flex-shrink: 0; margin-top: 1px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; transition: background .12s, border-color .12s;
+}
+.kb-zeile.done .kb-check { background: var(--p500); border-color: var(--p500); }
+.kb-aufg-titel {
+  font-size: 0.88rem; font-weight: 600; color: var(--text);
+  line-height: 1.35; font-family: 'Georgia', serif;
+}
+.kb-zeile.done .kb-aufg-titel { text-decoration: line-through; color: var(--muted); }
+.kb-aufg-meta { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+
+
+/* ══════════════════════════════════════
+   UNTERSEITEN DRAWER
+══════════════════════════════════════ */
+.chip-usz-trigger {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:2px 8px; border-radius:99px; font-size:0.67rem; font-weight:700;
+  background:var(--p50); color:var(--p600); border:1px solid var(--p300);
+  cursor:pointer; transition:background .12s, color .12s; user-select:none;
+  flex-shrink:0;
+}
+.chip-usz-trigger:hover { background:var(--p100); }
+.chip-usz-trigger.active { background:var(--p600); color:#fff; border-color:var(--p600); }
+
+.drawer-overlay {
+  position:fixed; inset:0;
+  background:rgba(11,37,39,0.25);
+  z-index:400;
+  opacity:0; pointer-events:none;
+  transition:opacity .22s;
+}
+.drawer-overlay.visible { opacity:1; pointer-events:all; }
+
+.notiz-drawer {
+  position:fixed; top:0; right:0; bottom:0;
+  width:62vw; max-width:240px;
+  background:var(--surface);
+  box-shadow:-4px 0 24px rgba(11,37,39,0.18);
+  z-index:401;
+  transform:translateX(100%);
+  transition:transform .25s cubic-bezier(.32,.72,0,1);
+  display:flex; flex-direction:column;
+  border-left:2px solid var(--p300);
+}
+.notiz-drawer.open { transform:translateX(0); }
+
+.drawer-header {
+  background:var(--p700); padding:11px 14px;
+  display:flex; align-items:center; justify-content:space-between;
+  flex-shrink:0;
+}
+.drawer-titel { color:#fff; font-size:0.82rem; font-weight:700; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.drawer-close-btn { background:transparent; border:none; color:rgba(255,255,255,0.7); cursor:pointer; padding:4px; display:flex; }
+.drawer-close-btn:hover { color:#fff; }
+
+.drawer-body { flex:1; overflow-y:auto; }
+
+.drawer-zeile {
+  display:flex; align-items:center; gap:8px;
+  padding:10px 14px; border-bottom:1px solid var(--border);
+  cursor:pointer; transition:background .12s;
+}
+.drawer-zeile:hover { background:var(--p50); }
+.drawer-zeile:last-of-type { border-bottom:none; }
+.drawer-zeile-info { flex:1; min-width:0; }
+.drawer-zeile-titel { font-size:0.82rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.drawer-zeile-meta { font-size:0.65rem; color:var(--muted); margin-top:1px; }
+
+.drawer-neu {
+  border-top:2px solid var(--border); padding:10px 14px;
+  display:flex; align-items:center; gap:8px;
+  cursor:pointer; transition:background .12s; flex-shrink:0;
+}
+.drawer-neu:hover { background:var(--p50); }
+.drawer-neu-text { font-size:0.78rem; font-weight:700; color:var(--p500); }
+
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 </style>
@@ -838,7 +992,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.5.7</div>
+    <div class="start-version">v1.6.1</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -897,10 +1051,13 @@ textarea.form-control.vorgaben-textarea {
   <div class="topbar-left">
     <div class="topbar-title">
       Backlog
-      <span class="version-pill">v1.5.7</span>
+      <span class="version-pill">v1.6.1</span>
     </div>
   </div>
   <div class="topbar-right">
+    <button class="btn-icon" onclick="openKlemmbretchTagSheet()" title="Klemmbrett">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+    </button>
     <button class="btn-icon" onclick="openZoomSheet()" title="Textgröße">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="4"/><line x1="19" y1="19" x2="15.5" y2="15.5"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
     </button>
@@ -1440,8 +1597,16 @@ textarea.form-control.vorgaben-textarea {
       Projekte
     </button>
     <div class="projekt-topbar-title" id="detail-topbar-titel">Projekt</div>
-    <div style="width:60px;"></div>
+    <div style="display:flex;gap:5px;">
+      <button class="btn-icon" onclick="openKlemmbretchProjekt(document.getElementById('projekt-edit-id').value)" title="Klemmbrett">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+      </button>
+      <button class="btn-icon" onclick="projektSpeichern()" title="Speichern">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
+    </div>
   </div>
+
   <div class="projekt-body">
     <input type="hidden" id="projekt-edit-id">
     <!-- Felder -->
@@ -1510,7 +1675,6 @@ textarea.form-control.vorgaben-textarea {
     </div>
   </div>
 </div>
-
 <!-- ═══════════════════════════════════════════════════════
      SCREEN: NOTIZEN-ÜBERSICHT
 ═══════════════════════════════════════════════════════ -->
@@ -1576,10 +1740,10 @@ textarea.form-control.vorgaben-textarea {
       <input class="notiz-tag-input-ed" type="text" id="notiz-edit-tag" list="tag-vorschlaege" placeholder="Tag …" autocomplete="off">
       <span class="notiz-edit-datum" id="notiz-edit-datum">–</span>
     </div>
-    <!-- Unterseiten-Chip: fest im Header, immer sichtbar für Oberseiten -->
+    <!-- Unterseiten-Chip: fest im Header, öffnet Drawer -->
     <div id="notiz-usz-zeile" style="display:none;padding:5px 16px 8px;border-bottom:1px solid var(--border);">
-      <button class="chip-unterseiten" id="notiz-usz-chip-toolbar" onclick="openUnterseitenSheet(document.getElementById('notiz-edit-id').value)">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      <button class="chip-usz-trigger" id="notiz-usz-chip-toolbar" onclick="openNotizenDrawerFromDetail()">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
         <span id="notiz-usz-chip-label">Unterseiten</span>
       </button>
     </div>
@@ -1680,6 +1844,62 @@ textarea.form-control.vorgaben-textarea {
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════
+     KLEMMBRETT TAG-AUSWAHL SHEET
+═══════════════════════════════════════════════════════ -->
+<div class="sheet-overlay" id="kb-tag-overlay" onclick="closeKlemmbretchTagSheet()" style="z-index:650;"></div>
+<div id="kb-tag-sheet" style="position:fixed;bottom:0;left:0;right:0;z-index:651;background:var(--surface);border-radius:18px 18px 0 0;padding:20px 16px 40px;transform:translateY(100%);transition:transform .28s cubic-bezier(.32,.72,0,1);box-shadow:0 -4px 32px rgba(11,37,39,0.2);">
+  <div style="width:38px;height:4px;background:var(--border);border-radius:99px;margin:0 auto 16px;"></div>
+  <div style="font-size:0.88rem;font-weight:700;margin-bottom:12px;">Tag für Klemmbrett wählen</div>
+  <div id="kb-tag-liste"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     KLEMMBRETT SCREEN
+═══════════════════════════════════════════════════════ -->
+<div class="screen-kb" id="screen-klemmbrett">
+  <div class="kb-topbar">
+    <button class="btn-back" id="kb-zurueck-btn" onclick="closeKlemmbrett()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Zurück
+    </button>
+    <div style="color:#fff;font-size:0.88rem;font-weight:700;" id="kb-topbar-titel">Klemmbrett</div>
+    <div style="width:60px;"></div>
+  </div>
+  <div class="kb-body">
+    <div class="klemmbrett">
+      <div class="kb-clip-area">
+        <div class="kb-clip-top"><div class="kb-clip-hole"></div></div>
+        <div class="kb-clip-bar"></div>
+      </div>
+      <div class="kb-header">
+        <div class="kb-titel" id="kb-titel">–</div>
+        <div class="kb-meta" id="kb-meta"></div>
+        <div class="kb-fortschritt" id="kb-fortschritt"></div>
+      </div>
+      <div id="kb-liste"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     UNTERSEITEN DRAWER
+═══════════════════════════════════════════════════════ -->
+<div class="drawer-overlay" id="notiz-drawer-overlay" onclick="closeNotizenDrawer()"></div>
+<div class="notiz-drawer" id="notiz-drawer">
+  <div class="drawer-header">
+    <div class="drawer-titel" id="notiz-drawer-titel">Unterseiten</div>
+    <button class="drawer-close-btn" onclick="closeNotizenDrawer()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body" id="notiz-drawer-body"></div>
+  <div class="drawer-neu" id="notiz-drawer-neu">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--p500)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span class="drawer-neu-text">Neue Unterseite</span>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -1772,12 +1992,12 @@ function renderNotizenListe() {
     const preview = (n.inhalt || '').replace(/^#{1,2} .+$/gm,'').replace(/\*\*/g,'').replace(/- \[[ x]\] /gi,'').replace(/^- /gm,'').trim().slice(0,120);
     const datum   = n.geaendert ? n.geaendert.slice(0,10).split('-').reverse().join('.') : '';
     const unterseiten = DB.notizen.filter(x => x.parentId === n.id);
-    const uszLabel = unterseiten.length > 0
-      ? unterseiten.length + ' Unterseite' + (unterseiten.length !== 1 ? 'n' : '')
-      : '+ Unterseite';
-    const uszChip = '<span class="chip-unterseiten notiz-usz-btn" data-id="' + escHtml(n.id) + '">' +
-      '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>' +
-      uszLabel + '</span>';
+    // Drawer-Trigger Chip — nur wenn Unterseiten vorhanden
+    const uszChip = unterseiten.length > 0
+      ? '<span class="chip-usz-trigger" data-nid="' + escHtml(n.id) + '">' +
+          '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>' +
+          unterseiten.length + ' Unterseite' + (unterseiten.length !== 1 ? 'n' : '') + ' ▶</span>'
+      : '';
     const chkBadge = notizChkBadge(n.inhalt);
     const footer = '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:5px;">' + tagChip + uszChip + chkBadge + '</div>';
     return '<div class="notiz-karte notiz-open-btn" data-id="' + escHtml(n.id) + '">' +
@@ -1796,12 +2016,10 @@ function renderNotizenListe() {
       notizOeffnen(this.dataset.id);
     });
   });
-  body.querySelectorAll('.notiz-usz-btn').forEach(el => {
+  body.querySelectorAll('.chip-usz-trigger').forEach(el => {
     el.addEventListener('click', function(e) {
       e.stopPropagation();
-      const id = this.dataset.id;
-      notizOeffnen(id);
-      openUnterseitenSheet(id);
+      openNotizenDrawer(this, this.dataset.nid);
     });
   });
 }
@@ -1828,6 +2046,104 @@ function aktualisiereUszChipToolbar(notizId) {
     const usz = DB.notizen.filter(x => x.parentId === notizId);
     uszLabel.textContent = usz.length + ' Unterseite' + (usz.length !== 1 ? 'n' : '');
   }
+}
+
+/* ════════════════════════════════
+   UNTERSEITEN DRAWER
+════════════════════════════════ */
+let _drawerActiveChip = null;
+
+function openNotizenDrawerFromDetail() {
+  const id  = document.getElementById('notiz-edit-id')?.value;
+  const btn = document.getElementById('notiz-usz-chip-toolbar');
+  if (id && btn) openNotizenDrawer(btn, id);
+}
+
+function openNotizenDrawer(chip, notizId) {
+  const n = DB.notizen.find(x => x.id === notizId);
+  if (!n) return;
+
+  // Alten Chip zurücksetzen
+  if (_drawerActiveChip) _drawerActiveChip.classList.remove('active');
+  _drawerActiveChip = chip;
+  chip.classList.add('active');
+
+  // Header
+  document.getElementById('notiz-drawer-titel').textContent = n.titel || 'Unterseiten';
+
+  // Unterseiten laden
+  const unterseiten = DB.notizen
+    .filter(x => x.parentId === notizId)
+    .sort((a,b) => (b.geaendert||'').localeCompare(a.geaendert||''));
+
+  const body = document.getElementById('notiz-drawer-body');
+  if (unterseiten.length === 0) {
+    body.innerHTML = '<div style="padding:20px 14px;text-align:center;color:var(--muted);font-size:0.8rem;">Noch keine Unterseiten.</div>';
+  } else {
+    body.innerHTML = unterseiten.map(u => {
+      const datum = u.geaendert ? u.geaendert.slice(0,10).split('-').reverse().join('.') : '';
+      const chkB  = notizChkBadge(u.inhalt);
+      return '<div class="drawer-zeile" data-uid="' + escHtml(u.id) + '">' +
+        '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--p400)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>' +
+        '<div class="drawer-zeile-info">' +
+          '<div class="drawer-zeile-titel">' + escHtml(u.titel || 'Ohne Titel') + '</div>' +
+          '<div class="drawer-zeile-meta">' + escHtml(datum) + '</div>' +
+        '</div>' +
+        (chkB ? '<div>' + chkB + '</div>' : '') +
+      '</div>';
+    }).join('');
+
+    // Klick-Listener nach Render
+    body.querySelectorAll('.drawer-zeile').forEach(el => {
+      el.addEventListener('click', function() {
+        closeNotizenDrawer();
+        notizOeffnen(this.dataset.uid);
+      });
+    });
+  }
+
+  // Neue Unterseite Button
+  const neuBtn = document.getElementById('notiz-drawer-neu');
+  if (neuBtn) {
+    neuBtn.onclick = function() {
+      closeNotizenDrawer();
+      unterseiteNeuMitParent(notizId);
+    };
+  }
+
+  // Drawer öffnen
+  document.getElementById('notiz-drawer-overlay').classList.add('visible');
+  document.getElementById('notiz-drawer').classList.add('open');
+}
+
+function closeNotizenDrawer() {
+  if (_drawerActiveChip) { _drawerActiveChip.classList.remove('active'); _drawerActiveChip = null; }
+  document.getElementById('notiz-drawer-overlay').classList.remove('visible');
+  document.getElementById('notiz-drawer').classList.remove('open');
+}
+
+function unterseiteNeuMitParent(parentId) {
+  // Neue Unterseite direkt mit gesetzter parentId öffnen
+  document.getElementById('notiz-edit-id').value       = '';
+  document.getElementById('notiz-edit-parentid').value = parentId;
+  document.getElementById('notiz-edit-titel').value    = '';
+  document.getElementById('notiz-edit-tag').value      = '';
+  document.getElementById('notiz-textarea').value      = '';
+  document.getElementById('notiz-edit-datum').textContent = '';
+  const btn = document.getElementById('btn-notiz-del');
+  if (btn) btn.style.display = 'none';
+  const vonEl = document.getElementById('notiz-unterseite-von');
+  if (vonEl) vonEl.style.display = 'flex';
+  const vonTxt = document.getElementById('notiz-unterseite-von-text');
+  if (vonTxt) {
+    const ob = DB.notizen.find(x => x.id === parentId);
+    vonTxt.textContent = 'Unterseite von: ' + (ob ? ob.titel : '');
+  }
+  const uszZeile = document.getElementById('notiz-usz-zeile');
+  if (uszZeile) uszZeile.style.display = 'none';
+  notizZeigeEdit();
+  document.getElementById('screen-notizen').classList.remove('active');
+  document.getElementById('screen-notiz-editor').classList.add('active');
 }
 
 function openUnterseitenSheet(parentId) {
@@ -2946,6 +3262,170 @@ function setZoom(scale, btn) {
   applyZoom(scale);
   markZoomBtn(scale);
   localStorage.setItem(ZOOM_KEY, scale);
+}
+
+/* ════════════════════════════════
+   KLEMMBRETT
+════════════════════════════════ */
+let kbRueckScreen = null; // Screen von dem aus Klemmbrett geöffnet wurde
+
+function openKlemmbretchTagSheet() {
+  // Tags aus Aufgaben sammeln
+  const tags = [...new Set(DB.aufgaben.filter(a => a.tag && !a.erledigt && a.status !== 'verworfen').map(a => a.tag))].sort();
+  const liste = document.getElementById('kb-tag-liste');
+  if (!liste) return;
+  if (tags.length === 0) {
+    liste.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;padding:8px 0;">Keine Tags vorhanden.</div>';
+  } else {
+    liste.innerHTML = '';
+    tags.forEach(tag => {
+      const anzahl = DB.aufgaben.filter(a => a.tag === tag && !a.erledigt && a.status !== 'verworfen').length;
+      const btn = document.createElement('div');
+      btn.style.cssText = 'padding:12px 10px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:10px;border-radius:8px;';
+      btn.innerHTML = '<span style="background:#f3e8ff;color:#6d28d9;padding:3px 10px;border-radius:99px;font-size:0.75rem;font-weight:700;">' + escHtml(tag) + '</span>' +
+        '<span style="color:var(--muted);font-size:0.78rem;">' + anzahl + ' offene Aufgaben</span>';
+      btn.addEventListener('click', () => {
+        closeKlemmbretchTagSheet();
+        kbRueckScreen = null;
+        renderKlemmbrett('tag', tag, null);
+      });
+      liste.appendChild(btn);
+    });
+  }
+  document.getElementById('kb-tag-overlay').classList.add('visible');
+  document.getElementById('kb-tag-sheet').style.transform = 'translateY(0)';
+}
+
+function closeKlemmbretchTagSheet() {
+  document.getElementById('kb-tag-overlay').classList.remove('visible');
+  document.getElementById('kb-tag-sheet').style.transform = 'translateY(100%)';
+}
+
+function openKlemmbretchProjekt(projektId) {
+  const p = DB.projekte.find(x => x.id === projektId);
+  if (!p) return;
+  kbRueckScreen = 'screen-projekt-detail';
+  renderKlemmbrett('projekt', p.tag, p);
+}
+
+function closeKlemmbrett() {
+  document.getElementById('screen-klemmbrett').classList.remove('active');
+  // Zurück zum richtigen Screen
+  if (kbRueckScreen) {
+    document.getElementById(kbRueckScreen).classList.add('active');
+  }
+}
+
+function renderKlemmbrett(modus, tag, projekt) {
+  // Aufgaben laden
+  let aufgaben = tag
+    ? DB.aufgaben.filter(a => a.tag === tag)
+    : DB.aufgaben;
+
+  // Sortierung: offen/in_arbeit zuerst, dann erledigt/verworfen
+  const statusOrder = { offen:0, in_arbeit:1, pausiert:2, erledigt:3, verworfen:4 };
+  aufgaben = [...aufgaben].sort((a,b) => {
+    const sa = statusOrder[a.status || (a.erledigt?'erledigt':'offen')] ?? 0;
+    const sb = statusOrder[b.status || (b.erledigt?'erledigt':'offen')] ?? 0;
+    return sa - sb;
+  });
+
+  // Header
+  const titel = projekt ? projekt.bezeichnung : (tag ? 'Tag: ' + tag : 'Alle Aufgaben');
+  document.getElementById('kb-titel').textContent = titel;
+  document.getElementById('kb-topbar-titel').textContent = 'Klemmbrett';
+  const meta = projekt
+    ? '📋 Projekt' + (tag ? ' · 🏷 ' + tag : '')
+    : '🏷 ' + (tag || 'Alle');
+  document.getElementById('kb-meta').textContent = meta;
+
+  const offen = aufgaben.filter(a => !a.erledigt && a.status !== 'verworfen').length;
+  const gesamt = aufgaben.length;
+  const erl = aufgaben.filter(a => a.erledigt || a.status === 'verworfen').length;
+  document.getElementById('kb-fortschritt').textContent = erl + ' von ' + gesamt + ' erledigt';
+
+  // Liste rendern
+  const liste = document.getElementById('kb-liste');
+  liste.innerHTML = '';
+
+  const offene = aufgaben.filter(a => !a.erledigt && a.status !== 'verworfen');
+  const erledigte = aufgaben.filter(a => a.erledigt || a.status === 'verworfen');
+
+  if (offene.length > 0) {
+    const grpLabel = document.createElement('div');
+    grpLabel.className = 'kb-gruppe-label';
+    grpLabel.textContent = 'Offen';
+    liste.appendChild(grpLabel);
+    offene.forEach(a => liste.appendChild(kbZeile(a)));
+  }
+
+  if (erledigte.length > 0) {
+    const grpLabel = document.createElement('div');
+    grpLabel.className = 'kb-gruppe-label';
+    grpLabel.textContent = 'Erledigt';
+    liste.appendChild(grpLabel);
+    erledigte.forEach(a => liste.appendChild(kbZeile(a, true)));
+  }
+
+  // Screen anzeigen
+  document.getElementById('screen-klemmbrett').classList.add('active');
+}
+
+function kbZeile(a, istDone) {
+  const status = a.status || (a.erledigt ? 'erledigt' : 'offen');
+  const done   = istDone || a.erledigt || status === 'verworfen';
+  const statusLabels = { offen:'Offen', in_arbeit:'In Arbeit', pausiert:'Pausiert', erledigt:'Erledigt', verworfen:'Verworfen' };
+
+  const zeile = document.createElement('div');
+  zeile.className = 'kb-zeile' + (done ? ' done' : '');
+  zeile.dataset.id = a.id;
+
+  const check = document.createElement('div');
+  check.className = 'kb-check';
+  if (done) check.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+
+  const text = document.createElement('div');
+  text.innerHTML =
+    '<div class="kb-aufg-titel">' + escHtml(a.titel) + '</div>' +
+    '<div class="kb-aufg-meta">' + escHtml(statusLabels[status] || 'Offen') + ' · ' + a.dauer + ' min</div>';
+
+  zeile.appendChild(check);
+  zeile.appendChild(text);
+
+  zeile.addEventListener('click', () => kbToggle(zeile, a.id));
+  return zeile;
+}
+
+function kbToggle(zeile, aufgabeId) {
+  const a = DB.aufgaben.find(x => x.id === aufgabeId);
+  if (!a) return;
+  const status = a.status || (a.erledigt ? 'erledigt' : 'offen');
+  const istDone = a.erledigt || status === 'verworfen';
+
+  if (istDone) {
+    // Zurück auf offen
+    a.status   = 'offen';
+    a.erledigt = false;
+  } else {
+    // Auf erledigt
+    a.status   = 'erledigt';
+    a.erledigt = true;
+  }
+  a.geaendert = new Date().toISOString().slice(0,16).replace('T',' ');
+  saveDB();
+
+  // Zeile sofort aktualisieren
+  const neuesDone = a.erledigt;
+  zeile.classList.toggle('done', neuesDone);
+  const check = zeile.querySelector('.kb-check');
+  check.innerHTML = neuesDone
+    ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>'
+    : '';
+
+  // Fortschritt aktualisieren
+  const alle   = document.querySelectorAll('#kb-liste .kb-zeile').length;
+  const erlNeu = document.querySelectorAll('#kb-liste .kb-zeile.done').length;
+  document.getElementById('kb-fortschritt').textContent = erlNeu + ' von ' + alle + ' erledigt';
 }
 
 function openZoomSheet() {
