@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aufgabenbacklog v1.5.0</title>
+<title>Aufgabenbacklog v1.5.2</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -804,6 +804,25 @@ textarea.form-control.vorgaben-textarea {
 .usz-meta  { font-size: 0.66rem; color: var(--muted); margin-top: 1px; }
 .usz-badges { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
 
+
+/* ══════════════════════════════════════
+   STATUS-BUTTONS
+══════════════════════════════════════ */
+.status-btn {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid var(--border);
+  background: transparent;
+  cursor: pointer; flex-shrink: 0; margin-top: 1px;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .15s; padding: 0;
+}
+.status-btn:hover { border-color: var(--p400); }
+.status-offen    { border-color: var(--border); }
+.status-in-arbeit { border-color: var(--p500); }
+.status-erledigt  { border-color: var(--ok); background: var(--ok); }
+.status-pausiert  { border-color: var(--muted); cursor: default !important; }
+.status-verworfen { border-color: var(--muted); cursor: default !important; }
+
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 </style>
@@ -819,7 +838,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.5.0</div>
+    <div class="start-version">v1.5.2</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -879,7 +898,7 @@ textarea.form-control.vorgaben-textarea {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <div class="topbar-title">
       Aufgabenbacklog
-      <span class="version-pill">v1.5.0</span>
+      <span class="version-pill">v1.5.2</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -908,7 +927,6 @@ textarea.form-control.vorgaben-textarea {
   <div class="card">
     <div class="filter-bar" id="filter-bar">
       <button class="filter-tab active" data-filter="alle">Alle</button>
-      <button class="filter-tab" data-filter="privat">Privat</button>
       <button class="filter-tab tab-erledigt" data-filter="erledigt">
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         Erledigt anzeigen
@@ -920,7 +938,7 @@ textarea.form-control.vorgaben-textarea {
         <option value="">Keine Gruppierung</option>
         <option value="datum">Datum</option>
         <option value="tag">Tag</option>
-        <option value="typ">Typ</option>
+        <option value="status">Status</option>
       </select>
     </div>
     <div class="task-list" id="task-list">
@@ -1005,6 +1023,16 @@ textarea.form-control.vorgaben-textarea {
             Privat
           </button>
         </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-control" id="aufgabe-status" onchange="aufgabeStatusDropdownChange()">
+          <option value="offen">○  Offen</option>
+          <option value="in_arbeit">↻  In Arbeit</option>
+          <option value="pausiert">⏸  Pausiert</option>
+          <option value="erledigt">✓  Erledigt</option>
+          <option value="verworfen">✗  Verworfen</option>
+        </select>
       </div>
       <div class="form-group">
         <label class="form-label">
@@ -2915,8 +2943,19 @@ function zeigStartFehler(msg) {
   if (el) { el.textContent = msg; el.style.display = 'block'; }
 }
 
+
+function migrateDB() {
+  // Migration: erledigt (bool) → status (string)
+  if (!Array.isArray(DB.aufgaben)) return;
+  DB.aufgaben.forEach(a => {
+    if (!a.status) {
+      a.status = a.erledigt ? 'erledigt' : 'offen';
+    }
+  });
+}
 async function ladeUndStarte() {
   await loadDB();
+  migrateDB();
   autoLoeschenErledigt();
   document.getElementById('start-overlay').classList.remove('open');
   startAutoSave();
@@ -2979,6 +3018,7 @@ function aufgabeFormularLeeren() {
   document.getElementById('aufgabe-edit-id').value = '';
   document.getElementById('aufgabe-titel').value = '';
   document.getElementById('aufgabe-beschreibung').value = '';
+  const stSel = document.getElementById('aufgabe-status'); if (stSel) stSel.value = 'offen';
   document.getElementById('aufgabe-datum').value = '';
   beschreibungRenderAktualisieren(null);
   document.getElementById('aufgabe-tag').value = '';
@@ -3010,6 +3050,8 @@ function aufgabeBearbeiten(id) {
   document.getElementById('aufgabe-beschreibung').value = a.beschreibung || '';
   document.getElementById('aufgabe-datum').value = a.datum || '';
   beschreibungRenderAktualisieren(id);
+  const statusSel = document.getElementById('aufgabe-status');
+  if (statusSel) statusSel.value = a.status || (a.erledigt ? 'erledigt' : 'offen');
   document.getElementById('aufgabe-tag').value = a.tag || '';
   aktualisiereTagVorschlaege();
   setTyp(a.typ || 'privat');
@@ -3055,6 +3097,8 @@ function aufgabeSpeichern() {
     if (idx !== -1) {
       DB.aufgaben[idx].titel        = titel;
       DB.aufgaben[idx].beschreibung = document.getElementById('aufgabe-beschreibung').value.trim();
+   DB.aufgaben[idx].status   = document.getElementById('aufgabe-status')?.value || 'offen';
+   DB.aufgaben[idx].erledigt = DB.aufgaben[idx].status === 'erledigt';
       DB.aufgaben[idx].typ          = currentTyp;
       DB.aufgaben[idx].datum        = document.getElementById('aufgabe-datum').value || null;
       DB.aufgaben[idx].tag          = document.getElementById('aufgabe-tag').value.trim() || null;
@@ -3066,6 +3110,7 @@ function aufgabeSpeichern() {
     DB.aufgaben.push({
       id: uid(), titel, typ: currentTyp,
       beschreibung: document.getElementById('aufgabe-beschreibung').value.trim(),
+      status:       document.getElementById('aufgabe-status')?.value || 'offen',
       datum: document.getElementById('aufgabe-datum').value || null,
       tag: document.getElementById('aufgabe-tag').value.trim() || null,
       startzeit: null, endzeit: null, dauer,
@@ -3132,17 +3177,31 @@ function aufgabeLoeschenAusOverlay() {
   aufgabeLoeschen(id);
 }
 
-function aufgabeToggleErledigt(id) {
+function aufgabeStatusDropdownChange() {
+  // Kein weiterer Effekt nötig — wird beim Speichern übernommen
+}
+
+function aufgabeStatusKlick(id) {
   const a = DB.aufgaben.find(x => x.id === id);
   if (!a) return;
-  a.erledigt = !a.erledigt;
-  a.geaendert = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const status = a.status || (a.erledigt ? 'erledigt' : 'offen');
+  const naechster = statusNaechster(status);
+  if (!naechster) return;
+  a.status   = naechster;
+  a.erledigt = (naechster === 'erledigt');
+  a.geaendert = new Date().toISOString().slice(0,16).replace('T',' ');
   saveDB().then(() => renderListe());
 }
 
-/* ═══════════════════════════════════════════════════════
-   PLANEN OVERLAY
-═══════════════════════════════════════════════════════ */
+function aufgabeToggleErledigt(id) {
+  // Legacy: direkt auf erledigt setzen (wird von Projekt-Screen genutzt)
+  const a = DB.aufgaben.find(x => x.id === id);
+  if (!a) return;
+  a.erledigt  = !a.erledigt;
+  a.status    = a.erledigt ? 'erledigt' : 'offen';
+  a.geaendert = new Date().toISOString().slice(0,16).replace('T',' ');
+  saveDB().then(() => renderListe());
+}
 function openPlanOverlay(id) {
   const a = DB.aufgaben.find(x => x.id === id);
   if (!a) return;
@@ -3572,11 +3631,11 @@ function checkboxToggle(aufgabeId, checkIdx, checked) {
   a.beschreibung = zeilen.join('\n');
   a.geaendert    = new Date().toISOString().slice(0,16).replace('T',' ');
 
-  // Textarea synchronisieren — damit aufgabeSpeichern() nicht überschreibt
+  // Textarea synchronisieren
   const textarea = document.getElementById('aufgabe-beschreibung');
   if (textarea) textarea.value = a.beschreibung;
 
-  // Beschreibungs-Render sofort aktualisieren
+  // Beschreibungs-Render aktualisieren
   const renderEl = document.getElementById('beschreibung-render-overlay');
   if (renderEl) renderEl.innerHTML = renderBeschreibungHTML(aufgabeId, a.beschreibung);
 
@@ -3589,9 +3648,51 @@ function checkboxToggle(aufgabeId, checkIdx, checked) {
       chipEl.className   = 'chip chip-fortschritt' + (fp.erledigt === fp.gesamt ? ' komplett' : '');
     }
   }
+
+  // Status-Logik durch Checkbox-Aktion
+  const status = a.status || (a.erledigt ? 'erledigt' : 'offen');
+  const fp = fortschrittAusText(a.beschreibung);
+
+  if (checked) {
+    // Erste Checkbox angehakt → offen/pausiert → in_arbeit
+    if (status === 'offen' || status === 'pausiert') {
+      a.status = 'in_arbeit';
+      a.erledigt = false;
+      // Status-Dropdown im Overlay aktualisieren
+      const sel = document.getElementById('aufgabe-status');
+      if (sel) sel.value = 'in_arbeit';
+      // Status-Button in Liste aktualisieren
+      const btn = document.querySelector('#row-' + aufgabeId + ' .status-btn');
+      if (btn) {
+        btn.className = 'status-btn status-in-arbeit';
+        btn.innerHTML = statusSvg('in_arbeit');
+      }
+    }
+    // Alle Checkboxen erledigt → nachfragen
+    if (fp && fp.erledigt === fp.gesamt) {
+      setTimeout(() => {
+        if (confirm('Alle Checkboxen erledigt — Aufgabe als erledigt markieren?')) {
+          a.status   = 'erledigt';
+          a.erledigt = true;
+          const sel = document.getElementById('aufgabe-status');
+          if (sel) sel.value = 'erledigt';
+          const btn = document.querySelector('#row-' + aufgabeId + ' .status-btn');
+          if (btn) {
+            btn.className = 'status-btn status-erledigt';
+            btn.innerHTML = statusSvg('erledigt');
+            btn.style.cursor = 'default';
+          }
+          saveDB().then(() => renderListe());
+        } else {
+          saveDB();
+        }
+      }, 200);
+      return;
+    }
+  }
+
   saveDB();
 }
-
 function beschreibungRenderAktualisieren(aufgabeId) {
   const textarea = document.getElementById('aufgabe-beschreibung');
   const renderEl = document.getElementById('beschreibung-render-overlay');
@@ -3628,6 +3729,47 @@ function beschreibungEditToggle() {
   }
 }
 
+
+/* ════════════════════════════════
+   STATUS-HILFSFUNKTIONEN
+════════════════════════════════ */
+function statusSvg(status) {
+  switch(status) {
+    case 'in_arbeit':
+      return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--p500)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-8.49"/></svg>';
+    case 'erledigt':
+      return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    case 'pausiert':
+      return '<svg width="11" height="11" viewBox="0 0 24 24" fill="var(--muted)" stroke="none"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
+    case 'verworfen':
+      return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    default: return ''; // offen = leer
+  }
+}
+
+function statusCls(status) {
+  const map = { offen:'status-offen', in_arbeit:'status-in-arbeit',
+    erledigt:'status-erledigt', pausiert:'status-pausiert', verworfen:'status-verworfen' };
+  return map[status] || 'status-offen';
+}
+
+function statusLabel(status) {
+  const map = { offen:'Offen', in_arbeit:'In Arbeit',
+    erledigt:'Erledigt', pausiert:'Pausiert', verworfen:'Verworfen' };
+  return map[status] || 'Offen';
+}
+
+function statusNaechster(status) {
+  // Standardprozess per Klick in Liste
+  if (status === 'offen')     return 'in_arbeit';
+  if (status === 'in_arbeit') return 'erledigt';
+  return null; // Endstatus oder Sonderprozess → kein Klick
+}
+
+function statusIstEnde(status) {
+  return status === 'erledigt' || status === 'verworfen';
+}
+
 function svgCheck() {
   return '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
 }
@@ -3636,10 +3778,13 @@ function svgKal() {
 }
 
 function renderAufgabe(a) {
+  const status  = a.status || (a.erledigt ? 'erledigt' : 'offen');
+  const istDone = status === 'erledigt' || status === 'verworfen';
+  const kannKlicken = !statusIstEnde(status) && status !== 'pausiert';
+
   const datumChip = a.datum
     ? '<span class="chip chip-datum">' + svgKal() + ' ' + formatDatum(a.datum) + '</span>' : '';
 
-  // Fortschritts-Chip: x/y wenn Checkboxen vorhanden
   const fp = fortschrittAusText(a.beschreibung);
   const fortChip = fp
     ? '<span class="chip chip-fortschritt' + (fp.erledigt === fp.gesamt ? ' komplett' : '') +
@@ -3649,13 +3794,18 @@ function renderAufgabe(a) {
   const chips = fortChip + datumChip +
     '<span class="chip chip-dauer">' + a.dauer + ' min</span>';
 
-  return '<div class="task-row' + (a.erledigt ? ' erledigt-row' : '') + '" id="row-' + a.id + '">' +
+  const statusBtnStyle = kannKlicken ? '' : ' style="cursor:default;"';
+  const statusBtnClick = kannKlicken
+    ? ' onclick="event.stopPropagation();aufgabeStatusKlick(\'' + a.id + '\')"'
+    : '';
+
+  return '<div class="task-row' + (istDone ? ' erledigt-row' : '') + '" id="row-' + a.id + '">' +
     '<div class="task-main" onclick="aufgabeBearbeiten(\'' + a.id + '\')">' +
-      '<div class="task-check' + (a.erledigt ? ' checked' : '') + '" onclick="event.stopPropagation();aufgabeToggleErledigt(\'' + a.id + '\')">' +
-        (a.erledigt ? svgCheck() : '') +
-      '</div>' +
+      '<button class="status-btn ' + statusCls(status) + '"' + statusBtnStyle + statusBtnClick + '>' +
+        statusSvg(status) +
+      '</button>' +
       '<div class="task-body">' +
-        '<span class="task-title-text' + (a.erledigt ? ' done' : '') + '">' + escHtml(a.titel) + '</span>' +
+        '<span class="task-title-text' + (istDone ? ' done' : '') + '">' + escHtml(a.titel) + '</span>' +
         '<div class="task-chips">' + chips + '</div>' +
       '</div>' +
     '</div>' +
@@ -3675,9 +3825,8 @@ function renderListe() {
 
   // Filter anwenden
   let sichtbar = sorted.filter(a => {
-    if (currentFilter === 'erledigt') return a.erledigt;
-    if (currentFilter === 'privat')   return !a.erledigt && a.typ === 'privat';
-    return !a.erledigt; // 'alle' = offene
+    if (currentFilter === 'erledigt') return a.erledigt || a.status === 'verworfen' || a.status === 'erledigt';
+    return !a.erledigt && a.status !== 'verworfen'; // 'alle' = offene
   });
 
   // Tag-Filter zusätzlich anwenden
@@ -3761,10 +3910,22 @@ function gruppiereAufgaben(aufgaben, modus) {
     return order.map(k => buckets[k]);
   }
 
-  if (modus === 'typ') {
-    // Alle Aufgaben (inkl. eventuell noch existierender typ:'beruf') in Privat
-    if (aufgaben.length) return [{ label:'Privat', icon:iPriv, aufgaben }];
-    return [];
+  if (modus === 'status') {
+    const reihenfolge = ['offen','in_arbeit','pausiert','erledigt','verworfen'];
+    const labels = { offen:'Offen', in_arbeit:'In Arbeit', pausiert:'Pausiert', erledigt:'Erledigt', verworfen:'Verworfen' };
+    const icons  = {
+      offen:     '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/></svg>',
+      in_arbeit: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--p500)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-8.49"/></svg>',
+      pausiert:  '<svg width="10" height="10" viewBox="0 0 24 24" fill="var(--muted)" stroke="none"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
+      erledigt:  '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+      verworfen: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+    };
+    const gruppen = [];
+    reihenfolge.forEach(st => {
+      const grp = aufgaben.filter(a => (a.status || (a.erledigt ? 'erledigt' : 'offen')) === st);
+      if (grp.length) gruppen.push({ label: labels[st], icon: icons[st], aufgaben: grp });
+    });
+    return gruppen;
   }
 
   return [{ label:'', icon:'', aufgaben }];
@@ -3773,12 +3934,11 @@ function gruppiereAufgaben(aufgaben, modus) {
 function aktualisiereFilterZaehler() {
   const alle    = DB.aufgaben.filter(a => !a.erledigt).length;
   const privat  = DB.aufgaben.filter(a => !a.erledigt && a.typ === 'privat').length;
-  const erledigt= DB.aufgaben.filter(a => a.erledigt).length;
+  const erledigt= DB.aufgaben.filter(a => a.erledigt || a.status === 'verworfen').length;
 
   document.querySelectorAll('.filter-tab').forEach(t => {
     const f = t.dataset.filter;
     if (f === 'alle')     t.textContent = 'Alle (' + alle + ')';
-    if (f === 'privat')   t.textContent = 'Privat (' + privat + ')';
     if (f === 'erledigt') {
       // Erledigt-Tab hat ein SVG-Icon, wir setzen nur den Text-Teil neu
       t.innerHTML = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Erledigt (' + erledigt + ')';
