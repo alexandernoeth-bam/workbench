@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Backlog v1.6.8</title>
+<title>Backlog v1.7.0</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1090,7 +1090,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.6.8</div>
+    <div class="start-version">v1.7.0</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -1149,7 +1149,7 @@ textarea.form-control.vorgaben-textarea {
   <div class="topbar-left">
     <div class="topbar-title">
       Backlog
-      <span class="version-pill">v1.6.8</span>
+      <span class="version-pill">v1.7.0</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -1354,7 +1354,7 @@ textarea.form-control.vorgaben-textarea {
 <!-- ═══════════════════════════════════════════════════════
      OVERLAY: PLANEN
 ═══════════════════════════════════════════════════════ -->
-<div class="overlay-bg" id="overlay-plan" onclick="handleOverlayBgClick(event,'overlay-plan')">
+<div class="overlay-bg" id="overlay-zeitplan" onclick="handleOverlayBgClick(event,'overlay-zeitplan')">
   <div class="overlay-sheet">
     <div class="overlay-handle"></div>
     <div class="overlay-header">
@@ -1362,7 +1362,7 @@ textarea.form-control.vorgaben-textarea {
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         Zeitpunkt planen
       </div>
-      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-plan')">
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-zeitplan')">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         Schließen
       </button>
@@ -1404,11 +1404,11 @@ textarea.form-control.vorgaben-textarea {
       <div class="form-error" id="err-plan" style="display:none;">Endzeit muss nach Startzeit liegen (max 479 min).</div>
     </div>
     <div class="overlay-footer">
-      <button class="btn btn-primary btn-sm" onclick="planSpeichern()">
+      <button class="btn btn-primary btn-sm" onclick="zeitplanSpeichern()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         Speichern
       </button>
-      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-plan')">Abbrechen</button>
+      <button class="btn btn-outline btn-sm" onclick="closeOverlay('overlay-zeitplan')">Abbrechen</button>
     </div>
   </div>
 </div>
@@ -1755,7 +1755,7 @@ textarea.form-control.vorgaben-textarea {
 </div>
 
 <!-- Plan Overlay -->
-<div class="overlay" id="overlay-plan" onclick="handleOverlayBgClick(event,'overlay-plan')">
+<div class="overlay" id="overlay-plaene-edit" onclick="handleOverlayBgClick(event,'overlay-plaene-edit')">
   <div class="overlay-sheet" style="max-height:92vh;">
     <div class="overlay-handle"></div>
     <div class="overlay-header">
@@ -3441,7 +3441,7 @@ function openPlanOverlay(id) {
     document.getElementById('plan-tag').value       = p.tag || '';
     document.getElementById('plan-status').value    = p.status || 'aktiv';
     document.getElementById('plan-overlay-titel').textContent = p.titel || 'Plan bearbeiten';
-    document.getElementById('plan-btn-loeschen').style.display = '';
+    document.getElementById('plan-btn-loeschen').style.display = 'flex';
     _planSchritte = (p.schritte || []).map(s => ({ ...s }));
   } else {
     document.getElementById('plan-edit-id').value   = '';
@@ -3453,11 +3453,11 @@ function openPlanOverlay(id) {
     _planSchritte = [{ titel: '', dauer: '', status: 'offen' }];
   }
   planRenderSchritte();
-  openOverlay('overlay-plan');
+  openOverlay('overlay-plaene-edit');
 }
 
 function closePlanOverlay() {
-  closeOverlay('overlay-plan');
+  closeOverlay('overlay-plaene-edit');
 }
 
 function planRenderSchritte() {
@@ -3939,7 +3939,60 @@ function planAusOverlay() {
   const id = document.getElementById('aufgabe-edit-id').value;
   if (!id) return;
   closeOverlay('overlay-aufgabe');
-  openPlanOverlay(id);
+  openZeitplanOverlay(id);
+}
+
+function openZeitplanOverlay(aufgabeId) {
+  const a = DB.aufgaben.find(x => x.id === aufgabeId);
+  if (!a) return;
+  document.getElementById('plan-aufgabe-id').value = aufgabeId;
+  document.getElementById('plan-datum').value  = a.datum || '';
+  document.getElementById('plan-start').value  = a.startzeit || '';
+  document.getElementById('plan-ende').value   = a.endzeit   || '';
+  document.getElementById('err-plan').style.display = 'none';
+  berechnePlanDauer();
+  openOverlay('overlay-zeitplan');
+}
+
+function zeitplanSpeichern() {
+  const id    = document.getElementById('plan-aufgabe-id').value;
+  const start = document.getElementById('plan-start').value;
+  const ende  = document.getElementById('plan-ende').value;
+  const a     = DB.aufgaben.find(x => x.id === id);
+  if (!a) return;
+  a.datum      = new Date().toISOString().slice(0,10);
+  a.startzeit  = start;
+  a.endzeit    = ende;
+  if (start && ende) {
+    const [sh,sm] = start.split(':').map(Number);
+    const [eh,em] = ende.split(':').map(Number);
+    const diff = (eh*60+em) - (sh*60+sm);
+    if (diff <= 0 || diff > 479) {
+      document.getElementById('err-plan').style.display = '';
+      return;
+    }
+    a.dauer = diff;
+  }
+  a.geaendert = new Date().toISOString().slice(0,16).replace('T',' ');
+  saveDB();
+  closeOverlay('overlay-zeitplan');
+  renderListe();
+  showToast('✓ Zeitpunkt gespeichert');
+}
+
+function berechnePlanDauer(triggerEl) {
+  const start = document.getElementById('plan-start')?.value;
+  const ende  = document.getElementById('plan-ende')?.value;
+  const anzeige = document.getElementById('plan-dauer-anzeige');
+  if (!anzeige) return;
+  if (start && ende) {
+    const [sh,sm] = start.split(':').map(Number);
+    const [eh,em] = ende.split(':').map(Number);
+    const diff = (eh*60+em) - (sh*60+sm);
+    anzeige.textContent = diff > 0 ? diff + ' min' : '– min';
+  } else {
+    anzeige.textContent = '– min';
+  }
 }
 
 function aufgabeLoeschenAusOverlay() {
