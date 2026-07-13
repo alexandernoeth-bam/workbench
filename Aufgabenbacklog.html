@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Backlog v1.6.4</title>
+<title>Backlog v1.6.5</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d52">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1032,7 +1032,7 @@ textarea.form-control.vorgaben-textarea {
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--p600)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Aufgabenbacklog
     </div>
-    <div class="start-version">v1.6.4</div>
+    <div class="start-version">v1.6.5</div>
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
       <div class="spin" style="font-size:24px;color:var(--p500);">↻</div>
       <div style="font-size:0.79rem;color:var(--muted);margin-top:8px;">Verbinde mit letzter Datei …</div>
@@ -1091,7 +1091,7 @@ textarea.form-control.vorgaben-textarea {
   <div class="topbar-left">
     <div class="topbar-title">
       Backlog
-      <span class="version-pill">v1.6.4</span>
+      <span class="version-pill">v1.6.5</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -3504,16 +3504,20 @@ function kbToggle(zeile, aufgabeId) {
    STARTDIALOG
 ════════════════════════════════ */
 function zeigeStartdialog() {
-  if (!DB.startdialogAktiv || !DB.startbotschaft) return;
-  const overlay = document.getElementById('startdialog-overlay');
-  const textEl  = document.getElementById('startdialog-text');
-  if (!overlay || !textEl) return;
-  textEl.textContent = DB.startbotschaft;
-  overlay.style.display = 'flex';
+  if (!DB.startdialogAktiv) return;
+  if (!DB.startbotschaft || !DB.startbotschaft.trim()) return;
   setTimeout(() => {
-    overlay.classList.add('hidden');
-    setTimeout(() => { overlay.style.display = 'none'; }, 500);
-  }, 3000);
+    const overlay = document.getElementById('startdialog-overlay');
+    const textEl  = document.getElementById('startdialog-text');
+    if (!overlay || !textEl) return;
+    textEl.textContent = DB.startbotschaft.trim();
+    overlay.style.cssText = 'display:flex;opacity:1;';
+    setTimeout(() => {
+      overlay.style.transition = 'opacity 0.5s';
+      overlay.style.opacity = '0';
+      setTimeout(() => { overlay.style.display = 'none'; }, 500);
+    }, 3000);
+  }, 300);
 }
 
 function openZoomSheet() {
@@ -4221,7 +4225,7 @@ function vorgabenSpeichern() {
   DB.startbotschaft    = bot   ? bot.value.trim() : '';
   saveDB();
   closeOverlay('overlay-vorgaben');
-  showToast('✓ Gespeichert · Startdialog: ' + (DB.startdialogAktiv ? 'AN' : 'AUS') + ' · Botschaft: ' + (DB.startbotschaft ? DB.startbotschaft.slice(0,20) + '…' : 'leer'));
+  showToast('✓ Planungsvorgaben gespeichert');
 }
 
 /* ═══════════════════════════════════════════════════════
