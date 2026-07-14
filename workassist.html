@@ -9058,27 +9058,22 @@ function setZoom(pct) {
 }
 
 function berechneBereichDetailHoehe() {
-  const zoom    = (currentZoom || 100) / 100;
-  const topbar  = document.querySelector('.bd-topbar');
-  const subbar  = document.querySelector('.bd-topbar + *') ; // bd-ziel-wrap + back bar
-  const zielWrap= document.getElementById('bd-ziel-wrap');
-  const grid    = document.getElementById('bd-content');
-  if (!grid) return;
+  const zoom   = (currentZoom || 100) / 100;
+  const screen = document.getElementById('screen-bereiche-detail');
+  const grid   = document.getElementById('bd-content');
+  if (!screen || !grid) return;
 
-  const effH       = Math.floor(window.innerHeight / zoom);
-  const topbarH    = topbar  ? topbar.offsetHeight  : 48;
-  const bdSubbarH  = 46; // Zurück + Titel Zeile (bd-topbar ist das)
-  const zielH      = zielWrap ? zielWrap.offsetHeight : 70;
-  const paddingH   = 24; // padding top+bottom des Grids
+  // Effektive Bildschirmhöhe nach Zoom
+  const effH = Math.floor(window.innerHeight / zoom);
 
-  const gridH = effH - topbarH - zielH - paddingH;
-  if (gridH > 100) {
-    grid.style.height = gridH + 'px';
-    grid.style.flex   = 'none';
-  } else {
-    grid.style.height = '';
-    grid.style.flex   = '1';
-  }
+  // Screen bekommt explizite Höhe – dann arbeitet flex korrekt
+  screen.style.height = effH + 'px';
+  screen.style.maxHeight = effH + 'px';
+
+  // Grid: Höhe = alles was übrig bleibt nach Topbar + Zielwrap
+  // CSS flex:1 + min-height:0 reicht wenn der Screen-Container die richtige Höhe hat
+  grid.style.height = '';
+  grid.style.flex   = '1';
 }
 
 function initZoom() {
