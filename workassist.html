@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.138</title>
+<title>WorkAssist v1.5.139</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1937,7 +1937,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.138</div>
+    <div class="start-version">v1.5.139</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2005,7 +2005,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.138</div>
+    <div class="app-version" id="app-version">v1.5.139</div>
   </div>
 
   <div class="nav-section">
@@ -3220,7 +3220,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.138';
+const APP_VERSION = '1.5.139';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -5737,9 +5737,13 @@ function planKarteHTML(p, kontext, zugeklappt) {
     const datum    = a?.startdatum || s.startdatum || '';
     const datumStr = datum ? new Date(datum + 'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}) : '';
     const clickAttr = a ? `onclick="openAufgabeModal('${a.id}');event.stopPropagation();" title="Aufgabe öffnen" style="cursor:pointer;"` : 'style="cursor:default;"';
+    // Kreis: bei Aufgabe → Status direkt togglen; bei Text-Schritt → status in Plan toggling
+    const kreisClick = a
+      ? `onclick="event.stopPropagation();planSchrittStatusToggle('${p.id}','${a.id}',null)" title="${isDone?'Wieder öffnen':'Als erledigt markieren'}" style="cursor:pointer;"`
+      : `onclick="event.stopPropagation();planSchrittStatusToggle('${p.id}',null,'${s.titel?.replace(/'/g,"\\'")}')" title="${isDone?'Wieder öffnen':'Als erledigt markieren'}" style="cursor:pointer;"`;
 
-    return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border);" ${clickAttr}>
-      <div style="width:17px;height:17px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0;${numStyle}">${icon}</div>
+    return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border);" ${a ? clickAttr : ''}>
+      <div ${kreisClick} style="width:17px;height:17px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0;${numStyle}">${icon}</div>
       <span style="flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isDone?'text-decoration:line-through;color:var(--text-xdim);':isAktiv?'font-weight:600;':''}">${titel}</span>
       ${groesse  ? `<span style="font-size:10px;color:var(--text-xdim);flex-shrink:0;">${groesse} min</span>` : ''}
       ${datumStr ? `<span style="font-size:10px;color:var(--text-xdim);flex-shrink:0;">${datumStr}</span>` : ''}
@@ -5785,6 +5789,48 @@ function planKarteToggle(detailId, headerEl) {
 }
 
 // Wenn eine Aufgabe erledigt/reaktiviert wird → Plan-Schritt synchronisieren
+// Schritt-Status direkt im Plan-Screen togglen (Kreis-Klick)
+function planSchrittStatusToggle(planId, aufgabeId, schritTitel) {
+  const p = (DB.plaene||[]).find(p => p.id === planId);
+  if (!p) return;
+
+  if (aufgabeId) {
+    // Verknüpfte Aufgabe: Status in DB.aufgaben togglen
+    const a = DB.aufgaben.find(a => a.id === aufgabeId);
+    if (!a) return;
+    const neuerStatus = a.status === 'erledigt' ? 'offen' : 'erledigt';
+    a.status    = neuerStatus;
+    a.geaendert = new Date().toISOString();
+    logAktion(a, 'status_geaendert', { von: a.status, zu: neuerStatus, viaCheckbox: true });
+    // Schritt-Status im Plan synchronisieren
+    const s = (p.schritte||[]).find(s => s.aufgabeId === aufgabeId);
+    if (s) s.status = neuerStatus;
+  } else {
+    // Text-Schritt: nur Status im Plan-Schritt selbst togglen
+    const s = (p.schritte||[]).find(s => !s.aufgabeId && s.titel === schritTitel);
+    if (!s) return;
+    s.status = s.status === 'erledigt' ? 'offen' : 'erledigt';
+  }
+
+  // Plan-Status prüfen
+  const alleErledigt = (p.schritte||[]).every(s => {
+    const effStatus = s.aufgabeId
+      ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status || s.status)
+      : s.status;
+    return effStatus === 'erledigt';
+  });
+  if (alleErledigt && p.status !== 'abgeschlossen') {
+    p.status = 'abgeschlossen';
+    showToast('✓ Plan „' + p.titel + '" abgeschlossen!');
+  } else if (!alleErledigt && p.status === 'abgeschlossen') {
+    p.status = 'aktiv';
+  }
+
+  saveDB();
+  renderPlaeneScreen();
+  renderDashboardPlaene();
+}
+
 function planSchrittSyncVonAufgabe(aufgabeId, neuerStatus) {
   if (!DB.plaene) return;
   let geaendert = false;
