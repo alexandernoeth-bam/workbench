@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.152</title>
+<title>WorkAssist v1.5.154</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2031,7 +2031,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.152</div>
+    <div class="start-version">v1.5.154</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2099,7 +2099,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.152</div>
+    <div class="app-version" id="app-version">v1.5.154</div>
   </div>
 
   <div class="nav-section">
@@ -3364,7 +3364,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.152';
+const APP_VERSION = '1.5.154';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -3469,6 +3469,10 @@ function migrateDB() {
   (DB.bereiche || []).forEach(b => {
     if (b.ziel === undefined) b.ziel = null;
     if (!Array.isArray(b.ressourcen)) b.ressourcen = [];
+  });
+  // Dokumente: ressourceTyp
+  (DB.dokumente || []).forEach(d => {
+    if (d.ressourceTyp === undefined) d.ressourceTyp = null;
   });
   // Notizen: bereichId
   (DB.notizen || []).forEach(n => {
@@ -6146,7 +6150,7 @@ function renderBereichDetail(b) {
   container.innerHTML =
     bdAufgabenHTML(aufgaben, aufgabenGesamt, b.id) +
     bdPlanHTML(plan) +
-    bdRessourcenHTML(ressourcen) +
+    bdRessourcenHTML(ressourcen, b.id) +
     bdNotizenHTML(notizen, b.id);
 }
 
@@ -6225,31 +6229,56 @@ function bdPlanHTML(plan) {
   </div>`;
 }
 
-function bdRessourcenHTML(ressourcen) {
-  const rows = ressourcen.length
-    ? ressourcen.map((r, i) => `
-      <div class="bd-res-row" onclick="if(event.target.closest('.bd-res-del'))return; window.open('${escHtml(r.url)}','_blank')">
-        ${ressourceIconSVG(r.typ)}
-        <div style="flex:1;min-width:0;">
-          <div class="bd-res-label">${escHtml(r.label)}</div>
-          <div class="bd-res-url">${escHtml(r.url).slice(0,50)}${r.url.length>50?'…':''}</div>
-        </div>
-        <div class="bd-res-del" onclick="resLoeschen(${i})" title="Entfernen" style="padding:2px 4px;cursor:pointer;color:var(--text-xdim);">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </div>
-      </div>`).join('')
-    : `<div class="bd-leer">Noch keine Ressourcen – mit + hinzufügen</div>`;
+function bdRessourcenHTML(ressourcen, bereichId) {
+  const INAKTIV = new Set(['fertig','einsatz','erkenntnisse']);
+  const dokumente = (DB.dokumente||[]).filter(d => d.bereichId === bereichId);
+  const DOK_STATUS = {
+    idee:'Idee', entwurf:'Entwurf', review:'Review', fertig:'Fertig', einsatz:'Im Einsatz',
+    lesen:'Zu lesen', liest:'Lese ich', gelesen:'Gelesen', erkenntnisse:'Erkenntnisse'
+  };
+  const DOK_FARBE = {
+    idee:'#8aaaa8', entwurf:'#1565C0', review:'#E65100', fertig:'#388e3c', einsatz:'#388e3c',
+    lesen:'#8aaaa8', liest:'#1565C0', gelesen:'#388e3c', erkenntnisse:'#388e3c'
+  };
+
+  const dokRows = dokumente.map(d => `
+    <div class="bd-res-row" onclick="openDokModal('${d.id}')">
+      ${d.ressourceTyp ? ressourceIconSVG(d.ressourceTyp) : `<svg width="20" height="20" viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="5" fill="#e0f2f1"/><path d="M10 8h10l6 6v14H10V8z" fill="none" stroke="#00695C" stroke-width="2"/><polyline points="20 8 20 14 26 14" fill="none" stroke="#00695C" stroke-width="2"/></svg>`}
+      <div style="flex:1;min-width:0;">
+        <div class="bd-res-label">${escHtml(d.titel)}</div>
+        <div class="bd-res-url">${d.typ === 'erstellen' ? 'Erstellen' : 'Lesen & Lernen'}</div>
+      </div>
+      <span style="font-size:9px;padding:1px 6px;border-radius:8px;background:${DOK_FARBE[d.status]||'#8aaaa8'}22;color:${DOK_FARBE[d.status]||'#8aaaa8'};font-weight:600;flex-shrink:0;">${DOK_STATUS[d.status]||d.status}</span>
+    </div>`).join('');
+
+  const linkRows = ressourcen.map((r, i) => `
+    <div class="bd-res-row" onclick="if(event.target.closest('.bd-res-del'))return; window.open('${escHtml(r.url)}','_blank')">
+      ${ressourceIconSVG(r.typ)}
+      <div style="flex:1;min-width:0;">
+        <div class="bd-res-label">${escHtml(r.label)}</div>
+        <div class="bd-res-url">${escHtml(r.url).slice(0,50)}${r.url.length>50?'…':''}</div>
+      </div>
+      <div class="bd-res-del" onclick="resLoeschen(${i})" title="Entfernen" style="padding:2px 4px;cursor:pointer;color:var(--text-xdim);">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>
+    </div>`).join('');
+
+  const leer = !dokumente.length && !ressourcen.length
+    ? `<div class="bd-leer">Noch keine Ressourcen</div>` : '';
 
   return `<div class="bd-card">
     <div class="bd-ch">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
       Ressourcen
-      <span class="bd-ch-count">${ressourcen.length}</span>
-      <button class="bd-ch-add" onclick="openResModal()">+</button>
+      <span class="bd-ch-count">${dokumente.length + ressourcen.length}</span>
+      <button class="bd-ch-add" onclick="resAuswahlOeffnen()">+</button>
     </div>
-    <div style="overflow-y:auto;flex:1;">${rows}</div>
+    <div style="overflow-y:auto;flex:1;">
+      ${dokRows}${linkRows}${leer}
+    </div>
   </div>`;
 }
+
 
 function bdNotizenHTML(notizen, bereichId) {
   const rows = notizen.length
@@ -6271,6 +6300,69 @@ function bdNotizenHTML(notizen, bereichId) {
     </div>
     <div style="overflow-y:auto;flex:1;">${rows}</div>
   </div>`;
+}
+
+function resAuswahlOeffnen() {
+  // Kleines Inline-Popup statt Modal
+  const existing = document.getElementById('res-auswahl-popup');
+  if (existing) { existing.remove(); return; }
+
+  const popup = document.createElement('div');
+  popup.id = 'res-auswahl-popup';
+  popup.style.cssText = `
+    position:fixed; z-index:2000;
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:9px; box-shadow:0 4px 20px rgba(0,0,0,.15);
+    padding:6px; min-width:200px; font-family:var(--font);
+  `;
+
+  // Positionierung: rechts neben dem + Button
+  const btn = document.querySelector('#bd-content .bd-ch-add');
+  if (btn) {
+    const r = btn.getBoundingClientRect();
+    const zoom = (currentZoom || 100) / 100;
+    popup.style.top  = Math.round(r.bottom / zoom + 4) + 'px';
+    popup.style.right = Math.round((window.innerWidth/zoom - r.right/zoom)) + 'px';
+  } else {
+    popup.style.top = '50%'; popup.style.right = '20px';
+  }
+
+  popup.innerHTML = `
+    <div onclick="resAuswahlDokument()" style="display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border-radius:6px;font-size:12px;" onmouseover="this.style.background='var(--teal-xlight)'" onmouseout="this.style.background=''">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Dokument anlegen
+    </div>
+    <div onclick="openResModal()" style="display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border-radius:6px;font-size:12px;" onmouseover="this.style.background='var(--teal-xlight)'" onmouseout="this.style.background=''">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      Externen Link hinzufügen
+    </div>
+  `;
+
+  document.body.appendChild(popup);
+
+  // Klick außerhalb schließt
+  setTimeout(() => {
+    document.addEventListener('click', function closePopup(e) {
+      if (!popup.contains(e.target)) {
+        popup.remove();
+        document.removeEventListener('click', closePopup);
+      }
+    });
+  }, 10);
+}
+
+function resAuswahlDokument() {
+  const existing = document.getElementById('res-auswahl-popup');
+  if (existing) existing.remove();
+  // Dok-Modal öffnen mit Bereich vorbelegt
+  openDokModal(null);
+  // Bereich vorbelegen nach kurzem Delay
+  setTimeout(() => {
+    const sel = document.getElementById('dok-bereich');
+    if (sel && aktiverBereichId) {
+      sel.value = aktiverBereichId;
+    }
+  }, 100);
 }
 
 function openResModal() {
@@ -7355,15 +7447,23 @@ function openDokModal(id, aufgabeId) {
     });
   }
 
+  // Ressourcetyp-Dropdown befüllen
+  const rSel = document.getElementById('dok-ressource-typ');
+  if (rSel) {
+    rSel.innerHTML = '<option value="">— Format —</option>' +
+      RESSOURCEN_TYPEN.map(t => `<option value="${t.id}">${t.label}</option>`).join('');
+  }
+
   if (id) {
     const d = (DB.dokumente||[]).find(d => d.id === id);
     if (!d) return;
-    document.getElementById('dok-edit-id').value  = d.id;
+    document.getElementById('dok-edit-id').value    = d.id;
     document.getElementById('dok-aufgabe-id').value = d.aufgabeId || '';
-    document.getElementById('dok-titel').value    = d.titel;
-    document.getElementById('dok-typ').value      = d.typ;
-    document.getElementById('dok-bereich').value  = d.bereichId || '';
-    document.getElementById('dok-link').value     = d.link || '';
+    document.getElementById('dok-titel').value      = d.titel;
+    document.getElementById('dok-typ').value        = d.typ;
+    document.getElementById('dok-bereich').value    = d.bereichId || '';
+    document.getElementById('dok-link').value       = d.link || '';
+    if (rSel) rSel.value = d.ressourceTyp || '';
     const rte = document.getElementById('dok-notiz-rte');
     if (rte) rte.innerHTML = d.notiz || '';
     document.getElementById('dok-modal-titel').textContent = d.titel;
@@ -7371,12 +7471,13 @@ function openDokModal(id, aufgabeId) {
     updateDokAufgabeAnzeige(d.aufgabeId);
     updateDokLinkBtn();
   } else {
-    document.getElementById('dok-edit-id').value   = '';
-    document.getElementById('dok-aufgabe-id').value= aufgabeId || '';
-    document.getElementById('dok-titel').value     = '';
-    document.getElementById('dok-typ').value       = 'erstellen';
-    document.getElementById('dok-bereich').value   = '';
-    document.getElementById('dok-link').value      = '';
+    document.getElementById('dok-edit-id').value    = '';
+    document.getElementById('dok-aufgabe-id').value = aufgabeId || '';
+    document.getElementById('dok-titel').value      = '';
+    document.getElementById('dok-typ').value        = 'erstellen';
+    document.getElementById('dok-bereich').value    = '';
+    document.getElementById('dok-link').value       = '';
+    if (rSel) rSel.value = '';
     const rte = document.getElementById('dok-notiz-rte');
     if (rte) rte.innerHTML = '';
     document.getElementById('dok-modal-titel').textContent = 'Neues Dokument';
@@ -7526,25 +7627,27 @@ function saveDokument(neuerStatus) {
   if (editId) {
     d = (DB.dokumente||[]).find(d => d.id === editId);
     if (!d) return;
-    d.titel     = titel;
-    d.typ       = typ;
-    d.link      = link;
-    d.bereichId = document.getElementById('dok-bereich').value || null;
-    d.notiz     = notiz;
-    d.status    = neuerStatus || d.status;
-    d.geaendert = new Date().toISOString();
+    d.titel        = titel;
+    d.typ          = typ;
+    d.link         = link;
+    d.bereichId    = document.getElementById('dok-bereich').value || null;
+    d.ressourceTyp = document.getElementById('dok-ressource-typ')?.value || null;
+    d.notiz        = notiz;
+    d.status       = neuerStatus || d.status;
+    d.geaendert    = new Date().toISOString();
   } else {
     if (!DB.dokumente) DB.dokumente = [];
     d = {
-      id:         uid(),
+      id:           uid(),
       titel, typ, link,
-      bereichId:  document.getElementById('dok-bereich').value || null,
+      bereichId:    document.getElementById('dok-bereich').value || null,
+      ressourceTyp: document.getElementById('dok-ressource-typ')?.value || null,
       aufgabeId,
-      status:     neuerStatus || schritte[0],
+      status:       neuerStatus || schritte[0],
       notiz,
       einsatzNotiz: null,
-      erstellt:   new Date().toISOString(),
-      geaendert:  new Date().toISOString(),
+      erstellt:     new Date().toISOString(),
+      geaendert:    new Date().toISOString(),
     };
     DB.dokumente.push(d);
     document.getElementById('dok-edit-id').value = d.id;
@@ -7589,6 +7692,11 @@ function saveDokument(neuerStatus) {
     showToast('✓ Dokumentenworkflow abgeschlossen');
   } else {
     showToast('Gespeichert');
+  }
+  // Bereich-Detail aktualisieren falls offen
+  if (aktiverBereichId && document.getElementById('screen-bereiche')?.classList.contains('active')) {
+    const _b = DB.bereiche.find(b => b.id === aktiverBereichId);
+    if (_b) renderBereichDetail(_b);
   }
 }
 
@@ -10330,12 +10438,18 @@ if (!fsApiVerfuegbar()) {
       </div>
 
       <!-- Typ / Bereich -->
-      <div class="modal-row2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="modal-row2" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
         <div class="field-group">
-          <div class="field-label">Typ *</div>
+          <div class="field-label">Workflow *</div>
           <select class="field-select" id="dok-typ" onchange="updateDokWorkflowUI()">
             <option value="erstellen">📝 Erstellen</option>
             <option value="lesen">📖 Lesen &amp; Lernen</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Format</div>
+          <select class="field-select" id="dok-ressource-typ">
+            <option value="">— Format —</option>
           </select>
         </div>
         <div class="field-group">
