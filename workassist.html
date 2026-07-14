@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.151</title>
+<title>WorkAssist v1.5.152</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2031,7 +2031,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.151</div>
+    <div class="start-version">v1.5.152</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2099,7 +2099,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.151</div>
+    <div class="app-version" id="app-version">v1.5.152</div>
   </div>
 
   <div class="nav-section">
@@ -2497,6 +2497,11 @@ textarea.field-input { resize: vertical; min-height: 70px; }
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
             <input class="notiz-tag-input" id="notiz-edit-tag" placeholder="Tag …" list="notiz-tag-vorschlaege" oninput="notizAutoSave()">
             <datalist id="notiz-tag-vorschlaege"></datalist>
+            <div style="width:1px;height:12px;background:var(--border);flex-shrink:0;"></div>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <select class="notiz-tag-input" id="notiz-edit-bereich" onchange="notizAutoSave()" style="border:none;background:transparent;color:var(--teal-dark);font-size:11px;font-family:var(--font);cursor:pointer;flex:1;">
+              <option value="">— kein Bereich —</option>
+            </select>
             <span class="notiz-datum-label" id="notiz-edit-datum">–</span>
             <button onclick="toggleUnterseitenPanel()" style="flex-shrink:0;border:1px solid var(--border);background:var(--surface);border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer;font-family:var(--font);color:var(--text-dim);" id="notiz-usz-btn">
               Unterseiten
@@ -3359,7 +3364,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.151';
+const APP_VERSION = '1.5.152';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -3464,6 +3469,10 @@ function migrateDB() {
   (DB.bereiche || []).forEach(b => {
     if (b.ziel === undefined) b.ziel = null;
     if (!Array.isArray(b.ressourcen)) b.ressourcen = [];
+  });
+  // Notizen: bereichId
+  (DB.notizen || []).forEach(n => {
+    if (n.bereichId === undefined) n.bereichId = null;
   });
   // geplantAm: alter String → neues Objekt { datum, startzeit }
   (DB.aufgaben || []).forEach(a => {
@@ -6349,6 +6358,14 @@ let aktiveNotizId     = null;
 let notizTagFilter    = '';
 let notizAutoSaveTimer= null;
 
+function notizBereichDropdownBefuellen(selectedId) {
+  const sel = document.getElementById('notiz-edit-bereich');
+  if (!sel) return;
+  const bereiche = (DB.bereiche || []).filter(b => !b.archiviert).sort((a,b) => a.name.localeCompare(b.name, 'de'));
+  sel.innerHTML = '<option value="">— kein Bereich —</option>' +
+    bereiche.map(b => `<option value="${b.id}" ${b.id === selectedId ? 'selected' : ''}>${escHtml(b.name)}</option>`).join('');
+}
+
 function showScreenNotizen() {
   renderNotizenTagFilter();
   renderNotizenListe();
@@ -6402,10 +6419,12 @@ function renderNotizenListe() {
     const usz = (DB.notizen||[]).filter(x=>x.parentId===n.id).length;
     const preview = (n.inhalt||'').replace(/[#*`>_\[\]]/g,'').slice(0,80);
     const datum = n.geaendert ? n.geaendert.slice(0,10).split('-').reverse().join('.') : '';
+    const bereich = n.bereichId ? DB.bereiche.find(b=>b.id===n.bereichId) : null;
     return `<div class="notiz-karte ${aktiveNotizId===n.id?'aktiv':''}" onclick="notizOeffnen('${n.id}')">
       <div class="notiz-karte-titel">${escHtml(n.titel)}</div>
       <div class="notiz-karte-meta">
         ${n.tag ? `<span class="notiz-karte-tag">#${escHtml(n.tag)}</span>` : ''}
+        ${bereich ? `<span class="notiz-karte-tag" style="background:var(--teal-xlight);color:var(--teal-dark);">${escHtml(bereich.name)}</span>` : ''}
         <span class="notiz-karte-datum">${datum}</span>
         ${usz ? `<span class="notiz-usz-badge">${usz} Unterseite${usz>1?'n':''}</span>` : ''}
       </div>
@@ -6431,6 +6450,8 @@ function notizOeffnen(id) {
   document.getElementById('notiz-textarea').value     = n.inhalt || '';
   document.getElementById('notiz-edit-datum').textContent =
     n.geaendert ? n.geaendert.slice(0,10).split('-').reverse().join('.') : '–';
+  // Bereich-Dropdown befüllen + Wert setzen
+  notizBereichDropdownBefuellen(n.bereichId || '');
 
   // Zurück-Button bei Unterseite
   const backBtn = document.getElementById('notiz-btn-back');
@@ -6468,6 +6489,8 @@ function notizNeu(parentId) {
   document.getElementById('notiz-edit-tag').value     = notizTagFilter || '';
   document.getElementById('notiz-textarea').value     = '';
   document.getElementById('notiz-edit-datum').textContent = '–';
+  // Bereich vorbelegen: aktiver Bereich oder leer
+  notizBereichDropdownBefuellen(aktiverBereichId || '');
   const backBtn = document.getElementById('notiz-btn-back');
   if (parentId) { backBtn.style.display = ''; backBtn.dataset.parentid = parentId; }
   else backBtn.style.display = 'none';
@@ -6483,10 +6506,11 @@ function notizZurOberseite() {
 }
 
 function notizSpeichern() {
-  const id     = document.getElementById('notiz-edit-id')?.value;
-  const titel  = document.getElementById('notiz-edit-titel')?.value.trim();
-  const inhalt = document.getElementById('notiz-textarea')?.value || '';
-  const tag    = document.getElementById('notiz-edit-tag')?.value.trim() || null;
+  const id       = document.getElementById('notiz-edit-id')?.value;
+  const titel    = document.getElementById('notiz-edit-titel')?.value.trim();
+  const inhalt   = document.getElementById('notiz-textarea')?.value || '';
+  const tag      = document.getElementById('notiz-edit-tag')?.value.trim() || null;
+  const bereichId= document.getElementById('notiz-edit-bereich')?.value || null;
   const parentId = document.getElementById('notiz-edit-parentid')?.value || null;
   if (!titel && !inhalt) return; // Nichts zu speichern
 
@@ -6496,7 +6520,7 @@ function notizSpeichern() {
     titel:    titel || 'Ohne Titel',
     inhalt, tag,
     parentId: parentId || null,
-    bereichId: aktiverBereichId || null,
+    bereichId: bereichId || null,
     geaendert: jetzt,
   };
 
