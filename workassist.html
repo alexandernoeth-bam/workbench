@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.136</title>
+<title>WorkAssist v1.5.137</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1937,7 +1937,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.136</div>
+    <div class="start-version">v1.5.137</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2005,7 +2005,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.136</div>
+    <div class="app-version" id="app-version">v1.5.137</div>
   </div>
 
   <div class="nav-section">
@@ -3220,7 +3220,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.136';
+const APP_VERSION = '1.5.137';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6238,24 +6238,25 @@ function openNeuerPlan(id) {
     // Lade Schritte – mit Aufgaben-Daten falls verknüpft
     planSchritte = (p.schritte || []).map(s => {
       if (s.aufgabeId) {
+        // Bestehende verknüpfte Aufgabe – IMMER Live-Status aus DB.aufgaben lesen
         const a = DB.aufgaben.find(a => a.id === s.aufgabeId);
         return {
-          titel:      a?.titel || s.titel || '',
-          status:     a?.status || s.status || 'offen',
-          alsAufgabe: true,
-          aufgabeId:  s.aufgabeId,
-          groesse:    a?.groesse || s.groesse || '',
-          startdatum: a?.startdatum || s.startdatum || '',
+          titel:       a?.titel || s.titel || '',
+          status:      a?.status ?? s.status ?? 'offen',  // ?? statt || damit 'erledigt' nicht falsch fällt
+          alsAufgabe:  false,   // bestehende Aufgabe → Modus 'vorhanden'
+          aufgabeId:   s.aufgabeId,
+          groesse:     a?.groesse || s.groesse || '',
+          startdatum:  a?.startdatum || s.startdatum || '',
           reihenfolge: s.reihenfolge || 0,
         };
       }
       return {
-        titel:      s.titel || '',
-        status:     s.status || 'offen',
-        alsAufgabe: false,
-        aufgabeId:  null,
-        groesse:    '',
-        startdatum: '',
+        titel:       s.titel || '',
+        status:      s.status ?? 'offen',
+        alsAufgabe:  false,
+        aufgabeId:   null,
+        groesse:     '',
+        startdatum:  '',
         reihenfolge: s.reihenfolge || 0,
       };
     });
@@ -6305,7 +6306,11 @@ function planRenderSchritte() {
   ];
 
   list.innerHTML = planSchritte.map((s, i) => {
-    const isDone  = s.status === 'erledigt';
+    // Status live aus DB.aufgaben lesen wenn verknüpft
+    const liveStatus = s.aufgabeId
+      ? (DB.aufgaben.find(a => a.id === s.aufgabeId)?.status ?? s.status)
+      : s.status;
+    const isDone  = liveStatus === 'erledigt';
     const numIcon = isDone
       ? '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
       : (i + 1);
