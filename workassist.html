@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.143</title>
+<title>WorkAssist v1.5.144</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1965,7 +1965,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.143</div>
+    <div class="start-version">v1.5.144</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2033,7 +2033,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.143</div>
+    <div class="app-version" id="app-version">v1.5.144</div>
   </div>
 
   <div class="nav-section">
@@ -2120,6 +2120,11 @@ textarea.field-input { resize: vertical; min-height: 70px; }
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       <span id="save-status-text">Gespeichert</span>
     </div>
+    <button onclick="dateiWechseln()" title="Andere Datei öffnen"
+      style="border:1px solid var(--border);background:transparent;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;color:var(--text-dim);font-family:var(--font);display:flex;align-items:center;gap:4px;flex-shrink:0;">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+      Datei wechseln
+    </button>
     <div class="zoom-wrap">
       <button class="zoom-btn" onclick="setZoom(currentZoom - 5)" title="Zoom verringern">−</button>
       <span id="zoom-label" class="zoom-label">100%</span>
@@ -3244,7 +3249,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.143';
+const APP_VERSION = '1.5.144';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -3363,6 +3368,32 @@ function startAutoSave() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 // FileHandle in IndexedDB speichern (localStorage unterstützt keine Handles)
+async function handleLoeschen() {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('workassist', 1);
+      req.onsuccess = e => {
+        try {
+          const db = e.target.result;
+          const tx = db.transaction('handles', 'readwrite');
+          tx.objectStore('handles').delete('filehandle');
+          tx.oncomplete = () => resolve();
+          tx.onerror    = () => resolve();
+        } catch(e2) { resolve(); }
+      };
+      req.onerror = () => resolve();
+    } catch(e) { resolve(); }
+  });
+}
+
+async function dateiWechseln() {
+  if (!confirm('Aktuelle Datei trennen und eine andere öffnen?\n\nUngespeicherte Änderungen gehen verloren.')) return;
+  await handleLoeschen();
+  localStorage.removeItem('workassist_db');
+  fileHandle = null;
+  location.reload();
+}
+
 async function handleSpeichern(handle) {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open('workassist', 1);
