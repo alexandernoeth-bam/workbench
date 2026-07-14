@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.150</title>
+<title>WorkAssist v1.5.151</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1936,7 +1936,34 @@ textarea.field-input { resize: vertical; min-height: 70px; }
   width: 400px; max-width: 95vw; padding: 16px;
   box-shadow: 0 8px 32px rgba(0,0,0,.18);
 }
-/* ── Ende Notizen-Screen ────────────────────────────────────────────────── */
+/* Schwebende Unterseiten-Übersicht */
+.notiz-usz-panel {
+  position: absolute; top: 0; right: 0; width: 260px; height: 100%;
+  background: var(--surface); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; z-index: 10;
+  transform: translateX(100%); transition: transform .2s ease;
+  box-shadow: -4px 0 16px rgba(0,0,0,.08);
+}
+.notiz-usz-panel.open { transform: translateX(0); }
+.notiz-usz-panel-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  background: var(--panel-header-bg); color: #fff; flex-shrink: 0;
+}
+.notiz-usz-panel-header span { font-size: 12px; font-weight: 700; flex: 1; }
+.notiz-usz-panel-close { background: none; border: none; color: #fff; cursor: pointer; padding: 2px; }
+.notiz-usz-panel-body { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.notiz-usz-item {
+  padding: 8px 10px; border-radius: 7px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg);
+}
+.notiz-usz-item:hover { background: var(--teal-xlight); border-color: var(--teal-light); }
+.notiz-usz-item-titel { font-size: 11px; font-weight: 600; color: var(--text); }
+.notiz-usz-item-datum { font-size: 10px; color: var(--text-xdim); margin-top: 2px; }
+.notiz-usz-panel-add { margin: 6px; padding: 6px; border: 1px dashed var(--border); border-radius: 7px; text-align: center; font-size: 11px; color: var(--text-xdim); cursor: pointer; }
+.notiz-usz-panel-add:hover { background: var(--teal-xlight); border-color: var(--teal); color: var(--teal-dark); }
+/* Editor relativ für absolute Positionierung des Panels */
+.notizen-editor { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); position: relative; }
 .plan-schritt-row {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 0; border-bottom: 1px solid var(--border);
@@ -2004,7 +2031,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.150</div>
+    <div class="start-version">v1.5.151</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2072,7 +2099,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.150</div>
+    <div class="app-version" id="app-version">v1.5.151</div>
   </div>
 
   <div class="nav-section">
@@ -2471,7 +2498,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
             <input class="notiz-tag-input" id="notiz-edit-tag" placeholder="Tag …" list="notiz-tag-vorschlaege" oninput="notizAutoSave()">
             <datalist id="notiz-tag-vorschlaege"></datalist>
             <span class="notiz-datum-label" id="notiz-edit-datum">–</span>
-            <button onclick="openUnterseitenOverlay()" style="flex-shrink:0;border:1px solid var(--border);background:var(--surface);border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer;font-family:var(--font);color:var(--text-dim);" id="notiz-usz-btn">
+            <button onclick="toggleUnterseitenPanel()" style="flex-shrink:0;border:1px solid var(--border);background:var(--surface);border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer;font-family:var(--font);color:var(--text-dim);" id="notiz-usz-btn">
               Unterseiten
             </button>
           </div>
@@ -2505,8 +2532,20 @@ textarea.field-input { resize: vertical; min-height: 70px; }
           <div class="notiz-render-view" id="notiz-render-view" style="display:none;"></div>
         </div>
       </div>
-    </div>
 
+      <!-- Schwebende Unterseiten-Übersicht -->
+      <div class="notiz-usz-panel" id="notiz-usz-panel">
+        <div class="notiz-usz-panel-header">
+          <span>Unterseiten</span>
+          <button class="notiz-usz-panel-close" onclick="closeUnterseitenPanel()" title="Schließen">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="notiz-usz-panel-body" id="notiz-usz-panel-body"></div>
+        <div class="notiz-usz-panel-add" onclick="unterseiteNeu()">+ Neue Unterseite</div>
+      </div>
+
+    </div><!-- /notizen-editor -->
   </div><!-- /screen-notizen -->
 
   <!-- ══ SCREEN: PLÄNE ═══════════════════════════════════════════════════ -->
@@ -3320,7 +3359,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.150';
+const APP_VERSION = '1.5.151';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6407,7 +6446,13 @@ function notizOeffnen(id) {
   const uszBtn = document.getElementById('notiz-usz-btn');
   if (uszBtn) uszBtn.textContent = uszCount ? `Unterseiten (${uszCount})` : 'Unterseiten';
 
-  notizToggleView(false); // Edit-Modus
+  notizToggleView(true); // Vorschau-Modus beim Öffnen
+  // Unterseiten-Panel anzeigen wenn Unterseiten vorhanden
+  if (uszCount > 0) {
+    openUnterseitenPanel(id);
+  } else {
+    closeUnterseitenPanel();
+  }
   renderNotizenListe();
 }
 
@@ -6426,7 +6471,8 @@ function notizNeu(parentId) {
   const backBtn = document.getElementById('notiz-btn-back');
   if (parentId) { backBtn.style.display = ''; backBtn.dataset.parentid = parentId; }
   else backBtn.style.display = 'none';
-  notizToggleView(false);
+  notizToggleView(false); // Edit-Modus bei neuer Notiz
+  closeUnterseitenPanel();
   setTimeout(() => document.getElementById('notiz-edit-titel').focus(), 30);
 }
 
@@ -6469,6 +6515,9 @@ function notizSpeichern() {
   renderNotizenTagFilter();
   const badge = document.getElementById('badge-notizen');
   if (badge) badge.textContent = (DB.notizen||[]).filter(n=>!n.parentId).length || 0;
+  // Panel aktualisieren falls offen
+  const panel = document.getElementById('notiz-usz-panel');
+  if (panel?.classList.contains('open')) openUnterseitenPanel();
 }
 
 function notizAutoSave() {
@@ -6545,30 +6594,59 @@ function notizTbInsert(text) {
   ta.focus(); notizAutoSave();
 }
 
-// ── Unterseiten ─────────────────────────────────────────────────────────────
-function openUnterseitenOverlay() {
-  const parentId = document.getElementById('notiz-edit-id').value;
-  if (!parentId) { showToast('Bitte zuerst speichern', true); return; }
-  const liste = document.getElementById('notiz-usz-liste');
-  const unterseiten = (DB.notizen||[]).filter(n=>n.parentId===parentId);
-  if (!unterseiten.length) {
-    liste.innerHTML = '<div style="color:var(--text-xdim);font-size:12px;text-align:center;padding:20px;">Keine Unterseiten vorhanden</div>';
+function toggleUnterseitenPanel() {
+  const panel = document.getElementById('notiz-usz-panel');
+  if (panel?.classList.contains('open')) {
+    closeUnterseitenPanel();
   } else {
-    liste.innerHTML = unterseiten.map(n => `
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:7px;cursor:pointer;" onclick="closeUnterseitenOverlay();notizOeffnen('${n.id}')">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-        <span style="flex:1;font-size:12px;font-weight:600;">${escHtml(n.titel)}</span>
-        <span style="font-size:10px;color:var(--text-xdim);">${n.geaendert?.slice(0,10).split('-').reverse().join('.')||''}</span>
-      </div>`).join('');
+    openUnterseitenPanel();
   }
-  document.getElementById('notiz-usz-overlay').classList.add('open');
 }
+
+// ── Unterseiten-Panel (schwebend rechts) ─────────────────────────────────────
+function openUnterseitenPanel(parentId) {
+  if (!parentId) parentId = document.getElementById('notiz-edit-id')?.value;
+  if (!parentId) return;
+  const panel = document.getElementById('notiz-usz-panel');
+  const body  = document.getElementById('notiz-usz-panel-body');
+  if (!panel || !body) return;
+
+  const unterseiten = (DB.notizen||[]).filter(n => n.parentId === parentId);
+  const uszBtn = document.getElementById('notiz-usz-btn');
+
+  if (!unterseiten.length) {
+    body.innerHTML = '<div style="padding:16px 10px;font-size:11px;color:var(--text-xdim);text-align:center;">Noch keine Unterseiten</div>';
+  } else {
+    body.innerHTML = unterseiten.map(n => {
+      const datum = n.geaendert ? n.geaendert.slice(0,10).split('-').reverse().join('.') : '';
+      return `<div class="notiz-usz-item" onclick="notizOeffnen('${n.id}')">
+        <div class="notiz-usz-item-titel">${escHtml(n.titel)}</div>
+        <div class="notiz-usz-item-datum">${datum}</div>
+      </div>`;
+    }).join('');
+  }
+
+  panel.classList.add('open');
+  if (uszBtn) uszBtn.textContent = unterseiten.length ? `Unterseiten (${unterseiten.length})` : 'Unterseiten';
+}
+
+function closeUnterseitenPanel() {
+  const panel = document.getElementById('notiz-usz-panel');
+  if (panel) panel.classList.remove('open');
+}
+
+function openUnterseitenOverlay() {
+  // Leitet jetzt auf Panel um
+  openUnterseitenPanel();
+}
+
 function closeUnterseitenOverlay() {
-  document.getElementById('notiz-usz-overlay').classList.remove('open');
+  closeUnterseitenPanel();
 }
+
 function unterseiteNeu() {
   const parentId = document.getElementById('notiz-edit-id').value;
-  closeUnterseitenOverlay();
+  closeUnterseitenPanel();
   notizNeu(parentId);
 }
 
