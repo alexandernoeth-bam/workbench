@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.148</title>
+<title>WorkAssist v1.5.149</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1501,7 +1501,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 .plan-btn.geplant { color: var(--teal); background: var(--teal-xlight); }
 
 /* ── Bereich-Detailseite ─────────────────────────────────────────────────── */
-#screen-bereiche-detail.active { display: flex !important; flex-direction: column; overflow: hidden; flex: 1; min-height: 0; }
+#screen-bereiche-detail.active { display: flex !important; flex-direction: column; overflow: hidden; flex: 1; min-height: 0; height: var(--app-h, 100vh); max-height: var(--app-h, 100vh); }
 .bd-topbar { display:flex; align-items:center; gap:10px; padding:10px 16px; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; }
 .bd-back { display:flex; align-items:center; gap:5px; padding:4px 10px; border:1px solid var(--border); border-radius:6px; background:var(--bg); color:var(--teal-dark); font-size:11px; cursor:pointer; font-family:var(--font); }
 .bd-back:hover { background:var(--teal-xlight); }
@@ -2003,7 +2003,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.148</div>
+    <div class="start-version">v1.5.149</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2071,7 +2071,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.148</div>
+    <div class="app-version" id="app-version">v1.5.149</div>
   </div>
 
   <div class="nav-section">
@@ -3338,7 +3338,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.148';
+const APP_VERSION = '1.5.149';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -9042,8 +9042,11 @@ function setZoom(pct) {
   if (lbl) lbl.textContent = pct + '%';
   try { localStorage.setItem('workassist_zoom', pct); } catch(e) {}
   const zoom = pct / 100;
+  // CSS-Variable für zoom-korrekte Höhe setzen
+  const effH = Math.floor(window.innerHeight / zoom);
+  document.documentElement.style.setProperty('--app-h', effH + 'px');
   // struct-layout Höhe zoom-korrigieren
-  const strukturH = Math.floor((window.innerHeight / zoom) - 100);
+  const strukturH = Math.floor(effH - 100);
   document.querySelectorAll('.struct-layout').forEach(el => {
     el.style.height = strukturH + 'px';
   });
@@ -9051,32 +9054,23 @@ function setZoom(pct) {
   if (document.getElementById('screen-dashboard')?.classList.contains('active')) {
     setTimeout(berechneDashRechtsHoehen, 30);
   }
-  // Bereich-Detail-Layout nach Zoom neu berechnen
-  if (document.getElementById('screen-bereiche-detail')?.classList.contains('active')) {
-    setTimeout(berechneBereichDetailHoehe, 30);
-  }
+  // Bereich-Detail: wird über CSS-Variable --app-h gesteuert, kein JS nötig
 }
 
 function berechneBereichDetailHoehe() {
-  const zoom   = (currentZoom || 100) / 100;
-  const screen = document.getElementById('screen-bereiche-detail');
-  const grid   = document.getElementById('bd-content');
-  if (!screen || !grid) return;
-
-  // Effektive Bildschirmhöhe nach Zoom
+  // --app-h wird in setZoom gesetzt; hier nur sicherstellen dass es gesetzt ist
+  const zoom = (currentZoom || 100) / 100;
   const effH = Math.floor(window.innerHeight / zoom);
-
-  // Screen bekommt explizite Höhe – dann arbeitet flex korrekt
-  screen.style.height = effH + 'px';
-  screen.style.maxHeight = effH + 'px';
-
-  // Grid: Höhe = alles was übrig bleibt nach Topbar + Zielwrap
-  // CSS flex:1 + min-height:0 reicht wenn der Screen-Container die richtige Höhe hat
-  grid.style.height = '';
-  grid.style.flex   = '1';
+  document.documentElement.style.setProperty('--app-h', effH + 'px');
 }
 
 function initZoom() {
+  // --app-h initialisieren
+  document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
+  window.addEventListener('resize', () => {
+    const zoom = (currentZoom || 100) / 100;
+    document.documentElement.style.setProperty('--app-h', Math.floor(window.innerHeight / zoom) + 'px');
+  });
   try {
     const gespeichert = localStorage.getItem('workassist_zoom');
     if (gespeichert) { setZoom(parseInt(gespeichert)); return; }
