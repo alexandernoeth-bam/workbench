@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.131</title>
+<title>WorkAssist v1.5.132</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -201,8 +201,9 @@ svg { display: block; }
   display: flex; align-items: center; gap: 8px;
   padding: 9px 12px; border-bottom: 1px solid var(--border);
   font-weight: 600; font-size: 13px; flex-shrink: 0;
+  color: var(--teal-dark);
 }
-.accent-bar { width: 3px; height: 15px; border-radius: 2px; flex-shrink: 0; }
+.accent-bar { display: none; }
 .bar-org { background: var(--orange); }
 .bar-tel { background: var(--teal); }
 .bar-tlt { background: var(--teal-light); }
@@ -1935,7 +1936,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.131</div>
+    <div class="start-version">v1.5.132</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2003,7 +2004,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.131</div>
+    <div class="app-version" id="app-version">v1.5.132</div>
   </div>
 
   <div class="nav-section">
@@ -3216,7 +3217,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.131';
+const APP_VERSION = '1.5.132';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -5742,11 +5743,23 @@ function planKarteHTML(p, kontext, zugeklappt) {
     </div>`;
   }).join('');
 
+  const naechsterSchritt = schritte.find(s => {
+    const status = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status || s.status) : s.status;
+    return status !== 'erledigt';
+  });
+  const naechsterTitel = naechsterSchritt
+    ? (naechsterSchritt.aufgabeId
+        ? DB.aufgaben.find(a=>a.id===naechsterSchritt.aufgabeId)?.titel || naechsterSchritt.titel
+        : naechsterSchritt.titel)
+    : null;
+
   return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:5px;">
     <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;cursor:pointer;" onclick="planKarteToggle('${detailId}',this)">
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-xdim);flex-shrink:0;transition:transform .2s;${istOffen?'transform:rotate(90deg)':''}"><polyline points="9 18 15 12 9 6"/></svg>
-      <span style="font-size:11px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.titel}</span>
-      ${b ? `<span style="font-size:9px;background:var(--teal-xlight);color:var(--teal-dark);padding:1px 5px;border-radius:4px;font-weight:600;flex-shrink:0;">${b.name}</span>` : ''}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.titel}</div>
+        ${naechsterTitel ? `<div style="font-size:10px;color:var(--teal-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">→ ${naechsterTitel}</div>` : (erledigt===gesamt && gesamt>0 ? '<div style="font-size:10px;color:var(--teal);">✓ Abgeschlossen</div>' : '')}
+      </div>
       <span style="font-size:10px;background:var(--teal);color:#fff;padding:1px 6px;border-radius:8px;font-weight:600;flex-shrink:0;">${erledigt}/${gesamt}</span>
       <button onclick="event.stopPropagation();openNeuerPlan('${p.id}')" style="flex-shrink:0;border:none;background:none;cursor:pointer;padding:2px 4px;color:var(--teal);" title="Plan bearbeiten">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
