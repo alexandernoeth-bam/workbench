@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.133</title>
+<title>WorkAssist v1.5.134</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1936,7 +1936,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.133</div>
+    <div class="start-version">v1.5.134</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2004,7 +2004,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.133</div>
+    <div class="app-version" id="app-version">v1.5.134</div>
   </div>
 
   <div class="nav-section">
@@ -2392,6 +2392,8 @@ textarea.field-input { resize: vertical; min-height: 70px; }
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
               Plan
             </button>
+            <button class="ntb" onclick="notizTbTabelle()" title="Tabelle einfügen">⊞</button>
+            <button class="ntb" onclick="notizTb('[','](url)')" title="Link">🔗</button>
             <div class="ntb-sep"></div>
             <button class="ntb" id="notiz-btn-edit" onclick="notizToggleView(false)" style="color:var(--teal);">Edit</button>
             <button class="ntb" id="notiz-btn-view" onclick="notizToggleView(true)">Ansicht</button>
@@ -3217,7 +3219,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.133';
+const APP_VERSION = '1.5.134';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6080,6 +6082,11 @@ function planLinkEinfuegen(planId) {
   showToast('Plan-Link eingefügt');
 }
 
+function notizTbTabelle() {
+  const template = '\n| Spalte 1 | Spalte 2 | Spalte 3 |\n|----------|----------|----------|\n| Zelle 1  | Zelle 2  | Zelle 3  |\n| Zelle 4  | Zelle 5  | Zelle 6  |\n';
+  notizTbInsert(template);
+}
+
 // ── Markdown-Renderer ────────────────────────────────────────────────────────
 function renderMarkdown(text) {
   if (!text) return '<span style="color:var(--text-xdim);font-style:italic;">Leer</span>';
@@ -6103,9 +6110,34 @@ function renderMarkdown(text) {
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
     .replace(/\*(.+?)\*/g,'<em>$1</em>')
     .replace(/`(.+?)`/g,'<code>$1</code>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank">$1</a>');
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;">$1</a>');
+
+  // Tabellen-Zeilen sammeln
+  let tableBuffer = [];
+  const flushTable = () => {
+    if (!tableBuffer.length) return;
+    closeUl();
+    let tableHtml = '<table>';
+    tableBuffer.forEach((row, ri) => {
+      const cells = row.split('|').filter((_,i,a)=> i>0 && i<a.length-1);
+      if (ri === 1 && cells.every(c => /^[-: ]+$/.test(c))) return; // Trennzeile
+      const tag = ri === 0 ? 'th' : 'td';
+      tableHtml += '<tr>' + cells.map(c => `<${tag}>${inline(c.trim())}</${tag}>`).join('') + '</tr>';
+    });
+    tableHtml += '</table>';
+    html += tableHtml;
+    tableBuffer = [];
+  };
 
   lines.forEach(line => {
+    // Tabellen-Zeile erkennen
+    if (/^\|.+\|/.test(line)) {
+      tableBuffer.push(line);
+      return;
+    } else {
+      flushTable();
+    }
+
     if (/^### (.+)/.test(line)) { closeUl(); html += `<h3>${inline(line.slice(4))}</h3>`; }
     else if (/^## (.+)/.test(line)) { closeUl(); html += `<h2>${inline(line.slice(3))}</h2>`; }
     else if (/^# (.+)/.test(line))  { closeUl(); html += `<h1>${inline(line.slice(2))}</h1>`; }
@@ -6126,6 +6158,7 @@ function renderMarkdown(text) {
     else if (line.trim() === '') { closeUl(); html += '<p style="margin:4px 0;"></p>'; }
     else { closeUl(); html += `<p>${inline(line)}</p>`; }
   });
+  flushTable();
   closeUl();
 
   // Platzhalter → Plan-Links ersetzen
