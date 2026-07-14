@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.146</title>
+<title>WorkAssist v1.5.147</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1507,8 +1507,9 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 .bd-back:hover { background:var(--teal-xlight); }
 .bd-title { font-size:15px; font-weight:700; color:var(--text); }
 .bd-sub { font-size:11px; color:var(--text-xdim); margin-left:6px; }
-.bd-content { flex:1; overflow:hidden; padding:14px; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:12px; }
-.bd-card { background:var(--surface); border:1px solid var(--border); border-radius:9px; overflow:hidden; display:flex; flex-direction:column; min-height:150px; }
+.bd-ziel-wrap { flex-shrink:0; padding:10px 14px 0; }
+.bd-grid { flex:1; min-height:0; padding:10px 14px 14px; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:10px; overflow:hidden; }
+.bd-card { background:var(--surface); border:1px solid var(--border); border-radius:9px; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
 .bd-card-full { grid-column:1/-1; min-height:60px; }
 .bd-ch { background:var(--panel-header-bg); color:#fff; font-size:11px; font-weight:700; padding:7px 12px; display:flex; align-items:center; gap:6px; }
 .bd-ch-count { margin-left:auto; background:rgba(255,255,255,.25); color:#fff; font-size:9px; padding:1px 6px; border-radius:6px; }
@@ -2002,7 +2003,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.146</div>
+    <div class="start-version">v1.5.147</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2070,7 +2071,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.146</div>
+    <div class="app-version" id="app-version">v1.5.147</div>
   </div>
 
   <div class="nav-section">
@@ -2337,7 +2338,8 @@ textarea.field-input { resize: vertical; min-height: 70px; }
         <button class="btn-primary" onclick="openAssistentMitBereich()" style="font-size:11px;padding:4px 10px;">+ Aufgabe</button>
       </div>
     </div>
-    <div class="bd-content" id="bd-content"></div>
+    <div class="bd-ziel-wrap" id="bd-ziel-wrap"></div>
+    <div class="bd-grid" id="bd-content"></div>
   </div><!-- /screen-bereiche-detail -->
 
   <!-- ══ RESSOURCEN-MODAL ═══════════════════════════════════════════════════ -->
@@ -3336,7 +3338,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.146';
+const APP_VERSION = '1.5.147';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6065,8 +6067,9 @@ function openAssistentMitBereich() {
 }
 
 function renderBereichDetail(b) {
+  const zielWrap = document.getElementById('bd-ziel-wrap');
   const container = document.getElementById('bd-content');
-  if (!container) return;
+  if (!container || !zielWrap) return;
 
   // Aufgaben dieses Bereichs
   const aufgaben = DB.aufgaben.filter(a => a.bereichId === b.id && a.status !== 'erledigt')
@@ -6085,17 +6088,19 @@ function renderBereichDetail(b) {
     .sort((a,x) => (x.geaendert||'').localeCompare(a.geaendert||''))
     .slice(0, 3);
 
-  container.innerHTML = `
-    ${bdZielHTML(b)}
-    ${bdAufgabenHTML(aufgaben, aufgabenGesamt, b.id)}
-    ${bdPlanHTML(plan)}
-    ${bdRessourcenHTML(ressourcen)}
-    ${bdNotizenHTML(notizen, b.id)}
-  `;
+  // Ziel in eigenen Bereich (flex-shrink:0)
+  zielWrap.innerHTML = bdZielHTML(b);
+
+  // 2x2 Grid
+  container.innerHTML =
+    bdAufgabenHTML(aufgaben, aufgabenGesamt, b.id) +
+    bdPlanHTML(plan) +
+    bdRessourcenHTML(ressourcen) +
+    bdNotizenHTML(notizen, b.id);
 }
 
 function bdZielHTML(b) {
-  return `<div class="bd-card bd-card-full" style="min-height:0;">
+  return `<div class="bd-card" style="min-height:0;">
     <div class="bd-ziel" onclick="bdZielBearbeiten('${b.id}')">
       <span class="bd-ziel-label">ZIEL</span>
       ${b.ziel
