@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.171</title>
+<title>WorkAssist v1.5.172</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -253,12 +253,26 @@ svg { display: block; }
 
 /* Kompakte Task-Zeile – 1 Zeile */
 .task-row {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: flex-start; gap: 8px;
   padding: 5px 12px; border-bottom: 1px solid var(--border);
-  cursor: pointer; transition: background 0.1s;
+  cursor: pointer; transition: background 0.1s; flex-wrap: wrap;
 }
 .task-row:last-child { border-bottom: none; }
 .task-row:hover { background: var(--bg); }
+/* Check-Button immer in erster Zeile, content nimmt restlichen Platz */
+.task-row > .task-check { flex-shrink: 0; margin-top: 2px; }
+/* Tags: wenn Titel lang → umbrechen in zweite Zeile */
+.task-row > .task-tags {
+  flex-shrink: 0; display: flex; gap: 5px; align-items: center; flex-wrap: wrap;
+  margin-left: auto; max-width: 50%;
+}
+/* Wenn content + tags nicht mehr in eine Zeile passen → tags in eigene Zeile */
+.task-row > .task-content {
+  flex: 1; min-width: 120px;
+}
+/* Plan-/WV-Buttons */
+.task-row > .plan-btn,
+.task-row > .wv-btn { flex-shrink: 0; }
 
 .task-check {
   width: 14px; height: 14px; border: 2px solid var(--border);
@@ -2102,7 +2116,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.171</div>
+    <div class="start-version">v1.5.172</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2170,7 +2184,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.171</div>
+    <div class="app-version" id="app-version">v1.5.172</div>
   </div>
 
   <div class="nav-section">
@@ -3454,7 +3468,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.171';
+const APP_VERSION = '1.5.172';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -5206,8 +5220,9 @@ function dashTaskRowHTML(a, datumRot) {
       <div class="task-title ${isDone ? 'done-text' : ''}">${a.titel}</div>
       ${a.untertitel ? '<div class="aufg-untertitel">' + a.untertitel + '</div>' : ''}
       ${dokZeile}
+      ${a.titel.length > 35 ? `<div class="task-meta" style="margin-top:3px;">${cbPill}${wvBadge}${dauerPill}${dueTag}</div>` : ''}
     </div>
-    <div class="task-tags">${cbPill}${wvBadge}${dauerPill}${dueTag}</div>
+    ${a.titel.length <= 35 ? `<div class="task-tags">${cbPill}${wvBadge}${dauerPill}${dueTag}</div>` : ''}
     ${planBtn}${wvBtn}
   </div>`;
 }
