@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.161</title>
+<title>WorkAssist v1.5.162</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1514,7 +1514,40 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 .plan-btn:hover { background: var(--teal-xlight); color: var(--teal); }
 .plan-btn.geplant { color: var(--teal); background: var(--teal-xlight); }
 
-/* ── Bereich-Detailseite ─────────────────────────────────────────────────── */
+/* ── Bereich-Edit-Modal ──────────────────────────────────────────────────── */
+.bereich-edit-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 1100;
+  display: none; align-items: center; justify-content: center;
+}
+.bereich-edit-overlay.open { display: flex; }
+.bereich-edit-modal {
+  background: var(--surface); border-radius: 14px; width: 520px;
+  max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,.18);
+}
+.bereich-edit-header {
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.bereich-edit-body {
+  flex: 1; overflow-y: auto; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.bereich-edit-footer {
+  padding: 12px 18px; border-top: 1px solid var(--border);
+  display: flex; gap: 8px; flex-shrink: 0;
+}
+/* Bereiche Gruppierung */
+.bereiche-gruppe-header {
+  font-size: 9px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-xdim);
+  padding: 10px 12px 4px; user-select: none;
+}
+.bereiche-gruppe-leer {
+  font-size: 11px; color: var(--text-xdim); padding: 6px 12px;
+  font-style: italic;
+}
+/* ── Ende Bereich-Edit-Modal ─────────────────────────────────────────────── */
 #screen-bereiche-detail.active { display: flex !important; flex-direction: column; overflow: hidden; flex: 1; min-height: 0; height: var(--app-h, 100vh); max-height: var(--app-h, 100vh); }
 .bd-topbar { display:flex; align-items:center; gap:10px; padding:10px 16px; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; }
 .bd-back { display:flex; align-items:center; gap:5px; padding:4px 10px; border:1px solid var(--border); border-radius:6px; background:var(--bg); color:var(--teal-dark); font-size:11px; cursor:pointer; font-family:var(--font); }
@@ -2044,7 +2077,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.161</div>
+    <div class="start-version">v1.5.162</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2112,7 +2145,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.161</div>
+    <div class="app-version" id="app-version">v1.5.162</div>
   </div>
 
   <div class="nav-section">
@@ -2353,7 +2386,21 @@ textarea.field-input { resize: vertical; min-height: 70px; }
   <!-- ══ BEREICHE ═════════════════════════════════════════════════════════ -->
   <div class="screen" id="screen-bereiche">
     <div class="struct-layout">
-      <div class="bereiche-list" id="bereiche-liste"></div>
+      <div class="bereiche-list" id="bereiche-liste">
+        <!-- Header mit Gruppierung + Neu -->
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg);">
+          <select id="bereiche-gruppierung" onchange="renderBereiche()"
+            class="field-select" style="flex:1;font-size:11px;padding:3px 6px;">
+            <option value="art">Projekt / Tagesgeschäft</option>
+            <option value="status">Status</option>
+            <option value="groesse">Größe</option>
+            <option value="datum">Lieferdatum</option>
+            <option value="oberbereich">Oberbereich</option>
+          </select>
+          <button onclick="openBereichAssistent('neu')" style="flex-shrink:0;border:none;background:var(--teal);color:#fff;border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">+</button>
+        </div>
+        <div id="bereiche-liste-inner" style="flex:1;overflow-y:auto;"></div>
+      </div>
       <div class="struct-detail" id="bereich-detail">
         <div class="sd-empty">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 10px;opacity:0.3;display:block;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
@@ -3377,7 +3424,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.161';
+const APP_VERSION = '1.5.162';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6077,7 +6124,105 @@ function planSchrittSyncVonAufgabe(aufgabeId, neuerStatus) {
   if (geaendert) saveDB();
 }
 
-// ══ BEREICH-DETAILSEITE ═══════════════════════════════════════════════════
+// ══ BEREICH-EDIT-MODAL ════════════════════════════════════════════════════
+let bEditGroesse = null;
+
+function openBereichEdit(bereichId) {
+  const b = DB.bereiche.find(b => b.id === bereichId);
+  if (!b) return;
+
+  document.getElementById('bedit-id').value       = b.id;
+  document.getElementById('bedit-titel').textContent = b.name;
+  document.getElementById('bedit-name').value     = b.name;
+  document.getElementById('bedit-status').value   = b.status || '';
+  document.getElementById('bedit-ziel').value     = b.ziel || '';
+  document.getElementById('bedit-notiz').value    = (b.notiz||'').replace(/<[^>]+>/g,'').trim();
+  document.getElementById('bedit-lieferdatum').value = b.lieferdatum || '';
+
+  // Oberbereich-Dropdown
+  const oSel = document.getElementById('bedit-oberbereich');
+  oSel.innerHTML = '<option value="">— kein Oberbereich —</option>' +
+    DB.bereiche.filter(x => x.id !== b.id && !x.archiviert)
+      .map(x => `<option value="${x.id}" ${x.id===b.oberbereich?'selected':''}>${escHtml(x.name)}</option>`)
+      .join('');
+
+  // Art + Größe
+  bEditGroesse = b.groesse || null;
+  bEditSetArt(b.art || 'tagesgeschaeft');
+  document.querySelectorAll('#bedit-groesse-pills .basst-groesse-pill').forEach(el => {
+    el.classList.toggle('aktiv', el.dataset.g === bEditGroesse);
+  });
+
+  document.getElementById('bereich-edit-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('bedit-name').focus(), 50);
+}
+
+function closeBereichEdit() {
+  document.getElementById('bereich-edit-overlay').classList.remove('open');
+}
+
+function bEditSetArt(art) {
+  document.getElementById('bedit-art-tages')?.classList.toggle('aktiv', art === 'tagesgeschaeft');
+  document.getElementById('bedit-art-projekt')?.classList.toggle('aktiv', art === 'projekt');
+  const pf = document.getElementById('bedit-projekt-felder');
+  if (pf) pf.style.display = art === 'projekt' ? 'flex' : 'none';
+  // art im hidden-field merken via data-attribute
+  document.getElementById('bedit-id').dataset.art = art;
+}
+
+function bEditSetGroesse(g) {
+  bEditGroesse = bEditGroesse === g ? null : g; // Toggle
+  document.querySelectorAll('#bedit-groesse-pills .basst-groesse-pill').forEach(el => {
+    el.classList.toggle('aktiv', el.dataset.g === bEditGroesse);
+  });
+}
+
+function bEditSpeichern() {
+  const id   = document.getElementById('bedit-id').value;
+  const name = document.getElementById('bedit-name').value.trim();
+  if (!name) { showToast('Name erforderlich', true); return; }
+  const b = DB.bereiche.find(b => b.id === id);
+  if (!b) return;
+
+  const art    = document.getElementById('bedit-id').dataset.art || 'tagesgeschaeft';
+  const notizTxt = document.getElementById('bedit-notiz').value.trim();
+
+  b.name        = name;
+  b.status      = document.getElementById('bedit-status').value || null;
+  b.oberbereich = document.getElementById('bedit-oberbereich').value || null;
+  b.ziel        = document.getElementById('bedit-ziel').value.trim() || null;
+  b.notiz       = notizTxt ? `<p>${notizTxt}</p>` : (b.notiz || null);
+  b.art         = art;
+  b.groesse     = art === 'projekt' ? bEditGroesse : null;
+  b.lieferdatum = art === 'projekt' ? (document.getElementById('bedit-lieferdatum').value || null) : null;
+  b.geaendert   = new Date().toISOString();
+
+  saveDB();
+  closeBereichEdit();
+  renderBereiche();
+  openBereichDetail(id);
+  showToast('Bereich gespeichert ✓');
+}
+
+function bEditLoeschen() {
+  const id = document.getElementById('bedit-id').value;
+  if (!confirm('Bereich wirklich löschen? Aufgaben bleiben erhalten.')) return;
+  DB.bereiche = DB.bereiche.filter(b => b.id !== id);
+  saveDB();
+  closeBereichEdit();
+  aktiverBereichId = null;
+  document.getElementById('bereich-detail').innerHTML = `
+    <div class="sd-empty">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 10px;opacity:0.3;display:block;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      Bereich auswählen<br>um Details zu sehen
+    </div>`;
+  renderBereiche();
+  showToast('Bereich gelöscht');
+}
+
+// ══ ENDE BEREICH-EDIT-MODAL ═══════════════════════════════════════════════
+
+
 
 let aktiverBereichId = null;
 
@@ -6113,7 +6258,7 @@ function openBereichDetail(bereichId) {
         </div>
       </div>
       <button onclick="openAssistentMitBereich()" class="btn-primary" style="font-size:11px;padding:4px 10px;">+ Aufgabe</button>
-      <button onclick="openBereichAssistent('bearbeiten','${b.id}')" class="btn-ghost" style="font-size:11px;padding:4px 10px;">Bearbeiten</button>
+      <button onclick="openBereichEdit('${b.id}')" class="btn-ghost" style="font-size:11px;padding:4px 10px;">Bearbeiten</button>
       <button onclick="deleteBereich('${b.id}')" style="border:none;background:none;cursor:pointer;padding:4px;color:#c62828;" title="Bereich löschen">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
       </button>
@@ -8853,131 +8998,102 @@ let bereichDetailTab     = 'aufgaben'; // 'aufgaben' | 'wissen'
 let bereichErledigteVis  = false;
 
 function renderBereiche() {
-  const liste = document.getElementById('bereiche-liste');
-  liste.innerHTML = '';
+  const inner = document.getElementById('bereiche-liste-inner');
+  if (!inner) return;
 
-  // Header mit + Button
-  const topBar = document.createElement('div');
-  topBar.style.cssText = 'padding:7px 10px 6px;border-bottom:1px solid var(--border);display:flex;align-items:center;flex-shrink:0;';
-  topBar.innerHTML = `<span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-xdim);flex:1;">Bereiche</span>
-    <div style="width:20px;height:20px;border-radius:4px;border:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="openBereichAssistent('neu')" title="Neuen Bereich anlegen">
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    </div>`;
-  liste.appendChild(topBar);
-
-  // Nur sichtbare Bereiche (je nach archiviertAnzeigen)
-  const sichtbar = typeof archiviertAnzeigen !== 'undefined'
-    ? DB.bereiche.filter(b => archiviertAnzeigen || !b.archiviert)
-    : DB.bereiche.filter(b => !b.archiviert);
-  const _bb = document.getElementById('badge-bereiche');
-  if (_bb) _bb.textContent = DB.bereiche.filter(b => !b.archiviert).length;
+  const sichtbar = DB.bereiche.filter(b => !b.archiviert);
+  const badge = document.getElementById('badge-bereiche');
+  if (badge) badge.textContent = sichtbar.length;
 
   if (!sichtbar.length) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
-    empty.innerHTML = DB.bereiche.length === 0
-      ? '<p>Noch keine Bereiche angelegt.</p>'
-      : '<p>Alle Bereiche archiviert.</p>';
-    liste.appendChild(empty);
-    if (selectedBereichId) selectBereich(selectedBereichId);
+    inner.innerHTML = '<div class="empty-state"><p>Noch keine Bereiche angelegt.</p></div>';
     return;
   }
 
-  // Gruppieren nach Oberbereich
+  const gruppierung = document.getElementById('bereiche-gruppierung')?.value || 'art';
+
+  // Gruppierungsschlüssel ermitteln
+  function getKey(b) {
+    if (gruppierung === 'art') return b.art === 'projekt' ? 'Projekt' : 'Tagesgeschäft';
+    if (gruppierung === 'status') {
+      const sm = {inArbeit:'In Arbeit', pausiert:'Pausiert', erledigt:'Erledigt'};
+      return sm[b.status] || 'Aktiv';
+    }
+    if (gruppierung === 'groesse') return b.groesse || 'Keine Größe';
+    if (gruppierung === 'datum') {
+      if (!b.lieferdatum) return 'Kein Datum';
+      const d = new Date(b.lieferdatum + 'T00:00:00');
+      return d.toLocaleDateString('de-DE', {month:'long', year:'numeric'});
+    }
+    if (gruppierung === 'oberbereich') {
+      if (!b.oberbereich) return 'Ohne Oberbereich';
+      const ob = DB.bereiche.find(x => x.id === b.oberbereich);
+      return ob ? ob.name : 'Unbekannt';
+    }
+    return 'Sonstige';
+  }
+
+  // Gruppenreihenfolge
+  const orderArt    = ['Projekt','Tagesgeschäft'];
+  const orderStatus = ['Aktiv','In Arbeit','Pausiert','Erledigt'];
+  const orderGroesse= ['XL','L','M','S','Keine Größe'];
+
+  function sortGroups(keys) {
+    if (gruppierung === 'art')     return keys.sort((a,b) => orderArt.indexOf(a) - orderArt.indexOf(b));
+    if (gruppierung === 'status')  return keys.sort((a,b) => orderStatus.indexOf(a) - orderStatus.indexOf(b));
+    if (gruppierung === 'groesse') return keys.sort((a,b) => orderGroesse.indexOf(a) - orderGroesse.indexOf(b));
+    return keys.sort((a,b) => a.localeCompare(b,'de'));
+  }
+
+  // Gruppen aufbauen
   const groups = {};
   sichtbar.forEach(b => {
-    const key = b.oberbereich || '—';
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(b);
+    const k = getKey(b);
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(b);
   });
-  const sortedKeys = Object.keys(groups).sort((a,b) => {
-    if (a === '—') return 1; if (b === '—') return -1;
-    return a.localeCompare(b, 'de');
-  });
+  const sortedKeys = sortGroups(Object.keys(groups));
 
+  // HTML rendern
+  let html = '';
   sortedKeys.forEach(key => {
-    const section = document.createElement('div');
-    section.className = 'ob-section';
-
-    // Klappbarer Oberbereich-Header
-    const label = document.createElement('div');
-    label.className = 'ob-label';
-    // Oberbereich: AzDO-Goal-Link falls vorhanden
-    const obMatch = DB.bereiche.find(b => b.name === key && b.azdoUrl && !b.oberbereich);
-    const obAzdoBtn = obMatch
-      ? ` <a class="azdo-link-btn" href="${obMatch.azdoUrl}" target="_blank" onclick="event.stopPropagation()" title="AzDO Goal öffnen" style="margin-left:6px;">
-           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-           AzDO Goal
-          </a>`
-      : '';
-    label.innerHTML = `
-      <svg class="ob-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-      ${key === '—' ? 'Ohne Oberbereich' : key}${obAzdoBtn}`;
-
-    const body = document.createElement('div');
-    body.className = 'ob-section-body';
-    body.style.maxHeight = (groups[key].length * 46 + 10) + 'px';
-
-    label.addEventListener('click', () => {
-      const collapsed = label.classList.toggle('collapsed');
-      body.classList.toggle('collapsed', collapsed);
-      if (!collapsed) body.style.maxHeight = (groups[key].length * 46 + 10) + 'px';
-    });
-
-    section.appendChild(label);
-
-    // Kompakte 1-Zeilen-Karten
+    html += `<div class="bereiche-gruppe-header">${key}</div>`;
     groups[key].forEach(b => {
       const offenCount = DB.aufgaben.filter(a => a.bereichId === b.id && a.status !== 'erledigt').length;
-      const card = document.createElement('div');
-      card.className = `bereich-card${b.archiviert ? ' archiviert' : ''}${selectedBereichId === b.id ? ' active' : ''}${b.imFokus ? ' im-fokus' : ''}`;
-      card.setAttribute('data-id', b.id);
-      // Status-Badge
-      const statusMap = { neu:'Neu', inarbeit:'In Arbeit', abgeschlossen:'Abgeschlossen', zurueckgestellt:'Zurückgestellt' };
-      const statusCss = { neu:'bs-neu', inarbeit:'bs-inarbeit', abgeschlossen:'bs-abgeschl', zurueckgestellt:'bs-zurueck' };
-      const statusBadge = b.status
-        ? `<span class="bereich-status-badge ${statusCss[b.status]||'bs-neu'}">${statusMap[b.status]||b.status}</span>`
+      const isAktiv = aktiverBereichId === b.id;
+      const statusMap = {inArbeit:'In Arbeit', pausiert:'Pausiert', erledigt:'Erledigt'};
+      const statusBadge = b.status && b.status !== 'aktiv'
+        ? `<span class="bereich-status-badge" style="font-size:9px;background:var(--bg);color:var(--text-xdim);padding:1px 5px;border-radius:5px;border:1px solid var(--border);">${statusMap[b.status]||b.status}</span>`
         : '';
-      // AzDO-Link-Button: Goal wenn kein Oberbereich, sonst Feature
-      const azdoTypLabel = b.oberbereich ? 'Feature' : 'Goal';
-      const azdoBtn = b.azdoUrl
-        ? `<a class="azdo-link-btn" href="${b.azdoUrl}" target="_blank" onclick="event.stopPropagation()" title="AzDO ${azdoTypLabel} öffnen">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            AzDO ${azdoTypLabel}
-           </a>`
-        : '';
+      const groesseBadge = b.groesse
+        ? `<span style="font-size:9px;color:var(--text-xdim);">${b.groesse}</span>` : '';
+      const datumBadge = b.lieferdatum
+        ? `<span style="font-size:9px;color:var(--text-xdim);">${new Date(b.lieferdatum+'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}</span>` : '';
 
-      card.innerHTML = `
+      html += `<div class="bereich-card${isAktiv?' active':''}" data-id="${b.id}">
         <div class="bereich-bar"></div>
-        <div class="bereich-body">
-          <div class="bereich-name">${b.name}${b.archiviert ? ' <span class="archiv-badge">Archiviert</span>' : ''}</div>
+        <div class="bereich-body" onclick="openBereichDetail('${b.id}')">
+          <div class="bereich-name">${escHtml(b.name)}</div>
           <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:2px;">
             <span class="bereich-aufg-cnt">${offenCount} offen</span>
-            ${statusBadge}
-            ${azdoBtn}
+            ${statusBadge}${groesseBadge}${datumBadge}
           </div>
         </div>
         <div class="bereich-actions">
-          <button class="fokus-btn${b.imFokus ? ' aktiv' : ''}" onclick="toggleBereichFokus('${b.id}', event)" title="${b.imFokus ? 'Aus Fokus entfernen' : 'In Fokus setzen'}">
-            ${svgFokus(!!b.imFokus, 14)}
+          <button class="fokus-btn${b.imFokus?' aktiv':''}" onclick="toggleBereichFokus('${b.id}',event)" title="${b.imFokus?'Aus Fokus':'In Fokus'}">
+            ${svgFokus(!!b.imFokus,14)}
           </button>
-          <div class="icon-btn" onclick="openBereichAssistent('bearbeiten','${b.id}')" title="Bearbeiten">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          <div class="icon-btn" onclick="openBereichEdit('${b.id}')" title="Bearbeiten">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </div>
-        </div>`;
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('.icon-btn') || e.target.closest('.fokus-btn') || e.target.closest('.azdo-link-btn')) return;
-        openBereichDetail(b.id);
-      });
-      body.appendChild(card);
+        </div>
+      </div>`;
     });
-
-    section.appendChild(body);
-    liste.appendChild(section);
   });
 
-  if (selectedBereichId) selectBereich(selectedBereichId);
+  inner.innerHTML = html;
 }
+
 
 function selectBereich(id) {
   selectedBereichId = id;
@@ -10886,6 +11002,98 @@ if (!fsApiVerfuegbar()) {
     <div id="notiz-plan-liste" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
   </div>
 </div>
+
+<!-- ══ BEREICH-EDIT-MODAL ══════════════════════════════════════════════════ -->
+<div class="bereich-edit-overlay" id="bereich-edit-overlay">
+  <div class="bereich-edit-modal">
+    <div class="bereich-edit-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <span style="font-size:13px;font-weight:700;flex:1;" id="bedit-titel">Bereich bearbeiten</span>
+      <span onclick="closeBereichEdit()" style="cursor:pointer;color:var(--text-xdim);padding:2px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </span>
+    </div>
+    <div class="bereich-edit-body">
+      <input type="hidden" id="bedit-id">
+
+      <!-- Name -->
+      <div class="field-group">
+        <div class="field-label">Name *</div>
+        <input class="field-input" id="bedit-name" placeholder="Bereichsname">
+      </div>
+
+      <!-- Art + Status -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field-group">
+          <div class="field-label">Art</div>
+          <div style="display:flex;gap:6px;">
+            <button id="bedit-art-tages" onclick="bEditSetArt('tagesgeschaeft')"
+              class="bereich-asst-art-btn aktiv" style="flex:1;font-size:11px;padding:4px 0;">Tagesgeschäft</button>
+            <button id="bedit-art-projekt" onclick="bEditSetArt('projekt')"
+              class="bereich-asst-art-btn" style="flex:1;font-size:11px;padding:4px 0;">Projekt</button>
+          </div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Status</div>
+          <select class="field-select" id="bedit-status">
+            <option value="">Aktiv</option>
+            <option value="inArbeit">In Arbeit</option>
+            <option value="pausiert">Pausiert</option>
+            <option value="erledigt">Erledigt</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Projekt-Felder -->
+      <div id="bedit-projekt-felder" style="display:none;flex-direction:column;gap:10px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="field-group">
+            <div class="field-label">Lieferdatum</div>
+            <input type="date" class="field-input" id="bedit-lieferdatum">
+          </div>
+          <div class="field-group">
+            <div class="field-label">Größe</div>
+            <div style="display:flex;gap:4px;" id="bedit-groesse-pills">
+              <button onclick="bEditSetGroesse('S')" class="basst-groesse-pill" data-g="S">S</button>
+              <button onclick="bEditSetGroesse('M')" class="basst-groesse-pill" data-g="M">M</button>
+              <button onclick="bEditSetGroesse('L')" class="basst-groesse-pill" data-g="L">L</button>
+              <button onclick="bEditSetGroesse('XL')" class="basst-groesse-pill" data-g="XL">XL</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Oberbereich -->
+      <div class="field-group">
+        <div class="field-label">Oberbereich</div>
+        <select class="field-select" id="bedit-oberbereich">
+          <option value="">— kein Oberbereich —</option>
+        </select>
+      </div>
+
+      <!-- Ziel -->
+      <div class="field-group">
+        <div class="field-label">Ziel</div>
+        <textarea class="field-input" id="bedit-ziel" rows="2"
+          placeholder="Was soll in diesem Bereich entstehen?" style="resize:vertical;"></textarea>
+      </div>
+
+      <!-- Notiz -->
+      <div class="field-group">
+        <div class="field-label">Notiz</div>
+        <textarea class="field-input" id="bedit-notiz" rows="3"
+          placeholder="Weitere Informationen …" style="resize:vertical;"></textarea>
+      </div>
+    </div>
+    <div class="bereich-edit-footer">
+      <button class="btn-ghost" onclick="closeBereichEdit()">Abbrechen</button>
+      <button class="btn-ghost" id="bedit-btn-loeschen" onclick="bEditLoeschen()"
+        style="color:#c62828;border-color:#ffcdd2;">Löschen</button>
+      <button class="btn-primary" onclick="bEditSpeichern()" style="margin-left:auto;">Speichern</button>
+    </div>
+  </div>
+</div>
+<!-- ══ ENDE BEREICH-EDIT-MODAL ════════════════════════════════════════════ -->
 
 <!-- ══ PLAN-MODAL ════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="modal-neuer-plan">
