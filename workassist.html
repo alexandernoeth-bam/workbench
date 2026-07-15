@@ -6550,51 +6550,6 @@ function bdPlanHTML(plan, bereichId) {
   </div>`;
 }
 
-  const planKarteKompakt = (p) => {
-    const schritte = (p.schritte||[]);
-    const erl = schritte.filter(s => {
-      const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
-      return st === 'erledigt';
-    }).length;
-    return `<div class="bd-row" onclick="openNeuerPlan('${p.id}')" style="opacity:.6;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;">
-      <div style="display:flex;align-items:center;gap:6px;width:100%;">
-        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-        <span style="flex:1;font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:line-through;">${escHtml(p.titel)}</span>
-        <span style="font-size:9px;color:var(--text-xdim);">${erl}/${schritte.length}</span>
-      </div>
-    </div>`;
-  };
-
-  if (!plan && !abgeschlossen.length) {
-    return `<div class="bd-card">
-      <div class="bd-ch">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/></svg>
-        Plan
-      </div>
-      <div class="bd-leer">Kein aktiver Plan</div>
-    </div>`;
-  }
-
-  const schritte = plan ? (plan.schritte||[]).map(s => ({
-    ...s, _aufgabe: s.aufgabeId ? DB.aufgaben.find(a=>a.id===s.aufgabeId) : null
-  })) : [];
-  const erledigt = schritte.filter(s => (s._aufgabe?.status||s.status) === 'erledigt').length;
-  const gesamt   = schritte.length;
-
-  const schrittRows = plan ? schritte.slice(0,4).map((s,i) => {
-    const status = s._aufgabe?.status || s.status || 'offen';
-    const isDone = status === 'erledigt';
-    const isAktiv= !isDone && schritte.slice(0,i).every(x => (x._aufgabe?.status||x.status) === 'erledigt');
-    const ns = isDone  ? 'background:var(--teal);border-color:var(--teal);color:#fff;'
-             : isAktiv ? 'border-color:var(--teal);color:var(--teal-dark);' : 'color:var(--text-xdim);';
-    const icon = isDone ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : (i+1);
-    const titel = s._aufgabe?.titel || s.titel || '';
-    return `<div class="bd-step-row">
-      <div style="width:16px;height:16px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;flex-shrink:0;${ns}">${icon}</div>
-      <span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isDone?'text-decoration:line-through;color:var(--text-xdim);':isAktiv?'font-weight:600;color:var(--teal-dark);':''}">${escHtml(titel)}</span>
-    </div>`;
-  }).join('') : '';
-
 function bdRessourcenHTML(ressourcen, bereichId) {
   const dokumente = (DB.dokumente||[]).filter(d => d.bereichId === bereichId);
   const wissen    = (DB.wissen||[]).filter(w => w.bereichId === bereichId);
