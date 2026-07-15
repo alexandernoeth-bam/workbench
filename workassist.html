@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.158</title>
+<title>WorkAssist v1.5.159</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2032,7 +2032,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.158</div>
+    <div class="start-version">v1.5.159</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2100,7 +2100,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.158</div>
+    <div class="app-version" id="app-version">v1.5.159</div>
   </div>
 
   <div class="nav-section">
@@ -3365,7 +3365,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.158';
+const APP_VERSION = '1.5.159';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6286,8 +6286,9 @@ function bdPlanHTML(plan, bereichId) {
 }
 
 function bdRessourcenHTML(ressourcen, bereichId) {
-  const INAKTIV = new Set(['fertig','einsatz','erkenntnisse']);
   const dokumente = (DB.dokumente||[]).filter(d => d.bereichId === bereichId);
+  const wissen    = (DB.wissen||[]).filter(w => w.bereichId === bereichId);
+
   const DOK_STATUS = {
     idee:'Idee', entwurf:'Entwurf', review:'Review', fertig:'Fertig', einsatz:'Im Einsatz',
     lesen:'Zu lesen', liest:'Lese ich', gelesen:'Gelesen', erkenntnisse:'Erkenntnisse'
@@ -6296,6 +6297,14 @@ function bdRessourcenHTML(ressourcen, bereichId) {
     idee:'#8aaaa8', entwurf:'#1565C0', review:'#E65100', fertig:'#388e3c', einsatz:'#388e3c',
     lesen:'#8aaaa8', liest:'#1565C0', gelesen:'#388e3c', erkenntnisse:'#388e3c'
   };
+
+  // Wissen-Icon: Glühbirne / Buch
+  const wissenIcon = `<svg width="22" height="22" viewBox="0 0 36 36" fill="none">
+    <rect width="36" height="36" rx="5" fill="#ede7f6"/>
+    <path d="M18 8a7 7 0 0 1 4 12.9V23h-8v-2.1A7 7 0 0 1 18 8z" stroke="#6a1b9a" stroke-width="2" fill="none"/>
+    <line x1="14" y1="26" x2="22" y2="26" stroke="#6a1b9a" stroke-width="2" stroke-linecap="round"/>
+    <line x1="15" y1="29" x2="21" y2="29" stroke="#6a1b9a" stroke-width="2" stroke-linecap="round"/>
+  </svg>`;
 
   const dokRows = dokumente.map(d => `
     <div class="bd-res-row" onclick="if(event.target.closest('.bd-res-edit'))return; ${d.link ? `window.open('${escHtml(d.link)}','_blank')` : `openDokModal('${d.id}')`}">
@@ -6307,6 +6316,18 @@ function bdRessourcenHTML(ressourcen, bereichId) {
       <span style="font-size:9px;padding:1px 6px;border-radius:8px;background:${DOK_FARBE[d.status]||'#8aaaa8'}22;color:${DOK_FARBE[d.status]||'#8aaaa8'};font-weight:600;flex-shrink:0;">${DOK_STATUS[d.status]||d.status}</span>
       <div class="bd-res-edit" onclick="event.stopPropagation();openDokModal('${d.id}')" title="Bearbeiten" style="padding:2px 5px;cursor:pointer;color:var(--text-xdim);flex-shrink:0;">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </div>
+    </div>`).join('');
+
+  const wissenRows = wissen.map(w => `
+    <div class="bd-res-row" onclick="if(event.target.closest('.bd-res-edit'))return; ${w.url ? `window.open('${escHtml(w.url)}','_blank')` : `showScreen('wissen',document.getElementById('nav-wissen'))`}">
+      ${wissenIcon}
+      <div style="flex:1;min-width:0;">
+        <div class="bd-res-label">${escHtml(w.titel)}</div>
+        <div class="bd-res-url">${w.typ === 'aufgabennotiz' ? 'Aus Aufgabe' : (w.typ||'Wissen')}</div>
+      </div>
+      <div class="bd-res-edit" onclick="event.stopPropagation();showScreen('wissen',document.getElementById('nav-wissen'))" title="Im Wissen öffnen" style="padding:2px 5px;cursor:pointer;color:var(--text-xdim);flex-shrink:0;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
       </div>
     </div>`).join('');
 
@@ -6325,22 +6346,21 @@ function bdRessourcenHTML(ressourcen, bereichId) {
       </div>
     </div>`).join('');
 
-  const leer = !dokumente.length && !ressourcen.length
-    ? `<div class="bd-leer">Noch keine Ressourcen</div>` : '';
+  const gesamt = dokumente.length + wissen.length + ressourcen.length;
+  const leer = !gesamt ? `<div class="bd-leer">Noch keine Ressourcen</div>` : '';
 
   return `<div class="bd-card">
     <div class="bd-ch">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
       Ressourcen
-      <span class="bd-ch-count">${dokumente.length + ressourcen.length}</span>
+      <span class="bd-ch-count">${gesamt}</span>
       <button class="bd-ch-add" onclick="resAuswahlOeffnen()">+</button>
     </div>
     <div style="overflow-y:auto;flex:1;">
-      ${dokRows}${linkRows}${leer}
+      ${dokRows}${wissenRows}${linkRows}${leer}
     </div>
   </div>`;
 }
-
 
 function bdNotizenHTML(notizen, bereichId) {
   const rows = notizen.length
