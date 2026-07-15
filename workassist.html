@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.162</title>
+<title>WorkAssist v1.5.163</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2077,7 +2077,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.162</div>
+    <div class="start-version">v1.5.163</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2145,7 +2145,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.162</div>
+    <div class="app-version" id="app-version">v1.5.163</div>
   </div>
 
   <div class="nav-section">
@@ -3424,7 +3424,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.162';
+const APP_VERSION = '1.5.163';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6139,12 +6139,19 @@ function openBereichEdit(bereichId) {
   document.getElementById('bedit-notiz').value    = (b.notiz||'').replace(/<[^>]+>/g,'').trim();
   document.getElementById('bedit-lieferdatum').value = b.lieferdatum || '';
 
-  // Oberbereich-Dropdown
-  const oSel = document.getElementById('bedit-oberbereich');
-  oSel.innerHTML = '<option value="">— kein Oberbereich —</option>' +
-    DB.bereiche.filter(x => x.id !== b.id && !x.archiviert)
-      .map(x => `<option value="${x.id}" ${x.id===b.oberbereich?'selected':''}>${escHtml(x.name)}</option>`)
-      .join('');
+  // Oberbereich als Text (Name, nicht ID)
+  const obEl = document.getElementById('bedit-oberbereich');
+  const obList = document.getElementById('bedit-oberbereich-list');
+  if (obEl && obList) {
+    // Aktuellen Oberbereich-Namen laden
+    const obBereich = b.oberbereich ? DB.bereiche.find(x => x.id === b.oberbereich) : null;
+    obEl.value = obBereich ? obBereich.name : '';
+    // Datalist: alle eindeutigen Oberbereich-Namen (Bereiche ohne eigenen Oberbereich)
+    const oben = [...new Set(DB.bereiche
+      .filter(x => x.id !== b.id && !x.archiviert && !x.oberbereich)
+      .map(x => x.name))].sort((a,z) => a.localeCompare(z,'de'));
+    obList.innerHTML = oben.map(n => `<option value="${escHtml(n)}">`).join('');
+  }
 
   // Art + Größe
   bEditGroesse = b.groesse || null;
@@ -6189,7 +6196,27 @@ function bEditSpeichern() {
 
   b.name        = name;
   b.status      = document.getElementById('bedit-status').value || null;
-  b.oberbereich = document.getElementById('bedit-oberbereich').value || null;
+  // Oberbereich: Name → ID auflösen
+  const obName = document.getElementById('bedit-oberbereich').value.trim();
+  let obId = null;
+  if (obName) {
+    const found = DB.bereiche.find(x => x.id !== id && x.name.trim().toLowerCase() === obName.toLowerCase());
+    if (found) {
+      obId = found.id;
+    } else {
+      // Neuen Oberbereich anlegen
+      obId = uid();
+      DB.bereiche.push({
+        id: obId, name: obName, oberbereich: null, typ: 'aufg', tags: [], imFokus: false,
+        status: null, azdoUrl: null, archiviert: false, ziel: null, ressourcen: [],
+        art: 'tagesgeschaeft', groesse: null, lieferdatum: null,
+        erstellt: new Date().toISOString(), geaendert: new Date().toISOString(),
+      });
+      showToast(`Oberbereich „${obName}" neu angelegt`);
+    }
+  }
+
+  b.oberbereich = obId;
   b.ziel        = document.getElementById('bedit-ziel').value.trim() || null;
   b.notiz       = notizTxt ? `<p>${notizTxt}</p>` : (b.notiz || null);
   b.art         = art;
@@ -6253,7 +6280,7 @@ function openBereichDetail(bereichId) {
           ${b.groesse ? `<span style="font-size:10px;background:var(--border);color:var(--text-dim);padding:1px 7px;border-radius:8px;font-weight:700;">${b.groesse}</span>` : ''}
         </div>
         <div style="font-size:10px;color:var(--text-xdim);">
-          ${b.status||'Aktiv'} · ${aufgabenOffen} offene Aufgaben · ${plaeneCount} Pläne
+          ${ {inArbeit:'In Arbeit',pausiert:'Pausiert',abgeschlossen:'Abgeschlossen'}[b.status] || 'Offen' } · ${aufgabenOffen} offene Aufgaben · ${plaeneCount} Pläne
           ${b.lieferdatum ? ` · 📅 ${new Date(b.lieferdatum+'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}` : ''}
         </div>
       </div>
@@ -9016,8 +9043,8 @@ function renderBereiche() {
   function getKey(b) {
     if (gruppierung === 'art') return b.art === 'projekt' ? 'Projekt' : 'Tagesgeschäft';
     if (gruppierung === 'status') {
-      const sm = {inArbeit:'In Arbeit', pausiert:'Pausiert', erledigt:'Erledigt'};
-      return sm[b.status] || 'Aktiv';
+      const sm = {inArbeit:'In Arbeit', pausiert:'Pausiert', abgeschlossen:'Abgeschlossen'};
+      return sm[b.status] || 'Offen';
     }
     if (gruppierung === 'groesse') return b.groesse || 'Keine Größe';
     if (gruppierung === 'datum') {
@@ -9035,7 +9062,7 @@ function renderBereiche() {
 
   // Gruppenreihenfolge
   const orderArt    = ['Projekt','Tagesgeschäft'];
-  const orderStatus = ['Aktiv','In Arbeit','Pausiert','Erledigt'];
+  const orderStatus = ['Offen','In Arbeit','Pausiert','Abgeschlossen'];
   const orderGroesse= ['XL','L','M','S','Keine Größe'];
 
   function sortGroups(keys) {
@@ -9061,7 +9088,7 @@ function renderBereiche() {
     groups[key].forEach(b => {
       const offenCount = DB.aufgaben.filter(a => a.bereichId === b.id && a.status !== 'erledigt').length;
       const isAktiv = aktiverBereichId === b.id;
-      const statusMap = {inArbeit:'In Arbeit', pausiert:'Pausiert', erledigt:'Erledigt'};
+      const statusMap = {inArbeit:'In Arbeit', pausiert:'Pausiert', abgeschlossen:'Abgeschlossen'};
       const statusBadge = b.status && b.status !== 'aktiv'
         ? `<span class="bereich-status-badge" style="font-size:9px;background:var(--bg);color:var(--text-xdim);padding:1px 5px;border-radius:5px;border:1px solid var(--border);">${statusMap[b.status]||b.status}</span>`
         : '';
@@ -11036,10 +11063,10 @@ if (!fsApiVerfuegbar()) {
         <div class="field-group">
           <div class="field-label">Status</div>
           <select class="field-select" id="bedit-status">
-            <option value="">Aktiv</option>
+            <option value="">Offen</option>
             <option value="inArbeit">In Arbeit</option>
             <option value="pausiert">Pausiert</option>
-            <option value="erledigt">Erledigt</option>
+            <option value="abgeschlossen">Abgeschlossen</option>
           </select>
         </div>
       </div>
@@ -11066,9 +11093,16 @@ if (!fsApiVerfuegbar()) {
       <!-- Oberbereich -->
       <div class="field-group">
         <div class="field-label">Oberbereich</div>
-        <select class="field-select" id="bedit-oberbereich">
-          <option value="">— kein Oberbereich —</option>
-        </select>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input class="field-input" id="bedit-oberbereich" list="bedit-oberbereich-list"
+            placeholder="z. B. Übergreifende QS …" style="flex:1;" autocomplete="off">
+          <datalist id="bedit-oberbereich-list"></datalist>
+          <button onclick="document.getElementById('bedit-oberbereich').value=''"
+            title="Oberbereich leeren"
+            style="flex-shrink:0;border:1px solid var(--border);background:var(--bg);border-radius:6px;width:30px;height:34px;cursor:pointer;color:var(--text-xdim);display:flex;align-items:center;justify-content:center;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
       </div>
 
       <!-- Ziel -->
