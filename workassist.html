@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.172</title>
+<title>WorkAssist v1.5.173</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2116,7 +2116,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.172</div>
+    <div class="start-version">v1.5.173</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2184,7 +2184,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.172</div>
+    <div class="app-version" id="app-version">v1.5.173</div>
   </div>
 
   <div class="nav-section">
@@ -2258,7 +2258,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 </div>
 
 <!-- ═══ MAIN ═══════════════════════════════════════════════════════════════ -->
-<div class="main">
+<div class="main" id="main-content">
   <div class="topbar">
     <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Sidebar ein-/ausblenden">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -3468,7 +3468,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.172';
+const APP_VERSION = '1.5.173';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -5970,23 +5970,27 @@ function berechneDashRechtsHoehen() {
   const tagPan  = document.getElementById('tags-panel');
   if (!planPan || !berPan || !aufgPan || !dokPan || !tagPan) return;
 
-  const zoom    = (currentZoom || 100) / 100;
-  const verfueg = (window.innerHeight / zoom) - 48 - 32 - 16; // topbar + padding + gaps
+  // Echte Höhe des sichtbaren App-Bereichs messen (korrekt für PWA + alle Zoom-Stufen)
+  const main    = document.getElementById('main-content');
+  const topbar  = document.querySelector('.topbar');
+  const mainH   = main   ? main.offsetHeight   : (window.innerHeight / ((currentZoom||100)/100));
+  const topbarH = topbar ? topbar.offsetHeight : 52;
+  const verfueg = mainH - topbarH - 20; // 20px padding
 
   if (verfueg < 100) return;
 
   // Links: Pläne 67%, Bereiche 33%
   const planH = Math.floor(verfueg * 0.67);
-  const berH  = verfueg - planH - 8; // 8px gap
+  const berH  = verfueg - planH - 8;
   planPan.style.height = planH + 'px';
   berPan.style.height  = berH  + 'px';
 
   // Rechts: Aufgaben 67%, Dok+Tags 33%
   const tagsH = 38;
   const aufgH = Math.floor(verfueg * 0.67);
-  const dokH  = verfueg - aufgH - tagsH - 16; // 2 gaps
+  const dokH  = verfueg - aufgH - tagsH - 16;
   aufgPan.style.height = aufgH + 'px';
-  dokPan.style.height  = dokH  + 'px';
+  dokPan.style.height  = Math.max(60, dokH) + 'px';
   tagPan.style.maxHeight = tagsH + 'px';
 }
 
@@ -9869,6 +9873,10 @@ function initZoom() {
   window.addEventListener('resize', () => {
     const zoom = (currentZoom || 100) / 100;
     document.documentElement.style.setProperty('--app-h', Math.floor(window.innerHeight / zoom) + 'px');
+    // Dashboard-Höhen neu berechnen bei Fenstergrößenänderung
+    if (document.getElementById('screen-dashboard')?.classList.contains('active')) {
+      setTimeout(berechneDashRechtsHoehen, 50);
+    }
   });
   try {
     const gespeichert = localStorage.getItem('workassist_zoom');
