@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.165</title>
+<title>WorkAssist v1.5.166</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2077,7 +2077,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.165</div>
+    <div class="start-version">v1.5.166</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2145,7 +2145,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.165</div>
+    <div class="app-version" id="app-version">v1.5.166</div>
   </div>
 
   <div class="nav-section">
@@ -3424,7 +3424,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.165';
+const APP_VERSION = '1.5.166';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -4410,6 +4410,7 @@ function kwNavigieren(delta) {
 }
 
 function renderDashboard() {
+  bereichStatusAktualisieren();
   const td = today();
 
   // Tag-Filter
@@ -6151,6 +6152,36 @@ function planSchrittSyncVonAufgabe(aufgabeId, neuerStatus) {
   if (geaendert) saveDB();
 }
 
+// ── Automatischer Bereich-Status ─────────────────────────────────────────────
+function bereichStatusBerechnen(bereichId) {
+  const b = DB.bereiche.find(b => b.id === bereichId);
+  if (!b || b.status === 'abgeschlossen') return b?.status || null;
+
+  const aufgabenOffen    = DB.aufgaben.filter(a => a.bereichId === bereichId && a.status !== 'erledigt').length;
+  const aufgabenErledigt = DB.aufgaben.filter(a => a.bereichId === bereichId && a.status === 'erledigt').length;
+  const planAktiv        = (DB.plaene||[]).some(p => p.bereichId === bereichId && p.status !== 'abgeschlossen');
+  const planErledigt     = (DB.plaene||[]).some(p => p.bereichId === bereichId && p.status === 'abgeschlossen');
+  const hatAktivitaet    = aufgabenErledigt > 0 || planErledigt;
+
+  if (aufgabenOffen > 0 || planAktiv) return 'inArbeit';
+  if (hatAktivitaet)                  return 'pausiert';
+  return null; // Offen
+}
+
+function bereichStatusAktualisieren() {
+  let geaendert = false;
+  DB.bereiche.forEach(b => {
+    if (b.archiviert || b.status === 'abgeschlossen') return;
+    const neu = bereichStatusBerechnen(b.id);
+    if (b.status !== neu) {
+      b.status  = neu;
+      geaendert = true;
+    }
+  });
+  if (geaendert) saveDB();
+}
+// ── Ende Automatischer Bereich-Status ────────────────────────────────────────
+
 // ══ BEREICH-EDIT-MODAL ════════════════════════════════════════════════════
 let bEditGroesse = null;
 
@@ -6161,7 +6192,7 @@ function openBereichEdit(bereichId) {
   document.getElementById('bedit-id').value       = b.id;
   document.getElementById('bedit-titel').textContent = b.name;
   document.getElementById('bedit-name').value     = b.name;
-  document.getElementById('bedit-status').value   = b.status || '';
+  document.getElementById('bedit-status').value   = b.status === 'abgeschlossen' ? 'abgeschlossen' : '';
   document.getElementById('bedit-ziel').value     = b.ziel || '';
   document.getElementById('bedit-notiz').value    = (b.notiz||'').replace(/<[^>]+>/g,'').trim();
   document.getElementById('bedit-lieferdatum').value = b.lieferdatum || '';
@@ -6222,7 +6253,14 @@ function bEditSpeichern() {
   const notizTxt = document.getElementById('bedit-notiz').value.trim();
 
   b.name        = name;
-  b.status      = document.getElementById('bedit-status').value || null;
+  // Status: nur 'abgeschlossen' ist manuell, Rest automatisch
+  const manuellerStatus = document.getElementById('bedit-status').value;
+  if (manuellerStatus === 'abgeschlossen') {
+    b.status = 'abgeschlossen';
+  } else {
+    // Automatisch neu berechnen
+    b.status = bereichStatusBerechnen(b.id);
+  }
   // Oberbereich: Name → ID auflösen
   const obName = document.getElementById('bedit-oberbereich').value.trim();
   let obId = null;
@@ -9052,6 +9090,7 @@ let bereichDetailTab     = 'aufgaben'; // 'aufgaben' | 'wissen'
 let bereichErledigteVis  = false;
 
 function renderBereiche() {
+  bereichStatusAktualisieren();
   const inner = document.getElementById('bereiche-liste-inner');
   if (!inner) return;
 
@@ -11114,11 +11153,12 @@ if (!fsApiVerfuegbar()) {
         <div class="field-group">
           <div class="field-label">Status</div>
           <select class="field-select" id="bedit-status">
-            <option value="">Offen</option>
-            <option value="inArbeit">In Arbeit</option>
-            <option value="pausiert">Pausiert</option>
+            <option value="">Automatisch</option>
             <option value="abgeschlossen">Abgeschlossen</option>
           </select>
+          <div style="font-size:10px;color:var(--text-xdim);margin-top:3px;">
+            Offen / In Arbeit / Pausiert werden automatisch berechnet
+          </div>
         </div>
       </div>
 
