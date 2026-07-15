@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.163</title>
+<title>WorkAssist v1.5.164</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2077,7 +2077,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.163</div>
+    <div class="start-version">v1.5.164</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2145,7 +2145,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.163</div>
+    <div class="app-version" id="app-version">v1.5.164</div>
   </div>
 
   <div class="nav-section">
@@ -3424,7 +3424,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.163';
+const APP_VERSION = '1.5.164';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -3529,9 +3529,36 @@ function migrateDB() {
   (DB.bereiche || []).forEach(b => {
     if (b.ziel === undefined) b.ziel = null;
     if (!Array.isArray(b.ressourcen)) b.ressourcen = [];
-    if (b.art === undefined) b.art = 'tagesgeschaeft'; // 'tagesgeschaeft' | 'projekt'
+    if (b.art === undefined) b.art = 'tagesgeschaeft';
     if (b.lieferdatum === undefined) b.lieferdatum = null;
     if (b.groesse === undefined) b.groesse = null;
+  });
+
+  // Migration: oberbereich als Name-String → ID konvertieren
+  (DB.bereiche || []).forEach(b => {
+    if (!b.oberbereich) return;
+    // Prüfen ob es bereits eine gültige ID ist
+    const istId = DB.bereiche.some(x => x.id === b.oberbereich);
+    if (!istId) {
+      // Es ist ein Name-String → nach passendem Bereich suchen
+      const gefunden = DB.bereiche.find(x => x.id !== b.id &&
+        x.name.trim().toLowerCase() === b.oberbereich.trim().toLowerCase());
+      if (gefunden) {
+        b.oberbereich = gefunden.id;
+      } else {
+        // Kein passender Bereich gefunden → Oberbereich neu anlegen
+        // (verhindert Datenverlust)
+        const neueId = 'ob_' + Math.random().toString(36).slice(2,9);
+        const neuerName = b.oberbereich;
+        DB.bereiche.unshift({
+          id: neueId, name: neuerName, oberbereich: null, typ: 'aufg', tags: [],
+          imFokus: false, status: null, azdoUrl: null, archiviert: false,
+          ziel: null, ressourcen: [], art: 'tagesgeschaeft', groesse: null,
+          lieferdatum: null, erstellt: new Date().toISOString(), geaendert: new Date().toISOString(),
+        });
+        b.oberbereich = neueId;
+      }
+    }
   });
   // Dokumente: ressourceTyp
   (DB.dokumente || []).forEach(d => {
