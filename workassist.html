@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.164</title>
+<title>WorkAssist v1.5.165</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2077,7 +2077,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.164</div>
+    <div class="start-version">v1.5.165</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2145,7 +2145,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.164</div>
+    <div class="app-version" id="app-version">v1.5.165</div>
   </div>
 
   <div class="nav-section">
@@ -3424,7 +3424,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.164';
+const APP_VERSION = '1.5.165';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -9059,16 +9059,47 @@ function renderBereiche() {
   const badge = document.getElementById('badge-bereiche');
   if (badge) badge.textContent = sichtbar.length;
 
+  const gruppierung = document.getElementById('bereiche-gruppierung')?.value || 'art';
+
   if (!sichtbar.length) {
     inner.innerHTML = '<div class="empty-state"><p>Noch keine Bereiche angelegt.</p></div>';
     return;
   }
 
-  const gruppierung = document.getElementById('bereiche-gruppierung')?.value || 'art';
+  // ── Oberbereich-Gruppierung: spezialfall ─────────────────────────────────
+  if (gruppierung === 'oberbereich') {
+    // Bereiche MIT Oberbereich = echte Arbeitsbereiche
+    // Bereiche OHNE Oberbereich = entweder Gruppenheader (haben Kinder) oder eigenständig
+    const kinderIds = new Set(sichtbar.filter(b => b.oberbereich).map(b => b.oberbereich));
+    const oberbereichBereiche = sichtbar.filter(b => !b.oberbereich && kinderIds.has(b.id));
+    const eigenstaendig       = sichtbar.filter(b => !b.oberbereich && !kinderIds.has(b.id));
+    const mitOberbereich      = sichtbar.filter(b => !!b.oberbereich);
 
-  // Gruppierungsschlüssel ermitteln
+    let html = '';
+
+    // Gruppen: je Oberbereich
+    oberbereichBereiche.sort((a,b) => a.name.localeCompare(b.name,'de')).forEach(ob => {
+      html += `<div class="bereiche-gruppe-header">${escHtml(ob.name)}</div>`;
+      mitOberbereich.filter(b => b.oberbereich === ob.id).forEach(b => {
+        html += bereichKarteHTML(b);
+      });
+    });
+
+    // Eigenständige (ohne Oberbereich, keine Kinder)
+    if (eigenstaendig.length) {
+      html += `<div class="bereiche-gruppe-header">Ohne Oberbereich</div>`;
+      eigenstaendig.sort((a,b) => a.name.localeCompare(b.name,'de')).forEach(b => {
+        html += bereichKarteHTML(b);
+      });
+    }
+
+    inner.innerHTML = html;
+    return;
+  }
+
+  // ── Alle anderen Gruppierungen ────────────────────────────────────────────
   function getKey(b) {
-    if (gruppierung === 'art') return b.art === 'projekt' ? 'Projekt' : 'Tagesgeschäft';
+    if (gruppierung === 'art')    return b.art === 'projekt' ? 'Projekt' : 'Tagesgeschäft';
     if (gruppierung === 'status') {
       const sm = {inArbeit:'In Arbeit', pausiert:'Pausiert', abgeschlossen:'Abgeschlossen'};
       return sm[b.status] || 'Offen';
@@ -9079,15 +9110,9 @@ function renderBereiche() {
       const d = new Date(b.lieferdatum + 'T00:00:00');
       return d.toLocaleDateString('de-DE', {month:'long', year:'numeric'});
     }
-    if (gruppierung === 'oberbereich') {
-      if (!b.oberbereich) return 'Ohne Oberbereich';
-      const ob = DB.bereiche.find(x => x.id === b.oberbereich);
-      return ob ? ob.name : 'Unbekannt';
-    }
     return 'Sonstige';
   }
 
-  // Gruppenreihenfolge
   const orderArt    = ['Projekt','Tagesgeschäft'];
   const orderStatus = ['Offen','In Arbeit','Pausiert','Abgeschlossen'];
   const orderGroesse= ['XL','L','M','S','Keine Größe'];
@@ -9099,53 +9124,52 @@ function renderBereiche() {
     return keys.sort((a,b) => a.localeCompare(b,'de'));
   }
 
-  // Gruppen aufbauen
   const groups = {};
   sichtbar.forEach(b => {
     const k = getKey(b);
     if (!groups[k]) groups[k] = [];
     groups[k].push(b);
   });
-  const sortedKeys = sortGroups(Object.keys(groups));
 
-  // HTML rendern
   let html = '';
-  sortedKeys.forEach(key => {
+  sortGroups(Object.keys(groups)).forEach(key => {
     html += `<div class="bereiche-gruppe-header">${key}</div>`;
-    groups[key].forEach(b => {
-      const offenCount = DB.aufgaben.filter(a => a.bereichId === b.id && a.status !== 'erledigt').length;
-      const isAktiv = aktiverBereichId === b.id;
-      const statusMap = {inArbeit:'In Arbeit', pausiert:'Pausiert', abgeschlossen:'Abgeschlossen'};
-      const statusBadge = b.status && b.status !== 'aktiv'
-        ? `<span class="bereich-status-badge" style="font-size:9px;background:var(--bg);color:var(--text-xdim);padding:1px 5px;border-radius:5px;border:1px solid var(--border);">${statusMap[b.status]||b.status}</span>`
-        : '';
-      const groesseBadge = b.groesse
-        ? `<span style="font-size:9px;color:var(--text-xdim);">${b.groesse}</span>` : '';
-      const datumBadge = b.lieferdatum
-        ? `<span style="font-size:9px;color:var(--text-xdim);">${new Date(b.lieferdatum+'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}</span>` : '';
-
-      html += `<div class="bereich-card${isAktiv?' active':''}" data-id="${b.id}">
-        <div class="bereich-bar"></div>
-        <div class="bereich-body" onclick="openBereichDetail('${b.id}')">
-          <div class="bereich-name">${escHtml(b.name)}</div>
-          <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:2px;">
-            <span class="bereich-aufg-cnt">${offenCount} offen</span>
-            ${statusBadge}${groesseBadge}${datumBadge}
-          </div>
-        </div>
-        <div class="bereich-actions">
-          <button class="fokus-btn${b.imFokus?' aktiv':''}" onclick="toggleBereichFokus('${b.id}',event)" title="${b.imFokus?'Aus Fokus':'In Fokus'}">
-            ${svgFokus(!!b.imFokus,14)}
-          </button>
-          <div class="icon-btn" onclick="openBereichEdit('${b.id}')" title="Bearbeiten">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          </div>
-        </div>
-      </div>`;
-    });
+    groups[key].forEach(b => { html += bereichKarteHTML(b); });
   });
 
   inner.innerHTML = html;
+}
+
+function bereichKarteHTML(b) {
+  const offenCount = DB.aufgaben.filter(a => a.bereichId === b.id && a.status !== 'erledigt').length;
+  const isAktiv = aktiverBereichId === b.id;
+  const statusMap = {inArbeit:'In Arbeit', pausiert:'Pausiert', abgeschlossen:'Abgeschlossen'};
+  const statusBadge = b.status
+    ? `<span style="font-size:9px;background:var(--bg);color:var(--text-xdim);padding:1px 5px;border-radius:5px;border:1px solid var(--border);">${statusMap[b.status]||b.status}</span>`
+    : '';
+  const groesseBadge = b.groesse
+    ? `<span style="font-size:9px;color:var(--text-xdim);">${b.groesse}</span>` : '';
+  const datumBadge = b.lieferdatum
+    ? `<span style="font-size:9px;color:var(--text-xdim);">${new Date(b.lieferdatum+'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}</span>` : '';
+
+  return `<div class="bereich-card${isAktiv?' active':''}" data-id="${b.id}">
+    <div class="bereich-bar"></div>
+    <div class="bereich-body" onclick="openBereichDetail('${b.id}')">
+      <div class="bereich-name">${escHtml(b.name)}</div>
+      <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:2px;">
+        <span class="bereich-aufg-cnt">${offenCount} offen</span>
+        ${statusBadge}${groesseBadge}${datumBadge}
+      </div>
+    </div>
+    <div class="bereich-actions">
+      <button class="fokus-btn${b.imFokus?' aktiv':''}" onclick="toggleBereichFokus('${b.id}',event)" title="${b.imFokus?'Aus Fokus':'In Fokus'}">
+        ${svgFokus(!!b.imFokus,14)}
+      </button>
+      <div class="icon-btn" onclick="openBereichEdit('${b.id}')" title="Bearbeiten">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </div>
+    </div>
+  </div>`;
 }
 
 
