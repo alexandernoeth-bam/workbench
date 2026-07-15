@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.168</title>
+<title>WorkAssist v1.5.169</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -417,7 +417,32 @@ svg { display: block; }
 
 .aufg-detail-notiz-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-xdim); margin-bottom: 4px; }
 .aufg-detail-notiz { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-size: 12px; line-height: 1.6; flex: 1; overflow-y: auto; }
-.aufg-detail-notiz input[type="checkbox"] { margin-right: 5px; accent-color: var(--teal); }
+/* ── Runde Checkboxen (global) ───────────────────────────────────────────── */
+input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none;
+  width: 15px; height: 15px; border-radius: 50%;
+  border: 2px solid var(--border); background: var(--surface);
+  cursor: pointer; flex-shrink: 0; vertical-align: middle;
+  position: relative; transition: background .15s, border-color .15s;
+}
+input[type="checkbox"]:checked {
+  background: var(--teal); border-color: var(--teal);
+}
+input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute; left: 3px; top: 1px;
+  width: 5px; height: 8px;
+  border: 2px solid #fff; border-top: none; border-left: none;
+  transform: rotate(45deg);
+}
+input[type="checkbox"]:hover:not(:checked) { border-color: var(--teal-light); }
+/* Spezifisch für RTE und Notizen */
+.rte-content input[type="checkbox"],
+.aufg-detail-notiz input[type="checkbox"],
+.notiz-render-view input[type="checkbox"] {
+  margin-right: 6px; margin-top: 1px;
+}
+/* ── Ende Runde Checkboxen ───────────────────────────────────────────────── */
 .aufg-detail-divider { border: none; border-top: 1px solid var(--border); margin: 2px 0; }
 .aufg-status-badge {
   display: inline-flex; align-items: center; gap: 4px;
@@ -779,7 +804,7 @@ svg { display: block; }
 .rte-content ul  { padding-left: 20px; }
 .rte-content ol  { padding-left: 20px; }
 .rte-content li  { margin: 2px 0; }
-.rte-content input[type=checkbox] { margin-right: 5px; accent-color: var(--teal); }
+.rte-content input[type=checkbox] { margin-right: 5px; }
 .rte-content a   { color: var(--teal); text-decoration: underline; cursor: pointer; }
 .rte-content a:hover { color: var(--teal-dark); }
 
@@ -2077,7 +2102,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.168</div>
+    <div class="start-version">v1.5.169</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2145,7 +2170,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.168</div>
+    <div class="app-version" id="app-version">v1.5.169</div>
   </div>
 
   <div class="nav-section">
@@ -3424,7 +3449,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.168';
+const APP_VERSION = '1.5.169';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6447,7 +6472,7 @@ function bdAufgabenHTML(aufgaben, gesamt, bereichId) {
         const isDue = a.faellig && a.faellig <= new Date().toISOString().slice(0,10);
         const pill  = a.groesse ? `<span style="background:var(--teal-xlight);color:var(--teal-dark);font-size:9px;padding:1px 5px;border-radius:5px;font-weight:600;">${a.groesse} min</span>` : '';
         return `<div class="bd-row" onclick="openAufgabeModal('${a.id}')">
-          ${isDue ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' : '☐'}
+          ${isDue ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>'}
           <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.titel)}</span>
           ${pill}
         </div>`;
