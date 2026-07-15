@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.169</title>
+<title>WorkAssist v1.5.170</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2102,7 +2102,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.169</div>
+    <div class="start-version">v1.5.170</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2170,7 +2170,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.169</div>
+    <div class="app-version" id="app-version">v1.5.170</div>
   </div>
 
   <div class="nav-section">
@@ -3449,7 +3449,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.169';
+const APP_VERSION = '1.5.170';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -3588,6 +3588,11 @@ function migrateDB() {
   // Dokumente: ressourceTyp
   (DB.dokumente || []).forEach(d => {
     if (d.ressourceTyp === undefined) d.ressourceTyp = null;
+  });
+  // Pläne: prioritaet + horizont
+  (DB.plaene || []).forEach(p => {
+    if (!p.prioritaet) p.prioritaet = 'mittel';
+    if (!p.horizont)   p.horizont   = 'kurzfristig';
   });
   // Notizen: bereichId
   (DB.notizen || []).forEach(n => {
@@ -3883,6 +3888,19 @@ const today = () => new Date().toISOString().slice(0,10);
 // ═══════════════════════════════════════════════════════════════════════════
 //  NAVIGATION
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ── Plan Priorität + Zeithorizont Icons ──────────────────────────────────────
+const PLAN_PRIO = {
+  hoch:    { label: 'Hoch',       svg: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>', dot: '#E65100' },
+  mittel:  { label: 'Mittel',     svg: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>', dot: '#f59e0b' },
+  niedrig: { label: 'Niedrig',    svg: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8aaaa8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 6 12 11 7 6"/><polyline points="17 13 12 18 7 13"/></svg>', dot: '#cde0de' },
+};
+const PLAN_HORIZONT = {
+  kurzfristig:  { label: 'Kurzfristig',  icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>' },
+  mittelfristig:{ label: 'Mittelfristig',icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' },
+  langfristig:  { label: 'Langfristig',  icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
+};
+// ── Ende Icons ────────────────────────────────────────────────────────────────
 const SCREENS = {
   dashboard:         { title: 'Dashboard',        sub: () => datumHeute() },
   aufgaben:          { title: 'Aufgaben',          sub: () => '' },
@@ -6013,7 +6031,68 @@ function renderDashboardPlaene() {
     return;
   }
 
-  el.innerHTML = plaene.map(p => planKarteHTML(p, 'dash', true)).join('');
+  // Prioritätsreihenfolge
+  const prioOrder = { hoch: 0, mittel: 1, niedrig: 2 };
+  const hzOrder   = { kurzfristig: 0, mittelfristig: 1, langfristig: 2 };
+
+  // Gruppieren nach Horizont, innerhalb nach Priorität
+  const groups = { kurzfristig: [], mittelfristig: [], langfristig: [] };
+  plaene.forEach(p => {
+    const hz = p.horizont || 'kurzfristig';
+    if (!groups[hz]) groups[hz] = [];
+    groups[hz].push(p);
+  });
+  Object.keys(groups).forEach(hz => {
+    groups[hz].sort((a,b) => (prioOrder[a.prioritaet||'mittel']||1) - (prioOrder[b.prioritaet||'mittel']||1));
+  });
+
+  const hzLabels = {
+    kurzfristig:   { label: 'Kurzfristig',   icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>' },
+    mittelfristig: { label: 'Mittelfristig',  icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' },
+    langfristig:   { label: 'Langfristig',    icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
+  };
+  const prioDots = {
+    hoch:    `<div style="width:8px;height:8px;border-radius:50%;background:#E65100;flex-shrink:0;" title="Hohe Priorität"></div>`,
+    mittel:  `<div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0;" title="Mittlere Priorität"></div>`,
+    niedrig: `<div style="width:8px;height:8px;border-radius:50%;background:#cde0de;border:1px solid #b0cccb;flex-shrink:0;" title="Niedrige Priorität"></div>`,
+  };
+
+  let html = '';
+  ['kurzfristig','mittelfristig','langfristig'].forEach(hz => {
+    if (!groups[hz]?.length) return;
+    const { label, icon } = hzLabels[hz];
+    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-xdim);padding:7px 12px 3px;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--border);">${icon} ${label}</div>`;
+    groups[hz].forEach(p => {
+      const schritte = (p.schritte||[]);
+      const erledigt = schritte.filter(s => {
+        const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
+        return st === 'erledigt';
+      }).length;
+      // Nächster offener Schritt
+      const naechster = schritte.find(s => {
+        const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
+        return st !== 'erledigt';
+      });
+      const naechsterTitel = naechster
+        ? (naechster.aufgabeId ? (DB.aufgaben.find(a=>a.id===naechster.aufgabeId)?.titel || naechster.titel) : naechster.titel)
+        : '✓ Alle Schritte erledigt';
+      const dot = prioDots[p.prioritaet||'mittel'];
+
+      html += `<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openNeuerPlan('${p.id}')">
+        ${dot}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.titel)}</div>
+          <div style="font-size:10px;color:var(--text-dim);display:flex;align-items:center;gap:3px;margin-top:2px;">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(naechsterTitel)}</span>
+          </div>
+        </div>
+        <span style="font-size:9px;background:var(--teal-xlight);color:var(--teal-dark);padding:1px 6px;border-radius:6px;font-weight:700;flex-shrink:0;align-self:center;">${erledigt}/${schritte.length}</span>
+      </div>`;
+    });
+  });
+
+  el.innerHTML = html;
 }
 
 function planKarteHTML(p, kontext, zugeklappt) {
@@ -7305,6 +7384,29 @@ function escHtml(s) {
 
 let planSchritte = [];
 
+function planSetPrio(prio) {
+  document.querySelectorAll('.plan-prio-btn').forEach(b => {
+    const isActive = b.dataset.prio === prio;
+    const colors = {hoch:'#E65100', mittel:'#f59e0b', niedrig:'#8aaaa8'};
+    b.style.background    = isActive ? colors[prio] : 'transparent';
+    b.style.borderColor   = isActive ? colors[prio] : 'var(--border)';
+    b.style.color         = isActive ? '#fff' : '';
+    b.querySelectorAll('svg').forEach(s => s.style.stroke = isActive ? '#fff' : '');
+  });
+  document.getElementById('plan-prio-btns').dataset.val = prio;
+}
+
+function planSetHz(hz) {
+  document.querySelectorAll('.plan-hz-btn').forEach(b => {
+    const isActive = b.dataset.hz === hz;
+    b.style.background  = isActive ? 'var(--teal)' : 'transparent';
+    b.style.borderColor = isActive ? 'var(--teal)' : 'var(--border)';
+    b.style.color       = isActive ? '#fff' : '';
+    b.querySelectorAll('svg').forEach(s => s.style.stroke = isActive ? '#fff' : 'currentColor');
+  });
+  document.getElementById('plan-hz-btns').dataset.val = hz;
+}
+
 function openNeuerPlan(id) {
   const bSel = document.getElementById('plan-bereich');
   if (bSel) {
@@ -7321,6 +7423,8 @@ function openNeuerPlan(id) {
     document.getElementById('plan-titel').value   = p.titel;
     document.getElementById('plan-bereich').value = p.bereichId || '';
     document.getElementById('plan-modal-titel').textContent = p.titel;
+    planSetPrio(p.prioritaet || 'mittel');
+    planSetHz(p.horizont || 'kurzfristig');
     document.getElementById('plan-btn-loeschen').style.display = '';
     // Lade Schritte – mit Aufgaben-Daten falls verknüpft
     planSchritte = (p.schritte || []).map(s => {
@@ -7353,6 +7457,8 @@ function openNeuerPlan(id) {
     document.getElementById('plan-titel').value   = '';
     document.getElementById('plan-bereich').value = '';
     document.getElementById('plan-modal-titel').textContent = 'Neuer Plan';
+    planSetPrio('mittel');
+    planSetHz('kurzfristig');
     document.getElementById('plan-btn-loeschen').style.display = 'none';
     document.getElementById('plan-fortschritt-wrap').style.display = 'none';
     planSchritte = [planNeuerSchrittObj(0)];
@@ -7640,7 +7746,9 @@ function savePlan() {
   if (!gueltig.length) { showToast('Mindestens einen Schritt angeben', true); return; }
 
   const editId    = document.getElementById('plan-edit-id').value;
-  const bereichId = document.getElementById('plan-bereich').value || null;
+  const bereichId  = document.getElementById('plan-bereich').value || null;
+  const prioritaet = document.getElementById('plan-prio-btns')?.dataset.val || 'mittel';
+  const horizont   = document.getElementById('plan-hz-btns')?.dataset.val  || 'kurzfristig';
   if (!DB.plaene) DB.plaene = [];
 
   // Schritte speichern – Aufgaben anlegen/aktualisieren wo gewünscht
@@ -7686,11 +7794,13 @@ function savePlan() {
   if (editId) {
     const p = DB.plaene.find(p => p.id === editId);
     if (p) {
-      p.titel     = titel;
-      p.bereichId = bereichId;
-      p.schritte  = schrittLinks;
-      p.status    = alleErledigt ? 'abgeschlossen' : 'aktiv';
-      p.geaendert = new Date().toISOString();
+      p.titel      = titel;
+      p.bereichId  = bereichId;
+      p.prioritaet = prioritaet;
+      p.horizont   = horizont;
+      p.schritte   = schrittLinks;
+      p.status     = alleErledigt ? 'abgeschlossen' : 'aktiv';
+      p.geaendert  = new Date().toISOString();
     }
   } else {
     const neuerPlanId = uid();
@@ -7701,12 +7811,12 @@ function savePlan() {
       }
     });
     DB.plaene.push({
-      id:        neuerPlanId,
-      titel, bereichId,
-      schritte:  schrittLinks,
-      status:    'aktiv',
-      erstellt:  new Date().toISOString(),
-      geaendert: new Date().toISOString(),
+      id:          neuerPlanId,
+      titel, bereichId, prioritaet, horizont,
+      schritte:    schrittLinks,
+      status:      'aktiv',
+      erstellt:    new Date().toISOString(),
+      geaendert:   new Date().toISOString(),
     });
   }
 
@@ -11275,6 +11385,38 @@ if (!fsApiVerfuegbar()) {
           <select class="field-select" id="plan-bereich">
             <option value="">— kein Bereich —</option>
           </select>
+        </div>
+      </div>
+
+      <!-- Priorität + Zeithorizont -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field-group">
+          <div class="field-label">Priorität</div>
+          <div style="display:flex;gap:5px;" id="plan-prio-btns">
+            <button onclick="planSetPrio('hoch')"    data-prio="hoch"    class="plan-prio-btn" style="flex:1;padding:5px 0;border-radius:7px;border:2px solid var(--border);background:transparent;font-size:10px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:3px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2.5" stroke-linecap="round"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>Hoch
+            </button>
+            <button onclick="planSetPrio('mittel')"  data-prio="mittel"  class="plan-prio-btn" style="flex:1;padding:5px 0;border-radius:7px;border:2px solid var(--border);background:transparent;font-size:10px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:3px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>Mittel
+            </button>
+            <button onclick="planSetPrio('niedrig')" data-prio="niedrig" class="plan-prio-btn" style="flex:1;padding:5px 0;border-radius:7px;border:2px solid var(--border);background:transparent;font-size:10px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:3px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8aaaa8" stroke-width="2.5" stroke-linecap="round"><polyline points="17 6 12 11 7 6"/><polyline points="17 13 12 18 7 13"/></svg>Niedrig
+            </button>
+          </div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Zeithorizont</div>
+          <div style="display:flex;gap:5px;" id="plan-hz-btns">
+            <button onclick="planSetHz('kurzfristig')"   data-hz="kurzfristig"   class="plan-hz-btn" style="flex:1;padding:5px 0;border-radius:7px;border:2px solid var(--border);background:transparent;font-size:10px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:3px;">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Kurz
+            </button>
+            <button onclick="planSetHz('mittelfristig')" data-hz="mittelfristig" class="plan-hz-btn" style="flex:1;padding:5px 0;border-radius:7px;border:2px solid var(--border);background:transparent;font-size:10px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:3px;">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Mittel
+            </button>
+            <button onclick="planSetHz('langfristig')"   data-hz="langfristig"   class="plan-hz-btn" style="flex:1;padding:5px 0;border-radius:7px;border:2px solid var(--border);background:transparent;font-size:10px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:3px;">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Lang
+            </button>
+          </div>
         </div>
       </div>
 
