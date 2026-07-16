@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#124d53">
-<title>Plan-Viewer v1.0.2</title>
+<title>Plan-Viewer v1.0.3</title>
 <style>
 :root {
   --petrol: #1a6b72;
@@ -30,6 +30,31 @@
   --tabs-h: 44px;
   --font-scale: 1;
 }
+/* ── DARK MODE VARIABLEN ── */
+[data-theme="dunkel"] {
+  --petrol:        #5ecbd4;
+  --petrol-dark:   #0d3538;
+  --petrol-light:  #1a3f42;
+  --petrol-mid:    #4db8c0;
+  --success:       #2ecc71;
+  --bg:            #0f1e1f;
+  --card:          #162627;
+  --text:          #e0eeee;
+  --text-muted:    #7aadb0;
+  --border:        #1e3a3d;
+  --shadow:        0 2px 8px rgba(0,0,0,0.4);
+  --header-bg:     #0d3538;
+  --schritt-bg:    #1a2e30;
+  --schritt-active:#1e3638;
+  --wartauf-bg:    #1e1a00;
+  --wartauf-border:#4a3800;
+  --wartauf-text:  #ffd95a;
+  --wartauf-label: #c9a800;
+  --warn-bg:       #2d2600;
+  --warn-border:   #b38600;
+  --warn-text:     #ffd95a;
+  --warn-btn-text: #ffd95a;
+}
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -48,7 +73,7 @@ body {
 
 /* ── HEADER ── */
 #header {
-  background: var(--petrol-dark);
+  background: var(--header-bg);
   height: var(--header-h);
   display: flex;
   align-items: center;
@@ -120,6 +145,24 @@ body {
 }
 #btn-zoom:active { background: rgba(255,255,255,0.28); }
 
+#btn-theme {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 15px;
+  padding: 5px 9px;
+  cursor: pointer;
+  min-width: 34px;
+  flex-shrink: 0;
+  transition: background 0.15s, outline 0.15s;
+}
+#btn-theme:active { background: rgba(255,255,255,0.28); }
+#btn-theme.aktiv {
+  background: rgba(94,203,212,0.25);
+  outline: 1px solid rgba(94,203,212,0.7);
+}
+
 /* ── WARN BANNER ── */
 #warn-banner {
   background: var(--warn-bg);
@@ -138,7 +181,7 @@ body {
   background: var(--warn-border);
   border: none;
   border-radius: 6px;
-  color: #5a3e00;
+  color: var(--warn-btn-text);
   font-size: calc(12px * var(--font-scale));
   font-weight: 700;
   padding: 4px 10px;
@@ -335,8 +378,8 @@ body {
 /* Warte-auf Sektion */
 .wartauf-section {
   padding: 8px 14px;
-  background: #fff8e6;
-  border-top: 1px solid #ffe0a0;
+  background: var(--wartauf-bg);
+  border-top: 1px solid var(--wartauf-border);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -346,7 +389,7 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  color: #9a6b00;
+  color: var(--wartauf-label);
   margin-bottom: 2px;
 }
 .wartauf-item {
@@ -354,7 +397,7 @@ body {
   align-items: center;
   gap: 8px;
   font-size: calc(12px * var(--font-scale));
-  color: #7a5200;
+  color: var(--wartauf-text);
   padding: 3px 0;
 }
 .wartauf-item-name { flex: 1; }
@@ -382,12 +425,12 @@ body {
   gap: 10px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: var(--bg);
+  background: var(--schritt-bg);
   cursor: pointer;
   user-select: none;
   transition: background 0.15s;
 }
-.schritt:active { background: #d0e8e9; }
+.schritt:active { background: var(--schritt-active); }
 
 .schritt-check {
   width: 22px;
@@ -626,9 +669,10 @@ body {
 <!-- HEADER -->
 <div id="header">
   <div id="header-title">
-    📋 Plan-Viewer<span id="header-version">v1.0.2</span>
+    📋 Plan-Viewer<span id="header-version">v1.0.3</span>
   </div>
   <button id="btn-speichern" onclick="speichernClick()">💾 Speichern</button>
+  <button id="btn-theme" onclick="themeToggle()" title="Dark Mode">🌓</button>
   <button id="btn-zoom" onclick="zoomToggle()" title="Schriftgröße">A</button>
   <button id="btn-datei" onclick="dateiClick()">📂 Öffnen</button>
 </div>
@@ -701,9 +745,63 @@ body {
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.0.2';
+const APP_VERSION = 'v1.0.3';
 const NOTIZ_KEY = 'planviewer_notiz';
 const ZOOM_KEY = 'planviewer_zoom';
+const THEME_KEY = 'planviewer_theme';
+
+// ── THEME: DARK MODE ──
+const THEME_STUFEN = [
+  { label: '🌓', modus: 'auto',   name: 'auto'   },
+  { label: '☀️', modus: 'hell',   name: 'hell'   },
+  { label: '🌙', modus: 'dunkel', name: 'dunkel' }
+];
+let themeIndex = 0;
+let systemDunkelQuery = null;
+
+function themeInit() {
+  const gespeichert = localStorage.getItem(THEME_KEY);
+  if (gespeichert !== null) {
+    const idx = THEME_STUFEN.findIndex(s => s.name === gespeichert);
+    themeIndex = idx >= 0 ? idx : 0;
+  }
+  systemDunkelQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  systemDunkelQuery.addEventListener('change', themeSystemWechsel);
+  themeAnwenden();
+}
+
+function themeToggle() {
+  themeIndex = (themeIndex + 1) % THEME_STUFEN.length;
+  localStorage.setItem(THEME_KEY, THEME_STUFEN[themeIndex].name);
+  themeAnwenden();
+  const namen = { auto: 'System', hell: 'Hell', dunkel: 'Dunkel' };
+  zeigeToast('Theme: ' + namen[THEME_STUFEN[themeIndex].name]);
+}
+
+function themeSystemWechsel() {
+  if (THEME_STUFEN[themeIndex].modus === 'auto') {
+    themeAnwenden();
+  }
+}
+
+function themeAnwenden() {
+  const stufe = THEME_STUFEN[themeIndex];
+  const btn = document.getElementById('btn-theme');
+  let istDunkel = false;
+
+  if (stufe.modus === 'auto') {
+    istDunkel = systemDunkelQuery && systemDunkelQuery.matches;
+    if (btn) { btn.textContent = '🌓'; btn.classList.remove('aktiv'); }
+  } else if (stufe.modus === 'dunkel') {
+    istDunkel = true;
+    if (btn) { btn.textContent = '🌙'; btn.classList.add('aktiv'); }
+  } else {
+    istDunkel = false;
+    if (btn) { btn.textContent = '☀️'; btn.classList.remove('aktiv'); }
+  }
+
+  document.documentElement.setAttribute('data-theme', istDunkel ? 'dunkel' : 'hell');
+}
 
 // ── ZOOM: Schriftgröße ──
 const ZOOM_STUFEN = [
@@ -1258,6 +1356,7 @@ self.addEventListener('fetch', e => {
       .catch(() => {});
   }
   zoomInit();
+  themeInit();
 })();
 </script>
 </body>
