@@ -4942,10 +4942,17 @@ function renderPanelBereiche() {
     return a.localeCompare(b, 'de');
   });
 
+  // ID → Name Lookup
+  function obName(id) {
+    if (id === '—') return 'Ohne Oberbereich';
+    const ob = DB.bereiche.find(x => x.id === id);
+    return ob ? ob.name : id;
+  }
+
   let html = '';
   sortedKeys.forEach(key => {
     if (sortedKeys.length > 1) {
-      html += `<div class="task-group-header">${key === '—' ? 'Ohne Oberbereich' : key}</div>`;
+      html += `<div class="task-group-header">${obName(key)}</div>`;
     }
     groups[key].forEach(b => {
       const anzahl   = offen.filter(a => a.bereichId === b.id).length;
@@ -4954,7 +4961,7 @@ function renderPanelBereiche() {
       html += `<div class="task-row" onclick="showScreen('bereiche', document.getElementById('nav-bereiche')); selectBereich('${b.id}')">
         <div class="task-content" style="flex-direction:column;align-items:flex-start;gap:1px;min-width:0;">
           <div class="bereich-panel-name">${fokusIco}${b.name}</div>
-          ${b.oberbereich && sortedKeys.length === 1 ? `<div class="bereich-panel-ob">${b.oberbereich}</div>` : ''}
+          ${b.oberbereich && sortedKeys.length === 1 ? `<div class="bereich-panel-ob">${obName(b.oberbereich)}</div>` : ''}
         </div>
         <span class="bereich-panel-cnt">${anzahl} offen</span>
       </div>`;
