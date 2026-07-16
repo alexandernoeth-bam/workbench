@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.181</title>
+<title>WorkAssist v1.5.182</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2128,7 +2128,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.181</div>
+    <div class="start-version">v1.5.182</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2196,7 +2196,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.181</div>
+    <div class="app-version" id="app-version">v1.5.182</div>
   </div>
 
   <div class="nav-section">
@@ -2287,6 +2287,11 @@ textarea.field-input { resize: vertical; min-height: 70px; }
       style="border:1px solid var(--border);background:transparent;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;color:var(--text-dim);font-family:var(--font);display:flex;align-items:center;gap:4px;flex-shrink:0;">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
       Datei wechseln
+    </button>
+    <!-- Toggle: work ↔ privat (nur sichtbar wenn beide Handles bekannt) -->
+    <button id="btn-toggle-db" onclick="toggleDB()" style="display:none;border:1px solid var(--border);background:transparent;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;color:var(--text-dim);font-family:var(--font);align-items:center;gap:4px;flex-shrink:0;">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+      Privat
     </button>
     <div class="zoom-wrap">
       <button class="zoom-btn" onclick="setZoom(currentZoom - 5)" title="Zoom verringern">−</button>
@@ -3480,7 +3485,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.181';
+const APP_VERSION = '1.5.182';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -3673,14 +3678,15 @@ async function dateiWechseln() {
   location.reload();
 }
 
-async function handleSpeichern(handle) {
+async function handleSpeichern(handle, key) {
+  key = key || 'filehandle';
   return new Promise((resolve, reject) => {
     const req = indexedDB.open('workassist', 1);
     req.onupgradeneeded = e => e.target.result.createObjectStore('handles');
     req.onsuccess = e => {
       const db = e.target.result;
       const tx = db.transaction('handles', 'readwrite');
-      tx.objectStore('handles').put(handle, 'filehandle');
+      tx.objectStore('handles').put(handle, key);
       tx.oncomplete = () => resolve();
       tx.onerror    = () => reject(tx.error);
     };
@@ -3688,7 +3694,8 @@ async function handleSpeichern(handle) {
   });
 }
 
-async function handleLaden() {
+async function handleLaden(key) {
+  key = key || 'filehandle';
   return new Promise((resolve) => {
     try {
       const req = indexedDB.open('workassist', 1);
@@ -3699,7 +3706,7 @@ async function handleLaden() {
         try {
           const db  = e.target.result;
           const tx  = db.transaction('handles', 'readonly');
-          const get = tx.objectStore('handles').get('filehandle');
+          const get = tx.objectStore('handles').get(key);
           get.onsuccess = () => resolve(get.result || null);
           get.onerror   = () => resolve(null);
         } catch(e2) { resolve(null); }
@@ -3707,7 +3714,6 @@ async function handleLaden() {
       req.onerror   = () => resolve(null);
       req.onblocked = () => resolve(null);
     } catch(e) {
-      // Safari blockiert IndexedDB bei file:// → null zurückgeben
       resolve(null);
     }
   });
@@ -3907,7 +3913,15 @@ async function ladeUndStarte() {
   startAutoSave();
   renderDashboard();
   const name = fileHandle ? (await fileHandle.getFile()).name : null;
-  if (name) setThemeFromFilename(name);
+  if (name) {
+    setThemeFromFilename(name);
+    // Handle unter korrektem Schlüssel speichern
+    const isPrivat = name.toLowerCase().includes('privat') || name.toLowerCase().includes('private') || name.toLowerCase().includes('personal');
+    await handleSpeichern(fileHandle, isPrivat ? 'filehandle_privat' : 'filehandle_work');
+    // Auch den generischen Schlüssel setzen (für Rückwärtskompatibilität)
+    await handleSpeichern(fileHandle, 'filehandle');
+    await updateToggleButton(name);
+  }
   setSaveStatus('save-ok', name ? `Gespeichert · ${name}` : 'Browser-Speicher');
 }
 
@@ -6313,7 +6327,51 @@ function planSchrittSyncVonAufgabe(aufgabeId, neuerStatus) {
   if (geaendert) saveDB();
 }
 
-// ── Automatischer Bereich-Status ─────────────────────────────────────────────
+// ── Dual-Handle Toggle ────────────────────────────────────────────────────────
+async function updateToggleButton(currentName) {
+  const btn = document.getElementById('btn-toggle-db');
+  if (!btn) return;
+  const isPrivat = currentName && (currentName.toLowerCase().includes('privat') || currentName.toLowerCase().includes('private') || currentName.toLowerCase().includes('personal'));
+  if (isPrivat) {
+    // Im Privat-Modus: kein Toggle anzeigen
+    btn.style.display = 'none';
+    return;
+  }
+  // Im Work-Modus: prüfe ob privat-Handle bekannt ist
+  const privatHandle = await handleLaden('filehandle_privat');
+  if (!privatHandle) {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = '';
+  btn.title = 'Zu privater Ansicht wechseln';
+}
+
+async function toggleDB() {
+  const name = fileHandle ? (await fileHandle.getFile()).name : '';
+  const isPrivat = name.toLowerCase().includes('privat') || name.toLowerCase().includes('private') || name.toLowerCase().includes('personal');
+  const zielKey = isPrivat ? 'filehandle_work' : 'filehandle_privat';
+  const zielHandle = await handleLaden(zielKey);
+  if (!zielHandle) {
+    showToast('Andere Datei nicht bekannt – bitte zuerst öffnen', true);
+    return;
+  }
+  // Aktuellen Handle sichern
+  if (fileHandle) {
+    await saveDB();
+    const curKey = isPrivat ? 'filehandle_privat' : 'filehandle_work';
+    await handleSpeichern(fileHandle, curKey);
+  }
+  // Zu anderem Handle wechseln
+  fileHandle = zielHandle;
+  const perm = await fileHandle.requestPermission({ mode: 'readwrite' });
+  if (perm !== 'granted') { showToast('Berechtigung verweigert', true); return; }
+  await handleSpeichern(fileHandle, 'filehandle');
+  await ladeUndStarte();
+}
+// ── Ende Dual-Handle Toggle ───────────────────────────────────────────────────
+
+
 function bereichStatusBerechnen(bereichId) {
   const b = DB.bereiche.find(b => b.id === bereichId);
   if (!b || b.status === 'abgeschlossen') return b?.status || null;
