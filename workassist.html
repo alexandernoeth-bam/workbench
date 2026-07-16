@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.184</title>
+<title>WorkAssist v1.5.185</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2128,7 +2128,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.184</div>
+    <div class="start-version">v1.5.185</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2196,7 +2196,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.184</div>
+    <div class="app-version" id="app-version">v1.5.185</div>
   </div>
 
   <div class="nav-section">
@@ -3485,7 +3485,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.184';
+const APP_VERSION = '1.5.185';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -4630,7 +4630,11 @@ function renderPanelBacklog(offen, overdue, heute, inArbeit) {
   );
 
   // Aufgaben die einem Plan zugeordnet sind – nur in Heute/Überfällig anzeigen
-  const hatPlan = a => !!a.planId && (DB.plaene||[]).some(p => p.schritte?.some(s => s.aufgabeId === a.id));
+  // Suche direkt in Plänen (planId auf Aufgabe kann fehlen bei manuell zugeordneten)
+  const planAufgabeIds = new Set(
+    (DB.plaene||[]).flatMap(p => (p.schritte||[]).filter(s => s.aufgabeId).map(s => s.aufgabeId))
+  );
+  const hatPlan = a => planAufgabeIds.has(a.id);
 
   // Zeitnah: anzeigedatum in nächsten 3 Arbeitstagen ODER manuelles Flag
   const zeitnahList = offen.filter(a => {
@@ -5253,15 +5257,13 @@ function dashTaskRowHTML(a, datumRot) {
       </div>`
     : '';
 
-  // Verknüpfter Plan – Badge anzeigen
-  const planBadge = a.planId
-    ? (() => {
-        const p = (DB.plaene||[]).find(p => p.schritte?.some(s => s.aufgabeId === a.id));
-        return p ? `<div style="display:flex;align-items:center;gap:4px;padding:2px 0 0 0;font-size:10px;color:var(--teal-dark);" onclick="event.stopPropagation();openNeuerPlan('${p.id}')">
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/></svg>
-          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.titel)}</span>
-        </div>` : '';
-      })()
+  // Verknüpfter Plan – direkt in Plänen suchen (planId auf Aufgabe kann fehlen)
+  const aufgPlan = (DB.plaene||[]).find(p => p.schritte?.some(s => s.aufgabeId === a.id));
+  const planBadge = aufgPlan
+    ? `<div style="display:flex;align-items:center;gap:4px;padding:2px 0 0 0;font-size:10px;color:var(--teal-dark);" onclick="event.stopPropagation();openNeuerPlan('${aufgPlan.id}')">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/></svg>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(aufgPlan.titel)}</span>
+      </div>`
     : '';
 
   return `<div class="task-row" data-aufg-id="${a.id}" onclick="openAufgabeModal('${a.id}')">
@@ -9098,22 +9100,22 @@ function openAufgabeModal(id) {
     if (!a) return;
     document.getElementById('modal-aufgabe-titel').textContent = a.typ === 'termin' ? 'Termin bearbeiten' : 'Aufgabe bearbeiten';
 
-    // Plan-Badge im Modal anzeigen
+    // Plan-Badge im Modal anzeigen – direkt in Plänen suchen
     let planBadgeEl = document.getElementById('aufg-modal-plan-badge');
     if (!planBadgeEl) {
       planBadgeEl = document.createElement('div');
       planBadgeEl.id = 'aufg-modal-plan-badge';
-      planBadgeEl.style.cssText = 'font-size:10px;color:var(--teal-dark);display:flex;align-items:center;gap:4px;margin-top:2px;cursor:pointer;';
+      planBadgeEl.style.cssText = 'font-size:10px;color:var(--teal-dark);display:none;align-items:center;gap:4px;margin-top:2px;cursor:pointer;';
       document.getElementById('modal-aufgabe-titel').after(planBadgeEl);
     }
-    if (a.planId) {
-      const p = (DB.plaene||[]).find(p => p.schritte?.some(s => s.aufgabeId === a.id));
-      if (p) {
-        planBadgeEl.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/></svg> ${escHtml(p.titel)}`;
-        planBadgeEl.onclick = () => { closeModal('modal-aufgabe'); openNeuerPlan(p.id); };
-        planBadgeEl.style.display = 'flex';
-      } else { planBadgeEl.style.display = 'none'; }
-    } else { planBadgeEl.style.display = 'none'; }
+    const modalPlan = (DB.plaene||[]).find(p => p.schritte?.some(s => s.aufgabeId === a.id));
+    if (modalPlan) {
+      planBadgeEl.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/></svg> ${escHtml(modalPlan.titel)}`;
+      planBadgeEl.onclick = () => { closeModal('modal-aufgabe'); openNeuerPlan(modalPlan.id); };
+      planBadgeEl.style.display = 'flex';
+    } else {
+      planBadgeEl.style.display = 'none';
+    }
     const _aufwLink = document.getElementById('modal-aufwerten-link');
     if (_aufwLink) _aufwLink.style.display = '';
     // Dokument-Button anzeigen
