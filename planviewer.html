@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#124d53">
+<title>Plan-Viewer v1.0.1</title>
+<style>
+:root {
+  --petrol: #1a6b72;
+  --petrol-dark: #124d53;
+  --petrol-light: #e8f4f5;
+  --petrol-mid: #2a8a93;
+  --accent: #e67e22;
+  --warn-bg: #fff3cd;
+  --warn-border: #ffc107;
+  --warn-text: #856404;
+  --success: #27ae60;
+  --danger: #e74c3c;
+  --bg: #f0f4f4;
+  --card: #ffffff;
+  --text: #1a2a2a;
+  --text-muted: #6b8a8a;
+  --border: #c8dede;
+  --radius: 12px;
+  --shadow: 0 2px 8px rgba(26,107,114,0.12);
+  --header-h: 56px;
+  --tabs-h: 44px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--petrol-dark);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HEADER ── */
+#header {
+  background: var(--petrol-dark);
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 10px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+#header-title {
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  flex: 1;
+}
+
+#header-version {
+  color: rgba(255,255,255,0.45);
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+#btn-datei {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+#btn-datei:active { background: rgba(255,255,255,0.28); }
+
+#btn-speichern {
+  background: var(--success);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 11px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+#btn-speichern:active { opacity: 0.8; }
+#btn-speichern.visible { display: flex; }
+
+/* ── WARN BANNER ── */
+#warn-banner {
+  background: var(--warn-bg);
+  border-bottom: 1px solid var(--warn-border);
+  padding: 8px 14px;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--warn-text);
+  flex-shrink: 0;
+}
+#warn-banner.visible { display: flex; }
+#warn-banner button {
+  margin-left: auto;
+  background: var(--warn-border);
+  border: none;
+  border-radius: 6px;
+  color: #5a3e00;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── TABS ── */
+#tabs {
+  display: none;
+  background: var(--petrol-dark);
+  height: var(--tabs-h);
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+#tabs.visible { display: flex; }
+
+.tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  gap: 5px;
+  letter-spacing: 0.2px;
+}
+.tab.active {
+  color: white;
+  border-bottom-color: #5ecbd4;
+}
+
+/* ── CONTENT ── */
+#content {
+  flex: 1;
+  overflow: hidden;
+  background: var(--bg);
+  position: relative;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 12px;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+.screen.active { display: flex; }
+
+/* ── NO-FILE SCREEN ── */
+#screen-nofile {
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.nofile-card {
+  background: var(--card);
+  border: 1px dashed var(--petrol);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 340px;
+  box-shadow: var(--shadow);
+}
+.nofile-icon { font-size: 40px; }
+.nofile-hint { color: var(--text-muted); font-size: 13px; line-height: 1.5; }
+
+.btn-primary {
+  background: var(--petrol);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.btn-primary:active { background: var(--petrol-dark); }
+
+.tip-box {
+  background: var(--warn-bg);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--warn-text);
+  line-height: 1.6;
+  width: 100%;
+  max-width: 340px;
+}
+.tip-box code {
+  background: rgba(133,100,4,0.12);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+/* ── PLÄNE SCREEN ── */
+.horizont-group { display: flex; flex-direction: column; gap: 8px; }
+
+.horizont-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--petrol);
+  text-transform: uppercase;
+  padding: 4px 2px 2px;
+}
+
+/* ── PLAN CARD ── */
+.plan-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.plan-header {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  user-select: none;
+}
+.plan-header:active { background: var(--petrol-light); }
+
+.plan-prio-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.prio-hoch { background: var(--danger); }
+.prio-mittel { background: #f39c12; }
+.prio-niedrig { background: var(--success); }
+
+.plan-titel {
+  font-size: 14px;
+  font-weight: 600;
+  flex: 1;
+  line-height: 1.3;
+}
+
+.plan-counter {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.plan-chevron {
+  color: var(--text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+.plan-card.open .plan-chevron { transform: rotate(90deg); }
+
+.plan-progress {
+  height: 3px;
+  background: var(--border);
+  margin: 0;
+}
+.plan-progress-fill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 0 2px 2px 0;
+  transition: width 0.3s;
+}
+
+.plan-body {
+  display: none;
+  flex-direction: column;
+  gap: 0;
+}
+.plan-card.open .plan-body { display: flex; }
+
+/* Warte-auf Sektion */
+.wartauf-section {
+  padding: 8px 14px;
+  background: #fff8e6;
+  border-top: 1px solid #ffe0a0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wartauf-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #9a6b00;
+  margin-bottom: 2px;
+}
+.wartauf-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #7a5200;
+  padding: 3px 0;
+}
+.wartauf-item-name { flex: 1; }
+.wartauf-badge {
+  font-size: 10px;
+  background: #f39c12;
+  color: white;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+/* Schritte */
+.schritte-section {
+  padding: 8px 14px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schritt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+.schritt:active { background: #d0e8e9; }
+
+.schritt-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid var(--petrol);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  color: white;
+  font-size: 13px;
+}
+.schritt.erledigt .schritt-check {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.schritt-titel {
+  font-size: 13px;
+  flex: 1;
+  line-height: 1.3;
+}
+.schritt.erledigt .schritt-titel {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.schritt-delegiert-badge {
+  font-size: 10px;
+  color: var(--petrol-mid);
+  background: var(--petrol-light);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.empty-plaene {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── NOTIZEN SCREEN ── */
+.notiz-hinweis {
+  background: var(--petrol-light);
+  border-left: 3px solid var(--petrol);
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 12px;
+  color: var(--petrol-dark);
+  line-height: 1.5;
+}
+.notiz-hinweis code {
+  background: rgba(26,107,114,0.12);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+.notiz-input-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  box-shadow: var(--shadow);
+}
+.notiz-input-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--petrol);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+#notiz-textarea {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+  resize: none;
+  min-height: 80px;
+  color: var(--text);
+  background: var(--bg);
+  outline: none;
+  transition: border-color 0.2s;
+  line-height: 1.5;
+}
+#notiz-textarea:focus { border-color: var(--petrol); }
+#notiz-textarea::placeholder { color: var(--text-muted); }
+
+.notiz-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.notiz-md-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex: 1;
+  line-height: 1.4;
+}
+.notiz-md-hint code {
+  background: rgba(0,0,0,0.07);
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+#btn-anfuegen {
+  background: var(--petrol);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+#btn-anfuegen:active { background: var(--petrol-dark); }
+
+.notiz-verlauf-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.notiz-verlauf-header {
+  padding: 9px 14px;
+  background: var(--petrol-light);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--petrol-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+#btn-notiz-leeren {
+  font-size: 11px;
+  color: var(--danger);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 2px 0;
+}
+
+#notiz-verlauf-content {
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+  max-height: 50vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Markdown rendering */
+.md-block { margin-bottom: 4px; }
+.md-ts-line {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 8px 0 3px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--border);
+  display: block;
+}
+.md-ts-line:first-child { margin-top: 0; }
+.md-cb-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 2px 0;
+}
+.md-cb {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--petrol);
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 10px;
+  color: white;
+}
+.md-cb.checked {
+  background: var(--success);
+  border-color: var(--success);
+}
+.md-cb-text { font-size: 13px; line-height: 1.4; flex: 1; }
+.md-cb-text.checked { text-decoration: line-through; color: var(--text-muted); }
+.md-plain-line { font-size: 13px; line-height: 1.5; color: var(--text-muted); padding: 1px 0; }
+.md-empty { height: 4px; }
+.notiz-empty { color: var(--text-muted); font-size: 13px; padding: 12px 0; text-align: center; }
+
+/* ── TOAST ── */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(70px);
+  background: rgba(18,77,83,0.95);
+  color: white;
+  padding: 10px 18px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: transform 0.25s ease;
+  z-index: 999;
+  pointer-events: none;
+  max-width: 90vw;
+  text-align: center;
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div id="header-title">
+    📋 Plan-Viewer<span id="header-version">v1.0.1</span>
+  </div>
+  <button id="btn-speichern" onclick="speichernClick()">💾 Speichern</button>
+  <button id="btn-datei" onclick="dateiClick()">📂 Öffnen</button>
+</div>
+
+<!-- WARN BANNER -->
+<div id="warn-banner">
+  ⚠️ Datei wurde am PC geändert
+  <button onclick="neuLaden()">Neu laden</button>
+</div>
+
+<!-- TABS -->
+<div id="tabs">
+  <div class="tab active" data-tab="plaene" onclick="switchTab('plaene')">📋 Pläne</div>
+  <div class="tab" data-tab="notizen" onclick="switchTab('notizen')">📝 Notizen</div>
+</div>
+
+<!-- CONTENT -->
+<div id="content">
+
+  <!-- KEIN FILE -->
+  <div class="screen active" id="screen-nofile">
+    <div class="nofile-card">
+      <div class="nofile-icon">📂</div>
+      <div class="nofile-hint">Öffne deine <strong>Backlog.json</strong> um Pläne anzuzeigen und Notizen zu erfassen.</div>
+      <button class="btn-primary" onclick="dateiClick()">📂 Datei öffnen</button>
+    </div>
+    <div class="tip-box">
+      💡 <strong>Tipp:</strong> Verwende dieselbe <code>Backlog.json</code> wie WorkAssist auf dem PC — alle Änderungen sind sofort dort sichtbar.
+    </div>
+  </div>
+
+  <!-- PLÄNE -->
+  <div class="screen" id="screen-plaene">
+    <div id="plaene-container"></div>
+  </div>
+
+  <!-- NOTIZEN -->
+  <div class="screen" id="screen-notizen">
+
+    <div class="notiz-hinweis">
+      💡 Notizen werden in <code>Backlog.json</code> gespeichert und sind sofort in WorkAssist am PC sichtbar.
+    </div>
+
+    <div class="notiz-input-card">
+      <div class="notiz-input-label">+ Neue Notiz anfügen</div>
+      <textarea id="notiz-textarea" rows="3"
+        placeholder="- [ ] Neue Aufgabe anlegen&#10;- [ ] Design prüfen&#10;Freier Text geht auch..."></textarea>
+      <div class="notiz-input-row">
+        <span class="notiz-md-hint">Markdown: <code>- [ ]</code> für Checkbox</span>
+        <button id="btn-anfuegen" onclick="notizAnfuegen()">↑ Anfügen</button>
+      </div>
+    </div>
+
+    <div class="notiz-verlauf-card">
+      <div class="notiz-verlauf-header">
+        Gespeicherte Notizen
+        <button id="btn-notiz-leeren" onclick="notizLeeren()">Leeren</button>
+      </div>
+      <div id="notiz-verlauf-content">
+        <div class="notiz-empty" id="notiz-empty-hint">Noch keine Notizen vorhanden.</div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /content -->
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+const APP_VERSION = 'v1.0.1';
+const NOTIZ_KEY = 'planviewer_notiz';
+
+// ── STATE ──
+let fileHandle = null;
+let db = null;
+let letzterLadeZeit = 0;
+let lastModifiedGeprueft = 0;
+let ungespeicherteAenderungen = false;
+let aktuellerTab = 'plaene';
+let pollingInterval = null;
+
+// ── HILFSFUNKTIONEN ──
+function zeigeToast(msg, dauer) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dauer || 2000);
+}
+
+function formatZeitstempel() {
+  const n = new Date();
+  const dd = String(n.getDate()).padStart(2,'0');
+  const mm = String(n.getMonth()+1).padStart(2,'0');
+  const jj = n.getFullYear();
+  const hh = String(n.getHours()).padStart(2,'0');
+  const mi = String(n.getMinutes()).padStart(2,'0');
+  return `${dd}.${mm}.${jj} – ${hh}:${mi}`;
+}
+
+function aktualisiereSpeichemButton() {
+  const btn = document.getElementById('btn-speichern');
+  if (ungespeicherteAenderungen && fileHandle) {
+    btn.classList.add('visible');
+  } else {
+    btn.classList.remove('visible');
+  }
+}
+
+function setzeUngespeichert(wert) {
+  ungespeicherteAenderungen = wert;
+  aktualisiereSpeichemButton();
+}
+
+// ── DATEI: ÖFFNEN ──
+async function dateiClick() {
+  if (fileHandle) {
+    // Datei wechseln
+    fileHandle = null;
+    db = null;
+    setzeUngespeichert(false);
+    document.getElementById('btn-datei').textContent = '📂 Öffnen';
+    document.getElementById('tabs').classList.remove('visible');
+    document.getElementById('warn-banner').classList.remove('visible');
+    zeigeScreen('nofile');
+    stopPolling();
+    return;
+  }
+  try {
+    const [handle] = await window.showOpenFilePicker({
+      types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+    });
+    fileHandle = handle;
+    await ladeDatei();
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      zeigeToast('❌ Fehler beim Öffnen');
+    }
+  }
+}
+
+async function ladeDatei() {
+  if (!fileHandle) return;
+  try {
+    const file = await fileHandle.getFile();
+    letzterLadeZeit = file.lastModified;
+    const text = await file.text();
+    db = JSON.parse(text);
+    migrateDB();
+    document.getElementById('btn-datei').textContent = '✕ Schließen';
+    document.getElementById('tabs').classList.add('visible');
+    document.getElementById('warn-banner').classList.remove('visible');
+    setzeUngespeichert(false);
+    renderNotizen();
+    zeigeScreen(aktuellerTab);
+    renderPlaene();
+    startPolling();
+    zeigeToast('📂 ' + fileHandle.name + ' geladen');
+  } catch(e) {
+    zeigeToast('❌ Datei konnte nicht gelesen werden');
+  }
+}
+
+// ── DATEI: SPEICHERN ──
+async function speichernClick() {
+  if (!fileHandle || !db) return;
+  try {
+    const writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(db, null, 2));
+    await writable.close();
+    const file = await fileHandle.getFile();
+    letzterLadeZeit = file.lastModified;
+    setzeUngespeichert(false);
+    document.getElementById('warn-banner').classList.remove('visible');
+    zeigeToast('💾 Gespeichert');
+  } catch(e) {
+    zeigeToast('❌ Speichern fehlgeschlagen');
+  }
+}
+
+// ── NEU LADEN ──
+async function neuLaden() {
+  await ladeDatei();
+  zeigeToast('🔄 Neu geladen');
+}
+
+// ── POLLING: PC-ÄNDERUNGEN ERKENNEN ──
+function startPolling() {
+  stopPolling();
+  pollingInterval = setInterval(pruefeDateiAenderung, 30000);
+}
+
+function stopPolling() {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+  }
+}
+
+async function pruefeDateiAenderung() {
+  if (!fileHandle || ungespeicherteAenderungen) return;
+  try {
+    const file = await fileHandle.getFile();
+    if (file.lastModified > letzterLadeZeit) {
+      document.getElementById('warn-banner').classList.add('visible');
+    }
+  } catch(e) {
+    // Ignorieren
+  }
+}
+
+// ── DB MIGRATION ──
+function migrateDB() {
+  if (!db) return;
+  if (!Array.isArray(db.plaene)) db.plaene = [];
+  if (!Array.isArray(db.notizen)) db.notizen = [];
+  if (!Array.isArray(db.aufgaben)) db.aufgaben = [];
+  if (!Array.isArray(db.bereiche)) db.bereiche = [];
+
+  db.plaene.forEach(p => {
+    if (!p.prioritaet) p.prioritaet = 'mittel';
+    if (!p.horizont) p.horizont = 'kurzfristig';
+    if (!Array.isArray(p.schritte)) p.schritte = [];
+    p.schritte.forEach(s => {
+      if (!s.status) s.status = 'offen';
+    });
+  });
+}
+
+// ── SCREENS ──
+function zeigeScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById('screen-' + name);
+  if (el) el.classList.add('active');
+}
+
+function switchTab(tab) {
+  aktuellerTab = tab;
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === tab);
+  });
+  if (!db) return;
+  zeigeScreen(tab);
+  if (tab === 'plaene') renderPlaene();
+  if (tab === 'notizen') renderNotizen();
+}
+
+// ── PLÄNE RENDERN ──
+function renderPlaene() {
+  const container = document.getElementById('plaene-container');
+  if (!db || !db.plaene) {
+    container.innerHTML = '<div class="empty-plaene">Keine Pläne vorhanden.</div>';
+    return;
+  }
+
+  const aktive = db.plaene.filter(p => p.status !== 'abgeschlossen' && p.status !== 'archiviert');
+
+  if (aktive.length === 0) {
+    container.innerHTML = '<div class="empty-plaene">Keine aktiven Pläne vorhanden.</div>';
+    return;
+  }
+
+  const horizontReihenfolge = ['kurzfristig', 'mittelfristig', 'langfristig'];
+  const horizontLabels = {
+    kurzfristig: '⚡ Kurzfristig',
+    mittelfristig: '🎯 Mittelfristig',
+    langfristig: '🔭 Langfristig'
+  };
+
+  let html = '';
+  horizontReihenfolge.forEach(hz => {
+    const gruppe = aktive.filter(p => p.horizont === hz);
+    if (gruppe.length === 0) return;
+
+    gruppe.sort((a, b) => {
+      const prioOrder = { hoch: 0, mittel: 1, niedrig: 2 };
+      return (prioOrder[a.prioritaet] ?? 1) - (prioOrder[b.prioritaet] ?? 1);
+    });
+
+    html += '<div class="horizont-group">';
+    html += '<div class="horizont-label">' + horizontLabels[hz] + '</div>';
+    gruppe.forEach(plan => {
+      html += planKarteHTML(plan);
+    });
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+
+  // Event-Listener für Schritt-Toggles
+  container.querySelectorAll('.schritt').forEach(el => {
+    el.addEventListener('click', function() {
+      const planId = this.dataset.planid;
+      const sIdx = parseInt(this.dataset.sidx, 10);
+      schrittToggle(planId, sIdx, this);
+    });
+  });
+
+  // Event-Listener für Plan-Header
+  container.querySelectorAll('.plan-header').forEach(el => {
+    el.addEventListener('click', function() {
+      const card = this.closest('.plan-card');
+      if (card) card.classList.toggle('open');
+    });
+  });
+}
+
+function planKarteHTML(plan) {
+  const schritte = plan.schritte || [];
+  const gesamt = schritte.length;
+  const erledigt = schritte.filter(s => s.status === 'erledigt').length;
+  const pct = gesamt > 0 ? Math.round(erledigt / gesamt * 100) : 0;
+
+  const offeneSchritte = schritte.filter(s => s.status !== 'erledigt');
+  const delegierteSchritte = offeneSchritte.filter(s => s.delegiertAn && s.delegiertAn.trim() !== '');
+
+  let schritteHTML = '';
+  schritte.forEach((s, idx) => {
+    if (s.delegiertAn && s.delegiertAn.trim() !== '' && s.status !== 'erledigt') return;
+    const istErledigt = s.status === 'erledigt';
+    const check = istErledigt ? '✓' : '';
+    schritteHTML += '<div class="schritt' + (istErledigt ? ' erledigt' : '') + '" data-planid="' + escHtml(plan.id) + '" data-sidx="' + idx + '">';
+    schritteHTML += '<div class="schritt-check">' + check + '</div>';
+    schritteHTML += '<div class="schritt-titel">' + escHtml(s.titel) + '</div>';
+    schritteHTML += '</div>';
+  });
+
+  let wartaufHTML = '';
+  if (delegierteSchritte.length > 0) {
+    wartaufHTML += '<div class="wartauf-section">';
+    wartaufHTML += '<div class="wartauf-label">⏳ Warte auf</div>';
+    delegierteSchritte.forEach(s => {
+      wartaufHTML += '<div class="wartauf-item">';
+      wartaufHTML += '<div class="wartauf-item-name">' + escHtml(s.titel) + '</div>';
+      wartaufHTML += '<div class="wartauf-badge">→ ' + escHtml(s.delegiertAn) + '</div>';
+      wartaufHTML += '</div>';
+    });
+    wartaufHTML += '</div>';
+  }
+
+  const prioClass = 'prio-' + (plan.prioritaet || 'mittel');
+
+  return '<div class="plan-card" id="plancard-' + escHtml(plan.id) + '">' +
+    '<div class="plan-header">' +
+      '<div class="plan-prio-dot ' + prioClass + '"></div>' +
+      '<div class="plan-titel">' + escHtml(plan.titel) + '</div>' +
+      '<div class="plan-counter">' + erledigt + '/' + gesamt + '</div>' +
+      '<div class="plan-chevron">▶</div>' +
+    '</div>' +
+    '<div class="plan-progress"><div class="plan-progress-fill" style="width:' + pct + '%"></div></div>' +
+    '<div class="plan-body">' +
+      (schritteHTML ? '<div class="schritte-section">' + schritteHTML + '</div>' : '') +
+      wartaufHTML +
+    '</div>' +
+  '</div>';
+}
+
+function schrittToggle(planId, sIdx, el) {
+  if (!db) return;
+  const plan = db.plaene.find(p => p.id === planId);
+  if (!plan || !plan.schritte[sIdx]) return;
+
+  const schritt = plan.schritte[sIdx];
+  schritt.status = schritt.status === 'erledigt' ? 'offen' : 'erledigt';
+
+  // UI sofort aktualisieren
+  const istErledigt = schritt.status === 'erledigt';
+  el.classList.toggle('erledigt', istErledigt);
+  el.querySelector('.schritt-check').textContent = istErledigt ? '✓' : '';
+  el.querySelector('.schritt-titel').style.textDecoration = istErledigt ? 'line-through' : '';
+
+  // Progress + Counter aktualisieren
+  const card = document.getElementById('plancard-' + planId);
+  if (card) {
+    const alleSchritte = plan.schritte.length;
+    const erledigtAnz = plan.schritte.filter(s => s.status === 'erledigt').length;
+    const pct = alleSchritte > 0 ? Math.round(erledigtAnz / alleSchritte * 100) : 0;
+    const bar = card.querySelector('.plan-progress-fill');
+    if (bar) bar.style.width = pct + '%';
+    const counter = card.querySelector('.plan-counter');
+    if (counter) counter.textContent = erledigtAnz + '/' + alleSchritte;
+  }
+
+  plan.geaendert = new Date().toISOString();
+  setzeUngespeichert(true);
+  zeigeToast(istErledigt ? '✓ Schritt erledigt' : '↩ Schritt wieder offen');
+}
+
+// ── NOTIZEN ──
+function ladeNotizText() {
+  if (!db || !db.notizen) return '';
+  const eintrag = db.notizen.find(n => n.id === '__planviewer_notiz__');
+  return eintrag ? (eintrag.inhalt || '') : '';
+}
+
+function speichereNotizText(text) {
+  if (!db) return;
+  const idx = db.notizen.findIndex(n => n.id === '__planviewer_notiz__');
+  const eintrag = {
+    id: '__planviewer_notiz__',
+    titel: 'Plan-Viewer Notizen',
+    inhalt: text,
+    geaendert: new Date().toISOString()
+  };
+  if (idx >= 0) {
+    db.notizen[idx] = eintrag;
+  } else {
+    db.notizen.push(eintrag);
+  }
+  setzeUngespeichert(true);
+}
+
+function notizAnfuegen() {
+  if (!db) {
+    zeigeToast('⚠️ Bitte zuerst Datei öffnen');
+    return;
+  }
+  const ta = document.getElementById('notiz-textarea');
+  const val = ta.value.trim();
+  if (!val) return;
+
+  const ts = formatZeitstempel();
+  const bisherig = ladeNotizText();
+  const neuerBlock = '## ' + ts + '\n' + val;
+  const neuerText = bisherig ? neuerBlock + '\n\n' + bisherig : neuerBlock;
+
+  speichereNotizText(neuerText);
+  ta.value = '';
+  renderNotizen();
+  zeigeToast('📝 Notiz gespeichert');
+}
+
+function notizLeeren() {
+  if (!db) return;
+  if (!confirm('Alle Notizen wirklich löschen?')) return;
+  speichereNotizText('');
+  renderNotizen();
+  zeigeToast('🗑️ Notizen geleert');
+}
+
+function renderNotizen() {
+  const container = document.getElementById('notiz-verlauf-content');
+  const emptyHint = document.getElementById('notiz-empty-hint');
+  const text = ladeNotizText();
+
+  if (!text || text.trim() === '') {
+    container.innerHTML = '<div class="notiz-empty" id="notiz-empty-hint">Noch keine Notizen vorhanden.</div>';
+    return;
+  }
+
+  const zeilen = text.split('\n');
+  let html = '';
+
+  zeilen.forEach(zeile => {
+    if (zeile.startsWith('## ')) {
+      html += '<span class="md-ts-line">' + escHtml(zeile.replace('## ', '')) + '</span>';
+    } else if (/^- \[x\]/i.test(zeile)) {
+      const inhalt = zeile.replace(/^- \[x\] /i, '');
+      html += '<div class="md-cb-line">' +
+        '<div class="md-cb checked" onclick="cbToggle(this)">✓</div>' +
+        '<span class="md-cb-text checked">' + escHtml(inhalt) + '</span>' +
+        '</div>';
+    } else if (/^- \[ \]/.test(zeile)) {
+      const inhalt = zeile.replace(/^- \[ \] /, '');
+      html += '<div class="md-cb-line">' +
+        '<div class="md-cb" onclick="cbToggle(this)"></div>' +
+        '<span class="md-cb-text">' + escHtml(inhalt) + '</span>' +
+        '</div>';
+    } else if (zeile.trim() === '') {
+      html += '<div class="md-empty"></div>';
+    } else {
+      html += '<div class="md-plain-line">' + escHtml(zeile) + '</div>';
+    }
+  });
+
+  container.innerHTML = html;
+}
+
+function cbToggle(el) {
+  el.classList.toggle('checked');
+  const istChecked = el.classList.contains('checked');
+  el.textContent = istChecked ? '✓' : '';
+  const textEl = el.nextElementSibling;
+  if (textEl) textEl.classList.toggle('checked', istChecked);
+  // Notiz-Text synchronisieren (Status im Speicher aktualisieren)
+  syncCbZuText();
+  zeigeToast(istChecked ? '✓ Erledigt' : '↩ Wieder offen');
+}
+
+function syncCbZuText() {
+  // Rekonstruiere Notiztext aus gerendertem DOM
+  const container = document.getElementById('notiz-verlauf-content');
+  const kinder = container.childNodes;
+  let zeilen = [];
+  kinder.forEach(kind => {
+    if (!kind.classList) return;
+    if (kind.classList.contains('md-ts-line')) {
+      zeilen.push('## ' + kind.textContent.trim());
+    } else if (kind.classList.contains('md-cb-line')) {
+      const cb = kind.querySelector('.md-cb');
+      const txt = kind.querySelector('.md-cb-text');
+      const erledigt = cb && cb.classList.contains('checked');
+      zeilen.push((erledigt ? '- [x] ' : '- [ ] ') + (txt ? txt.textContent : ''));
+    } else if (kind.classList.contains('md-plain-line')) {
+      zeilen.push(kind.textContent);
+    } else if (kind.classList.contains('md-empty')) {
+      zeilen.push('');
+    }
+  });
+  speichereNotizText(zeilen.join('\n'));
+}
+
+// ── UTILS ──
+function escHtml(str) {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── PWA: MANIFEST + SERVICE WORKER (inline als Blob) ──
+(function() {
+  // SVG-Icon als Data-URL (petrol Hintergrund, weißes Clipboard-Symbol)
+  const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="80" fill="#124d53"/>
+    <rect x="160" y="80" width="192" height="20" rx="10" fill="white" opacity="0.6"/>
+    <rect x="136" y="100" width="240" height="320" rx="16" fill="white" opacity="0.15" stroke="white" stroke-width="8"/>
+    <rect x="136" y="100" width="240" height="320" rx="16" fill="none" stroke="white" stroke-width="8"/>
+    <rect x="168" y="160" width="176" height="14" rx="7" fill="white"/>
+    <rect x="168" y="196" width="144" height="12" rx="6" fill="white" opacity="0.7"/>
+    <rect x="168" y="228" width="160" height="12" rx="6" fill="white" opacity="0.7"/>
+    <rect x="168" y="275" width="176" height="14" rx="7" fill="white"/>
+    <rect x="168" y="311" width="120" height="12" rx="6" fill="white" opacity="0.7"/>
+    <circle cx="152" cy="167" r="10" fill="#5ecbd4"/>
+    <circle cx="152" cy="203" r="8" fill="white" opacity="0.5"/>
+    <circle cx="152" cy="282" r="10" fill="#5ecbd4"/>
+    <circle cx="152" cy="318" r="8" fill="white" opacity="0.5"/>
+  </svg>`;
+  const iconUrl = 'data:image/svg+xml,' + encodeURIComponent(iconSvg);
+
+  // Manifest als Blob
+  const manifest = {
+    name: 'Plan-Viewer',
+    short_name: 'Plan-Viewer',
+    description: 'Pläne abhaken und Notizen erfassen',
+    start_url: '.',
+    display: 'standalone',
+    background_color: '#124d53',
+    theme_color: '#124d53',
+    orientation: 'portrait',
+    icons: [
+      { src: iconUrl, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
+      { src: iconUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
+    ]
+  };
+  const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+  const manifestUrl = URL.createObjectURL(manifestBlob);
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = manifestUrl;
+  document.head.appendChild(link);
+
+  // Service Worker als Blob
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+const CACHE = 'planviewer-v1_0_1';
+const SHELL = ['./'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', e => {
+  e.respondWith(
+    caches.match(e.request).then(cached => cached || fetch(e.request))
+  );
+});
+`;
+    const swBlob = new Blob([swCode], { type: 'application/javascript' });
+    const swUrl = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl, { scope: './' })
+      .catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
