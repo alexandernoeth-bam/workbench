@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.180</title>
+<title>WorkAssist v1.5.181</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2128,7 +2128,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.180</div>
+    <div class="start-version">v1.5.181</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2196,7 +2196,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.180</div>
+    <div class="app-version" id="app-version">v1.5.181</div>
   </div>
 
   <div class="nav-section">
@@ -3480,7 +3480,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.180';
+const APP_VERSION = '1.5.181';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6052,15 +6052,30 @@ function renderDashboardPlaene() {
     return;
   }
 
-  // Prioritätsreihenfolge
   const prioOrder = { hoch: 0, mittel: 1, niedrig: 2 };
   const hzOrder   = { kurzfristig: 0, mittelfristig: 1, langfristig: 2 };
 
-  // Gruppieren nach Horizont, innerhalb nach Priorität
-  const groups = { kurzfristig: [], mittelfristig: [], langfristig: [] };
+  // Nächster offener Schritt ermitteln
+  function naechsterSchritt(p) {
+    return (p.schritte||[]).find(s => {
+      const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
+      return st !== 'erledigt';
+    });
+  }
+
+  // Trennen: delegiert vs. aktiv
+  const delegiert = [];
+  const aktiv     = [];
   plaene.forEach(p => {
+    const ns = naechsterSchritt(p);
+    if (ns?.delegiertAn) delegiert.push({ p, ns });
+    else                  aktiv.push(p);
+  });
+
+  // Aktive gruppieren nach Horizont + Priorität
+  const groups = { kurzfristig: [], mittelfristig: [], langfristig: [] };
+  aktiv.forEach(p => {
     const hz = p.horizont || 'kurzfristig';
-    if (!groups[hz]) groups[hz] = [];
     groups[hz].push(p);
   });
   Object.keys(groups).forEach(hz => {
@@ -6078,44 +6093,65 @@ function renderDashboardPlaene() {
     niedrig: `<div style="width:8px;height:8px;border-radius:50%;background:#cde0de;border:1px solid #b0cccb;flex-shrink:0;" title="Niedrige Priorität"></div>`,
   };
 
+  function planZeile(p, ns) {
+    const schritte = (p.schritte||[]);
+    const erledigt = schritte.filter(s => {
+      const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
+      return st === 'erledigt';
+    }).length;
+    const naechsterTitel = ns
+      ? (ns.aufgabeId ? (DB.aufgaben.find(a=>a.id===ns.aufgabeId)?.titel || ns.titel) : ns.titel)
+      : '✓ Alle Schritte erledigt';
+    const dot = prioDots[p.prioritaet||'mittel'];
+    return `<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openNeuerPlan('${p.id}')">
+      ${dot}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.titel)}</div>
+        <div style="font-size:10px;color:var(--text-dim);display:flex;align-items:center;gap:3px;margin-top:2px;">
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(naechsterTitel)}</span>
+        </div>
+      </div>
+      <span style="font-size:9px;background:var(--teal-xlight);color:var(--teal-dark);padding:1px 6px;border-radius:6px;font-weight:700;flex-shrink:0;align-self:center;">${erledigt}/${schritte.length}</span>
+    </div>`;
+  }
+
   let html = '';
+
+  // Aktive Pläne nach Horizont
   ['kurzfristig','mittelfristig','langfristig'].forEach(hz => {
     if (!groups[hz]?.length) return;
     const { label, icon } = hzLabels[hz];
-    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-xdim);padding:7px 12px 3px;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--border);">${icon} ${label}</div>`;
-    groups[hz].forEach(p => {
+    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-xdim);padding:7px 12px 3px;display:flex;align-items:center;gap:5px;border-bottom:0.5px solid var(--border);">${icon} ${label}</div>`;
+    groups[hz].forEach(p => { html += planZeile(p, naechsterSchritt(p)); });
+  });
+
+  // Delegierte / Warte auf
+  if (delegiert.length) {
+    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#f59e0b;padding:7px 12px 3px;display:flex;align-items:center;gap:5px;border-bottom:0.5px solid var(--border);">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Warte auf
+    </div>`;
+    delegiert.forEach(({ p, ns }) => {
       const schritte = (p.schritte||[]);
       const erledigt = schritte.filter(s => {
         const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
         return st === 'erledigt';
       }).length;
-      // Nächster offener Schritt
-      const naechster = schritte.find(s => {
-        const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
-        return st !== 'erledigt';
-      });
-      const naechsterTitel = naechster
-        ? (naechster.aufgabeId ? (DB.aufgaben.find(a=>a.id===naechster.aufgabeId)?.titel || naechster.titel) : naechster.titel)
-        : '✓ Alle Schritte erledigt';
-      const dot = prioDots[p.prioritaet||'mittel'];
-
+      const naechsterTitel = ns.aufgabeId ? (DB.aufgaben.find(a=>a.id===ns.aufgabeId)?.titel || ns.titel) : ns.titel;
       html += `<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openNeuerPlan('${p.id}')">
-        ${dot}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <div style="flex:1;min-width:0;">
           <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.titel)}</div>
-          <div style="font-size:10px;color:var(--text-dim);display:flex;align-items:center;gap:3px;margin-top:2px;">
-            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(naechsterTitel)}</span>
-          </div>
+          <div style="font-size:10px;color:#f59e0b;margin-top:2px;">→ ${escHtml(ns.delegiertAn)} · ${escHtml(naechsterTitel)}</div>
         </div>
-        <span style="font-size:9px;background:var(--teal-xlight);color:var(--teal-dark);padding:1px 6px;border-radius:6px;font-weight:700;flex-shrink:0;align-self:center;">${erledigt}/${schritte.length}</span>
+        <span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:6px;font-weight:700;flex-shrink:0;align-self:center;">${erledigt}/${schritte.length}</span>
       </div>`;
     });
-  });
+  }
 
   el.innerHTML = html;
 }
-
 function planKarteHTML(p, kontext, zugeklappt) {
   const schritte = (p.schritte || []).map(s => ({
     ...s, _aufgabe: DB.aufgaben.find(a => a.id === s.aufgabeId) || null
@@ -7450,16 +7486,16 @@ function openNeuerPlan(id) {
     // Lade Schritte – mit Aufgaben-Daten falls verknüpft
     planSchritte = (p.schritte || []).map(s => {
       if (s.aufgabeId) {
-        // Bestehende verknüpfte Aufgabe – IMMER Live-Status aus DB.aufgaben lesen
         const a = DB.aufgaben.find(a => a.id === s.aufgabeId);
         return {
           titel:       a?.titel || s.titel || '',
-          status:      a?.status ?? s.status ?? 'offen',  // ?? statt || damit 'erledigt' nicht falsch fällt
-          alsAufgabe:  false,   // bestehende Aufgabe → Modus 'vorhanden'
+          status:      a?.status ?? s.status ?? 'offen',
+          alsAufgabe:  false,
           aufgabeId:   s.aufgabeId,
           groesse:     a?.groesse || s.groesse || '',
           startdatum:  a?.startdatum || s.startdatum || '',
           reihenfolge: s.reihenfolge || 0,
+          delegiertAn: s.delegiertAn || null,
         };
       }
       return {
@@ -7470,6 +7506,7 @@ function openNeuerPlan(id) {
         groesse:     '',
         startdatum:  '',
         reihenfolge: s.reihenfolge || 0,
+        delegiertAn: s.delegiertAn || null,
       };
     });
     planUpdateFortschritt();
@@ -7611,6 +7648,14 @@ function planRenderSchritte() {
       </div>
       ${modusRow}
       ${detailsRow}
+      <!-- Delegiert an -->
+      <div style="display:flex;align-items:center;gap:6px;padding-left:27px;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--text-xdim)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <input class="field-input" style="flex:1;padding:3px 7px;font-size:11px;color:var(--text-dim);"
+          placeholder="Delegiert an … (leer = selbst erledigen)"
+          value="${(s.delegiertAn||'').replace(/"/g,'&quot;')}"
+          oninput="planSchritte[${i}].delegiertAn=this.value.trim()||null">
+      </div>
     </div>`;
   }).join('');
 
@@ -7776,7 +7821,6 @@ function savePlan() {
   const schrittLinks = gueltig.map((s, i) => {
     if (s.alsAufgabe) {
       if (s.aufgabeId) {
-        // Bestehende Aufgabe aktualisieren
         const a = DB.aufgaben.find(x => x.id === s.aufgabeId);
         if (a) {
           a.titel      = s.titel.trim();
@@ -7785,9 +7829,8 @@ function savePlan() {
           a.bereichId  = bereichId || a.bereichId;
           a.geaendert  = new Date().toISOString();
         }
-        return { aufgabeId: s.aufgabeId, titel: s.titel.trim(), status: s.status, reihenfolge: i };
+        return { aufgabeId: s.aufgabeId, titel: s.titel.trim(), status: s.status, reihenfolge: i, delegiertAn: s.delegiertAn || null };
       } else {
-        // Neue Aufgabe anlegen
         const neueId = uid();
         DB.aufgaben.push({
           id:         neueId,
@@ -7802,11 +7845,10 @@ function savePlan() {
           log:        [],
           planId:     editId || '__neu__',
         });
-        return { aufgabeId: neueId, titel: s.titel.trim(), status: s.status, reihenfolge: i };
+        return { aufgabeId: neueId, titel: s.titel.trim(), status: s.status, reihenfolge: i, delegiertAn: s.delegiertAn || null };
       }
     } else {
-      // Reiner Text-Schritt – keine Aufgabe
-      return { titel: s.titel.trim(), status: s.status, reihenfolge: i };
+      return { titel: s.titel.trim(), status: s.status, reihenfolge: i, delegiertAn: s.delegiertAn || null };
     }
   });
 
