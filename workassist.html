@@ -3485,7 +3485,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.187';
+const APP_VERSION = '1.5.188';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -3937,6 +3937,7 @@ const today = () => new Date().toISOString().slice(0,10);
 
 // ── Plan Priorität + Zeithorizont Icons ──────────────────────────────────────
 const PLAN_PRIO = {
+  krise:   { label: 'Krise',      svg: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>', dot: '#c0392b' },
   hoch:    { label: 'Hoch',       svg: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>', dot: '#E65100' },
   mittel:  { label: 'Mittel',     svg: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>', dot: '#f59e0b' },
   niedrig: { label: 'Niedrig',    svg: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8aaaa8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 6 12 11 7 6"/><polyline points="17 13 12 18 7 13"/></svg>', dot: '#cde0de' },
@@ -6091,7 +6092,7 @@ function renderDashboardPlaene() {
     return;
   }
 
-  const prioOrder = { hoch: 0, mittel: 1, niedrig: 2 };
+  const prioOrder = { krise: -1, hoch: 0, mittel: 1, niedrig: 2 };
   const hzOrder   = { kurzfristig: 0, mittelfristig: 1, langfristig: 2 };
 
   // Nächster offener Schritt ermitteln
@@ -6127,6 +6128,7 @@ function renderDashboardPlaene() {
     langfristig:   { label: 'Langfristig',    icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
   };
   const prioDots = {
+    krise:   `<div style="width:8px;height:8px;border-radius:50%;background:#c0392b;flex-shrink:0;box-shadow:0 0 0 2px #f5c6c2;" title="Krise"></div>`,
     hoch:    `<div style="width:8px;height:8px;border-radius:50%;background:#E65100;flex-shrink:0;" title="Hohe Priorität"></div>`,
     mittel:  `<div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0;" title="Mittlere Priorität"></div>`,
     niedrig: `<div style="width:8px;height:8px;border-radius:50%;background:#cde0de;border:1px solid #b0cccb;flex-shrink:0;" title="Niedrige Priorität"></div>`,
@@ -6167,8 +6169,8 @@ function renderDashboardPlaene() {
 
   // Delegierte / Warte auf
   if (delegiert.length) {
-    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#f59e0b;padding:7px 12px 3px;display:flex;align-items:center;gap:5px;border-bottom:0.5px solid var(--border);">
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#1976d2;padding:7px 12px 3px;display:flex;align-items:center;gap:5px;border-bottom:0.5px solid var(--border);">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1976d2" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       Warte auf
     </div>`;
     delegiert.forEach(({ p, ns }) => {
@@ -6179,12 +6181,12 @@ function renderDashboardPlaene() {
       }).length;
       const naechsterTitel = ns.aufgabeId ? (DB.aufgaben.find(a=>a.id===ns.aufgabeId)?.titel || ns.titel) : ns.titel;
       html += `<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openNeuerPlan('${p.id}')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1976d2" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <div style="flex:1;min-width:0;">
           <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.titel)}</div>
-          <div style="font-size:10px;color:#f59e0b;margin-top:2px;">→ ${escHtml(ns.delegiertAn)} · ${escHtml(naechsterTitel)}</div>
+          <div style="font-size:10px;color:#1976d2;margin-top:2px;">→ ${escHtml(ns.delegiertAn)} · ${escHtml(naechsterTitel)}</div>
         </div>
-        <span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:6px;font-weight:700;flex-shrink:0;align-self:center;">${erledigt}/${schritte.length}</span>
+        <span style="font-size:9px;background:#e3f0fc;color:#1565c0;padding:1px 6px;border-radius:6px;font-weight:700;flex-shrink:0;align-self:center;">${erledigt}/${schritte.length}</span>
       </div>`;
     });
   }
@@ -7527,7 +7529,7 @@ let planSchritte = [];
 function planSetPrio(prio) {
   document.querySelectorAll('.plan-prio-btn').forEach(b => {
     const isActive = b.dataset.prio === prio;
-    const colors = {hoch:'#E65100', mittel:'#f59e0b', niedrig:'#8aaaa8'};
+    const colors = {krise:'#c0392b', hoch:'#E65100', mittel:'#f59e0b', niedrig:'#8aaaa8'};
     b.style.background    = isActive ? colors[prio] : 'transparent';
     b.style.borderColor   = isActive ? colors[prio] : 'var(--border)';
     b.style.color         = isActive ? '#fff' : '';
@@ -11557,6 +11559,9 @@ if (!fsApiVerfuegbar()) {
         <div class="field-group">
           <div class="field-label">Priorität</div>
           <div style="display:flex;gap:5px;" id="plan-prio-btns">
+            <button onclick="planSetPrio('krise')"   data-prio="krise"   class="plan-prio-btn" style="flex:1;padding:5px 0;border-radius:7px;border:2px solid var(--border);background:transparent;font-size:10px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:3px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Krise
+            </button>
             <button onclick="planSetPrio('hoch')"    data-prio="hoch"    class="plan-prio-btn" style="flex:1;padding:5px 0;border-radius:7px;border:2px solid var(--border);background:transparent;font-size:10px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:3px;">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2.5" stroke-linecap="round"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>Hoch
             </button>
