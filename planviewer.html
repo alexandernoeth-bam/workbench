@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#124d53">
-<title>Plan-Viewer v1.0.4</title>
+<title>Plan-Viewer v1.0.5</title>
 <style>
 :root {
   --petrol: #1a6b72;
@@ -770,7 +770,7 @@ body {
 <!-- HEADER -->
 <div id="header">
   <div id="header-title">
-    📋 Plan-Viewer<span id="header-version">v1.0.4</span>
+    📋 Plan-Viewer<span id="header-version">v1.0.5</span>
   </div>
   <button id="btn-speichern" onclick="speichernClick()">💾 Speichern</button>
   <button id="btn-theme" onclick="themeToggle()" title="Dark Mode">🌓</button>
@@ -853,7 +853,7 @@ body {
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.0.4';
+const APP_VERSION = 'v1.0.5';
 const NOTIZ_KEY = 'planviewer_notiz';
 const ZOOM_KEY = 'planviewer_zoom';
 const THEME_KEY = 'planviewer_theme';
@@ -1034,6 +1034,10 @@ async function ladeDatei() {
 
 // ── DATEI: SPEICHERN ──
 async function speichernClick() {
+  await autoSpeichern(true);
+}
+
+async function autoSpeichern(mitToast) {
   if (!fileHandle || !db) return;
   try {
     const writable = await fileHandle.createWritable();
@@ -1043,7 +1047,7 @@ async function speichernClick() {
     letzterLadeZeit = file.lastModified;
     setzeUngespeichert(false);
     document.getElementById('warn-banner').classList.remove('visible');
-    zeigeToast('💾 Gespeichert');
+    if (mitToast) zeigeToast('💾 Gespeichert');
   } catch(e) {
     zeigeToast('❌ Speichern fehlgeschlagen');
   }
@@ -1255,6 +1259,7 @@ function schrittToggle(planId, sIdx, el) {
 
   plan.geaendert = new Date().toISOString();
   setzeUngespeichert(true);
+  autoSpeichern(false);
   zeigeToast(istErledigt ? '✓ Schritt erledigt' : '↩ Schritt wieder offen');
 }
 
@@ -1299,6 +1304,7 @@ function notizAnfuegen() {
   speichereNotizText(neuerText);
   ta.value = '';
   renderNotizen();
+  autoSpeichern(false);
   zeigeToast('📝 Notiz gespeichert');
 }
 
@@ -1356,6 +1362,7 @@ function cbToggle(el) {
   if (textEl) textEl.classList.toggle('checked', istChecked);
   // Notiz-Text synchronisieren (Status im Speicher aktualisieren)
   syncCbZuText();
+  autoSpeichern(false);
   zeigeToast(istChecked ? '✓ Erledigt' : '↩ Wieder offen');
 }
 
@@ -1551,6 +1558,7 @@ function heuteToggle(aufgId, el) {
   a.status    = 'erledigt';
   a.geaendert = new Date().toISOString();
   setzeUngespeichert(true);
+  autoSpeichern(false);
 
   // UI: Checkmark + Durchstreichen
   const check = document.getElementById('check-' + aufgId);
