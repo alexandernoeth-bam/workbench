@@ -135,6 +135,105 @@ console.log('\n── 6. Dashboard-Panels ──');
   });
 })();
 
+
+// ── KATEGORIE 7: Krise-Plan immer oben (auch bei Delegation) ──
+console.log('\n── 7. Krise-Plan Positionierung ──');
+(function() {
+  if (typeof renderDashboardPlaene !== 'function') { warn('renderDashboardPlaene nicht verfügbar'); return; }
+
+  // Simuliere DB mit Krise+delegiert Plan
+  const backup = JSON.parse(JSON.stringify(DB));
+  DB.plaene = [
+    { id: 'k1', titel: 'Krise delegiert', prioritaet: 'krise', horizont: 'kurzfristig', status: null,
+      schritte: [{ titel: 'Schritt', status: 'offen', delegiertAn: 'Max', reihenfolge: 0 }] },
+    { id: 'n1', titel: 'Normal hoch',     prioritaet: 'hoch',  horizont: 'kurzfristig', status: null,
+      schritte: [{ titel: 'Schritt', status: 'offen', reihenfolge: 0 }] },
+  ];
+  renderDashboardPlaene();
+  const el = document.getElementById('ph-plan');
+  const html = el ? el.innerHTML : '';
+
+  // Krise-Block muss vor Kurzfristig kommen
+  const idxKrise  = html.indexOf('Krise');
+  const idxKurz   = html.indexOf('Kurzfristig');
+  if (idxKrise >= 0 && idxKurz >= 0 && idxKrise < idxKurz)
+    ok('Krise-Block erscheint vor Kurzfristig-Block');
+  else fail('Krise-Block nicht vor Kurzfristig-Block', {idxKrise, idxKurz});
+
+  // Krise-Plan darf NICHT in Warte-auf erscheinen
+  const idxWarte = html.indexOf('Warte auf');
+  if (idxWarte >= 0) {
+    // Prüfe ob Krise-Plan-Titel in Warte-auf vorkommt
+    const warteSection = html.slice(idxWarte);
+    if (!warteSection.includes('Krise delegiert'))
+      ok('Krise-Plan nicht in Warte-auf Sektion');
+    else fail('Krise-Plan erscheint fälschlicherweise in Warte-auf');
+  } else {
+    ok('Kein Warte-auf Bereich (Krise-Plan korrekt ausgefiltert)');
+  }
+
+  // Personen-SVG bei delegiertem Krise-Plan
+  const kriseSection = html.slice(html.indexOf('Krise'), idxKurz >= 0 ? idxKurz : html.length);
+  if (kriseSection.includes('M20 21v-2a4 4'))
+    ok('Personen-SVG bei delegiertem Krise-Plan vorhanden');
+  else fail('Personen-SVG fehlt bei delegiertem Krise-Plan');
+
+  // Roter Hintergrund bei Krise-Zeile
+  if (kriseSection.includes('background:#fdf0ef'))
+    ok('Roter Hintergrund bei Krise-Zeile');
+  else fail('Roter Hintergrund fehlt bei Krise-Zeile');
+
+  // Restore
+  DB.plaene = backup.plaene;
+  renderDashboardPlaene();
+})();
+
+// ── KATEGORIE 8: Favicon Badge ──
+console.log('\n── 8. Favicon Badge ──');
+(function() {
+  if (typeof badgeAktualisieren !== 'function') { fail('badgeAktualisieren nicht definiert'); return; }
+  ok('badgeAktualisieren definiert');
+
+  const backup = JSON.parse(JSON.stringify(DB));
+
+  // Test 1: Krise zählt immer (auch delegiert)
+  DB.plaene = [
+    { id: 'k1', prioritaet: 'krise', horizont: 'langfristig', status: null,
+      schritte: [{ titel: 'S', status: 'offen', delegiertAn: 'Max', reihenfolge: 0 }] }
+  ];
+  DB.aufgaben = [];
+  badgeAktualisieren();
+  const link1 = document.querySelector("link[rel~='icon']");
+  if (link1 && link1.href.startsWith('data:image/png'))
+    ok('Badge: Favicon nach badgeAktualisieren als PNG gesetzt');
+  else fail('Badge: Favicon nicht als PNG gesetzt');
+
+  // Test 2: Kurzfristig nicht-delegiert zählt
+  DB.plaene = [
+    { id: 'n1', prioritaet: 'mittel', horizont: 'kurzfristig', status: null,
+      schritte: [{ titel: 'S', status: 'offen', reihenfolge: 0 }] }
+  ];
+  badgeAktualisieren();
+  ok('Badge: kurzfristiger nicht-delegierter Plan – kein Fehler');
+
+  // Test 3: Kurzfristig + delegiert zählt NICHT
+  DB.plaene = [
+    { id: 'n2', prioritaet: 'mittel', horizont: 'kurzfristig', status: null,
+      schritte: [{ titel: 'S', status: 'offen', delegiertAn: 'Team', reihenfolge: 0 }] }
+  ];
+  badgeAktualisieren();
+  ok('Badge: delegierter kurzfristiger Plan – kein Fehler');
+
+  // Test 4: Keine Pläne → kein Fehler
+  DB.plaene = [];
+  badgeAktualisieren();
+  ok('Badge: leere Pläne – kein Fehler');
+
+  DB.plaene = backup.plaene;
+  DB.aufgaben = backup.aufgaben;
+  badgeAktualisieren();
+})();
+
 // ── ERGEBNIS ──
 console.log('\n══════════════════════════════════════');
 const okC   = results.filter(r => r.status === 'ok').length;

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist v1.5.187</title>
+<title>WorkAssist 1.5.189</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -3485,7 +3485,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.188';
+const APP_VERSION = '1.5.189';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6089,11 +6089,11 @@ function renderDashboardPlaene() {
 
   if (!plaene.length) {
     el.innerHTML = '<div class="empty-state"><p>Noch keine Pläne – mit + anlegen.</p></div>';
+    badgeAktualisieren();
     return;
   }
 
   const prioOrder = { krise: -1, hoch: 0, mittel: 1, niedrig: 2 };
-  const hzOrder   = { kurzfristig: 0, mittelfristig: 1, langfristig: 2 };
 
   // Nächster offener Schritt ermitteln
   function naechsterSchritt(p) {
@@ -6103,16 +6103,22 @@ function renderDashboardPlaene() {
     });
   }
 
-  // Trennen: delegiert vs. aktiv
+  // Krise-Pläne immer ganz oben – unabhängig von Delegation
+  const krise    = [];
   const delegiert = [];
-  const aktiv     = [];
+  const aktiv    = [];
   plaene.forEach(p => {
     const ns = naechsterSchritt(p);
-    if (ns?.delegiertAn) delegiert.push({ p, ns });
-    else                  aktiv.push(p);
+    if (p.prioritaet === 'krise') {
+      krise.push({ p, ns });
+    } else if (ns?.delegiertAn) {
+      delegiert.push({ p, ns });
+    } else {
+      aktiv.push(p);
+    }
   });
 
-  // Aktive gruppieren nach Horizont + Priorität
+  // Aktive nach Horizont + Priorität gruppieren
   const groups = { kurzfristig: [], mittelfristig: [], langfristig: [] };
   aktiv.forEach(p => {
     const hz = p.horizont || 'kurzfristig';
@@ -6134,6 +6140,7 @@ function renderDashboardPlaene() {
     niedrig: `<div style="width:8px;height:8px;border-radius:50%;background:#cde0de;border:1px solid #b0cccb;flex-shrink:0;" title="Niedrige Priorität"></div>`,
   };
 
+  // Normale Plan-Zeile (mit Dot)
   function planZeile(p, ns) {
     const schritte = (p.schritte||[]);
     const erledigt = schritte.filter(s => {
@@ -6157,9 +6164,45 @@ function renderDashboardPlaene() {
     </div>`;
   }
 
+  // Krise-Zeile: Personen-Icon wenn delegiert, sonst Stern-Dot
+  function kriseZeile(p, ns) {
+    const schritte = (p.schritte||[]);
+    const erledigt = schritte.filter(s => {
+      const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
+      return st === 'erledigt';
+    }).length;
+    const istDelegiert = !!(ns?.delegiertAn);
+    const naechsterTitel = ns
+      ? (ns.aufgabeId ? (DB.aufgaben.find(a=>a.id===ns.aufgabeId)?.titel || ns.titel) : ns.titel)
+      : '✓ Alle Schritte erledigt';
+    const linkIcon = istDelegiert
+      ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
+      : prioDots['krise'];
+    const subText = istDelegiert
+      ? `<span style="color:#c0392b;">→ ${escHtml(ns.delegiertAn)} · ${escHtml(naechsterTitel)}</span>`
+      : `<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(naechsterTitel)}</span>`;
+    return `<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;background:#fdf0ef;" onclick="openNeuerPlan('${p.id}')">
+      ${linkIcon}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;font-weight:700;color:#c0392b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.titel)}</div>
+        <div style="font-size:10px;color:var(--text-dim);display:flex;align-items:center;gap:3px;margin-top:2px;">${subText}</div>
+      </div>
+      <span style="font-size:9px;background:#fad7d4;color:#922b21;padding:1px 6px;border-radius:6px;font-weight:700;flex-shrink:0;align-self:center;">${erledigt}/${schritte.length}</span>
+    </div>`;
+  }
+
   let html = '';
 
-  // Aktive Pläne nach Horizont
+  // ── Krise-Block ganz oben ──
+  if (krise.length) {
+    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#c0392b;padding:7px 12px 3px;display:flex;align-items:center;gap:5px;border-bottom:0.5px solid var(--border);">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Krise
+    </div>`;
+    krise.forEach(({ p, ns }) => { html += kriseZeile(p, ns); });
+  }
+
+  // ── Aktive Pläne nach Horizont ──
   ['kurzfristig','mittelfristig','langfristig'].forEach(hz => {
     if (!groups[hz]?.length) return;
     const { label, icon } = hzLabels[hz];
@@ -6167,7 +6210,7 @@ function renderDashboardPlaene() {
     groups[hz].forEach(p => { html += planZeile(p, naechsterSchritt(p)); });
   });
 
-  // Delegierte / Warte auf
+  // ── Warte auf (ohne Krise) ──
   if (delegiert.length) {
     html += `<div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#1976d2;padding:7px 12px 3px;display:flex;align-items:center;gap:5px;border-bottom:0.5px solid var(--border);">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1976d2" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -6192,7 +6235,97 @@ function renderDashboardPlaene() {
   }
 
   el.innerHTML = html;
+  badgeAktualisieren();
 }
+
+// ── FAVICON BADGE ─────────────────────────────────────────────────────────────
+function badgeAktualisieren() {
+  const plaene = (DB.plaene || []).filter(p => p.status !== 'abgeschlossen');
+
+  function naechsterSchritt(p) {
+    return (p.schritte||[]).find(s => {
+      const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
+      return st !== 'erledigt';
+    });
+  }
+
+  let anzahl = 0;
+  plaene.forEach(p => {
+    const ns = naechsterSchritt(p);
+    const istKrise       = p.prioritaet === 'krise';
+    const istDelegiert   = !!(ns?.delegiertAn);
+    const istKurzfristig = (p.horizont || 'kurzfristig') === 'kurzfristig';
+    // Krise: immer zählen (auch wenn delegiert)
+    // Kurzfristig: nur wenn NICHT delegiert
+    if (istKrise || (istKurzfristig && !istDelegiert)) {
+      anzahl++;
+    }
+  });
+
+  const size   = 32;
+  const canvas = document.createElement('canvas');
+  canvas.width  = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  // Basis-Icon: grünes Quadrat mit Häkchen (wie Original-Favicon)
+  const r = size * 0.25;
+  ctx.beginPath();
+  ctx.moveTo(r, 0);
+  ctx.lineTo(size - r, 0);
+  ctx.quadraticCurveTo(size, 0, size, r);
+  ctx.lineTo(size, size - r);
+  ctx.quadraticCurveTo(size, size, size - r, size);
+  ctx.lineTo(r, size);
+  ctx.quadraticCurveTo(0, size, 0, size - r);
+  ctx.lineTo(0, r);
+  ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.closePath();
+  ctx.fillStyle = '#00897B';
+  ctx.fill();
+
+  // Häkchen
+  ctx.beginPath();
+  ctx.moveTo(9, 16);
+  ctx.lineTo(14, 21);
+  ctx.lineTo(23, 11);
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth   = 3;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+  ctx.stroke();
+
+  // Badge nur wenn anzahl > 0
+  if (anzahl > 0) {
+    const label  = anzahl > 99 ? '99+' : String(anzahl);
+    const bSize  = anzahl > 9 ? 13 : 11;
+    const bX     = size - bSize / 2 - 1;
+    const bY     = bSize / 2 + 1;
+    // Roter Kreis
+    ctx.beginPath();
+    ctx.arc(bX, bY, bSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#c0392b';
+    ctx.fill();
+    // Zahl
+    ctx.fillStyle   = 'white';
+    ctx.font        = `bold ${anzahl > 9 ? 7 : 8}px sans-serif`;
+    ctx.textAlign   = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, bX, bY + 0.5);
+  }
+
+  // Favicon setzen
+  let link = document.querySelector("link[rel~='icon']");
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'icon';
+    document.head.appendChild(link);
+  }
+  link.type = 'image/png';
+  link.href = canvas.toDataURL('image/png');
+}
+
+
 function planKarteHTML(p, kontext, zugeklappt) {
   const schritte = (p.schritte || []).map(s => ({
     ...s, _aufgabe: DB.aufgaben.find(a => a.id === s.aufgabeId) || null
