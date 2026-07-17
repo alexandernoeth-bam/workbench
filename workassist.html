@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.196</title>
+<title>WorkAssist 1.5.197</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2128,7 +2128,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.196</div>
+    <div class="start-version">v1.5.197</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2196,7 +2196,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.196</div>
+    <div class="app-version" id="app-version">v1.5.197</div>
   </div>
 
   <div class="nav-section">
@@ -3485,7 +3485,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.196';
+const APP_VERSION = '1.5.197';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -7834,6 +7834,7 @@ function openNeuerPlan(id) {
     planSetHz(p.horizont || 'kurzfristig');
     planNotizSetzen(p.notiz || null);
     document.getElementById('plan-btn-loeschen').style.display = '';
+    document.getElementById('plan-btn-duplizieren').style.display = 'flex';
     // Lade Schritte – mit Aufgaben-Daten falls verknüpft
     planSchritte = (p.schritte || []).map(s => {
       if (s.aufgabeId) {
@@ -7870,6 +7871,7 @@ function openNeuerPlan(id) {
     planSetHz('kurzfristig');
     planNotizSetzen(null);
     document.getElementById('plan-btn-loeschen').style.display = 'none';
+    document.getElementById('plan-btn-duplizieren').style.display = 'none';
     document.getElementById('plan-fortschritt-wrap').style.display = 'none';
     planSchritte = [planNeuerSchrittObj(0)];
   }
@@ -8195,6 +8197,87 @@ function planSchrittHinzufuegen() {
 function planSchrittEntfernen(idx) {
   planSchritte.splice(idx, 1);
   planRenderSchritte();
+}
+
+function planSchnelleingabeOeffnen() {
+  const ta = document.getElementById('plan-schnelleingabe');
+  if (ta) {
+    ta.style.display = 'block';
+    setTimeout(() => document.getElementById('plan-schnelleingabe-ta')?.focus(), 30);
+  }
+}
+
+function planSchnelleingabeSchliessen() {
+  const ta = document.getElementById('plan-schnelleingabe');
+  if (ta) { ta.style.display = 'none'; }
+  const textarea = document.getElementById('plan-schnelleingabe-ta');
+  if (textarea) textarea.value = '';
+}
+
+function planSchnelleingabeUebernehmen() {
+  const textarea = document.getElementById('plan-schnelleingabe-ta');
+  if (!textarea) return;
+  const zeilen = textarea.value.split('\n')
+    .map(z => z.trim())
+    .filter(z => z.length > 0);
+  if (!zeilen.length) { planSchnelleingabeSchliessen(); return; }
+  zeilen.forEach(zeile => {
+    planSchritte.push({
+      titel:       zeile,
+      status:      'offen',
+      alsAufgabe:  false,
+      aufgabeId:   null,
+      groesse:     '',
+      startdatum:  '',
+      reihenfolge: planSchritte.length,
+      delegiertAn: null,
+    });
+  });
+  planSchnelleingabeSchliessen();
+  planRenderSchritte();
+  planUpdateFortschritt();
+  showToast(zeilen.length + ' Schritte hinzugefügt');
+}
+
+function planDuplizieren() {
+  const editId = document.getElementById('plan-edit-id').value;
+  if (!editId) return;
+  const original = (DB.plaene||[]).find(p => p.id === editId);
+  if (!original) return;
+
+  const neueId = uid();
+  // Schritte kopieren: Aufgaben-Referenzen → Text-Schritte (unchecked)
+  const neueSchritte = (original.schritte||[]).map((s, i) => {
+    const titel = s.aufgabeId
+      ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.titel || s.titel || '')
+      : (s.titel || '');
+    return {
+      titel,
+      status:      'offen',   // immer unchecked
+      reihenfolge: i,
+      delegiertAn: s.delegiertAn || null,
+    };
+  });
+
+  const kopie = {
+    id:          neueId,
+    titel:       original.titel + ' (Kopie)',
+    bereichId:   original.bereichId || null,
+    prioritaet:  original.prioritaet || 'mittel',
+    horizont:    original.horizont   || 'kurzfristig',
+    notiz:       original.notiz      || null,
+    schritte:    neueSchritte,
+    status:      'aktiv',
+    erstellt:    new Date().toISOString(),
+    geaendert:   new Date().toISOString(),
+  };
+  DB.plaene.push(kopie);
+  saveDB();
+  closeNeuerPlanModal();
+  renderDashboard();
+  showToast('Plan dupliziert');
+  // Kopie direkt öffnen
+  setTimeout(() => openNeuerPlan(neueId), 150);
 }
 
 function planToggleSchritt(idx) {
@@ -11946,9 +12029,29 @@ if (!fsApiVerfuegbar()) {
       <div class="field-group">
         <div class="field-label">Schritte (Aufgaben)</div>
         <div id="plan-schritte-list" style="display:flex;flex-direction:column;gap:4px;"></div>
-        <div class="plan-add-schritt" id="plan-add-btn" onclick="planSchrittHinzufuegen()">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Schritt hinzufügen
+        <div style="display:flex;gap:6px;margin-top:2px;">
+          <div class="plan-add-schritt" style="flex:1;" id="plan-add-btn" onclick="planSchrittHinzufuegen()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Schritt hinzufügen
+          </div>
+          <div class="plan-add-schritt" style="flex:1;color:var(--teal);" onclick="planSchnelleingabeOeffnen()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            Schnelleingabe
+          </div>
+        </div>
+        <!-- Schnelleingabe-Bereich (versteckt) -->
+        <div id="plan-schnelleingabe" style="display:none;margin-top:6px;border:1px solid var(--teal);border-radius:8px;overflow:hidden;">
+          <div style="padding:6px 10px;background:var(--teal-xlight);font-size:11px;font-weight:600;color:var(--teal-dark);display:flex;align-items:center;justify-content:between;gap:6px;">
+            <span style="flex:1;">Eine Zeile = ein Schritt · leere Zeilen werden übersprungen</span>
+            <button type="button" onclick="planSchnelleingabeSchliessen()" style="border:none;background:none;cursor:pointer;color:var(--text-dim);padding:0 2px;font-size:14px;line-height:1;">✕</button>
+          </div>
+          <textarea id="plan-schnelleingabe-ta" rows="5"
+            placeholder="Recherche durchführen&#10;Entwurf erstellen&#10;Review mit Team&#10;Freigabe einholen"
+            style="width:100%;border:none;outline:none;padding:8px 10px;font-size:12px;font-family:var(--font);resize:none;color:var(--text);background:white;line-height:1.6;"></textarea>
+          <div style="padding:6px 10px;background:var(--bg);display:flex;justify-content:flex-end;gap:6px;border-top:1px solid var(--border);">
+            <button type="button" class="btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="planSchnelleingabeSchliessen()">Abbrechen</button>
+            <button type="button" class="btn-primary" style="font-size:11px;padding:4px 12px;" onclick="planSchnelleingabeUebernehmen()">Übernehmen</button>
+          </div>
         </div>
       </div>
 
@@ -11956,6 +12059,10 @@ if (!fsApiVerfuegbar()) {
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeNeuerPlanModal()">Abbrechen</button>
       <button class="btn-ghost" id="plan-btn-loeschen" style="color:#c62828;border-color:#ffcdd2;display:none;" onclick="planLoeschen()">Löschen</button>
+      <button class="btn-ghost" id="plan-btn-duplizieren" style="display:none;display:flex;align-items:center;gap:4px;" onclick="planDuplizieren()">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Duplizieren
+      </button>
       <button class="btn-primary" style="margin-left:auto;" onclick="savePlan()">Speichern</button>
     </div>
   </div>
