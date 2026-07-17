@@ -6,7 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#124d53">
-<title>Plan-Viewer v1.0.7</title>
+<link rel="manifest" href="manifest-planviewer.json">
+<link rel="apple-touch-icon" href="icon-planviewer.svg">
+<title>Plan-Viewer v1.0.8</title>
 <style>
 :root {
   --petrol: #1a6b72;
@@ -770,7 +772,7 @@ body {
 <!-- HEADER -->
 <div id="header">
   <div id="header-title">
-    📋 Plan-Viewer<span id="header-version">v1.0.7</span>
+    📋 Plan-Viewer<span id="header-version">v1.0.8</span>
   </div>
   <button id="btn-speichern" onclick="speichernClick()">💾 Speichern</button>
   <button id="btn-theme" onclick="themeToggle()" title="Dark Mode">🌓</button>
@@ -853,7 +855,7 @@ body {
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.0.7';
+const APP_VERSION = 'v1.0.8';
 const NOTIZ_KEY = 'planviewer_notiz';
 const ZOOM_KEY = 'planviewer_zoom';
 const THEME_KEY = 'planviewer_theme';
@@ -1686,74 +1688,26 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// ── PWA: MANIFEST + SERVICE WORKER (inline als Blob) ──
+// ── PWA: SERVICE WORKER (Manifest liegt als manifest-planviewer.json auf GitHub Pages) ──
 (function() {
-  // SVG-Icon als Data-URL (petrol Hintergrund, weißes Clipboard-Symbol)
-  const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-    <rect width="512" height="512" rx="80" fill="#124d53"/>
-    <rect x="160" y="80" width="192" height="20" rx="10" fill="white" opacity="0.6"/>
-    <rect x="136" y="100" width="240" height="320" rx="16" fill="white" opacity="0.15" stroke="white" stroke-width="8"/>
-    <rect x="136" y="100" width="240" height="320" rx="16" fill="none" stroke="white" stroke-width="8"/>
-    <rect x="168" y="160" width="176" height="14" rx="7" fill="white"/>
-    <rect x="168" y="196" width="144" height="12" rx="6" fill="white" opacity="0.7"/>
-    <rect x="168" y="228" width="160" height="12" rx="6" fill="white" opacity="0.7"/>
-    <rect x="168" y="275" width="176" height="14" rx="7" fill="white"/>
-    <rect x="168" y="311" width="120" height="12" rx="6" fill="white" opacity="0.7"/>
-    <circle cx="152" cy="167" r="10" fill="#5ecbd4"/>
-    <circle cx="152" cy="203" r="8" fill="white" opacity="0.5"/>
-    <circle cx="152" cy="282" r="10" fill="#5ecbd4"/>
-    <circle cx="152" cy="318" r="8" fill="white" opacity="0.5"/>
-  </svg>`;
-  const iconUrl = 'data:image/svg+xml,' + encodeURIComponent(iconSvg);
-
-  // Manifest als Blob
-  const manifest = {
-    name: 'Plan-Viewer',
-    short_name: 'Plan-Viewer',
-    description: 'Pläne abhaken und Notizen erfassen',
-    start_url: './',
-    display: 'standalone',
-    background_color: '#124d53',
-    theme_color: '#124d53',
-    orientation: 'portrait',
-    icons: [
-      { src: iconUrl, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
-      { src: iconUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
-    ],
-    shortcuts: [
-      {
-        name: 'Heute',
-        short_name: 'Heute',
-        description: 'Heutige Aufgaben und Überfällige anzeigen',
-        url: './?tab=heute',
-        icons: [{ src: iconUrl, sizes: '192x192', type: 'image/svg+xml' }]
-      }
-    ]
-  };
-  const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-  const manifestUrl = URL.createObjectURL(manifestBlob);
-  const link = document.createElement('link');
-  link.rel = 'manifest';
-  link.href = manifestUrl;
-  document.head.appendChild(link);
-
-  // Service Worker als Blob
   if ('serviceWorker' in navigator) {
     const swCode = `
-const CACHE = 'planviewer-v1_0_7';
-const SHELL = ['./'];
+const CACHE = 'planviewer-v1_0_8';
+const SHELL = ['./planviewer.html', './manifest-planviewer.json', './icon-planviewer.svg', './icon-planviewer-maskable.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then(c => c.addAll(SHELL))
+      .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
@@ -1764,9 +1718,8 @@ self.addEventListener('fetch', e => {
 });
 `;
     const swBlob = new Blob([swCode], { type: 'application/javascript' });
-    const swUrl = URL.createObjectURL(swBlob);
-    navigator.serviceWorker.register(swUrl, { scope: './' })
-      .catch(() => {});
+    const swUrl  = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl, { scope: './' }).catch(() => {});
   }
   zoomInit();
   themeInit();
