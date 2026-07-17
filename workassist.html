@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.191</title>
+<title>WorkAssist 1.5.192</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2095,71 +2095,6 @@ textarea.field-input { resize: vertical; min-height: 70px; }
   <meta name="apple-mobile-web-app-title" content="WorkAssist">
   <link rel="apple-touch-icon" href="icon-workassist-192.svg">
   <!-- ══ Ende PWA ══════════════════════════════════════════════════════════ -->
-
-<!-- PWA Manifest + Service Worker (inline als Blob) -->
-<script>
-(function() {
-  // SVG-Icon: grünes WA-Icon
-  const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-    <rect width="512" height="512" rx="80" fill="#00897B"/>
-    <polyline points="140 256 220 336 372 176" fill="none" stroke="white" stroke-width="48"
-      stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-  const iconUrl = 'data:image/svg+xml,' + encodeURIComponent(iconSvg);
-
-  // Manifest als Blob
-  const manifest = {
-    name: 'WorkAssist',
-    short_name: 'WorkAssist',
-    description: 'Aufgaben- und Wissensmanagement',
-    start_url: './',
-    display: 'standalone',
-    background_color: '#00897B',
-    theme_color: '#00897B',
-    orientation: 'any',
-    icons: [
-      { src: iconUrl, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
-      { src: iconUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
-    ]
-  };
-  const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-  const manifestUrl  = URL.createObjectURL(manifestBlob);
-  const mLink = document.createElement('link');
-  mLink.rel  = 'manifest';
-  mLink.href = manifestUrl;
-  document.head.appendChild(mLink);
-
-  // Service Worker als Blob (Cache-First für Offline)
-  if ('serviceWorker' in navigator) {
-    const swCode = `
-const CACHE = 'workassist-v1_5_190';
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE)
-      .then(c => c.addAll(['./']))
-      .then(() => self.skipWaiting())
-  );
-});
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
-});
-self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
-  );
-});
-`;
-    const swBlob = new Blob([swCode], { type: 'application/javascript' });
-    const swUrl  = URL.createObjectURL(swBlob);
-    navigator.serviceWorker.register(swUrl, { scope: './' }).catch(() => {});
-  }
-})();
-</script>
-
 <script>
   // --app-h sofort setzen damit Modals korrekte Höhe haben
   document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
@@ -2193,7 +2128,7 @@ self.addEventListener('fetch', e => {
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.191</div>
+    <div class="start-version">v1.5.192</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2261,7 +2196,7 @@ self.addEventListener('fetch', e => {
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.191</div>
+    <div class="app-version" id="app-version">v1.5.192</div>
   </div>
 
   <div class="nav-section">
@@ -3550,7 +3485,7 @@ self.addEventListener('fetch', e => {
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.191';
+const APP_VERSION = '1.5.192';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -3690,10 +3625,11 @@ function migrateDB() {
   (DB.dokumente || []).forEach(d => {
     if (d.ressourceTyp === undefined) d.ressourceTyp = null;
   });
-  // Pläne: prioritaet + horizont
+  // Pläne: prioritaet + horizont + notiz
   (DB.plaene || []).forEach(p => {
     if (!p.prioritaet) p.prioritaet = 'mittel';
     if (!p.horizont)   p.horizont   = 'kurzfristig';
+    if (p.notiz === undefined) p.notiz = null;
   });
   // Notizen: bereichId
   (DB.notizen || []).forEach(n => {
@@ -4002,7 +3938,6 @@ const today = () => new Date().toISOString().slice(0,10);
 
 // ── Plan Priorität + Zeithorizont Icons ──────────────────────────────────────
 const PLAN_PRIO = {
-  krise:   { label: 'Krise',      svg: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>', dot: '#c0392b' },
   hoch:    { label: 'Hoch',       svg: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>', dot: '#E65100' },
   mittel:  { label: 'Mittel',     svg: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>', dot: '#f59e0b' },
   niedrig: { label: 'Niedrig',    svg: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8aaaa8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 6 12 11 7 6"/><polyline points="17 13 12 18 7 13"/></svg>', dot: '#cde0de' },
@@ -6154,11 +6089,11 @@ function renderDashboardPlaene() {
 
   if (!plaene.length) {
     el.innerHTML = '<div class="empty-state"><p>Noch keine Pläne – mit + anlegen.</p></div>';
-    badgeAktualisieren();
     return;
   }
 
-  const prioOrder = { krise: -1, hoch: 0, mittel: 1, niedrig: 2 };
+  const prioOrder = { hoch: 0, mittel: 1, niedrig: 2 };
+  const hzOrder   = { kurzfristig: 0, mittelfristig: 1, langfristig: 2 };
 
   // Nächster offener Schritt ermitteln
   function naechsterSchritt(p) {
@@ -6168,22 +6103,16 @@ function renderDashboardPlaene() {
     });
   }
 
-  // Krise-Pläne immer ganz oben – unabhängig von Delegation
-  const krise    = [];
+  // Trennen: delegiert vs. aktiv
   const delegiert = [];
-  const aktiv    = [];
+  const aktiv     = [];
   plaene.forEach(p => {
     const ns = naechsterSchritt(p);
-    if (p.prioritaet === 'krise') {
-      krise.push({ p, ns });
-    } else if (ns?.delegiertAn) {
-      delegiert.push({ p, ns });
-    } else {
-      aktiv.push(p);
-    }
+    if (ns?.delegiertAn) delegiert.push({ p, ns });
+    else                  aktiv.push(p);
   });
 
-  // Aktive nach Horizont + Priorität gruppieren
+  // Aktive gruppieren nach Horizont + Priorität
   const groups = { kurzfristig: [], mittelfristig: [], langfristig: [] };
   aktiv.forEach(p => {
     const hz = p.horizont || 'kurzfristig';
@@ -6199,13 +6128,11 @@ function renderDashboardPlaene() {
     langfristig:   { label: 'Langfristig',    icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
   };
   const prioDots = {
-    krise:   `<div style="width:8px;height:8px;border-radius:50%;background:#c0392b;flex-shrink:0;box-shadow:0 0 0 2px #f5c6c2;" title="Krise"></div>`,
     hoch:    `<div style="width:8px;height:8px;border-radius:50%;background:#E65100;flex-shrink:0;" title="Hohe Priorität"></div>`,
     mittel:  `<div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0;" title="Mittlere Priorität"></div>`,
     niedrig: `<div style="width:8px;height:8px;border-radius:50%;background:#cde0de;border:1px solid #b0cccb;flex-shrink:0;" title="Niedrige Priorität"></div>`,
   };
 
-  // Normale Plan-Zeile (mit Dot)
   function planZeile(p, ns) {
     const schritte = (p.schritte||[]);
     const erledigt = schritte.filter(s => {
@@ -6216,7 +6143,7 @@ function renderDashboardPlaene() {
       ? (ns.aufgabeId ? (DB.aufgaben.find(a=>a.id===ns.aufgabeId)?.titel || ns.titel) : ns.titel)
       : '✓ Alle Schritte erledigt';
     const dot = prioDots[p.prioritaet||'mittel'];
-    return `<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openNeuerPlan('${p.id}')">
+    return `<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openPlanQuickView('${p.id}')">
       ${dot}
       <div style="flex:1;min-width:0;">
         <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.titel)}</div>
@@ -6229,45 +6156,9 @@ function renderDashboardPlaene() {
     </div>`;
   }
 
-  // Krise-Zeile: Personen-Icon wenn delegiert, sonst Stern-Dot
-  function kriseZeile(p, ns) {
-    const schritte = (p.schritte||[]);
-    const erledigt = schritte.filter(s => {
-      const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
-      return st === 'erledigt';
-    }).length;
-    const istDelegiert = !!(ns?.delegiertAn);
-    const naechsterTitel = ns
-      ? (ns.aufgabeId ? (DB.aufgaben.find(a=>a.id===ns.aufgabeId)?.titel || ns.titel) : ns.titel)
-      : '✓ Alle Schritte erledigt';
-    const linkIcon = istDelegiert
-      ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
-      : prioDots['krise'];
-    const subText = istDelegiert
-      ? `<span style="color:#c0392b;">→ ${escHtml(ns.delegiertAn)} · ${escHtml(naechsterTitel)}</span>`
-      : `<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(naechsterTitel)}</span>`;
-    return `<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;background:#fdf0ef;" onclick="openNeuerPlan('${p.id}')">
-      ${linkIcon}
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:11px;font-weight:700;color:#c0392b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.titel)}</div>
-        <div style="font-size:10px;color:var(--text-dim);display:flex;align-items:center;gap:3px;margin-top:2px;">${subText}</div>
-      </div>
-      <span style="font-size:9px;background:#fad7d4;color:#922b21;padding:1px 6px;border-radius:6px;font-weight:700;flex-shrink:0;align-self:center;">${erledigt}/${schritte.length}</span>
-    </div>`;
-  }
-
   let html = '';
 
-  // ── Krise-Block ganz oben ──
-  if (krise.length) {
-    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#c0392b;padding:7px 12px 3px;display:flex;align-items:center;gap:5px;border-bottom:0.5px solid var(--border);">
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-      Krise
-    </div>`;
-    krise.forEach(({ p, ns }) => { html += kriseZeile(p, ns); });
-  }
-
-  // ── Aktive Pläne nach Horizont ──
+  // Aktive Pläne nach Horizont
   ['kurzfristig','mittelfristig','langfristig'].forEach(hz => {
     if (!groups[hz]?.length) return;
     const { label, icon } = hzLabels[hz];
@@ -6275,10 +6166,10 @@ function renderDashboardPlaene() {
     groups[hz].forEach(p => { html += planZeile(p, naechsterSchritt(p)); });
   });
 
-  // ── Warte auf (ohne Krise) ──
+  // Delegierte / Warte auf
   if (delegiert.length) {
-    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#1976d2;padding:7px 12px 3px;display:flex;align-items:center;gap:5px;border-bottom:0.5px solid var(--border);">
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1976d2" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#f59e0b;padding:7px 12px 3px;display:flex;align-items:center;gap:5px;border-bottom:0.5px solid var(--border);">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       Warte auf
     </div>`;
     delegiert.forEach(({ p, ns }) => {
@@ -6288,7 +6179,7 @@ function renderDashboardPlaene() {
         return st === 'erledigt';
       }).length;
       const naechsterTitel = ns.aufgabeId ? (DB.aufgaben.find(a=>a.id===ns.aufgabeId)?.titel || ns.titel) : ns.titel;
-      html += `<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openNeuerPlan('${p.id}')">
+      html += `<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openPlanQuickView('${p.id}')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1976d2" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <div style="flex:1;min-width:0;">
           <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.titel)}</div>
@@ -6300,111 +6191,7 @@ function renderDashboardPlaene() {
   }
 
   el.innerHTML = html;
-  badgeAktualisieren();
 }
-
-// ── FAVICON BADGE ─────────────────────────────────────────────────────────────
-function badgeAktualisieren() {
-  const plaene = (DB.plaene || []).filter(p => p.status !== 'abgeschlossen');
-
-  function naechsterSchritt(p) {
-    return (p.schritte||[]).find(s => {
-      const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
-      return st !== 'erledigt';
-    });
-  }
-
-  let anzahl = 0;
-  let hatKrise = false;
-  plaene.forEach(p => {
-    const ns = naechsterSchritt(p);
-    const istKrise       = p.prioritaet === 'krise';
-    const istDelegiert   = !!(ns?.delegiertAn);
-    const istKurzfristig = (p.horizont || 'kurzfristig') === 'kurzfristig';
-    // Krise: immer zählen (auch wenn delegiert)
-    // Kurzfristig: nur wenn NICHT delegiert
-    if (istKrise || (istKurzfristig && !istDelegiert)) {
-      anzahl++;
-    }
-    if (istKrise) hatKrise = true;
-  });
-
-  // Icon-Farbe: rot bei Krise, grün sonst
-  const iconFarbe = hatKrise ? '#c0392b' : '#00897B';
-
-  // ── Primär: Web App Badge API (PWA Taskleisten-Icon) ──
-  if ('setAppBadge' in navigator) {
-    if (anzahl > 0) {
-      navigator.setAppBadge(anzahl).catch(() => {});
-    } else {
-      navigator.clearAppBadge().catch(() => {});
-    }
-  }
-
-  // ── Canvas-Favicon (Browser-Tab + Icon-Farbe) ──
-  const size   = 32;
-  const canvas = document.createElement('canvas');
-  canvas.width  = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-
-  // Basis-Icon: Quadrat mit Häkchen — Farbe je nach Krise
-  const r = size * 0.25;
-  ctx.beginPath();
-  ctx.moveTo(r, 0);
-  ctx.lineTo(size - r, 0);
-  ctx.quadraticCurveTo(size, 0, size, r);
-  ctx.lineTo(size, size - r);
-  ctx.quadraticCurveTo(size, size, size - r, size);
-  ctx.lineTo(r, size);
-  ctx.quadraticCurveTo(0, size, 0, size - r);
-  ctx.lineTo(0, r);
-  ctx.quadraticCurveTo(0, 0, r, 0);
-  ctx.closePath();
-  ctx.fillStyle = iconFarbe;
-  ctx.fill();
-
-  // Häkchen
-  ctx.beginPath();
-  ctx.moveTo(9, 16);
-  ctx.lineTo(14, 21);
-  ctx.lineTo(23, 11);
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth   = 3;
-  ctx.lineCap     = 'round';
-  ctx.lineJoin    = 'round';
-  ctx.stroke();
-
-  // Badge-Zahl auf Favicon (nur wenn anzahl > 0 UND kein Krise-Icon)
-  // Bei Krise-Icon: Farbe reicht als Signal, kein extra Badge-Kreis nötig
-  if (anzahl > 0 && !hatKrise) {
-    const label = anzahl > 99 ? '99+' : String(anzahl);
-    const bSize = anzahl > 9 ? 13 : 11;
-    const bX    = size - bSize / 2 - 1;
-    const bY    = bSize / 2 + 1;
-    ctx.beginPath();
-    ctx.arc(bX, bY, bSize / 2, 0, Math.PI * 2);
-    ctx.fillStyle = '#c0392b';
-    ctx.fill();
-    ctx.fillStyle    = 'white';
-    ctx.font         = `bold ${anzahl > 9 ? 7 : 8}px sans-serif`;
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(label, bX, bY + 0.5);
-  }
-
-  // Favicon setzen
-  let link = document.querySelector("link[rel~='icon']");
-  if (!link) {
-    link = document.createElement('link');
-    link.rel = 'icon';
-    document.head.appendChild(link);
-  }
-  link.type = 'image/png';
-  link.href = canvas.toDataURL('image/png');
-}
-
-
 function planKarteHTML(p, kontext, zugeklappt) {
   const schritte = (p.schritte || []).map(s => ({
     ...s, _aufgabe: DB.aufgaben.find(a => a.id === s.aufgabeId) || null
@@ -6488,6 +6275,119 @@ function planKarteToggle(detailId, headerEl) {
   const offen = detail.style.display !== 'none';
   detail.style.display = offen ? 'none' : 'block';
   if (chevron) chevron.style.transform = offen ? '' : 'rotate(90deg)';
+}
+
+// ── PLAN QUICK-VIEW ───────────────────────────────────────────────────────────
+function openPlanQuickView(planId) {
+  const p = (DB.plaene||[]).find(x => x.id === planId);
+  if (!p) return;
+
+  // Pills
+  const PRIO_LABELS  = { krise:'☆ Krise', hoch:'↑ Hoch', mittel:'— Mittel', niedrig:'↓ Niedrig' };
+  const PRIO_STYLES  = {
+    krise:   'background:#fad7d4;color:#922b21;',
+    hoch:    'background:#fde8dd;color:#9a3412;',
+    mittel:  'background:#fef3c7;color:#92400e;',
+    niedrig: 'background:var(--teal-xlight);color:var(--teal-dark);',
+  };
+  const HZ_LABELS = { kurzfristig:'⚡ Kurzfristig', mittelfristig:'📅 Mittelfristig', langfristig:'🕐 Langfristig' };
+  const HZ_STYLES = {
+    kurzfristig:   'background:var(--teal-xlight);color:var(--teal-dark);',
+    mittelfristig: 'background:#e3f0fc;color:#1565c0;',
+    langfristig:   'background:#f3e8ff;color:#6b21a8;',
+  };
+  const prioStyle = PRIO_STYLES[p.prioritaet||'mittel'] || '';
+  const hzStyle   = HZ_STYLES[p.horizont||'kurzfristig'] || '';
+  const pillHtml  =
+    `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;${prioStyle}">${PRIO_LABELS[p.prioritaet||'mittel']||p.prioritaet}</span>` +
+    `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;${hzStyle}">${HZ_LABELS[p.horizont||'kurzfristig']||p.horizont}</span>`;
+
+  document.getElementById('qv-plan-titel').textContent = p.titel;
+  document.getElementById('qv-plan-pills').innerHTML   = pillHtml;
+  document.getElementById('qv-plan-edit-id').value     = planId;
+
+  // Notiz-Vorschau (max 3 Zeilen)
+  const notizEl = document.getElementById('qv-plan-notiz');
+  if (p.notiz) {
+    const zeilen = p.notiz.split('\n').slice(0,3);
+    notizEl.innerHTML = zeilen.map(z => {
+      z = escHtml(z);
+      z = z.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+      z = z.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" style="color:var(--teal-dark);">$1</a>');
+      z = z.replace(/^- \[x\] /i,'☑ ');
+      z = z.replace(/^- \[ \] /,'☐ ');
+      return `<div>${z}</div>`;
+    }).join('');
+    notizEl.style.display = 'block';
+  } else {
+    notizEl.style.display = 'none';
+  }
+
+  // Schritte
+  const schritte = (p.schritte||[]).sort((a,b)=>(a.reihenfolge||0)-(b.reihenfolge||0));
+  const sl = document.getElementById('qv-plan-schritte');
+  sl.innerHTML = schritte.map((s, idx) => {
+    const a       = s.aufgabeId ? DB.aufgaben.find(x=>x.id===s.aufgabeId) : null;
+    const titel   = a?.titel || s.titel || '';
+    const status  = a?.status || s.status || 'offen';
+    const isDone  = status === 'erledigt';
+    const checkSvg = isDone
+      ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>'
+      : '';
+    const delBadge = s.delegiertAn
+      ? `<span style="font-size:9px;background:#e3f0fc;color:#1565c0;padding:1px 5px;border-radius:4px;font-weight:600;flex-shrink:0;">→ ${escHtml(s.delegiertAn)}</span>`
+      : '';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;cursor:pointer;transition:background .12s;"
+      onmouseover="this.style.background='var(--teal-xlight)'" onmouseout="this.style.background=''"
+      onclick="qvSchrittToggle('${planId}',${idx},this)">
+      <div style="width:20px;height:20px;border-radius:6px;border:2px solid var(--teal);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;${isDone?'background:var(--teal);border-color:var(--teal);':''}">
+        ${checkSvg}
+      </div>
+      <span style="flex:1;font-size:12px;${isDone?'text-decoration:line-through;color:var(--text-xdim);':''}">${escHtml(titel)}</span>
+      ${delBadge}
+    </div>`;
+  }).join('');
+
+  document.getElementById('modal-plan-quickview').classList.add('open');
+}
+
+function closePlanQuickView() {
+  document.getElementById('modal-plan-quickview').classList.remove('open');
+}
+
+function qvSchrittToggle(planId, sIdx, el) {
+  const p = (DB.plaene||[]).find(x => x.id === planId);
+  if (!p || !p.schritte[sIdx]) return;
+  const s      = p.schritte[sIdx];
+  const a      = s.aufgabeId ? DB.aufgaben.find(x=>x.id===s.aufgabeId) : null;
+  const isDone = (a?.status || s.status) === 'erledigt';
+  const neuerStatus = isDone ? 'offen' : 'erledigt';
+  if (a) a.status = neuerStatus;
+  else    s.status = neuerStatus;
+  p.geaendert = new Date().toISOString();
+  // UI direkt aktualisieren
+  const box = el.querySelector('div');
+  if (neuerStatus === 'erledigt') {
+    box.style.background  = 'var(--teal)';
+    box.style.borderColor = 'var(--teal)';
+    box.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    el.querySelector('span').style.textDecoration = 'line-through';
+    el.querySelector('span').style.color = 'var(--text-xdim)';
+  } else {
+    box.style.background  = '';
+    box.style.borderColor = 'var(--teal)';
+    box.innerHTML = '';
+    el.querySelector('span').style.textDecoration = '';
+    el.querySelector('span').style.color = '';
+  }
+  saveDB();
+  renderDashboard();
+}
+
+function qvBearbeiten() {
+  const planId = document.getElementById('qv-plan-edit-id').value;
+  closePlanQuickView();
+  openNeuerPlan(planId);
 }
 
 // Wenn eine Aufgabe erledigt/reaktiviert wird → Plan-Schritt synchronisieren
@@ -7741,7 +7641,7 @@ let planSchritte = [];
 function planSetPrio(prio) {
   document.querySelectorAll('.plan-prio-btn').forEach(b => {
     const isActive = b.dataset.prio === prio;
-    const colors = {krise:'#c0392b', hoch:'#E65100', mittel:'#f59e0b', niedrig:'#8aaaa8'};
+    const colors = {hoch:'#E65100', mittel:'#f59e0b', niedrig:'#8aaaa8'};
     b.style.background    = isActive ? colors[prio] : 'transparent';
     b.style.borderColor   = isActive ? colors[prio] : 'var(--border)';
     b.style.color         = isActive ? '#fff' : '';
@@ -7779,6 +7679,7 @@ function openNeuerPlan(id) {
     document.getElementById('plan-modal-titel').textContent = p.titel;
     planSetPrio(p.prioritaet || 'mittel');
     planSetHz(p.horizont || 'kurzfristig');
+    planNotizSetzen(p.notiz || null);
     document.getElementById('plan-btn-loeschen').style.display = '';
     // Lade Schritte – mit Aufgaben-Daten falls verknüpft
     planSchritte = (p.schritte || []).map(s => {
@@ -7814,6 +7715,7 @@ function openNeuerPlan(id) {
     document.getElementById('plan-modal-titel').textContent = 'Neuer Plan';
     planSetPrio('mittel');
     planSetHz('kurzfristig');
+    planNotizSetzen(null);
     document.getElementById('plan-btn-loeschen').style.display = 'none';
     document.getElementById('plan-fortschritt-wrap').style.display = 'none';
     planSchritte = [planNeuerSchrittObj(0)];
@@ -7829,6 +7731,61 @@ function planNeuerSchrittObj(reihenfolge) {
 
 function closeNeuerPlanModal() {
   document.getElementById('modal-neuer-plan').classList.remove('open');
+}
+
+function planNotizSetzen(notiz) {
+  const ta    = document.getElementById('plan-notiz-textarea');
+  const body  = document.getElementById('plan-notiz-body');
+  const btn   = document.getElementById('plan-notiz-toggle');
+  const prev  = document.getElementById('plan-notiz-preview');
+  if (!ta) return;
+  ta.value = notiz || '';
+  if (notiz) {
+    // Inhalt vorhanden → aufgeklappt, erste 3 Zeilen
+    body.style.display = 'block';
+    btn.dataset.open   = '1';
+    const zeilen = notiz.split('\n').slice(0, 3).join('\n');
+    prev.textContent = '';
+    btn.querySelector('.plan-notiz-chevron').style.transform = 'rotate(90deg)';
+    btn.querySelector('.plan-notiz-label').textContent = 'Notizen';
+  } else {
+    // Leer → zugeklappt
+    body.style.display = 'none';
+    btn.dataset.open   = '0';
+    prev.textContent   = '';
+    btn.querySelector('.plan-notiz-chevron').style.transform = '';
+    btn.querySelector('.plan-notiz-label').textContent = '+ Notizen hinzufügen';
+  }
+}
+
+function planNotizToggle() {
+  const btn  = document.getElementById('plan-notiz-toggle');
+  const body = document.getElementById('plan-notiz-body');
+  const prev = document.getElementById('plan-notiz-preview');
+  const ta   = document.getElementById('plan-notiz-textarea');
+  const istOffen = btn.dataset.open === '1';
+  if (istOffen) {
+    // Zuklappen: Vorschau erste Zeile
+    body.style.display = 'none';
+    btn.dataset.open   = '0';
+    btn.querySelector('.plan-notiz-chevron').style.transform = '';
+    const val = ta.value.trim();
+    if (val) {
+      btn.querySelector('.plan-notiz-label').textContent = 'Notizen';
+      prev.textContent = val.split('\n')[0].replace(/[*_#\[\]]/g,'').substring(0,48) + (val.length > 48 ? '…' : '');
+    } else {
+      btn.querySelector('.plan-notiz-label').textContent = '+ Notizen hinzufügen';
+      prev.textContent = '';
+    }
+  } else {
+    // Aufklappen
+    body.style.display = 'block';
+    btn.dataset.open   = '1';
+    prev.textContent   = '';
+    btn.querySelector('.plan-notiz-chevron').style.transform = 'rotate(90deg)';
+    btn.querySelector('.plan-notiz-label').textContent = 'Notizen';
+    setTimeout(() => ta.focus(), 50);
+  }
 }
 
 function planUpdateFortschritt() {
@@ -8112,6 +8069,7 @@ function savePlan() {
   const bereichId  = document.getElementById('plan-bereich').value || null;
   const prioritaet = document.getElementById('plan-prio-btns')?.dataset.val || 'mittel';
   const horizont   = document.getElementById('plan-hz-btns')?.dataset.val  || 'kurzfristig';
+  const notiz      = (document.getElementById('plan-notiz-textarea')?.value || '').trim() || null;
   if (!DB.plaene) DB.plaene = [];
 
   // Schritte speichern – Aufgaben anlegen/aktualisieren wo gewünscht
@@ -8152,6 +8110,7 @@ function savePlan() {
       p.bereichId  = bereichId;
       p.prioritaet = prioritaet;
       p.horizont   = horizont;
+      p.notiz      = notiz;
       p.schritte   = schrittLinks;
       p.status     = alleErledigt ? 'abgeschlossen' : 'aktiv';
       p.geaendert  = new Date().toISOString();
@@ -8166,7 +8125,7 @@ function savePlan() {
     });
     DB.plaene.push({
       id:          neuerPlanId,
-      titel, bereichId, prioritaet, horizont,
+      titel, bereichId, prioritaet, horizont, notiz,
       schritte:    schrittLinks,
       status:      'aktiv',
       erstellt:    new Date().toISOString(),
@@ -11771,9 +11730,6 @@ if (!fsApiVerfuegbar()) {
         <div class="field-group">
           <div class="field-label">Priorität</div>
           <div style="display:flex;gap:5px;" id="plan-prio-btns">
-            <button onclick="planSetPrio('krise')"   data-prio="krise"   class="plan-prio-btn" style="flex:1;padding:5px 0;border-radius:7px;border:2px solid var(--border);background:transparent;font-size:10px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:3px;">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Krise
-            </button>
             <button onclick="planSetPrio('hoch')"    data-prio="hoch"    class="plan-prio-btn" style="flex:1;padding:5px 0;border-radius:7px;border:2px solid var(--border);background:transparent;font-size:10px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:3px;">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2.5" stroke-linecap="round"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>Hoch
             </button>
@@ -11809,6 +11765,26 @@ if (!fsApiVerfuegbar()) {
         <div style="font-size:10px;color:var(--text-xdim);text-align:right;" id="plan-fortschritt-label"></div>
       </div>
 
+      <!-- Notizen (optional) -->
+      <div class="field-group">
+        <div class="field-label">Notizen &amp; Links</div>
+        <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <button type="button" id="plan-notiz-toggle" data-open="0"
+            onclick="planNotizToggle()"
+            style="width:100%;padding:7px 10px;background:var(--surface);border:none;text-align:left;font-size:11px;font-weight:600;color:var(--text-dim);cursor:pointer;display:flex;align-items:center;gap:6px;font-family:var(--font);">
+            <span class="plan-notiz-chevron" style="font-size:9px;transition:transform .2s;">▶</span>
+            <span class="plan-notiz-label">+ Notizen hinzufügen</span>
+            <span id="plan-notiz-preview" style="font-size:10px;color:var(--text-xdim);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400;font-style:italic;"></span>
+          </button>
+          <div id="plan-notiz-body" style="display:none;padding:8px 10px;border-top:1px solid var(--border);background:var(--card);">
+            <textarea id="plan-notiz-textarea" rows="3"
+              placeholder="Notizen, Links, Markdown&#10;- [ ] Checkbox&#10;https://link.de"
+              style="width:100%;border:none;outline:none;font-size:11px;font-family:'SF Mono','Fira Code',monospace;resize:none;color:var(--text);line-height:1.6;background:transparent;min-height:60px;"></textarea>
+            <div style="font-size:10px;color:var(--text-xdim);margin-top:4px;">Markdown: <code style="background:rgba(0,0,0,0.06);padding:1px 3px;border-radius:3px;">- [ ]</code> Checkbox &nbsp;·&nbsp; <code style="background:rgba(0,0,0,0.06);padding:1px 3px;border-radius:3px;">[Text](URL)</code> Link</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Schritte -->
       <div class="field-group">
         <div class="field-label">Schritte (Aufgaben)</div>
@@ -11828,6 +11804,39 @@ if (!fsApiVerfuegbar()) {
   </div>
 </div>
 <!-- ══ ENDE PLAN-MODAL ════════════════════════════════════════════════════ -->
+
+<!-- ══ PLAN QUICK-VIEW MODAL ═══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-plan-quickview">
+  <div class="modal" style="width:580px;max-height:calc(var(--app-h, 100vh) * 0.85);display:flex;flex-direction:column;">
+    <input type="hidden" id="qv-plan-edit-id">
+    <div class="modal-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal-dark)" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+      <h2 id="qv-plan-titel" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></h2>
+      <span class="modal-close" onclick="closePlanQuickView()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </span>
+    </div>
+    <div class="modal-body" style="gap:10px;overflow-y:auto;flex:1;padding-top:10px;">
+      <!-- Pills -->
+      <div id="qv-plan-pills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      <!-- Notiz-Vorschau -->
+      <div id="qv-plan-notiz" style="display:none;padding:8px 10px;background:var(--teal-xlight);border-left:3px solid var(--teal);border-radius:6px;font-size:11px;line-height:1.6;color:var(--text);"></div>
+      <!-- Schritte -->
+      <div>
+        <div class="field-label" style="margin-bottom:6px;">Schritte</div>
+        <div id="qv-plan-schritte" style="display:flex;flex-direction:column;gap:2px;"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closePlanQuickView()">Schließen</button>
+      <button class="btn-primary" style="margin-left:auto;display:flex;align-items:center;gap:5px;" onclick="qvBearbeiten()">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Bearbeiten
+      </button>
+    </div>
+  </div>
+</div>
+<!-- ══ ENDE PLAN QUICK-VIEW ══════════════════════════════════════════════════ -->
 
 
 <script>
