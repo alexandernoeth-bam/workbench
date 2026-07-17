@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.194</title>
+<title>WorkAssist 1.5.196</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2128,7 +2128,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.194</div>
+    <div class="start-version">v1.5.196</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2196,7 +2196,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.194</div>
+    <div class="app-version" id="app-version">v1.5.196</div>
   </div>
 
   <div class="nav-section">
@@ -3485,7 +3485,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.194';
+const APP_VERSION = '1.5.196';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6463,13 +6463,25 @@ function openPlanQuickView(planId) {
     const delBadge = s.delegiertAn
       ? `<span style="font-size:9px;background:#e3f0fc;color:#1565c0;padding:1px 5px;border-radius:4px;font-weight:600;flex-shrink:0;">→ ${escHtml(s.delegiertAn)}</span>`
       : '';
+    const numIcon = isDone
+      ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+      : (idx + 1);
+    const isNext = !isDone && schritte.slice(0, idx).every(x => {
+      const xs = x.aufgabeId ? (DB.aufgaben.find(a=>a.id===x.aufgabeId)?.status||x.status) : x.status;
+      return xs === 'erledigt';
+    });
+    const numStyle = isDone
+      ? 'background:var(--teal);border-color:var(--teal);color:#fff;'
+      : isNext
+        ? 'border-color:var(--teal);color:var(--teal-dark);'
+        : 'color:var(--text-xdim);';
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;cursor:pointer;transition:background .12s;"
       onmouseover="this.style.background='var(--teal-xlight)'" onmouseout="this.style.background=''"
       onclick="qvSchrittToggle('${planId}',${idx},this)">
-      <div style="width:20px;height:20px;border-radius:6px;border:2px solid var(--teal);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;${isDone?'background:var(--teal);border-color:var(--teal);':''}">
-        ${checkSvg}
+      <div style="width:18px;height:18px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:8px;font-weight:700;${numStyle}">
+        ${numIcon}
       </div>
-      <span style="flex:1;font-size:12px;${isDone?'text-decoration:line-through;color:var(--text-xdim);':''}">${escHtml(titel)}</span>
+      <span style="flex:1;font-size:12px;${isDone?'text-decoration:line-through;color:var(--text-xdim);':isNext?'font-weight:600;':''}">${escHtml(titel)}</span>
       ${delBadge}
     </div>`;
   }).join('');
@@ -7681,12 +7693,27 @@ function renderMarkdown(text) {
   let inUl = false;
   const closeUl = () => { if (inUl) { html += '</ul>'; inUl = false; } };
 
-  const inline = s => s
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/`(.+?)`/g,'<code>$1</code>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;">$1</a>');
+  const inline = s => {
+    // Erst escapen
+    s = s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    // Markdown-Links [Text](URL)
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;">$1</a>');
+    // [link]URL Format (WorkAssist-eigenes Format)
+    s = s.replace(/\[link\](https?:\/\/[^\s<]+)/gi, (_, url) => {
+      const kurz = url.length > 60 ? url.substring(0,60) + '…' : url;
+      return `<a href="${url}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;">${kurz}</a>`;
+    });
+    // Nackte URLs (https://... ohne Markdown-Syntax)
+    s = s.replace(/(^|[\s(])(https?:\/\/[^\s<"]+)/g, (_, pre, url) => {
+      const kurz = url.length > 60 ? url.substring(0,60) + '…' : url;
+      return `${pre}<a href="${url}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;">${kurz}</a>`;
+    });
+    // Inline-Formatierung
+    s = s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    s = s.replace(/\*(.+?)\*/g,'<em>$1</em>');
+    s = s.replace(/`(.+?)`/g,'<code>$1</code>');
+    return s;
+  };
 
   // Tabellen-Zeilen sammeln
   let tableBuffer = [];
@@ -8017,7 +8044,7 @@ function planRenderSchritte() {
           <svg width="10" height="14" viewBox="0 0 10 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="2" x2="8" y2="2"/><line x1="2" y1="6" x2="8" y2="6"/><line x1="2" y1="10" x2="8" y2="10"/><line x1="2" y1="14" x2="8" y2="14"/></svg>
         </div>
         <div class="plan-schritt-num ${numCls}" onclick="planToggleSchritt(${i})" title="${isDone?'Rückgängig':'Erledigt'}" style="cursor:pointer;">${numIcon}</div>
-        <input class="field-input" style="flex:1;padding:5px 8px;font-size:12px;${isDone?'text-decoration:line-through;color:var(--text-xdim);':''}"
+        <input class="field-input" id="plan-schritt-titel-${i}" style="flex:1;padding:5px 8px;font-size:12px;${isDone?'text-decoration:line-through;color:var(--text-xdim);':''}"
           value="${(s.titel||'').replace(/"/g,'&quot;')}"
           placeholder="Schritt ${i+1} …"
           ${s.aufgabeId ? 'readonly style="flex:1;padding:5px 8px;font-size:12px;background:var(--bg);color:var(--text-dim);"' : ''}
@@ -8155,10 +8182,14 @@ function planAufgabeWaehlen(idx, aufgabeId) {
 }
 
 function planSchrittHinzufuegen() {
-  planSchritte.push(planNeuerSchrittObj(planSchritte.length));
+  const neuerIdx = planSchritte.length;
+  planSchritte.push(planNeuerSchrittObj(neuerIdx));
   planRenderSchritte();
-  const inputs = document.querySelectorAll('#plan-schritte-list .plan-schritt-row input:not([type="checkbox"]):not([type="date"])');
-  if (inputs.length) inputs[inputs.length - 1].focus();
+  // Gezielt Titel-Input des neuen Schritts fokussieren (nicht Delegiert-Feld)
+  setTimeout(() => {
+    const input = document.getElementById('plan-schritt-titel-' + neuerIdx);
+    if (input) input.focus();
+  }, 30);
 }
 
 function planSchrittEntfernen(idx) {
