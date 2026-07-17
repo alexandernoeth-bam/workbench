@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.193</title>
+<title>WorkAssist 1.5.194</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2087,13 +2087,13 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 /* ── Ende Plan-Modal ───────────────────────────────────────────────────── */
 </style>
   <!-- ══ PWA ════════════════════════════════════════════════════════════ -->
-  <link rel="manifest" href="manifest-workassist.json">
+  <!-- manifest wird per JS als Data-URL gesetzt (verhindert Icon-Konflikt mit Edge) -->
   <meta name="theme-color" content="#00695C">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="WorkAssist">
-  <link rel="apple-touch-icon" href="icon-workassist-192.svg">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%2300897B'/%3E%3Cpolyline points='140 256 220 336 372 176' fill='none' stroke='white' stroke-width='48' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <!-- ══ Ende PWA ══════════════════════════════════════════════════════════ -->
 <script>
   // --app-h sofort setzen damit Modals korrekte Höhe haben
@@ -2128,7 +2128,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.193</div>
+    <div class="start-version">v1.5.194</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2196,7 +2196,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.193</div>
+    <div class="app-version" id="app-version">v1.5.194</div>
   </div>
 
   <div class="nav-section">
@@ -3485,7 +3485,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.193';
+const APP_VERSION = '1.5.194';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -11968,23 +11968,40 @@ if (!fsApiVerfuegbar()) {
 <script>
 // Service Worker + PWA Manifest (inline Blob für Single-File)
 (function() {
-  // SVG Icon
-  const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-    <rect width="512" height="512" rx="80" fill="#00897B"/>
-    <polyline points="140 256 220 336 372 176" fill="none" stroke="white"
-      stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-  const iconUrl = 'data:image/svg+xml,' + encodeURIComponent(iconSvg);
+  // PNG-Icon via Canvas erzeugen (Edge ignoriert SVG in PWA-Manifesten)
+  function ikonAlsPng(size) {
+    const c   = document.createElement('canvas');
+    c.width   = size; c.height = size;
+    const ctx = c.getContext('2d');
+    const r   = size * 0.16;
+    ctx.beginPath();
+    ctx.moveTo(r,0); ctx.lineTo(size-r,0);
+    ctx.quadraticCurveTo(size,0,size,r);
+    ctx.lineTo(size,size-r);
+    ctx.quadraticCurveTo(size,size,size-r,size);
+    ctx.lineTo(r,size); ctx.quadraticCurveTo(0,size,0,size-r);
+    ctx.lineTo(0,r); ctx.quadraticCurveTo(0,0,r,0);
+    ctx.closePath();
+    ctx.fillStyle = '#00897B'; ctx.fill();
+    ctx.beginPath();
+    const s = size / 32;
+    ctx.moveTo(9*s,16*s); ctx.lineTo(14*s,21*s); ctx.lineTo(23*s,11*s);
+    ctx.strokeStyle = 'white'; ctx.lineWidth = 3*s;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+    return c.toDataURL('image/png');
+  }
+  const icon192 = ikonAlsPng(192);
+  const icon512 = ikonAlsPng(512);
 
-  // Manifest
+  // Manifest mit PNG-Icons (Edge akzeptiert PNG zuverlässig)
   const manifest = {
     name: 'WorkAssist', short_name: 'WorkAssist',
     description: 'Aufgaben- und Wissensmanagement',
     start_url: './', display: 'standalone',
     background_color: '#00897B', theme_color: '#00897B',
     icons: [
-      { src: iconUrl, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
-      { src: iconUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
+      { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+      { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
     ]
   };
   const mBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
