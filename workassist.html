@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.190</title>
+<title>WorkAssist 1.5.191</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2193,7 +2193,7 @@ self.addEventListener('fetch', e => {
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.190</div>
+    <div class="start-version">v1.5.191</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2261,7 +2261,7 @@ self.addEventListener('fetch', e => {
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.190</div>
+    <div class="app-version" id="app-version">v1.5.191</div>
   </div>
 
   <div class="nav-section">
@@ -3550,7 +3550,7 @@ self.addEventListener('fetch', e => {
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.190';
+const APP_VERSION = '1.5.191';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6315,6 +6315,7 @@ function badgeAktualisieren() {
   }
 
   let anzahl = 0;
+  let hatKrise = false;
   plaene.forEach(p => {
     const ns = naechsterSchritt(p);
     const istKrise       = p.prioritaet === 'krise';
@@ -6325,7 +6326,11 @@ function badgeAktualisieren() {
     if (istKrise || (istKurzfristig && !istDelegiert)) {
       anzahl++;
     }
+    if (istKrise) hatKrise = true;
   });
+
+  // Icon-Farbe: rot bei Krise, grün sonst
+  const iconFarbe = hatKrise ? '#c0392b' : '#00897B';
 
   // ── Primär: Web App Badge API (PWA Taskleisten-Icon) ──
   if ('setAppBadge' in navigator) {
@@ -6336,14 +6341,14 @@ function badgeAktualisieren() {
     }
   }
 
-  // ── Fallback: Canvas-Favicon (Browser-Tab) ──
+  // ── Canvas-Favicon (Browser-Tab + Icon-Farbe) ──
   const size   = 32;
   const canvas = document.createElement('canvas');
   canvas.width  = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
 
-  // Basis-Icon: grünes Quadrat mit Häkchen
+  // Basis-Icon: Quadrat mit Häkchen — Farbe je nach Krise
   const r = size * 0.25;
   ctx.beginPath();
   ctx.moveTo(r, 0);
@@ -6356,7 +6361,7 @@ function badgeAktualisieren() {
   ctx.lineTo(0, r);
   ctx.quadraticCurveTo(0, 0, r, 0);
   ctx.closePath();
-  ctx.fillStyle = '#00897B';
+  ctx.fillStyle = iconFarbe;
   ctx.fill();
 
   // Häkchen
@@ -6370,8 +6375,9 @@ function badgeAktualisieren() {
   ctx.lineJoin    = 'round';
   ctx.stroke();
 
-  // Badge-Zahl auf Favicon
-  if (anzahl > 0) {
+  // Badge-Zahl auf Favicon (nur wenn anzahl > 0 UND kein Krise-Icon)
+  // Bei Krise-Icon: Farbe reicht als Signal, kein extra Badge-Kreis nötig
+  if (anzahl > 0 && !hatKrise) {
     const label = anzahl > 99 ? '99+' : String(anzahl);
     const bSize = anzahl > 9 ? 13 : 11;
     const bX    = size - bSize / 2 - 1;
