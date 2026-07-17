@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.197</title>
+<title>WorkAssist 1.5.198</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2128,7 +2128,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.197</div>
+    <div class="start-version">v1.5.198</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2196,7 +2196,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.197</div>
+    <div class="app-version" id="app-version">v1.5.198</div>
   </div>
 
   <div class="nav-section">
@@ -3485,7 +3485,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.197';
+const APP_VERSION = '1.5.198';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6429,8 +6429,35 @@ function openPlanQuickView(planId) {
     `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;${hzStyle}">${HZ_LABELS[p.horizont||'kurzfristig']||p.horizont}</span>`;
 
   document.getElementById('qv-plan-titel').textContent = p.titel;
-  document.getElementById('qv-plan-pills').innerHTML   = pillHtml;
   document.getElementById('qv-plan-edit-id').value     = planId;
+
+  // Bereich-Chip
+  const bereichChip = document.getElementById('qv-plan-bereich-chip');
+  if (p.bereichId) {
+    const b = (DB.bereiche||[]).find(x => x.id === p.bereichId);
+    if (b && bereichChip) {
+      bereichChip.style.display = 'inline-flex';
+      bereichChip.innerHTML = `<span
+        onclick="closePlanQuickView();openBereichDetail('${b.id}')"
+        style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
+          padding:2px 8px;border-radius:10px;background:#e8f4f5;color:var(--teal-dark);
+          cursor:pointer;border:1px solid var(--border);transition:background .12s;"
+        onmouseover="this.style.background='var(--teal-xlight)'"
+        onmouseout="this.style.background='#e8f4f5'">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        ${escHtml(b.name)}
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </span>`;
+    } else if (bereichChip) {
+      bereichChip.style.display = 'none';
+      bereichChip.innerHTML = '';
+    }
+  } else if (bereichChip) {
+    bereichChip.style.display = 'none';
+    bereichChip.innerHTML = '';
+  }
+
+  document.getElementById('qv-plan-pills').insertAdjacentHTML('afterbegin', pillHtml);
 
   // Notiz-Vorschau (max 3 Zeilen)
   const notizEl = document.getElementById('qv-plan-notiz');
@@ -7829,6 +7856,7 @@ function openNeuerPlan(id) {
     document.getElementById('plan-edit-id').value = p.id;
     document.getElementById('plan-titel').value   = p.titel;
     document.getElementById('plan-bereich').value = p.bereichId || '';
+    planBereichLinkAktualisieren();
     document.getElementById('plan-modal-titel').textContent = p.titel;
     planSetPrio(p.prioritaet || 'mittel');
     planSetHz(p.horizont || 'kurzfristig');
@@ -7866,6 +7894,7 @@ function openNeuerPlan(id) {
     document.getElementById('plan-edit-id').value = '';
     document.getElementById('plan-titel').value   = '';
     document.getElementById('plan-bereich').value = '';
+    planBereichLinkAktualisieren();
     document.getElementById('plan-modal-titel').textContent = 'Neuer Plan';
     planSetPrio('mittel');
     planSetHz('kurzfristig');
@@ -8197,6 +8226,24 @@ function planSchrittHinzufuegen() {
 function planSchrittEntfernen(idx) {
   planSchritte.splice(idx, 1);
   planRenderSchritte();
+}
+
+function planBereichLinkAktualisieren() {
+  const sel = document.getElementById('plan-bereich');
+  const btn = document.getElementById('plan-bereich-link');
+  if (!sel || !btn) return;
+  if (sel.value) {
+    btn.style.display = 'flex';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function planBereichOeffnen() {
+  const sel = document.getElementById('plan-bereich');
+  if (!sel || !sel.value) return;
+  closeNeuerPlanModal();
+  openBereichDetail(sel.value);
 }
 
 function planSchnelleingabeOeffnen() {
@@ -11959,9 +12006,18 @@ if (!fsApiVerfuegbar()) {
         </div>
         <div class="field-group">
           <div class="field-label">Bereich</div>
-          <select class="field-select" id="plan-bereich">
-            <option value="">— kein Bereich —</option>
-          </select>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <select class="field-select" id="plan-bereich" style="flex:1;"
+              onchange="planBereichLinkAktualisieren()">
+              <option value="">— kein Bereich —</option>
+            </select>
+            <button type="button" id="plan-bereich-link" onclick="planBereichOeffnen()"
+              title="Bereich öffnen"
+              style="display:none;border:none;background:var(--teal-xlight);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--teal-dark);font-size:11px;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:4px;flex-shrink:0;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Öffnen
+            </button>
+          </div>
         </div>
       </div>
 
@@ -12082,7 +12138,9 @@ if (!fsApiVerfuegbar()) {
     </div>
     <div class="modal-body" style="gap:10px;overflow-y:auto;flex:1;padding-top:10px;">
       <!-- Pills -->
-      <div id="qv-plan-pills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      <div id="qv-plan-pills" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <div id="qv-plan-bereich-chip" style="display:none;"></div>
+      </div>
       <!-- Notiz-Vorschau -->
       <div id="qv-plan-notiz" style="display:none;padding:8px 10px;background:var(--teal-xlight);border-left:3px solid var(--teal);border-radius:6px;font-size:11px;line-height:1.6;color:var(--text);"></div>
       <!-- Schritte -->
