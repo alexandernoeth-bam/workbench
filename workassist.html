@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.189</title>
+<title>WorkAssist 1.5.190</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2095,6 +2095,71 @@ textarea.field-input { resize: vertical; min-height: 70px; }
   <meta name="apple-mobile-web-app-title" content="WorkAssist">
   <link rel="apple-touch-icon" href="icon-workassist-192.svg">
   <!-- ══ Ende PWA ══════════════════════════════════════════════════════════ -->
+
+<!-- PWA Manifest + Service Worker (inline als Blob) -->
+<script>
+(function() {
+  // SVG-Icon: grünes WA-Icon
+  const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="80" fill="#00897B"/>
+    <polyline points="140 256 220 336 372 176" fill="none" stroke="white" stroke-width="48"
+      stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+  const iconUrl = 'data:image/svg+xml,' + encodeURIComponent(iconSvg);
+
+  // Manifest als Blob
+  const manifest = {
+    name: 'WorkAssist',
+    short_name: 'WorkAssist',
+    description: 'Aufgaben- und Wissensmanagement',
+    start_url: './',
+    display: 'standalone',
+    background_color: '#00897B',
+    theme_color: '#00897B',
+    orientation: 'any',
+    icons: [
+      { src: iconUrl, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
+      { src: iconUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
+    ]
+  };
+  const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+  const manifestUrl  = URL.createObjectURL(manifestBlob);
+  const mLink = document.createElement('link');
+  mLink.rel  = 'manifest';
+  mLink.href = manifestUrl;
+  document.head.appendChild(mLink);
+
+  // Service Worker als Blob (Cache-First für Offline)
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+const CACHE = 'workassist-v1_5_190';
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => c.addAll(['./']))
+      .then(() => self.skipWaiting())
+  );
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+self.addEventListener('fetch', e => {
+  e.respondWith(
+    caches.match(e.request).then(cached => cached || fetch(e.request))
+  );
+});
+`;
+    const swBlob = new Blob([swCode], { type: 'application/javascript' });
+    const swUrl  = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl, { scope: './' }).catch(() => {});
+  }
+})();
+</script>
+
 <script>
   // --app-h sofort setzen damit Modals korrekte Höhe haben
   document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
@@ -2128,7 +2193,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.187</div>
+    <div class="start-version">v1.5.190</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2196,7 +2261,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.187</div>
+    <div class="app-version" id="app-version">v1.5.190</div>
   </div>
 
   <div class="nav-section">
@@ -3485,7 +3550,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.189';
+const APP_VERSION = '1.5.190';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6262,13 +6327,23 @@ function badgeAktualisieren() {
     }
   });
 
+  // ── Primär: Web App Badge API (PWA Taskleisten-Icon) ──
+  if ('setAppBadge' in navigator) {
+    if (anzahl > 0) {
+      navigator.setAppBadge(anzahl).catch(() => {});
+    } else {
+      navigator.clearAppBadge().catch(() => {});
+    }
+  }
+
+  // ── Fallback: Canvas-Favicon (Browser-Tab) ──
   const size   = 32;
   const canvas = document.createElement('canvas');
   canvas.width  = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
 
-  // Basis-Icon: grünes Quadrat mit Häkchen (wie Original-Favicon)
+  // Basis-Icon: grünes Quadrat mit Häkchen
   const r = size * 0.25;
   ctx.beginPath();
   ctx.moveTo(r, 0);
@@ -6295,21 +6370,19 @@ function badgeAktualisieren() {
   ctx.lineJoin    = 'round';
   ctx.stroke();
 
-  // Badge nur wenn anzahl > 0
+  // Badge-Zahl auf Favicon
   if (anzahl > 0) {
-    const label  = anzahl > 99 ? '99+' : String(anzahl);
-    const bSize  = anzahl > 9 ? 13 : 11;
-    const bX     = size - bSize / 2 - 1;
-    const bY     = bSize / 2 + 1;
-    // Roter Kreis
+    const label = anzahl > 99 ? '99+' : String(anzahl);
+    const bSize = anzahl > 9 ? 13 : 11;
+    const bX    = size - bSize / 2 - 1;
+    const bY    = bSize / 2 + 1;
     ctx.beginPath();
     ctx.arc(bX, bY, bSize / 2, 0, Math.PI * 2);
     ctx.fillStyle = '#c0392b';
     ctx.fill();
-    // Zahl
-    ctx.fillStyle   = 'white';
-    ctx.font        = `bold ${anzahl > 9 ? 7 : 8}px sans-serif`;
-    ctx.textAlign   = 'center';
+    ctx.fillStyle    = 'white';
+    ctx.font         = `bold ${anzahl > 9 ? 7 : 8}px sans-serif`;
+    ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, bX, bY + 0.5);
   }

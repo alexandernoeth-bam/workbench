@@ -229,6 +229,27 @@ console.log('\n── 8. Favicon Badge ──');
   badgeAktualisieren();
   ok('Badge: leere Pläne – kein Fehler');
 
+  // Test 5: Web App Badge API vorhanden
+  if ('setAppBadge' in navigator)
+    ok('Web App Badge API: navigator.setAppBadge verfügbar (PWA installiert)');
+  else
+    warn('Web App Badge API nicht verfügbar (App evtl. nicht als PWA installiert)');
+
+  // Test 6: PWA Manifest vorhanden
+  const manifestLink = document.querySelector('link[rel="manifest"]');
+  if (manifestLink && manifestLink.href) ok('PWA Manifest-Link vorhanden');
+  else fail('PWA Manifest-Link fehlt');
+
+  // Test 7: Service Worker registriert
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistration().then(reg => {
+      if (reg) ok('Service Worker registriert: ' + reg.scope);
+      else warn('Kein Service Worker registriert');
+    });
+  } else {
+    warn('Service Worker API nicht verfügbar');
+  }
+
   DB.plaene = backup.plaene;
   DB.aufgaben = backup.aufgaben;
   badgeAktualisieren();
