@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#124d53">
 <link rel="manifest" href="manifest-planviewer.json">
 <link rel="apple-touch-icon" href="icon-planviewer.svg">
-<title>Plan-Viewer v1.0.9</title>
+<title>Plan-Viewer v1.1.0</title>
 <style>
 :root {
   --petrol: #1a6b72;
@@ -772,7 +772,7 @@ body {
 <!-- HEADER -->
 <div id="header">
   <div id="header-title">
-    📋 Plan-Viewer<span id="header-version">v1.0.9</span>
+    📋 Plan-Viewer<span id="header-version">v1.1.0</span>
   </div>
   <button id="btn-speichern" onclick="speichernClick()">💾 Speichern</button>
   <button id="btn-theme" onclick="themeToggle()" title="Dark Mode">🌓</button>
@@ -855,7 +855,7 @@ body {
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.0.9';
+const APP_VERSION = 'v1.1.0';
 const NOTIZ_KEY = 'planviewer_notiz';
 const ZOOM_KEY = 'planviewer_zoom';
 const THEME_KEY = 'planviewer_theme';
@@ -952,50 +952,19 @@ let ungespeicherteAenderungen = false;
 let aktuellerTab = 'plaene';
 let pollingInterval = null;
 
-// ── INDEXEDDB: File Handle persistent speichern ──
-const IDB_NAME    = 'planviewer-db';
-const IDB_STORE   = 'handles';
-const IDB_KEY     = 'backlog-handle';
+// ── DATEINAME: In localStorage speichern für Shortcut-Hinweis ──
+const DATEINAME_KEY = 'planviewer_dateiname';
 
-function idbOpen() {
-  return new Promise((res, rej) => {
-    const req = indexedDB.open(IDB_NAME, 1);
-    req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE);
-    req.onsuccess = e => res(e.target.result);
-    req.onerror   = e => rej(e.target.error);
-  });
+function dateinamesSpeichern(name) {
+  try { localStorage.setItem(DATEINAME_KEY, name); } catch(e) {}
 }
 
-async function idbSaveHandle(handle) {
-  try {
-    const db = await idbOpen();
-    const tx = db.transaction(IDB_STORE, 'readwrite');
-    tx.objectStore(IDB_STORE).put(handle, IDB_KEY);
-    return new Promise((res, rej) => {
-      tx.oncomplete = () => res();
-      tx.onerror    = () => rej(tx.error);
-    });
-  } catch(e) { /* Ignorieren */ }
+function dateinameHolen() {
+  try { return localStorage.getItem(DATEINAME_KEY) || null; } catch(e) { return null; }
 }
 
-async function idbLoadHandle() {
-  try {
-    const db = await idbOpen();
-    const tx = db.transaction(IDB_STORE, 'readonly');
-    return new Promise((res, rej) => {
-      const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
-      req.onsuccess = e => res(e.target.result || null);
-      req.onerror   = () => res(null);
-    });
-  } catch(e) { return null; }
-}
-
-async function idbClearHandle() {
-  try {
-    const db = await idbOpen();
-    const tx = db.transaction(IDB_STORE, 'readwrite');
-    tx.objectStore(IDB_STORE).delete(IDB_KEY);
-  } catch(e) { /* Ignorieren */ }
+function dateinameLoeschen() {
+  try { localStorage.removeItem(DATEINAME_KEY); } catch(e) {}
 }
 
 // ── HILFSFUNKTIONEN ──
@@ -1037,7 +1006,7 @@ async function dateiClick() {
     fileHandle = null;
     db = null;
     setzeUngespeichert(false);
-    idbClearHandle(); // Gespeicherten Handle löschen
+    dateinameLoeschen(); // Dateiname löschen
     document.getElementById('btn-datei').textContent = '📂 Öffnen';
     document.getElementById('tabs').classList.remove('visible');
     document.getElementById('warn-banner').classList.remove('visible');
@@ -1046,17 +1015,6 @@ async function dateiClick() {
     return;
   }
   try {
-    // Wenn gespeicherter Handle vorhanden (aus Shortcut-Start) → direkt verwenden
-    if (window._savedHandle) {
-      const saved = window._savedHandle;
-      window._savedHandle = null;
-      const perm = await saved.requestPermission({ mode: 'readwrite' });
-      if (perm === 'granted') {
-        fileHandle = saved;
-        await ladeDatei();
-        return;
-      }
-    }
     const [handle] = await window.showOpenFilePicker({
       types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
     });
@@ -1081,7 +1039,7 @@ async function ladeDatei() {
     document.getElementById('tabs').classList.add('visible');
     document.getElementById('warn-banner').classList.remove('visible');
     setzeUngespeichert(false);
-    idbSaveHandle(fileHandle); // Handle persistent für Shortcut-Starts
+    dateinamesSpeichern(fileHandle.name); // Dateiname für Shortcut-Hinweis
     renderNotizen();
     renderHeute();
     // Shortcut ?tab=heute: direkt Heute-Tab öffnen
@@ -1751,7 +1709,7 @@ function escHtml(str) {
 (function() {
   if ('serviceWorker' in navigator) {
     const swCode = `
-const CACHE = 'planviewer-v1_0_9';
+const CACHE = 'planviewer-v1_1_0';
 const SHELL = ['./planviewer.html', './manifest-planviewer.json', './icon-planviewer.svg', './icon-planviewer-maskable.svg'];
 
 self.addEventListener('install', e => {
@@ -1778,43 +1736,46 @@ self.addEventListener('fetch', e => {
 `;
     const swBlob = new Blob([swCode], { type: 'application/javascript' });
     const swUrl  = URL.createObjectURL(swBlob);
-    navigator.serviceWorker.register(swUrl, { scope: './' }).catch(() => {});
+    navigator.serviceWorker.register(swUrl, { scope: './' })
+      .then(() => {
+        // Badge nach SW-Registration aktualisieren falls Daten schon geladen
+        if (db) renderHeute();
+      })
+      .catch(() => {});
   }
   zoomInit();
   themeInit();
-  // URL-Parameter: ?tab=heute → direkt Heute-Tab öffnen
+  // URL-Parameter: ?tab=heute → Heute-Tab vormerken + Dateiname-Hinweis zeigen
   const urlParams = new URLSearchParams(window.location.search);
   const tabParam  = urlParams.get('tab');
   if (tabParam === 'heute') {
     window._startTab = 'heute';
-    // Gespeicherten File Handle laden und Datei direkt öffnen
-    idbLoadHandle().then(async savedHandle => {
-      if (!savedHandle) return; // Kein Handle → Datei-Dialog zeigen
-      try {
-        // Permission prüfen/anfragen
-        const perm = await savedHandle.queryPermission({ mode: 'readwrite' });
-        if (perm === 'granted') {
-          fileHandle = savedHandle;
-          await ladeDatei();
-        } else if (perm === 'prompt') {
-          // Muss explizit angefragt werden (User Gesture nötig)
-          // Wir zeigen einen Hinweis-Button statt des normalen Dialogs
-          const nofileScreen = document.getElementById('screen-nofile');
-          if (nofileScreen) {
-            const hint = document.createElement('div');
-            hint.style.cssText = 'background:#e8f4f5;border-radius:10px;padding:14px 16px;font-size:13px;color:#124d53;line-height:1.5;width:100%;max-width:340px;text-align:center;';
-            hint.innerHTML = '<div style="font-size:24px;margin-bottom:8px;">📂</div>' +
-              '<strong>Backlog.json erneut öffnen</strong><br>' +
-              '<small>Tippe auf Öffnen um die gespeicherte Datei zu laden</small>';
-            nofileScreen.appendChild(hint);
-          }
-          // Beim nächsten dateiClick: gespeicherten Handle verwenden
-          window._savedHandle = savedHandle;
-        }
-      } catch(e) { /* Handle ungültig → normaler Dialog */ }
-    });
+    // Gespeicherten Dateinamen holen und Schnell-Öffnen-Button anzeigen
+    const letzterName = dateinameHolen();
+    if (letzterName) {
+      // Warte bis DOM bereit, dann Hinweis-Button einblenden
+      document.addEventListener('DOMContentLoaded', () => {
+        zeigeSchnellOeffnen(letzterName);
+      });
+    }
   }
 })();
+
+function zeigeSchnellOeffnen(dateiname) {
+  const nofileCard = document.querySelector('.nofile-card');
+  if (!nofileCard) return;
+  // Bestehenden Hinweis falls vorhanden entfernen
+  document.getElementById('schnell-oeffnen-hint')?.remove();
+  const hint = document.createElement('div');
+  hint.id = 'schnell-oeffnen-hint';
+  hint.style.cssText = 'background:var(--petrol-light);border:1px solid var(--petrol);border-radius:10px;padding:12px 14px;text-align:center;margin-top:10px;width:100%;max-width:340px;';
+  hint.innerHTML =
+    '<div style="font-size:11px;color:var(--petrol-dark);margin-bottom:8px;">📂 Zuletzt verwendet:</div>' +
+    '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">' + escHtml(dateiname) + '</div>' +
+    '<button onclick="dateiClick()" style="background:var(--petrol);color:white;border:none;border-radius:9px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;width:100%;">📂 Öffnen</button>';
+  // Nach der nofileCard einfügen
+  nofileCard.parentNode.insertBefore(hint, nofileCard.nextSibling);
+}
 </script>
 </body>
 </html>
