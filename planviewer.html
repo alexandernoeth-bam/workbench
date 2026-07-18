@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#124d53">
 <link rel="manifest" href="manifest-planviewer.json">
 <link rel="apple-touch-icon" href="icon-planviewer.svg">
-<title>Plan-Viewer v1.1.1</title>
+<title>Plan-Viewer v1.1.2</title>
 <style>
 :root {
   --petrol: #1a6b72;
@@ -772,7 +772,7 @@ body {
 <!-- HEADER -->
 <div id="header">
   <div id="header-title">
-    📋 Plan-Viewer<span id="header-version">v1.1.1</span>
+    📋 Plan-Viewer<span id="header-version">v1.1.2</span>
   </div>
   <button id="btn-speichern" onclick="speichernClick()">💾 Speichern</button>
   <button id="btn-theme" onclick="themeToggle()" title="Dark Mode">🌓</button>
@@ -801,19 +801,12 @@ body {
 
   <!-- KEIN FILE -->
   <div class="screen active" id="screen-nofile">
-    <!-- Schnell-Öffnen: nur sichtbar wenn ?tab=heute + letzter Dateiname bekannt -->
-    <div id="schnell-oeffnen-card" style="display:none;background:var(--petrol-light);border:1px solid var(--petrol);border-radius:var(--radius);padding:18px;text-align:center;width:100%;max-width:340px;display:none;">
-      <div style="font-size:11px;color:var(--petrol-dark);margin-bottom:6px;">📂 Zuletzt verwendet:</div>
-      <div id="schnell-dateiname" style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;"></div>
-      <button class="btn-primary" style="width:100%;justify-content:center;" onclick="dateiClick()">📂 Öffnen</button>
-    </div>
-    <!-- Standard: normaler Öffnen-Dialog -->
-    <div class="nofile-card" id="nofile-standard">
+    <div class="nofile-card">
       <div class="nofile-icon">📂</div>
       <div class="nofile-hint">Öffne deine <strong>Backlog.json</strong> um Pläne anzuzeigen und Notizen zu erfassen.</div>
       <button class="btn-primary" onclick="dateiClick()">📂 Datei öffnen</button>
     </div>
-    <div class="tip-box" id="nofile-tipp">
+    <div class="tip-box">
       💡 <strong>Tipp:</strong> Verwende dieselbe <code>Backlog.json</code> wie WorkAssist auf dem PC — alle Änderungen sind sofort dort sichtbar.
     </div>
   </div>
@@ -862,7 +855,7 @@ body {
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.1.1';
+const APP_VERSION = 'v1.1.2';
 const NOTIZ_KEY = 'planviewer_notiz';
 const ZOOM_KEY = 'planviewer_zoom';
 const THEME_KEY = 'planviewer_theme';
@@ -959,20 +952,7 @@ let ungespeicherteAenderungen = false;
 let aktuellerTab = 'plaene';
 let pollingInterval = null;
 
-// ── DATEINAME: In localStorage speichern für Shortcut-Hinweis ──
-const DATEINAME_KEY = 'planviewer_dateiname';
-
-function dateinamesSpeichern(name) {
-  try { localStorage.setItem(DATEINAME_KEY, name); } catch(e) {}
-}
-
-function dateinameHolen() {
-  try { return localStorage.getItem(DATEINAME_KEY) || null; } catch(e) { return null; }
-}
-
-function dateinameLoeschen() {
-  try { localStorage.removeItem(DATEINAME_KEY); } catch(e) {}
-}
+// ── (Schnell-Öffnen via localStorage entfernt — Android erlaubt kein auto-open) ──
 
 // ── HILFSFUNKTIONEN ──
 function zeigeToast(msg, dauer) {
@@ -1013,7 +993,6 @@ async function dateiClick() {
     fileHandle = null;
     db = null;
     setzeUngespeichert(false);
-    dateinameLoeschen(); // Dateiname löschen
     document.getElementById('btn-datei').textContent = '📂 Öffnen';
     document.getElementById('tabs').classList.remove('visible');
     document.getElementById('warn-banner').classList.remove('visible');
@@ -1046,7 +1025,6 @@ async function ladeDatei() {
     document.getElementById('tabs').classList.add('visible');
     document.getElementById('warn-banner').classList.remove('visible');
     setzeUngespeichert(false);
-    dateinamesSpeichern(fileHandle.name); // Dateiname für Shortcut-Hinweis
     renderNotizen();
     renderHeute();
     // Shortcut ?tab=heute: direkt Heute-Tab öffnen
@@ -1695,11 +1673,7 @@ function aktualisiereHeuteBadge(anzahl) {
       badge.style.display = 'none';
     }
   }
-  // PWA App Badge API (Pixel Homescreen-Icon)
-  if ('setAppBadge' in navigator) {
-    if (anzahl > 0) navigator.setAppBadge(anzahl).catch(() => {});
-    else            navigator.clearAppBadge().catch(() => {});
-  }
+
 }
 
 // ── UTILS ──
@@ -1716,7 +1690,7 @@ function escHtml(str) {
 (function() {
   if ('serviceWorker' in navigator) {
     const swCode = `
-const CACHE = 'planviewer-v1_1_1';
+const CACHE = 'planviewer-v1_1_2';
 const SHELL = ['./planviewer.html', './manifest-planviewer.json', './icon-planviewer.svg', './icon-planviewer-maskable.svg'];
 
 self.addEventListener('install', e => {
@@ -1744,10 +1718,6 @@ self.addEventListener('fetch', e => {
     const swBlob = new Blob([swCode], { type: 'application/javascript' });
     const swUrl  = URL.createObjectURL(swBlob);
     navigator.serviceWorker.register(swUrl, { scope: './' })
-      .then(() => {
-        // Badge nach SW-Registration aktualisieren falls Daten schon geladen
-        if (db) renderHeute();
-      })
       .catch(() => {});
   }
   zoomInit();
@@ -1757,27 +1727,10 @@ self.addEventListener('fetch', e => {
   const tabParam  = urlParams.get('tab');
   if (tabParam === 'heute') {
     window._startTab = 'heute';
-    // Gespeicherten Dateinamen holen und Schnell-Öffnen-Button anzeigen
-    const letzterName = dateinameHolen();
-    if (letzterName) {
-      // Warte bis DOM bereit, dann Hinweis-Button einblenden
-      // Direkt aufrufen - DOM ist bei inline Script bereits bereit
-    setTimeout(() => zeigeSchnellOeffnen(letzterName), 0);
-    }
   }
 })();
 
-function zeigeSchnellOeffnen(dateiname) {
-  const card    = document.getElementById('schnell-oeffnen-card');
-  const nameEl  = document.getElementById('schnell-dateiname');
-  const standard = document.getElementById('nofile-standard');
-  const tipp    = document.getElementById('nofile-tipp');
-  if (!card || !nameEl) return;
-  nameEl.textContent = dateiname;
-  card.style.display    = 'block';
-  if (standard) standard.style.display = 'none';
-  if (tipp)     tipp.style.display     = 'none';
-}
+
 </script>
 </body>
 </html>
