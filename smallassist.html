@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.1.10</title>
+<title>SmallAssist 1.1.11</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -805,6 +805,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 .tl-actions { display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap; }
 .tl-act-btn { border: none; background: #f0ede4; border-radius: 5px; padding: 3px 8px; font-size: calc(var(--fs) * 0.72); color: #666; cursor: pointer; font-family: var(--font); }
 .tl-mv-btn { border: none; background: none; padding: 2px 4px; cursor: pointer; color: #c0b8a8; font-size: calc(var(--fs) * 0.6875); line-height: 1.2; }
+.tl-divider { padding: 8px 20px 3px; font-size: calc(var(--fs) * 0.65); color: #c0b8a8; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; border-top: 1px solid #f0ede4; margin-top: 4px; }
 .tl-add-bar { flex-shrink: 0; background: white; border-top: 1px solid #e8e4d8; padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
 .tl-add-input { flex: 1; border: none; background: #f7f6f2; border-radius: 10px; padding: 9px 12px; font-size: calc(var(--fs) * 0.92); color: var(--text); outline: none; font-family: var(--font); }
 .tl-add-input::placeholder { color: #a09880; }
@@ -823,7 +824,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.1.10</span>
+      <span class="sb-logo-version">v1.1.11</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="tagesliste" onclick="zeigeScreen('tagesliste',this)">
@@ -891,12 +892,9 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
         </div>
         <div class="tl-items" id="tl-items"></div>
         <div class="tl-add-bar">
-          <input class="tl-add-input" id="tl-add-input" placeholder="Eintrag hinzufügen …" onkeydown="if(event.key==='Enter')tlEintragHinzufuegen()">
-          <button class="tl-add-btn sec" onclick="tlAufgabeVerknuepfen()" title="Aufgabe verknüpfen">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-          </button>
-          <button class="tl-add-btn pri" onclick="tlEintragHinzufuegen()">
+          <button class="tl-add-btn pri" style="flex:1;padding:10px;font-size:calc(var(--fs)*0.88);display:flex;align-items:center;justify-content:center;gap:8px;" onclick="tlNeuerEintrag()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Eintrag hinzufügen
           </button>
         </div>
       </div>
@@ -1277,7 +1275,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 <script>
 'use strict';
 
-const APP_VERSION = '1.1.10';
+const APP_VERSION = '1.1.11';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1419,9 +1417,11 @@ async function ladeDatei() {
 
 
 
+let _speicherTimer = null;
 function setzeGeaendert() {
   ungespeichert = true;
-  speichern();
+  if (_speicherTimer) clearTimeout(_speicherTimer);
+  _speicherTimer = setTimeout(() => { _speicherTimer = null; speichern(); }, 1500);
 }
 
 // ── MIGRATION ──
@@ -3094,32 +3094,53 @@ function renderTagesliste(){
   if(mE)mE.innerHTML=(erlAnz>0?`<span class="tl-meta-pill">${erlAnz} erledigt</span>`:'')+
     (offAnz>0?`<span class="tl-meta-pill warn">${offAnz} offen</span>`:'')+
     (!sc.length?'<span class="tl-meta-pill" style="background:#f0ede4;color:#a09880;">Leerer Tag</span>':'');
-  iE.innerHTML=sc.length?sc.map((s,i)=>{
+
+  const ABSCHNITTE = ['','Morgen','Vormittag','Mittag','Nachmittag','Abend'];
+
+  let html = '';
+  let letzterAbschnitt = null;
+  sc.forEach((s,i)=>{
     const a=s.aufgabeId?DB.aufgaben.find(x=>x.id===s.aufgabeId):null;
     const st=a?.status||s.status||'offen'; const dn=st==='erledigt'; const rep=!!(a?.wiederholung);
     const tt=a?.titel||s.titel||''; const ls=(a?.tags||[]);
     const cbK=dn?'done':(rep?'repeat':'');
     const chips=ls.slice(0,2).map(l=>`<span class="tl-chip liste">${escHtml(l)}</span>`).join('')+(rep?'<span class="tl-chip repeat">↺</span>':'');
     const nH=s.kommentar?`<div class="tl-note">${escHtml(s.kommentar)}</div>`:'';
-    const aH=`<div class="tl-actions">
+
+    // Tagesabschnitt-Divider
+    const abschnitt = s.abschnitt || '';
+    if(abschnitt && abschnitt !== letzterAbschnitt){
+      html += `<div class="tl-divider">${escHtml(abschnitt)}</div>`;
+      letzterAbschnitt = abschnitt;
+    } else if(!abschnitt && letzterAbschnitt !== null && i===0){
+      letzterAbschnitt = '';
+    }
+
+    const aktH=`<div class="tl-actions">
       <button class="tl-act-btn" onclick="tlKommentarBearbeiten(${i})">Kommentar</button>
+      <select class="tl-act-btn" onchange="tlAbschnittSetzen(${i},this.value)" style="cursor:pointer;">
+        ${ABSCHNITTE.map(ab=>`<option value="${ab}"${(s.abschnitt||'')=== ab?' selected':''}>${ab||'Kein Abschnitt'}</option>`).join('')}
+      </select>
       ${!dn&&s.aufgabeId?`<button class="tl-act-btn" onclick="tlAufgabeOeffnen('${escHtml(s.aufgabeId)}')">Aufgabe</button>`:''}
       ${!dn?`<button class="tl-act-btn" onclick="tlMorgen(${i})">→ Morgen</button>`:''}
       <button class="tl-act-btn" style="color:var(--danger);" onclick="tlEntfernen(${i})">×</button>
     </div>`;
-    return `<div class="tl-item">
+    html+=`<div class="tl-item">
       <div class="tl-cb ${cbK}" onclick="tlToggle(${i})"></div>
       <div class="tl-body">
         <div class="tl-text ${dn?'done':''}">${escHtml(tt)}</div>${nH}
-        ${chips?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">${chips}</div>`:''}${aH}
+        ${chips?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">${chips}</div>`:''}${aktH}
       </div>
       <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0;">
         <button class="tl-mv-btn" onclick="tlVerschieben(${i},-1)" ${i===0?'style="opacity:.3;"':''}>▲</button>
         <button class="tl-mv-btn" onclick="tlVerschieben(${i},1)" ${i===sc.length-1?'style="opacity:.3;"':''}>▼</button>
       </div>
     </div>`;
-  }).join(''):'<div style="padding:24px;text-align:center;color:#c0b8a8;font-size:13px;">Noch keine Einträge — tippe unten um zu beginnen.</div>';
+  });
+  iE.innerHTML=html||'<div style="padding:24px;text-align:center;color:#c0b8a8;font-size:calc(var(--fs)*0.82);">Noch keine Einträge — tippe unten um zu beginnen.</div>';
 }
+
+
 function tlToggle(i){
   const s=tlPlan.schritte[i];if(!s)return;
   const a=s.aufgabeId?DB.aufgaben.find(x=>x.id===s.aufgabeId):null;
@@ -3128,22 +3149,19 @@ function tlToggle(i){
   else{s.status=dn?'offen':'erledigt';tlPlan.geaendert=new Date().toISOString();setzeGeaendert();}
   renderTagesliste();if(aktiverScreen==='aufgaben')renderAufgabenScreen();
 }
-function tlEintragHinzufuegen(){
-  const inp=document.getElementById('tl-add-input');const t=inp?.value.trim();if(!t)return;
-  tlPlan.schritte.push({titel:t,status:'offen',aufgabeId:null,reihenfolge:tlPlan.schritte.length,delegiertAn:null,kommentar:null});
-  tlPlan.geaendert=new Date().toISOString();setzeGeaendert();inp.value='';renderTagesliste();
+function tlNeuerEintrag(){
+  // Plan-Dialog öffnen — hat Text/Neue Aufgabe/Bestehende Aufgabe bereits eingebaut
+  if(!tlPlan) tlPlan=tlPlanHolen();
+  openNeuerPlan(tlPlan.id);
 }
-function tlAufgabeVerknuepfen(){
-  const of=DB.aufgaben.filter(a=>a.status!=='erledigt');
-  if(!of.length){showToast('Keine offenen Aufgaben');return;}
-  const ls=of.map((a,i)=>(i+1)+'. '+a.titel).join('\n');
-  const e=prompt('Aufgabe (Nr.):\n\n'+ls);if(!e)return;
-  const nr=parseInt(e)-1;if(isNaN(nr)||nr<0||nr>=of.length)return;
-  const a=of[nr];
-  if(tlPlan.schritte.some(s=>s.aufgabeId===a.id)){showToast('Bereits in Tagesliste');return;}
-  tlPlan.schritte.push({titel:a.titel,status:a.status,aufgabeId:a.id,reihenfolge:tlPlan.schritte.length,delegiertAn:null,kommentar:null});
+function tlEintragHinzufuegen(){ tlNeuerEintrag(); }
+function tlAufgabeVerknuepfen(){ tlNeuerEintrag(); }
+function tlAbschnittSetzen(i, abschnitt){
+  const s=tlPlan.schritte[i];if(!s)return;
+  s.abschnitt=abschnitt||null;
   tlPlan.geaendert=new Date().toISOString();setzeGeaendert();renderTagesliste();
 }
+
 function tlVerschieben(i,r){const sc=tlPlan.schritte;const z=i+r;if(z<0||z>=sc.length)return;[sc[i],sc[z]]=[sc[z],sc[i]];tlPlan.geaendert=new Date().toISOString();setzeGeaendert();renderTagesliste();}
 function tlEntfernen(i){tlPlan.schritte.splice(i,1);tlPlan.geaendert=new Date().toISOString();setzeGeaendert();renderTagesliste();}
 function tlKommentarBearbeiten(i){const s=tlPlan.schritte[i];if(!s)return;const t=prompt('Kommentar:',s.kommentar||'');if(t===null)return;s.kommentar=t.trim()||null;tlPlan.geaendert=new Date().toISOString();setzeGeaendert();renderTagesliste();}
@@ -3166,7 +3184,7 @@ function planSchrittVerschieben(idx,r){
 // ── INIT ──
 (function(){
   zoomInit();
-  const c=`const CACHE='smallassist-v1_1_10';
+  const c=`const CACHE='smallassist-v1_1_11';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg','./icon-smallassist-maskable.svg'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
