@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.2.5</title>
+<title>SmallAssist 1.2.6</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -884,7 +884,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.2.5</span>
+      <span class="sb-logo-version">v1.2.6</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="tagesliste" onclick="zeigeScreen('tagesliste',this)">
@@ -1401,7 +1401,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 <script>
 'use strict';
 
-const APP_VERSION = '1.2.5';
+const APP_VERSION = '1.2.6';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1449,96 +1449,154 @@ function showToast(msg) {
 }
 
 // ── DATEI ──
+
+// IndexedDB: FileHandle zwischen Sessions speichern (einziger Weg auf Safari PWA)
+function idbOpen() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('smallassist', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('handles');
+    req.onsuccess = e => res(e.target.result);
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+async function idbSet(key, val) {
+  try {
+    const db = await idbOpen();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('handles', 'readwrite');
+      tx.objectStore('handles').put(val, key);
+      tx.oncomplete = () => res();
+      tx.onerror    = e => rej(e.target.error);
+    });
+  } catch(e) { /* ignore */ }
+}
+async function idbGet(key) {
+  try {
+    const db = await idbOpen();
+    return new Promise((res, rej) => {
+      const tx  = db.transaction('handles', 'readonly');
+      const req = tx.objectStore('handles').get(key);
+      req.onsuccess = e => res(e.target.result);
+      req.onerror   = e => rej(e.target.error);
+    });
+  } catch(e) { return null; }
+}
+async function idbDel(key) {
+  try {
+    const db = await idbOpen();
+    return new Promise((res) => {
+      const tx = db.transaction('handles', 'readwrite');
+      tx.objectStore('handles').delete(key);
+      tx.oncomplete = () => res();
+    });
+  } catch(e) { /* ignore */ }
+}
+
 async function dateiClick() {
   if (fileHandle) {
     fileHandle = null; DB = null;
-    document.getElementById('topbar-file').textContent = 'Keine Datei geladen';
-    document.getElementById('btn-datei').textContent = '📂 Öffnen';
+    await idbDel('handle');
+    document.getElementById('topbar-file').textContent = '–';
+    document.getElementById('btn-datei').textContent = '📂';
     zeigeScreenDirekt('nofile');
     return;
   }
-  // File System Access API (Chrome/Edge) mit Fallback für Safari/iOS
   if (window.showOpenFilePicker) {
     try {
-      const [h] = await window.showOpenFilePicker({ types: [{ description:'JSON', accept:{'application/json':['.json']} }] });
+      const [h] = await window.showOpenFilePicker({
+        types: [{ description:'JSON', accept:{'application/json':['.json']} }]
+      });
       fileHandle = h;
+      await idbSet('handle', h); // Handle für nächste Session speichern
       await ladeDatei();
-    } catch(e) { if (e.name !== 'AbortError') showToast('❌ Fehler beim Öffnen'); }
+    } catch(e) { if (e.name !== 'AbortError') showToast('❌ ' + e.message); }
   } else {
-    // Safari/iPadOS Fallback: <input type="file">
+    // Fallback: <input type="file"> (ältere Browser)
     const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,application/json';
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+    input.type = 'file'; input.accept = '.json,application/json';
+    input.onchange = async (ev) => {
+      const file = ev.target.files[0]; if (!file) return;
       try {
         const text = await file.text();
-        const cleanText2 = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
-        const parsed2 = JSON.parse(cleanText2);
-        if (!parsed2 || typeof parsed2 !== 'object') throw new Error('Kein gültiges JSON');
-        if (!Array.isArray(parsed2.aufgaben)) parsed2.aufgaben = [];
-        DB = parsed2;
-        migrateDB();
-        // Kein fileHandle → speichern per Download
-        safariFile = file;
-        document.getElementById('topbar-file').textContent = '✓ ' + file.name + ' (nur lesen)';
-        document.getElementById('btn-datei').textContent = '✕ Schließen';
-        renderSidebar();
-        zeigeScreenDirekt('tagesliste');
-        renderTagesliste();
-  renderAufgabenScreen();
-      } catch(err) { showToast('❌ Datei konnte nicht gelesen werden'); }
+        await _ladeText(text, file.name);
+      } catch(err) { showToast('❌ ' + err.message); }
     };
     input.click();
   }
 }
 
-let safariFile = null; // Safari-Modus: File-Objekt ohne Handle
-
 async function speichern() {
   if (!DB) return;
-  if (fileHandle) {
-    try {
-      const w = await fileHandle.createWritable();
-      await w.write(JSON.stringify(DB, null, 2));
-      await w.close();
-      ungespeichert = false;
-    } catch(e) { showToast('❌ Speichern fehlgeschlagen'); }
-  } else if (safariFile) {
-    // Safari: Download als Datei
-    const blob = new Blob([JSON.stringify(DB, null, 2)], { type:'application/json' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = safariFile.name;
-    a.click();
-    URL.revokeObjectURL(url);
+  if (!fileHandle) return;
+  try {
+    // Berechtigungsprüfung — Safari PWA braucht queryPermission
+    let perm = await fileHandle.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') {
+      perm = await fileHandle.requestPermission({ mode: 'readwrite' });
+    }
+    if (perm !== 'granted') {
+      showToast('⚠️ Schreibzugriff nicht erteilt');
+      return;
+    }
+    const w = await fileHandle.createWritable();
+    await w.write(JSON.stringify(DB, null, 2));
+    await w.close();
     ungespeichert = false;
-    showToast('💾 Als Download gespeichert');
+  } catch(e) {
+    showToast('❌ Speichern: ' + (e.message || e));
   }
+}
+
+async function _ladeText(text, name) {
+  const clean  = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+  const parsed = JSON.parse(clean);
+  if (!parsed || typeof parsed !== 'object') throw new Error('Kein gültiges JSON');
+  if (!Array.isArray(parsed.aufgaben)) parsed.aufgaben = [];
+  DB = parsed;
+  migrateDB();
+  document.getElementById('topbar-file').textContent = '✓ ' + name;
+  document.getElementById('btn-datei').textContent = '📂';
+  renderSidebar();
+  zeigeScreenDirekt('tagesliste');
+  renderTagesliste();
+  renderAufgabenScreen();
 }
 
 async function ladeDatei() {
   try {
     const file = await fileHandle.getFile();
-    const text = await file.text();
-    // BOM entfernen falls vorhanden
-    const cleanText = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
-    const parsed = JSON.parse(cleanText);
-    // Validierung: mindestens aufgaben muss vorhanden sein
-    if (!parsed || typeof parsed !== 'object') throw new Error('Kein gültiges JSON-Objekt');
-    if (!Array.isArray(parsed.aufgaben)) parsed.aufgaben = [];
-    DB = parsed;
-    migrateDB();
-    document.getElementById('topbar-file').textContent = '✓ ' + file.name;
-    document.getElementById('btn-datei').textContent = '✕ Schließen';
-    renderSidebar();
-    zeigeScreenDirekt('tagesliste');
-    renderTagesliste();
-    renderAufgabenScreen();
+    await _ladeText(await file.text(), file.name);
   } catch(e) {
-    showToast('❌ Fehler: ' + (e.message || 'Datei konnte nicht gelesen werden'));
+    showToast('❌ ' + (e.message || 'Datei konnte nicht gelesen werden'));
   }
+}
+
+// Beim Start: gespeicherten Handle wiederherstellen
+async function handleWiederherstellen() {
+  try {
+    const h = await idbGet('handle');
+    if (!h) return;
+    // Berechtigungen prüfen ohne zu fragen (darf nicht im Hintergrund fragen)
+    const perm = await h.queryPermission({ mode: 'readwrite' });
+    if (perm === 'granted') {
+      fileHandle = h;
+      await ladeDatei();
+    } else {
+      // Handle merken, Nutzer muss einmal tippen zum Freigeben
+      fileHandle = h;
+      document.getElementById('topbar-file').textContent = '⚡ Tippen zum Öffnen';
+      document.getElementById('btn-datei').textContent = '📂';
+      // Einmaligen Klick-Handler für Re-Auth
+      document.getElementById('btn-datei').addEventListener('click', async function einmalig() {
+        this.removeEventListener('click', einmalig);
+        try {
+          const p = await fileHandle.requestPermission({ mode: 'readwrite' });
+          if (p === 'granted') await ladeDatei();
+          else { fileHandle = null; showToast('Zugriff verweigert'); }
+        } catch(e) { fileHandle = null; }
+      }, { once: true });
+    }
+  } catch(e) { /* kein gespeicherter Handle */ }
 }
 
 
@@ -3618,7 +3676,8 @@ function planSchrittVerschieben(idx,r){
 (function(){
   themeInit();
   zoomInit();
-  const c=`const CACHE='smallassist-v1_2_5';
+  handleWiederherstellen();
+  const c=`const CACHE='smallassist-v1_2_6';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg','./icon-smallassist-maskable.svg'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
