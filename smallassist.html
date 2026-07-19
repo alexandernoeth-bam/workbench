@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.1.2</title>
+<title>SmallAssist 1.1.3</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -824,7 +824,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.1.2</span>
+      <span class="sb-logo-version">v1.1.3</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="tagesliste" onclick="zeigeScreen('tagesliste',this)">
@@ -1278,7 +1278,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 <script>
 'use strict';
 
-const APP_VERSION = '1.1.2';
+const APP_VERSION = '1.1.3';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1528,6 +1528,113 @@ function listeFarbe(tag) {
 }
 
 // ── DASHBOARD ──
+function aufgabeSchnellLoeschen(id) {
+  DB.aufgaben = DB.aufgaben.filter(a => a.id !== id);
+  setzeGeaendert();
+  renderSidebar();
+  if (aktiverScreen === 'aufgaben')   renderAufgabenScreen();
+  if (aktiverScreen === 'tagesliste') renderTagesliste();
+  if (aktiverScreen === 'listen')     renderListenScreen();
+  showToast('Aufgabe gelöscht');
+}
+
+function planAufgabeWaehlen(idx, aufgabeId) {
+  const s = planSchritte[idx]; if (!s) return;
+  const a = DB.aufgaben.find(x => x.id === aufgabeId);
+  if (!a) return;
+  s.aufgabeId = aufgabeId; s.titel = a.titel; s.status = a.status;
+  if (s._sucheOffen) delete s._sucheOffen;
+  planRenderSchritte();
+}
+
+function aufgZeileHTML(a, td) {
+  const istLate = a.faellig && a.faellig < td && a.status !== 'erledigt';
+  const loeschBtn = a.status === 'erledigt'
+    ? `<button title="Löschen" style="border:none;background:none;cursor:pointer;padding:2px 4px;color:#aaa;flex-shrink:0;"
+        onclick="event.stopPropagation();aufgabeSchnellLoeschen('${escHtml(a.id)}')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      </button>`
+    : '';
+  return `<div class="aufg-row" data-id="${escHtml(a.id)}">
+    <div class="aufg-status-dot ${a.status||'offen'}"></div>
+    <div class="aufg-titel ${a.status==='erledigt'?'erledigt':''}">${escHtml(a.titel||'(ohne Titel)')}</div>
+    ${a.faellig ? `<div class="aufg-deadline ${istLate?'late':''}">${formatDatum(a.faellig)}</div>` : ''}
+    ${loeschBtn}
+  </div>`;
+}
+
+function planAufgabeSuche(idx, query) {
+  const res = document.getElementById(`plan-aufg-ergebnisse-${idx}`);
+  if (!res) return;
+  const q = query.trim().toLowerCase();
+  if (!q) { res.style.display = 'none'; return; }
+
+  // Bereits im Plan genutzte IDs ausschließen
+  const genutzt = new Set(planSchritte.map(s => s.aufgabeId).filter(Boolean));
+  const treffer = (DB.aufgaben || [])
+    .filter(a => !genutzt.has(a.id) &&
+      (a.titel.toLowerCase().includes(q) || (a.untertitel||'').toLowerCase().includes(q)))
+    .slice(0, 10);
+
+  if (!treffer.length) {
+    res.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-xdim);">Keine Treffer</div>';
+  } else {
+    res.innerHTML = treffer.map(a => {
+      const b = a.bereichId ? DB.bereiche.find(b=>b.id===a.bereichId)?.name : '';
+      const statusLabel = a.status === 'erledigt' ? ' ✓' : a.status === 'inArbeit' ? ' ↻' : '';
+      return `<div onclick="planAufgabeWaehlen(${idx},'${a.id}')"
+        style="padding:6px 10px;cursor:pointer;border-bottom:1px solid var(--border);font-size:11px;"
+        onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+        <div style="font-weight:600;">${a.titel}${statusLabel}</div>
+        ${b ? `<div style="font-size:10px;color:var(--text-xdim);">${b}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+  res.style.display = 'block';
+}
+
+let planDragIdx = null;
+
+
+function planDragStart(event, idx) {
+  planDragIdx = idx;
+  event.dataTransfer.effectAllowed = 'move';
+  // Row markieren (Parent des Handles)
+  const row = event.currentTarget.closest('.plan-schritt-row');
+  if (row) row.classList.add('dragging');
+}
+
+
+function planDragOver(event, idx) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  // Highlight-Border an der Ziel-Zeile
+  document.querySelectorAll('.plan-schritt-row').forEach(r => r.classList.remove('drag-over'));
+  if (idx !== planDragIdx) event.currentTarget.classList.add('drag-over');
+}
+
+
+function planDrop(event, idx) {
+  event.preventDefault();
+  if (planDragIdx === null || planDragIdx === idx) return;
+  // Element verschieben
+  const verschoben = planSchritte.splice(planDragIdx, 1)[0];
+  // Status NIEMALS auf erledigt übernehmen durch Positionswechsel
+  // (bleibt was er war – kein Reset, aber kein Autopromote)
+  planSchritte.splice(idx, 0, verschoben);
+  planDragIdx = null;
+  planRenderSchritte();
+}
+
+
+function planDragEnd(event) {
+  document.querySelectorAll('.plan-schritt-row').forEach(r => {
+    r.classList.remove('dragging', 'drag-over');
+  });
+  planDragIdx = null;
+}
+
+
 function renderAufgabenScreen() {
   const container = document.getElementById('aufg-liste');
   const countEl   = document.getElementById('aufg-count');
@@ -3060,7 +3167,7 @@ function planSchrittVerschieben(idx,r){
 // ── INIT ──
 (function(){
   zoomInit();
-  const c=`const CACHE='smallassist-v1_1_2';
+  const c=`const CACHE='smallassist-v1_1_3';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg','./icon-smallassist-maskable.svg'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
