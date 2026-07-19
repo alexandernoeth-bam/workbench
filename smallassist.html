@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.0.3</title>
+<title>SmallAssist 1.0.4</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -41,7 +41,24 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   flex-direction: column;
   flex-shrink: 0;
   overflow: hidden;
+  transition: width 0.2s ease;
 }
+#sidebar.versteckt {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+#btn-sidebar-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  color: var(--text-dim);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+}
+#btn-sidebar-toggle:hover { background: var(--bg); }
 .sb-logo {
   padding: 14px 14px 10px;
   display: flex;
@@ -769,7 +786,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.0.3</span>
+      <span class="sb-logo-version">v1.0.4</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="dashboard" onclick="zeigeScreen('dashboard',this)">
@@ -796,6 +813,9 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <!-- MAIN -->
   <div id="main">
     <div class="topbar">
+      <button id="btn-sidebar-toggle" onclick="sidebarToggle()" title="Sidebar ein-/ausblenden">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
       <span class="topbar-title" id="topbar-title">Dashboard</span>
       <span class="topbar-sub" id="topbar-file">Keine Datei geladen</span>
       <div class="topbar-actions">
@@ -1173,7 +1193,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 <script>
 'use strict';
 
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.0.4';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1196,6 +1216,11 @@ function formatDatum(iso) {
   return tage[d.getDay()] + ', ' + tt + '.' + mm + '.' + jj;
 }
 function today() { return new Date().toISOString().slice(0,10); }
+
+function sidebarToggle() {
+  const sb = document.getElementById('sidebar');
+  sb.classList.toggle('versteckt');
+}
 function escHtml(s) {
   if (typeof s !== 'string') return '';
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1903,7 +1928,8 @@ function notizOeffnen(id) {
   document.getElementById('notiz-leer-state').style.display = 'none';
   document.getElementById('notiz-editor-inner').style.display = 'flex';
   document.getElementById('notiz-btn-back').style.display = n.parentId ? '' : 'none';
-  notizToggleView(false);
+  // Bestehende Notiz: Render-Ansicht. Neue Notiz: Edit-Ansicht (wird in notizNeu gesetzt)
+  notizToggleView(true);
   const uszBtn = document.getElementById('notiz-usz-btn');
   const unterseiten = (DB.notizen||[]).filter(x=>x.parentId===id);
   if (uszBtn) uszBtn.textContent = unterseiten.length ? `Unterseiten (${unterseiten.length})` : 'Unterseiten';
@@ -1922,6 +1948,8 @@ function notizNeu(parentId) {
   setzeGeaendert();
   renderNotizenListe();
   notizOeffnen(n.id);
+  // Neue Notiz: direkt in Edit-Ansicht
+  notizToggleView(false);
   setTimeout(()=>document.getElementById('notiz-edit-titel')?.focus(),50);
 }
 
@@ -2690,120 +2718,13 @@ function planBereichOeffnen() { closeNeuerPlanModal(); }
 
 
 function openPlanQuickView(planId) {
-  const p = (DB.plaene||[]).find(x => x.id === planId);
-  if (!p) return;
-
-  // Pills
-  const PRIO_LABELS  = { krise:'☆ Krise', hoch:'↑ Hoch', mittel:'— Mittel', niedrig:'↓ Niedrig' };
-  const PRIO_STYLES  = {
-    krise:   'background:#fad7d4;color:#922b21;',
-    hoch:    'background:#fde8dd;color:#9a3412;',
-    mittel:  'background:#fef3c7;color:#92400e;',
-    niedrig: 'background:var(--teal-xlight);color:var(--teal-dark);',
-  };
-  const HZ_LABELS = { kurzfristig:'⚡ Kurzfristig', mittelfristig:'📅 Mittelfristig', langfristig:'🕐 Langfristig' };
-  const HZ_STYLES = {
-    kurzfristig:   'background:var(--teal-xlight);color:var(--teal-dark);',
-    mittelfristig: 'background:#e3f0fc;color:#1565c0;',
-    langfristig:   'background:#f3e8ff;color:#6b21a8;',
-  };
-  const prioStyle = PRIO_STYLES[p.prioritaet||'mittel'] || '';
-  const hzStyle   = HZ_STYLES[p.horizont||'kurzfristig'] || '';
-  const pillHtml  =
-    `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;${prioStyle}">${PRIO_LABELS[p.prioritaet||'mittel']||p.prioritaet}</span>` +
-    `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;${hzStyle}">${HZ_LABELS[p.horizont||'kurzfristig']||p.horizont}</span>`;
-
-  document.getElementById('qv-plan-titel').textContent = p.titel;
-  document.getElementById('qv-plan-edit-id').value     = planId;
-
-  // Bereich-Chip
-  const bereichChip = document.getElementById('qv-plan-bereich-chip');
-  if (p.bereichId) {
-    const b = ((DB.bereiche||[])||[]).find(x => x.id === p.bereichId);
-    if (b && bereichChip) {
-      bereichChip.style.display = 'inline-flex';
-      bereichChip.innerHTML = `<span
-        onclick="qvBereichOeffnen('${b.id}')"
-        style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
-          padding:2px 8px;border-radius:10px;background:#e8f4f5;color:var(--teal-dark);
-          cursor:pointer;border:1px solid var(--border);transition:background .12s;"
-        onmouseover="this.style.background='var(--teal-xlight)'"
-        onmouseout="this.style.background='#e8f4f5'">
-        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-        ${escHtml(b.name)}
-        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </span>`;
-    } else if (bereichChip) {
-      bereichChip.style.display = 'none';
-      bereichChip.innerHTML = '';
-    }
-  } else if (bereichChip) {
-    bereichChip.style.display = 'none';
-    bereichChip.innerHTML = '';
-  }
-
-  document.getElementById('qv-plan-pills').innerHTML = pillHtml;
-
-  // Notiz-Vorschau (max 3 Zeilen)
-  const notizEl = document.getElementById('qv-plan-notiz');
-  if (p.notiz) {
-    const zeilen = p.notiz.split('\n').slice(0,3);
-    notizEl.innerHTML = zeilen.map(z => {
-      z = escHtml(z);
-      z = z.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
-      z = z.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" style="color:var(--teal-dark);">$1</a>');
-      z = z.replace(/^- \[x\] /i,'☑ ');
-      z = z.replace(/^- \[ \] /,'☐ ');
-      return `<div>${z}</div>`;
-    }).join('');
-    notizEl.style.display = 'block';
-  } else {
-    notizEl.style.display = 'none';
-  }
-
-  // Schritte
-  const schritte = (p.schritte||[]).sort((a,b)=>(a.reihenfolge||0)-(b.reihenfolge||0));
-  const sl = document.getElementById('qv-plan-schritte');
-  sl.innerHTML = schritte.map((s, idx) => {
-    const a       = s.aufgabeId ? DB.aufgaben.find(x=>x.id===s.aufgabeId) : null;
-    const titel   = a?.titel || s.titel || '';
-    const status  = a?.status || s.status || 'offen';
-    const isDone  = status === 'erledigt';
-    const checkSvg = isDone
-      ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>'
-      : '';
-    const delBadge = s.delegiertAn
-      ? `<span style="font-size:9px;background:#e3f0fc;color:#1565c0;padding:1px 5px;border-radius:4px;font-weight:600;flex-shrink:0;">→ ${escHtml(s.delegiertAn)}</span>`
-      : '';
-    const numIcon = isDone
-      ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
-      : (idx + 1);
-    const isNext = !isDone && schritte.slice(0, idx).every(x => {
-      const xs = x.aufgabeId ? (DB.aufgaben.find(a=>a.id===x.aufgabeId)?.status||x.status) : x.status;
-      return xs === 'erledigt';
-    });
-    const numStyle = isDone
-      ? 'background:var(--teal);border-color:var(--teal);color:#fff;'
-      : isNext
-        ? 'border-color:var(--teal);color:var(--teal-dark);'
-        : 'color:var(--text-xdim);';
-    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;cursor:pointer;transition:background .12s;"
-      onmouseover="this.style.background='var(--teal-xlight)'" onmouseout="this.style.background=''"
-      onclick="qvSchrittToggle('${planId}',${idx},this)">
-      <div style="width:18px;height:18px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:8px;font-weight:700;${numStyle}">
-        ${numIcon}
-      </div>
-      <span style="flex:1;font-size:12px;${isDone?'text-decoration:line-through;color:var(--text-xdim);':isNext?'font-weight:600;':''}">${escHtml(titel)}</span>
-      ${delBadge}
-    </div>`;
-  }).join('');
-
-  document.getElementById('modal-plan-quickview').classList.add('open');
+  // Quick-View in SmallAssist nicht vorhanden — direkt Plan-Dialog öffnen
+  openNeuerPlan(planId);
 }
 
 
 function closePlanQuickView() {
-  document.getElementById('modal-plan-quickview').classList.remove('open');
+  // QV Modal nicht vorhanden in SmallAssist
 }
 
 
@@ -2889,7 +2810,7 @@ function planSchrittEntfernen(idx) {
 // ── PWA: SW inline ──
 (function() {
   if ('serviceWorker' in navigator) {
-    const swCode = `const CACHE='smallassist-v1_0_3';
+    const swCode = `const CACHE='smallassist-v1_0_4';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
