@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.2.1</title>
+<title>SmallAssist 1.2.2</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -852,7 +852,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.2.1</span>
+      <span class="sb-logo-version">v1.2.2</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="tagesliste" onclick="zeigeScreen('tagesliste',this)">
@@ -1137,6 +1137,36 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
         <div class="listen-auswahl" id="aufg-listen-auswahl"></div>
       </div>
       <div class="field-group">
+        <div class="field-label">Wiederholung</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <select class="field-select" id="aufg-wiederhol-typ" onchange="aufgWiederholTypGeaendert()" style="flex:1;min-width:130px;">
+            <option value="">Keine</option>
+            <option value="taeglich">Täglich</option>
+            <option value="woechentlich">Wöchentlich</option>
+            <option value="monatlich">Monatlich</option>
+            <option value="jaehrlich">Jährlich</option>
+          </select>
+          <div id="aufg-wiederhol-intervall-wrap" style="display:none;align-items:center;gap:4px;flex-shrink:0;">
+            <span style="font-size:calc(var(--fs)*0.75);color:var(--text-dim);">alle</span>
+            <input type="number" class="field-input" id="aufg-wiederhol-intervall" min="1" max="99" value="1"
+              style="width:52px;padding:6px 8px;text-align:center;">
+            <span id="aufg-wiederhol-einheit" style="font-size:calc(var(--fs)*0.75);color:var(--text-dim);">Tage</span>
+          </div>
+        </div>
+        <div id="aufg-wiederhol-wt-wrap" style="display:none;margin-top:6px;display:none;">
+          <div style="font-size:calc(var(--fs)*0.69);color:var(--text-dim);margin-bottom:4px;">Wochentage:</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;" id="aufg-wt-buttons">
+            <button type="button" class="aufg-wt-btn" data-wt="1" onclick="aufgWtToggle(this)" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:calc(var(--fs)*0.69);background:var(--bg);color:var(--text-dim);cursor:pointer;font-family:var(--font);">Mo</button>
+            <button type="button" class="aufg-wt-btn" data-wt="2" onclick="aufgWtToggle(this)" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:calc(var(--fs)*0.69);background:var(--bg);color:var(--text-dim);cursor:pointer;font-family:var(--font);">Di</button>
+            <button type="button" class="aufg-wt-btn" data-wt="3" onclick="aufgWtToggle(this)" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:calc(var(--fs)*0.69);background:var(--bg);color:var(--text-dim);cursor:pointer;font-family:var(--font);">Mi</button>
+            <button type="button" class="aufg-wt-btn" data-wt="4" onclick="aufgWtToggle(this)" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:calc(var(--fs)*0.69);background:var(--bg);color:var(--text-dim);cursor:pointer;font-family:var(--font);">Do</button>
+            <button type="button" class="aufg-wt-btn" data-wt="5" onclick="aufgWtToggle(this)" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:calc(var(--fs)*0.69);background:var(--bg);color:var(--text-dim);cursor:pointer;font-family:var(--font);">Fr</button>
+            <button type="button" class="aufg-wt-btn" data-wt="6" onclick="aufgWtToggle(this)" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:calc(var(--fs)*0.69);background:var(--bg);color:var(--text-dim);cursor:pointer;font-family:var(--font);">Sa</button>
+            <button type="button" class="aufg-wt-btn" data-wt="7" onclick="aufgWtToggle(this)" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:calc(var(--fs)*0.69);background:var(--bg);color:var(--text-dim);cursor:pointer;font-family:var(--font);">So</button>
+          </div>
+        </div>
+      </div>
+      <div class="field-group">
         <div class="field-label">Notiz</div>
         <textarea class="field-input" id="aufg-notiz" rows="3" placeholder="Optionale Notiz …" style="resize:none;" oninput="aufgModalGeaendert()"></textarea>
       </div>
@@ -1335,7 +1365,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 <script>
 'use strict';
 
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.2.2';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1972,6 +2002,7 @@ function aufgabeNeu() {
   document.getElementById('aufg-titel').value = '';
   document.getElementById('aufg-deadline').value = '';
   document.getElementById('aufg-notiz').value = '';
+  aufgWiederholungLaden(null);
   document.getElementById('aufg-modal-titel').textContent = 'Neue Aufgabe';
   document.getElementById('aufg-btn-loeschen').style.display = 'none';
   aufgStatusSetzen('offen');
@@ -1993,6 +2024,7 @@ function aufgabeBearbeiten(id) {
   document.getElementById('aufg-btn-loeschen').style.display = '';
   aufgStatusSetzen(a.status || 'offen');
   renderAufgListenAuswahl(a.tags||[]);
+  aufgWiederholungLaden(a.wiederholung || null);
   document.getElementById('modal-aufgabe').classList.add('open');
 }
 
@@ -2031,6 +2063,64 @@ function aufgNeueListe() {
 
 function aufgModalGeaendert() { /* auto-save optional */ }
 
+function aufgWiederholTypGeaendert() {
+  const typ = document.getElementById('aufg-wiederhol-typ').value;
+  const ivWrap = document.getElementById('aufg-wiederhol-intervall-wrap');
+  const wtWrap = document.getElementById('aufg-wiederhol-wt-wrap');
+  const einheit = document.getElementById('aufg-wiederhol-einheit');
+  if (!typ) {
+    ivWrap.style.display = 'none';
+    wtWrap.style.display = 'none';
+    return;
+  }
+  ivWrap.style.display = 'flex';
+  const einheiten = { taeglich:'Tage', woechentlich:'Wochen', monatlich:'Monate', jaehrlich:'Jahre' };
+  einheit.textContent = einheiten[typ] || 'Tage';
+  wtWrap.style.display = typ === 'woechentlich' ? 'block' : 'none';
+}
+
+function aufgWtToggle(btn) {
+  const aktiv = btn.style.background === 'var(--teal)' || btn.classList.contains('wt-aktiv');
+  if (aktiv) {
+    btn.style.background = 'var(--bg)'; btn.style.color = 'var(--text-dim)';
+    btn.classList.remove('wt-aktiv');
+  } else {
+    btn.style.background = 'var(--teal)'; btn.style.color = 'white';
+    btn.classList.add('wt-aktiv');
+  }
+}
+
+function aufgWiederholungLaden(w) {
+  const typEl = document.getElementById('aufg-wiederhol-typ');
+  if (!w) { typEl.value = ''; aufgWiederholTypGeaendert(); return; }
+  const typMap = { taeglich:'taeglich', woechentlich:'woechentlich', monatlich:'monatlich', jaehrlich:'jaehrlich' };
+  typEl.value = typMap[w.typ] || '';
+  document.getElementById('aufg-wiederhol-intervall').value = w.intervall || 1;
+  aufgWiederholTypGeaendert();
+  if (w.typ === 'woechentlich' && w.wochentage) {
+    document.querySelectorAll('.aufg-wt-btn').forEach(btn => {
+      if (w.wochentage.includes(parseInt(btn.dataset.wt))) {
+        btn.style.background = 'var(--teal)'; btn.style.color = 'white';
+        btn.classList.add('wt-aktiv');
+      } else {
+        btn.style.background = 'var(--bg)'; btn.style.color = 'var(--text-dim)';
+        btn.classList.remove('wt-aktiv');
+      }
+    });
+  }
+}
+
+function aufgWiederholungLesen() {
+  const typ = document.getElementById('aufg-wiederhol-typ').value;
+  if (!typ) return null;
+  const intervall = parseInt(document.getElementById('aufg-wiederhol-intervall').value) || 1;
+  const w = { typ, intervall };
+  if (typ === 'woechentlich') {
+    w.wochentage = [...document.querySelectorAll('.aufg-wt-btn.wt-aktiv')].map(b => parseInt(b.dataset.wt));
+  }
+  return w;
+}
+
 function aufgabeSpeichern() {
   const titel = document.getElementById('aufg-titel').value.trim();
   if (!titel) { showToast('Bitte Titel eingeben'); return; }
@@ -2042,23 +2132,26 @@ function aufgabeSpeichern() {
   if (aufgEditId) {
     const a = DB.aufgaben.find(x=>x.id===aufgEditId);
     if (a) {
-      a.titel    = titel;
-      a.status   = aufgStatus;
-      a.faellig  = faellig;
-      a.notiz    = notiz;
-      a.tags     = tags;
-      a.geaendert = new Date().toISOString();
+      a.titel       = titel;
+      a.status      = aufgStatus;
+      a.faellig     = faellig;
+      a.notiz       = notiz;
+      a.tags        = tags;
+      a.wiederholung = aufgWiederholungLesen();
+      a.geaendert   = new Date().toISOString();
     }
   } else {
     DB.aufgaben.push({
-      id:       uid(),
+      id:         uid(),
       titel,
-      status:   aufgStatus,
+      status:     aufgStatus,
       faellig,
       notiz,
       tags,
-      erstellt:  new Date().toISOString(),
-      geaendert: new Date().toISOString(),
+      wiederholung: aufgWiederholungLesen(),
+      nichtMehrAktiv: false,
+      erstellt:   new Date().toISOString(),
+      geaendert:  new Date().toISOString(),
     });
   }
   setzeGeaendert();
@@ -3443,7 +3536,7 @@ function planSchrittVerschieben(idx,r){
 // ── INIT ──
 (function(){
   zoomInit();
-  const c=`const CACHE='smallassist-v1_2_1';
+  const c=`const CACHE='smallassist-v1_2_2';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg','./icon-smallassist-maskable.svg'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
