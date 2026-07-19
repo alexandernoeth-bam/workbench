@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.1.12</title>
+<title>SmallAssist 1.2.0</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -780,6 +780,34 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 .notiz-plan-link:hover { background: var(--teal-light); }
 
 /* ── TAGESLISTE ── */
+.tl-edit-item { padding: 8px 14px; border-bottom: 1px solid #f0ede4; display: flex; gap: 8px; align-items: flex-start; background: #fff; }
+.tl-drag { color: #d0c8b8; font-size: 15px; flex-shrink: 0; padding-top: 3px; line-height: 1; }
+.tl-edit-body { flex: 1; min-width: 0; }
+.tl-edit-row1 { display: flex; align-items: center; gap: 6px; }
+.tl-edit-text { font-size: calc(var(--fs) * 0.82); color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-edit-mv { display: flex; gap: 2px; flex-shrink: 0; }
+.tl-edit-mvb { border: none; background: #f0ede4; border-radius: 4px; padding: 2px 6px; color: #888; font-size: calc(var(--fs) * 0.69); cursor: pointer; line-height: 1.4; }
+.tl-edit-row2 { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
+.tl-edit-sub { font-size: calc(var(--fs) * 0.63); color: #a09880; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-edit-acts { display: flex; gap: 3px; flex-shrink: 0; }
+.tl-eab { border: none; border-radius: 4px; padding: 3px 7px; font-size: calc(var(--fs) * 0.63); cursor: pointer; font-weight: 500; font-family: var(--font); }
+.tl-eab.sec { background: #f0ede4; color: #555; }
+.tl-eab.mor { background: #e3f0fc; color: #1565c0; }
+.tl-eab.del { background: #fdeaea; color: #c62828; }
+.tl-edit-section { padding: 6px 14px 2px; font-size: calc(var(--fs) * 0.59); color: #c0b8a8; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; background: #fafaf7; border-bottom: 1px solid #f0ede4; }
+.tl-add-section { background: #fafaf7; border-top: 1px solid #e8e4d8; padding: 10px 14px; flex-shrink: 0; }
+.tl-add-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.tl-add-inp { flex: 2; border: 1px solid #e8e4d8; border-radius: 7px; padding: 8px 10px; font-size: calc(var(--fs) * 0.75); background: white; color: var(--text); outline: none; font-family: var(--font); }
+.tl-add-sel { border: 1px solid #e8e4d8; border-radius: 7px; padding: 8px; font-size: calc(var(--fs) * 0.69); background: white; color: var(--text); outline: none; font-family: var(--font); }
+.tl-add-btns { display: flex; gap: 6px; }
+.tl-add-abtn { flex: 1; border: none; border-radius: 7px; padding: 8px; font-size: calc(var(--fs) * 0.69); font-weight: 600; cursor: pointer; font-family: var(--font); }
+.tl-add-abtn.aufg { background: #e3f0fc; color: #1565c0; }
+.tl-add-abtn.text { background: var(--teal-dark); color: white; }
+/* Aufgaben-Auswahl Overlay */
+.tl-aufg-overlay { position: absolute; bottom: 60px; left: 10px; right: 10px; background: white; border: 1px solid var(--border); border-radius: 10px; max-height: 220px; overflow-y: auto; z-index: 50; }
+.tl-aufg-item { padding: 9px 14px; border-bottom: 1px solid #f0ede4; font-size: calc(var(--fs) * 0.75); color: var(--text); cursor: pointer; }
+.tl-aufg-item:hover { background: var(--teal-xlight); }
+.tl-aufg-item:last-child { border-bottom: none; }
 #screen-tagesliste { flex-direction: column !important; background: #f7f6f2; overflow: hidden; height: 100%; }
 .tl-paper { background: #fff; flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 .tl-header { padding: 18px 20px 10px; border-bottom: 1.5px solid #e8e4d8; flex-shrink: 0; }
@@ -824,7 +852,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.1.12</span>
+      <span class="sb-logo-version">v1.2.0</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="tagesliste" onclick="zeigeScreen('tagesliste',this)">
@@ -883,19 +911,51 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
     </div>
 
     <!-- TAGESLISTE -->
-    <div class="screen" id="screen-tagesliste">
+    <div class="screen" id="screen-tagesliste" style="position:relative;">
       <div class="tl-paper">
-        <div class="tl-header">
-          <div class="tl-datum-label" id="tl-datum-label"></div>
-          <div class="tl-titel" id="tl-titel">Mein Tag</div>
-          <div class="tl-meta" id="tl-meta"></div>
-        </div>
-        <div class="tl-items" id="tl-items"></div>
-        <div class="tl-add-bar">
-          <button class="tl-add-btn pri" style="flex:1;padding:10px;font-size:calc(var(--fs)*0.88);display:flex;align-items:center;justify-content:center;gap:8px;" onclick="tlNeuerEintrag()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Eintrag hinzufügen
+        <div class="tl-header" style="display:flex;align-items:flex-start;gap:8px;">
+          <div style="flex:1;">
+            <div class="tl-datum-label" id="tl-datum-label"></div>
+            <div class="tl-titel" id="tl-titel">Mein Tag</div>
+            <div class="tl-meta" id="tl-meta"></div>
+          </div>
+          <button id="tl-edit-toggle" onclick="tlToggleBearbeiten()"
+            style="border:none;background:var(--teal-xlight);color:var(--teal-dark);border-radius:7px;padding:5px 10px;font-size:calc(var(--fs)*0.69);font-weight:600;cursor:pointer;font-family:var(--font);flex-shrink:0;margin-top:2px;">
+            ✏ Bearbeiten
           </button>
+        </div>
+        <!-- LESE-ANSICHT -->
+        <div id="tl-lese" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;">
+          <div class="tl-items" id="tl-items"></div>
+          <div class="tl-add-bar">
+            <input class="tl-add-input" id="tl-add-input" placeholder="Schnell-Text …" onkeydown="if(event.key==='Enter')tlSchnellText()">
+            <button class="tl-add-btn sec" onclick="tlAufgabeOverlayToggle()" title="Aufgabe verknüpfen" style="flex-shrink:0;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+          </div>
+          <div id="tl-aufg-overlay" class="tl-aufg-overlay" style="display:none;"></div>
+        </div>
+        <!-- BEARBEITEN-ANSICHT -->
+        <div id="tl-edit" style="flex:1;display:none;flex-direction:column;overflow:hidden;min-height:0;">
+          <div id="tl-edit-items" style="flex:1;overflow-y:auto;background:#fff;min-height:0;"></div>
+          <div class="tl-add-section">
+            <div class="tl-add-row">
+              <input class="tl-add-inp" id="tl-edit-input" placeholder="Titel eingeben …">
+              <select class="tl-add-sel" id="tl-edit-abschnitt">
+                <option value="">Kein Abschnitt</option>
+                <option value="Morgen">Morgen</option>
+                <option value="Vormittag">Vormittag</option>
+                <option value="Mittag">Mittag</option>
+                <option value="Nachmittag">Nachmittag</option>
+                <option value="Abend">Abend</option>
+              </select>
+            </div>
+            <div class="tl-add-btns">
+              <button class="tl-add-abtn aufg" onclick="tlEditAufgabeOverlayToggle()">✓ Aufgabe verknüpfen</button>
+              <button class="tl-add-abtn text" onclick="tlEditTextHinzufuegen()">+ Text hinzufügen</button>
+            </div>
+          </div>
+          <div id="tl-edit-aufg-overlay" class="tl-aufg-overlay" style="display:none;position:absolute;bottom:120px;"></div>
         </div>
       </div>
     </div>
@@ -1275,7 +1335,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 <script>
 'use strict';
 
-const APP_VERSION = '1.1.12';
+const APP_VERSION = '1.2.0';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1427,9 +1487,10 @@ function setzeGeaendert() {
 // ── MIGRATION ──
 function migrateDB() {
   if (!DB) return;
-  if (!Array.isArray(DB.aufgaben)) DB.aufgaben = [];
-  if (!Array.isArray(DB.plaene))   DB.plaene   = [];
-  if (!Array.isArray(DB.notizen))  DB.notizen  = [];
+  if (!Array.isArray(DB.aufgaben))    DB.aufgaben    = [];
+  if (!Array.isArray(DB.plaene))      DB.plaene      = [];
+  if (!Array.isArray(DB.notizen))     DB.notizen     = [];
+  if (!Array.isArray(DB.tageslisten)) DB.tageslisten = [];
   // Status normalisieren
   DB.aufgaben.forEach(a => {
     if (!a.status || !['offen','inArbeit','erledigt'].includes(a.status)) {
@@ -3077,113 +3138,300 @@ function aufgErledigen(aufgId) {
 }
 
 // ── TAGESLISTE ──
-let tlPlan=null;
-function tlPlanHolen(){
-  if(!DB.plaene)DB.plaene=[];
-  const td=today(); let p=DB.plaene.find(x=>x.typ==='tagesliste'&&x.datum===td);
-  if(!p){
-    p={id:uid(),typ:'tagesliste',datum:td,titel:'Mein Tag',prioritaet:'mittel',horizont:'kurzfristig',status:'offen',schritte:[],erstellt:new Date().toISOString(),geaendert:new Date().toISOString()};
-    (DB.aufgaben||[]).filter(a=>{if(a.status==='erledigt'||!a.wiederholung)return false;const ad=a.wiedervorlage||a.startdatum||a.faellig;return ad&&ad<=td;})
-      .forEach(a=>p.schritte.push({titel:a.titel,status:'offen',aufgabeId:a.id,reihenfolge:p.schritte.length,delegiertAn:null,kommentar:null}));
-    DB.plaene.push(p); setzeGeaendert();
+const TL_ABSCHNITTE = ['','Morgen','Vormittag','Mittag','Nachmittag','Abend'];
+let tlBearbeitenAktiv = false;
+
+function tlDatumHeute() { return today(); }
+
+function tlHeuteHolen() {
+  if (!DB.tageslisten) DB.tageslisten = [];
+  const td = tlDatumHeute();
+  let tl = DB.tageslisten.find(x => x.datum === td);
+  if (!tl) {
+    tl = { id: uid(), datum: td, eintraege: [], erstellt: new Date().toISOString(), geaendert: new Date().toISOString() };
+    // Wiederholende Aufgaben die heute fällig sind automatisch eintragen
+    (DB.aufgaben||[]).filter(a => {
+      if (a.status === 'erledigt' || !a.wiederholung) return false;
+      const ad = a.wiedervorlage || a.startdatum || a.faellig;
+      return ad && ad <= td;
+    }).forEach(a => tl.eintraege.push({
+      id: uid(), typ: 'aufgabe', aufgabeId: a.id, titel: a.titel,
+      abschnitt: null, status: 'offen', kommentar: null
+    }));
+    DB.tageslisten.push(tl);
+    setzeGeaendert();
   }
-  return p;
+  return tl;
 }
-function renderTagesliste(){
-  tlPlan=tlPlanHolen();
-  const td=today(); const d=new Date(td+'T00:00:00');
-  const T=['So','Mo','Di','Mi','Do','Fr','Sa'];
-  const M=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-  const dS=T[d.getDay()]+', '+d.getDate()+'. '+M[d.getMonth()]+' '+d.getFullYear();
-  const dE=document.getElementById('tl-datum-label'),tE=document.getElementById('tl-titel'),mE=document.getElementById('tl-meta'),iE=document.getElementById('tl-items');
-  if(!iE)return;
-  if(dE)dE.textContent=dS; if(tE)tE.textContent=tlPlan.titel||'Mein Tag';
-  const sc=tlPlan.schritte||[];
-  const erlAnz=sc.filter(s=>{const a=s.aufgabeId?DB.aufgaben.find(x=>x.id===s.aufgabeId):null;return(a?.status||s.status)==='erledigt';}).length;
-  const offAnz=sc.length-erlAnz;
-  if(mE)mE.innerHTML=(erlAnz>0?`<span class="tl-meta-pill">${erlAnz} erledigt</span>`:'')+
-    (offAnz>0?`<span class="tl-meta-pill warn">${offAnz} offen</span>`:'')+
-    (!sc.length?'<span class="tl-meta-pill" style="background:#f0ede4;color:#a09880;">Leerer Tag</span>':'');
 
-  const ABSCHNITTE = ['','Morgen','Vormittag','Mittag','Nachmittag','Abend'];
+function renderTagesliste() {
+  const tl = tlHeuteHolen();
+  const td = tlDatumHeute();
+  const d  = new Date(td + 'T00:00:00');
+  const T  = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const M  = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  const dS = T[d.getDay()]+', '+d.getDate()+'. '+M[d.getMonth()]+' '+d.getFullYear();
 
+  const datumEl = document.getElementById('tl-datum-label');
+  const titelEl = document.getElementById('tl-titel');
+  const metaEl  = document.getElementById('tl-meta');
+  if (datumEl) datumEl.textContent = dS;
+  if (titelEl) titelEl.textContent = 'Mein Tag';
+
+  const eintr = tl.eintraege || [];
+  const erlAnz = eintr.filter(e => {
+    const a = e.aufgabeId ? DB.aufgaben.find(x=>x.id===e.aufgabeId) : null;
+    return (a?.status || e.status) === 'erledigt';
+  }).length;
+  const offAnz = eintr.length - erlAnz;
+  if (metaEl) metaEl.innerHTML =
+    (erlAnz > 0 ? `<span class="tl-meta-pill">${erlAnz} erledigt</span>` : '') +
+    (offAnz > 0 ? `<span class="tl-meta-pill warn">${offAnz} offen</span>` : '') +
+    (!eintr.length ? '<span class="tl-meta-pill" style="background:#f0ede4;color:#a09880;">Leerer Tag</span>' : '');
+
+  if (tlBearbeitenAktiv) {
+    renderTlBearbeiten(tl);
+  } else {
+    renderTlLesen(tl);
+  }
+}
+
+function renderTlLesen(tl) {
+  document.getElementById('tl-lese').style.display = 'flex';
+  document.getElementById('tl-edit').style.display = 'none';
+  document.getElementById('tl-edit-toggle').textContent = '✏ Bearbeiten';
+  const itemsEl = document.getElementById('tl-items');
+  if (!itemsEl) return;
+  const eintr = tl.eintraege || [];
+  if (!eintr.length) {
+    itemsEl.innerHTML = '<div style="padding:24px;text-align:center;color:#c0b8a8;font-size:calc(var(--fs)*0.75);">Noch keine Einträge — tippe unten um zu beginnen.</div>';
+    return;
+  }
   let html = '';
   let letzterAbschnitt = null;
-  sc.forEach((s,i)=>{
-    const a=s.aufgabeId?DB.aufgaben.find(x=>x.id===s.aufgabeId):null;
-    const st=a?.status||s.status||'offen'; const dn=st==='erledigt'; const rep=!!(a?.wiederholung);
-    const tt=a?.titel||s.titel||''; const ls=(a?.tags||[]);
-    const cbK=dn?'done':(rep?'repeat':'');
-    const chips=ls.slice(0,2).map(l=>`<span class="tl-chip liste">${escHtml(l)}</span>`).join('')+(rep?'<span class="tl-chip repeat">↺</span>':'');
-    const nH=s.kommentar?`<div class="tl-note">${escHtml(s.kommentar)}</div>`:'';
-
-    // Tagesabschnitt-Divider
-    const abschnitt = s.abschnitt || '';
-    if(abschnitt && abschnitt !== letzterAbschnitt){
-      html += `<div class="tl-divider">${escHtml(abschnitt)}</div>`;
-      letzterAbschnitt = abschnitt;
-    } else if(!abschnitt && letzterAbschnitt !== null && i===0){
-      letzterAbschnitt = '';
+  eintr.forEach((e, i) => {
+    const a    = e.aufgabeId ? DB.aufgaben.find(x=>x.id===e.aufgabeId) : null;
+    const st   = a?.status || e.status || 'offen';
+    const isDn = st === 'erledigt';
+    const isRp = !!(a?.wiederholung);
+    const tt   = a?.titel || e.titel || '';
+    const ls   = (a?.tags||[]);
+    const cbK  = isDn ? 'done' : (isRp ? 'repeat' : '');
+    const chips = ls.slice(0,2).map(l=>`<span class="tl-chip liste">${escHtml(l)}</span>`).join('') +
+                  (isRp ? '<span class="tl-chip repeat">↺</span>' : '');
+    const noteH = e.kommentar ? `<div class="tl-note">${escHtml(e.kommentar)}</div>` : '';
+    const ab = e.abschnitt || '';
+    if (ab && ab !== letzterAbschnitt) {
+      html += `<div class="tl-divider">${escHtml(ab)}</div>`;
+      letzterAbschnitt = ab;
     }
-
-    const aktH=`<div class="tl-actions">
-      <button class="tl-act-btn" onclick="tlKommentarBearbeiten(${i})">Kommentar</button>
-      <select class="tl-act-btn" onchange="tlAbschnittSetzen(${i},this.value)" style="cursor:pointer;">
-        ${ABSCHNITTE.map(ab=>`<option value="${ab}"${(s.abschnitt||'')=== ab?' selected':''}>${ab||'Kein Abschnitt'}</option>`).join('')}
-      </select>
-      ${!dn&&s.aufgabeId?`<button class="tl-act-btn" onclick="tlAufgabeOeffnen('${escHtml(s.aufgabeId)}')">Aufgabe</button>`:''}
-      ${!dn?`<button class="tl-act-btn" onclick="tlMorgen(${i})">→ Morgen</button>`:''}
-      <button class="tl-act-btn" style="color:var(--danger);" onclick="tlEntfernen(${i})">×</button>
-    </div>`;
-    html+=`<div class="tl-item">
+    html += `<div class="tl-item">
       <div class="tl-cb ${cbK}" onclick="tlToggle(${i})"></div>
       <div class="tl-body">
-        <div class="tl-text ${dn?'done':''}">${escHtml(tt)}</div>${nH}
-        ${chips?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">${chips}</div>`:''}${aktH}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0;">
-        <button class="tl-mv-btn" onclick="tlVerschieben(${i},-1)" ${i===0?'style="opacity:.3;"':''}>▲</button>
-        <button class="tl-mv-btn" onclick="tlVerschieben(${i},1)" ${i===sc.length-1?'style="opacity:.3;"':''}>▼</button>
+        <div class="tl-text ${isDn?'done':''}">${escHtml(tt)}</div>
+        ${noteH}
+        ${chips ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">${chips}</div>` : ''}
+        <div class="tl-actions">
+          <button class="tl-act-btn" onclick="tlKommentarBearbeiten(${i})">Kommentar</button>
+        </div>
       </div>
     </div>`;
   });
-  iE.innerHTML=html||'<div style="padding:24px;text-align:center;color:#c0b8a8;font-size:calc(var(--fs)*0.82);">Noch keine Einträge — tippe unten um zu beginnen.</div>';
+  itemsEl.innerHTML = html;
 }
 
+function renderTlBearbeiten(tl) {
+  document.getElementById('tl-lese').style.display = 'none';
+  document.getElementById('tl-edit').style.display = 'flex';
+  document.getElementById('tl-edit-toggle').textContent = '✓ Fertig';
+  const itemsEl = document.getElementById('tl-edit-items');
+  if (!itemsEl) return;
+  const eintr = tl.eintraege || [];
+  if (!eintr.length) {
+    itemsEl.innerHTML = '<div style="padding:16px;text-align:center;color:#c0b8a8;font-size:calc(var(--fs)*0.75);">Noch keine Einträge.</div>';
+    return;
+  }
+  let html = '';
+  let letzterAbschnitt = null;
+  eintr.forEach((e, i) => {
+    const a   = e.aufgabeId ? DB.aufgaben.find(x=>x.id===e.aufgabeId) : null;
+    const tt  = a?.titel || e.titel || '';
+    const ls  = (a?.tags||[]);
+    const isRp = !!(a?.wiederholung);
+    const ab  = e.abschnitt || '';
+    if (ab !== letzterAbschnitt) {
+      html += `<div class="tl-edit-section">${ab ? escHtml(ab) : 'Kein Abschnitt'}</div>`;
+      letzterAbschnitt = ab;
+    }
+    const sub = [
+      e.typ === 'aufgabe' ? 'Aufgabe' : 'Text',
+      ls[0] ? escHtml(ls[0]) : null,
+      isRp ? '↺' : null,
+      ab || null,
+    ].filter(Boolean).join(' · ');
+    html += `<div class="tl-edit-item">
+      <span class="tl-drag">⠿</span>
+      <div class="tl-edit-body">
+        <div class="tl-edit-row1">
+          <span class="tl-edit-text">${escHtml(tt)}</span>
+          <div class="tl-edit-mv">
+            <button class="tl-edit-mvb" onclick="tlVerschieben(${i},-1)" ${i===0?'style="opacity:.3;"':''}>▲</button>
+            <button class="tl-edit-mvb" onclick="tlVerschieben(${i},1)" ${i===eintr.length-1?'style="opacity:.3;"':''}>▼</button>
+          </div>
+        </div>
+        <div class="tl-edit-row2">
+          <span class="tl-edit-sub">${sub}</span>
+          <div class="tl-edit-acts">
+            <button class="tl-eab sec" onclick="tlAbschnittWaehlen(${i})">Abschnitt</button>
+            <button class="tl-eab mor" onclick="tlMorgen(${i})">→ Morgen</button>
+            <button class="tl-eab del" onclick="tlEntfernen(${i})">×</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+  itemsEl.innerHTML = html;
+}
 
-function tlToggle(i){
-  const s=tlPlan.schritte[i];if(!s)return;
-  const a=s.aufgabeId?DB.aufgaben.find(x=>x.id===s.aufgabeId):null;
-  const dn=(a?.status||s.status)==='erledigt';
-  if(a){if(!dn)aufgErledigen(a.id);else{a.status='offen';a.geaendert=new Date().toISOString();setzeGeaendert();}}
-  else{s.status=dn?'offen':'erledigt';tlPlan.geaendert=new Date().toISOString();setzeGeaendert();}
-  renderTagesliste();if(aktiverScreen==='aufgaben')renderAufgabenScreen();
-}
-function tlNeuerEintrag(){
-  // Plan-Dialog öffnen — hat Text/Neue Aufgabe/Bestehende Aufgabe bereits eingebaut
-  if(!tlPlan) tlPlan=tlPlanHolen();
-  openNeuerPlan(tlPlan.id);
-}
-function tlEintragHinzufuegen(){ tlNeuerEintrag(); }
-function tlAufgabeVerknuepfen(){ tlNeuerEintrag(); }
-function tlAbschnittSetzen(i, abschnitt){
-  const s=tlPlan.schritte[i];if(!s)return;
-  s.abschnitt=abschnitt||null;
-  tlPlan.geaendert=new Date().toISOString();setzeGeaendert();renderTagesliste();
+function tlToggleBearbeiten() {
+  tlBearbeitenAktiv = !tlBearbeitenAktiv;
+  renderTagesliste();
 }
 
-function tlVerschieben(i,r){const sc=tlPlan.schritte;const z=i+r;if(z<0||z>=sc.length)return;[sc[i],sc[z]]=[sc[z],sc[i]];tlPlan.geaendert=new Date().toISOString();setzeGeaendert();renderTagesliste();}
-function tlEntfernen(i){tlPlan.schritte.splice(i,1);tlPlan.geaendert=new Date().toISOString();setzeGeaendert();renderTagesliste();}
-function tlKommentarBearbeiten(i){const s=tlPlan.schritte[i];if(!s)return;const t=prompt('Kommentar:',s.kommentar||'');if(t===null)return;s.kommentar=t.trim()||null;tlPlan.geaendert=new Date().toISOString();setzeGeaendert();renderTagesliste();}
-function tlMorgen(i){
-  const s=tlPlan.schritte[i];if(!s)return;
-  const mg=new Date();mg.setDate(mg.getDate()+1);const ms=mg.toISOString().slice(0,10);
-  let mp=DB.plaene.find(x=>x.typ==='tagesliste'&&x.datum===ms);
-  if(!mp){mp={id:uid(),typ:'tagesliste',datum:ms,titel:'Mein Tag',prioritaet:'mittel',horizont:'kurzfristig',status:'offen',schritte:[],erstellt:new Date().toISOString(),geaendert:new Date().toISOString()};DB.plaene.push(mp);}
-  mp.schritte.push({...s,reihenfolge:mp.schritte.length});
-  tlPlan.schritte.splice(i,1);tlPlan.geaendert=new Date().toISOString();setzeGeaendert();renderTagesliste();showToast('Auf morgen verschoben');
+function tlToggle(i) {
+  const tl = tlHeuteHolen();
+  const e  = tl.eintraege[i]; if (!e) return;
+  const a  = e.aufgabeId ? DB.aufgaben.find(x=>x.id===e.aufgabeId) : null;
+  const isDn = (a?.status || e.status) === 'erledigt';
+  if (a) {
+    if (!isDn) aufgErledigen(a.id);
+    else { a.status = 'offen'; a.geaendert = new Date().toISOString(); setzeGeaendert(); }
+  } else {
+    e.status = isDn ? 'offen' : 'erledigt';
+    tl.geaendert = new Date().toISOString(); setzeGeaendert();
+  }
+  renderTagesliste();
+  if (aktiverScreen === 'aufgaben') renderAufgabenScreen();
 }
-function tlAufgabeOeffnen(id){aufgabeBearbeiten(id);}
+
+function tlKommentarBearbeiten(i) {
+  const tl = tlHeuteHolen();
+  const e  = tl.eintraege[i]; if (!e) return;
+  const t  = prompt('Kommentar:', e.kommentar || ''); if (t === null) return;
+  e.kommentar = t.trim() || null;
+  tl.geaendert = new Date().toISOString(); setzeGeaendert(); renderTagesliste();
+}
+
+function tlVerschieben(i, r) {
+  const tl = tlHeuteHolen();
+  const ei = tl.eintraege; const z = i + r;
+  if (z < 0 || z >= ei.length) return;
+  [ei[i], ei[z]] = [ei[z], ei[i]];
+  tl.geaendert = new Date().toISOString(); setzeGeaendert(); renderTagesliste();
+}
+
+function tlEntfernen(i) {
+  const tl = tlHeuteHolen();
+  tl.eintraege.splice(i, 1);
+  tl.geaendert = new Date().toISOString(); setzeGeaendert(); renderTagesliste();
+}
+
+function tlAbschnittWaehlen(i) {
+  const tl = tlHeuteHolen();
+  const e  = tl.eintraege[i]; if (!e) return;
+  const ab = TL_ABSCHNITTE.filter(x => x);
+  const akt = e.abschnitt || '';
+  const liste = ab.map((a,n) => (n+1)+'. '+a).join('\n');
+  const inp = prompt('Abschnitt wählen (0=keiner):\n0. Kein Abschnitt\n'+liste, ab.indexOf(akt)+1||'0');
+  if (inp === null) return;
+  const nr = parseInt(inp);
+  e.abschnitt = (isNaN(nr)||nr<=0) ? null : (ab[nr-1]||null);
+  tl.geaendert = new Date().toISOString(); setzeGeaendert(); renderTagesliste();
+}
+
+function tlMorgen(i) {
+  const tl = tlHeuteHolen();
+  const e  = tl.eintraege[i]; if (!e) return;
+  if (!DB.tageslisten) DB.tageslisten = [];
+  const mg = new Date(); mg.setDate(mg.getDate()+1);
+  const ms = mg.toISOString().slice(0,10);
+  let mp = DB.tageslisten.find(x => x.datum === ms);
+  if (!mp) {
+    mp = { id:uid(), datum:ms, eintraege:[], erstellt:new Date().toISOString(), geaendert:new Date().toISOString() };
+    DB.tageslisten.push(mp);
+  }
+  mp.eintraege.push({ ...e, id: uid() });
+  tl.eintraege.splice(i, 1);
+  tl.geaendert = new Date().toISOString(); setzeGeaendert(); renderTagesliste(); showToast('Auf morgen verschoben');
+}
+
+function tlSchnellText() {
+  const inp = document.getElementById('tl-add-input');
+  const t   = inp?.value.trim(); if (!t) return;
+  const tl  = tlHeuteHolen();
+  tl.eintraege.push({ id:uid(), typ:'text', titel:t, aufgabeId:null, abschnitt:null, status:'offen', kommentar:null });
+  tl.geaendert = new Date().toISOString(); setzeGeaendert(); inp.value = ''; renderTagesliste();
+}
+
+function tlAufgabeOverlayToggle() {
+  const overlay = document.getElementById('tl-aufg-overlay');
+  if (!overlay) return;
+  if (overlay.style.display !== 'none') { overlay.style.display = 'none'; return; }
+  const tl = tlHeuteHolen();
+  const bereitsIds = new Set(tl.eintraege.filter(e=>e.aufgabeId).map(e=>e.aufgabeId));
+  const offene = (DB.aufgaben||[]).filter(a => a.status !== 'erledigt' && !bereitsIds.has(a.id));
+  if (!offene.length) { showToast('Keine offenen Aufgaben'); return; }
+  overlay.innerHTML = offene.map(a =>
+    `<div class="tl-aufg-item" onclick="tlAufgabeVerknuepfen('${escHtml(a.id)}')">${escHtml(a.titel)}</div>`
+  ).join('');
+  overlay.style.display = 'block';
+}
+
+function tlAufgabeVerknuepfen(aufgId) {
+  const tl = tlHeuteHolen();
+  const a  = DB.aufgaben.find(x=>x.id===aufgId); if (!a) return;
+  tl.eintraege.push({ id:uid(), typ:'aufgabe', aufgabeId:aufgId, titel:a.titel, abschnitt:null, status:a.status, kommentar:null });
+  tl.geaendert = new Date().toISOString(); setzeGeaendert();
+  document.getElementById('tl-aufg-overlay').style.display = 'none';
+  renderTagesliste();
+}
+
+function tlEditAufgabeOverlayToggle() {
+  const overlay = document.getElementById('tl-edit-aufg-overlay');
+  if (!overlay) return;
+  if (overlay.style.display !== 'none') { overlay.style.display = 'none'; return; }
+  const tl = tlHeuteHolen();
+  const bereitsIds = new Set(tl.eintraege.filter(e=>e.aufgabeId).map(e=>e.aufgabeId));
+  const offene = (DB.aufgaben||[]).filter(a => a.status !== 'erledigt' && !bereitsIds.has(a.id));
+  if (!offene.length) { showToast('Keine offenen Aufgaben'); return; }
+  overlay.innerHTML = offene.map(a =>
+    `<div class="tl-aufg-item" onclick="tlEditAufgabeWaehlen('${escHtml(a.id)}')">${escHtml(a.titel)}</div>`
+  ).join('');
+  overlay.style.display = 'block';
+}
+
+function tlEditAufgabeWaehlen(aufgId) {
+  const tl = tlHeuteHolen();
+  const a  = DB.aufgaben.find(x=>x.id===aufgId); if (!a) return;
+  const ab = document.getElementById('tl-edit-abschnitt')?.value || null;
+  tl.eintraege.push({ id:uid(), typ:'aufgabe', aufgabeId:aufgId, titel:a.titel, abschnitt:ab||null, status:a.status, kommentar:null });
+  tl.geaendert = new Date().toISOString(); setzeGeaendert();
+  document.getElementById('tl-edit-aufg-overlay').style.display = 'none';
+  renderTagesliste();
+}
+
+function tlEditTextHinzufuegen() {
+  const inp = document.getElementById('tl-edit-input');
+  const t   = inp?.value.trim(); if (!t) return;
+  const ab  = document.getElementById('tl-edit-abschnitt')?.value || null;
+  const tl  = tlHeuteHolen();
+  tl.eintraege.push({ id:uid(), typ:'text', titel:t, aufgabeId:null, abschnitt:ab||null, status:'offen', kommentar:null });
+  tl.geaendert = new Date().toISOString(); setzeGeaendert(); inp.value = ''; renderTagesliste();
+}
+
+// Kompatibilität: alte Funktionen die noch referenziert werden könnten
+function tlNeuerEintrag() { tlToggleBearbeiten(); }
+function tlEintragHinzufuegen() { tlSchnellText(); }
 
 // ── PLÄNE: Schritte verschieben ──
 function planSchrittVerschieben(idx,r){
@@ -3194,7 +3442,7 @@ function planSchrittVerschieben(idx,r){
 // ── INIT ──
 (function(){
   zoomInit();
-  const c=`const CACHE='smallassist-v1_1_12';
+  const c=`const CACHE='smallassist-v1_2_0';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg','./icon-smallassist-maskable.svg'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
