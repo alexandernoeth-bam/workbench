@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.2.2</title>
+<title>SmallAssist 1.2.3</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -852,7 +852,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.2.2</span>
+      <span class="sb-logo-version">v1.2.3</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="tagesliste" onclick="zeigeScreen('tagesliste',this)">
@@ -1365,7 +1365,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 <script>
 'use strict';
 
-const APP_VERSION = '1.2.2';
+const APP_VERSION = '1.2.3';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1521,6 +1521,7 @@ function migrateDB() {
   if (!Array.isArray(DB.plaene))      DB.plaene      = [];
   if (!Array.isArray(DB.notizen))     DB.notizen     = [];
   if (!Array.isArray(DB.tageslisten)) DB.tageslisten = [];
+  if (!Array.isArray(DB.listen))      DB.listen      = [];
   // Status normalisieren
   DB.aufgaben.forEach(a => {
     if (!a.status || !['offen','inArbeit','erledigt'].includes(a.status)) {
@@ -1607,6 +1608,7 @@ function befuelleListenDropdown(selectId) {
 function alleListen() {
   const tags = new Set();
   DB.aufgaben.forEach(a => (a.tags||[]).forEach(t => tags.add(t)));
+  (DB.listen||[]).forEach(l => tags.add(l));
   return [...tags].sort();
 }
 
@@ -1971,9 +1973,17 @@ function schliesseListeDialog() { document.getElementById('modal-liste').classLi
 function listeSpeichern() {
   const name = document.getElementById('liste-neu-input').value.trim();
   if (!name) return;
+  if (!DB.listen) DB.listen = [];
+  if (!DB.listen.includes(name)) {
+    DB.listen.push(name);
+    DB.listen.sort();
+    setzeGeaendert();
+  }
   schliesseListeDialog();
-  showToast('Tag angelegt: ' + name);
+  showToast('Liste angelegt: ' + name);
   renderSidebar();
+  befuelleListenDropdown('aufg-listen-filter');
+  befuelleListenDropdown('listen-screen-filter');
 }
 function listeLoeschen() {
   const filterSel = document.getElementById('listen-screen-filter');
@@ -2049,16 +2059,27 @@ function aufgTagToggle(el, tag) {
 }
 
 function aufgNeueListe() {
-  const name = prompt('Neuer Tag (mit oder ohne #):');
-  if (!name) return;
-  const tag = name;
+  const name = prompt('Name der neuen Liste:');
+  if (!name || !name.trim()) return;
+  const tag = name.trim();
+  if (!DB.listen) DB.listen = [];
+  if (!DB.listen.includes(tag)) {
+    DB.listen.push(tag);
+    DB.listen.sort();
+    setzeGeaendert();
+  }
+  // Button im Modal einfügen und als gewählt markieren
   const container = document.getElementById('aufg-listen-auswahl');
+  // Prüfen ob schon vorhanden
+  const existing = container.querySelector(`[data-tag="${CSS.escape(tag)}"]`);
+  if (existing) { existing.classList.add('selected'); return; }
   const btn = document.createElement('button');
-  btn.className = 'tag-ausw-pill selected';
+  btn.className = 'listen-ausw-pill selected';
   btn.dataset.tag = tag;
   btn.textContent = tag;
   btn.onclick = function() { this.classList.toggle('selected'); };
   container.insertBefore(btn, container.lastElementChild);
+  renderSidebar();
 }
 
 function aufgModalGeaendert() { /* auto-save optional */ }
@@ -3536,7 +3557,7 @@ function planSchrittVerschieben(idx,r){
 // ── INIT ──
 (function(){
   zoomInit();
-  const c=`const CACHE='smallassist-v1_2_2';
+  const c=`const CACHE='smallassist-v1_2_3';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg','./icon-smallassist-maskable.svg'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
