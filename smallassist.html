@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.1.11</title>
+<title>SmallAssist 1.1.12</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -824,7 +824,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.1.11</span>
+      <span class="sb-logo-version">v1.1.12</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="tagesliste" onclick="zeigeScreen('tagesliste',this)">
@@ -1275,7 +1275,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 <script>
 'use strict';
 
-const APP_VERSION = '1.1.11';
+const APP_VERSION = '1.1.12';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1661,7 +1661,7 @@ function renderAufgabenScreen() {
 function renderDashPlaene() {
   const container = document.getElementById('dash-plaene');
   const countEl   = document.getElementById('dash-plan-count');
-  const aktive = (DB.plaene||[]).filter(p => p.status !== 'abgeschlossen');
+  const aktive = (DB.plaene||[]).filter(p => p.status !== 'abgeschlossen' && p.typ !== 'tagesliste');
   if (countEl) countEl.textContent = aktive.length;
 
   if (!aktive.length) {
@@ -2766,9 +2766,17 @@ function savePlan() {
 
   setzeGeaendert();
   closeNeuerPlanModal();
-  renderAufgabenScreen();
+  // Wenn es der Tagesliste-Plan ist → Tagesliste neu rendern
+  const gespeicherterPlan = (DB.plaene||[]).find(p => p.id === editId) ||
+    (DB.plaene||[]).find(p => p.id === (DB.plaene||[]).slice(-1)[0]?.id);
+  if (tlPlan && (editId === tlPlan.id || (!editId && gespeicherterPlan?.typ === 'tagesliste'))) {
+    tlPlan = tlPlanHolen();
+    renderTagesliste();
+  }
+  if (aktiverScreen === 'plaene') renderPlaeneScreen();
+  if (aktiverScreen === 'aufgaben') renderAufgabenScreen();
   if (alleErledigt) showToast('✓ Plan abgeschlossen!');
-  else showToast('Plan gespeichert');
+  else showToast('✓ Gespeichert');
 }
 
 
@@ -2779,7 +2787,9 @@ function planLoeschen() {
   DB.plaene = (DB.plaene || []).filter(p => p.id !== editId);
   setzeGeaendert();
   closeNeuerPlanModal();
-  renderAufgabenScreen();
+  if (tlPlan && editId === tlPlan.id) { tlPlan = null; renderTagesliste(); }
+  if (aktiverScreen === 'plaene') renderPlaeneScreen();
+  if (aktiverScreen === 'aufgaben') renderAufgabenScreen();
   showToast('Plan gelöscht');
 }
 
@@ -3184,7 +3194,7 @@ function planSchrittVerschieben(idx,r){
 // ── INIT ──
 (function(){
   zoomInit();
-  const c=`const CACHE='smallassist-v1_1_11';
+  const c=`const CACHE='smallassist-v1_1_12';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg','./icon-smallassist-maskable.svg'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
