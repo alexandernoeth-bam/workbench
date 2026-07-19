@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.2.7</title>
+<title>SmallAssist 1.2.8</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -337,13 +337,11 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 }
 .pk-schritt:last-child { border-bottom: none; }
 .pk-num {
-  width: 15px; height: 15px;
-  border-radius: 50%;
+  width: 18px; height: 18px; border-radius: 50%;
   border: 1.5px solid var(--border);
-  font-size: calc(var(--fs) * 0.5);
+  font-size: calc(var(--fs) * 0.6);
   display: flex; align-items: center; justify-content: center;
-  color: var(--text-xdim);
-  flex-shrink: 0;
+  flex-shrink: 0; color: var(--text-xdim);
 }
 .pk-num.next { border-color: var(--teal); color: var(--teal); }
 .pk-num.done { background: var(--teal); border-color: var(--teal); color: white; font-size: calc(var(--fs) * 0.5625); }
@@ -892,7 +890,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.2.7</span>
+      <span class="sb-logo-version">v1.2.8</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="tagesliste" onclick="zeigeScreen('tagesliste',this)">
@@ -939,6 +937,8 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
           🌙
         </button>
         <button class="btn-ghost" id="btn-datei" onclick="dateiClick()" style="padding:4px 8px;font-size:11px;">📂</button>
+        <button id="btn-speichern" onclick="speichernManuell()"
+          style="border:none;background:rgba(255,255,255,0.15);color:white;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;display:none;" title="Speichern">💾</button>
       </div>
     </div>
 
@@ -1401,7 +1401,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 <script>
 'use strict';
 
-const APP_VERSION = '1.2.7';
+const APP_VERSION = '1.2.8';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1526,24 +1526,28 @@ async function dateiClick() {
 }
 
 async function speichern() {
-  if (!DB) return;
-  if (!fileHandle) return;
+  if (!DB || !fileHandle) return;
   try {
-    // Berechtigungsprüfung — Safari PWA braucht queryPermission
-    let perm = await fileHandle.queryPermission({ mode: 'readwrite' });
-    if (perm !== 'granted') {
-      perm = await fileHandle.requestPermission({ mode: 'readwrite' });
-    }
-    if (perm !== 'granted') {
-      showToast('⚠️ Schreibzugriff nicht erteilt');
-      return;
+    // Berechtigungsprüfung (optional — nicht alle Browser unterstützen queryPermission)
+    if (fileHandle.queryPermission) {
+      let perm = await fileHandle.queryPermission({ mode: 'readwrite' });
+      if (perm === 'prompt') {
+        perm = await fileHandle.requestPermission({ mode: 'readwrite' });
+      }
+      if (perm !== 'granted') {
+        // Nicht sofort Toast — kann im Hintergrund normal sein
+        ungespeichert = true;
+        return;
+      }
     }
     const w = await fileHandle.createWritable();
     await w.write(JSON.stringify(DB, null, 2));
     await w.close();
     ungespeichert = false;
   } catch(e) {
-    showToast('❌ Speichern: ' + (e.message || e));
+    // Bei Fehler: ungespeichert-Flag setzen, kein störender Toast beim Debounce
+    ungespeichert = true;
+    console.warn('Speichern fehlgeschlagen:', e.message);
   }
 }
 
@@ -1556,6 +1560,9 @@ async function _ladeText(text, name) {
   migrateDB();
   document.getElementById('topbar-file').textContent = '✓ ' + name;
   document.getElementById('btn-datei').textContent = '📂';
+  // Speichern-Button nur zeigen wenn fileHandle vorhanden
+  const sbtn = document.getElementById('btn-speichern');
+  if (sbtn) sbtn.style.display = fileHandle ? '' : 'none';
   renderSidebar();
   zeigeScreenDirekt('tagesliste');
   renderTagesliste();
@@ -1604,8 +1611,31 @@ async function handleWiederherstellen() {
 let _speicherTimer = null;
 function setzeGeaendert() {
   ungespeichert = true;
+  // Speichern-Button einblenden
+  const sb = document.getElementById('btn-speichern');
+  if (sb && fileHandle) sb.style.display = '';
   if (_speicherTimer) clearTimeout(_speicherTimer);
   _speicherTimer = setTimeout(() => { _speicherTimer = null; speichern(); }, 1500);
+}
+
+async function speichernManuell() {
+  if (!DB || !fileHandle) return;
+  try {
+    // requestPermission explizit — hier ist eine Nutzer-Geste vorhanden
+    if (fileHandle.requestPermission) {
+      const perm = await fileHandle.requestPermission({ mode: 'readwrite' });
+      if (perm !== 'granted') { showToast('⚠️ Zugriff verweigert'); return; }
+    }
+    const w = await fileHandle.createWritable();
+    await w.write(JSON.stringify(DB, null, 2));
+    await w.close();
+    ungespeichert = false;
+    const sb = document.getElementById('btn-speichern');
+    if (sb) sb.style.display = 'none';
+    showToast('✓ Gespeichert');
+  } catch(e) {
+    showToast('❌ ' + (e.message || 'Fehler beim Speichern'));
+  }
 }
 
 // ── MIGRATION ──
@@ -1982,7 +2012,7 @@ function renderPlaeneScreen() {
       const numCls = isDone ? 'done' : (i === erledigt ? 'next' : '');
       return `<div class="pk-schritt" style="cursor:pointer;padding:6px 12px;" onclick="planSchrittToggle('${p.id}',${i},this)">
         <div class="pk-num ${numCls}">${isDone?'✓':(i+1)}</div>
-        <span style="flex:1;font-size:12px;${isDone?'text-decoration:line-through;color:var(--text-xdim);':''};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(titel)}</span>
+        <span style="flex:1;font-size:calc(var(--fs)*0.75);${isDone?'text-decoration:line-through;color:var(--text-xdim);':''};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(titel)}</span>
         ${tagChip}${delChip}
       </div>`;
     }).join('');
@@ -1990,7 +2020,7 @@ function renderPlaeneScreen() {
     return `<div style="margin:10px 14px 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface);">
       <div class="pk-header" style="padding:9px 12px;cursor:pointer;" onclick="planToggleKlappen('${p.id}')">
         <div class="pk-prio-dot" style="background:${PRIO_DOTS[p.prioritaet]||'#f59e0b'};${p.prioritaet==='krise'?'box-shadow:0 0 0 2px #f5c6c2;':''}"></div>
-        <div class="pk-titel" style="font-size:13px;">${escHtml(p.titel)}</div>
+        <div class="pk-titel">${escHtml(p.titel)}</div>
         <span class="pk-counter">${erledigt}/${schritte.length}</span>
         <button onclick="event.stopPropagation();openNeuerPlan('${p.id}')" title="Bearbeiten"
           style="border:none;background:none;cursor:pointer;padding:2px 4px;color:var(--text-xdim);margin-left:4px;">
@@ -3661,7 +3691,7 @@ function planSchrittVerschieben(idx,r){
   themeInit();
   zoomInit();
   handleWiederherstellen();
-  const c=`const CACHE='smallassist-v1_2_7';
+  const c=`const CACHE='smallassist-v1_2_8';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg','./icon-smallassist-maskable.svg'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
