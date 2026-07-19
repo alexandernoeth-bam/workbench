@@ -1,0 +1,1931 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#00897B">
+<link rel="manifest" href="manifest-smallassist.json">
+<link rel="apple-touch-icon" href="icon-smallassist.svg">
+<title>SmallAssist 1.0.0</title>
+<style>
+:root {
+  --teal:        #00897B;
+  --teal-dark:   #00695C;
+  --teal-light:  #b2dfdb;
+  --teal-xlight: #e0f2f1;
+  --bg:          #f5f7f7;
+  --surface:     #ffffff;
+  --card:        #ffffff;
+  --border:      #e0e0e0;
+  --text:        #1a2a2a;
+  --text-dim:    #6b8a8a;
+  --text-xdim:   #9ab0b0;
+  --danger:      #c62828;
+  --warn:        #e65100;
+  --radius:      8px;
+  --font:        -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --sidebar-w:   200px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; font-family: var(--font); background: var(--bg); color: var(--text); }
+
+/* ── LAYOUT ── */
+#app { display: flex; height: 100vh; }
+
+/* ── SIDEBAR ── */
+#sidebar {
+  width: var(--sidebar-w);
+  background: #00695C;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.sb-logo {
+  padding: 14px 14px 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.sb-logo-name { color: white; font-size: 16px; font-weight: 700; }
+.sb-logo-version { color: rgba(255,255,255,0.4); font-size: 10px; }
+.sb-nav-item {
+  padding: 9px 14px;
+  color: rgba(255,255,255,0.7);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.1s;
+}
+.sb-nav-item:hover { background: rgba(255,255,255,0.08); }
+.sb-nav-item.active { background: rgba(255,255,255,0.15); color: white; font-weight: 600; }
+.sb-nav-item svg { flex-shrink: 0; opacity: 0.8; }
+.sb-section-label {
+  font-size: 10px;
+  color: rgba(255,255,255,0.4);
+  padding: 10px 14px 3px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.sb-tags { flex: 1; overflow-y: auto; }
+.sb-tags::-webkit-scrollbar { display: none; }
+.sb-tag-item {
+  padding: 6px 14px 6px 24px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: space-between;
+}
+.sb-tag-item:hover { background: rgba(255,255,255,0.08); }
+.sb-tag-item.active { color: white; }
+.sb-tag-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+.sb-tag-count { font-size: 10px; color: rgba(255,255,255,0.35); }
+.sb-add-tag {
+  padding: 6px 14px 10px 24px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sb-add-tag:hover { color: rgba(255,255,255,0.7); }
+
+/* ── MAIN ── */
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.topbar {
+  background: white;
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.topbar-title { font-size: 14px; font-weight: 700; color: var(--text); flex: 1; }
+.topbar-sub { font-size: 11px; color: var(--text-xdim); margin-left: 8px; }
+.topbar-actions { display: flex; gap: 6px; align-items: center; }
+
+/* ── BUTTONS ── */
+.btn-primary {
+  background: var(--teal);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font);
+}
+.btn-primary:hover { background: var(--teal-dark); }
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: var(--font);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
+
+/* ── SCREENS ── */
+.screen { display: none; flex: 1; overflow: hidden; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* ── DASHBOARD ── */
+#screen-dashboard { flex-direction: row !important; }
+.dash-left {
+  width: 50%;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dash-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel-header {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  background: var(--surface);
+}
+.panel-header-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.panel-count {
+  font-size: 10px;
+  color: var(--text-xdim);
+  background: var(--bg);
+  padding: 1px 7px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.panel-scroll { flex: 1; overflow-y: auto; }
+
+/* Aufgaben-Zeilen */
+.aufg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.aufg-row:hover { background: var(--teal-xlight); }
+.aufg-row:last-child { border-bottom: none; }
+.aufg-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border);
+}
+.aufg-status-dot.offen { border-color: #9ab0b0; }
+.aufg-status-dot.inArbeit { border-color: var(--warn); background: #fff3e0; }
+.aufg-status-dot.erledigt { background: var(--teal); border-color: var(--teal); }
+.aufg-titel {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aufg-titel.erledigt { text-decoration: line-through; color: var(--text-xdim); }
+.aufg-deadline {
+  font-size: 10px;
+  color: var(--text-xdim);
+  flex-shrink: 0;
+}
+.aufg-deadline.late { color: var(--danger); font-weight: 600; }
+.aufg-tag-chip {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.gruppe-header {
+  padding: 5px 14px 2px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-xdim);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Plan-Karten */
+.plan-karte {
+  margin: 8px 12px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.plan-karte:last-child { margin-bottom: 8px; }
+.pk-header {
+  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.pk-prio-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.pk-titel { font-size: 12px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-hz { font-size: 10px; padding: 1px 6px; border-radius: 6px; font-weight: 600; }
+.pk-counter { font-size: 10px; color: var(--text-xdim); }
+.pk-progress { height: 2px; background: var(--border); }
+.pk-progress-fill { height: 100%; background: var(--teal); }
+.pk-schritt {
+  padding: 5px 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.pk-schritt:last-child { border-bottom: none; }
+.pk-num {
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  font-size: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-xdim);
+  flex-shrink: 0;
+}
+.pk-num.next { border-color: var(--teal); color: var(--teal); }
+.pk-num.done { background: var(--teal); border-color: var(--teal); color: white; font-size: 9px; }
+.pk-tag-chip { font-size: 9px; padding: 1px 5px; border-radius: 4px; background: var(--teal-xlight); color: var(--teal-dark); margin-left: auto; flex-shrink: 0; }
+.pk-del-chip { font-size: 9px; padding: 1px 5px; border-radius: 4px; background: #e3f0fc; color: #1565c0; margin-left: auto; flex-shrink: 0; }
+.krise-header {
+  padding: 5px 12px 2px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: #c0392b;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.hz-header {
+  padding: 5px 12px 2px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-xdim);
+  margin-top: 4px;
+}
+.warte-header {
+  padding: 4px 10px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: #1976d2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f0f7ff;
+  border-top: 1px solid #d0e8fb;
+}
+.warte-zeile {
+  padding: 5px 10px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── TAGS SCREEN ── */
+#screen-tags { flex-direction: column; }
+
+/* ── NOTIZEN: 1:1 aus WorkAssist ── */
+#screen-notizen { flex-direction: row !important; overflow: hidden; }
+.notizen-liste {
+  width: 260px;
+  min-width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+.notizen-liste-header {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.notizen-such-input {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+  outline: none;
+}
+.notizen-such-input:focus { border-color: var(--teal); }
+.notizen-tag-bar {
+  display: flex;
+  gap: 4px;
+  padding: 5px 10px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.notizen-tag-bar::-webkit-scrollbar { display: none; }
+.notiz-tag-pill {
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: var(--font);
+  background: transparent;
+}
+.notiz-tag-pill.aktiv { background: var(--teal); border-color: var(--teal); color: white; }
+.notizen-scroll { flex: 1; overflow-y: auto; }
+.notiz-karte {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.notiz-karte:hover { background: var(--bg); }
+.notiz-karte.aktiv { background: var(--teal-xlight); border-left: 3px solid var(--teal); }
+.notiz-karte-titel { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.notiz-karte-meta { display: flex; gap: 6px; align-items: center; }
+.notiz-karte-datum { font-size: 10px; color: var(--text-xdim); }
+.notiz-karte-tag { font-size: 10px; background: var(--teal-xlight); color: var(--teal-dark); padding: 1px 5px; border-radius: 4px; }
+.notiz-karte-preview { font-size: 11px; color: var(--text-dim); margin-top: 3px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.notiz-usz-badge { font-size: 10px; background: var(--border); color: var(--text-dim); padding: 1px 5px; border-radius: 4px; }
+.notizen-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  position: relative;
+}
+.notiz-editor-header {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  background: var(--surface);
+}
+.notiz-titel-input {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  color: var(--text);
+  outline: none;
+}
+.notiz-titel-input::placeholder { color: var(--text-xdim); font-weight: 400; }
+.notiz-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg);
+}
+.notiz-tag-input {
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  color: var(--teal-dark);
+  font-family: var(--font);
+  outline: none;
+  flex: 1;
+}
+.notiz-tag-input::placeholder { color: var(--text-xdim); }
+.notiz-datum-label { font-size: 10px; color: var(--text-xdim); white-space: nowrap; }
+.notiz-toolbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+  background: var(--surface);
+}
+.notiz-toolbar::-webkit-scrollbar { display: none; }
+.ntb {
+  min-width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-family: var(--font);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+.ntb:hover { background: var(--teal-xlight); color: var(--teal); border-color: var(--teal-light); }
+.ntb-sep { width: 1px; height: 16px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
+.notiz-textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text);
+  resize: none;
+  background: transparent;
+  line-height: 1.6;
+}
+.notiz-render-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--surface);
+  display: none;
+}
+.notiz-render-view h1 { font-size: 18px; font-weight: 700; margin: 16px 0 8px; color: var(--text); }
+.notiz-render-view h2 { font-size: 15px; font-weight: 700; margin: 14px 0 6px; color: var(--text); }
+.notiz-render-view h3 { font-size: 13px; font-weight: 700; margin: 12px 0 4px; color: var(--text); }
+.notiz-render-view h1:first-child, .notiz-render-view h2:first-child { margin-top: 0; }
+.notiz-render-view ul { padding-left: 18px; margin: 4px 0; }
+.notiz-render-view li { margin: 2px 0; }
+.notiz-render-view p { margin: 4px 0; }
+.notiz-render-view code { background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 1px 4px; font-size: 11px; font-family: monospace; }
+.notiz-render-view pre { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin: 8px 0; overflow-x: auto; }
+.notiz-render-view blockquote { border-left: 3px solid var(--teal); padding-left: 10px; margin: 6px 0; color: var(--text-dim); border-radius: 0; }
+.notiz-render-view hr { border: none; border-top: 2px solid var(--border); margin: 12px 0; }
+.notiz-render-view table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+.notiz-render-view th { background: var(--teal-xlight); color: var(--teal-dark); font-weight: 700; padding: 5px 8px; border: 1px solid var(--border); text-align: left; }
+.notiz-render-view td { padding: 5px 8px; border: 1px solid var(--border); }
+.notiz-render-view input[type="checkbox"] { margin-right: 6px; margin-top: 1px; }
+.notiz-usz-panel {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 220px;
+  background: var(--teal-dark);
+  transform: translateX(100%);
+  transition: transform 0.2s;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+}
+.notiz-usz-panel.open { transform: translateX(0); }
+.notiz-usz-panel-header {
+  padding: 10px 12px;
+  background: rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.notiz-usz-panel-header span { font-size: 12px; font-weight: 700; flex: 1; color: white; }
+.notiz-usz-panel-close { background: none; border: none; color: #fff; cursor: pointer; padding: 2px; }
+.notiz-usz-panel-body { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.notiz-usz-item {
+  padding: 7px 10px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+.notiz-usz-item:hover { background: rgba(255,255,255,0.18); }
+.notiz-usz-item-titel { font-size: 11px; font-weight: 600; color: white; }
+.notiz-usz-item-datum { font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+.notiz-usz-panel-add {
+  padding: 10px 12px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  text-align: center;
+}
+.notiz-usz-panel-add:hover { color: white; }
+
+/* ── AUFGABEN MODAL ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface);
+  border-radius: 12px;
+  width: 460px;
+  max-width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.modal-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.modal-header h2 { font-size: 14px; font-weight: 700; flex: 1; }
+.modal-close { background: none; border: none; cursor: pointer; color: var(--text-dim); padding: 2px; }
+.modal-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  flex: 1;
+}
+.field-group { display: flex; flex-direction: column; gap: 5px; }
+.field-label { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; }
+.field-input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.field-input:focus { border-color: var(--teal); }
+.status-btns { display: flex; gap: 6px; }
+.status-btn {
+  flex: 1;
+  padding: 8px 0;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: var(--font);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.1s;
+}
+.status-btn.active-offen { border-color: #9ab0b0; background: var(--bg); color: var(--text); }
+.status-btn.active-inArbeit { border-color: var(--warn); background: #fff3e0; color: var(--warn); }
+.status-btn.active-erledigt { border-color: var(--teal); background: var(--teal-xlight); color: var(--teal-dark); }
+.tag-auswahl { display: flex; gap: 5px; flex-wrap: wrap; }
+.tag-ausw-pill {
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1.5px solid var(--border);
+  color: var(--text-dim);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.1s;
+}
+.tag-ausw-pill.selected { border-color: var(--teal); background: var(--teal-xlight); color: var(--teal-dark); }
+.tag-ausw-neu {
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  border: 1.5px dashed var(--teal-light);
+  color: var(--teal);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font);
+}
+.modal-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+.btn-danger { background: none; border: none; color: var(--danger); font-size: 12px; font-family: var(--font); cursor: pointer; }
+
+/* ── TAG DIALOG ── */
+.tag-dialog {
+  background: var(--surface);
+  border-radius: 10px;
+  width: 320px;
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-xdim);
+  font-size: 13px;
+}
+
+/* ── NOTIZ FARBEN OVERLAY ── */
+#notiz-farben-overlay {
+  display: none;
+  position: absolute;
+  z-index: 200;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  padding: 12px 14px;
+  min-width: 220px;
+  max-width: 280px;
+}
+
+/* ── PLAN LINK OVERLAY ── */
+.notiz-plan-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 150;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 40px;
+}
+.notiz-plan-overlay.open { display: flex; }
+.notiz-plan-sheet {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 16px;
+  width: 360px;
+  max-height: 60vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.notiz-plan-sheet h3 { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.notiz-plan-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--teal-xlight);
+  border: 1px solid var(--teal-light);
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 5px;
+  font-size: 12px;
+  color: var(--text);
+}
+.notiz-plan-link:hover { background: var(--teal-light); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sb-logo">
+      <span class="sb-logo-name">SmallAssist</span>
+      <span class="sb-logo-version">v1.0.0</span>
+    </div>
+    <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
+      <div class="sb-nav-item active" data-screen="dashboard" onclick="zeigeScreen('dashboard',this)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </div>
+      <div class="sb-nav-item" data-screen="plaene" onclick="zeigeScreen('plaene',this)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        Pläne
+      </div>
+      <div class="sb-nav-item" data-screen="notizen" onclick="zeigeScreen('notizen',this)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Notizen
+      </div>
+    </div>
+    <div class="sb-section-label">Tags</div>
+    <div class="sb-tags" id="sb-tags-container"></div>
+    <div class="sb-add-tag" onclick="tagNeuDialog()">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Neuer Tag
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main">
+    <div class="topbar">
+      <span class="topbar-title" id="topbar-title">Dashboard</span>
+      <span class="topbar-sub" id="topbar-file">Keine Datei geladen</span>
+      <div class="topbar-actions">
+        <button class="btn-ghost" id="btn-datei" onclick="dateiClick()">📂 Öffnen</button>
+      </div>
+    </div>
+
+    <!-- SCREENS -->
+
+    <!-- KEIN FILE -->
+    <div class="screen active" id="screen-nofile">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;">
+        <div style="font-size:40px;">📂</div>
+        <div style="font-size:14px;color:var(--text-dim);text-align:center;">Öffne deine <strong>Backlog.json</strong><br>um SmallAssist zu starten.</div>
+        <button class="btn-primary" onclick="dateiClick()">📂 Datei öffnen</button>
+        <div style="font-size:11px;color:var(--text-xdim);max-width:280px;text-align:center;">Dieselbe Datei wie WorkAssist — alle Änderungen sind sofort dort sichtbar.</div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="screen" id="screen-dashboard">
+      <div class="dash-left">
+        <div class="panel-header">
+          <div class="panel-header-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/></svg>
+            Aktive Pläne
+          </div>
+          <span class="panel-count" id="dash-plan-count">0</span>
+        </div>
+        <div class="panel-scroll" id="dash-plaene"></div>
+      </div>
+      <div class="dash-right">
+        <div class="panel-header">
+          <div class="panel-header-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Aufgaben
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span class="panel-count" id="dash-aufg-count">0 offen</span>
+            <button class="btn-primary" style="padding:4px 9px;font-size:11px;" onclick="aufgabeNeu()">+ Aufgabe</button>
+          </div>
+        </div>
+        <div class="panel-scroll" id="dash-aufgaben"></div>
+      </div>
+    </div>
+
+    <!-- PLÄNE -->
+    <div class="screen" id="screen-plaene">
+      <div class="panel-header">
+        <div class="panel-header-label">Alle Pläne</div>
+        <span class="panel-count" id="plaene-count">0</span>
+      </div>
+      <div class="panel-scroll" id="plaene-liste"></div>
+    </div>
+
+    <!-- TAGS -->
+    <div class="screen" id="screen-tags">
+      <div class="panel-header">
+        <div class="panel-header-label" id="tags-screen-titel">#tag</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-ghost" style="color:var(--danger);border-color:var(--danger);" onclick="tagLoeschen()">Tag löschen</button>
+          <button class="btn-primary" style="padding:4px 9px;font-size:11px;" onclick="aufgabeNeu()">+ Aufgabe</button>
+        </div>
+      </div>
+      <div class="panel-scroll" id="tags-aufgaben"></div>
+    </div>
+
+    <!-- NOTIZEN -->
+    <div class="screen" id="screen-notizen">
+      <div class="notizen-liste">
+        <div class="notizen-liste-header">
+          <input class="notizen-such-input" id="notiz-suche" placeholder="Suchen …" oninput="renderNotizenListe()">
+          <button class="btn-primary" onclick="notizNeu()" style="padding:5px 9px;font-size:11px;white-space:nowrap;">+ Neu</button>
+        </div>
+        <div class="notizen-tag-bar" id="notiz-tag-bar"></div>
+        <div class="notizen-scroll" id="notizen-liste-container">
+          <div class="empty-state">Noch keine Notizen</div>
+        </div>
+      </div>
+      <div class="notizen-editor" id="notizen-editor">
+        <div style="display:flex;flex-direction:column;height:100%;" id="notiz-editor-wrap">
+          <div id="notiz-leer-state" style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-xdim);font-size:13px;">
+            Notiz auswählen oder neu anlegen
+          </div>
+          <div id="notiz-editor-inner" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+            <div class="notiz-editor-header">
+              <button id="notiz-btn-back" onclick="notizZurOberseite()" style="display:none;border:none;background:none;cursor:pointer;padding:2px 6px;color:var(--teal);font-size:11px;font-family:var(--font);">← Oberseite</button>
+              <input class="notiz-titel-input" id="notiz-edit-titel" placeholder="Titel der Notiz …" oninput="notizAutoSave()">
+              <button onclick="notizLoeschen()" style="flex-shrink:0;border:none;background:none;cursor:pointer;padding:2px 6px;color:var(--danger);font-family:var(--font);font-size:11px;" title="Löschen">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+              </button>
+            </div>
+            <div class="notiz-meta-row">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+              <input class="notiz-tag-input" id="notiz-edit-tag" placeholder="Tag …" list="notiz-tag-vorschlaege" oninput="notizAutoSave()">
+              <datalist id="notiz-tag-vorschlaege"></datalist>
+              <span class="notiz-datum-label" id="notiz-edit-datum">–</span>
+              <button onclick="toggleUnterseitenPanel()" style="flex-shrink:0;border:1px solid var(--border);background:var(--bg);border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer;font-family:var(--font);color:var(--text-dim);" id="notiz-usz-btn">Unterseiten</button>
+            </div>
+            <div class="notiz-toolbar" id="notiz-toolbar">
+              <button class="ntb" onclick="notizTb('**','**')" title="Fett"><b>B</b></button>
+              <button class="ntb" onclick="notizTb('*','*')" title="Kursiv"><i>I</i></button>
+              <button class="ntb" onclick="notizTb('`','`')" title="Code" style="font-family:monospace;">``</button>
+              <div class="ntb-sep"></div>
+              <button class="ntb" onclick="notizTbZeile('# ')">H1</button>
+              <button class="ntb" onclick="notizTbZeile('## ')">H2</button>
+              <button class="ntb" onclick="notizTbZeile('### ')">H3</button>
+              <div class="ntb-sep"></div>
+              <button class="ntb" onclick="notizTbZeile('- ')">• –</button>
+              <button class="ntb" onclick="notizTbZeile('- [ ] ')">☐</button>
+              <button class="ntb" onclick="notizTbZeile('> ')">&ldquo;</button>
+              <button class="ntb" onclick="notizTbInsert('\n---\n')">—</button>
+              <div class="ntb-sep"></div>
+              <button class="ntb" onclick="openPlanLinkOverlay()" style="color:var(--teal);">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/></svg>
+                Plan
+              </button>
+              <button class="ntb" onclick="notizTbTabelle()">⊞</button>
+              <button class="ntb" onclick="notizTb('[','](url)')">🔗</button>
+              <div class="ntb-sep"></div>
+              <button class="ntb" id="notiz-btn-edit" onclick="notizToggleView(false)" style="color:var(--teal);">Edit</button>
+              <button class="ntb" id="notiz-btn-view" onclick="notizToggleView(true)">Ansicht</button>
+              <div class="ntb-sep"></div>
+              <button class="ntb" onclick="notizFarbenOverlayToggle(event)" style="color:var(--teal-dark);font-weight:700;">ℹ</button>
+            </div>
+            <div id="notiz-farben-overlay">
+              <div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Tabellen-Zellfarben</div>
+              <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;font-family:monospace;">Syntax: {farbe}Text</div>
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                <div style="display:flex;align-items:center;gap:8px;"><span style="background:#d4edda;color:#1a5c2a;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;min-width:60px;">{gruen}</span><span style="font-size:11px;color:var(--text-dim);">Grün</span></div>
+                <div style="display:flex;align-items:center;gap:8px;"><span style="background:#fff3cd;color:#7c5000;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;min-width:60px;">{gelb}</span><span style="font-size:11px;color:var(--text-dim);">Gelb</span></div>
+                <div style="display:flex;align-items:center;gap:8px;"><span style="background:#fcd5d5;color:#7c1a1a;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;min-width:60px;">{rot}</span><span style="font-size:11px;color:var(--text-dim);">Rot</span></div>
+                <div style="display:flex;align-items:center;gap:8px;"><span style="background:#d0e8fb;color:#0c3d6e;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;min-width:60px;">{blau}</span><span style="font-size:11px;color:var(--text-dim);">Blau</span></div>
+                <div style="display:flex;align-items:center;gap:8px;"><span style="background:#ffe5cc;color:#7c3a00;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;min-width:60px;">{orange}</span><span style="font-size:11px;color:var(--text-dim);">Orange</span></div>
+                <div style="display:flex;align-items:center;gap:8px;"><span style="background:#ead5fb;color:#4a1a7c;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;min-width:60px;">{lila}</span><span style="font-size:11px;color:var(--text-dim);">Lila</span></div>
+                <div style="display:flex;align-items:center;gap:8px;"><span style="background:#e8e8e8;color:#444;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;min-width:60px;">{grau}</span><span style="font-size:11px;color:var(--text-dim);">Grau</span></div>
+              </div>
+            </div>
+            <input type="hidden" id="notiz-edit-id">
+            <input type="hidden" id="notiz-edit-parentid">
+            <textarea class="notiz-textarea" id="notiz-textarea" placeholder="Notiz schreiben …&#10;&#10;Markdown wird unterstützt." oninput="notizAutoSave()"></textarea>
+            <div class="notiz-render-view" id="notiz-render-view"></div>
+          </div>
+        </div>
+        <div class="notiz-usz-panel" id="notiz-usz-panel">
+          <div class="notiz-usz-panel-header">
+            <span>Unterseiten</span>
+            <button class="notiz-usz-panel-close" onclick="closeUnterseitenPanel()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="notiz-usz-panel-body" id="notiz-usz-panel-body"></div>
+          <div class="notiz-usz-panel-add" onclick="unterseiteNeu()">+ Neue Unterseite</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- AUFGABEN MODAL -->
+<div class="modal-overlay" id="modal-aufgabe">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="aufg-modal-titel">Aufgabe</h2>
+      <button class="modal-close" onclick="schliesseAufgabeModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group">
+        <div class="field-label">Titel</div>
+        <input class="field-input" id="aufg-titel" placeholder="Was ist zu tun?" oninput="aufgModalGeaendert()">
+      </div>
+      <div class="field-group">
+        <div class="field-label">Status</div>
+        <div class="status-btns">
+          <button class="status-btn active-offen" data-status="offen" onclick="aufgStatusSetzen('offen')">
+            <span style="width:8px;height:8px;border-radius:50%;border:1.5px solid #9ab0b0;display:inline-block;"></span>Offen
+          </button>
+          <button class="status-btn" data-status="inArbeit" onclick="aufgStatusSetzen('inArbeit')">
+            <span style="width:8px;height:8px;border-radius:50%;border:1.5px solid var(--warn);background:#fff3e0;display:inline-block;"></span>In Arbeit
+          </button>
+          <button class="status-btn" data-status="erledigt" onclick="aufgStatusSetzen('erledigt')">
+            <span style="width:8px;height:8px;border-radius:50%;background:var(--teal);display:inline-block;"></span>Erledigt
+          </button>
+        </div>
+      </div>
+      <div class="field-group">
+        <div class="field-label">Deadline</div>
+        <input class="field-input" id="aufg-deadline" type="date" oninput="aufgModalGeaendert()">
+      </div>
+      <div class="field-group">
+        <div class="field-label">Tags</div>
+        <div class="tag-auswahl" id="aufg-tags-auswahl"></div>
+      </div>
+      <div class="field-group">
+        <div class="field-label">Notiz</div>
+        <textarea class="field-input" id="aufg-notiz" rows="3" placeholder="Optionale Notiz …" style="resize:none;" oninput="aufgModalGeaendert()"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger" id="aufg-btn-loeschen" onclick="aufgabeLoeschen()" style="display:none;">Löschen</button>
+      <div style="flex:1;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-ghost" onclick="schliesseAufgabeModal()">Abbrechen</button>
+        <button class="btn-primary" onclick="aufgabeSpeichern()">Speichern</button>
+      </div>
+    </div>
+    <input type="hidden" id="aufg-edit-id">
+  </div>
+</div>
+
+<!-- TAG NEU DIALOG -->
+<div class="modal-overlay" id="modal-tag">
+  <div class="tag-dialog">
+    <div style="font-size:14px;font-weight:700;margin-bottom:4px;">Neuer Tag</div>
+    <input class="field-input" id="tag-neu-input" placeholder="#mein-tag" style="margin-bottom:4px;">
+    <div style="font-size:11px;color:var(--text-xdim);margin-bottom:8px;">Tipp: Tags beginnen mit # oder ohne — wird automatisch ergänzt.</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn-ghost" onclick="schliesseTagDialog()">Abbrechen</button>
+      <button class="btn-primary" onclick="tagSpeichern()">Erstellen</button>
+    </div>
+  </div>
+</div>
+
+<!-- PLAN LINK OVERLAY -->
+<div class="notiz-plan-overlay" id="notiz-plan-overlay">
+  <div class="notiz-plan-sheet">
+    <h3>Plan verlinken</h3>
+    <div id="notiz-plan-liste"></div>
+    <button class="btn-ghost" onclick="closePlanLinkOverlay()" style="width:100%;margin-top:8px;">Abbrechen</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const APP_VERSION = '1.0.0';
+
+// ── STATE ──
+let fileHandle = null;
+let DB = null;
+let aktiverScreen = 'nofile';
+let aktiverTag = null;
+let aufgabeModalOffen = false;
+let ungespeichert = false;
+
+// ── UTILS ──
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function today() { return new Date().toISOString().slice(0,10); }
+function escHtml(s) {
+  if (typeof s !== 'string') return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showToast(msg) {
+  let t = document.getElementById('sa-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'sa-toast';
+    t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a2a2a;color:white;padding:8px 16px;border-radius:20px;font-size:12px;z-index:999;pointer-events:none;transition:opacity .3s;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 2000);
+}
+
+// ── DATEI ──
+async function dateiClick() {
+  if (fileHandle) {
+    fileHandle = null; DB = null;
+    document.getElementById('topbar-file').textContent = 'Keine Datei geladen';
+    document.getElementById('btn-datei').textContent = '📂 Öffnen';
+    zeigeScreenDirekt('nofile');
+    return;
+  }
+  try {
+    const [h] = await window.showOpenFilePicker({ types: [{ description:'JSON', accept:{'application/json':['.json']} }] });
+    fileHandle = h;
+    await ladeDatei();
+  } catch(e) { if (e.name !== 'AbortError') showToast('❌ Fehler beim Öffnen'); }
+}
+
+async function ladeDatei() {
+  try {
+    const file = await fileHandle.getFile();
+    const text = await file.text();
+    DB = JSON.parse(text);
+    migrateDB();
+    document.getElementById('topbar-file').textContent = '✓ ' + file.name;
+    document.getElementById('btn-datei').textContent = '✕ Schließen';
+    renderSidebar();
+    zeigeScreenDirekt('dashboard');
+    renderDashboard();
+  } catch(e) { showToast('❌ Datei konnte nicht gelesen werden'); }
+}
+
+async function speichern() {
+  if (!fileHandle || !DB) return;
+  try {
+    const w = await fileHandle.createWritable();
+    await w.write(JSON.stringify(DB, null, 2));
+    await w.close();
+    ungespeichert = false;
+  } catch(e) { showToast('❌ Speichern fehlgeschlagen'); }
+}
+
+function setzeGeaendert() {
+  ungespeichert = true;
+  speichern();
+}
+
+// ── MIGRATION ──
+function migrateDB() {
+  if (!DB) return;
+  if (!Array.isArray(DB.aufgaben)) DB.aufgaben = [];
+  if (!Array.isArray(DB.plaene))   DB.plaene   = [];
+  if (!Array.isArray(DB.notizen))  DB.notizen  = [];
+  // Status normalisieren
+  DB.aufgaben.forEach(a => {
+    if (!a.status || !['offen','inArbeit','erledigt'].includes(a.status)) {
+      if (a.status === 'erledigt') a.status = 'erledigt';
+      else if (a.status === 'inArbeit') a.status = 'inArbeit';
+      else a.status = 'offen';
+    }
+    if (!a.tags) a.tags = [];
+    if (!a.geaendert) a.geaendert = a.erstellt || new Date().toISOString();
+  });
+  DB.plaene.forEach(p => {
+    if (!p.prioritaet) p.prioritaet = 'mittel';
+    if (!p.horizont)   p.horizont   = 'kurzfristig';
+    if (!Array.isArray(p.schritte)) p.schritte = [];
+  });
+  DB.notizen.forEach(n => {
+    if (!n.geaendert) n.geaendert = n.erstellt || new Date().toISOString();
+  });
+}
+
+// ── SCREENS ──
+function zeigeScreen(name, navEl) {
+  if (!DB && name !== 'nofile') return;
+  zeigeScreenDirekt(name);
+  document.querySelectorAll('.sb-nav-item').forEach(el => el.classList.remove('active'));
+  if (navEl) navEl.classList.add('active');
+  const titel = { dashboard:'Dashboard', plaene:'Pläne', notizen:'Notizen', tags: aktiverTag || 'Tags' };
+  document.getElementById('topbar-title').textContent = titel[name] || name;
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'plaene')    renderPlaeneScreen();
+  if (name === 'notizen')   renderNotizenListe();
+  if (name === 'tags')      renderTagsScreen();
+}
+
+function zeigeScreenDirekt(name) {
+  aktiverScreen = name;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById('screen-' + name);
+  if (el) el.classList.add('active');
+}
+
+function zeigeTag(tag) {
+  aktiverTag = tag;
+  document.getElementById('topbar-title').textContent = tag;
+  document.getElementById('tags-screen-titel').textContent = tag;
+  document.querySelectorAll('.sb-nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.sb-tag-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.tag === tag);
+  });
+  zeigeScreenDirekt('tags');
+  renderTagsScreen();
+}
+
+// ── SIDEBAR ──
+function renderSidebar() {
+  const tags = alleTags();
+  const container = document.getElementById('sb-tags-container');
+  const FARBEN = ['#378ADD','#1D9E75','#D85A30','#7F77DD','#D4537E','#BA7517','#E24B4A','#888780'];
+  container.innerHTML = tags.map((tag, i) => {
+    const anzahl = DB.aufgaben.filter(a => (a.tags||[]).includes(tag) && a.status !== 'erledigt').length;
+    const farbe = FARBEN[i % FARBEN.length];
+    return `<div class="sb-tag-item" data-tag="${escHtml(tag)}" onclick="zeigeTag('${escHtml(tag)}')"
+      style="${aktiverTag === tag ? 'color:white;' : ''}">
+      <span style="display:flex;align-items:center;gap:5px;">
+        <span class="sb-tag-dot" style="background:${farbe};"></span>${escHtml(tag)}
+      </span>
+      <span class="sb-tag-count">${anzahl || ''}</span>
+    </div>`;
+  }).join('');
+}
+
+function alleTags() {
+  const tags = new Set();
+  DB.aufgaben.forEach(a => (a.tags||[]).forEach(t => tags.add(t)));
+  return [...tags].sort();
+}
+
+function tagFarbe(tag) {
+  const tags = alleTags();
+  const FARBEN = ['#378ADD','#1D9E75','#D85A30','#7F77DD','#D4537E','#BA7517','#E24B4A','#888780'];
+  const idx = tags.indexOf(tag);
+  return idx >= 0 ? FARBEN[idx % FARBEN.length] : '#888';
+}
+
+// ── DASHBOARD ──
+function renderDashboard() {
+  renderDashPlaene();
+  renderDashAufgaben();
+}
+
+function renderDashAufgaben() {
+  const container = document.getElementById('dash-aufgaben');
+  const countEl   = document.getElementById('dash-aufg-count');
+  const td = today();
+
+  const alle = [...DB.aufgaben].sort((a,b) =>
+    (b.geaendert||'').localeCompare(a.geaendert||'')
+  );
+  const offen    = alle.filter(a => a.status !== 'erledigt');
+  const erledigt = alle.filter(a => a.status === 'erledigt');
+  if (countEl) countEl.textContent = offen.length + ' offen';
+
+  let html = '';
+  if (!offen.length && !erledigt.length) {
+    html = '<div class="empty-state">Keine Aufgaben vorhanden</div>';
+  } else {
+    if (offen.length) {
+      html += '<div class="gruppe-header">Zu tun</div>';
+      html += offen.map(a => aufgZeileHTML(a, td)).join('');
+    }
+    if (erledigt.length) {
+      html += '<div class="gruppe-header">Erledigt</div>';
+      html += erledigt.map(a => aufgZeileHTML(a, td)).join('');
+    }
+  }
+  container.innerHTML = html;
+  container.querySelectorAll('.aufg-row').forEach(el => {
+    el.addEventListener('click', () => aufgabeBearbeiten(el.dataset.id));
+  });
+}
+
+function aufgZeileHTML(a, td) {
+  const istLate = a.faellig && a.faellig < td && a.status !== 'erledigt';
+  const tags = (a.tags||[]).slice(0,2).map(t =>
+    `<span class="aufg-tag-chip" style="background:${tagFarbe(t)}22;color:${tagFarbe(t)};">${escHtml(t)}</span>`
+  ).join('');
+  return `<div class="aufg-row" data-id="${escHtml(a.id)}">
+    <div class="aufg-status-dot ${a.status||'offen'}"></div>
+    <div class="aufg-titel ${a.status==='erledigt'?'erledigt':''}">${escHtml(a.titel||'(ohne Titel)')}</div>
+    ${tags}
+    ${a.faellig ? `<div class="aufg-deadline ${istLate?'late':''}">${a.faellig}</div>` : ''}
+  </div>`;
+}
+
+function renderDashPlaene() {
+  const container = document.getElementById('dash-plaene');
+  const countEl   = document.getElementById('dash-plan-count');
+  const aktive = (DB.plaene||[]).filter(p => p.status !== 'abgeschlossen');
+  if (countEl) countEl.textContent = aktive.length;
+
+  if (!aktive.length) {
+    container.innerHTML = '<div class="empty-state">Keine aktiven Pläne</div>';
+    return;
+  }
+
+  const prioOrder = { krise:-1, hoch:0, mittel:1, niedrig:2 };
+  function naechsterSchritt(p) {
+    return (p.schritte||[]).find(s => {
+      const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
+      return st !== 'erledigt';
+    });
+  }
+
+  const krise    = aktive.filter(p => p.prioritaet === 'krise');
+  const delegiert = [];
+  const normal   = [];
+  aktive.filter(p => p.prioritaet !== 'krise').forEach(p => {
+    const ns = naechsterSchritt(p);
+    if (ns?.delegiertAn) delegiert.push({p,ns});
+    else normal.push(p);
+  });
+  normal.sort((a,b) => (prioOrder[a.prioritaet??'mittel']??1)-(prioOrder[b.prioritaet??'mittel']??1));
+
+  const groups = { kurzfristig:[], mittelfristig:[], langfristig:[] };
+  normal.forEach(p => groups[p.horizont||'kurzfristig'].push(p));
+
+  const PRIO_DOTS = {
+    krise:   '#c0392b',
+    hoch:    '#E65100',
+    mittel:  '#f59e0b',
+    niedrig: '#cde0de',
+  };
+  const HZ_LABELS = { kurzfristig:'⚡ Kurzfristig', mittelfristig:'📅 Mittelfristig', langfristig:'🕐 Langfristig' };
+  const HZ_STYLES = {
+    kurzfristig:   'background:var(--teal-xlight);color:var(--teal-dark);',
+    mittelfristig: 'background:#e3f0fc;color:#1565c0;',
+    langfristig:   'background:#f3e8ff;color:#6b21a8;',
+  };
+
+  function planKarteHTML(p) {
+    const schritte = p.schritte||[];
+    const ns = naechsterSchritt(p);
+    const erledigt = schritte.filter(s => {
+      const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
+      return st === 'erledigt';
+    }).length;
+    const pct = schritte.length ? Math.round(erledigt/schritte.length*100) : 0;
+    const nsTitel = ns ? (ns.aufgabeId ? (DB.aufgaben.find(a=>a.id===ns.aufgabeId)?.titel||ns.titel) : ns.titel) : '✓ Alle erledigt';
+    const nsTags = ns?.aufgabeId ? (DB.aufgaben.find(a=>a.id===ns.aufgabeId)?.tags||[]) : [];
+    const nsChip = nsTags[0] ? `<span class="pk-tag-chip">${escHtml(nsTags[0])}</span>` :
+                  ns?.delegiertAn ? `<span class="pk-del-chip">→ ${escHtml(ns.delegiertAn)}</span>` : '';
+    const numCls = ns ? 'next' : 'done';
+    const numTxt = ns ? (schritte.indexOf(ns)+1) : '✓';
+    return `<div class="plan-karte" style="${p.prioritaet==='krise'?'background:#fdf0ef;':''}" onclick="zeigeScreen('plaene',document.querySelector('[data-screen=plaene]'))">
+      <div class="pk-header">
+        <div class="pk-prio-dot" style="background:${PRIO_DOTS[p.prioritaet]||'#f59e0b'};${p.prioritaet==='krise'?'box-shadow:0 0 0 2px #f5c6c2;':''}"></div>
+        <div class="pk-titel ${p.prioritaet==='krise'?'style="color:#c0392b;"':''}">${escHtml(p.titel)}</div>
+        <span class="pk-hz" style="${HZ_STYLES[p.horizont||'kurzfristig']}">${(p.horizont||'kurzfristig').slice(0,4)}.</span>
+        <span class="pk-counter">${erledigt}/${schritte.length}</span>
+      </div>
+      <div class="pk-progress"><div class="pk-progress-fill" style="width:${pct}%;"></div></div>
+      <div class="pk-schritt">
+        <div class="pk-num ${numCls}">${numTxt}</div>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${!ns?'color:var(--teal);':''}">${escHtml(nsTitel)}</span>
+        ${nsChip}
+      </div>
+    </div>`;
+  }
+
+  let html = '';
+  if (krise.length) {
+    html += '<div class="krise-header"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Krise</div>';
+    krise.forEach(p => { html += planKarteHTML(p); });
+  }
+  ['kurzfristig','mittelfristig','langfristig'].forEach(hz => {
+    if (!groups[hz].length) return;
+    html += `<div class="hz-header">${HZ_LABELS[hz]}</div>`;
+    groups[hz].forEach(p => { html += planKarteHTML(p); });
+  });
+  if (delegiert.length) {
+    html += `<div style="margin:6px 12px 0;border:1px solid #d0e8fb;border-radius:8px;overflow:hidden;background:var(--surface);">
+      <div class="warte-header"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Warte auf</div>`;
+    delegiert.forEach(({p,ns}) => {
+      const nsTitel = ns.aufgabeId ? (DB.aufgaben.find(a=>a.id===ns.aufgabeId)?.titel||ns.titel) : ns.titel;
+      html += `<div class="warte-zeile">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1976d2" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span style="flex:1;font-size:11px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.titel)} · ${escHtml(nsTitel)}</span>
+        <span style="font-size:9px;background:#e3f0fc;color:#1565c0;padding:1px 6px;border-radius:4px;font-weight:600;flex-shrink:0;">→ ${escHtml(ns.delegiertAn)}</span>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  container.innerHTML = html;
+}
+
+// ── PLÄNE SCREEN ──
+function renderPlaeneScreen() {
+  const container = document.getElementById('plaene-liste');
+  const countEl   = document.getElementById('plaene-count');
+  const aktive = (DB.plaene||[]).filter(p => p.status !== 'abgeschlossen');
+  if (countEl) countEl.textContent = aktive.length;
+  if (!aktive.length) {
+    container.innerHTML = '<div class="empty-state">Keine aktiven Pläne</div>';
+    return;
+  }
+  // Volle Plan-Karten mit allen Schritten
+  const prioOrder = { krise:-1, hoch:0, mittel:1, niedrig:2 };
+  const sorted = [...aktive].sort((a,b) => (prioOrder[a.prioritaet??'mittel']??1)-(prioOrder[b.prioritaet??'mittel']??1));
+  const PRIO_DOTS = { krise:'#c0392b', hoch:'#E65100', mittel:'#f59e0b', niedrig:'#cde0de' };
+
+  container.innerHTML = sorted.map(p => {
+    const schritte = p.schritte||[];
+    const erledigt = schritte.filter(s => {
+      const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
+      return st === 'erledigt';
+    }).length;
+    const pct = schritte.length ? Math.round(erledigt/schritte.length*100) : 0;
+
+    const schritteHTML = schritte.map((s,i) => {
+      const a = s.aufgabeId ? DB.aufgaben.find(x=>x.id===s.aufgabeId) : null;
+      const st = a?.status || s.status || 'offen';
+      const titel = a?.titel || s.titel || '';
+      const isDone = st === 'erledigt';
+      const nsTags = (a?.tags||[]);
+      const tagChip = nsTags[0] ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:${tagFarbe(nsTags[0])}22;color:${tagFarbe(nsTags[0])};margin-left:auto;flex-shrink:0;">${escHtml(nsTags[0])}</span>` : '';
+      const delChip = s.delegiertAn && !isDone ? `<span class="pk-del-chip" style="margin-left:auto;">→ ${escHtml(s.delegiertAn)}</span>` : '';
+      const numCls = isDone ? 'done' : (i === erledigt ? 'next' : '');
+      return `<div class="pk-schritt" style="cursor:pointer;padding:6px 12px;" data-planid="${p.id}" data-sidx="${i}" onclick="planSchrittToggle('${p.id}',${i},this)">
+        <div class="pk-num ${numCls}">${isDone?'✓':(i+1)}</div>
+        <span style="flex:1;font-size:12px;${isDone?'text-decoration:line-through;color:var(--text-xdim);':''};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(titel)}</span>
+        ${tagChip}${delChip}
+      </div>`;
+    }).join('');
+
+    return `<div style="margin:10px 14px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface);">
+      <div class="pk-header" style="padding:9px 12px;">
+        <div class="pk-prio-dot" style="background:${PRIO_DOTS[p.prioritaet]||'#f59e0b'};${p.prioritaet==='krise'?'box-shadow:0 0 0 2px #f5c6c2;':''}"></div>
+        <div class="pk-titel" style="font-size:13px;">${escHtml(p.titel)}</div>
+        <span class="pk-counter">${erledigt}/${schritte.length}</span>
+      </div>
+      <div class="pk-progress"><div class="pk-progress-fill" style="width:${pct}%;"></div></div>
+      ${schritteHTML || '<div style="padding:8px 12px;font-size:11px;color:var(--text-xdim);">Keine Schritte</div>'}
+    </div>`;
+  }).join('');
+}
+
+function planSchrittToggle(planId, sIdx, el) {
+  const p = (DB.plaene||[]).find(x=>x.id===planId);
+  if (!p || !p.schritte[sIdx]) return;
+  const s = p.schritte[sIdx];
+  const a = s.aufgabeId ? DB.aufgaben.find(x=>x.id===s.aufgabeId) : null;
+  const istDone = (a?.status||s.status) === 'erledigt';
+  const neu = istDone ? 'offen' : 'erledigt';
+  if (a) { a.status = neu; a.geaendert = new Date().toISOString(); }
+  else    { s.status = neu; }
+  p.geaendert = new Date().toISOString();
+  setzeGeaendert();
+  renderPlaeneScreen();
+  renderDashboard();
+}
+
+// ── TAGS SCREEN ──
+function renderTagsScreen() {
+  const container = document.getElementById('tags-aufgaben');
+  if (!aktiverTag) { container.innerHTML = '<div class="empty-state">Kein Tag ausgewählt</div>'; return; }
+  const td = today();
+  const aufgaben = [...DB.aufgaben]
+    .filter(a => (a.tags||[]).includes(aktiverTag))
+    .sort((a,b) => (b.geaendert||'').localeCompare(a.geaendert||''));
+  const offen    = aufgaben.filter(a => a.status !== 'erledigt');
+  const erledigt = aufgaben.filter(a => a.status === 'erledigt');
+  let html = '';
+  if (!aufgaben.length) {
+    html = '<div class="empty-state">Keine Aufgaben mit diesem Tag</div>';
+  } else {
+    if (offen.length)    { html += '<div class="gruppe-header">Zu tun</div>'; html += offen.map(a => aufgZeileHTML(a,td)).join(''); }
+    if (erledigt.length) { html += '<div class="gruppe-header">Erledigt</div>'; html += erledigt.map(a => aufgZeileHTML(a,td)).join(''); }
+  }
+  container.innerHTML = html;
+  container.querySelectorAll('.aufg-row').forEach(el => {
+    el.addEventListener('click', () => aufgabeBearbeiten(el.dataset.id));
+  });
+}
+
+// ── TAG VERWALTUNG ──
+function tagNeuDialog() {
+  document.getElementById('tag-neu-input').value = '';
+  document.getElementById('modal-tag').classList.add('open');
+  setTimeout(() => document.getElementById('tag-neu-input').focus(), 50);
+}
+function schliesseTagDialog() { document.getElementById('modal-tag').classList.remove('open'); }
+function tagSpeichern() {
+  let name = document.getElementById('tag-neu-input').value.trim();
+  if (!name) return;
+  if (!name.startsWith('#')) name = '#' + name;
+  schliesseTagDialog();
+  showToast('Tag angelegt: ' + name);
+  renderSidebar();
+}
+function tagLoeschen() {
+  if (!aktiverTag) return;
+  if (!confirm(`Tag "${aktiverTag}" löschen? Alle Aufgaben verlieren diesen Tag.`)) return;
+  DB.aufgaben.forEach(a => {
+    a.tags = (a.tags||[]).filter(t => t !== aktiverTag);
+  });
+  setzeGeaendert();
+  aktiverTag = null;
+  renderSidebar();
+  zeigeScreen('dashboard', document.querySelector('[data-screen="dashboard"]'));
+  showToast('Tag gelöscht');
+}
+
+// ── AUFGABEN MODAL ──
+let aufgEditId = null;
+let aufgStatus = 'offen';
+
+function aufgabeNeu() {
+  aufgEditId = null;
+  aufgStatus = 'offen';
+  document.getElementById('aufg-edit-id').value = '';
+  document.getElementById('aufg-titel').value = '';
+  document.getElementById('aufg-deadline').value = '';
+  document.getElementById('aufg-notiz').value = '';
+  document.getElementById('aufg-modal-titel').textContent = 'Neue Aufgabe';
+  document.getElementById('aufg-btn-loeschen').style.display = 'none';
+  aufgStatusSetzen('offen');
+  renderAufgTagAuswahl([]);
+  document.getElementById('modal-aufgabe').classList.add('open');
+  setTimeout(() => document.getElementById('aufg-titel').focus(), 50);
+}
+
+function aufgabeBearbeiten(id) {
+  const a = DB.aufgaben.find(x=>x.id===id);
+  if (!a) return;
+  aufgEditId = id;
+  aufgStatus = a.status || 'offen';
+  document.getElementById('aufg-edit-id').value = id;
+  document.getElementById('aufg-titel').value = a.titel || '';
+  document.getElementById('aufg-deadline').value = a.faellig || '';
+  document.getElementById('aufg-notiz').value = a.notiz || '';
+  document.getElementById('aufg-modal-titel').textContent = 'Aufgabe bearbeiten';
+  document.getElementById('aufg-btn-loeschen').style.display = '';
+  aufgStatusSetzen(a.status || 'offen');
+  renderAufgTagAuswahl(a.tags||[]);
+  document.getElementById('modal-aufgabe').classList.add('open');
+}
+
+function aufgStatusSetzen(status) {
+  aufgStatus = status;
+  document.querySelectorAll('.status-btn').forEach(btn => {
+    btn.className = 'status-btn' + (btn.dataset.status === status ? ' active-' + status : '');
+  });
+}
+
+function renderAufgTagAuswahl(selected) {
+  const tags = alleTags();
+  const container = document.getElementById('aufg-tags-auswahl');
+  container.innerHTML = tags.map(t =>
+    `<button class="tag-ausw-pill ${selected.includes(t)?'selected':''}" data-tag="${escHtml(t)}" onclick="aufgTagToggle(this,'${escHtml(t)}')">${escHtml(t)}</button>`
+  ).join('') +
+  `<button class="tag-ausw-neu" onclick="aufgNeuerTag()">+ Neuer Tag</button>`;
+}
+
+function aufgTagToggle(el, tag) {
+  el.classList.toggle('selected');
+}
+
+function aufgNeuerTag() {
+  const name = prompt('Neuer Tag (mit oder ohne #):');
+  if (!name) return;
+  const tag = name.startsWith('#') ? name : '#' + name;
+  const container = document.getElementById('aufg-tags-auswahl');
+  const btn = document.createElement('button');
+  btn.className = 'tag-ausw-pill selected';
+  btn.dataset.tag = tag;
+  btn.textContent = tag;
+  btn.onclick = function() { this.classList.toggle('selected'); };
+  container.insertBefore(btn, container.lastElementChild);
+}
+
+function aufgModalGeaendert() { /* auto-save optional */ }
+
+function aufgabeSpeichern() {
+  const titel = document.getElementById('aufg-titel').value.trim();
+  if (!titel) { showToast('Bitte Titel eingeben'); return; }
+  const faellig = document.getElementById('aufg-deadline').value || null;
+  const notiz   = document.getElementById('aufg-notiz').value.trim() || null;
+  const tags    = [...document.querySelectorAll('#aufg-tags-auswahl .tag-ausw-pill.selected')].map(b => b.dataset.tag);
+
+  if (aufgEditId) {
+    const a = DB.aufgaben.find(x=>x.id===aufgEditId);
+    if (a) {
+      a.titel    = titel;
+      a.status   = aufgStatus;
+      a.faellig  = faellig;
+      a.notiz    = notiz;
+      a.tags     = tags;
+      a.geaendert = new Date().toISOString();
+    }
+  } else {
+    DB.aufgaben.push({
+      id:       uid(),
+      titel,
+      status:   aufgStatus,
+      faellig,
+      notiz,
+      tags,
+      erstellt:  new Date().toISOString(),
+      geaendert: new Date().toISOString(),
+    });
+  }
+  setzeGeaendert();
+  renderSidebar();
+  if (aktiverScreen === 'dashboard') renderDashboard();
+  if (aktiverScreen === 'tags')      renderTagsScreen();
+  schliesseAufgabeModal();
+  showToast(aufgEditId ? 'Aufgabe gespeichert' : 'Aufgabe erstellt');
+}
+
+function aufgabeLoeschen() {
+  if (!aufgEditId) return;
+  if (!confirm('Aufgabe löschen?')) return;
+  DB.aufgaben = DB.aufgaben.filter(a => a.id !== aufgEditId);
+  setzeGeaendert();
+  renderSidebar();
+  if (aktiverScreen === 'dashboard') renderDashboard();
+  if (aktiverScreen === 'tags')      renderTagsScreen();
+  schliesseAufgabeModal();
+  showToast('Aufgabe gelöscht');
+}
+
+function schliesseAufgabeModal() {
+  document.getElementById('modal-aufgabe').classList.remove('open');
+  aufgEditId = null;
+}
+
+// ── NOTIZEN (1:1 aus WorkAssist portiert) ──
+function notizCheckboxenZuruecksetzen(html) {
+  return html.replace(/<input type="checkbox" checked>/gi,'<input type="checkbox">');
+}
+
+function renderNotizenListe() {
+  const suche = (document.getElementById('notiz-suche')?.value||'').toLowerCase();
+  const aktivTag = document.querySelector('.notiz-tag-pill.aktiv')?.dataset.tag || '';
+  const notizen = (DB.notizen||[]).filter(n => {
+    if (n.parentId) return false;
+    if (aktivTag && n.tag !== aktivTag) return false;
+    if (suche && !(n.titel||'').toLowerCase().includes(suche) && !(n.inhalt||'').toLowerCase().includes(suche)) return false;
+    return true;
+  }).sort((a,b)=>(b.geaendert||b.erstellt||'').localeCompare(a.geaendert||a.erstellt||''));
+
+  // Tag-Bar
+  const allNotizTags = [...new Set((DB.notizen||[]).map(n=>n.tag).filter(Boolean))].sort();
+  const tagBar = document.getElementById('notiz-tag-bar');
+  if (tagBar) {
+    tagBar.innerHTML = ['Alle',...allNotizTags].map(t =>
+      `<button class="notiz-tag-pill ${(aktivTag===t||(t==='Alle'&&!aktivTag))?'aktiv':''}" data-tag="${t==='Alle'?'':t}" onclick="notizTagFilter('${t==='Alle'?'':t}')">${escHtml(t)}</button>`
+    ).join('');
+  }
+  // Notiz-Tag-Vorschläge
+  const dl = document.getElementById('notiz-tag-vorschlaege');
+  if (dl) dl.innerHTML = allNotizTags.map(t=>`<option value="${escHtml(t)}">`).join('');
+
+  const container = document.getElementById('notizen-liste-container');
+  if (!container) return;
+  if (!notizen.length) {
+    container.innerHTML = '<div class="empty-state">Noch keine Notizen</div>';
+    return;
+  }
+  container.innerHTML = notizen.map(n => {
+    const unterseiten = (DB.notizen||[]).filter(x=>x.parentId===n.id);
+    const aktiv = document.getElementById('notiz-edit-id')?.value === n.id;
+    return `<div class="notiz-karte ${aktiv?'aktiv':''}" onclick="notizOeffnen('${n.id}')">
+      <div class="notiz-karte-titel">${escHtml(n.titel||'(ohne Titel)')}</div>
+      <div class="notiz-karte-meta">
+        <span class="notiz-karte-datum">${(n.geaendert||n.erstellt||'').slice(0,10)}</span>
+        ${n.tag?`<span class="notiz-karte-tag">${escHtml(n.tag)}</span>`:''}
+        ${unterseiten.length?`<span class="notiz-usz-badge">${unterseiten.length} Unterseiten</span>`:''}
+      </div>
+      <div class="notiz-karte-preview">${escHtml((n.inhalt||'').slice(0,80))}</div>
+    </div>`;
+  }).join('');
+}
+
+function notizTagFilter(tag) {
+  document.querySelectorAll('.notiz-tag-pill').forEach(p => {
+    p.classList.toggle('aktiv', p.dataset.tag === tag);
+  });
+  renderNotizenListe();
+}
+
+function notizOeffnen(id) {
+  const n = (DB.notizen||[]).find(x=>x.id===id);
+  if (!n) return;
+  document.getElementById('notiz-edit-id').value    = id;
+  document.getElementById('notiz-edit-parentid').value = n.parentId || '';
+  document.getElementById('notiz-edit-titel').value = n.titel || '';
+  document.getElementById('notiz-edit-tag').value   = n.tag   || '';
+  document.getElementById('notiz-edit-datum').textContent = (n.geaendert||n.erstellt||'').slice(0,10);
+  document.getElementById('notiz-textarea').value   = n.inhalt || '';
+  document.getElementById('notiz-leer-state').style.display = 'none';
+  document.getElementById('notiz-editor-inner').style.display = 'flex';
+  document.getElementById('notiz-btn-back').style.display = n.parentId ? '' : 'none';
+  notizToggleView(false);
+  const uszBtn = document.getElementById('notiz-usz-btn');
+  const unterseiten = (DB.notizen||[]).filter(x=>x.parentId===id);
+  if (uszBtn) uszBtn.textContent = unterseiten.length ? `Unterseiten (${unterseiten.length})` : 'Unterseiten';
+  renderNotizenListe();
+}
+
+function notizNeu(parentId) {
+  const n = {
+    id: uid(), titel:'', inhalt:'', tag:'',
+    parentId: parentId||null,
+    erstellt: new Date().toISOString(),
+    geaendert: new Date().toISOString(),
+  };
+  if (!DB.notizen) DB.notizen = [];
+  DB.notizen.unshift(n);
+  setzeGeaendert();
+  renderNotizenListe();
+  notizOeffnen(n.id);
+  setTimeout(()=>document.getElementById('notiz-edit-titel')?.focus(),50);
+}
+
+function notizZurOberseite() {
+  const parentId = document.getElementById('notiz-edit-parentid').value;
+  if (parentId) notizOeffnen(parentId);
+}
+
+function notizSpeichern() {
+  const id = document.getElementById('notiz-edit-id').value;
+  if (!id) return;
+  const n = (DB.notizen||[]).find(x=>x.id===id);
+  if (!n) return;
+  n.titel    = document.getElementById('notiz-edit-titel').value;
+  n.tag      = document.getElementById('notiz-edit-tag').value.trim();
+  n.inhalt   = document.getElementById('notiz-textarea').value;
+  n.geaendert = new Date().toISOString();
+  document.getElementById('notiz-edit-datum').textContent = n.geaendert.slice(0,10);
+  setzeGeaendert();
+  renderNotizenListe();
+}
+
+function notizAutoSave() {
+  notizSpeichern();
+}
+
+function notizLoeschen() {
+  const id = document.getElementById('notiz-edit-id').value;
+  if (!id || !confirm('Notiz löschen?')) return;
+  DB.notizen = (DB.notizen||[]).filter(n => n.id!==id && n.parentId!==id);
+  setzeGeaendert();
+  document.getElementById('notiz-edit-id').value = '';
+  document.getElementById('notiz-leer-state').style.display = '';
+  document.getElementById('notiz-editor-inner').style.display = 'none';
+  renderNotizenListe();
+  showToast('Notiz gelöscht');
+}
+
+function notizToggleView(ansicht) {
+  const ta  = document.getElementById('notiz-textarea');
+  const rv  = document.getElementById('notiz-render-view');
+  const be  = document.getElementById('notiz-btn-edit');
+  const bv  = document.getElementById('notiz-btn-view');
+  if (ansicht) {
+    if (ta) ta.style.display = 'none';
+    if (rv) { rv.style.display = 'block'; rv.innerHTML = renderMarkdown(document.getElementById('notiz-textarea').value); }
+    if (be) be.style.color = '';
+    if (bv) bv.style.color = 'var(--teal)';
+  } else {
+    if (ta) ta.style.display = '';
+    if (rv) rv.style.display = 'none';
+    if (be) be.style.color = 'var(--teal)';
+    if (bv) bv.style.color = '';
+  }
+}
+
+function notizTb(vor, nach) {
+  const ta = document.getElementById('notiz-textarea');
+  if (!ta) return;
+  const s = ta.selectionStart, e = ta.selectionEnd;
+  const sel = ta.value.slice(s,e);
+  ta.value = ta.value.slice(0,s) + vor + sel + nach + ta.value.slice(e);
+  ta.selectionStart = s + vor.length;
+  ta.selectionEnd   = s + vor.length + sel.length;
+  ta.focus();
+  notizAutoSave();
+}
+
+function notizTbZeile(prefix) {
+  const ta = document.getElementById('notiz-textarea');
+  if (!ta) return;
+  const s = ta.selectionStart;
+  const lineStart = ta.value.lastIndexOf('\n', s-1) + 1;
+  ta.value = ta.value.slice(0, lineStart) + prefix + ta.value.slice(lineStart);
+  ta.selectionStart = ta.selectionEnd = lineStart + prefix.length + (s - lineStart);
+  ta.focus();
+  notizAutoSave();
+}
+
+function notizTbInsert(text) {
+  const ta = document.getElementById('notiz-textarea');
+  if (!ta) return;
+  const s = ta.selectionStart;
+  ta.value = ta.value.slice(0,s) + text + ta.value.slice(s);
+  ta.selectionStart = ta.selectionEnd = s + text.length;
+  ta.focus();
+  notizAutoSave();
+}
+
+function notizTbTabelle() {
+  notizTbInsert('\n| Spalte 1 | Spalte 2 | Spalte 3 |\n|----------|----------|----------|\n| Zelle 1  | Zelle 2  | Zelle 3  |\n');
+}
+
+function openUnterseitenPanel(parentId) {
+  const panel = document.getElementById('notiz-usz-panel');
+  const body  = document.getElementById('notiz-usz-panel-body');
+  if (!panel || !body) return;
+  const id = parentId || document.getElementById('notiz-edit-id').value;
+  const unterseiten = (DB.notizen||[]).filter(n=>n.parentId===id);
+  body.innerHTML = unterseiten.length ? unterseiten.map(n=>`
+    <div class="notiz-usz-item" onclick="notizOeffnen('${n.id}');closeUnterseitenPanel()">
+      <div class="notiz-usz-item-titel">${escHtml(n.titel||'(ohne Titel)')}</div>
+      <div class="notiz-usz-item-datum">${(n.geaendert||'').slice(0,10)}</div>
+    </div>`).join('') : '<div style="font-size:11px;color:rgba(255,255,255,0.4);text-align:center;padding:12px;">Noch keine Unterseiten</div>';
+  panel.classList.add('open');
+}
+
+function closeUnterseitenPanel() {
+  document.getElementById('notiz-usz-panel')?.classList.remove('open');
+}
+
+function toggleUnterseitenPanel() {
+  const panel = document.getElementById('notiz-usz-panel');
+  if (panel?.classList.contains('open')) closeUnterseitenPanel();
+  else openUnterseitenPanel();
+}
+
+function unterseiteNeu() {
+  const parentId = document.getElementById('notiz-edit-id').value;
+  closeUnterseitenPanel();
+  notizNeu(parentId);
+}
+
+function notizFarbenOverlayToggle(event) {
+  event.stopPropagation();
+  const overlay = document.getElementById('notiz-farben-overlay');
+  if (!overlay) return;
+  const istOffen = overlay.style.display !== 'none';
+  overlay.style.display = istOffen ? 'none' : 'block';
+  if (!istOffen) {
+    const btn = event.currentTarget;
+    const rect = btn.getBoundingClientRect();
+    const toolbarRect = btn.closest('.notiz-toolbar').getBoundingClientRect();
+    overlay.style.top = (rect.bottom - toolbarRect.top + 4) + 'px';
+    overlay.style.right = '4px'; overlay.style.left = 'auto';
+    const close = (e) => {
+      if (!overlay.contains(e.target)) { overlay.style.display='none'; document.removeEventListener('click',close); }
+    };
+    setTimeout(()=>document.addEventListener('click',close),0);
+  }
+}
+
+function openPlanLinkOverlay() {
+  const liste = document.getElementById('notiz-plan-liste');
+  const plaene = (DB.plaene||[]);
+  liste.innerHTML = plaene.length ? plaene.map(p=>`
+    <div class="notiz-plan-link" onclick="planLinkEinfuegen('${p.id}')">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/></svg>
+      <span style="font-size:12px;font-weight:600;">${escHtml(p.titel)}</span>
+    </div>`).join('') :
+    '<div style="color:var(--text-xdim);font-size:12px;text-align:center;padding:12px;">Keine Pläne vorhanden</div>';
+  document.getElementById('notiz-plan-overlay').classList.add('open');
+}
+
+function closePlanLinkOverlay() {
+  document.getElementById('notiz-plan-overlay').classList.remove('open');
+}
+
+function planLinkEinfuegen(planId) {
+  const ta = document.getElementById('notiz-textarea');
+  if (!ta) return;
+  const link = '[[plan:' + planId + ']]';
+  const s = ta.selectionStart;
+  const prefix = s > 0 && !ta.value.slice(0,s).endsWith('\n') ? '\n' : '';
+  ta.value = ta.value.slice(0,s) + prefix + link + '\n' + ta.value.slice(s);
+  ta.selectionStart = ta.selectionEnd = s + prefix.length + link.length + 1;
+  ta.focus();
+  closePlanLinkOverlay();
+  notizAutoSave();
+  showToast('Plan-Link eingefügt');
+}
+
+// ── MARKDOWN RENDERER ──
+function renderMarkdown(text) {
+  if (!text) return '<span style="color:var(--text-xdim);font-style:italic;">Leer</span>';
+  const planMap = {}; let planIdx = 0;
+  text = text.replace(/\[\[plan:([^\]]+)\]\]/g, (match, planId) => {
+    const key = '%%PLAN' + (planIdx++) + '%%';
+    planMap[key] = planId;
+    return key;
+  });
+  const lines = text.split('\n');
+  let html = '', inUl = false;
+  const closeUl = () => { if (inUl) { html += '</ul>'; inUl = false; } };
+  const inline = s => {
+    s = s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;">$1</a>');
+    s = s.replace(/\[link\](https?:\/\/[^\s<]+)/gi,(_,url)=>{const k=url.length>60?url.slice(0,60)+'…':url;return`<a href="${url}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;">${k}</a>`;});
+    s = s.replace(/(^|[\s(])(https?:\/\/[^\s<"]+)/g,(_,pre,url)=>{const k=url.length>60?url.slice(0,60)+'…':url;return`${pre}<a href="${url}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;">${k}</a>`;});
+    s = s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    s = s.replace(/\*(.+?)\*/g,'<em>$1</em>');
+    s = s.replace(/`(.+?)`/g,'<code>$1</code>');
+    return s;
+  };
+  let tableBuffer = [];
+  const flushTable = () => {
+    if (!tableBuffer.length) return;
+    closeUl();
+    let th = '<table>';
+    tableBuffer.forEach((row,ri) => {
+      const cells = row.split('|').filter((_,i,a)=>i>0&&i<a.length-1);
+      if (ri===1 && cells.every(c=>/^[-: ]+$/.test(c))) return;
+      const tag = ri===0 ? 'th' : 'td';
+      th += '<tr>' + cells.map(c => {
+        const z = c.trim();
+        const farbMap = {gruen:{bg:'#d4edda',fg:'#1a5c2a'},gelb:{bg:'#fff3cd',fg:'#7c5000'},rot:{bg:'#fcd5d5',fg:'#7c1a1a'},blau:{bg:'#d0e8fb',fg:'#0c3d6e'},orange:{bg:'#ffe5cc',fg:'#7c3a00'},lila:{bg:'#ead5fb',fg:'#4a1a7c'},petrol:{bg:'#d5f0fb',fg:'#0c4d6e'},grau:{bg:'#e8e8e8',fg:'#444'}};
+        const fm = z.match(/^\{(\w+)\}(.*)/s);
+        if (fm) { const f=farbMap[fm[1].toLowerCase()]; if(f) return `<${tag} style="background:${f.bg};color:${f.fg};">${inline(fm[2].trim())}</${tag}>`; }
+        return `<${tag}>${inline(z)}</${tag}>`;
+      }).join('') + '</tr>';
+    });
+    html += th + '</table>';
+    tableBuffer = [];
+  };
+  lines.forEach(line => {
+    if (/^\|.+\|/.test(line)) { tableBuffer.push(line); return; } else { flushTable(); }
+    if (/^#{1,3} /.test(line)) {
+      closeUl();
+      const m = line.match(/^(#{1,3}) (.+)/);
+      if (m) html += `<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`;
+    } else if (/^- \[x\] /i.test(line)) {
+      if (!inUl) { html += '<ul>'; inUl = true; }
+      html += `<li><input type="checkbox" checked disabled> ${inline(line.replace(/^- \[x\] /i,''))}</li>`;
+    } else if (/^- \[ \] /.test(line)) {
+      if (!inUl) { html += '<ul>'; inUl = true; }
+      html += `<li><input type="checkbox" disabled> ${inline(line.replace(/^- \[ \] /,''))}</li>`;
+    } else if (/^- /.test(line)) {
+      if (!inUl) { html += '<ul>'; inUl = true; }
+      html += `<li>${inline(line.slice(2))}</li>`;
+    } else if (/^> /.test(line)) {
+      closeUl(); html += `<blockquote>${inline(line.slice(2))}</blockquote>`;
+    } else if (/^---+$/.test(line.trim())) {
+      closeUl(); html += '<hr>';
+    } else if (line.trim() === '') {
+      closeUl(); html += '<p></p>';
+    } else {
+      closeUl(); html += `<p>${inline(line)}</p>`;
+    }
+  });
+  closeUl(); flushTable();
+  // Plan-Links auflösen
+  Object.entries(planMap).forEach(([key,planId]) => {
+    const p = (DB.plaene||[]).find(x=>x.id===planId);
+    const label = p ? escHtml(p.titel) : 'Plan nicht gefunden';
+    html = html.replace(key, `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--teal-xlight);color:var(--teal-dark);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">${label}</span>`);
+  });
+  return html;
+}
+
+// ── PWA: SW inline ──
+(function() {
+  if ('serviceWorker' in navigator) {
+    const swCode = `const CACHE='smallassist-v1_0_0';
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg'])).then(()=>self.skipWaiting())));
+self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
+    const swBlob = new Blob([swCode], { type:'application/javascript' });
+    navigator.serviceWorker.register(URL.createObjectURL(swBlob), { scope:'./' }).catch(()=>{});
+  }
+})();
+</script>
+</body>
+</html>
