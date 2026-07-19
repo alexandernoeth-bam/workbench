@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.0.1</title>
+<title>SmallAssist 1.0.2</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -71,9 +71,9 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   letter-spacing: .07em;
   text-transform: uppercase;
 }
-.sb-tags { flex: 1; overflow-y: auto; }
-.sb-tags::-webkit-scrollbar { display: none; }
-.sb-tag-item {
+.sb-listen { flex: 1; overflow-y: auto; }
+.sb-listen::-webkit-scrollbar { display: none; }
+.sb-listen-item {
   padding: 6px 14px 6px 24px;
   font-size: 12px;
   color: rgba(255,255,255,0.65);
@@ -83,11 +83,11 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   gap: 6px;
   justify-content: space-between;
 }
-.sb-tag-item:hover { background: rgba(255,255,255,0.08); }
-.sb-tag-item.active { color: white; }
-.sb-tag-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
-.sb-tag-count { font-size: 10px; color: rgba(255,255,255,0.35); }
-.sb-add-tag {
+.sb-listen-item:hover { background: rgba(255,255,255,0.08); }
+.sb-listen-item.active { color: white; }
+.sb-listen-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+.sb-listen-count { font-size: 10px; color: rgba(255,255,255,0.35); }
+.sb-add-liste {
   padding: 6px 14px 10px 24px;
   font-size: 11px;
   color: rgba(255,255,255,0.4);
@@ -96,7 +96,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   align-items: center;
   gap: 4px;
 }
-.sb-add-tag:hover { color: rgba(255,255,255,0.7); }
+.sb-add-liste:hover { color: rgba(255,255,255,0.7); }
 
 /* ── MAIN ── */
 #main {
@@ -341,7 +341,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 }
 
 /* ── TAGS SCREEN ── */
-#screen-tags { flex-direction: column; }
+#screen-listen { flex-direction: column; }
 
 /* ── NOTIZEN: 1:1 aus WorkAssist ── */
 #screen-notizen { flex-direction: row !important; overflow: hidden; }
@@ -644,8 +644,8 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 .status-btn.active-offen { border-color: #9ab0b0; background: var(--bg); color: var(--text); }
 .status-btn.active-inArbeit { border-color: var(--warn); background: #fff3e0; color: var(--warn); }
 .status-btn.active-erledigt { border-color: var(--teal); background: var(--teal-xlight); color: var(--teal-dark); }
-.tag-auswahl { display: flex; gap: 5px; flex-wrap: wrap; }
-.tag-ausw-pill {
+.listen-auswahl { display: flex; gap: 5px; flex-wrap: wrap; }
+.listen-ausw-pill {
   padding: 4px 10px;
   border-radius: 10px;
   font-size: 11px;
@@ -657,8 +657,8 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   font-family: var(--font);
   transition: all 0.1s;
 }
-.tag-ausw-pill.selected { border-color: var(--teal); background: var(--teal-xlight); color: var(--teal-dark); }
-.tag-ausw-neu {
+.listen-ausw-pill.selected { border-color: var(--teal); background: var(--teal-xlight); color: var(--teal-dark); }
+.listen-ausw-neu {
   padding: 4px 10px;
   border-radius: 10px;
   font-size: 11px;
@@ -769,7 +769,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.0.1</span>
+      <span class="sb-logo-version">v1.0.2</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="dashboard" onclick="zeigeScreen('dashboard',this)">
@@ -785,9 +785,9 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
         Notizen
       </div>
     </div>
-    <div class="sb-section-label">Tags</div>
-    <div class="sb-tags" id="sb-tags-container"></div>
-    <div class="sb-add-tag" onclick="tagNeuDialog()">
+    <div class="sb-section-label">Listen</div>
+    <div class="sb-listen" id="sb-listen-container"></div>
+    <div class="sb-add-liste" onclick="listeNeuDialog()">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Neuer Tag
     </div>
@@ -835,6 +835,10 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
             <span class="panel-count" id="dash-aufg-count">0 offen</span>
+            <select id="dash-listen-filter" onchange="renderDashAufgaben()"
+              style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:var(--font);cursor:pointer;outline:none;max-width:100px;">
+              <option value="">Alle Listen</option>
+            </select>
             <button class="btn-primary" style="padding:4px 9px;font-size:11px;" onclick="aufgabeNeu()">+ Aufgabe</button>
           </div>
         </div>
@@ -855,15 +859,19 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
     </div>
 
     <!-- TAGS -->
-    <div class="screen" id="screen-tags">
+    <div class="screen" id="screen-listen">
       <div class="panel-header">
-        <div class="panel-header-label" id="tags-screen-titel">#tag</div>
-        <div style="display:flex;gap:6px;">
-          <button class="btn-ghost" style="color:var(--danger);border-color:var(--danger);" onclick="tagLoeschen()">Tag löschen</button>
+        <div class="panel-header-label" id="listen-screen-titel">Listen</div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <select id="listen-screen-filter" onchange="renderListenScreen()"
+            style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:var(--font);cursor:pointer;outline:none;">
+            <option value="">Alle Listen</option>
+          </select>
+          <button class="btn-ghost" style="color:var(--danger);border-color:var(--danger);font-size:11px;" onclick="listeLoeschen()">Löschen</button>
           <button class="btn-primary" style="padding:4px 9px;font-size:11px;" onclick="aufgabeNeu()">+ Aufgabe</button>
         </div>
       </div>
-      <div class="panel-scroll" id="tags-aufgaben"></div>
+      <div class="panel-scroll" id="listen-aufgaben"></div>
     </div>
 
     <!-- NOTIZEN -->
@@ -992,8 +1000,8 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
         <input class="field-input" id="aufg-deadline" type="date" oninput="aufgModalGeaendert()">
       </div>
       <div class="field-group">
-        <div class="field-label">Tags</div>
-        <div class="tag-auswahl" id="aufg-tags-auswahl"></div>
+        <div class="field-label">Listen</div>
+        <div class="listen-auswahl" id="aufg-listen-auswahl"></div>
       </div>
       <div class="field-group">
         <div class="field-label">Notiz</div>
@@ -1013,14 +1021,14 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 </div>
 
 <!-- TAG NEU DIALOG -->
-<div class="modal-overlay" id="modal-tag">
+<div class="modal-overlay" id="modal-liste">
   <div class="tag-dialog">
-    <div style="font-size:14px;font-weight:700;margin-bottom:4px;">Neuer Tag</div>
-    <input class="field-input" id="tag-neu-input" placeholder="#mein-tag" style="margin-bottom:4px;">
+    <div style="font-size:14px;font-weight:700;margin-bottom:4px;">Neue Liste</div>
+    <input class="field-input" id="liste-neu-input" placeholder="#mein-tag" style="margin-bottom:4px;">
     <div style="font-size:11px;color:var(--text-xdim);margin-bottom:8px;">Tipp: Tags beginnen mit # oder ohne — wird automatisch ergänzt.</div>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button class="btn-ghost" onclick="schliesseTagDialog()">Abbrechen</button>
-      <button class="btn-primary" onclick="tagSpeichern()">Erstellen</button>
+      <button class="btn-ghost" onclick="schliesseListeDialog()">Abbrechen</button>
+      <button class="btn-primary" onclick="listeSpeichern()">Erstellen</button>
     </div>
   </div>
 </div>
@@ -1153,41 +1161,6 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 
 <!-- ══ PLAN QUICK-VIEW MODAL ═══════════════════════════════════════════════ -->
 
-<!-- PLAN QUICKVIEW -->
-<div class="modal-overlay" id="modal-plan-quickview">
-  <div class="modal" style="width:580px;max-height:calc(var(--app-h, 100vh) * 0.85);display:flex;flex-direction:column;">
-    <input type="hidden" id="qv-plan-edit-id">
-    <div class="modal-header">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal-dark)" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-      <h2 id="qv-plan-titel" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></h2>
-      <span class="modal-close" onclick="closePlanQuickView()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </span>
-    </div>
-    <div class="modal-body" style="gap:10px;overflow-y:auto;flex:1;padding-top:10px;">
-      <!-- Pills -->
-      <div style="display:flex;flex-direction:column;gap:5px;">
-        <div id="qv-plan-pills" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"></div>
-        
-      </div>
-      <!-- Notiz-Vorschau -->
-      <div id="qv-plan-notiz" style="display:none;padding:8px 10px;background:var(--teal-xlight);border-left:3px solid var(--teal);border-radius:6px;font-size:11px;line-height:1.6;color:var(--text);"></div>
-      <!-- Schritte -->
-      <div>
-        <div class="field-label" style="margin-bottom:6px;">Schritte</div>
-        <div id="qv-plan-schritte" style="display:flex;flex-direction:column;gap:2px;"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-ghost" onclick="closePlanQuickView()">Schließen</button>
-      <button class="btn-primary" style="margin-left:auto;display:flex;align-items:center;gap:5px;" onclick="qvBearbeiten()">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        Bearbeiten
-      </button>
-    </div>
-  </div>
-</div>
-
 <!-- PLAN LINK OVERLAY -->
 <div class="notiz-plan-overlay" id="notiz-plan-overlay">
   <div class="notiz-plan-sheet">
@@ -1200,13 +1173,13 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 <script>
 'use strict';
 
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 
 // ── STATE ──
 let fileHandle = null;
 let DB = null;
 let aktiverScreen = 'nofile';
-let aktiverTag = null;
+let aktiverListe = null;
 let aufgabeModalOffen = false;
 let ungespeichert = false;
 
@@ -1319,12 +1292,12 @@ function zeigeScreen(name, navEl) {
   zeigeScreenDirekt(name);
   document.querySelectorAll('.sb-nav-item').forEach(el => el.classList.remove('active'));
   if (navEl) navEl.classList.add('active');
-  const titel = { dashboard:'Dashboard', plaene:'Pläne', notizen:'Notizen', tags: aktiverTag || 'Tags' };
+  const titel = { dashboard:'Dashboard', plaene:'Pläne', notizen:'Notizen', listen: aktiverListe || 'Listen' };
   document.getElementById('topbar-title').textContent = titel[name] || name;
   if (name === 'dashboard') renderDashboard();
   if (name === 'plaene')    renderPlaeneScreen();
   if (name === 'notizen')   renderNotizenListe();
-  if (name === 'tags')      renderTagsScreen();
+  if (name === 'listen')      renderListenScreen();
 }
 
 function zeigeScreenDirekt(name) {
@@ -1334,44 +1307,45 @@ function zeigeScreenDirekt(name) {
   if (el) el.classList.add('active');
 }
 
-function zeigeTag(tag) {
-  aktiverTag = tag;
-  document.getElementById('topbar-title').textContent = tag;
-  document.getElementById('tags-screen-titel').textContent = tag;
+function zeigeListe(liste) {
+  aktiverListe = liste;
+  document.getElementById('topbar-title').textContent = liste;
   document.querySelectorAll('.sb-nav-item').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.sb-tag-item').forEach(el => {
-    el.classList.toggle('active', el.dataset.tag === tag);
+  document.querySelectorAll('.sb-listen-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.tag === liste);
   });
-  zeigeScreenDirekt('tags');
-  renderTagsScreen();
+  const sel = document.getElementById('listen-screen-filter');
+  if (sel) { sel.value = liste; }
+  zeigeScreenDirekt('listen');
+  renderListenScreen();
 }
 
 // ── SIDEBAR ──
 function renderSidebar() {
-  const tags = alleTags();
-  const container = document.getElementById('sb-tags-container');
+  const tags = alleListen();
+  const container = document.getElementById('sb-listen-container');
   const FARBEN = ['#378ADD','#1D9E75','#D85A30','#7F77DD','#D4537E','#BA7517','#E24B4A','#888780'];
   container.innerHTML = tags.map((tag, i) => {
     const anzahl = DB.aufgaben.filter(a => (a.tags||[]).includes(tag) && a.status !== 'erledigt').length;
     const farbe = FARBEN[i % FARBEN.length];
-    return `<div class="sb-tag-item" data-tag="${escHtml(tag)}" onclick="zeigeTag('${escHtml(tag)}')"
-      style="${aktiverTag === tag ? 'color:white;' : ''}">
+    return `<div class="sb-listen-item" data-tag="${escHtml(tag)}" onclick="zeigeListe('${escHtml(tag)}')"
+      style="${aktiverListe === tag ? 'color:white;' : ''}">
       <span style="display:flex;align-items:center;gap:5px;">
-        <span class="sb-tag-dot" style="background:${farbe};"></span>${escHtml(tag)}
+        <span class="sb-listen-dot" style="background:${farbe};"></span>${escHtml(tag)}
       </span>
-      <span class="sb-tag-count">${anzahl || ''}</span>
+      <span class="sb-listen-count">${anzahl || ''}</span>
     </div>`;
   }).join('');
 }
 
-function alleTags() {
+function alleListen() {
   const tags = new Set();
   DB.aufgaben.forEach(a => (a.tags||[]).forEach(t => tags.add(t)));
   return [...tags].sort();
 }
 
-function tagFarbe(tag) {
-  const tags = alleTags();
+function listeFarbe(tag) {
+  const tags = alleListen();
   const FARBEN = ['#378ADD','#1D9E75','#D85A30','#7F77DD','#D4537E','#BA7517','#E24B4A','#888780'];
   const idx = tags.indexOf(tag);
   return idx >= 0 ? FARBEN[idx % FARBEN.length] : '#888';
@@ -1383,14 +1357,26 @@ function renderDashboard() {
   renderDashAufgaben();
 }
 
+function befuelleListenDropdown(selectId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const aktWert = sel.value;
+  const listen = alleListen();
+  sel.innerHTML = '<option value="">Alle Listen</option>' +
+    listen.map(l => `<option value="${l}"${aktWert===l?' selected':''}>${l}</option>`).join('');
+}
+
 function renderDashAufgaben() {
   const container = document.getElementById('dash-aufgaben');
   const countEl   = document.getElementById('dash-aufg-count');
   const td = today();
+  befuelleListenDropdown('dash-listen-filter');
+  const filterListe = document.getElementById('dash-listen-filter')?.value || '';
 
-  const alle = [...DB.aufgaben].sort((a,b) =>
+  let alle = [...DB.aufgaben].sort((a,b) =>
     (b.geaendert||'').localeCompare(a.geaendert||'')
   );
+  if (filterListe) alle = alle.filter(a => (a.tags||[]).includes(filterListe));
   const offen    = alle.filter(a => a.status !== 'erledigt');
   const erledigt = alle.filter(a => a.status === 'erledigt');
   if (countEl) countEl.textContent = offen.length + ' offen';
@@ -1416,9 +1402,7 @@ function renderDashAufgaben() {
 
 function aufgZeileHTML(a, td) {
   const istLate = a.faellig && a.faellig < td && a.status !== 'erledigt';
-  const tags = (a.tags||[]).slice(0,2).map(t =>
-    `<span class="aufg-tag-chip" style="background:${tagFarbe(t)}22;color:${tagFarbe(t)};">${escHtml(t)}</span>`
-  ).join('');
+  const tags = '';
   const loeschBtn = a.status === 'erledigt'
     ? `<button class="aufg-loeschen-btn" data-id="${escHtml(a.id)}" title="Löschen"
         style="border:none;background:none;cursor:pointer;padding:2px 4px;color:#aaa;flex-shrink:0;"
@@ -1440,7 +1424,7 @@ function aufgabeSchnellLoeschen(id) {
   setzeGeaendert();
   renderSidebar();
   if (aktiverScreen === 'dashboard') renderDashboard();
-  if (aktiverScreen === 'tags')      renderTagsScreen();
+  if (aktiverScreen === 'listen')      renderTagsScreen();
   showToast('Aufgabe gelöscht');
 }
 
@@ -1503,7 +1487,7 @@ function renderDashPlaene() {
                   ns?.delegiertAn ? `<span class="pk-del-chip">→ ${escHtml(ns.delegiertAn)}</span>` : '';
     const numCls = ns ? 'next' : 'done';
     const numTxt = ns ? (schritte.indexOf(ns)+1) : '✓';
-    return `<div class="plan-karte" style="${p.prioritaet==='krise'?'background:#fdf0ef;':''}" onclick="openPlanQuickView('${p.id}')">
+    return `<div class="plan-karte" style="${p.prioritaet==='krise'?'background:#fdf0ef;':''}" onclick="openNeuerPlan('${p.id}')">
       <div class="pk-header">
         <div class="pk-prio-dot" style="background:${PRIO_DOTS[p.prioritaet]||'#f59e0b'};${p.prioritaet==='krise'?'box-shadow:0 0 0 2px #f5c6c2;':''}"></div>
         <div class="pk-titel ${p.prioritaet==='krise'?'style="color:#c0392b;"':''}">${escHtml(p.titel)}</div>
@@ -1576,7 +1560,7 @@ function renderPlaeneScreen() {
       const titel = a?.titel || s.titel || '';
       const isDone = st === 'erledigt';
       const nsTags = (a?.tags||[]);
-      const tagChip = nsTags[0] ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:${tagFarbe(nsTags[0])}22;color:${tagFarbe(nsTags[0])};margin-left:auto;flex-shrink:0;">${escHtml(nsTags[0])}</span>` : '';
+      const tagChip = nsTags[0] ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:${listeFarbe(nsTags[0])}22;color:${listeFarbe(nsTags[0])};margin-left:auto;flex-shrink:0;">${escHtml(nsTags[0])}</span>` : '';
       const delChip = s.delegiertAn && !isDone ? `<span class="pk-del-chip" style="margin-left:auto;">→ ${escHtml(s.delegiertAn)}</span>` : '';
       const numCls = isDone ? 'done' : (i === erledigt ? 'next' : '');
       return `<div class="pk-schritt" style="cursor:pointer;padding:6px 12px;" onclick="planSchrittToggle('${p.id}',${i},this)">
@@ -1591,7 +1575,7 @@ function renderPlaeneScreen() {
         <div class="pk-prio-dot" style="background:${PRIO_DOTS[p.prioritaet]||'#f59e0b'};${p.prioritaet==='krise'?'box-shadow:0 0 0 2px #f5c6c2;':''}"></div>
         <div class="pk-titel" style="font-size:13px;">${escHtml(p.titel)}</div>
         <span class="pk-counter">${erledigt}/${schritte.length}</span>
-        <button onclick="event.stopPropagation();openPlanQuickView('${p.id}')" title="Bearbeiten"
+        <button onclick="event.stopPropagation();openNeuerPlan('${p.id}')" title="Bearbeiten"
           style="border:none;background:none;cursor:pointer;padding:2px 4px;color:var(--text-xdim);margin-left:4px;">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
@@ -1629,18 +1613,23 @@ function planSchrittToggle(planId, sIdx, el) {
 }
 
 // ── TAGS SCREEN ──
-function renderTagsScreen() {
-  const container = document.getElementById('tags-aufgaben');
-  if (!aktiverTag) { container.innerHTML = '<div class="empty-state">Kein Tag ausgewählt</div>'; return; }
+function renderTagsScreen() { renderListenScreen(); }
+
+function renderListenScreen() {
+  const container = document.getElementById('listen-aufgaben');
+  if (!container) return;
   const td = today();
-  const aufgaben = [...DB.aufgaben]
-    .filter(a => (a.tags||[]).includes(aktiverTag))
-    .sort((a,b) => (b.geaendert||'').localeCompare(a.geaendert||''));
+  befuelleListenDropdown('listen-screen-filter');
+  const aktivFilter = document.getElementById('listen-screen-filter')?.value || '';
+  const titelEl = document.getElementById('listen-screen-titel');
+  if (titelEl) titelEl.textContent = aktivFilter || 'Alle Listen';
+  let aufgaben = [...DB.aufgaben].sort((a,b) => (b.geaendert||'').localeCompare(a.geaendert||''));
+  if (aktivFilter) aufgaben = aufgaben.filter(a => (a.tags||[]).includes(aktivFilter));
   const offen    = aufgaben.filter(a => a.status !== 'erledigt');
   const erledigt = aufgaben.filter(a => a.status === 'erledigt');
   let html = '';
   if (!aufgaben.length) {
-    html = '<div class="empty-state">Keine Aufgaben mit diesem Tag</div>';
+    html = '<div class="empty-state">Keine Aufgaben</div>';
   } else {
     if (offen.length)    { html += '<div class="gruppe-header">Zu tun</div>'; html += offen.map(a => aufgZeileHTML(a,td)).join(''); }
     if (erledigt.length) { html += '<div class="gruppe-header">Erledigt</div>'; html += erledigt.map(a => aufgZeileHTML(a,td)).join(''); }
@@ -1651,31 +1640,34 @@ function renderTagsScreen() {
   });
 }
 
-// ── TAG VERWALTUNG ──
-function tagNeuDialog() {
-  document.getElementById('tag-neu-input').value = '';
-  document.getElementById('modal-tag').classList.add('open');
-  setTimeout(() => document.getElementById('tag-neu-input').focus(), 50);
+
+function listeNeuDialog() {
+  document.getElementById('liste-neu-input').value = '';
+  document.getElementById('modal-liste').classList.add('open');
+  setTimeout(() => document.getElementById('liste-neu-input').focus(), 50);
 }
-function schliesseTagDialog() { document.getElementById('modal-tag').classList.remove('open'); }
-function tagSpeichern() {
-  const name = document.getElementById('tag-neu-input').value.trim();
+function schliesseListeDialog() { document.getElementById('modal-liste').classList.remove('open'); }
+function listeSpeichern() {
+  const name = document.getElementById('liste-neu-input').value.trim();
   if (!name) return;
-  schliesseTagDialog();
+  schliesseListeDialog();
   showToast('Tag angelegt: ' + name);
   renderSidebar();
 }
-function tagLoeschen() {
-  if (!aktiverTag) return;
-  if (!confirm(`Tag "${aktiverTag}" löschen? Alle Aufgaben verlieren diesen Tag.`)) return;
+function listeLoeschen() {
+  const filterSel = document.getElementById('listen-screen-filter');
+  const zuLoeschen = filterSel?.value || aktiverListe;
+  if (!zuLoeschen) return;
+  if (!confirm(`Liste "${zuLoeschen}" löschen? Alle Aufgaben verlieren diese Liste.`)) return;
   DB.aufgaben.forEach(a => {
-    a.tags = (a.tags||[]).filter(t => t !== aktiverTag);
+    a.tags = (a.tags||[]).filter(t => t !== zuLoeschen);
+    if (a.tags.length === 0) a.tags = ['Allgemein'];
   });
   setzeGeaendert();
-  aktiverTag = null;
+  aktiverListe = null;
   renderSidebar();
-  zeigeScreen('dashboard', document.querySelector('[data-screen="dashboard"]'));
-  showToast('Tag gelöscht');
+  renderListenScreen();
+  showToast('Liste gelöscht');
 }
 
 // ── AUFGABEN MODAL ──
@@ -1721,19 +1713,19 @@ function aufgStatusSetzen(status) {
 }
 
 function renderAufgTagAuswahl(selected) {
-  const tags = alleTags();
+  const tags = alleListen();
   const container = document.getElementById('aufg-tags-auswahl');
   container.innerHTML = tags.map(t =>
-    `<button class="tag-ausw-pill ${selected.includes(t)?'selected':''}" data-tag="${escHtml(t)}" onclick="aufgTagToggle(this,'${escHtml(t)}')">${escHtml(t)}</button>`
+    `<button class="listen-ausw-pill ${selected.includes(t)?'selected':''}" data-tag="${escHtml(t)}" onclick="aufgTagToggle(this,'${escHtml(t)}')">${escHtml(t)}</button>`
   ).join('') +
-  `<button class="tag-ausw-neu" onclick="aufgNeuerTag()">+ Neuer Tag</button>`;
+  `<button class="listen-ausw-neu" onclick="aufgNeueListe()">+ Neue Liste</button>`;
 }
 
 function aufgTagToggle(el, tag) {
   el.classList.toggle('selected');
 }
 
-function aufgNeuerTag() {
+function aufgNeueListe() {
   const name = prompt('Neuer Tag (mit oder ohne #):');
   if (!name) return;
   const tag = name;
@@ -1753,7 +1745,7 @@ function aufgabeSpeichern() {
   if (!titel) { showToast('Bitte Titel eingeben'); return; }
   const faellig = document.getElementById('aufg-deadline').value || null;
   const notiz   = document.getElementById('aufg-notiz').value.trim() || null;
-  let tags = [...document.querySelectorAll('#aufg-tags-auswahl .tag-ausw-pill.selected')].map(b => b.dataset.tag);
+  let tags = [...document.querySelectorAll('#aufg-listen-auswahl .listen-ausw-pill.selected')].map(b => b.dataset.tag);
   if (tags.length === 0) tags = ['Allgemein'];
 
   if (aufgEditId) {
@@ -1781,7 +1773,7 @@ function aufgabeSpeichern() {
   setzeGeaendert();
   renderSidebar();
   if (aktiverScreen === 'dashboard') renderDashboard();
-  if (aktiverScreen === 'tags')      renderTagsScreen();
+  if (aktiverScreen === 'listen')      renderTagsScreen();
   schliesseAufgabeModal();
   showToast(aufgEditId ? 'Aufgabe gespeichert' : 'Aufgabe erstellt');
 }
@@ -1793,7 +1785,7 @@ function aufgabeLoeschen() {
   setzeGeaendert();
   renderSidebar();
   if (aktiverScreen === 'dashboard') renderDashboard();
-  if (aktiverScreen === 'tags')      renderTagsScreen();
+  if (aktiverScreen === 'listen')      renderTagsScreen();
   schliesseAufgabeModal();
   showToast('Aufgabe gelöscht');
 }
@@ -2850,7 +2842,7 @@ function planSchrittEntfernen(idx) {
 // ── PWA: SW inline ──
 (function() {
   if ('serviceWorker' in navigator) {
-    const swCode = `const CACHE='smallassist-v1_0_0';
+    const swCode = `const CACHE='smallassist-v1_0_2';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
