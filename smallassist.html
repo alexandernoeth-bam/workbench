@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.1.0</title>
+<title>SmallAssist 1.1.1</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -824,7 +824,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.1.0</span>
+      <span class="sb-logo-version">v1.1.1</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="tagesliste" onclick="zeigeScreen('tagesliste',this)">
@@ -1278,7 +1278,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 <script>
 'use strict';
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1351,7 +1351,11 @@ async function dateiClick() {
       if (!file) return;
       try {
         const text = await file.text();
-        DB = JSON.parse(text);
+        const cleanText2 = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+        const parsed2 = JSON.parse(cleanText2);
+        if (!parsed2 || typeof parsed2 !== 'object') throw new Error('Kein gültiges JSON');
+        if (!Array.isArray(parsed2.aufgaben)) parsed2.aufgaben = [];
+        DB = parsed2;
         migrateDB();
         // Kein fileHandle → speichern per Download
         safariFile = file;
@@ -1395,14 +1399,23 @@ async function ladeDatei() {
   try {
     const file = await fileHandle.getFile();
     const text = await file.text();
-    DB = JSON.parse(text);
+    // BOM entfernen falls vorhanden
+    const cleanText = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+    const parsed = JSON.parse(cleanText);
+    // Validierung: mindestens aufgaben muss vorhanden sein
+    if (!parsed || typeof parsed !== 'object') throw new Error('Kein gültiges JSON-Objekt');
+    if (!Array.isArray(parsed.aufgaben)) parsed.aufgaben = [];
+    DB = parsed;
     migrateDB();
     document.getElementById('topbar-file').textContent = '✓ ' + file.name;
     document.getElementById('btn-datei').textContent = '✕ Schließen';
     renderSidebar();
-    zeigeScreenDirekt('dashboard');
+    zeigeScreenDirekt('tagesliste');
+    renderTagesliste();
     renderAufgabenScreen();
-  } catch(e) { showToast('❌ Datei konnte nicht gelesen werden'); }
+  } catch(e) {
+    showToast('❌ Fehler: ' + (e.message || 'Datei konnte nicht gelesen werden'));
+  }
 }
 
 
@@ -3038,7 +3051,7 @@ function planSchrittVerschieben(idx,r){
 // ── INIT ──
 (function(){
   zoomInit();
-  const c=`const CACHE='smallassist-v1_1_0';
+  const c=`const CACHE='smallassist-v1_1_1';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg','./icon-smallassist-maskable.svg'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
