@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.0.5</title>
+<title>SmallAssist 1.0.6</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -786,7 +786,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.0.5</span>
+      <span class="sb-logo-version">v1.0.6</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="dashboard" onclick="zeigeScreen('dashboard',this)">
@@ -1181,6 +1181,35 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 
 <!-- ══ PLAN QUICK-VIEW MODAL ═══════════════════════════════════════════════ -->
 
+<!-- PLAN QUICKVIEW -->
+<div class="modal-overlay" id="modal-plan-quickview">
+  <div class="modal" style="width:560px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;">
+    <input type="hidden" id="qv-plan-edit-id">
+    <div class="modal-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal-dark)" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+      <h2 id="qv-plan-titel" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;"></h2>
+      <span class="modal-close" onclick="closePlanQuickView()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </span>
+    </div>
+    <div class="modal-body" style="gap:10px;overflow-y:auto;flex:1;padding-top:10px;">
+      <div id="qv-plan-pills" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"></div>
+      <div id="qv-plan-notiz" style="display:none;padding:8px 10px;background:var(--teal-xlight);border-left:3px solid var(--teal);border-radius:6px;font-size:11px;line-height:1.6;color:var(--text);"></div>
+      <div>
+        <div class="field-label" style="margin-bottom:6px;">Schritte</div>
+        <div id="qv-plan-schritte" style="display:flex;flex-direction:column;gap:2px;"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closePlanQuickView()">Schließen</button>
+      <button class="btn-primary" style="margin-left:auto;display:flex;align-items:center;gap:5px;" onclick="qvBearbeiten()">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Bearbeiten
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- PLAN LINK OVERLAY -->
 <div class="notiz-plan-overlay" id="notiz-plan-overlay">
   <div class="notiz-plan-sheet">
@@ -1193,7 +1222,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 <script>
 'use strict';
 
-const APP_VERSION = '1.0.5';
+const APP_VERSION = '1.0.6';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1554,7 +1583,7 @@ function renderDashPlaene() {
                   ns?.delegiertAn ? `<span class="pk-del-chip">→ ${escHtml(ns.delegiertAn)}</span>` : '';
     const numCls = ns ? 'next' : 'done';
     const numTxt = ns ? (schritte.indexOf(ns)+1) : '✓';
-    return `<div class="plan-karte" style="${p.prioritaet==='krise'?'background:#fdf0ef;':''}" onclick="openNeuerPlan('${p.id}')">
+    return `<div class="plan-karte" style="${p.prioritaet==='krise'?'background:#fdf0ef;':''}" onclick="openPlanQuickView('${p.id}')">
       <div class="pk-header">
         <div class="pk-prio-dot" style="background:${PRIO_DOTS[p.prioritaet]||'#f59e0b'};${p.prioritaet==='krise'?'box-shadow:0 0 0 2px #f5c6c2;':''}"></div>
         <div class="pk-titel ${p.prioritaet==='krise'?'style="color:#c0392b;"':''}">${escHtml(p.titel)}</div>
@@ -2719,13 +2748,65 @@ function planBereichOeffnen() { closeNeuerPlanModal(); }
 
 
 function openPlanQuickView(planId) {
-  // Quick-View in SmallAssist nicht vorhanden — direkt Plan-Dialog öffnen
-  openNeuerPlan(planId);
+  const p = (DB.plaene||[]).find(x => x.id === planId);
+  if (!p) return;
+
+  document.getElementById('qv-plan-edit-id').value   = planId;
+  document.getElementById('qv-plan-titel').textContent = p.titel;
+
+  // Pills: Priorität + Horizont
+  const PRIO_LABELS = { krise:'★ Krise', hoch:'↑ Hoch', mittel:'· Mittel', niedrig:'↓ Niedrig' };
+  const PRIO_CSS    = { krise:'background:#fad7d4;color:#922b21;', hoch:'background:#fde8dd;color:#9a3412;', mittel:'background:var(--teal-xlight);color:var(--teal-dark);', niedrig:'background:var(--bg);color:var(--text-dim);' };
+  const HZ_LABELS   = { kurzfristig:'⚡ Kurzfristig', mittelfristig:'📅 Mittelfristig', langfristig:'🕐 Langfristig' };
+  const HZ_CSS      = { kurzfristig:'background:var(--teal-xlight);color:var(--teal-dark);', mittelfristig:'background:#e3f0fc;color:#1565c0;', langfristig:'background:#f3e8ff;color:#6b21a8;' };
+  const prio = p.prioritaet || 'mittel';
+  const hz   = p.horizont   || 'kurzfristig';
+  const pillStyle = 'font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;';
+  document.getElementById('qv-plan-pills').innerHTML =
+    `<span style="${pillStyle}${PRIO_CSS[prio]}">${PRIO_LABELS[prio]||prio}</span>` +
+    `<span style="${pillStyle}${HZ_CSS[hz]}">${HZ_LABELS[hz]||hz}</span>`;
+
+  // Notiz-Vorschau
+  const notizEl = document.getElementById('qv-plan-notiz');
+  if (p.notiz && p.notiz.trim()) {
+    notizEl.style.display = '';
+    notizEl.textContent   = p.notiz.slice(0, 200) + (p.notiz.length > 200 ? '…' : '');
+  } else {
+    notizEl.style.display = 'none';
+  }
+
+  // Schritte
+  const sl = document.getElementById('qv-plan-schritte');
+  const schritte = p.schritte || [];
+  if (!schritte.length) {
+    sl.innerHTML = '<div style="font-size:12px;color:var(--text-xdim);padding:6px 0;">Keine Schritte</div>';
+  } else {
+    sl.innerHTML = schritte.map((s, idx) => {
+      const a     = s.aufgabeId ? DB.aufgaben.find(x => x.id === s.aufgabeId) : null;
+      const st    = a?.status || s.status || 'offen';
+      const titel = a?.titel  || s.titel  || '';
+      const done  = st === 'erledigt';
+      const delChip = s.delegiertAn && !done
+        ? `<span style="font-size:10px;background:#e3f0fc;color:#1565c0;padding:1px 6px;border-radius:4px;flex-shrink:0;">→ ${escHtml(s.delegiertAn)}</span>`
+        : '';
+      const tagChip = a && (a.tags||[]).length
+        ? `<span style="font-size:10px;background:${listeFarbe(a.tags[0])}22;color:${listeFarbe(a.tags[0])};padding:1px 6px;border-radius:4px;flex-shrink:0;">${escHtml(a.tags[0])}</span>`
+        : '';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;background:${done?'var(--bg)':'var(--surface)'};border:1px solid var(--border);"
+        onclick="qvSchrittToggle('${planId}',${idx},this)">
+        <div style="width:16px;height:16px;border-radius:50%;border:1.5px solid ${done?'var(--teal)':'var(--border)'};background:${done?'var(--teal)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;color:white;font-size:10px;">${done?'✓':''}</div>
+        <span style="flex:1;font-size:12px;${done?'text-decoration:line-through;color:var(--text-xdim);':'color:var(--text);'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(titel)}</span>
+        ${tagChip}${delChip}
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('modal-plan-quickview').classList.add('open');
 }
 
 
 function closePlanQuickView() {
-  // QV Modal nicht vorhanden in SmallAssist
+  document.getElementById('modal-plan-quickview').classList.remove('open');
 }
 
 
@@ -2762,7 +2843,7 @@ function qvSchrittToggle(planId, sIdx, el) {
 function qvBearbeiten() {
   const planId = document.getElementById('qv-plan-edit-id').value;
   closePlanQuickView();
-  openNeuerPlan(planId);
+  setTimeout(() => openNeuerPlan(planId), 80);
 }
 
 // Wenn eine Aufgabe erledigt/reaktiviert wird → Plan-Schritt synchronisieren
@@ -2811,7 +2892,7 @@ function planSchrittEntfernen(idx) {
 // ── PWA: SW inline ──
 (function() {
   if ('serviceWorker' in navigator) {
-    const swCode = `const CACHE='smallassist-v1_0_5';
+    const swCode = `const CACHE='smallassist-v1_0_6';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
