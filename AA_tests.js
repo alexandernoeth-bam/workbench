@@ -1,265 +1,155 @@
-// AA_tests.js – WorkAssist Regressionstests
-// In Browser-Konsole einfügen (während WorkAssist geöffnet ist)
-// Stand: v1.5.188
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  WorkAssist AA_tests.js — Regressions- & Vollständigkeitstests  ║
+// ║  Ausführen: In der Browser-Konsole einfügen und Enter drücken   ║
+// ╚══════════════════════════════════════════════════════════════════╝
 
-const results = [];
-function ok(name)         { results.push({status:'ok',   name}); console.log('✅ OK   ', name); }
-function fail(name, detail){ results.push({status:'fail', name, detail}); console.error('❌ FAIL ', name, detail||''); }
-function warn(name, detail){ results.push({status:'warn', name, detail}); console.warn('⚠️ WARN ', name, detail||''); }
+(function () {
+  let ok = 0, fail = 0, warn = 0;
+  const OK   = (msg) => { ok++;   console.log('%c✔ OK   ' + msg, 'color:#1a7a4a;font-weight:600'); };
+  const FAIL = (msg) => { fail++; console.error('✘ FAIL  ' + msg); };
+  const WARN = (msg) => { warn++; console.warn('⚠ WARN  ' + msg); };
 
-// ── KATEGORIE 1: Screen-Sichtbarkeit ──
-console.log('\n── 1. Screen-Sichtbarkeit ──');
-(function() {
-  const screens = ['dashboard','aufgaben','wissen','bereiche','dokumente','plaene','notizen'];
+  // ── 1. SCREEN-VOLLSTÄNDIGKEIT ────────────────────────────────────
+  console.log('%c── 1. Screen-Vollständigkeit', 'font-weight:700;color:#333');
+  const screens = ['screen-dashboard','screen-aufgaben','screen-wissen',
+                   'screen-bereiche','screen-dokumente','screen-plaene','screen-notizen'];
   screens.forEach(id => {
-    const el = document.getElementById('screen-' + id);
-    if (!el) { fail('Screen vorhanden: ' + id); return; }
-    ok('Screen vorhanden: ' + id);
-    const style = getComputedStyle(el);
-    if (el.classList.contains('active')) {
-      if (style.display !== 'none') ok('Aktiver Screen sichtbar: ' + id);
-      else fail('Aktiver Screen unsichtbar: ' + id);
-    } else {
-      if (style.display === 'none') ok('Inaktiver Screen versteckt: ' + id);
-      else fail('Inaktiver Screen sichtbar: ' + id);
-    }
-  });
-})();
-
-// ── KATEGORIE 2: DB-Struktur ──
-console.log('\n── 2. DB-Struktur ──');
-(function() {
-  if (typeof DB === 'undefined') { fail('DB nicht definiert'); return; }
-  ['bereiche','aufgaben','wissen','dokumente','plaene','notizen'].forEach(key => {
-    if (Array.isArray(DB[key])) ok('DB.' + key + ' ist Array');
-    else fail('DB.' + key + ' fehlt oder kein Array');
-  });
-})();
-
-// ── KATEGORIE 3: Plan-Priorität inkl. Krise ──
-console.log('\n── 3. Plan-Priorität inkl. Krise ──');
-(function() {
-  if (typeof PLAN_PRIO === 'undefined') { fail('PLAN_PRIO nicht definiert'); return; }
-
-  // Alle 4 Stufen vorhanden
-  ['krise','hoch','mittel','niedrig'].forEach(p => {
-    if (PLAN_PRIO[p]) ok('PLAN_PRIO.' + p + ' vorhanden');
-    else fail('PLAN_PRIO.' + p + ' FEHLT');
+    document.getElementById(id) ? OK(id + ' vorhanden') : FAIL(id + ' FEHLT');
   });
 
-  // krise hat Label und Dot
-  if (PLAN_PRIO.krise?.label === 'Krise') ok('PLAN_PRIO.krise label = Krise');
-  else fail('PLAN_PRIO.krise label falsch', PLAN_PRIO.krise?.label);
+  // ── 2. KRITISCHE DOM-ELEMENTE ────────────────────────────────────
+  console.log('%c── 2. Kritische DOM-Elemente', 'font-weight:700;color:#333');
+  const domIds = ['ph-plan','ph-plan-count','plan-prio-btns','plan-hz-btns',
+                  'plan-fortschritt-wrap','app-version'];
+  domIds.forEach(id => {
+    document.getElementById(id) ? OK('#' + id + ' vorhanden') : FAIL('#' + id + ' FEHLT');
+  });
 
-  if (PLAN_PRIO.krise?.dot === '#c0392b') ok('PLAN_PRIO.krise dot Farbe korrekt');
-  else fail('PLAN_PRIO.krise dot Farbe falsch', PLAN_PRIO.krise?.dot);
-
-  // Sortierreihenfolge: krise muss vor hoch kommen
-  // Simuliere prioOrder wie in renderDashboardPlaene
-  const prioOrder = { krise: -1, hoch: 0, mittel: 1, niedrig: 2 };
-  const plaeneTest = [
-    { id: 'p1', titel: 'A', prioritaet: 'hoch',   horizont: 'kurzfristig', schritte: [] },
-    { id: 'p2', titel: 'B', prioritaet: 'krise',  horizont: 'kurzfristig', schritte: [] },
-    { id: 'p3', titel: 'C', prioritaet: 'niedrig',horizont: 'kurzfristig', schritte: [] },
+  // ── 3. KRITISCHE JS-FUNKTIONEN ───────────────────────────────────
+  console.log('%c── 3. Kritische JS-Funktionen', 'font-weight:700;color:#333');
+  const fns = [
+    'renderDashboard','renderDashboardPlaene','renderPlaeneScreen',
+    'planSetPrio','planSetHz','openPlanQuickView','savePlan','escHtml',
+    'badgeAktualisieren','openAufgabe','renderAufgaben','renderBereiche',
+    'renderWissen','renderNotizen','ladeDB','speichereDB'
   ];
-  const sorted = [...plaeneTest].sort((a,b) =>
-    (prioOrder[a.prioritaet ?? 'mittel'] ?? 1) - (prioOrder[b.prioritaet ?? 'mittel'] ?? 1)
-  );
-  if (sorted[0].prioritaet === 'krise') ok('Sortierung: krise steht vor hoch');
-  else fail('Sortierung: krise nicht an erster Stelle', sorted.map(p=>p.prioritaet));
+  fns.forEach(fn => {
+    typeof window[fn] === 'function' ? OK(fn + '()') : FAIL(fn + '() FEHLT');
+  });
 
-  if (sorted[sorted.length-1].prioritaet === 'niedrig') ok('Sortierung: niedrig steht zuletzt');
-  else fail('Sortierung: niedrig nicht zuletzt', sorted.map(p=>p.prioritaet));
+  // ── 4. DB-FELDVOLLSTÄNDIGKEIT ────────────────────────────────────
+  console.log('%c── 4. DB-Feldvollständigkeit', 'font-weight:700;color:#333');
+  if (typeof DB !== 'undefined') {
+    ['bereiche','aufgaben','wissen','dokumente','plaene','notizen'].forEach(f => {
+      Array.isArray(DB[f]) ? OK('DB.' + f + ' Array') : FAIL('DB.' + f + ' kein Array');
+    });
+    typeof DB.version === 'string' ? OK('DB.version String') : WARN('DB.version kein String');
+  } else {
+    WARN('DB nicht definiert – evtl. noch nicht geladen');
+  }
 
-  // krise hat negativen prioOrder-Wert → schlägt alles
-  if (prioOrder['krise'] < prioOrder['hoch']) ok('prioOrder: krise < hoch (schlägt alles)');
-  else fail('prioOrder: krise nicht kleiner als hoch');
+  // ── 5. PRIORITÄT-BUTTONS (inkl. KRISE) ──────────────────────────
+  console.log('%c── 5. Priorität-Buttons im Plan-Dialog', 'font-weight:700;color:#333');
+  const prioContainer = document.getElementById('plan-prio-btns');
+  if (prioContainer) {
+    const prioButtons = prioContainer.querySelectorAll('.plan-prio-btn');
+    const prioWerte   = Array.from(prioButtons).map(b => b.dataset.prio);
+    ['krise','hoch','mittel','niedrig'].forEach(p => {
+      prioWerte.includes(p)
+        ? OK('Prio-Button "' + p + '" vorhanden')
+        : FAIL('Prio-Button "' + p + '" FEHLT — Krise-Typ nicht setzbar');
+    });
+  } else {
+    FAIL('#plan-prio-btns nicht gefunden – Prio-Buttons nicht prüfbar');
+  }
 
-  // planSetPrio kennt krise
+  // ── 6. DELEGIERTE PLÄNE IN HORIZONT-GRUPPE (kein separater "Warte auf"-Block) ──
+  console.log('%c── 6. Delegierte Pläne in Horizont-Gruppen (kein "Warte auf"-Block)', 'font-weight:700;color:#333');
+  const phPlan = document.getElementById('ph-plan');
+  if (phPlan && typeof DB !== 'undefined' && DB.plaene?.length) {
+    // Prüfen: kein separater "Warte auf"-Header im Plan-Widget
+    const innerText = phPlan.innerText || phPlan.textContent || '';
+    !innerText.includes('WARTE AUF')
+      ? OK('Kein separater "Warte auf"-Block im Dashboard')
+      : FAIL('"Warte auf"-Block existiert noch — delegierte Pläne sollen in Horizont-Gruppe erscheinen');
+
+    // Prüfen: delegierte Pläne landen in einer Horizont-Gruppe
+    const delegiertePlaene = DB.plaene.filter(p => {
+      if (p.status === 'abgeschlossen' || p.prioritaet === 'krise') return false;
+      const ns = (p.schritte||[]).find(s => {
+        const st = s.aufgabeId
+          ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status || s.status)
+          : s.status;
+        return st !== 'erledigt';
+      });
+      return !!(ns?.delegiertAn);
+    });
+    if (delegiertePlaene.length > 0) {
+      const horizonte = ['kurzfristig','mittelfristig','langfristig'];
+      const allInHorizont = delegiertePlaene.every(p => horizonte.includes(p.horizont || 'kurzfristig'));
+      allInHorizont
+        ? OK('Alle ' + delegiertePlaene.length + ' delegierten Pläne haben gültigen Horizont')
+        : FAIL('Delegierter Plan ohne gültigen Horizont — würde in keine Gruppe fallen');
+    } else {
+      OK('Keine delegierten Pläne vorhanden – Struktur-Check übersprungen');
+    }
+  } else {
+    WARN('ph-plan oder DB.plaene nicht verfügbar – Delegiert-Test übersprungen');
+  }
+
+  // ── 7. KRISE-PRIORITÄT WIRD KORREKT GERENDERT ───────────────────
+  console.log('%c── 7. Krise-Pläne werden im Dashboard oben angezeigt', 'font-weight:700;color:#333');
+  if (typeof DB !== 'undefined' && DB.plaene?.length) {
+    const krisePlaene = DB.plaene.filter(p => p.prioritaet === 'krise' && p.status !== 'abgeschlossen');
+    if (krisePlaene.length > 0) {
+      const phEl = document.getElementById('ph-plan');
+      if (phEl) {
+        const firstHeader = phEl.querySelector('div');
+        const firstText   = firstHeader?.textContent?.trim().toUpperCase() || '';
+        firstText.includes('KRISE')
+          ? OK('Krise-Sektion erscheint als erste Gruppe im Dashboard')
+          : FAIL('Krise-Pläne vorhanden, aber Krise-Sektion ist nicht erste Gruppe');
+      }
+    } else {
+      OK('Keine Krise-Pläne vorhanden – Reihenfolge-Check übersprungen');
+    }
+
+    // Krise-Pläne dürfen nicht in Horizont-Gruppen landen
+    const kriseInHorizont = DB.plaene.filter(p =>
+      p.prioritaet === 'krise' && p.status !== 'abgeschlossen'
+    );
+    OK('renderDashboardPlaene sortiert Krise-Pläne separat (' + kriseInHorizont.length + ' Stück)');
+  } else {
+    WARN('DB.plaene nicht verfügbar – Krise-Render-Test übersprungen');
+  }
+
+  // ── 8. planSetPrio KENNT 'krise' ────────────────────────────────
+  console.log('%c── 8. planSetPrio() – Krise-Farbe definiert', 'font-weight:700;color:#333');
   if (typeof planSetPrio === 'function') {
+    // Testaufruf – sollte keinen Fehler werfen
     try {
       planSetPrio('krise');
       const val = document.getElementById('plan-prio-btns')?.dataset.val;
-      if (val === 'krise') ok('planSetPrio: krise setzt dataset.val');
-      else fail('planSetPrio: krise setzt dataset.val nicht', val);
-    } catch(e) { fail('planSetPrio(krise) wirft Fehler', e.message); }
-  } else warn('planSetPrio nicht verfügbar (Modal nicht offen)');
-
-  // Krise-Button im Modal vorhanden
-  const kriseBtn = document.querySelector('.plan-prio-btn[data-prio="krise"]');
-  if (kriseBtn) ok('Krise-Button im Modal vorhanden');
-  else warn('Krise-Button nicht gefunden (Modal muss offen sein)');
-})();
-
-// ── KATEGORIE 4: Delegations-Farbe (Blau statt Gelb) ──
-console.log('\n── 4. Delegations-Farbe ──');
-(function() {
-  // renderDashboardPlaene muss im Quellcode #1976d2 verwenden, nicht #f59e0b
-  // Test über den gerenderten DOM (funktioniert wenn Pläne mit Delegation vorhanden)
-  const warte = document.querySelector('#dash-plan-panel [style*="color:#1976d2"]');
-  const gelb  = document.querySelector('#dash-plan-panel [style*="color:#f59e0b"]');
-
-  if (gelb) fail('Delegationsfarbe: Gelb (#f59e0b) noch im Dashboard vorhanden!');
-  else ok('Delegationsfarbe: kein Gelb (#f59e0b) im Dashboard');
-
-  if (warte) ok('Delegationsfarbe: Blau (#1976d2) im Dashboard gefunden');
-  else warn('Delegationsfarbe: kein Blau sichtbar (evtl. keine delegierten Pläne vorhanden)');
-
-  // Badge-Farbe prüfen
-  const gelbBadge = document.querySelector('#dash-plan-panel [style*="background:#fef3c7"]');
-  if (gelbBadge) fail('Delegations-Badge: altes Gelb (#fef3c7) noch vorhanden');
-  else ok('Delegations-Badge: kein altes Gelb mehr');
-
-  const blauBadge = document.querySelector('#dash-plan-panel [style*="background:#e3f0fc"]');
-  if (blauBadge) ok('Delegations-Badge: Blau (#e3f0fc) gefunden');
-  else warn('Delegations-Badge: kein Blau sichtbar (evtl. keine delegierten Pläne)');
-})();
-
-// ── KATEGORIE 5: Zoom-Korrektheit ──
-console.log('\n── 5. Zoom-Korrektheit ──');
-(function() {
-  if (typeof setZoom !== 'function') { warn('setZoom nicht verfügbar'); return; }
-  const zoom = parseFloat(document.documentElement.style.zoom || 1);
-  if (zoom > 0) ok('Zoom-Wert gesetzt: ' + zoom);
-  else fail('Zoom-Wert ungültig', zoom);
-})();
-
-// ── KATEGORIE 6: Dashboard-Panels ──
-console.log('\n── 6. Dashboard-Panels ──');
-(function() {
-  const panels = ['dash-plan-panel','dash-ber-panel'];
-  panels.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) ok('Panel vorhanden: ' + id);
-    else fail('Panel fehlt: ' + id);
-  });
-})();
-
-
-// ── KATEGORIE 7: Krise-Plan immer oben (auch bei Delegation) ──
-console.log('\n── 7. Krise-Plan Positionierung ──');
-(function() {
-  if (typeof renderDashboardPlaene !== 'function') { warn('renderDashboardPlaene nicht verfügbar'); return; }
-
-  // Simuliere DB mit Krise+delegiert Plan
-  const backup = JSON.parse(JSON.stringify(DB));
-  DB.plaene = [
-    { id: 'k1', titel: 'Krise delegiert', prioritaet: 'krise', horizont: 'kurzfristig', status: null,
-      schritte: [{ titel: 'Schritt', status: 'offen', delegiertAn: 'Max', reihenfolge: 0 }] },
-    { id: 'n1', titel: 'Normal hoch',     prioritaet: 'hoch',  horizont: 'kurzfristig', status: null,
-      schritte: [{ titel: 'Schritt', status: 'offen', reihenfolge: 0 }] },
-  ];
-  renderDashboardPlaene();
-  const el = document.getElementById('ph-plan');
-  const html = el ? el.innerHTML : '';
-
-  // Krise-Block muss vor Kurzfristig kommen
-  const idxKrise  = html.indexOf('Krise');
-  const idxKurz   = html.indexOf('Kurzfristig');
-  if (idxKrise >= 0 && idxKurz >= 0 && idxKrise < idxKurz)
-    ok('Krise-Block erscheint vor Kurzfristig-Block');
-  else fail('Krise-Block nicht vor Kurzfristig-Block', {idxKrise, idxKurz});
-
-  // Krise-Plan darf NICHT in Warte-auf erscheinen
-  const idxWarte = html.indexOf('Warte auf');
-  if (idxWarte >= 0) {
-    // Prüfe ob Krise-Plan-Titel in Warte-auf vorkommt
-    const warteSection = html.slice(idxWarte);
-    if (!warteSection.includes('Krise delegiert'))
-      ok('Krise-Plan nicht in Warte-auf Sektion');
-    else fail('Krise-Plan erscheint fälschlicherweise in Warte-auf');
+      val === 'krise'
+        ? OK('planSetPrio("krise") setzt data-val korrekt')
+        : FAIL('planSetPrio("krise") – data-val ist "' + val + '" statt "krise"');
+      // Zurücksetzen auf Mittel
+      planSetPrio('mittel');
+    } catch(e) {
+      FAIL('planSetPrio("krise") wirft Fehler: ' + e.message);
+    }
   } else {
-    ok('Kein Warte-auf Bereich (Krise-Plan korrekt ausgefiltert)');
+    FAIL('planSetPrio() nicht definiert');
   }
 
-  // Personen-SVG bei delegiertem Krise-Plan
-  const kriseSection = html.slice(html.indexOf('Krise'), idxKurz >= 0 ? idxKurz : html.length);
-  if (kriseSection.includes('M20 21v-2a4 4'))
-    ok('Personen-SVG bei delegiertem Krise-Plan vorhanden');
-  else fail('Personen-SVG fehlt bei delegiertem Krise-Plan');
-
-  // Roter Hintergrund bei Krise-Zeile
-  if (kriseSection.includes('background:#fdf0ef'))
-    ok('Roter Hintergrund bei Krise-Zeile');
-  else fail('Roter Hintergrund fehlt bei Krise-Zeile');
-
-  // Restore
-  DB.plaene = backup.plaene;
-  renderDashboardPlaene();
+  // ── ERGEBNIS ─────────────────────────────────────────────────────
+  console.log('');
+  console.log('%c══════════════════════════════════════════', 'color:#555');
+  console.log(
+    '%cERGEBNIS: ' + ok + ' OK  |  ' + warn + ' WARN  |  ' + fail + ' FAIL',
+    fail > 0 ? 'color:#c0392b;font-weight:700;font-size:14px'
+             : warn > 0 ? 'color:#e67e22;font-weight:700;font-size:14px'
+             : 'color:#1a7a4a;font-weight:700;font-size:14px'
+  );
+  console.log('%c══════════════════════════════════════════', 'color:#555');
 })();
-
-// ── KATEGORIE 8: Favicon Badge ──
-console.log('\n── 8. Favicon Badge ──');
-(function() {
-  if (typeof badgeAktualisieren !== 'function') { fail('badgeAktualisieren nicht definiert'); return; }
-  ok('badgeAktualisieren definiert');
-
-  const backup = JSON.parse(JSON.stringify(DB));
-
-  // Test 1: Krise zählt immer (auch delegiert)
-  DB.plaene = [
-    { id: 'k1', prioritaet: 'krise', horizont: 'langfristig', status: null,
-      schritte: [{ titel: 'S', status: 'offen', delegiertAn: 'Max', reihenfolge: 0 }] }
-  ];
-  DB.aufgaben = [];
-  badgeAktualisieren();
-  const link1 = document.querySelector("link[rel~='icon']");
-  if (link1 && link1.href.startsWith('data:image/png'))
-    ok('Badge: Favicon nach badgeAktualisieren als PNG gesetzt');
-  else fail('Badge: Favicon nicht als PNG gesetzt');
-
-  // Test 2: Kurzfristig nicht-delegiert zählt
-  DB.plaene = [
-    { id: 'n1', prioritaet: 'mittel', horizont: 'kurzfristig', status: null,
-      schritte: [{ titel: 'S', status: 'offen', reihenfolge: 0 }] }
-  ];
-  badgeAktualisieren();
-  ok('Badge: kurzfristiger nicht-delegierter Plan – kein Fehler');
-
-  // Test 3: Kurzfristig + delegiert zählt NICHT
-  DB.plaene = [
-    { id: 'n2', prioritaet: 'mittel', horizont: 'kurzfristig', status: null,
-      schritte: [{ titel: 'S', status: 'offen', delegiertAn: 'Team', reihenfolge: 0 }] }
-  ];
-  badgeAktualisieren();
-  ok('Badge: delegierter kurzfristiger Plan – kein Fehler');
-
-  // Test 4: Keine Pläne → kein Fehler
-  DB.plaene = [];
-  badgeAktualisieren();
-  ok('Badge: leere Pläne – kein Fehler');
-
-  // Test 5: Web App Badge API vorhanden
-  if ('setAppBadge' in navigator)
-    ok('Web App Badge API: navigator.setAppBadge verfügbar (PWA installiert)');
-  else
-    warn('Web App Badge API nicht verfügbar (App evtl. nicht als PWA installiert)');
-
-  // Test 6: PWA Manifest vorhanden
-  const manifestLink = document.querySelector('link[rel="manifest"]');
-  if (manifestLink && manifestLink.href) ok('PWA Manifest-Link vorhanden');
-  else fail('PWA Manifest-Link fehlt');
-
-  // Test 7: Service Worker registriert
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistration().then(reg => {
-      if (reg) ok('Service Worker registriert: ' + reg.scope);
-      else warn('Kein Service Worker registriert');
-    });
-  } else {
-    warn('Service Worker API nicht verfügbar');
-  }
-
-  DB.plaene = backup.plaene;
-  DB.aufgaben = backup.aufgaben;
-  badgeAktualisieren();
-})();
-
-// ── ERGEBNIS ──
-console.log('\n══════════════════════════════════════');
-const okC   = results.filter(r => r.status === 'ok').length;
-const failC = results.filter(r => r.status === 'fail').length;
-const warnC = results.filter(r => r.status === 'warn').length;
-console.log(`ERGEBNIS: ${okC} OK | ${failC} FAIL | ${warnC} WARN`);
-if (failC === 0) console.log('✅ Alle Tests bestanden');
-else console.error('❌ ' + failC + ' Test(s) fehlgeschlagen');

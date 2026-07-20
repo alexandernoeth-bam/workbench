@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.201</title>
+<title>WorkAssist 1.5.203</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2129,7 +2129,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.201</div>
+    <div class="start-version">v1.5.203</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2197,7 +2197,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.201</div>
+    <div class="app-version" id="app-version">v1.5.203</div>
   </div>
 
   <div class="nav-section">
@@ -3503,7 +3503,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.201';
+const APP_VERSION = '1.5.203';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -3575,7 +3575,7 @@ async function loadDB() {
   if (fileHandle) {
     try {
       const data = await leseDatei(fileHandle);
-      if (data && Array.isArray(data.bereiche) && Array.isArray(data.aufgaben)) {
+      if (data && Array.isArray(data.aufgaben)) { // bereiche optional (SmallAssist-kompatibel)
         DB = data;
         if (!Array.isArray(DB.wissen))    DB.wissen    = [];
         if (!Array.isArray(DB.dokumente)) DB.dokumente = [];
@@ -6122,30 +6122,32 @@ function renderDashboardPlaene() {
 
   // Krise immer oben — auch wenn delegiert
   const kriseGruppe = [];
-  const delegiert   = [];
   const aktiv       = [];
   plaene.forEach(p => {
     const ns = naechsterSchritt(p);
     if (p.prioritaet === 'krise') {
       kriseGruppe.push({ p, ns });
-    } else if (ns?.delegiertAn) {
-      delegiert.push({ p, ns });
     } else {
       aktiv.push(p);
     }
   });
 
-  // Aktive nach Horizont + Priorität
+  // Alle aktiven nach Horizont + Priorität — delegierte kommen ans Ende ihrer Gruppe
   const groups = { kurzfristig: [], mittelfristig: [], langfristig: [] };
   aktiv.forEach(p => { groups[p.horizont||'kurzfristig'].push(p); });
   Object.keys(groups).forEach(hz => {
-    groups[hz].sort((a,b) => (prioOrder[a.prioritaet??'mittel']??1) - (prioOrder[b.prioritaet??'mittel']??1));
+    groups[hz].sort((a, b) => {
+      const aDel = !!(naechsterSchritt(a)?.delegiertAn);
+      const bDel = !!(naechsterSchritt(b)?.delegiertAn);
+      if (aDel !== bDel) return aDel ? 1 : -1; // delegierte ans Ende
+      return (prioOrder[a.prioritaet??'mittel']??1) - (prioOrder[b.prioritaet??'mittel']??1);
+    });
   });
 
   const hzLabels = {
-    kurzfristig:   { label: 'Kurzfristig',  icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>' },
-    mittelfristig: { label: 'Mittelfristig', icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' },
-    langfristig:   { label: 'Langfristig',   icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
+    kurzfristig:   { label: 'Kurzfristig',  color: '#E65100',       icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>' },
+    mittelfristig: { label: 'Mittelfristig', color: '#f59e0b',       icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' },
+    langfristig:   { label: 'Langfristig',   color: 'var(--teal)',   icon: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
   };
   const prioDots = {
     krise:   `<div style="width:8px;height:8px;border-radius:50%;background:#c0392b;flex-shrink:0;box-shadow:0 0 0 2px #f5c6c2;" title="Krise"></div>`,
@@ -6154,7 +6156,7 @@ function renderDashboardPlaene() {
     niedrig: `<div style="width:8px;height:8px;border-radius:50%;background:#cde0de;border:1px solid #b0cccb;flex-shrink:0;" title="Niedrige Priorität"></div>`,
   };
 
-  function planZeile(p, ns) {
+  function planZeile(p, ns, hzColor) {
     const schritte = (p.schritte||[]);
     const erledigt = schritte.filter(s => {
       const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
@@ -6163,15 +6165,19 @@ function renderDashboardPlaene() {
     const naechsterTitel = ns
       ? (ns.aufgabeId ? (DB.aufgaben.find(a=>a.id===ns.aufgabeId)?.titel||ns.titel) : ns.titel)
       : '✓ Alle Schritte erledigt';
-    const dot = prioDots[p.prioritaet||'mittel'] || prioDots['mittel'];
+    const istDelegiert = !!(ns?.delegiertAn);
+    const sektFarbe = hzColor || 'var(--teal)';
+    const linksIcon = istDelegiert
+      ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${sektFarbe}" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
+      : (prioDots[p.prioritaet||'mittel'] || prioDots['mittel']);
+    const subLine = istDelegiert
+      ? `<span style="color:${sektFarbe};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">→ ${escHtml(ns.delegiertAn)} · ${escHtml(naechsterTitel)}</span>`
+      : `<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(naechsterTitel)}</span>`;
     return `<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openPlanQuickView('${p.id}')">
-      ${dot}
+      ${linksIcon}
       <div style="flex:1;min-width:0;">
         <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.titel)}</div>
-        <div style="font-size:10px;color:var(--text-dim);display:flex;align-items:center;gap:3px;margin-top:2px;">
-          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(naechsterTitel)}</span>
-        </div>
+        <div style="font-size:10px;color:var(--text-dim);display:flex;align-items:center;gap:3px;margin-top:2px;">${subLine}</div>
       </div>
       <span style="font-size:9px;background:var(--teal-xlight);color:var(--teal-dark);padding:1px 6px;border-radius:6px;font-weight:700;flex-shrink:0;align-self:center;">${erledigt}/${schritte.length}</span>
     </div>`;
@@ -6214,37 +6220,13 @@ function renderDashboardPlaene() {
     kriseGruppe.forEach(({ p, ns }) => { html += kriseZeile(p, ns); });
   }
 
-  // ── Aktive nach Horizont ──
+  // ── Aktive nach Horizont (inkl. delegierte am Ende jeder Gruppe) ──
   ['kurzfristig','mittelfristig','langfristig'].forEach(hz => {
     if (!groups[hz]?.length) return;
-    const { label, icon } = hzLabels[hz];
+    const { label, icon, color } = hzLabels[hz];
     html += `<div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-xdim);padding:7px 12px 3px;display:flex;align-items:center;gap:5px;border-bottom:0.5px solid var(--border);">${icon} ${label}</div>`;
-    groups[hz].forEach(p => { html += planZeile(p, naechsterSchritt(p)); });
+    groups[hz].forEach(p => { html += planZeile(p, naechsterSchritt(p), color); });
   });
-
-  // ── Warte auf (ohne Krise) ──
-  if (delegiert.length) {
-    html += `<div style="font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#1976d2;padding:7px 12px 3px;display:flex;align-items:center;gap:5px;border-bottom:0.5px solid var(--border);">
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1976d2" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      Warte auf
-    </div>`;
-    delegiert.forEach(({ p, ns }) => {
-      const schritte = (p.schritte||[]);
-      const erledigt = schritte.filter(s => {
-        const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
-        return st === 'erledigt';
-      }).length;
-      const naechsterTitel = ns.aufgabeId ? (DB.aufgaben.find(a=>a.id===ns.aufgabeId)?.titel||ns.titel) : ns.titel;
-      html += `<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openPlanQuickView('${p.id}')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1976d2" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.titel)}</div>
-          <div style="font-size:10px;color:#1976d2;margin-top:2px;">→ ${escHtml(ns.delegiertAn)} · ${escHtml(naechsterTitel)}</div>
-        </div>
-        <span style="font-size:9px;background:#e3f0fc;color:#1565c0;padding:1px 6px;border-radius:6px;font-weight:700;flex-shrink:0;align-self:center;">${erledigt}/${schritte.length}</span>
-      </div>`;
-    });
-  }
 
   el.innerHTML = html;
   badgeAktualisieren();
@@ -7897,7 +7879,7 @@ let planSchritte = [];
 function planSetPrio(prio) {
   document.querySelectorAll('.plan-prio-btn').forEach(b => {
     const isActive = b.dataset.prio === prio;
-    const colors = {hoch:'#E65100', mittel:'#f59e0b', niedrig:'#8aaaa8'};
+    const colors = {krise:'#c0392b', hoch:'#E65100', mittel:'#f59e0b', niedrig:'#8aaaa8'};
     b.style.background    = isActive ? colors[prio] : 'transparent';
     b.style.borderColor   = isActive ? colors[prio] : 'var(--border)';
     b.style.color         = isActive ? '#fff' : '';
@@ -12106,7 +12088,10 @@ if (!fsApiVerfuegbar()) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div class="field-group">
           <div class="field-label">Priorität</div>
-          <div style="display:flex;gap:5px;" id="plan-prio-btns">
+          <div style="display:flex;gap:5px;flex-wrap:wrap;" id="plan-prio-btns">
+            <button onclick="planSetPrio('krise')"   data-prio="krise"   class="plan-prio-btn" style="flex:1;padding:5px 0;border-radius:7px;border:2px solid var(--border);background:transparent;font-size:10px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:3px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Krise
+            </button>
             <button onclick="planSetPrio('hoch')"    data-prio="hoch"    class="plan-prio-btn" style="flex:1;padding:5px 0;border-radius:7px;border:2px solid var(--border);background:transparent;font-size:10px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:3px;">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2.5" stroke-linecap="round"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>Hoch
             </button>
