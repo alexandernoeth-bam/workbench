@@ -153,3 +153,78 @@
   );
   console.log('%c══════════════════════════════════════════', 'color:#555');
 })();
+
+// ── 9. BEREICHE VOLLBILD-ACCORDION ──────────────────────────────────────
+console.log('%c── 9. Bereiche Vollbild-Accordion', 'font-weight:700;color:#333');
+
+// 9a: Kein Split-Layout mehr — struct-layout darf nicht im Bereiche-Screen sein
+const bereicheScreen = document.getElementById('screen-bereiche');
+if (bereicheScreen) {
+  !bereicheScreen.querySelector('.struct-layout')
+    ? OK('Kein struct-layout im Bereiche-Screen (Vollbild korrekt)')
+    : FAIL('struct-layout noch im Bereiche-Screen — Split-View nicht entfernt');
+
+  // 9b: bd-scroll vorhanden
+  bereicheScreen.querySelector('.bd-scroll')
+    ? OK('.bd-scroll Container vorhanden')
+    : FAIL('.bd-scroll fehlt — Karten-Scrollbereich nicht gerendert');
+
+  // 9c: Suchfeld vorhanden
+  document.getElementById('bereiche-suche')
+    ? OK('#bereiche-suche Suchfeld vorhanden')
+    : FAIL('#bereiche-suche fehlt');
+} else {
+  FAIL('#screen-bereiche nicht gefunden');
+}
+
+// 9d: Neue Funktionen vorhanden
+['bdToggleKarte','bdAccToggle','renderBereichDetail','bereichKarteHTML'].forEach(fn => {
+  typeof window[fn] === 'function'
+    ? OK(fn + '() vorhanden')
+    : FAIL(fn + '() fehlt');
+});
+
+// 9e: Alte Split-View Funktionen nicht mehr nötig (bereich-detail)
+document.getElementById('bereich-detail')
+  ? WARN('#bereich-detail noch im DOM — wird nicht mehr benötigt')
+  : OK('#bereich-detail korrekt entfernt');
+
+// 9f: renderBereichDetail gibt String zurück (nicht undefined)
+if (typeof renderBereichDetail === 'function' && typeof DB !== 'undefined' && DB.bereiche?.length) {
+  const b = DB.bereiche[0];
+  const result = renderBereichDetail(b);
+  typeof result === 'string' && result.length > 0
+    ? OK('renderBereichDetail() gibt HTML-String zurück')
+    : FAIL('renderBereichDetail() gibt keinen String zurück — Accordion-Body bleibt leer');
+} else {
+  WARN('renderBereichDetail-Test übersprungen (keine Bereiche oder Funktion fehlt)');
+}
+
+// 9g: Notizen-Sektion nur bei privatem Theme
+if (typeof DB !== 'undefined' && DB.bereiche?.length) {
+  const istPrivat = document.documentElement.getAttribute('data-theme') === 'privat';
+  const b = DB.bereiche[0];
+  const html = typeof renderBereichDetail === 'function' ? renderBereichDetail(b) : '';
+  const hatNotizen = html.includes('bd-acc-title">Notizen');
+  if (istPrivat) {
+    hatNotizen ? OK('Notizen-Sektion bei Privat-Theme vorhanden') : WARN('Notizen-Sektion fehlt bei Privat-Theme');
+  } else {
+    !hatNotizen ? OK('Notizen-Sektion korrekt ausgeblendet (berufliche Datei)') : FAIL('Notizen-Sektion erscheint bei beruflicher Datei!');
+  }
+} else {
+  WARN('Notizen-Theme-Test übersprungen (keine Bereiche)');
+}
+
+// 9h: Pills in bereichKarteHTML
+if (typeof bereichKarteHTML === 'function' && typeof DB !== 'undefined' && DB.bereiche?.length) {
+  const html = bereichKarteHTML(DB.bereiche[0]);
+  html.includes('bd-pill')
+    ? OK('bd-pill Pills werden in Bereichskarte gerendert')
+    : FAIL('bd-pill fehlt in Bereichskarte');
+  html.includes('bd-card-ziel')
+    ? OK('bd-card-ziel Ziel-Unterzeile in Karte vorhanden')
+    : FAIL('bd-card-ziel fehlt — Ziel wird nicht in Karte angezeigt');
+} else {
+  WARN('bereichKarteHTML-Test übersprungen');
+}
+
