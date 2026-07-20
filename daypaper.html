@@ -1,0 +1,2977 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DayPaper">
+  <meta name="theme-color" content="#28201a">
+  <link rel="manifest" href="./daypaper_manifest.json">
+  <link rel="apple-touch-icon" href="./icons/icon-daypaper-192.png">
+  <title>DayPaper v0.1.7</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap" rel="stylesheet">
+
+  <script>
+    // App-Höhe sofort setzen (PWA CSS-zoom Bug Vermeidung)
+    document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
+    window.addEventListener('resize', () => {
+      document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
+    });
+  </script>
+
+  <style>
+    /* ═══════════════════════════════════════
+       RESET & ROOT
+    ═══════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #28201a;
+      color: #20180e;
+    }
+
+    :root {
+      --app-h: 100%;
+      --color-bg:        #ffffff;
+      --color-paper:     #ffffff;
+      --color-paper-dot: #dde0e8;
+      --color-margin:    #ffffff;
+      --color-red-line:  #cc2020;
+      --color-header:    #28201a;
+      --color-header-fg: #c8b89a;
+      --color-border:    #d8d0c4;
+      --color-muted:     #8a7a68;
+      --color-work:      #28201a;
+      --color-work-fg:   #c8b89a;
+      --color-priv:      #20183a;
+      --color-priv-fg:   #b0a8e0;
+      --color-plan:      #f0e098;
+      --color-plan-fg:   #5a4800;
+      --color-note:      #e0e8d8;
+      --color-note-fg:   #284018;
+      --color-done:      #4a7a5a;
+      --color-danger:    #c07070;
+      --color-pill-free: #e0dcd6;
+      --color-pill-free-fg: #5a5248;
+      --margin-width:    130px;
+      --handle-width:    24px;
+    }
+
+    /* ═══════════════════════════════════════
+       APP SHELL
+    ═══════════════════════════════════════ */
+    #app {
+      width: 100%;
+      height: var(--app-h);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ═══════════════════════════════════════
+       HEADER
+    ═══════════════════════════════════════ */
+    #app-header {
+      background: var(--color-header);
+      padding: 12px 20px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      gap: 12px;
+    }
+
+    #app-header .title {
+      color: var(--color-header-fg);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    #app-header .date {
+      color: var(--color-header-fg);
+      font-size: 18px;
+      font-weight: 400;
+      letter-spacing: 1px;
+      flex: 1;
+      text-align: center;
+    }
+
+    #app-header .app-version {
+      color: #4a3828;
+      font-size: 10px;
+      margin-left: 4px;
+    }
+
+    .status-badge {
+      font-size: 10px;
+      padding: 4px 11px;
+      border-radius: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+    .badge-start   { background: #6a6060; color: #f0e8e0; }
+    .badge-morning { background: #e8c97a; color: #5a4000; }
+    .badge-active  { background: #7ac98a; color: #0a3a18; }
+    .badge-transfer{ background: #c97a7a; color: #4a0808; }
+
+    /* ═══════════════════════════════════════
+       SCREEN CONTAINER
+    ═══════════════════════════════════════ */
+    #screen-container {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .screen.active { display: flex; }
+
+    /* ═══════════════════════════════════════
+       SCREEN: START
+    ═══════════════════════════════════════ */
+    #screen-start {
+      background: var(--color-bg);
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 40px 24px;
+    }
+
+    .start-logo {
+      text-align: center;
+    }
+    .start-logo h2 {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: var(--color-header);
+    }
+    .start-logo p {
+      font-size: 13px;
+      color: var(--color-muted);
+      margin-top: 4px;
+      letter-spacing: 1px;
+    }
+
+    .start-card {
+      background: white;
+      border: 1px solid var(--color-border);
+      border-radius: 14px;
+      padding: 20px 24px;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .start-card h3 {
+      font-size: 13px;
+      color: var(--color-muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .start-card p {
+      font-size: 14px;
+      color: var(--color-header);
+      line-height: 1.5;
+    }
+
+    .btn-primary {
+      background: var(--color-header);
+      color: var(--color-header-fg);
+      border: none;
+      border-radius: 11px;
+      padding: 13px 20px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      width: 100%;
+      text-align: center;
+    }
+    .btn-primary:active { opacity: 0.8; }
+
+    .btn-secondary {
+      background: var(--color-border);
+      color: #4a3820;
+      border: none;
+      border-radius: 11px;
+      padding: 11px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      text-align: center;
+    }
+    .btn-secondary:active { opacity: 0.8; }
+
+    .btn-danger {
+      background: var(--color-danger);
+      color: white;
+      border: none;
+      border-radius: 11px;
+      padding: 11px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      text-align: center;
+    }
+
+    /* ═══════════════════════════════════════
+       SCREEN: MORGEN
+    ═══════════════════════════════════════ */
+    #screen-morgen {
+      background: var(--color-bg);
+    }
+
+    .morgen-sources {
+      background: #eee8de;
+      border-bottom: 1px solid var(--color-border);
+      padding: 11px 18px 9px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .src-btn {
+      flex: 1;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .src-btn.work { background: var(--color-work); color: var(--color-work-fg); }
+    .src-btn.priv { background: var(--color-priv); color: var(--color-priv-fg); }
+    .src-loaded {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    .sl-w { background: var(--color-work); color: var(--color-work-fg); }
+    .sl-p { background: var(--color-priv); color: var(--color-priv-fg); }
+
+    .morgen-filter {
+      background: #eee8de;
+      border-bottom: 1px solid var(--color-border);
+      padding: 7px 18px;
+      display: flex;
+      gap: 7px;
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+    .filter-pill {
+      font-size: 11px;
+      padding: 4px 13px;
+      border-radius: 12px;
+      border: 1px solid #c8c0b4;
+      background: white;
+      color: #6a5a48;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .filter-pill.active {
+      background: var(--color-header);
+      color: var(--color-header-fg);
+      border-color: var(--color-header);
+    }
+
+    .morgen-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .pick-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 18px;
+      border-bottom: 1px solid #ede8df;
+      cursor: pointer;
+      user-select: none;
+    }
+    .pick-item.selected { background: #eaf4ec; }
+    .pick-item:active { background: #e0e8e2; }
+
+    .pick-cb {
+      width: 20px;
+      height: 20px;
+      border: 1.5px solid #9a8a78;
+      border-radius: 4px;
+      flex-shrink: 0;
+      margin-top: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      background: white;
+    }
+    .pick-cb.on { background: var(--color-done); border-color: var(--color-done); color: white; }
+
+    .pick-main { flex: 1; min-width: 0; }
+    .pick-title { font-size: 14px; color: #20180e; line-height: 1.4; }
+    .pick-meta  { display: flex; gap: 5px; margin-top: 4px; flex-wrap: wrap; }
+
+    .pm {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 7px;
+      font-weight: 500;
+    }
+    .pm-w  { background: var(--color-work); color: var(--color-work-fg); }
+    .pm-p  { background: var(--color-priv); color: var(--color-priv-fg); }
+    .pm-pl { background: var(--color-plan); color: var(--color-plan-fg); }
+    .pm-du { background: #f4c0b0; color: #5a1800; }
+    .pm-rc { background: #d0e8d0; color: #185018; }
+
+    .morgen-footer {
+      background: #eee8de;
+      border-top: 1px solid var(--color-border);
+      padding: 13px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      flex-shrink: 0;
+    }
+    .morgen-count {
+      font-size: 12px;
+      color: var(--color-muted);
+      text-align: center;
+    }
+
+    .morgen-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      color: var(--color-muted);
+      font-size: 14px;
+      padding: 40px;
+      text-align: center;
+    }
+
+    /* ═══════════════════════════════════════
+       SCREEN: TAGESZETTEL
+    ═══════════════════════════════════════ */
+    #screen-zettel {
+      background: var(--color-paper);
+    }
+
+    .paper-scroll {
+      flex: 1;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    /* Rote Marginallinie */
+    .paper-scroll::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: var(--margin-width);
+      width: 1.5px;
+      background: var(--color-red-line);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .paper-rows {
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+
+    .p-section-head {
+      padding: 10px 18px 2px calc(var(--handle-width) + 10px);
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #c02020;
+      font-weight: 700;
+      background: var(--color-paper);
+    }
+
+    .p-row {
+      display: flex;
+      align-items: stretch;
+      min-height: 28px;
+      position: relative;
+    }
+    .p-row.dragging { opacity: 0.4; }
+    .p-row.drag-over-top    { border-top: 2px solid var(--color-done); }
+    .p-row.drag-over-bottom { border-bottom: 2px solid var(--color-done); }
+
+    /* Drag Handle */
+    .p-handle {
+      width: var(--handle-width);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #d0c8bc;
+      font-size: 14px;
+      cursor: grab;
+      user-select: none;
+      padding-left: 4px;
+    }
+    .p-handle:active { cursor: grabbing; }
+
+    /* Linker Schreibbereich – gepunktet */
+    .p-left {
+      flex: 1;
+      padding: 4px 12px 0 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      background-image:
+        linear-gradient(to right, var(--color-paper-dot) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--color-paper-dot) 1px, transparent 1px);
+      background-size: 28px 28px;
+      background-position: 0 4px;
+      min-width: 0;
+    }
+
+    .p-line1 {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      min-height: 28px;
+    }
+
+    .p-cb {
+      width: 20px;
+      height: 20px;
+      border: 1.5px solid #9a8a78;
+      border-radius: 3px;
+      flex-shrink: 0;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      background: transparent;
+      cursor: pointer;
+      color: transparent;
+    }
+    .p-cb.done { border-color: #5a5a5a; color: #2a2a2a; background: transparent; }
+
+    .p-notiz-dash {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #6a5a50;
+    }
+
+    .p-text {
+      font-size: 19px;
+      color: #18100a;
+      line-height: 28px;
+      font-family: 'Kalam', 'Georgia', cursive;
+      flex: 1;
+      word-break: break-word;
+    }
+    .p-text.done  { text-decoration: line-through; color: #9a8a78; }
+    .p-text.notiz { color: #5a4a3a; font-style: italic; }
+
+    .p-sub {
+      font-size: 16px;
+      color: #7a6858;
+      font-family: 'Kalam', 'Georgia', cursive;
+      padding-left: 30px;
+      line-height: 28px;
+    }
+
+    /* Rechte Kennzeichenspalte – crème, keine Punkte */
+    .p-right {
+      width: var(--margin-width);
+      flex-shrink: 0;
+      background: var(--color-margin);
+      padding: 6px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      justify-content: flex-start;
+      z-index: 1;
+    }
+
+    .p-pill {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 7px;
+      display: inline-block;
+      white-space: nowrap;
+      width: fit-content;
+      font-weight: 500;
+    }
+    .pp-w  { background: var(--color-work); color: var(--color-work-fg); }
+    .pp-p  { background: var(--color-priv); color: var(--color-priv-fg); }
+    .pp-pl { background: var(--color-plan); color: var(--color-plan-fg); font-style: italic; }
+    .pp-f  { background: var(--color-pill-free); color: var(--color-pill-free-fg); }
+    .pp-n  { background: var(--color-note); color: var(--color-note-fg); }
+    .pp-ex { background: #f4c8c8; color: #680808; font-weight: 800; }
+
+
+    .edit-btn {
+      background: none;
+      border: none;
+      color: #c0b8b0;
+      font-size: 15px;
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+      align-self: flex-start;
+      margin-bottom: 2px;
+    }
+    .edit-btn:hover { color: #28201a; }
+    .edit-btn:active { color: var(--color-done); }
+
+    .p-row.empty .p-text { color: #c0b4a0; font-style: italic; }
+    .p-row.empty .p-cb   { border-style: dashed; background: transparent; }
+
+    /* Zettel-Toolbar */
+    .zettel-toolbar {
+      background: var(--color-header);
+      padding: 9px 14px;
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .tb-btn {
+      flex: 1;
+      background: rgba(200,184,154,0.12);
+      color: var(--color-header-fg);
+      border: none;
+      border-radius: 9px;
+      padding: 9px 4px;
+      font-size: 11px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .tb-btn.hi {
+      background: rgba(200,184,154,0.28);
+      border: 1px solid rgba(200,184,154,0.3);
+    }
+    .tb-btn:active { opacity: 0.7; }
+
+    /* ═══════════════════════════════════════
+       SCREEN: TRANSFER (Re-Import)
+    ═══════════════════════════════════════ */
+    #screen-transfer {
+      background: var(--color-bg);
+    }
+
+    .transfer-prog {
+      background: #eee8de;
+      border-bottom: 1px solid var(--color-border);
+      padding: 11px 18px 9px;
+      flex-shrink: 0;
+    }
+    .prog-lbl {
+      font-size: 11px;
+      color: var(--color-muted);
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .prog-track {
+      background: var(--color-border);
+      border-radius: 4px;
+      height: 5px;
+      overflow: hidden;
+    }
+    .prog-fill {
+      background: var(--color-done);
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+
+    .transfer-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .ri {
+      border-radius: 11px;
+      padding: 11px 13px;
+      border: 1px solid var(--color-border);
+      background: white;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .ri.ri-done { border-color: #9ac8a4; background: #f2fbf4; }
+    .ri.ri-open { border-color: #d0b898; background: #fdf6ee; }
+    .ri.ri-free { border-color: #b8b8cc; background: #f8f8fc; }
+
+    .ri-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+    }
+    .ri-ico { font-size: 17px; flex-shrink: 0; margin-top: 1px; }
+    .ri-inf { flex: 1; }
+    .ri-tit { font-size: 13px; color: #20180e; font-weight: 600; line-height: 1.3; }
+    .ri-sub { font-size: 11px; color: var(--color-muted); margin-top: 2px; }
+    .ri-stat {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .rs-done { background: #c0e8c8; color: #0a4a1a; }
+    .rs-open { background: #f0d8b4; color: #5a2800; }
+
+    .ri-steps {
+      background: #f0f0f8;
+      border-radius: 7px;
+      padding: 7px 10px;
+      font-size: 12px;
+      color: #383660;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ri-step { display: flex; align-items: center; gap: 7px; }
+    .ri-sb {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 5px;
+      margin-left: auto;
+    }
+    .rsb-d { background: #c0e8c8; color: #0a4a1a; }
+    .rsb-o { background: #f0d8b4; color: #5a2800; }
+
+    .ri-acts {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .ri-btn {
+      font-size: 11px;
+      padding: 5px 11px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .rb-ok   { background: var(--color-done); color: white; }
+    .rb-sec  { background: #e0d8cc; color: #4a3820; }
+    .rb-del  { background: var(--color-danger); color: white; }
+    .rb-srch { background: var(--color-priv); color: var(--color-priv-fg); }
+
+    .transfer-footer {
+      background: #eee8de;
+      border-top: 1px solid var(--color-border);
+      padding: 12px 18px;
+      flex-shrink: 0;
+    }
+
+    /* ═══════════════════════════════════════
+       MODAL / OVERLAY
+    ═══════════════════════════════════════ */
+    #modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 100;
+    }
+    #modal-overlay.active { display: flex; }
+
+    .modal-sheet {
+      background: white;
+      border-radius: 20px 20px 0 0;
+      padding: 20px;
+      width: 100%;
+      max-width: 600px;
+      max-height: 80vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .modal-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--color-header);
+      text-align: center;
+    }
+    .modal-input {
+      width: 100%;
+      border: 1px solid var(--color-border);
+      border-radius: 9px;
+      padding: 11px 13px;
+      font-size: 14px;
+      font-family: 'Kalam', 'Georgia', cursive;
+      outline: none;
+      resize: none;
+    }
+    .modal-input:focus { border-color: var(--color-header); }
+    .modal-row {
+      display: flex;
+      gap: 10px;
+    }
+    .modal-label {
+      font-size: 11px;
+      color: var(--color-muted);
+      margin-bottom: 4px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .modal-select {
+      width: 100%;
+      border: 1px solid var(--color-border);
+      border-radius: 9px;
+      padding: 10px 13px;
+      font-size: 13px;
+      background: white;
+      outline: none;
+    }
+
+    /* ═══════════════════════════════════════
+       TOAST
+    ═══════════════════════════════════════ */
+    #toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(40,32,26,0.92);
+      color: var(--color-header-fg);
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      z-index: 200;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
+
+    /* ═══════════════════════════════════════
+       HIDDEN FILE INPUT
+    ═══════════════════════════════════════ */
+    #file-input-work { display: none; }
+    #file-input-priv { display: none; }
+
+    /* ═══════════════════════════════════════
+       UTILITY
+    ═══════════════════════════════════════ */
+    .flex-col { display: flex; flex-direction: column; }
+    .flex-row { display: flex; flex-direction: row; }
+    .gap-8  { gap: 8px; }
+    .gap-12 { gap: 12px; }
+    .mt-8   { margin-top: 8px; }
+    .w-full { width: 100%; }
+
+    /* ═══════════════════════════════════════
+       BEARBEITUNGSMODUS
+    ═══════════════════════════════════════ */
+    #paper-rows.edit-mode .p-handle { color: #9a8a78 !important; cursor: grab; }
+    #paper-rows.edit-mode .p-row:hover .p-handle { color: #28201a !important; }
+    #paper-rows.edit-mode .p-row { background: rgba(255,248,240,0.6); }
+    #paper-rows.edit-mode .p-row:hover { background: rgba(255,240,220,0.8); }
+
+    .p-delete-btn {
+      display: none;
+      background: none;
+      border: none;
+      color: #d08080;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0 6px;
+      line-height: 1;
+      flex-shrink: 0;
+      align-self: center;
+    }
+    #paper-rows.edit-mode .p-delete-btn { display: flex; align-items: center; }
+    .p-delete-btn:active { color: var(--color-danger); }
+
+    .tb-btn.edit-active {
+      background: rgba(200,100,80,0.25);
+      border: 1px solid rgba(200,100,80,0.5);
+      color: #e09080;
+    }
+
+    /* ═══════════════════════════════════════
+       KENNZEICHEN (Signals)
+    ═══════════════════════════════════════ */
+    .sig-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px; height: 26px;
+      border-radius: 6px;
+      border: 1.5px solid transparent;
+      font-size: 14px;
+      cursor: pointer;
+      background: none;
+      opacity: 0.35;
+      transition: opacity 0.15s, border-color 0.15s;
+    }
+    .sig-btn.active { opacity: 1; border-color: currentColor; }
+    .sig-btn:hover  { opacity: 0.8; }
+    .sig-urgent  { color: #cc2020; }
+    .sig-unclear { color: #2060cc; }
+    .sig-idea    { color: #b08000; }
+    .sig-size-s  { color: #608060; font-size: 11px; font-weight: 700; font-family: sans-serif; }
+    .sig-size-m  { color: #806040; font-size: 11px; font-weight: 700; font-family: sans-serif; }
+    .sig-size-l  { color: #804040; font-size: 11px; font-weight: 700; font-family: sans-serif; }
+
+    /* Pill im Zettel für Kennzeichen */
+    .p-sig {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1;
+      padding: 1px 3px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+    .ps-urgent  { color: #cc2020; }
+    .ps-unclear { color: #2060cc; }
+    .ps-idea    { color: #b08000; }
+    .ps-size    { color: #606060; font-size: 10px; font-family: sans-serif; font-weight: 700; background: #f0f0f0; border-radius: 4px; padding: 1px 4px; }
+    .ps-deadline{ color: #cc2020; font-size: 10px; font-family: sans-serif; font-weight: 700; }
+
+    /* ═══════════════════════════════════════
+       ERINNERUNGS-SEKTION (oben)
+    ═══════════════════════════════════════ */
+    .p-section-heute {
+      background: #fff8f0;
+      border-bottom: 2px solid #e8c060;
+      padding: 8px 14px 8px calc(var(--handle-width) + 10px);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .p-section-heute-title {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #c02020;
+      font-weight: 700;
+    }
+    .erinnerung-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 0;
+    }
+    .erinnerung-zeit {
+      font-size: 15px;
+      font-weight: 700;
+      color: #28201a;
+      font-family: sans-serif;
+      min-width: 44px;
+    }
+    .erinnerung-text.done { text-decoration: line-through; color: #9a8a78; }
+    .erinnerung-text {
+      font-size: 16px;
+      color: #28201a;
+      font-family: 'Kalam', 'Georgia', cursive;
+      flex: 1;
+    }
+    .erinnerung-ort {
+      font-size: 12px;
+      color: var(--color-muted);
+      font-family: sans-serif;
+    }
+
+    /* ═══════════════════════════════════════
+       TERMIN-DETAILS im Zettel
+    ═══════════════════════════════════════ */
+
+    .termin-prefix {
+      font-family: sans-serif;
+      font-size: 15px;
+      color: #5a5050;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .termin-suffix {
+      font-family: sans-serif;
+      font-size: 15px;
+      color: #8a7a68;
+      font-weight: 400;
+    }
+
+    .termin-details {
+      font-size: 13px;
+      color: var(--color-muted);
+      font-family: sans-serif;
+      padding-left: 30px;
+      line-height: 1.5;
+    }
+    .termin-details span { margin-right: 10px; }
+
+    /* ═══════════════════════════════════════
+       MODAL: Kennzeichen-Auswahl
+    ═══════════════════════════════════════ */
+    .sig-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .sig-picker-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1.5px solid #e0d8cc;
+      background: white;
+      cursor: pointer;
+      font-size: 13px;
+      color: #4a3820;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .sig-picker-btn.on { border-color: currentColor; background: #faf4ec; }
+    .sig-picker-btn.on.urgent  { border-color: #cc2020; background: #fff0f0; }
+    .sig-picker-btn.on.unclear { border-color: #2060cc; background: #f0f4ff; }
+    .sig-picker-btn.on.idea    { border-color: #b08000; background: #fffce0; }
+
+    .size-picker { display: flex; gap: 6px; }
+    .size-btn {
+      flex: 1;
+      padding: 7px;
+      border-radius: 8px;
+      border: 1.5px solid #e0d8cc;
+      background: white;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      color: #4a3820;
+    }
+    .size-btn.on { border-color: #28201a; background: #f0ece4; }
+
+    /* ═══════════════════════════════════════
+       PLAN & SCHRITTE
+    ═══════════════════════════════════════ */
+    .p-row.ist-plan { background: #fafafa; }
+    /* Plan-Zeile: Titel beginnt genau auf Checkbox-Position (24px handle + 4px padding = 28px) */
+    .p-row.ist-plan .p-left { padding-left: 4px !important; }
+    /* Dünne goldene Linie links am Handle als Plan-Indikator */
+    .p-row.ist-plan .p-handle { border-left: 3px solid #c8b89a; }
+
+    /* Einrückung Schritte – kein Leerzeilen-Gap */
+    .p-row.ist-schritt { min-height: 24px; }
+    .p-row.ist-schritt .p-left { padding-left: 20px !important; padding-top: 2px; }
+    .p-row.ist-schritt .p-handle { color: #e0d8d0; }
+    .p-row.ist-schritt .p-cb {
+      width: 16px; height: 16px;
+      border-radius: 2px;
+      margin-top: 4px;
+      font-size: 12px;
+    }
+    .p-row.ist-schritt .p-text { font-size: 17px; color: #3a3028; line-height: 24px; }
+    .p-line1.schritt-line { min-height: 24px; }
+
+    /* Plan-Titel: gleiche Schrift wie Aufgabe, unterstrichen, keine CB */
+    .p-plan-titel {
+      font-size: 19px;
+      font-weight: 400;
+      color: #18100a;
+      line-height: 28px;
+      font-family: 'Kalam', 'Georgia', cursive;
+      flex: 1;
+      word-break: break-word;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      text-decoration-color: #9a8a78;
+    }
+    .p-plan-titel.done { text-decoration: line-through; color: #9a8a78; }
+
+    /* Plan-Editor Button: NUR im Edit-Modus sichtbar */
+    .plan-edit-btn {
+      display: none !important;
+      background: none;
+      border: 1px solid #c8b89a;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #8a7a68;
+      cursor: pointer;
+      padding: 2px 8px;
+      font-family: sans-serif;
+      white-space: nowrap;
+      flex-shrink: 0;
+      align-self: center;
+    }
+    .plan-edit-btn:hover { background: #faf4ec; color: #28201a; }
+    #paper-rows.edit-mode .plan-edit-btn { display: inline-flex !important; align-items: center; }
+
+    /* Plan-Modal interne Styles */
+    .plan-modal-schritt {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 0; border-bottom: 1px solid #f0e8e0;
+    }
+    .plan-modal-schritt:last-child { border-bottom: none; }
+    .plan-modal-schritt input {
+      flex: 1; border: none; outline: none; background: transparent;
+      font-size: 14px; font-family: 'Kalam', 'Georgia', cursive;
+      color: #20180e; padding: 2px 4px;
+    }
+    .plan-modal-schritt input:focus { border-bottom: 1px dashed #c8b89a; }
+    .plan-modal-schritt .cb-mini {
+      width: 16px; height: 16px; border: 1.5px solid #9a8a78; border-radius: 2px;
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 11px; cursor: pointer;
+    }
+    .plan-modal-schritt .cb-mini.done { color: #2a2a2a; border-color: #5a5a5a; }
+    .plan-modal-schritt .del-schritt {
+      background: none; border: none; color: #d08080; font-size: 16px;
+      cursor: pointer; padding: 0 2px; line-height: 1; flex-shrink: 0;
+    }
+    .plan-schritte-liste {
+      border: 1px solid #e8e0d8; border-radius: 8px;
+      padding: 4px 8px; max-height: 220px; overflow-y: auto;
+    }
+    .add-schritt-inline { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+    .add-schritt-inline input {
+      flex: 1; border: 1px dashed #c8b89a; border-radius: 6px;
+      padding: 6px 10px; font-size: 13px; font-family: 'Kalam', 'Georgia', cursive; outline: none;
+    }
+    .add-schritt-inline input:focus { border-style: solid; }
+    .add-schritt-inline button {
+      background: var(--color-done); color: white; border: none;
+      border-radius: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+    }
+
+  </style>
+</head>
+<body>
+
+<!-- Versteckte File Inputs für iOS/Safari Fallback -->
+<input type="file" id="file-input-work" accept=".json">
+<input type="file" id="file-input-priv" accept=".json">
+
+<div id="app">
+
+  <!-- ═══════════ HEADER ═══════════ -->
+  <div id="app-header">
+    <span class="title">DayPaper<span class="app-version">v0.1.7</span></span>
+    <span class="date" id="header-date"></span>
+    <span class="status-badge badge-start" id="status-badge">Start</span>
+  </div>
+
+  <!-- ═══════════ SCREENS ═══════════ -->
+  <div id="screen-container">
+
+    <!-- START -->
+    <div class="screen active" id="screen-start">
+      <div class="start-logo">
+        <h2>DayPaper</h2>
+        <p>Dein täglicher Arbeitszettel</p>
+      </div>
+      <div id="start-card-content"></div>
+    </div>
+
+    <!-- MORGEN -->
+    <div class="screen" id="screen-morgen">
+      <div class="morgen-sources">
+        <button class="src-btn work" id="btn-load-work" onclick="loadSource('work')">📁 Beruflich laden</button>
+        <button class="src-btn priv" id="btn-load-priv" onclick="loadSource('priv')">📁 Privat laden</button>
+        <span class="src-loaded sl-w" id="badge-work" style="display:none">✓ B</span>
+        <span class="src-loaded sl-p" id="badge-priv" style="display:none">✓ P</span>
+      </div>
+      <div class="morgen-filter" id="morgen-filter">
+        <span class="filter-pill active" data-filter="alle" onclick="setFilter('alle')">Alle</span>
+        <span class="filter-pill" data-filter="faellig" onclick="setFilter('faellig')">Fällig heute</span>
+        <span class="filter-pill" data-filter="plaene" onclick="setFilter('plaene')">Pläne</span>
+        <span class="filter-pill" data-filter="wiederkehrend" onclick="setFilter('wiederkehrend')">Wiederkehrend</span>
+      </div>
+      <div class="morgen-list" id="morgen-list">
+        <div class="morgen-empty">
+          <div style="font-size:32px;">📁</div>
+          <div>Lade eine Backlog-JSON um Aufgaben auszuwählen</div>
+        </div>
+      </div>
+      <div class="morgen-footer">
+        <div class="morgen-count" id="morgen-count">0 Aufgaben ausgewählt</div>
+        <button class="btn-primary" id="btn-generate" onclick="generateZettel()">✦ Tageszettel generieren</button>
+      </div>
+    </div>
+
+    <!-- TAGESZETTEL -->
+    <div class="screen" id="screen-zettel">
+      <div class="paper-scroll" id="paper-scroll">
+        <div class="paper-rows" id="paper-rows"></div>
+      </div>
+      <div class="zettel-toolbar">
+        <button class="tb-btn" onclick="addEntry('aufgabe')">＋ Aufgabe</button>
+        <button class="tb-btn" onclick="addEntry('notiz')">– Notiz</button>
+        <button class="tb-btn" onclick="addEntry('termin')">⊕ Termin</button>
+        <button class="tb-btn hi" id="tb-progress" onclick="showProgress()">☑ 0/0</button>
+        <button class="tb-btn" id="tb-edit" onclick="toggleEditMode()">✎ Edit</button>
+        <button class="tb-btn" onclick="addEntry('miniplan')" style="display:none" id="tb-miniplan"></button>
+      </div>
+    </div>
+
+    <!-- TRANSFER -->
+    <div class="screen" id="screen-transfer">
+      <div class="transfer-prog">
+        <div class="prog-lbl">
+          <span id="transfer-lbl">0 von 0 entschieden</span>
+          <span id="transfer-pct" style="color:var(--color-done);font-weight:700;">0%</span>
+        </div>
+        <div class="prog-track">
+          <div class="prog-fill" id="transfer-fill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="transfer-list" id="transfer-list"></div>
+      <div class="transfer-footer">
+        <button class="btn-primary" id="btn-finish-transfer" onclick="finishTransfer()">
+          ✦ Abschließen &amp; neuen Tageszettel generieren
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /screen-container -->
+</div><!-- /app -->
+
+<!-- MODAL -->
+<div id="modal-overlay" onclick="closeModalOnBackdrop(event)">
+  <div class="modal-sheet" id="modal-sheet"></div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════
+// KONSTANTEN & VERSION
+// ═══════════════════════════════════════════════════
+const APP_VERSION = 'v0.1.7';
+const STORAGE_KEY = 'daypaper_db';
+const ZETTEL_MAX_DAYS = 5;
+
+// ═══════════════════════════════════════════════════
+// DATENMODELL
+// ═══════════════════════════════════════════════════
+
+/*
+  DayPaperDB:
+  {
+    version: string,
+    tageszettel: [
+      {
+        id: string,           // ISO-Datum des Tages z.B. "2026-07-20"
+        datum: string,        // ISO-Datum
+        status: "aktiv" | "uebertragen",
+        eintraege: [
+          {
+            id: string,
+            typ: "aufgabe" | "termin" | "notiz" | "miniplan-schritt",
+            text: string,
+            erledigt: boolean,
+            zusatz: string,            // Freitext-Zusatz
+            quelle: "work" | "priv" | "frei",
+            refId: string|null,        // aufgabeId in Backlog
+            planId: string|null,       // planId in Backlog
+            planTitel: string|null,    // Name des Plans / Mini-Plans
+            miniplanId: string|null,   // Lokale Gruppe für Mini-Pläne
+            abschnitt: "aufgaben" | "termine" | "tagesueber" | "notizen",
+            reihenfolge: number,
+            transferiert: boolean,     // wurde im Re-Import entschieden
+            transferAktion: string|null  // "erledigt" | "offen" | "verwerfen" | "plan-anlegen"
+          }
+        ],
+        quellen: {
+          work: { dateiname: string, daten: object } | null,
+          priv: { dateiname: string, daten: object } | null
+        },
+        erstelltAm: string,
+        uebertragAm: string|null
+      }
+    ]
+  }
+*/
+
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+let DB = {
+  version: APP_VERSION,
+  tageszettel: []
+};
+
+let state = {
+  currentScreen: 'start',
+  activeZettelId: null,
+  morgenFilter: 'alle',
+  morgenAusgewaehlt: [],
+  quellen: { work: null, priv: null },
+  dragSrcIndex: null,
+  dragSrcAbschnitt: null,
+  dragSrcId: null,
+  dragSrcIstPlan: false,
+  dragSrcPlanId: null,
+  editMode: false
+};
+
+// ═══════════════════════════════════════════════════
+// PERSISTENZ
+// ═══════════════════════════════════════════════════
+function saveDB() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+  } catch(e) {
+    showToast('⚠️ Speichern fehlgeschlagen');
+  }
+}
+
+function loadDB() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.tageszettel)) {
+        DB = parsed;
+      }
+    }
+  } catch(e) {
+    console.warn('DB konnte nicht geladen werden:', e);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// HILFSFUNKTIONEN
+// ═══════════════════════════════════════════════════
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatDate(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr + 'T00:00:00');
+  return d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function formatDateShort(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr + 'T00:00:00');
+  return d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function daysDiff(isoA, isoB) {
+  const a = new Date(isoA + 'T00:00:00');
+  const b = new Date(isoB + 'T00:00:00');
+  return Math.round((b - a) / 86400000);
+}
+
+function showToast(msg, dauer) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dauer || 2500);
+}
+
+// ═══════════════════════════════════════════════════
+// APP INIT
+// ═══════════════════════════════════════════════════
+function init() {
+  loadDB();
+  bereinigeTageszettel();
+  updateHeaderDate();
+  renderStartScreen();
+}
+
+function updateHeaderDate() {
+  const el = document.getElementById('header-date');
+  if (el) el.textContent = formatDateShort(todayISO());
+}
+
+function bereinigeTageszettel() {
+  const heute = todayISO();
+  DB.tageszettel = DB.tageszettel.filter(z => {
+    if (z.status !== 'uebertragen') return true;
+    const diff = daysDiff(z.uebertragAm ? z.uebertragAm.slice(0,10) : z.datum, heute);
+    return diff < ZETTEL_MAX_DAYS;
+  });
+  saveDB();
+}
+
+// ═══════════════════════════════════════════════════
+// START SCREEN
+// ═══════════════════════════════════════════════════
+function renderStartScreen() {
+  const container = document.getElementById('start-card-content');
+  const heute = todayISO();
+
+  // Prüfe ob bereits ein aktiver Zettel für heute vorhanden
+  const aktivHeute = DB.tageszettel.find(z => z.datum === heute && z.status === 'aktiv');
+  // Prüfe ob nicht übertragene Zettel von gestern oder früher vorhanden
+  const nichtUebertragen = DB.tageszettel.filter(z => z.datum !== heute && z.status === 'aktiv');
+
+  let html = '';
+
+  if (nichtUebertragen.length > 0) {
+    // Muss erst Vorzettel übertragen werden
+    const z = nichtUebertragen[0];
+    html = `
+      <div class="start-card">
+        <h3>⚠️ Offener Übertrag</h3>
+        <p>Der Tageszettel vom <strong>${formatDate(z.datum)}</strong> wurde noch nicht übertragen. Bitte zuerst den Übertrag abschließen.</p>
+        <button class="btn-danger" onclick="openTransfer('${z.id}')">Übertrag öffnen →</button>
+      </div>`;
+  } else if (aktivHeute) {
+    html = `
+      <div class="start-card">
+        <h3>Tageszettel aktiv</h3>
+        <p>Du hast bereits einen Tageszettel für heute. Weiter arbeiten?</p>
+        <button class="btn-primary" onclick="openZettel('${aktivHeute.id}')">Tageszettel öffnen →</button>
+      </div>
+      <div class="start-card" style="margin-top:8px;">
+        <h3>Neuen Morgen starten</h3>
+        <p>Oder starte eine neue Morgen-Auswahl und erstelle einen neuen Tageszettel.</p>
+        <button class="btn-secondary" onclick="openMorgen()">Morgen-Auswahl →</button>
+      </div>`;
+  } else {
+    html = `
+      <div class="start-card">
+        <h3>Guten Morgen</h3>
+        <p>Kein aktiver Tageszettel. Starte jetzt die Morgen-Auswahl um deinen Tag zu planen.</p>
+        <button class="btn-primary" onclick="openMorgen()">✦ Morgen-Auswahl starten</button>
+      </div>`;
+
+    // Zeige abgeschlossene Zettel der letzten Tage
+    const alte = DB.tageszettel.filter(z => z.status === 'uebertragen').slice(-3).reverse();
+    if (alte.length > 0) {
+      html += `<div class="start-card" style="margin-top:8px;">
+        <h3>Letzte Tageszettel</h3>`;
+      alte.forEach(z => {
+        const done = z.eintraege.filter(e => e.erledigt).length;
+        const total = z.eintraege.filter(e => e.typ !== 'notiz').length;
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee;">
+          <span style="font-size:13px;color:#2a2018;">${formatDate(z.datum)}</span>
+          <span style="font-size:11px;color:var(--color-muted);">${done}/${total} erledigt</span>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+  }
+
+  container.innerHTML = html;
+  showScreen('start');
+  setBadge('start', 'badge-start');
+}
+
+// ═══════════════════════════════════════════════════
+// SCREEN NAVIGATION
+// ═══════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const target = document.getElementById('screen-' + id);
+  if (target) target.classList.add('active');
+  state.currentScreen = id;
+}
+
+function setBadge(text, cls) {
+  const b = document.getElementById('status-badge');
+  b.className = 'status-badge ' + cls;
+  const labels = { start: 'Start', morgen: 'Morgen', aktiv: 'Aktiv', transfer: 'Übertrag' };
+  b.textContent = labels[text] || text;
+}
+
+// ═══════════════════════════════════════════════════
+// MORGEN-SCREEN
+// ═══════════════════════════════════════════════════
+function openMorgen() {
+  state.morgenAusgewaehlt = [];
+  state.morgenFilter = 'alle';
+  renderMorgenList();
+  showScreen('morgen');
+  setBadge('morgen', 'badge-morning');
+}
+
+function loadSource(typ) {
+  // Versuche File System Access API, Fallback auf Input
+  if (window.showOpenFilePicker) {
+    window.showOpenFilePicker({ types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }] })
+      .then(([fh]) => fh.getFile())
+      .then(f => f.text())
+      .then(text => processSourceJSON(typ, text, ''))
+      .catch(e => { if (e.name !== 'AbortError') showToast('Fehler beim Laden'); });
+  } else {
+    const input = document.getElementById('file-input-' + typ);
+    input.onchange = (ev) => {
+      const f = ev.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = (e) => processSourceJSON(typ, e.target.result, f.name);
+      reader.readAsText(f);
+      input.value = '';
+    };
+    input.click();
+  }
+}
+
+function processSourceJSON(typ, text, dateiname) {
+  try {
+    // BOM entfernen
+    const clean = text.replace(/^\uFEFF/, '');
+    const data = JSON.parse(clean);
+    if (!data.aufgaben || !Array.isArray(data.aufgaben)) {
+      showToast('⚠️ Ungültiges Backlog-Format');
+      return;
+    }
+    state.quellen[typ] = { dateiname: dateiname || typ + '.json', daten: data };
+    document.getElementById('badge-' + typ).style.display = '';
+    showToast(typ === 'work' ? '✓ Beruflich geladen' : '✓ Privat geladen');
+    renderMorgenList();
+  } catch(e) {
+    showToast('⚠️ JSON konnte nicht gelesen werden');
+    console.error(e);
+  }
+}
+
+function setFilter(f) {
+  state.morgenFilter = f;
+  document.querySelectorAll('.filter-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.filter === f);
+  });
+  renderMorgenList();
+}
+
+function getAlleAufgaben() {
+  const result = [];
+  const heute = todayISO();
+
+  ['work', 'priv'].forEach(typ => {
+    if (!state.quellen[typ]) return;
+    const data = state.quellen[typ].daten;
+
+    // Plan-Aufgaben-IDs sammeln
+    const planAufgabeMap = {};  // aufgabeId -> planTitel
+    if (data.plaene) {
+      data.plaene.forEach(p => {
+        p.schritte.forEach(s => {
+          if (s.aufgabeId) planAufgabeMap[s.aufgabeId] = p.titel;
+        });
+      });
+    }
+
+    data.aufgaben.forEach(a => {
+      if (a.erledigt) return;
+      // Wiedervorlage prüfen
+      if (a.anzeigedatum && a.anzeigedatum > heute) return;
+
+      result.push({
+        refId: a.id,
+        quelle: typ,
+        titel: a.titel,
+        prioritaet: a.prioritaet || 'mittel',
+        faellig: a.faellig || null,
+        wiederholung: a.wiederholung || null,
+        planTitel: planAufgabeMap[a.id] || null,
+        planId: null,
+        bereichId: a.bereichId || null
+      });
+    });
+  });
+
+  return result;
+}
+
+function filteredAufgaben() {
+  const alle = getAlleAufgaben();
+  const heute = todayISO();
+  switch(state.morgenFilter) {
+    case 'faellig':
+      return alle.filter(a => a.faellig && a.faellig <= heute);
+    case 'plaene':
+      return alle.filter(a => a.planTitel);
+    case 'wiederkehrend':
+      return alle.filter(a => a.wiederholung);
+    default:
+      return alle;
+  }
+}
+
+function renderMorgenList() {
+  const list = document.getElementById('morgen-list');
+  const aufgaben = filteredAufgaben();
+  const heute = todayISO();
+
+  if (aufgaben.length === 0) {
+    list.innerHTML = `<div class="morgen-empty">
+      <div style="font-size:32px;">📋</div>
+      <div>${state.quellen.work || state.quellen.priv ? 'Keine Aufgaben für diesen Filter' : 'Lade eine Backlog-JSON um Aufgaben auszuwählen'}</div>
+    </div>`;
+    updateMorgenCount();
+    return;
+  }
+
+  list.innerHTML = aufgaben.map((a, i) => {
+    const selIdx = state.morgenAusgewaehlt.findIndex(x => x.refId === a.refId && x.quelle === a.quelle);
+    const isSel = selIdx >= 0;
+    const faelligHeute = a.faellig && a.faellig <= heute;
+
+    let metaHtml = '';
+    if (a.quelle === 'work') metaHtml += `<span class="pm pm-w">Beruflich</span>`;
+    else                     metaHtml += `<span class="pm pm-p">Privat</span>`;
+    if (a.planTitel)         metaHtml += `<span class="pm pm-pl">${escHtml(a.planTitel)}</span>`;
+    if (faelligHeute)        metaHtml += `<span class="pm pm-du">fällig heute</span>`;
+    else if (a.faellig)      metaHtml += `<span class="pm pm-du">fällig ${a.faellig}</span>`;
+    if (a.wiederholung)      metaHtml += `<span class="pm pm-rc">${escHtml(a.wiederholung)}</span>`;
+
+    return `<div class="pick-item${isSel ? ' selected' : ''}" onclick="toggleAuswahl(${i})">
+      <div class="pick-cb${isSel ? ' on' : ''}">
+        ${isSel ? '✓' : ''}
+      </div>
+      <div class="pick-main">
+        <div class="pick-title">${escHtml(a.titel)}</div>
+        <div class="pick-meta">${metaHtml}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  updateMorgenCount();
+}
+
+function toggleAuswahl(idx) {
+  const aufgaben = filteredAufgaben();
+  const a = aufgaben[idx];
+  if (!a) return;
+  const key = a.refId + '|' + a.quelle;
+  const existing = state.morgenAusgewaehlt.findIndex(x => x.refId === a.refId && x.quelle === a.quelle);
+  if (existing >= 0) {
+    state.morgenAusgewaehlt.splice(existing, 1);
+  } else {
+    state.morgenAusgewaehlt.push(a);
+  }
+  renderMorgenList();
+}
+
+function updateMorgenCount() {
+  const el = document.getElementById('morgen-count');
+  const n = state.morgenAusgewaehlt.length;
+  el.textContent = n === 0
+    ? 'Keine Aufgaben ausgewählt'
+    : `${n} Aufgabe${n === 1 ? '' : 'n'} ausgewählt · tippe zum Auswählen`;
+}
+
+// ═══════════════════════════════════════════════════
+// TAGESZETTEL GENERIEREN
+// ═══════════════════════════════════════════════════
+function generateZettel() {
+  const heute = todayISO();
+  let eintraege = [];
+  let reihenfolge = 0;
+
+  state.morgenAusgewaehlt.forEach(a => {
+    eintraege.push({
+      id: genId(),
+      typ: 'aufgabe',
+      text: a.titel,
+      erledigt: false,
+      zusatz: '',
+      quelle: a.quelle,
+      refId: a.refId,
+      planId: a.planId,
+      planTitel: a.planTitel,
+      miniplanId: null,
+      abschnitt: 'aufgaben',
+      reihenfolge: reihenfolge++,
+      transferiert: false,
+      transferAktion: null
+    });
+  });
+
+  const zettel = {
+    id: genId(),
+    datum: heute,
+    status: 'aktiv',
+    eintraege: eintraege,
+    quellen: {
+      work: state.quellen.work ? { dateiname: state.quellen.work.dateiname, daten: state.quellen.work.daten } : null,
+      priv: state.quellen.priv ? { dateiname: state.quellen.priv.dateiname, daten: state.quellen.priv.daten } : null
+    },
+    erstelltAm: new Date().toISOString(),
+    uebertragAm: null
+  };
+
+  DB.tageszettel.push(zettel);
+  saveDB();
+
+  state.activeZettelId = zettel.id;
+  showToast('✓ Tageszettel generiert');
+  renderZettel();
+  showScreen('zettel');
+  setBadge('aktiv', 'badge-active');
+}
+
+// ═══════════════════════════════════════════════════
+// TAGESZETTEL RENDERN
+// ═══════════════════════════════════════════════════
+function getAktuellerZettel() {
+  return DB.tageszettel.find(z => z.id === state.activeZettelId) || null;
+}
+
+function openZettel(id) {
+  state.activeZettelId = id;
+  renderZettel();
+  showScreen('zettel');
+  setBadge('aktiv', 'badge-active');
+}
+
+function renderZettel() {
+  const zettel = getAktuellerZettel();
+  if (!zettel) { renderStartScreen(); return; }
+
+  const abschnitte = ['aufgaben', 'termine', 'tagesueber', 'notizen'];
+  const abschnittLabels = {
+    aufgaben: 'Aufgaben',
+    termine: 'Termine',
+    tagesueber: 'Tagsüber',
+    notizen: 'Notizen'
+  };
+
+  let html = '';
+
+  // Erinnerungs-Sektion: Termine mit erinnerungAktiv=true ganz oben
+  const erinnerungen = zettel.eintraege.filter(e =>
+    e.terminDaten && e.terminDaten.erinnerungAktiv && !e.erledigt
+  ).sort((a, b) => (a.terminDaten.erinnerung || '').localeCompare(b.terminDaten.erinnerung || ''));
+
+  if (erinnerungen.length > 0) {
+    html += `<div class="p-section-heute">
+      <div class="p-section-heute-title">Heute</div>`;
+    erinnerungen.forEach(e => {
+      const td = e.terminDaten;
+      html += `<div class="erinnerung-item">
+        <div class="p-cb${e.erledigt ? ' done' : ''}" onclick="toggleEintrag('${e.id}');renderZettel();" style="flex-shrink:0;margin-top:0;">${e.erledigt ? '✓' : ''}</div>
+        <span class="erinnerung-zeit">${escHtml(td.erinnerung || td.start || '')}</span>
+        <span class="erinnerung-text${e.erledigt ? ' done' : ''}">${escHtml(e.text)}${td.ort ? ' <span style=\"color:#8a7a68;font-size:13px;font-family:sans-serif;\">('+escHtml(td.ort)+')</span>' : ''}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  abschnitte.forEach(abschnitt => {
+    const alleImAbschnitt = zettel.eintraege
+      .filter(e => e.abschnitt === abschnitt)
+      .sort((a, b) => a.reihenfolge - b.reihenfolge);
+
+    if (abschnitt === 'tagesueber' && alleImAbschnitt.length === 0) return;
+    if (abschnitt === 'notizen' && alleImAbschnitt.length === 0) return;
+
+    html += `<div class="p-section-head">${abschnittLabels[abschnitt]}</div>`;
+
+    // Plan-bewusste Ausgabe: Schritte direkt nach Plan-Zeile
+    // Gruppen: [plan, schritt, schritt, ..., normale aufgabe, ...]
+    const ausgegeben = new Set();
+    alleImAbschnitt.forEach((e, i) => {
+      if (ausgegeben.has(e.id)) return;
+      ausgegeben.add(e.id);
+      html += renderZettelRow(e, abschnitt, i);
+
+      // Wenn es ein Plan ist: Schritte direkt danach ausgeben
+      if (e.istPlan && e.planId) {
+        const schritte = alleImAbschnitt.filter(s => s.istSchritt && s.planId === e.planId);
+        schritte.forEach((s, si) => {
+          ausgegeben.add(s.id);
+          html += renderZettelRow(s, abschnitt, si);
+        });
+        // Schritt-hinzufügen: über Plan-Editor
+      }
+    });
+  });
+
+  // Leere Eingabezeile
+  html += `<div class="p-row empty">
+    <div class="p-handle" style="opacity:0.2">⠿</div>
+    <div class="p-left">
+      <div class="p-line1">
+        <div class="p-cb"></div>
+        <div class="p-text" onclick="addEntry('aufgabe')" style="cursor:pointer;">Neuer Eintrag …</div>
+      </div>
+    </div>
+    <div class="p-right"></div>
+  </div>`;
+
+  document.getElementById('paper-rows').innerHTML = html;
+  updateZettelToolbar();
+
+  // Langer Druck für Touch-Geräte auf jede Zeile
+  document.querySelectorAll('.p-left[id^="left-"]').forEach(el => {
+    const id = el.id.replace('left-', '');
+    setupLongPress(el, id);
+  });
+}
+
+function renderZettelRow(e, abschnitt, i) {
+  const istNotiz  = e.typ === 'notiz';
+  const istPlan   = e.istPlan === true;
+  const istSchritt= e.istSchritt === true;
+
+  // Checkbox: Notiz=Quadrat, Plan=kein Element (padding übernimmt Positionierung), Aufgabe=Kästchen
+  let cbHtml = '';
+  if (istNotiz) {
+    cbHtml = `<div class="p-notiz-dash">■</div>`;
+  } else if (istPlan) {
+    cbHtml = ''; // kein Platzhalter – p-left padding übernimmt Ausrichtung
+  } else {
+    cbHtml = `<div class="p-cb${e.erledigt ? ' done' : ''}" onclick="toggleEintrag('${e.id}')">${e.erledigt ? '✓' : ''}</div>`;
+  }
+
+  // Text-Klasse
+  let textClass = istPlan ? 'p-plan-titel' : 'p-text';
+  if (e.erledigt) textClass += ' done';
+  if (istNotiz)   textClass += ' notiz';
+
+  // Rechte Spalte: Kennzeichen + Plan-Pill (nur Einzelaufgabe mit Plan)
+  let pillsHtml = '';
+  if (!istPlan && !istSchritt && e.planTitel) {
+    pillsHtml += `<span class="p-pill pp-pl">${escHtml(e.planTitel)}</span>`;
+  }
+  const kz = e.kennzeichen || {};
+  if (kz.urgent)  pillsHtml += `<span class="p-sig ps-urgent">!</span>`;
+  if (kz.unclear) pillsHtml += `<span class="p-sig ps-unclear">?</span>`;
+  if (kz.idea)    pillsHtml += `<span class="p-sig ps-idea">💡</span>`;
+  if (e.groesse)  pillsHtml += `<span class="p-sig ps-size">${escHtml(e.groesse)}</span>`;
+  if (e.deadline) pillsHtml += `<span class="p-sig ps-deadline">⚑${formatDeadlineShort(e.deadline)}</span>`;
+
+  // Freitext-Zusatz (nicht bei Plan-Hauptzeile)
+  // Schritte: kein leerer Platzhalter (würde Leerzeile erzeugen)
+  let zusatzHtml = '';
+  if (!istPlan) {
+    const subIndent = istSchritt ? '36px' : '30px';
+    if (e.zusatz) {
+      zusatzHtml = `<div class="p-sub" onclick="editZusatz('${e.id}')" style="cursor:text;padding-left:${subIndent};">${escHtml(e.zusatz)}</div>`;
+    } else if (!istSchritt) {
+      zusatzHtml = `<div class="p-sub-placeholder" onclick="editZusatz('${e.id}')" style="cursor:text;min-height:20px;color:#c8c0b8;font-size:16px;padding-left:${subIndent};font-family:'Kalam','Georgia',cursive;"></div>`;
+    }
+  }
+
+  // Termin-Prefix / Suffix
+  let terminTextPrefix = '';
+  let terminTextSuffix = '';
+  if (e.terminDaten) {
+    const td = e.terminDaten;
+    if (td.start) terminTextPrefix = td.start + (td.ende ? ' – ' + td.ende : '') + ': ';
+    if (td.ort)   terminTextSuffix = ' (' + escHtml(td.ort) + ')';
+  }
+
+  // Delete-Button (nur Edit-Modus, via CSS)
+  const deleteBtn = `<button class="p-delete-btn" onclick="deleteEintrag('${e.id}')">×</button>`;
+
+  // Plan-Edit-Button: auf Plan-Zeile → öffnet Plan-Editor
+  //                   auf Einzelaufgabe → öffnet Hochstufen-Dialog
+  //                   auf Schritt → kein Button (Schritt über Plan editieren)
+  let planEditBtn = '';
+  if (istPlan) {
+    planEditBtn = `<button class="plan-edit-btn" onclick="openPlanEditor('${e.planId}')">✎ Plan</button>`;
+  } else if (!istSchritt && e.typ === 'aufgabe') {
+    planEditBtn = `<button class="plan-edit-btn" onclick="openPlanEditor(null,'${e.id}')">→ Plan</button>`;
+  }
+
+  // Row-Klassen
+  let rowClass = 'p-row';
+  if (istPlan)    rowClass += ' ist-plan';
+  if (istSchritt) rowClass += ' ist-schritt';
+
+  // Schritte sind nicht einzeln verschiebbar (nur via Plan-Editor)
+  const draggableAttr = istSchritt ? 'draggable="false"' : 'draggable="true"';
+  const dragHandlers = istSchritt ? '' : `
+    ondragstart="onDragStart(event,'${e.id}','${abschnitt}')"
+    ondragover="onDragOver(event)"
+    ondrop="onDrop(event,'${e.id}','${abschnitt}')"
+    ondragend="onDragEnd(event)"
+    ondragleave="onDragLeave(event)"`;
+
+  return `<div class="${rowClass}" data-id="${e.id}" data-abschnitt="${abschnitt}"
+    ${draggableAttr}${dragHandlers}>
+    ${deleteBtn}
+    <div class="p-handle" style="${istSchritt ? 'cursor:default;opacity:0.2;' : ''}">⠿</div>
+    <div class="p-left" oncontextmenu="return onContextMenu(event,'${e.id}')" id="left-${e.id}"
+         onclick="if(state.editMode && !event.target.closest('button')){ openEditModal('${e.id}'); }">
+      <div class="p-line1">
+        ${cbHtml}
+        <div class="${textClass}"><span class="termin-prefix">${terminTextPrefix}</span>${escHtml(e.text)}<span class="termin-suffix">${terminTextSuffix}</span></div>
+        ${planEditBtn}
+      </div>
+      ${zusatzHtml}
+    </div>
+    <div class="p-right">${pillsHtml}</div>
+  </div>`;
+}
+
+function updateZettelToolbar() {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+  const aufgaben = zettel.eintraege.filter(e => e.typ !== 'notiz');
+  const done = aufgaben.filter(e => e.erledigt).length;
+  const total = aufgaben.length;
+  const el = document.getElementById('tb-progress');
+  if (el) el.textContent = `☑ ${done}/${total}`;
+}
+
+function toggleEintrag(id) {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+  const e = zettel.eintraege.find(x => x.id === id);
+  if (!e) return;
+  e.erledigt = !e.erledigt;
+  // Plan: alle Schritte mittogglen
+  if (e.istPlan && e.planId) {
+    zettel.eintraege.filter(s => s.istSchritt && s.planId === e.planId)
+      .forEach(s => { s.erledigt = e.erledigt; });
+  }
+  saveDB();
+  renderZettel();
+}
+
+function showProgress() {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+  const aufgaben = zettel.eintraege.filter(e => e.typ !== 'notiz');
+  const done = aufgaben.filter(e => e.erledigt).length;
+  showToast(`${done} von ${aufgaben.length} erledigt`);
+}
+
+// ═══════════════════════════════════════════════════
+// EINTRAG HINZUFÜGEN (Modal)
+// ═══════════════════════════════════════════════════
+function addEntry(typ) {
+  const labels = { aufgabe: 'Neue Aufgabe', termin: 'Neuer Termin', notiz: 'Neue Notiz', miniplan: 'Mini-Plan Schritt' };
+  const abschnittMap = { aufgabe: 'tagesueber', termin: 'termine', notiz: 'notizen', miniplan: 'tagesueber' };
+
+  const istTermin = typ === 'termin';
+  const istNotiz  = typ === 'notiz';
+  const istPlan   = typ === 'miniplan';
+
+  const sheet = document.getElementById('modal-sheet');
+  sheet.innerHTML = `
+    <div class="modal-title">${labels[typ] || 'Neuer Eintrag'}</div>
+    <div>
+      <div class="modal-label">${istTermin ? 'Termin-Titel' : 'Text'}</div>
+      <textarea class="modal-input" id="modal-text" rows="2"
+        placeholder="${istNotiz ? 'Notiz …' : istTermin ? 'z.B. Jour Fixe Team' : 'Aufgabe …'}"></textarea>
+    </div>
+
+    ${istTermin ? `
+    <div class="modal-row">
+      <div style="flex:1;">
+        <div class="modal-label">Start</div>
+        <input class="modal-input" id="modal-start" type="time" placeholder="09:00">
+      </div>
+      <div style="flex:1;">
+        <div class="modal-label">Ende</div>
+        <input class="modal-input" id="modal-ende" type="time" placeholder="10:00">
+      </div>
+    </div>
+    <div>
+      <div class="modal-label">Ort (optional)</div>
+      <input class="modal-input" id="modal-ort" placeholder="Raum, Adresse …">
+    </div>
+    <div class="modal-row" style="align-items:center;gap:10px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#4a3820;">
+        <input type="checkbox" id="modal-erinnerung-aktiv" onchange="toggleErinnerungZeit()" style="width:16px;height:16px;">
+        Erinnerung anzeigen
+      </label>
+      <input class="modal-input" id="modal-erinnerung" type="time"
+        style="flex:1;display:none;" placeholder="08:45">
+    </div>` : ''}
+
+    ${!istTermin && !istNotiz ? `
+    <div>
+      <div class="modal-label">Kennzeichen</div>
+      <div class="sig-row">
+        <button class="sig-picker-btn urgent" id="sig-urgent" onclick="toggleSig('urgent')">❗ Dringend</button>
+        <button class="sig-picker-btn unclear" id="sig-unclear" onclick="toggleSig('unclear')">❓ Unklar</button>
+        <button class="sig-picker-btn idea"   id="sig-idea"   onclick="toggleSig('idea')">💡 Idee</button>
+      </div>
+    </div>
+    <div class="modal-row">
+      <div style="flex:1;">
+        <div class="modal-label">Größe</div>
+        <div class="size-picker">
+          <button class="size-btn" id="size-S" onclick="toggleSize('S')">S</button>
+          <button class="size-btn" id="size-M" onclick="toggleSize('M')">M</button>
+          <button class="size-btn" id="size-L" onclick="toggleSize('L')">L</button>
+        </div>
+      </div>
+      <div style="flex:1;">
+        <div class="modal-label">Deadline</div>
+        <input class="modal-input" id="modal-deadline" type="date">
+      </div>
+    </div>` : ''}
+
+    ${istPlan ? `
+    <div>
+      <div class="modal-label">Plan-Name</div>
+      <input class="modal-input" id="modal-planname" placeholder="z.B. Angebot XY">
+    </div>` : ''}
+
+    <div>
+      <div class="modal-label">Freitext darunter (optional)</div>
+      <input class="modal-input" id="modal-zusatz" placeholder="Ergänzung …">
+    </div>
+
+    <div class="modal-row">
+      <button class="btn-secondary w-full" onclick="closeModal()">Abbrechen</button>
+      <button class="btn-primary w-full" onclick="saveNewEntry('${typ}','${abschnittMap[typ]}')">Hinzufügen</button>
+    </div>`;
+  openModal();
+  setTimeout(() => document.getElementById('modal-text').focus(), 100);
+}
+
+function saveNewEntry(typ, abschnitt) {
+  const text = (document.getElementById('modal-text').value || '').trim();
+  if (!text) { showToast('Bitte Text eingeben'); return; }
+
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+
+  const zusatz = (document.getElementById('modal-zusatz')?.value || '').trim();
+  const planname = (document.getElementById('modal-planname')?.value || '').trim();
+
+  const existingInAbschnitt = zettel.eintraege.filter(e => e.abschnitt === abschnitt);
+  const maxReihenfolge = existingInAbschnitt.length > 0
+    ? Math.max(...existingInAbschnitt.map(e => e.reihenfolge)) + 1
+    : 0;
+
+  const eintrag = {
+    id: genId(),
+    typ: typ === 'miniplan' ? 'aufgabe' : typ,
+    text: text,
+    erledigt: false,
+    zusatz: zusatz,
+    quelle: 'frei',
+    refId: null,
+    planId: null,
+    planTitel: planname || null,
+    miniplanId: planname ? genId() : null,
+    istPlan: false,
+    istSchritt: false,
+    abschnitt: abschnitt,
+    reihenfolge: maxReihenfolge,
+    transferiert: false,
+    transferAktion: null,
+    kennzeichen: leseKennzeichen(),
+    groesse: leseGroesse(),
+    deadline: (document.getElementById('modal-deadline')?.value || '') || null,
+    terminDaten: typ === 'termin' ? leseTerminDaten() : null
+  };
+
+  zettel.eintraege.push(eintrag);
+  saveDB();
+  closeModal();
+  renderZettel();
+}
+
+function editEintrag(id) {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+  const e = zettel.eintraege.find(x => x.id === id);
+  if (!e) return;
+
+  const sheet = document.getElementById('modal-sheet');
+  sheet.innerHTML = `
+    <div class="modal-title">Eintrag bearbeiten</div>
+    <div>
+      <div class="modal-label">Text</div>
+      <textarea class="modal-input" id="modal-text" rows="3">${escHtml(e.text)}</textarea>
+    </div>
+    <div>
+      <div class="modal-label">Zusatz</div>
+      <input class="modal-input" id="modal-zusatz" value="${escHtml(e.zusatz || '')}">
+    </div>
+    <div class="modal-row">
+      <button class="btn-danger w-full" onclick="deleteEintrag('${id}')">Löschen</button>
+      <button class="btn-primary w-full" onclick="saveEditEintrag('${id}')">Speichern</button>
+    </div>`;
+  openModal();
+}
+
+function saveEditEintrag(id) {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+  const e = zettel.eintraege.find(x => x.id === id);
+  if (!e) return;
+  const text = (document.getElementById('modal-text').value || '').trim();
+  if (!text) { showToast('Bitte Text eingeben'); return; }
+  e.text = text;
+  e.zusatz = (document.getElementById('modal-zusatz')?.value || '').trim();
+  // Kennzeichen + Größe + Deadline
+  if (e.typ !== 'termin' && e.typ !== 'notiz') {
+    e.kennzeichen = leseKennzeichen();
+    e.groesse = leseGroesse();
+    e.deadline = (document.getElementById('modal-deadline')?.value || '') || null;
+  }
+  // Termin-Daten
+  if (e.typ === 'termin') {
+    e.terminDaten = leseTerminDaten();
+  }
+  saveDB();
+  closeModal();
+  renderZettel();
+}
+
+function deleteEintrag(id) {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+  zettel.eintraege = zettel.eintraege.filter(e => e.id !== id);
+  saveDB();
+  closeModal();
+  renderZettel();
+}
+
+// ═══════════════════════════════════════════════════
+// DRAG & DROP – Plan-Block-aware
+// Schritte: NICHT draggable
+// Plan-Titel: zieht ganzen Block (Titel + alle Schritte)
+// Normale Aufgaben: wie bisher
+// ═══════════════════════════════════════════════════
+function onDragStart(event, id, abschnitt) {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+  const e = zettel.eintraege.find(x => x.id === id);
+  if (!e) return;
+
+  // Schritte sind nicht einzeln verschiebbar
+  if (e.istSchritt) { event.preventDefault(); return; }
+
+  state.dragSrcId = id;
+  state.dragSrcAbschnitt = abschnitt;
+  // Merken ob es ein Plan ist (dann ganzen Block verschieben)
+  state.dragSrcIstPlan = e.istPlan === true;
+  state.dragSrcPlanId  = e.planId || null;
+  event.dataTransfer.effectAllowed = 'move';
+  event.currentTarget.classList.add('dragging');
+}
+
+function onDragOver(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  const row = event.currentTarget;
+  // Schritte als Drop-Ziel ablehnen (kein Einfügen zwischen Schritte)
+  if (row.classList.contains('ist-schritt')) return;
+  const rect = row.getBoundingClientRect();
+  const midY = rect.top + rect.height / 2;
+  row.classList.remove('drag-over-top', 'drag-over-bottom');
+  if (event.clientY < midY) row.classList.add('drag-over-top');
+  else row.classList.add('drag-over-bottom');
+}
+
+function onDragLeave(event) {
+  event.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+}
+
+function onDrop(event, targetId, targetAbschnitt) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+
+  const zettel = getAktuellerZettel();
+  if (!zettel || state.dragSrcId === targetId) return;
+
+  const srcEntry = zettel.eintraege.find(e => e.id === state.dragSrcId);
+  if (!srcEntry) return;
+
+  // Drop auf Schritt → ablehnen
+  const targetEntry = zettel.eintraege.find(e => e.id === targetId);
+  if (targetEntry && targetEntry.istSchritt) return;
+
+  const row = event.currentTarget;
+  const rect = row.getBoundingClientRect();
+  const insertBefore = event.clientY < rect.top + rect.height / 2;
+
+  // Einträge im Abschnitt sortiert – ohne Schritte (die hängen am Plan)
+  const abschnittEintraege = zettel.eintraege
+    .filter(e => e.abschnitt === targetAbschnitt && !e.istSchritt)
+    .sort((a, b) => a.reihenfolge - b.reihenfolge);
+
+  const targetIdx = abschnittEintraege.findIndex(e => e.id === targetId);
+  const srcIdx    = abschnittEintraege.findIndex(e => e.id === state.dragSrcId);
+  if (srcIdx < 0 || targetIdx < 0) return;
+
+  // Src aus Liste entfernen
+  abschnittEintraege.splice(srcIdx, 1);
+  const insertIdx = abschnittEintraege.findIndex(e => e.id === targetId);
+  abschnittEintraege.splice(insertBefore ? insertIdx : insertIdx + 1, 0, srcEntry);
+
+  // Reihenfolge der Nicht-Schritte neu setzen
+  abschnittEintraege.forEach((e, i) => { e.reihenfolge = i * 10; });
+
+  // Schritte direkt nach ihrem Plan einordnen
+  if (state.dragSrcIstPlan && state.dragSrcPlanId) {
+    const planReihenfolge = srcEntry.reihenfolge;
+    zettel.eintraege
+      .filter(e => e.istSchritt && e.planId === state.dragSrcPlanId)
+      .forEach((s, si) => { s.reihenfolge = planReihenfolge + si + 1; });
+  }
+
+  // Alle Schritte aller Pläne neu nach ihrem Plan-Titel einordnen
+  zettel.eintraege
+    .filter(e => e.istPlan && e.planId)
+    .forEach(plan => {
+      zettel.eintraege
+        .filter(s => s.istSchritt && s.planId === plan.planId)
+        .sort((a, b) => a.reihenfolge - b.reihenfolge)
+        .forEach((s, si) => { s.reihenfolge = plan.reihenfolge + 0.1 + si * 0.01; });
+    });
+
+  saveDB();
+  renderZettel();
+}
+
+function onDragEnd(event) {
+  event.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.p-row').forEach(r => r.classList.remove('drag-over-top', 'drag-over-bottom'));
+  state.dragSrcIstPlan = false;
+  state.dragSrcPlanId  = null;
+}
+
+// ═══════════════════════════════════════════════════
+// TRANSFER / RE-IMPORT
+// ═══════════════════════════════════════════════════
+function openTransfer(id) {
+  state.activeZettelId = id;
+  renderTransfer();
+  showScreen('transfer');
+  setBadge('transfer', 'badge-transfer');
+}
+
+function renderTransfer() {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+
+  const eintraege = zettel.eintraege;
+  const total = eintraege.length;
+  const entschieden = eintraege.filter(e => e.transferiert).length;
+  const pct = total > 0 ? Math.round(entschieden / total * 100) : 0;
+
+  document.getElementById('transfer-lbl').textContent = `${entschieden} von ${total} entschieden`;
+  document.getElementById('transfer-pct').textContent = pct + '%';
+  document.getElementById('transfer-fill').style.width = pct + '%';
+
+  const list = document.getElementById('transfer-list');
+
+  // Gruppierung: Referenz-Aufgaben, Plan-Blöcke, Freie Einträge
+  const refAufgaben    = eintraege.filter(e => e.refId && !e.istSchritt && !e.istPlan && e.typ !== 'notiz');
+  const freieEintraege = eintraege.filter(e => !e.refId && !e.istSchritt && !e.istPlan && e.typ !== 'notiz' && e.quelle === 'frei');
+  const planBloecke    = eintraege.filter(e => e.istPlan);
+
+  // Mini-Pläne (alter miniplanId-Weg, Kompatibilität)
+  const miniplanMap = {};
+  eintraege.filter(e => e.miniplanId).forEach(e => {
+    if (!miniplanMap[e.miniplanId]) miniplanMap[e.miniplanId] = { titel: e.planTitel, schritte: [] };
+    miniplanMap[e.miniplanId].schritte.push(e);
+  });
+
+  let html = '';
+
+  // Referenz-Aufgaben
+  refAufgaben.forEach(e => {
+    const cls = e.transferiert ? (e.erledigt ? 'ri-done' : 'ri-open') : '';
+    const statBadge = e.erledigt
+      ? `<span class="ri-stat rs-done">Erledigt</span>`
+      : `<span class="ri-stat rs-open">Offen</span>`;
+    const qTyp = e.quelle === 'work' ? 'Beruflich' : 'Privat';
+    const planInfo = e.planTitel ? ` · Plan: ${escHtml(e.planTitel)}` : '';
+
+    let aktionen = '';
+    if (e.erledigt) {
+      aktionen = `<button class="ri-btn rb-ok" onclick="transferAktion('${e.id}','erledigt')">Als erledigt übertragen</button>
+                  <button class="ri-btn rb-sec" onclick="transferAktion('${e.id}','ueberspringen')">Überspringen</button>`;
+    } else {
+      aktionen = `<button class="ri-btn rb-sec" onclick="transferAktion('${e.id}','offen')">Bleibt offen</button>
+                  <button class="ri-btn rb-del" onclick="transferAktion('${e.id}','verwerfen')">Verwerfen</button>`;
+    }
+
+    html += `<div class="ri ${cls}" id="ri-${e.id}">
+      <div class="ri-top">
+        <div class="ri-ico">${e.erledigt ? '✅' : '⏳'}</div>
+        <div class="ri-inf">
+          <div class="ri-tit">${escHtml(e.text)}</div>
+          <div class="ri-sub">Referenz-Aufgabe · ${qTyp}${planInfo}</div>
+        </div>
+        ${statBadge}
+      </div>
+      <div class="ri-acts">${aktionen}</div>
+    </div>`;
+  });
+
+  // Plan-Blöcke (istPlan=true, neu erstellt auf dem Zettel)
+  planBloecke.forEach(plan => {
+    const schritte = eintraege
+      .filter(s => s.istSchritt && s.planId === plan.planId)
+      .sort((a, b) => a.reihenfolge - b.reihenfolge);
+    const done  = schritte.filter(s => s.erledigt).length;
+    const total = schritte.length;
+    const allTransferred = plan.transferiert;
+
+    const stepsHtml = schritte.map(s => `
+      <div class="ri-step">
+        <span style="color:${s.erledigt ? 'var(--color-done)' : 'var(--color-danger)'};">${s.erledigt ? '✓' : '○'}</span>
+        ${escHtml(s.text)}
+        <span class="ri-sb ${s.erledigt ? 'rsb-d' : 'rsb-o'}">${s.erledigt ? 'erledigt' : 'offen'}</span>
+      </div>`).join('');
+
+    html += `<div class="ri ri-free" id="ri-plan-${plan.id}">
+      <div class="ri-top">
+        <div class="ri-ico">📋</div>
+        <div class="ri-inf">
+          <div class="ri-tit">${escHtml(plan.text)}</div>
+          <div class="ri-sub">Plan · ${done} von ${total} erledigt → wird in Inbox angelegt</div>
+        </div>
+        ${allTransferred ? '<span class="ri-stat rs-done">✓</span>' : ''}
+      </div>
+      ${total > 0 ? `<div class="ri-steps">${stepsHtml}</div>` : ''}
+      <div class="ri-acts">
+        <button class="ri-btn rb-ok" onclick="transferAktion('${plan.id}','plan-anlegen')">In Delta aufnehmen</button>
+        <button class="ri-btn rb-del" onclick="transferAktion('${plan.id}','verwerfen')">Verwerfen</button>
+      </div>
+    </div>`;
+  });
+
+  // Mini-Pläne (alter miniplanId-Weg, Kompatibilität)
+  Object.entries(miniplanMap).forEach(([mpId, mp]) => {
+    const done = mp.schritte.filter(s => s.erledigt).length;
+    const total = mp.schritte.length;
+    const stepsHtml = mp.schritte.map(s => `
+      <div class="ri-step">
+        <span style="color:${s.erledigt ? 'var(--color-done)' : 'var(--color-danger)'};">${s.erledigt ? '✓' : '○'}</span>
+        ${escHtml(s.text)}
+        <span class="ri-sb ${s.erledigt ? 'rsb-d' : 'rsb-o'}">${s.erledigt ? 'erledigt' : 'offen'}</span>
+      </div>`).join('');
+
+    html += `<div class="ri ri-free" id="ri-mp-${mpId}">
+      <div class="ri-top">
+        <div class="ri-ico">📋</div>
+        <div class="ri-inf">
+          <div class="ri-tit">Plan: ${escHtml(mp.titel || 'Unbenannt')}</div>
+          <div class="ri-sub">Tagsüber erstellt · ${done} erledigt · ${total - done} offen</div>
+        </div>
+      </div>
+      <div class="ri-steps">${stepsHtml}</div>
+      <div class="ri-acts">
+        <button class="ri-btn rb-ok" onclick="transferMiniplan('${mpId}','plan-anlegen')">In Delta aufnehmen</button>
+        <button class="ri-btn rb-sec" onclick="transferMiniplan('${mpId}','text')">Nur Text</button>
+      </div>
+    </div>`;
+  });
+
+  // Freie Einträge → landen in Inbox
+  freieEintraege.forEach(e => {
+    const cls = e.transferiert ? 'ri-done' : '';
+    html += `<div class="ri ${cls}" id="ri-${e.id}">
+      <div class="ri-top">
+        <div class="ri-ico">${e.erledigt ? '✅' : '📝'}</div>
+        <div class="ri-inf">
+          <div class="ri-tit">${escHtml(e.text)}</div>
+          <div class="ri-sub">Freier Eintrag · ${e.erledigt ? 'erledigt' : 'offen'} · → Inbox</div>
+        </div>
+        ${e.erledigt ? '<span class="ri-stat rs-done">Erledigt</span>' : '<span class="ri-stat rs-open">Offen</span>'}
+      </div>
+      <div class="ri-acts">
+        <button class="ri-btn rb-ok" onclick="transferAktion('${e.id}','aufgabe-${e.erledigt ? 'erledigt' : 'offen'}')">In Delta aufnehmen</button>
+        <button class="ri-btn rb-del" onclick="transferAktion('${e.id}','verwerfen')">Verwerfen</button>
+      </div>
+    </div>`;
+  });
+
+  if (html === '') {
+    html = `<div style="text-align:center;padding:40px;color:var(--color-muted);">Keine Einträge zum Übertragen</div>`;
+  }
+
+  list.innerHTML = html;
+}
+
+function transferAktion(id, aktion) {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+  const e = zettel.eintraege.find(x => x.id === id);
+  if (!e) return;
+  e.transferiert = true;
+  e.transferAktion = aktion;
+  saveDB();
+  renderTransfer();
+  showToast('✓ Entschieden');
+}
+
+function transferMiniplan(mpId, aktion) {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+  zettel.eintraege.filter(e => e.miniplanId === mpId).forEach(e => {
+    e.transferiert = true;
+    e.transferAktion = aktion;
+  });
+  saveDB();
+  renderTransfer();
+  if (aktion === 'verknuepfen') {
+    showToast('🔍 Verknüpfung: In nächster Version implementiert');
+  } else {
+    showToast('✓ Plan-Aktion gespeichert');
+  }
+}
+
+function finishTransfer() {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+
+  const offen = zettel.eintraege.filter(e => !e.transferiert && e.typ !== 'notiz').length;
+  if (offen > 0) {
+    if (!confirm(`Es sind noch ${offen} Einträge nicht entschieden. Trotzdem abschließen?`)) return;
+  }
+
+  // Delta generieren
+  const delta = erstelleDelta(zettel);
+
+  zettel.status = 'uebertragen';
+  zettel.uebertragAm = new Date().toISOString();
+  saveDB();
+
+  // Delta als JSON-Download anbieten
+  exportDelta(delta, zettel.datum);
+
+  state.activeZettelId = null;
+  state.quellen = { work: null, priv: null };
+  renderStartScreen();
+}
+
+function erstelleDelta(zettel) {
+  const heute = zettel.datum;
+  const delta = {
+    version: '1.0',
+    exportDatum: new Date().toISOString(),
+    zettelDatum: heute,
+    // IDs erledigter Referenz-Aufgaben (in Backlog als erledigt markieren)
+    erledigteAufgabenIds: [],
+    // IDs verworfener Referenz-Aufgaben (bleiben offen, nichts tun)
+    // Neue freie Aufgaben → Inbox
+    neueAufgaben: [],
+    // Neue Pläne (aus Plan-Editor erstellt)
+    neuePlaene: [],
+    // Plan-Schritte die erledigt wurden (Referenz-Schritte)
+    erledigtePlanSchritte: []
+  };
+
+  zettel.eintraege.forEach(e => {
+    // Erledigte Referenz-Aufgaben
+    if (e.refId && e.erledigt && e.transferAktion === 'erledigt') {
+      delta.erledigteAufgabenIds.push({
+        id: e.refId,
+        quelle: e.quelle
+      });
+    }
+
+    // Neue freie Aufgaben (nicht Notizen, nicht Schritte, keine Referenz)
+    if (!e.refId && !e.istSchritt && !e.istPlan && e.typ === 'aufgabe' && e.quelle === 'frei') {
+      if (e.transferAktion === 'aufgabe-offen' || e.transferAktion === 'aufgabe-erledigt' || !e.transferiert) {
+        delta.neueAufgaben.push({
+          titel: e.text,
+          beschreibung: e.zusatz || '',
+          erledigt: e.erledigt || e.transferAktion === 'aufgabe-erledigt',
+          prioritaet: e.groesse === 'L' ? 'hoch' : e.groesse === 'S' ? 'niedrig' : 'mittel',
+          faellig: e.deadline || null,
+          kennzeichen: e.kennzeichen || {},
+          bereich: 'inbox',
+          quelle: 'daypaper',
+          datum: heute
+        });
+      }
+    }
+
+    // Neue Pläne (istPlan, keine refId)
+    if (e.istPlan && !e.refId) {
+      const schritte = zettel.eintraege
+        .filter(s => s.istSchritt && s.planId === e.planId)
+        .sort((a, b) => a.reihenfolge - b.reihenfolge)
+        .map(s => ({
+          titel: s.text,
+          erledigt: s.erledigt,
+          refId: s.refId || null
+        }));
+
+      delta.neuePlaene.push({
+        titel: e.text,
+        quelle: e.quelle !== 'frei' ? e.quelle : null,
+        schritte: schritte,
+        datum: heute
+      });
+
+      // Referenz-Schritte die erledigt sind → als erledigt markieren
+      schritte.forEach(s => {
+        if (s.refId && s.erledigt) {
+          delta.erledigteAufgabenIds.push({ id: s.refId, quelle: e.quelle });
+        }
+      });
+    }
+  });
+
+  // Duplikate in erledigteAufgabenIds entfernen
+  const seen = new Set();
+  delta.erledigteAufgabenIds = delta.erledigteAufgabenIds.filter(x => {
+    const key = x.id + '|' + x.quelle;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return delta;
+}
+
+function exportDelta(delta, datum) {
+  // Datum für Dateiname: TTMMJJJJ
+  const d = new Date(datum + 'T00:00:00');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const jj = d.getFullYear();
+  const dateiname = `daypaper_delta_${dd}${mm}${jj}.json`;
+
+  const json = JSON.stringify(delta, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = dateiname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showToast(`✓ Delta exportiert: ${dateiname}`);
+}
+
+// ═══════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════
+function openModal() {
+  document.getElementById('modal-overlay').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('active');
+}
+
+function closeModalOnBackdrop(event) {
+  if (event.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+// ═══════════════════════════════════════════════════
+// HILFSFUNKTIONEN
+// ═══════════════════════════════════════════════════
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+
+// ═══════════════════════════════════════════════════
+// EDIT VIA RECHTSKLICK (PC) + LANGER DRUCK (Touch)
+// ═══════════════════════════════════════════════════
+let longPressTimer = null;
+let longPressTarget = null;
+
+function setupLongPress(el, id) {
+  el.addEventListener('touchstart', (ev) => {
+    longPressTarget = id;
+    longPressTimer = setTimeout(() => {
+      ev.preventDefault();
+      openEditModal(id);
+    }, 600);
+  }, { passive: false });
+  el.addEventListener('touchend', () => {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  });
+  el.addEventListener('touchmove', () => {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  });
+}
+
+function onContextMenu(event, id) {
+  event.preventDefault();
+  openEditModal(id);
+  return false;
+}
+
+function openEditModal(id) {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+  const e = zettel.eintraege.find(x => x.id === id);
+  if (!e) return;
+
+  const kz = e.kennzeichen || {};
+  const istTermin = e.typ === 'termin';
+  const istNotiz  = e.typ === 'notiz';
+  const td = e.terminDaten || {};
+
+  const sheet = document.getElementById('modal-sheet');
+  sheet.innerHTML = `
+    <div class="modal-title">Eintrag bearbeiten</div>
+    <div>
+      <div class="modal-label">Text</div>
+      <textarea class="modal-input" id="modal-text" rows="2">${escHtml(e.text)}</textarea>
+    </div>
+
+    ${istTermin ? `
+    <div class="modal-row">
+      <div style="flex:1;">
+        <div class="modal-label">Start</div>
+        <input class="modal-input" id="modal-start" type="time" value="${escHtml(td.start || '')}">
+      </div>
+      <div style="flex:1;">
+        <div class="modal-label">Ende</div>
+        <input class="modal-input" id="modal-ende" type="time" value="${escHtml(td.ende || '')}">
+      </div>
+    </div>
+    <div>
+      <div class="modal-label">Ort</div>
+      <input class="modal-input" id="modal-ort" value="${escHtml(td.ort || '')}" placeholder="Raum, Adresse …">
+    </div>
+    <div class="modal-row" style="align-items:center;gap:10px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#4a3820;">
+        <input type="checkbox" id="modal-erinnerung-aktiv" onchange="toggleErinnerungZeit()"
+          style="width:16px;height:16px;" ${td.erinnerungAktiv ? 'checked' : ''}>
+        Erinnerung anzeigen
+      </label>
+      <input class="modal-input" id="modal-erinnerung" type="time"
+        value="${escHtml(td.erinnerung || '')}"
+        style="flex:1;${td.erinnerungAktiv ? '' : 'display:none;'}">
+    </div>` : ''}
+
+    ${!istTermin && !istNotiz ? `
+    <div>
+      <div class="modal-label">Kennzeichen</div>
+      <div class="sig-row">
+        <button class="sig-picker-btn urgent ${kz.urgent ? 'on' : ''}" id="sig-urgent" onclick="toggleSig('urgent')">❗ Dringend</button>
+        <button class="sig-picker-btn unclear ${kz.unclear ? 'on' : ''}" id="sig-unclear" onclick="toggleSig('unclear')">❓ Unklar</button>
+        <button class="sig-picker-btn idea ${kz.idea ? 'on' : ''}"     id="sig-idea"   onclick="toggleSig('idea')">💡 Idee</button>
+      </div>
+    </div>
+    <div class="modal-row">
+      <div style="flex:1;">
+        <div class="modal-label">Größe</div>
+        <div class="size-picker">
+          <button class="size-btn ${e.groesse === 'S' ? 'on' : ''}" id="size-S" onclick="toggleSize('S')">S</button>
+          <button class="size-btn ${e.groesse === 'M' ? 'on' : ''}" id="size-M" onclick="toggleSize('M')">M</button>
+          <button class="size-btn ${e.groesse === 'L' ? 'on' : ''}" id="size-L" onclick="toggleSize('L')">L</button>
+        </div>
+      </div>
+      <div style="flex:1;">
+        <div class="modal-label">Deadline</div>
+        <input class="modal-input" id="modal-deadline" type="date" value="${e.deadline || ''}">
+      </div>
+    </div>` : ''}
+
+    <div>
+      <div class="modal-label">Freitext darunter</div>
+      <input class="modal-input" id="modal-zusatz" value="${escHtml(e.zusatz || '')}" placeholder="Ergänzung …">
+    </div>
+    <div class="modal-row">
+      <button class="btn-danger w-full" onclick="deleteEintrag('${e.id}')">Löschen</button>
+      <button class="btn-primary w-full" onclick="saveEditEintrag('${e.id}')">Speichern</button>
+    </div>
+    <div style="text-align:center;margin-top:4px;">
+      <button class="btn-secondary" style="width:auto;padding:6px 16px;font-size:11px;" onclick="closeModal()">Abbrechen</button>
+    </div>`;
+  openModal();
+  setTimeout(() => document.getElementById('modal-text').focus(), 100);
+}
+
+// ═══════════════════════════════════════════════════
+// ZUSATZ INLINE EDITIEREN
+// ═══════════════════════════════════════════════════
+function editZusatz(id) {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+  const e = zettel.eintraege.find(x => x.id === id);
+  if (!e) return;
+
+  const placeholder = document.querySelector(`#left-${CSS.escape(id)} .p-sub-placeholder`);
+  const existing = document.querySelector(`#left-${CSS.escape(id)} .p-sub`);
+  const target = placeholder || existing;
+  if (!target) return;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = e.zusatz || '';
+  input.placeholder = 'Ergänzung …';
+  input.style.cssText = `
+    width:100%; border:none; outline:none; background:transparent;
+    font-family:'Kalam','Georgia',cursive; font-size:16px;
+    color:#7a6858; font-style:italic; padding-left:30px;
+    border-bottom:1px dashed #c0b8b0;
+  `;
+
+  target.replaceWith(input);
+  input.focus();
+
+  function saveZusatz() {
+    e.zusatz = input.value.trim();
+    saveDB();
+    renderZettel();
+  }
+
+  input.addEventListener('blur', saveZusatz);
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); saveZusatz(); }
+    if (ev.key === 'Escape') renderZettel();
+  });
+}
+
+
+
+// ═══════════════════════════════════════════════════
+// PLAN-EDITOR MODAL
+// Öffnet für: bestehenden Plan (planId) ODER Aufgabe hochstufen (aufgabeId)
+// ═══════════════════════════════════════════════════
+
+// Temporärer State für Plan-Editor
+let planEditorState = {
+  planId: null,        // null = neuer Plan
+  aufgabeId: null,     // Aufgabe die hochgestuft wird
+  abschnitt: null,
+  schritte: []         // [{id, text, erledigt, istNeu}]
+};
+
+function openPlanEditor(planId, aufgabeId) {
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+
+  planEditorState = { planId: planId || null, aufgabeId: aufgabeId || null, abschnitt: null, schritte: [] };
+
+  let planTitel = '';
+  let modalTitel = '';
+
+  if (planId) {
+    // Bestehenden Plan bearbeiten
+    const plan = zettel.eintraege.find(e => e.planId === planId && e.istPlan);
+    if (!plan) return;
+    planTitel = plan.text;
+    modalTitel = 'Plan bearbeiten';
+    planEditorState.abschnitt = plan.abschnitt;
+    // Schritte laden
+    planEditorState.schritte = zettel.eintraege
+      .filter(e => e.planId === planId && e.istSchritt)
+      .sort((a, b) => a.reihenfolge - b.reihenfolge)
+      .map(e => ({ id: e.id, text: e.text, erledigt: e.erledigt, istNeu: false }));
+  } else if (aufgabeId) {
+    // Aufgabe hochstufen
+    const aufgabe = zettel.eintraege.find(e => e.id === aufgabeId);
+    if (!aufgabe) return;
+    planTitel = aufgabe.planTitel || '';
+    modalTitel = '→ Zu Plan erweitern';
+    planEditorState.abschnitt = aufgabe.abschnitt;
+    // Aufgabe als erster Schritt vorbelegt
+    planEditorState.schritte = [{ id: aufgabe.id, text: aufgabe.text, erledigt: aufgabe.erledigt, istNeu: false }];
+  }
+
+  renderPlanEditorModal(planTitel, modalTitel, !!planId);
+}
+
+function renderPlanEditorModal(planTitel, modalTitel, istBearbeitung) {
+  const schritteHtml = planEditorState.schritte.map((s, idx) => `
+    <div class="plan-modal-schritt" data-idx="${idx}">
+      <div class="cb-mini${s.erledigt ? ' done' : ''}" onclick="togglePlanEditorSchritt(${idx})">${s.erledigt ? '✓' : ''}</div>
+      <input type="text" value="${escHtml(s.text)}" placeholder="Schritt …"
+        oninput="planEditorState.schritte[${idx}].text = this.value"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();addPlanEditorSchritt();}">
+      <button class="del-schritt" onclick="deletePlanEditorSchritt(${idx})">×</button>
+    </div>`).join('');
+
+  const sheet = document.getElementById('modal-sheet');
+  sheet.innerHTML = `
+    <div class="modal-title">${modalTitel}</div>
+    <div>
+      <div class="modal-label">Plan-Titel</div>
+      <input class="modal-input" id="plan-editor-titel" value="${escHtml(planTitel)}"
+        placeholder="Plan-Name …">
+    </div>
+    <div>
+      <div class="modal-label">Schritte</div>
+      <div class="plan-schritte-liste" id="plan-schritte-liste">${schritteHtml}</div>
+      <div class="add-schritt-inline">
+        <input type="text" id="neuer-schritt-input" placeholder="Neuer Schritt …"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addPlanEditorSchritt();}">
+        <button onclick="addPlanEditorSchritt()">＋</button>
+      </div>
+    </div>
+    <div class="modal-row" style="margin-top:8px;">
+      ${istBearbeitung ? `<button class="btn-danger" style="flex:1;" onclick="deletePlan('${planEditorState.planId}')">Plan löschen</button>` : ''}
+      <button class="btn-secondary" style="flex:1;" onclick="closeModal()">Abbrechen</button>
+      <button class="btn-primary" style="flex:1;" onclick="savePlanEditor()">Speichern</button>
+    </div>`;
+  openModal();
+  setTimeout(() => document.getElementById('plan-editor-titel').focus(), 100);
+}
+
+function togglePlanEditorSchritt(idx) {
+  if (!planEditorState.schritte[idx]) return;
+  planEditorState.schritte[idx].erledigt = !planEditorState.schritte[idx].erledigt;
+  // Titel-Wert sichern vor re-render
+  const titel = document.getElementById('plan-editor-titel')?.value || '';
+  renderPlanEditorModal(titel, document.querySelector('.modal-title')?.textContent || '', !!planEditorState.planId);
+}
+
+function deletePlanEditorSchritt(idx) {
+  planEditorState.schritte.splice(idx, 1);
+  const titel = document.getElementById('plan-editor-titel')?.value || '';
+  renderPlanEditorModal(titel, document.querySelector('.modal-title')?.textContent || '', !!planEditorState.planId);
+}
+
+function addPlanEditorSchritt() {
+  const inp = document.getElementById('neuer-schritt-input');
+  if (!inp) return;
+  const text = inp.value.trim();
+  if (!text) return;
+  planEditorState.schritte.push({ id: genId(), text: text, erledigt: false, istNeu: true });
+  const titel = document.getElementById('plan-editor-titel')?.value || '';
+  renderPlanEditorModal(titel, document.querySelector('.modal-title')?.textContent || '', !!planEditorState.planId);
+  // Fokus auf neues Input setzen
+  setTimeout(() => document.getElementById('neuer-schritt-input')?.focus(), 50);
+}
+
+function savePlanEditor() {
+  const planTitel = (document.getElementById('plan-editor-titel')?.value || '').trim();
+  if (!planTitel) { showToast('Bitte Plan-Titel eingeben'); return; }
+
+  // Schritt-Texte aus Inputs lesen (aktueller DOM-Zustand)
+  document.querySelectorAll('.plan-modal-schritt input').forEach((inp, idx) => {
+    if (planEditorState.schritte[idx]) planEditorState.schritte[idx].text = inp.value.trim();
+  });
+
+  // Leere Schritte entfernen
+  planEditorState.schritte = planEditorState.schritte.filter(s => s.text);
+  if (planEditorState.schritte.length === 0) { showToast('Mindestens ein Schritt nötig'); return; }
+
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+
+  if (planEditorState.planId) {
+    // Bestehenden Plan aktualisieren
+    const plan = zettel.eintraege.find(e => e.planId === planEditorState.planId && e.istPlan);
+    if (plan) {
+      plan.text = planTitel;
+      plan.planTitel = planTitel;
+    }
+    // Bestehende Schritte aktualisieren / neue hinzufügen
+    const vorhandeneIds = new Set(planEditorState.schritte.filter(s => !s.istNeu).map(s => s.id));
+    // Gelöschte Schritte entfernen
+    zettel.eintraege = zettel.eintraege.filter(e =>
+      !(e.planId === planEditorState.planId && e.istSchritt && !vorhandeneIds.has(e.id))
+    );
+    // Schritte aktualisieren oder neu anlegen
+    planEditorState.schritte.forEach((s, idx) => {
+      if (s.istNeu) {
+        zettel.eintraege.push(neuerSchritteintrag(s.text, s.erledigt, planEditorState.planId, planTitel, planEditorState.abschnitt, 1000 + idx));
+      } else {
+        const existing = zettel.eintraege.find(e => e.id === s.id);
+        if (existing) { existing.text = s.text; existing.erledigt = s.erledigt; existing.reihenfolge = 1000 + idx; }
+      }
+    });
+  } else {
+    // Neuer Plan aus Aufgabe hochstufen
+    const planId = genId();
+    const aufgabe = planEditorState.aufgabeId ? zettel.eintraege.find(e => e.id === planEditorState.aufgabeId) : null;
+    const basisReihenfolge = aufgabe ? aufgabe.reihenfolge : 0;
+
+    // Plan-Hauptzeile
+    zettel.eintraege.push({
+      id: genId(), typ: 'plan', text: planTitel, erledigt: false, zusatz: '',
+      quelle: aufgabe ? aufgabe.quelle : 'frei',
+      refId: null, planId: planId, planTitel: planTitel, miniplanId: null,
+      istPlan: true, istSchritt: false, abschnitt: planEditorState.abschnitt,
+      reihenfolge: basisReihenfolge - 0.5,
+      transferiert: false, transferAktion: null,
+      kennzeichen: { urgent: false, unclear: false, idea: false },
+      groesse: null, deadline: null, terminDaten: null
+    });
+
+    // Ursprüngliche Aufgabe zum Schritt machen (oder neue Schritte)
+    planEditorState.schritte.forEach((s, idx) => {
+      if (!s.istNeu && aufgabe && s.id === aufgabe.id) {
+        // Aufgabe umwandeln
+        aufgabe.istSchritt = true; aufgabe.istPlan = false;
+        aufgabe.planId = planId; aufgabe.planTitel = planTitel;
+        aufgabe.reihenfolge = basisReihenfolge + idx;
+      } else {
+        zettel.eintraege.push(neuerSchritteintrag(s.text, s.erledigt, planId, planTitel, planEditorState.abschnitt, basisReihenfolge + idx));
+      }
+    });
+
+    // Reihenfolge normalisieren
+    const imAbschnitt = zettel.eintraege
+      .filter(x => x.abschnitt === planEditorState.abschnitt)
+      .sort((a, b) => a.reihenfolge - b.reihenfolge);
+    imAbschnitt.forEach((x, i) => { x.reihenfolge = i; });
+  }
+
+  saveDB();
+  closeModal();
+  renderZettel();
+  showToast('✓ Plan gespeichert');
+}
+
+function neuerSchritteintrag(text, erledigt, planId, planTitel, abschnitt, reihenfolge) {
+  return {
+    id: genId(), typ: 'aufgabe', text: text, erledigt: erledigt, zusatz: '',
+    quelle: 'frei', refId: null, planId: planId, planTitel: planTitel, miniplanId: null,
+    istPlan: false, istSchritt: true, abschnitt: abschnitt, reihenfolge: reihenfolge,
+    transferiert: false, transferAktion: null,
+    kennzeichen: { urgent: false, unclear: false, idea: false },
+    groesse: null, deadline: null, terminDaten: null
+  };
+}
+
+function deletePlan(planId) {
+  if (!confirm('Plan und alle Schritte löschen?')) return;
+  const zettel = getAktuellerZettel();
+  if (!zettel) return;
+  zettel.eintraege = zettel.eintraege.filter(e => e.planId !== planId);
+  saveDB();
+  closeModal();
+  renderZettel();
+  showToast('Plan gelöscht');
+}
+
+// ═══════════════════════════════════════════════════
+// BEARBEITUNGSMODUS
+// ═══════════════════════════════════════════════════
+function toggleEditMode() {
+  state.editMode = !state.editMode;
+  const rows = document.getElementById('paper-rows');
+  const btn  = document.getElementById('tb-edit');
+  if (state.editMode) {
+    rows.classList.add('edit-mode');
+    btn.classList.add('edit-active');
+    btn.textContent = '✓ Fertig';
+    showToast('Bearbeitungsmodus aktiv');
+  } else {
+    rows.classList.remove('edit-mode');
+    btn.classList.remove('edit-active');
+    btn.textContent = '✎ Edit';
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// KENNZEICHEN & GRÖSSE – Modal-Helfer
+// ═══════════════════════════════════════════════════
+function toggleSig(typ) {
+  const btn = document.getElementById('sig-' + typ);
+  if (!btn) return;
+  btn.classList.toggle('on');
+}
+
+function toggleSize(s) {
+  ['S','M','L'].forEach(x => {
+    const b = document.getElementById('size-' + x);
+    if (b) b.classList.toggle('on', x === s && !b.classList.contains('on'));
+  });
+  // Wenn gleiche Größe nochmal gedrückt: deselect
+  const btn = document.getElementById('size-' + s);
+  if (btn && !btn.classList.contains('on')) {
+    // war schon on, wurde deaktiviert – ok
+  }
+}
+
+function leseKennzeichen() {
+  return {
+    urgent:  document.getElementById('sig-urgent')?.classList.contains('on')  ?? false,
+    unclear: document.getElementById('sig-unclear')?.classList.contains('on') ?? false,
+    idea:    document.getElementById('sig-idea')?.classList.contains('on')    ?? false
+  };
+}
+
+function leseGroesse() {
+  for (const s of ['S','M','L']) {
+    if (document.getElementById('size-' + s)?.classList.contains('on')) return s;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════
+// TERMIN-HELFER
+// ═══════════════════════════════════════════════════
+function toggleErinnerungZeit() {
+  const cb = document.getElementById('modal-erinnerung-aktiv');
+  const inp = document.getElementById('modal-erinnerung');
+  if (!cb || !inp) return;
+  inp.style.display = cb.checked ? '' : 'none';
+}
+
+function leseTerminDaten() {
+  const start = document.getElementById('modal-start')?.value || '';
+  const ende  = document.getElementById('modal-ende')?.value  || '';
+  const ort   = (document.getElementById('modal-ort')?.value  || '').trim();
+  const aktiv = document.getElementById('modal-erinnerung-aktiv')?.checked ?? false;
+  const zeit  = document.getElementById('modal-erinnerung')?.value || '';
+  return { start, ende, ort, erinnerungAktiv: aktiv, erinnerung: zeit };
+}
+
+// ═══════════════════════════════════════════════════
+// DEADLINE FORMATIERUNG
+// ═══════════════════════════════════════════════════
+function formatDeadlineShort(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('de-DE', { day: 'numeric', month: 'numeric' });
+}
+
+// ═══════════════════════════════════════════════════
+// START
+// ═══════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', init);
+
+// Service Worker registrieren
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./daypaper_sw.js')
+      .then(() => console.log('DayPaper SW registriert'))
+      .catch(err => console.warn('SW Fehler:', err));
+  });
+}
+</script>
+
+</body>
+</html>

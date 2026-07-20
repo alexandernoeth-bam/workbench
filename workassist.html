@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.204</title>
+<title>WorkAssist 1.5.205</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2162,7 +2162,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.204</div>
+    <div class="start-version">v1.5.205</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2230,7 +2230,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.204</div>
+    <div class="app-version" id="app-version">v1.5.205</div>
   </div>
 
   <div class="nav-section">
@@ -2300,6 +2300,11 @@ textarea.field-input { resize: vertical; min-height: 70px; }
       Import
     </button>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importJSON(event)">
+    <button class="btn-sidebar" style="background:rgba(200,184,154,0.15);border-top:1px solid rgba(255,255,255,0.08);margin-top:2px;" onclick="document.getElementById('delta-import-file').click()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c8b89a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <span style="color:#c8b89a;">DayPaper Δ</span>
+    </button>
+    <input type="file" id="delta-import-file" accept=".json" style="display:none" onchange="deltaImportLaden(event)">
   </div>
 </div>
 
@@ -3527,7 +3532,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.204';
+const APP_VERSION = '1.5.205';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -12243,6 +12248,250 @@ self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c
     });
   }
 })();
+
+// ═══════════════════════════════════════════════════════════════════
+// DAYPAPER DELTA-IMPORT
+// ═══════════════════════════════════════════════════════════════════
+let deltaData = null; // aktuell geladenes Delta
+
+function deltaImportLaden(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const text = e.target.result.replace(/^\uFEFF/, '');
+      const delta = JSON.parse(text);
+      if (!delta.version || !delta.erledigteAufgabenIds) {
+        showToast('⚠️ Keine gültige DayPaper Delta-Datei');
+        return;
+      }
+      deltaData = delta;
+      deltaModalAnzeigen();
+    } catch(err) {
+      showToast('⚠️ Datei konnte nicht gelesen werden');
+      console.error(err);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function deltaModalAnzeigen() {
+  if (!deltaData) return;
+  const body = document.getElementById('delta-modal-body');
+  const d = deltaData;
+
+  // Datum formatieren
+  const datum = d.zettelDatum
+    ? new Date(d.zettelDatum + 'T00:00:00').toLocaleDateString('de-DE', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
+    : '–';
+
+  // Erledigte Aufgaben auflösen
+  const erledigteDetails = (d.erledigteAufgabenIds || []).map(x => {
+    const aufgabe = DB.aufgaben.find(a => a.id === x.id);
+    return aufgabe
+      ? { id: x.id, titel: aufgabe.titel, gefunden: true, quelle: x.quelle }
+      : { id: x.id, titel: `(ID: ${x.id} – nicht gefunden)`, gefunden: false, quelle: x.quelle };
+  });
+
+  let html = `
+    <div style="background:#f5f0e8;border-radius:8px;padding:12px 14px;font-size:13px;color:#5a4a38;">
+      <strong>Tageszettel vom ${datum}</strong><br>
+      Exportiert: ${d.exportDatum ? new Date(d.exportDatum).toLocaleString('de-DE') : '–'}
+    </div>`;
+
+  // Sektion: Erledigte Aufgaben
+  html += `<div>
+    <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#8a7a68;font-weight:600;margin-bottom:8px;">
+      Aufgaben als erledigt markieren (${erledigteDetails.length})
+    </div>`;
+
+  if (erledigteDetails.length === 0) {
+    html += `<div style="color:#a09080;font-size:13px;">Keine erledigten Referenz-Aufgaben</div>`;
+  } else {
+    erledigteDetails.forEach(e => {
+      const icon = e.gefunden ? '✅' : '⚠️';
+      const farbe = e.gefunden ? '#2a4a30' : '#8a6030';
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0e8e0;font-size:13px;color:${farbe};">
+        <span>${icon}</span>
+        <span style="flex:1;">${escHtml(e.titel)}</span>
+        <span style="font-size:10px;color:#a09080;">${e.quelle === 'work' ? 'B' : 'P'}</span>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
+  // Sektion: Neue Aufgaben (Inbox)
+  const neueAufgaben = d.neueAufgaben || [];
+  html += `<div>
+    <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#8a7a68;font-weight:600;margin-bottom:8px;">
+      Neue Aufgaben → Inbox (${neueAufgaben.length})
+    </div>`;
+
+  if (neueAufgaben.length === 0) {
+    html += `<div style="color:#a09080;font-size:13px;">Keine neuen Aufgaben</div>`;
+  } else {
+    neueAufgaben.forEach(a => {
+      const statusIcon = a.erledigt ? '✅' : '📝';
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0e8e0;font-size:13px;color:#2a2018;">
+        <span>${statusIcon}</span>
+        <span style="flex:1;">${escHtml(a.titel)}${a.beschreibung ? '<br><span style="font-size:11px;color:#8a7a68;">'+escHtml(a.beschreibung)+'</span>' : ''}</span>
+        <span style="font-size:10px;background:#e8e0d0;color:#5a4a30;padding:2px 6px;border-radius:4px;">Inbox</span>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
+  // Sektion: Neue Pläne
+  const neuePlaene = d.neuePlaene || [];
+  html += `<div>
+    <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#8a7a68;font-weight:600;margin-bottom:8px;">
+      Neue Pläne (${neuePlaene.length})
+    </div>`;
+
+  if (neuePlaene.length === 0) {
+    html += `<div style="color:#a09080;font-size:13px;">Keine neuen Pläne</div>`;
+  } else {
+    neuePlaene.forEach(p => {
+      const schritte = (p.schritte || []).map(s =>
+        `<div style="padding:3px 0 3px 16px;font-size:12px;color:#5a4a38;border-left:2px solid #c8b89a;margin-left:8px;">
+          ${s.erledigt ? '✓ ' : '○ '}${escHtml(s.titel)}
+        </div>`).join('');
+      html += `<div style="padding:6px 0;border-bottom:1px solid #f0e8e0;">
+        <div style="font-size:13px;font-weight:600;color:#2a2018;">📋 ${escHtml(p.titel)}</div>
+        ${schritte}
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
+  body.innerHTML = html;
+  document.getElementById('delta-modal').style.display = 'flex';
+}
+
+function deltaModalSchliessen() {
+  document.getElementById('delta-modal').style.display = 'none';
+  deltaData = null;
+}
+
+function deltaImportAnwenden() {
+  if (!deltaData) return;
+  const d = deltaData;
+  let erledigtCount = 0;
+  let neuCount = 0;
+  let planCount = 0;
+  const jetzt = new Date().toISOString();
+
+  // 1. Aufgaben als erledigt markieren
+  (d.erledigteAufgabenIds || []).forEach(x => {
+    const aufgabe = DB.aufgaben.find(a => a.id === x.id);
+    if (aufgabe && aufgabe.status !== 'erledigt') {
+      aufgabe.status = 'erledigt';
+      aufgabe.geaendert = jetzt;
+      erledigtCount++;
+    }
+  });
+
+  // 2. Neue Aufgaben in Inbox anlegen
+  // Inbox-Bereich suchen oder anlegen
+  let inboxBereich = DB.bereiche.find(b => b.name.toLowerCase() === 'inbox');
+  if (!inboxBereich) {
+    inboxBereich = {
+      id: uid(),
+      name: 'Inbox',
+      farbe: '#c8b89a',
+      status: 'aktiv',
+      ziel: '',
+      notiz: ''
+    };
+    DB.bereiche.push(inboxBereich);
+  }
+
+  (d.neueAufgaben || []).forEach(a => {
+    const neueAufgabe = {
+      id:          uid(),
+      titel:       a.titel,
+      untertitel:  null,
+      notiz:       a.beschreibung || '',
+      bereichId:   inboxBereich.id,
+      herkunft:    'DayPaper',
+      herkunftUrl: null,
+      faellig:     a.faellig || null,
+      uhrzeit:     null,
+      startdatum:  null,
+      groesse:     a.prioritaet === 'hoch' ? 'L' : a.prioritaet === 'niedrig' ? 'S' : 'M',
+      tags:        ['daypaper'],
+      wiederholung: null,
+      status:      a.erledigt ? 'erledigt' : 'offen',
+      typ:         'aufgabe',
+      zeitnah:     false,
+      wiedervorlage: null,
+      geplantAm:   null,
+      log:         [],
+      erstellt:    jetzt,
+      geaendert:   jetzt
+    };
+    DB.aufgaben.push(neueAufgabe);
+    neuCount++;
+  });
+
+  // 3. Neue Pläne anlegen
+  (d.neuePlaene || []).forEach(p => {
+    const neuerPlan = {
+      id:          uid(),
+      titel:       p.titel,
+      notiz:       '',
+      bereichId:   inboxBereich.id,
+      status:      'aktiv',
+      prioritaet:  'mittel',
+      zeithorizont: 'kurzfristig',
+      erstellt:    jetzt,
+      geaendert:   jetzt,
+      schritte:    (p.schritte || []).map((s, idx) => ({
+        id:          uid(),
+        titel:       s.titel,
+        erledigt:    s.erledigt || false,
+        reihenfolge: idx,
+        aufgabeId:   null,
+        delegiertAn: null
+      }))
+    };
+    DB.plaene.push(neuerPlan);
+    planCount++;
+  });
+
+  saveDB();
+  deltaModalSchliessen();
+
+  const msg = [
+    erledigtCount > 0 ? `${erledigtCount} Aufgabe${erledigtCount>1?'n':''} erledigt` : '',
+    neuCount > 0      ? `${neuCount} neue in Inbox` : '',
+    planCount > 0     ? `${planCount} Plan${planCount>1?'e':''}` : ''
+  ].filter(Boolean).join(' · ');
+
+  showToast(`✓ Delta angewendet: ${msg || 'keine Änderungen'}`, 4000);
+  renderAktuell();
+}
+
 </script>
+
+<!-- ═══ DAYPAPER DELTA-IMPORT MODAL ═══════════════════════════════════════ -->
+<div id="delta-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:14px;width:min(560px,95vw);max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.3);">
+    <div style="background:#28201a;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:14px 14px 0 0;">
+      <div style="color:#c8b89a;font-weight:700;font-size:15px;letter-spacing:1px;">⚡ DayPaper Delta-Import</div>
+      <button onclick="deltaModalSchliessen()" style="background:none;border:none;color:#8a7a68;font-size:20px;cursor:pointer;line-height:1;">×</button>
+    </div>
+    <div id="delta-modal-body" style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;">
+      <!-- wird dynamisch befüllt -->
+    </div>
+    <div style="padding:14px 20px;border-top:1px solid #e8e0d8;display:flex;gap:10px;">
+      <button onclick="deltaModalSchliessen()" style="flex:1;background:#e0d8cc;color:#4a3820;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;">Abbrechen</button>
+      <button id="delta-apply-btn" onclick="deltaImportAnwenden()" style="flex:2;background:#28201a;color:#c8b89a;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">✓ Delta anwenden</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
