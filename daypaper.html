@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#28201a">
   <link rel="manifest" href="./daypaper_manifest.json">
   <link rel="apple-touch-icon" href="./icons/icon-daypaper-192.png">
-  <title>DayPaper v0.1.8</title>
+  <title>DayPaper v0.1.9</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap" rel="stylesheet">
@@ -382,6 +382,57 @@
       text-align: center; cursor: pointer;
     }
     .morgen-add-hint:hover { background: #f5f0e8; color: #28201a; }
+
+    /* Plan-Blöcke in Morgen-Liste */
+    .morgen-plan-section {
+      font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+      color: #b0a090; font-weight: 600; background: #f5f0e8;
+      padding: 4px 12px 2px;
+    }
+    .morgen-plan-block {
+      border-bottom: 1px solid #ede8df;
+    }
+    .morgen-plan-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px 7px 12px;
+      cursor: pointer; user-select: none;
+      background: #f5f0e8;
+    }
+    .morgen-plan-header:hover { background: #ede8df; }
+    .morgen-plan-toggle {
+      font-size: 11px; color: #9a8a78; flex-shrink: 0; width: 14px; text-align: center;
+    }
+    .morgen-plan-icon { font-size: 13px; flex-shrink: 0; }
+    .morgen-plan-titel {
+      flex: 1; font-size: 12.5px; font-weight: 600; color: #28201a;
+      font-style: italic;
+    }
+    .morgen-plan-meta {
+      font-size: 10px; color: #9a8a78; flex-shrink: 0;
+    }
+    /* Schritt-Zeile im aufgeklappten Plan */
+    .morgen-plan-schritt {
+      display: flex; align-items: flex-start;
+      padding: 6px 10px 5px 32px;
+      border-bottom: 1px solid #f0ece4;
+      gap: 8px; cursor: pointer; user-select: none;
+      background: #faf8f4;
+    }
+    .morgen-plan-schritt:hover { background: #f0ece4; }
+    .morgen-plan-schritt.sel  { background: #e8f4ea; }
+    .morgen-plan-schritt:last-child { border-bottom: none; }
+    .mps-arrow {
+      width: 18px; height: 18px;
+      border: 1.5px solid #c0b8a8; border-radius: 50%;
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 10px; color: #9a8a78; margin-top: 1px;
+    }
+    .morgen-plan-schritt.sel .mps-arrow {
+      background: var(--color-done); border-color: var(--color-done); color: white;
+    }
+    .mps-body { flex: 1; min-width: 0; }
+    .mps-titel { font-size: 12px; color: #3a3028; line-height: 1.35; }
+    .mps-sub   { font-size: 10px; color: #9a8a78; margin-top: 2px; }
 
     .morgen-right-empty {
       padding: 20px 14px; font-size: 11px; color: #c0b8a8;
@@ -1119,7 +1170,7 @@
 
   <!-- ═══════════ HEADER ═══════════ -->
   <div id="app-header">
-    <span class="title">DayPaper<span class="app-version">v0.1.8</span></span>
+    <span class="title">DayPaper<span class="app-version">v0.1.9</span></span>
     <span class="date" id="header-date"></span>
     <span class="status-badge badge-start" id="status-badge">Start</span>
   </div>
@@ -1226,7 +1277,7 @@
 // ═══════════════════════════════════════════════════
 // KONSTANTEN & VERSION
 // ═══════════════════════════════════════════════════
-const APP_VERSION = 'v0.1.8';
+const APP_VERSION = 'v0.1.9';
 const STORAGE_KEY = 'daypaper_db';
 const ZETTEL_MAX_DAYS = 5;
 
@@ -1291,7 +1342,8 @@ let state = {
   dragSrcId: null,
   dragSrcIstPlan: false,
   dragSrcPlanId: null,
-  editMode: false
+  editMode: false,
+  morgenPlanAufgeklappt: {}  // planId -> bool
 };
 
 // ═══════════════════════════════════════════════════
@@ -1601,6 +1653,100 @@ function getAlleAufgaben() {
   return result;
 }
 
+function getAllePlaene() {
+  // Aufgaben-IDs die als aufgabeId in Planschritten referenziert sind
+  // → deren Aufgaben werden schon in der Aufgabenliste gezeigt
+  const result = [];
+
+  ['work', 'priv'].forEach(typ => {
+    if (!state.quellen[typ]) return;
+    const data = state.quellen[typ].daten;
+    if (!data.plaene || data.plaene.length === 0) return;
+
+    // Set erledigter Aufgaben-IDs aus aufgaben[]
+    const erledigteAufgabenIds = new Set(
+      (data.aufgaben || []).filter(a => a.erledigt || a.status === 'erledigt').map(a => a.id)
+    );
+
+    data.plaene.forEach(p => {
+      // Plan überspringen wenn komplett erledigt oder abgeschlossen
+      if (p.status === 'erledigt' || p.status === 'abgeschlossen') return;
+
+      const alleSchritte = p.schritte || [];
+
+      // Offene Schritte: nicht erledigt
+      const offeneSchritte = alleSchritte.filter(s => {
+        if (s.erledigt) return false;
+        // Schritt mit aufgabeId: prüfen ob Aufgabe erledigt
+        if (s.aufgabeId && erledigteAufgabenIds.has(s.aufgabeId)) return false;
+        return true;
+      });
+
+      if (offeneSchritte.length === 0) return; // Plan komplett erledigt
+
+      // Schritte ohne aufgabeId → das sind die die wir anzeigen wollen
+      // Schritte mit aufgabeId → Aufgabe erscheint schon in der Aufgabenliste
+      const schritteOhneAufgabe = offeneSchritte.filter(s => !s.aufgabeId);
+      const schritteReferenziert = offeneSchritte.filter(s => !!s.aufgabeId);
+
+      // Plan nur anzeigen wenn es Schritte ohne Aufgabe gibt
+      if (schritteOhneAufgabe.length === 0) return;
+
+      result.push({
+        planId:    p.id,
+        quelle:    typ,
+        titel:     p.titel,
+        prioritaet: p.prioritaet || 'mittel',
+        offeneSchritte: offeneSchritte.length,
+        schritteOhneAufgabe: schritteOhneAufgabe.map(s => ({
+          schrittId: s.id,
+          titel:     s.titel,
+          delegiertAn: s.delegiertAn || null
+        })),
+        schritteReferenziert: schritteReferenziert.length
+      });
+    });
+  });
+
+  return result;
+}
+
+function toggleMorgenPlan(planId) {
+  state.morgenPlanAufgeklappt[planId] = !state.morgenPlanAufgeklappt[planId];
+  renderMorgenList();
+}
+
+function togglePlanSchritt(planId, schrittId, quelle) {
+  const key = planId + '|' + schrittId;
+  const existing = state.morgenAusgewaehlt.findIndex(
+    x => x.planSchrittKey === key
+  );
+  if (existing >= 0) {
+    state.morgenAusgewaehlt.splice(existing, 1);
+  } else {
+    // Plan-Titel aus Daten lesen
+    const data = state.quellen[quelle]?.daten;
+    const plan = data?.plaene?.find(p => p.id === planId);
+    const schritt = plan?.schritte?.find(s => s.id === schrittId);
+    if (!schritt || !plan) return;
+    state.morgenAusgewaehlt.push({
+      refId:         null,          // kein Aufgaben-refId
+      quelle:        quelle,
+      titel:         schritt.titel,
+      planTitel:     plan.titel,
+      planId:        planId,
+      planSchrittKey: key,
+      schrittId:     schrittId,
+      faellig:       null,
+      zeitnah:       false,
+      groesse:       null,
+      wiederholung:  null,
+      istPlanSchritt: true
+    });
+  }
+  renderMorgenList();
+}
+
 function renderMorgenList() {
   const heute = todayISO();
   const alle  = getAlleAufgaben();
@@ -1677,8 +1823,53 @@ function renderMorgenList() {
     });
   }
 
-  if (work.length > 0) renderGruppe(work, 'Beruflich', '#28201a');
-  if (priv.length > 0) renderGruppe(priv, 'Privat', '#20183a');
+  const allePlaene = getAllePlaene();
+  const plaeneWork = allePlaene.filter(p => p.quelle === 'work');
+  const plaenePriv = allePlaene.filter(p => p.quelle === 'priv');
+
+  function renderPlanBloecke(plaene, quelle) {
+    if (plaene.length === 0) return;
+    html += `<div class="morgen-plan-section">Pläne</div>`;
+    plaene.forEach(p => {
+      const aufgeklappt = !!state.morgenPlanAufgeklappt[p.planId];
+      const selSchritte = p.schritteOhneAufgabe.filter(s =>
+        state.morgenAusgewaehlt.some(x => x.planSchrittKey === p.planId + '|' + s.schrittId)
+      ).length;
+
+      html += `<div class="morgen-plan-block">
+        <div class="morgen-plan-header" onclick="toggleMorgenPlan('${p.planId}')">
+          <span class="morgen-plan-toggle">${aufgeklappt ? '▼' : '▶'}</span>
+          <span class="morgen-plan-icon">📋</span>
+          <span class="morgen-plan-titel">${escHtml(p.titel)}</span>
+          <span class="morgen-plan-meta">${selSchritte > 0 ? selSchritte + ' gew. · ' : ''}${p.schritteOhneAufgabe.length} offen</span>
+        </div>`;
+
+      if (aufgeklappt) {
+        p.schritteOhneAufgabe.forEach(s => {
+          const key = p.planId + '|' + s.schrittId;
+          const isSel = state.morgenAusgewaehlt.some(x => x.planSchrittKey === key);
+          html += `<div class="morgen-plan-schritt${isSel ? ' sel' : ''}"
+            onclick="togglePlanSchritt('${p.planId}','${s.schrittId}','${quelle}')">
+            <div class="mps-arrow">${isSel ? '✓' : '→'}</div>
+            <div class="mps-body">
+              <div class="mps-titel">${escHtml(s.titel)}</div>
+              ${s.delegiertAn ? `<div class="mps-sub">→ ${escHtml(s.delegiertAn)}</div>` : ''}
+            </div>
+          </div>`;
+        });
+      }
+      html += `</div>`;
+    });
+  }
+
+  if (work.length > 0 || plaeneWork.length > 0) {
+    renderGruppe(work, 'Beruflich', '#28201a');
+    renderPlanBloecke(plaeneWork, 'work');
+  }
+  if (priv.length > 0 || plaenePriv.length > 0) {
+    renderGruppe(priv, 'Privat', '#20183a');
+    renderPlanBloecke(plaenePriv, 'priv');
+  }
 
   if (html === '') {
     html = `<div class="morgen-empty"><div style="font-size:28px;">✓</div><div>Alle Aufgaben erledigt</div></div>`;
@@ -1718,29 +1909,34 @@ function renderMorgenRight() {
 
   let html = '';
 
-  function renderSelGruppe(aufgaben, label, srcClass) {
+  function renderSelGruppe(aufgaben, label, srcClass, srcKurz) {
     if (aufgaben.length === 0) return;
     html += `<div class="morgen-right-section">${label}</div>`;
     aufgaben.forEach(a => {
       let sub = '';
-      if (a.zeitnah)  sub += '⚡ zeitnah · ';
-      if (a.faellig)  sub += `⚑ ${a.faellig.slice(8)}.${a.faellig.slice(5,7)}. · `;
-      if (a.groesse)  sub += `${a.groesse} · `;
+      if (a.zeitnah)   sub += '⚡ zeitnah · ';
+      if (a.faellig)   sub += `⚑ ${a.faellig.slice(8)}.${a.faellig.slice(5,7)}. · `;
+      if (a.groesse)   sub += `${a.groesse} · `;
       if (a.planTitel) sub += `${escHtml(a.planTitel)} · `;
+      if (a.istPlanSchritt) sub += 'Planschritt · ';
       sub = sub.replace(/ · $/, '');
 
+      const removeOnClick = a.istPlanSchritt
+        ? `togglePlanSchritt('${a.planId}','${a.schrittId}','${a.quelle}')`
+        : `toggleAuswahlNeu('${a.refId}','${a.quelle}')`;
+
       html += `<div class="sel-row">
-        <div class="sel-remove" onclick="toggleAuswahlNeu('${a.refId}','${a.quelle}')">×</div>
+        <div class="sel-remove" onclick="${removeOnClick}">×</div>
         <div class="sel-body">
           <div class="sel-title">${escHtml(a.titel)}</div>
-          ${sub ? `<div class="sel-sub">${sub} <span class="sel-src ${srcClass}">${label === 'Beruflich' ? 'B' : 'P'}</span></div>` : `<div class="sel-sub"><span class="sel-src ${srcClass}">${label === 'Beruflich' ? 'B' : 'P'}</span></div>`}
+          <div class="sel-sub">${sub}<span class="sel-src ${srcClass}">${srcKurz}</span></div>
         </div>
       </div>`;
     });
   }
 
-  renderSelGruppe(selWork, 'Beruflich', 'src-w');
-  renderSelGruppe(selPriv, 'Privat',    'src-p');
+  renderSelGruppe(selWork, 'Beruflich', 'src-w', 'B');
+  renderSelGruppe(selPriv, 'Privat',    'src-p', 'P');
 
   html += `<div class="morgen-add-hint" onclick="addEntry('termin')">＋ Termin / freien Eintrag hinzufügen</div>`;
 
@@ -1768,6 +1964,32 @@ function generateZettel() {
   let reihenfolge = 0;
 
   state.morgenAusgewaehlt.forEach(a => {
+    // Plan-Schritt ohne Aufgaben-Referenz
+    if (a.istPlanSchritt) {
+      eintraege.push({
+        id: genId(),
+        typ: 'aufgabe',
+        text: a.titel,
+        erledigt: false,
+        zusatz: '',
+        quelle: a.quelle,
+        refId: null,
+        planId: null,
+        planTitel: a.planTitel,
+        miniplanId: null,
+        istPlan: false,
+        istSchritt: false,
+        abschnitt: 'aufgaben',
+        reihenfolge: reihenfolge++,
+        transferiert: false,
+        transferAktion: null,
+        kennzeichen: { urgent: false, unclear: false, idea: false },
+        groesse: null,
+        deadline: null,
+        terminDaten: null
+      });
+      return; // nächster Eintrag
+    }
     eintraege.push({
       id: genId(),
       typ: 'aufgabe',
