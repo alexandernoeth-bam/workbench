@@ -1703,15 +1703,17 @@ function getAllePlaene() {
         // ALLE offenen Schritte zeigen – inklusive die mit aufgabeId
         schritte: offeneSchritte.map(s => {
           const aufgabe = s.aufgabeId ? aufgabenMap[s.aufgabeId] : null;
+          // schrittId: WorkAssist kann 'id', 'uid' oder 'schrittId' verwenden
+          const schrittId = s.id || s.uid || s.schrittId || null;
           return {
-            schrittId:   s.id,
-            titel:       s.titel,
-            delegiertAn: s.delegiertAn || null,
-            aufgabeId:   s.aufgabeId || null,
-            // Aufgaben-Metadaten für Anzeige
+            schrittId:    schrittId,
+            titel:        s.titel,
+            delegiertAn:  s.delegiertAn || null,
+            aufgabeId:    s.aufgabeId || null,
             aufgabeTitel: aufgabe ? aufgabe.titel : null,
             faellig:      aufgabe ? aufgabe.faellig || null : null,
-            zeitnah:      aufgabe ? !!(aufgabe.zeitnah || aufgabe.istZeitnah) : false
+            zeitnah:      aufgabe ? !!(aufgabe.zeitnah || aufgabe.istZeitnah) : false,
+            groesse:      aufgabe ? aufgabe.groesse || null : null
           };
         })
       });
@@ -1733,6 +1735,10 @@ function onPlanSchrittClick(event, planId, schrittId, quelle) {
 
 function togglePlanSchritt(planId, schrittId, quelle) {
   const key = planId + '|' + schrittId;
+
+  // Debug: in Konsole prüfen
+  console.log('togglePlanSchritt:', { planId, schrittId, quelle, key });
+
   const existing = state.morgenAusgewaehlt.findIndex(
     x => x.planSchrittKey === key
   );
@@ -1741,10 +1747,14 @@ function togglePlanSchritt(planId, schrittId, quelle) {
   } else {
     const data = state.quellen[quelle]?.daten;
     const plan = data?.plaene?.find(p => p.id === planId);
-    const schritt = plan?.schritte?.find(s => s.id === schrittId);
-    if (!schritt || !plan) return;
+    if (!plan) { console.warn('Plan nicht gefunden:', planId); return; }
 
-    // Wenn Schritt eine aufgabeId hat → Aufgaben-Titel verwenden
+    // Schritt suchen – WorkAssist verwendet möglicherweise 'id' oder 'uid' oder 'schrittId'
+    const schritt = (plan.schritte || []).find(s =>
+      s.id === schrittId || s.uid === schrittId || s.schrittId === schrittId
+    );
+    if (!schritt) { console.warn('Schritt nicht gefunden:', schrittId, 'in', plan.schritte?.map(s => s.id)); return; }
+
     const aufgabenMap = {};
     (data.aufgaben || []).forEach(a => { aufgabenMap[a.id] = a; });
     const aufgabe = schritt.aufgabeId ? aufgabenMap[schritt.aufgabeId] : null;
@@ -1869,7 +1879,7 @@ function renderMorgenList() {
         </div>`;
 
       if (aufgeklappt) {
-        p.schritte.forEach(s => {
+        p.schritte.forEach((s, sIdx) => {
           const key = p.planId + '|' + s.schrittId;
           const isSel = state.morgenAusgewaehlt.some(x => x.planSchrittKey === key);
           // Zeige Aufgaben-Titel wenn Schritt eine verknüpfte Aufgabe hat
@@ -1885,8 +1895,8 @@ function renderMorgenList() {
           }
           if (s.groesse)     metaPills += `<span class="pm pm-sz">${escHtml(s.groesse)}</span>`;
           if (s.delegiertAn) metaPills += `<span class="pm pm-rec">→ ${escHtml(s.delegiertAn)}</span>`;
-          const sub = metaPills; // für spätere Verwendung im HTML
 
+          // Schritt-Index innerhalb dieses Plans als einfache Zahl speichern
           const _idx = _planSchrittMapIdx++;
           _planSchrittMap[_idx] = { planId: p.planId, schrittId: s.schrittId, quelle: quelle };
           html += `<div class="morgen-plan-schritt${isSel ? ' sel' : ''}" data-mps-idx="${_idx}">
@@ -1917,13 +1927,15 @@ function renderMorgenList() {
 
   leftScroll.innerHTML = html;
 
-  // Event-Listener für Plan-Schritte via globalem Index (100% zuverlässig)
+  // Event-Listener NACH innerHTML setzen
+  // _planSchrittMap ist jetzt vollständig befüllt
+  // Wichtig: addEventListener liest Map zum KLICK-Zeitpunkt, nicht jetzt
   leftScroll.querySelectorAll('.morgen-plan-schritt[data-mps-idx]').forEach(el => {
     el.addEventListener('click', function(ev) {
       ev.stopPropagation();
-      const idx = parseInt(this.dataset.mpsIdx, 10);
+      const idx = parseInt(this.getAttribute('data-mps-idx'), 10);
       const entry = _planSchrittMap[idx];
-      if (entry) {
+      if (entry && entry.planId && entry.schrittId) {
         togglePlanSchritt(entry.planId, entry.schrittId, entry.quelle);
       }
     });
