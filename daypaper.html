@@ -1927,19 +1927,21 @@ function renderMorgenList() {
 
   leftScroll.innerHTML = html;
 
-  // Event-Listener NACH innerHTML setzen
-  // _planSchrittMap ist jetzt vollständig befüllt
-  // Wichtig: addEventListener liest Map zum KLICK-Zeitpunkt, nicht jetzt
-  leftScroll.querySelectorAll('.morgen-plan-schritt[data-mps-idx]').forEach(el => {
-    el.addEventListener('click', function(ev) {
+  // Event-Delegation auf Container (überlebt innerHTML-Updates durch Aufklappen)
+  // Nur einmal setzen - prüfen ob schon gesetzt
+  if (!leftScroll._delegationSet) {
+    leftScroll._delegationSet = true;
+    leftScroll.addEventListener('click', function(ev) {
+      const schritt = ev.target.closest('.morgen-plan-schritt[data-mps-idx]');
+      if (!schritt) return;
       ev.stopPropagation();
-      const idx = parseInt(this.getAttribute('data-mps-idx'), 10);
+      const idx = parseInt(schritt.getAttribute('data-mps-idx'), 10);
       const entry = _planSchrittMap[idx];
       if (entry && entry.planId && entry.schrittId) {
         togglePlanSchritt(entry.planId, entry.schrittId, entry.quelle);
       }
     });
-  });
+  }
 
   renderMorgenRight();
   updateMorgenCount();
