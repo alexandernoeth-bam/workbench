@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#28201a">
   <link rel="manifest" href="./daypaper_manifest.json">
   <link rel="apple-touch-icon" href="./icons/icon-daypaper-192.png">
-  <title>DayPaper v0.2.0</title>
+  <title>DayPaper v0.2.1</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap" rel="stylesheet">
@@ -1170,7 +1170,7 @@
 
   <!-- ═══════════ HEADER ═══════════ -->
   <div id="app-header">
-    <span class="title">DayPaper<span class="app-version">v0.2.0</span></span>
+    <span class="title">DayPaper<span class="app-version">v0.2.1</span></span>
     <span class="date" id="header-date"></span>
     <span class="status-badge badge-start" id="status-badge">Start</span>
   </div>
@@ -1277,7 +1277,7 @@
 // ═══════════════════════════════════════════════════
 // KONSTANTEN & VERSION
 // ═══════════════════════════════════════════════════
-const APP_VERSION = 'v0.2.0';
+const APP_VERSION = 'v0.2.1';
 const STORAGE_KEY = 'daypaper_db';
 const ZETTEL_MAX_DAYS = 5;
 
@@ -1867,19 +1867,27 @@ function renderMorgenList() {
           const isSel = state.morgenAusgewaehlt.some(x => x.planSchrittKey === key);
           // Zeige Aufgaben-Titel wenn Schritt eine verknüpfte Aufgabe hat
           const anzeigeTitel = s.aufgabeTitel || s.titel;
-          let sub = '';
-          if (s.aufgabeId)    sub += 'Aufgabe · ';
-          if (s.zeitnah)      sub += '⚡ · ';
-          if (s.faellig)      sub += `⚑ ${s.faellig.slice(8)}.${s.faellig.slice(5,7)}. · `;
-          if (s.delegiertAn)  sub += `→ ${escHtml(s.delegiertAn)} · `;
-          sub = sub.replace(/ · $/, '');
+          // Meta-Pills wie normale Aufgaben
+          let metaPills = '';
+          if (s.zeitnah)     metaPills += `<span class="pm pm-zeitnah">⚡ zeitnah</span>`;
+          if (s.faellig) {
+            const heute2 = todayISO();
+            if (s.faellig <= heute2)
+                               metaPills += `<span class="pm pm-dl-heute">⚑ heute</span>`;
+            else               metaPills += `<span class="pm pm-dl">⚑ ${s.faellig.slice(8)}.${s.faellig.slice(5,7)}.</span>`;
+          }
+          if (s.groesse)     metaPills += `<span class="pm pm-sz">${escHtml(s.groesse)}</span>`;
+          if (s.delegiertAn) metaPills += `<span class="pm pm-rec">→ ${escHtml(s.delegiertAn)}</span>`;
+          const sub = metaPills; // für spätere Verwendung im HTML
 
           html += `<div class="morgen-plan-schritt${isSel ? ' sel' : ''}"
-            onclick="onPlanSchrittClick(event,'${p.planId}','${s.schrittId}','${quelle}')">
+            data-plan-id="${escAttr(p.planId)}"
+            data-schritt-id="${escAttr(s.schrittId)}"
+            data-quelle="${quelle}">
             <div class="mps-arrow">${isSel ? '✓' : '→'}</div>
             <div class="mps-body">
               <div class="mps-titel">${escHtml(anzeigeTitel)}</div>
-              ${sub ? `<div class="mps-sub">${sub}</div>` : ''}
+              ${metaPills ? `<div class="pick-meta-new" style="margin-top:3px;">${metaPills}</div>` : ''}
             </div>
           </div>`;
         });
@@ -1902,6 +1910,20 @@ function renderMorgenList() {
   }
 
   leftScroll.innerHTML = html;
+
+  // Event-Listener für Plan-Schritte (sicherer als inline onclick mit IDs)
+  leftScroll.querySelectorAll('.morgen-plan-schritt').forEach(el => {
+    el.addEventListener('click', function(ev) {
+      ev.stopPropagation();
+      const planId    = this.dataset.planId;
+      const schrittId = this.dataset.schrittId;
+      const quelle    = this.dataset.quelle;
+      if (planId && schrittId && quelle) {
+        togglePlanSchritt(planId, schrittId, quelle);
+      }
+    });
+  });
+
   renderMorgenRight();
   updateMorgenCount();
 }
@@ -2909,6 +2931,11 @@ function closeModalOnBackdrop(event) {
 // ═══════════════════════════════════════════════════
 // HILFSFUNKTIONEN
 // ═══════════════════════════════════════════════════
+function escAttr(str) {
+  if (!str) return '';
+  return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function escHtml(str) {
   if (!str) return '';
   return String(str)
