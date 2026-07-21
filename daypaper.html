@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#28201a">
   <link rel="manifest" href="./daypaper_manifest.json">
   <link rel="apple-touch-icon" href="./icons/icon-daypaper-192.png">
-  <title>DayPaper v0.1.9</title>
+  <title>DayPaper v0.2.0</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap" rel="stylesheet">
@@ -1170,7 +1170,7 @@
 
   <!-- ═══════════ HEADER ═══════════ -->
   <div id="app-header">
-    <span class="title">DayPaper<span class="app-version">v0.1.9</span></span>
+    <span class="title">DayPaper<span class="app-version">v0.2.0</span></span>
     <span class="date" id="header-date"></span>
     <span class="status-badge badge-start" id="status-badge">Start</span>
   </div>
@@ -1277,7 +1277,7 @@
 // ═══════════════════════════════════════════════════
 // KONSTANTEN & VERSION
 // ═══════════════════════════════════════════════════
-const APP_VERSION = 'v0.1.9';
+const APP_VERSION = 'v0.2.0';
 const STORAGE_KEY = 'daypaper_db';
 const ZETTEL_MAX_DAYS = 5;
 
@@ -1615,12 +1615,16 @@ function getAlleAufgaben() {
     if (!state.quellen[typ]) return;
     const data = state.quellen[typ].daten;
 
-    // Plan-Aufgaben-IDs → planTitel
-    const planAufgabeMap = {};
+    // Plan-Aufgaben-IDs sammeln: diese werden NUR im Plan-Block angezeigt
+    const planAufgabeIds = new Set();
     if (data.plaene) {
       data.plaene.forEach(p => {
+        // Nur aus aktiven (nicht erledigten) Plänen
+        if (p.status === 'erledigt' || p.status === 'abgeschlossen') return;
         (p.schritte || []).forEach(s => {
-          if (s.aufgabeId) planAufgabeMap[s.aufgabeId] = p.titel;
+          if (s.aufgabeId && !s.erledigt && !s.alsErledigt) {
+            planAufgabeIds.add(s.aufgabeId);
+          }
         });
       });
     }
@@ -1631,6 +1635,8 @@ function getAlleAufgaben() {
       // Wiedervorlage / Startdatum prüfen
       const startdatum = a.anzeigedatum || a.startdatum || a.wiedervorlage || null;
       if (startdatum && startdatum > heute) return;
+      // Aufgaben die in einem Plan referenziert sind → nur im Plan-Block zeigen
+      if (planAufgabeIds.has(a.id)) return;
 
       const wText = wiederholungText(a.wiederholung);
 
@@ -1643,7 +1649,7 @@ function getAlleAufgaben() {
         wiederholung: wText,
         zeitnah:     !!(a.zeitnah || a.istZeitnah),
         groesse:     a.groesse || null,
-        planTitel:   planAufgabeMap[a.id] || null,
+        planTitel:   null,
         planId:      null,
         bereichId:   a.bereichId || null
       });
@@ -1714,6 +1720,11 @@ function getAllePlaene() {
 function toggleMorgenPlan(planId) {
   state.morgenPlanAufgeklappt[planId] = !state.morgenPlanAufgeklappt[planId];
   renderMorgenList();
+}
+
+function onPlanSchrittClick(event, planId, schrittId, quelle) {
+  event.stopPropagation();
+  togglePlanSchritt(planId, schrittId, quelle);
 }
 
 function togglePlanSchritt(planId, schrittId, quelle) {
@@ -1863,9 +1874,8 @@ function renderMorgenList() {
           if (s.delegiertAn)  sub += `→ ${escHtml(s.delegiertAn)} · `;
           sub = sub.replace(/ · $/, '');
 
-          // onclick auf dem div selbst – stopPropagation damit Header nicht mitklickt
           html += `<div class="morgen-plan-schritt${isSel ? ' sel' : ''}"
-            onclick="event.stopPropagation();togglePlanSchritt('${p.planId}','${s.schrittId}','${quelle}')">
+            onclick="onPlanSchrittClick(event,'${p.planId}','${s.schrittId}','${quelle}')">
             <div class="mps-arrow">${isSel ? '✓' : '→'}</div>
             <div class="mps-body">
               <div class="mps-titel">${escHtml(anzeigeTitel)}</div>
