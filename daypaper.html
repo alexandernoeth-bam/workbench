@@ -1654,8 +1654,6 @@ function getAlleAufgaben() {
 }
 
 function getAllePlaene() {
-  // Aufgaben-IDs die als aufgabeId in Planschritten referenziert sind
-  // → deren Aufgaben werden schon in der Aufgabenliste gezeigt
   const result = [];
 
   ['work', 'priv'].forEach(typ => {
@@ -1663,47 +1661,49 @@ function getAllePlaene() {
     const data = state.quellen[typ].daten;
     if (!data.plaene || data.plaene.length === 0) return;
 
-    // Set erledigter Aufgaben-IDs aus aufgaben[]
-    const erledigteAufgabenIds = new Set(
-      (data.aufgaben || []).filter(a => a.erledigt || a.status === 'erledigt').map(a => a.id)
-    );
+    // Aufgaben-Map für schnellen Zugriff: id → aufgabe
+    const aufgabenMap = {};
+    (data.aufgaben || []).forEach(a => { aufgabenMap[a.id] = a; });
 
     data.plaene.forEach(p => {
-      // Plan überspringen wenn komplett erledigt oder abgeschlossen
+      // Plan überspringen wenn erledigt/abgeschlossen
       if (p.status === 'erledigt' || p.status === 'abgeschlossen') return;
 
       const alleSchritte = p.schritte || [];
 
-      // Offene Schritte: nicht erledigt
+      // Offene Schritte: robuste erledigt-Prüfung
       const offeneSchritte = alleSchritte.filter(s => {
-        if (s.erledigt) return false;
-        // Schritt mit aufgabeId: prüfen ob Aufgabe erledigt
-        if (s.aufgabeId && erledigteAufgabenIds.has(s.aufgabeId)) return false;
+        // Schritt selbst erledigt?
+        if (s.erledigt === true || s.status === 'erledigt' || s.alsErledigt === true) return false;
+        // Schritt hat aufgabeId → Aufgabe erledigt?
+        if (s.aufgabeId) {
+          const aufgabe = aufgabenMap[s.aufgabeId];
+          if (aufgabe && (aufgabe.erledigt === true || aufgabe.status === 'erledigt')) return false;
+        }
         return true;
       });
 
-      if (offeneSchritte.length === 0) return; // Plan komplett erledigt
-
-      // Schritte ohne aufgabeId → das sind die die wir anzeigen wollen
-      // Schritte mit aufgabeId → Aufgabe erscheint schon in der Aufgabenliste
-      const schritteOhneAufgabe = offeneSchritte.filter(s => !s.aufgabeId);
-      const schritteReferenziert = offeneSchritte.filter(s => !!s.aufgabeId);
-
-      // Plan nur anzeigen wenn es Schritte ohne Aufgabe gibt
-      if (schritteOhneAufgabe.length === 0) return;
+      if (offeneSchritte.length === 0) return;
 
       result.push({
         planId:    p.id,
         quelle:    typ,
         titel:     p.titel,
         prioritaet: p.prioritaet || 'mittel',
-        offeneSchritte: offeneSchritte.length,
-        schritteOhneAufgabe: schritteOhneAufgabe.map(s => ({
-          schrittId: s.id,
-          titel:     s.titel,
-          delegiertAn: s.delegiertAn || null
-        })),
-        schritteReferenziert: schritteReferenziert.length
+        // ALLE offenen Schritte zeigen – inklusive die mit aufgabeId
+        schritte: offeneSchritte.map(s => {
+          const aufgabe = s.aufgabeId ? aufgabenMap[s.aufgabeId] : null;
+          return {
+            schrittId:   s.id,
+            titel:       s.titel,
+            delegiertAn: s.delegiertAn || null,
+            aufgabeId:   s.aufgabeId || null,
+            // Aufgaben-Metadaten für Anzeige
+            aufgabeTitel: aufgabe ? aufgabe.titel : null,
+            faellig:      aufgabe ? aufgabe.faellig || null : null,
+            zeitnah:      aufgabe ? !!(aufgabe.zeitnah || aufgabe.istZeitnah) : false
+          };
+        })
       });
     });
   });
@@ -1724,23 +1724,29 @@ function togglePlanSchritt(planId, schrittId, quelle) {
   if (existing >= 0) {
     state.morgenAusgewaehlt.splice(existing, 1);
   } else {
-    // Plan-Titel aus Daten lesen
     const data = state.quellen[quelle]?.daten;
     const plan = data?.plaene?.find(p => p.id === planId);
     const schritt = plan?.schritte?.find(s => s.id === schrittId);
     if (!schritt || !plan) return;
+
+    // Wenn Schritt eine aufgabeId hat → Aufgaben-Titel verwenden
+    const aufgabenMap = {};
+    (data.aufgaben || []).forEach(a => { aufgabenMap[a.id] = a; });
+    const aufgabe = schritt.aufgabeId ? aufgabenMap[schritt.aufgabeId] : null;
+    const anzeigeTitel = aufgabe ? aufgabe.titel : schritt.titel;
+
     state.morgenAusgewaehlt.push({
-      refId:         null,          // kein Aufgaben-refId
-      quelle:        quelle,
-      titel:         schritt.titel,
-      planTitel:     plan.titel,
-      planId:        planId,
+      refId:          aufgabe ? aufgabe.id : null,
+      quelle:         quelle,
+      titel:          anzeigeTitel,
+      planTitel:      plan.titel,
+      planId:         planId,
       planSchrittKey: key,
-      schrittId:     schrittId,
-      faellig:       null,
-      zeitnah:       false,
-      groesse:       null,
-      wiederholung:  null,
+      schrittId:      schrittId,
+      faellig:        aufgabe ? aufgabe.faellig || null : null,
+      zeitnah:        aufgabe ? !!(aufgabe.zeitnah || aufgabe.istZeitnah) : false,
+      groesse:        aufgabe ? aufgabe.groesse || null : null,
+      wiederholung:   null,
       istPlanSchritt: true
     });
   }
@@ -1832,7 +1838,7 @@ function renderMorgenList() {
     html += `<div class="morgen-plan-section">Pläne</div>`;
     plaene.forEach(p => {
       const aufgeklappt = !!state.morgenPlanAufgeklappt[p.planId];
-      const selSchritte = p.schritteOhneAufgabe.filter(s =>
+      const selAnzahl = p.schritte.filter(s =>
         state.morgenAusgewaehlt.some(x => x.planSchrittKey === p.planId + '|' + s.schrittId)
       ).length;
 
@@ -1841,19 +1847,29 @@ function renderMorgenList() {
           <span class="morgen-plan-toggle">${aufgeklappt ? '▼' : '▶'}</span>
           <span class="morgen-plan-icon">📋</span>
           <span class="morgen-plan-titel">${escHtml(p.titel)}</span>
-          <span class="morgen-plan-meta">${selSchritte > 0 ? selSchritte + ' gew. · ' : ''}${p.schritteOhneAufgabe.length} offen</span>
+          <span class="morgen-plan-meta">${selAnzahl > 0 ? selAnzahl + ' gew. · ' : ''}${p.schritte.length} offen</span>
         </div>`;
 
       if (aufgeklappt) {
-        p.schritteOhneAufgabe.forEach(s => {
+        p.schritte.forEach(s => {
           const key = p.planId + '|' + s.schrittId;
           const isSel = state.morgenAusgewaehlt.some(x => x.planSchrittKey === key);
+          // Zeige Aufgaben-Titel wenn Schritt eine verknüpfte Aufgabe hat
+          const anzeigeTitel = s.aufgabeTitel || s.titel;
+          let sub = '';
+          if (s.aufgabeId)    sub += 'Aufgabe · ';
+          if (s.zeitnah)      sub += '⚡ · ';
+          if (s.faellig)      sub += `⚑ ${s.faellig.slice(8)}.${s.faellig.slice(5,7)}. · `;
+          if (s.delegiertAn)  sub += `→ ${escHtml(s.delegiertAn)} · `;
+          sub = sub.replace(/ · $/, '');
+
+          // onclick auf dem div selbst – stopPropagation damit Header nicht mitklickt
           html += `<div class="morgen-plan-schritt${isSel ? ' sel' : ''}"
-            onclick="togglePlanSchritt('${p.planId}','${s.schrittId}','${quelle}')">
+            onclick="event.stopPropagation();togglePlanSchritt('${p.planId}','${s.schrittId}','${quelle}')">
             <div class="mps-arrow">${isSel ? '✓' : '→'}</div>
             <div class="mps-body">
-              <div class="mps-titel">${escHtml(s.titel)}</div>
-              ${s.delegiertAn ? `<div class="mps-sub">→ ${escHtml(s.delegiertAn)}</div>` : ''}
+              <div class="mps-titel">${escHtml(anzeigeTitel)}</div>
+              ${sub ? `<div class="mps-sub">${sub}</div>` : ''}
             </div>
           </div>`;
         });
