@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.210</title>
+<title>WorkAssist 1.5.211</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1065,6 +1065,34 @@ input[type="checkbox"]:hover:not(:checked) { border-color: var(--teal-light); }
 }
 
 /* ── Dokumente ──────────────────────────────────────────────────────────── */
+/* ── Dokumente & Ressourcen Screen ──────────────────────────────────── */
+.dok-filter-chip { padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text-dim);font-size:10px;font-weight:600;cursor:pointer;user-select:none; }
+.dok-filter-chip:hover { background:var(--teal-xlight); }
+.dok-filter-chip.active,.dok-filter-chip.active-status { background:var(--teal-dark);color:#fff;border-color:var(--teal-dark); }
+/* Karten */
+.dok-entry { background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;padding:5px 11px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .1s; }
+.dok-entry:hover { background:var(--teal-xlight);border-color:var(--teal-light); }
+.dok-entry.archiviert { opacity:.5; }
+.dok-entry-icon { width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+.dok-entry-icon.typ-dok  { background:#e8eaf6; }
+.dok-entry-icon.typ-res  { background:#e0f7fa; }
+.dok-entry-body { flex:1;min-width:0; }
+.dok-entry-row1 { display:flex;align-items:center;gap:7px; }
+.dok-entry-titel { font-size:12px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1; }
+.dok-entry-sub { display:flex;align-items:center;gap:6px;margin-top:1px;overflow:hidden; }
+.dok-entry-notiz { font-size:10px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1; }
+.dok-entry-meta { font-size:9px;color:var(--text-xdim);flex-shrink:0; }
+.dok-entry-actions { display:flex;gap:4px;flex-shrink:0; }
+.dok-act-btn { width:24px;height:24px;border-radius:5px;border:1px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-dim); }
+.dok-act-btn:hover { background:var(--teal-xlight);color:var(--teal-dark); }
+.dok-act-btn.danger:hover { background:#fde8e6;color:#c0392b;border-color:#f5b7b1; }
+/* Gruppe */
+.dok-group-head { font-size:9px;font-weight:700;color:var(--text-xdim);letter-spacing:.08em;text-transform:uppercase;padding:10px 0 5px;display:flex;align-items:center;gap:8px; }
+.dok-group-head::after { content:'';flex:1;height:1px;background:var(--border); }
+.dok-group-count { font-size:9px;color:var(--text-xdim);background:var(--border);padding:1px 6px;border-radius:5px;font-weight:600; }
+/* Ressource-Badges */
+.dok-res-badge { font-size:9px;font-weight:700;padding:1px 6px;border-radius:5px;background:#e0f7fa;color:#006064;flex-shrink:0; }
+
 .dok-status-badge {
   display: inline-flex; align-items: center; gap: 3px;
   font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 8px;
@@ -2162,7 +2190,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.210</div>
+    <div class="start-version">v1.5.211</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2230,7 +2258,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.210</div>
+    <div class="app-version" id="app-version">v1.5.211</div>
   </div>
 
   <div class="nav-section">
@@ -2576,37 +2604,47 @@ textarea.field-input { resize: vertical; min-height: 70px; }
   </div><!-- /screen-wissen -->
 
   <!-- ══ SCREEN: DOKUMENTE ════════════════════════════════════════════════ -->
-  <div class="screen" id="screen-dokumente">
-    <div class="wissen-toolbar">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8aaaa8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-      <select class="filter-select" id="filter-dok-typ" onchange="renderDokumente()">
-        <option value="">Alle Typen</option>
-        <option value="erstellen">📝 Erstellen</option>
-        <option value="lesen">📖 Lesen &amp; Lernen</option>
-      </select>
-      <select class="filter-select" id="filter-dok-status" onchange="renderDokumente()">
-        <option value="inarbeit" selected>In Arbeit</option>
+  <div class="screen" id="screen-dokumente" style="display:flex;flex-direction:column;overflow:hidden;">
+    <!-- Topbar -->
+    <div style="background:var(--teal-dark);color:#fff;padding:7px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+      <div style="flex:1;">
+        <span style="font-size:13px;font-weight:700;">Dokumente &amp; Ressourcen</span>
+        <span style="font-size:10px;opacity:.6;margin-left:8px;" id="dok-count"></span>
+      </div>
+      <input id="dok-suche" placeholder="Suchen …" oninput="renderDokumente()"
+        style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:4px 9px;font-size:11px;color:#fff;outline:none;width:180px;font-family:var(--font);">
+      <button onclick="openDokModal(null)" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:4px;">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Dokument
+      </button>
+      <button onclick="openRessourceModal(null)" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:4px;">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Ressource
+      </button>
+    </div>
+    <!-- Filterleiste -->
+    <div style="padding:5px 12px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;">
+      <span class="dok-filter-chip active" onclick="dokSetFilter('typ','',this)">Alle</span>
+      <span class="dok-filter-chip" onclick="dokSetFilter('typ','dokument',this)">📄 Dokumente</span>
+      <span class="dok-filter-chip" onclick="dokSetFilter('typ','ressource',this)">🔗 Ressourcen</span>
+      <div style="width:1px;height:16px;background:var(--border);margin:0 2px;"></div>
+      <span class="dok-filter-chip active-status" onclick="dokSetFilter('archiv','aktiv',this)">Aktiv</span>
+      <span class="dok-filter-chip" onclick="dokSetFilter('archiv','archiv',this)">Archiv</span>
+      <span class="dok-filter-chip" onclick="dokSetFilter('archiv','',this)">Alle</span>
+      <div style="width:1px;height:16px;background:var(--border);margin:0 2px;"></div>
+      <select id="filter-dok-status" class="filter-select" onchange="renderDokumente()" style="font-size:10px;">
         <option value="">Alle Status</option>
+        <option value="inarbeit">In Arbeit</option>
         <option value="idee">Idee</option>
         <option value="entwurf">Entwurf</option>
         <option value="review">Review</option>
         <option value="fertig">Fertig</option>
         <option value="einsatz">Einsatz</option>
-        <option value="lesen">Zu lesen</option>
-        <option value="liest">Lese ich</option>
-        <option value="gelesen">Gelesen</option>
-        <option value="erkenntnisse">Erkenntnisse notiert</option>
       </select>
-      <select class="filter-select" id="filter-dok-bereich" onchange="renderDokumente()">
+      <select id="filter-dok-bereich" class="filter-select" onchange="renderDokumente()" style="font-size:10px;">
         <option value="">Alle Bereiche</option>
       </select>
-      <span style="font-size:12px;color:var(--text-xdim);" id="dok-count"></span>
-      <button class="btn-primary" onclick="openDokModal(null)" style="margin-left:auto;display:flex;align-items:center;gap:5px;padding:5px 12px;font-size:11px;">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Dokument
-      </button>
     </div>
-    <div style="overflow-y:auto;flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:8px;" id="dok-container"></div>
+    <!-- Liste -->
+    <div style="overflow-y:auto;flex:1;padding:10px 14px;" id="dok-container"></div>
   </div><!-- /screen-dokumente -->
 
   <!-- ══ SCREEN: NOTIZEN ══════════════════════════════════════════════════ -->
@@ -3531,7 +3569,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.210';
+const APP_VERSION = '1.5.211';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -3667,9 +3705,43 @@ function migrateDB() {
       }
     }
   });
-  // Dokumente: ressourceTyp
+  // Dokumente: ressourceTyp + archiviert + kurzNotiz
   (DB.dokumente || []).forEach(d => {
     if (d.ressourceTyp === undefined) d.ressourceTyp = null;
+    if (d.archiviert   === undefined) d.archiviert   = false;
+    if (d.kurzNotiz    === undefined) d.kurzNotiz    = '';
+    if (d.eintragsTyp  === undefined) d.eintragsTyp  = 'dokument';
+  });
+
+  // Migration: b.ressourcen[] → DB.dokumente (einmalig, wenn noch nicht migriert)
+  (DB.bereiche || []).forEach(b => {
+    if (!Array.isArray(b.ressourcen) || b.ressourcen.length === 0) return;
+    b.ressourcen.forEach(r => {
+      // Prüfen ob bereits migriert (anhand Label+URL Duplikat-Check)
+      const bereitsVorhanden = (DB.dokumente||[]).some(d =>
+        d.eintragsTyp === 'ressource' && d.link === r.url && d.bereichId === b.id
+      );
+      if (bereitsVorhanden) return;
+      DB.dokumente.push({
+        id:          'res_mig_' + Math.random().toString(36).slice(2,9),
+        eintragsTyp: 'ressource',
+        titel:       r.label || r.url || 'Ressource',
+        typ:         null,
+        link:        r.url || '',
+        ressourceTyp: r.typ || 'link',
+        bereichId:   b.id,
+        aufgabeId:   null,
+        status:      'aktiv',
+        archiviert:  false,
+        kurzNotiz:   '',
+        einsatzNotiz: null,
+        notiz:       '',
+        erstellt:    new Date().toISOString(),
+        geaendert:   new Date().toISOString(),
+      });
+    });
+    // Ressourcen aus Bereich leeren (jetzt in DB.dokumente)
+    b.ressourcen = [];
   });
   // Pläne: prioritaet + horizont + notiz
   (DB.plaene || []).forEach(p => {
@@ -4046,6 +4118,9 @@ function showScreen(name, navEl) {
     if (badge) badge.textContent = (DB.dokumente||[]).length;
   }
   if (name === 'dokumente') {
+    // Bereich-Filter zurücksetzen damit er neu befüllt wird
+    const bSel = document.getElementById('filter-dok-bereich');
+    if (bSel) { bSel.innerHTML = '<option value="">Alle Bereiche</option>'; }
     renderDokumente();
   }
   if (name === 'notizen') {
@@ -7019,10 +7094,11 @@ function renderBereichDetail(b) {
     return st === 'erledigt';
   }).length;
 
-  const ressourcen   = b.ressourcen || [];
-  const dokumente    = (DB.dokumente||[]).filter(d => d.bereichId === b.id);
+  const ressourcen   = []; // migriert zu DB.dokumente
+  const dokumente    = (DB.dokumente||[]).filter(d => d.bereichId === b.id && (d.eintragsTyp||'dokument') === 'dokument' && !d.archiviert);
+  const resEintraege = (DB.dokumente||[]).filter(d => d.bereichId === b.id && (d.eintragsTyp||'dokument') === 'ressource' && !d.archiviert);
   const wissen       = (DB.wissen||[]).filter(w => w.bereichId === b.id);
-  const ressGesamt   = ressourcen.length + dokumente.length + wissen.length;
+  const ressGesamt   = dokumente.length + resEintraege.length + wissen.length;
 
   const notizen = (DB.notizen||[]).filter(n => n.bereichId === b.id && !n.parentId)
     .sort((a,x) => (x.geaendert||'').localeCompare(a.geaendert||'')).slice(0,5);
@@ -7121,19 +7197,18 @@ function renderBereichDetail(b) {
     ${wissenIcon}<div style="flex:1;min-width:0;"><div class="bd-res-label">${escHtml(w.titel)}</div><div class="bd-res-url">${w.typ==='aufgabennotiz'?'Aus Aufgabe':(w.typ||'Wissen')}</div></div>
     <div class="bd-res-edit" onclick="event.stopPropagation();openWissenModal('${w.id}')" style="padding:2px 5px;cursor:pointer;color:var(--text-xdim);flex-shrink:0;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
   </div>`).join('');
-  const linkRows = ressourcen.map((r,i) => `<div class="bd-res-row" onclick="if(!event.target.closest('.bd-res-del')&&!event.target.closest('.bd-res-edit')){window.open('${escHtml(r.url)}','_blank')}">
-    ${ressourceIconSVG(r.typ)}<div style="flex:1;min-width:0;"><div class="bd-res-label">${escHtml(r.label)}</div><div class="bd-res-url">${escHtml(r.url).slice(0,50)}${r.url.length>50?'…':''}</div></div>
-    <div class="bd-res-edit" onclick="event.stopPropagation();resBearbeiten(${i})" style="padding:2px 5px;cursor:pointer;color:var(--text-xdim);flex-shrink:0;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
-    <div class="bd-res-del" onclick="event.stopPropagation();resLoeschen(${i})" style="padding:2px 4px;cursor:pointer;color:var(--text-xdim);flex-shrink:0;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
+  const resRows  = resEintraege.map(r => `<div class="bd-res-row" onclick="if(!event.target.closest('.bd-res-edit')){${r.link?`window.open('${escHtml(r.link)}','_blank')`:`openRessourceModal('${r.id}')`}}">
+    ${ressourceIconSVG(r.ressourceTyp||'link')}<div style="flex:1;min-width:0;"><div class="bd-res-label">${escHtml(r.titel)}</div><div class="bd-res-url">${(r.kurzNotiz||r.link||'').slice(0,50)}</div></div>
+    <div class="bd-res-edit" onclick="event.stopPropagation();openRessourceModal('${r.id}')" style="padding:2px 5px;cursor:pointer;color:var(--text-xdim);flex-shrink:0;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
   </div>`).join('');
-  const ressContent = (dokRows + wisRows + linkRows) || `<div class="bd-leer">Noch keine Ressourcen</div>`;
+  const ressContent = (dokRows + wisRows + resRows) || `<div class="bd-leer">Noch keine Ressourcen</div>`;
 
   const accRessourcen = `<div class="bd-acc">
     <div class="bd-acc-head" onclick="bdAccToggle(this)">
       <span class="bd-acc-icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
       <span class="bd-acc-title">Ressourcen</span>
       <span class="bd-acc-count">${ressGesamt}</span>
-      <button class="bd-acc-add" onclick="event.stopPropagation();resAuswahlOeffnen()">+</button>
+      <button class="bd-acc-add" onclick="event.stopPropagation();openRessourceModal(null)">+</button>
       <span class="bd-acc-caret">▶</span>
     </div>
     <div class="bd-acc-body">${ressContent}</div>
@@ -8564,69 +8639,142 @@ const DOK_STATUS_CSS = {
 function dokStatusLabel(s) { return DOK_STATUS_LABELS[s] || s; }
 function dokStatusCss(s)   { return DOK_STATUS_CSS[s] || ''; }
 
+// Filter-State für Dokumente-Screen
+let _dokFilterTyp    = '';   // '' | 'dokument' | 'ressource'
+let _dokFilterArchiv = 'aktiv'; // '' | 'aktiv' | 'archiv'
+
+function dokSetFilter(key, val, el) {
+  if (key === 'typ')    _dokFilterTyp    = val;
+  if (key === 'archiv') _dokFilterArchiv = val;
+  // Chip-Styling aktualisieren
+  const group = el.parentElement.querySelectorAll('.dok-filter-chip');
+  // Nur Chips der gleichen "Gruppe" deaktivieren
+  el.closest('div').querySelectorAll('.dok-filter-chip').forEach(c => {
+    if ((key === 'typ'    && ['','dokument','ressource'].includes(c.getAttribute('onclick')?.match(/'([^']+)'/g)?.[1]?.replace(/'/g,''))) ||
+        (key === 'archiv' && ['','aktiv','archiv'].includes(c.getAttribute('onclick')?.match(/'([^']+)'/g)?.[1]?.replace(/'/g,'')))) {
+      c.classList.remove('active','active-status');
+    }
+  });
+  el.classList.add(key === 'archiv' ? 'active-status' : 'active');
+  renderDokumente();
+}
+
 function renderDokumente() {
   const container = document.getElementById('dok-container');
   const countEl   = document.getElementById('dok-count');
   if (!container) return;
 
-  // Bereich-Filter befüllen
+  // Bereich-Filter befüllen (nur einmal)
   const bSel = document.getElementById('filter-dok-bereich');
   if (bSel && bSel.options.length <= 1) {
-    DB.bereiche.filter(b => !b.archiviert).forEach(b => {
+    DB.bereiche.filter(b => !b.archiviert).sort((a,b)=>a.name.localeCompare(b.name,'de')).forEach(b => {
       const o = document.createElement('option');
       o.value = b.id; o.textContent = b.name;
       bSel.appendChild(o);
     });
   }
 
-  const filterTyp    = document.getElementById('filter-dok-typ')?.value    || '';
-  const filterStatus = document.getElementById('filter-dok-status')?.value  || '';
+  const filterStatus = document.getElementById('filter-dok-status')?.value || '';
   const filterBereich= document.getElementById('filter-dok-bereich')?.value || '';
-
-  const ENDSTATUS = new Set(['fertig','einsatz','gelesen','erkenntnisse']);
+  const suche        = (document.getElementById('dok-suche')?.value || '').toLowerCase().trim();
+  const ENDSTATUS    = new Set(['fertig','einsatz','gelesen','erkenntnisse']);
 
   let liste = (DB.dokumente || []).filter(d => {
-    if (filterTyp    && d.typ    !== filterTyp)    return false;
-    if (filterStatus === 'inarbeit' && ENDSTATUS.has(d.status)) return false;
-    if (filterStatus && filterStatus !== 'inarbeit' && d.status !== filterStatus) return false;
-    if (filterBereich&& d.bereichId !== filterBereich) return false;
+    // Typ-Filter
+    const typ = d.eintragsTyp || 'dokument';
+    if (_dokFilterTyp && typ !== _dokFilterTyp) return false;
+    // Archiv-Filter
+    if (_dokFilterArchiv === 'aktiv'  &&  d.archiviert) return false;
+    if (_dokFilterArchiv === 'archiv' && !d.archiviert) return false;
+    // Status-Filter (nur für Dokumente)
+    if (filterStatus && typ === 'dokument') {
+      if (filterStatus === 'inarbeit' && ENDSTATUS.has(d.status)) return false;
+      if (filterStatus !== 'inarbeit' && d.status !== filterStatus) return false;
+    }
+    // Bereich-Filter
+    if (filterBereich && d.bereichId !== filterBereich) return false;
+    // Suche
+    if (suche && !d.titel.toLowerCase().includes(suche) && !(d.kurzNotiz||'').toLowerCase().includes(suche)) return false;
     return true;
   }).sort((a,b) => (b.geaendert||'').localeCompare(a.geaendert||''));
 
-  if (countEl) countEl.textContent = liste.length + ' Dokument' + (liste.length !== 1 ? 'e' : '');
+  const aktiveGesamt = (DB.dokumente||[]).filter(d => !d.archiviert).length;
+  if (countEl) countEl.textContent = liste.length + ' Einträge';
 
-  // Badge aktualisieren
+  // Badge
   const badge = document.getElementById('badge-dokumente');
-  if (badge) badge.textContent = (DB.dokumente||[]).length;
+  if (badge) badge.textContent = aktiveGesamt;
 
   if (!liste.length) {
-    container.innerHTML = '<div style="color:var(--text-xdim);font-size:12px;padding:20px;text-align:center;">Keine Dokumente – mit + anlegen.</div>';
+    container.innerHTML = '<div style="color:var(--text-xdim);font-size:12px;padding:24px;text-align:center;">Keine Einträge – mit + anlegen.</div>';
     return;
   }
 
-  container.innerHTML = liste.map(d => {
-    const b = d.bereichId ? DB.bereiche.find(b => b.id === d.bereichId) : null;
-    const verAufg = d.aufgabeId ? DB.aufgaben.find(a => a.id === d.aufgabeId) : null;
-    const typCls  = d.typ === 'erstellen' ? 'dok-typ-erstellen' : 'dok-typ-lesen';
-    const typLbl  = d.typ === 'erstellen' ? '📝 Erstellen' : '📖 Lesen &amp; Lernen';
-    const subText = d.einsatzNotiz
-      ? 'Einsatz: ' + d.einsatzNotiz.slice(0,60) + (d.einsatzNotiz.length > 60 ? '…' : '')
-      : (d.status === 'erkenntnisse' ? 'Erkenntnisse notiert' : '');
-    return `<div class="dok-karte" onclick="openDokModal('${d.id}')">
-      <div class="dok-karte-header">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        <div class="dok-karte-titel">${d.titel}</div>
-        <span class="dok-status-badge ${dokStatusCss(d.status)}">${dokStatusLabel(d.status)}</span>
+  // Nach Bereichen gruppieren
+  const groups = {};
+  liste.forEach(d => {
+    const key = d.bereichId || '__kein__';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(d);
+  });
+
+  // Gruppen sortieren: Bereiche alphabetisch, "Ohne Bereich" zuletzt
+  const sortedKeys = Object.keys(groups).sort((a,b) => {
+    if (a === '__kein__') return 1;
+    if (b === '__kein__') return -1;
+    const na = DB.bereiche.find(x=>x.id===a)?.name || '';
+    const nb = DB.bereiche.find(x=>x.id===b)?.name || '';
+    return na.localeCompare(nb,'de');
+  });
+
+  let html = '';
+  sortedKeys.forEach(key => {
+    const bereich = key === '__kein__' ? null : DB.bereiche.find(b=>b.id===key);
+    const label   = bereich ? escHtml(bereich.name) : 'Ohne Bereich';
+    const items   = groups[key];
+    html += `<div class="dok-group-head">${label} <span class="dok-group-count">${items.length}</span></div>`;
+    html += items.map(d => dokEintragHTML(d)).join('');
+  });
+
+  container.innerHTML = html;
+}
+
+function dokEintragHTML(d) {
+  const istRess  = (d.eintragsTyp || 'dokument') === 'ressource';
+  const archCls  = d.archiviert ? ' archiviert' : '';
+  const notizTxt = (d.kurzNotiz||'').trim();
+  const metaTxt  = istRess
+    ? (d.link ? (() => { try { return new URL(d.link).hostname; } catch(e) { return d.link.slice(0,40); } })() : '')
+    : (d.typ === 'erstellen' ? 'Erstellen' : d.typ === 'lesen' ? 'Lesen &amp; Lernen' : '');
+  const statusBadge = istRess
+    ? (d.archiviert ? '<span class="badge dok-s-archiv" style="font-size:9px;padding:1px 5px;border-radius:4px;">Archiv</span>'
+                    : `<span class="dok-res-badge">${d.ressourceTyp ? escHtml(d.ressourceTyp.charAt(0).toUpperCase()+d.ressourceTyp.slice(1)) : 'Link'}</span>`)
+    : `<span class="dok-status-badge ${dokStatusCss(d.status)}">${dokStatusLabel(d.status)}</span>`;
+  const openFn   = istRess ? `openRessourceModal('${d.id}')` : `openDokModal('${d.id}')`;
+  const iconCls  = istRess ? 'typ-res' : 'typ-dok';
+  const iconSVG  = istRess
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#006064" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`
+    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3949ab" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+
+  return `<div class="dok-entry${archCls}" onclick="${openFn}">
+    <div class="dok-entry-icon ${iconCls}">${iconSVG}</div>
+    <div class="dok-entry-body">
+      <div class="dok-entry-row1">
+        <span class="dok-entry-titel">${escHtml(d.titel)}</span>
+        ${statusBadge}
       </div>
-      ${subText ? `<div class="dok-karte-sub">${subText}</div>` : ''}
-      <div class="dok-karte-meta">
-        <span class="dok-typ-chip ${typCls}">${typLbl}</span>
-        ${b ? `<span style="font-size:10px;color:var(--text-dim);">${b.name}</span>` : ''}
-        ${verAufg ? `<span style="font-size:10px;color:var(--text-dim);">→ ${verAufg.titel.slice(0,30)}${verAufg.titel.length>30?'…':''}</span>` : ''}
-        ${d.link ? (() => { try { return `<a href="${d.link}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:#1a56db;margin-left:auto;text-decoration:none;">${new URL(d.link).hostname} →</a>`; } catch(e) { return `<a href="${d.link}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:#1a56db;margin-left:auto;text-decoration:none;">Link →</a>`; } })() : ''}
+      <div class="dok-entry-sub">
+        ${notizTxt
+          ? `<span class="dok-entry-notiz">${escHtml(notizTxt)}</span>`
+          : `<span class="dok-entry-notiz" style="color:var(--text-xdim);font-style:italic;">Keine Notiz</span>`}
+        ${metaTxt ? `<span style="color:var(--text-xdim);font-size:9px;flex-shrink:0;">·</span><span class="dok-entry-meta">${metaTxt}</span>` : ''}
       </div>
-    </div>`;
-  }).join('');
+    </div>
+    <div class="dok-entry-actions">
+      ${d.link ? `<a href="${escHtml(d.link)}" target="_blank" onclick="event.stopPropagation()" class="dok-act-btn" title="Öffnen"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : ''}
+      <div class="dok-act-btn danger" onclick="event.stopPropagation();${istRess?`deleteRessource('${d.id}')`:`dokLoeschenById('${d.id}')`}" title="Löschen"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></div>
+    </div>
+  </div>`;
 }
 
 function openDokModal(id, aufgabeId) {
@@ -8659,8 +8807,12 @@ function openDokModal(id, aufgabeId) {
     const rte = document.getElementById('dok-notiz-rte');
     if (rte) rte.innerHTML = d.notiz || '';
     document.getElementById('dok-modal-titel').textContent = d.titel;
+    const kn = document.getElementById('dok-kurz-notiz');
+    if (kn) kn.value = d.kurzNotiz || '';
     const loeschBtn = document.getElementById('dok-btn-loeschen');
     if (loeschBtn) loeschBtn.style.display = '';
+    const archBtn = document.getElementById('dok-archiv-btn');
+    if (archBtn) { archBtn.textContent = d.archiviert ? '↑ Aus Archiv holen' : '↓ In Archiv'; archBtn.style.display = ''; }
     updateDokWorkflowUI(d.status);
     updateDokAufgabeAnzeige(d.aufgabeId);
     updateDokLinkBtn();
@@ -8674,9 +8826,13 @@ function openDokModal(id, aufgabeId) {
     if (rSel) rSel.value = '';
     const rte = document.getElementById('dok-notiz-rte');
     if (rte) rte.innerHTML = '';
+    const kn = document.getElementById('dok-kurz-notiz');
+    if (kn) kn.value = '';
     document.getElementById('dok-modal-titel').textContent = 'Neues Dokument';
     const loeschBtn = document.getElementById('dok-btn-loeschen');
     if (loeschBtn) loeschBtn.style.display = 'none';
+    const archBtn = document.getElementById('dok-archiv-btn');
+    if (archBtn) archBtn.textContent = '↓ In Archiv';
     updateDokWorkflowUI('idee');
     updateDokAufgabeAnzeige(aufgabeId);
     updateDokLinkBtn();
@@ -8702,6 +8858,141 @@ function dokLoeschen() {
 
 function closeDokModal() {
   document.getElementById('modal-dokument').classList.remove('open');
+}
+
+function toggleDokArchiv() {
+  const id = document.getElementById('dok-edit-id').value;
+  if (!id) return;
+  const d = (DB.dokumente||[]).find(d => d.id === id);
+  if (!d) return;
+  d.archiviert = !d.archiviert;
+  d.geaendert  = new Date().toISOString();
+  saveDB();
+  closeDokModal();
+  renderDokumente();
+  showToast(d.archiviert ? 'Archiviert' : 'Aus Archiv geholt');
+}
+
+function dokLoeschenById(id) {
+  if (!id) return;
+  if (!confirm('Eintrag wirklich löschen?')) return;
+  DB.dokumente = (DB.dokumente||[]).filter(d => d.id !== id);
+  saveDB();
+  renderDokumente();
+  showToast('Gelöscht');
+}
+
+// ── Ressourcen-Modal ──────────────────────────────────────────────────────
+function openRessourceModal(id) {
+  const bSel = document.getElementById('res-modal-bereich');
+  if (bSel) {
+    bSel.innerHTML = '<option value="">— Ohne Bereich —</option>';
+    DB.bereiche.filter(b=>!b.archiviert).sort((a,b)=>a.name.localeCompare(b.name,'de')).forEach(b => {
+      bSel.innerHTML += `<option value="${b.id}">${escHtml(b.name)}</option>`;
+    });
+  }
+  if (id) {
+    const d = (DB.dokumente||[]).find(d => d.id === id);
+    if (!d) return;
+    document.getElementById('res-modal-id').value        = d.id;
+    document.getElementById('res-modal-titel').value     = d.titel;
+    document.getElementById('res-modal-url').value       = d.link || '';
+    document.getElementById('res-modal-typ').value       = d.ressourceTyp || 'link';
+    document.getElementById('res-modal-kurz-notiz').value= d.kurzNotiz || '';
+    if (bSel) bSel.value = d.bereichId || '';
+    const archBtn = document.getElementById('res-archiv-btn');
+    if (archBtn) { archBtn.textContent = d.archiviert ? '↑ Aus Archiv holen' : '↓ In Archiv'; archBtn.style.display = ''; }
+    const delBtn = document.getElementById('res-btn-loeschen');
+    if (delBtn) delBtn.style.display = '';
+    updateResLinkBtn();
+  } else {
+    document.getElementById('res-modal-id').value        = '';
+    document.getElementById('res-modal-titel').value     = '';
+    document.getElementById('res-modal-url').value       = '';
+    document.getElementById('res-modal-typ').value       = 'link';
+    document.getElementById('res-modal-kurz-notiz').value= '';
+    if (bSel) bSel.value = '';
+    const archBtn = document.getElementById('res-archiv-btn');
+    if (archBtn) archBtn.style.display = 'none';
+    const delBtn = document.getElementById('res-btn-loeschen');
+    if (delBtn) delBtn.style.display = 'none';
+    updateResLinkBtn();
+  }
+  document.getElementById('modal-ressource').classList.add('open');
+}
+
+function closeRessourceModal() {
+  document.getElementById('modal-ressource').classList.remove('open');
+}
+
+function updateResLinkBtn() {
+  const url = document.getElementById('res-modal-url')?.value.trim() || '';
+  const btn = document.getElementById('res-link-open');
+  if (btn) { btn.style.display = url ? '' : 'none'; btn.href = url; }
+}
+
+function saveRessource() {
+  const titel = document.getElementById('res-modal-titel').value.trim();
+  if (!titel) { showToast('Bitte einen Titel eingeben', true); return; }
+  const editId    = document.getElementById('res-modal-id').value;
+  const link      = document.getElementById('res-modal-url').value.trim();
+  const typ       = document.getElementById('res-modal-typ').value;
+  const bereichId = document.getElementById('res-modal-bereich').value || null;
+  const kurzNotiz = document.getElementById('res-modal-kurz-notiz').value.trim();
+
+  if (!DB.dokumente) DB.dokumente = [];
+  if (editId) {
+    const d = DB.dokumente.find(d => d.id === editId);
+    if (!d) return;
+    d.titel       = titel;
+    d.link        = link;
+    d.ressourceTyp= typ;
+    d.bereichId   = bereichId;
+    d.kurzNotiz   = kurzNotiz;
+    d.geaendert   = new Date().toISOString();
+  } else {
+    DB.dokumente.push({
+      id:          uid(),
+      eintragsTyp: 'ressource',
+      titel, link,
+      ressourceTyp: typ,
+      bereichId,
+      aufgabeId:   null,
+      status:      'aktiv',
+      archiviert:  false,
+      kurzNotiz,
+      notiz:       '',
+      typ:         null,
+      einsatzNotiz:null,
+      erstellt:    new Date().toISOString(),
+      geaendert:   new Date().toISOString(),
+    });
+  }
+  saveDB();
+  closeRessourceModal();
+  renderDokumente();
+  showToast('Gespeichert');
+}
+
+function toggleRessourceArchiv() {
+  const id = document.getElementById('res-modal-id').value;
+  if (!id) return;
+  const d = (DB.dokumente||[]).find(d => d.id === id);
+  if (!d) return;
+  d.archiviert = !d.archiviert;
+  d.geaendert  = new Date().toISOString();
+  saveDB();
+  closeRessourceModal();
+  renderDokumente();
+  showToast(d.archiviert ? 'Archiviert' : 'Aus Archiv geholt');
+}
+
+function deleteRessource(id) {
+  if (!confirm('Ressource wirklich löschen?')) return;
+  DB.dokumente = (DB.dokumente||[]).filter(d => d.id !== id);
+  saveDB();
+  renderDokumente();
+  showToast('Ressource gelöscht');
 }
 
 function updateDokLinkBtn() {
@@ -8826,7 +9117,6 @@ function saveDokument(neuerStatus) {
   const titel = document.getElementById('dok-titel').value.trim();
   if (!titel) { showToast('Bitte einen Titel eingeben', true); return; }
   const link = document.getElementById('dok-link').value.trim();
-  if (!link) { showToast('Bitte einen Link angeben', true); return; }
 
   const editId    = document.getElementById('dok-edit-id').value;
   const aufgabeId = document.getElementById('dok-aufgabe-id').value || null;
@@ -8834,28 +9124,34 @@ function saveDokument(neuerStatus) {
   const schritte  = typ === 'erstellen' ? DOK_STATUS_ERSTELLEN : DOK_STATUS_LESEN;
   const rte       = document.getElementById('dok-notiz-rte');
   const notiz     = rte ? rte.innerHTML : '';
+  const kurzNotiz = (document.getElementById('dok-kurz-notiz')?.value || '').trim();
 
   let d;
   if (editId) {
     d = (DB.dokumente||[]).find(d => d.id === editId);
     if (!d) return;
     d.titel        = titel;
+    d.eintragsTyp  = 'dokument';
     d.typ          = typ;
     d.link         = link;
     d.bereichId    = document.getElementById('dok-bereich').value || null;
     d.ressourceTyp = document.getElementById('dok-ressource-typ')?.value || null;
     d.notiz        = notiz;
+    d.kurzNotiz    = kurzNotiz;
     d.status       = neuerStatus || d.status;
     d.geaendert    = new Date().toISOString();
   } else {
     if (!DB.dokumente) DB.dokumente = [];
     d = {
       id:           uid(),
+      eintragsTyp:  'dokument',
       titel, typ, link,
       bereichId:    document.getElementById('dok-bereich').value || null,
       ressourceTyp: document.getElementById('dok-ressource-typ')?.value || null,
       aufgabeId,
       status:       neuerStatus || schritte[0],
+      archiviert:   false,
+      kurzNotiz,
       notiz,
       einsatzNotiz: null,
       erstellt:     new Date().toISOString(),
@@ -10006,8 +10302,8 @@ function bereichKarteHTML(b) {
     const st = s.aufgabeId ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status||s.status) : s.status;
     return st === 'erledigt';
   }).length;
-  const ressGesamt      = (b.ressourcen||[]).length +
-    (DB.dokumente||[]).filter(d=>d.bereichId===b.id).length +
+  const ressGesamt      =
+    (DB.dokumente||[]).filter(d=>d.bereichId===b.id && !d.archiviert).length +
     (DB.wissen||[]).filter(w=>w.bereichId===b.id).length;
 
   const statusMap = {inArbeit:'In Arbeit', pausiert:'Pausiert', abgeschlossen:'Abgeschlossen'};
@@ -11730,9 +12026,15 @@ if (!fsApiVerfuegbar()) {
         </div>
       </div>
 
+      <!-- Kurznotiz -->
+      <div class="field-group">
+        <div class="field-label">Kurznotiz (wird in der Liste angezeigt)</div>
+        <input class="field-input" id="dok-kurz-notiz" placeholder="Kurze Beschreibung oder Hinweis …" maxlength="120">
+      </div>
+
       <!-- Link -->
       <div class="field-group">
-        <div class="field-label">Link zum Dokument *</div>
+        <div class="field-label">Link zum Dokument</div>
         <div style="display:flex;gap:6px;align-items:center;">
           <input class="field-input" id="dok-link" placeholder="https://…" style="flex:1;" oninput="updateDokLinkBtn()">
           <a id="dok-link-open" href="#" target="_blank" style="display:none;flex-shrink:0;" title="Öffnen">
@@ -11778,6 +12080,7 @@ if (!fsApiVerfuegbar()) {
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeDokModal()">Abbrechen</button>
       <button class="btn-ghost" id="dok-btn-loeschen" onclick="dokLoeschen()" style="color:#c62828;border-color:#ffcdd2;display:none;">Löschen</button>
+      <button class="btn-ghost" id="dok-archiv-btn" onclick="toggleDokArchiv()" style="display:none;">↓ In Archiv</button>
       <button class="btn-ghost" id="dok-btn-vorher" onclick="dokSchrittVorher()" style="display:none;margin-left:8px;">← Zurück</button>
       <div style="margin-left:auto;display:flex;gap:8px;">
         <button class="btn-ghost" id="dok-btn-speichern" onclick="saveDokument()">Speichern</button>
@@ -12057,6 +12360,71 @@ if (!fsApiVerfuegbar()) {
 <!-- ══ ENDE BEREICH-EDIT-MODAL ════════════════════════════════════════════ -->
 
 <!-- ══ PLAN-MODAL ════════════════════════════════════════════════════════ -->
+<!-- ══ MODAL: RESSOURCE ════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-ressource">
+  <div class="modal" style="width:500px;">
+    <div class="modal-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#006064" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      <h2>Ressource</h2>
+      <span class="modal-close" onclick="closeRessourceModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </span>
+    </div>
+    <div class="modal-body" style="padding:14px 18px;gap:10px;">
+      <input type="hidden" id="res-modal-id">
+
+      <div class="field-group">
+        <div class="field-label">Titel / Label *</div>
+        <input class="field-input" id="res-modal-titel" placeholder="Name der Ressource">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field-group">
+          <div class="field-label">Bereich</div>
+          <select class="field-select" id="res-modal-bereich">
+            <option value="">— Ohne Bereich —</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Typ</div>
+          <select class="field-select" id="res-modal-typ">
+            <option value="link">Link</option>
+            <option value="confluence">Confluence</option>
+            <option value="onenote">OneNote</option>
+            <option value="sharepoint">SharePoint</option>
+            <option value="teams">Teams</option>
+            <option value="github">GitHub</option>
+            <option value="jira">Jira</option>
+            <option value="sonstiges">Sonstiges</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">URL</div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input class="field-input" id="res-modal-url" placeholder="https://…" style="flex:1;" oninput="updateResLinkBtn()">
+          <a id="res-link-open" href="#" target="_blank" style="display:none;flex-shrink:0;" title="Öffnen">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">Kurznotiz (wird in der Liste angezeigt)</div>
+        <input class="field-input" id="res-modal-kurz-notiz" placeholder="Kurze Beschreibung oder Hinweis …" maxlength="120">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeRessourceModal()">Abbrechen</button>
+      <button class="btn-ghost" id="res-btn-loeschen" onclick="deleteRessource(document.getElementById('res-modal-id').value);closeRessourceModal();" style="color:#c62828;border-color:#ffcdd2;display:none;">Löschen</button>
+      <button class="btn-ghost" id="res-archiv-btn" onclick="toggleRessourceArchiv()" style="display:none;">↓ In Archiv</button>
+      <button class="btn-primary" onclick="saveRessource()">Speichern</button>
+    </div>
+  </div>
+</div>
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+
 <div class="modal-overlay" id="modal-neuer-plan">
   <div class="modal" style="width:600px;max-height:calc(var(--app-h, 100vh) * 0.90);display:flex;flex-direction:column;">
     <div class="modal-header">
