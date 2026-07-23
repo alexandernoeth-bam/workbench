@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.215</title>
+<title>WorkAssist 1.5.216</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2189,7 +2189,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.215</div>
+    <div class="start-version">v1.5.216</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2257,7 +2257,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.215</div>
+    <div class="app-version" id="app-version">v1.5.216</div>
   </div>
 
   <div class="nav-section">
@@ -2313,6 +2313,15 @@ textarea.field-input { resize: vertical; min-height: 70px; }
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       Notizen
       <span class="nav-badge" id="badge-notizen">0</span>
+    </div>
+  </div>
+
+  <div class="nav-section" id="nav-section-belege" style="display:none;">
+    <div class="nav-label">Privat</div>
+    <div class="nav-item" id="nav-belege" onclick="showScreen('belege',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Belege
+      <span class="nav-badge" id="badge-belege">0</span>
     </div>
   </div>
 
@@ -2599,6 +2608,89 @@ textarea.field-input { resize: vertical; min-height: 70px; }
     <!-- Liste -->
     <div style="overflow-y:auto;flex:1;padding:10px 14px;" id="dok-container"></div>
   </div><!-- /screen-dokumente -->
+
+  <!-- ══ SCREEN: BELEGE (nur Privat-Theme) ══════════════════════════════ -->
+  <div class="screen" id="screen-belege">
+    <div class="bel-layout">
+      <!-- Filter-Sidebar -->
+      <div class="bel-sidebar" id="bel-sidebar">
+        <div class="bel-sb-section">
+          <div class="bel-sb-label">Status</div>
+          <div class="bel-sb-item active" onclick="belSetFilter('status','aktiv',this)">Aktiv <span class="bel-sb-count" id="bel-count-aktiv">0</span></div>
+          <div class="bel-sb-item" onclick="belSetFilter('status','faellig',this)" style="color:#c0392b;">⚠ Fällig <span class="bel-sb-count" id="bel-count-faellig" style="color:#c0392b;background:#fde8e6;">0</span></div>
+          <div class="bel-sb-item" onclick="belSetFilter('status','archiv',this)">Archiv <span class="bel-sb-count" id="bel-count-archiv">0</span></div>
+        </div>
+        <div class="bel-sb-divider"></div>
+        <div class="bel-sb-section">
+          <div class="bel-sb-label">Kategorie</div>
+          <div class="bel-sb-item" onclick="belSetFilter('kat','',this)">📄 Alle <span class="bel-sb-count" id="bel-count-alle">0</span></div>
+          <div class="bel-sb-item" onclick="belSetFilter('kat','rechnung',this)">🧾 Rechnungen</div>
+          <div class="bel-sb-item" onclick="belSetFilter('kat','vertrag',this)">📋 Verträge</div>
+          <div class="bel-sb-item" onclick="belSetFilter('kat','police',this)">🛡️ Policen</div>
+          <div class="bel-sb-item" onclick="belSetFilter('kat','kontoauszug',this)">🏦 Kontoauszüge</div>
+          <div class="bel-sb-item" onclick="belSetFilter('kat','benachrichtigung',this)">📬 Benachrichtigungen</div>
+          <div class="bel-sb-item" onclick="belSetFilter('kat','sonstiges',this)">📄 Sonstiges</div>
+        </div>
+        <div class="bel-sb-divider"></div>
+        <div class="bel-sb-section">
+          <div class="bel-sb-label">Jahr</div>
+          <div class="bel-year-row" id="bel-year-filter"></div>
+        </div>
+        <div class="bel-sb-divider"></div>
+        <div class="bel-sb-section">
+          <div class="bel-sb-label">Tags</div>
+          <div id="bel-tag-filter"></div>
+        </div>
+      </div>
+      <!-- Hauptbereich -->
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;">
+        <!-- Topbar -->
+        <div style="background:var(--teal-dark);color:#fff;padding:7px 13px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+          <span style="font-size:13px;font-weight:700;">Belege &amp; Dokumente</span>
+          <span style="font-size:10px;opacity:.6;" id="bel-count-label"></span>
+          <div style="flex:1;"></div>
+          <input id="bel-suche" placeholder="Suchen …" oninput="renderBelege()"
+            style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:4px 9px;font-size:11px;color:#fff;outline:none;width:180px;font-family:var(--font);">
+          <button onclick="openBelegModal(null)" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:4px;">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Beleg
+          </button>
+        </div>
+        <!-- Liste -->
+        <div class="bel-main" id="bel-container">
+          <!-- PDF-Vorschau Overlay (innerhalb bel-main) -->
+          <div class="bel-preview-overlay" id="bel-preview-overlay">
+            <div class="bel-preview-bar">
+              <div style="flex:1;min-width:0;">
+                <div class="bel-preview-bar-title" id="bel-preview-title">—</div>
+                <div style="font-size:9px;opacity:.5;" id="bel-preview-sub"></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.08);border-radius:6px;padding:2px 7px;">
+                <button class="bel-pv-btn" style="background:none;border:none;padding:2px 5px;" onclick="belChangePage(-1)">‹</button>
+                <span style="font-size:11px;min-width:55px;text-align:center;" id="bel-page-ind">Seite 1/1</span>
+                <button class="bel-pv-btn" style="background:none;border:none;padding:2px 5px;" onclick="belChangePage(1)">›</button>
+              </div>
+              <a id="bel-drive-link" href="#" target="_blank" class="bel-pv-btn" onclick="return !!this.href&&this.href!=='#'">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                Drive
+              </a>
+              <button class="bel-pv-btn" onclick="belToggleFullscreen()" id="bel-fs-btn" title="Vollbild">
+                <svg id="bel-fs-exp" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                <svg id="bel-fs-cmp" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="21" y2="3"/><line x1="3" y1="21" x2="14" y2="10"/></svg>
+                <span id="bel-fs-lbl">Vollbild</span>
+              </button>
+              <button class="bel-pv-btn" onclick="closeBelPreview()" style="background:rgba(255,80,80,.2);border-color:rgba(255,80,80,.3);">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                Schließen
+              </button>
+            </div>
+            <div class="bel-iframe-wrap">
+              <iframe id="bel-preview-iframe" src="" allowfullscreen></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /screen-belege -->
 
   <!-- ══ SCREEN: NOTIZEN ══════════════════════════════════════════════════ -->
   <div class="screen" id="screen-notizen">
@@ -3522,7 +3614,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.215';
+const APP_VERSION = '1.5.216';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -3531,7 +3623,7 @@ let autoSaveTimer  = null;
 let pendingChanges = false;
 
 function emptyDB() {
-  return { version: APP_VERSION, bereiche: [], aufgaben: [], wissen: [], dokumente: [], plaene: [], notizen: [] };
+  return { version: APP_VERSION, bereiche: [], aufgaben: [], wissen: [], dokumente: [], plaene: [], notizen: [], belege: [] };
 }
 
 let DB = emptyDB();
@@ -3600,6 +3692,7 @@ async function loadDB() {
         if (!Array.isArray(DB.dokumente)) DB.dokumente = [];
         if (!Array.isArray(DB.plaene)) DB.plaene = [];
         if (!Array.isArray(DB.notizen)) DB.notizen = [];
+        if (!Array.isArray(DB.belege))  DB.belege  = [];
         migrateDB();
         return;
       }
@@ -3613,6 +3706,7 @@ async function loadDB() {
       if (!Array.isArray(DB.dokumente)) DB.dokumente = [];
       if (!Array.isArray(DB.plaene)) DB.plaene = [];
       if (!Array.isArray(DB.notizen)) DB.notizen = [];
+      if (!Array.isArray(DB.belege))  DB.belege  = [];
       migrateDB();
     }
   } catch(e) {
@@ -3727,6 +3821,17 @@ function migrateDB() {
     });
     DB.wissen = []; // geleert nach Migration
   }
+
+  // Belege: Felder sichern
+  (DB.belege || []).forEach(b => {
+    if (b.archiviert  === undefined) b.archiviert  = false;
+    if (b.einreichZiele === undefined) b.einreichZiele = [];
+    if (b.aufgabeId   === undefined) b.aufgabeId   = null;
+    if (b.driveUrl    === undefined) b.driveUrl     = '';
+    if (b.tags        === undefined) b.tags         = [];
+    if (b.notiz       === undefined) b.notiz        = '';
+    if (b.jahr        === undefined) b.jahr         = null;
+  });
 
   // Pläne: prioritaet + horizont + notiz
   (DB.plaene || []).forEach(p => {
@@ -3875,8 +3980,12 @@ function setThemeFromFilename(filename) {
   if (name.includes('privat') || name.includes('private') || name.includes('personal')) {
     document.documentElement.setAttribute('data-theme', 'privat');
     console.log('[WorkAssist] Privat-Theme aktiviert');
+    const navBelege = document.getElementById('nav-section-belege');
+    if (navBelege) navBelege.style.display = '';
   } else {
     document.documentElement.removeAttribute('data-theme');
+    const navBelege2 = document.getElementById('nav-section-belege');
+    if (navBelege2) navBelege2.style.display = 'none';
   }
   // Dokumente + Tags im Dashboard sind generell ausgeblendet (Fokus auf Pläne + Aufgaben)
 }
@@ -4102,6 +4211,9 @@ function showScreen(name, navEl) {
   }
   if (name === 'notizen') {
     showScreenNotizen();
+  }
+  if (name === 'belege') {
+    renderBelege();
   }
   if (name === 'plaene') {
     renderPlaeneScreen();
@@ -7250,6 +7362,399 @@ function bdAccToggle(head) {
   const caret = head.querySelector('.bd-acc-caret');
   const open  = body.classList.toggle('open');
   if (caret) caret.classList.toggle('open', open);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  BELEGE & DOKUMENTE (Privat-Screen)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const BEL_KATEGORIE_ICON = {
+  rechnung:'🧾', vertrag:'📋', police:'🛡️', kontoauszug:'🏦',
+  benachrichtigung:'📬', sonstiges:'📄'
+};
+const BEL_KATEGORIE_LABEL = {
+  rechnung:'Rechnung', vertrag:'Vertrag', police:'Police',
+  kontoauszug:'Kontoauszug', benachrichtigung:'Benachrichtigung', sonstiges:'Sonstiges'
+};
+const BEL_WF_ORDER = ['scannen','ablegen','bezahlen','einreichen','erledigt'];
+
+let _belFilterStatus = 'aktiv';
+let _belFilterKat    = '';
+let _belFilterJahr   = '';
+let _belFilterTag    = '';
+let _belPreviewFs    = false;
+let _belPreviewPage  = 1;
+
+function belSetFilter(key, val, el) {
+  if (key === 'status') _belFilterStatus = val;
+  if (key === 'kat')    _belFilterKat    = val;
+  if (key === 'jahr')   _belFilterJahr   = val;
+  if (key === 'tag')    _belFilterTag    = val;
+  // Sidebar-Chip aktiv markieren
+  const group = key === 'status' ? '.bel-sb-item[onclick*="status"]'
+              : key === 'kat'    ? '.bel-sb-item[onclick*="kat"]' : '';
+  if (group) {
+    document.querySelectorAll(group).forEach(c => c.classList.remove('active'));
+    if (el) el.classList.add('active');
+  }
+  // Jahr-Buttons
+  if (key === 'jahr') {
+    document.querySelectorAll('.bel-year-btn').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+  }
+  // Tag-Chips
+  if (key === 'tag') {
+    document.querySelectorAll('.bel-sb-tag').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.toggle('active');
+    _belFilterTag = el?.classList.contains('active') ? val : '';
+  }
+  renderBelege();
+}
+
+function renderBelege() {
+  const container = document.getElementById('bel-container');
+  if (!container) return;
+
+  const heute = today();
+  const suche  = (document.getElementById('bel-suche')?.value || '').toLowerCase().trim();
+  const belege = DB.belege || [];
+
+  // Badges berechnen
+  const aktiv   = belege.filter(b => !b.archiviert).length;
+  const faellig = belege.filter(b => !b.archiviert && b.faelligDatum && b.faelligDatum <= heute && b.workflow !== 'erledigt').length;
+  const archiv  = belege.filter(b => b.archiviert).length;
+  const el = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
+  el('bel-count-aktiv', aktiv);
+  el('bel-count-faellig', faellig);
+  el('bel-count-archiv', archiv);
+
+  // Jahr-Filter befüllen
+  const jahreSet = new Set(belege.map(b => b.jahr).filter(Boolean));
+  const jahreArr = [...jahreSet].sort((a,b) => b-a);
+  const yearEl = document.getElementById('bel-year-filter');
+  if (yearEl && yearEl.children.length !== jahreArr.length + 1) {
+    yearEl.innerHTML = jahreArr.map(j =>
+      `<div class="bel-year-btn${_belFilterJahr===String(j)?' active':''}" onclick="belSetFilter('jahr','${j}',this)">${j}</div>`
+    ).join('') + `<div class="bel-year-btn${_belFilterJahr===''?' active':''}" onclick="belSetFilter('jahr','',this)">Alle</div>`;
+  }
+
+  // Tag-Filter befüllen
+  const tagSet = new Set(belege.flatMap(b => b.tags||[]));
+  const tagEl  = document.getElementById('bel-tag-filter');
+  if (tagEl && tagEl.children.length !== tagSet.size) {
+    tagEl.innerHTML = [...tagSet].sort().map(t =>
+      `<span class="bel-sb-tag${_belFilterTag===t?' active':''}" onclick="belSetFilter('tag','${escHtml(t)}',this)">${escHtml(t)}</span>`
+    ).join('');
+  }
+
+  // Filtern
+  let liste = belege.filter(b => {
+    if (_belFilterStatus === 'aktiv'   &&  b.archiviert) return false;
+    if (_belFilterStatus === 'archiv'  && !b.archiviert) return false;
+    if (_belFilterStatus === 'faellig' && !(b.faelligDatum && b.faelligDatum <= heute && !b.archiviert && b.workflow !== 'erledigt')) return false;
+    if (_belFilterKat && b.kategorie !== _belFilterKat) return false;
+    if (_belFilterJahr && String(b.jahr) !== String(_belFilterJahr)) return false;
+    if (_belFilterTag && !(b.tags||[]).includes(_belFilterTag)) return false;
+    if (suche && !b.titel.toLowerCase().includes(suche) && !(b.notiz||'').toLowerCase().includes(suche)) return false;
+    return true;
+  }).sort((a,b) => (b.geaendert||'').localeCompare(a.geaendert||''));
+
+  el('bel-count-label', liste.length + ' Einträge');
+  const badge = document.getElementById('badge-belege');
+  if (badge) badge.textContent = aktiv;
+
+  if (!liste.length) {
+    const overlay = document.getElementById('bel-preview-overlay');
+    container.innerHTML = '<div style="color:var(--text-xdim);font-size:12px;padding:24px;text-align:center;">Keine Belege – mit + anlegen.</div>';
+    if (overlay) container.appendChild(overlay);
+    return;
+  }
+
+  // Nach Kategorie + Jahr gruppieren
+  const groups = {};
+  liste.forEach(b => {
+    const katLabel = BEL_KATEGORIE_LABEL[b.kategorie] || 'Sonstiges';
+    const key = katLabel + (b.jahr ? ' · ' + b.jahr : '');
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(b);
+  });
+
+  const sortedKeys = Object.keys(groups).sort();
+  let html = '';
+  sortedKeys.forEach(key => {
+    const items = groups[key];
+    html += `<div class="bel-group-head">${escHtml(key)} <span class="bel-group-count">${items.length}</span></div>`;
+    html += items.map(b => belEintragHTML(b)).join('');
+  });
+
+  const overlay = document.getElementById('bel-preview-overlay');
+  container.innerHTML = html;
+  if (overlay) container.appendChild(overlay);
+}
+
+function belEintragHTML(b) {
+  const heute     = today();
+  const istFaellig= !b.archiviert && b.faelligDatum && b.faelligDatum <= heute && b.workflow !== 'erledigt';
+  const archCls   = b.archiviert ? ' archiviert' : '';
+  const icon      = BEL_KATEGORIE_ICON[b.kategorie] || '📄';
+  const wfLabel   = { scannen:'Scannen', ablegen:'Abgelegt', bezahlen:'Bezahlen', einreichen:'Einreichen', erledigt:'Erledigt' };
+  const wfCss     = { scannen:'bel-s-scan', ablegen:'bel-s-ablegen', bezahlen:'bel-s-bezahlen', einreichen:'bel-s-einreichen', erledigt:'bel-s-ablegen' };
+  const statusBadge = istFaellig
+    ? `<span class="bel-badge bel-s-faellig">⚠ Fällig ${formatDatum(b.faelligDatum)}</span>`
+    : `<span class="bel-badge ${wfCss[b.workflow]||''}">${wfLabel[b.workflow]||''}</span>`;
+  const tags = (b.tags||[]).map(t => `<span class="bel-tag">${escHtml(t)}</span>`).join('');
+  const aufgChip = b.aufgabeId ? (() => {
+    const a = DB.aufgaben.find(a => a.id === b.aufgabeId);
+    return a ? `<span class="bel-aufg"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>${escHtml(a.titel.slice(0,25))}${a.titel.length>25?'…':''}</span>` : '';
+  })() : '';
+  const metaStr = [b.jahr, b.erstellt ? formatDatum(b.erstellt) : ''].filter(Boolean).join(' · ');
+  const driveBtn = b.driveUrl
+    ? `<a href="${escHtml(b.driveUrl)}" target="_blank" onclick="event.stopPropagation()" class="bel-act-btn" title="Drive öffnen"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : '';
+  const previewBtn = b.driveUrl
+    ? `<div class="bel-act-btn preview" onclick="event.stopPropagation();openBelPreview('${b.id}')" title="PDF-Vorschau"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>` : '';
+
+  return `<div class="bel-entry${archCls}" onclick="openBelegModal('${b.id}')">
+    <div class="bel-entry-icon">${icon}</div>
+    <div class="bel-entry-body">
+      <div class="bel-entry-row1">
+        <span class="bel-entry-titel">${escHtml(b.titel)}</span>
+        ${statusBadge}
+      </div>
+      <div class="bel-entry-row2">
+        ${tags}${aufgChip}
+        <span class="bel-entry-meta">${escHtml(metaStr)}</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:3px;flex-shrink:0;">${previewBtn}${driveBtn}</div>
+  </div>`;
+}
+
+// ── Modal öffnen/schließen ─────────────────────────────────────────────────
+function openBelegModal(id) {
+  // Jahr-Select befüllen
+  const jSel = document.getElementById('bel-jahr');
+  if (jSel) {
+    const curYear = new Date().getFullYear();
+    jSel.innerHTML = '<option value="">— kein Jahr —</option>';
+    for (let y = curYear; y >= curYear-10; y--) {
+      jSel.innerHTML += `<option value="${y}">${y}</option>`;
+    }
+  }
+
+  if (id) {
+    const b = (DB.belege||[]).find(b => b.id === id);
+    if (!b) return;
+    document.getElementById('bel-edit-id').value = b.id;
+    document.getElementById('bel-titel').value   = b.titel;
+    document.getElementById('bel-kategorie').value = b.kategorie || 'rechnung';
+    document.getElementById('bel-drive-url').value = b.driveUrl || '';
+    document.getElementById('bel-faellig').value   = b.faelligDatum || '';
+    document.getElementById('bel-tags').value       = (b.tags||[]).join(', ');
+    document.getElementById('bel-notiz').value      = b.notiz || '';
+    if (jSel) jSel.value = b.jahr || '';
+    document.getElementById('bel-modal-titel').textContent = b.titel;
+    document.getElementById('bel-btn-loeschen').style.display = '';
+    document.getElementById('bel-btn-archiv').style.display   = '';
+    document.getElementById('bel-btn-archiv').textContent     = b.archiviert ? '↑ Aus Archiv' : '↓ Archivieren';
+    // Workflow
+    belSetWfUI(b.workflow || 'scannen');
+    // Einreich-Chips
+    document.querySelectorAll('.bel-einreich-chip').forEach(c => {
+      c.classList.toggle('active', (b.einreichZiele||[]).includes(c.dataset.ziel));
+    });
+    // Aufgabe-Preview
+    belUpdateAufgabePreview(b.aufgabeId);
+    belUpdateDriveBtn();
+  } else {
+    document.getElementById('bel-edit-id').value   = '';
+    document.getElementById('bel-titel').value     = '';
+    document.getElementById('bel-kategorie').value = 'rechnung';
+    document.getElementById('bel-drive-url').value = '';
+    document.getElementById('bel-faellig').value   = '';
+    document.getElementById('bel-tags').value       = '';
+    document.getElementById('bel-notiz').value      = '';
+    document.getElementById('bel-modal-titel').textContent = 'Neuer Beleg';
+    document.getElementById('bel-btn-loeschen').style.display = 'none';
+    document.getElementById('bel-btn-archiv').style.display   = 'none';
+    document.querySelectorAll('.bel-einreich-chip').forEach(c => c.classList.remove('active'));
+    belSetWfUI('scannen');
+    belUpdateAufgabePreview(null);
+    belUpdateDriveBtn();
+  }
+  document.getElementById('modal-beleg').classList.add('open');
+}
+
+function closeBelegModal() {
+  document.getElementById('modal-beleg').classList.remove('open');
+}
+
+function belSetWf(wf) {
+  belSetWfUI(wf);
+}
+
+function belSetWfUI(aktiv) {
+  const btns = document.querySelectorAll('#bel-wf-btns .bel-wf-btn');
+  const idx   = BEL_WF_ORDER.indexOf(aktiv);
+  btns.forEach((btn, i) => {
+    btn.classList.remove('done','aktiv');
+    if (i < idx)      btn.classList.add('done');
+    else if (i === idx) btn.classList.add('aktiv');
+    if (i < idx) btn.textContent = '✓ ' + ({scannen:'Scannen',ablegen:'Ablegen',bezahlen:'Bezahlen',einreichen:'Einreichen',erledigt:'Erledigt'}[btn.dataset.wf]||'');
+    else          btn.textContent = {scannen:'Scannen',ablegen:'Ablegen',bezahlen:'Bezahlen',einreichen:'Einreichen',erledigt:'Erledigt'}[btn.dataset.wf]||'';
+  });
+  // Fälligkeitsdatum nur bei "bezahlen" zeigen
+  const fw = document.getElementById('bel-faellig-wrap');
+  if (fw) fw.style.display = (aktiv === 'bezahlen' || aktiv === 'einreichen' || aktiv === 'erledigt') ? '' : 'none';
+}
+
+function belToggleEinreich(el) {
+  el.classList.toggle('active');
+}
+
+function belUpdateDriveBtn() {
+  const url = document.getElementById('bel-drive-url')?.value.trim() || '';
+  const btn = document.getElementById('bel-drive-open');
+  if (btn) { btn.style.display = url ? 'inline-flex' : 'none'; btn.href = url; }
+}
+
+function belUpdateAufgabePreview(aufgabeId) {
+  const wrap = document.getElementById('bel-aufgabe-preview');
+  const txt  = document.getElementById('bel-aufgabe-preview-text');
+  if (!wrap || !txt) return;
+  if (aufgabeId) {
+    const a = DB.aufgaben.find(a => a.id === aufgabeId);
+    if (a) { wrap.style.display = 'flex'; txt.textContent = 'Aufgabe: ' + a.titel; return; }
+  }
+  wrap.style.display = 'none';
+}
+
+function belAufgabeAnlegen() {
+  const titel    = document.getElementById('bel-titel').value.trim();
+  const faellig  = document.getElementById('bel-faellig').value;
+  if (!titel) { showToast('Bitte zuerst einen Titel eingeben', true); return; }
+  const aufgTitel = titel + ' bezahlen';
+  const a = {
+    id: uid(), titel: aufgTitel, status: 'offen',
+    faellig: faellig || null, groesse: null, bereichId: null,
+    notiz: '', tags: [], erstellt: new Date().toISOString(), geaendert: new Date().toISOString(),
+  };
+  DB.aufgaben.push(a);
+  // Edit-ID merken für saveBelegg
+  document.getElementById('bel-edit-id').dataset.neuAufgId = a.id;
+  belUpdateAufgabePreview(a.id);
+  showToast('Aufgabe angelegt: ' + aufgTitel);
+}
+
+function saveBelegg() {
+  const titel = document.getElementById('bel-titel').value.trim();
+  if (!titel) { showToast('Bitte einen Titel eingeben', true); return; }
+  const editId = document.getElementById('bel-edit-id').value;
+  const neuAufgId = document.getElementById('bel-edit-id').dataset.neuAufgId || null;
+  delete document.getElementById('bel-edit-id').dataset.neuAufgId;
+
+  const aktWf = [...document.querySelectorAll('#bel-wf-btns .bel-wf-btn')].find(b=>b.classList.contains('aktiv'))?.dataset.wf || 'scannen';
+  const einreichZiele = [...document.querySelectorAll('.bel-einreich-chip.active')].map(c=>c.dataset.ziel);
+  const tags = document.getElementById('bel-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
+
+  if (!DB.belege) DB.belege = [];
+  if (editId) {
+    const b = DB.belege.find(b => b.id === editId);
+    if (!b) return;
+    b.titel         = titel;
+    b.kategorie     = document.getElementById('bel-kategorie').value;
+    b.driveUrl      = document.getElementById('bel-drive-url').value.trim();
+    b.faelligDatum  = document.getElementById('bel-faellig').value || null;
+    b.workflow      = aktWf;
+    b.einreichZiele = einreichZiele;
+    b.tags          = tags;
+    b.notiz         = document.getElementById('bel-notiz').value;
+    b.jahr          = document.getElementById('bel-jahr').value || null;
+    if (neuAufgId) b.aufgabeId = neuAufgId;
+    b.geaendert     = new Date().toISOString();
+  } else {
+    DB.belege.push({
+      id:             uid(),
+      titel,
+      kategorie:      document.getElementById('bel-kategorie').value,
+      driveUrl:       document.getElementById('bel-drive-url').value.trim(),
+      faelligDatum:   document.getElementById('bel-faellig').value || null,
+      workflow:       aktWf,
+      einreichZiele,
+      tags,
+      notiz:          document.getElementById('bel-notiz').value,
+      jahr:           document.getElementById('bel-jahr').value || null,
+      aufgabeId:      neuAufgId,
+      archiviert:     false,
+      erstellt:       new Date().toISOString(),
+      geaendert:      new Date().toISOString(),
+    });
+  }
+  saveDB();
+  closeBelegModal();
+  renderBelege();
+  showToast('Beleg gespeichert');
+}
+
+function belLoeschen() {
+  const id = document.getElementById('bel-edit-id').value;
+  if (!id || !confirm('Beleg wirklich löschen?')) return;
+  DB.belege = (DB.belege||[]).filter(b => b.id !== id);
+  saveDB();
+  closeBelegModal();
+  renderBelege();
+  showToast('Beleg gelöscht');
+}
+
+function belToggleArchiv() {
+  const id = document.getElementById('bel-edit-id').value;
+  if (!id) return;
+  const b = (DB.belege||[]).find(b => b.id === id);
+  if (!b) return;
+  b.archiviert = !b.archiviert;
+  b.geaendert  = new Date().toISOString();
+  saveDB();
+  closeBelegModal();
+  renderBelege();
+  showToast(b.archiviert ? 'Archiviert' : 'Aus Archiv geholt');
+}
+
+// ── PDF-Vorschau ───────────────────────────────────────────────────────────
+function openBelPreview(id) {
+  const b = (DB.belege||[]).find(b => b.id === id);
+  if (!b || !b.driveUrl) return;
+  // Google Drive Preview-URL erzeugen
+  let previewUrl = b.driveUrl;
+  try {
+    const m = b.driveUrl.match(/\/d\/([^/]+)/);
+    if (m) previewUrl = 'https://drive.google.com/file/d/' + m[1] + '/preview';
+  } catch(e) {}
+  document.getElementById('bel-preview-title').textContent = b.titel;
+  document.getElementById('bel-preview-sub').textContent   = BEL_KATEGORIE_LABEL[b.kategorie]||'' + (b.jahr?' · '+b.jahr:'');
+  document.getElementById('bel-preview-iframe').src = previewUrl;
+  document.getElementById('bel-drive-link').href    = b.driveUrl;
+  _belPreviewPage = 1;
+  document.getElementById('bel-page-ind').textContent = 'Seite 1';
+  document.getElementById('bel-preview-overlay').classList.add('open');
+}
+
+function closeBelPreview() {
+  if (_belPreviewFs) belToggleFullscreen();
+  document.getElementById('bel-preview-overlay').classList.remove('open');
+  document.getElementById('bel-preview-iframe').src = '';
+}
+
+function belChangePage(dir) {
+  _belPreviewPage = Math.max(1, _belPreviewPage + dir);
+  document.getElementById('bel-page-ind').textContent = 'Seite ' + _belPreviewPage;
+}
+
+function belToggleFullscreen() {
+  const overlay = document.getElementById('bel-preview-overlay');
+  _belPreviewFs = !_belPreviewFs;
+  overlay.classList.toggle('fullscreen', _belPreviewFs);
+  document.getElementById('bel-fs-exp').style.display = _belPreviewFs ? 'none' : '';
+  document.getElementById('bel-fs-cmp').style.display = _belPreviewFs ? '' : 'none';
+  document.getElementById('bel-fs-lbl').textContent   = _belPreviewFs ? 'Verkleinern' : 'Vollbild';
 }
 
 function resAuswahlOeffnen() {
@@ -11854,6 +12359,17 @@ if (!fsApiVerfuegbar()) {
 } else {
   autoReconnect();
 }
+
+// ESC: PDF-Vorschau schließen
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('bel-preview-overlay');
+    if (overlay && overlay.classList.contains('open')) {
+      if (_belPreviewFs) belToggleFullscreen();
+      else closeBelPreview();
+    }
+  }
+});
 </script>
 <!-- ══ AUFGABEN-ASSISTENT MODAL ═══════════════════════════════════════════ -->
 <div class="assistent-overlay" id="assistent-overlay">
@@ -12350,6 +12866,121 @@ if (!fsApiVerfuegbar()) {
 <!-- ══ ENDE BEREICH-EDIT-MODAL ════════════════════════════════════════════ -->
 
 <!-- ══ PLAN-MODAL ════════════════════════════════════════════════════════ -->
+<!-- ══ MODAL: BELEG ══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-beleg">
+  <div class="modal" style="width:540px;">
+    <div class="modal-header">
+      <span style="font-size:16px;">🧾</span>
+      <h2 id="bel-modal-titel">Neuer Beleg</h2>
+      <span class="modal-close" onclick="closeBelegModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </span>
+    </div>
+    <div class="modal-body" style="padding:14px 18px;gap:10px;">
+      <input type="hidden" id="bel-edit-id">
+
+      <!-- Titel -->
+      <div class="field-group">
+        <div class="field-label">Titel *</div>
+        <input class="field-input" id="bel-titel" placeholder="z.B. Rechnung Zahnarzt Dr. Müller">
+      </div>
+
+      <!-- Kategorie + Jahr -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field-group">
+          <div class="field-label">Kategorie *</div>
+          <select class="field-select" id="bel-kategorie">
+            <option value="rechnung">🧾 Rechnung</option>
+            <option value="vertrag">📋 Vertrag</option>
+            <option value="police">🛡️ Police</option>
+            <option value="kontoauszug">🏦 Kontoauszug</option>
+            <option value="benachrichtigung">📬 Benachrichtigung</option>
+            <option value="sonstiges">📄 Sonstiges</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Jahr</div>
+          <select class="field-select" id="bel-jahr">
+            <option value="">— kein Jahr —</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Google Drive Link -->
+      <div class="field-group">
+        <div class="field-label">Google Drive Link</div>
+        <div style="display:flex;gap:6px;">
+          <input class="field-input" id="bel-drive-url" placeholder="https://drive.google.com/file/d/…" style="flex:1;" oninput="belUpdateDriveBtn()">
+          <a id="bel-drive-open" href="#" target="_blank" style="display:none;flex-shrink:0;padding:0 9px;border:1px solid var(--border);border-radius:6px;color:var(--teal-dark);font-size:11px;text-decoration:none;display:none;align-items:center;gap:3px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Öffnen
+          </a>
+        </div>
+      </div>
+
+      <!-- Workflow -->
+      <div class="field-group">
+        <div class="field-label">Workflow-Status</div>
+        <div class="bel-wf" id="bel-wf-btns">
+          <div class="bel-wf-btn" data-wf="scannen"    onclick="belSetWf('scannen')">Scannen</div>
+          <div class="bel-wf-btn" data-wf="ablegen"    onclick="belSetWf('ablegen')">Ablegen</div>
+          <div class="bel-wf-btn" data-wf="bezahlen"   onclick="belSetWf('bezahlen')">Bezahlen</div>
+          <div class="bel-wf-btn" data-wf="einreichen" onclick="belSetWf('einreichen')">Einreichen</div>
+          <div class="bel-wf-btn" data-wf="erledigt"   onclick="belSetWf('erledigt')">Erledigt</div>
+        </div>
+      </div>
+
+      <!-- Fälligkeitsdatum -->
+      <div class="field-group" id="bel-faellig-wrap">
+        <div class="field-label">Fälligkeitsdatum (Bezahlen)</div>
+        <div style="display:flex;gap:8px;align-items:flex-end;">
+          <input class="field-input" type="date" id="bel-faellig" style="flex:1;">
+          <button class="btn-ghost" onclick="belAufgabeAnlegen()" style="font-size:11px;padding:5px 10px;white-space:nowrap;display:flex;align-items:center;gap:4px;">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            Aufgabe anlegen
+          </button>
+        </div>
+        <div id="bel-aufgabe-preview" style="display:none;background:#fff3e0;border:1px solid #ffe0b2;border-radius:6px;padding:5px 9px;font-size:11px;color:#e65100;margin-top:4px;display:flex;align-items:center;gap:6px;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span id="bel-aufgabe-preview-text">Aufgabe verknüpft</span>
+        </div>
+      </div>
+
+      <!-- Einreichen bei -->
+      <div class="field-group">
+        <div class="field-label">Einreichen bei</div>
+        <div class="bel-einreich-grid">
+          <div class="bel-einreich-chip" data-ziel="krankenkasse" onclick="belToggleEinreich(this)">Krankenkasse</div>
+          <div class="bel-einreich-chip" data-ziel="steuern"      onclick="belToggleEinreich(this)">Steuern</div>
+          <div class="bel-einreich-chip" data-ziel="arbeitgeber"  onclick="belToggleEinreich(this)">Arbeitgeber</div>
+          <div class="bel-einreich-chip" data-ziel="sonstiges"    onclick="belToggleEinreich(this)">Sonstiges</div>
+        </div>
+      </div>
+
+      <!-- Tags -->
+      <div class="field-group">
+        <div class="field-label">Tags (Komma-getrennt)</div>
+        <input class="field-input" id="bel-tags" placeholder="z.B. Steuern, Krankenkasse, Wohnen">
+      </div>
+
+      <!-- Notiz -->
+      <div class="field-group">
+        <div class="field-label">Notiz</div>
+        <textarea class="field-input" id="bel-notiz" rows="2" placeholder="Optionale Notiz …" style="resize:vertical;"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div style="display:flex;gap:6px;">
+        <button class="btn-ghost" onclick="closeBelegModal()">Abbrechen</button>
+        <button class="btn-ghost" id="bel-btn-loeschen" onclick="belLoeschen()" style="color:#c62828;border-color:#ffcdd2;display:none;">Löschen</button>
+        <button class="btn-ghost" id="bel-btn-archiv" onclick="belToggleArchiv()" style="display:none;">↓ Archivieren</button>
+      </div>
+      <button class="btn-primary" onclick="saveBelegg()">Speichern</button>
+    </div>
+  </div>
+</div>
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+
 <!-- ══ MODAL: RESSOURCE ════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="modal-ressource">
   <div class="modal" style="width:500px;">
