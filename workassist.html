@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.212</title>
+<title>WorkAssist 1.5.213</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -200,7 +200,6 @@ svg { display: block; }
 #screen-dashboard { padding: 16px; gap: 0; overflow: hidden; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 #screen-bereiche { padding: 20px; gap: 16px; overflow-y: auto; }
 #screen-dokumente.active { flex-direction: column; overflow: hidden; }
-#screen-wissen.active { flex-direction: column; overflow: hidden; }
 #screen-plaene { flex: 1; min-height: 0; }
 #screen-plaene.active { display: flex; flex-direction: column; overflow: hidden; flex: 1; min-height: 0; }
 #screen-notizen.active { display: flex !important; flex-direction: row; overflow: hidden; }
@@ -1076,6 +1075,7 @@ input[type="checkbox"]:hover:not(:checked) { border-color: var(--teal-light); }
 .dok-entry-icon { width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
 .dok-entry-icon.typ-dok  { background:#e8eaf6; }
 .dok-entry-icon.typ-res  { background:#e0f7fa; }
+.dok-entry-icon.typ-wis  { background:#ede9fe; }
 .dok-entry-body { flex:1;min-width:0; }
 .dok-entry-row1 { display:flex;align-items:center;gap:7px; }
 .dok-entry-titel { font-size:12px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1; }
@@ -1737,8 +1737,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
   scrollbar-color: var(--border) transparent;
 }
 /* Nicht-Dashboard-Panels behalten max-height */
-#screen-bereiche .panel > div:not(.panel-header),
-#screen-wissen .panel > div:not(.panel-header) {
+#screen-bereiche .panel > div:not(.panel-header) {
   min-height: 280px;
   max-height: 340px;
   flex: none;
@@ -2190,7 +2189,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.212</div>
+    <div class="start-version">v1.5.213</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2258,7 +2257,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.212</div>
+    <div class="app-version" id="app-version">v1.5.213</div>
   </div>
 
   <div class="nav-section">
@@ -2314,11 +2313,6 @@ textarea.field-input { resize: vertical; min-height: 70px; }
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       Notizen
       <span class="nav-badge" id="badge-notizen">0</span>
-    </div>
-    <div class="nav-item" id="nav-wissen" onclick="showScreen('wissen',this)">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-      Einträge
-      <span class="nav-badge" id="badge-wissen">0</span>
     </div>
   </div>
 
@@ -2560,48 +2554,6 @@ textarea.field-input { resize: vertical; min-height: 70px; }
   <!-- ══ ENDE RESSOURCEN-MODAL ══════════════════════════════════════════════ -->
 
   <!-- ══ WISSEN ════════════════════════════════════════════════════════════ -->
-  <div class="screen" id="screen-wissen">
-    <!-- Filterbar -->
-    <div class="wissen-toolbar">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8aaaa8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-      <select class="filter-select" id="filter-wissen-bereich" onchange="renderWissen()">
-        <option value="">Alle Bereiche</option>
-      </select>
-      <select class="filter-select" id="filter-wissen-typ" onchange="renderWissen()">
-        <option value="">Alle Typen</option>
-        <option value="entscheidung">Entscheidung</option>
-        <option value="doku">Erklärung/Doku</option>
-        <option value="protokoll">Besprechungsnotiz</option>
-        <option value="lerninhalt">Lerninhalt</option>
-        <option value="referenz-link">Referenz-Link</option>
-        <option value="aufgabennotiz">Aufgabennotiz</option>
-        <option value="mail">Mail</option>
-      </select>
-      <input class="search-box" id="wissen-search" style="border-radius:6px;padding:6px 10px;width:160px;" placeholder="Wissen suchen …" oninput="renderWissen()">
-      <span style="font-size:12px;color:var(--text-xdim);" id="wissen-count"></span>
-      <button class="btn-ghost" onclick="openAusAufgabeDialog()" style="white-space:nowrap;gap:5px;display:flex;align-items:center;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        Aus Aufgabe
-      </button>
-      <div style="margin-left:auto;">
-        <div class="wissen-ansicht-toggle">
-          <button class="wissen-ansicht-btn active" id="wk-btn-kacheln" onclick="setWissenAnsicht('kacheln')">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-            Kacheln
-          </button>
-          <button class="wissen-ansicht-btn" id="wk-btn-bereiche" onclick="setWissenAnsicht('bereiche')">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-            Nach Bereich
-          </button>
-        </div>
-      </div>
-    </div>
-    <!-- Scroll-Bereich -->
-    <div class="wissen-scroll-wrap">
-      <div class="wissen-grid" id="wissen-container"></div>
-      <div id="wissen-bereich-container" style="display:none;"></div>
-    </div>
-  </div><!-- /screen-wissen -->
 
   <!-- ══ SCREEN: DOKUMENTE ════════════════════════════════════════════════ -->
   <div class="screen" id="screen-dokumente" style="display:flex;flex-direction:column;overflow:hidden;">
@@ -2625,6 +2577,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
       <span class="dok-filter-chip active" onclick="dokSetFilter('typ','',this)">Alle</span>
       <span class="dok-filter-chip" onclick="dokSetFilter('typ','dokument',this)">📄 Dokumente</span>
       <span class="dok-filter-chip" onclick="dokSetFilter('typ','ressource',this)">🔗 Ressourcen</span>
+      <span class="dok-filter-chip" onclick="dokSetFilter('typ','wissen',this)">💡 Wissen</span>
       <div style="width:1px;height:16px;background:var(--border);margin:0 2px;"></div>
       <span class="dok-filter-chip active-status" onclick="dokSetFilter('archiv','aktiv',this)">Aktiv</span>
       <span class="dok-filter-chip" onclick="dokSetFilter('archiv','archiv',this)">Archiv</span>
@@ -3569,7 +3522,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.212';
+const APP_VERSION = '1.5.213';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -3743,6 +3696,38 @@ function migrateDB() {
     // Ressourcen aus Bereich leeren (jetzt in DB.dokumente)
     b.ressourcen = [];
   });
+  // Migration: DB.wissen[] → DB.dokumente (einmalig)
+  if (Array.isArray(DB.wissen) && DB.wissen.length > 0) {
+    DB.wissen.forEach(w => {
+      const bereitsVorhanden = (DB.dokumente||[]).some(d =>
+        d.eintragsTyp === 'wissen' && d.quelleWissenId === w.id
+      );
+      if (bereitsVorhanden) return;
+      if (!DB.dokumente) DB.dokumente = [];
+      DB.dokumente.push({
+        id:             'wis_mig_' + Math.random().toString(36).slice(2,9),
+        eintragsTyp:    'wissen',
+        quelleWissenId: w.id,
+        titel:          w.titel || 'Wissenseintrag',
+        typ:            w.typ   || null,
+        link:           w.url   || '',
+        ressourceTyp:   null,
+        bereichId:      w.bereichId || null,
+        aufgabeId:      w.quelleAufgabeId || null,
+        status:         'aktiv',
+        archiviert:     false,
+        kurzNotiz:      '',
+        notiz:          w.notiz || '',
+        tags:           w.tags  || [],
+        beziehungen:    w.beziehungen || [],
+        einsatzNotiz:   null,
+        erstellt:       w.erstellt  || new Date().toISOString(),
+        geaendert:      w.geaendert || new Date().toISOString(),
+      });
+    });
+    DB.wissen = []; // geleert nach Migration
+  }
+
   // Pläne: prioritaet + horizont + notiz
   (DB.plaene || []).forEach(p => {
     if (!p.prioritaet) p.prioritaet = 'mittel';
@@ -4091,10 +4076,6 @@ function showScreen(name, navEl) {
   const btn = document.getElementById('btn-neu');
   if (name === 'bereiche') {
     btn.style.display = 'none';  // + bereits in linker Spalte
-  } else if (name === 'wissen') {
-    btn.style.display = '';
-    btn.innerHTML = svgPlus() + ' Wissen';
-    btn.onclick = () => openWissenModal(null);
   } else if (name === 'dokumente') {
     btn.style.display = '';
     btn.innerHTML = svgPlus() + ' Dokument';
@@ -4112,11 +4093,7 @@ function showScreen(name, navEl) {
   if (name === 'dashboard') renderDashboard();
   if (name === 'aufgaben')  renderAufgaben();
   if (name === 'bereiche')  renderBereiche();
-  if (name === 'wissen') {
-    renderWissen();
-    const badge = document.getElementById('badge-dokumente');
-    if (badge) badge.textContent = (DB.dokumente||[]).length;
-  }
+
   if (name === 'dokumente') {
     // Bereich-Filter zurücksetzen damit er neu befüllt wird
     const bSel = document.getElementById('filter-dok-bereich');
@@ -4253,7 +4230,7 @@ function wissenAusAufgabeAnlegen() {
 
   saveDB();
   closeModal('modal-aus-aufgabe');
-  renderWissen();
+  renderDokumente();
   showToast('Wissenseintrag aus Aufgabe angelegt ✓');
 }
 
@@ -4284,8 +4261,8 @@ function renderWissen() {
 
   liste = liste.sort((a,b) => (b.geaendert||'').localeCompare(a.geaendert||''));
 
-  const badge = document.getElementById('badge-wissen');
-  if (badge) badge.textContent = DB.wissen.length;
+  const badge = document.getElementById('badge-dokumente');
+  if (badge) badge.textContent = (DB.dokumente||[]).filter(d=>!d.archiviert).length;
   const count = document.getElementById('wissen-count');
   if (count) count.textContent = liste.length + ' Einträge';
 
@@ -4549,15 +4526,17 @@ function saveWissen() {
 
   saveDB();
   closeModal('modal-wissen');
-  renderWissen();
+  renderDokumente();
   showToast(editId ? 'Wissenseintrag gespeichert ✓' : 'Wissenseintrag angelegt ✓');
 }
 
 function deleteWissen(id) {
   if (!confirm('Wissenseintrag wirklich löschen?')) return;
   DB.wissen = DB.wissen.filter(w=>w.id!==id);
+  // Auch aus DB.dokumente entfernen (migrierte Einträge)
+  DB.dokumente = (DB.dokumente||[]).filter(d => d.quelleWissenId !== id);
   saveDB();
-  renderWissen();
+  renderDokumente();
   showToast('Wissenseintrag gelöscht');
 }
 
@@ -4679,8 +4658,7 @@ function renderDashboard() {
     document.getElementById('badge-plaene-zahl').textContent = plaeneCount;
     elPlaene.style.display = plaeneCount > 0 ? 'inline-flex' : 'none';
   }
-  const bw = document.getElementById('badge-wissen');
-  if (bw) bw.textContent = (DB.wissen||[]).length;
+  // badge-wissen nicht mehr vorhanden (Wissen in Dokumente migriert)
 
   // Aufgaben-Badge: alle nicht erledigten
   const ba = document.getElementById('badge-aufgaben');
@@ -7097,7 +7075,7 @@ function renderBereichDetail(b) {
   const ressourcen   = []; // migriert zu DB.dokumente
   const dokumente    = (DB.dokumente||[]).filter(d => d.bereichId === b.id && (d.eintragsTyp||'dokument') === 'dokument' && !d.archiviert);
   const resEintraege = (DB.dokumente||[]).filter(d => d.bereichId === b.id && (d.eintragsTyp||'dokument') === 'ressource' && !d.archiviert);
-  const wissen       = (DB.wissen||[]).filter(w => w.bereichId === b.id);
+  const wissen       = (DB.dokumente||[]).filter(d => d.bereichId === b.id && (d.eintragsTyp||'dokument') === 'wissen' && !d.archiviert);
   const ressGesamt   = dokumente.length + resEintraege.length + wissen.length;
 
   const notizen = (DB.notizen||[]).filter(n => n.bereichId === b.id && !n.parentId)
@@ -7193,9 +7171,9 @@ function renderBereichDetail(b) {
     <span style="font-size:9px;padding:1px 6px;border-radius:8px;background:${DOK_FARBE[d.status]||'#8aaaa8'}22;color:${DOK_FARBE[d.status]||'#8aaaa8'};font-weight:600;flex-shrink:0;">${DOK_STATUS[d.status]||d.status}</span>
     <div class="bd-res-edit" onclick="event.stopPropagation();openDokModal('${d.id}')" style="padding:2px 5px;cursor:pointer;color:var(--text-xdim);flex-shrink:0;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
   </div>`).join('');
-  const wisRows  = wissen.map(w  => `<div class="bd-res-row" onclick="if(!event.target.closest('.bd-res-edit')){${w.url?`window.open('${escHtml(w.url)}','_blank')`:`openWissenModal('${w.id}')`}}">
+  const wisRows  = wissen.map(w  => `<div class="bd-res-row" onclick="if(!event.target.closest('.bd-res-edit')){${w.link?`window.open('${escHtml(w.link)}','_blank')`:`openWissenModal('${w.quelleWissenId||w.id}')`}}">
     ${wissenIcon}<div style="flex:1;min-width:0;"><div class="bd-res-label">${escHtml(w.titel)}</div><div class="bd-res-url">${w.typ==='aufgabennotiz'?'Aus Aufgabe':(w.typ||'Wissen')}</div></div>
-    <div class="bd-res-edit" onclick="event.stopPropagation();openWissenModal('${w.id}')" style="padding:2px 5px;cursor:pointer;color:var(--text-xdim);flex-shrink:0;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+    <div class="bd-res-edit" onclick="event.stopPropagation();openWissenModal('${w.quelleWissenId||w.id}')" style="padding:2px 5px;cursor:pointer;color:var(--text-xdim);flex-shrink:0;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
   </div>`).join('');
   const resRows  = resEintraege.map(r => `<div class="bd-res-row" onclick="if(!event.target.closest('.bd-res-edit')){${r.link?`window.open('${escHtml(r.link)}','_blank')`:`openRessourceModal('${r.id}')`}}">
     ${ressourceIconSVG(r.ressourceTyp||'link')}<div style="flex:1;min-width:0;"><div class="bd-res-label">${escHtml(r.titel)}</div><div class="bd-res-url">${(r.kurzNotiz||r.link||'').slice(0,50)}</div></div>
@@ -8740,7 +8718,8 @@ function renderDokumente() {
 }
 
 function dokEintragHTML(d) {
-  const istRess  = (d.eintragsTyp || 'dokument') === 'ressource';
+  const istRess   = (d.eintragsTyp || 'dokument') === 'ressource';
+  const istWissen = (d.eintragsTyp || 'dokument') === 'wissen';
   const archCls  = d.archiviert ? ' archiviert' : '';
   const notizTxt = (d.kurzNotiz||'').trim();
   const metaTxt  = istRess
@@ -8756,10 +8735,10 @@ function dokEintragHTML(d) {
   const iconCls  = hatRessTyp ? '' : (istRess ? 'typ-res' : 'typ-dok');
   const fallbackDocSVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3949ab" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
   const fallbackResSVG  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#006064" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
-  // ressourceIconSVG gibt 22×22 SVGs zurück — wir skalieren auf 26×26 via CSS
+  const fallbackWisSVG  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
   const iconSVG  = hatRessTyp
     ? ressourceIconSVG(d.ressourceTyp).replace(/width="22" height="22"/, 'width="26" height="26"')
-    : (istRess ? fallbackResSVG : fallbackDocSVG);
+    : (istRess ? fallbackResSVG : istWissen ? fallbackWisSVG : fallbackDocSVG);
 
   return `<div class="dok-entry${archCls}" onclick="${openFn}">
     <div class="dok-entry-icon ${hatRessTyp ? ''  : iconCls}" style="${hatRessTyp ? 'background:none;padding:0;' : ''}">${iconSVG}</div>
