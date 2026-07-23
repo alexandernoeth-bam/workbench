@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.219</title>
+<title>WorkAssist 1.5.220</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2254,7 +2254,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.219</div>
+    <div class="start-version">v1.5.220</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2322,7 +2322,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.219</div>
+    <div class="app-version" id="app-version">v1.5.220</div>
   </div>
 
   <div class="nav-section">
@@ -2681,7 +2681,9 @@ textarea.field-input { resize: vertical; min-height: 70px; }
       <div class="bel-sidebar" id="bel-sidebar">
         <div class="bel-sb-section">
           <div class="bel-sb-label">Status</div>
-          <div class="bel-sb-item active" onclick="belSetFilter('status','aktiv',this)">Aktiv <span class="bel-sb-count" id="bel-count-aktiv">0</span></div>
+          <div class="bel-sb-item active" onclick="belSetFilter('status','offen',this)">Offen <span class="bel-sb-count" id="bel-count-aktiv">0</span></div>
+          <div class="bel-sb-item" onclick="belSetFilter('status','bezahlen',this)">Zu bezahlen <span class="bel-sb-count" id="bel-count-bezahlen">0</span></div>
+          <div class="bel-sb-item" onclick="belSetFilter('status','einreichen',this)">Einzureichen <span class="bel-sb-count" id="bel-count-einreichen">0</span></div>
           <div class="bel-sb-item" onclick="belSetFilter('status','faellig',this)" style="color:#c0392b;">⚠ Fällig <span class="bel-sb-count" id="bel-count-faellig" style="color:#c0392b;background:#fde8e6;">0</span></div>
           <div class="bel-sb-item" onclick="belSetFilter('status','archiv',this)">Archiv <span class="bel-sb-count" id="bel-count-archiv">0</span></div>
         </div>
@@ -3679,7 +3681,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.219';
+const APP_VERSION = '1.5.220';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -7449,7 +7451,7 @@ const BEL_KATEGORIE_LABEL = {
 };
 const BEL_WF_ORDER = ['scannen','ablegen','bezahlen','einreichen','erledigt'];
 
-let _belFilterStatus = 'aktiv';
+let _belFilterStatus = 'offen';
 let _belFilterKat    = '';
 let _belFilterJahr   = '';
 let _belFilterTag    = '';
@@ -7491,13 +7493,17 @@ function renderBelege() {
   const belege = DB.belege || [];
 
   // Badges berechnen
-  const aktiv   = belege.filter(b => !b.archiviert).length;
-  const faellig = belege.filter(b => !b.archiviert && b.faelligDatum && b.faelligDatum <= heute && b.workflow !== 'erledigt').length;
-  const archiv  = belege.filter(b => b.archiviert).length;
+  const offen       = belege.filter(b => !b.archiviert && b.workflow !== 'erledigt').length;
+  const zaBezahlen  = belege.filter(b => !b.archiviert && b.workflow === 'bezahlen').length;
+  const zaEinreich  = belege.filter(b => !b.archiviert && b.workflow === 'einreichen').length;
+  const faellig     = belege.filter(b => !b.archiviert && b.faelligDatum && b.faelligDatum <= heute && b.workflow !== 'erledigt').length;
+  const archiv      = belege.filter(b => b.archiviert).length;
   const el = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
-  el('bel-count-aktiv', aktiv);
-  el('bel-count-faellig', faellig);
-  el('bel-count-archiv', archiv);
+  el('bel-count-aktiv',      offen);
+  el('bel-count-bezahlen',   zaBezahlen);
+  el('bel-count-einreichen', zaEinreich);
+  el('bel-count-faellig',    faellig);
+  el('bel-count-archiv',     archiv);
 
   // Jahr-Filter befüllen
   const jahreSet = new Set(belege.map(b => b.jahr).filter(Boolean));
@@ -7520,9 +7526,11 @@ function renderBelege() {
 
   // Filtern
   let liste = belege.filter(b => {
-    if (_belFilterStatus === 'aktiv'   &&  b.archiviert) return false;
-    if (_belFilterStatus === 'archiv'  && !b.archiviert) return false;
-    if (_belFilterStatus === 'faellig' && !(b.faelligDatum && b.faelligDatum <= heute && !b.archiviert && b.workflow !== 'erledigt')) return false;
+    if (_belFilterStatus === 'offen'      && (b.archiviert || b.workflow === 'erledigt')) return false;
+    if (_belFilterStatus === 'bezahlen'   && (b.archiviert || b.workflow !== 'bezahlen')) return false;
+    if (_belFilterStatus === 'einreichen' && (b.archiviert || b.workflow !== 'einreichen')) return false;
+    if (_belFilterStatus === 'faellig'    && !(b.faelligDatum && b.faelligDatum <= heute && !b.archiviert && b.workflow !== 'erledigt')) return false;
+    if (_belFilterStatus === 'archiv'     && !b.archiviert) return false;
     if (_belFilterKat && b.kategorie !== _belFilterKat) return false;
     if (_belFilterJahr && String(b.jahr) !== String(_belFilterJahr)) return false;
     if (_belFilterTag && !(b.tags||[]).includes(_belFilterTag)) return false;
