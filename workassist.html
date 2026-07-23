@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.211</title>
+<title>WorkAssist 1.5.212</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2190,7 +2190,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.211</div>
+    <div class="start-version">v1.5.212</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2258,7 +2258,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.211</div>
+    <div class="app-version" id="app-version">v1.5.212</div>
   </div>
 
   <div class="nav-section">
@@ -3569,7 +3569,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.211';
+const APP_VERSION = '1.5.212';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -8751,13 +8751,18 @@ function dokEintragHTML(d) {
                     : `<span class="dok-res-badge">${d.ressourceTyp ? escHtml(d.ressourceTyp.charAt(0).toUpperCase()+d.ressourceTyp.slice(1)) : 'Link'}</span>`)
     : `<span class="dok-status-badge ${dokStatusCss(d.status)}">${dokStatusLabel(d.status)}</span>`;
   const openFn   = istRess ? `openRessourceModal('${d.id}')` : `openDokModal('${d.id}')`;
-  const iconCls  = istRess ? 'typ-res' : 'typ-dok';
-  const iconSVG  = istRess
-    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#006064" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`
-    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3949ab" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+  // Icon: ressourceTyp hat Vorrang (z.B. PowerPoint, Confluence) — sonst Typ-Fallback
+  const hatRessTyp = !!(d.ressourceTyp);
+  const iconCls  = hatRessTyp ? '' : (istRess ? 'typ-res' : 'typ-dok');
+  const fallbackDocSVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3949ab" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+  const fallbackResSVG  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#006064" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
+  // ressourceIconSVG gibt 22×22 SVGs zurück — wir skalieren auf 26×26 via CSS
+  const iconSVG  = hatRessTyp
+    ? ressourceIconSVG(d.ressourceTyp).replace(/width="22" height="22"/, 'width="26" height="26"')
+    : (istRess ? fallbackResSVG : fallbackDocSVG);
 
   return `<div class="dok-entry${archCls}" onclick="${openFn}">
-    <div class="dok-entry-icon ${iconCls}">${iconSVG}</div>
+    <div class="dok-entry-icon ${hatRessTyp ? ''  : iconCls}" style="${hatRessTyp ? 'background:none;padding:0;' : ''}">${iconSVG}</div>
     <div class="dok-entry-body">
       <div class="dok-entry-row1">
         <span class="dok-entry-titel">${escHtml(d.titel)}</span>
