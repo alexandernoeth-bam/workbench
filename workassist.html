@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.221</title>
+<title>WorkAssist 1.5.225</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2254,7 +2254,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.221</div>
+    <div class="start-version">v1.5.225</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2322,7 +2322,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.221</div>
+    <div class="app-version" id="app-version">v1.5.225</div>
   </div>
 
   <div class="nav-section">
@@ -2697,6 +2697,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
           <div class="bel-sb-item" onclick="belSetFilter('kat','kontoauszug',this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Kontoauszüge</div>
           <div class="bel-sb-item" onclick="belSetFilter('kat','benachrichtigung',this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Benachrichtigungen</div>
           <div class="bel-sb-item" onclick="belSetFilter('kat','sonstiges',this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Sonstiges</div>
+          <div class="bel-sb-item" onclick="belSetFilter('kat','tagesplan',this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Tagespläne</div>
         </div>
         <div class="bel-sb-divider"></div>
         <div class="bel-sb-section">
@@ -2723,7 +2724,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
           </button>
         </div>
         <!-- PDF-Vorschau Overlay -->
-        <div class="bel-preview-overlay" id="bel-preview-overlay" style="display:none;">
+        <div class="bel-preview-overlay" id="bel-preview-overlay">
             <div class="bel-preview-bar">
               <div style="flex:1;min-width:0;">
                 <div class="bel-preview-bar-title" id="bel-preview-title">—</div>
@@ -3681,7 +3682,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.221';
+const APP_VERSION = '1.5.225';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -3889,15 +3890,16 @@ function migrateDB() {
     DB.wissen = []; // geleert nach Migration
   }
 
-  // Belege: Felder sichern
+  // Belege: Felder sichern + Migration workflow 'erledigt' → 'archivieren'
   (DB.belege || []).forEach(b => {
-    if (b.archiviert  === undefined) b.archiviert  = false;
+    if (b.archiviert    === undefined) b.archiviert    = false;
     if (b.einreichZiele === undefined) b.einreichZiele = [];
-    if (b.aufgabeId   === undefined) b.aufgabeId   = null;
-    if (b.driveUrl    === undefined) b.driveUrl     = '';
-    if (b.tags        === undefined) b.tags         = [];
-    if (b.notiz       === undefined) b.notiz        = '';
-    if (b.jahr        === undefined) b.jahr         = null;
+    if (b.aufgabeId     === undefined) b.aufgabeId     = null;
+    if (b.driveUrl      === undefined) b.driveUrl      = '';
+    if (b.tags          === undefined) b.tags          = [];
+    if (b.notiz         === undefined) b.notiz         = '';
+    if (b.jahr          === undefined) b.jahr          = null;
+    if (b.workflow === 'erledigt') b.workflow = 'archivieren'; // Migration
   });
 
   // Pläne: prioritaet + horizont + notiz
@@ -7500,13 +7502,14 @@ const BEL_KATEGORIE_SVG = {
   kontoauszug:      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>',
   benachrichtigung: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>',
   sonstiges:        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+  tagesplan:        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/></svg>',
 };
 const BEL_KATEGORIE_ICON = BEL_KATEGORIE_SVG;
 const BEL_KATEGORIE_LABEL = {
   rechnung:'Rechnung', vertrag:'Vertrag', police:'Police',
   kontoauszug:'Kontoauszug', benachrichtigung:'Benachrichtigung', sonstiges:'Sonstiges'
 };
-const BEL_WF_ORDER = ['scannen','ablegen','bezahlen','einreichen','erledigt'];
+const BEL_WF_ORDER = ['scannen','ablegen','bezahlen','einreichen','archivieren'];
 
 let _belFilterStatus = 'offen';
 let _belFilterKat    = '';
@@ -7550,10 +7553,10 @@ function renderBelege() {
   const belege = DB.belege || [];
 
   // Badges berechnen
-  const offen       = belege.filter(b => !b.archiviert && b.workflow !== 'erledigt').length;
+  const offen       = belege.filter(b => !b.archiviert && b.workflow !== 'archivieren').length;
   const zaBezahlen  = belege.filter(b => !b.archiviert && b.workflow === 'bezahlen').length;
   const zaEinreich  = belege.filter(b => !b.archiviert && b.workflow === 'einreichen').length;
-  const faellig     = belege.filter(b => !b.archiviert && b.faelligDatum && b.faelligDatum <= heute && b.workflow !== 'erledigt').length;
+  const faellig     = belege.filter(b => !b.archiviert && b.faelligDatum && b.faelligDatum <= heute && b.workflow !== 'archivieren').length;
   const archiv      = belege.filter(b => b.archiviert).length;
   const el = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
   el('bel-count-aktiv',      offen);
@@ -7583,10 +7586,10 @@ function renderBelege() {
 
   // Filtern
   let liste = belege.filter(b => {
-    if (_belFilterStatus === 'offen'      && (b.archiviert || b.workflow === 'erledigt')) return false;
+    if (_belFilterStatus === 'offen'      && (b.archiviert || b.workflow === 'archivieren')) return false;
     if (_belFilterStatus === 'bezahlen'   && (b.archiviert || b.workflow !== 'bezahlen')) return false;
     if (_belFilterStatus === 'einreichen' && (b.archiviert || b.workflow !== 'einreichen')) return false;
-    if (_belFilterStatus === 'faellig'    && !(b.faelligDatum && b.faelligDatum <= heute && !b.archiviert && b.workflow !== 'erledigt')) return false;
+    if (_belFilterStatus === 'faellig'    && !(b.faelligDatum && b.faelligDatum <= heute && !b.archiviert && b.workflow !== 'archivieren')) return false;
     if (_belFilterStatus === 'archiv'     && !b.archiviert) return false;
     if (_belFilterKat && b.kategorie !== _belFilterKat) return false;
     if (_belFilterJahr && String(b.jahr) !== String(_belFilterJahr)) return false;
@@ -7597,12 +7600,10 @@ function renderBelege() {
 
   el('bel-count-label', liste.length + ' Einträge');
   const badge = document.getElementById('badge-belege');
-  if (badge) badge.textContent = aktiv;
+  if (badge) badge.textContent = offen;
 
   if (!liste.length) {
-    const overlay = document.getElementById('bel-preview-overlay');
     container.innerHTML = '<div style="color:var(--text-xdim);font-size:12px;padding:24px;text-align:center;">Keine Belege – mit + anlegen.</div>';
-    if (overlay) container.appendChild(overlay);
     return;
   }
 
@@ -7623,9 +7624,7 @@ function renderBelege() {
     html += items.map(b => belEintragHTML(b)).join('');
   });
 
-  const overlay = document.getElementById('bel-preview-overlay');
   container.innerHTML = html;
-  if (overlay) container.appendChild(overlay);
 }
 
 function belEintragHTML(b) {
@@ -7634,7 +7633,7 @@ function belEintragHTML(b) {
   const archCls   = b.archiviert ? ' archiviert' : '';
   const icon      = BEL_KATEGORIE_ICON[b.kategorie] || '📄';
   const wfLabel   = { scannen:'Scannen', ablegen:'Abgelegt', bezahlen:'Bezahlen', einreichen:'Einreichen', erledigt:'Erledigt' };
-  const wfCss     = { scannen:'bel-s-scan', ablegen:'bel-s-ablegen', bezahlen:'bel-s-bezahlen', einreichen:'bel-s-einreichen', erledigt:'bel-s-ablegen' };
+  const wfCss     = { scannen:'bel-s-scan', ablegen:'bel-s-ablegen', bezahlen:'bel-s-bezahlen', einreichen:'bel-s-einreichen', archivieren:'bel-s-archiviert' };
   const statusBadge = istFaellig
     ? `<span class="bel-badge bel-s-faellig">⚠ Fällig ${formatDatum(b.faelligDatum)}</span>`
     : `<span class="bel-badge ${wfCss[b.workflow]||''}">${wfLabel[b.workflow]||''}</span>`;
@@ -7735,12 +7734,12 @@ function belSetWfUI(aktiv) {
     btn.classList.remove('done','aktiv');
     if (i < idx)      btn.classList.add('done');
     else if (i === idx) btn.classList.add('aktiv');
-    if (i < idx) btn.textContent = '✓ ' + ({scannen:'Scannen',ablegen:'Ablegen',bezahlen:'Bezahlen',einreichen:'Einreichen',erledigt:'Erledigt'}[btn.dataset.wf]||'');
-    else          btn.textContent = {scannen:'Scannen',ablegen:'Ablegen',bezahlen:'Bezahlen',einreichen:'Einreichen',erledigt:'Erledigt'}[btn.dataset.wf]||'';
+    if (i < idx) btn.textContent = '✓ ' + ({scannen:'Scannen',ablegen:'Ablegen',bezahlen:'Bezahlen',einreichen:'Einreichen',archivieren:'Archiviert'}[btn.dataset.wf]||'');
+    else          btn.textContent = {scannen:'Scannen',ablegen:'Ablegen',bezahlen:'Bezahlen',einreichen:'Einreichen',archivieren:'Archiviert'}[btn.dataset.wf]||'';
   });
   // Fälligkeitsdatum nur bei "bezahlen" zeigen
   const fw = document.getElementById('bel-faellig-wrap');
-  if (fw) fw.style.display = (aktiv === 'bezahlen' || aktiv === 'einreichen' || aktiv === 'erledigt') ? '' : 'none';
+  if (fw) fw.style.display = (aktiv === 'bezahlen' || aktiv === 'einreichen') ? '' : 'none';
 }
 
 function belToggleEinreich(el) {
@@ -13034,6 +13033,7 @@ document.addEventListener('keydown', e => {
             <option value="kontoauszug">Kontoauszug</option>
             <option value="benachrichtigung">Benachrichtigung</option>
             <option value="sonstiges">Sonstiges</option>
+          <option value="tagesplan">📅 Tagesplan</option>
           </select>
         </div>
         <div class="field-group">
@@ -13064,7 +13064,7 @@ document.addEventListener('keydown', e => {
           <div class="bel-wf-btn" data-wf="ablegen"    onclick="belSetWf('ablegen')">Ablegen</div>
           <div class="bel-wf-btn" data-wf="bezahlen"   onclick="belSetWf('bezahlen')">Bezahlen</div>
           <div class="bel-wf-btn" data-wf="einreichen" onclick="belSetWf('einreichen')">Einreichen</div>
-          <div class="bel-wf-btn" data-wf="erledigt"   onclick="belSetWf('erledigt')">Erledigt</div>
+          <div class="bel-wf-btn" data-wf="archivieren" onclick="belSetWf('archivieren')">Archiviert</div>
         </div>
       </div>
 
