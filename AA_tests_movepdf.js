@@ -762,3 +762,115 @@ console.log('\n=== NOTIZ → MOVE ===');
   }
 
 })();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: PWA-BADGE UND DATUMSBERECHNUNG   (neu in v1.5.234)
+//  Einfügen in AA_tests.js nach der Kategorie NOTIZ → MOVE,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Badge wird nur beim Dashboard-Rendern aktualisiert und ist überall
+//     sonst veraltet
+//   • Badge weicht bei 0 fälligen Aufgaben auf die Plananzahl aus – dieselbe
+//     Zahl bedeutet dann mal Aufgaben, mal Pläne
+//   • Datumsfunktionen rechnen wieder über toISOString() in UTC und liefern
+//     in Deutschland nachts bzw. bei lokaler Mitternacht den falschen Tag
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== PWA-BADGE UND DATUM ===');
+
+(function testBadgeUndDatum() {
+
+  // ── 1. Datumsfunktionen ─────────────────────────────────────────────────
+  if (typeof isoDatum !== 'function') {
+    fail('isoDatum() fehlt – zentrale lokale Datumsformatierung');
+  } else {
+    const f = [
+      ['2026-07-27T00:30:00', '2026-07-27', 'Sommerzeit 00:30'],
+      ['2026-01-15T00:30:00', '2026-01-15', 'Winterzeit 00:30'],
+      ['2026-12-31T23:00:00', '2026-12-31', 'Jahreswechsel'],
+    ];
+    const schlecht = f.filter(([iso, soll]) => isoDatum(new Date(iso)) !== soll);
+    if (schlecht.length) fail('isoDatum falsch bei: ' + schlecht.map(x => x[2]).join(', '));
+    else ok('isoDatum liefert das lokale Datum');
+  }
+
+  if (typeof today !== 'function') {
+    fail('today() fehlt');
+  } else if (today() !== moveTodayISO()) {
+    fail('today() und moveTodayISO() liefern verschiedene Tage: ' + today() + ' / ' + moveTodayISO());
+  } else ok('today() und moveTodayISO() stimmen überein');
+
+  if (typeof moveTodayISO === 'function' && !/return today\(\)/.test(moveTodayISO.toString()))
+    warn('moveTodayISO() rechnet wieder selbst – doppelte Datumslogik');
+  else ok('Nur eine Datumsimplementierung im Einsatz');
+
+  // arbeitstageVor wird immer mit '...T00:00:00' gerufen – lokale Mitternacht.
+  // Über toISOString() sprang das Ergebnis früher einen Tag zurück.
+  if (typeof arbeitstageVor === 'function') {
+    const heute = today();
+    if (arbeitstageVor(heute + 'T00:00:00', 0) !== heute)
+      fail('arbeitstageVor(heute, 0) liefert nicht heute – UTC-Verschiebung zurück?');
+    else ok('arbeitstageVor rechnet ohne Tagesversatz');
+  }
+
+  ['naechsteNArbeitstage','wocheStart','wocheEnde','naechste3ArbeitstageEnde',
+   'naechsterArbeitstag','datumPlusTageFaellig'].forEach(fn => {
+    if (typeof window[fn] !== 'function') return;
+    if (/toISOString\(\)\s*\.\s*slice\(\s*0\s*,\s*10\s*\)/.test(window[fn].toString()))
+      fail(fn + '() rechnet wieder über toISOString() – falscher Tag in der Nacht');
+  });
+  ok('Keine UTC-Datumsrückgaben in den Datumsfunktionen');
+
+  // ── 2. Badge-Aktualisierung ─────────────────────────────────────────────
+  if (typeof badgeAnstossen !== 'function')
+    fail('badgeAnstossen() fehlt – Badge wird nur beim Dashboard-Rendern aktualisiert');
+  else if (!/setTimeout/.test(badgeAnstossen.toString()))
+    warn('badgeAnstossen() ist nicht entprellt – läuft bei jedem Tastendruck');
+  else ok('Badge wird entprellt nachgezogen');
+
+  if (typeof saveDB === 'function' && !/badgeAnstossen/.test(saveDB.toString()))
+    fail('saveDB() stößt den Badge nicht an – er veraltet außerhalb des Dashboards');
+  else ok('Jede Datenänderung zieht den Badge nach');
+
+  if (typeof ladeUndStarte === 'function' && !/badgeAktualisieren/.test(ladeUndStarte.toString()))
+    fail('Badge wird nach dem Laden nicht gesetzt – alter Wert bleibt in der Taskleiste');
+  else ok('Badge wird nach dem Laden gesetzt');
+
+  // ── 3. Badge bedeutet immer dasselbe ────────────────────────────────────
+  if (typeof badgeAktualisieren === 'function') {
+    const src = badgeAktualisieren.toString();
+    if (/setAppBadge\(\s*anzahlPlaene\s*\)/.test(src))
+      fail('Badge weicht wieder auf die Plananzahl aus – Zahl ist nicht mehr deutbar');
+    else ok('Badge zeigt ausschließlich fällige Aufgaben');
+    if (!/clearAppBadge/.test(src))
+      fail('Badge wird bei 0 fälligen Aufgaben nicht gelöscht');
+    else ok('Badge wird bei 0 gelöscht');
+  }
+
+  // ── 4. Badge stimmt mit der Dashboard-Pille überein ─────────────────────
+  if (typeof DB !== 'undefined' && DB && Array.isArray(DB.aufgaben) &&
+      typeof istHeute === 'function') {
+    const heute = today();
+    const offen = DB.aufgaben.filter(a => a.status !== 'erledigt');
+    const ueber = offen.filter(a => {
+      if (a.wiedervorlage || a.startdatum) {
+        const ad = a.wiedervorlage || a.startdatum || a.faellig;
+        return ad && ad < heute;
+      }
+      return a.faellig && a.faellig < heute;
+    });
+    const heuteL = offen.filter(a => !ueber.includes(a) && istHeute(a, heute));
+    const erwartet = ueber.length + heuteL.length;
+    const pille = document.getElementById('badge-faellig-zahl');
+    if (!pille) {
+      warn('Dashboard-Pille nicht gefunden – Abgleich nicht möglich');
+    } else if (String(erwartet) !== (pille.textContent || '').trim()) {
+      warn('Badge-Erwartung ' + erwartet + ', Dashboard-Pille zeigt "' +
+           (pille.textContent || '').trim() + '" – Dashboard evtl. noch nicht gerendert');
+    } else {
+      ok('Badge-Rechnung deckt sich mit der Dashboard-Pille (' + erwartet + ')');
+    }
+  }
+
+})();

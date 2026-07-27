@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.233</title>
+<title>WorkAssist 1.5.234</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
@@ -171,7 +171,7 @@ svg { display: block; }
 
 
 /* ═══════════════════════════════════════
-   TAGESZETTEL-ASSISTENT (v1.5.233)
+   TAGESZETTEL-ASSISTENT (v1.5.234)
 ═══════════════════════════════════════ */
 #screen-tageszettel { display:none; flex-direction:column; overflow:hidden; padding:0; }
 #screen-tageszettel.active { display:flex !important; }
@@ -360,7 +360,7 @@ svg { display: block; }
 
 
 /* ═══════════════════════════════════════
-   NOTIZ → MOVE (v1.5.233)
+   NOTIZ → MOVE (v1.5.234)
 ═══════════════════════════════════════ */
 #screen-notizmove { display:none; flex-direction:column; overflow:hidden; padding:0; }
 #screen-notizmove.active { display:flex !important; }
@@ -2541,7 +2541,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.233</div>
+    <div class="start-version">v1.5.234</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -2609,7 +2609,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.233</div>
+    <div class="app-version" id="app-version">v1.5.234</div>
   </div>
 
   <div class="nav-section">
@@ -4097,7 +4097,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.233';
+const APP_VERSION = '1.5.234';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -4139,10 +4139,22 @@ async function leseDatei(handle) {
   return JSON.parse(text);
 }
 
+// Badge nach Datenaenderungen nachziehen – entprellt, weil saveDB() beim
+// Tippen sehr haeufig laeuft. Frueher wurde der Badge nur beim Rendern des
+// Dashboards aktualisiert und war auf allen anderen Screens veraltet.
+let _badgeTimer = null;
+function badgeAnstossen() {
+  clearTimeout(_badgeTimer);
+  _badgeTimer = setTimeout(() => {
+    try { badgeAktualisieren(); } catch (e) { console.warn('[Badge]', e); }
+  }, 300);
+}
+
 async function saveDB() {
   DB.version     = APP_VERSION;
   pendingChanges = true;
   setSaveStatus('save-pending', 'Nicht gespeichert');
+  badgeAnstossen();
 
   function lsSet(data) {
     try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) { /* Safari file:// blockiert localStorage */ }
@@ -4620,13 +4632,24 @@ async function ladeUndStarte() {
     await updateToggleButton(name);
   }
   setSaveStatus('save-ok', name ? `Gespeichert · ${name}` : 'Browser-Speicher');
+  // Badge sofort auf den geladenen Stand setzen, damit kein Wert von
+  // vorgestern in der Taskleiste stehen bleibt
+  try { badgeAktualisieren(); } catch (e) { console.warn('[Badge]', e); }
 }
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 }
 
-const today = () => new Date().toISOString().slice(0,10);
+// Lokales Datum als ISO-String. toISOString() rechnet in UTC und liefert in
+// Deutschland zwischen 00:00 und 02:00 den Vortag – deshalb hier bewusst
+// die lokalen Datumsanteile.
+function isoDatum(d) {
+  return d.getFullYear() + '-' +
+         String(d.getMonth() + 1).padStart(2, '0') + '-' +
+         String(d.getDate()).padStart(2, '0');
+}
+const today = () => isoDatum(new Date());
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  NAVIGATION
@@ -5019,7 +5042,7 @@ function naechsteNArbeitstage(von, n) {
     const dow = d.getDay();
     if (dow !== 0 && dow !== 6) count++;
   }
-  return d.toISOString().slice(0,10);
+  return isoDatum(d);
 }
 
 function openWissenModal(id) {
@@ -5159,12 +5182,12 @@ function rteWissenCmd(cmd) {
 function wocheStart(offsetWochen) {
   const d = new Date(); const day = d.getDay();
   d.setDate(d.getDate() - (day === 0 ? 6 : day - 1) + (offsetWochen||0) * 7);
-  return d.toISOString().slice(0,10);
+  return isoDatum(d);
 }
 function wocheEnde(offsetWochen) {
   const d = new Date(); const day = d.getDay();
   d.setDate(d.getDate() + (day === 0 ? 0 : 7 - day) + (offsetWochen||0) * 7);
-  return d.toISOString().slice(0,10);
+  return isoDatum(d);
 }
 function getKW(dateStr) {
   const d = new Date(dateStr);
@@ -5329,7 +5352,7 @@ function arbeitstageVor(datum, n) {
     const dow = d.getDay();
     if (dow !== 0 && dow !== 6) count++; // nicht Sa/So
   }
-  return d.toISOString().slice(0,10);
+  return isoDatum(d);
 }
 
 function renderPanelBacklog(offen, overdue, heute, inArbeit) {
@@ -5634,7 +5657,7 @@ function naechste3ArbeitstageEnde() {
     const tag = d.getDay();
     if (tag !== 0 && tag !== 6) gezaehlt++; // 0=So, 6=Sa überspringen
   }
-  return d.toISOString().slice(0,10);
+  return isoDatum(d);
 }
 
 function setBereichePanelModus(modus) {
@@ -6675,7 +6698,7 @@ function naechsterArbeitstag(vonDatum) {
   // Nächster Arbeitstag (Mo–Fr) nach gegebenem Datum
   const d = vonDatum ? new Date(vonDatum) : new Date();
   do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0 || d.getDay() === 6);
-  return d.toISOString().slice(0, 10);
+  return isoDatum(d);
 }
 
 function wiedervorlageSetzenDirekt(id, event) {
@@ -7069,11 +7092,13 @@ function badgeAktualisieren() {
     if (istKrise) hatKrise = true;
   });
 
-  // ── PWA App Badge API — Priorität: fällige Aufgaben > aktive Pläne ──
+  // ── PWA App Badge API ──────────────────────────────────────────────
+  // Der Badge zeigt ausschliesslich faellige und ueberfaellige Aufgaben.
+  // Frueher wurde bei 0 auf die Plananzahl ausgewichen – dieselbe Zahl stand
+  // dann mal fuer Aufgaben, mal fuer Plaene und war nicht deutbar.
   if ('setAppBadge' in navigator) {
-    if (faellig > 0)        navigator.setAppBadge(faellig).catch(()=>{});
-    else if (anzahlPlaene > 0) navigator.setAppBadge(anzahlPlaene).catch(()=>{});
-    else                    navigator.clearAppBadge().catch(()=>{});
+    if (faellig > 0) navigator.setAppBadge(faellig).catch(()=>{});
+    else             navigator.clearAppBadge().catch(()=>{});
   }
 
   const anzahl = faellig + anzahlPlaene; // für Favicon-Badge Gesamtsignal
@@ -7742,7 +7767,7 @@ function renderBereichDetail(b) {
   // ── Aufgaben-Sektion ──
   const aufgabenRows = aufgabenOffen.length
     ? aufgabenOffen.map(a => {
-        const isDue = a.faellig && a.faellig <= new Date().toISOString().slice(0,10);
+        const isDue = a.faellig && a.faellig <= today();
         const durBadge = a.groesse ? `<span style="font-size:9px;background:#fff3e0;color:#e65100;padding:1px 5px;border-radius:4px;flex-shrink:0;">${a.groesse} min</span>` : '';
         return `<div class="bd-row" onclick="openAufgabeModal('${a.id}')">
           ${isDue ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
@@ -11249,7 +11274,7 @@ function naechsteWiederholInstanz(faellig, wiederholung) {
           kandidat.setDate(kandidat.getDate() + (intervall - 1) * 7);
         }
       }
-      return kandidat ? kandidat.toISOString().slice(0,10) : null;
+      return kandidat ? isoDatum(kandidat) : null;
     } else {
       // Kein Wochentag konfiguriert → einfach +7*intervall Tage
       d.setDate(d.getDate() + 7 * (wiederholung.intervall || 1));
@@ -11261,7 +11286,7 @@ function naechsteWiederholInstanz(faellig, wiederholung) {
   } else if (wiederholung.typ === 'jaehrlich') {
     d.setFullYear(d.getFullYear() + 1);
   }
-  return d.toISOString().slice(0,10);
+  return isoDatum(d);
 }
 
 
@@ -11959,7 +11984,7 @@ function datumPlusTageFaellig(faelligISO, offsetTage) {
   if (!faelligISO) return null;
   const d = new Date(faelligISO + 'T12:00:00');
   d.setDate(d.getDate() + offsetTage);
-  return d.toISOString().slice(0, 10);
+  return isoDatum(d);
 }
 
 function terminFolgeAnlegen() {
@@ -12287,7 +12312,8 @@ function emlParse(text) {
   let uhrzeit = '';
   const d = new Date(date);
   if (!isNaN(d)) {
-    faellig = d.toISOString().slice(0, 10);
+    // Datum und Uhrzeit beide lokal – vorher war das Datum UTC, die Uhrzeit lokal
+    faellig = isoDatum(d);
     uhrzeit = d.toTimeString().slice(0, 5);
   }
 
@@ -12929,7 +12955,7 @@ document.addEventListener('keydown', e => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  MOVE-PDF-EXPORT  –  reMarkable Paper Pro Move (82,6 × 132,2 mm)
-//  Basis (jsPDF, Caveat-Fonts, Zweitquelle) + Übersichts-PDFs   v1.5.233
+//  Basis (jsPDF, Caveat-Fonts, Zweitquelle) + Übersichts-PDFs   v1.5.234
 //  Portiert aus DayPaper v0.3.4 (erstelleUebersichtPDF)
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -12967,11 +12993,9 @@ function ladeCaveatFonts() {
   return _caveatFonts;
 }
 
+// Eine Implementierung fuer alle: today() liefert bereits das lokale Datum
 function moveTodayISO() {
-  const d = new Date();
-  return d.getFullYear() + '-' +
-         String(d.getMonth() + 1).padStart(2, '0') + '-' +
-         String(d.getDate()).padStart(2, '0');
+  return today();
 }
 
 function moveIstPrivat() {
@@ -13282,7 +13306,7 @@ function moveUebersichtPDF(modus, fonts, quellen) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  TAGESZETTEL-ASSISTENT  –  6 Schritte, Vorschau mit Drag & Drop,
-//  Export als PDF für den reMarkable Paper Pro Move            v1.5.233
+//  Export als PDF für den reMarkable Paper Pro Move            v1.5.234
 //  Tages-PDF portiert aus DayPaper v0.3.4 (erstelleRemarkablePDF)
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -14036,7 +14060,7 @@ function erstelleTageszettelPDF(zettel, fonts) {
 // ═══════════════════════════════════════════════════════════════════════════
 //  NOTIZ → MOVE  –  Markdown nach PDF für den reMarkable Paper Pro Move
 //  Fließtext in Caveat, Tabellen und Code in Helvetica, rein schwarz/weiß
-//  auf Punktraster. Unterseiten optional, je auf neuer Seite.      v1.5.233
+//  auf Punktraster. Unterseiten optional, je auf neuer Seite.      v1.5.234
 // ═══════════════════════════════════════════════════════════════════════════
 
 const NM = {
@@ -15457,7 +15481,7 @@ async function nmPdfErstellen() {
       })
       .catch(() => {
         // Fallback: Inline-SW
-        const swCode = `const CACHE='wa-v1_5_233';
+        const swCode = `const CACHE='wa-v1_5_234';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
