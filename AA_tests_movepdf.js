@@ -622,3 +622,143 @@ console.log('\n=== TAGESZETTEL – GRUPPIERUNG ===');
   }
 
 })();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: NOTIZ → MOVE   (neu in v1.5.233)
+//  Einfügen in AA_tests.js nach der Kategorie TAGESZETTEL – GRUPPIERUNG,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Elemente des Export-Screens oder der Button in der Notiz gelöscht
+//   • Markdown-Erkennung bricht (Tabellen, Checkboxen, Überschriften)
+//   • Zellfarben landen wieder im PDF, obwohl schwarz/weiß gefordert ist
+//   • Unterseiten-Toggle wirkungslos
+//   • Text läuft über den rechten Seitenrand
+//   • Objekt-URLs der Vorschau werden nicht freigegeben (Speicherleck)
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== NOTIZ → MOVE ===');
+
+(function testNotizMove() {
+
+  // ── 1. Screen und Elemente ──────────────────────────────────────────────
+  const ids = ['screen-notizmove','nm-opts','nm-titel','nm-meta','nm-unter-sub',
+               'nm-sw-unter','nm-seg','nm-struct','nm-frame','nm-pv-cnt'];
+  const fehlend = ids.filter(i => !document.getElementById(i));
+  if (fehlend.length) fail('Fehlende Elemente im Notiz-Export: ' + fehlend.join(', '));
+  else ok('Alle ' + ids.length + ' Elemente vorhanden');
+
+  const seg = document.querySelectorAll('#nm-seg button');
+  if (seg.length !== 3) fail('Textgrößen-Umschalter hat ' + seg.length + ' statt 3 Stufen');
+  else ok('Textgrößen-Umschalter mit 3 Stufen');
+
+  const moveBtn = Array.from(document.querySelectorAll('.ntb'))
+    .some(b => (b.getAttribute('onclick') || '').includes('notizFuerMove'));
+  if (!moveBtn) fail('Move-Button in der Notiz-Werkzeugleiste fehlt');
+  else ok('Move-Button in der Notiz vorhanden');
+
+  if (typeof SCREENS === 'undefined' || !SCREENS.notizmove)
+    fail('SCREENS.notizmove fehlt');
+  else ok('SCREENS-Eintrag vorhanden');
+
+  // ── 2. Funktionen ───────────────────────────────────────────────────────
+  const noetig = ['notizFuerMove','nmZurueckZurNotiz','renderNotizMove','nmToggleUnter',
+                  'nmSetGroesse','nmVorschauNeu','nmVorschauBauen','nmParse','nmRuns',
+                  'nmZellenAusZeile','nmErstellePDF','nmPdfErstellen','nmNotiz','nmUnterseiten'];
+  const fehltFn = noetig.filter(f => typeof window[f] !== 'function');
+  if (fehltFn.length) fail('Nicht definierte Funktionen: ' + fehltFn.join(', '));
+  else ok('Alle ' + noetig.length + ' Funktionen definiert');
+
+  if (typeof NM_GROESSEN === 'undefined' || !NM_GROESSEN.s || !NM_GROESSEN.m || !NM_GROESSEN.l)
+    fail('NM_GROESSEN unvollständig');
+  else if (!(NM_GROESSEN.s.text < NM_GROESSEN.m.text && NM_GROESSEN.m.text < NM_GROESSEN.l.text))
+    fail('Textgrößen sind nicht aufsteigend');
+  else ok('Drei Textgrößen korrekt gestaffelt');
+
+  // ── 3. Markdown-Erkennung ───────────────────────────────────────────────
+  if (typeof nmParse === 'function') {
+    const b = nmParse('# T\n## Z\n### D\nAbsatz\n- P\n- [ ] o\n- [x] f\n> Z\n---\n| A | B |\n|---|---|\n| 1 | 2 |\n');
+    const typen = b.map(x => x.typ).join(',');
+    if (typen !== 'h1,h2,h3,p,liste,zitat,hr,tabelle,leer')
+      fail('Markdown-Erkennung verändert: ' + typen);
+    else ok('Alle Blocktypen werden erkannt');
+
+    const l = b.find(x => x.typ === 'liste');
+    if (!l || l.items.length !== 3) fail('Listenpunkte werden nicht korrekt gesammelt');
+    else if (!l.items[1].cb || l.items[2].an !== true) fail('Checkboxen werden nicht erkannt');
+    else ok('Aufzählung und Checkboxen korrekt');
+  }
+
+  if (typeof nmRuns === 'function') {
+    const f = [
+      ['a **b** c', r => r.length === 3 && r[1].bold === true, 'fett'],
+      ['*x*',       r => r.length === 1 && !r[0].bold,          'kursiv wird normal gesetzt'],
+      ['`y`',       r => r[0].code === true,                    'Code'],
+      ['[D](http://x)', r => r[0].t === 'D (http://x)',         'Link zu sichtbarem Text'],
+    ];
+    const schlecht = f.filter(([t, p]) => !p(nmRuns(t)));
+    if (schlecht.length) fail('Inline-Auszeichnung falsch bei: ' + schlecht.map(x => x[2]).join(', '));
+    else ok('Inline-Auszeichnung korrekt');
+  }
+
+  // ── 4. Keine Farben ─────────────────────────────────────────────────────
+  if (typeof nmZellenAusZeile === 'function') {
+    if (nmZellenAusZeile('| {gruen}OK | {rot}Fehler |').join('|') !== 'OK|Fehler')
+      fail('Farbsyntax wird nicht aus den Zellen entfernt');
+    else ok('Zellfarben werden verworfen');
+  }
+  if (typeof nmErstellePDF === 'function') {
+    const src = nmErstellePDF.toString();
+    if (/setFillColor\(\s*(?!190|20)\d/.test(src.replace(/setFillColor\(190, 195, 205\)/g, '')))
+      warn('Ungewöhnlicher Füllfarben-Aufruf im Notiz-PDF – schwarz/weiß prüfen');
+    else ok('Notiz-PDF bleibt schwarz auf Punktraster');
+  }
+
+  // ── 5. Unterseiten-Toggle wirkt ─────────────────────────────────────────
+  if (typeof nmErstellePDF === 'function' && typeof NM !== 'undefined' &&
+      typeof DB !== 'undefined' && DB && Array.isArray(DB.notizen) && window.jspdf) {
+    const mitKind = DB.notizen.find(n => !n.parentId &&
+      DB.notizen.some(u => u.parentId === n.id));
+    if (!mitKind) {
+      warn('Keine Notiz mit Unterseiten vorhanden – Toggle nicht prüfbar');
+    } else {
+      const sich = { id: NM.notizId, u: NM.mitUnter, g: NM.groesse };
+      try {
+        NM.notizId = mitKind.id; NM.groesse = 'm';
+        NM.mitUnter = true;  const a = nmErstellePDF();
+        NM.mitUnter = false; const b = nmErstellePDF();
+        if (!a || !b) fail('nmErstellePDF liefert kein Dokument');
+        else if (a.internal.getNumberOfPages() <= b.internal.getNumberOfPages())
+          fail('Unterseiten-Toggle wirkt nicht auf die Seitenzahl');
+        else ok('Unterseiten-Toggle wirkt (' + b.internal.getNumberOfPages() +
+                ' → ' + a.internal.getNumberOfPages() + ' Seiten)');
+        if (a._nmSeitenProAbschnitt) {
+          const summe = a._nmSeitenProAbschnitt.reduce((s, x) => s + x.seiten, 0);
+          if (summe !== a.internal.getNumberOfPages())
+            fail('Strukturliste und tatsächliche Seitenzahl weichen ab');
+          else ok('Strukturliste stimmt mit dem PDF überein');
+        }
+      } catch (e) {
+        fail('nmErstellePDF wirft Fehler: ' + e.message);
+      } finally {
+        NM.notizId = sich.id; NM.mitUnter = sich.u; NM.groesse = sich.g;
+      }
+    }
+  }
+
+  // ── 6. Vorschau gibt Objekt-URLs frei ──────────────────────────────────
+  if (typeof nmVorschauBauen === 'function') {
+    if (!nmVorschauBauen.toString().includes('revokeObjectURL'))
+      fail('Vorschau gibt alte Objekt-URLs nicht frei – Speicherleck bei jeder Änderung');
+    else ok('Alte Vorschau-URLs werden freigegeben');
+  }
+
+  // ── 7. Seitenränder ─────────────────────────────────────────────────────
+  if (typeof nmErstellePDF === 'function') {
+    const src = nmErstellePDF.toString();
+    if (!/ML\s*=\s*2\.5.*MR\s*=\s*3\.5/.test(src.replace(/\s+/g, ' ')))
+      warn('Seitenränder des Notiz-PDF wurden verändert – Randeinhaltung neu prüfen');
+    else ok('Seitenränder unverändert (2,5 / 3,5 mm)');
+  }
+
+})();
