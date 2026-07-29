@@ -1284,3 +1284,255 @@ console.log('\n=== PLAN-ABZEICHEN HEUTE ===');
   }
 
 })();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: TAGESZETTEL-DETAILTIEFE   (neu in v1.5.242)
+//  Einfügen in AA_tests.js nach der Kategorie PLAN-ABZEICHEN „HEUTE",
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Schalter wirken auf beide Bereiche statt nur auf ihren eigenen
+//   • Bereits erfüllte Kriterien landen wieder auf dem Papier
+//   • Erledigte erste Schritte werden noch angeboten
+//   • Schalterstellung überlebt den Reload nicht
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== TAGESZETTEL-DETAILTIEFE ===');
+
+(function testTageszettelTiefe() {
+
+  if (typeof TZ === 'undefined' || !TZ.tiefe) {
+    fail('TZ.tiefe fehlt – Detailtiefe nicht vorhanden');
+    return;
+  }
+  if (!TZ.tiefe.work || !TZ.tiefe.priv)
+    fail('TZ.tiefe muss je einen Eintrag für work und priv haben');
+  else ok('Detailtiefe je Bereich getrennt geführt');
+
+  if (typeof tzOffeneKriterien !== 'function')
+    fail('tzOffeneKriterien() nicht definiert');
+  else {
+    const a = { ergebnis:[{ text:'A', erledigt:true }, { text:'B', erledigt:false }] };
+    const r = tzOffeneKriterien(a);
+    if (r.length !== 1 || r[0] !== 'B')
+      fail('Erfüllte Kriterien landen wieder auf dem Zettel');
+    else ok('Nur offene Kriterien werden übernommen');
+    if (tzOffeneKriterien(null).length !== 0) fail('tzOffeneKriterien ist nicht null-sicher');
+    else ok('null-sicher');
+  }
+
+  // ── Schalter wirken nur auf ihren Bereich ───────────────────────────────
+  if (typeof tzPdfErstellen === 'function') {
+    const src = tzPdfErstellen.toString();
+    if (!/TZ\.tiefe\[z\.quelle\]/.test(src))
+      fail('Detailtiefe wird nicht je Quelle ausgewertet – Schalter wirken global');
+    else ok('Detailtiefe wird je Quelle ausgewertet');
+  }
+  if (typeof tzRenderPaper === 'function' && !/TZ\.tiefe\[z\.quelle\]/.test(tzRenderPaper.toString()))
+    fail('Vorschau wertet die Detailtiefe nicht je Quelle aus');
+  else ok('Vorschau folgt der Detailtiefe je Quelle');
+
+  // ── Schalterleiste im DOM ───────────────────────────────────────────────
+  if (typeof tzHtmlAufgaben === 'function' && typeof TZ !== 'undefined') {
+    const sich = { q:TZ.quellen, z:TZ.zettel, k:TZ.katalog, o:TZ.offen };
+    try {
+      TZ.quellen = { work: DB, priv: null };
+      TZ.zettel = []; TZ.katalog = {}; TZ.offen = {};
+      const h = tzHtmlAufgaben('work');
+      if (!h.includes('tz-tiefe')) fail('Schalterleiste fehlt in der Aufgabenliste');
+      else ok('Schalterleiste wird gerendert');
+      if ((h.match(/data-tz="tiefe"/g) || []).length !== 2)
+        fail('Erwartet genau 2 Schalter je Bereich');
+      else ok('Zwei Schalter je Bereich');
+
+      // Erledigte erste Schritte dürfen nicht angeboten werden
+      const falsch = Object.values(TZ.katalog).filter(k => {
+        if (!k.ersterSchritt) return false;
+        const a = (DB.aufgaben || []).find(x => x.titel === k.text);
+        return a && a.ersterSchrittErledigt;
+      });
+      if (falsch.length) fail(falsch.length + ' erledigte erste Schritte werden angeboten');
+      else ok('Erledigte erste Schritte bleiben draußen');
+
+      // Katalog trägt nur offene Kriterien
+      const zuviel = Object.values(TZ.katalog).filter(k => {
+        const a = (DB.aufgaben || []).find(x => x.titel === k.text);
+        if (!a || !Array.isArray(a.ergebnis)) return false;
+        return (k.kriterien || []).length !== a.ergebnis.filter(x => !x.erledigt).length;
+      });
+      if (zuviel.length) fail(zuviel.length + ' Aufgaben mit falscher Kriterienzahl im Katalog');
+      else ok('Katalog trägt genau die offenen Kriterien');
+    } catch (e) {
+      fail('tzHtmlAufgaben wirft Fehler: ' + e.message);
+    } finally {
+      TZ.quellen = sich.q; TZ.zettel = sich.z; TZ.katalog = sich.k; TZ.offen = sich.o;
+    }
+  }
+
+  // ── Persistenz ──────────────────────────────────────────────────────────
+  if (typeof tzSpeichern === 'function' && !/tiefe/.test(tzSpeichern.toString()))
+    fail('Schalterstellung wird nicht gesichert – geht beim Reload verloren');
+  else ok('Schalterstellung wird gesichert');
+  if (typeof tzWiederherstellen === 'function' && !/tiefe/.test(tzWiederherstellen.toString()))
+    fail('Schalterstellung wird nicht wiederhergestellt');
+  else ok('Schalterstellung wird wiederhergestellt');
+
+  // ── PDF zeichnet die Unterzeilen ───────────────────────────────────────
+  if (typeof erstelleTageszettelPDF === 'function') {
+    const src = erstelleTageszettelPDF.toString();
+    if (!/tzUnterZeile/.test(src))
+      fail('PDF zeichnet keine Unterzeilen mehr');
+    else ok('PDF zeichnet erste Schritte und Kriterien');
+  }
+
+  // ── Google-Kalender-Knopf ───────────────────────────────────────────────
+  if (typeof googleKalenderOeffnen !== 'function')
+    fail('googleKalenderOeffnen() fehlt');
+  else if (!document.querySelector('.btn-extern'))
+    fail('Kalender-Knopf in der Sidebar fehlt');
+  else ok('Kalender-Knopf vorhanden');
+
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: HEUTE ERLEDIGTES IM TAGESZETTEL   (neu in v1.5.243, v1.5.244)
+//  Einfügen in AA_tests.js nach der Kategorie TAGESZETTEL-DETAILTIEFE,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Ein Weg zum Erledigen setzt erledigtAm nicht – die Erledigung bleibt
+//     im Rückblick unsichtbar
+//   • Wiedergeöffnetes behält erledigtAm und gilt weiter als heute erledigt
+//   • Gestern oder früher Erledigtes rutscht in den Rückblick
+//   • Aufgaben an Plan-Schritten erscheinen doppelt
+//   • Rückfallebene über das Änderungsprotokoll fällt weg – dann bleibt
+//     alles unsichtbar, was vor v1.5.243 abgehakt wurde
+//   • Protokoll wird in UTC statt lokal ausgewertet
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== HEUTE ERLEDIGTES ===');
+
+(function testErledigtHeute() {
+
+  const noetig = ['statusSetzen','heuteErledigt','tzErledigteHeute'];
+  const fehlt = noetig.filter(f => typeof window[f] !== 'function');
+  if (fehlt.length) { fail('Nicht definiert: ' + fehlt.join(', ')); return; }
+  ok('Alle Funktionen definiert');
+
+  // ── statusSetzen pflegt den Zeitstempel ─────────────────────────────────
+  const o = { status:'offen' };
+  statusSetzen(o, 'erledigt');
+  if (o.erledigtAm !== today()) fail('statusSetzen setzt erledigtAm nicht auf heute');
+  else ok('erledigtAm wird gesetzt');
+  statusSetzen(o, 'offen');
+  if ('erledigtAm' in o) fail('erledigtAm bleibt beim Wiederöffnen stehen');
+  else ok('erledigtAm wird beim Wiederöffnen entfernt');
+
+  // ── Kein Weg schreibt den Status noch direkt ────────────────────────────
+  const skripte = Array.from(document.querySelectorAll('script'))
+    .map(s => s.textContent || '').join('\n');
+  const direkt = (skripte.match(/\b[as]\.status\s*=\s*(?!==)/g) || []).length;
+  if (direkt) fail(direkt + ' Stellen setzen den Status direkt statt über statusSetzen() – erledigtAm fehlt dort');
+  else ok('Alle Statusänderungen laufen über statusSetzen()');
+
+  // ── heuteErledigt ───────────────────────────────────────────────────────
+  const g = new Date(); g.setDate(g.getDate() - 1);
+  const gestern = isoDatum(g);
+  const jetzt   = new Date().toISOString();
+  const gesternTs = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString(); })();
+  const LG = (zu, ts) => ({ aktion:'status_geaendert', zu, datum: ts });
+  const f = [
+    [{ status:'erledigt', erledigtAm: today() }, true,  'heute erledigt'],
+    [{ status:'erledigt', erledigtAm: gestern }, false, 'gestern erledigt'],
+    [{ status:'erledigt' },                      false, 'weder Datum noch Protokoll'],
+    [{ status:'offen', erledigtAm: today() },    false, 'offen mit Zeitstempel'],
+    // Rückfallebene Protokoll
+    [{ status:'erledigt', log:[LG('erledigt', jetzt)] },     true,  'heute laut Protokoll'],
+    [{ status:'erledigt', log:[LG('erledigt', gesternTs)] }, false, 'gestern laut Protokoll'],
+    [{ status:'erledigt', log:[LG('erledigt', gesternTs), LG('offen', jetzt), LG('erledigt', jetzt)] },
+                                                             true,  'gestern zu, heute auf und wieder zu'],
+    [{ status:'erledigt', log:[LG('erledigt', jetzt), LG('offen', jetzt)] },
+                                                             false, 'letzter Protokolleintrag ist offen'],
+    [{ status:'erledigt', log:[LG('erledigt', jetzt), { aktion:'aufgewertet', datum: jetzt }] },
+                                                             true,  'fremde Einträge überspringen'],
+    [{ status:'erledigt', log:[LG('erledigt', 'keindatum')] }, false, 'kaputter Zeitstempel'],
+    [{ status:'erledigt', log:'kaputt' },                    false, 'Protokoll kein Array'],
+    [{ status:'erledigt', erledigtAm: gestern, log:[LG('erledigt', jetzt)] },
+                                                             false, 'erledigtAm hat Vorrang'],
+  ];
+  const schlecht = f.filter(([x, soll]) => heuteErledigt(x) !== soll);
+  if (schlecht.length) fail('heuteErledigt falsch bei: ' + schlecht.map(x => x[2]).join('; '));
+  else ok('Alle ' + f.length + ' Fälle korrekt, inklusive Rückfallebene');
+
+  if (!/isoDatum\(d\)/.test(heuteErledigt.toString()))
+    fail('Protokollzeitstempel wird nicht lokal umgerechnet – UTC-Verschiebung nachts');
+  else ok('Protokoll wird lokal ausgewertet');
+  if (!/l\.aktion !== 'status_geaendert'/.test(heuteErledigt.toString()))
+    warn('Rückfallebene filtert nicht mehr auf status_geaendert');
+
+  // ── Sammlung gegen echte Daten ──────────────────────────────────────────
+  if (typeof TZ !== 'undefined' && typeof DB !== 'undefined' && DB) {
+    const sich = TZ.quellen;
+    try {
+      TZ.quellen = { work: DB, priv: null };
+      const liste = tzErledigteHeute();
+
+      const nichtHeute = liste.filter(x => !x.text);
+      if (nichtHeute.length) fail(nichtHeute.length + ' Einträge ohne Text im Rückblick');
+      else ok('Alle Rückblick-Einträge haben einen Text');
+
+      // Aufgaben, die an einem Plan hängen, dürfen nur einmal erscheinen
+      const texte = liste.map(x => x.text);
+      const doppelt = texte.filter((x, i) => texte.indexOf(x) !== i);
+      if (doppelt.length) fail('Doppelte Einträge im Rückblick: ' + doppelt.join(', '));
+      else ok('Keine Doppelungen zwischen Aufgabenliste und Plänen');
+
+      const erwartet = (DB.aufgaben || []).filter(heuteErledigt).length;
+      ok('Heute abgehakt: ' + erwartet + ' Aufgaben, ' + liste.length + ' Einträge im Rückblick');
+    } catch (e) {
+      fail('tzErledigteHeute wirft Fehler: ' + e.message);
+    } finally {
+      TZ.quellen = sich;
+    }
+  }
+
+  // ── Schalter und Darstellung ────────────────────────────────────────────
+  if (typeof TZ !== 'undefined' && !('erledigte' in TZ))
+    fail('TZ.erledigte fehlt – Schalter nicht vorhanden');
+  else ok('Schalterzustand wird geführt');
+  if (!document.getElementById('tz-tg-erl'))
+    fail('Schalter „Heute Erledigtes zeigen" fehlt im DOM');
+  else ok('Schalter im DOM vorhanden');
+  if (typeof tzSpeichern === 'function' && !/erledigte/.test(tzSpeichern.toString()))
+    fail('Schalterstellung wird nicht gesichert');
+  else ok('Schalterstellung wird gesichert');
+
+  if (typeof erstelleTageszettelPDF === 'function' &&
+      !/'trenner'/.test(erstelleTageszettelPDF.toString()))
+    fail('PDF kennt den Trenner vor dem Rückblick nicht');
+  else ok('PDF trennt den Rückblick ab');
+
+  // Erledigtes wird nur durchgestrichen, nicht ausgegraut (v1.5.245)
+  if (typeof erstelleTageszettelPDF === 'function') {
+    const src = erstelleTageszettelPDF.toString();
+    const bullet = src.match(/function tzBulletZeile[\s\S]*?\n  \}/);
+    if (!bullet) {
+      warn('tzBulletZeile im Quelltext nicht auffindbar');
+    } else if (/erledigt \? 150/.test(bullet[0]) || /\[150, 138, 118\]/.test(bullet[0]))
+      fail('Erledigte Einträge werden im Tageszettel wieder ausgegraut');
+    else
+      ok('Erledigte Einträge bleiben schwarz, nur durchgestrichen');
+  }
+
+  // ── Protokollfehler von früher ──────────────────────────────────────────
+  if (typeof planSchrittStatusToggle === 'function') {
+    const src = planSchrittStatusToggle.toString();
+    if (/von:\s*a\.status/.test(src))
+      fail('planSchrittStatusToggle liest „von" wieder nach der Änderung – Protokoll falsch');
+    else ok('Protokoll hält den alten Status fest');
+  }
+  if (typeof qvSchrittToggle === 'function' && !/logAktion/.test(qvSchrittToggle.toString()))
+    fail('Abhaken in der Schnellansicht wird nicht protokolliert');
+  else ok('Schnellansicht protokolliert das Abhaken');
+
+})();
