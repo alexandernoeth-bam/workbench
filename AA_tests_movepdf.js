@@ -874,3 +874,413 @@ console.log('\n=== PWA-BADGE UND DATUM ===');
   }
 
 })();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: AUFGABEN-ASSISTENT V2   (neu in v1.5.235)
+//  Einfügen in AA_tests.js nach der Kategorie PWA-BADGE UND DATUM,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Titel und Untertitel wieder vertauscht (Wirkung landet im Titel)
+//   • Ein Schritt des Assistenten verschwindet oder die Vorschau rutscht
+//   • Kriterien-Haken gehen beim erneuten Aufwerten verloren
+//   • Altbestand-Umstellung läuft zweimal und dreht alles zurück
+//   • DOM-Elemente von Kriterienliste oder erstem Schritt gelöscht
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== AUFGABEN-ASSISTENT V2 ===');
+
+(function testAssistentV2() {
+
+  // ── 1. Sechs Schritte vorhanden ─────────────────────────────────────────
+  const fehlend = [1,2,3,4,5,6].filter(i => !document.getElementById('asst-s' + i));
+  if (fehlend.length) fail('Fehlende Assistenten-Schritte: ' + fehlend.join(', '));
+  else ok('Alle 6 Schritte im DOM');
+
+  const dots = [1,2,3,4].filter(i => document.getElementById('asst-dot-' + i)).length;
+  if (dots !== 4) fail('Erwartet 4 Fortschrittspunkte, gefunden: ' + dots);
+  else ok('4 Fortschrittspunkte');
+
+  const neueIds = ['asst-ergebnis','asst-erster','asst-prev-ergebnis','asst-prev-erster',
+                   'asst-groesse-unv','aufgabe-erster','krit-box','krit-pill','krit-fertig'];
+  const fehltId = neueIds.filter(i => !document.getElementById(i));
+  if (fehltId.length) fail('Fehlende Elemente: ' + fehltId.join(', '));
+  else ok('Alle ' + neueIds.length + ' neuen Elemente vorhanden');
+
+  if (document.getElementById('asst-wert'))
+    fail('Altes Feld asst-wert existiert noch – Schritt 4 nicht sauber ersetzt');
+  else ok('Altes Wert-Feld entfernt');
+
+  // ── 2. Funktionen ───────────────────────────────────────────────────────
+  const noetig = ['kritZuText','textZuKrit','kritRendern','kritToggle','kritLoeschen',
+                  'kritHinzufuegen','kritPille','kritAufgabeAbschliessen',
+                  'ersterSchrittRendern','ersterSchrittToggle','ersterSchrittGeaendert',
+                  'asstGroesseUnveraendert','aufwertungBetroffene','aufwertungTitelTauschen',
+                  'tauschBannerRendern','tauschBannerAusblenden'];
+  const fehltFn = noetig.filter(f => typeof window[f] !== 'function');
+  if (fehltFn.length) fail('Nicht definierte Funktionen: ' + fehltFn.join(', '));
+  else ok('Alle ' + noetig.length + ' Funktionen definiert');
+
+  // ── 3. Mapping: Tätigkeit → titel, Wirkung → untertitel ────────────────
+  if (typeof asstUebernehmen === 'function') {
+    const src = asstUebernehmen.toString();
+    if (/a\.untertitel\s*=\s*alterTitel/.test(src))
+      fail('Altes Mapping zurück: alter Titel wird wieder zum Untertitel');
+    else if (!/a\.untertitel\s*=\s*wirkung/.test(src))
+      fail('Wirkung wird nicht in untertitel geschrieben');
+    else ok('Wirkung geht in untertitel, Titel bleibt die Tätigkeit');
+    if (/a\.titel\s*=\s*titel/.test(src))
+      fail('Aufwerten überschreibt wieder den Titel');
+    else ok('Aufwerten lässt den Titel unangetastet');
+  }
+
+  // ── 4. Kriterien: Text und Haken ────────────────────────────────────────
+  if (typeof textZuKrit === 'function' && typeof kritZuText === 'function') {
+    const l = textZuKrit('A\nB\n\n  C  ');
+    if (l.length !== 3 || l[2].text !== 'C')
+      fail('textZuKrit trennt Zeilen nicht korrekt');
+    else ok('Eine Zeile ergibt ein Kriterium');
+
+    const erhalten = textZuKrit('A\nB', [{ text:'A', erledigt:true }]);
+    if (erhalten[0].erledigt !== true || erhalten[1].erledigt !== false)
+      fail('Haken gehen beim erneuten Schreiben verloren');
+    else ok('Gesetzte Haken überleben das Aufwerten');
+
+    if (kritZuText([{ text:'A' }, { text:'B' }]) !== 'A\nB')
+      fail('kritZuText liefert nicht eine Zeile je Kriterium');
+    else ok('Rückwandlung korrekt');
+  }
+
+  if (typeof kritPille === 'function') {
+    if (kritPille({}) !== '' || kritPille({ ergebnis: [] }) !== '')
+      fail('Pille erscheint ohne Kriterien');
+    else if (!kritPille({ ergebnis:[{ text:'a', erledigt:true }] }).includes('voll'))
+      fail('Vollständige Kriterien werden nicht hervorgehoben');
+    else ok('Kriterien-Pille verhält sich korrekt');
+  }
+
+  // ── 5. Altbestand-Umstellung ist einmalig ──────────────────────────────
+  if (typeof aufwertungBetroffene === 'function') {
+    if (!/titel_getauscht/.test(aufwertungBetroffene.toString()))
+      fail('Bereits umgestellte Aufgaben werden nicht ausgeschlossen – zweiter Lauf dreht zurück');
+    else ok('Umstellung kann nicht zweimal laufen');
+
+    const n = aufwertungBetroffene().length;
+    if (n) warn(n + ' Aufgabe(n) stammen noch aus der alten Aufwertung – Banner sollte erscheinen');
+    else ok('Kein Altbestand mehr offen');
+  }
+
+  // ── 6. Datenfelder in der DB ────────────────────────────────────────────
+  if (typeof DB !== 'undefined' && DB && Array.isArray(DB.aufgaben)) {
+    const kaputt = DB.aufgaben.filter(a => a.ergebnis && !Array.isArray(a.ergebnis));
+    if (kaputt.length) fail(kaputt.length + ' Aufgaben haben ein ergebnis-Feld, das kein Array ist');
+    else ok('Kriterien liegen überall als Array vor');
+
+    const ohneText = DB.aufgaben.filter(a =>
+      Array.isArray(a.ergebnis) && a.ergebnis.some(k => !k || typeof k.text !== 'string'));
+    if (ohneText.length) fail(ohneText.length + ' Aufgaben haben Kriterien ohne Text');
+    else ok('Alle Kriterien haben einen Text');
+
+    const mitKrit = DB.aufgaben.filter(a => (a.ergebnis || []).length).length;
+    const mitErst = DB.aufgaben.filter(a => a.ersterSchritt).length;
+    ok('Bestand: ' + mitKrit + ' mit Kriterien, ' + mitErst + ' mit erstem Schritt');
+  }
+
+  // ── 7. Routine-Knopf verwirft nichts mehr ──────────────────────────────
+  if (typeof asstRoutine === 'function') {
+    if (!/asst-taetigkeit/.test(asstRoutine.toString()))
+      fail('„Routine, direkt weiter" verwirft die eingegebene Tätigkeit wieder');
+    else ok('Routine-Knopf übernimmt die Tätigkeit');
+  }
+
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: MODAL-SCHLIESSVERHALTEN   (neu in v1.5.236)
+//  Einfügen in AA_tests.js nach der Kategorie AUFGABEN-ASSISTENT V2,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Modal schließt sich, wenn eine Textmarkierung im Modal beginnt und
+//     außerhalb endet – Eingaben gehen verloren
+//   • Rückfall auf einen reinen click-Handler auf dem Overlay
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== MODAL-SCHLIESSVERHALTEN ===');
+
+(function testModalSchliessen() {
+  const overlays = document.querySelectorAll('.modal-overlay');
+  if (!overlays.length) { fail('Keine .modal-overlay gefunden'); return; }
+  ok(overlays.length + ' Modal-Overlays vorhanden');
+
+  // Der Handler wird beim Laden gebunden – prüfbar ist der Quelltext
+  const skripte = Array.from(document.querySelectorAll('script'))
+    .map(s => s.textContent || '').join('\n');
+  const block = skripte.match(/querySelectorAll\('\.modal-overlay'\)\.forEach[\s\S]{0,900}/);
+  if (!block) {
+    warn('Overlay-Handler im Quelltext nicht auffindbar');
+  } else {
+    const src = block[0];
+    if (/addEventListener\('click'/.test(src) && !/addEventListener\('mousedown'/.test(src))
+      fail('Overlay nutzt wieder einen reinen click-Handler – Textmarkierung schließt das Modal');
+    else if (!/addEventListener\('mousedown'/.test(src) || !/addEventListener\('mouseup'/.test(src))
+      fail('mousedown/mouseup-Paarung fehlt – Schließen ist nicht abgesichert');
+    else ok('Schließen erfordert mousedown und mouseup auf dem Overlay');
+
+    if (!/mouseleave/.test(src))
+      warn('Kein Abbruch beim Verlassen des Fensters – Randfall ungesichert');
+    else ok('Verlassen des Fensters bricht den Schließvorgang ab');
+  }
+
+  // Live-Test an einem echten Overlay, ohne es sichtbar zu öffnen
+  const o = overlays[0];
+  const warOffen = o.classList.contains('open');
+  try {
+    o.classList.add('open');
+    const inner = o.querySelector('.modal') || o.firstElementChild || o;
+    inner.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    o.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    if (!o.classList.contains('open'))
+      fail('Markierung von innen nach außen schließt das Modal weiterhin');
+    else ok('Markierung von innen nach außen lässt das Modal offen');
+
+    o.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    o.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    if (o.classList.contains('open'))
+      fail('Echter Klick neben das Modal schließt es nicht mehr');
+    else ok('Klick neben das Modal schließt weiterhin');
+  } catch (e) {
+    warn('Live-Test nicht möglich: ' + e.message);
+  } finally {
+    o.classList.toggle('open', warOffen);
+  }
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: ERINNERUNGEN AN PLAN-SCHRITTEN   (neu in v1.5.237)
+//  Einfügen in AA_tests.js nach der Kategorie MODAL-SCHLIESSVERHALTEN,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Erinnerung wird außerhalb des Schritts abgelegt und zeigt nach dem
+//     Umsortieren auf den falschen Schritt
+//   • Verknüpfte Schritte bekommen eine zweite, konkurrierende Datumsangabe
+//   • Erledigte oder künftige Erinnerungen tauchen im Dashboard auf
+//   • Glocke wird wieder als Emoji statt als SVG gerendert
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== ERINNERUNGEN PLAN-SCHRITTE ===');
+
+(function testPlanErinnerungen() {
+
+  const noetig = ['svgGlocke','erinnStatus','erinnFaellige','erinnZeileHTML','erinnPopover',
+                  'erinnSetzen','erinnSetzenDatum','erinnPlusTag','erinnSchrittAbhaken',
+                  'erinnDashboardHTML','erinnPilleAktualisieren'];
+  const fehlt = noetig.filter(f => typeof window[f] !== 'function');
+  if (fehlt.length) fail('Nicht definierte Funktionen: ' + fehlt.join(', '));
+  else ok('Alle ' + noetig.length + ' Funktionen definiert');
+
+  if (!document.getElementById('ph-plan-erinn'))
+    fail('Erinnerungs-Pille im Panel-Kopf fehlt');
+  else ok('Erinnerungs-Pille vorhanden');
+
+  // ── Symbol bleibt schlicht ──────────────────────────────────────────────
+  if (typeof svgGlocke === 'function') {
+    const g = svgGlocke(12);
+    if (!g.includes('<svg')) fail('svgGlocke liefert kein SVG');
+    else if (/[\u{1F300}-\u{1FAFF}]/u.test(g)) fail('Glocke enthält wieder ein Emoji');
+    else ok('Glocke ist ein schlichtes SVG');
+  }
+  if (typeof erinnDashboardHTML === 'function' &&
+      /[\u{1F300}-\u{1FAFF}]/u.test(erinnDashboardHTML()))
+    fail('Dashboard-Erinnerungen enthalten Emojis');
+  else ok('Dashboard-Erinnerungen ohne Emojis');
+
+  // ── Ablageort: am Schritt, nicht über den Index ────────────────────────
+  if (typeof erinnSetzen === 'function') {
+    const src = erinnSetzen.toString();
+    if (/schrittIdx|erinnerungen\s*\[/.test(src))
+      fail('Erinnerung wird wieder außerhalb des Schritts abgelegt – Indexproblem');
+    else if (!/s\.erinnerung\s*=/.test(src))
+      fail('Erinnerung wird nicht am Schritt-Objekt gesetzt');
+    else ok('Erinnerung liegt am Schritt-Objekt');
+  }
+
+  // ── Verknüpfte Schritte bekommen keine Glocke ──────────────────────────
+  if (typeof erinnZeileHTML === 'function') {
+    if (erinnZeileHTML({ id:'x' }, { aufgabeId:'a1' }, 0, false) !== '')
+      fail('Verknüpfte Schritte bekommen eine eigene Erinnerung – zwei Datumsangaben');
+    else ok('Verknüpfte Schritte ohne eigene Erinnerung');
+  }
+
+  // ── Auswahl im Dashboard ────────────────────────────────────────────────
+  if (typeof erinnFaellige === 'function' && typeof DB !== 'undefined' && DB) {
+    const heute = today();
+    const liste = erinnFaellige();
+
+    const kuenftig = liste.filter(x => x.datum > heute);
+    if (kuenftig.length) fail(kuenftig.length + ' künftige Erinnerungen stehen im Dashboard');
+    else ok('Künftige Erinnerungen bleiben ausgeblendet');
+
+    const erledigt = liste.filter(x => (x.schritt.status === 'erledigt'));
+    if (erledigt.length) fail(erledigt.length + ' erledigte Schritte werden noch erinnert');
+    else ok('Erledigte Schritte fallen aus der Liste');
+
+    const verknuepft = liste.filter(x => x.schritt.aufgabeId);
+    if (verknuepft.length) fail('Verknüpfte Schritte tauchen in der Erinnerungsliste auf');
+    else ok('Nur Textschritte in der Erinnerungsliste');
+
+    const sortiert = liste.every((x, i) => i === 0 || liste[i-1].datum <= x.datum);
+    if (!sortiert) fail('Erinnerungen sind nicht nach Datum sortiert');
+    else ok('Sortierung nach Datum, Überfälliges zuerst');
+
+    ok(liste.length + ' fällige Erinnerung(en) im Bestand');
+  }
+
+  // ── Datenbestand plausibel ──────────────────────────────────────────────
+  if (typeof DB !== 'undefined' && DB && Array.isArray(DB.plaene)) {
+    let kaputt = 0, aufAufgabe = 0;
+    DB.plaene.forEach(p => (p.schritte || []).forEach(s => {
+      if (!s.erinnerung) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s.erinnerung)) kaputt++;
+      if (s.aufgabeId) aufAufgabe++;
+    }));
+    if (kaputt) fail(kaputt + ' Erinnerungen haben kein gültiges ISO-Datum');
+    else ok('Alle Erinnerungen im Format JJJJ-MM-TT');
+    if (aufAufgabe) warn(aufAufgabe + ' verknüpfte Schritte tragen eine eigene Erinnerung – Altbestand?');
+    else ok('Keine Erinnerungen an verknüpften Schritten');
+  }
+
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: PLAN-ABZEICHEN „HEUTE"   (neu in v1.5.238, erweitert bis v1.5.240)
+//  Einfügen in AA_tests.js nach der Kategorie ERINNERUNGEN PLAN-SCHRITTE,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Abzeichen zählt erledigte Aufgaben oder künftig eingeplante mit
+//   • Abzeichen zählt überfällige Aufgaben mit und klebt dauerhaft
+//   • Abzeichen fehlt in der Krise-Zeile oder in der Schnellansicht
+//   • Plan-Zähler und Einzelschritt-Kennzeichnung laufen auseinander
+//   • Abzeichen und die Sektion „Heute eingeplant" im Aufgaben-Panel
+//     kommen auf unterschiedliche Ergebnisse
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== PLAN-ABZEICHEN HEUTE ===');
+
+(function testPlanHeute() {
+
+  const noetig = ['schrittStehtHeuteAn','planHeuteEingeplant','planHeuteBadge','schrittHeuteBadge'];
+  const fehlt = noetig.filter(f => typeof window[f] !== 'function');
+  if (fehlt.length) { fail('Nicht definiert: ' + fehlt.join(', ')); return; }
+  ok('Alle ' + noetig.length + ' Funktionen definiert');
+
+  // Bedingung darf nur an einer Stelle stehen
+  if (!/schrittStehtHeuteAn/.test(planHeuteEingeplant.toString()))
+    fail('planHeuteEingeplant hat die Bedingung erneut ausformuliert statt sie zu teilen');
+  else ok('Bedingung steht nur in schrittStehtHeuteAn()');
+
+  // ── Kriterium: eingeplant, nicht fällig ─────────────────────────────────
+  const src = schrittStehtHeuteAn.toString();
+  if (!/geplantAm/.test(src))
+    fail('Abzeichen liest nicht geplantAm – eingeplante Aufgaben fehlen');
+  else ok('Abzeichen zählt eingeplante Aufgaben');
+  if (!/tzDatumGruppe/.test(src))
+    fail('Abzeichen nutzt tzDatumGruppe() nicht – heute fällige Aufgaben fehlen');
+  else ok('Fälligkeit über dieselbe Logik wie Dashboard und Tageszettel');
+  if (/'ueberfaellig'/.test(src))
+    fail('Überfällige Aufgaben zählen wieder mit – Abzeichen wird zum Dauerzustand');
+  else ok('Überfällige Fälligkeiten bleiben ausgeschlossen');
+
+  // ── Verhalten an konstruierten Fällen ───────────────────────────────────
+  if (typeof DB !== 'undefined' && DB && Array.isArray(DB.aufgaben)) {
+    const sich = DB.aufgaben;
+    const heute = today();
+    const gestern = tzPlusTage(heute, -2), morgen = tzPlusTage(heute, 1);
+    try {
+      DB.aufgaben = [
+        { id:'_t1', status:'offen',    geplantAm:{ datum: heute } },
+        { id:'_t2', status:'offen',    geplantAm:{ datum: gestern } },
+        { id:'_t3', status:'offen',    geplantAm:{ datum: morgen } },
+        { id:'_t4', status:'offen',    faellig: heute },
+        { id:'_t5', status:'erledigt', geplantAm:{ datum: heute } },
+      ];
+      DB.aufgaben.push(
+        { id:'_t6', status:'offen',    faellig: tzPlusTage(heute, -4) },
+        { id:'_t7', status:'offen',    faellig: morgen },
+        { id:'_t8', status:'offen',    startdatum: heute },
+        { id:'_t9', status:'offen',    startdatum: tzPlusTage(heute,-9), wiedervorlage: heute },
+      );
+      const f = [
+        [{ schritte:[{ aufgabeId:'_t1' }] }, 1, 'heute eingeplant'],
+        [{ schritte:[{ aufgabeId:'_t2' }] }, 1, 'vergangen und offen'],
+        [{ schritte:[{ aufgabeId:'_t3' }] }, 0, 'künftig eingeplant'],
+        [{ schritte:[{ aufgabeId:'_t4' }] }, 1, 'heute fällig'],
+        [{ schritte:[{ aufgabeId:'_t5' }] }, 0, 'erledigt'],
+        [{ schritte:[{ aufgabeId:'_t6' }] }, 0, 'überfällig'],
+        [{ schritte:[{ aufgabeId:'_t7' }] }, 0, 'morgen fällig'],
+        [{ schritte:[{ aufgabeId:'_t8' }] }, 1, 'Startdatum heute'],
+        [{ schritte:[{ aufgabeId:'_t9' }] }, 1, 'Wiedervorlage heute'],
+        [{ schritte:[{ aufgabeId:'_t1' }] }, 1, 'keine Doppelzählung'],
+        [{ schritte:[{ titel:'Text' }] },    0, 'reiner Textschritt'],
+        [{ schritte:[] },                    0, 'leerer Plan'],
+      ];
+      const schlecht = f.filter(([p, soll]) => planHeuteEingeplant(p) !== soll);
+      if (schlecht.length) fail('Zählung falsch bei: ' + schlecht.map(x => x[2]).join(', '));
+      else ok('Alle ' + f.length + ' Zählfälle korrekt');
+
+      if (planHeuteBadge({ schritte:[{ aufgabeId:'_t3' }] }) !== '')
+        fail('Abzeichen erscheint ohne Treffer');
+      else ok('Ohne Treffer kein Abzeichen');
+    } catch (e) {
+      fail('planHeuteEingeplant wirft Fehler: ' + e.message);
+    } finally {
+      DB.aufgaben = sich;
+    }
+  }
+
+  // ── Abgleich mit dem Aufgaben-Panel ─────────────────────────────────────
+  if (typeof DB !== 'undefined' && DB && Array.isArray(DB.plaene)) {
+    const heute = today();
+    const zaehltIds = new Set(DB.aufgaben.filter(a => {
+      if (moveAufgabeErledigt(a)) return false;
+      if (a.geplantAm?.datum && a.geplantAm.datum <= heute) return true;
+      return tzDatumGruppe(a, heute) === 'heute';
+    }).map(a => a.id));
+    let ausPlaenen = 0;
+    DB.plaene.forEach(p => {
+      (p.schritte || []).forEach(s => { if (s.aufgabeId && zaehltIds.has(s.aufgabeId)) ausPlaenen++; });
+    });
+    const summe = DB.plaene.reduce((n, p) => n + planHeuteEingeplant(p), 0);
+    if (summe !== ausPlaenen)
+      fail('Abzeichen zählt ' + summe + ', erwartet ' + ausPlaenen + ' – Kriterium weicht ab');
+    else ok('Abzeichen deckt sich mit dem Kriterium (' + summe + ')');
+
+    const mitBadge = DB.plaene.filter(p => planHeuteEingeplant(p) > 0).length;
+    ok(mitBadge + ' von ' + DB.plaene.length + ' Plänen tragen das Abzeichen');
+  }
+
+  // ── Abzeichen in allen Renderfunktionen ────────────────────────────────
+  // Pläne mit Priorität "Krise" werden über eine eigene Zeilenfunktion
+  // gerendert – dort fehlte das Abzeichen bis v1.5.239.
+  const skripte = Array.from(document.querySelectorAll('script'))
+    .map(s => s.textContent || '').join('\n');
+  const treffer = (skripte.match(/planHeuteBadge\(p\)/g) || []).length;
+  if (treffer < 5)
+    fail('planHeuteBadge wird nur ' + treffer + '× gerendert – erwartet 5 (Planzeile, Krise-Zeile, Plan-Karte, Schnellansicht, Helfer)');
+  else ok('Plan-Abzeichen in allen Ansichten gerendert');
+  if (!/schrittHeuteBadge\(s\)/.test(skripte))
+    fail('Einzelschritte in der Schnellansicht werden nicht gekennzeichnet');
+  else ok('Einzelschritte in der Schnellansicht gekennzeichnet');
+
+  // Zähler und Einzelkennzeichnung müssen übereinstimmen
+  if (typeof DB !== 'undefined' && DB && Array.isArray(DB.plaene)) {
+    const abweichung = DB.plaene.filter(p =>
+      planHeuteEingeplant(p) !== (p.schritte || []).filter(schrittStehtHeuteAn).length);
+    if (abweichung.length)
+      fail(abweichung.length + ' Pläne: Zähler und markierte Schritte weichen ab');
+    else ok('Zähler deckt sich überall mit den markierten Schritten');
+  }
+
+})();
