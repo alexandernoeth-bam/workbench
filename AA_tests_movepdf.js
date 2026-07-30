@@ -1522,6 +1522,26 @@ console.log('\n=== HEUTE ERLEDIGTES ===');
       fail('Erledigte Einträge werden im Tageszettel wieder ausgegraut');
     else
       ok('Erledigte Einträge bleiben schwarz, nur durchgestrichen');
+
+    // Unterzeilen (erster Schritt, Kriterien) in voller Schriftfarbe
+    const unter = src.match(/function tzUnterZeile[\s\S]*?\n  \}/);
+    if (unter && /60, 50, 38/.test(unter[0]))
+      fail('Erster Schritt und Kriterien werden wieder abgeschwächt gesetzt');
+    else if (unter) ok('Unterzeilen in voller Schriftfarbe');
+
+    // Die Trennlinie darf grau bleiben – sie ist Struktur, kein Text
+    if (!/setDrawColor\(150, 138, 118\)/.test(src))
+      warn('Trennlinie vor dem Rückblick ist nicht mehr abgesetzt');
+    else ok('Trennlinie bleibt dezent');
+  }
+
+  // Pläne-Übersicht folgt derselben Regel
+  if (typeof moveUebersichtPDF === 'function') {
+    const src = moveUebersichtPDF.toString();
+    const sz = src.match(/function schrittZeile[\s\S]*?\n  \}/);
+    if (sz && /erledigt \? \[150/.test(sz[0]))
+      fail('Pläne-Übersicht graut erledigte Schritte wieder aus');
+    else if (sz) ok('Pläne-Übersicht und Tageszettel gleich eingefärbt');
   }
 
   // ── Protokollfehler von früher ──────────────────────────────────────────
@@ -1534,5 +1554,126 @@ console.log('\n=== HEUTE ERLEDIGTES ===');
   if (typeof qvSchrittToggle === 'function' && !/logAktion/.test(qvSchrittToggle.toString()))
     fail('Abhaken in der Schnellansicht wird nicht protokolliert');
   else ok('Schnellansicht protokolliert das Abhaken');
+
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: TAGESZETTEL-OVERLAY   (neu in v1.5.247, erweitert in v1.5.248)
+//  Einfügen in AA_tests.js nach der Kategorie HEUTE ERLEDIGTES,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Einträge werden wieder als Momentaufnahme gezeigt statt live aufgelöst
+//   • Panel erscheint auf Ansichten, die selbst eine rechte Spalte haben
+//   • Einträge der zweiten, nur lesend geladenen Datei werden bearbeitbar
+//   • Gelöschte Originale verschwinden kommentarlos statt als verwaist
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== TAGESZETTEL-OVERLAY ===');
+
+(function testZettelPanel() {
+
+  const noetig = ['tzEintragAufloesen','zpBearbeitbar','zpNeueHeute','zpToggle','zpRender',
+                  'zpAnsicht','zpAnstossen','zpToggleEintrag','zpNeueUebernehmen','zpWiederherstellen'];
+  const fehlt = noetig.filter(f => typeof window[f] !== 'function');
+  if (fehlt.length) { fail('Nicht definiert: ' + fehlt.join(', ')); return; }
+  ok('Alle ' + noetig.length + ' Funktionen definiert');
+
+  ['zettel-panel','zp-paper','zp-cnt','zp-hinweis','btn-zettelpanel'].forEach(id => {
+    if (!document.getElementById(id)) fail('Element ' + id + ' fehlt');
+  });
+  ok('Panel-Elemente vorhanden');
+
+  // ── Ansichten ohne Panel ────────────────────────────────────────────────
+  if (typeof ZP_OHNE === 'undefined' || ZP_OHNE.indexOf('tageszettel') < 0 ||
+      ZP_OHNE.indexOf('notizmove') < 0)
+    fail('Panel wird nicht auf Tageszettel und Notiz-Export unterdrückt');
+  else ok('Ansichten mit eigener rechter Spalte ausgenommen');
+
+  // ── Live-Auflösung statt Momentaufnahme ────────────────────────────────
+  const src = tzEintragAufloesen.toString();
+  if (!/verwaist/.test(src))
+    fail('Gelöschte Originale werden nicht als verwaist gekennzeichnet');
+  else ok('Verwaiste Einträge werden erkannt');
+
+  if (typeof zpRender === 'function' && !/tzEintragAufloesen/.test(zpRender.toString()))
+    fail('Panel zeichnet aus der Momentaufnahme statt live aufzulösen');
+  else ok('Panel löst live gegen die Daten auf');
+
+  // ── Zweitquelle bleibt schreibgeschützt ────────────────────────────────
+  if (typeof zpToggleEintrag === 'function' && !/zpBearbeitbar/.test(zpToggleEintrag.toString()))
+    fail('Abhaken prüft nicht, ob der Eintrag zur geöffneten Datei gehört');
+  else ok('Zweitquelle bleibt schreibgeschützt');
+
+  // ── Gegen echte Daten ───────────────────────────────────────────────────
+  if (typeof TZ !== 'undefined' && Array.isArray(TZ.zettel) && TZ.zettel.length) {
+    let verwaist = 0, abweichend = 0;
+    TZ.zettel.forEach(z => {
+      const r = tzEintragAufloesen(z);
+      if (r.verwaist) verwaist++;
+      else if (z.typ !== 'termin' && r.text && z.text && r.text !== z.text) abweichend++;
+    });
+    if (verwaist) warn(verwaist + ' Zettel-Einträge zeigen auf gelöschte Originale');
+    else ok('Alle Zettel-Einträge auflösbar');
+    if (abweichend) ok(abweichend + ' Einträge zeigen den aktualisierten Titel');
+    else ok('Titel überall aktuell');
+  } else {
+    warn('Zettel ist leer – Live-Auflösung nicht gegen echte Daten prüfbar');
+  }
+
+  // ── Erweiterungen aus v1.5.248 ─────────────────────────────────────────
+  ['zpOffeneHeute','zpErstToggle','zpKritToggle','zpErledigteToggle','zpPdfExport',
+   'aufgabeStehtHeuteAn'].forEach(f => {
+    if (typeof window[f] !== 'function') fail(f + '() fehlt');
+  });
+  ok('Funktionen der Erweiterung vorhanden');
+
+  ['zp-tg-erl'].forEach(id => {
+    if (!document.getElementById(id)) fail('Element ' + id + ' fehlt');
+  });
+  if (!document.querySelector('.zp-export')) fail('PDF-Knopf im Panel fehlt');
+  else ok('Erledigt-Schalter und PDF-Knopf vorhanden');
+
+  // Vorschlag stützt sich auf Fälligkeit, nicht auf das Anlagedatum
+  if (typeof zpOffeneHeute === 'function') {
+    const src2 = zpOffeneHeute.toString();
+    if (/a\.erstellt/.test(src2))
+      fail('Vorschlagsliste greift wieder auf das Anlagedatum zurück');
+    else if (!/schrittStehtHeuteAn/.test(src2))
+      fail('Plan-Schritte werden nicht mehr vorgeschlagen');
+    else ok('Vorschlag umfasst heute fällige Aufgaben und Plan-Schritte');
+  }
+
+  // Regel steht nur an einer Stelle
+  if (typeof schrittStehtHeuteAn === 'function' &&
+      !/aufgabeStehtHeuteAn/.test(schrittStehtHeuteAn.toString()))
+    fail('schrittStehtHeuteAn formuliert die Regel erneut aus');
+  else ok('Regel „steht heute an" nur einmal im Code');
+
+  // Erledigt-Schalter teilt sich den Zustand mit dem Assistenten
+  if (typeof zpErledigteToggle === 'function' && !/TZ\.erledigte/.test(zpErledigteToggle.toString()))
+    fail('Panel-Schalter nutzt einen eigenen Zustand statt TZ.erledigte');
+  else ok('Panel und PDF teilen sich den Erledigt-Schalter');
+
+  // Ganztagstermine
+  if (typeof TZ !== 'undefined' && !('ganztag' in TZ))
+    fail('TZ.ganztag fehlt – Ganztagstermine nicht vorhanden');
+  else ok('Ganztag-Zustand wird geführt');
+  if (typeof tzAddTermin === 'function' && !/ganztag/.test(tzAddTermin.toString()))
+    fail('tzAddTermin kennt keine Ganztagstermine');
+  else ok('Ganztagstermine werden angelegt');
+
+  const ganz = (DB.aufgaben ? TZ.zettel : []).filter(z => z.terminDaten && z.terminDaten.ganztag);
+  if (ganz.length && ganz.some(z => z.terminDaten.start))
+    fail('Ganztagstermine tragen trotzdem eine Uhrzeit');
+  else ok(ganz.length + ' Ganztagstermin(e) auf dem Zettel, alle ohne Uhrzeit');
+
+  // ── Panel wird nachgezogen ──────────────────────────────────────────────
+  if (typeof saveDB === 'function' && !/zpAnstossen/.test(saveDB.toString()))
+    fail('saveDB zieht das Panel nicht nach – es bleibt stehen');
+  else ok('Jede Datenänderung zieht das Panel nach');
+  if (typeof zpAnstossen === 'function' && !/setTimeout/.test(zpAnstossen.toString()))
+    warn('Panel-Aktualisierung ist nicht entprellt');
+  else ok('Aktualisierung entprellt');
 
 })();
