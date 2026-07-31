@@ -1894,3 +1894,69 @@ console.log('\n=== GEWOHNHEITEN UND CHALLENGE ===');
   else ok('Umbenennung in der Navigation erfolgt');
 
 })();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: NOTIZBUCH-EXPORT   (neu in v1.5.251)
+//  Einfügen in AA_tests.js nach der Kategorie GEWOHNHEITEN,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Kompression wird abgeschaltet – die Datei wächst von 3,6 auf 39 MB
+//   • Seitenzahl oder Format weichen vom Daily Log ab
+//   • Kein Nachgeben an den Browser – die Oberfläche friert ein
+//   • Mehrfachstart erzeugt parallele Läufe
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== NOTIZBUCH-EXPORT ===');
+
+(function testNotizbuch() {
+
+  if (typeof notizbuchExport !== 'function' || typeof nbErstellePDF !== 'function') {
+    fail('notizbuchExport() / nbErstellePDF() nicht definiert');
+    return;
+  }
+  ok('Beide Funktionen definiert');
+
+  if (typeof NB_SEITEN === 'undefined' || NB_SEITEN !== 150)
+    fail('Seitenzahl ist nicht mehr 150, sondern ' + NB_SEITEN);
+  else ok('150 Seiten festgelegt');
+
+  const knopf = document.getElementById('btn-notizbuch');
+  if (!knopf) fail('Knopf „Notizbuch" fehlt in der Seitenleiste');
+  else if (!/notizbuchExport/.test(knopf.getAttribute('onclick') || ''))
+    fail('Knopf ist nicht verdrahtet');
+  else ok('Knopf vorhanden und verdrahtet');
+  if (knopf && !knopf.querySelector('svg')) fail('Knopf trägt kein SVG-Symbol');
+  else ok('SVG-Symbol vorhanden');
+
+  const src = nbErstellePDF.toString();
+
+  // Ohne Kompression wären es rund 39 MB statt 3,6
+  if (!/compress:\s*true/.test(src))
+    fail('Kompression abgeschaltet – die Datei würde rund zehnmal so groß');
+  else ok('Kompression eingeschaltet');
+
+  if (!/MOVE_PDF_W/.test(src) || !/MOVE_PDF_H/.test(src))
+    fail('Notizbuch nutzt nicht das Move-Format des Daily Log');
+  else ok('Gleiches Format wie der Daily Log');
+
+  if (!/await new Promise/.test(src))
+    fail('Kein Nachgeben an den Browser – die Oberfläche friert bei 150 Seiten ein');
+  else ok('Erzeugung gibt zwischendurch nach');
+
+  if (!/'Notizen\.pdf'/.test(src))
+    fail('Dateiname ist nicht mehr Notizen.pdf');
+  else ok('Dateiname Notizen.pdf');
+
+  if (!/doc\.text\('Notizen'/.test(src))
+    fail('Kopfzeile „Notizen" fehlt');
+  else ok('Kopfzeile links vorhanden');
+  if (!/align:\s*'right'/.test(src))
+    fail('Seitenzahl steht nicht mehr rechts');
+  else ok('Seitenzahl rechts');
+
+  if (typeof notizbuchExport === 'function' && !/nbLaeuft/.test(notizbuchExport.toString()))
+    fail('Mehrfachstart wird nicht verhindert');
+  else ok('Doppelstart wird abgefangen');
+
+})();

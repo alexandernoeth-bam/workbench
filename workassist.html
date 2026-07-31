@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.250</title>
+<title>WorkAssist 1.5.251</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
@@ -164,6 +164,8 @@ svg { display: block; }
 }
 .btn-extern:hover { background:rgba(255,255,255,0.16); color:#fff; }
 
+.sidebar-notiz { flex-shrink:0; padding:6px 10px 0; }
+.sidebar-notiz .btn-move { width:100%; }
 /* Move-PDF-Export (reMarkable Paper Pro Move) */
 .sidebar-move {
   flex-shrink: 0;
@@ -2967,7 +2969,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.250</div>
+    <div class="start-version">v1.5.251</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -3035,7 +3037,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.250</div>
+    <div class="app-version" id="app-version">v1.5.251</div>
   </div>
 
   <div class="nav-section">
@@ -3127,6 +3129,14 @@ textarea.field-input { resize: vertical; min-height: 70px; }
     <button class="btn-move" onclick="exportMovePlaenePDF()" title="Offene Plaene als PDF fuer den Paper Pro Move">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       Plaene
+    </button>
+  </div>
+
+  <div class="sidebar-notiz">
+    <button class="btn-move" id="btn-notizbuch" onclick="notizbuchExport()" title="Leeres Notizbuch mit 150 Seiten für den Paper Pro Move">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Notizbuch
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.65;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
     </button>
   </div>
 
@@ -4606,7 +4616,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.250';
+const APP_VERSION = '1.5.251';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -14358,6 +14368,86 @@ function moveUebersichtPDF(modus, fonts, quellen) {
 // ═══ Ende Move-PDF-Export ═════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  LEERES NOTIZBUCH FÜR DEN MOVE                                   v1.5.251
+//  150 Seiten Punktraster, gleiche Masse und Optik wie der Daily Log.
+//  Ohne Kompression waeren es rund 39 MB – deshalb zwingend compress:true.
+//  Gebaut wird in Bloecken, damit der Browser zwischendurch atmen kann.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const NB_SEITEN = 150;
+const NB_BLOCK  = 15;    // Seiten je Block, danach wird der Zeichenstrang frei
+
+let nbLaeuft = false;
+
+async function notizbuchExport() {
+  if (nbLaeuft) { showToast('Das Notizbuch wird bereits erstellt …'); return; }
+  nbLaeuft = true;
+  const knopf = document.getElementById('btn-notizbuch');
+  if (knopf) knopf.disabled = true;
+  try {
+    showToast('Notizbuch mit ' + NB_SEITEN + ' Seiten wird erstellt …');
+    await ladeJsPDF();
+    const fonts = ladeCaveatFonts();
+    await nbErstellePDF(fonts);
+  } catch (e) {
+    console.error('[Notizbuch]', e);
+    showToast('Notizbuch konnte nicht erstellt werden: ' + ((e && e.message) || 'unbekannt'), true);
+  } finally {
+    nbLaeuft = false;
+    if (knopf) knopf.disabled = false;
+  }
+}
+
+async function nbErstellePDF(fonts) {
+  const { jsPDF } = window.jspdf;
+  const W = MOVE_PDF_W, H = MOVE_PDF_H;
+  // compress ist hier nicht optional – ohne sie waere die Datei zehnmal so gross
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [W, H], compress: true });
+
+  const F = fonts ? 'Caveat' : 'helvetica';
+  if (fonts) {
+    doc.addFileToVFS('Caveat-R.ttf', fonts.regular); doc.addFont('Caveat-R.ttf', 'Caveat', 'normal');
+    doc.addFileToVFS('Caveat-B.ttf', fonts.bold);    doc.addFont('Caveat-B.ttf', 'Caveat', 'bold');
+  }
+
+  const ML = 2.5, MR = 3.5, MT = 9, PUNKT = 4.5;
+
+  function seite(nr) {
+    doc.setFillColor(190, 195, 205);
+    for (let py = 6; py < H - 4; py += PUNKT)
+      for (let px = ML; px <= W - MR; px += PUNKT)
+        doc.circle(px, py, 0.45, 'F');
+
+    doc.setFont(F, 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(24, 16, 10);
+    doc.text('Notizen', ML, MT - 2);
+
+    doc.setFont(F, 'normal');
+    doc.setFontSize(11);
+    doc.text(String(nr), W - MR, MT - 2, { align: 'right' });
+
+    doc.setDrawColor(24, 16, 10);
+    doc.setLineWidth(0.5);
+    doc.line(ML, MT + 0.4, W - MR, MT + 0.4);
+  }
+
+  for (let nr = 1; nr <= NB_SEITEN; nr++) {
+    if (nr > 1) doc.addPage([W, H]);
+    seite(nr);
+    if (nr % NB_BLOCK === 0) {
+      showToast('Notizbuch: Seite ' + nr + ' von ' + NB_SEITEN + ' …');
+      await new Promise(r => setTimeout(r, 0));   // Browser atmen lassen
+    }
+  }
+
+  doc.save('Notizen.pdf');
+  showToast('PDF exportiert: Notizen.pdf');
+}
+// ═══ Ende Notizbuch ═══════════════════════════════════════════════════════
+
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  TAGESZETTEL-ASSISTENT  –  6 Schritte, Vorschau mit Drag & Drop,
 //  Export als PDF für den reMarkable Paper Pro Move            v1.5.235
 //  Tages-PDF portiert aus DayPaper v0.3.4 (erstelleRemarkablePDF)
@@ -17877,7 +17967,7 @@ async function nmPdfErstellen() {
       })
       .catch(() => {
         // Fallback: Inline-SW
-        const swCode = `const CACHE='wa-v1_5_250';
+        const swCode = `const CACHE='wa-v1_5_251';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
