@@ -1677,3 +1677,107 @@ console.log('\n=== TAGESZETTEL-OVERLAY ===');
   else ok('Aktualisierung entprellt');
 
 })();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: FOKUS-MODUS   (neu in v1.5.249)
+//  Einfügen in AA_tests.js nach der Kategorie TAGESZETTEL-OVERLAY,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Fokus baut die Oberfläche neu auf statt sich darüberzulegen –
+//     laufende Eingaben gehen verloren
+//   • Neuladen wird zum bequemen Ausweg aus dem Fokus
+//   • Notfall-Modus verliert seine feste Laufzeit
+//   • Warnung lässt sich wieder wegklicken oder greift nach dem Export
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== FOKUS-MODUS ===');
+
+(function testFokusModus() {
+
+  const noetig = ['fmStart','fmFokusAn','fmModus','fmTick','fmAnsicht','fmSchirmFuellen',
+                  'fmWarnungAktiv','fmWarnbannerZeichnen','fmExportGemerkt',
+                  'fmZettelHeuteExportiert','fmSpeichern','fmWiederherstellen'];
+  const fehlt = noetig.filter(f => typeof window[f] !== 'function');
+  if (fehlt.length) { fail('Nicht definiert: ' + fehlt.join(', ')); return; }
+  ok('Alle ' + noetig.length + ' Funktionen definiert');
+
+  ['fm-schirm','fm-dlg','fm-uhr','fm-datum','fm-warn','fm-motto','fm-zahl','fm-dauer',
+   'fm-bar','fm-warnung','fm-dauer-wahl'].forEach(id => {
+    if (!document.getElementById(id)) fail('Element ' + id + ' fehlt');
+  });
+  if (document.querySelectorAll('.fm-wahl').length !== 3)
+    fail('Der Dialog hat nicht genau drei Wege');
+  else ok('Drei Wege im Dialog');
+  const prim = document.querySelector('.fm-wahl.prim');
+  if (!prim || !/Move nutzen/.test(prim.textContent))
+    fail('„Move nutzen — Abbrechen" ist nicht die hervorgehobene Vorgabe');
+  else ok('Move-Abbrechen ist die Vorgabe');
+
+  // ── Overlay statt Neuaufbau ─────────────────────────────────────────────
+  const schirm = document.getElementById('fm-schirm');
+  if (schirm && getComputedStyle(schirm).position !== 'fixed')
+    fail('Fokus-Schirm ist kein Overlay – Eingaben könnten verloren gehen');
+  else ok('Fokus liegt als Overlay über der Oberfläche');
+  if (typeof fmFokusAn === 'function' && /innerHTML\s*=/.test(fmFokusAn.toString()))
+    warn('fmFokusAn schreibt innerHTML – prüfen, ob etwas neu aufgebaut wird');
+
+  // ── Neuladen ist kein Ausweg ───────────────────────────────────────────
+  if (typeof fmWiederherstellen === 'function' &&
+      !/d\.modus === 'normal'/.test(fmWiederherstellen.toString()))
+    fail('Nach dem Neuladen wird der Fokus nicht wiederhergestellt');
+  else ok('Neuladen führt zurück in den Fokus');
+
+  // ── Notfall behält seine feste Laufzeit ────────────────────────────────
+  if (typeof FM_NOTFALL_MS === 'undefined' || FM_NOTFALL_MS !== 30 * 60 * 1000)
+    fail('Notfall-Laufzeit ist nicht mehr 30 Minuten');
+  else ok('Notfall-Modus läuft 30 Minuten');
+  if (typeof fmTick === 'function' && !/notfallBis/.test(fmTick.toString()))
+    fail('Notfall-Countdown wird nicht mehr geprüft');
+  else ok('Notfall endet automatisch');
+
+  // ── Warnung ─────────────────────────────────────────────────────────────
+  if (typeof fmWarnungAktiv === 'function') {
+    const src = fmWarnungAktiv.toString();
+    if (!/getHours\(\) === 7 && .*getMinutes\(\) >= 55/.test(src.replace(/\s+/g, ' ')))
+      warn('Die 07:55-Grenze ist nicht mehr erkennbar');
+    else ok('Warnung ab 07:55');
+    if (!/FM_LANG_OFFEN|15 \* 60/.test(src + String(typeof FM_LANG_OFFEN !== 'undefined' ? FM_LANG_OFFEN : '')))
+      warn('Die 15-Minuten-Regel ist nicht mehr erkennbar');
+    else ok('Warnung nach 15 Minuten ohne Export');
+    if (/getDay\(\)/.test(src))
+      fail('Warnung ist wieder auf Werktage beschränkt – gewünscht sind sieben Tage');
+    else ok('Warnung gilt an sieben Tagen');
+  }
+  const warnEl = document.getElementById('fm-warnung');
+  if (warnEl && /Heute nicht mehr|Später|Ausblenden/.test(warnEl.innerHTML))
+    fail('Die Warnung lässt sich wegklicken – sie soll bis zum Export bleiben');
+  else ok('Warnung ist nicht wegklickbar');
+
+  // ── Export setzt den Merker ────────────────────────────────────────────
+  if (typeof tzPdfErstellen === 'function' && !/fmExportGemerkt/.test(tzPdfErstellen.toString()))
+    fail('Der Export merkt sich den Tag nicht – die Warnung bliebe stehen');
+  else ok('Export setzt den Merker');
+  if (typeof tzPdfErstellen === 'function' && !/fmFokusAn/.test(tzPdfErstellen.toString()))
+    fail('Nach dem Export wird der Fokus nicht gestartet');
+  else ok('Export führt in den Fokus');
+
+  // ── Projektplanung blendet aus ─────────────────────────────────────────
+  if (typeof fmAnsicht === 'function' && !/fm-planung/.test(fmAnsicht.toString()))
+    fail('Projektplanung blendet Dashboard und Tageszettel nicht mehr aus');
+  else ok('Projektplanung blendet die Fokus-Ansichten aus');
+
+  // ── Laufender Zustand ───────────────────────────────────────────────────
+  if (typeof FM !== 'undefined') {
+    if (['fokus','normal','planung','notfall'].indexOf(FM.modus) < 0)
+      fail('Unbekannter Modus: ' + FM.modus);
+    else ok('Aktueller Modus: ' + FM.modus);
+    if (FM.inaktivMin !== 5 && FM.inaktivMin !== 10)
+      fail('Inaktivitätsdauer ist weder 5 noch 10 Minuten');
+    else ok('Inaktivität nach ' + FM.inaktivMin + ' Minuten');
+    if (!fmZettelHeuteExportiert())
+      warn('Heute noch kein Tageszettel exportiert – Warnung ist aktiv');
+    else ok('Tageszettel heute bereits exportiert');
+  }
+
+})();
