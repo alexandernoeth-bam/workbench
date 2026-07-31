@@ -1781,3 +1781,116 @@ console.log('\n=== FOKUS-MODUS ===');
   }
 
 })();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: GEWOHNHEITEN, CHALLENGE UND DAILY LOG   (neu in v1.5.250)
+//  Einfügen in AA_tests.js nach der Kategorie FOKUS-MODUS,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Auslassen reduziert wieder das Ziel – die Quote wird beschönigend
+//   • Nicht vorgesehene Wochentage zählen mit
+//   • Mehrere Challenges laufen gleichzeitig
+//   • Daily Log fällt unter vier Seiten oder verliert den Seitenindikator
+//   • Kontrollzeile steht nicht mehr direkt unter dem Motto
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== GEWOHNHEITEN UND CHALLENGE ===');
+
+(function testHabits() {
+
+  const noetig = ['hbInit','hbMontag','hbWocheTage','hbWert','hbSetzen','hbVorgesehen','hbSoll',
+                  'hbZielText','hbWoche','hbSchnitt','hbKlick','renderHabits','habitModal',
+                  'habitSpeichern','habitLoeschen','challengeAktiv','challengeModal',
+                  'challengeSpeichern','challengeUeberschneidung','hbPdfExport','hbErstellePDF'];
+  const fehlt = noetig.filter(f => typeof window[f] !== 'function');
+  if (fehlt.length) { fail('Nicht definiert: ' + fehlt.join(', ')); return; }
+  ok('Alle ' + noetig.length + ' Funktionen definiert');
+
+  ['screen-habits','hb-tab','hb-challenge','hb-mahnung','hb-kw-titel','hb-export',
+   'modal-habit','modal-challenge','nav-habits'].forEach(id => {
+    if (!document.getElementById(id)) fail('Element ' + id + ' fehlt');
+  });
+  ok('Screen, Modals und Nav-Eintrag vorhanden');
+
+  if (typeof DB === 'undefined' || !Array.isArray(DB.habits) || !Array.isArray(DB.challenges))
+    fail('DB-Sektionen habits/challenges fehlen oder sind keine Arrays');
+  else ok('Eigene DB-Sektionen vorhanden');
+
+  // ── Dreiwertig, ohne Freibrief ──────────────────────────────────────────
+  const probe = { ziel:{ typ:'tage', tage:[0,1,2,3,4] }, checks:{} };
+  const M = hbMontag(today());
+  hbSetzen(probe, M, 'ja');
+  hbSetzen(probe, tzPlusTage(M,1), 'nein');
+  const r = hbWoche(probe, M);
+  if (r.soll !== 5) fail('Das Ziel ändert sich durch Auslassen – Quote wird beschönigend');
+  else ok('Auslassen reduziert das Ziel nicht');
+  if (r.ja !== 1 || r.nein !== 1) fail('Zählung von ja/nein stimmt nicht');
+  else ok('Erledigt und ausgelassen werden getrennt gezählt');
+  hbSetzen(probe, tzPlusTage(M,5), 'ja');   // Samstag, nicht vorgesehen
+  if (hbWoche(probe, M).ja !== 1) fail('Nicht vorgesehene Tage zählen mit');
+  else ok('Nicht vorgesehene Tage bleiben außen vor');
+
+  if (hbWert({checks:{}}, M) !== 'offen') fail('Fehlender Eintrag ist nicht „offen"');
+  else ok('Drei Zustände sauber unterschieden');
+
+  // ── Challenge: nur eine gleichzeitig ────────────────────────────────────
+  const heute = today();
+  const laufend = (DB.challenges || []).filter(c =>
+    c.start && c.ende && c.start <= heute && heute <= c.ende);
+  if (laufend.length > 1) fail(laufend.length + ' Challenges laufen gleichzeitig');
+  else ok(laufend.length ? 'Eine Challenge aktiv' : 'Keine Challenge aktiv');
+
+  const kaputt = (DB.challenges || []).filter(c => !c.start || !c.ende || c.ende < c.start);
+  if (kaputt.length) fail(kaputt.length + ' Challenges mit ungültigem Zeitraum');
+  else ok('Alle Challenge-Zeiträume gültig');
+
+  if (typeof challengeSpeichern === 'function' &&
+      !/challengeUeberschneidung/.test(challengeSpeichern.toString()))
+    fail('Überschneidende Challenges werden nicht mehr abgelehnt');
+  else ok('Überschneidung wird geprüft');
+
+  // ── Rückwirkendes Abhaken begrenzt ──────────────────────────────────────
+  if (typeof hbBearbeitbar === 'function' && !/>= *-1/.test(hbBearbeitbar.toString()))
+    warn('Grenze für rückwirkendes Abhaken verändert – erwartet laufende und vorige Woche');
+  else ok('Rückwirkend nur laufende und vorige Woche');
+
+  // ── Datenbestand ────────────────────────────────────────────────────────
+  let ungueltig = 0;
+  (DB.habits || []).forEach(h => {
+    Object.values(h.checks || {}).forEach(v => { if (v !== 'ja' && v !== 'nein') ungueltig++; });
+    if (!h.ziel || (h.ziel.typ !== 'tage' && h.ziel.typ !== 'proWoche')) ungueltig++;
+  });
+  if (ungueltig) fail(ungueltig + ' ungültige Werte in den Gewohnheiten');
+  else ok((DB.habits || []).length + ' Gewohnheit(en), alle Werte gültig');
+
+  // ── Daily Log ───────────────────────────────────────────────────────────
+  if (typeof erstelleTageszettelPDF === 'function') {
+    const src = erstelleTageszettelPDF.toString();
+    if (!/getNumberOfPages\(\) < 4/.test(src))
+      fail('Daily Log erzeugt nicht mehr mindestens vier Seiten');
+    else ok('Mindestens vier Seiten');
+    if (!/belegteSeiten/.test(src))
+      fail('Seitenindikator fehlt');
+    else ok('Seitenindikator vorhanden');
+    if (!/tzKontrollZeile/.test(src))
+      fail('Kontrollzeile „Gewohnheiten eingehalten und gecheckt?" fehlt');
+    else ok('Kontrollzeile vorhanden');
+    if (!/challengeAktiv/.test(src))
+      fail('Challenge-Zähler fehlt im Daily Log');
+    else ok('Challenge-Zähler im Kopf');
+    if (/tzChallengeKopf[\s\S]{0,600}rect\([\s\S]{0,120}fill/.test(src) && /ch-fill|Fortschritt/.test(src))
+      warn('Im Daily Log scheint wieder ein Fortschrittsbalken zu stecken');
+    else ok('Kein Fortschrittsbalken im Daily Log');
+    if (!/_DailyLog\.pdf/.test(src))
+      fail('Dateiname folgt nicht dem Muster TT_MM_JJJJ_DailyLog.pdf');
+    else ok('Dateiname korrekt');
+  }
+
+  // ── Umbenennung ─────────────────────────────────────────────────────────
+  const nav = document.getElementById('nav-tageszettel');
+  if (nav && /Tageszettel/.test(nav.textContent))
+    fail('Der Menüpunkt heißt noch „Tageszettel" statt „Daily Log"');
+  else ok('Umbenennung in der Navigation erfolgt');
+
+})();
