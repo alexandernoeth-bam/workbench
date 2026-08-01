@@ -1960,3 +1960,149 @@ console.log('\n=== NOTIZBUCH-EXPORT ===');
   else ok('Doppelstart wird abgefangen');
 
 })();
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: TERMINE UND MONATSREFLEXION   (neu in v1.5.253)
+//  Einfügen in AA_tests.js nach der Kategorie NOTIZBUCH-EXPORT,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Termine werden nicht mehr gemerkt – die Zeitleiste bleibt leer und
+//     die Monatsreflexion wird zur Gedächtnisübung
+//   • Aufräumen greift nicht, die JSON-Datei wächst unbemerkt
+//   • Tagesreflexion rutscht von Seite 4 weg oder erscheint mehrfach
+//   • REF-Kachel wird wieder als belegte Seite eingefärbt
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== TERMINE UND MONATSREFLEXION ===');
+
+(function testMonatsreflexion() {
+
+  const noetig = ['terminMerken','terminAufraeumen','termineAmTag','mrErstellePDF',
+                  'monatsblattExport','mrMonatExportiert','mrMahnungAktiv','mrMahnungZeichnen'];
+  const fehlt = noetig.filter(f => typeof window[f] !== 'function');
+  if (fehlt.length) { fail('Nicht definiert: ' + fehlt.join(', ')); return; }
+  ok('Alle ' + noetig.length + ' Funktionen definiert');
+
+  if (typeof DB === 'undefined' || !Array.isArray(DB.termine))
+    fail('DB-Sektion termine fehlt');
+  else ok('Termine-Sektion vorhanden (' + DB.termine.length + ' Einträge)');
+
+  if (!document.getElementById('mr-mahnung'))
+    fail('Monatsblatt-Mahnung fehlt auf dem Gewohnheiten-Screen');
+  else ok('Mahnung vorhanden');
+
+  // Der Export muss jederzeit erreichbar sein, nicht nur über die Mahnung
+  const expKnopf = document.getElementById('mr-export');
+  if (!expKnopf)
+    fail('Fester Export-Knopf für das Monatsblatt fehlt – ohne ihn kommt man vor dem 25. nicht an den Export');
+  else if (!/mrExportKlick/.test(expKnopf.getAttribute('onclick') || ''))
+    fail('Export-Knopf ist nicht verdrahtet');
+  else ok('Export jederzeit erreichbar');
+
+  ['mr-sub','mr-lage','mr-btn-vor','mr-export-txt','mr-fuss'].forEach(id => {
+    if (!document.getElementById(id)) fail('Element ' + id + ' fehlt');
+  });
+  ok('Monatsnavigation vollständig');
+
+  if (typeof mrGewaehlt === 'function' && typeof mrMonatWechsel === 'function') {
+    const merk = (typeof mrMonatsOffset !== 'undefined') ? mrMonatsOffset : 0;
+    try {
+      const jetzt = new Date();
+      mrMonatWechsel(1);
+      if (mrGewaehlt().monat !== jetzt.getMonth())
+        fail('Der Monatswechsel läuft in die Zukunft – ein Rückblick auf kommende Monate ergibt keinen Sinn');
+      else ok('Kein Rückblick auf künftige Monate');
+      mrMonatWechsel(-13);
+      const soll = new Date(jetzt.getFullYear(), jetzt.getMonth() - 13, 1);
+      const g = mrGewaehlt();
+      if (g.jahr !== soll.getFullYear() || g.monat !== soll.getMonth())
+        fail('Monatsrechnung über die Jahresgrenze falsch');
+      else ok('Monatsrechnung über Jahresgrenzen korrekt');
+    } finally {
+      if (typeof mrMonatsOffset !== 'undefined') mrMonatsOffset = merk;
+      if (typeof mrKarteZeichnen === 'function') mrKarteZeichnen();
+    }
+  }
+
+  // ── Termine werden beim Anlegen gemerkt ────────────────────────────────
+  if (typeof tzAddTermin === 'function' && !/terminMerken/.test(tzAddTermin.toString()))
+    fail('Termine aus dem Daily Log werden nicht mehr gemerkt');
+  else ok('Termine werden beim Anlegen gespeichert');
+
+  // ── Datenbestand ────────────────────────────────────────────────────────
+  const kaputt = (DB.termine || []).filter(t =>
+    !t.datum || !/^\d{4}-\d{2}-\d{2}$/.test(t.datum) || !t.titel);
+  if (kaputt.length) fail(kaputt.length + ' Termine ohne gültiges Datum oder Titel');
+  else ok('Alle Termine vollständig');
+
+  const grenze = tzPlusTage(today(), -365);
+  const alt = (DB.termine || []).filter(t => t.datum && t.datum < grenze);
+  if (alt.length) warn(alt.length + ' Termine älter als ein Jahr – Aufräumen greift nicht');
+  else ok('Keine veralteten Termine');
+
+  if (typeof terminAufraeumen === 'function' && !/MR_MAX_ALT|365/.test(terminAufraeumen.toString()))
+    warn('Aufräumgrenze verändert');
+  else ok('Aufräumen nach einem Jahr');
+
+  // ── Sortierung: ganztägig zuerst ───────────────────────────────────────
+  if (typeof termineAmTag === 'function') {
+    const heute = today();
+    const liste = termineAmTag(heute);
+    const ganz = liste.filter(t => t.ganztag).length;
+    if (ganz && !liste[0].ganztag)
+      fail('Ganztagestermine stehen nicht mehr zuerst');
+    else ok(liste.length + ' Termine heute, Sortierung korrekt');
+  }
+
+  // ── Monatsblatt ─────────────────────────────────────────────────────────
+  if (typeof mrErstellePDF === 'function') {
+    const src = mrErstellePDF.toString();
+    if (!/compress:\s*true/.test(src)) fail('Kompression im Monatsblatt abgeschaltet');
+    else ok('Kompression eingeschaltet');
+    if (!/termineAmTag/.test(src))
+      fail('Zeitleiste druckt die Termine nicht mehr vor');
+    else ok('Termine werden in die Zeitleiste gedruckt');
+    if (!/new Date\(jahr, monat \+ 1, 0\)\.getDate\(\)/.test(src))
+      fail('Monatslänge kommt nicht mehr aus dem Kalender');
+    else ok('Monatslängen korrekt');
+    if (!/Reflexion_/.test(src)) fail('Dateiname folgt nicht dem Muster Reflexion_JJJJ_MM.pdf');
+    else ok('Dateiname korrekt');
+    if (!/Termine, davon/.test(src)) warn('Zusammenfassung am Seitenende entfällt');
+    else ok('Zusammenfassung vorhanden');
+  }
+
+  // ── Tagesreflexion auf Seite 4 ─────────────────────────────────────────
+  if (typeof erstelleTageszettelPDF === 'function') {
+    const src = erstelleTageszettelPDF.toString();
+    if (!/tzReflexionsSeite/.test(src))
+      fail('Tagesreflexion fehlt im Daily Log');
+    else ok('Tagesreflexion vorhanden');
+    if (!/doc\.setPage\(4\)/.test(src))
+      fail('Tagesreflexion sitzt nicht mehr fest auf Seite 4');
+    else ok('Tagesreflexion fest auf Seite 4');
+    if (!/'REF'/.test(src))
+      fail('REF-Kennzeichnung im Seitenindikator fehlt');
+    else ok('Seite 4 als REF gekennzeichnet');
+    if (!/istRef \? bx \* 1\.6 : bx/.test(src.replace(/\s+/g, ' ')))
+      warn('REF-Kachel ist nicht mehr breiter als die übrigen');
+    else ok('REF-Kachel abgesetzt');
+    if (/!istRef && belegteSeiten/.test(src)) ok('REF wird nie als belegt eingefärbt');
+    else fail('REF-Kachel wird wieder wie eine normale Seite eingefärbt');
+  }
+
+  // ── Register im Notizbuch ──────────────────────────────────────────────
+  if (typeof NB_INDEX === 'undefined' || NB_INDEX !== 4)
+    fail('Registerseiten im Notizbuch fehlen oder sind nicht mehr vier');
+  else ok('Vier Registerseiten im Notizbuch');
+  if (typeof nbErstellePDF === 'function' && !/indexSeite/.test(nbErstellePDF.toString()))
+    fail('Notizbuch erzeugt kein Register mehr');
+  else ok('Register wird erzeugt');
+
+  // ── BuJo ist entfernt ──────────────────────────────────────────────────
+  if (typeof bujoExport === 'function' || document.getElementById('btn-bujo'))
+    warn('Der BuJo-Export ist wieder vorhanden – bewusst entfernt in v1.5.253');
+  else ok('BuJo-Export entfernt');
+
+})();

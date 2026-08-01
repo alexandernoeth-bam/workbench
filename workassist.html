@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.251</title>
+<title>WorkAssist 1.5.254</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
@@ -164,7 +164,7 @@ svg { display: block; }
 }
 .btn-extern:hover { background:rgba(255,255,255,0.16); color:#fff; }
 
-.sidebar-notiz { flex-shrink:0; padding:6px 10px 0; }
+.sidebar-notiz { flex-shrink:0; padding:6px 10px 0; display:flex; flex-direction:column; gap:5px; }
 .sidebar-notiz .btn-move { width:100%; }
 /* Move-PDF-Export (reMarkable Paper Pro Move) */
 .sidebar-move {
@@ -788,6 +788,8 @@ body.fm-planung #btn-zettelpanel { display:none !important; }
                      border-radius:6px; padding:3px 10px; font-size:10.5px; cursor:pointer;
                      font-family:var(--font); color:#922b21; font-weight:600; }
 
+.hb-mahnung.mr { background:var(--amber-bg); border-color:var(--amber-light); color:#78350f; }
+.hb-mahnung.mr button { border-color:var(--amber-light); color:#78350f; }
 .hb-ch-karte { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
                padding:12px 14px; margin-bottom:12px; max-width:900px; }
 .hb-ch-kopf { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
@@ -807,6 +809,23 @@ body.fm-planung #btn-zettelpanel { display:none !important; }
 .hb-ch-hinweis { font-size:10.5px; color:var(--text-dim); background:var(--surface2);
                  border-radius:var(--radius); padding:8px 10px; line-height:1.45; }
 
+.mr-karte { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+            padding:11px 14px 12px; margin-bottom:12px; max-width:900px; }
+.mr-kopf { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.mr-titel { font-size:12.5px; font-weight:700; }
+.mr-sub { font-size:10.5px; color:var(--text-xdim); margin-top:2px; }
+.mr-nav { display:flex; align-items:center; gap:6px; margin-left:auto;
+          font-size:11px; color:var(--text-dim); }
+.mr-nav button { border:1px solid var(--border); background:var(--surface); border-radius:5px;
+                 width:22px; height:22px; cursor:pointer; color:var(--text-dim); font-family:var(--font); }
+.mr-nav button:disabled { opacity:.35; cursor:not-allowed; }
+.mr-fuss { margin-top:9px; font-size:10.5px; color:var(--text-dim); display:flex;
+           gap:10px; align-items:center; flex-wrap:wrap; }
+.mr-fuss .mr-pill { font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:8px;
+                    border:1px solid var(--border); background:var(--surface2); color:var(--text-dim); }
+.mr-fuss .mr-pill.offen { background:var(--amber-bg); color:#a16207; border-color:var(--amber-light); }
+.mr-fuss .mr-pill.fertig { background:var(--accent-xlight); color:var(--accent-dark);
+                           border-color:var(--accent-light); }
 .hb-karte { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
             overflow:hidden; max-width:900px; }
 .hb-khead { padding:10px 14px; border-bottom:1px solid var(--border); display:flex;
@@ -2969,7 +2988,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.251</div>
+    <div class="start-version">v1.5.254</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -3037,7 +3056,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.251</div>
+    <div class="app-version" id="app-version">v1.5.254</div>
   </div>
 
   <div class="nav-section">
@@ -3350,7 +3369,27 @@ textarea.field-input { resize: vertical; min-height: 70px; }
   <div class="screen" id="screen-habits">
     <div class="hb-scroll">
       <div class="hb-mahnung" id="hb-mahnung" style="display:none;"></div>
+      <div class="hb-mahnung mr" id="mr-mahnung" style="display:none;"></div>
       <div class="hb-ch-karte" id="hb-challenge"></div>
+
+      <div class="mr-karte">
+        <div class="mr-kopf">
+          <div>
+            <div class="mr-titel">Monatsreflexion</div>
+            <div class="mr-sub" id="mr-sub">–</div>
+          </div>
+          <div class="mr-nav">
+            <button onclick="mrMonatWechsel(-1)" title="Vormonat">‹</button>
+            <span id="mr-lage">laufender Monat</span>
+            <button onclick="mrMonatWechsel(1)" id="mr-btn-vor" title="Folgemonat">›</button>
+          </div>
+          <button class="hb-export" id="mr-export" onclick="mrExportKlick()">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            <span id="mr-export-txt">Reflexion.pdf</span>
+          </button>
+        </div>
+        <div class="mr-fuss" id="mr-fuss"></div>
+      </div>
 
       <div class="hb-karte">
         <div class="hb-khead">
@@ -4616,7 +4655,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.251';
+const APP_VERSION = '1.5.254';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -4625,7 +4664,7 @@ let autoSaveTimer  = null;
 let pendingChanges = false;
 
 function emptyDB() {
-  return { version: APP_VERSION, bereiche: [], aufgaben: [], wissen: [], dokumente: [], plaene: [], notizen: [], belege: [], habits: [], challenges: [] };
+  return { version: APP_VERSION, bereiche: [], aufgaben: [], wissen: [], dokumente: [], plaene: [], notizen: [], belege: [], habits: [], challenges: [], termine: [] };
 }
 
 let DB = emptyDB();
@@ -4816,6 +4855,7 @@ function migrateDB() {
       if (!DB.dokumente) DB.dokumente = [];
       if (!DB.habits)     DB.habits = [];
       if (!DB.challenges) DB.challenges = [];
+      if (!DB.termine)    DB.termine = [];
       DB.dokumente.push({
         id:             'wis_mig_' + Math.random().toString(36).slice(2,9),
         eintragsTyp:    'wissen',
@@ -14375,6 +14415,7 @@ function moveUebersichtPDF(modus, fonts, quellen) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const NB_SEITEN = 150;
+const NB_INDEX  = 4;     // Registerseiten vorn – ohne sie sind 150 lose Blaetter
 const NB_BLOCK  = 15;    // Seiten je Block, danach wird der Zeichenstrang frei
 
 let nbLaeuft = false;
@@ -14412,28 +14453,60 @@ async function nbErstellePDF(fonts) {
 
   const ML = 2.5, MR = 3.5, MT = 9, PUNKT = 4.5;
 
-  function seite(nr) {
+  function raster() {
     doc.setFillColor(190, 195, 205);
     for (let py = 6; py < H - 4; py += PUNKT)
       for (let px = ML; px <= W - MR; px += PUNKT)
         doc.circle(px, py, 0.45, 'F');
+  }
 
+  function kopf(titel, nr) {
     doc.setFont(F, 'bold');
     doc.setFontSize(13);
     doc.setTextColor(24, 16, 10);
-    doc.text('Notizen', ML, MT - 2);
-
-    doc.setFont(F, 'normal');
-    doc.setFontSize(11);
-    doc.text(String(nr), W - MR, MT - 2, { align: 'right' });
-
+    doc.text(titel, ML, MT - 2);
+    if (nr) {
+      doc.setFont(F, 'normal');
+      doc.setFontSize(11);
+      doc.text(String(nr), W - MR, MT - 2, { align: 'right' });
+    }
     doc.setDrawColor(24, 16, 10);
     doc.setLineWidth(0.5);
     doc.line(ML, MT + 0.4, W - MR, MT + 0.4);
   }
 
+  // Registerseiten: Thema links, Seitenzahlen rechts
+  function indexSeite(nr) {
+    raster();
+    kopf('Register' + (nr > 1 ? '  ' + nr : ''), null);
+    let y = MT + 5;
+    const trenn = W - MR - 16;
+    doc.setFont(F, 'normal'); doc.setFontSize(8.5); doc.setTextColor(140, 130, 116);
+    doc.text('Thema', ML + 0.6, y);
+    doc.text('Seiten', W - MR - 0.6, y, { align: 'right' });
+    y += 3.4;
+    const start = y;
+    while (y < H - 5) {
+      doc.setDrawColor(150, 138, 118); doc.setLineWidth(0.25);
+      doc.line(ML, y, W - MR, y);
+      y += 5.4;
+    }
+    doc.setDrawColor(150, 138, 118); doc.setLineWidth(0.25);
+    doc.line(trenn, start, trenn, y - 5.4);
+  }
+
+  function seite(nr) {
+    raster();
+    kopf('Notizen', nr);
+  }
+
+  for (let i = 1; i <= NB_INDEX; i++) {
+    if (i > 1) doc.addPage([W, H]);
+    indexSeite(i);
+  }
+
   for (let nr = 1; nr <= NB_SEITEN; nr++) {
-    if (nr > 1) doc.addPage([W, H]);
+    doc.addPage([W, H]);
     seite(nr);
     if (nr % NB_BLOCK === 0) {
       showToast('Notizbuch: Seite ' + nr + ' von ' + NB_SEITEN + ' …');
@@ -14445,6 +14518,8 @@ async function nbErstellePDF(fonts) {
   showToast('PDF exportiert: Notizen.pdf');
 }
 // ═══ Ende Notizbuch ═══════════════════════════════════════════════════════
+
+
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -15119,6 +15194,8 @@ function tzAddTermin(q) {
     meta,
     terminDaten: { start: st, ende: en, ort, ganztag: ganz, erinnerungAktiv: TZ.erinnern },
   });
+  terminMerken({ datum: TZ.datum || today(), titel, start: st, ende: en, ort,
+                 ganztag: ganz, quelle: q });
   tzSpeichern();
   tzRenderLinks();
   tzRenderPaper();
@@ -15240,6 +15317,36 @@ function erstelleTageszettelPDF(zettel, fonts) {
     tzHintergrund();
     tzKopfzeile(false);
     y = MT + 3;
+  }
+
+  // Seite 4 traegt fest die Tagesreflexion – ihre Position muss verlaesslich
+  // sein, deshalb rutscht sie bei laengeren Zetteln nicht mit.
+  function tzReflexionsSeite() {
+    doc.setPage(4);
+    doc.setFont(F, 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(24, 16, 10);
+    doc.text('Tagesreflexion', ML, MT - 2);
+    doc.setDrawColor(24, 16, 10);
+    doc.setLineWidth(0.5);
+    doc.line(ML, MT + 0.4, W - MR, MT + 0.4);
+
+    let ry = MT + 6;
+    ['Was ist gut gelaufen?', 'Woran hat es gehakt?', 'Was ist morgen das Wichtigste?']
+      .forEach(frage => {
+        doc.setFont(F, 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(24, 16, 10);
+        doc.text(frage, ML, ry + 3.4);
+        ry += 6.4;
+        for (let i = 0; i < 3; i++) {
+          doc.setDrawColor(150, 138, 118);
+          doc.setLineWidth(0.25);
+          doc.line(ML, ry, W - MR, ry);
+          ry += 6.2;
+        }
+        ry += 4;
+      });
   }
 
   // Feste Kontrollzeile: erinnert daran, das Gewohnheitsblatt zur Hand zu nehmen
@@ -15411,26 +15518,36 @@ function erstelleTageszettelPDF(zettel, fonts) {
     y = merk + verschub;
   }
 
-  // Immer mindestens vier Seiten
+  // Immer mindestens vier Seiten – Seite 4 ist fest die Tagesreflexion
   while (doc.internal.getNumberOfPages() < 4) {
     doc.addPage([W, H]);
     tzHintergrund();
     tzKopfzeile(false);
   }
+  tzReflexionsSeite();
 
   // Seitenindikator auf Seite 1: belegt = Seite traegt Text
   const gesamtSeiten = doc.internal.getNumberOfPages();
   doc.setPage(1);
   const bx = 5.0, gap = 1.0;
-  let sx = W - MR - (gesamtSeiten * bx + (gesamtSeiten - 1) * gap);
+  const extra = gesamtSeiten >= 4 ? bx * 0.6 : 0;   // REF-Kachel ist breiter
+  let sx = W - MR - (gesamtSeiten * bx + extra + (gesamtSeiten - 1) * gap);
   const sy = MT - 6.4;
   for (let i = 1; i <= gesamtSeiten; i++) {
-    if (belegteSeiten.has(i)) { doc.setFillColor(205, 200, 190); doc.rect(sx, sy, bx, bx, 'F'); }
+    const istRef = (i === 4);
+    // Seite 4 ist weder frei noch beliebig gefuellt – sie hat eine feste
+    // Funktion und wird deshalb nur umrandet mit REF gekennzeichnet.
+    const breite = istRef ? bx * 1.6 : bx;
+    if (!istRef && belegteSeiten.has(i)) {
+      doc.setFillColor(205, 200, 190);
+      doc.rect(sx, sy, breite, bx, 'F');
+    }
     doc.setDrawColor(24, 16, 10); doc.setLineWidth(0.35);
-    doc.rect(sx, sy, bx, bx, 'S');
-    doc.setFont(F, 'bold'); doc.setFontSize(8); doc.setTextColor(24, 16, 10);
-    doc.text(String(i), sx + bx / 2, sy + bx * 0.72, { align: 'center' });
-    sx += bx + gap;
+    doc.rect(sx, sy, breite, bx, 'S');
+    doc.setFont(F, 'bold'); doc.setFontSize(istRef ? 6.5 : 8);
+    doc.setTextColor(24, 16, 10);
+    doc.text(istRef ? 'REF' : String(i), sx + breite / 2, sy + bx * 0.72, { align: 'center' });
+    sx += breite + gap;
   }
 
   const d  = new Date(zettel.datum + 'T00:00:00');
@@ -16182,6 +16299,8 @@ function renderHabits() {
 
   hbChallengeZeichnen();
   hbMahnungZeichnen();
+  mrMahnungZeichnen();
+  mrKarteZeichnen();
 
   // Tabelle
   const tab = document.getElementById('hb-tab');
@@ -16514,6 +16633,251 @@ function hbErstellePDF(montagISO, habits, fonts) {
   showToast('PDF exportiert: ' + datei);
 }
 // ═══ Ende Gewohnheiten-Verwaltung ═════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  TERMINE UND MONATSREFLEXION                                     v1.5.254
+//  Termine aus dem Daily Log werden dauerhaft abgelegt – sie sind die
+//  Rohmasse fuer die Zeitleiste der Monatsreflexion. Ohne sie waere der
+//  Rueckblick eine Gedaechtnisuebung.
+//  t = { id, datum, titel, start, ende, ort, ganztag, quelle }
+// ═══════════════════════════════════════════════════════════════════════════
+
+const MR_LS_KEY  = 'workassist_monatsblatt';   // zuletzt exportierter Monat
+const MR_MAX_ALT = 365;                        // Termine aelter als ein Jahr entfallen
+
+function terminMerken(t) {
+  if (!DB.termine) DB.termine = [];
+  if (!t || !t.titel || !t.datum) return;
+  // Doppelte vermeiden, wenn derselbe Termin erneut angelegt wird
+  const doppelt = DB.termine.some(x =>
+    x.datum === t.datum && x.titel === t.titel && x.start === t.start);
+  if (doppelt) return;
+  DB.termine.push({ id: uid(), datum: t.datum, titel: t.titel,
+                    start: t.start || '', ende: t.ende || '', ort: t.ort || '',
+                    ganztag: !!t.ganztag, quelle: t.quelle || 'work',
+                    erstellt: new Date().toISOString() });
+  terminAufraeumen();
+  saveDB();
+}
+
+// Haelt die JSON-Datei klein – laeuft still beim Anlegen mit
+function terminAufraeumen() {
+  if (!DB.termine || !DB.termine.length) return;
+  const grenze = tzPlusTage(today(), -MR_MAX_ALT);
+  const vorher = DB.termine.length;
+  DB.termine = DB.termine.filter(t => !t.datum || t.datum >= grenze);
+  if (DB.termine.length !== vorher)
+    console.info('[Termine] ' + (vorher - DB.termine.length) + ' alte Einträge entfernt');
+}
+
+function termineAmTag(datum) {
+  return (DB.termine || []).filter(t => t.datum === datum)
+    .sort((a, b) => (a.ganztag ? '' : a.start || '99').localeCompare(b.ganztag ? '' : b.start || '99'));
+}
+
+// ── Monatsblatt ───────────────────────────────────────────────────────────
+function mrMonatSchluessel(jahr, monat) {
+  return jahr + '-' + String(monat + 1).padStart(2, '0');
+}
+
+function mrExportGemerkt(jahr, monat) {
+  try { localStorage.setItem(MR_LS_KEY, mrMonatSchluessel(jahr, monat)); } catch (e) {}
+}
+
+function mrMonatExportiert(jahr, monat) {
+  try { return localStorage.getItem(MR_LS_KEY) === mrMonatSchluessel(jahr, monat); }
+  catch (e) { return false; }
+}
+
+// Der Rueckblick lohnt sich erst, wenn der Monat weit genug gelaufen ist
+function mrMahnungAktiv() {
+  const d = new Date();
+  return d.getDate() >= 25 && !mrMonatExportiert(d.getFullYear(), d.getMonth());
+}
+
+async function monatsblattExport(jahr, monat) {
+  const d = new Date();
+  const j = (jahr === undefined) ? d.getFullYear() : jahr;
+  const m = (monat === undefined) ? d.getMonth()   : monat;
+  try {
+    showToast('Monatsblatt wird erstellt …');
+    await ladeJsPDF();
+    mrErstellePDF(j, m, ladeCaveatFonts());
+  } catch (e) {
+    console.error('[Monatsblatt]', e);
+    showToast('Monatsblatt konnte nicht erstellt werden: ' + ((e && e.message) || 'unbekannt'), true);
+  }
+}
+
+function mrErstellePDF(jahr, monat, fonts) {
+  const { jsPDF } = window.jspdf;
+  const W = MOVE_PDF_W, H = MOVE_PDF_H;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [W, H], compress: true });
+
+  const F = fonts ? 'Caveat' : 'helvetica';
+  if (fonts) {
+    doc.addFileToVFS('Caveat-R.ttf', fonts.regular); doc.addFont('Caveat-R.ttf', 'Caveat', 'normal');
+    doc.addFileToVFS('Caveat-B.ttf', fonts.bold);    doc.addFont('Caveat-B.ttf', 'Caveat', 'bold');
+  }
+
+  const ML = 2.5, MR = 3.5, MT = 9, PUNKT = 4.5;
+  const MAXW = W - ML - MR;
+  const WT = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+  const NAMEN = ['Januar','Februar','März','April','Mai','Juni',
+                 'Juli','August','September','Oktober','November','Dezember'];
+  let seite = 0;
+
+  function mrRaster() {
+    doc.setFillColor(190, 195, 205);
+    for (let py = 6; py < H - 7; py += PUNKT)
+      for (let px = ML; px <= W - MR; px += PUNKT)
+        doc.circle(px, py, 0.45, 'F');
+  }
+
+  function mrNeueSeite(titel) {
+    seite++;
+    if (seite > 1) doc.addPage([W, H]);
+    mrRaster();
+    doc.setFont(F, 'bold'); doc.setFontSize(13); doc.setTextColor(24, 16, 10);
+    doc.text(titel, ML, MT - 2);
+    doc.setDrawColor(24, 16, 10); doc.setLineWidth(0.5);
+    doc.line(ML, MT + 0.4, W - MR, MT + 0.4);
+    doc.setFont(F, 'normal'); doc.setFontSize(9); doc.setTextColor(120, 110, 96);
+    doc.text(String(seite) + ' / 3', W - MR, H - 2.4, { align: 'right' });
+    return MT + 4.5;
+  }
+
+  function mrLinie(y, x1, x2) {
+    doc.setDrawColor(150, 138, 118); doc.setLineWidth(0.25);
+    doc.line(x1, y, x2, y);
+  }
+
+  // ── Seite 1: Zeitleiste mit vorgedruckten Terminen ────────────────────
+  const tage = new Date(jahr, monat + 1, 0).getDate();
+  let y = mrNeueSeite(NAMEN[monat] + ' ' + jahr + ' · Zeitleiste');
+  const zH = Math.min(3.5, (H - 12 - y) / tage);
+  let anzTermine = 0, anzGanz = 0;
+
+  for (let t = 1; t <= tage; t++) {
+    const iso = jahr + '-' + String(monat + 1).padStart(2, '0') + '-' + String(t).padStart(2, '0');
+    const d  = new Date(jahr, monat, t);
+    const we = d.getDay() === 0 || d.getDay() === 6;
+    doc.setFont(F, we ? 'normal' : 'bold');
+    doc.setFontSize(Math.max(7.5, zH * 2.3));
+    doc.setTextColor(we ? 130 : 24, we ? 120 : 16, we ? 106 : 10);
+    doc.text(String(t), ML + 2.6, y + zH * 0.78, { align: 'right' });
+    doc.text(WT[(d.getDay() + 6) % 7][0], ML + 5.2, y + zH * 0.78, { align: 'center' });
+
+    const tm = termineAmTag(iso);
+    if (tm.length) {
+      anzTermine += tm.length;
+      anzGanz    += tm.filter(x => x.ganztag).length;
+      const txt = tm.map(x => (x.ganztag ? '' : (x.start ? x.start + ' ' : '')) + x.titel).join(' · ');
+      doc.setFont(F, 'normal');
+      doc.setFontSize(Math.max(7, zH * 2.1));
+      doc.setTextColor(90, 80, 68);
+      doc.text(doc.splitTextToSize(txt, MAXW - 8)[0], ML + 7.4, y + zH * 0.78);
+    }
+    mrLinie(y + zH * 0.95, ML + 7.0, W - MR);
+    y += zH;
+  }
+
+  y += 2;
+  doc.setFont(F, 'normal'); doc.setFontSize(9.5); doc.setTextColor(120, 110, 96);
+  doc.text(anzTermine + ' Termine, davon ' + anzGanz + ' ganztägig', W - MR, y, { align: 'right' });
+
+  // ── Seite 2: Rückblick ────────────────────────────────────────────────
+  y = mrNeueSeite('Rückblick');
+  [['Was ist gut gelaufen?', 5],
+   ['Woran hat es gehakt?', 5],
+   ['Was nehme ich mit?', 5]].forEach(([frage, zeilen]) => {
+    doc.setFont(F, 'bold'); doc.setFontSize(12); doc.setTextColor(24, 16, 10);
+    doc.text(frage, ML, y + 3.4);
+    y += 6;
+    for (let i = 0; i < zeilen; i++) { mrLinie(y, ML, W - MR); y += 5.4; }
+    y += 3;
+  });
+
+  // ── Seite 3: Vorausschau ──────────────────────────────────────────────
+  const nm = (monat + 1) % 12, nj = jahr + Math.floor((monat + 1) / 12);
+  y = mrNeueSeite('Vorausschau · ' + NAMEN[nm] + ' ' + nj);
+  [['Worauf kommt es an?', 5],
+   ['Was muss vorbereitet werden?', 5],
+   ['Was lasse ich bewusst weg?', 4]].forEach(([frage, zeilen]) => {
+    doc.setFont(F, 'bold'); doc.setFontSize(12); doc.setTextColor(24, 16, 10);
+    doc.text(frage, ML, y + 3.4);
+    y += 6;
+    for (let i = 0; i < zeilen; i++) { mrLinie(y, ML, W - MR); y += 5.4; }
+    y += 3;
+  });
+
+  const datei = 'Reflexion_' + jahr + '_' + String(monat + 1).padStart(2, '0') + '.pdf';
+  doc.save(datei);
+  mrExportGemerkt(jahr, monat);
+  if (typeof hbMahnungZeichnen === 'function') mrMahnungZeichnen();
+  showToast('PDF exportiert: ' + datei);
+}
+
+// Gewaehlter Monat als Versatz zum laufenden – 0 = dieser Monat
+let mrMonatsOffset = 0;
+
+function mrGewaehlt() {
+  const d = new Date();
+  const m = d.getMonth() + mrMonatsOffset;
+  return { jahr: d.getFullYear() + Math.floor(m / 12), monat: ((m % 12) + 12) % 12 };
+}
+
+function mrMonatWechsel(d) {
+  mrMonatsOffset = Math.min(0, mrMonatsOffset + d);   // Zukunft ergibt keinen Rueckblick
+  mrKarteZeichnen();
+}
+
+function mrExportKlick() {
+  const g = mrGewaehlt();
+  monatsblattExport(g.jahr, g.monat).then(mrKarteZeichnen);
+}
+
+function mrKarteZeichnen() {
+  const NAMEN = ['Januar','Februar','März','April','Mai','Juni',
+                 'Juli','August','September','Oktober','November','Dezember'];
+  const g = mrGewaehlt();
+  const sub = document.getElementById('mr-sub');
+  if (sub) sub.textContent = NAMEN[g.monat] + ' ' + g.jahr;
+  const lage = document.getElementById('mr-lage');
+  if (lage) lage.textContent = mrMonatsOffset === 0 ? 'laufender Monat'
+    : mrMonatsOffset === -1 ? 'Vormonat' : Math.abs(mrMonatsOffset) + ' Monate zurück';
+  const vor = document.getElementById('mr-btn-vor');
+  if (vor) vor.disabled = mrMonatsOffset >= 0;
+  const txt = document.getElementById('mr-export-txt');
+  if (txt) txt.textContent = 'Reflexion_' + g.jahr + '_' + String(g.monat + 1).padStart(2, '0') + '.pdf';
+
+  // Wie viele Termine liegen im gewaehlten Monat?
+  const prefix = g.jahr + '-' + String(g.monat + 1).padStart(2, '0');
+  const tm = (DB.termine || []).filter(t => (t.datum || '').startsWith(prefix));
+  const fertig = mrMonatExportiert(g.jahr, g.monat);
+  const fuss = document.getElementById('mr-fuss');
+  if (fuss) fuss.innerHTML =
+    `<span class="mr-pill ${fertig ? 'fertig' : 'offen'}">${fertig ? 'exportiert' : 'offen'}</span>
+     <span>${tm.length} ${tm.length === 1 ? 'Termin' : 'Termine'} in der Zeitleiste</span>
+     <span>·</span><span>Zeitleiste, Rückblick, Vorausschau</span>`;
+}
+
+function mrMahnungZeichnen() {
+  const el = document.getElementById('mr-mahnung');
+  if (!el) return;
+  if (!mrMahnungAktiv()) { el.style.display = 'none'; return; }
+  const d = new Date();
+  const NAMEN = ['Januar','Februar','März','April','Mai','Juni',
+                 'Juli','August','September','Oktober','November','Dezember'];
+  el.style.display = 'flex';
+  el.innerHTML =
+    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+       stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+     <span>Monatsblatt für ${NAMEN[d.getMonth()]} noch nicht exportiert.</span>
+     <button onclick="monatsblattExport()">Jetzt exportieren</button>`;
+}
+// ═══ Ende Termine und Monatsreflexion ═════════════════════════════════════
+
 
 
 
@@ -17967,7 +18331,7 @@ async function nmPdfErstellen() {
       })
       .catch(() => {
         // Fallback: Inline-SW
-        const swCode = `const CACHE='wa-v1_5_251';
+        const swCode = `const CACHE='wa-v1_5_254';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
