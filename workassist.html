@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.260</title>
+<title>WorkAssist 1.5.261</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
@@ -760,6 +760,25 @@ svg { display: block; }
 .fm-bar.notfall b { color:#7b241c; }
 .fm-bar.notfall button { border-color:#f5b7b1; color:#922b21; }
 
+.na-leiste { padding:6px 16px; font-size:11px; display:flex; align-items:center;
+             gap:9px; flex-shrink:0; flex-wrap:wrap; }
+.na-leiste.frage { background:var(--surface2); border-bottom:1px solid var(--border);
+                   color:var(--text-dim); }
+.na-leiste.an { background:var(--amber-bg); border-bottom:1px solid var(--amber-light);
+                color:#78350f; font-weight:600; }
+.na-leiste b { color:var(--text); }
+.na-leiste.an b { color:#7c2d12; }
+.na-leiste button { border:1px solid var(--border); background:var(--surface); border-radius:6px;
+                    padding:3px 10px; font-size:10.5px; cursor:pointer; font-family:var(--font);
+                    color:var(--text-dim); }
+.na-leiste button:hover { border-color:var(--accent-light); color:var(--accent-dark); }
+.na-leiste button.ja { border-color:var(--accent-dark); background:var(--accent-dark);
+                       color:#fff; font-weight:600; }
+.na-leiste button.ja:hover { background:var(--accent); color:#fff; }
+.na-leiste.frage button:first-of-type { margin-left:auto; }
+.na-leiste.an button { border-color:var(--amber-light); color:#78350f; margin-left:auto; }
+.na-datum { border:1px solid var(--amber-light); border-radius:5px; padding:2px 5px;
+            font-size:10.5px; font-family:var(--font); color:#78350f; background:var(--surface); }
 .fm-warnung { background:#fdecea; border-bottom:1px solid #f5b7b1; padding:6px 16px;
               font-size:11px; color:#922b21; display:flex; align-items:center; gap:9px;
               flex-shrink:0; font-weight:600; }
@@ -2998,7 +3017,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.260</div>
+    <div class="start-version">v1.5.261</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -3066,7 +3085,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.260</div>
+    <div class="app-version" id="app-version">v1.5.261</div>
   </div>
 
   <div class="nav-section">
@@ -3229,6 +3248,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 
   <div class="fm-bar" id="fm-bar" style="display:none;"></div>
   <div class="fm-warnung" id="fm-warnung" style="display:none;"></div>
+  <div class="na-leiste" id="na-leiste" style="display:none;"></div>
 
   <!-- ══ DASHBOARD ════════════════════════════════════════════════════════ -->
   <div class="screen active" id="screen-dashboard">
@@ -4665,7 +4685,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.260';
+const APP_VERSION = '1.5.261';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -4674,7 +4694,7 @@ let autoSaveTimer  = null;
 let pendingChanges = false;
 
 function emptyDB() {
-  return { version: APP_VERSION, bereiche: [], aufgaben: [], wissen: [], dokumente: [], plaene: [], notizen: [], belege: [], habits: [], challenges: [], termine: [], tageszettel: null, exporte: {} };
+  return { version: APP_VERSION, bereiche: [], aufgaben: [], wissen: [], dokumente: [], plaene: [], notizen: [], belege: [], habits: [], challenges: [], termine: [], tageszettel: null, nacharbeiten: null, exporte: {} };
 }
 
 let DB = emptyDB();
@@ -4725,6 +4745,7 @@ async function saveDB() {
   badgeAnstossen();
   zpAnstossen();
   try { fmWarnbannerZeichnen(); } catch (e) {}
+  try { naZeichnen(); } catch (e) {}
 
   function lsSet(data) {
     try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) { /* Safari file:// blockiert localStorage */ }
@@ -5211,6 +5232,7 @@ async function ladeUndStarte() {
   try { badgeAktualisieren(); } catch (e) { console.warn('[Badge]', e); }
   try { zpWiederherstellen(); zpRender(); } catch (e) { console.warn('[Zettelpanel]', e); }
   try { fmStart(); } catch (e) { console.warn('[Fokus]', e); }
+  try { naStart(); } catch (e) { console.warn('[Nacharbeiten]', e); }
 }
 
 function uid() {
@@ -6978,7 +7000,9 @@ function notizCheckboxenZuruecksetzen(html) {
 function statusSetzen(obj, neuerStatus) {
   if (!obj) return;
   obj.status = neuerStatus;
-  if (neuerStatus === 'erledigt') obj.erledigtAm = today();
+  // buchungsTag() statt today(): morgens abgehakte Aufgaben gehoeren zum
+  // Vortag, wenn der Nacharbeiten-Modus laeuft
+  if (neuerStatus === 'erledigt') obj.erledigtAm = buchungsTag();
   else delete obj.erledigtAm;
 }
 
@@ -14624,11 +14648,14 @@ function tzOffeneKriterien(a) {
 // localStorage. Der haengt an der Herkunft der Seite und ist nicht Teil des
 // Backups – Inhalte gehoeren in die JSON-Datei. Der localStorage bleibt als
 // Rueckfall, falls gerade keine Datei verbunden ist.
+// Diese Felder stehen direkt in der DB, alles andere unter DB.exporte
+const ZUSTAND_OBEN = ['tageszettel', 'nacharbeiten'];
+
 function zustandSchreiben(feld, wert, lsKey) {
   let inDatei = false;
   try {
     if (typeof DB === 'object' && DB) {
-      if (feld === 'tageszettel') DB.tageszettel = wert;
+      if (ZUSTAND_OBEN.indexOf(feld) >= 0) DB[feld] = wert;
       else { if (!DB.exporte) DB.exporte = {}; DB.exporte[feld] = wert; }
       inDatei = true;
     }
@@ -14641,7 +14668,7 @@ function zustandSchreiben(feld, wert, lsKey) {
 function zustandLesen(feld, lsKey) {
   try {
     if (typeof DB === 'object' && DB) {
-      const w = (feld === 'tageszettel') ? DB.tageszettel : (DB.exporte || {})[feld];
+      const w = (ZUSTAND_OBEN.indexOf(feld) >= 0) ? DB[feld] : (DB.exporte || {})[feld];
       if (w !== undefined && w !== null) return w;
     }
   } catch (e) {}
@@ -15607,6 +15634,8 @@ function erstelleTageszettelPDF(zettel, fonts) {
   doc.save(datei);
   showToast('PDF exportiert: ' + datei);
   // Export beendet die Planung – Merker setzen und in den Fokus wechseln
+  // Der Export ist der natuerliche Schnitt: ab jetzt wird wieder auf heute gebucht
+  try { naBeenden(true); } catch (e) { console.warn('[Nacharbeiten]', e); }
   try { fmExportGemerkt(); setTimeout(fmFokusAn, 700); } catch (e) { console.warn('[Fokus]', e); }
 }
 // ═══ Ende Tageszettel-Assistent ═══════════════════════════════════════════
@@ -16200,6 +16229,139 @@ function fmStart() {
 // ═══ Ende Fokus-Modus ═════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  NACHARBEITEN-MODUS                                              v1.5.261
+//  Morgens werden Aufgaben abgehakt, die am Vortag erledigt wurden. Ohne
+//  diesen Modus bekaemen sie erledigtAm = heute und wuerden den Rueckblick
+//  sowie die Zeitleiste der Monatsreflexion verfaelschen.
+//  Bewusst kein Automatismus: eine stille Fehlbuchung waere schlimmer als
+//  eine sichtbare Rueckfrage. Die Leiste bietet an, sie erzwingt nichts.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const NA_LS_KEY = 'workassist_nacharbeiten';
+
+const NA = {
+  aktiv:     false,
+  datum:     null,   // Arbeitstag, auf den gebucht wird
+  abgelehnt: false,  // heute schon "Nein" gesagt – dann nicht erneut anbieten
+  tag:       null,   // Kalendertag, an dem das entschieden wurde
+};
+
+// Der Tag, auf den eine Erledigung gebucht wird. Einzige Quelle fuer
+// erledigtAm – deshalb reicht die Aenderung hier, alle Wege profitieren.
+function buchungsTag() {
+  return (NA.aktiv && NA.datum) ? NA.datum : today();
+}
+
+function naSpeichern() {
+  NA.tag = today();
+  zustandSchreiben('nacharbeiten',
+    { aktiv: NA.aktiv, datum: NA.datum, abgelehnt: NA.abgelehnt, tag: NA.tag }, NA_LS_KEY);
+  try { saveDB(); } catch (e) {}
+}
+
+function naWiederherstellen() {
+  const d = zustandLesen('nacharbeiten', NA_LS_KEY);
+  NA.aktiv = false; NA.datum = null; NA.abgelehnt = false; NA.tag = today();
+  if (!d || typeof d !== 'object') return;
+  // Entscheidungen gelten nur fuer den Kalendertag, an dem sie fielen
+  if (d.tag !== today()) return;
+  NA.aktiv     = d.aktiv === true;
+  NA.datum     = d.datum || null;
+  NA.abgelehnt = d.abgelehnt === true;
+  NA.tag       = d.tag;
+}
+
+// Vorschlag: der letzte Exporttag, sonst gestern
+function naVorschlag() {
+  const letzter = zustandLesen('dailyLog', FM_EXPORT_KEY);
+  if (letzter && letzter < today()) return letzter;
+  return tzPlusTage(today(), -1);
+}
+
+// Angeboten wird nur, wenn heute noch kein Daily Log exportiert wurde
+function naAnbieten() {
+  if (NA.aktiv || NA.abgelehnt) return false;
+  return !fmZettelHeuteExportiert();
+}
+
+function naJa(datum) {
+  NA.aktiv = true;
+  NA.datum = datum || naVorschlag();
+  NA.abgelehnt = false;
+  naSpeichern();
+  naZeichnen();
+  showToast('Erledigte werden auf ' + formatDatum(NA.datum) + ' gebucht');
+}
+
+function naNein() {
+  NA.aktiv = false;
+  NA.datum = null;
+  NA.abgelehnt = true;
+  naSpeichern();
+  naZeichnen();
+}
+
+function naBeenden(still) {
+  if (!NA.aktiv) return;
+  NA.aktiv = false;
+  NA.datum = null;
+  NA.abgelehnt = true;   // nicht sofort erneut anbieten
+  naSpeichern();
+  naZeichnen();
+  if (!still) showToast('Nacharbeiten beendet – Erledigte zählen wieder für heute');
+}
+
+function naDatumWahl(el) {
+  if (!el.value) return;
+  NA.datum = el.value;
+  naSpeichern();
+  naZeichnen();
+}
+
+// ── Leiste ────────────────────────────────────────────────────────────────
+function naZeichnen() {
+  const el = document.getElementById('na-leiste');
+  if (!el) return;
+
+  if (NA.aktiv) {
+    el.style.display = 'flex';
+    el.className = 'na-leiste an';
+    el.innerHTML =
+      `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+         stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg>
+       <span><b>Nacharbeiten</b> – Erledigte werden auf
+         <b>${escHtml(formatDatum(NA.datum))}</b> gebucht.</span>
+       <input type="date" class="na-datum" value="${escHtml(NA.datum)}"
+         max="${escHtml(today())}" onchange="naDatumWahl(this)" title="Anderen Arbeitstag wählen">
+       <button onclick="naBeenden()">Beenden</button>`;
+    return;
+  }
+
+  if (naAnbieten()) {
+    const v = naVorschlag();
+    el.style.display = 'flex';
+    el.className = 'na-leiste frage';
+    el.innerHTML =
+      `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+         stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg>
+       <span>Arbeitest du <b>${escHtml(formatDatum(v))}</b> nach?
+         Erledigte würden dann auf diesen Tag gebucht.</span>
+       <button class="ja" onclick="naJa('${escHtml(v)}')">Ja, auf ${escHtml(formatDatum(v)).slice(0, 6)}</button>
+       <button onclick="naNein()">Nein, auf heute</button>`;
+    return;
+  }
+
+  el.style.display = 'none';
+}
+
+function naStart() {
+  naWiederherstellen();
+  naZeichnen();
+}
+// ═══ Ende Nacharbeiten ════════════════════════════════════════════════════
+
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  GEWOHNHEITEN UND CHALLENGE                                      v1.5.250
 //  Eigene DB-Sektionen, getrennt von wiederkehrenden Aufgaben.
 //  Dreiwertig: 'ja' | 'nein' (bewusst ausgelassen) | offen.
@@ -16719,7 +16881,7 @@ function hbErstellePDF(montagISO, habits, fonts) {
 // ═══ Ende Gewohnheiten-Verwaltung ═════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  TERMINE UND MONATSREFLEXION                                     v1.5.260
+//  TERMINE UND MONATSREFLEXION                                     v1.5.261
 //  Termine aus dem Daily Log werden dauerhaft abgelegt – sie sind die
 //  Rohmasse fuer die Zeitleiste der Monatsreflexion. Ohne sie waere der
 //  Rueckblick eine Gedaechtnisuebung.

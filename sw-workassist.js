@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-//  Service Worker für WorkAssist                                    v1.5.260
+//  Service Worker für WorkAssist                                    v1.5.261
 //
 //  Wichtig gegenüber der alten Fassung:
 //  1. NETZ ZUERST. Die alte Fassung lieferte zuerst aus dem Cache – dadurch
@@ -12,7 +12,7 @@
 //  Diese Datei gehört neben die workassist.html auf GitHub Pages.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const CACHE = 'wa-v1_5_260';
+const CACHE = 'wa-v1_5_261';
 
 self.addEventListener('install', () => {
   // Nichts vorab laden – der Cache füllt sich beim ersten erfolgreichen Abruf

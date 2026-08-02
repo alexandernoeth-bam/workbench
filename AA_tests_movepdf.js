@@ -2362,3 +2362,102 @@ console.log('\n=== ZUSTAND UND SERVICE WORKER ===');
   else ok('start_url ist absolut');
 
 })();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: NACHARBEITEN-MODUS   (neu in v1.5.261)
+//  Einfügen in AA_tests.js nach der Kategorie ZUSTAND UND SERVICE WORKER,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • erledigtAm wird wieder starr auf den Kalendertag gesetzt – morgens
+//     abgehakte Aufgaben landen dann fälschlich auf dem heutigen Tag
+//   • Der Modus läuft still weiter und verfälscht spätere Erledigungen
+//   • Eine Entscheidung von gestern gilt heute noch
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== NACHARBEITEN-MODUS ===');
+
+(function testNacharbeiten() {
+
+  const noetig = ['buchungsTag','naStart','naZeichnen','naJa','naNein','naBeenden',
+                  'naVorschlag','naAnbieten','naWiederherstellen','naSpeichern'];
+  const fehlt = noetig.filter(f => typeof window[f] !== 'function');
+  if (fehlt.length) { fail('Nicht definiert: ' + fehlt.join(', ')); return; }
+  ok('Alle ' + noetig.length + ' Funktionen definiert');
+
+  if (!document.getElementById('na-leiste')) fail('Leiste fehlt im DOM');
+  else ok('Leiste vorhanden');
+
+  // ── Der Kern: erledigtAm folgt dem Buchungstag ─────────────────────────
+  if (typeof statusSetzen === 'function') {
+    const src = statusSetzen.toString();
+    if (/erledigtAm = today\(\)/.test(src))
+      fail('statusSetzen bucht wieder starr auf den Kalendertag – morgens Abgehaktes landet falsch');
+    else if (!/buchungsTag\(\)/.test(src))
+      fail('statusSetzen nutzt nicht buchungsTag()');
+    else ok('erledigtAm folgt dem Buchungstag');
+  }
+
+  // Der Buchungstag ist die einzige Quelle – sonst laufen Wege auseinander
+  const skripte = Array.from(document.querySelectorAll('script'))
+    .map(x => x.textContent || '').join('\n');
+  const direkt = (skripte.match(/erledigtAm\s*=\s*today\(\)/g) || []).length;
+  if (direkt) fail(direkt + ' Stellen setzen erledigtAm direkt auf today()');
+  else ok('Nur eine Quelle für erledigtAm');
+
+  // ── Verhalten ───────────────────────────────────────────────────────────
+  if (typeof NA === 'undefined') { fail('Zustand NA fehlt'); return; }
+
+  const merk = { a: NA.aktiv, d: NA.datum, ab: NA.abgelehnt };
+  try {
+    NA.aktiv = false; NA.datum = null;
+    if (buchungsTag() !== today())
+      fail('Ohne Modus wird nicht auf heute gebucht');
+    else ok('Ohne Modus zählt heute');
+
+    const gestern = tzPlusTage(today(), -1);
+    NA.aktiv = true; NA.datum = gestern;
+    if (buchungsTag() !== gestern)
+      fail('Im Modus wird nicht auf den gewählten Tag gebucht');
+    else ok('Im Modus zählt der gewählte Tag');
+
+    const probe = { status: 'offen' };
+    statusSetzen(probe, 'erledigt');
+    if (probe.erledigtAm !== gestern)
+      fail('Eine Erledigung im Modus landet nicht auf dem Vortag');
+    else ok('Erledigung wird korrekt zurückdatiert');
+    if (heuteErledigt(probe))
+      fail('Zurückdatiertes gilt trotzdem als heute erledigt');
+    else ok('Zurückdatiertes fällt aus dem heutigen Rückblick');
+
+    // Vorschlag darf nie in der Zukunft liegen
+    if (naVorschlag() >= today())
+      fail('Der Vorschlag liegt nicht in der Vergangenheit');
+    else ok('Vorschlag liegt vor heute');
+  } finally {
+    NA.aktiv = merk.a; NA.datum = merk.d; NA.abgelehnt = merk.ab;
+    try { naZeichnen(); } catch (e) {}
+  }
+
+  // ── Der Export beendet den Modus ────────────────────────────────────────
+  if (typeof erstelleTageszettelPDF === 'function' &&
+      !/naBeenden/.test(erstelleTageszettelPDF.toString()))
+    fail('Der Daily-Log-Export beendet den Nacharbeiten-Modus nicht – er liefe still weiter');
+  else ok('Export beendet den Modus');
+
+  // ── Entscheidungen gelten nur für den laufenden Tag ────────────────────
+  if (typeof naWiederherstellen === 'function' &&
+      !/d\.tag !== today\(\)/.test(naWiederherstellen.toString()))
+    fail('Eine Entscheidung von gestern gilt heute weiter');
+  else ok('Entscheidung verfällt mit dem Tag');
+
+  // ── Zustand liegt in der Datei, nicht nur im Browser ───────────────────
+  if (typeof ZUSTAND_OBEN === 'undefined' || ZUSTAND_OBEN.indexOf('nacharbeiten') < 0)
+    fail('Der Modus wird nicht in der Datei gesichert');
+  else ok('Zustand liegt in der Datei');
+
+  // ── Laufender Stand ─────────────────────────────────────────────────────
+  if (NA.aktiv) warn('Nacharbeiten aktiv – Erledigte werden auf ' + NA.datum + ' gebucht');
+  else ok('Erledigte zählen für heute');
+
+})();
