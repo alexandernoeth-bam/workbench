@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.259</title>
+<title>WorkAssist 1.5.260</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
@@ -2998,7 +2998,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.259</div>
+    <div class="start-version">v1.5.260</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -3066,7 +3066,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.259</div>
+    <div class="app-version" id="app-version">v1.5.260</div>
   </div>
 
   <div class="nav-section">
@@ -4665,7 +4665,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.259';
+const APP_VERSION = '1.5.260';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -16615,7 +16615,11 @@ function hbErstellePDF(montagISO, habits, fonts) {
   const SPALTE = MAXW / 7;
   const BOX = 4.0;          // vom Nutzer so gewaehlt
   const PUNKT = 4.5;
-  const ZH_BESCHR = 3.0;    // Zeilenhoehe der Beschreibung
+  const FS_BESCHR = 11;     // zwei Stufen groesser als frueher
+  const ZH_BESCHR = 3.9;    // Zeilenhoehe passend zur groesseren Schrift
+  const LUFT_NAME = 1.6;    // zwischen Name und Beschreibung
+  const LUFT_BOX  = 2.0;    // zwischen Beschreibung und Kaestchen
+  const GRAU_TEXT = [45, 40, 33];   // Beschreibung und Tagesbuchstabe
   const tage = hbWocheTage(montagISO);
   let y = MT;
 
@@ -16641,7 +16645,7 @@ function hbErstellePDF(montagISO, habits, fonts) {
   function beschrZeilen(h) {
     if (!h.beschreibung) return [];
     doc.setFont(F, 'normal');
-    doc.setFontSize(9);
+    doc.setFontSize(FS_BESCHR);
     return doc.splitTextToSize(h.beschreibung, MAXW);
   }
 
@@ -16649,7 +16653,8 @@ function hbErstellePDF(montagISO, habits, fonts) {
 
   habits.forEach(h => {
     const zeilen = beschrZeilen(h);
-    const blockH = 4.4 + zeilen.length * ZH_BESCHR + BOX + 2.4;
+    const blockH = 4.4 + (zeilen.length ? LUFT_NAME + zeilen.length * ZH_BESCHR : 0)
+                 + LUFT_BOX + BOX + 2.4;
     if (y + blockH > H - MB) hbNeueSeite();
 
     doc.setFont(F, 'bold'); doc.setFontSize(12.5); doc.setTextColor(24, 16, 10);
@@ -16658,9 +16663,12 @@ function hbErstellePDF(montagISO, habits, fonts) {
 
     // Vollstaendige Beschreibung, fast schwarz statt hellgrau
     if (zeilen.length) {
-      doc.setFont(F, 'normal'); doc.setFontSize(9); doc.setTextColor(45, 40, 33);
-      zeilen.forEach(z => { doc.text(z, ML, y + 2.3); y += ZH_BESCHR; });
+      y += LUFT_NAME;
+      doc.setFont(F, 'normal'); doc.setFontSize(FS_BESCHR);
+      doc.setTextColor(GRAU_TEXT[0], GRAU_TEXT[1], GRAU_TEXT[2]);
+      zeilen.forEach(z => { doc.text(z, ML, y + 2.9); y += ZH_BESCHR; });
     }
+    y += LUFT_BOX;
 
     tage.forEach((d, i) => {
       const x = ML + i * SPALTE + (SPALTE - BOX) / 2;
@@ -16677,7 +16685,7 @@ function hbErstellePDF(montagISO, habits, fonts) {
         // Wochentag fuellt das Kaestchen, hell genug zum Ueberschreiben
         doc.setFont(F, 'bold');
         doc.setFontSize(BOX * 3.1);
-        doc.setTextColor(178, 170, 156);
+        doc.setTextColor(GRAU_TEXT[0], GRAU_TEXT[1], GRAU_TEXT[2]);
         doc.text(HB_TAGE[i][0], x + BOX / 2, y + BOX * 0.80, { align: 'center' });
         if (w === 'ja') {
           doc.setDrawColor(24, 16, 10); doc.setLineWidth(0.5);
@@ -16711,7 +16719,7 @@ function hbErstellePDF(montagISO, habits, fonts) {
 // ═══ Ende Gewohnheiten-Verwaltung ═════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  TERMINE UND MONATSREFLEXION                                     v1.5.259
+//  TERMINE UND MONATSREFLEXION                                     v1.5.260
 //  Termine aus dem Daily Log werden dauerhaft abgelegt – sie sind die
 //  Rohmasse fuer die Zeitleiste der Monatsreflexion. Ohne sie waere der
 //  Rueckblick eine Gedaechtnisuebung.

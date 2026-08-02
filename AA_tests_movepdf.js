@@ -1852,13 +1852,25 @@ console.log('\n=== GEWOHNHEITEN UND CHALLENGE ===');
       warn('Der Wochentag füllt das Kästchen nicht mehr aus');
     else ok('Wochentag füllt das Kästchen');
 
-    // Beschreibung vollständig und dunkel
+    // Beschreibung vollständig, groß und dunkel
     if (/splitTextToSize\(h\.beschreibung[^)]*\)\s*\.slice\(0, 1\)/.test(src))
       fail('Die Beschreibung wird wieder nach einer Zeile abgeschnitten');
     else ok('Beschreibung läuft vollständig um');
-    const farbe = src.match(/setTextColor\(45, 40, 33\)/);
-    if (!farbe) warn('Der Grauton der Beschreibung wurde verändert');
-    else ok('Beschreibung fast schwarz');
+    const fs = src.match(/const FS_BESCHR = (\d+)/);
+    if (!fs) warn('Schriftgröße der Beschreibung nicht mehr als Konstante geführt');
+    else if (Number(fs[1]) < 11)
+      fail('Beschreibung wieder kleiner als 11 pt');
+    else ok('Beschreibung ' + fs[1] + ' pt');
+    if (!/const GRAU_TEXT = \[45, 40, 33\]/.test(src))
+      warn('Der Grauton wurde verändert');
+    else ok('Beschreibung und Tagesbuchstabe fast schwarz');
+    if (!/setTextColor\(GRAU_TEXT\[0\], GRAU_TEXT\[1\], GRAU_TEXT\[2\]\)[\s\S]{0,200}HB_TAGE/.test(src)
+        && !/HB_TAGE[\s\S]{0,200}GRAU_TEXT/.test(src.split('setFontSize(BOX')[1] || ''))
+      warn('Der Tagesbuchstabe nutzt womöglich einen anderen Ton als die Beschreibung');
+    else ok('Beide im selben Ton');
+    if (!/const LUFT_NAME/.test(src) || !/const LUFT_BOX/.test(src))
+      warn('Die Abstände sind nicht mehr als Konstanten geführt');
+    else ok('Abstände als Konstanten geführt');
 
     // Die Quote je Gewohnheit ist entfallen
     if (/r\.ja \+ ' \/ ' \+ r\.soll/.test(src))
