@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.256</title>
+<title>WorkAssist 1.5.257</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
@@ -2998,7 +2998,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.256</div>
+    <div class="start-version">v1.5.257</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -3066,7 +3066,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.256</div>
+    <div class="app-version" id="app-version">v1.5.257</div>
   </div>
 
   <div class="nav-section">
@@ -4665,7 +4665,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.256';
+const APP_VERSION = '1.5.257';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -4674,7 +4674,7 @@ let autoSaveTimer  = null;
 let pendingChanges = false;
 
 function emptyDB() {
-  return { version: APP_VERSION, bereiche: [], aufgaben: [], wissen: [], dokumente: [], plaene: [], notizen: [], belege: [], habits: [], challenges: [], termine: [] };
+  return { version: APP_VERSION, bereiche: [], aufgaben: [], wissen: [], dokumente: [], plaene: [], notizen: [], belege: [], habits: [], challenges: [], termine: [], tageszettel: null, exporte: {} };
 }
 
 let DB = emptyDB();
@@ -4866,6 +4866,7 @@ function migrateDB() {
       if (!DB.habits)     DB.habits = [];
       if (!DB.challenges) DB.challenges = [];
       if (!DB.termine)    DB.termine = [];
+      if (!DB.exporte)    DB.exporte = {};
       DB.dokumente.push({
         id:             'wis_mig_' + Math.random().toString(36).slice(2,9),
         eintragsTyp:    'wissen',
@@ -14617,24 +14618,62 @@ function tzOffeneKriterien(a) {
 
 // ── Zwischenstand sichern und laden ───────────────────────────────────────
 // Nur im localStorage, nie in der JSON-Datei: der Assistent bleibt lesend.
-function tzSpeichern() {
+
+// ── Zustandsspeicher: Datei zuerst, Browser als Rueckfallebene ────────────
+// Bis v1.5.256 lagen Tagesplanung und Export-Merker ausschliesslich im
+// localStorage. Der haengt an der Herkunft der Seite und ist nicht Teil des
+// Backups – Inhalte gehoeren in die JSON-Datei. Der localStorage bleibt als
+// Rueckfall, falls gerade keine Datei verbunden ist.
+function zustandSchreiben(feld, wert, lsKey) {
+  let inDatei = false;
   try {
-    localStorage.setItem(TZ_LS_KEY, JSON.stringify({
-      datum:    TZ.datum,
-      schritt:  TZ.schritt,
-      motto:    TZ.motto,
-      erinnern: TZ.erinnern,
-      ganztag:  TZ.ganztag,
-      tiefe:     TZ.tiefe,
-      erledigte: TZ.erledigte,
-      zettel:    TZ.zettel,
-    }));
-  } catch (e) { /* localStorage kann blockiert sein */ }
+    if (typeof DB === 'object' && DB) {
+      if (feld === 'tageszettel') DB.tageszettel = wert;
+      else { if (!DB.exporte) DB.exporte = {}; DB.exporte[feld] = wert; }
+      inDatei = true;
+    }
+  } catch (e) { console.warn('[Zustand]', e); }
+  try { localStorage.setItem(lsKey, typeof wert === 'string' ? wert : JSON.stringify(wert)); }
+  catch (e) {}
+  return inDatei;
+}
+
+function zustandLesen(feld, lsKey) {
+  try {
+    if (typeof DB === 'object' && DB) {
+      const w = (feld === 'tageszettel') ? DB.tageszettel : (DB.exporte || {})[feld];
+      if (w !== undefined && w !== null) return w;
+    }
+  } catch (e) {}
+  // Rueckfall: was noch im Browser liegt, wird beim naechsten Schreiben
+  // automatisch in die Datei uebernommen
+  try {
+    const roh = localStorage.getItem(lsKey);
+    if (roh === null) return null;
+    if (roh.startsWith('{') || roh.startsWith('[')) { try { return JSON.parse(roh); } catch (e) { return null; } }
+    return roh;
+  } catch (e) { return null; }
+}
+
+function tzSpeichern() {
+  const stand = {
+    datum:    TZ.datum,
+    schritt:  TZ.schritt,
+    motto:    TZ.motto,
+    erinnern: TZ.erinnern,
+    ganztag:  TZ.ganztag,
+    tiefe:     TZ.tiefe,
+    erledigte: TZ.erledigte,
+    zettel:    TZ.zettel,
+  };
+  if (zustandSchreiben('tageszettel', stand, TZ_LS_KEY)) {
+    // Ohne saveDB bliebe die Planung nur im Arbeitsspeicher
+    try { saveDB(); } catch (e) {}
+  }
 }
 
 function tzWiederherstellen() {
-  let d = null;
-  try { d = JSON.parse(localStorage.getItem(TZ_LS_KEY) || 'null'); } catch (e) { return false; }
+  const d = zustandLesen('tageszettel', TZ_LS_KEY);
   if (!d || typeof d !== 'object') return false;
   if (d.datum !== moveTodayISO()) { tzVerwerfen(); return false; }
   TZ.datum    = d.datum;
@@ -14649,6 +14688,7 @@ function tzWiederherstellen() {
 }
 
 function tzVerwerfen() {
+  try { if (typeof DB === 'object' && DB) DB.tageszettel = null; } catch (e) {}
   try { localStorage.removeItem(TZ_LS_KEY); } catch (e) {}
 }
 
@@ -15954,11 +15994,12 @@ function fmWiederherstellen() {
 
 // ── Export-Merker ─────────────────────────────────────────────────────────
 function fmExportGemerkt() {
-  try { localStorage.setItem(FM_EXPORT_KEY, today()); } catch (e) {}
+  zustandSchreiben('dailyLog', today(), FM_EXPORT_KEY);
+  try { saveDB(); } catch (e) {}
 }
 
 function fmZettelHeuteExportiert() {
-  try { return localStorage.getItem(FM_EXPORT_KEY) === today(); } catch (e) { return false; }
+  return zustandLesen('dailyLog', FM_EXPORT_KEY) === today();
 }
 
 // Warnung: ab 07:55 oder wenn WorkAssist seit ueber 15 Minuten laeuft,
@@ -16279,11 +16320,12 @@ function hbKwSchluessel(montagISO) {
 }
 
 function hbExportGemerkt(montagISO) {
-  try { localStorage.setItem(HB_LS_KEY, hbKwSchluessel(montagISO)); } catch (e) {}
+  zustandSchreiben('habits', hbKwSchluessel(montagISO), HB_LS_KEY);
+  try { saveDB(); } catch (e) {}
 }
 
 function hbWocheExportiert(montagISO) {
-  try { return localStorage.getItem(HB_LS_KEY) === hbKwSchluessel(montagISO); } catch (e) { return false; }
+  return zustandLesen('habits', HB_LS_KEY) === hbKwSchluessel(montagISO);
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────
@@ -16657,7 +16699,7 @@ function hbErstellePDF(montagISO, habits, fonts) {
 // ═══ Ende Gewohnheiten-Verwaltung ═════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  TERMINE UND MONATSREFLEXION                                     v1.5.256
+//  TERMINE UND MONATSREFLEXION                                     v1.5.257
 //  Termine aus dem Daily Log werden dauerhaft abgelegt – sie sind die
 //  Rohmasse fuer die Zeitleiste der Monatsreflexion. Ohne sie waere der
 //  Rueckblick eine Gedaechtnisuebung.
@@ -16703,12 +16745,12 @@ function mrMonatSchluessel(jahr, monat) {
 }
 
 function mrExportGemerkt(jahr, monat) {
-  try { localStorage.setItem(MR_LS_KEY, mrMonatSchluessel(jahr, monat)); } catch (e) {}
+  zustandSchreiben('monatsblatt', mrMonatSchluessel(jahr, monat), MR_LS_KEY);
+  try { saveDB(); } catch (e) {}
 }
 
 function mrMonatExportiert(jahr, monat) {
-  try { return localStorage.getItem(MR_LS_KEY) === mrMonatSchluessel(jahr, monat); }
-  catch (e) { return false; }
+  return zustandLesen('monatsblatt', MR_LS_KEY) === mrMonatSchluessel(jahr, monat);
 }
 
 // Der Rueckblick lohnt sich erst, wenn der Monat weit genug gelaufen ist
@@ -18324,7 +18366,11 @@ async function nmPdfErstellen() {
   const manifest = {
     name: 'WorkAssist', short_name: 'WorkAssist',
     description: 'Aufgaben- und Wissensmanagement',
-    start_url: './', display: 'standalone',
+    // Im Blob-Manifest muessen die URLs absolut sein – relative beziehen sich
+    // sonst auf die blob:-Adresse und werden verworfen
+    start_url: location.href.split('#')[0].split('?')[0],
+    scope: location.pathname.replace(/[^/]*$/, ''),
+    display: 'standalone',
     background_color: '#00897B', theme_color: '#00897B',
     icons: [
       { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
@@ -18336,32 +18382,31 @@ async function nmPdfErstellen() {
   mLink.rel = 'manifest'; mLink.href = URL.createObjectURL(mBlob);
   document.head.appendChild(mLink);
 
-  // Service Worker (inline Blob — überschreibt externen sw-workassist.js nicht)
+  // Service Worker – nur der externe sw-workassist.js neben dieser Datei.
+  // Der frühere Inline-Fallback über eine blob:-URL konnte gar nicht greifen:
+  // ein Blob-Worker darf keinen Scope außerhalb seiner eigenen blob-Adresse
+  // beanspruchen, die Registrierung schlug still fehl.
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    // Zuerst externen SW versuchen (für GitHub Pages Caching)
     navigator.serviceWorker.register('sw-workassist.js')
       .then(reg => {
         console.log('[WorkAssist] SW registriert:', reg.scope);
+        reg.update().catch(() => {});
         reg.addEventListener('updatefound', () => {
-          const newSW = reg.installing;
-          newSW.addEventListener('statechange', () => {
-            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+          const neu = reg.installing;
+          if (!neu) return;
+          neu.addEventListener('statechange', () => {
+            if (neu.state === 'installed' && navigator.serviceWorker.controller)
               setTimeout(() => showToast('Update verfügbar – Seite neu laden'), 2000);
-            }
           });
         });
       })
-      .catch(() => {
-        // Fallback: Inline-SW
-        const swCode = `const CACHE='wa-v1_5_256';
-self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./'])).then(()=>self.skipWaiting())));
-self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
-self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
-        const swBlob = new Blob([swCode], { type: 'application/javascript' });
-        navigator.serviceWorker.register(URL.createObjectURL(swBlob), { scope: './' }).catch(()=>{});
-      });
+      .catch(err => console.warn('[WorkAssist] SW nicht registriert:', err));
+
     navigator.serviceWorker.addEventListener('message', e => {
-      if (e.data?.type === 'SW_UPDATED') console.log('[WorkAssist] SW aktualisiert');
+      if (e.data?.type === 'CACHE_GELEERT') {
+        showToast('Cache geleert – Seite wird neu geladen');
+        setTimeout(() => location.reload(), 600);
+      }
     });
   }
 })();

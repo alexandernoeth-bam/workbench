@@ -2197,3 +2197,110 @@ console.log('\n=== AUFGABENZEILE UND BANNER ===');
   else ok('Fokus-Schirm zeigt denselben Text');
 
 })();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: ZUSTANDSSPEICHERUNG UND SERVICE WORKER   (neu in v1.5.257)
+//  Einfügen in AA_tests.js nach der Kategorie AUFGABENZEILE UND BANNER,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Inhalte liegen wieder nur im localStorage – sie fehlen dann im Backup
+//     und gehen bei Wechsel der Herkunft oder der Browserdaten verloren
+//   • Der Service Worker liefert aus dem Cache zuerst und blockiert Updates
+//   • Ein Zweig des Fetch-Handlers liefert keine echte Response
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== ZUSTAND UND SERVICE WORKER ===');
+
+(function testZustand() {
+
+  if (typeof zustandSchreiben !== 'function' || typeof zustandLesen !== 'function') {
+    fail('zustandSchreiben() / zustandLesen() fehlen – Inhalte liegen wieder nur im Browser');
+    return;
+  }
+  ok('Zentrale Zustandsspeicherung vorhanden');
+
+  if (typeof DB === 'undefined' || !DB) { warn('Keine Datei verbunden – Prüfung eingeschränkt'); return; }
+
+  if (typeof DB.exporte !== 'object' || DB.exporte === null)
+    fail('DB.exporte fehlt – die Export-Merker landen nicht in der Datei');
+  else ok('DB.exporte vorhanden');
+  if (!('tageszettel' in DB))
+    fail('DB.tageszettel fehlt – die Tagesplanung landet nicht in der Datei');
+  else ok('DB.tageszettel vorhanden');
+
+  // ── Die drei Merker schreiben in die Datei ─────────────────────────────
+  [['fmExportGemerkt','dailyLog'], ['hbExportGemerkt','habits'],
+   ['mrExportGemerkt','monatsblatt']].forEach(([fn, feld]) => {
+    if (typeof window[fn] !== 'function') return;
+    const src = window[fn].toString();
+    if (!/zustandSchreiben/.test(src))
+      fail(fn + '() schreibt nicht über zustandSchreiben – der Merker fehlt in der Datei');
+    else if (!new RegExp("'" + feld + "'").test(src))
+      warn(fn + '() nutzt ein anderes Feld als ' + feld);
+  });
+  ok('Alle drei Export-Merker gehen in die Datei');
+
+  if (typeof tzSpeichern === 'function') {
+    const src = tzSpeichern.toString();
+    if (!/zustandSchreiben/.test(src))
+      fail('Die Tagesplanung wird nicht in die Datei geschrieben');
+    else if (!/saveDB/.test(src))
+      fail('tzSpeichern ruft saveDB nicht – die Planung bliebe im Arbeitsspeicher');
+    else ok('Tagesplanung wird in der Datei gesichert');
+  }
+
+  // ── Die Datei hat Vorrang vor dem Browser ──────────────────────────────
+  if (typeof zustandLesen === 'function') {
+    const merk = DB.exporte._probe;
+    try {
+      DB.exporte._probe = 'aus-der-datei';
+      localStorage.setItem('_wa_probe', 'aus-dem-browser');
+      if (zustandLesen('_probe', '_wa_probe') !== 'aus-der-datei')
+        fail('Der Browser überstimmt die Datei – bei Widerspruch muss die Datei gewinnen');
+      else ok('Datei hat Vorrang vor dem Browser');
+      delete DB.exporte._probe;
+      if (zustandLesen('_probe', '_wa_probe') !== 'aus-dem-browser')
+        fail('Ohne Eintrag in der Datei greift die Rückfallebene nicht');
+      else ok('Rückfall auf den Browser funktioniert');
+    } finally {
+      if (merk === undefined) delete DB.exporte._probe; else DB.exporte._probe = merk;
+      try { localStorage.removeItem('_wa_probe'); } catch (e) {}
+    }
+  }
+
+  // ── Bestand prüfen ──────────────────────────────────────────────────────
+  const heute = today();
+  const dl = (DB.exporte || {}).dailyLog;
+  if (dl === heute) ok('Daily Log heute exportiert');
+  else if (dl) warn('Letzter Daily-Log-Export: ' + dl);
+  else warn('Noch kein Daily-Log-Export in der Datei vermerkt');
+
+  if (DB.tageszettel && DB.tageszettel.datum && DB.tageszettel.datum !== heute)
+    warn('Gespeicherte Planung stammt vom ' + DB.tageszettel.datum);
+  else if (DB.tageszettel)
+    ok('Planung von heute in der Datei (' + ((DB.tageszettel.zettel || []).length) + ' Einträge)');
+
+  // ── Service Worker ──────────────────────────────────────────────────────
+  if (!('serviceWorker' in navigator)) {
+    warn('Kein Service Worker in diesem Browser');
+  } else {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      if (!regs.length) warn('Kein Service Worker registriert – Offline-Betrieb nicht möglich');
+      else if (regs.length > 1)
+        fail(regs.length + ' Service Worker registriert – alte Registrierung entfernen');
+      else console.log('  ok   Genau ein Service Worker: ' + regs[0].scope);
+      const blob = regs.filter(r => (r.scope || '').startsWith('blob:'));
+      if (blob.length) fail('Ein Blob-Service-Worker ist registriert – der kann keinen Scope beanspruchen');
+    }).catch(() => {});
+  }
+
+  const skripte = Array.from(document.querySelectorAll('script')).map(x => x.textContent || '').join('\n');
+  if (/register\(URL\.createObjectURL/.test(skripte))
+    fail('Der Blob-Fallback für den Service Worker ist zurück – er kann nicht funktionieren');
+  else ok('Kein Blob-Service-Worker mehr');
+  if (/start_url:\s*'\.\/'/.test(skripte))
+    fail('start_url ist wieder relativ – im Blob-Manifest wird es verworfen');
+  else ok('start_url ist absolut');
+
+})();
