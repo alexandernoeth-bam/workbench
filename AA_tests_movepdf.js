@@ -1829,6 +1829,33 @@ console.log('\n=== GEWOHNHEITEN UND CHALLENGE ===');
     warn('Beschreibung erscheint nicht mehr im Wochenblatt');
   else ok('Beschreibung steht im Wochenblatt');
 
+  // ── Kompaktes Wochenblatt (v1.5.258) ───────────────────────────────────
+  if (typeof hbErstellePDF === 'function') {
+    const src = hbErstellePDF.toString();
+    const box = src.match(/const BOX = ([^;]+);/);
+    if (!box) fail('Kästchengröße im Wochenblatt nicht auffindbar');
+    else if (/Math\.min/.test(box[1]))
+      fail('Kästchen werden wieder aus der Spaltenbreite berechnet – sie wurden 9 mm groß');
+    else if (parseFloat(box[1]) > 7.5)
+      fail('Kästchen sind ' + box[1].trim() + ' mm – dann passen zu wenige Gewohnheiten auf eine Seite');
+    else ok('Kästchen ' + box[1].trim() + ' mm');
+
+    // Die Wochentage gehören einmal je Seite in den Kopf, nicht je Gewohnheit
+    const kopf = src.match(/function hbKopf\(\)[\s\S]*?\n  \}/);
+    if (!kopf || !/HB_TAGE\[i\]\[0\]/.test(kopf[0]))
+      fail('Wochentage stehen nicht mehr im Seitenkopf – sie würden je Gewohnheit wiederholt');
+    else ok('Wochentage einmal je Seite');
+
+    if (!/sn \+ ' \/ ' \+ gesamt/.test(src))
+      fail('Seitenzähler x / y im Kopf fehlt');
+    else ok('Seitenzähler im Kopf');
+
+    const blockH = src.match(/const blockH = ([^;]+);/);
+    if (blockH && /BOX \+ 2\.4/.test(blockH[1]) === false)
+      warn('Blockhöhe verändert – Anzahl je Seite neu prüfen');
+    else ok('Blockhöhe kompakt');
+  }
+
   const mitBeschr = (DB.habits || []).filter(h => h.beschreibung).length;
   ok(mitBeschr + ' von ' + (DB.habits || []).length + ' Gewohnheiten mit Beschreibung');
 

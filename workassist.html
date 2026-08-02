@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.257</title>
+<title>WorkAssist 1.5.258</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
@@ -2998,7 +2998,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.257</div>
+    <div class="start-version">v1.5.258</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -3066,7 +3066,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.257</div>
+    <div class="app-version" id="app-version">v1.5.258</div>
   </div>
 
   <div class="nav-section">
@@ -4665,7 +4665,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.257';
+const APP_VERSION = '1.5.258';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -16602,7 +16602,7 @@ async function hbPdfExport() {
 function hbErstellePDF(montagISO, habits, fonts) {
   const { jsPDF } = window.jspdf;
   const W = MOVE_PDF_W, H = MOVE_PDF_H;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [W, H] });
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [W, H], compress: true });
 
   const F = fonts ? 'Caveat' : 'helvetica';
   if (fonts) {
@@ -16613,7 +16613,10 @@ function hbErstellePDF(montagISO, habits, fonts) {
   const ML = 2.5, MR = 3.5, MT = 9, MB = 7;
   const MAXW = W - ML - MR;
   const SPALTE = MAXW / 7;
-  const BOX = Math.min(SPALTE - 1.4, 9);
+  // 6,5 mm reichen fuer einen Haken mit dem Stift. Frueher 9 mm – zusammen mit
+  // den je Gewohnheit wiederholten Wochentagsbuchstaben passten so nur vier
+  // Gewohnheiten auf eine Seite.
+  const BOX = 6.5;
   const PUNKT = 4.5;
   const tage = hbWocheTage(montagISO);
   let y = MT;
@@ -16624,39 +16627,48 @@ function hbErstellePDF(montagISO, habits, fonts) {
       for (let px = ML; px <= W - MR; px += PUNKT)
         doc.circle(px, py, 0.45, 'F');
   }
+
+  // Wochentage stehen einmal je Seite als Spaltenkopf, nicht mehr je Gewohnheit
   function hbKopf() {
     doc.setFont(F, 'bold'); doc.setFontSize(13); doc.setTextColor(24, 16, 10);
     doc.text('Gewohnheiten · KW ' + getKW(montagISO), ML, MT - 2);
     doc.setDrawColor(24, 16, 10); doc.setLineWidth(0.5);
     doc.line(ML, MT + 0.4, W - MR, MT + 0.4);
-    y = MT + 4;
+
+    doc.setFont(F, 'normal'); doc.setFontSize(9.5);
+    tage.forEach((d, i) => {
+      const we = i >= 5;
+      doc.setTextColor(we ? 150 : 110, we ? 140 : 100, we ? 126 : 88);
+      doc.text(HB_TAGE[i][0], ML + i * SPALTE + SPALTE / 2, MT + 4.4, { align: 'center' });
+    });
+    y = MT + 6.2;
   }
+
   function hbNeueSeite() { doc.addPage([W, H]); hbHintergrund(); hbKopf(); }
 
   hbHintergrund(); hbKopf();
 
   habits.forEach(h => {
-    const blockH = 5.2 + 3.2 + BOX + 4.4 + (h.beschreibung ? 3.6 : 0);
+    const blockH = 4.6 + BOX + 2.4 + (h.beschreibung ? 3.4 : 0);
     if (y + blockH > H - MB) hbNeueSeite();
 
+    // Name links, Quote rechts in derselben Zeile – spart eine Zeile je Block
+    const r = hbWoche(h, montagISO);
+    doc.setFont(F, 'normal'); doc.setFontSize(9.5); doc.setTextColor(110, 100, 88);
+    const quote = r.ja + ' / ' + r.soll + (r.nein ? '  (' + r.nein + ')' : '');
+    const qBreite = doc.getTextWidth(quote) + 2;
+    doc.text(quote, W - MR, y + 3.4, { align: 'right' });
+
     doc.setFont(F, 'bold'); doc.setFontSize(12.5); doc.setTextColor(24, 16, 10);
-    const zeilen = doc.splitTextToSize(h.titel || '', MAXW);
-    zeilen.slice(0, 2).forEach(z => { doc.text(z, ML, y + 3.8); y += 4.6; });
+    doc.text(doc.splitTextToSize(h.titel || '', MAXW - qBreite)[0], ML, y + 3.4);
+    y += 4.6;
+
     if (h.beschreibung) {
-      doc.setFont(F, 'normal'); doc.setFontSize(9.5); doc.setTextColor(110, 100, 88);
-      doc.splitTextToSize(h.beschreibung, MAXW).slice(0, 1)
-        .forEach(z => { doc.text(z, ML, y + 2.8); y += 3.6; });
+      doc.setFont(F, 'normal'); doc.setFontSize(9); doc.setTextColor(130, 120, 106);
+      doc.text(doc.splitTextToSize(h.beschreibung, MAXW)[0], ML, y + 2.4);
+      y += 3.4;
     }
 
-    // Wochentagsbuchstaben
-    doc.setFont(F, 'normal'); doc.setFontSize(9); doc.setTextColor(110, 100, 88);
-    tage.forEach((d, i) => {
-      const x = ML + i * SPALTE + SPALTE / 2;
-      doc.text(HB_TAGE[i][0], x, y + 2.4, { align: 'center' });
-    });
-    y += 3.4;
-
-    // Kästchen
     tage.forEach((d, i) => {
       const x = ML + i * SPALTE + (SPALTE - BOX) / 2;
       const nv = !hbVorgesehen(h, i);
@@ -16670,25 +16682,27 @@ function hbErstellePDF(montagISO, habits, fonts) {
         doc.setDrawColor(24, 16, 10); doc.setLineWidth(0.4);
         doc.rect(x, y, BOX, BOX, 'S');
         if (w === 'ja') {
-          doc.setLineWidth(0.6);
+          doc.setLineWidth(0.55);
           doc.line(x + BOX * 0.22, y + BOX * 0.28, x + BOX * 0.78, y + BOX * 0.74);
           doc.line(x + BOX * 0.78, y + BOX * 0.28, x + BOX * 0.22, y + BOX * 0.74);
         } else if (w === 'nein') {
-          doc.setLineWidth(0.6);
+          doc.setLineWidth(0.55);
           doc.line(x + BOX * 0.24, y + BOX * 0.5, x + BOX * 0.76, y + BOX * 0.5);
         }
       }
     });
-    y += BOX + 1.2;
-
-    const r = hbWoche(h, montagISO);
-    doc.setFont(F, 'normal'); doc.setFontSize(10); doc.setTextColor(110, 100, 88);
-    doc.text(r.ja + ' / ' + r.soll + (r.nein ? '   (' + r.nein + ' ausgelassen)' : ''),
-             W - MR, y + 2.6, { align: 'right' });
-    y += 5.2;
+    y += BOX + 2.4;
   });
 
   while (doc.internal.getNumberOfPages() < 2) { doc.addPage([W, H]); hbHintergrund(); hbKopf(); }
+
+  // Seitenzaehler oben rechts – erst jetzt steht fest, wie viele es geworden sind
+  const gesamt = doc.internal.getNumberOfPages();
+  for (let sn = 1; sn <= gesamt; sn++) {
+    doc.setPage(sn);
+    doc.setFont(F, 'normal'); doc.setFontSize(10); doc.setTextColor(110, 100, 88);
+    doc.text(sn + ' / ' + gesamt, W - MR, MT - 2, { align: 'right' });
+  }
 
   const datei = 'Habits_KW' + getKW(montagISO) + '.pdf';
   doc.save(datei);
@@ -16699,7 +16713,7 @@ function hbErstellePDF(montagISO, habits, fonts) {
 // ═══ Ende Gewohnheiten-Verwaltung ═════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  TERMINE UND MONATSREFLEXION                                     v1.5.257
+//  TERMINE UND MONATSREFLEXION                                     v1.5.258
 //  Termine aus dem Daily Log werden dauerhaft abgelegt – sie sind die
 //  Rohmasse fuer die Zeitleiste der Monatsreflexion. Ohne sie waere der
 //  Rueckblick eine Gedaechtnisuebung.
