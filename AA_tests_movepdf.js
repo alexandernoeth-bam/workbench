@@ -1808,10 +1808,29 @@ console.log('\n=== GEWOHNHEITEN UND CHALLENGE ===');
   ok('Alle ' + noetig.length + ' Funktionen definiert');
 
   ['screen-habits','hb-tab','hb-challenge','hb-mahnung','hb-kw-titel','hb-export',
-   'modal-habit','modal-challenge','nav-habits'].forEach(id => {
+   'modal-habit','modal-challenge','nav-habits','hb-m-beschr'].forEach(id => {
     if (!document.getElementById(id)) fail('Element ' + id + ' fehlt');
   });
   ok('Screen, Modals und Nav-Eintrag vorhanden');
+
+  // Ohne Einstieg ins Modal liesse sich keine Gewohnheit ändern
+  if (typeof renderHabits === 'function' && !/habitModal\('\$\{hb\.id\}'\)/.test(renderHabits.toString()))
+    fail('Kein Weg zum Bearbeiten – habitModal wird nur ohne ID aufgerufen');
+  else ok('Gewohnheiten sind über die Namenszeile bearbeitbar');
+
+  // Beschreibung überall durchgereicht
+  if (typeof habitSpeichern === 'function' && !/beschreibung/.test(habitSpeichern.toString()))
+    fail('Beschreibung wird nicht gespeichert');
+  else ok('Beschreibung wird gespeichert');
+  if (typeof habitModal === 'function' && !/hb-m-beschr/.test(habitModal.toString()))
+    fail('Beschreibung wird beim Öffnen nicht vorbelegt');
+  else ok('Beschreibung wird vorbelegt');
+  if (typeof hbErstellePDF === 'function' && !/h\.beschreibung/.test(hbErstellePDF.toString()))
+    warn('Beschreibung erscheint nicht mehr im Wochenblatt');
+  else ok('Beschreibung steht im Wochenblatt');
+
+  const mitBeschr = (DB.habits || []).filter(h => h.beschreibung).length;
+  ok(mitBeschr + ' von ' + (DB.habits || []).length + ' Gewohnheiten mit Beschreibung');
 
   if (typeof DB === 'undefined' || !Array.isArray(DB.habits) || !Array.isArray(DB.challenges))
     fail('DB-Sektionen habits/challenges fehlen oder sind keine Arrays');
@@ -2104,5 +2123,77 @@ console.log('\n=== TERMINE UND MONATSREFLEXION ===');
   if (typeof bujoExport === 'function' || document.getElementById('btn-bujo'))
     warn('Der BuJo-Export ist wieder vorhanden – bewusst entfernt in v1.5.253');
   else ok('BuJo-Export entfernt');
+
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: AUFGABENZEILE UND BANNERTEXT   (neu in v1.5.255)
+//  Einfügen in AA_tests.js nach der Kategorie TERMINE UND MONATSREFLEXION,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Pillen rutschen bei langen Titeln wieder unter den Titel
+//   • Zeile bricht um und wird doppelt hoch
+//   • Bannertext verliert den Hinweis auf die Übertragung
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== AUFGABENZEILE UND BANNER ===');
+
+(function testAufgabenzeile() {
+
+  // ── Pillen stehen immer rechts ──────────────────────────────────────────
+  if (typeof aufgabeRowHTML === 'function' || typeof renderAufgaben === 'function') {
+    const skripte = Array.from(document.querySelectorAll('script'))
+      .map(x => x.textContent || '').join('\n');
+    if (/titel\.length\s*[<>]=?\s*35/.test(skripte))
+      fail('Die 35-Zeichen-Grenze ist zurück – Pillen rutschen bei langen Titeln nach unten');
+    else ok('Keine Längengrenze mehr in der Aufgabenzeile');
+    if (/class="task-meta"/.test(skripte))
+      fail('task-meta wird wieder verwendet – das war der Umbruch-Container');
+    else ok('Kein Umbruch-Container mehr');
+  }
+
+  // ── Live am gerenderten DOM ─────────────────────────────────────────────
+  const zeilen = document.querySelectorAll('.task-row');
+  if (!zeilen.length) {
+    warn('Keine Aufgabenzeilen sichtbar – Layout nicht prüfbar');
+  } else {
+    let umgebrochen = 0, tagsFalsch = 0;
+    zeilen.forEach(z => {
+      const tags = z.querySelector(':scope > .task-tags');
+      if (!tags) return;
+      const zr = z.getBoundingClientRect(), tr = tags.getBoundingClientRect();
+      // Pillen müssen vertikal in der Zeile liegen, nicht darunter
+      if (tr.top > zr.top + zr.height * 0.7) umgebrochen++;
+      // und rechtsbündig sitzen
+      if (zr.right - tr.right > 60) tagsFalsch++;
+    });
+    if (umgebrochen) fail(umgebrochen + ' Zeilen mit umgebrochenen Pillen');
+    else ok('Pillen bleiben in ' + zeilen.length + ' Zeilen oben');
+    if (tagsFalsch) warn(tagsFalsch + ' Zeilen mit Pillen weit links vom Rand');
+    else ok('Pillen rechtsbündig');
+  }
+
+  // ── CSS-Regeln ──────────────────────────────────────────────────────────
+  const probe = document.querySelector('.task-row > .task-tags');
+  if (probe) {
+    const st = getComputedStyle(probe);
+    if (st.flexWrap === 'wrap') fail('Pillenreihe darf wieder umbrechen');
+    else ok('Pillenreihe bricht nicht um');
+    if (st.marginLeft !== 'auto' && parseFloat(st.marginLeft) < 1)
+      warn('Pillen sind nicht mehr rechtsbündig ausgerichtet');
+    else ok('Rechtsbündig ausgerichtet');
+  }
+
+  // ── Bannertext ──────────────────────────────────────────────────────────
+  const SOLL = 'Heute noch kein Daily Log exportiert und die Planung von gestern übertragen';
+  if (typeof fmWarnbannerZeichnen === 'function' &&
+      !fmWarnbannerZeichnen.toString().includes(SOLL))
+    fail('Bannertext stimmt nicht mehr – der Hinweis auf die Übertragung fehlt');
+  else ok('Bannertext vollständig');
+  if (typeof fmSchirmFuellen === 'function' &&
+      !fmSchirmFuellen.toString().includes(SOLL))
+    fail('Text auf dem Fokus-Schirm stimmt nicht mehr');
+  else ok('Fokus-Schirm zeigt denselben Text');
 
 })();

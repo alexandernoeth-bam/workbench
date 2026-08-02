@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.254</title>
+<title>WorkAssist 1.5.256</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
@@ -851,6 +851,13 @@ body.fm-planung #btn-zettelpanel { display:none !important; }
 .hb-tabelle td.quote { text-align:right; padding-right:14px; }
 .hb-titel { font-size:12.5px; }
 .hb-ziel { font-size:10px; color:var(--text-xdim); margin-top:1px; }
+.hb-name-zeile { display:flex; align-items:center; gap:6px; cursor:pointer; }
+.hb-name-zeile:hover .hb-titel { color:var(--accent-dark); }
+.hb-stift { color:var(--text-xdim); opacity:0; flex-shrink:0; transition:opacity .12s; }
+.hb-name-zeile:hover .hb-stift { opacity:1; color:var(--accent-dark); }
+.hb-beschr { font-size:10px; color:var(--text-dim); margin-top:2px; line-height:1.35;
+             max-width:340px; }
+
 .hb-leer { padding:16px 14px; color:var(--text-xdim); font-size:12px; }
 .hb-zelle { width:26px; height:26px; border-radius:6px; border:1.5px solid var(--border);
             background:var(--surface); cursor:pointer; display:inline-flex; align-items:center;
@@ -993,20 +1000,23 @@ body.fm-planung #btn-zettelpanel { display:none !important; }
 .task-row {
   display: flex; align-items: flex-start; gap: 8px;
   padding: 5px 12px; border-bottom: 1px solid var(--border);
-  cursor: pointer; transition: background 0.1s; flex-wrap: wrap;
+  cursor: pointer; transition: background 0.1s;
 }
 .task-row:last-child { border-bottom: none; }
 .task-row:hover { background: var(--bg); }
 /* Check-Button immer in erster Zeile, content nimmt restlichen Platz */
 .task-row > .task-check { flex-shrink: 0; margin-top: 2px; }
-/* Tags: wenn Titel lang → umbrechen in zweite Zeile */
+/* Pillen stehen immer rechts in derselben Zeile – kein Umbruch mehr.
+   Bei wenig Platz weicht der Titel, nicht die Pillenreihe. */
 .task-row > .task-tags {
-  flex-shrink: 0; display: flex; gap: 5px; align-items: center; flex-wrap: wrap;
-  margin-left: auto; max-width: 50%;
+  flex-shrink: 0; display: flex; gap: 5px; align-items: center;
+  flex-wrap: nowrap; margin-left: auto; white-space: nowrap;
 }
-/* Wenn content + tags nicht mehr in eine Zeile passen → tags in eigene Zeile */
 .task-row > .task-content {
-  flex: 1; min-width: 120px;
+  flex: 1; min-width: 0; overflow: hidden;
+}
+.task-row > .task-content > .task-title {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* Plan-/WV-Buttons */
 .task-row > .plan-btn,
@@ -1047,7 +1057,6 @@ body.fm-planung #btn-zettelpanel { display:none !important; }
 }
 
 /* Task-Meta (für Aufgaben-Liste, bleibt erhalten) */
-.task-meta { margin-top: 4px; display: flex; gap: 5px; flex-wrap: wrap; }
 .task-due  { font-size: 10px; color: var(--text-xdim); margin-top: 3px; }
 .task-due.overdue { color: var(--orange); font-weight: 600; }
 
@@ -1792,6 +1801,7 @@ input[type="checkbox"]:hover:not(:checked) { border-color: var(--teal-light); }
 .aufg-untertitel {
   font-size: 10px; color: var(--text-dim); font-weight: 600;
   margin-top: 2px; line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .aufg-untertitel-modal {
   font-size: 11px; color: var(--text-dim); font-style: italic;
@@ -2988,7 +2998,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.254</div>
+    <div class="start-version">v1.5.256</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -3056,7 +3066,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.254</div>
+    <div class="app-version" id="app-version">v1.5.256</div>
   </div>
 
   <div class="nav-section">
@@ -4655,7 +4665,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.254';
+const APP_VERSION = '1.5.256';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -6604,9 +6614,8 @@ function dashTaskRowHTML(a, datumRot) {
       ${a.untertitel ? '<div class="aufg-untertitel">' + a.untertitel + '</div>' : ''}
       ${dokZeile}
       ${planBadge}
-      ${a.titel.length > 35 ? `<div class="task-meta" style="margin-top:3px;">${cbPill}${wvBadge}${kritPille(a)}${dauerPill}${dueTag}</div>` : ''}
     </div>
-    ${a.titel.length <= 35 ? `<div class="task-tags">${cbPill}${wvBadge}${kritPille(a)}${dauerPill}${dueTag}</div>` : ''}
+    <div class="task-tags">${cbPill}${wvBadge}${kritPille(a)}${dauerPill}${dueTag}</div>
     ${planBtn}${wvBtn}
   </div>`;
 }
@@ -16044,7 +16053,7 @@ function fmWarnbannerZeichnen() {
   el.innerHTML =
     `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-     <span>Heute noch kein Daily Log exportiert.</span>
+     <span>Heute noch kein Daily Log exportiert und die Planung von gestern übertragen.</span>
      <button onclick="showScreen('tageszettel', document.getElementById('nav-tageszettel'))">Jetzt planen</button>`;
 }
 
@@ -16065,7 +16074,7 @@ function fmSchirmFuellen() {
     wEl.innerHTML = warn
       ? `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-         Achtung — heute noch kein Daily Log exportiert`
+         Achtung — heute noch kein Daily Log exportiert und die Planung von gestern übertragen`
       : '';
   }
 
@@ -16316,8 +16325,13 @@ function renderHabits() {
     '<th class="quote">Woche</th></tr>';
 
   aktive.forEach(hb => {
-    h += `<tr><td class="name"><div class="hb-titel">${escHtml(hb.titel || '')}</div>
-            <div class="hb-ziel">${escHtml(hbZielText(hb))}</div></td>`;
+    h += `<tr><td class="name">
+            <div class="hb-name-zeile" onclick="habitModal('${hb.id}')" title="Gewohnheit bearbeiten">
+              <span class="hb-titel">${escHtml(hb.titel || '')}</span>
+              <svg class="hb-stift" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
+            </div>
+            <div class="hb-ziel">${escHtml(hbZielText(hb))}</div>
+            ${hb.beschreibung ? `<div class="hb-beschr">${escHtml(hb.beschreibung)}</div>` : ''}</td>`;
     tage.forEach((d, i) => {
       const nv  = !hbVorgesehen(hb, i);
       const zk  = d > heute;
@@ -16402,6 +16416,7 @@ function habitModal(id) {
   const h = id ? (DB.habits || []).find(x => x.id === id) : null;
   document.getElementById('hb-m-titel').textContent = h ? 'Gewohnheit bearbeiten' : 'Neue Gewohnheit';
   document.getElementById('hb-m-name').value = h ? (h.titel || '') : '';
+  document.getElementById('hb-m-beschr').value = h ? (h.beschreibung || '') : '';
   const typ = h && h.ziel ? h.ziel.typ : 'tage';
   document.getElementById('hb-m-typ').value = typ;
   document.getElementById('hb-m-anzahl').value = (h && h.ziel && h.ziel.anzahl) || 3;
@@ -16429,6 +16444,7 @@ function habitTagToggle(i) {
 function habitSpeichern() {
   const titel = document.getElementById('hb-m-name').value.trim();
   if (!titel) { showToast('Bitte einen Namen eingeben', true); return; }
+  const beschreibung = document.getElementById('hb-m-beschr').value.trim();
   const typ = document.getElementById('hb-m-typ').value;
   let ziel;
   if (typ === 'proWoche') {
@@ -16443,10 +16459,11 @@ function habitSpeichern() {
   hbInit();
   if (hbEditId) {
     const h = DB.habits.find(x => x.id === hbEditId);
-    if (h) { h.titel = titel; h.ziel = ziel; h.geaendert = new Date().toISOString(); }
+    if (h) { h.titel = titel; h.beschreibung = beschreibung || null; h.ziel = ziel;
+             h.geaendert = new Date().toISOString(); }
   } else {
-    DB.habits.push({ id: uid(), titel, aktiv: true, ziel, checks: {},
-                     erstellt: new Date().toISOString() });
+    DB.habits.push({ id: uid(), titel, beschreibung: beschreibung || null, aktiv: true,
+                     ziel, checks: {}, erstellt: new Date().toISOString() });
   }
   saveDB();
   closeModal('modal-habit');
@@ -16577,12 +16594,17 @@ function hbErstellePDF(montagISO, habits, fonts) {
   hbHintergrund(); hbKopf();
 
   habits.forEach(h => {
-    const blockH = 5.2 + 3.2 + BOX + 4.4;
+    const blockH = 5.2 + 3.2 + BOX + 4.4 + (h.beschreibung ? 3.6 : 0);
     if (y + blockH > H - MB) hbNeueSeite();
 
     doc.setFont(F, 'bold'); doc.setFontSize(12.5); doc.setTextColor(24, 16, 10);
     const zeilen = doc.splitTextToSize(h.titel || '', MAXW);
     zeilen.slice(0, 2).forEach(z => { doc.text(z, ML, y + 3.8); y += 4.6; });
+    if (h.beschreibung) {
+      doc.setFont(F, 'normal'); doc.setFontSize(9.5); doc.setTextColor(110, 100, 88);
+      doc.splitTextToSize(h.beschreibung, MAXW).slice(0, 1)
+        .forEach(z => { doc.text(z, ML, y + 2.8); y += 3.6; });
+    }
 
     // Wochentagsbuchstaben
     doc.setFont(F, 'normal'); doc.setFontSize(9); doc.setTextColor(110, 100, 88);
@@ -16635,7 +16657,7 @@ function hbErstellePDF(montagISO, habits, fonts) {
 // ═══ Ende Gewohnheiten-Verwaltung ═════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  TERMINE UND MONATSREFLEXION                                     v1.5.254
+//  TERMINE UND MONATSREFLEXION                                     v1.5.256
 //  Termine aus dem Daily Log werden dauerhaft abgelegt – sie sind die
 //  Rohmasse fuer die Zeitleiste der Monatsreflexion. Ohne sie waere der
 //  Rueckblick eine Gedaechtnisuebung.
@@ -18331,7 +18353,7 @@ async function nmPdfErstellen() {
       })
       .catch(() => {
         // Fallback: Inline-SW
-        const swCode = `const CACHE='wa-v1_5_254';
+        const swCode = `const CACHE='wa-v1_5_256';
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
@@ -18425,6 +18447,11 @@ self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c
       <div class="field-group">
         <div class="field-label">Name *</div>
         <input class="field-input" id="hb-m-name" placeholder="z. B. Sport, Lesen 20 Minuten">
+      </div>
+      <div class="field-group">
+        <div class="field-label">Beschreibung <span style="font-weight:400;text-transform:none">(optional)</span></div>
+        <textarea class="field-input" id="hb-m-beschr" rows="2"
+          placeholder="Warum will ich das? Was zählt als erledigt?"></textarea>
       </div>
       <div class="field-group">
         <div class="field-label">Ziel</div>
