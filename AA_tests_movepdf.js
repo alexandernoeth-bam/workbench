@@ -1836,15 +1836,34 @@ console.log('\n=== GEWOHNHEITEN UND CHALLENGE ===');
     if (!box) fail('Kästchengröße im Wochenblatt nicht auffindbar');
     else if (/Math\.min/.test(box[1]))
       fail('Kästchen werden wieder aus der Spaltenbreite berechnet – sie wurden 9 mm groß');
-    else if (parseFloat(box[1]) > 7.5)
-      fail('Kästchen sind ' + box[1].trim() + ' mm – dann passen zu wenige Gewohnheiten auf eine Seite');
+    else if (parseFloat(box[1]) > 5)
+      fail('Kästchen sind ' + box[1].trim() + ' mm – gewünscht sind 4 mm');
     else ok('Kästchen ' + box[1].trim() + ' mm');
 
-    // Die Wochentage gehören einmal je Seite in den Kopf, nicht je Gewohnheit
+    // Der Wochentag steht im Kästchen, nicht mehr als Spaltenkopf
     const kopf = src.match(/function hbKopf\(\)[\s\S]*?\n  \}/);
-    if (!kopf || !/HB_TAGE\[i\]\[0\]/.test(kopf[0]))
-      fail('Wochentage stehen nicht mehr im Seitenkopf – sie würden je Gewohnheit wiederholt');
-    else ok('Wochentage einmal je Seite');
+    if (kopf && /HB_TAGE/.test(kopf[0]))
+      fail('Der Spaltenkopf mit Wochentagen ist zurück – der Buchstabe gehört ins Kästchen');
+    else ok('Kein Spaltenkopf mehr');
+    if (!/doc\.text\(HB_TAGE\[i\]\[0\]/.test(src))
+      fail('Der Wochentag wird nicht mehr ins Kästchen gezeichnet');
+    else ok('Wochentag im Kästchen');
+    if (!/BOX \* 3\.1/.test(src))
+      warn('Der Wochentag füllt das Kästchen nicht mehr aus');
+    else ok('Wochentag füllt das Kästchen');
+
+    // Beschreibung vollständig und dunkel
+    if (/splitTextToSize\(h\.beschreibung[^)]*\)\s*\.slice\(0, 1\)/.test(src))
+      fail('Die Beschreibung wird wieder nach einer Zeile abgeschnitten');
+    else ok('Beschreibung läuft vollständig um');
+    const farbe = src.match(/setTextColor\(45, 40, 33\)/);
+    if (!farbe) warn('Der Grauton der Beschreibung wurde verändert');
+    else ok('Beschreibung fast schwarz');
+
+    // Die Quote je Gewohnheit ist entfallen
+    if (/r\.ja \+ ' \/ ' \+ r\.soll/.test(src))
+      fail('Die Quote je Gewohnheit ist zurück – sie war nicht gewünscht');
+    else ok('Keine Quote im Wochenblatt');
 
     if (!/sn \+ ' \/ ' \+ gesamt/.test(src))
       fail('Seitenzähler x / y im Kopf fehlt');
