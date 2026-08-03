@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.2.11</title>
+<title>SmallAssist 1.2.12</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -412,7 +412,6 @@ body.notiz-vollbild #screen-notizen { overflow: visible; }
 /* Im Vollbild darf die Notiz mehr Platz und etwas mehr Ruhe bekommen */
 body.notiz-vollbild #notiz-textarea,
 body.notiz-vollbild #notiz-render-view { padding-left: 22px; padding-right: 22px; }
-body.notiz-vollbild #notiz-btn-vollbild { color: var(--teal); font-weight: 700; }
 
 /* ── NOTIZEN: 1:1 aus WorkAssist ── */
 #screen-notizen { flex-direction: row !important; overflow: hidden; }
@@ -539,11 +538,19 @@ body.notiz-vollbild #notiz-btn-vollbild { color: var(--teal); font-weight: 700; 
   padding: 3px 8px;
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
+  overflow-y: hidden;
   flex-shrink: 0;
   background: var(--surface);
+  /* Ohne nowrap und ohne flex-shrink an den Knoepfen wurde die Leiste
+     gestaucht statt zu scrollen – overflow-x allein genuegt nicht */
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
 .notiz-toolbar::-webkit-scrollbar { display: none; }
 .ntb {
+  flex-shrink: 0;
   min-width: 26px;
   height: 26px;
   border-radius: 4px;
@@ -560,6 +567,11 @@ body.notiz-vollbild #notiz-btn-vollbild { color: var(--teal); font-weight: 700; 
   white-space: nowrap;
 }
 .ntb:hover { background: var(--teal-xlight); color: var(--teal); border-color: var(--teal-light); }
+.ntb-vb { color: var(--teal); }
+body.notiz-vollbild .ntb-vb {
+  background: var(--teal-xlight);
+  border-color: var(--teal-light);
+}
 .ntb-sep { width: 1px; height: 16px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
 .notiz-textarea {
   flex: 1;
@@ -924,7 +936,7 @@ body.notiz-vollbild #notiz-btn-vollbild { color: var(--teal); font-weight: 700; 
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.2.11</span>
+      <span class="sb-logo-version">v1.2.12</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="tagesliste" onclick="zeigeScreen('tagesliste',this)">
@@ -1110,6 +1122,11 @@ body.notiz-vollbild #notiz-btn-vollbild { color: var(--teal); font-weight: 700; 
               <button onclick="toggleUnterseitenPanel()" style="flex-shrink:0;border:1px solid var(--border);background:var(--bg);border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer;font-family:var(--font);color:var(--text-dim);" id="notiz-usz-btn">Unterseiten</button>
             </div>
             <div class="notiz-toolbar" id="notiz-toolbar">
+              <button class="ntb ntb-vb" id="notiz-btn-vollbild" onclick="notizVollbildToggle()" title="Vollbild (Esc zum Beenden)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="notiz-vb-icon-auf"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="notiz-vb-icon-zu" style="display:none;"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+              </button>
+              <div class="ntb-sep"></div>
               <button class="ntb" onclick="notizTb('**','**')" title="Fett"><b>B</b></button>
               <button class="ntb" onclick="notizTb('*','*')" title="Kursiv"><i>I</i></button>
               <button class="ntb" onclick="notizTb('`','`')" title="Code" style="font-family:monospace;">``</button>
@@ -1132,12 +1149,6 @@ body.notiz-vollbild #notiz-btn-vollbild { color: var(--teal); font-weight: 700; 
               <div class="ntb-sep"></div>
               <button class="ntb" id="notiz-btn-edit" onclick="notizToggleView(false)" style="color:var(--teal);">Edit</button>
               <button class="ntb" id="notiz-btn-view" onclick="notizToggleView(true)">Ansicht</button>
-              <div class="ntb-sep"></div>
-              <button class="ntb" id="notiz-btn-vollbild" onclick="notizVollbildToggle()" title="Vollbild (Esc zum Beenden)">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="notiz-vb-icon-auf"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="notiz-vb-icon-zu" style="display:none;"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-                <span id="notiz-vb-text">Vollbild</span>
-              </button>
               <div class="ntb-sep"></div>
               <button class="ntb" onclick="notizFarbenOverlayToggle(event)" style="color:var(--teal-dark);font-weight:700;">ℹ</button>
             </div>
@@ -1441,7 +1452,7 @@ body.notiz-vollbild #notiz-btn-vollbild { color: var(--teal); font-weight: 700; 
 <script>
 'use strict';
 
-const APP_VERSION = '1.2.11';
+const APP_VERSION = '1.2.12';
 
 // ── STATE ──
 let fileHandle = null;
@@ -2509,10 +2520,11 @@ function notizVollbildSetzen(an) {
 
   const auf = document.getElementById('notiz-vb-icon-auf');
   const zu  = document.getElementById('notiz-vb-icon-zu');
-  const txt = document.getElementById('notiz-vb-text');
+  const btn = document.getElementById('notiz-btn-vollbild');
   if (auf) auf.style.display = notizVollbildAn ? 'none' : '';
   if (zu)  zu.style.display  = notizVollbildAn ? '' : 'none';
-  if (txt) txt.textContent   = notizVollbildAn ? 'Zurück' : 'Vollbild';
+  // Nur noch ein Symbol – der Zweck steht im Tooltip
+  if (btn) btn.title = notizVollbildAn ? 'Vollbild beenden (Esc)' : 'Vollbild (Esc zum Beenden)';
 
   // Echtes Vollbild zusaetzlich versuchen – schlaegt es fehl, bleibt es
   // bei der Ueberlagerung, die ohnehin ueberall funktioniert
