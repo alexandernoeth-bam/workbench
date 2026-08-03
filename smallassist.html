@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.2.9</title>
+<title>SmallAssist 1.2.11</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -390,6 +390,29 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 
 /* ── TAGS SCREEN ── */
 #screen-listen { flex-direction: column; }
+
+
+/* ── NOTIZ-VOLLBILD (v1.2.10) ──
+   Bewusst als CSS-Ueberlagerung statt allein ueber die Fullscreen-API:
+   Safari auf dem iPad unterstuetzt requestFullscreen nur eingeschraenkt,
+   auf dem iPhone gar nicht. Die API wird zusaetzlich versucht. */
+body.notiz-vollbild #sidebar,
+body.notiz-vollbild .topbar,
+body.notiz-vollbild .notizen-liste { display: none !important; }
+
+body.notiz-vollbild .notizen-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  border-radius: 0;
+  background: var(--surface);
+}
+body.notiz-vollbild #screen-notizen { overflow: visible; }
+
+/* Im Vollbild darf die Notiz mehr Platz und etwas mehr Ruhe bekommen */
+body.notiz-vollbild #notiz-textarea,
+body.notiz-vollbild #notiz-render-view { padding-left: 22px; padding-right: 22px; }
+body.notiz-vollbild #notiz-btn-vollbild { color: var(--teal); font-weight: 700; }
 
 /* ── NOTIZEN: 1:1 aus WorkAssist ── */
 #screen-notizen { flex-direction: row !important; overflow: hidden; }
@@ -901,7 +924,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.2.9</span>
+      <span class="sb-logo-version">v1.2.11</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="tagesliste" onclick="zeigeScreen('tagesliste',this)">
@@ -1109,6 +1132,12 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
               <div class="ntb-sep"></div>
               <button class="ntb" id="notiz-btn-edit" onclick="notizToggleView(false)" style="color:var(--teal);">Edit</button>
               <button class="ntb" id="notiz-btn-view" onclick="notizToggleView(true)">Ansicht</button>
+              <div class="ntb-sep"></div>
+              <button class="ntb" id="notiz-btn-vollbild" onclick="notizVollbildToggle()" title="Vollbild (Esc zum Beenden)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="notiz-vb-icon-auf"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="notiz-vb-icon-zu" style="display:none;"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                <span id="notiz-vb-text">Vollbild</span>
+              </button>
               <div class="ntb-sep"></div>
               <button class="ntb" onclick="notizFarbenOverlayToggle(event)" style="color:var(--teal-dark);font-weight:700;">ℹ</button>
             </div>
@@ -1412,7 +1441,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); backgroun
 <script>
 'use strict';
 
-const APP_VERSION = '1.2.9';
+const APP_VERSION = '1.2.11';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1694,6 +1723,8 @@ function zeigeScreen(name, navEl) {
 }
 
 function zeigeScreenDirekt(name) {
+  // Sonst bliebe die Ueberlagerung ueber einem anderen Screen stehen
+  if (name !== 'notizen' && typeof notizVollbildSetzen === 'function') notizVollbildSetzen(false);
   aktiverScreen = name;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('screen-' + name);
@@ -2461,6 +2492,57 @@ function notizLoeschen() {
   renderNotizenListe();
   showToast('Notiz gelöscht');
 }
+
+
+// ── NOTIZ-VOLLBILD ────────────────────────────────────────────────────────
+// Absichtlich nicht gemerkt: ein Vollbild, das beim naechsten Start
+// ueberraschend anspringt, waere irritierend.
+let notizVollbildAn = false;
+
+function notizVollbildToggle() {
+  notizVollbildSetzen(!notizVollbildAn);
+}
+
+function notizVollbildSetzen(an) {
+  notizVollbildAn = !!an;
+  document.body.classList.toggle('notiz-vollbild', notizVollbildAn);
+
+  const auf = document.getElementById('notiz-vb-icon-auf');
+  const zu  = document.getElementById('notiz-vb-icon-zu');
+  const txt = document.getElementById('notiz-vb-text');
+  if (auf) auf.style.display = notizVollbildAn ? 'none' : '';
+  if (zu)  zu.style.display  = notizVollbildAn ? '' : 'none';
+  if (txt) txt.textContent   = notizVollbildAn ? 'Zurück' : 'Vollbild';
+
+  // Echtes Vollbild zusaetzlich versuchen – schlaegt es fehl, bleibt es
+  // bei der Ueberlagerung, die ohnehin ueberall funktioniert
+  try {
+    if (notizVollbildAn) {
+      const el = document.documentElement;
+      if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    } else if (document.fullscreenElement || document.webkitFullscreenElement) {
+      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    }
+  } catch (e) { /* ohne echtes Vollbild ist die Ueberlagerung ausreichend */ }
+}
+
+// Escape beendet das Vollbild
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && notizVollbildAn) {
+    e.preventDefault();
+    notizVollbildSetzen(false);
+  }
+});
+
+// Verlaesst der Browser das echte Vollbild (F11, Zurueck-Gestus),
+// soll die Ueberlagerung mitgehen
+['fullscreenchange', 'webkitfullscreenchange'].forEach(ev =>
+  document.addEventListener(ev, () => {
+    if (notizVollbildAn && !document.fullscreenElement && !document.webkitFullscreenElement)
+      notizVollbildSetzen(false);
+  }));
 
 function notizToggleView(ansicht) {
   const ta  = document.getElementById('notiz-textarea');
@@ -3702,11 +3784,46 @@ function planSchrittVerschieben(idx,r){
   themeInit();
   zoomInit();
   handleWiederherstellen();
-  const c=`const CACHE='smallassist-v1_2_9';
-self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./smallassist.html','./manifest-smallassist.json','./icon-smallassist.svg','./icon-smallassist-maskable.svg'])).then(()=>self.skipWaiting())));
-self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
-self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request))));`;
-  if('serviceWorker'in navigator)navigator.serviceWorker.register(URL.createObjectURL(new Blob([c],{type:'application/javascript'})),{scope:'./'}).catch(()=>{});
+
+  // ── SERVICE WORKER: gemeinsamer sw.js der Werkbank ────────────────────────
+  // Alle drei Apps teilen sich einen Worker. Alte Registrierungen – der
+  // frühere Blob-Worker und app-eigene Dateien – werden dabei entfernt,
+  // sonst blieben sie als zweiter Worker im Browser bestehen.
+  (function () {
+    if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => {
+        const skript = (r.active || r.installing || r.waiting || {}).scriptURL || '';
+        if (skript && !/\/sw\.js$/.test(skript)) {
+          r.unregister().catch(() => {});
+          console.info('[SW] alte Registrierung entfernt:', skript);
+        }
+      });
+    }).catch(() => {});
+
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => {
+        console.log('[SW] registriert:', reg.scope);
+        reg.update().catch(() => {});
+        reg.addEventListener('updatefound', () => {
+          const neu = reg.installing;
+          if (!neu) return;
+          neu.addEventListener('statechange', () => {
+            if (neu.state === 'installed' && navigator.serviceWorker.controller)
+              setTimeout(() => { try { showToast('Update verfügbar – Seite neu laden'); } catch (e) {} }, 2000);
+          });
+        });
+      })
+      .catch(err => console.warn('[SW] nicht registriert:', err));
+
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data && e.data.type === 'CACHE_GELEERT') {
+        try { showToast('Cache geleert – Seite wird neu geladen'); } catch (e2) {}
+        setTimeout(() => location.reload(), 600);
+      }
+    });
+  })();
 })();
 
 </script>

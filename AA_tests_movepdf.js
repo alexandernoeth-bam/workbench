@@ -2357,6 +2357,17 @@ console.log('\n=== ZUSTAND UND SERVICE WORKER ===');
   if (/register\(URL\.createObjectURL/.test(skripte))
     fail('Der Blob-Fallback für den Service Worker ist zurück – er kann nicht funktionieren');
   else ok('Kein Blob-Service-Worker mehr');
+
+  // Ab v1.5.262 teilen sich WorkAssist, SmallAssist und Plan-Viewer einen Worker
+  if (!/register\('sw\.js'\)/.test(skripte))
+    fail('Der gemeinsame sw.js der Werkbank wird nicht registriert');
+  else ok('Gemeinsamer sw.js registriert');
+  if (!/getRegistrations/.test(skripte))
+    warn('Alte Registrierungen werden nicht mehr entfernt – ein zweiter Worker könnte bestehen bleiben');
+  else ok('Alte Registrierungen werden entfernt');
+  if (/const CACHE\s*=/.test(skripte))
+    fail('Wieder ein eingebetteter Cache in der App – der Worker liegt in sw.js');
+  else ok('Kein eingebetteter Cache mehr');
   if (/start_url:\s*'\.\/'/.test(skripte))
     fail('start_url ist wieder relativ – im Blob-Manifest wird es verworfen');
   else ok('start_url ist absolut');
