@@ -2472,3 +2472,86 @@ console.log('\n=== NACHARBEITEN-MODUS ===');
   else ok('Erledigte zählen für heute');
 
 })();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: LISTEN   (neu in v1.5.263)
+//  Einfügen in AA_tests.js nach der Kategorie NACHARBEITEN-MODUS,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerart, die diese Kategorie abdeckt:
+//   • Ein eigenes Listen-Feld an der Aufgabe taucht auf – das wäre eine
+//     zweite Wahrheit neben den Bereichen und bräche SmallAssist
+//   • Angeheftete Tags verweisen auf nicht mehr vorhandene Tags
+//   • Erledigte Aufgaben verfälschen die Zähler in der Seitenleiste
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== LISTEN ===');
+
+(function testListen() {
+
+  const noetig = ['listenInit','listenAlleTags','listeAufgaben','listeOffenAnzahl','listeMinuten',
+                  'renderListenNav','listeOeffnen','renderListe','renderListenVerwalten',
+                  'listeUmschalten','listeLoesen','listeVerschieben'];
+  const fehlt = noetig.filter(f => typeof window[f] !== 'function');
+  if (fehlt.length) { fail('Nicht definiert: ' + fehlt.join(', ')); return; }
+  ok('Alle ' + noetig.length + ' Funktionen definiert');
+
+  ['nav-listen-items','screen-liste','screen-listen-verwalten','lv-tags','lv-reihenfolge',
+   'liste-kopf','liste-inhalt'].forEach(id => {
+    if (!document.getElementById(id)) fail('Element ' + id + ' fehlt');
+  });
+  ok('Menüabschnitt und beide Screens vorhanden');
+
+  // ── Kein neues Feld an der Aufgabe ──────────────────────────────────────
+  const mitFeld = (DB.aufgaben || []).filter(a => 'liste' in a || 'listeId' in a);
+  if (mitFeld.length)
+    fail(mitFeld.length + ' Aufgaben haben ein eigenes Listen-Feld – Listen sollen über tags laufen');
+  else ok('Kein eigenes Listen-Feld an den Aufgaben');
+
+  if (!Array.isArray(DB.listen))
+    fail('DB.listen fehlt oder ist kein Array');
+  else ok('DB.listen ist eine reine Auswahl (' + DB.listen.length + ' angeheftet)');
+
+  const keineStrings = (DB.listen || []).filter(x => typeof x !== 'string');
+  if (keineStrings.length) fail('DB.listen enthält Einträge, die keine Tag-Namen sind');
+  else ok('Nur Tag-Namen in DB.listen');
+
+  // ── Angeheftete Tags existieren wirklich ────────────────────────────────
+  const vorhanden = new Set();
+  (DB.aufgaben || []).forEach(a => (a.tags || []).forEach(t => vorhanden.add(t)));
+  (DB.wissen || []).forEach(w => (w.tags || []).forEach(t => vorhanden.add(t)));
+  const verwaist = (DB.listen || []).filter(t => !vorhanden.has(t));
+  if (verwaist.length) fail('Angeheftet, aber nirgends vergeben: ' + verwaist.join(', '));
+  else ok('Alle angehefteten Tags sind vergeben');
+
+  if (typeof listenInit === 'function' && !/filter\(t => vorhanden\.has\(t\)\)/.test(listenInit.toString()))
+    warn('Verwaiste Einträge werden nicht mehr entfernt');
+  else ok('Verwaiste Einträge werden entfernt');
+
+  // ── Zähler ignorieren Erledigtes ────────────────────────────────────────
+  if (typeof listeOffenAnzahl === 'function' && (DB.listen || []).length) {
+    const tag = DB.listen[0];
+    const alle = (DB.aufgaben || []).filter(a => (a.tags || []).includes(tag)).length;
+    const offen = listeOffenAnzahl(tag);
+    if (offen > alle) fail('Zähler größer als die Gesamtzahl');
+    else ok('„' + tag + '": ' + offen + ' offen von ' + alle);
+    if (typeof listeAufgaben === 'function' &&
+        !/moveAufgabeErledigt/.test(listeAufgaben.toString()))
+      fail('Erledigte werden nicht mehr ausgefiltert');
+    else ok('Erledigte fließen nicht in die Zähler');
+  }
+
+  // ── Summe ───────────────────────────────────────────────────────────────
+  if (typeof listeMinuten === 'function' && (DB.listen || []).length) {
+    const m = listeMinuten(DB.listen[0]);
+    if (typeof m !== 'number' || m < 0) fail('Minutensumme ist keine gültige Zahl');
+    else ok('Minutensumme berechnet (' + m + ' min)');
+  }
+
+  // ── Verträglichkeit mit SmallAssist ─────────────────────────────────────
+  // Beide Apps schreiben in dasselbe tags-Feld; DB.listen ist nur Auswahl
+  if (typeof listeUmschalten === 'function' && /\.tags\s*=/.test(listeUmschalten.toString()))
+    fail('Das Anheften verändert Aufgaben-Tags – das bräche die gemeinsame Datei');
+  else ok('Anheften lässt die Aufgaben unangetastet');
+
+})();
