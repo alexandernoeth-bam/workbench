@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.2.12</title>
+<title>SmallAssist 1.2.15</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -411,7 +411,66 @@ body.notiz-vollbild #screen-notizen { overflow: visible; }
 
 /* Im Vollbild darf die Notiz mehr Platz und etwas mehr Ruhe bekommen */
 body.notiz-vollbild #notiz-textarea,
-body.notiz-vollbild #notiz-render-view { padding-left: 22px; padding-right: 22px; }
+body.notiz-vollbild #notiz-render-view {
+  padding-left: 22px; padding-right: 22px;
+  /* Damit die Schreibmarke beim Tippen im Blick bleibt */
+  overflow-y: auto;
+  scroll-padding-bottom: 40px;
+}
+/* Etwas Luft unten, damit die letzte Zeile nicht am Rand klebt */
+body.notiz-vollbild #notiz-textarea { padding-bottom: 40px; }
+
+
+
+/* ── GRÖSSE (Aufwand) – 1:1 aus WorkAssist übernommen (v1.2.15) ── */
+.aufg-groesse {
+  flex-shrink: 0; font-size: calc(var(--fs) * 0.625); font-weight: 600;
+  color: var(--teal); background: var(--teal-xlight);
+  border: 1px solid var(--teal-light); border-radius: 8px; padding: 1px 6px;
+}
+.tl-groesse {
+  font-size: calc(var(--fs) * 0.625); font-weight: 600;
+  color: var(--teal); background: var(--teal-xlight);
+  border-radius: 7px; padding: 0 5px; white-space: nowrap;
+}
+
+.groesse-wrap { display: flex; align-items: center; gap: 8px; }
+.groesse-wrap .field-input { flex: 1; }
+.groesse-other-wrap { display: none; align-items: center; gap: 6px; flex-shrink: 0; }
+.groesse-other-wrap.show { display: flex; }
+.groesse-other-wrap .field-input { flex: none; }
+.groesse-unit { font-size: calc(var(--fs) * 0.6875); color: var(--text-xdim); white-space: nowrap; }
+
+/* ── TAGESLISTE: Überfällig und Zeitnah (v1.2.13) ── */
+.tl-zusatz-kopf {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 14px 5px;
+  font-size: calc(var(--fs) * 0.625);
+  font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-xdim); cursor: pointer; user-select: none;
+  border-top: 1px solid var(--border); margin-top: 6px;
+}
+.tl-zusatz-kopf.ueber { color: #b45309; }
+.tl-zusatz-pfeil { font-size: calc(var(--fs) * 0.6875); }
+.tl-zusatz-anz {
+  margin-left: auto; font-size: calc(var(--fs) * 0.625); font-weight: 700;
+  background: var(--surface2); color: var(--text-dim);
+  border-radius: 8px; padding: 1px 7px;
+}
+.tl-zusatz-kopf.ueber .tl-zusatz-anz { background: #fef3c7; color: #b45309; }
+.tl-item.tl-zusatz { opacity: .92; }
+.tl-zusatz-meta {
+  font-size: calc(var(--fs) * 0.625); color: var(--text-xdim); margin-top: 1px;
+}
+.tl-zusatz-kopf.ueber ~ .tl-item .tl-zusatz-meta { color: #b45309; }
+.tl-zusatz-plus {
+  flex-shrink: 0; width: 24px; height: 24px; border-radius: 5px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-dim); font-size: calc(var(--fs) * 0.875); line-height: 1;
+  cursor: pointer; font-family: var(--font); align-self: center;
+}
+.tl-zusatz-plus:hover { border-color: var(--teal-light); color: var(--teal);
+                        background: var(--teal-xlight); }
 
 /* ── NOTIZEN: 1:1 aus WorkAssist ── */
 #screen-notizen { flex-direction: row !important; overflow: hidden; }
@@ -936,7 +995,7 @@ body.notiz-vollbild .ntb-vb {
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.2.12</span>
+      <span class="sb-logo-version">v1.2.15</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="tagesliste" onclick="zeigeScreen('tagesliste',this)">
@@ -1019,7 +1078,10 @@ body.notiz-vollbild .ntb-vb {
           <div class="tl-items" id="tl-items"></div>
           <div class="tl-add-bar">
             <input class="tl-add-input" id="tl-add-input" placeholder="Schnell-Text …" onkeydown="if(event.key==='Enter')tlSchnellText()">
-            <button class="tl-add-btn sec" onclick="tlAufgabeOverlayToggle()" title="Aufgabe verknüpfen" style="flex-shrink:0;">
+            <button class="tl-add-btn sec" onclick="tlNeueAufgabe()" title="Als Aufgabe anlegen und eintragen" style="flex-shrink:0;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <button class="tl-add-btn sec" onclick="tlAufgabeOverlayToggle()" title="Bestehende Aufgabe verknüpfen" style="flex-shrink:0;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
             </button>
           </div>
@@ -1218,6 +1280,31 @@ body.notiz-vollbild .ntb-vb {
       <div class="field-group">
         <div class="field-label">Deadline</div>
         <input class="field-input" id="aufg-deadline" type="date" oninput="aufgModalGeaendert()">
+      </div>
+      <div class="field-group">
+        <div class="field-label">Größe (Aufwand)</div>
+        <div class="groesse-wrap">
+          <select class="field-input" id="aufg-groesse" onchange="aufgGroesseAndereToggle(); aufgModalGeaendert()">
+            <option value="">— bitte wählen —</option>
+            <option value="5">5 Min</option>
+            <option value="10">10 Min</option>
+            <option value="15">15 Min</option>
+            <option value="30">30 Min</option>
+            <option value="45">45 Min</option>
+            <option value="60">60 Min (1 Std)</option>
+            <option value="90">90 Min</option>
+            <option value="120">120 Min (2 Std)</option>
+            <option value="180">180 Min (3 Std)</option>
+            <option value="240">240 Min (4 Std)</option>
+            <option value="480">480 Min (8 Std)</option>
+            <option value="other">Andere …</option>
+          </select>
+          <div class="groesse-other-wrap" id="aufg-groesse-other-wrap">
+            <input class="field-input" type="number" id="aufg-groesse-other" min="15" max="480"
+              placeholder="z.B. 75" style="width:90px;" oninput="aufgModalGeaendert()">
+            <span class="groesse-unit">Min (15–480)</span>
+          </div>
+        </div>
       </div>
       <div class="field-group">
         <div class="field-label">Listen</div>
@@ -1452,7 +1539,7 @@ body.notiz-vollbild .ntb-vb {
 <script>
 'use strict';
 
-const APP_VERSION = '1.2.12';
+const APP_VERSION = '1.2.15';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1475,7 +1562,14 @@ function formatDatum(iso) {
   const jj = d.getFullYear();
   return tage[d.getDay()] + ', ' + tt + '.' + mm + '.' + jj;
 }
-function today() { return new Date().toISOString().slice(0,10); }
+// toISOString() rechnet nach UTC – abends ergab das schon den naechsten Tag
+// und Aufgaben galten faelschlich als ueberfaellig
+function isoDatum(d) {
+  return d.getFullYear() + '-' +
+         String(d.getMonth() + 1).padStart(2, '0') + '-' +
+         String(d.getDate()).padStart(2, '0');
+}
+function today() { return isoDatum(new Date()); }
 
 function sidebarToggle() {
   const sb = document.getElementById('sidebar');
@@ -1827,6 +1921,7 @@ function aufgZeileHTML(a, td) {
   return `<div class="aufg-row" data-id="${escHtml(a.id)}">
     <div class="aufg-status-dot ${a.status||'offen'}"></div>
     <div class="aufg-titel ${a.status==='erledigt'?'erledigt':''}">${escHtml(a.titel||'(ohne Titel)')}</div>
+    ${a.groesse ? `<div class="aufg-groesse">${a.groesse} min</div>` : ''}
     ${a.faellig ? `<div class="aufg-deadline ${istLate?'late':''}">${formatDatum(a.faellig)}</div>` : ''}
     ${loeschBtn}
   </div>`;
@@ -2182,6 +2277,38 @@ function listeLoeschen() {
 let aufgEditId = null;
 let aufgStatus = 'offen';
 
+
+// ── GRÖSSE (Aufwand) – 1:1 wie in WorkAssist ──────────────────────────────
+function aufgGroesseAndereToggle() {
+  const wrap = document.getElementById('aufg-groesse-other-wrap');
+  if (wrap) wrap.classList.toggle('show',
+    document.getElementById('aufg-groesse').value === 'other');
+}
+
+// Krumme Werte landen im Andere-Feld, damit sie beim Bearbeiten erhalten bleiben
+function aufgGroesseSetzen(min) {
+  const sel   = document.getElementById('aufg-groesse');
+  const other = document.getElementById('aufg-groesse-other');
+  if (!sel || !other) return;
+  const wert = (min === 0 || min) ? String(min) : '';
+  const bekannt = [...sel.options].some(o => o.value === wert && o.value !== '' && o.value !== 'other');
+  if (wert && bekannt) { sel.value = wert; other.value = ''; }
+  else if (wert)       { sel.value = 'other'; other.value = wert; }
+  else                 { sel.value = ''; other.value = ''; }
+  aufgGroesseAndereToggle();
+}
+
+function aufgGroesseLesen() {
+  const sel = document.getElementById('aufg-groesse');
+  if (!sel) return null;
+  if (sel.value === 'other') {
+    const n = parseInt(document.getElementById('aufg-groesse-other').value, 10);
+    return (n && n >= 15 && n <= 480) ? n : null;
+  }
+  const n = parseInt(sel.value, 10);
+  return n || null;
+}
+
 function aufgabeNeu() {
   aufgEditId = null;
   aufgStatus = 'offen';
@@ -2189,6 +2316,7 @@ function aufgabeNeu() {
   document.getElementById('aufg-titel').value = '';
   document.getElementById('aufg-deadline').value = '';
   document.getElementById('aufg-notiz').value = '';
+  aufgGroesseSetzen(null);
   aufgWiederholungLaden(null);
   document.getElementById('aufg-modal-titel').textContent = 'Neue Aufgabe';
   document.getElementById('aufg-btn-loeschen').style.display = 'none';
@@ -2207,6 +2335,7 @@ function aufgabeBearbeiten(id) {
   document.getElementById('aufg-titel').value = a.titel || '';
   document.getElementById('aufg-deadline').value = a.faellig || '';
   document.getElementById('aufg-notiz').value = a.notiz || '';
+  aufgGroesseSetzen(a.groesse);
   document.getElementById('aufg-modal-titel').textContent = 'Aufgabe bearbeiten';
   document.getElementById('aufg-btn-loeschen').style.display = '';
   aufgStatusSetzen(a.status || 'offen');
@@ -2324,6 +2453,7 @@ function aufgabeSpeichern() {
   if (!titel) { showToast('Bitte Titel eingeben'); return; }
   const faellig = document.getElementById('aufg-deadline').value || null;
   const notiz   = document.getElementById('aufg-notiz').value.trim() || null;
+  const groesse = aufgGroesseLesen();
   let tags = [...document.querySelectorAll('#aufg-listen-auswahl .listen-ausw-pill.selected')].map(b => b.dataset.tag);
   if (tags.length === 0) tags = ['Allgemein'];
 
@@ -2333,6 +2463,7 @@ function aufgabeSpeichern() {
       a.titel       = titel;
       a.status      = aufgStatus;
       a.faellig     = faellig;
+      a.groesse     = groesse;
       a.notiz       = notiz;
       a.tags        = tags;
       a.wiederholung = aufgWiederholungLesen();
@@ -2344,6 +2475,7 @@ function aufgabeSpeichern() {
       titel,
       status:     aufgStatus,
       faellig,
+      groesse,
       notiz,
       tags,
       wiederholung: aufgWiederholungLesen(),
@@ -2514,9 +2646,44 @@ function notizVollbildToggle() {
   notizVollbildSetzen(!notizVollbildAn);
 }
 
+// ── Bildschirmtastatur ──
+// Im Vollbild ist der Editor position:fixed mit inset:0. Das bezieht sich auf
+// das Layout-Viewport, das beim Aufklappen der Tastatur unveraendert bleibt –
+// das untere Drittel lag dadurch hinter der Tastatur. Das VisualViewport gibt
+// die tatsaechlich sichtbare Hoehe an.
+function notizViewportAnpassen() {
+  const ed = document.querySelector('.notizen-editor');
+  if (!ed) return;
+  const vv = window.visualViewport;
+  if (!notizVollbildAn || !vv) { ed.style.top = ''; ed.style.height = ''; return; }
+  ed.style.top    = vv.offsetTop + 'px';
+  ed.style.height = vv.height + 'px';
+
+  // Nach dem Verkleinern die Schreibmarke wieder sichtbar machen
+  const ta = document.getElementById('notiz-textarea');
+  if (ta && document.activeElement === ta) {
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    try { ta.setSelectionRange(s, e); } catch (err) {}
+  }
+}
+
+function notizViewportHorchen(an) {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  if (an) {
+    vv.addEventListener('resize', notizViewportAnpassen);
+    vv.addEventListener('scroll', notizViewportAnpassen);
+  } else {
+    vv.removeEventListener('resize', notizViewportAnpassen);
+    vv.removeEventListener('scroll', notizViewportAnpassen);
+  }
+}
+
 function notizVollbildSetzen(an) {
   notizVollbildAn = !!an;
   document.body.classList.toggle('notiz-vollbild', notizVollbildAn);
+  notizViewportHorchen(notizVollbildAn);
+  notizViewportAnpassen();
 
   const auf = document.getElementById('notiz-vb-icon-auf');
   const zu  = document.getElementById('notiz-vb-icon-zu');
@@ -3169,13 +3336,10 @@ function savePlan() {
 
   setzeGeaendert();
   closeNeuerPlanModal();
-  // Wenn es der Tagesliste-Plan ist → Tagesliste neu rendern
-  const gespeicherterPlan = (DB.plaene||[]).find(p => p.id === editId) ||
-    (DB.plaene||[]).find(p => p.id === (DB.plaene||[]).slice(-1)[0]?.id);
-  if (tlPlan && (editId === tlPlan.id || (!editId && gespeicherterPlan?.typ === 'tagesliste'))) {
-    tlPlan = tlPlanHolen();
-    renderTagesliste();
-  }
+  // Frueher war die Tagesliste selbst ein Plan – tlPlan/tlPlanHolen gibt es
+  // nicht mehr, der alte Zweig warf hier einen ReferenceError und brach das
+  // Speichern ab. Die Tagesliste wird jetzt einfach mitgezogen.
+  if (aktiverScreen === 'tagesliste') renderTagesliste();
   if (aktiverScreen === 'plaene') renderPlaeneScreen();
   if (aktiverScreen === 'aufgaben') renderAufgabenScreen();
   if (alleErledigt) showToast('✓ Plan abgeschlossen!');
@@ -3190,7 +3354,7 @@ function planLoeschen() {
   DB.plaene = (DB.plaene || []).filter(p => p.id !== editId);
   setzeGeaendert();
   closeNeuerPlanModal();
-  if (tlPlan && editId === tlPlan.id) { tlPlan = null; renderTagesliste(); }
+  if (aktiverScreen === 'tagesliste') renderTagesliste();
   if (aktiverScreen === 'plaene') renderPlaeneScreen();
   if (aktiverScreen === 'aufgaben') renderAufgabenScreen();
   showToast('Plan gelöscht');
@@ -3477,9 +3641,50 @@ function zoomSetzen(stufe) {
 function zoomInit() { zoomSetzen(localStorage.getItem(ZOOM_KEY) || 'm'); }
 
 // ── WIEDERHOLUNG ──
+
+// ── DATUMSGRUPPEN (aus WorkAssist portiert) ───────────────────────────────
+// Massgeblich ist immer anzeigedatum(), nicht a.faellig – sonst tauchen
+// wiedervorgelegte Aufgaben zu frueh auf
+function anzeigedatum(a) {
+  if (!a) return null;
+  return a.wiedervorlage || a.startdatum || a.faellig || null;
+}
+
+function plusTage(iso, n) {
+  const d = new Date(iso + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return isoDatum(d);
+}
+
+// Datum, das n Arbeitstage in der Zukunft liegt (Sa/So uebersprungen)
+function arbeitstageVor(iso, n) {
+  let d = new Date(iso + 'T12:00:00');
+  let uebrig = n;
+  while (uebrig > 0) {
+    d.setDate(d.getDate() + 1);
+    const wt = d.getDay();
+    if (wt !== 0 && wt !== 6) uebrig--;
+  }
+  return isoDatum(d);
+}
+
+function istUeberfaellig(a, td) {
+  if (!a || a.status === 'erledigt') return false;
+  const ad = anzeigedatum(a);
+  return !!ad && ad < td;
+}
+
+function istZeitnah(a, td) {
+  if (!a || a.status === 'erledigt') return false;
+  const ad = anzeigedatum(a);
+  if (!ad) return false;
+  return ad >= td && ad <= arbeitstageVor(td, 3);
+}
+
 function naechsteWiederholInstanz(faellig, wiederholung) {
   if (!faellig || !wiederholung) return null;
-  const d = new Date(faellig);
+  // 'JJJJ-MM-TT' wird als UTC gelesen – mittags verankern, sonst kippt der Tag
+  const d = new Date(faellig + 'T12:00:00');
   if (wiederholung.typ === 'woechentlich') {
     const wt = wiederholung.wochentage;
     if (wt && wt.length > 0) {
@@ -3487,19 +3692,19 @@ function naechsteWiederholInstanz(faellig, wiederholung) {
       const aj=d.getDay(); const iv=wiederholung.intervall||1; let k=null;
       for (const tag of st){const jt=jv(tag);let diff=jt-aj;if(diff<=0)diff+=7;const n=new Date(d);n.setDate(d.getDate()+diff);if(!k||n<k)k=n;}
       if(iv>1&&k){const dt=Math.round((k-d)/86400000);if(dt<7)k.setDate(k.getDate()+(iv-1)*7);}
-      return k?k.toISOString().slice(0,10):null;
+      return k ? isoDatum(k) : null;
     } else { d.setDate(d.getDate()+7*(wiederholung.intervall||1)); }
   } else if (wiederholung.typ==='monatlich'){d.setMonth(d.getMonth()+1);
   } else if (wiederholung.typ==='xmonatlich'){d.setMonth(d.getMonth()+(wiederholung.intervall||1));
   } else if (wiederholung.typ==='jaehrlich'){d.setFullYear(d.getFullYear()+1);}
-  return d.toISOString().slice(0,10);
+  return isoDatum(d);
 }
 function aufgErledigen(aufgId) {
   const a=DB.aufgaben.find(x=>x.id===aufgId); if(!a) return;
   a.status='erledigt'; a.geaendert=new Date().toISOString();
   if(a.wiederholung&&a.faellig&&!a.nichtMehrAktiv){
     const nf=naechsteWiederholInstanz(a.faellig,a.wiederholung);
-    if(nf)DB.aufgaben.push({id:uid(),titel:a.titel,status:'offen',faellig:nf,notiz:a.notiz||null,tags:[...(a.tags||[])],wiederholung:JSON.parse(JSON.stringify(a.wiederholung)),nichtMehrAktiv:false,erstellt:new Date().toISOString(),geaendert:new Date().toISOString()});
+    if(nf)DB.aufgaben.push({id:uid(),titel:a.titel,status:'offen',faellig:nf,groesse:a.groesse||null,notiz:a.notiz||null,tags:[...(a.tags||[])],wiederholung:JSON.parse(JSON.stringify(a.wiederholung)),nichtMehrAktiv:false,erstellt:new Date().toISOString(),geaendert:new Date().toISOString()});
   }
   setzeGeaendert();
 }
@@ -3572,7 +3777,9 @@ function renderTlLesen(tl) {
   if (!itemsEl) return;
   const eintr = tl.eintraege || [];
   if (!eintr.length) {
-    itemsEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-xdim);font-size:calc(var(--fs)*0.75);">Noch keine Einträge — tippe unten um zu beginnen.</div>';
+    itemsEl.innerHTML =
+      '<div style="padding:20px 24px;text-align:center;color:var(--text-xdim);font-size:calc(var(--fs)*0.75);">Noch keine Einträge — tippe unten um zu beginnen.</div>'
+      + tlZusatzAbschnitte(tl);
     return;
   }
   itemsEl.innerHTML = eintr.map((e, i) => {
@@ -3588,11 +3795,79 @@ function renderTlLesen(tl) {
     return `<div class="tl-item">
       <div class="tl-cb ${cbK}" onclick="tlToggle(${i})"></div>
       <div class="tl-body">
-        <div class="tl-text ${isDn?'done':''}">${escHtml(tt)}</div>
+        <div class="tl-text ${isDn?'done':''}">${escHtml(tt)}${
+          a?.groesse ? ` <span class="tl-groesse">${a.groesse} min</span>` : ''}</div>
         ${noteH}
       </div>
     </div>`;
-  }).join('');
+  }).join('') + tlZusatzAbschnitte(tl);
+}
+
+// Ueberfaellige und zeitnahe Aufgaben stehen unter der kuratierten Liste –
+// nicht darin. Die Tagesliste bleibt deine bewusste Auswahl.
+function tlZusatzAbschnitte(tl) {
+  const td = tlDatumHeute();
+  const drin = new Set((tl.eintraege || []).map(e => e.aufgabeId).filter(Boolean));
+  const frei = a => a.status !== 'erledigt' && !drin.has(a.id);
+
+  const ueber = (DB.aufgaben || []).filter(a => frei(a) && istUeberfaellig(a, td))
+    .sort((a, b) => (anzeigedatum(a) || '').localeCompare(anzeigedatum(b) || ''));
+  const nah = (DB.aufgaben || []).filter(a => frei(a) && istZeitnah(a, td))
+    .sort((a, b) => (anzeigedatum(a) || '').localeCompare(anzeigedatum(b) || ''));
+
+  if (!ueber.length && !nah.length) return '';
+
+  function block(titel, liste, klasse) {
+    if (!liste.length) return '';
+    const offen = tlAbschnittOffen[klasse] !== false;
+    return `<div class="tl-zusatz-kopf ${klasse}" onclick="tlAbschnittToggle('${klasse}')">
+        <span class="tl-zusatz-pfeil">${offen ? '▾' : '▸'}</span>
+        <span>${titel}</span>
+        <span class="tl-zusatz-anz">${liste.length}</span>
+      </div>` +
+      (offen ? liste.map(a => `<div class="tl-item tl-zusatz">
+          <div class="tl-cb ${a.wiederholung ? 'repeat' : ''}" onclick="tlZusatzErledigt('${a.id}')"></div>
+          <div class="tl-body">
+            <div class="tl-text">${escHtml(a.titel || '')}${
+              a.groesse ? ` <span class="tl-groesse">${a.groesse} min</span>` : ''}</div>
+            <div class="tl-zusatz-meta">${anzeigedatum(a) ? formatDatum(anzeigedatum(a)) : ''}</div>
+          </div>
+          <button class="tl-zusatz-plus" onclick="tlZusatzUebernehmen('${a.id}')"
+            title="Auf die Tagesliste setzen">+</button>
+        </div>`).join('') : '');
+  }
+
+  return block('Überfällig', ueber, 'ueber') +
+         block('Zeitnah – nächste 3 Arbeitstage', nah, 'nah');
+}
+
+// Aufklappzustand nur im Arbeitsspeicher – er soll nicht in die Datei
+const tlAbschnittOffen = { ueber: true, nah: true };
+
+function tlAbschnittToggle(klasse) {
+  tlAbschnittOffen[klasse] = tlAbschnittOffen[klasse] === false;
+  renderTagesliste();
+}
+
+function tlZusatzErledigt(id) {
+  // Ueber aufgErledigen(), damit Wiederholungen genauso behandelt werden
+  // wie beim Abhaken in der Tagesliste selbst
+  aufgErledigen(id);
+  renderTagesliste();
+  if (aktiverScreen === 'aufgaben') renderAufgabenScreen();
+}
+
+function tlZusatzUebernehmen(id) {
+  const a = (DB.aufgaben || []).find(x => x.id === id);
+  if (!a) return;
+  const tl = tlHeuteHolen();
+  if ((tl.eintraege || []).some(e => e.aufgabeId === id)) return;
+  tl.eintraege.push({ id: uid(), typ: 'aufgabe', aufgabeId: a.id, titel: a.titel,
+                      abschnitt: null, status: 'offen', kommentar: null });
+  tl.geaendert = new Date().toISOString();
+  setzeGeaendert();
+  renderTagesliste();
+  showToast('Auf die Tagesliste gesetzt');
 }
 
 function renderTlBearbeiten(tl) {
@@ -3708,7 +3983,7 @@ function tlMorgen(i) {
   const e  = tl.eintraege[i]; if (!e) return;
   if (!DB.tageslisten) DB.tageslisten = [];
   const mg = new Date(); mg.setDate(mg.getDate()+1);
-  const ms = mg.toISOString().slice(0,10);
+  const ms = isoDatum(mg);
   let mp = DB.tageslisten.find(x => x.datum === ms);
   if (!mp) {
     mp = { id:uid(), datum:ms, eintraege:[], erstellt:new Date().toISOString(), geaendert:new Date().toISOString() };
@@ -3725,6 +4000,42 @@ function tlSchnellText() {
   const tl  = tlHeuteHolen();
   tl.eintraege.push({ id:uid(), typ:'text', titel:t, aufgabeId:null, abschnitt:null, status:'offen', kommentar:null });
   tl.geaendert = new Date().toISOString(); setzeGeaendert(); inp.value = ''; renderTagesliste();
+}
+
+// Legt aus dem Schnell-Feld eine echte Aufgabe an und setzt sie gleich auf
+// die Tagesliste. Anders als tlSchnellText() ueberlebt sie den Tag und ist
+// in WorkAssist sichtbar. Faellig heute, damit sie nicht ohne Datum versandet.
+function tlNeueAufgabe() {
+  const inp = document.getElementById('tl-add-input');
+  const titel = inp?.value.trim();
+  if (!titel) { showToast('Bitte erst einen Text eingeben'); inp?.focus(); return; }
+
+  const a = {
+    id:         uid(),
+    titel,
+    status:     'offen',
+    faellig:    tlDatumHeute(),
+    groesse:    null,
+    notiz:      null,
+    tags:       [],
+    wiederholung: null,
+    nichtMehrAktiv: false,
+    erstellt:   new Date().toISOString(),
+    geaendert:  new Date().toISOString(),
+  };
+  DB.aufgaben.push(a);
+
+  const tl = tlHeuteHolen();
+  tl.eintraege.push({ id: uid(), typ: 'aufgabe', aufgabeId: a.id, titel: a.titel,
+                      abschnitt: null, status: 'offen', kommentar: null });
+  tl.geaendert = new Date().toISOString();
+
+  setzeGeaendert();
+  inp.value = '';
+  renderTagesliste();
+  if (typeof renderSidebar === 'function') renderSidebar();
+  if (aktiverScreen === 'aufgaben') renderAufgabenScreen();
+  showToast('Aufgabe angelegt und eingetragen');
 }
 
 function tlAufgabeOverlayToggle() {
