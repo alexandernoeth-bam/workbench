@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#00897B">
 <link rel="manifest" href="manifest-smallassist.json">
 <link rel="apple-touch-icon" href="icon-smallassist.svg">
-<title>SmallAssist 1.2.15</title>
+<title>SmallAssist 1.2.17</title>
 <style>
 :root {
   --teal:        #00897B;
@@ -421,6 +421,32 @@ body.notiz-vollbild #notiz-render-view {
 body.notiz-vollbild #notiz-textarea { padding-bottom: 40px; }
 
 
+
+
+/* ── GERÄTESPEICHER (v1.2.17) ── */
+/* Knöpfe nur im jeweils gültigen Modus zeigen */
+.opfs-nur { display: none; }
+body.opfs .opfs-nur { display: inline-flex; }
+body.opfs .datei-nur { display: none; }
+#btn-opfs-umschalten {
+  min-width: 26px; font-weight: 700; font-size: 12px;
+  background: rgba(255,255,255,0.18); border-radius: 6px; padding: 4px 8px;
+}
+#btn-opfs-import, #btn-opfs-export { padding: 4px 7px; font-size: 14px; }
+
+.opfs-warnung {
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  padding: 7px 14px; font-size: calc(var(--fs) * 0.6875);
+  background: #fffbeb; color: #78350f;
+  border-bottom: 1px solid #fde68a;
+}
+.opfs-warnung button {
+  margin-left: auto; flex-shrink: 0;
+  border: 1px solid #fcd34d; background: #fff; color: #78350f;
+  border-radius: 6px; padding: 4px 11px; font-size: calc(var(--fs) * 0.6875);
+  cursor: pointer; font-family: var(--font); min-height: 30px;
+}
+.opfs-warnung button:active { background: #fef3c7; }
 
 /* ── GRÖSSE (Aufwand) – 1:1 aus WorkAssist übernommen (v1.2.15) ── */
 .aufg-groesse {
@@ -995,7 +1021,7 @@ body.notiz-vollbild .ntb-vb {
   <div id="sidebar">
     <div class="sb-logo">
       <span class="sb-logo-name">SmallAssist</span>
-      <span class="sb-logo-version">v1.2.15</span>
+      <span class="sb-logo-version">v1.2.17</span>
     </div>
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);">
       <div class="sb-nav-item active" data-screen="tagesliste" onclick="zeigeScreen('tagesliste',this)">
@@ -1041,11 +1067,19 @@ body.notiz-vollbild .ntb-vb {
           style="border:none;background:rgba(255,255,255,0.15);color:white;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;" title="Hell/Dunkel">
           🌙
         </button>
-        <button class="btn-ghost" id="btn-datei" onclick="dateiClick()" style="padding:4px 8px;font-size:11px;">📂</button>
+        <button class="btn-ghost opfs-nur" id="btn-opfs-umschalten" onclick="opfsUmschalten()"
+          title="Zwischen Beruflich und Privat wechseln">B</button>
+        <button class="btn-ghost opfs-nur" id="btn-opfs-import" onclick="opfsImportieren()"
+          title="JSON übernehmen">↧</button>
+        <button class="btn-ghost opfs-nur" id="btn-opfs-export" onclick="opfsExportieren()"
+          title="JSON sichern">↥</button>
+        <button class="btn-ghost datei-nur" id="btn-datei" onclick="dateiClick()" style="padding:4px 8px;font-size:11px;">📂</button>
         <button id="btn-speichern" onclick="speichernManuell()"
           style="border:none;background:rgba(255,255,255,0.15);color:white;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;display:none;" title="Speichern">💾</button>
       </div>
     </div>
+
+    <div class="opfs-warnung" id="opfs-warnung" style="display:none;"></div>
 
     <!-- SCREENS -->
 
@@ -1539,7 +1573,7 @@ body.notiz-vollbild .ntb-vb {
 <script>
 'use strict';
 
-const APP_VERSION = '1.2.15';
+const APP_VERSION = '1.2.17';
 
 // ── STATE ──
 let fileHandle = null;
@@ -1571,9 +1605,23 @@ function isoDatum(d) {
 }
 function today() { return isoDatum(new Date()); }
 
+const SB_KEY = 'smallassist_sidebar';
+
 function sidebarToggle() {
   const sb = document.getElementById('sidebar');
-  sb.classList.toggle('versteckt');
+  const zu = sb.classList.toggle('versteckt');
+  try { localStorage.setItem(SB_KEY, zu ? 'zu' : 'auf'); } catch (e) {}
+}
+
+// Start im Vollbild: die Sidebar bleibt eingeklappt, bis sie geöffnet wird.
+// Die Entscheidung wird gemerkt – wer sie aufklappt, findet sie beim
+// nächsten Start wieder offen.
+function sidebarInit() {
+  const sb = document.getElementById('sidebar');
+  if (!sb) return;
+  let stand = null;
+  try { stand = localStorage.getItem(SB_KEY); } catch (e) {}
+  sb.classList.toggle('versteckt', stand !== 'auf');
 }
 function escHtml(s) {
   if (typeof s !== 'string') return '';
@@ -1670,7 +1718,216 @@ async function dateiClick() {
   }
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  GERÄTESPEICHER (OPFS)                                          v1.2.17
+//
+//  Auf Android gibt es showOpenFilePicker nicht – eine Web-App kann dort
+//  keine Datei im Dateisystem beschreiben. Stattdessen nutzt SmallAssist
+//  das Origin Private File System: einen privaten Dateibereich der App,
+//  in dem echte JSON-Dateien liegen, die ohne jede Nachfrage gelesen und
+//  geschrieben werden.
+//
+//  Auf dem PC bleibt der bisherige Weg über echte Dateien bestehen. Welcher
+//  Weg gilt, entscheidet die Verfügbarkeit von showOpenFilePicker.
+//
+//  ACHTUNG: Der Gerätespeicher wird nicht mit dem PC abgeglichen. Wer beide
+//  bearbeitet, hat zwei Stände. Deshalb der Export-Knopf.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const OPFS_DATEIEN = {
+  beruf:  { datei: 'workassist_data.json',   name: 'Beruflich' },
+  privat: { datei: 'workassist_privat.json', name: 'Privat'    },
+};
+const OPFS_AKTIV_KEY = 'smallassist_opfs_aktiv';
+
+let opfsModus  = false;    // true = Gerätespeicher statt Dateisystem
+let opfsAktiv  = 'beruf';  // welche der beiden Dateien gerade offen ist
+
+// Der Gerätespeicher greift nur, wo es keinen Dateidialog gibt
+function opfsNoetig() {
+  return !window.showOpenFilePicker && !!(navigator.storage && navigator.storage.getDirectory);
+}
+
+async function opfsWurzel() {
+  return await navigator.storage.getDirectory();
+}
+
+async function opfsLesen(schluessel) {
+  try {
+    const w = await opfsWurzel();
+    const h = await w.getFileHandle(OPFS_DATEIEN[schluessel].datei);
+    const t = await (await h.getFile()).text();
+    return t && t.trim() ? t : null;
+  } catch (e) { return null; }   // Datei gibt es noch nicht
+}
+
+async function opfsSchreiben(schluessel, text) {
+  const w = await opfsWurzel();
+  const h = await w.getFileHandle(OPFS_DATEIEN[schluessel].datei, { create: true });
+  const s = await h.createWritable();
+  await s.write(text);
+  await s.close();
+}
+
+async function opfsVorhanden(schluessel) {
+  return (await opfsLesen(schluessel)) !== null;
+}
+
+// Android darf den Speicher bei Platzmangel räumen – einmal um Schutz bitten
+async function opfsSchutzAnfragen() {
+  try {
+    if (!navigator.storage || !navigator.storage.persist) return false;
+    if (await navigator.storage.persisted()) return true;
+    return await navigator.storage.persist();
+  } catch (e) { return false; }
+}
+
+// ── Laden und Speichern ───────────────────────────────────────────────────
+async function opfsOeffnen(schluessel) {
+  opfsAktiv = OPFS_DATEIEN[schluessel] ? schluessel : 'beruf';
+  try { localStorage.setItem(OPFS_AKTIV_KEY, opfsAktiv); } catch (e) {}
+
+  const text = await opfsLesen(opfsAktiv);
+  if (text === null) {
+    // Noch keine Daten – migrateDB() legt alle Felder selbst an
+    DB = { version: APP_VERSION };
+    migrateDB();
+    await opfsSpeichern();
+  } else {
+    try {
+      await _ladeText(text, OPFS_DATEIEN[opfsAktiv].name);
+    } catch (e) {
+      showToast('❌ ' + OPFS_DATEIEN[opfsAktiv].name + ': ' + (e.message || 'unlesbar'));
+      return;
+    }
+  }
+  opfsStatusZeichnen();
+  renderSidebar();
+  zeigeScreenDirekt('tagesliste');
+  renderTagesliste();
+  renderAufgabenScreen();
+}
+
+async function opfsSpeichern() {
+  if (!DB) return;
+  try {
+    await opfsSchreiben(opfsAktiv, JSON.stringify(DB, null, 2));
+    ungespeichert = false;
+    try { localStorage.setItem('smallassist_opfs_stand_' + opfsAktiv,
+      new Date().toISOString()); } catch (e) {}
+    opfsStatusZeichnen();
+  } catch (e) {
+    ungespeichert = true;
+    console.warn('[Gerätespeicher] Schreiben fehlgeschlagen:', e.message);
+    showToast('❌ Speichern fehlgeschlagen');
+  }
+}
+
+async function opfsUmschalten() {
+  if (ungespeichert) await opfsSpeichern();
+  await opfsOeffnen(opfsAktiv === 'beruf' ? 'privat' : 'beruf');
+  showToast(OPFS_DATEIEN[opfsAktiv].name);
+}
+
+// ── Import und Export ─────────────────────────────────────────────────────
+function opfsImportieren() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'application/json,.json';
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0];
+    if (!f) return;
+    try {
+      const text = await f.text();
+      JSON.parse(text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text);  // erst prüfen
+      const ziel = /privat/i.test(f.name) ? 'privat' : 'beruf';
+      if (await opfsVorhanden(ziel) &&
+          !confirm(OPFS_DATEIEN[ziel].name + ' ersetzen? Der bisherige Stand geht verloren.'))
+        return;
+      await opfsSchreiben(ziel, text);
+      await opfsOeffnen(ziel);
+      showToast('✓ ' + OPFS_DATEIEN[ziel].name + ' übernommen');
+    } catch (e) {
+      showToast('❌ ' + (e.message || 'Datei konnte nicht gelesen werden'));
+    }
+  };
+  inp.click();
+}
+
+function opfsExportieren() {
+  if (!DB) return;
+  try {
+    const blob = new Blob([JSON.stringify(DB, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = OPFS_DATEIEN[opfsAktiv].datei;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    try { localStorage.setItem('smallassist_opfs_export_' + opfsAktiv,
+      new Date().toISOString()); } catch (e) {}
+    opfsStatusZeichnen();
+    showToast('✓ Ausgegeben – bitte sichern');
+  } catch (e) { showToast('❌ Export fehlgeschlagen'); }
+}
+
+// ── Statuszeile ───────────────────────────────────────────────────────────
+function opfsLetzterExport() {
+  try { return localStorage.getItem('smallassist_opfs_export_' + opfsAktiv); }
+  catch (e) { return null; }
+}
+
+// Tage seit dem letzten Export – ab 3 Tagen wird gemahnt
+function opfsExportAlter() {
+  const e = opfsLetzterExport();
+  if (!e) return null;
+  return Math.floor((Date.now() - new Date(e).getTime()) / 86400000);
+}
+
+function opfsStatusZeichnen() {
+  if (!opfsModus) return;
+  const el = document.getElementById('topbar-file');
+  if (el) el.textContent = OPFS_DATEIEN[opfsAktiv].name;
+
+  const btn = document.getElementById('btn-opfs-umschalten');
+  if (btn) btn.textContent = opfsAktiv === 'beruf' ? 'B' : 'P';
+
+  const warn = document.getElementById('opfs-warnung');
+  if (warn) {
+    const alter = opfsExportAlter();
+    if (alter === null) {
+      warn.style.display = 'flex';
+      warn.innerHTML = 'Noch keine Sicherung. Die Daten liegen nur auf diesem Gerät. ' +
+        '<button onclick="opfsExportieren()">Jetzt sichern</button>';
+    } else if (alter >= 3) {
+      warn.style.display = 'flex';
+      warn.innerHTML = 'Letzte Sicherung vor ' + alter + ' Tagen. ' +
+        '<button onclick="opfsExportieren()">Jetzt sichern</button>';
+    } else {
+      warn.style.display = 'none';
+    }
+  }
+}
+
+// ── Start ─────────────────────────────────────────────────────────────────
+async function opfsStart() {
+  opfsModus = opfsNoetig();
+  document.body.classList.toggle('opfs', opfsModus);
+  if (!opfsModus) return false;
+
+  try { opfsAktiv = localStorage.getItem(OPFS_AKTIV_KEY) || 'beruf'; } catch (e) {}
+  if (!OPFS_DATEIEN[opfsAktiv]) opfsAktiv = 'beruf';
+
+  await opfsSchutzAnfragen();
+  await opfsOeffnen(opfsAktiv);
+  return true;
+}
+// ═══ Ende Gerätespeicher ══════════════════════════════════════════════════
+
 async function speichern() {
+  // Auf Android führt der Weg über den Gerätespeicher
+  if (opfsModus) { await opfsSpeichern(); return; }
   if (!DB || !fileHandle) return;
   try {
     // Berechtigungsprüfung (optional — nicht alle Browser unterstützen queryPermission)
@@ -1703,7 +1960,7 @@ async function _ladeText(text, name) {
   if (!Array.isArray(parsed.aufgaben)) parsed.aufgaben = [];
   DB = parsed;
   migrateDB();
-  document.getElementById('topbar-file').textContent = '✓ ' + name;
+  document.getElementById('topbar-file').textContent = opfsModus ? name : '✓ ' + name;
   document.getElementById('btn-datei').textContent = '📂';
   // Speichern-Button nur zeigen wenn fileHandle vorhanden
   const sbtn = document.getElementById('btn-speichern');
@@ -1764,6 +2021,7 @@ function setzeGeaendert() {
 }
 
 async function speichernManuell() {
+  if (opfsModus) { await opfsSpeichern(); showToast('✓ Gespeichert'); return; }
   if (!DB || !fileHandle) return;
   try {
     // requestPermission explizit — hier ist eine Nutzer-Geste vorhanden
@@ -2218,16 +2476,17 @@ function renderListenScreen() {
   const aktivFilter = document.getElementById('listen-screen-filter')?.value || '';
   const titelEl = document.getElementById('listen-screen-titel');
   if (titelEl) titelEl.textContent = aktivFilter || 'Alle Listen';
-  let aufgaben = [...DB.aufgaben].sort((a,b) => (b.geaendert||'').localeCompare(a.geaendert||''));
+  // Listen zeigen nur Offenes – erledigte Aufgaben stehen im Aufgaben-Screen
+  let aufgaben = [...DB.aufgaben]
+    .filter(a => a.status !== 'erledigt')
+    .sort((a,b) => (b.geaendert||'').localeCompare(a.geaendert||''));
   if (aktivFilter) aufgaben = aufgaben.filter(a => (a.tags||[]).includes(aktivFilter));
-  const offen    = aufgaben.filter(a => a.status !== 'erledigt');
-  const erledigt = aufgaben.filter(a => a.status === 'erledigt');
   let html = '';
   if (!aufgaben.length) {
-    html = '<div class="empty-state">Keine Aufgaben</div>';
+    html = '<div class="empty-state">Nichts offen' +
+           (aktivFilter ? ' in „' + escHtml(aktivFilter) + '"' : '') + '</div>';
   } else {
-    if (offen.length)    { html += '<div class="gruppe-header">Zu tun</div>'; html += offen.map(a => aufgZeileHTML(a,td)).join(''); }
-    if (erledigt.length) { html += '<div class="gruppe-header">Erledigt</div>'; html += erledigt.map(a => aufgZeileHTML(a,td)).join(''); }
+    html = aufgaben.map(a => aufgZeileHTML(a,td)).join('');
   }
   container.innerHTML = html;
   container.querySelectorAll('.aufg-row').forEach(el => {
@@ -3681,6 +3940,19 @@ function istZeitnah(a, td) {
   return ad >= td && ad <= arbeitstageVor(td, 3);
 }
 
+
+// Monate weiterzählen, ohne über das Monatsende zu rollen.
+// setMonth() macht aus dem 31.08. + 1 Monat den 01.10., weil es den
+// 31.09. nicht gibt. Richtig ist der letzte Tag des Zielmonats.
+function monateWeiter(d, n) {
+  const tag = d.getDate();
+  d.setDate(1);                       // erst auf den Monatsersten, dann schieben
+  d.setMonth(d.getMonth() + n);
+  const letzter = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(tag, letzter));
+  return d;
+}
+
 function naechsteWiederholInstanz(faellig, wiederholung) {
   if (!faellig || !wiederholung) return null;
   // 'JJJJ-MM-TT' wird als UTC gelesen – mittags verankern, sonst kippt der Tag
@@ -3694,9 +3966,14 @@ function naechsteWiederholInstanz(faellig, wiederholung) {
       if(iv>1&&k){const dt=Math.round((k-d)/86400000);if(dt<7)k.setDate(k.getDate()+(iv-1)*7);}
       return k ? isoDatum(k) : null;
     } else { d.setDate(d.getDate()+7*(wiederholung.intervall||1)); }
-  } else if (wiederholung.typ==='monatlich'){d.setMonth(d.getMonth()+1);
-  } else if (wiederholung.typ==='xmonatlich'){d.setMonth(d.getMonth()+(wiederholung.intervall||1));
-  } else if (wiederholung.typ==='jaehrlich'){d.setFullYear(d.getFullYear()+1);}
+  } else if (wiederholung.typ==='monatlich'){ monateWeiter(d, 1);
+  } else if (wiederholung.typ==='xmonatlich'){ monateWeiter(d, wiederholung.intervall||1);
+  } else if (wiederholung.typ==='jaehrlich'){
+    // 29.02. gibt es nicht jedes Jahr – dann auf den 28.02. zurückfallen
+    const tag = d.getDate();
+    d.setFullYear(d.getFullYear()+1);
+    if (d.getDate() !== tag) d.setDate(0);
+  }
   return isoDatum(d);
 }
 function aufgErledigen(aufgId) {
@@ -4106,7 +4383,11 @@ function planSchrittVerschieben(idx,r){
 (function(){
   themeInit();
   zoomInit();
-  handleWiederherstellen();
+  sidebarInit();
+  // Auf Android übernimmt der Gerätespeicher, sonst der bisherige Dateiweg
+  opfsStart().then(uebernommen => {
+    if (!uebernommen) handleWiederherstellen();
+  }).catch(e => { console.warn('[Gerätespeicher]', e); handleWiederherstellen(); });
 
   // ── SERVICE WORKER: gemeinsamer sw.js der Werkbank ────────────────────────
   // Alle drei Apps teilen sich einen Worker. Alte Registrierungen – der
