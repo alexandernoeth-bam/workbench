@@ -2,8 +2,16 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>TimeAssist 0.21.0 · Mockup M7</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<!-- Zum Home-Bildschirm hinzufügen: startet ohne Adress- und Tableiste.
+     Ohne diese Angaben bleibt iOS im normalen Browserfenster.        -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="TimeAssist">
+<meta name="theme-color" content="#faf8f4">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
+<title>TimeAssist 0.22.0 · Mockup M7.1</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -37,7 +45,13 @@
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; }
 body { font-family: var(--sans); background: #cdc6b8; color: var(--tinte);
-       font-size: 14px; overflow: hidden; }
+       font-size: 14px; overflow: hidden; overscroll-behavior: none;
+       -webkit-text-size-adjust: 100%; }
+/* Im Vollbild (zum Home-Bildschirm hinzugefuegt) sitzt das Blatt buendig */
+@media (display-mode: standalone) {
+  .buehne { padding: env(safe-area-inset-top) env(safe-area-inset-right)
+                    env(safe-area-inset-bottom) env(safe-area-inset-left); }
+}
 button { cursor: pointer; background: none; border: none; font: inherit; color: inherit; }
 input, textarea { font: inherit; color: inherit; }
 
@@ -681,7 +695,7 @@ input, textarea { font: inherit; color: inherit; }
 <script>
 'use strict';
 
-const APP_VERSION = '0.21.0';
+const APP_VERSION = '0.22.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -1090,8 +1104,9 @@ function kopf(titel, sub, akt) {
   $('bk-sub').textContent = sub || '';
   $('bk-akt').innerHTML = akt || '';
   $('bf-nr').textContent = formNr();
-  $('bf-mitte').textContent = 'TimeAssist ' + APP_VERSION + ' \u00b7 Mockup M7';
-  $('bf-rechts').textContent = '2026';
+  $('bf-mitte').textContent = 'TimeAssist ' + APP_VERSION + ' \u00b7 Mockup M7.1';
+  /* bf-rechts traegt den Massstab, gesetzt in skaliere() */
+  skaliere();
 }
 
 /* ═══ GEMEINSAME BAUSTEINE ═══ */
@@ -3236,14 +3251,27 @@ function exportZu() { $('export').classList.remove('auf'); }
 /* ═══ SKALIERUNG DES GERÄTERAHMENS ═══ */
 function skaliere() {
   const g = $('geraet');
-  const s = Math.min(window.innerWidth / 820, window.innerHeight / 1180, 1);
+  /* visualViewport liefert auf iOS die tatsaechlich sichtbare Flaeche —
+     window.innerHeight zaehlt bei eingeblendeter Tastatur falsch.     */
+  const vv = window.visualViewport;
+  const b = vv ? vv.width : window.innerWidth;
+  const ho = vv ? vv.height : window.innerHeight;
+  const s = Math.min(b / 820, ho / 1180, 1);
   g.style.transform = 'scale(' + s + ')';
+  /* Zur Kontrolle im Blattfuss: so laesst sich am Geraet ablesen, ob eine
+     Schrift zu klein wirkt oder nur der Massstab kleiner als 1 ist.   */
+  const f = $('bf-rechts');
+  if (f) { f.textContent = '2026 \u00b7 ' + Math.round(s * 100) + '%'; }
 }
 
 /* ═══ START ═══ */
 (function () {
   skaliere();
   window.addEventListener('resize', skaliere);
+  window.addEventListener('orientationchange', function () { setTimeout(skaliere, 250); });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', skaliere);
+  }
   renderAlles();
 }());
 </script>
