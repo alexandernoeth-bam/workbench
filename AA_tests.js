@@ -153,7 +153,18 @@ kat('7 · Datenmodell minimal');
   else { fail('Altfelder zurückgekehrt: ' + drin.join(', ')); }
   if (!/\bq:\s*'(outlook|google)'/.test(JS)) { ok('kein Terminimport-Quellenfeld'); }
   else { fail('Quellenfeld für Terminimport zurück'); }
-  if (!/\.schritte\b|schritte:/.test(JSK)) { ok('keine Plan-schritte[] mehr'); }
+  /* Der Import liest p.schritte aus dem WorkAssist-Quellformat — das ist
+     erlaubt. Verboten ist das Feld nur am TimeAssist-Plan selbst.      */
+  const iA = JSK.indexOf('function waUmwandeln');
+  const iE = JSK.indexOf('let waErgebnis');
+  const ohneImport = (iA !== -1 && iE > iA)
+    ? JSK.slice(0, iA) + JSK.slice(iE)
+    : JSK;
+  /* Gesucht ist der Zugriff auf ein Planfeld (p.schritte, plan.schritte)
+     oder dessen Deklaration — nicht der Zaehler b.schritte im Bericht. */
+  if (!/\b(?:p|plan|x)\.schritte\b|schritte\s*:\s*\[/.test(ohneImport)) {
+    ok('keine Plan-schritte[] am TimeAssist-Plan');
+  }
   else { fail('Plan-schritte[] zurück — zweiter Mechanismus neben den Aktivitäten'); }
 }
 
@@ -272,6 +283,52 @@ kat('10 · Datenschicht und Speicher');
       /spZustand = 'fluechtig'/.test(JS)) {
     ok('Speicherausfall wird abgefangen und angezeigt');
   } else { fail('Kein Rückfall bei Speicherausfall'); }
+}
+
+/* ═══ 11 · WorkAssist-Import (S7) ═══════════════════════════════════════
+   Fehlerarten: erledigte Aufgaben werden mitgeschleppt; ein zweiter
+   Dateiimport ersetzt statt hinzuzufügen; Wochentage werden nicht von
+   Sonntag-Null auf Montag-Null gedreht; ein fehlender Wochentag wird zu
+   sieben erfundenen Tagen.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('11 · WorkAssist-Import');
+{
+  ['istWorkAssist', 'waUmwandeln', 'waVorschau', 'waUebernehmen', 'waDatum']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const mU = JSK.match(/function waUmwandeln\(d\) \{([\s\S]*?)\n\}/);
+  if (!mU) { fail('waUmwandeln nicht auswertbar'); }
+  else {
+    const u = mU[1];
+    if (/status === 'erledigt'/.test(u)) { ok('Erledigtes wird übersprungen'); }
+    else { fail('Erledigte Aufgaben werden mitgeschleppt'); }
+    if (/\(t \+ 6\) % 7/.test(u)) { ok('Wochentage von Sonntag-Null auf Montag-Null gedreht'); }
+    else { fail('Wochentagsdrehung fehlt — Rhythmen landen falsch'); }
+    if (/tage = \[0, 1, 2, 3, 4, 5, 6\]/.test(u.split('wieder.push')[0] || '')) {
+      fail('Fehlender Wochentag wird zu sieben erfundenen Tagen');
+    } else { ok('kein erfundener Wochenrhythmus bei leerer Angabe'); }
+    if (/BEREICHE\.find\(x => x\.name === 'Ohne Bereich'\)/.test(u)) {
+      ok('"Ohne Bereich" wird beim zweiten Import wiederverwendet');
+    } else { fail('Zweiter Import erzeugt ein zweites "Ohne Bereich"'); }
+    if (/hatKinder\[b\.id\]/.test(u)) { ok('Oberbereiche entfallen als Ebene'); }
+    else { fail('Bereichshierarchie wird nicht abgeflacht'); }
+    if (/zeitnah === true \? 'A' : 'B'/.test(JSK)) { ok('zeitnah → Priorität A'); }
+    else { fail('Prioritätsabbildung fehlt'); }
+  }
+
+  const mUeb = JSK.match(/function waUebernehmen\(\) \{([\s\S]*?)\n\}/);
+  if (!mUeb) { fail('waUebernehmen nicht auswertbar'); }
+  else if (/\.push\(/.test(mUeb[1]) && !/dbUebernehmen/.test(mUeb[1])) {
+    ok('Import fügt hinzu, statt zu ersetzen');
+  } else { fail('Import ersetzt den Bestand — die zweite Datei löscht die erste'); }
+
+  const mImp = JSK.match(/function datenImport\(ev\) \{([\s\S]*?)\n\}/);
+  if (mImp && /istWorkAssist\(neu\)/.test(mImp[1])) {
+    ok('Import erkennt das WorkAssist-Format');
+  } else { fail('WorkAssist-Dateien werden nicht erkannt'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

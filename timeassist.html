@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 1.0.0 · S1 Datenschicht</title>
+<title>TimeAssist 1.1.1 · S7 WorkAssist-Import</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -794,12 +794,27 @@ input, textarea { font: inherit; color: inherit; }
   </div>
 </div>
 
+<div class="hg" id="wa" onclick="if(event.target===this){waZu()}">
+  <div class="dlg" style="width:460px">
+    <div class="dlg-kopf">
+      <h2>Aus WorkAssist übernehmen</h2>
+      <button class="k-btn" style="margin-left:auto" onclick="waZu()">Abbrechen</button>
+    </div>
+    <div class="dlg-koerper" style="display:block" id="wa-inhalt"></div>
+    <div class="dlg-fuss">
+      <span class="bk-sub">Vorher exportieren lohnt sich.</span>
+      <span style="margin-left:auto"></span>
+      <button class="k-btn pri" onclick="waUebernehmen()">Übernehmen</button>
+    </div>
+  </div>
+</div>
+
 <div class="meldung" id="meldung"></div>
 
 <script>
 'use strict';
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.1';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -3787,8 +3802,9 @@ function datenImport(ev) {
     try { neu = JSON.parse(leser.result); }
     catch (e) { melde('Datei ist kein g\u00fcltiges JSON'); return; }
     /* Ein unvollstaendiger Import darf den Bestand nicht zerlegen */
+    if (istWorkAssist(neu)) { waVorschau(neu, f.name); return; }
     if (!neu || typeof neu !== 'object' || !Array.isArray(neu.aktivitaeten)) {
-      melde('Datei enth\u00e4lt keinen TimeAssist-Bestand');
+      melde('Datei enth\u00e4lt weder einen TimeAssist- noch einen WorkAssist-Bestand');
       return;
     }
     dbUebernehmen(neu);
@@ -3798,6 +3814,246 @@ function datenImport(ev) {
   };
   leser.onerror = function () { melde('Datei konnte nicht gelesen werden'); };
   leser.readAsText(f);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   IMPORT AUS WORKASSIST
+   Einbahnstraße: liest WorkAssist, schreibt TimeAssist, rührt die
+   Quelldatei nicht an. Er fügt hinzu, statt zu ersetzen — beide
+   Dateien laufen nacheinander in denselben Bestand.
+
+   Regeln (abgestimmt):
+     · nur offene und in Arbeit befindliche Aufgaben, kein Erledigtes
+     · Bereiche ohne Unterbereiche werden übernommen; hängt eine Aufgabe
+       direkt an einem Oberbereich, entsteht "<Name> – Allgemein"
+     · archivierte Bereiche samt ihrer Aufgaben bleiben draußen
+     · Planschritte ohne Aufgabenbezug nur bei aktiven Plänen
+     · zeitnah → Priorität A, sonst B
+   ═══════════════════════════════════════════════════════════════════ */
+const WA_FARBEN = ['#6b6459', '#7d6b53', '#4e6b52', '#8c3b2f', '#57524a',
+                   '#3f5d73', '#a8622c', '#5a5f4a', '#7a5568', '#46605c'];
+
+function istWorkAssist(d) {
+  return !!(d && Array.isArray(d.bereiche) && Array.isArray(d.aufgaben) &&
+            !Array.isArray(d.aktivitaeten));
+}
+function waDatum(iso) {
+  /* WorkAssist speichert JJJJ-MM-TT, das Formblatt zeigt TT.MM. */
+  if (!iso || typeof iso !== 'string' || iso.length < 10) { return ''; }
+  return iso.slice(8, 10) + '.' + iso.slice(5, 7) + '.';
+}
+function waPrio(a) { return a.zeitnah === true ? 'A' : 'B'; }
+function waGlyph(st) { return st === 'erledigt' ? '\u2715' : '\u2022'; }
+
+/* Wandelt einen WorkAssist-Stand in TimeAssist-Bestände um. Liefert die
+   neuen Sätze und einen Bericht, ohne DB anzufassen.                  */
+function waUmwandeln(d) {
+  const bericht = { bereiche:0, aktivitaeten:0, wieder:0, gewohnheiten:0,
+                    plaene:0, planarchiv:0, notizen:0, schritte:0,
+                    uebersprungen:{ erledigt:0, archiviert:0, schritte:0 } };
+  const quelle = {};
+  d.bereiche.forEach(function (b) { quelle[b.id] = b; });
+  const hatKinder = {};
+  d.bereiche.forEach(function (b) {
+    if (b.oberbereich) { hatKinder[b.oberbereich] = true; }
+  });
+  const archiviert = function (b) {
+    /* Ein Bereich gilt als archiviert, wenn er es ist oder sein
+       Oberbereich es ist.                                            */
+    let x = b, tiefe = 0;
+    while (x && tiefe < 6) {
+      if (x.archiviert === true) { return true; }
+      x = x.oberbereich ? quelle[x.oberbereich] : null;
+      tiefe += 1;
+    }
+    return false;
+  };
+
+  const bereiche = [];
+  const abbild = {};          // WorkAssist-Bereichs-ID → TimeAssist-ID
+  let farbe = BEREICHE.length;
+  const neuerBereich = function (name) {
+    const id = 'b' + naechsteId();
+    bereiche.push({ id:id, name:name, farbe:WA_FARBEN[farbe % WA_FARBEN.length] });
+    farbe += 1;
+    bericht.bereiche += 1;
+    return id;
+  };
+  d.bereiche.forEach(function (b) {
+    if (archiviert(b)) { bericht.uebersprungen.archiviert += 1; return; }
+    if (hatKinder[b.id]) { return; }          // Oberbereich ist keine Ebene mehr
+    abbild[b.id] = neuerBereich(b.name);
+  });
+  /* Oberbereiche, an denen direkt Aufgaben hängen, bekommen ein Allgemein */
+  d.aufgaben.forEach(function (a) {
+    const b = a.bereichId ? quelle[a.bereichId] : null;
+    if (!b || abbild[b.id] || archiviert(b)) { return; }
+    if (hatKinder[b.id]) { abbild[b.id] = neuerBereich(b.name + ' \u2013 Allgemein'); }
+  });
+  /* Beim zweiten Dateiimport soll kein zweites "Ohne Bereich" entstehen —
+     erst im bestehenden Bestand nachsehen.                             */
+  let ohneId = null;
+  const vorhanden = BEREICHE.find(x => x.name === 'Ohne Bereich');
+  if (vorhanden) { ohneId = vorhanden.id; }
+  const bereichVon = function (a) {
+    const b = a.bereichId ? quelle[a.bereichId] : null;
+    if (b && abbild[b.id]) { return abbild[b.id]; }
+    if (!ohneId) { ohneId = neuerBereich('Ohne Bereich'); }
+    return ohneId;
+  };
+
+  const aktivitaeten = [], wieder = [], plaene = [], notizen = [], gewohnheiten = [];
+  const aufgabeZuAkt = {};    // WorkAssist-Aufgaben-ID → neue Aktivitäts-ID
+
+  d.aufgaben.forEach(function (a) {
+    const b = a.bereichId ? quelle[a.bereichId] : null;
+    if (b && archiviert(b)) { bericht.uebersprungen.archiviert += 1; return; }
+    if (a.status === 'erledigt') { bericht.uebersprungen.erledigt += 1; return; }
+    if (a.wiederholung) {
+      /* Ein wiederkehrender Vorgang, kein Einzelvorgang */
+      const w = a.wiederholung;
+      let tage = Array.isArray(w.wochentage) ? w.wochentage.slice() : [];
+      /* WorkAssist zählt 0 = Sonntag, TimeAssist 0 = Montag */
+      tage = tage.map(function (t) { return (t + 6) % 7; }).sort();
+      let muster;
+      if (w.typ === 'monatlich') { muster = 'monatlich'; }
+      else if (!tage.length) {
+        /* Kein Wochentag hinterlegt: das Intervall ist die Aussage.
+           Sieben Tage anzunehmen wäre erfunden.                       */
+        const iv = parseInt(w.intervall, 10) || 1;
+        muster = (iv > 1) ? ('alle ' + iv + ' Wochen') : 'wöchentlich';
+        tage = [0];
+      } else {
+        const iv = parseInt(w.intervall, 10) || 1;
+        muster = tage.map(t => WOKURZ[t]).join(' \u00b7 ') +
+                 (iv > 1 ? ' \u00b7 alle ' + iv + ' Wochen' : '');
+      }
+      wieder.push({ id:naechsteId(), t:a.titel, b:bereichVon(a),
+                    min:parseInt(a.groesse, 10) || 0,
+                    muster:muster, tage:tage, log:{}, zielId:null });
+      bericht.wieder += 1;
+      return;
+    }
+    const id = naechsteId();
+    aufgabeZuAkt[a.id] = id;
+    aktivitaeten.push({ id:id, t:a.titel, b:bereichVon(a), prio:waPrio(a),
+                        min:parseInt(a.groesse, 10) || 0, wer:'',
+                        beginn:waDatum(a.startdatum), ende:waDatum(a.faellig),
+                        glyph:waGlyph(a.status), heute:false,
+                        planId:null, zielId:null });
+    bericht.aktivitaeten += 1;
+  });
+
+  d.plaene.forEach(function (p) {
+    const b = p.bereichId ? quelle[p.bereichId] : null;
+    if (b && archiviert(b)) { return; }
+    const fertig = (p.status === 'abgeschlossen');
+    const pid = 'p' + naechsteId();
+    plaene.push({ id:pid, t:p.titel, b:(b && abbild[b.id]) ? abbild[b.id] : bereichVon(p),
+                  zielId:null, zieldatum:'', archiviert:fertig,
+                  beschreibung:[(p.notiz || '').split('\n')[0] || '', ''] });
+    if (fertig) { bericht.planarchiv += 1; } else { bericht.plaene += 1; }
+    (p.schritte || []).forEach(function (sch) {
+      if (sch.aufgabeId && aufgabeZuAkt[sch.aufgabeId]) {
+        const a = aktivitaeten.find(x => x.id === aufgabeZuAkt[sch.aufgabeId]);
+        if (a) { a.planId = pid; bericht.schritte += 1; }
+        return;
+      }
+      if (fertig || sch.status === 'erledigt') {
+        bericht.uebersprungen.schritte += 1;
+        return;
+      }
+      aktivitaeten.push({ id:naechsteId(), t:sch.titel,
+                          b:(b && abbild[b.id]) ? abbild[b.id] : bereichVon(p),
+                          prio:'B', min:0, wer:sch.delegiertAn || '',
+                          beginn:'', ende:'', glyph:'\u2022', heute:false,
+                          planId:pid, zielId:null });
+      bericht.aktivitaeten += 1;
+      bericht.schritte += 1;
+    });
+  });
+
+  (d.habits || []).forEach(function (g) {
+    if (g.aktiv === false) { return; }
+    let tage = (g.ziel && Array.isArray(g.ziel.tage)) ? g.ziel.tage.slice() : [];
+    tage = tage.map(function (t) { return (t + 6) % 7; }).sort();
+    if (!tage.length) { tage = [0, 1, 2, 3, 4, 5, 6]; }
+    gewohnheiten.push({ id:naechsteId(), t:g.titel,
+                        ziel:tage.length + '\u00d7 pro Woche', soll:tage.length,
+                        tage:tage, log:{}, zielId:null });
+    bericht.gewohnheiten += 1;
+  });
+
+  let nr = NOTIZEN.length;
+  const alsNotiz = function (titel, datum, art, bid) {
+    nr += 1;
+    notizen.push({ id:naechsteId(), nr:nr, t:titel, art:art,
+                   b:bid || (bereiche[0] ? bereiche[0].id : 'b1'),
+                   datum:datum || '', seiten:1, quelle:'aus WorkAssist' });
+    bericht.notizen += 1;
+  };
+  (d.notizen || []).forEach(function (n) {
+    const b = n.bereichId ? quelle[n.bereichId] : null;
+    alsNotiz(n.titel || 'Ohne Titel', waDatum(n.geaendert),
+             'liniert', (b && abbild[b.id]) ? abbild[b.id] : null);
+  });
+  (d.dokumente || []).forEach(function (dok) {
+    const b = dok.bereichId ? quelle[dok.bereichId] : null;
+    alsNotiz(dok.titel || dok.name || 'Dokument', '',
+             'liniert', (b && abbild[b.id]) ? abbild[b.id] : null);
+  });
+
+  return { bereiche:bereiche, aktivitaeten:aktivitaeten, wieder:wieder,
+           gewohnheiten:gewohnheiten, plaene:plaene, notizen:notizen,
+           bericht:bericht };
+}
+
+let waErgebnis = null;
+function waVorschau(d, dateiname) {
+  waErgebnis = waUmwandeln(d);
+  const b = waErgebnis.bericht;
+  const z = [
+    ['Bereiche', b.bereiche], ['Aktivitäten', b.aktivitaeten],
+    ['davon aus Planschritten', b.schritte],
+    ['Wiederkehrende Vorgänge', b.wieder], ['Gewohnheiten', b.gewohnheiten],
+    ['Pläne aktiv', b.plaene], ['Pläne archiviert', b.planarchiv],
+    ['Notizen', b.notizen],
+  ];
+  let h = '<div class="dt-z"><span class="dt-l">Datei</span><span class="dt-w">' +
+    esc(dateiname) + '</span></div>' +
+    '<div class="dt-z"><span class="dt-l">Erkannt als</span>' +
+    '<span class="dt-w">WorkAssist ' + esc(d.version || '?') + '</span></div>';
+  h += z.map(function (x) {
+    return '<div class="dt-z"><span class="dt-l">' + esc(x[0]) + '</span>' +
+      '<span class="dt-w">' + x[1] + '</span></div>';
+  }).join('');
+  h += '<div class="dt-z"><span class="dt-l">Übersprungen</span><span class="dt-w">' +
+    b.uebersprungen.erledigt + ' erledigt \u00b7 ' +
+    b.uebersprungen.archiviert + ' archiviert \u00b7 ' +
+    b.uebersprungen.schritte + ' Schritte</span></div>';
+  h += '<div class="hinweis">Der Bestand wird <b>hinzugef\u00fcgt</b>, nichts wird ' +
+    'ersetzt \u2014 beide WorkAssist-Dateien laufen nacheinander hinein. ' +
+    'Dieselbe Datei zweimal einzulesen erzeugt allerdings Dubletten.</div>';
+  $('wa-inhalt').innerHTML = h;
+  $('wa').classList.add('auf');
+}
+function waZu() { $('wa').classList.remove('auf'); waErgebnis = null; }
+function waUebernehmen() {
+  if (!waErgebnis) { return; }
+  const r = waErgebnis;
+  r.bereiche.forEach(b => BEREICHE.push(b));
+  r.aktivitaeten.forEach(a => AKTIVITAETEN.push(a));
+  r.wieder.forEach(w => WIEDER.push(w));
+  r.gewohnheiten.forEach(g => GEWOHNHEIT.push(g));
+  r.plaene.forEach(p => PLAENE.push(p));
+  r.notizen.forEach(n => NOTIZEN.push(n));
+  const b = r.bericht;
+  waZu();
+  datenZu();
+  reg = 'akt';
+  unterAktiv.akt = 'akt';
+  renderAlles();
+  melde(b.aktivitaeten + ' Aktivit\u00e4ten, ' + b.bereiche + ' Bereiche \u00fcbernommen');
 }
 
 /* ═══ SKALIERUNG DES GERÄTERAHMENS ═══ */
