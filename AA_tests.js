@@ -560,6 +560,77 @@ kat('16 · Wochen- und Monatsblatt am Datum');
   } else { fail('Speichern lässt Tage außerhalb des Monats zu'); }
 }
 
+/* ═══ 17 · Bearbeitbarkeit und Datumsprüfung (S4) ═══════════════════════
+   Fehlerarten: ein Plan- oder Zieltitel lässt sich nirgends ändern, weil
+   er nur im Blattkopf steht; ein Bereich lässt sich nur bei Aktivitäten
+   umhängen; ein Datumsfeld nimmt "31.02.2026" an und der Balken landet
+   im Nichts.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('17 · Bearbeitbarkeit und Datumsprüfung');
+{
+  ['dmyZuIso', 'istDatum', 'bereichWahl', 'planZielWahl', 'planZielSetzen']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  /* Die Umwandlung muss echte Kalendertage prüfen, nicht nur die Form */
+  const mD = JSK.match(/function dmyZuIso\(t\) \{[\s\S]*?\n\}/);
+  if (mD) {
+    let fn = null;
+    try { fn = eval('(' + mD[0].replace('function dmyZuIso', 'function') + ')'); }
+    catch (e) { fn = null; }
+    if (!fn) { fail('dmyZuIso nicht auswertbar'); }
+    else {
+      const FAELLE = [['17.08.2026', '2026-08-17'], ['1.9.2026', '2026-09-01'],
+                      ['29.02.2028', '2028-02-29'], ['29.02.2027', null],
+                      ['31.02.2026', null], ['32.01.2026', null],
+                      ['17.13.2026', null], ['', null], ['2026-08-17', null]];
+      let f = 0;
+      FAELLE.forEach(function (x) {
+        const r = fn(x[0]);
+        if (r !== x[1]) { f++; fail('dmyZuIso("' + x[0] + '") = ' + r + ' statt ' + x[1]); }
+      });
+      if (!f) { ok(FAELLE.length + ' Datumsfälle korrekt, Schaltjahr geprüft'); }
+    }
+  } else { fail('dmyZuIso nicht gefunden'); }
+
+  const mP = JSK.match(/function blattPlan\(pid\) \{([\s\S]*?)\n\}/);
+  if (!mP) { fail('blattPlan nicht auswertbar'); }
+  else {
+    if (/planFeld\('? ?\+? ?p\.id[^)]*'titel'|'titel'\)/.test(mP[1])) {
+      ok('Plantitel ist bearbeitbar');
+    } else { fail('Plantitel lässt sich nicht ändern'); }
+    if (/bereichWahl\(\\'plan\\'/.test(mP[1])) { ok('Planbereich ist wählbar'); }
+    else { fail('Planbereich lässt sich nicht umhängen'); }
+    if (/planZielWahl/.test(mP[1])) { ok('Ziel eines Plans ist wählbar'); }
+    else { fail('Ziel eines Plans lässt sich nicht setzen'); }
+    if (/zieldatum/.test(mP[1])) { ok('Zieldatum ist am Blatt bearbeitbar'); }
+    else { fail('Zieldatum nur in der Übersicht sichtbar'); }
+  }
+
+  const mZ = JSK.match(/function blattZiel\(zid\) \{([\s\S]*?)\n\}/);
+  if (!mZ) { fail('blattZiel nicht auswertbar'); }
+  else {
+    if (/zielFeld\(.*'titel'\)|'titel'\)/.test(mZ[1])) { ok('Zieltitel ist bearbeitbar'); }
+    else { fail('Zieltitel lässt sich nicht ändern'); }
+    if (/bereichWahl\(\\'ziel\\'/.test(mZ[1])) { ok('Zielbereich ist wählbar'); }
+    else { fail('Zielbereich lässt sich nicht umhängen'); }
+  }
+
+  const mS = JSK.match(/function zielSchreiben\(\) \{([\s\S]*?)\n\}/);
+  if (mS && /dmyZuIso\(v\)/.test(mS[1])) { ok('Zieldaten werden geprüft'); }
+  else { fail('Zieldaten werden ungeprüft übernommen'); }
+  const mPS = JSK.match(/function planSchreiben\(\) \{([\s\S]*?)\n\}/);
+  if (mPS && /dmyZuIso\(v\)/.test(mPS[1])) { ok('Zieldatum des Plans wird geprüft'); }
+  else { fail('Zieldatum des Plans wird ungeprüft übernommen'); }
+
+  const mJ = JSK.match(/function jtSpeichern\(\) \{([\s\S]*?)\n\}/);
+  if (mJ && /dmyZuIso/.test(mJ[1]) && /bis < von/.test(mJ[1])) {
+    ok('Jahrestermin prüft Datum und dreht vertauschte Grenzen');
+  } else { fail('Jahrestermin-Datum ungeprüft'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
