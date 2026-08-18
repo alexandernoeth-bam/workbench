@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 2.0.0 · S2 Datumslogik</title>
+<title>TimeAssist 2.1.0 · S3 Woche und Monat</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -398,9 +398,11 @@ input, textarea { font: inherit; color: inherit; }
          border-bottom: 1px solid var(--linie-2); }
 .mon-t.we { background: var(--papier-2); }
 .mon-t.heute { box-shadow: inset 3px 0 0 var(--wein); }
-.mon-nr { flex: 0 0 34px; font-size: 13.2px; color: var(--tinte-3); padding-top: 5px;
+.mon-nr { flex: 0 0 34px; width: 34px; font-size: 13.2px; color: var(--tinte-3);
+           padding-top: 5px; cursor: pointer;
           font-variant-numeric: tabular-nums; letter-spacing: .02em; }
 .mon-t.we .mon-nr { color: var(--leder); }
+.mon-nr:active { color: var(--wein); }
 .mon-inhalt { flex: 1; min-width: 0; display: flex; flex-direction: column;
               justify-content: center; padding: 2px 0; cursor: pointer; }
 .mon-e { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
@@ -456,11 +458,13 @@ input, textarea { font: inherit; color: inherit; }
 .ed-f:focus { outline: none; border-color: var(--marke); }
 .ed-zeile { display: flex; gap: 8px; align-items: center; }
 .ed-tage { display: flex; gap: 5px; flex-wrap: wrap; }
-.ed-t { min-width: 42px; min-height: 40px; border: 1px solid var(--linie);
+.ed-t { min-width: 48px; min-height: 44px; border: 1px solid var(--linie);
         border-radius: 6px; background: var(--karte); font-size: 13.2px;
-        color: var(--tinte-2); }
+        color: var(--tinte-2); display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 1px; padding: 4px 6px; }
 .ed-t.aktiv { background: var(--wein); border-color: var(--wein); color: var(--papier);
               font-weight: 700; }
+.ed-t-d { font-size: 9.6px; opacity: .7; font-variant-numeric: tabular-nums; }
 .ed-hin { font-size: 12.6px; color: var(--tinte-3); margin-top: 10px; line-height: 1.5; }
 .ed-zu { margin-top: 12px; font-size: 13.2px; color: var(--wein);
          text-decoration: underline; text-decoration-style: dotted; }
@@ -545,13 +549,26 @@ input, textarea { font: inherit; color: inherit; }
         border-bottom: 1px solid var(--linie); }
 .wo-t.we { background: var(--papier-2); }
 .wo-t.heute { box-shadow: inset 3px 0 0 var(--wein); }
-.wo-nr { flex: 0 0 92px; font-size: 14.4px; font-weight: 700; color: var(--leder);
-         text-transform: uppercase; letter-spacing: .06em; padding-top: 7px; }
+.wo-nr { flex: 0 0 92px; width: 92px; font-size: 14.4px; font-weight: 700;
+         color: var(--leder); text-transform: uppercase; letter-spacing: .06em;
+         padding-top: 7px; cursor: pointer; }
 .wo-t.we .wo-nr { color: var(--tinte-3); }
 .wo-dat { font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--tinte-3);
           text-transform: none; margin-top: 1px; }
 .wo-inhalt { flex: 1; min-width: 0; display: flex; flex-direction: column;
              justify-content: center; padding: 4px 0; cursor: pointer; }
+
+/* Feiertag, Ferien und Jahrestermine im Wochenblatt */
+.wo-t.ferien { background: #f0ebe1; }
+.wo-t.ferien.we { background: #e8e2d5; }
+.wo-nr:active { color: var(--wein); }
+.wo-fei { font-size: 10.2px; letter-spacing: .06em; text-transform: uppercase;
+          color: var(--wein); margin-bottom: 2px; }
+.wo-jt { font-size: 12px; border-left: 3px solid var(--leder); background: var(--karte);
+         padding: 2px 7px; border-radius: 0 3px 3px 0; margin-bottom: 3px;
+         display: flex; align-items: center; gap: 7px; }
+.wo-jt-a { margin-left: auto; font-size: 9px; letter-spacing: .1em;
+           text-transform: uppercase; color: var(--tinte-3); }
 
 /* Tageswahl in der Auswahlliste */
 .wahl-tage { display: flex; gap: 3px; margin-top: 6px; }
@@ -881,7 +898,7 @@ input, textarea { font: inherit; color: inherit; }
 <script>
 'use strict';
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -1493,6 +1510,14 @@ function tagBlatt() {
 }
 function tagBlaettern(n) {
   tagOffen = isoPlus(tagOffen, n);
+  editZelle = null; editTermin = null;
+  renderAlles();
+}
+/* Vom Wochen- oder Monatsblatt auf den Tag springen — die Blätter
+   hängen jetzt an echten Daten, also lohnt der Weg dorthin.          */
+function tagSpringen(iso) {
+  tagOffen = iso;
+  reg = 'tag';
   editZelle = null; editTermin = null;
   renderAlles();
 }
@@ -2254,6 +2279,7 @@ function wocheBlaettern(schritt) {
   editZelle = null;
   renderAlles();
 }
+function wocheHeute() { wocheOffen = isoMontag(isoHeute()); editZelle = null; renderAlles(); }
 function wocheFinde(id) {
   const b = wocheBlatt();
   return b.eintraege.find(x => x.id === id) || b.wichtig.find(x => x.id === id) || null;
@@ -2317,11 +2343,13 @@ function blattWoche() {
   const b = wocheBlatt();
   const kw = kalenderwoche(b.montag);
   const so = tagPlus(b.montag, 6);
+  const dieseWoche = (b.montag === isoMontag(isoHeute()));
   kopf('Woche ' + kw,
        jtKurz(b.montag) + ' \u2013 ' + jtKurz(so) + ' \u00b7 ' +
-       b.eintraege.length + ' Eintr\u00e4ge',
+       b.eintraege.length + ' Eintr\u00e4ge' + (dieseWoche ? '' : ' \u00b7 nicht diese Woche'),
        '<button class="k-btn" onclick="wocheBlaettern(-1)">\u2039</button>' +
        '<button class="k-btn" onclick="wocheBlaettern(1)">\u203a</button>' +
+       (dieseWoche ? '' : '<button class="k-btn pri" onclick="wocheHeute()">Diese Woche</button>') +
        '<button class="k-btn" onclick="wahlAuf(\'wtermin\')">Termin</button>' +
        '<button class="k-btn" onclick="wahlAuf(\'waktivitaet\')">Aktivit\u00e4t</button>');
 
@@ -2335,10 +2363,27 @@ function blattWoche() {
   for (let d = 0; d < 7; d++) {
     const iso = tagPlus(b.montag, d);
     const heute = (iso === tagOffen);
-    h += '<div class="wo-t ' + (d >= 5 ? 'we' : '') + ' ' + (heute ? 'heute' : '') + '">' +
-      '<span class="wo-nr">' + WOTAGE[d] + '<div class="wo-dat">' + jtKurz(iso) + '</div></span>' +
+    const fer = zeigeKalender ? ferienAn(iso) : null;
+    const fei = zeigeKalender ? feiertagAn(iso) : null;
+    /* Mehrtägige Jahrestermine laufen quer über die Woche — sie einzeln
+       einzutragen wäre Abschreibarbeit. Einzige automatische Übernahme,
+       wie im Ganztags-Band des Tagesblatts.                            */
+    const jt = JAHRESTERMINE.filter(j => iso >= j.von && iso <= j.bis);
+    let band = '';
+    if (fei) { band += '<div class="wo-fei">' + esc(fei) + '</div>'; }
+    band += jt.map(function (j) {
+      const a = JT_ARTEN[j.art] || JT_ARTEN.termin;
+      return '<div class="wo-jt" style="border-color:' + a.f + '">' + esc(j.t) +
+        '<span class="wo-jt-a">' + esc(a.n) + '</span></div>';
+    }).join('');
+
+    h += '<div class="wo-t ' + (d >= 5 ? 'we ' : '') + (heute ? 'heute ' : '') +
+      (fer ? 'ferien' : '') + '">' +
+      '<span class="wo-nr" onclick="tagSpringen(\'' + iso + '\')" ' +
+      'title="Tagesblatt \u00f6ffnen">' + WOTAGE[d] +
+      '<div class="wo-dat">' + jtKurz(iso) + '</div></span>' +
       '<span class="wo-inhalt" onclick="eintragOeffnen(\'woche\',' + d + ',null)">' +
-      (proTag[d] || []).map(wocheZeile).join('') + '</span>' +
+      band + (proTag[d] || []).map(wocheZeile).join('') + '</span>' +
       '<button class="wo-plus" onclick="event.stopPropagation(); wocheWahl(' + d + ')" ' +
       'title="Vorhandenes auf diesen Tag legen">+</button></div>';
   }
@@ -3221,6 +3266,11 @@ function monatWochentag(tag) {
   const d = new Date(Date.UTC(b.jahr, b.monat - 1, tag)).getUTCDay();
   return (d + 6) % 7;          // 0 = Montag
 }
+function monatHeute() {
+  monatOffen = isoHeute().slice(0, 7);
+  editZelle = null;
+  renderAlles();
+}
 function monatBlaettern(schritt) {
   const b = monatBlatt();
   let jahr = b.jahr, monat = b.monat + schritt;
@@ -3273,6 +3323,8 @@ function blattMonat() {
        b.vorhaben.length + ' Vorhaben',
        '<button class="k-btn" onclick="monatBlaettern(-1)">\u2039</button>' +
        '<button class="k-btn" onclick="monatBlaettern(1)">\u203a</button>' +
+       (heutigerMonat ? '' :
+         '<button class="k-btn pri" onclick="monatHeute()">Dieser Monat</button>') +
        '<button class="k-btn' + (zeigeKalender ? ' pri' : '') +
        '" onclick="kalenderUm()">Kalender</button>' +
        '<button class="k-btn" onclick="wahlAuf(\'ereignis\')">Termin</button>' +
@@ -3296,7 +3348,9 @@ function blattMonat() {
       const fei = zeigeKalender ? feiertagAn(iso) : null;
       h += '<div class="mon-t ' + (we ? 'we ' : '') + (heute ? 'heute ' : '') +
         (fer ? 'ferien' : '') + '">' +
-        '<span class="mon-nr">' + String(t).padStart(2, '0') + ' ' + WOKURZ[wt] + '</span>' +
+        '<span class="mon-nr" onclick="event.stopPropagation(); tagSpringen(\'' + iso +
+        '\')" title="Tagesblatt \u00f6ffnen">' + String(t).padStart(2, '0') + ' ' +
+        WOKURZ[wt] + '</span>' +
         '<span class="mon-inhalt" onclick="eintragOeffnen(\'monat\',' + t + ',null)">' +
         (fei ? '<div class="mon-fei">' + esc(fei) + '</div>' : '') +
         (proTag[t] || []).map(monatEintragZeile).join('') + '</span></div>';
@@ -3802,16 +3856,23 @@ function eintragRender() {
   if (!ohneTag) {
     h += '<div class="ed-l">' + (woche ? 'Welcher Tag?' : 'Welcher Tag im Monat?') + '</div>';
     if (woche) {
+      const mo = wocheBlatt().montag;
       h += '<div class="ed-tage">';
       for (let d = 0; d < 7; d++) {
         h += '<button class="ed-t ' + (k.tag === d ? 'aktiv' : '') +
-          '" onclick="eintragTag(' + d + ')">' + WOKURZ[d] + '</button>';
+          '" onclick="eintragTag(' + d + ')">' + WOKURZ[d] +
+          '<span class="ed-t-d">' + dmyKurz(isoPlus(mo, d)) + '</span></button>';
       }
       h += '<button class="ed-t ' + (k.tag === -1 ? 'aktiv' : '') +
         '" onclick="eintragTag(-1)">ohne</button></div>';
     } else {
-      h += '<input class="ed-f" id="ed-mtag" value="' + (k.tag > 0 ? k.tag : 1) +
-        '" inputmode="numeric" style="width:88px">';
+      /* Der Monat hat 28 bis 31 Tage — ein Eintrag am 31. Februar waere
+         unsichtbar, weil die Zeile nicht existiert.                    */
+      const maxT = monatTage();
+      h += '<div class="ed-zeile">' +
+        '<input class="ed-f" id="ed-mtag" value="' + (k.tag > 0 ? Math.min(k.tag, maxT) : 1) +
+        '" inputmode="numeric" style="width:88px" min="1" max="' + maxT + '">' +
+        '<span class="bk-sub">1 bis ' + maxT + '</span></div>';
     }
   }
 

@@ -513,6 +513,53 @@ kat('15 · Datumslogik');
   else { fail('Tagesliste filtert nicht über geplant'); }
 }
 
+/* ═══ 16 · Wochen- und Monatsblatt am Datum (S3) ════════════════════════
+   Fehlerarten: ein Monatseintrag am 31. Februar wird angenommen, obwohl
+   die Zeile nicht existiert; man kommt vom Wochen- oder Monatsblatt nicht
+   auf den Tag; ohne Heute-Knopf verliert man sich beim Blättern.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('16 · Wochen- und Monatsblatt am Datum');
+{
+  ['tagSpringen', 'wocheHeute', 'monatHeute']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const mW = JSK.match(/function blattWoche\(\) \{([\s\S]*?)\n\}/);
+  if (!mW) { fail('blattWoche nicht auswertbar'); }
+  else {
+    const w = mW[1];
+    if (/tagSpringen/.test(w)) { ok('Wochenblatt führt auf das Tagesblatt'); }
+    else { fail('kein Weg vom Wochenblatt zum Tag'); }
+    if (/feiertagAn\(iso\)/.test(w) && /ferienAn\(iso\)/.test(w)) {
+      ok('Wochenblatt zeigt Feiertage und Ferien');
+    } else { fail('Wochenblatt ohne Feiertage/Ferien'); }
+    if (/JAHRESTERMINE\.filter/.test(w)) { ok('mehrtägige Jahrestermine laufen durch die Woche'); }
+    else { fail('Jahrestermine fehlen im Wochenblatt'); }
+    if (/isoMontag\(isoHeute\(\)\)/.test(w)) { ok('Wochenblatt erkennt die laufende Woche'); }
+    else { fail('laufende Woche wird nicht erkannt'); }
+  }
+
+  const mM = JSK.match(/function blattMonat\(\) \{([\s\S]*?)\n\}/);
+  if (mM && /tagSpringen/.test(mM[1])) { ok('Monatsblatt führt auf das Tagesblatt'); }
+  else { fail('kein Weg vom Monatsblatt zum Tag'); }
+
+  const mR = JSK.match(/function eintragRender\(\) \{([\s\S]*?)\n\}/);
+  if (!mR) { fail('eintragRender nicht auswertbar'); }
+  else {
+    if (/monatTage\(\)/.test(mR[1])) { ok('Dialog begrenzt den Monatstag auf die Monatslänge'); }
+    else { fail('Dialog nimmt jeden Monatstag an — 31. Februar wäre unsichtbar'); }
+    if (/isoPlus\(mo, d\)/.test(mR[1])) { ok('Wochentagsknöpfe zeigen das Datum'); }
+    else { fail('Wochentagsknöpfe ohne Datum'); }
+  }
+
+  const mS = JSK.match(/function eintragSpeichern\(\) \{([\s\S]*?)\n\}/);
+  if (mS && /Math\.min\(Math\.max\(k\.tag, 1\), monatTage\(\)\)/.test(mS[1])) {
+    ok('Speichern klemmt den Tag in den gültigen Bereich');
+  } else { fail('Speichern lässt Tage außerhalb des Monats zu'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
