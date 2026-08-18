@@ -147,7 +147,7 @@ kat('7 · Datenmodell minimal');
   if (!mA) { fail('SAAT_AKTIVITAETEN nicht gefunden'); }
   else {
     const ERLAUBT = ['id', 't', 'b', 'prio', 'min', 'wer', 'beginn', 'ende', 'glyph',
-                     'heute', 'planId', 'zielId'];
+                     'geplant', 'planId', 'zielId'];
     const felder = Array.from(new Set((mA[1].match(/[{,]\s*(\w+):/g) || [])
       .map(s => s.replace(/[{,]\s*/, '').replace(':', ''))));
     const zuviel = felder.filter(f => ERLAUBT.indexOf(f) === -1);
@@ -238,9 +238,9 @@ kat('9 · Kalenderrechnung');
    ═══════════════════════════════════════════════════════════════════════ */
 kat('10 · Datenschicht und Speicher');
 {
-  const BESTAENDE = ['BEREICHE', 'AKTIVITAETEN', 'TERMINE', 'JAHRESTERMINE', 'WIEDER',
-                     'GEWOHNHEIT', 'PLAENE', 'ZIELE', 'NOTIZEN', 'WOCHENBLAETTER',
-                     'MONATSBLAETTER', 'KONTAKTE', 'TAG'];
+  const BESTAENDE = ['GRUPPEN', 'BEREICHE', 'AKTIVITAETEN', 'TERMINE', 'JAHRESTERMINE',
+                     'WIEDER', 'GEWOHNHEIT', 'PLAENE', 'ZIELE', 'NOTIZEN',
+                     'WOCHENBLAETTER', 'MONATSBLAETTER', 'KONTAKTE', 'TAGESBLAETTER'];
   const alsConst = BESTAENDE.filter(b => new RegExp('const ' + b + '\\s*=\\s*DB\\.').test(JS));
   if (!alsConst.length) { ok('alle Bestände als let — nach dem Laden ersetzbar'); }
   else { fail('Als const gebunden, nicht ersetzbar: ' + alsConst.join(', ')); }
@@ -257,11 +257,11 @@ kat('10 · Datenschicht und Speicher');
   const mSaat = JS.match(/function saatDB\(\) \{([\s\S]*?)\n\}/);
   if (mSaat) {
     const fehlt = BESTAENDE.filter(function (b) {
-      const k = { BEREICHE:'bereiche', AKTIVITAETEN:'aktivitaeten', TERMINE:'termine',
-        JAHRESTERMINE:'jahrestermine', WIEDER:'wieder', GEWOHNHEIT:'gewohnheiten',
-        PLAENE:'plaene', ZIELE:'ziele', NOTIZEN:'notizen',
+      const k = { GRUPPEN:'gruppen', BEREICHE:'bereiche', AKTIVITAETEN:'aktivitaeten',
+        TERMINE:'termine', JAHRESTERMINE:'jahrestermine', WIEDER:'wieder',
+        GEWOHNHEIT:'gewohnheiten', PLAENE:'plaene', ZIELE:'ziele', NOTIZEN:'notizen',
         WOCHENBLAETTER:'wochenblaetter', MONATSBLAETTER:'monatsblaetter',
-        KONTAKTE:'kontakte', TAG:'tag' }[b];
+        KONTAKTE:'kontakte', TAGESBLAETTER:'tagesblaetter' }[b];
       return mSaat[1].indexOf(k + ':') === -1;
     });
     if (!fehlt.length) { ok('saatDB enthält alle Bestände'); }
@@ -466,6 +466,51 @@ kat('14 · Feste Maße in Tabellenzellen');
     } else if (/flex:\s*0 0 \d+px/.test(d)) { g++; }
   });
   if (!f) { ok(g + ' Zellenelemente mit fester Breite, keines nur mit flex-basis'); }
+}
+
+/* ═══ 15 · Datumslogik (S2) ═════════════════════════════════════════════
+   Fehlerarten: Wochentagsziffern statt Datum — ein log{0..6} überschreibt
+   sich jede Woche selbst, ein Termin mit tag:2 liegt in jeder Woche am
+   Mittwoch, und eine Aktivität mit heute:true bleibt ewig auf heute.
+   Ebenso: fest verdrahtete Beispieldaten wie der 19. August 2026.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('15 · Datumslogik');
+{
+  ['isoHeute', 'isoPlus', 'isoWt', 'isoMontag', 'tagBlatt', 'tagBlaettern', 'tagHeute']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  if (!/HEUTE_ISO|HEUTE_WT|HEUTE_DMY/.test(JSK)) { ok('keine fest verdrahtete Gegenwart'); }
+  else { fail('HEUTE_-Konstanten noch vorhanden'); }
+  if (!/=== 19\)|t === 19/.test(JSK)) { ok('kein fest verdrahteter Tag 19'); }
+  else { fail('Tag 19 noch fest verdrahtet'); }
+  if (!/tag:\s*isoWt|tag:\s*[0-6]\s*,/.test(JSK.slice(JSK.indexOf('function terminNeu'),
+      JSK.indexOf('function terminOeffnen')))) {
+    ok('neue Termine bekommen ein Datum, keine Wochentagsziffer');
+  } else { fail('Termin wird mit Wochentagsziffer angelegt'); }
+
+  const mSt = JSK.match(/function streifen\([\s\S]*?\n\}/);
+  if (mSt && /isoMontag\(tagOffen\)/.test(mSt[0]) && /obj\.log\[iso\]/.test(mSt[0])) {
+    ok('Wochenstreifen schreibt in Datumsschlüssel');
+  } else { fail('Wochenstreifen schreibt in Wochentagsziffern — überschreibt sich wöchentlich'); }
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mM) {
+    const m = mM[1];
+    let f = 0;
+    if (!/t\.datum = isoPlus/.test(m)) { f++; fail('Migration wandelt Termin-Wochentage nicht um'); }
+    if (!/\/\^\\d\$\//.test(m)) { f++; fail('Migration wandelt log-Wochentage nicht um'); }
+    if (!/a\.geplant =/.test(m)) { f++; fail('Migration wandelt heute nicht in geplant um'); }
+    if (!f) { ok('Migration wandelt Termine, log und heute um'); }
+  } else { fail('migriereDB nicht auswertbar'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 3) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht auf 3 erhöht'); }
+
+  if (/geplant === tagOffen/.test(JSK)) { ok('Tagesliste filtert über das Datum'); }
+  else { fail('Tagesliste filtert nicht über geplant'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 1.4.0 · Gruppen</title>
+<title>TimeAssist 2.0.0 · S2 Datumslogik</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -881,7 +881,7 @@ input, textarea { font: inherit; color: inherit; }
 <script>
 'use strict';
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '2.0.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -896,7 +896,7 @@ const APP_VERSION = '1.4.0';
    push und splice wirken dadurch unverändert weiter.
    Die SAAT_-Werte sind nur die Erstbefüllung beim allerersten Start.
    ═══════════════════════════════════════════════════════════════════ */
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 /* Gruppe: die Ebene ueber dem Bereich. Im Ringbuch ist sie das Register,
    hinter dem mehrere Aktivitaeten-Checklisten liegen. Gepflegte Liste,
@@ -916,43 +916,41 @@ const SAAT_BEREICHE = [
 
 /* Aktivität: t, b, prio, min, wer, beginn, ende, glyph, heute, planId
    wer = '' bedeutet: ich selbst. beginn/ende = TT.MM. oder ''
+   geplant: Datum, an dem die Aktivität auf dem Tagesplan steht, oder
+   null. Früher ein Ja/Nein-Feld — damit blieb sie ewig auf "heute" und
+   liess sich nicht auf morgen legen.
    planId: gehört die Aktivität zu einem Plan, steht sie auf dessen Blatt
    und trägt auf der Checkliste ein → statt eines zweiten Eintrags.
    zielId: nur für Aktivitäten OHNE Plan sinnvoll — Planaktivitäten
    zahlen mittelbar über ihren Plan ein und stünden sonst doppelt.       */
 const SAAT_AKTIVITAETEN = [
-  { id:1,  t:'Folien für CCD-Highlight fertigstellen', b:'b1', prio:'A', min:45,  wer:'',        beginn:'10.08.', ende:'18.08.', glyph:'•', heute:true, planId:'p1', zielId:null },
-  { id:2,  t:'Angebot von Nille prüfen',               b:'b1', prio:'A', min:30,  wer:'',        beginn:'',       ende:'14.08.', glyph:'•', heute:true, planId:'p1', zielId:null },
-  { id:3,  t:'Wartungsfenster abstimmen',              b:'b2', prio:'B', min:30,  wer:'Netzwerk',beginn:'',       ende:'21.08.', glyph:'•', heute:true, planId:'p2', zielId:null },
-  { id:4,  t:'Testfenster bestätigen',                 b:'b2', prio:'B', min:45,  wer:'',        beginn:'',       ende:'24.08.', glyph:'•', heute:false, planId:'p2', zielId:null },
-  { id:5,  t:'Unterlagen einscannen und abheften',     b:'b5', prio:'B', min:120, wer:'',        beginn:'',       ende:'',       glyph:'✕', heute:true, planId:'p4', zielId:null },
-  { id:6,  t:'Miele Waschmaschine registrieren',       b:'b3', prio:'C', min:10,  wer:'',        beginn:'',       ende:'',       glyph:'•', heute:false, planId:null, zielId:null },
-  { id:7,  t:'Grabbewässerung Nüdlingen planen',       b:'b4', prio:'C', min:90,  wer:'',        beginn:'',       ende:'30.09.', glyph:'>', heute:false, planId:'p3', zielId:null },
-  { id:8,  t:'Tabletten bestellen und holen',          b:'b4', prio:'B', min:60,  wer:'',        beginn:'',       ende:'19.08.', glyph:'✕', heute:true, planId:null, zielId:null },
-  { id:9,  t:'Heizung entlüften',                      b:'b3', prio:'C', min:20,  wer:'',        beginn:'',       ende:'',       glyph:'•', heute:false, planId:null, zielId:null },
-  { id:11, t:'Rückmeldung Netzwerkteam einholen',      b:'b2', prio:'B', min:15,  wer:'Netzwerk',beginn:'',       ende:'12.08.', glyph:'•', heute:true, planId:null, zielId:'z1' },
-  { id:12, t:'Artikel in VorProd anlegen',             b:'b1', prio:'B', min:60,  wer:'',        beginn:'',       ende:'26.08.', glyph:'•', heute:false, planId:null, zielId:'z1' },
-  { id:13, t:'Barcelona zum Jahreswechsel buchen',     b:'b4', prio:'C', min:120, wer:'',        beginn:'',       ende:'',       glyph:'•', heute:false, planId:null, zielId:null },
-  { id:14, t:'Nüdlingen: Giftstoffe wegfahren',        b:'b4', prio:'C', min:240, wer:'',        beginn:'',       ende:'',       glyph:'•', heute:false, planId:'p3', zielId:null },
-  { id:15, t:'Oskar reinigen und warten',              b:'b3', prio:'C', min:30,  wer:'',        beginn:'',       ende:'',       glyph:'•', heute:false, planId:null, zielId:null },
-  { id:16, t:'Hoheitszone Küche aufräumen',            b:'b3', prio:'C', min:45,  wer:'',        beginn:'',       ende:'',       glyph:'•', heute:false, planId:null, zielId:null },
+  { id:1,  t:'Folien für CCD-Highlight fertigstellen', b:'b1', prio:'A', min:45,  wer:'',        beginn:'10.08.', ende:'18.08.', glyph:'•', geplant:isoHeute(), planId:'p1', zielId:null },
+  { id:2,  t:'Angebot von Nille prüfen',               b:'b1', prio:'A', min:30,  wer:'',        beginn:'',       ende:'14.08.', glyph:'•', geplant:isoHeute(), planId:'p1', zielId:null },
+  { id:3,  t:'Wartungsfenster abstimmen',              b:'b2', prio:'B', min:30,  wer:'Netzwerk',beginn:'',       ende:'21.08.', glyph:'•', geplant:isoHeute(), planId:'p2', zielId:null },
+  { id:4,  t:'Testfenster bestätigen',                 b:'b2', prio:'B', min:45,  wer:'',        beginn:'',       ende:'24.08.', glyph:'•', geplant:null, planId:'p2', zielId:null },
+  { id:5,  t:'Unterlagen einscannen und abheften',     b:'b5', prio:'B', min:120, wer:'',        beginn:'',       ende:'',       glyph:'✕', geplant:isoHeute(), planId:'p4', zielId:null },
+  { id:6,  t:'Miele Waschmaschine registrieren',       b:'b3', prio:'C', min:10,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, planId:null, zielId:null },
+  { id:7,  t:'Grabbewässerung Nüdlingen planen',       b:'b4', prio:'C', min:90,  wer:'',        beginn:'',       ende:'30.09.', glyph:'>', geplant:null, planId:'p3', zielId:null },
+  { id:8,  t:'Tabletten bestellen und holen',          b:'b4', prio:'B', min:60,  wer:'',        beginn:'',       ende:'19.08.', glyph:'✕', geplant:isoHeute(), planId:null, zielId:null },
+  { id:9,  t:'Heizung entlüften',                      b:'b3', prio:'C', min:20,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, planId:null, zielId:null },
+  { id:11, t:'Rückmeldung Netzwerkteam einholen',      b:'b2', prio:'B', min:15,  wer:'Netzwerk',beginn:'',       ende:'12.08.', glyph:'•', geplant:isoHeute(), planId:null, zielId:'z1' },
+  { id:12, t:'Artikel in VorProd anlegen',             b:'b1', prio:'B', min:60,  wer:'',        beginn:'',       ende:'26.08.', glyph:'•', geplant:null, planId:null, zielId:'z1' },
+  { id:13, t:'Barcelona zum Jahreswechsel buchen',     b:'b4', prio:'C', min:120, wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, planId:null, zielId:null },
+  { id:14, t:'Nüdlingen: Giftstoffe wegfahren',        b:'b4', prio:'C', min:240, wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, planId:'p3', zielId:null },
+  { id:15, t:'Oskar reinigen und warten',              b:'b3', prio:'C', min:30,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, planId:null, zielId:null },
+  { id:16, t:'Hoheitszone Küche aufräumen',            b:'b3', prio:'C', min:45,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, planId:null, zielId:null },
 ];
 
 /* Termin: t, tag (0 = Montag dieser Woche), von, bis, ganztags, ort
    Händisch erfasst — kein Import, bewusst.                              */
-/* Termin: t, tag, von, bis, ganztags, ort — händisch erfasst.
+/* Termin: t, datum, von, bis, ganztags, ort — händisch erfasst.
    106/108 überschneiden sich bewusst: 16:00–17:00 gegen 16:30–17:30.   */
-const SAAT_TERMINE = [
-  { id:101, tag:0, von:'09:00', bis:'09:45', ganztags:false, ort:'Raum 2.14', t:'Abstimmung Migration' },
-  { id:102, tag:0, von:'14:00', bis:'15:00', ganztags:false, ort:'Teams',     t:'Jour fixe Team' },
-  { id:103, tag:1, von:'10:00', bis:'11:30', ganztags:false, ort:'Bamberg',   t:'CCD Lenkungskreis' },
-  { id:104, tag:2, von:'08:30', bis:'09:00', ganztags:false, ort:'Teams',     t:'Daily' },
-  { id:105, tag:2, von:'11:00', bis:'12:00', ganztags:false, ort:'Raum 1.02', t:'Abnahme Testfenster' },
-  { id:106, tag:2, von:'16:00', bis:'17:00', ganztags:false, ort:'Telefon',   t:'Rückruf Lieferant' },
-  { id:108, tag:2, von:'16:30', bis:'17:30', ganztags:false, ort:'zu Hause',     t:'Handwerker Heizung' },
-  { id:109, tag:2, von:'19:15', bis:'20:45', ganztags:false, ort:'Verein',       t:'Rudern' },
-  { id:107, tag:3, von:'',      bis:'',      ganztags:true,  ort:'Würzburg',  t:'Schulung Fachbereich' },
-];
+const SAAT_TERMINE = [];
+
+/* Tagesblatt je Datum: Motto oben, Reflexion unten, wichtigste Aufgabe.
+   Früher ein einzelnes Objekt — damit gab es genau einen Tag.         */
+const SAAT_TAGESBLAETTER = [];
+
 
 /* Jahrestermine: mehrtägige Abwesenheiten. Sie erscheinen automatisch im
    Ganztags-Band jedes betroffenen Tages — die einzige Übernahme, die
@@ -978,7 +976,7 @@ const SAAT_JAHRESTERMINE = [
   { id:508, t:'Kundentermin Hamburg', von:'2026-05-11', bis:'2026-05-13', ort:'Hamburg',  art:'dienstreise' },
   { id:509, t:'Konferenz Berlin',     von:'2026-10-06', bis:'2026-10-08', ort:'Berlin',   art:'dienstreise' },
 ];
-let jahrOffen = 2026;
+let jahrOffen = new Date().getFullYear();
 let zeigeKalender = true;   // Feiertage und Ferien als Hintergrund
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1163,22 +1161,16 @@ const SAAT_WOCHENBLAETTER = [
     ],
     reflexion: ['', '', ''] },
 ];
-let wocheOffen = '2026-08-17';   // Montag der angezeigten Woche
+let wocheOffen = null;   // Montag der angezeigten Woche, null = Woche von heute
 
 /* Kontakt: nur Tag und Text. Anrufe und Mails brauchen nicht mehr.     */
-const SAAT_KONTAKTE = [
-  { id:601, tag:2, t:'Nille wegen Angebot zurückrufen', glyph:'•' },
-  { id:602, tag:2, t:'Mail an QS — Termin Abstimmung',  glyph:'✕' },
-];
+const SAAT_KONTAKTE = [];
+
 
 /* Der Tag trägt drei Dinge: die wichtigste Aufgabe, das Motto oben und
    die Reflexion unten. Motto und Reflexion sind Arrays fester Länge —
    leere Zeilen sind der Normalfall und bleiben leer.                   */
-const SAAT_TAG = {
-  wichtigste: 1,
-  motto: ['Erst die Folien, dann alles andere.', ''],
-  reflexion: ['', '', ''],
-};
+
 
 /* Monatsblatt (CMP 11). Es spiegelt nichts: ein Eintrag steht hier, weil
    du ihn hierher gehoben oder hier geschrieben hast.
@@ -1220,7 +1212,7 @@ const SAAT_MONATSBLAETTER = [
     ],
     reflexion: ['', '', ''] },
 ];
-let monatOffen = '2026-08';   // Jahr und Monat des angezeigten Blattes
+let monatOffen = null;   // Jahr und Monat des angezeigten Blattes, null = heute
 
 /* Frisch aufgesetzter Bestand — nur beim ersten Start verwendet */
 function saatDB() {
@@ -1239,7 +1231,7 @@ function saatDB() {
     wochenblaetter: SAAT_WOCHENBLAETTER,
     monatsblaetter: SAAT_MONATSBLAETTER,
     kontakte:      SAAT_KONTAKTE,
-    tag:           SAAT_TAG,
+    tagesblaetter: SAAT_TAGESBLAETTER,
     naechsteId:    900,
   };
 }
@@ -1250,8 +1242,7 @@ function leereDB() {
     version: DB_VERSION,
     gruppen: [], bereiche: [], aktivitaeten: [], termine: [], jahrestermine: [],
     wieder: [], gewohnheiten: [], plaene: [], ziele: [], notizen: [],
-    wochenblaetter: [], monatsblaetter: [], kontakte: [],
-    tag: { wichtigste: null, motto: ['', ''], reflexion: ['', '', ''] },
+    wochenblaetter: [], monatsblaetter: [], kontakte: [], tagesblaetter: [],
     naechsteId: 900,
   };
 }
@@ -1272,7 +1263,7 @@ let NOTIZEN       = DB.notizen;
 let WOCHENBLAETTER = DB.wochenblaetter;
 let MONATSBLAETTER = DB.monatsblaetter;
 let KONTAKTE      = DB.kontakte;
-let TAG           = DB.tag;
+let TAGESBLAETTER = DB.tagesblaetter;
 
 function dbUebernehmen(neu) {
   DB = migriereDB(neu);
@@ -1289,7 +1280,7 @@ function dbUebernehmen(neu) {
   WOCHENBLAETTER = DB.wochenblaetter;
   MONATSBLAETTER = DB.monatsblaetter;
   KONTAKTE      = DB.kontakte;
-  TAG           = DB.tag;
+  TAGESBLAETTER = DB.tagesblaetter;
   neuId = DB.naechsteId || 900;
 }
 
@@ -1309,6 +1300,45 @@ function migriereDB(d) {
   d.bereiche.forEach(function (b) {
     if (b.gruppeId === undefined) { b.gruppeId = null; }
   });
+  /* Version 2 → 3: Wochentagsziffern werden zu echten Datumsangaben.
+     Ein log{0..6} überschrieb sich jede Woche selbst, ein Termin mit
+     tag:2 lag in jeder Woche am Mittwoch.                             */
+  if (!Array.isArray(d.tagesblaetter)) { d.tagesblaetter = []; }
+  if (d.tag && typeof d.tag === 'object') {
+    /* Das eine alte Tagesblatt bekommt das heutige Datum */
+    d.tagesblaetter.push({ datum:isoHeute(), wichtigste:d.tag.wichtigste || null,
+                           motto:d.tag.motto || ['', ''],
+                           reflexion:d.tag.reflexion || ['', '', ''] });
+    delete d.tag;
+  }
+  const mo = isoMontag(isoHeute());
+  (d.termine || []).forEach(function (t) {
+    if (t.datum === undefined && typeof t.tag === 'number') {
+      t.datum = isoPlus(mo, t.tag);
+      delete t.tag;
+    }
+  });
+  (d.kontakte || []).forEach(function (k) {
+    if (k.datum === undefined && typeof k.tag === 'number') {
+      k.datum = isoPlus(mo, k.tag);
+      delete k.tag;
+    }
+  });
+  [].concat(d.wieder || [], d.gewohnheiten || []).forEach(function (x) {
+    if (!x.log) { x.log = {}; return; }
+    const neu = {};
+    Object.keys(x.log).forEach(function (k) {
+      if (/^\d$/.test(k)) { neu[isoPlus(mo, parseInt(k, 10))] = x.log[k]; }
+      else { neu[k] = x.log[k]; }
+    });
+    x.log = neu;
+  });
+  (d.aktivitaeten || []).forEach(function (a) {
+    if (a.geplant === undefined) {
+      a.geplant = (a.heute === true) ? isoHeute() : null;
+      delete a.heute;
+    }
+  });
   d.version = DB_VERSION;
   return d;
 }
@@ -1318,9 +1348,36 @@ const MONATE_LANG = ['Januar','Februar','März','April','Mai','Juni','Juli','Aug
                      'September','Oktober','November','Dezember'];
 const WOTAGE = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
 const WOKURZ = ['Mo','Di','Mi','Do','Fr','Sa','So'];
-const HEUTE_WT = 2;
-const HEUTE_ISO = '2026-08-19';
-const HEUTE_DMY = '19.08.2026';
+/* ═══════════════════════════════════════════════════════════════════
+   ZEITBASIS
+   Alles hängt am echten Datum. tagOffen ist das angezeigte Blatt und
+   startet auf heute; frühere Fassungen hatten Wochentagsziffern, die
+   sich jede Woche selbst überschrieben haben.
+   ═══════════════════════════════════════════════════════════════════ */
+function isoHeute() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+         '-' + String(d.getDate()).padStart(2, '0');
+}
+function isoPlus(iso, n) {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+/* 0 = Montag */
+function isoWt(iso) {
+  return (new Date(iso + 'T00:00:00Z').getUTCDay() + 6) % 7;
+}
+function isoMontag(iso) { return isoPlus(iso, -isoWt(iso)); }
+function dmy(iso) {
+  if (!iso || iso.length < 10) { return ''; }
+  return iso.slice(8) + '.' + iso.slice(5, 7) + '.' + iso.slice(0, 4);
+}
+function dmyKurz(iso) {
+  if (!iso || iso.length < 10) { return ''; }
+  return iso.slice(8) + '.' + iso.slice(5, 7) + '.';
+}
+let tagOffen = isoHeute();
 
 /* ═══════════════════════════════════════════════════════════════════
    SPEICHER — IndexedDB
@@ -1423,6 +1480,26 @@ function ersterBereichId() {
     BEREICHE.push({ id:'b' + naechsteId(), name:'Allgemein', farbe:'#6b6459' });
   }
   return BEREICHE[0].id;
+}
+
+/* Liefert das Blatt des angezeigten Tages; fehlt es, entsteht es. */
+function tagBlatt() {
+  let b = TAGESBLAETTER.find(x => x.datum === tagOffen);
+  if (!b) {
+    b = { datum:tagOffen, wichtigste:null, motto:['', ''], reflexion:['', '', ''] };
+    TAGESBLAETTER.push(b);
+  }
+  return b;
+}
+function tagBlaettern(n) {
+  tagOffen = isoPlus(tagOffen, n);
+  editZelle = null; editTermin = null;
+  renderAlles();
+}
+function tagHeute() {
+  tagOffen = isoHeute();
+  editZelle = null; editTermin = null;
+  renderAlles();
 }
 
 /* ═══ REGISTER ═══ */
@@ -1688,17 +1765,17 @@ function titelKlasse(o) {
 /* Ganztägige Einträge des Tages: eigene Termine plus alle mehrtägigen
    Jahrestermine, in deren Zeitraum der Tag fällt.                      */
 function ganztagsEintraege() {
-  const l = TERMINE.filter(t => t.tag === HEUTE_WT && t.ganztags)
+  const l = TERMINE.filter(t => t.datum === tagOffen && t.ganztags)
     .map(function (t) { return { t:t.t, ort:t.ort, quelle:'' }; });
   /* Feiertag und Ferien stehen als Anhaltspunkt oben mit im Band */
   if (zeigeKalender) {
-    const fei = feiertagAn(HEUTE_ISO);
+    const fei = feiertagAn(tagOffen);
     if (fei) { l.push({ t:fei, ort:'', quelle:'Feiertag' }); }
-    const fer = ferienAn(HEUTE_ISO);
+    const fer = ferienAn(tagOffen);
     if (fer) { l.push({ t:fer + ' (Bayern)', ort:'', quelle:'Ferien' }); }
   }
   JAHRESTERMINE.forEach(function (j) {
-    if (HEUTE_ISO >= j.von && HEUTE_ISO <= j.bis) {
+    if (tagOffen >= j.von && tagOffen <= j.bis) {
       l.push({ t:j.t, ort:j.ort, quelle:'Jahrestermin' });
     }
   });
@@ -1760,7 +1837,8 @@ const wert = (id, fallback) => { const e = $(id); return e ? e.value.trim() : (f
 function aktNeu(heute, feld) {
   aufraeumen();
   const a = { id:naechsteId(), t:'', b:ersterBereichId(), prio:'B', min:30,
-              wer:'', beginn:'', ende:'', glyph:'\u2022', heute:!!heute };
+              wer:'', beginn:'', ende:'', glyph:'\u2022',
+              geplant:heute ? tagOffen : null, planId:null, zielId:null };
   AKTIVITAETEN.push(a);
   zelleOeffnen('akt', a.id, feld || 't');
 }
@@ -1839,7 +1917,7 @@ function zelleWeiter(folgeName) {
     if (art === 'kontakt') { kontaktNeu(); }
     else {
       const a = AKTIVITAETEN.find(x => x.id === id);
-      aktNeu(a ? a.heute : false, folge[0]);
+      aktNeu(a ? (a.geplant === tagOffen) : false, folge[0]);
     }
     return;
   }
@@ -1863,8 +1941,8 @@ function freiSchreiben() {
   if (!editZelle) { return; }
   const e = $('ez');
   if (!e) { return; }
-  if (editZelle.art === 'motto')      { TAG.motto[editZelle.id] = e.value; }
-  if (editZelle.art === 'reflexion')  { TAG.reflexion[editZelle.id] = e.value; }
+  if (editZelle.art === 'motto')      { tagBlatt().motto[editZelle.id] = e.value; }
+  if (editZelle.art === 'reflexion')  { tagBlatt().reflexion[editZelle.id] = e.value; }
   if (editZelle.art === 'mreflexion') { monatBlatt().reflexion[editZelle.id] = e.value; }
   if (editZelle.art === 'wreflexion') { wocheBlatt().reflexion[editZelle.id] = e.value; }
 }
@@ -1916,7 +1994,7 @@ function minZuZeit(m) {
 function terminNeu(min) {
   aufraeumen();
   editAkt = null; editKontakt = null;
-  const t = { id:naechsteId(), tag:HEUTE_WT, von:minZuZeit(min), bis:minZuZeit(min + 60),
+  const t = { id:naechsteId(), datum:tagOffen, von:minZuZeit(min), bis:minZuZeit(min + 60),
               ganztags:false, ort:'', t:'' };
   TERMINE.push(t);
   editTermin = t.id;
@@ -1967,7 +2045,7 @@ function terminEdit(t) {
 function kontaktNeu() {
   aufraeumen();
   editTermin = null;
-  const k = { id:naechsteId(), tag:HEUTE_WT, t:'', glyph:'\u2022' };
+  const k = { id:naechsteId(), datum:tagOffen, t:'', glyph:'\u2022' };
   KONTAKTE.push(k);
   zelleOeffnen('kontakt', k.id, 't');
 }
@@ -1977,9 +2055,15 @@ function prioFeld(p) {
 
 /* ═══ BLATT: TAG (CMP 01) ═══ */
 function blattTag() {
-  kopf(WOTAGE[HEUTE_WT] + ', 19. August 2026', 'Tagesplan \u00b7 KW 34', '');
+  const heute = (tagOffen === isoHeute());
+  kopf(WOTAGE[isoWt(tagOffen)] + ', ' + parseInt(tagOffen.slice(8), 10) + '. ' +
+       MONATE_LANG[parseInt(tagOffen.slice(5, 7), 10) - 1] + ' ' + tagOffen.slice(0, 4),
+       'Tagesplan \u00b7 KW ' + kalenderwoche(tagOffen) + (heute ? '' : ' \u00b7 nicht heute'),
+       '<button class="k-btn" onclick="tagBlaettern(-1)">\u2039</button>' +
+       '<button class="k-btn" onclick="tagBlaettern(1)">\u203a</button>' +
+       (heute ? '' : '<button class="k-btn pri" onclick="tagHeute()">Heute</button>'));
 
-  const fest = TERMINE.filter(t => t.tag === HEUTE_WT && !t.ganztags);
+  const fest = TERMINE.filter(t => t.datum === tagOffen && !t.ganztags);
   const inMin = z => parseInt(z.slice(0,2),10) * 60 + parseInt(z.slice(3),10);
 
   const spur = {};
@@ -2037,11 +2121,11 @@ function blattTag() {
     }
   }
 
-  const w = AKTIVITAETEN.find(a => a.id === TAG.wichtigste);
+  const w = AKTIVITAETEN.find(a => a.id === tagBlatt().wichtigste);
   let rechts = '<div class="wichtig"><div class="wichtig-l">Wichtigste Aufgabe heute</div>' +
     '<div class="tz-titel">' + (w ? esc(w.t) : '\u2014') + '</div></div>';
 
-  const liste = AKTIVITAETEN.filter(a => a.heute);
+  const liste = AKTIVITAETEN.filter(a => a.geplant === tagOffen);
   rechts += '<div class="abschnitt">' + abschnitt('Aktivit\u00e4ten', '') +
     '<table class="atab"><colgroup><col style="width:28px"><col style="width:26px">' +
     '<col><col style="width:48px"><col style="width:38px"></colgroup>' +
@@ -2072,18 +2156,18 @@ function blattTag() {
   /* Heute faellige wiederkehrende Vorgaenge. Sie kosten Zeit und gehoeren
      deshalb auf den Tagesplan — aber in einen eigenen Block, damit sie
      sich nicht unter die bewusst gehobenen Aktivitaeten mischen.       */
-  const wk = WIEDER.filter(x => x.tage.indexOf(HEUTE_WT) !== -1);
+  const wk = WIEDER.filter(x => x.tage.indexOf(isoWt(tagOffen)) !== -1);
   if (wk.length) {
     const summe = wk.reduce(function (n, x) { return n + x.min; }, 0);
     rechts += '<div class="abschnitt">' +
       abschnitt('Wiederkehrend heute', summe + ' Min');
     rechts += wk.map(function (x) {
-      const g = x.log[HEUTE_WT] || '\u2022';
+      const g = x.log[tagOffen] || '\u2022';
       const fuehrt = x.fuehrtZu
         ? ' fuehrt" onclick="blattOeffnen(\'akt\',\'' + x.fuehrtZu + '\')'
         : '';
       return '<div class="wk-z">' +
-        hakFeld(g, 'wiederWeiter(' + x.id + ',' + HEUTE_WT + ')') +
+        hakFeld(g, 'wiederWeiter(' + x.id + ',\'' + tagOffen + '\')') +
         '<span class="wk-t ' + titelKlasse({ glyph:g }) + fuehrt + '">' +
         esc(x.t) + '</span>' +
         '<span class="wk-min">' + x.min + '</span></div>';
@@ -2092,7 +2176,7 @@ function blattTag() {
   }
   rechts += '</div>';
 
-  const kont = KONTAKTE.filter(k => k.tag === HEUTE_WT);
+  const kont = KONTAKTE.filter(k => k.datum === tagOffen);
   rechts += '<div class="abschnitt rf-block">' +
     abschnitt('Kontakte / R\u00fcckfragen', 'antippen und schreiben');
   rechts += kont.map(function (k) {
@@ -2122,8 +2206,8 @@ function blattTag() {
   /* Reflexion schliesst den Tag ab: gerahmt, damit sie sich vom
      Formularteil darueber absetzt. */
   rechts += '<div class="refl"><div class="refl-l">Reflexion</div>';
-  for (let ri = 0; ri < TAG.reflexion.length; ri++) {
-    rechts += freiZeile('reflexion', ri, TAG.reflexion[ri], TAG.reflexion.length,
+  for (let ri = 0; ri < tagBlatt().reflexion.length; ri++) {
+    rechts += freiZeile('reflexion', ri, tagBlatt().reflexion[ri], tagBlatt().reflexion.length,
                         'refl-z', 'refl-t');
   }
   rechts += '</div>';
@@ -2132,8 +2216,8 @@ function blattTag() {
   /* Motto ueber die volle Blattbreite: es gilt fuer den ganzen Tag,
      nicht nur fuer die Terminspalte. */
   let motto = '<div class="motto"><div class="motto-l">Tagesmotto</div>';
-  for (let mi = 0; mi < TAG.motto.length; mi++) {
-    motto += freiZeile('motto', mi, TAG.motto[mi], TAG.motto.length, 'motto-z', 'motto-t');
+  for (let mi = 0; mi < tagBlatt().motto.length; mi++) {
+    motto += freiZeile('motto', mi, tagBlatt().motto[mi], tagBlatt().motto.length, 'motto-z', 'motto-t');
   }
   motto += '</div>';
 
@@ -2144,6 +2228,7 @@ function blattTag() {
 
 /* ═══ BLATT: WOCHE (CMP 10) ═══ */
 function wocheBlatt() {
+  if (!wocheOffen) { wocheOffen = isoMontag(isoHeute()); }
   let b = WOCHENBLAETTER.find(x => x.montag === wocheOffen);
   if (!b) {
     b = { montag:wocheOffen, eintraege:[], wichtig:[], reflexion:['', '', ''] };
@@ -2249,7 +2334,7 @@ function blattWoche() {
   let h = '';
   for (let d = 0; d < 7; d++) {
     const iso = tagPlus(b.montag, d);
-    const heute = (iso === HEUTE_ISO);
+    const heute = (iso === tagOffen);
     h += '<div class="wo-t ' + (d >= 5 ? 'we' : '') + ' ' + (heute ? 'heute' : '') + '">' +
       '<span class="wo-nr">' + WOTAGE[d] + '<div class="wo-dat">' + jtKurz(iso) + '</div></span>' +
       '<span class="wo-inhalt" onclick="eintragOeffnen(\'woche\',' + d + ',null)">' +
@@ -2329,7 +2414,7 @@ function blattAktivitaeten() {
     h += l.map(function (a) {
       if (editAkt === a.id) { return ''; }
       gezeigt += 1;
-      const knopf = a.heute
+      const knopf = (a.geplant === tagOffen)
         ? '<button class="tz-heute" onclick="event.stopPropagation(); heuteWeg(' + a.id + ')">\u2713 heute</button>'
         : '<button class="tz-heute" onclick="event.stopPropagation(); heuteHin(' + a.id + ')">\u2192 heute</button>';
       return '<tr>' +
@@ -2375,30 +2460,36 @@ function planPfeilZelle(a) {
 }
 function heuteHin(id) {
   const a = AKTIVITAETEN.find(x => x.id === id);
-  if (a) { a.heute = true; melde('Auf den Tagesplan gehoben'); renderAlles(); }
+  if (a) { a.geplant = tagOffen; melde('Auf den ' + dmyKurz(tagOffen) + ' gelegt'); renderAlles(); }
 }
 function heuteWeg(id) {
   const a = AKTIVITAETEN.find(x => x.id === id);
-  if (a) { a.heute = false; renderAlles(); }
+  if (a) { a.geplant = null; renderAlles(); }
 }
 
 /* ═══ BLATT: WIEDERKEHREND (CMP 03) ═══ */
 function streifen(obj, klickbar, fn) {
+  /* Der Streifen zeigt die Woche des angezeigten Tages und schreibt in
+     das Datum, nicht in eine Wochentagsziffer — sonst überschreibt sich
+     jede Woche selbst.                                                 */
+  const mo = isoMontag(tagOffen);
   let h = '<div class="str">';
   for (let d = 0; d < 7; d++) {
+    const iso = isoPlus(mo, d);
     const moeglich = obj.tage.indexOf(d) !== -1;
-    const z = obj.log[d] || (moeglich ? '•' : '');
-    const kl = 'str-t ' + (moeglich ? '' : 'aus') + ' ' + (d === HEUTE_WT ? 'heute' : '');
-    const klick = (klickbar && moeglich) ? ' onclick="' + fn + '(' + obj.id + ',' + d + ')"' : '';
+    const z = obj.log[iso] || (moeglich ? '\u2022' : '');
+    const kl = 'str-t ' + (moeglich ? '' : 'aus') + ' ' +
+               (iso === tagOffen ? 'heute' : '');
+    const klick = (klickbar && moeglich)
+      ? ' onclick="' + fn + '(' + obj.id + ',\'' + iso + '\')"' : '';
     h += '<span class="' + kl + '"' + klick + '>' + z + '</span>';
   }
   return h + '</div>';
 }
-function wiederWeiter(id, tag) {
+function wiederWeiter(id, iso) {
   const w = WIEDER.find(x => x.id === id);
   if (!w) { return; }
-  const folge = { '•':'✕', '✕':'–', '–':'•' };
-  w.log[tag] = folge[w.log[tag] || '•'];
+  w.log[iso] = naechsterGlyph(w.log[iso] || '\u2022');
   renderAlles();
 }
 function blattWieder() {
@@ -2418,11 +2509,10 @@ function blattWieder() {
 }
 
 /* ═══ BLATT: GEWOHNHEITEN (CMP 04) ═══ */
-function gewWeiter(id, tag) {
+function gewWeiter(id, iso) {
   const g = GEWOHNHEIT.find(x => x.id === id);
   if (!g) { return; }
-  const folge = { '•':'✕', '✕':'–', '–':'•' };
-  g.log[tag] = folge[g.log[tag] || '•'];
+  g.log[iso] = naechsterGlyph(g.log[iso] || '\u2022');
   renderAlles();
 }
 function blattGewohnheit() {
@@ -2431,7 +2521,7 @@ function blattGewohnheit() {
     WOKURZ.map(function (t) { return '<span class="str-k">' + t + '</span>'; }).join('') +
     '<span class="str-k" style="width:44px">Quote</span></div>';
   h += GEWOHNHEIT.map(function (g) {
-    const erf = [0,1,2,3,4,5,6].filter(d => g.log[d] === '✕').length;
+    const erf = [0,1,2,3,4,5,6].filter(d => g.log[isoPlus(isoMontag(tagOffen), d)] === '✕').length;
     return '<div class="tz" style="align-items:center">' +
       '<span class="tz-titel">' + esc(g.t) +
       '<div class="t-meta">' + esc(g.ziel) + '</div></span>' +
@@ -2628,7 +2718,7 @@ function planAktNeu(pid) {
   const p = PLAENE.find(x => x.id === pid);
   aufraeumen();
   const a = { id:naechsteId(), t:'', b:p ? p.b : ersterBereichId(), prio:'B', min:0,
-              wer:'', beginn:'', ende:'', glyph:'\u2022', heute:false, planId:pid };
+              wer:'', beginn:'', ende:'', glyph:'\u2022', geplant:null, planId:pid };
   AKTIVITAETEN.push(a);
   zelleOeffnen('akt', a.id, 't');
 }
@@ -2662,7 +2752,7 @@ function zielAnzahl(zid) {
 }
 function zielNeu() {
   const z = { id:'z' + naechsteId(), t:'Neues Ziel', b:ersterBereichId(),
-              start:HEUTE_DMY, frist:'', archiviert:false,
+              start:dmy(isoHeute()), frist:'', archiviert:false,
               zustand:['', ''], meilensteine:[] };
   ZIELE.push(z);
   reg = 'ziele';
@@ -2922,16 +3012,16 @@ function blattZiel(zid) {
   if (wi.length) {
     h += '<div class="abschnitt">' + abschnitt('Wiederkehrend', 'Verhalten anpassen');
     h += wi.map(function (w) {
-      return zielZeile('wied', w.id, w.log[HEUTE_WT] || '\u2022', w.t, w.muster,
-                       'wiederWeiter(' + w.id + ',' + HEUTE_WT + ')');
+      return zielZeile('wied', w.id, w.log[tagOffen] || '\u2022', w.t, w.muster,
+                       'wiederWeiter(' + w.id + ',\'' + tagOffen + '\')');
     }).join('') + '</div>';
   }
   if (gw.length) {
     h += '<div class="abschnitt">' + abschnitt('Gewohnheiten', 'einüben');
     h += gw.map(function (g) {
-      const erf = [0,1,2,3,4,5,6].filter(d => g.log[d] === '\u2715').length;
-      return zielZeile('gew', g.id, g.log[HEUTE_WT] || '\u2022', g.t,
-                       erf + '/' + g.soll, 'gewWeiter(' + g.id + ',' + HEUTE_WT + ')');
+      const erf = [0,1,2,3,4,5,6].filter(d => g.log[isoPlus(isoMontag(tagOffen), d)] === '\u2715').length;
+      return zielZeile('gew', g.id, g.log[tagOffen] || '\u2022', g.t,
+                       erf + '/' + g.soll, 'gewWeiter(' + g.id + ',\'' + tagOffen + '\')');
     }).join('') + '</div>';
   }
   if (!pl.length && !ak.length && !wi.length && !gw.length) {
@@ -3107,6 +3197,7 @@ function monatFinde(id) {
 /* Liefert das offene Blatt; fehlt es, wird es leer angelegt. So entsteht
    jeder Monat beim ersten Betreten von selbst.                         */
 function monatBlatt() {
+  if (!monatOffen) { monatOffen = isoHeute().slice(0, 7); }
   const jahr = parseInt(monatOffen.slice(0, 4), 10);
   const monat = parseInt(monatOffen.slice(5), 10);
   let b = MONATSBLAETTER.find(x => x.jahr === jahr && x.monat === monat);
@@ -3172,7 +3263,10 @@ function monatEintragZeile(e) {
 function blattMonat() {
   const b = monatBlatt();
   const tage = monatTage();
-  const heutigerMonat = (b.jahr === 2026 && b.monat === 8);
+  const hIso = isoHeute();
+  const heutigerMonat = (b.jahr === parseInt(hIso.slice(0, 4), 10) &&
+                         b.monat === parseInt(hIso.slice(5, 7), 10));
+  const heuteTag = parseInt(hIso.slice(8), 10);
 
   kopf(MONATE_LANG[b.monat - 1] + ' ' + b.jahr,
        'Monatsvorausplanung \u00b7 ' + b.ereignisse.length + ' Ereignisse, ' +
@@ -3196,7 +3290,7 @@ function blattMonat() {
     for (let t = von; t <= bis; t++) {
       const wt = monatWochentag(t);
       const we = wt >= 5;
-      const heute = heutigerMonat && (t === 19);
+      const heute = heutigerMonat && (t === heuteTag);
       const iso = isoDatum(b.jahr, b.monat, t);
       const fer = zeigeKalender ? ferienAn(iso) : null;
       const fei = zeigeKalender ? feiertagAn(iso) : null;
@@ -3452,7 +3546,7 @@ function blattJahrestermine() {
       const iso = isoDatum(jahrOffen, monat, tag);
       const wt = wochentagVon(jahrOffen, monat, tag);
       const treffer = jtAnTag(iso);
-      const heute = (iso === HEUTE_ISO);
+      const heute = (iso === tagOffen);
       const fer = zeigeKalender ? ferienAn(iso) : null;
       const fei = zeigeKalender ? feiertagAn(iso) : null;
       let kl = 'frei ' + (wt >= 5 ? 'we ' : '') + (heute ? 'heute ' : '') +
@@ -3763,7 +3857,7 @@ function eintragSpeichern() {
       /* Eine Aufgabe entsteht als echte Aktivitaet; das Wochenblatt
          traegt nur den Verweis darauf.                              */
       const a = { id:naechsteId(), t:titel, b:ersterBereichId(), prio:'B', min:0, wer:'',
-                  beginn:'', ende:'', glyph:'\u2022', heute:false, planId:null, zielId:null };
+                  beginn:'', ende:'', glyph:'\u2022', geplant:null, planId:null, zielId:null };
       AKTIVITAETEN.push(a);
       e = { id:naechsteId(), refArt:'aktivitaet', refId:a.id };
       if (k.tag >= 0) { e.tag = k.tag; b.eintraege.push(e); } else { b.wichtig.push(e); }
@@ -3889,7 +3983,7 @@ function exportAuf() {
     /* Auf dem Move wird mit dem Stift geschrieben. Deshalb bekommt die
        Reflexion dort fuenf Linien statt der drei am Bildschirm, und die
        Zeilen sind hoeher. Bereits Eingetragenes wird uebernommen.       */
-    const mottoText = TAG.motto.filter(z => z).join(' ');
+    const mottoText = tagBlatt().motto.filter(z => z).join(' ');
     inhalt += '<div class="move-l">Tagesmotto</div>' +
       '<div class="move-z">' + esc(mottoText) + '</div>';
 
@@ -3897,30 +3991,30 @@ function exportAuf() {
     inhalt += ganztagsEintraege().map(function (g) {
       return '<div class="move-z">ganztags  ' + esc(g.t) + '</div>';
     }).join('');
-    inhalt += TERMINE.filter(t => t.tag === HEUTE_WT && !t.ganztags)
+    inhalt += TERMINE.filter(t => t.datum === tagOffen && !t.ganztags)
       .sort(function (a, b) { return a.von < b.von ? -1 : 1; })
       .map(function (t) {
         return '<div class="move-z">' + esc(t.von) + '  ' + esc(t.t) + '</div>';
       }).join('');
 
     inhalt += '<div class="move-l">Aktivitaeten</div>';
-    inhalt += AKTIVITAETEN.filter(a => a.heute).map(function (a) {
+    inhalt += AKTIVITAETEN.filter(a => a.geplant === tagOffen).map(function (a) {
       const z = { '\u2022':'\u25a1', '\u2715':'\u2715', '>':'\u203a', '\u2013':'\u2013' };
       return '<div class="move-z">' + (z[a.glyph] || '\u25a1') + ' ' + esc(a.prio) +
              '  ' + esc(a.t) + '</div>';
     }).join('');
 
-    const wk = WIEDER.filter(x => x.tage.indexOf(HEUTE_WT) !== -1);
+    const wk = WIEDER.filter(x => x.tage.indexOf(isoWt(tagOffen)) !== -1);
     if (wk.length) {
       inhalt += '<div class="move-l">Wiederkehrend</div>';
       inhalt += wk.map(function (x) {
-        const g = x.log[HEUTE_WT] || '\u2022';
+        const g = x.log[tagOffen] || '\u2022';
         const z = { '\u2022':'\u25a1', '\u2715':'\u2715', '>':'\u203a', '\u2013':'\u2013' };
         return '<div class="move-z">' + (z[g] || '\u25a1') + ' ' + esc(x.t) + '</div>';
       }).join('');
     }
 
-    const kont = KONTAKTE.filter(x => x.tag === HEUTE_WT);
+    const kont = KONTAKTE.filter(x => x.datum === tagOffen);
     inhalt += '<div class="move-l">Kontakte / Rueckfragen</div>';
     inhalt += kont.map(function (x) {
       const z = { '\u2022':'\u25a1', '\u2715':'\u2715', '>':'\u203a', '\u2013':'\u2013' };
@@ -3929,7 +4023,7 @@ function exportAuf() {
     for (let i = kont.length; i < 3; i++) { inhalt += '<div class="move-linie"></div>'; }
 
     inhalt += '<div class="move-refl"><div class="move-l" style="margin-top:0">Reflexion</div>';
-    const refl = TAG.reflexion.filter(z => z);
+    const refl = tagBlatt().reflexion.filter(z => z);
     refl.forEach(function (z) { inhalt += '<div class="move-z">' + esc(z) + '</div>'; });
     for (let i = refl.length; i < 5; i++) { inhalt += '<div class="move-linie"></div>'; }
     inhalt += '</div>';
@@ -4202,7 +4296,7 @@ function waUmwandeln(d) {
     aktivitaeten.push({ id:id, t:a.titel, b:bereichVon(a), prio:waPrio(a),
                         min:parseInt(a.groesse, 10) || 0, wer:'',
                         beginn:waDatum(a.startdatum), ende:waDatum(a.faellig),
-                        glyph:waGlyph(a.status), heute:false,
+                        glyph:waGlyph(a.status), geplant:null,
                         planId:null, zielId:null });
     bericht.aktivitaeten += 1;
   });
@@ -4229,7 +4323,7 @@ function waUmwandeln(d) {
       aktivitaeten.push({ id:naechsteId(), t:sch.titel,
                           b:(b && abbild[b.id]) ? abbild[b.id] : bereichVon(p),
                           prio:'B', min:0, wer:sch.delegiertAn || '',
-                          beginn:'', ende:'', glyph:'\u2022', heute:false,
+                          beginn:'', ende:'', glyph:'\u2022', geplant:null,
                           planId:pid, zielId:null });
       bericht.aktivitaeten += 1;
       bericht.schritte += 1;
@@ -4408,7 +4502,7 @@ function skaliere() {
   const s = Math.min(window.innerWidth / 820, window.innerHeight / 1180, 1);
   g.style.transform = 'scale(' + s + ')';
   const f = $('bf-rechts');
-  if (f) { f.textContent = '2026 \u00b7 ' + Math.round(s * 100) + '%'; }
+  if (f) { f.textContent = isoHeute().slice(0, 4) + ' \u00b7 ' + Math.round(s * 100) + '%'; }
 }
 
 /* ═══ START ═══ */
