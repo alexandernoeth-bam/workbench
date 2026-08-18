@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 1.1.1 · S7 WorkAssist-Import</title>
+<title>TimeAssist 1.2.0 · S7 WorkAssist-Import</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -471,6 +471,11 @@ input, textarea { font: inherit; color: inherit; }
 .dt-l { flex: 0 0 150px; color: var(--tinte-3); font-size: 12px;
         letter-spacing: .06em; text-transform: uppercase; }
 .dt-w { flex: 1; font-variant-numeric: tabular-nums; }
+.dt-warn { border: 1px solid var(--wein); background: var(--wein-h); border-radius: 5px;
+           padding: 9px 11px; margin-bottom: 12px; font-size: 13.2px;
+           color: var(--tinte); line-height: 1.5; }
+.k-btn.warn { background: var(--wein); border-color: var(--wein); color: var(--papier);
+              font-weight: 700; }
 
 /* Ferientoenung und Feiertagsname im Monatsraster */
 .mon-t.ferien { background: #f0ebe1; }
@@ -788,6 +793,7 @@ input, textarea { font: inherit; color: inherit; }
       <input type="file" id="daten-datei" accept="application/json,.json" style="display:none"
              onchange="datenImport(event)">
       <button class="k-btn" onclick="document.getElementById('daten-datei').click()">Importieren</button>
+      <button class="k-btn" id="daten-loeschen" onclick="datenLoeschenFragen()">Alles löschen</button>
       <span style="margin-left:auto"></span>
       <button class="k-btn pri" onclick="datenExport()">Exportieren</button>
     </div>
@@ -814,7 +820,7 @@ input, textarea { font: inherit; color: inherit; }
 <script>
 'use strict';
 
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.2.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -1168,6 +1174,18 @@ function saatDB() {
   };
 }
 
+/* Vollstaendig leerer Bestand — gleiche Form, nur ohne Inhalt. */
+function leereDB() {
+  return {
+    version: DB_VERSION,
+    bereiche: [], aktivitaeten: [], termine: [], jahrestermine: [],
+    wieder: [], gewohnheiten: [], plaene: [], ziele: [], notizen: [],
+    wochenblaetter: [], monatsblaetter: [], kontakte: [],
+    tag: { wichtigste: null, motto: ['', ''], reflexion: ['', '', ''] },
+    naechsteId: 900,
+  };
+}
+
 /* Der lebende Bestand. Die Alias-Namen darunter zeigen auf dieselben
    Arrays; ein Neuladen ersetzt sie ueber dbUebernehmen().            */
 let DB = saatDB();
@@ -1318,6 +1336,15 @@ function melde(x) {
 const bName  = id => (BEREICHE.find(b => b.id === id) || {}).name  || '—';
 const bFarbe = id => (BEREICHE.find(b => b.id === id) || {}).farbe || '#8c857a';
 const offen  = a => a.glyph === '•';
+
+/* Bei leerem Bestand haette ein neuer Vorgang keinen Bereich. Statt
+   abzustuerzen entsteht einer.                                        */
+function ersterBereichId() {
+  if (!BEREICHE.length) {
+    BEREICHE.push({ id:'b' + naechsteId(), name:'Allgemein', farbe:'#6b6459' });
+  }
+  return BEREICHE[0].id;
+}
 
 /* ═══ REGISTER ═══ */
 /* Sieben Hauptregister. Unterregister erscheinen als Karteireiter.       */
@@ -1599,7 +1626,7 @@ const wert = (id, fallback) => { const e = $(id); return e ? e.value.trim() : (f
 /* ── Aktivität ───────────────────────────────────────────────────── */
 function aktNeu(heute, feld) {
   aufraeumen();
-  const a = { id:naechsteId(), t:'', b:BEREICHE[0].id, prio:'B', min:30,
+  const a = { id:naechsteId(), t:'', b:ersterBereichId(), prio:'B', min:30,
               wer:'', beginn:'', ende:'', glyph:'\u2022', heute:!!heute };
   AKTIVITAETEN.push(a);
   zelleOeffnen('akt', a.id, feld || 't');
@@ -2251,7 +2278,7 @@ function planFortschritt(pid) {
   return { fertig:l.filter(a => a.glyph === '\u2715').length, gesamt:l.length };
 }
 function planNeu() {
-  const p = { id:'p' + naechsteId(), t:'Neuer Plan', b:BEREICHE[0].id, zielId:null,
+  const p = { id:'p' + naechsteId(), t:'Neuer Plan', b:ersterBereichId(), zielId:null,
               von:1, bis:12, zieldatum:'', archiviert:false, beschreibung:['', ''] };
   PLAENE.push(p);
   unterAktiv.plaene = p.id;
@@ -2425,7 +2452,7 @@ function planLoesen(aid) {
 function planAktNeu(pid) {
   const p = PLAENE.find(x => x.id === pid);
   aufraeumen();
-  const a = { id:naechsteId(), t:'', b:p ? p.b : BEREICHE[0].id, prio:'B', min:0,
+  const a = { id:naechsteId(), t:'', b:p ? p.b : ersterBereichId(), prio:'B', min:0,
               wer:'', beginn:'', ende:'', glyph:'\u2022', heute:false, planId:pid };
   AKTIVITAETEN.push(a);
   zelleOeffnen('akt', a.id, 't');
@@ -2459,7 +2486,7 @@ function zielAnzahl(zid) {
          zielWieder(zid).length + zielGewohnheit(zid).length;
 }
 function zielNeu() {
-  const z = { id:'z' + naechsteId(), t:'Neues Ziel', b:BEREICHE[0].id,
+  const z = { id:'z' + naechsteId(), t:'Neues Ziel', b:ersterBereichId(),
               start:HEUTE_DMY, frist:'', archiviert:false,
               zustand:['', ''], meilensteine:[] };
   ZIELE.push(z);
@@ -3560,7 +3587,7 @@ function eintragSpeichern() {
     if (k.art === 'aufgabe' && !k.id) {
       /* Eine Aufgabe entsteht als echte Aktivitaet; das Wochenblatt
          traegt nur den Verweis darauf.                              */
-      const a = { id:naechsteId(), t:titel, b:BEREICHE[0].id, prio:'B', min:0, wer:'',
+      const a = { id:naechsteId(), t:titel, b:ersterBereichId(), prio:'B', min:0, wer:'',
                   beginn:'', ende:'', glyph:'\u2022', heute:false, planId:null, zielId:null };
       AKTIVITAETEN.push(a);
       e = { id:naechsteId(), refArt:'aktivitaet', refId:a.id };
@@ -3769,9 +3796,40 @@ function datenAuf() {
     'Ger\u00e4ts und sind beim Start sofort da. Der Export ist der Notfallweg \u2014 ' +
     'er geh\u00f6rt regelm\u00e4\u00dfig in die Ablage.</div>';
   $('daten-inhalt').innerHTML = h;
+  loeschFrage = false;
+  const kl = $('daten-loeschen');
+  if (kl) { kl.textContent = 'Alles löschen'; kl.classList.remove('warn'); }
   $('daten').classList.add('auf');
 }
-function datenZu() { $('daten').classList.remove('auf'); }
+function datenZu() { $('daten').classList.remove('auf'); loeschFrage = false; }
+
+/* Loeschen in zwei Schritten: der erste Druck fragt, der zweite loescht.
+   Ein einzelner Fehlgriff darf den Bestand nicht kosten.              */
+let loeschFrage = false;
+function datenLoeschenFragen() {
+  if (!loeschFrage) {
+    loeschFrage = true;
+    const k = $('daten-loeschen');
+    k.textContent = 'Wirklich alles löschen?';
+    k.classList.add('warn');
+    $('daten-inhalt').insertAdjacentHTML('afterbegin',
+      '<div class="dt-warn">Dies leert s\u00e4mtliche Best\u00e4nde dieses Ger\u00e4ts \u2014 ' +
+      'Bereiche, Aktivit\u00e4ten, Pl\u00e4ne, Ziele, Bl\u00e4tter und Notizen. ' +
+      'Ein zuvor erstellter Export l\u00e4sst sich jederzeit wieder einlesen. ' +
+      'Nochmals dr\u00fccken l\u00f6scht, Schlie\u00dfen bricht ab.</div>');
+    return;
+  }
+  dbUebernehmen(leereDB());
+  loeschFrage = false;
+  reg = 'tag';
+  Object.keys(unterAktiv).forEach(function (k) {
+    unterAktiv[k] = (k === 'akt') ? 'akt' : (k === 'planung' ? 'monat'
+                  : (k === 'db' ? 'notiz' : 'uebersicht'));
+  });
+  datenZu();
+  renderAlles();
+  melde('Alle Best\u00e4nde gel\u00f6scht');
+}
 
 function datenExport() {
   DB.naechsteId = neuId;

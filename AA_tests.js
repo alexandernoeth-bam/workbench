@@ -331,6 +331,51 @@ kat('11 · WorkAssist-Import');
   } else { fail('WorkAssist-Dateien werden nicht erkannt'); }
 }
 
+/* ═══ 12 · Löschen und leerer Bestand ═══════════════════════════════════
+   Fehlerarten: Löschen ohne Rückfrage kostet den Bestand bei einem
+   Fehlgriff; ein leerer Bestand bringt die App zum Absturz, weil
+   BEREICHE[0] vorausgesetzt wird; leereDB hat eine andere Form als saatDB
+   und lässt beim Übernehmen Felder fehlen.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('12 · Löschen und leerer Bestand');
+{
+  if (/function leereDB/.test(JS)) { ok('leereDB vorhanden'); }
+  else { fail('leereDB fehlt'); }
+
+  const mL = JSK.match(/function leereDB\(\) \{([\s\S]*?)\n\}/);
+  const mS = JSK.match(/function saatDB\(\) \{([\s\S]*?)\n\}/);
+  if (mL && mS) {
+    const felder = t => (t.match(/(\w+):/g) || []).map(x => x.replace(':', '')).sort();
+    const a = felder(mL[1]), b = felder(mS[1]);
+    const fehlt = b.filter(x => a.indexOf(x) === -1);
+    if (!fehlt.length) { ok('leereDB hat dieselbe Form wie saatDB'); }
+    else { fail('leereDB fehlen Felder: ' + fehlt.join(', ')); }
+  } else { fail('leereDB oder saatDB nicht auswertbar'); }
+
+  /* In ersterBereichId selbst ist der Zugriff nach dem Anlegen sicher —
+     nur ausserhalb waere er ungeschuetzt.                             */
+  const iF = JSK.indexOf('function ersterBereichId');
+  let ohneFallback = JSK;
+  if (iF !== -1) {
+    const iZ = JSK.indexOf('\n}', iF);
+    ohneFallback = JSK.slice(0, iF) + JSK.slice(iZ);
+  }
+  if (!/BEREICHE\[0\]\.id/.test(ohneFallback)) {
+    ok('kein ungeschützter Zugriff auf BEREICHE[0]');
+  } else { fail('BEREICHE[0].id ohne Schutz — leerer Bestand stürzt ab'); }
+  if (/function ersterBereichId/.test(JS)) { ok('ersterBereichId als Rückfall vorhanden'); }
+  else { fail('ersterBereichId fehlt'); }
+
+  const mD = JSK.match(/function datenLoeschenFragen\(\) \{([\s\S]*?)\n\}/);
+  if (!mD) { fail('datenLoeschenFragen fehlt'); }
+  else if (/if \(!loeschFrage\)/.test(mD[1]) && /dbUebernehmen\(leereDB\(\)\)/.test(mD[1])) {
+    ok('Löschen erst nach Rückfrage');
+  } else { fail('Löschen ohne zweistufige Rückfrage'); }
+  if (/loeschFrage = false/.test(JSK.match(/function datenZu\(\)[^\n]*/)[0] || '')) {
+    ok('Schließen bricht die Löschabfrage ab');
+  } else { warn('Löschabfrage wird beim Schließen nicht zurückgesetzt'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
