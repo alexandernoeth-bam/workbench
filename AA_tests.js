@@ -439,6 +439,35 @@ kat('13 · Gruppen als Registerebene');
     });
 }
 
+/* ═══ 14 · Feste Maße in Tabellenzellen ═════════════════════════════════
+   Fehlerart, zweimal aufgetreten: ein Element bekommt seine Breite nur
+   über flex-basis. In einer Tabellenzelle greift die Flex-Angabe nicht,
+   und das Element fällt auf null Breite zusammen — beim Kästchen wurde
+   daraus ein Strich, beim Bereichspunkt verschwand er ganz.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('14 · Feste Maße in Tabellenzellen');
+{
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  /* Klassen, die im Code in einer Tabellenzelle landen */
+  const inZelle = [];
+  (JS.match(/<td[^>]*>[^']*?class="([\w -]+)"/g) || []).forEach(function (t) {
+    const m = /class="([\w -]+)"/.exec(t);
+    if (m) { m[1].split(/\s+/).forEach(k => { if (k) { inZelle.push(k); } }); }
+  });
+  ['tz-punkt', 'hak'].forEach(k => { if (inZelle.indexOf(k) === -1) { inZelle.push(k); } });
+
+  let f = 0, g = 0;
+  Array.from(new Set(inZelle)).forEach(function (k) {
+    const m = new RegExp('^\\.' + k + ' \\{([^}]*)\\}', 'm').exec(css);
+    if (!m) { return; }
+    const d = m[1];
+    if (/flex:\s*0 0 \d+px/.test(d) && !/width:\s*\d/.test(d)) {
+      f++; fail('.' + k + ' hat nur flex-basis, keine width — fällt in der Zelle zusammen');
+    } else if (/flex:\s*0 0 \d+px/.test(d)) { g++; }
+  });
+  if (!f) { ok(g + ' Zellenelemente mit fester Breite, keines nur mit flex-basis'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
