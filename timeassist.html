@@ -1,0 +1,3251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TimeAssist 0.21.0 · Mockup M7</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   TIMEASSIST · Mockup M1 · 0.1.0
+   Ringbuch im Hochformat, Zielgerät iPad Air 10,9" (820 × 1180 pt).
+   Sieben Register rechts, Unterregister als Karteireiter über dem Blatt.
+   Datenmodell nach Time/system-Formblättern: minimal, kein Auto-Status.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --papier:   #faf8f4;
+  --papier-2: #f2efe8;
+  --karte:    #ffffff;
+  --tinte:    #23211e;
+  --tinte-2:  #57524a;
+  --tinte-3:  #8c857a;
+  --leder:    #6b6459;
+  --linie:    #ddd8ce;
+  --linie-2:  #ebe6dc;
+  --marke:    #7d6b53;
+  --marke-h:  #efe9df;
+  --rot:      #8c3b2f;
+  /* Weinrot des gedruckten Satzes, RGB 144/12/36 — Formulartitel,
+     Kopflinie, Spaltenueberschriften, Formularnummer im Fuss.       */
+  --wein:     #900c24;
+  --wein-h:   #f6e9ec;
+  --gruen:    #4e6b52;
+  --r-kl: 7px;
+  --serif: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body { font-family: var(--sans); background: #cdc6b8; color: var(--tinte);
+       font-size: 14px; overflow: hidden; }
+button { cursor: pointer; background: none; border: none; font: inherit; color: inherit; }
+input, textarea { font: inherit; color: inherit; }
+
+/* ── Geräterahmen: 820 × 1180 pt, auf kleineren Fenstern skaliert ──── */
+.buehne { position: fixed; inset: 0; display: flex; align-items: center;
+          justify-content: center; }
+.geraet { width: 820px; height: 1180px; flex-shrink: 0; transform-origin: center center;
+          background: var(--papier-2); display: flex; flex-direction: column;
+          overflow: hidden; box-shadow: 0 8px 40px rgba(35,33,30,.3); }
+
+/* ── Kopf ─────────────────────────────────────────────────────────── */
+/* Keine App-Leiste mehr: Auf Papier gibt es keine. Die Bedienung sitzt
+   im Blattkopf, wo rechts ohnehin Platz frei war. Gewinn: rund 55 px. */
+.bk-werkzeug { display: flex; gap: 7px; align-items: center; flex-shrink: 0; }
+.k-btn { min-height: 34px; border: 1px solid var(--linie); border-radius: var(--r-kl);
+         padding: 0 11px; font-size: 12px; color: var(--tinte-2); background: var(--karte);
+         display: flex; align-items: center; gap: 6px; }
+.k-btn:active { background: var(--papier-2); }
+.k-btn.pri { background: var(--wein); border-color: var(--wein); color: var(--papier);
+             font-weight: 600; }
+
+/* ── Ringbuch ─────────────────────────────────────────────────────── */
+.buch { flex: 1; min-height: 0; display: flex; padding: 10px 0 10px 12px; }
+.blatt-flaeche { flex: 1; min-width: 0; background: var(--papier);
+  border: 1px solid #c4bdae; border-right: none; border-radius: 3px 0 0 3px;
+  box-shadow: 0 2px 10px rgba(35,33,30,.13);
+  display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.lochung { position: absolute; left: 0; top: 0; bottom: 0; width: 20px;
+           background: var(--papier-2); border-right: 1px solid var(--linie-2);
+           display: flex; flex-direction: column; justify-content: space-around;
+           align-items: center; padding: 30px 0; z-index: 2; }
+.loch { width: 8px; height: 8px; border-radius: 50%; background: #d8d2c6;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
+
+/* Karteireiter für Unterregister */
+.unterreiter { flex-shrink: 0; display: flex; gap: 2px; padding: 7px 16px 0 32px;
+               background: var(--papier-2); border-bottom: 1px solid #c4bdae; }
+.unterreiter.aus { display: none; }
+.ur { min-height: 30px; border: 1px solid #c4bdae; border-bottom: none;
+      border-radius: var(--r-kl) var(--r-kl) 0 0; background: #e8e3d9;
+      padding: 0 12px; font-size: 11px; color: var(--tinte-2);
+      display: flex; align-items: center; gap: 6px; margin-bottom: -1px; }
+.ur.aktiv { background: var(--papier); color: var(--tinte); font-weight: 700; }
+.ur-punkt { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+.ur-zahl { font-size: 9.5px; color: var(--tinte-3); }
+
+.blatt-kopf { flex-shrink: 0; padding: 12px 18px 7px 32px;
+              border-bottom: 2.5px double var(--wein); background: var(--papier);
+              display: flex; align-items: flex-end; gap: 12px; }
+.bk-namen { flex: 1; min-width: 0; margin-right: auto; }
+.bk-titel { font-size: 17px; font-weight: 700; line-height: 1.1;
+            font-family: var(--serif); color: var(--wein); }
+.bk-sub { font-size: 11px; color: var(--tinte-3); margin-top: 2px; }
+.bk-akt { display: flex; gap: 6px; flex-shrink: 0; }
+.blatt-koerper { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+                 padding: 0 18px 18px 32px; }
+.blatt-fuss { flex-shrink: 0; display: flex; gap: 12px; align-items: baseline;
+              padding: 5px 18px 7px 32px; border-top: 1px solid var(--linie);
+              font-size: 8.5px; letter-spacing: .12em; color: #a9a294;
+              text-transform: uppercase; background: var(--papier); }
+#bf-mitte { flex: 1; text-align: center; }
+#bf-nr { color: var(--wein); font-weight: 700; }
+
+/* ── Register rechts ──────────────────────────────────────────────── */
+/* Register hochkant: Schrift um 90° gedreht, Unterseite links.
+   Spart gegenüber der liegenden Beschriftung rund 84 px Blattbreite.  */
+/* Passen nicht alle Reiter in die Spalte, wird der naechste schlicht
+   nicht mehr gezeigt — er bleibt ueber die Uebersicht erreichbar.
+   Ohne overflow:hidden wuerden die Reiter stattdessen gestaucht.     */
+.reiter { width: 38px; flex-shrink: 0; display: flex; flex-direction: column;
+          gap: 5px; padding: 6px 0; overflow: hidden; }
+.rt { flex: 0 0 auto; border: 1px solid #c4bdae; border-left: none;
+      border-radius: 0 var(--r-kl) var(--r-kl) 0; background: var(--papier-2);
+      color: var(--tinte-2); font-size: 13px; letter-spacing: .08em;
+      text-transform: uppercase; padding: 14px 0;
+      display: flex; align-items: center; justify-content: center;
+      writing-mode: vertical-rl;
+      box-shadow: 2px 1px 5px rgba(35,33,30,.1); white-space: nowrap; }
+.rt.aktiv { background: var(--papier); color: var(--wein); font-weight: 700;
+            box-shadow: 3px 2px 8px rgba(35,33,30,.14); }
+
+/* ── Bausteine ────────────────────────────────────────────────────── */
+.abschnitt { margin-top: 14px; }
+.ab-kopf { display: flex; align-items: baseline; gap: 8px; padding: 0 0 4px;
+           border-bottom: 1px solid var(--linie); margin-bottom: 6px; }
+.ab-titel { font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase;
+            font-weight: 700; color: var(--wein); }
+.ab-sub { font-size: 10.5px; color: var(--tinte-3); margin-left: auto; }
+.hinweis { font-size: 10.5px; color: var(--tinte-3); margin-top: 12px; line-height: 1.55; }
+
+/* Tagesblatt: zwei Spalten wie das gedruckte Formblatt */
+.doppel { display: grid; grid-template-columns: 1fr 1.15fr; height: 100%; }
+.doppel > div:first-child { padding-right: 14px; border-right: 1px dashed var(--linie); }
+.doppel > div:last-child { padding-left: 14px; display: flex; flex-direction: column; }
+
+/* Chronik mit Belegt-Markierung */
+.cz { display: flex; gap: 5px; border-top: 1px solid var(--linie-2); height: 24px; }
+.cz.voll { border-top-color: var(--linie); }
+.cz-zeit { width: 30px; flex-shrink: 0; font-size: 9.5px; color: var(--tinte-3);
+           font-variant-numeric: tabular-nums; padding-top: 2px; }
+/* Markierungsspalte: ein Strich je belegendem Termin. Zwei Striche =
+   Überschneidung. Der Konflikt wird gezeigt, nicht vorher aufgelöst. */
+.cz-mark { width: 11px; flex-shrink: 0; border-left: 1px solid var(--linie-2);
+           border-right: 1px solid var(--linie-2); display: flex; gap: 1px;
+           padding: 0 1px; align-items: stretch; }
+.cz-strich { flex: 1; background: var(--leder); }
+.cz-inhalt { flex: 1; min-width: 0; position: relative; }
+.termin { position: absolute; left: 0; right: 0; background: var(--karte);
+          border: 1px solid var(--linie); border-left: 3px solid var(--leder);
+          padding: 1px 6px; border-radius: 0 4px 4px 0; overflow: hidden; z-index: 1; }
+.termin.kollision { right: 50%; }
+.termin.kollision2 { left: 50%; right: 0; z-index: 2; }
+.t-titel { font-size: 11.5px; line-height: 1.2; overflow: hidden;
+           text-overflow: ellipsis; white-space: nowrap; }
+.t-meta { font-size: 9px; color: var(--tinte-3); overflow: hidden;
+          text-overflow: ellipsis; white-space: nowrap; }
+/* Ganztags-Band: quer über der Chronik, wie von Hand oben hingeschrieben */
+.gt-band { margin-bottom: 3px; }
+.ganztags { background: var(--marke-h); border-left: 3px solid var(--marke);
+            padding: 2px 7px; margin-bottom: 2px; border-radius: 0 3px 3px 0;
+            font-size: 11.5px; display: flex; align-items: center; gap: 6px; }
+.gt-quelle { margin-left: auto; font-size: 8.5px; letter-spacing: .08em;
+             text-transform: uppercase; color: var(--marke); }
+
+/* Sphäre als Kürzel B / P — lesbar auf einen Blick, wie ein Stempel */
+/* ── Aktivitätentabelle: echte Tabelle mit festen Spaltenbreiten ──── */
+.atab { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.atab th { font-size: 8px; letter-spacing: .12em; text-transform: uppercase;
+           color: var(--wein); font-weight: 400; text-align: left;
+           padding: 0 4px 4px; border-bottom: 1.2px solid var(--wein); }
+.atab th.r { text-align: right; }
+.atab td { border-bottom: 1px solid var(--linie); padding: 4px; vertical-align: top;
+           font-size: 13.5px; line-height: 1.25; }
+.atab td.r { text-align: right; font-variant-numeric: tabular-nums;
+             font-size: 11.5px; color: var(--leder); }
+.atab td.dat { text-align: right; font-variant-numeric: tabular-nums;
+               font-size: 11.5px; color: var(--tinte-3); }
+.atab td.wer { font-size: 11.5px; color: var(--marke); overflow: hidden;
+               text-overflow: ellipsis; white-space: nowrap; }
+.atab td.mitte { text-align: center; padding: 4px 2px; }
+/* Angedeutete Spaltenlinien — das Blatt bleibt ein Formular */
+.atab th, .atab td { border-right: 1px solid var(--linie-2); }
+.atab th:last-child, .atab td:last-child { border-right: none; }
+/* Jede Zelle ist Klickfläche: bearbeiten oder weiterschalten */
+.atab td.z:active { background: var(--marke-h); }
+.atab td.z { cursor: pointer; }
+.atab td.offen { background: var(--karte); box-shadow: inset 0 0 0 1.4px var(--marke); }
+.atab .zf { width: 100%; border: none; background: transparent; outline: none;
+            font: inherit; color: var(--tinte); padding: 0; }
+.atab .zf.r { text-align: right; }
+.atab .zs { width: 100%; border: none; background: transparent; outline: none;
+            font-size: 11.5px; color: var(--tinte); }
+/* Priorität: nur der Buchstabe, keine Auszeichnung */
+.a-prio { font-family: var(--serif); font-size: 13px; font-weight: 700;
+          color: var(--tinte-2); }
+.atab tr.leer td { height: 24px; }
+.atab tr.neu td { border-bottom: 1.4px dashed var(--marke); }
+.atab tr.neu:active td { background: var(--marke-h); }
+.atab tr.bearbeitet td { background: var(--karte); border-bottom-color: var(--marke); }
+.atab tr.klick:active td { background: var(--papier-2); }
+/* Die Zustandsklassen sitzen seit dem Tabellenumbau auf der Zelle
+   selbst, nicht mehr auf einem inneren span.                          */
+.atab td.durch { text-decoration: line-through; color: var(--tinte-3); }
+.atab td.blass { color: var(--tinte-3); }
+.a-titel.durch { text-decoration: line-through; color: var(--tinte-3); }
+.a-titel.blass { color: var(--tinte-3); }
+.a-neu { color: var(--marke); font-size: 11.5px; }
+.a-bereich { display: block; font-size: 9.5px; color: var(--tinte-3);
+             letter-spacing: .02em; margin-top: 1px; }
+
+/* Erledigt-Kästchen: leer → ✕ erledigt → › verschoben → – gestrichen.
+   Feste Breite, weil die Flex-Angabe in einer Tabellenzelle nicht greift
+   und das leere Kästchen sonst auf zwei Rahmenstriche zusammenfällt.   */
+.hak { width: 19px; height: 19px; flex: 0 0 19px; border: 1px solid var(--tinte-3);
+       border-radius: 2px; background: var(--karte); display: inline-flex;
+       align-items: center; justify-content: center; font-size: 13px;
+       line-height: 1; color: var(--tinte); padding: 0; }
+.hak:active { background: var(--papier-2); }
+
+/* ── Inline-Erfassung: die Zeile wird zum Feld, kein Dialog ───────── */
+.tz.bearbeitet { background: var(--karte); box-shadow: inset 0 0 0 1.4px var(--marke);
+                 border-radius: 4px; }
+.ef { border: none; border-bottom: 1px solid var(--marke); background: transparent;
+      padding: 1px 3px; font-size: 13.5px; outline: none; min-width: 0;
+      font-family: var(--sans); color: var(--tinte); }
+.ef:focus { background: var(--marke-h); }
+.ef.titel { flex: 1; }
+.ef.zahl  { width: 100%; text-align: right; font-variant-numeric: tabular-nums; }
+.ef.dat   { width: 100%; text-align: right; font-size: 11.5px; }
+.ef.wer   { width: 100%; font-size: 11.5px; }
+.es { border: 1px solid var(--linie); border-radius: 4px; background: var(--karte);
+      font-size: 11px; padding: 1px 2px; outline: none; max-width: 100%;
+      font-family: var(--sans); color: var(--tinte); }
+.es:focus { border-color: var(--marke); }
+.ef-hilfe { font-size: 9.5px; color: var(--tinte-3); padding: 3px 2px 0;
+            letter-spacing: .02em; }
+.neu-hinweis { font-size: 10.5px; color: var(--marke); padding-left: 26px;
+               line-height: 22px; }
+/* Termin-Erfassung im Raster */
+.termin.bearbeitet { box-shadow: 0 0 0 1.4px var(--marke); z-index: 5; height: auto !important;
+                     min-height: 44px; right: 0 !important; left: 0 !important; }
+.te-zeile { display: flex; gap: 4px; align-items: center; margin-top: 2px; }
+/* Rückfragen beginnen fest auf halber Blatthöhe, damit der Block immer
+   an derselben Stelle steht — wie ein vorgedruckter Abschnitt.        */
+.rf-block { margin-top: 14px; }
+.kontakt-z { display: flex; align-items: center; gap: 7px; height: 26px;
+             border-bottom: 1px solid var(--linie-2); }
+.kontakt-z .hak { flex: 0 0 17px; width: 17px; height: 17px; font-size: 12px; }
+.kontakt-t.durch { text-decoration: line-through; color: var(--tinte-3); }
+.kontakt-t.blass { color: var(--tinte-3); }
+.kontakt-z .ef { flex: 1; font-size: 13.5px; }
+.kontakt-t { flex: 1; font-size: 13.5px; padding-left: 3px;
+             overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Wichtigste Aufgabe */
+.wichtig { border: 1.4px solid var(--wein); border-radius: 4px; padding: 7px 9px;
+           background: var(--karte); margin-bottom: 4px; }
+.wichtig-l { font-size: 8.5px; letter-spacing: .13em; text-transform: uppercase;
+             color: var(--tinte-3); margin-bottom: 3px; }
+
+/* Formblatt-Zeilen */
+.tz-kopf, .tz { display: flex; align-items: flex-start; gap: 7px; padding: 0 2px; }
+.tz-kopf { align-items: center; font-size: 8px; letter-spacing: .12em;
+           text-transform: uppercase; color: #a9a294; padding-bottom: 4px;
+           border-bottom: 1.2px solid var(--tinte); }
+.tz { min-height: 34px; border-bottom: 1px solid var(--linie); padding: 5px 2px; }
+.tz.leer { min-height: 24px; padding: 0; }
+.tz-nr { flex: 0 0 17px; text-align: right; font-size: 9.5px; color: #b0a99c;
+         line-height: 1.7; font-variant-numeric: tabular-nums; }
+.tz-glyph { flex: 0 0 18px; text-align: center; font-size: 17px; line-height: 1.1; }
+.tz-prio { flex: 0 0 18px; font-family: var(--serif); font-size: 12px;
+           font-weight: 700; color: var(--tinte-2); text-align: center; }
+.tz-titel { flex: 1; min-width: 0; font-size: 14px; line-height: 1.25; }
+.tz-titel.durch { text-decoration: line-through; color: var(--tinte-3); }
+.tz-titel.blass { color: var(--tinte-3); }
+/* Die letzte Zeile ist immer leer und wartet auf Eingabe */
+.tz.leer.neu { border-bottom: 1.4px dashed var(--marke); }
+.tz-wer { flex: 0 0 62px; font-size: 10.5px; color: var(--marke); line-height: 1.7;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tz-min { flex: 0 0 34px; text-align: right; font-size: 10.5px; color: var(--leder);
+          font-variant-numeric: tabular-nums; line-height: 1.7; }
+.tz-dat { flex: 0 0 44px; text-align: right; font-size: 10.5px; color: var(--tinte-3);
+          font-variant-numeric: tabular-nums; line-height: 1.7; }
+.tz-dat.spaet { color: var(--rot); font-weight: 600; }
+.tz-punkt { flex: 0 0 7px; height: 7px; border-radius: 2px; margin-top: 6px; }
+.tz-heute { flex: 0 0 58px; min-height: 26px; border: 1px solid var(--linie);
+            border-radius: 6px; padding: 0 7px; font-size: 10.5px; color: var(--tinte-2);
+            background: var(--karte); white-space: nowrap; align-self: center; }
+.tz-heute:active { background: var(--tinte); color: var(--papier); }
+
+/* Freie Schreiblinien */
+.frei-l { height: 24px; border-bottom: 1px solid var(--linie-2); }
+
+/* Tagesmotto: zwei Linien über die volle Blattbreite, ohne Rahmen —
+   sonst konkurrieren zwei Kästen um Aufmerksamkeit.                  */
+.motto { margin: 0 0 10px; }
+.motto-l { font-size: 8.5px; letter-spacing: .13em; text-transform: uppercase;
+           color: var(--tinte-3); margin-bottom: 3px; }
+.motto-z { height: 25px; border-bottom: 1px solid var(--linie);
+           display: flex; align-items: center; padding-left: 3px; }
+.motto-z .zf { font-size: 14px; }
+.motto-t { font-size: 14px; color: var(--tinte); }
+.motto-z.offen { background: var(--karte); box-shadow: inset 0 0 0 1.4px var(--marke); }
+
+/* Wiederkehrend heute: eigener Block, nicht unter die geplanten
+   Aktivitaeten gemischt. Sie stehen dort, weil der Rhythmus sie
+   hinstellt — nicht weil du sie heute frueh dorthin gehoben hast.   */
+.wk-z { display: flex; align-items: center; gap: 7px; height: 25px;
+        border-bottom: 1px solid var(--linie-2); }
+.wk-z .hak { flex: 0 0 17px; width: 17px; height: 17px; font-size: 12px; }
+.wk-t { flex: 1; min-width: 0; font-size: 13px; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; }
+.wk-t.durch { text-decoration: line-through; color: var(--tinte-3); }
+.wk-t.blass { color: var(--tinte-3); }
+.wk-min { flex: 0 0 34px; text-align: right; font-size: 11px; color: var(--leder);
+          font-variant-numeric: tabular-nums; }
+
+/* Ein wiederkehrender Vorgang darf auf sein Blatt fuehren */
+.wk-t.fuehrt { color: var(--wein); text-decoration: underline;
+               text-decoration-style: dotted; }
+
+/* Reflexion: gerahmt, damit sie sich vom Formularteil absetzt */
+.refl { border: 1px solid var(--wein); border-radius: 4px; padding: 7px 9px;
+        margin-top: 14px; background: var(--karte); }
+.refl-l { font-size: 8.5px; letter-spacing: .13em; text-transform: uppercase;
+          color: var(--wein); font-weight: 700; margin-bottom: 4px; }
+.refl-z { height: 25px; border-bottom: 1px dotted var(--linie);
+          display: flex; align-items: center; padding-left: 2px; }
+.refl-z:last-child { border-bottom: none; }
+.refl-z .zf { font-size: 13.5px; }
+.refl-t { font-size: 13.5px; color: var(--tinte); }
+.refl-z.offen { background: var(--papier-2); box-shadow: inset 0 0 0 1.4px var(--marke); }
+
+/* Move-Vorschau */
+.move-l { font-size: 6.5px; letter-spacing: .1em; text-transform: uppercase;
+          color: #a9a294; margin-top: 4px; }
+.move-linie { height: 9px; border-bottom: .5px solid #d8d2ce; }
+.move-refl { border: .5px solid #8c857a; border-radius: 2px; padding: 3px 4px;
+             margin-top: 4px; }
+
+/* Wochenblatt */
+.wb-tag { border-bottom: 1px solid var(--linie); padding: 5px 0; display: flex; gap: 10px; }
+.wb-tag.heute { background: var(--marke-h); }
+.wb-name { flex: 0 0 74px; font-size: 11px; font-weight: 700; color: var(--leder);
+           text-transform: uppercase; letter-spacing: .06em; padding-top: 3px; }
+.wb-sp { flex: 1; min-width: 0; }
+.wb-l { height: 23px; border-bottom: 1px dotted var(--linie); font-size: 13px;
+        padding-left: 3px; color: var(--tinte); }
+
+/* Streifen für Wiederkehrend und Gewohnheiten */
+.str { display: flex; gap: 3px; }
+.str-t { width: 25px; height: 25px; border: 1px solid var(--linie); border-radius: 4px;
+         display: flex; align-items: center; justify-content: center; font-size: 14px;
+         background: var(--karte); color: var(--tinte-2); }
+.str-t.aus { background: var(--papier-2); color: #cbc4b7; }
+.str-t.heute { border-color: var(--tinte); border-width: 1.6px; }
+.str-kopf { display: flex; gap: 3px; margin-bottom: 3px; }
+.str-k { width: 25px; text-align: center; font-size: 8px; color: #a9a294;
+         letter-spacing: .06em; text-transform: uppercase; }
+
+
+/* Notizregister */
+.nz { display: flex; align-items: center; gap: 10px; padding: 8px 2px;
+      border-bottom: 1px solid var(--linie); }
+.nz-nr { flex: 0 0 26px; height: 26px; border: 1px solid var(--linie); border-radius: 4px;
+         display: flex; align-items: center; justify-content: center; font-size: 11px;
+         font-family: var(--serif); color: var(--leder); background: var(--karte); }
+.nz-t { flex: 1; min-width: 0; font-size: 13.5px; }
+.nz-m { font-size: 10px; color: var(--tinte-3); }
+.nz-art { font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+          color: var(--marke); border: 1px solid var(--marke-h); background: var(--marke-h);
+          border-radius: 3px; padding: 1px 5px; }
+
+/* ── Monatsvorausplanung (CMP 11) ─────────────────────────────────
+   Zwei Spalten zu je 16 bzw. 15 Tagen, darunter der undatierte Teil
+   und die Reflexion. Nur bewusst hierher gehobene Eintraege.        */
+.mon-raster { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+.mon-t { display: flex; align-items: stretch; gap: 6px; min-height: 27px;
+         border-bottom: 1px solid var(--linie-2); }
+.mon-t.we { background: var(--papier-2); }
+.mon-t.heute { box-shadow: inset 3px 0 0 var(--wein); }
+.mon-nr { flex: 0 0 34px; font-size: 11px; color: var(--tinte-3); padding-top: 5px;
+          font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.mon-t.we .mon-nr { color: var(--leder); }
+.mon-inhalt { flex: 1; min-width: 0; display: flex; flex-direction: column;
+              justify-content: center; padding: 2px 0; cursor: pointer; }
+.mon-e { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+.mon-e .hak { flex: 0 0 15px; width: 15px; height: 15px; font-size: 11px; }
+.mon-t2 { flex: 1; min-width: 0; font-size: 12.5px; overflow: hidden;
+          text-overflow: ellipsis; white-space: nowrap; }
+.mon-t2.durch { text-decoration: line-through; color: var(--tinte-3); }
+.mon-t2.blass { color: var(--tinte-3); }
+.mon-t2 .zf { font-size: 12.5px; }
+.mon-herkunft { font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase;
+                color: var(--wein); flex-shrink: 0; }
+.mon-offen { background: var(--karte); box-shadow: inset 0 0 0 1.4px var(--marke); }
+
+/* ── Jahrestermine (CMP 21) ───────────────────────────────────────
+   Zwoelf Monatsspalten, 31 Tagzeilen. Ein mehrtaegiger Eintrag wird
+   zum durchgehenden Balken — so sieht man Abwesenheit als Flaeche.  */
+.jt-tab { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.jt-tab th { font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase;
+             color: var(--wein); font-weight: 400; padding: 0 0 4px;
+             border-bottom: 1.2px solid var(--wein); }
+.jt-tab td { height: 24px; padding: 0; border-right: 1px solid var(--linie-2);
+             border-bottom: 1px solid var(--linie-2); position: relative; }
+.jt-tab td.tagnr { border-right: 1px solid var(--linie); text-align: right;
+                   padding-right: 5px; font-size: 9.5px; color: var(--tinte-3);
+                   font-variant-numeric: tabular-nums; }
+.jt-tab td.we { background: var(--papier-2); }
+.jt-tab td.leer { background: repeating-linear-gradient(135deg,
+                  transparent, transparent 4px, var(--linie-2) 4px, var(--linie-2) 5px); }
+.jt-tab td.heute { box-shadow: inset 0 0 0 1.5px var(--wein); }
+.jt-tab td.frei:active { background: var(--marke-h); }
+.jt-bal { position: absolute; inset: 2px 3px; }
+.jt-bal.start { border-radius: 4px 4px 0 0; }
+.jt-bal.ende  { border-radius: 0 0 4px 4px; }
+.jt-bal.eintag { border-radius: 4px; }
+.jt-kuerzel { position: absolute; inset: 2px 3px; display: flex; align-items: center;
+              justify-content: center; font-size: 8.5px; color: #fff;
+              overflow: hidden; pointer-events: none; }
+
+/* Legende: die vollen Titel, die im Raster keinen Platz haben */
+.jt-leg { display: flex; align-items: center; gap: 9px; padding: 5px 2px;
+          border-bottom: 1px solid var(--linie); }
+.jt-leg:active { background: var(--marke-h); }
+.jt-farbe { width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0; }
+.jt-lt { flex: 1; min-width: 0; font-size: 13px; }
+.jt-lm { font-size: 10.5px; color: var(--tinte-3); }
+.jt-ldat { font-size: 11px; color: var(--leder); font-variant-numeric: tabular-nums;
+           flex-shrink: 0; }
+.jt-feld { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.jt-feld label { flex: 0 0 62px; font-size: 10px; letter-spacing: .1em;
+                 text-transform: uppercase; color: var(--tinte-3); }
+.jt-feld input, .jt-feld select { flex: 1; min-width: 0; font: inherit; font-size: 13px;
+        border: 1px solid var(--linie); border-radius: 5px; padding: 6px 8px;
+        background: var(--karte); color: var(--tinte); }
+.jt-feld input:focus, .jt-feld select:focus { outline: none; border-color: var(--marke); }
+
+/* ── Wochenblatt (CMP 10) ─────────────────────────────────────────
+   Sieben Tagzeilen, gleiche Bedienung wie das Monatsraster.        */
+.wo-t { display: flex; align-items: stretch; gap: 8px; min-height: 74px;
+        border-bottom: 1px solid var(--linie); }
+.wo-t.we { background: var(--papier-2); }
+.wo-t.heute { box-shadow: inset 3px 0 0 var(--wein); }
+.wo-nr { flex: 0 0 92px; font-size: 12px; font-weight: 700; color: var(--leder);
+         text-transform: uppercase; letter-spacing: .06em; padding-top: 7px; }
+.wo-t.we .wo-nr { color: var(--tinte-3); }
+.wo-dat { font-size: 10px; font-weight: 400; letter-spacing: 0; color: var(--tinte-3);
+          text-transform: none; margin-top: 1px; }
+.wo-inhalt { flex: 1; min-width: 0; display: flex; flex-direction: column;
+             justify-content: center; padding: 4px 0; cursor: pointer; }
+
+/* Tageswahl in der Auswahlliste */
+.wahl-tage { display: flex; gap: 3px; margin-top: 6px; }
+.wahl-d { min-width: 30px; height: 26px; border: 1px solid var(--linie);
+          border-radius: 5px; background: var(--karte); font-size: 11px;
+          color: var(--tinte-2); }
+.wahl-d:active { background: var(--wein); border-color: var(--wein); color: var(--papier); }
+
+/* ── Planblatt (CMP 32) ───────────────────────────────────────────
+   Zwei Kopfzeilen wie im gedruckten Satz, darunter die Aktivitaeten. */
+.p-kopf { border-bottom: 1px solid var(--linie); padding-bottom: 6px; margin-bottom: 4px; }
+.p-kz { min-height: 24px; border-bottom: 1px dotted var(--linie-2); font-size: 13px;
+        color: var(--tinte-2); padding: 3px 2px; cursor: pointer; }
+.p-kz:last-child { border-bottom: none; }
+.p-kz:empty::before { content: 'antippen und schreiben'; color: var(--tinte-3);
+                      font-size: 11.5px; }
+.p-kz.offen { background: var(--karte); box-shadow: inset 0 0 0 1.4px var(--marke); }
+.p-kz .zf { font-size: 13px; }
+/* Der Pfeil auf der Checkliste: hier wird die Aktivitaet gefuehrt */
+.p-pfeil { display: block; font-size: 9.5px; color: var(--wein); margin-top: 1px;
+           letter-spacing: .02em; }
+/* Uebersicht */
+.ptab td { vertical-align: top; }
+.ptab tr.grp td { background: var(--papier-2); font-size: 9px; letter-spacing: .12em;
+                  text-transform: uppercase; color: var(--leder); padding: 5px 4px;
+                  border-bottom: 1px solid var(--linie); }
+.p-titel { font-size: 13.5px; display: block; }
+.p-link { color: var(--wein); text-decoration: underline;
+          text-decoration-style: dotted; text-underline-offset: 2px; }
+.p-chev { color: var(--wein); font-size: 17px; line-height: 1; }
+.p-besch { display: block; font-size: 10.5px; color: var(--tinte-3); margin-top: 1px;
+           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Zweite Registerebene: eigene, schmalere Spalte zwischen Blatt und
+   Hauptregistern. Beide Ebenen sind gleichzeitig sichtbar — so ist ein
+   Ringbuch mit Haupt- und Unterregister aufgebaut.                    */
+.reiter-innen { width: 38px; padding: 18px 0 6px; margin-right: 9px; }
+.reiter-innen.aus { display: none; }
+.reiter-innen .rt { box-shadow: 1px 1px 3px rgba(35,33,30,.09); }
+.reiter-innen .rt.aktiv { box-shadow: 2px 1px 5px rgba(35,33,30,.12); }
+/* Gleiche Schriftgroesse wie die Hauptregister — der Platz ist es wert.
+   Dunklerer Grund, damit sich die innere Ebene absetzt.               */
+.rt-plan { font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
+           padding: 14px 0; color: var(--tinte-2); background: #ddd6c8; }
+.rt-plan.aktiv { color: var(--wein); background: var(--papier); font-weight: 700; }
+
+/* ── Zielblatt (CMP 30) ───────────────────────────────────────────
+   Vier Abschnitte fuer die einzahlenden Bestaende, darunter die
+   Meilensteine als abgesetzter Block.                              */
+.zl-z { display: flex; align-items: center; gap: 8px; min-height: 28px;
+        border-bottom: 1px solid var(--linie-2); padding: 2px 0; }
+.zl-t { flex: 1; min-width: 0; font-size: 13.5px; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; }
+.zl-t.durch { text-decoration: line-through; color: var(--tinte-3); }
+.zl-t.blass { color: var(--tinte-3); }
+.zl-link { color: var(--wein); text-decoration: underline;
+           text-decoration-style: dotted; text-underline-offset: 2px; cursor: pointer; }
+.zl-m { flex: 0 0 auto; min-width: 52px; text-align: right; font-size: 11px;
+        color: var(--leder); font-variant-numeric: tabular-nums; cursor: pointer; }
+.zl-z .hak { flex: 0 0 17px; width: 17px; height: 17px; font-size: 12px; }
+.zl-z .zf { font-size: 13.5px; }
+.zl-z.neu-z { border-bottom: 1.4px dashed var(--marke); cursor: pointer; }
+.zl-z.neu-z:active { background: var(--marke-h); }
+.ms-block { border: 1px solid var(--wein); border-radius: 4px; padding: 7px 9px;
+            margin-top: 16px; background: var(--karte); }
+
+/* ── Ziele im Jahr (CMP 22) ───────────────────────────────────────*/
+.zj-tab { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.zj-tab th { font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase;
+             color: var(--wein); font-weight: 400; padding: 0 0 4px;
+             border-bottom: 1.2px solid var(--wein); text-align: center; }
+.zj-tab td { height: 30px; padding: 0; border-bottom: 1px solid var(--linie-2);
+             position: relative; }
+.zj-t { font-size: 12.5px; padding-right: 10px; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.zj-c { border-right: 1px solid var(--linie-2); }
+.zj-bal { position: absolute; inset: 10px 0; opacity: .55; }
+.zj-bal.erste { left: 3px; border-radius: 4px 0 0 4px; }
+/* Das Fristende ist der Punkt, an dem sich Ziele stauen */
+.zj-bal.frist { right: 3px; border-radius: 0 4px 4px 0; opacity: 1; }
+.zj-bal.frist::after { content: ''; position: absolute; right: 0; top: -5px; bottom: -5px;
+                       width: 3px; background: var(--wein); border-radius: 2px; }
+
+/* Laufzeitzeile auf dem Zielblatt */
+.zl-lauf { display: flex; align-items: center; gap: 8px; margin: 8px 0 2px; }
+.zl-lauf-l { font-size: 8.5px; letter-spacing: .13em; text-transform: uppercase;
+             color: var(--wein); font-weight: 700; }
+.zl-lauf-b { font-size: 11px; color: var(--tinte-3); }
+.zl-lauf-f { min-width: 92px; font-size: 13px; padding: 3px 6px; cursor: pointer;
+             border-bottom: 1px solid var(--linie); font-variant-numeric: tabular-nums; }
+.zl-lauf-f.offen { background: var(--karte); box-shadow: inset 0 0 0 1.4px var(--marke); }
+
+/* Loeschkreuz: Umsortieren heisst loeschen und neu schreiben */
+.mon-x { flex: 0 0 17px; width: 17px; height: 17px; border-radius: 3px;
+         color: var(--tinte-3); font-size: 15px; line-height: 1; padding: 0;
+         display: flex; align-items: center; justify-content: center; opacity: .45; }
+.mon-x:active { background: var(--wein-h); color: var(--wein); opacity: 1; }
+
+/* Auswahl aus den Bestaenden */
+.wahl-l { padding: 8px 4px; border-bottom: 1px solid var(--linie); display: flex;
+          align-items: center; gap: 9px; cursor: pointer; }
+.wahl-l:active { background: var(--marke-h); }
+.wahl-t { flex: 1; min-width: 0; font-size: 13px; }
+.wahl-m { font-size: 10px; color: var(--tinte-3); }
+.wahl-art { font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase;
+            color: var(--wein); border: 1px solid var(--wein-h); background: var(--wein-h);
+            border-radius: 3px; padding: 1px 5px; flex-shrink: 0; }
+.wahl-tag { flex: 0 0 52px; }
+.wahl-tag select { width: 100%; font-size: 11px; border: 1px solid var(--linie);
+                   border-radius: 4px; background: var(--karte); padding: 2px; }
+
+/* Platzhalterblatt für spätere Stufen */
+.stub { margin-top: 40px; text-align: center; color: var(--tinte-3); }
+.stub-z { font-family: var(--serif); font-size: 30px; color: #c9c2b4; }
+.stub-t { font-size: 13px; margin-top: 8px; }
+.stub-s { font-size: 11px; margin-top: 4px; }
+
+/* Dialog */
+.hg { position: fixed; inset: 0; background: rgba(35,33,30,.5); display: none;
+      align-items: center; justify-content: center; z-index: 50; }
+.hg.auf { display: flex; }
+.dlg { background: var(--papier); border-radius: 8px; width: 420px; max-width: 92vw;
+       max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
+.dlg-kopf { padding: 12px 16px; border-bottom: 1px solid var(--linie);
+            display: flex; align-items: center; gap: 10px; }
+.dlg-kopf h2 { font-size: 15px; font-family: var(--serif); }
+.dlg-koerper { padding: 16px; overflow-y: auto; display: flex; justify-content: center;
+               background: var(--papier-2); }
+.dlg-fuss { padding: 10px 16px; border-top: 1px solid var(--linie);
+            display: flex; align-items: center; gap: 8px; }
+.move { width: 248px; height: 397px; background: #fff; border: 1px solid var(--linie);
+        padding: 10px; display: flex; flex-direction: column; font-size: 8px; }
+.move-k { font-size: 9px; font-weight: 700; border-bottom: 1px solid var(--tinte);
+          padding-bottom: 3px; margin-bottom: 5px; }
+.move-z { font-size: 8.5px; padding: 2.5px 0; border-bottom: 1px dotted var(--linie); }
+.move-f { margin-top: auto; font-size: 6.5px; letter-spacing: .1em; color: #a9a294;
+          text-transform: uppercase; border-top: 1px solid var(--linie); padding-top: 3px; }
+
+/* Meldung */
+.meldung { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(14px);
+           background: var(--tinte); color: var(--papier); padding: 9px 18px;
+           border-radius: 20px; font-size: 12.5px; opacity: 0; pointer-events: none;
+           transition: opacity .18s, transform .18s; z-index: 60; }
+.meldung.auf { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="buehne">
+<div class="geraet" id="geraet">
+
+  <div class="buch">
+    <section class="blatt-flaeche">
+      <div class="lochung"><span class="loch"></span><span class="loch"></span>
+        <span class="loch"></span><span class="loch"></span><span class="loch"></span>
+        <span class="loch"></span></div>
+      <nav class="unterreiter aus" id="unterreiter"></nav>
+      <div class="blatt-kopf">
+        <div class="bk-namen">
+          <div class="bk-titel" id="bk-titel">—</div>
+          <div class="bk-sub" id="bk-sub"></div>
+        </div>
+        <div class="bk-akt" id="bk-akt"></div>
+        <div class="bk-werkzeug">
+          <button class="k-btn" onclick="melde('Daten liegen lokal — kein Öffnen nötig')">Daten</button>
+          <button class="k-btn pri" onclick="exportAuf()">Blatt an Move</button>
+        </div>
+      </div>
+      <div class="blatt-koerper" id="blatt"></div>
+      <div class="blatt-fuss">
+        <span id="bf-nr">CMP 01</span>
+        <span id="bf-mitte">TimeAssist</span>
+        <span id="bf-rechts">2026</span>
+      </div>
+    </section>
+    <nav class="reiter reiter-innen aus" id="reiter-plan"></nav>
+    <nav class="reiter" id="reiter"></nav>
+  </div>
+
+</div>
+</div>
+
+<div class="hg" id="export" onclick="if(event.target===this){exportZu()}">
+  <div class="dlg">
+    <div class="dlg-kopf">
+      <h2>Blatt an Move</h2>
+      <span class="bk-sub">82,6 × 132,2 mm</span>
+      <button class="k-btn" style="margin-left:auto" onclick="exportZu()">Schließen</button>
+    </div>
+    <div class="dlg-koerper" id="export-inhalt"></div>
+    <div class="dlg-fuss">
+      <span class="bk-sub" id="export-hinweis"></span>
+      <span style="margin-left:auto"></span>
+      <button class="k-btn" onclick="exportZu()">Abbrechen</button>
+      <button class="k-btn pri" onclick="melde('Im Mockup wird kein PDF erzeugt'); exportZu();">PDF erzeugen</button>
+    </div>
+  </div>
+</div>
+
+<div class="hg" id="wahl" onclick="if(event.target===this){wahlZu()}">
+  <div class="dlg">
+    <div class="dlg-kopf">
+      <h2 id="wahl-titel">Aufs Monatsblatt heben</h2>
+      <button class="k-btn" style="margin-left:auto" onclick="wahlZu()">Schließen</button>
+    </div>
+    <div class="dlg-koerper" style="display:block" id="wahl-inhalt"></div>
+    <div class="dlg-fuss">
+      <span class="bk-sub" id="wahl-fuss"></span>
+    </div>
+  </div>
+</div>
+
+<div class="hg" id="jt" onclick="if(event.target===this){jtZu()}">
+  <div class="dlg" style="width:380px">
+    <div class="dlg-kopf">
+      <h2>Jahrestermin</h2>
+      <button class="k-btn" style="margin-left:auto" onclick="jtZu()">Abbrechen</button>
+    </div>
+    <div class="dlg-koerper" style="display:block" id="jt-inhalt"></div>
+    <div class="dlg-fuss">
+      <button class="k-btn" onclick="jtLoeschen()">Löschen</button>
+      <span style="margin-left:auto"></span>
+      <button class="k-btn pri" onclick="jtSpeichern()">Übernehmen</button>
+    </div>
+  </div>
+</div>
+
+<div class="meldung" id="meldung"></div>
+
+<script>
+'use strict';
+
+const APP_VERSION = '0.21.0';
+
+/* ═══════════════════════════════════════════════════════════════════
+   DATEN — minimal nach Time/system-Formblättern.
+   Kein status, kein erstellt/geaendert, keine tags. Der Glyph ist der
+   Zustand:  •  offen   ✕  erledigt   >  weitergezogen   –  gestrichen
+   ═══════════════════════════════════════════════════════════════════ */
+
+const BEREICHE = [
+  { id:'b1', name:'CCD-Programm', farbe:'#6b6459' },
+  { id:'b2', name:'Migration',    farbe:'#7d6b53' },
+  { id:'b3', name:'Haus',         farbe:'#4e6b52' },
+  { id:'b4', name:'Familie',      farbe:'#8c3b2f' },
+  { id:'b5', name:'Organisation', farbe:'#57524a' },
+];
+
+/* Aktivität: t, b, prio, min, wer, beginn, ende, glyph, heute, planId
+   wer = '' bedeutet: ich selbst. beginn/ende = TT.MM. oder ''
+   planId: gehört die Aktivität zu einem Plan, steht sie auf dessen Blatt
+   und trägt auf der Checkliste ein → statt eines zweiten Eintrags.
+   zielId: nur für Aktivitäten OHNE Plan sinnvoll — Planaktivitäten
+   zahlen mittelbar über ihren Plan ein und stünden sonst doppelt.       */
+const AKTIVITAETEN = [
+  { id:1,  t:'Folien für CCD-Highlight fertigstellen', b:'b1', prio:'A', min:45,  wer:'',        beginn:'10.08.', ende:'18.08.', glyph:'•', heute:true, planId:'p1', zielId:null },
+  { id:2,  t:'Angebot von Nille prüfen',               b:'b1', prio:'A', min:30,  wer:'',        beginn:'',       ende:'14.08.', glyph:'•', heute:true, planId:'p1', zielId:null },
+  { id:3,  t:'Wartungsfenster abstimmen',              b:'b2', prio:'B', min:30,  wer:'Netzwerk',beginn:'',       ende:'21.08.', glyph:'•', heute:true, planId:'p2', zielId:null },
+  { id:4,  t:'Testfenster bestätigen',                 b:'b2', prio:'B', min:45,  wer:'',        beginn:'',       ende:'24.08.', glyph:'•', heute:false, planId:'p2', zielId:null },
+  { id:5,  t:'Unterlagen einscannen und abheften',     b:'b5', prio:'B', min:120, wer:'',        beginn:'',       ende:'',       glyph:'✕', heute:true, planId:'p4', zielId:null },
+  { id:6,  t:'Miele Waschmaschine registrieren',       b:'b3', prio:'C', min:10,  wer:'',        beginn:'',       ende:'',       glyph:'•', heute:false, planId:null, zielId:null },
+  { id:7,  t:'Grabbewässerung Nüdlingen planen',       b:'b4', prio:'C', min:90,  wer:'',        beginn:'',       ende:'30.09.', glyph:'>', heute:false, planId:'p3', zielId:null },
+  { id:8,  t:'Tabletten bestellen und holen',          b:'b4', prio:'B', min:60,  wer:'',        beginn:'',       ende:'19.08.', glyph:'✕', heute:true, planId:null, zielId:null },
+  { id:9,  t:'Heizung entlüften',                      b:'b3', prio:'C', min:20,  wer:'',        beginn:'',       ende:'',       glyph:'•', heute:false, planId:null, zielId:null },
+  { id:11, t:'Rückmeldung Netzwerkteam einholen',      b:'b2', prio:'B', min:15,  wer:'Netzwerk',beginn:'',       ende:'12.08.', glyph:'•', heute:true, planId:null, zielId:'z1' },
+  { id:12, t:'Artikel in VorProd anlegen',             b:'b1', prio:'B', min:60,  wer:'',        beginn:'',       ende:'26.08.', glyph:'•', heute:false, planId:null, zielId:'z1' },
+  { id:13, t:'Barcelona zum Jahreswechsel buchen',     b:'b4', prio:'C', min:120, wer:'',        beginn:'',       ende:'',       glyph:'•', heute:false, planId:null, zielId:null },
+  { id:14, t:'Nüdlingen: Giftstoffe wegfahren',        b:'b4', prio:'C', min:240, wer:'',        beginn:'',       ende:'',       glyph:'•', heute:false, planId:'p3', zielId:null },
+  { id:15, t:'Oskar reinigen und warten',              b:'b3', prio:'C', min:30,  wer:'',        beginn:'',       ende:'',       glyph:'•', heute:false, planId:null, zielId:null },
+  { id:16, t:'Hoheitszone Küche aufräumen',            b:'b3', prio:'C', min:45,  wer:'',        beginn:'',       ende:'',       glyph:'•', heute:false, planId:null, zielId:null },
+];
+
+/* Termin: t, tag (0 = Montag dieser Woche), von, bis, ganztags, ort
+   Händisch erfasst — kein Import, bewusst.                              */
+/* Termin: t, tag, von, bis, ganztags, ort — händisch erfasst.
+   106/108 überschneiden sich bewusst: 16:00–17:00 gegen 16:30–17:30.   */
+const TERMINE = [
+  { id:101, tag:0, von:'09:00', bis:'09:45', ganztags:false, ort:'Raum 2.14', t:'Abstimmung Migration' },
+  { id:102, tag:0, von:'14:00', bis:'15:00', ganztags:false, ort:'Teams',     t:'Jour fixe Team' },
+  { id:103, tag:1, von:'10:00', bis:'11:30', ganztags:false, ort:'Bamberg',   t:'CCD Lenkungskreis' },
+  { id:104, tag:2, von:'08:30', bis:'09:00', ganztags:false, ort:'Teams',     t:'Daily' },
+  { id:105, tag:2, von:'11:00', bis:'12:00', ganztags:false, ort:'Raum 1.02', t:'Abnahme Testfenster' },
+  { id:106, tag:2, von:'16:00', bis:'17:00', ganztags:false, ort:'Telefon',   t:'Rückruf Lieferant' },
+  { id:108, tag:2, von:'16:30', bis:'17:30', ganztags:false, ort:'zu Hause',     t:'Handwerker Heizung' },
+  { id:109, tag:2, von:'19:15', bis:'20:45', ganztags:false, ort:'Verein',       t:'Rudern' },
+  { id:107, tag:3, von:'',      bis:'',      ganztags:true,  ort:'Würzburg',  t:'Schulung Fachbereich' },
+];
+
+/* Jahrestermine: mehrtägige Abwesenheiten. Sie erscheinen automatisch im
+   Ganztags-Band jedes betroffenen Tages — die einzige Übernahme, die
+   ohne bewusste Handlung passiert. 14 Tage Urlaub tippt man nicht ab.  */
+/* Jahrestermin: t, von, bis, ort, art. Die Art faerbt den Balken —
+   mehr Unterscheidung braucht das Blatt nicht.                         */
+const JT_ARTEN = {
+  urlaub:   { n:'Urlaub',   f:'#4e6b52' },
+  abwesend: { n:'Abwesend', f:'#7d6b53' },
+  termin:   { n:'Termin',   f:'#900c24' },
+  feiertag: { n:'Feiertag', f:'#8c857a' },
+};
+const JAHRESTERMINE = [
+  { id:501, t:'Urlaub Nordsee',       von:'2026-08-17', bis:'2026-08-30', ort:'',         art:'urlaub' },
+  { id:502, t:'Betriebsversammlung',  von:'2026-09-14', bis:'2026-09-14', ort:'Werk 2',   art:'termin' },
+  { id:503, t:'Barcelona',            von:'2026-12-28', bis:'2027-01-04', ort:'',         art:'urlaub' },
+  { id:504, t:'Messe Nürnberg',       von:'2026-03-10', bis:'2026-03-12', ort:'Nürnberg', art:'abwesend' },
+  { id:505, t:'Osterferien',          von:'2026-04-03', bis:'2026-04-06', ort:'',         art:'feiertag' },
+  { id:506, t:'Schulung Fachbereich', von:'2026-08-20', bis:'2026-08-20', ort:'Würzburg', art:'termin' },
+];
+let jahrOffen = 2026;
+
+/* Wiederkehrend: t, b, min, muster, tage[], log{}                        */
+const WIEDER = [
+  { id:201, t:'Rudern — 20 Minuten',      b:'b3', min:20, muster:'täglich',     tage:[0,1,2,3,4,5,6], log:{0:'✕',1:'✕',2:'•'}, zielId:null },
+  { id:202, t:'Ablage leeren',            b:'b5', min:15, muster:'Mo · Mi · Fr', tage:[0,2,4],        log:{0:'✕',2:'•'},       zielId:'z1' },
+  { id:203, t:'Tag und Gewohnheiten reflektieren', b:'b5', min:15, muster:'täglich', tage:[0,1,2,3,4,5,6], log:{0:'✕',1:'–',2:'•'}, zielId:null, fuehrtZu:'gew' },
+  { id:204, t:'Müll rausstellen',         b:'b3', min:5,  muster:'dienstags',   tage:[1],             log:{1:'✕'},             zielId:null },
+  { id:205, t:'Wochenrückblick',          b:'b5', min:30, muster:'freitags',    tage:[4],             log:{},                  zielId:null },
+  { id:206, t:'Hoheitszone Küche',        b:'b3', min:25, muster:'Mo · Do',     tage:[0,3],           log:{0:'✕'},             zielId:null },
+];
+
+
+/* Gewohnheit: t, ziel, soll, tage[], log{} — Quote statt Rhythmus        */
+const GEWOHNHEIT = [
+  { id:301, t:'Ernährung im Rahmen',    ziel:'täglich',      soll:7, tage:[0,1,2,3,4,5,6], log:{0:'✕',1:'✕',2:'•'}, zielId:null },
+  { id:302, t:'Bewegung und Sport',     ziel:'5× pro Woche', soll:5, tage:[0,1,2,3,4,5,6], log:{0:'✕',1:'–',2:'•'}, zielId:'z2' },
+  { id:303, t:'Kein Handy nach 22 Uhr', ziel:'täglich',      soll:7, tage:[0,1,2,3,4,5,6], log:{0:'✕',1:'✕',2:'•'}, zielId:null },
+  { id:304, t:'Haushalt und Ordnung',   ziel:'Mo – Fr',      soll:5, tage:[0,1,2,3,4],     log:{0:'✕',1:'•',2:'•'}, zielId:null },
+  { id:305, t:'Lesen statt Scrollen',   ziel:'4× pro Woche', soll:4, tage:[0,1,2,3,4,5,6], log:{0:'✕',2:'•'},       zielId:null },
+];
+
+
+/* Plan: t, b, zielId,
+   beschreibung[2] (die zwei Kopfzeilen des Formblatts), zieldatum
+   (optional, nur in der Übersicht sichtbar), archiviert.
+   Die früheren schritte[] entfallen: Planinhalt sind Aktivitäten mit
+   planId — sonst gäbe es zwei konkurrierende Mechanismen.              */
+const PLAENE = [
+  { id:'p1', t:'CCD-Highlight vorbereiten', b:'b1', zielId:'z1',
+    zieldatum:'31.08.2026', archiviert:false,
+    beschreibung:['Foliensatz und Kennzahlen für den Lenkungskreis, abgestimmt mit QS.',
+                  'Freigabe muss vor dem Halbjahresgespräch stehen.'] },
+  { id:'p2', t:'Rechenzentrum migrieren', b:'b2', zielId:'z1',
+    zieldatum:'31.10.2026', archiviert:false,
+    beschreibung:['Umzug der Altsysteme mit Wartungsfenster und Abnahme durch den Fachbereich.',
+                  ''] },
+  { id:'p3', t:'Nüdlingen herrichten', b:'b4', zielId:'z2',
+    zieldatum:'', archiviert:false,
+    beschreibung:['Gelände räumen, Grab bepflanzen, Bewässerung installieren.', ''] },
+  { id:'p4', t:'Ablage neu ordnen', b:'b5', zielId:null,
+    zieldatum:'', archiviert:false,
+    beschreibung:['Altbestand sichten und einscannen, danach nur noch digital ablegen.', ''] },
+  { id:'p5', t:'Heizung erneuern', b:'b3', zielId:null,
+    zieldatum:'15.03.2026', archiviert:true,
+    beschreibung:['Angebote eingeholt, Einbau abgeschlossen, Abnahme erfolgt.', ''] },
+];
+
+
+/* Ziel: t, b, frist, warum, meilensteine[{t, dat, ok}]                   */
+/* Ziel: konkretes Vorhaben mit definiertem Zustand, immer einem Bereich
+   zugeordnet. Einzahlen können Pläne, einzelne Aktivitäten, wiederkehrende
+   Vorgänge und Gewohnheiten — alle über zielId bzw. über ihren Plan.
+   Meilensteine sind rein informativ: Zwischenstände, die man abhaken kann,
+   die aber nichts steuern. Geplantes Datum und Erreichen fallen bewusst
+   auseinander.
+   start und frist spannen die Laufzeit auf — beide TT.MM.JJJJ. start ist
+   Pflicht und wird bei Anlage mit dem heutigen Tag vorbelegt.           */
+const ZIELE = [
+  { id:'z1', t:'CCD produktiv bis Jahresende', b:'b1', start:'01.03.2026', frist:'31.12.2026', archiviert:false,
+    zustand:['Alle Fachbereiche arbeiten produktiv im CCD, Altsystem abgeschaltet.',
+             'Ohne produktives CCD bleibt die Migration Stückwerk.'],
+    meilensteine:[ { id:901, t:'Konzept abgenommen',    dat:'15.08.2026', glyph:'✕' },
+                   { id:902, t:'Testbetrieb gestartet', dat:'30.09.2026', glyph:'✕' },
+                   { id:903, t:'Fachbereich geschult',  dat:'15.11.2026', glyph:'•' },
+                   { id:904, t:'Produktivsetzung',      dat:'15.12.2026', glyph:'•' } ] },
+  { id:'z2', t:'Nüdlingen bis Herbst fertig', b:'b4', start:'01.06.2026', frist:'31.10.2026', archiviert:false,
+    zustand:['Gelände geräumt, Grab bepflanzt, Bewässerung läuft ohne Nachschauen.',
+             'Solange es offen ist, hängt es an jedem Wochenende mit dran.'],
+    meilensteine:[ { id:911, t:'Gelände geräumt',   dat:'31.08.2026', glyph:'•' },
+                   { id:912, t:'Bepflanzung steht', dat:'30.09.2026', glyph:'•' },
+                   { id:913, t:'Bewässerung läuft', dat:'20.10.2026', glyph:'•' } ] },
+];
+
+
+/* Notiz: nr, t, art, b, datum, seiten, quelle                            */
+const NOTIZEN = [
+  { id:401, nr:1, t:'Lenkungskreis CCD',         art:'hand',    b:'b1', datum:'11.08.2026', seiten:2, quelle:'Move · Notizen_KW33.pdf' },
+  { id:402, nr:3, t:'Migration — Abhängigkeiten',art:'mindmap', b:'b2', datum:'12.08.2026', seiten:1, quelle:'Move · Mindmap_Migration.png' },
+  { id:403, nr:4, t:'Gespräch Nille',            art:'hand',    b:'b1', datum:'13.08.2026', seiten:1, quelle:'Move · Notizen_KW33.pdf' },
+  { id:404, nr:5, t:'Nüdlingen — Skizze Gelände',art:'mindmap', b:'b4', datum:'14.08.2026', seiten:1, quelle:'Move · Skizze_Nuedlingen.png' },
+  { id:405, nr:6, t:'Offene Punkte Testabnahme', art:'liniert', b:'b2', datum:'15.08.2026', seiten:1, quelle:'' },
+  { id:406, nr:7, t:'Ideen Jahresplanung 2027',  art:'mindmap', b:'b5', datum:'16.08.2026', seiten:2, quelle:'Move · Mindmap_2027.png' },
+];
+
+/* Wochenblatt (CMP 10). Gleicher Charakter wie das Monatsblatt: grobe
+   Vorplanung, kein Spiegel. Ein Eintrag steht hier, weil du ihn hierher
+   gelegt hast — nichts wird nachträglich aufgefüllt.
+
+   Aktivitäten liegen als VERWEIS auf dem Blatt. Damit teilen Woche und
+   Tag denselben Zustand: einmal abhaken genügt. Die Planungsabsicht
+   bleibt trotzdem sichtbar, weil der Eintrag stehen bleibt.
+     Eintrag: id, tag (0 = Montag … 6 = Sonntag), glyph, t | refArt+refId */
+const WOCHENBLAETTER = [
+  { montag: '2026-08-17',
+    eintraege: [
+      { id:801, tag:0, glyph:'✕', t:'Abstimmung Migration, 9:00' },
+      { id:802, tag:1, glyph:'•', t:'CCD Lenkungskreis, 10:00' },
+      { id:803, tag:2, refArt:'aktivitaet', refId:1 },
+      { id:804, tag:2, refArt:'aktivitaet', refId:2 },
+      { id:805, tag:3, glyph:'•', refArt:'jahrestermin', refId:506 },
+      { id:806, tag:4, refArt:'aktivitaet', refId:4 },
+      { id:807, tag:4, glyph:'•', t:'Wochenrückblick schreiben' },
+    ],
+    wichtig: [
+      { id:811, refArt:'aktivitaet', refId:3 },
+      { id:812, glyph:'•', t:'Nicht wieder alles auf Freitag schieben' },
+    ],
+    reflexion: ['', '', ''] },
+];
+let wocheOffen = '2026-08-17';   // Montag der angezeigten Woche
+
+/* Kontakt: nur Tag und Text. Anrufe und Mails brauchen nicht mehr.     */
+const KONTAKTE = [
+  { id:601, tag:2, t:'Nille wegen Angebot zurückrufen', glyph:'•' },
+  { id:602, tag:2, t:'Mail an QS — Termin Abstimmung',  glyph:'✕' },
+];
+
+/* Der Tag trägt drei Dinge: die wichtigste Aufgabe, das Motto oben und
+   die Reflexion unten. Motto und Reflexion sind Arrays fester Länge —
+   leere Zeilen sind der Normalfall und bleiben leer.                   */
+const TAG = {
+  wichtigste: 1,
+  motto: ['Erst die Folien, dann alles andere.', ''],
+  reflexion: ['', '', ''],
+};
+
+/* Monatsblatt (CMP 11). Es spiegelt nichts: ein Eintrag steht hier, weil
+   du ihn hierher gehoben oder hier geschrieben hast.
+
+   Zwei getrennte Bestände, weil es zwei verschiedene Dinge sind:
+   EREIGNISSE haben von Natur aus einen Tag — dafür ist das Raster da.
+   VORHABEN haben keinen. Eine Aktivität mit Ende-Datum auf der Checkliste
+   bekäme hier ein zweites Datum; die beiden liefen auseinander. Deshalb
+   stehen Vorhaben undatiert darunter.
+     Ereignis: id, tag (1–31), glyph, t | refArt + refId
+     Vorhaben: id, glyph, t | refArt + refId                             */
+/* Ein Blatt je Monat. Nichts wird abgeheftet oder verschoben — du
+   blätterst hin und zurück, alte Blätter bleiben stehen. Rekonstruieren
+   liesse sich ohnehin nur der Verweisteil; Reflexion und frei
+   geschriebene Zeilen stehen nirgends sonst.                           */
+const MONATSBLAETTER = [
+  { jahr:2026, monat:7,
+    ereignisse: [
+      { id:691, tag:3,  glyph:'✕', t:'Sommerfest Abteilung' },
+      { id:692, tag:22, glyph:'✕', t:'Zahnarzt' },
+    ],
+    vorhaben: [
+      { id:695, glyph:'✕', t:'Ablage bis Juni aufgearbeitet' },
+      { id:696, glyph:'>', t:'Nüdlingen: Giftstoffe wegfahren' },
+    ],
+    reflexion: ['Zu viel gleichzeitig angefangen.', 'Nüdlingen wieder verschoben — dritter Monat.', ''] },
+  { jahr:2026, monat:8,
+    ereignisse: [
+      { id:701, tag:14, glyph:'•', t:'CCD Lenkungskreis, Bamberg' },
+      { id:702, tag:17, glyph:'•', refArt:'jahrestermin', refId:501 },
+      { id:703, tag:20, glyph:'•', t:'Halbjahresgespräch' },
+      { id:704, tag:26, glyph:'•', t:'Wartungsfenster Rechenzentrum' },
+    ],
+    vorhaben: [
+      { id:711, glyph:'•', refArt:'ziel', refId:'z2' },
+      { id:712, glyph:'•', refArt:'plan', refId:'p1' },
+      { id:713, glyph:'•', t:'Barcelona-Flüge buchen' },
+      { id:714, glyph:'✕', t:'Versicherung gekündigt' },
+    ],
+    reflexion: ['', '', ''] },
+];
+let monatOffen = '2026-08';   // Jahr und Monat des angezeigten Blattes
+
+const MONATE = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+const MONATE_LANG = ['Januar','Februar','März','April','Mai','Juni','Juli','August',
+                     'September','Oktober','November','Dezember'];
+const WOTAGE = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
+const WOKURZ = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+const HEUTE_WT = 2;
+const HEUTE_ISO = '2026-08-19';
+const HEUTE_DMY = '19.08.2026';
+
+/* ═══ HILFEN ═══ */
+const $ = id => document.getElementById(id);
+const esc = t => String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let mt = null;
+function melde(x) {
+  const e = $('meldung');
+  e.textContent = x;
+  e.classList.add('auf');
+  clearTimeout(mt);
+  mt = setTimeout(function () { e.classList.remove('auf'); }, 2000);
+}
+const bName  = id => (BEREICHE.find(b => b.id === id) || {}).name  || '—';
+const bFarbe = id => (BEREICHE.find(b => b.id === id) || {}).farbe || '#8c857a';
+const offen  = a => a.glyph === '•';
+
+/* ═══ REGISTER ═══ */
+/* Sieben Hauptregister. Unterregister erscheinen als Karteireiter.       */
+const REGISTER = [
+  { k:'tag',     n:'Tag' },
+  { k:'woche',   n:'Woche' },
+  { k:'akt',     n:'Aktivitäten', unter:[
+      { k:'akt',  n:'Aktivitäten' },
+      { k:'wied', n:'Wiederkehrend' },
+      { k:'gew',  n:'Gewohnheiten' } ] },
+  { k:'plaene',  n:'Pläne',    unter:'plaene' },
+  { k:'planung', n:'Planung',  unter:[
+      { k:'monat',    n:'Monat' },
+      { k:'jtermine', n:'Jahrestermine' } ] },
+  { k:'ziele',   n:'Ziele',   unter:'ziele' },
+  { k:'db',      n:'Datenbank', unter:[
+      { k:'notiz',  n:'Notizen' },
+      { k:'archiv', n:'Archiv' } ] },
+];
+
+/* Formularnummern wie im gedruckten Satz */
+const FORM_NR = { tag:'CMP 01', woche:'CMP 10', akt:'CMP 31', wied:'CMP 03', gew:'CMP 04',
+                  plaene:'CMP 32', monat:'CMP 11', zjahr:'CMP 22', jtermine:'CMP 21',
+                  ziele:'CMP 30', notiz:'CMP 40', archiv:'CMP 41' };
+
+let reg = 'tag';
+const unterAktiv = { akt:'akt', plaene:'uebersicht', ziele:'uebersicht', planung:'monat', db:'notiz' };
+
+function regDef(k) { return REGISTER.find(r => r.k === k) || REGISTER[0]; }
+
+/* Liefert die Liste der Unterregister eines Hauptregisters, oder null.   */
+function unterListe(k) {
+  const d = regDef(k);
+  if (!d.unter) { return null; }
+  if (d.unter === 'ziele') {
+    const l = [{ k:'uebersicht', n:'Übersicht' }, { k:'zjahr', n:'Jahr' }];
+    ZIELE.filter(z => !z.archiviert).forEach(function (z) { l.push({ k:z.id, n:z.t }); });
+    return l;
+  }
+  if (d.unter === 'plaene') {
+    /* Ein Reiter ist ein Plan, nicht ein Bereich. Sie stehen senkrecht
+       rechts unter den Hauptregistern, auf zehn Zeichen gekürzt. Was
+       nicht mehr in die Spalte passt, ist über die Übersicht erreichbar. */
+    const l = [{ k:'uebersicht', n:'Übersicht' }];
+    PLAENE.filter(p => !p.archiviert).forEach(function (p) {
+      l.push({ k:p.id, n:p.t });
+    });
+    return l;
+  }
+  return d.unter;
+}
+/* Reiterlasche: 12 Zeichen, hart abgeschnitten. Keine Auslassung —
+   auf einer beschrifteten Lasche steht auch keine.                   */
+function reiterKurz(t) {
+  return t.length > 12 ? t.slice(0, 12).trim() : t;
+}
+/* Der Pfeil auf der Checkliste ist Fließtext und behält die Auslassung */
+function pfeilKurz(t) {
+  return t.length > 12 ? t.slice(0, 12).trim() + '…' : t;
+}
+
+/* Aktives Blatt = Unterregister, falls vorhanden, sonst Hauptregister.   */
+function blattKey() {
+  const l = unterListe(reg);
+  if (!l) { return reg; }
+  return unterAktiv[reg];
+}
+
+function regZahl() {
+  /* Auf einem Registerreiter steht keine Zahl. Bewusst leer gelassen. */
+  return null;
+}
+
+function renderRegister() {
+  $('reiter').innerHTML = REGISTER.map(function (r) {
+    return '<button class="rt ' + (reg === r.k ? 'aktiv' : '') +
+           '" onclick="zeigeReg(\'' + r.k + '\')">' + esc(r.n) + '</button>';
+  }).join('');
+
+  /* Planreiter stehen in der inneren Spalte, nicht unter den
+     Hauptregistern. Sie erscheinen nur, wenn Pläne offen ist.        */
+  const el = $('reiter-plan');
+  if (reg !== 'plaene' && reg !== 'ziele') {
+    el.classList.add('aus'); el.innerHTML = ''; return;
+  }
+  el.classList.remove('aus');
+  const l = unterListe(reg) || [];
+  const a = unterAktiv[reg];
+  el.innerHTML = l.map(function (u) {
+    return '<button class="rt rt-plan ' + (a === u.k ? 'aktiv' : '') +
+           '" onclick="zeigeUnter(\'' + u.k + '\')">' +
+           esc(reiterKurz(u.n)) + '</button>';
+  }).join('');
+}
+
+function renderUnterreiter() {
+  const l = unterListe(reg);
+  const el = $('unterreiter');
+  /* Pläne führen ihre Reiter senkrecht rechts — die waagerechte Leiste
+     bleibt dort leer.                                                  */
+  if (!l || reg === 'plaene' || reg === 'ziele') {
+    el.classList.add('aus'); el.innerHTML = ''; return;
+  }
+  el.classList.remove('aus');
+  const a = unterAktiv[reg];
+  el.innerHTML = l.map(function (u) {
+    let z = '';
+    if (reg === 'akt') {
+      const n = u.k === 'akt' ? AKTIVITAETEN.filter(offen).length
+              : u.k === 'wied' ? WIEDER.length : GEWOHNHEIT.length;
+      z = '<span class="ur-zahl">' + n + '</span>';
+    }
+    return '<button class="ur ' + (a === u.k ? 'aktiv' : '') +
+           '" onclick="zeigeUnter(\'' + u.k + '\')">' + esc(u.n) + z + '</button>';
+  }).join('');
+}
+
+function zeigeReg(k)   { reg = k; renderAlles(); }
+function zeigeUnter(k) { unterAktiv[reg] = k; renderAlles(); }
+/* Springt auf ein bestimmtes Blatt, auch ueber Registergrenzen hinweg */
+function blattOeffnen(hauptK, unterK) {
+  reg = hauptK;
+  if (unterK) { unterAktiv[hauptK] = unterK; }
+  renderAlles();
+}
+
+/* ═══ BLATTKOPF ═══ */
+/* Bei Plänen und Zielen ist der Unterschlüssel eine ID — die Nummer
+   kommt dort vom Hauptregister.                                       */
+function formNr() {
+  if (reg === 'plaene') { return FORM_NR.plaene; }
+  if (reg === 'ziele')  {
+    return unterAktiv.ziele === 'zjahr' ? FORM_NR.zjahr : FORM_NR.ziele;
+  }
+  return FORM_NR[blattKey()] || 'CMP 05';
+}
+function kopf(titel, sub, akt) {
+  $('bk-titel').textContent = titel;
+  $('bk-sub').textContent = sub || '';
+  $('bk-akt').innerHTML = akt || '';
+  $('bf-nr').textContent = formNr();
+  $('bf-mitte').textContent = 'TimeAssist ' + APP_VERSION + ' \u00b7 Mockup M7';
+  $('bf-rechts').textContent = '2026';
+}
+
+/* ═══ GEMEINSAME BAUSTEINE ═══ */
+function abschnitt(titel, sub) {
+  return '<div class="ab-kopf"><span class="ab-titel">' + esc(titel) + '</span>' +
+         (sub ? '<span class="ab-sub">' + esc(sub) + '</span>' : '') + '</div>';
+}
+function freieZeilen(n) {
+  let h = '';
+  for (let i = 0; i < n; i++) { h += '<div class="frei-l"></div>'; }
+  return h;
+}
+function leerZeilen(belegt, gesamt) {
+  let h = '';
+  for (let i = belegt; i < gesamt; i++) {
+    h += '<div class="tz leer"><span class="tz-nr">' + (i + 1) + '</span></div>';
+  }
+  return h;
+}
+function glyphWeiter(id) {
+  const a = AKTIVITAETEN.find(x => x.id === id);
+  if (!a) { return; }
+  a.glyph = naechsterGlyph(a.glyph);
+  renderAlles();
+}
+function naechsterGlyph(g) {
+  const folge = { '\u2022':'\u2715', '\u2715':'>', '>':'\u2013', '\u2013':'\u2022' };
+  return folge[g] || '\u2022';
+}
+function kontaktGlyph(id) {
+  const k = KONTAKTE.find(x => x.id === id);
+  if (!k) { return; }
+  k.glyph = naechsterGlyph(k.glyph);
+  renderAlles();
+}
+function prioWeiter(id) {
+  const a = AKTIVITAETEN.find(x => x.id === id);
+  if (!a) { return; }
+  const folge = { 'A':'B', 'B':'C', 'C':'A' };
+  a.prio = folge[a.prio] || 'B';
+  renderAlles();
+}
+function bereichWeiter(id) {
+  const a = AKTIVITAETEN.find(x => x.id === id);
+  if (!a) { return; }
+  const i = BEREICHE.findIndex(b => b.id === a.b);
+  a.b = BEREICHE[(i + 1) % BEREICHE.length].id;
+  renderAlles();
+}
+
+/* Kästchen statt Glyph: leer = offen, ✕ erledigt, › verschoben,
+   – gestrichen. Der Zustand sitzt im Kästchen, der Text bleibt Text.  */
+function hakFeld(glyph, aktion) {
+  const zeichen = { '\u2022':'', '\u2715':'\u2715', '>':'\u203a', '\u2013':'\u2013' };
+  return '<button class="hak" onclick="event.stopPropagation(); ' + aktion + '">' +
+         (zeichen[glyph] || '') + '</button>';
+}
+function titelKlasse(o) {
+  if (o.glyph === '\u2715' || o.glyph === '\u2013') { return 'durch'; }
+  if (o.glyph === '>') { return 'blass'; }
+  return '';
+}
+/* Sphäre wird über den Bereich geerbt; Termine tragen sie selbst.      */
+/* Ganztägige Einträge des Tages: eigene Termine plus alle mehrtägigen
+   Jahrestermine, in deren Zeitraum der Tag fällt.                      */
+function ganztagsEintraege() {
+  const l = TERMINE.filter(t => t.tag === HEUTE_WT && t.ganztags)
+    .map(function (t) { return { t:t.t, ort:t.ort, quelle:'' }; });
+  JAHRESTERMINE.forEach(function (j) {
+    if (HEUTE_ISO >= j.von && HEUTE_ISO <= j.bis) {
+      l.push({ t:j.t, ort:j.ort, quelle:'Jahrestermin' });
+    }
+  });
+  return l;
+}
+/* ═══════════════════════════════════════════════════════════════════
+   INLINE-ERFASSUNG
+   Die Zeile wird zum Feld. Tab springt weiter, Enter speichert und
+   öffnet die nächste Leerzeile, Escape verwirft. Kein Dialog.
+   ═══════════════════════════════════════════════════════════════════ */
+let editAkt = null;      // id der Aktivität in Bearbeitung
+let editTermin = null;   // id des Termins in Bearbeitung
+let editKontakt = null;  // id des Kontakts in Bearbeitung
+let neuId = 900;
+function naechsteId() { neuId += 1; return neuId; }
+
+/* Nach dem Rendern: Feld fokussieren und über die Tastatur schieben.
+   Auf dem iPad verdeckt die Tastatur sonst das untere Blattdrittel.  */
+let fokusZiel = null;
+function fokusSetzen() {
+  if (!fokusZiel) { return; }
+  const el = $(fokusZiel);
+  fokusZiel = null;
+  if (!el) { return; }
+  el.focus();
+  if (el.select) { el.select(); }
+  if (el.scrollIntoView) { el.scrollIntoView({ block:'center' }); }
+}
+
+function tastatur(ev, speichern, weiter) {
+  if (ev.key === 'Enter')  { ev.preventDefault(); speichern(true);  }
+  if (ev.key === 'Escape') { ev.preventDefault(); abbrechen(); }
+  if (weiter) { weiter(ev); }
+}
+function abbrechen() {
+  aufraeumen();
+  editZelle = null; editTermin = null;
+  renderAlles();
+}
+/* Leer angelegte Zeilen verschwinden wieder, wenn nichts geschrieben wurde */
+function aufraeumen() {
+  /* Die gerade angelegte Zeile ist zwangsläufig leer. Sie darf nicht
+     mitgelöscht werden, sonst räumt die Aufräumlogik genau den Eintrag
+     weg, der eben zum Schreiben geöffnet wurde.                        */
+  const schonen = editZelle ? editZelle.id : null;
+  for (let i = AKTIVITAETEN.length - 1; i >= 0; i--) {
+    if (!AKTIVITAETEN[i].t && AKTIVITAETEN[i].id !== schonen) { AKTIVITAETEN.splice(i, 1); }
+  }
+  for (let i = TERMINE.length - 1; i >= 0; i--) {
+    if (!TERMINE[i].t && TERMINE[i].id !== editTermin) { TERMINE.splice(i, 1); }
+  }
+  for (let i = KONTAKTE.length - 1; i >= 0; i--) {
+    if (!KONTAKTE[i].t && KONTAKTE[i].id !== schonen) { KONTAKTE.splice(i, 1); }
+  }
+}
+const wert = (id, fallback) => { const e = $(id); return e ? e.value.trim() : (fallback || ''); };
+
+/* ── Aktivität ───────────────────────────────────────────────────── */
+function aktNeu(heute, feld) {
+  aufraeumen();
+  const a = { id:naechsteId(), t:'', b:BEREICHE[0].id, prio:'B', min:30,
+              wer:'', beginn:'', ende:'', glyph:'\u2022', heute:!!heute };
+  AKTIVITAETEN.push(a);
+  zelleOeffnen('akt', a.id, feld || 't');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ZELLBEARBEITUNG
+   Jede Zelle ist Klickfläche. Textzellen öffnen ein Feld, Kästchen und
+   Priorität schalten weiter. Tab springt zur nächsten Zelle derselben
+   Zeile, Tab in der letzten Zelle legt eine neue Zeile an.
+   ═══════════════════════════════════════════════════════════════════ */
+const FELDFOLGE = {
+  tag:  ['t', 'ende', 'min'],
+  voll: ['t', 'wer', 'beginn', 'ende', 'min'],
+};
+let editZelle = null;   // { art, id, feld }
+let wahlModus = 'ereignis';   // 'ereignis' oder 'vorhaben'
+
+function zelleOffen(art, id, feld) {
+  return editZelle !== null && editZelle.art === art &&
+         editZelle.id === id && editZelle.feld === feld;
+}
+function zelleOeffnen(art, id, feld) {
+  editZelle = { art:art, id:id, feld:feld };
+  editTermin = null;
+  aufraeumen();
+  fokusZiel = 'ez';
+  renderAlles();
+}
+function zelleWert() {
+  const e = $('ez');
+  return e ? e.value.trim() : '';
+}
+function zelleSchreiben() {
+  if (!editZelle) { return; }
+  const v = zelleWert();
+  if (editZelle.art === 'kontakt') {
+    const k = KONTAKTE.find(x => x.id === editZelle.id);
+    if (k) { k.t = v; }
+    return;
+  }
+  const a = AKTIVITAETEN.find(x => x.id === editZelle.id);
+  if (!a) { return; }
+  if (editZelle.feld === 'min') { a.min = parseInt(v, 10) || 0; }
+  else { a[editZelle.feld] = v; }
+}
+function zelleSchliessen(sofort) {
+  zelleSchreiben();
+  if (sofort) {
+    editZelle = null;
+    aufraeumen();
+    renderAlles();
+    return;
+  }
+  /* Beim Verlassen per Blur kurz warten: klickt der Finger auf eine
+     Nachbarzelle, hat diese das Feld längst neu gesetzt und der Neuaufbau
+     darf sie nicht wieder schließen.                                    */
+  const merk = editZelle;
+  setTimeout(function () {
+    if (editZelle === merk) {
+      editZelle = null;
+      aufraeumen();
+      renderAlles();
+    }
+  }, 120);
+}
+function zelleWeiter(folgeName) {
+  if (!editZelle) { return; }
+  zelleSchreiben();
+  const folge = FELDFOLGE[folgeName] || FELDFOLGE.tag;
+  const i = folge.indexOf(editZelle.feld);
+  const art = editZelle.art;
+  const id = editZelle.id;
+  if (art === 'kontakt' || i === -1 || i === folge.length - 1) {
+    editZelle = null;
+    aufraeumen();
+    if (art === 'kontakt') { kontaktNeu(); }
+    else {
+      const a = AKTIVITAETEN.find(x => x.id === id);
+      aktNeu(a ? a.heute : false, folge[0]);
+    }
+    return;
+  }
+  zelleOeffnen(art, id, folge[i + 1]);
+}
+function zelleTaste(ev, folgeName) {
+  if (ev.key === 'Enter')  { ev.preventDefault(); zelleSchliessen(true); }
+  if (ev.key === 'Escape') { ev.preventDefault(); abbrechen(); }
+  if (ev.key === 'Tab')    { ev.preventDefault(); zelleWeiter(folgeName); }
+}
+
+/* ── Freitextzeilen: Motto und Reflexion ─────────────────────────── */
+function freiOeffnen(art, i) {
+  editZelle = { art:art, id:i, feld:'zeile' };
+  editTermin = null;
+  aufraeumen();
+  fokusZiel = 'ez';
+  renderAlles();
+}
+function freiSchreiben() {
+  if (!editZelle) { return; }
+  const e = $('ez');
+  if (!e) { return; }
+  if (editZelle.art === 'motto')      { TAG.motto[editZelle.id] = e.value; }
+  if (editZelle.art === 'reflexion')  { TAG.reflexion[editZelle.id] = e.value; }
+  if (editZelle.art === 'mreflexion') { monatBlatt().reflexion[editZelle.id] = e.value; }
+  if (editZelle.art === 'wreflexion') { wocheBlatt().reflexion[editZelle.id] = e.value; }
+}
+function freiSchliessen(sofort) {
+  freiSchreiben();
+  if (sofort) { editZelle = null; renderAlles(); return; }
+  const merk = editZelle;
+  setTimeout(function () {
+    if (editZelle === merk) { editZelle = null; renderAlles(); }
+  }, 120);
+}
+function freiTaste(ev, art, i, anzahl) {
+  if (ev.key === 'Escape') { ev.preventDefault(); editZelle = null; renderAlles(); }
+  if (ev.key === 'Enter' || ev.key === 'Tab') {
+    ev.preventDefault();
+    freiSchreiben();
+    if (i + 1 < anzahl) { freiOeffnen(art, i + 1); }
+    else { editZelle = null; renderAlles(); }
+  }
+}
+/* Eine Schreibzeile: Anzeige oder offenes Feld */
+function freiZeile(art, i, text, anzahl, klasseZ, klasseT) {
+  if (editZelle && editZelle.art === art && editZelle.id === i) {
+    return '<div class="' + klasseZ + ' offen"><input class="zf" id="ez" value="' +
+      esc(text) + '" onblur="freiSchliessen()" onkeydown="freiTaste(event, \'' + art +
+      '\',' + i + ',' + anzahl + ')"></div>';
+  }
+  return '<div class="' + klasseZ + '" onclick="freiOeffnen(\'' + art + '\',' + i + ')">' +
+    '<span class="' + klasseT + '">' + esc(text) + '</span></div>';
+}
+
+/* Erzeugt eine Tabellenzelle: entweder Anzeige oder offenes Eingabefeld */
+function zelle(art, id, feld, wertText, folgeName, klasse, platzhalter) {
+  const kl = 'z ' + (klasse || '');
+  if (zelleOffen(art, id, feld)) {
+    const rechts = (klasse || '').indexOf('r') !== -1 ||
+                   (klasse || '').indexOf('dat') !== -1;
+    return '<td class="' + kl + ' offen"><input class="zf ' + (rechts ? 'r' : '') +
+      '" id="ez" value="' + esc(wertText) + '" placeholder="' + esc(platzhalter || '') +
+      '" onblur="zelleSchliessen()" onkeydown="zelleTaste(event, \'' + folgeName + '\')"></td>';
+  }
+  return '<td class="' + kl + '" onclick="zelleOeffnen(\'' + art + '\',' + id + ',\'' +
+    feld + '\')">' + esc(wertText) + '</td>';
+}
+/* ── Termin ──────────────────────────────────────────────────────── */
+function minZuZeit(m) {
+  return String(Math.floor(m / 60)).padStart(2,'0') + ':' + String(m % 60).padStart(2,'0');
+}
+function terminNeu(min) {
+  aufraeumen();
+  editAkt = null; editKontakt = null;
+  const t = { id:naechsteId(), tag:HEUTE_WT, von:minZuZeit(min), bis:minZuZeit(min + 60),
+              ganztags:false, ort:'', t:'' };
+  TERMINE.push(t);
+  editTermin = t.id;
+  fokusZiel = 'et-t';
+  renderAlles();
+}
+function terminOeffnen(id) {
+  aufraeumen();
+  editAkt = null; editKontakt = null;
+  editTermin = id;
+  fokusZiel = 'et-t';
+  renderAlles();
+}
+function terminSpeichern() {
+  const t = TERMINE.find(x => x.id === editTermin);
+  if (!t) { return; }
+  t.t   = wert('et-t');
+  t.von = wert('et-v', t.von) || t.von;
+  t.bis = wert('et-b', t.bis) || t.bis;
+  t.ort = wert('et-o');
+  if (!t.t) { abbrechen(); return; }
+  editTermin = null;
+  aufraeumen();
+  renderAlles();
+}
+function terminEdit(t) {
+  /* Ort steht auf einer eigenen Zeile mit Mindestbreite. Vorher teilte er
+     sich die Zeile mit Von, Bis und Auswahlfeld und wurde auf null Breite
+     zusammengedrückt — dadurch war er nicht beschreibbar.               */
+  return '<div class="termin bearbeitet">' +
+    '<input class="ef titel" id="et-t" value="' + esc(t.t) + '" placeholder="Termin" ' +
+    'style="width:100%" onkeydown="tastatur(event, terminSpeichern)">' +
+    '<div class="te-zeile">' +
+    '<input class="ef" id="et-v" value="' + esc(t.von) + '" style="width:44px" ' +
+    'inputmode="numeric" onkeydown="tastatur(event, terminSpeichern)">' +
+    '<span class="t-meta">bis</span>' +
+    '<input class="ef" id="et-b" value="' + esc(t.bis) + '" style="width:44px" ' +
+    'inputmode="numeric" onkeydown="tastatur(event, terminSpeichern)">' +
+    '<button class="tz-heute" style="flex:0 0 auto;margin-left:auto" ' +
+    'onclick="terminSpeichern()">\u2713 fertig</button></div>' +
+    '<div class="te-zeile">' +
+    '<input class="ef" id="et-o" value="' + esc(t.ort) + '" placeholder="Ort" ' +
+    'style="width:100%;min-width:120px" onkeydown="tastatur(event, terminSpeichern)">' +
+    '</div></div>';
+}
+
+/* ── Kontakt ─────────────────────────────────────────────────────── */
+function kontaktNeu() {
+  aufraeumen();
+  editTermin = null;
+  const k = { id:naechsteId(), tag:HEUTE_WT, t:'', glyph:'\u2022' };
+  KONTAKTE.push(k);
+  zelleOeffnen('kontakt', k.id, 't');
+}
+function prioFeld(p) {
+  return '<span class="a-prio">' + esc(p) + '</span>';
+}
+
+/* ═══ BLATT: TAG (CMP 01) ═══ */
+function blattTag() {
+  kopf(WOTAGE[HEUTE_WT] + ', 19. August 2026', 'Tagesplan \u00b7 KW 34', '');
+
+  const fest = TERMINE.filter(t => t.tag === HEUTE_WT && !t.ganztags);
+  const inMin = z => parseInt(z.slice(0,2),10) * 60 + parseInt(z.slice(3),10);
+
+  const spur = {};
+  fest.slice().sort(function (a, b) { return inMin(a.von) - inMin(b.von); })
+    .forEach(function (t, i, alle) {
+      spur[t.id] = alle.slice(0, i).some(function (v) {
+        return inMin(v.bis) > inMin(t.von) && inMin(v.von) < inMin(t.bis);
+      }) ? 1 : 0;
+    });
+
+  let links = abschnitt('Termine', '6 \u2013 23 Uhr');
+  const gt = ganztagsEintraege();
+  if (gt.length) {
+    links += '<div class="gt-band">' + gt.map(function (g) {
+      return '<div class="ganztags"><span>' + esc(g.t) +
+        (g.ort ? ' \u00b7 ' + esc(g.ort) : '') + '</span>' +
+        (g.quelle ? '<span class="gt-quelle">' + esc(g.quelle) + '</span>' : '') + '</div>';
+    }).join('') + '</div>';
+  }
+
+  for (let st = 6; st <= 23; st++) {
+    for (let hs = 0; hs < 2; hs++) {
+      const min = st * 60 + hs * 30;
+      const belegend = fest.filter(t => min >= inMin(t.von) && min < inMin(t.bis));
+      /* Ein Termin gehoert in das Halbstundenfenster, in das seine
+         Startzeit faellt. Der frueher benutzte Gleichheitstest liess
+         krumme Zeiten wie 19:15 durchs Raster fallen: die Belegt-Striche
+         standen, der Block wurde nie gezeichnet.                        */
+      const start = fest.filter(function (t) {
+        const v = inMin(t.von);
+        return v >= min && v < min + 30;
+      });
+      let striche = '';
+      for (let i = 0; i < Math.min(belegend.length, 3); i++) {
+        striche += '<span class="cz-strich"></span>';
+      }
+      const leer = start.length === 0;
+      links += '<div class="cz ' + (hs === 0 ? 'voll' : '') + '">' +
+        '<span class="cz-zeit">' + (hs === 0 ? String(st).padStart(2,'0') + ':00' : '') + '</span>' +
+        '<span class="cz-mark">' + striche + '</span>' +
+        '<span class="cz-inhalt"' + (leer ? ' onclick="terminNeu(' + min + ')"' : '') + '>' +
+        start.map(function (t) {
+          if (editTermin === t.id) { return terminEdit(t); }
+          const versatz = inMin(t.von) - min;          // 0, wenn glatt
+          const krumm = versatz !== 0;
+          const hoehe = Math.max(18,
+            Math.round((inMin(t.bis) - inMin(t.von)) / 30 * 24) - 3);
+          const kl = spur[t.id] === 1 ? 'kollision2' : (belegend.length > 1 ? 'kollision' : '');
+          return '<div class="termin ' + kl + '" style="height:' + hoehe +
+            'px;top:' + Math.round(versatz / 30 * 24) + 'px" ' +
+            'onclick="terminOeffnen(' + t.id + ')">' +
+            '<div class="t-titel">' + esc(t.t) + '</div>' +
+            '<div class="t-meta">' + (krumm ? esc(t.von) + ' ' : '') + esc(t.ort) + '</div></div>';
+        }).join('') + '</span></div>';
+    }
+  }
+
+  const w = AKTIVITAETEN.find(a => a.id === TAG.wichtigste);
+  let rechts = '<div class="wichtig"><div class="wichtig-l">Wichtigste Aufgabe heute</div>' +
+    '<div class="tz-titel">' + (w ? esc(w.t) : '\u2014') + '</div></div>';
+
+  const liste = AKTIVITAETEN.filter(a => a.heute);
+  rechts += '<div class="abschnitt">' + abschnitt('Aktivit\u00e4ten', '') +
+    '<table class="atab"><colgroup><col style="width:28px"><col style="width:26px">' +
+    '<col><col style="width:48px"><col style="width:38px"></colgroup>' +
+    '<thead><tr><th></th><th>Pri</th><th>Beschreibung</th><th class="r">Ende</th>' +
+    '<th class="r">Min</th></tr></thead><tbody>';
+
+  rechts += liste.map(function (a) {
+    return '<tr>' +
+      '<td class="mitte">' + hakFeld(a.glyph, 'glyphWeiter(' + a.id + ')') + '</td>' +
+      '<td class="mitte z" onclick="prioWeiter(' + a.id + ')">' + prioFeld(a.prio) + '</td>' +
+      zelle('akt', a.id, 't', a.t, 'tag', 'a-titel-zelle ' + titelKlasse(a), 'Beschreibung') +
+      zelle('akt', a.id, 'ende', a.ende, 'tag', 'dat', 'TT.MM') +
+      zelle('akt', a.id, 'min', String(a.min), 'tag', 'r', '') + '</tr>';
+  }).join('');
+
+  /* Das Blatt ist bis zur H\u00e4lfte durchliniert \u2014 14 Zeilen, damit die
+     R\u00fcckfragen immer an derselben Stelle beginnen.                     */
+  const ZEILEN_TAG = 14;
+  if (liste.length < ZEILEN_TAG) {
+    rechts += '<tr class="neu" onclick="aktNeu(true)"><td colspan="5">' +
+      '<span class="a-neu">antippen und schreiben</span></td></tr>';
+    for (let i = liste.length + 1; i < ZEILEN_TAG; i++) {
+      rechts += '<tr class="leer"><td></td><td></td><td></td><td></td><td></td></tr>';
+    }
+  }
+  rechts += '</tbody></table>';
+
+  /* Heute faellige wiederkehrende Vorgaenge. Sie kosten Zeit und gehoeren
+     deshalb auf den Tagesplan — aber in einen eigenen Block, damit sie
+     sich nicht unter die bewusst gehobenen Aktivitaeten mischen.       */
+  const wk = WIEDER.filter(x => x.tage.indexOf(HEUTE_WT) !== -1);
+  if (wk.length) {
+    const summe = wk.reduce(function (n, x) { return n + x.min; }, 0);
+    rechts += '<div class="abschnitt">' +
+      abschnitt('Wiederkehrend heute', summe + ' Min');
+    rechts += wk.map(function (x) {
+      const g = x.log[HEUTE_WT] || '\u2022';
+      const fuehrt = x.fuehrtZu
+        ? ' fuehrt" onclick="blattOeffnen(\'akt\',\'' + x.fuehrtZu + '\')'
+        : '';
+      return '<div class="wk-z">' +
+        hakFeld(g, 'wiederWeiter(' + x.id + ',' + HEUTE_WT + ')') +
+        '<span class="wk-t ' + titelKlasse({ glyph:g }) + fuehrt + '">' +
+        esc(x.t) + '</span>' +
+        '<span class="wk-min">' + x.min + '</span></div>';
+    }).join('');
+    rechts += '</div>';
+  }
+  rechts += '</div>';
+
+  const kont = KONTAKTE.filter(k => k.tag === HEUTE_WT);
+  rechts += '<div class="abschnitt rf-block">' +
+    abschnitt('Kontakte / R\u00fcckfragen', 'antippen und schreiben');
+  rechts += kont.map(function (k) {
+    let inhalt;
+    if (zelleOffen('kontakt', k.id, 't')) {
+      inhalt = '<input class="ef" id="ez" value="' + esc(k.t) +
+        '" placeholder="Anruf, Mail, delegiertes Thema" onblur="zelleSchliessen()" ' +
+        'onkeydown="zelleTaste(event, \'kontakt\')">';
+    } else {
+      inhalt = '<span class="kontakt-t ' + titelKlasse(k) +
+        '" onclick="zelleOeffnen(\'kontakt\',' + k.id + ',\'t\')">' + esc(k.t) + '</span>';
+    }
+    return '<div class="kontakt-z">' +
+      hakFeld(k.glyph, 'kontaktGlyph(' + k.id + ')') + inhalt + '</div>';
+  }).join('');
+
+  const ZEILEN_RF = 7;
+  let rest = ZEILEN_RF - kont.length;
+  if (rest < 1) { rest = 1; }
+  for (let i = 0; i < rest; i++) {
+    rechts += '<div class="kontakt-z" onclick="kontaktNeu()">' +
+      '<span class="hak" style="border-color:var(--linie)"></span>' +
+      '<span class="kontakt-t"></span></div>';
+  }
+  rechts += '</div>';
+
+  /* Reflexion schliesst den Tag ab: gerahmt, damit sie sich vom
+     Formularteil darueber absetzt. */
+  rechts += '<div class="refl"><div class="refl-l">Reflexion</div>';
+  for (let ri = 0; ri < TAG.reflexion.length; ri++) {
+    rechts += freiZeile('reflexion', ri, TAG.reflexion[ri], TAG.reflexion.length,
+                        'refl-z', 'refl-t');
+  }
+  rechts += '</div>';
+
+
+  /* Motto ueber die volle Blattbreite: es gilt fuer den ganzen Tag,
+     nicht nur fuer die Terminspalte. */
+  let motto = '<div class="motto"><div class="motto-l">Tagesmotto</div>';
+  for (let mi = 0; mi < TAG.motto.length; mi++) {
+    motto += freiZeile('motto', mi, TAG.motto[mi], TAG.motto.length, 'motto-z', 'motto-t');
+  }
+  motto += '</div>';
+
+  $('blatt').innerHTML = motto +
+    '<div class="doppel"><div>' + links + '</div><div>' + rechts + '</div></div>';
+  fokusSetzen();
+}
+
+/* ═══ BLATT: WOCHE (CMP 10) ═══ */
+function wocheBlatt() {
+  let b = WOCHENBLAETTER.find(x => x.montag === wocheOffen);
+  if (!b) {
+    b = { montag:wocheOffen, eintraege:[], wichtig:[], reflexion:['', '', ''] };
+    WOCHENBLAETTER.push(b);
+  }
+  return b;
+}
+function tagPlus(iso, n) {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+/* Kalenderwoche nach ISO 8601 — der Donnerstag entscheidet das Jahr */
+function kalenderwoche(iso) {
+  const d = new Date(iso + 'T00:00:00Z');
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - ((t.getUTCDay() + 6) % 7 + 1));
+  const j = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - j) / 86400000 + 1) / 7);
+}
+function wocheBlaettern(schritt) {
+  wocheOffen = tagPlus(wocheOffen, schritt * 7);
+  editZelle = null;
+  renderAlles();
+}
+function wocheFinde(id) {
+  const b = wocheBlatt();
+  return b.eintraege.find(x => x.id === id) || b.wichtig.find(x => x.id === id) || null;
+}
+/* Bei einem Verweis auf eine Aktivität sitzt der Zustand an der
+   Aktivität selbst. Sonst trägt der Eintrag ihn.                       */
+function wocheGlyph(e) {
+  if (e.refArt === 'aktivitaet') {
+    const a = AKTIVITAETEN.find(x => x.id === e.refId);
+    return a ? a.glyph : '\u2013';
+  }
+  return e.glyph || '\u2022';
+}
+function wocheGlyphWeiter(id) {
+  const e = wocheFinde(id);
+  if (!e) { return; }
+  if (e.refArt === 'aktivitaet') {
+    const a = AKTIVITAETEN.find(x => x.id === e.refId);
+    if (a) { a.glyph = naechsterGlyph(a.glyph); }
+  } else {
+    e.glyph = naechsterGlyph(e.glyph || '\u2022');
+  }
+  renderAlles();
+}
+function wocheText(e) {
+  if (!e.refArt) { return { t:e.t || '', herkunft:'' }; }
+  if (e.refArt === 'aktivitaet') {
+    const a = AKTIVITAETEN.find(x => x.id === e.refId);
+    return { t:a ? a.t : 'entfallen', herkunft:a && a.min ? a.min + ' Min' : 'Aktivität' };
+  }
+  if (e.refArt === 'jahrestermin') {
+    const j = JAHRESTERMINE.find(x => x.id === e.refId);
+    return { t:j ? j.t : 'entfallen', herkunft:'Termin' };
+  }
+  return { t:e.t || '', herkunft:'' };
+}
+function wocheLoeschen(id) {
+  const b = wocheBlatt();
+  [b.eintraege, b.wichtig].forEach(function (liste) {
+    const i = liste.findIndex(x => x.id === id);
+    if (i !== -1) { liste.splice(i, 1); }
+  });
+  editZelle = null;
+  renderAlles();
+}
+function wocheNeu(tag) {
+  wocheAufraeumen();
+  const b = wocheBlatt();
+  const e = { id:naechsteId(), glyph:'\u2022', t:'' };
+  if (tag >= 0) { e.tag = tag; b.eintraege.push(e); }
+  else { b.wichtig.push(e); }
+  editZelle = { art:'woche', id:e.id, feld:'t' };
+  fokusZiel = 'ez';
+  renderAlles();
+}
+function wocheAufraeumen() {
+  const schonen = editZelle ? editZelle.id : null;
+  const b = wocheBlatt();
+  [b.eintraege, b.wichtig].forEach(function (liste) {
+    for (let i = liste.length - 1; i >= 0; i--) {
+      const e = liste[i];
+      if (!e.refArt && !e.t && e.id !== schonen) { liste.splice(i, 1); }
+    }
+  });
+}
+function wocheSchreiben() {
+  if (!editZelle || editZelle.art !== 'woche') { return; }
+  const e = wocheFinde(editZelle.id);
+  const f = $('ez');
+  if (e && f) { e.t = f.value.trim(); }
+}
+function wocheSchliessen(sofort) {
+  wocheSchreiben();
+  if (sofort) { editZelle = null; wocheAufraeumen(); renderAlles(); return; }
+  const merk = editZelle;
+  setTimeout(function () {
+    if (editZelle === merk) { editZelle = null; wocheAufraeumen(); renderAlles(); }
+  }, 120);
+}
+function wocheTaste(ev, tag) {
+  if (ev.key === 'Escape') { ev.preventDefault(); editZelle = null; wocheAufraeumen(); renderAlles(); }
+  if (ev.key === 'Enter' || ev.key === 'Tab') {
+    ev.preventDefault();
+    wocheSchreiben();
+    const leer = !$('ez') || !$('ez').value.trim();
+    editZelle = null;
+    wocheAufraeumen();
+    if (leer) { renderAlles(); } else { wocheNeu(tag); }
+  }
+}
+function wocheOeffnen(id) {
+  wocheAufraeumen();
+  editZelle = { art:'woche', id:id, feld:'t' };
+  fokusZiel = 'ez';
+  renderAlles();
+}
+function wocheZeile(e) {
+  const info = wocheText(e);
+  const g = wocheGlyph(e);
+  const kreuz = '<button class="mon-x" onclick="event.stopPropagation(); ' +
+                'wocheLoeschen(' + e.id + ')" title="Eintrag l\u00f6schen">\u00d7</button>';
+  if (editZelle && editZelle.art === 'woche' && editZelle.id === e.id) {
+    return '<div class="mon-e">' + hakFeld(g, 'wocheGlyphWeiter(' + e.id + ')') +
+      '<span class="mon-t2 mon-offen"><input class="zf" id="ez" value="' + esc(info.t) +
+      '" placeholder="Eintrag" onblur="wocheSchliessen()" onkeydown="wocheTaste(event,' +
+      (typeof e.tag === 'number' ? e.tag : -1) + ')"></span>' + kreuz + '</div>';
+  }
+  const klick = e.refArt ? '' :
+    ' onclick="event.stopPropagation(); wocheOeffnen(' + e.id + ')"';
+  return '<div class="mon-e">' + hakFeld(g, 'wocheGlyphWeiter(' + e.id + ')') +
+    '<span class="mon-t2 ' + titelKlasse({ glyph:g }) + '"' + klick + '>' + esc(info.t) +
+    '</span>' +
+    (info.herkunft ? '<span class="mon-herkunft">' + esc(info.herkunft) + '</span>' : '') +
+    kreuz + '</div>';
+}
+
+function blattWoche() {
+  const b = wocheBlatt();
+  const kw = kalenderwoche(b.montag);
+  const so = tagPlus(b.montag, 6);
+  kopf('Woche ' + kw,
+       jtKurz(b.montag) + ' \u2013 ' + jtKurz(so) + ' \u00b7 ' +
+       b.eintraege.length + ' Eintr\u00e4ge',
+       '<button class="k-btn" onclick="wocheBlaettern(-1)">\u2039</button>' +
+       '<button class="k-btn" onclick="wocheBlaettern(1)">\u203a</button>' +
+       '<button class="k-btn" onclick="wahlAuf(\'wtermin\')">Termin</button>' +
+       '<button class="k-btn" onclick="wahlAuf(\'waktivitaet\')">Aktivit\u00e4t</button>');
+
+  const proTag = {};
+  b.eintraege.forEach(function (e) {
+    if (!proTag[e.tag]) { proTag[e.tag] = []; }
+    proTag[e.tag].push(e);
+  });
+
+  let h = '';
+  for (let d = 0; d < 7; d++) {
+    const iso = tagPlus(b.montag, d);
+    const heute = (iso === HEUTE_ISO);
+    h += '<div class="wo-t ' + (d >= 5 ? 'we' : '') + ' ' + (heute ? 'heute' : '') + '">' +
+      '<span class="wo-nr">' + WOTAGE[d] + '<div class="wo-dat">' + jtKurz(iso) + '</div></span>' +
+      '<span class="wo-inhalt" onclick="wocheNeu(' + d + ')">' +
+      (proTag[d] || []).map(wocheZeile).join('') + '</span></div>';
+  }
+
+  h += '<div class="abschnitt">' + abschnitt('Diese Woche wichtig', 'ohne festen Tag');
+  h += b.wichtig.map(wocheZeile).join('');
+  for (let i = 0; i < 2; i++) {
+    h += '<div class="mon-t"><span class="mon-nr"></span>' +
+         '<span class="mon-inhalt" onclick="wocheNeu(-1)"></span></div>';
+  }
+  h += '</div>';
+
+  h += '<div class="refl"><div class="refl-l">Reflexion der Woche</div>';
+  for (let ri = 0; ri < b.reflexion.length; ri++) {
+    h += freiZeile('wreflexion', ri, b.reflexion[ri], b.reflexion.length,
+                   'refl-z', 'refl-t');
+  }
+  h += '</div>';
+
+  $('blatt').innerHTML = h;
+  fokusSetzen();
+}
+
+/* ═══ BLATT: AKTIVITÄTEN (CMP 31) ═══ */
+function blattAktivitaeten() {
+  kopf('Aktivit\u00e4ten-Checkliste', AKTIVITAETEN.filter(offen).length + ' offen von ' + AKTIVITAETEN.length,
+       '<button class="k-btn" onclick="aktNeu(false)">+ Aktivit\u00e4t</button>');
+
+  let h = '<table class="atab"><colgroup><col style="width:28px"><col style="width:20px">' +
+    '<col style="width:26px"><col><col style="width:78px"><col style="width:54px">' +
+    '<col style="width:54px"><col style="width:40px"><col style="width:68px"></colgroup>' +
+    '<thead><tr><th></th><th></th><th>Pri</th><th>Aktivit\u00e4tenbeschreibung</th>' +
+    '<th>Wer</th><th class="r">Beginn</th><th class="r">Ende</th><th class="r">Min</th>' +
+    '<th></th></tr></thead><tbody>';
+
+  h += AKTIVITAETEN.map(function (a) {
+    const knopf = a.heute
+      ? '<button class="tz-heute" onclick="event.stopPropagation(); heuteWeg(' + a.id + ')">\u2713 heute</button>'
+      : '<button class="tz-heute" onclick="event.stopPropagation(); heuteHin(' + a.id + ')">\u2192 heute</button>';
+    return '<tr>' +
+      '<td class="mitte">' + hakFeld(a.glyph, 'glyphWeiter(' + a.id + ')') + '</td>' +
+      '<td class="mitte z" onclick="bereichWeiter(' + a.id + ')" title="' + esc(bName(a.b)) + '">' +
+      '<span class="tz-punkt" style="background:' + bFarbe(a.b) + '"></span></td>' +
+      '<td class="mitte z" onclick="prioWeiter(' + a.id + ')">' + prioFeld(a.prio) + '</td>' +
+      planPfeilZelle(a) +
+      zelle('akt', a.id, 'wer', a.wer || '', 'voll', 'wer', '\u2014') +
+      zelle('akt', a.id, 'beginn', a.beginn, 'voll', 'dat', 'TT.MM') +
+      zelle('akt', a.id, 'ende', a.ende, 'voll', 'dat', 'TT.MM') +
+      zelle('akt', a.id, 'min', String(a.min), 'voll', 'r', '') +
+      '<td class="mitte">' + knopf + '</td></tr>';
+  }).join('');
+
+  h += '<tr class="neu" onclick="aktNeu(false)"><td colspan="9">' +
+       '<span class="a-neu">antippen und schreiben</span></td></tr>';
+  for (let i = 0; i < 2; i++) {
+    h += '<tr class="leer"><td></td><td></td><td></td><td></td><td></td>' +
+         '<td></td><td></td><td></td><td></td></tr>';
+  }
+  h += '</tbody></table>';
+  h += '<div class="hinweis">Jede Zelle ist Klickfl\u00e4che. K\u00e4stchen, Bereichspunkt und ' +
+       'Priorit\u00e4t schalten weiter, Textzellen \u00f6ffnen sich zum Schreiben. Tab springt ' +
+       'zur n\u00e4chsten Zelle, Tab in der letzten Spalte legt eine neue Zeile an, ' +
+       'Escape verwirft.</div>';
+  $('blatt').innerHTML = h;
+  fokusSetzen();
+}
+/* Auf der Checkliste steht statt eines zweiten Eintrags ein Pfeil mit
+   dem Plannamen — genau der Vermerk, den man auf Papier hinschreibt. */
+function planPfeilZelle(a) {
+  const inner = zelle('akt', a.id, 't', a.t, 'voll', titelKlasse(a),
+                      'Aktivit\u00e4tenbeschreibung');
+  const p = a.planId ? PLAENE.find(x => x.id === a.planId) : null;
+  if (!p) { return inner; }
+  const pfeil = '<span class="p-pfeil" onclick="event.stopPropagation(); ' +
+    'blattOeffnen(\'plaene\',\'' + p.id + '\')">\u2192 ' + esc(pfeilKurz(p.t)) + '</span>';
+  return inner.replace('</td>', pfeil + '</td>');
+}
+function heuteHin(id) {
+  const a = AKTIVITAETEN.find(x => x.id === id);
+  if (a) { a.heute = true; melde('Auf den Tagesplan gehoben'); renderAlles(); }
+}
+function heuteWeg(id) {
+  const a = AKTIVITAETEN.find(x => x.id === id);
+  if (a) { a.heute = false; renderAlles(); }
+}
+
+/* ═══ BLATT: WIEDERKEHREND (CMP 03) ═══ */
+function streifen(obj, klickbar, fn) {
+  let h = '<div class="str">';
+  for (let d = 0; d < 7; d++) {
+    const moeglich = obj.tage.indexOf(d) !== -1;
+    const z = obj.log[d] || (moeglich ? '•' : '');
+    const kl = 'str-t ' + (moeglich ? '' : 'aus') + ' ' + (d === HEUTE_WT ? 'heute' : '');
+    const klick = (klickbar && moeglich) ? ' onclick="' + fn + '(' + obj.id + ',' + d + ')"' : '';
+    h += '<span class="' + kl + '"' + klick + '>' + z + '</span>';
+  }
+  return h + '</div>';
+}
+function wiederWeiter(id, tag) {
+  const w = WIEDER.find(x => x.id === id);
+  if (!w) { return; }
+  const folge = { '•':'✕', '✕':'–', '–':'•' };
+  w.log[tag] = folge[w.log[tag] || '•'];
+  renderAlles();
+}
+function blattWieder() {
+  kopf('Wiederkehrende Aktivitäten', WIEDER.length + ' Vorgänge · KW 34', '');
+  let h = '<div class="str-kopf"><span style="flex:1"></span>' +
+    WOKURZ.map(function (t) { return '<span class="str-k">' + t + '</span>'; }).join('') + '</div>';
+  h += WIEDER.map(function (w) {
+    return '<div class="tz" style="align-items:center">' +
+      '<span class="tz-punkt" style="background:' + bFarbe(w.b) + '"></span>' +
+      '<span class="tz-titel">' + esc(w.t) +
+      '<div class="t-meta">' + esc(w.muster) + ' · ' + w.min + ' Min</div></span>' +
+      streifen(w, true, 'wiederWeiter') + '</div>';
+  }).join('');
+  h += '<div class="hinweis">Ein wiederkehrender Vorgang wird erledigt — deshalb ein Rhythmus ' +
+       'und ein Erledigt-Zeichen je Tag, keine Quote.</div>';
+  $('blatt').innerHTML = h;
+}
+
+/* ═══ BLATT: GEWOHNHEITEN (CMP 04) ═══ */
+function gewWeiter(id, tag) {
+  const g = GEWOHNHEIT.find(x => x.id === id);
+  if (!g) { return; }
+  const folge = { '•':'✕', '✕':'–', '–':'•' };
+  g.log[tag] = folge[g.log[tag] || '•'];
+  renderAlles();
+}
+function blattGewohnheit() {
+  kopf('Gewohnheiten', GEWOHNHEIT.length + ' · KW 34', '');
+  let h = '<div class="str-kopf"><span style="flex:1"></span>' +
+    WOKURZ.map(function (t) { return '<span class="str-k">' + t + '</span>'; }).join('') +
+    '<span class="str-k" style="width:44px">Quote</span></div>';
+  h += GEWOHNHEIT.map(function (g) {
+    const erf = [0,1,2,3,4,5,6].filter(d => g.log[d] === '✕').length;
+    return '<div class="tz" style="align-items:center">' +
+      '<span class="tz-titel">' + esc(g.t) +
+      '<div class="t-meta">' + esc(g.ziel) + '</div></span>' +
+      streifen(g, true, 'gewWeiter') +
+      '<span class="tz-min" style="flex:0 0 44px">' + erf + '/' + g.soll + '</span></div>';
+  }).join('');
+  h += '<div class="hinweis">Eine Gewohnheit wird gehalten, nicht erledigt — deshalb ein ' +
+       'Wochenziel und eine Quote statt eines Rhythmus.</div>';
+  $('blatt').innerHTML = h;
+}
+
+/* ═══ BLATT: PLÄNE (CMP 32) ═══ */
+/* Aktivitäten eines Plans — der Planinhalt ist kein eigener Bestand */
+function planAktivitaeten(pid) {
+  return AKTIVITAETEN.filter(a => a.planId === pid);
+}
+function planFortschritt(pid) {
+  const l = planAktivitaeten(pid);
+  return { fertig:l.filter(a => a.glyph === '\u2715').length, gesamt:l.length };
+}
+function planNeu() {
+  const p = { id:'p' + naechsteId(), t:'Neuer Plan', b:BEREICHE[0].id, zielId:null,
+              von:1, bis:12, zieldatum:'', archiviert:false, beschreibung:['', ''] };
+  PLAENE.push(p);
+  unterAktiv.plaene = p.id;
+  reg = 'plaene';
+  renderAlles();
+  melde('Plan angelegt \u2014 Titel und Beschreibung antippen');
+}
+function planArchivieren(pid) {
+  const p = PLAENE.find(x => x.id === pid);
+  if (!p) { return; }
+  p.archiviert = true;
+  unterAktiv.plaene = 'uebersicht';
+  renderAlles();
+  melde('Archiviert \u2014 zu finden unter Datenbank \u203a Archiv');
+}
+function planReaktivieren(pid) {
+  const p = PLAENE.find(x => x.id === pid);
+  if (!p) { return; }
+  p.archiviert = false;
+  reg = 'plaene';
+  unterAktiv.plaene = pid;
+  renderAlles();
+  melde('Plan reaktiviert');
+}
+function planLoeschen(pid) {
+  const i = PLAENE.findIndex(x => x.id === pid);
+  if (i === -1) { return; }
+  /* Die Aktivitäten bleiben bestehen und verlieren nur ihre Zuordnung —
+     gelöscht wird der Plan, nicht die Arbeit.                           */
+  AKTIVITAETEN.forEach(function (a) { if (a.planId === pid) { a.planId = null; } });
+  PLAENE.splice(i, 1);
+  unterAktiv.plaene = 'uebersicht';
+  renderAlles();
+  melde('Plan gel\u00f6scht, Aktivit\u00e4ten bleiben in der Checkliste');
+}
+function planFeld(pid, feld, i) {
+  editZelle = { art:'plan', id:pid, feld:feld, zeile:i };
+  fokusZiel = 'ez';
+  renderAlles();
+}
+function planSchreiben() {
+  if (!editZelle || editZelle.art !== 'plan') { return; }
+  const p = PLAENE.find(x => x.id === editZelle.id);
+  const f = $('ez');
+  if (!p || !f) { return; }
+  if (editZelle.feld === 'beschreibung') { p.beschreibung[editZelle.zeile] = f.value; }
+  else if (editZelle.feld === 'titel') { p.t = f.value.trim() || p.t; }
+  else if (editZelle.feld === 'zieldatum') { p.zieldatum = f.value.trim(); }
+}
+function planSchliessen(sofort) {
+  planSchreiben();
+  if (sofort) { editZelle = null; renderAlles(); return; }
+  const merk = editZelle;
+  setTimeout(function () {
+    if (editZelle === merk) { editZelle = null; renderAlles(); }
+  }, 120);
+}
+function planTaste(ev) {
+  if (ev.key === 'Escape') { ev.preventDefault(); editZelle = null; renderAlles(); }
+  if (ev.key === 'Enter' || ev.key === 'Tab') { ev.preventDefault(); planSchliessen(true); }
+}
+function planOffen(pid, feld, i) {
+  return editZelle && editZelle.art === 'plan' && editZelle.id === pid &&
+         editZelle.feld === feld && (i === undefined || editZelle.zeile === i);
+}
+
+/* ── Übersicht: tabellarisch, nach Bereich gruppiert ──────────────── */
+function blattPlanUebersicht() {
+  const aktive = PLAENE.filter(p => !p.archiviert);
+  kopf('Pl\u00e4ne \u2014 \u00dcbersicht', aktive.length + ' Pl\u00e4ne',
+       '<button class="k-btn pri" onclick="planNeu()">+ Plan</button>');
+
+  let h = '<table class="atab ptab"><colgroup><col><col style="width:88px">' +
+    '<col style="width:52px"><col style="width:26px"></colgroup>' +
+    '<thead><tr><th>Plan</th><th class="r">Zieldatum</th><th class="r">Stand</th>' +
+    '<th></th></tr></thead><tbody>';
+
+  BEREICHE.forEach(function (b) {
+    const l = aktive.filter(p => p.b === b.id);
+    if (!l.length) { return; }
+    /* Pläne desselben Bereichs stehen hintereinander — das entspricht
+       dem Abheften im Ringbuch.                                        */
+    h += '<tr class="grp"><td colspan="4"><span class="tz-punkt" style="background:' +
+      b.farbe + '"></span>' + esc(b.name) + '</td></tr>';
+    l.forEach(function (p) {
+      const f = planFortschritt(p.id);
+      /* Sichtbarer Verweis aufs Planblatt — die Zeile ist die Navigation
+         zu den Reitern, die nicht mehr in die Spalte passen.          */
+      h += '<tr class="klick" onclick="zeigeUnter(\'' + p.id + '\')">' +
+        '<td><span class="p-titel p-link">' + esc(p.t) + '</span>' +
+        '<span class="p-besch">' + esc(p.beschreibung[0] || '\u2014') + '</span></td>' +
+        '<td class="dat">' + esc(p.zieldatum) + '</td>' +
+        '<td class="r">' + f.fertig + '/' + f.gesamt + '</td>' +
+        '<td class="mitte p-chev">\u203a</td></tr>';
+    });
+  });
+  h += '</tbody></table>';
+  h += '<div class="hinweis">Ein Reiter rechts je Plan. Passen nicht alle in die ' +
+       'Spalte, erreichst du die \u00fcbrigen \u00fcber diese Zeilen \u2014 ' +
+       'wie \u00fcber ein Inhaltsverzeichnis.</div>';
+  $('blatt').innerHTML = h;
+}
+
+/* ── Planblatt: zwei Kopfzeilen, darunter die Aktivitätentabelle ──── */
+function blattPlan(pid) {
+  const p = PLAENE.find(x => x.id === pid);
+  if (!p) { unterAktiv.plaene = 'uebersicht'; blattPlanUebersicht(); return; }
+  const f = planFortschritt(p.id);
+  const ziel = ZIELE.find(z => z.id === p.zielId);
+
+  kopf(p.t, esc(bName(p.b)) + (ziel ? ' \u00b7 Ziel: ' + ziel.t : '') +
+       ' \u00b7 ' + f.fertig + ' von ' + f.gesamt + ' erledigt',
+       '<button class="k-btn" onclick="planArchivieren(\'' + p.id + '\')">Archivieren</button>' +
+       '<button class="k-btn" onclick="planLoeschen(\'' + p.id + '\')">L\u00f6schen</button>');
+
+  /* Die zwei Kopfzeilen des Formblatts: worum es in diesem Plan geht */
+  let h = '<div class="p-kopf">';
+  for (let i = 0; i < 2; i++) {
+    if (planOffen(p.id, 'beschreibung', i)) {
+      h += '<div class="p-kz offen"><input class="zf" id="ez" value="' +
+        esc(p.beschreibung[i] || '') + '" placeholder="' +
+        (i === 0 ? 'Worum geht es in diesem Plan?' : 'Zweite Zeile, optional') +
+        '" onblur="planSchliessen()" onkeydown="planTaste(event)"></div>';
+    } else {
+      h += '<div class="p-kz" onclick="planFeld(\'' + p.id + '\',\'beschreibung\',' + i +
+        ')">' + esc(p.beschreibung[i] || '') + '</div>';
+    }
+  }
+  h += '</div>';
+
+  const liste = planAktivitaeten(p.id);
+  h += '<div class="abschnitt">' + abschnitt('Aktivit\u00e4ten', '') +
+    '<table class="atab"><colgroup><col style="width:28px"><col style="width:26px">' +
+    '<col><col style="width:78px"><col style="width:54px"><col style="width:40px">' +
+    '<col style="width:30px"></colgroup>' +
+    '<thead><tr><th></th><th>Pri</th><th>Aktivit\u00e4tenbeschreibung</th>' +
+    '<th>Wer</th><th class="r">Ende</th><th class="r">Min</th><th></th></tr></thead><tbody>';
+
+  h += liste.map(function (a) {
+    return '<tr>' +
+      '<td class="mitte">' + hakFeld(a.glyph, 'glyphWeiter(' + a.id + ')') + '</td>' +
+      '<td class="mitte z" onclick="prioWeiter(' + a.id + ')">' + prioFeld(a.prio) + '</td>' +
+      zelle('akt', a.id, 't', a.t, 'voll', titelKlasse(a), 'Aktivit\u00e4tenbeschreibung') +
+      zelle('akt', a.id, 'wer', a.wer || '', 'voll', 'wer', '\u2014') +
+      zelle('akt', a.id, 'ende', a.ende, 'voll', 'dat', 'TT.MM') +
+      zelle('akt', a.id, 'min', String(a.min), 'voll', 'r', '') +
+      '<td class="mitte"><button class="mon-x" onclick="event.stopPropagation(); ' +
+      'planLoesen(' + a.id + ')" title="Aus dem Plan l\u00f6sen">\u00d7</button></td></tr>';
+  }).join('');
+
+  if (editZelle === null) {
+    h += '<tr class="neu" onclick="planAktNeu(\'' + p.id + '\')"><td colspan="7">' +
+         '<span class="a-neu">antippen und schreiben</span></td></tr>';
+    h += '<tr class="leer"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+  }
+  h += '</tbody></table>';
+
+  h += '<div style="margin-top:10px"><button class="k-btn" onclick="wahlAuf(\'planakt\')">' +
+       'Vorhandene Aktivit\u00e4t zuordnen</button></div>';
+
+  h += '<div class="hinweis">Aktivit\u00e4ten geh\u00f6ren diesem Plan an, existieren aber nur ' +
+       'einmal. Auf der Checkliste tr\u00e4gt jede von ihnen ein \u2192 mit dem Plannamen. ' +
+       'Das Kreuz l\u00f6st die Zuordnung, l\u00f6scht die Aktivit\u00e4t aber nicht.</div>';
+  $('blatt').innerHTML = h;
+  fokusSetzen();
+}
+function planLoesen(aid) {
+  const a = AKTIVITAETEN.find(x => x.id === aid);
+  if (a) { a.planId = null; renderAlles(); melde('Aus dem Plan gel\u00f6st'); }
+}
+function planAktNeu(pid) {
+  const p = PLAENE.find(x => x.id === pid);
+  aufraeumen();
+  const a = { id:naechsteId(), t:'', b:p ? p.b : BEREICHE[0].id, prio:'B', min:0,
+              wer:'', beginn:'', ende:'', glyph:'\u2022', heute:false, planId:pid };
+  AKTIVITAETEN.push(a);
+  zelleOeffnen('akt', a.id, 't');
+}
+
+function blattPlaene() {
+  const u = unterAktiv.plaene;
+  if (u === 'uebersicht') { blattPlanUebersicht(); return; }
+  blattPlan(u);
+}
+
+/* ═══ BLATT: JAHRESPLAN (CMP 20) ═══ */
+/* ═══ BLATT: ZIELE (CMP 30) ═══ */
+/* ═══════════════════════════════════════════════════════════════════
+   ZIELE (CMP 30)
+   Ein Ziel ist ein konkretes Vorhaben mit definiertem Zustand, immer
+   einem Bereich zugeordnet. Einzahlen können Pläne, einzelne
+   Aktivitäten, wiederkehrende Vorgänge und Gewohnheiten.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Planaktivitäten zahlen mittelbar über ihren Plan ein — sie hier noch
+   einmal zu zeigen, hiesse dieselbe Zeile zweimal aufs Blatt zu setzen. */
+function zielAktivitaeten(zid) {
+  return AKTIVITAETEN.filter(a => a.zielId === zid && !a.planId);
+}
+function zielPlaene(zid)  { return PLAENE.filter(p => p.zielId === zid && !p.archiviert); }
+function zielWieder(zid)  { return WIEDER.filter(w => w.zielId === zid); }
+function zielGewohnheit(zid) { return GEWOHNHEIT.filter(g => g.zielId === zid); }
+function zielAnzahl(zid) {
+  return zielPlaene(zid).length + zielAktivitaeten(zid).length +
+         zielWieder(zid).length + zielGewohnheit(zid).length;
+}
+function zielNeu() {
+  const z = { id:'z' + naechsteId(), t:'Neues Ziel', b:BEREICHE[0].id,
+              start:HEUTE_DMY, frist:'', archiviert:false,
+              zustand:['', ''], meilensteine:[] };
+  ZIELE.push(z);
+  reg = 'ziele';
+  unterAktiv.ziele = z.id;
+  renderAlles();
+  melde('Ziel angelegt \u2014 Titel und Zustand antippen');
+}
+function zielArchivieren(zid) {
+  const z = ZIELE.find(x => x.id === zid);
+  if (!z) { return; }
+  z.archiviert = true;
+  unterAktiv.ziele = 'uebersicht';
+  renderAlles();
+  melde('Archiviert \u2014 zu finden unter Datenbank \u203a Archiv');
+}
+function zielReaktivieren(zid) {
+  const z = ZIELE.find(x => x.id === zid);
+  if (!z) { return; }
+  z.archiviert = false;
+  reg = 'ziele';
+  unterAktiv.ziele = zid;
+  renderAlles();
+  melde('Ziel reaktiviert');
+}
+function zielLoeschen(zid) {
+  const i = ZIELE.findIndex(x => x.id === zid);
+  if (i === -1) { return; }
+  /* Nur die Zuordnungen fallen weg — Pläne und Aktivitäten bleiben. */
+  PLAENE.forEach(function (p) { if (p.zielId === zid) { p.zielId = null; } });
+  [AKTIVITAETEN, WIEDER, GEWOHNHEIT].forEach(function (l) {
+    l.forEach(function (x) { if (x.zielId === zid) { x.zielId = null; } });
+  });
+  ZIELE.splice(i, 1);
+  unterAktiv.ziele = 'uebersicht';
+  renderAlles();
+  melde('Ziel gel\u00f6scht, alles Zugeordnete bleibt bestehen');
+}
+function zielLoesen(art, id) {
+  const l = art === 'plan' ? PLAENE : art === 'akt' ? AKTIVITAETEN
+          : art === 'wied' ? WIEDER : GEWOHNHEIT;
+  const x = l.find(y => y.id === id);
+  if (x) { x.zielId = null; renderAlles(); melde('Vom Ziel gel\u00f6st'); }
+}
+
+/* ── Kopfzeilen und Frist ────────────────────────────────────────── */
+function zielFeld(zid, feld, i) {
+  editZelle = { art:'ziel', id:zid, feld:feld, zeile:i };
+  fokusZiel = 'ez';
+  renderAlles();
+}
+function zielSchreiben() {
+  if (!editZelle || editZelle.art !== 'ziel') { return; }
+  const z = ZIELE.find(x => x.id === editZelle.id);
+  const f = $('ez');
+  if (!z || !f) { return; }
+  if (editZelle.feld === 'zustand') { z.zustand[editZelle.zeile] = f.value; }
+  else if (editZelle.feld === 'frist') { z.frist = f.value.trim(); }
+  else if (editZelle.feld === 'start') { z.start = f.value.trim() || z.start; }
+}
+function zielSchliessen(sofort) {
+  zielSchreiben();
+  if (sofort) { editZelle = null; renderAlles(); return; }
+  const merk = editZelle;
+  setTimeout(function () { if (editZelle === merk) { editZelle = null; renderAlles(); } }, 120);
+}
+function zielTaste(ev) {
+  if (ev.key === 'Escape') { ev.preventDefault(); editZelle = null; renderAlles(); }
+  if (ev.key === 'Enter' || ev.key === 'Tab') { ev.preventDefault(); zielSchliessen(true); }
+}
+function zielOffen(zid, feld, i) {
+  return editZelle && editZelle.art === 'ziel' && editZelle.id === zid &&
+         editZelle.feld === feld && (i === undefined || editZelle.zeile === i);
+}
+
+/* ── Meilensteine: informativ, aber abhakbar ─────────────────────── */
+function msFinde(id) {
+  for (let i = 0; i < ZIELE.length; i++) {
+    const m = ZIELE[i].meilensteine.find(x => x.id === id);
+    if (m) { return m; }
+  }
+  return null;
+}
+function msGlyph(id) {
+  const m = msFinde(id);
+  if (m) { m.glyph = naechsterGlyph(m.glyph); renderAlles(); }
+}
+function msNeu(zid) {
+  const z = ZIELE.find(x => x.id === zid);
+  if (!z) { return; }
+  const m = { id:naechsteId(), t:'', dat:'', glyph:'\u2022' };
+  z.meilensteine.push(m);
+  editZelle = { art:'ms', id:m.id, feld:'t' };
+  fokusZiel = 'ez';
+  renderAlles();
+}
+function msLoeschen(id) {
+  ZIELE.forEach(function (z) {
+    const i = z.meilensteine.findIndex(x => x.id === id);
+    if (i !== -1) { z.meilensteine.splice(i, 1); }
+  });
+  editZelle = null;
+  renderAlles();
+}
+function msOeffnen(id, feld) {
+  msAufraeumen();
+  editZelle = { art:'ms', id:id, feld:feld };
+  fokusZiel = 'ez';
+  renderAlles();
+}
+function msAufraeumen() {
+  const schonen = editZelle ? editZelle.id : null;
+  ZIELE.forEach(function (z) {
+    for (let i = z.meilensteine.length - 1; i >= 0; i--) {
+      if (!z.meilensteine[i].t && z.meilensteine[i].id !== schonen) {
+        z.meilensteine.splice(i, 1);
+      }
+    }
+  });
+}
+function msSchreiben() {
+  if (!editZelle || editZelle.art !== 'ms') { return; }
+  const m = msFinde(editZelle.id);
+  const f = $('ez');
+  if (m && f) { m[editZelle.feld] = f.value.trim(); }
+}
+function msSchliessen(sofort) {
+  msSchreiben();
+  if (sofort) { editZelle = null; msAufraeumen(); renderAlles(); return; }
+  const merk = editZelle;
+  setTimeout(function () {
+    if (editZelle === merk) { editZelle = null; msAufraeumen(); renderAlles(); }
+  }, 120);
+}
+function msTaste(ev, zid) {
+  if (ev.key === 'Escape') { ev.preventDefault(); editZelle = null; msAufraeumen(); renderAlles(); }
+  if (ev.key === 'Tab' && editZelle && editZelle.feld === 't') {
+    ev.preventDefault();
+    msSchreiben();
+    msOeffnen(editZelle.id, 'dat');
+    return;
+  }
+  if (ev.key === 'Enter' || ev.key === 'Tab') {
+    ev.preventDefault();
+    msSchreiben();
+    const leer = !$('ez') || !$('ez').value.trim();
+    editZelle = null;
+    msAufraeumen();
+    if (leer && editZelle === null) { renderAlles(); } else { msNeu(zid); }
+  }
+}
+
+/* ── Übersicht ───────────────────────────────────────────────────── */
+function blattZielUebersicht() {
+  const aktive = ZIELE.filter(z => !z.archiviert);
+  kopf('Ziele \u2014 \u00dcbersicht', aktive.length + (aktive.length === 1 ? ' Ziel' : ' Ziele'),
+       '<button class="k-btn pri" onclick="zielNeu()">+ Ziel</button>');
+
+  let h = '<table class="atab ptab"><colgroup><col><col style="width:88px">' +
+    '<col style="width:52px"><col style="width:26px"></colgroup>' +
+    '<thead><tr><th>Ziel</th><th class="r">Laufzeit</th><th class="r">Zahlt ein</th>' +
+    '<th></th></tr></thead><tbody>';
+
+  BEREICHE.forEach(function (b) {
+    const l = aktive.filter(z => z.b === b.id);
+    if (!l.length) { return; }
+    h += '<tr class="grp"><td colspan="4"><span class="tz-punkt" style="background:' +
+      b.farbe + '"></span>' + esc(b.name) + '</td></tr>';
+    l.forEach(function (z) {
+      h += '<tr class="klick" onclick="zeigeUnter(\'' + z.id + '\')">' +
+        '<td><span class="p-titel p-link">' + esc(z.t) + '</span>' +
+        '<span class="p-besch">' + esc(z.zustand[0] || '\u2014') + '</span></td>' +
+        '<td class="dat">' + esc(z.start) + '<div>' +
+        esc(z.frist || 'offen') + '</div></td>' +
+        '<td class="r">' + zielAnzahl(z.id) + '</td>' +
+        '<td class="mitte p-chev">\u203a</td></tr>';
+    });
+  });
+  h += '</tbody></table>';
+  h += '<div class="hinweis">Die Spalte Zahlt ein z\u00e4hlt, wie viele Pl\u00e4ne, ' +
+       'Aktivit\u00e4ten, wiederkehrende Vorg\u00e4nge und Gewohnheiten diesem Ziel ' +
+       'zugeordnet sind. Bewusst kein Prozentwert \u2014 ein Ziel ist ein Zustand, ' +
+       'kein Bruchteil.</div>';
+  $('blatt').innerHTML = h;
+}
+
+/* ── Zielblatt ───────────────────────────────────────────────────── */
+function zielZeile(art, id, glyph, titel, meta, aktion) {
+  return '<div class="zl-z">' + hakFeld(glyph, aktion) +
+    '<span class="zl-t">' + esc(titel) + '</span>' +
+    (meta ? '<span class="zl-m">' + esc(meta) + '</span>' : '') +
+    '<button class="mon-x" onclick="event.stopPropagation(); zielLoesen(\'' + art +
+    '\',' + (typeof id === 'string' ? '\'' + id + '\'' : id) +
+    ')" title="Vom Ziel l\u00f6sen">\u00d7</button></div>';
+}
+
+function blattZiel(zid) {
+  const z = ZIELE.find(x => x.id === zid);
+  if (!z) { unterAktiv.ziele = 'uebersicht'; blattZielUebersicht(); return; }
+
+  kopf(z.t, bName(z.b) + (z.frist ? ' \u00b7 Frist ' + z.frist : ''),
+       '<button class="k-btn" onclick="wahlAuf(\'zielzu\')">Zuordnen</button>' +
+       '<button class="k-btn" onclick="zielArchivieren(\'' + z.id + '\')">Archivieren</button>' +
+       '<button class="k-btn" onclick="zielLoeschen(\'' + z.id + '\')">L\u00f6schen</button>');
+
+  /* Zwei Kopfzeilen: der Zustand, der gilt, wenn das Ziel erreicht ist */
+  let h = '<div class="p-kopf">';
+  for (let i = 0; i < 2; i++) {
+    if (zielOffen(z.id, 'zustand', i)) {
+      h += '<div class="p-kz offen"><input class="zf" id="ez" value="' +
+        esc(z.zustand[i] || '') + '" placeholder="' +
+        (i === 0 ? 'Welcher Zustand gilt, wenn es erreicht ist?' : 'Warum lohnt es sich?') +
+        '" onblur="zielSchliessen()" onkeydown="zielTaste(event)"></div>';
+    } else {
+      h += '<div class="p-kz" onclick="zielFeld(\'' + z.id + '\',\'zustand\',' + i +
+        ')">' + esc(z.zustand[i] || '') + '</div>';
+    }
+  }
+  /* Laufzeit: Start ist Pflicht, die Frist darf offen bleiben. */
+  h += '<div class="zl-lauf"><span class="zl-lauf-l">Laufzeit</span>';
+  ['start', 'frist'].forEach(function (feld) {
+    if (zielOffen(z.id, feld)) {
+      h += '<span class="zl-lauf-f offen"><input class="zf" id="ez" value="' +
+        esc(z[feld] || '') + '" placeholder="TT.MM.JJJJ" onblur="zielSchliessen()" ' +
+        'onkeydown="zielTaste(event)"></span>';
+    } else {
+      h += '<span class="zl-lauf-f" onclick="zielFeld(\'' + z.id + '\',\'' + feld +
+        '\')">' + esc(z[feld] || (feld === 'frist' ? 'offen' : '\u2014')) + '</span>';
+    }
+    if (feld === 'start') { h += '<span class="zl-lauf-b">bis</span>'; }
+  });
+  h += '</div>';
+
+  const pl = zielPlaene(z.id), ak = zielAktivitaeten(z.id);
+  const wi = zielWieder(z.id), gw = zielGewohnheit(z.id);
+
+  if (pl.length) {
+    h += '<div class="abschnitt">' + abschnitt('Pl\u00e4ne', pl.length + '');
+    h += pl.map(function (p) {
+      const f = planFortschritt(p.id);
+      const g = (f.gesamt > 0 && f.fertig === f.gesamt) ? '\u2715' : '\u2022';
+      return '<div class="zl-z">' + hakFeld(g, 'blattOeffnen(\'plaene\',\'' + p.id + '\')') +
+        '<span class="zl-t zl-link" onclick="blattOeffnen(\'plaene\',\'' + p.id +
+        '\')">' + esc(p.t) + '</span>' +
+        '<span class="zl-m">' + f.fertig + '/' + f.gesamt + '</span>' +
+        '<button class="mon-x" onclick="event.stopPropagation(); zielLoesen(\'plan\',\'' +
+        p.id + '\')" title="Vom Ziel l\u00f6sen">\u00d7</button></div>';
+    }).join('') + '</div>';
+  }
+  if (ak.length) {
+    h += '<div class="abschnitt">' + abschnitt('Einzelne Aktivit\u00e4ten', 'ohne Plan');
+    h += ak.map(function (a) {
+      return zielZeile('akt', a.id, a.glyph, a.t,
+                       a.prio + ' \u00b7 ' + a.min + ' Min',
+                       'glyphWeiter(' + a.id + ')');
+    }).join('') + '</div>';
+  }
+  if (wi.length) {
+    h += '<div class="abschnitt">' + abschnitt('Wiederkehrend', 'Verhalten anpassen');
+    h += wi.map(function (w) {
+      return zielZeile('wied', w.id, w.log[HEUTE_WT] || '\u2022', w.t, w.muster,
+                       'wiederWeiter(' + w.id + ',' + HEUTE_WT + ')');
+    }).join('') + '</div>';
+  }
+  if (gw.length) {
+    h += '<div class="abschnitt">' + abschnitt('Gewohnheiten', 'einüben');
+    h += gw.map(function (g) {
+      const erf = [0,1,2,3,4,5,6].filter(d => g.log[d] === '\u2715').length;
+      return zielZeile('gew', g.id, g.log[HEUTE_WT] || '\u2022', g.t,
+                       erf + '/' + g.soll, 'gewWeiter(' + g.id + ',' + HEUTE_WT + ')');
+    }).join('') + '</div>';
+  }
+  if (!pl.length && !ak.length && !wi.length && !gw.length) {
+    h += '<div class="hinweis">Noch nichts zugeordnet. \u00dcber Zuordnen holst du ' +
+         'Pl\u00e4ne, Aktivit\u00e4ten, wiederkehrende Vorg\u00e4nge oder Gewohnheiten hierher.</div>';
+  }
+
+  /* Meilensteine: informativ, aber abhakbar — geplantes Datum und
+     tatsächliches Erreichen fallen auseinander.                       */
+  h += '<div class="ms-block"><div class="refl-l">Meilensteine</div>';
+  h += z.meilensteine.map(function (m) {
+    const kreuz = '<button class="mon-x" onclick="event.stopPropagation(); msLoeschen(' +
+      m.id + ')" title="Meilenstein l\u00f6schen">\u00d7</button>';
+    let titel;
+    if (editZelle && editZelle.art === 'ms' && editZelle.id === m.id && editZelle.feld === 't') {
+      titel = '<span class="zl-t mon-offen"><input class="zf" id="ez" value="' + esc(m.t) +
+        '" placeholder="Zwischenstand" onblur="msSchliessen()" onkeydown="msTaste(event,\'' +
+        z.id + '\')"></span>';
+    } else {
+      titel = '<span class="zl-t ' + titelKlasse(m) + '" onclick="msOeffnen(' + m.id +
+        ',\'t\')">' + esc(m.t) + '</span>';
+    }
+    let dat;
+    if (editZelle && editZelle.art === 'ms' && editZelle.id === m.id && editZelle.feld === 'dat') {
+      dat = '<span class="zl-m mon-offen"><input class="zf r" id="ez" value="' + esc(m.dat) +
+        '" placeholder="TT.MM.JJJJ" onblur="msSchliessen()" onkeydown="msTaste(event,\'' +
+        z.id + '\')"></span>';
+    } else {
+      dat = '<span class="zl-m" onclick="msOeffnen(' + m.id + ',\'dat\')">' +
+        esc(m.dat || '\u2014') + '</span>';
+    }
+    return '<div class="zl-z">' + hakFeld(m.glyph, 'msGlyph(' + m.id + ')') +
+      titel + dat + kreuz + '</div>';
+  }).join('');
+  h += '<div class="zl-z neu-z" onclick="msNeu(\'' + z.id + '\')">' +
+       '<span class="a-neu">antippen und schreiben</span></div></div>';
+
+  $('blatt').innerHTML = h;
+  fokusSetzen();
+}
+
+/* ── Ziele über das Jahr (CMP 22) ─────────────────────────────────
+   Der Erkenntniswert steckt in den Enden: laufen vier Fristen im selben
+   Monat zusammen, hat man sich zu viel gleichzeitig vorgenommen.
+   Deshalb ist das Fristende kräftig markiert, nicht der Balken.      */
+function dmyTeile(d) {
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec((d || '').trim());
+  if (!m) { return null; }
+  return { tag:parseInt(m[1], 10), monat:parseInt(m[2], 10), jahr:parseInt(m[3], 10) };
+}
+function blattZielJahr() {
+  const l = ZIELE.filter(z => !z.archiviert);
+  kopf('Ziele im Jahr ' + jahrOffen, l.length + (l.length === 1 ? ' Ziel' : ' Ziele'),
+       '<button class="k-btn" onclick="jahrBlaettern(-1)">\u2039</button>' +
+       '<button class="k-btn" onclick="jahrBlaettern(1)">\u203a</button>');
+
+  let h = '<table class="zj-tab"><colgroup><col style="width:168px">';
+  for (let m = 0; m < 12; m++) { h += '<col>'; }
+  h += '</colgroup><thead><tr><th></th>' +
+       MONATE.map(function (m) { return '<th>' + m + '</th>'; }).join('') +
+       '</tr></thead><tbody>';
+
+  let sichtbar = 0;
+  h += l.map(function (z) {
+    const a = dmyTeile(z.start);
+    const e = dmyTeile(z.frist);
+    if (!a) { return ''; }
+    /* Ein Ziel erscheint, wenn seine Spanne dieses Jahr berührt. Ohne
+       Frist läuft der Balken bis zum Jahresende weiter.               */
+    const vonM = (a.jahr < jahrOffen) ? 1 : (a.jahr === jahrOffen ? a.monat : 99);
+    let bisM;
+    if (!e) { bisM = 12; }
+    else { bisM = (e.jahr > jahrOffen) ? 12 : (e.jahr === jahrOffen ? e.monat : 0); }
+    if (vonM > 12 || bisM < 1 || vonM > bisM) { return ''; }
+    sichtbar++;
+    let z2 = '<tr class="klick" onclick="zeigeUnter(\'' + z.id + '\')">' +
+      '<td class="zj-t"><span class="tz-punkt" style="background:' + bFarbe(z.b) +
+      '"></span>' + esc(z.t) + '</td>';
+    for (let m = 1; m <= 12; m++) {
+      const an = m >= vonM && m <= bisM;
+      const ende = an && e && e.jahr === jahrOffen && m === e.monat;
+      const start = an && a.jahr === jahrOffen && m === a.monat;
+      z2 += '<td class="zj-c">' + (an ?
+        '<span class="zj-bal' + (start ? ' erste' : '') + (ende ? ' frist' : '') +
+        '" style="background:' + bFarbe(z.b) + '"></span>' : '') + '</td>';
+    }
+    return z2 + '</tr>';
+  }).join('');
+  h += '</tbody></table>';
+
+  if (!sichtbar) {
+    h += '<div class="hinweis">Kein Ziel ber\u00fchrt dieses Jahr.</div>';
+  } else {
+    /* Häufungen an den Fristenden sichtbar machen */
+    const proMonat = [];
+    for (let m = 0; m < 12; m++) { proMonat.push(0); }
+    l.forEach(function (z) {
+      const e = dmyTeile(z.frist);
+      if (e && e.jahr === jahrOffen) { proMonat[e.monat - 1] += 1; }
+    });
+    const eng = [];
+    proMonat.forEach(function (n, i) { if (n > 1) { eng.push(MONATE[i] + ' (' + n + ')'); } });
+    h += '<div class="hinweis">Die kr\u00e4ftige Kante markiert das Fristende. ' +
+      (eng.length
+        ? 'Mehrere Fristen fallen zusammen: ' + eng.join(', ') + '.'
+        : 'Derzeit f\u00e4llt keine Frist mit einer anderen zusammen.') + '</div>';
+  }
+  $('blatt').innerHTML = h;
+}
+
+function blattZiele() {
+  const u = unterAktiv.ziele;
+  if (u === 'uebersicht') { blattZielUebersicht(); return; }
+  if (u === 'zjahr') { blattZielJahr(); return; }
+  blattZiel(u);
+}
+
+/* ═══ BLATT: NOTIZEN (CMP 40) ═══ */
+function blattNotiz() {
+  kopf('Datenbank — Notizen', NOTIZEN.length + ' Blätter',
+       '<button class="k-btn" onclick="melde(\'Vom Move einlesen — folgt in der Umsetzung\')">Move einlesen</button>');
+  const artName = { hand:'Handschrift', mindmap:'Mindmap', liniert:'Liniert' };
+  let h = NOTIZEN.map(function (n) {
+    return '<div class="nz"><span class="nz-nr">' + n.nr + '</span>' +
+      '<span class="tz-punkt" style="background:' + bFarbe(n.b) + '"></span>' +
+      '<span class="nz-t">' + esc(n.t) +
+      '<div class="nz-m">' + esc(n.datum) + ' · ' + n.seiten + ' Seiten' +
+      (n.quelle ? ' · ' + esc(n.quelle) : '') + '</div></span>' +
+      '<span class="nz-art">' + esc(artName[n.art] || n.art) + '</span></div>';
+  }).join('');
+  $('blatt').innerHTML = h;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MONATSVORAUSPLANUNG (CMP 11)
+   Bullet-Journal-Logik: das Blatt sammelt nicht automatisch ein. Ein
+   Eintrag erscheint hier, weil du ihn aus den Beständen gehoben oder
+   direkt auf dieses Blatt geschrieben hast.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Löst einen Verweis auf. Fehlt das Ziel, bleibt der Eintrag stehen —
+   mit Hinweis statt leerer Zeile.                                      */
+function monatText(e) {
+  if (!e.refArt) { return { t:e.t || '', herkunft:'', zusatz:'' }; }
+  if (e.refArt === 'aktivitaet') {
+    const a = AKTIVITAETEN.find(x => x.id === e.refId);
+    return { t:a ? a.t : 'entfallen', herkunft:'Aktivität', zusatz:'' };
+  }
+  if (e.refArt === 'plan') {
+    const p = PLAENE.find(x => x.id === e.refId);
+    return { t:p ? p.t : 'entfallen', herkunft:'Plan', zusatz:'' };
+  }
+  if (e.refArt === 'ziel') {
+    const z = ZIELE.find(x => x.id === e.refId);
+    return { t:z ? z.t : 'entfallen', herkunft:'Ziel', zusatz:'' };
+  }
+  if (e.refArt === 'jahrestermin') {
+    const j = JAHRESTERMINE.find(x => x.id === e.refId);
+    if (!j) { return { t:'entfallen', herkunft:'Termin', zusatz:'' }; }
+    /* Mehrtägiges steht am Anfangstag mit Hinweis auf das Ende — eine
+       Zeile, nicht vierzehn.                                            */
+    const bis = j.bis.slice(8) + '.' + j.bis.slice(5, 7) + '.';
+    return { t:j.t, herkunft:'Termin', zusatz:(j.von !== j.bis ? 'bis ' + bis : '') };
+  }
+  return { t:e.t || '', herkunft:'', zusatz:'' };
+}
+/* Findet einen Eintrag in beiden Beständen */
+function monatFinde(id) {
+  const b = monatBlatt();
+  return b.ereignisse.find(x => x.id === id) ||
+         b.vorhaben.find(x => x.id === id) || null;
+}
+/* Liefert das offene Blatt; fehlt es, wird es leer angelegt. So entsteht
+   jeder Monat beim ersten Betreten von selbst.                         */
+function monatBlatt() {
+  const jahr = parseInt(monatOffen.slice(0, 4), 10);
+  const monat = parseInt(monatOffen.slice(5), 10);
+  let b = MONATSBLAETTER.find(x => x.jahr === jahr && x.monat === monat);
+  if (!b) {
+    b = { jahr:jahr, monat:monat, ereignisse:[], vorhaben:[], reflexion:['', '', ''] };
+    MONATSBLAETTER.push(b);
+  }
+  return b;
+}
+function monatSchluessel(jahr, monat) {
+  return jahr + '-' + String(monat).padStart(2, '0');
+}
+function monatTage() {
+  const b = monatBlatt();
+  return new Date(Date.UTC(b.jahr, b.monat, 0)).getUTCDate();
+}
+/* Wochentag aus dem Kalender, nicht hinterlegt — sonst stimmt er nur
+   fuer den einen Monat, fuer den er eingetragen wurde.                 */
+function monatWochentag(tag) {
+  const b = monatBlatt();
+  const d = new Date(Date.UTC(b.jahr, b.monat - 1, tag)).getUTCDay();
+  return (d + 6) % 7;          // 0 = Montag
+}
+function monatBlaettern(schritt) {
+  const b = monatBlatt();
+  let jahr = b.jahr, monat = b.monat + schritt;
+  if (monat > 12) { monat = 1; jahr += 1; }
+  if (monat < 1)  { monat = 12; jahr -= 1; }
+  monatOffen = monatSchluessel(jahr, monat);
+  editZelle = null;
+  renderAlles();
+}
+/* Loescht einen Eintrag aus beiden Bestaenden. Umsortieren heisst
+   loeschen und an anderer Stelle neu schreiben.                        */
+function monatLoeschen(id) {
+  const b = monatBlatt();
+  [b.ereignisse, b.vorhaben].forEach(function (liste) {
+    const i = liste.findIndex(x => x.id === id);
+    if (i !== -1) { liste.splice(i, 1); }
+  });
+  editZelle = null;
+  renderAlles();
+}
+function monatGlyph(id) {
+  const e = monatFinde(id);
+  if (!e) { return; }
+  e.glyph = naechsterGlyph(e.glyph);
+  renderAlles();
+}
+function monatNeu(tag) {
+  monatAufraeumen();
+  const b = monatBlatt();
+  const e = { id:naechsteId(), glyph:'\u2022', t:'' };
+  if (tag > 0) { e.tag = tag; b.ereignisse.push(e); }
+  else { b.vorhaben.push(e); }
+  editZelle = { art:'monat', id:e.id, feld:'t' };
+  fokusZiel = 'ez';
+  renderAlles();
+}
+function monatAufraeumen() {
+  const schonen = editZelle ? editZelle.id : null;
+  const b = monatBlatt();
+  [b.ereignisse, b.vorhaben].forEach(function (liste) {
+    for (let i = liste.length - 1; i >= 0; i--) {
+      const e = liste[i];
+      if (!e.refArt && !e.t && e.id !== schonen) { liste.splice(i, 1); }
+    }
+  });
+}
+function monatSchreiben() {
+  if (!editZelle || editZelle.art !== 'monat') { return; }
+  const e = monatFinde(editZelle.id);
+  const f = $('ez');
+  if (e && f) { e.t = f.value.trim(); }
+}
+function monatSchliessen(sofort) {
+  monatSchreiben();
+  if (sofort) { editZelle = null; monatAufraeumen(); renderAlles(); return; }
+  const merk = editZelle;
+  setTimeout(function () {
+    if (editZelle === merk) { editZelle = null; monatAufraeumen(); renderAlles(); }
+  }, 120);
+}
+function monatTaste(ev, tag) {
+  if (ev.key === 'Escape') { ev.preventDefault(); editZelle = null; monatAufraeumen(); renderAlles(); }
+  if (ev.key === 'Enter' || ev.key === 'Tab') {
+    ev.preventDefault();
+    monatSchreiben();
+    const leer = !$('ez') || !$('ez').value.trim();
+    editZelle = null;
+    monatAufraeumen();
+    if (leer) { renderAlles(); } else { monatNeu(tag); }
+  }
+}
+function monatEintragZeile(e) {
+  const info = monatText(e);
+  const kreuz = '<button class="mon-x" onclick="event.stopPropagation(); ' +
+                'monatLoeschen(' + e.id + ')" title="Eintrag l\u00f6schen">\u00d7</button>';
+  if (editZelle && editZelle.art === 'monat' && editZelle.id === e.id) {
+    return '<div class="mon-e">' + hakFeld(e.glyph, 'monatGlyph(' + e.id + ')') +
+      '<span class="mon-t2 mon-offen"><input class="zf" id="ez" value="' + esc(info.t) +
+      '" placeholder="Eintrag" onblur="monatSchliessen()" onkeydown="monatTaste(event,' +
+      (e.tag || 0) + ')"></span>' + kreuz + '</div>';
+  }
+  const klick = e.refArt ? '' :
+    ' onclick="event.stopPropagation(); monatOeffnen(' + e.id + ')"';
+  return '<div class="mon-e">' + hakFeld(e.glyph, 'monatGlyph(' + e.id + ')') +
+    '<span class="mon-t2 ' + titelKlasse(e) + '"' + klick + '>' + esc(info.t) +
+    (info.zusatz ? ' <span class="mon-herkunft">' + esc(info.zusatz) + '</span>' : '') +
+    '</span>' +
+    (info.herkunft ? '<span class="mon-herkunft">' + esc(info.herkunft) + '</span>' : '') +
+    kreuz + '</div>';
+}
+function monatOeffnen(id) {
+  monatAufraeumen();
+  editZelle = { art:'monat', id:id, feld:'t' };
+  fokusZiel = 'ez';
+  renderAlles();
+}
+
+function blattMonat() {
+  const b = monatBlatt();
+  const tage = monatTage();
+  const heutigerMonat = (b.jahr === 2026 && b.monat === 8);
+
+  kopf(MONATE_LANG[b.monat - 1] + ' ' + b.jahr,
+       'Monatsvorausplanung \u00b7 ' + b.ereignisse.length + ' Ereignisse, ' +
+       b.vorhaben.length + ' Vorhaben',
+       '<button class="k-btn" onclick="monatBlaettern(-1)">\u2039</button>' +
+       '<button class="k-btn" onclick="monatBlaettern(1)">\u203a</button>' +
+       '<button class="k-btn" onclick="wahlAuf(\'ereignis\')">Termin</button>' +
+       '<button class="k-btn" onclick="wahlAuf(\'vorhaben\')">Vorhaben</button>');
+
+  const proTag = {};
+  b.ereignisse.forEach(function (e) {
+    if (!proTag[e.tag]) { proTag[e.tag] = []; }
+    proTag[e.tag].push(e);
+  });
+
+  const haelfte = Math.ceil(tage / 2);
+  function spalte(von, bis) {
+    let h = '';
+    for (let t = von; t <= bis; t++) {
+      const wt = monatWochentag(t);
+      const we = wt >= 5;
+      const heute = heutigerMonat && (t === 19);
+      h += '<div class="mon-t ' + (we ? 'we' : '') + ' ' + (heute ? 'heute' : '') + '">' +
+        '<span class="mon-nr">' + String(t).padStart(2, '0') + ' ' + WOKURZ[wt] + '</span>' +
+        '<span class="mon-inhalt" onclick="monatNeu(' + t + ')">' +
+        (proTag[t] || []).map(monatEintragZeile).join('') + '</span></div>';
+    }
+    return h;
+  }
+
+  let h = '<div class="mon-raster"><div>' + spalte(1, haelfte) + '</div>' +
+          '<div>' + spalte(haelfte + 1, tage) + '</div></div>';
+
+  h += '<div class="abschnitt">' + abschnitt('Vorhaben im Monat', 'ohne festen Tag');
+  h += b.vorhaben.map(monatEintragZeile).join('');
+  for (let i = 0; i < 2; i++) {
+    h += '<div class="mon-t"><span class="mon-nr"></span>' +
+         '<span class="mon-inhalt" onclick="monatNeu(0)"></span></div>';
+  }
+  h += '</div>';
+
+  h += '<div class="refl"><div class="refl-l">Reflexion des Monats</div>';
+  for (let ri = 0; ri < b.reflexion.length; ri++) {
+    h += freiZeile('mreflexion', ri, b.reflexion[ri], b.reflexion.length,
+                   'refl-z', 'refl-t');
+  }
+  h += '</div>';
+
+  $('blatt').innerHTML = h;
+  fokusSetzen();
+}
+
+/* ── Auswahl aus den Beständen ───────────────────────────────────── */
+function wahlAuf(modus) {
+  wahlModus = modus;
+  const fuerWoche = (modus === 'wtermin' || modus === 'waktivitaet');
+  const b = fuerWoche ? wocheBlatt() : monatBlatt();
+  const bestand = fuerWoche ? b.eintraege.concat(b.wichtig)
+                            : b.ereignisse.concat(b.vorhaben);
+  const drin = function (art, id) {
+    return bestand.some(e => e.refArt === art && e.refId === id);
+  };
+  /* Auf dem Wochenblatt wird der Tag gleich mitgewählt — ein Tippen
+     statt aufnehmen, suchen, verschieben.                              */
+  const tagKnoepfe = function (art, id) {
+    let t = '<div class="wahl-tage">';
+    for (let d = 0; d < 7; d++) {
+      t += '<button class="wahl-d" onclick="event.stopPropagation(); wahlNehmen(\'' +
+        art + '\',\'' + id + '\',' + d + ')">' + WOKURZ[d] + '</button>';
+    }
+    t += '<button class="wahl-d" onclick="event.stopPropagation(); wahlNehmen(\'' +
+      art + '\',\'' + id + '\',-1)">\u2014</button></div>';
+    return t;
+  };
+  const zeile = function (art, id, titel, meta, artName) {
+    if (drin(art, id)) { return ''; }
+    const klick = fuerWoche ? '' :
+      ' onclick="wahlNehmen(\'' + art + '\',\'' + id + '\')"';
+    return '<div class="wahl-l"' + klick + '>' +
+      '<span class="wahl-art">' + esc(artName) + '</span>' +
+      '<span class="wahl-t">' + esc(titel) +
+      '<div class="wahl-m">' + esc(meta) + '</div>' +
+      (fuerWoche ? tagKnoepfe(art, id) : '') + '</span></div>';
+  };
+  let h = '';
+  if (modus === 'ereignis' || modus === 'wtermin') {
+    const monat = fuerWoche ? 0 : b.monat;
+    JAHRESTERMINE.forEach(function (j) {
+      if (!fuerWoche &&
+          parseInt(j.von.slice(5, 7), 10) !== monat &&
+          parseInt(j.bis.slice(5, 7), 10) !== monat) { return; }
+      if (fuerWoche) {
+        /* Nur Termine, die diese Woche berühren */
+        const so = tagPlus(b.montag, 6);
+        if (j.bis < b.montag || j.von > so) { return; }
+      }
+      h += zeile('jahrestermin', j.id, j.t,
+                 j.von.slice(8) + '.' + j.von.slice(5,7) + '. bis ' +
+                 j.bis.slice(8) + '.' + j.bis.slice(5,7) + '.', 'Termin');
+    });
+    $('wahl-titel').textContent = fuerWoche ? 'Termin auf die Woche legen'
+                                            : 'Termin aufs Monatsblatt heben';
+    $('wahl-fuss').textContent = 'Alles Weitere schreibst du direkt in die Tagzeile.';
+    if (!h) { h = '<div class="hinweis">Keine passenden Jahrestermine, ' +
+                  'die nicht schon auf dem Blatt stehen.</div>'; }
+  } else if (modus === 'zielzu') {
+    const zid = unterAktiv.ziele;
+    PLAENE.filter(p => !p.archiviert && !p.zielId).forEach(function (p) {
+      h += '<div class="wahl-l" onclick="zielZuordnen(\'plan\',\'' + p.id + '\')">' +
+        '<span class="wahl-art">Plan</span><span class="wahl-t">' + esc(p.t) +
+        '<div class="wahl-m">' + esc(bName(p.b)) + '</div></span></div>';
+    });
+    AKTIVITAETEN.filter(a => offen(a) && !a.planId && !a.zielId).forEach(function (a) {
+      h += '<div class="wahl-l" onclick="zielZuordnen(\'akt\',' + a.id + ')">' +
+        '<span class="wahl-art">Aktivit\u00e4t</span><span class="wahl-t">' + esc(a.t) +
+        '<div class="wahl-m">' + esc(bName(a.b)) + ' \u00b7 ' + a.min + ' Min</div></span></div>';
+    });
+    WIEDER.filter(w => !w.zielId).forEach(function (w) {
+      h += '<div class="wahl-l" onclick="zielZuordnen(\'wied\',' + w.id + ')">' +
+        '<span class="wahl-art">Wiederkehrend</span><span class="wahl-t">' + esc(w.t) +
+        '<div class="wahl-m">' + esc(w.muster) + '</div></span></div>';
+    });
+    GEWOHNHEIT.filter(g => !g.zielId).forEach(function (g) {
+      h += '<div class="wahl-l" onclick="zielZuordnen(\'gew\',' + g.id + ')">' +
+        '<span class="wahl-art">Gewohnheit</span><span class="wahl-t">' + esc(g.t) +
+        '<div class="wahl-m">' + esc(g.ziel) + '</div></span></div>';
+    });
+    $('wahl-titel').textContent = 'Diesem Ziel zuordnen';
+    $('wahl-fuss').textContent = 'Planaktivit\u00e4ten zahlen \u00fcber ihren Plan ein.';
+    if (!h) { h = '<div class="hinweis">Nichts Freies mehr vorhanden \u2014 alles ist ' +
+                  'bereits einem Ziel zugeordnet.</div>'; }
+  } else if (modus === 'planakt') {
+    AKTIVITAETEN.filter(a => offen(a) && !a.planId).forEach(function (a) {
+      h += '<div class="wahl-l" onclick="planZuordnen(' + a.id + ')">' +
+        '<span class="wahl-art">Aktivit\u00e4t</span>' +
+        '<span class="wahl-t">' + esc(a.t) +
+        '<div class="wahl-m">' + esc(bName(a.b)) + ' \u00b7 ' + a.min + ' Min</div></span></div>';
+    });
+    $('wahl-titel').textContent = 'Aktivit\u00e4t diesem Plan zuordnen';
+    $('wahl-fuss').textContent = 'Die Aktivit\u00e4t bleibt in der Checkliste und tr\u00e4gt dort ein \u2192.';
+    if (!h) { h = '<div class="hinweis">Keine freien offenen Aktivit\u00e4ten \u2014 ' +
+                  'alle sind bereits einem Plan zugeordnet.</div>'; }
+  } else if (modus === 'waktivitaet') {
+    AKTIVITAETEN.filter(offen).forEach(function (a) {
+      h += zeile('aktivitaet', a.id, a.t,
+                 bName(a.b) + ' \u00b7 ' + a.min + ' Min' +
+                 (a.ende ? ' \u00b7 Ende ' + a.ende : ''), 'Aktivit\u00e4t');
+    });
+    $('wahl-titel').textContent = 'Aktivit\u00e4t auf die Woche verteilen';
+    $('wahl-fuss').textContent = 'Der Eintrag bleibt ein Verweis \u2014 einmal abhaken gen\u00fcgt.';
+    if (!h) { h = '<div class="hinweis">Alle offenen Aktivit\u00e4ten liegen ' +
+                  'bereits auf dieser Woche.</div>'; }
+  } else {
+    AKTIVITAETEN.filter(offen).forEach(function (a) {
+      h += zeile('aktivitaet', a.id, a.t, bName(a.b), 'Aktivit\u00e4t');
+    });
+    PLAENE.forEach(function (p) { h += zeile('plan', p.id, p.t, bName(p.b), 'Plan'); });
+    ZIELE.forEach(function (z) { h += zeile('ziel', z.id, z.t, 'Frist ' + z.frist, 'Ziel'); });
+    $('wahl-titel').textContent = 'Vorhaben f\u00fcr diesen Monat';
+    $('wahl-fuss').textContent = 'Vorhaben bekommen bewusst keinen Tag.';
+    if (!h) { h = '<div class="hinweis">Alles bereits auf dem Monatsblatt.</div>'; }
+  }
+  $('wahl-inhalt').innerHTML = h;
+  $('wahl').classList.add('auf');
+}
+function wahlZu() { $('wahl').classList.remove('auf'); }
+function zielZuordnen(art, id) {
+  const zid = unterAktiv.ziele;
+  const l = art === 'plan' ? PLAENE : art === 'akt' ? AKTIVITAETEN
+          : art === 'wied' ? WIEDER : GEWOHNHEIT;
+  const x = l.find(y => y.id === id);
+  if (x) { x.zielId = zid; }
+  wahlZu();
+  renderAlles();
+  melde('Dem Ziel zugeordnet');
+}
+function planZuordnen(aid) {
+  const a = AKTIVITAETEN.find(x => x.id === aid);
+  if (a) { a.planId = unterAktiv.plaene; }
+  wahlZu();
+  renderAlles();
+  melde('Dem Plan zugeordnet');
+}
+function wahlNehmen(art, id, tag) {
+  const echteId = (art === 'aktivitaet' || art === 'jahrestermin') ? parseInt(id, 10) : id;
+  if (wahlModus === 'wtermin' || wahlModus === 'waktivitaet') {
+    const b = wocheBlatt();
+    const e = { id:naechsteId(), refArt:art, refId:echteId };
+    if (art !== 'aktivitaet') { e.glyph = '\u2022'; }
+    if (tag >= 0) { e.tag = tag; b.eintraege.push(e); melde('Auf ' + WOTAGE[tag] + ' gelegt'); }
+    else { b.wichtig.push(e); melde('Als wichtig f\u00fcr diese Woche gesetzt'); }
+    wahlZu();
+    renderAlles();
+    return;
+  }
+  const b = monatBlatt();
+  if (wahlModus === 'ereignis') {
+    const j = JAHRESTERMINE.find(x => x.id === echteId);
+    let t = 1;
+    if (j && parseInt(j.von.slice(5, 7), 10) === b.monat) { t = parseInt(j.von.slice(8), 10); }
+    b.ereignisse.push({ id:naechsteId(), tag:t, glyph:'\u2022', refArt:art, refId:echteId });
+    melde('Als Ereignis am ' + t + '. eingetragen');
+  } else {
+    b.vorhaben.push({ id:naechsteId(), glyph:'\u2022', refArt:art, refId:echteId });
+    melde('Als Vorhaben f\u00fcr diesen Monat gesetzt');
+  }
+  wahlZu();
+  renderAlles();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   JAHRESTERMINE (CMP 21)
+   Zwoelf Monatsspalten, 31 Tagzeilen. Abwesenheit wird als Flaeche
+   sichtbar — das ist der Zweck des Blattes.
+   ═══════════════════════════════════════════════════════════════════ */
+
+function isoDatum(jahr, monat, tag) {
+  return jahr + '-' + String(monat).padStart(2, '0') + '-' + String(tag).padStart(2, '0');
+}
+function tageImMonat(jahr, monat) {
+  return new Date(Date.UTC(jahr, monat, 0)).getUTCDate();
+}
+function wochentagVon(jahr, monat, tag) {
+  return (new Date(Date.UTC(jahr, monat - 1, tag)).getUTCDay() + 6) % 7;
+}
+/* Alle Termine, die diesen Tag beruehren. Der Vergleich laeuft ueber
+   ISO-Zeichenketten — damit stimmt auch der Jahreswechsel.            */
+function jtAnTag(iso) {
+  return JAHRESTERMINE.filter(j => iso >= j.von && iso <= j.bis);
+}
+function jtKuerzel(t) {
+  const w = t.split(' ');
+  if (w.length === 1) { return t.slice(0, 6); }
+  return w.map(x => x.charAt(0)).join('').slice(0, 4);
+}
+function jahrBlaettern(schritt) { jahrOffen += schritt; renderAlles(); }
+
+function blattJahrestermine() {
+  const anzahl = JAHRESTERMINE.filter(function (j) {
+    return j.von.slice(0, 4) === String(jahrOffen) || j.bis.slice(0, 4) === String(jahrOffen);
+  }).length;
+  kopf('Jahrestermine ' + jahrOffen, anzahl + ' Eintr\u00e4ge \u00b7 Tag antippen zum Erfassen',
+       '<button class="k-btn" onclick="jahrBlaettern(-1)">\u2039</button>' +
+       '<button class="k-btn" onclick="jahrBlaettern(1)">\u203a</button>');
+
+  let h = '<table class="jt-tab"><colgroup><col style="width:30px">';
+  for (let m = 0; m < 12; m++) { h += '<col>'; }
+  h += '</colgroup><thead><tr><th></th>' +
+       MONATE.map(function (m) { return '<th>' + m + '</th>'; }).join('') +
+       '</tr></thead><tbody>';
+
+  for (let tag = 1; tag <= 31; tag++) {
+    h += '<tr><td class="tagnr">' + tag + '</td>';
+    for (let monat = 1; monat <= 12; monat++) {
+      if (tag > tageImMonat(jahrOffen, monat)) { h += '<td class="leer"></td>'; continue; }
+      const iso = isoDatum(jahrOffen, monat, tag);
+      const wt = wochentagVon(jahrOffen, monat, tag);
+      const treffer = jtAnTag(iso);
+      const heute = (iso === HEUTE_ISO);
+      let kl = 'frei ' + (wt >= 5 ? 'we ' : '') + (heute ? 'heute' : '');
+      /* Ueberschneidungen werden gezeigt, nicht verdeckt: liegen mehrere
+         Termine auf einem Tag, teilen sie sich die Zellenbreite. Ein
+         einzelner Balken darf sonst einen zweiten verschlucken.        */
+      let inhalt = '';
+      const anz = Math.min(treffer.length, 3);
+      treffer.slice(0, 3).forEach(function (j, i) {
+        const start = (iso === j.von);
+        const ende = (iso === j.bis);
+        const eintag = start && ende;
+        const form = eintag ? 'eintag' : (start ? 'start' : (ende ? 'ende' : ''));
+        const breite = 100 / anz;
+        const stil = anz > 1
+          ? 'left:' + (i * breite) + '%;right:' + ((anz - 1 - i) * breite) + '%;'
+          : '';
+        inhalt += '<span class="jt-bal ' + form + '" style="' + stil + 'background:' +
+          (JT_ARTEN[j.art] || JT_ARTEN.termin).f + '" onclick="event.stopPropagation(); ' +
+          'jtOeffnen(' + j.id + ')" title="' + esc(j.t) + '"></span>';
+      });
+      if (anz === 1 && treffer[0].von === iso) {
+        inhalt += '<span class="jt-kuerzel">' + esc(jtKuerzel(treffer[0].t)) + '</span>';
+      }
+      h += '<td class="' + kl + '" onclick="jtNeu(' + monat + ',' + tag + ')">' +
+           inhalt + '</td>';
+    }
+    h += '</tr>';
+  }
+  h += '</tbody></table>';
+
+  const liste = JAHRESTERMINE.filter(function (j) {
+    return j.von.slice(0, 4) === String(jahrOffen) || j.bis.slice(0, 4) === String(jahrOffen);
+  }).sort(function (a, b) { return a.von < b.von ? -1 : 1; });
+
+  h += '<div class="abschnitt">' + abschnitt('Eintr\u00e4ge', jahrOffen + '');
+  h += liste.map(function (j) {
+    const a = JT_ARTEN[j.art] || JT_ARTEN.termin;
+    const tage = Math.round(
+      (Date.parse(j.bis) - Date.parse(j.von)) / 86400000) + 1;
+    return '<div class="jt-leg" onclick="jtOeffnen(' + j.id + ')">' +
+      '<span class="jt-farbe" style="background:' + a.f + '"></span>' +
+      '<span class="jt-lt">' + esc(j.t) +
+      '<div class="jt-lm">' + esc(a.n) + (j.ort ? ' \u00b7 ' + esc(j.ort) : '') +
+      ' \u00b7 ' + tage + (tage === 1 ? ' Tag' : ' Tage') + '</div></span>' +
+      '<span class="jt-ldat">' + esc(jtKurz(j.von)) +
+      (j.von !== j.bis ? ' \u2013 ' + esc(jtKurz(j.bis)) : '') + '</span></div>';
+  }).join('');
+  if (!liste.length) {
+    h += '<div class="hinweis">Noch keine Eintr\u00e4ge in diesem Jahr. ' +
+         'Tippe einen Tag im Raster an.</div>';
+  }
+  h += '</div>';
+
+  $('blatt').innerHTML = h;
+}
+function jtKurz(iso) { return iso.slice(8) + '.' + iso.slice(5, 7) + '.'; }
+
+/* ── Erfassen und Bearbeiten ─────────────────────────────────────── */
+let jtOffen = null;
+function jtNeu(monat, tag) {
+  const iso = isoDatum(jahrOffen, monat, tag);
+  const j = { id:naechsteId(), t:'', von:iso, bis:iso, ort:'', art:'termin' };
+  JAHRESTERMINE.push(j);
+  jtOeffnen(j.id);
+}
+function jtOeffnen(id) {
+  jtOffen = id;
+  const j = JAHRESTERMINE.find(x => x.id === id);
+  if (!j) { return; }
+  const artOpt = Object.keys(JT_ARTEN).map(function (k) {
+    return '<option value="' + k + '"' + (k === j.art ? ' selected' : '') + '>' +
+           JT_ARTEN[k].n + '</option>';
+  }).join('');
+  $('jt-inhalt').innerHTML =
+    '<div style="width:100%">' +
+    '<div class="jt-feld"><label>Titel</label>' +
+    '<input id="jt-t" value="' + esc(j.t) + '" placeholder="Bezeichnung"></div>' +
+    '<div class="jt-feld"><label>Von</label>' +
+    '<input id="jt-von" value="' + esc(j.von) + '" placeholder="JJJJ-MM-TT"></div>' +
+    '<div class="jt-feld"><label>Bis</label>' +
+    '<input id="jt-bis" value="' + esc(j.bis) + '" placeholder="JJJJ-MM-TT"></div>' +
+    '<div class="jt-feld"><label>Ort</label>' +
+    '<input id="jt-ort" value="' + esc(j.ort) + '" placeholder="optional"></div>' +
+    '<div class="jt-feld"><label>Art</label>' +
+    '<select id="jt-art">' + artOpt + '</select></div></div>';
+  $('jt').classList.add('auf');
+  setTimeout(function () { const e = $('jt-t'); if (e) { e.focus(); } }, 60);
+}
+function jtZu() {
+  /* Ein ohne Titel geschlossener Eintrag war ein Fehlgriff und geht wieder */
+  const j = JAHRESTERMINE.find(x => x.id === jtOffen);
+  if (j && !j.t) { jtLoeschen(true); return; }
+  $('jt').classList.remove('auf');
+  jtOffen = null;
+  renderAlles();
+}
+function jtSpeichern() {
+  const j = JAHRESTERMINE.find(x => x.id === jtOffen);
+  if (!j) { jtZu(); return; }
+  j.t = $('jt-t').value.trim();
+  j.ort = $('jt-ort').value.trim();
+  j.art = $('jt-art').value;
+  let von = $('jt-von').value.trim();
+  let bis = $('jt-bis').value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(von)) { von = j.von; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(bis)) { bis = von; }
+  /* Ende vor Anfang waere ein Balken ins Nichts */
+  if (bis < von) { const x = von; von = bis; bis = x; }
+  j.von = von;
+  j.bis = bis;
+  if (!j.t) { jtLoeschen(true); return; }
+  $('jt').classList.remove('auf');
+  jtOffen = null;
+  renderAlles();
+}
+function jtLoeschen(still) {
+  const i = JAHRESTERMINE.findIndex(x => x.id === jtOffen);
+  if (i !== -1) { JAHRESTERMINE.splice(i, 1); }
+  $('jt').classList.remove('auf');
+  jtOffen = null;
+  if (!still) { melde('Jahrestermin gel\u00f6scht'); }
+  renderAlles();
+}
+
+/* ═══ ARCHIV (CMP 41) ═══════════════════════════════════════════════
+   Archivierte Pläne werden nicht kopiert, sondern nur ausgeblendet.
+   Von hier aus lassen sie sich öffnen und wieder aktivieren.
+   ═══════════════════════════════════════════════════════════════════ */
+function blattArchiv() {
+  const l = PLAENE.filter(p => p.archiviert);
+  const lz = ZIELE.filter(z => z.archiviert);
+  kopf('Archiv', l.length + ' Pl\u00e4ne \u00b7 ' + lz.length + ' Ziele', '');
+  if (!l.length && !lz.length) {
+    $('blatt').innerHTML = '<div class="hinweis">Noch nichts archiviert. ' +
+      'Auf einem Planblatt legt der Knopf Archivieren den Plan hierher.</div>';
+    return;
+  }
+  let h = '';
+  h += l.map(function (p) {
+    const f = planFortschritt(p.id);
+    return '<div class="nz"><span class="tz-punkt" style="background:' + bFarbe(p.b) +
+      '"></span><span class="nz-t">' + esc(p.t) +
+      '<div class="nz-m">' + esc(bName(p.b)) +
+      (p.zieldatum ? ' \u00b7 Zieldatum ' + esc(p.zieldatum) : '') +
+      ' \u00b7 ' + f.fertig + ' von ' + f.gesamt + ' erledigt</div>' +
+      '<div class="nz-m">' + esc(p.beschreibung[0] || '') + '</div></span>' +
+      '<button class="k-btn" onclick="planReaktivieren(\'' + p.id + '\')">Reaktivieren</button>' +
+      '</div>';
+  }).join('');
+  h += lz.map(function (z) {
+    return '<div class="nz"><span class="tz-punkt" style="background:' + bFarbe(z.b) +
+      '"></span><span class="nz-t">' + esc(z.t) +
+      '<div class="nz-m">Ziel \u00b7 ' + esc(bName(z.b)) +
+      (z.frist ? ' \u00b7 Frist ' + esc(z.frist) : '') + '</div>' +
+      '<div class="nz-m">' + esc(z.zustand[0] || '') + '</div></span>' +
+      '<button class="k-btn" onclick="zielReaktivieren(\'' + z.id + '\')">Reaktivieren</button>' +
+      '</div>';
+  }).join('');
+  h += '<div class="hinweis">Ein reaktivierter Plan oder ein reaktiviertes Ziel bekommt ' +
+       'seinen Reiter zur\u00fcck. Das Zugeordnete war nie weg \u2014 es steht weiterhin ' +
+       'in seinen Best\u00e4nden.</div>';
+  $('blatt').innerHTML = h;
+}
+
+/* ═══ PLATZHALTER für spätere Stufen ═══ */
+function blattStub(nr, titel, sub, text) {
+  kopf(titel, sub, '');
+  $('blatt').innerHTML = '<div class="stub"><div class="stub-z">' + esc(nr) + '</div>' +
+    '<div class="stub-t">' + esc(titel) + '</div>' +
+    '<div class="stub-s">' + esc(text) + '</div></div>';
+}
+
+/* ═══ DISPATCHER ═══ */
+function renderBlatt() {
+  /* Register mit frei benannten Unterblättern zuerst: bei ihnen ist der
+     Unterschlüssel eine Plan- oder Ziel-ID und trägt keine Bedeutung für
+     den Dispatcher. 'uebersicht' kommt in beiden vor und wäre mehrdeutig. */
+  if (reg === 'plaene') { blattPlaene(); return; }
+  if (reg === 'ziele')  { blattZiele(); return; }
+
+  const k = blattKey();
+  if (k === 'tag')      { blattTag(); return; }
+  if (k === 'woche')    { blattWoche(); return; }
+  if (k === 'akt')      { blattAktivitaeten(); return; }
+  if (k === 'wied')     { blattWieder(); return; }
+  if (k === 'gew')      { blattGewohnheit(); return; }
+  if (k === 'notiz')    { blattNotiz(); return; }
+  if (k === 'monat')    { blattMonat(); return; }
+  if (k === 'jtermine') { blattJahrestermine(); return; }
+  if (k === 'archiv')   { blattArchiv(); return; }
+  /* Kein stiller Rückfall mehr auf ein beliebiges Blatt: ein unbekannter
+     Schlüssel soll auffallen, statt ein fremdes Blatt zu zeichnen. */
+  kopf('Unbekanntes Blatt', 'Schl\u00fcssel: ' + k, '');
+  $('blatt').innerHTML = '<div class="hinweis">F\u00fcr diesen Registerschl\u00fcssel ' +
+    'ist kein Blatt hinterlegt.</div>';
+}
+
+function renderAlles() {
+  renderRegister();
+  renderUnterreiter();
+  renderBlatt();
+}
+
+/* ═══ EXPORT AN DEN MOVE ═══ */
+function exportAuf() {
+  const k = blattKey();
+  const titel = $('bk-titel').textContent;
+  let inhalt = '<div class="move-k">' + esc(titel) + '</div>';
+
+  if (k === 'tag') {
+    /* Auf dem Move wird mit dem Stift geschrieben. Deshalb bekommt die
+       Reflexion dort fuenf Linien statt der drei am Bildschirm, und die
+       Zeilen sind hoeher. Bereits Eingetragenes wird uebernommen.       */
+    const mottoText = TAG.motto.filter(z => z).join(' ');
+    inhalt += '<div class="move-l">Tagesmotto</div>' +
+      '<div class="move-z">' + esc(mottoText) + '</div>';
+
+    inhalt += '<div class="move-l">Termine</div>';
+    inhalt += ganztagsEintraege().map(function (g) {
+      return '<div class="move-z">ganztags  ' + esc(g.t) + '</div>';
+    }).join('');
+    inhalt += TERMINE.filter(t => t.tag === HEUTE_WT && !t.ganztags)
+      .sort(function (a, b) { return a.von < b.von ? -1 : 1; })
+      .map(function (t) {
+        return '<div class="move-z">' + esc(t.von) + '  ' + esc(t.t) + '</div>';
+      }).join('');
+
+    inhalt += '<div class="move-l">Aktivitaeten</div>';
+    inhalt += AKTIVITAETEN.filter(a => a.heute).map(function (a) {
+      const z = { '\u2022':'\u25a1', '\u2715':'\u2715', '>':'\u203a', '\u2013':'\u2013' };
+      return '<div class="move-z">' + (z[a.glyph] || '\u25a1') + ' ' + esc(a.prio) +
+             '  ' + esc(a.t) + '</div>';
+    }).join('');
+
+    const wk = WIEDER.filter(x => x.tage.indexOf(HEUTE_WT) !== -1);
+    if (wk.length) {
+      inhalt += '<div class="move-l">Wiederkehrend</div>';
+      inhalt += wk.map(function (x) {
+        const g = x.log[HEUTE_WT] || '\u2022';
+        const z = { '\u2022':'\u25a1', '\u2715':'\u2715', '>':'\u203a', '\u2013':'\u2013' };
+        return '<div class="move-z">' + (z[g] || '\u25a1') + ' ' + esc(x.t) + '</div>';
+      }).join('');
+    }
+
+    const kont = KONTAKTE.filter(x => x.tag === HEUTE_WT);
+    inhalt += '<div class="move-l">Kontakte / Rueckfragen</div>';
+    inhalt += kont.map(function (x) {
+      const z = { '\u2022':'\u25a1', '\u2715':'\u2715', '>':'\u203a', '\u2013':'\u2013' };
+      return '<div class="move-z">' + (z[x.glyph] || '\u25a1') + ' ' + esc(x.t) + '</div>';
+    }).join('');
+    for (let i = kont.length; i < 3; i++) { inhalt += '<div class="move-linie"></div>'; }
+
+    inhalt += '<div class="move-refl"><div class="move-l" style="margin-top:0">Reflexion</div>';
+    const refl = TAG.reflexion.filter(z => z);
+    refl.forEach(function (z) { inhalt += '<div class="move-z">' + esc(z) + '</div>'; });
+    for (let i = refl.length; i < 5; i++) { inhalt += '<div class="move-linie"></div>'; }
+    inhalt += '</div>';
+  } else {
+    inhalt += '<div class="move-z">Blattinhalt massstabsgetreu</div>';
+  }
+
+  $('export-inhalt').innerHTML = '<div class="move">' + inhalt +
+    '<div class="move-f">' + esc(FORM_NR[k] || 'CMP') + ' \u00b7 TimeAssist</div></div>';
+  $('export-hinweis').textContent = 'Blatt ' + (FORM_NR[k] || 'CMP') + ' \u00b7 82,6 \u00d7 132,2 mm';
+  $('export').classList.add('auf');
+}
+function exportZu() { $('export').classList.remove('auf'); }
+
+/* ═══ SKALIERUNG DES GERÄTERAHMENS ═══ */
+function skaliere() {
+  const g = $('geraet');
+  const s = Math.min(window.innerWidth / 820, window.innerHeight / 1180, 1);
+  g.style.transform = 'scale(' + s + ')';
+}
+
+/* ═══ START ═══ */
+(function () {
+  skaliere();
+  window.addEventListener('resize', skaliere);
+  renderAlles();
+}());
+</script>
+</body>
+</html>
