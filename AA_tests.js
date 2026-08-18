@@ -1,230 +1,284 @@
-// ╔══════════════════════════════════════════════════════════════════╗
-// ║  WorkAssist AA_tests.js — Regressions- & Vollständigkeitstests  ║
-// ║  Ausführen: In der Browser-Konsole einfügen und Enter drücken   ║
-// ╚══════════════════════════════════════════════════════════════════╝
+/* ═══════════════════════════════════════════════════════════════════════
+   AA_tests.js — Regressionstests TimeAssist
+   Aufruf:  node AA_tests.js [pfad/timeassist.html]
+   Schema:  console.log + ok/fail/warn, ERGEBNIS-Block am Ende.
+   Neue Kategorien werden hinten vor dem ERGEBNIS-Block angehängt.
+   ═══════════════════════════════════════════════════════════════════════ */
+'use strict';
 
-(function () {
-  let ok = 0, fail = 0, warn = 0;
-  const OK   = (msg) => { ok++;   console.log('%c✔ OK   ' + msg, 'color:#1a7a4a;font-weight:600'); };
-  const FAIL = (msg) => { fail++; console.error('✘ FAIL  ' + msg); };
-  const WARN = (msg) => { warn++; console.warn('⚠ WARN  ' + msg); };
+const fs = require('fs');
+const PFAD = process.argv[2] || 'timeassist.html';
 
-  // ── 1. SCREEN-VOLLSTÄNDIGKEIT ────────────────────────────────────
-  console.log('%c── 1. Screen-Vollständigkeit', 'font-weight:700;color:#333');
-  const screens = ['screen-dashboard','screen-aufgaben','screen-wissen',
-                   'screen-bereiche','screen-dokumente','screen-plaene','screen-notizen'];
-  screens.forEach(id => {
-    document.getElementById(id) ? OK(id + ' vorhanden') : FAIL(id + ' FEHLT');
-  });
+let nOk = 0, nFail = 0, nWarn = 0;
+function ok(t)   { console.log('  ok    ' + t); nOk++; }
+function fail(t) { console.log('  FAIL  ' + t); nFail++; }
+function warn(t) { console.log('  warn  ' + t); nWarn++; }
+function kat(t)  { console.log('\n── ' + t + ' ' + '─'.repeat(Math.max(0, 60 - t.length))); }
 
-  // ── 2. KRITISCHE DOM-ELEMENTE ────────────────────────────────────
-  console.log('%c── 2. Kritische DOM-Elemente', 'font-weight:700;color:#333');
-  const domIds = ['ph-plan','ph-plan-count','plan-prio-btns','plan-hz-btns',
-                  'plan-fortschritt-wrap','app-version'];
-  domIds.forEach(id => {
-    document.getElementById(id) ? OK('#' + id + ' vorhanden') : FAIL('#' + id + ' FEHLT');
-  });
+if (!fs.existsSync(PFAD)) { console.log('Datei nicht gefunden: ' + PFAD); process.exit(1); }
+const H = fs.readFileSync(PFAD, 'utf8');
+const mS = H.match(/<script>\n([\s\S]*)<\/script>/);
+const JS = mS ? mS[1] : '';
+const HTMLTEIL = H.replace(/<script>[\s\S]*?<\/script>/g, '');
+const JSK = JS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 
-  // ── 3. KRITISCHE JS-FUNKTIONEN ───────────────────────────────────
-  console.log('%c── 3. Kritische JS-Funktionen', 'font-weight:700;color:#333');
-  const fns = [
-    'renderDashboard','renderDashboardPlaene','renderPlaeneScreen',
-    'planSetPrio','planSetHz','openPlanQuickView','savePlan','escHtml',
-    'badgeAktualisieren','openAufgabe','renderAufgaben','renderBereiche',
-    'renderWissen','renderNotizen','ladeDB','speichereDB'
-  ];
-  fns.forEach(fn => {
-    typeof window[fn] === 'function' ? OK(fn + '()') : FAIL(fn + '() FEHLT');
-  });
-
-  // ── 4. DB-FELDVOLLSTÄNDIGKEIT ────────────────────────────────────
-  console.log('%c── 4. DB-Feldvollständigkeit', 'font-weight:700;color:#333');
-  if (typeof DB !== 'undefined') {
-    ['bereiche','aufgaben','wissen','dokumente','plaene','notizen'].forEach(f => {
-      Array.isArray(DB[f]) ? OK('DB.' + f + ' Array') : FAIL('DB.' + f + ' kein Array');
+/* ═══ 1 · Strukturelle Integrität ═══════════════════════════════════════ */
+kat('1 · Strukturelle Integrität');
+{
+  const auf = (HTMLTEIL.match(/<div\b/g) || []).length;
+  const zu  = (HTMLTEIL.match(/<\/div>/g) || []).length;
+  if (auf === zu) { ok('div-Balance ausgeglichen (' + auf + ')'); }
+  else { fail('div-Balance verletzt: ' + auf + '/' + zu); }
+  ['nav', 'section', 'html', 'body', 'style', 'script', 'table', 'thead', 'tbody']
+    .forEach(function (t) {
+      const a = (H.match(new RegExp('<' + t + '\\b', 'g')) || []).length;
+      const z = (H.match(new RegExp('</' + t + '>', 'g')) || []).length;
+      if (a === z) { ok('<' + t + '> ausgeglichen (' + a + ')'); }
+      else { fail('<' + t + '> unausgeglichen: ' + a + '/' + z); }
     });
-    typeof DB.version === 'string' ? OK('DB.version String') : WARN('DB.version kein String');
-  } else {
-    WARN('DB nicht definiert – evtl. noch nicht geladen');
+}
+
+/* ═══ 2 · Keine Funktionsduplikate ══════════════════════════════════════ */
+kat('2 · Funktionsduplikate');
+{
+  const namen = (JSK.match(/^function\s+(\w+)/gm) || [])
+    .map(s => s.replace(/^function\s+/, ''));
+  const dup = Array.from(new Set(namen.filter((n, i) => namen.indexOf(n) !== i)));
+  if (!dup.length) { ok(namen.length + ' Funktionen, keine Duplikate'); }
+  else { fail('Doppelt definiert: ' + dup.join(', ')); }
+}
+
+/* ═══ 3 · Undefinierte Aufrufe aus Ereignis-Attributen ══════════════════ */
+kat('3 · Ereignis-Handler definiert');
+{
+  const def = new Set();
+  (JSK.match(/function\s+(\w+)/g) || []).forEach(s => def.add(s.replace(/function\s+/, '')));
+  (JSK.match(/(?:const|let)\s+(\w+)\s*=\s*(?:\w+\s*=>|function|\()/g) || [])
+    .forEach(s => def.add(s.match(/(?:const|let)\s+(\w+)/)[1]));
+  const eingebaut = new Set(['if', 'stopPropagation', 'preventDefault', 'parseInt', 'String']);
+  const ziele = new Set();
+  /* Nur freistehende Aufrufe zaehlen — document.getElementById(...) ist
+     eine DOM-Methode, keine Funktion dieser Datei.                     */
+  const sammle = t => (t.match(/(?:^|[^.\w])([A-Za-z_]\w*)\s*\(/g) || [])
+    .forEach(s => ziele.add(s.replace(/^[^A-Za-z_]*/, '').replace(/\s*\($/, '')));
+  (H.match(/on(?:click|keydown|blur|change)="([^"]*)"/g) || []).forEach(sammle);
+  (JS.match(/on(?:click|keydown|blur|change)=\\?['"][^'"\\]*/g) || []).forEach(sammle);
+  const fehlt = Array.from(ziele).filter(z => !def.has(z) && !eingebaut.has(z));
+  if (!fehlt.length) { ok(ziele.size + ' Handler-Ziele, alle definiert'); }
+  else { fail('Undefinierte Handler: ' + fehlt.join(', ')); }
+}
+
+/* ═══ 4 · Verbotene Muster ══════════════════════════════════════════════ */
+kat('4 · Verbotene Muster');
+{
+  if (!/onclick="[^"]*\breturn\b[^"]*"/.test(HTMLTEIL)) { ok('kein return in Inline-Handlern'); }
+  else { fail('onclick enthält return'); }
+  if (!/\bheight:\s*100vh\b/.test(H)) { ok('kein height:100vh'); }
+  else { fail('height:100vh gefunden'); }
+  if (!/localStorage|sessionStorage/.test(JS)) { ok('kein localStorage/sessionStorage'); }
+  else { fail('localStorage/sessionStorage gefunden — Speicher ist IndexedDB'); }
+  const sel = (H.match(/^(\.[a-z][\w.-]*) \{/gm) || []).map(s => s.replace(' {', ''));
+  const dupCss = Array.from(new Set(sel.filter((x, i) => sel.indexOf(x) !== i)));
+  if (!dupCss.length) { ok(sel.length + ' CSS-Regeln, keine Doppelten'); }
+  else { fail('Mehrfach definierte CSS-Regeln: ' + dupCss.join(', ')); }
+}
+
+/* ═══ 5 · Versionskonsistenz ════════════════════════════════════════════ */
+kat('5 · Versionskonsistenz');
+{
+  const mT = H.match(/<title>([^<]*)<\/title>/);
+  const mV = JS.match(/APP_VERSION\s*=\s*'([^']+)'/);
+  if (!mT || !mV) { fail('Titel oder APP_VERSION fehlt'); }
+  else {
+    if (mT[1].indexOf(mV[1]) !== -1) { ok('Titel enthält APP_VERSION ' + mV[1]); }
+    else { fail('Titel "' + mT[1] + '" passt nicht zu ' + mV[1]); }
+    if (/bf-mitte'\)\.textContent\s*=.*APP_VERSION/.test(JS)) {
+      ok('Anzeige im Blattfuß an APP_VERSION gekoppelt');
+    } else { fail('Versionsanzeige nicht gekoppelt'); }
   }
+}
 
-  // ── 5. PRIORITÄT-BUTTONS (inkl. KRISE) ──────────────────────────
-  console.log('%c── 5. Priorität-Buttons im Plan-Dialog', 'font-weight:700;color:#333');
-  const prioContainer = document.getElementById('plan-prio-btns');
-  if (prioContainer) {
-    const prioButtons = prioContainer.querySelectorAll('.plan-prio-btn');
-    const prioWerte   = Array.from(prioButtons).map(b => b.dataset.prio);
-    ['krise','hoch','mittel','niedrig'].forEach(p => {
-      prioWerte.includes(p)
-        ? OK('Prio-Button "' + p + '" vorhanden')
-        : FAIL('Prio-Button "' + p + '" FEHLT — Krise-Typ nicht setzbar');
-    });
-  } else {
-    FAIL('#plan-prio-btns nicht gefunden – Prio-Buttons nicht prüfbar');
+/* ═══ 6 · Registerstruktur und Dispatcher ═══════════════════════════════ */
+kat('6 · Registerstruktur');
+{
+  const SOLL = ['tag', 'woche', 'akt', 'plaene', 'planung', 'ziele', 'db'];
+  const mR = JS.match(/const REGISTER = \[([\s\S]*?)\n\];/);
+  if (!mR) { fail('REGISTER nicht gefunden'); }
+  else {
+    const keys = (mR[1].match(/k:'(\w+)'/g) || []).map(s => s.match(/k:'(\w+)'/)[1]);
+    const fehlt = SOLL.filter(s => keys.indexOf(s) === -1);
+    if (!fehlt.length) { ok('alle sieben Hauptregister vorhanden'); }
+    else { fail('Register fehlen: ' + fehlt.join(', ')); }
   }
+  /* Fehlerart: 'uebersicht' ist bei Plänen wie Zielen derselbe Unterschlüssel.
+     Verzweigt der Dispatcher darüber statt über reg, zeichnet er das falsche
+     Blatt — genau der Fehler aus 0.19.0.                                    */
+  const mD = JS.match(/function renderBlatt\(\) \{([\s\S]*?)\n\}/);
+  if (!mD) { fail('renderBlatt nicht gefunden'); }
+  else {
+    const d = mD[1];
+    const vorn = d.indexOf("reg === 'plaene'");
+    const key = d.indexOf('const k = blattKey()');
+    if (vorn !== -1 && key !== -1 && vorn < key) {
+      ok('Pläne/Ziele werden vor blattKey über reg verzweigt');
+    } else { fail('Dispatcher verzweigt Pläne/Ziele nicht vor blattKey'); }
+    if (!/\n  blattPlaene\(\);\n\}/.test(JS)) { ok('kein stiller Rückfall am Dispatcher-Ende'); }
+    else { fail('Dispatcher fällt still auf blattPlaene zurück'); }
+  }
+  const BL = ['tag', 'woche', 'akt', 'wied', 'gew', 'notiz', 'monat', 'jtermine', 'archiv'];
+  const ohne = BL.filter(b => JS.indexOf("k === '" + b + "'") === -1);
+  if (!ohne.length) { ok(BL.length + ' Blätter im Dispatcher erreichbar'); }
+  else { fail('Kein Dispatcher-Zweig für: ' + ohne.join(', ')); }
+}
 
-  // ── 6. DELEGIERTE PLÄNE IN HORIZONT-GRUPPE (kein separater "Warte auf"-Block) ──
-  console.log('%c── 6. Delegierte Pläne in Horizont-Gruppen (kein "Warte auf"-Block)', 'font-weight:700;color:#333');
-  const phPlan = document.getElementById('ph-plan');
-  if (phPlan && typeof DB !== 'undefined' && DB.plaene?.length) {
-    // Prüfen: kein separater "Warte auf"-Header im Plan-Widget
-    const innerText = phPlan.innerText || phPlan.textContent || '';
-    !innerText.includes('WARTE AUF')
-      ? OK('Kein separater "Warte auf"-Block im Dashboard')
-      : FAIL('"Warte auf"-Block existiert noch — delegierte Pläne sollen in Horizont-Gruppe erscheinen');
+/* ═══ 7 · Minimales Datenmodell ═════════════════════════════════════════ */
+kat('7 · Datenmodell minimal');
+{
+  const mA = JS.match(/const SAAT_AKTIVITAETEN = \[([\s\S]*?)\n\];/);
+  if (!mA) { fail('SAAT_AKTIVITAETEN nicht gefunden'); }
+  else {
+    const ERLAUBT = ['id', 't', 'b', 'prio', 'min', 'wer', 'beginn', 'ende', 'glyph',
+                     'heute', 'planId', 'zielId'];
+    const felder = Array.from(new Set((mA[1].match(/[{,]\s*(\w+):/g) || [])
+      .map(s => s.replace(/[{,]\s*/, '').replace(':', ''))));
+    const zuviel = felder.filter(f => ERLAUBT.indexOf(f) === -1);
+    if (!zuviel.length) { ok('Aktivität hat nur erlaubte Felder (' + felder.length + ')'); }
+    else { fail('Unerlaubte Felder in Aktivität: ' + zuviel.join(', ')); }
+  }
+  const VERBOTEN = ['erstellt', 'geaendert', 'status', 'tags', 'archiviert:', 'imFokus',
+                    'groesse', 'ressourcen', 'horizont', 'sphaere'];
+  const drin = VERBOTEN.filter(v => new RegExp('\\b' + v.replace(':', '') + ':').test(
+    JS.slice(JS.indexOf('const SAAT_AKTIVITAETEN'), JS.indexOf('const SAAT_TERMINE'))));
+  if (!drin.length) { ok('keine WorkAssist-Altfelder an der Aktivität'); }
+  else { fail('Altfelder zurückgekehrt: ' + drin.join(', ')); }
+  if (!/\bq:\s*'(outlook|google)'/.test(JS)) { ok('kein Terminimport-Quellenfeld'); }
+  else { fail('Quellenfeld für Terminimport zurück'); }
+  if (!/\.schritte\b|schritte:/.test(JSK)) { ok('keine Plan-schritte[] mehr'); }
+  else { fail('Plan-schritte[] zurück — zweiter Mechanismus neben den Aktivitäten'); }
+}
 
-    // Prüfen: delegierte Pläne landen in einer Horizont-Gruppe
-    const delegiertePlaene = DB.plaene.filter(p => {
-      if (p.status === 'abgeschlossen' || p.prioritaet === 'krise') return false;
-      const ns = (p.schritte||[]).find(s => {
-        const st = s.aufgabeId
-          ? (DB.aufgaben.find(a=>a.id===s.aufgabeId)?.status || s.status)
-          : s.status;
-        return st !== 'erledigt';
+/* ═══ 8 · Hochformat-Geometrie ══════════════════════════════════════════ */
+kat('8 · Hochformat-Geometrie');
+{
+  const mG = H.match(/\.geraet \{[^}]*width: (\d+)px; height: (\d+)px/);
+  if (!mG) { fail('Geräterahmen-Maße nicht gefunden'); }
+  else {
+    const b = parseInt(mG[1], 10), ho = parseInt(mG[2], 10);
+    if (b === 820 && ho === 1180) { ok('Rahmen 820 × 1180 (iPad Air hochkant)'); }
+    else { fail('Rahmen ' + b + ' × ' + ho); }
+    if (ho > b) { ok('Hochformat'); } else { fail('Querformat erkannt'); }
+  }
+  /* Fehlerart aus 0.22.0: visualViewport schrumpft bei offener Tastatur und
+     rechnet den Maßstab auf etwa 60 % herunter.                            */
+  const mSk = JSK.match(/function skaliere\(\) \{([\s\S]*?)\n\}/);
+  if (!mSk) { fail('skaliere nicht gefunden'); }
+  else if (/visualViewport/.test(mSk[1])) {
+    fail('skaliere nutzt visualViewport — Tastatur verkleinert das Formular');
+  } else { ok('Maßstab aus dem Layout-Viewport, tastaturfest'); }
+}
+
+/* ═══ 9 · Kalenderrechnung ══════════════════════════════════════════════ */
+kat('9 · Kalenderrechnung');
+{
+  const mO = JS.match(/function ostersonntag\(jahr\) \{[\s\S]*?\n\}/);
+  if (!mO) { fail('ostersonntag nicht gefunden'); }
+  else {
+    let ostern;
+    try { ostern = eval('(' + mO[0].replace('function ostersonntag', 'function') + ')'); }
+    catch (e) { ostern = null; }
+    if (!ostern) { fail('ostersonntag nicht auswertbar'); }
+    else {
+      const SOLL = { 2024:'2024-03-31', 2025:'2025-04-20', 2026:'2026-04-05',
+                     2027:'2027-03-28', 2028:'2028-04-16', 2030:'2030-04-21' };
+      let f = 0;
+      Object.keys(SOLL).forEach(function (j) {
+        const d = new Date(ostern(parseInt(j, 10))).toISOString().slice(0, 10);
+        if (d !== SOLL[j]) { f++; fail('Ostern ' + j + ': ' + d + ' statt ' + SOLL[j]); }
       });
-      return !!(ns?.delegiertAn);
+      if (!f) { ok('Ostersonntag über sechs Jahre korrekt'); }
+    }
+  }
+  const mF = JS.match(/const FERIEN_BAYERN = \[([\s\S]*?)\n\];/);
+  if (!mF) { fail('FERIEN_BAYERN nicht gefunden'); }
+  else {
+    const paare = mF[1].match(/von:'(\d{4}-\d{2}-\d{2})', bis:'(\d{4}-\d{2}-\d{2})'/g) || [];
+    let f = 0;
+    paare.forEach(function (p) {
+      const m = /von:'([^']+)', bis:'([^']+)'/.exec(p);
+      if (m[2] < m[1]) { f++; fail('Ferien mit Ende vor Anfang: ' + p); }
     });
-    if (delegiertePlaene.length > 0) {
-      const horizonte = ['kurzfristig','mittelfristig','langfristig'];
-      const allInHorizont = delegiertePlaene.every(p => horizonte.includes(p.horizont || 'kurzfristig'));
-      allInHorizont
-        ? OK('Alle ' + delegiertePlaene.length + ' delegierten Pläne haben gültigen Horizont')
-        : FAIL('Delegierter Plan ohne gültigen Horizont — würde in keine Gruppe fallen');
-    } else {
-      OK('Keine delegierten Pläne vorhanden – Struktur-Check übersprungen');
-    }
-  } else {
-    WARN('ph-plan oder DB.plaene nicht verfügbar – Delegiert-Test übersprungen');
+    if (!f) { ok(paare.length + ' Ferienzeiträume, alle plausibel'); }
   }
-
-  // ── 7. KRISE-PRIORITÄT WIRD KORREKT GERENDERT ───────────────────
-  console.log('%c── 7. Krise-Pläne werden im Dashboard oben angezeigt', 'font-weight:700;color:#333');
-  if (typeof DB !== 'undefined' && DB.plaene?.length) {
-    const krisePlaene = DB.plaene.filter(p => p.prioritaet === 'krise' && p.status !== 'abgeschlossen');
-    if (krisePlaene.length > 0) {
-      const phEl = document.getElementById('ph-plan');
-      if (phEl) {
-        const firstHeader = phEl.querySelector('div');
-        const firstText   = firstHeader?.textContent?.trim().toUpperCase() || '';
-        firstText.includes('KRISE')
-          ? OK('Krise-Sektion erscheint als erste Gruppe im Dashboard')
-          : FAIL('Krise-Pläne vorhanden, aber Krise-Sektion ist nicht erste Gruppe');
-      }
-    } else {
-      OK('Keine Krise-Pläne vorhanden – Reihenfolge-Check übersprungen');
-    }
-
-    // Krise-Pläne dürfen nicht in Horizont-Gruppen landen
-    const kriseInHorizont = DB.plaene.filter(p =>
-      p.prioritaet === 'krise' && p.status !== 'abgeschlossen'
-    );
-    OK('renderDashboardPlaene sortiert Krise-Pläne separat (' + kriseInHorizont.length + ' Stück)');
-  } else {
-    WARN('DB.plaene nicht verfügbar – Krise-Render-Test übersprungen');
-  }
-
-  // ── 8. planSetPrio KENNT 'krise' ────────────────────────────────
-  console.log('%c── 8. planSetPrio() – Krise-Farbe definiert', 'font-weight:700;color:#333');
-  if (typeof planSetPrio === 'function') {
-    // Testaufruf – sollte keinen Fehler werfen
-    try {
-      planSetPrio('krise');
-      const val = document.getElementById('plan-prio-btns')?.dataset.val;
-      val === 'krise'
-        ? OK('planSetPrio("krise") setzt data-val korrekt')
-        : FAIL('planSetPrio("krise") – data-val ist "' + val + '" statt "krise"');
-      // Zurücksetzen auf Mittel
-      planSetPrio('mittel');
-    } catch(e) {
-      FAIL('planSetPrio("krise") wirft Fehler: ' + e.message);
-    }
-  } else {
-    FAIL('planSetPrio() nicht definiert');
-  }
-
-  // ── ERGEBNIS ─────────────────────────────────────────────────────
-  console.log('');
-  console.log('%c══════════════════════════════════════════', 'color:#555');
-  console.log(
-    '%cERGEBNIS: ' + ok + ' OK  |  ' + warn + ' WARN  |  ' + fail + ' FAIL',
-    fail > 0 ? 'color:#c0392b;font-weight:700;font-size:14px'
-             : warn > 0 ? 'color:#e67e22;font-weight:700;font-size:14px'
-             : 'color:#1a7a4a;font-weight:700;font-size:14px'
-  );
-  console.log('%c══════════════════════════════════════════', 'color:#555');
-})();
-
-// ── 9. BEREICHE VOLLBILD-ACCORDION ──────────────────────────────────────
-console.log('%c── 9. Bereiche Vollbild-Accordion', 'font-weight:700;color:#333');
-
-// 9a: Kein Split-Layout mehr — struct-layout darf nicht im Bereiche-Screen sein
-const bereicheScreen = document.getElementById('screen-bereiche');
-if (bereicheScreen) {
-  !bereicheScreen.querySelector('.struct-layout')
-    ? OK('Kein struct-layout im Bereiche-Screen (Vollbild korrekt)')
-    : FAIL('struct-layout noch im Bereiche-Screen — Split-View nicht entfernt');
-
-  // 9b: bd-scroll vorhanden
-  bereicheScreen.querySelector('.bd-scroll')
-    ? OK('.bd-scroll Container vorhanden')
-    : FAIL('.bd-scroll fehlt — Karten-Scrollbereich nicht gerendert');
-
-  // 9c: Suchfeld vorhanden
-  document.getElementById('bereiche-suche')
-    ? OK('#bereiche-suche Suchfeld vorhanden')
-    : FAIL('#bereiche-suche fehlt');
-} else {
-  FAIL('#screen-bereiche nicht gefunden');
 }
 
-// 9d: Neue Funktionen vorhanden
-['bdToggleKarte','bdAccToggle','renderBereichDetail','bereichKarteHTML'].forEach(fn => {
-  typeof window[fn] === 'function'
-    ? OK(fn + '() vorhanden')
-    : FAIL(fn + '() fehlt');
-});
+/* ═══ 10 · Datenschicht und Speicher (S1) ═══════════════════════════════
+   Fehlerart: Bestände werden als const angelegt und lassen sich nach dem
+   Laden aus dem Speicher nicht mehr ersetzen — die App zeigt dann ewig
+   die Saat. Ebenso: eine Änderung ohne anschließendes Speichern.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('10 · Datenschicht und Speicher');
+{
+  const BESTAENDE = ['BEREICHE', 'AKTIVITAETEN', 'TERMINE', 'JAHRESTERMINE', 'WIEDER',
+                     'GEWOHNHEIT', 'PLAENE', 'ZIELE', 'NOTIZEN', 'WOCHENBLAETTER',
+                     'MONATSBLAETTER', 'KONTAKTE', 'TAG'];
+  const alsConst = BESTAENDE.filter(b => new RegExp('const ' + b + '\\s*=\\s*DB\\.').test(JS));
+  if (!alsConst.length) { ok('alle Bestände als let — nach dem Laden ersetzbar'); }
+  else { fail('Als const gebunden, nicht ersetzbar: ' + alsConst.join(', ')); }
 
-// 9e: Alte Split-View Funktionen nicht mehr nötig (bereich-detail)
-document.getElementById('bereich-detail')
-  ? WARN('#bereich-detail noch im DOM — wird nicht mehr benötigt')
-  : OK('#bereich-detail korrekt entfernt');
-
-// 9f: renderBereichDetail gibt String zurück (nicht undefined)
-if (typeof renderBereichDetail === 'function' && typeof DB !== 'undefined' && DB.bereiche?.length) {
-  const b = DB.bereiche[0];
-  const result = renderBereichDetail(b);
-  typeof result === 'string' && result.length > 0
-    ? OK('renderBereichDetail() gibt HTML-String zurück')
-    : FAIL('renderBereichDetail() gibt keinen String zurück — Accordion-Body bleibt leer');
-} else {
-  WARN('renderBereichDetail-Test übersprungen (keine Bereiche oder Funktion fehlt)');
-}
-
-// 9g: Notizen-Sektion nur bei privatem Theme
-if (typeof DB !== 'undefined' && DB.bereiche?.length) {
-  const istPrivat = document.documentElement.getAttribute('data-theme') === 'privat';
-  const b = DB.bereiche[0];
-  const html = typeof renderBereichDetail === 'function' ? renderBereichDetail(b) : '';
-  const hatNotizen = html.includes('bd-acc-title">Notizen');
-  if (istPrivat) {
-    hatNotizen ? OK('Notizen-Sektion bei Privat-Theme vorhanden') : WARN('Notizen-Sektion fehlt bei Privat-Theme');
-  } else {
-    !hatNotizen ? OK('Notizen-Sektion korrekt ausgeblendet (berufliche Datei)') : FAIL('Notizen-Sektion erscheint bei beruflicher Datei!');
+  const mU = JS.match(/function dbUebernehmen\(neu\) \{([\s\S]*?)\n\}/);
+  if (!mU) { fail('dbUebernehmen nicht gefunden'); }
+  else {
+    const fehlt = BESTAENDE.filter(b => mU[1].indexOf(b + ' ') === -1 &&
+                                        mU[1].indexOf(b + '=') === -1);
+    if (!fehlt.length) { ok('dbUebernehmen setzt alle ' + BESTAENDE.length + ' Aliase neu'); }
+    else { fail('Alias nicht neu gesetzt: ' + fehlt.join(', ')); }
   }
-} else {
-  WARN('Notizen-Theme-Test übersprungen (keine Bereiche)');
+
+  const mSaat = JS.match(/function saatDB\(\) \{([\s\S]*?)\n\}/);
+  if (mSaat) {
+    const fehlt = BESTAENDE.filter(function (b) {
+      const k = { BEREICHE:'bereiche', AKTIVITAETEN:'aktivitaeten', TERMINE:'termine',
+        JAHRESTERMINE:'jahrestermine', WIEDER:'wieder', GEWOHNHEIT:'gewohnheiten',
+        PLAENE:'plaene', ZIELE:'ziele', NOTIZEN:'notizen',
+        WOCHENBLAETTER:'wochenblaetter', MONATSBLAETTER:'monatsblaetter',
+        KONTAKTE:'kontakte', TAG:'tag' }[b];
+      return mSaat[1].indexOf(k + ':') === -1;
+    });
+    if (!fehlt.length) { ok('saatDB enthält alle Bestände'); }
+    else { fail('saatDB unvollständig: ' + fehlt.join(', ')); }
+  } else { fail('saatDB nicht gefunden'); }
+
+  if (/function migriereDB/.test(JS)) { ok('migriereDB vorhanden'); }
+  else { fail('migriereDB fehlt — fremde Stände könnten die App zerlegen'); }
+
+  const mR = JS.match(/function renderAlles\(\) \{([\s\S]*?)\n\}/);
+  if (mR && /speichern\(\)/.test(mR[1])) { ok('jede Neuzeichnung speichert'); }
+  else { fail('renderAlles speichert nicht — Änderungen gehen verloren'); }
+
+  ['spOeffnen', 'spLesen', 'spSchreiben', 'datenExport', 'datenImport']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const mI = JS.match(/function datenImport\(ev\) \{([\s\S]*?)\n\}/);
+  if (mI && /Array\.isArray\(neu\.aktivitaeten\)/.test(mI[1])) {
+    ok('Import prüft den Inhalt, bevor er übernimmt');
+  } else { fail('Import übernimmt ungeprüft — eine falsche Datei zerlegt den Bestand'); }
+
+  if (/spLesen\(\)\.then/.test(JS)) { ok('Start lädt aus dem Speicher'); }
+  else { fail('Start lädt nicht aus dem Speicher'); }
+  if (/catch\(?\s*function \(e\) \{[\s\S]*?fluechtig/.test(JS) ||
+      /spZustand = 'fluechtig'/.test(JS)) {
+    ok('Speicherausfall wird abgefangen und angezeigt');
+  } else { fail('Kein Rückfall bei Speicherausfall'); }
 }
 
-// 9h: Pills in bereichKarteHTML
-if (typeof bereichKarteHTML === 'function' && typeof DB !== 'undefined' && DB.bereiche?.length) {
-  const html = bereichKarteHTML(DB.bereiche[0]);
-  html.includes('bd-pill')
-    ? OK('bd-pill Pills werden in Bereichskarte gerendert')
-    : FAIL('bd-pill fehlt in Bereichskarte');
-  html.includes('bd-card-ziel')
-    ? OK('bd-card-ziel Ziel-Unterzeile in Karte vorhanden')
-    : FAIL('bd-card-ziel fehlt — Ziel wird nicht in Karte angezeigt');
-} else {
-  WARN('bereichKarteHTML-Test übersprungen');
-}
-
+/* ═══════════════════════════════════════════════════════════════════════
+   ERGEBNIS
+   ═══════════════════════════════════════════════════════════════════════ */
+console.log('\n' + '═'.repeat(66));
+console.log('ERGEBNIS   ok: ' + nOk + '   warn: ' + nWarn + '   FAIL: ' + nFail);
+console.log('Datei: ' + PFAD);
+console.log('═'.repeat(66));
+process.exit(nFail > 0 ? 1 : 0);

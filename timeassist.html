@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 0.26.0 · Mockup M8.1</title>
+<title>TimeAssist 1.0.0 · S1 Datenschicht</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -434,6 +434,44 @@ input, textarea { font: inherit; color: inherit; }
               justify-content: center; font-size: 10.2px; color: #fff;
               overflow: hidden; pointer-events: none; }
 
+/* ── Eintragsdialog für Woche und Monat ──────────────────────────
+   Ein Weg statt zweier: die Zeile sagt nicht, was man eintraegt —
+   der Dialog fragt es.                                             */
+.ed-l { font-size: 10.2px; letter-spacing: .12em; text-transform: uppercase;
+        color: var(--tinte-3); margin: 12px 0 5px; }
+.ed-l:first-child { margin-top: 0; }
+.ed-art { display: flex; gap: 6px; }
+.ed-a { flex: 1; min-height: 40px; border: 1px solid var(--linie); border-radius: 6px;
+        background: var(--karte); font-size: 13.2px; color: var(--tinte-2); }
+.ed-a.aktiv { background: var(--wein); border-color: var(--wein); color: var(--papier);
+              font-weight: 700; }
+.ed-f { width: 100%; font: inherit; font-size: 15.6px; border: 1px solid var(--linie);
+        border-radius: 6px; padding: 8px 10px; background: var(--karte);
+        color: var(--tinte); }
+.ed-f:focus { outline: none; border-color: var(--marke); }
+.ed-zeile { display: flex; gap: 8px; align-items: center; }
+.ed-tage { display: flex; gap: 5px; flex-wrap: wrap; }
+.ed-t { min-width: 42px; min-height: 40px; border: 1px solid var(--linie);
+        border-radius: 6px; background: var(--karte); font-size: 13.2px;
+        color: var(--tinte-2); }
+.ed-t.aktiv { background: var(--wein); border-color: var(--wein); color: var(--papier);
+              font-weight: 700; }
+.ed-hin { font-size: 12.6px; color: var(--tinte-3); margin-top: 10px; line-height: 1.5; }
+.ed-zu { margin-top: 12px; font-size: 13.2px; color: var(--wein);
+         text-decoration: underline; text-decoration-style: dotted; }
+
+/* Speicherzustand als Punkt im Datenknopf */
+.sp-punkt { width: 8px; height: 8px; border-radius: 50%; background: #c9c2b4;
+            flex-shrink: 0; display: inline-block; }
+.sp-punkt.bereit { background: var(--gruen); }
+.sp-punkt.fehler { background: var(--wein); }
+.sp-punkt.fluechtig { background: var(--marke); }
+.dt-z { display: flex; align-items: baseline; gap: 10px; padding: 6px 2px;
+        border-bottom: 1px solid var(--linie-2); font-size: 13.2px; }
+.dt-l { flex: 0 0 150px; color: var(--tinte-3); font-size: 12px;
+        letter-spacing: .06em; text-transform: uppercase; }
+.dt-w { flex: 1; font-variant-numeric: tabular-nums; }
+
 /* Ferientoenung und Feiertagsname im Monatsraster */
 .mon-t.ferien { background: #f0ebe1; }
 .mon-t.ferien.we { background: #e8e2d5; }
@@ -661,7 +699,7 @@ input, textarea { font: inherit; color: inherit; }
         </div>
         <div class="bk-akt" id="bk-akt"></div>
         <div class="bk-werkzeug">
-          <button class="k-btn" onclick="melde('Daten liegen lokal — kein Öffnen nötig')">Daten</button>
+          <button class="k-btn" onclick="datenAuf()"><span class="sp-punkt" id="spstand"></span>Daten</button>
           <button class="k-btn pri" onclick="exportAuf()">Blatt an Move</button>
         </div>
       </div>
@@ -724,12 +762,44 @@ input, textarea { font: inherit; color: inherit; }
   </div>
 </div>
 
+<div class="hg" id="eintrag" onclick="if(event.target===this){eintragZu()}">
+  <div class="dlg" style="width:420px">
+    <div class="dlg-kopf">
+      <h2 id="eintrag-titel">Eintrag</h2>
+      <button class="k-btn" style="margin-left:auto" onclick="eintragZu()">Abbrechen</button>
+    </div>
+    <div class="dlg-koerper" style="display:block" id="eintrag-inhalt"></div>
+    <div class="dlg-fuss">
+      <button class="k-btn" id="eintrag-loeschen" onclick="eintragLoeschen()">Löschen</button>
+      <span style="margin-left:auto"></span>
+      <button class="k-btn pri" onclick="eintragSpeichern()">Übernehmen</button>
+    </div>
+  </div>
+</div>
+
+<div class="hg" id="daten" onclick="if(event.target===this){datenZu()}">
+  <div class="dlg" style="width:440px">
+    <div class="dlg-kopf">
+      <h2>Daten</h2>
+      <button class="k-btn" style="margin-left:auto" onclick="datenZu()">Schließen</button>
+    </div>
+    <div class="dlg-koerper" style="display:block" id="daten-inhalt"></div>
+    <div class="dlg-fuss">
+      <input type="file" id="daten-datei" accept="application/json,.json" style="display:none"
+             onchange="datenImport(event)">
+      <button class="k-btn" onclick="document.getElementById('daten-datei').click()">Importieren</button>
+      <span style="margin-left:auto"></span>
+      <button class="k-btn pri" onclick="datenExport()">Exportieren</button>
+    </div>
+  </div>
+</div>
+
 <div class="meldung" id="meldung"></div>
 
 <script>
 'use strict';
 
-const APP_VERSION = '0.26.0';
+const APP_VERSION = '1.0.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -737,7 +807,16 @@ const APP_VERSION = '0.26.0';
    Zustand:  •  offen   ✕  erledigt   >  weitergezogen   –  gestrichen
    ═══════════════════════════════════════════════════════════════════ */
 
-const BEREICHE = [
+/* ═══════════════════════════════════════════════════════════════════
+   DATENSCHICHT
+   Die Bestände liegen ab hier in einem einzigen Objekt DB. Die alten
+   Namen bleiben als Alias bestehen und zeigen auf dieselben Arrays —
+   push und splice wirken dadurch unverändert weiter.
+   Die SAAT_-Werte sind nur die Erstbefüllung beim allerersten Start.
+   ═══════════════════════════════════════════════════════════════════ */
+const DB_VERSION = 1;
+
+const SAAT_BEREICHE = [
   { id:'b1', name:'CCD-Programm', farbe:'#6b6459' },
   { id:'b2', name:'Migration',    farbe:'#7d6b53' },
   { id:'b3', name:'Haus',         farbe:'#4e6b52' },
@@ -751,7 +830,7 @@ const BEREICHE = [
    und trägt auf der Checkliste ein → statt eines zweiten Eintrags.
    zielId: nur für Aktivitäten OHNE Plan sinnvoll — Planaktivitäten
    zahlen mittelbar über ihren Plan ein und stünden sonst doppelt.       */
-const AKTIVITAETEN = [
+const SAAT_AKTIVITAETEN = [
   { id:1,  t:'Folien für CCD-Highlight fertigstellen', b:'b1', prio:'A', min:45,  wer:'',        beginn:'10.08.', ende:'18.08.', glyph:'•', heute:true, planId:'p1', zielId:null },
   { id:2,  t:'Angebot von Nille prüfen',               b:'b1', prio:'A', min:30,  wer:'',        beginn:'',       ende:'14.08.', glyph:'•', heute:true, planId:'p1', zielId:null },
   { id:3,  t:'Wartungsfenster abstimmen',              b:'b2', prio:'B', min:30,  wer:'Netzwerk',beginn:'',       ende:'21.08.', glyph:'•', heute:true, planId:'p2', zielId:null },
@@ -773,7 +852,7 @@ const AKTIVITAETEN = [
    Händisch erfasst — kein Import, bewusst.                              */
 /* Termin: t, tag, von, bis, ganztags, ort — händisch erfasst.
    106/108 überschneiden sich bewusst: 16:00–17:00 gegen 16:30–17:30.   */
-const TERMINE = [
+const SAAT_TERMINE = [
   { id:101, tag:0, von:'09:00', bis:'09:45', ganztags:false, ort:'Raum 2.14', t:'Abstimmung Migration' },
   { id:102, tag:0, von:'14:00', bis:'15:00', ganztags:false, ort:'Teams',     t:'Jour fixe Team' },
   { id:103, tag:1, von:'10:00', bis:'11:30', ganztags:false, ort:'Bamberg',   t:'CCD Lenkungskreis' },
@@ -798,7 +877,7 @@ const JT_ARTEN = {
   termin:      { n:'Termin',       f:'#900c24' },
   feiertag:    { n:'Feiertag',     f:'#8c857a' },
 };
-const JAHRESTERMINE = [
+const SAAT_JAHRESTERMINE = [
   { id:501, t:'Urlaub Nordsee',       von:'2026-08-17', bis:'2026-08-30', ort:'',         art:'urlaub' },
   { id:502, t:'Betriebsversammlung',  von:'2026-09-14', bis:'2026-09-14', ort:'Werk 2',   art:'termin' },
   { id:503, t:'Barcelona',            von:'2026-12-28', bis:'2027-01-04', ort:'',         art:'urlaub' },
@@ -885,7 +964,7 @@ function ferienAn(iso) {
 }
 
 /* Wiederkehrend: t, b, min, muster, tage[], log{}                        */
-const WIEDER = [
+const SAAT_WIEDER = [
   { id:201, t:'Rudern — 20 Minuten',      b:'b3', min:20, muster:'täglich',     tage:[0,1,2,3,4,5,6], log:{0:'✕',1:'✕',2:'•'}, zielId:null },
   { id:202, t:'Ablage leeren',            b:'b5', min:15, muster:'Mo · Mi · Fr', tage:[0,2,4],        log:{0:'✕',2:'•'},       zielId:'z1' },
   { id:203, t:'Tag und Gewohnheiten reflektieren', b:'b5', min:15, muster:'täglich', tage:[0,1,2,3,4,5,6], log:{0:'✕',1:'–',2:'•'}, zielId:null, fuehrtZu:'gew' },
@@ -896,7 +975,7 @@ const WIEDER = [
 
 
 /* Gewohnheit: t, ziel, soll, tage[], log{} — Quote statt Rhythmus        */
-const GEWOHNHEIT = [
+const SAAT_GEWOHNHEIT = [
   { id:301, t:'Ernährung im Rahmen',    ziel:'täglich',      soll:7, tage:[0,1,2,3,4,5,6], log:{0:'✕',1:'✕',2:'•'}, zielId:null },
   { id:302, t:'Bewegung und Sport',     ziel:'5× pro Woche', soll:5, tage:[0,1,2,3,4,5,6], log:{0:'✕',1:'–',2:'•'}, zielId:'z2' },
   { id:303, t:'Kein Handy nach 22 Uhr', ziel:'täglich',      soll:7, tage:[0,1,2,3,4,5,6], log:{0:'✕',1:'✕',2:'•'}, zielId:null },
@@ -910,7 +989,7 @@ const GEWOHNHEIT = [
    (optional, nur in der Übersicht sichtbar), archiviert.
    Die früheren schritte[] entfallen: Planinhalt sind Aktivitäten mit
    planId — sonst gäbe es zwei konkurrierende Mechanismen.              */
-const PLAENE = [
+const SAAT_PLAENE = [
   { id:'p1', t:'CCD-Highlight vorbereiten', b:'b1', zielId:'z1',
     zieldatum:'31.08.2026', archiviert:false,
     beschreibung:['Foliensatz und Kennzahlen für den Lenkungskreis, abgestimmt mit QS.',
@@ -940,7 +1019,7 @@ const PLAENE = [
    auseinander.
    start und frist spannen die Laufzeit auf — beide TT.MM.JJJJ. start ist
    Pflicht und wird bei Anlage mit dem heutigen Tag vorbelegt.           */
-const ZIELE = [
+const SAAT_ZIELE = [
   { id:'z1', t:'CCD produktiv bis Jahresende', b:'b1', start:'01.03.2026', frist:'31.12.2026', archiviert:false,
     zustand:['Alle Fachbereiche arbeiten produktiv im CCD, Altsystem abgeschaltet.',
              'Ohne produktives CCD bleibt die Migration Stückwerk.'],
@@ -958,7 +1037,7 @@ const ZIELE = [
 
 
 /* Notiz: nr, t, art, b, datum, seiten, quelle                            */
-const NOTIZEN = [
+const SAAT_NOTIZEN = [
   { id:401, nr:1, t:'Lenkungskreis CCD',         art:'hand',    b:'b1', datum:'11.08.2026', seiten:2, quelle:'Move · Notizen_KW33.pdf' },
   { id:402, nr:3, t:'Migration — Abhängigkeiten',art:'mindmap', b:'b2', datum:'12.08.2026', seiten:1, quelle:'Move · Mindmap_Migration.png' },
   { id:403, nr:4, t:'Gespräch Nille',            art:'hand',    b:'b1', datum:'13.08.2026', seiten:1, quelle:'Move · Notizen_KW33.pdf' },
@@ -977,7 +1056,7 @@ const NOTIZEN = [
      Eintrag: id, tag (0 = Montag … 6 = Sonntag), glyph, zeit,
               t | refArt+refId
      zeit bleibt leer, wenn der Eintrag kein Termin ist.                */
-const WOCHENBLAETTER = [
+const SAAT_WOCHENBLAETTER = [
   { montag: '2026-08-17',
     eintraege: [
       { id:801, tag:0, glyph:'✕', zeit:'09:00', t:'Abstimmung Migration' },
@@ -997,7 +1076,7 @@ const WOCHENBLAETTER = [
 let wocheOffen = '2026-08-17';   // Montag der angezeigten Woche
 
 /* Kontakt: nur Tag und Text. Anrufe und Mails brauchen nicht mehr.     */
-const KONTAKTE = [
+const SAAT_KONTAKTE = [
   { id:601, tag:2, t:'Nille wegen Angebot zurückrufen', glyph:'•' },
   { id:602, tag:2, t:'Mail an QS — Termin Abstimmung',  glyph:'✕' },
 ];
@@ -1005,7 +1084,7 @@ const KONTAKTE = [
 /* Der Tag trägt drei Dinge: die wichtigste Aufgabe, das Motto oben und
    die Reflexion unten. Motto und Reflexion sind Arrays fester Länge —
    leere Zeilen sind der Normalfall und bleiben leer.                   */
-const TAG = {
+const SAAT_TAG = {
   wichtigste: 1,
   motto: ['Erst die Folien, dann alles andere.', ''],
   reflexion: ['', '', ''],
@@ -1025,7 +1104,7 @@ const TAG = {
    blätterst hin und zurück, alte Blätter bleiben stehen. Rekonstruieren
    liesse sich ohnehin nur der Verweisteil; Reflexion und frei
    geschriebene Zeilen stehen nirgends sonst.                           */
-const MONATSBLAETTER = [
+const SAAT_MONATSBLAETTER = [
   { jahr:2026, monat:7,
     ereignisse: [
       { id:691, tag:3,  glyph:'✕', t:'Sommerfest Abteilung' },
@@ -1053,6 +1132,75 @@ const MONATSBLAETTER = [
 ];
 let monatOffen = '2026-08';   // Jahr und Monat des angezeigten Blattes
 
+/* Frisch aufgesetzter Bestand — nur beim ersten Start verwendet */
+function saatDB() {
+  return {
+    version: DB_VERSION,
+    bereiche:      SAAT_BEREICHE,
+    aktivitaeten:  SAAT_AKTIVITAETEN,
+    termine:       SAAT_TERMINE,
+    jahrestermine: SAAT_JAHRESTERMINE,
+    wieder:        SAAT_WIEDER,
+    gewohnheiten:  SAAT_GEWOHNHEIT,
+    plaene:        SAAT_PLAENE,
+    ziele:         SAAT_ZIELE,
+    notizen:       SAAT_NOTIZEN,
+    wochenblaetter: SAAT_WOCHENBLAETTER,
+    monatsblaetter: SAAT_MONATSBLAETTER,
+    kontakte:      SAAT_KONTAKTE,
+    tag:           SAAT_TAG,
+    naechsteId:    900,
+  };
+}
+
+/* Der lebende Bestand. Die Alias-Namen darunter zeigen auf dieselben
+   Arrays; ein Neuladen ersetzt sie ueber dbUebernehmen().            */
+let DB = saatDB();
+let BEREICHE      = DB.bereiche;
+let AKTIVITAETEN  = DB.aktivitaeten;
+let TERMINE       = DB.termine;
+let JAHRESTERMINE = DB.jahrestermine;
+let WIEDER        = DB.wieder;
+let GEWOHNHEIT    = DB.gewohnheiten;
+let PLAENE        = DB.plaene;
+let ZIELE         = DB.ziele;
+let NOTIZEN       = DB.notizen;
+let WOCHENBLAETTER = DB.wochenblaetter;
+let MONATSBLAETTER = DB.monatsblaetter;
+let KONTAKTE      = DB.kontakte;
+let TAG           = DB.tag;
+
+function dbUebernehmen(neu) {
+  DB = migriereDB(neu);
+  BEREICHE      = DB.bereiche;
+  AKTIVITAETEN  = DB.aktivitaeten;
+  TERMINE       = DB.termine;
+  JAHRESTERMINE = DB.jahrestermine;
+  WIEDER        = DB.wieder;
+  GEWOHNHEIT    = DB.gewohnheiten;
+  PLAENE        = DB.plaene;
+  ZIELE         = DB.ziele;
+  NOTIZEN       = DB.notizen;
+  WOCHENBLAETTER = DB.wochenblaetter;
+  MONATSBLAETTER = DB.monatsblaetter;
+  KONTAKTE      = DB.kontakte;
+  TAG           = DB.tag;
+  neuId = DB.naechsteId || 900;
+}
+
+/* Fehlende Felder ergaenzen, statt an ihnen zu scheitern. Jede kuenftige
+   Schemaaenderung bekommt hier ihren eigenen Block.                   */
+function migriereDB(d) {
+  if (!d || typeof d !== 'object') { return saatDB(); }
+  const s = saatDB();
+  Object.keys(s).forEach(function (k) {
+    if (d[k] === undefined || d[k] === null) { d[k] = s[k]; }
+  });
+  if (!Array.isArray(d.bereiche) || !d.bereiche.length) { d.bereiche = s.bereiche; }
+  d.version = DB_VERSION;
+  return d;
+}
+
 const MONATE = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 const MONATE_LANG = ['Januar','Februar','März','April','Mai','Juni','Juli','August',
                      'September','Oktober','November','Dezember'];
@@ -1061,6 +1209,84 @@ const WOKURZ = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 const HEUTE_WT = 2;
 const HEUTE_ISO = '2026-08-19';
 const HEUTE_DMY = '19.08.2026';
+
+/* ═══════════════════════════════════════════════════════════════════
+   SPEICHER — IndexedDB
+   Liegt im App-eigenen Speicher, ist beim Start sofort da und braucht
+   keine Dateiauswahl. Bewusst nicht OPFS: dessen Schreibpfad ist in
+   Safari erst spaet und unvollstaendig gelandet, IndexedDB laeuft dort
+   seit Jahren zuverlaessig, auch als Home-Bildschirm-App.
+   ═══════════════════════════════════════════════════════════════════ */
+const SP_NAME = 'timeassist';
+const SP_STORE = 'daten';
+const SP_KEY = 'db';
+let spDatenbank = null;
+let spZustand = 'unbekannt';   // 'bereit' | 'fehler' | 'fluechtig'
+let spFehler = '';
+
+function spOeffnen() {
+  return new Promise(function (fertig, fehl) {
+    if (spDatenbank) { fertig(spDatenbank); return; }
+    if (!window.indexedDB) { fehl(new Error('IndexedDB nicht verfügbar')); return; }
+    const a = indexedDB.open(SP_NAME, 1);
+    a.onupgradeneeded = function () {
+      const d = a.result;
+      if (!d.objectStoreNames.contains(SP_STORE)) { d.createObjectStore(SP_STORE); }
+    };
+    a.onsuccess = function () { spDatenbank = a.result; fertig(spDatenbank); };
+    a.onerror = function () { fehl(a.error || new Error('IndexedDB-Fehler')); };
+  });
+}
+function spLesen() {
+  return spOeffnen().then(function (d) {
+    return new Promise(function (fertig, fehl) {
+      const t = d.transaction(SP_STORE, 'readonly').objectStore(SP_STORE).get(SP_KEY);
+      t.onsuccess = function () { fertig(t.result || null); };
+      t.onerror = function () { fehl(t.error); };
+    });
+  });
+}
+function spSchreiben(wert) {
+  return spOeffnen().then(function (d) {
+    return new Promise(function (fertig, fehl) {
+      const tx = d.transaction(SP_STORE, 'readwrite');
+      tx.objectStore(SP_STORE).put(wert, SP_KEY);
+      tx.oncomplete = function () { fertig(true); };
+      tx.onerror = function () { fehl(tx.error); };
+    });
+  });
+}
+
+/* Gespeichert wird gebuendelt kurz nach der letzten Aenderung, nicht bei
+   jedem Tastendruck — sonst schreibt die App im Sekundentakt.        */
+let spTimer = null;
+let spOffen = false;
+function speichern() {
+  spOffen = true;
+  clearTimeout(spTimer);
+  spTimer = setTimeout(function () {
+    DB.naechsteId = neuId;
+    DB.version = DB_VERSION;
+    spSchreiben(JSON.parse(JSON.stringify(DB))).then(function () {
+      spOffen = false;
+      spZustand = 'bereit';
+      spStandZeigen();
+    }).catch(function (e) {
+      spOffen = false;
+      spZustand = 'fehler';
+      spFehler = String(e && e.message ? e.message : e);
+      spStandZeigen();
+    });
+  }, 400);
+}
+function spStandZeigen() {
+  const e = $('spstand');
+  if (!e) { return; }
+  e.className = 'sp-punkt ' + spZustand;
+  e.title = spZustand === 'bereit' ? 'Lokal gespeichert'
+          : spZustand === 'fehler' ? 'Speichern fehlgeschlagen: ' + spFehler
+          : 'Daten liegen nur im Arbeitsspeicher';
+}
 
 /* ═══ HILFEN ═══ */
 const $ = id => document.getElementById(id);
@@ -1218,7 +1444,7 @@ function kopf(titel, sub, akt) {
   $('bk-sub').textContent = sub || '';
   $('bk-akt').innerHTML = akt || '';
   $('bf-nr').textContent = formNr();
-  $('bf-mitte').textContent = 'TimeAssist ' + APP_VERSION + ' \u00b7 Mockup M8.1';
+  $('bf-mitte').textContent = 'TimeAssist ' + APP_VERSION;
   /* bf-rechts traegt den Massstab, gesetzt in skaliere() */
   skaliere();
 }
@@ -1813,105 +2039,16 @@ function wocheLoeschen(id) {
   editZelle = null;
   renderAlles();
 }
-function wocheNeu(tag, feld) {
-  wocheAufraeumen();
-  const b = wocheBlatt();
-  const e = { id:naechsteId(), glyph:'\u2022', zeit:'', t:'' };
-  if (tag >= 0) { e.tag = tag; b.eintraege.push(e); }
-  else { b.wichtig.push(e); }
-  editZelle = { art:'woche', id:e.id, feld:feld || 'zeit' };
-  fokusZiel = 'ez';
-  renderAlles();
-}
-function wocheAufraeumen() {
-  const schonen = editZelle ? editZelle.id : null;
-  const b = wocheBlatt();
-  [b.eintraege, b.wichtig].forEach(function (liste) {
-    for (let i = liste.length - 1; i >= 0; i--) {
-      const e = liste[i];
-      if (!e.refArt && !e.t && e.id !== schonen) { liste.splice(i, 1); }
-    }
-  });
-}
-function wocheSchreiben() {
-  if (!editZelle || editZelle.art !== 'woche') { return; }
-  const e = wocheFinde(editZelle.id);
-  const f = $('ez');
-  if (e && f) { e[editZelle.feld] = f.value.trim(); }
-}
-function wocheSchliessen(sofort) {
-  wocheSchreiben();
-  if (sofort) { editZelle = null; wocheAufraeumen(); renderAlles(); return; }
-  const merk = editZelle;
-  setTimeout(function () {
-    if (editZelle === merk) { editZelle = null; wocheAufraeumen(); renderAlles(); }
-  }, 120);
-}
-function wocheTaste(ev, tag) {
-  if (ev.key === 'Escape') { ev.preventDefault(); editZelle = null; wocheAufraeumen(); renderAlles(); }
-  /* Tab im Zeitfeld springt in den Text derselben Zeile — erst danach
-     beginnt eine neue Zeile.                                          */
-  if (ev.key === 'Tab' && editZelle && editZelle.feld === 'zeit') {
-    ev.preventDefault();
-    wocheSchreiben();
-    wocheOeffnen(editZelle.id, 't');
-    return;
-  }
-  if (ev.key === 'Enter' || ev.key === 'Tab') {
-    ev.preventDefault();
-    wocheSchreiben();
-    const leer = !$('ez') || !$('ez').value.trim();
-    editZelle = null;
-    wocheAufraeumen();
-    if (leer) { renderAlles(); } else { wocheNeu(tag, 'zeit'); }
-  }
-}
-function wocheOeffnen(id, feld) {
-  wocheAufraeumen();
-  editZelle = { art:'woche', id:id, feld:feld || 't' };
-  fokusZiel = 'ez';
-  renderAlles();
-}
 function wocheZeile(e) {
   const info = wocheText(e);
   const g = wocheGlyph(e);
-  const tag = (typeof e.tag === 'number' ? e.tag : -1);
   const kreuz = '<button class="mon-x" onclick="event.stopPropagation(); ' +
                 'wocheLoeschen(' + e.id + ')" title="Eintrag l\u00f6schen">\u00d7</button>';
-  const offen = function (feld) {
-    return editZelle && editZelle.art === 'woche' && editZelle.id === e.id &&
-           editZelle.feld === feld;
-  };
-  /* Zeit nur bei frei geschriebenen Eintraegen — ein Verweis traegt
-     seine Angaben in seinem eigenen Bestand.                          */
-  let zeit = '';
-  if (!e.refArt) {
-    if (offen('zeit')) {
-      zeit = '<span class="wo-zeit mon-offen"><input class="zf" id="ez" value="' +
-        esc(e.zeit || '') + '" placeholder="hh:mm" inputmode="numeric" ' +
-        'onblur="wocheSchliessen()" onkeydown="wocheTaste(event,' + tag + ')"></span>';
-    } else {
-      zeit = '<span class="wo-zeit" onclick="event.stopPropagation(); wocheOeffnen(' +
-        e.id + ',\'zeit\')">' + esc(e.zeit || '') + '</span>';
-    }
-  } else {
-    zeit = '<span class="wo-zeit"></span>';
-  }
-
-  let text;
-  if (offen('t')) {
-    text = '<span class="mon-t2 mon-offen"><input class="zf" id="ez" value="' +
-      esc(info.t) + '" placeholder="Termin, Notiz oder Vorhaben" ' +
-      'onblur="wocheSchliessen()" onkeydown="wocheTaste(event,' + tag + ')"></span>';
-  } else {
-    const klick = e.refArt ? '' :
-      ' onclick="event.stopPropagation(); wocheOeffnen(' + e.id + ',\'t\')"';
-    text = '<span class="mon-t2 ' + titelKlasse({ glyph:g }) + '"' + klick + '>' +
-      esc(info.t) + '</span>';
-  }
-
-  return '<div class="mon-e">' + hakFeld(g, 'wocheGlyphWeiter(' + e.id + ')') +
-    zeit + text +
+  const zeit = '<span class="wo-zeit">' + esc(e.refArt ? '' : (e.zeit || '')) + '</span>';
+  return '<div class="mon-e">' + hakFeld(g, 'wocheGlyphWeiter(' + e.id + ')') + zeit +
+    '<span class="mon-t2 ' + titelKlasse({ glyph:g }) +
+    '" onclick="event.stopPropagation(); eintragOeffnen(\'woche\',' +
+    (typeof e.tag === 'number' ? e.tag : -1) + ',' + e.id + ')">' + esc(info.t) + '</span>' +
     (info.herkunft ? '<span class="mon-herkunft">' + esc(info.herkunft) + '</span>' : '') +
     kreuz + '</div>';
 }
@@ -1940,7 +2077,7 @@ function blattWoche() {
     const heute = (iso === HEUTE_ISO);
     h += '<div class="wo-t ' + (d >= 5 ? 'we' : '') + ' ' + (heute ? 'heute' : '') + '">' +
       '<span class="wo-nr">' + WOTAGE[d] + '<div class="wo-dat">' + jtKurz(iso) + '</div></span>' +
-      '<span class="wo-inhalt" onclick="wocheNeu(' + d + ')">' +
+      '<span class="wo-inhalt" onclick="eintragOeffnen(\'woche\',' + d + ',null)">' +
       (proTag[d] || []).map(wocheZeile).join('') + '</span>' +
       '<button class="wo-plus" onclick="event.stopPropagation(); wocheWahl(' + d + ')" ' +
       'title="Vorhandenes auf diesen Tag legen">+</button></div>';
@@ -1950,7 +2087,7 @@ function blattWoche() {
   h += b.wichtig.map(wocheZeile).join('');
   for (let i = 0; i < 2; i++) {
     h += '<div class="mon-t"><span class="mon-nr"></span>' +
-         '<span class="mon-inhalt" onclick="wocheNeu(-1)"></span></div>';
+         '<span class="mon-inhalt" onclick="eintragOeffnen(\'woche\',-1,null)"></span></div>';
   }
   h += '</div>';
 
@@ -2802,77 +2939,19 @@ function monatGlyph(id) {
   e.glyph = naechsterGlyph(e.glyph);
   renderAlles();
 }
-function monatNeu(tag) {
-  monatAufraeumen();
-  const b = monatBlatt();
-  const e = { id:naechsteId(), glyph:'\u2022', t:'' };
-  if (tag > 0) { e.tag = tag; b.ereignisse.push(e); }
-  else { b.vorhaben.push(e); }
-  editZelle = { art:'monat', id:e.id, feld:'t' };
-  fokusZiel = 'ez';
-  renderAlles();
-}
-function monatAufraeumen() {
-  const schonen = editZelle ? editZelle.id : null;
-  const b = monatBlatt();
-  [b.ereignisse, b.vorhaben].forEach(function (liste) {
-    for (let i = liste.length - 1; i >= 0; i--) {
-      const e = liste[i];
-      if (!e.refArt && !e.t && e.id !== schonen) { liste.splice(i, 1); }
-    }
-  });
-}
-function monatSchreiben() {
-  if (!editZelle || editZelle.art !== 'monat') { return; }
-  const e = monatFinde(editZelle.id);
-  const f = $('ez');
-  if (e && f) { e.t = f.value.trim(); }
-}
-function monatSchliessen(sofort) {
-  monatSchreiben();
-  if (sofort) { editZelle = null; monatAufraeumen(); renderAlles(); return; }
-  const merk = editZelle;
-  setTimeout(function () {
-    if (editZelle === merk) { editZelle = null; monatAufraeumen(); renderAlles(); }
-  }, 120);
-}
-function monatTaste(ev, tag) {
-  if (ev.key === 'Escape') { ev.preventDefault(); editZelle = null; monatAufraeumen(); renderAlles(); }
-  if (ev.key === 'Enter' || ev.key === 'Tab') {
-    ev.preventDefault();
-    monatSchreiben();
-    const leer = !$('ez') || !$('ez').value.trim();
-    editZelle = null;
-    monatAufraeumen();
-    if (leer) { renderAlles(); } else { monatNeu(tag); }
-  }
-}
 function monatEintragZeile(e) {
   const info = monatText(e);
   const kreuz = '<button class="mon-x" onclick="event.stopPropagation(); ' +
                 'monatLoeschen(' + e.id + ')" title="Eintrag l\u00f6schen">\u00d7</button>';
-  if (editZelle && editZelle.art === 'monat' && editZelle.id === e.id) {
-    return '<div class="mon-e">' + hakFeld(e.glyph, 'monatGlyph(' + e.id + ')') +
-      '<span class="mon-t2 mon-offen"><input class="zf" id="ez" value="' + esc(info.t) +
-      '" placeholder="Eintrag" onblur="monatSchliessen()" onkeydown="monatTaste(event,' +
-      (e.tag || 0) + ')"></span>' + kreuz + '</div>';
-  }
-  const klick = e.refArt ? '' :
-    ' onclick="event.stopPropagation(); monatOeffnen(' + e.id + ')"';
   return '<div class="mon-e">' + hakFeld(e.glyph, 'monatGlyph(' + e.id + ')') +
-    '<span class="mon-t2 ' + titelKlasse(e) + '"' + klick + '>' + esc(info.t) +
+    '<span class="mon-t2 ' + titelKlasse(e) +
+    '" onclick="event.stopPropagation(); eintragOeffnen(\'monat\',' +
+    (e.tag || 0) + ',' + e.id + ')">' + esc(info.t) +
     (info.zusatz ? ' <span class="mon-herkunft">' + esc(info.zusatz) + '</span>' : '') +
     '</span>' +
     (info.herkunft ? '<span class="mon-herkunft">' + esc(info.herkunft) + '</span>' : '') +
     kreuz + '</div>';
 }
-function monatOeffnen(id) {
-  monatAufraeumen();
-  editZelle = { art:'monat', id:id, feld:'t' };
-  fokusZiel = 'ez';
-  renderAlles();
-}
-
 function blattMonat() {
   const b = monatBlatt();
   const tage = monatTage();
@@ -2907,7 +2986,7 @@ function blattMonat() {
       h += '<div class="mon-t ' + (we ? 'we ' : '') + (heute ? 'heute ' : '') +
         (fer ? 'ferien' : '') + '">' +
         '<span class="mon-nr">' + String(t).padStart(2, '0') + ' ' + WOKURZ[wt] + '</span>' +
-        '<span class="mon-inhalt" onclick="monatNeu(' + t + ')">' +
+        '<span class="mon-inhalt" onclick="eintragOeffnen(\'monat\',' + t + ',null)">' +
         (fei ? '<div class="mon-fei">' + esc(fei) + '</div>' : '') +
         (proTag[t] || []).map(monatEintragZeile).join('') + '</span></div>';
     }
@@ -2921,7 +3000,7 @@ function blattMonat() {
   h += b.vorhaben.map(monatEintragZeile).join('');
   for (let i = 0; i < 2; i++) {
     h += '<div class="mon-t"><span class="mon-nr"></span>' +
-         '<span class="mon-inhalt" onclick="monatNeu(0)"></span></div>';
+         '<span class="mon-inhalt" onclick="eintragOeffnen(\'monat\',0,null)"></span></div>';
   }
   h += '</div>';
 
@@ -3321,6 +3400,181 @@ function jtLoeschen(still) {
   renderAlles();
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   EINTRAGSDIALOG für Wochen- und Monatsblatt
+   Die Zeile allein sagt nicht, ob ein Termin, eine Aufgabe oder eine
+   Notiz gemeint ist. Der Dialog fragt es und blendet nur die Felder
+   ein, die zur gewählten Art gehören.
+   ═══════════════════════════════════════════════════════════════════ */
+let edKontext = null;   // { blatt, id, art, tag, titel, zeit }
+
+function eintragOeffnen(blatt, tag, id) {
+  let e = null;
+  if (id) { e = (blatt === 'woche') ? wocheFinde(id) : monatFinde(id); }
+  let art;
+  if (e && e.refArt) { art = 'verweis'; }
+  else if (blatt === 'woche') { art = (e && e.zeit) ? 'termin' : (e ? 'notiz' : 'termin'); }
+  else { art = (e && typeof e.tag === 'number' && e.tag > 0) ? 'ereignis'
+                                                            : (e ? 'vorhaben' : 'ereignis'); }
+  if (blatt === 'monat' && !e) { art = tag > 0 ? 'ereignis' : 'vorhaben'; }
+  edKontext = {
+    blatt: blatt,
+    id: id || null,
+    art: art,
+    tag: (e && typeof e.tag === 'number') ? e.tag : tag,
+    titel: e ? (e.refArt ? (blatt === 'woche' ? wocheText(e).t : monatText(e).t) : (e.t || '')) : '',
+    zeit: e ? (e.zeit || '') : '',
+  };
+  eintragRender();
+  $('eintrag').classList.add('auf');
+  setTimeout(function () { const f = $('ed-titel'); if (f && edKontext.art !== 'verweis') { f.focus(); } }, 60);
+}
+function eintragArt(a) {
+  eintragMerken();
+  edKontext.art = a;
+  if (edKontext.blatt === 'monat') {
+    /* Ein Vorhaben trägt bewusst keinen Tag */
+    if (a === 'vorhaben') { edKontext.tag = 0; }
+    else if (edKontext.tag < 1) { edKontext.tag = 1; }
+  }
+  eintragRender();
+}
+function eintragTag(t) { eintragMerken(); edKontext.tag = t; eintragRender(); }
+function eintragMerken() {
+  const f = $('ed-titel'); if (f) { edKontext.titel = f.value; }
+  const z = $('ed-zeit');  if (z) { edKontext.zeit = z.value.trim(); }
+  const m = $('ed-mtag');  if (m) { edKontext.tag = parseInt(m.value, 10) || edKontext.tag; }
+}
+function eintragRender() {
+  const k = edKontext;
+  const woche = (k.blatt === 'woche');
+  $('eintrag-titel').textContent = (k.id ? 'Eintrag bearbeiten' : 'Neuer Eintrag') +
+    (woche ? ' \u00b7 Woche' : ' \u00b7 Monat');
+  $('eintrag-loeschen').style.display = k.id ? '' : 'none';
+
+  let h = '';
+  if (k.art === 'verweis') {
+    h += '<div class="ed-l">Verweis</div><input class="ed-f" value="' + esc(k.titel) +
+      '" disabled>';
+    h += '<div class="ed-hin">Dieser Eintrag verweist auf einen anderen Bestand. ' +
+      'Titel und Zustand werden dort gepflegt \u2014 hier l\u00e4sst sich nur der Tag ' +
+      '\u00e4ndern oder der Verweis entfernen.</div>';
+  } else {
+    const arten = woche
+      ? [['termin', 'Termin'], ['aufgabe', 'Aufgabe'], ['notiz', 'Notiz']]
+      : [['ereignis', 'Ereignis'], ['vorhaben', 'Vorhaben']];
+    h += '<div class="ed-l">Was ist es?</div><div class="ed-art">';
+    h += arten.map(function (a) {
+      return '<button class="ed-a ' + (k.art === a[0] ? 'aktiv' : '') +
+        '" onclick="eintragArt(\'' + a[0] + '\')">' + a[1] + '</button>';
+    }).join('') + '</div>';
+
+    h += '<div class="ed-l">Bezeichnung</div>';
+    if (k.art === 'termin') {
+      h += '<div class="ed-zeile">' +
+        '<input class="ed-f" id="ed-zeit" value="' + esc(k.zeit) +
+        '" placeholder="hh:mm" inputmode="numeric" style="width:88px;flex:0 0 88px">' +
+        '<input class="ed-f" id="ed-titel" value="' + esc(k.titel) +
+        '" placeholder="Worum geht es?"></div>';
+    } else {
+      h += '<input class="ed-f" id="ed-titel" value="' + esc(k.titel) +
+        '" placeholder="Worum geht es?">';
+    }
+    if (k.art === 'aufgabe') {
+      h += '<div class="ed-hin">Eine Aufgabe wird als echte Aktivit\u00e4t angelegt und ' +
+        'steht danach auch in der Checkliste. Der Eintrag hier ist ein Verweis darauf \u2014 ' +
+        'einmal abhaken gen\u00fcgt.</div>';
+    }
+  }
+
+  const ohneTag = (!woche && k.art === 'vorhaben');
+  if (!ohneTag) {
+    h += '<div class="ed-l">' + (woche ? 'Welcher Tag?' : 'Welcher Tag im Monat?') + '</div>';
+    if (woche) {
+      h += '<div class="ed-tage">';
+      for (let d = 0; d < 7; d++) {
+        h += '<button class="ed-t ' + (k.tag === d ? 'aktiv' : '') +
+          '" onclick="eintragTag(' + d + ')">' + WOKURZ[d] + '</button>';
+      }
+      h += '<button class="ed-t ' + (k.tag === -1 ? 'aktiv' : '') +
+        '" onclick="eintragTag(-1)">ohne</button></div>';
+    } else {
+      h += '<input class="ed-f" id="ed-mtag" value="' + (k.tag > 0 ? k.tag : 1) +
+        '" inputmode="numeric" style="width:88px">';
+    }
+  }
+
+  if (!k.id) {
+    h += '<div class="ed-zu" onclick="eintragZuordnen()">Stattdessen Vorhandenes ' +
+      'zuordnen \u2026</div>';
+  }
+  $('eintrag-inhalt').innerHTML = h;
+}
+function eintragZu() { $('eintrag').classList.remove('auf'); edKontext = null; }
+function eintragZuordnen() {
+  const k = edKontext;
+  const blatt = k.blatt, tag = k.tag;
+  eintragZu();
+  if (blatt === 'woche') { wocheWahl(tag >= 0 ? tag : -1); }
+  else { wahlAuf(k.art === 'vorhaben' ? 'vorhaben' : 'ereignis'); }
+}
+function eintragLoeschen() {
+  const k = edKontext;
+  if (!k || !k.id) { return; }
+  if (k.blatt === 'woche') { wocheLoeschen(k.id); } else { monatLoeschen(k.id); }
+  eintragZu();
+}
+function eintragSpeichern() {
+  eintragMerken();
+  const k = edKontext;
+  const titel = (k.titel || '').trim();
+
+  if (k.art === 'verweis') {
+    const e = (k.blatt === 'woche') ? wocheFinde(k.id) : monatFinde(k.id);
+    if (e) {
+      if (k.blatt === 'woche') { if (k.tag >= 0) { e.tag = k.tag; } }
+      else if (k.tag > 0) { e.tag = k.tag; }
+    }
+    eintragZu(); renderAlles(); return;
+  }
+  if (!titel) { melde('Ohne Bezeichnung geht es nicht'); return; }
+
+  if (k.blatt === 'woche') {
+    const b = wocheBlatt();
+    let e = k.id ? wocheFinde(k.id) : null;
+    if (k.art === 'aufgabe' && !k.id) {
+      /* Eine Aufgabe entsteht als echte Aktivitaet; das Wochenblatt
+         traegt nur den Verweis darauf.                              */
+      const a = { id:naechsteId(), t:titel, b:BEREICHE[0].id, prio:'B', min:0, wer:'',
+                  beginn:'', ende:'', glyph:'\u2022', heute:false, planId:null, zielId:null };
+      AKTIVITAETEN.push(a);
+      e = { id:naechsteId(), refArt:'aktivitaet', refId:a.id };
+      if (k.tag >= 0) { e.tag = k.tag; b.eintraege.push(e); } else { b.wichtig.push(e); }
+      eintragZu(); renderAlles(); melde('Als Aktivit\u00e4t angelegt und verwiesen'); return;
+    }
+    if (!e) {
+      e = { id:naechsteId(), glyph:'\u2022', zeit:'', t:'' };
+      if (k.tag >= 0) { e.tag = k.tag; b.eintraege.push(e); } else { b.wichtig.push(e); }
+    } else if (k.tag >= 0 && typeof e.tag === 'number') { e.tag = k.tag; }
+    e.t = titel;
+    e.zeit = (k.art === 'termin') ? (k.zeit || '') : '';
+    eintragZu(); renderAlles(); return;
+  }
+
+  const b = monatBlatt();
+  let e = k.id ? monatFinde(k.id) : null;
+  if (!e) {
+    e = { id:naechsteId(), glyph:'\u2022', t:'' };
+    if (k.art === 'ereignis') { e.tag = Math.min(Math.max(k.tag, 1), monatTage());
+                                b.ereignisse.push(e); }
+    else { b.vorhaben.push(e); }
+  } else if (k.art === 'ereignis' && typeof e.tag === 'number') {
+    e.tag = Math.min(Math.max(k.tag, 1), monatTage());
+  }
+  e.t = titel;
+  eintragZu(); renderAlles();
+}
+
 /* ═══ ARCHIV (CMP 41) ═══════════════════════════════════════════════
    Archivierte Pläne werden nicht kopiert, sondern nur ausgeblendet.
    Von hier aus lassen sie sich öffnen und wieder aktivieren.
@@ -3398,6 +3652,10 @@ function renderAlles() {
   renderRegister();
   renderUnterreiter();
   renderBlatt();
+  spStandZeigen();
+  /* Gespeichert wird bei jeder Neuzeichnung. Das ist grob, aber
+     lueckenlos: es gibt keine Aenderung ohne anschliessendes Rendern. */
+  speichern();
 }
 
 /* ═══ EXPORT AN DEN MOVE ═══ */
@@ -3465,6 +3723,83 @@ function exportAuf() {
 }
 function exportZu() { $('export').classList.remove('auf'); }
 
+/* ═══ DATENVERWALTUNG ═══════════════════════════════════════════════
+   Der Notfallweg: eine Datei zum Herunterladen, eine zum Zurückspielen.
+   ═══════════════════════════════════════════════════════════════════ */
+function dbGroesse() {
+  try { return JSON.stringify(DB).length; } catch (e) { return 0; }
+}
+function datenAuf() {
+  const zaehlung = [
+    ['Bereiche', BEREICHE.length], ['Aktivitäten', AKTIVITAETEN.length],
+    ['Pläne', PLAENE.length], ['Ziele', ZIELE.length],
+    ['Jahrestermine', JAHRESTERMINE.length], ['Wiederkehrend', WIEDER.length],
+    ['Gewohnheiten', GEWOHNHEIT.length], ['Wochenblätter', WOCHENBLAETTER.length],
+    ['Monatsblätter', MONATSBLAETTER.length], ['Notizen', NOTIZEN.length],
+  ];
+  const zustand = spZustand === 'bereit' ? 'Lokal gespeichert'
+                : spZustand === 'fehler' ? 'Fehler: ' + spFehler
+                : 'Noch nichts geschrieben';
+  let h = '<div class="dt-z"><span class="dt-l">Speicher</span>' +
+    '<span class="dt-w">IndexedDB \u00b7 ' + esc(zustand) + '</span></div>' +
+    '<div class="dt-z"><span class="dt-l">Schemaversion</span>' +
+    '<span class="dt-w">' + DB_VERSION + '</span></div>' +
+    '<div class="dt-z"><span class="dt-l">Umfang</span>' +
+    '<span class="dt-w">' + Math.round(dbGroesse() / 1024) + ' kB</span></div>';
+  h += zaehlung.map(function (z) {
+    return '<div class="dt-z"><span class="dt-l">' + esc(z[0]) + '</span>' +
+      '<span class="dt-w">' + z[1] + '</span></div>';
+  }).join('');
+  h += '<div class="hinweis">Die Daten liegen im App-eigenen Speicher dieses ' +
+    'Ger\u00e4ts und sind beim Start sofort da. Der Export ist der Notfallweg \u2014 ' +
+    'er geh\u00f6rt regelm\u00e4\u00dfig in die Ablage.</div>';
+  $('daten-inhalt').innerHTML = h;
+  $('daten').classList.add('auf');
+}
+function datenZu() { $('daten').classList.remove('auf'); }
+
+function datenExport() {
+  DB.naechsteId = neuId;
+  const txt = JSON.stringify(DB, null, 2);
+  const d = new Date();
+  const name = 'timeassist_' + d.getFullYear() +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    String(d.getDate()).padStart(2, '0') + '_' +
+    String(d.getHours()).padStart(2, '0') +
+    String(d.getMinutes()).padStart(2, '0') + '.json';
+  const url = URL.createObjectURL(new Blob([txt], { type:'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  melde('Export erstellt: ' + name);
+}
+function datenImport(ev) {
+  const f = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if (!f) { return; }
+  const leser = new FileReader();
+  leser.onload = function () {
+    let neu;
+    try { neu = JSON.parse(leser.result); }
+    catch (e) { melde('Datei ist kein g\u00fcltiges JSON'); return; }
+    /* Ein unvollstaendiger Import darf den Bestand nicht zerlegen */
+    if (!neu || typeof neu !== 'object' || !Array.isArray(neu.aktivitaeten)) {
+      melde('Datei enth\u00e4lt keinen TimeAssist-Bestand');
+      return;
+    }
+    dbUebernehmen(neu);
+    datenZu();
+    renderAlles();
+    melde('Bestand geladen');
+  };
+  leser.onerror = function () { melde('Datei konnte nicht gelesen werden'); };
+  leser.readAsText(f);
+}
+
 /* ═══ SKALIERUNG DES GERÄTERAHMENS ═══ */
 function skaliere() {
   const g = $('geraet');
@@ -3484,7 +3819,20 @@ function skaliere() {
   skaliere();
   window.addEventListener('resize', skaliere);
   window.addEventListener('orientationchange', function () { setTimeout(skaliere, 250); });
-  renderAlles();
+
+  /* Erst den gespeicherten Bestand holen, dann zeichnen. Faellt der
+     Speicher aus, laeuft die App mit der Saat weiter — fluechtig, aber
+     bedienbar, und der Punkt im Datenknopf sagt es.                   */
+  spLesen().then(function (gespeichert) {
+    if (gespeichert) { dbUebernehmen(gespeichert); spZustand = 'bereit'; }
+    else { spZustand = 'bereit'; }
+    renderAlles();
+  }).catch(function (e) {
+    spZustand = 'fluechtig';
+    spFehler = String(e && e.message ? e.message : e);
+    renderAlles();
+    melde('Kein dauerhafter Speicher \u2014 Daten nur in dieser Sitzung');
+  });
 }());
 </script>
 </body>
