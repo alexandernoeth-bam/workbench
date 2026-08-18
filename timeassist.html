@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 0.23.0 · Mockup M7.2</title>
+<title>TimeAssist 0.26.0 · Mockup M8.1</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -434,6 +434,20 @@ input, textarea { font: inherit; color: inherit; }
               justify-content: center; font-size: 10.2px; color: #fff;
               overflow: hidden; pointer-events: none; }
 
+/* Ferientoenung und Feiertagsname im Monatsraster */
+.mon-t.ferien { background: #f0ebe1; }
+.mon-t.ferien.we { background: #e8e2d5; }
+.mon-fei { font-size: 10.2px; letter-spacing: .06em; color: var(--wein);
+           text-transform: uppercase; }
+
+/* Ferien als Toenung, Feiertag als Punkt — Hintergrund, kein Eintrag */
+.jt-tab td.ferien { background: #ece7dc; }
+.jt-tab td.ferien.we { background: #e3ddd0; }
+.jt-tab td.feiertag::before { content: ''; position: absolute; left: 2px; top: 2px;
+                              width: 4px; height: 4px; border-radius: 50%;
+                              background: var(--wein); z-index: 3; }
+.jt-fei { position: absolute; inset: 0; }
+
 /* Legende: die vollen Titel, die im Raster keinen Platz haben */
 .jt-leg { display: flex; align-items: center; gap: 9px; padding: 5px 2px;
           border-bottom: 1px solid var(--linie); }
@@ -467,10 +481,20 @@ input, textarea { font: inherit; color: inherit; }
 
 /* Tageswahl in der Auswahlliste */
 .wahl-tage { display: flex; gap: 3px; margin-top: 6px; }
-.wahl-d { min-width: 30px; height: 26px; border: 1px solid var(--linie);
+.wahl-d { min-width: 32px; height: 30px; border: 1px solid var(--linie);
           border-radius: 5px; background: var(--karte); font-size: 13.2px;
           color: var(--tinte-2); }
+.wahl-d.vor { border-color: var(--wein); color: var(--wein); font-weight: 700;
+              background: var(--wein-h); }
 .wahl-d:active { background: var(--wein); border-color: var(--wein); color: var(--papier); }
+/* Zeitspalte und Pluszeichen im Wochenblatt */
+.wo-zeit { flex: 0 0 44px; font-size: 13.2px; color: var(--leder);
+           font-variant-numeric: tabular-nums; cursor: pointer; }
+.wo-zeit.mon-offen { padding: 0 2px; }
+.wo-plus { flex: 0 0 26px; align-self: center; height: 26px; border-radius: 5px;
+           border: 1px solid var(--linie); background: var(--karte); color: var(--wein);
+           font-size: 16px; line-height: 1; }
+.wo-plus:active { background: var(--wein); border-color: var(--wein); color: var(--papier); }
 
 /* ── Planblatt (CMP 32) ───────────────────────────────────────────
    Zwei Kopfzeilen wie im gedruckten Satz, darunter die Aktivitaeten. */
@@ -545,6 +569,16 @@ input, textarea { font: inherit; color: inherit; }
 .zj-bal.frist { right: 3px; border-radius: 0 4px 4px 0; opacity: 1; }
 .zj-bal.frist::after { content: ''; position: absolute; right: 0; top: -5px; bottom: -5px;
                        width: 3px; background: var(--wein); border-radius: 2px; }
+
+/* Summierung je Art */
+.jt-sum { display: flex; align-items: center; gap: 9px; padding: 4px 2px;
+          border-bottom: 1px solid var(--linie-2); }
+.jt-sum-n { font-size: 12.6px; color: var(--tinte-3); font-variant-numeric: tabular-nums; }
+.jt-sum-t { flex: 0 0 74px; text-align: right; font-size: 13.2px; color: var(--leder);
+            font-variant-numeric: tabular-nums; }
+.jt-sum-g { border-bottom: none; border-top: 1.2px solid var(--wein); margin-top: 2px;
+            padding-top: 6px; font-weight: 700; }
+.jt-sum-g .jt-sum-t { color: var(--wein); }
 
 /* Laufzeitzeile auf dem Zielblatt */
 .zl-lauf { display: flex; align-items: center; gap: 8px; margin: 8px 0 2px; }
@@ -695,7 +729,7 @@ input, textarea { font: inherit; color: inherit; }
 <script>
 'use strict';
 
-const APP_VERSION = '0.23.0';
+const APP_VERSION = '0.26.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -757,10 +791,12 @@ const TERMINE = [
 /* Jahrestermin: t, von, bis, ort, art. Die Art faerbt den Balken —
    mehr Unterscheidung braucht das Blatt nicht.                         */
 const JT_ARTEN = {
-  urlaub:   { n:'Urlaub',   f:'#4e6b52' },
-  abwesend: { n:'Abwesend', f:'#7d6b53' },
-  termin:   { n:'Termin',   f:'#900c24' },
-  feiertag: { n:'Feiertag', f:'#8c857a' },
+  urlaub:      { n:'Urlaub',       f:'#4e6b52' },
+  krank:       { n:'Krank',        f:'#a8622c' },
+  dienstreise: { n:'Dienstreise',  f:'#3f5d73' },
+  abwesend:    { n:'Abwesend',     f:'#7d6b53' },
+  termin:      { n:'Termin',       f:'#900c24' },
+  feiertag:    { n:'Feiertag',     f:'#8c857a' },
 };
 const JAHRESTERMINE = [
   { id:501, t:'Urlaub Nordsee',       von:'2026-08-17', bis:'2026-08-30', ort:'',         art:'urlaub' },
@@ -769,8 +805,84 @@ const JAHRESTERMINE = [
   { id:504, t:'Messe Nürnberg',       von:'2026-03-10', bis:'2026-03-12', ort:'Nürnberg', art:'abwesend' },
   { id:505, t:'Osterferien',          von:'2026-04-03', bis:'2026-04-06', ort:'',         art:'feiertag' },
   { id:506, t:'Schulung Fachbereich', von:'2026-08-20', bis:'2026-08-20', ort:'Würzburg', art:'termin' },
+  { id:507, t:'Grippe',               von:'2026-02-09', bis:'2026-02-13', ort:'',         art:'krank' },
+  { id:508, t:'Kundentermin Hamburg', von:'2026-05-11', bis:'2026-05-13', ort:'Hamburg',  art:'dienstreise' },
+  { id:509, t:'Konferenz Berlin',     von:'2026-10-06', bis:'2026-10-08', ort:'Berlin',   art:'dienstreise' },
 ];
 let jahrOffen = 2026;
+let zeigeKalender = true;   // Feiertage und Ferien als Hintergrund
+
+/* ═══════════════════════════════════════════════════════════════════
+   FEIERTAGE UND SCHULFERIEN BAYERN — nur Anhaltspunkt, keine Einträge.
+   Sie sind nicht löschbar und zählen nicht in die Summierung: Sie
+   beantworten die Frage, warum eine Woche schwierig ist, mehr nicht.
+
+   Feiertage werden gerechnet, nicht gepflegt — die beweglichen folgen
+   dem Osterdatum (Formel nach Meeus), geprüft gegen 2024 bis 2030.
+   Ferien legt das Kultusministerium fest und müssen hinterlegt werden;
+   die Liste reicht bis Sommer 2027 (BayMBl. 2022 Nr. 747).
+   ═══════════════════════════════════════════════════════════════════ */
+function ostersonntag(jahr) {
+  const a = jahr % 19, b = Math.floor(jahr / 100), c = jahr % 100;
+  const d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const monat = Math.floor((h + l - 7 * m + 114) / 31);
+  const tag = ((h + l - 7 * m + 114) % 31) + 1;
+  return Date.UTC(jahr, monat - 1, tag);
+}
+function isoVon(ms) { return new Date(ms).toISOString().slice(0, 10); }
+function feiertageBayern(jahr) {
+  const o = ostersonntag(jahr);
+  const tg = 86400000;
+  const l = [
+    { d:isoVon(Date.UTC(jahr, 0, 1)),   t:'Neujahr' },
+    { d:isoVon(Date.UTC(jahr, 0, 6)),   t:'Heilige Drei Könige' },
+    { d:isoVon(o - 2 * tg),             t:'Karfreitag' },
+    { d:isoVon(o + 1 * tg),             t:'Ostermontag' },
+    { d:isoVon(Date.UTC(jahr, 4, 1)),   t:'Tag der Arbeit' },
+    { d:isoVon(o + 39 * tg),            t:'Christi Himmelfahrt' },
+    { d:isoVon(o + 50 * tg),            t:'Pfingstmontag' },
+    { d:isoVon(o + 60 * tg),            t:'Fronleichnam' },
+    { d:isoVon(Date.UTC(jahr, 7, 15)),  t:'Mariä Himmelfahrt' },
+    { d:isoVon(Date.UTC(jahr, 9, 3)),   t:'Tag der Deutschen Einheit' },
+    { d:isoVon(Date.UTC(jahr, 10, 1)),  t:'Allerheiligen' },
+    { d:isoVon(Date.UTC(jahr, 11, 25)), t:'1. Weihnachtstag' },
+    { d:isoVon(Date.UTC(jahr, 11, 26)), t:'2. Weihnachtstag' },
+  ];
+  return l;
+}
+const FERIEN_BAYERN = [
+  { t:'Weihnachtsferien', von:'2025-12-22', bis:'2026-01-05' },
+  { t:'Frühjahrsferien',  von:'2026-02-16', bis:'2026-02-20' },
+  { t:'Osterferien',      von:'2026-03-30', bis:'2026-04-10' },
+  { t:'Pfingstferien',    von:'2026-05-26', bis:'2026-06-05' },
+  { t:'Sommerferien',     von:'2026-08-03', bis:'2026-09-14' },
+  { t:'Herbstferien',     von:'2026-11-02', bis:'2026-11-06' },
+  { t:'Weihnachtsferien', von:'2026-12-24', bis:'2027-01-08' },
+  { t:'Frühjahrsferien',  von:'2027-02-08', bis:'2027-02-12' },
+  { t:'Osterferien',      von:'2027-03-22', bis:'2027-04-02' },
+  { t:'Pfingstferien',    von:'2027-05-18', bis:'2027-05-28' },
+  { t:'Sommerferien',     von:'2027-08-02', bis:'2027-09-13' },
+];
+/* Zwischenspeicher, damit die Formel nicht je Zelle neu läuft */
+const feiertagCache = {};
+function feiertagAn(iso) {
+  const jahr = parseInt(iso.slice(0, 4), 10);
+  if (!feiertagCache[jahr]) {
+    const m = {};
+    feiertageBayern(jahr).forEach(function (f) { m[f.d] = f.t; });
+    feiertagCache[jahr] = m;
+  }
+  return feiertagCache[jahr][iso] || null;
+}
+function ferienAn(iso) {
+  const f = FERIEN_BAYERN.find(x => iso >= x.von && iso <= x.bis);
+  return f ? f.t : null;
+}
 
 /* Wiederkehrend: t, b, min, muster, tage[], log{}                        */
 const WIEDER = [
@@ -862,17 +974,19 @@ const NOTIZEN = [
    Aktivitäten liegen als VERWEIS auf dem Blatt. Damit teilen Woche und
    Tag denselben Zustand: einmal abhaken genügt. Die Planungsabsicht
    bleibt trotzdem sichtbar, weil der Eintrag stehen bleibt.
-     Eintrag: id, tag (0 = Montag … 6 = Sonntag), glyph, t | refArt+refId */
+     Eintrag: id, tag (0 = Montag … 6 = Sonntag), glyph, zeit,
+              t | refArt+refId
+     zeit bleibt leer, wenn der Eintrag kein Termin ist.                */
 const WOCHENBLAETTER = [
   { montag: '2026-08-17',
     eintraege: [
-      { id:801, tag:0, glyph:'✕', t:'Abstimmung Migration, 9:00' },
-      { id:802, tag:1, glyph:'•', t:'CCD Lenkungskreis, 10:00' },
+      { id:801, tag:0, glyph:'✕', zeit:'09:00', t:'Abstimmung Migration' },
+      { id:802, tag:1, glyph:'•', zeit:'10:00', t:'CCD Lenkungskreis' },
       { id:803, tag:2, refArt:'aktivitaet', refId:1 },
       { id:804, tag:2, refArt:'aktivitaet', refId:2 },
       { id:805, tag:3, glyph:'•', refArt:'jahrestermin', refId:506 },
       { id:806, tag:4, refArt:'aktivitaet', refId:4 },
-      { id:807, tag:4, glyph:'•', t:'Wochenrückblick schreiben' },
+      { id:807, tag:4, glyph:'•', zeit:'', t:'Wochenrückblick schreiben' },
     ],
     wichtig: [
       { id:811, refArt:'aktivitaet', refId:3 },
@@ -1104,7 +1218,7 @@ function kopf(titel, sub, akt) {
   $('bk-sub').textContent = sub || '';
   $('bk-akt').innerHTML = akt || '';
   $('bf-nr').textContent = formNr();
-  $('bf-mitte').textContent = 'TimeAssist ' + APP_VERSION + ' \u00b7 Mockup M7.2';
+  $('bf-mitte').textContent = 'TimeAssist ' + APP_VERSION + ' \u00b7 Mockup M8.1';
   /* bf-rechts traegt den Massstab, gesetzt in skaliere() */
   skaliere();
 }
@@ -1175,6 +1289,13 @@ function titelKlasse(o) {
 function ganztagsEintraege() {
   const l = TERMINE.filter(t => t.tag === HEUTE_WT && t.ganztags)
     .map(function (t) { return { t:t.t, ort:t.ort, quelle:'' }; });
+  /* Feiertag und Ferien stehen als Anhaltspunkt oben mit im Band */
+  if (zeigeKalender) {
+    const fei = feiertagAn(HEUTE_ISO);
+    if (fei) { l.push({ t:fei, ort:'', quelle:'Feiertag' }); }
+    const fer = ferienAn(HEUTE_ISO);
+    if (fer) { l.push({ t:fer + ' (Bayern)', ort:'', quelle:'Ferien' }); }
+  }
   JAHRESTERMINE.forEach(function (j) {
     if (HEUTE_ISO >= j.von && HEUTE_ISO <= j.bis) {
       l.push({ t:j.t, ort:j.ort, quelle:'Jahrestermin' });
@@ -1692,13 +1813,13 @@ function wocheLoeschen(id) {
   editZelle = null;
   renderAlles();
 }
-function wocheNeu(tag) {
+function wocheNeu(tag, feld) {
   wocheAufraeumen();
   const b = wocheBlatt();
-  const e = { id:naechsteId(), glyph:'\u2022', t:'' };
+  const e = { id:naechsteId(), glyph:'\u2022', zeit:'', t:'' };
   if (tag >= 0) { e.tag = tag; b.eintraege.push(e); }
   else { b.wichtig.push(e); }
-  editZelle = { art:'woche', id:e.id, feld:'t' };
+  editZelle = { art:'woche', id:e.id, feld:feld || 'zeit' };
   fokusZiel = 'ez';
   renderAlles();
 }
@@ -1716,7 +1837,7 @@ function wocheSchreiben() {
   if (!editZelle || editZelle.art !== 'woche') { return; }
   const e = wocheFinde(editZelle.id);
   const f = $('ez');
-  if (e && f) { e.t = f.value.trim(); }
+  if (e && f) { e[editZelle.feld] = f.value.trim(); }
 }
 function wocheSchliessen(sofort) {
   wocheSchreiben();
@@ -1728,37 +1849,69 @@ function wocheSchliessen(sofort) {
 }
 function wocheTaste(ev, tag) {
   if (ev.key === 'Escape') { ev.preventDefault(); editZelle = null; wocheAufraeumen(); renderAlles(); }
+  /* Tab im Zeitfeld springt in den Text derselben Zeile — erst danach
+     beginnt eine neue Zeile.                                          */
+  if (ev.key === 'Tab' && editZelle && editZelle.feld === 'zeit') {
+    ev.preventDefault();
+    wocheSchreiben();
+    wocheOeffnen(editZelle.id, 't');
+    return;
+  }
   if (ev.key === 'Enter' || ev.key === 'Tab') {
     ev.preventDefault();
     wocheSchreiben();
     const leer = !$('ez') || !$('ez').value.trim();
     editZelle = null;
     wocheAufraeumen();
-    if (leer) { renderAlles(); } else { wocheNeu(tag); }
+    if (leer) { renderAlles(); } else { wocheNeu(tag, 'zeit'); }
   }
 }
-function wocheOeffnen(id) {
+function wocheOeffnen(id, feld) {
   wocheAufraeumen();
-  editZelle = { art:'woche', id:id, feld:'t' };
+  editZelle = { art:'woche', id:id, feld:feld || 't' };
   fokusZiel = 'ez';
   renderAlles();
 }
 function wocheZeile(e) {
   const info = wocheText(e);
   const g = wocheGlyph(e);
+  const tag = (typeof e.tag === 'number' ? e.tag : -1);
   const kreuz = '<button class="mon-x" onclick="event.stopPropagation(); ' +
                 'wocheLoeschen(' + e.id + ')" title="Eintrag l\u00f6schen">\u00d7</button>';
-  if (editZelle && editZelle.art === 'woche' && editZelle.id === e.id) {
-    return '<div class="mon-e">' + hakFeld(g, 'wocheGlyphWeiter(' + e.id + ')') +
-      '<span class="mon-t2 mon-offen"><input class="zf" id="ez" value="' + esc(info.t) +
-      '" placeholder="Eintrag" onblur="wocheSchliessen()" onkeydown="wocheTaste(event,' +
-      (typeof e.tag === 'number' ? e.tag : -1) + ')"></span>' + kreuz + '</div>';
+  const offen = function (feld) {
+    return editZelle && editZelle.art === 'woche' && editZelle.id === e.id &&
+           editZelle.feld === feld;
+  };
+  /* Zeit nur bei frei geschriebenen Eintraegen — ein Verweis traegt
+     seine Angaben in seinem eigenen Bestand.                          */
+  let zeit = '';
+  if (!e.refArt) {
+    if (offen('zeit')) {
+      zeit = '<span class="wo-zeit mon-offen"><input class="zf" id="ez" value="' +
+        esc(e.zeit || '') + '" placeholder="hh:mm" inputmode="numeric" ' +
+        'onblur="wocheSchliessen()" onkeydown="wocheTaste(event,' + tag + ')"></span>';
+    } else {
+      zeit = '<span class="wo-zeit" onclick="event.stopPropagation(); wocheOeffnen(' +
+        e.id + ',\'zeit\')">' + esc(e.zeit || '') + '</span>';
+    }
+  } else {
+    zeit = '<span class="wo-zeit"></span>';
   }
-  const klick = e.refArt ? '' :
-    ' onclick="event.stopPropagation(); wocheOeffnen(' + e.id + ')"';
+
+  let text;
+  if (offen('t')) {
+    text = '<span class="mon-t2 mon-offen"><input class="zf" id="ez" value="' +
+      esc(info.t) + '" placeholder="Termin, Notiz oder Vorhaben" ' +
+      'onblur="wocheSchliessen()" onkeydown="wocheTaste(event,' + tag + ')"></span>';
+  } else {
+    const klick = e.refArt ? '' :
+      ' onclick="event.stopPropagation(); wocheOeffnen(' + e.id + ',\'t\')"';
+    text = '<span class="mon-t2 ' + titelKlasse({ glyph:g }) + '"' + klick + '>' +
+      esc(info.t) + '</span>';
+  }
+
   return '<div class="mon-e">' + hakFeld(g, 'wocheGlyphWeiter(' + e.id + ')') +
-    '<span class="mon-t2 ' + titelKlasse({ glyph:g }) + '"' + klick + '>' + esc(info.t) +
-    '</span>' +
+    zeit + text +
     (info.herkunft ? '<span class="mon-herkunft">' + esc(info.herkunft) + '</span>' : '') +
     kreuz + '</div>';
 }
@@ -1788,7 +1941,9 @@ function blattWoche() {
     h += '<div class="wo-t ' + (d >= 5 ? 'we' : '') + ' ' + (heute ? 'heute' : '') + '">' +
       '<span class="wo-nr">' + WOTAGE[d] + '<div class="wo-dat">' + jtKurz(iso) + '</div></span>' +
       '<span class="wo-inhalt" onclick="wocheNeu(' + d + ')">' +
-      (proTag[d] || []).map(wocheZeile).join('') + '</span></div>';
+      (proTag[d] || []).map(wocheZeile).join('') + '</span>' +
+      '<button class="wo-plus" onclick="event.stopPropagation(); wocheWahl(' + d + ')" ' +
+      'title="Vorhandenes auf diesen Tag legen">+</button></div>';
   }
 
   h += '<div class="abschnitt">' + abschnitt('Diese Woche wichtig', 'ohne festen Tag');
@@ -2728,6 +2883,8 @@ function blattMonat() {
        b.vorhaben.length + ' Vorhaben',
        '<button class="k-btn" onclick="monatBlaettern(-1)">\u2039</button>' +
        '<button class="k-btn" onclick="monatBlaettern(1)">\u203a</button>' +
+       '<button class="k-btn' + (zeigeKalender ? ' pri' : '') +
+       '" onclick="kalenderUm()">Kalender</button>' +
        '<button class="k-btn" onclick="wahlAuf(\'ereignis\')">Termin</button>' +
        '<button class="k-btn" onclick="wahlAuf(\'vorhaben\')">Vorhaben</button>');
 
@@ -2744,9 +2901,14 @@ function blattMonat() {
       const wt = monatWochentag(t);
       const we = wt >= 5;
       const heute = heutigerMonat && (t === 19);
-      h += '<div class="mon-t ' + (we ? 'we' : '') + ' ' + (heute ? 'heute' : '') + '">' +
+      const iso = isoDatum(b.jahr, b.monat, t);
+      const fer = zeigeKalender ? ferienAn(iso) : null;
+      const fei = zeigeKalender ? feiertagAn(iso) : null;
+      h += '<div class="mon-t ' + (we ? 'we ' : '') + (heute ? 'heute ' : '') +
+        (fer ? 'ferien' : '') + '">' +
         '<span class="mon-nr">' + String(t).padStart(2, '0') + ' ' + WOKURZ[wt] + '</span>' +
         '<span class="mon-inhalt" onclick="monatNeu(' + t + ')">' +
+        (fei ? '<div class="mon-fei">' + esc(fei) + '</div>' : '') +
         (proTag[t] || []).map(monatEintragZeile).join('') + '</span></div>';
     }
     return h;
@@ -2789,7 +2951,8 @@ function wahlAuf(modus) {
   const tagKnoepfe = function (art, id) {
     let t = '<div class="wahl-tage">';
     for (let d = 0; d < 7; d++) {
-      t += '<button class="wahl-d" onclick="event.stopPropagation(); wahlNehmen(\'' +
+      t += '<button class="wahl-d ' + (wahlTag === d ? 'vor' : '') +
+        '" onclick="event.stopPropagation(); wahlNehmen(\'' +
         art + '\',\'' + id + '\',' + d + ')">' + WOKURZ[d] + '</button>';
     }
     t += '<button class="wahl-d" onclick="event.stopPropagation(); wahlNehmen(\'' +
@@ -2870,7 +3033,9 @@ function wahlAuf(modus) {
                  bName(a.b) + ' \u00b7 ' + a.min + ' Min' +
                  (a.ende ? ' \u00b7 Ende ' + a.ende : ''), 'Aktivit\u00e4t');
     });
-    $('wahl-titel').textContent = 'Aktivit\u00e4t auf die Woche verteilen';
+    $('wahl-titel').textContent = wahlTag >= 0
+      ? 'Aktivit\u00e4t auf ' + WOTAGE[wahlTag] + ' legen'
+      : 'Aktivit\u00e4t auf die Woche verteilen';
     $('wahl-fuss').textContent = 'Der Eintrag bleibt ein Verweis \u2014 einmal abhaken gen\u00fcgt.';
     if (!h) { h = '<div class="hinweis">Alle offenen Aktivit\u00e4ten liegen ' +
                   'bereits auf dieser Woche.</div>'; }
@@ -2888,6 +3053,13 @@ function wahlAuf(modus) {
   $('wahl').classList.add('auf');
 }
 function wahlZu() { $('wahl').classList.remove('auf'); }
+/* Das + einer Tagzeile oeffnet die Auswahl mit diesem Tag vorbelegt —
+   der Umweg ueber den Blattkopf entfaellt.                            */
+let wahlTag = -1;
+function wocheWahl(tag) {
+  wahlTag = tag;
+  wahlAuf('waktivitaet');
+}
 function zielZuordnen(art, id) {
   const zid = unterAktiv.ziele;
   const l = art === 'plan' ? PLAENE : art === 'akt' ? AKTIVITAETEN
@@ -2913,6 +3085,7 @@ function wahlNehmen(art, id, tag) {
     if (art !== 'aktivitaet') { e.glyph = '\u2022'; }
     if (tag >= 0) { e.tag = tag; b.eintraege.push(e); melde('Auf ' + WOTAGE[tag] + ' gelegt'); }
     else { b.wichtig.push(e); melde('Als wichtig f\u00fcr diese Woche gesetzt'); }
+    wahlTag = -1;
     wahlZu();
     renderAlles();
     return;
@@ -2958,6 +3131,7 @@ function jtKuerzel(t) {
   return w.map(x => x.charAt(0)).join('').slice(0, 4);
 }
 function jahrBlaettern(schritt) { jahrOffen += schritt; renderAlles(); }
+function kalenderUm() { zeigeKalender = !zeigeKalender; renderAlles(); }
 
 function blattJahrestermine() {
   const anzahl = JAHRESTERMINE.filter(function (j) {
@@ -2965,7 +3139,9 @@ function blattJahrestermine() {
   }).length;
   kopf('Jahrestermine ' + jahrOffen, anzahl + ' Eintr\u00e4ge \u00b7 Tag antippen zum Erfassen',
        '<button class="k-btn" onclick="jahrBlaettern(-1)">\u2039</button>' +
-       '<button class="k-btn" onclick="jahrBlaettern(1)">\u203a</button>');
+       '<button class="k-btn" onclick="jahrBlaettern(1)">\u203a</button>' +
+       '<button class="k-btn' + (zeigeKalender ? ' pri' : '') +
+       '" onclick="kalenderUm()">Ferien &amp; Feiertage</button>');
 
   let h = '<table class="jt-tab"><colgroup><col style="width:30px">';
   for (let m = 0; m < 12; m++) { h += '<col>'; }
@@ -2981,11 +3157,15 @@ function blattJahrestermine() {
       const wt = wochentagVon(jahrOffen, monat, tag);
       const treffer = jtAnTag(iso);
       const heute = (iso === HEUTE_ISO);
-      let kl = 'frei ' + (wt >= 5 ? 'we ' : '') + (heute ? 'heute' : '');
+      const fer = zeigeKalender ? ferienAn(iso) : null;
+      const fei = zeigeKalender ? feiertagAn(iso) : null;
+      let kl = 'frei ' + (wt >= 5 ? 'we ' : '') + (heute ? 'heute ' : '') +
+               (fer ? 'ferien ' : '') + (fei ? 'feiertag' : '');
       /* Ueberschneidungen werden gezeigt, nicht verdeckt: liegen mehrere
          Termine auf einem Tag, teilen sie sich die Zellenbreite. Ein
          einzelner Balken darf sonst einen zweiten verschlucken.        */
-      let inhalt = '';
+      let inhalt = fei ? '<span class="jt-fei" title="' + esc(fei) +
+                         (fer ? ' \u00b7 ' + esc(fer) : '') + '"></span>' : '';
       const anz = Math.min(treffer.length, 3);
       treffer.slice(0, 3).forEach(function (j, i) {
         const start = (iso === j.von);
@@ -3033,6 +3213,43 @@ function blattJahrestermine() {
   }
   h += '</div>';
 
+  /* Summierung je Art. Gezaehlt werden Kalendertage, und nur die, die
+     tatsaechlich in dieses Jahr fallen — ein Eintrag ueber den
+     Jahreswechsel zaehlt in beiden Jahren nur seinen Anteil.          */
+  const summen = {};
+  Object.keys(JT_ARTEN).forEach(function (k) { summen[k] = { n:0, tage:0 }; });
+  JAHRESTERMINE.forEach(function (j) {
+    const a = j.von.slice(0, 4) === String(jahrOffen) ? j.von : jahrOffen + '-01-01';
+    const e = j.bis.slice(0, 4) === String(jahrOffen) ? j.bis : jahrOffen + '-12-31';
+    if (j.von.slice(0, 4) > String(jahrOffen) || j.bis.slice(0, 4) < String(jahrOffen)) { return; }
+    const tage = Math.round((Date.parse(e) - Date.parse(a)) / 86400000) + 1;
+    const art = JT_ARTEN[j.art] ? j.art : 'termin';
+    summen[art].n += 1;
+    summen[art].tage += tage;
+  });
+  const zeilen = Object.keys(JT_ARTEN).filter(k => summen[k].n > 0);
+  if (zeilen.length) {
+    h += '<div class="abschnitt">' + abschnitt('Summe je Art', 'Kalendertage ' + jahrOffen);
+    h += zeilen.map(function (k) {
+      const a = JT_ARTEN[k], su = summen[k];
+      return '<div class="jt-sum"><span class="jt-farbe" style="background:' + a.f +
+        '"></span><span class="jt-lt">' + esc(a.n) + '</span>' +
+        '<span class="jt-sum-n">' + su.n + (su.n === 1 ? ' Eintrag' : ' Eintr\u00e4ge') + '</span>' +
+        '<span class="jt-sum-t">' + su.tage + (su.tage === 1 ? ' Tag' : ' Tage') + '</span></div>';
+    }).join('');
+    const gesamt = zeilen.reduce(function (n, k) { return n + summen[k].tage; }, 0);
+    h += '<div class="jt-sum jt-sum-g"><span class="jt-farbe" style="background:none"></span>' +
+      '<span class="jt-lt">Zusammen</span><span class="jt-sum-n"></span>' +
+      '<span class="jt-sum-t">' + gesamt + ' Tage</span></div>';
+    h += '</div>';
+  }
+
+  if (zeigeKalender) {
+    h += '<div class="hinweis">Get\u00f6nte Zellen sind bayerische Schulferien, der ' +
+      'kleine Punkt markiert einen gesetzlichen Feiertag. Beides ist nur ' +
+      'Anhaltspunkt \u2014 nicht bearbeitbar und nicht in der Summierung. ' +
+      'Feiertage werden gerechnet, die Ferienliste reicht bis Sommer 2027.</div>';
+  }
   $('blatt').innerHTML = h;
 }
 function jtKurz(iso) { return iso.slice(8) + '.' + iso.slice(5, 7) + '.'; }
@@ -3251,15 +3468,13 @@ function exportZu() { $('export').classList.remove('auf'); }
 /* ═══ SKALIERUNG DES GERÄTERAHMENS ═══ */
 function skaliere() {
   const g = $('geraet');
-  /* visualViewport liefert auf iOS die tatsaechlich sichtbare Flaeche —
-     window.innerHeight zaehlt bei eingeblendeter Tastatur falsch.     */
-  const vv = window.visualViewport;
-  const b = vv ? vv.width : window.innerWidth;
-  const ho = vv ? vv.height : window.innerHeight;
-  const s = Math.min(b / 820, ho / 1180, 1);
+  /* Der Massstab kommt aus dem Layout-Viewport, NICHT aus visualViewport.
+     Letzteres schrumpft, sobald die Bildschirmtastatur aufgeht — daraus
+     wuerde ein Massstab von etwa 60 % gerechnet und das Formular waere
+     unlesbar klein. Die Tastatur soll das Blatt ueberdecken, nicht
+     verkleinern.                                                        */
+  const s = Math.min(window.innerWidth / 820, window.innerHeight / 1180, 1);
   g.style.transform = 'scale(' + s + ')';
-  /* Zur Kontrolle im Blattfuss: so laesst sich am Geraet ablesen, ob eine
-     Schrift zu klein wirkt oder nur der Massstab kleiner als 1 ist.   */
   const f = $('bf-rechts');
   if (f) { f.textContent = '2026 \u00b7 ' + Math.round(s * 100) + '%'; }
 }
@@ -3269,9 +3484,6 @@ function skaliere() {
   skaliere();
   window.addEventListener('resize', skaliere);
   window.addEventListener('orientationchange', function () { setTimeout(skaliere, 250); });
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', skaliere);
-  }
   renderAlles();
 }());
 </script>
