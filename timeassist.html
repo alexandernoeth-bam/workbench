@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 1.2.0 · S7 WorkAssist-Import</title>
+<title>TimeAssist 1.3.0 · Gruppen</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -471,6 +471,17 @@ input, textarea { font: inherit; color: inherit; }
 .dt-l { flex: 0 0 150px; color: var(--tinte-3); font-size: 12px;
         letter-spacing: .06em; text-transform: uppercase; }
 .dt-w { flex: 1; font-variant-numeric: tabular-nums; }
+/* Gruppen- und Bereichsverwaltung */
+.gr-z { display: flex; align-items: center; gap: 8px; padding: 5px 0;
+        border-bottom: 1px solid var(--linie-2); }
+.gr-z .ed-f { flex: 1; min-width: 0; padding: 6px 8px; font-size: 14.4px; }
+.gr-n { flex: 0 0 84px; text-align: right; font-size: 12px; color: var(--tinte-3); }
+.gr-s { flex: 0 0 150px; min-height: 34px; font-size: 13.2px; }
+.gr-z.neu-z { border-bottom: 1.4px dashed var(--marke); cursor: pointer;
+              padding: 9px 0; }
+.gr-z.neu-z:active { background: var(--marke-h); }
+.grp-n { float: right; font-size: 11px; color: var(--tinte-3); letter-spacing: 0;
+         text-transform: none; }
 .dt-warn { border: 1px solid var(--wein); background: var(--wein-h); border-radius: 5px;
            padding: 9px 11px; margin-bottom: 12px; font-size: 13.2px;
            color: var(--tinte); line-height: 1.5; }
@@ -568,6 +579,10 @@ input, textarea { font: inherit; color: inherit; }
    Ringbuch mit Haupt- und Unterregister aufgebaut.                    */
 .reiter-innen { width: 38px; padding: 18px 0 6px; margin-right: 9px; }
 .reiter-innen.aus { display: none; }
+/* Wiederkehrend und Gewohnheiten sitzen fest am unteren Ende der Spalte;
+   laufen die Gruppen über, werden diese abgeschnitten, nicht jene.    */
+.rt-fest { margin-top: auto; display: flex; flex-direction: column; gap: 5px;
+           padding-top: 8px; flex-shrink: 0; }
 .reiter-innen .rt { box-shadow: 1px 1px 3px rgba(35,33,30,.09); }
 .reiter-innen .rt.aktiv { box-shadow: 2px 1px 5px rgba(35,33,30,.12); }
 /* Gleiche Schriftgroesse wie die Hauptregister — der Platz ist es wert.
@@ -815,12 +830,25 @@ input, textarea { font: inherit; color: inherit; }
   </div>
 </div>
 
+<div class="hg" id="gruppen" onclick="if(event.target===this){gruppenZu()}">
+  <div class="dlg" style="width:520px">
+    <div class="dlg-kopf">
+      <h2>Gruppen und Bereiche</h2>
+      <button class="k-btn" style="margin-left:auto" onclick="gruppenZu()">Schließen</button>
+    </div>
+    <div class="dlg-koerper" style="display:block" id="gruppen-inhalt"></div>
+    <div class="dlg-fuss">
+      <span class="bk-sub">Eine Gruppe zu löschen entfernt keine Bereiche.</span>
+    </div>
+  </div>
+</div>
+
 <div class="meldung" id="meldung"></div>
 
 <script>
 'use strict';
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -835,14 +863,22 @@ const APP_VERSION = '1.2.0';
    push und splice wirken dadurch unverändert weiter.
    Die SAAT_-Werte sind nur die Erstbefüllung beim allerersten Start.
    ═══════════════════════════════════════════════════════════════════ */
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
+/* Gruppe: die Ebene ueber dem Bereich. Im Ringbuch ist sie das Register,
+   hinter dem mehrere Aktivitaeten-Checklisten liegen. Gepflegte Liste,
+   kein Freitext — sonst stehen "Organisation" und "Organisatorisch"
+   nebeneinander.                                                       */
+const SAAT_GRUPPEN = [
+  { id:'g1', name:'Arbeit' },
+  { id:'g2', name:'Zuhause' },
+];
 const SAAT_BEREICHE = [
-  { id:'b1', name:'CCD-Programm', farbe:'#6b6459' },
-  { id:'b2', name:'Migration',    farbe:'#7d6b53' },
-  { id:'b3', name:'Haus',         farbe:'#4e6b52' },
-  { id:'b4', name:'Familie',      farbe:'#8c3b2f' },
-  { id:'b5', name:'Organisation', farbe:'#57524a' },
+  { id:'b1', name:'CCD-Programm', farbe:'#6b6459', gruppeId:'g1' },
+  { id:'b2', name:'Migration',    farbe:'#7d6b53', gruppeId:'g1' },
+  { id:'b3', name:'Haus',         farbe:'#4e6b52', gruppeId:'g2' },
+  { id:'b4', name:'Familie',      farbe:'#8c3b2f', gruppeId:'g2' },
+  { id:'b5', name:'Organisation', farbe:'#57524a', gruppeId:'g2' },
 ];
 
 /* Aktivität: t, b, prio, min, wer, beginn, ende, glyph, heute, planId
@@ -1157,6 +1193,7 @@ let monatOffen = '2026-08';   // Jahr und Monat des angezeigten Blattes
 function saatDB() {
   return {
     version: DB_VERSION,
+    gruppen:       SAAT_GRUPPEN,
     bereiche:      SAAT_BEREICHE,
     aktivitaeten:  SAAT_AKTIVITAETEN,
     termine:       SAAT_TERMINE,
@@ -1178,7 +1215,7 @@ function saatDB() {
 function leereDB() {
   return {
     version: DB_VERSION,
-    bereiche: [], aktivitaeten: [], termine: [], jahrestermine: [],
+    gruppen: [], bereiche: [], aktivitaeten: [], termine: [], jahrestermine: [],
     wieder: [], gewohnheiten: [], plaene: [], ziele: [], notizen: [],
     wochenblaetter: [], monatsblaetter: [], kontakte: [],
     tag: { wichtigste: null, motto: ['', ''], reflexion: ['', '', ''] },
@@ -1189,6 +1226,7 @@ function leereDB() {
 /* Der lebende Bestand. Die Alias-Namen darunter zeigen auf dieselben
    Arrays; ein Neuladen ersetzt sie ueber dbUebernehmen().            */
 let DB = saatDB();
+let GRUPPEN       = DB.gruppen;
 let BEREICHE      = DB.bereiche;
 let AKTIVITAETEN  = DB.aktivitaeten;
 let TERMINE       = DB.termine;
@@ -1205,6 +1243,7 @@ let TAG           = DB.tag;
 
 function dbUebernehmen(neu) {
   DB = migriereDB(neu);
+  GRUPPEN       = DB.gruppen;
   BEREICHE      = DB.bereiche;
   AKTIVITAETEN  = DB.aktivitaeten;
   TERMINE       = DB.termine;
@@ -1230,6 +1269,13 @@ function migriereDB(d) {
     if (d[k] === undefined || d[k] === null) { d[k] = s[k]; }
   });
   if (!Array.isArray(d.bereiche) || !d.bereiche.length) { d.bereiche = s.bereiche; }
+  /* Version 1 → 2: Gruppen kamen dazu. Bereiche ohne Zuordnung bleiben
+     ohne — sie landen im Register "Ohne Gruppe" und lassen sich dort
+     einsortieren.                                                      */
+  if (!Array.isArray(d.gruppen)) { d.gruppen = []; }
+  d.bereiche.forEach(function (b) {
+    if (b.gruppeId === undefined) { b.gruppeId = null; }
+  });
   d.version = DB_VERSION;
   return d;
 }
@@ -1351,10 +1397,7 @@ function ersterBereichId() {
 const REGISTER = [
   { k:'tag',     n:'Tag' },
   { k:'woche',   n:'Woche' },
-  { k:'akt',     n:'Aktivitäten', unter:[
-      { k:'akt',  n:'Aktivitäten' },
-      { k:'wied', n:'Wiederkehrend' },
-      { k:'gew',  n:'Gewohnheiten' } ] },
+  { k:'akt',     n:'Aktivitäten', unter:'akt' },
   { k:'plaene',  n:'Pläne',    unter:'plaene' },
   { k:'planung', n:'Planung',  unter:[
       { k:'monat',    n:'Monat' },
@@ -1379,6 +1422,16 @@ function regDef(k) { return REGISTER.find(r => r.k === k) || REGISTER[0]; }
 function unterListe(k) {
   const d = regDef(k);
   if (!d.unter) { return null; }
+  if (d.unter === 'akt') {
+    /* Ein Register je Gruppe — im Ringbuch liegt hinter jedem Reiter ein
+       eigenes Checklistenblatt.                                        */
+    const l = [{ k:'uebersicht', n:'Alle' }];
+    GRUPPEN.forEach(function (g) { l.push({ k:'g:' + g.id, n:g.name }); });
+    if (BEREICHE.some(b => !b.gruppeId)) { l.push({ k:'g:0', n:'Ohne Gruppe' }); }
+    l.push({ k:'wied', n:'Wiederkehrend' });
+    l.push({ k:'gew', n:'Gewohnheiten' });
+    return l;
+  }
   if (d.unter === 'ziele') {
     const l = [{ k:'uebersicht', n:'Übersicht' }, { k:'zjahr', n:'Jahr' }];
     ZIELE.filter(z => !z.archiviert).forEach(function (z) { l.push({ k:z.id, n:z.t }); });
@@ -1424,20 +1477,29 @@ function renderRegister() {
            '" onclick="zeigeReg(\'' + r.k + '\')">' + esc(r.n) + '</button>';
   }).join('');
 
-  /* Planreiter stehen in der inneren Spalte, nicht unter den
-     Hauptregistern. Sie erscheinen nur, wenn Pläne offen ist.        */
+  /* Reiter der inneren Spalte. Bei den Aktivitäten stehen Wiederkehrend
+     und Gewohnheiten am Ende und dürfen nie abgeschnitten werden — sie
+     werden deshalb zuerst gesetzt und die Gruppen füllen den Rest.    */
   const el = $('reiter-plan');
-  if (reg !== 'plaene' && reg !== 'ziele') {
+  if (reg !== 'plaene' && reg !== 'ziele' && reg !== 'akt') {
     el.classList.add('aus'); el.innerHTML = ''; return;
   }
   el.classList.remove('aus');
   const l = unterListe(reg) || [];
   const a = unterAktiv[reg];
-  el.innerHTML = l.map(function (u) {
+  const knopf = function (u) {
     return '<button class="rt rt-plan ' + (a === u.k ? 'aktiv' : '') +
            '" onclick="zeigeUnter(\'' + u.k + '\')">' +
            esc(reiterKurz(u.n)) + '</button>';
-  }).join('');
+  };
+  if (reg === 'akt') {
+    const fest = l.filter(u => u.k === 'wied' || u.k === 'gew');
+    const rest = l.filter(u => u.k !== 'wied' && u.k !== 'gew');
+    el.innerHTML = rest.map(knopf).join('') +
+      '<div class="rt-fest">' + fest.map(knopf).join('') + '</div>';
+    return;
+  }
+  el.innerHTML = l.map(knopf).join('');
 }
 
 function renderUnterreiter() {
@@ -1445,7 +1507,7 @@ function renderUnterreiter() {
   const el = $('unterreiter');
   /* Pläne führen ihre Reiter senkrecht rechts — die waagerechte Leiste
      bleibt dort leer.                                                  */
-  if (!l || reg === 'plaene' || reg === 'ziele') {
+  if (!l || reg === 'plaene' || reg === 'ziele' || reg === 'akt') {
     el.classList.add('aus'); el.innerHTML = ''; return;
   }
   el.classList.remove('aus');
@@ -1475,6 +1537,10 @@ function blattOeffnen(hauptK, unterK) {
 /* Bei Plänen und Zielen ist der Unterschlüssel eine ID — die Nummer
    kommt dort vom Hauptregister.                                       */
 function formNr() {
+  if (reg === 'akt') {
+    const u = unterAktiv.akt;
+    return u === 'wied' ? FORM_NR.wied : (u === 'gew' ? FORM_NR.gew : FORM_NR.akt);
+  }
   if (reg === 'plaene') { return FORM_NR.plaene; }
   if (reg === 'ziele')  {
     return unterAktiv.ziele === 'zjahr' ? FORM_NR.zjahr : FORM_NR.ziele;
@@ -2145,9 +2211,37 @@ function blattWoche() {
 }
 
 /* ═══ BLATT: AKTIVITÄTEN (CMP 31) ═══ */
+/* Welche Gruppe zeigt das offene Blatt? '' bedeutet alle. */
+function offeneGruppe() {
+  const u = unterAktiv.akt || 'uebersicht';
+  if (u.indexOf('g:') !== 0) { return null; }
+  return u.slice(2);          // '0' = ohne Gruppe
+}
+function gruppeName(id) {
+  if (!id) { return 'Ohne Gruppe'; }
+  const g = GRUPPEN.find(x => x.id === id);
+  return g ? g.name : 'Ohne Gruppe';
+}
+function bereicheDerGruppe(gid) {
+  if (gid === null) { return BEREICHE; }
+  if (gid === '0') { return BEREICHE.filter(b => !b.gruppeId); }
+  return BEREICHE.filter(b => b.gruppeId === gid);
+}
+
 function blattAktivitaeten() {
-  kopf('Aktivit\u00e4ten-Checkliste', AKTIVITAETEN.filter(offen).length + ' offen von ' + AKTIVITAETEN.length,
-       '<button class="k-btn" onclick="aktNeu(false)">+ Aktivit\u00e4t</button>');
+  const gid = offeneGruppe();
+  const bl = bereicheDerGruppe(gid);
+  const bIds = {};
+  bl.forEach(function (b) { bIds[b.id] = true; });
+  const liste = AKTIVITAETEN.filter(a => bIds[a.b]);
+  const offenN = liste.filter(offen).length;
+
+  kopf(gid === null ? 'Aktivit\u00e4ten \u2014 alle'
+                    : 'Aktivit\u00e4ten \u2014 ' + gruppeName(gid === '0' ? null : gid),
+       offenN + ' offen von ' + liste.length +
+       ' \u00b7 ' + bl.length + (bl.length === 1 ? ' Bereich' : ' Bereiche'),
+       '<button class="k-btn" onclick="gruppenAuf()">Gruppen</button>' +
+       '<button class="k-btn pri" onclick="aktNeu(false)">+ Aktivit\u00e4t</button>');
 
   let h = '<table class="atab"><colgroup><col style="width:28px"><col style="width:20px">' +
     '<col style="width:26px"><col><col style="width:78px"><col style="width:54px">' +
@@ -2156,34 +2250,48 @@ function blattAktivitaeten() {
     '<th>Wer</th><th class="r">Beginn</th><th class="r">Ende</th><th class="r">Min</th>' +
     '<th></th></tr></thead><tbody>';
 
-  h += AKTIVITAETEN.map(function (a) {
-    const knopf = a.heute
-      ? '<button class="tz-heute" onclick="event.stopPropagation(); heuteWeg(' + a.id + ')">\u2713 heute</button>'
-      : '<button class="tz-heute" onclick="event.stopPropagation(); heuteHin(' + a.id + ')">\u2192 heute</button>';
-    return '<tr>' +
-      '<td class="mitte">' + hakFeld(a.glyph, 'glyphWeiter(' + a.id + ')') + '</td>' +
-      '<td class="mitte z" onclick="bereichWeiter(' + a.id + ')" title="' + esc(bName(a.b)) + '">' +
-      '<span class="tz-punkt" style="background:' + bFarbe(a.b) + '"></span></td>' +
-      '<td class="mitte z" onclick="prioWeiter(' + a.id + ')">' + prioFeld(a.prio) + '</td>' +
-      planPfeilZelle(a) +
-      zelle('akt', a.id, 'wer', a.wer || '', 'voll', 'wer', '\u2014') +
-      zelle('akt', a.id, 'beginn', a.beginn, 'voll', 'dat', 'TT.MM') +
-      zelle('akt', a.id, 'ende', a.ende, 'voll', 'dat', 'TT.MM') +
-      zelle('akt', a.id, 'min', String(a.min), 'voll', 'r', '') +
-      '<td class="mitte">' + knopf + '</td></tr>';
-  }).join('');
+  /* Nach Bereich gruppiert — das entspricht dem Stapel Checklistenblätter
+     hinter dem Register.                                                */
+  let gezeigt = 0;
+  bl.forEach(function (b) {
+    const l = liste.filter(a => a.b === b.id);
+    if (!l.length) { return; }
+    h += '<tr class="grp"><td colspan="9"><span class="tz-punkt" style="background:' +
+      b.farbe + '"></span>' + esc(b.name) +
+      '<span class="grp-n">' + l.filter(offen).length + ' offen</span></td></tr>';
+    h += l.map(function (a) {
+      if (editAkt === a.id) { return ''; }
+      gezeigt += 1;
+      const knopf = a.heute
+        ? '<button class="tz-heute" onclick="event.stopPropagation(); heuteWeg(' + a.id + ')">\u2713 heute</button>'
+        : '<button class="tz-heute" onclick="event.stopPropagation(); heuteHin(' + a.id + ')">\u2192 heute</button>';
+      return '<tr>' +
+        '<td class="mitte">' + hakFeld(a.glyph, 'glyphWeiter(' + a.id + ')') + '</td>' +
+        '<td class="mitte z" onclick="bereichWeiter(' + a.id + ')" title="' + esc(bName(a.b)) + '">' +
+        '<span class="tz-punkt" style="background:' + bFarbe(a.b) + '"></span></td>' +
+        '<td class="mitte z" onclick="prioWeiter(' + a.id + ')">' + prioFeld(a.prio) + '</td>' +
+        planPfeilZelle(a) +
+        zelle('akt', a.id, 'wer', a.wer || '', 'voll', 'wer', '\u2014') +
+        zelle('akt', a.id, 'beginn', a.beginn, 'voll', 'dat', 'TT.MM') +
+        zelle('akt', a.id, 'ende', a.ende, 'voll', 'dat', 'TT.MM') +
+        zelle('akt', a.id, 'min', String(a.min), 'voll', 'r', '') +
+        '<td class="mitte">' + knopf + '</td></tr>';
+    }).join('');
+  });
 
-  h += '<tr class="neu" onclick="aktNeu(false)"><td colspan="9">' +
-       '<span class="a-neu">antippen und schreiben</span></td></tr>';
-  for (let i = 0; i < 2; i++) {
-    h += '<tr class="leer"><td></td><td></td><td></td><td></td><td></td>' +
-         '<td></td><td></td><td></td><td></td></tr>';
+  if (!gezeigt) {
+    h += '<tr class="leer"><td colspan="9"><span class="a-neu">Noch nichts in dieser ' +
+      'Gruppe</span></td></tr>';
+  }
+  if (editZelle === null) {
+    h += '<tr class="neu" onclick="aktNeu(false)"><td colspan="9">' +
+         '<span class="a-neu">antippen und schreiben</span></td></tr>';
   }
   h += '</tbody></table>';
   h += '<div class="hinweis">Jede Zelle ist Klickfl\u00e4che. K\u00e4stchen, Bereichspunkt und ' +
-       'Priorit\u00e4t schalten weiter, Textzellen \u00f6ffnen sich zum Schreiben. Tab springt ' +
-       'zur n\u00e4chsten Zelle, Tab in der letzten Spalte legt eine neue Zeile an, ' +
-       'Escape verwirft.</div>';
+       'Priorit\u00e4t schalten weiter, Textzellen \u00f6ffnen sich zum Schreiben. Die Reiter ' +
+       'rechts f\u00fchren je Gruppe ein eigenes Blatt \u2014 wie ein Stapel Checklisten ' +
+       'hinter einem Register.</div>';
   $('blatt').innerHTML = h;
   fokusSetzen();
 }
@@ -3672,13 +3780,17 @@ function renderBlatt() {
      den Dispatcher. 'uebersicht' kommt in beiden vor und wäre mehrdeutig. */
   if (reg === 'plaene') { blattPlaene(); return; }
   if (reg === 'ziele')  { blattZiele(); return; }
+  if (reg === 'akt') {
+    const u = unterAktiv.akt;
+    if (u === 'wied') { blattWieder(); return; }
+    if (u === 'gew')  { blattGewohnheit(); return; }
+    blattAktivitaeten();
+    return;
+  }
 
   const k = blattKey();
   if (k === 'tag')      { blattTag(); return; }
   if (k === 'woche')    { blattWoche(); return; }
-  if (k === 'akt')      { blattAktivitaeten(); return; }
-  if (k === 'wied')     { blattWieder(); return; }
-  if (k === 'gew')      { blattGewohnheit(); return; }
   if (k === 'notiz')    { blattNotiz(); return; }
   if (k === 'monat')    { blattMonat(); return; }
   if (k === 'jtermine') { blattJahrestermine(); return; }
@@ -3773,7 +3885,8 @@ function dbGroesse() {
 }
 function datenAuf() {
   const zaehlung = [
-    ['Bereiche', BEREICHE.length], ['Aktivitäten', AKTIVITAETEN.length],
+    ['Gruppen', GRUPPEN.length], ['Bereiche', BEREICHE.length],
+    ['Aktivitäten', AKTIVITAETEN.length],
     ['Pläne', PLAENE.length], ['Ziele', ZIELE.length],
     ['Jahrestermine', JAHRESTERMINE.length], ['Wiederkehrend', WIEDER.length],
     ['Gewohnheiten', GEWOHNHEIT.length], ['Wochenblätter', WOCHENBLAETTER.length],
@@ -3906,7 +4019,7 @@ function waGlyph(st) { return st === 'erledigt' ? '\u2715' : '\u2022'; }
 /* Wandelt einen WorkAssist-Stand in TimeAssist-Bestände um. Liefert die
    neuen Sätze und einen Bericht, ohne DB anzufassen.                  */
 function waUmwandeln(d) {
-  const bericht = { bereiche:0, aktivitaeten:0, wieder:0, gewohnheiten:0,
+  const bericht = { gruppen:0, bereiche:0, aktivitaeten:0, wieder:0, gewohnheiten:0,
                     plaene:0, planarchiv:0, notizen:0, schritte:0,
                     uebersprungen:{ erledigt:0, archiviert:0, schritte:0 } };
   const quelle = {};
@@ -3927,26 +4040,51 @@ function waUmwandeln(d) {
     return false;
   };
 
-  const bereiche = [];
+  const bereiche = [], gruppen = [];
   const abbild = {};          // WorkAssist-Bereichs-ID → TimeAssist-ID
+  const gAbbild = {};         // WorkAssist-Oberbereichs-ID → Gruppen-ID
   let farbe = BEREICHE.length;
-  const neuerBereich = function (name) {
+
+  /* Der Oberbereich verschwindet nicht, er wird zur Gruppe — genau die
+     Ebene, die als Register über den Checklisten sitzt. Vorhandene
+     Gruppen gleichen Namens werden wiederverwendet.                    */
+  const gruppeFuer = function (name) {
+    const da = GRUPPEN.concat(gruppen).find(g => g.name === name);
+    if (da) { return da.id; }
+    const id = 'g' + naechsteId();
+    gruppen.push({ id:id, name:name });
+    bericht.gruppen += 1;
+    return id;
+  };
+  d.bereiche.forEach(function (b) {
+    if (archiviert(b)) { return; }
+    if (hatKinder[b.id]) { gAbbild[b.id] = gruppeFuer(b.name); }
+  });
+
+  const neuerBereich = function (name, gid) {
     const id = 'b' + naechsteId();
-    bereiche.push({ id:id, name:name, farbe:WA_FARBEN[farbe % WA_FARBEN.length] });
+    bereiche.push({ id:id, name:name, farbe:WA_FARBEN[farbe % WA_FARBEN.length],
+                    gruppeId:gid || null });
     farbe += 1;
     bericht.bereiche += 1;
     return id;
   };
   d.bereiche.forEach(function (b) {
     if (archiviert(b)) { bericht.uebersprungen.archiviert += 1; return; }
-    if (hatKinder[b.id]) { return; }          // Oberbereich ist keine Ebene mehr
-    abbild[b.id] = neuerBereich(b.name);
+    if (hatKinder[b.id]) { return; }          // Oberbereich ist jetzt Gruppe
+    /* Ein Bereich ohne Oberbereich bildet seine eigene Gruppe — sonst
+       laegen die privaten Bereiche alle unter "Ohne Gruppe".           */
+    const gid = b.oberbereich ? (gAbbild[b.oberbereich] || null)
+                              : gruppeFuer(b.name);
+    abbild[b.id] = neuerBereich(b.name, gid);
   });
   /* Oberbereiche, an denen direkt Aufgaben hängen, bekommen ein Allgemein */
   d.aufgaben.forEach(function (a) {
     const b = a.bereichId ? quelle[a.bereichId] : null;
     if (!b || abbild[b.id] || archiviert(b)) { return; }
-    if (hatKinder[b.id]) { abbild[b.id] = neuerBereich(b.name + ' \u2013 Allgemein'); }
+    if (hatKinder[b.id]) {
+      abbild[b.id] = neuerBereich(b.name + ' \u2013 Allgemein', gAbbild[b.id] || null);
+    }
   });
   /* Beim zweiten Dateiimport soll kein zweites "Ohne Bereich" entstehen —
      erst im bestehenden Bestand nachsehen.                             */
@@ -4061,7 +4199,7 @@ function waUmwandeln(d) {
              'liniert', (b && abbild[b.id]) ? abbild[b.id] : null);
   });
 
-  return { bereiche:bereiche, aktivitaeten:aktivitaeten, wieder:wieder,
+  return { gruppen:gruppen, bereiche:bereiche, aktivitaeten:aktivitaeten, wieder:wieder,
            gewohnheiten:gewohnheiten, plaene:plaene, notizen:notizen,
            bericht:bericht };
 }
@@ -4071,7 +4209,7 @@ function waVorschau(d, dateiname) {
   waErgebnis = waUmwandeln(d);
   const b = waErgebnis.bericht;
   const z = [
-    ['Bereiche', b.bereiche], ['Aktivitäten', b.aktivitaeten],
+    ['Gruppen', b.gruppen], ['Bereiche', b.bereiche], ['Aktivitäten', b.aktivitaeten],
     ['davon aus Planschritten', b.schritte],
     ['Wiederkehrende Vorgänge', b.wieder], ['Gewohnheiten', b.gewohnheiten],
     ['Pläne aktiv', b.plaene], ['Pläne archiviert', b.planarchiv],
@@ -4099,6 +4237,7 @@ function waZu() { $('wa').classList.remove('auf'); waErgebnis = null; }
 function waUebernehmen() {
   if (!waErgebnis) { return; }
   const r = waErgebnis;
+  r.gruppen.forEach(g => GRUPPEN.push(g));
   r.bereiche.forEach(b => BEREICHE.push(b));
   r.aktivitaeten.forEach(a => AKTIVITAETEN.push(a));
   r.wieder.forEach(w => WIEDER.push(w));
@@ -4111,7 +4250,82 @@ function waUebernehmen() {
   reg = 'akt';
   unterAktiv.akt = 'akt';
   renderAlles();
-  melde(b.aktivitaeten + ' Aktivit\u00e4ten, ' + b.bereiche + ' Bereiche \u00fcbernommen');
+  melde(b.aktivitaeten + ' Aktivit\u00e4ten in ' + b.bereiche + ' Bereichen, ' +
+        b.gruppen + ' Gruppen \u00fcbernommen');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   GRUPPEN UND BEREICHE
+   Die Gruppe ist die Registerebene über dem Bereich. Gepflegte Liste
+   statt Freitext: sonst stehen "Organisation" und "Organisatorisch"
+   als zwei Register nebeneinander.
+   ═══════════════════════════════════════════════════════════════════ */
+function gruppenAuf() { gruppenRender(); $('gruppen').classList.add('auf'); }
+function gruppenZu() { $('gruppen').classList.remove('auf'); renderAlles(); }
+
+function gruppeNeu() {
+  GRUPPEN.push({ id:'g' + naechsteId(), name:'Neue Gruppe' });
+  gruppenRender();
+}
+function gruppeName2(id, wert) {
+  const g = GRUPPEN.find(x => x.id === id);
+  if (g) { g.name = wert.trim() || g.name; }
+  gruppenRender();
+}
+function gruppeLoeschen(id) {
+  /* Die Bereiche bleiben — sie rutschen nur in "Ohne Gruppe". */
+  BEREICHE.forEach(function (b) { if (b.gruppeId === id) { b.gruppeId = null; } });
+  const i = GRUPPEN.findIndex(x => x.id === id);
+  if (i !== -1) { GRUPPEN.splice(i, 1); }
+  if (unterAktiv.akt === 'g:' + id) { unterAktiv.akt = 'uebersicht'; }
+  gruppenRender();
+}
+function bereichGruppe(bid, gid) {
+  const b = BEREICHE.find(x => x.id === bid);
+  if (b) { b.gruppeId = gid || null; }
+  gruppenRender();
+}
+function bereichNameSetzen(bid, wert) {
+  const b = BEREICHE.find(x => x.id === bid);
+  if (b) { b.name = wert.trim() || b.name; }
+  gruppenRender();
+}
+function gruppenRender() {
+  let h = '<div class="ed-l">Gruppen</div>';
+  h += GRUPPEN.map(function (g) {
+    const n = BEREICHE.filter(b => b.gruppeId === g.id).length;
+    return '<div class="gr-z"><input class="ed-f" value="' + esc(g.name) +
+      '" onchange="gruppeName2(\'' + g.id + '\', this.value)">' +
+      '<span class="gr-n">' + n + (n === 1 ? ' Bereich' : ' Bereiche') + '</span>' +
+      '<button class="mon-x" onclick="gruppeLoeschen(\'' + g.id + '\')" ' +
+      'title="Gruppe l\u00f6schen, Bereiche bleiben">\u00d7</button></div>';
+  }).join('');
+  if (!GRUPPEN.length) {
+    h += '<div class="hinweis">Noch keine Gruppe angelegt.</div>';
+  }
+  h += '<div class="gr-z neu-z" onclick="gruppeNeu()">' +
+       '<span class="a-neu">+ Gruppe anlegen</span></div>';
+
+  h += '<div class="ed-l">Bereiche zuordnen</div>';
+  const opt = function (bid, gid) {
+    let o = '<option value=""' + (!gid ? ' selected' : '') + '>\u2014 ohne \u2014</option>';
+    o += GRUPPEN.map(function (g) {
+      return '<option value="' + g.id + '"' + (g.id === gid ? ' selected' : '') + '>' +
+        esc(g.name) + '</option>';
+    }).join('');
+    return '<select class="es gr-s" onchange="bereichGruppe(\'' + bid +
+      '\', this.value)">' + o + '</select>';
+  };
+  h += BEREICHE.map(function (b) {
+    return '<div class="gr-z"><span class="tz-punkt" style="background:' + b.farbe +
+      '"></span><input class="ed-f" value="' + esc(b.name) +
+      '" onchange="bereichNameSetzen(\'' + b.id + '\', this.value)">' +
+      opt(b.id, b.gruppeId) + '</div>';
+  }).join('');
+  if (!BEREICHE.length) {
+    h += '<div class="hinweis">Noch keine Bereiche vorhanden.</div>';
+  }
+  $('gruppen-inhalt').innerHTML = h;
 }
 
 /* ═══ SKALIERUNG DES GERÄTERAHMENS ═══ */

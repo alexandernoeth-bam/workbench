@@ -125,8 +125,17 @@ kat('6 · Registerstruktur');
     if (!/\n  blattPlaene\(\);\n\}/.test(JS)) { ok('kein stiller Rückfall am Dispatcher-Ende'); }
     else { fail('Dispatcher fällt still auf blattPlaene zurück'); }
   }
-  const BL = ['tag', 'woche', 'akt', 'wied', 'gew', 'notiz', 'monat', 'jtermine', 'archiv'];
+  /* akt, wied und gew laufen seit den Gruppen über reg === 'akt' */
+  const BL = ['tag', 'woche', 'notiz', 'monat', 'jtermine', 'archiv'];
   const ohne = BL.filter(b => JS.indexOf("k === '" + b + "'") === -1);
+  /* Es gibt mehrere Stellen mit reg === 'akt' — gemeint ist die im
+     Dispatcher.                                                       */
+  const mDis = JSK.match(/function renderBlatt\(\) \{([\s\S]*?)\n\}/);
+  const uA = mDis ? mDis[1].match(/if \(reg === 'akt'\) \{([\s\S]*?)\n  \}/) : null;
+  if (uA && /blattWieder\(\)/.test(uA[1]) && /blattGewohnheit\(\)/.test(uA[1]) &&
+      /blattAktivitaeten\(\)/.test(uA[1])) {
+    ok('Aktivitäten-Zweig erreicht alle drei Blätter');
+  } else { fail('Aktivitäten-Zweig unvollständig'); }
   if (!ohne.length) { ok(BL.length + ' Blätter im Dispatcher erreichbar'); }
   else { fail('Kein Dispatcher-Zweig für: ' + ohne.join(', ')); }
 }
@@ -374,6 +383,60 @@ kat('12 · Löschen und leerer Bestand');
   if (/loeschFrage = false/.test(JSK.match(/function datenZu\(\)[^\n]*/)[0] || '')) {
     ok('Schließen bricht die Löschabfrage ab');
   } else { warn('Löschabfrage wird beim Schließen nicht zurückgesetzt'); }
+}
+
+/* ═══ 13 · Gruppen als Registerebene ════════════════════════════════════
+   Fehlerarten: Gruppen fehlen in saatDB/leereDB und gehen beim Übernehmen
+   verloren; die Migration lässt bestehende Bereiche ohne gruppeId und die
+   App stolpert darüber; der Import wirft die Oberbereiche weg, statt sie
+   zu Gruppen zu machen; das Löschen einer Gruppe reißt die Bereiche mit.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('13 · Gruppen als Registerebene');
+{
+  const mS = JSK.match(/function saatDB\(\) \{([\s\S]*?)\n\}/);
+  const mL = JSK.match(/function leereDB\(\) \{([\s\S]*?)\n\}/);
+  if (mS && /gruppen:/.test(mS[1])) { ok('saatDB kennt gruppen'); }
+  else { fail('gruppen fehlt in saatDB'); }
+  if (mL && /gruppen:/.test(mL[1])) { ok('leereDB kennt gruppen'); }
+  else { fail('gruppen fehlt in leereDB'); }
+
+  const mU = JSK.match(/function dbUebernehmen\(neu\) \{([\s\S]*?)\n\}/);
+  if (mU && /GRUPPEN\s*=\s*DB\.gruppen/.test(mU[1])) { ok('dbUebernehmen setzt GRUPPEN'); }
+  else { fail('GRUPPEN wird beim Übernehmen nicht neu gesetzt'); }
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mM && /gruppeId === undefined/.test(mM[1])) {
+    ok('Migration ergänzt gruppeId an bestehenden Bereichen');
+  } else { fail('Migration lässt Bereiche ohne gruppeId'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 2) { ok('Schemaversion auf ' + mV[1] + ' erhöht'); }
+  else { fail('Schemaversion nicht erhöht — Migration greift nicht'); }
+
+  const mUL = JSK.match(/if \(d\.unter === 'akt'\) \{([\s\S]*?)\n  \}/);
+  if (mUL && /GRUPPEN\.forEach/.test(mUL[1]) && /'wied'/.test(mUL[1])) {
+    ok('Aktivitäten-Register führt Gruppen plus Wiederkehrend und Gewohnheiten');
+  } else { fail('Registerliste der Aktivitäten unvollständig'); }
+  if (/reg !== 'plaene' && reg !== 'ziele' && reg !== 'akt'/.test(JSK)) {
+    ok('Aktivitäten nutzen die innere Reiterspalte');
+  } else { fail('Aktivitäten-Reiter nicht in der inneren Spalte'); }
+
+  const mG = JSK.match(/function gruppeLoeschen\(id\) \{([\s\S]*?)\n\}/);
+  if (mG && /b\.gruppeId = null/.test(mG[1])) {
+    ok('Gruppe löschen lässt die Bereiche stehen');
+  } else { fail('Gruppe löschen reißt Bereiche mit'); }
+
+  const mW = JSK.match(/function waUmwandeln\(d\) \{([\s\S]*?)\n\}/);
+  if (mW && /gruppeFuer/.test(mW[1])) { ok('Import macht Oberbereiche zu Gruppen'); }
+  else { fail('Import verwirft die Oberbereichsebene'); }
+  if (mW && /GRUPPEN\.concat\(gruppen\)\.find/.test(mW[1])) {
+    ok('Gleichnamige Gruppen werden wiederverwendet');
+  } else { fail('Zweiter Import erzeugt doppelte Gruppen'); }
+
+  ['gruppenAuf', 'gruppeNeu', 'gruppeLoeschen', 'bereichGruppe', 'gruppenRender']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
