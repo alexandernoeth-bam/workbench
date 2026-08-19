@@ -1765,6 +1765,70 @@ kat('35 · Wochenblatt');
   } else { fail('.wo-jd oder .wo-dat nicht gefunden'); }
 }
 
+/* ═══ 36 · Termine aus Woche und Monat im Kalender ═════════════════════
+   Fehlerarten: ein auf dem Wochenblatt erfasster Termin bleibt dort
+   liegen und erscheint nie im Tagesblatt; ein Termin ohne Uhrzeit ist im
+   Zeitraster unsichtbar statt ganztägig; beim Löschen des Eintrags bleibt
+   der Termin als Leiche im Kalender; eine unsinnige Uhrzeit wird
+   stillschweigend zu 'NaN:NaN'.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('36 · Termine aus Woche und Monat');
+{
+  if (/function zeitZuMin\b/.test(JS)) { ok('zeitZuMin vorhanden'); }
+  else { fail('zeitZuMin fehlt'); }
+
+  const mZ = JSK.match(/function zeitZuMin\(t\) \{[\s\S]*?\n\}/);
+  if (mZ) {
+    let fn = null;
+    try { fn = new Function(mZ[0] + '\nreturn zeitZuMin;')(); } catch (e) { fn = null; }
+    if (!fn) { fail('zeitZuMin nicht auswertbar'); }
+    else {
+      const F = [['09:30', 570], ['9:30', 570], ['0930', 570], ['23:59', 1439],
+                 ['24:00', null], ['09:60', null], ['', null], ['abc', null]];
+      let f = 0;
+      F.forEach(function (x) {
+        if (fn(x[0]) !== x[1]) { f++; fail('zeitZuMin("' + x[0] + '") = ' + fn(x[0])); }
+      });
+      if (!f) { ok(F.length + ' Zeitangaben korrekt geprüft'); }
+    }
+  }
+
+  const mS = JSK.match(/function eintragSpeichern\(\) \{([\s\S]*?)\n\}/);
+  if (!mS) { fail('eintragSpeichern nicht auswertbar'); }
+  else {
+    const t = mS[1];
+    if (/TERMINE\.push\(t\)/.test(t)) { ok('der Eintrag legt einen echten Termin an'); }
+    else { fail('Wochentermin bleibt auf dem Wochenblatt liegen'); }
+    if (/refArt:'termin'/.test(t)) { ok('der Wocheneintrag ist ein Verweis darauf'); }
+    else { fail('kein Verweis — Woche und Tag laufen auseinander'); }
+    if (/t\.ganztags = \(min === null\)/.test(t)) {
+      ok('ohne Uhrzeit wird der Termin ganztägig');
+    } else { fail('ein Termin ohne Uhrzeit wäre im Raster unsichtbar'); }
+    if (/min === null\) \{ melde/.test(t)) { ok('unsinnige Uhrzeit wird abgewiesen'); }
+    else { fail('unsinnige Uhrzeit würde übernommen'); }
+    if (/k\.art === 'ereignis'/.test(t) && /ganztags:true/.test(t)) {
+      ok('das Monatsereignis wird ein ganztägiger Termin');
+    } else { fail('Monatsereignis erreicht den Kalender nicht'); }
+  }
+
+  /* Beide Blätter müssen den Verweis auflösen können */
+  ['wocheText', 'monatText'].forEach(function (n) {
+    const m = JSK.match(new RegExp('function ' + n + '\\(e\\) \\{([\\s\\S]*?)\\n\\}'));
+    if (m && /e\.refArt === 'termin'/.test(m[1])) { ok(n + ' löst Terminverweise auf'); }
+    else { fail(n + ' zeigt bei einem Terminverweis nichts an'); }
+  });
+
+  const mL = JSK.match(/function eintragLoeschen\(\) \{([\s\S]*?)\n\}/);
+  if (mL && /TERMINE\.splice/.test(mL[1])) {
+    ok('Löschen räumt den Termin mit weg');
+  } else { fail('gelöschter Eintrag lässt den Termin im Kalender zurück'); }
+
+  const mO = JSK.match(/function eintragOeffnen\(blatt, tag, id\) \{([\s\S]*?)\n\}/);
+  if (mO && /e\.refArt === 'termin'/.test(mO[1])) {
+    ok('ein bestehender Termin wird zum Bearbeiten geladen');
+  } else { fail('Terminverweis lässt sich nicht bearbeiten'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */

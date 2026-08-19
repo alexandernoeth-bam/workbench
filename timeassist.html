@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 2.19.0 · Wochenblatt</title>
+<title>TimeAssist 2.20.0 · Termine durchreichen</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -1132,7 +1132,7 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
 <script>
 'use strict';
 
-const APP_VERSION = '2.19.0';
+const APP_VERSION = '2.20.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -2682,6 +2682,14 @@ function zelle(art, id, feld, wertText, folgeName, klasse, platzhalter) {
 function minZuZeit(m) {
   return String(Math.floor(m / 60)).padStart(2,'0') + ':' + String(m % 60).padStart(2,'0');
 }
+/* "9:30" oder "0930" → Minuten seit Mitternacht, sonst null */
+function zeitZuMin(t) {
+  const m = /^\s*(\d{1,2})[:.]?(\d{2})\s*$/.exec(t || '');
+  if (!m) { return null; }
+  const st = parseInt(m[1], 10), mi = parseInt(m[2], 10);
+  if (st > 23 || mi > 59) { return null; }
+  return st * 60 + mi;
+}
 function terminNeu(min) {
   aufraeumen();
   editAkt = null; editKontakt = null;
@@ -2996,6 +3004,11 @@ function wocheText(e) {
   if (e.refArt === 'jahrestermin') {
     const j = JAHRESTERMINE.find(x => x.id === e.refId);
     return { t:j ? j.t : 'entfallen', herkunft:'Termin' };
+  }
+  if (e.refArt === 'termin') {
+    const t = TERMINE.find(x => x.id === e.refId);
+    if (!t) { return { t:'entfallen', herkunft:'Termin' }; }
+    return { t:t.t || '', herkunft:t.ganztags ? 'ganzt\u00e4gig' : (t.von || 'Termin') };
   }
   return { t:e.t || '', herkunft:'' };
 }
@@ -4551,6 +4564,12 @@ function monatText(e) {
     const bis = j.bis.slice(8) + '.' + j.bis.slice(5, 7) + '.';
     return { t:j.t, herkunft:'Termin', zusatz:(j.von !== j.bis ? 'bis ' + bis : '') };
   }
+  if (e.refArt === 'termin') {
+    const t = TERMINE.find(x => x.id === e.refId);
+    if (!t) { return { t:'entfallen', herkunft:'Termin', zusatz:'' }; }
+    return { t:t.t || '', herkunft:t.ganztags ? 'ganzt\u00e4gig' : (t.von || 'Termin'),
+             zusatz:'' };
+  }
   return { t:e.t || '', herkunft:'', zusatz:'' };
 }
 /* Findet einen Eintrag in beiden Beständen */
@@ -5122,7 +5141,8 @@ function eintragOeffnen(blatt, tag, id) {
   let e = null;
   if (id) { e = (blatt === 'woche') ? wocheFinde(id) : monatFinde(id); }
   let art;
-  if (e && e.refArt) { art = 'verweis'; }
+  if (e && e.refArt === 'termin') { art = 'termin'; }
+  else if (e && e.refArt) { art = 'verweis'; }
   else if (blatt === 'woche') { art = (e && e.zeit) ? 'termin' : (e ? 'notiz' : 'termin'); }
   else { art = (e && typeof e.tag === 'number' && e.tag > 0) ? 'ereignis'
                                                             : (e ? 'vorhaben' : 'ereignis'); }
@@ -5135,6 +5155,13 @@ function eintragOeffnen(blatt, tag, id) {
     titel: e ? (e.refArt ? (blatt === 'woche' ? wocheText(e).t : monatText(e).t) : (e.t || '')) : '',
     zeit: e ? (e.zeit || '') : '',
   };
+  if (e && e.refArt === 'termin') {
+    /* Der Verweis wird durchgereicht: bearbeitet wird der Termin selbst,
+       damit Wochen- und Tagesblatt nicht auseinanderlaufen.           */
+    const t = TERMINE.find(x => x.id === e.refId);
+    if (t) { edKontext.titel = t.t || ''; edKontext.zeit = t.ganztags ? '' : (t.von || ''); }
+    edKontext.refId = e.refId;
+  }
   eintragRender();
   $('eintrag').classList.add('auf');
   setTimeout(function () { const f = $('ed-titel'); if (f && edKontext.art !== 'verweis') { f.focus(); } }, 60);
@@ -5195,6 +5222,23 @@ function eintragRender() {
         'steht danach auch in der Checkliste. Der Eintrag hier ist ein Verweis darauf \u2014 ' +
         'einmal abhaken gen\u00fcgt.</div>';
     }
+    if (k.art === 'termin') {
+      h += '<div class="ed-hin">Ein Termin geht in den Kalender und steht danach auch ' +
+        'im Tagesblatt. <b>Ohne Uhrzeit</b> wird er ganzt\u00e4gig und erscheint oben ' +
+        'im Band \u00fcber der Chronik.</div>';
+    }
+    if (k.art === 'notiz') {
+      h += '<div class="ed-hin">Eine Notiz bleibt auf dem Wochenblatt \u2014 ohne Zeit ' +
+        'h\u00e4tte sie im Tagesblatt keinen Ort.</div>';
+    }
+    if (k.art === 'ereignis') {
+      h += '<div class="ed-hin">Ein Ereignis geht als ganzt\u00e4giger Termin in den ' +
+        'Kalender und steht danach auch im Tagesblatt.</div>';
+    }
+    if (k.art === 'vorhaben') {
+      h += '<div class="ed-hin">Ein Vorhaben bleibt auf dem Monatsblatt \u2014 ohne Tag ' +
+        'h\u00e4tte es im Kalender keinen Ort.</div>';
+    }
   }
 
   const ohneTag = (!woche && k.art === 'vorhaben');
@@ -5238,6 +5282,13 @@ function eintragZuordnen() {
 function eintragLoeschen() {
   const k = edKontext;
   if (!k || !k.id) { return; }
+  /* Ein hier angelegter Termin verschwindet mit seinem Eintrag — sonst
+     bliebe er im Kalender stehen, ohne dass man ihn hier noch sieht. */
+  const e = (k.blatt === 'woche') ? wocheFinde(k.id) : monatFinde(k.id);
+  if (e && e.refArt === 'termin') {
+    const i = TERMINE.findIndex(x => x.id === e.refId);
+    if (i !== -1) { TERMINE.splice(i, 1); }
+  }
   if (k.blatt === 'woche') { wocheLoeschen(k.id); } else { monatLoeschen(k.id); }
   eintragZu();
 }
@@ -5259,6 +5310,33 @@ function eintragSpeichern() {
   if (k.blatt === 'woche') {
     const b = wocheBlatt();
     let e = k.id ? wocheFinde(k.id) : null;
+    if (k.art === 'termin') {
+      /* Ein Termin ist ein Kalendereintrag, kein Zettel auf der Woche.
+         Ohne Uhrzeit wird er ganztägig und steht oben im Band.        */
+      const tag = (k.tag >= 0) ? k.tag : 0;
+      const datum = isoPlus(b.montag, tag);
+      const zeit = (k.zeit || '').trim();
+      let t = k.refId ? TERMINE.find(x => x.id === k.refId) : null;
+      if (!t) {
+        t = { id:naechsteId(), datum:datum, von:'', bis:'', ganztags:true, ort:'', t:'' };
+        TERMINE.push(t);
+      }
+      t.t = titel;
+      t.datum = datum;
+      const min = zeitZuMin(zeit);
+      if (zeit && min === null) { melde('Zeit bitte als hh:mm'); return; }
+      t.ganztags = (min === null);
+      t.von = (min === null) ? '' : minZuZeit(min);
+      t.bis = (min === null) ? '' : minZuZeit(Math.min(min + 60, 23 * 60 + 59));
+      if (!e) {
+        e = { id:naechsteId(), tag:tag, refArt:'termin', refId:t.id, glyph:'\u2022' };
+        b.eintraege.push(e);
+      } else if (typeof e.tag === 'number') { e.tag = tag; }
+      eintragZu(); renderAlles();
+      melde(zeit ? ('Termin am ' + dmyKurz(datum) + ' um ' + zeit)
+                 : ('Ganzt\u00e4giger Termin am ' + dmyKurz(datum)));
+      return;
+    }
     if (k.art === 'aufgabe' && !k.id) {
       /* Eine Aufgabe entsteht als echte Aktivitaet; das Wochenblatt
          traegt nur den Verweis darauf.                              */
@@ -5280,6 +5358,24 @@ function eintragSpeichern() {
 
   const b = monatBlatt();
   let e = k.id ? monatFinde(k.id) : null;
+  if (k.art === 'ereignis') {
+    /* Ein datiertes Ereignis gehört in den Kalender — ganztägig, weil
+       die Monatsvorausplanung keine Uhrzeiten kennt.                  */
+    const tag = Math.min(Math.max(k.tag, 1), monatTage());
+    const datum = monatOffen + '-' + String(tag).padStart(2, '0');
+    let t = (e && e.refArt === 'termin') ? TERMINE.find(x => x.id === e.refId) : null;
+    if (!t && !e) {
+      t = { id:naechsteId(), datum:datum, von:'', bis:'', ganztags:true, ort:'', t:'' };
+      TERMINE.push(t);
+      e = { id:naechsteId(), tag:tag, refArt:'termin', refId:t.id, glyph:'\u2022' };
+      b.ereignisse.push(e);
+    }
+    if (t) { t.t = titel; t.datum = datum; t.ganztags = true; }
+    if (e) { e.tag = tag; if (!e.refArt) { e.t = titel; } }
+    eintragZu(); renderAlles();
+    melde('Ereignis am ' + dmyKurz(datum) + ' \u00b7 steht ganzt\u00e4gig im Tagesblatt');
+    return;
+  }
   if (!e) {
     e = { id:naechsteId(), glyph:'\u2022', t:'' };
     if (k.art === 'ereignis') { e.tag = Math.min(Math.max(k.tag, 1), monatTage());
