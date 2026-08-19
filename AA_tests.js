@@ -1292,7 +1292,7 @@ kat('29 · Rhythmen anlegen und pflegen');
   });
 
   /* Muster wird gerechnet, nicht getippt */
-  const mM = JSK.match(/function rhMuster\(tage\) \{[\s\S]*?\n\}/);
+  const mM = JSK.match(/function rhMuster\(w\) \{[\s\S]*?\n\}/);
   if (mM) {
     let fn = null;
     try {
@@ -1301,11 +1301,17 @@ kat('29 · Rhythmen anlegen und pflegen');
     } catch (e) { fn = null; }
     if (!fn) { fail('rhMuster nicht auswertbar'); }
     else {
-      const F = [[[0,1,2,3,4,5,6], 'täglich'], [[0,1,2,3,4], 'Mo – Fr'],
-                 [[5,6], 'Wochenende'], [[0,2,4], 'Mo · Mi · Fr']];
+      const F = [
+        [{ typ:'woche', tage:[0,1,2,3,4,5,6], intervall:1 }, 'täglich'],
+        [{ typ:'woche', tage:[0,1,2,3,4], intervall:1 }, 'Mo – Fr'],
+        [{ typ:'woche', tage:[5,6], intervall:1 }, 'Wochenende'],
+        [{ typ:'woche', tage:[0,2,4], intervall:1 }, 'Mo · Mi · Fr'],
+        [{ typ:'woche', tage:[2], intervall:2 }, 'Mi, jede zweite Woche'],
+        [{ typ:'monat', monatstag:15 }, 'am 15. jedes Monats'],
+      ];
       let f = 0;
       F.forEach(function (x) {
-        if (fn(x[0]) !== x[1]) { f++; fail('rhMuster(' + x[0] + ') = ' + fn(x[0])); }
+        if (fn(x[0]) !== x[1]) { f++; fail('rhMuster: ' + fn(x[0]) + ' statt ' + x[1]); }
       });
       if (!f) { ok(F.length + ' Rhythmusmuster korrekt gebildet'); }
     }
@@ -1314,9 +1320,9 @@ kat('29 · Rhythmen anlegen und pflegen');
   const mS = JSK.match(/function rhSpeichern\(\) \{([\s\S]*?)\n\}/);
   if (!mS) { fail('rhSpeichern nicht auswertbar'); }
   else {
-    if (/e\.muster = rhMuster\(e\.tage\)/.test(mS[1])) {
-      ok('Mustertext folgt den gewählten Tagen');
-    } else { fail('Muster und Tage können auseinanderlaufen'); }
+    if (/e\.muster = rhMuster\(e\)/.test(mS[1])) {
+      ok('Mustertext folgt dem Rhythmus');
+    } else { fail('Muster und Rhythmus können auseinanderlaufen'); }
     if (/e\.soll = e\.tage\.length/.test(mS[1])) {
       ok('Soll einer Gewohnheit folgt ihren Tagen');
     } else { fail('Soll und Tage können auseinanderlaufen'); }
@@ -1391,6 +1397,165 @@ kat('30 · Anhänge und Vollsicherung');
   else { fail('pdf.js nicht eingebunden'); }
   if (/function pdfBausteinDa/.test(JS)) { ok('fehlender PDF-Baustein wird abgefangen'); }
   else { fail('kein Rückfall ohne pdf.js'); }
+}
+
+/* ═══ 31 · Rhythmus mit Intervall und Monatstag ════════════════════════
+   Fehlerarten: nur Wochentage umgesetzt, "jede zweite Woche" und "am 15."
+   fehlen; der Monatstag 31 lässt den Vorgang in kürzeren Monaten ganz
+   ausfallen; der Import wirft das Intervall weg; Streifen und Tagesblatt
+   entscheiden die Fälligkeit unterschiedlich.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('31 · Rhythmus mit Intervall und Monatstag');
+{
+  ['faelligAn', 'wochenAbstand', 'rhTyp'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  /* Die Fälligkeit wirklich rechnen, nicht nur auf Vorkommen prüfen */
+  const teile = ['isoPlus', 'isoWt', 'isoMontag', 'wochenAbstand', 'faelligAn']
+    .map(function (n) {
+      const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+      return m ? m[0] : null;
+    });
+  if (teile.indexOf(null) !== -1) { fail('Fälligkeitsfunktionen nicht auswertbar'); }
+  else {
+    let fn = null;
+    try { fn = new Function(teile.join('\n') + '\nreturn faelligAn;')(); }
+    catch (e) { fn = null; }
+    if (!fn) { fail('faelligAn nicht auswertbar'); }
+    else {
+      const F = [
+        [{ typ:'woche', tage:[2], intervall:2, ab:'2026-08-17' }, '2026-08-19', true],
+        [{ typ:'woche', tage:[2], intervall:2, ab:'2026-08-17' }, '2026-08-26', false],
+        [{ typ:'woche', tage:[2], intervall:2, ab:'2026-08-17' }, '2026-09-02', true],
+        [{ typ:'woche', tage:[0], intervall:4, ab:'2026-08-17' }, '2026-09-14', true],
+        [{ typ:'woche', tage:[0], intervall:4, ab:'2026-08-17' }, '2026-09-07', false],
+        [{ typ:'woche', tage:[0,4], intervall:1 }, '2026-08-21', true],
+        [{ typ:'monat', monatstag:15 }, '2026-08-15', true],
+        [{ typ:'monat', monatstag:15 }, '2026-08-14', false],
+        /* Der 31. muss in kürzeren Monaten auf den letzten Tag rücken */
+        [{ typ:'monat', monatstag:31 }, '2026-02-28', true],
+        [{ typ:'monat', monatstag:31 }, '2026-04-30', true],
+        [{ typ:'monat', monatstag:31 }, '2026-04-29', false],
+        [{ typ:'monat', monatstag:31 }, '2028-02-29', true],
+      ];
+      let f = 0;
+      F.forEach(function (x) {
+        if (fn(x[0], x[1]) !== x[2]) {
+          f++;
+          fail('faelligAn ' + JSON.stringify(x[0]) + ' am ' + x[1] + ' = ' + fn(x[0], x[1]));
+        }
+      });
+      if (!f) { ok(F.length + ' Fälligkeitsfälle korrekt, Monatsende und Schalttag geprüft'); }
+    }
+  }
+
+  /* Streifen und Tagesblatt müssen dieselbe Quelle nutzen */
+  const mSt = JSK.match(/function streifen\(obj, klickbar, fn\) \{([\s\S]*?)\n\}/);
+  if (mSt && /faelligAn\(obj, iso\)/.test(mSt[1])) {
+    ok('Streifen fragt die Fälligkeit');
+  } else { fail('Streifen prüft nur Wochentage'); }
+  const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
+  if (mT && /faelligAn\(x, tagOffen\)/.test(mT[1])) {
+    ok('Tagesblatt fragt dieselbe Fälligkeit');
+  } else { fail('Tagesblatt entscheidet anders als der Streifen'); }
+
+  const mR = JSK.match(/function rhRender\(\) \{([\s\S]*?)\n\}/);
+  if (mR && /rh-iv/.test(mR[1]) && /rh-mt/.test(mR[1]) && /rhTyp\(/.test(mR[1])) {
+    ok('Dialog bietet Intervall und Monatstag');
+  } else { fail('Dialog kennt nur Wochentage'); }
+
+  const mW = JSK.match(/function waUmwandeln\(d\) \{([\s\S]*?)\n\}/);
+  if (mW && /neu\.typ = 'monat'/.test(mW[1]) && /intervall:iv/.test(mW[1])) {
+    ok('Import überträgt Intervall und Monatsrhythmus');
+  } else { fail('Import wirft den Rhythmus weg'); }
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mM && /w\.typ = 'woche'/.test(mM[1]) && /w\.ab = isoMontag/.test(mM[1])) {
+    ok('Migration ergänzt Typ, Intervall und Anker');
+  } else { fail('Migration ergänzt den Rhythmus nicht'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 10) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
+/* ═══ 32 · Annotieren ══════════════════════════════════════════════════
+   Fehlerarten: die Striche werden im Anhang gespeichert und bei jedem
+   Strich fliegen alle Seitenbilder neu auf die Platte; Koordinaten in
+   Bildpunkten statt Anteilen — der Strich liegt nach einer Drehung
+   daneben; der Finger malt statt zu schieben; ein gelöschter Anhang
+   lässt seine Striche als Leiche zurück.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('32 · Annotieren');
+{
+  ['avZeichnen', 'avMalen', 'avStrichMalen', 'avPunkt', 'avRadieren',
+   'avZeigerBinden', 'avLeinwandPassen', 'avSichern', 'avZurueckNehmen',
+   'avSeiteLeeren', 'anStricheLesen', 'anStricheSchreiben']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  /* Striche gehören in einen eigenen Datensatz */
+  const mS = JSK.match(/function avSichern\(\) \{([\s\S]*?)\n\}/);
+  if (mS && /anStricheSchreiben/.test(mS[1]) && !/anSchreiben\(/.test(mS[1])) {
+    ok('Striche werden getrennt vom Anhang gespeichert');
+  } else { fail('jeder Strich schreibt alle Seitenbilder neu'); }
+  if (/put\(\{ id:id, striche:striche \}, 'str' \+ id\)/.test(JSK)) {
+    ok('eigener Schlüssel für die Striche');
+  } else { fail('kein eigener Schlüssel für die Striche'); }
+
+  /* Koordinaten als Anteil, nicht in Bildpunkten */
+  const mP = JSK.match(/function avPunkt\(ev\) \{([\s\S]*?)\n\}/);
+  if (mP && /\/ r\.width/.test(mP[1]) && /\/ r\.height/.test(mP[1])) {
+    ok('Koordinaten als Anteil der Bildbreite');
+  } else { fail('Koordinaten in Bildpunkten — Striche verrutschen bei Größenänderung'); }
+  const mM = JSK.match(/function avStrichMalen\(g, st, b, h\) \{([\s\S]*?)\n\}/);
+  if (mM && /st\.p\[0\]\[0\] \* b/.test(mM[1]) && /st\.b \* b \/ 1000/.test(mM[1])) {
+    ok('Strichbreite skaliert mit der Anzeige');
+  } else { fail('Strichbreite fest in Bildpunkten'); }
+
+  /* Radierer wirklich rechnen */
+  const mR = JSK.match(/function avRadieren\(pt\) \{[\s\S]*?\n\}/);
+  if (mR) {
+    let fn = null;
+    try {
+      fn = new Function('zustand',
+        'let avSeite = zustand.seite, avStriche = zustand.striche;' +
+        'const $ = () => ({ clientWidth: 800 });' +
+        'const avMalen = () => {}; const avSichernSpaeter = () => {};' +
+        mR[0] + '\nreturn function (pt) { avRadieren(pt); return avStriche[avSeite].length; };');
+    } catch (e) { fn = null; }
+    if (!fn) { fail('avRadieren nicht auswertbar'); }
+    else {
+      const bau = () => ({ seite:0,
+        striche:{ 0:[{ f:'x', b:3, p:[[0.1,0.1],[0.5,0.5],[0.9,0.2]] }] } });
+      const treffer = fn(bau())([0.5, 0.5]);
+      const daneben = fn(bau())([0.3, 0.8]);
+      if (treffer === 0 && daneben === 1) { ok('Radierer trifft nur den gemeinten Strich'); }
+      else { fail('Radierer: Treffer=' + treffer + ' Daneben=' + daneben); }
+    }
+  }
+
+  /* Der Finger soll schieben können, solange der Stift zeichnet */
+  const mB = JSK.match(/function avZeigerBinden\(\) \{([\s\S]*?)\n\}/);
+  if (mB && /ev\.pointerType === 'pen' \|\| avStift/.test(mB[1])) {
+    ok('Stift zeichnet immer, der Finger nur im Zeichenbetrieb');
+  } else { fail('der Finger malt und die Seite lässt sich nicht schieben'); }
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  if (/\.av-flaeche canvas \{[^}]*touch-action:\s*none/.test(css)) {
+    ok('Zeichenfläche unterdrückt die Gestenerkennung');
+  } else { fail('ohne touch-action:none scrollt die Seite beim Zeichnen'); }
+
+  const mL = JSK.match(/function anLoesen\(notizId, anId\) \{([\s\S]*?)\n\}/);
+  if (mL && /delete\('str' \+ anId\)/.test(mL[1])) {
+    ok('Löschen räumt auch die Striche weg');
+  } else { fail('Striche bleiben als Leiche zurück'); }
+
+  if (/if \(avId !== null\) \{ avLeinwandPassen\(\); avMalen\(\); \}/.test(JSK)) {
+    ok('Zeichenebene folgt einer Größenänderung');
+  } else { fail('nach einer Drehung liegt der Strich neben dem Stift'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

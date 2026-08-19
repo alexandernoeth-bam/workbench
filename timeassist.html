@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 2.14.0 · Anhänge</title>
+<title>TimeAssist 2.16.0 · Annotieren</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -642,6 +642,21 @@ input, textarea { font: inherit; color: inherit; }
                   background: var(--marke-h); }
 .tz-heute.vor { color: var(--tinte-3); }
 
+/* Zeichenebene über dem Anhang */
+.av-werkzeuge { display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+                padding: 7px 12px; background: var(--papier-2);
+                border-bottom: 1px solid var(--linie); }
+.av-w { min-width: 40px; min-height: 38px; border: 1px solid var(--linie);
+        border-radius: 6px; background: var(--karte); font-size: 16px;
+        color: var(--tinte-2); padding: 0 9px; display: inline-flex;
+        align-items: center; justify-content: center; }
+.av-w.an { background: var(--wein); border-color: var(--wein); color: var(--papier); }
+.av-p { display: block; width: 20px; background: currentColor; border-radius: 3px; }
+.av-f { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--linie); }
+.av-f.an { border-color: var(--wein); box-shadow: 0 0 0 2px var(--wein-h); }
+.av-flaeche { position: relative; display: inline-block; line-height: 0; }
+.av-flaeche canvas { position: absolute; left: 0; top: 0; touch-action: none; }
+
 /* Anhänge: Vorschau und Vollansicht */
 .an-reihe { display: flex; flex-wrap: wrap; gap: 10px; }
 .an-k { position: relative; width: 130px; border: 1px solid var(--linie);
@@ -653,6 +668,9 @@ input, textarea { font: inherit; color: inherit; }
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .an-k .mon-x { position: absolute; top: 3px; right: 3px; background: var(--karte);
                border-radius: 4px; opacity: .9; }
+.an-mark { position: absolute; left: 4px; top: 4px; font-size: 10.2px;
+           background: var(--wein); color: var(--papier); border-radius: 3px;
+           padding: 1px 5px; letter-spacing: .04em; }
 .an-neu { width: 130px; height: 178px; border: 1.4px dashed var(--marke);
           border-radius: 6px; background: none; color: var(--marke);
           font-size: 13.2px; }
@@ -1091,6 +1109,7 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
       <button class="k-btn" id="av-vor" onclick="avBlaettern(1)">›</button>
       <button class="k-btn pri" onclick="avZu()">Schließen</button>
     </div>
+    <div class="av-werkzeuge" id="av-werkzeuge"></div>
     <div class="av-blatt" id="av-blatt"></div>
   </div>
 </div>
@@ -1102,7 +1121,7 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
 <script>
 'use strict';
 
-const APP_VERSION = '2.14.0';
+const APP_VERSION = '2.16.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -1117,7 +1136,7 @@ const APP_VERSION = '2.14.0';
    push und splice wirken dadurch unverändert weiter.
    Die SAAT_-Werte sind nur die Erstbefüllung beim allerersten Start.
    ═══════════════════════════════════════════════════════════════════ */
-const DB_VERSION = 9;
+const DB_VERSION = 10;
 
 /* Gruppe: die Ebene ueber dem Bereich. Im Ringbuch ist sie das Register,
    hinter dem mehrere Aktivitaeten-Checklisten liegen. Gepflegte Liste,
@@ -1289,7 +1308,12 @@ function ferienAn(iso) {
   return f ? f.t : null;
 }
 
-/* Wiederkehrend: t, b, min, muster, tage[], log{}                        */
+/* Wiederkehrend: t, b, min, typ, tage[], intervall, monatstag, ab,
+   muster (gerechnet), log{}, zielId.
+     typ 'woche'  — an den gewählten Wochentagen, jede intervall-te Woche
+     typ 'monat'  — an einem festen Tag im Monat
+   ab ist der Anker für die Intervallzählung; ohne ihn liesse sich
+   "jede zweite Woche" nicht bestimmen.                                 */
 const SAAT_WIEDER = [
   { id:201, t:'Rudern — 20 Minuten',      b:'b3', min:20, muster:'täglich',     tage:[0,1,2,3,4,5,6], log:{0:'✕',1:'✕',2:'•'}, zielId:null },
   { id:202, t:'Ablage leeren',            b:'b5', min:15, muster:'Mo · Mi · Fr', tage:[0,2,4],        log:{0:'✕',2:'•'},       zielId:'z1' },
@@ -1594,7 +1618,15 @@ function migriereDB(d) {
   (d.notizen || []).forEach(function (n) {
     if (n.text === undefined) { n.text = ''; }
     if (n.quelle === undefined) { n.quelle = ''; }
-    /* Version 8 → 9: Anhänge. Die Bilder selbst liegen in einem eigenen
+    /* Version 9 → 10: Rhythmus mit Intervall und Monatstag */
+  (d.wieder || []).forEach(function (w) {
+    if (!w.typ) { w.typ = 'woche'; }
+    if (!w.intervall) { w.intervall = 1; }
+    if (w.monatstag === undefined) { w.monatstag = 1; }
+    if (!w.ab) { w.ab = isoMontag(isoHeute()); }
+    if (!Array.isArray(w.tage)) { w.tage = [0]; }
+  });
+  /* Version 8 → 9: Anhänge. Die Bilder selbst liegen in einem eigenen
        Speicherbereich, hier stehen nur ihre Nummern.                  */
     if (!Array.isArray(n.anhaenge)) { n.anhaenge = []; }
     delete n.art;
@@ -1805,6 +1837,31 @@ function anAlle() {
     });
   });
 }
+/* Striche liegen als eigener Datensatz neben dem Anhang. Wuerden sie im
+   Anhang stehen, muesste bei jedem Strich die ganze Datei mit allen
+   Seitenbildern neu geschrieben werden — bei einem fuenfseitigen PDF
+   sind das Megabyte im Sekundentakt.                                  */
+function anStricheLesen(id) {
+  return anOeffnen().then(function (d) {
+    return new Promise(function (fertig) {
+      if (!d.objectStoreNames.contains(AN_STORE)) { fertig(null); return; }
+      const t = d.transaction(AN_STORE, 'readonly').objectStore(AN_STORE).get('str' + id);
+      t.onsuccess = function () { fertig(t.result || null); };
+      t.onerror = function () { fertig(null); };
+    });
+  });
+}
+function anStricheSchreiben(id, striche) {
+  return anOeffnen().then(function (d) {
+    return new Promise(function (fertig) {
+      const tx = d.transaction(AN_STORE, 'readwrite');
+      tx.objectStore(AN_STORE).put({ id:id, striche:striche }, 'str' + id);
+      tx.oncomplete = function () { fertig(true); };
+      tx.onerror = function () { fertig(false); };
+    });
+  });
+}
+
 /* Zwischenspeicher für die Anzeige — sonst laeuft je Neuzeichnung ein
    Lesevorgang je Anhang.                                              */
 const anCache = {};
@@ -1955,6 +2012,37 @@ function mdZuHtml(txt) {
   });
   listeZu(-1);
   return h || '<p class="a-neu">Noch nichts geschrieben.</p>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FÄLLIGKEIT EINES WIEDERKEHRENDEN VORGANGS
+   Wochentage allein reichen nicht: es gibt "jede zweite Woche" und
+   "am 15. jedes Monats". Beides wird hier entschieden, damit Streifen,
+   Tagesblatt und PDF dieselbe Antwort geben.
+   ═══════════════════════════════════════════════════════════════════ */
+function wochenAbstand(isoA, isoB) {
+  const a = Date.parse(isoMontag(isoA));
+  const b = Date.parse(isoMontag(isoB));
+  return Math.round((b - a) / 604800000);
+}
+function faelligAn(w, iso) {
+  if (!w) { return false; }
+  if (w.typ === 'monat') {
+    const jahr = parseInt(iso.slice(0, 4), 10);
+    const monat = parseInt(iso.slice(5, 7), 10);
+    const tag = parseInt(iso.slice(8), 10);
+    const letzter = new Date(Date.UTC(jahr, monat, 0)).getUTCDate();
+    /* Der 31. in einem 30-Tage-Monat rutscht auf den letzten Tag,
+       sonst fiele der Vorgang in diesen Monaten ganz aus.           */
+    const soll = Math.min(w.monatstag || 1, letzter);
+    return tag === soll;
+  }
+  const tage = Array.isArray(w.tage) ? w.tage : [];
+  if (tage.indexOf(isoWt(iso)) === -1) { return false; }
+  const iv = w.intervall || 1;
+  if (iv <= 1) { return true; }
+  const n = wochenAbstand(w.ab || isoMontag(iso), iso);
+  return ((n % iv) + iv) % iv === 0;
 }
 
 /* ═══ REGISTER ═══ */
@@ -2742,7 +2830,7 @@ function blattTag() {
   /* Heute faellige wiederkehrende Vorgaenge. Sie kosten Zeit und gehoeren
      deshalb auf den Tagesplan — aber in einen eigenen Block, damit sie
      sich nicht unter die bewusst gehobenen Aktivitaeten mischen.       */
-  const wk = WIEDER.filter(x => x.tage.indexOf(isoWt(tagOffen)) !== -1);
+  const wk = WIEDER.filter(x => faelligAn(x, tagOffen));
   if (wk.length) {
     const summe = wk.reduce(function (n, x) { return n + x.min; }, 0);
     rechts += '<div class="abschnitt">' +
@@ -3201,14 +3289,15 @@ function heuteWeg(id) {
 
 /* ═══ BLATT: WIEDERKEHREND (CMP 03) ═══ */
 function streifen(obj, klickbar, fn) {
-  /* Der Streifen zeigt die Woche des angezeigten Tages und schreibt in
-     das Datum, nicht in eine Wochentagsziffer — sonst überschreibt sich
-     jede Woche selbst.                                                 */
   const mo = isoMontag(tagOffen);
   let h = '<div class="str">';
   for (let d = 0; d < 7; d++) {
     const iso = isoPlus(mo, d);
-    const moeglich = obj.tage.indexOf(d) !== -1;
+    /* Gewohnheiten kennen nur Wochentage, wiederkehrende Vorgaenge
+       zusaetzlich Intervall und Monatstag.                          */
+    const moeglich = (fn === 'gewWeiter')
+      ? (obj.tage.indexOf(d) !== -1)
+      : faelligAn(obj, iso);
     const z = obj.log[iso] || (moeglich ? '\u2022' : '');
     const kl = 'str-t ' + (moeglich ? '' : 'aus') + ' ' +
                (iso === tagOffen ? 'heute' : '');
@@ -3273,7 +3362,7 @@ function blattGewohnheit() {
     const erf = [0,1,2,3,4,5,6].filter(d => g.log[isoPlus(mo, d)] === '\u2715').length;
     return '<div class="wk-z">' +
       '<span class="wk-t" onclick="rhOeffnen(\'gew\',' + g.id + ')">' + esc(g.t) +
-      '<div class="t-meta">' + esc(g.ziel || rhMuster(g.tage)) +
+      '<div class="t-meta">' + esc(g.ziel || rhMuster({ typ:'woche', tage:g.tage, intervall:1 })) +
       (g.zielId ? ' \u00b7 Ziel' : '') + '</div></span>' +
       streifen(g, true, 'gewWeiter') +
       '<span class="tz-min" style="flex:0 0 44px">' + erf + '/' + (g.soll || g.tage.length) +
@@ -4160,6 +4249,16 @@ function blattNotizBlatt(id) {
       k.querySelector('.an-bild').style.backgroundImage = 'url(' + a.seiten[0] + ')';
       k.querySelector('.an-n').textContent = a.name +
         (a.seiten.length > 1 ? ' \u00b7 ' + a.seiten.length + ' S.' : '');
+      anStricheLesen(id).then(function (r) {
+        const n = r && r.striche
+          ? Object.keys(r.striche).reduce(function (m, k2) {
+              return m + (r.striche[k2] ? r.striche[k2].length : 0); }, 0)
+          : 0;
+        if (n) {
+          k.insertAdjacentHTML('beforeend',
+            '<span class="an-mark">' + n + ' Striche</span>');
+        }
+      });
     });
   });
   fokusSetzen();
@@ -5225,8 +5324,9 @@ function rhNeu(art) {
   rhFrage = false;
   rhEntwurf = (art === 'gew')
     ? { id:naechsteId(), t:'', ziel:'', soll:5, tage:[0,1,2,3,4], log:{}, zielId:null }
-    : { id:naechsteId(), t:'', b:ersterBereichId(), min:15, muster:'',
-        tage:[0,1,2,3,4], log:{}, zielId:null };
+    : { id:naechsteId(), t:'', b:ersterBereichId(), min:15, typ:'woche',
+        tage:[0,1,2,3,4], intervall:1, monatstag:1, ab:isoMontag(isoHeute()),
+        muster:'', log:{}, zielId:null };
   rhRender();
   $('rh').classList.add('auf');
   setTimeout(function () { const f = $('rh-t'); if (f) { f.focus(); } }, 60);
@@ -5248,6 +5348,10 @@ function rhMerken() {
   const m = $('rh-min'); if (m) { rhEntwurf.min = parseInt(m.value, 10) || 0; }
   const b = $('rh-b'); if (b) { rhEntwurf.b = b.value; }
   const z = $('rh-ziel'); if (z) { rhEntwurf.zielId = z.value || null; }
+  const iv = $('rh-iv');
+  if (iv) { rhEntwurf.intervall = Math.max(1, parseInt(iv.value, 10) || 1); }
+  const mt = $('rh-mt');
+  if (mt) { rhEntwurf.monatstag = Math.min(31, Math.max(1, parseInt(mt.value, 10) || 1)); }
 }
 function rhTag(d) {
   rhMerken();
@@ -5267,28 +5371,52 @@ function rhLoeschen() {
 }
 /* Das Muster beschreibt den Rhythmus in Worten — es wird aus den Tagen
    gebildet, damit Text und Tage nicht auseinanderlaufen.              */
-function rhMuster(tage) {
+function rhMuster(w) {
+  /* Der Mustertext wird aus dem Rhythmus gebildet — zwei Angaben, die
+     dasselbe meinen, liefen sonst auseinander.                        */
+  if (w.typ === 'monat') {
+    return 'am ' + (w.monatstag || 1) + '. jedes Monats';
+  }
+  const tage = Array.isArray(w.tage)
+    ? w.tage.slice().sort(function (a, b) { return a - b; }) : [];
   if (!tage.length) { return 'kein Tag gew\u00e4hlt'; }
-  if (tage.length === 7) { return 't\u00e4glich'; }
-  if (tage.length === 5 && tage.join() === '0,1,2,3,4') { return 'Mo \u2013 Fr'; }
-  if (tage.length === 2 && tage.join() === '5,6') { return 'Wochenende'; }
-  return tage.map(d => WOKURZ[d]).join(' \u00b7 ');
+  let basis;
+  if (tage.length === 7) { basis = 't\u00e4glich'; }
+  else if (tage.length === 5 && tage.join() === '0,1,2,3,4') { basis = 'Mo \u2013 Fr'; }
+  else if (tage.length === 2 && tage.join() === '5,6') { basis = 'Wochenende'; }
+  else { basis = tage.map(d => WOKURZ[d]).join(' \u00b7 '); }
+  const iv = w.intervall || 1;
+  if (iv === 2) { return basis + ', jede zweite Woche'; }
+  if (iv > 2) { return basis + ', alle ' + iv + ' Wochen'; }
+  return basis;
+}
+/* Wechsel zwischen woechentlich und monatlich */
+function rhTyp(t) {
+  rhMerken();
+  rhEntwurf.typ = t;
+  if (t === 'woche' && !rhEntwurf.tage.length) { rhEntwurf.tage = [0]; }
+  rhRender();
 }
 function rhSpeichern() {
   rhMerken();
   const e = rhEntwurf;
   if (!e) { return; }
   if (!e.t.trim()) { melde('Ohne Bezeichnung geht es nicht'); return; }
-  if (!e.tage.length) { melde('Mindestens einen Wochentag w\u00e4hlen'); return; }
+  if (rhArt !== 'gew' && e.typ === 'monat') {
+    e.tage = [];
+  } else if (!e.tage.length) {
+    melde('Mindestens einen Wochentag w\u00e4hlen');
+    return;
+  }
   e.t = e.t.trim();
-  e.muster = rhMuster(e.tage);
   if (rhArt === 'gew') {
-    /* Das Soll folgt den gewählten Tagen — zwei Zahlen, die dasselbe
-       meinen, laufen sonst auseinander.                               */
     e.soll = e.tage.length;
-    e.ziel = rhMuster(e.tage);
+    e.ziel = rhMuster({ typ:'woche', tage:e.tage, intervall:1 });
     delete e.b;
     delete e.min;
+  } else {
+    if (!e.ab) { e.ab = isoMontag(isoHeute()); }
+    e.muster = rhMuster(e);
   }
   const l = rhListe(rhArt);
   const i = l.findIndex(x => x.id === e.id);
@@ -5314,13 +5442,36 @@ function rhRender() {
       '<select id="rh-b">' + bOpt + '</select></div>' +
       '<div class="jt-feld"><label>Minuten</label>' +
       '<input id="rh-min" value="' + (e.min || 0) + '" inputmode="numeric"></div>';
+    h += '<div class="ed-l">Rhythmus</div><div class="ed-art">' +
+      '<button class="ed-a ' + (e.typ !== 'monat' ? 'aktiv' : '') +
+      '" onclick="rhTyp(\'woche\')">W\u00f6chentlich</button>' +
+      '<button class="ed-a ' + (e.typ === 'monat' ? 'aktiv' : '') +
+      '" onclick="rhTyp(\'monat\')">Monatlich</button></div>';
   }
-  h += '<div class="ed-l">An welchen Tagen?</div><div class="ed-tage">';
-  for (let d = 0; d < 7; d++) {
-    h += '<button class="ed-t ' + (e.tage.indexOf(d) !== -1 ? 'aktiv' : '') +
-      '" onclick="rhTag(' + d + ')">' + WOKURZ[d] + '</button>';
+
+  if (!gew && e.typ === 'monat') {
+    h += '<div class="jt-feld"><label>Tag im Monat</label>' +
+      '<input id="rh-mt" value="' + (e.monatstag || 1) + '" inputmode="numeric"></div>' +
+      '<div class="ed-hin">1 bis 31. In k\u00fcrzeren Monaten r\u00fcckt der Vorgang auf ' +
+      'den letzten Tag, statt auszufallen.</div>';
+  } else {
+    h += '<div class="ed-l">An welchen Tagen?</div><div class="ed-tage">';
+    for (let d = 0; d < 7; d++) {
+      h += '<button class="ed-t ' + (e.tage.indexOf(d) !== -1 ? 'aktiv' : '') +
+        '" onclick="rhTag(' + d + ')">' + WOKURZ[d] + '</button>';
+    }
+    h += '</div>';
+    if (!gew) {
+      h += '<div class="jt-feld" style="margin-top:12px">' +
+        '<label>Jede wievielte Woche</label>' +
+        '<input id="rh-iv" value="' + (e.intervall || 1) + '" inputmode="numeric"></div>' +
+        '<div class="ed-hin">1 = jede Woche. Gez\u00e4hlt wird ab der Woche des ' +
+        esc(dmyKurz(e.ab || isoMontag(isoHeute()))) + '</div>';
+    }
   }
-  h += '</div><div class="ed-hin">' + esc(rhMuster(e.tage)) +
+  h += '<div class="ed-hin"><b>' + esc(gew
+        ? rhMuster({ typ:'woche', tage:e.tage, intervall:1 })
+        : rhMuster(e)) + '</b>' +
     (gew ? ' \u00b7 Soll: ' + e.tage.length + ' von 7' : '') + '</div>';
 
   const zOpt = '<option value="">\u2014 kein Ziel \u2014</option>' +
@@ -5441,23 +5592,49 @@ function anLoesen(notizId, anId) {
     if (i !== -1) { n.anhaenge.splice(i, 1); }
   }
   anEntfernen(anId);
+  anOeffnen().then(function (d) {
+    /* Auch der Strichdatensatz muss weg, sonst bleibt er verwaist */
+    const tx = d.transaction(AN_STORE, 'readwrite');
+    tx.objectStore(AN_STORE).delete('str' + anId);
+  });
   delete anCache[anId];
   renderAlles();
   melde('Anhang entfernt');
 }
 
-/* ── Vollansicht ─────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   VOLLANSICHT UND ANNOTIEREN
+   Die Striche liegen in Anteilen der Bildbreite (0 bis 1), nicht in
+   Bildpunkten. Nur so sehen sie auf jeder Anzeigegroesse gleich aus und
+   bleiben richtig, wenn das Fenster sich aendert.
+   Ein Strich: { f:Farbe, b:Breite in Promille der Breite, p:[[x,y],…] }
+   ═══════════════════════════════════════════════════════════════════ */
 let avId = null, avSeite = 0;
+let avStriche = {};          // Seitennummer → Liste von Strichen
+let avStift = false;         // Zeichenbetrieb: auch der Finger malt
+let avFarbe = '#900c24';
+let avBreite = 3;
+let avRadierer = false;
+let avAktiv = null;          // Strich, der gerade entsteht
+let avSpTimer = null;
+
+const AV_FARBEN = ['#23211e', '#900c24', '#2f5f86', '#3f6b45'];
+const AV_BREITEN = [1.6, 3, 6];
+
 function anVoll(id, seite) {
   avId = id;
   avSeite = seite || 0;
-  anHolen(id).then(function (a) {
+  avAktiv = null;
+  Promise.all([anHolen(id), anStricheLesen(id)]).then(function (r) {
+    const a = r[0];
     if (!a) { melde('Anhang nicht gefunden'); return; }
+    avStriche = (r[1] && r[1].striche) ? r[1].striche : {};
     avZeichnen(a);
     $('av').classList.add('auf');
   });
 }
 function avBlaettern(n) {
+  avSichern();
   anHolen(avId).then(function (a) {
     if (!a) { return; }
     avSeite = Math.min(Math.max(avSeite + n, 0), a.seiten.length - 1);
@@ -5467,13 +5644,172 @@ function avBlaettern(n) {
 function avZeichnen(a) {
   $('av-titel').textContent = a.name;
   $('av-seite').textContent = (avSeite + 1) + ' / ' + a.seiten.length;
-  $('av-blatt').innerHTML = '<img src="' + a.seiten[avSeite] + '" alt="' +
-    esc(a.name) + '">';
+  $('av-blatt').innerHTML = '<div class="av-flaeche" id="av-flaeche">' +
+    '<img id="av-bild" src="' + a.seiten[avSeite] + '" alt="' + esc(a.name) + '">' +
+    '<canvas id="av-lein"></canvas></div>';
   $('av-zurueck').style.visibility = (avSeite > 0) ? '' : 'hidden';
   $('av-vor').style.visibility = (avSeite < a.seiten.length - 1) ? '' : 'hidden';
+  avWerkzeugeZeichnen();
+  const bild = $('av-bild');
+  const fertig = function () { avLeinwandPassen(); avMalen(); };
+  if (bild.complete) { fertig(); } else { bild.onload = fertig; }
+  avZeigerBinden();
 }
-function avZu() { $('av').classList.remove('auf'); avId = null; }
-
+/* Die Leinwand deckt sich mit dem angezeigten Bild, nicht mit dessen
+   Urgroesse — sonst laege der Strich neben dem Stift.                 */
+function avLeinwandPassen() {
+  const bild = $('av-bild'), c = $('av-lein');
+  if (!bild || !c) { return; }
+  const b = bild.clientWidth, h = bild.clientHeight;
+  if (!b || !h) { return; }
+  const dpr = window.devicePixelRatio || 1;
+  c.style.width = b + 'px';
+  c.style.height = h + 'px';
+  c.width = Math.round(b * dpr);
+  c.height = Math.round(h * dpr);
+  const g = c.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function avMalen() {
+  const c = $('av-lein');
+  if (!c) { return; }
+  const g = c.getContext('2d');
+  const b = c.clientWidth, h = c.clientHeight;
+  g.clearRect(0, 0, b, h);
+  const liste = avStriche[avSeite] || [];
+  liste.forEach(function (st) { avStrichMalen(g, st, b, h); });
+  if (avAktiv) { avStrichMalen(g, avAktiv, b, h); }
+}
+function avStrichMalen(g, st, b, h) {
+  if (!st.p.length) { return; }
+  g.strokeStyle = st.f;
+  g.lineWidth = Math.max(1, st.b * b / 1000);
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  g.beginPath();
+  g.moveTo(st.p[0][0] * b, st.p[0][1] * h);
+  for (let i = 1; i < st.p.length; i++) { g.lineTo(st.p[i][0] * b, st.p[i][1] * h); }
+  if (st.p.length === 1) { g.lineTo(st.p[0][0] * b + 0.1, st.p[0][1] * h); }
+  g.stroke();
+}
+function avPunkt(ev) {
+  const c = $('av-lein');
+  const r = c.getBoundingClientRect();
+  return [(ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height];
+}
+/* Der Radierer nimmt den ganzen Strich — punktgenaues Wegwischen waere
+   auf einer Vektorebene teuer und traefe selten das Gemeinte.        */
+function avRadieren(pt) {
+  const liste = avStriche[avSeite] || [];
+  const c = $('av-lein');
+  const b = c.clientWidth || 1;
+  const nah = 14 / b;
+  for (let i = liste.length - 1; i >= 0; i--) {
+    const st = liste[i];
+    for (let j = 0; j < st.p.length; j++) {
+      const dx = st.p[j][0] - pt[0], dy = st.p[j][1] - pt[1];
+      if (Math.sqrt(dx * dx + dy * dy) < nah) {
+        liste.splice(i, 1);
+        avMalen();
+        avSichernSpaeter();
+        return;
+      }
+    }
+  }
+}
+function avZeigerBinden() {
+  const c = $('av-lein');
+  if (!c) { return; }
+  const malt = function (ev) {
+    /* Der Stift schreibt immer; der Finger nur im Zeichenbetrieb —
+       sonst koennte man die Seite nicht mehr schieben.               */
+    return ev.pointerType === 'pen' || avStift;
+  };
+  c.addEventListener('pointerdown', function (ev) {
+    if (!malt(ev)) { return; }
+    ev.preventDefault();
+    c.setPointerCapture(ev.pointerId);
+    if (avRadierer || ev.pointerType === 'eraser') { avRadieren(avPunkt(ev)); return; }
+    avAktiv = { f:avFarbe, b:avBreite, p:[avPunkt(ev)] };
+  });
+  c.addEventListener('pointermove', function (ev) {
+    if (!malt(ev)) { return; }
+    if (avRadierer || ev.pointerType === 'eraser') {
+      if (ev.buttons) { ev.preventDefault(); avRadieren(avPunkt(ev)); }
+      return;
+    }
+    if (!avAktiv) { return; }
+    ev.preventDefault();
+    avAktiv.p.push(avPunkt(ev));
+    avMalen();
+  });
+  const schluss = function () {
+    if (!avAktiv) { return; }
+    if (avAktiv.p.length) {
+      if (!avStriche[avSeite]) { avStriche[avSeite] = []; }
+      avStriche[avSeite].push(avAktiv);
+    }
+    avAktiv = null;
+    avMalen();
+    avSichernSpaeter();
+  };
+  c.addEventListener('pointerup', schluss);
+  c.addEventListener('pointercancel', schluss);
+  c.addEventListener('pointerleave', schluss);
+}
+function avWerkzeugeZeichnen() {
+  const k = function (inhalt, aktion, an, titel) {
+    return '<button class="av-w' + (an ? ' an' : '') + '" onclick="' + aktion +
+      '" title="' + esc(titel) + '">' + inhalt + '</button>';
+  };
+  let h = k('\u270e', 'avStiftUm()', avStift, 'Zeichnen mit dem Finger') +
+    k('\u232b', 'avRadiererUm()', avRadierer, 'Radierer') +
+    '<span class="md-tr"></span>';
+  h += AV_FARBEN.map(function (f) {
+    return '<button class="av-f' + (f === avFarbe && !avRadierer ? ' an' : '') +
+      '" style="background:' + f + '" onclick="avFarbeSetzen(\'' + f + '\')" ' +
+      'title="Farbe"></button>';
+  }).join('');
+  h += '<span class="md-tr"></span>';
+  h += AV_BREITEN.map(function (b) {
+    return '<button class="av-w' + (b === avBreite ? ' an' : '') +
+      '" onclick="avBreiteSetzen(' + b + ')" title="Strichst\u00e4rke">' +
+      '<span class="av-p" style="height:' + Math.max(2, b) + 'px"></span></button>';
+  }).join('');
+  h += '<span class="md-tr"></span>' +
+    k('\u21b6', 'avZurueckNehmen()', false, 'Letzten Strich zur\u00fccknehmen') +
+    k('Seite leeren', 'avSeiteLeeren()', false, 'Alle Striche dieser Seite');
+  $('av-werkzeuge').innerHTML = h;
+}
+function avStiftUm() { avStift = !avStift; if (avStift) { avRadierer = false; } avWerkzeugeZeichnen(); }
+function avRadiererUm() { avRadierer = !avRadierer; avWerkzeugeZeichnen(); }
+function avFarbeSetzen(f) { avFarbe = f; avRadierer = false; avWerkzeugeZeichnen(); }
+function avBreiteSetzen(b) { avBreite = b; avRadierer = false; avWerkzeugeZeichnen(); }
+function avZurueckNehmen() {
+  const l = avStriche[avSeite];
+  if (l && l.length) { l.pop(); avMalen(); avSichernSpaeter(); }
+}
+function avSeiteLeeren() {
+  avStriche[avSeite] = [];
+  avMalen();
+  avSichernSpaeter();
+}
+function avSichernSpaeter() {
+  clearTimeout(avSpTimer);
+  avSpTimer = setTimeout(avSichern, 900);
+}
+function avSichern() {
+  if (avId === null) { return; }
+  clearTimeout(avSpTimer);
+  anStricheSchreiben(avId, avStriche);
+}
+function avZu() {
+  avSichern();
+  $('av').classList.remove('auf');
+  avId = null;
+  avAktiv = null;
+  renderAlles();
+}
 /* ═══ ARCHIV (CMP 41) ═══════════════════════════════════════════════
    Archivierte Pläne werden nicht kopiert, sondern nur ausgeblendet.
    Von hier aus lassen sie sich öffnen und wieder aktivieren.
@@ -5658,7 +5994,7 @@ function exportAuf() {
              '  ' + esc(a.t) + '</div>';
     }).join('');
 
-    const wk = WIEDER.filter(x => x.tage.indexOf(isoWt(tagOffen)) !== -1);
+    const wk = WIEDER.filter(x => faelligAn(x, tagOffen));
     if (wk.length) {
       inhalt += '<div class="move-l">Wiederkehrend</div>';
       inhalt += wk.map(function (x) {
@@ -5980,22 +6316,25 @@ function waUmwandeln(d) {
       let tage = Array.isArray(w.wochentage) ? w.wochentage.slice() : [];
       /* WorkAssist zählt 0 = Sonntag, TimeAssist 0 = Montag */
       tage = tage.map(function (t) { return (t + 6) % 7; }).sort();
-      let muster;
-      if (w.typ === 'monatlich') { muster = 'monatlich'; }
-      else if (!tage.length) {
-        /* Kein Wochentag hinterlegt: das Intervall ist die Aussage.
-           Sieben Tage anzunehmen wäre erfunden.                       */
-        const iv = parseInt(w.intervall, 10) || 1;
-        muster = (iv > 1) ? ('alle ' + iv + ' Wochen') : 'wöchentlich';
-        tage = [0];
-      } else {
-        const iv = parseInt(w.intervall, 10) || 1;
-        muster = tage.map(t => WOKURZ[t]).join(' \u00b7 ') +
-                 (iv > 1 ? ' \u00b7 alle ' + iv + ' Wochen' : '');
-      }
-      wieder.push({ id:naechsteId(), t:a.titel, b:bereichVon(a),
+      const iv = Math.max(1, parseInt(w.intervall, 10) || 1);
+      const neu = { id:naechsteId(), t:a.titel, b:bereichVon(a),
                     min:parseInt(a.groesse, 10) || 0,
-                    muster:muster, tage:tage, log:{}, zielId:null });
+                    typ:'woche', tage:tage, intervall:iv, monatstag:1,
+                    ab:isoMontag(isoHeute()), muster:'', log:{}, zielId:null };
+      if (w.typ === 'monatlich') {
+        /* Der Monatstag steht in WorkAssist nicht am Rhythmus, sondern
+           allenfalls am Fälligkeitsdatum der Aufgabe.                 */
+        neu.typ = 'monat';
+        neu.tage = [];
+        const q = a.faellig || a.startdatum || '';
+        neu.monatstag = /^\d{4}-\d{2}-\d{2}/.test(q) ? parseInt(q.slice(8, 10), 10) : 1;
+      } else if (!tage.length) {
+        /* Kein Wochentag hinterlegt: Montag als Anker, das Intervall
+           trägt die Aussage. Sieben Tage anzunehmen wäre erfunden.   */
+        neu.tage = [0];
+      }
+      neu.muster = rhMuster(neu);
+      wieder.push(neu);
       bericht.wieder += 1;
       return;
     }
@@ -6363,7 +6702,7 @@ function moveTagPdf() {
   doc.text(dmy(tagOffen), L, y);
   y += 1.2; linie(y, true);
 
-  const wk = WIEDER.filter(x => x.tage.indexOf(isoWt(tagOffen)) !== -1);
+  const wk = WIEDER.filter(x => faelligAn(x, tagOffen));
   if (wk.length) {
     abschnitt('Wiederkehrend');
     wk.forEach(function (x) {
@@ -6473,6 +6812,11 @@ function skaliere() {
   skaliere();
   window.addEventListener('resize', skaliere);
   window.addEventListener('orientationchange', function () { setTimeout(skaliere, 250); });
+  /* Die Zeichenebene muss sich mitverändern, sonst laege der Strich
+     nach einer Drehung neben dem Stift.                              */
+  window.addEventListener('resize', function () {
+    if (avId !== null) { avLeinwandPassen(); avMalen(); }
+  });
 
   /* Erst den gespeicherten Bestand holen, dann zeichnen. Faellt der
      Speicher aus, laeuft die App mit der Saat weiter — fluechtig, aber
