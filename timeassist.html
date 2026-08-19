@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 2.7.0 · Datenbank</title>
+<title>TimeAssist 2.8.0 · Notizeditor</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -497,6 +497,7 @@ input, textarea { font: inherit; color: inherit; }
 .gr-z { display: flex; align-items: center; gap: 8px; padding: 5px 0;
         border-bottom: 1px solid var(--linie-2); }
 .gr-z .ed-f { flex: 1; min-width: 0; padding: 6px 8px; font-size: 14.4px; }
+.gr-z .k-btn { flex: 0 0 auto; }
 .gr-n { flex: 0 0 84px; text-align: right; font-size: 12px; color: var(--tinte-3); }
 .gr-o { flex: 0 0 58px; text-align: right; font-size: 12px; color: var(--leder);
         font-variant-numeric: tabular-nums; }
@@ -640,7 +641,19 @@ input, textarea { font: inherit; color: inherit; }
            margin-top: 12px; font-size: 15.6px; line-height: 1.6;
            white-space: pre-wrap; word-break: break-word; cursor: pointer;
            font-family: var(--sans); color: var(--tinte); }
-textarea.nz-text { resize: none; height: 520px; outline: none; }
+textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hidden; }
+/* Werkzeugleiste des Editors */
+.md-leiste { display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+             margin-top: 8px; padding: 6px; background: var(--papier-2);
+             border: 1px solid var(--linie); border-radius: 6px; }
+.md-w { min-width: 34px; min-height: 34px; border: 1px solid var(--linie);
+        border-radius: 5px; background: var(--karte); font-size: 13.2px;
+        color: var(--tinte-2); padding: 0 6px; }
+.md-w.breit { min-width: 52px; font-size: 12px; }
+.md-w:active { background: var(--wein); border-color: var(--wein); color: var(--papier); }
+.md-tr { width: 1px; height: 22px; background: var(--linie); margin: 0 3px; }
+.md-bild { max-width: 100%; border-radius: 4px; margin: 4px 0; }
+.md s { color: var(--tinte-3); }
 .nz-text.offen { box-shadow: inset 0 0 0 1.4px var(--marke); }
 .nz .p-chev { flex: 0 0 18px; text-align: right; }
 
@@ -679,10 +692,13 @@ textarea.nz-text { resize: none; height: 520px; outline: none; }
    Ringbuch mit Haupt- und Unterregister aufgebaut.                    */
 .reiter-innen { width: 38px; padding: 18px 0 6px; margin-right: 9px; }
 .reiter-innen.aus { display: none; }
-/* Wiederkehrend und Gewohnheiten sitzen fest am unteren Ende der Spalte;
-   laufen die Gruppen über, werden diese abgeschnitten, nicht jene.    */
-.rt-fest { margin-top: auto; display: flex; flex-direction: column; gap: 5px;
-           padding-top: 8px; flex-shrink: 0; }
+/* Die festen Reiter am unteren Spaltenende dürfen nie verdrängt werden.
+   Deshalb bekommt der laufende Teil nur den Restplatz und wird bei
+   Überlauf beschnitten — nicht umgekehrt.                             */
+.rt-lauf { flex: 1 1 auto; min-height: 0; overflow: hidden;
+           display: flex; flex-direction: column; gap: 5px; }
+.rt-fest { flex: 0 0 auto; display: flex; flex-direction: column; gap: 5px;
+           padding-top: 10px; margin-top: 4px; border-top: 1px solid var(--linie); }
 .reiter-innen .rt { box-shadow: 1px 1px 3px rgba(35,33,30,.09); }
 .reiter-innen .rt.aktiv { box-shadow: 2px 1px 5px rgba(35,33,30,.12); }
 /* Gleiche Schriftgroesse wie die Hauptregister — der Platz ist es wert.
@@ -975,7 +991,7 @@ textarea.nz-text { resize: none; height: 520px; outline: none; }
 <script>
 'use strict';
 
-const APP_VERSION = '2.7.0';
+const APP_VERSION = '2.8.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -1642,8 +1658,12 @@ function mdInline(t) {
      ausgeführt.                                                       */
   let x = esc(t);
   x = x.replace(/`([^`]+)`/g, '<code>$1</code>');
+  x = x.replace(/~~([^~]+)~~/g, '<s>$1</s>');
   x = x.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
   x = x.replace(/(^|[^*])\*([^*]+)\*/g, '$1<i>$2</i>');
+  /* Bild vor Verweis auswerten — sonst frisst das Verweismuster das ! */
+  x = x.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g,
+                '<img src="$2" alt="$1" class="md-bild">');
   x = x.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,
                 '<a href="$2" target="_blank" rel="noopener">$1</a>');
   return x;
@@ -1651,48 +1671,62 @@ function mdInline(t) {
 function mdZuHtml(txt) {
   const zeilen = String(txt == null ? '' : txt).split('\n');
   let h = '';
-  let liste = null;          // 'ul' | 'ol' | null
-  const listeZu = function () {
-    if (liste) { h += '</' + liste + '>'; liste = null; }
+  /* Stapel offener Listen: [{ typ, tiefe }]. Ohne ihn würde eine
+     eingerückte Zeile flach neben ihrem Vorgänger stehen.            */
+  const stapel = [];
+  const listeZu = function (bisTiefe) {
+    /* Nur tiefere Ebenen schliessen — sonst reisst ein Rücksprung auf
+       Ebene 0 auch die Ebene 0 selbst ab und beginnt eine neue Liste. */
+    while (stapel.length && stapel[stapel.length - 1].tiefe > bisTiefe) {
+      h += '</' + stapel.pop().typ + '>';
+    }
+  };
+  const listeAuf = function (typ, tiefe, klasse) {
+    listeZu(tiefe);
+    const oben = stapel[stapel.length - 1];
+    if (!oben || oben.tiefe < tiefe || oben.typ !== typ) {
+      if (oben && oben.tiefe === tiefe && oben.typ !== typ) {
+        h += '</' + stapel.pop().typ + '>';
+      }
+      h += '<' + typ + (klasse ? ' class="' + klasse + '"' : '') + '>';
+      stapel.push({ typ:typ, tiefe:tiefe });
+    }
+  };
+  const einzug = function (z) {
+    const m = /^(\s*)/.exec(z);
+    return Math.min(Math.floor(m[1].replace(/\t/g, '  ').length / 2), 3);
   };
   zeilen.forEach(function (z) {
     const roh = z.replace(/\s+$/, '');
-    if (!roh.trim()) { listeZu(); return; }
+    if (!roh.trim()) { listeZu(-1); return; }
+    const tiefe = einzug(roh);
     let m;
-    if (/^\s*(-{3,}|\*{3,})\s*$/.test(roh)) { listeZu(); h += '<hr>'; return; }
+    if (/^\s*(-{3,}|\*{3,})\s*$/.test(roh)) { listeZu(-1); h += '<hr>'; return; }
     m = /^(#{1,4})\s+(.*)$/.exec(roh);
     if (m) {
-      listeZu();
+      listeZu(-1);
       const n = m[1].length;
       h += '<h' + n + '>' + mdInline(m[2]) + '</h' + n + '>';
       return;
     }
     m = /^\s*[-*]\s+\[( |x|X)\]\s+(.*)$/.exec(roh);
     if (m) {
-      if (liste !== 'ul') { listeZu(); h += '<ul class="md-haken">'; liste = 'ul'; }
+      listeAuf('ul', tiefe, 'md-haken');
       const ab = (m[1] !== ' ');
       h += '<li class="' + (ab ? 'ab' : '') + '"><span class="md-box">' +
         (ab ? '\u2715' : '') + '</span>' + mdInline(m[2]) + '</li>';
       return;
     }
     m = /^\s*[-*]\s+(.*)$/.exec(roh);
-    if (m) {
-      if (liste !== 'ul') { listeZu(); h += '<ul>'; liste = 'ul'; }
-      h += '<li>' + mdInline(m[1]) + '</li>';
-      return;
-    }
+    if (m) { listeAuf('ul', tiefe, ''); h += '<li>' + mdInline(m[1]) + '</li>'; return; }
     m = /^\s*(\d+)\.\s+(.*)$/.exec(roh);
-    if (m) {
-      if (liste !== 'ol') { listeZu(); h += '<ol>'; liste = 'ol'; }
-      h += '<li>' + mdInline(m[2]) + '</li>';
-      return;
-    }
+    if (m) { listeAuf('ol', tiefe, ''); h += '<li>' + mdInline(m[2]) + '</li>'; return; }
     m = /^\s*>\s?(.*)$/.exec(roh);
-    if (m) { listeZu(); h += '<blockquote>' + mdInline(m[1]) + '</blockquote>'; return; }
-    listeZu();
+    if (m) { listeZu(-1); h += '<blockquote>' + mdInline(m[1]) + '</blockquote>'; return; }
+    listeZu(-1);
     h += '<p>' + mdInline(roh) + '</p>';
   });
-  listeZu();
+  listeZu(-1);
   return h || '<p class="a-neu">Noch nichts geschrieben.</p>';
 }
 
@@ -1805,10 +1839,14 @@ function renderRegister() {
            esc(reiterKurz(u.n)) + '</button>';
   };
   if (reg === 'akt' || reg === 'db') {
+    /* Die festen Reiter bekommen ihren Platz zuerst zugeteilt; die
+       Gruppen teilen sich den Rest und werden bei Überlauf beschnitten.
+       Mit margin-top:auto wurden bei vielen Gruppen die festen Reiter
+       aus der Spalte geschoben — das Archiv war nicht mehr erreichbar. */
     const FEST = (reg === 'akt') ? ['wied', 'gew'] : ['archiv'];
     const fest = l.filter(u => FEST.indexOf(u.k) !== -1);
     const rest = l.filter(u => FEST.indexOf(u.k) === -1);
-    el.innerHTML = rest.map(knopf).join('') +
+    el.innerHTML = '<div class="rt-lauf">' + rest.map(knopf).join('') + '</div>' +
       '<div class="rt-fest">' + fest.map(knopf).join('') + '</div>';
     return;
   }
@@ -3699,9 +3737,10 @@ function blattNotizBlatt(id) {
   if (notizOffenFeld(n.id, 'text')) {
     h += '<div class="nz-leiste"><span class="nz-mod">Bearbeiten \u00b7 Markdown</span>' +
       '<button class="k-btn pri" onclick="notizSchliessen(true)">Fertig</button></div>';
+    h += mdWerkzeuge();
     h += '<textarea class="nz-text offen" id="ez" placeholder="Inhalt in Markdown \u2014 ' +
       '# \u00dcberschrift, - Liste, - [ ] Haken, **fett**" ' +
-      'onblur="notizSchliessen()">' + esc(n.text) + '</textarea>';
+      'oninput="mdHoehe()" onblur="notizSchliessen()">' + esc(n.text) + '</textarea>';
   } else {
     h += '<div class="nz-leiste"><span class="nz-mod">Ansicht</span>' +
       '<button class="k-btn" onclick="notizFeld(' + n.id + ',\'text\')">Bearbeiten</button>' +
@@ -3711,7 +3750,135 @@ function blattNotizBlatt(id) {
   }
   $('blatt').innerHTML = h;
   fokusSetzen();
+  mdHoehe();
 }
+/* ── Werkzeugleiste des Notizeditors ──────────────────────────────
+   Alles wirkt auf die Auswahl im Textfeld. Die Knöpfe verhindern das
+   Verlassen des Feldes (mousedown), sonst schlösse der Editor beim
+   ersten Antippen.                                                   */
+function mdWerkzeuge() {
+  const k = function (bez, aktion, titel, breit) {
+    return '<button class="md-w' + (breit ? ' breit' : '') +
+      '" onmousedown="event.preventDefault()" onclick="' + aktion +
+      '" title="' + esc(titel) + '">' + bez + '</button>';
+  };
+  return '<div class="md-leiste">' +
+    k('H1', "mdZeile('# ')", 'Überschrift 1') +
+    k('H2', "mdZeile('## ')", 'Überschrift 2') +
+    k('H3', "mdZeile('### ')", 'Überschrift 3') +
+    '<span class="md-tr"></span>' +
+    k('\u2022', "mdZeile('- ')", 'Aufzählung') +
+    k('1.', "mdZeile('1. ')", 'Nummerierte Liste') +
+    k('\u2610', "mdZeile('- [ ] ')", 'Kästchen') +
+    k('\u201e', "mdZeile('> ')", 'Zitat') +
+    '<span class="md-tr"></span>' +
+    k('\u2192', 'mdEinzug(1)', 'Einrücken') +
+    k('\u2190', 'mdEinzug(-1)', 'Ausrücken') +
+    '<span class="md-tr"></span>' +
+    k('<b>F</b>', "mdUm('**')", 'Fett') +
+    k('<i>K</i>', "mdUm('*')", 'Kursiv') +
+    k('<s>D</s>', "mdUm('~~')", 'Durchgestrichen') +
+    '<span class="md-tr"></span>' +
+    k('\u2014', "mdEinfuegen('\\n---\\n')", 'Trenner') +
+    k('Link', 'mdLink()', 'Verweis einfügen', true) +
+    k('Bild', 'mdBild()', 'Bild einfügen', true) +
+    '</div>';
+}
+/* Passt die Höhe dem Inhalt an — vorher stand hier ein fester Wert und
+   der Editor wirkte bei langen Notizen halb so gross wie die Ansicht. */
+function mdHoehe() {
+  const e = $('ez');
+  if (!e || e.tagName !== 'TEXTAREA') { return; }
+  e.style.height = 'auto';
+  e.style.height = Math.max(420, e.scrollHeight + 24) + 'px';
+}
+function mdFeld() {
+  const e = $('ez');
+  return (e && e.tagName === 'TEXTAREA') ? e : null;
+}
+function mdSchreiben(neu, aStart, aEnde) {
+  const e = mdFeld();
+  if (!e) { return; }
+  e.value = neu;
+  e.focus();
+  e.setSelectionRange(aStart, aEnde);
+  mdHoehe();
+}
+/* Setzt ein Präfix an den Anfang jeder ausgewählten Zeile, oder nimmt
+   es weg, wenn es schon dasteht.                                      */
+function mdZeile(praefix) {
+  const e = mdFeld();
+  if (!e) { return; }
+  const v = e.value;
+  const a = v.lastIndexOf('\n', e.selectionStart - 1) + 1;
+  let b = v.indexOf('\n', e.selectionEnd);
+  if (b === -1) { b = v.length; }
+  const zeilen = v.slice(a, b).split('\n');
+  const alleDa = zeilen.every(z => z.replace(/^\s*/, '').indexOf(praefix) === 0);
+  const neu = zeilen.map(function (z) {
+    const m = /^(\s*)(.*)$/.exec(z);
+    if (alleDa) { return m[1] + m[2].slice(praefix.length); }
+    /* Ein vorhandenes anderes Präfix wird ersetzt, nicht gestapelt */
+    const ohne = m[2].replace(/^(#{1,4}\s+|[-*]\s+\[[ xX]\]\s+|[-*]\s+|\d+\.\s+|>\s?)/, '');
+    return m[1] + praefix + ohne;
+  }).join('\n');
+  mdSchreiben(v.slice(0, a) + neu + v.slice(b), a, a + neu.length);
+}
+function mdEinzug(richtung) {
+  const e = mdFeld();
+  if (!e) { return; }
+  const v = e.value;
+  const a = v.lastIndexOf('\n', e.selectionStart - 1) + 1;
+  let b = v.indexOf('\n', e.selectionEnd);
+  if (b === -1) { b = v.length; }
+  const neu = v.slice(a, b).split('\n').map(function (z) {
+    return (richtung > 0) ? ('  ' + z) : z.replace(/^ {1,2}/, '');
+  }).join('\n');
+  mdSchreiben(v.slice(0, a) + neu + v.slice(b), a, a + neu.length);
+}
+/* Umschliesst die Auswahl, oder entfernt die Zeichen wieder */
+function mdUm(zeichen) {
+  const e = mdFeld();
+  if (!e) { return; }
+  const v = e.value, a = e.selectionStart, b = e.selectionEnd;
+  const aus = v.slice(a, b);
+  const n = zeichen.length;
+  /* Auszeichnung innerhalb der Auswahl entfernen */
+  if (aus.length >= 2 * n && aus.slice(0, n) === zeichen && aus.slice(-n) === zeichen) {
+    const inn = aus.slice(n, -n);
+    mdSchreiben(v.slice(0, a) + inn + v.slice(b), a, a + inn.length);
+    return;
+  }
+  /* Und ebenso, wenn sie direkt um die Auswahl herum steht: nach dem
+     Einfügen umfasst die Auswahl nur den Text, nicht die Zeichen —
+     ein zweites Antippen würde sonst verschachteln statt zu lösen.   */
+  if (a >= n && v.slice(a - n, a) === zeichen && v.slice(b, b + n) === zeichen) {
+    mdSchreiben(v.slice(0, a - n) + aus + v.slice(b + n), a - n, a - n + aus.length);
+    return;
+  }
+  const text = aus || 'Text';
+  mdSchreiben(v.slice(0, a) + zeichen + text + zeichen + v.slice(b),
+              a + n, a + n + text.length);
+}
+function mdEinfuegen(txt) {
+  const e = mdFeld();
+  if (!e) { return; }
+  const v = e.value, a = e.selectionStart, b = e.selectionEnd;
+  mdSchreiben(v.slice(0, a) + txt + v.slice(b), a + txt.length, a + txt.length);
+}
+function mdVerweis(praefix) {
+  const e = mdFeld();
+  if (!e) { return; }
+  const a = e.selectionStart;
+  const aus = e.value.slice(a, e.selectionEnd) || (praefix ? 'Bild' : 'Beschriftung');
+  const txt = praefix + '[' + aus + '](https://)';
+  /* Der Zeiger steht hinter dem Protokoll, damit die Adresse folgt */
+  mdSchreiben(e.value.slice(0, a) + txt + e.value.slice(e.selectionEnd),
+              a + txt.length - 1, a + txt.length - 1);
+}
+function mdLink() { mdVerweis(''); }
+function mdBild() { mdVerweis('!'); }
+
 function kurzQuelle(q) {
   return q.length > 46 ? q.slice(0, 46) + '\u2026' : q;
 }
@@ -5079,10 +5246,14 @@ function waUebernehmen() {
    statt Freitext: sonst stehen "Organisation" und "Organisatorisch"
    als zwei Register nebeneinander.
    ═══════════════════════════════════════════════════════════════════ */
-function gruppenAuf() { gruppenRender(); $('gruppen').classList.add('auf'); }
+function gruppenAuf() { grFrage = null; gruppenRender(); $('gruppen').classList.add('auf'); }
 function gruppenZu() { $('gruppen').classList.remove('auf'); renderAlles(); }
 
+/* Löschen in zwei Schritten, wie überall sonst */
+let grFrage = null;
+function grFragen(id) { grFrage = id; gruppenRender(); }
 function gruppeNeu() {
+  grFrage = null;
   GRUPPEN.push({ id:'g' + naechsteId(), name:'Neue Gruppe' });
   gruppenRender();
 }
@@ -5092,6 +5263,7 @@ function gruppeName2(id, wert) {
   gruppenRender();
 }
 function gruppeLoeschen(id) {
+  grFrage = null;
   /* Die Bereiche bleiben — sie rutschen nur in "Ohne Gruppe". */
   BEREICHE.forEach(function (b) { if (b.gruppeId === id) { b.gruppeId = null; } });
   const i = GRUPPEN.findIndex(x => x.id === id);
@@ -5113,11 +5285,15 @@ function gruppenRender() {
   let h = '<div class="ed-l">Gruppen</div>';
   h += GRUPPEN.map(function (g) {
     const n = BEREICHE.filter(b => b.gruppeId === g.id).length;
+    /* Beschrifteter Knopf statt eines blassen Kreuzes — in einem
+       Verwaltungsdialog muss zu sehen sein, was möglich ist.          */
+    const frage = (grFrage === g.id);
     return '<div class="gr-z"><input class="ed-f" value="' + esc(g.name) +
       '" onchange="gruppeName2(\'' + g.id + '\', this.value)">' +
       '<span class="gr-n">' + n + (n === 1 ? ' Bereich' : ' Bereiche') + '</span>' +
-      '<button class="mon-x" onclick="gruppeLoeschen(\'' + g.id + '\')" ' +
-      'title="Gruppe l\u00f6schen, Bereiche bleiben">\u00d7</button></div>';
+      '<button class="k-btn ' + (frage ? 'warn' : '') + '" onclick="' +
+      (frage ? 'gruppeLoeschen(\'' + g.id + '\')' : 'grFragen(\'' + g.id + '\')') +
+      '">' + (frage ? 'Wirklich?' : 'L\u00f6schen') + '</button></div>';
   }).join('');
   if (!GRUPPEN.length) {
     h += '<div class="hinweis">Noch keine Gruppe angelegt.</div>';

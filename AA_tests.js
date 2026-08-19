@@ -868,6 +868,113 @@ kat('21 · Markdown, Notizgruppen, Archiv');
   } else { fail('Löschen im Archiv reißt Zugeordnetes mit'); }
 }
 
+/* ═══ 22 · Feste Reiter und Verwaltungsknöpfe ═══════════════════════════
+   Fehlerarten: die festen Reiter am Spaltenende werden bei vielen Gruppen
+   aus der Spalte geschoben und sind nicht mehr erreichbar (margin-top:auto
+   wirkt nur bei freiem Platz); ein Löschknopf steckt als blasses Kreuz in
+   einem Verwaltungsdialog und wird nicht gefunden.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('22 · Feste Reiter und Verwaltungsknöpfe');
+{
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  const mFest = /^\.rt-fest \{([^}]*)\}/m.exec(css);
+  if (!mFest) { fail('.rt-fest nicht definiert'); }
+  else if (/margin-top:\s*auto/.test(mFest[1])) {
+    fail('.rt-fest nutzt margin-top:auto — bei vielen Reitern wird es verdrängt');
+  } else if (/flex:\s*0 0 auto/.test(mFest[1])) {
+    ok('.rt-fest bekommt festen Platz zugeteilt');
+  } else { fail('.rt-fest ohne feste Platzzuteilung'); }
+
+  const mLauf = /^\.rt-lauf \{([^}]*)\}/m.exec(css);
+  if (mLauf && /overflow:\s*hidden/.test(mLauf[1]) && /flex:\s*1 1 auto/.test(mLauf[1])) {
+    ok('der laufende Teil nimmt den Rest und wird beschnitten');
+  } else { fail('.rt-lauf fehlt oder beschneidet nicht'); }
+
+  const mR = JSK.match(/function renderRegister\(\) \{([\s\S]*?)\n\}/);
+  if (mR && /rt-lauf/.test(mR[1]) && /rt-fest/.test(mR[1])) {
+    ok('Register trennt laufende und feste Reiter');
+  } else { fail('Register trennt die Reiterarten nicht'); }
+  if (mR && /FEST = \(reg === 'akt'\) \? \['wied', 'gew'\] : \['archiv'\]/.test(mR[1])) {
+    ok('Archiv und die beiden Listenblätter sind fest verankert');
+  } else { fail('feste Reiter nicht definiert'); }
+
+  const mG = JSK.match(/function gruppenRender\(\) \{([\s\S]*?)\n\}/);
+  if (!mG) { fail('gruppenRender nicht auswertbar'); }
+  else if (/mon-x/.test(mG[1])) {
+    fail('Gruppen-Löschen steckt als blasses Kreuz im Dialog');
+  } else if (/grFragen/.test(mG[1]) && /L\\u00f6schen/.test(mG[1])) {
+    ok('Gruppen-Löschen als beschrifteter Knopf mit Rückfrage');
+  } else { fail('Gruppen lassen sich nicht löschen'); }
+  if (/function grFragen/.test(JS)) { ok('grFragen vorhanden'); }
+  else { fail('grFragen fehlt'); }
+}
+
+/* ═══ 23 · Notizeditor und Werkzeugleiste ══════════════════════════════
+   Fehlerarten: das Eingabefeld hat eine feste Höhe und wirkt bei langen
+   Notizen halb so gross wie die Ansicht; ein Werkzeugknopf entzieht dem
+   Textfeld den Fokus und schliesst den Editor beim ersten Antippen; eine
+   Auszeichnung verschachtelt sich beim zweiten Antippen statt zu lösen;
+   eingerückte Listen werden flach dargestellt.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('23 · Notizeditor und Werkzeugleiste');
+{
+  ['mdWerkzeuge', 'mdHoehe', 'mdZeile', 'mdEinzug', 'mdUm', 'mdEinfuegen',
+   'mdVerweis', 'mdLink', 'mdBild']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  const mT = /textarea\.nz-text \{([^}]*)\}/.exec(css);
+  if (mT && /height:\s*\d+px/.test(mT[1]) && !/min-height/.test(mT[1])) {
+    fail('Eingabefeld hat eine feste Höhe — wirkt bei langen Notizen zu klein');
+  } else if (mT && /min-height/.test(mT[1])) {
+    ok('Eingabefeld wächst mit dem Inhalt');
+  } else { fail('textarea.nz-text nicht gefunden'); }
+
+  const mW = JSK.match(/function mdWerkzeuge\(\) \{([\s\S]*?)\n\}/);
+  if (mW && /onmousedown="event\.preventDefault\(\)"/.test(mW[1])) {
+    ok('Werkzeugknöpfe entziehen dem Feld nicht den Fokus');
+  } else { fail('Werkzeugknöpfe schliessen den Editor beim Antippen'); }
+
+  /* Die Umschaltung muss auch greifen, wenn die Zeichen ausserhalb der
+     Auswahl stehen — genau der Zustand nach dem Einfügen.            */
+  const mU = JSK.match(/function mdUm\(zeichen\) \{([\s\S]*?)\n\}/);
+  if (mU && /v\.slice\(a - n, a\) === zeichen/.test(mU[1])) {
+    ok('Auszeichnung löst sich beim zweiten Antippen');
+  } else { fail('zweites Antippen verschachtelt die Auszeichnung'); }
+
+  const mZ = JSK.match(/function mdZeile\(praefix\) \{([\s\S]*?)\n\}/);
+  if (mZ && /alleDa/.test(mZ[1]) && /#\{1,4\}/.test(mZ[1])) {
+    ok('Zeilenpräfix wird ersetzt statt gestapelt');
+  } else { fail('Zeilenpräfixe stapeln sich'); }
+
+  /* Verschachtelte Listen: der Renderer braucht einen Ebenenstapel */
+  const mI = JSK.match(/function mdInline\(t\) \{[\s\S]*?\n\}/);
+  const mM = JSK.match(/function mdZuHtml\(txt\) \{[\s\S]*?\n\}/);
+  if (mI && mM) {
+    let fn = null;
+    try {
+      fn = new Function('esc', mI[0] + '\n' + mM[0] + '\nreturn mdZuHtml;')(
+        t => String(t == null ? '' : t).replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'));
+    } catch (e) { fn = null; }
+    if (!fn) { fail('Markdown nicht auswertbar'); }
+    else {
+      const r = fn('- oben\n  - tiefer\n- wieder oben');
+      const auf = (r.match(/<ul|<ol/g) || []).length;
+      const zu = (r.match(/<\/ul>|<\/ol>/g) || []).length;
+      if (auf === zu && auf >= 2) { ok('verschachtelte Listen, Tags ausgeglichen'); }
+      else { fail('Listenverschachtelung unausgeglichen: ' + auf + '/' + zu); }
+      if (fn('~~weg~~').indexOf('<s>weg</s>') !== -1) { ok('Durchgestrichen wird erkannt'); }
+      else { fail('~~ wird nicht erkannt'); }
+      if (fn('![A](x.png)').indexOf('<img') !== -1) { ok('Bilder werden dargestellt'); }
+      else { fail('Bildsyntax wird nicht erkannt'); }
+    }
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
