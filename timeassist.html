@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 3.2.1 · Bereiche</title>
+<title>TimeAssist 3.3.0 · Gliederung</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -544,6 +544,10 @@ input, textarea { font: inherit; color: inherit; }
 .gr-z.neu-z:active { background: var(--marke-h); }
 .grp-n { float: right; font-size: 11px; color: var(--tinte-3); letter-spacing: 0;
          text-transform: none; }
+/* Planzeile innerhalb eines Bereichs — eingerueckt und leiser */
+.atab tr.grp.plan td { background: var(--papier); color: var(--tinte-2);
+                       font-weight: 400; padding-left: 26px; letter-spacing: .04em; }
+.grp-ein { color: var(--wein); margin-right: 7px; }
 .dt-warn { border: 1px solid var(--wein); background: var(--wein-h); border-radius: 5px;
            padding: 9px 11px; margin-bottom: 12px; font-size: 13.2px;
            color: var(--tinte); line-height: 1.5; }
@@ -760,7 +764,9 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
 .p-r:active { background: var(--wein); border-color: var(--wein); color: var(--papier); }
 .atab tr.p-arch td { background: var(--papier-2); color: var(--tinte-3); }
 .p-ab { font-size: 10.2px; letter-spacing: .04em; color: var(--tinte-3);
-        font-variant-numeric: tabular-nums; }
+        font-variant-numeric: tabular-nums; white-space: nowrap; }
+.p-abv { font-size: 10.2px; letter-spacing: .08em; text-transform: uppercase;
+         color: var(--tinte-3); margin-left: 8px; white-space: nowrap; }
 
 /* Kopfangaben auf Plan- und Zielblatt */
 /* Unterlagen an Plan und Ziel */
@@ -1144,7 +1150,7 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
 <script>
 'use strict';
 
-const APP_VERSION = '3.2.1';
+const APP_VERSION = '3.3.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -2352,9 +2358,13 @@ function kopf(titel, sub, akt) {
 }
 
 /* ═══ GEMEINSAME BAUSTEINE ═══ */
+/* Der Zusatz traegt manchmal Text, manchmal einen Knopf. Frueher wurde
+   er immer maskiert — dann stand das Markup als Zeichenkette im Blatt. */
 function abschnitt(titel, sub) {
+  const roh = (sub && String(sub).indexOf('<') === 0);
   return '<div class="ab-kopf"><span class="ab-titel">' + esc(titel) + '</span>' +
-         (sub ? '<span class="ab-sub">' + esc(sub) + '</span>' : '') + '</div>';
+         (sub ? '<span class="ab-sub">' + (roh ? sub : esc(sub)) + '</span>' : '') +
+         '</div>';
 }
 function freieZeilen(n) {
   let h = '';
@@ -3213,6 +3223,15 @@ function blattWoche() {
 
 /* ═══ BLATT: AKTIVITÄTEN (CMP 31) ═══ */
 /* Welche Gruppe zeigt das offene Blatt? '' bedeutet alle. */
+/* Gliederung der Checkliste: innerhalb des Bereichs nach Plan oder
+   flach. Der Schalter gilt fuer alle Blaetter — eine Ansicht, die je
+   Lasche anders gliedert, waere schwer zu behalten.                   */
+let nachPlan = false;
+function planGliederung() {
+  nachPlan = !nachPlan;
+  editZelle = null;
+  renderAlles();
+}
 function offeneGruppe() {
   const u = unterAktiv.akt || 'uebersicht';
   if (u.indexOf('g:') !== 0) { return null; }
@@ -3252,6 +3271,8 @@ function blattAktivitaeten() {
                     : 'Aktivit\u00e4ten \u2014 ' + gruppeName(gid === '0' ? null : gid),
        offenN + ' offen von ' + liste.length +
        ' \u00b7 ' + bl.length + (bl.length === 1 ? ' Bereich' : ' Bereiche'),
+       '<button class="k-btn' + (nachPlan ? ' pri' : '') +
+       '" onclick="planGliederung()">Nach Pl\u00e4nen</button>' +
        '<button class="k-btn" onclick="gruppenAuf()">Bereiche</button>' +
        '<button class="k-btn" onclick="uebertragAuf()">\u00dcbertrag</button>' +
        '<button class="k-btn pri" onclick="aktNeu(false)">+ Aktivit\u00e4t</button>');
@@ -3266,28 +3287,51 @@ function blattAktivitaeten() {
   /* Nach Bereich gruppiert — das entspricht dem Stapel Checklistenblätter
      hinter dem Register.                                                */
   let gezeigt = 0;
+  const zeile = function (a) {
+    if (editAkt === a.id) { return ''; }
+    gezeigt += 1;
+    return '<tr>' +
+      '<td class="mitte">' + hakFeld(a.glyph, 'glyphWeiter(' + a.id + ')') + '</td>' +
+      '<td class="mitte z" onclick="bereichWeiter(' + a.id + ')" title="' +
+      esc(bName(a.b)) + '">' +
+      '<span class="tz-punkt" style="background:' + bFarbe(a.b) + '"></span></td>' +
+      '<td class="mitte z" onclick="prioWeiter(' + a.id + ')">' + prioFeld(a.prio) + '</td>' +
+      planPfeilZelle(a) +
+      zelle('akt', a.id, 'wer', a.wer || '', 'voll', 'wer', '\u2014') +
+      zelle('akt', a.id, 'beginn', a.beginn, 'voll', 'dat', 'TT.MM') +
+      zelle('akt', a.id, 'ende', a.ende, 'voll', 'dat', 'TT.MM') +
+      zelle('akt', a.id, 'min', String(a.min), 'voll', 'r', '') +
+      '<td class="mitte">' + planStandZelle(a) + '</td></tr>';
+  };
   bl.forEach(function (b) {
     const l = liste.filter(a => a.b === b.id);
     if (!l.length) { return; }
     h += '<tr class="grp"><td colspan="9"><span class="tz-punkt" style="background:' +
       b.farbe + '"></span>' + esc(b.name) +
       '<span class="grp-n">' + l.filter(offen).length + ' offen</span></td></tr>';
-    h += l.map(function (a) {
-      if (editAkt === a.id) { return ''; }
-      gezeigt += 1;
-      const knopf = planStandZelle(a);
-      return '<tr>' +
-        '<td class="mitte">' + hakFeld(a.glyph, 'glyphWeiter(' + a.id + ')') + '</td>' +
-        '<td class="mitte z" onclick="bereichWeiter(' + a.id + ')" title="' + esc(bName(a.b)) + '">' +
-        '<span class="tz-punkt" style="background:' + bFarbe(a.b) + '"></span></td>' +
-        '<td class="mitte z" onclick="prioWeiter(' + a.id + ')">' + prioFeld(a.prio) + '</td>' +
-        planPfeilZelle(a) +
-        zelle('akt', a.id, 'wer', a.wer || '', 'voll', 'wer', '\u2014') +
-        zelle('akt', a.id, 'beginn', a.beginn, 'voll', 'dat', 'TT.MM') +
-        zelle('akt', a.id, 'ende', a.ende, 'voll', 'dat', 'TT.MM') +
-        zelle('akt', a.id, 'min', String(a.min), 'voll', 'r', '') +
-        '<td class="mitte">' + knopf + '</td></tr>';
-    }).join('');
+    if (!nachPlan) { h += l.map(zeile).join(''); return; }
+    /* Innerhalb des Bereichs nach Plan gegliedert: die Pläne zuerst, in
+       ihrer eigenen Reihenfolge, das Lose darunter.                   */
+    const pl = PLAENE.filter(p => !p.archiviert)
+      .filter(p => l.some(a => a.planId === p.id));
+    pl.forEach(function (p) {
+      const lp = l.filter(a => a.planId === p.id)
+        .sort(function (x, y) { return (x.pos || 0) - (y.pos || 0); });
+      h += '<tr class="grp plan"><td colspan="9"><span class="grp-ein">\u2192</span>' +
+        esc(p.t) + '<span class="grp-n">' + lp.filter(offen).length + ' offen</span>' +
+        '</td></tr>';
+      h += lp.map(zeile).join('');
+    });
+    const lose = l.filter(a => !a.planId ||
+      !PLAENE.some(p => p.id === a.planId && !p.archiviert));
+    if (lose.length) {
+      if (pl.length) {
+        h += '<tr class="grp plan"><td colspan="9"><span class="grp-ein">\u00b7</span>' +
+          'Ohne Plan<span class="grp-n">' + lose.filter(offen).length + ' offen</span>' +
+          '</td></tr>';
+      }
+      h += lose.map(zeile).join('');
+    }
   });
 
   if (!gezeigt) {
@@ -3891,11 +3935,12 @@ function blattPlan(pid) {
       return '<tr class="p-arch"><td class="mitte"><span class="hak">' +
         esc(a.glyph) + '</span></td>' +
         '<td class="mitte">' + prioFeld(a.prio) + '</td>' +
-        '<td><span class="a-titel durch">' + esc(a.t) + '</span></td>' +
+        '<td><span class="a-titel durch">' + esc(a.t) +
+        '</span><span class="p-abv">abgeheftet</span></td>' +
         '<td class="wer">' + esc(a.wer || '') + '</td>' +
         '<td class="dat">' + esc(a.ende || '') + '</td>' +
         '<td class="r">' + (a.min || '') + '</td>' +
-        '<td class="mitte p-rang"><span class="p-ab">abgeheftet ' +
+        '<td class="mitte p-rang"><span class="p-ab">' +
         esc(dmyKurz(a.archiviert)) + '</span></td><td></td></tr>';
     }
     const hoch = (i > 0)

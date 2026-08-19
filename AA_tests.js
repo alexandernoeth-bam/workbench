@@ -2148,6 +2148,62 @@ kat('42 · Bereichsreiter');
   }
 }
 
+/* ═══ 43 · Abschnittskopf und Gliederung nach Plänen ═══════════════════
+   Fehlerarten: der Abschnittskopf maskiert seinen Zusatz immer, wodurch
+   ein Knopf als Markup im Blatt steht; die Gliederung nach Plänen
+   verschluckt Aktivitäten oder zeigt sie doppelt; eine Aktivität eines
+   archivierten Plans verschwindet aus der Liste.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('43 · Abschnittskopf und Gliederung');
+{
+  /* Der Kopf muss Markup durchlassen, aber Text weiterhin maskieren */
+  const mA = JSK.match(/function abschnitt\(titel, sub\) \{[\s\S]*?\n\}/);
+  if (!mA) { fail('abschnitt nicht auswertbar'); }
+  else {
+    let fn = null;
+    try {
+      fn = new Function('esc', mA[0] + '\nreturn abschnitt;')(
+        t => String(t == null ? '' : t).replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+    } catch (e) { fn = null; }
+    if (!fn) { fail('abschnitt nicht ausführbar'); }
+    else {
+      let f = 0;
+      if (fn('X', '<button>A</button>').indexOf('<button>A</button>') === -1) {
+        f++; fail('Knopf im Abschnittskopf wird maskiert');
+      }
+      if (fn('X', 'a < b').indexOf('&lt;') === -1) {
+        f++; fail('Text im Abschnittskopf wird nicht maskiert');
+      }
+      if (fn('X', '').indexOf('ab-sub') !== -1) {
+        f++; fail('leerer Zusatz erzeugt eine Hülle');
+      }
+      if (!f) { ok('Abschnittskopf: Markup durch, Text maskiert'); }
+    }
+  }
+
+  if (/function planGliederung\b/.test(JS)) { ok('planGliederung vorhanden'); }
+  else { fail('planGliederung fehlt'); }
+
+  const mB = JSK.match(/function blattAktivitaeten\(\) \{([\s\S]*?)\n\}/);
+  if (!mB) { fail('blattAktivitaeten nicht auswertbar'); }
+  else {
+    if (/if \(!nachPlan\)/.test(mB[1])) { ok('Gliederung ist umschaltbar'); }
+    else { fail('Gliederung nach Plänen fehlt'); }
+    /* Eine Aktivität eines archivierten Plans darf nicht verschwinden */
+    if (/!PLAENE\.some\(p => p\.id === a\.planId && !p\.archiviert\)/.test(mB[1])) {
+      ok('Aktivität eines archivierten Plans bleibt sichtbar');
+    } else { fail('Aktivität eines archivierten Plans fällt aus der Liste'); }
+    if (/\(x\.pos \|\| 0\) - \(y\.pos \|\| 0\)/.test(mB[1])) {
+      ok('Planzeilen folgen ihrem Rang');
+    } else { fail('Planzeilen ignorieren den Rang'); }
+    /* Genau eine Zeilenfunktion, damit flach und gegliedert gleich aussehen */
+    const n = (mB[1].match(/hakFeld\(a\.glyph/g) || []).length;
+    if (n === 1) { ok('eine Zeilenfunktion für beide Gliederungen'); }
+    else { fail(n + ' Zeilenaufbauten — sie laufen auseinander'); }
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
