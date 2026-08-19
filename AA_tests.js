@@ -2092,6 +2092,62 @@ kat('41 · Bereiche anlegen und entfernen');
   } else { fail('Inhalt könnte heimatlos werden'); }
 }
 
+/* ═══ 42 · Bereichsreiter schlank und zweireihig ═══════════════════════
+   Fehlerarten: Farbpunkt und Zähler blähen die Reiter, sodass sie eine
+   dritte Reihe brauchen und das Blatt schrumpft; ein zu langer Name
+   sprengt die Leiste.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('42 · Bereichsreiter');
+{
+  const mU = JSK.match(/function renderUnterreiter\(\) \{([\s\S]*?)\n\}/);
+  if (!mU) { fail('renderUnterreiter nicht auswertbar'); }
+  else {
+    const teil = mU[1].slice(0, mU[1].indexOf('const l = unterListe'));
+    if (!/tz-punkt/.test(teil)) { ok('Bereichsreiter ohne Farbpunkt'); }
+    else { fail('Farbpunkt noch am Bereichsreiter'); }
+    if (!/ur-zahl/.test(teil)) { ok('Bereichsreiter ohne Zähler'); }
+    else { fail('Zähler noch am Bereichsreiter'); }
+  }
+
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  const mL = /^\.unterreiter \{([^}]*)\}/m.exec(css);
+  if (!mL) { fail('.unterreiter nicht gefunden'); }
+  else {
+    if (/flex-wrap:\s*wrap/.test(mL[1])) { ok('Leiste bricht um'); }
+    else { fail('Leiste bricht nicht um — Reiter laufen aus dem Blatt'); }
+    const m = /max-height:\s*(\d+)px/.exec(mL[1]);
+    const hoehe = m ? parseInt(m[1], 10) : 0;
+    if (hoehe && hoehe <= 80) { ok('Leiste höchstens zwei Reihen (' + hoehe + ' px)'); }
+    else { fail('Leiste ohne Höhenbegrenzung'); }
+  }
+
+  /* Die Kürzung muss so knapp sein, dass elf Bereiche in zwei Reihen
+     passen — sonst braucht die Leiste eine dritte.                   */
+  const mK = JSK.match(/function kurzReiter\(n\) \{[\s\S]*?\n\}/);
+  if (!mK) { fail('kurzReiter nicht auswertbar'); }
+  else {
+    let fn = null;
+    try { fn = new Function(mK[0] + '\nreturn kurzReiter;')(); } catch (e) { fn = null; }
+    if (!fn) { fail('kurzReiter nicht ausführbar'); }
+    else {
+      const NAMEN = ['Alle', 'Organisatorische Aufgaben', 'SMAX: Gitlab Ablöse',
+        'Last- und Performance', 'Hybride Tests', 'User Journey QS', 'F TO Analyse',
+        'Auslieferungen 20.0x', 'Einführung Windows 11 26H2', 'Update-Termine 2026',
+        'Sonstiges'];
+      const platz = 734;
+      let reihe = 0, zeilen = 1;
+      NAMEN.forEach(function (t) {
+        const b = fn(t).length * 7.1 + 27;
+        if (reihe + b > platz) { zeilen++; reihe = b; } else { reihe += b; }
+      });
+      if (zeilen <= 2) { ok('elf Bereiche passen in zwei Reihen'); }
+      else { fail('elf Bereiche brauchen ' + zeilen + ' Reihen'); }
+      if (fn('Kurz') === 'Kurz') { ok('kurze Namen bleiben unangetastet'); }
+      else { fail('kurze Namen werden verstümmelt'); }
+    }
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
