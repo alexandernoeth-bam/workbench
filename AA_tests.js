@@ -152,14 +152,16 @@ kat('7 · Datenmodell minimal');
   if (!mA) { fail('SAAT_AKTIVITAETEN nicht gefunden'); }
   else {
     const ERLAUBT = ['id', 't', 'b', 'prio', 'min', 'wer', 'beginn', 'ende', 'glyph',
-                     'geplant', 'verschoben', 'planId', 'zielId'];
+                     'geplant', 'verschoben', 'archiviert', 'planId', 'zielId'];
     const felder = Array.from(new Set((mA[1].match(/[{,]\s*(\w+):/g) || [])
       .map(s => s.replace(/[{,]\s*/, '').replace(':', ''))));
     const zuviel = felder.filter(f => ERLAUBT.indexOf(f) === -1);
     if (!zuviel.length) { ok('Aktivität hat nur erlaubte Felder (' + felder.length + ')'); }
     else { fail('Unerlaubte Felder in Aktivität: ' + zuviel.join(', ')); }
   }
-  const VERBOTEN = ['erstellt', 'geaendert', 'status', 'tags', 'archiviert:', 'imFokus',
+  /* archiviert ist seit dem Übertrag ein eigenes Feld mit Datum und
+     steht deshalb nicht mehr auf der Verbotsliste.                   */
+  const VERBOTEN = ['erstellt', 'geaendert', 'status', 'tags', 'imFokus',
                     'groesse', 'ressourcen', 'horizont', 'sphaere'];
   const drin = VERBOTEN.filter(v => new RegExp('\\b' + v.replace(':', '') + ':').test(
     JS.slice(JS.indexOf('const SAAT_AKTIVITAETEN'), JS.indexOf('const SAAT_TERMINE'))));
@@ -973,6 +975,77 @@ kat('23 · Notizeditor und Werkzeugleiste');
       else { fail('Bildsyntax wird nicht erkannt'); }
     }
   }
+}
+
+/* ═══ 24 · Übertrag und Löschen ════════════════════════════════════════
+   Fehlerarten: abgeheftete Aktivitäten stehen weiter in den Arbeitslisten;
+   der Übertrag nimmt auch Offenes oder Weitergezogenes mit; eine gelöschte
+   Aktivität hinterlässt Verweise ins Leere in Wochen- und Monatsblättern;
+   gelöscht wird ohne Rückfrage.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('24 · Übertrag und Löschen');
+{
+  ['uebertragKandidaten', 'uebertragAuf', 'uebertragMachen', 'aktZurueck',
+   'aktEntfernen', 'aktLebend']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  if (/const lebend = a => !a\.archiviert;/.test(JSK)) { ok('lebend-Prüfung vorhanden'); }
+  else { fail('keine zentrale Prüfung auf abgeheftet'); }
+
+  /* Jede Arbeitsliste muss abgeheftete Aktivitäten ausblenden */
+  const STELLEN = [
+    ['blattTag', 'a.geplant === tagOffen'],
+    ['blattAktivitaeten', 'bIds[a.b]'],
+    ['planAktivitaeten', 'a.planId === pid'],
+    ['zielAktivitaeten', 'a.zielId === zid'],
+  ];
+  let f = 0;
+  STELLEN.forEach(function (x) {
+    const m = JSK.match(new RegExp('function ' + x[0] + '\\([^)]*\\) \\{([\\s\\S]*?)\\n\\}'));
+    if (!m) { f++; fail(x[0] + ' nicht auswertbar'); return; }
+    const zeile = m[1].split('\n').find(z => z.indexOf(x[1]) !== -1);
+    if (!zeile || zeile.indexOf('lebend(a)') === -1) {
+      f++; fail(x[0] + ' zeigt auch abgeheftete Aktivitäten');
+    }
+  });
+  if (!f) { ok(STELLEN.length + ' Arbeitslisten blenden Abgeheftetes aus'); }
+
+  /* Der Übertrag darf nur Erledigtes und Gestrichenes nehmen */
+  const mK = JSK.match(/function uebertragKandidaten\(\) \{([\s\S]*?)\n\}/);
+  /* Der Code schreibt die Glyphen als \u-Escapes — beide Formen prüfen */
+  const glErl = /a\.glyph === '(?:\u2715|\\u2715)'/.test(mK ? mK[1] : '');
+  const glGestr = /a\.glyph === '(?:\u2013|\\u2013)'/.test(mK ? mK[1] : '');
+  if (mK && glErl && glGestr && /lebend\(a\)/.test(mK[1])) {
+    ok('Übertrag nimmt nur Erledigtes und Gestrichenes');
+  } else { fail('Übertrag greift zu weit — Offenes würde mit abgeheftet'); }
+
+  const mM = JSK.match(/function uebertragMachen\(\) \{([\s\S]*?)\n\}/);
+  if (mM && /a\.archiviert = datum/.test(mM[1])) {
+    ok('Übertrag setzt das Datum, verschiebt aber nichts');
+  } else { fail('Übertrag verschiebt Datensätze'); }
+
+  /* Löschen muss Verweise mitnehmen */
+  const mE = JSK.match(/function aktEntfernen\(id\) \{([\s\S]*?)\n\}/);
+  if (!mE) { fail('aktEntfernen nicht auswertbar'); }
+  else {
+    if (/WOCHENBLAETTER\.forEach/.test(mE[1]) && /MONATSBLAETTER\.forEach/.test(mE[1])) {
+      ok('Löschen räumt Verweise aus Wochen- und Monatsblättern');
+    } else { fail('gelöschte Aktivität hinterlässt Verweise ins Leere'); }
+  }
+  if (/function bwLoeschFragen/.test(JS) && /bwLoeschFrage/.test(JSK)) {
+    ok('Löschen erst nach Rückfrage');
+  } else { fail('Löschen ohne Rückfrage'); }
+
+  const mMig = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mMig && /a\.archiviert === undefined/.test(mMig[1])) {
+    ok('Migration ergänzt das Archivfeld');
+  } else { fail('Migration ergänzt archiviert nicht'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 6) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

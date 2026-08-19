@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 2.8.0 · Notizeditor</title>
+<title>TimeAssist 2.9.0 · Übertrag</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -480,6 +480,18 @@ input, textarea { font: inherit; color: inherit; }
 .dt-l { flex: 0 0 150px; color: var(--tinte-3); font-size: 12px;
         letter-spacing: .06em; text-transform: uppercase; }
 .dt-w { flex: 1; font-variant-numeric: tabular-nums; }
+/* Übertragsdialog */
+.ub-z { display: flex; align-items: center; gap: 9px; padding: 5px 2px;
+        border-bottom: 1px solid var(--linie-2); }
+.ub-t { flex: 1; min-width: 0; font-size: 13.2px; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; }
+.ub-z .hak { flex: 0 0 17px; width: 17px; height: 17px; font-size: 12px; }
+/* Archivblatt eines Übertrags */
+.ar-kopf { display: flex; align-items: baseline; gap: 9px; margin-top: 14px;
+           padding-bottom: 4px; border-bottom: 1.2px solid var(--wein); }
+.ar-d { font-family: var(--serif); font-size: 15.6px; color: var(--wein); font-weight: 700; }
+.ar-n { font-size: 12px; color: var(--tinte-3); margin-left: auto; }
+
 /* Bereichsauswahl */
 .bw-t { font-size: 15.6px; padding: 2px 2px 4px; border-bottom: 1px solid var(--linie); }
 .bw-gk { font-size: 10.2px; letter-spacing: .12em; text-transform: uppercase;
@@ -492,6 +504,7 @@ input, textarea { font: inherit; color: inherit; }
 .bw-n { flex: 1; min-width: 0; font-size: 14.4px; overflow: hidden;
         text-overflow: ellipsis; white-space: nowrap; }
 .bw-g { font-size: 11.4px; color: var(--tinte-3); flex-shrink: 0; }
+.bw-loesch { display: flex; justify-content: flex-end; margin-top: 8px; }
 
 /* Gruppen- und Bereichsverwaltung */
 .gr-z { display: flex; align-items: center; gap: 8px; padding: 5px 0;
@@ -985,13 +998,28 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
   </div>
 </div>
 
+<div class="hg" id="ub" onclick="if(event.target===this){uebertragZu()}">
+  <div class="dlg" style="width:480px">
+    <div class="dlg-kopf">
+      <h2>Übertrag</h2>
+      <button class="k-btn" style="margin-left:auto" onclick="uebertragZu()">Abbrechen</button>
+    </div>
+    <div class="dlg-koerper" style="display:block" id="ub-inhalt"></div>
+    <div class="dlg-fuss">
+      <span class="bk-sub">Offenes bleibt stehen.</span>
+      <span style="margin-left:auto"></span>
+      <button class="k-btn pri" id="ub-machen" onclick="uebertragMachen()">Abheften</button>
+    </div>
+  </div>
+</div>
+
 <div class="meldung" id="meldung"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 'use strict';
 
-const APP_VERSION = '2.8.0';
+const APP_VERSION = '2.9.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -1006,7 +1034,7 @@ const APP_VERSION = '2.8.0';
    push und splice wirken dadurch unverändert weiter.
    Die SAAT_-Werte sind nur die Erstbefüllung beim allerersten Start.
    ═══════════════════════════════════════════════════════════════════ */
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 /* Gruppe: die Ebene ueber dem Bereich. Im Ringbuch ist sie das Register,
    hinter dem mehrere Aktivitaeten-Checklisten liegen. Gepflegte Liste,
@@ -1029,6 +1057,10 @@ const SAAT_BEREICHE = [
    geplant: Datum, an dem die Aktivität auf dem Tagesplan steht, oder
    null. Früher ein Ja/Nein-Feld — damit blieb sie ewig auf "heute" und
    liess sich nicht auf morgen legen.
+   archiviert: Datum des Übertrags oder null. Zugleich Kennzeichen und
+   Blattidentität — alle Aktivitäten desselben Datums bilden ein
+   abgeheftetes Blatt. Die Aktivität selbst bleibt liegen, damit
+   Verweise aus Plänen, Zielen und Wochenblättern nicht brechen.
    verschoben: Tage, von denen sie weggezogen wurde. Ohne diese Spur
    verschwände sie vom alten Blatt, als hätte sie nie daraufgestanden —
    im Ringbuch bleibt der Eintrag mit einem › stehen.
@@ -1037,21 +1069,21 @@ const SAAT_BEREICHE = [
    zielId: nur für Aktivitäten OHNE Plan sinnvoll — Planaktivitäten
    zahlen mittelbar über ihren Plan ein und stünden sonst doppelt.       */
 const SAAT_AKTIVITAETEN = [
-  { id:1,  t:'Folien für CCD-Highlight fertigstellen', b:'b1', prio:'A', min:45,  wer:'',        beginn:'10.08.', ende:'18.08.', glyph:'•', geplant:isoHeute(), verschoben:[], planId:'p1', zielId:null },
-  { id:2,  t:'Angebot von Nille prüfen',               b:'b1', prio:'A', min:30,  wer:'',        beginn:'',       ende:'14.08.', glyph:'•', geplant:isoHeute(), verschoben:[], planId:'p1', zielId:null },
-  { id:3,  t:'Wartungsfenster abstimmen',              b:'b2', prio:'B', min:30,  wer:'Netzwerk',beginn:'',       ende:'21.08.', glyph:'•', geplant:isoHeute(), verschoben:[], planId:'p2', zielId:null },
-  { id:4,  t:'Testfenster bestätigen',                 b:'b2', prio:'B', min:45,  wer:'',        beginn:'',       ende:'24.08.', glyph:'•', geplant:null, verschoben:[], planId:'p2', zielId:null },
-  { id:5,  t:'Unterlagen einscannen und abheften',     b:'b5', prio:'B', min:120, wer:'',        beginn:'',       ende:'',       glyph:'✕', geplant:isoHeute(), verschoben:[], planId:'p4', zielId:null },
-  { id:6,  t:'Miele Waschmaschine registrieren',       b:'b3', prio:'C', min:10,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], planId:null, zielId:null },
-  { id:7,  t:'Grabbewässerung Nüdlingen planen',       b:'b4', prio:'C', min:90,  wer:'',        beginn:'',       ende:'30.09.', glyph:'>', geplant:null, verschoben:[], planId:'p3', zielId:null },
-  { id:8,  t:'Tabletten bestellen und holen',          b:'b4', prio:'B', min:60,  wer:'',        beginn:'',       ende:'19.08.', glyph:'✕', geplant:isoHeute(), verschoben:[], planId:null, zielId:null },
-  { id:9,  t:'Heizung entlüften',                      b:'b3', prio:'C', min:20,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], planId:null, zielId:null },
-  { id:11, t:'Rückmeldung Netzwerkteam einholen',      b:'b2', prio:'B', min:15,  wer:'Netzwerk',beginn:'',       ende:'12.08.', glyph:'•', geplant:isoHeute(), verschoben:[], planId:null, zielId:'z1' },
-  { id:12, t:'Artikel in VorProd anlegen',             b:'b1', prio:'B', min:60,  wer:'',        beginn:'',       ende:'26.08.', glyph:'•', geplant:null, verschoben:[], planId:null, zielId:'z1' },
-  { id:13, t:'Barcelona zum Jahreswechsel buchen',     b:'b4', prio:'C', min:120, wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], planId:null, zielId:null },
-  { id:14, t:'Nüdlingen: Giftstoffe wegfahren',        b:'b4', prio:'C', min:240, wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], planId:'p3', zielId:null },
-  { id:15, t:'Oskar reinigen und warten',              b:'b3', prio:'C', min:30,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], planId:null, zielId:null },
-  { id:16, t:'Hoheitszone Küche aufräumen',            b:'b3', prio:'C', min:45,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], planId:null, zielId:null },
+  { id:1,  t:'Folien für CCD-Highlight fertigstellen', b:'b1', prio:'A', min:45,  wer:'',        beginn:'10.08.', ende:'18.08.', glyph:'•', geplant:isoHeute(), verschoben:[], archiviert:null, planId:'p1', zielId:null },
+  { id:2,  t:'Angebot von Nille prüfen',               b:'b1', prio:'A', min:30,  wer:'',        beginn:'',       ende:'14.08.', glyph:'•', geplant:isoHeute(), verschoben:[], archiviert:null, planId:'p1', zielId:null },
+  { id:3,  t:'Wartungsfenster abstimmen',              b:'b2', prio:'B', min:30,  wer:'Netzwerk',beginn:'',       ende:'21.08.', glyph:'•', geplant:isoHeute(), verschoben:[], archiviert:null, planId:'p2', zielId:null },
+  { id:4,  t:'Testfenster bestätigen',                 b:'b2', prio:'B', min:45,  wer:'',        beginn:'',       ende:'24.08.', glyph:'•', geplant:null, verschoben:[], archiviert:null, planId:'p2', zielId:null },
+  { id:5,  t:'Unterlagen einscannen und abheften',     b:'b5', prio:'B', min:120, wer:'',        beginn:'',       ende:'',       glyph:'✕', geplant:isoHeute(), verschoben:[], archiviert:null, planId:'p4', zielId:null },
+  { id:6,  t:'Miele Waschmaschine registrieren',       b:'b3', prio:'C', min:10,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], archiviert:null, planId:null, zielId:null },
+  { id:7,  t:'Grabbewässerung Nüdlingen planen',       b:'b4', prio:'C', min:90,  wer:'',        beginn:'',       ende:'30.09.', glyph:'>', geplant:null, verschoben:[], archiviert:null, planId:'p3', zielId:null },
+  { id:8,  t:'Tabletten bestellen und holen',          b:'b4', prio:'B', min:60,  wer:'',        beginn:'',       ende:'19.08.', glyph:'✕', geplant:isoHeute(), verschoben:[], archiviert:null, planId:null, zielId:null },
+  { id:9,  t:'Heizung entlüften',                      b:'b3', prio:'C', min:20,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], archiviert:null, planId:null, zielId:null },
+  { id:11, t:'Rückmeldung Netzwerkteam einholen',      b:'b2', prio:'B', min:15,  wer:'Netzwerk',beginn:'',       ende:'12.08.', glyph:'•', geplant:isoHeute(), verschoben:[], archiviert:null, planId:null, zielId:'z1' },
+  { id:12, t:'Artikel in VorProd anlegen',             b:'b1', prio:'B', min:60,  wer:'',        beginn:'',       ende:'26.08.', glyph:'•', geplant:null, verschoben:[], archiviert:null, planId:null, zielId:'z1' },
+  { id:13, t:'Barcelona zum Jahreswechsel buchen',     b:'b4', prio:'C', min:120, wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], archiviert:null, planId:null, zielId:null },
+  { id:14, t:'Nüdlingen: Giftstoffe wegfahren',        b:'b4', prio:'C', min:240, wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], archiviert:null, planId:'p3', zielId:null },
+  { id:15, t:'Oskar reinigen und warten',              b:'b3', prio:'C', min:30,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], archiviert:null, planId:null, zielId:null },
+  { id:16, t:'Hoheitszone Küche aufräumen',            b:'b3', prio:'C', min:45,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], archiviert:null, planId:null, zielId:null },
 ];
 
 /* Termin: t, tag (0 = Montag dieser Woche), von, bis, ganztags, ort
@@ -1461,6 +1493,10 @@ function migriereDB(d) {
     delete n.art;
     delete n.seiten;
   });
+  /* Version 5 → 6: Übertrag ins Archiv */
+  (d.aktivitaeten || []).forEach(function (a) {
+    if (a.archiviert === undefined) { a.archiviert = null; }
+  });
   d.version = DB_VERSION;
   return d;
 }
@@ -1608,6 +1644,10 @@ function melde(x) {
 const bName  = id => (BEREICHE.find(b => b.id === id) || {}).name  || '—';
 const bFarbe = id => (BEREICHE.find(b => b.id === id) || {}).farbe || '#8c857a';
 const offen  = a => a.glyph === '•';
+/* Abgeheftete Aktivitaeten sind aus allen Arbeitslisten heraus. Sie
+   bleiben im Bestand, damit Verweise nicht brechen.                  */
+const lebend = a => !a.archiviert;
+function aktLebend() { return AKTIVITAETEN.filter(lebend); }
 
 /* Bei leerem Bestand haette ein neuer Vorgang keinen Bereich. Statt
    abzustuerzen entsteht einer.                                        */
@@ -1866,7 +1906,7 @@ function renderUnterreiter() {
   el.innerHTML = l.map(function (u) {
     let z = '';
     if (reg === 'akt') {
-      const n = u.k === 'akt' ? AKTIVITAETEN.filter(offen).length
+      const n = u.k === 'akt' ? aktLebend().filter(offen).length
               : u.k === 'wied' ? WIEDER.length : GEWOHNHEIT.length;
       z = '<span class="ur-zahl">' + n + '</span>';
     }
@@ -2025,6 +2065,7 @@ let bwId = null;
 let bwArt = 'akt';
 function bereichWeiter(id) { bereichWahl('akt', id); }
 function bereichWahl(art, id) {
+  if (art !== bwArt || id !== bwId) { bwLoeschFrage = false; }
   bwArt = art;
   bwId = id;
   const l = art === 'akt' ? AKTIVITAETEN : (art === 'plan' ? PLAENE : ZIELE);
@@ -2051,9 +2092,24 @@ function bereichWahl(art, id) {
     h += '<div class="bw-gk">Ohne Gruppe</div>' + ohne.map(zeile).join('');
   }
   if (!BEREICHE.length) { h += '<div class="hinweis">Noch keine Bereiche.</div>'; }
+  if (art === 'akt') {
+    /* Das Streichen (–) ist die Papiergeste fuer "nicht durchgefuehrt"
+       und gehoert in die Historie. Loeschen ist fuer Fehlgriffe da.  */
+    h += '<div class="ed-l">Entfernen</div>' +
+      '<div class="hinweis" style="margin-top:0">Nicht durchgef\u00fchrt? Dann setze das ' +
+      'K\u00e4stchen auf <b>\u2013</b> und hefte sie beim n\u00e4chsten \u00dcbertrag ab. ' +
+      'L\u00f6schen ist f\u00fcr Fehlgriffe.</div>' +
+      '<div class="bw-loesch">' +
+      (bwLoeschFrage
+        ? '<button class="k-btn warn" onclick="aktEntfernen(' + id + ')">Wirklich l\u00f6schen?</button>'
+        : '<button class="k-btn" onclick="bwLoeschFragen()">Aktivit\u00e4t l\u00f6schen</button>') +
+      '</div>';
+  }
   $('bw-inhalt').innerHTML = h;
   $('bw').classList.add('auf');
 }
+let bwLoeschFrage = false;
+function bwLoeschFragen() { bwLoeschFrage = true; bereichWahl(bwArt, bwId); }
 function bereichSetzen(bid) {
   const l = bwArt === 'akt' ? AKTIVITAETEN : (bwArt === 'plan' ? PLAENE : ZIELE);
   const o = l.find(x => x.id === bwId);
@@ -2062,7 +2118,7 @@ function bereichSetzen(bid) {
   renderAlles();
   melde('Nach ' + bName(bid) + ' verschoben');
 }
-function bereichZu() { $('bw').classList.remove('auf'); bwId = null; }
+function bereichZu() { $('bw').classList.remove('auf'); bwId = null; bwLoeschFrage = false; }
 
 /* Kästchen statt Glyph: leer = offen, ✕ erledigt, › verschoben,
    – gestrichen. Der Zustand sitzt im Kästchen, der Text bleibt Text.  */
@@ -2153,7 +2209,7 @@ function aktNeu(heute, feld) {
   aufraeumen();
   const a = { id:naechsteId(), t:'', b:ersterBereichId(), prio:'B', min:30,
               wer:'', beginn:'', ende:'', glyph:'\u2022',
-              geplant:heute ? tagOffen : null, verschoben:[], planId:null, zielId:null };
+              geplant:heute ? tagOffen : null, verschoben:[], archiviert:null, planId:null, zielId:null };
   AKTIVITAETEN.push(a);
   zelleOeffnen('akt', a.id, feld || 't');
 }
@@ -2440,10 +2496,10 @@ function blattTag() {
   let rechts = '<div class="wichtig"><div class="wichtig-l">Wichtigste Aufgabe heute</div>' +
     '<div class="tz-titel">' + (w ? esc(w.t) : '\u2014') + '</div></div>';
 
-  const liste = AKTIVITAETEN.filter(a => a.geplant === tagOffen);
+  const liste = AKTIVITAETEN.filter(a => lebend(a) && a.geplant === tagOffen);
   /* Was von diesem Tag weggezogen wurde, bleibt als Spur stehen — sonst
      sähe das Blatt aus, als hätte der Vorgang nie daraufgestanden.    */
-  const weg = AKTIVITAETEN.filter(a => Array.isArray(a.verschoben) &&
+  const weg = AKTIVITAETEN.filter(a => lebend(a) && Array.isArray(a.verschoben) &&
                                        a.verschoben.indexOf(tagOffen) !== -1 &&
                                        a.geplant !== tagOffen);
   rechts += '<div class="abschnitt">' + abschnitt('Aktivit\u00e4ten', '') +
@@ -2733,7 +2789,7 @@ function blattAktivitaeten() {
   const bl = bereicheDerGruppe(gid);
   const bIds = {};
   bl.forEach(function (b) { bIds[b.id] = true; });
-  const liste = AKTIVITAETEN.filter(a => bIds[a.b]);
+  const liste = AKTIVITAETEN.filter(a => lebend(a) && bIds[a.b]);
   const offenN = liste.filter(offen).length;
 
   kopf(gid === null ? 'Aktivit\u00e4ten \u2014 alle'
@@ -2741,6 +2797,7 @@ function blattAktivitaeten() {
        offenN + ' offen von ' + liste.length +
        ' \u00b7 ' + bl.length + (bl.length === 1 ? ' Bereich' : ' Bereiche'),
        '<button class="k-btn" onclick="gruppenAuf()">Gruppen</button>' +
+       '<button class="k-btn" onclick="uebertragAuf()">\u00dcbertrag</button>' +
        '<button class="k-btn pri" onclick="aktNeu(false)">+ Aktivit\u00e4t</button>');
 
   let h = '<table class="atab"><colgroup><col style="width:28px"><col style="width:20px">' +
@@ -2829,6 +2886,104 @@ function planStandZelle(a) {
   return '<button class="tz-heute" onclick="event.stopPropagation(); heuteHin(' + a.id +
     ')">\u2192 Tag</button>';
 }
+/* ═══════════════════════════════════════════════════════════════════
+   ÜBERTRAG
+   Auf Papier nimmt man ein frisches Blatt, überträgt das Offene und
+   heftet das alte ab. Digital wandert nichts: die erledigten und
+   gestrichenen Aktivitäten bekommen das Datum des Übertrags und sind
+   damit aus den Arbeitslisten heraus. Offenes bleibt stehen.
+   ═══════════════════════════════════════════════════════════════════ */
+function uebertragKandidaten() {
+  const gid = offeneGruppe();
+  const bl = bereicheDerGruppe(gid);
+  const bIds = {};
+  bl.forEach(function (b) { bIds[b.id] = true; });
+  return AKTIVITAETEN.filter(function (a) {
+    return lebend(a) && bIds[a.b] && (a.glyph === '\u2715' || a.glyph === '\u2013');
+  });
+}
+function uebertragAuf() {
+  const k = uebertragKandidaten();
+  const gid = offeneGruppe();
+  const bl = bereicheDerGruppe(gid);
+  const bIds = {};
+  bl.forEach(function (b) { bIds[b.id] = true; });
+  const bleibt = AKTIVITAETEN.filter(a => lebend(a) && bIds[a.b] && !(a.glyph === '\u2715' || a.glyph === '\u2013'));
+  const erl = k.filter(a => a.glyph === '\u2715').length;
+  const gestr = k.length - erl;
+
+  let h = '<div class="dt-z"><span class="dt-l">Blatt</span><span class="dt-w">' +
+    esc(gid === null ? 'alle Gruppen' : gruppeName(gid === '0' ? null : gid)) +
+    '</span></div>' +
+    '<div class="dt-z"><span class="dt-l">Wird abgeheftet</span><span class="dt-w">' +
+    k.length + ' \u00b7 ' + erl + ' erledigt, ' + gestr + ' gestrichen</span></div>' +
+    '<div class="dt-z"><span class="dt-l">Bleibt stehen</span><span class="dt-w">' +
+    bleibt.length + '</span></div>' +
+    '<div class="dt-z"><span class="dt-l">Datum</span><span class="dt-w">' +
+    esc(dmy(isoHeute())) + '</span></div>';
+  if (k.length) {
+    h += '<div class="ed-l">Diese Aktivit\u00e4ten</div>';
+    h += k.slice(0, 40).map(function (a) {
+      return '<div class="ub-z"><span class="hak">' +
+        (a.glyph === '\u2715' ? '\u2715' : '\u2013') + '</span>' +
+        '<span class="ub-t">' + esc(a.t) + '</span>' +
+        '<span class="bw-g">' + esc(bName(a.b)) + '</span></div>';
+    }).join('');
+    if (k.length > 40) {
+      h += '<div class="hinweis">und ' + (k.length - 40) + ' weitere.</div>';
+    }
+  } else {
+    h += '<div class="hinweis">Nichts abzuheften \u2014 auf diesem Blatt steht ' +
+         'nichts Erledigtes oder Gestrichenes.</div>';
+  }
+  h += '<div class="hinweis">Abgeheftete Aktivit\u00e4ten verschwinden aus allen ' +
+       'Arbeitslisten, bleiben aber erhalten: Verweise aus Pl\u00e4nen, Zielen und ' +
+       'Wochenbl\u00e4ttern brechen nicht. Unter Datenbank \u203a Archiv liegen sie als ' +
+       'datiertes Blatt und lassen sich einzeln zur\u00fcckholen.</div>';
+  $('ub-inhalt').innerHTML = h;
+  $('ub-machen').style.display = k.length ? '' : 'none';
+  $('ub').classList.add('auf');
+}
+function uebertragZu() { $('ub').classList.remove('auf'); }
+function uebertragMachen() {
+  const k = uebertragKandidaten();
+  const datum = isoHeute();
+  k.forEach(function (a) { a.archiviert = datum; });
+  uebertragZu();
+  renderAlles();
+  melde(k.length + (k.length === 1 ? ' Aktivit\u00e4t' : ' Aktivit\u00e4ten') + ' abgeheftet');
+}
+/* Einzelne Aktivität zurückholen oder endgültig entfernen */
+function aktZurueck(id) {
+  const a = AKTIVITAETEN.find(x => x.id === id);
+  if (a) { a.archiviert = null; a.glyph = '\u2022'; }
+  renderAlles();
+  melde('Zur\u00fcck in die Liste, wieder offen');
+}
+function aktEntfernen(id) {
+  const i = AKTIVITAETEN.findIndex(x => x.id === id);
+  if (i === -1) { return; }
+  const a = AKTIVITAETEN[i];
+  /* Verweise aus Wochenblättern mitnehmen, sonst zeigen sie ins Leere */
+  WOCHENBLAETTER.forEach(function (w) {
+    [w.eintraege, w.wichtig].forEach(function (l) {
+      for (let j = l.length - 1; j >= 0; j--) {
+        if (l[j].refArt === 'aktivitaet' && l[j].refId === a.id) { l.splice(j, 1); }
+      }
+    });
+  });
+  MONATSBLAETTER.forEach(function (m) {
+    [m.ereignisse, m.vorhaben].forEach(function (l) {
+      for (let j = l.length - 1; j >= 0; j--) {
+        if (l[j].refArt === 'aktivitaet' && l[j].refId === a.id) { l.splice(j, 1); }
+      }
+    });
+  });
+  AKTIVITAETEN.splice(i, 1);
+  bereichZu();
+  renderAlles();
+  melde('Aktivit\u00e4t gel\u00f6scht');
+}
 function heuteHin(id) {
   const a = AKTIVITAETEN.find(x => x.id === id);
   if (a) { a.geplant = tagOffen; melde('Auf den ' + dmyKurz(tagOffen) + ' gelegt'); renderAlles(); }
@@ -2907,7 +3062,7 @@ function blattGewohnheit() {
 /* ═══ BLATT: PLÄNE (CMP 32) ═══ */
 /* Aktivitäten eines Plans — der Planinhalt ist kein eigener Bestand */
 function planAktivitaeten(pid) {
-  return AKTIVITAETEN.filter(a => a.planId === pid);
+  return AKTIVITAETEN.filter(a => lebend(a) && a.planId === pid);
 }
 function planFortschritt(pid) {
   const l = planAktivitaeten(pid);
@@ -3148,7 +3303,7 @@ function planAktNeu(pid) {
   const p = PLAENE.find(x => x.id === pid);
   aufraeumen();
   const a = { id:naechsteId(), t:'', b:p ? p.b : ersterBereichId(), prio:'B', min:0,
-              wer:'', beginn:'', ende:'', glyph:'\u2022', geplant:null, verschoben:[], verschoben:[], planId:pid };
+              wer:'', beginn:'', ende:'', glyph:'\u2022', geplant:null, verschoben:[], verschoben:[], archiviert:null, planId:pid };
   AKTIVITAETEN.push(a);
   zelleOeffnen('akt', a.id, 't');
 }
@@ -3171,7 +3326,7 @@ function blattPlaene() {
 /* Planaktivitäten zahlen mittelbar über ihren Plan ein — sie hier noch
    einmal zu zeigen, hiesse dieselbe Zeile zweimal aufs Blatt zu setzen. */
 function zielAktivitaeten(zid) {
-  return AKTIVITAETEN.filter(a => a.zielId === zid && !a.planId);
+  return AKTIVITAETEN.filter(a => lebend(a) && a.zielId === zid && !a.planId);
 }
 function zielPlaene(zid)  { return PLAENE.filter(p => p.zielId === zid && !p.archiviert); }
 function zielWieder(zid)  { return WIEDER.filter(w => w.zielId === zid); }
@@ -4155,7 +4310,7 @@ function wahlAuf(modus) {
         '<span class="wahl-art">Plan</span><span class="wahl-t">' + esc(p.t) +
         '<div class="wahl-m">' + esc(bName(p.b)) + '</div></span></div>';
     });
-    AKTIVITAETEN.filter(a => offen(a) && !a.planId && !a.zielId).forEach(function (a) {
+    AKTIVITAETEN.filter(a => lebend(a) && offen(a) && !a.planId && !a.zielId).forEach(function (a) {
       h += '<div class="wahl-l" onclick="zielZuordnen(\'akt\',' + a.id + ')">' +
         '<span class="wahl-art">Aktivit\u00e4t</span><span class="wahl-t">' + esc(a.t) +
         '<div class="wahl-m">' + esc(bName(a.b)) + ' \u00b7 ' + a.min + ' Min</div></span></div>';
@@ -4175,7 +4330,7 @@ function wahlAuf(modus) {
     if (!h) { h = '<div class="hinweis">Nichts Freies mehr vorhanden \u2014 alles ist ' +
                   'bereits einem Ziel zugeordnet.</div>'; }
   } else if (modus === 'planakt') {
-    AKTIVITAETEN.filter(a => offen(a) && !a.planId).forEach(function (a) {
+    AKTIVITAETEN.filter(a => lebend(a) && offen(a) && !a.planId).forEach(function (a) {
       h += '<div class="wahl-l" onclick="planZuordnen(' + a.id + ')">' +
         '<span class="wahl-art">Aktivit\u00e4t</span>' +
         '<span class="wahl-t">' + esc(a.t) +
@@ -4186,7 +4341,7 @@ function wahlAuf(modus) {
     if (!h) { h = '<div class="hinweis">Keine freien offenen Aktivit\u00e4ten \u2014 ' +
                   'alle sind bereits einem Plan zugeordnet.</div>'; }
   } else if (modus === 'waktivitaet') {
-    AKTIVITAETEN.filter(offen).forEach(function (a) {
+    aktLebend().filter(offen).forEach(function (a) {
       h += zeile('aktivitaet', a.id, a.t,
                  bName(a.b) + ' \u00b7 ' + a.min + ' Min' +
                  (a.ende ? ' \u00b7 Ende ' + a.ende : ''), 'Aktivit\u00e4t');
@@ -4198,7 +4353,7 @@ function wahlAuf(modus) {
     if (!h) { h = '<div class="hinweis">Alle offenen Aktivit\u00e4ten liegen ' +
                   'bereits auf dieser Woche.</div>'; }
   } else {
-    AKTIVITAETEN.filter(offen).forEach(function (a) {
+    aktLebend().filter(offen).forEach(function (a) {
       h += zeile('aktivitaet', a.id, a.t, bName(a.b), 'Aktivit\u00e4t');
     });
     PLAENE.forEach(function (p) { h += zeile('plan', p.id, p.t, bName(p.b), 'Plan'); });
@@ -4636,7 +4791,7 @@ function eintragSpeichern() {
       /* Eine Aufgabe entsteht als echte Aktivitaet; das Wochenblatt
          traegt nur den Verweis darauf.                              */
       const a = { id:naechsteId(), t:titel, b:ersterBereichId(), prio:'B', min:0, wer:'',
-                  beginn:'', ende:'', glyph:'\u2022', geplant:null, verschoben:[], planId:null, zielId:null };
+                  beginn:'', ende:'', glyph:'\u2022', geplant:null, verschoben:[], archiviert:null, planId:null, zielId:null };
       AKTIVITAETEN.push(a);
       e = { id:naechsteId(), refArt:'aktivitaet', refId:a.id };
       if (k.tag >= 0) { e.tag = k.tag; b.eintraege.push(e); } else { b.wichtig.push(e); }
@@ -4704,8 +4859,19 @@ function blattArchiv() {
   arFrage = arFrage;
   const l = PLAENE.filter(p => p.archiviert);
   const lz = ZIELE.filter(z => z.archiviert);
-  kopf('Archiv', l.length + ' Pl\u00e4ne \u00b7 ' + lz.length + ' Ziele', '');
-  if (!l.length && !lz.length) {
+  const la = AKTIVITAETEN.filter(a => a.archiviert);
+  /* Nach Übertragsdatum gruppiert — jedes Datum ist ein abgeheftetes
+     Blatt, genau wie im Ringbuch.                                     */
+  const blaetter = {};
+  la.forEach(function (a) {
+    if (!blaetter[a.archiviert]) { blaetter[a.archiviert] = []; }
+    blaetter[a.archiviert].push(a);
+  });
+  const daten = Object.keys(blaetter).sort().reverse();
+  kopf('Archiv', l.length + ' Pl\u00e4ne \u00b7 ' + lz.length + ' Ziele \u00b7 ' +
+       la.length + ' Aktivit\u00e4ten in ' + daten.length +
+       (daten.length === 1 ? ' Blatt' : ' Bl\u00e4ttern'), '');
+  if (!l.length && !lz.length && !la.length) {
     $('blatt').innerHTML = '<div class="hinweis">Noch nichts archiviert. ' +
       'Auf einem Planblatt legt der Knopf Archivieren den Plan hierher.</div>';
     return;
@@ -4731,10 +4897,28 @@ function blattArchiv() {
       '<button class="k-btn" onclick="zielReaktivieren(\'' + z.id + '\')">Reaktivieren</button>' +
       arWeg('ziel', z.id) + '</div>';
   }).join('');
+  daten.forEach(function (d) {
+    const eintraege = blaetter[d];
+    const erl = eintraege.filter(a => a.glyph === '\u2715').length;
+    h += '<div class="ar-kopf"><span class="ar-d">\u00dcbertrag ' + esc(dmy(d)) +
+      '</span><span class="ar-n">' + eintraege.length + ' Eintr\u00e4ge \u00b7 ' +
+      erl + ' erledigt</span></div>';
+    h += eintraege.map(function (a) {
+      return '<div class="ub-z"><span class="hak">' +
+        (a.glyph === '\u2715' ? '\u2715' : '\u2013') + '</span>' +
+        '<span class="tz-punkt" style="background:' + bFarbe(a.b) + '"></span>' +
+        '<span class="ub-t">' + esc(a.t) + '</span>' +
+        '<span class="bw-g">' + esc(bName(a.b)) + '</span>' +
+        '<button class="k-btn" onclick="aktZurueck(' + a.id + ')">Zur\u00fcck</button></div>';
+    }).join('');
+  });
+
   h += '<div class="hinweis">Ein reaktivierter Plan oder ein reaktiviertes Ziel bekommt ' +
        'seinen Reiter zur\u00fcck. Das Zugeordnete war nie weg \u2014 es steht weiterhin ' +
        'in seinen Best\u00e4nden. <b>L\u00f6schen</b> entfernt endg\u00fcltig, l\u00f6st aber ' +
-       'nur die Zuordnungen: Aktivit\u00e4ten und Pl\u00e4ne bleiben bestehen.</div>';
+       'nur die Zuordnungen: Aktivit\u00e4ten und Pl\u00e4ne bleiben bestehen. ' +
+       'Eine abgeheftete Aktivit\u00e4t kommt mit <b>Zur\u00fcck</b> wieder in die Liste \u2014 ' +
+       'dann steht sie wieder offen.</div>';
   $('blatt').innerHTML = h;
 }
 
@@ -4813,7 +4997,7 @@ function exportAuf() {
       }).join('');
 
     inhalt += '<div class="move-l">Aktivitaeten</div>';
-    inhalt += AKTIVITAETEN.filter(a => a.geplant === tagOffen).map(function (a) {
+    inhalt += AKTIVITAETEN.filter(a => lebend(a) && a.geplant === tagOffen).map(function (a) {
       const z = { '\u2022':'\u25a1', '\u2715':'\u2715', '>':'\u203a', '\u2013':'\u2013' };
       return '<div class="move-z">' + (z[a.glyph] || '\u25a1') + ' ' + esc(a.prio) +
              '  ' + esc(a.t) + '</div>';
@@ -4862,7 +5046,8 @@ function dbGroesse() {
 function datenAuf() {
   const zaehlung = [
     ['Gruppen', GRUPPEN.length], ['Bereiche', BEREICHE.length],
-    ['Aktivitäten', AKTIVITAETEN.length],
+    ['Aktivitäten', aktLebend().length],
+    ['davon abgeheftet', AKTIVITAETEN.length - aktLebend().length],
     ['Pläne', PLAENE.length], ['Ziele', ZIELE.length],
     ['Jahrestermine', JAHRESTERMINE.length], ['Wiederkehrend', WIEDER.length],
     ['Gewohnheiten', GEWOHNHEIT.length], ['Wochenblätter', WOCHENBLAETTER.length],
@@ -5116,7 +5301,7 @@ function waUmwandeln(d) {
     aktivitaeten.push({ id:id, t:a.titel, b:bereichVon(a), prio:waPrio(a),
                         min:parseInt(a.groesse, 10) || 0, wer:'',
                         beginn:waDatum(a.startdatum), ende:waDatum(a.faellig),
-                        glyph:waGlyph(a.status), geplant:null, verschoben:[],
+                        glyph:waGlyph(a.status), geplant:null, verschoben:[], archiviert:null,
                         planId:null, zielId:null });
     bericht.aktivitaeten += 1;
   });
@@ -5143,7 +5328,7 @@ function waUmwandeln(d) {
       aktivitaeten.push({ id:naechsteId(), t:sch.titel,
                           b:(b && abbild[b.id]) ? abbild[b.id] : bereichVon(p),
                           prio:'B', min:0, wer:sch.delegiertAn || '',
-                          beginn:'', ende:'', glyph:'\u2022', geplant:null, verschoben:[],
+                          beginn:'', ende:'', glyph:'\u2022', geplant:null, verschoben:[], archiviert:null,
                           planId:pid, zielId:null });
       bericht.aktivitaeten += 1;
       bericht.schritte += 1;
@@ -5431,7 +5616,7 @@ function moveTagPdf() {
   if (!gt.length && !fest.length) { y += 4.2; }
 
   /* Aktivitäten, wichtigste zuerst */
-  const liste = AKTIVITAETEN.filter(a => a.geplant === tagOffen);
+  const liste = AKTIVITAETEN.filter(a => lebend(a) && a.geplant === tagOffen);
   liste.sort(function (a, b) {
     if (a.id === tb.wichtigste) { return -1; }
     if (b.id === tb.wichtigste) { return 1; }
