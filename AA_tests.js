@@ -690,6 +690,56 @@ kat('18 · Weiterziehen und Planungsstand');
   else { fail('Schemaversion nicht erhöht'); }
 }
 
+/* ═══ 19 · Datenbank und Notizen (S5) ══════════════════════════════════
+   Fehlerarten: der Notizinhalt geht beim Import verloren und es bleiben
+   leere Überschriften; ein Blatt lässt sich nicht anlegen oder ändern;
+   die Registernummer wird doppelt vergeben.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('19 · Datenbank und Notizen');
+{
+  ['notizNeu', 'notizAuf', 'notizZurueck', 'notizLoeschen', 'notizFeld',
+   'notizSchreiben', 'blattNotizBlatt', 'notizBereich']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  /* Registernummer: der Höchstwert plus eins, nicht die Anzahl —
+     sonst entstehen nach dem Löschen Dubletten.                      */
+  const mN = JSK.match(/function notizNr\(\) \{([\s\S]*?)\n\}/);
+  if (mN && /n\.nr > m/.test(mN[1])) { ok('Registernummer aus dem Höchstwert'); }
+  else { fail('Registernummer aus der Anzahl — nach dem Löschen doppelt'); }
+
+  const mB = JSK.match(/function blattNotizBlatt\(id\) \{([\s\S]*?)\n\}/);
+  if (!mB) { fail('blattNotizBlatt nicht auswertbar'); }
+  else {
+    ['t', 'datum', 'quelle', 'text'].forEach(function (f) {
+      if (new RegExp("notizFeld\\(' \\+ n\\.id \\+ ',\\\\'" + f + "\\\\'\\)").test(mB[1])) {
+        ok('Notizfeld ' + f + ' ist bearbeitbar');
+      } else { fail('Notizfeld ' + f + ' lässt sich nicht ändern'); }
+    });
+    if (/notizBereich/.test(mB[1])) { ok('Bereich des Blattes ist wählbar'); }
+    else { fail('Bereich des Blattes lässt sich nicht ändern'); }
+  }
+
+  const mW = JSK.match(/function waUmwandeln\(d\) \{([\s\S]*?)\n\}/);
+  if (mW && /n\.inhalt \|\| ''/.test(mW[1])) { ok('Import übernimmt den Notizinhalt'); }
+  else { fail('Notizinhalt geht beim Import verloren'); }
+  if (mW && /dok\.link/.test(mW[1])) { ok('Import übernimmt den Dokumentlink'); }
+  else { fail('Dokumentlink geht beim Import verloren'); }
+
+  const mS = JSK.match(/function notizSchreiben\(\) \{([\s\S]*?)\n\}/);
+  if (mS && /dmyZuIso\(v\)/.test(mS[1])) { ok('Notizdatum wird geprüft'); }
+  else { fail('Notizdatum ungeprüft'); }
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mM && /n\.text === undefined/.test(mM[1])) { ok('Migration ergänzt den Notiztext'); }
+  else { fail('Migration ergänzt text nicht'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 5) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
