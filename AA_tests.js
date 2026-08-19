@@ -17,7 +17,7 @@ function kat(t)  { console.log('\n── ' + t + ' ' + '─'.repeat(Math.max(0, 
 
 if (!fs.existsSync(PFAD)) { console.log('Datei nicht gefunden: ' + PFAD); process.exit(1); }
 const H = fs.readFileSync(PFAD, 'utf8');
-const mS = H.match(/<script>\n([\s\S]*)<\/script>/);
+const mS = H.match(/<script>\n'use strict';([\s\S]*)<\/script>/);
 const JS = mS ? mS[1] : '';
 const HTMLTEIL = H.replace(/<script>[\s\S]*?<\/script>/g, '');
 const JSK = JS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
@@ -738,6 +738,63 @@ kat('19 · Datenbank und Notizen');
   const mV = JS.match(/const DB_VERSION = (\d+)/);
   if (mV && parseInt(mV[1], 10) >= 5) { ok('Schemaversion auf ' + mV[1]); }
   else { fail('Schemaversion nicht erhöht'); }
+}
+
+/* ═══ 20 · Blatt an Move (S6) ═══════════════════════════════════════════
+   Fehlerarten: das PDF bekommt A4 statt Movemaß; fehlender PDF-Baustein
+   führt zum stillen Absturz statt zu einer Meldung; der Knopf steht auf
+   Blättern, die gar nicht exportiert werden; Text läuft über den Rand.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('20 · Blatt an Move');
+{
+  ['moveTagPdf', 'moveErzeugen', 'pdfVerfuegbar']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const mMV = JS.match(/const MV = \{ b:([\d.]+), h:([\d.]+), rand:([\d.]+) \}/);
+  if (mMV && mMV[1] === '82.6' && mMV[2] === '132.2') {
+    ok('Blattmaß 82,6 × 132,2 mm (reMarkable Paper Pro Move)');
+  } else { fail('Blattmaß stimmt nicht'); }
+
+  const mP = JSK.match(/function moveTagPdf\(\) \{([\s\S]*?)\n\}\n/);
+  if (!mP) { fail('moveTagPdf nicht auswertbar'); }
+  else {
+    const t = mP[1];
+    if (/if \(!pdfVerfuegbar\(\)\)/.test(t)) { ok('fehlender PDF-Baustein wird abgefangen'); }
+    else { fail('kein Rückfall ohne PDF-Baustein'); }
+    if (/format:\[MV\.b, MV\.h\]/.test(t)) { ok('Seitenformat aus dem Movemaß'); }
+    else { fail('Seitenformat nicht aus MV'); }
+    if (/doc\.addPage\(\[MV\.b, MV\.h\]/.test(t)) { ok('Folgeseiten im selben Maß'); }
+    else { fail('Folgeseiten fehlen oder haben ein anderes Maß'); }
+    if (/const kurz = function/.test(t) && /getTextWidth/.test(t)) {
+      ok('Text wird auf die Blattbreite gekürzt');
+    } else { fail('Text kann über den Rand laufen'); }
+    const seiten = (t.match(/doc\.addPage\(/g) || []).length + 1;
+    if (seiten === 3) { ok('drei Seiten: Plan, Rückfragen, Notizen'); }
+    else { fail('Seitenzahl ist ' + seiten + ', erwartet 3'); }
+    if (/'1 \/ 3'/.test(t) && /'2 \/ 3'/.test(t) && /'3 \/ 3'/.test(t)) {
+      ok('Seitenzahlen im Fuß stimmen');
+    } else { fail('Seitenzahlen im Fuß fehlen oder falsch'); }
+    /* Die Schreiblinie gehoert unter das eigene Kaestchen. Lag sie eine
+       halbe Zeile tiefer, durchkreuzte sie das folgende.              */
+    if (/doc\.line\(L \+ 4\.6, y \+ 1\.4, R, y \+ 1\.4\);\n    y \+= 5\.8;/.test(t)) {
+      ok('Schreiblinie liegt unter dem eigenen Kästchen');
+    } else { fail('Schreiblinie sitzt falsch — sie durchkreuzt das nächste Kästchen'); }
+    if (/while \(y < fussY\)/.test(t)) { ok('Aktivitäten haben freie Zeilen bis ans Blattende'); }
+    else { fail('keine freien Zeilen bei den Aktivitäten'); }
+    if (/const rZeilen = 3;/.test(t)) { ok('Reflexion auf drei Zeilen'); }
+    else { fail('Reflexion nicht auf drei Zeilen'); }
+  }
+
+  /* Der Knopf gehört nur auf das Tagesblatt */
+  if (/km\.style\.display = \(reg === 'tag'\)/.test(JSK)) {
+    ok('Move-Knopf nur auf dem Tagesblatt');
+  } else { fail('Move-Knopf erscheint auf Blättern ohne Export'); }
+
+  if (/jspdf\.umd\.min\.js/.test(H)) { ok('jsPDF eingebunden'); }
+  else { fail('jsPDF nicht eingebunden'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

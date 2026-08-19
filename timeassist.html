@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 2.4.0 · S5 Datenbank</title>
+<title>TimeAssist 2.6.0 · Blatt an Move</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -794,7 +794,7 @@ textarea.nz-text { resize: none; height: 520px; outline: none; }
         <div class="bk-akt" id="bk-akt"></div>
         <div class="bk-werkzeug">
           <button class="k-btn" onclick="datenAuf()"><span class="sp-punkt" id="spstand"></span>Daten</button>
-          <button class="k-btn pri" onclick="exportAuf()">Blatt an Move</button>
+          <button class="k-btn pri" id="k-move" onclick="exportAuf()">Blatt an Move</button>
         </div>
       </div>
       <div class="blatt-koerper" id="blatt"></div>
@@ -823,7 +823,7 @@ textarea.nz-text { resize: none; height: 520px; outline: none; }
       <span class="bk-sub" id="export-hinweis"></span>
       <span style="margin-left:auto"></span>
       <button class="k-btn" onclick="exportZu()">Abbrechen</button>
-      <button class="k-btn pri" onclick="melde('Im Mockup wird kein PDF erzeugt'); exportZu();">PDF erzeugen</button>
+      <button class="k-btn pri" onclick="moveErzeugen()">PDF erzeugen</button>
     </div>
   </div>
 </div>
@@ -945,10 +945,11 @@ textarea.nz-text { resize: none; height: 520px; outline: none; }
 
 <div class="meldung" id="meldung"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 'use strict';
 
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.6.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -1763,6 +1764,10 @@ function kopf(titel, sub, akt) {
   $('bk-sub').textContent = sub || '';
   $('bk-akt').innerHTML = akt || '';
   $('bf-nr').textContent = formNr();
+  /* Nur das Tagesblatt geht aufs Papier — die anderen leben von
+     Zustandswechseln und waeren gedruckt am naechsten Tag falsch.    */
+  const km = $('k-move');
+  if (km) { km.style.display = (reg === 'tag') ? '' : 'none'; }
   $('bf-mitte').textContent = 'TimeAssist ' + APP_VERSION;
   /* bf-rechts traegt den Massstab, gesetzt in skaliere() */
   skaliere();
@@ -4985,6 +4990,247 @@ function gruppenRender() {
     h += '<div class="hinweis">Noch keine Bereiche vorhanden.</div>';
   }
   $('gruppen-inhalt').innerHTML = h;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BLATT AN MOVE — PDF im Format 82,6 × 132,2 mm
+   Zwei Seiten: vorn der Plan, hinten die Schreibflächen. Einspaltig,
+   ohne Zeitraster — auf 72 mm Breite wäre ein Raster von 06 bis 23 Uhr
+   entweder unleserlich oder zwei Seiten lang, und auf dem Move schreibt
+   man ohnehin daneben statt hinein.
+   ═══════════════════════════════════════════════════════════════════ */
+const MV = { b:82.6, h:132.2, rand:5 };
+
+function pdfVerfuegbar() {
+  return !!(window.jspdf && window.jspdf.jsPDF);
+}
+
+function moveTagPdf() {
+  if (!pdfVerfuegbar()) {
+    melde('PDF-Baustein nicht geladen \u2014 Verbindung pr\u00fcfen');
+    return null;
+  }
+  const doc = new window.jspdf.jsPDF({ unit:'mm', format:[MV.b, MV.h], orientation:'portrait' });
+  const L = MV.rand, R = MV.b - MV.rand, BR = R - L;
+  const WEIN = [144, 12, 36], GRAU = [120, 115, 106], TINTE = [35, 33, 30];
+  let y = 0;
+
+  const linie = function (yy, stark) {
+    doc.setDrawColor(stark ? WEIN[0] : 205, stark ? WEIN[1] : 200, stark ? WEIN[2] : 190);
+    doc.setLineWidth(stark ? 0.5 : 0.15);
+    doc.line(L, yy, R, yy);
+  };
+  const abschnitt = function (titel) {
+    y += 3.6;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(5.4);
+    doc.setTextColor(WEIN[0], WEIN[1], WEIN[2]);
+    doc.text(titel.toUpperCase(), L, y);
+    y += 1.1; linie(y, true); y += 2.6;
+  };
+  const kaestchen = function (xx, yy, zeichen) {
+    doc.setDrawColor(120, 115, 106); doc.setLineWidth(0.18);
+    doc.roundedRect(xx, yy - 2.6, 3.2, 3.2, 0.4, 0.4);
+    if (zeichen) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(6);
+      doc.setTextColor(TINTE[0], TINTE[1], TINTE[2]);
+      doc.text(zeichen, xx + 0.7, yy - 0.1);
+    }
+  };
+  const schreiblinien = function (n, hoehe) {
+    for (let i = 0; i < n; i++) {
+      y += hoehe;
+      doc.setDrawColor(215, 210, 200); doc.setLineWidth(0.12);
+      doc.line(L, y, R, y);
+    }
+  };
+  /* Kuerzt auf die Blattbreite. Die Auslassungspunkte muessen in die
+     Messung, sonst wird die gekuerzte Zeile wieder zu breit.          */
+  const kurz = function (txt, breite, gr) {
+    doc.setFontSize(gr);
+    const voll = String(txt == null ? '' : txt);
+    if (doc.getTextWidth(voll) <= breite) { return voll; }
+    let t = voll;
+    while (t.length > 1 && doc.getTextWidth(t + '\u2026') > breite) { t = t.slice(0, -1); }
+    return t + '\u2026';
+  };
+
+  /* ── Seite 1 ─────────────────────────────────────────────────── */
+  y = MV.rand + 3;
+  doc.setFont('times', 'bold'); doc.setFontSize(10);
+  doc.setTextColor(WEIN[0], WEIN[1], WEIN[2]);
+  doc.text(WOTAGE[isoWt(tagOffen)] + ', ' + dmy(tagOffen), L, y);
+  y += 3.4;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(5.4);
+  doc.setTextColor(GRAU[0], GRAU[1], GRAU[2]);
+  doc.text('Tagesplan \u00b7 KW ' + kalenderwoche(tagOffen), L, y);
+  y += 1.2; linie(y, true);
+
+  const tb = tagBlatt();
+  y += 4;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(5.4);
+  doc.setTextColor(GRAU[0], GRAU[1], GRAU[2]);
+  doc.text('TAGESMOTTO', L, y);
+  y += 3.4;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  doc.setTextColor(TINTE[0], TINTE[1], TINTE[2]);
+  doc.text(kurz(tb.motto.filter(z => z).join('  '), BR, 7.5), L, y);
+  y += 1; linie(y);
+
+  /* Termine chronologisch, ohne Raster */
+  const gt = ganztagsEintraege();
+  const fest = TERMINE.filter(t => t.datum === tagOffen && !t.ganztags)
+    .sort(function (a, b) { return a.von < b.von ? -1 : 1; });
+  abschnitt('Termine');
+  gt.forEach(function (g) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.4);
+    doc.setTextColor(WEIN[0], WEIN[1], WEIN[2]);
+    doc.text(kurz(g.t + (g.ort ? ' \u00b7 ' + g.ort : ''), BR, 6.4), L, y);
+    y += 4.2;
+  });
+  fest.forEach(function (t) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.4);
+    doc.setTextColor(TINTE[0], TINTE[1], TINTE[2]);
+    doc.text(t.von, L, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(kurz(t.t + (t.ort ? ' \u00b7 ' + t.ort : ''), BR - 10, 6.4), L + 10, y);
+    y += 4.2;
+  });
+  if (!gt.length && !fest.length) { y += 4.2; }
+
+  /* Aktivitäten, wichtigste zuerst */
+  const liste = AKTIVITAETEN.filter(a => a.geplant === tagOffen);
+  liste.sort(function (a, b) {
+    if (a.id === tb.wichtigste) { return -1; }
+    if (b.id === tb.wichtigste) { return 1; }
+    return a.prio < b.prio ? -1 : (a.prio > b.prio ? 1 : 0);
+  });
+  abschnitt('Aktivit\u00e4ten');
+  const zeichenVon = { '\u2022':'', '\u2715':'x', '>':'>', '\u2013':'-' };
+  liste.forEach(function (a) {
+    kaestchen(L, y, zeichenVon[a.glyph] || '');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.4);
+    doc.setTextColor(TINTE[0], TINTE[1], TINTE[2]);
+    doc.text(a.prio, L + 4.6, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(kurz(a.t, BR - 15, 6.4), L + 7.6, y);
+    if (a.min) {
+      doc.setTextColor(GRAU[0], GRAU[1], GRAU[2]);
+      doc.text(String(a.min), R, y, { align:'right' });
+    }
+    y += 4.2;
+  });
+  /* Freie Zeilen bis ans Blattende: der Tag bringt Dinge, die morgens
+     noch nicht auf der Liste standen.                                 */
+  const fussY = MV.h - MV.rand - 4;
+  while (y < fussY) {
+    kaestchen(L, y, '');
+    doc.setDrawColor(222, 218, 208); doc.setLineWidth(0.1);
+    doc.line(L + 4.6, y + 1.2, R, y + 1.2);
+    y += 5.2;
+  }
+
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(4.6);
+  doc.setTextColor(170, 165, 155);
+  doc.text('CMP 01', L, MV.h - 3);
+  doc.text('1 / 3', R, MV.h - 3, { align:'right' });
+
+  /* ── Seite 2: Wiederkehrend, Rückfragen, Reflexion ───────────── */
+  doc.addPage([MV.b, MV.h], 'portrait');
+  y = MV.rand + 3;
+  doc.setFont('times', 'bold'); doc.setFontSize(7.5);
+  doc.setTextColor(WEIN[0], WEIN[1], WEIN[2]);
+  doc.text(dmy(tagOffen), L, y);
+  y += 1.2; linie(y, true);
+
+  const wk = WIEDER.filter(x => x.tage.indexOf(isoWt(tagOffen)) !== -1);
+  if (wk.length) {
+    abschnitt('Wiederkehrend');
+    wk.forEach(function (x) {
+      kaestchen(L, y, zeichenVon[x.log[tagOffen] || '\u2022'] || '');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.4);
+      doc.setTextColor(TINTE[0], TINTE[1], TINTE[2]);
+      doc.text(kurz(x.t, BR - 12, 6.4), L + 4.6, y);
+      doc.setTextColor(GRAU[0], GRAU[1], GRAU[2]);
+      doc.text(String(x.min), R, y, { align:'right' });
+      y += 4.4;
+    });
+  }
+
+  /* Die Schreiblinie gehoert unter das eigene Kaestchen. Vorher lag sie
+     eine halbe Zeile tiefer und durchkreuzte das folgende.            */
+  const kont = KONTAKTE.filter(k => k.datum === tagOffen);
+  abschnitt('Kontakte / R\u00fcckfragen');
+  const kontaktZeile = function (k) {
+    kaestchen(L, y, k ? (zeichenVon[k.glyph] || '') : '');
+    if (k) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.4);
+      doc.setTextColor(TINTE[0], TINTE[1], TINTE[2]);
+      doc.text(kurz(k.t, BR - 6, 6.4), L + 4.6, y);
+    }
+    doc.setDrawColor(215, 210, 200); doc.setLineWidth(0.12);
+    doc.line(L + 4.6, y + 1.4, R, y + 1.4);
+    y += 5.8;
+  };
+  kont.forEach(kontaktZeile);
+  for (let i = kont.length; i < 9; i++) { kontaktZeile(null); }
+
+  /* Reflexion: drei Zeilen genuegen, den Rest nimmt die Notizseite. */
+  y += 1.5;
+  const rTop = y;
+  const rZeilen = 3;
+  const rHoehe = rZeilen * 5.8 + 5;
+  doc.setDrawColor(WEIN[0], WEIN[1], WEIN[2]); doc.setLineWidth(0.3);
+  doc.roundedRect(L, rTop, BR, rHoehe, 0.8, 0.8);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(5.4);
+  doc.setTextColor(WEIN[0], WEIN[1], WEIN[2]);
+  doc.text('REFLEXION', L + 2, rTop + 3.4);
+  let ry = rTop + 4.6;
+  const rText = tb.reflexion.filter(z => z);
+  for (let i = 0; i < rZeilen; i++) {
+    ry += 5.8;
+    if (rText[i]) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.4);
+      doc.setTextColor(TINTE[0], TINTE[1], TINTE[2]);
+      doc.text(kurz(rText[i], BR - 4, 6.4), L + 2, ry - 1.6);
+    }
+    doc.setDrawColor(220, 215, 205); doc.setLineWidth(0.12);
+    doc.line(L + 2, ry - 1, R - 2, ry - 1);
+  }
+
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(4.6);
+  doc.setTextColor(170, 165, 155);
+  doc.text('CMP 01', L, MV.h - 3);
+  doc.text('2 / 3', R, MV.h - 3, { align:'right' });
+
+  /* ── Seite 3: freie Notizseite ───────────────────────────────── */
+  doc.addPage([MV.b, MV.h], 'portrait');
+  y = MV.rand + 3;
+  doc.setFont('times', 'bold'); doc.setFontSize(7.5);
+  doc.setTextColor(WEIN[0], WEIN[1], WEIN[2]);
+  doc.text(dmy(tagOffen), L, y);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(5.4);
+  doc.text('NOTIZEN', R, y, { align:'right' });
+  y += 1.2; linie(y, true);
+  y += 2;
+  while (y < MV.h - MV.rand - 6) {
+    y += 6.5;
+    doc.setDrawColor(215, 210, 200); doc.setLineWidth(0.12);
+    doc.line(L, y, R, y);
+  }
+
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(4.6);
+  doc.setTextColor(170, 165, 155);
+  doc.text('CMP 01', L, MV.h - 3);
+  doc.text('3 / 3', R, MV.h - 3, { align:'right' });
+  return doc;
+}
+
+function moveErzeugen() {
+  const doc = moveTagPdf();
+  if (!doc) { return; }
+  doc.save('Tagesblatt_' + tagOffen.replace(/-/g, '') + '.pdf');
+  exportZu();
+  melde('PDF erstellt \u2014 zwei Seiten f\u00fcr den Move');
 }
 
 /* ═══ SKALIERUNG DES GERÄTERAHMENS ═══ */
