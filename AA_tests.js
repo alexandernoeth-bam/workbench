@@ -2204,6 +2204,54 @@ kat('43 · Abschnittskopf und Gliederung');
   }
 }
 
+/* ═══ 44 · Spaltenzahl der Checkliste ══════════════════════════════════
+   Fehlerarten: die Bereichsspalte entfällt in der Plangliederung, aber
+   Kopfzeile, Zusammenfassungszeilen oder Leerzeilen zählen weiter neun —
+   die Tabelle verrutscht dann um eine Spalte. Und: der Planpfeil steht
+   an jeder Zeile, obwohl der Plan schon in der Überschrift darüber steht.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('44 · Spaltenzahl der Checkliste');
+{
+  const mB = JSK.match(/function blattAktivitaeten\(\) \{([\s\S]*?)\n  \$\('blatt'\)/);
+  if (!mB) { fail('blattAktivitaeten nicht auswertbar'); }
+  else {
+    const t = mB[1];
+    if (/const sp = nachPlan \? 8 : 9;/.test(t)) { ok('Spaltenzahl hängt an der Gliederung'); }
+    else { fail('Spaltenzahl fest verdrahtet'); }
+
+    /* Keine feste 9 mehr — sonst verrutscht die Tabelle */
+    if (!/colspan="9"/.test(t)) { ok('keine feste colspan-Angabe'); }
+    else { fail('colspan="9" trotz acht Spalten in der Plangliederung'); }
+    const feste = (t.match(/colspan="\d+"/g) || []);
+    if (!feste.length) { ok('alle Zusammenfassungszeilen rechnen mit sp'); }
+    else { fail('feste colspan: ' + feste.join(', ')); }
+
+    /* Die Zellenzahl je Datenzeile muss zu sp passen */
+    const mZ = t.match(/const zeile = function \(a\) \{([\s\S]*?)\n  \};/);
+    if (mZ && /nachPlan \? '' :\s*\n?\s*'<td class="mitte z" onclick="bereichWeiter/.test(mZ[1])) {
+      ok('Bereichsspalte entfällt in der Plangliederung');
+    } else { fail('Bereichsspalte bleibt und sprengt die Zeile'); }
+
+    /* Kopfzeile ebenso */
+    if (/<thead><tr><th><\/th>' \+ \(nachPlan \? '' : '<th><\/th>'\)/.test(t)) {
+      ok('Kopfzeile folgt der Spaltenzahl');
+    } else { fail('Kopfzeile hat immer neun Spalten'); }
+
+    /* Leerzeilen dürfen nicht neun Zellen fest ausgeben */
+    if (/'<td><\/td>'\.repeat\(sp\)/.test(t)) { ok('Leerzeilen folgen der Spaltenzahl'); }
+    else { fail('Leerzeilen mit fester Zellenzahl'); }
+  }
+
+  const mP = JSK.match(/function planPfeilZelle\(a, ohnePfeil\) \{([\s\S]*?)\n\}/);
+  if (mP && /if \(ohnePfeil\) \{ return inner; \}/.test(mP[1])) {
+    ok('Planpfeil lässt sich unterdrücken');
+  } else { fail('Planpfeil steht doppelt zum Überschriftstext'); }
+
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  if (/\.atab tr\.ein td:first-child/.test(css)) { ok('Zeilen der Plangliederung sind eingerückt'); }
+  else { fail('keine Einrückung in der Plangliederung'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
