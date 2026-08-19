@@ -1267,6 +1267,132 @@ kat('28 · Doppelte Schleifen und Zeilenhöhen');
   } else { fail('freie Zeilen in der Checkliste sind tot'); }
 }
 
+/* ═══ 29 · Rhythmen anlegen und pflegen ════════════════════════════════
+   Fehlerart: ein Bestand ist nur Anzeige — man kann Kästchen schalten,
+   den Vorgang selbst aber weder anlegen noch ändern noch löschen.
+   Ebenso: Mustertext und Wochentage laufen auseinander, weil beide von
+   Hand gepflegt werden; das Soll einer Gewohnheit passt nicht zu ihren
+   Tagen.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('29 · Rhythmen anlegen und pflegen');
+{
+  ['rhNeu', 'rhOeffnen', 'rhSpeichern', 'rhLoeschen', 'rhTag', 'rhMuster', 'rhRender']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  ['blattWieder', 'blattGewohnheit'].forEach(function (bl) {
+    const m = JSK.match(new RegExp('function ' + bl + '\\(\\) \\{([\\s\\S]*?)\\n\\}'));
+    if (!m) { fail(bl + ' nicht auswertbar'); return; }
+    if (/rhNeu\(/.test(m[1])) { ok(bl + ': Anlegen möglich'); }
+    else { fail(bl + ': kein Weg zum Anlegen'); }
+    if (/rhOeffnen\(/.test(m[1])) { ok(bl + ': Bearbeiten möglich'); }
+    else { fail(bl + ': kein Weg zum Bearbeiten'); }
+  });
+
+  /* Muster wird gerechnet, nicht getippt */
+  const mM = JSK.match(/function rhMuster\(tage\) \{[\s\S]*?\n\}/);
+  if (mM) {
+    let fn = null;
+    try {
+      fn = new Function('WOKURZ', mM[0] + '\nreturn rhMuster;')(
+        ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']);
+    } catch (e) { fn = null; }
+    if (!fn) { fail('rhMuster nicht auswertbar'); }
+    else {
+      const F = [[[0,1,2,3,4,5,6], 'täglich'], [[0,1,2,3,4], 'Mo – Fr'],
+                 [[5,6], 'Wochenende'], [[0,2,4], 'Mo · Mi · Fr']];
+      let f = 0;
+      F.forEach(function (x) {
+        if (fn(x[0]) !== x[1]) { f++; fail('rhMuster(' + x[0] + ') = ' + fn(x[0])); }
+      });
+      if (!f) { ok(F.length + ' Rhythmusmuster korrekt gebildet'); }
+    }
+  }
+
+  const mS = JSK.match(/function rhSpeichern\(\) \{([\s\S]*?)\n\}/);
+  if (!mS) { fail('rhSpeichern nicht auswertbar'); }
+  else {
+    if (/e\.muster = rhMuster\(e\.tage\)/.test(mS[1])) {
+      ok('Mustertext folgt den gewählten Tagen');
+    } else { fail('Muster und Tage können auseinanderlaufen'); }
+    if (/e\.soll = e\.tage\.length/.test(mS[1])) {
+      ok('Soll einer Gewohnheit folgt ihren Tagen');
+    } else { fail('Soll und Tage können auseinanderlaufen'); }
+    if (/!e\.tage\.length/.test(mS[1])) { ok('ohne Wochentag wird nicht gespeichert'); }
+    else { fail('ein Rhythmus ohne Tag wäre unsichtbar'); }
+    if (/i === -1 \) \{ l\.push\(e\); \} else \{ l\[i\] = e; \}|l\.push\(e\); \} else \{ l\[i\] = e/.test(mS[1])) {
+      ok('Bearbeiten ersetzt, statt anzuhängen');
+    } else { fail('Bearbeiten könnte Dubletten erzeugen'); }
+  }
+
+  const mL = JSK.match(/function rhFragen\(\)/);
+  if (mL) { ok('Löschen erst nach Rückfrage'); }
+  else { fail('Löschen ohne Rückfrage'); }
+}
+
+/* ═══ 30 · Anhänge und Vollsicherung ═══════════════════════════════════
+   Fehlerarten: die Bilder landen im Bestand und blähen jeden Speichervorgang
+   und jeden Export auf; ein Anhang wird beim Löschen der Notizzeile nicht
+   mitentfernt und bleibt als Leiche liegen; die Vollsicherung lässt sich
+   nicht wieder einlesen; ein 4000-Punkte-Foto wird ungerechnet abgelegt.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('30 · Anhänge und Vollsicherung');
+{
+  ['anLesen', 'anSchreiben', 'anEntfernen', 'anAlle', 'anHolen', 'anDateiGelesen',
+   'anBildVerkleinern', 'anPdfSeiten', 'anVoll', 'anLoesen', 'datenExportVoll']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  /* Die Bilder duerfen nicht im Bestand liegen */
+  const mS = JSK.match(/function saatDB\(\) \{([\s\S]*?)\n\}/);
+  if (mS && !/anhaenge:/.test(mS[1])) { ok('Anhänge liegen außerhalb des Bestands'); }
+  else { fail('Anhänge im Bestand — jeder Speichervorgang würde sie mitschreiben'); }
+  if (/const AN_STORE = 'anhaenge'/.test(JSK)) { ok('eigener Speicherbereich'); }
+  else { fail('kein eigener Speicherbereich für Anhänge'); }
+  if (/indexedDB\.open\(SP_NAME, 2\)/.test(JSK)) { ok('Speicherversion für den neuen Bereich erhöht'); }
+  else { fail('Speicherversion nicht erhöht — der Bereich entsteht nicht'); }
+
+  const mE = JSK.match(/function datenExport\(\) \{([\s\S]*?)\n\}/);
+  if (mE && !/anAlle/.test(mE[1])) { ok('gewöhnlicher Export bleibt schlank'); }
+  else { fail('gewöhnlicher Export zieht die Anhänge mit'); }
+  const mV = JSK.match(/function datenExportVoll\(\) \{([\s\S]*?)\n\}/);
+  if (mV && /anAlle\(\)/.test(mV[1]) && /vollsicherung/.test(mV[1])) {
+    ok('Vollsicherung bündelt Bestand und Anhänge');
+  } else { fail('Vollsicherung unvollständig'); }
+
+  const mI = JSK.match(/function datenImport\(ev\) \{([\s\S]*?)\n\}/);
+  if (mI && /neu\.timeassist === 'vollsicherung'/.test(mI[1])) {
+    ok('Vollsicherung wird beim Import erkannt');
+  } else { fail('Vollsicherung lässt sich nicht zurücklesen'); }
+
+  const mL = JSK.match(/function anLoesen\(notizId, anId\) \{([\s\S]*?)\n\}/);
+  if (mL && /anEntfernen\(anId\)/.test(mL[1]) && /anhaenge\.splice/.test(mL[1])) {
+    ok('Anhang wird aus Notiz und Speicher entfernt');
+  } else { fail('gelöschter Anhang bleibt als Leiche liegen'); }
+
+  const mB = JSK.match(/function anBildVerkleinern\(datenUrl\) \{([\s\S]*?)\n\}/);
+  if (mB && /AN_BREITE/.test(mB[1]) && /toDataURL/.test(mB[1])) {
+    ok('große Bilder werden auf Blattbreite gerechnet');
+  } else { fail('Bilder werden ungerechnet abgelegt'); }
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mM && /Array\.isArray\(n\.anhaenge\)/.test(mM[1])) {
+    ok('Migration ergänzt die Anhangliste');
+  } else { fail('Migration ergänzt anhaenge nicht'); }
+  const mDV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mDV && parseInt(mDV[1], 10) >= 9) { ok('Schemaversion auf ' + mDV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+
+  if (/pdf\.js\/[\d.]+\/pdf\.min\.js/.test(H)) { ok('pdf.js eingebunden'); }
+  else { fail('pdf.js nicht eingebunden'); }
+  if (/function pdfBausteinDa/.test(JS)) { ok('fehlender PDF-Baustein wird abgefangen'); }
+  else { fail('kein Rückfall ohne pdf.js'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
