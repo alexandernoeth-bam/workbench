@@ -1226,6 +1226,47 @@ kat('27 · Spaltenbreiten und Arten-Farben');
   }
 }
 
+/* ═══ 28 · Doppelte Schleifen und Zeilenhöhen ══════════════════════════
+   Fehlerarten: beim Umbau bleibt eine alte Schleife stehen und jeder
+   Eintrag erscheint zweimal; eine feste Zeilenhöhe verträgt den
+   Zweizeilenumbruch nicht und die Zeilen laufen ineinander; freie Zeilen
+   sind keine Klickfläche, obwohl man auf Papier auf jede Linie schreibt.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('28 · Doppelte Schleifen und Zeilenhöhen');
+{
+  const mG = JSK.match(/function ganztagsEintraege\(\) \{([\s\S]*?)\n\}/);
+  if (!mG) { fail('ganztagsEintraege nicht auswertbar'); }
+  else {
+    const n = (mG[1].match(/JAHRESTERMINE\.forEach/g) || []).length;
+    if (n === 1) { ok('genau eine Jahrestermin-Schleife im Ganztags-Band'); }
+    else { fail(n + ' Jahrestermin-Schleifen — Einträge erscheinen mehrfach'); }
+    if (!/ort/.test(mG[1])) { ok('das Band führt keinen Ort'); }
+    else { fail('Ort im Ganztags-Band'); }
+  }
+
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  /* Zeilen mit Zweizeilenumbruch duerfen keine feste Hoehe haben */
+  [['wk-z', 'wk-t'], ['zl-z', 'zl-t']].forEach(function (paar) {
+    const mZ = new RegExp('^\\.' + paar[0] + ' \\{([^}]*)\\}', 'm').exec(css);
+    const mT = new RegExp('^\\.' + paar[1] + ' \\{([^}]*)\\}', 'm').exec(css);
+    if (!mZ) { return; }
+    const clamp = mT && /-webkit-line-clamp/.test(mT[1]);
+    const fest = /(^|;)\s*height:\s*\d+px/.test(mZ[1]);
+    if (clamp && fest) {
+      fail('.' + paar[0] + ' hat feste Höhe, .' + paar[1] + ' bricht um — Zeilen überlappen');
+    } else { ok('.' + paar[0] + ' verträgt den Inhalt'); }
+  });
+
+  const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
+  if (mT && /tr class="leer klick"/.test(mT[1])) {
+    ok('freie Zeilen im Tagesblatt sind Klickflächen');
+  } else { fail('freie Zeilen im Tagesblatt sind tot'); }
+  const mA = JSK.match(/function blattAktivitaeten\(\) \{([\s\S]*?)\n\}/);
+  if (mA && /tr class="leer klick"/.test(mA[1])) {
+    ok('freie Zeilen in der Checkliste sind Klickflächen');
+  } else { fail('freie Zeilen in der Checkliste sind tot'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
