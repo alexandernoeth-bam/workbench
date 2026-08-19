@@ -1048,6 +1048,62 @@ kat('24 · Übertrag und Löschen');
   else { fail('Schemaversion nicht erhöht'); }
 }
 
+/* ═══ 25 · Jahresrahmen und Monatshintergrund ══════════════════════════
+   Fehlerarten: ein Rahmen wie ein Sabbatical erscheint im Tages- und
+   Wochenblatt und verrauscht sie; Jahrestermine fehlen im Monatsblatt,
+   obwohl sie den Monat prägen; sie werden dort zusätzlich als Eintrag
+   angeboten und stehen dann doppelt.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('25 · Jahresrahmen und Monatshintergrund');
+{
+  const mJ = JS.match(/const SAAT_JAHRESTERMINE = \[([\s\S]*?)\n\];/) ||
+             JS.match(/const JAHRESTERMINE = \[([\s\S]*?)\n\];/);
+  if (mJ && /nurJahr:true/.test(mJ[1].replace(/\s/g, ''))) {
+    ok('Jahresrahmen im Bestand vorhanden');
+  } else { warn('kein Beispiel mit nurJahr im Bestand'); }
+
+  const mG = JSK.match(/function ganztagsEintraege\(\) \{([\s\S]*?)\n\}/);
+  if (!mG) { fail('ganztagsEintraege nicht auswertbar'); }
+  else if (/if \(j\.nurJahr\) \{ return; \}/.test(mG[1])) {
+    ok('Tagesblatt lässt Jahresrahmen draußen');
+  } else { fail('Jahresrahmen erscheint im Tagesblatt'); }
+
+  const mW = JSK.match(/function blattWoche\(\) \{([\s\S]*?)\n\}/);
+  if (mW && /!j\.nurJahr && iso >= j\.von/.test(mW[1])) {
+    ok('Wochenblatt lässt Jahresrahmen draußen');
+  } else { fail('Jahresrahmen erscheint im Wochenblatt'); }
+
+  const mM = JSK.match(/function blattMonat\(\) \{([\s\S]*?)\n\}/);
+  if (!mM) { fail('blattMonat nicht auswertbar'); }
+  else {
+    if (/JAHRESTERMINE\.filter\(x => iso >= x\.von/.test(mM[1])) {
+      ok('Monatsblatt zeigt Jahrestermine automatisch');
+    } else { fail('Jahrestermine fehlen im Monatsblatt'); }
+    /* Sie dürfen Hintergrund sein, aber kein Eintrag — sonst mischen
+       sie sich unter das bewusst Gesetzte.                           */
+    if (/mon-jt/.test(mM[1]) && !/ereignisse\.push/.test(mM[1])) {
+      ok('Jahrestermine sind Hintergrund, kein Eintrag');
+    } else { fail('Jahrestermine werden als Eintrag geschrieben'); }
+  }
+
+  const mWa = JSK.match(/function wahlAuf\(modus\) \{([\s\S]*?)\n\}/);
+  if (mWa && /if \(fuerWoche\) \{[\s\S]{0,400}JAHRESTERMINE\.forEach/.test(mWa[1])) {
+    ok('Monatswähler bietet Jahrestermine nicht mehr doppelt an');
+  } else { fail('Jahrestermine werden im Monat doppelt angeboten'); }
+
+  const mS = JSK.match(/function jtSpeichern\(\) \{([\s\S]*?)\n\}/);
+  if (mS && /j\.nurJahr = /.test(mS[1])) { ok('Sichtbarkeit ist im Dialog einstellbar'); }
+  else { fail('nurJahr lässt sich nicht setzen'); }
+
+  const mMig = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mMig && /j\.nurJahr === undefined/.test(mMig[1])) {
+    ok('Migration ergänzt nurJahr');
+  } else { fail('Migration ergänzt nurJahr nicht'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 7) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */

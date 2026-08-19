@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 2.9.0 · Übertrag</title>
+<title>TimeAssist 2.10.0 · Jahresrahmen</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -526,7 +526,9 @@ input, textarea { font: inherit; color: inherit; }
 .k-btn.warn { background: var(--wein); border-color: var(--wein); color: var(--papier);
               font-weight: 700; }
 
-/* Ferientoenung und Feiertagsname im Monatsraster */
+/* Ferientoenung, Feiertagsname und Jahrestermine im Monatsraster */
+.mon-t.jt { box-shadow: inset 4px 0 0 rgba(125,107,83,.5); }
+.mon-jt { font-size: 11.4px; letter-spacing: .02em; font-weight: 700; }
 .mon-t.ferien { background: #f0ebe1; }
 .mon-t.ferien.we { background: #e8e2d5; }
 .mon-fei { font-size: 10.2px; letter-spacing: .06em; color: var(--wein);
@@ -1019,7 +1021,7 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
 <script>
 'use strict';
 
-const APP_VERSION = '2.9.0';
+const APP_VERSION = '2.10.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -1034,7 +1036,7 @@ const APP_VERSION = '2.9.0';
    push und splice wirken dadurch unverändert weiter.
    Die SAAT_-Werte sind nur die Erstbefüllung beim allerersten Start.
    ═══════════════════════════════════════════════════════════════════ */
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 /* Gruppe: die Ebene ueber dem Bereich. Im Ringbuch ist sie das Register,
    hinter dem mehrere Aktivitaeten-Checklisten liegen. Gepflegte Liste,
@@ -1100,8 +1102,10 @@ const SAAT_TAGESBLAETTER = [];
 /* Jahrestermine: mehrtägige Abwesenheiten. Sie erscheinen automatisch im
    Ganztags-Band jedes betroffenen Tages — die einzige Übernahme, die
    ohne bewusste Handlung passiert. 14 Tage Urlaub tippt man nicht ab.  */
-/* Jahrestermin: t, von, bis, ort, art. Die Art faerbt den Balken —
-   mehr Unterscheidung braucht das Blatt nicht.                         */
+/* Jahrestermin: t, von, bis, ort, art, nurJahr.
+   Die Art faerbt den Balken. nurJahr haelt einen Eintrag aus Tages- und
+   Wochenblatt heraus: ein Sabbatical ueber August ist fuer die
+   Jahresplanung wesentlich, im Tagesplan aber nur Rauschen.            */
 const JT_ARTEN = {
   urlaub:      { n:'Urlaub',       f:'#4e6b52' },
   krank:       { n:'Krank',        f:'#a8622c' },
@@ -1118,6 +1122,7 @@ const SAAT_JAHRESTERMINE = [
   { id:505, t:'Osterferien',          von:'2026-04-03', bis:'2026-04-06', ort:'',         art:'feiertag' },
   { id:506, t:'Schulung Fachbereich', von:'2026-08-20', bis:'2026-08-20', ort:'Würzburg', art:'termin' },
   { id:507, t:'Grippe',               von:'2026-02-09', bis:'2026-02-13', ort:'',         art:'krank' },
+  { id:510, t:'Sabbatical',           von:'2026-08-01', bis:'2026-08-31', ort:'',         art:'abwesend', nurJahr:true },
   { id:508, t:'Kundentermin Hamburg', von:'2026-05-11', bis:'2026-05-13', ort:'Hamburg',  art:'dienstreise' },
   { id:509, t:'Konferenz Berlin',     von:'2026-10-06', bis:'2026-10-08', ort:'Berlin',   art:'dienstreise' },
 ];
@@ -1492,6 +1497,10 @@ function migriereDB(d) {
     if (n.quelle === undefined) { n.quelle = ''; }
     delete n.art;
     delete n.seiten;
+  });
+  /* Version 6 → 7: Jahresrahmen */
+  (d.jahrestermine || []).forEach(function (j) {
+    if (j.nurJahr === undefined) { j.nurJahr = false; }
   });
   /* Version 5 → 6: Übertrag ins Archiv */
   (d.aktivitaeten || []).forEach(function (a) {
@@ -2139,6 +2148,13 @@ function ganztagsEintraege() {
   const l = TERMINE.filter(t => t.datum === tagOffen && t.ganztags)
     .map(function (t) { return { t:t.t, ort:t.ort, quelle:'' }; });
   /* Feiertag und Ferien stehen als Anhaltspunkt oben mit im Band */
+  /* Jahresrahmen bleiben draussen — sie gehoeren in die Jahressicht */
+  JAHRESTERMINE.forEach(function (j) {
+    if (j.nurJahr) { return; }
+    if (tagOffen >= j.von && tagOffen <= j.bis) {
+      l.push({ t:j.t, ort:j.ort, quelle:'Jahrestermin' });
+    }
+  });
   if (zeigeKalender) {
     const fei = feiertagAn(tagOffen);
     if (fei) { l.push({ t:fei, ort:'', quelle:'Feiertag' }); }
@@ -2727,7 +2743,7 @@ function blattWoche() {
     /* Mehrtägige Jahrestermine laufen quer über die Woche — sie einzeln
        einzutragen wäre Abschreibarbeit. Einzige automatische Übernahme,
        wie im Ganztags-Band des Tagesblatts.                            */
-    const jt = JAHRESTERMINE.filter(j => iso >= j.von && iso <= j.bis);
+    const jt = JAHRESTERMINE.filter(j => !j.nurJahr && iso >= j.von && iso <= j.bis);
     let band = '';
     if (fei) { band += '<div class="wo-fei">' + esc(fei) + '</div>'; }
     band += jt.map(function (j) {
@@ -4215,13 +4231,23 @@ function blattMonat() {
       const iso = isoDatum(b.jahr, b.monat, t);
       const fer = zeigeKalender ? ferienAn(iso) : null;
       const fei = zeigeKalender ? feiertagAn(iso) : null;
+      /* Mehrtägige Jahrestermine erscheinen als Hintergrund, nicht als
+         Eintrag: sichtbar, ohne sich unter das bewusst Gesetzte zu
+         mischen. Der Name steht nur am Anfangstag.                    */
+      const jt = JAHRESTERMINE.filter(x => iso >= x.von && iso <= x.bis);
       h += '<div class="mon-t ' + (we ? 'we ' : '') + (heute ? 'heute ' : '') +
-        (fer ? 'ferien' : '') + '">' +
+        (fer ? 'ferien ' : '') + (jt.length ? 'jt' : '') + '">' +
         '<span class="mon-nr" onclick="event.stopPropagation(); tagSpringen(\'' + iso +
         '\')" title="Tagesblatt \u00f6ffnen">' + String(t).padStart(2, '0') + ' ' +
         WOKURZ[wt] + '</span>' +
         '<span class="mon-inhalt" onclick="eintragOeffnen(\'monat\',' + t + ',null)">' +
         (fei ? '<div class="mon-fei">' + esc(fei) + '</div>' : '') +
+        jt.filter(x => x.von === iso).map(function (x) {
+          const a = JT_ARTEN[x.art] || JT_ARTEN.termin;
+          const bis = (x.bis !== x.von) ? (' bis ' + dmyKurz(x.bis)) : '';
+          return '<div class="mon-jt" style="color:' + a.f + '">' + esc(x.t) +
+            esc(bis) + '</div>';
+        }).join('') +
         (proTag[t] || []).map(monatEintragZeile).join('') + '</span></div>';
     }
     return h;
@@ -4284,25 +4310,29 @@ function wahlAuf(modus) {
   };
   let h = '';
   if (modus === 'ereignis' || modus === 'wtermin') {
-    const monat = fuerWoche ? 0 : b.monat;
-    JAHRESTERMINE.forEach(function (j) {
-      if (!fuerWoche &&
-          parseInt(j.von.slice(5, 7), 10) !== monat &&
-          parseInt(j.bis.slice(5, 7), 10) !== monat) { return; }
-      if (fuerWoche) {
-        /* Nur Termine, die diese Woche berühren */
-        const so = tagPlus(b.montag, 6);
+    /* Auf dem Monatsblatt stehen Jahrestermine seit Neuestem ohnehin als
+       Hintergrund — sie hier nochmals anzubieten hiesse, dasselbe zweimal
+       aufs Blatt zu setzen. Fuer die Woche bleibt die Auswahl.        */
+    if (fuerWoche) {
+      const so = tagPlus(b.montag, 6);
+      JAHRESTERMINE.forEach(function (j) {
         if (j.bis < b.montag || j.von > so) { return; }
-      }
-      h += zeile('jahrestermin', j.id, j.t,
-                 j.von.slice(8) + '.' + j.von.slice(5,7) + '. bis ' +
-                 j.bis.slice(8) + '.' + j.bis.slice(5,7) + '.', 'Termin');
-    });
+        h += zeile('jahrestermin', j.id, j.t,
+                   j.von.slice(8) + '.' + j.von.slice(5,7) + '. bis ' +
+                   j.bis.slice(8) + '.' + j.bis.slice(5,7) + '.', 'Termin');
+      });
+    }
     $('wahl-titel').textContent = fuerWoche ? 'Termin auf die Woche legen'
                                             : 'Termin aufs Monatsblatt heben';
     $('wahl-fuss').textContent = 'Alles Weitere schreibst du direkt in die Tagzeile.';
-    if (!h) { h = '<div class="hinweis">Keine passenden Jahrestermine, ' +
-                  'die nicht schon auf dem Blatt stehen.</div>'; }
+    if (!h) {
+      h = fuerWoche
+        ? '<div class="hinweis">Keine passenden Jahrestermine, die nicht schon auf ' +
+          'dem Blatt stehen.</div>'
+        : '<div class="hinweis">Jahrestermine erscheinen auf dem Monatsblatt von ' +
+          'selbst \u2014 als get\u00f6nte Zeile mit Namen. Ereignisse schreibst du ' +
+          'direkt in die Tagzeile.</div>';
+    }
   } else if (modus === 'zielzu') {
     const zid = unterAktiv.ziele;
     PLAENE.filter(p => !p.archiviert && !p.zielId).forEach(function (p) {
@@ -4571,7 +4601,7 @@ function jtKurz(iso) { return iso.slice(8) + '.' + iso.slice(5, 7) + '.'; }
 let jtOffen = null;
 function jtNeu(monat, tag) {
   const iso = isoDatum(jahrOffen, monat, tag);
-  const j = { id:naechsteId(), t:'', von:iso, bis:iso, ort:'', art:'termin' };
+  const j = { id:naechsteId(), t:'', von:iso, bis:iso, ort:'', art:'termin', nurJahr:false };
   JAHRESTERMINE.push(j);
   jtOeffnen(j.id);
 }
@@ -4596,7 +4626,13 @@ function jtOeffnen(id) {
     '<div class="jt-feld"><label>Ort</label>' +
     '<input id="jt-ort" value="' + esc(j.ort) + '" placeholder="optional"></div>' +
     '<div class="jt-feld"><label>Art</label>' +
-    '<select id="jt-art">' + artOpt + '</select></div></div>';
+    '<select id="jt-art">' + artOpt + '</select></div>' +
+    '<div class="jt-feld"><label>Sichtbar</label>' +
+    '<select id="jt-nur"><option value="">Überall</option>' +
+    '<option value="1"' + (j.nurJahr ? ' selected' : '') +
+    '>Nur im Jahresblatt</option></select></div>' +
+    '<div class="hinweis" style="margin-top:6px">Ein Rahmen wie ein Sabbatical ist ' +
+    'für die Jahresplanung wesentlich, im Tagesplan aber nur Rauschen.</div></div>';
   $('jt').classList.add('auf');
   setTimeout(function () { const e = $('jt-t'); if (e) { e.focus(); } }, 60);
 }
@@ -4614,6 +4650,7 @@ function jtSpeichern() {
   j.t = $('jt-t').value.trim();
   j.ort = $('jt-ort').value.trim();
   j.art = $('jt-art').value;
+  j.nurJahr = ($('jt-nur').value === '1');
   /* Eingabe in TT.MM.JJJJ, gespeichert wird ISO — nur so laesst sich
      mit Zeichenketten vergleichen und sortieren.                      */
   let von = dmyZuIso($('jt-von').value) || j.von;
