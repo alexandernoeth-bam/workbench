@@ -126,7 +126,8 @@ kat('6 · Registerstruktur');
     else { fail('Dispatcher fällt still auf blattPlaene zurück'); }
   }
   /* akt, wied und gew laufen seit den Gruppen über reg === 'akt' */
-  const BL = ['tag', 'woche', 'notiz', 'monat', 'jtermine', 'archiv'];
+  /* notiz und archiv laufen seit den Notizgruppen über reg === 'db' */
+  const BL = ['tag', 'woche', 'monat', 'jtermine'];
   const ohne = BL.filter(b => JS.indexOf("k === '" + b + "'") === -1);
   /* Es gibt mehrere Stellen mit reg === 'akt' — gemeint ist die im
      Dispatcher.                                                       */
@@ -136,6 +137,10 @@ kat('6 · Registerstruktur');
       /blattAktivitaeten\(\)/.test(uA[1])) {
     ok('Aktivitäten-Zweig erreicht alle drei Blätter');
   } else { fail('Aktivitäten-Zweig unvollständig'); }
+  const uD = mDis ? mDis[1].match(/if \(reg === 'db'\) \{([\s\S]*?)\n  \}/) : null;
+  if (uD && /blattArchiv\(\)/.test(uD[1]) && /blattNotiz\(\)/.test(uD[1])) {
+    ok('Datenbank-Zweig erreicht Notizen und Archiv');
+  } else { fail('Datenbank-Zweig unvollständig'); }
   if (!ohne.length) { ok(BL.length + ' Blätter im Dispatcher erreichbar'); }
   else { fail('Kein Dispatcher-Zweig für: ' + ohne.join(', ')); }
 }
@@ -795,6 +800,72 @@ kat('20 · Blatt an Move');
 
   if (/jspdf\.umd\.min\.js/.test(H)) { ok('jsPDF eingebunden'); }
   else { fail('jsPDF nicht eingebunden'); }
+}
+
+/* ═══ 21 · Markdown, Notizgruppen, Archiv-Löschen ══════════════════════
+   Fehlerarten: eingegebenes HTML wird ausgeführt statt angezeigt; die
+   Notizliste bleibt eine ungegliederte Halde; im Archiv lässt sich nichts
+   endgültig entfernen; Löschen ohne Rückfrage kostet den Eintrag.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('21 · Markdown, Notizgruppen, Archiv');
+{
+  ['mdZuHtml', 'mdInline', 'arWeg', 'arFragen', 'arLoeschen']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  /* Markdown wirklich auswerten, nicht nur auf Vorkommen prüfen */
+  const mI = JSK.match(/function mdInline\(t\) \{[\s\S]*?\n\}/);
+  const mZ = JSK.match(/function mdZuHtml\(txt\) \{[\s\S]*?\n\}/);
+  if (mI && mZ) {
+    let fn = null;
+    try {
+      fn = new Function('esc',
+        mI[0] + '\n' + mZ[0] + '\nreturn mdZuHtml;')(
+        t => String(t == null ? '' : t).replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'));
+    } catch (e) { fn = null; }
+    if (!fn) { fail('Markdown nicht auswertbar'); }
+    else {
+      const FAELLE = [
+        ['# Titel', '<h1>Titel</h1>'],
+        ['- [ ] offen', 'md-haken'],
+        ['- [x] fertig', 'ab'],
+        ['**fett**', '<b>fett</b>'],
+        ['> Zitat', '<blockquote>'],
+        ['---', '<hr>'],
+      ];
+      let f = 0;
+      FAELLE.forEach(function (x) {
+        if (fn(x[0]).indexOf(x[1]) === -1) { f++; fail('Markdown: "' + x[0] + '" ohne ' + x[1]); }
+      });
+      if (!f) { ok(FAELLE.length + ' Markdown-Muster korrekt'); }
+      /* Eingegebenes HTML darf nicht ausgeführt werden */
+      const boese = fn('<img src=x onerror=alert(1)>');
+      if (boese.indexOf('<img') === -1 && boese.indexOf('&lt;img') !== -1) {
+        ok('eingegebenes HTML wird maskiert');
+      } else { fail('HTML aus dem Notiztext wird ausgeführt'); }
+    }
+  } else { fail('mdInline oder mdZuHtml nicht gefunden'); }
+
+  const mN = JSK.match(/function blattNotiz\(\) \{([\s\S]*?)\n\}/);
+  if (mN && /bereicheDerGruppe\(gid\)/.test(mN[1])) {
+    ok('Notizliste ist nach Gruppen gegliedert');
+  } else { fail('Notizliste ohne Gruppengliederung'); }
+
+  const mB = JSK.match(/function blattNotizBlatt\(id\) \{([\s\S]*?)\n\}/);
+  if (mB && /mdZuHtml\(n\.text\)/.test(mB[1]) && /textarea/.test(mB[1])) {
+    ok('Notizblatt schaltet zwischen Ansicht und Bearbeitung');
+  } else { fail('keine Umschaltung zwischen Ansicht und Markdown'); }
+
+  const mA = JSK.match(/function arWeg\(art, id\) \{([\s\S]*?)\n\}/);
+  if (mA && /arFrage === schluessel/.test(mA[1])) { ok('Archiv-Löschen fragt zurück'); }
+  else { fail('Archiv-Löschen ohne Rückfrage'); }
+  const mAL = JSK.match(/function arLoeschen\(art, id\) \{([\s\S]*?)\n\}/);
+  if (mAL && /a\.planId = null/.test(mAL[1]) && /x\.zielId = null/.test(mAL[1])) {
+    ok('Löschen im Archiv löst nur Zuordnungen');
+  } else { fail('Löschen im Archiv reißt Zugeordnetes mit'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

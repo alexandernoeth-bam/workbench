@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 2.6.0 · Blatt an Move</title>
+<title>TimeAssist 2.7.0 · Datenbank</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -608,6 +608,32 @@ input, textarea { font: inherit; color: inherit; }
                   background: var(--marke-h); }
 .tz-heute.vor { color: var(--tinte-3); }
 
+/* Notizblatt: Umschaltung und Markdown-Darstellung */
+.nz-leiste { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.nz-mod { font-size: 10.2px; letter-spacing: .12em; text-transform: uppercase;
+          color: var(--wein); font-weight: 700; margin-right: auto; }
+.md h1 { font-family: var(--serif); font-size: 20px; color: var(--wein);
+         margin: 2px 0 8px; }
+.md h2 { font-family: var(--serif); font-size: 17px; margin: 12px 0 5px; }
+.md h3, .md h4 { font-size: 14.4px; margin: 10px 0 4px; letter-spacing: .04em;
+                 text-transform: uppercase; color: var(--leder); }
+.md p { margin: 0 0 7px; }
+.md ul, .md ol { margin: 0 0 8px; padding-left: 20px; }
+.md li { margin-bottom: 3px; }
+.md ul.md-haken { list-style: none; padding-left: 0; }
+.md ul.md-haken li { display: flex; align-items: flex-start; gap: 8px; }
+.md ul.md-haken li.ab { color: var(--tinte-3); text-decoration: line-through; }
+.md-box { flex: 0 0 17px; width: 17px; height: 17px; border: 1px solid var(--tinte-3);
+          border-radius: 2px; background: var(--karte); display: inline-flex;
+          align-items: center; justify-content: center; font-size: 12px;
+          color: var(--tinte); margin-top: 2px; text-decoration: none; }
+.md blockquote { margin: 0 0 8px; padding-left: 10px; border-left: 2px solid var(--wein);
+                 color: var(--tinte-2); font-style: italic; }
+.md hr { border: none; border-top: 1px solid var(--linie); margin: 12px 0; }
+.md code { font-family: ui-monospace, Menlo, monospace; font-size: 13.2px;
+           background: var(--papier-2); border-radius: 3px; padding: 1px 4px; }
+.md a { color: var(--wein); }
+
 /* Notizblatt */
 .nz-text { min-height: 420px; width: 100%; border: 1px solid var(--linie);
            border-radius: 5px; background: var(--karte); padding: 11px 13px;
@@ -949,7 +975,7 @@ textarea.nz-text { resize: none; height: 520px; outline: none; }
 <script>
 'use strict';
 
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.7.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -1604,6 +1630,72 @@ function tagHeute() {
   renderAlles();
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   MARKDOWN
+   Gespeichert wird Markdown — so kam es aus WorkAssist und so bleibt es
+   verlustfrei. Die Ansicht formatiert, die Bearbeitung zeigt den
+   Rohtext. Bewusst klein gehalten: Überschriften, Listen, Haken,
+   Betonung, Zitat, Trenner, Verweise. Mehr braucht ein Notizblatt nicht.
+   ═══════════════════════════════════════════════════════════════════ */
+function mdInline(t) {
+  /* Erst maskieren, dann auszeichnen — sonst wird eingegebenes HTML
+     ausgeführt.                                                       */
+  let x = esc(t);
+  x = x.replace(/`([^`]+)`/g, '<code>$1</code>');
+  x = x.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  x = x.replace(/(^|[^*])\*([^*]+)\*/g, '$1<i>$2</i>');
+  x = x.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,
+                '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return x;
+}
+function mdZuHtml(txt) {
+  const zeilen = String(txt == null ? '' : txt).split('\n');
+  let h = '';
+  let liste = null;          // 'ul' | 'ol' | null
+  const listeZu = function () {
+    if (liste) { h += '</' + liste + '>'; liste = null; }
+  };
+  zeilen.forEach(function (z) {
+    const roh = z.replace(/\s+$/, '');
+    if (!roh.trim()) { listeZu(); return; }
+    let m;
+    if (/^\s*(-{3,}|\*{3,})\s*$/.test(roh)) { listeZu(); h += '<hr>'; return; }
+    m = /^(#{1,4})\s+(.*)$/.exec(roh);
+    if (m) {
+      listeZu();
+      const n = m[1].length;
+      h += '<h' + n + '>' + mdInline(m[2]) + '</h' + n + '>';
+      return;
+    }
+    m = /^\s*[-*]\s+\[( |x|X)\]\s+(.*)$/.exec(roh);
+    if (m) {
+      if (liste !== 'ul') { listeZu(); h += '<ul class="md-haken">'; liste = 'ul'; }
+      const ab = (m[1] !== ' ');
+      h += '<li class="' + (ab ? 'ab' : '') + '"><span class="md-box">' +
+        (ab ? '\u2715' : '') + '</span>' + mdInline(m[2]) + '</li>';
+      return;
+    }
+    m = /^\s*[-*]\s+(.*)$/.exec(roh);
+    if (m) {
+      if (liste !== 'ul') { listeZu(); h += '<ul>'; liste = 'ul'; }
+      h += '<li>' + mdInline(m[1]) + '</li>';
+      return;
+    }
+    m = /^\s*(\d+)\.\s+(.*)$/.exec(roh);
+    if (m) {
+      if (liste !== 'ol') { listeZu(); h += '<ol>'; liste = 'ol'; }
+      h += '<li>' + mdInline(m[2]) + '</li>';
+      return;
+    }
+    m = /^\s*>\s?(.*)$/.exec(roh);
+    if (m) { listeZu(); h += '<blockquote>' + mdInline(m[1]) + '</blockquote>'; return; }
+    listeZu();
+    h += '<p>' + mdInline(roh) + '</p>';
+  });
+  listeZu();
+  return h || '<p class="a-neu">Noch nichts geschrieben.</p>';
+}
+
 /* ═══ REGISTER ═══ */
 /* Sieben Hauptregister. Unterregister erscheinen als Karteireiter.       */
 const REGISTER = [
@@ -1615,9 +1707,7 @@ const REGISTER = [
       { k:'monat',    n:'Monat' },
       { k:'jtermine', n:'Jahrestermine' } ] },
   { k:'ziele',   n:'Ziele',   unter:'ziele' },
-  { k:'db',      n:'Datenbank', unter:[
-      { k:'notiz',  n:'Notizen' },
-      { k:'archiv', n:'Archiv' } ] },
+  { k:'db',      n:'Datenbank', unter:'db' },
 ];
 
 /* Formularnummern wie im gedruckten Satz */
@@ -1626,7 +1716,8 @@ const FORM_NR = { tag:'CMP 01', woche:'CMP 10', akt:'CMP 31', wied:'CMP 03', gew
                   ziele:'CMP 30', notiz:'CMP 40', archiv:'CMP 41' };
 
 let reg = 'tag';
-const unterAktiv = { akt:'akt', plaene:'uebersicht', ziele:'uebersicht', planung:'monat', db:'notiz' };
+const unterAktiv = { akt:'uebersicht', plaene:'uebersicht', ziele:'uebersicht',
+                     planung:'monat', db:'uebersicht' };
 
 function regDef(k) { return REGISTER.find(r => r.k === k) || REGISTER[0]; }
 
@@ -1634,6 +1725,15 @@ function regDef(k) { return REGISTER.find(r => r.k === k) || REGISTER[0]; }
 function unterListe(k) {
   const d = regDef(k);
   if (!d.unter) { return null; }
+  if (d.unter === 'db') {
+    /* Wie bei den Aktivitäten: ein Register je Gruppe, das Archiv
+       hängt fest am Ende.                                            */
+    const l = [{ k:'uebersicht', n:'Alle' }];
+    GRUPPEN.forEach(function (g) { l.push({ k:'g:' + g.id, n:g.name }); });
+    if (BEREICHE.some(b => !b.gruppeId)) { l.push({ k:'g:0', n:'Ohne Gruppe' }); }
+    l.push({ k:'archiv', n:'Archiv' });
+    return l;
+  }
   if (d.unter === 'akt') {
     /* Ein Register je Gruppe — im Ringbuch liegt hinter jedem Reiter ein
        eigenes Checklistenblatt.                                        */
@@ -1693,7 +1793,7 @@ function renderRegister() {
      und Gewohnheiten am Ende und dürfen nie abgeschnitten werden — sie
      werden deshalb zuerst gesetzt und die Gruppen füllen den Rest.    */
   const el = $('reiter-plan');
-  if (reg !== 'plaene' && reg !== 'ziele' && reg !== 'akt') {
+  if (reg !== 'plaene' && reg !== 'ziele' && reg !== 'akt' && reg !== 'db') {
     el.classList.add('aus'); el.innerHTML = ''; return;
   }
   el.classList.remove('aus');
@@ -1704,9 +1804,10 @@ function renderRegister() {
            '" onclick="zeigeUnter(\'' + u.k + '\')">' +
            esc(reiterKurz(u.n)) + '</button>';
   };
-  if (reg === 'akt') {
-    const fest = l.filter(u => u.k === 'wied' || u.k === 'gew');
-    const rest = l.filter(u => u.k !== 'wied' && u.k !== 'gew');
+  if (reg === 'akt' || reg === 'db') {
+    const FEST = (reg === 'akt') ? ['wied', 'gew'] : ['archiv'];
+    const fest = l.filter(u => FEST.indexOf(u.k) !== -1);
+    const rest = l.filter(u => FEST.indexOf(u.k) === -1);
     el.innerHTML = rest.map(knopf).join('') +
       '<div class="rt-fest">' + fest.map(knopf).join('') + '</div>';
     return;
@@ -1719,7 +1820,7 @@ function renderUnterreiter() {
   const el = $('unterreiter');
   /* Pläne führen ihre Reiter senkrecht rechts — die waagerechte Leiste
      bleibt dort leer.                                                  */
-  if (!l || reg === 'plaene' || reg === 'ziele' || reg === 'akt') {
+  if (!l || reg === 'plaene' || reg === 'ziele' || reg === 'akt' || reg === 'db') {
     el.classList.add('aus'); el.innerHTML = ''; return;
   }
   el.classList.remove('aus');
@@ -1756,6 +1857,9 @@ function formNr() {
   if (reg === 'plaene') { return FORM_NR.plaene; }
   if (reg === 'ziele')  {
     return unterAktiv.ziele === 'zjahr' ? FORM_NR.zjahr : FORM_NR.ziele;
+  }
+  if (reg === 'db') {
+    return unterAktiv.db === 'archiv' ? FORM_NR.archiv : FORM_NR.notiz;
   }
   return FORM_NR[blattKey()] || 'CMP 05';
 }
@@ -3519,10 +3623,22 @@ function notizOffenFeld(id, feld) {
 
 function blattNotiz() {
   if (notizOffen) { blattNotizBlatt(notizOffen); return; }
-  kopf('Datenbank', NOTIZEN.length + (NOTIZEN.length === 1 ? ' Blatt' : ' Bl\u00e4tter'),
+  /* Dieselbe Registerlogik wie bei den Aktivitäten — 25 Blätter in einer
+     Liste werden sonst schnell unübersichtlich.                       */
+  const u = unterAktiv.db || 'uebersicht';
+  const gid = (u.indexOf('g:') === 0) ? u.slice(2) : null;
+  const bl = bereicheDerGruppe(gid);
+  const bIds = {};
+  bl.forEach(function (b) { bIds[b.id] = true; });
+  const liste = (gid === null) ? NOTIZEN : NOTIZEN.filter(n => bIds[n.b]);
+
+  kopf(gid === null ? 'Datenbank \u2014 alle'
+                    : 'Datenbank \u2014 ' + gruppeName(gid === '0' ? null : gid),
+       liste.length + (liste.length === 1 ? ' Blatt' : ' Bl\u00e4tter'),
+       '<button class="k-btn" onclick="gruppenAuf()">Gruppen</button>' +
        '<button class="k-btn pri" onclick="notizNeu()">+ Blatt</button>');
 
-  const sortiert = NOTIZEN.slice().sort(function (a, b) { return b.nr - a.nr; });
+  const sortiert = liste.slice().sort(function (a, b) { return b.nr - a.nr; });
   let h = sortiert.map(function (n) {
     const erste = (n.text || '').split('\n')[0].slice(0, 90);
     return '<div class="nz" onclick="notizAuf(' + n.id + ')">' +
@@ -3535,9 +3651,9 @@ function blattNotiz() {
       (n.quelle ? '<span class="nz-art">Quelle</span>' : '') +
       '<span class="p-chev">\u203a</span></div>';
   }).join('');
-  if (!NOTIZEN.length) {
-    h += '<div class="hinweis">Noch keine Bl\u00e4tter. Mit <b>+ Blatt</b> legst du ' +
-         'eines an; die Nummer vergibt das Register.</div>';
+  if (!liste.length) {
+    h += '<div class="hinweis">Keine Bl\u00e4tter in dieser Gruppe. Mit <b>+ Blatt</b> ' +
+         'legst du eines an; die Nummer vergibt das Register.</div>';
   }
   $('blatt').innerHTML = h;
 }
@@ -3581,12 +3697,17 @@ function blattNotizBlatt(id) {
   h += '</div></div>';
 
   if (notizOffenFeld(n.id, 'text')) {
-    h += '<textarea class="nz-text offen" id="ez" placeholder="Inhalt" ' +
+    h += '<div class="nz-leiste"><span class="nz-mod">Bearbeiten \u00b7 Markdown</span>' +
+      '<button class="k-btn pri" onclick="notizSchliessen(true)">Fertig</button></div>';
+    h += '<textarea class="nz-text offen" id="ez" placeholder="Inhalt in Markdown \u2014 ' +
+      '# \u00dcberschrift, - Liste, - [ ] Haken, **fett**" ' +
       'onblur="notizSchliessen()">' + esc(n.text) + '</textarea>';
   } else {
-    h += '<div class="nz-text" onclick="notizFeld(' + n.id + ',\'text\')">' +
-      (n.text ? esc(n.text) : '<span class="a-neu">antippen und schreiben</span>') +
+    h += '<div class="nz-leiste"><span class="nz-mod">Ansicht</span>' +
+      '<button class="k-btn" onclick="notizFeld(' + n.id + ',\'text\')">Bearbeiten</button>' +
       '</div>';
+    h += '<div class="nz-text md" onclick="notizFeld(' + n.id + ',\'text\')">' +
+      mdZuHtml(n.text) + '</div>';
   }
   $('blatt').innerHTML = h;
   fokusSetzen();
@@ -4381,7 +4502,39 @@ function eintragSpeichern() {
    Archivierte Pläne werden nicht kopiert, sondern nur ausgeblendet.
    Von hier aus lassen sie sich öffnen und wieder aktivieren.
    ═══════════════════════════════════════════════════════════════════ */
+/* Endgültiges Löschen aus dem Archiv, zweistufig — ausmisten soll gehen,
+   aber nicht mit einem Fehlgriff.                                      */
+let arFrage = null;
+function arWeg(art, id) {
+  const schluessel = art + ':' + id;
+  if (arFrage === schluessel) {
+    return '<button class="k-btn warn" onclick="arLoeschen(\'' + art + '\',\'' + id +
+      '\')">Wirklich l\u00f6schen?</button>';
+  }
+  return '<button class="k-btn" onclick="arFragen(\'' + schluessel + '\')">L\u00f6schen</button>';
+}
+function arFragen(schluessel) { arFrage = schluessel; renderAlles(); }
+function arLoeschen(art, id) {
+  arFrage = null;
+  if (art === 'plan') {
+    AKTIVITAETEN.forEach(function (a) { if (a.planId === id) { a.planId = null; } });
+    const i = PLAENE.findIndex(x => x.id === id);
+    if (i !== -1) { PLAENE.splice(i, 1); }
+    melde('Plan endg\u00fcltig entfernt, Aktivit\u00e4ten bleiben');
+  } else {
+    PLAENE.forEach(function (p) { if (p.zielId === id) { p.zielId = null; } });
+    [AKTIVITAETEN, WIEDER, GEWOHNHEIT].forEach(function (l) {
+      l.forEach(function (x) { if (x.zielId === id) { x.zielId = null; } });
+    });
+    const i = ZIELE.findIndex(x => x.id === id);
+    if (i !== -1) { ZIELE.splice(i, 1); }
+    melde('Ziel endg\u00fcltig entfernt, Zugeordnetes bleibt');
+  }
+  renderAlles();
+}
+
 function blattArchiv() {
+  arFrage = arFrage;
   const l = PLAENE.filter(p => p.archiviert);
   const lz = ZIELE.filter(z => z.archiviert);
   kopf('Archiv', l.length + ' Pl\u00e4ne \u00b7 ' + lz.length + ' Ziele', '');
@@ -4400,7 +4553,7 @@ function blattArchiv() {
       ' \u00b7 ' + f.fertig + ' von ' + f.gesamt + ' erledigt</div>' +
       '<div class="nz-m">' + esc(p.beschreibung[0] || '') + '</div></span>' +
       '<button class="k-btn" onclick="planReaktivieren(\'' + p.id + '\')">Reaktivieren</button>' +
-      '</div>';
+      arWeg('plan', p.id) + '</div>';
   }).join('');
   h += lz.map(function (z) {
     return '<div class="nz"><span class="tz-punkt" style="background:' + bFarbe(z.b) +
@@ -4409,11 +4562,12 @@ function blattArchiv() {
       (z.frist ? ' \u00b7 Frist ' + esc(z.frist) : '') + '</div>' +
       '<div class="nz-m">' + esc(z.zustand[0] || '') + '</div></span>' +
       '<button class="k-btn" onclick="zielReaktivieren(\'' + z.id + '\')">Reaktivieren</button>' +
-      '</div>';
+      arWeg('ziel', z.id) + '</div>';
   }).join('');
   h += '<div class="hinweis">Ein reaktivierter Plan oder ein reaktiviertes Ziel bekommt ' +
        'seinen Reiter zur\u00fcck. Das Zugeordnete war nie weg \u2014 es steht weiterhin ' +
-       'in seinen Best\u00e4nden.</div>';
+       'in seinen Best\u00e4nden. <b>L\u00f6schen</b> entfernt endg\u00fcltig, l\u00f6st aber ' +
+       'nur die Zuordnungen: Aktivit\u00e4ten und Pl\u00e4ne bleiben bestehen.</div>';
   $('blatt').innerHTML = h;
 }
 
@@ -4439,14 +4593,17 @@ function renderBlatt() {
     blattAktivitaeten();
     return;
   }
+  if (reg === 'db') {
+    if (unterAktiv.db === 'archiv') { blattArchiv(); return; }
+    blattNotiz();
+    return;
+  }
 
   const k = blattKey();
   if (k === 'tag')      { blattTag(); return; }
   if (k === 'woche')    { blattWoche(); return; }
-  if (k === 'notiz')    { blattNotiz(); return; }
   if (k === 'monat')    { blattMonat(); return; }
   if (k === 'jtermine') { blattJahrestermine(); return; }
-  if (k === 'archiv')   { blattArchiv(); return; }
   /* Kein stiller Rückfall mehr auf ein beliebiges Blatt: ein unbekannter
      Schlüssel soll auffallen, statt ein fremdes Blatt zu zeichnen. */
   kopf('Unbekanntes Blatt', 'Schl\u00fcssel: ' + k, '');
