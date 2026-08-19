@@ -1636,6 +1636,78 @@ kat('33 · Planblatt');
   else { fail('Schemaversion nicht erhöht'); }
 }
 
+/* ═══ 34 · Startdatum eines Rhythmus ═══════════════════════════════════
+   Fehlerarten: das Startdatum lässt sich nicht setzen, obwohl "jede
+   zweite Woche" ohne Anker nicht bestimmbar ist; ein Vorgang gilt auch
+   vor seinem Beginn als fällig; ein unsinniges Datum wird stillschweigend
+   übernommen und der Vorgang fällt lautlos aus; bereits erfasste Häkchen
+   liegen nach der Umstellung vor dem Start.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('34 · Startdatum eines Rhythmus');
+{
+  const mF = JSK.match(/function faelligAn\(w, iso\) \{([\s\S]*?)\n\}/);
+  if (mF && /w\.ab && iso < w\.ab/.test(mF[1])) {
+    ok('vor dem Startdatum ist nichts fällig');
+  } else { fail('der Vorgang gilt auch vor seinem Beginn als fällig'); }
+
+  /* Wirkung wirklich rechnen */
+  const teile = ['isoPlus', 'isoWt', 'isoMontag', 'wochenAbstand', 'faelligAn']
+    .map(function (n) {
+      const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+      return m ? m[0] : null;
+    });
+  if (teile.indexOf(null) !== -1) { fail('Fälligkeitsfunktionen nicht auswertbar'); }
+  else {
+    let fn = null;
+    try { fn = new Function(teile.join('\n') + '\nreturn faelligAn;')(); }
+    catch (e) { fn = null; }
+    if (!fn) { fail('faelligAn nicht auswertbar'); }
+    else {
+      const F = [
+        [{ typ:'woche', tage:[0,2,4], intervall:1, ab:'2026-09-01' }, '2026-08-31', false],
+        [{ typ:'woche', tage:[0,2,4], intervall:1, ab:'2026-09-01' }, '2026-09-02', true],
+        [{ typ:'monat', monatstag:15, ab:'2026-10-01' }, '2026-09-15', false],
+        [{ typ:'monat', monatstag:15, ab:'2026-10-01' }, '2026-10-15', true],
+        /* Start mitten in der Woche: der Tag davor bleibt aus, der Tag
+           danach zählt bereits zur ersten Intervallwoche.            */
+        [{ typ:'woche', tage:[0,4], intervall:2, ab:'2026-09-02' }, '2026-08-31', false],
+        [{ typ:'woche', tage:[0,4], intervall:2, ab:'2026-09-02' }, '2026-09-04', true],
+        [{ typ:'woche', tage:[0,4], intervall:2, ab:'2026-09-02' }, '2026-09-11', false],
+        [{ typ:'woche', tage:[0,4], intervall:2, ab:'2026-09-02' }, '2026-09-14', true],
+      ];
+      let f = 0;
+      F.forEach(function (x) {
+        if (fn(x[0], x[1]) !== x[2]) {
+          f++; fail('Startdatum: ' + x[1] + ' ergibt ' + fn(x[0], x[1]));
+        }
+      });
+      if (!f) { ok(F.length + ' Fälle mit Startdatum korrekt'); }
+    }
+  }
+
+  const mR = JSK.match(/function rhRender\(\) \{([\s\S]*?)\n\}/);
+  if (mR && /rh-ab/.test(mR[1])) { ok('Startdatum ist im Dialog zu setzen'); }
+  else { fail('Startdatum lässt sich nicht setzen'); }
+
+  const mM = JSK.match(/function rhMerken\(\) \{([\s\S]*?)\n\}/);
+  /* Nicht nur pruefen, ob geprueft wird — sondern ob das Ergebnis der
+     Pruefung auch die Zuweisung bewacht.                             */
+  if (mM && /if \(v\) \{ rhEntwurf\.ab = v; \}/.test(mM[1])) {
+    ok('Startdatum wird geprüft und nur Gültiges übernommen');
+  } else { fail('unsinniges Startdatum würde übernommen'); }
+  const mSp = JSK.match(/function rhSpeichern\(\) \{([\s\S]*?)\n\}/);
+  if (mSp && /rhAbFehler/.test(mSp[1])) { ok('falsches Startdatum verhindert das Speichern'); }
+  else { fail('falsches Startdatum wird stillschweigend verworfen'); }
+
+  const mMig = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mMig && /tage\[0\] < w\.ab/.test(mMig[1])) {
+    ok('Migration schützt bereits erfasste Häkchen');
+  } else { fail('erfasste Häkchen lägen nach der Umstellung vor dem Start'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 12) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */

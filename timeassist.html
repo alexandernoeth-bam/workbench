@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 2.17.0 · Pläne</title>
+<title>TimeAssist 2.18.0 · Startdatum</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -1131,7 +1131,7 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
 <script>
 'use strict';
 
-const APP_VERSION = '2.17.0';
+const APP_VERSION = '2.18.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -1146,7 +1146,7 @@ const APP_VERSION = '2.17.0';
    push und splice wirken dadurch unverändert weiter.
    Die SAAT_-Werte sind nur die Erstbefüllung beim allerersten Start.
    ═══════════════════════════════════════════════════════════════════ */
-const DB_VERSION = 11;
+const DB_VERSION = 12;
 
 /* Gruppe: die Ebene ueber dem Bereich. Im Ringbuch ist sie das Register,
    hinter dem mehrere Aktivitaeten-Checklisten liegen. Gepflegte Liste,
@@ -1324,8 +1324,9 @@ function ferienAn(iso) {
    muster (gerechnet), log{}, zielId.
      typ 'woche'  — an den gewählten Wochentagen, jede intervall-te Woche
      typ 'monat'  — an einem festen Tag im Monat
-   ab ist der Anker für die Intervallzählung; ohne ihn liesse sich
-   "jede zweite Woche" nicht bestimmen.                                 */
+   ab ist Startdatum und Anker zugleich: davor ist der Vorgang nicht
+   fällig, und ab dort zählt das Intervall. Ohne einen Anker liesse sich
+   "jede zweite Woche" gar nicht bestimmen — welche Woche wäre gemeint?  */
 const SAAT_WIEDER = [
   { id:201, t:'Rudern — 20 Minuten',      b:'b3', min:20, muster:'täglich',     tage:[0,1,2,3,4,5,6], log:{0:'✕',1:'✕',2:'•'}, zielId:null },
   { id:202, t:'Ablage leeren',            b:'b5', min:15, muster:'Mo · Mi · Fr', tage:[0,2,4],        log:{0:'✕',2:'•'},       zielId:'z1' },
@@ -1630,7 +1631,14 @@ function migriereDB(d) {
   (d.notizen || []).forEach(function (n) {
     if (n.text === undefined) { n.text = ''; }
     if (n.quelle === undefined) { n.quelle = ''; }
-    /* Version 10 → 11: Rang innerhalb eines Plans */
+    /* Version 11 → 12: Das Startdatum begrenzt jetzt auch nach vorn.
+     Damit bereits erfasste Häkchen nicht plötzlich vor dem Start lägen,
+     rückt ab notfalls auf den ältesten Eintrag im Log zurück.        */
+  (d.wieder || []).forEach(function (w) {
+    const tage = Object.keys(w.log || {}).filter(k => /^\d{4}-/.test(k)).sort();
+    if (tage.length && (!w.ab || tage[0] < w.ab)) { w.ab = tage[0]; }
+  });
+  /* Version 10 → 11: Rang innerhalb eines Plans */
   (function () {
     const zaehler = {};
     (d.aktivitaeten || []).forEach(function (a) {
@@ -2050,6 +2058,8 @@ function wochenAbstand(isoA, isoB) {
 }
 function faelligAn(w, iso) {
   if (!w) { return false; }
+  /* Vor dem Startdatum gibt es den Vorgang noch nicht. */
+  if (w.ab && iso < w.ab) { return false; }
   if (w.typ === 'monat') {
     const jahr = parseInt(iso.slice(0, 4), 10);
     const monat = parseInt(iso.slice(5, 7), 10);
@@ -3350,6 +3360,7 @@ function blattWieder() {
       '<span class="tz-punkt" style="background:' + bFarbe(w.b) + '"></span>' +
       '<span class="wk-t" onclick="rhOeffnen(\'wied\',' + w.id + ')">' + esc(w.t) +
       '<div class="t-meta">' + esc(w.muster) + ' \u00b7 ' + (w.min || 0) + ' Min' +
+      (w.ab ? ' \u00b7 ab ' + esc(dmyKurz(w.ab)) : '') +
       (w.zielId ? ' \u00b7 Ziel' : '') + '</div></span>' +
       streifen(w, true, 'wiederWeiter') +
       '<button class="mon-x" onclick="event.stopPropagation(); rhOeffnen(\'wied\',' +
@@ -5433,6 +5444,13 @@ function rhMerken() {
   if (iv) { rhEntwurf.intervall = Math.max(1, parseInt(iv.value, 10) || 1); }
   const mt = $('rh-mt');
   if (mt) { rhEntwurf.monatstag = Math.min(31, Math.max(1, parseInt(mt.value, 10) || 1)); }
+  const ab = $('rh-ab');
+  if (ab) {
+    /* Unsinn wird nicht uebernommen — sonst faellt der Vorgang stumm aus */
+    const v = dmyZuIso(ab.value);
+    if (v) { rhEntwurf.ab = v; }
+    else if (ab.value.trim()) { rhAbFehler = true; }
+  }
 }
 function rhTag(d) {
   rhMerken();
@@ -5478,11 +5496,14 @@ function rhTyp(t) {
   if (t === 'woche' && !rhEntwurf.tage.length) { rhEntwurf.tage = [0]; }
   rhRender();
 }
+let rhAbFehler = false;
 function rhSpeichern() {
+  rhAbFehler = false;
   rhMerken();
   const e = rhEntwurf;
   if (!e) { return; }
   if (!e.t.trim()) { melde('Ohne Bezeichnung geht es nicht'); return; }
+  if (rhAbFehler) { melde('Startdatum bitte als TT.MM.JJJJ'); return; }
   if (rhArt !== 'gew' && e.typ === 'monat') {
     e.tage = [];
   } else if (!e.tage.length) {
@@ -5545,10 +5566,18 @@ function rhRender() {
     if (!gew) {
       h += '<div class="jt-feld" style="margin-top:12px">' +
         '<label>Jede wievielte Woche</label>' +
-        '<input id="rh-iv" value="' + (e.intervall || 1) + '" inputmode="numeric"></div>' +
-        '<div class="ed-hin">1 = jede Woche. Gez\u00e4hlt wird ab der Woche des ' +
-        esc(dmyKurz(e.ab || isoMontag(isoHeute()))) + '</div>';
+        '<input id="rh-iv" value="' + (e.intervall || 1) + '" inputmode="numeric"></div>';
     }
+  }
+  if (!gew) {
+    h += '<div class="jt-feld"><label>Beginnt am</label>' +
+      '<input id="rh-ab" value="' + esc(dmy(e.ab || isoHeute())) +
+      '" placeholder="TT.MM.JJJJ" inputmode="numeric"></div>' +
+      '<div class="ed-hin">Vorher ist der Vorgang nicht f\u00e4llig' +
+      ((e.typ !== 'monat' && (e.intervall || 1) > 1)
+        ? '. Von hier aus z\u00e4hlt auch das Intervall \u2014 ' +
+          'die Woche des ' + esc(dmyKurz(isoMontag(e.ab || isoHeute()))) + ' ist die erste.'
+        : '.') + '</div>';
   }
   h += '<div class="ed-hin"><b>' + esc(gew
         ? rhMuster({ typ:'woche', tage:e.tage, intervall:1 })
