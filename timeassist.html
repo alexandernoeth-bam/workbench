@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 2.2.0 · S4 Pläne, Ziele, Jahrestermine</title>
+<title>TimeAssist 2.3.0 · Weiterziehen</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -600,6 +600,21 @@ input, textarea { font: inherit; color: inherit; }
 /* Der Pfeil auf der Checkliste: hier wird die Aktivitaet gefuehrt */
 .p-pfeil { display: block; font-size: 11.4px; color: var(--wein); margin-top: 1px;
            letter-spacing: .02em; }
+/* Planungsstand in der Checkliste */
+.tz-heute.stand { font-variant-numeric: tabular-nums; }
+.tz-heute.jetzt { border-color: var(--wein); color: var(--wein); font-weight: 700; }
+/* Geplant gewesen, nicht erledigt — sichtbar, aber ohne Alarm */
+.tz-heute.rueck { border-color: var(--marke); color: var(--marke);
+                  background: var(--marke-h); }
+.tz-heute.vor { color: var(--tinte-3); }
+
+/* Weiterziehen */
+.zug-t { display: flex; gap: 5px; flex-wrap: wrap; }
+/* Was von diesem Tag weggezogen wurde, bleibt als Spur stehen */
+.tz-weg { opacity: .6; }
+.tz-weg .a-titel { text-decoration: line-through; color: var(--tinte-3); }
+.tz-ziel { font-size: 11.4px; color: var(--wein); font-variant-numeric: tabular-nums; }
+
 /* Kopfangaben auf Plan- und Zielblatt */
 .p-haupt { font-family: var(--serif); font-size: 18px; color: var(--wein);
            font-weight: 700; }
@@ -905,12 +920,25 @@ input, textarea { font: inherit; color: inherit; }
   </div>
 </div>
 
+<div class="hg" id="zug" onclick="if(event.target===this){zugZu()}">
+  <div class="dlg" style="width:440px">
+    <div class="dlg-kopf">
+      <h2>Weiterziehen</h2>
+      <button class="k-btn" style="margin-left:auto" onclick="zugZu()">Abbrechen</button>
+    </div>
+    <div class="dlg-koerper" style="display:block" id="zug-inhalt"></div>
+    <div class="dlg-fuss">
+      <span class="bk-sub">Nur nach vorn — zurück geht nicht.</span>
+    </div>
+  </div>
+</div>
+
 <div class="meldung" id="meldung"></div>
 
 <script>
 'use strict';
 
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -925,7 +953,7 @@ const APP_VERSION = '2.2.0';
    push und splice wirken dadurch unverändert weiter.
    Die SAAT_-Werte sind nur die Erstbefüllung beim allerersten Start.
    ═══════════════════════════════════════════════════════════════════ */
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 /* Gruppe: die Ebene ueber dem Bereich. Im Ringbuch ist sie das Register,
    hinter dem mehrere Aktivitaeten-Checklisten liegen. Gepflegte Liste,
@@ -948,26 +976,29 @@ const SAAT_BEREICHE = [
    geplant: Datum, an dem die Aktivität auf dem Tagesplan steht, oder
    null. Früher ein Ja/Nein-Feld — damit blieb sie ewig auf "heute" und
    liess sich nicht auf morgen legen.
+   verschoben: Tage, von denen sie weggezogen wurde. Ohne diese Spur
+   verschwände sie vom alten Blatt, als hätte sie nie daraufgestanden —
+   im Ringbuch bleibt der Eintrag mit einem › stehen.
    planId: gehört die Aktivität zu einem Plan, steht sie auf dessen Blatt
    und trägt auf der Checkliste ein → statt eines zweiten Eintrags.
    zielId: nur für Aktivitäten OHNE Plan sinnvoll — Planaktivitäten
    zahlen mittelbar über ihren Plan ein und stünden sonst doppelt.       */
 const SAAT_AKTIVITAETEN = [
-  { id:1,  t:'Folien für CCD-Highlight fertigstellen', b:'b1', prio:'A', min:45,  wer:'',        beginn:'10.08.', ende:'18.08.', glyph:'•', geplant:isoHeute(), planId:'p1', zielId:null },
-  { id:2,  t:'Angebot von Nille prüfen',               b:'b1', prio:'A', min:30,  wer:'',        beginn:'',       ende:'14.08.', glyph:'•', geplant:isoHeute(), planId:'p1', zielId:null },
-  { id:3,  t:'Wartungsfenster abstimmen',              b:'b2', prio:'B', min:30,  wer:'Netzwerk',beginn:'',       ende:'21.08.', glyph:'•', geplant:isoHeute(), planId:'p2', zielId:null },
-  { id:4,  t:'Testfenster bestätigen',                 b:'b2', prio:'B', min:45,  wer:'',        beginn:'',       ende:'24.08.', glyph:'•', geplant:null, planId:'p2', zielId:null },
-  { id:5,  t:'Unterlagen einscannen und abheften',     b:'b5', prio:'B', min:120, wer:'',        beginn:'',       ende:'',       glyph:'✕', geplant:isoHeute(), planId:'p4', zielId:null },
-  { id:6,  t:'Miele Waschmaschine registrieren',       b:'b3', prio:'C', min:10,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, planId:null, zielId:null },
-  { id:7,  t:'Grabbewässerung Nüdlingen planen',       b:'b4', prio:'C', min:90,  wer:'',        beginn:'',       ende:'30.09.', glyph:'>', geplant:null, planId:'p3', zielId:null },
-  { id:8,  t:'Tabletten bestellen und holen',          b:'b4', prio:'B', min:60,  wer:'',        beginn:'',       ende:'19.08.', glyph:'✕', geplant:isoHeute(), planId:null, zielId:null },
-  { id:9,  t:'Heizung entlüften',                      b:'b3', prio:'C', min:20,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, planId:null, zielId:null },
-  { id:11, t:'Rückmeldung Netzwerkteam einholen',      b:'b2', prio:'B', min:15,  wer:'Netzwerk',beginn:'',       ende:'12.08.', glyph:'•', geplant:isoHeute(), planId:null, zielId:'z1' },
-  { id:12, t:'Artikel in VorProd anlegen',             b:'b1', prio:'B', min:60,  wer:'',        beginn:'',       ende:'26.08.', glyph:'•', geplant:null, planId:null, zielId:'z1' },
-  { id:13, t:'Barcelona zum Jahreswechsel buchen',     b:'b4', prio:'C', min:120, wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, planId:null, zielId:null },
-  { id:14, t:'Nüdlingen: Giftstoffe wegfahren',        b:'b4', prio:'C', min:240, wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, planId:'p3', zielId:null },
-  { id:15, t:'Oskar reinigen und warten',              b:'b3', prio:'C', min:30,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, planId:null, zielId:null },
-  { id:16, t:'Hoheitszone Küche aufräumen',            b:'b3', prio:'C', min:45,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, planId:null, zielId:null },
+  { id:1,  t:'Folien für CCD-Highlight fertigstellen', b:'b1', prio:'A', min:45,  wer:'',        beginn:'10.08.', ende:'18.08.', glyph:'•', geplant:isoHeute(), verschoben:[], planId:'p1', zielId:null },
+  { id:2,  t:'Angebot von Nille prüfen',               b:'b1', prio:'A', min:30,  wer:'',        beginn:'',       ende:'14.08.', glyph:'•', geplant:isoHeute(), verschoben:[], planId:'p1', zielId:null },
+  { id:3,  t:'Wartungsfenster abstimmen',              b:'b2', prio:'B', min:30,  wer:'Netzwerk',beginn:'',       ende:'21.08.', glyph:'•', geplant:isoHeute(), verschoben:[], planId:'p2', zielId:null },
+  { id:4,  t:'Testfenster bestätigen',                 b:'b2', prio:'B', min:45,  wer:'',        beginn:'',       ende:'24.08.', glyph:'•', geplant:null, verschoben:[], planId:'p2', zielId:null },
+  { id:5,  t:'Unterlagen einscannen und abheften',     b:'b5', prio:'B', min:120, wer:'',        beginn:'',       ende:'',       glyph:'✕', geplant:isoHeute(), verschoben:[], planId:'p4', zielId:null },
+  { id:6,  t:'Miele Waschmaschine registrieren',       b:'b3', prio:'C', min:10,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], planId:null, zielId:null },
+  { id:7,  t:'Grabbewässerung Nüdlingen planen',       b:'b4', prio:'C', min:90,  wer:'',        beginn:'',       ende:'30.09.', glyph:'>', geplant:null, verschoben:[], planId:'p3', zielId:null },
+  { id:8,  t:'Tabletten bestellen und holen',          b:'b4', prio:'B', min:60,  wer:'',        beginn:'',       ende:'19.08.', glyph:'✕', geplant:isoHeute(), verschoben:[], planId:null, zielId:null },
+  { id:9,  t:'Heizung entlüften',                      b:'b3', prio:'C', min:20,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], planId:null, zielId:null },
+  { id:11, t:'Rückmeldung Netzwerkteam einholen',      b:'b2', prio:'B', min:15,  wer:'Netzwerk',beginn:'',       ende:'12.08.', glyph:'•', geplant:isoHeute(), verschoben:[], planId:null, zielId:'z1' },
+  { id:12, t:'Artikel in VorProd anlegen',             b:'b1', prio:'B', min:60,  wer:'',        beginn:'',       ende:'26.08.', glyph:'•', geplant:null, verschoben:[], planId:null, zielId:'z1' },
+  { id:13, t:'Barcelona zum Jahreswechsel buchen',     b:'b4', prio:'C', min:120, wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], planId:null, zielId:null },
+  { id:14, t:'Nüdlingen: Giftstoffe wegfahren',        b:'b4', prio:'C', min:240, wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], planId:'p3', zielId:null },
+  { id:15, t:'Oskar reinigen und warten',              b:'b3', prio:'C', min:30,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], planId:null, zielId:null },
+  { id:16, t:'Hoheitszone Küche aufräumen',            b:'b3', prio:'C', min:45,  wer:'',        beginn:'',       ende:'',       glyph:'•', geplant:null, verschoben:[], planId:null, zielId:null },
 ];
 
 /* Termin: t, tag (0 = Montag dieser Woche), von, bis, ganztags, ort
@@ -1368,6 +1399,10 @@ function migriereDB(d) {
       delete a.heute;
     }
   });
+  /* Version 3 → 4: Verschiebungsspur */
+  (d.aktivitaeten || []).forEach(function (a) {
+    if (!Array.isArray(a.verschoben)) { a.verschoben = []; }
+  });
   d.version = DB_VERSION;
   return d;
 }
@@ -1738,8 +1773,69 @@ function leerZeilen(belegt, gesamt) {
 function glyphWeiter(id) {
   const a = AKTIVITAETEN.find(x => x.id === id);
   if (!a) { return; }
-  a.glyph = naechsterGlyph(a.glyph);
+  const naechst = naechsterGlyph(a.glyph);
+  /* Weiterziehen ist eine Terminentscheidung, kein blosser Zustand:
+     wer › setzt, muss sagen, wohin.                                   */
+  if (naechst === '>' && a.geplant) { zugAuf(id); return; }
+  a.glyph = naechst;
   renderAlles();
+}
+
+/* ── Weiterziehen ──────────────────────────────────────────────────
+   Frühestens der Tag nach dem angezeigten Blatt; liegt das Blatt weiter
+   zurück als gestern, frühestens heute. Ein Vorgang lässt sich nicht in
+   die Vergangenheit schieben.                                        */
+let zugId = null;
+function zugFruehestens() {
+  const nachBlatt = isoPlus(tagOffen, 1);
+  const h = isoHeute();
+  return (nachBlatt > h) ? nachBlatt : h;
+}
+function zugAuf(id) {
+  zugId = id;
+  const a = AKTIVITAETEN.find(x => x.id === id);
+  if (!a) { return; }
+  const ab = zugFruehestens();
+  let h = '<div class="ed-l">Aktivit\u00e4t</div><div class="bw-t">' + esc(a.t) + '</div>';
+  h += '<div class="ed-hin">Geplant war der ' + esc(dmyKurz(a.geplant)) +
+       '. Auf dem alten Blatt bleibt sie mit \u203a stehen.</div>';
+  h += '<div class="ed-l">Neuer Tag</div><div class="zug-t">';
+  for (let i = 0; i < 7; i++) {
+    const iso = isoPlus(ab, i);
+    h += '<button class="ed-t" onclick="zugSetzen(\'' + iso + '\')">' +
+      WOKURZ[isoWt(iso)] + '<span class="ed-t-d">' + dmyKurz(iso) + '</span></button>';
+  }
+  h += '</div>';
+  h += '<div class="ed-l">Oder ein anderes Datum</div>' +
+    '<div class="ed-zeile"><input class="ed-f" id="zug-d" value="' + esc(dmy(ab)) +
+    '" placeholder="TT.MM.JJJJ" inputmode="numeric" style="width:150px">' +
+    '<button class="k-btn pri" onclick="zugFrei()">\u00dcbernehmen</button></div>';
+  h += '<div class="ed-hin">Fr\u00fchestens ' + esc(dmy(ab)) + '.</div>';
+  $('zug-inhalt').innerHTML = h;
+  $('zug').classList.add('auf');
+}
+function zugZu() { $('zug').classList.remove('auf'); zugId = null; }
+function zugFrei() {
+  const iso = dmyZuIso($('zug-d').value);
+  if (!iso) { melde('Datum bitte als TT.MM.JJJJ'); return; }
+  if (iso < zugFruehestens()) {
+    melde('Fr\u00fchestens ' + dmyKurz(zugFruehestens()));
+    return;
+  }
+  zugSetzen(iso);
+}
+function zugSetzen(iso) {
+  const a = AKTIVITAETEN.find(x => x.id === zugId);
+  if (!a) { zugZu(); return; }
+  if (!Array.isArray(a.verschoben)) { a.verschoben = []; }
+  if (a.geplant && a.verschoben.indexOf(a.geplant) === -1) {
+    a.verschoben.push(a.geplant);
+  }
+  a.geplant = iso;
+  a.glyph = '\u2022';        /* auf dem neuen Tag wieder offen */
+  zugZu();
+  renderAlles();
+  melde('Weitergezogen auf ' + dmyKurz(iso));
 }
 function naechsterGlyph(g) {
   const folge = { '\u2022':'\u2715', '\u2715':'>', '>':'\u2013', '\u2013':'\u2022' };
@@ -1895,7 +1991,7 @@ function aktNeu(heute, feld) {
   aufraeumen();
   const a = { id:naechsteId(), t:'', b:ersterBereichId(), prio:'B', min:30,
               wer:'', beginn:'', ende:'', glyph:'\u2022',
-              geplant:heute ? tagOffen : null, planId:null, zielId:null };
+              geplant:heute ? tagOffen : null, verschoben:[], planId:null, zielId:null };
   AKTIVITAETEN.push(a);
   zelleOeffnen('akt', a.id, feld || 't');
 }
@@ -2183,6 +2279,11 @@ function blattTag() {
     '<div class="tz-titel">' + (w ? esc(w.t) : '\u2014') + '</div></div>';
 
   const liste = AKTIVITAETEN.filter(a => a.geplant === tagOffen);
+  /* Was von diesem Tag weggezogen wurde, bleibt als Spur stehen — sonst
+     sähe das Blatt aus, als hätte der Vorgang nie daraufgestanden.    */
+  const weg = AKTIVITAETEN.filter(a => Array.isArray(a.verschoben) &&
+                                       a.verschoben.indexOf(tagOffen) !== -1 &&
+                                       a.geplant !== tagOffen);
   rechts += '<div class="abschnitt">' + abschnitt('Aktivit\u00e4ten', '') +
     '<table class="atab"><colgroup><col style="width:28px"><col style="width:26px">' +
     '<col><col style="width:48px"><col style="width:38px"></colgroup>' +
@@ -2197,14 +2298,22 @@ function blattTag() {
       zelle('akt', a.id, 'ende', a.ende, 'tag', 'dat', 'TT.MM') +
       zelle('akt', a.id, 'min', String(a.min), 'tag', 'r', '') + '</tr>';
   }).join('');
+  rechts += weg.map(function (a) {
+    return '<tr class="tz-weg"><td class="mitte"><span class="hak">\u203a</span></td>' +
+      '<td class="mitte">' + prioFeld(a.prio) + '</td>' +
+      '<td><span class="a-titel">' + esc(a.t) + '</span></td>' +
+      '<td class="dat" colspan="2"><span class="tz-ziel">\u2192 ' +
+      esc(dmyKurz(a.geplant) || 'ohne Tag') + '</span></td></tr>';
+  }).join('');
 
   /* Das Blatt ist bis zur H\u00e4lfte durchliniert \u2014 14 Zeilen, damit die
      R\u00fcckfragen immer an derselben Stelle beginnen.                     */
   const ZEILEN_TAG = 14;
-  if (liste.length < ZEILEN_TAG) {
+  const belegt = liste.length + weg.length;
+  if (belegt < ZEILEN_TAG) {
     rechts += '<tr class="neu" onclick="aktNeu(true)"><td colspan="5">' +
       '<span class="a-neu">antippen und schreiben</span></td></tr>';
-    for (let i = liste.length + 1; i < ZEILEN_TAG; i++) {
+    for (let i = belegt + 1; i < ZEILEN_TAG; i++) {
       rechts += '<tr class="leer"><td></td><td></td><td></td><td></td><td></td></tr>';
     }
   }
@@ -2491,9 +2600,7 @@ function blattAktivitaeten() {
     h += l.map(function (a) {
       if (editAkt === a.id) { return ''; }
       gezeigt += 1;
-      const knopf = (a.geplant === tagOffen)
-        ? '<button class="tz-heute" onclick="event.stopPropagation(); heuteWeg(' + a.id + ')">\u2713 heute</button>'
-        : '<button class="tz-heute" onclick="event.stopPropagation(); heuteHin(' + a.id + ')">\u2192 heute</button>';
+      const knopf = planStandZelle(a);
       return '<tr>' +
         '<td class="mitte">' + hakFeld(a.glyph, 'glyphWeiter(' + a.id + ')') + '</td>' +
         '<td class="mitte z" onclick="bereichWeiter(' + a.id + ')" title="' + esc(bName(a.b)) + '">' +
@@ -2534,6 +2641,31 @@ function planPfeilZelle(a) {
   const pfeil = '<span class="p-pfeil" onclick="event.stopPropagation(); ' +
     'blattOeffnen(\'plaene\',\'' + p.id + '\')">\u2192 ' + esc(pfeilKurz(p.t)) + '</span>';
   return inner.replace('</td>', pfeil + '</td>');
+}
+/* Zeigt in der Checkliste, wo eine Aktivität im Kalender steht. Ohne
+   das sieht ein liegengebliebener Vorgang aus wie jeder andere offene. */
+function planStandZelle(a) {
+  const h = isoHeute();
+  if (a.geplant && offen(a) && a.geplant < h) {
+    return '<button class="tz-heute stand rueck" onclick="event.stopPropagation(); ' +
+      'heuteHin(' + a.id + ')" title="War geplant, noch offen \u2014 auf den ' +
+      'angezeigten Tag legen">' + esc(dmyKurz(a.geplant)) + '</button>';
+  }
+  if (a.geplant === tagOffen) {
+    return '<button class="tz-heute stand jetzt" onclick="event.stopPropagation(); ' +
+      'heuteWeg(' + a.id + ')">\u2713 geplant</button>';
+  }
+  if (a.geplant && a.geplant > h) {
+    return '<button class="tz-heute stand vor" onclick="event.stopPropagation(); ' +
+      'heuteHin(' + a.id + ')" title="Geplant f\u00fcr diesen Tag">' +
+      esc(dmyKurz(a.geplant)) + '</button>';
+  }
+  if (a.geplant) {
+    return '<button class="tz-heute stand" onclick="event.stopPropagation(); ' +
+      'heuteHin(' + a.id + ')">' + esc(dmyKurz(a.geplant)) + '</button>';
+  }
+  return '<button class="tz-heute" onclick="event.stopPropagation(); heuteHin(' + a.id +
+    ')">\u2192 Tag</button>';
 }
 function heuteHin(id) {
   const a = AKTIVITAETEN.find(x => x.id === id);
@@ -2854,7 +2986,7 @@ function planAktNeu(pid) {
   const p = PLAENE.find(x => x.id === pid);
   aufraeumen();
   const a = { id:naechsteId(), t:'', b:p ? p.b : ersterBereichId(), prio:'B', min:0,
-              wer:'', beginn:'', ende:'', glyph:'\u2022', geplant:null, planId:pid };
+              wer:'', beginn:'', ende:'', glyph:'\u2022', geplant:null, verschoben:[], verschoben:[], planId:pid };
   AKTIVITAETEN.push(a);
   zelleOeffnen('akt', a.id, 't');
 }
@@ -4037,7 +4169,7 @@ function eintragSpeichern() {
       /* Eine Aufgabe entsteht als echte Aktivitaet; das Wochenblatt
          traegt nur den Verweis darauf.                              */
       const a = { id:naechsteId(), t:titel, b:ersterBereichId(), prio:'B', min:0, wer:'',
-                  beginn:'', ende:'', glyph:'\u2022', geplant:null, planId:null, zielId:null };
+                  beginn:'', ende:'', glyph:'\u2022', geplant:null, verschoben:[], planId:null, zielId:null };
       AKTIVITAETEN.push(a);
       e = { id:naechsteId(), refArt:'aktivitaet', refId:a.id };
       if (k.tag >= 0) { e.tag = k.tag; b.eintraege.push(e); } else { b.wichtig.push(e); }
@@ -4476,7 +4608,7 @@ function waUmwandeln(d) {
     aktivitaeten.push({ id:id, t:a.titel, b:bereichVon(a), prio:waPrio(a),
                         min:parseInt(a.groesse, 10) || 0, wer:'',
                         beginn:waDatum(a.startdatum), ende:waDatum(a.faellig),
-                        glyph:waGlyph(a.status), geplant:null,
+                        glyph:waGlyph(a.status), geplant:null, verschoben:[],
                         planId:null, zielId:null });
     bericht.aktivitaeten += 1;
   });
@@ -4503,7 +4635,7 @@ function waUmwandeln(d) {
       aktivitaeten.push({ id:naechsteId(), t:sch.titel,
                           b:(b && abbild[b.id]) ? abbild[b.id] : bereichVon(p),
                           prio:'B', min:0, wer:sch.delegiertAn || '',
-                          beginn:'', ende:'', glyph:'\u2022', geplant:null,
+                          beginn:'', ende:'', glyph:'\u2022', geplant:null, verschoben:[],
                           planId:pid, zielId:null });
       bericht.aktivitaeten += 1;
       bericht.schritte += 1;

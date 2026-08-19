@@ -147,7 +147,7 @@ kat('7 · Datenmodell minimal');
   if (!mA) { fail('SAAT_AKTIVITAETEN nicht gefunden'); }
   else {
     const ERLAUBT = ['id', 't', 'b', 'prio', 'min', 'wer', 'beginn', 'ende', 'glyph',
-                     'geplant', 'planId', 'zielId'];
+                     'geplant', 'verschoben', 'planId', 'zielId'];
     const felder = Array.from(new Set((mA[1].match(/[{,]\s*(\w+):/g) || [])
       .map(s => s.replace(/[{,]\s*/, '').replace(':', ''))));
     const zuviel = felder.filter(f => ERLAUBT.indexOf(f) === -1);
@@ -629,6 +629,65 @@ kat('17 · Bearbeitbarkeit und Datumsprüfung');
   if (mJ && /dmyZuIso/.test(mJ[1]) && /bis < von/.test(mJ[1])) {
     ok('Jahrestermin prüft Datum und dreht vertauschte Grenzen');
   } else { fail('Jahrestermin-Datum ungeprüft'); }
+}
+
+/* ═══ 18 · Weiterziehen und Planungsstand ═══════════════════════════════
+   Fehlerarten: ein weitergezogener Vorgang verschwindet spurlos vom alten
+   Blatt; er lässt sich in die Vergangenheit schieben; ein liegen-
+   gebliebener Vorgang sieht in der Checkliste aus wie jeder andere offene.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('18 · Weiterziehen und Planungsstand');
+{
+  ['zugAuf', 'zugSetzen', 'zugFruehestens', 'zugFrei', 'planStandZelle']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const mG = JSK.match(/function glyphWeiter\(id\) \{([\s\S]*?)\n\}/);
+  if (mG && /naechst === '>' && a\.geplant/.test(mG[1]) && /zugAuf\(id\)/.test(mG[1])) {
+    ok('› öffnet die Datumsauswahl statt still zu schalten');
+  } else { fail('› setzt den Zustand ohne nach dem neuen Tag zu fragen'); }
+
+  const mF = JSK.match(/function zugFruehestens\(\) \{([\s\S]*?)\n\}/);
+  if (mF) {
+    let fn = null;
+    try {
+      fn = eval('(function (tagOffen, isoHeute, isoPlus) { return ' +
+        mF[0].replace('function zugFruehestens', 'function') + '; })')
+        .call(null);
+    } catch (e) { fn = null; }
+    if (/isoPlus\(tagOffen, 1\)/.test(mF[1]) && /nachBlatt > h/.test(mF[1])) {
+      ok('frühestens Blatt+1, bei alten Blättern frühestens heute');
+    } else { fail('Untergrenze des Weiterziehens falsch'); }
+  } else { fail('zugFruehestens nicht auswertbar'); }
+
+  const mS = JSK.match(/function zugSetzen\(iso\) \{([\s\S]*?)\n\}/);
+  if (mS && /a\.verschoben\.push\(a\.geplant\)/.test(mS[1])) {
+    ok('das alte Datum wird als Spur gemerkt');
+  } else { fail('Verschiebung hinterlässt keine Spur'); }
+  const mFr = JSK.match(/function zugFrei\(\) \{([\s\S]*?)\n\}/);
+  if (mFr && /iso < zugFruehestens\(\)/.test(mFr[1])) {
+    ok('freie Eingabe wird gegen die Untergrenze geprüft');
+  } else { fail('freie Datumseingabe erlaubt Rückdatierung'); }
+
+  const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
+  if (mT && /verschoben\.indexOf\(tagOffen\)/.test(mT[1])) {
+    ok('altes Tagesblatt zeigt das Weggezogene weiterhin');
+  } else { fail('weggezogene Vorgänge verschwinden vom alten Blatt'); }
+
+  const mP = JSK.match(/function planStandZelle\(a\) \{([\s\S]*?)\n\}/);
+  if (mP && /a\.geplant < h/.test(mP[1]) && /rueck/.test(mP[1])) {
+    ok('liegengebliebene Vorgänge sind in der Checkliste gekennzeichnet');
+  } else { fail('kein Hinweis auf liegengebliebene Vorgänge'); }
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mM && /Array\.isArray\(a\.verschoben\)/.test(mM[1])) {
+    ok('Migration ergänzt die Verschiebungsspur');
+  } else { fail('Migration ergänzt verschoben nicht'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 4) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
