@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 2.10.0 · Jahresrahmen</title>
+<title>TimeAssist 2.12.0 · Spaltenbreiten</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -142,8 +142,12 @@ input, textarea { font: inherit; color: inherit; }
 .ab-sub { font-size: 12.6px; color: var(--tinte-3); margin-left: auto; }
 .hinweis { font-size: 12.6px; color: var(--tinte-3); margin-top: 12px; line-height: 1.55; }
 
-/* Tagesblatt: zwei Spalten wie das gedruckte Formblatt */
-.doppel { display: grid; grid-template-columns: 1fr 1.15fr; height: 100%; }
+/* Tagesblatt: zwei Spalten wie das gedruckte Formblatt.
+   minmax(0,…) ist nötig: eine Rasterspalte wird sonst nie schmaler als
+   ihr längster Inhalt, und ein langer Aktivitätentitel drückt die
+   Terminspalte zusammen.                                              */
+.doppel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+          height: 100%; }
 .doppel > div:first-child { padding-right: 14px; border-right: 1px dashed var(--linie); }
 .doppel > div:last-child { padding-left: 14px; display: flex; flex-direction: column; }
 
@@ -164,8 +168,9 @@ input, textarea { font: inherit; color: inherit; }
           padding: 1px 6px; border-radius: 0 4px 4px 0; overflow: hidden; z-index: 1; }
 .termin.kollision { right: 50%; }
 .termin.kollision2 { left: 50%; right: 0; z-index: 2; }
-.t-titel { font-size: 13.8px; line-height: 1.2; overflow: hidden;
-           text-overflow: ellipsis; white-space: nowrap; }
+.t-titel { font-size: 13.8px; line-height: 1.2; display: -webkit-box;
+           -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+           overflow-wrap: anywhere; }
 .t-meta { font-size: 10.8px; color: var(--tinte-3); overflow: hidden;
           text-overflow: ellipsis; white-space: nowrap; }
 /* Ganztags-Band: quer über der Chronik, wie von Hand oben hingeschrieben */
@@ -184,7 +189,8 @@ input, textarea { font: inherit; color: inherit; }
            padding: 0 4px 4px; border-bottom: 1.2px solid var(--wein); }
 .atab th.r { text-align: right; }
 .atab td { border-bottom: 1px solid var(--linie); padding: 4px; vertical-align: top;
-           font-size: 16.2px; line-height: 1.25; }
+           font-size: 16.2px; line-height: 1.25; overflow: hidden;
+           overflow-wrap: anywhere; }
 .atab td.r { text-align: right; font-variant-numeric: tabular-nums;
              font-size: 13.8px; color: var(--leder); }
 .atab td.dat { text-align: right; font-variant-numeric: tabular-nums;
@@ -216,6 +222,10 @@ input, textarea { font: inherit; color: inherit; }
    selbst, nicht mehr auf einem inneren span.                          */
 .atab td.durch { text-decoration: line-through; color: var(--tinte-3); }
 .atab td.blass { color: var(--tinte-3); }
+/* Lange Bezeichnungen laufen über zwei Zeilen und werden dann
+   abgeschnitten — die Spaltenbreite bleibt dadurch fest.             */
+.a-titel { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+           overflow: hidden; overflow-wrap: anywhere; }
 .a-titel.durch { text-decoration: line-through; color: var(--tinte-3); }
 .a-titel.blass { color: var(--tinte-3); }
 .a-neu { color: var(--marke); font-size: 13.8px; }
@@ -263,7 +273,7 @@ input, textarea { font: inherit; color: inherit; }
 .kontakt-t.durch { text-decoration: line-through; color: var(--tinte-3); }
 .kontakt-t.blass { color: var(--tinte-3); }
 .kontakt-z .ef { flex: 1; font-size: 16.2px; }
-.kontakt-t { flex: 1; font-size: 16.2px; padding-left: 3px;
+.kontakt-t { flex: 1; min-width: 0; font-size: 16.2px; padding-left: 3px;
              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Wichtigste Aufgabe */
@@ -327,8 +337,9 @@ input, textarea { font: inherit; color: inherit; }
 .wk-z { display: flex; align-items: center; gap: 7px; height: 25px;
         border-bottom: 1px solid var(--linie-2); }
 .wk-z .hak { flex: 0 0 17px; width: 17px; height: 17px; font-size: 14.4px; }
-.wk-t { flex: 1; min-width: 0; font-size: 15.6px; overflow: hidden;
-        text-overflow: ellipsis; white-space: nowrap; }
+.wk-t { flex: 1; min-width: 0; font-size: 15.6px; display: -webkit-box;
+        -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        overflow-wrap: anywhere; }
 .wk-t.durch { text-decoration: line-through; color: var(--tinte-3); }
 .wk-t.blass { color: var(--tinte-3); }
 .wk-min { flex: 0 0 34px; text-align: right; font-size: 13.2px; color: var(--leder);
@@ -1021,7 +1032,7 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
 <script>
 'use strict';
 
-const APP_VERSION = '2.10.0';
+const APP_VERSION = '2.12.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -1036,7 +1047,7 @@ const APP_VERSION = '2.10.0';
    push und splice wirken dadurch unverändert weiter.
    Die SAAT_-Werte sind nur die Erstbefüllung beim allerersten Start.
    ═══════════════════════════════════════════════════════════════════ */
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 
 /* Gruppe: die Ebene ueber dem Bereich. Im Ringbuch ist sie das Register,
    hinter dem mehrere Aktivitaeten-Checklisten liegen. Gepflegte Liste,
@@ -1106,13 +1117,18 @@ const SAAT_TAGESBLAETTER = [];
    Die Art faerbt den Balken. nurJahr haelt einen Eintrag aus Tages- und
    Wochenblatt heraus: ein Sabbatical ueber August ist fuer die
    Jahresplanung wesentlich, im Tagesplan aber nur Rauschen.            */
+/* Die Farben sind auf Abstand gebracht: im Jahresraster ist ein Balken
+   nur 24 px hoch, da müssen sich benachbarte Arten deutlich scheiden.
+   Kleinster Abstand im Farbraum: 47.                                  */
 const JT_ARTEN = {
-  urlaub:      { n:'Urlaub',       f:'#4e6b52' },
-  krank:       { n:'Krank',        f:'#a8622c' },
-  dienstreise: { n:'Dienstreise',  f:'#3f5d73' },
-  abwesend:    { n:'Abwesend',     f:'#7d6b53' },
+  urlaub:      { n:'Urlaub',       f:'#3f6b45' },
+  krank:       { n:'Krank',        f:'#b5551f' },
+  dienstreise: { n:'Dienstreise',  f:'#2f5f86' },
+  besuche:     { n:'Besuche',      f:'#7d3f6e' },
+  abwesend:    { n:'Abwesend',     f:'#8a7038' },
   termin:      { n:'Termin',       f:'#900c24' },
-  feiertag:    { n:'Feiertag',     f:'#8c857a' },
+  feiertag:    { n:'Feiertag',     f:'#6e6a63' },
+  sonstiges:   { n:'Sonstiges',    f:'#adaba4' },
 };
 const SAAT_JAHRESTERMINE = [
   { id:501, t:'Urlaub Nordsee',       von:'2026-08-17', bis:'2026-08-30', ort:'',         art:'urlaub' },
@@ -1123,6 +1139,8 @@ const SAAT_JAHRESTERMINE = [
   { id:506, t:'Schulung Fachbereich', von:'2026-08-20', bis:'2026-08-20', ort:'Würzburg', art:'termin' },
   { id:507, t:'Grippe',               von:'2026-02-09', bis:'2026-02-13', ort:'',         art:'krank' },
   { id:510, t:'Sabbatical',           von:'2026-08-01', bis:'2026-08-31', ort:'',         art:'abwesend', nurJahr:true },
+  { id:511, t:'Eltern zu Besuch',     von:'2026-06-05', bis:'2026-06-08', ort:'',         art:'besuche' },
+  { id:512, t:'Handwerker Bad',       von:'2026-04-20', bis:'2026-04-24', ort:'',         art:'sonstiges' },
   { id:508, t:'Kundentermin Hamburg', von:'2026-05-11', bis:'2026-05-13', ort:'Hamburg',  art:'dienstreise' },
   { id:509, t:'Konferenz Berlin',     von:'2026-10-06', bis:'2026-10-08', ort:'Berlin',   art:'dienstreise' },
 ];
@@ -1275,6 +1293,13 @@ const SAAT_ZIELE = [
 
 
 /* Notiz: nr, t, art, b, datum, seiten, quelle                            */
+/* Infoseite: nr, t, text. Keine Zuordnung, kein Datum — es sind
+   Merkblätter, keine Vorgänge.                                        */
+const SAAT_INFOSEITEN = [
+  { id:801, nr:1, t:'Anleitung', text:'# TimeAssist\n\nEin Ringbuch auf dem iPad, gebaut nach der Formsprache von Time/System.\nAlles liegt lokal auf diesem Gerät. Es gibt keinen Terminimport und keine\nAutomatik, die für dich plant — die Reibung ist Absicht.\n\n## Das Kästchen\n\nJeder Vorgang hat ein Kästchen mit vier Zuständen. Antippen schaltet weiter:\n\n- **leer** — offen\n- **✕** — erledigt, der Titel wird durchgestrichen\n- **›** — weitergezogen; hier fragt ein Dialog nach dem neuen Tag\n- **–** — gestrichen, nicht durchgeführt\n\nDer Zustand hängt am Vorgang, nicht am Blatt. Ziehst du etwas weiter,\nbleibt auf dem alten Tagesblatt eine Spur mit dem neuen Datum stehen.\n\n## Die Register\n\n- **Tag** — Termine links, Aktivitäten rechts, Motto oben, Reflexion unten\n- **Woche** — grobe Vorplanung, nur was du bewusst hierher legst\n- **Aktivitäten** — die Checklisten, ein Register je Gruppe\n- **Pläne** — mehrschrittige Vorhaben, ein Register je Plan\n- **Planung** — Monatsvorausplanung und Jahrestermine\n- **Ziele** — Zustände, die du erreichen willst, mit Laufzeit\n- **Datenbank** — Notizblätter und das Archiv\n\n## Gruppe, Bereich, Vorgang\n\nEin Vorgang gehört zu einem **Bereich**, ein Bereich zu einer **Gruppe**.\nDie Gruppe ist die Registerlasche. Willst du eine Aktivität umhängen,\nänderst du ihren Bereich — die Gruppe folgt. Verwaltet wird beides über\nden Knopf *Gruppen* auf der Aktivitätencheckliste.\n\n## Der Weg eines Vorgangs\n\n1. Erfassen in der **Aktivitätencheckliste**\n2. Beim Wochenblick auf einen **Tag** legen\n3. Am Tag abhaken, weiterziehen oder streichen\n4. Beim **Übertrag** wandert Erledigtes und Gestrichenes ins Archiv\n\nDer Übertrag ist das digitale Abheften: Erledigtes und Gestrichenes\nbekommt das Datum des Übertrags und verschwindet aus den Arbeitslisten.\nOffenes bleibt stehen. Im Archiv liegen die Blätter datiert, einzelne\nEinträge lassen sich zurückholen.\n\n## Pläne und Ziele\n\nEin **Plan** bündelt Aktivitäten. Sie existieren nur einmal — auf der\nCheckliste trägt jede von ihnen ein → mit dem Plannamen.\n\nEin **Ziel** ist ein konkreter Zustand mit Laufzeit. Darauf zahlen Pläne,\neinzelne Aktivitäten, wiederkehrende Vorgänge und Gewohnheiten ein.\nMeilensteine sind rein informativ.\n\n## Automatik — was von selbst erscheint\n\nNur dreierlei, alles andere legst du selbst:\n\n- **Feiertage** werden gerechnet, **Schulferien Bayern** sind hinterlegt\n- **Jahrestermine** erscheinen im Tages-, Wochen- und Monatsblatt\n- ein Jahrestermin mit *Nur im Jahresblatt* bleibt aus Tag und Woche heraus\n\n## Daten\n\nDer Bestand liegt im App-eigenen Speicher dieses Geräts und ist beim\nStart sofort da. Der **Export** unter *Daten* ist der Notfallweg — er\ngehört regelmäßig in die Ablage. Der Import erkennt TimeAssist- und\nWorkAssist-Dateien.\n\n## Blatt an Move\n\nAuf dem Tagesblatt erzeugt *Blatt an Move* ein PDF im Format\n82,6 × 132,2 mm, drei Seiten: Plan, Rückfragen und Reflexion, freie\nNotizseite.\n\n## Notizen\n\nNotizblätter sind Markdown. Die Ansicht formatiert, *Bearbeiten* zeigt\nden Rohtext mit einer Werkzeugleiste. Bilder und Verweise gehen über die\nAdresse.\n' },
+  { id:802, nr:2, t:'Planungsvorgaben', text:'# Planungsvorgaben\n\nMeine Regeln für die Arbeit mit diesem Ringbuch. Antippen zum Bearbeiten.\n\n## Wochenplanung\n\n- \n\n## Tagesplanung\n\n- \n\n## Grenzen\n\n- \n' },
+];
+
 /* Notiz: nr (Registernummer), t, b, datum, text, quelle.
    Die frühere Seitenzahl und die Art wurden nirgends gepflegt und
    entfallen; der Inhalt ist das, was zählt. quelle trägt den Verweis
@@ -1380,6 +1405,7 @@ function saatDB() {
     monatsblaetter: SAAT_MONATSBLAETTER,
     kontakte:      SAAT_KONTAKTE,
     tagesblaetter: SAAT_TAGESBLAETTER,
+    infoseiten:    SAAT_INFOSEITEN,
     naechsteId:    900,
   };
 }
@@ -1391,6 +1417,7 @@ function leereDB() {
     gruppen: [], bereiche: [], aktivitaeten: [], termine: [], jahrestermine: [],
     wieder: [], gewohnheiten: [], plaene: [], ziele: [], notizen: [],
     wochenblaetter: [], monatsblaetter: [], kontakte: [], tagesblaetter: [],
+    infoseiten: [],
     naechsteId: 900,
   };
 }
@@ -1412,6 +1439,7 @@ let WOCHENBLAETTER = DB.wochenblaetter;
 let MONATSBLAETTER = DB.monatsblaetter;
 let KONTAKTE      = DB.kontakte;
 let TAGESBLAETTER = DB.tagesblaetter;
+let INFOSEITEN    = DB.infoseiten;
 
 function dbUebernehmen(neu) {
   DB = migriereDB(neu);
@@ -1429,6 +1457,7 @@ function dbUebernehmen(neu) {
   MONATSBLAETTER = DB.monatsblaetter;
   KONTAKTE      = DB.kontakte;
   TAGESBLAETTER = DB.tagesblaetter;
+  INFOSEITEN    = DB.infoseiten;
   neuId = DB.naechsteId || 900;
 }
 
@@ -1498,6 +1527,11 @@ function migriereDB(d) {
     delete n.art;
     delete n.seiten;
   });
+  /* Version 7 → 8: Infoseiten. Fehlen sie ganz, kommen Anleitung und
+     Vorgaben aus der Saat — sonst stünde das Register leer da.      */
+  if (!Array.isArray(d.infoseiten) || !d.infoseiten.length) {
+    d.infoseiten = saatDB().infoseiten;
+  }
   /* Version 6 → 7: Jahresrahmen */
   (d.jahrestermine || []).forEach(function (j) {
     if (j.nurJahr === undefined) { j.nurJahr = false; }
@@ -1791,16 +1825,17 @@ const REGISTER = [
       { k:'jtermine', n:'Jahrestermine' } ] },
   { k:'ziele',   n:'Ziele',   unter:'ziele' },
   { k:'db',      n:'Datenbank', unter:'db' },
+  { k:'info',    n:'Info',      unter:'info' },
 ];
 
 /* Formularnummern wie im gedruckten Satz */
 const FORM_NR = { tag:'CMP 01', woche:'CMP 10', akt:'CMP 31', wied:'CMP 03', gew:'CMP 04',
                   plaene:'CMP 32', monat:'CMP 11', zjahr:'CMP 22', jtermine:'CMP 21',
-                  ziele:'CMP 30', notiz:'CMP 40', archiv:'CMP 41' };
+                  ziele:'CMP 30', notiz:'CMP 40', archiv:'CMP 41', info:'CMP 00' };
 
 let reg = 'tag';
 const unterAktiv = { akt:'uebersicht', plaene:'uebersicht', ziele:'uebersicht',
-                     planung:'monat', db:'uebersicht' };
+                     planung:'monat', db:'uebersicht', info:'s1' };
 
 function regDef(k) { return REGISTER.find(r => r.k === k) || REGISTER[0]; }
 
@@ -1808,6 +1843,10 @@ function regDef(k) { return REGISTER.find(r => r.k === k) || REGISTER[0]; }
 function unterListe(k) {
   const d = regDef(k);
   if (!d.unter) { return null; }
+  if (d.unter === 'info') {
+    /* Ein Reiter je Seite — es sind wenige und sie haben feste Namen. */
+    return INFOSEITEN.map(function (x) { return { k:'s' + x.id, n:x.t }; });
+  }
   if (d.unter === 'db') {
     /* Wie bei den Aktivitäten: ein Register je Gruppe, das Archiv
        hängt fest am Ende.                                            */
@@ -1876,7 +1915,8 @@ function renderRegister() {
      und Gewohnheiten am Ende und dürfen nie abgeschnitten werden — sie
      werden deshalb zuerst gesetzt und die Gruppen füllen den Rest.    */
   const el = $('reiter-plan');
-  if (reg !== 'plaene' && reg !== 'ziele' && reg !== 'akt' && reg !== 'db') {
+  if (reg !== 'plaene' && reg !== 'ziele' && reg !== 'akt' && reg !== 'db' &&
+      reg !== 'info') {
     el.classList.add('aus'); el.innerHTML = ''; return;
   }
   el.classList.remove('aus');
@@ -1907,7 +1947,8 @@ function renderUnterreiter() {
   const el = $('unterreiter');
   /* Pläne führen ihre Reiter senkrecht rechts — die waagerechte Leiste
      bleibt dort leer.                                                  */
-  if (!l || reg === 'plaene' || reg === 'ziele' || reg === 'akt' || reg === 'db') {
+  if (!l || reg === 'plaene' || reg === 'ziele' || reg === 'akt' ||
+      reg === 'db' || reg === 'info') {
     el.classList.add('aus'); el.innerHTML = ''; return;
   }
   el.classList.remove('aus');
@@ -1948,6 +1989,7 @@ function formNr() {
   if (reg === 'db') {
     return unterAktiv.db === 'archiv' ? FORM_NR.archiv : FORM_NR.notiz;
   }
+  if (reg === 'info') { return FORM_NR.info; }
   return FORM_NR[blattKey()] || 'CMP 05';
 }
 function kopf(titel, sub, akt) {
@@ -4857,6 +4899,113 @@ function eintragSpeichern() {
   eintragZu(); renderAlles();
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   INFO (CMP 00)
+   Merkblätter: die Anleitung und die eigenen Planungsvorgaben. Gleiche
+   Markdown-Bedienung wie die Notizen, aber ohne Bereich und Datum —
+   es sind keine Vorgänge.
+   ═══════════════════════════════════════════════════════════════════ */
+function infoOffen() {
+  const u = unterAktiv.info || '';
+  const id = parseInt(u.slice(1), 10);
+  return INFOSEITEN.find(x => x.id === id) || INFOSEITEN[0] || null;
+}
+function infoNr() {
+  let m = 0;
+  INFOSEITEN.forEach(function (x) { if (x.nr > m) { m = x.nr; } });
+  return m + 1;
+}
+function infoNeu() {
+  const x = { id:naechsteId(), nr:infoNr(), t:'Neue Seite', text:'' };
+  INFOSEITEN.push(x);
+  unterAktiv.info = 's' + x.id;
+  editZelle = { art:'info', id:x.id, feld:'t' };
+  fokusZiel = 'ez';
+  renderAlles();
+}
+let infoFrage = null;
+function infoFragen(id) { infoFrage = id; renderAlles(); }
+function infoLoeschen(id) {
+  const i = INFOSEITEN.findIndex(x => x.id === id);
+  if (i !== -1) { INFOSEITEN.splice(i, 1); }
+  unterAktiv.info = INFOSEITEN.length ? ('s' + INFOSEITEN[0].id) : '';
+  infoFrage = null;
+  editZelle = null;
+  renderAlles();
+  melde('Seite entfernt');
+}
+function infoFeld(id, feld) {
+  editZelle = { art:'info', id:id, feld:feld };
+  fokusZiel = 'ez';
+  renderAlles();
+}
+function infoSchreiben() {
+  if (!editZelle || editZelle.art !== 'info') { return; }
+  const x = INFOSEITEN.find(y => y.id === editZelle.id);
+  const f = $('ez');
+  if (!x || !f) { return; }
+  if (editZelle.feld === 't') { x.t = f.value.trim() || x.t; }
+  else { x.text = f.value; }
+}
+function infoSchliessen(sofort) {
+  infoSchreiben();
+  if (sofort) { editZelle = null; renderAlles(); return; }
+  const merk = editZelle;
+  setTimeout(function () { if (editZelle === merk) { editZelle = null; renderAlles(); } }, 120);
+}
+function infoTaste(ev) {
+  if (ev.key === 'Escape') { ev.preventDefault(); editZelle = null; renderAlles(); }
+  if (ev.key === 'Enter') { ev.preventDefault(); infoSchliessen(true); }
+}
+function infoOffenFeld(id, feld) {
+  return editZelle && editZelle.art === 'info' && editZelle.id === id &&
+         editZelle.feld === feld;
+}
+
+function blattInfo() {
+  const x = infoOffen();
+  if (!x) {
+    kopf('Info', 'keine Seiten',
+         '<button class="k-btn pri" onclick="infoNeu()">+ Seite</button>');
+    $('blatt').innerHTML = '<div class="hinweis">Noch keine Seite angelegt.</div>';
+    return;
+  }
+  const frage = (infoFrage === x.id);
+  kopf(x.t, 'Seite ' + x.nr + ' von ' + INFOSEITEN.length,
+       (frage
+         ? '<button class="k-btn warn" onclick="infoLoeschen(' + x.id + ')">Wirklich l\u00f6schen?</button>'
+         : '<button class="k-btn" onclick="infoFragen(' + x.id + ')">L\u00f6schen</button>') +
+       '<button class="k-btn pri" onclick="infoNeu()">+ Seite</button>');
+
+  let h = '<div class="p-kopf">';
+  if (infoOffenFeld(x.id, 't')) {
+    h += '<div class="p-kz offen"><input class="zf" id="ez" value="' + esc(x.t) +
+      '" placeholder="\u00dcberschrift" onblur="infoSchliessen()" ' +
+      'onkeydown="infoTaste(event)"></div>';
+  } else {
+    h += '<div class="p-kz p-haupt" onclick="infoFeld(' + x.id + ',\'t\')">' +
+      esc(x.t) + '</div>';
+  }
+  h += '</div>';
+
+  if (infoOffenFeld(x.id, 'text')) {
+    h += '<div class="nz-leiste"><span class="nz-mod">Bearbeiten \u00b7 Markdown</span>' +
+      '<button class="k-btn pri" onclick="infoSchliessen(true)">Fertig</button></div>';
+    h += mdWerkzeuge();
+    h += '<textarea class="nz-text offen" id="ez" placeholder="Inhalt in Markdown" ' +
+      'oninput="mdHoehe()" onblur="infoSchliessen()">' + esc(x.text) + '</textarea>';
+  } else {
+    h += '<div class="nz-leiste"><span class="nz-mod">Ansicht</span>' +
+      '<button class="k-btn" onclick="infoFeld(' + x.id + ',\'text\')">Bearbeiten</button>' +
+      '</div>';
+    h += '<div class="nz-text md" onclick="infoFeld(' + x.id + ',\'text\')">' +
+      mdZuHtml(x.text) + '</div>';
+  }
+  $('blatt').innerHTML = h;
+  fokusSetzen();
+  mdHoehe();
+}
+
 /* ═══ ARCHIV (CMP 41) ═══════════════════════════════════════════════
    Archivierte Pläne werden nicht kopiert, sondern nur ausgeblendet.
    Von hier aus lassen sie sich öffnen und wieder aktivieren.
@@ -4986,6 +5135,7 @@ function renderBlatt() {
     blattNotiz();
     return;
   }
+  if (reg === 'info') { blattInfo(); return; }
 
   const k = blattKey();
   if (k === 'tag')      { blattTag(); return; }
@@ -5089,6 +5239,7 @@ function datenAuf() {
     ['Jahrestermine', JAHRESTERMINE.length], ['Wiederkehrend', WIEDER.length],
     ['Gewohnheiten', GEWOHNHEIT.length], ['Wochenblätter', WOCHENBLAETTER.length],
     ['Monatsblätter', MONATSBLAETTER.length], ['Notizen', NOTIZEN.length],
+    ['Infoseiten', INFOSEITEN.length],
   ];
   const zustand = spZustand === 'bereit' ? 'Lokal gespeichert'
                 : spZustand === 'fehler' ? 'Fehler: ' + spFehler

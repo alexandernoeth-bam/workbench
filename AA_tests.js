@@ -101,13 +101,13 @@ kat('5 · Versionskonsistenz');
 /* ═══ 6 · Registerstruktur und Dispatcher ═══════════════════════════════ */
 kat('6 · Registerstruktur');
 {
-  const SOLL = ['tag', 'woche', 'akt', 'plaene', 'planung', 'ziele', 'db'];
+  const SOLL = ['tag', 'woche', 'akt', 'plaene', 'planung', 'ziele', 'db', 'info'];
   const mR = JS.match(/const REGISTER = \[([\s\S]*?)\n\];/);
   if (!mR) { fail('REGISTER nicht gefunden'); }
   else {
     const keys = (mR[1].match(/k:'(\w+)'/g) || []).map(s => s.match(/k:'(\w+)'/)[1]);
     const fehlt = SOLL.filter(s => keys.indexOf(s) === -1);
-    if (!fehlt.length) { ok('alle sieben Hauptregister vorhanden'); }
+    if (!fehlt.length) { ok('alle acht Hauptregister vorhanden'); }
     else { fail('Register fehlen: ' + fehlt.join(', ')); }
   }
   /* Fehlerart: 'uebersicht' ist bei Plänen wie Zielen derselbe Unterschlüssel.
@@ -1102,6 +1102,128 @@ kat('25 · Jahresrahmen und Monatshintergrund');
   const mV = JS.match(/const DB_VERSION = (\d+)/);
   if (mV && parseInt(mV[1], 10) >= 7) { ok('Schemaversion auf ' + mV[1]); }
   else { fail('Schemaversion nicht erhöht'); }
+}
+
+/* ═══ 26 · Inforegister ════════════════════════════════════════════════
+   Fehlerarten: die Infoseiten fehlen in saatDB oder leereDB und das
+   Register steht leer; die Migration ergänzt sie nicht und ein alter
+   Bestand hat keine Anleitung; die Anleitung ist kein gültiges Markdown.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('26 · Inforegister');
+{
+  ['blattInfo', 'infoNeu', 'infoLoeschen', 'infoFeld', 'infoSchreiben', 'infoOffen']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const mS = JSK.match(/function saatDB\(\) \{([\s\S]*?)\n\}/);
+  const mL = JSK.match(/function leereDB\(\) \{([\s\S]*?)\n\}/);
+  if (mS && /infoseiten:/.test(mS[1])) { ok('saatDB kennt infoseiten'); }
+  else { fail('infoseiten fehlt in saatDB'); }
+  if (mL && /infoseiten:/.test(mL[1])) { ok('leereDB kennt infoseiten'); }
+  else { fail('infoseiten fehlt in leereDB'); }
+
+  const mU = JSK.match(/function dbUebernehmen\(neu\) \{([\s\S]*?)\n\}/);
+  if (mU && /INFOSEITEN\s*=\s*DB\.infoseiten/.test(mU[1])) {
+    ok('dbUebernehmen setzt INFOSEITEN');
+  } else { fail('INFOSEITEN wird nicht neu gesetzt'); }
+
+  /* Ein alter Bestand ohne Infoseiten bekommt die Anleitung nachgereicht */
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mM && /!Array\.isArray\(d\.infoseiten\) \|\| !d\.infoseiten\.length/.test(mM[1])) {
+    ok('Migration reicht die Anleitung nach');
+  } else { fail('alter Bestand bliebe ohne Anleitung'); }
+
+  /* Die Anleitung muss gültiges Markdown sein */
+  const mI = JS.match(/const SAAT_INFOSEITEN = \[([\s\S]*?)\n\];/);
+  if (!mI) { fail('SAAT_INFOSEITEN nicht gefunden'); }
+  else {
+    const mT = /text:'((?:[^'\\]|\\.)*)'/.exec(mI[1]);
+    if (!mT) { fail('Anleitungstext nicht lesbar'); }
+    else {
+      const txt = mT[1].replace(/\\n/g, '\n').replace(/\\'/g, "'")
+                       .replace(/\\\\/g, '\\');
+      if (txt.length > 1000) { ok('Anleitung mit ' + txt.length + ' Zeichen'); }
+      else { fail('Anleitung zu knapp: ' + txt.length + ' Zeichen'); }
+      const mIn = JSK.match(/function mdInline\(t\) \{[\s\S]*?\n\}/);
+      const mZ = JSK.match(/function mdZuHtml\(txt\) \{[\s\S]*?\n\}/);
+      if (mIn && mZ) {
+        let fn = null;
+        try {
+          fn = new Function('esc', mIn[0] + '\n' + mZ[0] + '\nreturn mdZuHtml;')(
+            t => String(t == null ? '' : t).replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'));
+        } catch (e) { fn = null; }
+        if (fn) {
+          const r = fn(txt);
+          const auf = (r.match(/<ul|<ol/g) || []).length;
+          const zu = (r.match(/<\/ul>|<\/ol>/g) || []).length;
+          if (auf === zu) { ok('Anleitung rendert mit ausgeglichenen Listen'); }
+          else { fail('Anleitung rendert unausgeglichen: ' + auf + '/' + zu); }
+          if ((r.match(/<h[12]/g) || []).length >= 5) { ok('Anleitung ist gegliedert'); }
+          else { fail('Anleitung ohne Gliederung'); }
+        }
+      }
+    }
+  }
+
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 8) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
+/* ═══ 27 · Spaltenbreiten und Arten-Farben ═════════════════════════════
+   Fehlerarten: eine Rasterspalte wird von langem Inhalt aufgedrückt und
+   die Nachbarspalte schrumpft (fehlendes minmax(0,…)); lange Titel laufen
+   einzeilig aus statt umzubrechen; zwei Arten bekommen fast dieselbe
+   Farbe und sind im 24-px-Balken nicht zu unterscheiden.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('27 · Spaltenbreiten und Arten-Farben');
+{
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  const mD = /\.doppel \{([^}]*)\}/.exec(css);
+  if (!mD) { fail('.doppel nicht gefunden'); }
+  else if (/minmax\(0,\s*1fr\)/.test(mD[1]) && /minmax\(0,\s*1\.15fr\)/.test(mD[1])) {
+    ok('Spaltenbreiten können nicht aufgedrückt werden');
+  } else { fail('.doppel ohne minmax(0,…) — langer Inhalt verschiebt die Spalten'); }
+
+  ['a-titel', 'wk-t'].forEach(function (k) {
+    const m = new RegExp('^\\.' + k + ' \\{([^}]*)\\}', 'm').exec(css);
+    if (m && /-webkit-line-clamp:\s*2/.test(m[1])) {
+      ok('.' + k + ' bricht auf zwei Zeilen und schneidet dann ab');
+    } else { fail('.' + k + ' ohne Zweizeilen-Begrenzung'); }
+  });
+
+  const mA = JS.match(/const JT_ARTEN = \{([\s\S]*?)\n\};/);
+  if (!mA) { fail('JT_ARTEN nicht gefunden'); }
+  else {
+    const arten = {};
+    (mA[1].match(/(\w+):\s*\{ n:'[^']*',\s*f:'(#[0-9a-fA-F]{6})' \}/g) || [])
+      .forEach(function (z) {
+        const m = /(\w+):\s*\{ n:'[^']*',\s*f:'(#[0-9a-fA-F]{6})' \}/.exec(z);
+        arten[m[1]] = m[2];
+      });
+    const k = Object.keys(arten);
+    ['besuche', 'sonstiges'].forEach(function (x) {
+      if (k.indexOf(x) !== -1) { ok('Art ' + x + ' vorhanden'); }
+      else { fail('Art ' + x + ' fehlt'); }
+    });
+    const rgb = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
+    let min = 999, paar = '';
+    for (let i = 0; i < k.length; i++) {
+      for (let j = i + 1; j < k.length; j++) {
+        const a = rgb(arten[k[i]]), b = rgb(arten[k[j]]);
+        const d = Math.sqrt(a.reduce((s, v, x) => s + (v - b[x]) * (v - b[x]), 0));
+        if (d < min) { min = d; paar = k[i] + '/' + k[j]; }
+      }
+    }
+    if (min >= 40) {
+      ok(k.length + ' Arten, kleinster Farbabstand ' + Math.round(min) + ' bei ' + paar);
+    } else {
+      fail('Farben zu ähnlich: ' + paar + ' (Abstand ' + Math.round(min) + ')');
+    }
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
