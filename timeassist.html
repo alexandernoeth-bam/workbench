@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 3.3.1 · Gliederung</title>
+<title>TimeAssist 3.3.2 · Annotieren</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -670,7 +670,11 @@ input, textarea { font: inherit; color: inherit; }
 .av-f { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--linie); }
 .av-f.an { border-color: var(--wein); box-shadow: 0 0 0 2px var(--wein-h); }
 .av-flaeche { position: relative; display: inline-block; line-height: 0; }
-.av-flaeche canvas { position: absolute; left: 0; top: 0; touch-action: none; }
+.av-flaeche canvas { position: absolute; left: 0; top: 0; touch-action: none;
+                     -webkit-user-select: none; user-select: none;
+                     -webkit-touch-callout: none; }
+/* Im Zeichenbetrieb rollt die Flaeche nicht mehr */
+.av-blatt.zeichnen { overflow: hidden; touch-action: none; }
 
 /* Anhänge: Vorschau und Vollansicht */
 .an-reihe { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -703,7 +707,9 @@ input, textarea { font: inherit; color: inherit; }
             align-items: flex-start; justify-content: center; padding: 12px;
             background: var(--papier-2); }
 .av-blatt img { max-width: 100%; height: auto; background: #fff;
-                box-shadow: 0 2px 12px rgba(0,0,0,.22); border-radius: 2px; }
+                box-shadow: 0 2px 12px rgba(0,0,0,.22); border-radius: 2px;
+                -webkit-user-select: none; user-select: none;
+                -webkit-touch-callout: none; pointer-events: none; }
 
 /* Notizblatt: Umschaltung und Markdown-Darstellung */
 .nz-leiste { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
@@ -1154,7 +1160,7 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
 <script>
 'use strict';
 
-const APP_VERSION = '3.3.1';
+const APP_VERSION = '3.3.2';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -6159,18 +6165,26 @@ function avZeichnen(a) {
   $('av-zurueck').style.visibility = (avSeite > 0) ? '' : 'hidden';
   $('av-vor').style.visibility = (avSeite < a.seiten.length - 1) ? '' : 'hidden';
   avWerkzeugeZeichnen();
+  avBlattModus();
   const bild = $('av-bild');
-  const fertig = function () { avLeinwandPassen(); avMalen(); };
+  const fertig = function () { avLeinwandPassen(0); avMalen(); };
   if (bild.complete) { fertig(); } else { bild.onload = fertig; }
   avZeigerBinden();
 }
 /* Die Leinwand deckt sich mit dem angezeigten Bild, nicht mit dessen
    Urgroesse — sonst laege der Strich neben dem Stift.                 */
-function avLeinwandPassen() {
+function avLeinwandPassen(versuch) {
   const bild = $('av-bild'), c = $('av-lein');
   if (!bild || !c) { return; }
   const b = bild.clientWidth, h = bild.clientHeight;
-  if (!b || !h) { return; }
+  if (!b || !h) {
+    /* Das Bild hat noch keine Groesse. Ohne erneuten Anlauf bliebe die
+       Zeichenflaeche null Pixel gross — man traefe sie nie.          */
+    if ((versuch || 0) < 12) {
+      requestAnimationFrame(function () { avLeinwandPassen((versuch || 0) + 1); avMalen(); });
+    }
+    return;
+  }
   const dpr = window.devicePixelRatio || 1;
   c.style.width = b + 'px';
   c.style.height = h + 'px';
@@ -6234,6 +6248,19 @@ function avZeigerBinden() {
        sonst koennte man die Seite nicht mehr schieben.               */
     return ev.pointerType === 'pen' || avStift;
   };
+  /* Safari beendet das Blaettern nicht allein wegen touch-action: die
+     Geste beginnt bereits, bevor der Zeiger-Handler laeuft. Deshalb
+     zusaetzlich die Touch-Ereignisse abfangen — nicht passiv, sonst
+     darf preventDefault gar nichts ausrichten.                       */
+  const stiftBeruehrung = function (ev) {
+    const t = ev.touches && ev.touches[0];
+    return avStift || (t && t.touchType === 'stylus');
+  };
+  ['touchstart', 'touchmove'].forEach(function (n) {
+    c.addEventListener(n, function (ev) {
+      if (stiftBeruehrung(ev)) { ev.preventDefault(); }
+    }, { passive:false });
+  });
   c.addEventListener('pointerdown', function (ev) {
     if (!malt(ev)) { return; }
     ev.preventDefault();
@@ -6290,7 +6317,19 @@ function avWerkzeugeZeichnen() {
     k('Seite leeren', 'avSeiteLeeren()', false, 'Alle Striche dieser Seite');
   $('av-werkzeuge').innerHTML = h;
 }
-function avStiftUm() { avStift = !avStift; if (avStift) { avRadierer = false; } avWerkzeugeZeichnen(); }
+function avStiftUm() {
+  avStift = !avStift;
+  if (avStift) { avRadierer = false; }
+  avBlattModus();
+  avWerkzeugeZeichnen();
+}
+/* Im Zeichenbetrieb wird die Blattflaeche festgestellt: kein Rollen,
+   keine Gestenerkennung. Sonst schiebt der Finger das Bild, statt zu
+   zeichnen.                                                          */
+function avBlattModus() {
+  const b = $('av-blatt');
+  if (b) { b.classList.toggle('zeichnen', avStift); }
+}
 function avRadiererUm() { avRadierer = !avRadierer; avWerkzeugeZeichnen(); }
 function avFarbeSetzen(f) { avFarbe = f; avRadierer = false; avWerkzeugeZeichnen(); }
 function avBreiteSetzen(b) { avBreite = b; avRadierer = false; avWerkzeugeZeichnen(); }
@@ -7410,7 +7449,7 @@ function skaliere() {
   /* Die Zeichenebene muss sich mitverändern, sonst laege der Strich
      nach einer Drehung neben dem Stift.                              */
   window.addEventListener('resize', function () {
-    if (avId !== null) { avLeinwandPassen(); avMalen(); }
+    if (avId !== null) { avLeinwandPassen(0); avMalen(); }
   });
 
   /* Erst den gespeicherten Bestand holen, dann zeichnen. Faellt der
