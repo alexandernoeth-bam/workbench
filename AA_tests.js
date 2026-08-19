@@ -152,7 +152,7 @@ kat('7 · Datenmodell minimal');
   if (!mA) { fail('SAAT_AKTIVITAETEN nicht gefunden'); }
   else {
     const ERLAUBT = ['id', 't', 'b', 'prio', 'min', 'wer', 'beginn', 'ende', 'glyph',
-                     'geplant', 'verschoben', 'archiviert', 'planId', 'zielId'];
+                     'geplant', 'verschoben', 'archiviert', 'pos', 'planId', 'zielId'];
     const felder = Array.from(new Set((mA[1].match(/[{,]\s*(\w+):/g) || [])
       .map(s => s.replace(/[{,]\s*/, '').replace(':', ''))));
     const zuviel = felder.filter(f => ERLAUBT.indexOf(f) === -1);
@@ -1556,6 +1556,84 @@ kat('32 · Annotieren');
   if (/if \(avId !== null\) \{ avLeinwandPassen\(\); avMalen\(\); \}/.test(JSK)) {
     ok('Zeichenebene folgt einer Größenänderung');
   } else { fail('nach einer Drehung liegt der Strich neben dem Stift'); }
+}
+
+/* ═══ 33 · Planblatt: Rang, Archivsicht, Überschriften ═════════════════
+   Fehlerarten: das Planblatt zeigt nur die lebenden Aktivitäten und die
+   Geschichte des Vorhabens fehlt; Abgeheftetes nimmt am Umsortieren teil
+   und wandert zwischen die Arbeit; der Titel steht im Blattkopf und
+   nochmals im Blatt und frisst eine Zeile.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('33 · Planblatt');
+{
+  ['planRuecken', 'planRangNeu'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  /* Reihenfolge wirklich rechnen */
+  const mA = JSK.match(/function planAktivitaeten\(pid, mitArchiv\) \{[\s\S]*?\n\}/);
+  const mR = JSK.match(/function planRuecken\(pid, id, richtung\) \{[\s\S]*?\n\}/);
+  if (!mA || !mR) { fail('Sortierfunktionen nicht auswertbar'); }
+  else {
+    let bau = null;
+    try {
+      bau = new Function(
+        'let AKTIVITAETEN = [];' +
+        'const lebend = a => !a.archiviert;' +
+        'const renderAlles = () => {};' +
+        mA[0] + '\n' + mR[0] + '\n' +
+        'return { setze:function (l) { AKTIVITAETEN = l; },' +
+        ' liste:function (m) { return planAktivitaeten("p1", m).map(a => a.t); },' +
+        ' ruecke:function (id, d) { planRuecken("p1", id, d); } };')();
+    } catch (e) { bau = null; }
+    if (!bau) { fail('Sortierlogik nicht auswertbar'); }
+    else {
+      bau.setze([
+        { id:1, t:'A', planId:'p1', pos:1, archiviert:null },
+        { id:2, t:'B', planId:'p1', pos:2, archiviert:null },
+        { id:3, t:'C', planId:'p1', pos:3, archiviert:null },
+        { id:4, t:'Alt', planId:'p1', pos:0, archiviert:'2026-08-01' },
+      ]);
+      let f = 0;
+      if (bau.liste(true).join() !== 'A,B,C,Alt') { f++; fail('Ausgangsfolge falsch: ' + bau.liste(true)); }
+      if (bau.liste(false).join() !== 'A,B,C') { f++; fail('Arbeitsliste enthält Abgeheftetes'); }
+      bau.ruecke(3, -1);
+      if (bau.liste(true).join() !== 'A,C,B,Alt') { f++; fail('nach ↑: ' + bau.liste(true)); }
+      bau.ruecke(3, -1);
+      bau.ruecke(3, -1);
+      if (bau.liste(true).join() !== 'C,A,B,Alt') { f++; fail('über den Rand: ' + bau.liste(true)); }
+      if (bau.liste(true).slice(-1)[0] !== 'Alt') { f++; fail('Abgeheftetes wandert nach vorn'); }
+      if (!f) { ok('Umsortieren korrekt, Abgeheftetes bleibt hinten'); }
+    }
+  }
+
+  const mB = JSK.match(/function blattPlan\(pid\) \{([\s\S]*?)\n\}/);
+  if (!mB) { fail('blattPlan nicht auswertbar'); }
+  else {
+    if (/planAktivitaeten\(p\.id, true\)/.test(mB[1])) {
+      ok('Planblatt zeigt auch Abgeheftetes');
+    } else { fail('Planblatt verschweigt die Geschichte des Vorhabens'); }
+    if (/p-arch/.test(mB[1])) { ok('Abgeheftetes ist als solches gekennzeichnet'); }
+    else { fail('Abgeheftetes sieht aus wie laufende Arbeit'); }
+    if (/planRuecken/.test(mB[1])) { ok('Rangknöpfe im Blatt'); }
+    else { fail('keine Möglichkeit umzusortieren'); }
+  }
+
+  /* Der Titel darf nicht zweimal dastehen */
+  [['blattPlan', "kopf('Plan'"], ['blattZiel', "kopf('Ziel'"],
+   ['blattInfo', "kopf('Info'"]].forEach(function (x) {
+    const m = JSK.match(new RegExp('function ' + x[0] + '\\([^)]*\\) \\{([\\s\\S]*?)\\n\\}'));
+    if (m && m[1].indexOf(x[1]) !== -1) { ok(x[0] + ': Überschrift steht nur einmal'); }
+    else { fail(x[0] + ': Titel doppelt in Kopf und Blatt'); }
+  });
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mM && /a\.pos === undefined/.test(mM[1])) { ok('Migration vergibt Ränge'); }
+  else { fail('Migration vergibt keine Ränge'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 11) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
