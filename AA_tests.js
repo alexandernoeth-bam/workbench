@@ -1991,6 +1991,41 @@ kat('39 · Unterlagen an Plan und Ziel');
   else { fail('Schemaversion nicht erhöht'); }
 }
 
+/* ═══ 40 · Wochenzuordnung setzt das Planungsdatum ═════════════════════
+   Fehlerart: eine Aufgabe wird auf einen Wochentag gelegt, aber ihr
+   geplant-Feld bleibt leer. Sie steht dann nur auf dem Wochenblatt —
+   weder im Tagesblatt noch als geplant in der Checkliste. Dasselbe beim
+   Zuordnen einer vorhandenen Aktivität und beim Verschieben auf einen
+   anderen Tag.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('40 · Wochenzuordnung und Planungsdatum');
+{
+  const mS = JSK.match(/function eintragSpeichern\(\) \{([\s\S]*?)\n\}/);
+  if (!mS) { fail('eintragSpeichern nicht auswertbar'); }
+  else {
+    /* Neue Aufgabe: geplant muss aus dem gewählten Tag kommen */
+    const auf = mS[1].slice(mS[1].indexOf("k.art === 'aufgabe'"));
+    if (/geplant:\(k\.tag >= 0\) \? isoPlus\(b\.montag, k\.tag\) : null/.test(auf)) {
+      ok('neue Aufgabe wird auf den gewählten Tag geplant');
+    } else { fail('neue Aufgabe bleibt ohne Planungsdatum'); }
+
+    /* Verschieben eines Verweises zieht das Datum mit */
+    const verw = mS[1].slice(mS[1].indexOf("k.art === 'verweis'"));
+    if (/a\.geplant = \(k\.tag >= 0\)/.test(verw)) {
+      ok('Verschieben auf einen anderen Tag ändert das Planungsdatum');
+    } else { fail('verschobene Aufgabe bleibt auf dem alten Tag geplant'); }
+  }
+
+  const mN = JSK.match(/function wahlNehmen\(art, id, tag\) \{([\s\S]*?)\n\}/);
+  if (mN && /za\.geplant = isoPlus\(b\.montag, tag\)/.test(mN[1])) {
+    ok('zugeordnete Aktivität wird auf den Tag geplant');
+  } else { fail('über die Auswahlliste zugeordnete Aktivität bleibt ungeplant'); }
+
+  /* Ohne festen Tag darf kein Datum entstehen */
+  if (mS && /: null/.test(mS[1])) { ok('ohne festen Tag bleibt geplant leer'); }
+  else { warn('kein erkennbarer Fall für "ohne festen Tag"'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */

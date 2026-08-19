@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 3.1.0 · Unterlagen</title>
+<title>TimeAssist 3.1.1 · Unterlagen</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -1139,7 +1139,7 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
 <script>
 'use strict';
 
-const APP_VERSION = '3.1.0';
+const APP_VERSION = '3.1.1';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -5090,8 +5090,17 @@ function wahlNehmen(art, id, tag) {
     const b = wocheBlatt();
     const e = { id:naechsteId(), refArt:art, refId:echteId };
     if (art !== 'aktivitaet') { e.glyph = '\u2022'; }
-    if (tag >= 0) { e.tag = tag; b.eintraege.push(e); melde('Auf ' + WOTAGE[tag] + ' gelegt'); }
-    else { b.wichtig.push(e); melde('Als wichtig f\u00fcr diese Woche gesetzt'); }
+    if (tag >= 0) {
+      e.tag = tag;
+      b.eintraege.push(e);
+      /* Eine Aktivitaet auf einen Wochentag zu legen heisst, sie fuer
+         diesen Tag zu planen — sonst stuende sie nur auf der Woche.  */
+      if (art === 'aktivitaet') {
+        const za = AKTIVITAETEN.find(x => x.id === echteId);
+        if (za) { za.geplant = isoPlus(b.montag, tag); }
+      }
+      melde('Auf ' + WOTAGE[tag] + ', ' + dmyKurz(isoPlus(b.montag, tag)) + ' gelegt');
+    } else { b.wichtig.push(e); melde('Als wichtig f\u00fcr diese Woche gesetzt'); }
     wahlTag = -1;
     wahlZu();
     renderAlles();
@@ -5510,8 +5519,16 @@ function eintragSpeichern() {
   if (k.art === 'verweis') {
     const e = (k.blatt === 'woche') ? wocheFinde(k.id) : monatFinde(k.id);
     if (e) {
-      if (k.blatt === 'woche') { if (k.tag >= 0) { e.tag = k.tag; } }
-      else if (k.tag > 0) { e.tag = k.tag; }
+      if (k.blatt === 'woche') {
+        if (k.tag >= 0) { e.tag = k.tag; }
+        /* Auf einen anderen Tag gezogen heisst auch: anders geplant. */
+        if (e.refArt === 'aktivitaet') {
+          const a = AKTIVITAETEN.find(x => x.id === e.refId);
+          if (a) {
+            a.geplant = (k.tag >= 0) ? isoPlus(wocheBlatt().montag, k.tag) : null;
+          }
+        }
+      } else if (k.tag > 0) { e.tag = k.tag; }
     }
     eintragZu(); renderAlles(); return;
   }
@@ -5550,12 +5567,21 @@ function eintragSpeichern() {
     if (k.art === 'aufgabe' && !k.id) {
       /* Eine Aufgabe entsteht als echte Aktivitaet; das Wochenblatt
          traegt nur den Verweis darauf.                              */
+      /* Der gewaehlte Tag muss ans geplant-Feld — sonst legt man sie auf
+         Dienstag und sie taucht weder im Tagesblatt noch in der
+         Checkliste als geplant auf.                                   */
       const a = { id:naechsteId(), t:titel, b:ersterBereichId(), prio:'B', min:0, wer:'',
-                  beginn:'', ende:'', glyph:'\u2022', geplant:null, verschoben:[], archiviert:null, pos:0, planId:null, zielId:null };
+                  beginn:'', ende:'', glyph:'\u2022',
+                  geplant:(k.tag >= 0) ? isoPlus(b.montag, k.tag) : null,
+                  verschoben:[], archiviert:null, pos:0, planId:null, zielId:null };
       AKTIVITAETEN.push(a);
       e = { id:naechsteId(), refArt:'aktivitaet', refId:a.id };
       if (k.tag >= 0) { e.tag = k.tag; b.eintraege.push(e); } else { b.wichtig.push(e); }
-      eintragZu(); renderAlles(); melde('Als Aktivit\u00e4t angelegt und verwiesen'); return;
+      eintragZu(); renderAlles();
+      melde(k.tag >= 0
+        ? ('Aktivit\u00e4t angelegt, geplant f\u00fcr ' + dmyKurz(isoPlus(b.montag, k.tag)))
+        : 'Aktivit\u00e4t angelegt, ohne festen Tag');
+      return;
     }
     if (!e) {
       e = { id:naechsteId(), glyph:'\u2022', zeit:'', t:'' };
