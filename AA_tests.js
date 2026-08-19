@@ -2026,6 +2026,72 @@ kat('40 · Wochenzuordnung und Planungsdatum');
   else { warn('kein erkennbarer Fall für "ohne festen Tag"'); }
 }
 
+/* ═══ 41 · Bereiche anlegen und entfernen ══════════════════════════════
+   Fehlerarten: Bereiche lassen sich weder anlegen noch löschen; das
+   Löschen reißt Aktivitäten, Pläne und Notizblätter mit oder lässt sie
+   heimatlos zurück; ein belegter Bereich verschwindet ohne Rückfrage.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('41 · Bereiche anlegen und entfernen');
+{
+  ['bereichNeu', 'bereichLoeschen', 'bereichInhalt', 'bereichBelegt',
+   'bereichFragen', 'bereichLoeschZeile']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const mG = JSK.match(/function gruppenRender\(\) \{([\s\S]*?)\n\}/);
+  if (mG && /bereichNeu\(/.test(mG[1])) { ok('Bereich lässt sich anlegen'); }
+  else { fail('kein Weg, einen Bereich anzulegen'); }
+  if (mG && /bereichFragen\(/.test(mG[1])) { ok('Bereich lässt sich löschen'); }
+  else { fail('kein Weg, einen Bereich zu löschen'); }
+
+  /* Das Verschieben wirklich rechnen */
+  const mI = JSK.match(/function bereichInhalt\(bid\) \{[\s\S]*?\n\}/);
+  const mB = JSK.match(/function bereichBelegt\(bid\) \{[\s\S]*?\n\}/);
+  const mL = JSK.match(/function bereichLoeschen\(bid, zielId\) \{[\s\S]*?\n\}/);
+  if (!mI || !mB || !mL) { fail('Löschlogik nicht auswertbar'); }
+  else {
+    let bau = null;
+    try {
+      bau = new Function(
+        'let AKTIVITAETEN=[],PLAENE=[],WIEDER=[],NOTIZEN=[],BEREICHE=[];' +
+        'const melde=()=>{}; const gruppenRender=()=>{}; let brFrage=null;' +
+        'const bName=()=>"x";' +
+        mI[0] + '\n' + mB[0] + '\n' + mL[0] + '\n' +
+        'return { setze:function(a,p,w,n,b){AKTIVITAETEN=a;PLAENE=p;WIEDER=w;' +
+        'NOTIZEN=n;BEREICHE=b;},' +
+        ' belegt:function(id){return bereichBelegt(id);},' +
+        ' loesche:function(id,z){bereichLoeschen(id,z);},' +
+        ' stand:function(){return {a:AKTIVITAETEN.map(x=>x.b),p:PLAENE.map(x=>x.b),' +
+        'w:WIEDER.map(x=>x.b),n:NOTIZEN.map(x=>x.b),b:BEREICHE.map(x=>x.id)};} };')();
+    } catch (e) { bau = null; }
+    if (!bau) { fail('Löschlogik nicht ausführbar'); }
+    else {
+      let f = 0;
+      const setze = () => bau.setze(
+        [{ b:'b1' }, { b:'b1' }, { b:'b2' }], [{ b:'b1' }], [{ b:'b1' }], [{ b:'b3' }],
+        [{ id:'b1' }, { id:'b2' }, { id:'b3' }]);
+      setze();
+      if (bau.belegt('b1') !== 4) { f++; fail('Inhaltszählung falsch: ' + bau.belegt('b1')); }
+      bau.loesche('b1', null);
+      if (bau.stand().b.length !== 3) { f++; fail('belegter Bereich ohne Ziel gelöscht'); }
+      bau.loesche('b1', 'b2');
+      const st = bau.stand();
+      if (st.b.indexOf('b1') !== -1) { f++; fail('Bereich nicht entfernt'); }
+      if (st.a.join() !== 'b2,b2,b2') { f++; fail('Aktivitäten nicht verschoben: ' + st.a); }
+      if (st.p.join() !== 'b2' || st.w.join() !== 'b2') { f++; fail('Pläne oder Wiederkehrende verloren'); }
+      if (st.n.join() !== 'b3') { f++; fail('fremde Notiz mitverschoben'); }
+      if (!f) { ok('Löschen verschiebt allen Inhalt und verliert nichts'); }
+    }
+  }
+
+  const mZ = JSK.match(/function bereichLoeschZeile\(b\) \{([\s\S]*?)\n\}/);
+  if (mZ && /andere\.length/.test(mZ[1])) {
+    ok('ohne Ausweichbereich wird das Löschen verweigert');
+  } else { fail('Inhalt könnte heimatlos werden'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */

@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 3.1.1 · Unterlagen</title>
+<title>TimeAssist 3.2.0 · Bereiche</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -536,6 +536,9 @@ input, textarea { font: inherit; color: inherit; }
 .gr-s { flex: 0 0 150px; min-height: 34px; font-size: 13.2px; }
 .gr-z.neu-z { border-bottom: 1.4px dashed var(--marke); cursor: pointer;
               padding: 9px 0; }
+.br-ziele { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.br-ziele .k-btn { font-size: 12.6px; }
+.br-ziele .tz-punkt { margin-right: 6px; }
 .gr-z.neu-z:active { background: var(--marke-h); }
 .grp-n { float: right; font-size: 11px; color: var(--tinte-3); letter-spacing: 0;
          text-transform: none; }
@@ -1139,7 +1142,7 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
 <script>
 'use strict';
 
-const APP_VERSION = '3.1.1';
+const APP_VERSION = '3.2.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -6947,6 +6950,81 @@ function bereichGruppe(bid, gid) {
   if (b) { b.gruppeId = gid || null; }
   gruppenRender();
 }
+/* ── Bereiche anlegen und entfernen ────────────────────────────────
+   Ein Bereich mit Inhalt darf nicht einfach verschwinden. Beim Loeschen
+   wandert alles, was an ihm haengt, in einen anderen Bereich derselben
+   Sphaere — sonst waeren Aktivitaeten, Plaene und Notizblaetter
+   heimatlos und aus den Listen verschwunden.                         */
+const BEREICH_FARBEN = ['#6b6459', '#7d6b53', '#4e6b52', '#8c3b2f', '#57524a',
+                        '#3f5d73', '#a8622c', '#5a5f4a', '#7a5568', '#46605c'];
+function bereichNeu(gid) {
+  const b = { id:'b' + naechsteId(), name:'Neuer Bereich',
+              farbe:BEREICH_FARBEN[BEREICHE.length % BEREICH_FARBEN.length],
+              gruppeId:gid || null };
+  BEREICHE.push(b);
+  brFrage = null;
+  gruppenRender();
+}
+/* Was haengt an diesem Bereich? */
+function bereichInhalt(bid) {
+  return {
+    aktivitaeten: AKTIVITAETEN.filter(a => a.b === bid).length,
+    plaene:       PLAENE.filter(p => p.b === bid).length,
+    wieder:       WIEDER.filter(w => w.b === bid).length,
+    notizen:      NOTIZEN.filter(n => n.b === bid).length,
+  };
+}
+function bereichBelegt(bid) {
+  const i = bereichInhalt(bid);
+  return i.aktivitaeten + i.plaene + i.wieder + i.notizen;
+}
+let brFrage = null;
+function bereichFragen(bid) { brFrage = bid; gruppenRender(); }
+function bereichAbbrechen() { brFrage = null; gruppenRender(); }
+function bereichLoeschen(bid, zielId) {
+  if (bereichBelegt(bid) && !zielId) { return; }
+  if (zielId) {
+    AKTIVITAETEN.forEach(function (a) { if (a.b === bid) { a.b = zielId; } });
+    PLAENE.forEach(function (p) { if (p.b === bid) { p.b = zielId; } });
+    WIEDER.forEach(function (w) { if (w.b === bid) { w.b = zielId; } });
+    NOTIZEN.forEach(function (n) { if (n.b === bid) { n.b = zielId; } });
+  }
+  const i = BEREICHE.findIndex(x => x.id === bid);
+  if (i !== -1) { BEREICHE.splice(i, 1); }
+  brFrage = null;
+  gruppenRender();
+  melde(zielId ? ('Bereich entfernt, Inhalt nach ' + bName(zielId) + ' verschoben')
+               : 'Bereich entfernt');
+}
+/* Die Rueckfrage: leer geht sofort, mit Inhalt braucht ein Ziel. */
+function bereichLoeschZeile(b) {
+  const i = bereichInhalt(b.id);
+  const n = bereichBelegt(b.id);
+  if (!n) {
+    return '<div class="dt-warn">Der Bereich ist leer. ' +
+      '<button class="k-btn warn" onclick="bereichLoeschen(\'' + b.id +
+      '\', null)">Wirklich l\u00f6schen?</button></div>';
+  }
+  const teile = [];
+  if (i.aktivitaeten) { teile.push(i.aktivitaeten + ' Aktivit\u00e4ten'); }
+  if (i.plaene) { teile.push(i.plaene + ' Pl\u00e4ne'); }
+  if (i.wieder) { teile.push(i.wieder + ' Wiederkehrende'); }
+  if (i.notizen) { teile.push(i.notizen + ' Notizbl\u00e4tter'); }
+  const andere = BEREICHE.filter(x => x.id !== b.id);
+  if (!andere.length) {
+    return '<div class="dt-warn">Hier h\u00e4ngen ' + teile.join(', ') +
+      '. Es gibt keinen anderen Bereich, in den sie wandern k\u00f6nnten \u2014 ' +
+      'lege zuerst einen an.</div>';
+  }
+  return '<div class="dt-warn">Hier h\u00e4ngen ' + teile.join(', ') +
+    '. Sie werden nicht gel\u00f6scht, sondern verschoben. Wohin?' +
+    '<div class="br-ziele">' + andere.map(function (x) {
+      const g = x.gruppeId ? GRUPPEN.find(y => y.id === x.gruppeId) : null;
+      return '<button class="k-btn" onclick="bereichLoeschen(\'' + b.id + '\',\'' +
+        x.id + '\')"><span class="tz-punkt" style="background:' + x.farbe +
+        '"></span>' + esc(x.name) + (g ? ' \u00b7 ' + esc(g.name) : '') + '</button>';
+    }).join('') + '</div></div>';
+}
 function bereichNameSetzen(bid, wert) {
   const b = BEREICHE.find(x => x.id === bid);
   if (b) { b.name = wert.trim() || b.name; }
@@ -6984,15 +7062,26 @@ function gruppenRender() {
   };
   h += BEREICHE.map(function (b) {
     const n = AKTIVITAETEN.filter(a => a.b === b.id && offen(a)).length;
-    return '<div class="gr-z"><span class="tz-punkt" style="background:' + b.farbe +
+    let z = '<div class="gr-z"><span class="tz-punkt" style="background:' + b.farbe +
       '"></span><input class="ed-f" value="' + esc(b.name) +
       '" onchange="bereichNameSetzen(\'' + b.id + '\', this.value)">' +
       '<span class="gr-o">' + n + ' offen</span>' +
-      opt(b.id, b.gruppeId) + '</div>';
+      opt(b.id, b.gruppeId);
+    if (brFrage === b.id) {
+      z += '<button class="k-btn" onclick="bereichAbbrechen()">Abbrechen</button>';
+    } else {
+      z += '<button class="k-btn" onclick="bereichFragen(\'' + b.id +
+        '\')">L\u00f6schen</button>';
+    }
+    z += '</div>';
+    if (brFrage === b.id) { z += bereichLoeschZeile(b); }
+    return z;
   }).join('');
   if (!BEREICHE.length) {
     h += '<div class="hinweis">Noch keine Bereiche vorhanden.</div>';
   }
+  h += '<div class="gr-z neu-z" onclick="bereichNeu(null)">' +
+       '<span class="a-neu">+ Bereich anlegen</span></div>';
   $('gruppen-inhalt').innerHTML = h;
 }
 
