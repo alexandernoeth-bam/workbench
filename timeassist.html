@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 2.18.0 · Startdatum</title>
+<title>TimeAssist 2.19.0 · Wochenblatt</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -579,11 +579,14 @@ input, textarea { font: inherit; color: inherit; }
 
 /* ── Wochenblatt (CMP 10) ─────────────────────────────────────────
    Sieben Tagzeilen, gleiche Bedienung wie das Monatsraster.        */
-.wo-t { display: flex; align-items: stretch; gap: 8px; min-height: 74px;
+/* Vier Zeilen je Tag: 4 x 24 px plus Polster. Vorher passten zwei und
+   die Kästchen der dritten wurden angeschnitten. Mehr Höhe geht nicht
+   ohne dass das Blatt zu scrollen beginnt.                           */
+.wo-t { display: flex; align-items: stretch; gap: 8px; min-height: 104px;
         border-bottom: 1px solid var(--linie); }
 .wo-t.we { background: var(--papier-2); }
 .wo-t.heute { box-shadow: inset 3px 0 0 var(--wein); }
-.wo-nr { flex: 0 0 92px; width: 92px; font-size: 14.4px; font-weight: 700;
+.wo-nr { flex: 0 0 168px; width: 168px; font-size: 14.4px; font-weight: 700;
          color: var(--leder); text-transform: uppercase; letter-spacing: .06em;
          padding-top: 7px; cursor: pointer; }
 .wo-t.we .wo-nr { color: var(--tinte-3); }
@@ -591,18 +594,16 @@ input, textarea { font: inherit; color: inherit; }
           text-transform: none; margin-top: 1px; }
 .wo-inhalt { flex: 1; min-width: 0; display: flex; flex-direction: column;
              justify-content: center; padding: 4px 0; cursor: pointer; }
+/* Feste Zeilenhoehe im Wochenblatt, damit vier Eintraege sicher passen */
+.wo-inhalt .mon-e { min-height: 24px; }
 
 /* Feiertag, Ferien und Jahrestermine im Wochenblatt */
 .wo-t.ferien { background: #f0ebe1; }
 .wo-t.ferien.we { background: #e8e2d5; }
 .wo-nr:active { color: var(--wein); }
-.wo-fei { font-size: 10.2px; letter-spacing: .06em; text-transform: uppercase;
-          color: var(--wein); margin-bottom: 2px; }
-.wo-jt { font-size: 12px; border-left: 3px solid var(--leder); background: var(--karte);
-         padding: 2px 7px; border-radius: 0 3px 3px 0; margin-bottom: 3px;
-         display: flex; align-items: center; gap: 7px; }
-.wo-jt-a { margin-left: auto; font-size: 9px; letter-spacing: .1em;
-           text-transform: uppercase; color: var(--tinte-3); }
+
+.wo-jd { font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--tinte-3);
+         margin-top: 2px; line-height: 1.3; overflow-wrap: anywhere; }
 
 /* Tageswahl in der Auswahlliste */
 .wahl-tage { display: flex; gap: 3px; margin-top: 6px; }
@@ -1131,7 +1132,7 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
 <script>
 'use strict';
 
-const APP_VERSION = '2.18.0';
+const APP_VERSION = '2.19.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -3051,21 +3052,22 @@ function blattWoche() {
        einzutragen wäre Abschreibarbeit. Einzige automatische Übernahme,
        wie im Ganztags-Band des Tagesblatts.                            */
     const jt = JAHRESTERMINE.filter(j => !j.nurJahr && iso >= j.von && iso <= j.bis);
+    /* Jahrestermine und Feiertag stehen unter dem Datum, schlicht wie
+       das Datum selbst. Als Kästen im Inhaltsbereich verdrängten sie
+       die eigenen Einträge und überschnitten die Kästchen.           */
     let band = '';
-    if (fei) { band += '<div class="wo-fei">' + esc(fei) + '</div>'; }
+    if (fei) { band += '<div class="wo-jd">' + esc(fei) + '</div>'; }
     band += jt.map(function (j) {
-      const a = JT_ARTEN[j.art] || JT_ARTEN.termin;
-      return '<div class="wo-jt" style="border-color:' + a.f + '">' + esc(j.t) +
-        '<span class="wo-jt-a">' + esc(a.n) + '</span></div>';
+      return '<div class="wo-jd">' + esc(j.t) + '</div>';
     }).join('');
 
     h += '<div class="wo-t ' + (d >= 5 ? 'we ' : '') + (heute ? 'heute ' : '') +
       (fer ? 'ferien' : '') + '">' +
       '<span class="wo-nr" onclick="tagSpringen(\'' + iso + '\')" ' +
       'title="Tagesblatt \u00f6ffnen">' + WOTAGE[d] +
-      '<div class="wo-dat">' + jtKurz(iso) + '</div></span>' +
+      '<div class="wo-dat">' + jtKurz(iso) + '</div>' + band + '</span>' +
       '<span class="wo-inhalt" onclick="eintragOeffnen(\'woche\',' + d + ',null)">' +
-      band + (proTag[d] || []).map(wocheZeile).join('') + '</span>' +
+      (proTag[d] || []).map(wocheZeile).join('') + '</span>' +
       '<button class="wo-plus" onclick="event.stopPropagation(); wocheWahl(' + d + ')" ' +
       'title="Vorhandenes auf diesen Tag legen">+</button></div>';
   }

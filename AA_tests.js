@@ -1708,6 +1708,63 @@ kat('34 · Startdatum eines Rhythmus');
   else { fail('Schemaversion nicht erhöht'); }
 }
 
+/* ═══ 35 · Wochenblatt: Datumsspalte und Zeilenhöhe ════════════════════
+   Fehlerarten: die Jahrestermine stehen als Kästen im Inhaltsbereich,
+   verdrängen die eigenen Einträge und überschneiden deren Kästchen; die
+   Datumsspalte ist zu schmal für die Termintitel; die Tagzeile fasst
+   weniger als vier Einträge und schneidet die letzten an.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('35 · Wochenblatt');
+{
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  const mT = /^\.wo-t \{([^}]*)\}/m.exec(css);
+  if (!mT) { fail('.wo-t nicht gefunden'); }
+  else {
+    const m = /min-height:\s*(\d+)px/.exec(mT[1]);
+    const hoehe = m ? parseInt(m[1], 10) : 0;
+    if (hoehe >= 104) { ok('Tagzeile fasst vier Einträge (' + hoehe + ' px)'); }
+    else { fail('Tagzeile nur ' + hoehe + ' px — vier Einträge passen nicht'); }
+    /* Sieben Tagzeilen plus Kopf, Wichtig-Block und Reflexion müssen ins
+       Blatt passen, sonst scrollt die Woche.                          */
+    const ges = 52 + hoehe * 7 + 100 + 120 + 24;
+    if (ges <= 1052) { ok('Wochenblatt bleibt ohne Scrollbalken (' + ges + ' px)'); }
+    else { warn('Wochenblatt scrollt um ' + (ges - 1052) + ' px'); }
+  }
+
+  const mN = /^\.wo-nr \{([^}]*)\}/m.exec(css);
+  if (mN) {
+    const m = /width:\s*(\d+)px/.exec(mN[1]);
+    const b = m ? parseInt(m[1], 10) : 0;
+    if (b >= 150) { ok('Datumsspalte ' + b + ' px breit'); }
+    else { fail('Datumsspalte nur ' + b + ' px — Termintitel passen nicht'); }
+  } else { fail('.wo-nr nicht gefunden'); }
+
+  const mW = JSK.match(/function blattWoche\(\) \{([\s\S]*?)\n\}/);
+  if (!mW) { fail('blattWoche nicht auswertbar'); }
+  else {
+    /* Das Band gehört in die Datumsspalte, nicht in den Inhalt */
+    const i1 = mW[1].indexOf("'</div>' + band + '</span>'");
+    const i2 = mW[1].indexOf('wo-dat');
+    if (mW[1].indexOf('wo-jd') !== -1 && i1 !== -1 && i2 !== -1 && i1 > i2) {
+      ok('Jahrestermine stehen unter dem Datum');
+    } else { fail('Jahrestermine stehen noch im Inhaltsbereich'); }
+    if (!/wo-jt-a|JT_ARTEN\[j\.art\]/.test(mW[1])) {
+      ok('keine Kategorie und kein Kasten am Termin');
+    } else { fail('Termin trägt weiterhin Kategorie oder Kasten'); }
+  }
+
+  const mJ = /^\.wo-jd \{([^}]*)\}/m.exec(css);
+  const mD = /^\.wo-dat \{([^}]*)\}/m.exec(css);
+  if (mJ && mD) {
+    const g1 = /font-size:\s*([\d.]+)px/.exec(mJ[1]);
+    const g2 = /font-size:\s*([\d.]+)px/.exec(mD[1]);
+    if (g1 && g2 && g1[1] === g2[1]) { ok('Termin so groß wie das Datum'); }
+    else { fail('Termin und Datum verschieden groß'); }
+    if (!/background/.test(mJ[1])) { ok('kein Hintergrund am Termin'); }
+    else { fail('Termin hat einen Hintergrund'); }
+  } else { fail('.wo-jd oder .wo-dat nicht gefunden'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
