@@ -95,6 +95,17 @@ kat('5 · Versionskonsistenz');
     if (/bf-mitte'\)\.textContent\s*=.*APP_VERSION/.test(JS)) {
       ok('Anzeige im Blattfuß an APP_VERSION gekoppelt');
     } else { fail('Versionsanzeige nicht gekoppelt'); }
+    /* Die Schemaversion darf nie hinter dem zurückliegen, was die
+       Migration bereits kann — sonst läuft sie nicht an.            */
+    const mSV = JS.match(/const DB_VERSION = (\d+)/);
+    const stufen = (JS.match(/Version \d+ → (\d+):/g) || [])
+      .map(x => parseInt(/→ (\d+)/.exec(x)[1], 10));
+    const hoechste = stufen.length ? Math.max.apply(null, stufen) : 0;
+    if (mSV && parseInt(mSV[1], 10) >= hoechste) {
+      ok('DB_VERSION ' + mSV[1] + ' deckt alle ' + stufen.length + ' Migrationsstufen');
+    } else {
+      fail('DB_VERSION ' + (mSV ? mSV[1] : '?') + ' liegt hinter Stufe ' + hoechste);
+    }
   }
 }
 
@@ -621,8 +632,9 @@ kat('17 · Bearbeitbarkeit und Datumsprüfung');
   else {
     if (/zielFeld\(.*'titel'\)|'titel'\)/.test(mZ[1])) { ok('Zieltitel ist bearbeitbar'); }
     else { fail('Zieltitel lässt sich nicht ändern'); }
-    if (/bereichWahl\(\\'ziel\\'/.test(mZ[1])) { ok('Zielbereich ist wählbar'); }
-    else { fail('Zielbereich lässt sich nicht umhängen'); }
+    /* Ein Ziel hängt an der Sphäre, nicht am Bereich */
+    if (/sphWahl\(/.test(mZ[1])) { ok('Sphäre des Ziels ist wählbar'); }
+    else { fail('Sphäre des Ziels lässt sich nicht umhängen'); }
   }
 
   const mS = JSK.match(/function zielSchreiben\(\) \{([\s\S]*?)\n\}/);
@@ -1827,6 +1839,156 @@ kat('36 · Termine aus Woche und Monat');
   if (mO && /e\.refArt === 'termin'/.test(mO[1])) {
     ok('ein bestehender Termin wird zum Bearbeiten geladen');
   } else { fail('Terminverweis lässt sich nicht bearbeiten'); }
+}
+
+/* ═══ 37 · Begriffe in der Oberfläche ══════════════════════════════════
+   Fehlerart: dieselbe Sache heißt an verschiedenen Stellen verschieden,
+   oder ein Wort meint zweierlei. "Vorgang" war zugleich Sammelbegriff
+   und Name der wiederkehrenden Einträge — das war der Auslöser.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('37 · Begriffe in der Oberfläche');
+{
+  /* Auf das Wort mit Wortgrenzen prüfen statt zu versuchen, Strings
+     herauszuschneiden: eine Paarung von Anführungszeichen verrutscht,
+     sobald ein maskiertes Apostroph dazwischen steht. Bezeichner wie
+     bereichGruppe fallen durch die Wortgrenze von selbst heraus.     */
+  const quelle = JSK + ' ' + HTMLTEIL.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  if (!/\bVorgang\b|\bVorgänge\b|Vorg\\u00e4nge/.test(quelle)) {
+    ok('"Vorgang" kommt in der Oberfläche nicht mehr vor');
+  } else { fail('"Vorgang" ist noch in der Oberfläche'); }
+
+  if (!/\bGruppe\b|\bGruppen\b|\bGruppenr?\b/.test(quelle)) {
+    ok('"Gruppe" kommt in der Oberfläche nicht mehr vor');
+  } else { fail('"Gruppe" steht noch in sichtbaren Texten'); }
+
+  if (/Sph\\u00e4re|Sphäre/.test(quelle)) { ok('"Sphäre" wird verwendet'); }
+  else { fail('"Sphäre" fehlt'); }
+
+  /* Die Anleitung muss die Begriffe erklären */
+  const mI = JS.match(/const SAAT_INFOSEITEN = \[([\s\S]*?)\n\];/);
+  if (!mI) { fail('SAAT_INFOSEITEN nicht gefunden'); }
+  else {
+    const mT = /text:'((?:[^'\\]|\\.)*)'/.exec(mI[1]);
+    const txt = mT ? mT[1].replace(/\\n/g, '\n').replace(/\\'/g, "'")
+                          .replace(/\\\\/g, '\\') : '';
+    const BEGRIFFE = ['Sphäre', 'Bereich', 'Aktivität', 'Plan', 'Ziel', 'Termin'];
+    const fehlt = BEGRIFFE.filter(b => txt.indexOf('**' + b + '**') === -1);
+    if (!fehlt.length) { ok('alle sechs Begriffe sind in der Anleitung erklärt'); }
+    else { fail('in der Anleitung nicht erklärt: ' + fehlt.join(', ')); }
+    if (txt.indexOf('Vorgang') === -1) { ok('Anleitung ohne "Vorgang"'); }
+    else { fail('Anleitung nennt noch "Vorgang"'); }
+  }
+}
+
+/* ═══ 38 · Sphären, Kartenreiter, Zielbindung ══════════════════════════
+   Fehlerarten: dreizehn Bereiche als senkrechte Laschen — unlesbar; ein
+   Ziel hängt an einem Bereich, obwohl es mehrere überspannt; die Wahl des
+   Kartenreiters geht beim Wechsel der Lasche verloren; die Migration
+   lässt Ziele ohne Sphäre zurück.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('38 · Sphären und Kartenreiter');
+{
+  ['reiterBereiche', 'zeigeBereich', 'bereichOffen', 'sphWahl', 'sphSetzen',
+   'sphName', 'sphFarbe', 'ersteSphaere']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const mU = JSK.match(/function renderUnterreiter\(\) \{([\s\S]*?)\n\}/);
+  if (mU && /reiterBereiche\(\)/.test(mU[1]) && /zeigeBereich/.test(mU[1])) {
+    ok('Bereiche erscheinen als Kartenreiter über dem Blatt');
+  } else { fail('Bereiche stehen nicht als Kartenreiter'); }
+
+  /* Die Wahl muss je Lasche getrennt gemerkt werden */
+  const mK = JSK.match(/function bereichReiterKey\(\) \{([\s\S]*?)\n\}/);
+  if (mK && /reg \+ ':'/.test(mK[1])) {
+    ok('Kartenreiterwahl wird je Lasche gemerkt');
+  } else { fail('Wechsel der Lasche vergisst den gewählten Bereich'); }
+
+  /* Blätter und Übertrag müssen den Kartenreiter beachten */
+  ['blattAktivitaeten', 'blattNotiz', 'uebertragKandidaten'].forEach(function (n) {
+    const m = JSK.match(new RegExp('function ' + n + '\\(\\) \\{([\\s\\S]*?)\\n\\}'));
+    if (m && /bereichOffen\(\)/.test(m[1])) { ok(n + ' beachtet den Kartenreiter'); }
+    else { fail(n + ' zeigt trotz Kartenreiter alles'); }
+  });
+
+  /* Ziele an der Sphäre */
+  const mZ = JS.match(/const SAAT_ZIELE = \[([\s\S]*?)\n\];/);
+  if (mZ && /sphaere:'g\d'/.test(mZ[1]) && !/\bb:'b\d'/.test(mZ[1])) {
+    ok('Ziele tragen eine Sphäre statt eines Bereichs');
+  } else { fail('Ziele hängen noch an einem Bereich'); }
+  const mUe = JSK.match(/function blattZielUebersicht\(\) \{([\s\S]*?)\n\}/);
+  if (mUe && /GRUPPEN\.forEach/.test(mUe[1])) {
+    ok('Zielübersicht gruppiert nach Sphäre');
+  } else { fail('Zielübersicht gruppiert noch nach Bereich'); }
+
+  const mG = JS.match(/const SAAT_GRUPPEN = \[([\s\S]*?)\n\];/);
+  if (mG && /farbe:'#/.test(mG[1])) { ok('Sphären tragen eine Farbe'); }
+  else { fail('Sphären ohne Farbe — Ziele hätten keine'); }
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mM && /z\.sphaere === undefined/.test(mM[1]) && /delete z\.b/.test(mM[1])) {
+    ok('Migration hängt Ziele an die Sphäre ihres bisherigen Bereichs');
+  } else { fail('Migration lässt Ziele ohne Sphäre'); }
+  if (mM && /!g\.farbe/.test(mM[1])) { ok('Migration ergänzt Sphärenfarben'); }
+  else { fail('Migration ergänzt keine Farben'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 13) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
+/* ═══ 39 · Unterlagen an Plan und Ziel ═════════════════════════════════
+   Fehlerarten: ein Plan hat keinen Ort für Unterlagen; der Verweis liegt
+   an der Notiz statt am Plan und ein Blatt kann dadurch nur zu einem
+   Vorhaben gehören; der Verweis führt nicht zum Blatt; das Entfernen des
+   Verweises löscht die Notiz.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('39 · Unterlagen an Plan und Ziel');
+{
+  ['unAbschnitt', 'unWahl', 'unSchalten', 'unLoesen', 'notizSpringen', 'unTraeger']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  /* Der Verweis gehört an Plan und Ziel, nicht an die Notiz */
+  const mN = JS.match(/const SAAT_NOTIZEN = \[([\s\S]*?)\n\];/);
+  if (mN && !/plaene:|zielId/.test(mN[1])) { ok('die Notiz kennt ihre Vorhaben nicht'); }
+  else { fail('Verweis liegt an der Notiz — sie gehörte dann nur zu einem Vorhaben'); }
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mM && /Array\.isArray\(x\.notizen\)/.test(mM[1])) {
+    ok('Migration ergänzt die Unterlagenliste');
+  } else { fail('Migration ergänzt notizen nicht'); }
+
+  ['blattPlan', 'blattZiel'].forEach(function (n) {
+    const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{([\\s\\S]*?)\\n\\}'));
+    if (m && /unAbschnitt\(/.test(m[1])) { ok(n + ': Unterlagen sichtbar'); }
+    else { fail(n + ': kein Ort für Unterlagen'); }
+  });
+
+  const mA = JSK.match(/function unAbschnitt\(art, id\) \{([\s\S]*?)\n\}/);
+  if (mA && /notizSpringen\(/.test(mA[1])) { ok('der Verweis führt zum Blatt'); }
+  else { fail('der Verweis führt nirgendwohin'); }
+
+  /* Entfernen darf nur die Zuordnung lösen */
+  const mL = JSK.match(/function unLoesen\(art, id, nid\) \{([\s\S]*?)\n\}/);
+  if (mL && /o\.notizen\.splice/.test(mL[1]) && !/NOTIZEN\.splice/.test(mL[1])) {
+    ok('Entfernen löst nur die Zuordnung');
+  } else { fail('Entfernen löscht das Notizblatt'); }
+
+  /* Der Sprung muss die richtige Lasche öffnen, sonst ist das Blatt
+     zwar aufgeschlagen, aber nicht erreichbar.                       */
+  const mS = JSK.match(/function notizSpringen\(nid\) \{([\s\S]*?)\n\}/);
+  if (mS && /unterAktiv\.db =/.test(mS[1]) && /notizOffen = nid/.test(mS[1])) {
+    ok('der Sprung öffnet Lasche und Blatt');
+  } else { fail('der Sprung landet auf dem falschen Register'); }
+
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 14) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
