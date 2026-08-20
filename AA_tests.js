@@ -2457,6 +2457,55 @@ kat('48 · Sicherung');
   else { fail('Schemaversion nicht erhöht'); }
 }
 
+/* ═══ 49 · Aktualisierung ══════════════════════════════════════════════
+   Fehlerarten: die App merkt nie, dass eine neue Fassung bereitsteht, und
+   iOS liefert ewig die zwischengespeicherte alte; die Prüfung holt die
+   Datei aus demselben Zwischenspeicher und vergleicht sich mit sich
+   selbst; das Neuladen landet wieder auf der alten Fassung.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('49 · Aktualisierung');
+{
+  ['fassungPruefen', 'fassungLaden', 'fassungZu'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  const mP = JSK.match(/function fassungPruefen\(laut\) \{([\s\S]*?)\n\}/);
+  if (!mP) { fail('fassungPruefen nicht auswertbar'); }
+  else {
+    if (/cache:'no-store'/.test(mP[1])) { ok('die Prüfung umgeht den Zwischenspeicher'); }
+    else { fail('die Prüfung liest aus dem Zwischenspeicher und findet nie etwas'); }
+    if (/\?p=' \+ Date\.now\(\)/.test(mP[1])) { ok('zusätzlich ein Kennzeichen an der Adresse'); }
+    else { warn('kein Kennzeichen an der Adresse'); }
+    if (/APP_VERSION\\s\*=\\s\*'\(\[\^'\]\+\)'/.test(mP[1]) || /APP_VERSION/.test(mP[1])) {
+      ok('die Fassung wird aus der Datei gelesen');
+    } else { fail('kein Versionsvergleich'); }
+    if (/\.catch\(function \(\) \{/.test(mP[1])) { ok('ohne Verbindung passiert nichts Schlimmes'); }
+    else { fail('ohne Verbindung bricht die Prüfung sichtbar ab'); }
+  }
+
+  const mL = JSK.match(/function fassungLaden\(\) \{([\s\S]*?)\n\}/);
+  if (mL && /location\.pathname \+ '\?v='/.test(mL[1])) {
+    ok('Neuladen umgeht den Zwischenspeicher');
+  } else { fail('Neuladen holt wieder die alte Fassung'); }
+
+  if (/setTimeout\(function \(\) \{ fassungPruefen\(false\); \}/.test(JSK)) {
+    ok('Prüfung läuft beim Start');
+  } else { fail('Prüfung wird nie ausgelöst'); }
+  /* Der Knopf steht im HTML, nicht im Skript */
+  if (/fassungPruefen\(true\)/.test(H)) { ok('Prüfung auch von Hand auslösbar'); }
+  else { fail('keine Prüfung von Hand'); }
+
+  /* Die Anleitung muss den Weg beschreiben — sonst löscht man wieder */
+  const mI = JS.match(/const SAAT_INFOSEITEN = \[([\s\S]*?)\n\];/);
+  if (mI) {
+    const mT = /text:'((?:[^'\\]|\\.)*)'/.exec(mI[1]);
+    const txt = mT ? mT[1] : '';
+    if (/Symbol nicht entfernen/.test(txt)) { ok('die Anleitung warnt vor dem Entfernen'); }
+    else { fail('die Anleitung erklärt das Aktualisieren nicht'); }
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
