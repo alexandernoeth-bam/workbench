@@ -2776,14 +2776,22 @@ kat('54 · Wochenblatt in drei Spalten');
   const mW = JSK.match(/function blattWoche\(\) \{([\s\S]*?)\n\}/);
   if (!mW) { fail('blattWoche nicht auswertbar'); }
   else {
-    const n = (mW[1].match(/wo-sp (t|a|n)/g) || []).length;
-    if (n >= 6) { ok('drei Spalten je Tag, mit Kopfzeile'); }
-    else { fail('nur ' + n + ' Spaltenangaben gefunden'); }
-    ['termin', 'akt', 'notiz'].forEach(function (s) {
-      if (new RegExp("wocheSpalte\\(x\\) === '" + s + "'").test(mW[1])) {
-        ok('Spalte ' + s + ' wird gefüllt');
-      } else { fail('Spalte ' + s + ' bleibt leer'); }
+    /* Die Spalten werden über eine Hilfsfunktion gebaut — geprüft wird
+       der Aufruf je Spalte, nicht die inline wiederholte Auszeichnung. */
+    const rufe = (mW[1].match(/spalte\('[tan]', '\w+', d, proTag\)/g) || []).length;
+    if (rufe === 3) { ok('drei Spalten je Tag'); }
+    else { fail(rufe + ' Spaltenaufrufe statt drei'); }
+    if (/wo-sp t<\/span>|wo-sp t">Termine/.test(mW[1])) { ok('Kopfzeile über den Spalten'); }
+    else { fail('keine Kopfzeile über den Spalten'); }
+    [['t', 'termin'], ['a', 'akt'], ['n', 'notiz']].forEach(function (s) {
+      if (new RegExp("spalte\\('" + s[0] + "', '" + s[1] + "'").test(mW[1])) {
+        ok('Spalte ' + s[1] + ' wird gefüllt');
+      } else { fail('Spalte ' + s[1] + ' bleibt leer'); }
     });
+    /* Eine einzelne Zeile darf ausschreiben */
+    if (/l\.length === 1 \? ' einzeln' : ''/.test(mW[1])) {
+      ok('einzelner Eintrag wird ausgeschrieben');
+    } else { fail('auch ein einzelner Eintrag wird gekürzt'); }
   }
 
   const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
@@ -2825,10 +2833,16 @@ kat('55 · Wochenblatt: Grund und Spalten');
   });
 
   /* Ohne Toenung muss das Wort erscheinen, sonst geht die Angabe verloren */
-  const mW = JSK.match(/function blattWoche\(\) \{([\s\S]*?)\n\}/);
-  if (mW && /if \(fer\) \{ band \+=/.test(mW[1])) {
+  const mW2 = JSK.match(/function blattWoche\(\) \{([\s\S]*?)\n\}/);
+  if (mW2 && /if \(fer\) \{ band \+=/.test(mW2[1])) {
     ok('Ferien stehen als Wort unter dem Datum');
   } else { fail('Ferien wären nach dem Entfernen der Tönung unsichtbar'); }
+  /* In derselben Schriftfarbe wie die Jahrestermine, nicht blasser */
+  if (mW2 && !/wo-jd blass/.test(mW2[1])) {
+    ok('Ferien so dunkel wie die Jahrestermine');
+  } else { fail('Ferientext blasser als die übrigen Angaben'); }
+  if (!/\.wo-jd\.blass/.test(css)) { ok('keine verwaiste Blass-Regel'); }
+  else { fail('Blass-Regel steht noch im Stil'); }
 
   /* Spaltenlinien sichtbar */
   const mS = /^\.wo-sp \{([^}]*)\}/m.exec(css);
