@@ -2390,6 +2390,73 @@ kat('47 · Symbol für den Home-Bildschirm');
   else { warn('keine theme-color'); }
 }
 
+/* ═══ 48 · Sicherung und Tagesblattaufbau ══════════════════════════════
+   Fehlerarten: keine Erinnerung an die Sicherungsdatei — der Bestand ist
+   weg, sobald iOS den Speicher abräumt; die Erinnerung kommt mehrmals am
+   Tag; der Dateiname trägt ein Datum und es sammeln sich Dutzende
+   Dateien; die interne Kopie wird nie erneuert.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('48 · Sicherung');
+{
+  ['sicherungPruefen', 'sicherungJetzt', 'sicherungSchreiben', 'sicherungLesen',
+   'sicherungZurueck']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const mP = JSK.match(/function sicherungPruefen\(\) \{([\s\S]*?)\n\}/);
+  if (!mP) { fail('sicherungPruefen nicht auswertbar'); }
+  else {
+    if (/DB\.sicherung\.zuletzt === heute\) \{ return; \}/.test(mP[1])) {
+      ok('höchstens einmal am Tag');
+    } else { fail('die Erinnerung käme bei jedem Start'); }
+    if (/sicherungSchreiben\(\)/.test(mP[1])) { ok('die interne Kopie wird beim Start erneuert'); }
+    else { fail('die interne Kopie veraltet'); }
+  }
+
+  const mJ = JSK.match(/function sicherungJetzt\(\) \{([\s\S]*?)\n\}/);
+  if (!mJ) { fail('sicherungJetzt nicht auswertbar'); }
+  else {
+    if (/'timeassist\.json'/.test(mJ[1])) { ok('eine Datei ohne Datumszusatz'); }
+    else { fail('Dateiname mit Datum — es sammeln sich Dutzende'); }
+    if (/DB\.sicherung\.zuletzt = isoHeute\(\)/.test(mJ[1])) {
+      ok('der Stand wird vermerkt');
+    } else { fail('ohne Vermerk fragt die App gleich wieder'); }
+  }
+
+  if (/setTimeout\(sicherungPruefen/.test(JSK)) { ok('Prüfung läuft beim Start'); }
+  else { fail('Prüfung wird nie ausgelöst'); }
+
+  /* Der Hinweis muss die Grenze benennen, sonst wiegt er in Sicherheit */
+  const mD = JSK.match(/function datenAuf\(\) \{([\s\S]*?)\n\}/);
+  if (mD && /r\\u00e4umt iOS diesen/.test(mD[1])) {
+    ok('die Datenverwaltung benennt das Risiko');
+  } else { fail('kein Hinweis auf den Verlust beim Entfernen der App'); }
+
+  /* Tagesblatt: Chronik bis 22 Uhr, Notizen in der Terminspalte */
+  const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
+  if (!mT) { fail('blattTag nicht auswertbar'); }
+  else {
+    if (/for \(let st = 6; st <= 22; st\+\+\)/.test(mT[1])) { ok('Chronik von 6 bis 22 Uhr'); }
+    else { fail('Chronik nicht auf 6 bis 22 Uhr'); }
+    if (/'6 \\u2013 22 Uhr'/.test(mT[1])) { ok('Beschriftung passt zum Raster'); }
+    else { fail('Beschriftung und Raster laufen auseinander'); }
+    /* Der Notizblock gehört in die linke Spalte */
+    const iN = mT[1].indexOf('TAGNOTIZEN.filter');
+    const iR = mT[1].indexOf("let rechts =");
+    if (iN !== -1 && iR !== -1 && iN < iR) { ok('Notizen stehen in der Terminspalte'); }
+    else { fail('Notizen stehen nicht in der Terminspalte'); }
+    if (!/rechts \+= '<div class="abschnitt rf-block">' \+\s*\n\s*abschnitt\('Notizen'/.test(mT[1])) {
+      ok('kein Notizblock mehr in der rechten Spalte');
+    } else { fail('Notizblock steht doppelt'); }
+  }
+
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 16) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
