@@ -2559,6 +2559,77 @@ kat('50 · Datendialog');
   }
 }
 
+/* ═══ 51 · Journal ═════════════════════════════════════════════════════
+   Fehlerarten: das Journal fehlt in saatDB oder leereDB und geht beim
+   Übernehmen verloren; die Einträge stehen in der falschen Reihenfolge —
+   ein Journal liest man von vorn; bei gleichem Datum entscheidet der
+   Zufall; ein Eintrag lässt sich keinem Ziel zuordnen.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('51 · Journal');
+{
+  ['blattJournal', 'blattJournalEintrag', 'jNeu', 'jLoeschen', 'jSchreiben',
+   'jListe', 'jZielWahl', 'zielName']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const mS = JSK.match(/function saatDB\(\) \{([\s\S]*?)\n\}/);
+  const mL = JSK.match(/function leereDB\(\) \{([\s\S]*?)\n\}/);
+  if (mS && /journal:/.test(mS[1])) { ok('saatDB kennt journal'); }
+  else { fail('journal fehlt in saatDB'); }
+  if (mL && /journal:/.test(mL[1])) { ok('leereDB kennt journal'); }
+  else { fail('journal fehlt in leereDB'); }
+  const mU = JSK.match(/function dbUebernehmen\(neu\) \{([\s\S]*?)\n\}/);
+  if (mU && /JOURNAL\s*=\s*DB\.journal/.test(mU[1])) { ok('dbUebernehmen setzt JOURNAL'); }
+  else { fail('JOURNAL wird nicht neu gesetzt'); }
+
+  /* Reihenfolge wirklich rechnen */
+  const mLi = JSK.match(/function jListe\(\) \{[\s\S]*?\n\}/);
+  if (!mLi) { fail('jListe nicht auswertbar'); }
+  else {
+    let fn = null;
+    try {
+      fn = new Function('zustand',
+        'let JOURNAL = zustand.j; const unterAktiv = { journal: zustand.u };' +
+        'function jZiel(){const u=unterAktiv.journal||"alle";' +
+        'if(u.indexOf("z:")!==0)return null;return u.slice(2);}' +
+        mLi[0] + '\nreturn jListe;');
+    } catch (e) { fn = null; }
+    if (!fn) { fail('jListe nicht ausführbar'); }
+    else {
+      const J = [{ id:1, datum:'2026-08-18', t:'A', zielId:'z9' },
+                 { id:2, datum:'2026-08-20', t:'B', zielId:'z9' },
+                 { id:3, datum:'2026-08-20', t:'C', zielId:null },
+                 { id:4, datum:'2026-07-02', t:'D', zielId:'z9' }];
+      const kopie = () => JSON.parse(JSON.stringify(J));
+      let f = 0;
+      const alle = fn({ j:kopie(), u:'alle' })().map(x => x.t).join('');
+      if (alle !== 'CBAD') { f++; fail('Reihenfolge: ' + alle + ' statt CBAD'); }
+      const ziel = fn({ j:kopie(), u:'z:z9' })().map(x => x.t).join('');
+      if (ziel !== 'BAD') { f++; fail('Zielfilter: ' + ziel + ' statt BAD'); }
+      const ohne = fn({ j:kopie(), u:'z:0' })().map(x => x.t).join('');
+      if (ohne !== 'C') { f++; fail('Ohne-Ziel-Filter: ' + ohne + ' statt C'); }
+      if (!f) { ok('neueste zuerst, Filter nach Ziel korrekt'); }
+    }
+  }
+
+  const mR = JSK.match(/const REGISTER = \[([\s\S]*?)\n\];/);
+  if (mR) {
+    const keys = (mR[1].match(/k:'(\w+)'/g) || []).map(s => s.match(/k:'(\w+)'/)[1]);
+    const iD = keys.indexOf('db'), iJ = keys.indexOf('journal'), iI = keys.indexOf('info');
+    if (iJ > iD && iJ < iI) { ok('Journal liegt zwischen Datenbank und Info'); }
+    else { fail('Journal steht an der falschen Stelle'); }
+  }
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mM && /Array\.isArray\(d\.journal\)/.test(mM[1])) { ok('Migration ergänzt das Journal'); }
+  else { fail('Migration ergänzt journal nicht'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 17) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
