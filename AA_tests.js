@@ -2506,6 +2506,59 @@ kat('49 · Aktualisierung');
   }
 }
 
+/* ═══ 50 · Datendialog: Knöpfe und Platz ══════════════════════════════
+   Fehlerart: die Fußzeile eines Dialogs sammelt mit der Zeit Knöpfe an,
+   bis sie nicht mehr hineinpassen und stillschweigend abgeschnitten
+   werden. Ebenso: ein Knopf wird per Kennung umgebaut, obwohl der Dialog
+   inzwischen neu gezeichnet wird — dann greift die Rückfrage ins Leere.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('50 · Datendialog');
+{
+  /* Die Fußzeile darf höchstens zwei Knöpfe tragen */
+  const mD = /<div class="hg" id="daten"[\s\S]*?<div class="dlg-fuss">([\s\S]*?)<\/div>/
+    .exec(HTMLTEIL);
+  if (!mD) { fail('Datendialog nicht gefunden'); }
+  else {
+    const n = (mD[1].match(/<button/g) || []).length;
+    if (n <= 2) { ok('Fußzeile mit ' + n + ' Knöpfen'); }
+    else { fail(n + ' Knöpfe in der Fußzeile — sie passen nicht nebeneinander'); }
+  }
+
+  const mA = JSK.match(/function datenAuf\(\) \{([\s\S]*?)\n\}/);
+  if (!mA) { fail('datenAuf nicht auswertbar'); }
+  else {
+    const GRUPPEN = ['Sichern', 'Einlesen', 'Programm'];
+    const fehlt = GRUPPEN.filter(g => mA[1].indexOf('>' + g + '<') === -1);
+    if (!fehlt.length) { ok('Knöpfe nach Zweck gruppiert'); }
+    else { fail('Gruppe fehlt: ' + fehlt.join(', ')); }
+    const AKTIONEN = ['datenExport()', 'datenExportVoll()', 'sicherungZurueck()',
+                      'fassungPruefen(true)', 'datenLoeschenFragen()'];
+    const ohne = AKTIONEN.filter(a => mA[1].indexOf(a) === -1);
+    if (!ohne.length) { ok('alle ' + AKTIONEN.length + ' Aktionen erreichbar'); }
+    else { fail('nicht erreichbar: ' + ohne.join(', ')); }
+  }
+
+  /* Die Rückfrage muss den Dialog neu zeichnen, nicht einen Knopf
+     umbauen, den es nach dem Neuzeichnen nicht mehr gibt.            */
+  const mL = JSK.match(/function datenLoeschenFragen\(\) \{([\s\S]*?)\n\}/);
+  if (mL && /datenAuf\(\)/.test(mL[1]) && !/daten-loeschen/.test(mL[1])) {
+    ok('Löschrückfrage zeichnet den Dialog neu');
+  } else { fail('Löschrückfrage baut einen Knopf um, der neu gezeichnet wird'); }
+
+  /* Die Breite muss zur längsten Knopfgruppe passen */
+  const mB = /<div class="hg" id="daten"[\s\S]*?<div class="dlg" style="width:(\d+)px">/
+    .exec(HTMLTEIL);
+  if (!mB) { fail('Dialogbreite nicht gefunden'); }
+  else {
+    const innen = parseInt(mB[1], 10) - 36;
+    const laengste = ['Exportieren', 'Mit Anhängen', 'Kopie zurück']
+      .reduce(function (n, t) { return n + t.length * 7.2 + 32; }, 0);
+    if (laengste <= innen) {
+      ok('breiteste Gruppe passt in eine Zeile (' + Math.round(laengste) + ' von ' + innen + ' px)');
+    } else { fail('Knopfgruppe bricht um: ' + Math.round(laengste) + ' von ' + innen + ' px'); }
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
