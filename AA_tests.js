@@ -112,14 +112,22 @@ kat('5 · Versionskonsistenz');
 /* ═══ 6 · Registerstruktur und Dispatcher ═══════════════════════════════ */
 kat('6 · Registerstruktur');
 {
-  const SOLL = ['tag', 'woche', 'akt', 'plaene', 'planung', 'ziele', 'db', 'info'];
+  /* Planung ist in Monat und Jahr aufgeteilt — die Zeitebenen stehen
+     jetzt als eigene Laschen beieinander.                            */
+  const SOLL = ['tag', 'woche', 'monat', 'jahr', 'akt', 'plaene', 'ziele',
+                'db', 'journal', 'info'];
   const mR = JS.match(/const REGISTER = \[([\s\S]*?)\n\];/);
   if (!mR) { fail('REGISTER nicht gefunden'); }
   else {
     const keys = (mR[1].match(/k:'(\w+)'/g) || []).map(s => s.match(/k:'(\w+)'/)[1]);
     const fehlt = SOLL.filter(s => keys.indexOf(s) === -1);
-    if (!fehlt.length) { ok('alle acht Hauptregister vorhanden'); }
+    if (!fehlt.length) { ok('alle ' + SOLL.length + ' Hauptregister vorhanden'); }
     else { fail('Register fehlen: ' + fehlt.join(', ')); }
+    /* Die Zeitebenen gehören in der richtigen Folge beieinander */
+    const zeit = ['tag', 'woche', 'monat', 'jahr'].map(x => keys.indexOf(x));
+    if (zeit.every((v, i) => i === 0 || v === zeit[i - 1] + 1)) {
+      ok('Tag, Woche, Monat, Jahr stehen in Folge');
+    } else { fail('die Zeitebenen sind auseinandergerissen'); }
   }
   /* Fehlerart: 'uebersicht' ist bei Plänen wie Zielen derselbe Unterschlüssel.
      Verzweigt der Dispatcher darüber statt über reg, zeichnet er das falsche
@@ -138,7 +146,8 @@ kat('6 · Registerstruktur');
   }
   /* akt, wied und gew laufen seit den Gruppen über reg === 'akt' */
   /* notiz und archiv laufen seit den Notizgruppen über reg === 'db' */
-  const BL = ['tag', 'woche', 'monat', 'jtermine'];
+  /* monat und jahr laufen jetzt über reg, nicht über blattKey */
+  const BL = ['tag', 'woche'];
   const ohne = BL.filter(b => JS.indexOf("k === '" + b + "'") === -1);
   /* Es gibt mehrere Stellen mit reg === 'akt' — gemeint ist die im
      Dispatcher.                                                       */
@@ -2628,6 +2637,97 @@ kat('51 · Journal');
   const mV = JS.match(/const DB_VERSION = (\d+)/);
   if (mV && parseInt(mV[1], 10) >= 17) { ok('Schemaversion auf ' + mV[1]); }
   else { fail('Schemaversion nicht erhöht'); }
+}
+
+/* ═══ 52 · Sprungmarken zwischen den Ebenen ════════════════════════════
+   Fehlerart: ein Weg zwischen zwei Blättern hängt an einem Datenfeld, das
+   nur die Beispielzeile trägt — bei eingelesenen Daten gibt es ihn nie.
+   Ebenso: der Sprung landet auf der falschen Woche oder im falschen
+   Monat, weil er vom heutigen Tag statt vom angezeigten ausgeht.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('52 · Sprungmarken');
+{
+  ['springWoche', 'springMonat', 'springMonatAusWoche', 'tagSpringen']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  /* Die Wege müssen im Blattkopf stehen, nicht an einem Datenfeld */
+  const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
+  if (!mT) { fail('blattTag nicht auswertbar'); }
+  else {
+    [['springWoche', 'Woche'], ['springMonat', 'Monat'],
+     ["blattOeffnen\\(\\\\'akt\\\\',\\\\'gew", 'Gewohnheiten']]
+      .forEach(function (x) {
+        if (new RegExp(x[0]).test(mT[1])) { ok('Weg zu ' + x[1] + ' im Blattkopf'); }
+        else { fail('kein fester Weg zu ' + x[1]); }
+      });
+  }
+
+  /* Der Sprung muss vom angezeigten Tag ausgehen, nicht von heute */
+  const mW = JSK.match(/function springWoche\(\) \{([\s\S]*?)\n\}/);
+  if (mW && /isoMontag\(tagOffen\)/.test(mW[1])) { ok('Woche folgt dem angezeigten Tag'); }
+  else { fail('Sprung landet auf der laufenden Woche statt der angezeigten'); }
+  const mM = JSK.match(/function springMonat\(\) \{([\s\S]*?)\n\}/);
+  if (mM && /tagOffen\.slice\(0, 7\)/.test(mM[1])) { ok('Monat folgt dem angezeigten Tag'); }
+  else { fail('Sprung landet im laufenden Monat statt im angezeigten'); }
+
+  /* Eine Woche über den Monatswechsel gehört zu dem Monat, in dem ihr
+     Donnerstag liegt — sonst springt man in den falschen.            */
+  const mA = JSK.match(/function springMonatAusWoche\(\) \{([\s\S]*?)\n\}/);
+  if (mA && /isoPlus\(wocheBlatt\(\)\.montag, 3\)/.test(mA[1])) {
+    ok('Woche über den Monatswechsel springt in den überwiegenden Monat');
+  } else { fail('Sprung nimmt den Montag und landet im falschen Monat'); }
+
+  /* Der alte Weg über fuehrtZu darf nicht der einzige sein */
+  if (/fuehrtZu/.test(JSK)) {
+    const nurDaten = !new RegExp("blattOeffnen\\(\\\\'akt\\\\',\\\\'gew").test(JSK);
+    if (nurDaten) { fail('der Weg zu den Gewohnheiten hängt nur an fuehrtZu'); }
+    else { ok('fuehrtZu ist Beiwerk, nicht der einzige Weg'); }
+  }
+}
+
+/* ═══ 53 · Zeitebenen als eigene Laschen ═══════════════════════════════
+   Fehlerarten: Monat und Jahr bleiben hinter einem Sammelreiter und
+   werden selten benutzt; nach der Aufteilung führt kein Dispatcher-Zweig
+   mehr auf sie und die Laschen bleiben leer; die Sprungmarken zeigen auf
+   ein Register, das es nicht mehr gibt.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('53 · Zeitebenen');
+{
+  const mD = JSK.match(/function renderBlatt\(\) \{([\s\S]*?)\n\}/);
+  if (!mD) { fail('renderBlatt nicht auswertbar'); }
+  else {
+    [['monat', 'blattMonat'], ['jahr', 'blattJahrestermine']].forEach(function (x) {
+      const re = new RegExp("reg === '" + x[0] + "'[\\s\\S]{0,80}" + x[1]);
+      if (re.test(mD[1])) { ok(x[0] + ' hat einen Dispatcher-Zweig'); }
+      else { fail(x[0] + ' ist nicht erreichbar'); }
+    });
+  }
+
+  /* Kein Verweis mehr auf das aufgeloeste Register */
+  if (!/'planung'/.test(JSK)) { ok('keine Reste des Sammelreiters'); }
+  else { fail("'planung' wird noch verwendet"); }
+
+  const mF = JSK.match(/function formNr\(\) \{([\s\S]*?)\n\}/);
+  if (mF && /reg === 'monat'/.test(mF[1]) && /reg === 'jahr'/.test(mF[1])) {
+    ok('Formularnummern für Monat und Jahr');
+  } else { fail('Formularnummer fehlt für Monat oder Jahr'); }
+
+  const mS = JSK.match(/function springMonat\(\) \{([\s\S]*?)\n\}/);
+  if (mS && /reg = 'monat'/.test(mS[1])) { ok('Sprungmarke zeigt auf das neue Register'); }
+  else { fail('Sprungmarke zeigt ins Leere'); }
+
+  /* Zehn Laschen müssen in die Spalte passen */
+  const mR = JSK.match(/const REGISTER = \[([\s\S]*?)\n\];/);
+  if (mR) {
+    const namen = (mR[1].match(/n:'([^']+)'/g) || []).map(s => s.match(/n:'([^']+)'/)[1]);
+    const hoehe = namen.reduce(function (n, t) { return n + t.length * 7.5 + 33; }, 0);
+    if (hoehe <= 1052) {
+      ok(namen.length + ' Laschen, ' + Math.round(hoehe) + ' px von 1052');
+    } else { fail('Laschen brauchen ' + Math.round(hoehe) + ' px — die Spalte reicht nicht'); }
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
