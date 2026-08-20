@@ -2730,6 +2730,80 @@ kat('53 · Zeitebenen');
   }
 }
 
+/* ═══ 54 · Wochenblatt in drei Spalten ═════════════════════════════════
+   Fehlerarten: auf dem Wochenblatt stehen Kästchen, obwohl dort geplant
+   und nicht abgehakt wird; ein Eintrag landet in der falschen Spalte oder
+   in keiner und verschwindet; alte freie Zeilen aus früheren Fassungen
+   fallen durch das Raster.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('54 · Wochenblatt in drei Spalten');
+{
+  const mZ = JSK.match(/function wocheZeile\(e\) \{([\s\S]*?)\n\}/);
+  if (!mZ) { fail('wocheZeile nicht auswertbar'); }
+  else {
+    if (!/hakFeld/.test(mZ[1])) { ok('keine Kästchen auf dem Wochenblatt'); }
+    else { fail('Kästchen auf dem Wochenblatt — dort wird nicht abgehakt'); }
+    /* Der Zustand muss trotzdem ablesbar bleiben */
+    if (/titelKlasse/.test(mZ[1])) { ok('Erledigtes bleibt als solches erkennbar'); }
+    else { fail('der Zustand ist auf der Woche nicht mehr ablesbar'); }
+  }
+
+  /* Jeder Eintrag muss in genau eine Spalte fallen */
+  const mS = JSK.match(/function wocheSpalte\(e\) \{[\s\S]*?\n\}/);
+  if (!mS) { fail('wocheSpalte fehlt'); }
+  else {
+    let fn = null;
+    try { fn = new Function(mS[0] + '\nreturn wocheSpalte;')(); } catch (e) { fn = null; }
+    if (!fn) { fail('wocheSpalte nicht ausführbar'); }
+    else {
+      const F = [
+        [{ refArt:'termin' }, 'termin'],
+        [{ refArt:'aktivitaet' }, 'akt'],
+        [{ refArt:'tagnotiz' }, 'notiz'],
+        [{ refArt:'jahrestermin' }, 'termin'],
+        /* Freie Zeilen aus früheren Fassungen dürfen nicht verschwinden */
+        [{ zeit:'09:30', t:'alt' }, 'termin'],
+        [{ t:'alt ohne Zeit' }, 'notiz'],
+      ];
+      let f = 0;
+      F.forEach(function (x) {
+        if (fn(x[0]) !== x[1]) { f++; fail('Spalte: ' + fn(x[0]) + ' statt ' + x[1]); }
+      });
+      if (!f) { ok(F.length + ' Einträge korrekt zugeordnet, keiner fällt heraus'); }
+    }
+  }
+
+  const mW = JSK.match(/function blattWoche\(\) \{([\s\S]*?)\n\}/);
+  if (!mW) { fail('blattWoche nicht auswertbar'); }
+  else {
+    const n = (mW[1].match(/wo-sp (t|a|n)/g) || []).length;
+    if (n >= 6) { ok('drei Spalten je Tag, mit Kopfzeile'); }
+    else { fail('nur ' + n + ' Spaltenangaben gefunden'); }
+    ['termin', 'akt', 'notiz'].forEach(function (s) {
+      if (new RegExp("wocheSpalte\\(x\\) === '" + s + "'").test(mW[1])) {
+        ok('Spalte ' + s + ' wird gefüllt');
+      } else { fail('Spalte ' + s + ' bleibt leer'); }
+    });
+  }
+
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  const anteil = function (k) {
+    const m = new RegExp('\\.wo-sp\\.' + k + ' \\{[^}]*flex:\\s*(\\d+)').exec(css);
+    return m ? parseInt(m[1], 10) : 0;
+  };
+  if (anteil('t') === 2 && anteil('a') === 2 && anteil('n') === 1) {
+    ok('Spaltenverhältnis 2:2:1');
+  } else {
+    fail('Verhältnis ' + anteil('t') + ':' + anteil('a') + ':' + anteil('n'));
+  }
+
+  /* Die Tagzeilen sollen hell sein */
+  const mWe = /^\.wo-t\.we \{([^}]*)\}/m.exec(css);
+  if (mWe && !/background:\s*var\(--papier-2\)/.test(mWe[1])) {
+    ok('Wochenendzeilen nicht mehr grau hinterlegt');
+  } else { fail('Wochenendzeilen liegen auf Grau'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
