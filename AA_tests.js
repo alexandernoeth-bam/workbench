@@ -2804,6 +2804,48 @@ kat('54 · Wochenblatt in drei Spalten');
   } else { fail('Wochenendzeilen liegen auf Grau'); }
 }
 
+/* ═══ 55 · Wochenblatt: heller Grund, sichtbare Spalten ═══════════════
+   Fehlerarten: Ferien und Wochenende tönen die Zeile als Fläche — im
+   August liegt damit das ganze Blatt auf Grau; die Spaltentrennung ist
+   so blass, dass die Spalten nicht als solche lesbar sind; nach dem
+   Entfernen des Zeilenknopfs bleiben verwaiste Regeln zurück.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('55 · Wochenblatt: Grund und Spalten');
+{
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+
+  /* Keine Flaechentoenung mehr, weder Wochenende noch Ferien */
+  [['\\.wo-t\\.we', 'Wochenende'], ['\\.wo-t\\.ferien', 'Ferien']].forEach(function (x) {
+    const m = new RegExp('^' + x[0] + ' \\{([^}]*)\\}', 'm').exec(css);
+    if (!m) { fail(x[1] + '-Regel nicht gefunden'); return; }
+    const grau = /background:\s*(#[0-9a-f]{6}|var\(--papier-2\))/i.test(m[1]) ||
+                 /box-shadow:[^;]*rgba/.test(m[1]);
+    if (!grau) { ok(x[1] + ' tönt die Zeile nicht'); }
+    else { fail(x[1] + ' liegt weiterhin auf Grau'); }
+  });
+
+  /* Ohne Toenung muss das Wort erscheinen, sonst geht die Angabe verloren */
+  const mW = JSK.match(/function blattWoche\(\) \{([\s\S]*?)\n\}/);
+  if (mW && /if \(fer\) \{ band \+=/.test(mW[1])) {
+    ok('Ferien stehen als Wort unter dem Datum');
+  } else { fail('Ferien wären nach dem Entfernen der Tönung unsichtbar'); }
+
+  /* Spaltenlinien sichtbar */
+  const mS = /^\.wo-sp \{([^}]*)\}/m.exec(css);
+  if (!mS) { fail('.wo-sp nicht gefunden'); }
+  else if (/border-left:\s*1px solid var\(--linie\)/.test(mS[1])) {
+    ok('Spalten durch sichtbare Linien getrennt');
+  } else { fail('Spaltentrennung zu blass oder fehlend'); }
+
+  /* Der Zeilenknopf ist weg — samt seiner Regeln */
+  if (!/wo-plus/.test(H)) { ok('kein Zeilenknopf und keine verwaisten Regeln'); }
+  else { fail('Reste des Zeilenknopfs vorhanden'); }
+  /* Der Weg über den Blattkopf muss bleiben */
+  if (/wahlAuf\(\\'waktivitaet\\'\)/.test(JSK)) {
+    ok('Aktivität zuordnen geht weiterhin über den Blattkopf');
+  } else { fail('kein Weg mehr, eine Aktivität auf die Woche zu legen'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
