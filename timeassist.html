@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="TimeAssist">
 <meta name="theme-color" content="#faf8f4">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23faf8f4'/%3E%3Crect x='24' y='20' width='118' height='140' rx='6' fill='%23fff' stroke='%23c4bdae' stroke-width='3'/%3E%3Cline x1='24' y1='52' x2='142' y2='52' stroke='%23900c24' stroke-width='5'/%3E%3Crect x='142' y='36' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3Crect x='142' y='78' width='16' height='34' rx='4' fill='%23ddd6c8'/%3E%3C/svg%3E">
-<title>TimeAssist 3.3.2 · Annotieren</title>
+<title>TimeAssist 3.4.0 · Tagesnotizen</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    TIMEASSIST · Mockup M1 · 0.1.0
@@ -281,6 +281,13 @@ input, textarea { font: inherit; color: inherit; }
 .kontakt-t.durch { text-decoration: line-through; color: var(--tinte-3); }
 .kontakt-t.blass { color: var(--tinte-3); }
 .kontakt-z .ef { flex: 1; font-size: 16.2px; }
+/* Tagesnotizen */
+.tn-z { display: flex; align-items: center; gap: 7px; min-height: 26px;
+        border-bottom: 1px solid var(--linie-2); cursor: pointer; }
+.tn-p { flex: 0 0 12px; width: 12px; text-align: center; color: var(--leder); }
+.tn-t { flex: 1; min-width: 0; font-size: 16.2px; overflow-wrap: anywhere; }
+.tn-z .ef { flex: 1; min-width: 0; }
+.tn-z .mon-x { flex: 0 0 auto; }
 .kontakt-t { flex: 1; min-width: 0; font-size: 16.2px; padding-left: 3px;
              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1160,7 +1167,7 @@ textarea.nz-text { resize: none; min-height: 420px; outline: none; overflow: hid
 <script>
 'use strict';
 
-const APP_VERSION = '3.3.2';
+const APP_VERSION = '3.4.0';
 
 /* ═══════════════════════════════════════════════════════════════════
    DATEN — minimal nach Time/system-Formblättern.
@@ -1175,7 +1182,7 @@ const APP_VERSION = '3.3.2';
    push und splice wirken dadurch unverändert weiter.
    Die SAAT_-Werte sind nur die Erstbefüllung beim allerersten Start.
    ═══════════════════════════════════════════════════════════════════ */
-const DB_VERSION = 14;
+const DB_VERSION = 15;
 
 /* Sphaere: die oberste Ebene, im Ringbuch die Lasche rechts. Typisch
    Beruf und Privat, aber die Liste ist frei. Die Bereiche dahinter
@@ -1476,6 +1483,11 @@ let wocheOffen = null;   // Montag der angezeigten Woche, null = Woche von heute
 /* Kontakt: nur Tag und Text. Anrufe und Mails brauchen nicht mehr.     */
 const SAAT_KONTAKTE = [];
 
+/* Tagesnotiz: id, datum, t. Kein Zustand, kein Kaestchen — eine Notiz
+   wird nicht erledigt. Sie steht unter der Reflexion, weil sie zum Tag
+   gehoert und nicht zur Arbeit daran.                                 */
+const SAAT_TAGNOTIZEN = [];
+
 
 /* Der Tag trägt drei Dinge: die wichtigste Aufgabe, das Motto oben und
    die Reflexion unten. Motto und Reflexion sind Arrays fester Länge —
@@ -1542,6 +1554,7 @@ function saatDB() {
     monatsblaetter: SAAT_MONATSBLAETTER,
     kontakte:      SAAT_KONTAKTE,
     tagesblaetter: SAAT_TAGESBLAETTER,
+    tagnotizen:    SAAT_TAGNOTIZEN,
     infoseiten:    SAAT_INFOSEITEN,
     naechsteId:    900,
   };
@@ -1554,6 +1567,7 @@ function leereDB() {
     gruppen: [], bereiche: [], aktivitaeten: [], termine: [], jahrestermine: [],
     wieder: [], gewohnheiten: [], plaene: [], ziele: [], notizen: [],
     wochenblaetter: [], monatsblaetter: [], kontakte: [], tagesblaetter: [],
+    tagnotizen: [],
     infoseiten: [],
     naechsteId: 900,
   };
@@ -1576,6 +1590,7 @@ let WOCHENBLAETTER = DB.wochenblaetter;
 let MONATSBLAETTER = DB.monatsblaetter;
 let KONTAKTE      = DB.kontakte;
 let TAGESBLAETTER = DB.tagesblaetter;
+let TAGNOTIZEN    = DB.tagnotizen;
 let INFOSEITEN    = DB.infoseiten;
 
 function dbUebernehmen(neu) {
@@ -1594,6 +1609,7 @@ function dbUebernehmen(neu) {
   MONATSBLAETTER = DB.monatsblaetter;
   KONTAKTE      = DB.kontakte;
   TAGESBLAETTER = DB.tagesblaetter;
+  TAGNOTIZEN    = DB.tagnotizen;
   INFOSEITEN    = DB.infoseiten;
   neuId = DB.naechsteId || 900;
 }
@@ -1661,7 +1677,9 @@ function migriereDB(d) {
   (d.notizen || []).forEach(function (n) {
     if (n.text === undefined) { n.text = ''; }
     if (n.quelle === undefined) { n.quelle = ''; }
-    /* Version 13 → 14: Pläne und Ziele führen Unterlagen — Verweise auf
+    /* Version 14 → 15: Notizen am Tag */
+  if (!Array.isArray(d.tagnotizen)) { d.tagnotizen = []; }
+  /* Version 13 → 14: Pläne und Ziele führen Unterlagen — Verweise auf
      Notizblätter. Der Verweis liegt am Plan, nicht an der Notiz: ein
      Blatt kann zu mehreren Vorhaben gehören.                         */
   (d.plaene || []).forEach(function (x) {
@@ -2697,6 +2715,11 @@ function zelleSchreiben() {
     if (k) { k.t = v; }
     return;
   }
+  if (editZelle.art === 'tagnotiz') {
+    const n = TAGNOTIZEN.find(x => x.id === editZelle.id);
+    if (n) { n.t = v; }
+    return;
+  }
   const a = AKTIVITAETEN.find(x => x.id === editZelle.id);
   if (!a) { return; }
   if (editZelle.feld === 'min') { a.min = parseInt(v, 10) || 0; }
@@ -2729,6 +2752,7 @@ function zelleWeiter(folgeName) {
   const i = folge.indexOf(editZelle.feld);
   const art = editZelle.art;
   const id = editZelle.id;
+  if (art === 'tagnotiz') { tagnotizNeu(); return; }
   if (art === 'kontakt' || i === -1 || i === folge.length - 1) {
     editZelle = null;
     aufraeumen();
@@ -2874,6 +2898,30 @@ function kontaktNeu() {
   const k = { id:naechsteId(), datum:tagOffen, t:'', glyph:'\u2022' };
   KONTAKTE.push(k);
   zelleOeffnen('kontakt', k.id, 't');
+}
+/* ── Tagesnotizen ──────────────────────────────────────────────────
+   Was am Tag anfaellt und weder Aufgabe noch Termin ist. Auch die
+   Notiz vom Wochenblatt landet hier.                                */
+function tagnotizNeu() {
+  aufraeumen();
+  editTermin = null;
+  const n = { id:naechsteId(), datum:tagOffen, t:'' };
+  TAGNOTIZEN.push(n);
+  zelleOeffnen('tagnotiz', n.id, 't');
+}
+function tagnotizLoeschen(id) {
+  const i = TAGNOTIZEN.findIndex(x => x.id === id);
+  if (i !== -1) { TAGNOTIZEN.splice(i, 1); }
+  /* Verweise aus Wochenblaettern mitnehmen, sonst zeigen sie ins Leere */
+  WOCHENBLAETTER.forEach(function (w) {
+    [w.eintraege, w.wichtig].forEach(function (l) {
+      for (let j = l.length - 1; j >= 0; j--) {
+        if (l[j].refArt === 'tagnotiz' && l[j].refId === id) { l.splice(j, 1); }
+      }
+    });
+  });
+  editZelle = null;
+  renderAlles();
 }
 function prioFeld(p) {
   return '<span class="a-prio">' + esc(p) + '</span>';
@@ -3055,6 +3103,33 @@ function blattTag() {
   }
   rechts += '</div>';
 
+  /* Notizen: was am Tag anfaellt und weder Aufgabe noch Termin ist.
+     Kein Kaestchen — eine Notiz wird nicht erledigt.                  */
+  const tn = TAGNOTIZEN.filter(n => n.datum === tagOffen);
+  rechts += '<div class="abschnitt rf-block">' +
+    abschnitt('Notizen', 'antippen und schreiben');
+  rechts += tn.map(function (n) {
+    if (zelleOffen('tagnotiz', n.id, 't')) {
+      return '<div class="tn-z"><span class="tn-p">\u00b7</span>' +
+        '<input class="ef" id="ez" value="' + esc(n.t) +
+        '" placeholder="Was war noch" onblur="zelleSchliessen()" ' +
+        'onkeydown="zelleTaste(event, \'tagnotiz\')"></div>';
+    }
+    return '<div class="tn-z"><span class="tn-p">\u00b7</span>' +
+      '<span class="tn-t" onclick="zelleOeffnen(\'tagnotiz\',' + n.id + ',\'t\')">' +
+      esc(n.t) + '</span>' +
+      '<button class="mon-x" onclick="event.stopPropagation(); tagnotizLoeschen(' +
+      n.id + ')" title="Notiz entfernen">\u00d7</button></div>';
+  }).join('');
+  const ZEILEN_TN = 3;
+  let restTn = ZEILEN_TN - tn.length;
+  if (restTn < 1) { restTn = 1; }
+  for (let i = 0; i < restTn; i++) {
+    rechts += '<div class="tn-z" onclick="tagnotizNeu()">' +
+      '<span class="tn-p">\u00b7</span><span class="tn-t"></span></div>';
+  }
+  rechts += '</div>';
+
 
   /* Motto ueber die volle Blattbreite: es gilt fuer den ganzen Tag,
      nicht nur fuer die Terminspalte. */
@@ -3136,6 +3211,10 @@ function wocheText(e) {
     const t = TERMINE.find(x => x.id === e.refId);
     if (!t) { return { t:'entfallen', herkunft:'Termin' }; }
     return { t:t.t || '', herkunft:t.ganztags ? 'ganzt\u00e4gig' : (t.von || 'Termin') };
+  }
+  if (e.refArt === 'tagnotiz') {
+    const n = TAGNOTIZEN.find(x => x.id === e.refId);
+    return { t:n ? (n.t || '') : 'entfallen', herkunft:'Notiz' };
   }
   return { t:e.t || '', herkunft:'' };
 }
@@ -5432,6 +5511,7 @@ function eintragOeffnen(blatt, tag, id) {
   if (id) { e = (blatt === 'woche') ? wocheFinde(id) : monatFinde(id); }
   let art;
   if (e && e.refArt === 'termin') { art = 'termin'; }
+  else if (e && e.refArt === 'tagnotiz') { art = 'notiz'; }
   else if (e && e.refArt) { art = 'verweis'; }
   else if (blatt === 'woche') { art = (e && e.zeit) ? 'termin' : (e ? 'notiz' : 'termin'); }
   else { art = (e && typeof e.tag === 'number' && e.tag > 0) ? 'ereignis'
@@ -5450,6 +5530,11 @@ function eintragOeffnen(blatt, tag, id) {
        damit Wochen- und Tagesblatt nicht auseinanderlaufen.           */
     const t = TERMINE.find(x => x.id === e.refId);
     if (t) { edKontext.titel = t.t || ''; edKontext.zeit = t.ganztags ? '' : (t.von || ''); }
+    edKontext.refId = e.refId;
+  }
+  if (e && e.refArt === 'tagnotiz') {
+    const n = TAGNOTIZEN.find(x => x.id === e.refId);
+    if (n) { edKontext.titel = n.t || ''; }
     edKontext.refId = e.refId;
   }
   eintragRender();
@@ -5518,8 +5603,8 @@ function eintragRender() {
         'im Band \u00fcber der Chronik.</div>';
     }
     if (k.art === 'notiz') {
-      h += '<div class="ed-hin">Eine Notiz bleibt auf dem Wochenblatt \u2014 ohne Zeit ' +
-        'h\u00e4tte sie im Tagesblatt keinen Ort.</div>';
+      h += '<div class="ed-hin">Mit Tag steht die Notiz auch im Tagesblatt, unter der ' +
+        'Reflexion. Ohne festen Tag bleibt sie im Wichtig-Block der Woche.</div>';
     }
     if (k.art === 'ereignis') {
       h += '<div class="ed-hin">Ein Ereignis geht als ganzt\u00e4giger Termin in den ' +
@@ -5579,6 +5664,10 @@ function eintragLoeschen() {
     const i = TERMINE.findIndex(x => x.id === e.refId);
     if (i !== -1) { TERMINE.splice(i, 1); }
   }
+  if (e && e.refArt === 'tagnotiz') {
+    const i = TAGNOTIZEN.findIndex(x => x.id === e.refId);
+    if (i !== -1) { TAGNOTIZEN.splice(i, 1); }
+  }
   if (k.blatt === 'woche') { wocheLoeschen(k.id); } else { monatLoeschen(k.id); }
   eintragZu();
 }
@@ -5633,6 +5722,26 @@ function eintragSpeichern() {
       eintragZu(); renderAlles();
       melde(zeit ? ('Termin am ' + dmyKurz(datum) + ' um ' + zeit)
                  : ('Ganzt\u00e4giger Termin am ' + dmyKurz(datum)));
+      return;
+    }
+    if (k.art === 'notiz' && k.tag >= 0) {
+      /* Eine Notiz mit Tag gehoert auf das Tagesblatt — dort unter der
+         Reflexion. Ohne Tag bleibt sie im Wichtig-Block der Woche.   */
+      const datum = isoPlus(b.montag, k.tag);
+      let n = (e && e.refArt === 'tagnotiz')
+        ? TAGNOTIZEN.find(x => x.id === e.refId) : null;
+      if (!n) {
+        n = { id:naechsteId(), datum:datum, t:'' };
+        TAGNOTIZEN.push(n);
+      }
+      n.t = titel;
+      n.datum = datum;
+      if (!e) {
+        e = { id:naechsteId(), tag:k.tag, refArt:'tagnotiz', refId:n.id, glyph:'\u2022' };
+        b.eintraege.push(e);
+      } else { e.tag = k.tag; }
+      eintragZu(); renderAlles();
+      melde('Notiz am ' + dmyKurz(datum) + ' \u00b7 steht unter der Reflexion');
       return;
     }
     if (k.art === 'aufgabe' && !k.id) {
@@ -7406,6 +7515,16 @@ function moveTagPdf() {
   doc.text('NOTIZEN', R, y, { align:'right' });
   y += 1.2; linie(y, true);
   y += 2;
+  /* Was schon am Geraet notiert wurde, steht gedruckt oben */
+  const tn = TAGNOTIZEN.filter(n => n.datum === tagOffen && n.t);
+  tn.forEach(function (n) {
+    y += 6.5;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.4);
+    doc.setTextColor(TINTE[0], TINTE[1], TINTE[2]);
+    doc.text('\u00b7 ' + kurz(n.t, BR - 4, 6.4), L, y - 1.6);
+    doc.setDrawColor(215, 210, 200); doc.setLineWidth(0.12);
+    doc.line(L, y, R, y);
+  });
   while (y < MV.h - MV.rand - 6) {
     y += 6.5;
     doc.setDrawColor(215, 210, 200); doc.setLineWidth(0.12);
