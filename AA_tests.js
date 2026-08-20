@@ -1565,7 +1565,7 @@ kat('32 · Annotieren');
     ok('Löschen räumt auch die Striche weg');
   } else { fail('Striche bleiben als Leiche zurück'); }
 
-  if (/if \(avId !== null\) \{ avLeinwandPassen\(\); avMalen\(\); \}/.test(JSK)) {
+  if (/if \(avId !== null\) \{ avLeinwandPassen\(0\); avMalen\(\); \}/.test(JSK)) {
     ok('Zeichenebene folgt einer Größenänderung');
   } else { fail('nach einer Drehung liegt der Strich neben dem Stift'); }
 }
@@ -2250,6 +2250,144 @@ kat('44 · Spaltenzahl der Checkliste');
   const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
   if (/\.atab tr\.ein td:first-child/.test(css)) { ok('Zeilen der Plangliederung sind eingerückt'); }
   else { fail('keine Einrückung in der Plangliederung'); }
+}
+
+/* ═══ 45 · Zeichnen auf dem Gerät ══════════════════════════════════════
+   Fehlerart: touch-action allein hält Safari nicht davon ab, die Seite
+   zu schieben — die Geste beginnt, bevor der Zeiger-Handler läuft. Und:
+   misst man die Zeichenfläche, bevor das Bild eine Größe hat, bleibt sie
+   null Pixel groß und lässt sich nie treffen.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('45 · Zeichnen auf dem Gerät');
+{
+  const mB = JSK.match(/function avZeigerBinden\(\) \{([\s\S]*?)\n\}/);
+  if (!mB) { fail('avZeigerBinden nicht auswertbar'); }
+  else {
+    if (/\{ passive:false \}/.test(mB[1])) {
+      ok('Touch-Ereignisse werden nicht passiv gebunden');
+    } else { fail('passive Bindung — preventDefault richtet nichts aus'); }
+    if (/touchstart/.test(mB[1]) && /touchmove/.test(mB[1])) {
+      ok('touchstart und touchmove werden abgefangen');
+    } else { fail('Touch-Ereignisse werden nicht abgefangen'); }
+    if (/touchType === 'stylus'/.test(mB[1])) {
+      ok('der Stift wird an der Berührungsart erkannt');
+    } else { fail('Stift und Finger nicht unterscheidbar'); }
+  }
+
+  /* Im Zeichenbetrieb darf die Fläche nicht mehr rollen */
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  if (/\.av-blatt\.zeichnen \{[^}]*overflow:\s*hidden/.test(css)) {
+    ok('Blattfläche rollt im Zeichenbetrieb nicht');
+  } else { fail('Blattfläche rollt weiter und verschiebt das Bild'); }
+  if (/function avBlattModus/.test(JS)) { ok('avBlattModus vorhanden'); }
+  else { fail('avBlattModus fehlt'); }
+  const mS = JSK.match(/function avStiftUm\(\) \{([\s\S]*?)\n\}/);
+  if (mS && /avBlattModus\(\)/.test(mS[1])) { ok('der Schalter stellt die Fläche fest'); }
+  else { fail('der Schalter wirkt nicht auf die Fläche'); }
+
+  /* Das Bild darf keine Zeiger schlucken */
+  if (/\.av-blatt img \{[^}]*pointer-events:\s*none/.test(css)) {
+    ok('das Bild nimmt keine Berührungen an');
+  } else { fail('das Bild fängt Berührungen vor der Zeichenfläche ab'); }
+
+  /* Erneuter Anlauf, wenn das Bild noch keine Größe hat */
+  const mL = JSK.match(/function avLeinwandPassen\(versuch\) \{([\s\S]*?)\n\}/);
+  if (mL && /requestAnimationFrame/.test(mL[1])) {
+    ok('Zeichenfläche wird erneut gemessen, wenn das Bild noch fehlt');
+  } else { fail('Zeichenfläche bleibt null Pixel groß'); }
+}
+
+/* ═══ 46 · Tagesnotizen ════════════════════════════════════════════════
+   Fehlerarten: die Notiz vom Wochenblatt bleibt dort liegen und erreicht
+   den Tag nie; sie wird zwar angelegt, aber nicht als Verweis geführt und
+   läuft mit der Woche auseinander; beim Löschen bleibt ein Verweis ins
+   Leere zurück.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('46 · Tagesnotizen');
+{
+  ['tagnotizNeu', 'tagnotizLoeschen'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  const mS = JSK.match(/function saatDB\(\) \{([\s\S]*?)\n\}/);
+  const mL = JSK.match(/function leereDB\(\) \{([\s\S]*?)\n\}/);
+  if (mS && /tagnotizen:/.test(mS[1])) { ok('saatDB kennt tagnotizen'); }
+  else { fail('tagnotizen fehlt in saatDB'); }
+  if (mL && /tagnotizen:/.test(mL[1])) { ok('leereDB kennt tagnotizen'); }
+  else { fail('tagnotizen fehlt in leereDB'); }
+  const mU = JSK.match(/function dbUebernehmen\(neu\) \{([\s\S]*?)\n\}/);
+  if (mU && /TAGNOTIZEN\s*=\s*DB\.tagnotizen/.test(mU[1])) { ok('dbUebernehmen setzt TAGNOTIZEN'); }
+  else { fail('TAGNOTIZEN wird nicht neu gesetzt'); }
+
+  const mE = JSK.match(/function eintragSpeichern\(\) \{([\s\S]*?)\n\}/);
+  if (!mE) { fail('eintragSpeichern nicht auswertbar'); }
+  else {
+    if (/k\.art === 'notiz' && k\.tag >= 0/.test(mE[1])) {
+      ok('Notiz mit Tag wird zur Tagesnotiz');
+    } else { fail('Notiz bleibt auf dem Wochenblatt liegen'); }
+    if (/refArt:'tagnotiz'/.test(mE[1])) { ok('der Wocheneintrag verweist darauf'); }
+    else { fail('kein Verweis — Woche und Tag laufen auseinander'); }
+  }
+
+  const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
+  if (mT && /TAGNOTIZEN\.filter\(n => n\.datum === tagOffen\)/.test(mT[1])) {
+    ok('Tagesblatt zeigt die Notizen');
+  } else { fail('Notizen erscheinen nicht auf dem Tagesblatt'); }
+  if (mT && /tagnotizNeu\(\)/.test(mT[1])) { ok('am Tag lassen sich Notizen ergänzen'); }
+  else { fail('keine Möglichkeit, am Tag zu ergänzen'); }
+
+  const mW = JSK.match(/function wocheText\(e\) \{([\s\S]*?)\n\}/);
+  if (mW && /e\.refArt === 'tagnotiz'/.test(mW[1])) { ok('wocheText löst Notizverweise auf'); }
+  else { fail('Wochenblatt zeigt bei einem Notizverweis nichts an'); }
+
+  const mDel = JSK.match(/function tagnotizLoeschen\(id\) \{([\s\S]*?)\n\}/);
+  if (mDel && /WOCHENBLAETTER\.forEach/.test(mDel[1])) {
+    ok('Löschen räumt den Wochenverweis mit weg');
+  } else { fail('gelöschte Notiz hinterlässt einen Verweis ins Leere'); }
+  const mEL = JSK.match(/function eintragLoeschen\(\) \{([\s\S]*?)\n\}/);
+  if (mEL && /TAGNOTIZEN\.findIndex/.test(mEL[1])) {
+    ok('vom Wochenblatt gelöscht verschwindet auch die Tagesnotiz');
+  } else { fail('Tagesnotiz bleibt als Leiche zurück'); }
+
+  const mP = JSK.match(/function moveTagPdf\(\) \{([\s\S]*?)\n\}\n/);
+  if (mP && /TAGNOTIZEN\.filter/.test(mP[1])) { ok('Notizen stehen im Move-PDF'); }
+  else { fail('Notizen fehlen im Move-PDF'); }
+
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 15) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
+/* ═══ 47 · Symbol für den Home-Bildschirm ══════════════════════════════
+   Fehlerarten: kein apple-touch-icon — iOS nimmt dann einen Bildschirm-
+   ausschnitt; nur ein data-URI, das ältere iOS-Fassungen ignorieren; die
+   Datei-Verweise fehlen oder zeigen auf nicht mitgelieferte Größen.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('47 · Symbol für den Home-Bildschirm');
+{
+  const links = H.match(/<link rel="apple-touch-icon"[^>]*>/g) || [];
+  if (links.length) { ok(links.length + ' apple-touch-icon-Verweise'); }
+  else { fail('kein apple-touch-icon — iOS nimmt einen Bildschirmausschnitt'); }
+
+  /* Mindestens ein Verweis auf eine echte Datei, nicht nur data-URI */
+  const dateien = links.filter(l => /href="icon-\d+\.png"/.test(l));
+  if (dateien.length >= 1) { ok(dateien.length + ' Verweise auf Symboldateien'); }
+  else { fail('nur data-URI — ältere iOS-Fassungen zeigen dann nichts'); }
+
+  const GROESSEN = ['180x180', '167x167', '152x152'];
+  const fehlt = GROESSEN.filter(g => H.indexOf('sizes="' + g + '"') === -1);
+  if (!fehlt.length) { ok('Größen für iPhone und iPad hinterlegt'); }
+  else { warn('keine Angabe für: ' + fehlt.join(', ')); }
+
+  if (/href="data:image\/png;base64,/.test(H)) {
+    ok('eingebettetes Symbol als Rückfall');
+  } else { warn('kein eingebettetes Symbol — die Datei allein bliebe ohne'); }
+
+  if (/<meta name="apple-mobile-web-app-title"/.test(H)) { ok('Name für den Home-Bildschirm gesetzt'); }
+  else { fail('ohne Titel steht der Dateiname unter dem Symbol'); }
+  if (/<meta name="theme-color"/.test(H)) { ok('theme-color gesetzt'); }
+  else { warn('keine theme-color'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
