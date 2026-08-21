@@ -3007,6 +3007,136 @@ kat('58 · Termine entfernen');
   }
 }
 
+/* ═══ 59 · Planschritte aus der Checkliste ═════════════════════════════
+   Fehlerarten: die 25 Schritte eines Vorhabens stehen zusätzlich in der
+   Checkliste und im Tagesblatt und verstopfen beide; der Plan selbst ist
+   dort nicht sichtbar, also weiß man nicht, dass es ihn gibt; ein Plan
+   lässt sich nicht auf einen Tag legen, nur seine Schritte.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('59 · Planschritte und Planzeile');
+{
+  ['schritteUm', 'werUm', 'planAufTag', 'planOeffnen'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  const mA = JSK.match(/function blattAktivitaeten\(\) \{([\s\S]*?)\n\}/);
+  if (!mA) { fail('blattAktivitaeten nicht auswertbar'); }
+  else {
+    if (/zeigeSchritte \|\| !a\.planId/.test(mA[1])) {
+      ok('Planschritte bleiben aus der Checkliste heraus');
+    } else { fail('die Schritte verstopfen weiterhin die Liste'); }
+    /* Ein archivierter Plan darf seine Schritte nicht verschlucken */
+    if (/!PLAENE\.some\(p => p\.id === a\.planId && !p\.archiviert\)/.test(mA[1])) {
+      ok('Schritte archivierter Pläne bleiben sichtbar');
+    } else { fail('Schritte eines archivierten Plans verschwinden'); }
+    if (/plaeneHier/.test(mA[1]) && /planFortschritt\(p\.id\)/.test(mA[1])) {
+      ok('der Plan erscheint als eine Zeile mit Fortschritt');
+    } else { fail('der Plan ist in der Checkliste unsichtbar'); }
+  }
+
+  const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
+  if (!mT) { fail('blattTag nicht auswertbar'); }
+  else {
+    if (/p\.geplant === tagOffen/.test(mT[1])) { ok('Pläne lassen sich auf den Tag legen'); }
+    else { fail('ein Plan erreicht das Tagesblatt nicht'); }
+    /* Die Zeilenzählung muss die Planzeilen mitzählen, sonst überlappen
+       sie mit den Leerzeilen darunter.                                */
+    if (/liste\.length \+ weg\.length \+ tagPlaene\.length/.test(mT[1])) {
+      ok('die Planzeilen zählen bei den Blattzeilen mit');
+    } else { fail('Planzeilen werden bei der Zeilenzahl übergangen'); }
+  }
+
+  const mP = JSK.match(/function blattPlan\(pid\) \{([\s\S]*?)\n\}/);
+  if (!mP) { fail('blattPlan nicht auswertbar'); }
+  else {
+    if (/planAufTag\(/.test(mP[1])) { ok('vom Planblatt auf den Tag'); }
+    else { fail('kein Weg, den Plan auf einen Tag zu legen'); }
+    if (/if \(nachWer\)/.test(mP[1])) { ok('Gliederung nach Zuständigkeit'); }
+    else { fail('keine Gliederung nach Wer'); }
+    /* Nichtzugeordnetes gehört ans Ende, nicht an den Anfang */
+    if (/if \(!x\) \{ return 1; \}/.test(mP[1])) {
+      ok('Nichtzugeordnetes steht am Ende');
+    } else { fail('Nichtzugeordnetes steht vor den Namen'); }
+  }
+
+  const mMig = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mMig && /p\.geplant === undefined/.test(mMig[1])) {
+    ok('Migration ergänzt das Planungsdatum am Plan');
+  } else { fail('Migration ergänzt geplant nicht'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 19) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
+/* ═══ 60 · Geräterahmen ════════════════════════════════════════════════
+   Fehlerarten: der Rahmen ist auf ein Gerät festgenagelt; auf einem
+   dichteren Bildschirm wird alles physisch kleiner, ohne dass es
+   auffällt; ein kleiner Rahmen behält das zweispaltige Tagesblatt und
+   die Beschreibung schrumpft auf 90 px; der Maßstab darf nie über 100 %,
+   dann nützt der kleine Rahmen nichts.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('60 · Geräterahmen');
+{
+  ['rahmenWahl', 'rahmenSetzen'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  const mR = JS.match(/const RAHMEN = \{([\s\S]*?)\n\};/);
+  if (!mR) { fail('RAHMEN nicht gefunden'); }
+  else {
+    const keys = (mR[1].match(/^\s*'?([\w-]+)'?:/gm) || [])
+      .map(s => s.replace(/[^\w-]/g, ''));
+    ['air', 'mini', 'mini-gross'].forEach(function (k) {
+      if (keys.indexOf(k) !== -1) { ok('Rahmen ' + k + ' vorhanden'); }
+      else { fail('Rahmen ' + k + ' fehlt'); }
+    });
+  }
+
+  const mS = JSK.match(/function skaliere\(\) \{([\s\S]*?)\n\}/);
+  if (!mS) { fail('skaliere nicht auswertbar'); }
+  else {
+    if (/g\.style\.width = r\.b/.test(mS[1])) { ok('der Rahmen wird gesetzt, nicht fest verdrahtet'); }
+    else { fail('Rahmengröße fest im Stil'); }
+    /* Ohne Vergroesserung ueber 100 % nuetzt der kleine Rahmen nichts */
+    if (/grenze = \(r\.b < 700\) \? 1\.35 : 1/.test(mS[1])) {
+      ok('der kleine Rahmen darf über 100 % wachsen');
+    } else { fail('Maßstab bei 100 % gedeckelt — die Schrift bliebe klein'); }
+    if (/classList\.toggle\('schmal'/.test(mS[1])) { ok('schmaler Rahmen wird gekennzeichnet'); }
+    else { fail('kein Kennzeichen für den schmalen Rahmen'); }
+    /* visualViewport bleibt tabu */
+    if (!/visualViewport/.test(mS[1])) { ok('weiterhin aus dem Layout-Viewport'); }
+    else { fail('visualViewport zurück — die Tastatur verkleinert das Blatt'); }
+  }
+
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  if (/\.geraet\.schmal \.doppel \{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/.test(css)) {
+    ok('schmaler Rahmen stapelt das Tagesblatt');
+  } else { fail('zweispaltiges Tagesblatt auch im schmalen Rahmen'); }
+
+  /* Die Rechnung: bleibt in jedem Rahmen genug für die Beschreibung? */
+  if (mR) {
+    const masse = {};
+    (mR[1].match(/'?([\w-]+)'?:\s*\{ b:(\d+), h:(\d+)/g) || []).forEach(function (z) {
+      const m = /'?([\w-]+)'?:\s*\{ b:(\d+), h:(\d+)/.exec(z);
+      masse[m[1]] = parseInt(m[2], 10);
+    });
+    let f = 0;
+    Object.keys(masse).forEach(function (k) {
+      const blatt = masse[k] - 100;
+      const spalte = (masse[k] < 700) ? blatt : Math.round(blatt * 1.15 / 2.15);
+      const rest = spalte - 180;
+      if (rest < 150) { f++; fail(k + ': nur ' + rest + ' px für die Beschreibung'); }
+    });
+    if (!f) { ok('in jedem Rahmen bleibt genug für die Beschreibung'); }
+  }
+
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 20) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
