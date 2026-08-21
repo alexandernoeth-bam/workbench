@@ -571,20 +571,12 @@ kat('16 · Wochen- und Monatsblatt am Datum');
   const mM = JSK.match(/function blattMonat\(\) \{([\s\S]*?)\n\}/);
   if (mM && /tagSpringen/.test(mM[1])) { ok('Monatsblatt führt auf das Tagesblatt'); }
   else { fail('kein Weg vom Monatsblatt zum Tag'); }
+  if (mM && /monatZurWoche/.test(mM[1])) { ok('Monatsblatt führt auf das Wochenblatt'); }
+  else { fail('kein Weg vom Monatsblatt zur Woche'); }
 
   const mR = JSK.match(/function eintragRender\(\) \{([\s\S]*?)\n\}/);
-  if (!mR) { fail('eintragRender nicht auswertbar'); }
-  else {
-    if (/monatTage\(\)/.test(mR[1])) { ok('Dialog begrenzt den Monatstag auf die Monatslänge'); }
-    else { fail('Dialog nimmt jeden Monatstag an — 31. Februar wäre unsichtbar'); }
-    if (/isoPlus\(mo, d\)/.test(mR[1])) { ok('Wochentagsknöpfe zeigen das Datum'); }
-    else { fail('Wochentagsknöpfe ohne Datum'); }
-  }
-
-  const mS = JSK.match(/function eintragSpeichern\(\) \{([\s\S]*?)\n\}/);
-  if (mS && /Math\.min\(Math\.max\(k\.tag, 1\), monatTage\(\)\)/.test(mS[1])) {
-    ok('Speichern klemmt den Tag in den gültigen Bereich');
-  } else { fail('Speichern lässt Tage außerhalb des Monats zu'); }
+  if (mR && /isoPlus\(mo, d\)/.test(mR[1])) { ok('Wochentagsknöpfe zeigen das Datum'); }
+  else { fail('Wochentagsknöpfe ohne Datum'); }
 }
 
 /* ═══ 17 · Bearbeitbarkeit und Datumsprüfung (S4) ═══════════════════════
@@ -1097,14 +1089,13 @@ kat('25 · Jahresrahmen und Monatshintergrund');
   const mM = JSK.match(/function blattMonat\(\) \{([\s\S]*?)\n\}/);
   if (!mM) { fail('blattMonat nicht auswertbar'); }
   else {
-    if (/JAHRESTERMINE\.filter\(x => iso >= x\.von/.test(mM[1])) {
-      ok('Monatsblatt zeigt Jahrestermine automatisch');
+    /* Sie stehen im festen Rahmen des Monats, nicht als Eintrag */
+    if (/JAHRESTERMINE\.forEach/.test(mM[1]) && /rahmen\.push/.test(mM[1])) {
+      ok('Monatsblatt zeigt Jahrestermine im festen Rahmen');
     } else { fail('Jahrestermine fehlen im Monatsblatt'); }
-    /* Sie dürfen Hintergrund sein, aber kein Eintrag — sonst mischen
-       sie sich unter das bewusst Gesetzte.                           */
-    if (/mon-jt/.test(mM[1]) && !/ereignisse\.push/.test(mM[1])) {
-      ok('Jahrestermine sind Hintergrund, kein Eintrag');
-    } else { fail('Jahrestermine werden als Eintrag geschrieben'); }
+    if (!/vorhaben\.push/.test(mM[1])) {
+      ok('Jahrestermine werden nicht als Vorhaben geschrieben');
+    } else { fail('Jahrestermine mischen sich unter die Vorhaben'); }
   }
 
   const mWa = JSK.match(/function wahlAuf\(modus\) \{([\s\S]*?)\n\}/);
@@ -1827,9 +1818,10 @@ kat('36 · Termine aus Woche und Monat');
     } else { fail('ein Termin ohne Uhrzeit wäre im Raster unsichtbar'); }
     if (/min === null\) \{ melde/.test(t)) { ok('unsinnige Uhrzeit wird abgewiesen'); }
     else { fail('unsinnige Uhrzeit würde übernommen'); }
-    if (/k\.art === 'ereignis'/.test(t) && /ganztags:true/.test(t)) {
-      ok('das Monatsereignis wird ein ganztägiger Termin');
-    } else { fail('Monatsereignis erreicht den Kalender nicht'); }
+    /* Der Monat kennt keine datierten Ereignisse mehr — er gliedert
+       nach Wochen. Datiertes gehört in den Kalender.                 */
+    if (!/k\.art === 'ereignis'/.test(t)) { ok('der Monat kennt keine Ereignisse mehr'); }
+    else { fail("'ereignis' ist noch im Dialog"); }
   }
 
   /* Beide Blätter müssen den Verweis auflösen können */
@@ -1844,7 +1836,7 @@ kat('36 · Termine aus Woche und Monat');
     ok('Löschen räumt den Termin mit weg');
   } else { fail('gelöschter Eintrag lässt den Termin im Kalender zurück'); }
 
-  const mO = JSK.match(/function eintragOeffnen\(blatt, tag, id\) \{([\s\S]*?)\n\}/);
+  const mO = JSK.match(/function eintragOeffnen\(blatt, tag, id, montag\) \{([\s\S]*?)\n\}/);
   if (mO && /e\.refArt === 'termin'/.test(mO[1])) {
     ok('ein bestehender Termin wird zum Bearbeiten geladen');
   } else { fail('Terminverweis lässt sich nicht bearbeiten'); }
@@ -2858,6 +2850,161 @@ kat('55 · Wochenblatt: Grund und Spalten');
   if (/wahlAuf\(\\'waktivitaet\\'\)/.test(JSK)) {
     ok('Aktivität zuordnen geht weiterhin über den Blattkopf');
   } else { fail('kein Weg mehr, eine Aktivität auf die Woche zu legen'); }
+}
+
+/* ═══ 56 · Monatsblatt nach Wochen ═════════════════════════════════════
+   Fehlerarten: das Monatsblatt bleibt ein zweiter Tageskalender und
+   beantwortet keine eigene Frage; die Wocheneinträge liegen in einem
+   eigenen Bestand und laufen mit dem Wochenblatt auseinander; beim Umbau
+   gehen die alten Ereignisse verloren; ein Monat, den zwei Wochen nur
+   berühren, verliert die erste oder letzte Woche.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('56 · Monatsblatt nach Wochen');
+{
+  ['wocheBlattFuer', 'monatZurWoche', 'monatWocheNeu'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  const mM = JSK.match(/function blattMonat\(\) \{([\s\S]*?)\n\}/);
+  if (!mM) { fail('blattMonat nicht auswertbar'); }
+  else {
+    const t = mM[1];
+    if (/while \(mo <= letzter\)/.test(t)) { ok('gliedert nach Wochen, nicht nach Tagen'); }
+    else { fail('noch ein Tagesraster'); }
+    /* Die Einträge müssen aus dem Wochenblatt kommen, nicht aus einem
+       eigenen Bestand — sonst sind es zwei Wahrheiten.               */
+    if (/wocheBlattFuer\(mo\)/.test(t) && /wb\.wichtig/.test(t)) {
+      ok('die Wocheneinträge sind dieselben wie auf dem Wochenblatt');
+    } else { fail('eigener Bestand für die Wochen — er läuft auseinander'); }
+    if (/Fester Rahmen/.test(t)) { ok('fester Rahmen aus Jahresterminen und Ganztägigem'); }
+    else { fail('kein Rahmen, in den geplant wird'); }
+    if (/Diesen Monat/.test(t)) { ok('Wartebereich ohne feste Woche'); }
+    else { fail('Vorhaben ohne Woche haben keinen Ort'); }
+  }
+
+  /* Alle Wochen, die den Monat berühren — auch die angeschnittenen */
+  const teile = ['isoPlus', 'isoWt', 'isoMontag'].map(function (n) {
+    const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+    return m ? m[0] : null;
+  });
+  if (teile.indexOf(null) === -1) {
+    const f = new Function(teile.join('\n') +
+      'return function (erster, letzter) { let mo = isoMontag(erster); const l = [];' +
+      'while (mo <= letzter) { l.push(mo); mo = isoPlus(mo, 7); } return l; };')();
+    /* Nachgerechnet: ein Monat beruehrt vier bis sechs Wochen, je
+       nachdem, auf welchen Wochentag der Erste faellt.               */
+    const FAELLE = [['2026-08-01', '2026-08-31', 6], ['2026-02-01', '2026-02-28', 5],
+                    ['2026-03-01', '2026-03-31', 6], ['2027-02-01', '2027-02-28', 4]];
+    let fe = 0;
+    FAELLE.forEach(function (x) {
+      const n = f(x[0], x[1]).length;
+      if (n !== x[2]) { fe++; fail(x[0].slice(0, 7) + ': ' + n + ' Wochen statt ' + x[2]); }
+    });
+    if (!fe) { ok('alle berührten Wochen erscheinen, auch die angeschnittenen'); }
+  }
+
+  /* Die Migration darf nichts wegwerfen */
+  const mMig = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mMig && /m\.vorhaben\.push\(e\)/.test(mMig[1]) && /delete m\.ereignisse/.test(mMig[1])) {
+    ok('alte freie Ereignisse wandern zu den Vorhaben');
+  } else { fail('beim Umbau gehen die alten Ereignisse verloren'); }
+
+  /* Der Dialog muss auf eine bestimmte Woche zielen können */
+  const mS = JSK.match(/function eintragSpeichern\(\) \{([\s\S]*?)\n\}/);
+  if (mS && /k\.montag \? wocheBlattFuer\(k\.montag\)/.test(mS[1])) {
+    ok('vom Monat aus zielt der Dialog auf die richtige Woche');
+  } else { fail('der Eintrag landet in der gerade offenen Woche'); }
+
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 18) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
+/* ═══ 57 · Blattkopf und Vollständigkeit des Monats ════════════════════
+   Fehlerarten: Titel und Knopfreihe brauchen zusammen mehr als die
+   Blattbreite — der Kopf wird dreizeilig und das Blatt höher als der
+   Bildschirm; das Monatsblatt zeigt nur einen Teil einer Woche, sodass
+   ein dort eingetragener Termin spurlos verschwindet.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('57 · Blattkopf und Monatsvollständigkeit');
+{
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  [['bk-titel', 'Titel'], ['bk-sub', 'Untertitel']].forEach(function (x) {
+    const m = new RegExp('^\\.' + x[0] + ' \\{([^}]*)\\}', 'm').exec(css);
+    if (m && /white-space:\s*nowrap/.test(m[1])) { ok(x[1] + ' bricht nicht um'); }
+    else { fail(x[1] + ' darf umbrechen und macht den Kopf höher'); }
+  });
+
+  /* Die Knopfreihe des Tagesblatts muss neben den Titel passen */
+  const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
+  if (!mT) { fail('blattTag nicht auswertbar'); }
+  else {
+    const kopfAufruf = mT[1].slice(mT[1].indexOf('kopf('), mT[1].indexOf('\n\n'));
+    const knoepfe = (kopfAufruf.match(/k-btn/g) || []).length;
+    if (knoepfe <= 3) { ok('Tagesblatt mit ' + knoepfe + ' Knöpfen im Kopf'); }
+    else { fail(knoepfe + ' Knöpfe — Titel und Reihe passen nicht nebeneinander'); }
+    /* Die Wege stehen stattdessen im Untertitel */
+    if (/bk-weg/.test(mT[1])) { ok('Wege als Text im Untertitel'); }
+    else { fail('keine Wege in andere Blätter'); }
+  }
+
+  const mK = JSK.match(/function kopf\(titel, sub, akt\) \{([\s\S]*?)\n\}/);
+  if (mK && /indexOf\('<'\) !== -1/.test(mK[1])) {
+    ok('der Untertitel darf Markup tragen, Text bleibt maskiert');
+  } else { fail('Wege im Untertitel würden als Zeichenkette erscheinen'); }
+
+  /* Das Monatsblatt muss die ganze Woche zeigen */
+  const mM = JSK.match(/function blattMonat\(\) \{([\s\S]*?)\n\}/);
+  if (!mM) { fail('blattMonat nicht auswertbar'); }
+  else {
+    if (/wb\.wichtig/.test(mM[1]) && /wb\.eintraege/.test(mM[1])) {
+      ok('Monatsblatt zeigt Vorgemerktes und auf Tage Gelegtes');
+    } else { fail('ein im Monat eingetragener Termin verschwindet'); }
+    if (/WOKURZ\[typeof e\.tag === 'number'/.test(mM[1])) {
+      ok('die Tageseinträge tragen ihren Wochentag');
+    } else { fail('ohne Wochentag ist nicht erkennbar, wann etwas liegt'); }
+    if (/\(x\.tag \|\| 0\) - \(y\.tag \|\| 0\)/.test(mM[1])) {
+      ok('nach Wochentag sortiert');
+    } else { fail('die Tageseinträge stehen in zufälliger Folge'); }
+  }
+}
+
+/* ═══ 58 · Termine entfernen ═══════════════════════════════════════════
+   Fehlerarten: ein Termin lässt sich nur loswerden, indem man seinen
+   Titel leert — das findet niemand; ein ganztägiger Termin liegt im Band
+   und ist gar nicht anzutippen; beim Löschen bleiben Verweise aus Wochen-
+   und Monatsblatt stehen und zeigen "entfallen".
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('58 · Termine entfernen');
+{
+  if (/function terminLoeschen\b/.test(JS)) { ok('terminLoeschen vorhanden'); }
+  else { fail('kein Weg, einen Termin zu löschen'); }
+
+  const mE = JSK.match(/function terminEdit\(t\) \{([\s\S]*?)\n\}/);
+  if (mE && /terminLoeschen\(/.test(mE[1])) { ok('Löschen in der Terminbearbeitung'); }
+  else { fail('in der Bearbeitung fehlt das Löschen'); }
+
+  /* Ganztägiges liegt im Band — auch dort muss man herankommen */
+  const mG = JSK.match(/function ganztagsEintraege\(\) \{([\s\S]*?)\n\}/);
+  if (mG && /id:t\.id/.test(mG[1])) { ok('eigene Termine tragen ihre Kennung mit'); }
+  else { fail('im Band ist nicht unterscheidbar, was eigen ist'); }
+  const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
+  if (mT && /g\.id \? ' eigen' : ''/.test(mT[1]) && /terminLoeschen\(' \+ g\.id/.test(mT[1])) {
+    ok('ganztägige Termine sind im Band bearbeitbar');
+  } else { fail('ganztägige Termine lassen sich nicht anfassen'); }
+  /* Fremdes darf nicht anklickbar sein */
+  if (mG && /l\.push\(\{ t:j\.t, quelle:'Jahrestermin' \}\)/.test(mG[1])) {
+    ok('Jahrestermine und Feiertage bleiben Hinweis');
+  } else { warn('Herkunft im Band nicht mehr unterscheidbar'); }
+
+  const mL = JSK.match(/function terminLoeschen\(id\) \{([\s\S]*?)\n\}/);
+  if (!mL) { fail('terminLoeschen nicht auswertbar'); }
+  else {
+    if (/WOCHENBLAETTER\.forEach/.test(mL[1]) && /MONATSBLAETTER\.forEach/.test(mL[1])) {
+      ok('Verweise aus Wochen- und Monatsblatt werden mitgeräumt');
+    } else { fail('gelöschter Termin hinterlässt "entfallen" auf anderen Blättern'); }
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
