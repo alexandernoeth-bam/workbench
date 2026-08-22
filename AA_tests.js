@@ -1533,10 +1533,14 @@ kat('32 · Annotieren');
   if (mR) {
     let fn = null;
     try {
+      /* strichNah gehoert dazu: der Radierer prueft den Abstand zur
+         Strecke, nicht nur zu den gespeicherten Punkten.             */
+      const mN = JSK.match(/function strichNah\(st, pt, nah\) \{[\s\S]*?\n\}/);
       fn = new Function('zustand',
         'let avSeite = zustand.seite, avStriche = zustand.striche;' +
         'const $ = () => ({ clientWidth: 800 });' +
         'const avMalen = () => {}; const avSichernSpaeter = () => {};' +
+        (mN ? mN[0] + '\n' : '') +
         mR[0] + '\nreturn function (pt) { avRadieren(pt); return avStriche[avSeite].length; };');
     } catch (e) { fn = null; }
     if (!fn) { fail('avRadieren nicht auswertbar'); }
@@ -3253,6 +3257,69 @@ kat('61 · Tageswechsel und Zettel');
   const mV = JS.match(/const DB_VERSION = (\d+)/);
   if (mV && parseInt(mV[1], 10) >= 21) { ok('Schemaversion auf ' + mV[1]); }
   else { fail('Schemaversion nicht erhöht'); }
+}
+
+/* ═══ 62 · Radierer ════════════════════════════════════════════════════
+   Fehlerarten: der Radierer prüft nur die gespeicherten Punkte — ein
+   schnell gezogener langer Strich hat wenige davon, und dazwischen greift
+   er ins Leere; Stift und Radierer sind gleichzeitig an; ohne Radierer
+   bleibt nur "alles löschen".
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('62 · Radierer');
+{
+  ['strichNah', 'zRadieren', 'zRadiererUm'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  /* Abstand zur Strecke wirklich rechnen */
+  const mN = JSK.match(/function strichNah\(st, pt, nah\) \{[\s\S]*?\n\}/);
+  if (!mN) { fail('strichNah nicht auswertbar'); }
+  else {
+    let fn = null;
+    try { fn = new Function(mN[0] + '\nreturn strichNah;')(); } catch (e) { fn = null; }
+    if (!fn) { fail('strichNah nicht ausführbar'); }
+    else {
+      const nah = 16 / 336;
+      const lang = { p:[[0.2, 0.8], [0.8, 0.8]] };
+      const kurve = { p:[[0.1, 0.1], [0.5, 0.5], [0.9, 0.2]] };
+      const F = [
+        [lang, [0.5, 0.8], true, 'Mitte eines langen Strichs'],
+        [lang, [0.2, 0.8], true, 'Anfangspunkt'],
+        [lang, [0.5, 0.9], false, 'daneben'],
+        [kurve, [0.3, 0.3], true, 'zwischen zwei Punkten'],
+        [kurve, [0.9, 0.9], false, 'weit weg'],
+      ];
+      let f = 0;
+      F.forEach(function (x) {
+        if (fn(x[0], x[1], nah) !== x[2]) { f++; fail('strichNah: ' + x[3] + ' falsch'); }
+      });
+      if (!f) { ok(F.length + ' Radierfälle korrekt, auch zwischen den Punkten'); }
+    }
+  }
+
+  /* Beide Radierer nutzen dieselbe Prüfung */
+  ['zRadieren', 'avRadieren'].forEach(function (n) {
+    const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{([\\s\\S]*?)\\n\\}'));
+    if (m && /strichNah\(/.test(m[1])) { ok(n + ' prüft die Strecke'); }
+    else { fail(n + ' prüft nur die Punkte'); }
+  });
+
+  const mU = JSK.match(/function zStiftUm\(\) \{([\s\S]*?)\n\}/);
+  if (mU && /zRadierer = false/.test(mU[1])) { ok('Stift und Radierer schliessen sich aus'); }
+  else { fail('beide Werkzeuge zugleich aktiv'); }
+
+  const mB = JSK.match(/function zBinden\(\) \{([\s\S]*?)\n\}/);
+  if (mB && /ev\.pointerType === 'eraser'/.test(mB[1])) {
+    ok('die Rückseite des Pencil radiert');
+  } else { fail('die Rückseite des Pencil zeichnet'); }
+  if (mB && /zStift \|\| zRadierer \|\|/.test(mB[1])) {
+    ok('das Blatt verrutscht auch beim Radieren nicht');
+  } else { fail('beim Radieren mit dem Finger rollt die Seite'); }
+
+  const mE = JSK.match(/function zettelEbene\(\) \{([\s\S]*?)\n\}/);
+  if (mE && /zRadiererUm\(\)/.test(mE[1])) { ok('der Radierer ist erreichbar'); }
+  else { fail('kein Knopf für den Radierer'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
