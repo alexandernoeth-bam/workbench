@@ -3137,6 +3137,98 @@ kat('60 · Geräterahmen');
   else { fail('Schemaversion nicht erhöht'); }
 }
 
+/* ═══ 61 · Tageswechsel und Zettelwand ═════════════════════════════════
+   Fehlerarten: die App bleibt tagelang offen und zeigt morgens noch das
+   Blatt von gestern — man trägt in den falschen Tag ein; der Wechsel
+   reisst ein bewusst zurückgeblättertes Blatt mit; die Handschrift auf
+   den Zetteln wird ungefiltert gespeichert und bläht den Bestand.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('61 · Tageswechsel und Zettel');
+{
+  if (/function tageswechselPruefen\b/.test(JS)) { ok('tageswechselPruefen vorhanden'); }
+  else { fail('der Tageswechsel wird nicht bemerkt'); }
+
+  const mT = JSK.match(/function tageswechselPruefen\(\) \{([\s\S]*?)\n\}/);
+  if (!mT) { fail('tageswechselPruefen nicht auswertbar'); }
+  else {
+    /* Nur mitziehen, wenn das Blatt auf dem alten Heute stand */
+    if (/mitziehen = \(tagOffen === letzterTag\)/.test(mT[1])) {
+      ok('ein zurückgeblättertes Blatt bleibt stehen');
+    } else { fail('der Wechsel reisst jedes Blatt mit'); }
+    if (/wocheOffen/.test(mT[1]) && /monatOffen/.test(mT[1])) {
+      ok('Woche und Monat wandern mit');
+    } else { fail('nur der Tag wandert, Woche und Monat bleiben zurück'); }
+    if (/sicherungPruefen/.test(mT[1])) { ok('die Sicherung wird wieder fällig'); }
+    else { warn('nach dem Wechsel wird nicht nach der Sicherung gefragt'); }
+  }
+  if (/visibilitychange/.test(JSK) && /setInterval\(tageswechselPruefen/.test(JSK)) {
+    ok('geprüft beim Zurückkehren und laufend');
+  } else { fail('die Prüfung wird nicht ausgelöst'); }
+
+  /* Zettelwand */
+  ['zettelEbene', 'zettelOrt', 'zHier', 'zNeu', 'zLoeschen', 'zBinden', 'zMalen', 'zFarbe']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const mB = JSK.match(/function zBinden\(\) \{([\s\S]*?)\n\}/);
+  if (!mB) { fail('zBinden nicht auswertbar'); }
+  else {
+    /* Die Handschrift muss ausgedünnt werden, sonst bläht sie den
+       Bestand — und der wird bei jeder Änderung ganz neu geschrieben. */
+    if (/Math\.abs\(pt\[0\] - v\[0\]\) < 0\.012/.test(mB[1])) {
+      ok('Striche werden ausgedünnt');
+    } else { fail('ungefilterte Punkte blähen den Bestand'); }
+    if (/Math\.round\(pt\[0\] \* 100\) \/ 100/.test(mB[1])) {
+      ok('auf zwei Nachkommastellen gerundet');
+    } else { fail('unnötig viele Nachkommastellen'); }
+    if (/ev\.pointerType === 'pen' \|\| zStift/.test(mB[1])) {
+      ok('der Stift schreibt immer, der Finger nur im Schreibbetrieb');
+    } else { fail('Finger und Stift nicht unterschieden'); }
+    if (/\{ passive:false \}/.test(mB[1])) { ok('Touch-Ereignisse nicht passiv'); }
+    else { fail('das Blatt würde beim Schreiben verrutschen'); }
+    /* Schieben darf den Zettel nicht aus der Wand tragen */
+    if (/Math\.min\(Math\.max\(/.test(mB[1])) { ok('Zettel bleiben auf der Wand'); }
+    else { fail('ein Zettel lässt sich aus der Wand schieben'); }
+  }
+
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  if (/\.z-griff \{[^}]*touch-action:\s*none/.test(css)) { ok('der Griff nimmt die Geste an'); }
+  else { fail('ohne touch-action rollt die Seite statt zu schieben'); }
+
+  /* Zettel kleben auf den Blaettern, sie sind kein Register */
+  const mR = JSK.match(/const REGISTER = \[([\s\S]*?)\n\];/);
+  if (mR && !/k:'zettel'/.test(mR[1])) { ok('kein eigenes Register — sie kleben am Blatt'); }
+  else { fail('Zettel als Register statt auf dem Blatt'); }
+  /* Der Ort muss das Blatt unterscheiden, nicht nur das Register */
+  const mO = JSK.match(/function zettelOrt\(\) \{([\s\S]*?)\n\}/);
+  if (mO && /'tag:' \+ tagOffen/.test(mO[1]) && /'woche:' \+ wocheBlatt\(\)\.montag/.test(mO[1])) {
+    ok('der Ort unterscheidet die einzelnen Blätter');
+  } else { fail('alle Tage teilten sich dieselben Zettel'); }
+  const mN = JSK.match(/function zNeu\(\) \{([\s\S]*?)\n\}/);
+  if (mN && /hier\.length >= ZETTEL_MAX/.test(mN[1])) { ok('höchstens vier je Blatt'); }
+  else { fail('beliebig viele Zettel je Blatt'); }
+  /* Die Ebene darf das Blatt nicht blockieren */
+  if (/\.z-wand \{[^}]*pointer-events:\s*none/.test(css)) {
+    ok('die Zettelebene lässt das Blatt durch');
+  } else { fail('die Ebene fängt alle Berührungen ab'); }
+  /* Reihenfolge statt Wortlaut pruefen: zettelEbene muss in renderAlles
+     nach renderBlatt stehen, sonst raeumt das Blatt sie wieder weg.  */
+  const mA = JSK.match(/function renderAlles\(\) \{([\s\S]*?)\n\}/);
+  if (!mA) { fail('renderAlles nicht auswertbar'); }
+  else {
+    const iB = mA[1].indexOf('renderBlatt()');
+    const iZ = mA[1].indexOf('zettelEbene()');
+    if (iB !== -1 && iZ !== -1 && iZ > iB) {
+      ok('die Zettel werden nach dem Blatt gezeichnet');
+    } else { fail('das Blatt überschreibt die Zettel'); }
+  }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 21) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
