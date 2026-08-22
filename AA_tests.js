@@ -3189,13 +3189,39 @@ kat('61 · Tageswechsel und Zettel');
     if (/\{ passive:false \}/.test(mB[1])) { ok('Touch-Ereignisse nicht passiv'); }
     else { fail('das Blatt würde beim Schreiben verrutschen'); }
     /* Schieben darf den Zettel nicht aus der Wand tragen */
-    if (/Math\.min\(Math\.max\(/.test(mB[1])) { ok('Zettel bleiben auf der Wand'); }
-    else { fail('ein Zettel lässt sich aus der Wand schieben'); }
+    /* Der Anschlag muss aus der wirklichen Groesse kommen. Feste Werte
+       stimmen nur fuer eine Zettelgroesse.                           */
+    if (/el\.offsetWidth \/ r\.width/.test(mB[1]) &&
+        /el\.offsetHeight \/ r\.height/.test(mB[1])) {
+      ok('der Anschlag folgt der Zettelgröße');
+    } else { fail('fester Anschlag — bei anderer Größe falsch'); }
   }
 
   const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
   if (/\.z-griff \{[^}]*touch-action:\s*none/.test(css)) { ok('der Griff nimmt die Geste an'); }
   else { fail('ohne touch-action rollt die Seite statt zu schieben'); }
+
+  /* Zettel und Zeichenflaeche muessen sich decken */
+  const zz = /^\.z-z \{([^}]*)\}/m.exec(css);
+  const zl = /^\.z-l \{([^}]*)\}/m.exec(css);
+  const zg = /^\.z-griff \{([^}]*)\}/m.exec(css);
+  if (zz && zl && zg) {
+    const b = parseInt(/width:\s*(\d+)px/.exec(zz[1])[1], 10);
+    const hz = parseInt(/height:\s*(\d+)px/.exec(zz[1])[1], 10);
+    const bl = parseInt(/width:\s*(\d+)px/.exec(zl[1])[1], 10);
+    const hl = parseInt(/height:\s*(\d+)px/.exec(zl[1])[1], 10);
+    const top = parseInt(/top:\s*(\d+)px/.exec(zl[1])[1], 10);
+    const gr = parseInt(/flex:\s*0 0 (\d+)px/.exec(zg[1])[1], 10);
+    if (bl === b && hl === hz - gr && top === gr) {
+      ok('Zeichenfläche deckt sich mit dem Zettel (' + b + '\u00d7' + hl + ')');
+    } else {
+      fail('Zeichenfläche passt nicht: ' + bl + '\u00d7' + hl +
+           ' bei Zettel ' + b + '\u00d7' + hz + ', Griff ' + gr);
+    }
+    /* Im kleinsten Rahmen bleibt das Blatt 505 px breit */
+    if (b <= 505) { ok('der Zettel passt auch in den kleinsten Rahmen'); }
+    else { fail('im kleinen Rahmen ragt der Zettel über das Blatt'); }
+  } else { fail('Zettelmaße nicht gefunden'); }
 
   /* Zettel kleben auf den Blaettern, sie sind kein Register */
   const mR = JSK.match(/const REGISTER = \[([\s\S]*?)\n\];/);
