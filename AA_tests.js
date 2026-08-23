@@ -870,7 +870,7 @@ kat('21 · Markdown, Notizgruppen, Archiv');
   } else { fail('Notizliste ohne Gruppengliederung'); }
 
   const mB = JSK.match(/function blattNotizBlatt\(id\) \{([\s\S]*?)\n\}/);
-  if (mB && /mdZuHtml\(n\.text\)/.test(mB[1]) && /textarea/.test(mB[1])) {
+  if (mB && /mdZuHtml\(seiten\[nSeite\]\)/.test(mB[1]) && /textarea/.test(mB[1])) {
     ok('Notizblatt schaltet zwischen Ansicht und Bearbeitung');
   } else { fail('keine Umschaltung zwischen Ansicht und Markdown'); }
 
@@ -3320,6 +3320,75 @@ kat('62 · Radierer');
   const mE = JSK.match(/function zettelEbene\(\) \{([\s\S]*?)\n\}/);
   if (mE && /zRadiererUm\(\)/.test(mE[1])) { ok('der Radierer ist erreichbar'); }
   else { fail('kein Knopf für den Radierer'); }
+}
+
+/* ═══ 63 · Notizseiten und Markdown-Werkzeuge ══════════════════════════
+   Fehlerarten: ein Zeilenbefehl markiert die ganze Zeile, das nächste
+   Zeichen überschreibt sie; ein Blatt hat nur ein endloses Textfeld;
+   der Text landet im Blatt statt auf der offenen Seite; die letzte Seite
+   lässt sich entfernen und das Blatt bleibt ohne Inhalt.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('63 · Notizseiten');
+{
+  /* Der Zeilenbefehl darf ohne Auswahl nichts markieren */
+  const mZ = JSK.match(/function mdZeile\(praefix\) \{[\s\S]*?\n\}/);
+  if (!mZ) { fail('mdZeile nicht auswertbar'); }
+  else {
+    let bau = null;
+    try {
+      bau = new Function('start', 'ende', 'praefix',
+        'let feld = { value:"Meine Zeile", selectionStart:start, selectionEnd:ende,' +
+        ' focus:function(){}, setSelectionRange:function(a,b){this.sa=a;this.sb=b;} };' +
+        'const mdFeld = () => feld; const mdHoehe = () => {};' +
+        'function mdSchreiben(neu,a,b){ feld.value=neu; feld.setSelectionRange(a,b); }' +
+        mZ[0] + '\nmdZeile(praefix); return feld;');
+    } catch (e) { bau = null; }
+    if (!bau) { fail('mdZeile nicht ausführbar'); }
+    else {
+      const ohne = bau(6, 6, '# ');
+      if (ohne.value === '# Meine Zeile' && ohne.sa === ohne.sb) {
+        ok('ohne Auswahl bleibt die Einfügemarke stehen');
+      } else {
+        fail('nach dem Zeilenbefehl ist markiert: ' + ohne.sa + '\u2013' + ohne.sb);
+      }
+      /* Die Marke muss um das Präfix mitwandern */
+      if (ohne.sa === 8) { ok('die Einfügemarke wandert um das Präfix mit'); }
+      else { fail('Einfügemarke bei ' + ohne.sa + ' statt 8'); }
+      const mit = bau(0, 11, '- ');
+      if (mit.sa === 0 && mit.sb === 13) { ok('mit Auswahl bleibt sie erhalten'); }
+      else { fail('Auswahl nach dem Befehl: ' + mit.sa + '\u2013' + mit.sb); }
+    }
+  }
+
+  /* Seiten je Blatt */
+  ['nSeiteNeu', 'nSeiteWeg', 'nBlaettern', 'nSeiteAuf'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}/);
+  if (mM && /n\.seiten = \[n\.text \|\| ''\]/.test(mM[1])) {
+    ok('Migration macht aus dem Text die erste Seite');
+  } else { fail('vorhandene Notizen verlieren ihren Text'); }
+
+  const mS = JSK.match(/function notizSchreiben\(\) \{([\s\S]*?)\n\}/);
+  if (mS && /n\.seiten\[nSeite\] = f\.value/.test(mS[1])) {
+    ok('geschrieben wird auf die offene Seite');
+  } else { fail('der Text landet im Blatt statt auf der Seite'); }
+
+  const mW = JSK.match(/function nSeiteWeg\(\) \{([\s\S]*?)\n\}/);
+  if (mW && /n\.seiten\.length < 2/.test(mW[1])) { ok('die letzte Seite bleibt'); }
+  else { fail('das Blatt liesse sich leerräumen'); }
+  if (mW && /nWegFrage/.test(mW[1])) { ok('eine beschriebene Seite fragt zurück'); }
+  else { fail('eine beschriebene Seite verschwindet ohne Rückfrage'); }
+
+  const mA = JSK.match(/function notizAuf\(id\) \{([\s\S]*?)\n\}/);
+  if (mA && /nSeite = 0/.test(mA[1])) { ok('ein anderes Blatt öffnet auf Seite eins'); }
+  else { fail('das neue Blatt öffnet auf der Seitenzahl des alten'); }
+
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 23) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
