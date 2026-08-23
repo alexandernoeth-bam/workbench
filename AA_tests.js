@@ -3391,6 +3391,83 @@ kat('63 · Notizseiten');
   else { fail('Schemaversion nicht erhöht'); }
 }
 
+/* ═══ 64 · Migration: Verschachtelung und Reihenfolge ══════════════════
+   Fehlerarten: eine neue Migrationsstufe wird versehentlich in eine
+   Schleife hineingeschrieben — dann läuft sie je Element mehrfach und
+   bei leerem Bestand gar nicht; eine ältere Stufe räumt ein Feld weg,
+   das eine neuere gerade angelegt hat.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('64 · Migration');
+{
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}\n/);
+  if (!mM) { fail('migriereDB nicht auswertbar'); }
+  else {
+    const t = mM[1];
+
+    /* Keine spätere Stufe darf löschen, was eine frühere anlegt */
+    if (!/delete n\.seiten/.test(t)) { ok('die Seiten werden nicht wieder gelöscht'); }
+    else { fail('eine ältere Stufe löscht die Seiten wieder weg'); }
+
+    /* Die Stufen ab d.zettel gehören auf die oberste Ebene, nicht in
+       die Notizschleife — sonst laufen sie ohne Notizen nie.        */
+    const iSchleife = t.indexOf('(d.notizen || []).forEach');
+    if (iSchleife !== -1) {
+      let tiefe = 0, ende = -1;
+      for (let i = t.indexOf('{', iSchleife + 20); i < t.length; i++) {
+        if (t[i] === '{') { tiefe++; }
+        else if (t[i] === '}') { tiefe--; if (!tiefe) { ende = i; break; } }
+      }
+      const drin = t.slice(iSchleife, ende);
+      const FREMD = ['d.zettel', 'd.ansicht', 'd.plaene', 'd.monatsblaetter',
+                     'd.journal', 'd.tagnotizen'];
+      const falsch = FREMD.filter(x => drin.indexOf(x) !== -1);
+      if (!falsch.length) { ok('keine fremde Stufe in der Notizschleife'); }
+      else { fail('in der Notizschleife verschachtelt: ' + falsch.join(', ')); }
+    }
+  }
+
+  /* Die Migration wirklich laufen lassen */
+  const teile = ['isoHeute', 'isoPlus', 'isoWt', 'isoMontag', 'migriereDB']
+    .map(function (n) {
+      const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+      return m ? m[0] : null;
+    });
+  if (teile.indexOf(null) !== -1) { fail('Migration nicht auswertbar'); }
+  else {
+    let fn = null;
+    try {
+      fn = new Function('SAAT_INFOSEITEN',
+        'const DB_VERSION = 99;' +
+        'const S = { bereiche:[{id:"b1"}], gruppen:[{id:"g1"}], notizen:[], zettel:[],' +
+        ' aktivitaeten:[], plaene:[], ziele:[], wieder:[], gewohnheit:[], termine:[],' +
+        ' kontakte:[], jahrestermine:[], wochenblaetter:[], monatsblaetter:[],' +
+        ' tagesblaetter:[], tagnotizen:[], journal:[], infoseiten:SAAT_INFOSEITEN,' +
+        ' sicherung:{}, ansicht:{}, naechsteId:1 };' +
+        'const saatDB = () => JSON.parse(JSON.stringify(S));' +
+        teile.join('\n') + '\nreturn migriereDB;')([{ id:1, nr:1, t:'x', text:'y' }]);
+    } catch (e) { fn = null; }
+    if (!fn) { fail('Migration nicht ausführbar'); }
+    else {
+      /* Ein altes Notizblatt behält seinen Text als erste Seite */
+      const alt = fn({ version:5, bereiche:[{ id:'b1' }], gruppen:[{ id:'g1' }],
+                       notizen:[{ id:1, nr:1, t:'Alt', b:'b1', text:'Erste\nZweite' }] });
+      if (alt.notizen[0].seiten && alt.notizen[0].seiten[0] === 'Erste\nZweite') {
+        ok('alter Notiztext wird zur ersten Seite');
+      } else {
+        fail('Notiztext verloren: ' + JSON.stringify(alt.notizen[0].seiten));
+      }
+      /* Ohne Notizen müssen die späteren Stufen trotzdem laufen */
+      const leer = fn({ version:5, bereiche:[{ id:'b1' }], gruppen:[{ id:'g1' }],
+                        notizen:[] });
+      const FEHLT = ['zettel', 'journal', 'tagnotizen'].filter(function (k) {
+        return !Array.isArray(leer[k]);
+      });
+      if (!FEHLT.length) { ok('alle Stufen laufen auch bei leerem Notizbestand'); }
+      else { fail('ohne Notizen nicht migriert: ' + FEHLT.join(', ')); }
+    }
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
