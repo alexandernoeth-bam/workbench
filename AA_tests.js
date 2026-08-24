@@ -1270,8 +1270,7 @@ kat('28 · Doppelte Schleifen und Zeilenhöhen');
   });
 
   const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
-  /* Die Kleinigkeiten stehen nicht mehr in einer Tabelle */
-  if (mT && /class="k-z leer-z" onclick="aktNeu/.test(mT[1])) {
+  if (mT && /class="leer klick" onclick="aktNeu/.test(mT[1])) {
     ok('freie Zeilen im Tagesblatt sind Klickflächen');
   } else { fail('freie Zeilen im Tagesblatt sind tot'); }
   const mA = JSK.match(/function blattAktivitaeten\(\) \{([\s\S]*?)\n\}/);
@@ -3047,11 +3046,10 @@ kat('59 · Planschritte und Planzeile');
     else { fail('ein Plan erreicht das Tagesblatt nicht'); }
     /* Die Zeilenzählung muss die Planzeilen mitzählen, sonst überlappen
        sie mit den Leerzeilen darunter.                                */
-    /* Die freien Zeilen muessen alles Belegte abziehen, sonst
-       ueberlappen sie mit den Eintraegen.                          */
-    if (/ZEILEN_KLEIN - klein\.length - weg\.length - tagPlaene\.length/.test(mT[1])) {
-      ok('die freien Zeilen zählen alles Belegte ab');
-    } else { fail('freie Zeilen überlappen mit den Einträgen'); }
+    /* Die Planzeilen muessen bei den freien Zeilen abgezogen werden */
+    if (/liste\.length \+ weg\.length \+ tagPlaene\.length/.test(mT[1])) {
+      ok('die Planzeilen zählen bei den Blattzeilen mit');
+    } else { fail('Planzeilen werden bei der Zeilenzahl übergangen'); }
   }
 
   const mP = JSK.match(/function blattPlan\(pid\) \{([\s\S]*?)\n\}/);
@@ -3471,46 +3469,45 @@ kat('64 · Migration');
   }
 }
 
-/* ═══ 65 · Tagesblatt: drei Grosse, Training, Kleinigkeiten ════════════
-   Fehlerarten: eine Regel über die Minuten belegt die drei Plätze
-   ungefragt; ein oben gewähltes Vorhaben steht zusätzlich unten bei den
-   Kleinigkeiten; die Reflexion wird samt Inhalt gelöscht statt nur
-   ausgeblendet; das Motto bleibt zweizeilig.
+/* ═══ 65 · Tagesblatt ═════════════════════════════════════════════════
+   Fehlerarten: die Tagesreflexion kehrt zurück oder ihr Inhalt wird beim
+   Rückbau gelöscht; die freien Zeilen überlappen mit den Einträgen, weil
+   nicht alles Belegte abgezogen wird; der Kleinkram landet wieder in der
+   Aktivitätenliste statt im Blattblock.
    ═══════════════════════════════════════════════════════════════════════ */
 kat('65 · Tagesblatt');
 {
-  ['grossEintrag', 'grossWahl', 'grossSetzen', 'grossLoesen', 'entwGlyph',
-   'entwZiel', 'entwTag', 'entwZielWahl', 'leereEntw']
-    .forEach(function (f) {
-      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
-      else { fail(f + ' fehlt'); }
-    });
-
   const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
   if (!mT) { fail('blattTag nicht auswertbar'); }
   else {
     const t = mT[1];
-    /* Keine Minutenregel — die Plaetze werden gewaehlt */
-    if (!/min\s*>=?\s*60/.test(t) && /grossWahl\(/.test(t)) {
-      ok('die drei Plätze werden gewählt, nicht gerechnet');
-    } else { fail('eine Minutenregel belegt die Plätze'); }
-    /* Was oben steht, darf unten nicht nochmals stehen */
-    if (/grossIds\.indexOf\(a\.id\) === -1/.test(t) &&
-        /grossIds\.indexOf\(p\.id\) === -1/.test(t)) {
-      ok('Grosses erscheint nicht zusätzlich bei den Kleinigkeiten');
-    } else { fail('ein gewähltes Vorhaben steht doppelt auf dem Blatt'); }
-    if (/class="klein"/.test(t)) { ok('Kleinigkeiten stehen zweispaltig'); }
-    else { fail('Kleinigkeiten einspaltig'); }
-    /* Der Sport ist eine der vier Entwicklungszeilen, keine
-       Sonderkategorie mehr.                                          */
-    if (/class="entw"/.test(t) && /entwGlyph\(/.test(t)) {
-      ok('Entwicklungsblock mit Haken je Zeile');
-    } else { fail('kein Entwicklungsblock'); }
-    if (!/class="train"/.test(t)) { ok('keine gesonderte Trainingszeile mehr'); }
-    else { fail('Training steht noch als eigene Zeile'); }
-    /* Die Reflexion ist ausgeblendet, nicht geloescht */
-    if (!/refl-l">Reflexion/.test(t)) { ok('keine Tagesreflexion mehr auf dem Blatt'); }
-    else { fail('die Reflexion steht noch da'); }
+    /* Keine Tagesreflexion */
+    if (!/refl-l">Reflexion/.test(t)) { ok('keine Tagesreflexion auf dem Blatt'); }
+    else { fail('die Reflexion steht wieder da'); }
+    /* Wichtigste Aufgabe zurück */
+    if (/wichtig-l">Wichtigste Aufgabe heute/.test(t)) { ok('Wichtigste Aufgabe wieder da'); }
+    else { fail('die wichtigste Aufgabe fehlt'); }
+    /* Die drei Grossen und die Entwicklung sind draussen */
+    ['class="gross"', 'class="entw"', 'class="klein"'].forEach(function (x) {
+      if (t.indexOf(x) === -1) { ok(x + ' ist zurückgebaut'); }
+      else { fail(x + ' steht noch auf dem Blatt'); }
+    });
+    /* Aktivitaeten wieder als Tabelle */
+    if (/<table class="atab">/.test(t)) { ok('Aktivitäten wieder als Tabelle'); }
+    else { fail('keine Aktivitätentabelle'); }
+    /* Die freien Zeilen muessen alles Belegte abziehen */
+    if (/liste\.length \+ weg\.length \+ tagPlaene\.length/.test(t)) {
+      ok('die freien Zeilen zählen alles Belegte ab');
+    } else { fail('freie Zeilen überlappen mit den Einträgen'); }
+    if (/class="leer klick" onclick="aktNeu/.test(t)) {
+      ok('freie Zeilen sind Klickflächen');
+    } else { fail('freie Zeilen im Tagesblatt sind tot'); }
+    /* Der letzte Block traegt jetzt drei Zwecke */
+    if (/Kontakte \/ R\\u00fcckfragen \/ Kleinigkeiten/.test(t)) {
+      ok('Kontakte / Rückfragen / Kleinigkeiten');
+    } else { fail('der Block heisst noch anders'); }
+    if (/kontakt-m/.test(t)) { ok('Minutenfeld am Blattblock'); }
+    else { fail('keine Minuten bei den Kleinigkeiten'); }
   }
 
   /* Woche und Monat behalten ihren Rückblick */
@@ -3520,96 +3517,57 @@ kat('65 · Tagesblatt');
     else { fail(n + ': Rückblick versehentlich mitentfernt'); }
   });
 
+  /* Der Rückbau darf nichts aus dem Bestand werfen */
   const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}\n/);
   if (!mM) { fail('migriereDB nicht auswertbar'); }
   else {
-    if (/t\.gross = \[t\.wichtigste \|\| null, null, null\]/.test(mM[1])) {
-      ok('die bisherige wichtigste Aufgabe wird Platz eins');
-    } else { fail('die wichtigste Aufgabe geht verloren'); }
-    if (/t\.motto\.filter/.test(mM[1])) { ok('beide Mottozeilen werden zu einer'); }
-    else { fail('der Text der zweiten Mottozeile geht verloren'); }
-    /* Die Reflexion darf nicht aus dem Bestand fliegen */
-    if (!/delete t\.reflexion/.test(mM[1])) {
-      ok('bereits Geschriebenes bleibt im Bestand');
-    } else { fail('die Migration löscht die Reflexion'); }
+    if (/t\.gross\.find\(x => typeof x === 'number'\)/.test(mM[1])) {
+      ok('der erste der drei Plätze wird wieder die wichtigste Aufgabe');
+    } else { fail('die Wahl aus den drei Plätzen geht verloren'); }
+    ['delete t.gross', 'delete t.entw', 'delete t.reflexion'].forEach(function (x) {
+      if (mM[1].indexOf(x) === -1) { ok('Bestand bleibt erhalten: ' + x.slice(7)); }
+      else { fail('der Rückbau löscht ' + x.slice(7)); }
+    });
+    if (/k\.min === undefined/.test(mM[1])) { ok('Kontakte bekommen ein Minutenfeld'); }
+    else { fail('Migration ergänzt die Minuten nicht'); }
   }
 
-  /* Ein Platz traegt Aktivitaet oder Plan — unterschieden am Kennungstyp */
-  const mE = JSK.match(/function grossEintrag\(id\) \{([\s\S]*?)\n\}/);
-  if (mE && /typeof id === 'string'/.test(mE[1])) {
-    ok('ein Platz kann auch einen Plan tragen');
-  } else { fail('nur Aktivitäten passen in die drei Plätze'); }
-
   const mV = JS.match(/const DB_VERSION = (\d+)/);
-  if (mV && parseInt(mV[1], 10) >= 24) { ok('Schemaversion auf ' + mV[1]); }
+  if (mV && parseInt(mV[1], 10) >= 26) { ok('Schemaversion auf ' + mV[1]); }
   else { fail('Schemaversion nicht erhöht'); }
 }
 
-/* ═══ 66 · Entwicklungsblock ═══════════════════════════════════════════
-   Fehlerarten: das bisherige Training geht bei der Umstellung verloren;
-   die Tageszählung zählt vor dem Start weiter oder beginnt bei null; die
-   Überschrift hängt fest im Code statt am Ziel; weniger als vier Zeilen
-   nach einer Migration.
+/* ═══ 67 · div-Bilanz der Blattfunktionen ══════════════════════════════
+   Fehlerart: eine Blattfunktion erzeugt ein überzähliges schliessendes
+   Element. Die Datei bleibt syntaktisch heil und die Prüfung der Datei
+   selbst schlägt nicht an — aber im Browser schliesst der Block zu früh,
+   und alles Folgende fällt aus dem Layout. Genau so verschwanden die
+   Kontakte vom Tagesblatt.
    ═══════════════════════════════════════════════════════════════════════ */
-kat('66 · Entwicklungsblock');
+kat('67 · div-Bilanz der Blattfunktionen');
 {
-  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}\n/);
-  if (!mM) { fail('migriereDB nicht auswertbar'); }
-  else {
-    if (/t\.training && \(t\.training\.t \|\| t\.training\.min\)/.test(mM[1])) {
-      ok('das bisherige Training wird die erste Zeile');
-    } else { fail('das bisherige Training geht verloren'); }
-    if (/while \(t\.entw\.length < 4\)/.test(mM[1])) { ok('immer vier Zeilen'); }
-    else { fail('ein älterer Bestand hätte weniger als vier Zeilen'); }
-  }
-
-  /* Die Tageszählung wirklich rechnen */
-  const mT = JSK.match(/function entwTag\(\) \{[\s\S]*?\n\}/);
-  if (!mT) { fail('entwTag nicht auswertbar'); }
-  else {
-    let fn = null;
-    try {
-      fn = new Function('start', 'heute',
-        'const DB = { ansicht:{ entwZiel:"z1" } };' +
-        'const ZIELE = [{ id:"z1", start:start }];' +
-        'const tagOffen = heute;' +
-        'const dmyZuIso = x => x;' +
-        'function entwZiel(){ return ZIELE[0]; }' +
-        mT[0] + '\nreturn entwTag();');
-    } catch (e) { fn = null; }
-    if (!fn) { fail('entwTag nicht ausführbar'); }
-    else {
-      const F = [['2026-07-19', '2026-08-21', 34], ['2026-08-21', '2026-08-21', 1],
-                 ['2026-09-01', '2026-08-21', null]];
-      let f = 0;
-      F.forEach(function (x) {
-        if (fn(x[0], x[1]) !== x[2]) { f++; fail('entwTag(' + x[0] + '): ' + fn(x[0], x[1])); }
-      });
-      if (!f) { ok('Tageszählung korrekt, vor dem Start keine Zahl'); }
+  const BLAETTER = ['blattTag', 'blattWoche', 'blattMonat', 'blattAktivitaeten',
+                    'blattPlan', 'blattZiel', 'blattNotizBlatt', 'blattJournal',
+                    'blattJahrestermine'];
+  let schief = 0;
+  BLAETTER.forEach(function (n) {
+    const i = JSK.indexOf('function ' + n + '(');
+    if (i === -1) { fail(n + ' nicht gefunden'); schief++; return; }
+    let t = 0, j = JSK.indexOf('{', i), k = j;
+    while (k < JSK.length) {
+      if (JSK[k] === '{') { t++; }
+      else if (JSK[k] === '}') { t--; if (!t) { break; } }
+      k++;
     }
-  }
-
-  const mB = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
-  if (!mB) { fail('blattTag nicht auswertbar'); }
-  else {
-    if (/esc\(ez \? ez\.t : 'Entwicklung'\)/.test(mB[1])) {
-      ok('die Überschrift kommt vom Ziel');
-    } else { fail('Überschrift fest im Code'); }
-    if (/entwZielWahl\(\)/.test(mB[1])) { ok('das Ziel ist wählbar'); }
-    else { fail('kein Weg, das Ziel zu wechseln'); }
-    /* Vier Zeilen, jede mit Text und Minuten */
-    if (/zelleOffen\('entw', i, 'min'\)/.test(mB[1])) { ok('jede Zeile trägt Minuten'); }
-    else { fail('nur eine Zeile kann Minuten tragen'); }
-  }
-
-  /* Keine Liste zum Abhaken: der Block darf keine Vorlagen ziehen */
-  if (!/entwVorlagen|entwListe/.test(JSK)) {
-    ok('freier Text statt Vorlagenliste');
-  } else { warn('eine Vorlagenliste ist zurück'); }
-
-  const mV = JS.match(/const DB_VERSION = (\d+)/);
-  if (mV && parseInt(mV[1], 10) >= 25) { ok('Schemaversion auf ' + mV[1]); }
-  else { fail('Schemaversion nicht erhöht'); }
+    const koerper = JSK.slice(i, k);
+    const auf = (koerper.match(/<div\b/g) || []).length;
+    const zu = (koerper.match(/<\/div>/g) || []).length;
+    if (auf !== zu) {
+      fail(n + ': ' + auf + ' <div> gegen ' + zu + ' </div>');
+      schief++;
+    }
+  });
+  if (!schief) { ok('alle ' + BLAETTER.length + ' Blattfunktionen ausgeglichen'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
