@@ -3479,7 +3479,8 @@ kat('64 · Migration');
    ═══════════════════════════════════════════════════════════════════════ */
 kat('65 · Tagesblatt');
 {
-  ['grossEintrag', 'grossWahl', 'grossSetzen', 'grossLoesen', 'trainingGlyph']
+  ['grossEintrag', 'grossWahl', 'grossSetzen', 'grossLoesen', 'entwGlyph',
+   'entwZiel', 'entwTag', 'entwZielWahl', 'leereEntw']
     .forEach(function (f) {
       if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
       else { fail(f + ' fehlt'); }
@@ -3500,9 +3501,13 @@ kat('65 · Tagesblatt');
     } else { fail('ein gewähltes Vorhaben steht doppelt auf dem Blatt'); }
     if (/class="klein"/.test(t)) { ok('Kleinigkeiten stehen zweispaltig'); }
     else { fail('Kleinigkeiten einspaltig'); }
-    if (/train-l/.test(t) && /trainingGlyph\(\)/.test(t)) {
-      ok('Training als eigene Zeile mit Text, Haken und Minuten');
-    } else { fail('keine Trainingszeile'); }
+    /* Der Sport ist eine der vier Entwicklungszeilen, keine
+       Sonderkategorie mehr.                                          */
+    if (/class="entw"/.test(t) && /entwGlyph\(/.test(t)) {
+      ok('Entwicklungsblock mit Haken je Zeile');
+    } else { fail('kein Entwicklungsblock'); }
+    if (!/class="train"/.test(t)) { ok('keine gesonderte Trainingszeile mehr'); }
+    else { fail('Training steht noch als eigene Zeile'); }
     /* Die Reflexion ist ausgeblendet, nicht geloescht */
     if (!/refl-l">Reflexion/.test(t)) { ok('keine Tagesreflexion mehr auf dem Blatt'); }
     else { fail('die Reflexion steht noch da'); }
@@ -3537,6 +3542,73 @@ kat('65 · Tagesblatt');
 
   const mV = JS.match(/const DB_VERSION = (\d+)/);
   if (mV && parseInt(mV[1], 10) >= 24) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
+/* ═══ 66 · Entwicklungsblock ═══════════════════════════════════════════
+   Fehlerarten: das bisherige Training geht bei der Umstellung verloren;
+   die Tageszählung zählt vor dem Start weiter oder beginnt bei null; die
+   Überschrift hängt fest im Code statt am Ziel; weniger als vier Zeilen
+   nach einer Migration.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('66 · Entwicklungsblock');
+{
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}\n/);
+  if (!mM) { fail('migriereDB nicht auswertbar'); }
+  else {
+    if (/t\.training && \(t\.training\.t \|\| t\.training\.min\)/.test(mM[1])) {
+      ok('das bisherige Training wird die erste Zeile');
+    } else { fail('das bisherige Training geht verloren'); }
+    if (/while \(t\.entw\.length < 4\)/.test(mM[1])) { ok('immer vier Zeilen'); }
+    else { fail('ein älterer Bestand hätte weniger als vier Zeilen'); }
+  }
+
+  /* Die Tageszählung wirklich rechnen */
+  const mT = JSK.match(/function entwTag\(\) \{[\s\S]*?\n\}/);
+  if (!mT) { fail('entwTag nicht auswertbar'); }
+  else {
+    let fn = null;
+    try {
+      fn = new Function('start', 'heute',
+        'const DB = { ansicht:{ entwZiel:"z1" } };' +
+        'const ZIELE = [{ id:"z1", start:start }];' +
+        'const tagOffen = heute;' +
+        'const dmyZuIso = x => x;' +
+        'function entwZiel(){ return ZIELE[0]; }' +
+        mT[0] + '\nreturn entwTag();');
+    } catch (e) { fn = null; }
+    if (!fn) { fail('entwTag nicht ausführbar'); }
+    else {
+      const F = [['2026-07-19', '2026-08-21', 34], ['2026-08-21', '2026-08-21', 1],
+                 ['2026-09-01', '2026-08-21', null]];
+      let f = 0;
+      F.forEach(function (x) {
+        if (fn(x[0], x[1]) !== x[2]) { f++; fail('entwTag(' + x[0] + '): ' + fn(x[0], x[1])); }
+      });
+      if (!f) { ok('Tageszählung korrekt, vor dem Start keine Zahl'); }
+    }
+  }
+
+  const mB = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
+  if (!mB) { fail('blattTag nicht auswertbar'); }
+  else {
+    if (/esc\(ez \? ez\.t : 'Entwicklung'\)/.test(mB[1])) {
+      ok('die Überschrift kommt vom Ziel');
+    } else { fail('Überschrift fest im Code'); }
+    if (/entwZielWahl\(\)/.test(mB[1])) { ok('das Ziel ist wählbar'); }
+    else { fail('kein Weg, das Ziel zu wechseln'); }
+    /* Vier Zeilen, jede mit Text und Minuten */
+    if (/zelleOffen\('entw', i, 'min'\)/.test(mB[1])) { ok('jede Zeile trägt Minuten'); }
+    else { fail('nur eine Zeile kann Minuten tragen'); }
+  }
+
+  /* Keine Liste zum Abhaken: der Block darf keine Vorlagen ziehen */
+  if (!/entwVorlagen|entwListe/.test(JSK)) {
+    ok('freier Text statt Vorlagenliste');
+  } else { warn('eine Vorlagenliste ist zurück'); }
+
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 25) { ok('Schemaversion auf ' + mV[1]); }
   else { fail('Schemaversion nicht erhöht'); }
 }
 
