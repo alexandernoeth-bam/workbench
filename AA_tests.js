@@ -3019,7 +3019,7 @@ kat('58 · Termine entfernen');
    ═══════════════════════════════════════════════════════════════════════ */
 kat('59 · Planschritte und Planzeile');
 {
-  ['schritteUm', 'werUm', 'planAufTag', 'planOeffnen'].forEach(function (f) {
+  ['schritteUm', 'werUm', 'planOeffnen'].forEach(function (f) {
     if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
     else { fail(f + ' fehlt'); }
   });
@@ -3042,21 +3042,23 @@ kat('59 · Planschritte und Planzeile');
   const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
   if (!mT) { fail('blattTag nicht auswertbar'); }
   else {
-    if (/p\.geplant === tagOffen/.test(mT[1])) { ok('Pläne lassen sich auf den Tag legen'); }
-    else { fail('ein Plan erreicht das Tagesblatt nicht'); }
-    /* Die Zeilenzählung muss die Planzeilen mitzählen, sonst überlappen
-       sie mit den Leerzeilen darunter.                                */
-    /* Die Planzeilen muessen bei den freien Zeilen abgezogen werden */
-    if (/liste\.length \+ weg\.length \+ tagPlaene\.length/.test(mT[1])) {
-      ok('die Planzeilen zählen bei den Blattzeilen mit');
-    } else { fail('Planzeilen werden bei der Zeilenzahl übergangen'); }
+    /* Ein Planschritt steht auf dem Tagesblatt wie jede andere
+       Aktivitaet — keine Gruppierung, kein Planname, keine Planzeile. */
+    if (!/tagPlaene/.test(mT[1])) { ok('keine Planzeilen auf dem Tagesblatt'); }
+    else { fail('der Plan steht wieder als eigene Zeile da'); }
+    if (/liste\.length \+ weg\.length/.test(mT[1])) {
+      ok('die freien Zeilen zählen alles Belegte ab');
+    } else { fail('freie Zeilen überlappen mit den Einträgen'); }
   }
 
   const mP = JSK.match(/function blattPlan\(pid\) \{([\s\S]*?)\n\}/);
   if (!mP) { fail('blattPlan nicht auswertbar'); }
   else {
-    if (/planAufTag\(/.test(mP[1])) { ok('vom Planblatt auf den Tag'); }
-    else { fail('kein Weg, den Plan auf einen Tag zu legen'); }
+    /* Der einzelne Schritt kommt auf den Tag, nicht der ganze Plan */
+    if (/planStandZelle\(a\)/.test(mP[1])) { ok('jeder Schritt kommt einzeln auf den Tag'); }
+    else { fail('kein Weg, einen Schritt auf einen Tag zu legen'); }
+    if (!/planAufTag/.test(JSK)) { ok('kein zweiter Weg über den ganzen Plan'); }
+    else { fail('zwei Wege für dieselbe Frage'); }
     if (/if \(nachWer\)/.test(mP[1])) { ok('Gliederung nach Zuständigkeit'); }
     else { fail('keine Gliederung nach Wer'); }
     /* Nichtzugeordnetes gehört ans Ende, nicht an den Anfang */
@@ -3496,7 +3498,7 @@ kat('65 · Tagesblatt');
     if (/<table class="atab">/.test(t)) { ok('Aktivitäten wieder als Tabelle'); }
     else { fail('keine Aktivitätentabelle'); }
     /* Die freien Zeilen muessen alles Belegte abziehen */
-    if (/liste\.length \+ weg\.length \+ tagPlaene\.length/.test(t)) {
+    if (/const belegt = liste\.length \+ weg\.length;/.test(t)) {
       ok('die freien Zeilen zählen alles Belegte ab');
     } else { fail('freie Zeilen überlappen mit den Einträgen'); }
     if (/class="leer klick" onclick="aktNeu/.test(t)) {
