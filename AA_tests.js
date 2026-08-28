@@ -3723,6 +3723,8 @@ kat('69 · Kalendereinfuhr');
       bau = new Function(
         'let neuId = 900; const naechsteId = () => ++neuId;' +
         'let TERMINE = [], JAHRESTERMINE = [];' +
+        /* Der Stichtag gehoert dazu, sonst filtert der Befund nicht */
+        'let icsAb = "2026-01-01";' +
         teile.join('\n') +
         '\nreturn { lauf:function (text, kal) {' +
         '  return icsUebernehmen(icsBefund(icsLesen(text), kal)); },' +
@@ -3996,6 +3998,78 @@ kat('72 · Kalenderdialog');
   if (mW && /kalenderRender\(\)/.test(mW[1])) {
     ok('nach dem Umhängen wandert die Zeile sofort');
   } else { fail('die umgehängte Zeile bleibt im alten Block stehen'); }
+}
+
+/* ═══ 73 · Stichtag beim Einlesen ══════════════════════════════════════
+   Fehlerart: Google kann nur den ganzen Kalender ausgeben. Ohne Stichtag
+   käme jeder Termin seit 2019 mit. Und: massgeblich ist das Ende, nicht
+   der Beginn — ein laufender Urlaub, der vor dem Stichtag begann, gehört
+   noch dazu.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('73 · Stichtag beim Einlesen');
+{
+  ['icsAbSetzen', 'icsAbFeld'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  const mB = JSK.match(/function icsBefund\(roh, kal\) \{([\s\S]*?)\n\}/);
+  if (!mB) { fail('icsBefund nicht auswertbar'); }
+  else {
+    if (/const ab = icsAb \|\| isoHeute\(\)/.test(mB[1])) {
+      ok('ohne gesetzten Stichtag gilt heute');
+    } else { fail('kein Stichtag im Befund'); }
+    if (/art:'zualt'/.test(mB[1])) { ok('zu Altes wird als solches gemeldet'); }
+    else { fail('zu Altes verschwindet stillschweigend'); }
+  }
+
+  /* Den Filter wirklich rechnen */
+  const teile = ['isoHeute', 'isoPlus', 'isoWt', 'icsBefund'].map(function (n) {
+    const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+    return m ? m[0] : null;
+  });
+  if (teile.indexOf(null) !== -1) { fail('Befund nicht auswertbar'); }
+  else {
+    let fn = null;
+    try {
+      fn = new Function('ab',
+        'let TERMINE = [], JAHRESTERMINE = []; let icsAb = ab;' +
+        teile.join('\n') + '\nreturn icsBefund;');
+    } catch (e) { fn = null; }
+    if (!fn) { fail('Befund nicht ausführbar'); }
+    else {
+      const b = fn('2026-08-01');
+      const F = [
+        [{ uid:'a', t:'Alt', von:{ datum:'2019-05-04', zeit:'10:00', ganztags:false },
+           bis:{ datum:'2019-05-04' } }, 'zualt', 'Termin von 2019'],
+        [{ uid:'b', t:'Läuft', von:{ datum:'2026-07-28', ganztags:true },
+           bis:{ datum:'2026-08-05' } }, 'neu', 'laufender Urlaub über den Stichtag'],
+        [{ uid:'c', t:'Knapp', von:{ datum:'2026-07-25', ganztags:true },
+           bis:{ datum:'2026-08-01' } }, 'zualt', 'endete am Vortag'],
+        [{ uid:'d', t:'Genau', von:{ datum:'2026-08-01', zeit:'08:00', ganztags:false },
+           bis:{ datum:'2026-08-01' } }, 'neu', 'genau am Stichtag'],
+        [{ uid:'e', t:'Künftig', von:{ datum:'2026-09-10', zeit:'09:00', ganztags:false },
+           bis:{ datum:'2026-09-10' } }, 'neu', 'künftig'],
+      ];
+      let f = 0;
+      F.forEach(function (x) {
+        const r = b([x[0]], 'alex')[0];
+        if (r.art !== x[1]) { f++; fail(x[2] + ': ' + r.art + ' statt ' + x[1]); }
+      });
+      if (!f) { ok(F.length + ' Fälle am Stichtag korrekt, Ende zählt statt Beginn'); }
+    }
+  }
+
+  /* Der Stichtag muss ohne erneutes Lesen wirken */
+  const mS = JSK.match(/function icsAbSetzen\(iso\) \{([\s\S]*?)\n\}/);
+  if (mS && /icsRoh/.test(mS[1])) { ok('der Stichtag wirkt ohne neues Einlesen'); }
+  else { fail('die Datei müsste nochmals gewählt werden'); }
+  const mE = JSK.match(/function icsEinleseBlock\(\) \{([\s\S]*?)\n\}/);
+  if (mE && /Monatsanfang/.test(mE[1]) && /icsAbFeld/.test(mE[1])) {
+    ok('Stichtag frei eingebbar und mit Abkürzungen');
+  } else { fail('kein Bedienelement für den Stichtag'); }
+  if (mE && /zualt:/.test(mE[1])) { ok('die Vorschau nennt die übersprungenen Alten'); }
+  else { fail('man erführe nicht, wie viel weggefiltert wurde'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
