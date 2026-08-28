@@ -3017,11 +3017,16 @@ kat('58 · Termine entfernen');
   } else { warn('Herkunft im Band nicht mehr unterscheidbar'); }
 
   const mL = JSK.match(/function terminLoeschen\(id\) \{([\s\S]*?)\n\}/);
-  if (!mL) { fail('terminLoeschen nicht auswertbar'); }
+  const mV = JSK.match(/function terminVerweiseWeg\(id\) \{([\s\S]*?)\n\}/);
+  if (!mL || !mV) { fail('terminLoeschen nicht auswertbar'); }
   else {
-    if (/WOCHENBLAETTER\.forEach/.test(mL[1]) && /MONATSBLAETTER\.forEach/.test(mL[1])) {
-      ok('Verweise aus Wochen- und Monatsblatt werden mitgeräumt');
-    } else { fail('gelöschter Termin hinterlässt "entfallen" auf anderen Blättern'); }
+    /* Das Aufraeumen liegt in einer gemeinsamen Funktion — Loeschen und
+       Umwandeln brauchen es beide.                                    */
+    if (/terminVerweiseWeg\(id\)/.test(mL[1])) { ok('Löschen räumt die Verweise mit'); }
+    else { fail('gelöschter Termin hinterlässt "entfallen" auf anderen Blättern'); }
+    if (/WOCHENBLAETTER\.forEach/.test(mV[1]) && /MONATSBLAETTER\.forEach/.test(mV[1])) {
+      ok('Wochen- und Monatsblatt werden beide geräumt');
+    } else { fail('ein Blatt bleibt mit Verweisen zurück'); }
   }
 }
 
@@ -4124,6 +4129,85 @@ kat('74 · Jahresblatt und ganztägige Termine');
     if (/ganzt\\u00e4gige Termine/.test(mJ[1])) { ok('der Kopf nennt beide Zahlen'); }
     else { warn('die Kopfzeile zählt nur die Jahrestermine'); }
   }
+}
+
+/* ═══ 75 · Termin und Jahrestermin umwandeln ═══════════════════════════
+   Fehlerarten: beim Umwandeln wechselt die Kennung, und in Google steht
+   der Eintrag danach zweimal; die Verweise aus Wochen- und Monatsblatt
+   zeigen ins Leere; ein mehrtägiger Jahrestermin lässt sich in einen
+   Termin verwandeln und verliert dabei seine Dauer.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('75 · Umwandeln');
+{
+  ['zumJahrestermin', 'zumTermin', 'terminVerweiseWeg'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  /* Eingelesene behalten ihre Kennung auch bei der Ausfuhr */
+  const mE = JSK.match(/function icsEintraege\(\) \{([\s\S]*?)\n\}/);
+  if (mE && /t\.uid \|\| \('ta-t' \+ t\.id\)/.test(mE[1]) &&
+      /j\.uid \|\| \('ta-j' \+ j\.id\)/.test(mE[1])) {
+    ok('eingelesene Einträge behalten ihre Kennung');
+  } else { fail('ein eingelesener Eintrag käme in Google ein zweites Mal an'); }
+  const mB = JSK.match(/function icsBlock\(e, stempel\) \{([\s\S]*?)\n\}/);
+  if (mB && /indexOf\('@'\) === -1/.test(mB[1])) {
+    ok('fremde Kennungen werden nicht nochmals ergänzt');
+  } else { fail('fremde Kennung bekäme ein zweites @timeassist'); }
+
+  /* Das Umwandeln wirklich rechnen */
+  const teile = ['terminVerweiseWeg', 'zumJahrestermin'].map(function (n) {
+    const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+    return m ? m[0] : null;
+  });
+  if (teile.indexOf(null) !== -1) { fail('Umwandlung nicht auswertbar'); }
+  else {
+    let w = null;
+    try {
+      w = new Function(
+        'let neuId = 900; const naechsteId = () => ++neuId;' +
+        'let TERMINE = [{ id:5, datum:"2026-08-21", ganztags:true, t:"Fremd",' +
+        ' ort:"", kal:"feste", uid:"abc@google.com", exp:"x" },' +
+        ' { id:6, datum:"2026-08-22", ganztags:true, t:"Eigen", ort:"",' +
+        ' kal:"alex", uid:null, exp:"y" }];' +
+        'let JAHRESTERMINE = [];' +
+        'let WOCHENBLAETTER = [{ eintraege:[{ id:1, refArt:"termin", refId:5 }],' +
+        ' wichtig:[] }];' +
+        'let MONATSBLAETTER = [{ vorhaben:[{ id:2, refArt:"termin", refId:5 }] }];' +
+        'let editTermin = null; const renderAlles = () => {}; const melde = () => {};' +
+        teile.join('\n') +
+        '\nreturn { wandle:zumJahrestermin, stand:function () {' +
+        ' return { t:TERMINE, j:JAHRESTERMINE, w:WOCHENBLAETTER, m:MONATSBLAETTER }; } };')();
+    } catch (e) { w = null; }
+    if (!w) { fail('Umwandlung nicht ausführbar'); }
+    else {
+      w.wandle(5);
+      const st = w.stand();
+      let f = 0;
+      const j = st.j[0];
+      if (!j || j.von !== '2026-08-21' || j.bis !== '2026-08-21') {
+        f++; fail('Jahrestermin falsch datiert');
+      }
+      /* Fremde Kennung und Ausfuhrvermerk müssen mitwandern */
+      if (!j || j.uid !== 'abc@google.com' || j.exp !== 'x') {
+        f++; fail('Kennung geht verloren — Google bekäme einen zweiten Eintrag');
+      }
+      if (st.t.length !== 1) { f++; fail('der alte Termin blieb stehen'); }
+      if (st.w[0].eintraege.length || st.m[0].vorhaben.length) {
+        f++; fail('Verweise zeigen ins Leere');
+      }
+      /* Ohne fremde Kennung gilt der Eintrag wieder als offen */
+      w.wandle(6);
+      const j2 = w.stand().j[1];
+      if (!j2 || j2.exp !== null) { f++; fail('eigener Eintrag gilt fälschlich als ausgeführt'); }
+      if (!f) { ok('Umwandlung erhält Kennung, Datum und räumt die Verweise'); }
+    }
+  }
+
+  const mZ = JSK.match(/function zumTermin\(id\) \{([\s\S]*?)\n\}/);
+  if (mZ && /j\.von !== j\.bis/.test(mZ[1])) {
+    ok('mehrtägige lassen sich nicht zurückverwandeln');
+  } else { fail('ein mehrtägiger Eintrag verlöre seine Dauer'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
