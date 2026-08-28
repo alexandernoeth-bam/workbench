@@ -20,7 +20,21 @@ const H = fs.readFileSync(PFAD, 'utf8');
 const mS = H.match(/<script>\n'use strict';([\s\S]*)<\/script>/);
 const JS = mS ? mS[1] : '';
 const HTMLTEIL = H.replace(/<script>[\s\S]*?<\/script>/g, '');
-const JSK = JS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+/* Zeilenkommentare entfernen, aber nicht in Zeichenketten: 'PRODID:-//DE'
+   ist kein Kommentar. Deshalb nur schneiden, wenn vor den beiden
+   Schraegstrichen kein ungerades Anfuehrungszeichen offen steht.      */
+const JSK = JS.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map(function (z) {
+  let inStr = null, esc = false;
+  for (let i = 0; i < z.length; i++) {
+    const c = z[i];
+    if (esc) { esc = false; continue; }
+    if (c === '\\') { esc = true; continue; }
+    if (inStr) { if (c === inStr) { inStr = null; } continue; }
+    if (c === "'" || c === '"' || c === '`') { inStr = c; continue; }
+    if (c === '/' && z[i + 1] === '/') { return z.slice(0, i); }
+  }
+  return z;
+}).join('\n');
 
 /* ═══ 1 · Strukturelle Integrität ═══════════════════════════════════════ */
 kat('1 · Strukturelle Integrität');
@@ -3570,6 +3584,115 @@ kat('67 · div-Bilanz der Blattfunktionen');
     }
   });
   if (!schief) { ok('alle ' + BLAETTER.length + ' Blattfunktionen ausgeglichen'); }
+}
+
+/* ═══ 68 · Kalenderausfuhr ═════════════════════════════════════════════
+   Fehlerarten: ohne feste Kennung legt jeder Export Dubletten an; eine
+   Änderung an Zeit oder Titel bleibt unbemerkt, weil nur ein Zeitstempel
+   verglichen wird; Sonderzeichen zerlegen die Datei; ein ganztägiger
+   Eintrag endet einen Tag zu früh, weil das Ende ausschliessend ist.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('68 · Kalenderausfuhr');
+{
+  ['icsEintraege', 'icsAbdruck', 'icsBlock', 'icsDatei', 'icsOffen',
+   'icsAusfuehren', 'kalenderAuf', 'kalWeiter']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  /* Eine Datei wirklich bauen und prüfen */
+  const teile = ['isoPlus', 'isoWt', 'icsEsc', 'icsFalten', 'icsDatum', 'icsZeit',
+                 'icsBlock', 'icsDatei'].map(function (n) {
+    const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+    return m ? m[0] : null;
+  });
+  if (teile.indexOf(null) !== -1) { fail('ICS-Funktionen nicht auswertbar'); }
+  else {
+    let fn = null;
+    try {
+      fn = new Function('const JT_ARTEN = { urlaub:{ n:"Urlaub" } };' +
+        teile.join('\n') + '\nreturn icsDatei;')();
+    } catch (e) { fn = null; }
+    if (!fn) { fail('ICS-Erzeugung nicht ausführbar'); }
+    else {
+      const l = [
+        { art:'termin', uid:'ta-t5', o:{ datum:'2026-08-21', von:'09:30', bis:'10:30',
+          ganztags:false, t:'Zahnarzt; Kontrolle', ort:'Bamberg, Innenstadt' } },
+        { art:'termin', uid:'ta-t6', o:{ datum:'2026-08-22', ganztags:true,
+          t:'Sandkerwa', ort:'' } },
+        { art:'jahr', uid:'ta-j2', o:{ von:'2026-08-20', bis:'2026-08-23',
+          t:'Urlaub', art:'urlaub', ort:'' } },
+      ];
+      const d = fn(l, 'Alex', '20260821T080000Z');
+      let f = 0;
+      if (!/^BEGIN:VCALENDAR/.test(d)) { f++; fail('kein VCALENDAR-Kopf'); }
+      if (!/END:VCALENDAR\r\n$/.test(d)) { f++; fail('Datei endet falsch'); }
+      /* Zeilenenden müssen CRLF sein */
+      if (/[^\r]\n/.test(d)) { f++; fail('Zeilenenden nicht durchgehend CRLF'); }
+      /* Sonderzeichen maskiert */
+      if (d.indexOf('Zahnarzt\\; Kontrolle') === -1) { f++; fail('Semikolon nicht maskiert'); }
+      if (d.indexOf('Bamberg\\, Innenstadt') === -1) { f++; fail('Komma nicht maskiert'); }
+      /* Ganztägig: Ende ist der Folgetag */
+      if (d.indexOf('DTEND;VALUE=DATE:20260823') === -1) {
+        f++; fail('ganztägiger Termin endet einen Tag zu früh');
+      }
+      if (d.indexOf('DTEND;VALUE=DATE:20260824') === -1) {
+        f++; fail('mehrtägiger Eintrag endet einen Tag zu früh');
+      }
+      /* Feste Kennung je Eintrag — sonst Dubletten */
+      if ((d.match(/^UID:/gm) || []).length !== 3) { f++; fail('nicht jeder Eintrag hat eine UID'); }
+      if (!/UID:ta-t5@timeassist/.test(d)) { f++; fail('UID nicht aus der Kennung gebildet'); }
+      /* Keine Zeile über 75 Zeichen */
+      if (!d.split('\r\n').every(z => z.length <= 75)) { f++; fail('Zeile über 75 Zeichen'); }
+      if (!f) { ok('ICS formal korrekt: CRLF, Maskierung, Enddatum, UID, Faltung'); }
+    }
+  }
+
+  /* Der Abdruck muss jede Änderung bemerken */
+  const mA = JSK.match(/function icsAbdruck\(e\) \{[\s\S]*?\n\}/);
+  if (!mA) { fail('icsAbdruck nicht auswertbar'); }
+  else {
+    let fn = null;
+    try { fn = new Function(mA[0] + '\nreturn icsAbdruck;')(); } catch (e) { fn = null; }
+    if (!fn) { fail('icsAbdruck nicht ausführbar'); }
+    else {
+      const bau = () => ({ art:'termin', o:{ datum:'2026-08-21', von:'09:30', bis:'10:30',
+        ganztags:false, t:'Zahnarzt', ort:'', kal:'alex' } });
+      const grund = fn(bau());
+      let f = 0;
+      [['von', '10:00'], ['t', 'Arzt'], ['ort', 'Praxis'], ['kal', 'familie'],
+       ['datum', '2026-08-22']].forEach(function (x) {
+        const e = bau(); e.o[x[0]] = x[1];
+        if (fn(e) === grund) { f++; fail('Änderung an ' + x[0] + ' bleibt unbemerkt'); }
+      });
+      if (!f) { ok('der Abdruck bemerkt jede Änderung'); }
+    }
+  }
+
+  /* Der Kleinkram unter Kontakten darf nicht mitgehen */
+  const mE = JSK.match(/function icsEintraege\(\) \{([\s\S]*?)\n\}/);
+  if (mE && !/KONTAKTE/.test(mE[1])) { ok('Kontakte und Kleinigkeiten bleiben draussen'); }
+  else { fail('der Kleinkram landet im Kalender'); }
+  if (mE && /a\.geplant/.test(mE[1])) { ok('Aktivitäten mit festem Tag gehen mit'); }
+  else { fail('geplante Aktivitäten fehlen'); }
+
+  /* Vermerkt wird erst nach dem Schreiben */
+  const mAus = JSK.match(/function icsAusfuehren\(k\) \{([\s\S]*?)\n\}/);
+  if (mAus) {
+    const iD = mAus[1].indexOf('dateiGeben');
+    const iV = mAus[1].indexOf('e.o.exp = e.abdruck');
+    if (iD !== -1 && iV > iD) { ok('vermerkt wird erst nach dem Schreiben'); }
+    else { fail('der Vermerk steht vor der Datei'); }
+  }
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}\n/);
+  if (mM && /j\.art === 'urlaub' \|\| j\.art === 'besuche'/.test(mM[1])) {
+    ok('Urlaube und Besuche kommen in den Familienkalender');
+  } else { fail('keine sinnvolle Voreinstellung je Art'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 27) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
