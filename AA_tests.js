@@ -3695,6 +3695,109 @@ kat('68 · Kalenderausfuhr');
   else { fail('Schemaversion nicht erhöht'); }
 }
 
+/* ═══ 69 · Kalendereinfuhr ═════════════════════════════════════════════
+   Fehlerarten: jeder zweite Import legt Dubletten an, weil die fremde
+   Kennung nicht gemerkt wird; gefaltete Zeilen werden nicht wieder
+   zusammengesetzt; Weltzeit wird nicht in Ortszeit umgerechnet; das
+   ausschliessende Enddatum macht mehrtägige Einträge einen Tag zu lang;
+   wiederkehrende Termine werden geraten statt übersprungen.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('69 · Kalendereinfuhr');
+{
+  ['icsLesen', 'icsBefund', 'icsUebernehmen', 'icsEntfalten', 'icsZerlegeZeit',
+   'icsAusEsc', 'icsGelesen'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  const holen = function (n) {
+    const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+    return m ? m[0] : null;
+  };
+  const teile = ['isoPlus', 'isoWt', 'icsEntfalten', 'icsZerlegeZeit', 'icsAusEsc',
+                 'icsLesen', 'icsAbdruck', 'icsBefund', 'icsUebernehmen'].map(holen);
+  if (teile.indexOf(null) !== -1) { fail('Einlesefunktionen nicht auswertbar'); }
+  else {
+    let bau = null;
+    try {
+      bau = new Function(
+        'let neuId = 900; const naechsteId = () => ++neuId;' +
+        'let TERMINE = [], JAHRESTERMINE = [];' +
+        teile.join('\n') +
+        '\nreturn { lauf:function (text, kal) {' +
+        '  return icsUebernehmen(icsBefund(icsLesen(text), kal)); },' +
+        ' befund:function (text, kal) { return icsBefund(icsLesen(text), kal); },' +
+        ' stand:function () { return { t:TERMINE, j:JAHRESTERMINE }; } };');
+    } catch (e) { bau = null; }
+    if (!bau) { fail('Einlesen nicht ausführbar'); }
+    else {
+      const w = bau();
+      const datei = ['BEGIN:VCALENDAR',
+        'BEGIN:VEVENT', 'UID:a@g', 'SUMMARY:Elternabend', 'DTSTART:20260903T183000',
+        'DTEND:20260903T200000', 'END:VEVENT',
+        'BEGIN:VEVENT', 'UID:b@g', 'SUMMARY:Urlaub Nordsee',
+        'DTSTART;VALUE=DATE:20260810', 'DTEND;VALUE=DATE:20260818', 'END:VEVENT',
+        'BEGIN:VEVENT', 'UID:c@g', 'SUMMARY:Geburtstag', 'RRULE:FREQ=YEARLY',
+        'DTSTART;VALUE=DATE:20260915', 'DTEND;VALUE=DATE:20260916', 'END:VEVENT',
+        'BEGIN:VEVENT', 'UID:ta-t5@timeassist', 'SUMMARY:Zahnarzt',
+        'DTSTART:20260821T093000', 'DTEND:20260821T103000', 'END:VEVENT',
+        'END:VCALENDAR'].join('\r\n');
+
+      const b = w.befund(datei, 'familie');
+      const arten = {};
+      b.forEach(function (x) { arten[x.art] = (arten[x.art] || 0) + 1; });
+      let f = 0;
+      if (arten.wiederkehrend !== 1) { f++; fail('wiederkehrender Termin nicht übersprungen'); }
+      if (arten.eigen !== 1) { f++; fail('eigener Eintrag nicht erkannt — er käme doppelt'); }
+      if (arten.neu !== 2) { f++; fail('neue Einträge: ' + arten.neu + ' statt 2'); }
+      if (!f) { ok('Befund trennt neu, eigen und übersprungen'); }
+
+      /* Zweimal dieselbe Datei darf keine Dubletten machen */
+      w.lauf(datei, 'familie');
+      const nach1 = w.stand();
+      const r2 = w.lauf(datei, 'familie');
+      const nach2 = w.stand();
+      if (nach1.t.length === nach2.t.length && nach1.j.length === nach2.j.length &&
+          r2.neu === 0 && r2.geaendert === 2) {
+        ok('ein zweiter Import legt keine Dubletten an');
+      } else {
+        fail('Dubletten: ' + nach1.t.length + '/' + nach1.j.length + ' → ' +
+             nach2.t.length + '/' + nach2.j.length);
+      }
+      /* Mehrtägig: das Ende ist ausschliessend */
+      const j = nach2.j[0];
+      if (j && j.von === '2026-08-10' && j.bis === '2026-08-17') {
+        ok('mehrtägiger Eintrag endet am richtigen Tag');
+      } else {
+        fail('Jahrestermin ' + (j ? j.von + '–' + j.bis : 'fehlt'));
+      }
+      /* Eingelesenes gilt als im Kalender vorhanden */
+      if (nach2.t[0] && nach2.t[0].exp) { ok('Eingelesenes gilt nicht sofort als offen'); }
+      else { fail('Eingelesenes stünde sofort wieder zur Ausfuhr an'); }
+    }
+  }
+
+  /* Faltung und Zeitzone */
+  const mE = holen('icsEntfalten');
+  if (mE) {
+    let fn = null;
+    try { fn = new Function(mE + '\nreturn icsEntfalten;')(); } catch (e) { fn = null; }
+    if (fn && fn('SUMMARY:Ein lang\r\n er Titel') === 'SUMMARY:Ein langer Titel') {
+      ok('gefaltete Zeilen werden zusammengesetzt');
+    } else { fail('Faltung wird nicht aufgelöst'); }
+  }
+  const mZ = holen('icsZerlegeZeit');
+  if (mZ && /getUTCDate|Date\.UTC/.test(mZ)) { ok('Weltzeit wird in Ortszeit gerechnet'); }
+  else { fail('Weltzeit bleibt unumgerechnet'); }
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}\n/);
+  if (mM && /t\.uid === undefined/.test(mM[1])) { ok('Migration ergänzt die fremde Kennung'); }
+  else { fail('ohne uid legte jeder Import Dubletten an'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 28) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
