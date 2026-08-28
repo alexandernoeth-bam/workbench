@@ -3856,12 +3856,15 @@ kat('70 · Zellenbearbeitung');
   /* Der Importknopf muss vor den Ausfuhrblöcken stehen */
   const mK = JSK.match(/function kalenderRender\(\) \{([\s\S]*?)\n\}/);
   if (mK) {
-    const iE = mK[1].indexOf('Aus dem Kalender einlesen');
+    /* Der Einleseteil ist ausgelagert — geprueft wird sein Aufruf */
+    const iE = mK[1].indexOf('icsEinleseBlock()');
     const iA = mK[1].indexOf('KALENDER.forEach');
     if (iE !== -1 && iA !== -1 && iE < iA) {
       ok('Einlesen steht vor der Ausfuhr, nicht unter drei Listen');
     } else { fail('der Importknopf liegt hinter allen Kalenderblöcken'); }
   }
+  if (/function icsEinleseBlock\b/.test(JS)) { ok('icsEinleseBlock vorhanden'); }
+  else { fail('der Einleseteil fehlt ganz'); }
 }
 
 /* ═══ 71 · Schreiben in die richtige Zelle ═════════════════════════════
@@ -3941,6 +3944,58 @@ kat('71 · Schreiben in die richtige Zelle');
       /String\(editZelle\.id\) === String\(id\)/.test(mA[1])) {
     ok('geschlossen wird nur die eigene Zelle');
   } else { fail('das Verlassen schliesst die eben geöffnete Zelle wieder'); }
+}
+
+/* ═══ 72 · Kalenderdialog: auswählen und umhängen ══════════════════════
+   Fehlerarten: der Dialog listet nur auf — man kann nichts abwählen und
+   nichts umhängen; die Liste ist abgeschnitten und der Rest unerreichbar;
+   die Auswahl wird gespeichert und wirkt beim nächsten Mal nach; das
+   Ausführen nimmt trotz Abwahl alles mit.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('72 · Kalenderdialog');
+{
+  ['icsWaehlen', 'icsAlleWaehlen'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  const mR = JSK.match(/function kalenderRender\(\) \{([\s\S]*?)\n\}/);
+  if (!mR) { fail('kalenderRender nicht auswertbar'); }
+  else {
+    const t = mR[1];
+    if (/ics-h/.test(t) && /icsWaehlen\(/.test(t)) { ok('jede Zeile hat einen Auswahlhaken'); }
+    else { fail('nichts lässt sich abwählen'); }
+    if (/kalWeiter\(/.test(t)) { ok('jede Zeile lässt sich umhängen'); }
+    else { fail('die Kalenderzuordnung ist im Dialog nicht änderbar'); }
+    if (/icsAlleWaehlen\(/.test(t)) { ok('Alle und Keine je Kalender'); }
+    else { fail('kein Weg, alle auf einmal zu wählen'); }
+    /* Die Liste darf nicht abgeschnitten sein */
+    if (!/\.slice\(0, 8\)/.test(t)) { ok('die Liste zeigt alle Einträge'); }
+    else { fail('die Liste ist nach acht Einträgen abgeschnitten'); }
+    /* Was schon im Kalender steht, muss erkennbar sein */
+    if (/ics-schon/.test(t)) { ok('bereits Ausgeführtes ist gekennzeichnet'); }
+    else { fail('offen und ausgeführt sind nicht unterscheidbar'); }
+  }
+
+  /* Ausgeführt wird nur das Gewählte */
+  const mA = JSK.match(/function icsAusfuehren\(k\) \{([\s\S]*?)\n\}/);
+  if (mA && /icsWahl && icsWahl\[e\.uid\]/.test(mA[1])) {
+    ok('ausgeführt wird nur das Gewählte');
+  } else { fail('die Abwahl wird beim Ausführen übergangen'); }
+
+  /* Die Wahl darf nicht im Bestand landen */
+  const mS = JSK.match(/function saatDB\(\) \{([\s\S]*?)\n\}/);
+  if (mS && !/icsWahl/.test(mS[1])) { ok('die Wahl gilt nur für diese Ausfuhr'); }
+  else { fail('die Auswahl wird gespeichert und wirkt nach'); }
+  const mAuf = JSK.match(/function kalenderAuf\(\) \{([\s\S]*?)\n\}/);
+  if (mAuf && /icsWahl = null/.test(mAuf[1])) { ok('beim Öffnen ist alles gewählt'); }
+  else { fail('die Wahl des letzten Mals wirkt nach'); }
+
+  /* Umhängen muss den Dialog neu zeichnen, sonst bleibt die Zeile stehen */
+  const mW = JSK.match(/function kalWeiter\(art, id\) \{([\s\S]*?)\n\}/);
+  if (mW && /kalenderRender\(\)/.test(mW[1])) {
+    ok('nach dem Umhängen wandert die Zeile sofort');
+  } else { fail('die umgehängte Zeile bleibt im alten Block stehen'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
