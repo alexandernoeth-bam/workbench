@@ -1096,7 +1096,9 @@ kat('25 · Jahresrahmen und Monatshintergrund');
   } else { fail('Jahresrahmen erscheint im Tagesblatt'); }
 
   const mW = JSK.match(/function blattWoche\(\) \{([\s\S]*?)\n\}/);
-  if (mW && /!j\.nurJahr && iso >= j\.von/.test(mW[1])) {
+  /* Die Datumspruefung laeuft jetzt ueber jtLaeuft, damit jaehrliche
+     mitgezaehlt werden.                                              */
+  if (mW && /!j\.nurJahr && jtLaeuft\(j, iso\)/.test(mW[1])) {
     ok('Wochenblatt lässt Jahresrahmen draußen');
   } else { fail('Jahresrahmen erscheint im Wochenblatt'); }
 
@@ -3733,7 +3735,15 @@ kat('69 · Kalendereinfuhr');
         'let neuId = 900; const naechsteId = () => ++neuId;' +
         'let TERMINE = [], JAHRESTERMINE = [];' +
         /* Der Stichtag gehoert dazu, sonst filtert der Befund nicht */
-        'let icsAb = "2026-01-01";' +
+        'let icsAb = "2026-01-01"; let WTERMINE = [];' +
+        /* Die Serienlogik gehoert dazu — der Befund stuetzt sich darauf */
+        ['isoWt', 'isoMontag', 'wochenAbstand', 'wtFaellig', 'rrZerlegen']
+          .map(function (n) {
+            const m = JSK.match(new RegExp('function ' + n +
+              '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+            return m ? m[0] : '';
+          }).join('\n') +
+        'const RR_TAGE = { MO:0, TU:1, WE:2, TH:3, FR:4, SA:5, SU:6 };' +
         teile.join('\n') +
         '\nreturn { lauf:function (text, kal) {' +
         '  return icsUebernehmen(icsBefund(icsLesen(text), kal)); },' +
@@ -3748,8 +3758,10 @@ kat('69 · Kalendereinfuhr');
         'DTEND:20260903T200000', 'END:VEVENT',
         'BEGIN:VEVENT', 'UID:b@g', 'SUMMARY:Urlaub Nordsee',
         'DTSTART;VALUE=DATE:20260810', 'DTEND;VALUE=DATE:20260818', 'END:VEVENT',
-        'BEGIN:VEVENT', 'UID:c@g', 'SUMMARY:Geburtstag', 'RRULE:FREQ=YEARLY',
-        'DTSTART;VALUE=DATE:20260915', 'DTEND;VALUE=DATE:20260916', 'END:VEVENT',
+        /* Woechentlich: das bleibt draussen. Jaehrliche pruefen wir in
+           Kategorie 78, sie werden inzwischen uebernommen.           */
+        'BEGIN:VEVENT', 'UID:c@g', 'SUMMARY:Jour fixe', 'RRULE:FREQ=WEEKLY;BYDAY=MO',
+        'DTSTART:20260907T090000', 'DTEND:20260907T100000', 'END:VEVENT',
         'BEGIN:VEVENT', 'UID:ta-t5@timeassist', 'SUMMARY:Zahnarzt',
         'DTSTART:20260821T093000', 'DTEND:20260821T103000', 'END:VEVENT',
         'END:VCALENDAR'].join('\r\n');
@@ -3758,7 +3770,9 @@ kat('69 · Kalendereinfuhr');
       const arten = {};
       b.forEach(function (x) { arten[x.art] = (arten[x.art] || 0) + 1; });
       let f = 0;
-      if (arten.wiederkehrend !== 1) { f++; fail('wiederkehrender Termin nicht übersprungen'); }
+      /* Woechentliche werden jetzt Serientermine — Kategorie 79 prueft
+         sie im Einzelnen.                                            */
+      if (arten.serie !== 1) { f++; fail('wöchentlicher Termin wird keine Serie'); }
       if (arten.eigen !== 1) { f++; fail('eigener Eintrag nicht erkannt — er käme doppelt'); }
       if (arten.neu !== 2) { f++; fail('neue Einträge: ' + arten.neu + ' statt 2'); }
       if (!f) { ok('Befund trennt neu, eigen und übersprungen'); }
@@ -3768,8 +3782,9 @@ kat('69 · Kalendereinfuhr');
       const nach1 = w.stand();
       const r2 = w.lauf(datei, 'familie');
       const nach2 = w.stand();
+      /* Die Serie zaehlt beim zweiten Lauf als geaendert mit */
       if (nach1.t.length === nach2.t.length && nach1.j.length === nach2.j.length &&
-          r2.neu === 0 && r2.geaendert === 2) {
+          r2.neu === 0 && r2.geaendert === 3) {
         ok('ein zweiter Import legt keine Dubletten an');
       } else {
         fail('Dubletten: ' + nach1.t.length + '/' + nach1.j.length + ' → ' +
@@ -4042,7 +4057,8 @@ kat('73 · Stichtag beim Einlesen');
     let fn = null;
     try {
       fn = new Function('ab',
-        'let TERMINE = [], JAHRESTERMINE = []; let icsAb = ab;' +
+        'let TERMINE = [], JAHRESTERMINE = [], WTERMINE = []; let icsAb = ab;' +
+        'const rrZerlegen = () => null;' +
         teile.join('\n') + '\nreturn icsBefund;');
     } catch (e) { fn = null; }
     if (!fn) { fail('Befund nicht ausführbar'); }
@@ -4097,8 +4113,14 @@ kat('74 · Jahresblatt und ganztägige Termine');
 
     let fn = null;
     try {
+      /* Die Jahreslogik gehoert dazu — jtAnTag stuetzt sich darauf */
+      const hilf = ['jtSchalttag', 'jtVon', 'jtBis', 'jtLaeuft'].map(function (n) {
+        const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+        return m ? m[0] : '';
+      }).join('\n');
       fn = new Function('J', 'T',
-        'const JAHRESTERMINE = J, TERMINE = T;' + mT[0] + '\nreturn jtAnTag;');
+        'const JAHRESTERMINE = J, TERMINE = T;' + hilf + '\n' + mT[0] +
+        '\nreturn jtAnTag;');
     } catch (e) { fn = null; }
     if (!fn) { fail('jtAnTag nicht ausführbar'); }
     else {
@@ -4330,6 +4352,182 @@ kat('77 · Termine im Wochenblatt');
     if (r === 'Sandkerwa,Testfenster,Zahnarzt') { ok('Reihenfolge und Filter korrekt'); }
     else { fail('Reihenfolge: ' + r); }
   }
+}
+
+/* ═══ 78 · Jährliche Jahrestermine ═════════════════════════════════════
+   Fehlerarten: ein Geburtstag muss jedes Jahr neu angelegt werden; der
+   29. Februar fällt in gewöhnlichen Jahren aus; ein jährlicher Eintrag
+   wird vom Stichtag weggefiltert, weil sein erstes Auftreten weit
+   zurückliegt; wöchentliche Regeln werden geraten statt übersprungen.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('78 · Jährliche Jahrestermine');
+{
+  ['jtVon', 'jtBis', 'jtLaeuft', 'jtImZeitraum', 'jtSchalttag']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const teile = ['jtSchalttag', 'jtVon', 'jtBis', 'jtLaeuft', 'jtImZeitraum']
+    .map(function (n) {
+      const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+      return m ? m[0] : null;
+    });
+  if (teile.indexOf(null) !== -1) { fail('Jahreslogik nicht auswertbar'); }
+  else {
+    let w = null;
+    try {
+      w = new Function(teile.join('\n') +
+        '\nreturn { laeuft:jtLaeuft, zeitraum:jtImZeitraum, von:jtVon };')();
+    } catch (e) { w = null; }
+    if (!w) { fail('Jahreslogik nicht ausführbar'); }
+    else {
+      const g = { von:'1954-09-15', bis:'1954-09-15', jaehrlich:true };
+      const u = { von:'2026-08-06', bis:'2026-08-16', jaehrlich:false };
+      const s = { von:'2020-02-29', bis:'2020-02-29', jaehrlich:true };
+      const F = [
+        [g, '2026-09-15', true, 'Geburtstag in einem anderen Jahr'],
+        [g, '2027-09-15', true, 'und im übernächsten'],
+        [g, '2026-09-14', false, 'einen Tag davor'],
+        [u, '2027-08-10', false, 'einmaliger Urlaub wiederholt sich nicht'],
+        [s, '2028-02-29', true, 'Schalttag im Schaltjahr'],
+        [s, '2026-02-28', true, 'Schalttag rückt auf den 28.'],
+        [s, '2026-02-29', false, 'den es gar nicht gibt'],
+      ];
+      let f = 0;
+      F.forEach(function (x) {
+        if (w.laeuft(x[0], x[1]) !== x[2]) { f++; fail(x[3] + ': falsch'); }
+      });
+      if (!f) { ok(F.length + ' Fälle korrekt, Schalttag geprüft'); }
+      if (w.zeitraum(g, '2026-09-01', '2026-09-30') &&
+          !w.zeitraum(g, '2026-07-01', '2026-07-31')) {
+        ok('Zeitraumprüfung trifft das richtige Jahr');
+      } else { fail('Zeitraumprüfung falsch'); }
+    }
+  }
+
+  /* Einfuhr: jährlich ja, wöchentlich nein */
+  const mB = JSK.match(/function icsBefund\(roh, kal\) \{([\s\S]*?)\n\}/);
+  if (!mB) { fail('icsBefund nicht auswertbar'); }
+  else {
+    if (/FREQ=YEARLY/.test(mB[1])) { ok('jährliche Regeln werden übernommen'); }
+    else { fail('auch jährliche werden übersprungen'); }
+    if (/INTERVAL=\(\?!1/.test(mB[1])) { ok('alle zwei Jahre bleibt draussen'); }
+    else { fail('ein Zweijahresrhythmus käme als jährlich an'); }
+    /* Ein jährlicher darf nicht am Stichtag scheitern */
+    if (/!e\.rrule &&/.test(mB[1])) { ok('der Stichtag greift bei jährlichen nicht'); }
+    else { fail('ein Geburtstag von 1954 fiele durch den Stichtag'); }
+    /* Ein eintägiger jährlicher gehört zu den Jahresterminen */
+    if (/\|\| !!e\.jaehrlich/.test(mB[1])) {
+      ok('ein eintägiger jährlicher wird ein Jahrestermin');
+    } else { fail('ein Geburtstag käme als gewöhnlicher Termin an'); }
+  }
+
+  /* Ausfuhr trägt die Regel mit */
+  const mBl = JSK.match(/function icsBlock\(e, stempel\) \{([\s\S]*?)\n\}/);
+  if (mBl && /RRULE:FREQ=YEARLY/.test(mBl[1])) {
+    ok('jährliche gehen mit ihrer Regel hinaus');
+  } else { fail('ein jährlicher Eintrag stünde in Google nur einmal'); }
+
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 30) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
+/* ═══ 79 · Serientermine ═══════════════════════════════════════════════
+   Fehlerarten: wöchentliche und monatliche Termine werden übersprungen
+   und fehlen im Tagesplan; oder sie erscheinen überall und machen
+   Wochen-, Monats- und Jahresblatt unlesbar; die Regel wird falsch
+   gerechnet — der 31. fällt in kurzen Monaten aus, ein Zähler läuft
+   unbegrenzt weiter; eine gespiegelte Serie wird zurückexportiert und
+   verfälscht dabei ihre Regel.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('79 · Serientermine');
+{
+  ['rrZerlegen', 'wtFaellig', 'wtAnTag', 'wtLoeschen'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  /* Die Regeln wirklich rechnen */
+  const teile = ['isoPlus', 'isoWt', 'isoMontag', 'wochenAbstand', 'wtFaellig',
+                 'rrZerlegen'].map(function (n) {
+    const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+    return m ? m[0] : null;
+  });
+  if (teile.indexOf(null) !== -1) { fail('Serienlogik nicht auswertbar'); }
+  else {
+    let w = null;
+    try {
+      w = new Function('const RR_TAGE = { MO:0, TU:1, WE:2, TH:3, FR:4, SA:5, SU:6 };' +
+        teile.join('\n') +
+        '\nreturn function (rr, start, tage) {' +
+        '  const r = rrZerlegen(rr, start); if (!r) { return null; }' +
+        '  const l = []; let d = start;' +
+        '  for (let i = 0; i < tage; i++) { if (wtFaellig(r, d)) { l.push(d); }' +
+        '    d = isoPlus(d, 1); } return { regel:r, treffer:l }; };')();
+    } catch (e) { w = null; }
+    if (!w) { fail('Serienlogik nicht ausführbar'); }
+    else {
+      let f = 0;
+      const F = [
+        ['FREQ=WEEKLY;BYDAY=MO', '2026-08-03', 30,
+         ['2026-08-03', '2026-08-10', '2026-08-17', '2026-08-24'], 'wöchentlich montags'],
+        ['FREQ=WEEKLY;BYDAY=TU,TH;INTERVAL=2', '2026-08-04', 20,
+         ['2026-08-04', '2026-08-06', '2026-08-18', '2026-08-20'], 'jede zweite Woche'],
+        ['FREQ=MONTHLY;BYMONTHDAY=15', '2026-08-15', 100,
+         ['2026-08-15', '2026-09-15', '2026-10-15', '2026-11-15'], 'monatlich am 15.'],
+        /* Der 31. rueckt in kuerzeren Monaten auf den letzten Tag */
+        ['FREQ=MONTHLY;INTERVAL=3', '2026-08-31', 100,
+         ['2026-08-31', '2026-11-30'], 'alle drei Monate am 31.'],
+        ['FREQ=WEEKLY;BYDAY=FR;COUNT=3', '2026-08-07', 60,
+         ['2026-08-07', '2026-08-14', '2026-08-21'], 'dreimal freitags'],
+        /* Mit Enddatum: danach ist Schluss */
+        ['FREQ=WEEKLY;BYDAY=WE;UNTIL=20260826T235959Z', '2026-08-05', 60,
+         ['2026-08-05', '2026-08-12', '2026-08-19', '2026-08-26'], 'mittwochs bis 26.08.'],
+      ];
+      F.forEach(function (x) {
+        const r = w(x[0], x[1], x[2]);
+        if (!r) { f++; fail(x[4] + ': Regel nicht erkannt'); return; }
+        const soll = x[3].join(',');
+        const ist = r.treffer.slice(0, x[3].length).join(',');
+        if (ist !== soll) { f++; fail(x[4] + ': ' + ist); }
+        /* Bei COUNT muss die Serie auch wirklich enden */
+        if (/COUNT/.test(x[0]) && r.treffer.length !== 3) {
+          f++; fail(x[4] + ': ' + r.treffer.length + ' statt 3 Termine');
+        }
+        if (/UNTIL/.test(x[0]) && r.treffer.length !== 4) {
+          f++; fail(x[4] + ': ' + r.treffer.length + ' statt 4 Termine');
+        }
+      });
+      if (!f) { ok(F.length + ' Serienregeln korrekt gerechnet'); }
+      /* Jährliches gehört nicht hierher */
+      if (w('FREQ=YEARLY', '2026-08-01', 5) === null) { ok('jährliche bleiben Jahrestermine'); }
+      else { fail('jährliche würden zu Serienterminen'); }
+    }
+  }
+
+  /* Nur im Tagesblatt */
+  const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
+  if (mT && /wtAnTag\(tagOffen\)/.test(mT[1])) { ok('Serien stehen im Tagesblatt'); }
+  else { fail('Serien fehlen im Tagesplan'); }
+  ['blattWoche', 'blattMonat', 'blattJahrestermine'].forEach(function (n) {
+    const m = JSK.match(new RegExp('function ' + n + '\\(\\) \\{([\\s\\S]*?)\\n\\}'));
+    if (m && !/wtAnTag/.test(m[1])) { ok(n + ' bleibt frei davon'); }
+    else { fail(n + ': die Serien machen das Blatt unlesbar'); }
+  });
+
+  /* Sie werden gespiegelt, nicht zurückgeführt */
+  const mE = JSK.match(/function icsEintraege\(\) \{([\s\S]*?)\n\}/);
+  if (mE && !/WTERMINE/.test(mE[1])) { ok('Serien gehen nicht zurück nach Google'); }
+  else { fail('eine zurückgeführte Serie verfälscht ihre Regel'); }
+  if (mT && /Serie aus dem Kalender/.test(mT[1])) {
+    ok('eine Serie sagt, dass sie in Google gepflegt wird');
+  } else { fail('eine Serie sieht bearbeitbar aus'); }
+
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 31) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
