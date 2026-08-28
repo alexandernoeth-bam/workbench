@@ -3798,6 +3798,151 @@ kat('69 · Kalendereinfuhr');
   else { fail('Schemaversion nicht erhöht'); }
 }
 
+/* ═══ 70 · Zellenbearbeitung ═══════════════════════════════════════════
+   Fehlerarten: die Rechtsbündigkeit wird über einen Buchstaben statt
+   einen Klassennamen entschieden — 'durch' enthält ein r, und der Titel
+   einer erledigten Aktivität rückt beim Bearbeiten nach rechts; die
+   Feldfolge nennt eine Spalte, die es auf dem Blatt gar nicht gibt, und
+   die Tabulatortaste springt ins Leere.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('70 · Zellenbearbeitung');
+{
+  const mZ = JSK.match(/function zelle\(art, id, feld, wertText, folgeName, klasse, platzhalter\) \{[\s\S]*?\n\}/);
+  if (!mZ) { fail('zelle nicht auswertbar'); }
+  else {
+    if (/kls\.indexOf\('r'\)/.test(mZ[0])) { ok('Rechtsbündigkeit über den Klassennamen'); }
+    else { fail('Rechtsbündigkeit über einen Buchstaben — "durch" enthält ein r'); }
+    let fn = null;
+    try {
+      fn = new Function('esc', 'zelleOffen',
+        mZ[0] + '\nreturn zelle;')(x => String(x == null ? '' : x),
+        () => true);
+    } catch (e) { fn = null; }
+    if (!fn) { fail('zelle nicht ausführbar'); }
+    else {
+      const F = [['a-titel durch', false, 'erledigter Titel'],
+                 ['wer', false, 'Wer-Zelle'],
+                 ['dat', true, 'Datumszelle'],
+                 ['r', true, 'Minutenzelle']];
+      let f = 0;
+      F.forEach(function (x) {
+        const rechts = /class="zf r"/.test(fn('akt', 1, 't', 'X', 'voll', x[0], ''));
+        if (rechts !== x[1]) { f++; fail(x[2] + ': ' + (rechts ? 'rechts' : 'links')); }
+      });
+      if (!f) { ok(F.length + ' Zellenarten richtig ausgerichtet'); }
+    }
+  }
+
+  /* Die Feldfolge darf nur Spalten nennen, die das Blatt auch hat */
+  const mF = JS.match(/const FELDFOLGE = \{([\s\S]*?)\n\};/);
+  if (!mF) { fail('FELDFOLGE nicht gefunden'); }
+  else {
+    if (/plan:\s*\['t', 'wer', 'ende', 'min'\]/.test(mF[1])) {
+      ok('das Planblatt hat eine eigene Feldfolge ohne Beginn');
+    } else { fail('die Tabulatortaste springt im Planblatt ins Leere'); }
+  }
+  const mP = JSK.match(/function blattPlan\(pid\) \{([\s\S]*?)\n\}/);
+  if (mP) {
+    if (!/'voll'/.test(mP[1])) { ok('Planblatt nutzt seine eigene Folge'); }
+    else { fail("Planblatt nutzt noch 'voll' — mit einer Spalte, die es nicht hat"); }
+    /* Jede in der Folge genannte Spalte muss auch gerendert werden */
+    const FEHLT = ['t', 'wer', 'ende', 'min'].filter(function (x) {
+      return mP[1].indexOf("'" + x + "'") === -1;
+    });
+    if (!FEHLT.length) { ok('alle Spalten der Folge werden gezeichnet'); }
+    else { fail('Folge nennt fehlende Spalten: ' + FEHLT.join(', ')); }
+  }
+
+  /* Der Importknopf muss vor den Ausfuhrblöcken stehen */
+  const mK = JSK.match(/function kalenderRender\(\) \{([\s\S]*?)\n\}/);
+  if (mK) {
+    const iE = mK[1].indexOf('Aus dem Kalender einlesen');
+    const iA = mK[1].indexOf('KALENDER.forEach');
+    if (iE !== -1 && iA !== -1 && iE < iA) {
+      ok('Einlesen steht vor der Ausfuhr, nicht unter drei Listen');
+    } else { fail('der Importknopf liegt hinter allen Kalenderblöcken'); }
+  }
+}
+
+/* ═══ 71 · Schreiben in die richtige Zelle ═════════════════════════════
+   Fehlerart: das Schreiben sucht sein Ziel über zwei globale Zustände —
+   editZelle und das erste Element mit der Kennung ez. Beim Weiterspringen
+   zeigt editZelle schon auf die neue Zelle, während das Verlassen des
+   alten Feldes erst danach auslöst. Der alte Wert landet dann im neuen
+   Feld: eine frisch angelegte Aktivität bekam die Minutenzahl als Titel.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('71 · Schreiben in die richtige Zelle');
+{
+  ['zelleAusFeld', 'zelleZiel'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  /* Das Feld muss sein Ziel selbst tragen */
+  const mZ = JSK.match(/function zelle\(art, id, feld[\s\S]*?\n\}/);
+  if (!mZ) { fail('zelle nicht auswertbar'); }
+  else {
+    ['data-art', 'data-id', 'data-feld'].forEach(function (x) {
+      if (mZ[0].indexOf(x) !== -1) { ok('Eingabefeld trägt ' + x); }
+      else { fail(x + ' fehlt am Eingabefeld'); }
+    });
+    if (/onblur="zelleAusFeld\(this\)"/.test(mZ[0])) {
+      ok('das Verlassen schreibt über das Feld selbst');
+    } else { fail('das Verlassen schreibt über den globalen Zustand'); }
+  }
+
+  /* Den Ablauf wirklich nachstellen */
+  const mT = JSK.match(/function zelleZiel\(art, id, feld, v\) \{[\s\S]*?\n\}/);
+  if (!mT) { fail('zelleZiel nicht auswertbar'); }
+  else {
+    let w = null;
+    try {
+      w = new Function(
+        /* Zwei Eintraege, geschrieben wird in den zweiten: sonst faende
+           auch ein falscher Zugriff auf den ersten das Richtige.     */
+        'let AKTIVITAETEN = [{ id:7, t:"Anderes", min:15 },' +
+        ' { id:11, t:"Schritt", min:90 }];' +
+        'let KONTAKTE = [];' +
+        mT[0] +
+        '\nreturn { schreibe:zelleZiel, neu:function () {' +
+        '  AKTIVITAETEN.push({ id:200, t:"", min:30 }); },' +
+        ' stand:function () { return AKTIVITAETEN; } };')();
+    } catch (e) { w = null; }
+    if (!w) { fail('zelleZiel nicht ausführbar'); }
+    else {
+      /* Minuten schreiben, neue Aktivität anlegen, verspätet nochmals
+         schreiben — der Wert muss beim alten Eintrag bleiben.        */
+      w.schreibe('akt', 11, 'min', '90');
+      w.neu();
+      w.schreibe('akt', 11, 'min', '90');
+      const st = w.stand();
+      const alt = st.find(x => x.id === 11);
+      const erste = st.find(x => x.id === 7);
+      const neuA = st.find(x => x.id === 200);
+      if (alt.min === 90 && neuA.t === '' && neuA.min === 30 &&
+          erste.min === 15 && erste.t === 'Anderes') {
+        ok('der Wert bleibt beim verlassenen Eintrag');
+      } else {
+        fail('geschrieben wurde falsch: neue t="' + neuA.t + '" min=' + neuA.min +
+             ' / Ziel min=' + alt.min + ' / erste min=' + erste.min);
+      }
+      /* Ein unbekanntes Ziel darf nichts anrichten */
+      const vorher = JSON.stringify(w.stand());
+      w.schreibe('akt', 999, 't', 'X');
+      if (JSON.stringify(w.stand()) === vorher) {
+        ok('ein unbekanntes Ziel richtet nichts an');
+      } else { fail('unbekanntes Ziel schreibt irgendwohin'); }
+    }
+  }
+
+  /* Das verzögerte Schliessen darf nicht die neue Zelle treffen */
+  const mA = JSK.match(/function zelleAusFeld\(el\) \{([\s\S]*?)\n\}/);
+  if (mA && /editZelle\.art === art &&/.test(mA[1]) &&
+      /String\(editZelle\.id\) === String\(id\)/.test(mA[1])) {
+    ok('geschlossen wird nur die eigene Zelle');
+  } else { fail('das Verlassen schliesst die eben geöffnete Zelle wieder'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
