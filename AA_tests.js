@@ -1231,7 +1231,8 @@ kat('27 · Spaltenbreiten und Arten-Farben');
         arten[m[1]] = m[2];
       });
     const k = Object.keys(arten);
-    ['besuche', 'sonstiges'].forEach(function (x) {
+    ['urlaub', 'krank', 'dienstreise', 'besuche', 'abwesend', 'termin',
+     'geburtstag', 'feier', 'feiertag', 'sonstiges'].forEach(function (x) {
       if (k.indexOf(x) !== -1) { ok('Art ' + x + ' vorhanden'); }
       else { fail('Art ' + x + ' fehlt'); }
     });
@@ -2767,7 +2768,9 @@ kat('54 · Wochenblatt in drei Spalten');
     if (!fn) { fail('wocheSpalte nicht ausführbar'); }
     else {
       const F = [
-        [{ refArt:'termin' }, 'termin'],
+        /* Ein Terminverweis wird nicht mehr eigens gezeigt — der Termin
+           selbst steht in der Spalte, sonst staende er doppelt.      */
+        [{ refArt:'termin' }, 'nichts'],
         [{ refArt:'aktivitaet' }, 'akt'],
         [{ refArt:'tagnotiz' }, 'notiz'],
         [{ refArt:'jahrestermin' }, 'termin'],
@@ -2798,8 +2801,9 @@ kat('54 · Wochenblatt in drei Spalten');
         ok('Spalte ' + s[1] + ' wird gefüllt');
       } else { fail('Spalte ' + s[1] + ' bleibt leer'); }
     });
-    /* Eine einzelne Zeile darf ausschreiben */
-    if (/l\.length === 1 \? ' einzeln' : ''/.test(mW[1])) {
+    /* Eine einzelne Zeile darf ausschreiben — gezaehlt wird alles in
+       der Spalte, auch die unmittelbar gelesenen Termine.           */
+    if (/anzahl === 1 \? ' einzeln' : ''/.test(mW[1])) {
       ok('einzelner Eintrag wird ausgeschrieben');
     } else { fail('auch ein einzelner Eintrag wird gekürzt'); }
   }
@@ -4208,6 +4212,124 @@ kat('75 · Umwandeln');
   if (mZ && /j\.von !== j\.bis/.test(mZ[1])) {
     ok('mehrtägige lassen sich nicht zurückverwandeln');
   } else { fail('ein mehrtägiger Eintrag verlöre seine Dauer'); }
+}
+
+/* ═══ 76 · Ledereinband ════════════════════════════════════════════════
+   Fehlerarten: der Einband klappt bei jedem Zurückkehren zur App auf und
+   wird zur Last; er lässt sich nicht überspringen; die Sicherungsfrage
+   erscheint unter dem Deckel; das Zuklappen springt ohne Bewegung, weil
+   beide Zustände im selben Bildaufbau gesetzt werden.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('76 · Ledereinband');
+{
+  ['einbandZeigen', 'einbandWeg', 'einbandSchliessen', 'einbandUeberspringen']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  const mZ = JSK.match(/function einbandZeigen\(\) \{([\s\S]*?)\n\}/);
+  if (!mZ) { fail('einbandZeigen nicht auswertbar'); }
+  else {
+    if (/DB\.ansicht\.einbandTag === isoHeute\(\)/.test(mZ[1])) {
+      ok('höchstens einmal am Tag');
+    } else { fail('der Einband käme bei jedem Start'); }
+    if (/setTimeout\(einbandWeg/.test(mZ[1])) { ok('er räumt sich selbst weg'); }
+    else { fail('der Deckel bliebe liegen'); }
+  }
+
+  /* Überspringen muss möglich sein */
+  if (/onclick="einbandUeberspringen\(\)"/.test(HTMLTEIL)) {
+    ok('ein Tipp überspringt ihn');
+  } else { fail('man müsste die Bewegung abwarten'); }
+
+  /* Zuklappen braucht zwei Bildaufbauten, sonst gibt es keine Bewegung */
+  const mS = JSK.match(/function einbandSchliessen\(\) \{([\s\S]*?)\n\}/);
+  if (!mS) { fail('einbandSchliessen nicht auswertbar'); }
+  else {
+    const n = (mS[1].match(/requestAnimationFrame/g) || []).length;
+    if (n >= 2) { ok('das Zuklappen wird sichtbar bewegt'); }
+    else { fail('Deckel springt zu, ohne sich zu bewegen'); }
+    if (/dk-bilanz/.test(mS[1])) { ok('die Bilanz steht auf dem Deckel'); }
+    else { fail('keine Bilanz beim Zuklappen'); }
+  }
+
+  /* Die Sicherungsfrage darf nicht unter dem Deckel liegen */
+  const mSt = JS.match(/einbandZeigen\(\);\s*\n\s*setTimeout\(sicherungPruefen, (\d+)\)/);
+  if (mSt && parseInt(mSt[1], 10) >= 1400) {
+    ok('die Sicherungsfrage kommt nach dem Aufklappen (' + mSt[1] + ' ms)');
+  } else { fail('die Sicherungsfrage läge unter dem Deckel'); }
+
+  /* Der Deckel braucht Tiefe am Elternteil, sonst klappt nichts */
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  if (/\.geraet \{[^}]*perspective:/.test(css)) { ok('das Gerät gibt die Tiefe vor'); }
+  else { fail('ohne perspective bleibt die Bewegung flach'); }
+  if (/\.deckel \{[^}]*transform-origin:\s*left center/.test(css)) {
+    ok('die Angel sitzt links');
+  } else { fail('der Deckel dreht um die falsche Kante'); }
+  const mD = /\.deckel \{([^}]*)\}/.exec(css);
+  if (mD && /900ms/.test(mD[1])) { ok('900 ms wie gewünscht'); }
+  else { fail('andere Dauer als vereinbart'); }
+  /* Er darf das Blatt nur zeigen, wenn er auch gebraucht wird */
+  if (/\.deckel \{[^}]*display:\s*none/.test(css) && /\.deckel\.da \{/.test(css)) {
+    ok('sonst liegt er nicht im Weg');
+  } else { fail('der Deckel liegt dauerhaft über dem Blatt'); }
+}
+
+/* ═══ 77 · Termine im Wochenblatt ══════════════════════════════════════
+   Fehlerart: Tages-, Monats- und Jahresblatt lesen die Termine
+   unmittelbar aus dem Kalender, das Wochenblatt zeigte nur, was jemand
+   dort abgelegt hatte. Ein am Tag erfasster oder eingelesener Termin
+   fehlte damit ausgerechnet in der Wochenübersicht.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('77 · Termine im Wochenblatt');
+{
+  const mW = JSK.match(/function blattWoche\(\) \{([\s\S]*?)\n\}/);
+  if (!mW) { fail('blattWoche nicht auswertbar'); }
+  else {
+    const t = mW[1];
+    if (/TERMINE\.filter\(x => x\.datum === iso/.test(t)) {
+      ok('die Woche liest die Termine unmittelbar');
+    } else { fail('die Woche zeigt nur abgelegte Verweise'); }
+    /* Leere Termine gehören nicht ins Blatt */
+    if (/\(x\.t \|\| ''\)\.trim\(\)/.test(t)) { ok('leere Termine bleiben draussen'); }
+    else { fail('ein leerer Termin erzeugt eine leere Zeile'); }
+    /* Ganztägiges zuerst, dann nach Uhrzeit */
+    if (/x\.ganztags !== y\.ganztags/.test(t)) {
+      ok('ganztägig zuerst, dann nach Uhrzeit');
+    } else { fail('die Termine stehen in zufälliger Folge'); }
+    /* Ein Tipp führt auf den Tag */
+    if (/tagSpringen\(/.test(t) && /wo-et/.test(t)) {
+      ok('ein Termin führt auf sein Tagesblatt');
+    } else { fail('der Termin ist von der Woche aus nicht erreichbar'); }
+  }
+
+  /* Kein doppeltes Erscheinen */
+  const mS = JSK.match(/function wocheSpalte\(e\) \{([\s\S]*?)\n\}/);
+  if (mS && /e\.refArt === 'termin'\) \{ return 'nichts'/.test(mS[1])) {
+    ok('ein Terminverweis erscheint nicht zusätzlich');
+  } else { fail('Termin und Verweis stünden doppelt nebeneinander'); }
+
+  /* Die Sortierung wirklich rechnen */
+  let fn = null;
+  try {
+    fn = new Function('l',
+      'return l.filter(x => x.datum === "2026-08-21" && (x.t || "").trim())' +
+      '.sort(function (x, y) {' +
+      '  if (x.ganztags !== y.ganztags) { return x.ganztags ? -1 : 1; }' +
+      '  return (x.von || "") < (y.von || "") ? -1 : 1; });');
+  } catch (e) { fn = null; }
+  if (fn) {
+    const r = fn([
+      { id:1, datum:'2026-08-21', ganztags:false, von:'14:00', t:'Zahnarzt' },
+      { id:2, datum:'2026-08-21', ganztags:true, t:'Sandkerwa' },
+      { id:3, datum:'2026-08-21', ganztags:false, von:'09:30', t:'Testfenster' },
+      { id:4, datum:'2026-08-22', ganztags:false, von:'10:00', t:'Anderer Tag' },
+      { id:5, datum:'2026-08-21', ganztags:false, von:'11:00', t:'   ' },
+    ]).map(x => x.t).join(',');
+    if (r === 'Sandkerwa,Testfenster,Zahnarzt') { ok('Reihenfolge und Filter korrekt'); }
+    else { fail('Reihenfolge: ' + r); }
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
