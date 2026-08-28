@@ -4114,13 +4114,15 @@ kat('74 · Jahresblatt und ganztägige Termine');
     let fn = null;
     try {
       /* Die Jahreslogik gehoert dazu — jtAnTag stuetzt sich darauf */
-      const hilf = ['jtSchalttag', 'jtVon', 'jtBis', 'jtLaeuft'].map(function (n) {
+      const hilf = ['jtSchalttag', 'jtVon', 'jtBis', 'jtLaeuft', 'jtFilterPasst']
+        .map(function (n) {
         const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
         return m ? m[0] : '';
       }).join('\n');
       fn = new Function('J', 'T',
-        'const JAHRESTERMINE = J, TERMINE = T;' + hilf + '\n' + mT[0] +
-        '\nreturn jtAnTag;');
+        'const JAHRESTERMINE = J, TERMINE = T;' +
+        'let jtFilter = null; const JT_ARTEN = { urlaub:{}, termin:{} };' +
+        hilf + '\n' + mT[0] + '\nreturn jtAnTag;');
     } catch (e) { fn = null; }
     if (!fn) { fail('jtAnTag nicht ausführbar'); }
     else {
@@ -4528,6 +4530,79 @@ kat('79 · Serientermine');
   const mV = JS.match(/const DB_VERSION = (\d+)/);
   if (mV && parseInt(mV[1], 10) >= 31) { ok('Schemaversion auf ' + mV[1]); }
   else { fail('Schemaversion nicht erhöht'); }
+}
+
+/* ═══ 80 · Filter im Jahresblatt ═══════════════════════════════════════
+   Fehlerarten: die Zusammenfassung steht unter den Einträgen, wo sie
+   niemand sucht; ein Filter wirkt nur auf die Liste, nicht auf das
+   Raster — beide zeigen dann Verschiedenes; ein Eintrag mit unbekannter
+   Art fällt durch jeden Filter und ist unerreichbar.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('80 · Filter im Jahresblatt');
+{
+  ['jtFilterSetzen', 'jtFilterPasst'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  const mJ = JSK.match(/function blattJahrestermine\(\) \{([\s\S]*?)\n\}/);
+  if (!mJ) { fail('blattJahrestermine nicht auswertbar'); }
+  else {
+    const t = mJ[1];
+    /* Reihenfolge: Raster, Zusammenfassung, Einträge */
+    const iR = t.indexOf('</tbody></table>');
+    const iS = t.indexOf('Summe je Art');
+    const iE = t.indexOf("abschnitt('Eintr");
+    if (iR !== -1 && iS !== -1 && iE !== -1 && iR < iS && iS < iE) {
+      ok('erst Raster, dann Zusammenfassung, dann Einträge');
+    } else { fail('die Zusammenfassung steht an der falschen Stelle'); }
+    if (/jtFilterSetzen\(/.test(t)) { ok('die Zusammenfassung filtert'); }
+    else { fail('die Summenzeilen sind nicht anklickbar'); }
+    if (/jtFilterSetzen\(null\)/.test(t)) { ok('eine Zeile Alle hebt den Filter auf'); }
+    else { fail('kein Weg zurück zu allen Einträgen'); }
+    /* Die Liste muss ebenfalls gefiltert werden */
+    if (/if \(!jtFilterPasst\(j\)\) \{ return false; \}/.test(t)) {
+      ok('die Liste folgt dem Filter');
+    } else { fail('die Liste zeigt weiterhin alles'); }
+  }
+
+  /* Das Raster muss demselben Filter folgen */
+  const mA = JSK.match(/function jtAnTag\(iso\) \{([\s\S]*?)\n\}/);
+  if (mA && /jtFilterPasst\(j\)/.test(mA[1])) { ok('das Raster folgt dem Filter'); }
+  else { fail('Raster und Liste zeigen Verschiedenes'); }
+  if (mA && /!jtFilter \|\| jtFilter === 'termin'/.test(mA[1])) {
+    ok('ganztägige Termine folgen dem Filter Termin');
+  } else { fail('ganztägige Termine ignorieren den Filter'); }
+
+  /* Eine unbekannte Art darf nicht unerreichbar werden */
+  const mP = JSK.match(/function jtFilterPasst\(j\) \{[\s\S]*?\n\}/);
+  if (!mP) { fail('jtFilterPasst nicht auswertbar'); }
+  else {
+    let fn = null;
+    try {
+      fn = new Function('f',
+        'let jtFilter = f; const JT_ARTEN = { urlaub:{}, termin:{}, geburtstag:{} };' +
+        mP[0] + '\nreturn jtFilterPasst;');
+    } catch (e) { fn = null; }
+    if (!fn) { fail('jtFilterPasst nicht ausführbar'); }
+    else {
+      const J = [{ art:'urlaub' }, { art:'geburtstag' }, { art:'termin' },
+                 { art:'unbekannt' }];
+      const zaehl = k => J.filter(fn(k)).length;
+      let f = 0;
+      if (zaehl(null) !== 4) { f++; fail('ohne Filter fehlen Einträge'); }
+      if (zaehl('urlaub') !== 1) { f++; fail('Filter Urlaub: ' + zaehl('urlaub')); }
+      /* Unbekannte Arten zählen als Termin — sonst wären sie in keinem
+         Filter zu finden.                                            */
+      if (zaehl('termin') !== 2) { f++; fail('unbekannte Art ist unerreichbar'); }
+      if (!f) { ok('Filter trifft jede Art, auch unbekannte'); }
+    }
+  }
+
+  /* Ein zweites Antippen derselben Art hebt den Filter auf */
+  const mS = JSK.match(/function jtFilterSetzen\(k\) \{([\s\S]*?)\n\}/);
+  if (mS && /k !== jtFilter/.test(mS[1])) { ok('nochmals antippen hebt auf'); }
+  else { fail('ein gesetzter Filter lässt sich nur über Alle lösen'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
