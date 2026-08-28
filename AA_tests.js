@@ -4072,6 +4072,60 @@ kat('73 · Stichtag beim Einlesen');
   else { fail('man erführe nicht, wie viel weggefiltert wurde'); }
 }
 
+/* ═══ 74 · Jahresblatt zeigt denselben Rahmen ══════════════════════════
+   Fehlerart: das Monatsblatt fasst Jahrestermine und ganztägige Termine
+   zum festen Rahmen zusammen, das Jahresblatt zeigte nur die
+   Jahrestermine. Ein eingelesener eintägiger Termin stand damit im Tages-
+   und Monatsblatt, im Jahr aber nicht — und niemand fand den Grund.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('74 · Jahresblatt und ganztägige Termine');
+{
+  const mT = JSK.match(/function jtAnTag\(iso\) \{[\s\S]*?\n\}/);
+  if (!mT) { fail('jtAnTag nicht auswertbar'); }
+  else {
+    if (/TERMINE\.forEach/.test(mT[0])) { ok('ganztägige Termine gehören zum Rahmen'); }
+    else { fail('das Jahresblatt zeigt nur Jahrestermine'); }
+
+    let fn = null;
+    try {
+      fn = new Function('J', 'T',
+        'const JAHRESTERMINE = J, TERMINE = T;' + mT[0] + '\nreturn jtAnTag;');
+    } catch (e) { fn = null; }
+    if (!fn) { fail('jtAnTag nicht ausführbar'); }
+    else {
+      const f = fn(
+        [{ id:1, t:'Kreta', von:'2026-08-06', bis:'2026-08-16', art:'urlaub' }],
+        [{ id:5, datum:'2026-08-21', ganztags:true, t:'Sandkerwa' },
+         { id:6, datum:'2026-08-21', ganztags:false, von:'09:30', t:'Zahnarzt' },
+         { id:7, datum:'2026-08-22', ganztags:true, t:'' }]);
+      let fe = 0;
+      if (f('2026-08-10').length !== 1) { fe++; fail('Jahrestermin fehlt'); }
+      const eins = f('2026-08-21');
+      if (eins.length !== 1 || eins[0].t !== 'Sandkerwa') {
+        fe++; fail('ganztägiger Termin nicht im Jahresblatt');
+      }
+      /* Zeitgebundenes gehört nicht in den Rahmen — sonst stünde jeder
+         Zahnarzttermin als Balken im Jahr.                            */
+      if (eins.some(x => x.t === 'Zahnarzt')) { fe++; fail('Termin mit Uhrzeit im Jahresraster'); }
+      if (f('2026-08-22').length) { fe++; fail('leerer Termin erscheint'); }
+      if (!fe) { ok('Jahrestermine und ganztägige Termine, nichts Zeitgebundenes'); }
+      /* Sie müssen unterscheidbar bleiben */
+      if (eins[0] && eins[0].ganztagsTermin) { ok('Herkunft bleibt unterscheidbar'); }
+      else { fail('Termin und Jahrestermin nicht auseinanderzuhalten'); }
+    }
+  }
+
+  const mJ = JSK.match(/function blattJahrestermine\(\) \{([\s\S]*?)\n\}/);
+  if (mJ) {
+    /* Ein Termin darf nicht den Jahrestermin-Dialog öffnen */
+    if (/j\.ganztagsTermin/.test(mJ[1]) && /tagSpringen/.test(mJ[1])) {
+      ok('ein Termin führt auf sein Tagesblatt, nicht in den Jahresdialog');
+    } else { fail('der Balken öffnet den falschen Dialog'); }
+    if (/ganzt\\u00e4gige Termine/.test(mJ[1])) { ok('der Kopf nennt beide Zahlen'); }
+    else { warn('die Kopfzeile zählt nur die Jahrestermine'); }
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
