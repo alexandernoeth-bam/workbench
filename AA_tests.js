@@ -4605,6 +4605,109 @@ kat('80 · Filter im Jahresblatt');
   else { fail('ein gesetzter Filter lässt sich nur über Alle lösen'); }
 }
 
+/* ═══ 81 · Drucksatz ═══════════════════════════════════════════════════
+   Fehlerarten: eine lange Tabelle läuft über den Seitenrand hinaus statt
+   umzubrechen; auf der Folgeseite fehlt die Kopfzeile und niemand weiss
+   mehr, welche Spalte was ist; ein Bauplan enthält Geometrie und passt
+   dann nur in ein Format; ein Blatt ohne Inhalt erzeugt ein leeres PDF
+   statt einer Ansage.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('81 · Drucksatz');
+{
+  ['druckSetzen', 'druckAuf', 'druckLos', 'druckRender'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  /* Jedes Blatt braucht einen Bauplan, und jeder Bauplan ein Blatt */
+  const mB = JS.match(/const DR_BLAETTER = \{([\s\S]*?)\n\};/);
+  const mA = JS.match(/const DR_BAU = \{([\s\S]*?)\};/);
+  if (!mB || !mA) { fail('DR_BLAETTER oder DR_BAU nicht gefunden'); }
+  else {
+    const bl = (mB[1].match(/^\s*(\w+):/gm) || []).map(s => s.replace(/[^\w]/g, ''));
+    const bau = (mA[1].match(/(\w+):\s*dr\w+/g) || []).map(s => s.split(':')[0].trim());
+    const fehlt = bl.filter(k => bau.indexOf(k) === -1);
+    if (!fehlt.length) { ok(bl.length + ' Blätter, jedes mit Bauplan'); }
+    else { fail('ohne Bauplan: ' + fehlt.join(', ')); }
+    /* Und jede Bauplanfunktion muss es geben */
+    const namen = (mA[1].match(/dr[A-Z]\w+/g) || []);
+    const ohne = namen.filter(n => !new RegExp('function ' + n + '\\b').test(JS));
+    if (!ohne.length) { ok('alle Bauplanfunktionen vorhanden'); }
+    else { fail('fehlende Funktionen: ' + ohne.join(', ')); }
+  }
+
+  /* Ein Bauplan darf keine Geometrie kennen */
+  ['drTag', 'drWoche', 'drMonat', 'drJahr', 'drCheckliste', 'drPlan', 'drZiel',
+   'drNotiz', 'drJournal'].forEach(function (n) {
+    const m = JSK.match(new RegExp('function ' + n + '\\(o\\) \\{[\\s\\S]*?\\n\\}'));
+    if (!m) { fail(n + ' nicht auswertbar'); return; }
+    if (/doc\.|addPage|setFontSize|\bmm\b/.test(m[0])) {
+      fail(n + ' enthält Geometrie und passt nur in ein Format');
+    }
+  });
+  ok('kein Bauplan kennt Geometrie');
+
+  /* Der Umbruch: nachgebaut mit denselben Maßen */
+  const mF = JS.match(/const DR_FORMATE = \{([\s\S]*?)\n\};/);
+  if (!mF) { fail('DR_FORMATE nicht gefunden'); }
+  else {
+    let werte = null;
+    try { werte = new Function('return {' + mF[1] + '};')(); } catch (e) { werte = null; }
+    if (!werte) { fail('DR_FORMATE nicht auswertbar'); }
+    else {
+      let f = 0;
+      Object.keys(werte).forEach(function (k) {
+        const F = werte[k];
+        const nutz = F.h - F.rand - F.fussrand;
+        if (nutz < F.tabzh * 8) {
+          f++; fail(k + ': nur ' + Math.floor(nutz / F.tabzh) + ' Zeilen je Seite');
+        }
+        /* Der Rand muss innerhalb des Blattes liegen */
+        if (F.rand * 2 >= F.b) { f++; fail(k + ': Rand grösser als das Blatt'); }
+      });
+      if (!f) {
+        ok(Object.keys(werte).length + ' Formate mit brauchbarer Nutzhöhe');
+      }
+      /* Seitenzahl für eine lange Liste */
+      const a4 = werte.a4;
+      const proSeite = Math.floor((a4.h - a4.rand - a4.fussrand) / a4.tabzh);
+      if (proSeite >= 30 && proSeite <= 60) {
+        ok('A4 fasst ' + proSeite + ' Tabellenzeilen je Seite');
+      } else { fail('A4 fasst ' + proSeite + ' Zeilen — unplausibel'); }
+    }
+  }
+
+  /* Umbruch und wiederholte Kopfzeile */
+  const mS = JSK.match(/function druckSetzen\(bauplan, formatKey, dateiname\) \{([\s\S]*?)\n\}\n/);
+  if (!mS) { fail('druckSetzen nicht auswertbar'); }
+  else {
+    if (/if \(y \+ hoehe > UNTEN\) \{ neueSeite\(\)/.test(mS[1])) {
+      ok('der Setzer bricht um, statt über den Rand zu laufen');
+    } else { fail('lange Blätter laufen über den Seitenrand'); }
+    if (/kopfzeile = kopf;/.test(mS[1])) {
+      ok('die Tabellenkopfzeile wiederholt sich auf Folgeseiten');
+    } else { fail('auf Seite 2 fehlt die Kopfzeile'); }
+    /* Die vorherige Kopfzeile muss zurückgesetzt werden */
+    if (/kopfzeile = vorher;/.test(mS[1])) {
+      ok('nach der Tabelle gilt die Kopfzeile nicht mehr');
+    } else { fail('die Kopfzeile bleibt auf allen Folgeseiten stehen'); }
+    if (/seitenfuss\(\)/.test(mS[1])) { ok('jede Seite trägt Fuss und Seitenzahl'); }
+    else { fail('keine Seitenzahl'); }
+    /* Spaltenbreiten als Anteile, nicht in Millimetern */
+    if (/BR \* \(s\.b \|\| 1\) \/ summe/.test(mS[1])) {
+      ok('Spaltenbreiten als Anteile — dieselbe Tabelle passt in jedes Format');
+    } else { fail('Spaltenbreiten fest in Millimetern'); }
+  }
+
+  /* Ein Blatt ohne Inhalt muss es sagen */
+  const mR = JSK.match(/function druckRender\(\) \{([\s\S]*?)\n\}/);
+  if (mR && /Es ist kein Plan aufgeschlagen/.test(mR[1])) {
+    ok('ohne aufgeschlagenen Plan wird nichts gedruckt');
+  } else { fail('ein leeres PDF statt einer Ansage'); }
+  if (mR && /kn\.disabled = !!hinweis/.test(mR[1])) { ok('der Knopf sperrt dann'); }
+  else { fail('man könnte trotzdem drucken'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
