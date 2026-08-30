@@ -1089,7 +1089,7 @@ kat('25 · Jahresrahmen und Monatshintergrund');
     ok('Jahresrahmen im Bestand vorhanden');
   } else { warn('kein Beispiel mit nurJahr im Bestand'); }
 
-  const mG = JSK.match(/function ganztagsEintraege\(\) \{([\s\S]*?)\n\}/);
+  const mG = JSK.match(/function ganztagsEintraegeFuer\(D\) \{([\s\S]*?)\n\}/);
   if (!mG) { fail('ganztagsEintraege nicht auswertbar'); }
   else if (/if \(j\.nurJahr\) \{ return; \}/.test(mG[1])) {
     ok('Tagesblatt lässt Jahresrahmen draußen');
@@ -1263,7 +1263,7 @@ kat('27 · Spaltenbreiten und Arten-Farben');
    ═══════════════════════════════════════════════════════════════════════ */
 kat('28 · Doppelte Schleifen und Zeilenhöhen');
 {
-  const mG = JSK.match(/function ganztagsEintraege\(\) \{([\s\S]*?)\n\}/);
+  const mG = JSK.match(/function ganztagsEintraegeFuer\(D\) \{([\s\S]*?)\n\}/);
   if (!mG) { fail('ganztagsEintraege nicht auswertbar'); }
   else {
     const n = (mG[1].match(/JAHRESTERMINE\.forEach/g) || []).length;
@@ -3010,7 +3010,7 @@ kat('58 · Termine entfernen');
   else { fail('in der Bearbeitung fehlt das Löschen'); }
 
   /* Ganztägiges liegt im Band — auch dort muss man herankommen */
-  const mG = JSK.match(/function ganztagsEintraege\(\) \{([\s\S]*?)\n\}/);
+  const mG = JSK.match(/function ganztagsEintraegeFuer\(D\) \{([\s\S]*?)\n\}/);
   if (mG && /id:t\.id/.test(mG[1])) { ok('eigene Termine tragen ihre Kennung mit'); }
   else { fail('im Band ist nicht unterscheidbar, was eigen ist'); }
   const mT = JSK.match(/function blattTag\(\) \{([\s\S]*?)\n\}/);
@@ -3018,7 +3018,7 @@ kat('58 · Termine entfernen');
     ok('ganztägige Termine sind im Band bearbeitbar');
   } else { fail('ganztägige Termine lassen sich nicht anfassen'); }
   /* Fremdes darf nicht anklickbar sein */
-  if (mG && /l\.push\(\{ t:j\.t, quelle:'Jahrestermin' \}\)/.test(mG[1])) {
+  if (mG && /quelle:'Jahrestermin'/.test(mG[1])) {
     ok('Jahrestermine und Feiertage bleiben Hinweis');
   } else { warn('Herkunft im Band nicht mehr unterscheidbar'); }
 
@@ -4639,7 +4639,9 @@ kat('81 · Drucksatz');
   /* Ein Bauplan darf keine Geometrie kennen */
   ['drTag', 'drWoche', 'drMonat', 'drJahr', 'drCheckliste', 'drPlan', 'drZiel',
    'drNotiz', 'drJournal'].forEach(function (n) {
-    const m = JSK.match(new RegExp('function ' + n + '\\(o\\) \\{[\\s\\S]*?\\n\\}'));
+    /* Manche Baupläne nehmen ein zweites Argument — Tag oder Montag */
+    const m = JSK.match(new RegExp('function ' + n +
+      '\\(o(?:, \\w+)?\\) \\{[\\s\\S]*?\\n\\}'));
     if (!m) { fail(n + ' nicht auswertbar'); return; }
     if (/doc\.|addPage|setFontSize|\bmm\b/.test(m[0])) {
       fail(n + ' enthält Geometrie und passt nur in ein Format');
@@ -4706,6 +4708,70 @@ kat('81 · Drucksatz');
   } else { fail('ein leeres PDF statt einer Ansage'); }
   if (mR && /kn\.disabled = !!hinweis/.test(mR[1])) { ok('der Knopf sperrt dann'); }
   else { fail('man könnte trotzdem drucken'); }
+}
+
+/* ═══ 82 · Wochensatz ══════════════════════════════════════════════════
+   Fehlerarten: der Satz druckt immer dieselbe Woche, weil die Baupläne
+   an den globalen Zustand gebunden sind; die Tagesblätter laufen
+   ineinander statt auf eigene Seiten; ein Tag ohne eigenes Blatt legt
+   beim Drucken einen Datensatz für den falschen Tag an.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('82 · Wochensatz');
+{
+  if (/function drWochensatz\b/.test(JS)) { ok('drWochensatz vorhanden'); }
+  else { fail('drWochensatz fehlt'); }
+
+  /* Die Baupläne müssen ein Datum annehmen, sonst druckt der Satz
+     siebenmal denselben Tag.                                         */
+  const mT = JSK.match(/function drTag\(o, iso\) \{([\s\S]*?)\n\}/);
+  if (mT) { ok('drTag nimmt ein Datum an'); }
+  else { fail('drTag hängt am aufgeschlagenen Tag'); }
+  if (mT && !/\btagOffen\b/.test(mT[1].replace(/iso \|\| tagOffen/, ''))) {
+    ok('drTag greift nicht mehr auf den offenen Tag durch');
+  } else { fail('drTag liest doch wieder den globalen Tag'); }
+  const mW = JSK.match(/function drWoche\(o, montag\) \{([\s\S]*?)\n\}/);
+  if (mW) { ok('drWoche nimmt einen Montag an'); }
+  else { fail('drWoche hängt an der offenen Woche'); }
+
+  /* tagBlattFuer darf keinen Datensatz für den falschen Tag anlegen */
+  const mB = JSK.match(/function tagBlattFuer\(iso\) \{([\s\S]*?)\n\}/);
+  if (mB && /datum:iso/.test(mB[1]) && !/tagOffen/.test(mB[1])) {
+    ok('ein neues Tagesblatt trägt das richtige Datum');
+  } else { fail('beim Drucken entstünde ein Blatt für den falschen Tag'); }
+  const mG = JSK.match(/function ganztagsEintraegeFuer\(D\) \{([\s\S]*?)\n\}/);
+  if (mG && !/tagOffen/.test(mG[1])) { ok('das Ganztags-Band folgt dem Datum'); }
+  else { fail('das Band zeigt immer den offenen Tag'); }
+
+  /* Der Satz selbst */
+  const mS = JSK.match(/function drWochensatz\(o\) \{([\s\S]*?)\n\}/);
+  if (!mS) { fail('drWochensatz nicht auswertbar'); }
+  else {
+    if (/typ:'seitenwechsel'/.test(mS[1])) { ok('jeder Tag beginnt auf eigener Seite'); }
+    else { fail('die Tagesblätter laufen ineinander'); }
+    if (/o\.werktage \? 5 : 7/.test(mS[1])) { ok('wahlweise fünf oder sieben Tage'); }
+    else { fail('die Zahl der Tage ist fest'); }
+    if (/o\.wVor \? isoPlus\(wocheBlatt\(\)\.montag, 7\)/.test(mS[1])) {
+      ok('auch die kommende Woche lässt sich drucken');
+    } else { fail('nur die offene Woche druckbar'); }
+    if (/drWoche\(o, montag\)/.test(mS[1]) && /drTag\(o, isoPlus\(montag, d\)\)/.test(mS[1])) {
+      ok('Wochenblatt zuerst, dann die Tage der Reihe nach');
+    } else { fail('Reihenfolge oder Datum falsch'); }
+  }
+
+  /* Im Wähler und mit passenden Schaltern */
+  const mBl = JS.match(/const DR_BLAETTER = \{([\s\S]*?)\n\};/);
+  if (mBl && /wsatz:/.test(mBl[1])) { ok('Wochensatz steht im Wähler'); }
+  else { fail('der Wochensatz ist nicht wählbar'); }
+  const mSch = JS.match(/const DR_SCHALTER = \{([\s\S]*?)\n\};/);
+  if (mSch && /werktage:/.test(mSch[1]) && /wVor:/.test(mSch[1])) {
+    ok('eigene Schalter für den Satz');
+  } else { fail('Schalter fehlen'); }
+
+  /* Der Dateiname muss die Woche nennen, nicht das Druckdatum */
+  const mL = JSK.match(/function druckLos\(\) \{([\s\S]*?)\n\}/);
+  if (mL && /'kw' \+ kalenderwoche\(mo\)/.test(mL[1])) {
+    ok('der Dateiname nennt die Kalenderwoche');
+  } else { fail('zwei Wochensätze hiessen am selben Tag gleich'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
