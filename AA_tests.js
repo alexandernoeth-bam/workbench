@@ -4774,6 +4774,79 @@ kat('82 · Wochensatz');
   } else { fail('zwei Wochensätze hiessen am selben Tag gleich'); }
 }
 
+/* ═══ 83 · Move-Dreisatz ═══════════════════════════════════════════════
+   Fehlerarten: das Format erreicht den Bauplan nicht, der Dreisatz greift
+   nie; die Zeitleiste zeichnet Termine ausserhalb ihrer Stunden oder
+   überdeckt den Seitenfuss; ein Termin ohne Ende bekommt keine Höhe; auf
+   A4 wird der Tag ebenfalls zerrissen, obwohl dort alles auf eine Seite
+   passt.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('83 · Move-Dreisatz');
+{
+  /* Das Format muss in den Bauplan gereicht werden */
+  const mL = JSK.match(/function druckLos\(\) \{([\s\S]*?)\n\}/);
+  if (mL && /format:drFormat/.test(mL[1])) { ok('das Format erreicht den Bauplan'); }
+  else { fail('der Bauplan erfährt das Format nicht'); }
+
+  const mT = JSK.match(/function drTag\(o, iso\) \{([\s\S]*?)\n\}/);
+  if (!mT) { fail('drTag nicht auswertbar'); }
+  else {
+    const t = mT[1];
+    if (/dreisatz = \(o\.format === 'move'\)/.test(t)) {
+      ok('der Dreisatz gilt nur für das Move');
+    } else { fail('auch A4 würde zerrissen'); }
+    const n = (t.match(/typ:'seitenwechsel'/g) || []).length;
+    if (n === 2) { ok('zwei Seitenwechsel — drei Seiten'); }
+    else { fail(n + ' Seitenwechsel statt zwei'); }
+    if (/typ:'zeitleiste'/.test(t)) { ok('Seite eins trägt die Zeitleiste'); }
+    else { fail('keine Zeitleiste'); }
+    if (/fuellen:true/.test(t)) { ok('die Zeitleiste füllt die Seite'); }
+    else { fail('die Zeitleiste bleibt ein Streifen'); }
+    /* Auf A4 bleibt die Tabelle */
+    if (/spalten:\[\{ t:'Zeit', b:2 \}/.test(t)) { ok('A4 behält die Terminliste'); }
+    else { fail('A4 hat keine Termine mehr'); }
+  }
+
+  /* Der Baustein muss im Setzer stehen */
+  const mS = JSK.match(/function druckSetzen\(bauplan, formatKey, dateiname\) \{([\s\S]*?)\n\}\n/);
+  if (!mS) { fail('druckSetzen nicht auswertbar'); }
+  else {
+    const z = mS[1].match(/zeitleiste: function \(b\) \{([\s\S]*?)\n    \},/);
+    if (!z) { fail('Baustein zeitleiste fehlt'); }
+    else {
+      /* Termine ausserhalb der Stunden dürfen nicht gezeichnet werden */
+      if (/if \(e <= vonSt \* 60 \|\| a >= bisSt \* 60\) \{ return; \}/.test(z[1])) {
+        ok('Termine ausserhalb der Stunden bleiben draussen');
+      } else { fail('ein Termin um fünf Uhr würde über den Rand gezeichnet'); }
+      /* Und angeschnittene werden geklemmt */
+      if (/Math\.max\(inMin\(t\.von\), vonSt \* 60\)/.test(z[1]) &&
+          /Math\.min\(inMin\(t\.bis \|\| t\.von\)/.test(z[1])) {
+        ok('angeschnittene Termine werden geklemmt');
+      } else { fail('ein Termin über Mitternacht liefe aus dem Raster'); }
+      /* Ein Termin ohne Ende braucht trotzdem Höhe */
+      if (/Math\.max\(y1 \+ proStunde \* 0\.34/.test(z[1])) {
+        ok('ein Termin ohne Ende bekommt eine Mindesthöhe');
+      } else { fail('ein Termin ohne Endzeit wäre unsichtbar'); }
+      /* Die Leiste darf den Fuss nicht überdecken */
+      if (/UNTEN - y - 2/.test(z[1])) { ok('die Leiste bleibt über dem Seitenfuss'); }
+      else { fail('die Zeitleiste liefe in den Fuss'); }
+    }
+  }
+
+  /* Die Höhe je Stunde muss für eine Zeile reichen */
+  const mF = JS.match(/const DR_FORMATE = \{([\s\S]*?)\n\};/);
+  if (mF) {
+    const m = /move:\s*\{[^}]*h:([\d.]+), rand:([\d.]+), fussrand:([\d.]+)/.exec(mF[1]);
+    if (m) {
+      const nutz = parseFloat(m[1]) - parseFloat(m[2]) - parseFloat(m[3]);
+      const proStunde = (nutz - 17) / 16;
+      if (proStunde >= 4) {
+        ok('je Stunde ' + proStunde.toFixed(1) + ' mm — genug für eine Zeile');
+      } else { fail('je Stunde nur ' + proStunde.toFixed(1) + ' mm'); }
+    }
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
