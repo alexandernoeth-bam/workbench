@@ -4847,6 +4847,66 @@ kat('83 · Move-Dreisatz');
   }
 }
 
+/* ═══ 84 · Masse im Druck ══════════════════════════════════════════════
+   Fehlerarten: das Kästchen wird an der Schriftgrösse bemessen und wird
+   auf A4 fast acht Millimeter gross; die Terminschrift in der Zeitleiste
+   ist so gross wie im Fliesstext und sprengt einen Block von wenigen
+   Millimetern; freie Zeilen zum Nachtragen haben kein Kästchen — man
+   kann Nachgetragenes nicht abhaken.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('84 · Masse im Druck');
+{
+  const mS = JSK.match(/function druckSetzen\(bauplan, formatKey, dateiname\) \{([\s\S]*?)\n\}\n/);
+  if (!mS) { fail('druckSetzen nicht auswertbar'); }
+  else {
+    /* Das Kaestchen haengt an der Zeilenhoehe */
+    if (/kastenMass = function \(\) \{ return F\.zh \* 0\.62; \}/.test(mS[1])) {
+      ok('das Kästchen ist an der Zeilenhöhe bemessen');
+    } else { fail('das Kästchen hängt an der Schriftgrösse'); }
+    if (!/const s = F\.fs\.text \* 0\.34/.test(mS[1])) {
+      ok('keine Bemessung mehr über die Schriftgrösse');
+    } else { fail('die alte Bemessung steht noch da'); }
+    /* Die Terminschrift in der Leiste ist die kleine */
+    const z = mS[1].match(/zeitleiste: function \(b\) \{([\s\S]*?)\n    \},/);
+    if (z && /doc\.setFontSize\(F\.fs\.klein\);\s*\n\s*doc\.text\(kurz\(t\.t/.test(z[1])) {
+      ok('Termine in der Zeitleiste in kleiner Schrift');
+    } else { fail('die Terminschrift ist so gross wie der Fliesstext'); }
+    /* Freie Zeilen koennen ein Kaestchen tragen */
+    const l = mS[1].match(/linien: function \(b\) \{([\s\S]*?)\n    \},/);
+    if (l && /if \(b\.kasten\)/.test(l[1])) { ok('freie Zeilen können ein Kästchen tragen'); }
+    else { fail('freie Zeilen bleiben ohne Kästchen'); }
+  }
+
+  /* Die Masse wirklich rechnen */
+  const mF = JS.match(/const DR_FORMATE = \{([\s\S]*?)\n\};/);
+  if (mF) {
+    let f = 0;
+    [['a4', 6.2], ['move', 4.6]].forEach(function (x) {
+      const m = new RegExp(x[0] + ':[\\s\\S]*?zh:([\\d.]+)').exec(mF[1]);
+      if (!m) { f++; fail(x[0] + ': Zeilenhöhe nicht gefunden'); return; }
+      const kasten = parseFloat(m[1]) * 0.62;
+      /* Zwischen zwei und fuenf Millimetern ist ein Kaestchen brauchbar */
+      if (kasten < 2 || kasten > 5) {
+        f++; fail(x[0] + ': Kästchen ' + kasten.toFixed(1) + ' mm');
+      }
+    });
+    if (!f) { ok('Kästchen in beiden Formaten zwischen 2 und 5 mm'); }
+  }
+
+  /* Die abhakbaren Blöcke müssen Kästchen haben, die anderen nicht */
+  const bl = (JSK.match(/typ:'linien'[^}]*/g) || []);
+  const mit = bl.filter(x => /kasten:true/.test(x)).length;
+  if (mit >= 6) { ok(mit + ' von ' + bl.length + ' Zeilenblöcken mit Kästchen'); }
+  else { fail('nur ' + mit + ' Zeilenblöcke zum Abhaken'); }
+  /* Reflexion und Notizen brauchen keine */
+  const mT = JSK.match(/function drTag\(o, iso\) \{([\s\S]*?)\n\}/);
+  if (mT) {
+    const nachNotizen = mT[1].slice(mT[1].indexOf("t:'Notizen'"));
+    if (!/kasten:true/.test(nachNotizen)) { ok('Notizzeilen bleiben ohne Kästchen'); }
+    else { fail('auch die Notizen bekommen Kästchen'); }
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
