@@ -4523,9 +4523,11 @@ kat('79 · Serientermine');
   const mE = JSK.match(/function icsEintraege\(\) \{([\s\S]*?)\n\}/);
   if (mE && !/WTERMINE/.test(mE[1])) { ok('Serien gehen nicht zurück nach Google'); }
   else { fail('eine zurückgeführte Serie verfälscht ihre Regel'); }
-  if (mT && /Serie aus dem Kalender/.test(mT[1])) {
-    ok('eine Serie sagt, dass sie in Google gepflegt wird');
-  } else { fail('eine Serie sieht bearbeitbar aus'); }
+  /* Eine Serie laesst sich jetzt loesen: was in Google geloescht wurde,
+     sieht TimeAssist nicht und muss hier von Hand weg.               */
+  if (mT && /serieAuf\(/.test(mT[1])) {
+    ok('eine Serie lässt sich anfassen');
+  } else { fail('eine Serie ist nicht loszuwerden'); }
 
   const mV = JS.match(/const DB_VERSION = (\d+)/);
   if (mV && parseInt(mV[1], 10) >= 31) { ok('Schemaversion auf ' + mV[1]); }
@@ -4626,9 +4628,21 @@ kat('81 · Drucksatz');
   else {
     const bl = (mB[1].match(/^\s*(\w+):/gm) || []).map(s => s.replace(/[^\w]/g, ''));
     const bau = (mA[1].match(/(\w+):\s*dr\w+/g) || []).map(s => s.split(':')[0].trim());
-    const fehlt = bl.filter(k => bau.indexOf(k) === -1);
-    if (!fehlt.length) { ok(bl.length + ' Blätter, jedes mit Bauplan'); }
-    else { fail('ohne Bauplan: ' + fehlt.join(', ')); }
+    /* Das Heft baut sich selbst — feste Seiten und Sprungmarken passen
+       nicht in den fliessenden Satz. Es braucht deshalb keinen Bauplan,
+       aber einen eigenen Weg im Druckknopf.                          */
+    const SELBST = ['heft'];
+    const fehlt = bl.filter(k => bau.indexOf(k) === -1 && SELBST.indexOf(k) === -1);
+    if (!fehlt.length) {
+      ok(bl.length + ' Blätter: ' + (bl.length - SELBST.length) +
+         ' mit Bauplan, ' + SELBST.length + ' selbstbauend');
+    } else { fail('ohne Bauplan: ' + fehlt.join(', ')); }
+    SELBST.forEach(function (k) {
+      const m = JSK.match(/function druckLos\(\) \{([\s\S]*?)\n\}/);
+      if (m && new RegExp("drBlatt === '" + k + "'").test(m[1])) {
+        ok(k + ' hat einen eigenen Weg');
+      } else { fail(k + ' ist wählbar, tut aber nichts'); }
+    });
     /* Und jede Bauplanfunktion muss es geben */
     const namen = (mA[1].match(/dr[A-Z]\w+/g) || []);
     const ohne = namen.filter(n => !new RegExp('function ' + n + '\\b').test(JS));
@@ -4905,6 +4919,188 @@ kat('84 · Masse im Druck');
     if (!/kasten:true/.test(nachNotizen)) { ok('Notizzeilen bleiben ohne Kästchen'); }
     else { fail('auch die Notizen bekommen Kästchen'); }
   }
+}
+
+/* ═══ 85 · Monatsheft für den Move ═════════════════════════════════════
+   Fehlerarten: die Sprungmarken zeigen auf falsche Seiten, weil die
+   Seitenzahlen erst beim Zeichnen entstehen; ein Monat mit sechs
+   berührten Wochen verschiebt alles danach; das Heft ist bunt oder
+   graustufig statt schwarzweiss — auf E-Papier nur Unschärfe; ein Tag
+   ausserhalb des Monats bekommt eine Sprungmarke ins Leere.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('85 · Monatsheft');
+{
+  ['heftBauen', 'jtAnTagRoh'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  const mH = JSK.match(/function heftBauen\(o\) \{([\s\S]*?)\n\}\n/);
+  if (!mH) { fail('heftBauen nicht auswertbar'); }
+  else {
+    const t = mH[1];
+    /* Erst zaehlen, dann zeichnen */
+    const iP = t.indexOf('P.notiz = s;');
+    const iZ = t.indexOf('neueSeite();');
+    if (iP !== -1 && iZ !== -1 && iP < iZ) {
+      ok('die Seitenzahlen stehen fest, bevor gezeichnet wird');
+    } else { fail('Sprungmarken zeigten auf noch unbekannte Seiten'); }
+    if (/doc\.link\(/.test(t)) { ok('Sprungmarken sind gesetzt'); }
+    else { fail('keine Verweise im Heft'); }
+    /* Schwarzweiss: keine Farbe ausser Grauwerten */
+    const farben = (t.match(/set(?:Text|Draw|Fill)Color\(([^)]*)\)/g) || []);
+    const bunt = farben.filter(function (f) {
+      const z = f.match(/-?\d+/g) || [];
+      return z.length === 3 && !(z[0] === z[1] && z[1] === z[2]);
+    });
+    if (!bunt.length) { ok(farben.length + ' Farbangaben, alle schwarzweiss'); }
+    else { fail('bunte Farbe im Heft: ' + bunt[0]); }
+    /* Punktraster */
+    if (/raster = function/.test(t) && /doc\.circle/.test(t)) {
+      ok('Punktraster als Schreibgrund');
+    } else { fail('kein Punktraster'); }
+    /* Ein Tag ausserhalb des Monats darf keine Marke bekommen */
+    if (/if \(drin\) \{\s*\n\s*doc\.link/.test(t)) {
+      ok('nur Tage des Monats tragen eine Sprungmarke');
+    } else { fail('ein Nachbartag verwiese ins Leere'); }
+  }
+
+  /* Die Seitenrechnung wirklich nachrechnen */
+  const teile = ['isoPlus', 'isoWt', 'isoMontag'].map(function (n) {
+    const m = JSK.match(new RegExp('function ' + n + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+    return m ? m[0] : null;
+  });
+  if (teile.indexOf(null) === -1) {
+    const f = new Function(teile.join('\n') +
+      '\nreturn function (monatOffen) {' +
+      '  const jahr = parseInt(monatOffen.slice(0, 4), 10);' +
+      '  const monat = parseInt(monatOffen.slice(5), 10);' +
+      '  const tage = new Date(Date.UTC(jahr, monat, 0)).getUTCDate();' +
+      '  const letzter = monatOffen + "-" + String(tage).padStart(2, "0");' +
+      '  let mo = isoMontag(monatOffen + "-01"), w = 0;' +
+      '  while (mo <= letzter) { w += 1; mo = isoPlus(mo, 7); }' +
+      '  return { tage:tage, wochen:w, gesamt:1 + w + tage + 4 + 2 + 20 }; };')();
+    const F = [['2026-09', 30, 5], ['2026-08', 31, 6], ['2027-02', 28, 4]];
+    let fe = 0;
+    F.forEach(function (x) {
+      const r = f(x[0]);
+      if (r.tage !== x[1] || r.wochen !== x[2]) {
+        fe++; fail(x[0] + ': ' + r.tage + ' Tage, ' + r.wochen + ' Wochen');
+      }
+    });
+    if (!fe) { ok('Seitenrechnung stimmt, auch bei sechs berührten Wochen'); }
+    const sep = f('2026-09');
+    if (sep.gesamt === 62) { ok('September 2026: ' + sep.gesamt + ' Seiten'); }
+    else { fail('September ergibt ' + sep.gesamt + ' Seiten'); }
+  }
+
+  /* Die Masse müssen zum Schreiben taugen */
+  const mF = JS.match(/const HF = \{([\s\S]*?)\n\};/);
+  if (!mF) { fail('HF nicht gefunden'); }
+  else {
+    const z = {};
+    ['b', 'h', 'rand', 'kopf', 'fuss'].forEach(function (k) {
+      const m = new RegExp(k + ':\\s*([\\d.]+)').exec(mF[1]);
+      if (m) { z[k] = parseFloat(m[1]); }
+    });
+    const nutz = z.h - z.rand - z.kopf - z.fuss;
+    const proStunde = nutz * 0.66 / 16;
+    if (proStunde >= 4) {
+      ok('Tagesraster ' + proStunde.toFixed(1) + ' mm je Stunde');
+    } else { fail('nur ' + proStunde.toFixed(1) + ' mm je Stunde'); }
+    const zelle = (z.b - 2 * z.rand) / 7;
+    if (zelle >= 9) { ok('Monatszelle ' + zelle.toFixed(1) + ' mm breit'); }
+    else { fail('Monatszelle nur ' + zelle.toFixed(1) + ' mm'); }
+  }
+
+  const mBl = JS.match(/const DR_BLAETTER = \{([\s\S]*?)\n\};/);
+  if (mBl && /heft:/.test(mBl[1])) { ok('das Heft steht im Wähler'); }
+  else { fail('das Heft ist nicht wählbar'); }
+  const mL = JSK.match(/function druckLos\(\) \{([\s\S]*?)\n\}/);
+  if (mL && /drBlatt === 'heft'\) \{ heftBauen/.test(mL[1])) {
+    ok('der Druckknopf baut das Heft');
+  } else { fail('der Knopf führt ins Leere'); }
+}
+
+/* ═══ 86 · Serien lösen ════════════════════════════════════════════════
+   Fehlerart: Serientermine sind gespiegelt und unantastbar. Was in Google
+   gelöscht wurde, sieht TimeAssist aber nicht — in einer Exportdatei
+   fehlt es einfach. Der Eintrag bleibt dann für immer stehen.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('86 · Serien lösen');
+{
+  ['wtAusnahme', 'wtVerselbstaendigen', 'serieAuf', 'serieZu']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  /* Die Ausnahme muss beim Rechnen greifen */
+  const mF = JSK.match(/function wtFaellig\(r, iso, ohneEnde, aus\) \{[\s\S]*?\n\}/);
+  if (!mF) { fail('wtFaellig nimmt keine Ausnahmen an'); }
+  else {
+    if (/aus && aus\.indexOf\(iso\) !== -1/.test(mF[0])) {
+      ok('ausgenommene Tage fallen aus der Serie');
+    } else { fail('die Ausnahme wird nicht geprüft'); }
+    const mA = JSK.match(/function wtAnTag\(iso\) \{[\s\S]*?\n\}/);
+    if (mA && /w\.aus/.test(mA[0])) { ok('das Tagesblatt reicht sie durch'); }
+    else { fail('die Ausnahme erreicht die Anzeige nicht'); }
+
+    /* Wirklich rechnen */
+    const teile = ['isoPlus', 'isoWt', 'isoMontag', 'wochenAbstand']
+      .map(function (n) {
+        const m = JSK.match(new RegExp('function ' + n +
+          '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+        return m ? m[0] : '';
+      }).join('\n');
+    let fn = null;
+    try { fn = new Function(teile + '\n' + mF[0] + '\nreturn wtFaellig;')(); }
+    catch (e) { fn = null; }
+    if (!fn) { fail('wtFaellig nicht ausführbar'); }
+    else {
+      const r = { freq:'woche', intervall:1, ab:'2026-08-03', bis:'', tage:[0] };
+      let f = 0;
+      if (!fn(r, '2026-08-10', false, [])) { f++; fail('normaler Montag fehlt'); }
+      if (fn(r, '2026-08-10', false, ['2026-08-10'])) {
+        f++; fail('der ausgenommene Tag erscheint trotzdem');
+      }
+      if (!fn(r, '2026-08-17', false, ['2026-08-10'])) {
+        f++; fail('die Ausnahme trifft auch andere Tage');
+      }
+      if (!f) { ok('die Ausnahme trifft genau einen Tag'); }
+    }
+  }
+
+  /* Verselbständigen macht einen echten Termin und nimmt den Tag aus */
+  const mV = JSK.match(/function wtVerselbstaendigen\(id, iso\) \{([\s\S]*?)\n\}/);
+  if (!mV) { fail('wtVerselbstaendigen nicht auswertbar'); }
+  else {
+    if (/TERMINE\.push\(t\)/.test(mV[1]) && /wtAusnahme\(id, iso\)/.test(mV[1])) {
+      ok('der Termin wird echt und fällt aus der Serie');
+    } else { fail('der Termin stünde danach doppelt da'); }
+    if (/uid:null/.test(mV[1])) { ok('ohne fremde Kennung — er gehört jetzt hierher'); }
+    else { fail('er trüge die Kennung der Serie weiter'); }
+  }
+
+  /* Drei Wege im Dialog */
+  const mD = JSK.match(/function serieAuf\(id, iso\) \{([\s\S]*?)\n\}/);
+  if (!mD) { fail('serieAuf nicht auswertbar'); }
+  else {
+    ['wtVerselbstaendigen', 'wtAusnahme', 'wtLoeschen'].forEach(function (x) {
+      if (mD[1].indexOf(x) !== -1) { ok('Dialog bietet ' + x); }
+      else { fail(x + ' fehlt im Dialog'); }
+    });
+    if (/seit/.test(mD[1])) { ok('der Dialog nennt die Regel der Serie'); }
+    else { warn('man erführe nicht, welche Serie man löscht'); }
+  }
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}\n/);
+  if (mM && /Array\.isArray\(w\.aus\)/.test(mM[1])) {
+    ok('Migration ergänzt die Ausnahmeliste');
+  } else { fail('vorhandene Serien hätten keine Ausnahmeliste'); }
+  const mVer = JS.match(/const DB_VERSION = (\d+)/);
+  if (mVer && parseInt(mVer[1], 10) >= 32) { ok('Schemaversion auf ' + mVer[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
