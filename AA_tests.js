@@ -5169,6 +5169,92 @@ kat('87 · Anlegen und Migration');
   } else { warn('das Blatt liest seiten nicht mehr'); }
 }
 
+/* ═══ 88 · Punkteraster ════════════════════════════════════════════════
+   Fehlerarten: Bildschirm und Druck verwenden verschiedene Masse und
+   sehen unterschiedlich aus; am Bildschirm wird das Raster in
+   Bildpunkten gesetzt und ist damit im kleinen Rahmen ein anderes als im
+   grossen; ein Punkt wird kleiner als zwei Bildpunkte und verwischt; das
+   Raster wird erst nach dem Inhalt gezeichnet und deckt ihn zu.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('88 · Punkteraster');
+{
+  const mR = JS.match(/const RASTER = \{([^}]*)\}/);
+  if (!mR) { fail('RASTER nicht gefunden'); }
+  else {
+    const w = {};
+    ['abstand', 'punkt', 'grau', 'papierBreite'].forEach(function (k) {
+      const m = new RegExp(k + ':\\s*([\\d.]+)').exec(mR[1]);
+      if (m) { w[k] = parseFloat(m[1]); }
+    });
+    if (w.abstand === 3.5 && w.punkt === 0.4) {
+      ok('3,5 mm Abstand, 0,4 mm Punkt wie vereinbart');
+    } else { fail('andere Masse als vereinbart: ' + JSON.stringify(w)); }
+    /* Ton 30 Prozent entspricht Grauwert 216 */
+    if (w.grau >= 205 && w.grau <= 225) { ok('Ton bei ' + w.grau + ' — rund 30 %'); }
+    else { fail('Ton ' + w.grau + ' liegt neben den 30 %'); }
+    if (w.papierBreite === 148) { ok('die Blattfläche gilt als A5 breit'); }
+    else { fail('kein Papiermass für den Bildschirm'); }
+  }
+
+  /* Ein Mass für beides: der Druck darf keine eigenen Zahlen haben */
+  const mS = JSK.match(/function druckSetzen\(bauplan, formatKey, dateiname\) \{([\s\S]*?)\n\}\n/);
+  if (mS && /RASTER\.abstand/.test(mS[1]) && /RASTER\.punkt/.test(mS[1])) {
+    ok('der Setzer nimmt dieselben Masse');
+  } else { fail('der Druck rechnet mit eigenen Zahlen'); }
+  const mH = JSK.match(/function heftBauen\(o\) \{([\s\S]*?)\n\}\n/);
+  if (mH && /RASTER\.abstand/.test(mH[1])) { ok('das Heft ebenso'); }
+  else { fail('das Heft hat ein anderes Raster'); }
+  if (!/HF\.punkt/.test(JSK)) { ok('keine zweite Rasterangabe mehr im Heft'); }
+  else { fail('im Heft steht noch eine eigene Rasterangabe'); }
+
+  /* Auf jeder Seite, und zwar zuerst */
+  if (mS) {
+    const iR = mS[1].indexOf('rasterSeite();\n  bauplan.forEach');
+    if (iR !== -1) { ok('das Raster liegt unter dem Inhalt der ersten Seite'); }
+    else { fail('das Raster deckt den Inhalt zu oder fehlt auf Seite eins'); }
+    const mN = mS[1].match(/const neueSeite = function \(\) \{([\s\S]*?)\n  \};/);
+    if (mN) {
+      const iA = mN[1].indexOf('addPage');
+      const iRa = mN[1].indexOf('rasterSeite()');
+      const iK = mN[1].indexOf('kopfzeile()');
+      if (iRa > iA && iK > iRa) { ok('auf Folgeseiten: Raster, dann Kopfzeile'); }
+      else { fail('Reihenfolge auf Folgeseiten falsch'); }
+    }
+  }
+
+  /* Am Bildschirm über den Massstab, nicht in Bildpunkten */
+  const mSk = JSK.match(/function skaliere\(\) \{([\s\S]*?)\n\}/);
+  if (!mSk) { fail('skaliere nicht auswertbar'); }
+  else {
+    if (/RASTER\.papierBreite/.test(mSk[1])) {
+      ok('der Bildschirmmassstab kommt aus dem Papiermass');
+    } else { fail('das Raster hinge an der Rahmenbreite'); }
+    /* Ein Punkt unter zwei Bildpunkten verwischt */
+    if (/Math\.max\(2, RASTER\.punkt \* mm\)/.test(mSk[1])) {
+      ok('der Punkt bleibt mindestens zwei Bildpunkte gross');
+    } else { fail('im kleinen Rahmen verwischt der Punkt'); }
+
+    /* Nachrechnen: in jedem Rahmen dieselbe Millimeterzahl */
+    const F = [['air', 820], ['mini', 744], ['mini-gross', 605]];
+    let f = 0;
+    F.forEach(function (x) {
+      const blattB = x[1] - 38 - 12;
+      const mm = blattB / 148;
+      const abst = 3.5 * mm;
+      /* Der Abstand muss zwischen zehn und zwanzig Bildpunkten liegen */
+      if (abst < 10 || abst > 22) {
+        f++; fail(x[0] + ': Rasterabstand ' + abst.toFixed(1) + ' px');
+      }
+    });
+    if (!f) { ok('Rasterabstand in allen drei Rahmen brauchbar'); }
+  }
+
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  if (/\.blatt-koerper \{[^}]*radial-gradient/.test(css)) {
+    ok('das Blatt am Bildschirm liegt auf dem Raster');
+  } else { fail('am Bildschirm fehlt das Raster'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
