@@ -5103,6 +5103,72 @@ kat('86 · Serien lösen');
   else { fail('Schemaversion nicht erhöht'); }
 }
 
+/* ═══ 87 · Anlegen und Migration im Gleichschritt ══════════════════════
+   Fehlerart: die Migration ergänzt ein neues Feld an vorhandenen
+   Einträgen, die Anlagefunktion aber nicht. Alles Bestehende läuft
+   weiter, nur ein frisch angelegter Eintrag bricht ab. Genau so blieb
+   der Knopf "+ Blatt" wirkungslos: dem neuen Blatt fehlte seiten.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('87 · Anlegen und Migration');
+{
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}\n/);
+  if (!mM) { fail('migriereDB nicht auswertbar'); }
+  else {
+    /* Je Bestand: welche Felder ergänzt die Migration, und legt die
+       zugehörige Anlagefunktion sie ebenfalls an?                    */
+    const PAARE = [
+      ['notizen', 'notizNeu'],
+      ['wtermine', null],
+      ['zettel', 'zNeu'],
+    ];
+    PAARE.forEach(function (x) {
+      const re = new RegExp('\\(d\\.' + x[0] +
+        ' \\|\\| \\[\\]\\)\\.forEach\\(function \\((\\w+)\\) \\{([\\s\\S]*?)\\n  \\}\\);');
+      const m = re.exec(mM[1]);
+      if (!m) { return; }
+      const v = m[1];
+      /* Nur was gesetzt wird, nicht was gelöscht wird */
+      const gesetzt = [];
+      const zeilen = m[2].split('\n');
+      zeilen.forEach(function (z) {
+        if (/delete /.test(z)) { return; }
+        const t = new RegExp(v + '\\.(\\w+)\\s*=').exec(z);
+        if (t && gesetzt.indexOf(t[1]) === -1) { gesetzt.push(t[1]); }
+      });
+      if (!x[1] || !gesetzt.length) { return; }
+      const mN = JSK.match(new RegExp('function ' + x[1] +
+        '\\([^)]*\\) \\{[\\s\\S]*?\\{([\\s\\S]*?)\\};'));
+      if (!mN) { fail(x[1] + ' nicht auswertbar'); return; }
+      const fehlt = gesetzt.filter(function (f) {
+        return !new RegExp('\\b' + f + ':').test(mN[1]);
+      });
+      if (!fehlt.length) {
+        ok(x[1] + ' legt alle ' + gesetzt.length + ' Felder an');
+      } else {
+        fail(x[1] + ' legt nicht an: ' + fehlt.join(', '));
+      }
+    });
+  }
+
+  /* Ein neues Notizblatt muss sich aufschlagen lassen */
+  const mN = JSK.match(/function notizNeu\(\) \{[\s\S]*?const n = \{([\s\S]*?)\};/);
+  if (!mN) { fail('notizNeu nicht auswertbar'); }
+  else {
+    ['seiten:', 'anhaenge:', 'quelle:'].forEach(function (f) {
+      if (mN[1].indexOf(f) !== -1) { ok('neues Blatt hat ' + f.slice(0, -1)); }
+      else { fail('neues Blatt ohne ' + f.slice(0, -1) + ' — es bricht beim Aufschlagen ab'); }
+    });
+    if (/seiten:\[''\]/.test(mN[1])) { ok('genau eine leere Seite'); }
+    else { fail('die Seitenzahl des neuen Blattes stimmt nicht'); }
+  }
+
+  /* Und das Blatt greift wirklich darauf zu */
+  const mB = JSK.match(/function blattNotizBlatt\(id\) \{([\s\S]*?)\n\}/);
+  if (mB && /seiten\.length/.test(mB[1])) {
+    ok('das Blatt liest die Seitenzahl — deshalb muss sie da sein');
+  } else { warn('das Blatt liest seiten nicht mehr'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
