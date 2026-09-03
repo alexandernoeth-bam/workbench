@@ -5229,10 +5229,9 @@ kat('88 · Punkteraster');
     if (/RASTER\.papierBreite/.test(mSk[1])) {
       ok('der Bildschirmmassstab kommt aus dem Papiermass');
     } else { fail('das Raster hinge an der Rahmenbreite'); }
-    /* Ein Punkt unter zwei Bildpunkten verwischt */
-    if (/Math\.max\(2, RASTER\.punkt \* mm\)/.test(mSk[1])) {
-      ok('der Punkt bleibt mindestens zwei Bildpunkte gross');
-    } else { fail('im kleinen Rahmen verwischt der Punkt'); }
+    /* Am Bildschirm kein Raster: dort ist es Muster, keine Schreibhilfe */
+    if (!/pkt-abstand/.test(mSk[1])) { ok('am Bildschirm wird kein Raster gesetzt'); }
+    else { fail('das Raster ist am Bildschirm zurück'); }
 
     /* Nachrechnen: in jedem Rahmen dieselbe Millimeterzahl */
     const F = [['air', 820], ['mini', 744], ['mini-gross', 605]];
@@ -5250,9 +5249,99 @@ kat('88 · Punkteraster');
   }
 
   const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
-  if (/\.blatt-koerper \{[^}]*radial-gradient/.test(css)) {
-    ok('das Blatt am Bildschirm liegt auf dem Raster');
-  } else { fail('am Bildschirm fehlt das Raster'); }
+  if (!/\.blatt-koerper \{[^}]*radial-gradient/.test(css)) {
+    ok('das Blatt am Bildschirm bleibt frei davon');
+  } else { fail('am Bildschirm liegt wieder ein Raster'); }
+}
+
+/* ═══ 89 · Bullet Journal ══════════════════════════════════════════════
+   Fehlerarten: das Punkteraster bleibt am Bildschirm, wo es nur Muster
+   ist; die Zeichen der Methode werden vertauscht — Erledigtes sieht aus
+   wie Offenes; der erste Bereich beginnt mit einem leeren Blatt, weil
+   der Seitenwechsel vor ihm steht; ein Planschritt erscheint zusätzlich
+   unter "Ohne Plan".
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('89 · Bullet Journal');
+{
+  ['drBujoTag', 'drBujoAkt', 'bjZeichen', 'bjZeile'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  /* Die Zeichen der Methode */
+  const mZ = JSK.match(/function bjZeichen\(a\) \{[\s\S]*?\n\}/);
+  if (!mZ) { fail('bjZeichen nicht auswertbar'); }
+  else {
+    let fn = null;
+    try {
+      fn = new Function("const BJ = { offen:'o', fertig:'x', weg:'-' };" +
+        mZ[0] + '\nreturn bjZeichen;')();
+    } catch (e) { fn = null; }
+    if (!fn) { fail('bjZeichen nicht ausführbar'); }
+    else {
+      let f = 0;
+      if (fn({ glyph:'\u2022' }) !== 'o') { f++; fail('Offenes falsch gezeichnet'); }
+      if (fn({ glyph:'\u2715' }) !== 'x') { f++; fail('Erledigtes falsch gezeichnet'); }
+      if (fn({ glyph:'\u2013' }) !== '-') { f++; fail('Gestrichenes falsch gezeichnet'); }
+      if (!f) { ok('offen, erledigt und gestrichen richtig unterschieden'); }
+    }
+  }
+  const mB = JSK.match(/function bjZeile\(a, ein\) \{[\s\S]*?\n\}/);
+  if (mB && /a\.prio === 'A' \? BJ\.stern/.test(mB[0])) {
+    ok('Priorität A trägt den Stern');
+  } else { fail('nichts hebt sich heraus'); }
+  if (mB && /durch:\(a\.glyph === '\\u2715' \|\| a\.glyph === '\\u2013'\)/.test(mB[0])) {
+    ok('Erledigtes und Gestrichenes wird durchgestrichen');
+  } else { fail('alles sieht gleich aus'); }
+
+  /* Der Baustein */
+  const mS = JSK.match(/function druckSetzen\(bauplan, formatKey, dateiname\) \{([\s\S]*?)\n\}\n/);
+  if (mS && /bujo: function \(b\)/.test(mS[1])) { ok('Baustein bujo im Setzer'); }
+  else { fail('der Setzer kennt keine Bullet-Zeilen'); }
+
+  /* Ein Bereich je Seite, aber kein leeres erstes Blatt */
+  const mA = JSK.match(/function drBujoAkt\(o\) \{([\s\S]*?)\n\}/);
+  if (!mA) { fail('drBujoAkt nicht auswertbar'); }
+  else {
+    if (/if \(!erste\) \{ b\.push\(\{ typ:'seitenwechsel' \}\); \}/.test(mA[1])) {
+      ok('jeder Bereich auf eigener Seite, ohne leeres erstes Blatt');
+    } else { fail('vor dem ersten Bereich stünde eine leere Seite'); }
+    /* Leere Bereiche überspringen */
+    if (/if \(!alle\.length && !pl\.length\) \{ return; \}/.test(mA[1])) {
+      ok('leere Bereiche bekommen keine Seite');
+    } else { fail('leere Bereiche verschwenden Papier'); }
+    /* Ein Planschritt darf nicht zweimal erscheinen */
+    if (/!a\.planId \|\| !PLAENE\.some/.test(mA[1])) {
+      ok('Planschritte stehen nicht zusätzlich unter Ohne Plan');
+    } else { fail('Planschritte erscheinen doppelt'); }
+    if (/typ:'titel', t:be\.name/.test(mA[1])) { ok('der Bereich ist die Überschrift'); }
+    else { fail('die Seite nennt den Bereich nicht'); }
+  }
+
+  /* Der Daily Log führt alles in einer Spalte */
+  const mT = JSK.match(/function drBujoTag\(o, iso\) \{([\s\S]*?)\n\}/);
+  if (!mT) { fail('drBujoTag nicht auswertbar'); }
+  else {
+    ['TERMINE', 'AKTIVITAETEN', 'WIEDER', 'KONTAKTE', 'TAGNOTIZEN'].forEach(function (x) {
+      if (mT[1].indexOf(x) !== -1) { ok('Daily Log führt ' + x); }
+      else { fail(x + ' fehlt im Daily Log'); }
+    });
+    if (/BJ\.termin/.test(mT[1]) && /BJ\.notiz/.test(mT[1])) {
+      ok('Termine und Notizen mit eigenen Zeichen');
+    } else { fail('alles hat dasselbe Zeichen'); }
+    /* Eine Legende, sonst versteht es niemand */
+    if (/erledigt/.test(mT[1]) && /gestrichen/.test(mT[1])) {
+      ok('eine Legende erklärt die Zeichen');
+    } else { fail('die Zeichen bleiben unerklärt'); }
+    if (/o\.format === 'move' \? 14 : 26/.test(mT[1])) {
+      ok('freie Zeilen nach Format bemessen');
+    } else { fail('gleich viele freie Zeilen auf jedem Format'); }
+  }
+
+  const mBl = JS.match(/const DR_BLAETTER = \{([\s\S]*?)\n\};/);
+  if (mBl && /bujoTag:/.test(mBl[1]) && /bujoAkt:/.test(mBl[1])) {
+    ok('beide stehen im Wähler');
+  } else { fail('nicht wählbar'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
