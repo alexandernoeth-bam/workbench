@@ -5598,6 +5598,111 @@ kat('92 · Übergabe aus dem Daily Log');
   else { fail('kein Knopf zur Übergabe'); }
 }
 
+/* ═══ 93 · Handschrift vom Move einlesen ═══════════════════════════════
+   Fehlerarten: der Erkenner besteht auf den richtigen Zeichen, aber die
+   Umwandlung macht aus dem Kreis ein o und aus dem Kreuz ein x; eine
+   Zeile ohne erkennbares Zeichen verschwindet stillschweigend; das
+   Eingelesene landet ohne Vorschau im Bestand; ein Bild-PDF wird ohne
+   Erklärung leer eingelesen.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('93 · Handschrift einlesen');
+{
+  ['bjDeuten', 'bjDatumZeile', 'bjZeilenAusSeite', 'bujoDateiGelesen',
+   'bujoEinleseUebernehmen', 'bujoEinleseWaehlen'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  /* Den Erkenner wirklich laufen lassen */
+  const mE = JS.match(/const BJ_ERKENNUNG = \[[\s\S]*?\n\];/);
+  const mD = JSK.match(/function bjDeuten\(roh\) \{[\s\S]*?\n\}/);
+  const mT = JSK.match(/function bjDatumZeile\(roh\) \{[\s\S]*?\n\}/);
+  if (!mE || !mD || !mT) { fail('Erkenner nicht auswertbar'); }
+  else {
+    let w = null;
+    try {
+      w = new Function('MONATE_LANG', mE[0] + '\n' + mD[0] + '\n' + mT[0] +
+        '\nreturn { d:bjDeuten, dat:bjDatumZeile };')(
+        ['Januar', 'Februar', 'M\u00e4rz', 'April', 'Mai', 'Juni', 'Juli',
+         'August', 'September', 'Oktober', 'November', 'Dezember']);
+    } catch (e) { w = null; }
+    if (!w) { fail('Erkenner nicht ausführbar'); }
+    else {
+      /* Was die Umwandlung aus den Zeichen macht */
+      const F = [
+        ['\u2022 Michi anrufen', 'aufgabe', '\u2022', 0, ''],
+        ['* Ablage geleert', 'aufgabe', '\u2022', 0, ''],
+        ['. Kurzer Punkt', 'aufgabe', '\u2022', 0, ''],
+        ['x Erledigt', 'aufgabe', '\u2715', 0, ''],
+        ['X Auch erledigt', 'aufgabe', '\u2715', 0, ''],
+        ['> Verschoben', 'aufgabe', '\u203a', 0, ''],
+        ['o Besucht', 'ereignis', '\u25cb', 0, ''],
+        ['0 Null statt o', 'ereignis', '\u25cb', 0, ''],
+        ['= zufrieden', 'stimmung', '=', 0, ''],
+        ['- Gedanke', 'notiz', '\u2014', 0, ''],
+        ['  \u2022 Unterpunkt', 'aufgabe', '\u2022', 1, ''],
+        ['    \u2022 Zweite Stufe', 'aufgabe', '\u2022', 2, ''],
+        ['* \u2022 Wichtiges', 'aufgabe', '\u2022', 0, 'A'],
+        ['Ohne Zeichen', 'aufgabe', '\u2022', 0, ''],
+      ];
+      let f = 0;
+      F.forEach(function (x) {
+        const r = w.d(x[0]);
+        if (!r) { f++; fail('verschluckt: ' + x[0]); return; }
+        if (r.typ !== x[1] || r.glyph !== x[2] || r.ein !== x[3] ||
+            (r.prio || '') !== x[4]) {
+          f++;
+          fail(JSON.stringify(x[0]) + ': ' + r.typ + ' ' + r.glyph +
+               ' Einzug ' + r.ein + ' ' + (r.prio || '-'));
+        }
+      });
+      if (!f) { ok(F.length + ' Schreibweisen richtig gedeutet'); }
+      /* Leerzeilen fallen weg, aber nichts mit Text */
+      if (w.d('   ') === null && w.d('') === null) { ok('leere Zeilen fallen weg'); }
+      else { fail('leere Zeilen erzeugen Einträge'); }
+      /* Eine unerkannte Zeile wird zur Aufgabe, aber gekennzeichnet */
+      const u = w.d('Ohne Zeichen');
+      if (u && u.erkannt === false) { ok('Unerkanntes bleibt als solches vermerkt'); }
+      else { fail('man sähe nicht, was geraten wurde'); }
+      /* Datumszeilen */
+      const D = [['21.08.2026', '2026-08-21'],
+                 ['Freitag, 21. August 2026', '2026-08-21'],
+                 ['1.9.2026', '2026-09-01'], ['Kein Datum', null]];
+      let fd = 0;
+      D.forEach(function (x) {
+        if (w.dat(x[0]) !== x[1]) { fd++; fail('Datum "' + x[0] + '": ' + w.dat(x[0])); }
+      });
+      if (!fd) { ok('Datumszeilen trennen die Tage'); }
+    }
+  }
+
+  /* Vorschau vor der Übernahme */
+  const mG = JSK.match(/function bujoDateiGelesen\(ev\) \{([\s\S]*?)\n\}/);
+  if (mG && !/BUJO\.push/.test(mG[1])) { ok('beim Lesen wird nichts geschrieben'); }
+  else { fail('das Eingelesene landet ohne Vorschau im Bestand'); }
+  const mU = JSK.match(/function bujoEinleseUebernehmen\(\) \{([\s\S]*?)\n\}/);
+  if (mU && /!z\.nehmen/.test(mU[1])) { ok('nur Ausgewähltes wird übernommen'); }
+  else { fail('die Abwahl wird übergangen'); }
+  if (mU && /BUJO\.push/.test(mU[1])) { ok('erst hier entstehen die Zeilen'); }
+  else { fail('nichts wird angelegt'); }
+
+  /* Keine eigene Bibliothek nachladen */
+  const mZ = JSK.match(/function bjZeilenAusSeite\(inhalt\) \{([\s\S]*?)\n\}/);
+  if (mZ && /it\.transform\[5\]/.test(mZ[1])) {
+    ok('Zeilen werden aus der Höhe der Textstücke gebildet');
+  } else { fail('die Zeilen laufen ineinander'); }
+  if (mZ && /it\.transform\[4\]/.test(mZ[1])) {
+    ok('der linke Rand wird zum Einzug');
+  } else { fail('der Einzug geht verloren'); }
+  if (mG && /pdfBausteinDa\(\)/.test(mG[1])) { ok('ohne Baustein wird gewarnt'); }
+  else { fail('ohne Baustein bräche es stumm ab'); }
+  /* Der Hinweis auf das Bild-PDF */
+  const mR = JSK.match(/function bujoEinleseRender\(\) \{([\s\S]*?)\n\}/);
+  if (mR && /umgewandelten Text/.test(mR[1])) {
+    ok('der Dialog sagt, dass Text im PDF stehen muss');
+  } else { fail('ein Bild-PDF bliebe unerklärt leer'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
