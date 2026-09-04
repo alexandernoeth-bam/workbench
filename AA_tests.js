@@ -5344,6 +5344,124 @@ kat('89 · Bullet Journal');
   } else { fail('nicht wählbar'); }
 }
 
+/* ═══ 90 · Bullet-Journal-Betrieb ══════════════════════════════════════
+   Fehlerarten: der Schalter blendet Register aus, während man auf einem
+   davon steht — das Blatt bleibt leer; das Daily Log greift doch auf die
+   übrigen Bestände zu und führt eine zweite Buchhaltung; das Übertragen
+   nimmt Erledigtes mit oder lässt die Vorlage offen stehen; die
+   Zeichenfolge kennt nicht alle vier Zustände.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('90 · Bullet-Journal-Betrieb');
+{
+  ['bujoModus', 'bujoModusUm', 'registerSichtbar', 'blattBujo', 'bujoNeu',
+   'bujoGlyph', 'bujoTyp', 'bujoUebertragen', 'bujoLoeschen']
+    .forEach(function (f) {
+      if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+      else { fail(f + ' fehlt'); }
+    });
+
+  /* Der Registerfilter */
+  const mS = JSK.match(/function registerSichtbar\(\) \{([\s\S]*?)\n\}/);
+  if (!mS) { fail('registerSichtbar nicht auswertbar'); }
+  else {
+    let fn = null;
+    try {
+      fn = new Function('bm',
+        "const REGISTER = [{k:'bujo'},{k:'tag'},{k:'woche'},{k:'monat'}," +
+        "{k:'jahr'},{k:'akt'}];" +
+        'const bujoModus = () => bm;' + mS[0] + '\nreturn registerSichtbar();');
+    } catch (e) { fn = null; }
+    if (!fn) { fail('registerSichtbar nicht ausführbar'); }
+    else {
+      const aus = fn(false).map(r => r.k).join(' ');
+      const an = fn(true).map(r => r.k).join(' ');
+      if (aus === 'tag woche monat jahr akt' && an === 'bujo jahr akt') {
+        ok('der Schalter tauscht genau Tag, Woche und Monat gegen das Log');
+      } else { fail('sichtbar: "' + aus + '" / "' + an + '"'); }
+    }
+  }
+  const mU = JSK.match(/function bujoModusUm\(\) \{([\s\S]*?)\n\}/);
+  if (mU && /!registerSichtbar\(\)\.some\(r => r\.k === reg\)/.test(mU[1])) {
+    ok('man wird vom verschwindenden Register weggeführt');
+  } else { fail('man bliebe auf einem ausgeblendeten Register stehen'); }
+
+  /* Ohne Verbindung zu den übrigen Beständen */
+  const mB = JSK.match(/function blattBujo\(\) \{([\s\S]*?)\n\}/);
+  if (!mB) { fail('blattBujo nicht auswertbar'); }
+  else {
+    const FREMD = ['AKTIVITAETEN', 'TERMINE', 'WIEDER', 'KONTAKTE', 'PLAENE'];
+    const drin = FREMD.filter(x => mB[1].indexOf(x) !== -1);
+    if (!drin.length) { ok('das Log steht für sich, ohne die übrigen Bestände'); }
+    else { fail('das Log greift auf ' + drin.join(', ') + ' zu'); }
+    if (/bj-blatt/.test(mB[1])) { ok('auf Punkteraster'); }
+    else { fail('kein Raster im Log'); }
+    if (/bujoUebertragen/.test(mB[1])) { ok('Übertragen ist erreichbar'); }
+    else { fail('kein Weg, Offenes mitzunehmen'); }
+  }
+
+  /* Vier Zustände im Kreis */
+  const mF = JS.match(/const BJ_FOLGE = \[([^\]]*)\]/);
+  if (mF && (mF[1].match(/'/g) || []).length / 2 === 4) {
+    ok('vier Zustände: offen, erledigt, gestrichen, verschoben');
+  } else { fail('die Zustandsfolge ist unvollständig'); }
+  const mT = JS.match(/const BJ_TYPEN = \{([\s\S]*?)\};/);
+  if (!mT) { fail('BJ_TYPEN nicht gefunden'); }
+  else {
+    /* Im Quelltext stehen die Zeichen maskiert — deshalb der doppelte
+       Rueckstrich im Muster.                                          */
+    const SOLL = { aufgabe:'\\\\u2022', ereignis:'\\\\u25cb',
+                   notiz:'\\\\u2014', stimmung:'=' };
+    const fehlt = Object.keys(SOLL).filter(function (k) {
+      return !new RegExp(k + ":\\s*'" + SOLL[k] + "'").test(mT[1]);
+    });
+    if (!fehlt.length) { ok('vier Arten: Aufgabe, Ereignis, Notiz, Stimmung'); }
+    else { fail('Arten fehlen oder tragen ein anderes Zeichen: ' + fehlt.join(', ')); }
+    /* Jede Art braucht einen Namen, sonst steht nur ein Zeichen da */
+    const mN = JS.match(/const BJ_TYPNAME = \{([\s\S]*?)\};/);
+    if (mN && Object.keys(SOLL).every(k => new RegExp(k + ':').test(mN[1]))) {
+      ok('jede Art hat einen Namen');
+    } else { fail('die Arten sind nur Zeichen ohne Namen'); }
+  }
+  const mG = JSK.match(/function bujoGlyph\(id\) \{([\s\S]*?)\n\}/);
+  if (mG && /z\.typ !== 'aufgabe'/.test(mG[1])) {
+    ok('nur Aufgaben wechseln den Zustand');
+  } else { fail('auch ein Termin liesse sich abhaken'); }
+
+  /* Das Übertragen */
+  const mUe = JSK.match(/function bujoUebertragen\(\) \{([\s\S]*?)\n\}/);
+  if (!mUe) { fail('bujoUebertragen nicht auswertbar'); }
+  else {
+    if (/z\.typ === 'aufgabe' &&\s*\n?\s*z\.glyph === '\\u2022'/.test(mUe[1])) {
+      ok('nur offene Aufgaben werden mitgenommen');
+    } else { fail('Erledigtes oder Notizen wandern mit'); }
+    if (/z\.glyph = '\\u203a'/.test(mUe[1])) {
+      ok('die Vorlage gilt danach als verschoben');
+    } else { fail('die Aufgabe stünde an beiden Tagen offen'); }
+    if (/\(z\.t \|\| ''\)\.trim\(\)/.test(mUe[1])) { ok('leere Zeilen bleiben zurück'); }
+    else { fail('leere Zeilen würden mitgeschleppt'); }
+  }
+
+  const mM = JSK.match(/function migriereDB\(d\) \{([\s\S]*?)\n\}\n/);
+  if (mM && /Array\.isArray\(d\.bujo\)/.test(mM[1])) { ok('Migration legt den Bestand an'); }
+  else { fail('der Bestand fehlt nach einem Import'); }
+  /* Die Umbenennung darf vorhandene Zeilen nicht verwaisen lassen */
+  if (mM && /z\.typ === 'termin'\) \{ z\.typ = 'ereignis'/.test(mM[1])) {
+    ok('bisherige Termine werden zu Ereignissen');
+  } else { fail('vorhandene Zeilen behielten eine Art, die es nicht mehr gibt'); }
+  /* Und die Anzeige muss jede Art kennen */
+  const mBl = JSK.match(/function blattBujo\(\) \{([\s\S]*?)\n\}/);
+  if (mBl && /BJ_TYPNAME\[z\.typ\]/.test(mBl[1])) {
+    ok('die Zeile nennt ihre Art');
+  } else { fail('man sieht nicht, was eine Zeile ist'); }
+  if (mBl && /bujoNeu\(..stimmung..\)/.test(mBl[1]) &&
+      /bujoNeu\(..ereignis..\)/.test(mBl[1])) {
+    ok('jede Art lässt sich unmittelbar anlegen');
+  } else { fail('man müsste sich durch die Arten klicken'); }
+  const mV = JS.match(/const DB_VERSION = (\d+)/);
+  if (mV && parseInt(mV[1], 10) >= 33) { ok('Schemaversion auf ' + mV[1]); }
+  else { fail('Schemaversion nicht erhöht'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
