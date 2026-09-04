@@ -5462,6 +5462,142 @@ kat('90 · Bullet-Journal-Betrieb');
   else { fail('Schemaversion nicht erhöht'); }
 }
 
+/* ═══ 91 · Einzug im Daily Log ═════════════════════════════════════════
+   Fehlerarten: der Einzug lässt sich nur über einen Knopf ändern, den
+   niemand findet; die Tabulatortaste läuft über das Ende hinaus oder
+   schliesst das Feld; eingerückte Zeilen zeigen nicht, wozu sie gehören;
+   der Einzug steht am Bildschirm, fehlt aber im Druck.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('91 · Einzug im Daily Log');
+{
+  ['bujoEin', 'bujoEinSetzen', 'drBujoEigen'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  /* Die Tabulatortaste rückt ein, ohne das Feld zu schliessen */
+  const mT = JSK.match(/function bujoTaste\(ev, id\) \{([\s\S]*?)\n\}/);
+  if (!mT) { fail('bujoTaste nicht auswertbar'); }
+  else {
+    if (/ev\.key === 'Tab'/.test(mT[1])) { ok('die Tabulatortaste rückt ein'); }
+    else { fail('nur über den Knopf einzurücken'); }
+    if (/ev\.shiftKey \? -1 : 1/.test(mT[1])) { ok('Umschalt-Tabulator rückt aus'); }
+    else { fail('kein Weg zurück ohne Maus'); }
+    if (/zelleOeffnen\('bujo', id, 't'\)/.test(mT[1])) {
+      ok('das Feld bleibt beim Einrücken offen');
+    } else { fail('nach jedem Einzug müsste man neu antippen'); }
+  }
+
+  /* Die Stufen wirklich rechnen */
+  const mS = JSK.match(/function bujoEinSetzen\(id, d, imKreis\) \{[\s\S]*?\n\}/);
+  if (!mS) { fail('bujoEinSetzen nicht auswertbar'); }
+  else {
+    let fn = null;
+    try {
+      fn = new Function('z0', 'd', 'kreis',
+        'const z = { ein:z0 }; const BUJO = [z];' +
+        'const renderAlles = () => {};' +
+        mS[0].replace('BUJO.find(x => x.id === id)', 'BUJO[0]') +
+        '\nbujoEinSetzen(0, d, kreis); return z.ein;');
+    } catch (e) { fn = null; }
+    if (!fn) { fail('bujoEinSetzen nicht ausführbar'); }
+    else {
+      let f = 0;
+      /* Schrittweise: nicht über null und nicht über zwei hinaus */
+      if (fn(2, 1, false) !== 2) { f++; fail('der Tabulator läuft über die letzte Stufe'); }
+      if (fn(0, -1, false) !== 0) { f++; fail('Umschalt-Tabulator läuft unter null'); }
+      if (fn(0, 1, false) !== 1 || fn(1, 1, false) !== 2) {
+        f++; fail('der Tabulator rückt nicht ein');
+      }
+      /* Der Knopf schaltet im Kreis */
+      if (fn(2, 1, true) !== 0) { f++; fail('der Knopf bleibt auf der letzten Stufe hängen'); }
+      if (!f) { ok('Tabulator schrittweise, Knopf im Kreis'); }
+    }
+  }
+
+  /* Eine Leitlinie zeigt die Zugehörigkeit */
+  const mB = JSK.match(/function blattBujo\(\) \{([\s\S]*?)\n\}/);
+  if (mB && /bj-stufe/.test(mB[1])) { ok('je Stufe ein Streifen'); }
+  else { fail('eingerückte Zeilen zeigen nicht, wozu sie gehören'); }
+  const css = H.slice(H.indexOf('<style>'), H.indexOf('</style>'));
+  if (/\.bj-stufe \{[^}]*border-left/.test(css)) { ok('mit Leitlinie'); }
+  else { fail('der Streifen ist leer'); }
+
+  /* Im Druck darf der Einzug nicht verlorengehen */
+  const mD = JSK.match(/function drBujoEigen\(o\) \{([\s\S]*?)\n\}/);
+  if (mD && /ein:z\.ein \|\| 0/.test(mD[1])) { ok('der Einzug geht mit in den Druck'); }
+  else { fail('gedruckt stünde alles auf einer Stufe'); }
+  /* Und im Betrieb wird das eigene Blatt gedruckt, nicht das abgeleitete */
+  const mDT = JSK.match(/function drBujoTag\(o, iso\) \{([\s\S]*?)\n\}/);
+  if (mDT && /bujoModus\(\) && !iso/.test(mDT[1])) {
+    ok('im Betrieb wird das eigene Blatt gedruckt');
+  } else { fail('gedruckt würde das abgeleitete Blatt'); }
+  const mBau = JSK.match(/function druckSetzen[\s\S]*?bujo: function \(b\) \{([\s\S]*?)\n    \},/);
+  if (mBau && /z\.ein \|\| 0/.test(mBau[1])) { ok('der Setzer rückt wirklich ein'); }
+  else { fail('der Setzer übergeht den Einzug'); }
+}
+
+/* ═══ 92 · Übergabe aus dem Daily Log ══════════════════════════════════
+   Fehlerarten: die Übergabe geht in beide Richtungen und man führt doch
+   zwei Bücher; eine leere Zeile erzeugt eine leere Aktivität; die Zeile
+   bleibt danach offen und man macht dieselbe Arbeit zweimal; eine Notiz
+   oder Stimmung landet als Aufgabe in der Checkliste.
+   ═══════════════════════════════════════════════════════════════════════ */
+kat('92 · Übergabe aus dem Daily Log');
+{
+  ['bujoAusgeben', 'bujoAusgebenNach'].forEach(function (f) {
+    if (new RegExp('function ' + f + '\\b').test(JS)) { ok(f + ' vorhanden'); }
+    else { fail(f + ' fehlt'); }
+  });
+
+  const mA = JSK.match(/function bujoAusgeben\(id\) \{([\s\S]*?)\n\}/);
+  if (!mA) { fail('bujoAusgeben nicht auswertbar'); }
+  else {
+    if (/!\(z\.t \|\| ''\)\.trim\(\)/.test(mA[1])) { ok('leere Zeilen werden abgelehnt'); }
+    else { fail('eine leere Zeile erzeugte eine leere Aktivität'); }
+    if (/z\.typ === 'ereignis'/.test(mA[1]) && /TERMINE\.push/.test(mA[1])) {
+      ok('ein Ereignis wird ein ganztägiger Termin');
+    } else { fail('Ereignisse lassen sich nicht übergeben'); }
+    if (/z\.typ !== 'aufgabe'/.test(mA[1])) {
+      ok('Notiz und Stimmung bleiben, wo sie sind');
+    } else { fail('auch eine Stimmung würde zur Aufgabe'); }
+    if (/BEREICHE\.filter/.test(mA[1])) { ok('der Bereich wird gewählt, nicht geraten'); }
+    else { fail('die Aktivität landete in irgendeinem Bereich'); }
+  }
+
+  const mN = JSK.match(/function bujoAusgebenNach\(bid\) \{([\s\S]*?)\n\}/);
+  if (!mN) { fail('bujoAusgebenNach nicht auswertbar'); }
+  else {
+    if (/AKTIVITAETEN\.push\(a\)/.test(mN[1])) { ok('die Aktivität entsteht'); }
+    else { fail('nichts wird angelegt'); }
+    if (/geplant:z\.datum/.test(mN[1])) { ok('sie ist auf den Tag der Zeile geplant'); }
+    else { fail('die Aktivität hätte keinen Tag'); }
+    if (/prio:z\.prio \|\| 'B'/.test(mN[1])) { ok('der Stern wird zur Priorität A'); }
+    else { fail('die Hervorhebung geht verloren'); }
+    /* Die Zeile muss danach als verschoben gelten */
+    if (/z\.glyph = '\\u203a'/.test(mN[1])) {
+      ok('die Zeile gilt danach als verschoben');
+    } else { fail('die Aufgabe stünde im Log und in der Checkliste offen'); }
+  }
+
+  /* Nur in eine Richtung: nichts schreibt in BUJO zurück */
+  const RUECK = ['aktNeu', 'planAktNeu', 'kontaktNeu', 'tagnotizNeu'];
+  const drin = RUECK.filter(function (f) {
+    const m = JSK.match(new RegExp('function ' + f + '\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
+    return m && /BUJO/.test(m[0]);
+  });
+  if (!drin.length) { ok('nichts schreibt zurück ins Log'); }
+  else { fail('Rückweg vorhanden: ' + drin.join(', ')); }
+
+  /* Der Knopf nur dort, wo er etwas tut */
+  const mB = JSK.match(/function blattBujo\(\) \{([\s\S]*?)\n\}/);
+  if (mB && /z\.typ === 'aufgabe' \|\| z\.typ === 'ereignis'/.test(mB[1])) {
+    ok('der Pfeil steht nur bei Aufgabe und Ereignis');
+  } else { fail('der Pfeil steht auch dort, wo er nichts tut'); }
+  if (mB && /bj-aus/.test(mB[1])) { ok('mit eigenem Zeichen'); }
+  else { fail('kein Knopf zur Übergabe'); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ERGEBNIS
    ═══════════════════════════════════════════════════════════════════════ */
