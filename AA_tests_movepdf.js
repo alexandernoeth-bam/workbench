@@ -2726,4 +2726,37 @@ console.log('\n=== KALENDER: JAHRESSICHT UND ICS ===');
     fail('Der Wochentag wird nicht in die Zellen geschrieben');
   else ok('Wochentag in jeder Zelle');
 
+  // ── Kalender über beide Dateien hinweg (v1.5.268) ───────────────────────
+  // Termine gehören nicht zu einem Bereich – ein Urlaub gilt beruflich wie
+  // privat. Ohne den gemeinsamen Speicher sähe jede Datei nur ihre eigenen.
+  if (typeof kalGemeinsamSichern !== 'function' ||
+      typeof kalGemeinsamUebernehmen !== 'function') {
+    fail('Der gemeinsame Kalenderspeicher fehlt');
+  } else {
+    ok('Gemeinsamer Kalenderspeicher vorhanden');
+
+    ['jtSpeichern','jtLoeschen','icsUebernehmen','taUebernehmen','icsExportieren']
+      .forEach(f => {
+        if (typeof window[f] === 'function' &&
+            !/kalGemeinsamSichern\(\)/.test(window[f].toString()))
+          fail(f + ' sichert nicht gemeinsam – die Änderung fehlte in der anderen Datei');
+      });
+    ok('Alle Änderungswege sichern gemeinsam');
+
+    // Die reichere Seite gewinnt, damit auf einem neuen Gerät nichts verloren geht
+    if (!/inDatei > gemeinsam/.test(kalGemeinsamUebernehmen.toString()))
+      warn('Beim ersten Öffnen auf einem neuen Gerät könnten Termine verloren gehen');
+    else ok('Die reichere Seite gewinnt');
+
+    const g = kalGemeinsamLesen();
+    if (!g) warn('Noch kein gemeinsamer Bestand – er entsteht beim nächsten Speichern');
+    else {
+      const n = g.termine.length + g.jahrestermine.length + g.wtermine.length;
+      const d = (DB.termine || []).length + (DB.jahrestermine || []).length +
+                (DB.wtermine || []).length;
+      if (n !== d) warn('Gemeinsam ' + n + ', in der Datei ' + d + ' – beim nächsten Speichern gleicht es sich an');
+      else ok('Gemeinsamer Bestand und Datei stimmen überein (' + n + ')');
+    }
+  }
+
 })();

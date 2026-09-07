@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.267</title>
+<title>WorkAssist 1.5.268</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
@@ -3162,7 +3162,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.267</div>
+    <div class="start-version">v1.5.268</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -3230,7 +3230,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.267</div>
+    <div class="app-version" id="app-version">v1.5.268</div>
   </div>
 
   <div class="nav-section">
@@ -4947,7 +4947,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.267';
+const APP_VERSION = '1.5.268';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -5043,6 +5043,7 @@ async function loadDB() {
         if (!Array.isArray(DB.notizen)) DB.notizen = [];
         if (!Array.isArray(DB.belege))  DB.belege  = [];
         migrateDB();
+        try { kalGemeinsamUebernehmen(); } catch (e) { console.warn('[Kalender]', e); }
         return;
       }
     } catch(e) { /* Datei leer/neu → weiter zu localStorage */ }
@@ -5057,6 +5058,7 @@ async function loadDB() {
       if (!Array.isArray(DB.notizen)) DB.notizen = [];
       if (!Array.isArray(DB.belege))  DB.belege  = [];
       migrateDB();
+      try { kalGemeinsamUebernehmen(); } catch (e) { console.warn('[Kalender]', e); }
     }
   } catch(e) {
     // Safari file:// blockiert localStorage → leere DB
@@ -17493,6 +17495,7 @@ function icsExportieren(alle) {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
   // Erst nach der Ausgabe merken, sonst gingen Einträge verloren
   liste.forEach(e => { e.o.exp = e.abdruck; });
+  kalGemeinsamSichern();
   saveDB();
   renderKalender();
   showToast(liste.length + (liste.length === 1 ? ' Eintrag' : ' Einträge') + ' ausgegeben');
@@ -17706,6 +17709,7 @@ function icsUebernehmen(befund) {
       t.exp     = icsAbdruck({ art:'termin', o:t });
     }
   });
+  kalGemeinsamSichern();
   saveDB();
   return { neu, geaendert, serien };
 }
@@ -17910,6 +17914,57 @@ function kalFeiertageUm() { kalZeigeFT = !kalZeigeFT; renderKalender(); }
 // ═══ Ende Kalender ════════════════════════════════════════════════════════
 
 
+
+// ── Kalender über beide Dateien hinweg ────────────────────────────────────
+// Termine gehören nicht zu einem Bereich – ein Urlaub gilt beruflich wie
+// privat. Deshalb liegen die drei Kalenderbestände zusätzlich in einem
+// gemeinsamen Speicher, den sich berufliche und private Datei teilen.
+// Die Datei bleibt die Sicherung: Beim Wechsel auf ein anderes Gerät wird
+// der Bestand von dort übernommen, wenn der gemeinsame Speicher leer ist.
+const KAL_LS_KEY = 'workassist_kalender';
+
+function kalGemeinsamSichern() {
+  try {
+    localStorage.setItem(KAL_LS_KEY, JSON.stringify({
+      termine:       DB.termine || [],
+      jahrestermine: DB.jahrestermine || [],
+      wtermine:      DB.wtermine || [],
+      stand:         new Date().toISOString(),
+    }));
+  } catch (e) { /* ohne gemeinsamen Speicher bleibt es bei der Datei */ }
+}
+
+function kalGemeinsamLesen() {
+  try {
+    const roh = localStorage.getItem(KAL_LS_KEY);
+    if (!roh) return null;
+    const d = JSON.parse(roh);
+    if (!d || !Array.isArray(d.termine)) return null;
+    return d;
+  } catch (e) { return null; }
+}
+
+// Beim Laden einer Datei: den gemeinsamen Bestand übernehmen. Enthält die
+// Datei mehr, gewinnt sie – so geht beim ersten Öffnen auf einem neuen
+// Gerät nichts verloren.
+function kalGemeinsamUebernehmen() {
+  const g = kalGemeinsamLesen();
+  if (!g) { kalGemeinsamSichern(); return; }
+
+  const inDatei = (DB.termine || []).length + (DB.jahrestermine || []).length +
+                  (DB.wtermine || []).length;
+  const gemeinsam = g.termine.length + g.jahrestermine.length + g.wtermine.length;
+
+  if (inDatei > gemeinsam) {
+    // Die Datei ist reicher – sie füllt den gemeinsamen Speicher
+    kalGemeinsamSichern();
+    return;
+  }
+  DB.termine       = g.termine;
+  DB.jahrestermine = g.jahrestermine;
+  DB.wtermine      = g.wtermine;
+}
+
 // ── TimeAssist-Bestand übernehmen ─────────────────────────────────────────
 // TimeAssist nutzt andere Feldnamen: t statt titel, von/bis statt start/ende,
 // ganztags statt ganztag, nurJahr/jaehrlich für Geburtstage. Der Weg über ICS
@@ -17986,6 +18041,7 @@ function taUebernehmen(b) {
       start: e.von || '', ende: e.bis || '', ganztag: !!e.ganztags,
       regel: e.regel, aus: Array.isArray(e.aus) ? e.aus.slice() : [] });
   });
+  kalGemeinsamSichern();
   saveDB();
   return { t: b.termine.length, j: b.jahres.length, w: b.serien.length };
 }
@@ -18110,6 +18166,7 @@ function jtSpeichern() {
   } else {
     DB.jahrestermine.push(Object.assign({ id: uid(), uid: 'wa-j' + uid() }, daten));
   }
+  kalGemeinsamSichern();
   saveDB();
   jtSchliessen();
   renderKalender();
@@ -18122,6 +18179,7 @@ function jtLoeschen() {
   if (!j) return;
   if (!confirm('„' + j.titel + '" wirklich löschen?')) return;
   DB.jahrestermine = DB.jahrestermine.filter(x => String(x.id) !== String(jtOffen));
+  kalGemeinsamSichern();
   saveDB();
   jtSchliessen();
   renderKalender();
