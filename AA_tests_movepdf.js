@@ -2760,3 +2760,49 @@ console.log('\n=== KALENDER: JAHRESSICHT UND ICS ===');
   }
 
 })();
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: ANLAGEN AN NOTIZEN   (neu in v1.5.270)
+//  Einfügen nach der Kalender-Kategorie, vor dem ERGEBNIS-Block.
+//
+//  Fehlerart: Die Art wird aus Adresse UND Bezeichnung zusammen geraten –
+//  dann hängt ein Leerzeichen an und das Zeilenende-Zeichen greift nie.
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== ANLAGEN AN NOTIZEN ===');
+
+(function testAnlagen() {
+
+  ['anlageArtRaten','notizAnlagen','anlagenZeichnen','anlageDialog',
+   'anlageSpeichern','anlageLoeschen'].forEach(f => {
+    if (typeof window[f] !== 'function') fail(f + ' fehlt');
+  });
+  if (!document.getElementById('notiz-anlagen')) fail('Anlagenzeile fehlt');
+  else if (!document.getElementById('anl-modal')) fail('Anlagen-Dialog fehlt');
+  else ok('Anlagen vorhanden');
+
+  // Die Art muss aus der Adresse allein erkannt werden
+  if (anlageArtRaten('https://x.de/bericht.pdf', '') !== 'pdf')
+    fail('PDF wird nicht erkannt – prüft die Funktion Adresse und Titel zusammen?');
+  else ok('PDF an der Endung erkannt');
+  if (anlageArtRaten('https://x.de/foto.JPG', 'Bild vom Termin') !== 'bild')
+    fail('Bilder werden nicht erkannt');
+  else ok('Bild erkannt, auch mit Bezeichnung');
+  if (anlageArtRaten('https://drive.google.com/file/d/x', '') !== 'datei')
+    fail('Drive-Verweise werden nicht erkannt');
+  else ok('Drive erkannt');
+
+  // Adresse muss ein Schema haben, sonst öffnet der Verweis nichts
+  if (!/\^https\?:/.test(anlageSpeichern.toString().replace(/\\/g,'^')))
+    warn('Adressen ohne http:// würden angenommen und öffneten nichts');
+  else ok('Adressen werden auf ein Schema geprüft');
+
+  // Bestand
+  const mit = (DB.notizen || []).filter(n => (n.anlagen || []).length);
+  ok(mit.length + ' Notizen mit Anlagen');
+  const kaputt = mit.filter(n => n.anlagen.some(a => !a.url));
+  if (kaputt.length) fail(kaputt.length + ' Anlagen ohne Adresse');
+  else ok('Alle Anlagen haben eine Adresse');
+
+})();

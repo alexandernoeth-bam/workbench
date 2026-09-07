@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300897B'/%3E%3Cpolyline points='9 16 14 21 23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>WorkAssist 1.5.269</title>
+<title>WorkAssist 1.5.270</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
@@ -957,6 +957,28 @@ body.fm-planung #btn-zettelpanel { display:none !important; }
 .lv-rf-btn:disabled { opacity:.3; cursor:not-allowed; }
 .lv-rf-leer { font-size:11.5px; color:var(--text-xdim); }
 
+
+
+/* ── Anlagen an Notizen (v1.5.270) ── */
+.notiz-anlagen { display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+                 padding:6px 10px; border-bottom:1px solid var(--border);
+                 background:var(--surface2); flex-shrink:0; }
+.anl { display:inline-flex; align-items:center; gap:5px; max-width:260px;
+       border:1px solid var(--border); background:var(--surface);
+       border-radius:12px; padding:2px 4px 2px 8px; font-size:11px; }
+.anl-i { flex-shrink:0; font-size:11px; }
+.anl-t { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
+         white-space:nowrap; color:var(--accent-dark); text-decoration:none; }
+.anl-t:hover { text-decoration:underline; }
+.anl-x { flex-shrink:0; border:none; background:none; cursor:pointer;
+         color:var(--text-xdim); font-size:11px; padding:0 4px;
+         font-family:var(--font); line-height:1; }
+.anl-x:hover { color:var(--danger); }
+.anl-neu { border:1px dashed var(--border); background:none; border-radius:12px;
+           padding:2px 10px; font-size:11px; color:var(--text-dim);
+           cursor:pointer; font-family:var(--font); }
+.anl-neu:hover { border-color:var(--accent-light); color:var(--accent-dark); }
+.notiz-anl-zahl { font-size:10px; color:var(--text-xdim); margin-left:6px; }
 
 /* ═══════════════════════════════════════
    KALENDER: JAHRESSICHT (v1.5.264)
@@ -3162,7 +3184,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="start-overlay" id="start-overlay">
   <div class="start-card">
     <div class="start-logo">WorkAssist</div>
-    <div class="start-version">v1.5.269</div>
+    <div class="start-version">v1.5.270</div>
 
     <!-- Lade-Zustand: erscheint beim automatischen Verbindungsversuch -->
     <div id="start-loading" style="display:none;text-align:center;padding:20px 0;">
@@ -3230,7 +3252,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="app-name">WorkAssist</div>
-    <div class="app-version" id="app-version">v1.5.269</div>
+    <div class="app-version" id="app-version">v1.5.270</div>
   </div>
 
   <div class="nav-section">
@@ -3641,6 +3663,30 @@ textarea.field-input { resize: vertical; min-height: 70px; }
   </div>
 
   <!-- Jahrestermin -->
+  <div class="modal-overlay" id="anl-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header"><h2>Anlage</h2>
+      <button class="modal-close" onclick="anlageDialogZu()">✕</button></div>
+    <div class="modal-body">
+      <div class="field-group"><div class="field-label">Adresse</div>
+        <input class="field-input" id="anl-url" placeholder="https://drive.google.com/…"
+          onkeydown="if(event.key==='Enter') anlageSpeichern()"></div>
+      <div class="field-group"><div class="field-label">Bezeichnung</div>
+        <input class="field-input" id="anl-titel" placeholder="optional"
+          onkeydown="if(event.key==='Enter') anlageSpeichern()"></div>
+      <div style="font-size:11.5px;color:var(--text-dim);line-height:1.5;">
+        Gespeichert wird nur der Verweis, nicht die Datei –
+        wie bei den Belegen.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span style="flex:1"></span>
+      <button class="btn-secondary" onclick="anlageDialogZu()">Abbrechen</button>
+      <button class="btn-primary" onclick="anlageSpeichern()">Hinzufügen</button>
+    </div>
+  </div>
+</div>
+
   <div class="modal-overlay" id="jt-modal">
     <div class="modal" style="max-width:460px;">
       <div class="modal-header"><h2>Zeitraum</h2>
@@ -4044,6 +4090,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
               Unterseiten
             </button>
           </div>
+          <div class="notiz-anlagen" id="notiz-anlagen" style="display:none;"></div>
           <div class="notiz-toolbar" id="notiz-toolbar">
             <button class="ntb" onclick="notizTb('**','**')" title="Fett"><b>B</b></button>
             <button class="ntb" onclick="notizTb('*','*')" title="Kursiv"><i>I</i></button>
@@ -4947,7 +4994,7 @@ textarea.field-input { resize: vertical; min-height: 70px; }
 //  Primär: workassist_data.json via File System Access API (Chrome/Edge)
 //  Fallback: localStorage falls API nicht verfügbar
 // ═══════════════════════════════════════════════════════════════════════════
-const APP_VERSION = '1.5.269';
+const APP_VERSION = '1.5.270';
 const LS_KEY        = 'workassist_db';
 const LS_HANDLE_KEY = 'workassist_filehandle_name'; // Dateiname für Info-Anzeige
 
@@ -5153,6 +5200,7 @@ function migrateDB() {
       if (!DB.challenges) DB.challenges = [];
       if (!DB.termine)    DB.termine = [];
       if (!Array.isArray(DB.jahrestermine)) DB.jahrestermine = [];
+      (DB.notizen || []).forEach(n => { if (!Array.isArray(n.anlagen)) n.anlagen = []; });
       if (!Array.isArray(DB.wtermine))      DB.wtermine = [];
       if (!DB.exporte)    DB.exporte = {};
       if (!Array.isArray(DB.listen)) DB.listen = [];
@@ -9763,6 +9811,7 @@ function renderNotizenListe() {
         ${bereich ? `<span class="notiz-karte-tag" style="background:var(--teal-xlight);color:var(--teal-dark);">${escHtml(bereich.name)}</span>` : ''}
         <span class="notiz-karte-datum">${datum}</span>
         ${usz ? `<span class="notiz-usz-badge">${usz} Unterseite${usz>1?'n':''}</span>` : ''}
+        ${(n.anlagen||[]).length ? `<span class="notiz-anl-zahl">📎 ${n.anlagen.length}</span>` : ''}
       </div>
       ${preview ? `<div class="notiz-karte-preview">${escHtml(preview)}</div>` : ''}
     </div>`;
@@ -9780,6 +9829,7 @@ function notizOeffnen(id) {
   inner.style.display = 'flex';
 
   document.getElementById('notiz-edit-id').value      = n.id;
+  try { anlagenZeichnen(); } catch (e) {}
   document.getElementById('notiz-edit-parentid').value= n.parentId || '';
   document.getElementById('notiz-edit-titel').value   = n.titel;
   document.getElementById('notiz-edit-tag').value     = n.tag || '';
@@ -9839,6 +9889,103 @@ function notizZurOberseite() {
   const backBtn = document.getElementById('notiz-btn-back');
   const parentId = backBtn?.dataset.parentid;
   if (parentId) notizOeffnen(parentId);
+}
+
+
+// ── ANLAGEN AN NOTIZEN ────────────────────────────────────────────────────
+// Eine Besprechungsnotiz und das PDF dazu gehören zusammen. Belege haben
+// den Drive-Verweis schon, Notizen bisher nicht. Gespeichert wird nur der
+// Verweis, nicht die Datei selbst – wie bei den Belegen.
+
+const ANLAGE_ARTEN = {
+  pdf:   { n: 'PDF',      i: '📄' },
+  bild:  { n: 'Bild',     i: '🖼' },
+  datei: { n: 'Datei',    i: '📎' },
+  link:  { n: 'Link',     i: '🔗' },
+};
+
+// Aus der Adresse ableiten, worum es sich handelt – spart eine Auswahl
+function anlageArtRaten(url, titel) {
+  // Adresse und Bezeichnung getrennt prüfen: zusammengesetzt haengt ein
+  // Leerzeichen an, dadurch endete der String nie auf .pdf
+  const u = String(url || '').toLowerCase();
+  const g = (u + ' ' + String(titel || '')).toLowerCase();
+  if (/[.]pdf([?]|$)/.test(u) || /docs[.]google[.]com/.test(g)) return 'pdf';
+  if (/[.](png|jpe?g|gif|webp|heic|svg)([?]|$)/.test(u) || /photos[.]google/.test(g)) return 'bild';
+  if (/drive[.]google[.]com|onedrive|dropbox|sharepoint/.test(g)) return 'datei';
+  return 'link';
+}
+
+function notizAnlagen(n) {
+  return Array.isArray(n && n.anlagen) ? n.anlagen : [];
+}
+
+function notizAktuelle() {
+  const id = document.getElementById('notiz-edit-id')?.value;
+  if (!id || !Array.isArray(DB.notizen)) return null;
+  return DB.notizen.find(x => String(x.id) === String(id)) || null;
+}
+
+function anlagenZeichnen() {
+  const el = document.getElementById('notiz-anlagen');
+  if (!el) return;
+  const n = notizAktuelle();
+  const l = notizAnlagen(n);
+
+  el.innerHTML = l.map((a, i) => `<span class="anl" title="${escHtml(a.url)}">
+      <span class="anl-i">${(ANLAGE_ARTEN[a.art] || ANLAGE_ARTEN.link).i}</span>
+      <a class="anl-t" href="${escHtml(a.url)}" target="_blank" rel="noopener"
+         onclick="event.stopPropagation()">${escHtml(a.titel || a.url)}</a>
+      <button class="anl-x" onclick="anlageLoeschen(${i})" title="Entfernen">✕</button>
+    </span>`).join('') +
+    `<button class="anl-neu" onclick="anlageDialog()">+ Anlage</button>`;
+
+  el.style.display = (n ? 'flex' : 'none');
+}
+
+function anlageDialog() {
+  const n = notizAktuelle();
+  if (!n) { showToast('Erst die Notiz speichern'); return; }
+  document.getElementById('anl-url').value = '';
+  document.getElementById('anl-titel').value = '';
+  document.getElementById('anl-modal').classList.add('open');
+  setTimeout(() => document.getElementById('anl-url')?.focus(), 60);
+}
+
+function anlageDialogZu() {
+  document.getElementById('anl-modal').classList.remove('open');
+}
+
+function anlageSpeichern() {
+  const n = notizAktuelle();
+  if (!n) { anlageDialogZu(); return; }
+  const url = document.getElementById('anl-url').value.trim();
+  if (!url) { showToast('Bitte eine Adresse eingeben'); return; }
+  if (!/^https?:\/\//i.test(url)) {
+    showToast('Die Adresse muss mit http:// oder https:// beginnen');
+    return;
+  }
+  const titel = document.getElementById('anl-titel').value.trim();
+  if (!Array.isArray(n.anlagen)) n.anlagen = [];
+  n.anlagen.push({ id: uid(), url, titel: titel || url.replace(/^https?:\/\//, '').slice(0, 60),
+                   art: anlageArtRaten(url, titel) });
+  n.geaendert = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  saveDB();
+  anlageDialogZu();
+  anlagenZeichnen();
+  renderNotizenListe();
+  showToast('Anlage hinzugefügt');
+}
+
+function anlageLoeschen(i) {
+  const n = notizAktuelle();
+  if (!n || !Array.isArray(n.anlagen) || !n.anlagen[i]) return;
+  if (!confirm('Anlage „' + (n.anlagen[i].titel || n.anlagen[i].url) + '" entfernen?')) return;
+  n.anlagen.splice(i, 1);
+  n.geaendert = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  saveDB();
+  anlagenZeichnen();
+  renderNotizenListe();
 }
 
 function notizSpeichern() {
