@@ -2697,4 +2697,33 @@ console.log('\n=== KALENDER: JAHRESSICHT UND ICS ===');
   });
   ok('Kalender-Dialoge nutzen die richtige Klasse');
 
+  // ── Liste und Wochentage (v1.5.267) ─────────────────────────────────────
+  if (typeof kalListeEintraege !== 'function') fail('kalListeEintraege fehlt');
+  else if (!document.getElementById('kal-liste')) fail('Element kal-liste fehlt');
+  else {
+    ok('Liste unter dem Raster vorhanden');
+    // Die Liste muss denselben Filter beachten wie das Raster
+    const src = kalListeEintraege.toString();
+    if (!/kalFilter/.test(src))
+      fail('Die Liste beachtet den Filter nicht – sie zeigte anderes als das Raster');
+    else ok('Liste folgt dem Filter');
+    if (!/kalZeigeFT/.test(src))
+      warn('Feiertage ließen sich in der Liste nicht ausblenden');
+    else ok('Liste folgt der Feiertagsanzeige');
+    if (!/kalJahr/.test(src))
+      fail('Die Liste folgt nicht dem gewählten Jahr');
+    else ok('Liste folgt dem Jahr');
+
+    const l = kalListeEintraege();
+    const unsortiert = l.some((e, i) => i > 0 && e.sort < l[i-1].sort);
+    if (unsortiert) fail('Die Liste ist nicht nach Datum sortiert');
+    else ok('Liste nach Datum sortiert (' + l.length + ' Einträge)');
+  }
+
+  if (typeof KAL_WT === 'undefined' || KAL_WT.length !== 7)
+    fail('Die Wochentagskürzel fehlen');
+  else if (!/jt-wt/.test(renderKalender.toString()))
+    fail('Der Wochentag wird nicht in die Zellen geschrieben');
+  else ok('Wochentag in jeder Zelle');
+
 })();
