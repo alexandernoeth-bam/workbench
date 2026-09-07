@@ -2555,3 +2555,125 @@ console.log('\n=== LISTEN ===');
   else ok('Anheften lässt die Aufgaben unangetastet');
 
 })();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  KATEGORIE: KALENDER — JAHRESSICHT UND ICS   (neu in v1.5.264)
+//  Einfügen in AA_tests.js nach der Kategorie LISTEN,
+//  weiterhin VOR dem ERGEBNIS-Block.
+//
+//  Fehlerarten, die diese Kategorie abdeckt:
+//   • Der Fingerabdruck fällt weg – Einträge gehen bei jeder Ausgabe erneut
+//     hinaus und stehen mehrfach im Kalender
+//   • Eigene Einträge werden beim Einlesen zurückgeholt und wachsen
+//   • Feiertage landen bei den Einzelterminen statt im Jahresraster
+//   • Serientermine werden zurückgegeben und verlieren ihre Regel
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log('\n=== KALENDER: JAHRESSICHT UND ICS ===');
+
+(function testKalender() {
+
+  const noetig = ['kalInit','icsAbdruck','icsEintraege','icsOffen','icsExportieren',
+                  'icsLesen','icsBefund','icsUebernehmen','icsArtRaten','rrZerlegen',
+                  'wtFaellig','wtAnTag','jtAnTag','renderKalender','jtSpeichern',
+                  'jtLoeschen','kalBlaettern','icsGelesen'];
+  const fehlt = noetig.filter(f => typeof window[f] !== 'function');
+  if (fehlt.length) { fail('Nicht definiert: ' + fehlt.join(', ')); return; }
+  ok('Alle ' + noetig.length + ' Funktionen definiert');
+
+  ['screen-kalender','nav-kalender','kal-raster','kal-legende','jt-modal',
+   'ics-modal','ics-datei','jt-art','ics-uebernehmen'].forEach(id => {
+    if (!document.getElementById(id)) fail('Element ' + id + ' fehlt');
+  });
+  ok('Screen, Menüpunkt und beide Dialoge vorhanden');
+
+  if (!Array.isArray(DB.jahrestermine)) fail('DB.jahrestermine fehlt');
+  else if (!Array.isArray(DB.wtermine)) fail('DB.wtermine fehlt');
+  else ok('Bestände vorhanden (' + DB.jahrestermine.length + ' Zeiträume, ' +
+          DB.wtermine.length + ' Serien)');
+
+  // ── Der Fingerabdruck ist das Herzstück ─────────────────────────────────
+  const src = icsEintraege.toString();
+  if (!/e\.offen = \(e\.o\.exp !== e\.abdruck\)/.test(src))
+    fail('Ohne Abgleich ginge bei jeder Ausgabe alles erneut hinaus');
+  else ok('Offen ist, was sich seit der Ausgabe geändert hat');
+
+  if (/DB\.wtermine/.test(src))
+    fail('Serientermine gehen mit hinaus und verlieren ihre Regel');
+  else ok('Serientermine bleiben aus der Ausgabe');
+
+  const sx = icsExportieren.toString();
+  if (sx.indexOf('a.click()') > sx.indexOf('e.o.exp = e.abdruck'))
+    fail('Gemerkt wird vor der Ausgabe – bei Abbruch gingen Einträge verloren');
+  else ok('Gemerkt wird erst nach der Ausgabe');
+
+  // ── Rückläufer erkennen ─────────────────────────────────────────────────
+  const sb = icsBefund.toString();
+  if (!/workassist\$\/\.test\(e\.uid\)/.test(sb))
+    fail('Eigene Einträge kämen zurück und wüchsen bei jedem Umlauf');
+  else ok('Eigene Einträge werden nicht zurückgeholt');
+  if (!/festTag/.test(sb))
+    fail('Eintägige Feiertage lägen bei den Einzelterminen');
+  else ok('Feiertage und Ferien gehen ins Jahresraster');
+  if (!/art:'zualt'/.test(sb)) warn('Ohne Altersgrenze käme der ganze Kalender herein');
+  else ok('Alte Einträge werden übersprungen');
+
+  // ── Verhalten prüfen ────────────────────────────────────────────────────
+  const probe = { art:'jahr', o:{ von:'2026-08-17', bis:'2026-08-30',
+                  titel:'Probe', art:'urlaub', ort:'' } };
+  const a1 = icsAbdruck(probe);
+  probe.o.bis = '2026-08-31';
+  if (icsAbdruck(probe) === a1) fail('Der Fingerabdruck bemerkt Änderungen nicht');
+  else ok('Der Fingerabdruck folgt den Feldern');
+
+  // Monatliche Serien am 31. dürfen in kurzen Monaten nicht ausfallen
+  const r31 = rrZerlegen('FREQ=MONTHLY;BYMONTHDAY=31', '2026-01-31');
+  if (!r31 || !wtFaellig(r31, '2026-02-28'))
+    fail('Monatliche Serien am 31. fallen in kurzen Monaten aus');
+  else ok('Der 31. fällt in kurzen Monaten auf den letzten Tag');
+
+  const rw = rrZerlegen('FREQ=WEEKLY;BYDAY=MO,WE,FR', '2026-08-03');
+  if (!rw || !wtFaellig(rw, '2026-08-05') || wtFaellig(rw, '2026-08-04'))
+    fail('Wöchentliche Serien treffen die falschen Tage');
+  else ok('Wöchentliche Serien treffen die richtigen Tage');
+
+  if (rrZerlegen('FREQ=YEARLY', '2026-01-01') !== null)
+    warn('Jährliche werden als Serie geführt statt als Jahrestermin');
+  else ok('Nur wöchentlich und monatlich werden zu Serien');
+
+  // ── Laufender Stand ─────────────────────────────────────────────────────
+  const offen = icsOffen().length;
+  if (offen) warn(offen + ' Einträge noch nicht im Kalender');
+  else ok('Alles im Kalender');
+
+  const ohneArt = (DB.jahrestermine || []).filter(j => !j.art).length;
+  if (ohneArt) fail(ohneArt + ' Zeiträume ohne Art – sie erschienen farblos');
+  else ok('Alle Zeiträume haben eine Art');
+
+  const ohneUid = (DB.jahrestermine || []).concat(DB.termine || [])
+    .filter(x => !x.uid).length;
+  if (ohneUid) fail(ohneUid + ' Einträge ohne Kennung – sie würden doppelt ausgegeben');
+  else ok('Alle Einträge haben eine Kennung');
+
+  // ── Übernahme aus TimeAssist (v1.5.265) ─────────────────────────────────
+  ['taFeldUm','taSerieLaeuft','taBefund','taUebernehmen','taGelesen']
+    .forEach(f => { if (typeof window[f] !== 'function') fail(f + ' fehlt'); });
+  if (!document.getElementById('ta-datei')) fail('Dateifeld ta-datei fehlt');
+  else ok('TimeAssist-Übernahme vorhanden');
+
+  // Der Name uid darf die Funktion uid() nicht verdecken
+  if (typeof taFeldUm === 'function' && /const uid =/.test(taFeldUm.toString()))
+    fail('taFeldUm verdeckt die Funktion uid() – die Übernahme bräche ab');
+  else ok('Kein Namenskonflikt mit uid()');
+
+  // Abgelaufene Serien gehören nicht in den Bestand
+  if (typeof taSerieLaeuft === 'function' && !/r\.bis >= stichtag/.test(taSerieLaeuft.toString()))
+    warn('Abgelaufene Serien würden mit übernommen');
+  else ok('Nur laufende Serien werden übernommen');
+
+  // Übernommenes gilt als schon im Kalender, sonst ginge alles erneut hinaus
+  if (typeof taUebernehmen === 'function' && !/n\.exp = icsAbdruck/.test(taUebernehmen.toString()))
+    fail('Übernommenes ginge sofort wieder hinaus und stünde doppelt in Google');
+  else ok('Übernommenes gilt als im Kalender');
+
+})();
