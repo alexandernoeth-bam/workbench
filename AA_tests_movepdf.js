@@ -2676,4 +2676,25 @@ console.log('\n=== KALENDER: JAHRESSICHT UND ICS ===');
     fail('Übernommenes ginge sofort wieder hinaus und stünde doppelt in Google');
   else ok('Übernommenes gilt als im Kalender');
 
+  // ── Dialoge starten verborgen (v1.5.266) ────────────────────────────────
+  // Eine falsche Klasse hat keine CSS-Regel – der Dialog stünde dann offen
+  // im Seitenfluss statt als Overlay
+  let sichtbar = 0;
+  document.querySelectorAll('[class*="overlay"][id]').forEach(el => {
+    if (el.style.display === 'none') return;      // steuert sich selbst
+    if (el.classList.contains('open')) return;    // gerade absichtlich offen
+    if (getComputedStyle(el).display !== 'none') {
+      fail('Dialog ' + el.id + ' ist sichtbar, obwohl er zu sein sollte');
+      sichtbar++;
+    }
+  });
+  if (!sichtbar) ok('Alle Dialoge starten verborgen');
+
+  ['jt-modal','ics-modal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.classList.contains('modal-overlay'))
+      fail(id + ' nutzt nicht die Klasse modal-overlay – ohne Regel bleibt er offen');
+  });
+  ok('Kalender-Dialoge nutzen die richtige Klasse');
+
 })();
