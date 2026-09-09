@@ -990,8 +990,8 @@ console.log('\n19. Regelmäßiges Nachsehen bei Drive');
   pruefe(starten2 && /setInterval/.test(starten2[0]), 'der Takt läuft über setInterval');
 
   const wert = skript.match(/ABGLEICH_TAKT\s*=\s*(\d+)/);
-  pruefe(wert && Number(wert[1]) >= 60000 && Number(wert[1]) <= 600000,
-         'der Takt liegt zwischen einer und zehn Minuten');
+  pruefe(wert && Number(wert[1]) >= 15000 && Number(wert[1]) <= 600000,
+         'der Takt liegt zwischen 15 Sekunden und zehn Minuten');
 
   const sichern = skript.match(/function spaeterSichern\([\s\S]*?\n\}/);
   pruefe(sichern && /lokalOffen = true/.test(sichern[0]),
@@ -999,6 +999,89 @@ console.log('\n19. Regelmäßiges Nachsehen bei Drive');
   const still = skript.match(/function abgleichStill\([\s\S]*?\n\}\n/);
   pruefe(still && /lokalOffen = false/.test(still[0]),
          'ein erfolgreicher Abgleich löscht den Merker');
+}
+
+/* ============================================================
+   20. Installierbare App und Versionswechsel
+   Grund: Ein zu gieriger Service Worker bedient den Neustart mit der
+   alten Fassung. Genau daran scheiterte die Aktualisierung frueher,
+   bis hin zum Deinstallieren.
+   ============================================================ */
+console.log('\n20. Installierbare App und Versionswechsel');
+{
+  const skript = hauptSkript();
+  const pfad = require('path').dirname(DATEI);
+  const swPfad = require('path').join(pfad, 'sw.js');
+  const manifestPfad = require('path').join(pfad, 'manifest.webmanifest');
+
+  pruefe(/<link rel="manifest"/.test(QUELLE), 'das Manifest ist verknüpft');
+  pruefe(/apple-touch-icon/.test(QUELLE), 'ein Symbol für iOS ist hinterlegt');
+  ['swAnmelden', 'versionPruefen', 'neuLaden', 'neuStreifenZeigen',
+   'neuStreifenVerbergen', 'versionTaktStarten'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/id="neuStreifen"/.test(QUELLE), 'der Hinweisstreifen liegt im HTML');
+
+  const pruef = skript.match(/function versionPruefen\([\s\S]*?\n\}/);
+  pruefe(pruef && /cache: 'no-store'/.test(pruef[0]),
+         'die Versionsprüfung geht am Zwischenspeicher vorbei');
+  pruefe(pruef && /stand=' \+ Date\.now\(\)/.test(pruef[0]),
+         'der Abruf trägt einen Zeitstempel gegen zwischengespeicherte Antworten');
+  pruefe(pruef && /APP_VERSION/.test(pruef[0]),
+         'verglichen wird gegen die laufende Version');
+
+  const laden = skript.match(/function neuLaden\([\s\S]*?\n\}/);
+  pruefe(laden && /speichern\(\)/.test(laden[0]),
+         'vor dem Neuladen wird gesichert');
+  pruefe(laden && /sofort-uebernehmen/.test(laden[0]),
+         'ein wartender Service Worker wird zur Übernahme aufgefordert');
+  pruefe(laden && /location\.reload\(\)/.test(laden[0]), 'danach wird neu geladen');
+
+  const start = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(start && /swAnmelden\(\)/.test(start[0]), 'der Service Worker wird beim Start angemeldet');
+  pruefe(start && /versionPruefen\(false\)/.test(start[0]),
+         'beim Start wird still auf eine neue Fassung geprüft');
+
+  if (!fs.existsSync(swPfad)) {
+    fail('sw.js liegt nicht neben der App');
+  } else {
+    const sw = fs.readFileSync(swPfad, 'utf8');
+    ok('sw.js liegt neben der App');
+    pruefe(/fetch\(anfrage\)\.then/.test(sw) && /catch\(function \(\) \{\s*return caches\.match/.test(sw),
+           'der Service Worker fragt erst das Netz und den Vorrat nur ersatzweise');
+    pruefe(/skipWaiting\(\)/.test(sw), 'eine neue Fassung übernimmt sofort');
+    pruefe(/clients\.claim\(\)/.test(sw), 'die neue Fassung übernimmt offene Fenster');
+    pruefe(/adresse\.origin !== self\.location\.origin/.test(sw),
+           'fremde Adressen werden nicht abgefangen (Google bleibt unberührt)');
+    pruefe(/caches\.delete/.test(sw), 'alte Vorräte werden aufgeräumt');
+    pruefe(!/caches\.match\(anfrage\)\.then\(function \(gefunden\) \{\s*if \(gefunden\) \{ return gefunden; \}\s*return fetch/.test(sw),
+           'kein Vorrat-zuerst für die App selbst');
+  }
+
+  if (!fs.existsSync(manifestPfad)) {
+    fail('manifest.webmanifest liegt nicht neben der App');
+  } else {
+    let m = null;
+    try { m = JSON.parse(fs.readFileSync(manifestPfad, 'utf8')); } catch (e) { m = null; }
+    pruefe(!!m, 'das Manifest ist gültiges JSON');
+    if (m) {
+      pruefe(m.display === 'standalone', 'die App startet als eigenes Fenster');
+      pruefe(/workbench\.html$/.test(m.start_url || ''),
+             'die Startadresse zeigt auf die App');
+      const groessen = (m.icons || []).map(function (i) { return i.sizes; });
+      pruefe(groessen.indexOf('192x192') >= 0 && groessen.indexOf('512x512') >= 0,
+             'beide für die Installation nötigen Symbolgrößen sind vorhanden');
+      const maskierbar = (m.icons || []).filter(function (i) {
+        return String(i.purpose || '').indexOf('maskable') >= 0;
+      });
+      pruefe(maskierbar.length > 0, 'ein maskierbares Symbol für Android ist dabei');
+      (m.icons || []).forEach(function (i) {
+        const p = require('path').join(pfad, String(i.src).replace('./', ''));
+        pruefe(fs.existsSync(p), 'Symboldatei ' + i.src + ' liegt vor');
+      });
+    }
+  }
 }
 
 /* ============================================================

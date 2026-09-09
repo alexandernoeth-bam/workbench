@@ -4,7 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F6F5F2">
-<title>Workbench 0.5.4</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Workbench 0.6.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -196,6 +200,13 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .rueck-wort{flex:0 0 auto;font-weight:500;text-decoration:underline}
 .ttext{cursor:pointer}
 
+.neustreifen{display:none;flex:0 0 auto;align-items:center;gap:10px;padding:10px 20px;
+  background:var(--petrol);border:0;font:inherit;font-size:calc(var(--fs)*0.82);
+  color:#fff;cursor:pointer;width:100%;text-align:left}
+.neustreifen.sichtbar{display:flex}
+#neuText{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.neu-wort{flex:0 0 auto;font-weight:500;text-decoration:underline}
+
 /* ---------- Fussleiste ---------- */
 .fuss{flex:0 0 auto;display:flex;background:var(--karte);border-top:1px solid var(--linie);
   padding-bottom:env(safe-area-inset-bottom)}
@@ -275,6 +286,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
     <button type="button" id="knopfRecht" onclick="zugriffErlauben()">Zugriff erlauben</button>
     <button type="button" onclick="speichernJetzt()">Jetzt speichern</button>
     <button type="button" onclick="ladenJetzt()">Neu laden</button>
+    <button type="button" onclick="versionPruefen(true)">Auf neue Fassung prüfen</button>
     <button type="button" class="stark" onclick="handleVergessen()">Datei lösen</button>
   </div>
 
@@ -316,6 +328,11 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   <div id="migBericht"></div>
 </div>
 
+<button class="neustreifen" id="neuStreifen" type="button" onclick="neuLaden()">
+  <span id="neuText"></span>
+  <span class="neu-wort">Jetzt laden</span>
+</button>
+
 <div class="fuss">
   <button type="button" id="navTag" class="aktiv" onclick="zeigeSchirm('Tag')">
     <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"></rect>
@@ -337,7 +354,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.5.4';
+var APP_VERSION = '0.6.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -352,8 +369,8 @@ var GIS_URL   = 'https://accounts.google.com/gsi/client';
 var TOKEN_KEY = 'workbench-zugriff';
 var ANMELDE_MERKER = 'workbench-war-angemeldet';
 var ABGLEICH_VERZUG  = 4000;    /* so lange nach der letzten Änderung wird gewartet */
-var ABGLEICH_MINDEST = 30000;   /* nicht öfter als alle 30 Sekunden von selbst */
-var ABGLEICH_TAKT    = 120000;  /* alle zwei Minuten bei Drive nachsehen */
+var ABGLEICH_MINDEST = 20000;   /* nicht öfter als alle 20 Sekunden von selbst */
+var ABGLEICH_TAKT    = 30000;   /* alle 30 Sekunden bei Drive nachsehen */
 var DRIVE_DATEI = 'workbench.json';
 var VORLAUF_MS = 5 * 60 * 1000;   /* so lange vor Ablauf wird still erneuert */
 var GRABSTEIN_TAGE = 180;         /* so lange bleibt ein Löschvermerk erhalten */
@@ -1233,7 +1250,9 @@ function standZeichnen() {
   if (letzterBericht) { teile.push(berichtText(letzterBericht)); }
   teile.push((DB.grabsteine || []).length + ' Löschvermerke');
   if (lokalOffen) { teile.push('lokale Änderung wartet'); }
-  teile.push('prüft alle ' + Math.round(ABGLEICH_TAKT / 60000) + ' Minuten');
+  teile.push(ABGLEICH_TAKT < 60000
+    ? ('prüft alle ' + Math.round(ABGLEICH_TAKT / 1000) + ' Sekunden')
+    : ('prüft alle ' + Math.round(ABGLEICH_TAKT / 60000) + ' Minuten'));
   standSetzen(teile.join(' · '), false);
 }
 
@@ -2842,6 +2861,9 @@ function zeichneUmgebung() {
   h += zeile('IndexedDB', c.t, c.k);
   h += zeile('Lokaler Speicher', d.t, d.k);
   h += zeile('Als App installiert', pwa ? 'ja' : 'nein', pwa ? 'ja' : 'grau');
+  h += zeile('Service Worker', ('serviceWorker' in navigator) ? 'unterstützt' : 'fehlt',
+             ('serviceWorker' in navigator) ? 'ja' : 'nein');
+  h += zeile('Neuere Fassung', neueVersion || 'keine', neueVersion ? 'nein' : 'grau');
   h += zeile('Fensterhöhe', window.innerHeight + ' px', 'grau');
   h += zeile('Heute', isoDatum(), 'grau');
   ziel.innerHTML = h;
@@ -2854,6 +2876,94 @@ function zeichne() {
   zeichneGoogle();
   zeichneBestand();
   zeichneUmgebung();
+}
+
+/* ============================================================
+   Als App: Service Worker und Versionsprüfung
+
+   Der Service Worker holt alles zuerst aus dem Netz. Eine neue
+   Fassung kommt damit von selbst an — ohne Deinstallieren.
+   Zusätzlich fragt die App aktiv nach, damit ein laufendes Fenster
+   nicht tagelang auf einem alten Stand bleibt.
+   ============================================================ */
+
+var VERSION_TAKT = 15 * 60 * 1000;
+var neueVersion = '';
+var versionUhr = null;
+
+function swAnmelden() {
+  if (!('serviceWorker' in navigator)) { return Promise.resolve(false); }
+  return navigator.serviceWorker.register('./sw.js').then(function () {
+    return true;
+  }).catch(function () {
+    return false;
+  });
+}
+
+function versionPruefen(laut) {
+  var adresse = './workbench.html?stand=' + Date.now();
+  return window.fetch(adresse, { cache: 'no-store' }).then(function (a) {
+    if (!a.ok) { throw new Error('Abruf mit Status ' + a.status); }
+    return a.text();
+  }).then(function (text) {
+    var treffer = text.match(/APP_VERSION\s*=\s*'([\d.]+)'/);
+    if (!treffer) { throw new Error('Im Abruf steht keine Versionsnummer.'); }
+    var dort = treffer[1];
+    if (dort !== APP_VERSION) {
+      neueVersion = dort;
+      neuStreifenZeigen(dort);
+      if (laut) { melde('Neue Fassung ' + dort + ' gefunden.', 'gut'); }
+    } else {
+      neueVersion = '';
+      neuStreifenVerbergen();
+      if (laut) { melde('Die laufende Fassung ' + APP_VERSION + ' ist die neueste.', 'gut'); }
+    }
+    zeichne();
+    return dort;
+  }).catch(function (f) {
+    if (laut) { melde('Versionsprüfung nicht möglich.\n' + (f ? f.message : ''), 'warn'); }
+    return null;
+  });
+}
+
+function neuStreifenZeigen(dort) {
+  var streifen = document.getElementById('neuStreifen');
+  var text = document.getElementById('neuText');
+  if (!streifen || !text) { return; }
+  text.textContent = 'Neue Fassung ' + dort + ' verfügbar (läuft: ' + APP_VERSION + ')';
+  streifen.classList.add('sichtbar');
+}
+
+function neuStreifenVerbergen() {
+  var streifen = document.getElementById('neuStreifen');
+  if (streifen) { streifen.classList.remove('sichtbar'); }
+}
+
+/* Vor dem Neuladen wird alles Wartende gesichert, sonst geht die
+   letzte Änderung beim Austausch verloren. */
+function neuLaden() {
+  neuStreifenVerbergen();
+  melde('Neue Fassung wird geladen …', null);
+  speichern().catch(function () { return null; }).then(function () {
+    if (!('serviceWorker' in navigator)) { return null; }
+    return navigator.serviceWorker.getRegistration().then(function (anmeldung) {
+      if (!anmeldung) { return null; }
+      if (anmeldung.waiting) { anmeldung.waiting.postMessage('sofort-uebernehmen'); }
+      return anmeldung.update().catch(function () { return null; });
+    }).catch(function () { return null; });
+  }).then(function () {
+    window.setTimeout(function () {
+      window.location.reload();
+    }, 600);
+  });
+}
+
+function versionTaktStarten() {
+  if (versionUhr) { window.clearInterval(versionUhr); }
+  versionUhr = window.setInterval(function () {
+    if (document.hidden) { return; }
+    versionPruefen(false);
+  }, VERSION_TAKT);
 }
 
 /* ============================================================
@@ -2884,6 +2994,8 @@ function starten() {
   }
   document.addEventListener('visibilitychange', rueckkehrPruefen);
   taktStarten();
+  swAnmelden().then(function () { return versionPruefen(false); });
+  versionTaktStarten();
   zeichne();
   if (!idbDa()) {
     speicherWeg = opfsDa() ? 'opfs' : (localDa() ? 'local' : 'keiner');
