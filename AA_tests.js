@@ -515,10 +515,16 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var zahl = monatFilterZahl();'
                  + '   monatArten = null; monatKalender = null; monatOffeneTage = {};'
                  + '   var zurueck = monatFilterZahl();'
+                 + '   monatFilterAllesAus();'
+                 + '   var allesAus = monatFilterZahl();'
+                 + '   monatGruppeSetzen(\'arten\', true);'
+                 + '   var nachGruppe = monatFilterZahl();'
+                 + '   monatArten = null; monatKalender = null;'
                  + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
                  + '   return { spalten:spalten, sichtbar:sichtbar, mehrKnopf:mehr,'
                  + '            aufgeklappt:auf, nachAbwahl:weg, zahlNachAbwahl:zahl,'
-                 + '            zurueckgesetzt:zurueck };'
+                 + '            zurueckgesetzt:zurueck, allesAus:allesAus,'
+                 + '            nachGruppe:nachGruppe };'
                  + ' } };'
                  + 'globalThis.__jahrApi = { ferienImJahr,'
                  + ' pruefeFerien: function(){'
@@ -2478,6 +2484,20 @@ console.log('\n41. Monatssicht');
   pruefe(blatt && /Kategorien/.test(blatt[0]) && /Kalender/.test(blatt[0]),
          'das Filterblatt trennt Kategorien und Kalender');
   pruefe(blatt && /mf-haken/.test(blatt[0]), 'jede Zeile trägt ein Häkchen');
+  pruefe(blatt && /monatFilterAllesAus\(\)/.test(blatt[0]),
+         'es gibt einen Knopf, der alles ausblendet');
+  pruefe(blatt && /monatFilterZuruecksetzen\(\)/.test(blatt[0]),
+         'und einen, der alles wieder zeigt');
+  pruefe(blatt && (blatt[0].match(/monatGruppeSetzen\(/g) || []).length === 4,
+         'jede Gruppe lässt sich für sich an- und abschalten');
+
+  ['monatGruppeSetzen', 'monatFilterAllesAus'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const aus = skript.match(/function monatFilterAllesAus\([\s\S]*?\n\}/);
+  pruefe(aus && /'arten', false/.test(aus[0]) && /'kalender', false/.test(aus[0]),
+         'Alles ausblenden trifft beide Gruppen');
 
   if (!m) {
     warn('Monatsfunktionen nicht auswertbar');
@@ -2490,6 +2510,8 @@ console.log('\n41. Monatssicht');
     pruefe(e.nachAbwahl === true, 'ein abgewählter Kalender verschwindet');
     pruefe(e.zahlNachAbwahl === 1, 'der Knopf zählt die Abwahl');
     pruefe(e.zurueckgesetzt === 0, 'zurücksetzen räumt alle Filter ab');
+    pruefe(e.allesAus === 11, 'Alles ausblenden schaltet neun Arten und zwei Kalender ab');
+    pruefe(e.nachGruppe === 2, 'eine Gruppe lässt sich wieder einschalten, ohne die andere');
   }
 }
 

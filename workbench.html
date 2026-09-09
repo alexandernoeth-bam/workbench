@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.13.0</title>
+<title>Workbench 0.13.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -259,7 +259,11 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .mt-termin.privat .mt-titel{color:var(--petrol)}
 .mt-mehr{background:none;border:0;padding:2px 0 0;font:inherit;
   font-size:calc(var(--fs)*0.74);color:var(--weinrot);cursor:pointer;text-align:left}
-.mf-gruppe{font-size:calc(var(--fs)*0.76);color:var(--grau);padding:14px 0 4px}
+.mf-kopf{display:flex;align-items:center;gap:7px;padding:14px 0 4px}
+.mf-gruppe{flex:1;font-size:calc(var(--fs)*0.76);color:var(--grau)}
+.mf-klein{font:inherit;font-size:calc(var(--fs)*0.72);padding:2px 10px;
+  border:1px solid var(--linie);border-radius:20px;background:var(--karte);
+  color:var(--grau);cursor:pointer}
 .mf-zeile{display:flex;align-items:center;gap:10px;padding:8px 0;
   border-bottom:1px solid var(--linie);cursor:pointer}
 .mf-farbe{flex:0 0 10px;height:10px;border-radius:2px}
@@ -665,7 +669,7 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.13.0';
+var APP_VERSION = '0.13.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4610,7 +4614,10 @@ function monatFilterHtml() {
   h += '<div class="as-titel">Was der Monat zeigt</div>';
   h += '<div class="as-linie"></div>';
 
-  h += '<div class="mf-gruppe">Kategorien</div>';
+  h += '<div class="mf-kopf"><span class="mf-gruppe">Kategorien</span>'
+     + '<button type="button" class="mf-klein" onclick="monatGruppeSetzen(\'arten\',true)">alle</button>'
+     + '<button type="button" class="mf-klein" onclick="monatGruppeSetzen(\'arten\',false)">keine</button>'
+     + '</div>';
   var i;
   for (i = 0; i < JT_REIHE.length; i++) {
     var k = JT_REIHE[i];
@@ -4621,7 +4628,10 @@ function monatFilterHtml() {
        + '<span class="mf-haken' + (an ? ' an' : '') + '"></span></div>';
   }
 
-  h += '<div class="mf-gruppe">Kalender</div>';
+  h += '<div class="mf-kopf"><span class="mf-gruppe">Kalender</span>'
+     + '<button type="button" class="mf-klein" onclick="monatGruppeSetzen(\'kalender\',true)">alle</button>'
+     + '<button type="button" class="mf-klein" onclick="monatGruppeSetzen(\'kalender\',false)">keine</button>'
+     + '</div>';
   if (!kalenderListe.length) {
     h += '<div class="mt-anmerkung">Noch keine Kalender eingelesen.</div>';
   }
@@ -4638,9 +4648,31 @@ function monatFilterHtml() {
 
   h += '<div class="d-reihe">';
   h += '<button type="button" onclick="monatFilterZuruecksetzen()">Alles zeigen</button>';
+  h += '<button type="button" onclick="monatFilterAllesAus()">Alles ausblenden</button>';
+  h += '</div>';
+  h += '<div class="d-reihe">';
   h += '<button type="button" onclick="aktionenSchliessen()">Fertig</button>';
   h += '</div>';
   return h;
+}
+
+/* Setzt eine ganze Gruppe auf einmal. */
+function monatGruppeSetzen(gruppe, an) {
+  var i;
+  if (gruppe === 'arten') {
+    monatArten = {};
+    for (i = 0; i < JT_REIHE.length; i++) { monatArten[JT_REIHE[i]] = an; }
+  } else {
+    monatKalender = {};
+    for (i = 0; i < kalenderListe.length; i++) { monatKalender[kalenderListe[i].name] = an; }
+  }
+  monatFilterOeffnen();
+  kalZeichnen();
+}
+
+function monatFilterAllesAus() {
+  monatGruppeSetzen('arten', false);
+  monatGruppeSetzen('kalender', false);
 }
 
 function monatArtUm(art) {
