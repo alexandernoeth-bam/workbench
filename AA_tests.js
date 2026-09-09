@@ -65,6 +65,24 @@ console.log('\n1. Bildschirme und Navigation');
          '.schirm ist mit !important ausgeblendet');
   pruefe(/\.schirm\.aktiv\{display:flex !important/.test(QUELLE),
          '.schirm.aktiv ist mit !important eingeblendet');
+
+  /* Rückmeldungen müssen auf dem Bildschirm stehen, auf dem gearbeitet wird.
+     Eine Meldezeile allein auf der Diagnose bleibt sonst ungesehen. */
+  const meldeFn = hauptSkript().match(/function melde\([\s\S]*?\n\}/);
+  const meldeStellen = meldeFn
+    ? [...meldeFn[0].matchAll(/'([a-zA-Z][\w-]*)'/g)].map(m => m[1]).filter(x => /melder/i.test(x))
+    : [];
+  pruefe(meldeStellen.length >= 2, 'melde() bedient mehr als eine Meldezeile');
+  meldeStellen.forEach(function (id) {
+    pruefe(new RegExp('id="' + id + '"').test(QUELLE),
+           'Meldezeile "' + id + '" existiert im HTML');
+  });
+  schirme.forEach(function (s) {
+    if (s === 'Tag') { return; }
+    const block = QUELLE.match(new RegExp('id="schirm' + s + '"[\\s\\S]*?\\n</div>'));
+    pruefe(!block || /class="melder"/.test(block[0]),
+           'Bildschirm "' + s + '" hat eine eigene Meldezeile');
+  });
 }
 
 /* ============================================================

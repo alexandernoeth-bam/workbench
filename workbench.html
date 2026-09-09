@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F6F5F2">
-<title>Workbench 0.4.0</title>
+<title>Workbench 0.4.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -157,6 +157,8 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
             onclick="migUebernehmen()">Übernehmen</button>
   </div>
 
+  <div class="melder" id="migMelder">Bereit.</div>
+
   <div class="abschnitt-titel"><span>Vorschau</span></div>
   <div id="migBericht"></div>
 </div>
@@ -182,7 +184,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.4.0';
+var APP_VERSION = '0.4.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -266,10 +268,14 @@ function isoZeit(d) {
 }
 
 function melde(text, art) {
-  var el = document.getElementById('melder');
-  if (!el) { return; }
-  el.textContent = text;
-  el.className = 'melder' + (art ? ' ' + art : '');
+  var stellen = ['melder', 'migMelder'];
+  var i;
+  for (i = 0; i < stellen.length; i++) {
+    var el = document.getElementById(stellen[i]);
+    if (!el) { continue; }
+    el.textContent = text;
+    el.className = 'melder' + (art ? ' ' + art : '');
+  }
 }
 
 function fsApiDa()   { return (typeof window.showOpenFilePicker === 'function'); }
@@ -1141,6 +1147,22 @@ function wiederholungUmschreiben(alt, faellig) {
   return null;
 }
 
+function quelleInhalt(quelle) {
+  var d = quelle.daten || {};
+  var teile = [];
+  function zaehl(feld, wort) {
+    if (Array.isArray(d[feld]) && d[feld].length) { teile.push(d[feld].length + ' ' + wort); }
+  }
+  zaehl('bereiche', 'Bereiche');
+  zaehl('aufgaben', 'Aufgaben');
+  zaehl('plaene', 'Pläne');
+  zaehl('jahrestermine', 'Jahrestermine');
+  zaehl('ziele', 'Ziele');
+  zaehl('aktivitaeten', 'Aktivitäten');
+  if (!teile.length) { return 'nichts Verwertbares gefunden'; }
+  return teile.join(' · ');
+}
+
 function quelleErkennen(name, daten) {
   if (daten && Array.isArray(daten.aktivitaeten) && Array.isArray(daten.gruppen)) {
     return 'timeassist';
@@ -1478,15 +1500,27 @@ function migDateienGewaehlt(ereignis) {
           migQuellen.push({ name: datei.name, art: 'unlesbar', kontext: '', daten: {} });
         }
         offen--;
-        if (offen === 0) { migZeichne(); }
+        if (offen === 0) { migFertigGelesen(); }
       };
       leser.onerror = function () {
+        migQuellen.push({ name: datei.name, art: 'unlesbar', kontext: '', daten: {} });
         offen--;
-        if (offen === 0) { migZeichne(); }
+        if (offen === 0) { migFertigGelesen(); }
       };
       leser.readAsText(datei);
     })(dateien[i]);
   }
+}
+
+function migFertigGelesen() {
+  migZeichne();
+  var gut = 0;
+  var i;
+  for (i = 0; i < migQuellen.length; i++) {
+    if (migQuellen[i].art !== 'unlesbar' && migQuellen[i].art !== 'unbekannt') { gut++; }
+  }
+  melde(migQuellen.length + ' Datei(en) gelesen, davon ' + gut + ' verwertbar.\n'
+      + 'Jetzt „Vorschau berechnen" antippen.', gut ? 'gut' : 'warn');
 }
 
 function migVorschau() {
@@ -1497,13 +1531,29 @@ function migVorschau() {
       brauchbar.push(migQuellen[i]);
     }
   }
-  if (!brauchbar.length) {
-    melde('Keine brauchbare Quelldatei gewählt.', 'warn');
+  if (!migQuellen.length) {
+    melde('Es ist noch keine Datei gewählt. Bitte oben die JSON-Dateien auswählen.', 'warn');
     return;
   }
-  migErgebnis = migrationRechnen(brauchbar);
+  if (!brauchbar.length) {
+    melde('Die gewählten Dateien wurden nicht erkannt.\n'
+        + 'Erwartet werden WorkAssist- oder TimeAssist-Sicherungen.', 'warn');
+    return;
+  }
+  try {
+    migErgebnis = migrationRechnen(brauchbar);
+  } catch (f) {
+    migErgebnis = null;
+    migZeichne();
+    melde('Die Vorschau ist gescheitert.\n' + (f ? (f.message + '\n' + (f.stack || '')) : ''), 'warn');
+    return;
+  }
   migZeichne();
-  melde('Vorschau berechnet. Es wurde noch nichts übernommen.', null);
+  var b = migErgebnis.bericht;
+  melde('Vorschau aus ' + brauchbar.length + ' Datei(en) berechnet.\n'
+      + b.aufgaben + ' Aufgaben · ' + b.themen + ' Themen · ' + b.projekte + ' Projekte · '
+      + b.ziele + ' Ziele · ' + b.jahrestermine + ' Jahrestermine\n'
+      + 'Es wurde noch nichts übernommen.', 'gut');
 }
 
 function migUebernehmen() {
@@ -1533,8 +1583,10 @@ function migZeichne() {
     }
     for (i = 0; i < migQuellen.length; i++) {
       var s = migQuellen[i];
-      var art = (s.art === 'unlesbar' || s.art === 'unbekannt') ? 'nein' : 'ja';
-      h += zeile(s.name, s.art + (s.kontext ? ' · ' + s.kontext : ''), art);
+      var brauchbarS = (s.art !== 'unlesbar' && s.art !== 'unbekannt');
+      h += zeile(s.name, s.art + (s.kontext ? ' · ' + s.kontext : ''),
+                 brauchbarS ? 'ja' : 'nein');
+      h += zeile('&nbsp;&nbsp;enthält', quelleInhalt(s), 'grau');
     }
     qziel.innerHTML = h;
   }
