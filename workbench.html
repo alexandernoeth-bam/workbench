@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.7.3</title>
+<title>Workbench 0.8.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -100,6 +100,10 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   white-space:nowrap}
 .tk-form.frei{color:var(--petrol);border-color:var(--petrol)}
 .tk-blaettern{display:flex;gap:6px;margin-top:10px}
+.tk-ganztags{display:none;font-size:calc(var(--fs)*0.76);color:var(--petrol);
+  margin-top:7px;line-height:1.4}
+.tk-ganztags.sichtbar{display:block}
+.tk-ganztags b{font-weight:500}
 .tk-stand{font-size:calc(var(--fs)*0.72);color:var(--grau);margin-top:6px;
   white-space:pre-wrap;line-height:1.4}
 .tk-stand.warn{color:var(--weinrot)}
@@ -326,6 +330,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
       <button type="button" onclick="tagBlaettern(1)">›</button>
       <button type="button" id="tkAbgleich" onclick="abgleichenJetzt()">Abgleichen</button>
     </div>
+    <div class="tk-ganztags" id="tkGanztags"></div>
     <div class="tk-stand" id="tkStand"></div>
   </div>
 
@@ -371,6 +376,13 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
     <button type="button" id="knopfDriveLaden" onclick="driveLadenJetzt()">Von Drive laden</button>
     <button type="button" id="knopfDriveSpeichern" onclick="driveSpeichernJetzt()">Zu Drive sichern</button>
     <button type="button" id="knopfAbgleich" class="stark" onclick="abgleichenJetzt()">Abgleichen</button>
+  </div>
+
+  <div class="abschnitt-titel"><span>Kalender</span></div>
+  <div id="kalenderListe"></div>
+  <div class="knopfreihe">
+    <button type="button" onclick="kalenderNeuLesen()">Kalender neu einlesen</button>
+    <button type="button" onclick="termineHolen(true)">Termine neu holen</button>
   </div>
 
   <div class="abschnitt-titel"><span>Datenbestand</span></div>
@@ -458,7 +470,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.7.3';
+var APP_VERSION = '0.8.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -1131,6 +1143,7 @@ function anmelden(still) {
           tokenMerken(antwort.access_token, Number(antwort.expires_in) || 3600);
           try { window.localStorage.setItem(ANMELDE_MERKER, '1'); } catch (e) { /* egal */ }
           abgleichPlanen(true);
+          termineHolen(false);
           if (!still) { melde('Angemeldet. Gültig für ' + restMinuten() + ' Minuten.', 'gut'); }
           zeichne();
           fertig(true);
@@ -2220,6 +2233,15 @@ function tagesEintraege(is) {
     verlauf.push({ art: 'termin', zeit: termine[i].von || '00:00', t: termine[i] });
   }
 
+  /* Aus Google gelesen, nicht gespeichert. */
+  var ausGoogle = termineFuerTag(is);
+  for (i = 0; i < ausGoogle.zeit.length; i++) {
+    var g = ausGoogle.zeit[i];
+    verlauf.push({ art: 'termin', zeit: g.zeit || '00:00',
+                   t: { titel: g.titel, von: g.zeit, bis: g.bis, ort: g.ort,
+                        quelle: g.quelle, extern: true } });
+  }
+
   verlauf.sort(function (x, y) { return (x.zeit < y.zeit) ? -1 : ((x.zeit > y.zeit) ? 1 : 0); });
   return { verlauf: verlauf, wieder: wieder, haupt: haupt, klein: klein, fertig: fertig };
 }
@@ -2227,6 +2249,18 @@ function tagesEintraege(is) {
 /* ------------------------------------------------------------
    Zeichnen
    ------------------------------------------------------------ */
+
+function ganztagsZeichnen(is) {
+  var el = document.getElementById('tkGanztags');
+  if (!el) { return; }
+  var g = termineFuerTag(is).ganztags;
+  if (!g.length) { el.classList.remove('sichtbar'); el.innerHTML = ''; return; }
+  var namen = [];
+  var i;
+  for (i = 0; i < g.length; i++) { namen.push(esc(g[i].titel)); }
+  el.innerHTML = '<b>Ganztägig:</b> ' + namen.join(' · ');
+  el.classList.add('sichtbar');
+}
 
 function tagKopfZeichnen(is) {
   var d = ausIso(is);
@@ -2314,6 +2348,7 @@ function verlaufHtml(eintrag, is) {
     var unten = [];
     if (t.bis) { unten.push(esc(t.von) + '–' + esc(t.bis)); }
     if (t.ort) { unten.push(esc(t.ort)); }
+    if (t.quelle) { unten.push(esc(t.quelle)); }
     if (unten.length) { h += '<div class="tmeta">' + unten.join(' · ') + '</div>'; }
     h += '</div></div>';
     return h;
@@ -2380,6 +2415,7 @@ function tagZeichnen() {
   }
 
   blatt.innerHTML = h;
+  ganztagsZeichnen(is);
   streifenPruefen();
   standZeichnen();
 }
@@ -3290,6 +3326,39 @@ function zeichneGoogle() {
   if (kg) { kg.disabled = !an; }
 }
 
+function kalenderNeuLesen() {
+  if (!tokenGueltig()) { melde('Bitte zuerst anmelden.', 'warn'); return; }
+  kalenderListeHolen().then(function () {
+    melde(kalenderListe.length + ' Kalender gefunden.', 'gut');
+    zeichne();
+    return termineHolen(false);
+  }).catch(function (f) {
+    melde('Kalenderliste nicht lesbar.\n' + (f ? f.message : ''), 'warn');
+  });
+}
+
+function zeichneKalender() {
+  var ziel = document.getElementById('kalenderListe');
+  if (!ziel) { return; }
+  var h = '';
+  h += zeile('Zuletzt geholt', kalenderStand || 'noch nie', kalenderStand ? '' : 'grau');
+  h += zeile('Termine im Fenster', String(termineZahl()), termineZahl() ? '' : 'grau');
+  if (kalenderFehler) { h += zeile('Letzter Fehler', esc(kalenderFehler), 'nein'); }
+  if (!kalenderListe.length) {
+    h += '<div class="platzhalter">Noch keine Kalender eingelesen.</div>';
+  }
+  var i;
+  for (i = 0; i < kalenderListe.length; i++) {
+    var k = kalenderListe[i];
+    var an = kalenderGewaehlt(k.id);
+    h += '<div class="zeile"><div class="zeile-name">' + esc(k.name) + '</div>'
+       + '<button class="d-wahl' + (an ? ' an' : '') + '" type="button" '
+       + 'onclick="kalenderUm(\'' + esc(k.id) + '\',\'' + esc(k.name) + '\')">'
+       + (an ? 'wird gelesen' : 'aus') + '</button></div>';
+  }
+  ziel.innerHTML = h;
+}
+
 function zeichneBestand() {
   var ziel = document.getElementById('bestandListe');
   if (!ziel) { return; }
@@ -3339,10 +3408,253 @@ function zeichne() {
   if (v) { v.textContent = 'v' + APP_VERSION; }
   zeichneSpeicher();
   zeichneGoogle();
+  zeichneKalender();
   zeichneBestand();
   zeichneUmgebung();
 }
 
+
+
+/* ============================================================
+   Google Kalender — nur lesen
+
+   Termine gehören Google. Die App holt sie in ein Fenster um den
+   heutigen Tag und hält sie nur im Arbeitsspeicher: Sie werden nie
+   in die eigene Datei geschrieben, sonst gäbe es zwei Wahrheiten.
+   ============================================================ */
+
+var KAL_VOR = 21;      /* Tage rückwärts */
+var KAL_NACH = 120;    /* Tage vorwärts */
+var KAL_TAKT = 10 * 60 * 1000;
+
+var kalenderListe = [];      /* {id, name, farbe} */
+var termineNachTag = {};     /* iso -> [{zeit, bis, titel, ort, ganztags, quelle, id}] */
+var kalenderStand = '';
+var kalenderFehler = '';
+var kalenderLaeuft = false;
+var kalenderUhr = null;
+
+function kalenderAktiv() {
+  var gewaehlt = (DB.einstellungen && DB.einstellungen.kalender) || [];
+  if (!gewaehlt.length) { return kalenderListe; }
+  var aus = [];
+  var i, j;
+  for (i = 0; i < kalenderListe.length; i++) {
+    for (j = 0; j < gewaehlt.length; j++) {
+      if (gewaehlt[j].id === kalenderListe[i].id && gewaehlt[j].aktiv !== false) {
+        aus.push(kalenderListe[i]);
+      }
+    }
+  }
+  return aus;
+}
+
+function kalenderGewaehlt(id) {
+  var gewaehlt = (DB.einstellungen && DB.einstellungen.kalender) || [];
+  var i;
+  for (i = 0; i < gewaehlt.length; i++) {
+    if (gewaehlt[i].id === id) { return gewaehlt[i].aktiv !== false; }
+  }
+  return true;   /* noch nie entschieden: lesen */
+}
+
+function kalenderUm(id, name) {
+  if (!DB.einstellungen.kalender) { DB.einstellungen.kalender = []; }
+  var liste = DB.einstellungen.kalender;
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    if (liste[i].id === id) {
+      liste[i].aktiv = (liste[i].aktiv === false);
+      DB.einstellungen.stempel = jetzt();
+      spaeterSichern();
+      termineHolen(true);
+      zeichne();
+      return;
+    }
+  }
+  liste.push({ id: id, name: name || '', aktiv: false });
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  termineHolen(true);
+  zeichne();
+}
+
+function kalenderListeHolen() {
+  if (!tokenGueltig()) { return Promise.resolve([]); }
+  var adresse = 'https://www.googleapis.com/calendar/v3/users/me/calendarList'
+              + '?fields=' + encodeURIComponent('items(id,summary,backgroundColor,selected)')
+              + '&maxResults=50';
+  return window.fetch(adresse, { headers: driveKopf() })
+    .then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      var roh = (d && d.items) ? d.items : [];
+      kalenderListe = [];
+      var i;
+      for (i = 0; i < roh.length; i++) {
+        kalenderListe.push({
+          id: roh[i].id,
+          name: roh[i].summary || roh[i].id,
+          farbe: roh[i].backgroundColor || ''
+        });
+      }
+      return kalenderListe;
+    });
+}
+
+function zeitAusEintrag(wert) {
+  /* Google liefert dateTime mit Zeitzone. Die lokale Uhrzeit ist das,
+     was auf dem Blatt stehen soll. */
+  if (typeof wert !== 'string' || wert.length === 0) { return ''; }
+  var d = new Date(wert);
+  if (isNaN(d.getTime())) { return ''; }
+  return zwei(d.getHours()) + ':' + zwei(d.getMinutes());
+}
+
+function tagAusEintrag(wert) {
+  if (typeof wert !== 'string' || wert.length === 0) { return ''; }
+  var d = new Date(wert);
+  if (isNaN(d.getTime())) { return ''; }
+  return isoDatum(d);
+}
+
+function eintraegeEinsortieren(eintraege, quelle) {
+  var i;
+  for (i = 0; i < eintraege.length; i++) {
+    var e = eintraege[i];
+    if (e.status === 'cancelled') { continue; }
+    var titel = e.summary || '(ohne Titel)';
+
+    if (e.start && e.start.date) {
+      /* Ganztägig: das Ende ist bei Google der Folgetag. */
+      var von = e.start.date;
+      var bis = e.end && e.end.date ? tagePlus(e.end.date, -1) : von;
+      var lauf = von;
+      var schutz = 0;
+      while (lauf <= bis && schutz < 400) {
+        merkeTermin(lauf, { id: e.id, titel: titel, zeit: '', bis: '',
+                            ort: e.location || '', ganztags: true, quelle: quelle });
+        lauf = tagePlus(lauf, 1);
+        schutz++;
+      }
+      continue;
+    }
+
+    if (!e.start || !e.start.dateTime) { continue; }
+    var tag = tagAusEintrag(e.start.dateTime);
+    if (!tag) { continue; }
+    merkeTermin(tag, {
+      id: e.id, titel: titel,
+      zeit: zeitAusEintrag(e.start.dateTime),
+      bis: e.end && e.end.dateTime ? zeitAusEintrag(e.end.dateTime) : '',
+      ort: e.location || '', ganztags: false, quelle: quelle
+    });
+  }
+}
+
+function merkeTermin(tag, satz) {
+  if (!termineNachTag[tag]) { termineNachTag[tag] = []; }
+  var vorhanden = termineNachTag[tag];
+  var i;
+  for (i = 0; i < vorhanden.length; i++) {
+    if (vorhanden[i].id === satz.id) { return; }
+  }
+  vorhanden.push(satz);
+}
+
+function termineHolen(laut) {
+  if (!tokenGueltig()) { return Promise.resolve(false); }
+  if (kalenderLaeuft) { return Promise.resolve(false); }
+  kalenderLaeuft = true;
+  kalenderFehler = '';
+
+  var heute = isoDatum();
+  var von = tagePlus(heute, -KAL_VOR);
+  var bis = tagePlus(heute, KAL_NACH);
+
+  var vorbereitung = kalenderListe.length ? Promise.resolve(kalenderListe)
+                                          : kalenderListeHolen();
+
+  return vorbereitung.then(function () {
+    var aktive = [];
+    var i;
+    for (i = 0; i < kalenderListe.length; i++) {
+      if (kalenderGewaehlt(kalenderListe[i].id)) { aktive.push(kalenderListe[i]); }
+    }
+    termineNachTag = {};
+    var reihe = Promise.resolve(true);
+    aktive.forEach(function (kal) {
+      reihe = reihe.then(function () { return einenKalenderHolen(kal, von, bis); });
+    });
+    return reihe;
+  }).then(function () {
+    kalenderStand = isoZeit();
+    if (laut) { melde('Termine geholt: ' + termineZahl() + ' im Fenster.', 'gut'); }
+    tagZeichnen();
+    zeichne();
+    return true;
+  }).catch(function (f) {
+    kalenderFehler = f ? f.message : 'unbekannter Fehler';
+    if (laut) { melde('Termine konnten nicht geholt werden.\n' + kalenderFehler, 'warn'); }
+    zeichne();
+    return false;
+  }).then(function (wert) {
+    kalenderLaeuft = false;
+    return wert;
+  });
+}
+
+function einenKalenderHolen(kal, von, bis) {
+  var adresse = 'https://www.googleapis.com/calendar/v3/calendars/'
+              + encodeURIComponent(kal.id) + '/events'
+              + '?singleEvents=true&orderBy=startTime&maxResults=250'
+              + '&timeMin=' + encodeURIComponent(von + 'T00:00:00Z')
+              + '&timeMax=' + encodeURIComponent(bis + 'T23:59:59Z')
+              + '&fields=' + encodeURIComponent('items(id,summary,location,status,start,end)');
+  return window.fetch(adresse, { headers: driveKopf() })
+    .then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      eintraegeEinsortieren((d && d.items) ? d.items : [], kal.name);
+      return true;
+    }).catch(function (f) {
+      /* Ein einzelner Kalender darf nicht die anderen verhindern. */
+      kalenderFehler = kal.name + ': ' + (f ? f.message : 'Fehler');
+      return true;
+    });
+}
+
+function termineZahl() {
+  var n = 0;
+  var k;
+  for (k in termineNachTag) {
+    if (Object.prototype.hasOwnProperty.call(termineNachTag, k)) {
+      n += termineNachTag[k].length;
+    }
+  }
+  return n;
+}
+
+function termineFuerTag(is) {
+  var liste = termineNachTag[is] || [];
+  var zeit = [], ganztags = [];
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    if (liste[i].ganztags) { ganztags.push(liste[i]); }
+    else { zeit.push(liste[i]); }
+  }
+  zeit.sort(function (x, y) { return (x.zeit < y.zeit) ? -1 : ((x.zeit > y.zeit) ? 1 : 0); });
+  return { zeit: zeit, ganztags: ganztags };
+}
+
+function kalenderTaktStarten() {
+  if (kalenderUhr) { window.clearInterval(kalenderUhr); }
+  kalenderUhr = window.setInterval(function () {
+    if (document.hidden) { return; }
+    if (!tokenGueltig()) { return; }
+    termineHolen(false);
+  }, KAL_TAKT);
+}
 
 /* ============================================================
    Aufgabenfläche
@@ -3791,6 +4103,7 @@ function starten() {
   }
   document.addEventListener('visibilitychange', rueckkehrPruefen);
   taktStarten();
+  kalenderTaktStarten();
   swAnmelden().then(function () { return versionPruefen(false); });
   versionTaktStarten();
   zeichne();

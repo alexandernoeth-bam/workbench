@@ -438,7 +438,10 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + ' tagesEintraege, ausIso, tagePlus };'
                  + 'globalThis.__aufApi = { gruppeVonPlanung, gruppeVonFrist, wochenEnde,'
                  + ' regelText, planungText, planungKlasse, isoDatum, tagePlus,'
-                 + ' themenFuer, projekteFuer };';
+                 + ' themenFuer, projekteFuer };'
+                 + 'globalThis.__kalApi = { eintraegeEinsortieren, termineFuerTag, termineZahl,'
+                 + ' zeitAusEintrag, tagAusEintrag,'
+                 + ' zuruecksetzen: function(){ termineNachTag = {}; } };';
     (0, eval)(skript + anhang);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -1473,6 +1476,99 @@ console.log('\n27. Aufgabe anlegen');
   /* Im Tagesplan bleibt die Schnelleingabe */
   pruefe(/id="schnellFeld"/.test(QUELLE), 'der Tagesplan behält seine Schnelleingabe');
   pruefe(!/id="aufFeld"/.test(QUELLE), 'die Aufgabenfläche hat keine Schnelleingabe mehr');
+}
+
+/* ============================================================
+   28. Google Kalender lesen
+   Grund: Termine gehoeren Google. Sie duerfen nie in die eigene
+   Datei geraten — sonst gibt es zwei Wahrheiten. Und ein einzelner
+   unlesbarer Kalender darf nicht alle anderen verhindern.
+   ============================================================ */
+console.log('\n28. Google Kalender lesen');
+{
+  const skript = hauptSkript();
+  const api = globalThis.__kalApi;
+
+  const noetig = ['kalenderListeHolen', 'termineHolen', 'einenKalenderHolen',
+                  'termineFuerTag', 'eintraegeEinsortieren', 'merkeTermin',
+                  'zeitAusEintrag', 'tagAusEintrag', 'kalenderUm', 'kalenderGewaehlt',
+                  'kalenderNeuLesen', 'zeichneKalender', 'ganztagsZeichnen',
+                  'kalenderTaktStarten', 'termineZahl'];
+  noetig.forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  /* Nur lesend */
+  pruefe(!/calendar\/v3[^']*'\s*,\s*\{\s*method:\s*'(POST|PATCH|PUT|DELETE)/.test(skript),
+         'am Kalender wird nichts geschrieben');
+  const holen = skript.match(/function einenKalenderHolen\([\s\S]*?\n\}/);
+  pruefe(holen && /singleEvents=true/.test(holen[0]),
+         'Serien werden zu einzelnen Vorkommen aufgelöst');
+  pruefe(holen && /catch\(/.test(holen[0]),
+         'ein unlesbarer Kalender verhindert die anderen nicht');
+
+  /* Termine niemals in die eigene Datei */
+  const leer = skript.match(/function leereDatenbank\([\s\S]*?\n\}/);
+  pruefe(leer && !/termineNachTag/.test(leer[0]),
+         'die gelesenen Termine stehen nicht im Datenmodell');
+  const alsText = skript.match(/function alsText\([\s\S]*?\n\}/);
+  pruefe(alsText && !/termineNachTag/.test(alsText[0]),
+         'sie werden nicht in die Datei geschrieben');
+  const samm = skript.match(/var SAMMLUNGEN = \[([\s\S]*?)\];/);
+  /* kalenderzuordnung ist erlaubt — sie speichert die Artzuordnung,
+     nicht die Termine selbst. */
+  pruefe(samm && !/termine[A-Za-zÄÖÜäöü]/.test(samm[1]),
+         'keine Sammlung führt gelesene Termine');
+  const zuo = skript.match(/function zusammenfuehren\([\s\S]*?\n\}\n/);
+  pruefe(zuo && !/termineNachTag/.test(zuo[0]),
+         'der Abgleich fasst gelesene Termine nicht an');
+
+  if (!api) {
+    warn('Kalenderfunktionen nicht auswertbar');
+  } else {
+    api.zuruecksetzen();
+
+    /* Ganztägig: Google nennt als Ende den Folgetag */
+    api.eintraegeEinsortieren([{
+      id: 'g1', summary: 'Urlaub', start: { date: '2026-08-03' }, end: { date: '2026-08-06' }
+    }], 'Familie');
+    pruefe(api.termineFuerTag('2026-08-03').ganztags.length === 1, 'der erste Urlaubstag zählt');
+    pruefe(api.termineFuerTag('2026-08-05').ganztags.length === 1, 'der letzte Urlaubstag zählt');
+    pruefe(api.termineFuerTag('2026-08-06').ganztags.length === 0,
+           'der Folgetag des Endes zählt nicht mehr');
+
+    /* Abgesagtes wird übergangen */
+    api.eintraegeEinsortieren([{
+      id: 'g2', summary: 'Abgesagt', status: 'cancelled',
+      start: { dateTime: '2026-09-08T10:00:00+02:00' }, end: { dateTime: '2026-09-08T11:00:00+02:00' }
+    }], 'Beruf');
+    pruefe(api.termineFuerTag('2026-09-08').zeit.length === 0, 'abgesagte Termine erscheinen nicht');
+
+    /* Zeiten und Sortierung */
+    api.eintraegeEinsortieren([
+      { id: 'g4', summary: 'Spät', start: { dateTime: '2026-09-08T14:00:00+02:00' },
+        end: { dateTime: '2026-09-08T15:00:00+02:00' } },
+      { id: 'g3', summary: 'Früh', start: { dateTime: '2026-09-08T09:00:00+02:00' },
+        end: { dateTime: '2026-09-08T09:30:00+02:00' }, location: 'Raum 2.14' }
+    ], 'Beruf');
+    const t = api.termineFuerTag('2026-09-08').zeit;
+    pruefe(t.length === 2, 'beide Termine sind da');
+    pruefe(t[0].titel === 'Früh', 'sortiert wird nach der Uhrzeit');
+    pruefe(t[0].ort === 'Raum 2.14', 'der Ort wird übernommen');
+    pruefe(t[0].quelle === 'Beruf', 'der Kalendername wird mitgeführt');
+
+    /* Derselbe Termin zweimal geliefert: nur einmal merken */
+    api.eintraegeEinsortieren([
+      { id: 'g3', summary: 'Früh', start: { dateTime: '2026-09-08T09:00:00+02:00' },
+        end: { dateTime: '2026-09-08T09:30:00+02:00' } }
+    ], 'Beruf');
+    pruefe(api.termineFuerTag('2026-09-08').zeit.length === 2, 'Dubletten werden nicht doppelt geführt');
+
+    /* Ohne Startzeit wird übergangen */
+    api.eintraegeEinsortieren([{ id: 'g9', summary: 'Kaputt' }], 'Beruf');
+    pruefe(api.termineFuerTag('2026-09-08').zeit.length === 2, 'ein Eintrag ohne Start wird übergangen');
+  }
 }
 
 /* ============================================================
