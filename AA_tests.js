@@ -483,6 +483,35 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__msApi = {'
+                 + ' pruefeMs: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'P\', kontext:\'privat\','
+                 + '     status:\'laufend\', zielzustaende:[], anlagen:[], meilensteine:['
+                 + '       { titel:\'A\', datum:\'2026-01-10\', erreicht:false },'
+                 + '       { titel:\'B\', datum:\'\', erreicht:false },'
+                 + '       { titel:\'C\', datum:\'2026-02-20\', erreicht:false } ] }];'
+                 + '   vhDetail = \'p1\'; vhDetailArt = \'projekt\';'
+                 + '   vhMsHoch(1);'
+                 + '   var nachHoch = DB.projekte[0].meilensteine[0].titel;'
+                 + '   vhMsHoch(0);'
+                 + '   var erstes = DB.projekte[0].meilensteine[0].titel;'
+                 + '   vhMsOrdnen();'
+                 + '   var reihe = DB.projekte[0].meilensteine.map(function(x){ return x.titel; }).join(\',\');'
+                 + '   var letztes = DB.projekte[0].meilensteine[2].titel;'
+                 + '   var db2 = leereDatenbank();'
+                 + '   db2.projekte = [{ id:\'p2\', meilensteine:['
+                 + '     { titel:\'Fertig\', datum:\'7.3.2026\' },'
+                 + '     { titel:\'Abnahme\', datum:\'kurz vor Ostern\' } ] }];'
+                 + '   bestandStempeln(db2);'
+                 + '   var deutsch = db2.projekte[0].meilensteine[0].datum;'
+                 + '   var gerettet = db2.projekte[0].meilensteine[1].titel;'
+                 + '   var gerettetDatum = db2.projekte[0].meilensteine[1].datum;'
+                 + '   vhDetail = \'\'; vhDetailArt = \'\'; DB = alt;'
+                 + '   return { nachHoch:nachHoch, erstesBleibt:erstes, geordnet:reihe,'
+                 + '            ohneDatumHinten:letztes, deutsch:deutsch,'
+                 + '            gerettet:gerettet, gerettetDatum:gerettetDatum };'
+                 + ' } };'
                  + 'globalThis.__abApi = {'
                  + ' pruefeAblauf: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -2821,6 +2850,70 @@ console.log('\n44. Abläufe und Wochenrückblick');
            'Rückgängig holt zurück und räumt den Vermerk weg');
     pruefe(e.vorlagenNachSichern === 1,
            'aus einem einmaligen Durchlauf lässt sich eine Vorlage sichern');
+  }
+}
+
+/* ============================================================
+   45. Meilensteine: Datum, Reihenfolge, Ordnen
+   Grund: Das Datum war ein freies Textfeld, die Reihenfolge liess
+   sich nicht aendern. Ein Datumsfeld wuerde einen alten Freitext
+   stillschweigend verwerfen — das darf nicht geschehen.
+   ============================================================ */
+console.log('\n45. Meilensteine');
+{
+  const skript = hauptSkript();
+  const m = globalThis.__msApi;
+
+  ['vhMsHoch', 'vhMsOrdnen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const detail = skript.match(/function vhDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(detail && /type="date"[\s\S]{0,40}esc\(ms\[m\]\.datum/.test(detail[0]),
+         'das Meilensteindatum ist ein echtes Datumsfeld');
+  pruefe(detail && !/placeholder="wann"/.test(detail[0]),
+         'das alte Freitextfeld ist verschwunden');
+  pruefe(detail && /onchange="vhMsDatum/.test(detail[0]),
+         'es meldet erst beim Verlassen, nicht bei jedem Zeichen');
+  pruefe(detail && /vhMsHoch\(/.test(detail[0]), 'jeder Meilenstein lässt sich hochschieben');
+  pruefe(detail && /Nach Datum ordnen/.test(detail[0]),
+         'ordnen geschieht auf Knopfdruck');
+  pruefe(detail && /ms\.length > 1/.test(detail[0]),
+         'bei nur einem Meilenstein bleibt der Knopf weg');
+
+  /* Nicht von selbst sortieren */
+  const setzen = skript.match(/function vhMsDatum\([\s\S]*?\n\}/);
+  pruefe(setzen && !/sort\(/.test(setzen[0]),
+         'ein eingetragenes Datum sortiert die Liste nicht von selbst um');
+
+  const ordnen = skript.match(/function vhMsOrdnen\([\s\S]*?\n\}/);
+  pruefe(ordnen && /ohne\.push/.test(ordnen[0]),
+         'Meilensteine ohne Datum behalten ihre Stelle am Ende');
+
+  /* Altbestand */
+  const stempeln = skript.match(/function bestandStempeln\([\s\S]*?\n\}\n/);
+  pruefe(stempeln && /mss\[mi\]\.datum = d\[3\]/.test(stempeln[0]),
+         'ein Datum in deutscher Schreibweise wird umgerechnet');
+  pruefe(stempeln && /titel = \(mss\[mi\]\.titel \|\| ''\) \+ ' \('/.test(stempeln[0]),
+         'ein unlesbarer Wert wird in den Titel gerettet statt verworfen');
+
+  const karte = skript.match(/function projektKarteHtml\([\s\S]*?\n\}\n/);
+  pruefe(karte && /erreicht \+ ' von ' \+ alleMs\.length/.test(karte[0]),
+         'die Karte zeigt alle Meilensteine mit Stand');
+
+  if (!m) {
+    warn('Meilensteinfunktionen nicht auswertbar');
+  } else {
+    const e = m.pruefeMs();
+    pruefe(e.nachHoch === 'B', 'hochschieben vertauscht mit dem Vorgänger');
+    pruefe(e.erstesBleibt === 'B', 'das oberste lässt sich nicht weiter hochschieben');
+    pruefe(e.geordnet === 'A,C,B', 'nach Datum geordnet stehen sie in Datumsfolge');
+    pruefe(e.ohneDatumHinten === 'B', 'das ohne Datum steht am Ende');
+    pruefe(e.deutsch === '2026-03-07', 'ein Datum wie 7.3.2026 wird umgerechnet');
+    pruefe(e.gerettet === 'Abnahme (kurz vor Ostern)',
+           'ein Freitext landet im Titel');
+    pruefe(e.gerettetDatum === '', 'und das Feld bleibt leer');
   }
 }
 

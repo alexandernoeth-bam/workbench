@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.15.0</title>
+<title>Workbench 0.15.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -811,7 +811,7 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.15.0';
+var APP_VERSION = '0.15.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -1090,6 +1090,29 @@ function bestandStempeln(db) {
   /* Aus dem Altbestand tragen wiederkehrende Aufgaben teils den Status
      „erledigt". Das ist keine Eigenschaft, die es bei ihnen gibt — sie
      würden sonst nie wieder erscheinen. */
+  /* Das Meilensteindatum war früher ein freies Textfeld. Ein
+     Datumsfeld würde einen unlesbaren Wert stillschweigend
+     verwerfen — deshalb wird er umgerechnet oder in den Titel
+     gerettet. */
+  var pro = db.projekte || [];
+  var pi, mi;
+  for (pi = 0; pi < pro.length; pi++) {
+    var mss = pro[pi].meilensteine || [];
+    for (mi = 0; mi < mss.length; mi++) {
+      var wert = String(mss[mi].datum || '').trim();
+      if (wert.length === 0) { continue; }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(wert)) { continue; }
+      var d = wert.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (d) {
+        mss[mi].datum = d[3] + '-' + zwei(Number(d[2])) + '-' + zwei(Number(d[1]));
+      } else {
+        mss[mi].titel = (mss[mi].titel || '') + ' (' + wert + ')';
+        mss[mi].datum = '';
+      }
+      nachgetragen++;
+    }
+  }
+
   var aufg = db.aufgaben || [];
   var w;
   for (w = 0; w < aufg.length; w++) {
@@ -5527,11 +5550,19 @@ function projektKarteHtml(p) {
      + esc(satz || 'noch kein Zielzustand für diese Woche') + '</div>';
 
   h += '<div class="vk-mehr">';
-  if (ms) {
-    h += '<div class="vk-label">Nächster Meilenstein</div>';
-    h += '<div class="vk-ms"><span class="vk-ms-punkt"></span>'
-       + '<span class="vk-ms-titel">' + esc(ms.titel) + '</span>'
-       + '<span class="vk-ms-datum">' + esc(ms.datum || '') + '</span></div>';
+  var alleMs = p.meilensteine || [];
+  if (alleMs.length) {
+    var erreicht = 0;
+    var k;
+    for (k = 0; k < alleMs.length; k++) { if (alleMs[k].erreicht) { erreicht++; } }
+    h += '<div class="vk-label">Meilensteine · ' + erreicht + ' von ' + alleMs.length + '</div>';
+    for (k = 0; k < alleMs.length; k++) {
+      h += '<div class="vk-ms' + (alleMs[k].erreicht ? ' erreicht' : '') + '">'
+         + '<span class="vk-ms-punkt"></span>'
+         + '<span class="vk-ms-titel">' + esc(alleMs[k].titel) + '</span>'
+         + '<span class="vk-ms-datum">'
+         + esc(alleMs[k].datum ? kurzDatum(alleMs[k].datum) : '') + '</span></div>';
+    }
   }
   var auf = aufgabenZuProjekt(p.id);
   h += '<div class="vk-label">Aufgaben · ' + auf.length + '</div>';
@@ -5740,14 +5771,22 @@ function vhDetailHtml() {
          + '" onclick="vhMsUm(' + m + ')"></button>'
          + '<input class="v-feld" type="text" value="' + esc(ms[m].titel) + '" '
          + 'oninput="vhMsTitel(' + m + ',this.value)">'
-         + '<input class="v-feld" type="text" value="' + esc(ms[m].datum || '') + '" '
-         + 'placeholder="wann" style="flex:0 0 84px" oninput="vhMsDatum(' + m + ',this.value)">'
-         + '<button class="v-knopf" type="button" onclick="vhMsWeg(' + m + ')">'
-         + '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>'
+         + '<input class="v-feld" type="date" value="' + esc(ms[m].datum || '') + '" '
+         + 'style="flex:0 0 138px" onchange="vhMsDatum(' + m + ',this.value)">'
+         + '<button class="v-knopf" type="button" onclick="vhMsHoch(' + m + ')" '
+         + 'aria-label="nach oben"><svg viewBox="0 0 24 24">'
+         + '<path d="M6 15l6-6 6 6"></path></svg></button>'
+         + '<button class="v-knopf" type="button" onclick="vhMsWeg(' + m + ')" '
+         + 'aria-label="entfernen"><svg viewBox="0 0 24 24">'
+         + '<path d="M6 6l12 12M18 6L6 18"></path></svg></button>'
          + '</div>';
     }
     h += '<button class="neu-zeile" type="button" onclick="vhMsNeu()">'
        + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Meilenstein</button>';
+    if (ms.length > 1) {
+      h += '<div class="d-reihe"><button type="button" onclick="vhMsOrdnen()">'
+         + 'Nach Datum ordnen</button></div>';
+    }
 
     h += '<div class="s-abschnitt">Anlagen</div>';
     var an = v.anlagen || [];
@@ -5852,6 +5891,33 @@ function vhMsDatum(i, wert) {
   if (!v || !v.meilensteine[i]) { return; }
   v.meilensteine[i].datum = wert;
   vhGeaendert(false);
+}
+
+function vhMsHoch(i) {
+  var v = vorhabenFinden(vhDetail, vhDetailArt);
+  if (!v || i < 1 || !v.meilensteine[i]) { return; }
+  var merk = v.meilensteine[i - 1];
+  v.meilensteine[i - 1] = v.meilensteine[i];
+  v.meilensteine[i] = merk;
+  vhGeaendert(true);
+}
+
+/* Ordnen geschieht auf Knopfdruck, nicht von selbst — sonst
+   springt ein Plan beim Eintragen eines Datums um. Meilensteine
+   ohne Datum behalten ihre Stelle am Ende. */
+function vhMsOrdnen() {
+  var v = vorhabenFinden(vhDetail, vhDetailArt);
+  if (!v || !Array.isArray(v.meilensteine)) { return; }
+  var mit = [], ohne = [];
+  var i;
+  for (i = 0; i < v.meilensteine.length; i++) {
+    if (v.meilensteine[i].datum) { mit.push(v.meilensteine[i]); }
+    else { ohne.push(v.meilensteine[i]); }
+  }
+  mit.sort(function (a, b) { return (a.datum < b.datum) ? -1 : ((a.datum > b.datum) ? 1 : 0); });
+  v.meilensteine = mit.concat(ohne);
+  vhGeaendert(true);
+  melde('Nach Datum geordnet · ' + mit.length + ' mit Datum, ' + ohne.length + ' ohne.', 'gut');
 }
 
 function vhMsWeg(i) {
