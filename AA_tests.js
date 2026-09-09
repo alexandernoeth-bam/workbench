@@ -954,6 +954,54 @@ console.log('\n18. Sichtbarer Abgleichstand');
 }
 
 /* ============================================================
+   19. Regelmaessiges Nachsehen bei Drive
+   Grund: Eine Seite, die nur offen liegt, erfaehrt sonst nie von
+   Aenderungen anderer Geraete. Genau so blieb eine geloeschte
+   Kleinigkeit auf dem Handy stehen.
+   ============================================================ */
+console.log('\n19. Regelmäßiges Nachsehen bei Drive');
+{
+  const skript = hauptSkript();
+
+  ['taktPruefen', 'taktStarten'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript), 'Funktion ' + f + ' ist definiert');
+  });
+
+  const takt = skript.match(/function taktPruefen\([\s\S]*?\n\}/);
+  pruefe(takt && /document\.hidden/.test(takt[0]),
+         'im Hintergrund wird nicht nachgesehen');
+  pruefe(takt && /tokenGueltig\(\)/.test(takt[0]),
+         'ohne Anmeldung wird nicht nachgesehen');
+  pruefe(takt && /abgleichLaeuft/.test(takt[0]),
+         'während eines laufenden Abgleichs wird nicht erneut angestoßen');
+  pruefe(takt && /driveSuchen\(\)/.test(takt[0]),
+         'zuerst wird nur der Stand bei Drive geholt');
+  pruefe(takt && /modifiedTime/.test(takt[0]),
+         'der Vergleich läuft über den Änderungszeitpunkt bei Drive');
+  pruefe(takt && /lokalOffen/.test(takt[0]),
+         'eine wartende lokale Änderung stößt den Abgleich sofort an');
+
+  const start = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(start && /taktStarten\(\)/.test(start[0]), 'der Takt wird beim Start angeworfen');
+
+  const starten2 = skript.match(/function taktStarten\([\s\S]*?\n\}/);
+  pruefe(starten2 && /clearInterval/.test(starten2[0]),
+         'ein alter Takt wird abgeräumt (keine doppelten Uhren)');
+  pruefe(starten2 && /setInterval/.test(starten2[0]), 'der Takt läuft über setInterval');
+
+  const wert = skript.match(/ABGLEICH_TAKT\s*=\s*(\d+)/);
+  pruefe(wert && Number(wert[1]) >= 60000 && Number(wert[1]) <= 600000,
+         'der Takt liegt zwischen einer und zehn Minuten');
+
+  const sichern = skript.match(/function spaeterSichern\([\s\S]*?\n\}/);
+  pruefe(sichern && /lokalOffen = true/.test(sichern[0]),
+         'eine Änderung setzt den Merker für Unerledigtes');
+  const still = skript.match(/function abgleichStill\([\s\S]*?\n\}\n/);
+  pruefe(still && /lokalOffen = false/.test(still[0]),
+         'ein erfolgreicher Abgleich löscht den Merker');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');

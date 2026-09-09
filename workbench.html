@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F6F5F2">
-<title>Workbench 0.5.3</title>
+<title>Workbench 0.5.4</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -337,7 +337,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.5.3';
+var APP_VERSION = '0.5.4';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -353,6 +353,7 @@ var TOKEN_KEY = 'workbench-zugriff';
 var ANMELDE_MERKER = 'workbench-war-angemeldet';
 var ABGLEICH_VERZUG  = 4000;    /* so lange nach der letzten Änderung wird gewartet */
 var ABGLEICH_MINDEST = 30000;   /* nicht öfter als alle 30 Sekunden von selbst */
+var ABGLEICH_TAKT    = 120000;  /* alle zwei Minuten bei Drive nachsehen */
 var DRIVE_DATEI = 'workbench.json';
 var VORLAUF_MS = 5 * 60 * 1000;   /* so lange vor Ablauf wird still erneuert */
 var GRABSTEIN_TAGE = 180;         /* so lange bleibt ein Löschvermerk erhalten */
@@ -408,6 +409,8 @@ var abgleichUhr = null;
 var abgleichLaeuft = false;
 var abgleichZuletztMs = 0;
 var abgleichFehler = '';
+var lokalOffen = false;
+var taktUhr = null;
 
 /* ============================================================
    Kleine Helfer
@@ -1192,6 +1195,7 @@ function abgleichStill() {
   abgleichen().then(function (b) {
     abgleichZuletztMs = Date.now();
     abgleichFehler = '';
+    lokalOffen = false;
     if (b && (b.neu || b.ersetzt || b.entfernt)) {
       melde('Abgeglichen: ' + berichtText(b), 'gut');
     }
@@ -1228,7 +1232,31 @@ function standZeichnen() {
   teile.push(letzterAbgleich ? ('Abgeglichen ' + letzterAbgleich) : 'Noch nicht abgeglichen');
   if (letzterBericht) { teile.push(berichtText(letzterBericht)); }
   teile.push((DB.grabsteine || []).length + ' Löschvermerke');
+  if (lokalOffen) { teile.push('lokale Änderung wartet'); }
+  teile.push('prüft alle ' + Math.round(ABGLEICH_TAKT / 60000) + ' Minuten');
   standSetzen(teile.join(' · '), false);
+}
+
+/* Eine Seite, die nur offen liegt, bekommt sonst nie mit, dass ein
+   anderes Gerät etwas geändert hat. Deshalb wird regelmäßig nachgesehen —
+   erst nur der Stand bei Drive, und nur bei Abweichung der volle Abgleich. */
+function taktPruefen() {
+  if (document.hidden) { return; }
+  if (!tokenGueltig() || abgleichLaeuft) { return; }
+  if (lokalOffen) { abgleichStill(); return; }
+  var vorher = driveStand;
+  driveSuchen().then(function (treffer) {
+    if (treffer && treffer.modifiedTime && treffer.modifiedTime !== vorher) {
+      abgleichStill();
+    }
+  }).catch(function () {
+    return null;
+  });
+}
+
+function taktStarten() {
+  if (taktUhr) { window.clearInterval(taktUhr); }
+  taktUhr = window.setInterval(taktPruefen, ABGLEICH_TAKT);
 }
 
 function rueckkehrPruefen() {
@@ -2284,6 +2312,7 @@ function spaeterSichern() {
   if (speicherUhr) { window.clearTimeout(speicherUhr); }
   speicherUhr = window.setTimeout(function () {
     speicherUhr = null;
+    lokalOffen = true;
     speichern().then(function () {
       zeichne();
       abgleichPlanen(false);
@@ -2854,6 +2883,7 @@ function starten() {
     });
   }
   document.addEventListener('visibilitychange', rueckkehrPruefen);
+  taktStarten();
   zeichne();
   if (!idbDa()) {
     speicherWeg = opfsDa() ? 'opfs' : (localDa() ? 'local' : 'keiner');
