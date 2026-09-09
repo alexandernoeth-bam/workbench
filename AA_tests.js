@@ -483,6 +483,23 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__feiApi = {'
+                 + ' pruefeFeiertage: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var l = feiertageImJahr(2026);'
+                 + '   var sortiert = true;'
+                 + '   var i;'
+                 + '   for (i = 1; i < l.length; i++) {'
+                 + '     if (l[i].von < l[i-1].von) { sortiert = false; }'
+                 + '   }'
+                 + '   var mitNamen = l.every(function(x){ return x.titel.length > 0; });'
+                 + '   DB.ferien = [{ id:\'f1\', titel:\'Eigener Name\', art:\'feiertag\','
+                 + '                  von:\'2026-01-01\', bis:\'2026-01-01\' }];'
+                 + '   var eigen = feiertagAn(\'2026-01-01\');'
+                 + '   DB = alt;'
+                 + '   return { anzahl:l.length, erster:l[0].von, letzter:l[l.length-1].von,'
+                 + '            sortiert:sortiert, mitNamen:mitNamen, eingelesenGewinnt:eigen };'
+                 + ' } };'
                  + 'globalThis.__nzApi = {'
                  + ' pruefeNachzuegler: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -3186,14 +3203,18 @@ console.log('\n48. Liegengebliebenes und Wischen');
   pruefe(blatt && /nzSetzen\(/.test(blatt[0]), 'jeder Eintrag lässt sich neu einordnen');
   pruefe(blatt && /Alle auf heute/.test(blatt[0]), 'es gibt einen Weg für alle auf einmal');
 
-  const wisch = skript.match(/function wischEnde\([\s\S]*?\n\}/);
+  const wisch = skript.match(/function wischRichtung\([\s\S]*?\n\}/);
   pruefe(wisch && /Math\.abs\(dx\) < WISCH_WEITE/.test(wisch[0]),
          'eine zu kurze Bewegung zählt nicht');
   pruefe(wisch && /Math\.abs\(dy\) \* 2/.test(wisch[0]),
          'eine eher senkrechte Bewegung zählt nicht — das Rollen bleibt frei');
-  const an = skript.match(/function wischenAnmelden\([\s\S]*?\n\}/);
+  const an = skript.match(/function wischenAnHeften\([\s\S]*?\n\}/);
   pruefe(an && /passive: true/.test(an[0]), 'die Zuhörer stören das Rollen nicht');
-  pruefe(an && /schirmTag/.test(an[0]), 'gewischt wird nur im Tagesplan');
+  const anm = skript.match(/function wischenAnmelden\([\s\S]*?\n\}/);
+  pruefe(anm && /schirmTag/.test(anm[0]), 'im Tagesplan wird gewischt');
+  pruefe(anm && /schirmKalender/.test(anm[0]), 'im Kalender ebenfalls');
+  pruefe(anm && !/schirmAufgaben/.test(anm[0]),
+         'in Listen ohne Zeitachse nicht — dort gibt es kein Vor und Zurück');
 
   if (!n) {
     warn('Funktionen nicht auswertbar');
@@ -3212,6 +3233,52 @@ console.log('\n48. Liegengebliebenes und Wischen');
     pruefe(e.wischLinks === 1 && e.wischRechts === -1,
            'links wischen geht vor, rechts zurück');
     pruefe(e.wischSchraeg === 0, 'eine schräge Bewegung blättert nicht');
+  }
+}
+
+/* ============================================================
+   49. Wischen im Kalender und Feiertage im Jahr
+   Grund: Der Feiertagspunkt im Raster sagt nicht, welcher Feiertag
+   gemeint ist. Und Blaettern per Wischen soll ueberall gelten, wo
+   es ein Vor und Zurueck gibt.
+   ============================================================ */
+console.log('\n49. Wischen im Kalender, Feiertagsliste');
+{
+  const skript = hauptSkript();
+  const f = globalThis.__feiApi;
+
+  ['wischRichtung', 'wischEndeKalender', 'wischenAnHeften',
+   'feiertageImJahr'].forEach(function (n) {
+    pruefe(new RegExp('function\\s+' + n + '\\s*\\(').test(skript),
+           'Funktion ' + n + ' ist definiert');
+  });
+
+  const kal = skript.match(/function wischEndeKalender\([\s\S]*?\n\}/);
+  pruefe(kal && /kalBlaettern\(richtung\)/.test(kal[0]),
+         'im Kalender blättert das Wischen die gewählte Stufe');
+  const tag = skript.match(/function wischEnde\([\s\S]*?\n\}/);
+  pruefe(tag && /tagBlaettern\(richtung\)/.test(tag[0]),
+         'im Tag blättert es den Tag');
+
+  const jahr = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
+  pruefe(jahr && /Nur Feiertage/.test(jahr[0]), 'es gibt eine Summenzeile für Feiertage');
+  pruefe(jahr && /Feiertage ' \+ jahr/.test(jahr[0]),
+         'gefiltert erscheint eine Liste mit Namen und Datum');
+  const passt = skript.match(/function jtPasst\([\s\S]*?\n\}/);
+  pruefe(passt && /jahrFilter === 'feiertage'/.test(passt[0]),
+         'bei „nur Feiertage" verschwinden die Jahrestermine');
+
+  if (!f) {
+    warn('Feiertagsfunktion nicht auswertbar');
+  } else {
+    const e = f.pruefeFeiertage();
+    pruefe(e.anzahl === 13, '2026 hat dreizehn bayerische Feiertage (ist: ' + e.anzahl + ')');
+    pruefe(e.erster === '2026-01-01', 'der erste ist Neujahr');
+    pruefe(e.letzter === '2026-12-26', 'der letzte der zweite Weihnachtstag');
+    pruefe(e.sortiert === true, 'die Liste ist chronologisch');
+    pruefe(e.mitNamen === true, 'jeder Eintrag trägt seinen Namen');
+    pruefe(e.eingelesenGewinnt === 'Eigener Name',
+           'ein eingelesener Feiertag geht vor die Berechnung');
   }
 }
 

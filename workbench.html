@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.17.0</title>
+<title>Workbench 0.17.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -835,7 +835,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.17.0';
+var APP_VERSION = '0.17.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3011,23 +3011,39 @@ function wischBeginn(ereignis) {
   wischStart = { x: ereignis.touches[0].clientX, y: ereignis.touches[0].clientY };
 }
 
-function wischEnde(ereignis) {
-  if (!wischStart) { return; }
+/* Gibt 1 für vorwärts, -1 für rückwärts, 0 wenn es kein Wischen war. */
+function wischRichtung(ereignis) {
+  if (!wischStart) { return 0; }
   var b = (ereignis.changedTouches && ereignis.changedTouches[0]) || null;
-  if (!b) { wischStart = null; return; }
+  if (!b) { wischStart = null; return 0; }
   var dx = b.clientX - wischStart.x;
   var dy = b.clientY - wischStart.y;
   wischStart = null;
-  if (Math.abs(dx) < WISCH_WEITE) { return; }
-  if (Math.abs(dx) < Math.abs(dy) * 2) { return; }
-  tagBlaettern(dx < 0 ? 1 : -1);
+  if (Math.abs(dx) < WISCH_WEITE) { return 0; }
+  if (Math.abs(dx) < Math.abs(dy) * 2) { return 0; }
+  return (dx < 0) ? 1 : -1;
+}
+
+function wischEnde(ereignis) {
+  var richtung = wischRichtung(ereignis);
+  if (richtung !== 0) { tagBlaettern(richtung); }
+}
+
+function wischEndeKalender(ereignis) {
+  var richtung = wischRichtung(ereignis);
+  if (richtung !== 0) { kalBlaettern(richtung); }
+}
+
+function wischenAnHeften(kennung, ende) {
+  var flaeche = document.getElementById(kennung);
+  if (!flaeche || !flaeche.addEventListener) { return; }
+  flaeche.addEventListener('touchstart', wischBeginn, { passive: true });
+  flaeche.addEventListener('touchend', ende, { passive: true });
 }
 
 function wischenAnmelden() {
-  var flaeche = document.getElementById('schirmTag');
-  if (!flaeche || !flaeche.addEventListener) { return; }
-  flaeche.addEventListener('touchstart', wischBeginn, { passive: true });
-  flaeche.addEventListener('touchend', wischEnde, { passive: true });
+  wischenAnHeften('schirmTag', wischEnde);
+  wischenAnHeften('schirmKalender', wischEndeKalender);
 }
 
 function tagZeichnen() {
@@ -4777,7 +4793,7 @@ function jtFarbe(e) {
 function jtPasst(e) {
   if (!passtZumKalender(jtKontext(e))) { return false; }
   if (jahrFilter === null) { return true; }
-  if (jahrFilter === 'ferien') { return false; }
+  if (jahrFilter === 'ferien' || jahrFilter === 'feiertage') { return false; }
   return (e.art || '') === jahrFilter;
 }
 
@@ -5225,6 +5241,16 @@ function jahrHtml(is) {
        + '<span class="jsum-t">' + summen[key].tage + ' Tage</span></div>';
   }
 
+  var fei = feiertageImJahr(jahr);
+  if (fei.length) {
+    h += '<div class="jsum' + (jahrFilter === 'feiertage' ? ' aktiv' : '') + '" '
+       + 'onclick="jahrFilterSetzen(\'feiertage\')">'
+       + '<span class="jsum-farbe" style="background:var(--grau)"></span>'
+       + '<span class="jsum-name">Nur Feiertage</span>'
+       + '<span class="jsum-n">' + fei.length + '</span>'
+       + '<span class="jsum-t">' + fei.length + ' Tage</span></div>';
+  }
+
   var fer = ferienImJahr(jahr);
   if (fer.n) {
     h += '<div class="jsum' + (jahrFilter === 'ferien' ? ' aktiv' : '') + '" '
@@ -5233,6 +5259,22 @@ function jahrHtml(is) {
        + '<span class="jsum-name">Nur Ferien</span>'
        + '<span class="jsum-n">' + fer.n + '</span>'
        + '<span class="jsum-t">' + fer.tage + ' Tage</span></div>';
+  }
+
+  if (jahrFilter === 'feiertage') {
+    h += '<div class="gruppenkopf"><span>Feiertage ' + jahr + ' · '
+       + fei.length + '</span></div>';
+    h += '<div class="jliste">';
+    for (i = 0; i < fei.length; i++) {
+      var d2 = ausIso(fei[i].von);
+      h += '<div class="jl-zeile" onclick="jtTagOeffnen(\'' + fei[i].von + '\')">'
+         + '<span class="jl-farbe" style="background:var(--grau)"></span>'
+         + '<span class="jl-spanne">' + TAGE_KURZ[d2.getDay()] + ' '
+         + esc(kurzDatum(fei[i].von)) + '</span>'
+         + '<span class="jl-name">' + esc(fei[i].titel) + '</span></div>';
+    }
+    h += '</div>';
+    return h;
   }
 
   if (jahrFilter === 'ferien') {
@@ -5290,6 +5332,21 @@ function jahrHtml(is) {
   }
   h += '</div>';
   return h;
+}
+
+/* Alle Feiertage eines Jahres, berechnete wie eingelesene. */
+function feiertageImJahr(jahr) {
+  var aus = [];
+  var m, t;
+  for (m = 1; m <= 12; m++) {
+    var ende = monatsende(jahr, m);
+    for (t = 1; t <= ende; t++) {
+      var iso = jahr + '-' + zwei(m) + '-' + zwei(t);
+      var name = feiertagAn(iso);
+      if (name) { aus.push({ von: iso, titel: name }); }
+    }
+  }
+  return aus;
 }
 
 function jahrFilterSetzen(art) {
