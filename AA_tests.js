@@ -913,6 +913,47 @@ console.log('\n17. Löschen und Rückgängig');
 }
 
 /* ============================================================
+   18. Sichtbarer Abgleichstand
+   Grund: Ein Abgleich, der still scheitert, sieht aus wie einer,
+   der nie lief. Genau daran ist eine Loeschung haengengeblieben,
+   ohne dass es jemand bemerken konnte.
+   ============================================================ */
+console.log('\n18. Sichtbarer Abgleichstand');
+{
+  const skript = hauptSkript();
+
+  ['standSetzen', 'standZeichnen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript), 'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/id="tkStand"/.test(QUELLE), 'die Standzeile liegt im Tagesbildschirm');
+  pruefe(/id="tkAbgleich"/.test(QUELLE), 'der Tagesbildschirm hat einen Abgleich-Knopf');
+
+  const stand = skript.match(/function standZeichnen\([\s\S]*?\n\}/);
+  pruefe(stand && /tokenGueltig\(\)/.test(stand[0]),
+         'ohne Anmeldung wird das ausdrücklich gesagt');
+  pruefe(stand && /abgleichFehler/.test(stand[0]),
+         'ein fehlgeschlagener Abgleich wird angezeigt');
+  pruefe(stand && /grabsteine/.test(stand[0]),
+         'die Zahl der Löschvermerke steht im Stand');
+  pruefe(stand && /letzterAbgleich/.test(stand[0]),
+         'der Zeitpunkt des letzten Abgleichs steht im Stand');
+
+  const still = skript.match(/function abgleichStill\([\s\S]*?\n\}\n/);
+  pruefe(still && /abgleichFehler = /.test(still[0]),
+         'der stille Abgleich merkt sich seinen Fehler statt ihn zu verschlucken');
+
+  const zeichnen = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zeichnen && /standZeichnen\(\)/.test(zeichnen[0]),
+         'der Stand wird bei jedem Zeichnen des Tages aufgefrischt');
+
+  /* Die Aktionsfläche darf am großen Bildschirm nicht die volle Breite nehmen */
+  pruefe(/\.aktion-sheet\{[^}]*max-width/.test(QUELLE),
+         'die Aktionsfläche ist in der Breite begrenzt');
+  pruefe(/\.aktion-sheet\{[^}]*translateX\(-50%\)/.test(QUELLE),
+         'die Aktionsfläche steht mittig');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');
