@@ -1572,6 +1572,88 @@ console.log('\n28. Google Kalender lesen');
 }
 
 /* ============================================================
+   29. Sichtbarkeit und Lesbarkeit
+   Grund: Eine abgelaufene Anmeldung blieb unbemerkt, weil der
+   Hinweis nur in der Diagnose stand. Und graue Schrift auf hellem
+   Papier war auf dem Handy im Freien kaum zu lesen.
+   ============================================================ */
+console.log('\n29. Sichtbarkeit und Lesbarkeit');
+{
+  const skript = hauptSkript();
+
+  pruefe(new RegExp('function\\s+anmeldeStreifenPruefen\\s*\\(').test(skript),
+         'Funktion anmeldeStreifenPruefen ist definiert');
+  pruefe(/id="anmeldeStreifen"/.test(QUELLE), 'der Anmeldestreifen liegt im HTML');
+  pruefe(/onclick="anmelden\(\)"/.test(QUELLE), 'der Streifen führt zur Anmeldung');
+
+  /* Er muss auf jedem Bildschirm greifen, nicht nur in der Diagnose */
+  const streifenBlock = QUELLE.match(/<button class="anmeldestreifen"[\s\S]*?<\/button>/);
+  pruefe(streifenBlock && QUELLE.indexOf(streifenBlock[0]) > QUELLE.lastIndexOf('</div>\n\n<button class="anmeldestreifen"') - 1,
+         'der Streifen steht außerhalb der Bildschirme');
+  const zeichnen = skript.match(/function zeichne\(\)[\s\S]*?\n\}/);
+  pruefe(zeichnen && /anmeldeStreifenPruefen\(\)/.test(zeichnen[0]),
+         'die Diagnose frischt ihn auf');
+  const stand = skript.match(/function standZeichnen\([\s\S]*?\n\}/);
+  pruefe(stand && /anmeldeStreifenPruefen\(\)/.test(stand[0]),
+         'der Tagesplan frischt ihn auf');
+  const takt = skript.match(/function taktPruefen\([\s\S]*?\n\}/);
+  pruefe(takt && /anmeldeStreifenPruefen\(\)/.test(takt[0]),
+         'ein zwischenzeitlich abgelaufener Zugriff fällt beim nächsten Takt auf');
+
+  const pruef = skript.match(/function anmeldeStreifenPruefen\([\s\S]*?\n\}/);
+  pruefe(pruef && /warAngemeldet\(\)/.test(pruef[0]),
+         'der Text unterscheidet abgelaufen von noch nie angemeldet');
+  pruefe(pruef && /tokenGueltig\(\)/.test(pruef[0]),
+         'bei gültigem Zugriff verschwindet er');
+
+  /* Lesbarkeit: Kontrast der Textfarben gegen den Papierton */
+  function leuchte(hex) {
+    const h = hex.replace('#', '');
+    const teile = [0, 2, 4].map(function (i) { return parseInt(h.slice(i, i + 2), 16) / 255; });
+    const f = function (c) { return (c <= 0.03928) ? (c / 12.92) : Math.pow((c + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f(teile[0]) + 0.7152 * f(teile[1]) + 0.0722 * f(teile[2]);
+  }
+  function kontrast(a, b) {
+    let la = leuchte(a), lb = leuchte(b);
+    if (la < lb) { const m = la; la = lb; lb = m; }
+    return (la + 0.05) / (lb + 0.05);
+  }
+  function farbe(name) {
+    const t = QUELLE.match(new RegExp('--' + name + ':\\s*(#[0-9A-Fa-f]{6})'));
+    return t ? t[1] : null;
+  }
+
+  const papier = farbe('papier');
+  const grau = farbe('grau');
+  const tinte = farbe('tinte');
+  const weinrot = farbe('weinrot');
+  const petrol = farbe('petrol');
+
+  pruefe(!!papier && !!grau && !!tinte, 'die Grundfarben sind definiert');
+  if (papier && grau) {
+    pruefe(kontrast(grau, papier) >= 4.5,
+           'Nebentext hat mindestens Kontrast 4.5 (ist: ' + kontrast(grau, papier).toFixed(2) + ')');
+  }
+  if (papier && tinte) {
+    pruefe(kontrast(tinte, papier) >= 7,
+           'Haupttext hat mindestens Kontrast 7 (ist: ' + kontrast(tinte, papier).toFixed(2) + ')');
+  }
+  if (papier && weinrot) {
+    pruefe(kontrast(weinrot, papier) >= 4.5,
+           'Weinrot hat mindestens Kontrast 4.5 (ist: ' + kontrast(weinrot, papier).toFixed(2) + ')');
+  }
+  if (papier && petrol) {
+    pruefe(kontrast(petrol, papier) >= 4.5,
+           'Petrol hat mindestens Kontrast 4.5 (ist: ' + kontrast(petrol, papier).toFixed(2) + ')');
+  }
+
+  const fs = QUELLE.match(/--fs:\s*([\d.]+)px/);
+  pruefe(fs && Number(fs[1]) >= 17,
+         'die Grundschriftgröße liegt bei mindestens 17 px (ist: ' + (fs ? fs[1] : '?') + ')');
+  pruefe(!/#B3AEA6/.test(QUELLE), 'der blasse Platzhalterton ist ersetzt');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');

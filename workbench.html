@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.8.0</title>
+<title>Workbench 0.8.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -28,11 +28,12 @@
   --papier:#F6F5F2;
   --karte:#FFFFFF;
   --tinte:#2E2C29;
-  --grau:#8A857D;
-  --linie:#DEDBD4;
-  --weinrot:#900C24;
-  --petrol:#1F5B63;
-  --fs:16px;
+  --grau:#645F58;
+  --grau-hell:#8A857D;
+  --linie:#D4D0C8;
+  --weinrot:#8A0B22;
+  --petrol:#19525A;
+  --fs:17.6px;
   --app-h:100%;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -73,7 +74,7 @@ body{
   border:1px solid var(--linie);border-radius:6px;background:var(--karte);
   color:var(--tinte);cursor:pointer}
 .knopfreihe button.stark{border-color:var(--weinrot);color:var(--weinrot);font-weight:500}
-.knopfreihe button:disabled{color:#B3AEA6;cursor:default}
+.knopfreihe button:disabled{color:var(--grau-hell);cursor:default}
 
 .melder{margin-top:14px;font-size:calc(var(--fs)*0.8);padding:9px 11px;border-radius:6px;
   background:var(--karte);border:1px solid var(--linie);color:var(--grau);
@@ -84,7 +85,7 @@ body{
 input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   border:1px solid var(--linie);border-radius:6px;padding:9px;background:var(--karte);
   color:var(--tinte);margin-bottom:4px}
-.platzhalter{color:#B3AEA6;font-size:calc(var(--fs)*0.85);padding:18px 0}
+.platzhalter{color:var(--grau-hell);font-size:calc(var(--fs)*0.85);padding:18px 0}
 
 
 /* ---------- Tagesplan ---------- */
@@ -115,7 +116,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   border-bottom:1px solid var(--linie);margin-top:12px}
 .eingabe-feld{width:100%;border:0;background:transparent;font:inherit;
   font-size:calc(var(--fs)*0.95);color:var(--tinte);padding:13px 20px;outline:none}
-.eingabe-feld::placeholder{color:#B3AEA6}
+.eingabe-feld::placeholder{color:var(--grau-hell)}
 .eingabe-vorschau{display:none;padding:0 20px 11px;font-size:calc(var(--fs)*0.76);color:var(--grau)}
 .eingabe-vorschau.sichtbar{display:block}
 .eingabe-vorschau b{font-weight:500;color:var(--tinte)}
@@ -161,7 +162,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .tfalt svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;
   stroke-linecap:round;stroke-linejoin:round;transition:transform .15s ease}
 .tfalt svg.auf{transform:rotate(180deg)}
-.tleer{font-size:calc(var(--fs)*0.8);color:#B3AEA6;padding:2px 0 0 11px}
+.tleer{font-size:calc(var(--fs)*0.8);color:var(--grau-hell);padding:2px 0 0 11px}
 
 .streifen{display:none;flex:0 0 auto;align-items:center;gap:8px;padding:9px 20px;
   background:var(--papier);border:0;border-top:1px solid var(--linie);
@@ -281,6 +282,12 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .rueck-wort{flex:0 0 auto;font-weight:500;text-decoration:underline}
 .ttext{cursor:pointer}
 
+.anmeldestreifen{display:none;flex:0 0 auto;align-items:center;gap:10px;padding:11px 20px;
+  background:var(--weinrot);border:0;font:inherit;font-size:calc(var(--fs)*0.84);
+  color:#fff;cursor:pointer;width:100%;text-align:left}
+.anmeldestreifen.sichtbar{display:flex}
+#anmeldeText{flex:1;min-width:0}
+.anmelde-wort{flex:0 0 auto;font-weight:600;text-decoration:underline;white-space:nowrap}
 .neustreifen{display:none;flex:0 0 auto;align-items:center;gap:10px;padding:10px 20px;
   background:var(--petrol);border:0;font:inherit;font-size:calc(var(--fs)*0.82);
   color:#fff;cursor:pointer;width:100%;text-align:left}
@@ -441,6 +448,11 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 <div class="aktion-hg" id="aktionHg" onclick="aktionenSchliessen()"></div>
 <div class="aktion-sheet" id="aktionSheet"></div>
 
+<button class="anmeldestreifen" id="anmeldeStreifen" type="button" onclick="anmelden()">
+  <span id="anmeldeText">Nicht bei Google angemeldet — es wird nur lokal gespeichert.</span>
+  <span class="anmelde-wort">Anmelden</span>
+</button>
+
 <button class="neustreifen" id="neuStreifen" type="button" onclick="neuLaden()">
   <span id="neuText"></span>
   <span class="neu-wort">Jetzt laden</span>
@@ -470,7 +482,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.8.0';
+var APP_VERSION = '0.8.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -1144,6 +1156,7 @@ function anmelden(still) {
           try { window.localStorage.setItem(ANMELDE_MERKER, '1'); } catch (e) { /* egal */ }
           abgleichPlanen(true);
           termineHolen(false);
+          anmeldeStreifenPruefen();
           if (!still) { melde('Angemeldet. Gültig für ' + restMinuten() + ' Minuten.', 'gut'); }
           zeichne();
           fertig(true);
@@ -1179,6 +1192,7 @@ function abmelden() {
     catch (e) { /* Widerruf ist Beiwerk */ }
   }
   melde('Abgemeldet. Die lokalen Daten bleiben erhalten.', null);
+  anmeldeStreifenPruefen();
   zeichne();
 }
 
@@ -1372,7 +1386,21 @@ function standSetzen(text, warnen) {
   el.className = 'tk-stand' + (warnen ? ' warn' : '');
 }
 
+/* Ohne Anmeldung läuft nichts nach Drive und kein Kalender kommt an.
+   Das muss auf jedem Bildschirm sichtbar sein, nicht nur in der Diagnose. */
+function anmeldeStreifenPruefen() {
+  var streifen = document.getElementById('anmeldeStreifen');
+  var text = document.getElementById('anmeldeText');
+  if (!streifen || !text) { return; }
+  if (tokenGueltig()) { streifen.classList.remove('sichtbar'); return; }
+  text.textContent = warAngemeldet()
+    ? 'Die Anmeldung bei Google ist abgelaufen. Ohne sie wird nur lokal gespeichert.'
+    : 'Noch nicht bei Google angemeldet — es wird nur lokal gespeichert.';
+  streifen.classList.add('sichtbar');
+}
+
 function standZeichnen() {
+  anmeldeStreifenPruefen();
   if (!tokenGueltig()) {
     standSetzen('Nicht angemeldet — es wird nur lokal gespeichert.', true);
     return;
@@ -1398,6 +1426,7 @@ function standZeichnen() {
    erst nur der Stand bei Drive, und nur bei Abweichung der volle Abgleich. */
 function taktPruefen() {
   if (document.hidden) { return; }
+  anmeldeStreifenPruefen();
   if (!tokenGueltig() || abgleichLaeuft) { return; }
   if (lokalOffen) { abgleichStill(); return; }
   var vorher = driveStand;
@@ -3404,6 +3433,7 @@ function zeichneUmgebung() {
 }
 
 function zeichne() {
+  anmeldeStreifenPruefen();
   var v = document.getElementById('kopfVersion');
   if (v) { v.textContent = 'v' + APP_VERSION; }
   zeichneSpeicher();
@@ -4096,7 +4126,7 @@ function starten() {
         abgleichPlanen(true);
       } else {
         melde('Die Anmeldung ließ sich nicht im Hintergrund erneuern.\n'
-            + 'Bitte unter Diagnose einmal „Anmelden" antippen.', 'warn');
+            + 'Bitte oben auf „Anmelden" tippen.', 'warn');
       }
       zeichne();
     });
