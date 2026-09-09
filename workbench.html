@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.9.0</title>
+<title>Workbench 0.9.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -100,16 +100,19 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   color:var(--weinrot);border:1px solid var(--weinrot);border-radius:3px;padding:3px 8px;
   white-space:nowrap}
 .tk-form.frei{color:var(--petrol);border-color:var(--petrol)}
-.tk-blaettern{display:flex;gap:6px;margin-top:10px}
-.tk-pillen{margin-top:9px;padding:0}
+.tk-leiste{display:flex;align-items:center;gap:5px;margin-top:9px}
+.tk-luecke{flex:1}
+.tk-leiste .pille{border-radius:20px;padding:3px 11px}
+.tk-leiste .pille.aktiv{border-color:var(--tinte);color:var(--tinte);font-weight:500}
 .tk-ganztags{display:none;font-size:calc(var(--fs)*0.76);color:var(--petrol);
   margin-top:7px;line-height:1.4}
 .tk-ganztags.sichtbar{display:block}
 .tk-ganztags b{font-weight:500}
-.tk-stand{font-size:calc(var(--fs)*0.72);color:var(--grau);margin-top:6px;
+.tk-stand{display:none;font-size:calc(var(--fs)*0.74);color:var(--grau);margin-top:7px;
   white-space:pre-wrap;line-height:1.4}
+.tk-stand.sichtbar{display:block}
 .tk-stand.warn{color:var(--weinrot)}
-.tk-blaettern button{font:inherit;font-size:calc(var(--fs)*0.8);padding:3px 12px;
+.tk-leiste button{font:inherit;font-size:calc(var(--fs)*0.8);padding:3px 12px;
   border:1px solid var(--linie);border-radius:5px;background:var(--karte);
   color:var(--grau);cursor:pointer}
 
@@ -178,6 +181,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 
 /* ---------- Aufgabenfläche ---------- */
 #schirmAufgaben{padding:0}
+.auf-kopf{flex:0 0 auto;padding:14px 20px 0;font-size:calc(var(--fs)*0.8);color:var(--grau)}
 .leisten{display:flex;flex-wrap:wrap;gap:8px;padding:11px 20px 0;flex:0 0 auto;align-items:center}
 .gruppe{display:inline-flex;border:1px solid var(--linie);border-radius:6px;overflow:hidden;
   background:var(--karte)}
@@ -314,14 +318,6 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 </head>
 <body>
 
-<div class="kopf">
-  <div class="kopf-zeile">
-    <div class="kopf-titel" id="kopfTitel">Tag</div>
-    <div class="kopf-version" id="kopfVersion"></div>
-  </div>
-  <div class="kopf-linie"></div>
-</div>
-
 <div class="schirm aktiv" id="schirmTag">
   <div class="tagkopf">
     <div class="tk-zeile">
@@ -332,16 +328,14 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
       </div>
       <div class="tk-form" id="tkForm"></div>
     </div>
-    <div class="tk-blaettern">
+    <div class="tk-leiste">
       <button type="button" onclick="tagBlaettern(-1)">‹</button>
       <button type="button" onclick="tagHeute()">Heute</button>
       <button type="button" onclick="tagBlaettern(1)">›</button>
-      <button type="button" id="tkAbgleich" onclick="abgleichenJetzt()">Abgleichen</button>
-    </div>
-    <div class="pillen tk-pillen">
-      <button type="button" id="tAlle" class="aktiv" onclick="setTagFilter('alle')">Alle</button>
-      <button type="button" id="tBeruf" onclick="setTagFilter('beruflich')">Beruf</button>
-      <button type="button" id="tPrivat" onclick="setTagFilter('privat')">Privat</button>
+      <span class="tk-luecke"></span>
+      <button type="button" id="tAlle" class="pille aktiv" onclick="setTagFilter('alle')">Alle</button>
+      <button type="button" id="tBeruf" class="pille" onclick="setTagFilter('beruflich')">Beruf</button>
+      <button type="button" id="tPrivat" class="pille" onclick="setTagFilter('privat')">Privat</button>
     </div>
     <div class="tk-ganztags" id="tkGanztags"></div>
     <div class="tk-stand" id="tkStand"></div>
@@ -424,6 +418,8 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 </div>
 
 <div class="schirm" id="schirmAufgaben">
+  <div class="auf-kopf"><span id="aufZahl"></span></div>
+
   <div class="leisten">
     <div class="gruppe">
       <button type="button" id="gPlanung" class="aktiv" onclick="setAufGruppe('planung')">Planung</button>
@@ -488,7 +484,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.9.0';
+var APP_VERSION = '0.9.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -1383,7 +1379,6 @@ function abgleichStill() {
   abgleichUhr = null;
   if (!tokenGueltig() || abgleichLaeuft) { return; }
   abgleichLaeuft = true;
-  standSetzen('Abgleich läuft …', false);
   abgleichen().then(function (b) {
     abgleichZuletztMs = Date.now();
     abgleichFehler = '';
@@ -1407,7 +1402,7 @@ function standSetzen(text, warnen) {
   var el = document.getElementById('tkStand');
   if (!el) { return; }
   el.textContent = text;
-  el.className = 'tk-stand' + (warnen ? ' warn' : '');
+  el.className = 'tk-stand' + (warnen ? ' warn' : '') + (text ? ' sichtbar' : '');
 }
 
 /* Ohne Anmeldung läuft nichts nach Drive und kein Kalender kommt an.
@@ -1423,30 +1418,19 @@ function anmeldeStreifenPruefen() {
   streifen.classList.add('sichtbar');
 }
 
+/* Die Zeile meldet sich nur, wenn etwas nicht stimmt. Der laufende
+   Betrieb braucht keine Ansage — der Diagnosebildschirm zeigt ihn. */
 function standZeichnen() {
   anmeldeStreifenPruefen();
-  if (!tokenGueltig()) {
-    standSetzen('Nicht angemeldet — es wird nur lokal gespeichert.', true);
-    return;
-  }
-  if (abgleichLaeuft) { standSetzen('Abgleich läuft …', false); return; }
   if (abgleichFehler) {
-    standSetzen('Letzter Abgleich fehlgeschlagen: ' + abgleichFehler, true);
+    standSetzen('Abgleich fehlgeschlagen: ' + abgleichFehler, true);
     return;
   }
   if (kalenderFehler) {
     standSetzen('Termine: ' + kalenderFehler, true);
     return;
   }
-  var teile = [];
-  teile.push(letzterAbgleich ? ('Abgeglichen ' + letzterAbgleich) : 'Noch nicht abgeglichen');
-  if (letzterBericht) { teile.push(berichtText(letzterBericht)); }
-  teile.push((DB.grabsteine || []).length + ' Löschvermerke');
-  if (lokalOffen) { teile.push('lokale Änderung wartet'); }
-  teile.push(ABGLEICH_TAKT < 60000
-    ? ('prüft alle ' + Math.round(ABGLEICH_TAKT / 1000) + ' Sekunden')
-    : ('prüft alle ' + Math.round(ABGLEICH_TAKT / 60000) + ' Minuten'));
-  standSetzen(teile.join(' · '), false);
+  standSetzen('', false);
 }
 
 /* Eine Seite, die nur offen liegt, bekommt sonst nie mit, dass ein
@@ -2282,6 +2266,7 @@ function tagesEintraege(is) {
     if (a.wiederholung) {
       if (!faelligAn(a.wiederholung, is)) { continue; }
       if (erledigt) { fertig.push({ art: 'aufgabe', a: a }); }
+      else if (a.uhrzeit) { verlauf.push({ art: 'aufgabe', zeit: a.uhrzeit, a: a }); }
       else { wieder.push(a); }
       continue;
     }
@@ -2348,7 +2333,7 @@ function tagKopfZeichnen(is) {
   if (z) { z.textContent = d.getDate(); }
   if (w) { w.textContent = WOCHENTAGE_LANG[d.getDay()]; }
   if (m) { m.textContent = MONATE_LANG[d.getMonth()] + ' ' + d.getFullYear()
-                          + ' · KW ' + kalenderwoche(is); }
+                          + ' · KW ' + kalenderwoche(is) + ' · v' + APP_VERSION; }
   if (fo) {
     fo.textContent = f.form;
     fo.className = 'tk-form' + (f.form === 'Freizeittag' ? ' frei' : '');
@@ -2493,6 +2478,7 @@ function tagZeichnen() {
   blatt.innerHTML = h;
   ganztagsZeichnen(is);
   streifenPruefen();
+  anmeldeStreifenPruefen();
   standZeichnen();
 }
 
@@ -3306,8 +3292,6 @@ function zeigeSchirm(name) {
       if (alle[i] === name) { n.classList.add('aktiv'); } else { n.classList.remove('aktiv'); }
     }
   }
-  var titel = document.getElementById('kopfTitel');
-  if (titel) { titel.textContent = name; }
   if (name === 'Migration') { migZeichne(); }
   if (name === 'Tag') { tagZeichnen(); }
   if (name === 'Aufgaben') { aufZeichnen(); }
@@ -3485,8 +3469,6 @@ function zeichneUmgebung() {
 
 function zeichne() {
   anmeldeStreifenPruefen();
-  var v = document.getElementById('kopfVersion');
-  if (v) { v.textContent = 'v' + APP_VERSION; }
   zeichneSpeicher();
   zeichneGoogle();
   zeichneKalender();
@@ -3981,8 +3963,8 @@ function aufZeichnen() {
   h += erledigtBlockHtml();
   blatt.innerHTML = h;
 
-  var zahl = document.getElementById('kopfVersion');
-  if (zahl) { zahl.textContent = sichtbar.length + ' offen · v' + APP_VERSION; }
+  var zahl = document.getElementById('aufZahl');
+  if (zahl) { zahl.textContent = sichtbar.length + ' offen'; }
 }
 
 /* Erledigtes steht am Ende, eingeklappt. Es gehört nicht in die
@@ -4211,6 +4193,8 @@ function starten() {
     });
   }
   document.addEventListener('visibilitychange', rueckkehrPruefen);
+  window.addEventListener('focus', anmeldeStreifenPruefen);
+  window.setInterval(anmeldeStreifenPruefen, 15000);
   taktStarten();
   kalenderTaktStarten();
   swAnmelden().then(function () { return versionPruefen(false); });

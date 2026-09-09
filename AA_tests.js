@@ -209,8 +209,8 @@ console.log('\n7. Versionierung');
     pruefe(ausTitel[1] === ausKonst[1],
            'title und APP_VERSION stimmen überein (' + ausTitel[1] + ' / ' + ausKonst[1] + ')');
   }
-  pruefe(/kopfVersion/.test(QUELLE) && /'v' \+ APP_VERSION/.test(QUELLE),
-         'Version wird im Kopf sichtbar ausgegeben');
+  pruefe(/' · v' \+ APP_VERSION/.test(QUELLE),
+         'Version steht sichtbar im Tageskopf');
 }
 
 /* ============================================================
@@ -435,7 +435,20 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + ' wiederholungUmschreiben, wochentagUmrechnen, schluesselId, deutschZuIso };'
                  + 'globalThis.__tagApi = { tagesform, faelligAn, feiertagAn, monatsende,'
                  + ' kalenderwoche, wochenIndex, eingabeDeuten, esc, istErledigtAn,'
-                 + ' tagesEintraege, ausIso, tagePlus };'
+                 + ' tagesEintraege, ausIso, tagePlus,'
+                 + ' pruefeVerlauf: function(){'
+                 + '   var alt = DB;'
+                 + '   DB = leereDatenbank();'
+                 + '   var regel = { takt:\'woche\', intervall:1, tage:[0,1,2,3,4,5,6], tag:1 };'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'r1\', titel:\'Mit Zeit\', kontext:\'beruflich\', uhrzeit:\'07:30\','
+                 + '       wiederholung: regel, status:\'offen\', planung:\'backlog\' },'
+                 + '     { id:\'r2\', titel:\'Ohne Zeit\', kontext:\'beruflich\', uhrzeit:\'\','
+                 + '       wiederholung: regel, status:\'offen\', planung:\'backlog\' } ];'
+                 + '   var e = tagesEintraege(isoDatum());'
+                 + '   DB = alt;'
+                 + '   return { mitZeit: e.verlauf.length, ohneZeit: e.wieder.length };'
+                 + ' } };'
                  + 'globalThis.__aufApi = { gruppeVonPlanung, gruppeVonFrist, wochenEnde,'
                  + ' regelText, planungText, planungKlasse, isoDatum, tagePlus,'
                  + ' themenFuer, projekteFuer };'
@@ -938,17 +951,24 @@ console.log('\n18. Sichtbarer Abgleichstand');
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript), 'Funktion ' + f + ' ist definiert');
   });
   pruefe(/id="tkStand"/.test(QUELLE), 'die Standzeile liegt im Tagesbildschirm');
-  pruefe(/id="tkAbgleich"/.test(QUELLE), 'der Tagesbildschirm hat einen Abgleich-Knopf');
+  pruefe(/id="knopfAbgleich"/.test(QUELLE),
+         'ein Abgleich von Hand ist über die Diagnose erreichbar');
 
   const stand = skript.match(/function standZeichnen\([\s\S]*?\n\}/);
-  pruefe(stand && /tokenGueltig\(\)/.test(stand[0]),
-         'ohne Anmeldung wird das ausdrücklich gesagt');
+  pruefe(stand && /anmeldeStreifenPruefen\(\)/.test(stand[0]),
+         'die fehlende Anmeldung meldet der eigene Streifen');
   pruefe(stand && /abgleichFehler/.test(stand[0]),
          'ein fehlgeschlagener Abgleich wird angezeigt');
-  pruefe(stand && /grabsteine/.test(stand[0]),
-         'die Zahl der Löschvermerke steht im Stand');
-  pruefe(stand && /letzterAbgleich/.test(stand[0]),
-         'der Zeitpunkt des letzten Abgleichs steht im Stand');
+  pruefe(stand && /kalenderFehler/.test(stand[0]),
+         'ein Kalenderfehler wird angezeigt');
+  pruefe(stand && /standSetzen\(''/.test(stand[0]),
+         'im ungestörten Betrieb bleibt die Zeile leer');
+
+  const google = skript.match(/function zeichneGoogle\([\s\S]*?\n\}/);
+  pruefe(google && /grabsteine/.test(google[0]),
+         'die Zahl der Löschvermerke steht in der Diagnose');
+  pruefe(google && /letzterAbgleich/.test(google[0]),
+         'der Zeitpunkt des letzten Abgleichs steht in der Diagnose');
 
   const still = skript.match(/function abgleichStill\([\s\S]*?\n\}\n/);
   pruefe(still && /abgleichFehler = /.test(still[0]),
@@ -1759,6 +1779,52 @@ console.log('\n31. Kalenderkennzeichnung und Tagesfilter');
     pruefe(api.passtZumTag('') === true,
            'ein Eintrag ohne Kontext fällt nicht durch den Filter');
     api.setTagFilter('alle');
+  }
+}
+
+/* ============================================================
+   32. Verdichteter Tagesplan
+   Grund: Auf dem Handy zaehlt jede Zeile. Ueberschriften, die den
+   Bildschirm nur benennen, und Betriebsmeldungen im Normalfall
+   kosten Platz, den die Eintraege brauchen.
+   ============================================================ */
+console.log('\n32. Verdichteter Tagesplan');
+{
+  const skript = hauptSkript();
+  const api = globalThis.__tagApi;
+
+  pruefe(!/id="kopfTitel"/.test(QUELLE), 'die Bildschirmüberschrift ist entfallen');
+  pruefe(!/id="kopfVersion"/.test(QUELLE), 'die getrennte Versionszeile ist entfallen');
+  pruefe(!/id="tkAbgleich"/.test(QUELLE), 'der Abgleich-Knopf im Tag ist entfallen');
+  pruefe(/id="tAlle"/.test(QUELLE) && /class="tk-leiste"/.test(QUELLE),
+         'die Filterpillen stehen in der Blätterleiste');
+  pruefe(/tk-luecke/.test(QUELLE), 'Blättern und Filter teilen sich eine Zeile');
+  pruefe(!/class="pillen tk-pillen"/.test(QUELLE), 'die eigene Pillenzeile ist entfallen');
+
+  /* Der Aufgabenbildschirm behält seine Zahl */
+  pruefe(/id="aufZahl"/.test(QUELLE), 'die Aufgabenfläche zeigt weiterhin die Zahl der Offenen');
+
+  /* Der Anmeldezustand wird auch ohne Standzeile geprüft */
+  const zeichnen = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zeichnen && /anmeldeStreifenPruefen\(\)/.test(zeichnen[0]),
+         'der Tagesplan prüft den Anmeldezustand selbst');
+  const start = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(start && /addEventListener\('focus', anmeldeStreifenPruefen\)/.test(start[0]),
+         'beim Zurückkehren ins Fenster wird geprüft');
+  pruefe(start && /setInterval\(anmeldeStreifenPruefen/.test(start[0]),
+         'zusätzlich wird regelmäßig geprüft');
+
+  /* Wiederkehrendes mit Uhrzeit gehört in den Tagesverlauf */
+  const eintraege = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
+  pruefe(eintraege && /else if \(a\.uhrzeit\) \{ verlauf\.push/.test(eintraege[0]),
+         'eine wiederkehrende Aufgabe mit Uhrzeit steht im Tagesverlauf');
+
+  if (api && api.pruefeVerlauf) {
+    const e = api.pruefeVerlauf();
+    pruefe(e.mitZeit === 1, 'die wiederkehrende Aufgabe mit Uhrzeit liegt im Verlauf');
+    pruefe(e.ohneZeit === 1, 'die ohne Uhrzeit steht weiterhin unter Wiederkehrend');
+  } else {
+    warn('Verlaufsprüfung nicht auswertbar');
   }
 }
 
