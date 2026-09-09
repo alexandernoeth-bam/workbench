@@ -1957,6 +1957,53 @@ console.log('\n34. Banner bei fehlender Verbindung');
 }
 
 /* ============================================================
+   35. Termine beim Start holen
+   Grund: Mit bestehender Sitzung wurde nicht neu angemeldet — und
+   da die Termine nur nach einer Anmeldung geholt wurden, blieb der
+   Tagesverlauf leer, ohne dass irgendwo ein Fehler stand.
+   ============================================================ */
+console.log('\n35. Termine beim Start holen');
+{
+  const skript = hauptSkript();
+
+  pruefe(new RegExp('function\\s+kalenderNachholen\\s*\\(').test(skript),
+         'Funktion kalenderNachholen ist definiert');
+
+  const nach = skript.match(/function kalenderNachholen\([\s\S]*?\n\}/);
+  pruefe(nach && /kalenderStand/.test(nach[0]),
+         'sie holt nur, wenn in dieser Sitzung noch nichts geholt wurde');
+  pruefe(nach && /kalenderLaeuft/.test(nach[0]),
+         'ein laufender Abruf wird nicht doppelt angestoßen');
+  pruefe(nach && /tokenGueltig\(\)/.test(nach[0]),
+         'ohne Anmeldung wird nichts geholt');
+
+  const start = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(start && /kalenderNachholen\(\)/.test(start[0]),
+         'beim Start wird nachgeholt, auch ohne neue Anmeldung');
+
+  const zeigen = skript.match(/function zeigeSchirm\([\s\S]*?\n\}/);
+  pruefe(zeigen && /kalenderNachholen\(\)/.test(zeigen[0]),
+         'auch das Öffnen des Tages holt nach');
+
+  const verb = skript.match(/function verbindungPruefen\([\s\S]*?\n\}\n/);
+  pruefe(verb && /kalenderNachholen\(\)/.test(verb[0]),
+         'nach geglückter Verbindungsprüfung wird nachgeholt');
+
+  /* Ein leerer Kalender darf nicht stumm bleiben */
+  const stand = skript.match(/function standZeichnen\([\s\S]*?\n\}/);
+  pruefe(stand && /!kalenderStand/.test(stand[0]),
+         'noch nicht geholte Termine werden im Tagesplan gemeldet');
+  pruefe(stand && /Termine wurden noch nicht geholt/.test(stand[0]),
+         'der Text sagt, was fehlt');
+
+  const kal = skript.match(/function zeichneKalender\([\s\S]*?\n\}/);
+  pruefe(kal && /kalenderStand \? '' : 'nein'/.test(kal[0]),
+         'in der Diagnose ist „noch nie" als Störung ausgezeichnet');
+  pruefe(kal && /Holt gerade/.test(kal[0]),
+         'ein laufender Abruf ist erkennbar');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');

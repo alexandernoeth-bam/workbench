@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.9.3</title>
+<title>Workbench 0.9.4</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -487,7 +487,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.9.3';
+var APP_VERSION = '0.9.4';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -1422,7 +1422,7 @@ function verbindungPruefen() {
   if (!tokenGueltig()) { verbindungOk = false; anmeldeStreifenPruefen(); return; }
   var adresse = 'https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)';
   window.fetch(adresse, { headers: driveKopf() }).then(function (a) {
-    if (a.ok) { verbindungOk = true; }
+    if (a.ok) { verbindungOk = true; kalenderNachholen(); }
     else if (a.status === 401 || a.status === 403) { tokenVergessen(); verbindungOk = false; }
     anmeldeStreifenPruefen();
   }).catch(function () {
@@ -1470,6 +1470,10 @@ function standZeichnen() {
   }
   if (kalenderFehler) {
     standSetzen('Termine: ' + kalenderFehler, true);
+    return;
+  }
+  if (tokenGueltig() && !kalenderStand && !kalenderLaeuft) {
+    standSetzen('Termine wurden noch nicht geholt.', true);
     return;
   }
   standSetzen('', false);
@@ -3198,6 +3202,14 @@ function schnellAnlegen() {
 /* Das geholte Fenster deckt nur einen Ausschnitt ab. Blättert man
    darüber hinaus, stünde der Tag ohne Termine da, ohne dass es
    auffiele — deshalb wird dann nachgeholt. */
+/* Holt die Termine, wenn sie in dieser Sitzung noch nie geholt wurden. */
+function kalenderNachholen() {
+  if (!tokenGueltig()) { return; }
+  if (kalenderLaeuft) { return; }
+  if (kalenderStand) { return; }
+  termineHolen(false);
+}
+
 function fensterPruefen() {
   if (!tokenGueltig()) { return; }
   var is = tagOffen || isoDatum();
@@ -3350,7 +3362,7 @@ function zeigeSchirm(name) {
     }
   }
   if (name === 'Migration') { migZeichne(); }
-  if (name === 'Tag') { tagZeichnen(); }
+  if (name === 'Tag') { tagZeichnen(); kalenderNachholen(); }
   if (name === 'Aufgaben') { aufZeichnen(); }
   if (name !== 'Aufgaben') { zeichne(); }
 }
@@ -3461,7 +3473,8 @@ function zeichneKalender() {
   var ziel = document.getElementById('kalenderListe');
   if (!ziel) { return; }
   var h = '';
-  h += zeile('Zuletzt geholt', kalenderStand || 'noch nie', kalenderStand ? '' : 'grau');
+  h += zeile('Zuletzt geholt', kalenderStand || 'noch nie', kalenderStand ? '' : 'nein');
+  h += zeile('Holt gerade', kalenderLaeuft ? 'ja' : 'nein', kalenderLaeuft ? 'ja' : 'grau');
   h += zeile('Termine im Fenster', String(termineZahl()), termineZahl() ? '' : 'grau');
   h += zeile('Fenster', (kalVon && kalBis) ? (kurzDatum(kalVon) + ' – ' + kurzDatum(kalBis)) : '—',
              (kalVon ? '' : 'grau'));
@@ -4305,6 +4318,9 @@ function starten() {
     tagZeichnen();
     zeigeSchirm('Tag');
     zeichne();
+    /* Mit bestehender Sitzung wird nicht neu angemeldet — die Termine
+       müssen trotzdem geholt werden, sonst bleibt der Tag leer. */
+    kalenderNachholen();
     if (tokenGueltig()) {
       abgleichen().then(function (b) {
         melde('Beim Start abgeglichen.\n' + berichtText(b), 'gut');
