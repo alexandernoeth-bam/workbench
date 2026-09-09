@@ -44,7 +44,17 @@ console.log('\n1. Bildschirme und Navigation');
 
   pruefe(schirme.length > 0, 'mindestens ein Bildschirm vorhanden (' + schirme.length + ')');
 
+  /* Absichtlich versteckte Bildschirme: kein Knopf in der Leiste, aber
+     nachweislich anders erreichbar. */
+  const VERSTECKT = ['Migration'];
   schirme.forEach(function (s) {
+    if (VERSTECKT.indexOf(s) >= 0) {
+      pruefe(navs.indexOf(s) < 0,
+             'Bildschirm "' + s + '" steht bewusst nicht in der Leiste');
+      pruefe(QUELLE.indexOf("zeigeSchirm('" + s + "')") >= 0,
+             'Bildschirm "' + s + '" bleibt anders erreichbar');
+      return;
+    }
     pruefe(navs.indexOf(s) >= 0, 'Bildschirm "' + s + '" hat einen Navigationsknopf');
   });
   navs.forEach(function (n) {
@@ -164,7 +174,12 @@ console.log('\n5. Element-IDs');
 
   /* Zusammengesetzte IDs wie 'schirm' + name */
   const schirme = [...QUELLE.matchAll(/id="schirm([A-Za-zÄÖÜäöü]+)"/g)].map(m => m[1]);
+  const OHNE_KNOPF = ['Migration'];
   schirme.forEach(function (s) {
+    if (OHNE_KNOPF.indexOf(s) >= 0) {
+      pruefe(imHtml.has('schirm' + s), 'ID schirm' + s + ' existiert (ohne Knopf)');
+      return;
+    }
     pruefe(imHtml.has('schirm' + s) && imHtml.has('nav' + s),
            'zusammengesetzte IDs schirm' + s + ' und nav' + s + ' existieren');
   });
@@ -466,6 +481,38 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__vhApi = {'
+                 + ' pruefeVorhaben: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var p = { id:\'p1\', name:\'Garage\', kontext:\'privat\','
+                 + '     status:\'laufend\', meilensteine:[], zielzustaende:[], anlagen:[] };'
+                 + '   DB.projekte = [p];'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Angebot\', projektId:\'p1\', status:\'offen\' },'
+                 + '     { id:\'a2\', titel:\'Bagger\', projektId:\'p1\', status:\'offen\' } ];'
+                 + '   zustandSetzen(p, \'Fundament steht\');'
+                 + '   var satz = zustandText(p);'
+                 + '   zustandSetzen(p, \'Fundament steht\');'
+                 + '   var zweimal = p.zielzustaende.length;'
+                 + '   var leer = fruehereZustaende(p).length;'
+                 + '   p.zielzustaende.push({ jahr:2025, kw:40, satz:\'alt\', erreicht:false });'
+                 + '   p.zielzustaende.push({ jahr:2025, kw:12, satz:\'aelter\', erreicht:false });'
+                 + '   var nach = fruehereZustaende(p).length;'
+                 + '   var erste = fruehereZustaende(p)[0].kw;'
+                 + '   p.meilensteine = [ { titel:\'Erster\', erreicht:true },'
+                 + '                      { titel:\'Zweiter\', erreicht:false } ];'
+                 + '   var ms = naechsterMeilenstein(p).titel;'
+                 + '   var alleFertig = naechsterMeilenstein({ meilensteine:[{titel:\'x\',erreicht:true}] });'
+                 + '   vhDetail = \'p1\'; vhDetailArt = \'projekt\';'
+                 + '   vhLoeschen();'
+                 + '   var anzahl = DB.aufgaben.length;'
+                 + '   var ohne = DB.aufgaben.filter(function(a){ return !a.projektId; }).length;'
+                 + '   vhDetail = \'\'; vhDetailArt = \'\'; DB = alt;'
+                 + '   return { satzDieseWoche:satz, zweitesMalGleicheWoche:zweimal,'
+                 + '            frueherLeer:leer, frueherNach:nach - 1, reihenfolge:erste,'
+                 + '            naechsterMs:ms, ohneOffenen:alleFertig,'
+                 + '            aufgabenNachLoeschen:anzahl, ohneProjekt:ohne };'
+                 + ' } };'
                  + 'globalThis.__jtKontextApi = { jtKontext,'
                  + ' pruefeFilter: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -2575,6 +2622,77 @@ console.log('\n42. Kontext der Jahrestermine');
     pruefe(e.alle === 3, 'ohne Filter stehen alle drei im Raster');
     pruefe(e.beruf === 1, 'nur Beruf zeigt die Dienstreise');
     pruefe(e.privat === 2, 'nur Privat zeigt Geburtstag und Urlaub');
+  }
+}
+
+/* ============================================================
+   43. Vorhaben: Ziele und Projekte
+   Grund: Ein Projekt liefert und hat ein Ende, ein Ziel wird
+   gehalten. Beide tragen einen Zielzustand je Woche. Wird ein
+   Projekt geloescht, duerfen seine Aufgaben nicht mitverschwinden.
+   ============================================================ */
+console.log('\n43. Vorhaben');
+{
+  const skript = hauptSkript();
+  const v = globalThis.__vhApi;
+
+  const noetig = ['vhZeichnen', 'setVhFilter', 'vhKarteUm', 'zielKarteHtml',
+                  'projektKarteHtml', 'vorhabenNeu', 'vorhabenAnlegen',
+                  'vhDetailOeffnen', 'vhDetailHtml', 'vhNameSetzen', 'vhKontextSetzen',
+                  'vhFeldSetzen', 'vhZustandSetzen', 'vhHistorieUm', 'vhErreichtUm',
+                  'vhMsNeu', 'vhMsUm', 'vhMsTitel', 'vhMsDatum', 'vhMsWeg',
+                  'vhAnlageSpeichern', 'vhAnlageWeg', 'vhEinzahlerWahl',
+                  'vhEinzahlerDazu', 'vhEinzahlerWeg', 'vhAbschliessen', 'vhLoeschen',
+                  'zustandDieseWoche', 'zustandSetzen', 'zustandText',
+                  'fruehereZustaende', 'wochenSchluessel', 'naechsterMeilenstein',
+                  'aufgabenZuProjekt', 'einzahlerAufgaben'];
+  noetig.forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  pruefe(/id="schirmVorhaben"/.test(QUELLE), 'der Vorhabenbildschirm liegt im HTML');
+  pruefe(/id="navVorhaben"/.test(QUELLE), 'er hat einen Navigationsknopf');
+  pruefe(/id="vAlle"/.test(QUELLE) && /id="vBeruf"/.test(QUELLE) && /id="vPrivat"/.test(QUELLE),
+         'die drei Filterpillen sind da');
+
+  /* Der Unterschied zwischen Ziel und Projekt muss sichtbar bleiben */
+  const neu = skript.match(/function vorhabenNeu\([\s\S]*?\n\}/);
+  pruefe(neu && /Ein Projekt liefert und hat ein Ende/.test(neu[0]),
+         'beim Anlegen wird der Unterschied benannt');
+  const anlegen = skript.match(/function vorhabenAnlegen\([\s\S]*?\n\}/);
+  pruefe(anlegen && /zieltermin/.test(anlegen[0]) && /meilensteine/.test(anlegen[0]),
+         'Ziel und Projekt bekommen verschiedene Felder');
+
+  /* Ein gelöschtes Projekt darf keine Aufgaben mitreißen */
+  const loe = skript.match(/function vhLoeschen\([\s\S]*?\n\}/);
+  pruefe(loe && /projektId = null/.test(loe[0]),
+         'beim Löschen eines Projekts verlieren die Aufgaben nur ihre Zuordnung');
+  pruefe(loe && /grabsteinSetzen\(/.test(loe[0]), 'ein Löschvermerk entsteht');
+  pruefe(loe && !/DB\.aufgaben\.splice/.test(loe[0]),
+         'keine Aufgabe wird mitgelöscht');
+
+  const schliessen = skript.match(/function aktionenSchliessen\([\s\S]*?\n\}/);
+  pruefe(schliessen && /vhFrischAngelegt/.test(schliessen[0]),
+         'ein namenlos gebliebenes Vorhaben verschwindet wieder');
+
+  if (!v) {
+    warn('Vorhabenfunktionen nicht auswertbar');
+  } else {
+    const e = v.pruefeVorhaben();
+    pruefe(e.satzDieseWoche === 'Fundament steht',
+           'der Zielzustand dieser Woche wird gehalten');
+    pruefe(e.zweitesMalGleicheWoche === 1,
+           'ein zweiter Satz derselben Woche überschreibt, statt zu ergänzen');
+    pruefe(e.frueherLeer === 0, 'die laufende Woche steht nicht in der Historie');
+    pruefe(e.frueherNach === 1, 'eine vergangene Woche schon');
+    pruefe(e.reihenfolge === 40, 'die Historie beginnt bei der jüngsten Woche');
+    pruefe(e.naechsterMs === 'Zweiter',
+           'als nächster Meilenstein gilt der erste noch offene');
+    pruefe(e.ohneOffenen === null, 'sind alle erreicht, gibt es keinen nächsten');
+    pruefe(e.aufgabenNachLoeschen === 2,
+           'nach dem Löschen eines Projekts bestehen seine Aufgaben weiter');
+    pruefe(e.ohneProjekt === 2, 'sie tragen danach kein Projekt mehr');
   }
 }
 
