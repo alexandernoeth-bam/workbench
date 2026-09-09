@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.8.1</title>
+<title>Workbench 0.8.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -482,7 +482,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.8.1';
+var APP_VERSION = '0.8.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -1211,14 +1211,32 @@ function driveKopf(zusatz) {
   return k;
 }
 
+function dienstAusAdresse(url) {
+  var text = String(url || '');
+  if (text.indexOf('/calendar/') >= 0) { return 'Der Kalender'; }
+  if (text.indexOf('/drive/') >= 0 || text.indexOf('/upload/drive/') >= 0) { return 'Drive'; }
+  return 'Google';
+}
+
 function antwortPruefen(a) {
   if (a.ok) { return a; }
+  var dienst = dienstAusAdresse(a.url);
   if (a.status === 401) {
     tokenVergessen();
     throw new Error('Der Zugriff ist abgelaufen. Bitte neu anmelden.');
   }
   return a.text().then(function (t) {
-    throw new Error('Drive antwortete mit ' + a.status + ': ' + t.slice(0, 200));
+    /* Eine nicht freigeschaltete Schnittstelle sieht aus wie ein
+       Rechtefehler, ist aber eine Einstellung im Google-Projekt. */
+    if (a.status === 403 && /has not been used|is disabled|SERVICE_DISABLED/i.test(t)) {
+      throw new Error(dienst + ' ist im Google-Projekt noch nicht freigeschaltet.\n'
+        + 'Cloud Console öffnen, Projekt wählen, unter „APIs & Dienste – Bibliothek" '
+        + 'die passende Schnittstelle aktivieren und ein bis zwei Minuten warten.');
+    }
+    if (a.status === 403) {
+      throw new Error(dienst + ' verweigert den Zugriff (403).\n' + t.slice(0, 200));
+    }
+    throw new Error(dienst + ' antwortete mit ' + a.status + ': ' + t.slice(0, 200));
   });
 }
 
@@ -1408,6 +1426,10 @@ function standZeichnen() {
   if (abgleichLaeuft) { standSetzen('Abgleich läuft …', false); return; }
   if (abgleichFehler) {
     standSetzen('Letzter Abgleich fehlgeschlagen: ' + abgleichFehler, true);
+    return;
+  }
+  if (kalenderFehler) {
+    standSetzen('Termine: ' + kalenderFehler, true);
     return;
   }
   var teile = [];
@@ -3619,7 +3641,11 @@ function termineHolen(laut) {
     return reihe;
   }).then(function () {
     kalenderStand = isoZeit();
-    if (laut) { melde('Termine geholt: ' + termineZahl() + ' im Fenster.', 'gut'); }
+    if (!kalenderFehler && laut) {
+      melde('Termine geholt: ' + termineZahl() + ' im Fenster.', 'gut');
+    } else if (kalenderFehler && laut) {
+      melde('Termine teilweise geholt.\n' + kalenderFehler, 'warn');
+    }
     tagZeichnen();
     zeichne();
     return true;

@@ -441,7 +441,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + ' themenFuer, projekteFuer };'
                  + 'globalThis.__kalApi = { eintraegeEinsortieren, termineFuerTag, termineZahl,'
                  + ' zeitAusEintrag, tagAusEintrag,'
-                 + ' zuruecksetzen: function(){ termineNachTag = {}; } };';
+                 + ' zuruecksetzen: function(){ termineNachTag = {}; } };'
+                 + 'globalThis.__fehlerApi = { dienstAusAdresse, antwortPruefen };';
     (0, eval)(skript + anhang);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -1651,6 +1652,46 @@ console.log('\n29. Sichtbarkeit und Lesbarkeit');
   pruefe(fs && Number(fs[1]) >= 17,
          'die Grundschriftgröße liegt bei mindestens 17 px (ist: ' + (fs ? fs[1] : '?') + ')');
   pruefe(!/#B3AEA6/.test(QUELLE), 'der blasse Platzhalterton ist ersetzt');
+}
+
+/* ============================================================
+   30. Fehlermeldungen von Google
+   Grund: Ein Kalenderfehler wurde als „Drive antwortete mit 403"
+   gemeldet — falscher Dienst, und die eigentliche Ursache (eine
+   nicht freigeschaltete Schnittstelle) blieb unerkannt.
+   ============================================================ */
+console.log('\n30. Fehlermeldungen von Google');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__fehlerApi;
+
+  pruefe(new RegExp('function\\s+dienstAusAdresse\\s*\\(').test(skript),
+         'Funktion dienstAusAdresse ist definiert');
+
+  const pruef = skript.match(/function antwortPruefen\([\s\S]*?\n\}/);
+  pruefe(pruef && !/'Drive antwortete mit '/.test(pruef[0]),
+         'die Meldung nennt nicht mehr pauschal Drive');
+  pruefe(pruef && /SERVICE_DISABLED|has not been used/.test(pruef[0]),
+         'eine nicht freigeschaltete Schnittstelle wird erkannt');
+  pruefe(pruef && /a\.url/.test(pruef[0]),
+         'der Dienst wird aus der Adresse abgeleitet');
+
+  const stand = skript.match(/function standZeichnen\([\s\S]*?\n\}/);
+  pruefe(stand && /kalenderFehler/.test(stand[0]),
+         'ein Kalenderfehler steht auch im Tagesplan');
+
+  if (!t) {
+    warn('Fehlerfunktionen nicht auswertbar');
+  } else {
+    pruefe(t.dienstAusAdresse('https://www.googleapis.com/calendar/v3/x') === 'Der Kalender',
+           'eine Kalenderadresse wird als Kalender erkannt');
+    pruefe(t.dienstAusAdresse('https://www.googleapis.com/drive/v3/files') === 'Drive',
+           'eine Drive-Adresse wird als Drive erkannt');
+    pruefe(t.dienstAusAdresse('https://www.googleapis.com/upload/drive/v3/files/1') === 'Drive',
+           'auch der Hochladeweg zählt zu Drive');
+    pruefe(t.dienstAusAdresse('https://example.org/x') === 'Google',
+           'Unbekanntes bekommt einen neutralen Namen');
+  }
 }
 
 /* ============================================================
