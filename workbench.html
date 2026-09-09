@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.16.1</title>
+<title>Workbench 0.17.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -110,6 +110,23 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   margin-top:7px;line-height:1.4}
 .tk-ganztags.sichtbar{display:block}
 .tk-ganztags b{font-weight:500}
+.tk-nachzuegler{display:none;width:100%;align-items:center;gap:10px;margin-top:8px;
+  padding:8px 12px;border:1px solid var(--weinrot);border-radius:6px;
+  background:var(--karte);color:var(--weinrot);font:inherit;
+  font-size:calc(var(--fs)*0.78);cursor:pointer;text-align:left}
+.tk-nachzuegler.sichtbar{display:flex}
+.tk-nachzuegler span:first-child{flex:1;min-width:0}
+.nz-wort{flex:0 0 auto;font-weight:600;text-decoration:underline}
+.nz-block{padding:10px 0;border-bottom:1px solid var(--linie)}
+.nz-zeile{display:flex;align-items:flex-start;gap:10px}
+.nz-mitte{flex:1;min-width:0;cursor:pointer}
+.nz-titel{font-size:calc(var(--fs)*0.88);line-height:1.35}
+.nz-titel.privat{color:var(--petrol)}
+.nz-meta{font-size:calc(var(--fs)*0.74);color:var(--grau);margin-top:2px}
+.nz-knoepfe{display:flex;gap:6px;margin-top:7px;padding-left:32px}
+.nz-knoepfe button{flex:1;font:inherit;font-size:calc(var(--fs)*0.74);padding:5px 0;
+  border:1px solid var(--linie);border-radius:5px;background:var(--papier);
+  color:var(--tinte);cursor:pointer}
 .tk-stand{display:none;font-size:calc(var(--fs)*0.74);color:var(--grau);margin-top:7px;
   white-space:pre-wrap;line-height:1.4}
 .tk-stand.sichtbar{display:block}
@@ -581,6 +598,8 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
       <button type="button" id="tPrivat" class="pille" onclick="setTagFilter('privat')">Privat</button>
     </div>
     <div class="tk-ganztags" id="tkGanztags"></div>
+    <button class="tk-nachzuegler" id="tkNachzuegler" type="button"
+            onclick="nachzueglerOeffnen()"></button>
     <div class="tk-stand" id="tkStand"></div>
   </div>
 
@@ -816,7 +835,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.16.1';
+var APP_VERSION = '0.17.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2863,6 +2882,154 @@ function ablaufZeileHtml(e) {
   return h;
 }
 
+/* Eine Aufgabe mit vergangenem Datum steht in keinem Tag mehr: nicht
+   im gestrigen, weil er vorbei ist, und nicht im heutigen, weil ihr
+   Datum nicht stimmt. Sie wäre unsichtbar — deshalb dieser Hinweis. */
+function liegengeblieben(is) {
+  var tag = is || tagOffen || isoDatum();
+  var aus = [];
+  var l = DB.aufgaben || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    var a = l[i];
+    if (a.wiederholung) { continue; }
+    if (a.status === 'erledigt') { continue; }
+    if (!a.planung || a.planung === 'backlog' || a.planung === 'woche') { continue; }
+    if (a.planung >= tag) { continue; }
+    if (!passtZumTag(a.kontext)) { continue; }
+    aus.push(a);
+  }
+  aus.sort(function (x, y) { return (x.planung < y.planung) ? -1 : 1; });
+  return aus;
+}
+
+function nachzueglerZeichnen(is) {
+  var el = document.getElementById('tkNachzuegler');
+  if (!el) { return; }
+  var liste = liegengeblieben(is);
+  if (!liste.length) { el.classList.remove('sichtbar'); el.innerHTML = ''; return; }
+  el.innerHTML = '<span>' + liste.length
+               + (liste.length === 1 ? ' Eintrag liegt' : ' Einträge liegen')
+               + ' seit früheren Tagen offen</span><span class="nz-wort">Ansehen</span>';
+  el.classList.add('sichtbar');
+}
+
+function nachzueglerOeffnen() {
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = nachzueglerHtml();
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function nachzueglerHtml() {
+  var is = tagOffen || isoDatum();
+  var liste = liegengeblieben(is);
+  var h = blattKopf();
+  h += '<div class="as-titel">Liegengeblieben</div>';
+  h += '<div class="as-meta">' + liste.length
+     + ' aus vergangenen Tagen · noch keinem Platz zugeordnet</div>';
+  h += '<div class="as-linie"></div>';
+
+  if (!liste.length) {
+    h += '<div class="tleer" style="padding-left:0">Nichts liegengeblieben.</div>';
+    return h;
+  }
+
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    var a = liste[i];
+    h += '<div class="nz-block">';
+    h += '<div class="nz-zeile">';
+    h += '<button class="tkasten" type="button" onclick="nzErledigen(\'' + esc(a.id) + '\')"></button>';
+    h += '<div class="nz-mitte" onclick="aufgabeAktionen(\'' + esc(a.id) + '\')">'
+       + '<div class="nz-titel' + (a.kontext === 'privat' ? ' privat' : '') + '">'
+       + esc(a.titel) + '</div>'
+       + '<div class="nz-meta">war für ' + esc(kurzDatum(a.planung)) + ' geplant'
+       + (a.art === 'klein' ? ' · Kleinigkeit' : '') + '</div></div>';
+    h += '</div>';
+    h += '<div class="nz-knoepfe">';
+    h += '<button type="button" onclick="nzSetzen(\'' + esc(a.id) + '\',\'heute\')">Heute</button>';
+    h += '<button type="button" onclick="nzSetzen(\'' + esc(a.id) + '\',\'morgen\')">Morgen</button>';
+    h += '<button type="button" onclick="nzSetzen(\'' + esc(a.id) + '\',\'woche\')">Woche</button>';
+    h += '<button type="button" onclick="nzSetzen(\'' + esc(a.id) + '\',\'backlog\')">Backlog</button>';
+    h += '</div></div>';
+  }
+
+  h += '<div class="d-reihe">';
+  h += '<button type="button" onclick="nzAlle(\'heute\')">Alle auf heute</button>';
+  h += '<button type="button" onclick="nzAlle(\'backlog\')">Alle ins Backlog</button>';
+  h += '</div>';
+  return h;
+}
+
+function nzWert(art) {
+  if (art === 'heute') { return isoDatum(); }
+  if (art === 'morgen') { return tagePlus(isoDatum(), 1); }
+  return art;   /* 'woche' oder 'backlog' */
+}
+
+function nzSetzen(id, art) {
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  a.planung = nzWert(art);
+  a.geaendert = jetzt();
+  spaeterSichern();
+  tagZeichnen();
+  aufZeichnen();
+  nachzueglerOeffnen();
+}
+
+function nzAlle(art) {
+  var liste = liegengeblieben(tagOffen || isoDatum());
+  var wert = nzWert(art);
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    liste[i].planung = wert;
+    liste[i].geaendert = jetzt();
+  }
+  spaeterSichern();
+  tagZeichnen();
+  aufZeichnen();
+  aktionenSchliessen();
+  melde(liste.length + ' Einträge verschoben.', 'gut');
+}
+
+function nzErledigen(id) {
+  aufgabeErledigen(id);
+  nachzueglerOeffnen();
+}
+
+/* Wischen im Tagesplan. Nur eine deutlich waagerechte Bewegung zählt,
+   damit das Rollen nicht gestört wird. */
+var wischStart = null;
+var WISCH_WEITE = 60;
+
+function wischBeginn(ereignis) {
+  if (!ereignis.touches || ereignis.touches.length !== 1) { wischStart = null; return; }
+  wischStart = { x: ereignis.touches[0].clientX, y: ereignis.touches[0].clientY };
+}
+
+function wischEnde(ereignis) {
+  if (!wischStart) { return; }
+  var b = (ereignis.changedTouches && ereignis.changedTouches[0]) || null;
+  if (!b) { wischStart = null; return; }
+  var dx = b.clientX - wischStart.x;
+  var dy = b.clientY - wischStart.y;
+  wischStart = null;
+  if (Math.abs(dx) < WISCH_WEITE) { return; }
+  if (Math.abs(dx) < Math.abs(dy) * 2) { return; }
+  tagBlaettern(dx < 0 ? 1 : -1);
+}
+
+function wischenAnmelden() {
+  var flaeche = document.getElementById('schirmTag');
+  if (!flaeche || !flaeche.addEventListener) { return; }
+  flaeche.addEventListener('touchstart', wischBeginn, { passive: true });
+  flaeche.addEventListener('touchend', wischEnde, { passive: true });
+}
+
 function tagZeichnen() {
   if (!tagOffen) { tagOffen = isoDatum(); }
   var is = tagOffen;
@@ -2920,6 +3087,7 @@ function tagZeichnen() {
 
   blatt.innerHTML = h;
   ganztagsZeichnen(is);
+  nachzueglerZeichnen(is);
   streifenPruefen();
   anmeldeStreifenPruefen();
   standZeichnen();
@@ -7205,6 +7373,7 @@ function starten() {
   document.addEventListener('visibilitychange', rueckkehrPruefen);
   window.addEventListener('focus', anmeldeStreifenPruefen);
   window.addEventListener('resize', darstellungAnwenden);
+  wischenAnmelden();
   window.setInterval(anmeldeStreifenPruefen, 15000);
   taktStarten();
   kalenderTaktStarten();

@@ -483,6 +483,62 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__nzApi = {'
+                 + ' pruefeNachzuegler: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var heute = isoDatum();'
+                 + '   var morgen = tagePlus(heute, 1);'
+                 + '   tagOffen = heute;'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Neu\', planung: tagePlus(heute,-1),'
+                 + '       status:\'offen\', kontext:\'beruflich\' },'
+                 + '     { id:\'a2\', titel:\'Alt\', planung: tagePlus(heute,-9),'
+                 + '       status:\'offen\', kontext:\'beruflich\' },'
+                 + '     { id:\'a3\', titel:\'Heute\', planung: heute,'
+                 + '       status:\'offen\', kontext:\'beruflich\' },'
+                 + '     { id:\'a4\', titel:\'Backlog\', planung:\'backlog\','
+                 + '       status:\'offen\', kontext:\'beruflich\' },'
+                 + '     { id:\'a5\', titel:\'Fertig\', planung: tagePlus(heute,-3),'
+                 + '       status:\'erledigt\', kontext:\'beruflich\' } ];'
+                 + '   var liste = liegengeblieben(heute);'
+                 + '   var anzahl = liste.length;'
+                 + '   var reihe = liste.map(function(x){ return x.titel; }).join(\',\');'
+                 + '   var titel = liste.map(function(x){ return x.titel; });'
+                 + '   var heuteNicht = titel.indexOf(\'Heute\') < 0;'
+                 + '   var backlogNicht = titel.indexOf(\'Backlog\') < 0;'
+                 + '   var erledigtNicht = titel.indexOf(\'Fertig\') < 0;'
+                 + '   var wHeute = nzWert(\'heute\');'
+                 + '   var wMorgen = nzWert(\'morgen\');'
+                 + '   var wWoche = nzWert(\'woche\');'
+                 + '   DB.aufgaben[0].planung = heute;'
+                 + '   DB.aufgaben[1].planung = heute;'
+                 + '   var nachHeute = liegengeblieben(heute).length;'
+                 + '   DB.aufgaben[0].planung = tagePlus(heute,-1);'
+                 + '   DB.aufgaben[1].planung = tagePlus(heute,-9);'
+                 + '   nzAlle(\'backlog\');'
+                 + '   var alleWeg = liegengeblieben(heute).length;'
+                 + '   var gerufen = [];'
+                 + '   var merkBl = tagBlaettern;'
+                 + '   tagBlaettern = function(n){ gerufen.push(n); };'
+                 + '   wischBeginn({ touches:[{ clientX:300, clientY:100 }] });'
+                 + '   wischEnde({ changedTouches:[{ clientX:200, clientY:110 }] });'
+                 + '   var links = gerufen.length ? gerufen[gerufen.length-1] : 0;'
+                 + '   wischBeginn({ touches:[{ clientX:100, clientY:100 }] });'
+                 + '   wischEnde({ changedTouches:[{ clientX:220, clientY:110 }] });'
+                 + '   var rechts = gerufen[gerufen.length-1];'
+                 + '   var vorher = gerufen.length;'
+                 + '   wischBeginn({ touches:[{ clientX:100, clientY:100 }] });'
+                 + '   wischEnde({ changedTouches:[{ clientX:180, clientY:400 }] });'
+                 + '   var schraeg = gerufen.length - vorher;'
+                 + '   tagBlaettern = merkBl;'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return { anzahl:anzahl, reihenfolge:reihe, heuteNicht:heuteNicht,'
+                 + '            backlogNicht:backlogNicht, erledigtNicht:erledigtNicht,'
+                 + '            nachHeute:nachHeute, wertHeute:wHeute, wertMorgen:wMorgen,'
+                 + '            wertWoche:wWoche, heute:heute, morgen:morgen,'
+                 + '            alleWeg:alleWeg, wischLinks:links, wischRechts:rechts,'
+                 + '            wischSchraeg:schraeg };'
+                 + ' } };'
                  + 'globalThis.__darstellungApi = {'
                  + ' pruefeDarstellung: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -3089,6 +3145,73 @@ console.log('\n47. Blätter und Darstellung');
     pruefe(e.erzwungenSchmal === false, 'festgelegt auf Handy gilt auch im breiten Fenster');
     pruefe(e.unsinnFaelltZurueck === 'automatisch',
            'ein unbrauchbarer Wert fällt auf automatisch zurück');
+  }
+}
+
+/* ============================================================
+   48. Liegengebliebenes und Wischen
+   Grund: Eine Aufgabe mit vergangenem Datum stand in keinem Tag
+   mehr — nicht im gestrigen, weil er vorbei ist, und nicht im
+   heutigen, weil ihr Datum nicht stimmt. Sie war unsichtbar.
+   ============================================================ */
+console.log('\n48. Liegengebliebenes und Wischen');
+{
+  const skript = hauptSkript();
+  const n = globalThis.__nzApi;
+
+  ['liegengeblieben', 'nachzueglerZeichnen', 'nachzueglerOeffnen', 'nachzueglerHtml',
+   'nzWert', 'nzSetzen', 'nzAlle', 'nzErledigen',
+   'wischBeginn', 'wischEnde', 'wischenAnmelden'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  pruefe(/id="tkNachzuegler"/.test(QUELLE), 'die Hinweiszeile liegt im Tageskopf');
+  pruefe(/\.tk-nachzuegler\{[^}]*display:none/.test(QUELLE),
+         'ohne Liegengebliebenes bleibt sie weg');
+
+  const l = skript.match(/function liegengeblieben\([\s\S]*?\n\}/);
+  pruefe(l && /a\.planung === 'backlog'.*continue/s.test(l[0]),
+         'was im Backlog liegt, gilt nicht als liegengeblieben');
+  pruefe(l && /a\.planung === 'woche'/.test(l[0]),
+         'was auf der Woche liegt, ebenfalls nicht');
+  pruefe(l && /a\.wiederholung.*continue/s.test(l[0]),
+         'wiederkehrende Aufgaben zählen nicht');
+  pruefe(l && /passtZumTag\(a\.kontext\)/.test(l[0]),
+         'der Kontextfilter des Tages greift');
+  pruefe(l && /a\.planung >= tag/.test(l[0]),
+         'gemessen wird am angezeigten Tag');
+
+  const blatt = skript.match(/function nachzueglerHtml\([\s\S]*?\n\}\n/);
+  pruefe(blatt && /nzSetzen\(/.test(blatt[0]), 'jeder Eintrag lässt sich neu einordnen');
+  pruefe(blatt && /Alle auf heute/.test(blatt[0]), 'es gibt einen Weg für alle auf einmal');
+
+  const wisch = skript.match(/function wischEnde\([\s\S]*?\n\}/);
+  pruefe(wisch && /Math\.abs\(dx\) < WISCH_WEITE/.test(wisch[0]),
+         'eine zu kurze Bewegung zählt nicht');
+  pruefe(wisch && /Math\.abs\(dy\) \* 2/.test(wisch[0]),
+         'eine eher senkrechte Bewegung zählt nicht — das Rollen bleibt frei');
+  const an = skript.match(/function wischenAnmelden\([\s\S]*?\n\}/);
+  pruefe(an && /passive: true/.test(an[0]), 'die Zuhörer stören das Rollen nicht');
+  pruefe(an && /schirmTag/.test(an[0]), 'gewischt wird nur im Tagesplan');
+
+  if (!n) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = n.pruefeNachzuegler();
+    pruefe(e.anzahl === 2, 'zwei vergangene Einträge werden gefunden');
+    pruefe(e.reihenfolge === 'Alt,Neu', 'das Älteste steht oben');
+    pruefe(e.heuteNicht === true, 'ein Eintrag von heute zählt nicht');
+    pruefe(e.backlogNicht === true, 'einer im Backlog zählt nicht');
+    pruefe(e.erledigtNicht === true, 'ein erledigter zählt nicht');
+    pruefe(e.nachHeute === 0, 'auf heute gesetzt verschwindet er aus der Liste');
+    pruefe(e.wertHeute === e.heute, 'Heute setzt das heutige Datum');
+    pruefe(e.wertMorgen === e.morgen, 'Morgen setzt den Folgetag');
+    pruefe(e.wertWoche === 'woche', 'Woche setzt die Wochenliste');
+    pruefe(e.alleWeg === 0, 'alle auf einmal räumt die Liste');
+    pruefe(e.wischLinks === 1 && e.wischRechts === -1,
+           'links wischen geht vor, rechts zurück');
+    pruefe(e.wischSchraeg === 0, 'eine schräge Bewegung blättert nicht');
   }
 }
 
