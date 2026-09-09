@@ -466,6 +466,40 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__monatApi = {'
+                 + ' pruefeMonat: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   kalenderListe = [{id:\'a\',name:\'Alex\'},{id:\'b\',name:\'Familie\'}];'
+                 + '   termineNachTag = {};'
+                 + '   eintraegeEinsortieren(['
+                 + '     {id:\'e1\',summary:\'A\',start:{dateTime:\'2026-09-08T08:30:00+02:00\'},end:{dateTime:\'2026-09-08T09:00:00+02:00\'}},'
+                 + '     {id:\'e2\',summary:\'B\',start:{dateTime:\'2026-09-08T10:00:00+02:00\'},end:{dateTime:\'2026-09-08T11:00:00+02:00\'}},'
+                 + '     {id:\'e3\',summary:\'C\',start:{dateTime:\'2026-09-08T13:00:00+02:00\'},end:{dateTime:\'2026-09-08T14:00:00+02:00\'}},'
+                 + '     {id:\'e4\',summary:\'D\',start:{dateTime:\'2026-09-08T16:00:00+02:00\'},end:{dateTime:\'2026-09-08T17:00:00+02:00\'}}'
+                 + '   ], \'Alex\', \'beruflich\');'
+                 + '   eintraegeEinsortieren([{id:\'f1\',summary:\'Elternabend\','
+                 + '     start:{dateTime:\'2026-09-08T19:00:00+02:00\'},end:{dateTime:\'2026-09-08T20:00:00+02:00\'}}],'
+                 + '     \'Familie\', \'privat\');'
+                 + '   monatArten = null; monatKalender = null; monatOffeneTage = {};'
+                 + '   var h = monatHtml(\'2026-09-01\');'
+                 + '   var spalten = (h.match(/mt-links/g) || []).length;'
+                 + '   var t8 = h.split(\'mtag\')[8];'
+                 + '   var sichtbar = (t8.match(/mt-termin/g) || []).length;'
+                 + '   var mehr = t8.indexOf(\'Termine</button>\') >= 0;'
+                 + '   monatOffeneTage[\'2026-09-08\'] = true;'
+                 + '   var h2 = monatHtml(\'2026-09-01\');'
+                 + '   var auf = (h2.split(\'mtag\')[8].match(/mt-termin/g) || []).length;'
+                 + '   monatKalender = { Alex:true, Familie:false };'
+                 + '   var h3 = monatHtml(\'2026-09-01\');'
+                 + '   var weg = h3.indexOf(\'Elternabend\') < 0;'
+                 + '   var zahl = monatFilterZahl();'
+                 + '   monatArten = null; monatKalender = null; monatOffeneTage = {};'
+                 + '   var zurueck = monatFilterZahl();'
+                 + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
+                 + '   return { spalten:spalten, sichtbar:sichtbar, mehrKnopf:mehr,'
+                 + '            aufgeklappt:auf, nachAbwahl:weg, zahlNachAbwahl:zahl,'
+                 + '            zurueckgesetzt:zurueck };'
+                 + ' } };'
                  + 'globalThis.__jahrApi = { ferienImJahr,'
                  + ' pruefeFerien: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -2372,6 +2406,66 @@ console.log('\n40. Filter „nur Ferien"');
     pruefe(e.summe.n === 3 && e.summe.tage === 53,
            'die Ferientage des Jahres werden richtig gezählt (ist: '
            + e.summe.n + ' Zeiträume, ' + e.summe.tage + ' Tage)');
+  }
+}
+
+/* ============================================================
+   41. Monatssicht in zwei Spalten
+   Grund: Links praegt den Tag (Jahrestermine, Feiertag, Ferien),
+   rechts findet er statt (Kalendertermine). Ohne Begrenzung wuerde
+   ein voller Tag die Monatsuebersicht sprengen.
+   ============================================================ */
+console.log('\n41. Monatssicht');
+{
+  const skript = hauptSkript();
+  const m = globalThis.__monatApi;
+
+  ['monatArtErlaubt', 'monatKalenderErlaubt', 'monatTagUm', 'monatFilterZahl',
+   'monatFilterOeffnen', 'monatFilterHtml', 'monatArtUm', 'monatKalenderUm',
+   'monatFilterZuruecksetzen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const monat = skript.match(/function monatHtml\([\s\S]*?\n\}\n/);
+  pruefe(monat && /class="mt-links"/.test(monat[0]), 'jeder Tag hat eine linke Spalte');
+  pruefe(monat && /class="mt-rechts"/.test(monat[0]), 'und eine rechte Spalte');
+  pruefe(monat && !/mt-bal/.test(monat[0]),
+         'die Jahrestermine stehen ohne Farbfläche da');
+  pruefe(monat && /style="color:' \+ jtFarbe/.test(monat[0]),
+         'ihre Art zeigt sich in der Schriftfarbe');
+  pruefe(monat && /MONAT_ZEIGEN/.test(monat[0]), 'die Zahl der gezeigten Termine ist begrenzt');
+  pruefe(monat && /Termine<\/button>/.test(monat[0]), 'darüber hinaus gibt es einen Mehr-Knopf');
+  pruefe(monat && /monatArtErlaubt/.test(monat[0]) && /monatKalenderErlaubt/.test(monat[0]),
+         'beide Filter greifen');
+
+  const grenze = skript.match(/MONAT_ZEIGEN\s*=\s*(\d+)/);
+  pruefe(grenze && Number(grenze[1]) >= 1 && Number(grenze[1]) <= 5,
+         'die Grenze liegt zwischen einem und fünf Terminen');
+
+  pruefe(/id="kalFilterKnopf"/.test(QUELLE), 'der Filterknopf liegt im Kalenderkopf');
+  const zeichnen = skript.match(/function kalZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zeichnen && /kalStufe === 'monat'/.test(zeichnen[0]),
+         'er erscheint nur in der Monatsstufe');
+  pruefe(zeichnen && /Filter · '/.test(zeichnen[0]),
+         'er nennt die Zahl der abgeschalteten Einträge');
+
+  const blatt = skript.match(/function monatFilterHtml\([\s\S]*?\n\}\n/);
+  pruefe(blatt && /Kategorien/.test(blatt[0]) && /Kalender/.test(blatt[0]),
+         'das Filterblatt trennt Kategorien und Kalender');
+  pruefe(blatt && /mf-haken/.test(blatt[0]), 'jede Zeile trägt ein Häkchen');
+
+  if (!m) {
+    warn('Monatsfunktionen nicht auswertbar');
+  } else {
+    const e = m.pruefeMonat();
+    pruefe(e.spalten === 30, 'jeder Tag des Monats hat beide Spalten');
+    pruefe(e.sichtbar === 2, 'zunächst sind zwei Termine zu sehen');
+    pruefe(e.mehrKnopf === true, 'der Rest steckt hinter dem Mehr-Knopf');
+    pruefe(e.aufgeklappt === 5, 'aufgeklappt sind alle zu sehen');
+    pruefe(e.nachAbwahl === true, 'ein abgewählter Kalender verschwindet');
+    pruefe(e.zahlNachAbwahl === 1, 'der Knopf zählt die Abwahl');
+    pruefe(e.zurueckgesetzt === 0, 'zurücksetzen räumt alle Filter ab');
   }
 }
 
