@@ -483,6 +483,23 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__darstellungApi = {'
+                 + ' pruefeDarstellung: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var merk = window.innerWidth;'
+                 + '   DB.einstellungen.darstellung = \'automatisch\';'
+                 + '   window.innerWidth = 400; var a = istBreit();'
+                 + '   window.innerWidth = 1400; var b = istBreit();'
+                 + '   DB.einstellungen.darstellung = \'breit\';'
+                 + '   window.innerWidth = 400; var c = istBreit();'
+                 + '   DB.einstellungen.darstellung = \'schmal\';'
+                 + '   window.innerWidth = 1400; var e = istBreit();'
+                 + '   DB.einstellungen.darstellung = \'unsinn\';'
+                 + '   var f = darstellungGewaehlt();'
+                 + '   window.innerWidth = merk; DB = alt;'
+                 + '   return { autoSchmal:a, autoBreit:b, erzwungenBreit:c,'
+                 + '            erzwungenSchmal:e, unsinnFaelltZurueck:f };'
+                 + ' } };'
                  + 'globalThis.__ruhtApi = {'
                  + ' pruefeRuhen: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -2366,8 +2383,13 @@ console.log('\n37. Wochensicht als Spalten');
   pruefe(woche && (woche[0].match(/passtZumKalender\(/g) || []).length >= 4,
          'der Filter greift auf Termine, Ganztägiges, Aufgaben und die Wochenliste');
 
-  pruefe(/@media \(min-width:900px\)/.test(QUELLE), 'am großen Bildschirm gilt ein eigenes Bild');
-  pruefe(/grid-template-columns:repeat\(7,1fr\)/.test(QUELLE), 'dort stehen sieben Spalten');
+  /* Seit v0.16.1 steuert eine Klasse am Körper die Darstellung, damit
+     sie sich auch von Hand festlegen lässt. */
+  pruefe(/body\.breit /.test(QUELLE), 'am großen Bildschirm gilt ein eigenes Bild');
+  pruefe(!/@media/.test(QUELLE),
+         'die Darstellung hängt nicht mehr an Media-Abfragen');
+  pruefe(/body\.breit \.woche-raster\{display:grid;grid-template-columns:repeat\(7,1fr\)/
+         .test(QUELLE), 'dort stehen sieben Spalten');
   pruefe(/\.ktag-termine\{min-height/.test(QUELLE),
          'der Terminblock hat eine feste Mindesthöhe, damit die zweite Zeile fluchtet');
 
@@ -3008,6 +3030,65 @@ console.log('\n46. Ruhende Ablaufschritte');
 
     pruefe(e.folge.join(',') === e.erwarteteFolge.join(','),
            'der Knopf schaltet morgen → in einer Woche → wieder heute');
+  }
+}
+
+/* ============================================================
+   47. Blaetter schliessen und Darstellung waehlen
+   Grund: Ein bildschirmfuellendes Blatt liess sich am Handy nicht
+   mehr schliessen — es gab nur den Hintergrund, und der war weg.
+   Und die Darstellung hing an zwei verschiedenen Schwellen.
+   ============================================================ */
+console.log('\n47. Blätter und Darstellung');
+{
+  const skript = hauptSkript();
+  const d = globalThis.__darstellungApi;
+
+  /* Jedes Blatt hat denselben Kopf mit Kreuz */
+  pruefe(new RegExp('function\\s+blattKopf\\s*\\(').test(skript),
+         'Funktion blattKopf ist definiert');
+  const kopf = skript.match(/function blattKopf\([\s\S]*?\n\}/);
+  pruefe(kopf && /onclick="aktionenSchliessen\(\)"/.test(kopf[0]),
+         'der Kopf trägt einen Schließknopf');
+  pruefe(kopf && /aria-label="Schließen"/.test(kopf[0]), 'er ist beschriftet');
+  /* Nur den Rumpf ansehen — die Kopfzeile enthält den Namen naturgemäß. */
+  const rumpf = kopf ? kopf[0].replace(/^function blattKopf\(\)\s*\{/, '') : '';
+  pruefe(!/blattKopf\(/.test(rumpf),
+         'die Hilfsfunktion ruft sich nicht selbst auf');
+
+  const aufrufe = (skript.match(/blattKopf\(\)/g) || []).length - 1;
+  pruefe(aufrufe >= 12, 'alle Blätter benutzen den Kopf (gefunden: ' + aufrufe + ')');
+  pruefe(!/'<div class="as-griff"><\/div>'/.test(skript),
+         'kein Blatt baut den Griff mehr selbst');
+
+  pruefe(/\.as-oben\{[^}]*position:sticky/.test(QUELLE),
+         'der Kopf bleibt beim Blättern stehen');
+  pruefe(/\.aktion-sheet\{[^}]*max-height/.test(QUELLE),
+         'ein Blatt kann nicht höher werden als der Bildschirm');
+  pruefe(/\.aktion-sheet\{[^}]*overflow-y:auto/.test(QUELLE),
+         'ein langes Blatt lässt sich rollen');
+
+  /* Darstellung */
+  ['darstellungGewaehlt', 'istBreit', 'darstellungAnwenden',
+   'darstellungSetzen', 'zeichneDarstellung'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/id="darstellungWahl"/.test(QUELLE), 'die Diagnose hat die Wahl');
+  const start = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(start && /addEventListener\('resize', darstellungAnwenden\)/.test(start[0]),
+         'bei geänderter Fenstergröße wird nachgezogen');
+
+  if (!d) {
+    warn('Darstellungsfunktionen nicht auswertbar');
+  } else {
+    const e = d.pruefeDarstellung();
+    pruefe(e.autoSchmal === false, 'automatisch: ein schmales Fenster gilt als Handy');
+    pruefe(e.autoBreit === true, 'automatisch: ein breites gilt als großer Bildschirm');
+    pruefe(e.erzwungenBreit === true, 'festgelegt auf groß gilt auch im schmalen Fenster');
+    pruefe(e.erzwungenSchmal === false, 'festgelegt auf Handy gilt auch im breiten Fenster');
+    pruefe(e.unsinnFaelltZurueck === 'automatisch',
+           'ein unbrauchbarer Wert fällt auf automatisch zurück');
   }
 }
 
