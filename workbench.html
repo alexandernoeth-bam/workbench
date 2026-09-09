@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.12.1</title>
+<title>Workbench 0.12.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -279,16 +279,17 @@ table.jraster td{height:17px;border:1px solid var(--linie);padding:0;position:re
   cursor:pointer}
 @media (min-width:900px){
   table.jraster{min-width:0}
-  table.jraster td{height:28px}
+  table.jraster td{height:30px}
   table.jraster th{font-size:calc(var(--fs)*0.8);padding-bottom:6px}
   td.jnr{font-size:calc(var(--fs)*0.72);width:30px;padding-right:7px}
-  .jwt{font-size:calc(var(--fs)*0.72);padding-left:6px}
+  .jwt{flex:0 0 30px;font-size:calc(var(--fs)*0.7);padding-left:6px}
+  .jbalken i{font-size:calc(var(--fs)*0.68)}
   .jpunkt{width:5px;height:5px;right:3px;top:3px}
 }
-.jwt{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-start;
+.jzelle{position:absolute;inset:0;display:flex;align-items:stretch}
+.jwt{flex:0 0 20px;display:flex;align-items:center;justify-content:flex-start;
   padding-left:3px;font-size:calc(var(--fs)*0.54);color:var(--grau-hell);
-  letter-spacing:-.02em;z-index:2;pointer-events:none}
-.jwt.hell{color:rgba(255,255,255,.92);font-weight:500}
+  letter-spacing:-.03em}
 td.ferien{background:#E1E8E1}
 td.jnr{border:0;font-size:calc(var(--fs)*0.6);color:var(--grau);text-align:right;
   padding-right:4px;width:22px;font-variant-numeric:tabular-nums}
@@ -297,8 +298,10 @@ td.jleer{background:transparent;border-color:transparent}
 td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
 .jpunkt{position:absolute;right:2px;top:2px;width:4px;height:4px;border-radius:50%;
   background:var(--grau);z-index:3}
-.jbalken{position:absolute;inset:0;display:flex;gap:1px;z-index:1}
-.jbalken i{flex:1;display:block}
+.jbalken{flex:1;min-width:0;display:flex;gap:1px}
+.jbalken i{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;
+  font-style:normal;font-size:calc(var(--fs)*0.5);color:rgba(255,255,255,.95);
+  font-weight:500;letter-spacing:-.03em;overflow:hidden}
 .jsum{display:flex;align-items:center;gap:9px;padding:5px 7px;border-radius:5px;cursor:pointer}
 .jsum.aktiv{background:var(--karte);outline:1px solid var(--linie)}
 .jsum-farbe{flex:0 0 10px;height:10px;border-radius:2px}
@@ -662,7 +665,7 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.12.1';
+var APP_VERSION = '0.12.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4688,25 +4691,17 @@ function jahrHtml(is) {
       var r;
       for (r = 0; r < roh.length; r++) { if (jtPasst(roh[r])) { treffer.push(roh[r]); } }
 
-      var inhalt = '';
-      if (treffer.length) {
-        inhalt += '<span class="jbalken">';
-        var b;
-        for (b = 0; b < Math.min(treffer.length, 3); b++) {
-          inhalt += '<i style="background:' + jtFarbe(treffer[b]) + '"></i>';
-        }
-        inhalt += '</span>';
+      /* Vorne der Wochentag, dahinter der Rest zu gleichen Teilen auf
+         die Termine dieses Tages aufgeteilt — jeder mit seinem Kürzel. */
+      var inhalt = '<span class="jzelle">';
+      inhalt += '<span class="jwt">' + TAGE_KURZ[d.getDay()] + '</span>';
+      inhalt += '<span class="jbalken">';
+      var b;
+      for (b = 0; b < Math.min(treffer.length, 3); b++) {
+        inhalt += '<i style="background:' + jtFarbe(treffer[b]) + '">'
+                + esc(jtKuerzel(treffer[b])) + '</i>';
       }
-      var beschriftung = TAGE_KURZ[d.getDay()];
-      var b2;
-      for (b2 = 0; b2 < treffer.length; b2++) {
-        var beginn = treffer[b2].jaehrlich
-          ? (String(jahr) + treffer[b2].von.slice(4))
-          : treffer[b2].von;
-        if (beginn === iso) { beschriftung = jtKuerzel(treffer[b2]); break; }
-      }
-      inhalt += '<span class="jwt' + (treffer.length ? ' hell' : '') + '">'
-              + esc(beschriftung) + '</span>';
+      inhalt += '</span></span>';
       if (feiertagAn(iso)) { inhalt += '<span class="jpunkt"></span>'; }
       h += '<td class="' + kl.join(' ') + '" onclick="jtTagOeffnen(\'' + iso + '\')">'
          + inhalt + '</td>';

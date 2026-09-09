@@ -514,14 +514,14 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '       von:\'2026-11-02\', bis:\'2026-11-06\' } ];'
                  + '   var merkFilter = jahrFilter;'
                  + '   jahrFilter = null;'
-                 + '   var a = (jahrHtml(\'2026-01-01\').match(/jbalken/g) || []).length;'
+                 + '   var a = (jahrHtml(\'2026-01-01\').match(/<i style="background:/g) || []).length;'
                  + '   jahrFilter = \'ferien\';'
                  + '   var hf = jahrHtml(\'2026-01-01\');'
-                 + '   var b = (hf.match(/jbalken/g) || []).length;'
+                 + '   var b = (hf.match(/<i style="background:/g) || []).length;'
                  + '   var l = (hf.match(/jl-zeile/g) || []).length;'
                  + '   jahrFilter = \'urlaub\';'
                  + '   var hu = jahrHtml(\'2026-01-01\');'
-                 + '   var c = (hu.match(/jbalken/g) || []).length;'
+                 + '   var c = (hu.match(/<i style="background:/g) || []).length;'
                  + '   var t = hu.indexOf(\'ferien"\') < 0;'
                  + '   var s = ferienImJahr(2026);'
                  + '   jahrFilter = merkFilter; DB = alt;'
@@ -2238,19 +2238,21 @@ console.log('\n38. Ferien, Feiertage und Jahrestermine');
   const jahr = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
   pruefe(jahr && /onclick="jtTagOeffnen\(/.test(jahr[0]),
          'eine Zelle im Jahresraster öffnet die Pflege');
-  pruefe(jahr && /jwt' \+ \(treffer\.length \? ' hell' : ''\)/.test(jahr[0]),
-         'jede Zelle nennt ihren Wochentag, auf Farbe hell gesetzt');
+  pruefe(jahr && /class="jwt"/.test(jahr[0]),
+         'jede Zelle nennt ihren Wochentag in einer eigenen Spalte');
   pruefe(jahr && /ferienAn\(iso\)/.test(jahr[0]),
          'Ferienzeiträume werden im Raster getönt');
   pruefe(/\.jwt\{/.test(QUELLE), 'der Wochentag ist eigens gestaltet');
-  pruefe(/\.jbalken\{[^}]*inset:0/.test(QUELLE),
-         'die Balken füllen die ganze Zelle');
-  pruefe(/\.jwt\{[^}]*z-index:2/.test(QUELLE),
-         'der Wochentag liegt über der Farbe');
+  pruefe(/\.jzelle\{[^}]*inset:0/.test(QUELLE),
+         'die Zelle wird vollständig ausgefüllt');
+  pruefe(/\.jwt\{[^}]*flex:0 0/.test(QUELLE),
+         'der Wochentag hat eine feste eigene Spalte');
   pruefe(/\.jwt\{[^}]*justify-content:flex-start/.test(QUELLE),
          'der Wochentag steht linksbündig');
-  pruefe(/\.jwt\.hell\{/.test(QUELLE),
-         'auf farbigem Grund wird er hell gesetzt');
+  pruefe(/\.jbalken\{[^}]*flex:1/.test(QUELLE),
+         'der Rest der Zelle gehört den Terminen');
+  pruefe(/\.jbalken i\{[^}]*flex:1/.test(QUELLE),
+         'mehrere Termine teilen sich diesen Rest zu gleichen Teilen');
 
   const sheet = skript.match(/function jtTagHtml\([\s\S]*?\n\}\n/);
   pruefe(sheet && /jtNeuOeffnen\(\)/.test(sheet[0]),
@@ -2329,10 +2331,10 @@ console.log('\n39. Einlesen und Kürzel');
          'nach dem Einlesen wird die Auswahl geräumt');
 
   const jahr = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
-  pruefe(jahr && /jtKuerzel\(/.test(jahr[0]),
-         'das Raster beschriftet den Beginn eines Eintrags mit seinem Kürzel');
-  pruefe(jahr && /beginn === iso/.test(jahr[0]),
-         'das Kürzel steht am ersten Tag, danach wieder der Wochentag');
+  pruefe(jahr && /jtKuerzel\(treffer\[b\]\)/.test(jahr[0]),
+         'jeder Terminbereich trägt sein eigenes Kürzel');
+  pruefe(/\.jbalken i\{[^}]*color:rgba\(255/.test(QUELLE),
+         'das Kürzel steht hell auf der Artfarbe');
 
   const blatt = skript.match(/function jtTagHtml\([\s\S]*?\n\}\n/);
   pruefe(blatt && /jtKuerzelSetzen\(/.test(blatt[0]),
