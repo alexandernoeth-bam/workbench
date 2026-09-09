@@ -1143,7 +1143,7 @@ console.log('\n22. Aufgabenfläche und Detailfläche');
 
   const noetig = ['aufZeichnen', 'setAufGruppe', 'setAufFilter', 'aufGruppeVon',
                   'aufReihenfolge', 'aufMetaText', 'regelText', 'planungText',
-                  'planungKlasse', 'planungWeiter', 'aufgabeErledigen', 'aufAnlegen',
+                  'planungKlasse', 'planungWeiter', 'aufgabeErledigen', 'aufgabeNeu',
                   'themenFuer', 'projekteFuer', 'wochenEnde',
                   'detailHtml', 'detailNeuZeichnen', 'detailGeaendert',
                   'dKontext', 'dArt', 'dThema', 'dProjekt', 'dFrist', 'dPlanung',
@@ -1430,6 +1430,49 @@ console.log('\n26. Erledigtes in der Aufgabenfläche');
   const grenze = skript.match(/ERLEDIGT_ZEIGEN\s*=\s*(\d+)/);
   pruefe(grenze && Number(grenze[1]) >= 10 && Number(grenze[1]) <= 200,
          'die Grenze liegt zwischen 10 und 200 Einträgen');
+}
+
+/* ============================================================
+   27. Aufgabe anlegen ueber den Plusknopf
+   Grund: Ein Eingabefeld ohne Rahmen wurde als Ueberschrift gelesen.
+   Und eine ueber den Knopf angelegte Aufgabe darf nicht namenlos
+   zurueckbleiben, wenn der Dialog ohne Eingabe geschlossen wird.
+   ============================================================ */
+console.log('\n27. Aufgabe anlegen');
+{
+  const skript = hauptSkript();
+
+  pruefe(new RegExp('function\\s+aufgabeNeu\\s*\\(').test(skript), 'Funktion aufgabeNeu ist definiert');
+  pruefe(/class="plusknopf"/.test(QUELLE), 'der Plusknopf liegt im Aufgabenbildschirm');
+  pruefe(/onclick="aufgabeNeu\(\)"/.test(QUELLE), 'der Plusknopf legt eine Aufgabe an');
+  pruefe(/aria-label="Neue Aufgabe"/.test(QUELLE), 'der Knopf ist beschriftet');
+  pruefe(/\.plusknopf\{[^}]*position:fixed/.test(QUELLE), 'der Knopf liegt fest über der Liste');
+
+  const neu = skript.match(/function aufgabeNeu\([\s\S]*?\n\}/);
+  pruefe(neu && /aufgabeAktionen\(/.test(neu[0]),
+         'nach dem Anlegen öffnet sich sofort die Detailfläche');
+  pruefe(neu && /frischAngelegt = /.test(neu[0]),
+         'die Neuanlage wird vermerkt');
+  pruefe(neu && /planung: 'backlog'/.test(neu[0]),
+         'eine neue Aufgabe landet im Backlog');
+  pruefe(neu && /aufFilter === 'privat'/.test(neu[0]),
+         'der gewählte Filter bestimmt den Kontext');
+  pruefe(neu && /focus\(\)/.test(neu[0]),
+         'der Schreibbalken steht im Titelfeld');
+
+  const schliessen = skript.match(/function aktionenSchliessen\([\s\S]*?\n\}/);
+  pruefe(schliessen && /aktionFuer === frischAngelegt/.test(schliessen[0]),
+         'beim Schließen wird die Neuanlage erkannt');
+  pruefe(schliessen && /splice\(stelle, 1\)/.test(schliessen[0]),
+         'eine namenlos gebliebene Neuanlage wird entfernt');
+  pruefe(schliessen && /grabsteinSetzen\('aufgaben'/.test(schliessen[0]),
+         'dabei entsteht ein Löschvermerk, damit sie nicht zurückkehrt');
+  pruefe(schliessen && /frischAngelegt = ''/.test(schliessen[0]),
+         'der Vermerk wird danach zurückgesetzt');
+
+  /* Im Tagesplan bleibt die Schnelleingabe */
+  pruefe(/id="schnellFeld"/.test(QUELLE), 'der Tagesplan behält seine Schnelleingabe');
+  pruefe(!/id="aufFeld"/.test(QUELLE), 'die Aufgabenfläche hat keine Schnelleingabe mehr');
 }
 
 /* ============================================================

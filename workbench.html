@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.7.2</title>
+<title>Workbench 0.7.3</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -198,6 +198,16 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   border:1px solid var(--linie);background:var(--papier);color:var(--grau);white-space:nowrap}
 .planungsknopf.tag{border-color:var(--weinrot);color:var(--weinrot);font-weight:500}
 .planungsknopf.woche{border-color:var(--tinte);color:var(--tinte)}
+
+.plusknopf{position:fixed;right:18px;bottom:calc(72px + env(safe-area-inset-bottom));
+  width:54px;height:54px;border-radius:50%;border:0;background:var(--weinrot);
+  color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 3px 10px rgba(0,0,0,.22);z-index:4}
+.plusknopf svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:2.2;
+  stroke-linecap:round}
+@media (min-width:760px){
+  .plusknopf{bottom:calc(84px + env(safe-area-inset-bottom))}
+}
 
 /* ---------- Detailfläche ---------- */
 .d-feld{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--linie)}
@@ -389,12 +399,6 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 </div>
 
 <div class="schirm" id="schirmAufgaben">
-  <div class="eingabe-zone">
-    <input class="eingabe-feld" id="aufFeld" type="text" autocomplete="off"
-           placeholder="Neue Aufgabe ins Backlog …  (p = privat)"
-           onkeydown="aufTaste(event)">
-  </div>
-
   <div class="leisten">
     <div class="gruppe">
       <button type="button" id="gPlanung" class="aktiv" onclick="setAufGruppe('planung')">Planung</button>
@@ -411,6 +415,10 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 
   <div class="melder" id="aufMelder" style="margin:10px 20px 0">Bereit.</div>
   <div class="aufblatt" id="aufBlatt"></div>
+
+  <button class="plusknopf" type="button" onclick="aufgabeNeu()" aria-label="Neue Aufgabe">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
+  </button>
 </div>
 
 <button class="rueckstreifen" id="rueckStreifen" type="button" onclick="rueckgaengig()">
@@ -450,7 +458,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.7.2';
+var APP_VERSION = '0.7.3';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2511,6 +2519,7 @@ function zeileZustandSetzen(id, erledigt) {
 
 var aktionFuer = '';
 var titelVorher = '';
+var frischAngelegt = '';
 var zurueckHolen = null;
 var rueckUhr = null;
 var RUECK_ZEIT = 8000;
@@ -2529,9 +2538,20 @@ function titelTaste(ereignis) {
 }
 
 function aktionenSchliessen() {
-  /* Ein leer geräumter Titel wäre eine Aufgabe ohne Namen — dann gilt
-     wieder der Stand von vor dem Öffnen. */
   var a = aufgabeFinden(aktionFuer);
+
+  /* Eine gerade angelegte Aufgabe ohne Titel verschwindet wieder. */
+  if (a && aktionFuer === frischAngelegt && String(a.titel).trim().length === 0) {
+    var stelle = DB.aufgaben.indexOf(a);
+    if (stelle >= 0) { DB.aufgaben.splice(stelle, 1); }
+    grabsteinSetzen('aufgaben', a.id);
+    a = null;
+    spaeterSichern();
+  }
+  frischAngelegt = '';
+
+  /* Ein leer geräumter Titel bei einer bestehenden Aufgabe fällt auf
+     den Stand von vor dem Öffnen zurück. */
   if (a && String(a.titel).trim().length === 0) {
     a.titel = titelVorher;
     a.geaendert = jetzt();
@@ -3637,28 +3657,22 @@ function planungWeiter(id) {
   spaeterSichern();
 }
 
-function aufTaste(ereignis) {
-  if (!ereignis || ereignis.key !== 'Enter') { return; }
-  aufAnlegen();
-}
-
-function aufAnlegen() {
-  var feld = document.getElementById('aufFeld');
-  if (!feld) { return; }
-  var wert = feld.value.trim();
-  if (wert.length === 0) { return; }
-  var d = eingabeDeuten(wert);
-  if (d.titel.length === 0) { return; }
-  DB.aufgaben.push({
-    id: neueKennung(), titel: d.titel, beschreibung: '', kontext: d.kontext,
+/* Der Plusknopf legt eine leere Aufgabe an und öffnet gleich die
+   Detailfläche. Bleibt der Titel leer, wird sie beim Schließen
+   wieder entfernt — eine namenlose Aufgabe soll nicht entstehen. */
+function aufgabeNeu() {
+  var kontext = (aufFilter === 'privat') ? 'privat' : 'beruflich';
+  var neu = {
+    id: neueKennung(), titel: '', beschreibung: '', kontext: kontext,
     themaId: null, projektId: null, frist: '', planung: 'backlog', uhrzeit: '',
-    art: d.art, wiederholung: null, status: 'offen', erledigtAm: null,
+    art: 'haupt', wiederholung: null, status: 'offen', erledigtAm: null,
     zuletztErledigt: null, ablaufSchritt: null, geaendert: jetzt()
-  });
-  feld.value = '';
-  aufZeichnen();
-  zeichne();
-  spaeterSichern();
+  };
+  DB.aufgaben.push(neu);
+  frischAngelegt = neu.id;
+  aufgabeAktionen(neu.id);
+  var feld = document.getElementById('asTitel');
+  if (feld && feld.focus) { feld.focus(); }
 }
 
 /* ============================================================
