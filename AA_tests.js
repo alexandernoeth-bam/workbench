@@ -456,7 +456,25 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + ' zeitAusEintrag, tagAusEintrag,'
                  + ' zuruecksetzen: function(){ termineNachTag = {}; } };'
                  + 'globalThis.__fehlerApi = { dienstAusAdresse, antwortPruefen };'
-                 + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext };';
+                 + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext };'
+                 + 'globalThis.__kalenderApi = { montagVon, jtAn,'
+                 + ' pruefeJaehrlich: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.jahrestermine = ['
+                 + '     { id:\'j1\', titel:\'Geburtstag\', art:\'geburtstag\','
+                 + '       von:\'2008-03-26\', bis:\'2008-03-26\', jaehrlich:true },'
+                 + '     { id:\'j2\', titel:\'Einmalig\', art:\'termin\','
+                 + '       von:\'2026-04-01\', bis:\'2026-04-01\', jaehrlich:false },'
+                 + '     { id:\'j3\', titel:\'Urlaub\', art:\'urlaub\','
+                 + '       von:\'2026-08-03\', bis:\'2026-08-21\', jaehrlich:false } ];'
+                 + '   var r = {'
+                 + '     imJahr: jtAn(\'2008-03-26\').length > 0,'
+                 + '     spaeter: jtAn(\'2030-03-26\').length > 0,'
+                 + '     einmalSpaeter: jtAn(\'2030-04-01\').length > 0,'
+                 + '     zeitraumMitte: jtAn(\'2026-08-10\').length > 0,'
+                 + '     zeitraumDanach: jtAn(\'2026-08-22\').length > 0 };'
+                 + '   DB = alt; return r;'
+                 + ' } };';
     (0, eval)(skript + anhang);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -2001,6 +2019,66 @@ console.log('\n35. Termine beim Start holen');
          'in der Diagnose ist „noch nie" als Störung ausgezeichnet');
   pruefe(kal && /Holt gerade/.test(kal[0]),
          'ein laufender Abruf ist erkennbar');
+}
+
+/* ============================================================
+   36. Kalender: Woche, Monat, Jahr
+   Grund: Die Jahrestermine waren bisher unsichtbar. Und
+   jaehrliche Eintraege muessen ueber Jahresgrenzen hinweg gelten,
+   sonst verschwinden 85 Geburtstage im naechsten Januar.
+   ============================================================ */
+console.log('\n36. Kalender');
+{
+  const skript = hauptSkript();
+  const api = globalThis.__kalenderApi;
+
+  const noetig = ['kalZeichnen', 'setKalStufe', 'kalBlaettern', 'kalJetzt',
+                  'wocheHtml', 'monatHtml', 'jahrHtml', 'jtAn', 'jtFarbe', 'jtPasst',
+                  'jahrFilterSetzen', 'montagVon', 'zumTag', 'fensterPruefenFuer'];
+  noetig.forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  pruefe(/id="schirmKalender"/.test(QUELLE), 'der Kalenderbildschirm liegt im HTML');
+  pruefe(/id="sWoche"/.test(QUELLE) && /id="sMonat"/.test(QUELLE) && /id="sJahr"/.test(QUELLE),
+         'alle drei Stufen haben einen Knopf');
+  pruefe(/id="navKalender"/.test(QUELLE), 'der Kalender hat einen Navigationsknopf');
+
+  /* Die Artfarben sind dieselben wie in TimeAssist */
+  pruefe(/urlaub:\s*\{ n: 'Urlaub'/.test(skript), 'die Arten sind übernommen');
+  const arten = skript.match(/var JT_REIHE = \[([\s\S]*?)\];/);
+  pruefe(arten && (arten[1].match(/'/g) || []).length / 2 === 9,
+         'es sind neun Arten');
+
+  if (!api) {
+    warn('Kalenderfunktionen nicht auswertbar');
+  } else {
+    /* Montag einer Woche */
+    pruefe(api.montagVon('2026-09-08') === '2026-09-07', 'der Dienstag gehört zu seinem Montag');
+    pruefe(api.montagVon('2026-09-13') === '2026-09-07', 'der Sonntag ebenfalls');
+    pruefe(api.montagVon('2026-09-07') === '2026-09-07', 'der Montag zu sich selbst');
+
+    /* Jährliche Einträge gelten in jedem Jahr */
+    const e = api.pruefeJaehrlich();
+    pruefe(e.imJahr === true, 'ein jährlicher Eintrag gilt im Ursprungsjahr');
+    pruefe(e.spaeter === true, 'und auch viele Jahre später');
+    pruefe(e.einmalSpaeter === false, 'ein einmaliger Eintrag gilt nur in seinem Jahr');
+
+    /* Zeitraum über mehrere Tage */
+    pruefe(e.zeitraumMitte === true, 'ein Zeitraum gilt auch an seinen mittleren Tagen');
+    pruefe(e.zeitraumDanach === false, 'nach dem Ende nicht mehr');
+  }
+
+  /* Beim Blättern wird das Terminfenster nachgezogen */
+  const blaettern = skript.match(/function kalBlaettern\([\s\S]*?\n\}/);
+  pruefe(blaettern && /fensterPruefenFuer\(/.test(blaettern[0]),
+         'beim Blättern wird das Terminfenster geprüft');
+
+  /* Der Sprung in den Tag */
+  const zum = skript.match(/function zumTag\([\s\S]*?\n\}/);
+  pruefe(zum && /zeigeSchirm\('Tag'\)/.test(zum[0]),
+         'ein Tag im Kalender führt in die Tagesansicht');
 }
 
 /* ============================================================
