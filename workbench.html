@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.9.2</title>
+<title>Workbench 0.9.3</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -287,12 +287,15 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .rueck-wort{flex:0 0 auto;font-weight:500;text-decoration:underline}
 .ttext{cursor:pointer}
 
-.anmeldestreifen{display:none;flex:0 0 auto;align-items:center;gap:10px;padding:11px 20px;
-  background:var(--weinrot);border:0;font:inherit;font-size:calc(var(--fs)*0.84);
-  color:#fff;cursor:pointer;width:100%;text-align:left}
-.anmeldestreifen.sichtbar{display:flex}
+.anmeldebanner{display:none;flex:0 0 auto;align-items:center;gap:12px;
+  padding:11px 16px calc(11px) 20px;background:var(--weinrot);color:#fff;
+  font-size:calc(var(--fs)*0.84);line-height:1.35;
+  padding-top:calc(11px + env(safe-area-inset-top))}
+.anmeldebanner.sichtbar{display:flex}
 #anmeldeText{flex:1;min-width:0}
-.anmelde-wort{flex:0 0 auto;font-weight:600;text-decoration:underline;white-space:nowrap}
+.anmeldebanner button{flex:0 0 auto;font:inherit;font-size:calc(var(--fs)*0.8);
+  font-weight:600;padding:7px 14px;border:1px solid rgba(255,255,255,.75);
+  border-radius:6px;background:transparent;color:#fff;cursor:pointer;white-space:nowrap}
 .neustreifen{display:none;flex:0 0 auto;align-items:center;gap:10px;padding:10px 20px;
   background:var(--petrol);border:0;font:inherit;font-size:calc(var(--fs)*0.82);
   color:#fff;cursor:pointer;width:100%;text-align:left}
@@ -317,6 +320,11 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 </style>
 </head>
 <body>
+
+<div class="anmeldebanner" id="anmeldeStreifen">
+  <span id="anmeldeText">Keine Verbindung zu Google.</span>
+  <button type="button" onclick="anmelden()">Neu verbinden</button>
+</div>
 
 <div class="schirm aktiv" id="schirmTag">
   <div class="tagkopf">
@@ -450,11 +458,6 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 <div class="aktion-hg" id="aktionHg" onclick="aktionenSchliessen()"></div>
 <div class="aktion-sheet" id="aktionSheet"></div>
 
-<button class="anmeldestreifen" id="anmeldeStreifen" type="button" onclick="anmelden()">
-  <span id="anmeldeText">Nicht bei Google angemeldet — es wird nur lokal gespeichert.</span>
-  <span class="anmelde-wort">Anmelden</span>
-</button>
-
 <button class="neustreifen" id="neuStreifen" type="button" onclick="neuLaden()">
   <span id="neuText"></span>
   <span class="neu-wort">Jetzt laden</span>
@@ -484,7 +487,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.9.2';
+var APP_VERSION = '0.9.3';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -1162,7 +1165,7 @@ function anmelden(still) {
           verbindungOk = true;
           abgleichPlanen(true);
           termineHolen(false);
-          anmeldeStreifenPruefen();
+          verbindungPruefen();
           if (!still) { melde('Angemeldet. Gültig für ' + restMinuten() + ' Minuten.', 'gut'); }
           zeichne();
           fertig(true);
@@ -4241,6 +4244,7 @@ function warAngemeldet() {
 }
 
 function starten() {
+  anmeldeStreifenPruefen();
   if (tokenAusSitzung()) {
     melde('Anmeldung aus dieser Sitzung übernommen, noch ' + restMinuten() + ' Minuten gültig.', null);
   } else if (warAngemeldet()) {
@@ -4251,9 +4255,11 @@ function starten() {
         melde('Anmeldung im Hintergrund erneuert.', 'gut');
         abgleichPlanen(true);
       } else {
+        verbindungOk = false;
         melde('Die Anmeldung ließ sich nicht im Hintergrund erneuern.\n'
-            + 'Bitte oben auf „Anmelden" tippen.', 'warn');
+            + 'Bitte oben auf „Neu verbinden" tippen.', 'warn');
       }
+      anmeldeStreifenPruefen();
       zeichne();
     });
   }
@@ -4263,7 +4269,7 @@ function starten() {
   taktStarten();
   kalenderTaktStarten();
   verbindungTaktStarten();
-  window.setTimeout(verbindungPruefen, 2500);
+  verbindungPruefen();
   swAnmelden().then(function () { return versionPruefen(false); });
   versionTaktStarten();
   zeichne();

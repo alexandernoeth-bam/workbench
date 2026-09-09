@@ -1609,9 +1609,13 @@ console.log('\n29. Sichtbarkeit und Lesbarkeit');
   pruefe(/onclick="anmelden\(\)"/.test(QUELLE), 'der Streifen führt zur Anmeldung');
 
   /* Er muss auf jedem Bildschirm greifen, nicht nur in der Diagnose */
-  const streifenBlock = QUELLE.match(/<button class="anmeldestreifen"[\s\S]*?<\/button>/);
-  pruefe(streifenBlock && QUELLE.indexOf(streifenBlock[0]) > QUELLE.lastIndexOf('</div>\n\n<button class="anmeldestreifen"') - 1,
-         'der Streifen steht außerhalb der Bildschirme');
+  /* Er muss ganz oben stehen — unten am Bildschirmrand wird er übersehen. */
+  const bannerStelle = QUELLE.indexOf('id="anmeldeStreifen"');
+  const ersterSchirm = QUELLE.indexOf('<div class="schirm');
+  pruefe(bannerStelle > -1 && ersterSchirm > -1 && bannerStelle < ersterSchirm,
+         'das Banner steht über allen Bildschirmen');
+  pruefe(/<button type="button" onclick="anmelden\(\)">/.test(QUELLE),
+         'es trägt einen eigenen Knopf zum Neuverbinden');
   const zeichnen = skript.match(/function zeichne\(\)[\s\S]*?\n\}/);
   pruefe(zeichnen && /anmeldeStreifenPruefen\(\)/.test(zeichnen[0]),
          'die Diagnose frischt ihn auf');
@@ -1866,8 +1870,10 @@ console.log('\n33. Verbindung und Kalenderfenster');
   const start = skript.match(/function starten\(\)[\s\S]*?\n\}/);
   pruefe(start && /verbindungTaktStarten\(\)/.test(start[0]),
          'die Verbindungsprüfung läuft regelmäßig');
-  pruefe(start && /setTimeout\(verbindungPruefen/.test(start[0]),
-         'kurz nach dem Start wird einmal geprüft');
+  pruefe(start && /\n  verbindungPruefen\(\);/.test(start[0]),
+         'beim Start wird sofort geprüft');
+  pruefe(start && /^\s*anmeldeStreifenPruefen\(\);/m.test(start[0]),
+         'das Banner wird schon vor allen Abrufen gesetzt');
 
   const takt = skript.match(/VERBINDUNG_TAKT\s*=\s*(\d+)/);
   pruefe(takt && Number(takt[1]) >= 20000 && Number(takt[1]) <= 300000,
@@ -1900,6 +1906,54 @@ console.log('\n33. Verbindung und Kalenderfenster');
            'der Kalender wird höchstens alle fünf Minuten geholt (ist: '
            + Math.round(wert / 60000) + ' Minuten)');
   }
+}
+
+/* ============================================================
+   34. Banner bei fehlender Verbindung
+   Grund: Nach einem Neuladen war die Anmeldung weg, ohne dass es
+   irgendwo stand. Ein Hinweis am unteren Rand wird auf dem Handy
+   uebersehen — er gehoert nach oben und braucht einen Knopf.
+   ============================================================ */
+console.log('\n34. Banner bei fehlender Verbindung');
+{
+  const skript = hauptSkript();
+
+  pruefe(/class="anmeldebanner"/.test(QUELLE), 'das Banner ist als solches gestaltet');
+  pruefe(/id="anmeldeStreifen"/.test(QUELLE), 'es hat eine Kennung');
+  pruefe(/id="anmeldeText"/.test(QUELLE), 'der Text ist austauschbar');
+
+  const bannerStelle = QUELLE.indexOf('id="anmeldeStreifen"');
+  const bodyStelle = QUELLE.indexOf('<body>');
+  const ersterSchirm = QUELLE.indexOf('<div class="schirm');
+  pruefe(bannerStelle > bodyStelle && bannerStelle < ersterSchirm,
+         'es steht als Erstes im Fenster, über allen Bildschirmen');
+
+  pruefe(/\.anmeldebanner\{[^}]*display:none/.test(QUELLE),
+         'im Normalfall ist es unsichtbar');
+  pruefe(/\.anmeldebanner\.sichtbar\{display:flex\}/.test(QUELLE),
+         'bei Störung wird es eingeblendet');
+  pruefe(/\.anmeldebanner\{[^}]*safe-area-inset-top/.test(QUELLE),
+         'es respektiert den oberen Rand des Geräts');
+  pruefe(/\.anmeldebanner button\{/.test(QUELLE),
+         'der Knopf ist eigens gestaltet');
+  pruefe(/>Neu verbinden</.test(QUELLE), 'der Knopf heißt „Neu verbinden"');
+
+  const start = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(start && start[0].indexOf('anmeldeStreifenPruefen()') < start[0].indexOf('tokenAusSitzung()'),
+         'das Banner wird vor jedem Abruf gesetzt');
+
+  const streifen = skript.match(/function anmeldeStreifenPruefen\([\s\S]*?\n\}/);
+  pruefe(streifen && /verbindungOk !== false/.test(streifen[0]),
+         'es erscheint auch bei gültiger Uhr, aber toter Verbindung');
+
+  /* Nach der Anmeldung muss es verschwinden */
+  const anm = skript.match(/function anmelden\([\s\S]*?\n\}\n/);
+  pruefe(anm && /verbindungPruefen\(\)/.test(anm[0]),
+         'nach erfolgreicher Anmeldung wird die Verbindung geprüft und das Banner geräumt');
+
+  /* Und nach einer misslungenen stillen Erneuerung stehen bleiben */
+  pruefe(start && /verbindungOk = false/.test(start[0]),
+         'eine misslungene stille Erneuerung setzt den Zustand auf getrennt');
 }
 
 /* ============================================================
