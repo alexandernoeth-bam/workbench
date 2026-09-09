@@ -2175,16 +2175,30 @@ console.log('\n38. Ferien, Feiertage und Jahrestermine');
   const jahr = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
   pruefe(jahr && /onclick="jtTagOeffnen\(/.test(jahr[0]),
          'eine Zelle im Jahresraster öffnet die Pflege');
-  pruefe(jahr && /class="jwt"/.test(jahr[0]),
-         'jede Zelle nennt ihren Wochentag');
+  pruefe(jahr && /jwt' \+ \(treffer\.length \? ' hell' : ''\)/.test(jahr[0]),
+         'jede Zelle nennt ihren Wochentag, auf Farbe hell gesetzt');
   pruefe(jahr && /ferienAn\(iso\)/.test(jahr[0]),
          'Ferienzeiträume werden im Raster getönt');
   pruefe(/\.jwt\{/.test(QUELLE), 'der Wochentag ist eigens gestaltet');
-  pruefe(/\.jbalken\{[^}]*bottom:0/.test(QUELLE),
-         'die Balken sitzen unten, damit der Wochentag lesbar bleibt');
+  pruefe(/\.jbalken\{[^}]*inset:0/.test(QUELLE),
+         'die Balken füllen die ganze Zelle');
+  pruefe(/\.jwt\{[^}]*z-index:2/.test(QUELLE),
+         'der Wochentag liegt über der Farbe');
+  pruefe(/\.jwt\{[^}]*justify-content:flex-start/.test(QUELLE),
+         'der Wochentag steht linksbündig');
+  pruefe(/\.jwt\.hell\{/.test(QUELLE),
+         'auf farbigem Grund wird er hell gesetzt');
 
   const sheet = skript.match(/function jtTagHtml\([\s\S]*?\n\}\n/);
-  pruefe(sheet && /jtAnlegen\(\)/.test(sheet[0]), 'ein neuer Jahrestermin lässt sich anlegen');
+  pruefe(sheet && /jtNeuOeffnen\(\)/.test(sheet[0]),
+         'das Tagesblatt führt zum getrennten Anlegeblatt');
+  pruefe(sheet && !/jtNeuTitel/.test(sheet[0]),
+         'im Tagesblatt steht kein Anlegeformular');
+  const neuBlatt = skript.match(/function jtNeuHtml\([\s\S]*?\n\}/);
+  pruefe(neuBlatt && /jtAnlegen\(\)/.test(neuBlatt[0]),
+         'im Anlegeblatt lässt sich ein Jahrestermin anlegen');
+  pruefe(neuBlatt && /jtTagOeffnen\(/.test(neuBlatt[0]),
+         'ein Rückweg ins Tagesblatt ist vorhanden');
   pruefe(sheet && /jtLoeschen\(/.test(sheet[0]), 'ein bestehender lässt sich löschen');
   pruefe(sheet && /jtJaehrlichUm\(/.test(sheet[0]), 'jährlich lässt sich umschalten');
   pruefe(sheet && /zumTagAusJahr\(\)/.test(sheet[0]), 'der Weg in den Tag bleibt erhalten');

@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.11.0</title>
+<title>Workbench 0.11.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -82,6 +82,8 @@ body{
 .melder.warn{border-color:var(--weinrot);color:var(--weinrot)}
 .melder.gut{border-color:var(--petrol);color:var(--petrol)}
 
+.feld-hinweis{font-size:calc(var(--fs)*0.78);color:var(--grau);margin:10px 0 6px;line-height:1.45}
+.feld-hinweis b{font-weight:500;color:var(--tinte)}
 input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   border:1px solid var(--linie);border-radius:6px;padding:9px;background:var(--karte);
   color:var(--tinte);margin-bottom:4px}
@@ -257,18 +259,28 @@ table.jraster th{font-size:calc(var(--fs)*0.64);font-weight:500;color:var(--grau
   padding:0 0 4px;text-align:center}
 table.jraster td{height:17px;border:1px solid var(--linie);padding:0;position:relative;
   cursor:pointer}
-.jwt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-size:calc(var(--fs)*0.54);color:var(--grau-hell);letter-spacing:-.02em}
+@media (min-width:900px){
+  table.jraster{min-width:0}
+  table.jraster td{height:28px}
+  table.jraster th{font-size:calc(var(--fs)*0.8);padding-bottom:6px}
+  td.jnr{font-size:calc(var(--fs)*0.72);width:30px;padding-right:7px}
+  .jwt{font-size:calc(var(--fs)*0.72);padding-left:6px}
+  .jpunkt{width:5px;height:5px;right:3px;top:3px}
+}
+.jwt{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-start;
+  padding-left:3px;font-size:calc(var(--fs)*0.54);color:var(--grau-hell);
+  letter-spacing:-.02em;z-index:2;pointer-events:none}
+.jwt.hell{color:rgba(255,255,255,.92);font-weight:500}
 td.ferien{background:#E1E8E1}
 td.jnr{border:0;font-size:calc(var(--fs)*0.6);color:var(--grau);text-align:right;
   padding-right:4px;width:22px;font-variant-numeric:tabular-nums}
 td.we{background:#EBE9E4}
 td.jleer{background:transparent;border-color:transparent}
 td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
-.jpunkt{position:absolute;left:1px;top:1px;width:3px;height:3px;border-radius:50%;
-  background:var(--grau)}
-.jbalken{position:absolute;left:0;right:0;bottom:0;height:5px;display:flex;gap:1px}
-.jbalken i{flex:1;display:block;border-radius:1px}
+.jpunkt{position:absolute;right:2px;top:2px;width:4px;height:4px;border-radius:50%;
+  background:var(--grau);z-index:3}
+.jbalken{position:absolute;inset:0;display:flex;gap:1px;z-index:1}
+.jbalken i{flex:1;display:block}
 .jsum{display:flex;align-items:center;gap:9px;padding:5px 7px;border-radius:5px;cursor:pointer}
 .jsum.aktiv{background:var(--karte);outline:1px solid var(--linie)}
 .jsum-farbe{flex:0 0 10px;height:10px;border-radius:2px}
@@ -507,6 +519,8 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
 
   <div class="abschnitt-titel"><span>Ferien und Feiertage</span></div>
   <div id="ferienListe"></div>
+  <div class="feld-hinweis">ICS-Datei wählen, etwa <b>Schulferien_BY.ics</b> —
+    mehrere Dateien auf einmal sind möglich.</div>
   <input type="file" id="ferienDatei" multiple accept=".ics,text/calendar"
          onchange="ferienDateiGewaehlt(event)">
 
@@ -625,7 +639,7 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.11.0';
+var APP_VERSION = '0.11.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4427,12 +4441,12 @@ function jahrHtml(is) {
       if (iso === heute) { kl.push('jheute'); }
 
       if (ferienAn(iso)) { kl.push('ferien'); }
-      var inhalt = '<span class="jwt">' + TAGE_KURZ[d.getDay()] + '</span>';
-      if (feiertagAn(iso)) { inhalt += '<span class="jpunkt"></span>'; }
       var treffer = [];
       var roh = jtAn(iso);
       var r;
       for (r = 0; r < roh.length; r++) { if (jtPasst(roh[r])) { treffer.push(roh[r]); } }
+
+      var inhalt = '';
       if (treffer.length) {
         inhalt += '<span class="jbalken">';
         var b;
@@ -4441,6 +4455,9 @@ function jahrHtml(is) {
         }
         inhalt += '</span>';
       }
+      inhalt += '<span class="jwt' + (treffer.length ? ' hell' : '') + '">'
+              + TAGE_KURZ[d.getDay()] + '</span>';
+      if (feiertagAn(iso)) { inhalt += '<span class="jpunkt"></span>'; }
       h += '<td class="' + kl.join(' ') + '" onclick="jtTagOeffnen(\'' + iso + '\')">'
          + inhalt + '</td>';
     }
@@ -4622,18 +4639,41 @@ function jtTagHtml(is) {
     h += '<div class="kleer" style="padding-left:0">Kein Jahrestermin an diesem Tag.</div>';
   }
 
-  h += '<div class="d-feld" style="display:block;border-bottom:0">';
-  h += '<div class="d-name" style="flex:none">Neuer Jahrestermin</div>';
+  h += '<div class="d-reihe">';
+  h += '<button type="button" onclick="jtNeuOeffnen()">Neuer Jahrestermin</button>';
+  h += '<button type="button" onclick="zumTagAusJahr()">Zum Tag</button>';
+  h += '</div>';
+  return h;
+}
+
+/* Anlegen und Bearbeiten sind getrennte Blätter — sonst steht ein
+   leeres Formular unter Einträgen, die man gerade ändern will. */
+function jtNeuOeffnen() {
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = jtNeuHtml(jtTag);
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function jtNeuHtml(is) {
+  var h = '<div class="as-griff"></div>';
+  h += '<button class="zurueck" type="button" onclick="jtTagOeffnen(\'' + is + '\')">'
+     + '<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;'
+     + 'stroke-width:2;stroke-linecap:round;stroke-linejoin:round">'
+     + '<path d="M15 6l-6 6 6 6"></path></svg>' + esc(kurzDatum(is)) + '</button>';
+  h += '<div class="as-titel">Neuer Jahrestermin</div>';
+  h += '<div class="as-linie"></div>';
   h += '<input class="v-name" type="text" id="jtNeuTitel" placeholder="Bezeichnung" '
-     + 'style="width:100%;margin-top:6px">';
-  h += '<div class="s-zeile" style="display:flex;gap:7px;margin-top:7px">';
+     + 'style="width:100%;margin-top:10px">';
+  h += '<div style="display:flex;gap:7px;margin-top:8px">';
   h += '<input type="date" id="jtNeuVon" value="' + is + '" style="flex:1">';
   h += '<input type="date" id="jtNeuBis" value="' + is + '" style="flex:1">';
   h += '</div>';
   h += jtArtenHtml('neu', jtNeuArt);
   h += '<div class="d-reihe"><button type="button" onclick="jtAnlegen()">Anlegen</button>'
-     + '<button type="button" onclick="zumTagAusJahr()">Zum Tag</button></div>';
-  h += '</div>';
+     + '<button type="button" onclick="jtTagOeffnen(\'' + is + '\')">Zurück</button></div>';
   return h;
 }
 
@@ -4645,7 +4685,7 @@ function jtFinden(id) {
 }
 
 function jtArtSetzen(kennung, art) {
-  if (kennung === 'neu') { jtNeuArt = art; jtTagOeffnen(jtTag); return; }
+  if (kennung === 'neu') { jtNeuArt = art; jtNeuOeffnen(); return; }
   var e = jtFinden(kennung);
   if (!e) { return; }
   e.art = art;
@@ -4703,6 +4743,7 @@ function jtAnlegen() {
     von: von, bis: bis, jaehrlich: false, geaendert: jetzt()
   });
   spaeterSichern();
+  jtTag = von;
   jtTagOeffnen(von);
   kalZeichnen();
   zeichne();
