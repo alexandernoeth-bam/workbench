@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F6F5F2">
-<title>Workbench 0.5.0</title>
+<title>Workbench 0.5.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -292,7 +292,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.5.0';
+var APP_VERSION = '0.5.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -305,6 +305,9 @@ var SCOPES = 'https://www.googleapis.com/auth/drive.file '
            + 'https://www.googleapis.com/auth/calendar.readonly';
 var GIS_URL   = 'https://accounts.google.com/gsi/client';
 var TOKEN_KEY = 'workbench-zugriff';
+var ANMELDE_MERKER = 'workbench-war-angemeldet';
+var ABGLEICH_VERZUG  = 4000;    /* so lange nach der letzten Änderung wird gewartet */
+var ABGLEICH_MINDEST = 30000;   /* nicht öfter als alle 30 Sekunden von selbst */
 var DRIVE_DATEI = 'workbench.json';
 var VORLAUF_MS = 5 * 60 * 1000;   /* so lange vor Ablauf wird still erneuert */
 var GRABSTEIN_TAGE = 180;         /* so lange bleibt ein Löschvermerk erhalten */
@@ -356,6 +359,9 @@ var driveStand = '';
 var letzteUebertragung = null;
 var letzterAbgleich = null;
 var letzterBericht = null;
+var abgleichUhr = null;
+var abgleichLaeuft = false;
+var abgleichZuletztMs = 0;
 
 /* ============================================================
    Kleine Helfer
@@ -933,6 +939,8 @@ function anmelden(still) {
       klient.callback = function (antwort) {
         if (antwort && antwort.access_token) {
           tokenMerken(antwort.access_token, Number(antwort.expires_in) || 3600);
+          try { window.localStorage.setItem(ANMELDE_MERKER, '1'); } catch (e) { /* egal */ }
+          abgleichPlanen(true);
           if (!still) { melde('Angemeldet. Gültig für ' + restMinuten() + ' Minuten.', 'gut'); }
           zeichne();
           fertig(true);
@@ -959,6 +967,7 @@ function anmelden(still) {
 
 function abmelden() {
   var alt = zugriffToken;
+  try { window.localStorage.removeItem(ANMELDE_MERKER); } catch (e) { /* egal */ }
   tokenVergessen();
   driveDateiId = '';
   driveStand = '';
@@ -1118,6 +1127,40 @@ function abgleichen() {
     letzterAbgleich = isoZeit();
     return letzterBericht;
   });
+}
+
+/* Der Abgleich läuft von selbst: kurz nach einer Änderung, beim
+   Zurückkehren zur App und nach der Anmeldung. Ohne das bleibt die
+   Arbeit auf dem Gerät liegen, auf dem sie entstanden ist. */
+function abgleichPlanen(sofort) {
+  if (!tokenGueltig()) { return; }
+  if (abgleichUhr) { window.clearTimeout(abgleichUhr); }
+  abgleichUhr = window.setTimeout(abgleichStill, sofort ? 300 : ABGLEICH_VERZUG);
+}
+
+function abgleichStill() {
+  abgleichUhr = null;
+  if (!tokenGueltig() || abgleichLaeuft) { return; }
+  abgleichLaeuft = true;
+  abgleichen().then(function (b) {
+    abgleichZuletztMs = Date.now();
+    if (b && (b.neu || b.ersetzt || b.entfernt)) {
+      melde('Abgeglichen: ' + berichtText(b), 'gut');
+    }
+    tagZeichnen();
+    zeichne();
+  }).catch(function () {
+    return null;
+  }).then(function () {
+    abgleichLaeuft = false;
+  });
+}
+
+function rueckkehrPruefen() {
+  if (document.hidden) { return; }
+  if (!tokenGueltig()) { return; }
+  if (Date.now() - abgleichZuletztMs < ABGLEICH_MINDEST) { return; }
+  abgleichPlanen(true);
 }
 
 function abgleichenJetzt() {
@@ -2160,7 +2203,10 @@ function spaeterSichern() {
   if (speicherUhr) { window.clearTimeout(speicherUhr); }
   speicherUhr = window.setTimeout(function () {
     speicherUhr = null;
-    speichern().catch(function () { return null; });
+    speichern().then(function () {
+      zeichne();
+      abgleichPlanen(false);
+    }).catch(function () { return null; });
   }, 1500);
 }
 
@@ -2502,6 +2548,10 @@ function zeichneGoogle() {
              (letzterBericht && letzterBericht.konflikte.length) ? 'nein' : 'grau');
   h += zeile('Löschvermerke', String((DB.grabsteine || []).length),
              (DB.grabsteine || []).length ? '' : 'grau');
+  h += zeile('Automatischer Abgleich', an ? 'aktiv' : 'ruht (nicht angemeldet)',
+             an ? 'ja' : 'grau');
+  h += zeile('Anmeldung gemerkt', warAngemeldet() ? 'ja' : 'nein',
+             warAngemeldet() ? 'ja' : 'grau');
   ziel.innerHTML = h;
 
   var ka = document.getElementById('knopfAnmelden');
@@ -2570,10 +2620,29 @@ function zeichne() {
    Start
    ============================================================ */
 
+function warAngemeldet() {
+  try { return window.localStorage.getItem(ANMELDE_MERKER) === '1'; }
+  catch (e) { return false; }
+}
+
 function starten() {
   if (tokenAusSitzung()) {
     melde('Anmeldung aus dieser Sitzung übernommen, noch ' + restMinuten() + ' Minuten gültig.', null);
+  } else if (warAngemeldet()) {
+    /* Google kann den Zugriff ohne Nachfrage erneuern, solange die
+       Sitzung im Browser besteht. Erst wenn das misslingt, fragen wir. */
+    anmelden(true).then(function (gut) {
+      if (gut) {
+        melde('Anmeldung im Hintergrund erneuert.', 'gut');
+        abgleichPlanen(true);
+      } else {
+        melde('Die Anmeldung ließ sich nicht im Hintergrund erneuern.\n'
+            + 'Bitte unter Diagnose einmal „Anmelden" antippen.', 'warn');
+      }
+      zeichne();
+    });
   }
+  document.addEventListener('visibilitychange', rueckkehrPruefen);
   zeichne();
   if (!idbDa()) {
     speicherWeg = opfsDa() ? 'opfs' : (localDa() ? 'local' : 'keiner');

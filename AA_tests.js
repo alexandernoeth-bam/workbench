@@ -789,6 +789,72 @@ console.log('\n15. Tagesplan');
 }
 
 /* ============================================================
+   16. Automatischer Abgleich
+   Grund: Ohne selbsttaetigen Abgleich bleibt jede Aenderung auf dem
+   Geraet liegen, auf dem sie entstand. Genau das ist passiert:
+   drei am PC erfasste Kleinigkeiten erschienen nie auf dem Handy.
+   ============================================================ */
+console.log('\n16. Automatischer Abgleich');
+{
+  const skript = hauptSkript();
+
+  ['abgleichPlanen', 'abgleichStill', 'rueckkehrPruefen', 'warAngemeldet'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript), 'Funktion ' + f + ' ist definiert');
+  });
+
+  /* Nach dem lokalen Sichern muss der Abgleich angestoßen werden */
+  const sichern = skript.match(/function spaeterSichern\([\s\S]*?\n\}/);
+  pruefe(sichern && /abgleichPlanen\(/.test(sichern[0]),
+         'nach dem lokalen Sichern wird ein Abgleich eingeplant');
+
+  /* Nach der Anmeldung ebenso */
+  const anm = skript.match(/function anmelden\([\s\S]*?\n\}\n/);
+  pruefe(anm && /abgleichPlanen\(true\)/.test(anm[0]),
+         'nach erfolgreicher Anmeldung wird sofort abgeglichen');
+
+  /* Rückkehr zur App */
+  const start = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(start && /visibilitychange/.test(start[0]),
+         'die Rückkehr zur App wird beobachtet');
+  const rueck = skript.match(/function rueckkehrPruefen\([\s\S]*?\n\}/);
+  pruefe(rueck && /document\.hidden/.test(rueck[0]),
+         'beim Verlassen wird nicht abgeglichen');
+  pruefe(rueck && /ABGLEICH_MINDEST/.test(rueck[0]),
+         'ein Mindestabstand verhindert dauerndes Abgleichen');
+
+  /* Kein doppelter Lauf, keine doppelte Uhr */
+  const still = skript.match(/function abgleichStill\([\s\S]*?\n\}/);
+  pruefe(still && /abgleichLaeuft/.test(still[0]),
+         'ein laufender Abgleich wird nicht ein zweites Mal gestartet');
+  const planen = skript.match(/function abgleichPlanen\([\s\S]*?\n\}/);
+  pruefe(planen && /clearTimeout/.test(planen[0]),
+         'eine bereits geplante Uhr wird abgeräumt');
+  pruefe(planen && /tokenGueltig\(\)/.test(planen[0]),
+         'ohne Anmeldung wird kein Abgleich geplant');
+
+  /* Stille Wiederanmeldung beim Start */
+  pruefe(start && /warAngemeldet\(\)/.test(start[0]),
+         'beim Start wird geprüft, ob früher angemeldet war');
+  pruefe(start && /anmelden\(true\)/.test(start[0]),
+         'die Wiederanmeldung läuft zunächst ohne Nachfrage');
+  pruefe(/localStorage\.setItem\(ANMELDE_MERKER/.test(skript),
+         'der Merker steht in localStorage, nicht der Schlüssel selbst');
+  pruefe(!/localStorage\.setItem\(TOKEN_KEY/.test(skript),
+         'der Zugriffsschlüssel wird weiterhin nicht dauerhaft abgelegt');
+  const ab = skript.match(/function abmelden\([\s\S]*?\n\}/);
+  pruefe(ab && /removeItem\(ANMELDE_MERKER\)/.test(ab[0]),
+         'Abmelden löscht den Merker');
+
+  /* Verzögerungen plausibel */
+  const verzug = skript.match(/ABGLEICH_VERZUG\s*=\s*(\d+)/);
+  const mindest = skript.match(/ABGLEICH_MINDEST\s*=\s*(\d+)/);
+  pruefe(verzug && Number(verzug[1]) >= 1000 && Number(verzug[1]) <= 15000,
+         'die Wartezeit nach einer Änderung liegt zwischen 1 und 15 Sekunden');
+  pruefe(mindest && Number(mindest[1]) > Number(verzug[1]),
+         'der Mindestabstand ist größer als die Wartezeit');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');
