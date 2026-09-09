@@ -3293,6 +3293,58 @@ console.log('\n49. Wischen im Kalender, Feiertagsliste');
 }
 
 /* ============================================================
+   50. Spalten auf dem grossen Bildschirm
+   Grund: Tag und Vorhaben blieben einspaltig, obwohl die Entwuerfe
+   dort Spalten vorsahen. Auf einem breiten Bildschirm entsteht sonst
+   eine schmale Saeule mit viel leerem Raum daneben.
+   ============================================================ */
+console.log('\n50. Spalten auf dem großen Bildschirm');
+{
+  /* Tag: zwei Spalten mit fester Zuordnung je Abschnitt */
+  pruefe(/body\.breit \.tagblatt\{display:grid/.test(QUELLE),
+         'der Tag steht im breiten Bild in einem Raster');
+  pruefe(/body\.breit \.tagblatt\{[^}]*grid-template-columns:1fr 1fr/.test(QUELLE),
+         'es sind zwei Spalten');
+
+  const links = ['Tagesverlauf', 'Wiederkehrend', 'Abläufe'];
+  const rechts = ['Aufgaben', 'Kleinigkeiten'];
+  links.forEach(function (n) {
+    pruefe(new RegExp('body\\.breit \\.tabschnitt\\[data-kurz="' + n + '"\\]\\{grid-column:1\\}')
+           .test(QUELLE), n + ' steht links');
+  });
+  rechts.forEach(function (n) {
+    pruefe(new RegExp('body\\.breit \\.tabschnitt\\[data-kurz="' + n + '"\\]\\{grid-column:2\\}')
+           .test(QUELLE), n + ' steht rechts');
+  });
+  pruefe(/body\.breit \.tabschnitt\[data-kurz="Erledigt"\]\{grid-column:1 \/ -1\}/.test(QUELLE),
+         'Erledigtes geht über beide Spalten');
+
+  /* Jeder gezeichnete Abschnitt muss auch zugeordnet sein */
+  const skript = hauptSkript();
+  const namen = [...skript.matchAll(/data-kurz="([^"]+)"/g)].map(m => m[1]);
+  const einmalig = [];
+  namen.forEach(function (n) { if (einmalig.indexOf(n) < 0) { einmalig.push(n); } });
+  einmalig.forEach(function (n) {
+    pruefe(QUELLE.indexOf('data-kurz="' + n + '"]{grid-column') >= 0,
+           'Abschnitt „' + n + '" hat eine Spalte zugewiesen');
+  });
+
+  /* Vorhaben und Abläufe als Kacheln */
+  pruefe(/body\.breit \.vhblatt\{display:grid/.test(QUELLE),
+         'Vorhaben und Abläufe stehen als Kacheln');
+  pruefe(/repeat\(auto-fill,minmax\(300px,1fr\)\)/.test(QUELLE),
+         'die Zahl der Spalten richtet sich nach der Breite');
+  pruefe(/body\.breit \.vh-gruppe\{grid-column:1 \/ -1\}/.test(QUELLE),
+         'die Gruppenüberschrift geht über alle Spalten');
+  pruefe(/body\.breit \.vkarte\{[^}]*align-self:start/.test(QUELLE),
+         'eine Karte wächst nicht auf die Höhe ihrer Nachbarin');
+
+  /* Im schmalen Bild bleibt es einspaltig */
+  pruefe(!/\.tagblatt\{[^}]*display:grid/.test(QUELLE.replace(/body\.breit [^\n]*/g, '')),
+         'im schmalen Bild bleibt der Tag einspaltig');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');
