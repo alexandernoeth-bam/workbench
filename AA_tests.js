@@ -376,6 +376,181 @@ console.log('\n12. Google-Anmeldung und Drive');
 }
 
 /* ============================================================
+   13. Abgleich zwischen zwei Geraeten
+   Grund: Zwei Geraete aendern denselben Bestand. Ohne datensatzweises
+   Zusammenfuehren verliert der zweite Speichervorgang die Arbeit des
+   ersten. Diese Kategorie fuehrt den Abgleich wirklich aus.
+   ============================================================ */
+console.log('\n13. Abgleich zwischen zwei Geräten');
+{
+  const skript = hauptSkript();
+  let api = null;
+
+  const stummeListe = { setItem() {}, getItem() { return null; }, removeItem() {} };
+  global.window = {
+    addEventListener() {}, setTimeout, clearTimeout,
+    localStorage: stummeListe, sessionStorage: stummeListe,
+    indexedDB: null, innerHeight: 800,
+    matchMedia() { return { matches: false }; },
+    fetch() { return Promise.reject(new Error('kein Netz im Test')); },
+    google: null
+  };
+  global.document = {
+    getElementById() { return null; },
+    createElement() { return { addEventListener() {} }; },
+    head: { appendChild() {} },
+    documentElement: { style: { setProperty() {} } }
+  };
+  /* navigator ist in neueren Node-Fassungen schreibgeschützt */
+  try {
+    Object.defineProperty(global, 'navigator', {
+      value: { storage: null }, configurable: true, writable: true
+    });
+  } catch (e) {
+    warn('navigator ließ sich nicht ersetzen: ' + e.message);
+  }
+
+  try {
+    const anhang = ';globalThis.__api = { zusammenfuehren, leereDatenbank, bestandStempeln,'
+                 + ' grabsteineAufraeumen, textZuBestand, neueKennung };';
+    (0, eval)(skript + anhang);
+    api = globalThis.__api;
+    ok('Skript lässt sich außerhalb des Browsers auswerten');
+  } catch (e) {
+    fail('Skript ließ sich nicht auswerten: ' + e.message);
+  }
+
+  if (api) {
+    /* Realistische Zeitpunkte: Löschvermerke älter als die Frist werden
+       aufgeräumt, ein Stempel aus 1970 fiele darunter. */
+    const T0 = Date.now() - (24 * 60 * 60 * 1000);
+    function bestand(aufgaben, steine) {
+      const db = api.leereDatenbank();
+      db.aufgaben = aufgaben || [];
+      db.grabsteine = steine || [];
+      return db;
+    }
+    function finde(liste, id) { return liste.filter(x => x.id === id)[0] || null; }
+
+    /* A — derselbe Datensatz auf beiden Seiten geaendert */
+    let r = api.zusammenfuehren(
+      bestand([{ id: 'a1', titel: 'lokal', geaendert: T0 + 100 }]),
+      bestand([{ id: 'a1', titel: 'fremd', geaendert: T0 + 200 }])
+    );
+    let t = finde(r.db.aufgaben, 'a1');
+    pruefe(t && t.titel === 'fremd', 'A: der jüngere Stand gewinnt');
+    pruefe(r.bericht.konflikte.length === 1, 'A: der Konflikt wird gemeldet');
+
+    /* B — umgekehrte Richtung */
+    r = api.zusammenfuehren(
+      bestand([{ id: 'a1', titel: 'lokal', geaendert: T0 + 300 }]),
+      bestand([{ id: 'a1', titel: 'fremd', geaendert: T0 + 200 }])
+    );
+    t = finde(r.db.aufgaben, 'a1');
+    pruefe(t && t.titel === 'lokal', 'B: auch andersherum gewinnt der jüngere Stand');
+
+    /* C — Aufgabe des einen Geraets darf nicht verschwinden */
+    r = api.zusammenfuehren(
+      bestand([{ id: 'beruf', titel: 'Abendplanung', geaendert: T0 + 10 }]),
+      bestand([{ id: 'privat', titel: 'Einkauf', geaendert: T0 + 20 }])
+    );
+    pruefe(r.db.aufgaben.length === 2, 'C: beide Geräte behalten ihre eigenen Aufgaben');
+    pruefe(r.bericht.neu === 1 && r.bericht.behalten === 1, 'C: Bericht zählt richtig');
+
+    /* D — geloescht bleibt geloescht */
+    r = api.zusammenfuehren(
+      bestand([], [{ s: 'aufgaben', id: 'a1', z: T0 + 500 }]),
+      bestand([{ id: 'a1', titel: 'kommt zurück', geaendert: T0 + 100 }])
+    );
+    pruefe(r.db.aufgaben.length === 0, 'D: Gelöschtes kommt nicht vom anderen Gerät zurück');
+    pruefe(r.bericht.entfernt === 1, 'D: die Entfernung steht im Bericht');
+
+    /* E — nach dem Loeschen wieder bearbeitet: der Datensatz lebt */
+    r = api.zusammenfuehren(
+      bestand([], [{ s: 'aufgaben', id: 'a1', z: T0 + 100 }]),
+      bestand([{ id: 'a1', titel: 'danach bearbeitet', geaendert: T0 + 500 }])
+    );
+    pruefe(r.db.aufgaben.length === 1,
+           'E: eine nach dem Löschen bearbeitete Aufgabe überlebt');
+
+    /* F — Loeschvermerk wandert mit */
+    r = api.zusammenfuehren(
+      bestand([], [{ s: 'aufgaben', id: 'a1', z: T0 + 500 }]),
+      bestand([])
+    );
+    pruefe(r.db.grabsteine.length === 1, 'F: der Löschvermerk bleibt erhalten');
+
+    /* G — doppelte Vermerke werden auf den juengsten zusammengezogen */
+    r = api.zusammenfuehren(
+      bestand([], [{ s: 'aufgaben', id: 'a1', z: T0 + 100 }]),
+      bestand([], [{ s: 'aufgaben', id: 'a1', z: T0 + 900 }])
+    );
+    pruefe(r.db.grabsteine.length === 1, 'G: doppelte Vermerke werden zusammengezogen');
+    pruefe(r.db.grabsteine[0].z === T0 + 900, 'G: der jüngste Zeitpunkt bleibt stehen');
+
+    /* H — alte Vermerke werden aufgeraeumt */
+    const uralt = Date.now() - (400 * 24 * 60 * 60 * 1000);
+    const geputzt = api.grabsteineAufraeumen([
+      { s: 'aufgaben', id: 'alt', z: uralt },
+      { s: 'aufgaben', id: 'neu', z: Date.now() }
+    ]);
+    pruefe(geputzt.length === 1 && geputzt[0].id === 'neu',
+           'H: Vermerke älter als die Frist werden entfernt');
+
+    /* I — Kalenderzuordnung wird schluesselweise zusammengefuehrt */
+    let a = api.leereDatenbank(); a.kalenderzuordnung = { g1: { art: 'urlaub', geaendert: T0 + 10 } };
+    let b = api.leereDatenbank(); b.kalenderzuordnung = { g1: { art: 'krank', geaendert: T0 + 99 },
+                                                          g2: { art: 'feier', geaendert: T0 + 5 } };
+    r = api.zusammenfuehren(a, b);
+    pruefe(r.db.kalenderzuordnung.g1 && r.db.kalenderzuordnung.g1.art === 'krank',
+           'I: bei der Kalenderzuordnung gewinnt der jüngere Eintrag');
+    pruefe(!!r.db.kalenderzuordnung.g2, 'I: fremde Zuordnungen kommen dazu');
+
+    /* J — Altbestand ohne Kennung und Stempel wird nachgetragen */
+    const alt = api.leereDatenbank();
+    alt.aufgaben = [{ titel: 'ohne alles' }, { titel: 'auch ohne' }];
+    const nachgetragen = api.bestandStempeln(alt);
+    pruefe(nachgetragen >= 4, 'J: Kennung und Stempel werden nachgetragen');
+    pruefe(!!alt.aufgaben[0].id && alt.aufgaben[0].id !== alt.aufgaben[1].id,
+           'J: die nachgetragenen Kennungen sind verschieden');
+
+    /* K — Kennungen sind eindeutig */
+    const gesehen = {};
+    let doppelt = 0;
+    let n;
+    for (n = 0; n < 500; n++) {
+      const kk = api.neueKennung();
+      if (gesehen[kk]) { doppelt++; }
+      gesehen[kk] = true;
+    }
+    pruefe(doppelt === 0, 'K: 500 Kennungen ohne Dublette');
+
+    /* L — Stempel sind Zahlen, keine Datumstexte */
+    pruefe(!/geaendert\s*[:=]\s*isoZeit\(\)/.test(skript),
+           'L: der Änderungsstempel ist kein Datumstext');
+    pruefe(/function jetzt\(\)\s*\{\s*return Date\.now\(\)/.test(skript),
+           'L: der Stempel kommt aus Date.now()');
+
+    /* L2 — die Aufräumfrist hat eine Kehrseite, die bewusst hingenommen wird:
+       war ein Gerät länger als die Frist offline, kann Gelöschtes zurückkommen. */
+    const laengstVorbei = Date.now() - (400 * 24 * 60 * 60 * 1000);
+    r = api.zusammenfuehren(
+      bestand([], [{ s: 'aufgaben', id: 'a1', z: laengstVorbei }]),
+      bestand([{ id: 'a1', titel: 'sehr alt', geaendert: laengstVorbei - 1000 }])
+    );
+    pruefe(r.db.aufgaben.length === 1,
+           'L2: nach Ablauf der Vermerkfrist kehrt Gelöschtes zurück (bewusst so)');
+
+    /* M — der Abgleich schreibt das Ergebnis lokal, bevor er hochlaedt */
+    const abgl = skript.match(/function abgleichen\(\)[\s\S]*?\n\}/);
+    pruefe(abgl && /speichern\(\)[\s\S]*driveHochladen\(\)/.test(abgl[0]),
+           'M: erst lokal sichern, dann hochladen');
+    pruefe(abgl && /zusammenfuehren\(DB, fremd\)/.test(abgl[0]),
+           'M: der Abgleich benutzt das Zusammenführen');
+  }
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');

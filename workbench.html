@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F6F5F2">
-<title>Workbench 0.2.0</title>
+<title>Workbench 0.3.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -132,6 +132,7 @@ body{
     <button type="button" id="knopfAbmelden" onclick="abmelden()">Abmelden</button>
     <button type="button" id="knopfDriveLaden" onclick="driveLadenJetzt()">Von Drive laden</button>
     <button type="button" id="knopfDriveSpeichern" onclick="driveSpeichernJetzt()">Zu Drive sichern</button>
+    <button type="button" id="knopfAbgleich" class="stark" onclick="abgleichenJetzt()">Abgleichen</button>
   </div>
 
   <div class="abschnitt-titel"><span>Datenbestand</span></div>
@@ -158,7 +159,7 @@ body{
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.2.0';
+var APP_VERSION = '0.3.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -173,6 +174,7 @@ var GIS_URL   = 'https://accounts.google.com/gsi/client';
 var TOKEN_KEY = 'workbench-zugriff';
 var DRIVE_DATEI = 'workbench.json';
 var VORLAUF_MS = 5 * 60 * 1000;   /* so lange vor Ablauf wird still erneuert */
+var GRABSTEIN_TAGE = 180;         /* so lange bleibt ein Löschvermerk erhalten */
 
 var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe',
                   'jahrestermine','kalenderzuordnung','termine'];
@@ -189,12 +191,14 @@ function leereDatenbank() {
     jahrestermine:     [],
     kalenderzuordnung: {},
     termine:           [],
+    grabsteine:        [],
     einstellungen: {
       clientId:      CLIENT_ID,
       redirectUri:   REDIRECT_URI,
       kalender:      [],
       ferienZeigen:  true,
-      geaendert:     null
+      gespeichert:   null,
+      stempel:       0
     }
   };
 }
@@ -217,6 +221,8 @@ var gisBereit = false;
 var driveDateiId = '';
 var driveStand = '';
 var letzteUebertragung = null;
+var letzterAbgleich = null;
+var letzterBericht = null;
 
 /* ============================================================
    Kleine Helfer
@@ -366,13 +372,212 @@ function localLesen() {
 }
 
 /* ============================================================
+   Datensätze: Kennung, Stempel, Grabsteine
+
+   Der Änderungsstempel ist eine Zahl in Millisekunden seit 1970.
+   Ein Datumstext wäre je nach Zeitzone unterschiedlich lang und
+   ließe sich zwischen zwei Geräten nicht sicher vergleichen.
+   ============================================================ */
+
+function jetzt() { return Date.now(); }
+
+function neueKennung() {
+  return 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function stempeln(satz) {
+  if (!satz.id) { satz.id = neueKennung(); }
+  satz.geaendert = jetzt();
+  return satz;
+}
+
+/* Ältere Bestände tragen weder Kennung noch Stempel. Beides wird
+   einmalig nachgetragen, ohne Inhalte anzufassen. */
+function bestandStempeln(db) {
+  var i, s, k;
+  var nachgetragen = 0;
+  for (i = 0; i < SAMMLUNGEN.length; i++) {
+    s = SAMMLUNGEN[i];
+    if (s === 'kalenderzuordnung') {
+      var z = db[s] || {};
+      for (k in z) {
+        if (!Object.prototype.hasOwnProperty.call(z, k)) { continue; }
+        if (typeof z[k] === 'string') { z[k] = { art: z[k], geaendert: 0 }; nachgetragen++; }
+        else if (!z[k].geaendert) { z[k].geaendert = 0; nachgetragen++; }
+      }
+      continue;
+    }
+    var liste = db[s] || [];
+    var j;
+    for (j = 0; j < liste.length; j++) {
+      if (!liste[j].id) { liste[j].id = neueKennung(); nachgetragen++; }
+      if (typeof liste[j].geaendert !== 'number') { liste[j].geaendert = 0; nachgetragen++; }
+    }
+  }
+  if (!Array.isArray(db.grabsteine)) { db.grabsteine = []; }
+  return nachgetragen;
+}
+
+function grabsteinSetzen(sammlung, id) {
+  if (!Array.isArray(DB.grabsteine)) { DB.grabsteine = []; }
+  var i;
+  for (i = 0; i < DB.grabsteine.length; i++) {
+    if (DB.grabsteine[i].s === sammlung && DB.grabsteine[i].id === id) {
+      DB.grabsteine[i].z = jetzt();
+      return DB.grabsteine[i];
+    }
+  }
+  var g = { s: sammlung, id: id, z: jetzt() };
+  DB.grabsteine.push(g);
+  return g;
+}
+
+function grabsteinZeit(steine, sammlung, id) {
+  var i;
+  for (i = 0; i < steine.length; i++) {
+    if (steine[i].s === sammlung && steine[i].id === id) { return steine[i].z || 0; }
+  }
+  return 0;
+}
+
+function grabsteineAufraeumen(steine) {
+  var grenze = jetzt() - (GRABSTEIN_TAGE * 24 * 60 * 60 * 1000);
+  var frisch = [];
+  var i;
+  for (i = 0; i < steine.length; i++) {
+    if ((steine[i].z || 0) >= grenze) { frisch.push(steine[i]); }
+  }
+  return frisch;
+}
+
+/* ============================================================
+   Zusammenführen zweier Bestände
+
+   Regel: Der jüngere Stempel gewinnt. Ein Löschvermerk gewinnt
+   gegen jede Änderung, die älter ist als er selbst. Reine Funktion,
+   damit sie außerhalb des Browsers geprüft werden kann.
+   ============================================================ */
+
+function zusammenfuehren(lokal, fremd) {
+  var bericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0, konflikte: [] };
+  var ergebnis = leereDatenbank();
+
+  var steine = grabsteineAufraeumen(
+    (Array.isArray(lokal.grabsteine) ? lokal.grabsteine : [])
+      .concat(Array.isArray(fremd.grabsteine) ? fremd.grabsteine : [])
+  );
+  /* Doppelte Vermerke auf den jüngsten zusammenziehen */
+  var karteS = {};
+  var i, s, k;
+  for (i = 0; i < steine.length; i++) {
+    var sl = steine[i].s + '|' + steine[i].id;
+    if (!karteS[sl] || (steine[i].z || 0) > karteS[sl].z) {
+      karteS[sl] = { s: steine[i].s, id: steine[i].id, z: steine[i].z || 0 };
+    }
+  }
+  var steineFrisch = [];
+  for (k in karteS) {
+    if (Object.prototype.hasOwnProperty.call(karteS, k)) { steineFrisch.push(karteS[k]); }
+  }
+  ergebnis.grabsteine = steineFrisch;
+
+  for (i = 0; i < SAMMLUNGEN.length; i++) {
+    s = SAMMLUNGEN[i];
+
+    if (s === 'kalenderzuordnung') {
+      var a = lokal[s] || {};
+      var b = fremd[s] || {};
+      var alle = {};
+      for (k in a) { if (Object.prototype.hasOwnProperty.call(a, k)) { alle[k] = true; } }
+      for (k in b) { if (Object.prototype.hasOwnProperty.call(b, k)) { alle[k] = true; } }
+      for (k in alle) {
+        if (!Object.prototype.hasOwnProperty.call(alle, k)) { continue; }
+        var wa = a[k] || null;
+        var wb = b[k] || null;
+        var tot = grabsteinZeit(steineFrisch, s, k);
+        var neuster = Math.max(wa ? (wa.geaendert || 0) : 0, wb ? (wb.geaendert || 0) : 0);
+        if (tot && tot >= neuster) { bericht.entfernt++; continue; }
+        if (wa && wb) {
+          if ((wb.geaendert || 0) > (wa.geaendert || 0)) {
+            ergebnis[s][k] = wb; bericht.ersetzt++;
+            if (wa.art !== wb.art) { bericht.konflikte.push({ s: s, id: k, gewaehlt: 'fremd' }); }
+          } else {
+            ergebnis[s][k] = wa; bericht.behalten++;
+            if (wa.art !== wb.art) { bericht.konflikte.push({ s: s, id: k, gewaehlt: 'lokal' }); }
+          }
+        } else if (wb) {
+          ergebnis[s][k] = wb; bericht.neu++;
+        } else {
+          ergebnis[s][k] = wa; bericht.behalten++;
+        }
+      }
+      continue;
+    }
+
+    var listeA = Array.isArray(lokal[s]) ? lokal[s] : [];
+    var listeB = Array.isArray(fremd[s]) ? fremd[s] : [];
+    var karte = {};
+    var j;
+    for (j = 0; j < listeA.length; j++) { karte[listeA[j].id] = { a: listeA[j], b: null }; }
+    for (j = 0; j < listeB.length; j++) {
+      if (karte[listeB[j].id]) { karte[listeB[j].id].b = listeB[j]; }
+      else { karte[listeB[j].id] = { a: null, b: listeB[j] }; }
+    }
+
+    var kennung;
+    for (kennung in karte) {
+      if (!Object.prototype.hasOwnProperty.call(karte, kennung)) { continue; }
+      var paar = karte[kennung];
+      var za = paar.a ? (paar.a.geaendert || 0) : 0;
+      var zb = paar.b ? (paar.b.geaendert || 0) : 0;
+      var totZeit = grabsteinZeit(steineFrisch, s, kennung);
+
+      if (totZeit && totZeit >= Math.max(za, zb)) { bericht.entfernt++; continue; }
+
+      if (paar.a && paar.b) {
+        if (zb > za) {
+          ergebnis[s].push(paar.b); bericht.ersetzt++;
+          if (za > 0 && zb > 0) { bericht.konflikte.push({ s: s, id: kennung, gewaehlt: 'fremd' }); }
+        } else if (za > zb) {
+          ergebnis[s].push(paar.a); bericht.behalten++;
+          if (zb > 0) { bericht.konflikte.push({ s: s, id: kennung, gewaehlt: 'lokal' }); }
+        } else {
+          ergebnis[s].push(paar.a); bericht.behalten++;
+        }
+      } else if (paar.b) {
+        ergebnis[s].push(paar.b); bericht.neu++;
+      } else {
+        ergebnis[s].push(paar.a); bericht.behalten++;
+      }
+    }
+  }
+
+  var ea = (lokal.einstellungen && lokal.einstellungen.stempel) || 0;
+  var eb = (fremd.einstellungen && fremd.einstellungen.stempel) || 0;
+  var quelle = (eb > ea) ? fremd.einstellungen : lokal.einstellungen;
+  if (quelle) {
+    var e;
+    for (e in quelle) {
+      if (Object.prototype.hasOwnProperty.call(quelle, e)) { ergebnis.einstellungen[e] = quelle[e]; }
+    }
+  }
+  ergebnis.einstellungen.clientId = CLIENT_ID;
+  ergebnis.einstellungen.redirectUri = REDIRECT_URI;
+  ergebnis.version = APP_VERSION;
+
+  return { db: ergebnis, bericht: bericht };
+}
+
+/* ============================================================
    Speichern und Laden
    ============================================================ */
 
 function alsText() {
   DB.version = APP_VERSION;
   if (!DB.einstellungen) { DB.einstellungen = leereDatenbank().einstellungen; }
-  DB.einstellungen.geaendert = isoZeit();
+  DB.einstellungen.gespeichert = isoZeit();
+  if (!DB.einstellungen.stempel) { DB.einstellungen.stempel = jetzt(); }
+  if (!Array.isArray(DB.grabsteine)) { DB.grabsteine = []; }
   return JSON.stringify(DB, null, 2);
 }
 
@@ -405,8 +610,10 @@ function uebernehmen(text) {
       }
     }
   }
+  if (Array.isArray(gelesen.grabsteine)) { frisch.grabsteine = gelesen.grabsteine; }
   frisch.einstellungen.clientId    = CLIENT_ID;
   frisch.einstellungen.redirectUri = REDIRECT_URI;
+  bestandStempeln(frisch);
   DB = frisch;
   return true;
 }
@@ -714,6 +921,81 @@ function driveHerunterladen() {
   });
 }
 
+/* ============================================================
+   Abgleich: herunterladen, zusammenführen, zurückschreiben
+   ============================================================ */
+
+function textZuBestand(text) {
+  var gelesen;
+  try {
+    gelesen = JSON.parse(text);
+  } catch (e) {
+    return null;
+  }
+  if (!gelesen || typeof gelesen !== 'object') { return null; }
+  var frisch = leereDatenbank();
+  var i, name;
+  for (i = 0; i < SAMMLUNGEN.length; i++) {
+    name = SAMMLUNGEN[i];
+    if (name === 'kalenderzuordnung') {
+      if (gelesen[name] && typeof gelesen[name] === 'object') { frisch[name] = gelesen[name]; }
+    } else if (Array.isArray(gelesen[name])) {
+      frisch[name] = gelesen[name];
+    }
+  }
+  if (Array.isArray(gelesen.grabsteine)) { frisch.grabsteine = gelesen.grabsteine; }
+  if (gelesen.einstellungen && typeof gelesen.einstellungen === 'object') {
+    var e;
+    for (e in gelesen.einstellungen) {
+      if (Object.prototype.hasOwnProperty.call(gelesen.einstellungen, e)) {
+        frisch.einstellungen[e] = gelesen.einstellungen[e];
+      }
+    }
+  }
+  bestandStempeln(frisch);
+  return frisch;
+}
+
+function berichtText(b) {
+  if (!b) { return 'kein Abgleich gelaufen'; }
+  var t = b.neu + ' neu · ' + b.ersetzt + ' ersetzt · ' + b.behalten + ' behalten · '
+        + b.entfernt + ' entfernt';
+  if (b.konflikte.length) { t += ' · ' + b.konflikte.length + ' Konflikt(e)'; }
+  return t;
+}
+
+function abgleichen() {
+  if (!tokenGueltig()) { return Promise.reject(new Error('Nicht angemeldet.')); }
+  bestandStempeln(DB);
+  return driveHerunterladen().then(function (text) {
+    var fremd = text ? textZuBestand(text) : null;
+    if (!fremd) {
+      letzterBericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0, konflikte: [] };
+      return driveHochladen();
+    }
+    var ergebnis = zusammenfuehren(DB, fremd);
+    DB = ergebnis.db;
+    letzterBericht = ergebnis.bericht;
+    return speichern().then(function () { return driveHochladen(); });
+  }).then(function () {
+    letzterAbgleich = isoZeit();
+    return letzterBericht;
+  });
+}
+
+function abgleichenJetzt() {
+  if (!tokenGueltig()) { melde('Bitte zuerst anmelden.', 'warn'); return; }
+  melde('Abgleich läuft …', null);
+  abgleichen().then(function (b) {
+    var art = (b && b.konflikte.length) ? null : 'gut';
+    melde('Abgleich fertig.\n' + berichtText(b), art);
+    zeichne();
+  }).catch(function (f) {
+    melde('Abgleich fehlgeschlagen.\n' + (f ? f.message : ''), 'warn');
+    zeichne();
+  });
+}
+
 function driveLadenJetzt() {
   if (!tokenGueltig()) { melde('Bitte zuerst anmelden.', 'warn'); return; }
   driveHerunterladen().then(function (text) {
@@ -940,6 +1222,11 @@ function zeichneGoogle() {
   h += zeile('Letzte Übertragung', letzteUebertragung || 'noch nie',
              letzteUebertragung ? '' : 'grau');
   h += zeile('Rechte', 'drive.file · calendar.readonly', 'grau');
+  h += zeile('Letzter Abgleich', letzterAbgleich || 'noch nie', letzterAbgleich ? '' : 'grau');
+  h += zeile('Ergebnis', berichtText(letzterBericht),
+             (letzterBericht && letzterBericht.konflikte.length) ? 'nein' : 'grau');
+  h += zeile('Löschvermerke', String((DB.grabsteine || []).length),
+             (DB.grabsteine || []).length ? '' : 'grau');
   ziel.innerHTML = h;
 
   var ka = document.getElementById('knopfAnmelden');
@@ -950,6 +1237,8 @@ function zeichneGoogle() {
   if (kb) { kb.disabled = !an; }
   if (kl) { kl.disabled = !an; }
   if (ks) { ks.disabled = !an; }
+  var kg = document.getElementById('knopfAbgleich');
+  if (kg) { kg.disabled = !an; }
 }
 
 function zeichneBestand() {
@@ -968,6 +1257,8 @@ function zeichneBestand() {
     var zahl = Array.isArray(wert) ? wert.length : Object.keys(wert || {}).length;
     h += zeile(namen[s] || s, String(zahl), zahl ? '' : 'grau');
   }
+  var g = (DB.grabsteine || []).length;
+  h += zeile('Löschvermerke', String(g), g ? '' : 'grau');
   ziel.innerHTML = h;
 }
 
@@ -1036,7 +1327,17 @@ function starten() {
     } else {
       melde('Noch kein Bestand vorhanden. Lege eine Datei an oder öffne eine.', null);
     }
+    bestandStempeln(DB);
     zeichne();
+    if (tokenGueltig()) {
+      abgleichen().then(function (b) {
+        melde('Beim Start abgeglichen.\n' + berichtText(b), 'gut');
+        zeichne();
+      }).catch(function () {
+        melde('Der Abgleich beim Start ist ausgefallen. Die App arbeitet lokal weiter.', null);
+        zeichne();
+      });
+    }
   }).catch(function (f) {
     melde('Start unvollständig.\n' + (f ? f.message : ''), 'warn');
     zeichne();
