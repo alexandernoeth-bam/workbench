@@ -855,6 +855,64 @@ console.log('\n16. Automatischer Abgleich');
 }
 
 /* ============================================================
+   17. Löschen und Rückgängig
+   Grund: Loeschen ohne Loeschvermerk holt der naechste Abgleich
+   vom anderen Geraet zurueck. Und ein Rueckgaengig, das den Vermerk
+   stehen laesst, loescht den Eintrag beim naechsten Abgleich erneut.
+   ============================================================ */
+console.log('\n17. Löschen und Rückgängig');
+{
+  const skript = hauptSkript();
+
+  ['aufgabeAktionen', 'aktionenSchliessen', 'aufgabeLoeschen', 'rueckgaengig',
+   'rueckZeigen', 'rueckVerbergen', 'aufgabeSchieben', 'aufgabeInsBacklog'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript), 'Funktion ' + f + ' ist definiert');
+  });
+
+  const loe = skript.match(/function aufgabeLoeschen\([\s\S]*?\n\}/);
+  pruefe(loe && /grabsteinSetzen\('aufgaben'/.test(loe[0]),
+         'Löschen setzt einen Löschvermerk');
+  pruefe(loe && /zurueckHolen\s*=/.test(loe[0]),
+         'Löschen bewahrt den Satz für das Rückgängig auf');
+  pruefe(loe && /rueckZeigen\(/.test(loe[0]),
+         'nach dem Löschen erscheint der Rückweg');
+  pruefe(loe && /spaeterSichern\(\)/.test(loe[0]),
+         'die Löschung wird gesichert und abgeglichen');
+
+  const rueck = skript.match(/function rueckgaengig\([\s\S]*?\n\}/);
+  pruefe(rueck && /splice\(/.test(rueck[0]), 'Rückgängig setzt den Satz wieder ein');
+  pruefe(rueck && /grabsteine/.test(rueck[0]) && /splice\(i, 1\)/.test(rueck[0]),
+         'Rückgängig entfernt den Löschvermerk wieder');
+  pruefe(rueck && /geaendert = jetzt\(\)/.test(rueck[0]),
+         'der wiederhergestellte Satz bekommt einen frischen Stempel');
+
+  const verb = skript.match(/function rueckVerbergen\([\s\S]*?\n\}/);
+  pruefe(verb && /zurueckHolen = null/.test(verb[0]),
+         'nach Ablauf der Frist ist das Rückgängig endgültig vorbei');
+
+  const zeit = skript.match(/RUECK_ZEIT\s*=\s*(\d+)/);
+  pruefe(zeit && Number(zeit[1]) >= 4000 && Number(zeit[1]) <= 20000,
+         'die Rückgängig-Frist liegt zwischen 4 und 20 Sekunden');
+
+  /* Löschen braucht Reibung: kein Knopf direkt in der Zeile */
+  pruefe(!/onclick="aufgabeLoeschen\(/.test(QUELLE.replace(/as-knopf gefahr[\s\S]{0,120}/g, '')),
+         'Löschen steht nur in der Aktionsfläche, nicht in der Liste');
+  const akt = skript.match(/function aufgabeAktionen\([\s\S]*?\n\}/);
+  pruefe(akt && /as-knopf gefahr/.test(akt[0]),
+         'der Löschknopf ist als gefährlich ausgezeichnet');
+
+  /* Wiederkehrendes darf nicht einfach verschoben werden */
+  const schieben = skript.match(/function aufgabeSchieben\([\s\S]*?\n\}/);
+  pruefe(schieben && /wiederholung/.test(schieben[0]),
+         'eine wiederkehrende Aufgabe wird beim Verschieben abgewiesen');
+
+  /* Die Aktionsfläche gehört zum Tagesbildschirm */
+  pruefe(/id="aktionSheet"/.test(QUELLE) && /id="aktionHg"/.test(QUELLE),
+         'Aktionsfläche und Hintergrund liegen im HTML');
+  pruefe(/id="rueckStreifen"/.test(QUELLE), 'der Rückgängig-Streifen liegt im HTML');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');

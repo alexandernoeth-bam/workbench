@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F6F5F2">
-<title>Workbench 0.5.1</title>
+<title>Workbench 0.5.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -161,6 +161,33 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .streifen svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;
   stroke-linecap:round;stroke-linejoin:round}
 
+
+/* ---------- Aktionsfläche und Rückgängig ---------- */
+.aktion-hg{position:absolute;inset:0;background:rgba(46,44,41,.42);display:none;z-index:5}
+.aktion-hg.auf{display:block}
+.aktion-sheet{position:absolute;left:0;right:0;bottom:0;background:var(--karte);
+  border-radius:14px 14px 0 0;padding:16px 20px 22px;display:none;z-index:6;
+  box-shadow:0 -6px 24px rgba(0,0,0,.14)}
+.aktion-sheet.auf{display:block}
+.as-griff{width:36px;height:4px;border-radius:2px;background:var(--linie);margin:0 auto 12px}
+.as-titel{font-size:calc(var(--fs)*1.0);font-weight:600;line-height:1.3}
+.as-meta{font-size:calc(var(--fs)*0.76);color:var(--grau);margin-top:2px}
+.as-linie{height:2px;background:var(--weinrot);margin:11px 0 4px}
+.as-linie.privat{background:var(--petrol)}
+.as-knopf{width:100%;font:inherit;font-size:calc(var(--fs)*0.88);padding:11px;margin-top:8px;
+  border:1px solid var(--linie);border-radius:6px;background:var(--papier);
+  color:var(--tinte);cursor:pointer;text-align:left}
+.as-knopf.gefahr{border-color:var(--weinrot);color:var(--weinrot)}
+.as-hinweis{font-size:calc(var(--fs)*0.74);color:var(--grau);padding-top:10px;line-height:1.5}
+
+.rueckstreifen{display:none;flex:0 0 auto;align-items:center;gap:10px;padding:9px 20px;
+  background:var(--tinte);border:0;font:inherit;font-size:calc(var(--fs)*0.8);
+  color:#fff;cursor:pointer;width:100%;text-align:left}
+.rueckstreifen.sichtbar{display:flex}
+#rueckText{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rueck-wort{flex:0 0 auto;font-weight:500;text-decoration:underline}
+.ttext{cursor:pointer}
+
 /* ---------- Fussleiste ---------- */
 .fuss{flex:0 0 auto;display:flex;background:var(--karte);border-top:1px solid var(--linie);
   padding-bottom:env(safe-area-inset-bottom)}
@@ -213,10 +240,18 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 
   <div class="tagblatt" id="tagBlatt" onscroll="streifenPruefen()"></div>
 
+  <button class="rueckstreifen" id="rueckStreifen" type="button" onclick="rueckgaengig()">
+    <span id="rueckText"></span>
+    <span class="rueck-wort">Rückgängig</span>
+  </button>
+
   <button class="streifen" id="streifen" type="button" onclick="zumOffenen()">
     <span id="streifenText"></span>
     <svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"></path></svg>
   </button>
+
+  <div class="aktion-hg" id="aktionHg" onclick="aktionenSchliessen()"></div>
+  <div class="aktion-sheet" id="aktionSheet"></div>
 </div>
 
 
@@ -292,7 +327,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.5.1';
+var APP_VERSION = '0.5.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2048,7 +2083,8 @@ function zeileHtml(a, is, kompakt) {
         + (erledigt ? ' erledigt' : '') + '">';
   h += '<button class="tkasten' + (erledigt ? ' an' : '') + '" type="button" '
      + 'onclick="aufgabeHaken(\'' + esc(a.id) + '\')"></button>';
-  h += '<div class="ttext"><div class="ttitel">' + esc(a.titel) + '</div>';
+  h += '<div class="ttext" onclick="aufgabeAktionen(\'' + esc(a.id) + '\')">'
+     + '<div class="ttitel">' + esc(a.titel) + '</div>';
   if (meta) { h += '<div class="tmeta">' + meta + '</div>'; }
   h += '</div></div>';
   return h;
@@ -2075,7 +2111,9 @@ function verlaufHtml(eintrag, is) {
   v += '<div class="tv-inhalt"><div class="tv-reihe">';
   v += '<button class="tkasten' + (erledigt ? ' an' : '') + '" type="button" '
      + 'onclick="aufgabeHaken(\'' + esc(a.id) + '\')"></button>';
-  v += '<div class="ttitel">' + esc(a.titel) + '</div></div></div></div>';
+  v += '<div class="ttext" onclick="aufgabeAktionen(\'' + esc(a.id) + '\')">'
+     + '<div class="ttitel">' + esc(a.titel) + '</div></div>';
+  v += '</div></div></div>';
   return v;
 }
 
@@ -2256,6 +2294,135 @@ function zeileZustandSetzen(id, erledigt) {
       if (zeile) { zeile.classList.remove('erledigt'); }
     }
   }
+}
+
+/* ------------------------------------------------------------
+   Aktionen an einer Aufgabe
+   ------------------------------------------------------------ */
+
+var aktionFuer = '';
+var zurueckHolen = null;
+var rueckUhr = null;
+var RUECK_ZEIT = 8000;
+
+function aufgabeAktionen(id) {
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  aktionFuer = id;
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+
+  var meta = [];
+  meta.push(a.kontext === 'privat' ? 'Privat' : 'Beruflich');
+  meta.push(a.art === 'klein' ? 'Kleinigkeit' : 'Aufgabe');
+  if (a.wiederholung) { meta.push('wiederkehrend'); }
+  if (a.frist) { meta.push('Frist ' + kurzDatum(a.frist)); }
+
+  var h = '<div class="as-griff"></div>';
+  h += '<div class="as-titel">' + esc(a.titel) + '</div>';
+  h += '<div class="as-meta">' + esc(meta.join(' · ')) + '</div>';
+  h += '<div class="as-linie' + (a.kontext === 'privat' ? ' privat' : '') + '"></div>';
+  h += '<button class="as-knopf" type="button" onclick="aufgabeSchieben(1)">'
+     + 'Auf morgen schieben</button>';
+  h += '<button class="as-knopf" type="button" onclick="aufgabeInsBacklog()">'
+     + 'Zurück ins Backlog</button>';
+  h += '<button class="as-knopf gefahr" type="button" onclick="aufgabeLoeschen()">'
+     + 'Löschen</button>';
+  h += '<div class="as-hinweis">Die vollständige Bearbeitung kommt mit der Aufgabenfläche.</div>';
+  sheet.innerHTML = h;
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function aktionenSchliessen() {
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (sheet) { sheet.classList.remove('auf'); }
+  if (hg) { hg.classList.remove('auf'); }
+  aktionFuer = '';
+}
+
+function aufgabeSchieben(n) {
+  var a = aufgabeFinden(aktionFuer);
+  if (!a) { return; }
+  if (a.wiederholung) {
+    melde('Eine wiederkehrende Aufgabe lässt sich nicht verschieben.', 'warn');
+    aktionenSchliessen();
+    return;
+  }
+  a.planung = tagePlus(a.planung && a.planung.length === 10 ? a.planung : tagOffen, n);
+  a.geaendert = jetzt();
+  aktionenSchliessen();
+  tagZeichnen();
+  spaeterSichern();
+}
+
+function aufgabeInsBacklog() {
+  var a = aufgabeFinden(aktionFuer);
+  if (!a) { return; }
+  a.planung = 'backlog';
+  a.geaendert = jetzt();
+  aktionenSchliessen();
+  tagZeichnen();
+  spaeterSichern();
+}
+
+function aufgabeLoeschen() {
+  var id = aktionFuer;
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  var stelle = DB.aufgaben.indexOf(a);
+  if (stelle < 0) { return; }
+
+  zurueckHolen = { satz: a, stelle: stelle };
+  DB.aufgaben.splice(stelle, 1);
+  grabsteinSetzen('aufgaben', id);
+
+  aktionenSchliessen();
+  tagZeichnen();
+  zeichne();
+  rueckZeigen(a.titel);
+  spaeterSichern();
+}
+
+function rueckZeigen(titel) {
+  var streifen = document.getElementById('rueckStreifen');
+  var text = document.getElementById('rueckText');
+  if (!streifen || !text) { return; }
+  text.textContent = 'Gelöscht: ' + titel;
+  streifen.classList.add('sichtbar');
+  if (rueckUhr) { window.clearTimeout(rueckUhr); }
+  rueckUhr = window.setTimeout(rueckVerbergen, RUECK_ZEIT);
+}
+
+function rueckVerbergen() {
+  if (rueckUhr) { window.clearTimeout(rueckUhr); rueckUhr = null; }
+  zurueckHolen = null;
+  var streifen = document.getElementById('rueckStreifen');
+  if (streifen) { streifen.classList.remove('sichtbar'); }
+}
+
+function rueckgaengig() {
+  if (!zurueckHolen) { rueckVerbergen(); return; }
+  var satz = zurueckHolen.satz;
+  var stelle = zurueckHolen.stelle;
+  if (stelle < 0 || stelle > DB.aufgaben.length) { stelle = DB.aufgaben.length; }
+  DB.aufgaben.splice(stelle, 0, satz);
+
+  /* Der Löschvermerk muss weg, sonst entfernt ihn der nächste Abgleich erneut. */
+  var steine = DB.grabsteine || [];
+  var i;
+  for (i = steine.length - 1; i >= 0; i--) {
+    if (steine[i].s === 'aufgaben' && steine[i].id === satz.id) { steine.splice(i, 1); }
+  }
+  satz.geaendert = jetzt();
+
+  rueckVerbergen();
+  tagZeichnen();
+  zeichne();
+  spaeterSichern();
+  melde('Wiederhergestellt: ' + satz.titel, 'gut');
 }
 
 /* ------------------------------------------------------------
