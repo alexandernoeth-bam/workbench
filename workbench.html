@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.15.1</title>
+<title>Workbench 0.16.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -402,6 +402,7 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
 .vk-knoepfe button{flex:1;font:inherit;font-size:calc(var(--fs)*0.8);padding:7px;
   border:1px solid var(--linie);border-radius:6px;background:var(--papier);
   color:var(--tinte);cursor:pointer}
+.vk-ruht{font-size:calc(var(--fs)*0.74);color:var(--petrol);margin-top:3px}
 .vk-ms{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:calc(var(--fs)*0.84)}
 .vk-ms-punkt{flex:0 0 11px;height:11px;border-radius:50%;border:1.5px solid var(--grau)}
 .vk-ms.erreicht .vk-ms-punkt{background:var(--petrol);border-color:var(--petrol)}
@@ -811,7 +812,7 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.15.1';
+var APP_VERSION = '0.16.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2824,7 +2825,8 @@ function verlaufHtml(eintrag, is) {
 
 /* Aus jedem laufenden Durchlauf steht der nächste offene Schritt im
    Tag — nicht der ganze Ablauf, sondern das, was jetzt dran ist. */
-function ablaufSchritteHeute() {
+function ablaufSchritteHeute(is) {
+  var tag = is || tagOffen || isoDatum();
   var aus = [];
   var l = laufendeDurchlaeufe();
   var i;
@@ -2832,6 +2834,7 @@ function ablaufSchritteHeute() {
     if (!passtZumTag(l[i].kontext)) { continue; }
     var s = offenerSchritt(l[i]);
     if (!s) { continue; }
+    if (schrittRuht(s.satz, tag)) { continue; }
     aus.push({ durchlauf: l[i], nr: s.nr, satz: s.satz });
   }
   return aus;
@@ -2847,7 +2850,11 @@ function ablaufZeileHtml(e) {
   h += '<div class="ttitel">' + esc(e.satz.titel) + '</div>';
   h += '<div class="tmeta">' + esc(e.durchlauf.name) + ' · noch ' + offen
      + (offen === 1 ? ' Schritt' : ' Schritte') + '</div>';
-  h += '</div></div>';
+  h += '</div>';
+  h += '<button class="planungsknopf" type="button" '
+     + 'onclick="schrittAbWeiter(\'' + esc(e.durchlauf.id) + '\',' + e.nr + ')">'
+     + 'Später</button>';
+  h += '</div>';
   return h;
 }
 
@@ -2874,7 +2881,7 @@ function tagZeichnen() {
   for (i = 0; i < e.wieder.length; i++) { h += zeileHtml(e.wieder[i], is, false); }
   h += '</div>';
 
-  var schritte = ablaufSchritteHeute();
+  var schritte = ablaufSchritteHeute(is);
   if (schritte.length) {
     h += '<div class="tabschnitt" data-kurz="Abläufe"><div class="tabschnitt-titel">'
        + '<span>Abläufe</span></div>';
@@ -6118,6 +6125,42 @@ function offenerSchritt(d) {
   return null;
 }
 
+/* Ein Schritt kann ruhen: Er ist der nächste, aber noch nicht dran.
+   Bis dahin taucht sein Durchlauf nicht im Tag auf. */
+function schrittRuht(s, is) {
+  if (!s || !s.ab) { return false; }
+  return s.ab > (is || isoDatum());
+}
+
+function ruhtBis(d) {
+  var s = offenerSchritt(d);
+  if (!s) { return ''; }
+  return schrittRuht(s.satz, isoDatum()) ? s.satz.ab : '';
+}
+
+function schrittAbSetzen(id, nr, wert) {
+  var d = durchlaufFinden(id);
+  if (!d || !d.schritte || !d.schritte[nr]) { return; }
+  d.schritte[nr].ab = wert || '';
+  d.geaendert = jetzt();
+  spaeterSichern();
+  abZeichnen();
+  tagZeichnen();
+}
+
+/* heute → morgen → in einer Woche → heute */
+function schrittAbWeiter(id, nr) {
+  var d = durchlaufFinden(id);
+  if (!d || !d.schritte || !d.schritte[nr]) { return; }
+  var heute = isoDatum();
+  var jetztWert = d.schritte[nr].ab || '';
+  var neu;
+  if (!jetztWert || jetztWert <= heute) { neu = tagePlus(heute, 1); }
+  else if (jetztWert === tagePlus(heute, 1)) { neu = tagePlus(heute, 7); }
+  else { neu = ''; }
+  schrittAbSetzen(id, nr, neu);
+}
+
 function laufendeDurchlaeufe() {
   var aus = [];
   var l = DB.durchlaeufe || [];
@@ -6170,8 +6213,13 @@ function durchlaufKarteHtml(d) {
   h += '<div class="vk-name">' + esc(d.name) + '</div>';
   h += '<div class="vk-zeit">' + fertig + ' von ' + l.length + '</div>';
   h += '<svg class="vk-pfeil" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></div>';
+  var ruht = ruhtBis(d);
   h += '<div class="vk-satz' + (jetztSchritt ? '' : ' leer') + '">'
-     + esc(jetztSchritt ? jetztSchritt.satz.titel : 'alle Schritte erledigt') + '</div>';
+     + esc(jetztSchritt ? jetztSchritt.satz.titel : 'alle Schritte erledigt')
+     + (ruht ? '' : '') + '</div>';
+  if (ruht) {
+    h += '<div class="vk-ruht">ruht bis ' + esc(kurzDatum(ruht)) + '</div>';
+  }
 
   h += '<div class="vk-mehr">';
   var i;
@@ -6240,7 +6288,7 @@ function durchlaufStarten(vorlageId) {
   var l = v.schritte || [];
   var i;
   for (i = 0; i < l.length; i++) {
-    schritte.push({ titel: l[i].titel, auf: !!l[i].auf, fertig: false, planung: 'backlog' });
+    schritte.push({ titel: l[i].titel, auf: !!l[i].auf, fertig: false, ab: '' });
   }
   var neu = {
     id: neueKennung(), ablaufId: v.id, name: v.name, kontext: v.kontext,
@@ -6382,6 +6430,11 @@ function abDetailHtml() {
     }
     h += '<input class="v-feld" type="text" value="' + esc(l[i].titel) + '" '
        + 'oninput="abSchrittTitel(' + i + ',this.value)">';
+    if (!istVorlage) {
+      h += '<input class="v-feld" type="date" value="' + esc(l[i].ab || '') + '" '
+         + 'style="flex:0 0 138px" title="frühestens ab" '
+         + 'onchange="abSchrittAb(' + i + ',this.value)">';
+    }
     h += '<button class="v-knopf" type="button" onclick="abSchrittHoch(' + i + ')" '
        + 'aria-label="nach oben"><svg viewBox="0 0 24 24">'
        + '<path d="M6 15l6-6 6 6"></path></svg></button>';
@@ -6430,7 +6483,7 @@ function abSchrittNeu() {
   if (!a) { return; }
   if (!Array.isArray(a.schritte)) { a.schritte = []; }
   if (abDetailArt === 'vorlage') { a.schritte.push({ id: neueKennung(), titel: '', auf: false }); }
-  else { a.schritte.push({ titel: '', auf: false, fertig: false, planung: 'backlog' }); }
+  else { a.schritte.push({ titel: '', auf: false, fertig: false, ab: '' }); }
   abGeaendert(true);
 }
 
@@ -6438,6 +6491,13 @@ function abSchrittTitel(i, wert) {
   var a = ablaufFinden(abDetail, abDetailArt);
   if (!a || !a.schritte[i]) { return; }
   a.schritte[i].titel = wert;
+  abGeaendert(false);
+}
+
+function abSchrittAb(i, wert) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || !a.schritte[i]) { return; }
+  a.schritte[i].ab = wert || '';
   abGeaendert(false);
 }
 

@@ -483,6 +483,38 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__ruhtApi = {'
+                 + ' pruefeRuhen: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var heute = isoDatum();'
+                 + '   var morgen = tagePlus(heute, 1);'
+                 + '   var woche = tagePlus(heute, 7);'
+                 + '   var gestern = tagePlus(heute, -1);'
+                 + '   var a1 = schrittRuht({ ab: \'\' }, heute) === false;'
+                 + '   var a2 = schrittRuht({ ab: heute }, heute) === false;'
+                 + '   var a3 = schrittRuht({ ab: gestern }, heute) === false;'
+                 + '   var a4 = schrittRuht({ ab: morgen }, heute) === false;'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'D\', kontext:\'beruflich\','
+                 + '     schritte:[{ titel:\'Eins\', fertig:false, ab:\'\' }] }];'
+                 + '   tagOffen = heute;'
+                 + '   var vorher = ablaufSchritteHeute(heute).length;'
+                 + '   schrittAbSetzen(\'d1\', 0, morgen);'
+                 + '   var nachher = ablaufSchritteHeute(heute).length;'
+                 + '   var amZielTag = ablaufSchritteHeute(morgen).length;'
+                 + '   var liste = abSichtbar(DB.durchlaeufe).length;'
+                 + '   var bis = ruhtBis(DB.durchlaeufe[0]);'
+                 + '   schrittAbSetzen(\'d1\', 0, \'\');'
+                 + '   var folge = [];'
+                 + '   schrittAbWeiter(\'d1\', 0); folge.push(DB.durchlaeufe[0].schritte[0].ab);'
+                 + '   schrittAbWeiter(\'d1\', 0); folge.push(DB.durchlaeufe[0].schritte[0].ab);'
+                 + '   schrittAbWeiter(\'d1\', 0); folge.push(DB.durchlaeufe[0].schritte[0].ab);'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return { ohneAb:a1, heute:a2, gestern:a3, morgen:a4,'
+                 + '            imTagVorher:vorher, imTagNachher:nachher,'
+                 + '            spaeterAmZielTag:amZielTag, inDerListe:liste,'
+                 + '            ruhtBisWert:bis, morgenWert:morgen,'
+                 + '            folge:folge, erwarteteFolge:[morgen, woche, \'\'] };'
+                 + ' } };'
                  + 'globalThis.__msApi = {'
                  + ' pruefeMs: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -2914,6 +2946,68 @@ console.log('\n45. Meilensteine');
     pruefe(e.gerettet === 'Abnahme (kurz vor Ostern)',
            'ein Freitext landet im Titel');
     pruefe(e.gerettetDatum === '', 'und das Feld bleibt leer');
+  }
+}
+
+/* ============================================================
+   46. Ruhende Ablaufschritte
+   Grund: Ein Durchlauf hing im Tag, obwohl sein naechster Schritt
+   erst spaeter dran war. Ruhen muss den Durchlauf aus dem Tag
+   nehmen, ohne ihn aus der Ablaufliste verschwinden zu lassen.
+   ============================================================ */
+console.log('\n46. Ruhende Ablaufschritte');
+{
+  const skript = hauptSkript();
+  const r = globalThis.__ruhtApi;
+
+  ['schrittRuht', 'ruhtBis', 'schrittAbSetzen', 'schrittAbWeiter',
+   'abSchrittAb'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const heute = skript.match(/function ablaufSchritteHeute\([\s\S]*?\n\}/);
+  pruefe(heute && /schrittRuht\(s\.satz, tag\)/.test(heute[0]),
+         'ein ruhender Schritt bleibt aus dem Tag');
+  pruefe(heute && /is \|\| tagOffen/.test(heute[0]),
+         'gemessen wird am angezeigten Tag, nicht an heute');
+
+  const zeile = skript.match(/function ablaufZeileHtml\([\s\S]*?\n\}/);
+  pruefe(zeile && /schrittAbWeiter\(/.test(zeile[0]),
+         'in der Tageszeile lässt sich der Schritt wegschieben');
+
+  const karte = skript.match(/function durchlaufKarteHtml\([\s\S]*?\n\}\n/);
+  pruefe(karte && /ruht bis /.test(karte[0]),
+         'die Ablaufliste zeigt, bis wann ein Durchlauf ruht');
+
+  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(detail && /abSchrittAb\(/.test(detail[0]),
+         'im Detail steht je Schritt ein Datumsfeld');
+  pruefe(detail && /!istVorlage/.test(detail[0]),
+         'eine Vorlage hat kein Ruhen — sie läuft ja nicht');
+
+  const starten = skript.match(/function durchlaufStarten\([\s\S]*?\n\}/);
+  pruefe(starten && /ab: ''/.test(starten[0]),
+         'ein gestarteter Durchlauf beginnt ohne Ruhen');
+
+  if (!r) {
+    warn('Ruhefunktionen nicht auswertbar');
+  } else {
+    const e = r.pruefeRuhen();
+    pruefe(e.ohneAb === true, 'ohne Datum ist ein Schritt fällig');
+    pruefe(e.heute === true, 'am Tag selbst ist er fällig');
+    pruefe(e.gestern === true, 'ein vergangenes Datum hält nicht mehr auf');
+    pruefe(e.morgen === false, 'ein künftiges Datum lässt ihn ruhen');
+
+    pruefe(e.imTagVorher === 1, 'vor dem Wegschieben steht er im Tag');
+    pruefe(e.imTagNachher === 0, 'danach nicht mehr');
+    pruefe(e.spaeterAmZielTag === 1,
+           'am Tag, ab dem er wieder gilt, steht er wieder da');
+    pruefe(e.inDerListe === 1, 'in der Ablaufliste bleibt der Durchlauf sichtbar');
+    pruefe(e.ruhtBisWert === e.morgenWert, 'die Liste nennt das richtige Datum');
+
+    pruefe(e.folge.join(',') === e.erwarteteFolge.join(','),
+           'der Knopf schaltet morgen → in einer Woche → wieder heute');
   }
 }
 
