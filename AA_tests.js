@@ -412,7 +412,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
 
   try {
     const anhang = ';globalThis.__api = { zusammenfuehren, leereDatenbank, bestandStempeln,'
-                 + ' grabsteineAufraeumen, textZuBestand, neueKennung };';
+                 + ' grabsteineAufraeumen, textZuBestand, neueKennung,'
+                 + ' migrationRechnen, quelleErkennen, kontextRaten, gruppenKontext,'
+                 + ' wiederholungUmschreiben, wochentagUmrechnen, schluesselId, deutschZuIso };';
     (0, eval)(skript + anhang);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -547,6 +549,137 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
            'M: erst lokal sichern, dann hochladen');
     pruefe(abgl && /zusammenfuehren\(DB, fremd\)/.test(abgl[0]),
            'M: der Abgleich benutzt das Zusammenführen');
+  }
+}
+
+/* ============================================================
+   14. Migration der Altbestände
+   Grund: Die Migration laeuft einmal ueber Jahre gewachsene Daten.
+   Was sie falsch einordnet oder verliert, faellt erst spaeter auf.
+   Sie muss ausserdem wiederholbar sein, sonst entstehen Dubletten.
+   ============================================================ */
+console.log('\n14. Migration der Altbestände');
+{
+  const api = globalThis.__api;
+  const skript = hauptSkript();
+
+  const noetig = ['migrationRechnen', 'wiederholungUmschreiben', 'wochentagUmrechnen',
+                  'schluesselId', 'quelleErkennen', 'kontextRaten', 'gruppenKontext',
+                  'deutschZuIso', 'migVorschau', 'migUebernehmen', 'migZeichne'];
+  noetig.forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript), 'Funktion ' + f + ' ist definiert');
+  });
+
+  if (!api || !api.migrationRechnen) {
+    /* Die Sandkasten-Auswertung aus Kategorie 13 liefert die Funktionen mit. */
+    warn('Migrationsfunktionen nicht auswertbar — Kategorie 13 muss vorher laufen');
+  } else {
+    /* Wochentage: alt 1=Mo..7=So, neu 0=So..6=Sa */
+    const umrechnen = api.wochentagUmrechnen;
+    pruefe(umrechnen(1) === 1 && umrechnen(5) === 5, 'Montag und Freitag bleiben unverändert');
+    pruefe(umrechnen(7) === 0, 'Sonntag wird von 7 auf 0 umgerechnet');
+    pruefe(umrechnen(0) === -1 && umrechnen(9) === -1, 'ungültige Wochentage werden verworfen');
+
+    const umschreiben = api.wiederholungUmschreiben;
+    let regel = umschreiben({ typ: 'woechentlich', intervall: 1, wochentage: [7, 1, 3, 5] }, '');
+    pruefe(regel && regel.takt === 'woche', 'wöchentlich wird zu Takt Woche');
+    pruefe(regel && JSON.stringify(regel.tage) === '[0,1,3,5]',
+           'die Wochentage werden umgerechnet und sortiert');
+
+    regel = umschreiben({ typ: 'woechentlich', intervall: 4, wochentage: [] }, '');
+    pruefe(regel === null, 'eine Regel ohne Wochentag wird abgeschaltet');
+
+    regel = umschreiben({ typ: 'monatlich' }, '2026-09-04');
+    pruefe(regel && regel.takt === 'monat' && regel.tag === 4,
+           'monatlich übernimmt den Tag aus dem Fälligkeitsdatum');
+
+    regel = umschreiben({ typ: 'woechentlich', intervall: 12, wochentage: [1] }, '');
+    pruefe(regel && regel.intervall === 4, 'zu große Intervalle werden auf 4 begrenzt');
+
+    pruefe(umschreiben(null, '') === null, 'ohne Altregel entsteht keine Regel');
+
+    /* Wiederholbarkeit: gleiche Eingabe, gleiche Kennungen */
+    const quelle = {
+      name: 'test.json', art: 'workassist', kontext: 'beruflich',
+      daten: {
+        bereiche: [{ id: 'b1', name: 'Organisatorische Aufgaben' },
+                   { id: 'b2', name: 'Einführung Windows 11 26H2' },
+                   { id: 'b3', name: 'Sonstiges (Einzelaufgaben)' },
+                   { id: 'b4', name: 'Etwas ganz Neues' }],
+        aufgaben: [
+          { id: 'a1', titel: 'Einzelaufgabe', bereichId: 'b1', status: 'offen' },
+          { id: 'a2', titel: 'Wiederkehrend', bereichId: 'b1', status: 'erledigt',
+            erledigtAm: '2026-09-01',
+            wiederholung: { typ: 'woechentlich', intervall: 1, wochentage: [1] } },
+          { id: 'a3', titel: 'Wiederkehrend', bereichId: 'b1', status: 'erledigt',
+            erledigtAm: '2026-09-08',
+            wiederholung: { typ: 'woechentlich', intervall: 1, wochentage: [1] } }
+        ],
+        plaene: [{ id: 'p1', titel: 'Mein Tag', schritte: [] },
+                 { id: 'p2', titel: 'Irgendein Vorhaben',
+                   schritte: [{ titel: 'Schritt A' }, { titel: 'Schritt B' }] },
+                 { id: 'p3', titel: 'Workflowtest Testdurchführung',
+                   schritte: [{ titel: 'Vorbereiten' }] }],
+        jahrestermine: [{ t: 'Urlaub', art: 'urlaub', von: '2026-08-03', bis: '2026-08-21' },
+                        { t: 'Neujahr', art: 'feiertag', von: '2026-01-01', bis: '2026-01-01' },
+                        { t: 'Urlaub', art: 'urlaub', von: '2026-08-03', bis: '2026-08-21' }]
+      }
+    };
+
+    const e1 = api.migrationRechnen([quelle]);
+    const e2 = api.migrationRechnen([quelle]);
+
+    pruefe(e1.ziel.themen.length === 2, 'bekannte und unbekannte Bereiche werden Themen (2)');
+    pruefe(e1.bericht.unbekannteBereiche.length === 1,
+           'der unbekannte Bereich wird im Bericht ausgewiesen');
+    pruefe(e1.ziel.projekte.length === 1, 'ein Bereich wird zum Projekt');
+    pruefe(e1.bericht.verworfen >= 2, 'Sammelbecken und Feiertag werden verworfen');
+
+    const wdh = e1.ziel.aufgaben.filter(a => a.titel === 'Wiederkehrend');
+    pruefe(wdh.length === 1, 'erzeugte Wiederholungen werden zu einer Aufgabe zusammengezogen');
+    pruefe(wdh[0] && wdh[0].zuletztErledigt === '2026-09-08',
+           'das jüngste Erledigtdatum bleibt erhalten');
+
+    pruefe(e1.ziel.ablaeufe.length === 1, 'die wiederverwendbare Vorlage wird als Ablauf angelegt');
+    pruefe(e1.ziel.durchlaeufe.length === 1, 'einmalige Vorhaben werden Durchläufe ohne Vorlage');
+    pruefe(e1.ziel.durchlaeufe[0] && e1.ziel.durchlaeufe[0].ablaufId === null,
+           'ein einmaliger Durchlauf hat keine Vorlage');
+
+    pruefe(e1.ziel.jahrestermine.length === 1, 'doppelte Jahrestermine werden zusammengezogen');
+    pruefe(e1.ziel.jahrestermine[0].art === 'urlaub', 'Feiertage sind nicht dabei');
+
+    const ids1 = e1.ziel.aufgaben.map(a => a.id).sort().join(',');
+    const ids2 = e2.ziel.aufgaben.map(a => a.id).sort().join(',');
+    pruefe(ids1 === ids2, 'zweimal gerechnet ergibt dieselben Kennungen');
+
+    const zus = api.zusammenfuehren(e1.ziel, e2.ziel);
+    pruefe(zus.db.aufgaben.length === e1.ziel.aufgaben.length,
+           'zweimal übernommen ergibt keine Dubletten');
+    pruefe(zus.db.themen.length === e1.ziel.themen.length,
+           'auch bei Themen entstehen keine Dubletten');
+
+    /* Alle Aufgaben tragen Kennung, Stempel und Kontext */
+    const ohneKennung = e1.ziel.aufgaben.filter(a => !a.id).length;
+    const ohneStempel = e1.ziel.aufgaben.filter(a => typeof a.geaendert !== 'number').length;
+    const ohneKontext = e1.ziel.aufgaben.filter(a => !a.kontext).length;
+    pruefe(ohneKennung === 0, 'alle Aufgaben haben eine Kennung');
+    pruefe(ohneStempel === 0, 'alle Aufgaben haben einen Änderungsstempel');
+    pruefe(ohneKontext === 0, 'alle Aufgaben haben einen Kontext');
+
+    /* Datumsformat aus TimeAssist */
+    const deutsch = api.deutschZuIso;
+    pruefe(deutsch('10.12.2026') === '2026-12-10', 'TT.MM.JJJJ wird zu JJJJ-MM-TT');
+    pruefe(deutsch('') === '', 'ein leeres Datum bleibt leer');
+
+    /* Die Migration darf nicht von selbst loslaufen */
+    const startFn = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+    pruefe(startFn && !/migrationRechnen|migUebernehmen/.test(startFn[0]),
+           'die Migration läuft nicht beim Start');
+    const uebern = skript.match(/function migUebernehmen\([\s\S]*?\n\}/);
+    pruefe(uebern && /migErgebnis/.test(uebern[0]),
+           'Übernehmen setzt eine berechnete Vorschau voraus');
+    pruefe(uebern && /zusammenfuehren\(DB, neu\)/.test(uebern[0]),
+           'Übernehmen führt zusammen statt zu überschreiben');
   }
 }
 

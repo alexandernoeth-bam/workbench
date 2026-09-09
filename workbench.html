@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F6F5F2">
-<title>Workbench 0.3.0</title>
+<title>Workbench 0.4.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -77,6 +77,9 @@ body{
 .melder.warn{border-color:var(--weinrot);color:var(--weinrot)}
 .melder.gut{border-color:var(--petrol);color:var(--petrol)}
 
+input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
+  border:1px solid var(--linie);border-radius:6px;padding:9px;background:var(--karte);
+  color:var(--tinte);margin-bottom:4px}
 .platzhalter{color:#B3AEA6;font-size:calc(var(--fs)*0.85);padding:18px 0}
 
 /* ---------- Fussleiste ---------- */
@@ -142,10 +145,30 @@ body{
   <div id="umgebungListe"></div>
 </div>
 
+<div class="schirm" id="schirmMigration">
+  <div class="abschnitt-titel"><span>Quelldateien</span></div>
+  <input type="file" id="migDateien" multiple accept=".json,application/json"
+         onchange="migDateienGewaehlt(event)">
+  <div id="migQuellen"></div>
+
+  <div class="knopfreihe">
+    <button type="button" onclick="migVorschau()">Vorschau berechnen</button>
+    <button type="button" id="knopfMigUebernehmen" class="stark"
+            onclick="migUebernehmen()">Übernehmen</button>
+  </div>
+
+  <div class="abschnitt-titel"><span>Vorschau</span></div>
+  <div id="migBericht"></div>
+</div>
+
 <div class="fuss">
   <button type="button" id="navTag" onclick="zeigeSchirm('Tag')">
     <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"></rect>
       <path d="M3 10h18M8 3v4M16 3v4M8 15h8"></path></svg><span>Tag</span>
+  </button>
+  <button type="button" id="navMigration" onclick="zeigeSchirm('Migration')">
+    <svg viewBox="0 0 24 24"><path d="M4 17V7a2 2 0 0 1 2-2h7l3 3h2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"></path>
+      <path d="M9 13h6M12 10v6"></path></svg><span>Migration</span>
   </button>
   <button type="button" id="navDiagnose" class="aktiv" onclick="zeigeSchirm('Diagnose')">
     <svg viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"></path></svg><span>Diagnose</span>
@@ -159,7 +182,7 @@ body{
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.3.0';
+var APP_VERSION = '0.4.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -1027,6 +1050,530 @@ function driveSpeichernJetzt() {
   });
 }
 
+
+/* ============================================================
+   Migration der Altbestände
+
+   Läuft nur auf ausdrücklichen Anstoß, zeigt erst eine Vorschau
+   und ist wiederholbar: Kennungen werden aus dem Altbestand
+   abgeleitet, dieselbe Datei zweimal ergibt keine Dubletten.
+   ============================================================ */
+
+var migQuellen = [];
+var migErgebnis = null;
+
+/* Was aus welchem Bereich wird. Unbekannte werden Thema und im
+   Bericht ausgewiesen. */
+var BEREICH_ZUORDNUNG = {
+  'Organisatorische Aufgaben':                'thema',
+  'User Journey QS - Allgemeines':            'thema',
+  'Organisation und Personal':                'thema',
+  'Last- und Performance - Messungen online': 'thema',
+  'übergreifende QS Online + Hybrd':          'thema',
+  'Hybride Tests':                            'thema',
+  'Reisen 2026':                              'thema',
+  'Mindset und Planung':                      'thema',
+  'Update-Termine 2026: Auslieferungen':      'projekt',
+  'SMAX: Gitlab Ablöse des ALM-Support-Issue-Trackers': 'projekt',
+  'Auslieferungen 20.0x':                     'projekt',
+  'Einführung Windows 11 26H2':               'projekt',
+  'F TO Analyse und Design eines hybriden Workflowtests (hWFT)': 'projekt',
+  'Garage erstellen lassen':                  'projekt',
+  'Ernährung und Gewicht':                    'ziel',
+  'übergreifende Qualitätssicherung OnPremise': 'weg',
+  'Sonstiges (Einzelaufgaben)':               'weg'
+};
+
+var PLAN_ZUORDNUNG = {
+  'Projektplan SMAX':                      'projekt',
+  'Workflowtest Testdurchführung':         'vorlage',
+  'Kreta: Akklimatisieren und Schwimmen':  'aufgabe',
+  'Mein Tag':                              'weg'
+};
+
+var ZIEL_ANGABEN = {
+  'Ernährung und Gewicht': { name: 'Gewicht auf 73 kg', zieltermin: '2027-04-30' }
+};
+
+/* Kurze, gleichbleibende Kennung aus einem Text. Damit ergibt ein
+   zweiter Durchlauf dieselben Kennungen. */
+function schluesselId(vorsatz, text) {
+  var h = 5381;
+  var i;
+  for (i = 0; i < text.length; i++) {
+    h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+  }
+  return vorsatz + '-' + h.toString(36);
+}
+
+/* Alt: 1 = Montag bis 7 = Sonntag. Neu: 0 = Sonntag bis 6 = Samstag. */
+function wochentagUmrechnen(alt) {
+  var n = Number(alt);
+  if (!(n >= 1 && n <= 7)) { return -1; }
+  return (n === 7) ? 0 : n;
+}
+
+function wiederholungUmschreiben(alt, faellig) {
+  if (!alt || !alt.typ) { return null; }
+  var intervall = Number(alt.intervall) || 1;
+  if (intervall < 1) { intervall = 1; }
+  if (intervall > 4) { intervall = 4; }
+
+  if (alt.typ === 'woechentlich') {
+    var tage = [];
+    var roh = Array.isArray(alt.wochentage) ? alt.wochentage : [];
+    var i;
+    for (i = 0; i < roh.length; i++) {
+      var t = wochentagUmrechnen(roh[i]);
+      if (t >= 0 && tage.indexOf(t) < 0) { tage.push(t); }
+    }
+    /* Ohne Wochentag trifft die Regel nie zu — dann gibt es sie nicht. */
+    if (!tage.length) { return null; }
+    tage.sort(function (a, b) { return a - b; });
+    return { takt: 'woche', intervall: intervall, tage: tage, tag: 1 };
+  }
+
+  if (alt.typ === 'monatlich') {
+    var tag = 1;
+    if (faellig && faellig.length >= 10) { tag = Number(faellig.slice(8, 10)) || 1; }
+    return { takt: 'monat', intervall: intervall, tage: [], tag: tag };
+  }
+  return null;
+}
+
+function quelleErkennen(name, daten) {
+  if (daten && Array.isArray(daten.aktivitaeten) && Array.isArray(daten.gruppen)) {
+    return 'timeassist';
+  }
+  if (daten && Array.isArray(daten.bereiche) && Array.isArray(daten.aufgaben)) {
+    return 'workassist';
+  }
+  if (daten && Array.isArray(daten.aufgaben)) { return 'backlog'; }
+  return 'unbekannt';
+}
+
+function kontextRaten(name) {
+  return (/privat/i.test(name)) ? 'privat' : 'beruflich';
+}
+
+/* ------------------------------------------------------------
+   Der eigentliche Rechenschritt. Reine Funktion, damit sie
+   außerhalb des Browsers geprüft werden kann.
+   ------------------------------------------------------------ */
+function migrationRechnen(quellen) {
+  var ziel = leereDatenbank();
+  var bericht = {
+    themen: 0, projekte: 0, ziele: 0, aufgaben: 0, ablaeufe: 0, durchlaeufe: 0,
+    jahrestermine: 0, verworfen: 0, zusammengezogen: 0, regelnAus: 0,
+    unbekannteBereiche: [], verworfeneArten: {}, hinweise: []
+  };
+
+  var themenNachAlt = {};    /* alte bereichId -> neue themaId */
+  var projekteNachAlt = {};  /* alte bereichId -> neue projektId */
+  var zielNachAlt = {};
+  var jtGesehen = {};
+  var wdhGesehen = {};       /* kontext|titel -> Aufgabe */
+
+  var q, i, j;
+
+  /* --- Durchgang 1: Bereiche ------------------------------- */
+  for (q = 0; q < quellen.length; q++) {
+    var quelle = quellen[q];
+    if (quelle.art !== 'workassist') { continue; }
+    var bereiche = quelle.daten.bereiche || [];
+    for (i = 0; i < bereiche.length; i++) {
+      var b = bereiche[i];
+      var name = (b.name || '').trim();
+      if (!name) { continue; }
+      var wohin = BEREICH_ZUORDNUNG[name];
+      if (!wohin) {
+        wohin = 'thema';
+        if (bericht.unbekannteBereiche.indexOf(name) < 0) {
+          bericht.unbekannteBereiche.push(name);
+        }
+      }
+      if (wohin === 'weg') { bericht.verworfen++; continue; }
+
+      if (wohin === 'thema') {
+        var tid = schluesselId('th', quelle.kontext + '|' + name);
+        if (!themenNachAlt[b.id]) {
+          themenNachAlt[b.id] = tid;
+          ziel.themen.push(stempelnMit({ id: tid, name: name, kontext: quelle.kontext }));
+          bericht.themen++;
+        }
+      } else if (wohin === 'projekt') {
+        var pid = schluesselId('pj', quelle.kontext + '|' + name);
+        if (!projekteNachAlt[b.id]) {
+          projekteNachAlt[b.id] = pid;
+          ziel.projekte.push(stempelnMit({
+            id: pid, name: name, kontext: quelle.kontext, beschreibung: '',
+            start: '', ende: '', status: 'laufend',
+            meilensteine: [], zielzustaende: [], anlagen: []
+          }));
+          bericht.projekte++;
+        }
+      } else if (wohin === 'ziel') {
+        var angabe = ZIEL_ANGABEN[name] || { name: name, zieltermin: '' };
+        var zid = schluesselId('zl', quelle.kontext + '|' + name);
+        if (!zielNachAlt[b.id]) {
+          zielNachAlt[b.id] = zid;
+          ziel.ziele.push(stempelnMit({
+            id: zid, name: angabe.name, kontext: quelle.kontext, beschreibung: '',
+            zieltermin: angabe.zieltermin, status: 'laufend',
+            zielzustaende: [], einzahler: []
+          }));
+          bericht.ziele++;
+        }
+      }
+    }
+  }
+
+  /* --- Durchgang 2: Aufgaben ------------------------------- */
+  for (q = 0; q < quellen.length; q++) {
+    var qa = quellen[q];
+    if (qa.art !== 'workassist' && qa.art !== 'backlog') { continue; }
+    var aufgaben = qa.daten.aufgaben || [];
+    for (i = 0; i < aufgaben.length; i++) {
+      var a = aufgaben[i];
+      var titel = (a.titel || '').trim();
+      if (!titel) { bericht.verworfen++; continue; }
+
+      var regel = wiederholungUmschreiben(a.wiederholung, a.faellig);
+      if (a.wiederholung && !regel) { bericht.regelnAus++; }
+
+      /* Wiederkehrendes lag im Altbestand als Reihe von Instanzen vor.
+         Daraus wird eine Aufgabe mit Regel und dem jüngsten Erledigtdatum. */
+      if (a.wiederholung) {
+        var wschluessel = qa.kontext + '|' + titel;
+        var schon = wdhGesehen[wschluessel];
+        if (schon) {
+          bericht.zusammengezogen++;
+          if (a.erledigtAm && (!schon.zuletztErledigt || a.erledigtAm > schon.zuletztErledigt)) {
+            schon.zuletztErledigt = a.erledigtAm;
+          }
+          continue;
+        }
+      }
+
+      var neu = stempelnMit({
+        id: schluesselId('au', qa.kontext + '|' + (a.id || titel + '|' + i)),
+        titel: titel,
+        beschreibung: a.notiz || '',
+        kontext: qa.kontext,
+        themaId: themenNachAlt[a.bereichId] || null,
+        projektId: projekteNachAlt[a.bereichId] || null,
+        frist: a.faellig || '',
+        planung: 'backlog',
+        uhrzeit: a.uhrzeit || '',
+        art: 'haupt',
+        wiederholung: regel,
+        status: (a.status === 'erledigt') ? 'erledigt' : 'offen',
+        erledigtAm: a.erledigtAm || null,
+        zuletztErledigt: a.erledigtAm || null,
+        ablaufSchritt: null
+      });
+      if (a.wiederholung) {
+        neu.id = schluesselId('au', qa.kontext + '|wdh|' + titel);
+        wdhGesehen[qa.kontext + '|' + titel] = neu;
+      }
+      ziel.aufgaben.push(neu);
+      bericht.aufgaben++;
+    }
+  }
+
+  /* --- Durchgang 3: Pläne ---------------------------------- */
+  for (q = 0; q < quellen.length; q++) {
+    var qp = quellen[q];
+    if (qp.art !== 'workassist') { continue; }
+    var plaene = qp.daten.plaene || [];
+    for (i = 0; i < plaene.length; i++) {
+      var pl = plaene[i];
+      var ptitel = (pl.titel || '').trim();
+      if (!ptitel) { bericht.verworfen++; continue; }
+      var wohinP = PLAN_ZUORDNUNG[ptitel] || 'durchlauf';
+      var schritte = Array.isArray(pl.schritte) ? pl.schritte : [];
+
+      if (wohinP === 'weg') { bericht.verworfen++; continue; }
+
+      if (wohinP === 'aufgabe') {
+        ziel.aufgaben.push(stempelnMit({
+          id: schluesselId('au', qp.kontext + '|plan|' + ptitel),
+          titel: ptitel, beschreibung: pl.notiz || '', kontext: qp.kontext,
+          themaId: themenNachAlt[pl.bereichId] || null,
+          projektId: projekteNachAlt[pl.bereichId] || null,
+          frist: '', planung: 'backlog', uhrzeit: '', art: 'haupt',
+          wiederholung: null, status: 'offen', erledigtAm: null,
+          zuletztErledigt: null, ablaufSchritt: null
+        }));
+        bericht.aufgaben++;
+        continue;
+      }
+
+      if (wohinP === 'projekt') {
+        var meilen = [];
+        for (j = 0; j < schritte.length; j++) {
+          meilen.push({
+            id: schluesselId('ms', ptitel + '|' + j),
+            titel: (schritte[j].titel || schritte[j].t || ('Schritt ' + (j + 1))),
+            datum: '', erreicht: !!schritte[j].erledigt
+          });
+        }
+        ziel.projekte.push(stempelnMit({
+          id: schluesselId('pj', qp.kontext + '|plan|' + ptitel),
+          name: ptitel, kontext: qp.kontext, beschreibung: pl.notiz || '',
+          start: '', ende: '', status: 'laufend',
+          meilensteine: meilen, zielzustaende: [], anlagen: []
+        }));
+        bericht.projekte++;
+        continue;
+      }
+
+      var stufen = [];
+      for (j = 0; j < schritte.length; j++) {
+        stufen.push({
+          titel: (schritte[j].titel || schritte[j].t || ('Schritt ' + (j + 1))),
+          auf: !!schritte[j].alsAufgabe,
+          fertig: !!schritte[j].erledigt,
+          planung: 'backlog'
+        });
+      }
+
+      if (wohinP === 'vorlage') {
+        var vschritte = [];
+        for (j = 0; j < stufen.length; j++) {
+          vschritte.push({ id: schluesselId('sc', ptitel + '|' + j),
+                           titel: stufen[j].titel, auf: stufen[j].auf });
+        }
+        ziel.ablaeufe.push(stempelnMit({
+          id: schluesselId('ab', qp.kontext + '|' + ptitel),
+          name: ptitel, kontext: qp.kontext, schritte: vschritte, zuletzt: null
+        }));
+        bericht.ablaeufe++;
+      } else {
+        ziel.durchlaeufe.push(stempelnMit({
+          id: schluesselId('dl', qp.kontext + '|' + ptitel),
+          ablaufId: null, name: ptitel, kontext: qp.kontext,
+          start: isoDatum(), frist: '', schritte: stufen
+        }));
+        bericht.durchlaeufe++;
+      }
+    }
+  }
+
+  /* --- Durchgang 4: Jahrestermine -------------------------- */
+  for (q = 0; q < quellen.length; q++) {
+    var qj = quellen[q];
+    var jt = qj.daten.jahrestermine || [];
+    for (i = 0; i < jt.length; i++) {
+      var e = jt[i];
+      var etitel = (e.t || e.titel || '').trim();
+      var art = e.art || 'sonstiges';
+      if (art === 'feiertag' || art === 'ferien') {
+        bericht.verworfen++;
+        bericht.verworfeneArten[art] = (bericht.verworfeneArten[art] || 0) + 1;
+        continue;
+      }
+      if (!etitel) { bericht.verworfen++; continue; }
+      var schluessel = etitel + '|' + (e.von || '') + '|' + (e.bis || '');
+      if (jtGesehen[schluessel]) { bericht.zusammengezogen++; continue; }
+      jtGesehen[schluessel] = true;
+      ziel.jahrestermine.push(stempelnMit({
+        id: schluesselId('jt', schluessel),
+        titel: etitel, art: art,
+        von: e.von || '', bis: e.bis || e.von || '',
+        jaehrlich: !!e.jaehrlich
+      }));
+      bericht.jahrestermine++;
+    }
+  }
+
+  /* --- Durchgang 5: Ziele aus TimeAssist ------------------- */
+  for (q = 0; q < quellen.length; q++) {
+    var qz = quellen[q];
+    if (qz.art !== 'timeassist') { continue; }
+    var zl = qz.daten.ziele || [];
+    for (i = 0; i < zl.length; i++) {
+      var z = zl[i];
+      var zname = (z.t || z.titel || '').trim();
+      if (!zname || z.archiviert) { bericht.verworfen++; continue; }
+      var zkontext = gruppenKontext(qz.daten, z.sphaere) || qz.kontext;
+      ziel.ziele.push(stempelnMit({
+        id: schluesselId('zl', 'ta|' + zname),
+        name: zname, kontext: zkontext, beschreibung: '',
+        zieltermin: deutschZuIso(z.frist), status: 'laufend',
+        zielzustaende: [], einzahler: []
+      }));
+      bericht.ziele++;
+    }
+  }
+
+  if (bericht.zusammengezogen) {
+    bericht.hinweise.push(bericht.zusammengezogen
+      + ' Einträge waren Dubletten oder erzeugte Wiederholungen und wurden zusammengezogen.');
+  }
+  if (bericht.regelnAus) {
+    bericht.hinweise.push(bericht.regelnAus
+      + ' Wiederholungsregeln ohne Wochentag wurden abgeschaltet.');
+  }
+  if (bericht.unbekannteBereiche.length) {
+    bericht.hinweise.push('Nicht zugeordnete Bereiche wurden Themen: '
+      + bericht.unbekannteBereiche.join(', '));
+  }
+
+  return { ziel: ziel, bericht: bericht };
+}
+
+function stempelnMit(satz) {
+  satz.geaendert = jetzt();
+  return satz;
+}
+
+/* TimeAssist führt den Kontext als Gruppe, nicht im Dateinamen. */
+function gruppenKontext(daten, sphaere) {
+  var gruppen = (daten && daten.gruppen) || [];
+  var i;
+  for (i = 0; i < gruppen.length; i++) {
+    if (gruppen[i].id === sphaere) {
+      var name = String(gruppen[i].name || '').toLowerCase();
+      if (name.indexOf('privat') >= 0) { return 'privat'; }
+      if (name.indexOf('beruf') >= 0) { return 'beruflich'; }
+    }
+  }
+  return '';
+}
+
+/* TimeAssist speichert TT.MM.JJJJ */
+function deutschZuIso(text) {
+  if (!text) { return ''; }
+  var m = String(text).match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!m) { return String(text); }
+  return m[3] + '-' + m[2] + '-' + m[1];
+}
+
+/* ------------------------------------------------------------
+   Bedienung
+   ------------------------------------------------------------ */
+
+function migDateienGewaehlt(ereignis) {
+  var dateien = ereignis && ereignis.target ? ereignis.target.files : null;
+  if (!dateien || !dateien.length) { return; }
+  migQuellen = [];
+  migErgebnis = null;
+  var offen = dateien.length;
+  var i;
+  for (i = 0; i < dateien.length; i++) {
+    (function (datei) {
+      var leser = new window.FileReader();
+      leser.onload = function () {
+        var daten = null;
+        try { daten = JSON.parse(leser.result); } catch (e) { daten = null; }
+        if (daten) {
+          migQuellen.push({
+            name: datei.name,
+            art: quelleErkennen(datei.name, daten),
+            kontext: kontextRaten(datei.name),
+            daten: daten
+          });
+        } else {
+          migQuellen.push({ name: datei.name, art: 'unlesbar', kontext: '', daten: {} });
+        }
+        offen--;
+        if (offen === 0) { migZeichne(); }
+      };
+      leser.onerror = function () {
+        offen--;
+        if (offen === 0) { migZeichne(); }
+      };
+      leser.readAsText(datei);
+    })(dateien[i]);
+  }
+}
+
+function migVorschau() {
+  var brauchbar = [];
+  var i;
+  for (i = 0; i < migQuellen.length; i++) {
+    if (migQuellen[i].art !== 'unlesbar' && migQuellen[i].art !== 'unbekannt') {
+      brauchbar.push(migQuellen[i]);
+    }
+  }
+  if (!brauchbar.length) {
+    melde('Keine brauchbare Quelldatei gewählt.', 'warn');
+    return;
+  }
+  migErgebnis = migrationRechnen(brauchbar);
+  migZeichne();
+  melde('Vorschau berechnet. Es wurde noch nichts übernommen.', null);
+}
+
+function migUebernehmen() {
+  if (!migErgebnis) { melde('Bitte zuerst die Vorschau berechnen.', 'warn'); return; }
+  var neu = migErgebnis.ziel;
+  var zusammen = zusammenfuehren(DB, neu);
+  DB = zusammen.db;
+  bestandStempeln(DB);
+  speichern().then(function () {
+    melde('Übernommen und lokal gesichert.\n' + berichtText(zusammen.bericht)
+        + '\nDer Altbestand bleibt unverändert.', 'gut');
+    migErgebnis = null;
+    migZeichne();
+    zeichne();
+  }).catch(function (f) {
+    melde('Übernahme fehlgeschlagen.\n' + (f ? f.message : ''), 'warn');
+  });
+}
+
+function migZeichne() {
+  var qziel = document.getElementById('migQuellen');
+  if (qziel) {
+    var h = '';
+    var i;
+    if (!migQuellen.length) {
+      h = '<div class="platzhalter">Noch keine Datei gewählt.</div>';
+    }
+    for (i = 0; i < migQuellen.length; i++) {
+      var s = migQuellen[i];
+      var art = (s.art === 'unlesbar' || s.art === 'unbekannt') ? 'nein' : 'ja';
+      h += zeile(s.name, s.art + (s.kontext ? ' · ' + s.kontext : ''), art);
+    }
+    qziel.innerHTML = h;
+  }
+
+  var bziel = document.getElementById('migBericht');
+  if (bziel) {
+    if (!migErgebnis) {
+      bziel.innerHTML = '<div class="platzhalter">Noch keine Vorschau berechnet.</div>';
+    } else {
+      var b = migErgebnis.bericht;
+      var t = '';
+      t += zeile('Themen', String(b.themen), b.themen ? '' : 'grau');
+      t += zeile('Projekte', String(b.projekte), b.projekte ? '' : 'grau');
+      t += zeile('Ziele', String(b.ziele), b.ziele ? '' : 'grau');
+      t += zeile('Aufgaben', String(b.aufgaben), b.aufgaben ? '' : 'grau');
+      t += zeile('Ablauf-Vorlagen', String(b.ablaeufe), b.ablaeufe ? '' : 'grau');
+      t += zeile('Einmalige Abläufe', String(b.durchlaeufe), b.durchlaeufe ? '' : 'grau');
+      t += zeile('Jahrestermine', String(b.jahrestermine), b.jahrestermine ? '' : 'grau');
+      t += zeile('Zusammengezogen', String(b.zusammengezogen), b.zusammengezogen ? '' : 'grau');
+      t += zeile('Verworfen', String(b.verworfen), b.verworfen ? 'nein' : 'grau');
+      t += zeile('Regeln abgeschaltet', String(b.regelnAus), b.regelnAus ? 'nein' : 'grau');
+      var k;
+      for (k in b.verworfeneArten) {
+        if (Object.prototype.hasOwnProperty.call(b.verworfeneArten, k)) {
+          t += zeile('davon Art „' + k + '"', String(b.verworfeneArten[k]), 'grau');
+        }
+      }
+      var j;
+      for (j = 0; j < b.hinweise.length; j++) {
+        t += '<div class="melder">' + b.hinweise[j] + '</div>';
+      }
+      bziel.innerHTML = t;
+    }
+  }
+
+  var ku = document.getElementById('knopfMigUebernehmen');
+  if (ku) { ku.disabled = !migErgebnis; }
+}
+
 /* ============================================================
    Bedienung
    ============================================================ */
@@ -1142,7 +1689,7 @@ function handleVergessen() {
 
 function zeigeSchirm(name) {
   schirmOffen = name;
-  var alle = ['Tag', 'Diagnose'];
+  var alle = ['Tag', 'Migration', 'Diagnose'];
   var i;
   for (i = 0; i < alle.length; i++) {
     var s = document.getElementById('schirm' + alle[i]);
@@ -1155,7 +1702,8 @@ function zeigeSchirm(name) {
     }
   }
   var titel = document.getElementById('kopfTitel');
-  if (titel) { titel.textContent = (name === 'Tag') ? 'Tag' : 'Diagnose'; }
+  if (titel) { titel.textContent = name; }
+  if (name === 'Migration') { migZeichne(); }
 }
 
 /* ============================================================
