@@ -191,8 +191,10 @@ console.log('\n5. Element-IDs');
 console.log('\n6. Datenmodell');
 {
   const skript = hauptSkript();
+  /* „termine" ist mit v0.15.0 entfallen: berufliche Termine stehen im
+     Google-Kalender, eine zweite Wahrheit soll es nicht geben. */
   const erwartet = ['aufgaben', 'ziele', 'themen', 'projekte', 'ablaeufe',
-                    'durchlaeufe', 'jahrestermine', 'ferien', 'kalenderzuordnung', 'termine'];
+                    'durchlaeufe', 'jahrestermine', 'ferien', 'kalenderzuordnung'];
 
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
   pruefe(!!leer, 'leereDatenbank ist auslesbar');
@@ -481,6 +483,37 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__abApi = {'
+                 + ' pruefeAblauf: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.ablaeufe = [{ id:\'v1\', name:\'Vorlage\', kontext:\'beruflich\','
+                 + '     schritte:[{id:\'s1\',titel:\'Eins\',auf:false},'
+                 + '               {id:\'s2\',titel:\'Zwei\',auf:false}], zuletzt:\'\' }];'
+                 + '   durchlaufStarten(\'v1\');'
+                 + '   var d = DB.durchlaeufe[0];'
+                 + '   var vorher = ablaufSchritteHeute().length;'
+                 + '   schrittUm(d.id, 0);'
+                 + '   var ersterOffen = offenerSchritt(d).satz.titel;'
+                 + '   schrittUm(d.id, 1);'
+                 + '   var nachher = ablaufSchritteHeute().length;'
+                 + '   var kopiert = (DB.ablaeufe[0].schritte[0].fertig === undefined);'
+                 + '   durchlaufBeenden(d.id);'
+                 + '   var nachBeenden = DB.durchlaeufe.length;'
+                 + '   var steine = DB.grabsteine.length;'
+                 + '   rueckgaengig();'
+                 + '   var nachZurueck = DB.durchlaeufe.length;'
+                 + '   var steineDanach = DB.grabsteine.length;'
+                 + '   DB.ablaeufe = [];'
+                 + '   abDetail = DB.durchlaeufe[0].id; abDetailArt = \'durchlauf\';'
+                 + '   vorlageAusDurchlauf();'
+                 + '   var vorlagen = DB.ablaeufe.length;'
+                 + '   abDetail = \'\'; abDetailArt = \'\'; zurueckHolen = null; DB = alt;'
+                 + '   return { ersterOffen:ersterOffen, imTagVorher:vorher,'
+                 + '            imTagNachher:nachher, kopiert:kopiert,'
+                 + '            nachBeenden:nachBeenden, grabsteine:steine,'
+                 + '            nachZurueck:nachZurueck, grabsteineDanach:steineDanach,'
+                 + '            vorlagenNachSichern:vorlagen };'
+                 + ' } };'
                  + 'globalThis.__vhApi = {'
                  + ' pruefeVorhaben: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -1475,6 +1508,24 @@ console.log('\n23. Aufrufe im Skript selbst');
          'keine Aufrufe undefinierter Funktionen'
          + (fehlend.length ? ' — gefunden: ' + fehlend.join(', ') : ''));
   ok(gesehen.size + ' verschiedene Aufrufe geprüft');
+
+  /* Zuweisungen an nie erklärte Namen: in strenger Betriebsart ein
+     Abbruch. rueckSatz = … war genau so ein Fall. */
+  const zuweisung = /(?:^|\n)\s*([a-zA-Z_$][\w$]*)\s*=[^=]/g;
+  const ohneErklaerung = [];
+  const gesehenZ = new Set();
+  let z;
+  while ((z = zuweisung.exec(skript)) !== null) {
+    const name = z[1];
+    if (gesehenZ.has(name)) { continue; }
+    gesehenZ.add(name);
+    if (definiert.has(name) || zugewiesen.has(name) || parameter.has(name)
+        || bekannt.has(name)) { continue; }
+    ohneErklaerung.push(name);
+  }
+  pruefe(ohneErklaerung.length === 0,
+         'keine Zuweisung an eine nie erklärte Variable'
+         + (ohneErklaerung.length ? ' — gefunden: ' + ohneErklaerung.join(', ') : ''));
 }
 
 /* ============================================================
@@ -2693,6 +2744,83 @@ console.log('\n43. Vorhaben');
     pruefe(e.aufgabenNachLoeschen === 2,
            'nach dem Löschen eines Projekts bestehen seine Aufgaben weiter');
     pruefe(e.ohneProjekt === 2, 'sie tragen danach kein Projekt mehr');
+  }
+}
+
+/* ============================================================
+   44. Ablaeufe, Abläufe im Tag und Wochenrueckblick
+   Grund: Eine Vorlage wiederholt sich, ein Durchlauf gilt einem
+   Fall. Im Tag darf nur der naechste offene Schritt stehen, nicht
+   der ganze Ablauf. Und ein beendeter Durchlauf muss zurueckholbar
+   sein — die Rueckgaengig-Ablage kannte bisher nur Aufgaben.
+   ============================================================ */
+console.log('\n44. Abläufe und Wochenrückblick');
+{
+  const skript = hauptSkript();
+  const a = globalThis.__abApi;
+
+  const noetig = ['abZeichnen', 'setAbFilter', 'abKarteUm', 'vorlageKarteHtml',
+                  'durchlaufKarteHtml', 'vorlageFinden', 'durchlaufFinden', 'ablaufFinden',
+                  'schritteFertig', 'offenerSchritt', 'laufendeDurchlaeufe',
+                  'schrittUm', 'durchlaufStarten', 'durchlaufBeenden',
+                  'ablaufNeu', 'ablaufAnlegen', 'abDetailOeffnen', 'abDetailHtml',
+                  'abSchrittNeu', 'abSchrittHoch', 'abSchrittWeg', 'vorlageAusDurchlauf',
+                  'abLoeschen', 'ablaufSchritteHeute', 'ablaufZeileHtml',
+                  'rueckblickOeffnen', 'rueckblickHtml', 'rbErreicht', 'rbSatz',
+                  'letzteWoche', 'zustandVonWoche', 'alleVorhaben'];
+  noetig.forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  pruefe(/id="schirmAblaeufe"/.test(QUELLE), 'der Ablaufbildschirm liegt im HTML');
+  pruefe(/id="navAblaeufe"/.test(QUELLE), 'er hat einen Navigationsknopf');
+  pruefe(/rueckblickOeffnen\(\)/.test(QUELLE), 'der Wochenrückblick ist erreichbar');
+
+  /* Nur der nächste offene Schritt gehört in den Tag */
+  const heute = skript.match(/function ablaufSchritteHeute\([\s\S]*?\n\}/);
+  pruefe(heute && /offenerSchritt\(/.test(heute[0]),
+         'im Tag steht je Durchlauf nur der nächste offene Schritt');
+  pruefe(heute && /passtZumTag\(/.test(heute[0]),
+         'der Kontextfilter des Tages greift auch darauf');
+  const tag = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tag && /data-kurz="Abläufe"/.test(tag[0]), 'der Tag hat einen Abschnitt dafür');
+  pruefe(tag && /schritte\.length\) \{/.test(tag[0]),
+         'ohne offenen Schritt bleibt der Abschnitt weg');
+
+  /* Starten erzeugt eine Kopie, keine Verknüpfung */
+  const starten = skript.match(/function durchlaufStarten\([\s\S]*?\n\}/);
+  pruefe(starten && /schritte\.push\(\{ titel: l\[i\]\.titel/.test(starten[0]),
+         'beim Starten werden die Schritte kopiert, nicht geteilt');
+  pruefe(starten && /ablaufId: v\.id/.test(starten[0]), 'der Durchlauf merkt sich seine Vorlage');
+  pruefe(starten && /v\.zuletzt = isoDatum\(\)/.test(starten[0]),
+         'die Vorlage merkt sich, wann sie zuletzt lief');
+
+  /* Beenden ist zurückholbar */
+  const beenden = skript.match(/function durchlaufBeenden\([\s\S]*?\n\}/);
+  pruefe(beenden && /zurueckHolen = \{ sammlung: 'durchlaeufe'/.test(beenden[0]),
+         'ein beendeter Durchlauf landet in der Rückgängig-Ablage');
+  const zurueck = skript.match(/function rueckgaengig\([\s\S]*?\n\}/);
+  pruefe(zurueck && /zurueckHolen\.sammlung/.test(zurueck[0]),
+         'die Ablage gilt für jede Sammlung, nicht nur für Aufgaben');
+  pruefe(zurueck && /steine\[i\]\.s === sammlung/.test(zurueck[0]),
+         'der Löschvermerk der richtigen Sammlung wird entfernt');
+
+  if (!a) {
+    warn('Ablauffunktionen nicht auswertbar');
+  } else {
+    const e = a.pruefeAblauf();
+    pruefe(e.ersterOffen === 'Zwei',
+           'nach dem Abhaken rückt der nächste Schritt nach');
+    pruefe(e.imTagVorher === 1 && e.imTagNachher === 0,
+           'ein vollständig abgehakter Durchlauf verschwindet aus dem Tag');
+    pruefe(e.kopiert === true,
+           'ein Schritt der Vorlage bleibt unberührt, wenn der Durchlauf abgehakt wird');
+    pruefe(e.nachBeenden === 0 && e.grabsteine === 1, 'Beenden entfernt und vermerkt');
+    pruefe(e.nachZurueck === 1 && e.grabsteineDanach === 0,
+           'Rückgängig holt zurück und räumt den Vermerk weg');
+    pruefe(e.vorlagenNachSichern === 1,
+           'aus einem einmaligen Durchlauf lässt sich eine Vorlage sichern');
   }
 }
 

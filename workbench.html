@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.14.0</title>
+<title>Workbench 0.15.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -358,6 +358,12 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
   font-size:calc(var(--fs)*0.8);color:var(--grau);background:none;border:0;
   padding:0 0 8px;cursor:pointer}
 
+.rb-block{padding:12px 0;border-bottom:1px solid var(--linie)}
+.rb-name{font-size:calc(var(--fs)*0.92);font-weight:600;line-height:1.3}
+.rb-art{font-size:calc(var(--fs)*0.72);color:var(--grau);margin-top:2px}
+.rb-alt{font-size:calc(var(--fs)*0.82);color:var(--tinte);margin-top:6px;line-height:1.4}
+.rb-alt.leer{color:var(--grau-hell)}
+
 /* ---------- Vorhaben ---------- */
 #schirmVorhaben{padding:0}
 .vh-kopf{flex:0 0 auto;padding:14px 20px 0}
@@ -704,12 +710,34 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
       <button type="button" id="vBeruf" class="pille" onclick="setVhFilter('beruflich')">Beruf</button>
       <button type="button" id="vPrivat" class="pille" onclick="setVhFilter('privat')">Privat</button>
     </div>
+    <div class="knopfreihe" style="margin-top:9px">
+      <button type="button" onclick="rueckblickOeffnen()">Wochenrückblick</button>
+    </div>
   </div>
 
   <div class="melder" id="vhMelder" style="margin:10px 20px 0">Bereit.</div>
   <div class="vhblatt" id="vhBlatt"></div>
 
   <button class="plusknopf" type="button" onclick="vorhabenNeu()" aria-label="Neues Vorhaben">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
+  </button>
+</div>
+
+<div class="schirm" id="schirmAblaeufe">
+  <div class="vh-kopf">
+    <div class="vh-zeile">
+      <span id="abZahl"></span>
+      <span class="vh-luecke"></span>
+      <button type="button" id="abAlle" class="pille aktiv" onclick="setAbFilter('alle')">Alle</button>
+      <button type="button" id="abBeruf" class="pille" onclick="setAbFilter('beruflich')">Beruf</button>
+      <button type="button" id="abPrivat" class="pille" onclick="setAbFilter('privat')">Privat</button>
+    </div>
+  </div>
+
+  <div class="melder" id="abMelder" style="margin:10px 20px 0">Bereit.</div>
+  <div class="vhblatt" id="abBlatt"></div>
+
+  <button class="plusknopf" type="button" onclick="ablaufNeu()" aria-label="Neuer Ablauf">
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
   </button>
 </div>
@@ -764,6 +792,10 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
   <button type="button" id="navVorhaben" onclick="zeigeSchirm('Vorhaben')">
     <svg viewBox="0 0 24 24"><path d="M12 3l2.5 6.3L21 10l-4.6 4.2 1.2 6.3L12 17.3 6.4 20.5l1.2-6.3L3 10l6.5-.7z"></path></svg><span>Vorhaben</span>
   </button>
+  <button type="button" id="navAblaeufe" onclick="zeigeSchirm('Ablaeufe')">
+    <svg viewBox="0 0 24 24"><path d="M4 6h4l2 3M4 12h7M4 18h4l2-3"></path>
+      <path d="M14 6h6M14 12h6M14 18h6"></path></svg><span>Abläufe</span>
+  </button>
   <button type="button" id="navAufgaben" onclick="zeigeSchirm('Aufgaben')">
     <svg viewBox="0 0 24 24"><path d="M4 6l2 2 3.5-3.5M4 13l2 2 3.5-3.5M4 20l2 2 3.5-3.5M13 6h7M13 13h7M13 20h7"></path></svg><span>Aufgaben</span>
   </button>
@@ -779,7 +811,7 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.14.0';
+var APP_VERSION = '0.15.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -800,8 +832,10 @@ var DRIVE_DATEI = 'workbench.json';
 var VORLAUF_MS = 5 * 60 * 1000;   /* so lange vor Ablauf wird still erneuert */
 var GRABSTEIN_TAGE = 180;         /* so lange bleibt ein Löschvermerk erhalten */
 
+/* Berufliche Termine stehen seit v0.9.0 im Google-Kalender „Alex" —
+   eine eigene Terminsammlung gibt es nicht mehr. */
 var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe',
-                  'jahrestermine','ferien','kalenderzuordnung','termine'];
+                  'jahrestermine','ferien','kalenderzuordnung'];
 
 function leereDatenbank() {
   return {
@@ -815,7 +849,6 @@ function leereDatenbank() {
     jahrestermine:     [],
     ferien:            [],
     kalenderzuordnung: {},
-    termine:           [],
     grabsteine:        [],
     einstellungen: {
       clientId:      CLIENT_ID,
@@ -877,7 +910,7 @@ function isoZeit(d) {
 }
 
 function melde(text, art) {
-  var stellen = ['melder', 'migMelder', 'aufMelder', 'vhMelder'];
+  var stellen = ['melder', 'migMelder', 'aufMelder', 'vhMelder', 'abMelder'];
   var i;
   for (i = 0; i < stellen.length; i++) {
     var el = document.getElementById(stellen[i]);
@@ -2626,12 +2659,6 @@ function tagesEintraege(is) {
     else { haupt.push(a); }
   }
 
-  var termine = DB.termine || [];
-  for (i = 0; i < termine.length; i++) {
-    if (termine[i].datum !== is) { continue; }
-    verlauf.push({ art: 'termin', zeit: termine[i].von || '00:00', t: termine[i] });
-  }
-
   /* Aus Google gelesen, nicht gespeichert. */
   var ausGoogle = termineFuerTag(is);
   for (i = 0; i < ausGoogle.zeit.length; i++) {
@@ -2772,6 +2799,35 @@ function verlaufHtml(eintrag, is) {
   return v;
 }
 
+/* Aus jedem laufenden Durchlauf steht der nächste offene Schritt im
+   Tag — nicht der ganze Ablauf, sondern das, was jetzt dran ist. */
+function ablaufSchritteHeute() {
+  var aus = [];
+  var l = laufendeDurchlaeufe();
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (!passtZumTag(l[i].kontext)) { continue; }
+    var s = offenerSchritt(l[i]);
+    if (!s) { continue; }
+    aus.push({ durchlauf: l[i], nr: s.nr, satz: s.satz });
+  }
+  return aus;
+}
+
+function ablaufZeileHtml(e) {
+  var offen = (e.durchlauf.schritte || []).length - schritteFertig(e.durchlauf);
+  var h = '<div class="tzeile' + (e.durchlauf.kontext === 'privat' ? ' privat' : '') + '">';
+  h += '<button class="tkasten" type="button" onclick="schrittUm(\'' + esc(e.durchlauf.id)
+     + '\',' + e.nr + ')"></button>';
+  h += '<div class="ttext" onclick="abDetailOeffnen(\'' + esc(e.durchlauf.id)
+     + '\',\'durchlauf\')">';
+  h += '<div class="ttitel">' + esc(e.satz.titel) + '</div>';
+  h += '<div class="tmeta">' + esc(e.durchlauf.name) + ' · noch ' + offen
+     + (offen === 1 ? ' Schritt' : ' Schritte') + '</div>';
+  h += '</div></div>';
+  return h;
+}
+
 function tagZeichnen() {
   if (!tagOffen) { tagOffen = isoDatum(); }
   var is = tagOffen;
@@ -2794,6 +2850,14 @@ function tagZeichnen() {
   if (!e.wieder.length) { h += '<div class="tleer">Heute nichts fällig.</div>'; }
   for (i = 0; i < e.wieder.length; i++) { h += zeileHtml(e.wieder[i], is, false); }
   h += '</div>';
+
+  var schritte = ablaufSchritteHeute();
+  if (schritte.length) {
+    h += '<div class="tabschnitt" data-kurz="Abläufe"><div class="tabschnitt-titel">'
+       + '<span>Abläufe</span></div>';
+    for (i = 0; i < schritte.length; i++) { h += ablaufZeileHtml(schritte[i]); }
+    h += '</div>';
+  }
 
   h += '<div class="tabschnitt" data-kurz="Aufgaben"><div class="tabschnitt-titel">'
      + '<span>Aufgaben</span></div>';
@@ -3057,7 +3121,7 @@ function aufgabeLoeschen() {
   var stelle = DB.aufgaben.indexOf(a);
   if (stelle < 0) { return; }
 
-  zurueckHolen = { satz: a, stelle: stelle };
+  zurueckHolen = { sammlung: 'aufgaben', satz: a, stelle: stelle };
   DB.aufgaben.splice(stelle, 1);
   grabsteinSetzen('aufgaben', id);
 
@@ -3086,25 +3150,31 @@ function rueckVerbergen() {
 
 function rueckgaengig() {
   if (!zurueckHolen) { rueckVerbergen(); return; }
+  var sammlung = zurueckHolen.sammlung || 'aufgaben';
+  var ziel = DB[sammlung];
+  if (!Array.isArray(ziel)) { rueckVerbergen(); return; }
+
   var satz = zurueckHolen.satz;
   var stelle = zurueckHolen.stelle;
-  if (stelle < 0 || stelle > DB.aufgaben.length) { stelle = DB.aufgaben.length; }
-  DB.aufgaben.splice(stelle, 0, satz);
+  if (stelle < 0 || stelle > ziel.length) { stelle = ziel.length; }
+  ziel.splice(stelle, 0, satz);
 
   /* Der Löschvermerk muss weg, sonst entfernt ihn der nächste Abgleich erneut. */
   var steine = DB.grabsteine || [];
   var i;
   for (i = steine.length - 1; i >= 0; i--) {
-    if (steine[i].s === 'aufgaben' && steine[i].id === satz.id) { steine.splice(i, 1); }
+    if (steine[i].s === sammlung && steine[i].id === satz.id) { steine.splice(i, 1); }
   }
   satz.geaendert = jetzt();
 
   rueckVerbergen();
   tagZeichnen();
   aufZeichnen();
+  abZeichnen();
+  vhZeichnen();
   zeichne();
   spaeterSichern();
-  melde('Wiederhergestellt: ' + satz.titel, 'gut');
+  melde('Wiederhergestellt: ' + (satz.titel || satz.name), 'gut');
 }
 
 
@@ -3661,7 +3731,8 @@ function handleVergessen() {
 
 function zeigeSchirm(name) {
   schirmOffen = name;
-  var alle = ['Tag', 'Kalender', 'Vorhaben', 'Aufgaben', 'Migration', 'Diagnose'];
+  var alle = ['Tag', 'Kalender', 'Vorhaben', 'Ablaeufe', 'Aufgaben',
+              'Migration', 'Diagnose'];
   var i;
   for (i = 0; i < alle.length; i++) {
     var s = document.getElementById('schirm' + alle[i]);
@@ -3677,6 +3748,7 @@ function zeigeSchirm(name) {
   if (name === 'Tag') { tagZeichnen(); kalenderNachholen(); }
   if (name === 'Aufgaben') { aufZeichnen(); }
   if (name === 'Vorhaben') { vhZeichnen(); }
+  if (name === 'Ablaeufe') { abZeichnen(); }
   if (name === 'Kalender') { kalZeichnen(); kalenderNachholen(); }
   if (name !== 'Aufgaben') { zeichne(); }
 }
@@ -5906,6 +5978,584 @@ function vhLoeschen() {
   vhZeichnen();
   melde('Gelöscht: ' + (v.name || 'ohne Namen')
       + (vhDetailArt === 'projekt' ? ' — die Aufgaben bleiben, ohne Projekt.' : ''), null);
+}
+
+
+/* ============================================================
+   Abläufe: Vorlagen und Durchläufe
+
+   Eine Vorlage ist die Schrittfolge, die sich wiederholt. Ein
+   Durchlauf ist ihre Anwendung auf einen Fall — mit eigenem Stand.
+   Ein Durchlauf kann auch ohne Vorlage entstehen.
+   ============================================================ */
+
+var abFilter = 'alle';
+var abOffen = {};
+var abDetail = '';
+var abDetailArt = '';     /* 'vorlage' oder 'durchlauf' */
+var abFrischAngelegt = '';
+
+function setAbFilter(art) {
+  abFilter = art;
+  markiere([['alle', 'abAlle'], ['beruflich', 'abBeruf'], ['privat', 'abPrivat']], art);
+  abZeichnen();
+}
+
+function abKarteUm(id) {
+  if (abOffen[id]) { delete abOffen[id]; } else { abOffen[id] = true; }
+  abZeichnen();
+}
+
+function vorlageFinden(id) {
+  var l = DB.ablaeufe || [];
+  var i;
+  for (i = 0; i < l.length; i++) { if (l[i].id === id) { return l[i]; } }
+  return null;
+}
+
+function durchlaufFinden(id) {
+  var l = DB.durchlaeufe || [];
+  var i;
+  for (i = 0; i < l.length; i++) { if (l[i].id === id) { return l[i]; } }
+  return null;
+}
+
+function ablaufFinden(id, art) {
+  return (art === 'vorlage') ? vorlageFinden(id) : durchlaufFinden(id);
+}
+
+function abSichtbar(liste) {
+  var aus = [];
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    if (abFilter !== 'alle' && liste[i].kontext !== abFilter) { continue; }
+    aus.push(liste[i]);
+  }
+  return aus;
+}
+
+function schritteFertig(d) {
+  var n = 0;
+  var l = d.schritte || [];
+  var i;
+  for (i = 0; i < l.length; i++) { if (l[i].fertig) { n++; } }
+  return n;
+}
+
+/* Der erste noch offene Schritt ist der, an dem gearbeitet wird. */
+function offenerSchritt(d) {
+  var l = d.schritte || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (!l[i].fertig) { return { nr: i, satz: l[i] }; }
+  }
+  return null;
+}
+
+function laufendeDurchlaeufe() {
+  var aus = [];
+  var l = DB.durchlaeufe || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (offenerSchritt(l[i])) { aus.push(l[i]); }
+  }
+  return aus;
+}
+
+/* ------------------------------------------------------------
+   Zeichnen
+   ------------------------------------------------------------ */
+
+function vorlageKarteHtml(v) {
+  var offen = abOffen[v.id] === true;
+  var n = (v.schritte || []).length;
+  var h = '<div class="vkarte ' + (offen ? 'auf' : 'zu')
+        + (v.kontext === 'privat' ? ' privat' : '') + '">';
+  h += '<div class="vk-kopf" onclick="abKarteUm(\'' + esc(v.id) + '\')">';
+  h += '<div class="vk-name">' + esc(v.name) + '</div>';
+  h += '<div class="vk-zeit">' + n + (n === 1 ? ' Schritt' : ' Schritte') + '</div>';
+  h += '<svg class="vk-pfeil" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></div>';
+  h += '<div class="vk-satz leer">'
+     + (v.zuletzt ? ('zuletzt ' + esc(kurzDatum(v.zuletzt))) : 'noch nie angewendet') + '</div>';
+
+  h += '<div class="vk-mehr">';
+  var i;
+  var l = v.schritte || [];
+  for (i = 0; i < l.length; i++) {
+    h += '<div class="vk-ms"><span class="vk-ms-punkt"></span>'
+       + '<span class="vk-ms-titel">' + esc(l[i].titel) + '</span></div>';
+  }
+  h += '<div class="vk-knoepfe">'
+     + '<button type="button" onclick="durchlaufStarten(\'' + esc(v.id) + '\')">Starten</button>'
+     + '<button type="button" onclick="abDetailOeffnen(\'' + esc(v.id) + '\',\'vorlage\')">'
+     + 'Bearbeiten</button></div>';
+  h += '</div></div>';
+  return h;
+}
+
+function durchlaufKarteHtml(d) {
+  var offen = abOffen[d.id] === true;
+  var l = d.schritte || [];
+  var fertig = schritteFertig(d);
+  var jetztSchritt = offenerSchritt(d);
+  var h = '<div class="vkarte ' + (offen ? 'auf' : 'zu')
+        + (d.kontext === 'privat' ? ' privat' : '') + '">';
+  h += '<div class="vk-kopf" onclick="abKarteUm(\'' + esc(d.id) + '\')">';
+  h += '<div class="vk-name">' + esc(d.name) + '</div>';
+  h += '<div class="vk-zeit">' + fertig + ' von ' + l.length + '</div>';
+  h += '<svg class="vk-pfeil" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></div>';
+  h += '<div class="vk-satz' + (jetztSchritt ? '' : ' leer') + '">'
+     + esc(jetztSchritt ? jetztSchritt.satz.titel : 'alle Schritte erledigt') + '</div>';
+
+  h += '<div class="vk-mehr">';
+  var i;
+  for (i = 0; i < l.length; i++) {
+    h += '<div class="vk-zeile">'
+       + '<button class="tkasten' + (l[i].fertig ? ' an' : '') + '" type="button" '
+       + 'onclick="schrittUm(\'' + esc(d.id) + '\',' + i + ')"></button>'
+       + '<span class="vk-titel' + (l[i].fertig ? ' fertig' : '') + '">'
+       + esc(l[i].titel) + '</span></div>';
+  }
+  h += '<div class="vk-knoepfe">'
+     + '<button type="button" onclick="abDetailOeffnen(\'' + esc(d.id) + '\',\'durchlauf\')">'
+     + 'Bearbeiten</button>'
+     + '<button type="button" onclick="durchlaufBeenden(\'' + esc(d.id) + '\')">Beenden</button>'
+     + '</div>';
+  h += '</div></div>';
+  return h;
+}
+
+function abZeichnen() {
+  var blatt = document.getElementById('abBlatt');
+  if (!blatt) { return; }
+  var vorlagen = abSichtbar(DB.ablaeufe || []);
+  var laufend = abSichtbar(DB.durchlaeufe || []);
+  var h = '';
+  var i;
+
+  h += '<div class="vh-gruppe"><span>Läuft gerade · ' + laufend.length + '</span></div>';
+  if (!laufend.length) { h += '<div class="tleer">Kein Durchlauf offen.</div>'; }
+  for (i = 0; i < laufend.length; i++) { h += durchlaufKarteHtml(laufend[i]); }
+
+  h += '<div class="vh-gruppe"><span>Vorlagen · ' + vorlagen.length + '</span></div>';
+  if (!vorlagen.length) { h += '<div class="tleer">Keine Vorlage in dieser Auswahl.</div>'; }
+  for (i = 0; i < vorlagen.length; i++) { h += vorlageKarteHtml(vorlagen[i]); }
+
+  blatt.innerHTML = h;
+  var zahl = document.getElementById('abZahl');
+  if (zahl) {
+    zahl.textContent = laufend.length + ' laufend · ' + vorlagen.length
+                     + (vorlagen.length === 1 ? ' Vorlage' : ' Vorlagen');
+  }
+}
+
+/* ------------------------------------------------------------
+   Schritte abhaken
+   ------------------------------------------------------------ */
+
+function schrittUm(id, nr) {
+  var d = durchlaufFinden(id);
+  if (!d || !d.schritte || !d.schritte[nr]) { return; }
+  d.schritte[nr].fertig = !d.schritte[nr].fertig;
+  d.geaendert = jetzt();
+  spaeterSichern();
+  abZeichnen();
+  tagZeichnen();
+}
+
+/* ------------------------------------------------------------
+   Starten, beenden, anlegen
+   ------------------------------------------------------------ */
+
+function durchlaufStarten(vorlageId) {
+  var v = vorlageFinden(vorlageId);
+  if (!v) { return; }
+  var schritte = [];
+  var l = v.schritte || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    schritte.push({ titel: l[i].titel, auf: !!l[i].auf, fertig: false, planung: 'backlog' });
+  }
+  var neu = {
+    id: neueKennung(), ablaufId: v.id, name: v.name, kontext: v.kontext,
+    start: isoDatum(), frist: '', schritte: schritte, geaendert: jetzt()
+  };
+  DB.durchlaeufe.push(neu);
+  v.zuletzt = isoDatum();
+  v.geaendert = jetzt();
+  abOffen[neu.id] = true;
+  spaeterSichern();
+  abZeichnen();
+  tagZeichnen();
+  melde('Durchlauf gestartet: ' + v.name, 'gut');
+}
+
+/* Ein abgeschlossener Durchlauf wird entfernt — die Vorlage bleibt. */
+/* Ein beendeter Durchlauf wird entfernt — die Vorlage bleibt. Acht
+   Sekunden lang lässt er sich zurückholen. */
+function durchlaufBeenden(id) {
+  var d = durchlaufFinden(id);
+  if (!d) { return; }
+  var stelle = DB.durchlaeufe.indexOf(d);
+  if (stelle >= 0) { DB.durchlaeufe.splice(stelle, 1); }
+  grabsteinSetzen('durchlaeufe', d.id);
+  zurueckHolen = { sammlung: 'durchlaeufe', satz: d, stelle: stelle };
+  spaeterSichern();
+  abZeichnen();
+  tagZeichnen();
+  rueckZeigen(d.name);
+}
+
+function ablaufNeu() {
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  var h = '<div class="as-griff"></div>';
+  h += '<div class="as-titel">Was soll entstehen?</div>';
+  h += '<div class="as-linie"></div>';
+  h += '<div class="d-hinweis" style="text-align:left;padding:8px 0 4px">'
+     + 'Eine Vorlage wiederholt sich. Ein Durchlauf gilt einem Fall.</div>';
+  h += '<div class="d-reihe">';
+  h += '<button type="button" onclick="ablaufAnlegen(\'vorlage\')">Vorlage</button>';
+  h += '<button type="button" onclick="ablaufAnlegen(\'durchlauf\')">Einmaliger Durchlauf</button>';
+  h += '</div>';
+  sheet.innerHTML = h;
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function ablaufAnlegen(art) {
+  var kontext = (abFilter === 'privat') ? 'privat' : 'beruflich';
+  var id = neueKennung();
+  if (art === 'vorlage') {
+    DB.ablaeufe.push({ id: id, name: '', kontext: kontext, schritte: [],
+                       zuletzt: '', geaendert: jetzt() });
+  } else {
+    DB.durchlaeufe.push({ id: id, ablaufId: null, name: '', kontext: kontext,
+                          start: isoDatum(), frist: '', schritte: [], geaendert: jetzt() });
+  }
+  abFrischAngelegt = id;
+  abOffen[id] = true;
+  abDetailOeffnen(id, art);
+  var feld = document.getElementById('abName');
+  if (feld && feld.focus) { feld.focus(); }
+}
+
+
+/* ============================================================
+   Detailfläche eines Ablaufs
+   ============================================================ */
+
+function abDetailOeffnen(id, art) {
+  abDetail = id;
+  abDetailArt = art;
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = abDetailHtml();
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function abDetailNeu() {
+  var sheet = document.getElementById('aktionSheet');
+  if (sheet && abDetail) { sheet.innerHTML = abDetailHtml(); }
+}
+
+function abGeaendert(neuZeichnen) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a) { return; }
+  a.geaendert = jetzt();
+  spaeterSichern();
+  abZeichnen();
+  tagZeichnen();
+  if (neuZeichnen) { abDetailNeu(); }
+}
+
+function abDetailHtml() {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a) { return '<div class="as-griff"></div><div class="tleer">Nicht gefunden.</div>'; }
+  var istVorlage = (abDetailArt === 'vorlage');
+
+  var h = '<div class="as-griff"></div>';
+  h += '<input class="as-titelfeld" id="abName" type="text" value="' + esc(a.name) + '" '
+     + 'placeholder="' + (istVorlage ? 'Name der Vorlage' : 'Worum geht es?') + '" '
+     + 'oninput="abNameSetzen(this.value)">';
+  h += '<div class="as-meta">' + (istVorlage ? 'Vorlage' : 'Durchlauf') + '</div>';
+  h += '<div class="as-linie' + (a.kontext === 'privat' ? ' privat' : '') + '"></div>';
+
+  h += '<div class="d-feld"><div class="d-name">Kontext</div><div class="d-wert">';
+  h += '<button class="d-wahl' + (a.kontext === 'beruflich' ? ' an' : '') + '" type="button" '
+     + 'onclick="abKontextSetzen(\'beruflich\')">Beruflich</button>';
+  h += '<button class="d-wahl' + (a.kontext === 'privat' ? ' an' : '') + '" type="button" '
+     + 'onclick="abKontextSetzen(\'privat\')">Privat</button>';
+  h += '</div></div>';
+
+  if (!istVorlage) {
+    h += '<div class="d-feld"><div class="d-name">Frist</div><div class="d-wert">'
+       + '<input type="date" value="' + esc(a.frist || '') + '" '
+       + 'onchange="abFeldSetzen(\'frist\',this.value)"></div></div>';
+    if (a.ablaufId) {
+      var v = vorlageFinden(a.ablaufId);
+      h += '<div class="d-feld"><div class="d-name">Aus Vorlage</div><div class="d-wert">'
+         + '<span class="d-hinweis">' + esc(v ? v.name : 'nicht mehr vorhanden')
+         + '</span></div></div>';
+    }
+  }
+
+  h += '<div class="s-abschnitt">Schritte</div>';
+  var l = a.schritte || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    h += '<div class="v-schritt">';
+    if (istVorlage) {
+      h += '<span class="vk-ms-punkt"></span>';
+    } else {
+      h += '<button class="tkasten' + (l[i].fertig ? ' an' : '') + '" type="button" '
+         + 'onclick="abSchrittUm(' + i + ')"></button>';
+    }
+    h += '<input class="v-feld" type="text" value="' + esc(l[i].titel) + '" '
+       + 'oninput="abSchrittTitel(' + i + ',this.value)">';
+    h += '<button class="v-knopf" type="button" onclick="abSchrittHoch(' + i + ')" '
+       + 'aria-label="nach oben"><svg viewBox="0 0 24 24">'
+       + '<path d="M6 15l6-6 6 6"></path></svg></button>';
+    h += '<button class="v-knopf" type="button" onclick="abSchrittWeg(' + i + ')" '
+       + 'aria-label="entfernen"><svg viewBox="0 0 24 24">'
+       + '<path d="M6 6l12 12M18 6L6 18"></path></svg></button>';
+    h += '</div>';
+  }
+  h += '<button class="neu-zeile" type="button" onclick="abSchrittNeu()">'
+     + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Schritt</button>';
+
+  h += '<div class="d-reihe">';
+  if (istVorlage) {
+    h += '<button type="button" onclick="durchlaufStartenAusDetail()">Jetzt starten</button>';
+  } else {
+    h += '<button type="button" onclick="vorlageAusDurchlauf()">Als Vorlage sichern</button>';
+  }
+  h += '<button type="button" class="gefahr" onclick="abLoeschen()">Löschen</button>';
+  h += '</div>';
+  return h;
+}
+
+function abNameSetzen(wert) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a) { return; }
+  a.name = wert;
+  abGeaendert(false);
+}
+
+function abKontextSetzen(wert) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a) { return; }
+  a.kontext = wert;
+  abGeaendert(true);
+}
+
+function abFeldSetzen(feld, wert) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a) { return; }
+  a[feld] = wert;
+  abGeaendert(false);
+}
+
+function abSchrittNeu() {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a) { return; }
+  if (!Array.isArray(a.schritte)) { a.schritte = []; }
+  if (abDetailArt === 'vorlage') { a.schritte.push({ id: neueKennung(), titel: '', auf: false }); }
+  else { a.schritte.push({ titel: '', auf: false, fertig: false, planung: 'backlog' }); }
+  abGeaendert(true);
+}
+
+function abSchrittTitel(i, wert) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || !a.schritte[i]) { return; }
+  a.schritte[i].titel = wert;
+  abGeaendert(false);
+}
+
+function abSchrittUm(i) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || !a.schritte[i]) { return; }
+  a.schritte[i].fertig = !a.schritte[i].fertig;
+  abGeaendert(true);
+}
+
+function abSchrittHoch(i) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || i < 1 || !a.schritte[i]) { return; }
+  var merk = a.schritte[i - 1];
+  a.schritte[i - 1] = a.schritte[i];
+  a.schritte[i] = merk;
+  abGeaendert(true);
+}
+
+function abSchrittWeg(i) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || !a.schritte[i]) { return; }
+  a.schritte.splice(i, 1);
+  abGeaendert(true);
+}
+
+function durchlaufStartenAusDetail() {
+  var id = abDetail;
+  aktionenSchliessen();
+  durchlaufStarten(id);
+}
+
+/* Aus einem einmaligen Durchlauf wird eine Vorlage, wenn sich der
+   Fall als wiederkehrend herausstellt. */
+function vorlageAusDurchlauf() {
+  var d = durchlaufFinden(abDetail);
+  if (!d) { return; }
+  var schritte = [];
+  var l = d.schritte || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    schritte.push({ id: neueKennung(), titel: l[i].titel, auf: !!l[i].auf });
+  }
+  var v = { id: neueKennung(), name: d.name, kontext: d.kontext,
+            schritte: schritte, zuletzt: isoDatum(), geaendert: jetzt() };
+  DB.ablaeufe.push(v);
+  d.ablaufId = v.id;
+  d.geaendert = jetzt();
+  spaeterSichern();
+  abZeichnen();
+  abDetailNeu();
+  melde('Als Vorlage gesichert: ' + (v.name || 'ohne Namen'), 'gut');
+}
+
+function abLoeschen() {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a) { return; }
+  var sammlung = (abDetailArt === 'vorlage') ? DB.ablaeufe : DB.durchlaeufe;
+  var stelle = sammlung.indexOf(a);
+  if (stelle >= 0) { sammlung.splice(stelle, 1); }
+  grabsteinSetzen((abDetailArt === 'vorlage') ? 'ablaeufe' : 'durchlaeufe', a.id);
+  spaeterSichern();
+  aktionenSchliessen();
+  abZeichnen();
+  tagZeichnen();
+  melde('Gelöscht: ' + (a.name || 'ohne Namen'), null);
+}
+
+
+/* ============================================================
+   Wochenrückblick
+
+   Einmal in der Woche durch alle Vorhaben gehen: Was war der Satz
+   der letzten Woche, hat er getragen, und was gilt für die nächste.
+   ============================================================ */
+
+function letzteWoche() {
+  var s = wochenSchluessel(tagePlus(isoDatum(), -7));
+  return s;
+}
+
+function zustandVonWoche(v, jahr, kw) {
+  var l = v.zielzustaende || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].jahr === jahr && l[i].kw === kw) { return l[i]; }
+  }
+  return null;
+}
+
+function alleVorhaben() {
+  var aus = [];
+  var i;
+  var z = DB.ziele || [];
+  for (i = 0; i < z.length; i++) {
+    if (z[i].status === 'abgeschlossen') { continue; }
+    aus.push({ art: 'ziel', satz: z[i] });
+  }
+  var p = DB.projekte || [];
+  for (i = 0; i < p.length; i++) {
+    if (p[i].status === 'abgeschlossen') { continue; }
+    aus.push({ art: 'projekt', satz: p[i] });
+  }
+  return aus;
+}
+
+function rueckblickOeffnen() {
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = rueckblickHtml();
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function rueckblickNeu() {
+  var sheet = document.getElementById('aktionSheet');
+  if (sheet) { sheet.innerHTML = rueckblickHtml(); }
+}
+
+function rueckblickHtml() {
+  var jetztWoche = wochenSchluessel(isoDatum());
+  var vor = letzteWoche();
+  var liste = alleVorhaben();
+
+  var h = '<div class="as-griff"></div>';
+  h += '<div class="as-titel">Wochenrückblick · KW ' + vor.kw + ' auf KW ' + jetztWoche.kw + '</div>';
+  h += '<div class="as-meta">' + liste.length
+     + (liste.length === 1 ? ' Vorhaben' : ' Vorhaben') + '</div>';
+  h += '<div class="as-linie"></div>';
+
+  if (!liste.length) {
+    h += '<div class="tleer" style="padding-left:0">Kein laufendes Vorhaben.</div>';
+    return h;
+  }
+
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    var v = liste[i].satz;
+    var alt = zustandVonWoche(v, vor.jahr, vor.kw);
+    h += '<div class="rb-block">';
+    h += '<div class="rb-name">' + esc(v.name || 'ohne Namen') + '</div>';
+    h += '<div class="rb-art">' + (liste[i].art === 'ziel' ? 'Ziel' : 'Projekt') + '</div>';
+
+    if (alt) {
+      h += '<div class="rb-alt">KW ' + vor.kw + ': ' + esc(alt.satz || '—') + '</div>';
+      h += '<div class="d-wert" style="justify-content:flex-start;margin:5px 0">'
+         + '<button class="d-wahl' + (alt.erreicht ? ' an' : '') + '" type="button" '
+         + 'onclick="rbErreicht(\'' + esc(v.id) + '\',\'' + liste[i].art + '\',true)">erreicht</button>'
+         + '<button class="d-wahl' + (alt.erreicht ? '' : ' an') + '" type="button" '
+         + 'onclick="rbErreicht(\'' + esc(v.id) + '\',\'' + liste[i].art + '\',false)">offen</button>'
+         + '</div>';
+    } else {
+      h += '<div class="rb-alt leer">für KW ' + vor.kw + ' stand nichts an</div>';
+    }
+
+    h += '<textarea class="d-text" style="margin-top:5px" placeholder="Was gilt für KW '
+       + jetztWoche.kw + '?" oninput="rbSatz(\'' + esc(v.id) + '\',\'' + liste[i].art
+       + '\',this.value)">' + esc(zustandText(v)) + '</textarea>';
+    h += '</div>';
+  }
+
+  h += '<div class="d-reihe"><button type="button" onclick="aktionenSchliessen()">Fertig</button></div>';
+  return h;
+}
+
+function rbErreicht(id, art, wert) {
+  var v = vorhabenFinden(id, art);
+  if (!v) { return; }
+  var vor = letzteWoche();
+  var z = zustandVonWoche(v, vor.jahr, vor.kw);
+  if (!z) { return; }
+  z.erreicht = wert;
+  v.geaendert = jetzt();
+  spaeterSichern();
+  vhZeichnen();
+  rueckblickNeu();
+}
+
+function rbSatz(id, art, wert) {
+  var v = vorhabenFinden(id, art);
+  if (!v) { return; }
+  zustandSetzen(v, wert);
+  vhZeichnen();
 }
 
 /* ============================================================
