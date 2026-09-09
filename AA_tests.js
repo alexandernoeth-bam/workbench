@@ -482,7 +482,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     \'Familie\', \'privat\');'
                  + '   monatArten = null; monatKalender = null; monatOffeneTage = {};'
                  + '   var h = monatHtml(\'2026-09-01\');'
-                 + '   var spalten = (h.match(/mt-links/g) || []).length;'
+                 + '   var spalten = (h.match(/mt-oben/g) || []).length;'
                  + '   var t8 = h.split(\'mtag\')[8];'
                  + '   var sichtbar = (t8.match(/mt-termin/g) || []).length;'
                  + '   var mehr = t8.indexOf(\'Termine</button>\') >= 0;'
@@ -2428,8 +2428,10 @@ console.log('\n41. Monatssicht');
   });
 
   const monat = skript.match(/function monatHtml\([\s\S]*?\n\}\n/);
-  pruefe(monat && /class="mt-links"/.test(monat[0]), 'jeder Tag hat eine linke Spalte');
-  pruefe(monat && /class="mt-rechts"/.test(monat[0]), 'und eine rechte Spalte');
+  pruefe(monat && /class="mt-oben"/.test(monat[0]), 'jeder Tag hat eine obere Zeile');
+  pruefe(monat && /class="mt-unten"/.test(monat[0]), 'und eine untere Zeile');
+  pruefe(/\.mt-unten\{[^}]*border-top/.test(QUELLE),
+         'eine Trennlinie scheidet die beiden Zeilen');
   pruefe(monat && !/mt-bal/.test(monat[0]),
          'die Jahrestermine stehen ohne Farbfläche da');
   pruefe(monat && /style="color:' \+ jtFarbe/.test(monat[0]),
@@ -2459,7 +2461,7 @@ console.log('\n41. Monatssicht');
     warn('Monatsfunktionen nicht auswertbar');
   } else {
     const e = m.pruefeMonat();
-    pruefe(e.spalten === 30, 'jeder Tag des Monats hat beide Spalten');
+    pruefe(e.spalten === 30, 'jeder Tag des Monats hat beide Zeilen');
     pruefe(e.sichtbar === 2, 'zunächst sind zwei Termine zu sehen');
     pruefe(e.mehrKnopf === true, 'der Rest steckt hinter dem Mehr-Knopf');
     pruefe(e.aufgeklappt === 5, 'aufgeklappt sind alle zu sehen');

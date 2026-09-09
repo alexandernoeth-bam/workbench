@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.12.0</title>
+<title>Workbench 0.12.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -247,10 +247,10 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .mt-datum{flex:0 0 46px;display:flex;align-items:baseline;gap:4px;cursor:pointer}
 .mt-wt{font-size:calc(var(--fs)*0.74);color:var(--grau)}
 .mt-nr{font-size:calc(var(--fs)*0.86);font-variant-numeric:tabular-nums}
-.mt-links{flex:1 1 42%;min-width:0}
-.mt-rechts{flex:1 1 58%;min-width:0;border-left:1px solid var(--linie);padding-left:8px}
-.mt-jt{font-size:calc(var(--fs)*0.8);line-height:1.35;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap;cursor:pointer;font-weight:500}
+.mt-inhalt{flex:1;min-width:0}
+.mt-oben{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.mt-unten{margin-top:3px;padding-top:3px;border-top:1px dashed var(--linie)}
+.mt-jt{font-size:calc(var(--fs)*0.8);line-height:1.35;cursor:pointer;font-weight:500}
 .mt-anmerkung{font-size:calc(var(--fs)*0.74);color:var(--grau);line-height:1.35}
 .mt-anmerkung.leer{color:var(--grau-hell)}
 .mt-termin{display:flex;gap:6px;font-size:calc(var(--fs)*0.8);line-height:1.35}
@@ -662,7 +662,7 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.12.0';
+var APP_VERSION = '0.12.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4503,26 +4503,29 @@ function monatHtml(is) {
        + '<span class="mt-wt">' + TAGE_KURZ[d.getDay()] + '</span>'
        + '<span class="mt-nr">' + t + '</span></div>';
 
-    h += '<div class="mt-links">';
+    h += '<div class="mt-inhalt">';
+
+    /* Obere Zeile: was den Tag prägt. */
+    h += '<div class="mt-oben">';
     var jt = jtAn(tag);
     var i;
-    var etwasLinks = false;
+    var etwasOben = false;
     for (i = 0; i < jt.length; i++) {
       if (!jtPasst(jt[i])) { continue; }
       if (!monatArtErlaubt(jt[i].art)) { continue; }
-      h += '<div class="mt-jt" style="color:' + jtFarbe(jt[i]) + '" '
-         + 'onclick="jtTagOeffnen(\'' + tag + '\')">' + esc(jt[i].titel) + '</div>';
-      etwasLinks = true;
+      h += '<span class="mt-jt" style="color:' + jtFarbe(jt[i]) + '" '
+         + 'onclick="jtTagOeffnen(\'' + tag + '\')">' + esc(jt[i].titel) + '</span>';
+      etwasOben = true;
     }
-    if (fei) { h += '<div class="mt-anmerkung">' + esc(fei) + '</div>'; etwasLinks = true; }
+    if (fei) { h += '<span class="mt-anmerkung">' + esc(fei) + '</span>'; etwasOben = true; }
     if (fer && ferienZeigen()) {
-      h += '<div class="mt-anmerkung">' + esc(fer) + '</div>';
-      etwasLinks = true;
+      h += '<span class="mt-anmerkung">' + esc(fer) + '</span>';
+      etwasOben = true;
     }
-    if (!etwasLinks) { h += '<div class="mt-anmerkung leer">—</div>'; }
+    if (!etwasOben) { h += '<span class="mt-anmerkung leer">—</span>'; }
     h += '</div>';
 
-    h += '<div class="mt-rechts">';
+    h += '<div class="mt-unten">';
     var tm = termineFuerTag(tag);
     var liste = [];
     for (i = 0; i < tm.ganztags.length; i++) {
@@ -4552,7 +4555,7 @@ function monatHtml(is) {
          + 'weniger</button>';
     }
     if (!liste.length) { h += '<div class="mt-anmerkung leer">—</div>'; }
-    h += '</div></div>';
+    h += '</div></div></div>';
   }
   return h;
 }
