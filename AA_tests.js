@@ -126,8 +126,14 @@ console.log('\n5. Element-IDs');
 {
   const skript = hauptSkript();
   const imHtml = new Set([...QUELLE.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]));
+  /* Zur Laufzeit erzeugte Elemente stehen naturgemäß nicht im HTML. */
+  const erzeugt = new Set([...skript.matchAll(/\.id\s*=\s*'([A-Za-z][\w-]*)'/g)].map(m => m[1]));
   const feste = new Set([...skript.matchAll(/getElementById\('([A-Za-z][\w-]*)'\)/g)].map(m => m[1]));
   feste.forEach(function (id) {
+    if (erzeugt.has(id)) {
+      ok('ID "' + id + '" wird zur Laufzeit erzeugt');
+      return;
+    }
     pruefe(imHtml.has(id), 'ID "' + id + '" wird angesprochen und existiert');
   });
 
@@ -281,6 +287,92 @@ console.log('\n11. Google-Anbindung');
            'REDIRECT_URI endet auf den Dateinamen der App (' + uri[1] + ')');
   }
   pruefe(!/client_secret/i.test(QUELLE), 'kein Client-Secret im Quelltext');
+}
+
+/* ============================================================
+   12. Google-Anmeldung und Drive
+   Grund: Der Zugriff läuft nach 60 Minuten ab. Ohne stille Erneuerung
+   reißt jede laufende Arbeit ab. Und der Schlüssel darf niemals in der
+   Datendatei landen, die bei Drive liegt.
+   ============================================================ */
+console.log('\n12. Google-Anmeldung und Drive');
+{
+  const skript = hauptSkript();
+
+  const pflicht = [
+    'gisLaden', 'klientVorbereiten', 'anmelden', 'abmelden',
+    'tokenMerken', 'tokenAusSitzung', 'tokenVergessen', 'tokenGueltig',
+    'erneuerungPlanen', 'restMinuten',
+    'driveKopf', 'antwortPruefen', 'driveSuchen', 'driveAnlegen',
+    'driveHochladen', 'driveHerunterladen',
+    'driveLadenJetzt', 'driveSpeichernJetzt', 'zeichneGoogle'
+  ];
+  pflicht.forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  /* Rechte: nur lesen beim Kalender, nur eigene Dateien bei Drive */
+  pruefe(/auth\/drive\.file/.test(skript), 'Drive-Recht ist auf eigene Dateien beschränkt');
+  pruefe(/auth\/calendar\.readonly/.test(skript), 'Kalender-Recht ist nur lesend');
+  pruefe(!/auth\/drive['" ]/.test(skript), 'kein Drive-Vollzugriff angefordert');
+  pruefe(!/auth\/calendar['" ]/.test(skript), 'kein schreibender Kalenderzugriff angefordert');
+
+  /* Der Schlüssel darf nie in die Datendatei */
+  const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
+  if (leer) {
+    pruefe(!/token/i.test(leer[0]), 'leereDatenbank enthält kein Schlüsselfeld');
+  }
+  const samm = skript.match(/var SAMMLUNGEN = \[([\s\S]*?)\];/);
+  if (samm) {
+    pruefe(!/token/i.test(samm[1]), 'SAMMLUNGEN enthält kein Schlüsselfeld');
+  }
+  pruefe(/sessionStorage\.setItem\(TOKEN_KEY/.test(skript),
+         'Schlüssel liegt in sessionStorage, nicht dauerhaft');
+  pruefe(!/localStorage\.setItem\(TOKEN_KEY/.test(skript),
+         'Schlüssel wird nicht in localStorage geschrieben');
+  const alsTextFn = skript.match(/function alsText\(\)[\s\S]*?\n\}/);
+  if (alsTextFn) {
+    pruefe(!/zugriffToken/.test(alsTextFn[0]),
+           'alsText schreibt den Schlüssel nicht in die Datei');
+  }
+
+  /* Stille Erneuerung */
+  pruefe(/VORLAUF_MS/.test(skript), 'Vorlauf für die Erneuerung ist definiert');
+  const vorlauf = skript.match(/VORLAUF_MS\s*=\s*([\d\s*]+);/);
+  if (vorlauf) {
+    const wert = Function('"use strict";return (' + vorlauf[1] + ')')();
+    pruefe(wert > 0 && wert < 3600000,
+           'Vorlauf liegt zwischen 0 und einer Stunde (' + Math.round(wert / 60000) + ' Minuten)');
+  }
+  const merken = skript.match(/function tokenMerken\([\s\S]*?\n\}/);
+  pruefe(merken && /erneuerungPlanen\(\)/.test(merken[0]),
+         'tokenMerken plant die Erneuerung ein');
+  const planen = skript.match(/function erneuerungPlanen\([\s\S]*?\n\}/);
+  pruefe(planen && /setTimeout/.test(planen[0]) && /anmelden\(true\)/.test(planen[0]),
+         'erneuerungPlanen ruft die stille Anmeldung auf');
+  pruefe(planen && /clearTimeout/.test(planen[0]),
+         'erneuerungPlanen räumt eine alte Uhr ab (keine doppelten Timer)');
+  pruefe(/requestAccessToken\(\{ prompt: still \? '' : 'consent' \}\)/.test(skript),
+         'stille Anmeldung fragt ohne Nachfrage, laute mit');
+
+  /* Abgelaufener Zugriff wird erkannt */
+  const pruefFn = skript.match(/function antwortPruefen\([\s\S]*?\n\}/);
+  pruefe(pruefFn && /401/.test(pruefFn[0]) && /tokenVergessen\(\)/.test(pruefFn[0]),
+         'Antwort 401 verwirft den Schlüssel statt still zu scheitern');
+
+  /* Offline-Vorrang: Drive ist Transport, nicht Arbeitsspeicher */
+  const startFn = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(startFn && !/drive(Suchen|Herunterladen|Hochladen)/.test(startFn[0]),
+         'starten() greift nicht auf Drive zu (App läuft ohne Netz an)');
+  const ladenDrive = skript.match(/function driveLadenJetzt\([\s\S]*?\n\}/);
+  pruefe(ladenDrive && /speichern\(\)/.test(ladenDrive[0]),
+         'von Drive Geladenes wird sofort lokal gesichert');
+
+  /* Anmeldebibliothek wird nicht doppelt eingehängt */
+  const gis = skript.match(/function gisLaden\([\s\S]*?\n\}/);
+  pruefe(gis && /getElementById\('gisSkript'\)/.test(gis[0]),
+         'gisLaden hängt das Skript nur einmal ein');
 }
 
 /* ============================================================

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F6F5F2">
-<title>Workbench 0.1.0</title>
+<title>Workbench 0.2.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -124,6 +124,16 @@ body{
 
   <div class="melder" id="melder">Bereit.</div>
 
+  <div class="abschnitt-titel"><span>Google</span></div>
+  <div id="googleListe"></div>
+
+  <div class="knopfreihe">
+    <button type="button" id="knopfAnmelden" onclick="anmelden()">Anmelden</button>
+    <button type="button" id="knopfAbmelden" onclick="abmelden()">Abmelden</button>
+    <button type="button" id="knopfDriveLaden" onclick="driveLadenJetzt()">Von Drive laden</button>
+    <button type="button" id="knopfDriveSpeichern" onclick="driveSpeichernJetzt()">Zu Drive sichern</button>
+  </div>
+
   <div class="abschnitt-titel"><span>Datenbestand</span></div>
   <div id="bestandListe"></div>
 
@@ -148,7 +158,7 @@ body{
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.1.0';
+var APP_VERSION = '0.2.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -157,6 +167,12 @@ var LS_KEY      = 'workbench-daten';
 var OPFS_NAME   = 'workbench.json';
 var CLIENT_ID   = '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com';
 var REDIRECT_URI = 'https://alexandernoeth-bam.github.io/workbench/workbench.html';
+var SCOPES = 'https://www.googleapis.com/auth/drive.file '
+           + 'https://www.googleapis.com/auth/calendar.readonly';
+var GIS_URL   = 'https://accounts.google.com/gsi/client';
+var TOKEN_KEY = 'workbench-zugriff';
+var DRIVE_DATEI = 'workbench.json';
+var VORLAUF_MS = 5 * 60 * 1000;   /* so lange vor Ablauf wird still erneuert */
 
 var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe',
                   'jahrestermine','kalenderzuordnung','termine'];
@@ -190,6 +206,17 @@ var dateiName = '';
 var rechteStand = 'unbekannt';
 var letzterSchreibvorgang = null;
 var schirmOffen = 'Diagnose';
+
+/* Der Zugriffsschlüssel wird bewusst nie in DB geschrieben. Er lebt im
+   Arbeitsspeicher und in sessionStorage, damit ein Neuladen ihn nicht verliert. */
+var tokenClient = null;
+var zugriffToken = null;
+var tokenAblauf = 0;
+var erneuerungsUhr = null;
+var gisBereit = false;
+var driveDateiId = '';
+var driveStand = '';
+var letzteUebertragung = null;
 
 /* ============================================================
    Kleine Helfer
@@ -465,6 +492,260 @@ function localNotwegLesen() {
 }
 
 /* ============================================================
+   Google: Anmeldung
+   ============================================================ */
+
+function gisLaden() {
+  if (gisBereit) { return Promise.resolve(true); }
+  if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+    gisBereit = true;
+    return Promise.resolve(true);
+  }
+  return new Promise(function (fertig, fehler) {
+    var vorhanden = document.getElementById('gisSkript');
+    if (vorhanden) {
+      vorhanden.addEventListener('load', function () { gisBereit = true; fertig(true); });
+      return;
+    }
+    var s = document.createElement('script');
+    s.id = 'gisSkript';
+    s.src = GIS_URL;
+    s.async = true;
+    s.onload = function () { gisBereit = true; fertig(true); };
+    s.onerror = function () { fehler(new Error('Die Anmeldebibliothek ließ sich nicht laden.')); };
+    document.head.appendChild(s);
+  });
+}
+
+function tokenMerken(token, gueltigSek) {
+  zugriffToken = token;
+  tokenAblauf = Date.now() + (gueltigSek * 1000);
+  try {
+    window.sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ t: token, a: tokenAblauf }));
+  } catch (e) {
+    /* ohne sessionStorage lebt der Schlüssel nur bis zum Neuladen */
+  }
+  erneuerungPlanen();
+}
+
+function tokenAusSitzung() {
+  try {
+    var roh = window.sessionStorage.getItem(TOKEN_KEY);
+    if (!roh) { return false; }
+    var w = JSON.parse(roh);
+    if (!w || !w.t || !w.a || w.a <= Date.now()) { return false; }
+    zugriffToken = w.t;
+    tokenAblauf = w.a;
+    erneuerungPlanen();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function tokenVergessen() {
+  zugriffToken = null;
+  tokenAblauf = 0;
+  if (erneuerungsUhr) { window.clearTimeout(erneuerungsUhr); erneuerungsUhr = null; }
+  try { window.sessionStorage.removeItem(TOKEN_KEY); } catch (e) { /* egal */ }
+}
+
+function tokenGueltig() {
+  return !!zugriffToken && tokenAblauf > Date.now();
+}
+
+function restMinuten() {
+  if (!tokenGueltig()) { return 0; }
+  return Math.max(0, Math.round((tokenAblauf - Date.now()) / 60000));
+}
+
+/* Still erneuern, bevor die Stunde um ist. Ohne das reißt jede laufende
+   Arbeit nach 60 Minuten ab — genau der bekannte Knackpunkt. */
+function erneuerungPlanen() {
+  if (erneuerungsUhr) { window.clearTimeout(erneuerungsUhr); erneuerungsUhr = null; }
+  if (!tokenAblauf) { return; }
+  var wartezeit = tokenAblauf - Date.now() - VORLAUF_MS;
+  if (wartezeit < 1000) { wartezeit = 1000; }
+  erneuerungsUhr = window.setTimeout(function () {
+    anmelden(true);
+  }, wartezeit);
+}
+
+function klientVorbereiten() {
+  if (tokenClient) { return Promise.resolve(tokenClient); }
+  return gisLaden().then(function () {
+    tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: function () { /* wird je Anfrage überschrieben */ }
+    });
+    return tokenClient;
+  });
+}
+
+function anmelden(still) {
+  return klientVorbereiten().then(function (klient) {
+    return new Promise(function (fertig) {
+      klient.callback = function (antwort) {
+        if (antwort && antwort.access_token) {
+          tokenMerken(antwort.access_token, Number(antwort.expires_in) || 3600);
+          if (!still) { melde('Angemeldet. Gültig für ' + restMinuten() + ' Minuten.', 'gut'); }
+          zeichne();
+          fertig(true);
+          return;
+        }
+        var grund = (antwort && antwort.error) ? antwort.error : 'unbekannt';
+        if (still) {
+          melde('Die stille Erneuerung ist fehlgeschlagen (' + grund + ').\n'
+              + 'Bitte einmal auf „Anmelden" tippen.', 'warn');
+        } else {
+          melde('Anmeldung nicht abgeschlossen (' + grund + ').', 'warn');
+        }
+        zeichne();
+        fertig(false);
+      };
+      klient.requestAccessToken({ prompt: still ? '' : 'consent' });
+    });
+  }).catch(function (f) {
+    melde('Anmeldung nicht möglich.\n' + (f ? f.message : ''), 'warn');
+    zeichne();
+    return false;
+  });
+}
+
+function abmelden() {
+  var alt = zugriffToken;
+  tokenVergessen();
+  driveDateiId = '';
+  driveStand = '';
+  if (alt && window.google && window.google.accounts && window.google.accounts.oauth2) {
+    try { window.google.accounts.oauth2.revoke(alt, function () { return null; }); }
+    catch (e) { /* Widerruf ist Beiwerk */ }
+  }
+  melde('Abgemeldet. Die lokalen Daten bleiben erhalten.', null);
+  zeichne();
+}
+
+/* ============================================================
+   Google Drive
+   ============================================================ */
+
+function driveKopf(zusatz) {
+  var k = { 'Authorization': 'Bearer ' + zugriffToken };
+  if (zusatz) {
+    var n;
+    for (n in zusatz) {
+      if (Object.prototype.hasOwnProperty.call(zusatz, n)) { k[n] = zusatz[n]; }
+    }
+  }
+  return k;
+}
+
+function antwortPruefen(a) {
+  if (a.ok) { return a; }
+  if (a.status === 401) {
+    tokenVergessen();
+    throw new Error('Der Zugriff ist abgelaufen. Bitte neu anmelden.');
+  }
+  return a.text().then(function (t) {
+    throw new Error('Drive antwortete mit ' + a.status + ': ' + t.slice(0, 200));
+  });
+}
+
+function driveSuchen() {
+  var url = 'https://www.googleapis.com/drive/v3/files'
+          + '?q=' + encodeURIComponent("name='" + DRIVE_DATEI + "' and trashed=false")
+          + '&fields=' + encodeURIComponent('files(id,name,modifiedTime)')
+          + '&pageSize=10';
+  return window.fetch(url, { headers: driveKopf() })
+    .then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      var liste = (d && d.files) ? d.files : [];
+      if (!liste.length) { return null; }
+      driveDateiId = liste[0].id;
+      driveStand = liste[0].modifiedTime || '';
+      return liste[0];
+    });
+}
+
+function driveAnlegen() {
+  return window.fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: driveKopf({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ name: DRIVE_DATEI, mimeType: 'application/json' })
+  }).then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      driveDateiId = d.id;
+      return d.id;
+    });
+}
+
+function driveHochladen() {
+  var text = alsText();
+  var los = driveDateiId ? Promise.resolve(driveDateiId)
+                         : driveSuchen().then(function (t) { return t ? t.id : driveAnlegen(); });
+  return los.then(function (id) {
+    return window.fetch('https://www.googleapis.com/upload/drive/v3/files/' + id
+                        + '?uploadType=media&fields=id,modifiedTime', {
+      method: 'PATCH',
+      headers: driveKopf({ 'Content-Type': 'application/json' }),
+      body: text
+    });
+  }).then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      driveStand = d.modifiedTime || '';
+      letzteUebertragung = isoZeit();
+      return true;
+    });
+}
+
+function driveHerunterladen() {
+  var los = driveDateiId ? Promise.resolve(driveDateiId)
+                         : driveSuchen().then(function (t) { return t ? t.id : null; });
+  return los.then(function (id) {
+    if (!id) { return null; }
+    return window.fetch('https://www.googleapis.com/drive/v3/files/' + id + '?alt=media', {
+      headers: driveKopf()
+    }).then(antwortPruefen)
+      .then(function (a) { return a.text(); });
+  });
+}
+
+function driveLadenJetzt() {
+  if (!tokenGueltig()) { melde('Bitte zuerst anmelden.', 'warn'); return; }
+  driveHerunterladen().then(function (text) {
+    if (!text) {
+      melde('Bei Drive liegt noch keine ' + DRIVE_DATEI + '.', null);
+      zeichne();
+      return null;
+    }
+    if (!uebernehmen(text)) { zeichne(); return null; }
+    letzteUebertragung = isoZeit();
+    return speichern().then(function () {
+      melde('Von Drive geladen und lokal gesichert.', 'gut');
+      zeichne();
+    });
+  }).catch(function (f) {
+    melde('Laden von Drive fehlgeschlagen.\n' + (f ? f.message : ''), 'warn');
+    zeichne();
+  });
+}
+
+function driveSpeichernJetzt() {
+  if (!tokenGueltig()) { melde('Bitte zuerst anmelden.', 'warn'); return; }
+  driveHochladen().then(function () {
+    melde('Zu Drive gesichert: ' + DRIVE_DATEI + '\n' + letzteUebertragung, 'gut');
+    zeichne();
+  }).catch(function (f) {
+    melde('Sichern zu Drive fehlgeschlagen.\n' + (f ? f.message : ''), 'warn');
+    zeichne();
+  });
+}
+
+/* ============================================================
    Bedienung
    ============================================================ */
 
@@ -644,6 +925,33 @@ function zeichneSpeicher() {
   if (kn) { kn.disabled = (typeof window.showSaveFilePicker !== 'function'); }
 }
 
+function zeichneGoogle() {
+  var ziel = document.getElementById('googleListe');
+  if (!ziel) { return; }
+  var an = tokenGueltig();
+  var h = '';
+  h += zeile('Anmeldung', an ? 'aktiv' : 'nicht angemeldet', an ? 'ja' : 'grau');
+  h += zeile('Gültig noch', an ? (restMinuten() + ' Minuten') : '—', an ? '' : 'grau');
+  h += zeile('Stille Erneuerung', erneuerungsUhr ? 'geplant' : 'nicht geplant',
+             erneuerungsUhr ? 'ja' : 'grau');
+  h += zeile('Drive-Datei', driveDateiId ? DRIVE_DATEI : 'noch nicht gesucht',
+             driveDateiId ? '' : 'grau');
+  h += zeile('Stand bei Drive', driveStand || '—', driveStand ? '' : 'grau');
+  h += zeile('Letzte Übertragung', letzteUebertragung || 'noch nie',
+             letzteUebertragung ? '' : 'grau');
+  h += zeile('Rechte', 'drive.file · calendar.readonly', 'grau');
+  ziel.innerHTML = h;
+
+  var ka = document.getElementById('knopfAnmelden');
+  var kb = document.getElementById('knopfAbmelden');
+  var kl = document.getElementById('knopfDriveLaden');
+  var ks = document.getElementById('knopfDriveSpeichern');
+  if (ka) { ka.textContent = an ? 'Erneut anmelden' : 'Anmelden'; }
+  if (kb) { kb.disabled = !an; }
+  if (kl) { kl.disabled = !an; }
+  if (ks) { ks.disabled = !an; }
+}
+
 function zeichneBestand() {
   var ziel = document.getElementById('bestandListe');
   if (!ziel) { return; }
@@ -687,6 +995,7 @@ function zeichne() {
   var v = document.getElementById('kopfVersion');
   if (v) { v.textContent = 'v' + APP_VERSION; }
   zeichneSpeicher();
+  zeichneGoogle();
   zeichneBestand();
   zeichneUmgebung();
 }
@@ -696,6 +1005,9 @@ function zeichne() {
    ============================================================ */
 
 function starten() {
+  if (tokenAusSitzung()) {
+    melde('Anmeldung aus dieser Sitzung übernommen, noch ' + restMinuten() + ' Minuten gültig.', null);
+  }
   zeichne();
   if (!idbDa()) {
     speicherWeg = opfsDa() ? 'opfs' : (localDa() ? 'local' : 'keiner');
