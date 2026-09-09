@@ -442,7 +442,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__kalApi = { eintraegeEinsortieren, termineFuerTag, termineZahl,'
                  + ' zeitAusEintrag, tagAusEintrag,'
                  + ' zuruecksetzen: function(){ termineNachTag = {}; } };'
-                 + 'globalThis.__fehlerApi = { dienstAusAdresse, antwortPruefen };';
+                 + 'globalThis.__fehlerApi = { dienstAusAdresse, antwortPruefen };'
+                 + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext };';
     (0, eval)(skript + anhang);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -1691,6 +1692,73 @@ console.log('\n30. Fehlermeldungen von Google');
            'auch der Hochladeweg zählt zu Drive');
     pruefe(t.dienstAusAdresse('https://example.org/x') === 'Google',
            'Unbekanntes bekommt einen neutralen Namen');
+  }
+}
+
+/* ============================================================
+   31. Kalenderkennzeichnung und Tagesfilter
+   Grund: Berufliche Termine kommen jetzt aus einem eigens
+   gekennzeichneten Google-Kalender. Faellt die Kennzeichnung weg
+   oder greift der Filter nicht, steht Berufliches als privat da.
+   ============================================================ */
+console.log('\n31. Kalenderkennzeichnung und Tagesfilter');
+{
+  const skript = hauptSkript();
+  const api = globalThis.__filterApi;
+
+  ['kalenderKontext', 'kalenderEintrag', 'kalenderKontextUm',
+   'passtZumTag', 'setTagFilter'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/id="tAlle"/.test(QUELLE) && /id="tBeruf"/.test(QUELLE) && /id="tPrivat"/.test(QUELLE),
+         'der Tagesplan hat die drei Filterpillen');
+
+  /* Die Kennzeichnung liegt in der eigenen Datei, nicht bei Google */
+  const kontext = skript.match(/function kalenderKontext\([\s\S]*?\n\}/);
+  pruefe(kontext && /DB\.einstellungen/.test(kontext[0]),
+         'die Kennzeichnung steht in den eigenen Einstellungen');
+  pruefe(kontext && /'privat'/.test(kontext[0]),
+         'ein nicht gekennzeichneter Kalender gilt als privat');
+
+  const um = skript.match(/function kalenderKontextUm\([\s\S]*?\n\}/);
+  pruefe(um && /DB\.einstellungen\.stempel = jetzt\(\)/.test(um[0]),
+         'eine Änderung der Kennzeichnung wird abgeglichen');
+
+  /* Der gelesene Termin trägt seinen Kontext */
+  const holen = skript.match(/function einenKalenderHolen\([\s\S]*?\n\}/);
+  pruefe(holen && /kalenderKontext\(kal\.id\)/.test(holen[0]),
+         'beim Einlesen bekommt jeder Termin den Kontext seines Kalenders');
+
+  /* Der Filter greift auf alles, nicht nur auf Termine */
+  const eintraege = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
+  pruefe(eintraege && /passtZumTag\(a\.kontext\)/.test(eintraege[0]),
+         'der Filter greift auf Aufgaben');
+  pruefe(eintraege && /passtZumTag\(g\.kontext\)/.test(eintraege[0]),
+         'der Filter greift auf Termine');
+  const ganz = skript.match(/function ganztagsZeichnen\([\s\S]*?\n\}/);
+  pruefe(ganz && /passtZumTag/.test(ganz[0]),
+         'der Filter greift auch auf Ganztägiges');
+
+  if (!api) {
+    warn('Filterfunktionen nicht auswertbar');
+  } else {
+    api.setTagFilter('alle');
+    pruefe(api.passtZumTag('beruflich') && api.passtZumTag('privat'),
+           'Alle zeigt beides');
+    api.setTagFilter('beruflich');
+    pruefe(api.passtZumTag('beruflich') && !api.passtZumTag('privat'),
+           'Beruf zeigt nur Berufliches');
+    api.setTagFilter('privat');
+    pruefe(!api.passtZumTag('beruflich') && api.passtZumTag('privat'),
+           'Privat zeigt nur Privates');
+    api.setTagFilter('alle');
+
+    /* Ein Termin ohne Kennzeichnung darf nicht verschwinden */
+    api.setTagFilter('beruflich');
+    pruefe(api.passtZumTag('') === true,
+           'ein Eintrag ohne Kontext fällt nicht durch den Filter');
+    api.setTagFilter('alle');
   }
 }
 

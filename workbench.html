@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.8.2</title>
+<title>Workbench 0.9.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -101,6 +101,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   white-space:nowrap}
 .tk-form.frei{color:var(--petrol);border-color:var(--petrol)}
 .tk-blaettern{display:flex;gap:6px;margin-top:10px}
+.tk-pillen{margin-top:9px;padding:0}
 .tk-ganztags{display:none;font-size:calc(var(--fs)*0.76);color:var(--petrol);
   margin-top:7px;line-height:1.4}
 .tk-ganztags.sichtbar{display:block}
@@ -337,6 +338,11 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
       <button type="button" onclick="tagBlaettern(1)">›</button>
       <button type="button" id="tkAbgleich" onclick="abgleichenJetzt()">Abgleichen</button>
     </div>
+    <div class="pillen tk-pillen">
+      <button type="button" id="tAlle" class="aktiv" onclick="setTagFilter('alle')">Alle</button>
+      <button type="button" id="tBeruf" onclick="setTagFilter('beruflich')">Beruf</button>
+      <button type="button" id="tPrivat" onclick="setTagFilter('privat')">Privat</button>
+    </div>
     <div class="tk-ganztags" id="tkGanztags"></div>
     <div class="tk-stand" id="tkStand"></div>
   </div>
@@ -482,7 +488,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.8.2';
+var APP_VERSION = '0.9.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2097,6 +2103,7 @@ function migZeichne() {
    ============================================================ */
 
 var tagOffen = '';
+var tagFilter = 'alle';
 var erledigtOffen = false;
 var wartende = {};
 var WARTEZEIT = 4000;
@@ -2251,6 +2258,17 @@ function istErledigtAn(a, is) {
   return a.status === 'erledigt' && (!a.erledigtAm || a.erledigtAm === is);
 }
 
+function passtZumTag(kontext) {
+  if (tagFilter === 'alle') { return true; }
+  return (kontext || 'beruflich') === tagFilter;
+}
+
+function setTagFilter(art) {
+  tagFilter = art;
+  markiere([['alle', 'tAlle'], ['beruflich', 'tBeruf'], ['privat', 'tPrivat']], art);
+  tagZeichnen();
+}
+
 function tagesEintraege(is) {
   var aufgaben = DB.aufgaben || [];
   var verlauf = [], wieder = [], haupt = [], klein = [], fertig = [];
@@ -2258,6 +2276,7 @@ function tagesEintraege(is) {
 
   for (i = 0; i < aufgaben.length; i++) {
     var a = aufgaben[i];
+    if (!passtZumTag(a.kontext)) { continue; }
     var erledigt = istErledigtAn(a, is);
 
     if (a.wiederholung) {
@@ -2288,9 +2307,10 @@ function tagesEintraege(is) {
   var ausGoogle = termineFuerTag(is);
   for (i = 0; i < ausGoogle.zeit.length; i++) {
     var g = ausGoogle.zeit[i];
+    if (!passtZumTag(g.kontext)) { continue; }
     verlauf.push({ art: 'termin', zeit: g.zeit || '00:00',
                    t: { titel: g.titel, von: g.zeit, bis: g.bis, ort: g.ort,
-                        quelle: g.quelle, extern: true } });
+                        quelle: g.quelle, kontext: g.kontext, extern: true } });
   }
 
   verlauf.sort(function (x, y) { return (x.zeit < y.zeit) ? -1 : ((x.zeit > y.zeit) ? 1 : 0); });
@@ -2304,7 +2324,12 @@ function tagesEintraege(is) {
 function ganztagsZeichnen(is) {
   var el = document.getElementById('tkGanztags');
   if (!el) { return; }
-  var g = termineFuerTag(is).ganztags;
+  var roh = termineFuerTag(is).ganztags;
+  var g = [];
+  var j;
+  for (j = 0; j < roh.length; j++) {
+    if (passtZumTag(roh[j].kontext)) { g.push(roh[j]); }
+  }
   if (!g.length) { el.classList.remove('sichtbar'); el.innerHTML = ''; return; }
   var namen = [];
   var i;
@@ -2393,7 +2418,7 @@ function zeileHtml(a, is, kompakt) {
 function verlaufHtml(eintrag, is) {
   if (eintrag.art === 'termin') {
     var t = eintrag.t;
-    var h = '<div class="tverlauf fest">';
+    var h = '<div class="tverlauf fest' + (t.kontext === 'privat' ? ' privat' : '') + '">';
     h += '<div class="tv-zeit">' + esc(t.von || '') + '</div><div class="tv-schiene"></div>';
     h += '<div class="tv-inhalt"><div class="ttitel">' + esc(t.titel) + '</div>';
     var unten = [];
@@ -3402,7 +3427,11 @@ function zeichneKalender() {
   for (i = 0; i < kalenderListe.length; i++) {
     var k = kalenderListe[i];
     var an = kalenderGewaehlt(k.id);
+    var kk = kalenderKontext(k.id);
     h += '<div class="zeile"><div class="zeile-name">' + esc(k.name) + '</div>'
+       + '<button class="d-wahl' + (kk === 'beruflich' ? ' an' : '') + '" type="button" '
+       + 'onclick="kalenderKontextUm(\'' + esc(k.id) + '\',\'' + esc(k.name) + '\')">'
+       + (kk === 'beruflich' ? 'beruflich' : 'privat') + '</button>'
        + '<button class="d-wahl' + (an ? ' an' : '') + '" type="button" '
        + 'onclick="kalenderUm(\'' + esc(k.id) + '\',\'' + esc(k.name) + '\')">'
        + (an ? 'wird gelesen' : 'aus') + '</button></div>';
@@ -3510,24 +3539,44 @@ function kalenderGewaehlt(id) {
   return true;   /* noch nie entschieden: lesen */
 }
 
-function kalenderUm(id, name) {
+/* Ein Kalender gilt als beruflich, wenn er so gekennzeichnet ist.
+   Die Kennzeichnung liegt in der eigenen Datei, nicht bei Google. */
+function kalenderKontext(id) {
+  var gewaehlt = (DB.einstellungen && DB.einstellungen.kalender) || [];
+  var i;
+  for (i = 0; i < gewaehlt.length; i++) {
+    if (gewaehlt[i].id === id) { return gewaehlt[i].kontext || 'privat'; }
+  }
+  return 'privat';
+}
+
+function kalenderEintrag(id, name) {
   if (!DB.einstellungen.kalender) { DB.einstellungen.kalender = []; }
   var liste = DB.einstellungen.kalender;
   var i;
   for (i = 0; i < liste.length; i++) {
-    if (liste[i].id === id) {
-      liste[i].aktiv = (liste[i].aktiv === false);
-      DB.einstellungen.stempel = jetzt();
-      spaeterSichern();
-      termineHolen(true);
-      zeichne();
-      return;
-    }
+    if (liste[i].id === id) { return liste[i]; }
   }
-  liste.push({ id: id, name: name || '', aktiv: false });
+  var neu = { id: id, name: name || '', aktiv: true, kontext: 'privat' };
+  liste.push(neu);
+  return neu;
+}
+
+function kalenderKontextUm(id, name) {
+  var e = kalenderEintrag(id, name);
+  e.kontext = (e.kontext === 'beruflich') ? 'privat' : 'beruflich';
   DB.einstellungen.stempel = jetzt();
   spaeterSichern();
-  termineHolen(true);
+  tagZeichnen();
+  zeichne();
+}
+
+function kalenderUm(id, name) {
+  var e = kalenderEintrag(id, name);
+  e.aktiv = (e.aktiv === false);
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  termineHolen(false);
   zeichne();
 }
 
@@ -3570,7 +3619,8 @@ function tagAusEintrag(wert) {
   return isoDatum(d);
 }
 
-function eintraegeEinsortieren(eintraege, quelle) {
+function eintraegeEinsortieren(eintraege, quelle, kontext) {
+  var welcher = kontext || 'privat';
   var i;
   for (i = 0; i < eintraege.length; i++) {
     var e = eintraege[i];
@@ -3585,7 +3635,8 @@ function eintraegeEinsortieren(eintraege, quelle) {
       var schutz = 0;
       while (lauf <= bis && schutz < 400) {
         merkeTermin(lauf, { id: e.id, titel: titel, zeit: '', bis: '',
-                            ort: e.location || '', ganztags: true, quelle: quelle });
+                            ort: e.location || '', ganztags: true, quelle: quelle,
+                            kontext: welcher });
         lauf = tagePlus(lauf, 1);
         schutz++;
       }
@@ -3599,7 +3650,8 @@ function eintraegeEinsortieren(eintraege, quelle) {
       id: e.id, titel: titel,
       zeit: zeitAusEintrag(e.start.dateTime),
       bis: e.end && e.end.dateTime ? zeitAusEintrag(e.end.dateTime) : '',
-      ort: e.location || '', ganztags: false, quelle: quelle
+      ort: e.location || '', ganztags: false, quelle: quelle,
+      kontext: welcher
     });
   }
 }
@@ -3671,7 +3723,8 @@ function einenKalenderHolen(kal, von, bis) {
     .then(antwortPruefen)
     .then(function (a) { return a.json(); })
     .then(function (d) {
-      eintraegeEinsortieren((d && d.items) ? d.items : [], kal.name);
+      eintraegeEinsortieren((d && d.items) ? d.items : [], kal.name,
+                            kalenderKontext(kal.id));
       return true;
     }).catch(function (f) {
       /* Ein einzelner Kalender darf nicht die anderen verhindern. */
