@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.17.1</title>
+<title>Workbench 0.17.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -835,7 +835,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.17.1';
+var APP_VERSION = '0.17.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3006,8 +3006,25 @@ function nzErledigen(id) {
 var wischStart = null;
 var WISCH_WEITE = 60;
 
+/* Liegt unter dem Finger etwas, das selbst waagerecht rollt — das
+   Wochenraster, das Jahresraster —, dann gehört die Bewegung ihm.
+   Sonst wechselte beim Rollen ungewollt die Woche. */
+function rolltWaagerecht(knoten) {
+  var el = knoten;
+  var tiefe = 0;
+  while (el && tiefe < 8) {
+    if (el.scrollWidth && el.clientWidth && el.scrollWidth > el.clientWidth + 4) {
+      return true;
+    }
+    el = el.parentNode;
+    tiefe++;
+  }
+  return false;
+}
+
 function wischBeginn(ereignis) {
   if (!ereignis.touches || ereignis.touches.length !== 1) { wischStart = null; return; }
+  if (rolltWaagerecht(ereignis.target)) { wischStart = null; return; }
   wischStart = { x: ereignis.touches[0].clientX, y: ereignis.touches[0].clientY };
 }
 

@@ -3210,6 +3210,16 @@ console.log('\n48. Liegengebliebenes und Wischen');
          'eine eher senkrechte Bewegung zählt nicht — das Rollen bleibt frei');
   const an = skript.match(/function wischenAnHeften\([\s\S]*?\n\}/);
   pruefe(an && /passive: true/.test(an[0]), 'die Zuhörer stören das Rollen nicht');
+  pruefe(new RegExp('function\\s+rolltWaagerecht\\s*\\(').test(skript),
+         'Funktion rolltWaagerecht ist definiert');
+  const beginn = skript.match(/function wischBeginn\([\s\S]*?\n\}/);
+  pruefe(beginn && /rolltWaagerecht\(ereignis\.target\)/.test(beginn[0]),
+         'über einer waagerecht rollenden Fläche wird nicht gewischt');
+  const roll = skript.match(/function rolltWaagerecht\([\s\S]*?\n\}/);
+  pruefe(roll && /scrollWidth > el\.clientWidth/.test(roll[0]),
+         'erkannt wird sie am Überhang');
+  pruefe(roll && /tiefe < 8/.test(roll[0]),
+         'die Suche nach oben ist begrenzt');
   const anm = skript.match(/function wischenAnmelden\([\s\S]*?\n\}/);
   pruefe(anm && /schirmTag/.test(anm[0]), 'im Tagesplan wird gewischt');
   pruefe(anm && /schirmKalender/.test(anm[0]), 'im Kalender ebenfalls');
