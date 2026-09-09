@@ -1085,6 +1085,45 @@ console.log('\n20. Installierbare App und Versionswechsel');
 }
 
 /* ============================================================
+   21. Titel aendern
+   Grund: Ein Vertipper darf kein Loeschen und Neuanlegen erfordern.
+   Und ein leergeraeumtes Feld darf keine namenlose Aufgabe hinterlassen.
+   ============================================================ */
+console.log('\n21. Titel ändern');
+{
+  const skript = hauptSkript();
+
+  ['titelAendern', 'titelTaste'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/id="asTitel"/.test(skript), 'die Aktionsfläche enthält ein Titelfeld');
+  pruefe(/class="as-titelfeld"/.test(skript), 'das Titelfeld ist als solches gestaltet');
+
+  const aendern = skript.match(/function titelAendern\([\s\S]*?\n\}/);
+  pruefe(aendern && /geaendert = jetzt\(\)/.test(aendern[0]),
+         'eine Titeländerung setzt den Änderungsstempel');
+  pruefe(aendern && /spaeterSichern\(\)/.test(aendern[0]),
+         'die Änderung wird gesichert und abgeglichen');
+
+  const schliessen = skript.match(/function aktionenSchliessen\([\s\S]*?\n\}/);
+  pruefe(schliessen && /titelVorher/.test(schliessen[0]),
+         'ein leerer Titel fällt auf den vorherigen zurück');
+  pruefe(schliessen && /trim\(\)\.length === 0/.test(schliessen[0]),
+         'geprüft wird auf einen leeren Titel, nicht auf einen falschen Wert');
+  pruefe(schliessen && /tagZeichnen\(\)/.test(schliessen[0]),
+         'nach dem Schließen wird der Tag neu gezeichnet');
+
+  const taste = skript.match(/function titelTaste\([\s\S]*?\n\}/);
+  pruefe(taste && /'Enter'/.test(taste[0]), 'die Eingabetaste schließt die Fläche');
+
+  /* Kein doppeltes Zeichnen mehr in den Aktionen */
+  const schieben = skript.match(/function aufgabeSchieben\([\s\S]*?\n\}/);
+  pruefe(schieben && (schieben[0].match(/tagZeichnen\(\)/g) || []).length <= 1,
+         'Verschieben zeichnet den Tag nicht doppelt');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');

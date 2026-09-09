@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.6.0</title>
+<title>Workbench 0.6.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -182,6 +182,10 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .aktion-sheet.auf{display:block}
 .as-griff{width:36px;height:4px;border-radius:2px;background:var(--linie);margin:0 auto 12px}
 .as-titel{font-size:calc(var(--fs)*1.0);font-weight:600;line-height:1.3}
+.as-titelfeld{width:100%;font:inherit;font-size:calc(var(--fs)*1.0);font-weight:600;
+  line-height:1.3;border:1px solid var(--linie);border-radius:6px;padding:8px 10px;
+  background:var(--papier);color:var(--tinte);outline:none}
+.as-titelfeld:focus{border-color:var(--weinrot);background:var(--karte)}
 .as-meta{font-size:calc(var(--fs)*0.76);color:var(--grau);margin-top:2px}
 .as-linie{height:2px;background:var(--weinrot);margin:11px 0 4px}
 .as-linie.privat{background:var(--petrol)}
@@ -354,7 +358,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.6.0';
+var APP_VERSION = '0.6.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2392,6 +2396,7 @@ function zeileZustandSetzen(id, erledigt) {
    ------------------------------------------------------------ */
 
 var aktionFuer = '';
+var titelVorher = '';
 var zurueckHolen = null;
 var rueckUhr = null;
 var RUECK_ZEIT = 8000;
@@ -2410,8 +2415,10 @@ function aufgabeAktionen(id) {
   if (a.wiederholung) { meta.push('wiederkehrend'); }
   if (a.frist) { meta.push('Frist ' + kurzDatum(a.frist)); }
 
+  titelVorher = a.titel;
   var h = '<div class="as-griff"></div>';
-  h += '<div class="as-titel">' + esc(a.titel) + '</div>';
+  h += '<input class="as-titelfeld" id="asTitel" type="text" value="' + esc(a.titel) + '" '
+     + 'oninput="titelAendern(this.value)" onkeydown="titelTaste(event)">';
   h += '<div class="as-meta">' + esc(meta.join(' · ')) + '</div>';
   h += '<div class="as-linie' + (a.kontext === 'privat' ? ' privat' : '') + '"></div>';
   h += '<button class="as-knopf" type="button" onclick="aufgabeSchieben(1)">'
@@ -2426,12 +2433,39 @@ function aufgabeAktionen(id) {
   hg.classList.add('auf');
 }
 
+function titelAendern(wert) {
+  var a = aufgabeFinden(aktionFuer);
+  if (!a) { return; }
+  a.titel = wert;
+  a.geaendert = jetzt();
+  spaeterSichern();
+}
+
+function titelTaste(ereignis) {
+  if (!ereignis || ereignis.key !== 'Enter') { return; }
+  aktionenSchliessen();
+}
+
 function aktionenSchliessen() {
+  /* Ein leer geräumter Titel wäre eine Aufgabe ohne Namen — dann gilt
+     wieder der Stand von vor dem Öffnen. */
+  var a = aufgabeFinden(aktionFuer);
+  if (a && String(a.titel).trim().length === 0) {
+    a.titel = titelVorher;
+    a.geaendert = jetzt();
+    spaeterSichern();
+  } else if (a) {
+    var sauber = String(a.titel).trim();
+    if (sauber !== a.titel) { a.titel = sauber; a.geaendert = jetzt(); spaeterSichern(); }
+  }
+
   var sheet = document.getElementById('aktionSheet');
   var hg = document.getElementById('aktionHg');
   if (sheet) { sheet.classList.remove('auf'); }
   if (hg) { hg.classList.remove('auf'); }
   aktionFuer = '';
+  titelVorher = '';
+  tagZeichnen();
 }
 
 function aufgabeSchieben(n) {
@@ -2445,7 +2479,6 @@ function aufgabeSchieben(n) {
   a.planung = tagePlus(a.planung && a.planung.length === 10 ? a.planung : tagOffen, n);
   a.geaendert = jetzt();
   aktionenSchliessen();
-  tagZeichnen();
   spaeterSichern();
 }
 
@@ -2455,7 +2488,6 @@ function aufgabeInsBacklog() {
   a.planung = 'backlog';
   a.geaendert = jetzt();
   aktionenSchliessen();
-  tagZeichnen();
   spaeterSichern();
 }
 
