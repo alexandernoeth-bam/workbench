@@ -432,7 +432,10 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
     const anhang = ';globalThis.__api = { zusammenfuehren, leereDatenbank, bestandStempeln,'
                  + ' grabsteineAufraeumen, textZuBestand, neueKennung,'
                  + ' migrationRechnen, quelleErkennen, kontextRaten, gruppenKontext,'
-                 + ' wiederholungUmschreiben, wochentagUmrechnen, schluesselId, deutschZuIso };';
+                 + ' wiederholungUmschreiben, wochentagUmrechnen, schluesselId, deutschZuIso };'
+                 + 'globalThis.__tagApi = { tagesform, faelligAn, feiertagAn, monatsende,'
+                 + ' kalenderwoche, wochenIndex, eingabeDeuten, esc, istErledigtAn,'
+                 + ' tagesEintraege, ausIso, tagePlus };';
     (0, eval)(skript + anhang);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -698,6 +701,90 @@ console.log('\n14. Migration der Altbestände');
            'Übernehmen setzt eine berechnete Vorschau voraus');
     pruefe(uebern && /zusammenfuehren\(DB, neu\)/.test(uebern[0]),
            'Übernehmen führt zusammen statt zu überschreiben');
+  }
+}
+
+/* ============================================================
+   15. Tagesplan
+   Grund: Der Tagesplan entscheidet, was ueberhaupt erscheint.
+   Eine falsche Wiederholungsrechnung zeigt Dinge am falschen Tag
+   oder gar nicht — und faellt im Alltag erst spaet auf.
+   ============================================================ */
+console.log('\n15. Tagesplan');
+{
+  const api = globalThis.__tagApi;
+  const skript = hauptSkript();
+
+  const noetig = ['tagZeichnen', 'tagBlaettern', 'tagHeute', 'tagesform', 'faelligAn',
+                  'tagesEintraege', 'aufgabeHaken', 'schnellAnlegen', 'eingabeDeuten',
+                  'feiertagAn', 'urlaubAn', 'monatsende', 'kalenderwoche', 'wochenIndex',
+                  'streifenPruefen', 'istErledigtAn', 'esc'];
+  noetig.forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript), 'Funktion ' + f + ' ist definiert');
+  });
+
+  if (!api) {
+    warn('Tagesfunktionen nicht auswertbar');
+  } else {
+    /* Monatsende: nie über den Ersten des Folgemonats rechnen */
+    pruefe(api.monatsende(2026, 2) === 28, 'Februar 2026 hat 28 Tage');
+    pruefe(api.monatsende(2024, 2) === 29, 'Februar 2024 hat 29 Tage');
+    pruefe(api.monatsende(2026, 12) === 31, 'Dezember hat 31 Tage');
+
+    /* Feiertage */
+    pruefe(api.feiertagAn('2026-01-01') === 'Neujahr', 'Neujahr wird erkannt');
+    pruefe(api.feiertagAn('2026-06-04') === 'Fronleichnam', 'Fronleichnam 2026 stimmt');
+    pruefe(api.feiertagAn('2026-09-08') === '', 'ein normaler Dienstag ist kein Feiertag');
+    pruefe(api.feiertagAn('2027-03-26') === 'Karfreitag', 'Karfreitag 2027 stimmt');
+
+    /* Tagesform */
+    pruefe(api.tagesform('2026-09-08').form === 'Arbeitstag', 'Dienstag ist ein Arbeitstag');
+    pruefe(api.tagesform('2026-09-12').form === 'Freizeittag', 'Samstag ist ein Freizeittag');
+    pruefe(api.tagesform('2026-01-01').form === 'Freizeittag', 'Neujahr ist ein Freizeittag');
+
+    /* Wochenregel */
+    const woche = { takt: 'woche', intervall: 1, tage: [1, 5], tag: 1 };
+    pruefe(api.faelligAn(woche, '2026-09-07') === true, 'Montag trifft die Regel Mo+Fr');
+    pruefe(api.faelligAn(woche, '2026-09-11') === true, 'Freitag trifft die Regel Mo+Fr');
+    pruefe(api.faelligAn(woche, '2026-09-08') === false, 'Dienstag trifft sie nicht');
+
+    const leer = { takt: 'woche', intervall: 1, tage: [], tag: 1 };
+    pruefe(api.faelligAn(leer, '2026-09-07') === false, 'ohne Wochentag trifft nichts zu');
+
+    /* Zweiwöchentlich: genau jede zweite Woche */
+    const zwei = { takt: 'woche', intervall: 2, tage: [1], tag: 1 };
+    const m1 = api.faelligAn(zwei, '2026-09-07');
+    const m2 = api.faelligAn(zwei, '2026-09-14');
+    const m3 = api.faelligAn(zwei, '2026-09-21');
+    pruefe(m1 !== m2, 'zweiwöchentlich trifft nicht in zwei Wochen hintereinander');
+    pruefe(m1 === m3, 'aber wieder zwei Wochen später');
+
+    /* Monatsregel und der Monatsletzte */
+    const monat = { takt: 'monat', intervall: 1, tage: [], tag: 31 };
+    pruefe(api.faelligAn(monat, '2026-01-31') === true, 'der 31. trifft im Januar');
+    pruefe(api.faelligAn(monat, '2026-02-28') === true,
+           'im Februar rückt der 31. auf den Monatsletzten');
+    pruefe(api.faelligAn(monat, '2026-02-27') === false, 'der 27. Februar trifft nicht');
+
+    /* Kalenderwoche */
+    pruefe(api.kalenderwoche('2026-09-08') === 37, 'die Kalenderwoche wird richtig gerechnet');
+
+    /* Deutung der Schnelleingabe */
+    let d = api.eingabeDeuten('Rückruf Bergmann');
+    pruefe(d.art === 'klein' && d.kontext === 'beruflich',
+           'ohne Zusatz entsteht eine berufliche Kleinigkeit');
+    d = api.eingabeDeuten('!Präsentation schreiben');
+    pruefe(d.art === 'haupt' && d.titel === 'Präsentation schreiben',
+           'das Ausrufezeichen macht eine Hauptaufgabe und verschwindet aus dem Titel');
+    d = api.eingabeDeuten('Tisch reservieren p');
+    pruefe(d.kontext === 'privat' && d.titel === 'Tisch reservieren',
+           'das angehängte p macht es privat und verschwindet');
+    d = api.eingabeDeuten('!Zisterne vergleichen privat');
+    pruefe(d.art === 'haupt' && d.kontext === 'privat' && d.titel === 'Zisterne vergleichen',
+           'beide Kürzel zusammen werden verstanden');
+
+    /* Maskierung gegen eingeschleustes Markup */
+    pruefe(api.esc('<b>x</b>').indexOf('<') < 0, 'Titel werden maskiert');
   }
 }
 
