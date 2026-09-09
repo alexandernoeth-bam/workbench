@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.18.0</title>
+<title>Workbench 0.18.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -393,13 +393,14 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
 /* ---------- Breite Ansicht: Spalten wie im Entwurf ---------- */
 /* Der Tag steht in zwei Spalten: links die Zeitachse und was sich
    wiederholt, rechts die Arbeit des Tages. Erledigtes über beide. */
+/* Im schmalen Bild lösen sich die Spaltenbehälter auf, damit die
+   Abschnitte in ihrer natürlichen Folge untereinander stehen. */
+.tspalte{display:contents}
 body.breit .tagblatt{display:grid;grid-template-columns:1fr 1fr;gap:0 32px;
-  align-content:start}
-body.breit .tabschnitt[data-kurz="Tagesverlauf"]{grid-column:1}
-body.breit .tabschnitt[data-kurz="Wiederkehrend"]{grid-column:1}
-body.breit .tabschnitt[data-kurz="Abläufe"]{grid-column:1}
-body.breit .tabschnitt[data-kurz="Aufgaben"]{grid-column:2}
-body.breit .tabschnitt[data-kurz="Kleinigkeiten"]{grid-column:2}
+  align-items:start}
+body.breit .tspalte{display:block}
+body.breit .tspalte-links{grid-column:1}
+body.breit .tspalte-rechts{grid-column:2}
 body.breit .tabschnitt[data-kurz="Erledigt"]{grid-column:1 / -1}
 
 /* Vorhaben und Abläufe als Kacheln, so viele wie hineinpassen. */
@@ -855,7 +856,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.18.0';
+var APP_VERSION = '0.18.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3094,6 +3095,10 @@ function tagZeichnen() {
   var h = '';
   var i;
 
+  /* Zwei Spalten als eigene Behälter: In einem Raster teilen sich
+     nebeneinanderliegende Abschnitte die Zeilenhöhe, wodurch oben
+     rechts eine Lücke entstünde. */
+  h += '<div class="tspalte tspalte-links">';
   h += '<div class="tabschnitt" data-kurz="Tagesverlauf"><div class="tabschnitt-titel">'
      + '<span>Tagesverlauf</span></div>';
   if (!e.verlauf.length) { h += '<div class="tleer">Nichts mit fester Zeit.</div>'; }
@@ -3114,6 +3119,7 @@ function tagZeichnen() {
     h += '</div>';
   }
 
+  h += '</div><div class="tspalte tspalte-rechts">';
   h += '<div class="tabschnitt" data-kurz="Aufgaben"><div class="tabschnitt-titel">'
      + '<span>Aufgaben</span></div>';
   if (!e.haupt.length) { h += '<div class="tleer">Für heute nichts eingeplant.</div>'; }
@@ -3124,6 +3130,8 @@ function tagZeichnen() {
      + '<span>Kleinigkeiten &amp; Kontakte</span></div>';
   if (!e.klein.length) { h += '<div class="tleer">Nichts offen.</div>'; }
   for (i = 0; i < e.klein.length; i++) { h += zeileHtml(e.klein[i], is, true); }
+  h += '</div>';
+
   h += '</div>';
 
   if (e.fertig.length) {

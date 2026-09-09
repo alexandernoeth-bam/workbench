@@ -3306,28 +3306,31 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
   pruefe(/body\.breit \.tagblatt\{[^}]*grid-template-columns:1fr 1fr/.test(QUELLE),
          'es sind zwei Spalten');
 
-  const links = ['Tagesverlauf', 'Wiederkehrend', 'Abläufe'];
-  const rechts = ['Aufgaben', 'Kleinigkeiten'];
-  links.forEach(function (n) {
-    pruefe(new RegExp('body\\.breit \\.tabschnitt\\[data-kurz="' + n + '"\\]\\{grid-column:1\\}')
-           .test(QUELLE), n + ' steht links');
-  });
-  rechts.forEach(function (n) {
-    pruefe(new RegExp('body\\.breit \\.tabschnitt\\[data-kurz="' + n + '"\\]\\{grid-column:2\\}')
-           .test(QUELLE), n + ' steht rechts');
-  });
+  /* Die Spalten sind eigene Behälter — in einem reinen Raster teilen
+     sich Nachbarn die Zeilenhöhe, wodurch oben rechts eine Lücke
+     entstand. */
+  pruefe(/body\.breit \.tspalte-links\{grid-column:1\}/.test(QUELLE),
+         'die linke Spalte sitzt links');
+  pruefe(/body\.breit \.tspalte-rechts\{grid-column:2\}/.test(QUELLE),
+         'die rechte Spalte sitzt rechts');
+  pruefe(/\.tspalte\{display:contents\}/.test(QUELLE),
+         'im schmalen Bild lösen sich die Behälter auf');
+  pruefe(/body\.breit \.tspalte\{display:block\}/.test(QUELLE),
+         'im breiten Bild werden sie zu Spalten');
+  pruefe(/body\.breit \.tagblatt\{[^}]*align-items:start/.test(QUELLE),
+         'die Spalten beginnen beide oben');
   pruefe(/body\.breit \.tabschnitt\[data-kurz="Erledigt"\]\{grid-column:1 \/ -1\}/.test(QUELLE),
          'Erledigtes geht über beide Spalten');
 
-  /* Jeder gezeichnete Abschnitt muss auch zugeordnet sein */
-  const skript = hauptSkript();
-  const namen = [...skript.matchAll(/data-kurz="([^"]+)"/g)].map(m => m[1]);
-  const einmalig = [];
-  namen.forEach(function (n) { if (einmalig.indexOf(n) < 0) { einmalig.push(n); } });
-  einmalig.forEach(function (n) {
-    pruefe(QUELLE.indexOf('data-kurz="' + n + '"]{grid-column') >= 0,
-           'Abschnitt „' + n + '" hat eine Spalte zugewiesen');
-  });
+  /* Jeder Abschnitt liegt in genau einer Spalte */
+  const tag = hauptSkript().match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  const folge = tag ? [...tag[0].matchAll(/tspalte tspalte-(\w+)|data-kurz="([^"]+)"/g)]
+                       .map(m => m[1] ? ('[' + m[1] + ']') : m[2]) : [];
+  const erwarteteFolge = ['[links]', 'Tagesverlauf', 'Wiederkehrend', 'Abläufe',
+                          '[rechts]', 'Aufgaben', 'Kleinigkeiten', 'Erledigt'];
+  pruefe(folge.join(',') === erwarteteFolge.join(','),
+         'die Abschnitte stehen in der vereinbarten Folge und Spalte'
+         + (folge.join(',') === erwarteteFolge.join(',') ? '' : ' — ist: ' + folge.join(' → ')));
 
   /* Vorhaben und Abläufe als Kacheln */
   pruefe(/body\.breit \.vhblatt\{display:grid/.test(QUELLE),
