@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.9.1</title>
+<title>Workbench 0.9.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -484,7 +484,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.9.1';
+var APP_VERSION = '0.9.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -555,6 +555,9 @@ var letzterBericht = null;
 var abgleichUhr = null;
 var abgleichLaeuft = false;
 var abgleichZuletztMs = 0;
+var verbindungOk = null;      /* null = noch nicht geprüft */
+var verbindungUhr = null;
+var VERBINDUNG_TAKT = 60000;
 var abgleichFehler = '';
 var lokalOffen = false;
 var taktUhr = null;
@@ -1156,6 +1159,7 @@ function anmelden(still) {
         if (antwort && antwort.access_token) {
           tokenMerken(antwort.access_token, Number(antwort.expires_in) || 3600);
           try { window.localStorage.setItem(ANMELDE_MERKER, '1'); } catch (e) { /* egal */ }
+          verbindungOk = true;
           abgleichPlanen(true);
           termineHolen(false);
           anmeldeStreifenPruefen();
@@ -1383,6 +1387,7 @@ function abgleichStill() {
     abgleichZuletztMs = Date.now();
     abgleichFehler = '';
     lokalOffen = false;
+    verbindungOk = true;
     if (b && (b.neu || b.ersetzt || b.entfernt)) {
       melde('Abgeglichen: ' + berichtText(b), 'gut');
     }
@@ -1407,14 +1412,48 @@ function standSetzen(text, warnen) {
 
 /* Ohne Anmeldung läuft nichts nach Drive und kein Kalender kommt an.
    Das muss auf jedem Bildschirm sichtbar sein, nicht nur in der Diagnose. */
+/* Ein Zugriffsschlüssel kann verworfen sein, lange bevor seine Stunde
+   um ist. Deshalb wird die Verbindung wirklich ausprobiert und nicht
+   nur die Uhr befragt. */
+function verbindungPruefen() {
+  if (!tokenGueltig()) { verbindungOk = false; anmeldeStreifenPruefen(); return; }
+  var adresse = 'https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)';
+  window.fetch(adresse, { headers: driveKopf() }).then(function (a) {
+    if (a.ok) { verbindungOk = true; }
+    else if (a.status === 401 || a.status === 403) { tokenVergessen(); verbindungOk = false; }
+    anmeldeStreifenPruefen();
+  }).catch(function () {
+    /* Kein Netz ist etwas anderes als kein Zugriff — der Schlüssel
+       bleibt, aber gearbeitet wird lokal. */
+    verbindungOk = false;
+    anmeldeStreifenPruefen();
+  });
+}
+
+function verbindungTaktStarten() {
+  if (verbindungUhr) { window.clearInterval(verbindungUhr); }
+  verbindungUhr = window.setInterval(function () {
+    if (document.hidden) { return; }
+    verbindungPruefen();
+  }, VERBINDUNG_TAKT);
+}
+
 function anmeldeStreifenPruefen() {
   var streifen = document.getElementById('anmeldeStreifen');
   var text = document.getElementById('anmeldeText');
   if (!streifen || !text) { return; }
-  if (tokenGueltig()) { streifen.classList.remove('sichtbar'); return; }
-  text.textContent = warAngemeldet()
-    ? 'Die Anmeldung bei Google ist abgelaufen. Ohne sie wird nur lokal gespeichert.'
-    : 'Noch nicht bei Google angemeldet — es wird nur lokal gespeichert.';
+
+  if (tokenGueltig() && verbindungOk !== false) {
+    streifen.classList.remove('sichtbar');
+    return;
+  }
+  if (!tokenGueltig()) {
+    text.textContent = warAngemeldet()
+      ? 'Die Anmeldung bei Google ist abgelaufen — bitte neu anmelden.'
+      : 'Noch nicht bei Google angemeldet — es wird nur lokal gespeichert.';
+  } else {
+    text.textContent = 'Keine Verbindung zu Google — es wird nur lokal gespeichert.';
+  }
   streifen.classList.add('sichtbar');
 }
 
@@ -3153,16 +3192,31 @@ function schnellAnlegen() {
    Blättern
    ------------------------------------------------------------ */
 
+/* Das geholte Fenster deckt nur einen Ausschnitt ab. Blättert man
+   darüber hinaus, stünde der Tag ohne Termine da, ohne dass es
+   auffiele — deshalb wird dann nachgeholt. */
+function fensterPruefen() {
+  if (!tokenGueltig()) { return; }
+  var is = tagOffen || isoDatum();
+  if (!kalVon || !kalBis) { termineHolen(false); return; }
+  var rand = 7;
+  if (is < tagePlus(kalVon, rand) || is > tagePlus(kalBis, -rand)) {
+    termineHolen(false);
+  }
+}
+
 function tagBlaettern(n) {
   tagOffen = tagePlus(tagOffen || isoDatum(), n);
   erledigtOffen = false;
   tagZeichnen();
+  fensterPruefen();
 }
 
 function tagHeute() {
   tagOffen = isoDatum();
   erledigtOffen = false;
   tagZeichnen();
+  fensterPruefen();
 }
 
 /* ============================================================
@@ -3353,6 +3407,9 @@ function zeichneGoogle() {
   var an = tokenGueltig();
   var h = '';
   h += zeile('Anmeldung', an ? 'aktiv' : 'nicht angemeldet', an ? 'ja' : 'grau');
+  h += zeile('Verbindung geprüft',
+             (verbindungOk === null) ? 'noch nicht' : (verbindungOk ? 'erreichbar' : 'nicht erreichbar'),
+             (verbindungOk === null) ? 'grau' : (verbindungOk ? 'ja' : 'nein'));
   h += zeile('Gültig noch', an ? (restMinuten() + ' Minuten') : '—', an ? '' : 'grau');
   h += zeile('Stille Erneuerung', erneuerungsUhr ? 'geplant' : 'nicht geplant',
              erneuerungsUhr ? 'ja' : 'grau');
@@ -3403,6 +3460,9 @@ function zeichneKalender() {
   var h = '';
   h += zeile('Zuletzt geholt', kalenderStand || 'noch nie', kalenderStand ? '' : 'grau');
   h += zeile('Termine im Fenster', String(termineZahl()), termineZahl() ? '' : 'grau');
+  h += zeile('Fenster', (kalVon && kalBis) ? (kurzDatum(kalVon) + ' – ' + kurzDatum(kalBis)) : '—',
+             (kalVon ? '' : 'grau'));
+  h += zeile('Wird geholt alle', Math.round(KAL_TAKT / 60000) + ' Minuten', 'grau');
   if (kalenderFehler) { h += zeile('Letzter Fehler', esc(kalenderFehler), 'nein'); }
   if (!kalenderListe.length) {
     h += '<div class="platzhalter">Noch keine Kalender eingelesen.</div>';
@@ -3488,7 +3548,9 @@ function zeichne() {
 
 var KAL_VOR = 21;      /* Tage rückwärts */
 var KAL_NACH = 120;    /* Tage vorwärts */
-var KAL_TAKT = 10 * 60 * 1000;
+var KAL_TAKT = 2 * 60 * 1000;
+var kalVon = '';
+var kalBis = '';
 
 var kalenderListe = [];      /* {id, name, farbe} */
 var termineNachTag = {};     /* iso -> [{zeit, bis, titel, ort, ganztags, quelle, id}] */
@@ -3654,9 +3716,11 @@ function termineHolen(laut) {
   kalenderLaeuft = true;
   kalenderFehler = '';
 
-  var heute = isoDatum();
-  var von = tagePlus(heute, -KAL_VOR);
-  var bis = tagePlus(heute, KAL_NACH);
+  var mitte = tagOffen || isoDatum();
+  var von = tagePlus(mitte, -KAL_VOR);
+  var bis = tagePlus(mitte, KAL_NACH);
+  kalVon = von;
+  kalBis = bis;
 
   var vorbereitung = kalenderListe.length ? Promise.resolve(kalenderListe)
                                           : kalenderListeHolen();
@@ -3675,6 +3739,7 @@ function termineHolen(laut) {
     return reihe;
   }).then(function () {
     kalenderStand = isoZeit();
+    if (!kalenderFehler) { verbindungOk = true; }
     if (!kalenderFehler && laut) {
       melde('Termine geholt: ' + termineZahl() + ' im Fenster.', 'gut');
     } else if (kalenderFehler && laut) {
@@ -4197,6 +4262,8 @@ function starten() {
   window.setInterval(anmeldeStreifenPruefen, 15000);
   taktStarten();
   kalenderTaktStarten();
+  verbindungTaktStarten();
+  window.setTimeout(verbindungPruefen, 2500);
   swAnmelden().then(function () { return versionPruefen(false); });
   versionTaktStarten();
   zeichne();

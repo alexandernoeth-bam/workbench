@@ -1829,6 +1829,80 @@ console.log('\n32. Verdichteter Tagesplan');
 }
 
 /* ============================================================
+   33. Verbindung und Kalenderfenster
+   Grund: Die Warnung hing an der Uhr statt an der Wirklichkeit —
+   ein laengst verworfener Zugriff galt bis zum Ablauf als gueltig.
+   Und beim Blaettern ueber das geholte Fenster hinaus stand der Tag
+   ohne Termine da, ohne dass es auffiel.
+   ============================================================ */
+console.log('\n33. Verbindung und Kalenderfenster');
+{
+  const skript = hauptSkript();
+
+  ['verbindungPruefen', 'verbindungTaktStarten', 'fensterPruefen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  /* Die Verbindung wird wirklich ausprobiert */
+  const pruef = skript.match(/function verbindungPruefen\([\s\S]*?\n\}\n/);
+  pruefe(pruef && /window\.fetch\(/.test(pruef[0]),
+         'die Prüfung ruft Google wirklich auf');
+  pruefe(pruef && /drive\/v3\/about/.test(pruef[0]),
+         'dafür genügt ein kleiner Aufruf');
+  pruefe(pruef && /401 \|\| a\.status === 403/.test(pruef[0]),
+         'ein verworfener Zugriff wird erkannt');
+  pruefe(pruef && /tokenVergessen\(\)/.test(pruef[0]),
+         'der Schlüssel wird dann verworfen');
+  pruefe(pruef && /catch\(/.test(pruef[0]),
+         'auch fehlendes Netz wird bemerkt');
+
+  const streifen = skript.match(/function anmeldeStreifenPruefen\([\s\S]*?\n\}/);
+  pruefe(streifen && /verbindungOk !== false/.test(streifen[0]),
+         'der Streifen erscheint auch bei gültiger Uhr, aber toter Verbindung');
+  pruefe(streifen && /Keine Verbindung zu Google/.test(streifen[0]),
+         'die drei Fälle werden unterschieden');
+
+  const start = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(start && /verbindungTaktStarten\(\)/.test(start[0]),
+         'die Verbindungsprüfung läuft regelmäßig');
+  pruefe(start && /setTimeout\(verbindungPruefen/.test(start[0]),
+         'kurz nach dem Start wird einmal geprüft');
+
+  const takt = skript.match(/VERBINDUNG_TAKT\s*=\s*(\d+)/);
+  pruefe(takt && Number(takt[1]) >= 20000 && Number(takt[1]) <= 300000,
+         'der Takt liegt zwischen 20 Sekunden und fünf Minuten');
+
+  /* Erfolgreiche Aufrufe setzen den Zustand zurück */
+  pruefe(/verbindungOk = true/.test(skript), 'ein erfolgreicher Aufruf meldet die Verbindung als gut');
+
+  /* Kalenderfenster */
+  const fenster = skript.match(/function fensterPruefen\([\s\S]*?\n\}/);
+  pruefe(fenster && /kalVon/.test(fenster[0]) && /kalBis/.test(fenster[0]),
+         'das geholte Fenster wird gemerkt');
+  pruefe(fenster && /termineHolen\(false\)/.test(fenster[0]),
+         'außerhalb des Fensters wird nachgeholt');
+  const blaettern = skript.match(/function tagBlaettern\([\s\S]*?\n\}/);
+  pruefe(blaettern && /fensterPruefen\(\)/.test(blaettern[0]),
+         'beim Blättern wird das Fenster geprüft');
+  const heute = skript.match(/function tagHeute\([\s\S]*?\n\}/);
+  pruefe(heute && /fensterPruefen\(\)/.test(heute[0]),
+         'auch der Sprung auf heute prüft es');
+
+  const holen = skript.match(/function termineHolen\([\s\S]*?\n\}\n/);
+  pruefe(holen && /tagOffen \|\| isoDatum\(\)/.test(holen[0]),
+         'das Fenster legt sich um den angezeigten Tag, nicht um heute');
+
+  const kaltakt = skript.match(/KAL_TAKT\s*=\s*([\d\s*]+);/);
+  if (kaltakt) {
+    const wert = Function('"use strict";return (' + kaltakt[1] + ')')();
+    pruefe(wert <= 5 * 60 * 1000,
+           'der Kalender wird höchstens alle fünf Minuten geholt (ist: '
+           + Math.round(wert / 60000) + ' Minuten)');
+  }
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');
