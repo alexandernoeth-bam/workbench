@@ -466,6 +466,26 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__jtKontextApi = { jtKontext,'
+                 + ' pruefeFilter: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.jahrestermine = ['
+                 + '     { id:\'a\', titel:\'Werksbesuch\', art:\'dienstreise\','
+                 + '       von:\'2026-03-10\', bis:\'2026-03-10\' },'
+                 + '     { id:\'b\', titel:\'Geburtstag Anna\', art:\'geburtstag\','
+                 + '       von:\'2026-03-10\', bis:\'2026-03-10\' },'
+                 + '     { id:\'c\', titel:\'Kreta\', art:\'urlaub\','
+                 + '       von:\'2026-03-10\', bis:\'2026-03-10\' } ];'
+                 + '   var merk = kalFilter; var merkJ = jahrFilter; jahrFilter = null;'
+                 + '   kalFilter = \'alle\';'
+                 + '   var a = jtAn(\'2026-03-10\').filter(jtPasst).length;'
+                 + '   kalFilter = \'beruflich\';'
+                 + '   var b = jtAn(\'2026-03-10\').filter(jtPasst).length;'
+                 + '   kalFilter = \'privat\';'
+                 + '   var c = jtAn(\'2026-03-10\').filter(jtPasst).length;'
+                 + '   kalFilter = merk; jahrFilter = merkJ; DB = alt;'
+                 + '   return { alle:a, beruf:b, privat:c };'
+                 + ' } };'
                  + 'globalThis.__monatApi = {'
                  + ' pruefeMonat: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -2470,6 +2490,69 @@ console.log('\n41. Monatssicht');
     pruefe(e.nachAbwahl === true, 'ein abgewählter Kalender verschwindet');
     pruefe(e.zahlNachAbwahl === 1, 'der Knopf zählt die Abwahl');
     pruefe(e.zurueckgesetzt === 0, 'zurücksetzen räumt alle Filter ab');
+  }
+}
+
+/* ============================================================
+   42. Kontext der Jahrestermine
+   Grund: Die Filterpillen im Kalender griffen nicht auf Jahrestermine.
+   Eine Dienstreise ist beruflich, ein Geburtstag privat — ohne diese
+   Unterscheidung zeigt „nur Beruf" weiterhin alle Geburtstage.
+   ============================================================ */
+console.log('\n42. Kontext der Jahrestermine');
+{
+  const skript = hauptSkript();
+  const j = globalThis.__jtKontextApi;
+
+  ['jtKontext', 'jtKontextSetzen', 'jtNeuKontextSetzen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const passt = skript.match(/function jtPasst\([\s\S]*?\n\}/);
+  pruefe(passt && /passtZumKalender\(jtKontext\(e\)\)/.test(passt[0]),
+         'die Filterpillen greifen jetzt auch auf Jahrestermine');
+
+  const jahr = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
+  pruefe(jahr && /passtZumKalender\(jtKontext\(e\)\)/.test(jahr[0]),
+         'auch die Summen folgen dem Kontextfilter');
+
+  const blatt = skript.match(/function jtTagHtml\([\s\S]*?\n\}\n/);
+  pruefe(blatt && /jtKontextSetzen\(/.test(blatt[0]),
+         'im Tagesblatt lässt sich der Kontext umschalten');
+  const neu = skript.match(/function jtNeuHtml\([\s\S]*?\n\}\n/);
+  pruefe(neu && /jtNeuKontextSetzen\(/.test(neu[0]),
+         'beim Anlegen ist er wählbar');
+
+  const anlegen = skript.match(/function jtAnlegen\([\s\S]*?\n\}/);
+  pruefe(anlegen && /kontext: jtNeuKontext/.test(anlegen[0]),
+         'der gewählte Kontext wird gespeichert');
+
+  const mig = skript.match(/function migrationRechnen\([\s\S]*?\n\}\n/);
+  pruefe(mig && /'dienstreise', 'abwesend', 'termin'/.test(mig[0]),
+         'die Migration gibt jedem Jahrestermin einen Kontext');
+
+  if (!j) {
+    warn('Kontextfunktion nicht auswertbar');
+  } else {
+    pruefe(j.jtKontext({ art: 'dienstreise' }) === 'beruflich', 'Dienstreise ist beruflich');
+    pruefe(j.jtKontext({ art: 'abwesend' }) === 'beruflich', 'Abwesend ist beruflich');
+    pruefe(j.jtKontext({ art: 'termin' }) === 'beruflich', 'Termin ist beruflich');
+    pruefe(j.jtKontext({ art: 'besuche' }) === 'privat', 'Besuche sind privat');
+    pruefe(j.jtKontext({ art: 'geburtstag' }) === 'privat', 'Geburtstage sind privat');
+    pruefe(j.jtKontext({ art: 'urlaub' }) === 'privat', 'Urlaub ist privat');
+    pruefe(j.jtKontext({ art: 'krank' }) === 'privat', 'Krankheit ist privat');
+    pruefe(j.jtKontext({ art: 'dienstreise', kontext: 'privat' }) === 'privat',
+           'ein gesetzter Kontext gewinnt gegen die Ableitung');
+    pruefe(j.jtKontext({ art: 'geburtstag', kontext: 'beruflich' }) === 'beruflich',
+           'auch andersherum');
+    pruefe(j.jtKontext({ art: 'sonstiges', kontext: 'unsinn' }) === 'privat',
+           'ein unbrauchbarer Wert fällt auf die Ableitung zurück');
+
+    const e = j.pruefeFilter();
+    pruefe(e.alle === 3, 'ohne Filter stehen alle drei im Raster');
+    pruefe(e.beruf === 1, 'nur Beruf zeigt die Dienstreise');
+    pruefe(e.privat === 2, 'nur Privat zeigt Geburtstag und Urlaub');
   }
 }
 

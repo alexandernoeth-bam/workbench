@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.12.2</title>
+<title>Workbench 0.13.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -665,7 +665,7 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.12.2';
+var APP_VERSION = '0.13.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2082,6 +2082,8 @@ function migrationRechnen(quellen) {
       ziel.jahrestermine.push(stempelnMit({
         id: schluesselId('jt', schluessel),
         titel: etitel, art: art,
+        kontext: (['dienstreise', 'abwesend', 'termin'].indexOf(art) >= 0)
+                 ? 'beruflich' : 'privat',
         von: e.von || '', bis: e.bis || e.von || '',
         jaehrlich: !!e.jaehrlich
       }));
@@ -2404,7 +2406,7 @@ function urlaubAn(is) {
   var jt = DB.jahrestermine || [];
   var i;
   for (i = 0; i < jt.length; i++) {
-    if (jt[i].art !== 'urlaub') { continue; }
+    if (jt[i].art !== 'urlaub' && jt[i].art !== 'krank') { continue; }
     if (is >= jt[i].von && is <= (jt[i].bis || jt[i].von)) { return jt[i].titel || 'Urlaub'; }
   }
   return '';
@@ -4323,6 +4325,16 @@ function jtKuerzel(e) {
   return drei.charAt(0).toUpperCase() + drei.slice(1).toLowerCase();
 }
 
+/* Beruflich ist, was nur wegen der Arbeit besteht. Urlaub und
+   Krankheit gehören zur Person, nicht zum Beruf. Die Ableitung ist
+   nur die Voreinstellung — an jedem Eintrag änderbar. */
+var JT_BERUFLICH = ['dienstreise', 'abwesend', 'termin'];
+
+function jtKontext(e) {
+  if (e.kontext === 'beruflich' || e.kontext === 'privat') { return e.kontext; }
+  return (JT_BERUFLICH.indexOf(e.art) >= 0) ? 'beruflich' : 'privat';
+}
+
 function jtFarbe(e) {
   var a = JT_ARTEN[e.art] || JT_ARTEN.sonstiges;
   return a.f;
@@ -4331,6 +4343,7 @@ function jtFarbe(e) {
 /* Der Filter 'ferien' ist der Gegenpart zu 'Alle': dann sind die
    Jahrestermine ganz aus dem Bild, nur die Ferientage bleiben. */
 function jtPasst(e) {
+  if (!passtZumKalender(jtKontext(e))) { return false; }
   if (jahrFilter === null) { return true; }
   if (jahrFilter === 'ferien') { return false; }
   return (e.art || '') === jahrFilter;
@@ -4718,6 +4731,7 @@ function jahrHtml(is) {
   var i;
   for (i = 0; i < liste.length; i++) {
     var e = liste[i];
+    if (!passtZumKalender(jtKontext(e))) { continue; }
     var von = e.jaehrlich ? (jahr + e.von.slice(4)) : e.von;
     var bis = e.jaehrlich ? (jahr + (e.bis || e.von).slice(4)) : (e.bis || e.von);
     if (von.slice(0, 4) > String(jahr) || bis.slice(0, 4) < String(jahr)) { continue; }
@@ -4867,6 +4881,7 @@ function kalZeichnen() {
 
 var jtTag = '';
 var jtNeuArt = 'urlaub';
+var jtNeuKontext = 'privat';
 
 function jtTagOeffnen(is) {
   jtTag = is;
@@ -4924,6 +4939,13 @@ function jtTagHtml(is) {
        + 'onchange="jtKuerzelSetzen(\'' + esc(e.id) + '\',this.value)" '
        + 'style="width:64px;text-align:center">'
        + '</div></div>';
+    h += '<div class="d-feld" style="border-bottom:0;padding:7px 0 0">'
+       + '<div class="d-name">Kontext</div><div class="d-wert">'
+       + '<button class="d-wahl' + (jtKontext(e) === 'beruflich' ? ' an' : '') + '" '
+       + 'type="button" onclick="jtKontextSetzen(\'' + esc(e.id) + '\',\'beruflich\')">Beruflich</button>'
+       + '<button class="d-wahl' + (jtKontext(e) === 'privat' ? ' an' : '') + '" '
+       + 'type="button" onclick="jtKontextSetzen(\'' + esc(e.id) + '\',\'privat\')">Privat</button>'
+       + '</div></div>';
     h += jtArtenHtml(esc(e.id), e.art);
     h += '<div class="d-reihe">';
     h += '<button type="button" onclick="jtJaehrlichUm(\'' + esc(e.id) + '\')">'
@@ -4968,10 +4990,22 @@ function jtNeuHtml(is) {
   h += '<input type="date" id="jtNeuVon" value="' + is + '" style="flex:1">';
   h += '<input type="date" id="jtNeuBis" value="' + is + '" style="flex:1">';
   h += '</div>';
+  h += '<div class="d-feld" style="border-bottom:0;padding:9px 0 0">'
+     + '<div class="d-name">Kontext</div><div class="d-wert">'
+     + '<button class="d-wahl' + (jtNeuKontext === 'beruflich' ? ' an' : '') + '" '
+     + 'type="button" onclick="jtNeuKontextSetzen(\'beruflich\')">Beruflich</button>'
+     + '<button class="d-wahl' + (jtNeuKontext === 'privat' ? ' an' : '') + '" '
+     + 'type="button" onclick="jtNeuKontextSetzen(\'privat\')">Privat</button>'
+     + '</div></div>';
   h += jtArtenHtml('neu', jtNeuArt);
   h += '<div class="d-reihe"><button type="button" onclick="jtAnlegen()">Anlegen</button>'
      + '<button type="button" onclick="jtTagOeffnen(\'' + is + '\')">Zurück</button></div>';
   return h;
+}
+
+function jtNeuKontextSetzen(wert) {
+  jtNeuKontext = wert;
+  jtNeuOeffnen();
 }
 
 function jtFinden(id) {
@@ -5013,6 +5047,16 @@ function jtKuerzelSetzen(id, wert) {
   kalZeichnen();
 }
 
+function jtKontextSetzen(id, wert) {
+  var e = jtFinden(id);
+  if (!e) { return; }
+  e.kontext = wert;
+  e.geaendert = jetzt();
+  spaeterSichern();
+  jtTagOeffnen(jtTag);
+  kalZeichnen();
+}
+
 function jtJaehrlichUm(id) {
   var e = jtFinden(id);
   if (!e) { return; }
@@ -5046,7 +5090,7 @@ function jtAnlegen() {
   var bis = b.value || von;
   if (bis < von) { bis = von; }
   DB.jahrestermine.push({
-    id: neueKennung(), titel: titel, art: jtNeuArt,
+    id: neueKennung(), titel: titel, art: jtNeuArt, kontext: jtNeuKontext,
     von: von, bis: bis, jaehrlich: false, geaendert: jetzt()
   });
   spaeterSichern();
