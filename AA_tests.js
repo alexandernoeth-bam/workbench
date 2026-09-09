@@ -435,7 +435,10 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + ' wiederholungUmschreiben, wochentagUmrechnen, schluesselId, deutschZuIso };'
                  + 'globalThis.__tagApi = { tagesform, faelligAn, feiertagAn, monatsende,'
                  + ' kalenderwoche, wochenIndex, eingabeDeuten, esc, istErledigtAn,'
-                 + ' tagesEintraege, ausIso, tagePlus };';
+                 + ' tagesEintraege, ausIso, tagePlus };'
+                 + 'globalThis.__aufApi = { gruppeVonPlanung, gruppeVonFrist, wochenEnde,'
+                 + ' regelText, planungText, planungKlasse, isoDatum, tagePlus,'
+                 + ' themenFuer, projekteFuer };';
     (0, eval)(skript + anhang);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -895,11 +898,15 @@ console.log('\n17. Löschen und Rückgängig');
          'die Rückgängig-Frist liegt zwischen 4 und 20 Sekunden');
 
   /* Löschen braucht Reibung: kein Knopf direkt in der Zeile */
-  pruefe(!/onclick="aufgabeLoeschen\(/.test(QUELLE.replace(/as-knopf gefahr[\s\S]{0,120}/g, '')),
-         'Löschen steht nur in der Aktionsfläche, nicht in der Liste');
-  const akt = skript.match(/function aufgabeAktionen\([\s\S]*?\n\}/);
-  pruefe(akt && /as-knopf gefahr/.test(akt[0]),
-         'der Löschknopf ist als gefährlich ausgezeichnet');
+  const detail = skript.match(/function detailHtml\([\s\S]*?\n\}\n/);
+  pruefe(detail && /gefahr" onclick="aufgabeLoeschen\(\)/.test(detail[0]),
+         'der Löschknopf steht in der Detailfläche und ist als gefährlich ausgezeichnet');
+  const zeichnen = skript.match(/function aufZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zeichnen && !/aufgabeLoeschen/.test(zeichnen[0]),
+         'in der Liste selbst gibt es keinen Löschknopf');
+  const tagFn = skript.match(/function zeileHtml\([\s\S]*?\n\}/);
+  pruefe(tagFn && !/aufgabeLoeschen/.test(tagFn[0]),
+         'auch im Tagesplan nicht');
 
   /* Wiederkehrendes darf nicht einfach verschoben werden */
   const schieben = skript.match(/function aufgabeSchieben\([\s\S]*?\n\}/);
@@ -1121,6 +1128,209 @@ console.log('\n21. Titel ändern');
   const schieben = skript.match(/function aufgabeSchieben\([\s\S]*?\n\}/);
   pruefe(schieben && (schieben[0].match(/tagZeichnen\(\)/g) || []).length <= 1,
          'Verschieben zeichnet den Tag nicht doppelt');
+}
+
+/* ============================================================
+   22. Aufgabenflaeche und Detailflaeche
+   Grund: Hier liegt der gesamte Bestand. Eine falsche Gruppierung
+   oder ein Feld, das nicht speichert, faellt erst auf, wenn Arbeit
+   verlorengegangen ist.
+   ============================================================ */
+console.log('\n22. Aufgabenfläche und Detailfläche');
+{
+  const api = globalThis.__aufApi;
+  const skript = hauptSkript();
+
+  const noetig = ['aufZeichnen', 'setAufGruppe', 'setAufFilter', 'aufGruppeVon',
+                  'aufReihenfolge', 'aufMetaText', 'regelText', 'planungText',
+                  'planungKlasse', 'planungWeiter', 'aufgabeErledigen', 'aufAnlegen',
+                  'themenFuer', 'projekteFuer', 'wochenEnde',
+                  'detailHtml', 'detailNeuZeichnen', 'detailGeaendert',
+                  'dKontext', 'dArt', 'dThema', 'dProjekt', 'dFrist', 'dPlanung',
+                  'dZeit', 'dBeschreibung', 'dWdh', 'dWdhIntervall', 'dWdhTag',
+                  'dWdhMonatstag', 'themaNeuZeigen', 'themaAnlegen',
+                  'teilenZeigen', 'teilenTippen', 'teilenUebernehmen',
+                  'themaKontext', 'projektKontext'];
+  noetig.forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript), 'Funktion ' + f + ' ist definiert');
+  });
+
+  pruefe(/id="schirmAufgaben"/.test(QUELLE), 'der Aufgabenbildschirm liegt im HTML');
+  pruefe(/id="aufBlatt"/.test(QUELLE), 'die Liste hat einen Behälter');
+  pruefe(/id="gPlanung"/.test(QUELLE) && /id="gThema"/.test(QUELLE)
+         && /id="gProjekt"/.test(QUELLE) && /id="gFrist"/.test(QUELLE),
+         'alle vier Gruppierungen haben einen Knopf');
+
+  if (!api) {
+    warn('Aufgabenfunktionen nicht auswertbar');
+  } else {
+    const heute = api.isoDatum();
+    const gestern = api.tagePlus(heute, -1);
+    const morgen = api.tagePlus(heute, 1);
+
+    /* Gruppierung nach Planung */
+    pruefe(api.gruppeVonPlanung({ planung: 'backlog' }) === 'Backlog', 'Backlog wird erkannt');
+    pruefe(api.gruppeVonPlanung({ planung: 'woche' }) === 'Diese Woche', 'Woche wird erkannt');
+    pruefe(api.gruppeVonPlanung({ planung: heute }) === 'Heute', 'Heute wird erkannt');
+    pruefe(api.gruppeVonPlanung({ planung: morgen }) === 'Fest geplant', 'Späteres wird erkannt');
+    pruefe(api.gruppeVonPlanung({ planung: gestern }) === 'Liegengeblieben',
+           'ein vergangener Tag heißt liegengeblieben, nicht heute');
+
+    /* Gruppierung nach Frist */
+    pruefe(api.gruppeVonFrist({ frist: '' }) === 'Ohne Frist', 'ohne Frist');
+    pruefe(api.gruppeVonFrist({ frist: gestern }) === 'Überfällig', 'überfällig');
+    pruefe(api.gruppeVonFrist({ frist: '2099-01-01' }) === 'Später fällig', 'später fällig');
+
+    /* Wochenende: Sonntag bleibt in derselben Woche */
+    pruefe(api.wochenEnde('2026-09-08') === '2026-09-13', 'die Woche endet am Sonntag');
+    pruefe(api.wochenEnde('2026-09-13') === '2026-09-13', 'ein Sonntag endet an sich selbst');
+
+    /* Regeltext */
+    pruefe(api.regelText({ takt: 'woche', intervall: 1, tage: [1, 5], tag: 1 })
+             === 'jede Woche · Mo Fr',
+           'die Wochenregel wird lesbar beschrieben');
+    pruefe(api.regelText({ takt: 'woche', intervall: 1, tage: [0, 1], tag: 1 })
+             === 'jede Woche · Mo So',
+           'Sonntag steht am Ende der Woche');
+    pruefe(api.regelText({ takt: 'monat', intervall: 2, tage: [], tag: 15 })
+             === 'jeden 2. Monat · am 15.',
+           'die Monatsregel wird lesbar beschrieben');
+
+    /* Planung weiterschalten */
+    pruefe(api.planungText({ planung: 'backlog' }) === 'Backlog', 'Beschriftung Backlog');
+    pruefe(api.planungText({ planung: 'woche' }) === 'Woche', 'Beschriftung Woche');
+    pruefe(api.planungKlasse({ planung: heute }) === ' tag', 'ein Tag wird hervorgehoben');
+  }
+
+  /* Jede Änderung muss stempeln und sichern */
+  const geaendert = skript.match(/function detailGeaendert\([\s\S]*?\n\}/);
+  pruefe(geaendert && /geaendert = jetzt\(\)/.test(geaendert[0]),
+         'jede Feldänderung setzt den Änderungsstempel');
+  pruefe(geaendert && /spaeterSichern\(\)/.test(geaendert[0]),
+         'jede Feldänderung wird gesichert und abgeglichen');
+
+  /* Kontextwechsel räumt fremde Zuordnungen weg */
+  const kontext = skript.match(/function dKontext\([\s\S]*?\n\}/);
+  pruefe(kontext && /themaId = null/.test(kontext[0]) && /projektId = null/.test(kontext[0]),
+         'ein Kontextwechsel entfernt Thema und Projekt des anderen Kontexts');
+
+  /* Regel ohne Wochentag schaltet sich ab */
+  const wdhTag = skript.match(/function dWdhTag\([\s\S]*?\n\}/);
+  pruefe(wdhTag && /tage\.length === 0/.test(wdhTag[0]) && /wiederholung = null/.test(wdhTag[0]),
+         'der letzte abgewählte Wochentag schaltet die Regel ab');
+
+  /* Aufteilen hinterlässt einen Löschvermerk */
+  const teilen = skript.match(/function teilenUebernehmen\([\s\S]*?\n\}/);
+  pruefe(teilen && /grabsteinSetzen\('aufgaben'/.test(teilen[0]),
+         'beim Aufteilen bekommt die ursprüngliche Aufgabe einen Löschvermerk');
+  pruefe(teilen && /vorlage\.kontext/.test(teilen[0]),
+         'die neuen Aufgaben erben den Kontext');
+
+  /* Erledigtes verschwindet aus der Liste */
+  const zeichnen = skript.match(/function aufZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zeichnen && /status === 'erledigt'/.test(zeichnen[0]),
+         'erledigte Aufgaben stehen nicht in der Liste');
+}
+
+/* ============================================================
+   23. Aufrufe im Skript selbst
+   Grund: markiere() wurde aufgerufen, aber nie definiert — die App
+   waere beim ersten Umschalten stehengeblieben. Die bisherige
+   Pruefung sah nur Aufrufe aus dem HTML.
+   ============================================================ */
+console.log('\n23. Aufrufe im Skript selbst');
+{
+  const roh = hauptSkript();
+
+  /* Kommentare und Zeichenketten heraus, sonst gelten Wörter aus Texten
+     wie „Konflikt(e)" als Funktionsaufruf. */
+  const skript = roh
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ')
+    .replace(/'(?:\\.|[^'\\])*'/g, "''")
+    .replace(/"(?:\\.|[^"\\])*"/g, '""');
+
+  const definiert = new Set([...roh.matchAll(/function\s+([A-Za-z_$][\w$]*)\s*\(/g)].map(m => m[1]));
+  const zugewiesen = new Set([...roh.matchAll(/\b(?:var|let|const)\s+([A-Za-z_$][\w$]*)/g)].map(m => m[1]));
+
+  /* Parameternamen zählen als bekannt */
+  const parameter = new Set();
+  [...roh.matchAll(/function\s*[A-Za-z_$\w]*\s*\(([^)]*)\)/g)].forEach(function (m) {
+    String(m[1]).split(',').forEach(function (p) {
+      const name = p.trim();
+      if (/^[A-Za-z_$][\w$]*$/.test(name)) { parameter.add(name); }
+    });
+  });
+
+  const bekannt = new Set([
+    'if', 'for', 'while', 'switch', 'catch', 'return', 'typeof', 'function', 'else', 'do',
+    'Promise', 'Date', 'Number', 'String', 'Boolean', 'Array', 'Object', 'JSON', 'Math',
+    'Error', 'RegExp', 'Set', 'Map', 'URL', 'FileReader', 'parseInt', 'parseFloat',
+    'isNaN', 'encodeURIComponent', 'decodeURIComponent', 'fetch', 'caches', 'eval'
+  ]);
+
+  const fehlend = [];
+  const gesehen = new Set();
+  const muster = /(^|[^\w$.])([a-zA-Z_$][\w$]*)\s*\(/g;
+  let treffer;
+  while ((treffer = muster.exec(skript)) !== null) {
+    const name = treffer[2];
+    if (gesehen.has(name)) { continue; }
+    gesehen.add(name);
+    if (definiert.has(name) || zugewiesen.has(name) || parameter.has(name)
+        || bekannt.has(name)) { continue; }
+    fehlend.push(name);
+  }
+
+  pruefe(fehlend.length === 0,
+         'keine Aufrufe undefinierter Funktionen'
+         + (fehlend.length ? ' — gefunden: ' + fehlend.join(', ') : ''));
+  ok(gesehen.size + ' verschiedene Aufrufe geprüft');
+}
+
+/* ============================================================
+   24. Wiederkehrende Aufgaben haben keinen Erledigt-Status
+   Grund: Aus dem Altbestand trugen sie „erledigt" und verschwanden
+   damit fuer immer aus der Liste — obwohl sie jede Woche wiederkehren.
+   ============================================================ */
+console.log('\n24. Status wiederkehrender Aufgaben');
+{
+  const skript = hauptSkript();
+
+  const mig = skript.match(/function migrationRechnen\([\s\S]*?\n\}\n/);
+  pruefe(mig && /a\.wiederholung \|\| a\.status !== 'erledigt'/.test(mig[0]),
+         'die Migration setzt wiederkehrende Aufgaben auf offen');
+
+  const stempeln = skript.match(/function bestandStempeln\([\s\S]*?\n\}/);
+  pruefe(stempeln && /wiederholung && aufg\[w\]\.status === 'erledigt'/.test(stempeln[0]),
+         'ein vorhandener Bestand wird beim Laden richtiggestellt');
+  pruefe(stempeln && /zuletztErledigt/.test(stempeln[0]),
+         'das Erledigtdatum wandert dabei nach zuletztErledigt');
+
+  const zeichnen = skript.match(/function aufZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zeichnen && /!alle\[i\]\.wiederholung && alle\[i\]\.status === 'erledigt'/.test(zeichnen[0]),
+         'die Liste blendet nur einmalige erledigte Aufgaben aus');
+
+  const api = globalThis.__aufApi;
+  if (globalThis.__api && globalThis.__api.migrationRechnen) {
+    const quelle = {
+      name: 't.json', art: 'workassist', kontext: 'beruflich',
+      daten: {
+        bereiche: [], plaene: [], jahrestermine: [],
+        aufgaben: [{ id: 'w1', titel: 'Wöchentlich', status: 'erledigt',
+                     erledigtAm: '2026-09-01',
+                     wiederholung: { typ: 'woechentlich', intervall: 1, wochentage: [1] } },
+                   { id: 'e1', titel: 'Einmalig', status: 'erledigt', erledigtAm: '2026-09-01' }]
+      }
+    };
+    const e = globalThis.__api.migrationRechnen([quelle]);
+    const w = e.ziel.aufgaben.filter(a => a.titel === 'Wöchentlich')[0];
+    const einmal = e.ziel.aufgaben.filter(a => a.titel === 'Einmalig')[0];
+    pruefe(w && w.status === 'offen', 'die wiederkehrende Aufgabe kommt als offen an');
+    pruefe(einmal && einmal.status === 'erledigt', 'die einmalige bleibt erledigt');
+  } else {
+    warn('Migrationsfunktionen nicht auswertbar');
+  }
 }
 
 /* ============================================================
