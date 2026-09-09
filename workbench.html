@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.10.0</title>
+<title>Workbench 0.10.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -194,6 +194,12 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   padding:6px 13px 8px;color:var(--grau);cursor:pointer;
   border-bottom:2px solid transparent;margin-bottom:-1px}
 .stufen button.aktiv{color:var(--weinrot);border-bottom-color:var(--weinrot);font-weight:500}
+.stufen-luecke{flex:1}
+.stufen .pille{align-self:center;border:1px solid var(--linie);border-radius:20px;
+  padding:3px 11px;margin:0 0 6px 5px;font-size:calc(var(--fs)*0.74);
+  background:var(--karte);border-bottom-width:1px}
+.stufen .pille.aktiv{border-color:var(--tinte);color:var(--tinte);font-weight:500;
+  border-bottom-color:var(--tinte)}
 .kalblatt{flex:1 1 auto;overflow-y:auto;padding:6px 20px 24px}
 
 /* Woche */
@@ -206,6 +212,22 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .ktag.heute .ktag-name{color:var(--weinrot)}
 .ktag-datum{font-size:calc(var(--fs)*0.8);color:var(--grau);font-variant-numeric:tabular-nums}
 .ktag-form{margin-left:auto;font-size:calc(var(--fs)*0.72);color:var(--grau)}
+.woche-raster{display:flex;flex-direction:column}
+.ktag-termine,.ktag-aufgaben{padding-top:2px}
+.ktag-aufgaben{border-top:1px dashed var(--linie);margin-top:5px;padding-top:5px}
+@media (min-width:900px){
+  .woche-raster{display:grid;grid-template-columns:repeat(7,1fr);gap:0}
+  .ktag{border-bottom:0;border-right:1px solid var(--linie);padding:0 8px 8px}
+  .ktag:last-child{border-right:0}
+  .ktag-kopf{flex-wrap:wrap;gap:5px;padding:7px 0 6px 6px;margin-bottom:6px;
+    border-bottom:1px solid var(--linie)}
+  .ktag-form{margin-left:0;flex-basis:100%}
+  .ktag-termine{min-height:190px;border-bottom:1px solid var(--linie);padding-bottom:6px}
+  .ktag-aufgaben{border-top:0;margin-top:0;padding-top:7px;min-height:120px}
+  .kzeile{padding-left:6px;gap:6px}
+  .kzeit{flex:0 0 34px}
+  .kleer{padding-left:6px}
+}
 .kzeile{display:flex;gap:9px;padding:3px 0 3px 11px;align-items:baseline}
 .kzeit{flex:0 0 42px;font-size:calc(var(--fs)*0.76);color:var(--grau);
   font-variant-numeric:tabular-nums}
@@ -518,10 +540,13 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
       <button type="button" id="sWoche" class="aktiv" onclick="setKalStufe('woche')">Woche</button>
       <button type="button" id="sMonat" onclick="setKalStufe('monat')">Monat</button>
       <button type="button" id="sJahr" onclick="setKalStufe('jahr')">Jahr</button>
+      <span class="stufen-luecke"></span>
+      <button type="button" id="kAlle" class="pille aktiv" onclick="setKalFilter('alle')">Alle</button>
+      <button type="button" id="kBeruf" class="pille" onclick="setKalFilter('beruflich')">Beruf</button>
+      <button type="button" id="kPrivat" class="pille" onclick="setKalFilter('privat')">Privat</button>
     </div>
   </div>
 
-  <div class="melder" id="kalMelder" style="margin:10px 20px 0">Bereit.</div>
   <div class="kalblatt" id="kalBlatt"></div>
 </div>
 
@@ -591,7 +616,7 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.10.0';
+var APP_VERSION = '0.10.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -688,7 +713,7 @@ function isoZeit(d) {
 }
 
 function melde(text, art) {
-  var stellen = ['melder', 'migMelder', 'aufMelder', 'kalMelder'];
+  var stellen = ['melder', 'migMelder', 'aufMelder'];
   var i;
   for (i = 0; i < stellen.length; i++) {
     var el = document.getElementById(stellen[i]);
@@ -3942,6 +3967,18 @@ function kalenderTaktStarten() {
 var kalStufe = 'woche';
 var kalAnker = '';
 var jahrFilter = null;      /* null = kein Filter, '' = ohne Art */
+var kalFilter = 'alle';
+
+function passtZumKalender(kontext) {
+  if (kalFilter === 'alle') { return true; }
+  return (kontext || 'beruflich') === kalFilter;
+}
+
+function setKalFilter(art) {
+  kalFilter = art;
+  markiere([['alle', 'kAlle'], ['beruflich', 'kBeruf'], ['privat', 'kPrivat']], art);
+  kalZeichnen();
+}
 
 var JT_ARTEN = {
   urlaub:      { n: 'Urlaub',      f: '#3f6b45' },
@@ -4046,59 +4083,71 @@ function jtPasst(e) {
 function wocheHtml(is) {
   var mo = montagVon(is);
   var heute = isoDatum();
-  var h = '';
+  var h = '<div class="woche-raster">';
   var i;
   for (i = 0; i < 7; i++) {
     var tag = tagePlus(mo, i);
     var d = ausIso(tag);
     var form = tagesform(tag);
     var frei = (form.form === 'Freizeittag');
+
     h += '<div class="ktag' + (frei ? ' frei' : '') + (tag === heute ? ' heute' : '') + '">';
     h += '<div class="ktag-kopf" onclick="zumTag(\'' + tag + '\')">';
     h += '<span class="ktag-name">' + TAGE_KURZ[d.getDay()] + '</span>';
     h += '<span class="ktag-datum">' + d.getDate() + '.' + (d.getMonth() + 1) + '.</span>';
     h += '<span class="ktag-form">' + esc(form.grund || form.form) + '</span></div>';
 
-    var etwas = false;
+    /* Oben: alles mit fester Zeit oder ganzem Tag */
+    h += '<div class="ktag-termine">';
+    var etwasOben = false;
     var jt = jtAn(tag);
     var j;
     for (j = 0; j < jt.length; j++) {
       h += '<div class="kzeile"><span class="kzeit"></span>'
          + '<span class="ktitel" style="color:' + jtFarbe(jt[j]) + '">'
          + esc(jt[j].titel) + '</span></div>';
-      etwas = true;
+      etwasOben = true;
     }
-
     var t = termineFuerTag(tag);
     var g;
     for (g = 0; g < t.ganztags.length; g++) {
+      if (!passtZumKalender(t.ganztags[g].kontext)) { continue; }
       h += '<div class="kzeile"><span class="kzeit">ganz</span>'
          + '<span class="ktitel' + (t.ganztags[g].kontext === 'privat' ? ' privat' : '') + '">'
          + esc(t.ganztags[g].titel) + '</span></div>';
-      etwas = true;
+      etwasOben = true;
     }
     for (g = 0; g < t.zeit.length; g++) {
+      if (!passtZumKalender(t.zeit[g].kontext)) { continue; }
       h += '<div class="kzeile"><span class="kzeit fest">' + esc(t.zeit[g].zeit) + '</span>'
          + '<span class="ktitel' + (t.zeit[g].kontext === 'privat' ? ' privat' : '') + '">'
          + esc(t.zeit[g].titel) + '</span></div>';
-      etwas = true;
+      etwasOben = true;
     }
+    if (!etwasOben) { h += '<div class="kleer">keine Termine</div>'; }
+    h += '</div>';
 
+    /* Unten: die Hauptaufgaben dieses Tages. Kleinigkeiten gehören
+       in den Tag, nicht in die Wochenübersicht. */
+    h += '<div class="ktag-aufgaben">';
+    var etwasUnten = false;
     var aufgaben = DB.aufgaben || [];
     var k;
     for (k = 0; k < aufgaben.length; k++) {
       var a = aufgaben[k];
       if (a.status === 'erledigt' || a.wiederholung) { continue; }
+      if (a.art === 'klein') { continue; }
       if (a.planung !== tag) { continue; }
+      if (!passtZumKalender(a.kontext)) { continue; }
       h += '<div class="kzeile"><span class="kzeit">' + esc(a.uhrzeit || '') + '</span>'
          + '<span class="ktitel' + (a.kontext === 'privat' ? ' privat' : '') + '">'
          + esc(a.titel) + '</span></div>';
-      etwas = true;
+      etwasUnten = true;
     }
-
-    if (!etwas) { h += '<div class="kleer">nichts eingetragen</div>'; }
-    h += '</div>';
+    if (!etwasUnten) { h += '<div class="kleer">keine Aufgaben</div>'; }
+    h += '</div></div>';
   }
+  h += '</div>';
 
   /* Die Wochenliste: was diese Woche zur Debatte steht, ohne Tag. */
   var wochenliste = [];
@@ -4106,7 +4155,9 @@ function wocheHtml(is) {
   var m;
   for (m = 0; m < alle.length; m++) {
     if (alle[m].status === 'erledigt' || alle[m].wiederholung) { continue; }
-    if (alle[m].planung === 'woche') { wochenliste.push(alle[m]); }
+    if (alle[m].planung !== 'woche') { continue; }
+    if (!passtZumKalender(alle[m].kontext)) { continue; }
+    wochenliste.push(alle[m]);
   }
   h += '<div class="gruppenkopf"><span>Diese Woche · ' + wochenliste.length + '</span></div>';
   if (!wochenliste.length) {
@@ -4161,10 +4212,12 @@ function monatHtml(is) {
     }
     var tm = termineFuerTag(tag);
     for (i = 0; i < tm.ganztags.length; i++) {
+      if (!passtZumKalender(tm.ganztags[i].kontext)) { continue; }
       h += '<span class="mt-bal" style="background:var(--petrol)">'
          + esc(tm.ganztags[i].titel) + '</span>';
     }
     for (i = 0; i < tm.zeit.length; i++) {
+      if (!passtZumKalender(tm.zeit[i].kontext)) { continue; }
       h += '<span class="mt-bal" style="background:var(--tinte)">'
          + esc(tm.zeit[i].zeit + ' ' + tm.zeit[i].titel) + '</span>';
     }

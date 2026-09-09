@@ -77,12 +77,19 @@ console.log('\n1. Bildschirme und Navigation');
     pruefe(new RegExp('id="' + id + '"').test(QUELLE),
            'Meldezeile "' + id + '" existiert im HTML');
   });
-  schirme.forEach(function (s) {
-    if (s === 'Tag') { return; }
+  /* Tag und Kalender melden über eigene Wege (Standzeile, Banner) und
+     bleiben im Normalfall bewusst stumm. Die übrigen Flächen führen
+     Vorgänge aus, deren Ergebnis benannt werden muss. */
+  const mitMelder = ['Diagnose', 'Migration', 'Aufgaben'];
+  mitMelder.forEach(function (s) {
+    if (schirme.indexOf(s) < 0) { return; }
     const block = QUELLE.match(new RegExp('id="schirm' + s + '"[\\s\\S]*?\\n</div>'));
     pruefe(!block || /class="melder"/.test(block[0]),
            'Bildschirm "' + s + '" hat eine eigene Meldezeile');
   });
+  const kalBlock = QUELLE.match(/id="schirmKalender"[\s\S]*?\n<\/div>/);
+  pruefe(!kalBlock || !/class="melder"/.test(kalBlock[0]),
+         'der Kalender bleibt bewusst ohne Meldezeile');
 }
 
 /* ============================================================
@@ -456,7 +463,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + ' zeitAusEintrag, tagAusEintrag,'
                  + ' zuruecksetzen: function(){ termineNachTag = {}; } };'
                  + 'globalThis.__fehlerApi = { dienstAusAdresse, antwortPruefen };'
-                 + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext };'
+                 + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
+                 + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__kalenderApi = { montagVon, jtAn,'
                  + ' pruefeJaehrlich: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -2079,6 +2087,52 @@ console.log('\n36. Kalender');
   const zum = skript.match(/function zumTag\([\s\S]*?\n\}/);
   pruefe(zum && /zeigeSchirm\('Tag'\)/.test(zum[0]),
          'ein Tag im Kalender führt in die Tagesansicht');
+}
+
+/* ============================================================
+   37. Wochensicht als Spalten
+   Grund: Am grossen Bildschirm soll die Woche wie ein Stundenplan
+   lesbar sein — sieben Spalten, oben Termine, unten Hauptaufgaben.
+   Kleinigkeiten gehoeren in den Tag, nicht in die Wochenuebersicht.
+   ============================================================ */
+console.log('\n37. Wochensicht als Spalten');
+{
+  const skript = hauptSkript();
+  const api = globalThis.__filterApi;
+
+  pruefe(new RegExp('function\\s+passtZumKalender\\s*\\(').test(skript),
+         'Funktion passtZumKalender ist definiert');
+  pruefe(new RegExp('function\\s+setKalFilter\\s*\\(').test(skript),
+         'Funktion setKalFilter ist definiert');
+  pruefe(/id="kAlle"/.test(QUELLE) && /id="kBeruf"/.test(QUELLE) && /id="kPrivat"/.test(QUELLE),
+         'der Kalender hat die drei Filterpillen');
+
+  const woche = skript.match(/function wocheHtml\([\s\S]*?\n\}\n/);
+  pruefe(woche && /class="woche-raster"/.test(woche[0]), 'die Woche steht in einem Raster');
+  pruefe(woche && /class="ktag-termine"/.test(woche[0]), 'jeder Tag hat einen Terminblock');
+  pruefe(woche && /class="ktag-aufgaben"/.test(woche[0]), 'und einen Aufgabenblock');
+  pruefe(woche && /a\.art === 'klein'.*continue/s.test(woche[0]),
+         'Kleinigkeiten stehen nicht in der Wochensicht');
+  pruefe(woche && (woche[0].match(/passtZumKalender\(/g) || []).length >= 4,
+         'der Filter greift auf Termine, Ganztägiges, Aufgaben und die Wochenliste');
+
+  pruefe(/@media \(min-width:900px\)/.test(QUELLE), 'am großen Bildschirm gilt ein eigenes Bild');
+  pruefe(/grid-template-columns:repeat\(7,1fr\)/.test(QUELLE), 'dort stehen sieben Spalten');
+  pruefe(/\.ktag-termine\{min-height/.test(QUELLE),
+         'der Terminblock hat eine feste Mindesthöhe, damit die zweite Zeile fluchtet');
+
+  const monat = skript.match(/function monatHtml\([\s\S]*?\n\}/);
+  pruefe(monat && /passtZumKalender/.test(monat[0]), 'der Filter greift auch im Monat');
+
+  if (api && api.passtZumKalender) {
+    api.setKalFilter('beruflich');
+    pruefe(api.passtZumKalender('beruflich') && !api.passtZumKalender('privat'),
+           'Beruf zeigt nur Berufliches');
+    api.setKalFilter('alle');
+    pruefe(api.passtZumKalender('privat'), 'Alle zeigt wieder alles');
+  } else {
+    warn('Kalenderfilter nicht auswertbar');
+  }
 }
 
 /* ============================================================
