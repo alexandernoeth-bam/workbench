@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.10.1</title>
+<title>Workbench 0.11.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -255,7 +255,11 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 table.jraster{border-collapse:collapse;width:100%;min-width:470px;table-layout:fixed}
 table.jraster th{font-size:calc(var(--fs)*0.64);font-weight:500;color:var(--grau);
   padding:0 0 4px;text-align:center}
-table.jraster td{height:14px;border:1px solid var(--linie);padding:0;position:relative}
+table.jraster td{height:17px;border:1px solid var(--linie);padding:0;position:relative;
+  cursor:pointer}
+.jwt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:calc(var(--fs)*0.54);color:var(--grau-hell);letter-spacing:-.02em}
+td.ferien{background:#E1E8E1}
 td.jnr{border:0;font-size:calc(var(--fs)*0.6);color:var(--grau);text-align:right;
   padding-right:4px;width:22px;font-variant-numeric:tabular-nums}
 td.we{background:#EBE9E4}
@@ -263,7 +267,7 @@ td.jleer{background:transparent;border-color:transparent}
 td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
 .jpunkt{position:absolute;left:1px;top:1px;width:3px;height:3px;border-radius:50%;
   background:var(--grau)}
-.jbalken{position:absolute;inset:1px 0;display:flex;gap:1px}
+.jbalken{position:absolute;left:0;right:0;bottom:0;height:5px;display:flex;gap:1px}
 .jbalken i{flex:1;display:block;border-radius:1px}
 .jsum{display:flex;align-items:center;gap:9px;padding:5px 7px;border-radius:5px;cursor:pointer}
 .jsum.aktiv{background:var(--karte);outline:1px solid var(--linie)}
@@ -501,6 +505,11 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
     <button type="button" onclick="termineHolen(true)">Termine neu holen</button>
   </div>
 
+  <div class="abschnitt-titel"><span>Ferien und Feiertage</span></div>
+  <div id="ferienListe"></div>
+  <input type="file" id="ferienDatei" multiple accept=".ics,text/calendar"
+         onchange="ferienDateiGewaehlt(event)">
+
   <div class="abschnitt-titel"><span>Datenbestand</span></div>
   <div id="bestandListe"></div>
 
@@ -616,7 +625,7 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.10.1';
+var APP_VERSION = '0.11.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -638,7 +647,7 @@ var VORLAUF_MS = 5 * 60 * 1000;   /* so lange vor Ablauf wird still erneuert */
 var GRABSTEIN_TAGE = 180;         /* so lange bleibt ein Löschvermerk erhalten */
 
 var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe',
-                  'jahrestermine','kalenderzuordnung','termine'];
+                  'jahrestermine','ferien','kalenderzuordnung','termine'];
 
 function leereDatenbank() {
   return {
@@ -650,6 +659,7 @@ function leereDatenbank() {
     ablaeufe:          [],
     durchlaeufe:       [],
     jahrestermine:     [],
+    ferien:            [],
     kalenderzuordnung: {},
     termine:           [],
     grabsteine:        [],
@@ -2339,6 +2349,9 @@ var feiertagJahr = 0;
 var feiertagListe = {};
 
 function feiertagAn(is) {
+  /* Eingelesene Feiertage haben Vorrang vor der Berechnung. */
+  var e = ferienEintragAn(is, 'feiertag');
+  if (e) { return e.titel; }
   var jahr = Number(String(is).slice(0, 4));
   if (jahr !== feiertagJahr) {
     feiertagJahr = jahr;
@@ -3629,6 +3642,22 @@ function zeichneKalender() {
   ziel.innerHTML = h;
 }
 
+function zeichneFerien() {
+  var ziel = document.getElementById('ferienListe');
+  if (!ziel) { return; }
+  var liste = DB.ferien || [];
+  var ferien = 0, feiertage = 0;
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    if (liste[i].art === 'ferien') { ferien++; } else { feiertage++; }
+  }
+  var h = '';
+  h += zeile('Ferienzeiträume', String(ferien), ferien ? '' : 'nein');
+  h += zeile('Eingelesene Feiertage', String(feiertage), feiertage ? '' : 'grau');
+  h += zeile('Feiertage werden gerechnet', 'bayerisch, ohne Datei', 'grau');
+  ziel.innerHTML = h;
+}
+
 function zeichneBestand() {
   var ziel = document.getElementById('bestandListe');
   if (!ziel) { return; }
@@ -3678,6 +3707,7 @@ function zeichne() {
   zeichneSpeicher();
   zeichneGoogle();
   zeichneKalender();
+  zeichneFerien();
   zeichneBestand();
   zeichneUmgebung();
 }
@@ -3960,6 +3990,146 @@ function kalenderTaktStarten() {
 }
 
 
+
+/* ============================================================
+   Ferien und Feiertage aus ICS
+
+   Feiertage lassen sich rechnen, Ferien nicht. Beides kommt als
+   Ganztagstermin herein und liegt danach in der eigenen Datei.
+   ============================================================ */
+
+function icsEntfalten(text) {
+  /* Fortsetzungszeilen beginnen mit Leerzeichen oder Tabulator. */
+  return String(text).replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '');
+}
+
+function icsDatum(wert) {
+  var t = String(wert).trim();
+  var m = t.match(/^(\d{4})(\d{2})(\d{2})/);
+  if (!m) { return ''; }
+  return m[1] + '-' + m[2] + '-' + m[3];
+}
+
+function icsLesen(text) {
+  var zeilen = icsEntfalten(text).split('\n');
+  var eintraege = [];
+  var offen = null;
+  var i;
+  for (i = 0; i < zeilen.length; i++) {
+    var z = zeilen[i].trim();
+    if (z === 'BEGIN:VEVENT') { offen = { uid: '', titel: '', von: '', bis: '', art: '' }; continue; }
+    if (z === 'END:VEVENT') {
+      if (offen && offen.von) {
+        if (!offen.bis) { offen.bis = offen.von; }
+        eintraege.push(offen);
+      }
+      offen = null;
+      continue;
+    }
+    if (!offen) { continue; }
+
+    var doppel = z.indexOf(':');
+    if (doppel < 0) { continue; }
+    var kopf = z.slice(0, doppel).toUpperCase();
+    var wert = z.slice(doppel + 1);
+
+    if (kopf.indexOf('UID') === 0) { offen.uid = wert; }
+    else if (kopf.indexOf('SUMMARY') === 0) { offen.titel = wert.replace(/\\,/g, ','); }
+    else if (kopf.indexOf('DTSTART') === 0) { offen.von = icsDatum(wert); }
+    else if (kopf.indexOf('DTEND') === 0) {
+      /* Bei Ganztagsterminen ist das Ende der Folgetag. */
+      var bis = icsDatum(wert);
+      offen.bis = bis ? tagePlus(bis, -1) : '';
+    }
+    else if (kopf.indexOf('CATEGORIES') === 0) {
+      offen.art = (/FERIEN/i.test(wert)) ? 'ferien' : 'feiertag';
+    }
+  }
+  return eintraege;
+}
+
+function ferienUebernehmen(text, dateiname) {
+  var roh = icsLesen(text);
+  if (!roh.length) { return { neu: 0, ersetzt: 0, gesamt: 0 }; }
+  if (!Array.isArray(DB.ferien)) { DB.ferien = []; }
+
+  var bericht = { neu: 0, ersetzt: 0, gesamt: roh.length };
+  var i, j;
+  for (i = 0; i < roh.length; i++) {
+    var e = roh[i];
+    /* Steht in der Datei keine Kategorie, entscheidet der Dateiname
+       oder die Bezeichnung. */
+    var art = e.art;
+    if (art !== 'ferien' && art !== 'feiertag') {
+      art = (/ferien/i.test(dateiname || '') || /ferien/i.test(e.titel)) ? 'ferien' : 'feiertag';
+    }
+    var kennung = schluesselId('fe', e.uid || (e.titel + '|' + e.von));
+    var satz = { id: kennung, titel: e.titel || (art === 'ferien' ? 'Ferien' : 'Feiertag'),
+                 von: e.von, bis: e.bis || e.von, art: art, geaendert: jetzt() };
+    var gefunden = false;
+    for (j = 0; j < DB.ferien.length; j++) {
+      if (DB.ferien[j].id === kennung) {
+        DB.ferien[j] = satz;
+        gefunden = true;
+        bericht.ersetzt++;
+        break;
+      }
+    }
+    if (!gefunden) { DB.ferien.push(satz); bericht.neu++; }
+  }
+  return bericht;
+}
+
+function ferienDateiGewaehlt(ereignis) {
+  var dateien = ereignis && ereignis.target ? ereignis.target.files : null;
+  if (!dateien || !dateien.length) { return; }
+  var offen = dateien.length;
+  var gesamt = { neu: 0, ersetzt: 0, gesamt: 0 };
+  var i;
+  for (i = 0; i < dateien.length; i++) {
+    (function (datei) {
+      var leser = new window.FileReader();
+      leser.onload = function () {
+        var b = ferienUebernehmen(String(leser.result), datei.name);
+        gesamt.neu += b.neu;
+        gesamt.ersetzt += b.ersetzt;
+        gesamt.gesamt += b.gesamt;
+        offen--;
+        if (offen === 0) { ferienFertig(gesamt); }
+      };
+      leser.onerror = function () {
+        offen--;
+        if (offen === 0) { ferienFertig(gesamt); }
+      };
+      leser.readAsText(datei);
+    })(dateien[i]);
+  }
+}
+
+function ferienFertig(bericht) {
+  melde('Eingelesen: ' + bericht.gesamt + ' Einträge · '
+      + bericht.neu + ' neu · ' + bericht.ersetzt + ' aufgefrischt.', 'gut');
+  spaeterSichern();
+  kalZeichnen();
+  tagZeichnen();
+  zeichne();
+}
+
+function ferienEintragAn(is, art) {
+  var liste = DB.ferien || [];
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    if (art && liste[i].art !== art) { continue; }
+    if (is >= liste[i].von && is <= (liste[i].bis || liste[i].von)) { return liste[i]; }
+  }
+  return null;
+}
+
+function ferienAn(is) {
+  var e = ferienEintragAn(is, 'ferien');
+  return e ? e.titel : '';
+}
+
 /* ============================================================
    Kalender: Woche, Monat, Jahr
    ============================================================ */
@@ -4095,7 +4265,8 @@ function wocheHtml(is) {
     h += '<div class="ktag-kopf" onclick="zumTag(\'' + tag + '\')">';
     h += '<span class="ktag-name">' + TAGE_KURZ[d.getDay()] + '</span>';
     h += '<span class="ktag-datum">' + d.getDate() + '.' + (d.getMonth() + 1) + '.</span>';
-    h += '<span class="ktag-form">' + esc(form.grund || form.form) + '</span></div>';
+    var fer = ferienAn(tag);
+    h += '<span class="ktag-form">' + esc(fer || form.grund || form.form) + '</span></div>';
 
     /* Oben: alles mit fester Zeit oder ganzem Tag */
     h += '<div class="ktag-termine">';
@@ -4222,6 +4393,8 @@ function monatHtml(is) {
          + esc(tm.zeit[i].zeit + ' ' + tm.zeit[i].titel) + '</span>';
     }
     if (fei) { h += '<span class="mt-frei">' + esc(fei) + '</span>'; }
+    var mfer = ferienAn(tag);
+    if (mfer) { h += '<span class="mt-frei">' + esc(mfer) + '</span>'; }
     h += '</div></div>';
   }
   return h;
@@ -4253,7 +4426,9 @@ function jahrHtml(is) {
       if (d.getDay() === 0 || d.getDay() === 6) { kl.push('we'); }
       if (iso === heute) { kl.push('jheute'); }
 
-      var inhalt = feiertagAn(iso) ? '<span class="jpunkt"></span>' : '';
+      if (ferienAn(iso)) { kl.push('ferien'); }
+      var inhalt = '<span class="jwt">' + TAGE_KURZ[d.getDay()] + '</span>';
+      if (feiertagAn(iso)) { inhalt += '<span class="jpunkt"></span>'; }
       var treffer = [];
       var roh = jtAn(iso);
       var r;
@@ -4266,7 +4441,8 @@ function jahrHtml(is) {
         }
         inhalt += '</span>';
       }
-      h += '<td class="' + kl.join(' ') + '" onclick="zumTag(\'' + iso + '\')">' + inhalt + '</td>';
+      h += '<td class="' + kl.join(' ') + '" onclick="jtTagOeffnen(\'' + iso + '\')">'
+         + inhalt + '</td>';
     }
     h += '</tr>';
   }
@@ -4332,7 +4508,7 @@ function jahrHtml(is) {
     var p = drin[i];
     var spanne = (p.von === p.bis) ? kurzDatum(p.von)
                                    : (kurzDatum(p.von) + '–' + kurzDatum(p.bis));
-    h += '<div class="jl-zeile" onclick="zumTag(\'' + p.von + '\')">'
+    h += '<div class="jl-zeile" onclick="jtTagOeffnen(\'' + p.von + '\')">'
        + '<span class="jl-farbe" style="background:' + jtFarbe(p.e) + '"></span>'
        + '<span class="jl-spanne">' + esc(spanne) + '</span>'
        + '<span class="jl-name">' + esc(p.e.titel) + '</span></div>';
@@ -4374,6 +4550,168 @@ function kalZeichnen() {
   }
   if (titel) { titel.textContent = 'Jahr ' + kalAnker.slice(0, 4); }
   blatt.innerHTML = jahrHtml(kalAnker);
+}
+
+
+/* ============================================================
+   Jahrestermine pflegen
+   ============================================================ */
+
+var jtTag = '';
+var jtNeuArt = 'urlaub';
+
+function jtTagOeffnen(is) {
+  jtTag = is;
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = jtTagHtml(is);
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function jtArtenHtml(kennung, aktuell) {
+  var h = '<div class="d-wert" style="justify-content:flex-start;margin-top:6px">';
+  var i;
+  for (i = 0; i < JT_REIHE.length; i++) {
+    var k = JT_REIHE[i];
+    h += '<button class="d-wahl' + (aktuell === k ? ' an' : '') + '" type="button" '
+       + 'onclick="jtArtSetzen(\'' + kennung + '\',\'' + k + '\')">'
+       + '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;'
+       + 'background:' + JT_ARTEN[k].f + ';margin-right:6px"></span>'
+       + JT_ARTEN[k].n + '</button>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function jtTagHtml(is) {
+  var d = ausIso(is);
+  var h = '<div class="as-griff"></div>';
+  h += '<div class="as-titel">' + WOCHENTAGE_LANG[d.getDay()] + ', ' + d.getDate() + '. '
+     + MONATE_LANG[d.getMonth()] + ' ' + d.getFullYear() + '</div>';
+
+  var zusatz = [];
+  var fei = feiertagAn(is);
+  if (fei) { zusatz.push(fei); }
+  var fer = ferienAn(is);
+  if (fer) { zusatz.push(fer); }
+  if (zusatz.length) { h += '<div class="as-meta">' + esc(zusatz.join(' · ')) + '</div>'; }
+  h += '<div class="as-linie"></div>';
+
+  var treffer = jtAn(is);
+  var i;
+  for (i = 0; i < treffer.length; i++) {
+    var e = treffer[i];
+    var spanne = (e.von === (e.bis || e.von)) ? kurzDatum(e.von)
+                                              : (kurzDatum(e.von) + ' – ' + kurzDatum(e.bis));
+    h += '<div class="d-feld" style="display:block">';
+    h += '<input class="v-name" type="text" value="' + esc(e.titel) + '" '
+       + 'onchange="jtTitelSetzen(\'' + esc(e.id) + '\',this.value)" '
+       + 'style="width:100%;font-size:calc(var(--fs)*0.92)">';
+    h += '<div class="as-meta">' + esc(spanne) + (e.jaehrlich ? ' · jährlich' : '') + '</div>';
+    h += jtArtenHtml(esc(e.id), e.art);
+    h += '<div class="d-reihe">';
+    h += '<button type="button" onclick="jtJaehrlichUm(\'' + esc(e.id) + '\')">'
+       + (e.jaehrlich ? 'nicht mehr jährlich' : 'jährlich wiederholen') + '</button>';
+    h += '<button type="button" class="gefahr" onclick="jtLoeschen(\'' + esc(e.id) + '\')">'
+       + 'Löschen</button>';
+    h += '</div></div>';
+  }
+  if (!treffer.length) {
+    h += '<div class="kleer" style="padding-left:0">Kein Jahrestermin an diesem Tag.</div>';
+  }
+
+  h += '<div class="d-feld" style="display:block;border-bottom:0">';
+  h += '<div class="d-name" style="flex:none">Neuer Jahrestermin</div>';
+  h += '<input class="v-name" type="text" id="jtNeuTitel" placeholder="Bezeichnung" '
+     + 'style="width:100%;margin-top:6px">';
+  h += '<div class="s-zeile" style="display:flex;gap:7px;margin-top:7px">';
+  h += '<input type="date" id="jtNeuVon" value="' + is + '" style="flex:1">';
+  h += '<input type="date" id="jtNeuBis" value="' + is + '" style="flex:1">';
+  h += '</div>';
+  h += jtArtenHtml('neu', jtNeuArt);
+  h += '<div class="d-reihe"><button type="button" onclick="jtAnlegen()">Anlegen</button>'
+     + '<button type="button" onclick="zumTagAusJahr()">Zum Tag</button></div>';
+  h += '</div>';
+  return h;
+}
+
+function jtFinden(id) {
+  var liste = DB.jahrestermine || [];
+  var i;
+  for (i = 0; i < liste.length; i++) { if (liste[i].id === id) { return liste[i]; } }
+  return null;
+}
+
+function jtArtSetzen(kennung, art) {
+  if (kennung === 'neu') { jtNeuArt = art; jtTagOeffnen(jtTag); return; }
+  var e = jtFinden(kennung);
+  if (!e) { return; }
+  e.art = art;
+  e.geaendert = jetzt();
+  spaeterSichern();
+  jtTagOeffnen(jtTag);
+  kalZeichnen();
+}
+
+function jtTitelSetzen(id, wert) {
+  var e = jtFinden(id);
+  if (!e) { return; }
+  var sauber = String(wert).trim();
+  if (sauber.length === 0) { return; }
+  e.titel = sauber;
+  e.geaendert = jetzt();
+  spaeterSichern();
+  kalZeichnen();
+}
+
+function jtJaehrlichUm(id) {
+  var e = jtFinden(id);
+  if (!e) { return; }
+  e.jaehrlich = !e.jaehrlich;
+  e.geaendert = jetzt();
+  spaeterSichern();
+  jtTagOeffnen(jtTag);
+  kalZeichnen();
+}
+
+function jtLoeschen(id) {
+  var e = jtFinden(id);
+  if (!e) { return; }
+  var stelle = DB.jahrestermine.indexOf(e);
+  if (stelle >= 0) { DB.jahrestermine.splice(stelle, 1); }
+  grabsteinSetzen('jahrestermine', id);
+  spaeterSichern();
+  jtTagOeffnen(jtTag);
+  kalZeichnen();
+  melde('Jahrestermin gelöscht: ' + e.titel, null);
+}
+
+function jtAnlegen() {
+  var t = document.getElementById('jtNeuTitel');
+  var v = document.getElementById('jtNeuVon');
+  var b = document.getElementById('jtNeuBis');
+  if (!t || !v || !b) { return; }
+  var titel = t.value.trim();
+  if (titel.length === 0) { return; }
+  var von = v.value || jtTag;
+  var bis = b.value || von;
+  if (bis < von) { bis = von; }
+  DB.jahrestermine.push({
+    id: neueKennung(), titel: titel, art: jtNeuArt,
+    von: von, bis: bis, jaehrlich: false, geaendert: jetzt()
+  });
+  spaeterSichern();
+  jtTagOeffnen(von);
+  kalZeichnen();
+  zeichne();
+}
+
+function zumTagAusJahr() {
+  var is = jtTag;
+  aktionenSchliessen();
+  zumTag(is);
 }
 
 /* ============================================================

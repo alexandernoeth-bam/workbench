@@ -177,7 +177,7 @@ console.log('\n6. Datenmodell');
 {
   const skript = hauptSkript();
   const erwartet = ['aufgaben', 'ziele', 'themen', 'projekte', 'ablaeufe',
-                    'durchlaeufe', 'jahrestermine', 'kalenderzuordnung', 'termine'];
+                    'durchlaeufe', 'jahrestermine', 'ferien', 'kalenderzuordnung', 'termine'];
 
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
   pruefe(!!leer, 'leereDatenbank ist auslesbar');
@@ -465,6 +465,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__fehlerApi = { dienstAusAdresse, antwortPruefen };'
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
+                 + 'globalThis.__ferienApi = { icsLesen, ferienUebernehmen, ferienAn,'
+                 + ' feiertagAn, leereDatenbank, setDB: function(d){ DB = d; } };'
                  + 'globalThis.__kalenderApi = { montagVon, jtAn,'
                  + ' pruefeJaehrlich: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -2132,6 +2134,96 @@ console.log('\n37. Wochensicht als Spalten');
     pruefe(api.passtZumKalender('privat'), 'Alle zeigt wieder alles');
   } else {
     warn('Kalenderfilter nicht auswertbar');
+  }
+}
+
+/* ============================================================
+   38. Ferien, Feiertage und Jahresterminpflege
+   Grund: Feiertage lassen sich rechnen, Ferien nicht. Und ein
+   Jahrestermin, den man nur ansehen kann, ist keiner — im Raster
+   fuehrte bisher jeder Klick nur in die Tagesansicht.
+   ============================================================ */
+console.log('\n38. Ferien, Feiertage und Jahrestermine');
+{
+  const skript = hauptSkript();
+  const f = globalThis.__ferienApi;
+
+  const noetig = ['icsLesen', 'icsDatum', 'icsEntfalten', 'ferienUebernehmen',
+                  'ferienDateiGewaehlt', 'ferienAn', 'ferienEintragAn', 'zeichneFerien',
+                  'jtTagOeffnen', 'jtTagHtml', 'jtAnlegen', 'jtLoeschen',
+                  'jtArtSetzen', 'jtTitelSetzen', 'jtJaehrlichUm', 'jtFinden'];
+  noetig.forEach(function (n) {
+    pruefe(new RegExp('function\\s+' + n + '\\s*\\(').test(skript),
+           'Funktion ' + n + ' ist definiert');
+  });
+
+  pruefe(/id="ferienDatei"/.test(QUELLE), 'die Diagnose hat ein Feld zum Einlesen');
+  const samm = skript.match(/var SAMMLUNGEN = \[([\s\S]*?)\];/);
+  pruefe(samm && /'ferien'/.test(samm[1]), 'Ferien sind eine eigene Sammlung und werden abgeglichen');
+
+  /* Das Ende eines Ganztagstermins ist bei ICS der Folgetag */
+  const lesen = skript.match(/function icsLesen\([\s\S]*?\n\}/);
+  pruefe(lesen && /tagePlus\(bis, -1\)/.test(lesen[0]),
+         'beim Einlesen wird das Ende um einen Tag zurückgesetzt');
+
+  /* Eingelesene Feiertage haben Vorrang vor der Berechnung */
+  const fei = skript.match(/function feiertagAn\([\s\S]*?\n\}/);
+  pruefe(fei && /ferienEintragAn\(is, 'feiertag'\)/.test(fei[0]),
+         'eingelesene Feiertage gehen vor die Berechnung');
+
+  /* Das Raster führt in die Pflege, nicht in den Tag */
+  const jahr = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
+  pruefe(jahr && /onclick="jtTagOeffnen\(/.test(jahr[0]),
+         'eine Zelle im Jahresraster öffnet die Pflege');
+  pruefe(jahr && /class="jwt"/.test(jahr[0]),
+         'jede Zelle nennt ihren Wochentag');
+  pruefe(jahr && /ferienAn\(iso\)/.test(jahr[0]),
+         'Ferienzeiträume werden im Raster getönt');
+  pruefe(/\.jwt\{/.test(QUELLE), 'der Wochentag ist eigens gestaltet');
+  pruefe(/\.jbalken\{[^}]*bottom:0/.test(QUELLE),
+         'die Balken sitzen unten, damit der Wochentag lesbar bleibt');
+
+  const sheet = skript.match(/function jtTagHtml\([\s\S]*?\n\}\n/);
+  pruefe(sheet && /jtAnlegen\(\)/.test(sheet[0]), 'ein neuer Jahrestermin lässt sich anlegen');
+  pruefe(sheet && /jtLoeschen\(/.test(sheet[0]), 'ein bestehender lässt sich löschen');
+  pruefe(sheet && /jtJaehrlichUm\(/.test(sheet[0]), 'jährlich lässt sich umschalten');
+  pruefe(sheet && /zumTagAusJahr\(\)/.test(sheet[0]), 'der Weg in den Tag bleibt erhalten');
+
+  const loe = skript.match(/function jtLoeschen\([\s\S]*?\n\}/);
+  pruefe(loe && /grabsteinSetzen\('jahrestermine'/.test(loe[0]),
+         'das Löschen hinterlässt einen Löschvermerk');
+
+  if (!f) {
+    warn('ICS-Funktionen nicht auswertbar');
+  } else {
+    f.setDB(f.leereDatenbank());
+    const text = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x1@test\r\n'
+               + 'DTSTART;VALUE=DATE:20260803\r\nDTEND;VALUE=DATE:20260915\r\n'
+               + 'SUMMARY:Sommerferien Bayern\r\nCATEGORIES:SCHULFERIEN\r\n'
+               + 'END:VEVENT\r\nEND:VCALENDAR\r\n';
+    const roh = f.icsLesen(text);
+    pruefe(roh.length === 1, 'ein Ereignis wird gelesen');
+    pruefe(roh[0].von === '2026-08-03', 'der Beginn stimmt');
+    pruefe(roh[0].bis === '2026-09-14', 'das Ende ist der letzte Ferientag, nicht der Folgetag');
+    pruefe(roh[0].art === 'ferien', 'die Kategorie wird erkannt');
+
+    const b1 = f.ferienUebernehmen(text, 'test.ics');
+    const b2 = f.ferienUebernehmen(text, 'test.ics');
+    pruefe(b1.neu === 1 && b2.neu === 0 && b2.ersetzt === 1,
+           'zweimal einlesen erzeugt keine Dublette');
+
+    pruefe(f.ferienAn('2026-08-10') === 'Sommerferien Bayern', 'mitten drin gilt es');
+    pruefe(f.ferienAn('2026-09-14') === 'Sommerferien Bayern', 'am letzten Tag auch');
+    pruefe(f.ferienAn('2026-09-15') === '', 'am Folgetag nicht mehr');
+
+    /* Zusammengeklebte Zeilen */
+    const gefaltet = 'BEGIN:VEVENT\r\nSUMMARY:Sehr langer\r\n  Titel\r\n'
+                   + 'DTSTART;VALUE=DATE:20260101\r\nEND:VEVENT\r\n';
+    const g = f.icsLesen(gefaltet);
+    /* Nach der Norm ist genau ein Leerzeichen die Faltmarke, weitere
+       gehören zum Text. */
+    pruefe(g.length === 1 && g[0].titel === 'Sehr langer Titel',
+           'umbrochene Zeilen werden wieder zusammengefügt');
   }
 }
 
