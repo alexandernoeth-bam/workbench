@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.7.0</title>
+<title>Workbench 0.7.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -450,7 +450,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.7.0';
+var APP_VERSION = '0.7.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -727,6 +727,10 @@ function bestandStempeln(db) {
   var aufg = db.aufgaben || [];
   var w;
   for (w = 0; w < aufg.length; w++) {
+    if (aufg[w].wiederholung && aufg[w].frist) {
+      aufg[w].frist = '';
+      nachgetragen++;
+    }
     if (aufg[w].wiederholung && aufg[w].status === 'erledigt') {
       aufg[w].status = 'offen';
       if (!aufg[w].zuletztErledigt && aufg[w].erledigtAm) {
@@ -1671,7 +1675,9 @@ function migrationRechnen(quellen) {
         kontext: qa.kontext,
         themaId: themenNachAlt[a.bereichId] || null,
         projektId: projekteNachAlt[a.bereichId] || null,
-        frist: a.faellig || '',
+        /* Bei wiederkehrenden Aufgaben war „faellig" das nächste
+           Vorkommen der Instanz, keine Frist. Die Regel entscheidet. */
+        frist: a.wiederholung ? '' : (a.faellig || ''),
         planung: 'backlog',
         uhrzeit: a.uhrzeit || '',
         art: 'haupt',
@@ -2240,7 +2246,7 @@ function esc(text) {
 
 function metaZeile(a, is) {
   var teile = [];
-  if (a.frist) {
+  if (a.frist && !a.wiederholung) {
     var eilig = a.frist <= is;
     teile.push('<span class="' + (eilig ? 'eilig' : '') + '">Frist '
                + esc(kurzDatum(a.frist)) + '</span>');
@@ -2700,9 +2706,15 @@ function detailHtml(a) {
   }
   h += '</select></div></div>';
 
-  h += '<div class="d-feld"><div class="d-name">Frist</div><div class="d-wert">';
-  h += '<input type="date" value="' + esc(a.frist || '') + '" onchange="dFrist(this.value)">';
-  h += '</div></div>';
+  if (a.wiederholung) {
+    h += '<div class="d-feld"><div class="d-name">Frist</div><div class="d-wert">';
+    h += '<span class="d-hinweis">entscheidet die Regel</span>';
+    h += '</div></div>';
+  } else {
+    h += '<div class="d-feld"><div class="d-name">Frist</div><div class="d-wert">';
+    h += '<input type="date" value="' + esc(a.frist || '') + '" onchange="dFrist(this.value)">';
+    h += '</div></div>';
+  }
 
   var istTag = a.planung && a.planung !== 'backlog' && a.planung !== 'woche';
   h += '<div class="d-feld"><div class="d-name">Planung</div><div class="d-wert">';
@@ -2844,6 +2856,7 @@ function dWdh(takt) {
   if (!takt) { a.wiederholung = null; }
   else if (a.wiederholung) { a.wiederholung.takt = takt; }
   else { a.wiederholung = neueRegel(takt); }
+  if (a.wiederholung) { a.frist = ''; }
   detailGeaendert(true);
 }
 
@@ -3317,6 +3330,8 @@ function zeichne() {
 
 var aufGruppe = 'planung';
 var aufFilter = 'alle';
+var aufErledigtAuf = false;
+var ERLEDIGT_ZEIGEN = 50;
 var THEMEN_LEER = { beruflich: [], privat: [] };
 
 function themenFuer(kontext) {
@@ -3394,6 +3409,7 @@ function gruppeVonPlanung(a) {
 
 function gruppeVonFrist(a) {
   var heute = isoDatum();
+  if (a.wiederholung) { return 'Wiederkehrend'; }
   if (!a.frist) { return 'Ohne Frist'; }
   if (a.frist < heute) { return 'Überfällig'; }
   if (a.frist <= wochenEnde(heute)) { return 'Diese Woche fällig'; }
@@ -3412,7 +3428,7 @@ function aufReihenfolge(sichtbar) {
     return ['Liegengeblieben', 'Heute', 'Fest geplant', 'Diese Woche', 'Backlog'];
   }
   if (aufGruppe === 'frist') {
-    return ['Überfällig', 'Diese Woche fällig', 'Später fällig', 'Ohne Frist'];
+    return ['Überfällig', 'Diese Woche fällig', 'Später fällig', 'Ohne Frist', 'Wiederkehrend'];
   }
   var ohne = (aufGruppe === 'thema') ? 'Ohne Thema' : 'Ohne Projekt';
   var namen = [];
@@ -3429,7 +3445,7 @@ function aufReihenfolge(sichtbar) {
 function aufMetaText(a) {
   var teile = [];
   var heute = isoDatum();
-  if (a.frist) {
+  if (a.frist && !a.wiederholung) {
     var eilig = a.frist <= wochenEnde(heute);
     var wort = (a.frist < heute) ? 'überfällig seit ' : 'Frist ';
     teile.push('<span class="' + (eilig ? 'eilig' : '') + '">' + wort
@@ -3521,10 +3537,77 @@ function aufZeichnen() {
   }
 
   if (!h) { h = '<div class="tleer">Keine Aufgaben in dieser Auswahl.</div>'; }
+  h += erledigtBlockHtml();
   blatt.innerHTML = h;
 
   var zahl = document.getElementById('kopfVersion');
   if (zahl) { zahl.textContent = sichtbar.length + ' offen · v' + APP_VERSION; }
+}
+
+/* Erledigtes steht am Ende, eingeklappt. Es gehört nicht in die
+   Arbeitsliste, aber es soll auch nicht spurlos verschwinden. */
+function erledigteSammeln() {
+  var liste = [];
+  var alle = DB.aufgaben || [];
+  var i;
+  for (i = 0; i < alle.length; i++) {
+    var a = alle[i];
+    if (a.wiederholung) { continue; }
+    if (a.status !== 'erledigt') { continue; }
+    if (aufFilter !== 'alle' && a.kontext !== aufFilter) { continue; }
+    liste.push(a);
+  }
+  liste.sort(function (x, y) {
+    var dx = x.erledigtAm || '';
+    var dy = y.erledigtAm || '';
+    if (dx !== dy) { return (dx > dy) ? -1 : 1; }
+    return (x.titel < y.titel) ? -1 : 1;
+  });
+  return liste;
+}
+
+function erledigtBlockHtml() {
+  var liste = erledigteSammeln();
+  if (!liste.length) { return ''; }
+
+  var h = '<button class="tfalt" type="button" onclick="aufErledigtUm()">'
+        + '<span>Erledigt · ' + liste.length + '</span>'
+        + '<svg class="' + (aufErledigtAuf ? 'auf' : '') + '" viewBox="0 0 24 24">'
+        + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+  if (!aufErledigtAuf) { return h; }
+
+  var i;
+  var bis = Math.min(liste.length, ERLEDIGT_ZEIGEN);
+  for (i = 0; i < bis; i++) {
+    var a = liste[i];
+    var meta = a.erledigtAm ? ('erledigt ' + kurzDatum(a.erledigtAm)) : 'erledigt';
+    var th = themaName(a.themaId);
+    if (th) { meta += ' · ' + esc(th); }
+    h += '<div class="tzeile kompakt erledigt' + (a.kontext === 'privat' ? ' privat' : '') + '">';
+    h += '<button class="tkasten an" type="button" onclick="aufgabeWiederOeffnen(\'' + esc(a.id) + '\')"></button>';
+    h += '<div class="ttext" onclick="aufgabeAktionen(\'' + esc(a.id) + '\')">';
+    h += '<div class="ttitel">' + esc(a.titel) + '</div>';
+    h += '<div class="tmeta">' + meta + '</div></div></div>';
+  }
+  if (liste.length > bis) {
+    h += '<div class="tleer">… und ' + (liste.length - bis) + ' weitere, ältere.</div>';
+  }
+  return h;
+}
+
+function aufErledigtUm() {
+  aufErledigtAuf = !aufErledigtAuf;
+  aufZeichnen();
+}
+
+function aufgabeWiederOeffnen(id) {
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  a.status = 'offen';
+  a.erledigtAm = null;
+  a.geaendert = jetzt();
+  aufZeichnen();
+  spaeterSichern();
 }
 
 function aufgabeErledigen(id) {

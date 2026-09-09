@@ -1334,6 +1334,105 @@ console.log('\n24. Status wiederkehrender Aufgaben');
 }
 
 /* ============================================================
+   25. Wiederkehrende Aufgaben haben keine Frist
+   Grund: In WorkAssist war „faellig" bei wiederkehrenden Aufgaben
+   das naechste Vorkommen der Instanz. Als Frist uebernommen ergibt
+   das einen falschen und irrefuehrenden Termin.
+   ============================================================ */
+console.log('\n25. Frist bei wiederkehrenden Aufgaben');
+{
+  const skript = hauptSkript();
+
+  const mig = skript.match(/function migrationRechnen\([\s\S]*?\n\}\n/);
+  pruefe(mig && /a\.wiederholung \? '' : \(a\.faellig/.test(mig[0]),
+         'die Migration übernimmt bei wiederkehrenden Aufgaben keine Frist');
+
+  const stempeln = skript.match(/function bestandStempeln\([\s\S]*?\n\}/);
+  pruefe(stempeln && /wiederholung && aufg\[w\]\.frist/.test(stempeln[0]),
+         'ein bereits übernommener Bestand wird beim Laden bereinigt');
+
+  const detail = skript.match(/function detailHtml\([\s\S]*?\n\}\n/);
+  pruefe(detail && /entscheidet die Regel/.test(detail[0]),
+         'die Detailfläche zeigt statt eines Fristfeldes den Hinweis auf die Regel');
+
+  const wdh = skript.match(/function dWdh\([\s\S]*?\n\}/);
+  pruefe(wdh && /a\.frist = ''/.test(wdh[0]),
+         'das Einschalten einer Regel räumt eine bestehende Frist weg');
+
+  const meta = skript.match(/function aufMetaText\([\s\S]*?\n\}/);
+  pruefe(meta && /a\.frist && !a\.wiederholung/.test(meta[0]),
+         'die Liste zeigt bei wiederkehrenden Aufgaben keine Frist');
+  const metaTag = skript.match(/function metaZeile\([\s\S]*?\n\}/);
+  pruefe(metaTag && /a\.frist && !a\.wiederholung/.test(metaTag[0]),
+         'auch der Tagesplan zeigt dort keine Frist');
+
+  const frist = skript.match(/function gruppeVonFrist\([\s\S]*?\n\}/);
+  pruefe(frist && /a\.wiederholung.*'Wiederkehrend'/s.test(frist[0]),
+         'nach Frist gruppiert stehen sie in einer eigenen Gruppe');
+
+  if (globalThis.__api && globalThis.__api.migrationRechnen) {
+    const e = globalThis.__api.migrationRechnen([{
+      name: 't.json', art: 'workassist', kontext: 'beruflich',
+      daten: { bereiche: [], plaene: [], jahrestermine: [], aufgaben: [
+        { id: 'w1', titel: 'Wöchentlich', status: 'offen', faellig: '2026-09-14',
+          wiederholung: { typ: 'woechentlich', intervall: 1, wochentage: [1] } },
+        { id: 'e1', titel: 'Einmalig', status: 'offen', faellig: '2026-09-14' } ] }
+    }]);
+    const w = e.ziel.aufgaben.filter(a => a.titel === 'Wöchentlich')[0];
+    const einmal = e.ziel.aufgaben.filter(a => a.titel === 'Einmalig')[0];
+    pruefe(w && w.frist === '', 'die wiederkehrende Aufgabe kommt ohne Frist an');
+    pruefe(einmal && einmal.frist === '2026-09-14', 'die einmalige behält ihre Frist');
+  }
+}
+
+/* ============================================================
+   26. Erledigtes in der Aufgabenflaeche
+   Grund: Erledigtes gehoert nicht in die Arbeitsliste, darf aber
+   auch nicht spurlos verschwinden — und es darf die Liste nicht
+   ueberschwemmen.
+   ============================================================ */
+console.log('\n26. Erledigtes in der Aufgabenfläche');
+{
+  const skript = hauptSkript();
+
+  ['erledigteSammeln', 'erledigtBlockHtml', 'aufErledigtUm',
+   'aufgabeWiederOeffnen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const sammeln = skript.match(/function erledigteSammeln\([\s\S]*?\n\}/);
+  pruefe(sammeln && /a\.wiederholung.*continue/s.test(sammeln[0]),
+         'wiederkehrende Aufgaben stehen nie im Erledigt-Block');
+  pruefe(sammeln && /aufFilter/.test(sammeln[0]),
+         'der Kontextfilter wirkt auch auf Erledigtes');
+  pruefe(sammeln && /erledigtAm/.test(sammeln[0]),
+         'sortiert wird nach dem Erledigtdatum');
+
+  const block = skript.match(/function erledigtBlockHtml\([\s\S]*?\n\}\n/);
+  pruefe(block && /ERLEDIGT_ZEIGEN/.test(block[0]),
+         'die Zahl der gezeigten Einträge ist begrenzt');
+  pruefe(block && /aufErledigtAuf/.test(block[0]),
+         'der Block ist ein- und ausklappbar');
+  pruefe(block && /weitere, ältere/.test(block[0]),
+         'bei Überlänge wird gesagt, wie viele fehlen');
+
+  const zeichnen = skript.match(/function aufZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zeichnen && /erledigtBlockHtml\(\)/.test(zeichnen[0]),
+         'der Block hängt in jeder Gruppierung am Ende');
+
+  const wieder = skript.match(/function aufgabeWiederOeffnen\([\s\S]*?\n\}/);
+  pruefe(wieder && /status = 'offen'/.test(wieder[0]) && /erledigtAm = null/.test(wieder[0]),
+         'ein Häkchen im Erledigt-Block öffnet die Aufgabe wieder');
+  pruefe(wieder && /geaendert = jetzt\(\)/.test(wieder[0]),
+         'das Wiederöffnen stempelt und wird abgeglichen');
+
+  const grenze = skript.match(/ERLEDIGT_ZEIGEN\s*=\s*(\d+)/);
+  pruefe(grenze && Number(grenze[1]) >= 10 && Number(grenze[1]) <= 200,
+         'die Grenze liegt zwischen 10 und 200 Einträgen');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');
