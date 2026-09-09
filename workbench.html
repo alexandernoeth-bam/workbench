@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.11.1</title>
+<title>Workbench 0.11.3</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -522,7 +522,10 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
   <div class="feld-hinweis">ICS-Datei wählen, etwa <b>Schulferien_BY.ics</b> —
     mehrere Dateien auf einmal sind möglich.</div>
   <input type="file" id="ferienDatei" multiple accept=".ics,text/calendar"
-         onchange="ferienDateiGewaehlt(event)">
+         onchange="ferienDateiGemerkt()">
+  <div class="knopfreihe">
+    <button type="button" id="knopfFerien" onclick="ferienEinlesen()" disabled>Einlesen</button>
+  </div>
 
   <div class="abschnitt-titel"><span>Datenbestand</span></div>
   <div id="bestandListe"></div>
@@ -639,7 +642,7 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.11.1';
+var APP_VERSION = '0.11.3';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4094,9 +4097,26 @@ function ferienUebernehmen(text, dateiname) {
   return bericht;
 }
 
-function ferienDateiGewaehlt(ereignis) {
-  var dateien = ereignis && ereignis.target ? ereignis.target.files : null;
-  if (!dateien || !dateien.length) { return; }
+/* Das Auswählen merkt nur vor. Eingelesen wird auf Knopfdruck —
+   sonst passiert es unbemerkt. */
+function ferienDateiGemerkt() {
+  var feld = document.getElementById('ferienDatei');
+  var knopf = document.getElementById('knopfFerien');
+  var anzahl = (feld && feld.files) ? feld.files.length : 0;
+  if (knopf) {
+    knopf.disabled = (anzahl === 0);
+    knopf.textContent = anzahl ? ('Einlesen (' + anzahl + ')') : 'Einlesen';
+  }
+  if (anzahl) { melde(anzahl + ' Datei(en) gewählt. Jetzt „Einlesen" antippen.', null); }
+}
+
+function ferienEinlesen() {
+  var feld = document.getElementById('ferienDatei');
+  var dateien = (feld && feld.files) ? feld.files : null;
+  if (!dateien || !dateien.length) {
+    melde('Es ist keine Datei gewählt.', 'warn');
+    return;
+  }
   var offen = dateien.length;
   var gesamt = { neu: 0, ersetzt: 0, gesamt: 0 };
   var i;
@@ -4123,6 +4143,10 @@ function ferienDateiGewaehlt(ereignis) {
 function ferienFertig(bericht) {
   melde('Eingelesen: ' + bericht.gesamt + ' Einträge · '
       + bericht.neu + ' neu · ' + bericht.ersetzt + ' aufgefrischt.', 'gut');
+  var feld = document.getElementById('ferienDatei');
+  if (feld) { feld.value = ''; }
+  var knopf = document.getElementById('knopfFerien');
+  if (knopf) { knopf.disabled = true; knopf.textContent = 'Einlesen'; }
   spaeterSichern();
   kalZeichnen();
   tagZeichnen();
@@ -4250,14 +4274,60 @@ function jtAn(is) {
   return treffer;
 }
 
+/* Ein Kürzel von drei Zeichen. Ein vorangestelltes Gattungswort
+   wie „Geburtstag" sagt nichts — dann zählt das nächste Wort. */
+var JT_GATTUNG = ['geburtstag', 'urlaub', 'ferien', 'termin', 'feier', 'feiertag',
+                  'besuch', 'besuche', 'dienstreise', 'abwesend', 'krank', 'sonstiges'];
+
+function jtKuerzel(e) {
+  if (e.kuerzel) { return String(e.kuerzel).slice(0, 3); }
+  var worte = String(e.titel || '').split(/[^A-Za-zÄÖÜäöüß]+/);
+  var brauchbar = [];
+  var i;
+  for (i = 0; i < worte.length; i++) {
+    if (worte[i].length > 0) { brauchbar.push(worte[i]); }
+  }
+  if (!brauchbar.length) { return '···'; }
+  var wort = brauchbar[0];
+  if (brauchbar.length > 1 && JT_GATTUNG.indexOf(wort.toLowerCase()) >= 0) {
+    wort = brauchbar[1];
+  }
+  var drei = wort.slice(0, 3);
+  return drei.charAt(0).toUpperCase() + drei.slice(1).toLowerCase();
+}
+
 function jtFarbe(e) {
   var a = JT_ARTEN[e.art] || JT_ARTEN.sonstiges;
   return a.f;
 }
 
+/* Der Filter 'ferien' ist der Gegenpart zu 'Alle': dann sind die
+   Jahrestermine ganz aus dem Bild, nur die Ferientage bleiben. */
 function jtPasst(e) {
   if (jahrFilter === null) { return true; }
+  if (jahrFilter === 'ferien') { return false; }
   return (e.art || '') === jahrFilter;
+}
+
+function ferienZeigen() {
+  return (jahrFilter === null || jahrFilter === 'ferien');
+}
+
+function ferienImJahr(jahr) {
+  var liste = DB.ferien || [];
+  var n = 0, tage = 0;
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    if (liste[i].art !== 'ferien') { continue; }
+    var von = liste[i].von;
+    var bis = liste[i].bis || von;
+    if (von.slice(0, 4) > String(jahr) || bis.slice(0, 4) < String(jahr)) { continue; }
+    var a = (von.slice(0, 4) === String(jahr)) ? von : (jahr + '-01-01');
+    var z = (bis.slice(0, 4) === String(jahr)) ? bis : (jahr + '-12-31');
+    n += 1;
+    tage += Math.round((Date.parse(z) - Date.parse(a)) / 86400000) + 1;
+  }
+  return { n: n, tage: tage };
 }
 
 /* ------------------------------------------------------------
@@ -4440,7 +4510,7 @@ function jahrHtml(is) {
       if (d.getDay() === 0 || d.getDay() === 6) { kl.push('we'); }
       if (iso === heute) { kl.push('jheute'); }
 
-      if (ferienAn(iso)) { kl.push('ferien'); }
+      if (ferienZeigen() && ferienAn(iso)) { kl.push('ferien'); }
       var treffer = [];
       var roh = jtAn(iso);
       var r;
@@ -4455,8 +4525,16 @@ function jahrHtml(is) {
         }
         inhalt += '</span>';
       }
+      var beschriftung = TAGE_KURZ[d.getDay()];
+      var b2;
+      for (b2 = 0; b2 < treffer.length; b2++) {
+        var beginn = treffer[b2].jaehrlich
+          ? (String(jahr) + treffer[b2].von.slice(4))
+          : treffer[b2].von;
+        if (beginn === iso) { beschriftung = jtKuerzel(treffer[b2]); break; }
+      }
       inhalt += '<span class="jwt' + (treffer.length ? ' hell' : '') + '">'
-              + TAGE_KURZ[d.getDay()] + '</span>';
+              + esc(beschriftung) + '</span>';
       if (feiertagAn(iso)) { inhalt += '<span class="jpunkt"></span>'; }
       h += '<td class="' + kl.join(' ') + '" onclick="jtTagOeffnen(\'' + iso + '\')">'
          + inhalt + '</td>';
@@ -4504,6 +4582,45 @@ function jahrHtml(is) {
        + '<span class="jsum-name">' + JT_ARTEN[key].n + '</span>'
        + '<span class="jsum-n">' + summen[key].n + '</span>'
        + '<span class="jsum-t">' + summen[key].tage + ' Tage</span></div>';
+  }
+
+  var fer = ferienImJahr(jahr);
+  if (fer.n) {
+    h += '<div class="jsum' + (jahrFilter === 'ferien' ? ' aktiv' : '') + '" '
+       + 'onclick="jahrFilterSetzen(\'ferien\')">'
+       + '<span class="jsum-farbe" style="background:#8FA98C"></span>'
+       + '<span class="jsum-name">Nur Ferien</span>'
+       + '<span class="jsum-n">' + fer.n + '</span>'
+       + '<span class="jsum-t">' + fer.tage + ' Tage</span></div>';
+  }
+
+  if (jahrFilter === 'ferien') {
+    var fliste = DB.ferien || [];
+    var fdrin = [];
+    for (i = 0; i < fliste.length; i++) {
+      if (fliste[i].art !== 'ferien') { continue; }
+      var fv = fliste[i].von;
+      var fb = fliste[i].bis || fv;
+      if (fv.slice(0, 4) !== String(jahr) && fb.slice(0, 4) !== String(jahr)) { continue; }
+      fdrin.push(fliste[i]);
+    }
+    fdrin.sort(function (p, q) { return (p.von < q.von) ? -1 : ((p.von > q.von) ? 1 : 0); });
+    h += '<div class="gruppenkopf"><span>Ferien ' + jahr + ' · ' + fdrin.length + '</span></div>';
+    h += '<div class="jliste">';
+    if (!fdrin.length) { h += '<div class="kleer">Keine Ferien eingelesen.</div>'; }
+    for (i = 0; i < fdrin.length; i++) {
+      var f = fdrin[i];
+      var fspanne = (f.von === (f.bis || f.von)) ? kurzDatum(f.von)
+                    : (kurzDatum(f.von) + '–' + kurzDatum(f.bis));
+      var ftage = Math.round((Date.parse(f.bis || f.von) - Date.parse(f.von)) / 86400000) + 1;
+      h += '<div class="jl-zeile" onclick="zumTag(\'' + f.von + '\')">'
+         + '<span class="jl-farbe" style="background:#8FA98C"></span>'
+         + '<span class="jl-spanne">' + esc(fspanne) + '</span>'
+         + '<span class="jl-name">' + esc(f.titel) + '</span>'
+         + '<span class="jsum-t">' + ftage + ' Tage</span></div>';
+    }
+    h += '</div>';
+    return h;
   }
 
   /* Einträge des Jahres, dem Filter folgend */
@@ -4627,6 +4744,12 @@ function jtTagHtml(is) {
        + 'onchange="jtTitelSetzen(\'' + esc(e.id) + '\',this.value)" '
        + 'style="width:100%;font-size:calc(var(--fs)*0.92)">';
     h += '<div class="as-meta">' + esc(spanne) + (e.jaehrlich ? ' · jährlich' : '') + '</div>';
+    h += '<div class="d-feld" style="border-bottom:0;padding:7px 0 0">'
+       + '<div class="d-name">Kürzel</div><div class="d-wert">'
+       + '<input type="text" maxlength="3" size="3" value="' + esc(jtKuerzel(e)) + '" '
+       + 'onchange="jtKuerzelSetzen(\'' + esc(e.id) + '\',this.value)" '
+       + 'style="width:64px;text-align:center">'
+       + '</div></div>';
     h += jtArtenHtml(esc(e.id), e.art);
     h += '<div class="d-reihe">';
     h += '<button type="button" onclick="jtJaehrlichUm(\'' + esc(e.id) + '\')">'
@@ -4701,6 +4824,16 @@ function jtTitelSetzen(id, wert) {
   var sauber = String(wert).trim();
   if (sauber.length === 0) { return; }
   e.titel = sauber;
+  e.geaendert = jetzt();
+  spaeterSichern();
+  kalZeichnen();
+}
+
+function jtKuerzelSetzen(id, wert) {
+  var e = jtFinden(id);
+  if (!e) { return; }
+  var sauber = String(wert).trim().slice(0, 3);
+  e.kuerzel = (sauber.length > 0) ? sauber : '';
   e.geaendert = jetzt();
   spaeterSichern();
   kalZeichnen();

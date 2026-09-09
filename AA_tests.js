@@ -465,6 +465,35 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__fehlerApi = { dienstAusAdresse, antwortPruefen };'
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
+                 + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__jahrApi = { ferienImJahr,'
+                 + ' pruefeFerien: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.jahrestermine = [{ id:\'u1\', titel:\'Sommerurlaub\', art:\'urlaub\','
+                 + '     von:\'2026-08-03\', bis:\'2026-08-21\', jaehrlich:false }];'
+                 + '   DB.ferien = ['
+                 + '     { id:\'f1\', titel:\'Frühjahrsferien\', art:\'ferien\','
+                 + '       von:\'2026-02-16\', bis:\'2026-02-20\' },'
+                 + '     { id:\'f2\', titel:\'Sommerferien\', art:\'ferien\','
+                 + '       von:\'2026-08-03\', bis:\'2026-09-14\' },'
+                 + '     { id:\'f3\', titel:\'Herbstferien\', art:\'ferien\','
+                 + '       von:\'2026-11-02\', bis:\'2026-11-06\' } ];'
+                 + '   var merkFilter = jahrFilter;'
+                 + '   jahrFilter = null;'
+                 + '   var a = (jahrHtml(\'2026-01-01\').match(/jbalken/g) || []).length;'
+                 + '   jahrFilter = \'ferien\';'
+                 + '   var hf = jahrHtml(\'2026-01-01\');'
+                 + '   var b = (hf.match(/jbalken/g) || []).length;'
+                 + '   var l = (hf.match(/jl-zeile/g) || []).length;'
+                 + '   jahrFilter = \'urlaub\';'
+                 + '   var hu = jahrHtml(\'2026-01-01\');'
+                 + '   var c = (hu.match(/jbalken/g) || []).length;'
+                 + '   var t = hu.indexOf(\'ferien"\') < 0;'
+                 + '   var s = ferienImJahr(2026);'
+                 + '   jahrFilter = merkFilter; DB = alt;'
+                 + '   return { ohneFilter:a, nurFerien:b, ferienListe:l,'
+                 + '            andererFilter:c, toenungAus:t, summe:s };'
+                 + ' } };'
                  + 'globalThis.__ferienApi = { icsLesen, ferienUebernehmen, ferienAn,'
                  + ' feiertagAn, leereDatenbank, setDB: function(d){ DB = d; } };'
                  + 'globalThis.__kalenderApi = { montagVon, jtAn,'
@@ -2149,7 +2178,7 @@ console.log('\n38. Ferien, Feiertage und Jahrestermine');
   const f = globalThis.__ferienApi;
 
   const noetig = ['icsLesen', 'icsDatum', 'icsEntfalten', 'ferienUebernehmen',
-                  'ferienDateiGewaehlt', 'ferienAn', 'ferienEintragAn', 'zeichneFerien',
+                  'ferienDateiGemerkt', 'ferienEinlesen', 'ferienAn', 'ferienEintragAn', 'zeichneFerien',
                   'jtTagOeffnen', 'jtTagHtml', 'jtAnlegen', 'jtLoeschen',
                   'jtArtSetzen', 'jtTitelSetzen', 'jtJaehrlichUm', 'jtFinden'];
   noetig.forEach(function (n) {
@@ -2238,6 +2267,111 @@ console.log('\n38. Ferien, Feiertage und Jahrestermine');
        gehören zum Text. */
     pruefe(g.length === 1 && g[0].titel === 'Sehr langer Titel',
            'umbrochene Zeilen werden wieder zusammengefügt');
+  }
+}
+
+/* ============================================================
+   39. Einlesen auf Knopfdruck und Kuerzel im Jahresraster
+   Grund: Ein Dateifeld, das beim Auswaehlen sofort einliest, tut
+   es unbemerkt. Und ein farbiger Balken ohne Beschriftung sagt
+   nur die Art, nicht welcher Eintrag gemeint ist.
+   ============================================================ */
+console.log('\n39. Einlesen und Kürzel');
+{
+  const skript = hauptSkript();
+  const j = globalThis.__jtApi;
+
+  pruefe(new RegExp('function\\s+jtKuerzel\\s*\\(').test(skript), 'Funktion jtKuerzel ist definiert');
+  pruefe(new RegExp('function\\s+jtKuerzelSetzen\\s*\\(').test(skript),
+         'Funktion jtKuerzelSetzen ist definiert');
+  pruefe(/id="knopfFerien"/.test(QUELLE), 'es gibt einen Einlesen-Knopf');
+  pruefe(/onchange="ferienDateiGemerkt\(\)"/.test(QUELLE),
+         'das Auswählen merkt nur vor');
+  pruefe(/disabled>Einlesen</.test(QUELLE),
+         'der Knopf ist ohne Auswahl gesperrt');
+
+  const fertig = skript.match(/function ferienFertig\([\s\S]*?\n\}/);
+  pruefe(fertig && /feld\.value = ''/.test(fertig[0]),
+         'nach dem Einlesen wird die Auswahl geräumt');
+
+  const jahr = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
+  pruefe(jahr && /jtKuerzel\(/.test(jahr[0]),
+         'das Raster beschriftet den Beginn eines Eintrags mit seinem Kürzel');
+  pruefe(jahr && /beginn === iso/.test(jahr[0]),
+         'das Kürzel steht am ersten Tag, danach wieder der Wochentag');
+
+  const blatt = skript.match(/function jtTagHtml\([\s\S]*?\n\}\n/);
+  pruefe(blatt && /jtKuerzelSetzen\(/.test(blatt[0]),
+         'das Kürzel lässt sich von Hand überschreiben');
+  pruefe(blatt && /maxlength="3"/.test(blatt[0]), 'höchstens drei Zeichen');
+
+  if (!j) {
+    warn('Kürzelfunktion nicht auswertbar');
+  } else {
+    pruefe(j.jtKuerzel({ titel: 'Skiwoche' }) === 'Ski', 'ein Wort ergibt seine ersten drei Zeichen');
+    pruefe(j.jtKuerzel({ titel: 'Geburtstag Anita Müller (1937)' }) === 'Ani',
+           'ein Gattungswort wird übersprungen');
+    pruefe(j.jtKuerzel({ titel: 'Urlaub Familie' }) === 'Fam',
+           'auch „Urlaub" zählt als Gattungswort');
+    pruefe(j.jtKuerzel({ titel: 'Werksbesuch Hamburg' }) === 'Wer',
+           'ein zusammengesetztes Wort bleibt stehen');
+    pruefe(j.jtKuerzel({ titel: 'Urlaub' }) === 'Url',
+           'steht nur das Gattungswort da, wird es benutzt');
+    pruefe(j.jtKuerzel({ titel: 'x', kuerzel: 'ABC' }) === 'ABC',
+           'ein von Hand gesetztes Kürzel gewinnt');
+    pruefe(j.jtKuerzel({ titel: 'x', kuerzel: 'ABCDE' }) === 'ABC',
+           'es wird auf drei Zeichen gekürzt');
+    pruefe(j.jtKuerzel({ titel: '' }) === '···', 'ohne Titel bleibt ein Platzhalter');
+  }
+}
+
+/* ============================================================
+   40. Filter „nur Ferien"
+   Grund: Ferien waren nur Hintergrundton und tauchten in keiner
+   Summe auf. Als Gegenpart zu „Alle" braucht es eine Sicht, die
+   ausschliesslich die Ferientage zeigt.
+   ============================================================ */
+console.log('\n40. Filter „nur Ferien"');
+{
+  const skript = hauptSkript();
+  const f = globalThis.__jahrApi;
+
+  ['ferienZeigen', 'ferienImJahr'].forEach(function (n) {
+    pruefe(new RegExp('function\\s+' + n + '\\s*\\(').test(skript),
+           'Funktion ' + n + ' ist definiert');
+  });
+
+  const passt = skript.match(/function jtPasst\([\s\S]*?\n\}/);
+  pruefe(passt && /jahrFilter === 'ferien'.*return false/s.test(passt[0]),
+         'bei „nur Ferien" verschwinden die Jahrestermine');
+  pruefe(passt && /jahrFilter === null/.test(passt[0]),
+         'ohne Filter wird weiterhin alles gezeigt');
+
+  const zeigen = skript.match(/function ferienZeigen\([\s\S]*?\n\}/);
+  pruefe(zeigen && /jahrFilter === null \|\| jahrFilter === 'ferien'/.test(zeigen[0]),
+         'die Ferientönung erscheint nur ohne Filter oder bei „nur Ferien"');
+
+  const jahr = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
+  pruefe(jahr && /ferienZeigen\(\) && ferienAn\(iso\)/.test(jahr[0]),
+         'das Raster folgt dem Filter auch bei der Tönung');
+  pruefe(jahr && /Nur Ferien/.test(jahr[0]), 'es gibt eine eigene Summenzeile');
+  pruefe(jahr && /Ferien ' \+ jahr/.test(jahr[0]),
+         'die Eintragsliste zeigt dann die Ferienzeiträume');
+
+  if (!f) {
+    warn('Jahresfunktionen nicht auswertbar');
+  } else {
+    const e = f.pruefeFerien();
+    pruefe(e.ohneFilter > 0, 'ohne Filter stehen Jahrestermine im Raster');
+    pruefe(e.nurFerien === 0, 'bei „nur Ferien" steht kein Jahrestermin mehr im Raster');
+    pruefe(e.ferienListe === 3, 'die Ferienliste nennt die Zeiträume');
+    pruefe(e.andererFilter > 0, 'ein anderer Filter zeigt weiterhin seine Art');
+    pruefe(e.toenungAus === true,
+           'bei einem anderen Filter ist auch die Ferientönung aus');
+    /* 5 + 43 + 5 Tage aus den drei Zeiträumen des Prüfbeispiels */
+    pruefe(e.summe.n === 3 && e.summe.tage === 53,
+           'die Ferientage des Jahres werden richtig gezählt (ist: '
+           + e.summe.n + ' Zeiträume, ' + e.summe.tage + ' Tage)');
   }
 }
 
