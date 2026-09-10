@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.19.0</title>
+<title>Workbench 0.20.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -348,6 +348,18 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
 .vh-stand.ja{border-color:var(--petrol);color:var(--petrol)}
 .vh-stand.nein{color:var(--grau)}
 .v-schritt{display:flex;align-items:center;gap:8px;padding:5px 0}
+.ms-block{padding:9px 0;border-bottom:1px solid var(--linie)}
+.ms-oben{display:flex;align-items:flex-start;gap:9px}
+.ms-titel{flex:1;min-width:0;font:inherit;font-size:calc(var(--fs)*0.86);
+  line-height:1.4;border:1px solid var(--linie);border-radius:5px;padding:6px 8px;
+  background:var(--papier);color:var(--tinte);outline:none;resize:vertical}
+.ms-unten{display:flex;align-items:center;gap:6px;margin-top:6px;padding-left:20px;
+  flex-wrap:wrap}
+.ms-wort{font:inherit;font-size:calc(var(--fs)*0.74);padding:4px 10px;
+  border:1px solid var(--linie);border-radius:5px;background:var(--papier);
+  color:var(--tinte);cursor:pointer;white-space:nowrap}
+.ms-wort.gefahr{border-color:var(--weinrot);color:var(--weinrot)}
+.ms-marke{font-size:calc(var(--fs)*0.74);color:var(--grau)}
 .v-feld{flex:1;min-width:0;font:inherit;font-size:calc(var(--fs)*0.85);
   border:1px solid var(--linie);border-radius:5px;padding:5px 7px;
   background:var(--papier);color:var(--tinte);outline:none}
@@ -861,7 +873,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.19.0';
+var APP_VERSION = '0.20.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -6173,21 +6185,25 @@ function vhDetailHtml() {
     var ms = v.meilensteine || [];
     var m;
     for (m = 0; m < ms.length; m++) {
-      h += '<div class="v-schritt">'
+      h += '<div class="ms-block">';
+      h += '<div class="ms-oben">'
          + '<button class="vk-ms-punkt" type="button" style="cursor:pointer'
          + (ms[m].erreicht ? ';background:var(--petrol);border-color:var(--petrol)' : '')
-         + '" onclick="vhMsUm(' + m + ')"></button>'
-         + '<input class="v-feld" type="text" value="' + esc(ms[m].titel) + '" '
-         + 'oninput="vhMsTitel(' + m + ',this.value)">'
-         + '<input class="v-feld" type="date" value="' + esc(ms[m].datum || '') + '" '
-         + 'style="flex:0 0 138px" onchange="vhMsDatum(' + m + ',this.value)">'
-         + '<button class="v-knopf" type="button" onclick="vhMsHoch(' + m + ')" '
-         + 'aria-label="nach oben"><svg viewBox="0 0 24 24">'
-         + '<path d="M6 15l6-6 6 6"></path></svg></button>'
-         + '<button class="v-knopf" type="button" onclick="vhMsWeg(' + m + ')" '
-         + 'aria-label="entfernen"><svg viewBox="0 0 24 24">'
-         + '<path d="M6 6l12 12M18 6L6 18"></path></svg></button>'
+         + '" onclick="vhMsUm(' + m + ')" aria-label="erreicht"></button>'
+         + '<textarea class="ms-titel" rows="2" placeholder="Was ist erreicht?" '
+         + 'oninput="vhMsTitel(' + m + ',this.value)">' + esc(ms[m].titel) + '</textarea>'
          + '</div>';
+      h += '<div class="ms-unten">'
+         + '<input class="v-feld" type="date" value="' + esc(ms[m].datum || '') + '" '
+         + 'style="flex:0 0 auto" onchange="vhMsDatum(' + m + ',this.value)">'
+         + '<span style="flex:1"></span>'
+         + '<button class="ms-wort" type="button" onclick="vhMsAlsAufgabe(' + m + ')" '
+         + 'title="Aus diesem Meilenstein eine Aufgabe machen">Aufgabe daraus</button>'
+         + '<button class="ms-wort" type="button" onclick="vhMsHoch(' + m + ')" '
+         + 'title="Diesen Meilenstein nach oben schieben">Nach oben</button>'
+         + '<button class="ms-wort gefahr" type="button" onclick="vhMsWeg(' + m + ')" '
+         + 'title="Diesen Meilenstein entfernen">Entfernen</button>'
+         + '</div></div>';
     }
     h += '<button class="neu-zeile" type="button" onclick="vhMsNeu()">'
        + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Meilenstein</button>';
@@ -6195,6 +6211,35 @@ function vhDetailHtml() {
       h += '<div class="d-reihe"><button type="button" onclick="vhMsOrdnen()">'
          + 'Nach Datum ordnen</button></div>';
     }
+
+    h += '<div class="s-abschnitt">Aufgaben</div>';
+    var zug = aufgabenZuProjekt(v.id);
+    if (!zug.length) {
+      h += '<div class="tleer" style="padding-left:0">Noch keine Aufgabe zugeordnet.</div>';
+    }
+    var z;
+    for (z = 0; z < zug.length; z++) {
+      var za = zug[z];
+      h += '<div class="anlage">'
+         + '<button class="tkasten" type="button" style="flex:0 0 auto" '
+         + 'onclick="vhAufgabeErledigen(\'' + esc(za.id) + '\')"></button>'
+         + '<div class="a-mitte" onclick="aufgabeAktionen(\'' + esc(za.id) + '\')">'
+         + '<div class="a-name">' + esc(za.titel) + '</div>'
+         + '<div class="a-quelle">' + esc(planungText(za))
+         + (za.frist ? (' · Frist ' + esc(kurzDatum(za.frist))) : '') + '</div></div>'
+         + '<button class="a-weg" type="button" onclick="vhAufgabeLoesen(\'' + esc(za.id) + '\')" '
+         + 'title="Aus dem Projekt lösen"><svg viewBox="0 0 24 24">'
+         + '<path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>';
+    }
+    h += '<div class="ms-unten" style="padding-left:0">'
+       + '<input class="v-feld" type="text" id="vhAufgabeNeu" '
+       + 'placeholder="Neue Aufgabe für dieses Projekt" '
+       + 'onkeydown="vhAufgabeTaste(event)">'
+       + '<button class="ms-wort" type="button" onclick="vhAufgabeAnlegen()">Anlegen</button>'
+       + '</div>';
+    h += '<button class="neu-zeile" type="button" onclick="vhAufgabeWahl()">'
+       + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>'
+       + 'Vorhandene Aufgabe zuordnen</button>';
 
     h += '<div class="s-abschnitt">Anlagen</div>';
     var an = v.anlagen || [];
@@ -6333,6 +6378,114 @@ function vhMsWeg(i) {
   if (!v || !v.meilensteine[i]) { return; }
   v.meilensteine.splice(i, 1);
   vhGeaendert(true);
+}
+
+/* Ein Meilenstein beschreibt einen Zustand, eine Aufgabe eine
+   Handlung. Manchmal will man aus dem einen das andere machen. */
+function vhMsAlsAufgabe(i) {
+  var v = vorhabenFinden(vhDetail, vhDetailArt);
+  if (!v || !v.meilensteine || !v.meilensteine[i]) { return; }
+  var titel = String(v.meilensteine[i].titel || '').trim();
+  if (titel.length === 0) { return; }
+  DB.aufgaben.push({
+    id: neueKennung(), titel: titel, beschreibung: '', kontext: v.kontext,
+    themaId: null, projektId: v.id, frist: v.meilensteine[i].datum || '',
+    planung: 'backlog', uhrzeit: '', art: 'haupt', wiederholung: null,
+    status: 'offen', erledigtAm: null, zuletztErledigt: null,
+    ablaufSchritt: null, geaendert: jetzt()
+  });
+  spaeterSichern();
+  aufZeichnen();
+  vhGeaendert(true);
+  melde('Aufgabe angelegt: ' + titel, 'gut');
+}
+
+function vhAufgabeTaste(ereignis) {
+  if (!ereignis || ereignis.key !== 'Enter') { return; }
+  vhAufgabeAnlegen();
+}
+
+function vhAufgabeAnlegen() {
+  var v = vorhabenFinden(vhDetail, vhDetailArt);
+  var feld = document.getElementById('vhAufgabeNeu');
+  if (!v || !feld) { return; }
+  var titel = feld.value.trim();
+  if (titel.length === 0) { return; }
+  DB.aufgaben.push({
+    id: neueKennung(), titel: titel, beschreibung: '', kontext: v.kontext,
+    themaId: null, projektId: v.id, frist: '', planung: 'backlog', uhrzeit: '',
+    art: 'haupt', wiederholung: null, status: 'offen', erledigtAm: null,
+    zuletztErledigt: null, ablaufSchritt: null, geaendert: jetzt()
+  });
+  spaeterSichern();
+  aufZeichnen();
+  vhGeaendert(true);
+}
+
+function vhAufgabeErledigen(id) {
+  aufgabeErledigen(id);
+  vhDetailNeu();
+}
+
+/* Lösen, nicht löschen: Die Aufgabe bleibt, sie gehört nur nicht
+   mehr zu diesem Projekt. */
+function vhAufgabeLoesen(id) {
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  a.projektId = null;
+  a.geaendert = jetzt();
+  spaeterSichern();
+  aufZeichnen();
+  vhGeaendert(true);
+}
+
+function vhAufgabeWahl() {
+  var v = vorhabenFinden(vhDetail, vhDetailArt);
+  var sheet = document.getElementById('aktionSheet');
+  if (!v || !sheet) { return; }
+
+  var h = blattKopf();
+  h += '<button class="zurueck" type="button" onclick="vhDetailOeffnen(\'' + esc(v.id)
+     + '\',\'' + esc(vhDetailArt) + '\')">'
+     + '<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;'
+     + 'stroke-width:2;stroke-linecap:round;stroke-linejoin:round">'
+     + '<path d="M15 6l-6 6 6 6"></path></svg>' + esc(v.name || 'Projekt') + '</button>';
+  h += '<div class="as-titel">Aufgabe zuordnen</div>';
+  h += '<div class="as-meta">offene Aufgaben ohne Projekt · Kontext '
+     + esc(v.kontext) + '</div>';
+  h += '<div class="as-linie"></div>';
+
+  var l = DB.aufgaben || [];
+  var i;
+  var gab = false;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].projektId) { continue; }
+    if (l[i].status === 'erledigt' && !l[i].wiederholung) { continue; }
+    if (l[i].kontext !== v.kontext) { continue; }
+    h += '<div class="mf-zeile" onclick="vhAufgabeZuordnen(\'' + esc(l[i].id) + '\')">'
+       + '<span class="mf-name">' + esc(l[i].titel) + '</span>'
+       + '<span class="a-quelle">' + esc(planungText(l[i])) + '</span></div>';
+    gab = true;
+  }
+  if (!gab) {
+    h += '<div class="tleer" style="padding-left:0">Keine freie Aufgabe in diesem '
+       + 'Kontext.</div>';
+  }
+  h += '<div class="d-reihe"><button type="button" onclick="vhDetailOeffnen(\'' + esc(v.id)
+     + '\',\'' + esc(vhDetailArt) + '\')">Zurück</button></div>';
+  sheet.innerHTML = h;
+}
+
+function vhAufgabeZuordnen(id) {
+  var v = vorhabenFinden(vhDetail, vhDetailArt);
+  var a = aufgabeFinden(id);
+  if (!v || !a) { return; }
+  a.projektId = v.id;
+  a.geaendert = jetzt();
+  spaeterSichern();
+  aufZeichnen();
+  vhZeichnen();
+  vhAufgabeWahl();
 }
 
 function vhAnlageFormular() {
@@ -6822,27 +6975,42 @@ function abDetailHtml() {
   var l = a.schritte || [];
   var i;
   for (i = 0; i < l.length; i++) {
-    h += '<div class="v-schritt">';
+    h += '<div class="ms-block">';
+    h += '<div class="ms-oben">';
     if (istVorlage) {
       h += '<span class="vk-ms-punkt"></span>';
     } else {
       h += '<button class="tkasten' + (l[i].fertig ? ' an' : '') + '" type="button" '
-         + 'onclick="abSchrittUm(' + i + ')"></button>';
+         + 'onclick="abSchrittUm(' + i + ')" aria-label="erledigt"></button>';
     }
-    h += '<input class="v-feld" type="text" value="' + esc(l[i].titel) + '" '
-       + 'oninput="abSchrittTitel(' + i + ',this.value)">';
-    if (!istVorlage) {
-      h += '<input class="v-feld" type="date" value="' + esc(l[i].ab || '') + '" '
-         + 'style="flex:0 0 138px" title="frühestens ab" '
-         + 'onchange="abSchrittAb(' + i + ',this.value)">';
-    }
-    h += '<button class="v-knopf" type="button" onclick="abSchrittHoch(' + i + ')" '
-       + 'aria-label="nach oben"><svg viewBox="0 0 24 24">'
-       + '<path d="M6 15l6-6 6 6"></path></svg></button>';
-    h += '<button class="v-knopf" type="button" onclick="abSchrittWeg(' + i + ')" '
-       + 'aria-label="entfernen"><svg viewBox="0 0 24 24">'
-       + '<path d="M6 6l12 12M18 6L6 18"></path></svg></button>';
+    h += '<textarea class="ms-titel" rows="2" placeholder="Was ist zu tun?" '
+       + 'oninput="abSchrittTitel(' + i + ',this.value)">' + esc(l[i].titel) + '</textarea>';
     h += '</div>';
+
+    h += '<div class="ms-unten">';
+    if (!istVorlage) {
+      h += '<span class="ms-marke">frühestens ab</span>'
+         + '<input class="v-feld" type="date" value="' + esc(l[i].ab || '') + '" '
+         + 'style="flex:0 0 auto" onchange="abSchrittAb(' + i + ',this.value)">';
+    }
+    h += '<span style="flex:1"></span>';
+    if (!istVorlage) {
+      var verknuepft = l[i].aufgabeId ? aufgabeFinden(l[i].aufgabeId) : null;
+      if (verknuepft) {
+        h += '<button class="ms-wort" type="button" '
+           + 'onclick="aufgabeAktionen(\'' + esc(verknuepft.id) + '\')" '
+           + 'title="Die zugehörige Aufgabe öffnen">Aufgabe: '
+           + esc(planungText(verknuepft)) + '</button>';
+      } else {
+        h += '<button class="ms-wort" type="button" onclick="abSchrittAlsAufgabe(' + i + ')" '
+           + 'title="Aus diesem Schritt eine echte Aufgabe machen">Aufgabe daraus</button>';
+      }
+    }
+    h += '<button class="ms-wort" type="button" onclick="abSchrittHoch(' + i + ')" '
+       + 'title="Diesen Schritt nach oben schieben">Nach oben</button>';
+    h += '<button class="ms-wort gefahr" type="button" onclick="abSchrittWeg(' + i + ')" '
+       + 'title="Diesen Schritt entfernen">Entfernen</button>';
+    h += '</div></div>';
   }
   h += '<button class="neu-zeile" type="button" onclick="abSchrittNeu()">'
      + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Schritt</button>';
@@ -6893,6 +7061,29 @@ function abSchrittTitel(i, wert) {
   if (!a || !a.schritte[i]) { return; }
   a.schritte[i].titel = wert;
   abGeaendert(false);
+}
+
+/* Ein Schritt ist eine Zeile in einem Ablauf. Braucht er einen
+   eigenen Platz im Tag, eine Frist oder ein Thema, wird eine echte
+   Aufgabe daraus — der Schritt behält sie in Sicht. */
+function abSchrittAlsAufgabe(i) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || !a.schritte || !a.schritte[i]) { return; }
+  var titel = String(a.schritte[i].titel || '').trim();
+  if (titel.length === 0) { return; }
+  var neu = {
+    id: neueKennung(), titel: titel, beschreibung: '', kontext: a.kontext,
+    themaId: null, projektId: null, frist: '',
+    planung: a.schritte[i].ab || 'backlog', uhrzeit: '', art: 'haupt',
+    wiederholung: null, status: 'offen', erledigtAm: null, zuletztErledigt: null,
+    ablaufSchritt: a.id + '#' + i, geaendert: jetzt()
+  };
+  DB.aufgaben.push(neu);
+  a.schritte[i].aufgabeId = neu.id;
+  spaeterSichern();
+  aufZeichnen();
+  abGeaendert(true);
+  melde('Aufgabe angelegt: ' + titel, 'gut');
 }
 
 function abSchrittAb(i, wert) {

@@ -485,6 +485,52 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__abSchrittApi = {'
+                 + ' pruefeSchritt: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'D\', kontext:\'beruflich\','
+                 + '     ablaufId:null, start:\'\', frist:\'\', schritte:['
+                 + '       { titel:\'Erster\', fertig:true, ab:\'\' },'
+                 + '       { titel:\'Zweiter\', fertig:false, ab:\'2026-10-01\' },'
+                 + '       { titel:\'\', fertig:false, ab:\'\' } ] }];'
+                 + '   abDetail = \'d1\'; abDetailArt = \'durchlauf\';'
+                 + '   abSchrittAlsAufgabe(1);'
+                 + '   var angelegt = DB.aufgaben.length;'
+                 + '   var neu = DB.aufgaben[0];'
+                 + '   var verkn = DB.durchlaeufe[0].schritte[1].aufgabeId === neu.id'
+                 + '               && neu.ablaufSchritt === \'d1#1\';'
+                 + '   abSchrittAlsAufgabe(2);'
+                 + '   var ohneTitel = DB.aufgaben.length;'
+                 + '   abDetail = \'\'; abDetailArt = \'\'; DB = alt;'
+                 + '   return { angelegt:angelegt, titel:neu.titel, planung:neu.planung,'
+                 + '            verknuepft:verkn, ohneTitel:ohneTitel };'
+                 + ' } };'
+                 + 'globalThis.__projektApi = {'
+                 + ' pruefeProjekt: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'Garage\', kontext:\'privat\','
+                 + '     status:\'laufend\', zielzustaende:[], anlagen:[],'
+                 + '     meilensteine:[{ titel:\'Fundament\', datum:\'2026-05-04\','
+                 + '                     erreicht:false }] }];'
+                 + '   vhDetail = \'p1\'; vhDetailArt = \'projekt\';'
+                 + '   vhMsAlsAufgabe(0);'
+                 + '   var eins = aufgabenZuProjekt(\'p1\');'
+                 + '   DB.aufgaben.push({ id:\'x9\', titel:\'Extra\', kontext:\'privat\','
+                 + '     projektId:\'p1\', status:\'offen\', planung:\'backlog\' });'
+                 + '   var zwei = aufgabenZuProjekt(\'p1\').length;'
+                 + '   vhAufgabeLoesen(\'x9\');'
+                 + '   var nachLoesen = aufgabenZuProjekt(\'p1\').length;'
+                 + '   var bleibt = !!aufgabeFinden(\'x9\');'
+                 + '   vhAufgabeZuordnen(\'x9\');'
+                 + '   var nachZu = aufgabenZuProjekt(\'p1\').length;'
+                 + '   vhDetail = \'\'; vhDetailArt = \'\'; DB = alt;'
+                 + '   return { ausMeilenstein: eins.length,'
+                 + '            titelUebernommen: eins[0].titel,'
+                 + '            fristUebernommen: eins[0].frist,'
+                 + '            kontextUebernommen: eins[0].kontext,'
+                 + '            nachAnlegen: zwei, nachLoesen: nachLoesen,'
+                 + '            bleibtErhalten: bleibt, nachZuordnen: nachZu };'
+                 + ' } };'
                  + 'globalThis.__vorbeiApi = {'
                  + ' pruefeVorbei: function(){'
                  + '   var heute = isoDatum();'
@@ -3470,6 +3516,131 @@ console.log('\n52. Erneuerung mit Nachsetzen');
          'erst danach mit Rückfrage');
   pruefe(anm && /gut \|\| still/.test(anm[0]),
          'ein stiller Versuch führt nie zu einer Rückfrage');
+}
+
+/* ============================================================
+   53. Aufgaben am Projekt, lesbare Meilensteine
+   Grund: Ein Projekt konnte Aufgaben haben, aber aus seinem Dialog
+   fuehrte kein Weg dorthin. Und die Meilensteinzeile war ein
+   einzeiliges Feld mit Knoepfen, die nur aus Zeichen bestanden.
+   ============================================================ */
+console.log('\n53. Aufgaben am Projekt');
+{
+  const skript = hauptSkript();
+  const p = globalThis.__projektApi;
+
+  ['vhMsAlsAufgabe', 'vhAufgabeAnlegen', 'vhAufgabeTaste', 'vhAufgabeErledigen',
+   'vhAufgabeLoesen', 'vhAufgabeWahl', 'vhAufgabeZuordnen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const detail = skript.match(/function vhDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(detail && /s-abschnitt">Aufgaben/.test(detail[0]),
+         'das Projektdetail hat einen Aufgabenabschnitt');
+  pruefe(detail && /vhAufgabeWahl\(\)/.test(detail[0]),
+         'eine vorhandene Aufgabe lässt sich zuordnen');
+  pruefe(detail && /id="vhAufgabeNeu"/.test(detail[0]),
+         'eine neue lässt sich direkt anlegen');
+  pruefe(detail && /vhMsAlsAufgabe\(/.test(detail[0]),
+         'aus einem Meilenstein lässt sich eine Aufgabe machen');
+
+  /* Knöpfe mit Wörtern statt Zeichen */
+  pruefe(detail && /Nach oben<\/button>/.test(detail[0]),
+         'der Hochschiebeknopf trägt ein Wort statt eines Pfeils');
+  pruefe(detail && /Entfernen<\/button>/.test(detail[0]),
+         'der Entfernenknopf ebenfalls');
+  pruefe(detail && /title="Diesen Meilenstein nach oben schieben"/.test(detail[0]),
+         'zusätzlich erklärt ein Hinweis, was er tut');
+  pruefe(detail && /class="ms-titel" rows="2"/.test(detail[0]),
+         'der Meilensteintitel ist ein mehrzeiliges Feld');
+  pruefe(/\.ms-titel\{[^}]*resize:vertical/.test(QUELLE),
+         'es lässt sich aufziehen');
+
+  /* Lösen heißt nicht löschen */
+  const loesen = skript.match(/function vhAufgabeLoesen\([\s\S]*?\n\}/);
+  pruefe(loesen && /projektId = null/.test(loesen[0]),
+         'Lösen entfernt nur die Zuordnung');
+  pruefe(loesen && !/splice/.test(loesen[0]), 'die Aufgabe selbst bleibt');
+
+  /* Die Auswahl zeigt nur freie Aufgaben desselben Kontexts */
+  const wahl = skript.match(/function vhAufgabeWahl\([\s\S]*?\n\}\n/);
+  pruefe(wahl && /l\[i\]\.projektId\) \{ continue/.test(wahl[0]),
+         'schon zugeordnete Aufgaben stehen nicht zur Wahl');
+  pruefe(wahl && /kontext !== v\.kontext/.test(wahl[0]),
+         'nur Aufgaben desselben Kontexts');
+
+  if (!p) {
+    warn('Projektfunktionen nicht auswertbar');
+  } else {
+    const e = p.pruefeProjekt();
+    pruefe(e.ausMeilenstein === 1, 'aus einem Meilenstein entsteht eine Aufgabe');
+    pruefe(e.titelUebernommen === 'Fundament', 'sie trägt seinen Titel');
+    pruefe(e.fristUebernommen === '2026-05-04', 'und sein Datum als Frist');
+    pruefe(e.kontextUebernommen === 'privat', 'und den Kontext des Projekts');
+    pruefe(e.nachAnlegen === 2, 'eine neue Aufgabe lässt sich anlegen');
+    pruefe(e.nachLoesen === 1, 'Lösen nimmt sie aus dem Projekt');
+    pruefe(e.bleibtErhalten === true, 'sie bleibt im Bestand');
+    pruefe(e.nachZuordnen === 2, 'und lässt sich wieder zuordnen');
+  }
+}
+
+/* ============================================================
+   54. Ablaufdialog: lesbare Schritte, echte Aufgaben
+   Grund: Dieselben Maengel wie beim Projektdialog — einzeilige
+   Felder, Knoepfe aus Zeichen, kein Weg zu einer echten Aufgabe.
+   ============================================================ */
+console.log('\n54. Ablaufdialog');
+{
+  const skript = hauptSkript();
+  const a = globalThis.__abSchrittApi;
+
+  pruefe(new RegExp('function\\s+abSchrittAlsAufgabe\\s*\\(').test(skript),
+         'Funktion abSchrittAlsAufgabe ist definiert');
+
+  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(detail && /class="ms-titel" rows="2"/.test(detail[0]),
+         'der Schritttitel ist ein mehrzeiliges Feld');
+  pruefe(detail && /Nach oben<\/button>/.test(detail[0]),
+         'der Hochschiebeknopf trägt ein Wort');
+  pruefe(detail && /Entfernen<\/button>/.test(detail[0]), 'der Entfernenknopf ebenfalls');
+  pruefe(detail && /title="Diesen Schritt nach oben schieben"/.test(detail[0]),
+         'ein Hinweis erklärt ihn');
+  pruefe(detail && /ms-marke">frühestens ab/.test(detail[0]),
+         'das Datumsfeld ist beschriftet');
+  pruefe(detail && /abSchrittAlsAufgabe\(/.test(detail[0]),
+         'aus einem Schritt lässt sich eine Aufgabe machen');
+  pruefe(detail && /'Aufgabe: '\s*\n?\s*\+ esc\(planungText/.test(detail[0])
+         || (detail && /Aufgabe: '[\s\S]{0,40}planungText/.test(detail[0])),
+         'ein Schritt mit Aufgabe zeigt deren Stand');
+  pruefe(detail && /verknuepft \? /.test(detail[0]) === false
+         && /if \(verknuepft\)/.test(detail[0]),
+         'nur ein Schritt ohne Aufgabe bietet das Anlegen an');
+
+  /* Eine Vorlage kennt weder Ruhen noch Aufgaben */
+  pruefe(detail && /if \(!istVorlage\)/.test(detail[0]),
+         'bei einer Vorlage bleiben Datum und Aufgabe weg');
+
+  const alsAuf = skript.match(/function abSchrittAlsAufgabe\([\s\S]*?\n\}/);
+  pruefe(alsAuf && /ablaufSchritt: a\.id \+ '#' \+ i/.test(alsAuf[0]),
+         'die Aufgabe merkt sich, aus welchem Schritt sie kam');
+  pruefe(alsAuf && /a\.schritte\[i\]\.aufgabeId = neu\.id/.test(alsAuf[0]),
+         'und der Schritt merkt sich die Aufgabe');
+  pruefe(alsAuf && /planung: a\.schritte\[i\]\.ab \|\| 'backlog'/.test(alsAuf[0]),
+         'ein ruhender Schritt gibt sein Datum als Planung weiter');
+  pruefe(alsAuf && /kontext: a\.kontext/.test(alsAuf[0]),
+         'der Kontext des Durchlaufs gilt');
+
+  if (!a) {
+    warn('Ablauffunktionen nicht auswertbar');
+  } else {
+    const e = a.pruefeSchritt();
+    pruefe(e.angelegt === 1, 'aus einem Schritt entsteht genau eine Aufgabe');
+    pruefe(e.titel === 'Zweiter', 'sie trägt seinen Titel');
+    pruefe(e.planung === '2026-10-01', 'ein Ruhedatum wird zur Planung');
+    pruefe(e.verknuepft === true, 'Schritt und Aufgabe kennen einander');
+    pruefe(e.ohneTitel === 1, 'ein Schritt ohne Titel erzeugt keine Aufgabe');
+  }
 }
 
 /* ============================================================
