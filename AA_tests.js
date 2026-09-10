@@ -495,19 +495,28 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB.aufgaben = [{ id:\'a1\', titel:\'Einkauf\', kontext:\'privat\','
                  + '     status:\'offen\', wiederholung:{ takt:\'woche\', intervall:1,'
                  + '     tage:[6], tag:1 } }];'
+                 + '   var merk = abGruppierung;'
+                 + '   abGruppierung = \'projekt\';'
                  + '   var p = abGruppeVon({ projektId:\'p1\' });'
-                 + '   var z = abGruppeVon({ zielId:\'z1\' });'
-                 + '   var a = abGruppeVon({ anlassAufgabeId:\'a1\' });'
-                 + '   var o = abGruppeVon({});'
-                 + '   var beides = abGruppeVon({ projektId:\'p1\', zielId:\'z1\' });'
+                 + '   var op = abGruppeVon({});'
                  + '   var weg = abGruppeVon({ projektId:\'gibtesnicht\' });'
                  + '   var liste = [{ id:1 }, { id:2, projektId:\'p1\' }];'
                  + '   var h = abGruppenHtml(liste, function(){ return \'\'; });'
-                 + '   var ohneZuletzt = h.indexOf(\'Ohne Zuordnung\') > h.indexOf(\'Garage\');'
-                 + '   DB = alt;'
-                 + '   return { projekt:p, ziel:z, aufgabe:a, ohne:o,'
-                 + '            projektVorZiel:beides, gelöschtesProjekt:weg,'
-                 + '            ohneZuletzt:ohneZuletzt };'
+                 + '   var keinZuletzt = h.indexOf(\'Kein Projekt\') > h.indexOf(\'Garage\');'
+                 + '   abGruppierung = \'ziel\';'
+                 + '   var z = abGruppeVon({ zielId:\'z1\' });'
+                 + '   var oz = abGruppeVon({});'
+                 + '   abGruppierung = \'aufgabe\';'
+                 + '   var a = abGruppeVon({ anlassAufgabeId:\'a1\' });'
+                 + '   abGruppierung = \'keine\';'
+                 + '   var kg = abGruppeVon({ projektId:\'p1\' });'
+                 + '   var flach = abGruppenHtml(liste, function(){ return \'<i></i>\'; });'
+                 + '   var ohneKoepfe = flach.indexOf(\'gruppenkopf\') < 0;'
+                 + '   abGruppierung = merk; DB = alt;'
+                 + '   return { projekt:p, ziel:z, aufgabe:a, ohneProjekt:op,'
+                 + '            ohneZiel:oz, gelöschtesProjekt:weg,'
+                 + '            keineGruppierung:kg, flachOhneKoepfe:ohneKoepfe,'
+                 + '            keinZuletzt:keinZuletzt };'
                  + ' } };'
                  + 'globalThis.__routineApi = {'
                  + ' pruefeRoutine: function(){'
@@ -4067,31 +4076,54 @@ console.log('\n59. Ablaufkarten');
          'ein gestarteter Durchlauf klappt nicht von selbst auf');
 
   /* Gruppierung */
+  /* Seit v0.25.0 wählt der Mensch, wonach gruppiert wird. */
+  ['setAbStufe', 'setAbGruppierung', 'istKeinGruppe'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/id="abStufeLaufend"/.test(QUELLE) && /id="abStufeVorlagen"/.test(QUELLE),
+         'es gibt zwei Reiter');
+  pruefe(/id="abGrKeine"/.test(QUELLE) && /id="abGrAufgabe"/.test(QUELLE)
+         && /id="abGrProjekt"/.test(QUELLE) && /id="abGrZiel"/.test(QUELLE),
+         'die Gruppierung ist über Pillen wählbar');
+
   const von = skript.match(/function abGruppeVon\([\s\S]*?\n\}/);
-  pruefe(von && /Projekt: /.test(von[0]), 'nach Projekt wird gruppiert');
-  pruefe(von && /Ziel: /.test(von[0]), 'nach Ziel ebenfalls');
-  pruefe(von && /Nach Aufgabe: /.test(von[0]), 'und nach der auslösenden Aufgabe');
-  pruefe(von && /Ohne Zuordnung/.test(von[0]), 'der Rest sammelt sich getrennt');
-  pruefe(von && von[0].indexOf('projektId') < von[0].indexOf('zielId'),
-         'ein Projekt geht vor ein Ziel');
+  pruefe(von && /abGruppierung === 'projekt'/.test(von[0]), 'nach Projekt lässt sich gruppieren');
+  pruefe(von && /abGruppierung === 'ziel'/.test(von[0]), 'nach Ziel ebenfalls');
+  pruefe(von && /abGruppierung === 'aufgabe'/.test(von[0]),
+         'und nach der auslösenden Aufgabe');
+  pruefe(von && /'Kein Projekt'/.test(von[0]) && /'Kein Ziel'/.test(von[0])
+         && /'Keine Aufgabe'/.test(von[0]),
+         'was die gewählte Zuordnung nicht hat, sammelt sich getrennt');
+
+  const gruppen = skript.match(/function abGruppenHtml\([\s\S]*?\n\}\n/);
+  pruefe(gruppen && /abGruppierung === 'keine'/.test(gruppen[0]),
+         'ohne Gruppierung bleibt die Liste flach, ganz ohne Köpfe');
 
   const offen = skript.match(/function abGruppeOffen\([\s\S]*?\n\}/);
-  pruefe(offen && /name !== 'Ohne Zuordnung'/.test(offen[0]),
-         'die Gruppe ohne Zuordnung beginnt eingeklappt');
+  pruefe(offen && /!istKeinGruppe\(name\)/.test(offen[0]),
+         'die Kein-Gruppe beginnt eingeklappt');
+
+  const zeichnen = skript.match(/function abZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zeichnen && /abStufe === 'laufend'/.test(zeichnen[0]),
+         'gezeigt wird nur der gewählte Reiter');
+  pruefe(zeichnen && /Läuft gerade · '/.test(zeichnen[0]),
+         'die Reiter tragen ihre Zahl');
 
   if (!a) {
     warn('Funktionen nicht auswertbar');
   } else {
     const e = a.pruefeGruppen();
-    pruefe(e.projekt === 'Projekt: Garage', 'ein zugeordnetes Projekt benennt die Gruppe');
-    pruefe(e.ziel === 'Ziel: Gewicht', 'ein Ziel ebenfalls');
-    pruefe(e.aufgabe === 'Nach Aufgabe: Einkauf', 'eine auslösende Aufgabe ebenfalls');
-    pruefe(e.ohne === 'Ohne Zuordnung', 'ohne alles heißt es so');
-    pruefe(e.projektVorZiel === 'Projekt: Garage',
-           'trägt ein Ablauf beides, gewinnt das Projekt');
-    pruefe(e.gelöschtesProjekt === 'Ohne Zuordnung',
+    pruefe(e.projekt === 'Garage', 'nach Projekt gruppiert trägt die Gruppe seinen Namen');
+    pruefe(e.ziel === 'Gewicht', 'nach Ziel ebenso');
+    pruefe(e.aufgabe === 'Einkauf', 'nach Aufgabe ebenso');
+    pruefe(e.ohneProjekt === 'Kein Projekt', 'ohne Projekt heißt die Gruppe so');
+    pruefe(e.ohneZiel === 'Kein Ziel', 'ohne Ziel ebenso');
+    pruefe(e.gelöschtesProjekt === 'Kein Projekt',
            'zeigt die Zuordnung ins Leere, gilt sie als keine');
-    pruefe(e.ohneZuletzt === true, '„Ohne Zuordnung" steht am Ende');
+    pruefe(e.keineGruppierung === '', 'ohne Gruppierung gibt es keinen Namen');
+    pruefe(e.flachOhneKoepfe === true, 'und keine Gruppenköpfe');
+    pruefe(e.keinZuletzt === true, 'die Kein-Gruppe steht am Ende');
   }
 }
 

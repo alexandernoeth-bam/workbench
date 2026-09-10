@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.24.1</title>
+<title>Workbench 0.25.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -822,6 +822,21 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     </div>
   </div>
 
+    <div class="stufen">
+      <button type="button" id="abStufeLaufend" class="aktiv"
+              onclick="setAbStufe('laufend')">Läuft gerade</button>
+      <button type="button" id="abStufeVorlagen"
+              onclick="setAbStufe('vorlagen')">Vorlagen</button>
+    </div>
+    <div class="pillen" style="margin-left:0;margin-top:9px">
+      <span class="ms-marke" style="align-self:center;margin-right:3px">Gruppiert nach</span>
+      <button type="button" id="abGrKeine" class="aktiv"
+              onclick="setAbGruppierung('keine')">nichts</button>
+      <button type="button" id="abGrAufgabe" onclick="setAbGruppierung('aufgabe')">Aufgabe</button>
+      <button type="button" id="abGrProjekt" onclick="setAbGruppierung('projekt')">Projekt</button>
+      <button type="button" id="abGrZiel" onclick="setAbGruppierung('ziel')">Ziel</button>
+    </div>
+
   <div class="melder" id="abMelder" style="margin:10px 20px 0">Bereit.</div>
   <div class="vhblatt" id="abBlatt"></div>
 
@@ -904,7 +919,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.24.1';
+var APP_VERSION = '0.25.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -7069,28 +7084,49 @@ function durchlaufKarteHtml(d) {
    ------------------------------------------------------------ */
 
 var abGruppeStand = {};
+var abStufe = 'laufend';
+var abGruppierung = 'keine';
 
+function setAbStufe(name) {
+  abStufe = name;
+  markiere([['laufend', 'abStufeLaufend'], ['vorlagen', 'abStufeVorlagen']], name);
+  abZeichnen();
+}
+
+function setAbGruppierung(art) {
+  abGruppierung = art;
+  markiere([['keine', 'abGrKeine'], ['aufgabe', 'abGrAufgabe'],
+            ['projekt', 'abGrProjekt'], ['ziel', 'abGrZiel']], art);
+  abZeichnen();
+}
+
+/* Die Gruppe hängt davon ab, wonach gerade gruppiert wird. Was die
+   gewählte Zuordnung nicht hat, sammelt sich in der Kein-Gruppe. */
 function abGruppeVon(e) {
-  if (e.projektId) {
-    var p = projektFinden(e.projektId);
-    if (p) { return 'Projekt: ' + p.name; }
+  if (abGruppierung === 'projekt') {
+    var p = e.projektId ? projektFinden(e.projektId) : null;
+    return p ? p.name : 'Kein Projekt';
   }
-  if (e.zielId) {
-    var z = zielFinden(e.zielId);
-    if (z) { return 'Ziel: ' + z.name; }
+  if (abGruppierung === 'ziel') {
+    var z = e.zielId ? zielFinden(e.zielId) : null;
+    return z ? z.name : 'Kein Ziel';
   }
-  if (e.anlassAufgabeId) {
-    var a = aufgabeFinden(e.anlassAufgabeId);
-    if (a) { return 'Nach Aufgabe: ' + a.titel; }
+  if (abGruppierung === 'aufgabe') {
+    var a = e.anlassAufgabeId ? aufgabeFinden(e.anlassAufgabeId) : null;
+    return a ? a.titel : 'Keine Aufgabe';
   }
-  return 'Ohne Zuordnung';
+  return '';
+}
+
+function istKeinGruppe(name) {
+  return String(name).indexOf('Kein') === 0;
 }
 
 function abGruppeOffen(name) {
   var stand = abGruppeStand[name];
   if (stand === 'auf') { return true; }
   if (stand === 'zu') { return false; }
-  return name !== 'Ohne Zuordnung';
+  return !istKeinGruppe(name);
 }
 
 function abGruppeUm(name) {
@@ -7100,15 +7136,20 @@ function abGruppeUm(name) {
 
 /* Sortiert eine Liste in Gruppen und zeichnet sie. */
 function abGruppenHtml(liste, karte) {
-  var namen = [];
   var i;
+  if (abGruppierung === 'keine') {
+    var flach = '';
+    for (i = 0; i < liste.length; i++) { flach += karte(liste[i]); }
+    return flach;
+  }
+
+  var namen = [];
   for (i = 0; i < liste.length; i++) {
     var n = abGruppeVon(liste[i]);
     if (namen.indexOf(n) < 0) { namen.push(n); }
   }
   namen.sort(function (a, b) {
-    if (a === 'Ohne Zuordnung') { return 1; }
-    if (b === 'Ohne Zuordnung') { return -1; }
+    if (istKeinGruppe(a) !== istKeinGruppe(b)) { return istKeinGruppe(a) ? 1 : -1; }
     return (a < b) ? -1 : 1;
   });
 
@@ -7139,13 +7180,13 @@ function abZeichnen() {
   var h = '';
   var i;
 
-  h += '<div class="vh-gruppe"><span>Läuft gerade · ' + laufend.length + '</span></div>';
-  if (!laufend.length) { h += '<div class="tleer">Kein Durchlauf offen.</div>'; }
-  h += abGruppenHtml(laufend, durchlaufKarteHtml);
-
-  h += '<div class="vh-gruppe"><span>Vorlagen · ' + vorlagen.length + '</span></div>';
-  if (!vorlagen.length) { h += '<div class="tleer">Keine Vorlage in dieser Auswahl.</div>'; }
-  h += abGruppenHtml(vorlagen, vorlageKarteHtml);
+  if (abStufe === 'laufend') {
+    if (!laufend.length) { h += '<div class="tleer">Kein Durchlauf offen.</div>'; }
+    h += abGruppenHtml(laufend, durchlaufKarteHtml);
+  } else {
+    if (!vorlagen.length) { h += '<div class="tleer">Keine Vorlage in dieser Auswahl.</div>'; }
+    h += abGruppenHtml(vorlagen, vorlageKarteHtml);
+  }
 
   blatt.innerHTML = h;
   var zahl = document.getElementById('abZahl');
@@ -7153,6 +7194,10 @@ function abZeichnen() {
     zahl.textContent = laufend.length + ' laufend · ' + vorlagen.length
                      + (vorlagen.length === 1 ? ' Vorlage' : ' Vorlagen');
   }
+  var knopfL = document.getElementById('abStufeLaufend');
+  if (knopfL) { knopfL.textContent = 'Läuft gerade · ' + laufend.length; }
+  var knopfV = document.getElementById('abStufeVorlagen');
+  if (knopfV) { knopfV.textContent = 'Vorlagen · ' + vorlagen.length; }
 }
 
 /* ------------------------------------------------------------
