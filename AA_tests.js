@@ -485,6 +485,32 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__aufArtApi = {'
+                 + ' pruefeArt: function(){'
+                 + '   var merkStand = aufGruppeStand; var merkArt = aufArt;'
+                 + '   aufGruppeStand = {};'
+                 + '   var ohneZu = gruppeOffen(\'Ohne Thema\');'
+                 + '   var mitOffen = gruppeOffen(\'Reisen 2026\');'
+                 + '   gruppeUm(\'Ohne Thema\');'
+                 + '   var nachTippen = gruppeOffen(\'Ohne Thema\');'
+                 + '   gruppeUm(\'Ohne Thema\');'
+                 + '   var nochmal = gruppeOffen(\'Ohne Thema\');'
+                 + '   gruppeUm(\'Reisen 2026\');'
+                 + '   var benannt = gruppeOffen(\'Reisen 2026\');'
+                 + '   aufArt = \'alle\';'
+                 + '   var liste = [{ art:\'haupt\' }, { art:\'klein\' }, {}];'
+                 + '   var alleN = liste.filter(passtZurArt).length;'
+                 + '   aufArt = \'haupt\';'
+                 + '   var hauptN = liste.filter(passtZurArt).length;'
+                 + '   var ohneArt = passtZurArt({});'
+                 + '   aufArt = \'klein\';'
+                 + '   var kleinN = liste.filter(passtZurArt).length;'
+                 + '   aufGruppeStand = merkStand; aufArt = merkArt;'
+                 + '   return { ohneZu:ohneZu, mitOffen:mitOffen, nachTippen:nachTippen,'
+                 + '            nochmal:nochmal, auchBenannteZu:benannt,'
+                 + '            alle:alleN, haupt:hauptN, klein:kleinN,'
+                 + '            ohneArtGiltAlsAufgabe:ohneArt };'
+                 + ' } };'
                  + 'globalThis.__ganztagsApi = {'
                  + ' pruefeGanztags: function(){'
                  + '   var alt = DB; var merk = tagFilter; DB = leereDatenbank();'
@@ -3714,6 +3740,60 @@ console.log('\n55. Ganztägiges im Tagesverlauf');
     pruefe(e.beruflichNur === 0,
            'auf Beruf gefiltert bleibt von diesen privaten nichts');
     pruefe(e.mitFarbe === 1, 'ein Jahrestermin bringt seine Artfarbe mit');
+  }
+}
+
+/* ============================================================
+   56. Gruppen einklappen, nach Art filtern
+   Grund: „Ohne Thema" ist die groesste Gruppe und schob alles
+   andere aus dem Blick. Und eine Kleinigkeit ist etwas anderes
+   als eine Aufgabe — manchmal will man nur das eine sehen.
+   ============================================================ */
+console.log('\n56. Gruppen und Art');
+{
+  const skript = hauptSkript();
+  const a = globalThis.__aufArtApi;
+
+  ['setAufArt', 'passtZurArt', 'gruppeOffen', 'gruppeUm'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  pruefe(/id="aArtAlle"/.test(QUELLE) && /id="aArtHaupt"/.test(QUELLE)
+         && /id="aArtKlein"/.test(QUELLE), 'die drei Pillen für die Art sind da');
+
+  const zeichnen = skript.match(/function aufZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zeichnen && /passtZurArt\(alle\[i\]\)/.test(zeichnen[0]),
+         'der Artfilter greift auf die Liste');
+  pruefe(zeichnen && /gruppeUm\(/.test(zeichnen[0]),
+         'der Gruppenkopf ist antippbar');
+  pruefe(zeichnen && /if \(!offen\) \{ continue; \}/.test(zeichnen[0]),
+         'eine zugeklappte Gruppe zeigt ihre Einträge nicht');
+  pruefe(zeichnen && /drin\.length/.test(zeichnen[0]),
+         'die Zahl steht auch im zugeklappten Kopf');
+
+  const offen = skript.match(/function gruppeOffen\([\s\S]*?\n\}/);
+  pruefe(offen && /indexOf\('Ohne '\) !== 0/.test(offen[0]),
+         'Gruppen ohne Zuordnung beginnen eingeklappt');
+  pruefe(offen && /stand === 'auf'/.test(offen[0]),
+         'eine von Hand geöffnete Gruppe bleibt offen');
+
+  if (!a) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = a.pruefeArt();
+    pruefe(e.ohneZu === false, '„Ohne Thema" ist zunächst zu');
+    pruefe(e.mitOffen === true, 'eine benannte Gruppe ist offen');
+    pruefe(e.nachTippen === true, 'ein Tippen klappt sie auf');
+    pruefe(e.nochmal === false, 'ein zweites Tippen wieder zu');
+    pruefe(e.auchBenannteZu === false,
+           'auch eine benannte Gruppe lässt sich zuklappen');
+
+    pruefe(e.alle === 3, 'ohne Artfilter alle drei');
+    pruefe(e.haupt === 2, 'nur Aufgaben: zwei');
+    pruefe(e.klein === 1, 'nur Kleinigkeiten: eine');
+    pruefe(e.ohneArtGiltAlsAufgabe === true,
+           'eine Aufgabe ohne Artangabe zählt als Aufgabe, nicht als Kleinigkeit');
   }
 }
 

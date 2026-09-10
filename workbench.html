@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.21.1</title>
+<title>Workbench 0.22.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -489,6 +489,15 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
   display:flex;align-items:center;gap:8px;margin:14px 0 5px}
 .gruppenkopf::after{content:"";flex:1;height:1px;background:var(--linie)}
 .gruppenkopf.warn{color:var(--weinrot)}
+button.gruppenkopf{width:100%;background:none;border:0;font:inherit;
+  font-size:calc(var(--fs)*0.78);font-weight:500;color:var(--grau);cursor:pointer;
+  text-align:left;padding:0}
+button.gruppenkopf.warn{color:var(--weinrot)}
+button.gruppenkopf svg{flex:0 0 auto;width:14px;height:14px;stroke:currentColor;fill:none;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  transform:rotate(-90deg);transition:transform .15s ease;order:3}
+button.gruppenkopf svg.auf{transform:rotate(0deg)}
+button.gruppenkopf::after{order:2}
 .marke{flex:0 0 auto;width:12px;height:12px;stroke:var(--grau);fill:none;stroke-width:2;
   stroke-linecap:round;stroke-linejoin:round}
 .ttitel{display:flex;align-items:center;gap:6px}
@@ -821,6 +830,11 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
       <button type="button" id="fBeruf" onclick="setAufFilter('beruflich')">Beruf</button>
       <button type="button" id="fPrivat" onclick="setAufFilter('privat')">Privat</button>
     </div>
+    <div class="pillen" style="margin-left:0">
+      <button type="button" id="aArtAlle" class="aktiv" onclick="setAufArt('alle')">Alles</button>
+      <button type="button" id="aArtHaupt" onclick="setAufArt('haupt')">Aufgaben</button>
+      <button type="button" id="aArtKlein" onclick="setAufArt('klein')">Kleinigkeiten</button>
+    </div>
   </div>
 
   <div class="melder" id="aufMelder" style="margin:10px 20px 0">Bereit.</div>
@@ -875,7 +889,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.21.1';
+var APP_VERSION = '0.22.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -7301,6 +7315,8 @@ function rbSatz(id, art, wert) {
 var aufGruppe = 'planung';
 var aufFilter = 'alle';
 var aufErledigtAuf = false;
+var aufArt = 'alle';
+var aufGruppeStand = {};
 var ERLEDIGT_ZEIGEN = 50;
 var THEMEN_LEER = { beruflich: [], privat: [] };
 
@@ -7341,6 +7357,34 @@ function setAufGruppe(art) {
   aufGruppe = art;
   markiere([['planung', 'gPlanung'], ['thema', 'gThema'],
             ['projekt', 'gProjekt'], ['frist', 'gFrist']], art);
+  aufZeichnen();
+}
+
+/* Eine Kleinigkeit ist etwas anderes als eine Aufgabe — manchmal
+   will man nur das eine sehen. */
+function setAufArt(art) {
+  aufArt = art;
+  markiere([['alle', 'aArtAlle'], ['haupt', 'aArtHaupt'], ['klein', 'aArtKlein']], art);
+  aufZeichnen();
+}
+
+function passtZurArt(a) {
+  if (aufArt === 'alle') { return true; }
+  if (aufArt === 'klein') { return a.art === 'klein'; }
+  return a.art !== 'klein';
+}
+
+/* Gruppen ohne Zuordnung sind meist die größten und selten die
+   wichtigsten — sie beginnen eingeklappt. */
+function gruppeOffen(name) {
+  var stand = aufGruppeStand[name];
+  if (stand === 'auf') { return true; }
+  if (stand === 'zu') { return false; }
+  return String(name).indexOf('Ohne ') !== 0;
+}
+
+function gruppeUm(name) {
+  aufGruppeStand[name] = gruppeOffen(name) ? 'zu' : 'auf';
   aufZeichnen();
 }
 
@@ -7456,6 +7500,7 @@ function aufZeichnen() {
   for (i = 0; i < alle.length; i++) {
     if (!alle[i].wiederholung && alle[i].status === 'erledigt') { continue; }
     if (aufFilter !== 'alle' && alle[i].kontext !== aufFilter) { continue; }
+    if (!passtZurArt(alle[i])) { continue; }
     sichtbar.push(alle[i]);
   }
 
@@ -7477,8 +7522,13 @@ function aufZeichnen() {
     });
 
     var warn = (name === 'Überfällig' || name === 'Liegengeblieben') ? ' warn' : '';
-    h += '<div class="gruppenkopf' + warn + '"><span>' + esc(name) + ' · ' + drin.length
-       + '</span></div>';
+    var offen = gruppeOffen(name);
+    h += '<button class="gruppenkopf falt' + warn + '" type="button" '
+       + 'onclick="gruppeUm(\'' + esc(name).replace(/'/g, '') + '\')">'
+       + '<span>' + esc(name) + ' · ' + drin.length + '</span>'
+       + '<svg class="' + (offen ? 'auf' : '') + '" viewBox="0 0 24 24">'
+       + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+    if (!offen) { continue; }
 
     var k;
     for (k = 0; k < drin.length; k++) {
