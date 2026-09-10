@@ -485,6 +485,29 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__ganztagsApi = {'
+                 + ' pruefeGanztags: function(){'
+                 + '   var alt = DB; var merk = tagFilter; DB = leereDatenbank();'
+                 + '   DB.jahrestermine = [{ id:\'j1\', titel:\'Kreta\', art:\'urlaub\','
+                 + '     von:\'2026-01-01\', bis:\'2026-01-01\', kontext:\'privat\' }];'
+                 + '   DB.ferien = [{ id:\'f1\', titel:\'Weihnachtsferien\', art:\'ferien\','
+                 + '     von:\'2026-01-01\', bis:\'2026-01-01\' }];'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Familie\' }];'
+                 + '   termineNachTag = {};'
+                 + '   eintraegeEinsortieren([{ id:\'g1\', summary:\'Vorort\','
+                 + '     start:{ date:\'2026-01-01\' }, end:{ date:\'2026-01-02\' } }],'
+                 + '     \'Familie\', \'privat\');'
+                 + '   tagFilter = \'alle\';'
+                 + '   var e = tagesEintraege(\'2026-01-01\');'
+                 + '   var quellen = e.ganztags.map(function(x){ return x.quelle; }).join(\',\');'
+                 + '   var mitFarbe = e.ganztags.filter(function(x){ return !!x.farbe; }).length;'
+                 + '   tagFilter = \'beruflich\';'
+                 + '   var b = tagesEintraege(\'2026-01-01\').ganztags.filter('
+                 + '     function(x){ return x.kontext === \'privat\'; }).length;'
+                 + '   tagFilter = merk; termineNachTag = {}; kalenderListe = []; DB = alt;'
+                 + '   return { anzahl:e.ganztags.length, quellen:quellen,'
+                 + '            beruflichNur:b, mitFarbe:mitFarbe };'
+                 + ' } };'
                  + 'globalThis.__abSchrittApi = {'
                  + ' pruefeSchritt: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -1948,7 +1971,7 @@ console.log('\n28. Google Kalender lesen');
   const noetig = ['kalenderListeHolen', 'termineHolen', 'einenKalenderHolen',
                   'termineFuerTag', 'eintraegeEinsortieren', 'merkeTermin',
                   'zeitAusEintrag', 'tagAusEintrag', 'kalenderUm', 'kalenderGewaehlt',
-                  'kalenderNeuLesen', 'zeichneKalender', 'ganztagsZeichnen',
+                  'kalenderNeuLesen', 'zeichneKalender',
                   'kalenderTaktStarten', 'termineZahl'];
   noetig.forEach(function (f) {
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
@@ -2194,9 +2217,12 @@ console.log('\n31. Kalenderkennzeichnung und Tagesfilter');
          'der Filter greift auf Aufgaben');
   pruefe(eintraege && /passtZumTag\(g\.kontext\)/.test(eintraege[0]),
          'der Filter greift auf Termine');
-  const ganz = skript.match(/function ganztagsZeichnen\([\s\S]*?\n\}/);
-  pruefe(ganz && /passtZumTag/.test(ganz[0]),
+  /* Ganztägiges steht seit v0.21.0 im Tagesverlauf, nicht mehr als
+     eigene Zeile über dem Kopf. */
+  pruefe(eintraege && /passtZumTag\(g0\.kontext\)/.test(eintraege[0]),
          'der Filter greift auch auf Ganztägiges');
+  pruefe(eintraege && /passtZumTag\(jtKontext\(jt\[i\]\)\)/.test(eintraege[0]),
+         'und auf Jahrestermine');
 
   if (!api) {
     warn('Filterfunktionen nicht auswertbar');
@@ -3640,6 +3666,49 @@ console.log('\n54. Ablaufdialog');
     pruefe(e.planung === '2026-10-01', 'ein Ruhedatum wird zur Planung');
     pruefe(e.verknuepft === true, 'Schritt und Aufgabe kennen einander');
     pruefe(e.ohneTitel === 1, 'ein Schritt ohne Titel erzeugt keine Aufgabe');
+  }
+}
+
+/* ============================================================
+   55. Ganztaegiges im Tagesverlauf
+   Grund: Ganztaegige Google-Termine standen als eigene Zeile ueber
+   dem Kopf, Jahrestermine erschienen im Tag gar nicht. Beides praegt
+   den Tag und gehoert an dessen Anfang.
+   ============================================================ */
+console.log('\n55. Ganztägiges im Tagesverlauf');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__ganztagsApi;
+
+  pruefe(!/id="tkGanztags"/.test(QUELLE), 'die eigene Zeile über dem Kopf ist entfallen');
+  pruefe(!/function ganztagsZeichnen/.test(skript), 'ihre Funktion ebenfalls');
+
+  const eintraege = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
+  pruefe(eintraege && /var ganztags = \[\]/.test(eintraege[0]),
+         'die Tageseinträge führen Ganztägiges');
+  pruefe(eintraege && /jtAn\(is\)/.test(eintraege[0]), 'Jahrestermine kommen hinein');
+  pruefe(eintraege && /feiertagAn\(is\)/.test(eintraege[0]), 'Feiertage ebenfalls');
+  pruefe(eintraege && /ferienAn\(is\)/.test(eintraege[0]), 'Ferien ebenfalls');
+  pruefe(eintraege && /ausGoogle\.ganztags/.test(eintraege[0]),
+         'und die ganztägigen Termine aus Google');
+
+  const tag = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tag && /tverlauf ganztags/.test(tag[0]), 'sie werden als Verlaufszeilen gezeichnet');
+  const stelleGanz = tag ? tag[0].indexOf('tverlauf ganztags') : -1;
+  const stelleFalt = tag ? tag[0].indexOf('vorbei-falt') : -1;
+  pruefe(stelleGanz > -1 && stelleFalt > -1 && stelleGanz < stelleFalt,
+         'sie stehen ganz oben, vor allem mit Uhrzeit');
+
+  if (!g) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = g.pruefeGanztags();
+    pruefe(e.anzahl === 4, 'vier ganztägige Einträge an diesem Tag');
+    pruefe(e.quellen === 'Urlaub,Feiertag,Ferien,Familie',
+           'jede Herkunft wird benannt (ist: ' + e.quellen + ')');
+    pruefe(e.beruflichNur === 0,
+           'auf Beruf gefiltert bleibt von diesen privaten nichts');
+    pruefe(e.mitFarbe === 1, 'ein Jahrestermin bringt seine Artfarbe mit');
   }
 }
 

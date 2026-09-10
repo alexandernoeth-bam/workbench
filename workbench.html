@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.20.1</title>
+<title>Workbench 0.21.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -106,10 +106,8 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .tk-luecke{flex:1}
 .tk-leiste .pille{border-radius:20px;padding:3px 11px}
 .tk-leiste .pille.aktiv{border-color:var(--tinte);color:var(--tinte);font-weight:500}
-.tk-ganztags{display:none;font-size:calc(var(--fs)*0.76);color:var(--petrol);
-  margin-top:7px;line-height:1.4}
-.tk-ganztags.sichtbar{display:block}
-.tk-ganztags b{font-weight:500}
+.tverlauf.ganztags .tv-zeit{color:var(--grau)}
+.tverlauf.ganztags .tv-schiene{background:var(--linie)}
 .tk-nachzuegler{display:none;width:100%;align-items:center;gap:10px;margin-top:8px;
   padding:8px 12px;border:1px solid var(--weinrot);border-radius:6px;
   background:var(--karte);color:var(--weinrot);font:inherit;
@@ -635,7 +633,6 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
       <button type="button" id="tBeruf" class="pille" onclick="setTagFilter('beruflich')">Beruf</button>
       <button type="button" id="tPrivat" class="pille" onclick="setTagFilter('privat')">Privat</button>
     </div>
-    <div class="tk-ganztags" id="tkGanztags"></div>
     <button class="tk-nachzuegler" id="tkNachzuegler" type="button"
             onclick="nachzueglerOeffnen()"></button>
     <div class="tk-stand" id="tkStand"></div>
@@ -873,7 +870,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.20.1';
+var APP_VERSION = '0.21.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2787,8 +2784,28 @@ function tagesEintraege(is) {
     else { haupt.push(a); }
   }
 
+  /* Ganztägiges hat keine Uhrzeit und steht deshalb vor allem
+     anderen: Es prägt den Tag, statt in ihm stattzufinden. */
+  var ganztags = [];
+  var jt = jtAn(is);
+  for (i = 0; i < jt.length; i++) {
+    if (!passtZumTag(jtKontext(jt[i]))) { continue; }
+    ganztags.push({ titel: jt[i].titel, quelle: JT_ARTEN[jt[i].art]
+                    ? JT_ARTEN[jt[i].art].n : 'Jahrestermin',
+                    farbe: jtFarbe(jt[i]), kontext: jtKontext(jt[i]) });
+  }
+  var fei = feiertagAn(is);
+  if (fei) { ganztags.push({ titel: fei, quelle: 'Feiertag', farbe: '', kontext: '' }); }
+  var fer = ferienAn(is);
+  if (fer) { ganztags.push({ titel: fer, quelle: 'Ferien', farbe: '', kontext: '' }); }
+
   /* Aus Google gelesen, nicht gespeichert. */
   var ausGoogle = termineFuerTag(is);
+  for (i = 0; i < ausGoogle.ganztags.length; i++) {
+    var g0 = ausGoogle.ganztags[i];
+    if (!passtZumTag(g0.kontext)) { continue; }
+    ganztags.push({ titel: g0.titel, quelle: g0.quelle, farbe: '', kontext: g0.kontext });
+  }
   for (i = 0; i < ausGoogle.zeit.length; i++) {
     var g = ausGoogle.zeit[i];
     if (!passtZumTag(g.kontext)) { continue; }
@@ -2798,29 +2815,13 @@ function tagesEintraege(is) {
   }
 
   verlauf.sort(function (x, y) { return (x.zeit < y.zeit) ? -1 : ((x.zeit > y.zeit) ? 1 : 0); });
-  return { verlauf: verlauf, wieder: wieder, haupt: haupt, klein: klein, fertig: fertig };
+  return { verlauf: verlauf, wieder: wieder, haupt: haupt, klein: klein,
+           fertig: fertig, ganztags: ganztags };
 }
 
 /* ------------------------------------------------------------
    Zeichnen
    ------------------------------------------------------------ */
-
-function ganztagsZeichnen(is) {
-  var el = document.getElementById('tkGanztags');
-  if (!el) { return; }
-  var roh = termineFuerTag(is).ganztags;
-  var g = [];
-  var j;
-  for (j = 0; j < roh.length; j++) {
-    if (passtZumTag(roh[j].kontext)) { g.push(roh[j]); }
-  }
-  if (!g.length) { el.classList.remove('sichtbar'); el.innerHTML = ''; return; }
-  var namen = [];
-  var i;
-  for (i = 0; i < g.length; i++) { namen.push(esc(g[i].titel)); }
-  el.innerHTML = '<b>Ganztägig:</b> ' + namen.join(' · ');
-  el.classList.add('sichtbar');
-}
 
 function tagKopfZeichnen(is) {
   var d = ausIso(is);
@@ -3192,6 +3193,16 @@ function tagZeichnen() {
   h += '<div class="tabschnitt' + (vorbeiOffen ? ' aufgeklappt' : '')
      + '" data-kurz="Tagesverlauf"><div class="tabschnitt-titel">'
      + '<span>Tagesverlauf</span></div>';
+  var g;
+  for (g = 0; g < e.ganztags.length; g++) {
+    var gt = e.ganztags[g];
+    h += '<div class="tverlauf ganztags' + (gt.kontext === 'privat' ? ' privat' : '') + '">';
+    h += '<div class="tv-zeit">ganz</div><div class="tv-schiene"'
+       + (gt.farbe ? (' style="background:' + gt.farbe + '"') : '') + '></div>';
+    h += '<div class="tv-inhalt"><div class="ttitel">' + esc(gt.titel) + '</div>';
+    h += '<div class="tmeta">' + esc(gt.quelle) + '</div></div></div>';
+  }
+
   if (vorbeiZahl) {
     h += '<button class="tfalt vorbei-falt" type="button" onclick="vorbeiUm()">'
        + '<span>' + vorbeiZahl + (vorbeiZahl === 1 ? ' Termin vorbei' : ' Termine vorbei')
@@ -3244,7 +3255,6 @@ function tagZeichnen() {
   }
 
   blatt.innerHTML = h;
-  ganztagsZeichnen(is);
   nachzueglerZeichnen(is);
   streifenPruefen();
   anmeldeStreifenPruefen();
