@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.24.0</title>
+<title>Workbench 0.24.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -904,7 +904,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.24.0';
+var APP_VERSION = '0.24.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -7003,21 +7003,10 @@ function vorlageKarteHtml(v) {
   h += '<div class="vk-name">' + esc(v.name) + '</div>';
   h += '<div class="vk-zeit">' + n + (n === 1 ? ' Schritt' : ' Schritte') + '</div>';
   h += '<svg class="vk-pfeil" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></div>';
-  var anlassText = '';
-  if (v.wiederholung) { anlassText = regelText(v.wiederholung); }
-  else if (v.anlassAufgabeId) {
-    var anl = aufgabeFinden(v.anlassAufgabeId);
-    anlassText = anl ? ('nach: ' + anl.titel) : 'Anlass fehlt';
-  }
-  h += '<div class="vk-satz' + (anlassText ? '' : ' leer') + '">'
-     + esc(anlassText || (v.zuletzt ? ('zuletzt ' + kurzDatum(v.zuletzt))
-                                    : 'läuft nur von Hand an')) + '</div>';
-  if (anlassText && v.zuletztGestartet) {
-    h += '<div class="vk-ruht">zuletzt angelaufen ' + esc(kurzDatum(v.zuletztGestartet))
-       + '</div>';
-  }
 
   h += '<div class="vk-mehr">';
+  var anlass = ablaufAnlassText(v);
+  h += '<div class="vk-label">' + esc(anlass) + '</div>';
   var i;
   var l = v.schritte || [];
   for (i = 0; i < l.length; i++) {
@@ -7032,21 +7021,27 @@ function vorlageKarteHtml(v) {
   return h;
 }
 
+/* Woran läuft diese Vorlage an? */
+function ablaufAnlassText(v) {
+  if (v.wiederholung) { return regelText(v.wiederholung); }
+  if (v.anlassAufgabeId) {
+    var a = aufgabeFinden(v.anlassAufgabeId);
+    return a ? ('nach: ' + a.titel) : 'Anlass fehlt';
+  }
+  return 'läuft nur von Hand an';
+}
+
 function durchlaufKarteHtml(d) {
   var offen = abOffen[d.id] === true;
   var l = d.schritte || [];
   var fertig = schritteFertig(d);
-  var jetztSchritt = offenerSchritt(d);
+  var ruht = ruhtBis(d);
   var h = '<div class="vkarte ' + (offen ? 'auf' : 'zu')
         + (d.kontext === 'privat' ? ' privat' : '') + '">';
   h += '<div class="vk-kopf" onclick="abKarteUm(\'' + esc(d.id) + '\')">';
   h += '<div class="vk-name">' + esc(d.name) + '</div>';
   h += '<div class="vk-zeit">' + fertig + ' von ' + l.length + '</div>';
   h += '<svg class="vk-pfeil" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></div>';
-  var ruht = ruhtBis(d);
-  h += '<div class="vk-satz' + (jetztSchritt ? '' : ' leer') + '">'
-     + esc(jetztSchritt ? jetztSchritt.satz.titel : 'alle Schritte erledigt')
-     + (ruht ? '' : '') + '</div>';
   if (ruht) {
     h += '<div class="vk-ruht">ruht bis ' + esc(kurzDatum(ruht)) + '</div>';
   }
@@ -7069,6 +7064,73 @@ function durchlaufKarteHtml(d) {
   return h;
 }
 
+/* ------------------------------------------------------------
+   Gruppierung nach Zuordnung
+   ------------------------------------------------------------ */
+
+var abGruppeStand = {};
+
+function abGruppeVon(e) {
+  if (e.projektId) {
+    var p = projektFinden(e.projektId);
+    if (p) { return 'Projekt: ' + p.name; }
+  }
+  if (e.zielId) {
+    var z = zielFinden(e.zielId);
+    if (z) { return 'Ziel: ' + z.name; }
+  }
+  if (e.anlassAufgabeId) {
+    var a = aufgabeFinden(e.anlassAufgabeId);
+    if (a) { return 'Nach Aufgabe: ' + a.titel; }
+  }
+  return 'Ohne Zuordnung';
+}
+
+function abGruppeOffen(name) {
+  var stand = abGruppeStand[name];
+  if (stand === 'auf') { return true; }
+  if (stand === 'zu') { return false; }
+  return name !== 'Ohne Zuordnung';
+}
+
+function abGruppeUm(name) {
+  abGruppeStand[name] = abGruppeOffen(name) ? 'zu' : 'auf';
+  abZeichnen();
+}
+
+/* Sortiert eine Liste in Gruppen und zeichnet sie. */
+function abGruppenHtml(liste, karte) {
+  var namen = [];
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    var n = abGruppeVon(liste[i]);
+    if (namen.indexOf(n) < 0) { namen.push(n); }
+  }
+  namen.sort(function (a, b) {
+    if (a === 'Ohne Zuordnung') { return 1; }
+    if (b === 'Ohne Zuordnung') { return -1; }
+    return (a < b) ? -1 : 1;
+  });
+
+  var h = '';
+  var g, k;
+  for (g = 0; g < namen.length; g++) {
+    var drin = [];
+    for (k = 0; k < liste.length; k++) {
+      if (abGruppeVon(liste[k]) === namen[g]) { drin.push(liste[k]); }
+    }
+    var offen = abGruppeOffen(namen[g]);
+    h += '<button class="gruppenkopf falt" type="button" '
+       + 'onclick="abGruppeUm(\'' + esc(namen[g]).replace(/'/g, '') + '\')">'
+       + '<span>' + esc(namen[g]) + ' · ' + drin.length + '</span>'
+       + '<svg class="' + (offen ? 'auf' : '') + '" viewBox="0 0 24 24">'
+       + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+    if (!offen) { continue; }
+    for (k = 0; k < drin.length; k++) { h += karte(drin[k]); }
+  }
+  return h;
+}
+
 function abZeichnen() {
   var blatt = document.getElementById('abBlatt');
   if (!blatt) { return; }
@@ -7079,11 +7141,11 @@ function abZeichnen() {
 
   h += '<div class="vh-gruppe"><span>Läuft gerade · ' + laufend.length + '</span></div>';
   if (!laufend.length) { h += '<div class="tleer">Kein Durchlauf offen.</div>'; }
-  for (i = 0; i < laufend.length; i++) { h += durchlaufKarteHtml(laufend[i]); }
+  h += abGruppenHtml(laufend, durchlaufKarteHtml);
 
   h += '<div class="vh-gruppe"><span>Vorlagen · ' + vorlagen.length + '</span></div>';
   if (!vorlagen.length) { h += '<div class="tleer">Keine Vorlage in dieser Auswahl.</div>'; }
-  for (i = 0; i < vorlagen.length; i++) { h += vorlageKarteHtml(vorlagen[i]); }
+  h += abGruppenHtml(vorlagen, vorlageKarteHtml);
 
   blatt.innerHTML = h;
   var zahl = document.getElementById('abZahl');
@@ -7187,7 +7249,6 @@ function durchlaufStarten(vorlageId, still) {
   v.zuletzt = isoDatum();
   v.zuletztGestartet = isoDatum();
   v.geaendert = jetzt();
-  abOffen[neu.id] = true;
   if (still) { return; }
   spaeterSichern();
   abZeichnen();
@@ -7243,7 +7304,6 @@ function ablaufAnlegen(art) {
                           start: isoDatum(), frist: '', schritte: [], geaendert: jetzt() });
   }
   abFrischAngelegt = id;
-  abOffen[id] = true;
   abDetailOeffnen(id, art);
   var feld = document.getElementById('abName');
   if (feld && feld.focus) { feld.focus(); }

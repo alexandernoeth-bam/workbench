@@ -485,6 +485,30 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__abGruppeApi = {'
+                 + ' pruefeGruppen: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'Garage\', kontext:\'privat\','
+                 + '     status:\'laufend\', meilensteine:[], zielzustaende:[], anlagen:[] }];'
+                 + '   DB.ziele = [{ id:\'z1\', name:\'Gewicht\', kontext:\'privat\','
+                 + '     status:\'laufend\', zielzustaende:[], einzahler:[] }];'
+                 + '   DB.aufgaben = [{ id:\'a1\', titel:\'Einkauf\', kontext:\'privat\','
+                 + '     status:\'offen\', wiederholung:{ takt:\'woche\', intervall:1,'
+                 + '     tage:[6], tag:1 } }];'
+                 + '   var p = abGruppeVon({ projektId:\'p1\' });'
+                 + '   var z = abGruppeVon({ zielId:\'z1\' });'
+                 + '   var a = abGruppeVon({ anlassAufgabeId:\'a1\' });'
+                 + '   var o = abGruppeVon({});'
+                 + '   var beides = abGruppeVon({ projektId:\'p1\', zielId:\'z1\' });'
+                 + '   var weg = abGruppeVon({ projektId:\'gibtesnicht\' });'
+                 + '   var liste = [{ id:1 }, { id:2, projektId:\'p1\' }];'
+                 + '   var h = abGruppenHtml(liste, function(){ return \'\'; });'
+                 + '   var ohneZuletzt = h.indexOf(\'Ohne Zuordnung\') > h.indexOf(\'Garage\');'
+                 + '   DB = alt;'
+                 + '   return { projekt:p, ziel:z, aufgabe:a, ohne:o,'
+                 + '            projektVorZiel:beides, gelöschtesProjekt:weg,'
+                 + '            ohneZuletzt:ohneZuletzt };'
+                 + ' } };'
                  + 'globalThis.__routineApi = {'
                  + ' pruefeRoutine: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -4001,6 +4025,73 @@ console.log('\n58. Wiederkehrende Abläufe');
     pruefe(e.nachAufgabe === 1, 'das Abhaken der Anlassaufgabe startet den Ablauf');
     pruefe(e.nochmalAbhaken === 1, 'ein zweites Abhaken doppelt ihn nicht');
     pruefe(e.geerbt === 'p1', 'der Durchlauf erbt das Projekt der Vorlage');
+  }
+}
+
+/* ============================================================
+   59. Kompakte Ablaufkarten mit Gruppierung
+   Grund: Zehn Karten mit allen Schritten fuellten den Bildschirm.
+   Eingeklappt zeigt eine Karte nur, was sie ist und wie weit sie
+   ist — und die Gruppierung sagt, wozu sie gehoert.
+   ============================================================ */
+console.log('\n59. Ablaufkarten');
+{
+  const skript = hauptSkript();
+  const a = globalThis.__abGruppeApi;
+
+  ['ablaufAnlassText', 'abGruppeVon', 'abGruppeOffen', 'abGruppeUm',
+   'abGruppenHtml'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  /* Eingeklappt nur Titel und Zahl */
+  const vk = skript.match(/function vorlageKarteHtml\([\s\S]*?\n\}\n/);
+  pruefe(vk && /vk-mehr/.test(vk[0]), 'die Schritte stecken im aufklappbaren Teil');
+  pruefe(vk && vk[0].indexOf('vk-mehr') < vk[0].indexOf('vk-ms-titel'),
+         'sie stehen nicht im Kopf');
+  pruefe(vk && !/vk-satz/.test(vk[0]),
+         'die Vorlagenkarte trägt keine zusätzliche Satzzeile mehr');
+
+  const dk = skript.match(/function durchlaufKarteHtml\([\s\S]*?\n\}\n/);
+  pruefe(dk && !/vk-satz/.test(dk[0]),
+         'auch die Durchlaufkarte nicht');
+  pruefe(dk && /fertig \+ ' von ' \+ l\.length/.test(dk[0]),
+         'der Kopf nennt den Stand');
+  pruefe(dk && /vk-ruht/.test(dk[0]),
+         'ein ruhender Durchlauf sagt es trotzdem — sonst wirkte er verschwunden');
+
+  /* Nichts klappt von selbst auf */
+  const starten = skript.match(/function durchlaufStarten\([\s\S]*?\n\}/);
+  pruefe(starten && !/abOffen\[neu\.id\] = true/.test(starten[0]),
+         'ein gestarteter Durchlauf klappt nicht von selbst auf');
+
+  /* Gruppierung */
+  const von = skript.match(/function abGruppeVon\([\s\S]*?\n\}/);
+  pruefe(von && /Projekt: /.test(von[0]), 'nach Projekt wird gruppiert');
+  pruefe(von && /Ziel: /.test(von[0]), 'nach Ziel ebenfalls');
+  pruefe(von && /Nach Aufgabe: /.test(von[0]), 'und nach der auslösenden Aufgabe');
+  pruefe(von && /Ohne Zuordnung/.test(von[0]), 'der Rest sammelt sich getrennt');
+  pruefe(von && von[0].indexOf('projektId') < von[0].indexOf('zielId'),
+         'ein Projekt geht vor ein Ziel');
+
+  const offen = skript.match(/function abGruppeOffen\([\s\S]*?\n\}/);
+  pruefe(offen && /name !== 'Ohne Zuordnung'/.test(offen[0]),
+         'die Gruppe ohne Zuordnung beginnt eingeklappt');
+
+  if (!a) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = a.pruefeGruppen();
+    pruefe(e.projekt === 'Projekt: Garage', 'ein zugeordnetes Projekt benennt die Gruppe');
+    pruefe(e.ziel === 'Ziel: Gewicht', 'ein Ziel ebenfalls');
+    pruefe(e.aufgabe === 'Nach Aufgabe: Einkauf', 'eine auslösende Aufgabe ebenfalls');
+    pruefe(e.ohne === 'Ohne Zuordnung', 'ohne alles heißt es so');
+    pruefe(e.projektVorZiel === 'Projekt: Garage',
+           'trägt ein Ablauf beides, gewinnt das Projekt');
+    pruefe(e.gelöschtesProjekt === 'Ohne Zuordnung',
+           'zeigt die Zuordnung ins Leere, gilt sie als keine');
+    pruefe(e.ohneZuletzt === true, '„Ohne Zuordnung" steht am Ende');
   }
 }
 
