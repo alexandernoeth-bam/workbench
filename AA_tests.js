@@ -391,12 +391,14 @@ console.log('\n12. Google-Anmeldung und Drive');
   pruefe(merken && /erneuerungPlanen\(\)/.test(merken[0]),
          'tokenMerken plant die Erneuerung ein');
   const planen = skript.match(/function erneuerungPlanen\([\s\S]*?\n\}/);
-  pruefe(planen && /setTimeout/.test(planen[0]) && /anmelden\(true\)/.test(planen[0]),
-         'erneuerungPlanen ruft die stille Anmeldung auf');
+  pruefe(planen && /setTimeout/.test(planen[0]) && /erneuerungLaufen/.test(planen[0]),
+         'erneuerungPlanen stößt den Erneuerungslauf an');
   pruefe(planen && /clearTimeout/.test(planen[0]),
          'erneuerungPlanen räumt eine alte Uhr ab (keine doppelten Timer)');
-  pruefe(/requestAccessToken\(\{ prompt: still \? '' : 'consent' \}\)/.test(skript),
-         'stille Anmeldung fragt ohne Nachfrage, laute mit');
+  const lauf = skript.match(/function erneuerungLaufen\([\s\S]*?\n\}/);
+  pruefe(lauf && /anmelden\(true\)/.test(lauf[0]), 'der Lauf meldet still an');
+  pruefe(/requestAccessToken\(\{ prompt: aufforderung \}\)/.test(skript),
+         'die Art der Nachfrage wird durchgereicht');
 
   /* Abgelaufener Zugriff wird erkannt */
   const pruefFn = skript.match(/function antwortPruefen\([\s\S]*?\n\}/);
@@ -1197,7 +1199,7 @@ console.log('\n16. Automatischer Abgleich');
          'nach dem lokalen Sichern wird ein Abgleich eingeplant');
 
   /* Nach der Anmeldung ebenso */
-  const anm = skript.match(/function anmelden\([\s\S]*?\n\}\n/);
+  const anm = skript.match(/function anmeldeVersuch\([\s\S]*?\n\}\n/);
   pruefe(anm && /abgleichPlanen\(true\)/.test(anm[0]),
          'nach erfolgreicher Anmeldung wird sofort abgeglichen');
 
@@ -2333,8 +2335,8 @@ console.log('\n34. Banner bei fehlender Verbindung');
          'es erscheint auch bei gültiger Uhr, aber toter Verbindung');
 
   /* Nach der Anmeldung muss es verschwinden */
-  const anm = skript.match(/function anmelden\([\s\S]*?\n\}\n/);
-  pruefe(anm && /verbindungPruefen\(\)/.test(anm[0]),
+  const anv = skript.match(/function anmeldeVersuch\([\s\S]*?\n\}\n/);
+  pruefe(anv && /verbindungPruefen\(\)/.test(anv[0]),
          'nach erfolgreicher Anmeldung wird die Verbindung geprüft und das Banner geräumt');
 
   /* Und nach einer misslungenen stillen Erneuerung stehen bleiben */
@@ -3410,6 +3412,64 @@ console.log('\n51. Vergangene Termine');
     pruefe(e.ohneZeit === false, 'ohne Zeitangabe gilt nichts als vorbei');
     pruefe(e.aufgabeFrueh === true, 'auch eine Aufgabe mit Uhrzeit kann vorbei sein');
   }
+}
+
+/* ============================================================
+   52. Erneuerung, die nicht beim ersten Fehlschlag aufgibt
+   Grund: Ein einziger Versuch fuenf Minuten vor Ablauf. Schlug er
+   fehl — schlafender Rechner, kurz kein Netz, blockierte Cookies —,
+   war die Sitzung verloren und niemand erfuhr den Grund.
+   ============================================================ */
+console.log('\n52. Erneuerung mit Nachsetzen');
+{
+  const skript = hauptSkript();
+
+  ['erneuerungLaufen', 'erneuerungPruefen', 'anmeldeVersuch'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const lauf = skript.match(/function erneuerungLaufen\([\s\S]*?\n\}/);
+  pruefe(lauf && /erneuerungVersuche >= ERNEUERUNG_MAX/.test(lauf[0]),
+         'nach genügend Versuchen wird aufgegeben');
+  pruefe(lauf && /ERNEUERUNG_ABSTAND/.test(lauf[0]),
+         'zwischen den Versuchen liegt ein Abstand');
+  const max = skript.match(/ERNEUERUNG_MAX\s*=\s*(\d+)/);
+  pruefe(max && Number(max[1]) >= 3 && Number(max[1]) <= 12,
+         'die Zahl der Versuche liegt zwischen drei und zwölf');
+  const abstand = skript.match(/ERNEUERUNG_ABSTAND\s*=\s*(\d+)/);
+  pruefe(abstand && Number(abstand[1]) >= 20000,
+         'der Abstand ist nicht kürzer als zwanzig Sekunden');
+
+  const pruef = skript.match(/function erneuerungPruefen\([\s\S]*?\n\}/);
+  pruefe(pruef && /restMinuten\(\) > 10/.test(pruef[0]),
+         'beim Zurückkehren wird nur erneuert, wenn es bald abläuft');
+  pruefe(pruef && /erneuerungsUhr\) \{ return/.test(pruef[0]),
+         'eine laufende Erneuerung wird nicht überholt');
+  const start = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(start && /addEventListener\('focus', erneuerungPruefen\)/.test(start[0]),
+         'die Rückkehr an den Rechner löst die Prüfung aus');
+  const rueck = skript.match(/function rueckkehrPruefen\([\s\S]*?\n\}/);
+  pruefe(rueck && /erneuerungPruefen\(\)/.test(rueck[0]),
+         'auch die Rückkehr zur Fläche');
+
+  /* Der Grund eines Fehlschlags muss ablesbar sein */
+  pruefe(/letzteErneuerung = \{ zeit/.test(skript),
+         'jeder Versuch hinterlässt Zeitpunkt und Ergebnis');
+  const google = skript.match(/function zeichneGoogle\([\s\S]*?\n\}/);
+  pruefe(google && /letzteErneuerung\.grund/.test(google[0]),
+         'die Diagnose nennt den Grund des Fehlschlags');
+  pruefe(google && /Versuche in Folge/.test(google[0]),
+         'sie nennt auch die Zahl der Versuche');
+
+  /* Von Hand: erst still, dann mit Rückfrage */
+  const anm = skript.match(/function anmelden\([\s\S]*?\n\}/);
+  pruefe(anm && /anmeldeVersuch\(still, still \? '' : ''\)/.test(anm[0]),
+         'auch von Hand wird zuerst ohne Rückfrage versucht');
+  pruefe(anm && /anmeldeVersuch\(false, 'consent'\)/.test(anm[0]),
+         'erst danach mit Rückfrage');
+  pruefe(anm && /gut \|\| still/.test(anm[0]),
+         'ein stiller Versuch führt nie zu einer Rückfrage');
 }
 
 /* ============================================================

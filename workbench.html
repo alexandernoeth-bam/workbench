@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.18.3</title>
+<title>Workbench 0.19.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -861,7 +861,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.18.3';
+var APP_VERSION = '0.19.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -926,6 +926,10 @@ var tokenClient = null;
 var zugriffToken = null;
 var tokenAblauf = 0;
 var erneuerungsUhr = null;
+var erneuerungVersuche = 0;
+var ERNEUERUNG_MAX = 6;
+var ERNEUERUNG_ABSTAND = 60000;
+var letzteErneuerung = null;   /* { zeit, ergebnis, grund } */
 var gisBereit = false;
 var driveDateiId = '';
 var driveStand = '';
@@ -1531,16 +1535,37 @@ function restMinuten() {
   return Math.max(0, Math.round((tokenAblauf - Date.now()) / 60000));
 }
 
-/* Still erneuern, bevor die Stunde um ist. Ohne das reißt jede laufende
-   Arbeit nach 60 Minuten ab — genau der bekannte Knackpunkt. */
+/* Still erneuern, bevor die Stunde um ist. Ein einziger Versuch reicht
+   nicht: Schlägt er fehl — schlafender Rechner, kurz kein Netz —, war
+   es das bisher. Deshalb wird mehrfach nachgesetzt. */
 function erneuerungPlanen() {
   if (erneuerungsUhr) { window.clearTimeout(erneuerungsUhr); erneuerungsUhr = null; }
   if (!tokenAblauf) { return; }
+  erneuerungVersuche = 0;
   var wartezeit = tokenAblauf - Date.now() - VORLAUF_MS;
   if (wartezeit < 1000) { wartezeit = 1000; }
-  erneuerungsUhr = window.setTimeout(function () {
-    anmelden(true);
-  }, wartezeit);
+  erneuerungsUhr = window.setTimeout(erneuerungLaufen, wartezeit);
+}
+
+function erneuerungLaufen() {
+  erneuerungsUhr = null;
+  erneuerungVersuche++;
+  anmelden(true).then(function (gut) {
+    if (gut) { return; }
+    if (erneuerungVersuche >= ERNEUERUNG_MAX) { return; }
+    erneuerungsUhr = window.setTimeout(erneuerungLaufen, ERNEUERUNG_ABSTAND);
+  });
+}
+
+/* Beim Zurückkehren an den Rechner: läuft der Zugriff bald ab, gleich
+   erneuern statt auf die Uhr zu warten. Ein schlafender Rechner hält
+   auch die Uhr an. */
+function erneuerungPruefen() {
+  if (!tokenGueltig()) { return; }
+  if (erneuerungsUhr) { return; }
+  if (restMinuten() > 10) { return; }
+  erneuerungVersuche = 0;
+  erneuerungLaufen();
 }
 
 function klientVorbereiten() {
@@ -1555,7 +1580,16 @@ function klientVorbereiten() {
   });
 }
 
+/* Meldet an. Schlägt der stille Weg bei einer Anmeldung von Hand fehl,
+   wird einmal mit Rückfrage nachgesetzt. */
 function anmelden(still) {
+  return anmeldeVersuch(still, still ? '' : '').then(function (gut) {
+    if (gut || still) { return gut; }
+    return anmeldeVersuch(false, 'consent');
+  });
+}
+
+function anmeldeVersuch(still, aufforderung) {
   return klientVorbereiten().then(function (klient) {
     return new Promise(function (fertig) {
       klient.callback = function (antwort) {
@@ -1563,6 +1597,8 @@ function anmelden(still) {
           tokenMerken(antwort.access_token, Number(antwort.expires_in) || 3600);
           try { window.localStorage.setItem(ANMELDE_MERKER, '1'); } catch (e) { /* egal */ }
           verbindungOk = true;
+          letzteErneuerung = { zeit: isoZeit(), ergebnis: still ? 'still erneuert' : 'angemeldet',
+                               grund: '' };
           abgleichPlanen(true);
           termineHolen(false);
           verbindungPruefen();
@@ -1572,6 +1608,9 @@ function anmelden(still) {
           return;
         }
         var grund = (antwort && antwort.error) ? antwort.error : 'unbekannt';
+        letzteErneuerung = { zeit: isoZeit(),
+                             ergebnis: still ? 'still fehlgeschlagen' : 'abgebrochen',
+                             grund: grund };
         if (still) {
           melde('Die stille Erneuerung ist fehlgeschlagen (' + grund + ').\n'
               + 'Bitte einmal auf „Anmelden" tippen.', 'warn');
@@ -1581,7 +1620,9 @@ function anmelden(still) {
         zeichne();
         fertig(false);
       };
-      klient.requestAccessToken({ prompt: still ? '' : 'consent' });
+      /* Auch von Hand zuerst ohne Rückfrage: Wer schon zugestimmt hat,
+         soll die Zustimmung nicht jedes Mal wieder erteilen müssen. */
+      klient.requestAccessToken({ prompt: aufforderung });
     });
   }).catch(function (f) {
     melde('Anmeldung nicht möglich.\n' + (f ? f.message : ''), 'warn');
@@ -1903,6 +1944,7 @@ function taktStarten() {
 }
 
 function rueckkehrPruefen() {
+  erneuerungPruefen();
   if (document.hidden) { return; }
   if (!tokenGueltig()) { return; }
   if (Date.now() - abgleichZuletztMs < ABGLEICH_MINDEST) { return; }
@@ -4132,6 +4174,19 @@ function zeichneGoogle() {
   h += zeile('Gültig noch', an ? (restMinuten() + ' Minuten') : '—', an ? '' : 'grau');
   h += zeile('Stille Erneuerung', erneuerungsUhr ? 'geplant' : 'nicht geplant',
              erneuerungsUhr ? 'ja' : 'grau');
+  if (letzteErneuerung) {
+    h += zeile('Zuletzt', letzteErneuerung.zeit + ' · ' + letzteErneuerung.ergebnis,
+               (letzteErneuerung.grund ? 'nein' : 'ja'));
+    if (letzteErneuerung.grund) {
+      h += zeile('Grund', esc(letzteErneuerung.grund), 'nein');
+    }
+  } else {
+    h += zeile('Zuletzt', 'noch kein Versuch', 'grau');
+  }
+  if (erneuerungVersuche) {
+    h += zeile('Versuche in Folge', erneuerungVersuche + ' von ' + ERNEUERUNG_MAX,
+               (erneuerungVersuche >= ERNEUERUNG_MAX) ? 'nein' : 'grau');
+  }
   h += zeile('Drive-Datei', driveDateiId ? DRIVE_DATEI : 'noch nicht gesucht',
              driveDateiId ? '' : 'grau');
   h += zeile('Stand bei Drive', driveStand || '—', driveStand ? '' : 'grau');
@@ -7517,6 +7572,7 @@ function starten() {
   }
   document.addEventListener('visibilitychange', rueckkehrPruefen);
   window.addEventListener('focus', anmeldeStreifenPruefen);
+  window.addEventListener('focus', erneuerungPruefen);
   window.addEventListener('resize', darstellungAnwenden);
   wischenAnmelden();
   window.setInterval(anmeldeStreifenPruefen, 15000);
