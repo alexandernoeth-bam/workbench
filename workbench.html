@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.18.1</title>
+<title>Workbench 0.18.3</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -395,6 +395,11 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    wiederholt, rechts die Arbeit des Tages. Erledigtes über beide. */
 /* Im schmalen Bild lösen sich die Spaltenbehälter auf, damit die
    Abschnitte in ihrer natürlichen Folge untereinander stehen. */
+/* Vergangenes bleibt eingeklappt — auf jedem Gerät gleich.
+   Aufgeklappt steht es zurückgenommen da. */
+.tverlauf.vorbei{display:none}
+.tabschnitt.aufgeklappt .tverlauf.vorbei{display:flex;opacity:.55}
+
 .tspalte{display:contents}
 body.breit .tagblatt{display:grid;grid-template-columns:1fr 1fr;gap:0 32px;
   align-items:start}
@@ -856,7 +861,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.18.1';
+var APP_VERSION = '0.18.3';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2840,10 +2845,36 @@ function zeileHtml(a, is, kompakt) {
   return h;
 }
 
+var vorbeiOffen = false;
+
+function vorbeiUm() {
+  vorbeiOffen = !vorbeiOffen;
+  tagZeichnen();
+}
+
+function uhrzeitJetzt() {
+  var d = new Date();
+  return zwei(d.getHours()) + ':' + zwei(d.getMinutes());
+}
+
+/* Vorbei ist nur, was am heutigen Tag schon zu Ende ist. An anderen
+   Tagen gibt es kein Vorbei — der ganze Tag ist Vergangenheit oder
+   Zukunft. Gemessen wird am Ende, nicht am Beginn: Ein Termin, der
+   noch läuft, ist nicht vorbei. */
+function eintragVorbei(eintrag, is) {
+  if (is !== isoDatum()) { return false; }
+  var ende = '';
+  if (eintrag.art === 'termin') { ende = eintrag.t.bis || eintrag.t.von || ''; }
+  else { ende = eintrag.zeit || ''; }
+  if (!ende) { return false; }
+  return ende < uhrzeitJetzt();
+}
+
 function verlaufHtml(eintrag, is) {
   if (eintrag.art === 'termin') {
     var t = eintrag.t;
-    var h = '<div class="tverlauf fest' + (t.kontext === 'privat' ? ' privat' : '') + '">';
+    var h = '<div class="tverlauf fest' + (t.kontext === 'privat' ? ' privat' : '')
+          + (eintragVorbei(eintrag, is) ? ' vorbei' : '') + '">';
     h += '<div class="tv-zeit">' + esc(t.von || '') + '</div><div class="tv-schiene"></div>';
     h += '<div class="tv-inhalt"><div class="ttitel">' + esc(t.titel) + '</div>';
     var unten = [];
@@ -2857,6 +2888,7 @@ function verlaufHtml(eintrag, is) {
   var a = eintrag.a;
   var erledigt = istErledigtAn(a, is);
   var v = '<div class="tverlauf aufgabe' + (a.kontext === 'privat' ? ' privat' : '')
+        + (eintragVorbei(eintrag, is) ? ' vorbei' : '')
         + (erledigt ? ' erledigt' : '') + '">';
   v += '<div class="tv-zeit">' + esc(a.uhrzeit) + '</div><div class="tv-schiene"></div>';
   v += '<div class="tv-inhalt"><div class="tv-reihe">';
@@ -3099,8 +3131,19 @@ function tagZeichnen() {
      nebeneinanderliegende Abschnitte die Zeilenhöhe, wodurch oben
      rechts eine Lücke entstünde. */
   h += '<div class="tspalte tspalte-links">';
-  h += '<div class="tabschnitt" data-kurz="Tagesverlauf"><div class="tabschnitt-titel">'
+  var vorbeiZahl = 0;
+  for (i = 0; i < e.verlauf.length; i++) {
+    if (eintragVorbei(e.verlauf[i], is)) { vorbeiZahl++; }
+  }
+  h += '<div class="tabschnitt' + (vorbeiOffen ? ' aufgeklappt' : '')
+     + '" data-kurz="Tagesverlauf"><div class="tabschnitt-titel">'
      + '<span>Tagesverlauf</span></div>';
+  if (vorbeiZahl) {
+    h += '<button class="tfalt vorbei-falt" type="button" onclick="vorbeiUm()">'
+       + '<span>' + vorbeiZahl + (vorbeiZahl === 1 ? ' Termin vorbei' : ' Termine vorbei')
+       + '</span><svg class="' + (vorbeiOffen ? 'auf' : '') + '" viewBox="0 0 24 24">'
+       + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+  }
   if (!e.verlauf.length) { h += '<div class="tleer">Nichts mit fester Zeit.</div>'; }
   for (i = 0; i < e.verlauf.length; i++) { h += verlaufHtml(e.verlauf[i], is); }
   h += '</div>';

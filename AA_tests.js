@@ -483,6 +483,26 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__vorbeiApi = {'
+                 + ' pruefeVorbei: function(){'
+                 + '   var heute = isoDatum();'
+                 + '   var gestern = tagePlus(heute, -1);'
+                 + '   var frueh = { art:\'termin\', zeit:\'00:01\','
+                 + '     t:{ von:\'00:01\', bis:\'00:02\' } };'
+                 + '   var laeuft = { art:\'termin\', zeit:\'00:01\','
+                 + '     t:{ von:\'00:01\', bis:\'23:59\' } };'
+                 + '   var spaet = { art:\'termin\', zeit:\'23:58\','
+                 + '     t:{ von:\'23:58\', bis:\'23:59\' } };'
+                 + '   var ohne = { art:\'termin\', zeit:\'\', t:{ von:\'\', bis:\'\' } };'
+                 + '   var aufg = { art:\'aufgabe\', zeit:\'00:01\', a:{ titel:\'x\' } };'
+                 + '   return {'
+                 + '     frueherTermin: eintragVorbei(frueh, heute),'
+                 + '     laufenderTermin: eintragVorbei(laeuft, heute),'
+                 + '     spaeterTermin: eintragVorbei(spaet, heute),'
+                 + '     andererTag: eintragVorbei(frueh, gestern),'
+                 + '     ohneZeit: eintragVorbei(ohne, heute),'
+                 + '     aufgabeFrueh: eintragVorbei(aufg, heute) };'
+                 + ' } };'
                  + 'globalThis.__feiApi = {'
                  + ' pruefeFeiertage: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -3345,6 +3365,51 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
   /* Im schmalen Bild bleibt es einspaltig */
   pruefe(!/\.tagblatt\{[^}]*display:grid/.test(QUELLE.replace(/body\.breit [^\n]*/g, '')),
          'im schmalen Bild bleibt der Tag einspaltig');
+}
+
+/* ============================================================
+   51. Vergangene Termine einklappen
+   Grund: Der Entwurf versteckt am Handy, was schon vorbei ist,
+   hinter einer Faltzeile. Am grossen Bildschirm ist Platz genug.
+   Ein noch laufender Termin darf nicht als vorbei gelten.
+   ============================================================ */
+console.log('\n51. Vergangene Termine');
+{
+  const skript = hauptSkript();
+  const v = globalThis.__vorbeiApi;
+
+  ['eintragVorbei', 'vorbeiUm', 'uhrzeitJetzt'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const tag = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tag && /vorbei-falt/.test(tag[0]), 'es gibt eine Faltzeile');
+  pruefe(tag && /Termine vorbei/.test(tag[0]), 'sie nennt die Zahl');
+  pruefe(tag && /vorbeiZahl\) \{/.test(tag[0]),
+         'ohne Vergangenes bleibt sie weg');
+
+  pruefe(/\n\.tverlauf\.vorbei\{display:none\}/.test(QUELLE),
+         'Vergangenes ist eingeklappt');
+  pruefe(/\.tabschnitt\.aufgeklappt \.tverlauf\.vorbei\{display:flex;opacity/.test(QUELLE),
+         'aufgeklappt steht es zurückgenommen da');
+  pruefe(!/body\.(breit|schmal) [^\n]*vorbei/.test(QUELLE),
+         'die Regel gilt auf jedem Gerät gleich');
+  pruefe(!/body\.breit \.vorbei-falt/.test(QUELLE),
+         'die Faltzeile bleibt auch am großen Bildschirm');
+
+  if (!v) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = v.pruefeVorbei();
+    pruefe(e.frueherTermin === true, 'ein beendeter Termin gilt als vorbei');
+    pruefe(e.laufenderTermin === false,
+           'ein noch laufender Termin gilt nicht als vorbei');
+    pruefe(e.spaeterTermin === false, 'ein späterer erst recht nicht');
+    pruefe(e.andererTag === false, 'an einem anderen Tag gibt es kein Vorbei');
+    pruefe(e.ohneZeit === false, 'ohne Zeitangabe gilt nichts als vorbei');
+    pruefe(e.aufgabeFrueh === true, 'auch eine Aufgabe mit Uhrzeit kann vorbei sein');
+  }
 }
 
 /* ============================================================
