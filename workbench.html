@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.22.0</title>
+<title>Workbench 0.23.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -713,6 +713,21 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     <button type="button" onclick="zeigeSchirm('Migration')">Migration öffnen</button>
   </div>
 
+  <div class="abschnitt-titel"><span>Jahrestermine austauschen</span></div>
+  <div id="jtDateiStand"></div>
+  <div class="feld-hinweis">Zur Erstbestückung eines zweiten Bestands: ausgeben,
+    die Datei übergeben, dort einlesen. Eingelesen wird nur, was fehlt —
+    Vorhandenes bleibt unangetastet.</div>
+  <div class="knopfreihe">
+    <button type="button" onclick="jtAusgeben()">Jahrestermine ausgeben</button>
+  </div>
+  <input type="file" id="jtDatei" accept=".json,application/json"
+         onchange="jtDateiGemerkt()">
+  <div class="knopfreihe">
+    <button type="button" id="knopfJtLesen" onclick="jtEinlesen()" disabled>
+      Jahrestermine einlesen</button>
+  </div>
+
   <div class="abschnitt-titel"><span>Ferien und Feiertage</span></div>
   <div id="ferienListe"></div>
   <div class="feld-hinweis">ICS-Datei wählen, etwa <b>Schulferien_BY.ics</b> —
@@ -889,7 +904,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.22.0';
+var APP_VERSION = '0.23.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4384,6 +4399,7 @@ function zeichne() {
   zeichneGoogle();
   zeichneKalender();
   zeichneDarstellung();
+  zeichneJtDatei();
   zeichneFerien();
   zeichneBestand();
   zeichneUmgebung();
@@ -4826,6 +4842,158 @@ function ferienEintragAn(is, art) {
 function ferienAn(is) {
   var e = ferienEintragAn(is, 'ferien');
   return e ? e.titel : '';
+}
+
+
+/* ============================================================
+   Jahrestermine ausgeben und einlesen
+
+   Zur Erstbestückung eines zweiten Bestands: Die Datei enthält nur
+   Jahrestermine, nichts sonst. Eingelesen wird ergänzend — was schon
+   da ist, bleibt unangetastet.
+   ============================================================ */
+
+var JT_DATEI_ART = 'workbench-jahrestermine';
+var jtImportBericht = null;
+
+function dateiAnbieten(name, text) {
+  try {
+    var brocken = new window.Blob([text], { type: 'application/json' });
+    var adresse = window.URL.createObjectURL(brocken);
+    var a = document.createElement('a');
+    a.href = adresse;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.setTimeout(function () { window.URL.revokeObjectURL(adresse); }, 4000);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function jtAusgeben() {
+  var liste = DB.jahrestermine || [];
+  if (!liste.length) {
+    melde('Es gibt keine Jahrestermine zum Ausgeben.', 'warn');
+    return;
+  }
+  var inhalt = {
+    art: JT_DATEI_ART,
+    version: APP_VERSION,
+    erzeugt: isoZeit(),
+    anzahl: liste.length,
+    eintraege: liste
+  };
+  var name = 'workbench_jahrestermine_' + isoDatum().replace(/-/g, '') + '.json';
+  if (dateiAnbieten(name, JSON.stringify(inhalt, null, 2))) {
+    melde(liste.length + ' Jahrestermine ausgegeben: ' + name, 'gut');
+  } else {
+    melde('Die Datei ließ sich nicht anbieten.', 'warn');
+  }
+}
+
+/* Nimmt einen gelesenen Inhalt an und trägt nach, was fehlt. */
+function jtUebernehmen(inhalt) {
+  var bericht = { gelesen: 0, neu: 0, vorhanden: 0, fehler: '' };
+  if (!inhalt || inhalt.art !== JT_DATEI_ART || !Array.isArray(inhalt.eintraege)) {
+    bericht.fehler = 'Das ist keine Datei mit Jahresterminen.';
+    return bericht;
+  }
+  if (!Array.isArray(DB.jahrestermine)) { DB.jahrestermine = []; }
+
+  var vorhanden = {};
+  var i;
+  for (i = 0; i < DB.jahrestermine.length; i++) {
+    vorhanden[DB.jahrestermine[i].id] = true;
+    /* Zusätzlich über den Inhalt erkennen: Wer den Bestand einmal
+       neu aufgebaut hat, hat andere Kennungen für dieselbe Sache. */
+    vorhanden[jtKennzeichen(DB.jahrestermine[i])] = true;
+  }
+
+  for (i = 0; i < inhalt.eintraege.length; i++) {
+    var e = inhalt.eintraege[i];
+    if (!e || !e.id || !e.von) { continue; }
+    bericht.gelesen++;
+    if (vorhanden[e.id] || vorhanden[jtKennzeichen(e)]) {
+      bericht.vorhanden++;
+      continue;
+    }
+    DB.jahrestermine.push({
+      id: e.id, titel: e.titel || 'ohne Titel', art: e.art || 'sonstiges',
+      kontext: (e.kontext === 'beruflich') ? 'beruflich' : 'privat',
+      von: e.von, bis: e.bis || e.von, jaehrlich: !!e.jaehrlich,
+      kuerzel: e.kuerzel || '', geaendert: jetzt()
+    });
+    vorhanden[e.id] = true;
+    vorhanden[jtKennzeichen(e)] = true;
+    bericht.neu++;
+  }
+  return bericht;
+}
+
+function jtKennzeichen(e) {
+  return 'k|' + String(e.titel || '').trim().toLowerCase()
+       + '|' + String(e.von || '') + '|' + String(e.bis || e.von || '');
+}
+
+function jtDateiGemerkt() {
+  var feld = document.getElementById('jtDatei');
+  var knopf = document.getElementById('knopfJtLesen');
+  var anzahl = (feld && feld.files) ? feld.files.length : 0;
+  if (knopf) { knopf.disabled = (anzahl === 0); }
+  if (anzahl) { melde('Datei gewählt. Jetzt „Jahrestermine einlesen" antippen.', null); }
+}
+
+function jtEinlesen() {
+  var feld = document.getElementById('jtDatei');
+  var dateien = (feld && feld.files) ? feld.files : null;
+  if (!dateien || !dateien.length) {
+    melde('Es ist keine Datei gewählt.', 'warn');
+    return;
+  }
+  var leser = new window.FileReader();
+  leser.onload = function () {
+    var inhalt = null;
+    try {
+      inhalt = JSON.parse(String(leser.result));
+    } catch (e) {
+      melde('Die Datei ließ sich nicht lesen.\n' + e.message, 'warn');
+      return;
+    }
+    var bericht = jtUebernehmen(inhalt);
+    jtImportBericht = bericht;
+    if (bericht.fehler) {
+      melde(bericht.fehler, 'warn');
+    } else {
+      melde('Gelesen: ' + bericht.gelesen + ' · neu übernommen: ' + bericht.neu
+          + ' · schon vorhanden: ' + bericht.vorhanden, 'gut');
+      spaeterSichern();
+      kalZeichnen();
+      tagZeichnen();
+    }
+    if (feld) { feld.value = ''; }
+    var knopf = document.getElementById('knopfJtLesen');
+    if (knopf) { knopf.disabled = true; }
+    zeichne();
+  };
+  leser.onerror = function () {
+    melde('Die Datei ließ sich nicht lesen.', 'warn');
+  };
+  leser.readAsText(dateien[0]);
+}
+
+function zeichneJtDatei() {
+  var ziel = document.getElementById('jtDateiStand');
+  if (!ziel) { return; }
+  var h = zeile('Jahrestermine im Bestand', String((DB.jahrestermine || []).length), 'grau');
+  if (jtImportBericht && !jtImportBericht.fehler) {
+    h += zeile('Zuletzt eingelesen',
+               jtImportBericht.neu + ' neu · ' + jtImportBericht.vorhanden + ' vorhanden',
+               'ja');
+  }
+  ziel.innerHTML = h;
 }
 
 /* ============================================================

@@ -485,6 +485,34 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__jtDateiApi = {'
+                 + ' pruefeAustausch: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var datei = { art: JT_DATEI_ART, eintraege: ['
+                 + '     { id:\'a\', titel:\'Kreta\', art:\'urlaub\', kontext:\'privat\','
+                 + '       von:\'2026-08-03\', bis:\'2026-08-21\', jaehrlich:true },'
+                 + '     { id:\'b\', titel:\'Geburtstag Anna\', art:\'geburtstag\','
+                 + '       von:\'2008-03-26\', bis:\'2008-03-26\', jaehrlich:true },'
+                 + '     { id:\'c\', titel:\'Werksbesuch\', art:\'dienstreise\','
+                 + '       von:\'2026-04-01\', bis:\'2026-04-01\' } ] };'
+                 + '   var erst = jtUebernehmen(datei);'
+                 + '   var zweit = jtUebernehmen(datei);'
+                 + '   var bestand = DB.jahrestermine.length;'
+                 + '   var anders = jtUebernehmen({ art: JT_DATEI_ART, eintraege: ['
+                 + '     { id:\'ganz-anders\', titel:\'Kreta\', art:\'urlaub\','
+                 + '       von:\'2026-08-03\', bis:\'2026-08-21\' } ] });'
+                 + '   var fremd = jtUebernehmen({ art:\'etwas-anderes\' });'
+                 + '   var leer = jtUebernehmen(null);'
+                 + '   DB.jahrestermine[0].titel = \'Mein eigener\';'
+                 + '   jtUebernehmen(datei);'
+                 + '   var eigenes = DB.jahrestermine[0].titel;'
+                 + '   var erster = DB.jahrestermine[0];'
+                 + '   var felder = erster.art + \'|\' + erster.kontext + \'|\' + erster.jaehrlich;'
+                 + '   DB = alt;'
+                 + '   return { erst:erst, zweit:zweit, bestand:bestand,'
+                 + '            andereKennung:anders, fremd:fremd, leer:leer,'
+                 + '            eigenesBleibt:eigenes, felder:felder };'
+                 + ' } };'
                  + 'globalThis.__aufArtApi = {'
                  + ' pruefeArt: function(){'
                  + '   var merkStand = aufGruppeStand; var merkArt = aufArt;'
@@ -3794,6 +3822,60 @@ console.log('\n56. Gruppen und Art');
     pruefe(e.klein === 1, 'nur Kleinigkeiten: eine');
     pruefe(e.ohneArtGiltAlsAufgabe === true,
            'eine Aufgabe ohne Artangabe zählt als Aufgabe, nicht als Kleinigkeit');
+  }
+}
+
+/* ============================================================
+   57. Jahrestermine austauschen
+   Grund: Zwei Bestaende brauchen eine Erstbestueckung. Ein Einlesen
+   darf nichts ueberschreiben und beim zweiten Mal nichts doppeln —
+   auch dann nicht, wenn dieselbe Sache andere Kennungen traegt.
+   ============================================================ */
+console.log('\n57. Jahrestermine austauschen');
+{
+  const skript = hauptSkript();
+  const j = globalThis.__jtDateiApi;
+
+  ['jtAusgeben', 'jtUebernehmen', 'jtKennzeichen', 'jtEinlesen',
+   'jtDateiGemerkt', 'dateiAnbieten', 'zeichneJtDatei'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  pruefe(/id="jtDatei"/.test(QUELLE), 'es gibt ein Feld für die Datei');
+  pruefe(/id="knopfJtLesen"/.test(QUELLE) && /disabled>/.test(QUELLE),
+         'der Einleseknopf ist ohne Auswahl gesperrt');
+  pruefe(/jtAusgeben\(\)/.test(QUELLE), 'es gibt einen Knopf zum Ausgeben');
+
+  const aus = skript.match(/function jtAusgeben\([\s\S]*?\n\}/);
+  pruefe(aus && /JT_DATEI_ART/.test(aus[0]), 'die Datei nennt ihre Art');
+  pruefe(aus && /DB\.jahrestermine/.test(aus[0]) && !/DB\.aufgaben/.test(aus[0]),
+         'sie enthält nur Jahrestermine, nichts sonst');
+
+  const ueb = skript.match(/function jtUebernehmen\([\s\S]*?\n\}\n/);
+  pruefe(ueb && /inhalt\.art !== JT_DATEI_ART/.test(ueb[0]),
+         'eine fremde Datei wird abgewiesen');
+  pruefe(ueb && /bericht\.vorhanden\+\+/.test(ueb[0]),
+         'Vorhandenes wird gezählt, nicht überschrieben');
+  pruefe(ueb && !/splice/.test(ueb[0]), 'nichts wird entfernt');
+
+  if (!j) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = j.pruefeAustausch();
+    pruefe(e.erst.neu === 3 && e.erst.vorhanden === 0,
+           'die Erstbestückung übernimmt alles');
+    pruefe(e.zweit.neu === 0 && e.zweit.vorhanden === 3,
+           'ein zweites Einlesen doppelt nichts');
+    pruefe(e.bestand === 3, 'der Bestand bleibt bei drei');
+    pruefe(e.andereKennung.neu === 0,
+           'dieselbe Sache mit anderer Kennung wird erkannt');
+    pruefe(e.fremd.fehler.length > 0, 'eine fremde Datei meldet einen Fehler');
+    pruefe(e.leer.fehler.length > 0, 'ein leerer Inhalt ebenfalls');
+    pruefe(e.eigenesBleibt === 'Mein eigener',
+           'ein eigener Eintrag mit gleicher Kennung wird nicht überschrieben');
+    pruefe(e.felder === 'urlaub|privat|true',
+           'Art, Kontext und Wiederholung kommen mit');
   }
 }
 
