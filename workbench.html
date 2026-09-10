@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.23.0</title>
+<title>Workbench 0.24.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -904,7 +904,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.23.0';
+var APP_VERSION = '0.24.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4029,6 +4029,7 @@ function tagBlaettern(n) {
 }
 
 function tagHeute() {
+  faelligeStarten();
   tagOffen = isoDatum();
   erledigtOffen = false;
   tagZeichnen();
@@ -6380,6 +6381,9 @@ function vhDetailHtml() {
     }
     h += '<button class="neu-zeile" type="button" onclick="vhEinzahlerWahl()">'
        + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Einzahler</button>';
+
+    h += '<div class="s-abschnitt">Abläufe</div>';
+    h += vhAblaeufeHtml(v.id, 'ziel');
   } else {
     h += '<div class="s-abschnitt">Meilensteine</div>';
     var ms = v.meilensteine || [];
@@ -6411,6 +6415,9 @@ function vhDetailHtml() {
       h += '<div class="d-reihe"><button type="button" onclick="vhMsOrdnen()">'
          + 'Nach Datum ordnen</button></div>';
     }
+
+    h += '<div class="s-abschnitt">Abläufe</div>';
+    h += vhAblaeufeHtml(v.id, 'projekt');
 
     h += '<div class="s-abschnitt">Aufgaben</div>';
     var zug = aufgabenZuProjekt(v.id);
@@ -6468,6 +6475,52 @@ function vhDetailHtml() {
   h += '<button type="button" class="gefahr" onclick="vhLoeschen()">Löschen</button>';
   h += '</div>';
   return h;
+}
+
+/* Welche Vorlagen und laufenden Durchläufe gehören zu diesem
+   Vorhaben? */
+function vhAblaeufeHtml(id, art) {
+  var feld = (art === 'ziel') ? 'zielId' : 'projektId';
+  var h = '';
+  var i;
+  var gab = false;
+
+  var d = DB.durchlaeufe || [];
+  for (i = 0; i < d.length; i++) {
+    if (d[i][feld] !== id) { continue; }
+    var offen = (d[i].schritte || []).length - schritteFertig(d[i]);
+    h += '<div class="anlage"><div class="a-mitte" '
+       + 'onclick="abDetailOeffnen(\'' + esc(d[i].id) + '\',\'durchlauf\')">'
+       + '<div class="a-name">' + esc(d[i].name) + '</div>'
+       + '<div class="a-quelle">läuft · ' + schritteFertig(d[i]) + ' von '
+       + (d[i].schritte || []).length + ' · noch ' + offen
+       + (offen === 1 ? ' Schritt' : ' Schritte') + '</div></div></div>';
+    gab = true;
+  }
+
+  var v = DB.ablaeufe || [];
+  for (i = 0; i < v.length; i++) {
+    if (v[i][feld] !== id) { continue; }
+    h += '<div class="anlage"><div class="a-mitte" '
+       + 'onclick="abDetailOeffnen(\'' + esc(v[i].id) + '\',\'vorlage\')">'
+       + '<div class="a-name">' + esc(v[i].name) + '</div>'
+       + '<div class="a-quelle">Vorlage · '
+       + esc(v[i].wiederholung ? regelText(v[i].wiederholung) : 'von Hand')
+       + '</div></div>'
+       + '<button class="ms-wort" type="button" '
+       + 'onclick="vhAblaufStarten(\'' + esc(v[i].id) + '\')">Starten</button></div>';
+    gab = true;
+  }
+
+  if (!gab) {
+    h += '<div class="tleer" style="padding-left:0">Kein Ablauf zugeordnet.</div>';
+  }
+  return h;
+}
+
+function vhAblaufStarten(vorlageId) {
+  durchlaufStarten(vorlageId);
+  vhDetailNeu();
 }
 
 function vhNameSetzen(wert) {
@@ -6792,12 +6845,24 @@ function vhLoeschen() {
   if (stelle >= 0) { sammlung.splice(stelle, 1); }
   grabsteinSetzen((vhDetailArt === 'ziel') ? 'ziele' : 'projekte', v.id);
 
-  /* Aufgaben werden nicht mitgelöscht — sie verlieren nur ihr Projekt. */
+  /* Aufgaben und Abläufe werden nicht mitgelöscht — sie verlieren
+     nur ihre Zuordnung. */
+  var feld = (vhDetailArt === 'ziel') ? 'zielId' : 'projektId';
   if (vhDetailArt === 'projekt') {
     var l = DB.aufgaben || [];
     var i;
     for (i = 0; i < l.length; i++) {
       if (l[i].projektId === v.id) { l[i].projektId = null; l[i].geaendert = jetzt(); }
+    }
+  }
+  var samml = [DB.ablaeufe || [], DB.durchlaeufe || []];
+  var s, k;
+  for (s = 0; s < samml.length; s++) {
+    for (k = 0; k < samml[s].length; k++) {
+      if (samml[s][k][feld] === v.id) {
+        samml[s][k][feld] = null;
+        samml[s][k].geaendert = jetzt();
+      }
     }
   }
   spaeterSichern();
@@ -6938,8 +7003,19 @@ function vorlageKarteHtml(v) {
   h += '<div class="vk-name">' + esc(v.name) + '</div>';
   h += '<div class="vk-zeit">' + n + (n === 1 ? ' Schritt' : ' Schritte') + '</div>';
   h += '<svg class="vk-pfeil" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></div>';
-  h += '<div class="vk-satz leer">'
-     + (v.zuletzt ? ('zuletzt ' + esc(kurzDatum(v.zuletzt))) : 'noch nie angewendet') + '</div>';
+  var anlassText = '';
+  if (v.wiederholung) { anlassText = regelText(v.wiederholung); }
+  else if (v.anlassAufgabeId) {
+    var anl = aufgabeFinden(v.anlassAufgabeId);
+    anlassText = anl ? ('nach: ' + anl.titel) : 'Anlass fehlt';
+  }
+  h += '<div class="vk-satz' + (anlassText ? '' : ' leer') + '">'
+     + esc(anlassText || (v.zuletzt ? ('zuletzt ' + kurzDatum(v.zuletzt))
+                                    : 'läuft nur von Hand an')) + '</div>';
+  if (anlassText && v.zuletztGestartet) {
+    h += '<div class="vk-ruht">zuletzt angelaufen ' + esc(kurzDatum(v.zuletztGestartet))
+       + '</div>';
+  }
 
   h += '<div class="vk-mehr">';
   var i;
@@ -7035,7 +7111,65 @@ function schrittUm(id, nr) {
    Starten, beenden, anlegen
    ------------------------------------------------------------ */
 
-function durchlaufStarten(vorlageId) {
+/* Läuft aus dieser Vorlage schon etwas? Dann wird nichts Zweites
+   gestartet — sonst häufen sich unerledigte Durchläufe. */
+function offenerDurchlaufVon(vorlageId) {
+  var l = DB.durchlaeufe || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].ablaufId === vorlageId) { return l[i]; }
+  }
+  return null;
+}
+
+/* Startet fällige Vorlagen. Läuft beim Start und bei jedem
+   Tageswechsel — nicht öfter, sonst entstünde Unruhe. */
+function vorlagenFaellig() {
+  var heute = isoDatum();
+  var aus = [];
+  var l = DB.ablaeufe || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    var v = l[i];
+    if (!v.wiederholung) { continue; }
+    if (!faelligAn(v.wiederholung, heute)) { continue; }
+    if (v.zuletztGestartet === heute) { continue; }
+    if (offenerDurchlaufVon(v.id)) { continue; }
+    aus.push(v);
+  }
+  return aus;
+}
+
+function faelligeStarten() {
+  var faellig = vorlagenFaellig();
+  if (!faellig.length) { return 0; }
+  var i;
+  for (i = 0; i < faellig.length; i++) {
+    durchlaufStarten(faellig[i].id, true);
+  }
+  spaeterSichern();
+  tagZeichnen();
+  abZeichnen();
+  return faellig.length;
+}
+
+/* Eine wiederkehrende Aufgabe kann ebenfalls Anlass sein: Wird sie
+   abgehakt, beginnt der Ablauf. */
+function durchlaufAusAufgabe(aufgabeId) {
+  var l = DB.ablaeufe || [];
+  var i;
+  var zahl = 0;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].anlassAufgabeId !== aufgabeId) { continue; }
+    if (offenerDurchlaufVon(l[i].id)) { continue; }
+    durchlaufStarten(l[i].id, true);
+    zahl++;
+  }
+  if (zahl) { spaeterSichern(); abZeichnen(); }
+  return zahl;
+}
+
+function durchlaufStarten(vorlageId, still) {
   var v = vorlageFinden(vorlageId);
   if (!v) { return; }
   var schritte = [];
@@ -7046,12 +7180,15 @@ function durchlaufStarten(vorlageId) {
   }
   var neu = {
     id: neueKennung(), ablaufId: v.id, name: v.name, kontext: v.kontext,
+    projektId: v.projektId || null, zielId: v.zielId || null,
     start: isoDatum(), frist: '', schritte: schritte, geaendert: jetzt()
   };
   DB.durchlaeufe.push(neu);
   v.zuletzt = isoDatum();
+  v.zuletztGestartet = isoDatum();
   v.geaendert = jetzt();
   abOffen[neu.id] = true;
+  if (still) { return; }
   spaeterSichern();
   abZeichnen();
   tagZeichnen();
@@ -7097,9 +7234,12 @@ function ablaufAnlegen(art) {
   var id = neueKennung();
   if (art === 'vorlage') {
     DB.ablaeufe.push({ id: id, name: '', kontext: kontext, schritte: [],
-                       zuletzt: '', geaendert: jetzt() });
+                       wiederholung: null, anlassAufgabeId: null,
+                       projektId: null, zielId: null,
+                       zuletzt: '', zuletztGestartet: '', geaendert: jetzt() });
   } else {
     DB.durchlaeufe.push({ id: id, ablaufId: null, name: '', kontext: kontext,
+                          projektId: null, zielId: null,
                           start: isoDatum(), frist: '', schritte: [], geaendert: jetzt() });
   }
   abFrischAngelegt = id;
@@ -7158,6 +7298,77 @@ function abDetailHtml() {
   h += '<button class="d-wahl' + (a.kontext === 'privat' ? ' an' : '') + '" type="button" '
      + 'onclick="abKontextSetzen(\'privat\')">Privat</button>';
   h += '</div></div>';
+
+  if (istVorlage) {
+    /* Der Anlass: entweder ein Takt oder eine wiederkehrende Aufgabe.
+       Beides zugleich wäre verwirrend, also schließen sie einander aus. */
+    var w = a.wiederholung;
+    h += '<div class="s-abschnitt">Wann läuft er an?</div>';
+    h += '<div class="d-feld"><div class="d-name">Takt</div><div class="d-wert">';
+    h += '<button class="d-wahl' + (w ? '' : ' an') + '" type="button" '
+       + 'onclick="abWdh(\'\')">von Hand</button>';
+    h += '<button class="d-wahl' + ((w && w.takt === 'woche') ? ' an' : '') + '" type="button" '
+       + 'onclick="abWdh(\'woche\')">wöchentlich</button>';
+    h += '<button class="d-wahl' + ((w && w.takt === 'monat') ? ' an' : '') + '" type="button" '
+       + 'onclick="abWdh(\'monat\')">monatlich</button>';
+    h += '</div></div>';
+
+    if (w && w.takt === 'woche') {
+      h += '<div class="d-feld"><div class="d-name">Wochentage</div><div class="d-wert">';
+      var t;
+      for (t = 0; t < TAKTE_TAGE.length; t++) {
+        var nr = TAKTE_TAGE[t][0];
+        h += '<button class="d-tag' + ((w.tage || []).indexOf(nr) >= 0 ? ' an' : '')
+           + '" type="button" onclick="abWdhTag(' + nr + ')">' + TAKTE_TAGE[t][1] + '</button>';
+      }
+      h += '</div></div>';
+    } else if (w && w.takt === 'monat') {
+      h += '<div class="d-feld"><div class="d-name">Tag im Monat</div><div class="d-wert">'
+         + '<input type="number" min="1" max="31" value="' + esc(String(w.tag))
+         + '" onchange="abWdhMonatstag(this.value)"></div></div>';
+    }
+    if (w) { h += '<div class="d-hinweis">' + esc(regelText(w)) + '</div>'; }
+
+    var anlass = a.anlassAufgabeId ? aufgabeFinden(a.anlassAufgabeId) : null;
+    h += '<div class="d-feld"><div class="d-name">Oder nach</div><div class="d-wert">';
+    if (anlass) {
+      h += '<span class="d-hinweis">' + esc(anlass.titel) + '</span>'
+         + '<button class="ms-wort" type="button" onclick="abAnlassWeg()">lösen</button>';
+    } else {
+      h += '<button class="ms-wort" type="button" onclick="abAnlassWahl()">'
+         + 'wiederkehrende Aufgabe wählen</button>';
+    }
+    h += '</div></div>';
+    if (a.zuletztGestartet) {
+      h += '<div class="d-hinweis">zuletzt angelaufen ' + esc(kurzDatum(a.zuletztGestartet))
+         + '</div>';
+    }
+  }
+
+  /* Zuordnung zu einem Vorhaben — bei Vorlage wie Durchlauf. */
+  h += '<div class="d-feld"><div class="d-name">Projekt</div><div class="d-wert">';
+  h += '<select onchange="abFeldSetzen(\'projektId\',this.value)">'
+     + '<option value="">kein Projekt</option>';
+  var pl = projekteFuer(a.kontext);
+  var pi;
+  for (pi = 0; pi < pl.length; pi++) {
+    h += '<option value="' + esc(pl[pi].id) + '"'
+       + (a.projektId === pl[pi].id ? ' selected' : '') + '>' + esc(pl[pi].name) + '</option>';
+  }
+  h += '</select></div></div>';
+
+  h += '<div class="d-feld"><div class="d-name">Ziel</div><div class="d-wert">';
+  h += '<select onchange="abFeldSetzen(\'zielId\',this.value)">'
+     + '<option value="">kein Ziel</option>';
+  var zl = DB.ziele || [];
+  var zi;
+  for (zi = 0; zi < zl.length; zi++) {
+    if (zl[zi].kontext !== a.kontext) { continue; }
+    if (zl[zi].status === 'abgeschlossen') { continue; }
+    h += '<option value="' + esc(zl[zi].id) + '"'
+       + (a.zielId === zl[zi].id ? ' selected' : '') + '>' + esc(zl[zi].name) + '</option>';
+  }
+  h += '</select></div></div>';
 
   if (!istVorlage) {
     h += '<div class="d-feld"><div class="d-name">Frist</div><div class="d-wert">'
@@ -7245,6 +7456,86 @@ function abFeldSetzen(feld, wert) {
   if (!a) { return; }
   a[feld] = wert;
   abGeaendert(false);
+}
+
+function abWdh(takt) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a) { return; }
+  if (!takt) { a.wiederholung = null; }
+  else if (a.wiederholung) { a.wiederholung.takt = takt; }
+  else { a.wiederholung = neueRegel(takt); }
+  /* Ein Takt und eine auslösende Aufgabe zugleich wären zwei Anlässe
+     für dieselbe Sache. */
+  if (a.wiederholung) { a.anlassAufgabeId = null; }
+  abGeaendert(true);
+}
+
+function abWdhTag(nr) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || !a.wiederholung) { return; }
+  var tage = a.wiederholung.tage || [];
+  var i = tage.indexOf(nr);
+  if (i >= 0) { tage.splice(i, 1); } else { tage.push(nr); }
+  a.wiederholung.tage = tage;
+  if (a.wiederholung.takt === 'woche' && tage.length === 0) { a.wiederholung = null; }
+  abGeaendert(true);
+}
+
+function abWdhMonatstag(wert) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || !a.wiederholung) { return; }
+  var n = Number(wert);
+  if (!(n >= 1 && n <= 31)) { return; }
+  a.wiederholung.tag = n;
+  abGeaendert(true);
+}
+
+function abAnlassWeg() {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a) { return; }
+  a.anlassAufgabeId = null;
+  abGeaendert(true);
+}
+
+function abAnlassWahl() {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  var sheet = document.getElementById('aktionSheet');
+  if (!a || !sheet) { return; }
+  var h = blattKopf();
+  h += '<button class="zurueck" type="button" onclick="abDetailOeffnen(\'' + esc(a.id)
+     + '\',\'vorlage\')">'
+     + '<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;'
+     + 'stroke-width:2;stroke-linecap:round;stroke-linejoin:round">'
+     + '<path d="M15 6l-6 6 6 6"></path></svg>' + esc(a.name || 'Vorlage') + '</button>';
+  h += '<div class="as-titel">Welche Aufgabe löst ihn aus?</div>';
+  h += '<div class="as-meta">wiederkehrende Aufgaben im Kontext ' + esc(a.kontext) + '</div>';
+  h += '<div class="as-linie"></div>';
+  var l = DB.aufgaben || [];
+  var i;
+  var gab = false;
+  for (i = 0; i < l.length; i++) {
+    if (!l[i].wiederholung) { continue; }
+    if (l[i].kontext !== a.kontext) { continue; }
+    h += '<div class="mf-zeile" onclick="abAnlassSetzen(\'' + esc(l[i].id) + '\')">'
+       + '<span class="mf-name">' + esc(l[i].titel) + '</span>'
+       + '<span class="a-quelle">' + esc(regelText(l[i].wiederholung)) + '</span></div>';
+    gab = true;
+  }
+  if (!gab) {
+    h += '<div class="tleer" style="padding-left:0">Keine wiederkehrende Aufgabe '
+       + 'in diesem Kontext.</div>';
+  }
+  h += '<div class="d-reihe"><button type="button" onclick="abDetailOeffnen(\'' + esc(a.id)
+     + '\',\'vorlage\')">Zurück</button></div>';
+  sheet.innerHTML = h;
+}
+
+function abAnlassSetzen(id) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a) { return; }
+  a.anlassAufgabeId = id;
+  a.wiederholung = null;
+  abGeaendert(true);
 }
 
 function abSchrittNeu() {
@@ -7803,6 +8094,7 @@ function aufgabeErledigen(id) {
   if (!a) { return; }
   if (a.wiederholung) {
     a.zuletztErledigt = isoDatum();
+    durchlaufAusAufgabe(a.id);
   } else {
     a.status = 'erledigt';
     a.erledigtAm = isoDatum();
@@ -8039,6 +8331,7 @@ function starten() {
     }
     bestandStempeln(DB);
     darstellungAnwenden();
+    faelligeStarten();
     tagOffen = isoDatum();
     tagZeichnen();
     zeigeSchirm('Tag');

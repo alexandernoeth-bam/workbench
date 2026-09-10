@@ -485,6 +485,48 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__routineApi = {'
+                 + ' pruefeRoutine: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var heute = isoDatum();'
+                 + '   var wt = ausIso(heute).getDay();'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'P\', kontext:\'beruflich\','
+                 + '     status:\'laufend\', meilensteine:[], zielzustaende:[], anlagen:[] }];'
+                 + '   DB.ablaeufe = ['
+                 + '     { id:\'v1\', name:\'Tagesabschluss\', kontext:\'beruflich\','
+                 + '       schritte:[{ id:\'s1\', titel:\'A\', auf:false }],'
+                 + '       wiederholung:{ takt:\'woche\', intervall:1, tage:[wt], tag:1 },'
+                 + '       anlassAufgabeId:null, projektId:\'p1\', zielId:null,'
+                 + '       zuletzt:\'\', zuletztGestartet:\'\' },'
+                 + '     { id:\'v2\', name:\'Nach Einkauf\', kontext:\'privat\','
+                 + '       schritte:[{ id:\'s2\', titel:\'B\', auf:false }],'
+                 + '       wiederholung:null, anlassAufgabeId:\'a1\','
+                 + '       projektId:null, zielId:null, zuletzt:\'\', zuletztGestartet:\'\' } ];'
+                 + '   DB.aufgaben = [{ id:\'a1\', titel:\'Einkauf\', kontext:\'privat\','
+                 + '     status:\'offen\', planung:\'backlog\','
+                 + '     wiederholung:{ takt:\'woche\', intervall:1, tage:[6], tag:1 } }];'
+                 + '   var faellig = vorlagenFaellig().length;'
+                 + '   var gestartet = faelligeStarten();'
+                 + '   var geerbt = DB.durchlaeufe[0].projektId;'
+                 + '   var zweit = faelligeStarten();'
+                 + '   DB.durchlaeufe[0].schritte.forEach(function(s){ s.fertig = true; });'
+                 + '   var trotz = faelligeStarten();'
+                 + '   var d0 = DB.durchlaeufe[0].id;'
+                 + '   durchlaufBeenden(d0);'
+                 + '   var nachBeenden = faelligeStarten();'
+                 + '   DB.ablaeufe[0].zuletztGestartet = tagePlus(heute, -1);'
+                 + '   var morgen = faelligeStarten();'
+                 + '   var vorher = DB.durchlaeufe.filter(function(d){ return d.ablaufId === \'v2\'; }).length;'
+                 + '   aufgabeErledigen(\'a1\');'
+                 + '   var nachAufgabe = DB.durchlaeufe.filter(function(d){ return d.ablaufId === \'v2\'; }).length;'
+                 + '   aufgabeErledigen(\'a1\');'
+                 + '   var nochmal = DB.durchlaeufe.filter(function(d){ return d.ablaufId === \'v2\'; }).length;'
+                 + '   zurueckHolen = null; DB = alt;'
+                 + '   return { faelligHeute:faellig, gestartet:gestartet, zweiterLauf:zweit,'
+                 + '            trotzErledigt:trotz, nachBeenden:nachBeenden,'
+                 + '            amNaechstenTag:morgen, nachAufgabe:nachAufgabe - vorher,'
+                 + '            nochmalAbhaken:nochmal, geerbt:geerbt };'
+                 + ' } };'
                  + 'globalThis.__jtDateiApi = {'
                  + ' pruefeAustausch: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -3876,6 +3918,89 @@ console.log('\n57. Jahrestermine austauschen');
            'ein eigener Eintrag mit gleicher Kennung wird nicht überschrieben');
     pruefe(e.felder === 'urlaub|privat|true',
            'Art, Kontext und Wiederholung kommen mit');
+  }
+}
+
+/* ============================================================
+   58. Wiederkehrende Ablaeufe und ihre Zuordnung
+   Grund: Tages- und Wochenplanung sind Routinen. Sie muessen von
+   selbst anlaufen, duerfen sich aber nicht haeufen — und ein Ablauf
+   gehoert oft zu einem Projekt oder Ziel.
+   ============================================================ */
+console.log('\n58. Wiederkehrende Abläufe');
+{
+  const skript = hauptSkript();
+  const r = globalThis.__routineApi;
+
+  ['offenerDurchlaufVon', 'vorlagenFaellig', 'faelligeStarten',
+   'durchlaufAusAufgabe', 'abWdh', 'abWdhTag', 'abWdhMonatstag',
+   'abAnlassWahl', 'abAnlassSetzen', 'abAnlassWeg',
+   'vhAblaeufeHtml', 'vhAblaufStarten'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  /* Kein Wuchern */
+  const faellig = skript.match(/function vorlagenFaellig\([\s\S]*?\n\}/);
+  pruefe(faellig && /offenerDurchlaufVon\(v\.id\)/.test(faellig[0]),
+         'aus einer Vorlage mit offenem Durchlauf wird kein zweiter gestartet');
+  pruefe(faellig && /zuletztGestartet === heute/.test(faellig[0]),
+         'auch nicht zweimal am selben Tag');
+  pruefe(faellig && /faelligAn\(v\.wiederholung, heute\)/.test(faellig[0]),
+         'die Regel entscheidet über die Fälligkeit');
+
+  /* Zwei Anlässe schließen einander aus */
+  const wdh = skript.match(/function abWdh\([\s\S]*?\n\}/);
+  pruefe(wdh && /anlassAufgabeId = null/.test(wdh[0]),
+         'ein Takt löscht eine auslösende Aufgabe');
+  const anl = skript.match(/function abAnlassSetzen\([\s\S]*?\n\}/);
+  pruefe(anl && /wiederholung = null/.test(anl[0]),
+         'eine auslösende Aufgabe löscht den Takt');
+
+  /* Anlass über eine Aufgabe */
+  const erl = skript.match(/function aufgabeErledigen\([\s\S]*?\n\}/);
+  pruefe(erl && /durchlaufAusAufgabe\(a\.id\)/.test(erl[0]),
+         'das Abhaken einer wiederkehrenden Aufgabe kann einen Ablauf starten');
+
+  /* Anlaufen beim Start und beim Sprung auf heute */
+  const start = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(start && /faelligeStarten\(\)/.test(start[0]), 'beim Start wird geprüft');
+  const heute = skript.match(/function tagHeute\([\s\S]*?\n\}/);
+  pruefe(heute && /faelligeStarten\(\)/.test(heute[0]),
+         'beim Sprung auf heute ebenfalls');
+
+  /* Zuordnung */
+  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(detail && /abFeldSetzen\(\\'projektId\\'/.test(detail[0]),
+         'ein Ablauf lässt sich einem Projekt zuordnen');
+  pruefe(detail && /abFeldSetzen\(\\'zielId\\'/.test(detail[0]), 'und einem Ziel');
+  const vh = skript.match(/function vhDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(vh && /vhAblaeufeHtml\(v\.id, 'projekt'\)/.test(vh[0]),
+         'das Projekt zeigt seine Abläufe');
+  pruefe(vh && /vhAblaeufeHtml\(v\.id, 'ziel'\)/.test(vh[0]), 'das Ziel ebenfalls');
+
+  const startenAusVorlage = skript.match(/function durchlaufStarten\([\s\S]*?\n\}/);
+  pruefe(startenAusVorlage && /projektId: v\.projektId/.test(startenAusVorlage[0]),
+         'ein Durchlauf erbt die Zuordnung seiner Vorlage');
+
+  /* Löschen löst, es löscht nicht mit */
+  const loe = skript.match(/function vhLoeschen\([\s\S]*?\n\}/);
+  pruefe(loe && /samml\[s\]\[k\]\[feld\] = null/.test(loe[0]),
+         'ein gelöschtes Vorhaben nimmt keine Abläufe mit');
+
+  if (!r) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = r.pruefeRoutine();
+    pruefe(e.faelligHeute === 1, 'eine für heute getaktete Vorlage ist fällig');
+    pruefe(e.gestartet === 1, 'sie läuft an');
+    pruefe(e.zweiterLauf === 0, 'ein zweiter Lauf am selben Tag startet nichts');
+    pruefe(e.trotzErledigt === 0, 'auch mit erledigten Schritten nicht');
+    pruefe(e.nachBeenden === 0, 'nach dem Beenden am selben Tag ebenfalls nicht');
+    pruefe(e.amNaechstenTag === 1, 'am nächsten Tag wieder');
+    pruefe(e.nachAufgabe === 1, 'das Abhaken der Anlassaufgabe startet den Ablauf');
+    pruefe(e.nochmalAbhaken === 1, 'ein zweites Abhaken doppelt ihn nicht');
+    pruefe(e.geerbt === 'p1', 'der Durchlauf erbt das Projekt der Vorlage');
   }
 }
 
