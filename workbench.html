@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.21.0</title>
+<title>Workbench 0.21.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -106,8 +106,13 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .tk-luecke{flex:1}
 .tk-leiste .pille{border-radius:20px;padding:3px 11px}
 .tk-leiste .pille.aktiv{border-color:var(--tinte);color:var(--tinte);font-weight:500}
-.tverlauf.ganztags .tv-zeit{color:var(--grau)}
-.tverlauf.ganztags .tv-schiene{background:var(--linie)}
+.tganz{display:flex;align-items:baseline;gap:9px;padding:4px 0 4px 11px}
+.tganz-punkt{flex:0 0 9px;height:9px;border-radius:2px;background:var(--grau-hell);
+  border:1px solid var(--grau-hell);align-self:center}
+.tganz-titel{flex:0 1 auto;min-width:0;font-size:calc(var(--fs)*0.88);line-height:1.35;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tganz.privat .tganz-titel{color:var(--petrol)}
+.tganz-quelle{flex:0 0 auto;font-size:calc(var(--fs)*0.72);color:var(--grau)}
 .tk-nachzuegler{display:none;width:100%;align-items:center;gap:10px;margin-top:8px;
   padding:8px 12px;border:1px solid var(--weinrot);border-radius:6px;
   background:var(--karte);color:var(--weinrot);font:inherit;
@@ -870,7 +875,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.21.0';
+var APP_VERSION = '0.21.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3193,14 +3198,17 @@ function tagZeichnen() {
   h += '<div class="tabschnitt' + (vorbeiOffen ? ' aufgeklappt' : '')
      + '" data-kurz="Tagesverlauf"><div class="tabschnitt-titel">'
      + '<span>Tagesverlauf</span></div>';
+  /* Ganztägiges hat keine Uhrzeit und gehört deshalb nicht an die
+     Zeitschiene: je eine schlichte Zeile darüber. */
   var g;
   for (g = 0; g < e.ganztags.length; g++) {
     var gt = e.ganztags[g];
-    h += '<div class="tverlauf ganztags' + (gt.kontext === 'privat' ? ' privat' : '') + '">';
-    h += '<div class="tv-zeit">ganz</div><div class="tv-schiene"'
-       + (gt.farbe ? (' style="background:' + gt.farbe + '"') : '') + '></div>';
-    h += '<div class="tv-inhalt"><div class="ttitel">' + esc(gt.titel) + '</div>';
-    h += '<div class="tmeta">' + esc(gt.quelle) + '</div></div></div>';
+    h += '<div class="tganz' + (gt.kontext === 'privat' ? ' privat' : '') + '">';
+    h += '<span class="tganz-punkt"'
+       + (gt.farbe ? (' style="background:' + gt.farbe + ';border-color:' + gt.farbe + '"') : '')
+       + '></span>';
+    h += '<span class="tganz-titel">' + esc(gt.titel) + '</span>';
+    h += '<span class="tganz-quelle">' + esc(gt.quelle) + '</span></div>';
   }
 
   if (vorbeiZahl) {

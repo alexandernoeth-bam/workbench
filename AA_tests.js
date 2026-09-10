@@ -3693,8 +3693,13 @@ console.log('\n55. Ganztägiges im Tagesverlauf');
          'und die ganztägigen Termine aus Google');
 
   const tag = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tag && /tverlauf ganztags/.test(tag[0]), 'sie werden als Verlaufszeilen gezeichnet');
-  const stelleGanz = tag ? tag[0].indexOf('tverlauf ganztags') : -1;
+  pruefe(tag && /class="tganz/.test(tag[0]),
+         'sie stehen als schlichte Zeilen, nicht an der Zeitschiene');
+  pruefe(tag && !/tverlauf ganztags/.test(tag[0]),
+         'sie sind keine Verlaufszeile mehr');
+  pruefe(!/\.tganz\{[^}]*tv-schiene/.test(QUELLE) && /\.tganz\{display:flex/.test(QUELLE),
+         'sie tragen keine Zeitspalte');
+  const stelleGanz = tag ? tag[0].indexOf('class="tganz') : -1;
   const stelleFalt = tag ? tag[0].indexOf('vorbei-falt') : -1;
   pruefe(stelleGanz > -1 && stelleFalt > -1 && stelleGanz < stelleFalt,
          'sie stehen ganz oben, vor allem mit Uhrzeit');
