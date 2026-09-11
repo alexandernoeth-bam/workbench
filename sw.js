@@ -9,12 +9,15 @@
 
 'use strict';
 
-var VORRAT = 'workbench-vorrat-2';
+/* Der Vorratsname wandert mit: Ein neuer Name wirft beim Aktivieren
+   den alten Vorrat weg — sonst hielte er die alten Symbole fest. */
+var VORRAT = 'workbench-vorrat-3';
 var GRUNDLAGE = [
   './workbench.html',
   './manifest.webmanifest',
-  './icon-192.png',
-  './icon-512.png'
+  './icon-192-v2.png',
+  './icon-512-v2.png',
+  './icon-512-maskierbar-v2.png'
 ];
 
 self.addEventListener('install', function (ereignis) {
