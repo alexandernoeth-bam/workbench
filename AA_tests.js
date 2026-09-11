@@ -485,6 +485,33 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__abhakApi = {'
+                 + ' pruefeAbhaken: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var heute = isoDatum();'
+                 + '   DB.aufgaben = [{ id:\'a1\', titel:\'Offerings anlegen\','
+                 + '     kontext:\'beruflich\', status:\'offen\', planung:\'backlog\','
+                 + '     art:\'haupt\' }];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Besprechung\','
+                 + '     kontext:\'beruflich\', terminTag: heute, schritte:['
+                 + '       { titel:\'Agenda\', fertig:true },'
+                 + '       { titel:\'x\', aufgabeId:\'a1\' },'
+                 + '       { titel:\'Protokoll\', fertig:false } ] }];'
+                 + '   abhakFuer = \'d1\';'
+                 + '   var h = abhakHtml();'
+                 + '   var zeilen = (h.match(/class="tzeile/g) || []).length;'
+                 + '   var stand = (h.match(/as-meta">([^<·]*)/) || [])[1];'
+                 + '   var r = { zeilen: zeilen, stand: stand.trim(),'
+                 + '             titelAusAufgabe: h.indexOf(\'Offerings anlegen\') >= 0,'
+                 + '             ohneFelder: h.indexOf(\'<textarea\') < 0'
+                 + '                         && h.indexOf(\'<input\') < 0 };'
+                 + '   schrittUm(\'d1\', 1);'
+                 + '   var h2 = abhakHtml();'
+                 + '   r.nachHaken = ((h2.match(/as-meta">([^<·]*)/) || [])[1] || \'\').trim();'
+                 + '   r.aufgabeErledigt = DB.aufgaben[0].status;'
+                 + '   abhakFuer = \'\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__traegerApi = {'
                  + ' pruefeTraeger: function(){'
                  + '   var alt = DB; var merkAkt = aktionFuer; DB = leereDatenbank();'
@@ -4945,6 +4972,64 @@ console.log('\n67. Schritt und Aufgabe');
     pruefe(e.nachLoeschenTitel === 'Offerings anlegen',
            'nach dem Löschen behalten die Schritte den Titel');
     pruefe(e.nachLoeschenStand === '1,1,1', 'und ihren Stand');
+  }
+}
+
+/* ============================================================
+   68. Kompaktes Abhakblatt
+   Grund: Aus dem Tag und dem Kalender heraus zaehlt nur das Abhaken.
+   Die volle Pflegeflaeche mit Textfeldern, Kontextwahl und Loeschen
+   ist dort ein Hindernis — gepflegt wird ein Ablauf in seiner Flaeche.
+   ============================================================ */
+console.log('\n68. Abhakblatt');
+{
+  const skript = hauptSkript();
+  const a = globalThis.__abhakApi;
+
+  ['durchlaufAbhakenOeffnen', 'abhakHtml', 'abhakUm', 'abhakNeu'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const blatt = skript.match(/function abhakHtml\([\s\S]*?\n\}\n/);
+  pruefe(blatt && /abhakUm\(/.test(blatt[0]), 'jeder Schritt lässt sich abhaken');
+  pruefe(blatt && /schrittTitel\(/.test(blatt[0]),
+         'der Titel kommt von der tragenden Aufgabe, wenn es eine gibt');
+  pruefe(blatt && /schrittRuht\(/.test(blatt[0]), 'ein ruhender Schritt sagt es');
+  pruefe(blatt && !/textarea/.test(blatt[0]), 'es gibt kein Feld zum Ändern');
+  pruefe(blatt && !/gefahr/.test(blatt[0]), 'und keinen Löschknopf');
+  pruefe(blatt && /abDetailOeffnen\(/.test(blatt[0]),
+         'ein Knopf führt in die Pflegefläche');
+
+  /* Die Aufrufe aus Tag und Kalender gehen aufs Abhakblatt */
+  const verlauf = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
+  pruefe(verlauf && /durchlaufAbhakenOeffnen\(/.test(verlauf[0]),
+         'die Terminzeile im Tag führt zum Abhaken');
+  const zeile = skript.match(/function ablaufZeileHtml\([\s\S]*?\n\}/);
+  pruefe(zeile && /durchlaufAbhakenOeffnen\(/.test(zeile[0]),
+         'der Abschnitt Abläufe im Tag ebenso');
+  const kal = skript.match(/function kAblaufKnopfHtml\([\s\S]*?\n\}/);
+  pruefe(kal && /durchlaufAbhakenOeffnen\(/.test(kal[0]),
+         'und die Wochensicht');
+
+  /* Beim ersten Anlegen bleibt die volle Fläche */
+  const neu = skript.match(/function terminAblaufNeu\([\s\S]*?\n\}/);
+  pruefe(neu && /abDetailOeffnen\(neu\.id/.test(neu[0]),
+         'ein frisch angelegter Ablauf öffnet die Pflegefläche — dort fehlen '
+         + 'ja noch die Schritte');
+
+  if (!a) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = a.pruefeAbhaken();
+    pruefe(e.zeilen === 3, 'alle Schritte stehen im Blatt');
+    pruefe(e.stand === '1 von 3', 'der Kopf nennt den Stand');
+    pruefe(e.titelAusAufgabe === true,
+           'ein getragener Schritt zeigt den Titel seiner Aufgabe');
+    pruefe(e.ohneFelder === true, 'es gibt keine Eingabefelder');
+    pruefe(e.nachHaken === '2 von 3', 'ein Haken zählt sofort mit');
+    pruefe(e.aufgabeErledigt === 'erledigt',
+           'und wirkt auf die tragende Aufgabe');
   }
 }
 
