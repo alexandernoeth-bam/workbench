@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.36.2</title>
+<title>Workbench 0.38.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -958,7 +958,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.36.2';
+var APP_VERSION = '0.38.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3283,6 +3283,141 @@ function wischenAnmelden() {
   wischenAnHeften('schirmKalender', wischEndeKalender);
 }
 
+/* ============================================================
+   Die Zahl am App-Symbol
+
+   Was heute noch offen ist: Aufgaben, Kleinigkeiten, wiederkehrende
+   Aufgaben, Ablaufschritte und Termine, die noch nicht vorbei sind.
+   Der Filter des Tagesplans gilt hier nicht — die Zahl am Symbol soll
+   den ganzen Tag meinen, nicht den gerade betrachteten Ausschnitt.
+   ============================================================ */
+var BADGE_TAKT = 60000;
+var badgeUhr = null;
+var badgeZahl = -1;
+
+function offeneHeute() {
+  var heute = isoDatum();
+  var merk = tagFilter;
+  tagFilter = 'alle';
+  var e = tagesEintraege(heute);
+  var n = 0;
+  var i;
+
+  for (i = 0; i < e.verlauf.length; i++) {
+    if (e.verlauf[i].art === 'termin') {
+      if (!eintragVorbei(e.verlauf[i], heute)) { n++; }
+    } else if (!istErledigtAn(e.verlauf[i].a, heute)) {
+      n++;
+    }
+  }
+  n += e.wieder.length;
+  n += e.haupt.length;
+  n += e.klein.length;
+
+  var schritte = ablaufSchritteHeute(heute);
+  n += schritte.length;
+
+  tagFilter = merk;
+  return n;
+}
+
+function badgeSetzen() {
+  var n = offeneHeute();
+  if (n === badgeZahl) { return; }
+  badgeZahl = n;
+  vorausAblegen();
+
+  /* Der Fenstertitel trägt die Zahl mit — er ist der einzige Weg, der
+     überall funktioniert, und in der Taskleiste sichtbar. */
+  document.title = (n > 0 ? ('(' + n + ') ') : '') + 'Workbench ' + APP_VERSION;
+
+  if (!navigator || typeof navigator.setAppBadge !== 'function') { return; }
+  try {
+    if (n > 0) { navigator.setAppBadge(n); }
+    else if (typeof navigator.clearAppBadge === 'function') { navigator.clearAppBadge(); }
+  } catch (e) {
+    return;
+  }
+}
+
+/* Bei geschlossener App kann nur der Service Worker die Zahl setzen —
+   und der kennt den Bestand nicht. Deshalb legt die App bei jedem Lauf
+   eine kleine Vorausschau ab: für jeden der nächsten Tage die Zahl der
+   offenen Dinge. Der Service Worker liest daraus den heutigen Wert. */
+var VORAUS_TAGE = 21;
+var VORAUS_SCHLUESSEL = 'workbench-voraus';
+
+function vorausRechnen() {
+  var merkTag = tagOffen;
+  var merkFilter = tagFilter;
+  tagFilter = 'alle';
+  var aus = {};
+  var heute = isoDatum();
+  var i;
+  for (i = 0; i < VORAUS_TAGE; i++) {
+    var is = tagePlus(heute, i);
+    tagOffen = is;
+    var e = tagesEintraege(is);
+    var n = 0;
+    var k;
+    for (k = 0; k < e.verlauf.length; k++) {
+      if (e.verlauf[k].art === 'termin') {
+        /* In der Vorausschau zählt jeder Termin des Tages: Ob er vorbei
+           ist, kann nur zur Laufzeit entschieden werden. */
+        n++;
+      } else if (!istErledigtAn(e.verlauf[k].a, is)) {
+        n++;
+      }
+    }
+    n += e.wieder.length + e.haupt.length + e.klein.length;
+    n += ablaufSchritteHeute(is).length;
+    aus[is] = n;
+  }
+  tagOffen = merkTag;
+  tagFilter = merkFilter;
+  return aus;
+}
+
+/* Abgelegt wird zweimal: im Vorrat, weil nur der für den Service
+   Worker erreichbar ist — localStorage kennt er nicht —, und im
+   localStorage, damit die Diagnose sie ohne Umweg zeigen kann. */
+function vorausAblegen() {
+  var inhalt = JSON.stringify({ gestellt: isoDatum(), tage: vorausRechnen() });
+  try {
+    window.localStorage.setItem(VORAUS_SCHLUESSEL, inhalt);
+  } catch (e) {
+    /* Kein Speicher — der Vorrat unten zählt ohnehin mehr. */
+  }
+  if (!window.caches || typeof window.caches.open !== 'function') { return; }
+  window.caches.open(VORAUS_SCHLUESSEL).then(function (vorrat) {
+    return vorrat.put('voraus', new window.Response(inhalt, {
+      headers: { 'Content-Type': 'application/json' }
+    }));
+  }).catch(function () {
+    return null;
+  });
+}
+
+/* Bittet den Browser, die Zahl auch bei geschlossener App gelegentlich
+   nachzuziehen. Ob und wann er das tut, entscheidet er selbst. */
+function hintergrundAnmelden() {
+  if (!('serviceWorker' in navigator)) { return; }
+  navigator.serviceWorker.ready.then(function (anmeldung) {
+    if (!anmeldung.periodicSync) { return null; }
+    return anmeldung.periodicSync.register('badge', {
+      minInterval: 4 * 60 * 60 * 1000
+    });
+  }).catch(function () {
+    return null;
+  });
+}
+
+function badgeTaktStarten() {
+  if (badgeUhr) { window.clearInterval(badgeUhr); }
+  /* Ein Termin wird ohne Zutun vorbei — deshalb regelmäßig nachsehen. */
+  badgeUhr = window.setInterval(badgeSetzen, BADGE_TAKT);
+}
+
 function tagZeichnen() {
   if (!tagOffen) { tagOffen = isoDatum(); }
   var is = tagOffen;
@@ -3381,6 +3516,7 @@ function tagZeichnen() {
   streifenPruefen();
   anmeldeStreifenPruefen();
   standZeichnen();
+  badgeSetzen();
 }
 
 function erledigtUm() {
@@ -4503,6 +4639,17 @@ function zeichneUmgebung() {
   h += zeile('IndexedDB', c.t, c.k);
   h += zeile('Lokaler Speicher', d.t, d.k);
   h += zeile('Als App installiert', pwa ? 'ja' : 'nein', pwa ? 'ja' : 'grau');
+  var kannBadge = (typeof navigator.setAppBadge === 'function');
+  h += zeile('Zahl am Symbol',
+             kannBadge ? (offeneHeute() + ' offen') : 'vom Gerät nicht unterstützt',
+             kannBadge ? 'ja' : 'grau');
+  var voraus = null;
+  try { voraus = JSON.parse(window.localStorage.getItem(VORAUS_SCHLUESSEL) || 'null'); }
+  catch (e) { voraus = null; }
+  h += zeile('Vorausschau abgelegt',
+             voraus ? (Object.keys(voraus.tage || {}).length + ' Tage, gestellt '
+                       + kurzDatum(voraus.gestellt)) : 'noch nicht',
+             voraus ? 'ja' : 'grau');
   h += zeile('Service Worker', ('serviceWorker' in navigator) ? 'unterstützt' : 'fehlt',
              ('serviceWorker' in navigator) ? 'ja' : 'nein');
   h += zeile('Neuere Fassung', neueVersion || 'keine', neueVersion ? 'nein' : 'grau');
@@ -9390,6 +9537,8 @@ function starten() {
   window.setInterval(anmeldeStreifenPruefen, 15000);
   taktStarten();
   kalenderTaktStarten();
+  badgeTaktStarten();
+  hintergrundAnmelden();
   verbindungTaktStarten();
   verbindungPruefen();
   swAnmelden().then(function () { return versionPruefen(false); });

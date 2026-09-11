@@ -17,6 +17,25 @@ if (!fs.existsSync(DATEI)) {
 
 const QUELLE = fs.readFileSync(DATEI, 'utf8');
 
+/* Der Service Worker liegt neben der HTML-Datei. Er gehört zur
+   Auslieferung, also wird er mitgeprüft — fehlt er, sagen die
+   betroffenen Prüfungen das, statt stillzuschweigen. */
+const SW_PFAD = path.join(path.dirname(path.resolve(DATEI)), 'sw.js');
+const SW_QUELLE = fs.existsSync(SW_PFAD) ? fs.readFileSync(SW_PFAD, 'utf8') : '';
+
+/* Für Prüfungen auf „kommt dieser Aufruf vor" zählt nur echter Code.
+   Ein Wort in einem Kommentar ist kein Aufruf — sonst schlägt eine
+   Prüfung an, weil jemand erklärt hat, warum er etwas gerade NICHT
+   tut. */
+const SW_CODE = SW_QUELLE
+  .replace(/\/\*[\s\S]*?\*\//g, ' ')
+  .split('\n')
+  .map(function (z) {
+    const stelle = z.indexOf('//');
+    return (stelle >= 0 && !/:\/\//.test(z.slice(0, stelle + 3))) ? z.slice(0, stelle) : z;
+  })
+  .join('\n');
+
 let anzOk = 0, anzFail = 0, anzWarn = 0;
 
 function ok(text)   { console.log('  ok   ' + text); anzOk++; }
@@ -485,6 +504,72 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__vorausApi = {'
+                 + ' pruefeVoraus: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var heute = isoDatum();'
+                 + '   tagOffen = heute; tagFilter = \'beruflich\';'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Heute\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung: heute, art:\'haupt\' },'
+                 + '     { id:\'a2\', titel:\'Morgen\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung: tagePlus(heute,1), art:\'haupt\' },'
+                 + '     { id:\'a4\', titel:\'Spaet\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung: tagePlus(heute,30), art:\'haupt\' } ];'
+                 + '   var t = vorausRechnen();'
+                 + '   var r = { tage: Object.keys(t).length, heute: t[heute],'
+                 + '             morgen: t[tagePlus(heute,1)],'
+                 + '             leererTag: t[tagePlus(heute,5)],'
+                 + '             weitDrausen: t[tagePlus(heute,30)],'
+                 + '             tagUnveraendert: (tagOffen === heute),'
+                 + '             filterUnveraendert: tagFilter };'
+                 + '   tagFilter = \'alle\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__badgeApi = {'
+                 + ' pruefeBadge: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; var merkF = tagFilter;'
+                 + '   DB = leereDatenbank();'
+                 + '   var heute = isoDatum();'
+                 + '   var std = Number(uhrzeitJetzt().slice(0,2));'
+                 + '   var f = String(Math.max(0, std - 2)); if (f.length < 2) { f = \'0\' + f; }'
+                 + '   var s = String(Math.min(23, std + 2)); if (s.length < 2) { s = \'0\' + s; }'
+                 + '   f += \':00\'; s += \':00\';'
+                 + '   tagOffen = heute; tagFilter = \'alle\';'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Haupt\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung: heute, art:\'haupt\' },'
+                 + '     { id:\'a2\', titel:\'Klein\', kontext:\'privat\','
+                 + '       status:\'offen\', planung: heute, art:\'klein\' },'
+                 + '     { id:\'a3\', titel:\'Fertig\', kontext:\'beruflich\','
+                 + '       status:\'erledigt\', erledigtAm: heute, planung: heute, art:\'haupt\' },'
+                 + '     { id:\'a4\', titel:\'Woechentlich\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung:\'backlog\', art:\'haupt\','
+                 + '       wiederholung:{ takt:\'woche\', intervall:1,'
+                 + '       tage:[0,1,2,3,4,5,6], tag:1 } },'
+                 + '     { id:\'a5\', titel:\'Spaeter\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung:\'2099-01-01\', art:\'haupt\' } ];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Ablauf\','
+                 + '     kontext:\'beruflich\', schritte:[{ titel:\'S\', fertig:false }] }];'
+                 + '   termineNachTag = {};'
+                 + '   merkeTermin(heute, { id:\'g1\', titel:\'Vorbei\', zeit:f, bis:f,'
+                 + '     ort:\'\', ganztags:false, quelle:\'A\', kontext:\'beruflich\' });'
+                 + '   merkeTermin(heute, { id:\'g2\', titel:\'Kommt\', zeit:s, bis:s,'
+                 + '     ort:\'\', ganztags:false, quelle:\'A\', kontext:\'beruflich\' });'
+                 + '   var gesamt = offeneHeute();'
+                 + '   tagFilter = \'beruflich\';'
+                 + '   var egal = offeneHeute();'
+                 + '   tagFilter = \'alle\';'
+                 + '   aufgabeErledigen(\'a1\'); aufgabeErledigen(\'a2\');'
+                 + '   badgeSetzen();'
+                 + '   var nach = offeneHeute();'
+                 + '   var titel = document.title;'
+                 + '   termineNachTag = {}; tagOffen = merkTag; tagFilter = merkF; DB = alt;'
+                 + '   return { gesamt:gesamt, erledigtZaehltNicht:(gesamt === 5),'
+                 + '            andererTagZaehltNicht:(gesamt === 5),'
+                 + '            vorbeiZaehltNicht:(gesamt === 5), filterEgal:egal,'
+                 + '            nachHaken:nach, titel:titel, version:APP_VERSION };'
+                 + ' } };'
                  + 'globalThis.__abhakApi = {'
                  + ' pruefeAbhaken: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -5044,6 +5129,137 @@ console.log('\n68. Abhakblatt');
     pruefe(e.nachHaken === '2 von 3', 'ein Haken zählt sofort mit');
     pruefe(e.aufgabeErledigt === 'erledigt',
            'und wirkt auf die tragende Aufgabe');
+  }
+}
+
+/* ============================================================
+   69. Die Zahl am App-Symbol
+   Grund: Auf dem Startbildschirm soll ohne Oeffnen sichtbar sein,
+   was heute noch aussteht. Sie muss den ganzen Tag meinen, nicht
+   den gerade gefilterten Ausschnitt — und ohne Unterstuetzung des
+   Geraets still ausbleiben.
+   ============================================================ */
+console.log('\n69. Zahl am App-Symbol');
+{
+  const skript = hauptSkript();
+  const b = globalThis.__badgeApi;
+
+  ['offeneHeute', 'badgeSetzen', 'badgeTaktStarten'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const offen = skript.match(/function offeneHeute\([\s\S]*?\n\}/);
+  pruefe(offen && /tagFilter = 'alle'/.test(offen[0]),
+         'der Filter des Tagesplans wird für die Zählung übergangen');
+  pruefe(offen && /tagFilter = merk/.test(offen[0]),
+         'und danach wiederhergestellt');
+  pruefe(offen && /eintragVorbei/.test(offen[0]),
+         'ein vorbeigegangener Termin zählt nicht mehr');
+  pruefe(offen && /ablaufSchritteHeute/.test(offen[0]),
+         'offene Ablaufschritte zählen mit');
+
+  const setzen = skript.match(/function badgeSetzen\([\s\S]*?\n\}/);
+  pruefe(setzen && /typeof navigator\.setAppBadge !== 'function'/.test(setzen[0]),
+         'ohne Unterstützung geschieht nichts');
+  pruefe(setzen && /catch/.test(setzen[0]),
+         'ein Fehler des Geräts bricht nichts ab');
+  pruefe(setzen && /clearAppBadge/.test(setzen[0]),
+         'bei null wird die Zahl entfernt');
+  pruefe(setzen && /document\.title/.test(setzen[0]),
+         'der Fenstertitel trägt sie mit — der Weg, der überall wirkt');
+  pruefe(setzen && /APP_VERSION/.test(setzen[0]),
+         'die Version bleibt im Titel stehen');
+  pruefe(setzen && /n === badgeZahl/.test(setzen[0]),
+         'ohne Änderung wird nichts gesetzt');
+
+  const takt = skript.match(/function badgeTaktStarten\([\s\S]*?\n\}/);
+  pruefe(takt && /setInterval/.test(takt[0]),
+         'regelmäßig wird nachgesehen — ein Termin wird ohne Zutun vorbei');
+
+  if (!b) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = b.pruefeBadge();
+    pruefe(e.gesamt === 5, 'alle fünf offenen Dinge des Tages zählen');
+    pruefe(e.erledigtZaehltNicht === true, 'Erledigtes zählt nicht mit');
+    pruefe(e.andererTagZaehltNicht === true, 'was auf einen anderen Tag liegt, auch nicht');
+    pruefe(e.vorbeiZaehltNicht === true, 'ein vorbeigegangener Termin nicht');
+    pruefe(e.filterEgal === 5, 'der Kontextfilter ändert die Zahl nicht');
+    pruefe(e.nachHaken === 3, 'zwei Haken senken sie um zwei');
+    pruefe(e.titel === '(3) Workbench ' + e.version,
+           'der Titel trägt Zahl und Version');
+  }
+}
+
+/* ============================================================
+   70. Die Zahl auch bei geschlossener App
+   Grund: setAppBadge wirkt nur, solange die App laeuft — danach
+   veraltet die Zahl. Der Service Worker kann sie nachziehen, kennt
+   aber den Bestand nicht und kann localStorage nicht lesen. Deshalb
+   legt die App eine Vorausschau in den Vorrat.
+   ============================================================ */
+console.log('\n70. Zahl bei geschlossener App');
+{
+  const skript = hauptSkript();
+  const v = globalThis.__vorausApi;
+
+  ['vorausRechnen', 'vorausAblegen', 'hintergrundAnmelden'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const rechnen = skript.match(/function vorausRechnen\([\s\S]*?\n\}/);
+  pruefe(rechnen && /tagOffen = merkTag/.test(rechnen[0]),
+         'der angezeigte Tag wird hinterher wiederhergestellt');
+  pruefe(rechnen && /tagFilter = merkFilter/.test(rechnen[0]),
+         'der Filter ebenso');
+  pruefe(rechnen && /VORAUS_TAGE/.test(rechnen[0]),
+         'die Vorausschau reicht über mehrere Tage');
+
+  const ablegen = skript.match(/function vorausAblegen\([\s\S]*?\n\}\n/);
+  pruefe(ablegen && /caches\.open\(VORAUS_SCHLUESSEL\)/.test(ablegen[0]),
+         'sie landet im Vorrat — nur dort kommt der Service Worker heran');
+  pruefe(ablegen && /localStorage\.setItem/.test(ablegen[0]),
+         'zusätzlich im localStorage für die Diagnose');
+
+  const anmelden = skript.match(/function hintergrundAnmelden\([\s\S]*?\n\}\n/);
+  pruefe(anmelden && /periodicSync/.test(anmelden[0]),
+         'der Hintergrundtermin wird angemeldet');
+  pruefe(anmelden && /catch/.test(anmelden[0]),
+         'lehnt der Browser ab, bricht nichts');
+
+  /* Der Service Worker */
+  if (typeof SW_QUELLE === 'string' && SW_QUELLE.length) {
+    pruefe(/periodicsync/.test(SW_QUELLE),
+           'der Service Worker horcht auf den Hintergrundtermin');
+    pruefe(/function badgeNachziehen/.test(SW_QUELLE),
+           'er kann die Zahl nachziehen');
+    pruefe(/caches\.open\(VORAUS_SCHLUESSEL\)/.test(SW_QUELLE),
+           'er liest die Vorausschau aus dem Vorrat');
+    pruefe(!/localStorage/.test(SW_CODE),
+           'er greift nicht auf localStorage zu — das gäbe es dort nicht');
+    pruefe(/n === VORRAT \|\| n === VORAUS_SCHLUESSEL/.test(SW_QUELLE),
+           'beim Aufräumen bleibt der Vorrat der Vorausschau verschont');
+    pruefe(/addEventListener\('activate'[\s\S]{0,120}badgeNachziehen/.test(SW_QUELLE),
+           'auch beim Aktivieren wird nachgezogen');
+  } else {
+    warn('sw.js nicht gelesen');
+  }
+
+  if (!v) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = v.pruefeVoraus();
+    pruefe(e.tage === 21, 'die Vorausschau umfasst einundzwanzig Tage');
+    pruefe(e.heute === 1, 'für heute wird richtig gezählt');
+    pruefe(e.morgen === 1, 'für morgen ebenso');
+    pruefe(e.leererTag === 0, 'ein Tag ohne Offenes steht auf null');
+    pruefe(e.weitDrausen === undefined, 'weit Entferntes steht nicht darin');
+    pruefe(e.tagUnveraendert === true,
+           'das Rechnen verstellt den angezeigten Tag nicht');
+    pruefe(e.filterUnveraendert === 'beruflich',
+           'und auch den Filter nicht');
   }
 }
 
