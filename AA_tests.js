@@ -504,6 +504,43 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__dublettenApi = {'
+                 + ' pruefeDubletten: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var heute = isoDatum();'
+                 + '   tagOffen = heute;'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Offerings anlegen\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung: heute, art:\'haupt\' },'
+                 + '     { id:\'a2\', titel:\'Ungeplant\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung:\'backlog\', art:\'haupt\' } ];'
+                 + '   DB.durchlaeufe = ['
+                 + '     { id:\'d1\', name:\'SMAX Teil 1\', kontext:\'beruflich\','
+                 + '       schritte:[{ titel:\'x\', aufgabeId:\'a1\' }] },'
+                 + '     { id:\'d2\', name:\'SMAX Teil 2\', kontext:\'beruflich\','
+                 + '       schritte:[{ titel:\'y\', aufgabeId:\'a2\' }] },'
+                 + '     { id:\'d3\', name:\'Eigener\', kontext:\'beruflich\','
+                 + '       schritte:[{ titel:\'Reiner Schritt\', fertig:false }] } ];'
+                 + '   var e = tagesEintraege(heute);'
+                 + '   var imTag = e.haupt.map(function(x){ return x.titel; });'
+                 + '   var schritte = ablaufSchritteHeute(heute).map(function(x){'
+                 + '     return schrittTitel(x.satz); });'
+                 + '   var vermerk = ablaufVermerk(DB.aufgaben[0]);'
+                 + '   var zahl = offeneHeute();'
+                 + '   DB.durchlaeufe[1].schritte[0].aufgabeId = \'a1\';'
+                 + '   var zwei = ablaufVermerk(DB.aufgaben[0]);'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   var zaehl = function(t){'
+                 + '     var n = 0;'
+                 + '     if (imTag.indexOf(t) >= 0) { n++; }'
+                 + '     if (schritte.indexOf(t) >= 0) { n++; }'
+                 + '     return n; };'
+                 + '   return { geplantEinmal: zaehl(\'Offerings anlegen\'),'
+                 + '            ungeplantUeberAblauf: zaehl(\'Ungeplant\'),'
+                 + '            reinerSchritt: zaehl(\'Reiner Schritt\'),'
+                 + '            vermerk: vermerk, zweiAblaeufe: zwei,'
+                 + '            zahlAmSymbol: zahl };'
+                 + ' } };'
                  + 'globalThis.__vorausApi = {'
                  + ' pruefeVoraus: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -5260,6 +5297,55 @@ console.log('\n70. Zahl bei geschlossener App');
            'das Rechnen verstellt den angezeigten Tag nicht');
     pruefe(e.filterUnveraendert === 'beruflich',
            'und auch den Filter nicht');
+  }
+}
+
+/* ============================================================
+   71. Eine Sache steht einmal im Tag
+   Grund: Eine Aufgabe, die einen Ablaufschritt traegt und selbst auf
+   heute geplant ist, stand zweimal im Tagesplan — einmal als Aufgabe,
+   einmal als Schritt. Es ist dieselbe Sache.
+   ============================================================ */
+console.log('\n71. Keine Dublette im Tag');
+{
+  const skript = hauptSkript();
+  const d = globalThis.__dublettenApi;
+
+  ['aufgabeStehtImTag', 'ablaufVermerk'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const schritte = skript.match(/function ablaufSchritteHeute\([\s\S]*?\n\}/);
+  pruefe(schritte && /aufgabeStehtImTag\(schrittAufgabe\(s\.satz\), tag\)/.test(schritte[0]),
+         'ein Schritt entfällt, wenn seine Aufgabe schon im Tag steht');
+
+  const steht = skript.match(/function aufgabeStehtImTag\([\s\S]*?\n\}/);
+  pruefe(steht && /a\.planung === tag/.test(steht[0]),
+         'entschieden wird an der Tagesplanung der Aufgabe');
+  pruefe(steht && /faelligAn\(a\.wiederholung, tag\)/.test(steht[0]),
+         'bei einer wiederkehrenden entscheidet ihre Regel');
+  pruefe(steht && /status === 'erledigt'/.test(steht[0]),
+         'eine erledigte steht nicht mehr im Tag — dann darf der Schritt wieder');
+
+  const zeile = skript.match(/function zeileHtml\([\s\S]*?\n\}/);
+  pruefe(zeile && /ablaufVermerk\(a\)/.test(zeile[0]),
+         'die Aufgabe nennt dafür ihren Ablauf');
+
+  if (!d) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = d.pruefeDubletten();
+    pruefe(e.geplantEinmal === 1,
+           'eine auf heute geplante Aufgabe mit Schritt steht genau einmal da');
+    pruefe(e.ungeplantUeberAblauf === 1,
+           'eine ungeplante erscheint über ihren Ablaufschritt');
+    pruefe(e.reinerSchritt === 1, 'ein Schritt ohne Aufgabe steht wie bisher da');
+    pruefe(e.vermerk === 'SMAX Teil 1', 'die Aufgabenzeile nennt den Ablauf');
+    pruefe(e.zweiAblaeufe === '2 Abläufe',
+           'trägt sie Schritte in mehreren, wird gezählt statt aufgezählt');
+    pruefe(e.zahlAmSymbol === 3,
+           'die Zahl am Symbol zählt sie ebenfalls nur einmal');
   }
 }
 

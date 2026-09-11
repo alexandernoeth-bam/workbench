@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.38.0</title>
+<title>Workbench 0.38.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -958,7 +958,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.38.0';
+var APP_VERSION = '0.38.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2978,6 +2978,10 @@ function zeileHtml(a, is, kompakt) {
   var meta = metaZeile(a, is);
   var wdh = a.wiederholung ? ('zuletzt ' + (a.zuletztErledigt ? kurzDatum(a.zuletztErledigt) : 'nie')) : '';
   if (wdh) { meta = meta ? (meta + ' · ' + wdh) : wdh; }
+  /* Steht sie im Tag statt ihres Ablaufschritts, soll man sehen,
+     wozu sie gehört. */
+  var vermerk = ablaufVermerk(a);
+  if (vermerk) { meta = meta ? (meta + ' · ' + esc(vermerk)) : esc(vermerk); }
   var h = '<div class="tzeile' + (kompakt ? ' kompakt' : '')
         + (a.kontext === 'privat' ? ' privat' : '')
         + (erledigt ? ' erledigt' : '') + '">';
@@ -3066,6 +3070,17 @@ function verlaufHtml(eintrag, is) {
 
 /* Aus jedem laufenden Durchlauf steht der nächste offene Schritt im
    Tag — nicht der ganze Ablauf, sondern das, was jetzt dran ist. */
+/* Steht die tragende Aufgabe schon selbst im Tagesplan, gehört der
+   Schritt nicht noch einmal hierher — es ist dieselbe Sache, und sie
+   stünde zweimal da. Der Aufgabenblock gewinnt: Dort steht auch der
+   Planungsknopf. */
+function aufgabeStehtImTag(a, tag) {
+  if (!a) { return false; }
+  if (a.wiederholung) { return faelligAn(a.wiederholung, tag); }
+  if (a.status === 'erledigt') { return false; }
+  return a.planung === tag;
+}
+
 function ablaufSchritteHeute(is) {
   var tag = is || tagOffen || isoDatum();
   var aus = [];
@@ -3076,9 +3091,18 @@ function ablaufSchritteHeute(is) {
     var s = offenerSchritt(l[i]);
     if (!s) { continue; }
     if (schrittRuht(s.satz, tag)) { continue; }
+    if (aufgabeStehtImTag(schrittAufgabe(s.satz), tag)) { continue; }
     aus.push({ durchlauf: l[i], nr: s.nr, satz: s.satz });
   }
   return aus;
+}
+
+/* Kurz: zu welchem Ablauf gehört diese Aufgabe? */
+function ablaufVermerk(a) {
+  var l = durchlaeufeZuAufgabe(a.id);
+  if (!l.length) { return ''; }
+  if (l.length === 1) { return l[0].name; }
+  return l.length + ' Abläufe';
 }
 
 function ablaufZeileHtml(e) {
