@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.33.1</title>
+<title>Workbench 0.34.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -383,6 +383,11 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
   color:var(--tinte);cursor:pointer;white-space:nowrap}
 .ms-wort.gefahr{border-color:var(--weinrot);color:var(--weinrot)}
 .ms-wort.an{border-color:var(--tinte);color:var(--tinte);font-weight:500}
+.ms-fest{flex:1;min-width:0;padding:6px 8px;border:1px dashed var(--linie);
+  border-radius:5px;font-size:calc(var(--fs)*0.86);line-height:1.4;cursor:pointer;
+  background:var(--karte)}
+.vk-traeger{font-size:calc(var(--fs)*0.68);color:var(--grau);border:1px solid var(--linie);
+  border-radius:20px;padding:0 7px;margin-left:5px}
 .ms-marke{font-size:calc(var(--fs)*0.74);color:var(--grau)}
 .v-feld{flex:1;min-width:0;font:inherit;font-size:calc(var(--fs)*0.85);
   border:1px solid var(--linie);border-radius:5px;padding:5px 7px;
@@ -943,7 +948,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.33.1';
+var APP_VERSION = '0.34.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3073,7 +3078,7 @@ function ablaufZeileHtml(e) {
      + '\',' + e.nr + ')"></button>';
   h += '<div class="ttext" onclick="abDetailOeffnen(\'' + esc(e.durchlauf.id)
      + '\',\'durchlauf\')">';
-  h += '<div class="ttitel">' + esc(e.satz.titel) + '</div>';
+  h += '<div class="ttitel">' + esc(schrittTitel(e.satz)) + '</div>';
   h += '<div class="tmeta">' + esc(e.durchlauf.name) + ' · noch ' + offen
      + (offen === 1 ? ' Schritt' : ' Schritte') + '</div>';
   h += '</div>';
@@ -3610,6 +3615,21 @@ function aufgabeLoeschen() {
   var stelle = DB.aufgaben.indexOf(a);
   if (stelle < 0) { return; }
 
+  /* Die Schritte, die sie getragen hat, behalten Titel und Stand —
+     sonst stünden sie leer da. */
+  var laeufe = durchlaeufeZuAufgabe(id);
+  var li, si;
+  for (li = 0; li < laeufe.length; li++) {
+    var ss = laeufe[li].schritte || [];
+    for (si = 0; si < ss.length; si++) {
+      if (ss[si].aufgabeId !== id) { continue; }
+      ss[si].titel = a.titel;
+      ss[si].fertig = (a.status === 'erledigt');
+      ss[si].aufgabeId = null;
+    }
+    laeufe[li].geaendert = jetzt();
+  }
+
   zurueckHolen = { sammlung: 'aufgaben', satz: a, stelle: stelle };
   DB.aufgaben.splice(stelle, 1);
   grabsteinSetzen('aufgaben', id);
@@ -3826,6 +3846,21 @@ function detailHtml(a) {
   h += '<div class="d-reihe"><button type="button" onclick="teilenUebernehmen()">'
      + 'Übernehmen</button></div>';
   h += '</div>';
+
+  var laeufe = durchlaeufeZuAufgabe(a.id);
+  if (laeufe.length) {
+    h += '<div class="s-abschnitt">Trägt Schritte in</div>';
+    var dl;
+    for (dl = 0; dl < laeufe.length; dl++) {
+      h += '<div class="anlage"><div class="a-mitte" '
+         + 'onclick="abDetailOeffnen(\'' + esc(laeufe[dl].id) + '\',\'durchlauf\')">'
+         + '<div class="a-name">' + esc(laeufe[dl].name) + '</div>'
+         + '<div class="a-quelle">' + schritteFertig(laeufe[dl]) + ' von '
+         + (laeufe[dl].schritte || []).length + ' Schritten</div></div></div>';
+    }
+    h += '<div class="d-hinweis" style="text-align:left">Ein Haken hier gilt '
+       + (laeufe.length === 1 ? 'auch dort.' : 'in allen.') + '</div>';
+  }
 
   var hist = [];
   if (a.zuletztErledigt) { hist.push('zuletzt erledigt ' + kurzDatum(a.zuletztErledigt)); }
@@ -7454,8 +7489,27 @@ function schritteFertig(d) {
   var n = 0;
   var l = d.schritte || [];
   var i;
-  for (i = 0; i < l.length; i++) { if (l[i].fertig) { n++; } }
+  for (i = 0; i < l.length; i++) { if (schrittFertig(l[i])) { n++; } }
   return n;
+}
+
+/* Ein Schritt kann von einer Aufgabe getragen werden. Dann ist er
+   keine Kopie, sondern ein Fenster auf sie: Ihr Stand ist sein Stand.
+   Es gibt nichts nachzuziehen, weil es nur eine Sache gibt. */
+function schrittAufgabe(s) {
+  if (!s || !s.aufgabeId) { return null; }
+  return aufgabeFinden(s.aufgabeId);
+}
+
+function schrittFertig(s) {
+  var a = schrittAufgabe(s);
+  if (a) { return a.status === 'erledigt'; }
+  return !!s.fertig;
+}
+
+function schrittTitel(s) {
+  var a = schrittAufgabe(s);
+  return (a ? a.titel : s.titel) || '';
 }
 
 /* Der erste noch offene Schritt ist der, an dem gearbeitet wird. */
@@ -7463,9 +7517,23 @@ function offenerSchritt(d) {
   var l = d.schritte || [];
   var i;
   for (i = 0; i < l.length; i++) {
-    if (!l[i].fertig) { return { nr: i, satz: l[i] }; }
+    if (!schrittFertig(l[i])) { return { nr: i, satz: l[i] }; }
   }
   return null;
+}
+
+/* In welchen Durchläufen kommt diese Aufgabe vor? */
+function durchlaeufeZuAufgabe(aufgabeId) {
+  var aus = [];
+  var l = DB.durchlaeufe || [];
+  var i, k;
+  for (i = 0; i < l.length; i++) {
+    var s = l[i].schritte || [];
+    for (k = 0; k < s.length; k++) {
+      if (s[k].aufgabeId === aufgabeId) { aus.push(l[i]); break; }
+    }
+  }
+  return aus;
 }
 
 /* Ein Schritt kann ruhen: Er ist der nächste, aber noch nicht dran.
@@ -7583,11 +7651,15 @@ function durchlaufKarteHtml(d) {
   h += '<div class="vk-mehr">';
   var i;
   for (i = 0; i < l.length; i++) {
+    var fertig = schrittFertig(l[i]);
+    var traeger = schrittAufgabe(l[i]);
     h += '<div class="vk-zeile">'
-       + '<button class="tkasten' + (l[i].fertig ? ' an' : '') + '" type="button" '
+       + '<button class="tkasten' + (fertig ? ' an' : '') + '" type="button" '
        + 'onclick="schrittUm(\'' + esc(d.id) + '\',' + i + ')"></button>'
-       + '<span class="vk-titel' + (l[i].fertig ? ' fertig' : '') + '">'
-       + esc(l[i].titel) + '</span></div>';
+       + '<span class="vk-titel' + (fertig ? ' fertig' : '') + '">'
+       + esc(schrittTitel(l[i]))
+       + (traeger ? ' <span class="vk-traeger">Aufgabe</span>' : '')
+       + '</span></div>';
   }
   h += '<div class="vk-knoepfe">'
      + '<button type="button" onclick="abDetailOeffnen(\'' + esc(d.id) + '\',\'durchlauf\')">'
@@ -7723,14 +7795,25 @@ function abZeichnen() {
    Schritte abhaken
    ------------------------------------------------------------ */
 
+/* Trägt eine Aufgabe den Schritt, wird sie abgehakt — nicht der
+   Schritt. Damit stimmt der Stand überall zugleich, ohne dass
+   irgendetwas nachgezogen werden müsste. */
 function schrittUm(id, nr) {
   var d = durchlaufFinden(id);
   if (!d || !d.schritte || !d.schritte[nr]) { return; }
-  d.schritte[nr].fertig = !d.schritte[nr].fertig;
-  d.geaendert = jetzt();
-  spaeterSichern();
+  var s = d.schritte[nr];
+  var a = schrittAufgabe(s);
+  if (a) {
+    if (a.status === 'erledigt') { aufgabeWiederOeffnen(a.id); }
+    else { aufgabeErledigen(a.id); }
+  } else {
+    s.fertig = !s.fertig;
+    d.geaendert = jetzt();
+    spaeterSichern();
+  }
   abZeichnen();
   tagZeichnen();
+  kalZeichnen();
 }
 
 /* ------------------------------------------------------------
@@ -8208,8 +8291,16 @@ function abDetailHtml() {
       h += '<button class="tkasten' + (l[i].fertig ? ' an' : '') + '" type="button" '
          + 'onclick="abSchrittUm(' + i + ')" aria-label="erledigt"></button>';
     }
-    h += '<textarea class="ms-titel" rows="2" placeholder="Was ist zu tun?" '
-       + 'oninput="abSchrittTitel(' + i + ',this.value)">' + esc(l[i].titel) + '</textarea>';
+    var traegerS = istVorlage ? null : schrittAufgabe(l[i]);
+    if (traegerS) {
+      /* Trägt eine Aufgabe den Schritt, gilt ihr Titel — er lässt sich
+         nur dort ändern, sonst gäbe es zwei Fassungen derselben Sache. */
+      h += '<div class="ms-titel ms-fest" onclick="aufgabeAktionen(\''
+         + esc(traegerS.id) + '\')">' + esc(traegerS.titel) + '</div>';
+    } else {
+      h += '<textarea class="ms-titel" rows="2" placeholder="Was ist zu tun?" '
+         + 'oninput="abSchrittTitel(' + i + ',this.value)">' + esc(l[i].titel) + '</textarea>';
+    }
     h += '</div>';
 
     h += '<div class="ms-unten">';
@@ -8227,15 +8318,20 @@ function abDetailHtml() {
     }
     h += '<span style="flex:1"></span>';
     if (!istVorlage) {
-      var verknuepft = l[i].aufgabeId ? aufgabeFinden(l[i].aufgabeId) : null;
+      var verknuepft = schrittAufgabe(l[i]);
       if (verknuepft) {
-        h += '<button class="ms-wort" type="button" '
+        h += '<button class="ms-wort an" type="button" '
            + 'onclick="aufgabeAktionen(\'' + esc(verknuepft.id) + '\')" '
-           + 'title="Die zugehörige Aufgabe öffnen">Aufgabe: '
+           + 'title="Die tragende Aufgabe öffnen">Aufgabe: '
            + esc(planungText(verknuepft)) + '</button>';
+        h += '<button class="ms-wort" type="button" onclick="abSchrittLoesen(' + i + ')" '
+           + 'title="Die Aufgabe vom Schritt lösen">lösen</button>';
       } else {
         h += '<button class="ms-wort" type="button" onclick="abSchrittAlsAufgabe(' + i + ')" '
            + 'title="Aus diesem Schritt eine echte Aufgabe machen">Aufgabe daraus</button>';
+        h += '<button class="ms-wort" type="button" onclick="abSchrittWahl(' + i + ')" '
+           + 'title="Eine vorhandene Aufgabe diesen Schritt tragen lassen">'
+           + 'Aufgabe verknüpfen</button>';
       }
     }
     h += '<button class="ms-wort" type="button" onclick="abSchrittHoch(' + i + ')" '
@@ -8380,6 +8476,74 @@ function abSchrittTitel(i, wert) {
 /* Ein Schritt ist eine Zeile in einem Ablauf. Braucht er einen
    eigenen Platz im Tag, eine Frist oder ein Thema, wird eine echte
    Aufgabe daraus — der Schritt behält sie in Sicht. */
+/* Eine vorhandene Aufgabe soll diesen Schritt tragen. */
+function abSchrittWahl(i) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  var sheet = document.getElementById('aktionSheet');
+  if (!a || !sheet || !a.schritte[i]) { return; }
+
+  var h = blattKopf();
+  h += '<button class="zurueck" type="button" onclick="abDetailOeffnen(\'' + esc(a.id)
+     + '\',\'durchlauf\')">'
+     + '<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;'
+     + 'stroke-width:2;stroke-linecap:round;stroke-linejoin:round">'
+     + '<path d="M15 6l-6 6 6 6"></path></svg>' + esc(a.name || 'Durchlauf') + '</button>';
+  h += '<div class="as-titel">Welche Aufgabe trägt diesen Schritt?</div>';
+  h += '<div class="as-meta">' + esc(a.schritte[i].titel || ('Schritt ' + (i + 1)))
+     + ' · Kontext ' + esc(a.kontext) + '</div>';
+  h += '<div class="as-linie"></div>';
+  h += '<div class="d-hinweis" style="text-align:left;padding:4px 0 8px">'
+     + 'Danach ist der Schritt ein Fenster auf die Aufgabe: ein Haken hier '
+     + 'oder dort ist derselbe Haken.</div>';
+
+  var l = DB.aufgaben || [];
+  var k;
+  var gab = false;
+  for (k = 0; k < l.length; k++) {
+    if (l[k].wiederholung) { continue; }
+    if (l[k].art === 'klein') { continue; }
+    if (l[k].kontext !== a.kontext) { continue; }
+    if (l[k].status === 'erledigt') { continue; }
+    h += '<div class="mf-zeile" onclick="abSchrittVerknuepfen(' + i + ',\''
+       + esc(l[k].id) + '\')">'
+       + '<span class="mf-name">' + esc(l[k].titel) + '</span>'
+       + '<span class="a-quelle">' + esc(planungText(l[k])) + '</span></div>';
+    gab = true;
+  }
+  if (!gab) {
+    h += '<div class="tleer" style="padding-left:0">Keine offene Aufgabe in diesem '
+       + 'Kontext. Kleinigkeiten und Wiederkehrendes tragen keine Schritte.</div>';
+  }
+  h += '<div class="d-reihe"><button type="button" onclick="abDetailOeffnen(\'' + esc(a.id)
+     + '\',\'durchlauf\')">Zurück</button></div>';
+  sheet.innerHTML = h;
+}
+
+function abSchrittVerknuepfen(i, aufgabeId) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || !a.schritte[i]) { return; }
+  a.schritte[i].aufgabeId = aufgabeId;
+  a.geaendert = jetzt();
+  spaeterSichern();
+  abDetailOeffnen(a.id, abDetailArt);
+  abZeichnen();
+  tagZeichnen();
+}
+
+/* Lösen nimmt nur das Fenster weg. Die Aufgabe bleibt, und der
+   Schritt behält den Stand, den sie zuletzt hatte. */
+function abSchrittLoesen(i) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || !a.schritte[i]) { return; }
+  var traeger = schrittAufgabe(a.schritte[i]);
+  if (traeger) {
+    a.schritte[i].titel = traeger.titel;
+    a.schritte[i].fertig = (traeger.status === 'erledigt');
+  }
+  a.schritte[i].aufgabeId = null;
+  abGeaendert(true);
+}
+
 function abSchrittAlsAufgabe(i) {
   var a = ablaufFinden(abDetail, abDetailArt);
   if (!a || !a.schritte || !a.schritte[i]) { return; }
@@ -8417,6 +8581,11 @@ function abSchrittAb(i, wert) {
 function abSchrittUm(i) {
   var a = ablaufFinden(abDetail, abDetailArt);
   if (!a || !a.schritte[i]) { return; }
+  if (abDetailArt === 'durchlauf') {
+    schrittUm(a.id, i);
+    abDetailNeu();
+    return;
+  }
   a.schritte[i].fertig = !a.schritte[i].fertig;
   abGeaendert(true);
 }
