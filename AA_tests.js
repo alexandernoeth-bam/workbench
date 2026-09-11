@@ -1945,6 +1945,16 @@ console.log('\n20. Installierbare App und Versionswechsel');
         return String(i.purpose || '').indexOf('maskable') >= 0;
       });
       pruefe(maskierbar.length > 0, 'ein maskierbares Symbol für Android ist dabei');
+      pruefe(maskierbar.every(function (i) {
+        return (m.icons || []).some(function (j) {
+          return j.src !== i.src && String(j.purpose || '').indexOf('any') >= 0;
+        });
+      }), 'das maskierbare ist eine eigene Datei — sonst wird der Inhalt beschnitten');
+      pruefe(Array.isArray(m.shortcuts) && m.shortcuts.length >= 3,
+             'es gibt Verknüpfungen für das lange Drücken');
+      pruefe((m.shortcuts || []).every(function (s) {
+        return /workbench\.html#/.test(s.url || '');
+      }), 'jede Verknüpfung zeigt auf einen Bildschirm');
       (m.icons || []).forEach(function (i) {
         const p = require('path').join(pfad, String(i.src).replace('./', ''));
         pruefe(fs.existsSync(p), 'Symboldatei ' + i.src + ' liegt vor');
