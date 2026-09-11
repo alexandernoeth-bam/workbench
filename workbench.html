@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.34.0</title>
+<title>Workbench 0.34.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -948,7 +948,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.34.0';
+var APP_VERSION = '0.34.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8500,19 +8500,23 @@ function abSchrittWahl(i) {
   var k;
   var gab = false;
   for (k = 0; k < l.length; k++) {
+    /* Eine wiederkehrende Aufgabe kennt kein „erledigt", nur ein
+       „zuletzt erledigt" — ihr Stand ließe sich am Schritt nicht
+       anzeigen. Kleinigkeiten dagegen können tragen. */
     if (l[k].wiederholung) { continue; }
-    if (l[k].art === 'klein') { continue; }
     if (l[k].kontext !== a.kontext) { continue; }
     if (l[k].status === 'erledigt') { continue; }
     h += '<div class="mf-zeile" onclick="abSchrittVerknuepfen(' + i + ',\''
        + esc(l[k].id) + '\')">'
        + '<span class="mf-name">' + esc(l[k].titel) + '</span>'
-       + '<span class="a-quelle">' + esc(planungText(l[k])) + '</span></div>';
+       + '<span class="a-quelle">' + esc(planungText(l[k]))
+       + (l[k].art === 'klein' ? ' · Kleinigkeit' : '') + '</span></div>';
     gab = true;
   }
   if (!gab) {
     h += '<div class="tleer" style="padding-left:0">Keine offene Aufgabe in diesem '
-       + 'Kontext. Kleinigkeiten und Wiederkehrendes tragen keine Schritte.</div>';
+       + 'Kontext. Wiederkehrendes trägt keine Schritte — es hat keinen '
+       + 'Erledigt-Zustand, nur ein Datum der letzten Erledigung.</div>';
   }
   h += '<div class="d-reihe"><button type="button" onclick="abDetailOeffnen(\'' + esc(a.id)
      + '\',\'durchlauf\')">Zurück</button></div>';

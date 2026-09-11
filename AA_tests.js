@@ -516,12 +516,20 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   aufgabeLoeschen();'
                  + '   var nachTitel = DB.durchlaeufe[0].schritte[0].titel;'
                  + '   var nachStand = stand();'
+                 + '   DB.aufgaben.push({ id:\'k1\', titel:\'Ordner holen\','
+                 + '     kontext:\'beruflich\', status:\'offen\', planung:\'backlog\','
+                 + '     art:\'klein\' });'
+                 + '   DB.durchlaeufe[1].schritte.push({ titel:\'q\', aufgabeId:\'k1\' });'
+                 + '   aufgabeErledigen(\'k1\');'
+                 + '   var kleinTraegt = schrittFertig('
+                 + '     DB.durchlaeufe[1].schritte[DB.durchlaeufe[1].schritte.length - 1]);'
                  + '   aktionFuer = merkAkt; zurueckHolen = null; DB = alt;'
                  + '   return { titelAusAufgabe:titel, vorher:vorher, nachHaken:nachHaken,'
                  + '            aufgabeErledigt:status, nachRuecknahme:zurueck,'
                  + '            ueberTagesplan:ueberTag,'
                  + '            eigenerSchrittUnberuehrt:eigener, weissVon:weiss,'
-                 + '            nachLoeschenTitel:nachTitel, nachLoeschenStand:nachStand };'
+                 + '            nachLoeschenTitel:nachTitel, nachLoeschenStand:nachStand,'
+                 + '            kleinigkeitTraegt:kleinTraegt };'
                  + ' } };'
                  + 'globalThis.__artApi = {'
                  + ' pruefeArten: function(){'
@@ -4900,8 +4908,10 @@ console.log('\n67. Schritt und Aufgabe');
   const wahl = skript.match(/function abSchrittWahl\([\s\S]*?\n\}\n/);
   pruefe(wahl && /l\[k\]\.wiederholung.*continue/s.test(wahl[0]),
          'Wiederkehrendes trägt keinen Schritt');
-  pruefe(wahl && /l\[k\]\.art === 'klein'/.test(wahl[0]),
-         'eine Kleinigkeit auch nicht');
+  pruefe(wahl && !/l\[k\]\.art === 'klein'\) \{ continue/.test(wahl[0]),
+         'eine Kleinigkeit darf tragen');
+  pruefe(wahl && /Kleinigkeit'/.test(wahl[0]),
+         'sie ist in der Auswahl als solche gekennzeichnet');
 
   /* Lösen und Löschen hinterlassen keine Lücke */
   const loesen = skript.match(/function abSchrittLoesen\([\s\S]*?\n\}/);
@@ -4931,6 +4941,7 @@ console.log('\n67. Schritt und Aufgabe');
     pruefe(e.eigenerSchrittUnberuehrt === false,
            'ein Schritt ohne Aufgabe bleibt davon unberührt');
     pruefe(e.weissVon === 3, 'die Aufgabe kennt alle drei Abläufe');
+    pruefe(e.kleinigkeitTraegt === true, 'auch eine Kleinigkeit kann tragen');
     pruefe(e.nachLoeschenTitel === 'Offerings anlegen',
            'nach dem Löschen behalten die Schritte den Titel');
     pruefe(e.nachLoeschenStand === '1,1,1', 'und ihren Stand');
