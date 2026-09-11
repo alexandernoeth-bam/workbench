@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.28.0</title>
+<title>Workbench 0.29.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -34,6 +34,7 @@
   --weinrot:#8A0B22;
   --petrol:#19525A;
   --fs:17.6px;
+  --wochenspalte:168px;
   --app-h:100%;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -236,15 +237,21 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .ktag-form{margin-left:auto;font-size:calc(var(--fs)*0.72);color:var(--grau)}
 .woche-raster{display:flex;flex-direction:column}
 .ktag-termine{padding-top:2px}
-body.breit .woche-raster{display:grid;grid-template-columns:repeat(7,1fr);gap:0}
+body.breit .woche-raster{display:grid;
+  grid-template-columns:repeat(7,minmax(0,var(--wochenspalte)));
+  justify-content:start;gap:0}
 body.breit .ktag{border-bottom:0;border-right:1px solid var(--linie);padding:0 8px 8px}
 body.breit .ktag:last-child{border-right:0}
 body.breit .ktag-kopf{flex-wrap:wrap;gap:5px;padding:7px 0 6px 6px;margin-bottom:6px;
   border-bottom:1px solid var(--linie)}
 body.breit .ktag-form{margin-left:0;flex-basis:100%}
 body.breit .ktag-termine{min-height:220px}
-body.breit .kzeile{padding-left:6px;gap:6px}
-body.breit .kzeit{flex:0 0 34px}
+body.breit .kzeile{padding-left:6px;gap:6px;align-items:flex-start}
+body.breit .kzeit{flex:0 0 34px;padding-top:1px}
+/* In schmalen Spalten wird umgebrochen statt abgeschnitten. */
+body.breit .ktag .ktitel{white-space:normal;overflow:visible;text-overflow:clip;
+  line-height:1.3;word-break:break-word}
+body.breit .ktag-kopf{gap:4px}
 body.breit .kleer{padding-left:6px}
 .kzeile{display:flex;gap:9px;padding:3px 0 3px 11px;align-items:baseline}
 .kzeit{flex:0 0 42px;font-size:calc(var(--fs)*0.76);color:var(--grau);
@@ -253,6 +260,11 @@ body.breit .kleer{padding-left:6px}
 .ktitel{font-size:calc(var(--fs)*0.84);min-width:0;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .ktitel.privat{color:var(--petrol)}
+.k-ablauf{margin-left:6px;font:inherit;font-size:calc(var(--fs)*0.66);
+  padding:1px 7px;border:1px solid var(--linie);border-radius:20px;
+  background:var(--papier);color:var(--grau);cursor:pointer;white-space:nowrap;
+  vertical-align:1px}
+.k-ablauf.an{border-color:var(--weinrot);color:var(--weinrot);font-weight:500}
 .kleer{font-size:calc(var(--fs)*0.78);color:var(--grau-hell);padding-left:11px}
 
 /* Monat */
@@ -919,7 +931,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.28.0';
+var APP_VERSION = '0.29.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5277,9 +5289,10 @@ function wocheHtml(is) {
     }
     for (g = 0; g < t.zeit.length; g++) {
       if (!passtZumKalender(t.zeit[g].kontext)) { continue; }
-      h += '<div class="kzeile"><span class="kzeit fest">' + esc(t.zeit[g].zeit) + '</span>'
-         + '<span class="ktitel' + (t.zeit[g].kontext === 'privat' ? ' privat' : '') + '">'
-         + esc(t.zeit[g].titel) + '</span></div>';
+      var tz = t.zeit[g];
+      h += '<div class="kzeile"><span class="kzeit fest">' + esc(tz.zeit) + '</span>'
+         + '<span class="ktitel' + (tz.kontext === 'privat' ? ' privat' : '') + '">'
+         + esc(tz.titel) + kAblaufKnopfHtml(tz, tag) + '</span></div>';
       etwasOben = true;
     }
     if (!etwasOben) { h += '<div class="kleer">keine Termine</div>'; }
@@ -5361,6 +5374,22 @@ function wochenListeHtml(mo) {
        + esc(planungText(w)) + '</button></div>';
   }
   return h;
+}
+
+/* Auch in der Woche lässt sich ein Ablauf an einen Termin heften —
+   dort plant man die Woche, dort fällt es einem ein. */
+function kAblaufKnopfHtml(termin, tag) {
+  if (!termin.id) { return ''; }
+  var lauf = durchlaufZuTermin(termin.id);
+  if (lauf) {
+    return '<button class="k-ablauf an" type="button" '
+         + 'onclick="event.stopPropagation();abDetailOeffnen(\'' + esc(lauf.id)
+         + '\',\'durchlauf\')" title="Den angehefteten Ablauf öffnen">'
+         + schritteFertig(lauf) + '/' + (lauf.schritte || []).length + '</button>';
+  }
+  return '<button class="k-ablauf" type="button" '
+       + 'onclick="event.stopPropagation();terminAblaufWahl(\'' + esc(termin.id)
+       + '\',\'' + tag + '\')" title="Einen Ablauf an diesen Termin heften">Ablauf</button>';
 }
 
 function zumTag(is) {

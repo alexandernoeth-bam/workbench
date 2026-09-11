@@ -2768,8 +2768,12 @@ console.log('\n37. Wochensicht als Spalten');
   pruefe(/body\.breit /.test(QUELLE), 'am großen Bildschirm gilt ein eigenes Bild');
   pruefe(!/@media/.test(QUELLE),
          'die Darstellung hängt nicht mehr an Media-Abfragen');
-  pruefe(/body\.breit \.woche-raster\{display:grid;grid-template-columns:repeat\(7,1fr\)/
-         .test(QUELLE), 'dort stehen sieben Spalten');
+  pruefe(/body\.breit \.woche-raster\{display:grid;[\s\S]{0,60}repeat\(7,/.test(QUELLE),
+         'dort stehen sieben Spalten');
+  pruefe(/--wochenspalte:\s*\d+px/.test(QUELLE),
+         'ihre Breite ist fest, nicht vom Fenster abhängig');
+  pruefe(/body\.breit \.ktag \.ktitel\{white-space:normal/.test(QUELLE),
+         'lange Termintitel brechen um, statt abgeschnitten zu werden');
   pruefe(/\.ktag-termine\{min-height/.test(QUELLE),
          'der Terminblock hat eine feste Mindesthöhe, damit die zweite Zeile fluchtet');
 
