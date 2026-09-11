@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.32.1</title>
+<title>Workbench 0.33.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -740,7 +740,8 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     die Datei übergeben, dort einlesen. Eingelesen wird nur, was fehlt —
     Vorhandenes bleibt unangetastet.</div>
   <div class="knopfreihe">
-    <button type="button" onclick="jtAusgeben()">Jahrestermine ausgeben</button>
+    <button type="button" onclick="jtAusgeben()">Als JSON ausgeben</button>
+    <button type="button" onclick="jtAlsIcs()">Als Kalenderdatei ausgeben</button>
   </div>
   <input type="file" id="jtDatei" accept=".json,application/json"
          onchange="jtDateiGemerkt()">
@@ -942,7 +943,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.32.1';
+var APP_VERSION = '0.33.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2746,12 +2747,14 @@ function feiertagAn(is) {
   return feiertagListe[is] || '';
 }
 
+/* Urlaub und Krankheit machen den Tag frei — gleich, ob sie aus der
+   eigenen Datei oder aus dem Kalender kommen. */
 function urlaubAn(is) {
-  var jt = DB.jahrestermine || [];
+  var jt = jtAn(is);
   var i;
   for (i = 0; i < jt.length; i++) {
     if (jt[i].art !== 'urlaub' && jt[i].art !== 'krank') { continue; }
-    if (is >= jt[i].von && is <= (jt[i].bis || jt[i].von)) { return jt[i].titel || 'Urlaub'; }
+    return jt[i].titel || 'Urlaub';
   }
   return '';
 }
@@ -2862,9 +2865,12 @@ function tagesEintraege(is) {
   var jt = jtAn(is);
   for (i = 0; i < jt.length; i++) {
     if (!passtZumTag(jtKontext(jt[i]))) { continue; }
-    ganztags.push({ titel: jt[i].titel, quelle: JT_ARTEN[jt[i].art]
-                    ? JT_ARTEN[jt[i].art].n : 'Jahrestermin',
-                    farbe: jtFarbe(jt[i]), kontext: jtKontext(jt[i]) });
+    ganztags.push({ id: jt[i].ausKalender ? jt[i].id : '',
+                    titel: jt[i].titel,
+                    quelle: jt[i].art ? artName(jt[i].art)
+                                      : (jt[i].ausKalender ? 'ohne Art' : 'Jahrestermin'),
+                    farbe: jtFarbe(jt[i]), kontext: jtKontext(jt[i]),
+                    art: jt[i].art, ausKalender: !!jt[i].ausKalender });
   }
   var fei = feiertagAn(is);
   if (fei) { ganztags.push({ titel: fei, quelle: 'Feiertag', farbe: '', kontext: '' }); }
@@ -2872,12 +2878,9 @@ function tagesEintraege(is) {
   if (fer) { ganztags.push({ titel: fer, quelle: 'Ferien', farbe: '', kontext: '' }); }
 
   /* Aus Google gelesen, nicht gespeichert. */
+  /* Die ganztägigen Kalendertermine stehen bereits in jtAn — sie
+     hier noch einmal anzuhängen, hätte sie verdoppelt. */
   var ausGoogle = termineFuerTag(is);
-  for (i = 0; i < ausGoogle.ganztags.length; i++) {
-    var g0 = ausGoogle.ganztags[i];
-    if (!passtZumTag(g0.kontext)) { continue; }
-    ganztags.push({ titel: g0.titel, quelle: g0.quelle, farbe: '', kontext: g0.kontext });
-  }
   for (i = 0; i < ausGoogle.zeit.length; i++) {
     var g = ausGoogle.zeit[i];
     if (!passtZumTag(g.kontext)) { continue; }
@@ -3297,7 +3300,14 @@ function tagZeichnen() {
        + (gt.farbe ? (' style="background:' + gt.farbe + ';border-color:' + gt.farbe + '"') : '')
        + '></span>';
     h += '<span class="tganz-titel">' + esc(gt.titel) + '</span>';
-    h += '<span class="tganz-quelle">' + esc(gt.quelle) + '</span></div>';
+    h += '<span class="tganz-quelle">' + esc(gt.quelle) + '</span>';
+    if (gt.ausKalender && gt.id) {
+      h += '<button class="k-ablauf' + (gt.art ? ' an' : '') + '" type="button" '
+         + 'onclick="artWahlOeffnen(\'' + esc(gt.id) + '\')" '
+         + 'title="Die Art dieses Kalendereintrags setzen">'
+         + (gt.art ? 'Art' : 'Art?') + '</button>';
+    }
+    h += '</div>';
   }
 
   if (vorbeiZahl) {
@@ -4612,7 +4622,7 @@ function eintraegeEinsortieren(eintraege, quelle, kontext) {
       while (lauf <= bis && schutz < 400) {
         merkeTermin(lauf, { id: e.id, titel: titel, zeit: '', bis: '',
                             ort: e.location || '', ganztags: true, quelle: quelle,
-                            kontext: welcher });
+                            kontext: welcher, beschreibung: e.description || '' });
         lauf = tagePlus(lauf, 1);
         schutz++;
       }
@@ -4698,7 +4708,8 @@ function einenKalenderHolen(kal, von, bis) {
               + '?singleEvents=true&orderBy=startTime&maxResults=250'
               + '&timeMin=' + encodeURIComponent(von + 'T00:00:00Z')
               + '&timeMax=' + encodeURIComponent(bis + 'T23:59:59Z')
-              + '&fields=' + encodeURIComponent('items(id,summary,location,status,start,end)');
+              + '&fields=' + encodeURIComponent(
+                  'items(id,summary,description,location,status,start,end)');
   return window.fetch(adresse, { headers: driveKopf() })
     .then(antwortPruefen)
     .then(function (a) { return a.json(); })
@@ -5001,6 +5012,52 @@ function jtKennzeichen(e) {
        + '|' + String(e.von || '') + '|' + String(e.bis || e.von || '');
 }
 
+/* Ausgabe als ICS, damit die vorhandenen Jahrestermine in einen
+   Google-Kalender wandern können. Die Art steht als Kürzel in der
+   Beschreibung — dort stört sie den Kalender nicht, und die App
+   erkennt sie dort wieder. */
+function icsZeile(text) {
+  return String(text).replace(/\\/g, '\\\\').replace(/;/g, '\\;')
+                     .replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+
+function jtAlsIcs() {
+  var liste = DB.jahrestermine || [];
+  if (!liste.length) {
+    melde('Es gibt keine Jahrestermine zum Ausgeben.', 'warn');
+    return;
+  }
+  var zeilen = ['BEGIN:VCALENDAR', 'VERSION:2.0',
+                'PRODID:-//Workbench//Jahrestermine//DE', 'CALSCALE:GREGORIAN',
+                'METHOD:PUBLISH', 'X-WR-CALNAME:Workbench Jahrestermine'];
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    var e = liste[i];
+    if (!e.von) { continue; }
+    var bis = e.bis || e.von;
+    zeilen.push('BEGIN:VEVENT');
+    zeilen.push('UID:' + e.id + '@workbench');
+    zeilen.push('DTSTAMP:' + isoDatum().replace(/-/g, '') + 'T000000Z');
+    zeilen.push('DTSTART;VALUE=DATE:' + e.von.replace(/-/g, ''));
+    zeilen.push('DTEND;VALUE=DATE:' + tagePlus(bis, 1).replace(/-/g, ''));
+    zeilen.push('SUMMARY:' + icsZeile(e.titel));
+    if (e.art) { zeilen.push('DESCRIPTION:' + icsZeile('#' + e.art)); }
+    if (e.jaehrlich) { zeilen.push('RRULE:FREQ=YEARLY'); }
+    zeilen.push('TRANSP:TRANSPARENT');
+    zeilen.push('END:VEVENT');
+  }
+  zeilen.push('END:VCALENDAR');
+
+  var name = 'workbench_jahrestermine_' + isoDatum().replace(/-/g, '') + '.ics';
+  if (dateiAnbieten(name, zeilen.join('\r\n') + '\r\n')) {
+    melde(liste.length + ' Jahrestermine als Kalenderdatei ausgegeben: ' + name
+        + '\nDie Art steht als Kürzel in der Beschreibung.'
+        + '\nIn Google Kalender unter Einstellungen → Importieren einlesen.', 'gut');
+  } else {
+    melde('Die Datei ließ sich nicht anbieten.', 'warn');
+  }
+}
+
 function jtDateiGemerkt() {
   var feld = document.getElementById('jtDatei');
   var knopf = document.getElementById('knopfJtLesen');
@@ -5057,6 +5114,136 @@ function zeichneJtDatei() {
                'ja');
   }
   ziel.innerHTML = h;
+}
+
+
+/* ============================================================
+   Arten aus dem Kalender
+
+   Ein ganztägiger Termin trägt seine Art als Kürzel im Titel oder in
+   der Beschreibung: „Kreta #urlaub". Damit steht sie im gemeinsamen
+   Kalender und gilt für alle, die ihn sehen. Wer abweichen will,
+   setzt für sich eine eigene Zuordnung — die geht vor.
+   ============================================================ */
+
+var ART_MUSTER = /#([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9_-]{1,23})/;
+
+function artAusText(text) {
+  if (typeof text !== 'string' || text.length === 0) { return ''; }
+  var treffer = text.match(ART_MUSTER);
+  if (!treffer) { return ''; }
+  return treffer[1].toLowerCase();
+}
+
+function titelOhneArt(titel) {
+  if (typeof titel !== 'string') { return ''; }
+  return titel.replace(ART_MUSTER, '').replace(/\s{2,}/g, ' ').trim();
+}
+
+/* Eigene Zuordnung: Kennung des Kalendereintrags → Art. Sie liegt in
+   der eigenen Datei und wird abgeglichen. */
+function zuordnungArt(id) {
+  var z = DB.kalenderzuordnung || {};
+  var e = z[id];
+  return (e && e.art) ? e.art : '';
+}
+
+function zuordnungSetzen(id, art) {
+  if (!DB.kalenderzuordnung) { DB.kalenderzuordnung = {}; }
+  if (typeof art !== 'string' || art.length === 0) { delete DB.kalenderzuordnung[id]; }
+  else { DB.kalenderzuordnung[id] = { art: art, geaendert: jetzt() }; }
+  spaeterSichern();
+  tagZeichnen();
+  kalZeichnen();
+}
+
+/* Die eigene Zuordnung schlägt das Kürzel im Termin. */
+function terminArt(t) {
+  if (!t) { return ''; }
+  var eigen = t.id ? zuordnungArt(t.id) : '';
+  if (eigen) { return eigen; }
+  var ausTitel = artAusText(t.rohTitel || t.titel);
+  if (ausTitel) { return ausTitel; }
+  return artAusText(t.beschreibung);
+}
+
+/* ------------------------------------------------------------
+   Arten — die neun bekannten und alles, was hinzukommt
+   ------------------------------------------------------------ */
+
+/* Eine neue Art aus dem Kalender bekommt eine Farbe, die sich aus
+   ihrem Namen ergibt: gleicher Name, gleiche Farbe, auf jedem Gerät. */
+function artFarbeAus(name) {
+  var summe = 0;
+  var i;
+  for (i = 0; i < name.length; i++) {
+    summe = (summe * 31 + name.charCodeAt(i)) % 360;
+  }
+  return 'hsl(' + summe + ',42%,38%)';
+}
+
+function artName(schluessel) {
+  if (JT_ARTEN[schluessel]) { return JT_ARTEN[schluessel].n; }
+  if (!schluessel) { return 'Ohne Art'; }
+  return schluessel.charAt(0).toUpperCase() + schluessel.slice(1);
+}
+
+function artFarbe(schluessel) {
+  if (JT_ARTEN[schluessel]) { return JT_ARTEN[schluessel].f; }
+  if (!schluessel) { return '#9b978f'; }
+  return artFarbeAus(schluessel);
+}
+
+/* Alle vorkommenden Arten: die neun festen, dazu alles, was in
+   Jahresterminen, Zuordnungen oder Kalendertiteln auftaucht. */
+function artenAlle() {
+  var aus = JT_REIHE.slice();
+  var dazu = function (a) {
+    if (a && aus.indexOf(a) < 0) { aus.push(a); }
+  };
+  var i;
+  var jt = DB.jahrestermine || [];
+  for (i = 0; i < jt.length; i++) { dazu(jt[i].art); }
+  var z = DB.kalenderzuordnung || {};
+  var k;
+  for (k in z) {
+    if (Object.prototype.hasOwnProperty.call(z, k)) { dazu(z[k].art); }
+  }
+  var tag;
+  for (tag in termineNachTag) {
+    if (!Object.prototype.hasOwnProperty.call(termineNachTag, tag)) { continue; }
+    var l = termineNachTag[tag];
+    for (i = 0; i < l.length; i++) {
+      if (l[i].ganztags) { dazu(terminArt(l[i])); }
+    }
+  }
+  return aus;
+}
+
+/* ------------------------------------------------------------
+   Ganztägige Kalendertermine als Jahrestermine
+   ------------------------------------------------------------ */
+
+function kalenderJahrestermine(is) {
+  var aus = [];
+  var g = (termineNachTag[is] || []);
+  var i;
+  for (i = 0; i < g.length; i++) {
+    if (!g[i].ganztags) { continue; }
+    var art = terminArt(g[i]);
+    aus.push({
+      id: g[i].id,
+      titel: titelOhneArt(g[i].titel) || g[i].titel,
+      art: art,
+      kontext: g[i].kontext || 'privat',
+      von: is, bis: is,
+      jaehrlich: false,
+      kuerzel: '',
+      ausKalender: true,
+      quelle: g[i].quelle || ''
+    });
+  }
+  return aus;
 }
 
 /* ============================================================
@@ -5177,7 +5364,7 @@ function fensterPruefenFuer(is) {
    ------------------------------------------------------------ */
 
 function jtAn(is) {
-  var treffer = [];
+  var treffer = kalenderJahrestermine(is);
   var liste = DB.jahrestermine || [];
   var i;
   for (i = 0; i < liste.length; i++) {
@@ -5226,8 +5413,7 @@ function jtKontext(e) {
 }
 
 function jtFarbe(e) {
-  var a = JT_ARTEN[e.art] || JT_ARTEN.sonstiges;
-  return a.f;
+  return artFarbe(e.art);
 }
 
 /* Der Filter 'ferien' ist der Gegenpart zu 'Alle': dann sind die
@@ -5797,10 +5983,14 @@ function jahrHtml(is) {
   h += '</tbody></table></div>';
 
   /* Summen je Art, zugleich Filter */
+  /* Die Summen umfassen beide Quellen: die eigene Datei und die
+     ganztägigen Kalendertermine des geholten Fensters. */
+  var arten = artenAlle();
   var summen = {};
   var s;
-  for (s = 0; s < JT_REIHE.length; s++) { summen[JT_REIHE[s]] = { n: 0, tage: 0 }; }
-  var liste = DB.jahrestermine || [];
+  for (s = 0; s < arten.length; s++) { summen[arten[s]] = { n: 0, tage: 0 }; }
+  summen[''] = { n: 0, tage: 0 };
+  var liste = jahrestermineUndKalender(jahr);
   var i;
   for (i = 0; i < liste.length; i++) {
     var e = liste[i];
@@ -5811,29 +6001,33 @@ function jahrHtml(is) {
     var a = von.slice(0, 4) === String(jahr) ? von : (jahr + '-01-01');
     var z = bis.slice(0, 4) === String(jahr) ? bis : (jahr + '-12-31');
     var tage = Math.round((Date.parse(z) - Date.parse(a)) / 86400000) + 1;
-    var art = JT_ARTEN[e.art] ? e.art : 'sonstiges';
+    var art = (e.art || '');
+    if (!summen[art]) { summen[art] = { n: 0, tage: 0 }; }
     summen[art].n += 1;
     summen[art].tage += tage;
   }
 
   h += '<div class="gruppenkopf"><span>Summe je Art</span></div>';
+  var reihe = arten.slice();
+  reihe.push('');
   var gesamtN = 0, gesamtT = 0;
-  for (s = 0; s < JT_REIHE.length; s++) {
-    gesamtN += summen[JT_REIHE[s]].n;
-    gesamtT += summen[JT_REIHE[s]].tage;
+  for (s = 0; s < reihe.length; s++) {
+    if (!summen[reihe[s]]) { continue; }
+    gesamtN += summen[reihe[s]].n;
+    gesamtT += summen[reihe[s]].tage;
   }
   h += '<div class="jsum' + (jahrFilter === null ? ' aktiv' : '') + '" onclick="jahrFilterSetzen(null)">'
      + '<span class="jsum-farbe" style="background:var(--tinte)"></span>'
      + '<span class="jsum-name">Alle</span>'
      + '<span class="jsum-n">' + gesamtN + '</span>'
      + '<span class="jsum-t">' + gesamtT + ' Tage</span></div>';
-  for (s = 0; s < JT_REIHE.length; s++) {
-    var key = JT_REIHE[s];
-    if (summen[key].n < 1) { continue; }
+  for (s = 0; s < reihe.length; s++) {
+    var key = reihe[s];
+    if (!summen[key] || summen[key].n < 1) { continue; }
     h += '<div class="jsum' + (jahrFilter === key ? ' aktiv' : '') + '" '
-       + 'onclick="jahrFilterSetzen(\'' + key + '\')">'
-       + '<span class="jsum-farbe" style="background:' + JT_ARTEN[key].f + '"></span>'
-       + '<span class="jsum-name">' + JT_ARTEN[key].n + '</span>'
+       + 'onclick="jahrFilterSetzen(\'' + esc(key) + '\')">'
+       + '<span class="jsum-farbe" style="background:' + artFarbe(key) + '"></span>'
+       + '<span class="jsum-name">' + esc(artName(key)) + '</span>'
        + '<span class="jsum-n">' + summen[key].n + '</span>'
        + '<span class="jsum-t">' + summen[key].tage + ' Tage</span></div>';
   }
@@ -5946,6 +6140,27 @@ function feiertageImJahr(jahr) {
   return aus;
 }
 
+/* Eigene Jahrestermine und ganztägige Kalendertermine des Jahres in
+   einer Liste. Der Kalender ist nur für sein geholtes Fenster bekannt —
+   weiter zurück oder voraus steht dort nichts. */
+function jahrestermineUndKalender(jahr) {
+  var aus = (DB.jahrestermine || []).slice();
+  var gesehen = {};
+  var tag;
+  for (tag in termineNachTag) {
+    if (!Object.prototype.hasOwnProperty.call(termineNachTag, tag)) { continue; }
+    if (tag.slice(0, 4) !== String(jahr)) { continue; }
+    var l = kalenderJahrestermine(tag);
+    var i;
+    for (i = 0; i < l.length; i++) {
+      if (gesehen[l[i].id]) { continue; }
+      gesehen[l[i].id] = true;
+      aus.push(l[i]);
+    }
+  }
+  return aus;
+}
+
 function jahrFilterSetzen(art) {
   jahrFilter = (jahrFilter === art) ? null : art;
   kalZeichnen();
@@ -5997,6 +6212,73 @@ var jtTag = '';
 var jtNeuArt = 'urlaub';
 var jtNeuKontext = 'privat';
 
+/* Die Art eines Kalendereintrags von Hand setzen. Sie landet in der
+   eigenen Zuordnung, nicht im Kalender — dorthin schreiben wir nicht. */
+var artWahlFuer = '';
+
+function artWahlOeffnen(id) {
+  artWahlFuer = id;
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = artWahlHtml();
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function artWahlHtml() {
+  var id = artWahlFuer;
+  var jetztArt = zuordnungArt(id);
+  var h = blattKopf();
+  h += '<div class="as-titel">Was ist das für ein Tag?</div>';
+  h += '<div class="as-meta">gilt nur für dich — im Kalender wird nichts '
+     + 'geändert</div>';
+  h += '<div class="as-linie"></div>';
+
+  var arten = artenAlle();
+  var i;
+  h += '<div class="d-wert" style="justify-content:flex-start;margin-top:6px">';
+  for (i = 0; i < arten.length; i++) {
+    var k = arten[i];
+    h += '<button class="d-wahl' + (jetztArt === k ? ' an' : '') + '" type="button" '
+       + 'onclick="artWahlSetzen(\'' + esc(k) + '\')">'
+       + '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;'
+       + 'background:' + artFarbe(k) + ';margin-right:6px"></span>'
+       + esc(artName(k)) + '</button>';
+  }
+  h += '</div>';
+
+  h += '<div class="ms-unten" style="padding-left:0">'
+     + '<input class="v-feld" type="text" id="artNeuName" placeholder="Neue Art, etwa Kur">'
+     + '<button class="ms-wort" type="button" onclick="artWahlNeu()">Übernehmen</button>'
+     + '</div>';
+
+  h += '<div class="d-hinweis" style="text-align:left">'
+     + 'Dauerhaft und für alle gilt sie, wenn du sie in den Termin schreibst: '
+     + 'ein Kürzel wie #urlaub im Titel oder in der Beschreibung.</div>';
+
+  h += '<div class="d-reihe">';
+  if (jetztArt) {
+    h += '<button type="button" onclick="artWahlSetzen(\'\')">Zuordnung lösen</button>';
+  }
+  h += '<button type="button" onclick="aktionenSchliessen()">Fertig</button></div>';
+  return h;
+}
+
+function artWahlSetzen(art) {
+  zuordnungSetzen(artWahlFuer, art);
+  artWahlOeffnen(artWahlFuer);
+}
+
+function artWahlNeu() {
+  var feld = document.getElementById('artNeuName');
+  if (!feld) { return; }
+  var name = feld.value.trim().toLowerCase().replace(/[^a-zäöüß0-9_-]/g, '');
+  if (name.length < 2) { return; }
+  zuordnungSetzen(artWahlFuer, name);
+  artWahlOeffnen(artWahlFuer);
+}
+
 function jtTagOeffnen(is) {
   jtTag = is;
   var sheet = document.getElementById('aktionSheet');
@@ -6008,15 +6290,16 @@ function jtTagOeffnen(is) {
 }
 
 function jtArtenHtml(kennung, aktuell) {
+  var arten = artenAlle();
   var h = '<div class="d-wert" style="justify-content:flex-start;margin-top:6px">';
   var i;
-  for (i = 0; i < JT_REIHE.length; i++) {
-    var k = JT_REIHE[i];
+  for (i = 0; i < arten.length; i++) {
+    var k = arten[i];
     h += '<button class="d-wahl' + (aktuell === k ? ' an' : '') + '" type="button" '
-       + 'onclick="jtArtSetzen(\'' + kennung + '\',\'' + k + '\')">'
+       + 'onclick="jtArtSetzen(\'' + kennung + '\',\'' + esc(k) + '\')">'
        + '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;'
-       + 'background:' + JT_ARTEN[k].f + ';margin-right:6px"></span>'
-       + JT_ARTEN[k].n + '</button>';
+       + 'background:' + artFarbe(k) + ';margin-right:6px"></span>'
+       + esc(artName(k)) + '</button>';
   }
   h += '</div>';
   return h;

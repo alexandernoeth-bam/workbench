@@ -485,6 +485,39 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__artApi = {'
+                 + ' pruefeArten: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   kalenderListe = [{ id:\'a\', name:\'Familie\' }];'
+                 + '   termineNachTag = {};'
+                 + '   eintraegeEinsortieren(['
+                 + '     { id:\'g1\', summary:\'Kreta #urlaub\','
+                 + '       start:{ date:\'2026-08-03\' }, end:{ date:\'2026-08-04\' } },'
+                 + '     { id:\'g2\', summary:\'Werksbesuch\','
+                 + '       description:\'Anreise #dienstreise\','
+                 + '       start:{ date:\'2026-08-10\' }, end:{ date:\'2026-08-11\' } },'
+                 + '     { id:\'g3\', summary:\'Kur #kur\','
+                 + '       start:{ date:\'2026-08-12\' }, end:{ date:\'2026-08-13\' } },'
+                 + '     { id:\'g4\', summary:\'Ohne alles\','
+                 + '       start:{ date:\'2026-08-14\' }, end:{ date:\'2026-08-15\' } } ],'
+                 + '     \'Familie\', \'privat\');'
+                 + '   var r = {'
+                 + '     ausTitel: jtAn(\'2026-08-03\')[0].art,'
+                 + '     ausBeschreibung: jtAn(\'2026-08-10\')[0].art,'
+                 + '     titelSauber: jtAn(\'2026-08-03\')[0].titel,'
+                 + '     neueArt: jtAn(\'2026-08-12\')[0].art,'
+                 + '     neueArtName: artName(\'kur\'),'
+                 + '     neueArtFarbe: artFarbe(\'kur\'),'
+                 + '     farbeStabil: (artFarbeAus(\'kur\') === artFarbeAus(\'kur\')),'
+                 + '     ohneKuerzel: jtAn(\'2026-08-14\')[0].art,'
+                 + '     inArtenListe: (artenAlle().indexOf(\'kur\') >= 0),'
+                 + '     urlaubMachtFrei: tagesform(\'2026-08-03\').form,'
+                 + '     keineDublette: tagesEintraege(\'2026-08-03\').ganztags.length };'
+                 + '   zuordnungSetzen(\'g1\', \'krank\');'
+                 + '   r.zuordnungGewinnt = jtAn(\'2026-08-03\')[0].art;'
+                 + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__terminVerbindungApi = {'
                  + ' pruefeVerbindung: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -1998,13 +2031,69 @@ console.log('\n23. Aufrufe im Skript selbst');
 {
   const roh = hauptSkript();
 
-  /* Kommentare und Zeichenketten heraus, sonst gelten Wörter aus Texten
-     wie „Konflikt(e)" als Funktionsaufruf. */
-  const skript = roh
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ')
-    .replace(/'(?:\\.|[^'\\])*'/g, "''")
-    .replace(/"(?:\\.|[^"\\])*"/g, '""');
+  /* Ein einfaches Abstreifen mit Ersetzungen scheitert zuverlässig:
+     Ein // in einer Adresse sieht aus wie ein Kommentar, ein
+     Apostroph in einem Kommentar wie ein Zeichenkettenbeginn, ein /
+     in einem regulären Ausdruck wie eine Division. Deshalb läuft hier
+     ein kleiner Leser einmal durch den Text und weiß jederzeit, worin
+     er steckt. Übrig bleibt nur echter Code. */
+  function nurCode(text) {
+    let aus = '';
+    let i = 0;
+    let zuletzt = '';
+    while (i < text.length) {
+      const z = text[i];
+      const zwei = text.slice(i, i + 2);
+
+      if (zwei === '//') {
+        while (i < text.length && text[i] !== '\n') { i++; }
+        continue;
+      }
+      if (zwei === '/*') {
+        i += 2;
+        while (i < text.length && text.slice(i, i + 2) !== '*/') { i++; }
+        i += 2;
+        aus += ' ';
+        continue;
+      }
+      if (z === '"' || z === "'" || z === '`') {
+        const ende = z;
+        i++;
+        while (i < text.length && text[i] !== ende) {
+          if (text[i] === '\\') { i++; }
+          i++;
+        }
+        i++;
+        aus += '""';
+        zuletzt = '"';
+        continue;
+      }
+      if (z === '/' && /[(,=:[!&|?{};+\n]/.test(zuletzt || '\n')) {
+        i++;
+        while (i < text.length && text[i] !== '/') {
+          if (text[i] === '\\') { i++; }
+          if (text[i] === '[') {
+            while (i < text.length && text[i] !== ']') {
+              if (text[i] === '\\') { i++; }
+              i++;
+            }
+          }
+          i++;
+        }
+        i++;
+        while (i < text.length && /[gimsuy]/.test(text[i])) { i++; }
+        aus += 'RE';
+        zuletzt = 'E';
+        continue;
+      }
+      aus += z;
+      if (!/\s/.test(z)) { zuletzt = z; }
+      i++;
+    }
+    return aus;
+  }
+
+  const skript = nurCode(roh);
 
   const definiert = new Set([...roh.matchAll(/function\s+([A-Za-z_$][\w$]*)\s*\(/g)].map(m => m[1]));
   const zugewiesen = new Set([...roh.matchAll(/\b(?:var|let|const)\s+([A-Za-z_$][\w$]*)/g)].map(m => m[1]));
@@ -2511,10 +2600,8 @@ console.log('\n31. Kalenderkennzeichnung und Tagesfilter');
          'der Filter greift auf Termine');
   /* Ganztägiges steht seit v0.21.0 im Tagesverlauf, nicht mehr als
      eigene Zeile über dem Kopf. */
-  pruefe(eintraege && /passtZumTag\(g0\.kontext\)/.test(eintraege[0]),
-         'der Filter greift auch auf Ganztägiges');
   pruefe(eintraege && /passtZumTag\(jtKontext\(jt\[i\]\)\)/.test(eintraege[0]),
-         'und auf Jahrestermine');
+         'der Filter greift auf Jahrestermine und Ganztägiges');
 
   if (!api) {
     warn('Filterfunktionen nicht auswertbar');
@@ -4007,8 +4094,16 @@ console.log('\n55. Ganztägiges im Tagesverlauf');
   pruefe(eintraege && /jtAn\(is\)/.test(eintraege[0]), 'Jahrestermine kommen hinein');
   pruefe(eintraege && /feiertagAn\(is\)/.test(eintraege[0]), 'Feiertage ebenfalls');
   pruefe(eintraege && /ferienAn\(is\)/.test(eintraege[0]), 'Ferien ebenfalls');
-  pruefe(eintraege && /ausGoogle\.ganztags/.test(eintraege[0]),
-         'und die ganztägigen Termine aus Google');
+  /* Seit v0.33.0 kommen die ganztägigen Kalendertermine über jtAn —
+     sie sind Jahresterminen gleichgestellt. */
+  const kjt = skript.match(/function kalenderJahrestermine\([\s\S]*?\n\}/);
+  pruefe(kjt && /ganztags/.test(kjt[0]),
+         'die ganztägigen Termine aus Google werden zu Jahresterminen');
+  const jtan = skript.match(/function jtAn\([\s\S]*?\n\}/);
+  pruefe(jtan && /kalenderJahrestermine\(is\)/.test(jtan[0]),
+         'und erscheinen überall dort, wo Jahrestermine erscheinen');
+  pruefe(eintraege && !/ausGoogle\.ganztags/.test(eintraege[0]),
+         'sie werden nicht zusätzlich angehängt — das gäbe Dubletten');
 
   const tag = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
   pruefe(tag && /class="tganz/.test(tag[0]),
@@ -4027,11 +4122,12 @@ console.log('\n55. Ganztägiges im Tagesverlauf');
   } else {
     const e = g.pruefeGanztags();
     pruefe(e.anzahl === 4, 'vier ganztägige Einträge an diesem Tag');
-    pruefe(e.quellen === 'Urlaub,Feiertag,Ferien,Familie',
+    pruefe(e.quellen === 'ohne Art,Urlaub,Feiertag,Ferien',
            'jede Herkunft wird benannt (ist: ' + e.quellen + ')');
     pruefe(e.beruflichNur === 0,
            'auf Beruf gefiltert bleibt von diesen privaten nichts');
-    pruefe(e.mitFarbe === 1, 'ein Jahrestermin bringt seine Artfarbe mit');
+    pruefe(e.mitFarbe === 2,
+           'jeder Eintrag bringt eine Farbe mit — die Artfarbe oder den neutralen Ton');
   }
 }
 
@@ -4650,6 +4746,74 @@ console.log('\n65. Ablauf und Termin verbinden');
     pruefe(e.neuerName === 'Workshop', 'ein einmaliger lässt sich anlegen');
     pruefe(e.neuerOhneVorlage === true, 'er hat keine Vorlage');
     pruefe(e.neuerAmTermin === true, 'und hängt am Termin');
+  }
+}
+
+/* ============================================================
+   66. Arten aus dem Kalender
+   Grund: Ein gemeinsamer Kalender loest das Problem zweier Bestaende,
+   aber ein Google-Termin kennt keine Art. Sie steht deshalb als
+   Kuerzel im Termin selbst — dort gilt sie fuer alle, die ihn sehen.
+   ============================================================ */
+console.log('\n66. Arten aus dem Kalender');
+{
+  const skript = hauptSkript();
+  const a = globalThis.__artApi;
+
+  ['artAusText', 'titelOhneArt', 'terminArt', 'zuordnungArt', 'zuordnungSetzen',
+   'artenAlle', 'artName', 'artFarbe', 'artFarbeAus', 'kalenderJahrestermine',
+   'jahrestermineUndKalender', 'artWahlOeffnen', 'artWahlSetzen', 'artWahlNeu',
+   'jtAlsIcs'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  /* Am Kalender wird nichts geändert */
+  pruefe(/calendar\.readonly/.test(QUELLE), 'das Kalenderrecht bleibt nur lesend');
+  const setzen = skript.match(/function zuordnungSetzen\([\s\S]*?\n\}/);
+  pruefe(setzen && /DB\.kalenderzuordnung/.test(setzen[0]),
+         'die eigene Zuordnung landet in der eigenen Datei');
+
+  /* Vorrang */
+  const art = skript.match(/function terminArt\([\s\S]*?\n\}/);
+  pruefe(art && art[0].indexOf('zuordnungArt') < art[0].indexOf('artAusText'),
+         'die eigene Zuordnung geht vor das Kürzel im Termin');
+
+  /* Beschreibung wird mitgelesen */
+  pruefe(/items\(id,summary,description/.test(QUELLE),
+         'die Beschreibung wird von Google mitgeholt');
+
+  /* ICS-Ausgabe */
+  const ics = skript.match(/function jtAlsIcs\([\s\S]*?\n\}\n/);
+  pruefe(ics && /DESCRIPTION:' \+ icsZeile\('#' \+ e\.art\)/.test(ics[0]),
+         'die Ausgabe schreibt die Art als Kürzel in die Beschreibung');
+  pruefe(ics && /SUMMARY:' \+ icsZeile\(e\.titel\)/.test(ics[0]),
+         'der Titel bleibt unberührt');
+  pruefe(ics && /RRULE:FREQ=YEARLY/.test(ics[0]),
+         'jährliche Termine werden als Serie ausgegeben');
+  pruefe(ics && /tagePlus\(bis, 1\)/.test(ics[0]),
+         'das Ende wird um einen Tag verschoben, wie ICS es verlangt');
+
+  if (!a) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = a.pruefeArten();
+    pruefe(e.ausTitel === 'urlaub', 'das Kürzel im Titel wird gelesen');
+    pruefe(e.ausBeschreibung === 'dienstreise', 'auch das in der Beschreibung');
+    pruefe(e.titelSauber === 'Kreta', 'der Titel erscheint ohne das Kürzel');
+    pruefe(e.neueArt === 'kur', 'eine unbekannte Art wird übernommen');
+    pruefe(e.neueArtName === 'Kur', 'sie bekommt einen lesbaren Namen');
+    pruefe(e.neueArtFarbe.indexOf('hsl(') === 0,
+           'und eine Farbe, die sich aus ihrem Namen ergibt');
+    pruefe(e.farbeStabil === true, 'derselbe Name ergibt immer dieselbe Farbe');
+    pruefe(e.ohneKuerzel === '', 'ohne Kürzel bleibt die Art leer');
+    pruefe(e.inArtenListe === true, 'die neue Art steht in der Auswahl');
+    pruefe(e.zuordnungGewinnt === 'krank',
+           'die eigene Zuordnung schlägt das Kürzel im Termin');
+    pruefe(e.urlaubMachtFrei === 'Freizeittag',
+           'ein Urlaub aus dem Kalender macht den Tag frei');
+    pruefe(e.keineDublette === 1,
+           'ein ganztägiger Kalendertermin erscheint im Tag genau einmal');
   }
 }
 
