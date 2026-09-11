@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.30.0</title>
+<title>Workbench 0.31.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -266,6 +266,11 @@ body.breit .kleer{padding-left:6px}
   background:var(--papier);color:var(--grau);cursor:pointer;white-space:nowrap;
   vertical-align:1px}
 .k-ablauf.an{border-color:var(--weinrot);color:var(--weinrot);font-weight:500}
+.klein-banner{display:flex;width:100%;align-items:center;gap:10px;margin:0 0 10px;
+  padding:8px 12px;border:1px solid var(--linie);border-radius:6px;
+  background:var(--karte);color:var(--grau);font:inherit;
+  font-size:calc(var(--fs)*0.78);cursor:pointer;text-align:left}
+.klein-banner span:first-child{flex:1;min-width:0}
 .kleer{font-size:calc(var(--fs)*0.78);color:var(--grau-hell);padding-left:11px}
 
 /* Monat */
@@ -938,7 +943,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.30.0';
+var APP_VERSION = '0.31.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5259,7 +5264,8 @@ function ferienImJahr(jahr) {
 function wocheHtml(is) {
   var mo = montagVon(is);
   var heute = isoDatum();
-  var h = '<div class="woche-raster">';
+  var h = wochenKleinBanner(mo);
+  h += '<div class="woche-raster">';
   var i;
   for (i = 0; i < 7; i++) {
     var tag = tagePlus(mo, i);
@@ -5310,6 +5316,7 @@ function wocheHtml(is) {
   h += '</div>';
 
   h += wochenListeHtml(mo);
+  h += wochenKleinHtml(mo);
   return h;
 }
 
@@ -5346,6 +5353,102 @@ function wochenAufgaben(mo) {
     return (x.titel < y.titel) ? -1 : 1;
   });
   return aus;
+}
+
+/* Kleinigkeiten dieser Woche. Eine Kleinigkeit auf „Woche" hat keinen
+   Tag und stand deshalb in keinem Tagesplan — und aus der Wochenliste
+   hatten wir sie ausgeschlossen. Hier ist ihr Platz: unten,
+   eingeklappt, aber mit einem Hinweis oben, dass es sie gibt. */
+var wochenKleinAuf = false;
+
+function wochenKleinigkeiten(mo) {
+  var so = tagePlus(mo, 6);
+  var dieseWoche = montagVon(isoDatum());
+  var naechsteWoche = tagePlus(dieseWoche, 7);
+  var aus = [];
+  var alle = DB.aufgaben || [];
+  var i;
+  for (i = 0; i < alle.length; i++) {
+    var a = alle[i];
+    if (a.wiederholung) { continue; }
+    if (a.art !== 'klein') { continue; }
+    if (!passtZumKalender(a.kontext)) { continue; }
+    var p = a.planung || '';
+    var drin = false;
+    if (p === 'woche') { drin = (mo === dieseWoche); }
+    else if (p === 'naechste') { drin = (mo === naechsteWoche); }
+    else { drin = (p >= mo && p <= so); }
+    if (!drin) { continue; }
+    aus.push(a);
+  }
+  aus.sort(function (x, y) {
+    var fx = x.frist || '9999-12-31';
+    var fy = y.frist || '9999-12-31';
+    if (fx !== fy) { return (fx < fy) ? -1 : 1; }
+    return (x.titel < y.titel) ? -1 : 1;
+  });
+  return aus;
+}
+
+function wochenKleinOffen(mo) {
+  var l = wochenKleinigkeiten(mo);
+  var n = 0;
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].status !== 'erledigt') { n++; }
+  }
+  return n;
+}
+
+function wochenKleinUm() {
+  wochenKleinAuf = !wochenKleinAuf;
+  kalZeichnen();
+  if (wochenKleinAuf) {
+    var blatt = document.getElementById('kalBlatt');
+    if (blatt && typeof blatt.scrollHeight === 'number') {
+      blatt.scrollTop = blatt.scrollHeight;
+    }
+  }
+}
+
+function wochenKleinBanner(mo) {
+  var offen = wochenKleinOffen(mo);
+  if (!offen || wochenKleinAuf) { return ''; }
+  return '<button class="klein-banner" type="button" onclick="wochenKleinUm()">'
+       + '<span>' + offen + (offen === 1 ? ' Kleinigkeit ist' : ' Kleinigkeiten sind')
+       + ' offen</span><span class="nz-wort">ganz unten ansehen</span></button>';
+}
+
+function wochenKleinHtml(mo) {
+  var liste = wochenKleinigkeiten(mo);
+  if (!liste.length) { return ''; }
+  var offen = wochenKleinOffen(mo);
+
+  var h = '<button class="tfalt" type="button" onclick="wochenKleinUm()">'
+        + '<span>Kleinigkeiten · ' + offen + ' offen von ' + liste.length + '</span>'
+        + '<svg class="' + (wochenKleinAuf ? 'auf' : '') + '" viewBox="0 0 24 24">'
+        + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+  if (!wochenKleinAuf) { return h; }
+
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    var k = liste[i];
+    var fertig = (k.status === 'erledigt');
+    h += '<div class="tzeile kompakt' + (k.kontext === 'privat' ? ' privat' : '') + '">';
+    h += '<button class="tkasten' + (fertig ? ' an' : '') + '" type="button" onclick="'
+       + (fertig ? ('aufgabeWiederOeffnen(\'' + esc(k.id) + '\')')
+                 : ('aufgabeErledigen(\'' + esc(k.id) + '\')')) + '"></button>';
+    h += '<div class="ttext" onclick="aufgabeAktionen(\'' + esc(k.id) + '\')">';
+    h += '<div class="ttitel' + (fertig ? ' fertig' : '') + '">' + esc(k.titel) + '</div>';
+    if (k.frist) {
+      h += '<div class="tmeta">Frist ' + esc(kurzDatum(k.frist)) + '</div>';
+    }
+    h += '</div>';
+    h += '<button class="planungsknopf' + planungKlasse(k) + '" type="button" '
+       + 'onclick="planungWeiter(\'' + esc(k.id) + '\')">'
+       + esc(planungText(k)) + '</button></div>';
+  }
+  return h;
 }
 
 function wochenListeHtml(mo) {

@@ -485,6 +485,35 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__kleinApi = {'
+                 + ' pruefeKlein: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var heute = isoDatum();'
+                 + '   var mo = montagVon(heute);'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'k1\', titel:\'Batterien\', kontext:\'privat\','
+                 + '       status:\'offen\', planung:\'woche\', art:\'klein\', frist: heute },'
+                 + '     { id:\'k2\', titel:\'Ablegen\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung: tagePlus(mo,2), art:\'klein\' },'
+                 + '     { id:\'k3\', titel:\'Fertig\', kontext:\'beruflich\','
+                 + '       status:\'erledigt\', planung: mo, art:\'klein\' },'
+                 + '     { id:\'k4\', titel:\'Naechste\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung:\'naechste\', art:\'klein\' },'
+                 + '     { id:\'k5\', titel:\'Woechentlich\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung: mo, art:\'klein\','
+                 + '       wiederholung:{ takt:\'woche\', intervall:1, tage:[1], tag:1 } },'
+                 + '     { id:\'a1\', titel:\'Hauptaufgabe\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung:\'woche\', art:\'haupt\' } ];'
+                 + '   var l = wochenKleinigkeiten(mo);'
+                 + '   var titel = l.map(function(x){ return x.titel; });'
+                 + '   var r = { anzahl:l.length, offen:wochenKleinOffen(mo),'
+                 + '             mitFristZuerst: titel[0],'
+                 + '             hauptNichtDrin: titel.indexOf(\'Hauptaufgabe\') < 0,'
+                 + '             naechsteNichtDrin: titel.indexOf(\'Naechste\') < 0,'
+                 + '             erledigtDrin: titel.indexOf(\'Fertig\') >= 0,'
+                 + '             wiederkehrendDrin: titel.indexOf(\'Woechentlich\') >= 0 };'
+                 + '   DB = alt; return r;'
+                 + ' } };'
                  + 'globalThis.__monatSpaltenApi = {'
                  + ' pruefeMonatSpalten: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -4448,6 +4477,65 @@ console.log('\n63. Monat in zwei Spalten');
            'im September stehen fünfzehn Tage je Spalte');
     pruefe(e.ausgeglichen === true, 'die erzeugten Elemente sind ausgeglichen');
     pruefe(e.alleTageDa === 31, 'kein Tag geht bei der Teilung verloren');
+  }
+}
+
+/* ============================================================
+   64. Kleinigkeiten in der Wochensicht
+   Grund: Eine Kleinigkeit auf „Woche" hat keinen Tag — kein
+   Tagesplan zeigte sie, und aus der Wochenliste war sie
+   ausgeschlossen. Sie fiel durch alle Raster.
+   ============================================================ */
+console.log('\n64. Kleinigkeiten in der Woche');
+{
+  const skript = hauptSkript();
+  const k = globalThis.__kleinApi;
+
+  ['wochenKleinigkeiten', 'wochenKleinOffen', 'wochenKleinUm',
+   'wochenKleinBanner', 'wochenKleinHtml'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const woche = skript.match(/function wocheHtml\([\s\S]*?\n\}\n/);
+  pruefe(woche && /wochenKleinBanner\(mo\)/.test(woche[0]),
+         'oben steht ein Hinweis, wenn welche offen sind');
+  pruefe(woche && /wochenKleinHtml\(mo\)/.test(woche[0]),
+         'der Block hängt ganz unten');
+
+  const liste = skript.match(/function wochenKleinigkeiten\([\s\S]*?\n\}/);
+  pruefe(liste && /a\.art !== 'klein'/.test(liste[0]), 'nur Kleinigkeiten');
+  pruefe(liste && /p === 'woche'/.test(liste[0]) && /p === 'naechste'/.test(liste[0]),
+         'auch die ohne festen Tag');
+  pruefe(liste && /x\.frist \|\| '9999-12-31'/.test(liste[0]),
+         'sortiert nach Frist — die mit Frist zuerst');
+
+  const banner = skript.match(/function wochenKleinBanner\([\s\S]*?\n\}/);
+  pruefe(banner && /!offen \|\| wochenKleinAuf/.test(banner[0]),
+         'der Hinweis verschwindet, sobald aufgeklappt ist oder nichts offen');
+
+  const um = skript.match(/function wochenKleinUm\([\s\S]*?\n\}/);
+  pruefe(um && /scrollTop = blatt\.scrollHeight/.test(um[0]),
+         'beim Aufklappen wird ans Ende gerollt');
+
+  const html = skript.match(/function wochenKleinHtml\([\s\S]*?\n\}\n/);
+  pruefe(html && /offen \+ ' offen von '/.test(html[0]),
+         'der Kopf nennt offen und gesamt');
+  pruefe(html && /aufgabeWiederOeffnen\(/.test(html[0]),
+         'ein Haken lässt sich zurücknehmen');
+
+  if (!k) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = k.pruefeKlein();
+    pruefe(e.anzahl === 3, 'drei Kleinigkeiten in dieser Woche');
+    pruefe(e.offen === 2, 'zwei davon offen');
+    pruefe(e.mitFristZuerst === 'Batterien', 'die mit Frist steht oben');
+    pruefe(e.hauptNichtDrin === true, 'eine Hauptaufgabe steht nicht darin');
+    pruefe(e.naechsteNichtDrin === true,
+           'eine für die nächste Woche gehört nicht in diese');
+    pruefe(e.erledigtDrin === true, 'Erledigtes bleibt sichtbar');
+    pruefe(e.wiederkehrendDrin === false, 'Wiederkehrendes nicht');
   }
 }
 
