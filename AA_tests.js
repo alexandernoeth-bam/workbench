@@ -485,6 +485,42 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__terminAblaufApi = {'
+                 + ' pruefeTermin: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var heute = isoDatum();'
+                 + '   var std = Number(uhrzeitJetzt().slice(0,2));'
+                 + '   var spaet = String(Math.min(23, std + 3));'
+                 + '   if (spaet.length < 2) { spaet = \'0\' + spaet; }'
+                 + '   spaet = spaet + \':00\';'
+                 + '   DB.ablaeufe = [{ id:\'v1\', name:\'Besprechung\','
+                 + '     kontext:\'beruflich\', schritte:['
+                 + '       { id:\'s1\', titel:\'Agenda\', auf:false, wann:\'davor\' },'
+                 + '       { id:\'s2\', titel:\'Protokoll\', auf:false, wann:\'danach\' } ],'
+                 + '     wiederholung:null, anlassAufgabeId:null, projektId:null,'
+                 + '     zielId:null, zuletzt:\'\', zuletztGestartet:\'\' }];'
+                 + '   termineNachTag = {};'
+                 + '   merkeTermin(heute, { id:\'g1\', titel:\'JF-Weekly\', zeit:spaet,'
+                 + '     bis:spaet, ort:\'\', ganztags:false, quelle:\'Alex\','
+                 + '     kontext:\'beruflich\' });'
+                 + '   tagOffen = heute;'
+                 + '   terminDurchlaufStarten(\'v1\', { id:\'g1\', titel:\'JF-Weekly\','
+                 + '     zeit:spaet, bis:spaet }, heute);'
+                 + '   var d = durchlaufZuTermin(\'g1\');'
+                 + '   var vor = ablaufSchritteHeute(heute).map(function(x){ return x.satz.titel; }).join(\',\');'
+                 + '   schrittUm(d.id, 0);'
+                 + '   var nachAgenda = ablaufSchritteHeute(heute).map(function(x){ return x.satz.titel; }).join(\',\');'
+                 + '   d.schritte[1].abZeit = \'00:01\';'
+                 + '   var nachTermin = ablaufSchritteHeute(heute).map(function(x){ return x.satz.titel; }).join(\',\');'
+                 + '   var schon = durchlaufZuTermin(\'g1\') ? 1 : 0;'
+                 + '   var r = { name:d.name, terminId:d.terminId,'
+                 + '             davorOhneRuhen: !d.schritte[0].ab,'
+                 + '             danachMitZeit: spaet,'
+                 + '             vorDemTermin: vor, nachDerAgenda: nachAgenda,'
+                 + '             nachDemTermin: nachTermin, zweiterAmTermin: schon };'
+                 + '   termineNachTag = {}; tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__wocheApi = {'
                  + ' pruefeWoche: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -4242,8 +4278,12 @@ console.log('\n61. Wochensicht');
   });
 
   const liste = skript.match(/function wochenAufgaben\([\s\S]*?\n\}/);
-  pruefe(liste && /p !== 'woche' && !\(p >= mo && p <= so\)/.test(liste[0]),
+  pruefe(liste && /p === 'woche'/.test(liste[0]) && /p >= mo && p <= so/.test(liste[0]),
          'die Liste fasst Wochenliste und Tagesplanung zusammen');
+  pruefe(liste && /p === 'naechste'/.test(liste[0]),
+         'auch was auf die nächste Woche gelegt ist');
+  pruefe(liste && /montagVon\(isoDatum\(\)\)/.test(liste[0]),
+         '„diese" und „nächste" messen sich an heute, nicht an der gezeigten Woche');
   pruefe(liste && !/status === 'erledigt'/.test(liste[0]),
          'Erledigtes bleibt in der Liste');
   pruefe(liste && /a\.wiederholung.*continue/s.test(liste[0]),
@@ -4271,6 +4311,72 @@ console.log('\n61. Wochensicht');
     pruefe(e.backlogDrin === false, 'und nichts aus dem Backlog');
     pruefe(e.erledigtDrin === true, 'Erledigtes dieser Woche bleibt');
     pruefe(e.wiederkehrendDrin === false, 'Wiederkehrendes nicht');
+  }
+}
+
+/* ============================================================
+   62. Ablauf an einem Termin, Planung auf die naechste Woche
+   Grund: Bei den meisten Besprechungen sind es dieselben Handgriffe.
+   Sie sollen sich an den einzelnen Termin heften lassen — und die
+   Nachbereitung darf nicht schon am Morgen dastehen.
+   ============================================================ */
+console.log('\n62. Termin-Abläufe und nächste Woche');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__terminAblaufApi;
+
+  ['durchlaufZuTermin', 'terminDurchlaufStarten', 'terminAblaufWahl',
+   'terminAblaufSetzen', 'terminFuerKennung', 'abSchrittWann'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const zeile = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
+  pruefe(zeile && /terminAblaufWahl\(/.test(zeile[0]),
+         'jede Terminzeile bietet das Anheften an');
+  pruefe(zeile && /Ablauf ' \+ schritteFertig/.test(zeile[0]),
+         'ein angehefteter Ablauf zeigt seinen Stand in der Zeile');
+
+  const starten = skript.match(/function terminDurchlaufStarten\([\s\S]*?\n\}\n/);
+  pruefe(starten && /terminId: termin\.id/.test(starten[0]),
+         'der Durchlauf merkt sich das Vorkommen, nicht die Serie');
+  pruefe(starten && /v\.name \+ ': ' \+ \(termin\.titel/.test(starten[0]),
+         'sein Name nennt Vorlage und Termin');
+  pruefe(starten && /wann === 'danach'/.test(starten[0]),
+         'Danach-Schritte bekommen ein Ruhen');
+
+  const ruht = skript.match(/function schrittRuht\([\s\S]*?\n\}/);
+  pruefe(ruht && /s\.abZeit > uhrzeitJetzt\(\)/.test(ruht[0]),
+         'am Tag selbst entscheidet zusätzlich die Uhrzeit');
+  pruefe(ruht && /tag === isoDatum\(\)/.test(ruht[0]),
+         'die Uhrzeit gilt nur für heute — an anderen Tagen sagt sie nichts');
+
+  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(detail && /abSchrittWann\(/.test(detail[0]),
+         'in der Vorlage lässt sich davor und danach setzen');
+
+  /* Nächste Woche */
+  pruefe(/planung === 'naechste'/.test(skript), 'die Planungsstufe „nächste Woche" gibt es');
+  const weiter = skript.match(/function planungWeiter\([\s\S]*?\n\}/);
+  pruefe(weiter && /jetztWert === 'woche'.*'naechste'/s.test(weiter[0]),
+         'der Knopf schaltet von dieser auf die nächste Woche');
+  const text = skript.match(/function planungText\([\s\S]*?\n\}/);
+  pruefe(text && /Nächste Woche/.test(text[0]), 'sie ist beschriftet');
+  const gr = skript.match(/function gruppeVonPlanung\([\s\S]*?\n\}/);
+  pruefe(gr && /'Nächste Woche'/.test(gr[0]), 'sie hat eine eigene Gruppe');
+
+  if (!t) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = t.pruefeTermin();
+    pruefe(e.name === 'Besprechung: JF-Weekly', 'der Durchlauf trägt beide Namen');
+    pruefe(e.terminId === 'g1', 'die Terminkennung ist vermerkt');
+    pruefe(e.davorOhneRuhen === true, 'Davor-Schritte ruhen nicht');
+    pruefe(e.danachMitZeit === '13:00', 'Danach-Schritte ruhen bis zum Terminende');
+    pruefe(e.vorDemTermin === 'Agenda', 'vor dem Termin steht nur die Vorbereitung an');
+    pruefe(e.nachDerAgenda === '', 'danach ruht der nächste Schritt noch');
+    pruefe(e.nachDemTermin === 'Protokoll', 'nach dem Termin erscheint er');
+    pruefe(e.zweiterAmTermin === 1, 'an denselben Termin wird nichts Zweites geheftet');
   }
 }
 

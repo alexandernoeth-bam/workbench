@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.27.0</title>
+<title>Workbench 0.28.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -359,6 +359,7 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
   border:1px solid var(--linie);border-radius:5px;background:var(--papier);
   color:var(--tinte);cursor:pointer;white-space:nowrap}
 .ms-wort.gefahr{border-color:var(--weinrot);color:var(--weinrot)}
+.ms-wort.an{border-color:var(--tinte);color:var(--tinte);font-weight:500}
 .ms-marke{font-size:calc(var(--fs)*0.74);color:var(--grau)}
 .v-feld{flex:1;min-width:0;font:inherit;font-size:calc(var(--fs)*0.85);
   border:1px solid var(--linie);border-radius:5px;padding:5px 7px;
@@ -918,7 +919,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.27.0';
+var APP_VERSION = '0.28.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2858,7 +2859,7 @@ function tagesEintraege(is) {
     var g = ausGoogle.zeit[i];
     if (!passtZumTag(g.kontext)) { continue; }
     verlauf.push({ art: 'termin', zeit: g.zeit || '00:00',
-                   t: { titel: g.titel, von: g.zeit, bis: g.bis, ort: g.ort,
+                   t: { id: g.id, titel: g.titel, von: g.zeit, bis: g.bis, ort: g.ort,
                         quelle: g.quelle, kontext: g.kontext, extern: true } });
   }
 
@@ -2984,8 +2985,23 @@ function verlaufHtml(eintrag, is) {
     if (t.bis) { unten.push(esc(t.von) + '–' + esc(t.bis)); }
     if (t.ort) { unten.push(esc(t.ort)); }
     if (t.quelle) { unten.push(esc(t.quelle)); }
+    var lauf = t.id ? durchlaufZuTermin(t.id) : null;
     if (unten.length) { h += '<div class="tmeta">' + unten.join(' · ') + '</div>'; }
-    h += '</div></div>';
+    h += '</div>';
+    if (t.id) {
+      if (lauf) {
+        var offenSchritte = (lauf.schritte || []).length - schritteFertig(lauf);
+        h += '<button class="planungsknopf tag" type="button" '
+           + 'onclick="abDetailOeffnen(\'' + esc(lauf.id) + '\',\'durchlauf\')" '
+           + 'title="Den angehefteten Ablauf öffnen">Ablauf ' + schritteFertig(lauf)
+           + '/' + (lauf.schritte || []).length + '</button>';
+      } else {
+        h += '<button class="planungsknopf" type="button" '
+           + 'onclick="terminAblaufWahl(\'' + esc(t.id) + '\',\'' + is + '\')" '
+           + 'title="Einen Ablauf an diesen Termin heften">Ablauf</button>';
+      }
+    }
+    h += '</div>';
     return h;
   }
   var a = eintrag.a;
@@ -3050,7 +3066,8 @@ function liegengeblieben(is) {
     var a = l[i];
     if (a.wiederholung) { continue; }
     if (a.status === 'erledigt') { continue; }
-    if (!a.planung || a.planung === 'backlog' || a.planung === 'woche') { continue; }
+    if (!a.planung || a.planung === 'backlog' || a.planung === 'woche'
+        || a.planung === 'naechste') { continue; }
     if (a.planung >= tag) { continue; }
     if (!passtZumTag(a.kontext)) { continue; }
     aus.push(a);
@@ -3109,6 +3126,8 @@ function nachzueglerHtml() {
     h += '<button type="button" onclick="nzSetzen(\'' + esc(a.id) + '\',\'heute\')">Heute</button>';
     h += '<button type="button" onclick="nzSetzen(\'' + esc(a.id) + '\',\'morgen\')">Morgen</button>';
     h += '<button type="button" onclick="nzSetzen(\'' + esc(a.id) + '\',\'woche\')">Woche</button>';
+    h += '<button type="button" onclick="nzSetzen(\'' + esc(a.id) + '\',\'naechste\')">'
+       + 'Nächste</button>';
     h += '<button type="button" onclick="nzSetzen(\'' + esc(a.id) + '\',\'backlog\')">Backlog</button>';
     h += '</div></div>';
   }
@@ -3701,6 +3720,8 @@ function detailHtml(a) {
      + '" type="button" onclick="dPlanung(\'backlog\')">Backlog</button>';
   h += '<button class="d-wahl' + (a.planung === 'woche' ? ' an' : '')
      + '" type="button" onclick="dPlanung(\'woche\')">Woche</button>';
+  h += '<button class="d-wahl' + (a.planung === 'naechste' ? ' an' : '')
+     + '" type="button" onclick="dPlanung(\'naechste\')">Nächste Woche</button>';
   h += '<input type="date" value="' + esc(istTag ? a.planung : '') + '" '
      + 'onchange="dPlanung(this.value)">';
   h += '</div></div>';
@@ -5278,6 +5299,10 @@ function wocheHtml(is) {
    Kleinigkeiten gehören nicht hierher, sie würden die Liste fluten. */
 function wochenAufgaben(mo) {
   var so = tagePlus(mo, 6);
+  /* „Diese Woche" und „Nächste Woche" sind relativ zum heutigen Tag,
+     nicht zur gezeigten Woche — sonst wanderten sie beim Blättern mit. */
+  var dieseWoche = montagVon(isoDatum());
+  var naechsteWoche = tagePlus(dieseWoche, 7);
   var aus = [];
   var alle = DB.aufgaben || [];
   var i;
@@ -5287,12 +5312,16 @@ function wochenAufgaben(mo) {
     if (a.art === 'klein') { continue; }
     if (!passtZumKalender(a.kontext)) { continue; }
     var p = a.planung || '';
-    if (p !== 'woche' && !(p >= mo && p <= so)) { continue; }
+    var drin = false;
+    if (p === 'woche') { drin = (mo === dieseWoche); }
+    else if (p === 'naechste') { drin = (mo === naechsteWoche); }
+    else { drin = (p >= mo && p <= so); }
+    if (!drin) { continue; }
     aus.push(a);
   }
   aus.sort(function (x, y) {
-    var px = (x.planung === 'woche') ? '9999-99-99' : x.planung;
-    var py = (y.planung === 'woche') ? '9999-99-99' : y.planung;
+    var px = (x.planung === 'woche' || x.planung === 'naechste') ? '9999-99-99' : x.planung;
+    var py = (y.planung === 'woche' || y.planung === 'naechste') ? '9999-99-99' : y.planung;
     if (px !== py) { return (px < py) ? -1 : 1; }
     return (x.titel < y.titel) ? -1 : 1;
   });
@@ -7008,13 +7037,21 @@ function offenerSchritt(d) {
    Bis dahin taucht sein Durchlauf nicht im Tag auf. */
 function schrittRuht(s, is) {
   if (!s || !s.ab) { return false; }
-  return s.ab > (is || isoDatum());
+  var tag = is || isoDatum();
+  if (s.ab > tag) { return true; }
+  /* Am Tag selbst kann zusätzlich eine Uhrzeit gelten — ein Schritt
+     nach einer Besprechung soll nicht schon am Morgen dastehen. */
+  if (s.ab === tag && s.abZeit && tag === isoDatum()) {
+    return s.abZeit > uhrzeitJetzt();
+  }
+  return false;
 }
 
 function ruhtBis(d) {
   var s = offenerSchritt(d);
   if (!s) { return ''; }
-  return schrittRuht(s.satz, isoDatum()) ? s.satz.ab : '';
+  if (!schrittRuht(s.satz, isoDatum())) { return ''; }
+  return s.satz.ab + (s.satz.abZeit ? (' ' + s.satz.abZeit) : '');
 }
 
 function schrittAbSetzen(id, nr, wert) {
@@ -7103,7 +7140,9 @@ function durchlaufKarteHtml(d) {
   h += '<div class="vk-zeit">' + fertig + ' von ' + l.length + '</div>';
   h += '<svg class="vk-pfeil" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></div>';
   if (ruht) {
-    h += '<div class="vk-ruht">ruht bis ' + esc(kurzDatum(ruht)) + '</div>';
+    var teile = String(ruht).split(' ');
+    h += '<div class="vk-ruht">ruht bis ' + esc(kurzDatum(teile[0]))
+       + (teile[1] ? (', ' + esc(teile[1]) + ' Uhr') : '') + '</div>';
   }
 
   h += '<div class="vk-mehr">';
@@ -7262,6 +7301,105 @@ function schrittUm(id, nr) {
 /* ------------------------------------------------------------
    Starten, beenden, anlegen
    ------------------------------------------------------------ */
+
+/* Ein Ablauf zu einem Termin: Die Kennung gilt für dieses Vorkommen,
+   nicht für die Serie — ein Protokoll gehört zu einer Sitzung. */
+function durchlaufZuTermin(terminId) {
+  var l = DB.durchlaeufe || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].terminId === terminId) { return l[i]; }
+  }
+  return null;
+}
+
+/* Vorlagenschritte tragen 'davor' oder 'danach'. Danach-Schritte
+   ruhen bis zum Terminende, sonst stünde alles gleichzeitig im Tag. */
+function terminDurchlaufStarten(vorlageId, termin, is) {
+  var v = vorlageFinden(vorlageId);
+  if (!v) { return null; }
+  var schritte = [];
+  var l = v.schritte || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    schritte.push({
+      titel: l[i].titel,
+      auf: !!l[i].auf,
+      wann: l[i].wann || 'davor',
+      fertig: false,
+      ab: (l[i].wann === 'danach') ? is : '',
+      abZeit: (l[i].wann === 'danach') ? (termin.bis || termin.zeit || '') : ''
+    });
+  }
+  var neu = {
+    id: neueKennung(), ablaufId: v.id,
+    name: v.name + ': ' + (termin.titel || 'Termin'),
+    kontext: v.kontext, projektId: v.projektId || null, zielId: v.zielId || null,
+    terminId: termin.id, terminTag: is, terminZeit: termin.zeit || '',
+    start: isoDatum(), frist: is, schritte: schritte, geaendert: jetzt()
+  };
+  DB.durchlaeufe.push(neu);
+  v.zuletzt = isoDatum();
+  v.geaendert = jetzt();
+  spaeterSichern();
+  tagZeichnen();
+  abZeichnen();
+  melde('Ablauf angeheftet: ' + neu.name, 'gut');
+  return neu;
+}
+
+function terminAblaufWahl(terminId, is) {
+  var t = terminFuerKennung(terminId, is);
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!t || !sheet || !hg) { return; }
+
+  var h = blattKopf();
+  h += '<div class="as-titel">' + esc(t.titel) + '</div>';
+  h += '<div class="as-meta">' + esc(t.zeit ? (t.zeit + ' Uhr · ') : '')
+     + esc(kurzDatum(is)) + '</div>';
+  h += '<div class="as-linie"></div>';
+  h += '<div class="d-hinweis" style="text-align:left;padding:6px 0">'
+     + 'Welcher Ablauf gehört zu dieser Besprechung?</div>';
+
+  var l = DB.ablaeufe || [];
+  var i;
+  var gab = false;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].kontext !== (t.kontext || 'beruflich')) { continue; }
+    h += '<div class="mf-zeile" onclick="terminAblaufSetzen(\'' + esc(l[i].id) + '\',\''
+       + esc(terminId) + '\',\'' + is + '\')">'
+       + '<span class="mf-name">' + esc(l[i].name) + '</span>'
+       + '<span class="a-quelle">' + (l[i].schritte || []).length + ' Schritte</span></div>';
+    gab = true;
+  }
+  if (!gab) {
+    h += '<div class="tleer" style="padding-left:0">Keine Vorlage in diesem Kontext. '
+       + 'Lege unter Abläufe eine an, etwa „Besprechung".</div>';
+  }
+  h += '<div class="d-reihe"><button type="button" onclick="aktionenSchliessen()">'
+     + 'Abbrechen</button></div>';
+  sheet.innerHTML = h;
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function terminAblaufSetzen(vorlageId, terminId, is) {
+  var t = terminFuerKennung(terminId, is);
+  if (!t) { return; }
+  terminDurchlaufStarten(vorlageId, t, is);
+  aktionenSchliessen();
+}
+
+function terminFuerKennung(terminId, is) {
+  var t = termineFuerTag(is);
+  var alle = t.zeit.concat(t.ganztags);
+  var i;
+  for (i = 0; i < alle.length; i++) {
+    if (alle[i].id === terminId) { return alle[i]; }
+  }
+  return null;
+}
 
 /* Läuft aus dieser Vorlage schon etwas? Dann wird nichts Zweites
    gestartet — sonst häufen sich unerledigte Durchläufe. */
@@ -7549,7 +7687,14 @@ function abDetailHtml() {
     h += '</div>';
 
     h += '<div class="ms-unten">';
-    if (!istVorlage) {
+    if (istVorlage) {
+      h += '<button class="ms-wort' + ((l[i].wann !== 'danach') ? ' an' : '') + '" '
+         + 'type="button" onclick="abSchrittWann(' + i + ',\'davor\')" '
+         + 'title="Dieser Schritt gehört vor den Termin">davor</button>';
+      h += '<button class="ms-wort' + ((l[i].wann === 'danach') ? ' an' : '') + '" '
+         + 'type="button" onclick="abSchrittWann(' + i + ',\'danach\')" '
+         + 'title="Dieser Schritt gehört nach den Termin">danach</button>';
+    } else {
       h += '<span class="ms-marke">frühestens ab</span>'
          + '<input class="v-feld" type="date" value="' + esc(l[i].ab || '') + '" '
          + 'style="flex:0 0 auto" onchange="abSchrittAb(' + i + ',this.value)">';
@@ -7692,8 +7837,10 @@ function abSchrittNeu() {
   var a = ablaufFinden(abDetail, abDetailArt);
   if (!a) { return; }
   if (!Array.isArray(a.schritte)) { a.schritte = []; }
-  if (abDetailArt === 'vorlage') { a.schritte.push({ id: neueKennung(), titel: '', auf: false }); }
-  else { a.schritte.push({ titel: '', auf: false, fertig: false, ab: '' }); }
+  if (abDetailArt === 'vorlage') {
+    a.schritte.push({ id: neueKennung(), titel: '', auf: false, wann: 'davor' });
+  }
+  else { a.schritte.push({ titel: '', auf: false, fertig: false, ab: '', abZeit: '' }); }
   abGeaendert(true);
 }
 
@@ -7725,6 +7872,13 @@ function abSchrittAlsAufgabe(i) {
   aufZeichnen();
   abGeaendert(true);
   melde('Aufgabe angelegt: ' + titel, 'gut');
+}
+
+function abSchrittWann(i, wert) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || !a.schritte[i]) { return; }
+  a.schritte[i].wann = wert;
+  abGeaendert(true);
 }
 
 function abSchrittAb(i, wert) {
@@ -8012,12 +8166,13 @@ function wochenEnde(is) {
 function planungText(a) {
   if (!a.planung || a.planung === 'backlog') { return 'Backlog'; }
   if (a.planung === 'woche') { return 'Woche'; }
+  if (a.planung === 'naechste') { return 'Nächste Woche'; }
   return kurzDatum(a.planung);
 }
 
 function planungKlasse(a) {
   if (!a.planung || a.planung === 'backlog') { return ''; }
-  if (a.planung === 'woche') { return ' woche'; }
+  if (a.planung === 'woche' || a.planung === 'naechste') { return ' woche'; }
   return ' tag';
 }
 
@@ -8025,6 +8180,7 @@ function gruppeVonPlanung(a) {
   var heute = isoDatum();
   if (!a.planung || a.planung === 'backlog') { return 'Backlog'; }
   if (a.planung === 'woche') { return 'Diese Woche'; }
+  if (a.planung === 'naechste') { return 'Nächste Woche'; }
   if (a.planung === heute) { return 'Heute'; }
   if (a.planung < heute) { return 'Liegengeblieben'; }
   return 'Fest geplant';
@@ -8048,7 +8204,8 @@ function aufGruppeVon(a) {
 
 function aufReihenfolge(sichtbar) {
   if (aufGruppe === 'planung') {
-    return ['Liegengeblieben', 'Heute', 'Fest geplant', 'Diese Woche', 'Backlog'];
+    return ['Liegengeblieben', 'Heute', 'Fest geplant', 'Diese Woche',
+            'Nächste Woche', 'Backlog'];
   }
   if (aufGruppe === 'frist') {
     return ['Überfällig', 'Diese Woche fällig', 'Später fällig', 'Ohne Frist', 'Wiederkehrend'];
@@ -8257,13 +8414,14 @@ function aufgabeErledigen(id) {
   spaeterSichern();
 }
 
-/* Backlog → Diese Woche → Heute → Backlog */
+/* Backlog → Diese Woche → Nächste Woche → Heute → Backlog */
 function planungWeiter(id) {
   var a = aufgabeFinden(id);
   if (!a) { return; }
   var jetztWert = a.planung || 'backlog';
   if (jetztWert === 'backlog') { a.planung = 'woche'; }
-  else if (jetztWert === 'woche') { a.planung = isoDatum(); }
+  else if (jetztWert === 'woche') { a.planung = 'naechste'; }
+  else if (jetztWert === 'naechste') { a.planung = isoDatum(); }
   else { a.planung = 'backlog'; }
   a.geaendert = jetzt();
   aufZeichnen();
