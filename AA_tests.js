@@ -213,7 +213,8 @@ console.log('\n6. Datenmodell');
   /* „termine" ist mit v0.15.0 entfallen: berufliche Termine stehen im
      Google-Kalender, eine zweite Wahrheit soll es nicht geben. */
   const erwartet = ['aufgaben', 'ziele', 'themen', 'projekte', 'ablaeufe',
-                    'durchlaeufe', 'jahrestermine', 'ferien', 'kalenderzuordnung'];
+                    'durchlaeufe', 'jahrestermine', 'ferien', 'einfaelle',
+                    'kalenderzuordnung'];
 
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
   pruefe(!!leer, 'leereDatenbank ist auslesbar');
@@ -504,6 +505,35 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__einfallApi = {'
+                 + ' pruefeEinfaelle: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var heute = isoDatum(); tagOffen = heute;'
+                 + '   [\'Toskana mit dem Rad p\', \'Schweissen lernen p\','
+                 + '    \'Tauchschein p\'].forEach(function(t){ einfallNeu(t); });'
+                 + '   var erster = DB.einfaelle[0];'
+                 + '   var ohneDatum = Object.keys(erster).filter(function(k){'
+                 + '     return /frist|planung|uhrzeit/.test(k); }).length === 0;'
+                 + '   einfallDetail = erster.id;'
+                 + '   einfallWirdVorhaben(\'projekt\');'
+                 + '   einfallStand(DB.einfaelle[1].id, \'verworfen\');'
+                 + '   var e = tagesEintraege(heute);'
+                 + '   var imTag = e.haupt.length + e.klein.length'
+                 + '             + e.wieder.length + e.verlauf.length;'
+                 + '   var r = { gemerkt: DB.einfaelle.length,'
+                 + '             kontextGedeutet: erster.kontext,'
+                 + '             titelSauber: erster.titel,'
+                 + '             ohneDatumsfelder: ohneDatum,'
+                 + '             nachProjekt: DB.projekte.length,'
+                 + '             standVerfolgt: erster.stand,'
+                 + '             bleibtErhalten: DB.einfaelle.length,'
+                 + '             offen: einfaelleSichtbar(\'offen\').length,'
+                 + '             verfolgt: einfaelleSichtbar(\'verfolgt\').length,'
+                 + '             verworfen: einfaelleSichtbar(\'verworfen\').length,'
+                 + '             imTagesplan: imTag, amSymbol: offeneHeute() };'
+                 + '   einfallDetail = \'\'; tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__dublettenApi = {'
                  + ' pruefeDubletten: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -5346,6 +5376,85 @@ console.log('\n71. Keine Dublette im Tag');
            'trägt sie Schritte in mehreren, wird gezählt statt aufgezählt');
     pruefe(e.zahlAmSymbol === 3,
            'die Zahl am Symbol zählt sie ebenfalls nur einmal');
+  }
+}
+
+/* ============================================================
+   72. Einfaelle
+   Grund: Was man irgendwann einmal tun moechte, darf nicht mahnen.
+   Alles andere im System draengt — Tag, Woche, Fristen, die Zahl am
+   Symbol. Ein Einfall muss davon unberuehrt bleiben, sonst wird er
+   zum Vorwurf und man schreibt keine mehr auf.
+   ============================================================ */
+console.log('\n72. Einfälle');
+{
+  const skript = hauptSkript();
+  const e = globalThis.__einfallApi;
+
+  ['einfallFinden', 'einfaelleSichtbar', 'einfallNeu', 'einfallStand',
+   'einfallFeld', 'einfallWirdVorhaben', 'einfallLoeschen', 'einfaelleZeichnen',
+   'einfallOeffnen', 'einfallDetailHtml', 'setVhStufe'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  /* Sie mahnen nicht */
+  const tag = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
+  pruefe(tag && !/einfaelle/.test(tag[0]),
+         'im Tagesplan kommen Einfälle nicht vor');
+  const badge = skript.match(/function offeneHeute\([\s\S]*?\n\}/);
+  pruefe(badge && !/einfaelle/.test(badge[0]),
+         'die Zahl am Symbol zählt sie nicht');
+  const woche = skript.match(/function wochenAufgaben\([\s\S]*?\n\}/);
+  pruefe(woche && !/einfaelle/.test(woche[0]),
+         'die Wochenliste ebenfalls nicht');
+
+  /* Kein Datum, keine Planung */
+  const neu = skript.match(/function einfallNeu\([\s\S]*?\n\}/);
+  pruefe(neu && !/frist|planung|uhrzeit/.test(neu[0]),
+         'ein Einfall bekommt weder Frist noch Planung noch Uhrzeit');
+
+  /* Der Weg hinaus */
+  const wird = skript.match(/function einfallWirdVorhaben\([\s\S]*?\n\}\n/);
+  pruefe(wird && /e\.stand = 'verfolgt'/.test(wird[0]),
+         'wird etwas daraus, gilt er als verfolgt');
+  pruefe(wird && /e\.wurdeId = id/.test(wird[0]),
+         'er merkt sich, was aus ihm wurde');
+  pruefe(wird && !/splice/.test(wird[0]),
+         'er verschwindet dabei nicht — die Geschichte bleibt');
+
+  /* Abgleich */
+  pruefe(/'ferien','einfaelle'/.test(skript) || /'einfaelle'/.test(skript),
+         'die Sammlung wird mit abgeglichen');
+  const loeschen = skript.match(/function einfallLoeschen\([\s\S]*?\n\}/);
+  pruefe(loeschen && /grabsteinSetzen\('einfaelle'/.test(loeschen[0]),
+         'Löschen hinterlässt einen Grabstein');
+  pruefe(loeschen && /zurueckHolen/.test(loeschen[0]),
+         'und lässt sich rückgängig machen');
+
+  /* Der Reiter */
+  const stufe = skript.match(/function setVhStufe\([\s\S]*?\n\}\n/);
+  pruefe(stufe && /einfaelleGesehen = isoDatum\(\)/.test(stufe[0]),
+         'beim Öffnen wird vermerkt, wann zuletzt hingesehen wurde');
+  pruefe(stufe && /plus\.style\.display/.test(stufe[0]),
+         'der Plusknopf für Vorhaben verschwindet im Einfallreiter');
+
+  if (!e) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const r = e.pruefeEinfaelle();
+    pruefe(r.gemerkt === 3, 'drei Einfälle gemerkt');
+    pruefe(r.kontextGedeutet === 'privat', 'das p wird als privat gelesen');
+    pruefe(r.titelSauber === 'Toskana mit dem Rad', 'und aus dem Titel entfernt');
+    pruefe(r.ohneDatumsfelder === true,
+           'kein Feld für Frist, Planung oder Uhrzeit');
+    pruefe(r.nachProjekt === 1, 'aus einem Einfall wird ein Projekt');
+    pruefe(r.standVerfolgt === 'verfolgt', 'er gilt dann als verfolgt');
+    pruefe(r.bleibtErhalten === 3, 'alle drei stehen weiterhin da');
+    pruefe(r.offen === 1 && r.verfolgt === 1 && r.verworfen === 1,
+           'offen, verfolgt und verworfen werden getrennt geführt');
+    pruefe(r.imTagesplan === 0, 'im Tagesplan steht nichts davon');
+    pruefe(r.amSymbol === 0, 'die Zahl am Symbol bleibt unberührt');
   }
 }
 

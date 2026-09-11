@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.38.1</title>
+<title>Workbench 0.39.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -831,21 +831,29 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 <div class="schirm" id="schirmVorhaben">
   <div class="vh-kopf">
     <div class="vh-zeile">
-      <span id="vhZahl"></span>
+      <span id="vhZahl"></span><span id="einfallZahl"></span>
       <span class="vh-luecke"></span>
       <button type="button" id="vAlle" class="pille aktiv" onclick="setVhFilter('alle')">Alle</button>
       <button type="button" id="vBeruf" class="pille" onclick="setVhFilter('beruflich')">Beruf</button>
       <button type="button" id="vPrivat" class="pille" onclick="setVhFilter('privat')">Privat</button>
     </div>
-    <div class="knopfreihe" style="margin-top:9px">
+    <div class="stufen">
+      <button type="button" id="vhStufeVorhaben" class="aktiv"
+              onclick="setVhStufe('vorhaben')">Vorhaben</button>
+      <button type="button" id="vhStufeEinfaelle"
+              onclick="setVhStufe('einfaelle')">Einfälle</button>
+    </div>
+    <div class="knopfreihe" style="margin-top:9px" id="vhRueckblickReihe">
       <button type="button" onclick="rueckblickOeffnen()">Wochenrückblick</button>
     </div>
   </div>
 
   <div class="melder" id="vhMelder" style="margin:10px 20px 0">Bereit.</div>
   <div class="vhblatt" id="vhBlatt"></div>
+  <div class="vhblatt" id="einfallBlatt" style="display:none"></div>
 
-  <button class="plusknopf" type="button" onclick="vorhabenNeu()" aria-label="Neues Vorhaben">
+  <button class="plusknopf" type="button" id="vhPlus" onclick="vorhabenNeu()"
+          aria-label="Neues Vorhaben">
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
   </button>
 </div>
@@ -958,7 +966,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.38.1';
+var APP_VERSION = '0.39.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -982,7 +990,7 @@ var GRABSTEIN_TAGE = 180;         /* so lange bleibt ein Löschvermerk erhalten 
 /* Berufliche Termine stehen seit v0.9.0 im Google-Kalender „Alex" —
    eine eigene Terminsammlung gibt es nicht mehr. */
 var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe',
-                  'jahrestermine','ferien','kalenderzuordnung'];
+                  'jahrestermine','ferien','einfaelle','kalenderzuordnung'];
 
 function leereDatenbank() {
   return {
@@ -995,6 +1003,7 @@ function leereDatenbank() {
     durchlaeufe:       [],
     jahrestermine:     [],
     ferien:            [],
+    einfaelle:         [],
     kalenderzuordnung: {},
     grabsteine:        [],
     einstellungen: {
@@ -6735,6 +6744,11 @@ var vhDetailArt = '';     /* 'ziel' oder 'projekt' */
 
 function setVhFilter(art) {
   vhFilter = art;
+  if (vhStufe === 'einfaelle') {
+    markiere([['alle', 'vAlle'], ['beruflich', 'vBeruf'], ['privat', 'vPrivat']], art);
+    einfaelleZeichnen();
+    return;
+  }
   markiere([['alle', 'vAlle'], ['beruflich', 'vBeruf'], ['privat', 'vPrivat']], art);
   vhZeichnen();
 }
@@ -6947,6 +6961,35 @@ function projektKarteHtml(p) {
   return h;
 }
 
+/* Einfälle liegen hinter einem eigenen Reiter — sie sollen nicht
+   zwischen den Vorhaben stehen und mit ihnen um Aufmerksamkeit
+   ringen. */
+var vhStufe = 'vorhaben';
+
+function setVhStufe(name) {
+  vhStufe = name;
+  markiere([['vorhaben', 'vhStufeVorhaben'], ['einfaelle', 'vhStufeEinfaelle']], name);
+
+  var vh = document.getElementById('vhBlatt');
+  var ein = document.getElementById('einfallBlatt');
+  var rueck = document.getElementById('vhRueckblickReihe');
+  var plus = document.getElementById('vhPlus');
+  if (vh)    { vh.style.display    = (name === 'einfaelle') ? 'none' : ''; }
+  if (ein)   { ein.style.display   = (name === 'einfaelle') ? '' : 'none'; }
+  if (rueck) { rueck.style.display = (name === 'einfaelle') ? 'none' : ''; }
+  if (plus)  { plus.style.display  = (name === 'einfaelle') ? 'none' : ''; }
+
+  if (name === 'einfaelle') {
+    /* Nicht als Mahnung, sondern als Antwort auf die Frage, die man
+       sich beim Öffnen stellt: Ist das hier noch aktuell? */
+    DB.einstellungen.einfaelleGesehen = isoDatum();
+    spaeterSichern();
+    einfaelleZeichnen();
+  } else {
+    vhZeichnen();
+  }
+}
+
 function vhZeichnen() {
   var blatt = document.getElementById('vhBlatt');
   if (!blatt) { return; }
@@ -6965,7 +7008,7 @@ function vhZeichnen() {
 
   blatt.innerHTML = h;
   var zahl = document.getElementById('vhZahl');
-  if (zahl) {
+  if (zahl && vhStufe !== 'einfaelle') {
     zahl.textContent = ziele.length + (ziele.length === 1 ? ' Ziel' : ' Ziele')
                      + ' · ' + projekte.length
                      + (projekte.length === 1 ? ' Projekt' : ' Projekte');
@@ -7612,6 +7655,270 @@ function vhLoeschen() {
       + (vhDetailArt === 'projekt' ? ' — die Aufgaben bleiben, ohne Projekt.' : ''), null);
 }
 
+
+
+/* ============================================================
+   Einfälle
+
+   Was man irgendwann einmal tun möchte, ohne es sich vorgenommen zu
+   haben. Diese Sammlung mahnt bewusst nicht: kein Datum, keine
+   Frist, keine Planung, keine Zahl am Symbol, kein Auftauchen im
+   Tagesplan. Man geht hin, wenn man hingehen will.
+   ============================================================ */
+
+var EINFALL_STAENDE = { offen: 'offen', verfolgt: 'wird verfolgt',
+                        verworfen: 'verworfen' };
+var einfallDetail = '';
+var einfallGeschichteAuf = false;
+
+function einfallFinden(id) {
+  var l = DB.einfaelle || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].id === id) { return l[i]; }
+  }
+  return null;
+}
+
+function einfaelleSichtbar(stand) {
+  var l = DB.einfaelle || [];
+  var aus = [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if ((l[i].stand || 'offen') !== stand) { continue; }
+    if (vhFilter !== 'alle' && l[i].kontext !== vhFilter) { continue; }
+    aus.push(l[i]);
+  }
+  aus.sort(function (a, b) {
+    var sa = a.stichwort || 'zzz';
+    var sb = b.stichwort || 'zzz';
+    if (sa !== sb) { return (sa < sb) ? -1 : 1; }
+    return (a.titel < b.titel) ? -1 : 1;
+  });
+  return aus;
+}
+
+/* Ohne Übergabe wird das Eingabefeld gelesen — mit Übergabe gilt der
+   Text. So lässt sich das Merken auch ohne Zeichenfläche prüfen. */
+function einfallNeu(text) {
+  var feld = document.getElementById('einfallNeu');
+  var titel = (typeof text === 'string') ? text.trim()
+            : (feld ? feld.value.trim() : '');
+  if (titel.length === 0) { return; }
+  if (!Array.isArray(DB.einfaelle)) { DB.einfaelle = []; }
+  var gedeutet = eingabeDeuten(titel);
+  DB.einfaelle.push({
+    id: neueKennung(), titel: gedeutet.titel, notiz: '',
+    kontext: gedeutet.kontext, stichwort: '', stand: 'offen',
+    angelegt: isoDatum(), geaendert: jetzt()
+  });
+  if (feld) { feld.value = ''; }
+  spaeterSichern();
+  einfaelleZeichnen();
+}
+
+function einfallStand(id, stand) {
+  var e = einfallFinden(id);
+  if (!e) { return; }
+  e.stand = stand;
+  e.geaendert = jetzt();
+  spaeterSichern();
+  einfaelleZeichnen();
+  if (einfallDetail === id) { einfallDetailNeu(); }
+}
+
+function einfallFeld(feld, wert) {
+  var e = einfallFinden(einfallDetail);
+  if (!e) { return; }
+  e[feld] = wert;
+  e.geaendert = jetzt();
+  spaeterSichern();
+  einfaelleZeichnen();
+}
+
+/* Der Weg hinaus: Aus einem Einfall wird ein Vorhaben. Der Einfall
+   bleibt stehen und merkt sich, was aus ihm geworden ist. */
+function einfallWirdVorhaben(art) {
+  var e = einfallFinden(einfallDetail);
+  if (!e) { return; }
+  var id = neueKennung();
+  var satz = {
+    id: id, name: e.titel, kontext: e.kontext, status: 'laufend',
+    zielzustaende: [], anlagen: [], notiz: e.notiz || '',
+    geaendert: jetzt()
+  };
+  if (art === 'projekt') {
+    satz.meilensteine = [];
+    satz.themaId = null;
+    DB.projekte.push(satz);
+  } else {
+    satz.einzahler = [];
+    DB.ziele.push(satz);
+  }
+  e.stand = 'verfolgt';
+  e.wurde = art;
+  e.wurdeId = id;
+  e.geaendert = jetzt();
+  spaeterSichern();
+  vhZeichnen();
+  einfaelleZeichnen();
+  aktionenSchliessen();
+  melde('Daraus wurde ein ' + (art === 'projekt' ? 'Projekt' : 'Ziel') + ': '
+      + e.titel, 'gut');
+}
+
+function einfallLoeschen() {
+  var e = einfallFinden(einfallDetail);
+  if (!e) { return; }
+  var stelle = DB.einfaelle.indexOf(e);
+  if (stelle < 0) { return; }
+  zurueckHolen = { sammlung: 'einfaelle', satz: e, stelle: stelle };
+  DB.einfaelle.splice(stelle, 1);
+  grabsteinSetzen('einfaelle', e.id);
+  spaeterSichern();
+  aktionenSchliessen();
+  einfaelleZeichnen();
+  melde('Gelöscht: ' + e.titel + ' — rückgängig möglich', null);
+}
+
+/* ------------------------------------------------------------
+   Zeichnen
+   ------------------------------------------------------------ */
+
+function einfallZeileHtml(e) {
+  var verfolgt = (e.stand === 'verfolgt');
+  var verworfen = (e.stand === 'verworfen');
+  var h = '<div class="tzeile' + (e.kontext === 'privat' ? ' privat' : '') + '">';
+  h += '<div class="ttext" onclick="einfallOeffnen(\'' + esc(e.id) + '\')">';
+  h += '<div class="ttitel' + (verworfen ? ' fertig' : '') + '">' + esc(e.titel) + '</div>';
+  var unten = [];
+  if (e.stichwort) { unten.push(esc(e.stichwort)); }
+  if (verfolgt) { unten.push('wurde ein ' + (e.wurde === 'ziel' ? 'Ziel' : 'Projekt')); }
+  if (e.notiz) { unten.push('mit Notiz'); }
+  if (unten.length) { h += '<div class="tmeta">' + unten.join(' · ') + '</div>'; }
+  h += '</div></div>';
+  return h;
+}
+
+function einfaelleZeichnen() {
+  var blatt = document.getElementById('einfallBlatt');
+  if (!blatt) { return; }
+  var offen = einfaelleSichtbar('offen');
+  var verfolgt = einfaelleSichtbar('verfolgt');
+  var verworfen = einfaelleSichtbar('verworfen');
+
+  var h = '<div class="ms-unten" style="padding-left:0;margin:0 0 10px">'
+        + '<input class="v-feld" type="text" id="einfallNeu" '
+        + 'placeholder="Was fällt dir ein? (p = privat)" '
+        + 'onkeydown="if(event.key===\'Enter\'){einfallNeu();}">'
+        + '<button class="ms-wort" type="button" onclick="einfallNeu()">Merken</button>'
+        + '</div>';
+
+  if (!offen.length) {
+    h += '<div class="tleer" style="padding-left:0">Noch nichts gemerkt. '
+       + 'Hier darf alles stehen, was du vielleicht einmal tun willst — '
+       + 'ohne Datum, ohne Verpflichtung.</div>';
+  }
+  var i;
+  for (i = 0; i < offen.length; i++) { h += einfallZeileHtml(offen[i]); }
+
+  var alt = verfolgt.length + verworfen.length;
+  if (alt) {
+    h += '<button class="tfalt" type="button" onclick="einfallGeschichteUm()">'
+       + '<span>Geschichte · ' + verfolgt.length + ' verfolgt, '
+       + verworfen.length + ' verworfen</span>'
+       + '<svg class="' + (einfallGeschichteAuf ? 'auf' : '') + '" viewBox="0 0 24 24">'
+       + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+    if (einfallGeschichteAuf) {
+      for (i = 0; i < verfolgt.length; i++) { h += einfallZeileHtml(verfolgt[i]); }
+      for (i = 0; i < verworfen.length; i++) { h += einfallZeileHtml(verworfen[i]); }
+    }
+  }
+
+  blatt.innerHTML = h;
+
+  var zahl = document.getElementById('einfallZahl');
+  if (zahl) {
+    var g = DB.einstellungen.einfaelleGesehen;
+    zahl.textContent = offen.length + (offen.length === 1 ? ' Einfall' : ' Einfälle')
+                     + (g ? (' · zuletzt angesehen ' + kurzDatum(g)) : '');
+  }
+}
+
+function einfallGeschichteUm() {
+  einfallGeschichteAuf = !einfallGeschichteAuf;
+  einfaelleZeichnen();
+}
+
+/* ------------------------------------------------------------
+   Detailfläche
+   ------------------------------------------------------------ */
+
+function einfallOeffnen(id) {
+  einfallDetail = id;
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = einfallDetailHtml();
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function einfallDetailNeu() {
+  var sheet = document.getElementById('aktionSheet');
+  if (sheet && einfallDetail) { sheet.innerHTML = einfallDetailHtml(); }
+}
+
+function einfallDetailHtml() {
+  var e = einfallFinden(einfallDetail);
+  if (!e) { return blattKopf() + '<div class="tleer">Nicht gefunden.</div>'; }
+
+  var h = blattKopf();
+  h += '<input class="d-titel" type="text" value="' + esc(e.titel) + '" '
+     + 'oninput="einfallFeld(\'titel\',this.value)">';
+  h += '<div class="d-unter">Einfall · ' + esc(EINFALL_STAENDE[e.stand] || 'offen')
+     + (e.angelegt ? (' · gemerkt ' + esc(kurzDatum(e.angelegt))) : '') + '</div>';
+  h += '<div class="as-linie' + (e.kontext === 'privat' ? ' privat' : '') + '"></div>';
+
+  h += '<div class="d-feld"><div class="d-name">Kontext</div><div class="d-wert">'
+     + '<button class="d-wahl' + (e.kontext === 'beruflich' ? ' an' : '') + '" type="button" '
+     + 'onclick="einfallFeld(\'kontext\',\'beruflich\')">Beruflich</button>'
+     + '<button class="d-wahl' + (e.kontext === 'privat' ? ' an' : '') + '" type="button" '
+     + 'onclick="einfallFeld(\'kontext\',\'privat\')">Privat</button></div></div>';
+
+  h += '<div class="d-feld"><div class="d-name">Stichwort</div><div class="d-wert">'
+     + '<input type="text" value="' + esc(e.stichwort || '') + '" '
+     + 'placeholder="etwa Reisen, Haus, Lernen" '
+     + 'oninput="einfallFeld(\'stichwort\',this.value)"></div></div>';
+
+  h += '<div class="s-abschnitt">Notiz</div>';
+  h += '<textarea class="ms-titel" rows="4" style="width:100%" '
+     + 'placeholder="Was schwebt dir vor?" '
+     + 'oninput="einfallFeld(\'notiz\',this.value)">' + esc(e.notiz || '') + '</textarea>';
+
+  if (e.stand === 'verfolgt' && e.wurdeId) {
+    h += '<div class="d-hinweis" style="text-align:left">Daraus wurde ein '
+       + (e.wurde === 'ziel' ? 'Ziel' : 'Projekt') + '.</div>';
+  }
+
+  h += '<div class="s-abschnitt">Daraus wird etwas</div>';
+  h += '<div class="d-reihe">'
+     + '<button type="button" onclick="einfallWirdVorhaben(\'projekt\')">Ein Projekt</button>'
+     + '<button type="button" onclick="einfallWirdVorhaben(\'ziel\')">Ein Ziel</button>'
+     + '</div>';
+
+  h += '<div class="d-reihe">';
+  if (e.stand === 'verworfen') {
+    h += '<button type="button" onclick="einfallStand(\'' + esc(e.id)
+       + '\',\'offen\')">Doch wieder offen</button>';
+  } else {
+    h += '<button type="button" onclick="einfallStand(\'' + esc(e.id)
+       + '\',\'verworfen\')">Verwerfen</button>';
+  }
+  h += '<button class="gefahr" type="button" onclick="einfallLoeschen()">Löschen</button>';
+  h += '</div>';
+  return h;
+}
 
 /* ============================================================
    Abläufe: Vorlagen und Durchläufe
