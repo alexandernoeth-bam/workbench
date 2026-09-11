@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.26.0</title>
+<title>Workbench 0.27.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -235,17 +235,14 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .ktag-datum{font-size:calc(var(--fs)*0.8);color:var(--grau);font-variant-numeric:tabular-nums}
 .ktag-form{margin-left:auto;font-size:calc(var(--fs)*0.72);color:var(--grau)}
 .woche-raster{display:flex;flex-direction:column}
-.ktag-termine,.ktag-aufgaben{padding-top:2px}
-.ktag-aufgaben{border-top:1px dashed var(--linie);margin-top:5px;padding-top:5px}
+.ktag-termine{padding-top:2px}
 body.breit .woche-raster{display:grid;grid-template-columns:repeat(7,1fr);gap:0}
 body.breit .ktag{border-bottom:0;border-right:1px solid var(--linie);padding:0 8px 8px}
 body.breit .ktag:last-child{border-right:0}
 body.breit .ktag-kopf{flex-wrap:wrap;gap:5px;padding:7px 0 6px 6px;margin-bottom:6px;
   border-bottom:1px solid var(--linie)}
 body.breit .ktag-form{margin-left:0;flex-basis:100%}
-body.breit .ktag-termine{min-height:190px;border-bottom:1px solid var(--linie);
-  padding-bottom:6px}
-body.breit .ktag-aufgaben{border-top:0;margin-top:0;padding-top:7px;min-height:120px}
+body.breit .ktag-termine{min-height:220px}
 body.breit .kzeile{padding-left:6px;gap:6px}
 body.breit .kzeit{flex:0 0 34px}
 body.breit .kleer{padding-left:6px}
@@ -921,7 +918,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.26.0';
+var APP_VERSION = '0.27.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5267,50 +5264,72 @@ function wocheHtml(is) {
     if (!etwasOben) { h += '<div class="kleer">keine Termine</div>'; }
     h += '</div>';
 
-    /* Unten: die Hauptaufgaben dieses Tages. Kleinigkeiten gehören
-       in den Tag, nicht in die Wochenübersicht. */
-    h += '<div class="ktag-aufgaben">';
-    var etwasUnten = false;
-    var aufgaben = DB.aufgaben || [];
-    var k;
-    for (k = 0; k < aufgaben.length; k++) {
-      var a = aufgaben[k];
-      if (a.status === 'erledigt' || a.wiederholung) { continue; }
-      if (a.art === 'klein') { continue; }
-      if (a.planung !== tag) { continue; }
-      if (!passtZumKalender(a.kontext)) { continue; }
-      h += '<div class="kzeile"><span class="kzeit">' + esc(a.uhrzeit || '') + '</span>'
-         + '<span class="ktitel' + (a.kontext === 'privat' ? ' privat' : '') + '">'
-         + esc(a.titel) + '</span></div>';
-      etwasUnten = true;
-    }
-    if (!etwasUnten) { h += '<div class="kleer">keine Aufgaben</div>'; }
-    h += '</div></div>';
+    h += '</div>';
   }
   h += '</div>';
 
-  /* Die Wochenliste: was diese Woche zur Debatte steht, ohne Tag. */
-  var wochenliste = [];
+  h += wochenListeHtml(mo);
+  return h;
+}
+
+/* Alle Hauptaufgaben dieser Woche an einer Stelle — ob auf einen Tag
+   gelegt oder nur auf die Woche. Erledigtes bleibt durchgestrichen
+   stehen: Die Woche soll am Ende zeigen, was sie gebracht hat.
+   Kleinigkeiten gehören nicht hierher, sie würden die Liste fluten. */
+function wochenAufgaben(mo) {
+  var so = tagePlus(mo, 6);
+  var aus = [];
   var alle = DB.aufgaben || [];
-  var m;
-  for (m = 0; m < alle.length; m++) {
-    if (alle[m].status === 'erledigt' || alle[m].wiederholung) { continue; }
-    if (alle[m].planung !== 'woche') { continue; }
-    if (!passtZumKalender(alle[m].kontext)) { continue; }
-    wochenliste.push(alle[m]);
+  var i;
+  for (i = 0; i < alle.length; i++) {
+    var a = alle[i];
+    if (a.wiederholung) { continue; }
+    if (a.art === 'klein') { continue; }
+    if (!passtZumKalender(a.kontext)) { continue; }
+    var p = a.planung || '';
+    if (p !== 'woche' && !(p >= mo && p <= so)) { continue; }
+    aus.push(a);
   }
-  h += '<div class="gruppenkopf"><span>Diese Woche · ' + wochenliste.length + '</span></div>';
-  if (!wochenliste.length) {
+  aus.sort(function (x, y) {
+    var px = (x.planung === 'woche') ? '9999-99-99' : x.planung;
+    var py = (y.planung === 'woche') ? '9999-99-99' : y.planung;
+    if (px !== py) { return (px < py) ? -1 : 1; }
+    return (x.titel < y.titel) ? -1 : 1;
+  });
+  return aus;
+}
+
+function wochenListeHtml(mo) {
+  var liste = wochenAufgaben(mo);
+  var offen = 0;
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    if (liste[i].status !== 'erledigt') { offen++; }
+  }
+
+  var h = '<div class="gruppenkopf"><span>Diese Woche · ' + offen + ' offen von '
+        + liste.length + '</span></div>';
+  if (!liste.length) {
     h += '<div class="kleer">Nichts für diese Woche vorgemerkt.</div>';
+    return h;
   }
-  for (m = 0; m < wochenliste.length; m++) {
-    var w = wochenliste[m];
+
+  for (i = 0; i < liste.length; i++) {
+    var w = liste[i];
+    var fertig = (w.status === 'erledigt');
     h += '<div class="tzeile' + (w.kontext === 'privat' ? ' privat' : '') + '">';
-    h += '<button class="tkasten" type="button" onclick="aufgabeErledigen(\'' + esc(w.id) + '\')"></button>';
+    h += '<button class="tkasten' + (fertig ? ' an' : '') + '" type="button" onclick="'
+       + (fertig ? ('aufgabeWiederOeffnen(\'' + esc(w.id) + '\')')
+                 : ('aufgabeErledigen(\'' + esc(w.id) + '\')')) + '"></button>';
     h += '<div class="ttext" onclick="aufgabeAktionen(\'' + esc(w.id) + '\')">';
-    h += '<div class="ttitel">' + esc(w.titel) + '</div></div>';
-    h += '<button class="planungsknopf woche" type="button" '
-       + 'onclick="planungWeiter(\'' + esc(w.id) + '\')">Woche</button></div>';
+    h += '<div class="ttitel' + (fertig ? ' fertig' : '') + '">' + esc(w.titel) + '</div>';
+    if (w.frist) {
+      h += '<div class="tmeta">Frist ' + esc(kurzDatum(w.frist)) + '</div>';
+    }
+    h += '</div>';
+    h += '<button class="planungsknopf' + planungKlasse(w) + '" type="button" '
+       + 'onclick="planungWeiter(\'' + esc(w.id) + '\')">'
+       + esc(planungText(w)) + '</button></div>';
   }
   return h;
 }
@@ -8217,6 +8236,8 @@ function aufgabeWiederOeffnen(id) {
   a.erledigtAm = null;
   a.geaendert = jetzt();
   aufZeichnen();
+  kalZeichnen();
+  tagZeichnen();
   spaeterSichern();
 }
 
@@ -8232,6 +8253,7 @@ function aufgabeErledigen(id) {
   }
   a.geaendert = jetzt();
   aufZeichnen();
+  kalZeichnen();
   spaeterSichern();
 }
 

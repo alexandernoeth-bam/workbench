@@ -485,6 +485,36 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__wocheApi = {'
+                 + ' pruefeWoche: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var mo = montagVon(\'2026-09-09\');'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Am Dienstag\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung: tagePlus(mo,1), art:\'haupt\' },'
+                 + '     { id:\'a2\', titel:\'Nur diese Woche\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung:\'woche\', art:\'haupt\' },'
+                 + '     { id:\'a3\', titel:\'Am Montag, erledigt\', kontext:\'beruflich\','
+                 + '       status:\'erledigt\', planung: mo, art:\'haupt\' },'
+                 + '     { id:\'a4\', titel:\'Kleinigkeit\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung: mo, art:\'klein\' },'
+                 + '     { id:\'a5\', titel:\'Naechste Woche\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung: tagePlus(mo,9), art:\'haupt\' },'
+                 + '     { id:\'a6\', titel:\'Im Backlog\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung:\'backlog\', art:\'haupt\' },'
+                 + '     { id:\'a7\', titel:\'Woechentlich\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung: mo, art:\'haupt\','
+                 + '       wiederholung:{ takt:\'woche\', intervall:1, tage:[1], tag:1 } } ];'
+                 + '   var l = wochenAufgaben(mo);'
+                 + '   var titel = l.map(function(x){ return x.titel; });'
+                 + '   DB = alt;'
+                 + '   return { anzahl:l.length, titel:titel.join(\',\'),'
+                 + '            kleinigkeitDrin: titel.indexOf(\'Kleinigkeit\') >= 0,'
+                 + '            naechsteWocheDrin: titel.indexOf(\'Naechste Woche\') >= 0,'
+                 + '            backlogDrin: titel.indexOf(\'Im Backlog\') >= 0,'
+                 + '            erledigtDrin: titel.indexOf(\'Am Montag, erledigt\') >= 0,'
+                 + '            wiederkehrendDrin: titel.indexOf(\'Woechentlich\') >= 0 };'
+                 + ' } };'
                  + 'globalThis.__googleKalApi = {'
                  + ' pruefeAdresse: function(){'
                  + '   var merkA = kalAnker; var merkS = kalStufe;'
@@ -2683,11 +2713,19 @@ console.log('\n37. Wochensicht als Spalten');
   const woche = skript.match(/function wocheHtml\([\s\S]*?\n\}\n/);
   pruefe(woche && /class="woche-raster"/.test(woche[0]), 'die Woche steht in einem Raster');
   pruefe(woche && /class="ktag-termine"/.test(woche[0]), 'jeder Tag hat einen Terminblock');
-  pruefe(woche && /class="ktag-aufgaben"/.test(woche[0]), 'und einen Aufgabenblock');
-  pruefe(woche && /a\.art === 'klein'.*continue/s.test(woche[0]),
-         'Kleinigkeiten stehen nicht in der Wochensicht');
-  pruefe(woche && (woche[0].match(/passtZumKalender\(/g) || []).length >= 4,
-         'der Filter greift auf Termine, Ganztägiges, Aufgaben und die Wochenliste');
+  /* Seit v0.27.0 zeigen die Spalten nur, was feststeht; die Aufgaben
+     stehen gesammelt in der Wochenliste darunter. */
+  pruefe(woche && !/ktag-aufgaben/.test(woche[0]),
+         'in den Tagesspalten stehen keine Aufgaben mehr');
+  pruefe(woche && /wochenListeHtml\(mo\)/.test(woche[0]),
+         'die Wochenliste hängt darunter');
+  const wliste = hauptSkript().match(/function wochenAufgaben\([\s\S]*?\n\}/);
+  pruefe(wliste && /a\.art === 'klein'/.test(wliste[0]),
+         'Kleinigkeiten stehen nicht in der Wochenliste');
+  pruefe(woche && (woche[0].match(/passtZumKalender\(/g) || []).length >= 2,
+         'der Filter greift auf Termine und Ganztägiges');
+  pruefe(wliste && /passtZumKalender\(a\.kontext\)/.test(wliste[0]),
+         'und auf die Wochenliste');
 
   /* Seit v0.16.1 steuert eine Klasse am Körper die Darstellung, damit
      sie sich auch von Hand festlegen lässt. */
@@ -4184,6 +4222,55 @@ console.log('\n60. Weg in den Google-Kalender');
     pruefe(e.jahr.indexOf('/year/2026/8/10') > 0, 'das Jahr zur Jahresansicht');
     pruefe(e.name === 'workbench-google-kalender',
            'immer dasselbe Fenster, nie ein zweites');
+  }
+}
+
+/* ============================================================
+   61. Wochensicht: Termine oben, Aufgaben gesammelt
+   Grund: Eine auf einen Tag gelegte Aufgabe stand in der Tagesspalte
+   und fehlte in der Wochenliste — die Woche zeigte nie, was sie
+   insgesamt vorhat. Und Erledigtes verschwand spurlos.
+   ============================================================ */
+console.log('\n61. Wochensicht');
+{
+  const skript = hauptSkript();
+  const w = globalThis.__wocheApi;
+
+  ['wochenAufgaben', 'wochenListeHtml'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const liste = skript.match(/function wochenAufgaben\([\s\S]*?\n\}/);
+  pruefe(liste && /p !== 'woche' && !\(p >= mo && p <= so\)/.test(liste[0]),
+         'die Liste fasst Wochenliste und Tagesplanung zusammen');
+  pruefe(liste && !/status === 'erledigt'/.test(liste[0]),
+         'Erledigtes bleibt in der Liste');
+  pruefe(liste && /a\.wiederholung.*continue/s.test(liste[0]),
+         'Wiederkehrendes gehört nicht hinein');
+
+  const html = skript.match(/function wochenListeHtml\([\s\S]*?\n\}\n/);
+  pruefe(html && /ttitel' \+ \(fertig \? ' fertig' : ''\)/.test(html[0]),
+         'Erledigtes steht durchgestrichen da');
+  pruefe(html && /aufgabeWiederOeffnen\(/.test(html[0]),
+         'ein Haken lässt sich zurücknehmen');
+  pruefe(html && /offen \+ ' offen von '/.test(html[0]),
+         'der Kopf nennt offen und gesamt');
+  pruefe(html && /planungText\(w\)/.test(html[0]),
+         'jede Zeile zeigt ihren Tag oder „Woche"');
+
+  if (!w) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = w.pruefeWoche();
+    pruefe(e.anzahl === 3, 'drei Einträge: zwei mit Tag, einer für die Woche');
+    pruefe(e.titel === 'Am Montag, erledigt,Am Dienstag,Nur diese Woche',
+           'sortiert nach Tag, Undatiertes zuletzt');
+    pruefe(e.kleinigkeitDrin === false, 'eine Kleinigkeit steht nicht darin');
+    pruefe(e.naechsteWocheDrin === false, 'eine Aufgabe der Folgewoche auch nicht');
+    pruefe(e.backlogDrin === false, 'und nichts aus dem Backlog');
+    pruefe(e.erledigtDrin === true, 'Erledigtes dieser Woche bleibt');
+    pruefe(e.wiederkehrendDrin === false, 'Wiederkehrendes nicht');
   }
 }
 
