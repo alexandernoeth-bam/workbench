@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.25.0</title>
+<title>Workbench 0.25.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -919,7 +919,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.25.0';
+var APP_VERSION = '0.25.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2961,15 +2961,15 @@ function uhrzeitJetzt() {
   return zwei(d.getHours()) + ':' + zwei(d.getMinutes());
 }
 
-/* Vorbei ist nur, was am heutigen Tag schon zu Ende ist. An anderen
-   Tagen gibt es kein Vorbei — der ganze Tag ist Vergangenheit oder
-   Zukunft. Gemessen wird am Ende, nicht am Beginn: Ein Termin, der
-   noch läuft, ist nicht vorbei. */
+/* Vorbei ist nur ein Termin — und nur am heutigen Tag. Eine Aufgabe
+   ist nie vorbei, solange sie offen ist: Sie verschwindet, wenn der
+   Haken gesetzt wird, nicht wenn die Uhr weiterläuft. An anderen
+   Tagen gibt es überhaupt kein Vorbei. Gemessen wird am Ende, nicht
+   am Beginn: Ein Termin, der noch läuft, ist nicht vorbei. */
 function eintragVorbei(eintrag, is) {
+  if (eintrag.art !== 'termin') { return false; }
   if (is !== isoDatum()) { return false; }
-  var ende = '';
-  if (eintrag.art === 'termin') { ende = eintrag.t.bis || eintrag.t.von || ''; }
-  else { ende = eintrag.zeit || ''; }
+  var ende = eintrag.t.bis || eintrag.t.von || '';
   if (!ende) { return false; }
   return ende < uhrzeitJetzt();
 }

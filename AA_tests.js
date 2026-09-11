@@ -3581,6 +3581,10 @@ console.log('\n51. Vergangene Termine');
   const skript = hauptSkript();
   const v = globalThis.__vorbeiApi;
 
+  const fn = hauptSkript().match(/function eintragVorbei\([\s\S]*?\n\}/);
+  pruefe(fn && /eintrag\.art !== 'termin'/.test(fn[0]),
+         'nur Termine können vorbei sein');
+
   ['eintragVorbei', 'vorbeiUm', 'uhrzeitJetzt'].forEach(function (f) {
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
@@ -3611,7 +3615,8 @@ console.log('\n51. Vergangene Termine');
     pruefe(e.spaeterTermin === false, 'ein späterer erst recht nicht');
     pruefe(e.andererTag === false, 'an einem anderen Tag gibt es kein Vorbei');
     pruefe(e.ohneZeit === false, 'ohne Zeitangabe gilt nichts als vorbei');
-    pruefe(e.aufgabeFrueh === true, 'auch eine Aufgabe mit Uhrzeit kann vorbei sein');
+    pruefe(e.aufgabeFrueh === false,
+           'eine Aufgabe ist nie vorbei — sie verschwindet erst mit dem Haken');
   }
 }
 
