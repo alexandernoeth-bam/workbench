@@ -4613,8 +4613,12 @@ console.log('\n62. Termin-Abläufe und nächste Woche');
   const zeile = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
   pruefe(zeile && /terminAblaufWahl\(/.test(zeile[0]),
          'jede Terminzeile bietet das Anheften an');
-  pruefe(zeile && /Ablauf ' \+ schritteFertig/.test(zeile[0]),
+  pruefe(zeile && /t-ablauf an[\s\S]{0,200}schritteFertig\(lauf\)/.test(zeile[0]),
          'ein angehefteter Ablauf zeigt seinen Stand in der Zeile');
+  pruefe(/\.t-ablauf\{[^}]*font-size:calc\(var\(--fs\)\*0\.6/.test(QUELLE),
+         'die Pille ist kleiner gesetzt als der Termintitel');
+  pruefe(/\.t-ablauf\{[^}]*align-self:flex-start/.test(QUELLE),
+         'sie sitzt oben, nicht auf halber Höhe der Beschreibung');
 
   const starten = skript.match(/function terminDurchlaufStarten\([\s\S]*?\n\}\n/);
   pruefe(starten && /terminId: termin\.id/.test(starten[0]),
