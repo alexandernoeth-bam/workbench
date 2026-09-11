@@ -485,6 +485,23 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__monatSpaltenApi = {'
+                 + ' pruefeMonatSpalten: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var h = monatHtml(\'2026-09-01\');'
+                 + '   var teile = h.split(\'mhaelfte-rechts\');'
+                 + '   var links = (teile[0].match(/class="mtag/g) || []).length;'
+                 + '   var rechts = (teile[1].match(/class="mtag/g) || []).length;'
+                 + '   var auf = (h.match(/<div/g) || []).length;'
+                 + '   var zu = (h.match(/<\\/div>/g) || []).length;'
+                 + '   var lang = monatHtml(\'2026-01-01\');'
+                 + '   var alleTage = (lang.match(/class="mtag/g) || []).length;'
+                 + '   DB = alt;'
+                 + '   return { h28: monatsHaelfte(28), h29: monatsHaelfte(29),'
+                 + '            h30: monatsHaelfte(30), h31: monatsHaelfte(31),'
+                 + '            linksSeptember: links, rechtsSeptember: rechts,'
+                 + '            ausgeglichen: (auf === zu), alleTageDa: alleTage };'
+                 + ' } };'
                  + 'globalThis.__terminAblaufApi = {'
                  + ' pruefeTermin: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -507,6 +524,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   terminDurchlaufStarten(\'v1\', { id:\'g1\', titel:\'JF-Weekly\','
                  + '     zeit:spaet, bis:spaet }, heute);'
                  + '   var d = durchlaufZuTermin(\'g1\');'
+                 + '   var danachZeit = d.schritte[1].abZeit;'
                  + '   var vor = ablaufSchritteHeute(heute).map(function(x){ return x.satz.titel; }).join(\',\');'
                  + '   schrittUm(d.id, 0);'
                  + '   var nachAgenda = ablaufSchritteHeute(heute).map(function(x){ return x.satz.titel; }).join(\',\');'
@@ -515,7 +533,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var schon = durchlaufZuTermin(\'g1\') ? 1 : 0;'
                  + '   var r = { name:d.name, terminId:d.terminId,'
                  + '             davorOhneRuhen: !d.schritte[0].ab,'
-                 + '             danachMitZeit: spaet,'
+                 + '             danachMitZeit: danachZeit, terminEnde: spaet,'
                  + '             vorDemTermin: vor, nachDerAgenda: nachAgenda,'
                  + '             nachDemTermin: nachTermin, zweiterAmTermin: schon };'
                  + '   termineNachTag = {}; tagOffen = merkTag; DB = alt;'
@@ -4376,11 +4394,60 @@ console.log('\n62. Termin-Abläufe und nächste Woche');
     pruefe(e.name === 'Besprechung: JF-Weekly', 'der Durchlauf trägt beide Namen');
     pruefe(e.terminId === 'g1', 'die Terminkennung ist vermerkt');
     pruefe(e.davorOhneRuhen === true, 'Davor-Schritte ruhen nicht');
-    pruefe(e.danachMitZeit === '13:00', 'Danach-Schritte ruhen bis zum Terminende');
+    pruefe(e.danachMitZeit === e.terminEnde,
+           'Danach-Schritte ruhen bis zum Terminende');
     pruefe(e.vorDemTermin === 'Agenda', 'vor dem Termin steht nur die Vorbereitung an');
     pruefe(e.nachDerAgenda === '', 'danach ruht der nächste Schritt noch');
     pruefe(e.nachDemTermin === 'Protokoll', 'nach dem Termin erscheint er');
     pruefe(e.zweiterAmTermin === 1, 'an denselben Termin wird nichts Zweites geheftet');
+  }
+}
+
+/* ============================================================
+   63. Monat in zwei Spalten
+   Grund: Dreissig Zeilen mit je zwei Ebenen fuellen am grossen
+   Bildschirm mehr als eine Seite, waehrend rechts die halbe Breite
+   leer bleibt. Der Monat soll auf einen Blick passen.
+   ============================================================ */
+console.log('\n63. Monat in zwei Spalten');
+{
+  const skript = hauptSkript();
+  const m = globalThis.__monatSpaltenApi;
+
+  pruefe(new RegExp('function\\s+monatsHaelfte\\s*\\(').test(skript),
+         'Funktion monatsHaelfte ist definiert');
+
+  const monat = skript.match(/function monatHtml\([\s\S]*?\n\}\n/);
+  pruefe(monat && /mhaelfte-links/.test(monat[0]) && /mhaelfte-rechts/.test(monat[0]),
+         'der Monat wird in zwei Hälften gelegt');
+  pruefe(monat && /t === grenze \+ 1/.test(monat[0]),
+         'die zweite Hälfte beginnt an der berechneten Grenze');
+
+  pruefe(/\.mhaelfte\{display:contents\}/.test(QUELLE),
+         'im schmalen Bild lösen sich die Hälften auf');
+  pruefe(/body\.breit \.mhaelfte\{display:block\}/.test(QUELLE),
+         'im breiten Bild werden sie zu Spalten');
+  pruefe(/body\.breit \.monatsraster\{[^}]*repeat\(2,minmax\(0,1fr\)\)/.test(QUELLE),
+         'es sind genau zwei gleich breite Spalten');
+  pruefe(/body\.breit \.monatsraster\{[^}]*align-items:start/.test(QUELLE),
+         'beide Spalten beginnen oben');
+
+  const zeichnen = skript.match(/function kalZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zeichnen && /monatsraster/.test(zeichnen[0]),
+         'der Monat bekommt seinen Behälter');
+
+  if (!m) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = m.pruefeMonatSpalten();
+    pruefe(e.h28 === 14, 'der Februar wird 14 zu 14 geteilt');
+    pruefe(e.h29 === 15, 'ein Schaltjahr 15 zu 14');
+    pruefe(e.h30 === 15, 'ein dreißigtägiger Monat 15 zu 15');
+    pruefe(e.h31 === 16, 'ein einunddreißigtägiger 16 zu 15');
+    pruefe(e.linksSeptember === 15 && e.rechtsSeptember === 15,
+           'im September stehen fünfzehn Tage je Spalte');
+    pruefe(e.ausgeglichen === true, 'die erzeugten Elemente sind ausgeglichen');
+    pruefe(e.alleTageDa === 31, 'kein Tag geht bei der Teilung verloren');
   }
 }
 

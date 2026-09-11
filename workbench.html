@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.29.2</title>
+<title>Workbench 0.30.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -269,6 +269,12 @@ body.breit .kleer{padding-left:6px}
 .kleer{font-size:calc(var(--fs)*0.78);color:var(--grau-hell);padding-left:11px}
 
 /* Monat */
+.mhaelfte{display:contents}
+body.breit .kalblatt{--monatsspalten:2}
+body.breit .mhaelfte{display:block}
+body.breit .monatsraster{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:0 28px;align-items:start}
+
 .mtag{display:flex;align-items:flex-start;gap:8px;padding:7px 6px;
   border-bottom:1px solid var(--linie)}
 .mtag.frei{background:rgba(25,82,90,.05)}
@@ -932,7 +938,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.29.2';
+var APP_VERSION = '0.30.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5422,14 +5428,23 @@ function monatTagUm(is) {
 
 /* Zwei Spalten je Tag: links was den Tag prägt, rechts was in ihm
    stattfindet. Mehr als zwei Termine werden erst auf Wunsch gezeigt. */
+/* Der Monat wird in zwei möglichst gleich lange Hälften geteilt —
+   nicht starr bei 15, sonst wäre im Februar die linke Spalte deutlich
+   länger. Im schmalen Bild lösen sich die Hälften wieder auf. */
+function monatsHaelfte(anzahl) {
+  return Math.ceil(anzahl / 2);
+}
+
 function monatHtml(is) {
   var jahr = Number(is.slice(0, 4));
   var monat = Number(is.slice(5, 7));
   var heute = isoDatum();
   var anzahl = monatsende(jahr, monat);
-  var h = '';
+  var grenze = monatsHaelfte(anzahl);
+  var h = '<div class="mhaelfte mhaelfte-links">';
   var t;
   for (t = 1; t <= anzahl; t++) {
+    if (t === grenze + 1) { h += '</div><div class="mhaelfte mhaelfte-rechts">'; }
     var tag = jahr + '-' + zwei(monat) + '-' + zwei(t);
     var d = ausIso(tag);
     var form = tagesform(tag);
@@ -5496,6 +5511,7 @@ function monatHtml(is) {
     if (!liste.length) { h += '<div class="mt-anmerkung leer">—</div>'; }
     h += '</div></div></div>';
   }
+  h += '</div>';
   return h;
 }
 
@@ -5859,7 +5875,7 @@ function kalZeichnen() {
     var jahr = Number(kalAnker.slice(0, 4));
     var monat = Number(kalAnker.slice(5, 7));
     if (titel) { titel.textContent = MONATE_LANG[monat - 1] + ' ' + jahr; }
-    blatt.innerHTML = monatHtml(kalAnker);
+    blatt.innerHTML = '<div class="monatsraster">' + monatHtml(kalAnker) + '</div>';
     return;
   }
   if (titel) { titel.textContent = 'Jahr ' + kalAnker.slice(0, 4); }
