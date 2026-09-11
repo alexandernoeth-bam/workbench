@@ -485,6 +485,16 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__googleKalApi = {'
+                 + ' pruefeAdresse: function(){'
+                 + '   var merkA = kalAnker; var merkS = kalStufe;'
+                 + '   kalAnker = \'2026-08-10\';'
+                 + '   kalStufe = \'woche\'; var w = googleKalenderAdresse();'
+                 + '   kalStufe = \'monat\'; var m = googleKalenderAdresse();'
+                 + '   kalStufe = \'jahr\';  var j = googleKalenderAdresse();'
+                 + '   kalAnker = merkA; kalStufe = merkS;'
+                 + '   return { woche:w, monat:m, jahr:j, name:GOOGLE_FENSTER };'
+                 + ' } };'
                  + 'globalThis.__abGruppeApi = {'
                  + ' pruefeGruppen: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -4129,6 +4139,51 @@ console.log('\n59. Ablaufkarten');
     pruefe(e.keineGruppierung === '', 'ohne Gruppierung gibt es keinen Namen');
     pruefe(e.flachOhneKoepfe === true, 'und keine Gruppenköpfe');
     pruefe(e.keinZuletzt === true, 'die Kein-Gruppe steht am Ende');
+  }
+}
+
+/* ============================================================
+   60. Weg in den Google-Kalender
+   Grund: Zum Eintragen und Aendern von Terminen braucht es Google
+   selbst. Der Sprung soll an der Stelle landen, die hier zu sehen
+   ist — und nicht bei jedem Tippen ein neues Fenster oeffnen.
+   ============================================================ */
+console.log('\n60. Weg in den Google-Kalender');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__googleKalApi;
+
+  ['googleKalenderAdresse', 'googleKalenderOeffnen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/onclick="googleKalenderOeffnen\(\)"/.test(QUELLE),
+         'der Kalenderkopf hat einen Knopf dafür');
+
+  const oeffnen = skript.match(/function googleKalenderOeffnen\([\s\S]*?\n\}/);
+  pruefe(oeffnen && /GOOGLE_FENSTER/.test(oeffnen[0]),
+         'das Fenster ist benannt, damit es wiederverwendet wird');
+  pruefe(oeffnen && /fenster\.focus\(\)/.test(oeffnen[0]),
+         'ein schon offenes Fenster wird nach vorn geholt');
+  pruefe(oeffnen && /blockiert/.test(oeffnen[0]),
+         'wird es vom Browser blockiert, wird das gesagt');
+
+  const adresse = skript.match(/function googleKalenderAdresse\([\s\S]*?\n\}/);
+  pruefe(adresse && /kalStufe === 'monat'/.test(adresse[0]),
+         'die gezeigte Stufe bestimmt die Ansicht drüben');
+  pruefe(adresse && /kalAnker \|\| isoDatum\(\)/.test(adresse[0]),
+         'und der gezeigte Tag das Datum');
+
+  if (!g) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = g.pruefeAdresse();
+    pruefe(e.woche === 'https://calendar.google.com/calendar/u/0/r/week/2026/8/10',
+           'die Woche führt zur Wochenansicht');
+    pruefe(e.monat.indexOf('/month/2026/8/10') > 0, 'der Monat zur Monatsansicht');
+    pruefe(e.jahr.indexOf('/year/2026/8/10') > 0, 'das Jahr zur Jahresansicht');
+    pruefe(e.name === 'workbench-google-kalender',
+           'immer dasselbe Fenster, nie ein zweites');
   }
 }
 

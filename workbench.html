@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.25.1</title>
+<title>Workbench 0.26.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -773,6 +773,8 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
         <button type="button" onclick="kalBlaettern(1)">›</button>
         <button type="button" id="kalFilterKnopf" onclick="monatFilterOeffnen()"
                 style="display:none">Filter</button>
+        <button type="button" onclick="googleKalenderOeffnen()"
+                title="Den Google-Kalender in einem eigenen Fenster öffnen">Google</button>
       </div>
     </div>
     <div class="stufen">
@@ -919,7 +921,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.25.1';
+var APP_VERSION = '0.26.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5064,6 +5066,30 @@ function setKalStufe(name) {
   kalStufe = name;
   markiere([['woche', 'sWoche'], ['monat', 'sMonat'], ['jahr', 'sJahr']], name);
   kalZeichnen();
+}
+
+/* Öffnet den Google-Kalender an der Stelle, die hier gerade zu sehen
+   ist — in einem benannten Fenster, damit nicht bei jedem Tippen ein
+   weiteres aufgeht. */
+var GOOGLE_FENSTER = 'workbench-google-kalender';
+
+function googleKalenderAdresse() {
+  var is = kalAnker || isoDatum();
+  var d = ausIso(is);
+  var stufe = 'week';
+  if (kalStufe === 'monat') { stufe = 'month'; }
+  else if (kalStufe === 'jahr') { stufe = 'year'; }
+  return 'https://calendar.google.com/calendar/u/0/r/' + stufe + '/'
+       + d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+}
+
+function googleKalenderOeffnen() {
+  var fenster = window.open(googleKalenderAdresse(), GOOGLE_FENSTER);
+  if (fenster && fenster.focus) { fenster.focus(); }
+  if (!fenster) {
+    melde('Das Fenster wurde vom Browser blockiert.\n'
+        + 'Bitte Pop-ups für diese Seite erlauben.', 'warn');
+  }
 }
 
 function kalJetzt() {
