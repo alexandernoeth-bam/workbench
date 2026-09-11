@@ -2859,8 +2859,17 @@ console.log('\n37. Wochensicht als Spalten');
          'dort stehen sieben Spalten');
   pruefe(/--wochenspalte:\s*\d+px/.test(QUELLE),
          'ihre Breite ist fest, nicht vom Fenster abhängig');
-  pruefe(/body\.breit \.ktag \.ktitel\{white-space:normal/.test(QUELLE),
+  /* Seit v0.32.1 gilt der Umbruch auf jedem Gerät — am Handy schob ein
+     langer Titel sonst die Ablaufpille aus dem Bild. */
+  const ktitel = QUELLE.match(/\n\.ktitel\{[^}]*\}/);
+  pruefe(ktitel && !/white-space:nowrap/.test(ktitel[0]),
          'lange Termintitel brechen um, statt abgeschnitten zu werden');
+  pruefe(ktitel && /overflow-wrap:anywhere/.test(ktitel[0]),
+         'auch ein sehr langes Wort bricht');
+  pruefe(!/body\.breit \.ktag \.ktitel/.test(QUELLE),
+         'es gibt keine Sonderregel mehr für den großen Bildschirm');
+  pruefe(/\.kzeile\{[^}]*align-items:flex-start/.test(QUELLE),
+         'die Uhrzeit bleibt oben stehen, wenn der Titel umbricht');
   pruefe(/\.ktag-termine\{min-height/.test(QUELLE),
          'der Terminblock hat eine feste Mindesthöhe, damit die zweite Zeile fluchtet');
 
