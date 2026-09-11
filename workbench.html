@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.31.0</title>
+<title>Workbench 0.32.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -943,7 +943,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.31.0';
+var APP_VERSION = '0.32.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3019,6 +3019,10 @@ function verlaufHtml(eintrag, is) {
            + 'onclick="abDetailOeffnen(\'' + esc(lauf.id) + '\',\'durchlauf\')" '
            + 'title="Den angehefteten Ablauf öffnen">Ablauf ' + schritteFertig(lauf)
            + '/' + (lauf.schritte || []).length + '</button>';
+        h += '<button class="a-weg" type="button" '
+           + 'onclick="terminAblaufLoesen(\'' + esc(lauf.id) + '\')" '
+           + 'title="Die Verbindung zum Termin lösen"><svg viewBox="0 0 24 24">'
+           + '<path d="M6 6l12 12M18 6L6 18"></path></svg></button>';
       } else {
         h += '<button class="planungsknopf" type="button" '
            + 'onclick="terminAblaufWahl(\'' + esc(t.id) + '\',\'' + is + '\')" '
@@ -7502,20 +7506,21 @@ function terminAblaufWahl(terminId, is) {
   var sheet = document.getElementById('aktionSheet');
   var hg = document.getElementById('aktionHg');
   if (!t || !sheet || !hg) { return; }
+  var kontext = t.kontext || 'beruflich';
 
   var h = blattKopf();
   h += '<div class="as-titel">' + esc(t.titel) + '</div>';
   h += '<div class="as-meta">' + esc(t.zeit ? (t.zeit + ' Uhr · ') : '')
      + esc(kurzDatum(is)) + '</div>';
   h += '<div class="as-linie"></div>';
-  h += '<div class="d-hinweis" style="text-align:left;padding:6px 0">'
-     + 'Welcher Ablauf gehört zu dieser Besprechung?</div>';
 
+  /* Erstens: aus einer Vorlage einen neuen Durchlauf starten. */
+  h += '<div class="s-abschnitt">Aus einer Vorlage</div>';
   var l = DB.ablaeufe || [];
   var i;
   var gab = false;
   for (i = 0; i < l.length; i++) {
-    if (l[i].kontext !== (t.kontext || 'beruflich')) { continue; }
+    if (l[i].kontext !== kontext) { continue; }
     h += '<div class="mf-zeile" onclick="terminAblaufSetzen(\'' + esc(l[i].id) + '\',\''
        + esc(terminId) + '\',\'' + is + '\')">'
        + '<span class="mf-name">' + esc(l[i].name) + '</span>'
@@ -7523,14 +7528,97 @@ function terminAblaufWahl(terminId, is) {
     gab = true;
   }
   if (!gab) {
-    h += '<div class="tleer" style="padding-left:0">Keine Vorlage in diesem Kontext. '
-       + 'Lege unter Abläufe eine an, etwa „Besprechung".</div>';
+    h += '<div class="tleer" style="padding-left:0">Keine Vorlage in diesem Kontext.</div>';
   }
+
+  /* Zweitens: einen schon laufenden Durchlauf anhängen. */
+  h += '<div class="s-abschnitt">Oder einen laufenden Ablauf</div>';
+  var d = DB.durchlaeufe || [];
+  var gabD = false;
+  for (i = 0; i < d.length; i++) {
+    if (d[i].terminId) { continue; }
+    if (d[i].kontext !== kontext) { continue; }
+    if (!offenerSchritt(d[i])) { continue; }
+    h += '<div class="mf-zeile" onclick="terminDurchlaufAnhaengen(\'' + esc(d[i].id)
+       + '\',\'' + esc(terminId) + '\',\'' + is + '\')">'
+       + '<span class="mf-name">' + esc(d[i].name) + '</span>'
+       + '<span class="a-quelle">' + schritteFertig(d[i]) + ' von '
+       + (d[i].schritte || []).length + '</span></div>';
+    gabD = true;
+  }
+  if (!gabD) {
+    h += '<div class="tleer" style="padding-left:0">Kein freier Durchlauf in diesem '
+       + 'Kontext.</div>';
+  }
+
+  /* Drittens: einen einmaligen Ablauf für diesen Termin anlegen. */
+  h += '<div class="s-abschnitt">Oder einen einmaligen anlegen</div>';
+  h += '<div class="ms-unten" style="padding-left:0">'
+     + '<input class="v-feld" type="text" id="terminAblaufName" '
+     + 'value="' + esc(t.titel) + '" placeholder="Name des Ablaufs">'
+     + '<button class="ms-wort" type="button" onclick="terminAblaufNeu(\''
+     + esc(terminId) + '\',\'' + is + '\')">Anlegen</button></div>';
+
   h += '<div class="d-reihe"><button type="button" onclick="aktionenSchliessen()">'
      + 'Abbrechen</button></div>';
   sheet.innerHTML = h;
   sheet.classList.add('auf');
   hg.classList.add('auf');
+}
+
+/* Ein laufender Durchlauf wird nur verknüpft: Seine Schritte haben
+   ihren Stand, und ein Ruhen wäre hier falsch — es gibt kein Davor
+   und Danach, das jemand festgelegt hätte. */
+function terminDurchlaufAnhaengen(durchlaufId, terminId, is) {
+  var d = durchlaufFinden(durchlaufId);
+  var t = terminFuerKennung(terminId, is);
+  if (!d || !t) { return; }
+  d.terminId = terminId;
+  d.terminTag = is;
+  d.terminZeit = t.zeit || '';
+  if (!d.frist) { d.frist = is; }
+  d.geaendert = jetzt();
+  spaeterSichern();
+  aktionenSchliessen();
+  tagZeichnen();
+  kalZeichnen();
+  abZeichnen();
+  melde('Verknüpft: ' + d.name + ' mit ' + t.titel, 'gut');
+}
+
+function terminAblaufNeu(terminId, is) {
+  var t = terminFuerKennung(terminId, is);
+  var feld = document.getElementById('terminAblaufName');
+  if (!t || !feld) { return; }
+  var name = feld.value.trim();
+  if (name.length === 0) { name = t.titel || 'Ablauf'; }
+  var neu = {
+    id: neueKennung(), ablaufId: null, name: name,
+    kontext: t.kontext || 'beruflich', projektId: null, zielId: null,
+    terminId: terminId, terminTag: is, terminZeit: t.zeit || '',
+    start: isoDatum(), frist: is, schritte: [], geaendert: jetzt()
+  };
+  DB.durchlaeufe.push(neu);
+  spaeterSichern();
+  abDetailOeffnen(neu.id, 'durchlauf');
+  tagZeichnen();
+  kalZeichnen();
+  abZeichnen();
+}
+
+/* Trennt nur die Verbindung — der Durchlauf bleibt. */
+function terminAblaufLoesen(durchlaufId) {
+  var d = durchlaufFinden(durchlaufId);
+  if (!d) { return; }
+  d.terminId = null;
+  d.terminTag = '';
+  d.terminZeit = '';
+  d.geaendert = jetzt();
+  spaeterSichern();
+  tagZeichnen();
+  kalZeichnen();
+  abZeichnen();
+  melde('Verbindung gelöst: ' + d.name, null);
 }
 
 function terminAblaufSetzen(vorlageId, terminId, is) {
@@ -7816,6 +7904,13 @@ function abDetailHtml() {
       h += '<div class="d-feld"><div class="d-name">Aus Vorlage</div><div class="d-wert">'
          + '<span class="d-hinweis">' + esc(v ? v.name : 'nicht mehr vorhanden')
          + '</span></div></div>';
+    }
+    if (a.terminId) {
+      h += '<div class="d-feld"><div class="d-name">Termin</div><div class="d-wert">'
+         + '<span class="d-hinweis">' + esc(kurzDatum(a.terminTag || ''))
+         + (a.terminZeit ? (', ' + esc(a.terminZeit) + ' Uhr') : '') + '</span>'
+         + '<button class="ms-wort" type="button" onclick="terminAblaufLoesen(\''
+         + esc(a.id) + '\')">lösen</button></div></div>';
     }
   }
 

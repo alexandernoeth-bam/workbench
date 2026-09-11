@@ -485,6 +485,46 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__terminVerbindungApi = {'
+                 + ' pruefeVerbindung: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var heute = isoDatum();'
+                 + '   termineNachTag = {};'
+                 + '   merkeTermin(heute, { id:\'g1\', titel:\'Abstimmung\', zeit:\'14:00\','
+                 + '     bis:\'15:00\', ort:\'\', ganztags:false, quelle:\'Alex\','
+                 + '     kontext:\'beruflich\' });'
+                 + '   merkeTermin(heute, { id:\'g2\', titel:\'Zweiter\', zeit:\'16:00\','
+                 + '     bis:\'17:00\', ort:\'\', ganztags:false, quelle:\'Alex\','
+                 + '     kontext:\'beruflich\' });'
+                 + '   DB.durchlaeufe = ['
+                 + '     { id:\'d1\', name:\'ALM\', kontext:\'beruflich\', ablaufId:null,'
+                 + '       terminId:null, frist:\'\','
+                 + '       schritte:[{ titel:\'A\', fertig:true }, { titel:\'B\', fertig:false }] },'
+                 + '     { id:\'d2\', name:\'Mit Frist\', kontext:\'beruflich\', ablaufId:null,'
+                 + '       terminId:null, frist:\'2026-12-24\','
+                 + '       schritte:[{ titel:\'C\', fertig:false }] } ];'
+                 + '   tagOffen = heute;'
+                 + '   terminDurchlaufAnhaengen(\'d1\', \'g1\', heute);'
+                 + '   var d = durchlaufZuTermin(\'g1\');'
+                 + '   var stand = d.schritte[0].fertig === true && d.schritte[1].fertig === false;'
+                 + '   var ohneRuhen = !d.schritte[1].ab;'
+                 + '   var fristGesetzt = (d.frist === heute);'
+                 + '   terminDurchlaufAnhaengen(\'d2\', \'g2\', heute);'
+                 + '   var fristBleibt = durchlaufFinden(\'d2\').frist;'
+                 + '   terminAblaufLoesen(\'d1\');'
+                 + '   var nachLoesen = durchlaufZuTermin(\'g1\');'
+                 + '   var bleibt = !!durchlaufFinden(\'d1\');'
+                 + '   DB.durchlaeufe.push({ id:\'d3\', name:\'Workshop\','
+                 + '     kontext:\'beruflich\', ablaufId:null, terminId:\'g1\','
+                 + '     terminTag:heute, frist:heute, schritte:[] });'
+                 + '   var neu = durchlaufZuTermin(\'g1\');'
+                 + '   termineNachTag = {}; tagOffen = merkTag; DB = alt;'
+                 + '   return { verknuepft: d.name, standBleibt: stand, ohneRuhen: ohneRuhen,'
+                 + '            fristGesetzt: fristGesetzt, fristBleibt: fristBleibt,'
+                 + '            nachLoesen: nachLoesen, bleibtErhalten: bleibt,'
+                 + '            neuerName: neu.name, neuerOhneVorlage: (neu.ablaufId === null),'
+                 + '            neuerAmTermin: (neu.terminId === \'g1\') };'
+                 + ' } };'
                  + 'globalThis.__kleinApi = {'
                  + ' pruefeKlein: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -4536,6 +4576,71 @@ console.log('\n64. Kleinigkeiten in der Woche');
            'eine für die nächste Woche gehört nicht in diese');
     pruefe(e.erledigtDrin === true, 'Erledigtes bleibt sichtbar');
     pruefe(e.wiederkehrendDrin === false, 'Wiederkehrendes nicht');
+  }
+}
+
+/* ============================================================
+   65. Laufenden Ablauf an einen Termin haengen
+   Grund: Ein einmaliger Durchlauf und sein Termin standen
+   nebeneinander, ohne voneinander zu wissen. Und fuer eine Sache
+   ohne Vorlage musste man den Bildschirm wechseln.
+   ============================================================ */
+console.log('\n65. Ablauf und Termin verbinden');
+{
+  const skript = hauptSkript();
+  const v = globalThis.__terminVerbindungApi;
+
+  ['terminDurchlaufAnhaengen', 'terminAblaufNeu',
+   'terminAblaufLoesen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const wahl = skript.match(/function terminAblaufWahl\([\s\S]*?\n\}\n/);
+  pruefe(wahl && /Aus einer Vorlage/.test(wahl[0]), 'der erste Weg führt über eine Vorlage');
+  pruefe(wahl && /Oder einen laufenden Ablauf/.test(wahl[0]),
+         'der zweite über einen laufenden Durchlauf');
+  pruefe(wahl && /Oder einen einmaligen anlegen/.test(wahl[0]),
+         'der dritte legt einen einmaligen an');
+  pruefe(wahl && /d\[i\]\.terminId\) \{ continue/.test(wahl[0]),
+         'schon verbundene Durchläufe stehen nicht zur Wahl');
+  pruefe(wahl && /!offenerSchritt\(d\[i\]\)/.test(wahl[0]),
+         'ein durchgelaufener auch nicht');
+  pruefe(wahl && /value="' \+ esc\(t\.titel\)/.test(wahl[0]),
+         'der Name des neuen ist mit dem Termintitel vorbelegt');
+
+  const anh = skript.match(/function terminDurchlaufAnhaengen\([\s\S]*?\n\}/);
+  pruefe(anh && !/schritte/.test(anh[0]),
+         'ein laufender Durchlauf wird nur verknüpft, seine Schritte bleiben unberührt');
+  pruefe(anh && /if \(!d\.frist\)/.test(anh[0]),
+         'eine schon gesetzte Frist wird nicht überschrieben');
+
+  const loesen = skript.match(/function terminAblaufLoesen\([\s\S]*?\n\}/);
+  pruefe(loesen && /terminId = null/.test(loesen[0]), 'Lösen trennt nur die Verbindung');
+  pruefe(loesen && !/splice/.test(loesen[0]), 'der Durchlauf bleibt bestehen');
+
+  const zeile = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
+  pruefe(zeile && /terminAblaufLoesen\(/.test(zeile[0]),
+         'in der Tageszeile lässt sich die Verbindung lösen');
+  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(detail && /a\.terminId/.test(detail[0]),
+         'der Durchlauf nennt seinen Termin');
+
+  if (!v) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = v.pruefeVerbindung();
+    pruefe(e.verknuepft === 'ALM', 'ein laufender Durchlauf lässt sich anhängen');
+    pruefe(e.standBleibt === true, 'sein Stand bleibt erhalten');
+    pruefe(e.ohneRuhen === true, 'seine Schritte bekommen kein Ruhen');
+    pruefe(e.fristGesetzt === true, 'eine fehlende Frist wird auf den Termintag gesetzt');
+    pruefe(e.fristBleibt === '2026-12-24',
+           'eine vorhandene Frist bleibt unangetastet');
+    pruefe(e.nachLoesen === null, 'Lösen trennt die Verbindung');
+    pruefe(e.bleibtErhalten === true, 'der Durchlauf bleibt im Bestand');
+    pruefe(e.neuerName === 'Workshop', 'ein einmaliger lässt sich anlegen');
+    pruefe(e.neuerOhneVorlage === true, 'er hat keine Vorlage');
+    pruefe(e.neuerAmTermin === true, 'und hängt am Termin');
   }
 }
 
