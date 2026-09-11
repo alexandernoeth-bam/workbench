@@ -485,6 +485,44 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__traegerApi = {'
+                 + ' pruefeTraeger: function(){'
+                 + '   var alt = DB; var merkAkt = aktionFuer; DB = leereDatenbank();'
+                 + '   DB.aufgaben = [{ id:\'a1\', titel:\'Offerings anlegen\','
+                 + '     kontext:\'beruflich\', status:\'offen\', planung:\'backlog\','
+                 + '     art:\'haupt\' }];'
+                 + '   DB.durchlaeufe = ['
+                 + '     { id:\'d1\', name:\'Teil 1\', kontext:\'beruflich\','
+                 + '       schritte:[{ titel:\'x\', aufgabeId:\'a1\' },'
+                 + '                 { titel:\'Eigener\', fertig:false }] },'
+                 + '     { id:\'d2\', name:\'Teil 2\', kontext:\'beruflich\','
+                 + '       schritte:[{ titel:\'y\', aufgabeId:\'a1\' }] },'
+                 + '     { id:\'d3\', name:\'Besprechung\', kontext:\'beruflich\','
+                 + '       schritte:[{ titel:\'z\', aufgabeId:\'a1\' }] } ];'
+                 + '   var stand = function(){ return DB.durchlaeufe.map(function(d){'
+                 + '     return schritteFertig(d); }).join(\',\'); };'
+                 + '   var titel = schrittTitel(DB.durchlaeufe[0].schritte[0]);'
+                 + '   var vorher = stand();'
+                 + '   schrittUm(\'d1\', 0);'
+                 + '   var nachHaken = stand();'
+                 + '   var status = DB.aufgaben[0].status;'
+                 + '   var eigener = schrittFertig(DB.durchlaeufe[0].schritte[1]);'
+                 + '   schrittUm(\'d3\', 0);'
+                 + '   var zurueck = stand();'
+                 + '   aufgabeErledigen(\'a1\');'
+                 + '   var ueberTag = stand();'
+                 + '   var weiss = durchlaeufeZuAufgabe(\'a1\').length;'
+                 + '   aktionFuer = \'a1\';'
+                 + '   aufgabeLoeschen();'
+                 + '   var nachTitel = DB.durchlaeufe[0].schritte[0].titel;'
+                 + '   var nachStand = stand();'
+                 + '   aktionFuer = merkAkt; zurueckHolen = null; DB = alt;'
+                 + '   return { titelAusAufgabe:titel, vorher:vorher, nachHaken:nachHaken,'
+                 + '            aufgabeErledigt:status, nachRuecknahme:zurueck,'
+                 + '            ueberTagesplan:ueberTag,'
+                 + '            eigenerSchrittUnberuehrt:eigener, weissVon:weiss,'
+                 + '            nachLoeschenTitel:nachTitel, nachLoeschenStand:nachStand };'
+                 + ' } };'
                  + 'globalThis.__artApi = {'
                  + ' pruefeArten: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -4814,6 +4852,88 @@ console.log('\n66. Arten aus dem Kalender');
            'ein Urlaub aus dem Kalender macht den Tag frei');
     pruefe(e.keineDublette === 1,
            'ein ganztägiger Kalendertermin erscheint im Tag genau einmal');
+  }
+}
+
+/* ============================================================
+   67. Ein Schritt als Fenster auf seine Aufgabe
+   Grund: Derselbe Handgriff kommt in mehreren Ablaeufen vor. Statt
+   Haken zwischen Schritten nachzuziehen — mit Ringen, halben
+   Zustaenden und Loechern beim Loeschen — gibt es nur eine Wahrheit:
+   die Aufgabe. Der Schritt zeigt sie an.
+   ============================================================ */
+console.log('\n67. Schritt und Aufgabe');
+{
+  const skript = hauptSkript();
+  const s = globalThis.__traegerApi;
+
+  ['schrittAufgabe', 'schrittFertig', 'schrittTitel', 'durchlaeufeZuAufgabe',
+   'abSchrittWahl', 'abSchrittVerknuepfen', 'abSchrittLoesen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  /* Der Stand kommt von der Aufgabe, nicht vom Schritt */
+  const fertig = skript.match(/function schrittFertig\([\s\S]*?\n\}/);
+  pruefe(fertig && /a\.status === 'erledigt'/.test(fertig[0]),
+         'trägt eine Aufgabe den Schritt, gilt ihr Stand');
+  pruefe(fertig && /!!s\.fertig/.test(fertig[0]),
+         'ohne Aufgabe gilt der eigene Stand des Schritts');
+
+  const um = skript.match(/function schrittUm\([\s\S]*?\n\}/);
+  pruefe(um && /aufgabeErledigen\(a\.id\)/.test(um[0]),
+         'ein Haken am Schritt hakt die Aufgabe ab');
+  pruefe(um && /aufgabeWiederOeffnen\(a\.id\)/.test(um[0]),
+         'und nimmt ihn auch wieder zurück');
+  pruefe(um && !/nachziehen|synchron/i.test(um[0]),
+         'es wird nichts nachgezogen — es gibt nur eine Sache');
+
+  /* Der Titel gehört der Aufgabe */
+  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(detail && /ms-fest/.test(detail[0]),
+         'der Titel eines getragenen Schritts ist nicht doppelt änderbar');
+  pruefe(detail && /abSchrittWahl\(/.test(detail[0]),
+         'eine vorhandene Aufgabe lässt sich verknüpfen');
+  pruefe(detail && /abSchrittLoesen\(/.test(detail[0]), 'und wieder lösen');
+
+  /* Was nicht tragen darf */
+  const wahl = skript.match(/function abSchrittWahl\([\s\S]*?\n\}\n/);
+  pruefe(wahl && /l\[k\]\.wiederholung.*continue/s.test(wahl[0]),
+         'Wiederkehrendes trägt keinen Schritt');
+  pruefe(wahl && /l\[k\]\.art === 'klein'/.test(wahl[0]),
+         'eine Kleinigkeit auch nicht');
+
+  /* Lösen und Löschen hinterlassen keine Lücke */
+  const loesen = skript.match(/function abSchrittLoesen\([\s\S]*?\n\}/);
+  pruefe(loesen && /a\.schritte\[i\]\.titel = traeger\.titel/.test(loesen[0]),
+         'beim Lösen übernimmt der Schritt Titel und Stand');
+  const loeschen = skript.match(/function aufgabeLoeschen\([\s\S]*?\n\}/);
+  pruefe(loeschen && /durchlaeufeZuAufgabe\(id\)/.test(loeschen[0]),
+         'beim Löschen einer Aufgabe werden ihre Schritte versorgt');
+
+  /* Die Aufgabe weiß, wo sie vorkommt */
+  const aufg = skript.match(/function detailHtml\([\s\S]*?\n\}\n/);
+  pruefe(aufg && /Trägt Schritte in/.test(aufg[0]),
+         'die Aufgabe nennt die Abläufe, in denen sie vorkommt');
+
+  if (!s) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = s.pruefeTraeger();
+    pruefe(e.titelAusAufgabe === 'Offerings anlegen', 'der Schritt zeigt ihren Titel');
+    pruefe(e.vorher === '0,0,0', 'zu Beginn ist nichts erledigt');
+    pruefe(e.nachHaken === '1,1,1',
+           'ein Haken in einem Ablauf gilt sofort in allen dreien');
+    pruefe(e.aufgabeErledigt === 'erledigt', 'die Aufgabe ist erledigt');
+    pruefe(e.nachRuecknahme === '0,0,0', 'die Rücknahme gilt ebenso überall');
+    pruefe(e.ueberTagesplan === '1,1,1',
+           'ein Haken im Tagesplan wirkt genauso');
+    pruefe(e.eigenerSchrittUnberuehrt === false,
+           'ein Schritt ohne Aufgabe bleibt davon unberührt');
+    pruefe(e.weissVon === 3, 'die Aufgabe kennt alle drei Abläufe');
+    pruefe(e.nachLoeschenTitel === 'Offerings anlegen',
+           'nach dem Löschen behalten die Schritte den Titel');
+    pruefe(e.nachLoeschenStand === '1,1,1', 'und ihren Stand');
   }
 }
 
