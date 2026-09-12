@@ -904,9 +904,15 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   kalStufe = \'monat\'; var m = googleKalenderAdresse();'
                  + '   kalStufe = \'jahr\';  var j = googleKalenderAdresse();'
                  + '   kalStufe = \'woche\'; var hd = googleKalenderAdresse(true);'
+                 + '   var ai = androidKalenderAdresse(\'2026-08-10\');'
+                 + '   var ms = Number(ai.match(/time\\/(\\d+)/)[1]);'
+                 + '   var ad = new Date(ms);'
+                 + '   var zwei = function(n){ return (n < 10 ? \'0\' : \'\') + n; };'
+                 + '   var atag = ad.getFullYear() + \'-\' + zwei(ad.getMonth() + 1)'
+                 + '            + \'-\' + zwei(ad.getDate());'
                  + '   kalAnker = merkA; kalStufe = merkS;'
                  + '   return { woche:w, monat:m, jahr:j, handy:hd,'
-                 + '            name:GOOGLE_FENSTER };'
+                 + '            androidTag:atag, name:GOOGLE_FENSTER };'
                  + ' } };'
                  + 'globalThis.__abGruppeApi = {'
                  + ' pruefeGruppen: function(){'
@@ -4683,8 +4689,26 @@ console.log('\n60. Weg in den Google-Kalender');
          + 'im Schreibtischformat');
   const oeffnen2 = skript.match(/function googleKalenderOeffnen\([\s\S]*?\n\}/);
   pruefe(oeffnen2 && /'_blank'/.test(oeffnen2[0]),
-         'am Handy ohne Fensternamen, damit Android an die Kalender-App '
-         + 'weiterreichen kann');
+         'am Handy ohne Fensternamen');
+
+  /* Unter Android führt nur der Weg über die App: Google liefert im
+     Browser stets die Schreibtischfassung. */
+  ['istAndroid', 'androidKalenderAdresse', 'adresseAnklicken'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const andr = skript.match(/function androidKalenderAdresse\([\s\S]*?\n\}/);
+  pruefe(andr && /package=com\.google\.android\.calendar/.test(andr[0]),
+         'die Adresse spricht die Kalender-App unmittelbar an');
+  pruefe(andr && /browser_fallback_url/.test(andr[0]),
+         'fehlt die App, greift eine Rückfalladresse');
+  pruefe(andr && /12, 0, 0/.test(andr[0]),
+         'gerechnet wird auf Mittag — sonst kippt der Tag über die Zeitzone');
+  const klick = skript.match(/function adresseAnklicken\([\s\S]*?\n\}/);
+  pruefe(klick && /a\.click\(\)/.test(klick[0]),
+         'geöffnet wird über einen angeklickten Verweis, nicht über window.open');
+  pruefe(oeffnen2 && /istAndroid\(\)/.test(oeffnen2[0]),
+         'unter Android wird dieser Weg gewählt');
   pruefe(new RegExp('function\\s+istHandy\\s*\\(').test(skript),
          'Funktion istHandy ist definiert');
   const handy = skript.match(/function istHandy\([\s\S]*?\n\}/);
@@ -4705,6 +4729,8 @@ console.log('\n60. Weg in den Google-Kalender');
     pruefe(e.jahr.indexOf('/year/2026/8/10') > 0, 'das Jahr zur Jahresansicht');
     pruefe(e.name === 'workbench-google-kalender',
            'immer dasselbe Fenster, nie ein zweites');
+    pruefe(e.androidTag === '2026-08-10',
+           'die Android-Adresse trifft denselben Tag');
   }
 }
 

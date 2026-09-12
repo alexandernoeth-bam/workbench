@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.40.0</title>
+<title>Workbench 0.41.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -966,7 +966,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.40.0';
+var APP_VERSION = '0.41.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5550,11 +5550,43 @@ function googleKalenderAdresse(handy) {
        + d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
 }
 
+function istAndroid() {
+  return /Android/i.test((navigator && navigator.userAgent) || '');
+}
+
+/* Google liefert für den Kalender keine brauchbare mobile Weboberfläche
+   mehr — im Browser kommt stets die Schreibtischfassung. Unter Android
+   führt deshalb nur der Weg über die App. Dieser Adresstyp spricht sie
+   unmittelbar an; ist sie nicht da, greift die hinterlegte Rückfalladresse. */
+function androidKalenderAdresse(is) {
+  var d = ausIso(is);
+  var mittag = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0);
+  var rueckfall = googleKalenderAdresse(true);
+  return 'intent://time/' + mittag.getTime() + '#Intent'
+       + ';scheme=content'
+       + ';package=com.google.android.calendar'
+       + ';S.browser_fallback_url=' + encodeURIComponent(rueckfall)
+       + ';end';
+}
+
+/* Ein angeklickter Verweis darf Android an eine App übergeben,
+   window.open dagegen landet im eingebauten Browserfenster. */
+function adresseAnklicken(adresse) {
+  var a = document.createElement('a');
+  a.href = adresse;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 function googleKalenderOeffnen() {
   var handy = istHandy();
+  if (istAndroid()) {
+    adresseAnklicken(androidKalenderAdresse(kalAnker || isoDatum()));
+    return;
+  }
   var adresse = googleKalenderAdresse(handy);
-  /* Ohne Fensternamen darf Android die Adresse an die Kalender-App
-     weiterreichen; ein benanntes Fenster bliebe im Browser. */
   var fenster = handy ? window.open(adresse, '_blank')
                       : window.open(adresse, GOOGLE_FENSTER);
   if (fenster && fenster.focus) { fenster.focus(); }
