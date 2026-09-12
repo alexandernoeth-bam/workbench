@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.43.0</title>
+<title>Workbench 0.44.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -114,6 +114,51 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tganz.privat .tganz-titel{color:var(--petrol)}
 .tganz-quelle{flex:0 0 auto;font-size:calc(var(--fs)*0.72);color:var(--grau)}
+.sk-name{font-size:calc(var(--fs)*1.12);font-weight:500;line-height:1.25;
+  margin-top:8px}
+.sk-meta{font-size:calc(var(--fs)*0.76);color:var(--grau);margin-top:2px}
+.sk-zustand{font-size:calc(var(--fs)*0.9);line-height:1.45;padding:10px 0 4px;
+  color:var(--tinte)}
+.sa{border-top:1px solid var(--linie);margin-top:10px}
+.sa-kopf{display:flex;width:100%;align-items:center;gap:9px;background:none;border:0;
+  font:inherit;font-size:calc(var(--fs)*0.78);font-weight:500;color:var(--grau);
+  padding:9px 0;cursor:pointer;text-align:left}
+.sa-name{flex:1;min-width:0}
+.sa-zahl{flex:0 0 auto;font-weight:400;font-variant-numeric:tabular-nums}
+.sa-kopf svg{flex:0 0 auto;width:14px;height:14px;stroke:currentColor;fill:none;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  transform:rotate(-90deg);transition:transform .15s ease}
+.sa-kopf svg.auf{transform:rotate(0deg)}
+.sa-inhalt{padding-bottom:8px}
+
+.sm{display:flex;align-items:baseline;gap:9px;padding:4px 0}
+.sm-punkt{flex:0 0 8px;height:8px;border-radius:50%;border:1px solid var(--grau);
+  align-self:center}
+.sm.fertig .sm-punkt{background:var(--petrol);border-color:var(--petrol)}
+.sm-titel{flex:1;min-width:0;font-size:calc(var(--fs)*0.86);line-height:1.35}
+.sm.fertig .sm-titel{color:var(--grau);text-decoration:line-through}
+.sm-datum{flex:0 0 auto;font-size:calc(var(--fs)*0.74);color:var(--grau)}
+
+.fest{display:flex;align-items:center;gap:6px;padding:3px 0}
+.fest-stich{flex:0 0 34%;min-width:0;font:inherit;font-size:calc(var(--fs)*0.8);
+  border:0;border-bottom:1px solid var(--linie);background:none;color:var(--grau);
+  padding:4px 2px;outline:none}
+.fest-wert{flex:1;min-width:0;font:inherit;font-size:calc(var(--fs)*0.86);
+  border:0;border-bottom:1px solid var(--linie);background:none;color:var(--tinte);
+  padding:4px 2px;outline:none}
+.fest-seit{flex:0 0 auto;font-size:calc(var(--fs)*0.7);color:var(--grau-hell)}
+.fest.neu{padding-top:8px}
+.fest.neu .fest-stich,.fest.neu .fest-wert{border-bottom-style:dashed}
+
+.sz{display:flex;gap:9px;padding:3px 0}
+.sz-kw{flex:0 0 62px;font-size:calc(var(--fs)*0.74);color:var(--grau);
+  font-variant-numeric:tabular-nums}
+.sz-satz{flex:1;min-width:0;font-size:calc(var(--fs)*0.84);line-height:1.4}
+
+body.breit #seiteBlatt{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:0 28px;align-items:start}
+body.breit #seiteBlatt .sk-zustand{grid-column:1 / -1}
+
 .tablauf{border-left:2px solid var(--linie);padding:2px 0 6px 0;margin:4px 0 8px}
 .tablauf.privat{border-left-color:var(--petrol)}
 .tablauf-kopf{display:flex;width:100%;align-items:center;gap:9px;background:none;
@@ -720,6 +765,18 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 </div>
 
 
+<div class="schirm" id="schirmSeite">
+  <div class="vh-kopf">
+    <div class="vh-zeile">
+      <button type="button" class="pille" onclick="seiteZurueck()">Zurück</button>
+      <span class="vh-luecke"></span>
+      <button type="button" class="pille" onclick="seiteBearbeiten()">Bearbeiten</button>
+    </div>
+    <div id="seiteKopf"></div>
+  </div>
+  <div class="vhblatt" id="seiteBlatt"></div>
+</div>
+
 <div class="schirm" id="schirmDiagnose">
   <div class="abschnitt-titel"><span>Speicher</span></div>
   <div id="speicherListe"></div>
@@ -981,7 +1038,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.43.0';
+var APP_VERSION = '0.44.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4545,7 +4602,7 @@ function handleVergessen() {
 function zeigeSchirm(name) {
   schirmOffen = name;
   var alle = ['Tag', 'Kalender', 'Vorhaben', 'Ablaeufe', 'Aufgaben',
-              'Migration', 'Diagnose'];
+              'Seite', 'Migration', 'Diagnose'];
   var i;
   for (i = 0; i < alle.length; i++) {
     var s = document.getElementById('schirm' + alle[i]);
@@ -4554,10 +4611,14 @@ function zeigeSchirm(name) {
       if (alle[i] === name) { s.classList.add('aktiv'); } else { s.classList.remove('aktiv'); }
     }
     if (n) {
-      if (alle[i] === name) { n.classList.add('aktiv'); } else { n.classList.remove('aktiv'); }
+      /* Die Seite hat keinen eigenen Knopf — sie gehört zu Vorhaben. */
+      var leuchtet = (alle[i] === name)
+                  || (name === 'Seite' && alle[i] === 'Vorhaben');
+      if (leuchtet) { n.classList.add('aktiv'); } else { n.classList.remove('aktiv'); }
     }
   }
   if (name === 'Migration') { migZeichne(); }
+  if (name === 'Seite') { seiteZeichnen(); }
   if (name === 'Tag') { tagZeichnen(); kalenderNachholen(); }
   if (name === 'Aufgaben') { aufZeichnen(); }
   if (name === 'Vorhaben') { vhZeichnen(); }
@@ -7041,6 +7102,18 @@ function vorhabenFinden(id, art) {
   return (art === 'ziel') ? zielFinden(id) : projektFinden(id);
 }
 
+/* Für die Nachschlageseite: alle, auch das Erledigte. Im Projektblatt
+   stört Erledigtes, hier ist es der halbe Ertrag. */
+function alleAufgabenZuProjekt(id) {
+  var aus = [];
+  var l = DB.aufgaben || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].projektId === id) { aus.push(l[i]); }
+  }
+  return aus;
+}
+
 function aufgabenZuProjekt(id) {
   var aus = [];
   var l = DB.aufgaben || [];
@@ -7116,6 +7189,8 @@ function zielKarteHtml(z) {
     h += '</div>';
   }
   h += '<div class="vk-knoepfe">'
+     + '<button type="button" onclick="seiteOeffnen(\'' + esc(z.id) + '\',\'ziel\')">'
+     + 'Alles auf einer Seite</button>'
      + '<button type="button" onclick="vhDetailOeffnen(\'' + esc(z.id) + '\',\'ziel\')">'
      + 'Bearbeiten</button></div>';
   h += '</div></div>';
@@ -7166,6 +7241,8 @@ function projektKarteHtml(p) {
     h += '<div class="vk-satz leer">… und ' + (auf.length - 8) + ' weitere</div>';
   }
   h += '<div class="vk-knoepfe">'
+     + '<button type="button" onclick="seiteOeffnen(\'' + esc(p.id) + '\',\'projekt\')">'
+     + 'Alles auf einer Seite</button>'
      + '<button type="button" onclick="vhDetailOeffnen(\'' + esc(p.id) + '\',\'projekt\')">'
      + 'Bearbeiten</button></div>';
   h += '</div></div>';
@@ -8129,6 +8206,283 @@ function einfallDetailHtml() {
   h += '<button class="gefahr" type="button" onclick="einfallLoeschen()">Löschen</button>';
   h += '</div>';
   return h;
+}
+
+
+/* ============================================================
+   Die Vorhabenseite
+
+   Das Detailblatt ist ein Formular zum Ändern einzelner Felder. Diese
+   Seite ist zum Nachschlagen: alles zu einem Vorhaben an einer
+   Stelle — was festliegt, was ansteht, was erreicht ist.
+   ============================================================ */
+
+var seiteFuer = '';
+var seiteArt = '';
+var seiteZu = {};          /* eingeklappte Abschnitte */
+
+function seiteOeffnen(id, art) {
+  seiteFuer = id;
+  seiteArt = art;
+  zeigeSchirm('Seite');
+  seiteZeichnen();
+}
+
+function seiteAbschnittUm(name) {
+  seiteZu[name] = !seiteZu[name];
+  seiteZeichnen();
+}
+
+function seiteAbschnitt(name, zahl, inhalt, warnung) {
+  var zu = seiteZu[name] === true;
+  var h = '<div class="sa' + (warnung ? ' warn' : '') + '">';
+  h += '<button class="sa-kopf" type="button" onclick="seiteAbschnittUm(\'' + name + '\')">';
+  h += '<span class="sa-name">' + esc(name) + '</span>';
+  if (zahl !== '') { h += '<span class="sa-zahl">' + esc(String(zahl)) + '</span>'; }
+  h += '<svg class="' + (zu ? '' : 'auf') + '" viewBox="0 0 24 24">'
+     + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+  if (!zu) { h += '<div class="sa-inhalt">' + inhalt + '</div>'; }
+  return h + '</div>';
+}
+
+/* ------------------------------------------------------------
+   Festlegungen — das, was man nachschlägt statt abhakt
+   ------------------------------------------------------------ */
+
+function festlegungen(v) {
+  return Array.isArray(v.festlegungen) ? v.festlegungen : [];
+}
+
+function festlegungNeu() {
+  var v = vorhabenFinden(seiteFuer, seiteArt);
+  var fStich = document.getElementById('festStich');
+  var fWert = document.getElementById('festWert');
+  if (!v || !fStich || !fWert) { return; }
+  var stich = fStich.value.trim();
+  var wert = fWert.value.trim();
+  if (stich.length === 0 && wert.length === 0) { return; }
+  if (!Array.isArray(v.festlegungen)) { v.festlegungen = []; }
+  v.festlegungen.push({
+    id: neueKennung(), stichwort: stich || 'ohne Stichwort',
+    inhalt: wert, seit: isoDatum()
+  });
+  v.geaendert = jetzt();
+  fStich.value = '';
+  fWert.value = '';
+  spaeterSichern();
+  seiteZeichnen();
+}
+
+/* Geändert, nicht ergänzt: Eine Festlegung wird überschrieben, sonst
+   stehen nach einem halben Jahr drei Torbreiten da. */
+function festlegungSetzen(id, feld, wert) {
+  var v = vorhabenFinden(seiteFuer, seiteArt);
+  if (!v) { return; }
+  var l = festlegungen(v);
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].id !== id) { continue; }
+    if (l[i][feld] === wert) { return; }
+    l[i][feld] = wert;
+    l[i].seit = isoDatum();
+    v.geaendert = jetzt();
+    spaeterSichern();
+    return;
+  }
+}
+
+function festlegungWeg(id) {
+  var v = vorhabenFinden(seiteFuer, seiteArt);
+  if (!v) { return; }
+  var l = festlegungen(v);
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].id !== id) { continue; }
+    l.splice(i, 1);
+    v.geaendert = jetzt();
+    spaeterSichern();
+    seiteZeichnen();
+    return;
+  }
+}
+
+function festlegungenHtml(v) {
+  var l = festlegungen(v);
+  var h = '';
+  var i;
+  for (i = 0; i < l.length; i++) {
+    h += '<div class="fest">';
+    h += '<input class="fest-stich" type="text" value="' + esc(l[i].stichwort) + '" '
+       + 'oninput="festlegungSetzen(\'' + esc(l[i].id) + '\',\'stichwort\',this.value)">';
+    h += '<input class="fest-wert" type="text" value="' + esc(l[i].inhalt) + '" '
+       + 'oninput="festlegungSetzen(\'' + esc(l[i].id) + '\',\'inhalt\',this.value)">';
+    h += '<span class="fest-seit">' + esc(kurzDatum(l[i].seit || '')) + '</span>';
+    h += '<button class="a-weg" type="button" onclick="festlegungWeg(\'' + esc(l[i].id)
+       + '\')" title="Festlegung entfernen"><svg viewBox="0 0 24 24">'
+       + '<path d="M6 6l12 12M18 6L6 18"></path></svg></button>';
+    h += '</div>';
+  }
+  if (!l.length) {
+    h += '<div class="tleer" style="padding-left:0">Noch nichts festgelegt. '
+       + 'Hierher gehört, was man nachschlägt: Maße, Grenzen, Vereinbarungen.</div>';
+  }
+  h += '<div class="fest neu">'
+     + '<input class="fest-stich" type="text" id="festStich" placeholder="Stichwort">'
+     + '<input class="fest-wert" type="text" id="festWert" placeholder="Inhalt" '
+     + 'onkeydown="if(event.key===\'Enter\'){festlegungNeu();}">'
+     + '<button class="ms-wort" type="button" onclick="festlegungNeu()">Festlegen</button>'
+     + '</div>';
+  return h;
+}
+
+/* ------------------------------------------------------------
+   Die Seite
+   ------------------------------------------------------------ */
+
+function seiteZeichnen() {
+  var blatt = document.getElementById('seiteBlatt');
+  if (!blatt) { return; }
+  var v = vorhabenFinden(seiteFuer, seiteArt);
+  if (!v) {
+    blatt.innerHTML = '<div class="tleer">Nicht gefunden.</div>';
+    return;
+  }
+  var heute = isoDatum();
+  var istProjekt = (seiteArt === 'projekt');
+
+  var kopf = document.getElementById('seiteKopf');
+  if (kopf) {
+    kopf.innerHTML = '<div class="sk-name">' + esc(v.name) + '</div>'
+      + '<div class="sk-meta">' + (istProjekt ? 'Projekt' : 'Ziel') + ' · '
+      + esc(v.kontext) + ' · ' + esc(v.status || 'laufend') + '</div>';
+  }
+
+  var h = '';
+
+  /* Zielzustand dieser Woche */
+  var satz = zustandText(v);
+  h += '<div class="sk-zustand">'
+     + (satz ? esc(satz) : 'Für diese Woche ist kein Zustand gesetzt.') + '</div>';
+
+  /* Meilensteine */
+  if (istProjekt) {
+    var ms = v.meilensteine || [];
+    var erreicht = 0;
+    var mi;
+    var mh = '';
+    for (mi = 0; mi < ms.length; mi++) {
+      if (ms[mi].erreicht) { erreicht++; }
+      mh += '<div class="sm' + (ms[mi].erreicht ? ' fertig' : '') + '">'
+         + '<span class="sm-punkt"></span>'
+         + '<span class="sm-titel">' + esc(ms[mi].titel) + '</span>'
+         + '<span class="sm-datum">' + esc(ms[mi].datum ? kurzDatum(ms[mi].datum) : '')
+         + '</span></div>';
+    }
+    if (!ms.length) { mh = '<div class="tleer" style="padding-left:0">Keine.</div>'; }
+    h += seiteAbschnitt('Meilensteine', erreicht + ' von ' + ms.length, mh, false);
+  }
+
+  /* Festlegungen */
+  h += seiteAbschnitt('Festlegungen', festlegungen(v).length,
+                      festlegungenHtml(v), false);
+
+  /* Aufgaben und Kleinigkeiten */
+  var zug = istProjekt ? alleAufgabenZuProjekt(v.id) : [];
+  var haupt = [], klein = [], fertig = [];
+  var ai;
+  for (ai = 0; ai < zug.length; ai++) {
+    if (zug[ai].status === 'erledigt') { fertig.push(zug[ai]); }
+    else if (zug[ai].art === 'klein') { klein.push(zug[ai]); }
+    else { haupt.push(zug[ai]); }
+  }
+  var listeHtml = function (l) {
+    var t = '';
+    var i;
+    for (i = 0; i < l.length; i++) {
+      t += '<div class="tzeile kompakt' + (l[i].kontext === 'privat' ? ' privat' : '')
+         + (l[i].status === 'erledigt' ? ' erledigt' : '') + '">'
+         + '<button class="tkasten' + (l[i].status === 'erledigt' ? ' an' : '')
+         + '" type="button" onclick="seiteAufgabeHaken(\'' + esc(l[i].id) + '\')"></button>'
+         + '<div class="ttext" onclick="aufgabeAktionen(\'' + esc(l[i].id) + '\')">'
+         + '<div class="ttitel' + (l[i].status === 'erledigt' ? ' fertig' : '')
+         + '">' + esc(l[i].titel) + '</div>'
+         + '<div class="tmeta">' + esc(planungText(l[i]))
+         + (l[i].frist ? (' · Frist ' + esc(kurzDatum(l[i].frist))) : '')
+         + '</div></div></div>';
+    }
+    if (!l.length) { t += '<div class="tleer" style="padding-left:0">Keine.</div>'; }
+    return t;
+  };
+  if (istProjekt) {
+    h += seiteAbschnitt('Aufgaben', haupt.length, listeHtml(haupt), false);
+    h += seiteAbschnitt('Kleinigkeiten', klein.length, listeHtml(klein), false);
+    if (fertig.length) {
+      h += seiteAbschnitt('Erledigt', fertig.length, listeHtml(fertig), false);
+    }
+  }
+
+  /* Abläufe */
+  h += seiteAbschnitt('Abläufe', '', vhAblaeufeHtml(v.id, seiteArt), false);
+
+  /* Einzahler beim Ziel */
+  if (!istProjekt) {
+    var ein = v.einzahler || [];
+    var eh = '';
+    var ei;
+    for (ei = 0; ei < ein.length; ei++) {
+      var p = projektFinden(ein[ei]);
+      if (!p) { continue; }
+      eh += '<div class="anlage"><div class="a-mitte" onclick="seiteOeffnen(\''
+         + esc(p.id) + '\',\'projekt\')"><div class="a-name">' + esc(p.name)
+         + '</div><div class="a-quelle">' + esc(p.status || 'laufend')
+         + '</div></div></div>';
+    }
+    if (!eh) { eh = '<div class="tleer" style="padding-left:0">Keine.</div>'; }
+    h += seiteAbschnitt('Zahlt ein', ein.length, eh, false);
+  }
+
+  /* Frühere Zielzustände */
+  var frueher = fruehereZustaende(v);
+  if (frueher.length) {
+    var fh = '';
+    var fi;
+    for (fi = 0; fi < frueher.length; fi++) {
+      fh += '<div class="sz"><span class="sz-kw">KW ' + frueher[fi].kw + '/'
+         + String(frueher[fi].jahr).slice(2) + '</span>'
+         + '<span class="sz-satz">' + esc(frueher[fi].satz) + '</span></div>';
+    }
+    h += seiteAbschnitt('Frühere Zustände', frueher.length, fh, false);
+  }
+
+  /* Anlagen */
+  var an = v.anlagen || [];
+  var ah = '';
+  var ani;
+  for (ani = 0; ani < an.length; ani++) {
+    ah += '<div class="anlage"><div class="a-mitte"><div class="a-name">'
+       + esc(an[ani].name) + '</div><div class="a-quelle">'
+       + esc(an[ani].quelle || '') + '</div></div></div>';
+  }
+  if (!ah) { ah = '<div class="tleer" style="padding-left:0">Keine.</div>'; }
+  h += seiteAbschnitt('Anlagen', an.length, ah, false);
+
+  blatt.innerHTML = h;
+}
+
+function seiteAufgabeHaken(id) {
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  if (a.status === 'erledigt') { aufgabeWiederOeffnen(id); }
+  else { aufgabeErledigen(id); }
+  seiteZeichnen();
+}
+
+function seiteBearbeiten() {
+  vhDetailOeffnen(seiteFuer, seiteArt);
+}
+
+function seiteZurueck() {
+  zeigeSchirm('Vorhaben');
 }
 
 /* ============================================================

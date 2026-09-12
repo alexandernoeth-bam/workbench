@@ -65,7 +65,10 @@ console.log('\n1. Bildschirme und Navigation');
 
   /* Absichtlich versteckte Bildschirme: kein Knopf in der Leiste, aber
      nachweislich anders erreichbar. */
-  const VERSTECKT = ['Migration'];
+  /* Nicht jeder Bildschirm gehört in die Leiste: Die Migration wird
+     einmal gebraucht, die Vorhabenseite gehört zu „Vorhaben" und wird
+     von dort geöffnet. Beide müssen aber erreichbar bleiben. */
+  const VERSTECKT = ['Migration', 'Seite'];
   schirme.forEach(function (s) {
     if (VERSTECKT.indexOf(s) >= 0) {
       pruefe(navs.indexOf(s) < 0,
@@ -193,7 +196,7 @@ console.log('\n5. Element-IDs');
 
   /* Zusammengesetzte IDs wie 'schirm' + name */
   const schirme = [...QUELLE.matchAll(/id="schirm([A-Za-zÄÖÜäöü]+)"/g)].map(m => m[1]);
-  const OHNE_KNOPF = ['Migration'];
+  const OHNE_KNOPF = ['Migration', 'Seite'];
   schirme.forEach(function (s) {
     if (OHNE_KNOPF.indexOf(s) >= 0) {
       pruefe(imHtml.has('schirm' + s), 'ID schirm' + s + ' existiert (ohne Knopf)');
@@ -454,16 +457,40 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
   global.window = {
     addEventListener() {}, setTimeout, clearTimeout,
     localStorage: stummeListe, sessionStorage: stummeListe,
-    indexedDB: null, innerHeight: 800,
+    indexedDB: null, innerHeight: 800, innerWidth: 1400,
+    setInterval, clearInterval, caches: null,
     matchMedia() { return { matches: false }; },
     fetch() { return Promise.reject(new Error('kein Netz im Test')); },
     google: null
   };
+  /* Ein Platzhalter für die Zeichenfläche. Früher gab er für jede
+     Kennung null zurück; dann scheiterte jede Prüfung, die eine
+     Zeichenfunktion aufruft, an einem Fehler in der Umgebung statt an
+     der Sache. Jetzt liefert er ein taugliches Element und merkt es
+     sich, damit man hinterher hineinsehen kann. */
+  const flaeche = {};
+  const platzhalterElement = function (id) {
+    return {
+      id: id, innerHTML: '', textContent: '', value: '', href: '',
+      style: {}, scrollTop: 0, scrollHeight: 100, clientHeight: 800,
+      classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+      addEventListener() {}, removeEventListener() {}, focus() {}, click() {},
+      appendChild() {}, removeChild() {}, setAttribute() {},
+      getBoundingClientRect() { return { top: 0, bottom: 800, height: 800 }; },
+      querySelectorAll() { return []; }
+    };
+  };
   global.document = {
-    getElementById() { return null; },
-    createElement() { return { addEventListener() {} }; },
+    title: '',
+    getElementById(id) {
+      if (!flaeche[id]) { flaeche[id] = platzhalterElement(id); }
+      return flaeche[id];
+    },
+    createElement() { return platzhalterElement('neu'); },
     head: { appendChild() {} },
-    documentElement: { style: { setProperty() {} } }
+    body: { classList: { add() {}, remove() {} }, appendChild() {}, removeChild() {} },
+    documentElement: { style: { setProperty() {} } },
+    addEventListener() {}
   };
   /* navigator ist in neueren Node-Fassungen schreibgeschützt */
   try {
@@ -505,6 +532,60 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__seiteApi = {'
+                 + ' pruefeSeite: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var p = { id:\'p1\', name:\'Garage\', kontext:\'privat\','
+                 + '     status:\'laufend\', zielzustaende:[], festlegungen:[],'
+                 + '     anlagen:[{ name:\'Plan.pdf\', quelle:\'Drive\' }],'
+                 + '     meilensteine:[{ titel:\'Antrag\', datum:\'2026-10-01\','
+                 + '       erreicht:true }, { titel:\'Platte\', datum:\'\','
+                 + '       erreicht:false }] };'
+                 + '   DB.projekte = [p];'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Angebote\', kontext:\'privat\','
+                 + '       projektId:\'p1\', status:\'offen\', planung:\'woche\','
+                 + '       art:\'haupt\' },'
+                 + '     { id:\'a2\', titel:\'Massband\', kontext:\'privat\','
+                 + '       projektId:\'p1\', status:\'offen\', planung:\'backlog\','
+                 + '       art:\'klein\' },'
+                 + '     { id:\'a3\', titel:\'Vermesser\', kontext:\'privat\','
+                 + '       projektId:\'p1\', status:\'erledigt\', planung:\'backlog\','
+                 + '       art:\'haupt\' } ];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Antrag\','
+                 + '     kontext:\'privat\', projektId:\'p1\','
+                 + '     schritte:[{ titel:\'F\', fertig:false }] }];'
+                 + '   zustandSetzen(p, \'Bodenplatte ist gegossen\');'
+                 + '   seiteFuer = \'p1\'; seiteArt = \'projekt\'; seiteZu = {};'
+                 + '   p.festlegungen.push({ id:\'f1\', stichwort:\'Grundfläche\','
+                 + '     inhalt:\'6 x 9 m\', seit: isoDatum() });'
+                 + '   p.festlegungen.push({ id:\'f2\', stichwort:\'Torbreite\','
+                 + '     inhalt:\'3,50 m\', seit: isoDatum() });'
+                 + '   seiteZeichnen();'
+                 + '   var h = document.getElementById(\'seiteBlatt\').innerHTML;'
+                 + '   var namen = [];'
+                 + '   (h.match(/sa-name">([^<]*)/g) || []).forEach(function(x){'
+                 + '     namen.push(x.replace(/.*">/, \'\')); });'
+                 + '   var zahlen = [];'
+                 + '   (h.match(/sa-zahl">([^<]*)/g) || []).forEach(function(x){'
+                 + '     zahlen.push(x.replace(/.*">/, \'\')); });'
+                 + '   var r = { abschnitte: namen,'
+                 + '             erledigtSichtbar: (h.indexOf(\'Vermesser\') >= 0),'
+                 + '             msStand: zahlen[0],'
+                 + '             zustand: (h.match(/sk-zustand">([^<]*)/) || [])[1],'
+                 + '             festGesetzt: festlegungen(p).length };'
+                 + '   festlegungSetzen(\'f2\', \'inhalt\', \'4,00 m\');'
+                 + '   r.festGeaendert = festlegungen(p)[1].inhalt;'
+                 + '   r.festAnzahlBleibt = festlegungen(p).length;'
+                 + '   seiteZu[\'Festlegungen\'] = true;'
+                 + '   seiteZeichnen();'
+                 + '   r.nachEinklappen = (document.getElementById(\'seiteBlatt\')'
+                 + '     .innerHTML.indexOf(\'Grundfläche\') >= 0);'
+                 + '   seiteAufgabeHaken(\'a1\');'
+                 + '   r.hakenWirkt = DB.aufgaben[0].status;'
+                 + '   seiteFuer = \'\'; seiteArt = \'\'; seiteZu = {}; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__klammerApi = {'
                  + ' pruefeKlammer: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -5615,6 +5696,76 @@ console.log('\n73. Ablauf als Klammer');
     pruefe(e.vermerk === 'steht oben', 'er trägt den Vermerk');
     pruefe(e.stand === '0/3', 'der Kopf zeigt den Stand');
     pruefe(e.fristText === 'Frist heute', 'und die Frist');
+  }
+}
+
+/* ============================================================
+   74. Die Vorhabenseite
+   Grund: Das Detailblatt ist ein Formular zum Aendern einzelner
+   Felder. Zum Nachschlagen braucht es eine Seite: Meilensteine,
+   Festlegungen, Aufgaben, Ablaeufe, Anlagen an einer Stelle. Und es
+   fehlte eine Ablage fuer das, was man nachschlaegt statt abhakt.
+   ============================================================ */
+console.log('\n74. Vorhabenseite');
+{
+  const skript = hauptSkript();
+  const s = globalThis.__seiteApi;
+
+  ['seiteOeffnen', 'seiteZeichnen', 'seiteAbschnitt', 'seiteAbschnittUm',
+   'festlegungen', 'festlegungNeu', 'festlegungSetzen', 'festlegungWeg',
+   'festlegungenHtml', 'seiteAufgabeHaken', 'seiteBearbeiten', 'seiteZurueck',
+   'alleAufgabenZuProjekt'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  pruefe(/id="schirmSeite"/.test(QUELLE), 'es gibt einen eigenen Bildschirm');
+  pruefe(!/id="navSeite"/.test(QUELLE),
+         'aber keinen Knopf in der Leiste — die Seite gehört zu Vorhaben');
+  pruefe(/seiteOeffnen\(/.test(QUELLE), 'sie ist von den Karten aus erreichbar');
+
+  /* Festlegungen werden geändert, nicht ergänzt */
+  const setzen = skript.match(/function festlegungSetzen\([\s\S]*?\n\}/);
+  pruefe(setzen && /l\[i\]\[feld\] = wert/.test(setzen[0]),
+         'eine Festlegung wird überschrieben');
+  pruefe(setzen && !/push/.test(setzen[0]),
+         'nicht ein zweites Mal hingeschrieben — sonst stehen drei Torbreiten da');
+  pruefe(setzen && /l\[i\]\.seit = isoDatum\(\)/.test(setzen[0]),
+         'jede Änderung setzt das Datum neu');
+  pruefe(setzen && /l\[i\]\[feld\] === wert\) \{ return/.test(setzen[0]),
+         'ohne echte Änderung bleibt das Datum stehen');
+
+  /* Erledigtes gehört auf eine Nachschlageseite */
+  const alle = skript.match(/function alleAufgabenZuProjekt\([\s\S]*?\n\}/);
+  pruefe(alle && !/erledigt/.test(alle[0]),
+         'die Seite zeigt auch Erledigtes');
+  const zeichnen = skript.match(/function seiteZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zeichnen && /alleAufgabenZuProjekt\(v\.id\)/.test(zeichnen[0]),
+         'sie holt es sich entsprechend');
+
+  /* Festlegungen hängen am Vorhaben, werden also mit abgeglichen */
+  pruefe(/v\.festlegungen/.test(skript),
+         'Festlegungen liegen im Vorhaben — sie brauchen keine eigene Sammlung');
+
+  if (!s) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = s.pruefeSeite();
+    pruefe(e.abschnitte.indexOf('Meilensteine') >= 0, 'Meilensteine stehen auf der Seite');
+    pruefe(e.abschnitte.indexOf('Festlegungen') >= 0, 'Festlegungen ebenso');
+    pruefe(e.abschnitte.indexOf('Aufgaben') >= 0, 'Aufgaben ebenso');
+    pruefe(e.abschnitte.indexOf('Kleinigkeiten') >= 0, 'Kleinigkeiten ebenso');
+    pruefe(e.abschnitte.indexOf('Abläufe') >= 0, 'Abläufe ebenso');
+    pruefe(e.abschnitte.indexOf('Anlagen') >= 0, 'Anlagen ebenso');
+    pruefe(e.erledigtSichtbar === true, 'Erledigtes steht in einem eigenen Abschnitt');
+    pruefe(e.msStand === '1 von 2', 'die Meilensteine nennen ihren Stand');
+    pruefe(e.zustand === 'Bodenplatte ist gegossen',
+           'der Zielzustand der Woche steht oben');
+    pruefe(e.festGesetzt === 2, 'zwei Festlegungen angelegt');
+    pruefe(e.festGeaendert === '4,00 m', 'eine Änderung überschreibt');
+    pruefe(e.festAnzahlBleibt === 2, 'ohne eine zweite anzulegen');
+    pruefe(e.nachEinklappen === false, 'ein eingeklappter Abschnitt zeigt nichts');
+    pruefe(e.hakenWirkt === 'erledigt', 'Abhaken wirkt von der Seite aus');
   }
 }
 
