@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.41.0</title>
+<title>Workbench 0.41.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -966,7 +966,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.41.0';
+var APP_VERSION = '0.41.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4508,6 +4508,19 @@ function zeichneSpeicher() {
   if (kn) { kn.disabled = (typeof window.showSaveFilePicker !== 'function'); }
 }
 
+/* Eine Zeile mit Auswahlknöpfen für die Diagnose. */
+function zeileWahl(name, moeglichkeiten, jetztWert, ruf) {
+  var h = '<div class="d-feld"><div class="d-name">' + esc(name) + '</div>'
+        + '<div class="d-wert">';
+  var i;
+  for (i = 0; i < moeglichkeiten.length; i++) {
+    h += '<button class="d-wahl' + (jetztWert === moeglichkeiten[i][0] ? ' an' : '')
+       + '" type="button" onclick="' + ruf + '(\'' + moeglichkeiten[i][0] + '\')">'
+       + esc(moeglichkeiten[i][1]) + '</button>';
+  }
+  return h + '</div></div>';
+}
+
 function zeichneGoogle() {
   var ziel = document.getElementById('googleListe');
   if (!ziel) { return; }
@@ -4673,6 +4686,9 @@ function zeichneUmgebung() {
   h += zeile('Lokaler Speicher', d.t, d.k);
   h += zeile('Als App installiert', pwa ? 'ja' : 'nein', pwa ? 'ja' : 'grau');
   var kannBadge = (typeof navigator.setAppBadge === 'function');
+  h += zeileWahl('Kalender öffnen über',
+                 [['app', 'die App'], ['browser', 'den Browser']],
+                 kalenderWeg(), 'kalenderWegSetzen');
   h += zeile('Zahl am Symbol',
              kannBadge ? (offeneHeute() + ' offen') : 'vom Gerät nicht unterstützt',
              kannBadge ? 'ja' : 'grau');
@@ -5558,11 +5574,15 @@ function istAndroid() {
    mehr — im Browser kommt stets die Schreibtischfassung. Unter Android
    führt deshalb nur der Weg über die App. Dieser Adresstyp spricht sie
    unmittelbar an; ist sie nicht da, greift die hinterlegte Rückfalladresse. */
+/* Die Android-Adresse für einen Kalendertag lautet
+   content://com.android.calendar/time/<Zeitpunkt in ms>. Der Teil vor
+   dem Schrägstrich ist der Anbieter, nicht der Pfad — steht dort nur
+   „time", zeigt die Adresse ins Leere und nichts geschieht. */
 function androidKalenderAdresse(is) {
   var d = ausIso(is);
   var mittag = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0);
   var rueckfall = googleKalenderAdresse(true);
-  return 'intent://time/' + mittag.getTime() + '#Intent'
+  return 'intent://com.android.calendar/time/' + mittag.getTime() + '#Intent'
        + ';scheme=content'
        + ';package=com.google.android.calendar'
        + ';S.browser_fallback_url=' + encodeURIComponent(rueckfall)
@@ -5580,9 +5600,20 @@ function adresseAnklicken(adresse) {
   document.body.removeChild(a);
 }
 
+function kalenderWeg() {
+  var w = DB.einstellungen.kalenderWeg;
+  return (w === 'browser' || w === 'app') ? w : 'app';
+}
+
+function kalenderWegSetzen(wert) {
+  DB.einstellungen.kalenderWeg = wert;
+  spaeterSichern();
+  zeichne();
+}
+
 function googleKalenderOeffnen() {
   var handy = istHandy();
-  if (istAndroid()) {
+  if (istAndroid() && kalenderWeg() === 'app') {
     adresseAnklicken(androidKalenderAdresse(kalAnker || isoDatum()));
     return;
   }

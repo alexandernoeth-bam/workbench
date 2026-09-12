@@ -4700,6 +4700,15 @@ console.log('\n60. Weg in den Google-Kalender');
   const andr = skript.match(/function androidKalenderAdresse\([\s\S]*?\n\}/);
   pruefe(andr && /package=com\.google\.android\.calendar/.test(andr[0]),
          'die Adresse spricht die Kalender-App unmittelbar an');
+  pruefe(andr && /intent:\/\/com\.android\.calendar\/time\//.test(andr[0]),
+         'sie nennt den Anbieter com.android.calendar — ohne ihn zeigt sie ins Leere');
+  pruefe(new RegExp('function\\s+kalenderWeg\\s*\\(').test(skript),
+         'der Weg lässt sich umstellen');
+  const weg = skript.match(/function kalenderWeg\([\s\S]*?\n\}/);
+  pruefe(weg && /\? w : 'app'/.test(weg[0]),
+         'voreingestellt ist die App');
+  pruefe(oeffnen2 && /kalenderWeg\(\) === 'app'/.test(oeffnen2[0]),
+         'auf Browser umgestellt, geht es wieder über das Fenster');
   pruefe(andr && /browser_fallback_url/.test(andr[0]),
          'fehlt die App, greift eine Rückfalladresse');
   pruefe(andr && /12, 0, 0/.test(andr[0]),
