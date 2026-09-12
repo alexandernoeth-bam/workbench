@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.41.2</title>
+<title>Workbench 0.42.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -966,7 +966,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.41.2';
+var APP_VERSION = '0.42.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4598,8 +4598,17 @@ function zeichneKalender() {
              (kalVon ? '' : 'grau'));
   h += zeile('Wird geholt alle', Math.round(KAL_TAKT / 60000) + ' Minuten', 'grau');
   h += zeileWahl('Der Knopf „Google" öffnet',
-                 [['app', 'die Kalender-App'], ['browser', 'den Browser']],
+                 [['app', 'die App'], ['mobil', 'die mobile Seite'],
+                  ['voll', 'die volle Seite']],
                  kalenderWeg(), 'kalenderWegSetzen');
+  if (kalenderWeg() === 'mobil') {
+    h += '<div class="feld-hinweis">Die mobile Seite von Google ist alt, aber '
+       + 'mit dem Daumen bedienbar. Sie öffnet stets den heutigen Tag.</div>';
+  }
+  if (kalenderWeg() === 'app' && !istAndroid()) {
+    h += '<div class="feld-hinweis">Der Weg über die App gilt nur unter '
+       + 'Android.</div>';
+  }
   if (kalenderFehler) { h += zeile('Letzter Fehler', esc(kalenderFehler), 'nein'); }
   if (!kalenderListe.length) {
     h += '<div class="platzhalter">Noch keine Kalender eingelesen.</div>';
@@ -5600,9 +5609,24 @@ function adresseAnklicken(adresse) {
   document.body.removeChild(a);
 }
 
+/* Drei Wege, weil keiner überall taugt:
+   'app'    — spricht die Kalender-App an. Aus einer installierten PWA
+              heraus blockiert Chrome das meist.
+   'mobil'  — die alte mobile Seite von Google. Angestaubt, aber für
+              den Daumen gemacht und im Custom Tab bedienbar.
+   'voll'   — die volle Webfassung. Am großen Bildschirm richtig, am
+              Handy unbedienbar. */
 function kalenderWeg() {
   var w = DB.einstellungen.kalenderWeg;
-  return (w === 'browser' || w === 'app') ? w : 'app';
+  if (w === 'app' || w === 'mobil' || w === 'voll') { return w; }
+  return istHandy() ? 'mobil' : 'voll';
+}
+
+/* Die alte mobile Fassung kennt keine Adresse je Tag — sie öffnet
+   stets den heutigen. Beim Blättern in der Zukunft nützt sie deshalb
+   wenig, für den schnellen Blick auf heute dagegen sehr. */
+function mobilKalenderAdresse() {
+  return 'https://calendar.google.com/calendar/gp';
 }
 
 function kalenderWegSetzen(wert) {
@@ -5613,11 +5637,13 @@ function kalenderWegSetzen(wert) {
 
 function googleKalenderOeffnen() {
   var handy = istHandy();
-  if (istAndroid() && kalenderWeg() === 'app') {
+  var weg = kalenderWeg();
+  if (istAndroid() && weg === 'app') {
     adresseAnklicken(androidKalenderAdresse(kalAnker || isoDatum()));
     return;
   }
-  var adresse = googleKalenderAdresse(handy);
+  var adresse = (weg === 'mobil') ? mobilKalenderAdresse()
+                                  : googleKalenderAdresse(handy);
   var fenster = handy ? window.open(adresse, '_blank')
                       : window.open(adresse, GOOGLE_FENSTER);
   if (fenster && fenster.focus) { fenster.focus(); }

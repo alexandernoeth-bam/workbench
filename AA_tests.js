@@ -4705,10 +4705,19 @@ console.log('\n60. Weg in den Google-Kalender');
   pruefe(new RegExp('function\\s+kalenderWeg\\s*\\(').test(skript),
          'der Weg lässt sich umstellen');
   const weg = skript.match(/function kalenderWeg\([\s\S]*?\n\}/);
-  pruefe(weg && /\? w : 'app'/.test(weg[0]),
-         'voreingestellt ist die App');
-  pruefe(oeffnen2 && /kalenderWeg\(\) === 'app'/.test(oeffnen2[0]),
-         'auf Browser umgestellt, geht es wieder über das Fenster');
+  pruefe(weg && /istHandy\(\) \? 'mobil' : 'voll'/.test(weg[0]),
+         'voreingestellt ist am Handy die mobile Seite, am Rechner die volle');
+  pruefe(weg && /w === 'app' \|\| w === 'mobil' \|\| w === 'voll'/.test(weg[0]),
+         'drei Wege stehen zur Wahl');
+  pruefe(new RegExp('function\\s+mobilKalenderAdresse\\s*\\(').test(skript),
+         'die mobile Seite hat eine eigene Adresse');
+  const mob = skript.match(/function mobilKalenderAdresse\([\s\S]*?\n\}/);
+  pruefe(mob && /calendar\/gp/.test(mob[0]),
+         'sie zeigt auf die mobile Fassung von Google');
+  pruefe(oeffnen2 && /weg === 'mobil'/.test(oeffnen2[0]),
+         'der gewählte Weg entscheidet über die Adresse');
+  pruefe(oeffnen2 && /istAndroid\(\) && weg === 'app'/.test(oeffnen2[0]),
+         'der Weg über die App gilt nur unter Android');
   pruefe(andr && /browser_fallback_url/.test(andr[0]),
          'fehlt die App, greift eine Rückfalladresse');
   pruefe(andr && /12, 0, 0/.test(andr[0]),
