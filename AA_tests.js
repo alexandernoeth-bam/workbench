@@ -903,8 +903,10 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   kalStufe = \'woche\'; var w = googleKalenderAdresse();'
                  + '   kalStufe = \'monat\'; var m = googleKalenderAdresse();'
                  + '   kalStufe = \'jahr\';  var j = googleKalenderAdresse();'
+                 + '   kalStufe = \'woche\'; var hd = googleKalenderAdresse(true);'
                  + '   kalAnker = merkA; kalStufe = merkS;'
-                 + '   return { woche:w, monat:m, jahr:j, name:GOOGLE_FENSTER };'
+                 + '   return { woche:w, monat:m, jahr:j, handy:hd,'
+                 + '            name:GOOGLE_FENSTER };'
                  + ' } };'
                  + 'globalThis.__abGruppeApi = {'
                  + ' pruefeGruppen: function(){'
@@ -4676,6 +4678,18 @@ console.log('\n60. Weg in den Google-Kalender');
   const adresse = skript.match(/function googleKalenderAdresse\([\s\S]*?\n\}/);
   pruefe(adresse && /kalStufe === 'monat'/.test(adresse[0]),
          'die gezeigte Stufe bestimmt die Ansicht drüben');
+  pruefe(adresse && /if \(handy\) \{ stufe = 'day'/.test(adresse[0]),
+         'am Handy führt der Weg auf den Tag — Woche und Jahr kommen dort '
+         + 'im Schreibtischformat');
+  const oeffnen2 = skript.match(/function googleKalenderOeffnen\([\s\S]*?\n\}/);
+  pruefe(oeffnen2 && /'_blank'/.test(oeffnen2[0]),
+         'am Handy ohne Fensternamen, damit Android an die Kalender-App '
+         + 'weiterreichen kann');
+  pruefe(new RegExp('function\\s+istHandy\\s*\\(').test(skript),
+         'Funktion istHandy ist definiert');
+  const handy = skript.match(/function istHandy\([\s\S]*?\n\}/);
+  pruefe(handy && /pointer: coarse/.test(handy[0]),
+         'erkannt wird es am Zeigegerät, nicht nur an der Breite');
   pruefe(adresse && /kalAnker \|\| isoDatum\(\)/.test(adresse[0]),
          'und der gezeigte Tag das Datum');
 
@@ -4684,7 +4698,9 @@ console.log('\n60. Weg in den Google-Kalender');
   } else {
     const e = g.pruefeAdresse();
     pruefe(e.woche === 'https://calendar.google.com/calendar/u/0/r/week/2026/8/10',
-           'die Woche führt zur Wochenansicht');
+           'die Woche führt am großen Bildschirm zur Wochenansicht');
+    pruefe(e.handy.indexOf('/day/2026/8/10') > 0,
+           'am Handy dagegen zum Tag, mit demselben Datum');
     pruefe(e.monat.indexOf('/month/2026/8/10') > 0, 'der Monat zur Monatsansicht');
     pruefe(e.jahr.indexOf('/year/2026/8/10') > 0, 'das Jahr zur Jahresansicht');
     pruefe(e.name === 'workbench-google-kalender',
