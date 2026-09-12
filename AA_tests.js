@@ -505,6 +505,43 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__klammerApi = {'
+                 + ' pruefeKlammer: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var heute = isoDatum(); tagOffen = heute;'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Muster besprechen\', kontext:\'privat\','
+                 + '       status:\'offen\', planung: heute, art:\'haupt\' },'
+                 + '     { id:\'a2\', titel:\'Fenster ausmessen\', kontext:\'privat\','
+                 + '       status:\'offen\', planung:\'backlog\', art:\'haupt\' } ];'
+                 + '   DB.durchlaeufe = ['
+                 + '     { id:\'d1\', name:\'Haustür erneuern\', kontext:\'privat\','
+                 + '       frist: heute, schritte:[{ titel:\'x\', aufgabeId:\'a1\' },'
+                 + '         { titel:\'y\', aufgabeId:\'a2\' },'
+                 + '         { titel:\'Angebot\', fertig:false }] },'
+                 + '     { id:\'d2\', name:\'Ruht\', kontext:\'privat\','
+                 + '       frist: tagePlus(heute,30), schritte:[{ titel:\'Spaeter\','
+                 + '         fertig:false, ab: tagePlus(heute,5) }] } ];'
+                 + '   var l = durchlaeufeHeute(heute);'
+                 + '   var namen = l.map(function(d){ return d.name; });'
+                 + '   tagAblaufAuf = {};'
+                 + '   var zu = ablaufKlammerHtml(DB.durchlaeufe[0], heute);'
+                 + '   tagAblaufAuf[\'d1\'] = true;'
+                 + '   var auf = ablaufKlammerHtml(DB.durchlaeufe[0], heute);'
+                 + '   var titel = [];'
+                 + '   var m = auf.match(/ttitel">([^<]*)/g) || [];'
+                 + '   m.forEach(function(x){ titel.push(x.replace(/.*">/, \'\')); });'
+                 + '   var r = { imTag: namen[0],'
+                 + '             ruhenderDraussen: (namen.indexOf(\'Ruht\') < 0),'
+                 + '             eingeklapptOhneSchritte: (zu.match(/tzeile kompakt/g) || []).length,'
+                 + '             aufgeklappt: (auf.match(/tzeile kompakt/g) || []).length,'
+                 + '             mitAufgabeDrin: (titel.indexOf(\'Muster besprechen\') >= 0),'
+                 + '             vermerk: (auf.match(/tmeta">([^<]*)/) || [])[1],'
+                 + '             stand: (zu.match(/tablauf-stand">([^<]*)/) || [])[1],'
+                 + '             fristText: (zu.match(/tablauf-meta[^>]*>([^<]*)/) || [])[1] };'
+                 + '   tagAblaufAuf = {}; tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__einfallApi = {'
                  + ' pruefeEinfaelle: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -3658,7 +3695,7 @@ console.log('\n44. Abläufe und Wochenrückblick');
                   'schrittUm', 'durchlaufStarten', 'durchlaufBeenden',
                   'ablaufNeu', 'ablaufAnlegen', 'abDetailOeffnen', 'abDetailHtml',
                   'abSchrittNeu', 'abSchrittHoch', 'abSchrittWeg', 'vorlageAusDurchlauf',
-                  'abLoeschen', 'ablaufSchritteHeute', 'ablaufZeileHtml',
+                  'abLoeschen', 'ablaufSchritteHeute', 'ablaufKlammerHtml',
                   'rueckblickOeffnen', 'rueckblickHtml', 'rbErreicht', 'rbSatz',
                   'letzteWoche', 'zustandVonWoche', 'alleVorhaben'];
   noetig.forEach(function (f) {
@@ -3678,8 +3715,8 @@ console.log('\n44. Abläufe und Wochenrückblick');
          'der Kontextfilter des Tages greift auch darauf');
   const tag = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
   pruefe(tag && /data-kurz="Abläufe"/.test(tag[0]), 'der Tag hat einen Abschnitt dafür');
-  pruefe(tag && /schritte\.length\) \{/.test(tag[0]),
-         'ohne offenen Schritt bleibt der Abschnitt weg');
+  pruefe(tag && /laeufe\.length\) \{/.test(tag[0]),
+         'ohne anstehenden Durchlauf bleibt der Abschnitt weg');
 
   /* Starten erzeugt eine Kopie, keine Verknüpfung */
   const starten = skript.match(/function durchlaufStarten\([\s\S]*?\n\}/);
@@ -3804,7 +3841,7 @@ console.log('\n46. Ruhende Ablaufschritte');
   pruefe(heute && /is \|\| tagOffen/.test(heute[0]),
          'gemessen wird am angezeigten Tag, nicht an heute');
 
-  const zeile = skript.match(/function ablaufZeileHtml\([\s\S]*?\n\}/);
+  const zeile = skript.match(/function ablaufKlammerHtml\([\s\S]*?\n\}\n/);
   pruefe(zeile && /schrittAbWeiter\(/.test(zeile[0]),
          'in der Tageszeile lässt sich der Schritt wegschieben');
 
@@ -5231,8 +5268,8 @@ console.log('\n68. Abhakblatt');
   const verlauf = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
   pruefe(verlauf && /durchlaufAbhakenOeffnen\(/.test(verlauf[0]),
          'die Terminzeile im Tag führt zum Abhaken');
-  const zeile = skript.match(/function ablaufZeileHtml\([\s\S]*?\n\}/);
-  pruefe(zeile && /durchlaufAbhakenOeffnen\(/.test(zeile[0]),
+  const klammer = skript.match(/function ablaufKlammerHtml\([\s\S]*?\n\}\n/);
+  pruefe(klammer && /durchlaufAbhakenOeffnen\(/.test(klammer[0]),
          'der Abschnitt Abläufe im Tag ebenso');
   const kal = skript.match(/function kAblaufKnopfHtml\([\s\S]*?\n\}/);
   pruefe(kal && /durchlaufAbhakenOeffnen\(/.test(kal[0]),
@@ -5515,6 +5552,69 @@ console.log('\n72. Einfälle');
            'offen, verfolgt und verworfen werden getrennt geführt');
     pruefe(r.imTagesplan === 0, 'im Tagesplan steht nichts davon');
     pruefe(r.amSymbol === 0, 'die Zahl am Symbol bleibt unberührt');
+  }
+}
+
+/* ============================================================
+   73. Der Ablauf als Klammer im Tag
+   Grund: Standen die Aufgaben eines Durchlaufs einzeln im Tag, sah man
+   nicht mehr, dass sie zusammengehoeren und dass der Ablauf faellig
+   ist. Die Klammer fehlte — und sie ist gerade das Wesentliche.
+   ============================================================ */
+console.log('\n73. Ablauf als Klammer');
+{
+  const skript = hauptSkript();
+  const k = globalThis.__klammerApi;
+
+  ['durchlaufImTag', 'durchlaeufeHeute', 'schritteOffen', 'ablaufKlammerHtml',
+   'tagAblaufUm'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const imTag = skript.match(/function durchlaufImTag\([\s\S]*?\n\}/);
+  pruefe(imTag && /d\.terminTag === tag/.test(imTag[0]),
+         'ein Durchlauf mit Termin heute steht im Tag');
+  pruefe(imTag && /d\.frist <= tag/.test(imTag[0]),
+         'einer mit erreichter oder verstrichener Frist ebenso');
+  pruefe(imTag && /!schrittRuht/.test(imTag[0]),
+         'und einer mit fälligem Schritt');
+  pruefe(imTag && /!offenerSchritt\(d\)/.test(imTag[0]),
+         'ein durchgelaufener nicht mehr');
+
+  const offen = skript.match(/function schritteOffen\([\s\S]*?\n\}/);
+  pruefe(offen && /anderswo: aufgabeStehtImTag/.test(offen[0]),
+         'ein Schritt, dessen Aufgabe oben steht, wird gekennzeichnet');
+  pruefe(offen && !/if \(aufgabeStehtImTag[\s\S]{0,40}continue/.test(offen[0]),
+         'aber nicht weggelassen — sonst fehlte der Zusammenhang');
+
+  const klammer2 = skript.match(/function ablaufKlammerHtml\([\s\S]*?\n\}\n/);
+  pruefe(klammer2 && /steht oben/.test(klammer2[0]),
+         'der Vermerk sagt, dass es dieselbe Sache ist');
+  pruefe(klammer2 && /Frist heute/.test(klammer2[0]), 'die Frist wird benannt');
+  pruefe(klammer2 && /Frist war/.test(klammer2[0]),
+         'eine verstrichene Frist wird als solche gezeigt');
+  pruefe(klammer2 && /tablauf-meta' \+\s*\n?\s*\(\(d\.frist && d\.frist < tag\) \? ' warn'/
+         .test(klammer2[0]) || (klammer2 && /' warn'/.test(klammer2[0])),
+         'und hervorgehoben');
+  pruefe(klammer2 && /fertig \+ '\/' \+ alle/.test(klammer2[0]),
+         'der Kopf nennt den Stand');
+
+  if (!k) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = k.pruefeKlammer();
+    pruefe(e.imTag === 'Haustür erneuern',
+           'der fällige Durchlauf steht im Tag');
+    pruefe(e.ruhenderDraussen === true, 'ein ruhender bleibt draußen');
+    pruefe(e.eingeklapptOhneSchritte === 0,
+           'eingeklappt stehen keine Schritte da');
+    pruefe(e.aufgeklappt === 3, 'aufgeklappt alle drei offenen');
+    pruefe(e.mitAufgabeDrin === true,
+           'auch der Schritt, dessen Aufgabe oben im Tag steht');
+    pruefe(e.vermerk === 'steht oben', 'er trägt den Vermerk');
+    pruefe(e.stand === '0/3', 'der Kopf zeigt den Stand');
+    pruefe(e.fristText === 'Frist heute', 'und die Frist');
   }
 }
 

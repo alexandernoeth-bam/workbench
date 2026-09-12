@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.42.0</title>
+<title>Workbench 0.43.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -114,6 +114,21 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tganz.privat .tganz-titel{color:var(--petrol)}
 .tganz-quelle{flex:0 0 auto;font-size:calc(var(--fs)*0.72);color:var(--grau)}
+.tablauf{border-left:2px solid var(--linie);padding:2px 0 6px 0;margin:4px 0 8px}
+.tablauf.privat{border-left-color:var(--petrol)}
+.tablauf-kopf{display:flex;width:100%;align-items:center;gap:9px;background:none;
+  border:0;font:inherit;padding:4px 0 4px 11px;cursor:pointer;text-align:left;
+  color:var(--tinte)}
+.tablauf-name{flex:1;min-width:0;font-size:calc(var(--fs)*0.88);line-height:1.3}
+.tablauf-stand{flex:0 0 auto;font-size:calc(var(--fs)*0.74);color:var(--grau);
+  font-variant-numeric:tabular-nums}
+.tablauf-kopf svg{flex:0 0 auto;width:14px;height:14px;stroke:currentColor;fill:none;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  transform:rotate(-90deg);transition:transform .15s ease}
+.tablauf-kopf svg.auf{transform:rotate(0deg)}
+.tablauf-meta{font-size:calc(var(--fs)*0.72);color:var(--grau);padding:0 0 2px 11px}
+.tablauf-meta.warn{color:var(--weinrot)}
+
 .t-ablauf-paar{flex:0 0 auto;display:inline-flex;align-items:center;gap:2px;
   align-self:flex-start;margin-top:2px}
 .t-ablauf{flex:0 0 auto;align-self:flex-start;margin-top:2px;font:inherit;
@@ -966,7 +981,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.42.0';
+var APP_VERSION = '0.43.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3090,6 +3105,49 @@ function aufgabeStehtImTag(a, tag) {
   return a.planung === tag;
 }
 
+/* Ein Durchlauf steht im Tag, wenn heute etwas an ihm zu tun ist:
+   ein Schritt fällig, die Frist erreicht oder überschritten, oder
+   sein Termin ist heute. Sonst ruht er weiter. */
+function durchlaufImTag(d, tag) {
+  if (!offenerSchritt(d)) { return false; }
+  if (d.terminTag === tag) { return true; }
+  if (d.frist && d.frist <= tag) { return true; }
+  var s = offenerSchritt(d);
+  return !schrittRuht(s.satz, tag);
+}
+
+function durchlaeufeHeute(is) {
+  var tag = is || tagOffen || isoDatum();
+  var aus = [];
+  var l = laufendeDurchlaeufe();
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (!passtZumTag(l[i].kontext)) { continue; }
+    if (!durchlaufImTag(l[i], tag)) { continue; }
+    aus.push(l[i]);
+  }
+  return aus;
+}
+
+/* Die offenen Schritte eines Durchlaufs, für die aufgeklappte Sicht.
+   Steht die tragende Aufgabe anderswo im Tag, wird der Schritt
+   gekennzeichnet statt weggelassen — sonst fehlte gerade das, was
+   den Zusammenhang ausmacht. */
+function schritteOffen(d, tag) {
+  var aus = [];
+  var l = d.schritte || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (schrittFertig(l[i])) { continue; }
+    var a = schrittAufgabe(l[i]);
+    aus.push({ nr: i, satz: l[i],
+               anderswo: aufgabeStehtImTag(a, tag),
+               aufgabe: a,
+               ruht: schrittRuht(l[i], tag) });
+  }
+  return aus;
+}
+
 function ablaufSchritteHeute(is) {
   var tag = is || tagOffen || isoDatum();
   var aus = [];
@@ -3114,20 +3172,69 @@ function ablaufVermerk(a) {
   return l.length + ' Abläufe';
 }
 
-function ablaufZeileHtml(e) {
-  var offen = (e.durchlauf.schritte || []).length - schritteFertig(e.durchlauf);
-  var h = '<div class="tzeile' + (e.durchlauf.kontext === 'privat' ? ' privat' : '') + '">';
-  h += '<button class="tkasten" type="button" onclick="schrittUm(\'' + esc(e.durchlauf.id)
-     + '\',' + e.nr + ')"></button>';
-  h += '<div class="ttext" onclick="durchlaufAbhakenOeffnen(\'' + esc(e.durchlauf.id)
-     + '\')">';
-  h += '<div class="ttitel">' + esc(schrittTitel(e.satz)) + '</div>';
-  h += '<div class="tmeta">' + esc(e.durchlauf.name) + ' · noch ' + offen
-     + (offen === 1 ? ' Schritt' : ' Schritte') + '</div>';
-  h += '</div>';
-  h += '<button class="planungsknopf" type="button" '
-     + 'onclick="schrittAbWeiter(\'' + esc(e.durchlauf.id) + '\',' + e.nr + ')">'
-     + 'Später</button>';
+/* Welche Durchläufe sind im Tag aufgeklappt? Der Zustand gilt für die
+   Sitzung, nicht dauerhaft. */
+var tagAblaufAuf = {};
+
+function tagAblaufUm(id) {
+  tagAblaufAuf[id] = !tagAblaufAuf[id];
+  tagZeichnen();
+}
+
+/* Der Durchlauf als Klammer: eine Zeile, die sagt, was läuft und wie
+   weit es ist. Aufgeklappt stehen alle offenen Schritte darunter. */
+function ablaufKlammerHtml(d, tag) {
+  var alle = (d.schritte || []).length;
+  var fertig = schritteFertig(d);
+  var offen = schritteOffen(d, tag);
+  var auf = tagAblaufAuf[d.id] === true;
+
+  var unten = [];
+  if (d.terminTag === tag) { unten.push('Termin heute'); }
+  if (d.frist) {
+    if (d.frist < tag) { unten.push('Frist war ' + kurzDatum(d.frist)); }
+    else if (d.frist === tag) { unten.push('Frist heute'); }
+    else { unten.push('Frist ' + kurzDatum(d.frist)); }
+  }
+
+  var h = '<div class="tablauf' + (d.kontext === 'privat' ? ' privat' : '') + '">';
+  h += '<button class="tablauf-kopf" type="button" onclick="tagAblaufUm(\''
+     + esc(d.id) + '\')">';
+  h += '<span class="tablauf-name">' + esc(d.name) + '</span>';
+  h += '<span class="tablauf-stand">' + fertig + '/' + alle + '</span>';
+  h += '<svg class="' + (auf ? 'auf' : '') + '" viewBox="0 0 24 24">'
+     + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+  if (unten.length) {
+    h += '<div class="tablauf-meta'
+       + ((d.frist && d.frist < tag) ? ' warn' : '') + '">'
+       + unten.join(' · ') + '</div>';
+  }
+
+  if (auf) {
+    var i;
+    for (i = 0; i < offen.length; i++) {
+      var s = offen[i];
+      h += '<div class="tzeile kompakt' + (d.kontext === 'privat' ? ' privat' : '') + '">';
+      h += '<button class="tkasten" type="button" onclick="schrittUm(\'' + esc(d.id)
+         + '\',' + s.nr + ')"></button>';
+      h += '<div class="ttext" onclick="durchlaufAbhakenOeffnen(\'' + esc(d.id) + '\')">';
+      h += '<div class="ttitel">' + esc(schrittTitel(s.satz)) + '</div>';
+      var vermerk = [];
+      if (s.anderswo) { vermerk.push('steht oben'); }
+      if (s.ruht) {
+        vermerk.push('ruht bis ' + kurzDatum(s.satz.ab)
+                   + (s.satz.abZeit ? (', ' + s.satz.abZeit) : ''));
+      }
+      if (vermerk.length) { h += '<div class="tmeta">' + esc(vermerk.join(' · ')) + '</div>'; }
+      h += '</div>';
+      h += '<button class="planungsknopf" type="button" '
+         + 'onclick="schrittAbWeiter(\'' + esc(d.id) + '\',' + s.nr + ')">Später</button>';
+      h += '</div>';
+    }
+    if (!offen.length) {
+      h += '<div class="tleer" style="padding-left:20px">Alle Schritte erledigt.</div>';
+    }
+  }
   h += '</div>';
   return h;
 }
@@ -3509,11 +3616,11 @@ function tagZeichnen() {
   for (i = 0; i < e.wieder.length; i++) { h += zeileHtml(e.wieder[i], is, false); }
   h += '</div>';
 
-  var schritte = ablaufSchritteHeute(is);
-  if (schritte.length) {
+  var laeufe = durchlaeufeHeute(is);
+  if (laeufe.length) {
     h += '<div class="tabschnitt" data-kurz="Abläufe"><div class="tabschnitt-titel">'
        + '<span>Abläufe</span></div>';
-    for (i = 0; i < schritte.length; i++) { h += ablaufZeileHtml(schritte[i]); }
+    for (i = 0; i < laeufe.length; i++) { h += ablaufKlammerHtml(laeufe[i], is); }
     h += '</div>';
   }
 
