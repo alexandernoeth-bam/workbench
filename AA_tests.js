@@ -532,6 +532,28 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__abAnlageApi = {'
+                 + ' pruefeAnlagen: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.ablaeufe = [{ id:\'v1\', name:\'Bauantrag\','
+                 + '     kontext:\'privat\', schritte:[{ id:\'s1\', titel:\'A\','
+                 + '     auf:false }], anlagen:[{ id:\'an1\', name:\'Checkliste\','
+                 + '     url:\'https://drive.example/x\' }], wiederholung:null,'
+                 + '     anlassAufgabeId:null, projektId:null, zielId:null,'
+                 + '     zuletzt:\'\', zuletztGestartet:\'\' }];'
+                 + '   durchlaufStarten(\'v1\', true);'
+                 + '   var d = DB.durchlaeufe[0];'
+                 + '   var r = { anVorlage: abAnlagen(DB.ablaeufe[0]).length,'
+                 + '             imDurchlauf: abAnlagen(d).length,'
+                 + '             name: abAnlagen(d)[0].name };'
+                 + '   abDetail = d.id; abDetailArt = \'durchlauf\';'
+                 + '   abAnlageWeg(0);'
+                 + '   r.nachEntfernen = abAnlagen(d).length;'
+                 + '   r.vorlageUnberuehrt = abAnlagen(DB.ablaeufe[0]).length;'
+                 + '   r.eigeneListe = (r.vorlageUnberuehrt === 1);'
+                 + '   abDetail = \'\'; abDetailArt = \'\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__seiteApi = {'
                  + ' pruefeSeite: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -5766,6 +5788,65 @@ console.log('\n74. Vorhabenseite');
     pruefe(e.festAnzahlBleibt === 2, 'ohne eine zweite anzulegen');
     pruefe(e.nachEinklappen === false, 'ein eingeklappter Abschnitt zeigt nichts');
     pruefe(e.hakenWirkt === 'erledigt', 'Abhaken wirkt von der Seite aus');
+  }
+}
+
+/* ============================================================
+   75. Anlagen am Ablauf
+   Grund: Zu einem Ablauf gehoeren Unterlagen — die Checkliste, das
+   Protokollmuster, der Verweis ins Laufwerk. Sie lagen bisher nur an
+   Vorhaben, wo man sie im Durchlauf nicht zur Hand hat.
+   ============================================================ */
+console.log('\n75. Anlagen am Ablauf');
+{
+  const skript = hauptSkript();
+  const a = globalThis.__abAnlageApi;
+
+  ['abAnlagen', 'abAnlageFormular', 'abAnlageSpeichern', 'abAnlageWeg',
+   'abAnlagenHtml'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(detail && /abAnlagenHtml\(a\)/.test(detail[0]),
+         'Vorlage wie Durchlauf zeigen ihre Anlagen');
+
+  /* Vererbung */
+  const starten = skript.match(/function durchlaufStarten\([\s\S]*?\n\}/);
+  pruefe(starten && /anlagen: abAnlagen\(v\)\.slice\(\)/.test(starten[0]),
+         'ein Durchlauf erbt die Anlagen seiner Vorlage');
+  pruefe(starten && /\.slice\(\)/.test(starten[0]),
+         'als eigene Liste — sonst änderte ein Durchlauf die Vorlage mit');
+  const termin = skript.match(/function terminDurchlaufStarten\([\s\S]*?\n\}/);
+  pruefe(termin && /anlagen: abAnlagen\(v\)\.slice\(\)/.test(termin[0]),
+         'auch ein Durchlauf an einem Termin');
+  const zurueck = skript.match(/function vorlageAusDurchlauf\([\s\S]*?\n\}/);
+  pruefe(zurueck && /anlagen: abAnlagen\(d\)\.slice\(\)/.test(zurueck[0]),
+         'und beim Sichern als Vorlage geht es zurück');
+
+  /* Im Abhakblatt sichtbar, aber nicht änderbar */
+  const abhak = skript.match(/function abhakHtml\([\s\S]*?\n\}\n/);
+  pruefe(abhak && /abAnlagen\(d\)/.test(abhak[0]),
+         'beim Abhaken stehen die Anlagen zur Hand');
+  pruefe(abhak && !/abAnlageWeg/.test(abhak[0]),
+         'dort aber ohne Möglichkeit, sie zu entfernen');
+
+  /* Abgleich */
+  pruefe(/anlagen: \[\]/.test(skript),
+         'neue Vorlagen und Durchläufe beginnen mit einer leeren Liste');
+
+  if (!a) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = a.pruefeAnlagen();
+    pruefe(e.anVorlage === 1, 'eine Anlage an der Vorlage');
+    pruefe(e.imDurchlauf === 1, 'der gestartete Durchlauf hat sie');
+    pruefe(e.name === 'Checkliste', 'mit Namen');
+    pruefe(e.eigeneListe === true,
+           'eine Änderung am Durchlauf berührt die Vorlage nicht');
+    pruefe(e.nachEntfernen === 0, 'entfernen geht');
+    pruefe(e.vorlageUnberuehrt === 1, 'die Vorlage behält ihre');
   }
 }
 

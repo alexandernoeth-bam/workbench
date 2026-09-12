@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.44.1</title>
+<title>Workbench 0.45.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1038,7 +1038,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.44.1';
+var APP_VERSION = '0.45.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8906,6 +8906,7 @@ function terminDurchlaufStarten(vorlageId, termin, is) {
     id: neueKennung(), ablaufId: v.id,
     name: v.name + ': ' + (termin.titel || 'Termin'),
     kontext: v.kontext, projektId: v.projektId || null, zielId: v.zielId || null,
+    anlagen: abAnlagen(v).slice(),
     terminId: termin.id, terminTag: is, terminZeit: termin.zeit || '',
     start: isoDatum(), frist: is, schritte: schritte, geaendert: jetzt()
   };
@@ -9126,6 +9127,7 @@ function durchlaufStarten(vorlageId, still) {
   var neu = {
     id: neueKennung(), ablaufId: v.id, name: v.name, kontext: v.kontext,
     projektId: v.projektId || null, zielId: v.zielId || null,
+    anlagen: abAnlagen(v).slice(),
     start: isoDatum(), frist: '', schritte: schritte, geaendert: jetzt()
   };
   DB.durchlaeufe.push(neu);
@@ -9179,11 +9181,11 @@ function ablaufAnlegen(art) {
   if (art === 'vorlage') {
     DB.ablaeufe.push({ id: id, name: '', kontext: kontext, schritte: [],
                        wiederholung: null, anlassAufgabeId: null,
-                       projektId: null, zielId: null,
+                       projektId: null, zielId: null, anlagen: [],
                        zuletzt: '', zuletztGestartet: '', geaendert: jetzt() });
   } else {
     DB.durchlaeufe.push({ id: id, ablaufId: null, name: '', kontext: kontext,
-                          projektId: null, zielId: null,
+                          projektId: null, zielId: null, anlagen: [],
                           start: isoDatum(), frist: '', schritte: [], geaendert: jetzt() });
   }
   abFrischAngelegt = id;
@@ -9252,6 +9254,17 @@ function abhakHtml() {
          + (l[i].abZeit ? (', ' + esc(l[i].abZeit) + ' Uhr') : '') + '</div>';
     }
     h += '</div></div>';
+  }
+
+  var anl = abAnlagen(d);
+  if (anl.length) {
+    h += '<div class="s-abschnitt">Anlagen</div>';
+    var k;
+    for (k = 0; k < anl.length; k++) {
+      h += '<div class="anlage"><div class="a-mitte"><div class="a-name">'
+         + esc(anl[k].name) + '</div><div class="a-quelle">'
+         + esc(anl[k].url) + '</div></div></div>';
+    }
   }
 
   h += '<div class="d-reihe">';
@@ -9396,6 +9409,8 @@ function abDetailHtml() {
          + esc(a.id) + '\')">lösen</button></div></div>';
     }
   }
+
+  h += abAnlagenHtml(a);
 
   h += '<div class="s-abschnitt">Schritte</div>';
   var l = a.schritte || [];
@@ -9686,6 +9701,65 @@ function abSchrittAlsAufgabe(i) {
   melde('Aufgabe angelegt: ' + titel, 'gut');
 }
 
+/* Anlagen am Ablauf: die Checkliste für den Bauantrag, das
+   Protokollmuster, der Verweis ins Laufwerk. Eine Vorlage gibt ihre
+   Anlagen an jeden Durchlauf weiter, der aus ihr entsteht — dort
+   braucht man sie ja, nicht in der Vorlage. */
+function abAnlagen(a) {
+  return Array.isArray(a.anlagen) ? a.anlagen : [];
+}
+
+function abAnlageFormular() {
+  var f = document.getElementById('abAnlageNeu');
+  if (f) { f.classList.toggle('auf'); }
+}
+
+function abAnlageSpeichern() {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  var n = document.getElementById('abAnlageName');
+  var u = document.getElementById('abAnlageUrl');
+  if (!a || !n || !u) { return; }
+  var name = n.value.trim();
+  var url = u.value.trim();
+  if (name.length === 0 || url.length === 0) { return; }
+  if (!Array.isArray(a.anlagen)) { a.anlagen = []; }
+  a.anlagen.push({ id: neueKennung(), name: name, url: url });
+  n.value = '';
+  u.value = '';
+  abGeaendert(true);
+}
+
+function abAnlageWeg(i) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || !a.anlagen || !a.anlagen[i]) { return; }
+  a.anlagen.splice(i, 1);
+  abGeaendert(true);
+}
+
+function abAnlagenHtml(a) {
+  var l = abAnlagen(a);
+  var h = '<div class="s-abschnitt">Anlagen</div>';
+  var i;
+  for (i = 0; i < l.length; i++) {
+    h += '<div class="anlage"><div class="a-mitte"><div class="a-name">'
+       + esc(l[i].name) + '</div><div class="a-quelle">' + esc(l[i].url) + '</div></div>'
+       + '<button class="a-weg" type="button" onclick="abAnlageWeg(' + i + ')" '
+       + 'title="Anlage entfernen"><svg viewBox="0 0 24 24">'
+       + '<path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>';
+  }
+  if (!l.length) {
+    h += '<div class="tleer" style="padding-left:0">Keine Anlage.</div>';
+  }
+  h += '<button class="neu-zeile" type="button" onclick="abAnlageFormular()">'
+     + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Anlage</button>';
+  h += '<div class="d-neu" id="abAnlageNeu">'
+     + '<input type="text" id="abAnlageName" placeholder="Bezeichnung">'
+     + '<input type="text" id="abAnlageUrl" placeholder="Link zu Google Drive">'
+     + '<div class="d-reihe"><button type="button" onclick="abAnlageSpeichern()">'
+     + 'Übernehmen</button></div></div>';
+  return h;
+}
+
 function abSchrittWann(i, wert) {
   var a = ablaufFinden(abDetail, abDetailArt);
   if (!a || !a.schritte[i]) { return; }
@@ -9746,7 +9820,8 @@ function vorlageAusDurchlauf() {
     schritte.push({ id: neueKennung(), titel: l[i].titel, auf: !!l[i].auf });
   }
   var v = { id: neueKennung(), name: d.name, kontext: d.kontext,
-            schritte: schritte, zuletzt: isoDatum(), geaendert: jetzt() };
+            schritte: schritte, anlagen: abAnlagen(d).slice(),
+            zuletzt: isoDatum(), geaendert: jetzt() };
   DB.ablaeufe.push(v);
   d.ablaufId = v.id;
   d.geaendert = jetzt();
