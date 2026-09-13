@@ -565,7 +565,20 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '         if (l[i].id === id) { return l[i]; } } }'
                  + '     return null; };'
                  + '   var nam = function(p){ return p ? p.name : null; };'
+                 + '   DB.projekte.push({ id:\'p3\','
+                 + '     name:\'Solaranlage und Wärmepumpe\', kontext:\'privat\','
+                 + '     status:\'laufend\', zielzustaende:[], anlagen:[],'
+                 + '     festlegungen:[], meilensteine:[] });'
+                 + '   DB.projekte.push({ id:\'p4\', name:\'Garage streichen\','
+                 + '     kontext:\'privat\', status:\'laufend\', zielzustaende:[],'
+                 + '     anlagen:[], festlegungen:[], meilensteine:[] });'
                  + '   var r = { schluessel: projektSchluessel(DB.projekte[0]),'
+                 + '             langerName: projektSchluessel(DB.projekte[2]),'
+                 + '             abgekuerzt: (function(){'
+                 + '               var p = projektZuSchluessel(\'solaranlage\');'
+                 + '               return p ? p.name : null; })(),'
+                 + '             mehrdeutig: projektZuSchluessel(\'garage\'),'
+                 + '             zuKurz: projektZuSchluessel(\'ga\'),'
                  + '             ausKuerzel: nam(terminProjekt(hole(\'g1\'))),'
                  + '             ausBeschreibung: nam(terminProjekt(hole(\'g2\'))),'
                  + '             ohneKuerzel: nam(terminProjekt(hole(\'g3\'))) };'
@@ -3413,7 +3426,8 @@ console.log('\n37. Wochensicht als Spalten');
          'der Terminblock hat eine feste Mindesthöhe, damit die zweite Zeile fluchtet');
 
   const monat = skript.match(/function monatHtml\([\s\S]*?\n\}/);
-  pruefe(monat && /passtZumKalender/.test(monat[0]), 'der Filter greift auch im Monat');
+  pruefe(monat && /terminPasst\(/.test(monat[0]),
+         'Kontext- und Projektfilter greifen auch im Monat');
 
   if (api && api.passtZumKalender) {
     api.setKalFilter('beruflich');
@@ -3736,8 +3750,18 @@ console.log('\n42. Kontext der Jahrestermine');
          'die Filterpillen greifen jetzt auch auf Jahrestermine');
 
   const jahr = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
-  pruefe(jahr && /passtZumKalender\(jtKontext\(e\)\)/.test(jahr[0]),
-         'auch die Summen folgen dem Kontextfilter');
+  pruefe(jahr && /jtPasst\(e\)/.test(jahr[0]),
+         'auch die Summen folgen beiden Filtern');
+  const jp = hauptSkript().match(/function jtPasst\([\s\S]*?\n\}/);
+  pruefe(jp && /kalProjektFilter/.test(jp[0]),
+         'ein gewähltes Projekt wirkt auch auf Jahrestermine');
+  pruefe(jp && /!e\.ausKalender/.test(jp[0]),
+         'ein eigener Jahrestermin gehört keinem Projekt und tritt dann zurück');
+  const jz = hauptSkript().match(/function kalZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(jz && (jz[0].match(/kalProjektFilterHtml\(\)/g) || []).length >= 2,
+         'Monat und Jahr zeigen die Filterleiste');
+  pruefe(new RegExp('function\\s+projektFilterHinweis\\s*\\(').test(hauptSkript()),
+         'ein gesetzter Filter wird benannt');
 
   const blatt = skript.match(/function jtTagHtml\([\s\S]*?\n\}\n/);
   pruefe(blatt && /jtKontextSetzen\(/.test(blatt[0]),
@@ -5993,6 +6017,13 @@ console.log('\n76. Termin und Projekt');
   } else {
     const e = p.pruefeBezug();
     pruefe(e.schluessel === 'garage-bauen', 'der Schlüssel folgt dem Namen');
+    pruefe(e.langerName === 'solaranlage-und-wärmepumpe',
+           'ein langer Name wird nicht mehr abgeschnitten');
+    pruefe(e.abgekuerzt === 'Solaranlage und Wärmepumpe',
+           'ein abgekürztes Kürzel trifft, solange es eindeutig ist');
+    pruefe(e.mehrdeutig === null,
+           'bei zwei möglichen Treffern gilt keiner');
+    pruefe(e.zuKurz === null, 'unter drei Zeichen wird gar nicht gesucht');
     pruefe(e.ausKuerzel === 'Garage bauen', 'das Kürzel im Titel findet das Projekt');
     pruefe(e.ausBeschreibung === 'Garage bauen', 'auch das in der Beschreibung');
     pruefe(e.ohneKuerzel === null, 'ohne Kürzel gehört ein Termin zu keinem');
