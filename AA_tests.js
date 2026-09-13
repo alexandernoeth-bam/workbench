@@ -532,6 +532,66 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__pBezugApi = {'
+                 + ' pruefeBezug: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.projekte = ['
+                 + '     { id:\'p1\', name:\'Garage bauen\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[], anlagen:[],'
+                 + '       festlegungen:[], meilensteine:[] },'
+                 + '     { id:\'p2\', name:\'Abnehmen\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[], anlagen:[],'
+                 + '       festlegungen:[], meilensteine:[] } ];'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Familie\' }];'
+                 + '   termineNachTag = {};'
+                 + '   eintraegeEinsortieren(['
+                 + '     { id:\'g1\', summary:\'Bauantrag #garage-bauen\','
+                 + '       start:{ dateTime:\'2026-09-15T10:00:00+02:00\' },'
+                 + '       end:{ dateTime:\'2026-09-15T11:00:00+02:00\' } },'
+                 + '     { id:\'g2\', summary:\'Werksarzt\','
+                 + '       description:\'Thema #garage-bauen\','
+                 + '       start:{ dateTime:\'2026-09-16T10:00:00+02:00\' },'
+                 + '       end:{ dateTime:\'2026-09-16T11:00:00+02:00\' } },'
+                 + '     { id:\'g3\', summary:\'Zahnarzt\','
+                 + '       start:{ dateTime:\'2026-09-17T10:00:00+02:00\' },'
+                 + '       end:{ dateTime:\'2026-09-17T11:00:00+02:00\' } } ],'
+                 + '     \'Familie\', \'privat\');'
+                 + '   var hole = function(id){'
+                 + '     var tag;'
+                 + '     for (tag in termineNachTag) {'
+                 + '       var l = termineNachTag[tag];'
+                 + '       var i;'
+                 + '       for (i = 0; i < l.length; i++) {'
+                 + '         if (l[i].id === id) { return l[i]; } } }'
+                 + '     return null; };'
+                 + '   var nam = function(p){ return p ? p.name : null; };'
+                 + '   var r = { schluessel: projektSchluessel(DB.projekte[0]),'
+                 + '             ausKuerzel: nam(terminProjekt(hole(\'g1\'))),'
+                 + '             ausBeschreibung: nam(terminProjekt(hole(\'g2\'))),'
+                 + '             ohneKuerzel: nam(terminProjekt(hole(\'g3\'))) };'
+                 + '   zuordnungProjektSetzen(\'g3\', \'p2\');'
+                 + '   r.eigeneZuordnung = nam(terminProjekt(hole(\'g3\')));'
+                 + '   zuordnungProjektSetzen(\'g1\', \'p2\');'
+                 + '   r.zuordnungGewinnt = nam(terminProjekt(hole(\'g1\')));'
+                 + '   zuordnungProjektSetzen(\'g1\', \'\');'
+                 + '   r.termineZuGarage = termineZuProjekt(\'p1\').length;'
+                 + '   r.projekteMitTerminen = projekteMitTerminen().length;'
+                 + '   kalProjektFilter = \'p2\';'
+                 + '   var zaehl = 0;'
+                 + '   var tg;'
+                 + '   for (tg in termineNachTag) {'
+                 + '     termineNachTag[tg].forEach(function(t){'
+                 + '       if (passtZumProjektFilter(t)) { zaehl++; } }); }'
+                 + '   r.filterZeigt = zaehl;'
+                 + '   kalProjektFilter = null;'
+                 + '   var alleZ = 0;'
+                 + '   for (tg in termineNachTag) {'
+                 + '     termineNachTag[tg].forEach(function(t){'
+                 + '       if (passtZumProjektFilter(t)) { alleZ++; } }); }'
+                 + '   r.ohneFilterAlle = (alleZ === 3);'
+                 + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__abAnlageApi = {'
                  + ' pruefeAnlagen: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -592,7 +652,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   (h.match(/sa-zahl">([^<]*)/g) || []).forEach(function(x){'
                  + '     zahlen.push(x.replace(/.*">/, \'\')); });'
                  + '   var r = { abschnitte: namen,'
-                 + '             erledigtSichtbar: (h.indexOf(\'Vermesser\') >= 0),'
+                 + '             erledigtUnterAufgaben: (h.indexOf(\'Erledigt · 1\') >= 0),'
                  + '             msStand: zahlen[0],'
                  + '             zustand: (h.match(/sk-zustand">([^<]*)/) || [])[1],'
                  + '             festGesetzt: festlegungen(p).length };'
@@ -3315,8 +3375,10 @@ console.log('\n37. Wochensicht als Spalten');
   const wliste = hauptSkript().match(/function wochenAufgaben\([\s\S]*?\n\}/);
   pruefe(wliste && /a\.art === 'klein'/.test(wliste[0]),
          'Kleinigkeiten stehen nicht in der Wochenliste');
-  pruefe(woche && (woche[0].match(/passtZumKalender\(/g) || []).length >= 2,
+  pruefe(woche && (woche[0].match(/terminPasst\(|passtZumKalender\(/g) || []).length >= 2,
          'der Filter greift auf Termine und Ganztägiges');
+  pruefe(new RegExp('function\\s+terminPasst\\s*\\(').test(hauptSkript()),
+         'Kontext- und Projektfilter wirken zusammen');
   pruefe(wliste && /passtZumKalender\(a\.kontext\)/.test(wliste[0]),
          'und auf die Wochenliste');
 
@@ -5776,10 +5838,13 @@ console.log('\n74. Vorhabenseite');
     pruefe(e.abschnitte.indexOf('Meilensteine') >= 0, 'Meilensteine stehen auf der Seite');
     pruefe(e.abschnitte.indexOf('Festlegungen') >= 0, 'Festlegungen ebenso');
     pruefe(e.abschnitte.indexOf('Aufgaben') >= 0, 'Aufgaben ebenso');
-    pruefe(e.abschnitte.indexOf('Kleinigkeiten') >= 0, 'Kleinigkeiten ebenso');
+    pruefe(e.abschnitte.indexOf('Termine') >= 0, 'Termine ebenso');
     pruefe(e.abschnitte.indexOf('Abläufe') >= 0, 'Abläufe ebenso');
     pruefe(e.abschnitte.indexOf('Anlagen') >= 0, 'Anlagen ebenso');
-    pruefe(e.erledigtSichtbar === true, 'Erledigtes steht in einem eigenen Abschnitt');
+    pruefe(e.abschnitte.indexOf('Erledigt') < 0,
+           'Erledigtes hat keinen eigenen Abschnitt mehr');
+    pruefe(e.erledigtUnterAufgaben === true,
+           'es steht eingeklappt unter den Aufgaben');
     pruefe(e.msStand === '1 von 2', 'die Meilensteine nennen ihren Stand');
     pruefe(e.zustand === 'Bodenplatte ist gegossen',
            'der Zielzustand der Woche steht oben');
@@ -5847,6 +5912,83 @@ console.log('\n75. Anlagen am Ablauf');
            'eine Änderung am Durchlauf berührt die Vorlage nicht');
     pruefe(e.nachEntfernen === 0, 'entfernen geht');
     pruefe(e.vorlageUnberuehrt === 1, 'die Vorlage behält ihre');
+  }
+}
+
+/* ============================================================
+   76. Projektbezug eines Termins
+   Grund: Ein Kalendertermin gehoerte zu keinem Vorhaben. Damit fehlte
+   auf der Projektseite die halbe Wirklichkeit — und im Kalender ein
+   Weg, nur die Termine eines Projekts zu sehen.
+   ============================================================ */
+console.log('\n76. Termin und Projekt');
+{
+  const skript = hauptSkript();
+  const p = globalThis.__pBezugApi;
+
+  ['projektSchluessel', 'projektZuSchluessel', 'projektAusText',
+   'zuordnungProjekt', 'zuordnungProjektSetzen', 'terminProjekt',
+   'termineZuProjekt', 'projekteMitTerminen', 'kalProjektSetzen',
+   'passtZumProjektFilter', 'kalProjektFilterHtml',
+   'zumKalenderMitProjekt', 'projektWahlOeffnen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  /* Am Kalender wird nichts geändert */
+  const setzen = skript.match(/function zuordnungProjektSetzen\([\s\S]*?\n\}/);
+  pruefe(setzen && /DB\.kalenderzuordnung/.test(setzen[0]),
+         'die Zuordnung landet in der eigenen Datei');
+  pruefe(setzen && /!e\.art && !e\.projektId/.test(setzen[0]),
+         'ohne Art und ohne Projekt wird der Eintrag wieder entfernt');
+
+  /* Vorrang wie bei den Arten */
+  const tp = skript.match(/function terminProjekt\([\s\S]*?\n\}/);
+  pruefe(tp && tp[0].indexOf('zuordnungProjekt') < tp[0].indexOf('projektAusText'),
+         'die eigene Zuordnung geht vor das Kürzel im Termin');
+
+  /* Filter */
+  const filter = skript.match(/function passtZumProjektFilter\([\s\S]*?\n\}/);
+  pruefe(filter && /!kalProjektFilter\) \{ return true/.test(filter[0]),
+         'ohne gewähltes Projekt bleibt alles sichtbar');
+  const woche2 = skript.match(/function wocheHtml\([\s\S]*?\n\}\n/);
+  pruefe(woche2 && /kalProjektFilterHtml\(\)/.test(woche2[0]),
+         'die Woche zeigt die Filterleiste');
+
+  /* Die Seite */
+  const seite = skript.match(/function seiteZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(seite && /termineZuProjekt\(v\.id\)/.test(seite[0]),
+         'die Projektseite listet ihre Termine');
+  pruefe(seite && /zumKalenderMitProjekt\(/.test(seite[0]),
+         'und führt in den Kalender');
+  pruefe(seite && /Erledigt · '/.test(seite[0]),
+         'Erledigtes steht eingeklappt unter den Aufgaben');
+  pruefe(seite && !/seiteAbschnitt\('Kleinigkeiten'/.test(seite[0]),
+         'Kleinigkeiten haben keinen eigenen Abschnitt mehr');
+
+  const absch = skript.match(/function seiteAbschnitt\([\s\S]*?\n\}/);
+  pruefe(absch && /stand === undefined && leer/.test(absch[0]),
+         'ein leerer Abschnitt beginnt eingeklappt');
+  pruefe(absch && /stand === true/.test(absch[0]),
+         'von Hand geschlossen bleibt er zu');
+
+  if (!p) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = p.pruefeBezug();
+    pruefe(e.schluessel === 'garage-bauen', 'der Schlüssel folgt dem Namen');
+    pruefe(e.ausKuerzel === 'Garage bauen', 'das Kürzel im Titel findet das Projekt');
+    pruefe(e.ausBeschreibung === 'Garage bauen', 'auch das in der Beschreibung');
+    pruefe(e.ohneKuerzel === null, 'ohne Kürzel gehört ein Termin zu keinem');
+    pruefe(e.eigeneZuordnung === 'Abnehmen', 'die eigene Zuordnung greift');
+    pruefe(e.zuordnungGewinnt === 'Abnehmen',
+           'und schlägt ein anderslautendes Kürzel');
+    pruefe(e.termineZuGarage === 2,
+           'beide Termine mit Kürzel gehören zur Garage — der im Titel '
+           + 'und der in der Beschreibung');
+    pruefe(e.projekteMitTerminen === 2, 'zwei Projekte haben Termine');
+    pruefe(e.filterZeigt === 1, 'der Filter zeigt nur die des gewählten');
+    pruefe(e.ohneFilterAlle === true, 'ohne Filter alle');
   }
 }
 

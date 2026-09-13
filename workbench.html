@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.45.0</title>
+<title>Workbench 0.46.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -130,6 +130,7 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   transform:rotate(-90deg);transition:transform .15s ease}
 .sa-kopf svg.auf{transform:rotate(0deg)}
 .sa-inhalt{padding-bottom:8px}
+.sa.leer .sa-name{color:var(--grau-hell)}
 
 .sm{display:flex;align-items:baseline;gap:9px;padding:4px 0}
 .sm-punkt{flex:0 0 8px;height:8px;border-radius:50%;border:1px solid var(--grau);
@@ -330,6 +331,12 @@ body.breit .kleer{padding-left:6px}
 .ktitel{font-size:calc(var(--fs)*0.84);min-width:0;line-height:1.35;
   overflow-wrap:anywhere}
 .ktitel.privat{color:var(--petrol)}
+.kpf{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.kpf-knopf{font:inherit;font-size:calc(var(--fs)*0.72);padding:3px 11px;
+  border:1px solid var(--linie);border-radius:20px;background:var(--papier);
+  color:var(--grau);cursor:pointer;white-space:nowrap}
+.kpf-knopf.an{border-color:var(--weinrot);color:var(--weinrot);font-weight:500}
+
 .k-ablauf{display:inline-block;margin:2px 0 0 6px;font:inherit;
   font-size:calc(var(--fs)*0.66);padding:1px 7px;border:1px solid var(--linie);
   border-radius:20px;background:var(--papier);color:var(--grau);cursor:pointer;
@@ -1038,7 +1045,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.45.0';
+var APP_VERSION = '0.46.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3115,6 +3122,12 @@ function verlaufHtml(eintrag, is) {
     if (unten.length) { h += '<div class="tmeta">' + unten.join(' · ') + '</div>'; }
     h += '</div>';
     if (t.id) {
+      var pBezug = terminProjekt(t);
+      if (pBezug) {
+        h += '<button class="t-ablauf an" type="button" '
+           + 'onclick="seiteOeffnen(\'' + esc(pBezug.id) + '\',\'projekt\')" '
+           + 'title="Zur Projektseite">' + esc(pBezug.name) + '</button>';
+      }
       if (lauf) {
         var offenSchritte = (lauf.schritte || []).length - schritteFertig(lauf);
         h += '<span class="t-ablauf-paar">';
@@ -3129,6 +3142,11 @@ function verlaufHtml(eintrag, is) {
         h += '<button class="t-ablauf" type="button" '
            + 'onclick="terminAblaufWahl(\'' + esc(t.id) + '\',\'' + is + '\')" '
            + 'title="Einen Ablauf an diesen Termin heften">Ablauf</button>';
+      }
+      if (!pBezug) {
+        h += '<button class="t-ablauf" type="button" '
+           + 'onclick="projektWahlOeffnen(\'' + esc(t.id) + '\')" '
+           + 'title="Diesen Termin einem Projekt zuordnen">Projekt</button>';
       }
     }
     h += '</div>';
@@ -5055,6 +5073,7 @@ function eintraegeEinsortieren(eintraege, quelle, kontext) {
       zeit: zeitAusEintrag(e.start.dateTime),
       bis: e.end && e.end.dateTime ? zeitAusEintrag(e.end.dateTime) : '',
       ort: e.location || '', ganztags: false, quelle: quelle,
+      beschreibung: e.description || '',
       kontext: welcher
     });
   }
@@ -5664,6 +5683,168 @@ function kalenderJahrestermine(is) {
   return aus;
 }
 
+
+/* ============================================================
+   Projektbezug eines Termins
+
+   Wie bei den Arten: Das Kürzel steht im Termin selbst und gilt damit
+   für alle, die den Kalender sehen. Wer abweichen will, setzt für sich
+   eine eigene Zuordnung — die geht vor. Geschrieben wird im Kalender
+   nie.
+   ============================================================ */
+
+var PROJEKT_MUSTER = /#([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9_-]{1,23})/g;
+
+/* Aus „Bauantrag #garage" wird der Schlüssel „garage". Ein Projekt
+   trägt seinen Schlüssel selbst oder bekommt ihn aus seinem Namen. */
+function projektSchluessel(p) {
+  if (p.schluessel) { return String(p.schluessel).toLowerCase(); }
+  return String(p.name || '').toLowerCase()
+           .replace(/[^a-zäöüß0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
+}
+
+function projektZuSchluessel(s) {
+  if (!s) { return null; }
+  var l = DB.projekte || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (projektSchluessel(l[i]) === s) { return l[i]; }
+  }
+  return null;
+}
+
+/* Alle Kürzel eines Textes — eines davon kann ein Projekt meinen. */
+function projektAusText(text) {
+  if (typeof text !== 'string' || text.length === 0) { return null; }
+  PROJEKT_MUSTER.lastIndex = 0;
+  var treffer;
+  while ((treffer = PROJEKT_MUSTER.exec(text)) !== null) {
+    var p = projektZuSchluessel(treffer[1].toLowerCase());
+    if (p) { return p; }
+  }
+  return null;
+}
+
+function zuordnungProjekt(id) {
+  var z = DB.kalenderzuordnung || {};
+  var e = z[id];
+  return (e && e.projektId) ? e.projektId : '';
+}
+
+function zuordnungProjektSetzen(id, projektId) {
+  if (!DB.kalenderzuordnung) { DB.kalenderzuordnung = {}; }
+  var e = DB.kalenderzuordnung[id] || {};
+  if (!projektId) { delete e.projektId; } else { e.projektId = projektId; }
+  e.geaendert = jetzt();
+  if (!e.art && !e.projektId) { delete DB.kalenderzuordnung[id]; }
+  else { DB.kalenderzuordnung[id] = e; }
+  spaeterSichern();
+  tagZeichnen();
+  kalZeichnen();
+}
+
+/* Die eigene Zuordnung schlägt das Kürzel im Termin. */
+function terminProjekt(t) {
+  if (!t) { return null; }
+  var eigen = t.id ? zuordnungProjekt(t.id) : '';
+  if (eigen) {
+    var p = projektFinden(eigen);
+    if (p) { return p; }
+  }
+  var ausTitel = projektAusText(t.rohTitel || t.titel);
+  if (ausTitel) { return ausTitel; }
+  return projektAusText(t.beschreibung);
+}
+
+/* Alle Termine des geholten Fensters, die zu einem Projekt gehören. */
+function termineZuProjekt(projektId) {
+  var aus = [];
+  var tag;
+  for (tag in termineNachTag) {
+    if (!Object.prototype.hasOwnProperty.call(termineNachTag, tag)) { continue; }
+    var l = termineNachTag[tag];
+    var i;
+    for (i = 0; i < l.length; i++) {
+      var p = terminProjekt(l[i]);
+      if (!p || p.id !== projektId) { continue; }
+      aus.push({ tag: tag, termin: l[i] });
+    }
+  }
+  aus.sort(function (a, b) {
+    if (a.tag !== b.tag) { return (a.tag < b.tag) ? -1 : 1; }
+    return (String(a.termin.zeit) < String(b.termin.zeit)) ? -1 : 1;
+  });
+  return aus;
+}
+
+/* Welche Projekte kommen im geholten Fenster überhaupt vor? */
+function projekteMitTerminen() {
+  var gesehen = {};
+  var aus = [];
+  var tag;
+  for (tag in termineNachTag) {
+    if (!Object.prototype.hasOwnProperty.call(termineNachTag, tag)) { continue; }
+    var l = termineNachTag[tag];
+    var i;
+    for (i = 0; i < l.length; i++) {
+      var p = terminProjekt(l[i]);
+      if (!p || gesehen[p.id]) { continue; }
+      gesehen[p.id] = true;
+      aus.push(p);
+    }
+  }
+  aus.sort(function (a, b) { return (a.name < b.name) ? -1 : 1; });
+  return aus;
+}
+
+/* ------------------------------------------------------------
+   Der Projektfilter im Kalender
+   ------------------------------------------------------------ */
+
+var kalProjektFilter = null;   /* null = alle */
+
+function kalProjektSetzen(id) {
+  kalProjektFilter = (kalProjektFilter === id) ? null : id;
+  kalZeichnen();
+}
+
+function passtZumProjektFilter(t) {
+  if (!kalProjektFilter) { return true; }
+  var p = terminProjekt(t);
+  return !!(p && p.id === kalProjektFilter);
+}
+
+function kalProjektFilterHtml() {
+  var l = projekteMitTerminen();
+  if (!l.length) { return ''; }
+  var h = '<div class="kpf">';
+  h += '<button class="kpf-knopf' + (kalProjektFilter ? '' : ' an') + '" type="button" '
+     + 'onclick="kalProjektSetzen(null)">Alle</button>';
+  var i;
+  for (i = 0; i < l.length; i++) {
+    h += '<button class="kpf-knopf' + (kalProjektFilter === l[i].id ? ' an' : '')
+       + '" type="button" onclick="kalProjektSetzen(\'' + esc(l[i].id) + '\')">'
+       + esc(l[i].name) + '</button>';
+  }
+  return h + '</div>';
+}
+
+/* Von der Projektseite in den Kalender: Der Filter steht dann auf
+   diesem Projekt, und die Woche zeigt seinen nächsten Termin. */
+function zumKalenderMitProjekt(id) {
+  kalProjektFilter = id;
+  var l = termineZuProjekt(id);
+  var heute = isoDatum();
+  var ziel = heute;
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].tag >= heute) { ziel = l[i].tag; break; }
+  }
+  kalAnker = ziel;
+  zeigeSchirm('Kalender');
+  kalZeichnen();
+}
+
 /* ============================================================
    Kalender: Woche, Monat, Jahr
    ============================================================ */
@@ -5676,6 +5857,11 @@ var monatArten = null;       /* null = alle Kategorien */
 var monatKalender = null;    /* null = alle Kalender */
 var monatOffeneTage = {};
 var MONAT_ZEIGEN = 2;
+
+/* Beide Filter zusammen: Kontext und Projekt. */
+function terminPasst(t) {
+  return passtZumKalender(t.kontext) && passtZumProjektFilter(t);
+}
 
 function passtZumKalender(kontext) {
   if (kalFilter === 'alle') { return true; }
@@ -5950,7 +6136,8 @@ function ferienImJahr(jahr) {
 function wocheHtml(is) {
   var mo = montagVon(is);
   var heute = isoDatum();
-  var h = wochenKleinBanner(mo);
+  var h = kalProjektFilterHtml();
+  h += wochenKleinBanner(mo);
   h += '<div class="woche-raster">';
   var i;
   for (i = 0; i < 7; i++) {
@@ -5987,7 +6174,7 @@ function wocheHtml(is) {
       etwasOben = true;
     }
     for (g = 0; g < t.zeit.length; g++) {
-      if (!passtZumKalender(t.zeit[g].kontext)) { continue; }
+      if (!terminPasst(t.zeit[g])) { continue; }
       var tz = t.zeit[g];
       h += '<div class="kzeile"><span class="kzeit fest">' + esc(tz.zeit) + '</span>'
          + '<span class="ktitel' + (tz.kontext === 'privat' ? ' privat' : '') + '">'
@@ -6693,7 +6880,8 @@ function kalZeichnen() {
     var jahr = Number(kalAnker.slice(0, 4));
     var monat = Number(kalAnker.slice(5, 7));
     if (titel) { titel.textContent = MONATE_LANG[monat - 1] + ' ' + jahr; }
-    blatt.innerHTML = '<div class="monatsraster">' + monatHtml(kalAnker) + '</div>';
+    blatt.innerHTML = kalProjektFilterHtml()
+                    + '<div class="monatsraster">' + monatHtml(kalAnker) + '</div>';
     return;
   }
   if (titel) { titel.textContent = 'Jahr ' + kalAnker.slice(0, 4); }
@@ -6760,6 +6948,56 @@ function artWahlHtml() {
   }
   h += '<button type="button" onclick="aktionenSchliessen()">Fertig</button></div>';
   return h;
+}
+
+/* Welches Projekt gehört zu diesem Termin? Gesetzt wird in der
+   eigenen Zuordnung, im Kalender ändert sich nichts. */
+function projektWahlOeffnen(id) {
+  artWahlFuer = id;
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = projektWahlHtml();
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function projektWahlHtml() {
+  var jetztId = zuordnungProjekt(artWahlFuer);
+  var h = blattKopf();
+  h += '<div class="as-titel">Zu welchem Projekt gehört das?</div>';
+  h += '<div class="as-meta">gilt nur für dich — im Kalender wird nichts '
+     + 'geändert</div>';
+  h += '<div class="as-linie"></div>';
+
+  var l = DB.projekte || [];
+  var i;
+  var gab = false;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].status === 'abgeschlossen') { continue; }
+    h += '<div class="mf-zeile" onclick="projektWahlSetzen(\'' + esc(l[i].id) + '\')">'
+       + '<span class="mf-name">' + esc(l[i].name) + '</span>'
+       + '<span class="a-quelle">' + (jetztId === l[i].id ? 'gesetzt' : '#'
+       + esc(projektSchluessel(l[i]))) + '</span></div>';
+    gab = true;
+  }
+  if (!gab) {
+    h += '<div class="tleer" style="padding-left:0">Kein laufendes Projekt.</div>';
+  }
+  h += '<div class="d-hinweis" style="text-align:left">Dauerhaft und für alle gilt '
+     + 'es, wenn du das Kürzel in den Termin schreibst, etwa #'
+     + esc(l.length ? projektSchluessel(l[0]) : 'projekt') + '.</div>';
+  h += '<div class="d-reihe">';
+  if (jetztId) {
+    h += '<button type="button" onclick="projektWahlSetzen(\'\')">Zuordnung lösen</button>';
+  }
+  h += '<button type="button" onclick="aktionenSchliessen()">Fertig</button></div>';
+  return h;
+}
+
+function projektWahlSetzen(id) {
+  zuordnungProjektSetzen(artWahlFuer, id);
+  aktionenSchliessen();
 }
 
 function artWahlSetzen(art) {
@@ -8229,13 +8467,30 @@ function seiteOeffnen(id, art) {
 }
 
 function seiteAbschnittUm(name) {
-  seiteZu[name] = !seiteZu[name];
+  /* undefined heißt „noch nie angefasst" — dann richtet sich der
+     erste Griff nach dem, was gerade zu sehen ist. */
+  var jetztZu = (seiteZu[name] === true)
+             || (seiteZu[name] === undefined && seiteIstLeer(name));
+  seiteZu[name] = !jetztZu;
   seiteZeichnen();
 }
 
+/* Merkt sich beim Zeichnen, welche Abschnitte leer waren. */
+var seiteLeer = {};
+
+function seiteIstLeer(name) {
+  return seiteLeer[name] === true;
+}
+
+/* Ein Abschnitt ohne Inhalt beginnt eingeklappt — er soll dastehen,
+   damit man weiß, dass es ihn gibt, aber keinen Platz beanspruchen.
+   Von Hand geöffnet bleibt er offen. */
 function seiteAbschnitt(name, zahl, inhalt, warnung) {
-  var zu = seiteZu[name] === true;
-  var h = '<div class="sa' + (warnung ? ' warn' : '') + '">';
+  var leer = (zahl === 0 || zahl === '0');
+  var stand = seiteZu[name];
+  var zu = (stand === true) || (stand === undefined && leer);
+  seiteLeer[name] = leer;
+  var h = '<div class="sa' + (warnung ? ' warn' : '') + (leer ? ' leer' : '') + '">';
   h += '<button class="sa-kopf" type="button" onclick="seiteAbschnittUm(\'' + name + '\')">';
   h += '<span class="sa-name">' + esc(name) + '</span>';
   if (zahl !== '') { h += '<span class="sa-zahl">' + esc(String(zahl)) + '</span>'; }
@@ -8349,6 +8604,7 @@ function seiteZeichnen() {
   }
   var heute = isoDatum();
   var istProjekt = (seiteArt === 'projekt');
+  seiteLeer = {};
 
   var kopf = document.getElementById('seiteKopf');
   if (kopf) {
@@ -8386,43 +8642,84 @@ function seiteZeichnen() {
   h += seiteAbschnitt('Festlegungen', festlegungen(v).length,
                       festlegungenHtml(v), false);
 
-  /* Aufgaben und Kleinigkeiten */
+  /* Aktivitäten: Termine, Abläufe, Aufgaben — alles, was geschieht.
+     Kleinigkeiten und Wiederkehrendes stehen bei den Aufgaben mit,
+     Erledigtes eingeklappt darunter. */
   var zug = istProjekt ? alleAufgabenZuProjekt(v.id) : [];
-  var haupt = [], klein = [], fertig = [];
+  var offen = [], fertig = [];
   var ai;
   for (ai = 0; ai < zug.length; ai++) {
-    if (zug[ai].status === 'erledigt') { fertig.push(zug[ai]); }
-    else if (zug[ai].art === 'klein') { klein.push(zug[ai]); }
-    else { haupt.push(zug[ai]); }
+    if (zug[ai].status === 'erledigt' && !zug[ai].wiederholung) { fertig.push(zug[ai]); }
+    else { offen.push(zug[ai]); }
   }
   var listeHtml = function (l) {
     var t = '';
     var i;
     for (i = 0; i < l.length; i++) {
-      t += '<div class="tzeile kompakt' + (l[i].kontext === 'privat' ? ' privat' : '')
-         + (l[i].status === 'erledigt' ? ' erledigt' : '') + '">'
+      var art = [];
+      if (l[i].art === 'klein') { art.push('Kleinigkeit'); }
+      if (l[i].wiederholung) { art.push(regelText(l[i].wiederholung)); }
+      else { art.push(planungText(l[i])); }
+      if (l[i].frist) { art.push('Frist ' + kurzDatum(l[i].frist)); }
+      t += '<div class="tzeile kompakt' + (l[i].kontext === 'privat' ? ' privat' : '') + '">'
          + '<button class="tkasten' + (l[i].status === 'erledigt' ? ' an' : '')
          + '" type="button" onclick="seiteAufgabeHaken(\'' + esc(l[i].id) + '\')"></button>'
          + '<div class="ttext" onclick="aufgabeAktionen(\'' + esc(l[i].id) + '\')">'
          + '<div class="ttitel' + (l[i].status === 'erledigt' ? ' fertig' : '')
          + '">' + esc(l[i].titel) + '</div>'
-         + '<div class="tmeta">' + esc(planungText(l[i]))
-         + (l[i].frist ? (' · Frist ' + esc(kurzDatum(l[i].frist))) : '')
-         + '</div></div></div>';
+         + '<div class="tmeta">' + esc(art.join(' · ')) + '</div></div></div>';
     }
     if (!l.length) { t += '<div class="tleer" style="padding-left:0">Keine.</div>'; }
     return t;
   };
+
+  /* Termine */
+  var tl = istProjekt ? termineZuProjekt(v.id) : [];
+  var th = '';
+  var ti;
+  for (ti = 0; ti < tl.length; ti++) {
+    th += '<div class="anlage"><div class="a-mitte" onclick="zumTag(\''
+       + tl[ti].tag + '\')"><div class="a-name">' + esc(tl[ti].termin.titel)
+       + '</div><div class="a-quelle">' + esc(kurzDatum(tl[ti].tag))
+       + (tl[ti].termin.zeit ? (' · ' + esc(tl[ti].termin.zeit)) : ' · ganztägig')
+       + '</div></div></div>';
+  }
+  if (!tl.length) {
+    th = '<div class="tleer" style="padding-left:0">Keiner im geholten Fenster. '
+       + 'Ein Termin gehört dazu, wenn #' + esc(projektSchluessel(v))
+       + ' in Titel oder Beschreibung steht.</div>';
+  } else {
+    th += '<button class="neu-zeile" type="button" onclick="zumKalenderMitProjekt(\''
+       + esc(v.id) + '\')"><svg viewBox="0 0 24 24">'
+       + '<path d="M5 12h14M13 6l6 6-6 6"></path></svg>Im Kalender zeigen</button>';
+  }
   if (istProjekt) {
-    h += seiteAbschnitt('Aufgaben', haupt.length, listeHtml(haupt), false);
-    h += seiteAbschnitt('Kleinigkeiten', klein.length, listeHtml(klein), false);
-    if (fertig.length) {
-      h += seiteAbschnitt('Erledigt', fertig.length, listeHtml(fertig), false);
-    }
+    h += seiteAbschnitt('Termine', tl.length, th, false);
   }
 
   /* Abläufe */
-  h += seiteAbschnitt('Abläufe', '', vhAblaeufeHtml(v.id, seiteArt), false);
+  var laeufeZahl = (DB.durchlaeufe || []).filter(function (d) {
+    return d[istProjekt ? 'projektId' : 'zielId'] === v.id;
+  }).length + (DB.ablaeufe || []).filter(function (d) {
+    return d[istProjekt ? 'projektId' : 'zielId'] === v.id;
+  }).length;
+  h += seiteAbschnitt('Abläufe', laeufeZahl, vhAblaeufeHtml(v.id, seiteArt), false);
+
+  /* Aufgaben — mit Kleinigkeiten und Wiederkehrendem, Erledigtes
+     eingeklappt darunter. */
+  if (istProjekt) {
+    var ah2 = listeHtml(offen);
+    if (fertig.length) {
+      var zuF = seiteZu['Erledigt'] !== false;
+      ah2 += '<button class="tfalt" type="button" '
+           + 'onclick="seiteAbschnittUm(\'Erledigt\')">'
+           + '<span>Erledigt · ' + fertig.length + '</span>'
+           + '<svg class="' + (zuF ? '' : 'auf') + '" viewBox="0 0 24 24">'
+           + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+      if (!zuF) { ah2 += listeHtml(fertig); }
+    }
+    h += seiteAbschnitt('Aufgaben', offen.length, ah2, false);
+  }
 
   /* Einzahler beim Ziel */
   if (!istProjekt) {
