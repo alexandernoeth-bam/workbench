@@ -6056,6 +6056,17 @@ console.log('\n74. Vorhabenseite');
          'eine Festlegung wird überschrieben');
   pruefe(setzen && /l\[i\]\.seit = isoDatum\(\)/.test(setzen[0]),
          'jede Änderung setzt das Datum neu');
+  const fh = hauptSkript().match(/function festlegungenHtml\([\s\S]*?\n\}\n/);
+  pruefe(fh && /<textarea class="fest-wert"/.test(fh[0]),
+         'der Inhalt steht in einem wachsenden Feld, nicht in einer Zeile');
+  pruefe(fh && /festHoehe\(this\)/.test(fh[0]),
+         'es wächst beim Tippen mit');
+  pruefe(new RegExp('function\\s+festHoehenSetzen\\s*\\(').test(hauptSkript()),
+         'und hat beim Zeichnen schon die richtige Höhe');
+  pruefe(/\.fest\{[^}]*flex-wrap:wrap/.test(QUELLE),
+         'bei wenig Breite bricht die Zeile um');
+  pruefe(/\.fest-wert\{[^}]*overflow:hidden/.test(QUELLE),
+         'kein Rollbalken im Feld — es wächst ja');
 
   if (!s) {
     warn('Funktionen nicht auswertbar');

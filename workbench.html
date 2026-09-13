@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.56.0</title>
+<title>Workbench 0.57.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -236,14 +236,16 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .sm.fertig .sm-titel{color:var(--grau);text-decoration:line-through}
 .sm-datum{flex:0 0 auto;font-size:calc(var(--fs)*0.74);color:var(--grau)}
 
-.fest{display:flex;align-items:center;gap:6px;padding:3px 0}
-.fest-stich{flex:0 0 34%;min-width:0;font:inherit;font-size:calc(var(--fs)*0.8);
+.fest{display:flex;align-items:flex-start;gap:6px;padding:4px 0;flex-wrap:wrap}
+.fest-stich{flex:1 1 110px;min-width:0;font:inherit;font-size:calc(var(--fs)*0.78);
   border:0;border-bottom:1px solid var(--linie);background:none;color:var(--grau);
   padding:4px 2px;outline:none}
-.fest-wert{flex:1;min-width:0;font:inherit;font-size:calc(var(--fs)*0.86);
-  border:0;border-bottom:1px solid var(--linie);background:none;color:var(--tinte);
-  padding:4px 2px;outline:none}
-.fest-seit{flex:0 0 auto;font-size:calc(var(--fs)*0.7);color:var(--grau-hell)}
+.fest-wert{flex:3 1 180px;min-width:0;font:inherit;font-size:calc(var(--fs)*0.86);
+  line-height:1.4;border:0;border-bottom:1px solid var(--linie);background:none;
+  color:var(--tinte);padding:4px 2px;outline:none;resize:none;overflow:hidden}
+.fest-seit{flex:0 0 auto;font-size:calc(var(--fs)*0.7);color:var(--grau-hell);
+  padding-top:7px}
+.fest .a-weg{align-self:center}
 .fest.neu{padding-top:8px}
 .fest.neu .fest-stich,.fest.neu .fest-wert{border-bottom-style:dashed}
 
@@ -1148,7 +1150,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.56.0';
+var APP_VERSION = '0.57.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -9401,6 +9403,7 @@ function seiteZeichnen() {
   h += '</div>';
 
   blatt.innerHTML = h;
+  festHoehenSetzen();
 }
 
 function seiteAufgabeHaken(id) {
@@ -9472,6 +9475,21 @@ function festlegungNeu() {
 
 /* Geändert, nicht ergänzt: Eine Festlegung wird überschrieben, sonst
    stehen nach einem halben Jahr drei Torbreiten da. */
+/* Ein Textfeld wächst mit seinem Inhalt. */
+function festHoehe(el) {
+  if (!el || !el.style) { return; }
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight + 2) + 'px';
+}
+
+function festHoehenSetzen() {
+  var blatt = document.getElementById('seiteBlatt');
+  if (!blatt || !blatt.querySelectorAll) { return; }
+  var l = blatt.querySelectorAll('.fest-wert');
+  var i;
+  for (i = 0; i < l.length; i++) { festHoehe(l[i]); }
+}
+
 function festlegungSetzen(id, feld, wert) {
   var v = vorhabenFinden(seiteFuer, seiteArt);
   if (!v) { return; }
@@ -9508,11 +9526,16 @@ function festlegungenHtml(v) {
   var h = '';
   var i;
   for (i = 0; i < l.length; i++) {
+    /* Der Inhalt ist ein wachsendes Feld, kein einzeiliges: Eine
+       Festlegung wie „Satteldach, Ziegel wie am Haus, Kniestock 80 cm"
+       passt sonst nicht hinein. */
     h += '<div class="fest">';
     h += '<input class="fest-stich" type="text" value="' + esc(l[i].stichwort) + '" '
+       + 'placeholder="Stichwort" '
        + 'oninput="festlegungSetzen(\'' + esc(l[i].id) + '\',\'stichwort\',this.value)">';
-    h += '<input class="fest-wert" type="text" value="' + esc(l[i].inhalt) + '" '
-       + 'oninput="festlegungSetzen(\'' + esc(l[i].id) + '\',\'inhalt\',this.value)">';
+    h += '<textarea class="fest-wert" rows="1" '
+       + 'oninput="festHoehe(this);festlegungSetzen(\'' + esc(l[i].id)
+       + '\',\'inhalt\',this.value)">' + esc(l[i].inhalt) + '</textarea>';
     h += '<span class="fest-seit">' + esc(kurzDatum(l[i].seit || '')) + '</span>';
     h += '<button class="a-weg" type="button" onclick="festlegungWeg(\'' + esc(l[i].id)
        + '\')" title="Festlegung entfernen"><svg viewBox="0 0 24 24">'
