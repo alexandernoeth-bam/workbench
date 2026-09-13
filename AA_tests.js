@@ -532,167 +532,6 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
-                 + 'globalThis.__notizApi = {'
-                 + ' pruefeNotiz: function(){'
-                 + '   var alt = DB; DB = leereDatenbank();'
-                 + '   var notiz = \'Grundfläche: 6,00 x 9,00 m\\n\''
-                 + '             + \'- Torbreite: 3,50 m\\n\''
-                 + '             + \'• Bodenplatte 25 cm bewehrt\\n\''
-                 + '             + \'\\n\''
-                 + '             + \'Satteldach, Ziegel wie Haus\\n\''
-                 + '             + \'Bauamt: Herr Schmidt\';'
-                 + '   var p = { id:\'p1\', name:\'Garage\', kontext:\'privat\','
-                 + '     status:\'laufend\', zielzustaende:[], anlagen:[],'
-                 + '     meilensteine:[], notiz: notiz };'
-                 + '   DB.projekte = [p];'
-                 + '   seiteFuer = \'p1\'; seiteArt = \'projekt\';'
-                 + '   notizUebernehmen(p);'
-                 + '   var f = festlegungen(p);'
-                 + '   var lang = notizZerlegen(\'Ein Satz mit einem sehr langen '
-                 + 'Vorspann, der weit über vierzig Zeichen geht: und dann Inhalt\');'
-                 + '   var r = { zahl: f.length, stichwort: f[0].stichwort,'
-                 + '             inhalt: f[0].inhalt,'
-                 + '             ohneDoppelpunkt: f[2].inhalt,'
-                 + '             strichWeg: (f[1].stichwort === \'Torbreite\'),'
-                 + '             leerzeilenWeg: (f.length === 5),'
-                 + '             imLog: (logEintraege(p)[0].text'
-                 + '               .indexOf(\'Herr Schmidt\') >= 0),'
-                 + '             notizLeer: p.notiz,'
-                 + '             satzZeichenKeinStichwort: (lang[0].stichwort === \'\') };'
-                 + '   notizUebernehmen(p);'
-                 + '   r.zweitesMal = festlegungen(p).length;'
-                 + '   seiteFuer = \'\'; seiteArt = \'\'; DB = alt;'
-                 + '   return r;'
-                 + ' } };'
-                 + 'globalThis.__zuordnenApi = {'
-                 + ' pruefeZuordnen: function(){'
-                 + '   var alt = DB; DB = leereDatenbank();'
-                 + '   DB.projekte = [{ id:\'p1\', name:\'Halbmarathon\','
-                 + '     kontext:\'privat\', status:\'laufend\', zielzustaende:[],'
-                 + '     anlagen:[], festlegungen:[], meilensteine:[] }];'
-                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
-                 + '   termineNachTag = {};'
-                 + '   var lauf = [];'
-                 + '   var t;'
-                 + '   for (t = 1; t <= 5; t++) {'
-                 + '     lauf.push({ id:\'L\' + t, summary:\'Lauftraining\','
-                 + '       recurringEventId:\'serie-lauf\','
-                 + '       start:{ dateTime:\'2026-09-0\' + t + \'T18:00:00+02:00\' },'
-                 + '       end:{ dateTime:\'2026-09-0\' + t + \'T19:00:00+02:00\' } });'
-                 + '   }'
-                 + '   lauf.push({ id:\'Z1\', summary:\'Zahnarzt\','
-                 + '     start:{ dateTime:\'2026-09-08T09:00:00+02:00\' },'
-                 + '     end:{ dateTime:\'2026-09-08T10:00:00+02:00\' } });'
-                 + '   lauf.push({ id:\'W1\', summary:\'Wettkampf #halbmarathon\','
-                 + '     start:{ dateTime:\'2026-09-09T09:00:00+02:00\' },'
-                 + '     end:{ dateTime:\'2026-09-09T12:00:00+02:00\' } });'
-                 + '   eintraegeEinsortieren(lauf, \'Alex\', \'privat\');'
-                 + '   var f = freieTermine();'
-                 + '   var serie = f.filter(function(x){ return x.serie; })[0];'
-                 + '   seiteFuer = \'p1\'; seiteArt = \'projekt\';'
-                 + '   zuordnenWahl = {}; zuordnenWahl[serie.schluessel] = true;'
-                 + '   zuordnenUebernehmen();'
-                 + '   var zahl = termineZuProjekt(\'p1\').filter(function(x){'
-                 + '     return x.termin.titel === \'Lauftraining\'; }).length;'
-                 + '   var wie = hole(\'W1\');'
-                 + '   var eig = hole(\'L1\');'
-                 + '   eintraegeEinsortieren([{ id:\'L9\', summary:\'Lauftraining\','
-                 + '     recurringEventId:\'serie-lauf\','
-                 + '     start:{ dateTime:\'2026-09-20T18:00:00+02:00\' },'
-                 + '     end:{ dateTime:\'2026-09-20T19:00:00+02:00\' } }],'
-                 + '     \'Alex\', \'privat\');'
-                 + '   var neuDrin = !!terminProjekt(hole(\'L9\'));'
-                 + '   var r = { freieVorher: f.length, serieZahl: serie.zahl,'
-                 + '             nachZuordnung: zahl,'
-                 + '             freieNachher: freieTermine().length,'
-                 + '             herkunftEigen: projektHerkunft(eig),'
-                 + '             herkunftTitel: projektHerkunft(wie),'
-                 + '             kuenftigesVorkommen: neuDrin };'
-                 + '   function hole(id){'
-                 + '     var tag;'
-                 + '     for (tag in termineNachTag) {'
-                 + '       var l = termineNachTag[tag];'
-                 + '       var i;'
-                 + '       for (i = 0; i < l.length; i++) {'
-                 + '         if (l[i].id === id) { return l[i]; } } }'
-                 + '     return null; }'
-                 + '   seiteFuer = \'\'; seiteArt = \'\'; zuordnenWahl = {};'
-                 + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
-                 + '   return r;'
-                 + ' } };'
-                 + 'globalThis.__pBezugApi = {'
-                 + ' pruefeBezug: function(){'
-                 + '   var alt = DB; DB = leereDatenbank();'
-                 + '   DB.projekte = ['
-                 + '     { id:\'p1\', name:\'Garage bauen\', kontext:\'privat\','
-                 + '       status:\'laufend\', zielzustaende:[], anlagen:[],'
-                 + '       festlegungen:[], meilensteine:[] },'
-                 + '     { id:\'p2\', name:\'Abnehmen\', kontext:\'privat\','
-                 + '       status:\'laufend\', zielzustaende:[], anlagen:[],'
-                 + '       festlegungen:[], meilensteine:[] } ];'
-                 + '   kalenderListe = [{ id:\'k\', name:\'Familie\' }];'
-                 + '   termineNachTag = {};'
-                 + '   eintraegeEinsortieren(['
-                 + '     { id:\'g1\', summary:\'Bauantrag #garage-bauen\','
-                 + '       start:{ dateTime:\'2026-09-15T10:00:00+02:00\' },'
-                 + '       end:{ dateTime:\'2026-09-15T11:00:00+02:00\' } },'
-                 + '     { id:\'g2\', summary:\'Werksarzt\','
-                 + '       description:\'Thema #garage-bauen\','
-                 + '       start:{ dateTime:\'2026-09-16T10:00:00+02:00\' },'
-                 + '       end:{ dateTime:\'2026-09-16T11:00:00+02:00\' } },'
-                 + '     { id:\'g3\', summary:\'Zahnarzt\','
-                 + '       start:{ dateTime:\'2026-09-17T10:00:00+02:00\' },'
-                 + '       end:{ dateTime:\'2026-09-17T11:00:00+02:00\' } } ],'
-                 + '     \'Familie\', \'privat\');'
-                 + '   var hole = function(id){'
-                 + '     var tag;'
-                 + '     for (tag in termineNachTag) {'
-                 + '       var l = termineNachTag[tag];'
-                 + '       var i;'
-                 + '       for (i = 0; i < l.length; i++) {'
-                 + '         if (l[i].id === id) { return l[i]; } } }'
-                 + '     return null; };'
-                 + '   var nam = function(p){ return p ? p.name : null; };'
-                 + '   DB.projekte.push({ id:\'p3\','
-                 + '     name:\'Solaranlage und Wärmepumpe\', kontext:\'privat\','
-                 + '     status:\'laufend\', zielzustaende:[], anlagen:[],'
-                 + '     festlegungen:[], meilensteine:[] });'
-                 + '   DB.projekte.push({ id:\'p4\', name:\'Garage streichen\','
-                 + '     kontext:\'privat\', status:\'laufend\', zielzustaende:[],'
-                 + '     anlagen:[], festlegungen:[], meilensteine:[] });'
-                 + '   var r = { schluessel: projektSchluessel(DB.projekte[0]),'
-                 + '             langerName: projektSchluessel(DB.projekte[2]),'
-                 + '             abgekuerzt: (function(){'
-                 + '               var p = projektZuSchluessel(\'solaranlage\');'
-                 + '               return p ? p.name : null; })(),'
-                 + '             mehrdeutig: projektZuSchluessel(\'garage\'),'
-                 + '             zuKurz: projektZuSchluessel(\'ga\'),'
-                 + '             ausKuerzel: nam(terminProjekt(hole(\'g1\'))),'
-                 + '             ausBeschreibung: nam(terminProjekt(hole(\'g2\'))),'
-                 + '             ohneKuerzel: nam(terminProjekt(hole(\'g3\'))) };'
-                 + '   zuordnungProjektSetzen(\'g3\', \'p2\');'
-                 + '   r.eigeneZuordnung = nam(terminProjekt(hole(\'g3\')));'
-                 + '   zuordnungProjektSetzen(\'g1\', \'p2\');'
-                 + '   r.zuordnungGewinnt = nam(terminProjekt(hole(\'g1\')));'
-                 + '   zuordnungProjektSetzen(\'g1\', \'\');'
-                 + '   r.termineZuGarage = termineZuProjekt(\'p1\').length;'
-                 + '   r.projekteMitTerminen = projekteMitTerminen().length;'
-                 + '   kalProjektFilter = \'p2\';'
-                 + '   var zaehl = 0;'
-                 + '   var tg;'
-                 + '   for (tg in termineNachTag) {'
-                 + '     termineNachTag[tg].forEach(function(t){'
-                 + '       if (passtZumProjektFilter(t)) { zaehl++; } }); }'
-                 + '   r.filterZeigt = zaehl;'
-                 + '   kalProjektFilter = null;'
-                 + '   var alleZ = 0;'
-                 + '   for (tg in termineNachTag) {'
-                 + '     termineNachTag[tg].forEach(function(t){'
-                 + '       if (passtZumProjektFilter(t)) { alleZ++; } }); }'
-                 + '   r.ohneFilterAlle = (alleZ === 3);'
-                 + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
-                 + '   return r;'
-                 + ' } };'
                  + 'globalThis.__abAnlageApi = {'
                  + ' pruefeAnlagen: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -713,73 +552,6 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.vorlageUnberuehrt = abAnlagen(DB.ablaeufe[0]).length;'
                  + '   r.eigeneListe = (r.vorlageUnberuehrt === 1);'
                  + '   abDetail = \'\'; abDetailArt = \'\'; DB = alt;'
-                 + '   return r;'
-                 + ' } };'
-                 + 'globalThis.__seiteApi = {'
-                 + ' pruefeSeite: function(){'
-                 + '   var alt = DB; DB = leereDatenbank();'
-                 + '   var heute = isoDatum();'
-                 + '   var p = { id:\'p1\', name:\'Garage\', kontext:\'privat\','
-                 + '     status:\'laufend\', zielzustaende:[], festlegungen:[],'
-                 + '     log:[], anlagen:[],'
-                 + '     meilensteine:[{ titel:\'Antrag\', datum: tagePlus(heute,-10),'
-                 + '       erreicht:true }, { titel:\'Platte\','
-                 + '       datum: tagePlus(heute,20), erreicht:false }] };'
-                 + '   DB.projekte = [p];'
-                 + '   DB.aufgaben = ['
-                 + '     { id:\'a1\', titel:\'Angebote\', kontext:\'privat\','
-                 + '       projektId:\'p1\', status:\'offen\','
-                 + '       planung: tagePlus(heute,3), art:\'haupt\' },'
-                 + '     { id:\'a3\', titel:\'Vermesser\', kontext:\'privat\','
-                 + '       projektId:\'p1\', status:\'erledigt\','
-                 + '       erledigtAm: tagePlus(heute,-5), art:\'haupt\' } ];'
-                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Bauantrag\','
-                 + '     kontext:\'privat\', projektId:\'p1\','
-                 + '     start: tagePlus(heute,-30), frist:\'\','
-                 + '     schritte:[{ titel:\'F\', fertig:false }] }];'
-                 + '   p.festlegungen.push({ id:\'f2\', stichwort:\'Torbreite\','
-                 + '     inhalt:\'3,50 m\', seit: heute });'
-                 + '   seiteFuer = \'p1\'; seiteArt = \'projekt\'; seiteZu = {};'
-                 + '   seiteArten = null; seiteVergangenAuf = false;'
-                 + '   var l = seiteListe(p, true, \'projektId\');'
-                 + '   var r = { gesamt: l.length,'
-                 + '             arten: l.map(function(x){ return x.art; }).join(\',\'),'
-                 + '             erledigtZahl: l.filter(function(x){'
-                 + '               return x.fertig; }).length,'
-                 + '             offenTrotzVergangen: l.some(function(x){'
-                 + '               return x.art === \'Ablauf\' && !x.fertig; }) };'
-                 + '   DB.aufgaben.push({ id:\'a9\', titel:\'Getragen\','
-                 + '     kontext:\'privat\', projektId:\'p1\', status:\'offen\','
-                 + '     planung:\'backlog\', art:\'haupt\' });'
-                 + '   DB.durchlaeufe[0].schritte[0].aufgabeId = \'a9\';'
-                 + '   var l2 = seiteListe(p, true, \'projektId\');'
-                 + '   var ab = l2.filter(function(x){ return x.art === \'Ablauf\'; })[0];'
-                 + '   r.schritteAmAblauf = ab.schritte.length;'
-                 + '   r.getrageneNichtDaneben = !l2.some(function(x){'
-                 + '     return x.titel === \'Getragen\' && x.art === \'Aufgabe\'; });'
-                 + '   seiteHaken(\'abHaken:d1\');'
-                 + '   var l3 = seiteListe(p, true, \'projektId\');'
-                 + '   var ab3 = l3.filter(function(x){ return x.art === \'Ablauf\'; })[0];'
-                 + '   r.ablaufDurchgefuehrt = ab3.fertig;'
-                 + '   r.schritteBleibenOffen = DB.durchlaeufe[0].schritte.some('
-                 + '     function(s){ return !schrittFertig(s); });'
-                 + '   seiteArten = { Meilenstein: true };'
-                 + '   r.nurMeilensteine = l.filter(function(x){'
-                 + '     return seiteArtAn(x.art); }).length;'
-                 + '   seiteArten = { Meilenstein: true, Aufgabe: true };'
-                 + '   r.zweiArten = l.filter(function(x){'
-                 + '     return seiteArtAn(x.art); }).length;'
-                 + '   seiteArten = null;'
-                 + '   r.keinePille = l.filter(function(x){'
-                 + '     return seiteArtAn(x.art); }).length;'
-                 + '   logNeu(\'Fundament gegossen\');'
-                 + '   r.logEintrag = logEintraege(p)[0].text;'
-                 + '   r.logTag = (logEintraege(p)[0].tag === heute);'
-                 + '   seiteFeld(\'name\', \'Garage neu\');'
-                 + '   r.nameGeaendert = p.name;'
-                 + '   festlegungSetzen(\'f2\', \'inhalt\', \'4,00 m\');'
-                 + '   r.festGeaendert = festlegungen(p)[0].inhalt;'
-                 + '   seiteFuer = \'\'; seiteArt = \'\'; seiteZu = {}; DB = alt;'
                  + '   return r;'
                  + ' } };'
                  + 'globalThis.__klammerApi = {'
@@ -1400,32 +1172,6 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   return { angelegt:angelegt, titel:neu.titel, planung:neu.planung,'
                  + '            verknuepft:verkn, ohneTitel:ohneTitel };'
                  + ' } };'
-                 + 'globalThis.__projektApi = {'
-                 + ' pruefeProjekt: function(){'
-                 + '   var alt = DB; DB = leereDatenbank();'
-                 + '   DB.projekte = [{ id:\'p1\', name:\'Garage\', kontext:\'privat\','
-                 + '     status:\'laufend\', zielzustaende:[], anlagen:[],'
-                 + '     meilensteine:[{ titel:\'Fundament\', datum:\'2026-05-04\','
-                 + '                     erreicht:false }] }];'
-                 + '   vhDetail = \'p1\'; vhDetailArt = \'projekt\';'
-                 + '   vhMsAlsAufgabe(0);'
-                 + '   var eins = aufgabenZuProjekt(\'p1\');'
-                 + '   DB.aufgaben.push({ id:\'x9\', titel:\'Extra\', kontext:\'privat\','
-                 + '     projektId:\'p1\', status:\'offen\', planung:\'backlog\' });'
-                 + '   var zwei = aufgabenZuProjekt(\'p1\').length;'
-                 + '   vhAufgabeLoesen(\'x9\');'
-                 + '   var nachLoesen = aufgabenZuProjekt(\'p1\').length;'
-                 + '   var bleibt = !!aufgabeFinden(\'x9\');'
-                 + '   vhAufgabeZuordnen(\'x9\');'
-                 + '   var nachZu = aufgabenZuProjekt(\'p1\').length;'
-                 + '   vhDetail = \'\'; vhDetailArt = \'\'; DB = alt;'
-                 + '   return { ausMeilenstein: eins.length,'
-                 + '            titelUebernommen: eins[0].titel,'
-                 + '            fristUebernommen: eins[0].frist,'
-                 + '            kontextUebernommen: eins[0].kontext,'
-                 + '            nachAnlegen: zwei, nachLoesen: nachLoesen,'
-                 + '            bleibtErhalten: bleibt, nachZuordnen: nachZu };'
-                 + ' } };'
                  + 'globalThis.__vorbeiApi = {'
                  + ' pruefeVorbei: function(){'
                  + '   var heute = isoDatum();'
@@ -1567,35 +1313,6 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '            spaeterAmZielTag:amZielTag, inDerListe:liste,'
                  + '            ruhtBisWert:bis, morgenWert:morgen,'
                  + '            folge:folge, erwarteteFolge:[morgen, woche, \'\'] };'
-                 + ' } };'
-                 + 'globalThis.__msApi = {'
-                 + ' pruefeMs: function(){'
-                 + '   var alt = DB; DB = leereDatenbank();'
-                 + '   DB.projekte = [{ id:\'p1\', name:\'P\', kontext:\'privat\','
-                 + '     status:\'laufend\', zielzustaende:[], anlagen:[], meilensteine:['
-                 + '       { titel:\'A\', datum:\'2026-01-10\', erreicht:false },'
-                 + '       { titel:\'B\', datum:\'\', erreicht:false },'
-                 + '       { titel:\'C\', datum:\'2026-02-20\', erreicht:false } ] }];'
-                 + '   vhDetail = \'p1\'; vhDetailArt = \'projekt\';'
-                 + '   vhMsHoch(1);'
-                 + '   var nachHoch = DB.projekte[0].meilensteine[0].titel;'
-                 + '   vhMsHoch(0);'
-                 + '   var erstes = DB.projekte[0].meilensteine[0].titel;'
-                 + '   vhMsOrdnen();'
-                 + '   var reihe = DB.projekte[0].meilensteine.map(function(x){ return x.titel; }).join(\',\');'
-                 + '   var letztes = DB.projekte[0].meilensteine[2].titel;'
-                 + '   var db2 = leereDatenbank();'
-                 + '   db2.projekte = [{ id:\'p2\', meilensteine:['
-                 + '     { titel:\'Fertig\', datum:\'7.3.2026\' },'
-                 + '     { titel:\'Abnahme\', datum:\'kurz vor Ostern\' } ] }];'
-                 + '   bestandStempeln(db2);'
-                 + '   var deutsch = db2.projekte[0].meilensteine[0].datum;'
-                 + '   var gerettet = db2.projekte[0].meilensteine[1].titel;'
-                 + '   var gerettetDatum = db2.projekte[0].meilensteine[1].datum;'
-                 + '   vhDetail = \'\'; vhDetailArt = \'\'; DB = alt;'
-                 + '   return { nachHoch:nachHoch, erstesBleibt:erstes, geordnet:reihe,'
-                 + '            ohneDatumHinten:letztes, deutsch:deutsch,'
-                 + '            gerettet:gerettet, gerettetDatum:gerettetDatum };'
                  + ' } };'
                  + 'globalThis.__abApi = {'
                  + ' pruefeAblauf: function(){'
@@ -3489,10 +3206,8 @@ console.log('\n37. Wochensicht als Spalten');
   const wliste = hauptSkript().match(/function wochenAufgaben\([\s\S]*?\n\}/);
   pruefe(wliste && /a\.art === 'klein'/.test(wliste[0]),
          'Kleinigkeiten stehen nicht in der Wochenliste');
-  pruefe(woche && (woche[0].match(/terminPasst\(|passtZumKalender\(/g) || []).length >= 2,
+  pruefe(woche && (woche[0].match(/passtZumKalenderT?\(/g) || []).length >= 2,
          'der Filter greift auf Termine und Ganztägiges');
-  pruefe(new RegExp('function\\s+terminPasst\\s*\\(').test(hauptSkript()),
-         'Kontext- und Projektfilter wirken zusammen');
   pruefe(wliste && /passtZumKalender\(a\.kontext\)/.test(wliste[0]),
          'und auf die Wochenliste');
 
@@ -3520,8 +3235,8 @@ console.log('\n37. Wochensicht als Spalten');
          'der Terminblock hat eine feste Mindesthöhe, damit die zweite Zeile fluchtet');
 
   const monat = skript.match(/function monatHtml\([\s\S]*?\n\}/);
-  pruefe(monat && /terminPasst\(/.test(monat[0]),
-         'Kontext- und Projektfilter greifen auch im Monat');
+  pruefe(monat && /passtZumKalenderT\(/.test(monat[0]),
+         'der Kontextfilter greift auch im Monat');
 
   if (api && api.passtZumKalender) {
     api.setKalFilter('beruflich');
@@ -3846,16 +3561,6 @@ console.log('\n42. Kontext der Jahrestermine');
   const jahr = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
   pruefe(jahr && /jtPasst\(e\)/.test(jahr[0]),
          'auch die Summen folgen beiden Filtern');
-  const jp = hauptSkript().match(/function jtPasst\([\s\S]*?\n\}/);
-  pruefe(jp && /kalProjektFilter/.test(jp[0]),
-         'ein gewähltes Projekt wirkt auch auf Jahrestermine');
-  pruefe(jp && /!e\.ausKalender/.test(jp[0]),
-         'ein eigener Jahrestermin gehört keinem Projekt und tritt dann zurück');
-  const jz = hauptSkript().match(/function kalZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(jz && (jz[0].match(/kalProjektFilterHtml\(\)/g) || []).length >= 2,
-         'Monat und Jahr zeigen die Filterleiste');
-  pruefe(new RegExp('function\\s+projektFilterHinweis\\s*\\(').test(hauptSkript()),
-         'ein gesetzter Filter wird benannt');
 
   const blatt = skript.match(/function jtTagHtml\([\s\S]*?\n\}\n/);
   pruefe(blatt && /jtKontextSetzen\(/.test(blatt[0]),
@@ -3909,11 +3614,8 @@ console.log('\n43. Vorhaben');
 
   const noetig = ['vhZeichnen', 'setVhFilter', 'vhKarteUm', 'zielKarteHtml',
                   'projektKarteHtml', 'vorhabenNeu', 'vorhabenAnlegen',
-                  'vhDetailOeffnen', 'vhDetailHtml', 'vhNameSetzen', 'vhKontextSetzen',
-                  'vhFeldSetzen', 'vhZustandSetzen', 'vhHistorieUm', 'vhErreichtUm',
-                  'vhMsNeu', 'vhMsUm', 'vhMsTitel', 'vhMsDatum', 'vhMsWeg',
-                  'vhAnlageSpeichern', 'vhAnlageWeg', 'vhEinzahlerWahl',
-                  'vhEinzahlerDazu', 'vhEinzahlerWeg', 'vhAbschliessen', 'vhLoeschen',
+                  'vhDetailOeffnen', 'vhDetailHtml', 'vhNameSetzen',
+                  'vhFeldSetzen', 'vhZustandSetzen', 'vhHistorieUm', 'vhLoeschen',
                   'zustandDieseWoche', 'zustandSetzen', 'zustandText',
                   'fruehereZustaende', 'wochenSchluessel', 'naechsterMeilenstein',
                   'aufgabenZuProjekt', 'einzahlerAufgaben'];
@@ -4041,82 +3743,6 @@ console.log('\n44. Abläufe und Wochenrückblick');
            'Rückgängig holt zurück und räumt den Vermerk weg');
     pruefe(e.vorlagenNachSichern === 1,
            'aus einem einmaligen Durchlauf lässt sich eine Vorlage sichern');
-  }
-}
-
-/* ============================================================
-   45. Meilensteine: Datum, Reihenfolge, Ordnen
-   Grund: Das Datum war ein freies Textfeld, die Reihenfolge liess
-   sich nicht aendern. Ein Datumsfeld wuerde einen alten Freitext
-   stillschweigend verwerfen — das darf nicht geschehen.
-   ============================================================ */
-console.log('\n45. Meilensteine');
-{
-  const skript = hauptSkript();
-  const m = globalThis.__msApi;
-
-  ['vhMsHoch', 'vhMsOrdnen'].forEach(function (f) {
-    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
-           'Funktion ' + f + ' ist definiert');
-  });
-
-  const detail = skript.match(/function vhDetailHtml\([\s\S]*?\n\}\n/);
-  pruefe(detail && /type="date"[\s\S]{0,40}esc\(ms\[m\]\.datum/.test(detail[0]),
-         'das Meilensteindatum ist ein echtes Datumsfeld');
-  pruefe(detail && !/placeholder="wann"/.test(detail[0]),
-         'das alte Freitextfeld ist verschwunden');
-  pruefe(detail && /onchange="vhMsDatum/.test(detail[0]),
-         'es meldet erst beim Verlassen, nicht bei jedem Zeichen');
-  pruefe(detail && /vhMsHoch\(/.test(detail[0]), 'jeder Meilenstein lässt sich hochschieben');
-  pruefe(detail && /Nach Datum ordnen/.test(detail[0]),
-         'ordnen geschieht auf Knopfdruck');
-  pruefe(detail && /ms\.length > 1/.test(detail[0]),
-         'bei nur einem Meilenstein bleibt der Knopf weg');
-
-  /* Nicht von selbst sortieren */
-  const setzen = skript.match(/function vhMsDatum\([\s\S]*?\n\}/);
-  pruefe(setzen && !/sort\(/.test(setzen[0]),
-         'ein eingetragenes Datum sortiert die Liste nicht von selbst um');
-
-  const ordnen = skript.match(/function vhMsOrdnen\([\s\S]*?\n\}/);
-  pruefe(ordnen && /ohne\.push/.test(ordnen[0]),
-         'Meilensteine ohne Datum behalten ihre Stelle am Ende');
-
-  /* Altbestand */
-  const stempeln = skript.match(/function bestandStempeln\([\s\S]*?\n\}\n/);
-  pruefe(stempeln && /mss\[mi\]\.datum = d\[3\]/.test(stempeln[0]),
-         'ein Datum in deutscher Schreibweise wird umgerechnet');
-  pruefe(stempeln && /titel = \(mss\[mi\]\.titel \|\| ''\) \+ ' \('/.test(stempeln[0]),
-         'ein unlesbarer Wert wird in den Titel gerettet statt verworfen');
-
-  /* Seit v0.50.0 ist die Karte ein Verweis, keine dritte Ansicht: Der
-     Stand der Meilensteine steht auf der Seite, die ein Klick öffnet. */
-  const karte = skript.match(/function projektKarteHtml\([\s\S]*?\n\}\n/);
-  pruefe(karte && /seiteOeffnen\(/.test(karte[0]),
-         'ein Klick auf die Karte öffnet die Projektseite');
-  pruefe(karte && !/vkKarteUm|vhKarteUm/.test(karte[0]),
-         'die Karte klappt nicht mehr auf');
-  pruefe(karte && !/vhDetailOeffnen/.test(karte[0]),
-         'und hat keinen eigenen Bearbeiten-Knopf mehr');
-  const zkarte = skript.match(/function zielKarteHtml\([\s\S]*?\n\}\n/);
-  pruefe(zkarte && /seiteOeffnen\(/.test(zkarte[0]),
-         'bei einem Ziel ebenso');
-  const liste2 = hauptSkript().match(/function seiteListe\([\s\S]*?\n\}\n/);
-  pruefe(liste2 && /erreicht/.test(liste2[0]),
-         'die Meilensteine stehen mit ihrem Stand in der Liste der Seite');
-
-  if (!m) {
-    warn('Meilensteinfunktionen nicht auswertbar');
-  } else {
-    const e = m.pruefeMs();
-    pruefe(e.nachHoch === 'B', 'hochschieben vertauscht mit dem Vorgänger');
-    pruefe(e.erstesBleibt === 'B', 'das oberste lässt sich nicht weiter hochschieben');
-    pruefe(e.geordnet === 'A,C,B', 'nach Datum geordnet stehen sie in Datumsfolge');
-    pruefe(e.ohneDatumHinten === 'B', 'das ohne Datum steht am Ende');
-    pruefe(e.deutsch === '2026-03-07', 'ein Datum wie 7.3.2026 wird umgerechnet');
-    pruefe(e.gerettet === 'Abnahme (kurz vor Ostern)',
-           'ein Freitext landet im Titel');
-    pruefe(e.gerettetDatum === '', 'und das Feld bleibt leer');
   }
 }
 
@@ -4532,73 +4158,6 @@ console.log('\n52. Erneuerung mit Nachsetzen');
 }
 
 /* ============================================================
-   53. Aufgaben am Projekt, lesbare Meilensteine
-   Grund: Ein Projekt konnte Aufgaben haben, aber aus seinem Dialog
-   fuehrte kein Weg dorthin. Und die Meilensteinzeile war ein
-   einzeiliges Feld mit Knoepfen, die nur aus Zeichen bestanden.
-   ============================================================ */
-console.log('\n53. Aufgaben am Projekt');
-{
-  const skript = hauptSkript();
-  const p = globalThis.__projektApi;
-
-  ['vhMsAlsAufgabe', 'vhAufgabeAnlegen', 'vhAufgabeTaste', 'vhAufgabeErledigen',
-   'vhAufgabeLoesen', 'vhAufgabeWahl', 'vhAufgabeZuordnen'].forEach(function (f) {
-    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
-           'Funktion ' + f + ' ist definiert');
-  });
-
-  const detail = skript.match(/function vhDetailHtml\([\s\S]*?\n\}\n/);
-  pruefe(detail && /s-abschnitt">Aufgaben/.test(detail[0]),
-         'das Projektdetail hat einen Aufgabenabschnitt');
-  pruefe(detail && /vhAufgabeWahl\(\)/.test(detail[0]),
-         'eine vorhandene Aufgabe lässt sich zuordnen');
-  pruefe(detail && /id="vhAufgabeNeu"/.test(detail[0]),
-         'eine neue lässt sich direkt anlegen');
-  pruefe(detail && /vhMsAlsAufgabe\(/.test(detail[0]),
-         'aus einem Meilenstein lässt sich eine Aufgabe machen');
-
-  /* Knöpfe mit Wörtern statt Zeichen */
-  pruefe(detail && /Nach oben<\/button>/.test(detail[0]),
-         'der Hochschiebeknopf trägt ein Wort statt eines Pfeils');
-  pruefe(detail && /Entfernen<\/button>/.test(detail[0]),
-         'der Entfernenknopf ebenfalls');
-  pruefe(detail && /title="Diesen Meilenstein nach oben schieben"/.test(detail[0]),
-         'zusätzlich erklärt ein Hinweis, was er tut');
-  pruefe(detail && /class="ms-titel" rows="2"/.test(detail[0]),
-         'der Meilensteintitel ist ein mehrzeiliges Feld');
-  pruefe(/\.ms-titel\{[^}]*resize:vertical/.test(QUELLE),
-         'es lässt sich aufziehen');
-
-  /* Lösen heißt nicht löschen */
-  const loesen = skript.match(/function vhAufgabeLoesen\([\s\S]*?\n\}/);
-  pruefe(loesen && /projektId = null/.test(loesen[0]),
-         'Lösen entfernt nur die Zuordnung');
-  pruefe(loesen && !/splice/.test(loesen[0]), 'die Aufgabe selbst bleibt');
-
-  /* Die Auswahl zeigt nur freie Aufgaben desselben Kontexts */
-  const wahl = skript.match(/function vhAufgabeWahl\([\s\S]*?\n\}\n/);
-  pruefe(wahl && /l\[i\]\.projektId\) \{ continue/.test(wahl[0]),
-         'schon zugeordnete Aufgaben stehen nicht zur Wahl');
-  pruefe(wahl && /kontext !== v\.kontext/.test(wahl[0]),
-         'nur Aufgaben desselben Kontexts');
-
-  if (!p) {
-    warn('Projektfunktionen nicht auswertbar');
-  } else {
-    const e = p.pruefeProjekt();
-    pruefe(e.ausMeilenstein === 1, 'aus einem Meilenstein entsteht eine Aufgabe');
-    pruefe(e.titelUebernommen === 'Fundament', 'sie trägt seinen Titel');
-    pruefe(e.fristUebernommen === '2026-05-04', 'und sein Datum als Frist');
-    pruefe(e.kontextUebernommen === 'privat', 'und den Kontext des Projekts');
-    pruefe(e.nachAnlegen === 2, 'eine neue Aufgabe lässt sich anlegen');
-    pruefe(e.nachLoesen === 1, 'Lösen nimmt sie aus dem Projekt');
-    pruefe(e.bleibtErhalten === true, 'sie bleibt im Bestand');
-    pruefe(e.nachZuordnen === 2, 'und lässt sich wieder zuordnen');
-  }
-}
-
-/* ============================================================
    54. Ablaufdialog: lesbare Schritte, echte Aufgaben
    Grund: Dieselben Maengel wie beim Projektdialog — einzeilige
    Felder, Knoepfe aus Zeichen, kein Weg zu einer echten Aufgabe.
@@ -4835,7 +4394,7 @@ console.log('\n58. Wiederkehrende Abläufe');
   ['offenerDurchlaufVon', 'vorlagenFaellig', 'faelligeStarten',
    'durchlaufAusAufgabe', 'abWdh', 'abWdhTag', 'abWdhMonatstag',
    'abAnlassWahl', 'abAnlassSetzen', 'abAnlassWeg',
-   'vhAblaeufeHtml', 'vhAblaufStarten'].forEach(function (f) {
+].forEach(function (f) {
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
   });
@@ -4874,10 +4433,7 @@ console.log('\n58. Wiederkehrende Abläufe');
   pruefe(detail && /abFeldSetzen\(\\'projektId\\'/.test(detail[0]),
          'ein Ablauf lässt sich einem Projekt zuordnen');
   pruefe(detail && /abFeldSetzen\(\\'zielId\\'/.test(detail[0]), 'und einem Ziel');
-  const vh = skript.match(/function vhDetailHtml\([\s\S]*?\n\}\n/);
-  pruefe(vh && /vhAblaeufeHtml\(v\.id, 'projekt'\)/.test(vh[0]),
-         'das Projekt zeigt seine Abläufe');
-  pruefe(vh && /vhAblaeufeHtml\(v\.id, 'ziel'\)/.test(vh[0]), 'das Ziel ebenfalls');
+
 
   const startenAusVorlage = skript.match(/function durchlaufStarten\([\s\S]*?\n\}/);
   pruefe(startenAusVorlage && /projektId: v\.projektId/.test(startenAusVorlage[0]),
@@ -5438,7 +4994,6 @@ console.log('\n66. Arten aus dem Kalender');
     const e = a.pruefeArten();
     pruefe(e.ausTitel === 'urlaub', 'das Kürzel im Titel wird gelesen');
     pruefe(e.ausBeschreibung === 'dienstreise', 'auch das in der Beschreibung');
-    pruefe(e.titelSauber === 'Kreta', 'der Titel erscheint ohne das Kürzel');
     pruefe(e.neueArt === 'kur', 'eine unbekannte Art wird übernommen');
     pruefe(e.neueArtName === 'Kur', 'sie bekommt einen lesbaren Namen');
     pruefe(e.neueArtFarbe.indexOf('hsl(') === 0,
@@ -5921,184 +5476,6 @@ console.log('\n73. Ablauf als Klammer');
 }
 
 /* ============================================================
-   74. Die Vorhabenseite nach dem Entwurf
-   Grund: Links eine einzige Liste ueber alles Datierte, mit
-   Filterpillen je Art — nicht getrennte Abschnitte nach Datentyp.
-   Rechts die Informationen. Gepflegt wird auf der Seite selbst.
-   ============================================================ */
-console.log('\n74. Vorhabenseite');
-{
-  const skript = hauptSkript();
-  const s = globalThis.__seiteApi;
-
-  ['seiteOeffnen', 'seiteZeichnen', 'seiteAbschnitt', 'seiteAbschnittUm',
-   'festlegungen', 'festlegungNeu', 'festlegungSetzen', 'festlegungWeg',
-   'seiteAufgabeHaken', 'schluesselKopieren', 'alleAufgabenZuProjekt',
-   'seiteListe', 'seiteListeHtml', 'seiteZeileHtml', 'seiteArtUm', 'seiteArtAn',
-   'seiteVergangenUm', 'seiteFeld', 'seiteLoeschen', 'logEintraege', 'logNeu',
-   'logWeg', 'logHtml', 'monatName'].forEach(function (f) {
-    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
-           'Funktion ' + f + ' ist definiert');
-  });
-
-  pruefe(/id="schirmSeite"/.test(QUELLE), 'es gibt einen eigenen Bildschirm');
-  pruefe(!/id="navSeite"/.test(QUELLE),
-         'aber keinen Knopf in der Leiste — die Seite gehört zu Vorhaben');
-
-  /* Eine Liste statt getrennter Abschnitte */
-  const liste = skript.match(/function seiteListe\([\s\S]*?\n\}\n/);
-  pruefe(liste && /'Meilenstein'/.test(liste[0]), 'Meilensteine stehen in der Liste');
-  pruefe(liste && /'Termin'/.test(liste[0]), 'Termine ebenso');
-  pruefe(liste && /'Aufgabe'/.test(liste[0]), 'Aufgaben ebenso');
-  pruefe(liste && /'Ablauf'/.test(liste[0]), 'Abläufe ebenso');
-  pruefe(liste && /dx < dy/.test(liste[0]), 'sortiert nach Datum');
-  pruefe(liste && /'9999-99-99'/.test(liste[0]), 'Undatiertes steht am Ende');
-
-  const lhtml = skript.match(/function seiteListeHtml\([\s\S]*?\n\}\n/);
-  pruefe(lhtml && /sl-pille/.test(lhtml[0]), 'darüber die Filterpillen');
-  pruefe(lhtml && /seiteArtAn\(/.test(lhtml[0]), 'die Pillen filtern die Liste');
-  pruefe(lhtml && /Erledigt · /.test(lhtml[0]),
-         'Erledigtes ist eingeklappt, nicht weg');
-  pruefe(lhtml && /if \(alle\[i\]\.fertig\)/.test(lhtml[0]),
-         'getrennt wird nach erledigt, nicht nach Datum — sonst verschwände '
-         + 'Überfälliges');
-  const zeile2 = hauptSkript().match(/function seiteZeileHtml\([\s\S]*?\n\}/);
-  pruefe(zeile2 && /faellig/.test(zeile2[0]),
-         'Überfälliges wird hervorgehoben');
-  pruefe(zeile2 && /seiteHaken\(/.test(zeile2[0]),
-         'Aufgaben und Meilensteine lassen sich in der Liste abhaken');
-  /* Die Art steckt im Zeichen, nicht in einem Etikett. */
-  pruefe(zeile2 && !/sl-art/.test(zeile2[0]),
-         'die Zeile trägt kein Etikett für die Art mehr');
-  pruefe(zeile2 && /sl-kreis/.test(zeile2[0]),
-         'ein Meilenstein steht als Kreis da');
-  pruefe(zeile2 && /sl-zeit/.test(zeile2[0]),
-         'ein Termin durch seine Uhrzeit');
-  pruefe(zeile2 && /sl-stand/.test(zeile2[0]),
-         'ein Ablauf durch seinen Stand');
-  pruefe(zeile2 && /tkasten/.test(zeile2[0]),
-         'eine Aufgabe durch ihr Kästchen');
-  pruefe(/\.sl-kreis\{[^}]*border-radius:50%/.test(QUELLE),
-         'der Kreis ist rund, das Kästchen eckig — daran unterscheidet man sie');
-  pruefe(lhtml && !/sl-monat/.test(lhtml[0]),
-         'keine Monatstrenner — das Datum steht in jeder Zeile');
-  const lst2 = hauptSkript().match(/function seiteListe\([\s\S]*?\n\}\n/);
-  pruefe(lst2 && /imAblauf\[a\.id\]\) \{ continue/.test(lst2[0]),
-         'eine Aufgabe, die einen Ablaufschritt trägt, steht nicht daneben');
-  pruefe(lst2 && /schritteAlsZeilen\(laeufe\[li\]\)/.test(lst2[0]),
-         'der Ablauf trägt seine Schritte');
-  pruefe(zeile2 && /sl-schritt/.test(zeile2[0]),
-         'die Schritte stehen eingerückt darunter');
-  pruefe(/\.sl-schritt\{padding-left/.test(QUELLE),
-         'die Einrückung macht die Hierarchie sichtbar');
-  pruefe(new RegExp('function\\s+seiteSchrittHaken\\s*\\(').test(hauptSkript()),
-         'ein Schritt lässt sich von hier abhaken');
-  pruefe(/\.sl \.tkasten\{[^}]*align-self:center/.test(QUELLE)
-         && !/\.sl \.tkasten\{[^}]*flex:0 0 auto/.test(QUELLE),
-         'das Kästchen behält seine Breite — sonst fällt es zu einem Strich '
-         + 'zusammen');
-  const lst3 = hauptSkript().match(/function seiteListe\([\s\S]*?\n\}\n/);
-  pruefe(lst3 && /abHaken/.test(lst3[0]),
-         'auch ein Ablauf lässt sich als durchgeführt kennzeichnen');
-  pruefe(zeile2 && /durchgeführt kennzeichnen/.test(zeile2[0]),
-         'er bekommt dafür ein Kästchen');
-  const hak = hauptSkript().match(/function seiteHaken\([\s\S]*?\n\}\n/);
-  pruefe(hak && /d\.erledigt = !d\.erledigt/.test(hak[0]),
-         'das setzt ein eigenes Merkmal am Durchlauf');
-  pruefe(hak && !/s\.fertig = true/.test(hak[0]),
-         'offene Schritte werden dabei nicht stillschweigend mit abgehakt');
-  const imTag = hauptSkript().match(/function durchlaufImTag\([\s\S]*?\n\}/);
-  pruefe(imTag && /d\.erledigt/.test(imTag[0]),
-         'ein durchgeführter Ablauf steht nicht mehr im Tagesplan');
-  pruefe(lhtml && /sl-ende/.test(lhtml[0]),
-         'das Projektende schließt die Liste ab');
-  pruefe(lhtml && /noch ' \+ tage/.test(lhtml[0]),
-         'mit der Zahl der verbleibenden Tage');
-  const haken = hauptSkript().match(/function seiteHaken\([\s\S]*?\n\}\n/);
-  pruefe(haken && /erreicht = !/.test(haken[0]),
-         'ein Meilenstein lässt sich als erreicht kennzeichnen');
-  pruefe(haken && /seiteAufgabeHaken/.test(haken[0]),
-         'eine Aufgabe lässt sich erledigen');
-  const neuH = hauptSkript().match(/function seiteNeuHtml\([\s\S]*?\n\}/);
-  pruefe(neuH && /seiteNeu\(\\'meilenstein\\'\)/.test(neuH[0]),
-         'ein Meilenstein lässt sich anlegen');
-  pruefe(neuH && /seiteNeu\(\\'aufgabe\\'\)/.test(neuH[0]), 'eine Aufgabe ebenso');
-  pruefe(neuH && /seiteNeu\(\\'klein\\'\)/.test(neuH[0]), 'eine Kleinigkeit ebenso');
-  pruefe(neuH && /seiteAblaufWahl\(\)/.test(neuH[0]), 'ein Ablauf ebenso');
-  pruefe(neuH && /zuordnenOeffnen\(\)/.test(neuH[0]), 'und ein Termin zugeordnet');
-  const lst = hauptSkript().match(/function seiteListe\([\s\S]*?\n\}\n/);
-  pruefe(lst && !/laeufe\[li\]\.start/.test(lst[0]),
-         'ein Ablauf datiert auf Frist oder Termin, nicht auf seinen Start');
-
-  const artUm = skript.match(/function seiteArtUm\([\s\S]*?\n\}/);
-  pruefe(artUm && /seiteArten = null/.test(artUm[0]),
-         'ohne gewählte Art gelten wieder alle');
-
-  /* Gepflegt wird auf der Seite */
-  const z = skript.match(/function seiteZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(z && /seiteFeld\(\\'name\\'/.test(z[0]),
-         'der Name lässt sich hier ändern');
-  pruefe(z && /seiteZustandSetzen/.test(z[0]), 'das Ziel ebenso');
-  pruefe(z && /seiteLoeschen/.test(z[0]), 'und löschen geht von hier');
-  pruefe(z && /s-links/.test(z[0]) && /s-rechts/.test(z[0]),
-         'links die Liste, rechts die Informationen');
-
-  /* Das Log */
-  const log = skript.match(/function logNeu\([\s\S]*?\n\}/);
-  pruefe(log && /tag: isoDatum\(\)/.test(log[0]),
-         'ein Logeintrag trägt den Tag, an dem er geschrieben wurde');
-  const lh = skript.match(/function logHtml\([\s\S]*?\n\}\n/);
-  pruefe(lh && /a\.tag > b\.tag/.test(lh[0]), 'das Jüngste steht oben');
-
-  /* Festlegungen werden geändert, nicht ergänzt */
-  const setzen = skript.match(/function festlegungSetzen\([\s\S]*?\n\}/);
-  pruefe(setzen && /l\[i\]\[feld\] = wert/.test(setzen[0]),
-         'eine Festlegung wird überschrieben');
-  pruefe(setzen && /l\[i\]\.seit = isoDatum\(\)/.test(setzen[0]),
-         'jede Änderung setzt das Datum neu');
-  const fh = hauptSkript().match(/function festlegungenHtml\([\s\S]*?\n\}\n/);
-  pruefe(fh && /<textarea class="fest-wert"/.test(fh[0]),
-         'der Inhalt steht in einem wachsenden Feld, nicht in einer Zeile');
-  pruefe(fh && /festHoehe\(this\)/.test(fh[0]),
-         'es wächst beim Tippen mit');
-  pruefe(new RegExp('function\\s+festHoehenSetzen\\s*\\(').test(hauptSkript()),
-         'und hat beim Zeichnen schon die richtige Höhe');
-  pruefe(/\.fest\{[^}]*flex-wrap:wrap/.test(QUELLE),
-         'bei wenig Breite bricht die Zeile um');
-  pruefe(/\.fest-wert\{[^}]*overflow:hidden/.test(QUELLE),
-         'kein Rollbalken im Feld — es wächst ja');
-
-  if (!s) {
-    warn('Funktionen nicht auswertbar');
-  } else {
-    const e = s.pruefeSeite();
-    pruefe(e.gesamt === 5,
-           'alle fünf datierten Dinge stehen in einer Liste (ist: ' + e.gesamt + ')');
-    pruefe(e.schritteAmAblauf === 1,
-           'der Ablauf trägt seinen Schritt');
-    pruefe(e.ablaufDurchgefuehrt === true,
-           'ein Ablauf lässt sich als durchgeführt kennzeichnen');
-    pruefe(e.schritteBleibenOffen === true,
-           'seine offenen Schritte bleiben dabei offen');
-    pruefe(e.getrageneNichtDaneben === true,
-           'die getragene Aufgabe steht nicht zusätzlich in der Liste');
-    pruefe(e.arten === 'Meilenstein,Aufgabe,Aufgabe,Meilenstein,Ablauf',
-           'gemischt nach Datum, nicht nach Art (ist: ' + e.arten + ')');
-    pruefe(e.nurMeilensteine === 2, 'die Pille filtert auf zwei Meilensteine');
-    pruefe(e.zweiArten === 4, 'zwei Pillen zusammen zeigen vier');
-    pruefe(e.keinePille === 5, 'keine Pille gewählt heißt alle');
-    pruefe(e.erledigtZahl === 2, 'zwei sind erledigt');
-    pruefe(e.offenTrotzVergangen === true,
-           'ein überfälliger Ablauf bleibt sichtbar, statt unter Erledigt zu '
-           + 'verschwinden');
-    pruefe(e.logEintrag === 'Fundament gegossen', 'ein Logeintrag lässt sich schreiben');
-    pruefe(e.logTag === true, 'er trägt das heutige Datum');
-    pruefe(e.nameGeaendert === 'Garage neu', 'der Name lässt sich ändern');
-    pruefe(e.festGeaendert === '4,00 m', 'eine Festlegung überschreibt');
-  }
-}
-
-/* ============================================================
    75. Anlagen am Ablauf
    Grund: Zu einem Ablauf gehoeren Unterlagen — die Checkliste, das
    Protokollmuster, der Verweis ins Laufwerk. Sie lagen bisher nur an
@@ -6154,197 +5531,6 @@ console.log('\n75. Anlagen am Ablauf');
            'eine Änderung am Durchlauf berührt die Vorlage nicht');
     pruefe(e.nachEntfernen === 0, 'entfernen geht');
     pruefe(e.vorlageUnberuehrt === 1, 'die Vorlage behält ihre');
-  }
-}
-
-/* ============================================================
-   76. Projektbezug eines Termins
-   Grund: Ein Kalendertermin gehoerte zu keinem Vorhaben. Damit fehlte
-   auf der Projektseite die halbe Wirklichkeit — und im Kalender ein
-   Weg, nur die Termine eines Projekts zu sehen.
-   ============================================================ */
-console.log('\n76. Termin und Projekt');
-{
-  const skript = hauptSkript();
-  const p = globalThis.__pBezugApi;
-
-  ['projektSchluessel', 'projektZuSchluessel', 'projektAusText',
-   'zuordnungProjekt', 'zuordnungProjektSetzen', 'terminProjekt',
-   'termineZuProjekt', 'projekteMitTerminen', 'kalProjektSetzen',
-   'passtZumProjektFilter', 'kalProjektFilterHtml',
-   'zumKalenderMitProjekt', 'projektWahlOeffnen'].forEach(function (f) {
-    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
-           'Funktion ' + f + ' ist definiert');
-  });
-
-  /* Am Kalender wird nichts geändert */
-  const setzen = skript.match(/function zuordnungProjektSetzen\([\s\S]*?\n\}/);
-  pruefe(setzen && /DB\.kalenderzuordnung/.test(setzen[0]),
-         'die Zuordnung landet in der eigenen Datei');
-  pruefe(setzen && /!e\.art && !e\.projektId/.test(setzen[0]),
-         'ohne Art und ohne Projekt wird der Eintrag wieder entfernt');
-
-  /* Vorrang wie bei den Arten */
-  const tp = skript.match(/function terminProjekt\([\s\S]*?\n\}/);
-  pruefe(tp && tp[0].indexOf('zuordnungProjekt') < tp[0].indexOf('projektAusText'),
-         'die eigene Zuordnung geht vor das Kürzel im Termin');
-
-  /* Filter */
-  const filter = skript.match(/function passtZumProjektFilter\([\s\S]*?\n\}/);
-  pruefe(filter && /!kalProjektFilter\) \{ return true/.test(filter[0]),
-         'ohne gewähltes Projekt bleibt alles sichtbar');
-  const woche2 = skript.match(/function wocheHtml\([\s\S]*?\n\}\n/);
-  pruefe(woche2 && /kalProjektFilterHtml\(\)/.test(woche2[0]),
-         'die Woche zeigt die Filterleiste');
-
-  /* Die Seite */
-  const sl = skript.match(/function seiteListe\([\s\S]*?\n\}\n/);
-  pruefe(sl && /termineZuProjekt\(v\.id\)/.test(sl[0]),
-         'die Projektseite führt ihre Termine in der Liste');
-  pruefe(sl && /terminTitel\(/.test(sl[0]),
-         'ohne das Kürzel im Titel');
-  pruefe(/zuordnenOeffnen\(\)/.test(QUELLE),
-         'von der Seite aus lassen sich Termine zuordnen');
-
-  const absch = skript.match(/function seiteAbschnitt\([\s\S]*?\n\}/);
-  pruefe(absch && /stand === undefined && leer/.test(absch[0]),
-         'ein leerer Abschnitt beginnt eingeklappt');
-  pruefe(absch && /stand === true/.test(absch[0]),
-         'von Hand geschlossen bleibt er zu');
-
-  if (!p) {
-    warn('Funktionen nicht auswertbar');
-  } else {
-    const e = p.pruefeBezug();
-    pruefe(e.schluessel === 'garage-bauen', 'der Schlüssel folgt dem Namen');
-    pruefe(e.langerName === 'solaranlage-und-wärmepumpe',
-           'ein langer Name wird nicht mehr abgeschnitten');
-    pruefe(e.abgekuerzt === 'Solaranlage und Wärmepumpe',
-           'ein abgekürztes Kürzel trifft, solange es eindeutig ist');
-    pruefe(e.mehrdeutig === null,
-           'bei zwei möglichen Treffern gilt keiner');
-    pruefe(e.zuKurz === null, 'unter drei Zeichen wird gar nicht gesucht');
-    pruefe(e.ausKuerzel === 'Garage bauen', 'das Kürzel im Titel findet das Projekt');
-    pruefe(e.ausBeschreibung === 'Garage bauen', 'auch das in der Beschreibung');
-    pruefe(e.ohneKuerzel === null, 'ohne Kürzel gehört ein Termin zu keinem');
-    pruefe(e.eigeneZuordnung === 'Abnehmen', 'die eigene Zuordnung greift');
-    pruefe(e.zuordnungGewinnt === 'Abnehmen',
-           'und schlägt ein anderslautendes Kürzel');
-    pruefe(e.termineZuGarage === 2,
-           'beide Termine mit Kürzel gehören zur Garage — der im Titel '
-           + 'und der in der Beschreibung');
-    pruefe(e.projekteMitTerminen === 2, 'zwei Projekte haben Termine');
-    pruefe(e.filterZeigt === 1, 'der Filter zeigt nur die des gewählten');
-    pruefe(e.ohneFilterAlle === true, 'ohne Filter alle');
-  }
-}
-
-/* ============================================================
-   77. Termine zuordnen — in der Workbench, nicht im Kalender
-   Grund: Beim Eintragen im Kalender denkt niemand in Projektkuerzeln.
-   Die Zuordnung gehoert dorthin, wo man ueber das Projekt nachdenkt.
-   Und eine Serie muss in einem Griff gehen — sonst sind es zwanzig.
-   ============================================================ */
-console.log('\n77. Termine zuordnen');
-{
-  const skript = hauptSkript();
-  const z = globalThis.__zuordnenApi;
-
-  ['zuordnungSchluessel', 'terminProjektAusZuordnung', 'projektHerkunft',
-   'herkunftText', 'freieTermine', 'zuordnenOeffnen', 'zuordnenUm',
-   'zuordnenHtml', 'zuordnenUebernehmen'].forEach(function (f) {
-    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
-           'Funktion ' + f + ' ist definiert');
-  });
-
-  pruefe(/recurringEventId/.test(QUELLE),
-         'die Serienkennung wird von Google mitgeholt');
-  const sch = skript.match(/function zuordnungSchluessel\([\s\S]*?\n\}/);
-  pruefe(sch && /t\.serieId \|\| t\.id/.test(sch[0]),
-         'zugeordnet wird die Serie, wenn es eine gibt');
-  const aus = skript.match(/function terminProjektAusZuordnung\([\s\S]*?\n\}/);
-  pruefe(aus && /zuordnungProjekt\(t\.id\)/.test(aus[0]),
-         'eine ältere Zuordnung am einzelnen Vorkommen gilt weiter');
-
-  const frei = skript.match(/function freieTermine\([\s\S]*?\n\}\n/);
-  pruefe(frei && /terminProjekt\(t\)\) \{ continue/.test(frei[0]),
-         'schon zugeordnete Termine stehen nicht zur Wahl');
-  pruefe(frei && /gesehen\[s\]\.zahl\+\+/.test(frei[0]),
-         'eine Serie erscheint einmal, mit der Zahl ihrer Vorkommen');
-
-  const herk = skript.match(/function projektHerkunft\([\s\S]*?\n\}/);
-  pruefe(herk && /'titel'/.test(herk[0]) && /'beschreibung'/.test(herk[0])
-         && /'eigen'/.test(herk[0]),
-         'die Herkunft der Zuordnung ist ablesbar');
-
-  if (!z) {
-    warn('Funktionen nicht auswertbar');
-  } else {
-    const e = z.pruefeZuordnen();
-    pruefe(e.freieVorher === 2,
-           'zwei Einträge zur Wahl: die Serie einmal, der einzelne Termin');
-    pruefe(e.serieZahl === 5, 'die Serie nennt ihre fünf Vorkommen');
-    pruefe(e.nachZuordnung === 5,
-           'ein Griff ordnet alle fünf Vorkommen der Serie zu');
-    pruefe(e.freieNachher === 1, 'danach bleibt nur der einzelne übrig');
-    pruefe(e.herkunftEigen === 'eigen', 'die eigene Zuordnung ist als solche erkennbar');
-    pruefe(e.herkunftTitel === 'titel', 'ein Kürzel im Titel ebenso');
-    pruefe(e.kuenftigesVorkommen === true,
-           'ein später hinzukommendes Vorkommen derselben Serie gehört dazu');
-  }
-}
-
-/* ============================================================
-   78. Die Notiz wird zu Festlegungen
-   Grund: Die Notiz am Vorhaben war eine Aufzaehlung festgelegter
-   Eigenschaften — also Festlegungen in einem Feld. Seit die Karte
-   direkt auf die Seite fuehrt, war das alte Blatt unerreichbar und
-   die Notiz damit unsichtbar.
-   ============================================================ */
-console.log('\n78. Notiz zu Festlegungen');
-{
-  const skript = hauptSkript();
-  const n = globalThis.__notizApi;
-
-  ['notizZerlegen', 'notizUebernehmen'].forEach(function (f) {
-    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
-           'Funktion ' + f + ' ist definiert');
-  });
-
-  const ueb = skript.match(/function notizUebernehmen\([\s\S]*?\n\}\n/);
-  pruefe(ueb && /v\.log\.push/.test(ueb[0]),
-         'der volle Wortlaut wird vorher im Log gesichert');
-  pruefe(ueb && /v\.notiz = ''/.test(ueb[0]),
-         'danach wird das Feld geleert — sonst stünde alles doppelt da');
-  pruefe(ueb && /text\.length === 0\) \{ return 0/.test(ueb[0]),
-         'ohne Notiz geschieht nichts');
-
-  const zeichnen = skript.match(/function seiteZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(zeichnen && /notizUebernehmen\(v\)/.test(zeichnen[0]),
-         'übernommen wird beim Öffnen der Seite');
-
-  const zer = skript.match(/function notizZerlegen\([\s\S]*?\n\}/);
-  pruefe(zer && /\[-–—•\*·\]/.test(zer[0]),
-         'Aufzählungszeichen am Zeilenanfang fallen weg');
-  pruefe(zer && /doppel <= 40/.test(zer[0]),
-         'ein Doppelpunkt weit hinten ist Satzzeichen, kein Stichwort');
-
-  if (!n) {
-    warn('Funktionen nicht auswertbar');
-  } else {
-    const e = n.pruefeNotiz();
-    pruefe(e.zahl === 5, 'fünf Zeilen ergeben fünf Festlegungen');
-    pruefe(e.stichwort === 'Grundfläche', 'vor dem Doppelpunkt steht das Stichwort');
-    pruefe(e.inhalt === '6,00 x 9,00 m', 'dahinter der Inhalt');
-    pruefe(e.ohneDoppelpunkt === 'Bodenplatte 25 cm bewehrt',
-           'ohne Doppelpunkt ist die ganze Zeile der Inhalt');
-    pruefe(e.strichWeg === true, 'der Aufzählungsstrich ist weg');
-    pruefe(e.leerzeilenWeg === true, 'Leerzeilen ergeben keine Einträge');
-    pruefe(e.imLog === true, 'der volle Wortlaut steht im Log');
-    pruefe(e.notizLeer === '', 'das Notizfeld ist geleert');
-    pruefe(e.zweitesMal === 5, 'ein zweites Öffnen legt nichts nach');
-    pruefe(e.satzZeichenKeinStichwort === true,
-           'ein Doppelpunkt mitten im Satz macht kein Stichwort');
   }
 }
 
