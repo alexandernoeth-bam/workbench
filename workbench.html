@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.51.0</title>
+<title>Workbench 0.52.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -146,6 +146,11 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .sl-monat{font-size:calc(var(--fs)*0.74);color:var(--grau);font-weight:500;
   padding:9px 0 3px;border-bottom:1px solid var(--linie);margin-bottom:3px}
 .sl{display:flex;align-items:baseline;gap:9px;padding:4px 0}
+.sl.faellig .sl-datum{color:var(--weinrot);font-weight:500}
+.sl-ohne{flex:0 0 18px}
+.sl .tkasten{flex:0 0 auto;align-self:center}
+.sl-neu{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0 10px}
+.sl-neu .v-feld{flex:1 1 200px;min-width:0}
 .sl.fertig .sl-titel{color:var(--grau);text-decoration:line-through}
 .sl-datum{flex:0 0 62px;font-size:calc(var(--fs)*0.74);color:var(--grau);
   font-variant-numeric:tabular-nums}
@@ -1125,7 +1130,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.51.0';
+var APP_VERSION = '0.52.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8815,6 +8820,12 @@ function logHtml(v) {
    Die Liste — alles Datierte an einer Stelle
    ------------------------------------------------------------ */
 
+
+
+
+
+
+
 function seiteListe(v, istProjekt, feld) {
   var aus = [];
   var i;
@@ -8824,7 +8835,8 @@ function seiteListe(v, istProjekt, feld) {
     for (i = 0; i < ms.length; i++) {
       aus.push({ datum: ms[i].datum || '', art: 'Meilenstein',
                  titel: ms[i].titel, fertig: !!ms[i].erreicht,
-                 ruf: '' });
+                 haken: 'msHaken:' + i,
+                 ruf: 'msOeffnen(' + i + ')' });
     }
     var tl = termineZuProjekt(v.id);
     for (i = 0; i < tl.length; i++) {
@@ -8842,8 +8854,8 @@ function seiteListe(v, istProjekt, feld) {
           : (a.frist || (a.status === 'erledigt' ? a.erledigtAm : '') || '');
     aus.push({ datum: d || '', art: 'Aufgabe', titel: a.titel,
                fertig: (a.status === 'erledigt' && !a.wiederholung),
+               haken: 'aufHaken:' + a.id,
                ruf: 'aufgabeAktionen(\'' + esc(a.id) + '\')',
-               haken: a.id,
                zusatz: (a.art === 'klein' ? 'Kleinigkeit'
                       : (a.wiederholung ? regelText(a.wiederholung) : planungText(a))) });
   }
@@ -8851,13 +8863,16 @@ function seiteListe(v, istProjekt, feld) {
   var laeufe = (DB.durchlaeufe || []).filter(function (d) { return d[feld] === v.id; });
   var li;
   for (li = 0; li < laeufe.length; li++) {
-    var offenZahl = (laeufe[li].schritte || []).length - schritteFertig(laeufe[li]);
-    aus.push({ datum: laeufe[li].frist || laeufe[li].terminTag || laeufe[li].start || '',
+    var gesamt = (laeufe[li].schritte || []).length;
+    var fertigZahl = schritteFertig(laeufe[li]);
+    /* Ein Ablauf datiert auf seine Frist oder seinen Termin. Sein
+       Startdatum ist kein Termin — sonst rutschte er in die
+       Vergangenheit, obwohl noch Schritte offen sind. */
+    aus.push({ datum: laeufe[li].frist || laeufe[li].terminTag || '',
                art: 'Ablauf', titel: laeufe[li].name,
-               fertig: (offenZahl === 0),
+               fertig: (gesamt > 0 && fertigZahl === gesamt),
                ruf: 'durchlaufAbhakenOeffnen(\'' + esc(laeufe[li].id) + '\')',
-               zusatz: schritteFertig(laeufe[li]) + ' von '
-                     + (laeufe[li].schritte || []).length + ' Schritten' });
+               zusatz: fertigZahl + ' von ' + gesamt + ' Schritten' });
   }
 
   aus.sort(function (x, y) {
@@ -8869,8 +8884,34 @@ function seiteListe(v, istProjekt, feld) {
   return aus;
 }
 
-function seiteZeileHtml(e) {
-  var h = '<div class="sl' + (e.fertig ? ' fertig' : '') + '">';
+function seiteHaken(was) {
+  var teile = String(was).split(':');
+  if (teile[0] === 'aufHaken') {
+    seiteAufgabeHaken(teile[1]);
+    return;
+  }
+  if (teile[0] === 'msHaken') {
+    var v = vorhabenFinden(seiteFuer, seiteArt);
+    var nr = Number(teile[1]);
+    if (!v || !v.meilensteine || !v.meilensteine[nr]) { return; }
+    v.meilensteine[nr].erreicht = !v.meilensteine[nr].erreicht;
+    v.geaendert = jetzt();
+    spaeterSichern();
+    vhZeichnen();
+    seiteZeichnen();
+  }
+}
+
+function seiteZeileHtml(e, heute) {
+  var faellig = (!e.fertig && e.datum && e.datum < heute);
+  var h = '<div class="sl' + (e.fertig ? ' fertig' : '')
+        + (faellig ? ' faellig' : '') + '">';
+  if (e.haken) {
+    h += '<button class="tkasten' + (e.fertig ? ' an' : '') + '" type="button" '
+       + 'onclick="seiteHaken(\'' + esc(e.haken) + '\')"></button>';
+  } else {
+    h += '<span class="sl-ohne"></span>';
+  }
   h += '<span class="sl-datum">' + esc(e.datum ? kurzDatum(e.datum) : '—') + '</span>';
   h += '<span class="sl-art">' + esc(e.art) + '</span>';
   h += '<span class="sl-titel"' + (e.ruf ? (' onclick="' + e.ruf + '"') : '') + '>'
@@ -8884,13 +8925,15 @@ function seiteZeileHtml(e) {
 function seiteListeHtml(v, istProjekt, feld) {
   var heute = isoDatum();
   var alle = seiteListe(v, istProjekt, feld);
-  var vergangen = [];
-  var kommend = [];
+  var erledigt = [];
+  var offen = [];
   var i;
   for (i = 0; i < alle.length; i++) {
     if (!seiteArtAn(alle[i].art)) { continue; }
-    if (alle[i].datum && alle[i].datum < heute) { vergangen.push(alle[i]); }
-    else { kommend.push(alle[i]); }
+    /* Vergangen heißt erledigt — nicht „Datum vorbei". Was offen ist,
+       bleibt sichtbar, auch wenn es überfällig ist. Gerade dann. */
+    if (alle[i].fertig) { erledigt.push(alle[i]); }
+    else { offen.push(alle[i]); }
   }
 
   var h = '<div class="sl-pillen">';
@@ -8907,30 +8950,222 @@ function seiteListeHtml(v, istProjekt, feld) {
   }
   h += '</div>';
 
-  if (vergangen.length) {
-    h += '<button class="tfalt" type="button" onclick="seiteVergangenUm()">'
-       + '<span>Vergangen · ' + vergangen.length + '</span>'
-       + '<svg class="' + (seiteVergangenAuf ? 'auf' : '') + '" viewBox="0 0 24 24">'
-       + '<path d="M6 9l6 6 6-6"></path></svg></button>';
-    if (seiteVergangenAuf) {
-      for (i = 0; i < vergangen.length; i++) { h += seiteZeileHtml(vergangen[i]); }
-    }
-  }
+  h += seiteNeuHtml(istProjekt);
 
   var letzterMonat = '';
-  for (i = 0; i < kommend.length; i++) {
-    var monat = kommend[i].datum ? kommend[i].datum.slice(0, 7) : '';
+  for (i = 0; i < offen.length; i++) {
+    var monat = offen[i].datum ? offen[i].datum.slice(0, 7) : '';
     if (monat !== letzterMonat) {
       letzterMonat = monat;
       h += '<div class="sl-monat">'
          + (monat ? esc(monatName(monat)) : 'ohne Datum') + '</div>';
     }
-    h += seiteZeileHtml(kommend[i]);
+    h += seiteZeileHtml(offen[i], heute);
   }
-  if (!kommend.length && !vergangen.length) {
-    h += '<div class="tleer" style="padding-left:0">Nichts eingetragen.</div>';
+  if (!offen.length) {
+    h += '<div class="tleer" style="padding-left:0">Nichts Offenes.</div>';
+  }
+
+  if (erledigt.length) {
+    h += '<button class="tfalt" type="button" onclick="seiteVergangenUm()">'
+       + '<span>Erledigt · ' + erledigt.length + '</span>'
+       + '<svg class="' + (seiteVergangenAuf ? 'auf' : '') + '" viewBox="0 0 24 24">'
+       + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+    if (seiteVergangenAuf) {
+      for (i = 0; i < erledigt.length; i++) {
+        h += seiteZeileHtml(erledigt[i], heute);
+      }
+    }
   }
   return h;
+}
+
+/* ------------------------------------------------------------
+   Anlegen auf der Seite
+   ------------------------------------------------------------ */
+
+function seiteNeuHtml(istProjekt) {
+  if (!istProjekt) { return ''; }
+  var h = '<div class="sl-neu">';
+  h += '<input class="v-feld" type="text" id="seiteNeuTitel" '
+     + 'placeholder="Neu — Titel eingeben, dann Art wählen" '
+     + 'onkeydown="if(event.key===\'Enter\'){seiteNeu(\'aufgabe\');}">';
+  h += '<button class="ms-wort" type="button" onclick="seiteNeu(\'meilenstein\')">'
+     + 'Meilenstein</button>';
+  h += '<button class="ms-wort" type="button" onclick="seiteNeu(\'aufgabe\')">'
+     + 'Aufgabe</button>';
+  h += '<button class="ms-wort" type="button" onclick="seiteNeu(\'klein\')">'
+     + 'Kleinigkeit</button>';
+  h += '<button class="ms-wort" type="button" onclick="seiteAblaufWahl()">'
+     + 'Ablauf</button>';
+  h += '<button class="ms-wort" type="button" onclick="zuordnenOeffnen()">'
+     + 'Termin</button>';
+  h += '</div>';
+  return h;
+}
+
+function seiteNeu(art) {
+  var v = vorhabenFinden(seiteFuer, seiteArt);
+  var feld = document.getElementById('seiteNeuTitel');
+  if (!v || !feld) { return; }
+  var titel = feld.value.trim();
+  if (titel.length === 0) { return; }
+
+  if (art === 'meilenstein') {
+    if (!Array.isArray(v.meilensteine)) { v.meilensteine = []; }
+    v.meilensteine.push({ titel: titel, datum: '', erreicht: false });
+    v.geaendert = jetzt();
+  } else {
+    DB.aufgaben.push({
+      id: neueKennung(), titel: titel, beschreibung: '', kontext: v.kontext,
+      themaId: null, projektId: v.id, frist: '', planung: 'backlog', uhrzeit: '',
+      art: (art === 'klein') ? 'klein' : 'haupt', wiederholung: null,
+      status: 'offen', erledigtAm: null, zuletztErledigt: null,
+      ablaufSchritt: null, geaendert: jetzt()
+    });
+    aufZeichnen();
+  }
+  feld.value = '';
+  spaeterSichern();
+  vhZeichnen();
+  seiteZeichnen();
+}
+
+/* Einen Ablauf aus einer Vorlage starten, gleich diesem Vorhaben
+   zugeordnet. */
+function seiteAblaufWahl() {
+  var v = vorhabenFinden(seiteFuer, seiteArt);
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!v || !sheet || !hg) { return; }
+
+  var h = blattKopf();
+  h += '<div class="as-titel">Ablauf hinzufügen</div>';
+  h += '<div class="as-meta">' + esc(v.name) + '</div>';
+  h += '<div class="as-linie"></div>';
+
+  var l = DB.ablaeufe || [];
+  var i;
+  var gab = false;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].kontext !== v.kontext) { continue; }
+    h += '<div class="mf-zeile" onclick="seiteAblaufStarten(\'' + esc(l[i].id) + '\')">'
+       + '<span class="mf-name">' + esc(l[i].name) + '</span>'
+       + '<span class="a-quelle">' + (l[i].schritte || []).length + ' Schritte</span></div>';
+    gab = true;
+  }
+  if (!gab) {
+    h += '<div class="tleer" style="padding-left:0">Keine Vorlage in diesem '
+       + 'Kontext. Ein einmaliger Ablauf lässt sich unter Abläufe anlegen.</div>';
+  }
+  h += '<div class="d-reihe"><button type="button" onclick="seiteAblaufLeer()">'
+     + 'Einmaliger Ablauf</button>'
+     + '<button type="button" onclick="aktionenSchliessen()">Abbrechen</button></div>';
+  sheet.innerHTML = h;
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function seiteAblaufStarten(vorlageId) {
+  var v = vorhabenFinden(seiteFuer, seiteArt);
+  if (!v) { return; }
+  durchlaufStarten(vorlageId, true);
+  var neu = DB.durchlaeufe[DB.durchlaeufe.length - 1];
+  neu[seiteArt === 'ziel' ? 'zielId' : 'projektId'] = v.id;
+  neu.geaendert = jetzt();
+  spaeterSichern();
+  aktionenSchliessen();
+  seiteZeichnen();
+}
+
+function seiteAblaufLeer() {
+  var v = vorhabenFinden(seiteFuer, seiteArt);
+  if (!v) { return; }
+  var neu = {
+    id: neueKennung(), ablaufId: null, name: v.name + ': neuer Ablauf',
+    kontext: v.kontext, anlagen: [],
+    projektId: (seiteArt === 'projekt') ? v.id : null,
+    zielId: (seiteArt === 'ziel') ? v.id : null,
+    start: isoDatum(), frist: '', schritte: [], geaendert: jetzt()
+  };
+  DB.durchlaeufe.push(neu);
+  spaeterSichern();
+  aktionenSchliessen();
+  abDetailOeffnen(neu.id, 'durchlauf');
+}
+
+/* ------------------------------------------------------------
+   Meilenstein pflegen
+   ------------------------------------------------------------ */
+
+var msOffen = -1;
+
+function msOeffnen(nr) {
+  msOffen = nr;
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = msBlattHtml();
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function msBlattHtml() {
+  var v = vorhabenFinden(seiteFuer, seiteArt);
+  if (!v || !v.meilensteine || !v.meilensteine[msOffen]) {
+    return blattKopf() + '<div class="tleer">Nicht gefunden.</div>';
+  }
+  var m = v.meilensteine[msOffen];
+  var h = blattKopf();
+  h += '<div class="as-titel">Meilenstein</div>';
+  h += '<div class="as-linie"></div>';
+  h += '<div class="s-abschnitt">Was ist erreicht?</div>';
+  h += '<textarea class="ms-titel" rows="2" style="width:100%" '
+     + 'oninput="msFeld(\'titel\',this.value)">' + esc(m.titel) + '</textarea>';
+  h += '<div class="d-feld"><div class="d-name">Datum</div><div class="d-wert">'
+     + '<input type="date" value="' + esc(m.datum || '') + '" '
+     + 'onchange="msFeld(\'datum\',this.value)"></div></div>';
+  h += '<div class="d-feld"><div class="d-name">Erreicht</div><div class="d-wert">'
+     + '<button class="d-wahl' + (m.erreicht ? ' an' : '') + '" type="button" '
+     + 'onclick="msErreichtUm()">' + (m.erreicht ? 'ja' : 'noch nicht')
+     + '</button></div></div>';
+  h += '<div class="d-reihe">'
+     + '<button class="gefahr" type="button" onclick="msWeg()">Entfernen</button>'
+     + '<button type="button" onclick="msFertig()">Fertig</button></div>';
+  return h;
+}
+
+function msFeld(feld, wert) {
+  var v = vorhabenFinden(seiteFuer, seiteArt);
+  if (!v || !v.meilensteine[msOffen]) { return; }
+  v.meilensteine[msOffen][feld] = wert;
+  v.geaendert = jetzt();
+  spaeterSichern();
+}
+
+function msErreichtUm() {
+  var v = vorhabenFinden(seiteFuer, seiteArt);
+  if (!v || !v.meilensteine[msOffen]) { return; }
+  v.meilensteine[msOffen].erreicht = !v.meilensteine[msOffen].erreicht;
+  v.geaendert = jetzt();
+  spaeterSichern();
+  msOeffnen(msOffen);
+}
+
+function msWeg() {
+  var v = vorhabenFinden(seiteFuer, seiteArt);
+  if (!v || !v.meilensteine[msOffen]) { return; }
+  v.meilensteine.splice(msOffen, 1);
+  v.geaendert = jetzt();
+  spaeterSichern();
+  msFertig();
+}
+
+function msFertig() {
+  msOffen = -1;
+  aktionenSchliessen();
+  vhZeichnen();
+  seiteZeichnen();
 }
 
 function monatName(jjjjmm) {

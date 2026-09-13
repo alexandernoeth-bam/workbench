@@ -703,7 +703,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '       erledigtAm: tagePlus(heute,-5), art:\'haupt\' } ];'
                  + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Bauantrag\','
                  + '     kontext:\'privat\', projektId:\'p1\','
-                 + '     frist: tagePlus(heute,30),'
+                 + '     start: tagePlus(heute,-30), frist:\'\','
                  + '     schritte:[{ titel:\'F\', fertig:false }] }];'
                  + '   p.festlegungen.push({ id:\'f2\', stichwort:\'Torbreite\','
                  + '     inhalt:\'3,50 m\', seit: heute });'
@@ -712,8 +712,10 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var l = seiteListe(p, true, \'projektId\');'
                  + '   var r = { gesamt: l.length,'
                  + '             arten: l.map(function(x){ return x.art; }).join(\',\'),'
-                 + '             vergangenZahl: l.filter(function(x){'
-                 + '               return x.datum && x.datum < heute; }).length };'
+                 + '             erledigtZahl: l.filter(function(x){'
+                 + '               return x.fertig; }).length,'
+                 + '             offenTrotzVergangen: l.some(function(x){'
+                 + '               return x.art === \'Ablauf\' && !x.fertig; }) };'
                  + '   seiteArten = { Meilenstein: true };'
                  + '   r.nurMeilensteine = l.filter(function(x){'
                  + '     return seiteArtAn(x.art); }).length;'
@@ -5908,8 +5910,31 @@ console.log('\n74. Vorhabenseite');
   const lhtml = skript.match(/function seiteListeHtml\([\s\S]*?\n\}\n/);
   pruefe(lhtml && /sl-pille/.test(lhtml[0]), 'darüber die Filterpillen');
   pruefe(lhtml && /seiteArtAn\(/.test(lhtml[0]), 'die Pillen filtern die Liste');
-  pruefe(lhtml && /Vergangen · /.test(lhtml[0]),
-         'Vergangenes ist eingeklappt, nicht weg');
+  pruefe(lhtml && /Erledigt · /.test(lhtml[0]),
+         'Erledigtes ist eingeklappt, nicht weg');
+  pruefe(lhtml && /if \(alle\[i\]\.fertig\)/.test(lhtml[0]),
+         'getrennt wird nach erledigt, nicht nach Datum — sonst verschwände '
+         + 'Überfälliges');
+  const zeile2 = hauptSkript().match(/function seiteZeileHtml\([\s\S]*?\n\}/);
+  pruefe(zeile2 && /faellig/.test(zeile2[0]),
+         'Überfälliges wird hervorgehoben');
+  pruefe(zeile2 && /seiteHaken\(/.test(zeile2[0]),
+         'Aufgaben und Meilensteine lassen sich in der Liste abhaken');
+  const haken = hauptSkript().match(/function seiteHaken\([\s\S]*?\n\}\n/);
+  pruefe(haken && /erreicht = !/.test(haken[0]),
+         'ein Meilenstein lässt sich als erreicht kennzeichnen');
+  pruefe(haken && /seiteAufgabeHaken/.test(haken[0]),
+         'eine Aufgabe lässt sich erledigen');
+  const neuH = hauptSkript().match(/function seiteNeuHtml\([\s\S]*?\n\}/);
+  pruefe(neuH && /seiteNeu\(\\'meilenstein\\'\)/.test(neuH[0]),
+         'ein Meilenstein lässt sich anlegen');
+  pruefe(neuH && /seiteNeu\(\\'aufgabe\\'\)/.test(neuH[0]), 'eine Aufgabe ebenso');
+  pruefe(neuH && /seiteNeu\(\\'klein\\'\)/.test(neuH[0]), 'eine Kleinigkeit ebenso');
+  pruefe(neuH && /seiteAblaufWahl\(\)/.test(neuH[0]), 'ein Ablauf ebenso');
+  pruefe(neuH && /zuordnenOeffnen\(\)/.test(neuH[0]), 'und ein Termin zugeordnet');
+  const lst = hauptSkript().match(/function seiteListe\([\s\S]*?\n\}\n/);
+  pruefe(lst && !/laeufe\[li\]\.start/.test(lst[0]),
+         'ein Ablauf datiert auf Frist oder Termin, nicht auf seinen Start');
 
   const artUm = skript.match(/function seiteArtUm\([\s\S]*?\n\}/);
   pruefe(artUm && /seiteArten = null/.test(artUm[0]),
@@ -5949,7 +5974,10 @@ console.log('\n74. Vorhabenseite');
     pruefe(e.nurMeilensteine === 2, 'die Pille filtert auf zwei Meilensteine');
     pruefe(e.zweiArten === 4, 'zwei Pillen zusammen zeigen vier');
     pruefe(e.keinePille === 5, 'keine Pille gewählt heißt alle');
-    pruefe(e.vergangenZahl === 2, 'zwei liegen in der Vergangenheit');
+    pruefe(e.erledigtZahl === 2, 'zwei sind erledigt');
+    pruefe(e.offenTrotzVergangen === true,
+           'ein überfälliger Ablauf bleibt sichtbar, statt unter Erledigt zu '
+           + 'verschwinden');
     pruefe(e.logEintrag === 'Fundament gegossen', 'ein Logeintrag lässt sich schreiben');
     pruefe(e.logTag === true, 'er trägt das heutige Datum');
     pruefe(e.nameGeaendert === 'Garage neu', 'der Name lässt sich ändern');
