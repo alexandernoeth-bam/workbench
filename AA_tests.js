@@ -725,6 +725,12 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.schritteAmAblauf = ab.schritte.length;'
                  + '   r.getrageneNichtDaneben = !l2.some(function(x){'
                  + '     return x.titel === \'Getragen\' && x.art === \'Aufgabe\'; });'
+                 + '   seiteHaken(\'abHaken:d1\');'
+                 + '   var l3 = seiteListe(p, true, \'projektId\');'
+                 + '   var ab3 = l3.filter(function(x){ return x.art === \'Ablauf\'; })[0];'
+                 + '   r.ablaufDurchgefuehrt = ab3.fertig;'
+                 + '   r.schritteBleibenOffen = DB.durchlaeufe[0].schritte.some('
+                 + '     function(s){ return !schrittFertig(s); });'
                  + '   seiteArten = { Meilenstein: true };'
                  + '   r.nurMeilensteine = l.filter(function(x){'
                  + '     return seiteArtAn(x.art); }).length;'
@@ -5955,6 +5961,23 @@ console.log('\n74. Vorhabenseite');
          'die Einrückung macht die Hierarchie sichtbar');
   pruefe(new RegExp('function\\s+seiteSchrittHaken\\s*\\(').test(hauptSkript()),
          'ein Schritt lässt sich von hier abhaken');
+  pruefe(/\.sl \.tkasten\{[^}]*align-self:center/.test(QUELLE)
+         && !/\.sl \.tkasten\{[^}]*flex:0 0 auto/.test(QUELLE),
+         'das Kästchen behält seine Breite — sonst fällt es zu einem Strich '
+         + 'zusammen');
+  const lst3 = hauptSkript().match(/function seiteListe\([\s\S]*?\n\}\n/);
+  pruefe(lst3 && /abHaken/.test(lst3[0]),
+         'auch ein Ablauf lässt sich als durchgeführt kennzeichnen');
+  pruefe(zeile2 && /durchgeführt kennzeichnen/.test(zeile2[0]),
+         'er bekommt dafür ein Kästchen');
+  const hak = hauptSkript().match(/function seiteHaken\([\s\S]*?\n\}\n/);
+  pruefe(hak && /d\.erledigt = !d\.erledigt/.test(hak[0]),
+         'das setzt ein eigenes Merkmal am Durchlauf');
+  pruefe(hak && !/s\.fertig = true/.test(hak[0]),
+         'offene Schritte werden dabei nicht stillschweigend mit abgehakt');
+  const imTag = hauptSkript().match(/function durchlaufImTag\([\s\S]*?\n\}/);
+  pruefe(imTag && /d\.erledigt/.test(imTag[0]),
+         'ein durchgeführter Ablauf steht nicht mehr im Tagesplan');
   pruefe(lhtml && /sl-ende/.test(lhtml[0]),
          'das Projektende schließt die Liste ab');
   pruefe(lhtml && /noch ' \+ tage/.test(lhtml[0]),
@@ -6010,6 +6033,10 @@ console.log('\n74. Vorhabenseite');
            'alle fünf datierten Dinge stehen in einer Liste (ist: ' + e.gesamt + ')');
     pruefe(e.schritteAmAblauf === 1,
            'der Ablauf trägt seinen Schritt');
+    pruefe(e.ablaufDurchgefuehrt === true,
+           'ein Ablauf lässt sich als durchgeführt kennzeichnen');
+    pruefe(e.schritteBleibenOffen === true,
+           'seine offenen Schritte bleiben dabei offen');
     pruefe(e.getrageneNichtDaneben === true,
            'die getragene Aufgabe steht nicht zusätzlich in der Liste');
     pruefe(e.arten === 'Meilenstein,Aufgabe,Aufgabe,Meilenstein,Ablauf',

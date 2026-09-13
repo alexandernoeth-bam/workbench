@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.54.0</title>
+<title>Workbench 0.55.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -147,7 +147,9 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   padding:9px 0 3px;border-bottom:1px solid var(--linie);margin-bottom:3px}
 .sl{display:flex;align-items:baseline;gap:9px;padding:4px 0}
 .sl.faellig .sl-datum{color:var(--weinrot);font-weight:500}
-.sl .tkasten{flex:0 0 auto;align-self:center}
+/* Die Breite kommt aus .tkasten — sie hier zu überschreiben ließ das
+   Kästchen zu einem Strich zusammenfallen. */
+.sl .tkasten{align-self:center;margin-top:0}
 .sl-kreis{flex:0 0 18px;width:18px;height:18px;border-radius:50%;
   border:1.5px solid var(--grau);background:none;cursor:pointer;padding:0;
   align-self:center}
@@ -1146,7 +1148,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.54.0';
+var APP_VERSION = '0.55.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3285,6 +3287,7 @@ function aufgabeStehtImTag(a, tag) {
    ein Schritt fällig, die Frist erreicht oder überschritten, oder
    sein Termin ist heute. Sonst ruht er weiter. */
 function durchlaufImTag(d, tag) {
+  if (d.erledigt) { return false; }
   if (!offenerSchritt(d)) { return false; }
   if (d.terminTag === tag) { return true; }
   if (d.frist && d.frist <= tag) { return true; }
@@ -8899,7 +8902,9 @@ function seiteListe(v, istProjekt, feld) {
        Vergangenheit, obwohl noch Schritte offen sind. */
     aus.push({ datum: laeufe[li].frist || laeufe[li].terminTag || '',
                art: 'Ablauf', titel: laeufe[li].name,
-               fertig: (gesamt > 0 && fertigZahl === gesamt),
+               haken: 'abHaken:' + laeufe[li].id,
+               fertig: (laeufe[li].erledigt === true)
+                    || (gesamt > 0 && fertigZahl === gesamt),
                ruf: 'durchlaufAbhakenOeffnen(\'' + esc(laeufe[li].id) + '\')',
                stand: fertigZahl + '/' + gesamt,
                schritte: schritteAlsZeilen(laeufe[li]) });
@@ -8936,6 +8941,21 @@ function seiteHaken(was) {
     seiteAufgabeHaken(teile[1]);
     return;
   }
+  if (teile[0] === 'abHaken') {
+    /* Durchgeführt heißt: Der Ablauf ist abgeschlossen, auch wenn
+       einzelne Schritte offen blieben. Sie werden nicht stillschweigend
+       abgehakt — was offen war, bleibt offen und sichtbar, sobald man
+       ihn wieder öffnet. */
+    var d = durchlaufFinden(teile[1]);
+    if (!d) { return; }
+    d.erledigt = !d.erledigt;
+    d.geaendert = jetzt();
+    spaeterSichern();
+    abZeichnen();
+    tagZeichnen();
+    seiteZeichnen();
+    return;
+  }
   if (teile[0] === 'msHaken') {
     var v = vorhabenFinden(seiteFuer, seiteArt);
     var nr = Number(teile[1]);
@@ -8964,6 +8984,9 @@ function seiteZeileHtml(e, heute) {
   } else if (e.art === 'Termin') {
     h += '<span class="sl-zeit" title="Termin">' + esc(e.zeit || 'ganz') + '</span>';
   } else if (e.art === 'Ablauf') {
+    h += '<button class="tkasten' + (e.fertig ? ' an' : '') + '" type="button" '
+       + 'onclick="seiteHaken(\'' + esc(e.haken) + '\')" '
+       + 'title="Ablauf als durchgeführt kennzeichnen"></button>';
     h += '<span class="sl-stand" title="Ablauf">' + esc(e.stand || '') + '</span>';
   } else {
     h += '<button class="tkasten' + (e.fertig ? ' an' : '') + '" type="button" '
@@ -9632,6 +9655,12 @@ function schrittAbWeiter(id, nr) {
   else if (jetztWert === tagePlus(heute, 1)) { neu = tagePlus(heute, 7); }
   else { neu = ''; }
   schrittAbSetzen(id, nr, neu);
+}
+
+/* Ein als durchgeführt gekennzeichneter Durchlauf gilt als beendet —
+   er bleibt im Bestand, drängt sich aber nicht mehr auf. */
+function durchlaufOffen(d) {
+  return !d.erledigt;
 }
 
 function laufendeDurchlaeufe() {
