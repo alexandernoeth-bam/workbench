@@ -689,7 +689,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var heute = isoDatum();'
                  + '   var p = { id:\'p1\', name:\'Garage\', kontext:\'privat\','
                  + '     status:\'laufend\', zielzustaende:[], festlegungen:[],'
-                 + '     anlagen:[{ name:\'Plan.pdf\', url:\'https://x\' }],'
+                 + '     log:[], anlagen:[],'
                  + '     meilensteine:[{ titel:\'Antrag\', datum: tagePlus(heute,-10),'
                  + '       erreicht:true }, { titel:\'Platte\','
                  + '       datum: tagePlus(heute,20), erreicht:false }] };'
@@ -698,57 +698,36 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     { id:\'a1\', titel:\'Angebote\', kontext:\'privat\','
                  + '       projektId:\'p1\', status:\'offen\','
                  + '       planung: tagePlus(heute,3), art:\'haupt\' },'
-                 + '     { id:\'a2\', titel:\'Ohne Datum\', kontext:\'privat\','
-                 + '       projektId:\'p1\', status:\'offen\', planung:\'backlog\','
-                 + '       art:\'klein\' },'
                  + '     { id:\'a3\', titel:\'Vermesser\', kontext:\'privat\','
                  + '       projektId:\'p1\', status:\'erledigt\','
-                 + '       erledigtAm: tagePlus(heute,-5), art:\'haupt\' },'
-                 + '     { id:\'a4\', titel:\'Laufen\', kontext:\'privat\','
-                 + '       projektId:\'p1\', status:\'offen\', planung:\'backlog\','
-                 + '       art:\'haupt\', wiederholung:{ takt:\'woche\','
-                 + '       intervall:1, tage:[1,3,5], tag:1 },'
-                 + '       zuletztErledigt: tagePlus(heute,-1),'
-                 + '       erledigtTage:[ tagePlus(heute,-8), tagePlus(heute,-4),'
-                 + '                      tagePlus(heute,-1) ] } ];'
+                 + '       erledigtAm: tagePlus(heute,-5), art:\'haupt\' } ];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Bauantrag\','
+                 + '     kontext:\'privat\', projektId:\'p1\','
+                 + '     frist: tagePlus(heute,30),'
+                 + '     schritte:[{ titel:\'F\', fertig:false }] }];'
                  + '   p.festlegungen.push({ id:\'f2\', stichwort:\'Torbreite\','
                  + '     inhalt:\'3,50 m\', seit: heute });'
                  + '   seiteFuer = \'p1\'; seiteArt = \'projekt\'; seiteZu = {};'
-                 + '   seiteZeichnen();'
-                 + '   var h = document.getElementById(\'seiteBlatt\').innerHTML;'
-                 + '   var namen = [];'
-                 + '   (h.match(/sa-name">([^<]*)/g) || []).forEach(function(x){'
-                 + '     namen.push(x.replace(/.*">/, \'\')); });'
-                 + '   var kommt = kommendes(p, true, \'projektId\', heute);'
-                 + '   var getan = getanes(p, true, \'projektId\', heute);'
-                 + '   var q = quoteVon(DB.aufgaben[3]);'
-                 + '   var stand = standZahlenHtml(p, true, \'projektId\');'
-                 + '   var r = { abschnitte: namen,'
-                 + '             kommtZahl: kommt.length, getanZahl: getan.length,'
-                 + '             kommtOhneVergangenes: kommt.every(function(x){'
-                 + '               return !x.datum || x.datum >= heute; }),'
-                 + '             getanOhneKuenftiges: getan.every(function(x){'
-                 + '               return !x.datum || x.datum <= heute; }),'
-                 + '             ohneDatumZahl: ohneDatum(p, true, \'projektId\').length,'
-                 + '             standNennt: (stand.indexOf(\'Meilensteine\') >= 0'
-                 + '               && stand.indexOf(\'Aufgaben\') >= 0),'
-                 + '             quoteErledigt: q.erledigt, quoteFaellig: q.faellig };'
-                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
-                 + '   termineNachTag = {};'
-                 + '   eintraegeEinsortieren([{ id:\'W1\','
-                 + '     summary:\'Volkslauf #garage\','
-                 + '     start:{ dateTime: tagePlus(heute,6) + \'T09:00:00+02:00\' },'
-                 + '     end:{ dateTime: tagePlus(heute,6) + \'T11:00:00+02:00\' } }],'
-                 + '     \'Alex\', \'privat\');'
-                 + '   var kk = kommendes(p, true, \'projektId\', heute)'
-                 + '     .filter(function(x){ return x.art === \'Termin\'; })[0];'
-                 + '   r.titelOhneKuerzel = kk ? kk.titel : \'(keiner)\';'
-                 + '   var qq = quoteVon({ wiederholung:{ takt:\'woche\','
-                 + '     intervall:1, tage:[1], tag:1 },'
-                 + '     erledigtTage:[ tagePlus(heute,-2), tagePlus(heute,-1),'
-                 + '                    heute ] });'
-                 + '   r.quoteNieUeberVoll = (qq.erledigt <= qq.faellig);'
-                 + '   termineNachTag = {}; kalenderListe = [];'
+                 + '   seiteArten = null; seiteVergangenAuf = false;'
+                 + '   var l = seiteListe(p, true, \'projektId\');'
+                 + '   var r = { gesamt: l.length,'
+                 + '             arten: l.map(function(x){ return x.art; }).join(\',\'),'
+                 + '             vergangenZahl: l.filter(function(x){'
+                 + '               return x.datum && x.datum < heute; }).length };'
+                 + '   seiteArten = { Meilenstein: true };'
+                 + '   r.nurMeilensteine = l.filter(function(x){'
+                 + '     return seiteArtAn(x.art); }).length;'
+                 + '   seiteArten = { Meilenstein: true, Aufgabe: true };'
+                 + '   r.zweiArten = l.filter(function(x){'
+                 + '     return seiteArtAn(x.art); }).length;'
+                 + '   seiteArten = null;'
+                 + '   r.keinePille = l.filter(function(x){'
+                 + '     return seiteArtAn(x.art); }).length;'
+                 + '   logNeu(\'Fundament gegossen\');'
+                 + '   r.logEintrag = logEintraege(p)[0].text;'
+                 + '   r.logTag = (logEintraege(p)[0].tag === heute);'
+                 + '   seiteFeld(\'name\', \'Garage neu\');'
+                 + '   r.nameGeaendert = p.name;'
                  + '   festlegungSetzen(\'f2\', \'inhalt\', \'4,00 m\');'
                  + '   r.festGeaendert = festlegungen(p)[0].inhalt;'
                  + '   seiteFuer = \'\'; seiteArt = \'\'; seiteZu = {}; DB = alt;'
@@ -4061,9 +4040,21 @@ console.log('\n45. Meilensteine');
   pruefe(stempeln && /titel = \(mss\[mi\]\.titel \|\| ''\) \+ ' \('/.test(stempeln[0]),
          'ein unlesbarer Wert wird in den Titel gerettet statt verworfen');
 
+  /* Seit v0.50.0 ist die Karte ein Verweis, keine dritte Ansicht: Der
+     Stand der Meilensteine steht auf der Seite, die ein Klick öffnet. */
   const karte = skript.match(/function projektKarteHtml\([\s\S]*?\n\}\n/);
-  pruefe(karte && /erreicht \+ ' von ' \+ alleMs\.length/.test(karte[0]),
-         'die Karte zeigt alle Meilensteine mit Stand');
+  pruefe(karte && /seiteOeffnen\(/.test(karte[0]),
+         'ein Klick auf die Karte öffnet die Projektseite');
+  pruefe(karte && !/vkKarteUm|vhKarteUm/.test(karte[0]),
+         'die Karte klappt nicht mehr auf');
+  pruefe(karte && !/vhDetailOeffnen/.test(karte[0]),
+         'und hat keinen eigenen Bearbeiten-Knopf mehr');
+  const zkarte = skript.match(/function zielKarteHtml\([\s\S]*?\n\}\n/);
+  pruefe(zkarte && /seiteOeffnen\(/.test(zkarte[0]),
+         'bei einem Ziel ebenso');
+  const liste2 = hauptSkript().match(/function seiteListe\([\s\S]*?\n\}\n/);
+  pruefe(liste2 && /erreicht/.test(liste2[0]),
+         'die Meilensteine stehen mit ihrem Stand in der Liste der Seite');
 
   if (!m) {
     warn('Meilensteinfunktionen nicht auswertbar');
@@ -5881,11 +5872,10 @@ console.log('\n73. Ablauf als Klammer');
 }
 
 /* ============================================================
-   74. Die Vorhabenseite: vier Fragen
-   Grund: Die Seite war nach Datentypen gegliedert — Meilensteine,
-   Aufgaben, Ablaeufe. Gefragt wird aber nicht nach Typen, sondern:
-   Wo stehe ich, was kommt, was haben wir festgelegt, was habe ich
-   gemacht. Danach ist sie jetzt geordnet.
+   74. Die Vorhabenseite nach dem Entwurf
+   Grund: Links eine einzige Liste ueber alles Datierte, mit
+   Filterpillen je Art — nicht getrennte Abschnitte nach Datentyp.
+   Rechts die Informationen. Gepflegt wird auf der Seite selbst.
    ============================================================ */
 console.log('\n74. Vorhabenseite');
 {
@@ -5895,8 +5885,9 @@ console.log('\n74. Vorhabenseite');
   ['seiteOeffnen', 'seiteZeichnen', 'seiteAbschnitt', 'seiteAbschnittUm',
    'festlegungen', 'festlegungNeu', 'festlegungSetzen', 'festlegungWeg',
    'seiteAufgabeHaken', 'schluesselKopieren', 'alleAufgabenZuProjekt',
-   'standZahlenHtml', 'kommendes', 'getanes', 'ohneDatum', 'zeitleisteHtml',
-   'wiederkehrendeZu', 'quoteVon', 'monatName'].forEach(function (f) {
+   'seiteListe', 'seiteListeHtml', 'seiteZeileHtml', 'seiteArtUm', 'seiteArtAn',
+   'seiteVergangenUm', 'seiteFeld', 'seiteLoeschen', 'logEintraege', 'logNeu',
+   'logWeg', 'logHtml', 'monatName'].forEach(function (f) {
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
   });
@@ -5905,74 +5896,64 @@ console.log('\n74. Vorhabenseite');
   pruefe(!/id="navSeite"/.test(QUELLE),
          'aber keinen Knopf in der Leiste — die Seite gehört zu Vorhaben');
 
+  /* Eine Liste statt getrennter Abschnitte */
+  const liste = skript.match(/function seiteListe\([\s\S]*?\n\}\n/);
+  pruefe(liste && /'Meilenstein'/.test(liste[0]), 'Meilensteine stehen in der Liste');
+  pruefe(liste && /'Termin'/.test(liste[0]), 'Termine ebenso');
+  pruefe(liste && /'Aufgabe'/.test(liste[0]), 'Aufgaben ebenso');
+  pruefe(liste && /'Ablauf'/.test(liste[0]), 'Abläufe ebenso');
+  pruefe(liste && /dx < dy/.test(liste[0]), 'sortiert nach Datum');
+  pruefe(liste && /'9999-99-99'/.test(liste[0]), 'Undatiertes steht am Ende');
+
+  const lhtml = skript.match(/function seiteListeHtml\([\s\S]*?\n\}\n/);
+  pruefe(lhtml && /sl-pille/.test(lhtml[0]), 'darüber die Filterpillen');
+  pruefe(lhtml && /seiteArtAn\(/.test(lhtml[0]), 'die Pillen filtern die Liste');
+  pruefe(lhtml && /Vergangen · /.test(lhtml[0]),
+         'Vergangenes ist eingeklappt, nicht weg');
+
+  const artUm = skript.match(/function seiteArtUm\([\s\S]*?\n\}/);
+  pruefe(artUm && /seiteArten = null/.test(artUm[0]),
+         'ohne gewählte Art gelten wieder alle');
+
+  /* Gepflegt wird auf der Seite */
   const z = skript.match(/function seiteZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(z && /Was kommt/.test(z[0]), 'die Seite fragt: was kommt');
-  pruefe(z && /Festgelegt/.test(z[0]), 'was haben wir festgelegt');
-  pruefe(z && /Was ich gemacht habe/.test(z[0]), 'was habe ich gemacht');
-  pruefe(z && /standZahlenHtml/.test(z[0]), 'und zeigt oben, wo man steht');
-  pruefe(z && /Ohne Datum/.test(z[0]),
-         'Undatiertes fällt nicht durch — es hat einen eigenen Platz');
+  pruefe(z && /seiteFeld\(\\'name\\'/.test(z[0]),
+         'der Name lässt sich hier ändern');
+  pruefe(z && /seiteZustandSetzen/.test(z[0]), 'das Ziel ebenso');
+  pruefe(z && /seiteLoeschen/.test(z[0]), 'und löschen geht von hier');
+  pruefe(z && /s-links/.test(z[0]) && /s-rechts/.test(z[0]),
+         'links die Liste, rechts die Informationen');
 
-  /* Vergangenes und Künftiges sauber getrennt */
-  const kommt = skript.match(/function kommendes\([\s\S]*?\n\}\n/);
-  pruefe(kommt && /< heute\) \{ continue/.test(kommt[0]),
-         'was kommt, zeigt nichts Vergangenes');
-  const getan = skript.match(/function getanes\([\s\S]*?\n\}\n/);
-  pruefe(getan && />= heute\) \{ continue/.test(getan[0]),
-         'was gemacht wurde, nichts Künftiges');
-  pruefe(getan && /x\.datum > y\.datum/.test(getan[0]),
-         'der Verlauf läuft rückwärts, das Jüngste zuerst');
-
-  /* Wiederkehrendes wird zusammengefasst */
-  pruefe(getan && /quoteVon\(wied\[i\]\)/.test(getan[0]),
-         'Wiederkehrendes steht als Quote, nicht als hundert Zeilen');
-  const quote = skript.match(/function quoteVon\([\s\S]*?\n\}/);
-  pruefe(quote && /faelligAn\(a\.wiederholung, tag\)/.test(quote[0]),
-         'gezählt wird, wie oft es fällig war');
-  pruefe(quote && /a\.erledigtTage/.test(quote[0]),
-         'und wie oft es abgehakt wurde');
-  const erl = skript.match(/function aufgabeErledigen\([\s\S]*?\n\}/);
-  pruefe(erl && /erledigtTage\.push/.test(erl[0]),
-         'jede Erledigung wird dafür festgehalten');
-  pruefe(erl && /indexOf\(a\.zuletztErledigt\) < 0/.test(erl[0]),
-         'zweimal am selben Tag zählt einmal');
+  /* Das Log */
+  const log = skript.match(/function logNeu\([\s\S]*?\n\}/);
+  pruefe(log && /tag: isoDatum\(\)/.test(log[0]),
+         'ein Logeintrag trägt den Tag, an dem er geschrieben wurde');
+  const lh = skript.match(/function logHtml\([\s\S]*?\n\}\n/);
+  pruefe(lh && /a\.tag > b\.tag/.test(lh[0]), 'das Jüngste steht oben');
 
   /* Festlegungen werden geändert, nicht ergänzt */
   const setzen = skript.match(/function festlegungSetzen\([\s\S]*?\n\}/);
   pruefe(setzen && /l\[i\]\[feld\] = wert/.test(setzen[0]),
          'eine Festlegung wird überschrieben');
-  pruefe(setzen && !/push/.test(setzen[0]),
-         'nicht ein zweites Mal hingeschrieben');
   pruefe(setzen && /l\[i\]\.seit = isoDatum\(\)/.test(setzen[0]),
          'jede Änderung setzt das Datum neu');
-
-  const absch = skript.match(/function seiteAbschnitt\([\s\S]*?\n\}/);
-  pruefe(absch && /stand === undefined && leer/.test(absch[0]),
-         'ein leerer Abschnitt beginnt eingeklappt');
 
   if (!s) {
     warn('Funktionen nicht auswertbar');
   } else {
     const e = s.pruefeSeite();
-    pruefe(e.abschnitte.join(',') === 'Was kommt,Festgelegt,Unterlagen,'
-           + 'Was ich gemacht habe,Ohne Datum',
-           'die vier Fragen stehen in der gedachten Reihenfolge (ist: '
-           + e.abschnitte.join(', ') + ')');
-    pruefe(e.kommtZahl === 2, 'zwei Dinge stehen bevor');
-    pruefe(e.getanZahl === 3,
-           'drei Dinge sind geschehen: Meilenstein, Aufgabe, Wiederkehrendes');
-    pruefe(e.kommtOhneVergangenes === true,
-           'unter „was kommt" steht nichts Vergangenes');
-    pruefe(e.getanOhneKuenftiges === true, 'und umgekehrt');
-    pruefe(e.ohneDatumZahl === 1, 'eine Aufgabe hat kein Datum');
-    pruefe(e.standNennt === true, 'der Stand nennt Meilensteine und Aufgaben');
-    pruefe(e.quoteErledigt === 3, 'die Quote zählt drei Erledigungen');
-    pruefe(e.quoteFaellig >= 3, 'und mindestens ebenso viele Fälligkeiten');
-    pruefe(e.festGeaendert === '4,00 m', 'eine Änderung überschreibt');
-    pruefe(e.titelOhneKuerzel === 'Volkslauf',
-           'im Termintitel steht kein Kürzel mehr');
-    pruefe(e.quoteNieUeberVoll === true,
-           'die Quote geht nie über hundert Prozent');
+    pruefe(e.gesamt === 5,
+           'alle fünf datierten Dinge stehen in einer Liste (ist: ' + e.gesamt + ')');
+    pruefe(e.arten === 'Meilenstein,Aufgabe,Aufgabe,Meilenstein,Ablauf',
+           'gemischt nach Datum, nicht nach Art (ist: ' + e.arten + ')');
+    pruefe(e.nurMeilensteine === 2, 'die Pille filtert auf zwei Meilensteine');
+    pruefe(e.zweiArten === 4, 'zwei Pillen zusammen zeigen vier');
+    pruefe(e.keinePille === 5, 'keine Pille gewählt heißt alle');
+    pruefe(e.vergangenZahl === 2, 'zwei liegen in der Vergangenheit');
+    pruefe(e.logEintrag === 'Fundament gegossen', 'ein Logeintrag lässt sich schreiben');
+    pruefe(e.logTag === true, 'er trägt das heutige Datum');
+    pruefe(e.nameGeaendert === 'Garage neu', 'der Name lässt sich ändern');
+    pruefe(e.festGeaendert === '4,00 m', 'eine Festlegung überschreibt');
   }
 }
 
@@ -6076,12 +6057,11 @@ console.log('\n76. Termin und Projekt');
          'die Woche zeigt die Filterleiste');
 
   /* Die Seite */
-  const kom = skript.match(/function kommendes\([\s\S]*?\n\}\n/);
-  pruefe(kom && /termineZuProjekt\(v\.id\)/.test(kom[0]),
-         'die Projektseite führt ihre Termine unter „was kommt"');
-  const gtn = skript.match(/function getanes\([\s\S]*?\n\}\n/);
-  pruefe(gtn && /termineZuProjekt\(v\.id\)/.test(gtn[0]),
-         'und die vergangenen unter „was ich gemacht habe"');
+  const sl = skript.match(/function seiteListe\([\s\S]*?\n\}\n/);
+  pruefe(sl && /termineZuProjekt\(v\.id\)/.test(sl[0]),
+         'die Projektseite führt ihre Termine in der Liste');
+  pruefe(sl && /terminTitel\(/.test(sl[0]),
+         'ohne das Kürzel im Titel');
   pruefe(/zuordnenOeffnen\(\)/.test(QUELLE),
          'von der Seite aus lassen sich Termine zuordnen');
 
