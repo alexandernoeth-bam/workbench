@@ -636,7 +636,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '       art:\'haupt\' } ];'
                  + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Antrag\','
                  + '     kontext:\'privat\', projektId:\'p1\','
-                 + '     schritte:[{ titel:\'F\', fertig:false }] }];'
+                 + '     schritte:[{ titel:\'F\', aufgabeId:\'a2\' }] }];'
                  + '   zustandSetzen(p, \'Bodenplatte ist gegossen\');'
                  + '   seiteFuer = \'p1\'; seiteArt = \'projekt\'; seiteZu = {};'
                  + '   p.festlegungen.push({ id:\'f1\', stichwort:\'Grundfläche\','
@@ -648,14 +648,21 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var namen = [];'
                  + '   (h.match(/sa-name">([^<]*)/g) || []).forEach(function(x){'
                  + '     namen.push(x.replace(/.*">/, \'\')); });'
+                 + '   var unter = [];'
+                 + '   (h.match(/su-name">([^<]*)/g) || []).forEach(function(x){'
+                 + '     unter.push(x.replace(/.*">/, \'\')); });'
                  + '   var zahlen = [];'
                  + '   (h.match(/sa-zahl">([^<]*)/g) || []).forEach(function(x){'
                  + '     zahlen.push(x.replace(/.*">/, \'\')); });'
-                 + '   var r = { abschnitte: namen,'
+                 + '   var r = { abschnitte: namen, unter: unter,'
                  + '             erledigtUnterAufgaben: (h.indexOf(\'Erledigt · 1\') >= 0),'
                  + '             msStand: zahlen[0],'
                  + '             zustand: (h.match(/sk-zustand">([^<]*)/) || [])[1],'
-                 + '             festGesetzt: festlegungen(p).length };'
+                 + '             festGesetzt: festlegungen(p).length,'
+                 + '             einzelnOhneAblaufAufgabe: (h.indexOf(\'Massband\') < 0),'
+                 + '             aktivitaetenZahl: Number(zahlen[2]),'
+                 + '             terminZahl: Number(zahlen[3]),'
+                 + '             aktionZahl: Number(zahlen[4]) };'
                  + '   festlegungSetzen(\'f2\', \'inhalt\', \'4,00 m\');'
                  + '   r.festGeaendert = festlegungen(p)[1].inhalt;'
                  + '   r.festAnzahlBleibt = festlegungen(p).length;'
@@ -5837,9 +5844,18 @@ console.log('\n74. Vorhabenseite');
     const e = s.pruefeSeite();
     pruefe(e.abschnitte.indexOf('Meilensteine') >= 0, 'Meilensteine stehen auf der Seite');
     pruefe(e.abschnitte.indexOf('Festlegungen') >= 0, 'Festlegungen ebenso');
-    pruefe(e.abschnitte.indexOf('Aufgaben') >= 0, 'Aufgaben ebenso');
-    pruefe(e.abschnitte.indexOf('Termine') >= 0, 'Termine ebenso');
-    pruefe(e.abschnitte.indexOf('Abläufe') >= 0, 'Abläufe ebenso');
+    pruefe(e.abschnitte.indexOf('Aktivitäten') >= 0,
+           'Aktivitäten fassen zusammen, was geschieht');
+    pruefe(e.unter.indexOf('Termine') >= 0, 'Termine als Unterbereich');
+    pruefe(e.unter.indexOf('Aktionen') >= 0, 'Aktionen als Unterbereich');
+    pruefe(e.unter.indexOf('Abläufe') >= 0, 'Abläufe innerhalb der Aktionen');
+    pruefe(e.unter.indexOf('Einzeln') >= 0,
+           'daneben, was in keinem Ablauf steckt');
+    pruefe(e.einzelnOhneAblaufAufgabe === true,
+           'eine Aufgabe, die einen Ablaufschritt trägt, steht nicht auch einzeln');
+    pruefe(e.aktivitaetenZahl === e.terminZahl + e.aktionZahl,
+           'die Aktivitäten zählen Termine und Aktionen zusammen (ist: '
+           + e.aktivitaetenZahl + ' = ' + e.terminZahl + ' + ' + e.aktionZahl + ')');
     pruefe(e.abschnitte.indexOf('Anlagen') >= 0, 'Anlagen ebenso');
     pruefe(e.abschnitte.indexOf('Erledigt') < 0,
            'Erledigtes hat keinen eigenen Abschnitt mehr');

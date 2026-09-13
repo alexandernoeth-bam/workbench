@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.46.1</title>
+<title>Workbench 0.47.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -131,6 +131,17 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .sa-kopf svg.auf{transform:rotate(0deg)}
 .sa-inhalt{padding-bottom:8px}
 .sa.leer .sa-name{color:var(--grau-hell)}
+.su{margin-left:12px;border-left:1px solid var(--linie);padding-left:10px}
+.su-kopf{display:flex;width:100%;align-items:center;gap:9px;background:none;border:0;
+  font:inherit;font-size:calc(var(--fs)*0.74);color:var(--grau);padding:7px 0;
+  cursor:pointer;text-align:left}
+.su-name{flex:1;min-width:0}
+.su.leer .su-name{color:var(--grau-hell)}
+.su-kopf svg{flex:0 0 auto;width:13px;height:13px;stroke:currentColor;fill:none;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  transform:rotate(-90deg);transition:transform .15s ease}
+.su-kopf svg.auf{transform:rotate(0deg)}
+.su-inhalt{padding-bottom:6px}
 
 .sm{display:flex;align-items:baseline;gap:9px;padding:4px 0}
 .sm-punkt{flex:0 0 8px;height:8px;border-radius:50%;border:1px solid var(--grau);
@@ -1045,7 +1056,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.46.1';
+var APP_VERSION = '0.47.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8475,6 +8486,24 @@ function seiteAbschnittUm(name) {
   seiteZeichnen();
 }
 
+/* Ein Unterabschnitt sitzt innerhalb eines Abschnitts: kleiner
+   gesetzt, eingerückt, sonst gleich. */
+function seiteUnterAbschnitt(name, zahl, inhalt) {
+  var leer = (zahl === 0 || zahl === '0');
+  var stand = seiteZu[name];
+  var zu = (stand === true) || (stand === undefined && leer);
+  seiteLeer[name] = leer;
+
+  var h = '<div class="su' + (leer ? ' leer' : '') + '">';
+  h += '<button class="su-kopf" type="button" onclick="seiteAbschnittUm(\'' + name + '\')">';
+  h += '<span class="su-name">' + esc(name) + '</span>';
+  if (zahl !== '') { h += '<span class="sa-zahl">' + esc(String(zahl)) + '</span>'; }
+  h += '<svg class="' + (zu ? '' : 'auf') + '" viewBox="0 0 24 24">'
+     + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+  if (!zu) { h += '<div class="su-inhalt">' + inhalt + '</div>'; }
+  return h + '</div>';
+}
+
 /* Merkt sich beim Zeichnen, welche Abschnitte leer waren. */
 var seiteLeer = {};
 
@@ -8642,16 +8671,38 @@ function seiteZeichnen() {
   h += seiteAbschnitt('Festlegungen', festlegungen(v).length,
                       festlegungenHtml(v), false);
 
-  /* Aktivitäten: Termine, Abläufe, Aufgaben — alles, was geschieht.
-     Kleinigkeiten und Wiederkehrendes stehen bei den Aufgaben mit,
-     Erledigtes eingeklappt darunter. */
+  /* Aktivitäten: alles, was geschieht. Darunter die Termine und die
+     Aktionen — Abläufe und das, was nicht in einem Ablauf steckt.
+     Eine Aufgabe, die einen Ablaufschritt trägt, erscheint dort und
+     nicht noch einmal daneben. */
   var zug = istProjekt ? alleAufgabenZuProjekt(v.id) : [];
+  var feld = istProjekt ? 'projektId' : 'zielId';
+
+  var meineLaeufe = (DB.durchlaeufe || []).filter(function (d) {
+    return d[feld] === v.id;
+  });
+  var meineVorlagen = (DB.ablaeufe || []).filter(function (d) {
+    return d[feld] === v.id;
+  });
+
+  /* Welche Aufgaben stecken in diesen Abläufen? */
+  var imAblauf = {};
+  var di, si;
+  for (di = 0; di < meineLaeufe.length; di++) {
+    var ss = meineLaeufe[di].schritte || [];
+    for (si = 0; si < ss.length; si++) {
+      if (ss[si].aufgabeId) { imAblauf[ss[si].aufgabeId] = true; }
+    }
+  }
+
   var offen = [], fertig = [];
   var ai;
   for (ai = 0; ai < zug.length; ai++) {
+    if (imAblauf[zug[ai].id]) { continue; }
     if (zug[ai].status === 'erledigt' && !zug[ai].wiederholung) { fertig.push(zug[ai]); }
     else { offen.push(zug[ai]); }
   }
+
   var listeHtml = function (l) {
     var t = '';
     var i;
@@ -8673,7 +8724,7 @@ function seiteZeichnen() {
     return t;
   };
 
-  /* Termine */
+  /* Unterbereich Termine */
   var tl = istProjekt ? termineZuProjekt(v.id) : [];
   var th = '';
   var ti;
@@ -8693,33 +8744,28 @@ function seiteZeichnen() {
        + esc(v.id) + '\')"><svg viewBox="0 0 24 24">'
        + '<path d="M5 12h14M13 6l6 6-6 6"></path></svg>Im Kalender zeigen</button>';
   }
-  if (istProjekt) {
-    h += seiteAbschnitt('Termine', tl.length, th, false);
-  }
 
-  /* Abläufe */
-  var laeufeZahl = (DB.durchlaeufe || []).filter(function (d) {
-    return d[istProjekt ? 'projektId' : 'zielId'] === v.id;
-  }).length + (DB.ablaeufe || []).filter(function (d) {
-    return d[istProjekt ? 'projektId' : 'zielId'] === v.id;
-  }).length;
-  h += seiteAbschnitt('Abläufe', laeufeZahl, vhAblaeufeHtml(v.id, seiteArt), false);
-
-  /* Aufgaben — mit Kleinigkeiten und Wiederkehrendem, Erledigtes
-     eingeklappt darunter. */
-  if (istProjekt) {
-    var ah2 = listeHtml(offen);
-    if (fertig.length) {
-      var zuF = seiteZu['Erledigt'] !== false;
-      ah2 += '<button class="tfalt" type="button" '
-           + 'onclick="seiteAbschnittUm(\'Erledigt\')">'
-           + '<span>Erledigt · ' + fertig.length + '</span>'
-           + '<svg class="' + (zuF ? '' : 'auf') + '" viewBox="0 0 24 24">'
-           + '<path d="M6 9l6 6 6-6"></path></svg></button>';
-      if (!zuF) { ah2 += listeHtml(fertig); }
-    }
-    h += seiteAbschnitt('Aufgaben', offen.length, ah2, false);
+  /* Unterbereich Aktionen */
+  var akt = '';
+  akt += seiteUnterAbschnitt('Abläufe', meineLaeufe.length + meineVorlagen.length,
+                             vhAblaeufeHtml(v.id, seiteArt));
+  var freiHtml = listeHtml(offen);
+  if (fertig.length) {
+    var zuF = seiteZu['Erledigt'] !== false;
+    freiHtml += '<button class="tfalt" type="button" '
+              + 'onclick="seiteAbschnittUm(\'Erledigt\')">'
+              + '<span>Erledigt · ' + fertig.length + '</span>'
+              + '<svg class="' + (zuF ? '' : 'auf') + '" viewBox="0 0 24 24">'
+              + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+    if (!zuF) { freiHtml += listeHtml(fertig); }
   }
+  akt += seiteUnterAbschnitt('Einzeln', offen.length, freiHtml);
+
+  var aktZahl = meineLaeufe.length + meineVorlagen.length + offen.length;
+  var innen = '';
+  if (istProjekt) { innen += seiteUnterAbschnitt('Termine', tl.length, th); }
+  innen += seiteUnterAbschnitt('Aktionen', aktZahl, akt);
+  h += seiteAbschnitt('Aktivitäten', tl.length + aktZahl, innen, false);
 
   /* Einzahler beim Ziel */
   if (!istProjekt) {
