@@ -532,6 +532,38 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__notizApi = {'
+                 + ' pruefeNotiz: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var notiz = \'Grundfläche: 6,00 x 9,00 m\\n\''
+                 + '             + \'- Torbreite: 3,50 m\\n\''
+                 + '             + \'• Bodenplatte 25 cm bewehrt\\n\''
+                 + '             + \'\\n\''
+                 + '             + \'Satteldach, Ziegel wie Haus\\n\''
+                 + '             + \'Bauamt: Herr Schmidt\';'
+                 + '   var p = { id:\'p1\', name:\'Garage\', kontext:\'privat\','
+                 + '     status:\'laufend\', zielzustaende:[], anlagen:[],'
+                 + '     meilensteine:[], notiz: notiz };'
+                 + '   DB.projekte = [p];'
+                 + '   seiteFuer = \'p1\'; seiteArt = \'projekt\';'
+                 + '   notizUebernehmen(p);'
+                 + '   var f = festlegungen(p);'
+                 + '   var lang = notizZerlegen(\'Ein Satz mit einem sehr langen '
+                 + 'Vorspann, der weit über vierzig Zeichen geht: und dann Inhalt\');'
+                 + '   var r = { zahl: f.length, stichwort: f[0].stichwort,'
+                 + '             inhalt: f[0].inhalt,'
+                 + '             ohneDoppelpunkt: f[2].inhalt,'
+                 + '             strichWeg: (f[1].stichwort === \'Torbreite\'),'
+                 + '             leerzeilenWeg: (f.length === 5),'
+                 + '             imLog: (logEintraege(p)[0].text'
+                 + '               .indexOf(\'Herr Schmidt\') >= 0),'
+                 + '             notizLeer: p.notiz,'
+                 + '             satzZeichenKeinStichwort: (lang[0].stichwort === \'\') };'
+                 + '   notizUebernehmen(p);'
+                 + '   r.zweitesMal = festlegungen(p).length;'
+                 + '   seiteFuer = \'\'; seiteArt = \'\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__zuordnenApi = {'
                  + ' pruefeZuordnen: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -6248,6 +6280,60 @@ console.log('\n77. Termine zuordnen');
     pruefe(e.herkunftTitel === 'titel', 'ein Kürzel im Titel ebenso');
     pruefe(e.kuenftigesVorkommen === true,
            'ein später hinzukommendes Vorkommen derselben Serie gehört dazu');
+  }
+}
+
+/* ============================================================
+   78. Die Notiz wird zu Festlegungen
+   Grund: Die Notiz am Vorhaben war eine Aufzaehlung festgelegter
+   Eigenschaften — also Festlegungen in einem Feld. Seit die Karte
+   direkt auf die Seite fuehrt, war das alte Blatt unerreichbar und
+   die Notiz damit unsichtbar.
+   ============================================================ */
+console.log('\n78. Notiz zu Festlegungen');
+{
+  const skript = hauptSkript();
+  const n = globalThis.__notizApi;
+
+  ['notizZerlegen', 'notizUebernehmen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const ueb = skript.match(/function notizUebernehmen\([\s\S]*?\n\}\n/);
+  pruefe(ueb && /v\.log\.push/.test(ueb[0]),
+         'der volle Wortlaut wird vorher im Log gesichert');
+  pruefe(ueb && /v\.notiz = ''/.test(ueb[0]),
+         'danach wird das Feld geleert — sonst stünde alles doppelt da');
+  pruefe(ueb && /text\.length === 0\) \{ return 0/.test(ueb[0]),
+         'ohne Notiz geschieht nichts');
+
+  const zeichnen = skript.match(/function seiteZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zeichnen && /notizUebernehmen\(v\)/.test(zeichnen[0]),
+         'übernommen wird beim Öffnen der Seite');
+
+  const zer = skript.match(/function notizZerlegen\([\s\S]*?\n\}/);
+  pruefe(zer && /\[-–—•\*·\]/.test(zer[0]),
+         'Aufzählungszeichen am Zeilenanfang fallen weg');
+  pruefe(zer && /doppel <= 40/.test(zer[0]),
+         'ein Doppelpunkt weit hinten ist Satzzeichen, kein Stichwort');
+
+  if (!n) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = n.pruefeNotiz();
+    pruefe(e.zahl === 5, 'fünf Zeilen ergeben fünf Festlegungen');
+    pruefe(e.stichwort === 'Grundfläche', 'vor dem Doppelpunkt steht das Stichwort');
+    pruefe(e.inhalt === '6,00 x 9,00 m', 'dahinter der Inhalt');
+    pruefe(e.ohneDoppelpunkt === 'Bodenplatte 25 cm bewehrt',
+           'ohne Doppelpunkt ist die ganze Zeile der Inhalt');
+    pruefe(e.strichWeg === true, 'der Aufzählungsstrich ist weg');
+    pruefe(e.leerzeilenWeg === true, 'Leerzeilen ergeben keine Einträge');
+    pruefe(e.imLog === true, 'der volle Wortlaut steht im Log');
+    pruefe(e.notizLeer === '', 'das Notizfeld ist geleert');
+    pruefe(e.zweitesMal === 5, 'ein zweites Öffnen legt nichts nach');
+    pruefe(e.satzZeichenKeinStichwort === true,
+           'ein Doppelpunkt mitten im Satz macht kein Stichwort');
   }
 }
 
