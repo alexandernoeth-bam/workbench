@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.52.0</title>
+<title>Workbench 0.53.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -147,8 +147,21 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   padding:9px 0 3px;border-bottom:1px solid var(--linie);margin-bottom:3px}
 .sl{display:flex;align-items:baseline;gap:9px;padding:4px 0}
 .sl.faellig .sl-datum{color:var(--weinrot);font-weight:500}
-.sl-ohne{flex:0 0 18px}
 .sl .tkasten{flex:0 0 auto;align-self:center}
+.sl-kreis{flex:0 0 18px;width:18px;height:18px;border-radius:50%;
+  border:1.5px solid var(--grau);background:none;cursor:pointer;padding:0;
+  align-self:center}
+.sl-kreis.an{background:var(--petrol);border-color:var(--petrol)}
+.sl-zeit{flex:0 0 auto;min-width:40px;font-size:calc(var(--fs)*0.74);
+  color:var(--weinrot);font-variant-numeric:tabular-nums;align-self:center}
+.sl-stand{flex:0 0 auto;min-width:40px;font-size:calc(var(--fs)*0.72);
+  color:var(--grau);font-variant-numeric:tabular-nums;align-self:center}
+.sl-ende{display:flex;align-items:baseline;gap:9px;margin:14px 0 4px;padding:8px 11px;
+  border:1px solid var(--tinte);border-radius:6px}
+.sl-ende.vorbei{border-color:var(--weinrot)}
+.sl-ende-datum{flex:0 0 62px;font-size:calc(var(--fs)*0.76);font-weight:500;
+  font-variant-numeric:tabular-nums}
+.sl-ende-text{flex:1;min-width:0;font-size:calc(var(--fs)*0.82)}
 .sl-neu{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0 10px}
 .sl-neu .v-feld{flex:1 1 200px;min-width:0}
 .sl.fertig .sl-titel{color:var(--grau);text-decoration:line-through}
@@ -1130,7 +1143,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.52.0';
+var APP_VERSION = '0.53.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8842,8 +8855,8 @@ function seiteListe(v, istProjekt, feld) {
     for (i = 0; i < tl.length; i++) {
       aus.push({ datum: tl[i].tag, art: 'Termin',
                  titel: terminTitel(tl[i].termin), fertig: false,
-                 ruf: 'zumTag(\'' + tl[i].tag + '\')',
-                 zusatz: tl[i].termin.zeit || 'ganztägig' });
+                 zeit: tl[i].termin.zeit || '',
+                 ruf: 'zumTag(\'' + tl[i].tag + '\')' });
     }
   }
 
@@ -8856,8 +8869,8 @@ function seiteListe(v, istProjekt, feld) {
                fertig: (a.status === 'erledigt' && !a.wiederholung),
                haken: 'aufHaken:' + a.id,
                ruf: 'aufgabeAktionen(\'' + esc(a.id) + '\')',
-               zusatz: (a.art === 'klein' ? 'Kleinigkeit'
-                      : (a.wiederholung ? regelText(a.wiederholung) : planungText(a))) });
+               zusatz: (a.wiederholung ? regelText(a.wiederholung)
+                      : (a.art === 'klein' ? 'Kleinigkeit' : '')) });
   }
 
   var laeufe = (DB.durchlaeufe || []).filter(function (d) { return d[feld] === v.id; });
@@ -8872,7 +8885,7 @@ function seiteListe(v, istProjekt, feld) {
                art: 'Ablauf', titel: laeufe[li].name,
                fertig: (gesamt > 0 && fertigZahl === gesamt),
                ruf: 'durchlaufAbhakenOeffnen(\'' + esc(laeufe[li].id) + '\')',
-               zusatz: fertigZahl + ' von ' + gesamt + ' Schritten' });
+               stand: fertigZahl + '/' + gesamt });
   }
 
   aus.sort(function (x, y) {
@@ -8906,14 +8919,24 @@ function seiteZeileHtml(e, heute) {
   var faellig = (!e.fertig && e.datum && e.datum < heute);
   var h = '<div class="sl' + (e.fertig ? ' fertig' : '')
         + (faellig ? ' faellig' : '') + '">';
-  if (e.haken) {
-    h += '<button class="tkasten' + (e.fertig ? ' an' : '') + '" type="button" '
-       + 'onclick="seiteHaken(\'' + esc(e.haken) + '\')"></button>';
-  } else {
-    h += '<span class="sl-ohne"></span>';
-  }
   h += '<span class="sl-datum">' + esc(e.datum ? kurzDatum(e.datum) : '—') + '</span>';
-  h += '<span class="sl-art">' + esc(e.art) + '</span>';
+
+  /* Die Art steckt im Zeichen, nicht in einem Etikett: ein Kreis für
+     den Meilenstein, ein Kästchen für die Aufgabe, die Uhrzeit für
+     den Termin, der Stand für den Ablauf. */
+  if (e.art === 'Meilenstein') {
+    h += '<button class="sl-kreis' + (e.fertig ? ' an' : '') + '" type="button" '
+       + 'onclick="seiteHaken(\'' + esc(e.haken) + '\')" '
+       + 'title="Meilenstein"></button>';
+  } else if (e.art === 'Termin') {
+    h += '<span class="sl-zeit" title="Termin">' + esc(e.zeit || 'ganz') + '</span>';
+  } else if (e.art === 'Ablauf') {
+    h += '<span class="sl-stand" title="Ablauf">' + esc(e.stand || '') + '</span>';
+  } else {
+    h += '<button class="tkasten' + (e.fertig ? ' an' : '') + '" type="button" '
+       + 'onclick="seiteHaken(\'' + esc(e.haken) + '\')" title="Aufgabe"></button>';
+  }
+
   h += '<span class="sl-titel"' + (e.ruf ? (' onclick="' + e.ruf + '"') : '') + '>'
      + esc(e.titel)
      + (e.zusatz ? ('<span class="sl-zusatz">' + esc(e.zusatz) + '</span>') : '')
@@ -8964,6 +8987,17 @@ function seiteListeHtml(v, istProjekt, feld) {
   }
   if (!offen.length) {
     h += '<div class="tleer" style="padding-left:0">Nichts Offenes.</div>';
+  }
+
+  var ende = v[istProjekt ? 'ende' : 'zieltermin'];
+  if (ende) {
+    var tage = Math.round((ausIso(ende) - ausIso(heute)) / 86400000);
+    h += '<div class="sl-ende' + (tage < 0 ? ' vorbei' : '') + '">'
+       + '<span class="sl-ende-datum">' + esc(kurzDatum(ende)) + '</span>'
+       + '<span class="sl-ende-text">'
+       + (istProjekt ? 'Projektende' : 'Zieltermin')
+       + (tage >= 0 ? (' · noch ' + tage + (tage === 1 ? ' Tag' : ' Tage'))
+                    : (' · ' + Math.abs(tage) + ' Tage her')) + '</span></div>';
   }
 
   if (erledigt.length) {

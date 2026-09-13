@@ -5920,6 +5920,23 @@ console.log('\n74. Vorhabenseite');
          'Überfälliges wird hervorgehoben');
   pruefe(zeile2 && /seiteHaken\(/.test(zeile2[0]),
          'Aufgaben und Meilensteine lassen sich in der Liste abhaken');
+  /* Die Art steckt im Zeichen, nicht in einem Etikett. */
+  pruefe(zeile2 && !/sl-art/.test(zeile2[0]),
+         'die Zeile trägt kein Etikett für die Art mehr');
+  pruefe(zeile2 && /sl-kreis/.test(zeile2[0]),
+         'ein Meilenstein steht als Kreis da');
+  pruefe(zeile2 && /sl-zeit/.test(zeile2[0]),
+         'ein Termin durch seine Uhrzeit');
+  pruefe(zeile2 && /sl-stand/.test(zeile2[0]),
+         'ein Ablauf durch seinen Stand');
+  pruefe(zeile2 && /tkasten/.test(zeile2[0]),
+         'eine Aufgabe durch ihr Kästchen');
+  pruefe(/\.sl-kreis\{[^}]*border-radius:50%/.test(QUELLE),
+         'der Kreis ist rund, das Kästchen eckig — daran unterscheidet man sie');
+  pruefe(lhtml && /sl-ende/.test(lhtml[0]),
+         'das Projektende schließt die Liste ab');
+  pruefe(lhtml && /noch ' \+ tage/.test(lhtml[0]),
+         'mit der Zahl der verbleibenden Tage');
   const haken = hauptSkript().match(/function seiteHaken\([\s\S]*?\n\}\n/);
   pruefe(haken && /erreicht = !/.test(haken[0]),
          'ein Meilenstein lässt sich als erreicht kennzeichnen');
