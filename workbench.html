@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.53.0</title>
+<title>Workbench 0.54.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -156,6 +156,9 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
   color:var(--weinrot);font-variant-numeric:tabular-nums;align-self:center}
 .sl-stand{flex:0 0 auto;min-width:40px;font-size:calc(var(--fs)*0.72);
   color:var(--grau);font-variant-numeric:tabular-nums;align-self:center}
+.sl-schritt{padding-left:22px}
+.sl-schritt .sl-titel{font-size:calc(var(--fs)*0.82);color:var(--grau)}
+.sl-schritt.fertig .sl-titel{text-decoration:line-through}
 .sl-ende{display:flex;align-items:baseline;gap:9px;margin:14px 0 4px;padding:8px 11px;
   border:1px solid var(--tinte);border-radius:6px}
 .sl-ende.vorbei{border-color:var(--weinrot)}
@@ -1143,7 +1146,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.53.0';
+var APP_VERSION = '0.54.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8843,6 +8846,19 @@ function seiteListe(v, istProjekt, feld) {
   var aus = [];
   var i;
 
+  var laeufe = (DB.durchlaeufe || []).filter(function (d) { return d[feld] === v.id; });
+
+  /* Welche Aufgaben stecken in diesen Abläufen? Sie erscheinen dort
+     als Schritte, nicht noch einmal daneben. */
+  var imAblauf = {};
+  var di, si;
+  for (di = 0; di < laeufe.length; di++) {
+    var ss = laeufe[di].schritte || [];
+    for (si = 0; si < ss.length; si++) {
+      if (ss[si].aufgabeId) { imAblauf[ss[si].aufgabeId] = true; }
+    }
+  }
+
   if (istProjekt) {
     var ms = v.meilensteine || [];
     for (i = 0; i < ms.length; i++) {
@@ -8863,6 +8879,7 @@ function seiteListe(v, istProjekt, feld) {
   var zug = istProjekt ? alleAufgabenZuProjekt(v.id) : [];
   for (i = 0; i < zug.length; i++) {
     var a = zug[i];
+    if (imAblauf[a.id]) { continue; }
     var d = (a.planung && a.planung.length === 10) ? a.planung
           : (a.frist || (a.status === 'erledigt' ? a.erledigtAm : '') || '');
     aus.push({ datum: d || '', art: 'Aufgabe', titel: a.titel,
@@ -8873,7 +8890,6 @@ function seiteListe(v, istProjekt, feld) {
                       : (a.art === 'klein' ? 'Kleinigkeit' : '')) });
   }
 
-  var laeufe = (DB.durchlaeufe || []).filter(function (d) { return d[feld] === v.id; });
   var li;
   for (li = 0; li < laeufe.length; li++) {
     var gesamt = (laeufe[li].schritte || []).length;
@@ -8885,7 +8901,8 @@ function seiteListe(v, istProjekt, feld) {
                art: 'Ablauf', titel: laeufe[li].name,
                fertig: (gesamt > 0 && fertigZahl === gesamt),
                ruf: 'durchlaufAbhakenOeffnen(\'' + esc(laeufe[li].id) + '\')',
-               stand: fertigZahl + '/' + gesamt });
+               stand: fertigZahl + '/' + gesamt,
+               schritte: schritteAlsZeilen(laeufe[li]) });
   }
 
   aus.sort(function (x, y) {
@@ -8894,6 +8911,22 @@ function seiteListe(v, istProjekt, feld) {
     if (dx !== dy) { return (dx < dy) ? -1 : 1; }
     return (x.titel < y.titel) ? -1 : 1;
   });
+  return aus;
+}
+
+/* Die Schritte eines Ablaufs als eingerückte Zeilen. Trägt eine
+   Aufgabe den Schritt, gilt ihr Titel und ihr Stand. */
+function schritteAlsZeilen(d) {
+  var aus = [];
+  var l = d.schritte || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    var a = schrittAufgabe(l[i]);
+    aus.push({ nr: i, titel: schrittTitel(l[i]), fertig: schrittFertig(l[i]),
+               durchlaufId: d.id,
+               zusatz: a ? (a.art === 'klein' ? 'Kleinigkeit' : planungText(a)) : '',
+               ruht: (l[i].ab || '') });
+  }
   return aus;
 }
 
@@ -8942,7 +8975,30 @@ function seiteZeileHtml(e, heute) {
      + (e.zusatz ? ('<span class="sl-zusatz">' + esc(e.zusatz) + '</span>') : '')
      + '</span>';
   h += '</div>';
+
+  /* Ein Ablauf trägt seine Schritte — eingerückt, nicht daneben. */
+  if (e.schritte && e.schritte.length) {
+    var i;
+    for (i = 0; i < e.schritte.length; i++) {
+      var s = e.schritte[i];
+      h += '<div class="sl sl-schritt' + (s.fertig ? ' fertig' : '') + '">';
+      h += '<span class="sl-datum"></span>';
+      h += '<button class="tkasten' + (s.fertig ? ' an' : '') + '" type="button" '
+         + 'onclick="seiteSchrittHaken(\'' + esc(s.durchlaufId) + '\',' + s.nr + ')">'
+         + '</button>';
+      h += '<span class="sl-titel" onclick="durchlaufAbhakenOeffnen(\''
+         + esc(s.durchlaufId) + '\')">' + esc(s.titel)
+         + (s.zusatz ? ('<span class="sl-zusatz">' + esc(s.zusatz) + '</span>') : '')
+         + '</span>';
+      h += '</div>';
+    }
+  }
   return h;
+}
+
+function seiteSchrittHaken(durchlaufId, nr) {
+  schrittUm(durchlaufId, nr);
+  seiteZeichnen();
 }
 
 function seiteListeHtml(v, istProjekt, feld) {
@@ -8975,14 +9031,9 @@ function seiteListeHtml(v, istProjekt, feld) {
 
   h += seiteNeuHtml(istProjekt);
 
-  var letzterMonat = '';
+  /* Eine Liste ohne Monatstrenner: Sie zerschneiden den Fluss, und
+     das Datum steht ohnehin in jeder Zeile. */
   for (i = 0; i < offen.length; i++) {
-    var monat = offen[i].datum ? offen[i].datum.slice(0, 7) : '';
-    if (monat !== letzterMonat) {
-      letzterMonat = monat;
-      h += '<div class="sl-monat">'
-         + (monat ? esc(monatName(monat)) : 'ohne Datum') + '</div>';
-    }
     h += seiteZeileHtml(offen[i], heute);
   }
   if (!offen.length) {

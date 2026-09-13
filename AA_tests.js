@@ -716,6 +716,15 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '               return x.fertig; }).length,'
                  + '             offenTrotzVergangen: l.some(function(x){'
                  + '               return x.art === \'Ablauf\' && !x.fertig; }) };'
+                 + '   DB.aufgaben.push({ id:\'a9\', titel:\'Getragen\','
+                 + '     kontext:\'privat\', projektId:\'p1\', status:\'offen\','
+                 + '     planung:\'backlog\', art:\'haupt\' });'
+                 + '   DB.durchlaeufe[0].schritte[0].aufgabeId = \'a9\';'
+                 + '   var l2 = seiteListe(p, true, \'projektId\');'
+                 + '   var ab = l2.filter(function(x){ return x.art === \'Ablauf\'; })[0];'
+                 + '   r.schritteAmAblauf = ab.schritte.length;'
+                 + '   r.getrageneNichtDaneben = !l2.some(function(x){'
+                 + '     return x.titel === \'Getragen\' && x.art === \'Aufgabe\'; });'
                  + '   seiteArten = { Meilenstein: true };'
                  + '   r.nurMeilensteine = l.filter(function(x){'
                  + '     return seiteArtAn(x.art); }).length;'
@@ -5933,6 +5942,19 @@ console.log('\n74. Vorhabenseite');
          'eine Aufgabe durch ihr Kästchen');
   pruefe(/\.sl-kreis\{[^}]*border-radius:50%/.test(QUELLE),
          'der Kreis ist rund, das Kästchen eckig — daran unterscheidet man sie');
+  pruefe(lhtml && !/sl-monat/.test(lhtml[0]),
+         'keine Monatstrenner — das Datum steht in jeder Zeile');
+  const lst2 = hauptSkript().match(/function seiteListe\([\s\S]*?\n\}\n/);
+  pruefe(lst2 && /imAblauf\[a\.id\]\) \{ continue/.test(lst2[0]),
+         'eine Aufgabe, die einen Ablaufschritt trägt, steht nicht daneben');
+  pruefe(lst2 && /schritteAlsZeilen\(laeufe\[li\]\)/.test(lst2[0]),
+         'der Ablauf trägt seine Schritte');
+  pruefe(zeile2 && /sl-schritt/.test(zeile2[0]),
+         'die Schritte stehen eingerückt darunter');
+  pruefe(/\.sl-schritt\{padding-left/.test(QUELLE),
+         'die Einrückung macht die Hierarchie sichtbar');
+  pruefe(new RegExp('function\\s+seiteSchrittHaken\\s*\\(').test(hauptSkript()),
+         'ein Schritt lässt sich von hier abhaken');
   pruefe(lhtml && /sl-ende/.test(lhtml[0]),
          'das Projektende schließt die Liste ab');
   pruefe(lhtml && /noch ' \+ tage/.test(lhtml[0]),
@@ -5986,6 +6008,10 @@ console.log('\n74. Vorhabenseite');
     const e = s.pruefeSeite();
     pruefe(e.gesamt === 5,
            'alle fünf datierten Dinge stehen in einer Liste (ist: ' + e.gesamt + ')');
+    pruefe(e.schritteAmAblauf === 1,
+           'der Ablauf trägt seinen Schritt');
+    pruefe(e.getrageneNichtDaneben === true,
+           'die getragene Aufgabe steht nicht zusätzlich in der Liste');
     pruefe(e.arten === 'Meilenstein,Aufgabe,Aufgabe,Meilenstein,Ablauf',
            'gemischt nach Datum, nicht nach Art (ist: ' + e.arten + ')');
     pruefe(e.nurMeilensteine === 2, 'die Pille filtert auf zwei Meilensteine');
