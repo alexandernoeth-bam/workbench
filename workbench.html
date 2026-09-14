@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.59.0</title>
+<title>Workbench 0.61.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -665,6 +665,43 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
   border:1px solid var(--linie);border-radius:6px;background:var(--papier);
   color:var(--tinte);cursor:pointer}
 .vk-ruht{font-size:calc(var(--fs)*0.74);color:var(--petrol);margin-top:3px}
+.fl-kopf{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.fl-name{flex:1 1 160px;min-width:0;font-size:calc(var(--fs)*1.02);font-weight:500}
+.fl-suche{flex:0 1 180px;min-width:0;font:inherit;font-size:calc(var(--fs)*0.78);
+  border:1px solid var(--linie);border-radius:20px;padding:4px 11px;
+  background:var(--papier);color:var(--tinte);outline:none}
+.fl-leiste{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 8px}
+.fl-feld{width:100%;min-height:60vh;font:inherit;
+  font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  font-size:calc(var(--fs)*0.84);line-height:1.6;border:1px solid var(--linie);
+  border-radius:6px;padding:10px 12px;background:var(--papier);color:var(--tinte);
+  outline:none;resize:vertical;tab-size:2}
+.fl-treffer{font-size:calc(var(--fs)*0.76);color:var(--weinrot);margin-bottom:8px}
+.fl-ansicht{padding-bottom:40px}
+.fl-h1{font-size:calc(var(--fs)*1.14);font-weight:500;line-height:1.3;
+  padding:14px 0 4px;border-bottom:1px solid var(--linie);margin-bottom:4px}
+.fl-h2{font-size:calc(var(--fs)*0.98);font-weight:500;line-height:1.3;
+  padding:11px 0 2px;color:var(--tinte)}
+.fl-h3{font-size:calc(var(--fs)*0.88);font-weight:500;line-height:1.3;
+  padding:8px 0 2px;color:var(--grau)}
+.fl-absatz{font-size:calc(var(--fs)*0.88);line-height:1.55;padding:2px 0}
+.fl-zeile{display:flex;align-items:baseline;gap:9px;padding:2px 0}
+.fl-text{flex:1;min-width:0;font-size:calc(var(--fs)*0.88);line-height:1.55}
+.fl-text.fertig{color:var(--grau);text-decoration:line-through}
+.fl-punkt{flex:0 0 8px;height:8px;border:1.5px solid var(--grau);border-radius:2px;
+  align-self:center}
+.fl-trenner{border-top:1px solid var(--linie);margin:12px 0}
+.fl-leer{height:9px}
+.fl-ansicht mark{background:#f5e6a8;color:inherit;border-radius:2px;padding:0 1px}
+.fl-zeile .tkasten{align-self:center;margin-top:0}
+
+.vk-flaeche{display:inline-flex;align-items:center;gap:5px;margin-top:7px;
+  font:inherit;font-size:calc(var(--fs)*0.7);padding:2px 10px;
+  border:1px solid var(--linie);border-radius:20px;background:var(--papier);
+  color:var(--grau);cursor:pointer}
+.vk-flaeche.voll{border-color:var(--weinrot);color:var(--weinrot)}
+.vk-punkt{width:5px;height:5px;border-radius:50%;background:var(--weinrot)}
+
 .vh-bereich{display:flex;width:100%;align-items:center;gap:9px;background:none;
   border:0;border-bottom:1.5px solid var(--tinte);font:inherit;
   font-size:calc(var(--fs)*0.86);font-weight:500;color:var(--tinte);
@@ -891,6 +928,16 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 </div>
 
 
+<div class="schirm" id="schirmFlaeche">
+  <div class="vh-kopf">
+    <div class="vh-zeile">
+      <button type="button" class="pille" onclick="flaecheZurueck()">Zurück</button>
+    </div>
+    <div id="flaecheKopf"></div>
+  </div>
+  <div class="vhblatt einfachliste" id="flaecheBlatt"></div>
+</div>
+
 <div class="schirm" id="schirmDiagnose">
   <div class="abschnitt-titel"><span>Speicher</span></div>
   <div id="speicherListe"></div>
@@ -1028,6 +1075,8 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
               onclick="setVhStufe('vorhaben')">Vorhaben</button>
       <button type="button" id="vhStufeEinfaelle"
               onclick="setVhStufe('einfaelle')">Einfälle</button>
+      <button type="button" id="vhStufeGedanken"
+              onclick="flaecheOeffnen(FREIE_FLAECHE)">Gedanken</button>
     </div>
     <div class="knopfreihe" style="margin-top:9px" id="vhRueckblickReihe">
       <button type="button" onclick="rueckblickOeffnen()">Wochenrückblick</button>
@@ -1152,7 +1201,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.59.0';
+var APP_VERSION = '0.61.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2237,6 +2286,7 @@ function taktStarten() {
 
 function rueckkehrPruefen() {
   erneuerungPruefen();
+  wochenUmstellen();
   if (document.hidden) { return; }
   if (!tokenGueltig()) { return; }
   if (Date.now() - abgleichZuletztMs < ABGLEICH_MINDEST) { return; }
@@ -3506,8 +3556,7 @@ function nzWert(art) {
 function nzSetzen(id, art) {
   var a = aufgabeFinden(id);
   if (!a) { return; }
-  a.planung = nzWert(art);
-  a.geaendert = jetzt();
+  planungSetzen(a, nzWert(art));
   spaeterSichern();
   tagZeichnen();
   aufZeichnen();
@@ -4377,7 +4426,7 @@ function dBeschreibung(wert) { var a = aufgabeFinden(aktionFuer); if (a) { a.bes
 function dPlanung(wert) {
   var a = aufgabeFinden(aktionFuer);
   if (!a || !wert) { return; }
-  a.planung = wert;
+  planungSetzen(a, wert);
   detailGeaendert(true);
 }
 
@@ -4595,6 +4644,7 @@ function tagBlaettern(n) {
 }
 
 function tagHeute() {
+  wochenUmstellen();
   faelligeStarten();
   tagOffen = isoDatum();
   erledigtOffen = false;
@@ -4718,7 +4768,7 @@ function handleVergessen() {
 function zeigeSchirm(name) {
   schirmOffen = name;
   var alle = ['Tag', 'Kalender', 'Vorhaben', 'Ablaeufe', 'Aufgaben',
-              'Migration', 'Diagnose'];
+              'Flaeche', 'Migration', 'Diagnose'];
   var i;
   for (i = 0; i < alle.length; i++) {
     var s = document.getElementById('schirm' + alle[i]);
@@ -4727,10 +4777,14 @@ function zeigeSchirm(name) {
       if (alle[i] === name) { s.classList.add('aktiv'); } else { s.classList.remove('aktiv'); }
     }
     if (n) {
-      if (alle[i] === name) { n.classList.add('aktiv'); } else { n.classList.remove('aktiv'); }
+      /* Die Fläche hat keinen eigenen Knopf — sie gehört zu Vorhaben. */
+      var leuchtet = (alle[i] === name)
+                  || (name === 'Flaeche' && alle[i] === 'Vorhaben');
+      if (leuchtet) { n.classList.add('aktiv'); } else { n.classList.remove('aktiv'); }
     }
   }
   if (name === 'Migration') { migZeichne(); }
+  if (name === 'Flaeche') { flaecheZeichnen(); }
   if (name === 'Tag') { tagZeichnen(); kalenderNachholen(); }
   if (name === 'Aufgaben') { aufZeichnen(); }
   if (name === 'Vorhaben') { vhZeichnen(); }
@@ -7342,8 +7396,19 @@ function zielKarteHtml(z) {
   h += '</div>';
   h += '<div class="vk-satz' + (satz ? '' : ' leer') + '">'
      + esc(satz || 'noch kein Zielzustand für diese Woche') + '</div>';
+  h += flaecheKnopfHtml(z);
   h += '</div>';
   return h;
+}
+
+/* Der Weg zur Gedankenfläche des Vorhabens. Ein Punkt zeigt an, dass
+   dort etwas steht. */
+function flaecheKnopfHtml(v) {
+  var text = String(v.flaeche || '').trim();
+  return '<button class="vk-flaeche' + (text ? ' voll' : '') + '" type="button" '
+       + 'onclick="event.stopPropagation();flaecheOeffnen(\'' + esc(v.id) + '\')" '
+       + 'title="Gedankenfläche">Gedanken'
+       + (text ? ('<span class="vk-punkt"></span>') : '') + '</button>';
 }
 
 function projektKarteHtml(p) {
@@ -7356,6 +7421,7 @@ function projektKarteHtml(p) {
   h += '</div>';
   h += '<div class="vk-satz' + (satz ? '' : ' leer') + '">'
      + esc(satz || 'noch kein Zielzustand für diese Woche') + '</div>';
+  h += flaecheKnopfHtml(p);
   h += '</div>';
   return h;
 }
@@ -8047,6 +8113,271 @@ function seiteBearbeiten() {
 }
 
 
+
+
+/* ============================================================
+   Die Gedankenfläche
+
+   Freier Text mit einfachen Zeichen am Zeilenanfang — gespeichert wird
+   nichts als Text. Er ist durchsuchbar, geht über den Abgleich mit und
+   ist in zehn Jahren noch lesbar. Ein Kästchen hier ist ein Zeichen im
+   Text, keine Aufgabe: Wird aus einem Gedanken eine echte Aufgabe,
+   wird sie dort eingetragen, wo sie hingehört.
+
+   Zeichen am Zeilenanfang:
+     #  ##  ###   Überschrift
+     []  [x]      Kästchen
+     -            Aufzählung
+     ---          Trenner
+     Leerzeichen  Einrückung
+   ============================================================ */
+
+var flaecheFuer = '';        /* Kennung des Vorhabens, '' = die freie */
+var flaecheModus = 'ansicht';
+var flaecheSuche = '';
+
+var FREIE_FLAECHE = 'frei';
+
+function flaecheText(id) {
+  if (id === FREIE_FLAECHE) {
+    return String(DB.einstellungen.flaecheFrei || '');
+  }
+  var v = vorhabenFinden(id, 'projekt') || vorhabenFinden(id, 'ziel');
+  return v ? String(v.flaeche || '') : '';
+}
+
+function flaecheSetzen(id, text) {
+  if (id === FREIE_FLAECHE) {
+    DB.einstellungen.flaecheFrei = text;
+  } else {
+    var v = vorhabenFinden(id, 'projekt') || vorhabenFinden(id, 'ziel');
+    if (!v) { return; }
+    v.flaeche = text;
+    v.geaendert = jetzt();
+  }
+  spaeterSichern();
+}
+
+function flaecheName(id) {
+  if (id === FREIE_FLAECHE) { return 'Gedanken'; }
+  var v = vorhabenFinden(id, 'projekt') || vorhabenFinden(id, 'ziel');
+  return v ? v.name : 'Fläche';
+}
+
+/* ------------------------------------------------------------
+   Vom Text zur Ansicht
+   ------------------------------------------------------------ */
+
+function flaecheZeileHtml(zeile, nr, suche) {
+  var roh = String(zeile);
+  var tiefe = 0;
+  var rest = roh;
+  while (rest.indexOf('  ') === 0) { tiefe++; rest = rest.slice(2); }
+  if (tiefe > 6) { tiefe = 6; }
+  rest = rest.replace(/^\t+/, '');
+
+  var hervor = function (text) {
+    var t = esc(text);
+    if (suche && suche.length >= 2) {
+      var re = new RegExp('(' + suche.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+      t = t.replace(re, '<mark>$1</mark>');
+    }
+    return t;
+  };
+
+  var stil = tiefe ? (' style="padding-left:' + (tiefe * 18) + 'px"') : '';
+
+  if (/^---+\s*$/.test(rest)) {
+    return '<div class="fl-trenner"' + stil + '></div>';
+  }
+  if (rest.length === 0) {
+    return '<div class="fl-leer"></div>';
+  }
+  var ueber = rest.match(/^(#{1,3})\s*(.*)$/);
+  if (ueber) {
+    return '<div class="fl-h' + ueber[1].length + '"' + stil + '>'
+         + hervor(ueber[2]) + '</div>';
+  }
+  var kasten = rest.match(/^\[([ xX]?)\]\s*(.*)$/);
+  if (kasten) {
+    var an = (kasten[1] === 'x' || kasten[1] === 'X');
+    return '<div class="fl-zeile"' + stil + '>'
+         + '<button class="tkasten' + (an ? ' an' : '') + '" type="button" '
+         + 'onclick="flaecheKastenUm(' + nr + ')"></button>'
+         + '<span class="fl-text' + (an ? ' fertig' : '') + '">'
+         + hervor(kasten[2]) + '</span></div>';
+  }
+  var punkt = rest.match(/^[-•*]\s+(.*)$/);
+  if (punkt) {
+    return '<div class="fl-zeile"' + stil + '>'
+         + '<span class="fl-punkt"></span>'
+         + '<span class="fl-text">' + hervor(punkt[1]) + '</span></div>';
+  }
+  return '<div class="fl-absatz"' + stil + '>' + hervor(rest) + '</div>';
+}
+
+function flaecheAnsichtHtml(text, suche) {
+  var zeilen = String(text).split('\n');
+  var h = '';
+  var i;
+  var treffer = 0;
+  for (i = 0; i < zeilen.length; i++) {
+    if (suche && suche.length >= 2
+        && zeilen[i].toLowerCase().indexOf(suche.toLowerCase()) >= 0) {
+      treffer++;
+    }
+    h += flaecheZeileHtml(zeilen[i], i, suche);
+  }
+  if (!String(text).trim().length) {
+    h = '<div class="tleer" style="padding-left:0">Noch leer. '
+      + 'Wechsle zum Schreiben und fang an.</div>';
+  }
+  return { html: h, treffer: treffer };
+}
+
+/* Ein Kästchen umschalten heißt: im Text ein Zeichen ändern. */
+function flaecheKastenUm(nr) {
+  var zeilen = flaecheText(flaecheFuer).split('\n');
+  if (nr < 0 || nr >= zeilen.length) { return; }
+  var z = zeilen[nr];
+  var vorne = z.match(/^(\s*)\[([ xX]?)\]/);
+  if (!vorne) { return; }
+  var an = (vorne[2] === 'x' || vorne[2] === 'X');
+  zeilen[nr] = vorne[1] + (an ? '[]' : '[x]') + z.slice(vorne[0].length);
+  flaecheSetzen(flaecheFuer, zeilen.join('\n'));
+  flaecheZeichnen();
+}
+
+/* ------------------------------------------------------------
+   Schreiben
+   ------------------------------------------------------------ */
+
+function flaecheModusSetzen(m) {
+  flaecheModus = m;
+  flaecheZeichnen();
+  if (m === 'schreiben') {
+    var feld = document.getElementById('flaecheFeld');
+    if (feld && feld.focus) {
+      feld.focus();
+      /* Ans Ende springen: Wer schreibt, will weiterschreiben. */
+      if (typeof feld.setSelectionRange === 'function') {
+        var n = String(feld.value || '').length;
+        feld.setSelectionRange(n, n);
+      }
+      if (typeof feld.scrollHeight === 'number') { feld.scrollTop = feld.scrollHeight; }
+    }
+  }
+}
+
+function flaecheGetippt(wert) {
+  flaecheSetzen(flaecheFuer, wert);
+}
+
+/* Setzt ein Zeichen an den Anfang der Zeile, in der der Strich steht. */
+function flaecheZeichen(was) {
+  var feld = document.getElementById('flaecheFeld');
+  if (!feld) { return; }
+  var text = String(feld.value || '');
+  var stelle = (typeof feld.selectionStart === 'number') ? feld.selectionStart : text.length;
+  var anfang = text.lastIndexOf('\n', stelle - 1) + 1;
+  var ende = text.indexOf('\n', stelle);
+  if (ende < 0) { ende = text.length; }
+  var zeile = text.slice(anfang, ende);
+  var einzug = (zeile.match(/^\s*/) || [''])[0];
+  var ohne = zeile.slice(einzug.length).replace(/^(#{1,3}\s*|\[[ xX]?\]\s*|[-•*]\s+)/, '');
+
+  var neu;
+  if (was === 'einzug')      { neu = '  ' + zeile; }
+  else if (was === 'ausrueck') { neu = zeile.replace(/^ {1,2}/, ''); }
+  else if (was === 'trenner')  { neu = '---'; }
+  else if (was === 'datum')    { neu = einzug + kurzDatum(isoDatum()) + ' — ' + ohne; }
+  else if (was === 'h1')       { neu = einzug + '# ' + ohne; }
+  else if (was === 'h2')       { neu = einzug + '## ' + ohne; }
+  else if (was === 'kasten')   { neu = einzug + '[] ' + ohne; }
+  else if (was === 'punkt')    { neu = einzug + '- ' + ohne; }
+  else { return; }
+
+  feld.value = text.slice(0, anfang) + neu + text.slice(ende);
+  flaecheSetzen(flaecheFuer, feld.value);
+  var neuStelle = anfang + neu.length;
+  if (typeof feld.setSelectionRange === 'function') {
+    feld.setSelectionRange(neuStelle, neuStelle);
+  }
+  if (feld.focus) { feld.focus(); }
+}
+
+function flaecheSuchen(wert) {
+  flaecheSuche = String(wert || '');
+  flaecheZeichnen();
+}
+
+/* ------------------------------------------------------------
+   Zeichnen
+   ------------------------------------------------------------ */
+
+function flaecheOeffnen(id) {
+  flaecheFuer = id;
+  flaecheModus = 'ansicht';
+  flaecheSuche = '';
+  zeigeSchirm('Flaeche');
+  flaecheZeichnen();
+}
+
+function flaecheZurueck() {
+  zeigeSchirm('Vorhaben');
+}
+
+function flaecheZeichnen() {
+  var blatt = document.getElementById('flaecheBlatt');
+  var kopf = document.getElementById('flaecheKopf');
+  if (!blatt) { return; }
+  var text = flaecheText(flaecheFuer);
+
+  if (kopf) {
+    var k = '<div class="fl-kopf">';
+    k += '<span class="fl-name">' + esc(flaecheName(flaecheFuer)) + '</span>';
+    k += '<button class="sl-pille' + (flaecheModus === 'ansicht' ? ' an' : '')
+       + '" type="button" onclick="flaecheModusSetzen(\'ansicht\')">Ansicht</button>';
+    k += '<button class="sl-pille' + (flaecheModus === 'schreiben' ? ' an' : '')
+       + '" type="button" onclick="flaecheModusSetzen(\'schreiben\')">Schreiben</button>';
+    k += '<input class="fl-suche" type="search" placeholder="Suchen" '
+       + 'value="' + esc(flaecheSuche) + '" oninput="flaecheSuchen(this.value)">';
+    k += '</div>';
+    kopf.innerHTML = k;
+  }
+
+  if (flaecheModus === 'schreiben') {
+    var h = '<div class="fl-leiste">';
+    var knoepfe = [['h1', 'Titel'], ['h2', 'Zwischentitel'], ['kasten', 'Kästchen'],
+                   ['punkt', 'Punkt'], ['einzug', 'Einrücken'],
+                   ['ausrueck', 'Ausrücken'], ['trenner', 'Trenner'],
+                   ['datum', 'Datum']];
+    var i;
+    for (i = 0; i < knoepfe.length; i++) {
+      h += '<button class="ms-wort" type="button" onclick="flaecheZeichen(\''
+         + knoepfe[i][0] + '\')">' + esc(knoepfe[i][1]) + '</button>';
+    }
+    h += '</div>';
+    h += '<textarea class="fl-feld" id="flaecheFeld" spellcheck="false" '
+       + 'oninput="flaecheGetippt(this.value)">' + esc(text) + '</textarea>';
+    blatt.innerHTML = h;
+    return;
+  }
+
+  var a = flaecheAnsichtHtml(text, flaecheSuche);
+  var vor = '';
+  if (flaecheSuche.length >= 2) {
+    vor = '<div class="fl-treffer">' + a.treffer
+        + (a.treffer === 1 ? ' Zeile' : ' Zeilen') + ' mit „'
+        + esc(flaecheSuche) + '"</div>';
+  }
+  blatt.innerHTML = vor + '<div class="fl-ansicht">' + a.html + '</div>';
+
+  /* Bei langem Text ans Ende springen — dort steht das Neueste. */
+  if (!flaecheSuche && typeof blatt.scrollHeight === 'number') {
+    blatt.scrollTop = blatt.scrollHeight;
+  }
+}
 
 /* ============================================================
    Abläufe: Vorlagen und Durchläufe
@@ -9882,16 +10213,55 @@ function aufgabeErledigen(id) {
   spaeterSichern();
 }
 
+/* „Diese" und „nächste Woche" sind relativ zu heute. Ohne einen Merker,
+   wann sie gesetzt wurden, schiebt sich „nächste Woche" jede Woche
+   weiter vor sich her und kommt nie an. Deshalb hält jede so geplante
+   Aufgabe fest, in welcher Woche das geschah. */
+function planungSetzen(a, wert) {
+  a.planung = wert;
+  if (wert === 'woche' || wert === 'naechste') {
+    a.planungWoche = montagVon(isoDatum());
+  } else {
+    a.planungWoche = '';
+  }
+  a.geaendert = jetzt();
+}
+
+/* Ist die Woche vorbei, in der „nächste Woche" gesetzt wurde, dann ist
+   aus der nächsten diese geworden. Ohne Merker gilt es als alt — bei
+   Beständen aus der Zeit vor dieser Fassung ist das die richtige
+   Annahme, denn sie stammen aus einer früheren Woche. */
+function wochenUmstellen() {
+  var jetztMo = montagVon(isoDatum());
+  var l = DB.aufgaben || [];
+  var zahl = 0;
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].planung !== 'naechste') { continue; }
+    var gesetzt = l[i].planungWoche || '';
+    if (gesetzt && gesetzt >= jetztMo) { continue; }
+    l[i].planung = 'woche';
+    l[i].planungWoche = jetztMo;
+    l[i].geaendert = jetzt();
+    zahl++;
+  }
+  if (zahl) {
+    spaeterSichern();
+    melde(zahl + (zahl === 1 ? ' Aufgabe ist' : ' Aufgaben sind')
+        + ' von „nächste Woche" auf diese Woche gerückt.', null);
+  }
+  return zahl;
+}
+
 /* Backlog → Diese Woche → Nächste Woche → Heute → Backlog */
 function planungWeiter(id) {
   var a = aufgabeFinden(id);
   if (!a) { return; }
   var jetztWert = a.planung || 'backlog';
-  if (jetztWert === 'backlog') { a.planung = 'woche'; }
-  else if (jetztWert === 'woche') { a.planung = 'naechste'; }
-  else if (jetztWert === 'naechste') { a.planung = isoDatum(); }
-  else { a.planung = 'backlog'; }
-  a.geaendert = jetzt();
+  if (jetztWert === 'backlog') { planungSetzen(a, 'woche'); }
+  else if (jetztWert === 'woche') { planungSetzen(a, 'naechste'); }
+  else if (jetztWert === 'naechste') { planungSetzen(a, isoDatum()); }
+  else { planungSetzen(a, 'backlog'); }
   aufZeichnen();
   spaeterSichern();
 }
@@ -10120,6 +10490,7 @@ function starten() {
     }
     bestandStempeln(DB);
     darstellungAnwenden();
+    wochenUmstellen();
     faelligeStarten();
     tagOffen = isoDatum();
     tagZeichnen();

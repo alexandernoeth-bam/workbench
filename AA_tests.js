@@ -68,7 +68,7 @@ console.log('\n1. Bildschirme und Navigation');
   /* Nicht jeder Bildschirm gehört in die Leiste: Die Migration wird
      einmal gebraucht, die Vorhabenseite gehört zu „Vorhaben" und wird
      von dort geöffnet. Beide müssen aber erreichbar bleiben. */
-  const VERSTECKT = ['Migration', 'Seite'];
+  const VERSTECKT = ['Migration', 'Flaeche'];
   schirme.forEach(function (s) {
     if (VERSTECKT.indexOf(s) >= 0) {
       pruefe(navs.indexOf(s) < 0,
@@ -196,7 +196,7 @@ console.log('\n5. Element-IDs');
 
   /* Zusammengesetzte IDs wie 'schirm' + name */
   const schirme = [...QUELLE.matchAll(/id="schirm([A-Za-zÄÖÜäöü]+)"/g)].map(m => m[1]);
-  const OHNE_KNOPF = ['Migration', 'Seite'];
+  const OHNE_KNOPF = ['Migration', 'Flaeche'];
   schirme.forEach(function (s) {
     if (OHNE_KNOPF.indexOf(s) >= 0) {
       pruefe(imHtml.has('schirm' + s), 'ID schirm' + s + ' existiert (ohne Knopf)');
@@ -532,6 +532,78 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__wochenApi = {'
+                 + ' pruefeWochen: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var heute = isoDatum();'
+                 + '   var mo = montagVon(heute);'
+                 + '   var vorher = tagePlus(mo, -7);'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Aus letzter Woche\','
+                 + '       kontext:\'beruflich\', status:\'offen\','
+                 + '       planung:\'naechste\', planungWoche: vorher, art:\'haupt\' },'
+                 + '     { id:\'a2\', titel:\'Ohne Merker\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung:\'naechste\', art:\'haupt\' },'
+                 + '     { id:\'a3\', titel:\'Heute gesetzt\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung:\'naechste\','
+                 + '       planungWoche: mo, art:\'haupt\' },'
+                 + '     { id:\'a4\', titel:\'Diese Woche\', kontext:\'beruflich\','
+                 + '       status:\'offen\', planung:\'woche\','
+                 + '       planungWoche: mo, art:\'haupt\' } ];'
+                 + '   var n = wochenUmstellen();'
+                 + '   var r = { umgestellt: n,'
+                 + '             ausLetzterWoche: DB.aufgaben[0].planung,'
+                 + '             ohneMerker: DB.aufgaben[1].planung,'
+                 + '             heuteGesetzt: DB.aufgaben[2].planung,'
+                 + '             dieseWocheUnberuehrt: DB.aufgaben[3].planung,'
+                 + '             inDieserWoche: wochenAufgaben(mo).length,'
+                 + '             inNaechsterWoche: wochenAufgaben(tagePlus(mo,7)).length,'
+                 + '             zweiterLauf: wochenUmstellen() };'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__flaecheApi = {'
+                 + ' pruefeFlaeche: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var t = [\'# Garage\', \'## Fragen\', \'[] Tor\','
+                 + '            \'[x] Angebote\', \'- Satteldach\', \'---\','
+                 + '            \'    Tief\', \'Einfach\'].join(\'\\n\');'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'Garage\','
+                 + '     kontext:\'privat\', status:\'laufend\', zielzustaende:[],'
+                 + '     flaeche: t }];'
+                 + '   flaecheFuer = \'p1\'; flaecheModus = \'ansicht\';'
+                 + '   flaecheSuche = \'\';'
+                 + '   var zeilen = t.split(\'\\n\');'
+                 + '   var z = function(i, s){ return flaecheZeileHtml(zeilen[i], i, s); };'
+                 + '   var r = {'
+                 + '     ueberschrift: (z(0).match(/class="(fl-h\\d)"/) || [])[1],'
+                 + '     zwischentitel: (z(1).match(/class="(fl-h\\d)"/) || [])[1],'
+                 + '     kasten: (z(2).indexOf(\'tkasten\') >= 0),'
+                 + '     kastenAn: (z(3).indexOf(\'tkasten an\') >= 0),'
+                 + '     punkt: (z(4).indexOf(\'fl-punkt\') >= 0),'
+                 + '     trenner: (z(5).indexOf(\'fl-trenner\') >= 0),'
+                 + '     einzug: Number((z(6).match(/padding-left:(\\d+)px/) || [])[1]),'
+                 + '     absatz: (z(7).indexOf(\'fl-absatz\') >= 0) };'
+                 + '   flaecheKastenUm(2);'
+                 + '   r.nachHaken = flaecheText(\'p1\').split(\'\\n\')[2];'
+                 + '   flaecheKastenUm(2);'
+                 + '   r.nachRuecknahme = flaecheText(\'p1\').split(\'\\n\')[2];'
+                 + '   var a = flaecheAnsichtHtml(flaecheText(\'p1\'), \'Tor\');'
+                 + '   r.treffer = a.treffer;'
+                 + '   r.hervorgehoben = (a.html.indexOf(\'<mark>\') >= 0);'
+                 + '   var feld = document.getElementById(\'flaecheFeld\');'
+                 + '   feld.value = \'Neue Zeile\'; feld.selectionStart = 3;'
+                 + '   flaecheZeichen(\'kasten\');'
+                 + '   r.knopfKasten = feld.value;'
+                 + '   feld.value = \'# Titel\'; feld.selectionStart = 3;'
+                 + '   flaecheZeichen(\'h2\');'
+                 + '   r.knopfTauscht = feld.value;'
+                 + '   feld.value = \'Text\'; feld.selectionStart = 2;'
+                 + '   flaecheZeichen(\'einzug\');'
+                 + '   r.einzugKnopf = feld.value;'
+                 + '   flaecheFuer = \'\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__bereichApi = {'
                  + ' pruefeBereiche: function(){'
                  + '   var alt = DB; var merkF = vhFilter; DB = leereDatenbank();'
@@ -5616,6 +5688,153 @@ console.log('\n74. Bereiche nach Kontext');
            'auf Beruf geschaltet steht das Private nicht mehr da');
     pruefe(r.beiFilterOffen === true,
            'und der gewählte ist offen, auch wenn er vorher zu war');
+  }
+}
+
+/* ============================================================
+   75. Die Gedankenflaeche
+   Grund: Geplant wird textuell. Jede Form aus Feldern und Listen war
+   „nicht ganz" — eine freie Flaeche zwingt keine Struktur auf.
+   Gespeichert wird reiner Text: durchsuchbar, abgleichbar, in zehn
+   Jahren noch lesbar. Ein Kaestchen hier ist ein Zeichen im Text,
+   keine Aufgabe.
+   ============================================================ */
+console.log('\n75. Gedankenfläche');
+{
+  const skript = hauptSkript();
+  const f = globalThis.__flaecheApi;
+
+  ['flaecheText', 'flaecheSetzen', 'flaecheName', 'flaecheZeileHtml',
+   'flaecheAnsichtHtml', 'flaecheKastenUm', 'flaecheModusSetzen',
+   'flaecheGetippt', 'flaecheZeichen', 'flaecheSuchen', 'flaecheOeffnen',
+   'flaecheZeichnen', 'flaecheKnopfHtml'].forEach(function (fn) {
+    pruefe(new RegExp('function\\s+' + fn + '\\s*\\(').test(skript),
+           'Funktion ' + fn + ' ist definiert');
+  });
+
+  pruefe(/id="schirmFlaeche"/.test(QUELLE), 'sie hat einen eigenen Bildschirm');
+  pruefe(!/id="navFlaeche"/.test(QUELLE),
+         'aber keinen Knopf in der Leiste — sie gehört zu Vorhaben');
+  pruefe(/flaecheOeffnen\(FREIE_FLAECHE\)/.test(QUELLE),
+         'es gibt eine Fläche ohne Vorhaben');
+
+  /* Gespeichert wird Text, nichts anderes */
+  const setzen = skript.match(/function flaecheSetzen\([\s\S]*?\n\}/);
+  pruefe(setzen && /v\.flaeche = text/.test(setzen[0]),
+         'der Text hängt am Vorhaben und geht über den Abgleich mit');
+  pruefe(setzen && /DB\.einstellungen\.flaecheFrei/.test(setzen[0]),
+         'die freie Fläche liegt in den Einstellungen');
+
+  /* Ein Kästchen ist ein Zeichen, keine Aufgabe */
+  const kasten = skript.match(/function flaecheKastenUm\([\s\S]*?\n\}/);
+  pruefe(kasten && /flaecheSetzen/.test(kasten[0]),
+         'ein Haken ändert ein Zeichen im Text');
+  pruefe(kasten && !/DB\.aufgaben/.test(kasten[0]),
+         'er legt keine Aufgabe an — die Fläche ist zum Denken, nicht zum Planen');
+
+  /* Zwei Modi */
+  const zeichnen = skript.match(/function flaecheZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zeichnen && /flaecheModus === 'schreiben'/.test(zeichnen[0]),
+         'es gibt einen Schreib- und einen Ansichtsmodus');
+  pruefe(zeichnen && /fl-suche/.test(zeichnen[0]), 'darüber ein Suchfeld');
+  pruefe(zeichnen && /blatt\.scrollTop = blatt\.scrollHeight/.test(zeichnen[0]),
+         'bei langem Text wird ans Ende gesprungen');
+  const modus = skript.match(/function flaecheModusSetzen\([\s\S]*?\n\}/);
+  pruefe(modus && /setSelectionRange\(n, n\)/.test(modus[0]),
+         'beim Schreiben steht der Strich am Ende');
+
+  if (!f) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = f.pruefeFlaeche();
+    pruefe(e.ueberschrift === 'fl-h1', 'ein # ergibt eine Überschrift');
+    pruefe(e.zwischentitel === 'fl-h2', 'zwei ## eine kleinere');
+    pruefe(e.kasten === true, 'ein [] ergibt ein Kästchen');
+    pruefe(e.kastenAn === true, 'ein [x] ein abgehaktes');
+    pruefe(e.punkt === true, 'ein - eine Aufzählung');
+    pruefe(e.trenner === true, 'drei --- einen Trenner');
+    pruefe(e.einzug === 36, 'zwei Leerzeichen rücken ein, vier doppelt');
+    pruefe(e.absatz === true, 'alles andere ist ein Absatz');
+    pruefe(e.nachHaken === '[x] Tor', 'ein Haken schreibt [x] in den Text');
+    pruefe(e.nachRuecknahme === '[] Tor', 'und wieder zurück');
+    pruefe(e.treffer === 1, 'die Suche zählt Zeilen');
+    pruefe(e.hervorgehoben === true, 'und hebt den Fund hervor');
+    pruefe(e.knopfKasten === '[] Neue Zeile',
+           'der Knopf setzt das Zeichen an den Zeilenanfang');
+    pruefe(e.knopfTauscht === '## Titel',
+           'ein zweiter Knopf ersetzt das erste Zeichen, statt zu stapeln');
+    pruefe(e.einzugKnopf === '  Text', 'Einrücken setzt zwei Leerzeichen');
+  }
+}
+
+/* ============================================================
+   76. Der Wochenwechsel bei der Planung
+   Grund: „Naechste Woche" ist relativ zu heute. Ohne einen Merker,
+   wann es gesetzt wurde, schob sich eine so geplante Aufgabe jede
+   Woche weiter vor sich her und kam nie an — sie stand ewig unter
+   „naechste Woche" und in keiner Wochenuebersicht.
+   ============================================================ */
+console.log('\n76. Wochenwechsel');
+{
+  const skript = hauptSkript();
+  const w = globalThis.__wochenApi;
+
+  ['planungSetzen', 'wochenUmstellen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const setzen = skript.match(/function planungSetzen\([\s\S]*?\n\}/);
+  pruefe(setzen && /a\.planungWoche = montagVon\(isoDatum\(\)\)/.test(setzen[0]),
+         'beim Planen wird die Woche festgehalten');
+  pruefe(setzen && /a\.planungWoche = ''/.test(setzen[0]),
+         'bei einem festen Tag oder Backlog wird sie geleert');
+
+  const um = skript.match(/function wochenUmstellen\([\s\S]*?\n\}\n/);
+  pruefe(um && /gesetzt >= jetztMo\) \{ continue/.test(um[0]),
+         'was in dieser Woche gesetzt wurde, bleibt nächste Woche');
+  pruefe(um && /l\[i\]\.planung = 'woche'/.test(um[0]),
+         'was älter ist, rückt auf diese Woche');
+  pruefe(um && !/planung !== 'woche'/.test(um[0]),
+         '„diese Woche" wird nicht angefasst — sie meint immer die laufende');
+
+  /* Die Umstellung muss laufen, ohne dass man daran denkt */
+  const start = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(start && /wochenUmstellen\(\)/.test(start[0]), 'geprüft wird beim Start');
+  const heute = skript.match(/function tagHeute\([\s\S]*?\n\}/);
+  pruefe(heute && /wochenUmstellen\(\)/.test(heute[0]),
+         'beim Sprung auf heute ebenso');
+  const rueck = skript.match(/function rueckkehrPruefen\([\s\S]*?\n\}/);
+  pruefe(rueck && /wochenUmstellen\(\)/.test(rueck[0]),
+         'und bei der Rückkehr an den Rechner — ein Wochenwechsel geschieht '
+         + 'ohne Zutun');
+
+  /* Alle Wege setzen die Planung über dieselbe Stelle */
+  const weiter = skript.match(/function planungWeiter\([\s\S]*?\n\}/);
+  pruefe(weiter && (weiter[0].match(/planungSetzen\(/g) || []).length >= 4,
+         'der Planungsknopf geht über planungSetzen');
+  const dp = skript.match(/function dPlanung\([\s\S]*?\n\}/);
+  pruefe(dp && /planungSetzen\(a, wert\)/.test(dp[0]), 'die Detailfläche ebenso');
+  const nz = skript.match(/function nzSetzen\([\s\S]*?\n\}/);
+  pruefe(nz && /planungSetzen\(a, nzWert\(art\)\)/.test(nz[0]),
+         'und die Sammelaktion für Liegengebliebenes');
+
+  if (!w) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = w.pruefeWochen();
+    pruefe(e.umgestellt === 2, 'zwei Aufgaben rücken nach');
+    pruefe(e.ausLetzterWoche === 'woche',
+           'was letzte Woche auf „nächste" gelegt wurde, steht jetzt auf dieser');
+    pruefe(e.ohneMerker === 'woche',
+           'ein alter Bestand ohne Merker gilt als älter und rückt ebenfalls');
+    pruefe(e.heuteGesetzt === 'naechste',
+           'was heute auf „nächste" gelegt wurde, bleibt dort');
+    pruefe(e.dieseWocheUnberuehrt === 'woche', '„diese Woche" bleibt unberührt');
+    pruefe(e.inDieserWoche === 3,
+           'in der Wochenübersicht stehen sie jetzt');
+    pruefe(e.inNaechsterWoche === 1, 'und nur eine in der nächsten');
+    pruefe(e.zweiterLauf === 0, 'ein zweiter Lauf stellt nichts mehr um');
   }
 }
 
