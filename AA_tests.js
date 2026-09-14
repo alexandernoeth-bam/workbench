@@ -551,11 +551,12 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '       start:{ dateTime:\'2026-09-20T09:00:00+02:00\' },'
                  + '       end:{ dateTime:\'2026-09-20T10:00:00+02:00\' } } ],'
                  + '     \'Familie\', \'privat\');'
-                 + '   var r = { ohneWahl: jtAn(\'2026-09-20\').length,'
+                 + '   var r = { ohneWahl: jtAn(\'2026-09-20\', true).length,'
                  + '             treffenInListe: (artenAlle().indexOf(\'treffen\')'
                  + '               >= 0) };'
                  + '   artImJahrUm(\'treffen\');'
-                 + '   var mit = jtAn(\'2026-09-20\');'
+                 + '   var mit = jtAn(\'2026-09-20\', true);'
+                 + '   r.imTagNurGanztags = jtAn(\'2026-09-20\').length;'
                  + '   r.mitWahl = mit.length;'
                  + '   r.ganztaegigZuerst = (function(){'
                  + '     var s = mit.slice();'
@@ -565,9 +566,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '       return gx - gy; });'
                  + '     return !s[0].nurZeit; })();'
                  + '   artImJahrUm(\'geburtstag\');'
-                 + '   r.andereArtDraussen = jtAn(\'2026-09-20\').length;'
+                 + '   r.andereArtDraussen = jtAn(\'2026-09-20\', true).length;'
                  + '   artImJahrUm(\'treffen\');'
-                 + '   r.zurueckgenommen = jtAn(\'2026-09-20\').length;'
+                 + '   r.zurueckgenommen = jtAn(\'2026-09-20\', true).length;'
                  + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
                  + '   return r;'
                  + ' } };'
@@ -4649,7 +4650,7 @@ console.log('\n55. Ganztägiges im Tagesverlauf');
   pruefe(kjt && /ganztags/.test(kjt[0]),
          'die ganztägigen Termine aus Google werden zu Jahresterminen');
   const jtan = skript.match(/function jtAn\([\s\S]*?\n\}/);
-  pruefe(jtan && /kalenderJahrestermine\(is\)/.test(jtan[0]),
+  pruefe(jtan && /kalenderJahrestermine\(is, mitZeit\)/.test(jtan[0]),
          'und erscheinen überall dort, wo Jahrestermine erscheinen');
   pruefe(eintraege && !/ausGoogle\.ganztags/.test(eintraege[0]),
          'sie werden nicht zusätzlich angehängt — das gäbe Dubletten');
@@ -6608,8 +6609,17 @@ console.log('\n83. Arten im Jahresraster');
          'ein Termin ohne Art bleibt draußen');
 
   const kj = skript.match(/function kalenderJahrestermine\([\s\S]*?\n\}/);
-  pruefe(kj && /!g\[i\]\.ganztags && !artImJahr\(art\)/.test(kj[0]),
-         'ganztägig gehört immer hinein, mit Uhrzeit nur nach Wahl');
+  pruefe(kj && /!\(mitZeit && artImJahr\(art\)\)/.test(kj[0]),
+         'ganztägig gehört immer hinein, mit Uhrzeit nur nach Wahl — und nur '
+         + 'dort, wo danach gefragt wird');
+  const jh2 = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
+  pruefe(jh2 && /jtAn\(iso, true\)/.test(jh2[0]),
+         'allein das Jahresraster fragt danach');
+  ['tagesEintraege', 'urlaubAn', 'wocheHtml', 'monatHtml'].forEach(function (f) {
+    const b = skript.match(new RegExp('function ' + f + '\\([\\s\\S]*?\\n\\}'));
+    pruefe(b && !/jtAn\([^)]*,\s*true\)/.test(b[0]),
+           f + ' zeigt weiterhin nur Ganztägiges');
+  });
   pruefe(kj && /nurZeit: !g\[i\]\.ganztags/.test(kj[0]),
          'am Eintrag ist vermerkt, ob er eine Uhrzeit hat');
 
@@ -6636,6 +6646,8 @@ console.log('\n83. Arten im Jahresraster');
     pruefe(e.zurueckgenommen === 1, 'die Wahl lässt sich zurücknehmen');
     pruefe(e.ganztaegigZuerst === true,
            'am selben Tag steht das Ganztägige vorn');
+    pruefe(e.imTagNurGanztags === 1,
+           'in der Tagesansicht bleibt es bei den ganztägigen');
     pruefe(e.treffenInListe === true,
            'eine Art, die nur an Terminen mit Uhrzeit vorkommt, steht zur Wahl');
   }

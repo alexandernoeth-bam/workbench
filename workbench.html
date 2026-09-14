@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.72.1</title>
+<title>Workbench 0.72.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1267,7 +1267,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.72.1';
+var APP_VERSION = '0.72.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5969,15 +5969,18 @@ function artenAlle() {
    Ganztägige Kalendertermine als Jahrestermine
    ------------------------------------------------------------ */
 
-function kalenderJahrestermine(is) {
+/* Nur das Jahresraster nimmt Termine mit Uhrzeit auf, und auch dort nur
+   die freigeschalteten Arten. Überall sonst — im Tag, in der Woche, im
+   Monat, bei der Tagesform — bleibt es bei ganztägigen: Ein
+   Trainingstermin ist kein Jahrestermin, er hat seinen Platz in der
+   Zeitleiste. */
+function kalenderJahrestermine(is, mitZeit) {
   var aus = [];
   var g = (termineNachTag[is] || []);
   var i;
   for (i = 0; i < g.length; i++) {
     var art = terminArt(g[i]);
-    /* Ganztägiges gehört immer ins Jahr. Ein Termin mit Uhrzeit nur,
-       wenn seine Art dafür vorgesehen ist. */
-    if (!g[i].ganztags && !artImJahr(art)) { continue; }
+    if (!g[i].ganztags && !(mitZeit && artImJahr(art))) { continue; }
     aus.push({
       id: g[i].id,
       titel: g[i].titel,
@@ -6244,8 +6247,8 @@ function fensterPruefenFuer(is) {
    Jahrestermine
    ------------------------------------------------------------ */
 
-function jtAn(is) {
-  var treffer = kalenderJahrestermine(is);
+function jtAn(is, mitZeit) {
+  var treffer = kalenderJahrestermine(is, mitZeit);
   var liste = DB.jahrestermine || [];
   var i;
   for (i = 0; i < liste.length; i++) {
@@ -6888,7 +6891,7 @@ function jahrHtml(is) {
 
       if (ferienZeigen() && ferienAn(iso)) { kl.push('ferien'); }
       var treffer = [];
-      var roh = jtAn(iso);
+      var roh = jtAn(iso, true);
       /* Liegt an einem Tag beides, gibt das Ganztägige den Ton an —
          ein Urlaubstag bleibt ein Urlaubstag, auch wenn abends ein
          Treffen ansteht. */
