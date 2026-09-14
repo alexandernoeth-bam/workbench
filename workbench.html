@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.72.2</title>
+<title>Workbench 0.73.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1267,7 +1267,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.72.2';
+var APP_VERSION = '0.73.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2237,6 +2237,9 @@ function abgleichStill() {
   if (!tokenGueltig() || abgleichLaeuft) { return; }
   abgleichLaeuft = true;
   abgleichen().then(function (b) {
+    /* Was vom anderen Gerät kommt, kann noch auf „nächste Woche" stehen
+       — umgestellt wird deshalb auch nach dem Verschmelzen. */
+    wochenUmstellen();
     abgleichZuletztMs = Date.now();
     abgleichFehler = '';
     lokalOffen = false;
@@ -11438,7 +11441,14 @@ function planungSetzen(a, wert) {
 /* Ist die Woche vorbei, in der „nächste Woche" gesetzt wurde, dann ist
    aus der nächsten diese geworden. Ohne Merker gilt es als alt — bei
    Beständen aus der Zeit vor dieser Fassung ist das die richtige
-   Annahme, denn sie stammen aus einer früheren Woche. */
+   Annahme, denn sie stammen aus einer früheren Woche.
+
+   Der Änderungszeitpunkt bleibt dabei unangetastet. Das ist der
+   entscheidende Punkt: Diese Umstellung rechnet jedes Gerät für sich
+   aus demselben Datum aus — sie ist keine Entscheidung eines Menschen.
+   Würde sie stempeln, machte sie beim Start eine veraltete Kopie jünger
+   als eine anderswo abgehakte Aufgabe, und das Abhaken ginge beim
+   Verschmelzen verloren. */
 function wochenUmstellen() {
   var jetztMo = montagVon(isoDatum());
   var l = DB.aufgaben || [];
@@ -11450,7 +11460,6 @@ function wochenUmstellen() {
     if (gesetzt && gesetzt >= jetztMo) { continue; }
     l[i].planung = 'woche';
     l[i].planungWoche = jetztMo;
-    l[i].geaendert = jetzt();
     zahl++;
   }
   if (zahl) {

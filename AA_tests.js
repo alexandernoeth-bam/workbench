@@ -536,6 +536,32 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__stempelApi = {'
+                 + ' pruefeStempel: function(){'
+                 + '   var alt = DB;'
+                 + '   var heute = isoDatum();'
+                 + '   var mo = montagVon(heute);'
+                 + '   var vor = tagePlus(mo, -7);'
+                 + '   var mach = function(stand, zeit){'
+                 + '     var d = leereDatenbank();'
+                 + '     d.aufgaben = [{ id:\'a1\', titel:\'Angebote\','
+                 + '       kontext:\'privat\', status: stand,'
+                 + '       planung:\'naechste\', planungWoche: vor,'
+                 + '       art:\'haupt\', geaendert: zeit }];'
+                 + '     d.grabsteine = [];'
+                 + '     return d; };'
+                 + '   var fremd = mach(\'erledigt\', 5000);'
+                 + '   var hier = mach(\'offen\', 3000);'
+                 + '   DB = hier;'
+                 + '   var r = { umgestellt: wochenUmstellen(),'
+                 + '             zeitUnveraendert: hier.aufgaben[0].geaendert };'
+                 + '   var e = zusammenfuehren(hier, fremd);'
+                 + '   r.nachMischen = e.db.aufgaben[0].status;'
+                 + '   planungSetzen(hier.aufgaben[0], \'backlog\');'
+                 + '   r.echteAenderungStempelt = hier.aufgaben[0].geaendert;'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__jahrArtApi = {'
                  + ' pruefeJahrArten: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -6650,6 +6676,46 @@ console.log('\n83. Arten im Jahresraster');
            'in der Tagesansicht bleibt es bei den ganztägigen');
     pruefe(e.treffenInListe === true,
            'eine Art, die nur an Terminen mit Uhrzeit vorkommt, steht zur Wahl');
+  }
+}
+
+/* ============================================================
+   84. Automatische Umstellungen duerfen nicht stempeln
+   Grund: Die Umstellung von „naechste Woche" auf „diese Woche" lief
+   bei jedem Start und setzte den Aenderungszeitpunkt neu. Damit wurde
+   eine veraltete Kopie juenger als eine anderswo abgehakte Aufgabe —
+   und das Abhaken ging beim Verschmelzen verloren.
+
+   Die Regel dahinter: Was jedes Geraet aus demselben Datum selbst
+   ausrechnet, ist keine Entscheidung eines Menschen und darf im
+   Abgleich kein Gewicht bekommen.
+   ============================================================ */
+console.log('\n84. Umstellung ohne Stempel');
+{
+  const skript = hauptSkript();
+  const w = globalThis.__stempelApi;
+
+  const um = skript.match(/function wochenUmstellen\([\s\S]*?\n\}\n/);
+  pruefe(um && !/l\[i\]\.geaendert = jetzt\(\)/.test(um[0]),
+         'die Umstellung setzt den Änderungszeitpunkt nicht neu');
+  pruefe(um && /l\[i\]\.planung = 'woche'/.test(um[0]),
+         'sie stellt die Planung trotzdem um');
+  const still = skript.match(/function abgleichStill\([\s\S]*?\n\}\n/);
+  pruefe(still && /wochenUmstellen\(\)/.test(still[0]),
+         'nach dem Verschmelzen wird erneut umgestellt — der fremde Stand kann '
+         + 'noch auf „nächste" stehen');
+
+  if (!w) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = w.pruefeStempel();
+    pruefe(e.umgestellt === 1, 'die Aufgabe rückt auf diese Woche');
+    pruefe(e.zeitUnveraendert === 3000,
+           'ihr Änderungszeitpunkt bleibt, wie er war');
+    pruefe(e.nachMischen === 'erledigt',
+           'ein anderswo gesetzter Haken überlebt das Verschmelzen');
+    pruefe(e.echteAenderungStempelt > 3000,
+           'eine echte Änderung stempelt weiterhin');
   }
 }
 
