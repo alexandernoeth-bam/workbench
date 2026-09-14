@@ -536,6 +536,39 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__jahrArtApi = {'
+                 + ' pruefeJahrArten: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Familie\' }];'
+                 + '   termineNachTag = {};'
+                 + '   eintraegeEinsortieren(['
+                 + '     { id:\'u1\', summary:\'Urlaub #urlaub\','
+                 + '       start:{ date:\'2026-09-20\' }, end:{ date:\'2026-09-21\' } },'
+                 + '     { id:\'t1\', summary:\'Stammtisch #treffen\','
+                 + '       start:{ dateTime:\'2026-09-20T19:00:00+02:00\' },'
+                 + '       end:{ dateTime:\'2026-09-20T22:00:00+02:00\' } },'
+                 + '     { id:\'z1\', summary:\'Zahnarzt #termin\','
+                 + '       start:{ dateTime:\'2026-09-20T09:00:00+02:00\' },'
+                 + '       end:{ dateTime:\'2026-09-20T10:00:00+02:00\' } } ],'
+                 + '     \'Familie\', \'privat\');'
+                 + '   var r = { ohneWahl: jtAn(\'2026-09-20\').length };'
+                 + '   artImJahrUm(\'treffen\');'
+                 + '   var mit = jtAn(\'2026-09-20\');'
+                 + '   r.mitWahl = mit.length;'
+                 + '   r.ganztaegigZuerst = (function(){'
+                 + '     var s = mit.slice();'
+                 + '     s.sort(function(x, y){'
+                 + '       var gx = (x.ausKalender && x.nurZeit) ? 1 : 0;'
+                 + '       var gy = (y.ausKalender && y.nurZeit) ? 1 : 0;'
+                 + '       return gx - gy; });'
+                 + '     return !s[0].nurZeit; })();'
+                 + '   artImJahrUm(\'geburtstag\');'
+                 + '   r.andereArtDraussen = jtAn(\'2026-09-20\').length;'
+                 + '   artImJahrUm(\'treffen\');'
+                 + '   r.zurueckgenommen = jtAn(\'2026-09-20\').length;'
+                 + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__aehnlichApi = {'
                  + ' pruefeAehnlich: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -6547,6 +6580,56 @@ console.log('\n82. Ähnliche Aufgaben');
            'ein Schritt mit tragender Aufgabe erscheint nur einmal');
     pruefe(e.eigeneNichtDabei === 0,
            'die Aufgabe, die man gerade bearbeitet, findet sich nicht selbst');
+  }
+}
+
+/* ============================================================
+   83. Welche Arten ins Jahresraster gehoeren
+   Grund: Die Jahressicht zeigte nur ganztaegige Kalendertermine. Ein
+   wiederkehrendes Treffen mit Uhrzeit fiel durch, auch mit Kuerzel.
+   Statt die Regel umzustossen, entscheidet der Mensch je Art.
+   ============================================================ */
+console.log('\n83. Arten im Jahresraster');
+{
+  const skript = hauptSkript();
+  const j = globalThis.__jahrArtApi;
+
+  ['artImJahr', 'artImJahrUm', 'zeichneArtenImJahr'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const im = skript.match(/function artImJahr\([\s\S]*?\n\}/);
+  pruefe(im && /k\[schluessel\] === true/.test(im[0]),
+         'ohne Eintrag gilt: nicht im Jahr — sonst wäre das Raster übersät');
+  pruefe(im && /!schluessel\) \{ return false/.test(im[0]),
+         'ein Termin ohne Art bleibt draußen');
+
+  const kj = skript.match(/function kalenderJahrestermine\([\s\S]*?\n\}/);
+  pruefe(kj && /!g\[i\]\.ganztags && !artImJahr\(art\)/.test(kj[0]),
+         'ganztägig gehört immer hinein, mit Uhrzeit nur nach Wahl');
+  pruefe(kj && /nurZeit: !g\[i\]\.ganztags/.test(kj[0]),
+         'am Eintrag ist vermerkt, ob er eine Uhrzeit hat');
+
+  const jh = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
+  pruefe(jh && /roh\.sort\(/.test(jh[0]),
+         'liegt beides an einem Tag, gibt das Ganztägige den Ton an');
+
+  pruefe(/id="artenJahrListe"/.test(QUELLE),
+         'in der Diagnose steht die Wahl je Art');
+
+  if (!j) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = j.pruefeJahrArten();
+    pruefe(e.ohneWahl === 1,
+           'ohne Wahl steht nur das Ganztägige im Jahr');
+    pruefe(e.mitWahl === 2, 'nach der Wahl auch das Treffen mit Uhrzeit');
+    pruefe(e.andereArtDraussen === 2,
+           'eine andere Art bleibt weiterhin draußen');
+    pruefe(e.zurueckgenommen === 1, 'die Wahl lässt sich zurücknehmen');
+    pruefe(e.ganztaegigZuerst === true,
+           'am selben Tag steht das Ganztägige vorn');
   }
 }
 

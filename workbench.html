@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.71.1</title>
+<title>Workbench 0.72.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1025,6 +1025,9 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     <button type="button" id="knopfAbgleich" class="stark" onclick="abgleichenJetzt()">Abgleichen</button>
   </div>
 
+  <div class="abschnitt-titel"><span>Arten im Jahresraster</span></div>
+  <div id="artenJahrListe"></div>
+
   <div class="abschnitt-titel"><span>Skizzen</span></div>
   <div id="skizzenListe"></div>
 
@@ -1264,7 +1267,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.71.1';
+var APP_VERSION = '0.72.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4997,6 +5000,26 @@ function kalenderNeuLesen() {
 
 /* Der Ordner mit den Skizzen — einmal eintragen, dann steht alles
    darin zur Wahl. */
+/* Welche Arten im Jahresraster erscheinen sollen — einmal je Kürzel
+   entschieden. */
+function zeichneArtenImJahr() {
+  var ziel = document.getElementById('artenJahrListe');
+  if (!ziel) { return; }
+  var l = artenAlle();
+  var h = '<div class="d-hinweis" style="text-align:left">Ganztägige Termine '
+        + 'stehen immer im Jahresraster. Hier wählst du, welche Arten auch mit '
+        + 'Uhrzeit dorthin gehören.</div>';
+  var i;
+  for (i = 0; i < l.length; i++) {
+    var an = artImJahr(l[i]);
+    h += '<div class="mf-zeile" onclick="artImJahrUm(\'' + esc(l[i]) + '\')">'
+       + '<span class="mf-farbe" style="background:' + artFarbe(l[i]) + '"></span>'
+       + '<span class="mf-name">' + esc(artName(l[i])) + '</span>'
+       + '<span class="a-quelle">' + (an ? 'im Jahr' : '—') + '</span></div>';
+  }
+  ziel.innerHTML = h;
+}
+
 function zeichneSkizzen() {
   var ziel = document.getElementById('skizzenListe');
   if (!ziel) { return; }
@@ -5166,6 +5189,7 @@ function zeichne() {
   zeichneGoogle();
   zeichneKalender();
   zeichneSkizzen();
+  zeichneArtenImJahr();
   zeichneDarstellung();
   zeichneJtDatei();
   zeichneFerien();
@@ -5881,6 +5905,25 @@ function artFarbeAus(name) {
   return 'hsl(' + summe + ',42%,38%)';
 }
 
+/* Welche Arten gehören ins Jahresraster, auch wenn ihre Termine eine
+   Uhrzeit haben? Ganztägiges steht dort ohnehin; hier geht es um das,
+   was man bewusst eingeordnet hat und übers Jahr sehen will — etwa
+   Treffen mit Freunden. Ohne Eintrag gilt: nein. */
+function artImJahr(schluessel) {
+  if (!schluessel) { return false; }
+  var k = DB.einstellungen.artenImJahr || {};
+  return k[schluessel] === true;
+}
+
+function artImJahrUm(schluessel) {
+  if (!DB.einstellungen.artenImJahr) { DB.einstellungen.artenImJahr = {}; }
+  var k = DB.einstellungen.artenImJahr;
+  if (k[schluessel]) { delete k[schluessel]; } else { k[schluessel] = true; }
+  spaeterSichern();
+  kalZeichnen();
+  zeichne();
+}
+
 function artName(schluessel) {
   if (JT_ARTEN[schluessel]) { return JT_ARTEN[schluessel].n; }
   if (!schluessel) { return 'Ohne Art'; }
@@ -5928,14 +5971,17 @@ function kalenderJahrestermine(is) {
   var g = (termineNachTag[is] || []);
   var i;
   for (i = 0; i < g.length; i++) {
-    if (!g[i].ganztags) { continue; }
     var art = terminArt(g[i]);
+    /* Ganztägiges gehört immer ins Jahr. Ein Termin mit Uhrzeit nur,
+       wenn seine Art dafür vorgesehen ist. */
+    if (!g[i].ganztags && !artImJahr(art)) { continue; }
     aus.push({
       id: g[i].id,
       titel: g[i].titel,
       art: art,
       kontext: g[i].kontext || 'privat',
       von: is, bis: is,
+      nurZeit: !g[i].ganztags,
       jaehrlich: false,
       kuerzel: '',
       ausKalender: true,
@@ -6840,6 +6886,14 @@ function jahrHtml(is) {
       if (ferienZeigen() && ferienAn(iso)) { kl.push('ferien'); }
       var treffer = [];
       var roh = jtAn(iso);
+      /* Liegt an einem Tag beides, gibt das Ganztägige den Ton an —
+         ein Urlaubstag bleibt ein Urlaubstag, auch wenn abends ein
+         Treffen ansteht. */
+      roh.sort(function (x, y) {
+        var gx = (x.ausKalender && x.nurZeit) ? 1 : 0;
+        var gy = (y.ausKalender && y.nurZeit) ? 1 : 0;
+        return gx - gy;
+      });
       var r;
       for (r = 0; r < roh.length; r++) { if (jtPasst(roh[r])) { treffer.push(roh[r]); } }
 
