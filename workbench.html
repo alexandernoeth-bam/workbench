@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.67.1</title>
+<title>Workbench 0.68.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -699,6 +699,7 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
 .fl-kap{font-variant-caps:all-small-caps;letter-spacing:.03em}
 .fl-ansicht a{color:var(--weinrot)}
 .fl-ansicht s{color:var(--grau)}
+.fl-ansicht u{text-underline-offset:3px}
 .fl-feld{width:100%;min-height:60vh;font:inherit;
   font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
   font-size:calc(var(--fs)*0.84);line-height:1.6;border:1px solid var(--linie);
@@ -1247,7 +1248,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.67.1';
+var APP_VERSION = '0.68.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -6316,6 +6317,12 @@ function wocheHtml(is) {
   h += '</div>';
 
   h += wochenListeHtml(mo);
+  h += '<div class="ms-unten" style="padding-left:0;margin:6px 0 10px">'
+     + '<input class="v-feld" type="text" id="wochenNeu" '
+     + 'placeholder="Für diese Woche vornehmen (p = privat)" '
+     + 'onkeydown="wochenNeuTaste(event,\'' + mo + '\')">'
+     + '<button class="ms-wort" type="button" onclick="wochenAufgabeNeu(\'' + mo
+     + '\')">Vornehmen</button></div>';
   h += wochenKleinHtml(mo);
   return h;
 }
@@ -6449,6 +6456,42 @@ function wochenKleinHtml(mo) {
        + esc(planungText(k)) + '</button></div>';
   }
   return h;
+}
+
+/* Beim Blick auf die Woche fällt einem ein, was noch fehlt — dann soll
+   man es gleich dort eintragen können. Die Aufgabe wird auf die
+   gezeigte Woche geplant, nicht auf die laufende: Wer in der nächsten
+   Woche blättert, meint auch sie. */
+function wochenAufgabeNeu(mo) {
+  var feld = document.getElementById('wochenNeu');
+  if (!feld) { return; }
+  var roh = feld.value.trim();
+  if (roh.length === 0) { return; }
+  var g = eingabeDeuten(roh);
+  var jetztMo = montagVon(isoDatum());
+  var wert = (mo === jetztMo) ? 'woche'
+           : ((mo === tagePlus(jetztMo, 7)) ? 'naechste' : mo);
+
+  var a = {
+    id: neueKennung(), titel: g.titel, beschreibung: '', kontext: g.kontext,
+    themaId: null, projektId: null, frist: '', planung: 'backlog', uhrzeit: '',
+    /* Anders als im Tagesplan ist hier die Aufgabe die Voreinstellung:
+       Wer auf die Woche sieht, nimmt sich etwas vor. Kleinigkeiten
+       trägt man dort ein, wo sie anfallen. */
+    art: 'haupt', wiederholung: null, status: 'offen', erledigtAm: null,
+    zuletztErledigt: null, ablaufSchritt: null, geaendert: jetzt()
+  };
+  planungSetzen(a, wert);
+  DB.aufgaben.push(a);
+  feld.value = '';
+  spaeterSichern();
+  kalZeichnen();
+  aufZeichnen();
+  tagZeichnen();
+}
+
+function wochenNeuTaste(e, mo) {
+  if (e && e.key === 'Enter') { wochenAufgabeNeu(mo); }
 }
 
 function wochenListeHtml(mo) {
@@ -8301,6 +8344,7 @@ function flaecheAuszeichnen(text) {
   paar('*', '<b>', '</b>');
   paar('_', '<i>', '</i>');
   paar('~', '<s>', '</s>');
+  paar('+', '<u>', '</u>');
   paar('^', '<span class="fl-kap">', '</span>');
   return t;
 }
@@ -8522,6 +8566,8 @@ function flaecheSinnbild(art) {
     durch:   '<text x="4" y="18" font-size="16">S</text>'
            + '<path d="M3 12h18"></path>',
     kap:     '<text x="1" y="18" font-size="15">Aa</text>',
+    unter:   '<text x="5" y="16" font-size="14">U</text>'
+           + '<path d="M5 20h14"></path>',
     link:    '<path d="M10 14a4 4 0 0 0 6 .5l2-2a4 4 0 0 0-6-6l-1 1"></path>'
            + '<path d="M14 10a4 4 0 0 0-6-.5l-2 2a4 4 0 0 0 6 6l1-1"></path>',
     ein:     '<path d="M3 6h18M9 12h12M9 18h12M3 10l3 2-3 2z" '
@@ -8695,6 +8741,7 @@ function flaecheZeichnen() {
     h += flaecheKnopf('paar', '*', 'fett', 'Fett');
     h += flaecheKnopf('paar', '_', 'kursiv', 'Kursiv');
     h += flaecheKnopf('paar', '~', 'durch', 'Durchgestrichen');
+    h += flaecheKnopf('paar', '+', 'unter', 'Unterstrichen');
     h += flaecheKnopf('paar', '^', 'kap', 'Kapitälchen');
     h += flaecheKnopf('link', '', 'link', 'Verweis');
     h += '<span class="fl-teiler"></span>';

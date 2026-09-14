@@ -536,6 +536,33 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__wnApi = {'
+                 + ' pruefeVornehmen: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var mo = montagVon(isoDatum());'
+                 + '   var feld = document.getElementById(\'wochenNeu\');'
+                 + '   feld.value = \'Zapf anrufen p\';'
+                 + '   wochenAufgabeNeu(mo);'
+                 + '   var a1 = DB.aufgaben[0];'
+                 + '   feld.value = \'Nächste Woche\';'
+                 + '   wochenAufgabeNeu(tagePlus(mo, 7));'
+                 + '   feld.value = \'Übernächste\';'
+                 + '   wochenAufgabeNeu(tagePlus(mo, 14));'
+                 + '   feld.value = \'   \';'
+                 + '   var vorher = DB.aufgaben.length;'
+                 + '   wochenAufgabeNeu(mo);'
+                 + '   var r = { dieseWoche: a1.planung,'
+                 + '             merker: (a1.planungWoche === mo),'
+                 + '             naechste: DB.aufgaben[1].planung,'
+                 + '             spaeter: DB.aufgaben[2].planung,'
+                 + '             kontext: a1.kontext, titel: a1.titel,'
+                 + '             istAufgabe: a1.art,'
+                 + '             inDerListe: wochenAufgaben(mo).some(function(x){'
+                 + '               return x.id === a1.id; }),'
+                 + '             leerLegtNichtAn: (DB.aufgaben.length - vorher) };'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__skizzenApi = {'
                  + ' pruefeSkizzen: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -701,6 +728,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.linkMitText = az(\'Siehe [Bauamt](https://x.de)\');'
                  + '   r.linkNackt = az(\'Adresse https://x.de hier\');'
                  + '   r.keinFalscherStern = az(\'a * b * c\');'
+                 + '   r.unter = az(\'Das +wichtig+ hier\');'
                  + '   feld.value = \'wichtig\'; feld.selectionStart = 0;'
                  + '   feld.selectionEnd = 7;'
                  + '   flaecheUmschliessen(\'*\');'
@@ -5957,7 +5985,8 @@ console.log('\n75. Gedankenfläche');
            'der Verweisknopf legt ein Gerüst an');
     pruefe(e.linkStrich === 17, 'und setzt den Strich hinter https://');
     pruefe(e.datumLang === 'Mo, 14.09.2026', 'das Datum trägt Wochentag und Jahr');
-    pruefe(e.knoepfe === 18, 'achtzehn Knöpfe in der Leiste');
+    pruefe(e.knoepfe === 19, 'neunzehn Knöpfe in der Leiste');
+    pruefe(e.unter === 'Das <u>wichtig</u> hier', 'Pluszeichen unterstreichen');
     pruefe(e.hakenEingefuegt === 'Fertig ✔', 'ein Häkchen wird eingefügt');
     pruefe(e.pfeilStrich === 8, 'der Strich steht hinter dem Zeichen');
     pruefe(e.nurOffen === 2, 'die Suche nach Offenem findet zwei Zeilen');
@@ -6239,6 +6268,55 @@ console.log('\n79. Skizzen');
            'mit abgelegtem Vorschaubild wird dieses gezeigt');
     pruefe(e.ohneVorschau === true, 'ohne eines das von Google');
     pruefe(e.nachLeeren === 0, 'die Vorschaubilder lassen sich verwerfen');
+  }
+}
+
+/* ============================================================
+   80. Aufgaben aus der Wochenuebersicht
+   Grund: Beim Blick auf die Woche faellt einem ein, was noch fehlt.
+   Dann soll man es dort eintragen koennen — und zwar fuer die Woche,
+   die man gerade ansieht, nicht fuer die laufende.
+   ============================================================ */
+console.log('\n80. Vornehmen in der Woche');
+{
+  const skript = hauptSkript();
+  const w = globalThis.__wnApi;
+
+  ['wochenAufgabeNeu', 'wochenNeuTaste'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const neu = skript.match(/function wochenAufgabeNeu\([\s\S]*?\n\}\n/);
+  pruefe(neu && /eingabeDeuten\(roh\)/.test(neu[0]),
+         'die Eingabe wird gedeutet — ! und p wirken wie überall');
+  pruefe(neu && /planungSetzen\(a, wert\)/.test(neu[0]),
+         'geplant wird über planungSetzen, damit die Woche vermerkt wird');
+  pruefe(neu && /mo === jetztMo\) \? 'woche'/.test(neu[0]),
+         'die laufende Woche ergibt „diese Woche"');
+  pruefe(neu && /tagePlus\(jetztMo, 7\)\) \? 'naechste'/.test(neu[0]),
+         'die kommende ergibt „nächste Woche"');
+  pruefe(neu && /: mo\)/.test(neu[0]),
+         'eine weiter entfernte Woche bekommt ihren Montag als Datum');
+  pruefe(/id="wochenNeu"/.test(skript), 'das Feld steht in der Wochensicht');
+
+  if (!w) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = w.pruefeVornehmen();
+    pruefe(e.dieseWoche === 'woche',
+           'in der laufenden Woche eingetragen heißt „diese Woche"');
+    pruefe(e.merker === true, 'und die Woche wird vermerkt');
+    pruefe(e.naechste === 'naechste', 'eine Woche weiter heißt „nächste"');
+    pruefe(e.spaeter.length === 10,
+           'zwei Wochen weiter bekommt sie den Montag als Datum');
+    pruefe(e.kontext === 'privat', 'das p wird als privat gelesen');
+    pruefe(e.titel === 'Zapf anrufen', 'und aus dem Titel entfernt');
+    pruefe(e.inDerListe === true, 'sie steht gleich in der Wochenliste');
+    pruefe(e.istAufgabe === 'haupt',
+           'sie ist eine Aufgabe, keine Kleinigkeit — hier nimmt man sich '
+           + 'etwas vor');
+    pruefe(e.leerLegtNichtAn === 0, 'ein leeres Feld legt nichts an');
   }
 }
 
