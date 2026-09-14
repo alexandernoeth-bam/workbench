@@ -68,7 +68,7 @@ console.log('\n1. Bildschirme und Navigation');
   /* Nicht jeder Bildschirm gehört in die Leiste: Die Migration wird
      einmal gebraucht, die Vorhabenseite gehört zu „Vorhaben" und wird
      von dort geöffnet. Beide müssen aber erreichbar bleiben. */
-  const VERSTECKT = ['Migration', 'Flaeche'];
+  const VERSTECKT = ['Migration', 'Flaeche', 'Gedanken'];
   schirme.forEach(function (s) {
     if (VERSTECKT.indexOf(s) >= 0) {
       pruefe(navs.indexOf(s) < 0,
@@ -196,7 +196,7 @@ console.log('\n5. Element-IDs');
 
   /* Zusammengesetzte IDs wie 'schirm' + name */
   const schirme = [...QUELLE.matchAll(/id="schirm([A-Za-zÄÖÜäöü]+)"/g)].map(m => m[1]);
-  const OHNE_KNOPF = ['Migration', 'Flaeche'];
+  const OHNE_KNOPF = ['Migration', 'Flaeche', 'Gedanken'];
   schirme.forEach(function (s) {
     if (OHNE_KNOPF.indexOf(s) >= 0) {
       pruefe(imHtml.has('schirm' + s), 'ID schirm' + s + ' existiert (ohne Knopf)');
@@ -217,7 +217,7 @@ console.log('\n6. Datenmodell');
      Google-Kalender, eine zweite Wahrheit soll es nicht geben. */
   const erwartet = ['aufgaben', 'ziele', 'themen', 'projekte', 'ablaeufe',
                     'durchlaeufe', 'jahrestermine', 'ferien', 'einfaelle',
-                    'kalenderzuordnung'];
+                    'gedanken', 'kalenderzuordnung'];
 
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
   pruefe(!!leer, 'leereDatenbank ist auslesbar');
@@ -536,6 +536,37 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__gedankenApi = {'
+                 + ' pruefeGedanken: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.einstellungen.flaecheFrei = \'Alter Text\';'
+                 + '   var r = { uebernommen: gedankenUebernehmen() };'
+                 + '   r.nachUebernahme = DB.einstellungen.flaecheFrei;'
+                 + '   r.zweiteUebernahme = gedankenUebernehmen();'
+                 + '   DB.gedanken.push({ id:\'g2\', titel:\'Zweite\','
+                 + '     text:\'# Kopf\\n\\nZweiter Text\', geaendert:\'2026-01-01\' });'
+                 + '   DB.projekte = ['
+                 + '     { id:\'p1\', name:\'Garage\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[],'
+                 + '       flaeche:\'- Erster Gedanke\\n\\nZweite Zeile\' },'
+                 + '     { id:\'p2\', name:\'Ohne Text\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[], flaeche:\'\' } ];'
+                 + '   var l = alleFlaechen();'
+                 + '   r.gesamt = l.length;'
+                 + '   r.freie = l.filter(function(x){'
+                 + '     return x.woher === \'frei\'; }).length;'
+                 + '   r.ausVorhaben = l.filter(function(x){'
+                 + '     return x.woher !== \'frei\'; }).length;'
+                 + '   r.leeresVorhabenFehlt = !l.some(function(x){'
+                 + '     return x.titel === \'Ohne Text\'; });'
+                 + '   r.vorschau = flaecheVorschau(DB.projekte[0].flaeche);'
+                 + '   r.zeilen = flaecheZeilen(DB.projekte[0].flaeche);'
+                 + '   r.textGefunden = flaecheText(\'g:g2\').split(\'\\n\')[2];'
+                 + '   gedankeTitelSetzen(\'g2\', \'Neuer Titel\');'
+                 + '   r.titelGesetzt = flaecheName(\'g:g2\');'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__rbApi = {'
                  + ' pruefeWochen: function(){'
                  + '   var merk = rbVersatz;'
@@ -5811,15 +5842,28 @@ console.log('\n75. Gedankenfläche');
   pruefe(/id="schirmFlaeche"/.test(QUELLE), 'sie hat einen eigenen Bildschirm');
   pruefe(!/id="navFlaeche"/.test(QUELLE),
          'aber keinen Knopf in der Leiste — sie gehört zu Vorhaben');
-  pruefe(/flaecheOeffnen\(FREIE_FLAECHE\)/.test(QUELLE),
-         'es gibt eine Fläche ohne Vorhaben');
+  pruefe(/id="schirmGedanken"/.test(QUELLE),
+         'es gibt eine Übersicht über alle Flächen');
+  pruefe(new RegExp('function\\s+alleFlaechen\\s*\\(').test(skript),
+         'sie sammelt freie und die aus Vorhaben');
+  const af = skript.match(/function alleFlaechen\([\s\S]*?\n\}\n/);
+  pruefe(af && /DB\.gedanken/.test(af[0]) && /DB\.projekte/.test(af[0])
+         && /DB\.ziele/.test(af[0]),
+         'aus allen drei Quellen');
+  pruefe(af && /a\.geaendert > b\.geaendert/.test(af[0]),
+         'das zuletzt Geänderte steht oben');
+  pruefe(af && /!String\(p\[i\]\.flaeche \|\| ''\)\.trim\(\)\.length/.test(af[0]),
+         'ein Vorhaben ohne Text taucht nicht auf');
 
   /* Gespeichert wird Text, nichts anderes */
   const setzen = skript.match(/function flaecheSetzen\([\s\S]*?\n\}/);
   pruefe(setzen && /v\.flaeche = text/.test(setzen[0]),
          'der Text hängt am Vorhaben und geht über den Abgleich mit');
-  pruefe(setzen && /DB\.einstellungen\.flaecheFrei/.test(setzen[0]),
-         'die freie Fläche liegt in den Einstellungen');
+  pruefe(setzen && /gedankeFinden/.test(setzen[0]),
+         'eine freie Fläche liegt in der eigenen Sammlung');
+  const ueb = skript.match(/function gedankenUebernehmen\([\s\S]*?\n\}/);
+  pruefe(ueb && /DB\.einstellungen\.flaecheFrei = ''/.test(ueb[0]),
+         'die eine Fläche von früher wird übernommen und geleert');
 
   /* Ein Kästchen ist ein Zeichen, keine Aufgabe */
   const kasten = skript.match(/function flaecheKastenUm\([\s\S]*?\n\}/);
@@ -6036,6 +6080,58 @@ console.log('\n77. Zielwoche des Rückblicks');
     pruefe(e.zielAmMittwoch === 38,
            'mitten in der Woche zielt er auf die laufende');
     pruefe(e.nachWahl === 0, 'eine Wahl überschreibt die Vorbelegung');
+  }
+}
+
+/* ============================================================
+   78. Mehrere Flaechen und die Uebersicht
+   Grund: Eine einzige freie Flaeche reicht nicht, und wer etwas sucht,
+   weiss nicht immer, in welchem Vorhaben es steht. Die Uebersicht
+   sammelt alle — die freien und die aus Vorhaben.
+   ============================================================ */
+console.log('\n78. Übersicht über die Flächen');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__gedankenApi;
+
+  ['gedankeFinden', 'gedankenUebernehmen', 'gedankeNeu', 'gedankeTitelSetzen',
+   'gedankeLoeschen', 'flaecheVorschau', 'flaecheZeilen', 'alleFlaechen',
+   'gedankenZeichnen', 'istFreie'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const frei = skript.match(/function istFreie\([\s\S]*?\n\}/);
+  pruefe(frei && /indexOf\('g:'\) === 0/.test(frei[0]),
+         'freie Flächen tragen einen eigenen Vorsatz in der Kennung');
+
+  const loe = skript.match(/function gedankeLoeschen\([\s\S]*?\n\}/);
+  pruefe(loe && /zurueckHolen/.test(loe[0]), 'Löschen lässt sich rückgängig machen');
+  pruefe(loe && /grabsteinSetzen\('gedanken'/.test(loe[0]),
+         'und hinterlässt einen Grabstein für den Abgleich');
+
+  const vor = skript.match(/function flaecheVorschau\([\s\S]*?\n\}/);
+  pruefe(vor && /#\{1,3\}\|\\\[\[ xX\]\?\\\]\|\[-•\*\]/.test(vor[0]),
+         'die Vorschau lässt die Zeichen der Form weg');
+
+  if (!g) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = g.pruefeGedanken();
+    pruefe(e.uebernommen === 1, 'die eine alte Fläche wird übernommen');
+    pruefe(e.nachUebernahme === '', 'und das alte Feld geleert');
+    pruefe(e.zweiteUebernahme === 0, 'ein zweiter Lauf übernimmt nichts');
+    pruefe(e.gesamt === 3, 'die Übersicht zeigt alle drei Flächen');
+    pruefe(e.freie === 2, 'zwei davon frei');
+    pruefe(e.ausVorhaben === 1, 'eine aus einem Vorhaben');
+    pruefe(e.leeresVorhabenFehlt === true,
+           'ein Vorhaben ohne Text steht nicht in der Liste');
+    pruefe(e.vorschau === 'Erster Gedanke',
+           'die Vorschau zeigt die erste Zeile ohne Formzeichen');
+    pruefe(e.zeilen === 2, 'leere Zeilen zählen nicht mit');
+    pruefe(e.textGefunden === 'Zweiter Text',
+           'eine freie Fläche wird über ihre Kennung gefunden');
+    pruefe(e.titelGesetzt === 'Neuer Titel', 'ihr Titel lässt sich ändern');
   }
 }
 

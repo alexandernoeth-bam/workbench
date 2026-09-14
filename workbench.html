@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.65.0</title>
+<title>Workbench 0.66.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -665,6 +665,20 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
   border:1px solid var(--linie);border-radius:6px;background:var(--papier);
   color:var(--tinte);cursor:pointer}
 .vk-ruht{font-size:calc(var(--fs)*0.74);color:var(--petrol);margin-top:3px}
+.gk{border:1px solid var(--linie);border-radius:7px;padding:10px 12px;margin:0 0 8px;
+  cursor:pointer;border-left-width:3px;border-left-color:var(--weinrot)}
+.gk.privat{border-left-color:var(--petrol)}
+.gk-kopf{display:flex;align-items:baseline;gap:9px}
+.gk-titel{flex:1;min-width:0;font-size:calc(var(--fs)*0.92);font-weight:500}
+.gk-woher{flex:0 0 auto;font-size:calc(var(--fs)*0.7);color:var(--grau)}
+.gk-vor{font-size:calc(var(--fs)*0.82);color:var(--grau);line-height:1.4;
+  margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gk-fuss{font-size:calc(var(--fs)*0.7);color:var(--grau-hell);margin-top:4px}
+.fl-namefeld{font:inherit;font-size:calc(var(--fs)*1.02);font-weight:500;
+  border:0;border-bottom:1px solid transparent;background:none;color:var(--tinte);
+  padding:2px 0;outline:none}
+.fl-namefeld:focus{border-bottom-color:var(--linie)}
+
 .fl-kopf{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
 .fl-name{flex:1 1 160px;min-width:0;font-size:calc(var(--fs)*1.02);font-weight:500}
 .fl-suche{flex:0 1 180px;min-width:0;font:inherit;font-size:calc(var(--fs)*0.78);
@@ -942,6 +956,17 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 </div>
 
 
+<div class="schirm" id="schirmGedanken">
+  <div class="vh-kopf">
+    <div class="vh-zeile">
+      <button type="button" class="pille" onclick="zeigeSchirm('Vorhaben')">Zurück</button>
+      <span class="vh-luecke"></span>
+      <span id="gedankenZahl"></span>
+    </div>
+  </div>
+  <div class="vhblatt einfachliste" id="gedankenBlatt"></div>
+</div>
+
 <div class="schirm" id="schirmFlaeche">
   <div class="vh-kopf">
     <div class="vh-zeile">
@@ -1090,7 +1115,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
       <button type="button" id="vhStufeEinfaelle"
               onclick="setVhStufe('einfaelle')">Einfälle</button>
       <button type="button" id="vhStufeGedanken"
-              onclick="flaecheOeffnen(FREIE_FLAECHE)">Gedanken</button>
+              onclick="zeigeSchirm('Gedanken')">Gedanken</button>
     </div>
     <div class="knopfreihe" style="margin-top:9px" id="vhRueckblickReihe">
       <button type="button" onclick="rueckblickOeffnen()">Wochenrückblick</button>
@@ -1215,7 +1240,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.65.0';
+var APP_VERSION = '0.66.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -1239,7 +1264,8 @@ var GRABSTEIN_TAGE = 180;         /* so lange bleibt ein Löschvermerk erhalten 
 /* Berufliche Termine stehen seit v0.9.0 im Google-Kalender „Alex" —
    eine eigene Terminsammlung gibt es nicht mehr. */
 var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe',
-                  'jahrestermine','ferien','einfaelle','kalenderzuordnung'];
+                  'jahrestermine','ferien','einfaelle','gedanken',
+                  'kalenderzuordnung'];
 
 function leereDatenbank() {
   return {
@@ -1253,6 +1279,7 @@ function leereDatenbank() {
     jahrestermine:     [],
     ferien:            [],
     einfaelle:         [],
+    gedanken:          [],
     kalenderzuordnung: {},
     grabsteine:        [],
     einstellungen: {
@@ -4782,7 +4809,7 @@ function handleVergessen() {
 function zeigeSchirm(name) {
   schirmOffen = name;
   var alle = ['Tag', 'Kalender', 'Vorhaben', 'Ablaeufe', 'Aufgaben',
-              'Flaeche', 'Migration', 'Diagnose'];
+              'Flaeche', 'Gedanken', 'Migration', 'Diagnose'];
   var i;
   for (i = 0; i < alle.length; i++) {
     var s = document.getElementById('schirm' + alle[i]);
@@ -4793,12 +4820,14 @@ function zeigeSchirm(name) {
     if (n) {
       /* Die Fläche hat keinen eigenen Knopf — sie gehört zu Vorhaben. */
       var leuchtet = (alle[i] === name)
-                  || (name === 'Flaeche' && alle[i] === 'Vorhaben');
+                  || ((name === 'Flaeche' || name === 'Gedanken')
+                      && alle[i] === 'Vorhaben');
       if (leuchtet) { n.classList.add('aktiv'); } else { n.classList.remove('aktiv'); }
     }
   }
   if (name === 'Migration') { migZeichne(); }
   if (name === 'Flaeche') { flaecheZeichnen(); }
+  if (name === 'Gedanken') { gedankenZeichnen(); }
   if (name === 'Tag') { tagZeichnen(); kalenderNachholen(); }
   if (name === 'Aufgaben') { aufZeichnen(); }
   if (name === 'Vorhaben') { vhZeichnen(); }
@@ -8152,7 +8181,6 @@ var flaecheFuer = '';        /* Kennung des Vorhabens, '' = die freie */
 var flaecheModus = 'ansicht';
 var flaecheSuche = '';
 
-var FREIE_FLAECHE = 'frei';
 
 /* „Mo, 14.09.2026" — in einer Gedankenfläche steht das Datum oft allein
    in einer Zeile, dort hilft die volle Form. */
@@ -8163,17 +8191,26 @@ function langDatum(is) {
        + zwei(d.getMonth() + 1) + '.' + d.getFullYear();
 }
 
+/* Eine Kennung mit dem Vorsatz „g:" meint eine freie Fläche. */
+function istFreie(id) {
+  return String(id).indexOf('g:') === 0;
+}
+
 function flaecheText(id) {
-  if (id === FREIE_FLAECHE) {
-    return String(DB.einstellungen.flaecheFrei || '');
+  if (istFreie(id)) {
+    var g = gedankeFinden(String(id).slice(2));
+    return g ? String(g.text || '') : '';
   }
   var v = vorhabenFinden(id, 'projekt') || vorhabenFinden(id, 'ziel');
   return v ? String(v.flaeche || '') : '';
 }
 
 function flaecheSetzen(id, text) {
-  if (id === FREIE_FLAECHE) {
-    DB.einstellungen.flaecheFrei = text;
+  if (istFreie(id)) {
+    var g = gedankeFinden(String(id).slice(2));
+    if (!g) { return; }
+    g.text = text;
+    g.geaendert = jetzt();
   } else {
     var v = vorhabenFinden(id, 'projekt') || vorhabenFinden(id, 'ziel');
     if (!v) { return; }
@@ -8184,7 +8221,10 @@ function flaecheSetzen(id, text) {
 }
 
 function flaecheName(id) {
-  if (id === FREIE_FLAECHE) { return 'Gedanken'; }
+  if (istFreie(id)) {
+    var g = gedankeFinden(String(id).slice(2));
+    return g ? (g.titel || 'ohne Titel') : 'Fläche';
+  }
   var v = vorhabenFinden(id, 'projekt') || vorhabenFinden(id, 'ziel');
   return v ? v.name : 'Fläche';
 }
@@ -8547,6 +8587,11 @@ function flaecheOeffnen(id) {
 }
 
 function flaecheZurueck() {
+  if (istFreie(flaecheFuer)) {
+    zeigeSchirm('Gedanken');
+    gedankenZeichnen();
+    return;
+  }
   zeigeSchirm('Vorhaben');
 }
 
@@ -8558,13 +8603,24 @@ function flaecheZeichnen() {
 
   if (kopf) {
     var k = '<div class="fl-kopf">';
-    k += '<span class="fl-name">' + esc(flaecheName(flaecheFuer)) + '</span>';
+    if (istFreie(flaecheFuer)) {
+      k += '<input class="fl-name fl-namefeld" type="text" '
+         + 'value="' + esc(flaecheName(flaecheFuer)) + '" placeholder="Titel" '
+         + 'oninput="gedankeTitelSetzen(\'' + esc(String(flaecheFuer).slice(2))
+         + '\',this.value)">';
+    } else {
+      k += '<span class="fl-name">' + esc(flaecheName(flaecheFuer)) + '</span>';
+    }
     k += '<button class="sl-pille' + (flaecheModus === 'ansicht' ? ' an' : '')
        + '" type="button" onclick="flaecheModusSetzen(\'ansicht\')">Ansicht</button>';
     k += '<button class="sl-pille' + (flaecheModus === 'schreiben' ? ' an' : '')
        + '" type="button" onclick="flaecheModusSetzen(\'schreiben\')">Schreiben</button>';
     k += '<input class="fl-suche" type="search" placeholder="Suchen" '
        + 'value="' + esc(flaecheSuche) + '" oninput="flaecheSuchen(this.value)">';
+    if (istFreie(flaecheFuer)) {
+      k += '<button class="sk-loeschen" type="button" onclick="gedankeLoeschen(\''
+         + esc(String(flaecheFuer).slice(2)) + '\')">Löschen</button>';
+    }
     k += '</div>';
     k += '<div class="fl-arten">';
     k += '<button class="sl-pille' + (flaecheArt.offen ? ' an' : '') + '" type="button" '
@@ -8622,6 +8678,164 @@ function flaecheZeichnen() {
   /* Bei langem Text ans Ende springen — dort steht das Neueste. */
   if (!flaecheSuche && typeof blatt.scrollHeight === 'number') {
     blatt.scrollTop = blatt.scrollHeight;
+  }
+}
+
+
+/* ------------------------------------------------------------
+   Mehrere freie Flächen und eine Übersicht über alle
+
+   Eine Gedankenfläche gehört entweder zu einem Vorhaben oder zu
+   niemandem. Die freien liegen in einer eigenen Sammlung, damit es
+   mehrere geben kann; angesprochen werden sie mit dem Vorsatz „g:".
+   ------------------------------------------------------------ */
+
+function gedankeFinden(id) {
+  var l = DB.gedanken || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].id === id) { return l[i]; }
+  }
+  return null;
+}
+
+/* Die eine Fläche aus der Zeit vor dieser Fassung wird beim ersten
+   Öffnen zu einem Eintrag der Sammlung. */
+function gedankenUebernehmen() {
+  var frei = String(DB.einstellungen.flaecheFrei || '').trim();
+  if (!frei.length) { return 0; }
+  if (!Array.isArray(DB.gedanken)) { DB.gedanken = []; }
+  DB.gedanken.push({ id: neueKennung(), titel: 'Gedanken',
+                     text: DB.einstellungen.flaecheFrei, geaendert: jetzt() });
+  DB.einstellungen.flaecheFrei = '';
+  spaeterSichern();
+  return 1;
+}
+
+function gedankeNeu() {
+  if (!Array.isArray(DB.gedanken)) { DB.gedanken = []; }
+  var g = { id: neueKennung(), titel: '', text: '', geaendert: jetzt() };
+  DB.gedanken.push(g);
+  spaeterSichern();
+  flaecheOeffnen('g:' + g.id);
+  flaecheModusSetzen('schreiben');
+}
+
+function gedankeTitelSetzen(id, wert) {
+  var g = gedankeFinden(id);
+  if (!g) { return; }
+  g.titel = wert;
+  g.geaendert = jetzt();
+  spaeterSichern();
+}
+
+function gedankeLoeschen(id) {
+  var g = gedankeFinden(id);
+  if (!g) { return; }
+  var stelle = DB.gedanken.indexOf(g);
+  zurueckHolen = { sammlung: 'gedanken', satz: g, stelle: stelle };
+  DB.gedanken.splice(stelle, 1);
+  grabsteinSetzen('gedanken', g.id);
+  spaeterSichern();
+  zeigeSchirm('Gedanken');
+  gedankenZeichnen();
+  melde('Gelöscht: ' + (g.titel || 'ohne Titel') + ' — rückgängig möglich', null);
+}
+
+/* ------------------------------------------------------------
+   Die Übersicht über alle Flächen
+   ------------------------------------------------------------ */
+
+function flaecheVorschau(text) {
+  var zeilen = String(text || '').split('\n');
+  var i;
+  for (i = 0; i < zeilen.length; i++) {
+    var z = zeilen[i].replace(/^\s*(#{1,3}|\[[ xX]?\]|[-•*])\s*/, '').trim();
+    if (z.length) { return z.slice(0, 90); }
+  }
+  return '';
+}
+
+function flaecheZeilen(text) {
+  var zeilen = String(text || '').split('\n');
+  var n = 0;
+  var i;
+  for (i = 0; i < zeilen.length; i++) {
+    if (zeilen[i].trim().length) { n++; }
+  }
+  return n;
+}
+
+function alleFlaechen() {
+  var aus = [];
+  var i;
+  var g = DB.gedanken || [];
+  for (i = 0; i < g.length; i++) {
+    aus.push({ id: 'g:' + g[i].id, titel: g[i].titel || 'ohne Titel',
+               woher: 'frei', text: g[i].text || '', geaendert: g[i].geaendert || '' });
+  }
+  var p = DB.projekte || [];
+  for (i = 0; i < p.length; i++) {
+    if (!String(p[i].flaeche || '').trim().length) { continue; }
+    aus.push({ id: p[i].id, titel: p[i].name, woher: 'Projekt',
+               kontext: p[i].kontext, text: p[i].flaeche,
+               geaendert: p[i].geaendert || '' });
+  }
+  var z = DB.ziele || [];
+  for (i = 0; i < z.length; i++) {
+    if (!String(z[i].flaeche || '').trim().length) { continue; }
+    aus.push({ id: z[i].id, titel: z[i].name, woher: 'Ziel',
+               kontext: z[i].kontext, text: z[i].flaeche,
+               geaendert: z[i].geaendert || '' });
+  }
+  aus.sort(function (a, b) { return (a.geaendert > b.geaendert) ? -1 : 1; });
+  return aus;
+}
+
+function gedankenZeichnen() {
+  var blatt = document.getElementById('gedankenBlatt');
+  if (!blatt) { return; }
+  gedankenUebernehmen();
+  var l = alleFlaechen();
+  var frei = l.filter(function (e) { return e.woher === 'frei'; });
+  var ausVorhaben = l.filter(function (e) { return e.woher !== 'frei'; });
+
+  var h = '<button class="neu-zeile" type="button" onclick="gedankeNeu()">'
+        + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>'
+        + 'Neue Fläche</button>';
+
+  var karte = function (e) {
+    var vor = flaecheVorschau(e.text);
+    var n = flaecheZeilen(e.text);
+    return '<div class="gk' + (e.kontext === 'privat' ? ' privat' : '') + '" '
+         + 'onclick="flaecheOeffnen(\'' + esc(e.id) + '\')">'
+         + '<div class="gk-kopf"><span class="gk-titel">' + esc(e.titel) + '</span>'
+         + '<span class="gk-woher">' + esc(e.woher === 'frei' ? '' : e.woher)
+         + '</span></div>'
+         + '<div class="gk-vor">' + (vor ? esc(vor) : 'leer') + '</div>'
+         + '<div class="gk-fuss">' + n + (n === 1 ? ' Zeile' : ' Zeilen') + '</div>'
+         + '</div>';
+  };
+
+  var i;
+  if (frei.length) {
+    h += '<div class="vh-gruppe"><span>Frei · ' + frei.length + '</span></div>';
+    for (i = 0; i < frei.length; i++) { h += karte(frei[i]); }
+  }
+  if (ausVorhaben.length) {
+    h += '<div class="vh-gruppe"><span>Aus Vorhaben · ' + ausVorhaben.length
+       + '</span></div>';
+    for (i = 0; i < ausVorhaben.length; i++) { h += karte(ausVorhaben[i]); }
+  }
+  if (!l.length) {
+    h += '<div class="tleer" style="padding-left:0">Noch keine Fläche. '
+       + 'Leg eine an oder schreib etwas auf der Fläche eines Vorhabens.</div>';
+  }
+
+  blatt.innerHTML = h;
+  var zahl = document.getElementById('gedankenZahl');
+  if (zahl) {
+    zahl.textContent = l.length + (l.length === 1 ? ' Fläche' : ' Flächen');
   }
 }
 
