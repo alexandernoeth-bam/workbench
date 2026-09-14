@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.58.0</title>
+<title>Workbench 0.59.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -628,6 +628,9 @@ body.breit .tspalte-rechts{grid-column:2}
 body.breit .tabschnitt[data-kurz="Erledigt"]{grid-column:1 / -1}
 
 /* Vorhaben und Abläufe als Kacheln, so viele wie hineinpassen. */
+/* Eine Liste braucht keine Kacheln — die Spalten entstanden nur,
+   weil dieses Blatt dasselbe Raster benutzte wie die Vorhaben. */
+body.breit .vhblatt.einfachliste{display:block}
 body.breit .vhblatt{display:grid;
   grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
   gap:0 16px;align-content:start}
@@ -662,6 +665,18 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
   border:1px solid var(--linie);border-radius:6px;background:var(--papier);
   color:var(--tinte);cursor:pointer}
 .vk-ruht{font-size:calc(var(--fs)*0.74);color:var(--petrol);margin-top:3px}
+.vh-bereich{display:flex;width:100%;align-items:center;gap:9px;background:none;
+  border:0;border-bottom:1.5px solid var(--tinte);font:inherit;
+  font-size:calc(var(--fs)*0.86);font-weight:500;color:var(--tinte);
+  padding:12px 0 5px;margin:6px 0 8px;cursor:pointer;text-align:left}
+.vh-bereich.privat{border-bottom-color:var(--petrol);color:var(--petrol)}
+.vh-bereich span{flex:1;min-width:0}
+.vh-bereich svg{flex:0 0 auto;width:15px;height:15px;stroke:currentColor;fill:none;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  transform:rotate(-90deg);transition:transform .15s ease}
+.vh-bereich svg.auf{transform:rotate(0deg)}
+body.breit .vh-bereich{grid-column:1 / -1}
+
 .vkarte.flach{cursor:pointer}
 .vkarte.flach .vk-kopf{cursor:pointer}
 .vkarte.flach:hover{border-color:var(--grau-hell)}
@@ -1021,7 +1036,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 
   <div class="melder" id="vhMelder" style="margin:10px 20px 0">Bereit.</div>
   <div class="vhblatt" id="vhBlatt"></div>
-  <div class="vhblatt" id="einfallBlatt" style="display:none"></div>
+  <div class="vhblatt einfachliste" id="einfallBlatt" style="display:none"></div>
 
   <button class="plusknopf" type="button" id="vhPlus" onclick="vorhabenNeu()"
           aria-label="Neues Vorhaben">
@@ -1137,7 +1152,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.58.0';
+var APP_VERSION = '0.59.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -7176,6 +7191,9 @@ var vhDetailArt = '';     /* 'ziel' oder 'projekt' */
 
 function setVhFilter(art) {
   vhFilter = art;
+  /* Beim Umschalten auf einen Kontext soll der gewählte offen sein —
+     auch wenn er vorher eingeklappt war. */
+  vhKontextZu = {};
   if (vhStufe === 'einfaelle') {
     markiere([['alle', 'vAlle'], ['beruflich', 'vBeruf'], ['privat', 'vPrivat']], art);
     einfaelleZeichnen();
@@ -7371,21 +7389,63 @@ function setVhStufe(name) {
   }
 }
 
+/* Bei „Alle" stehen Beruf und Privat getrennt, jeder Bereich
+   einklappbar — erst der Beruf, dann das Private. Wird auf einen
+   Kontext geschaltet, bleibt nur er übrig, aufgeklappt. */
+var vhKontextZu = {};
+
+function vhKontextUm(k) {
+  vhKontextZu[k] = !vhKontextZu[k];
+  vhZeichnen();
+  einfaelleZeichnen();
+}
+
+function vhKontextOffen(k) {
+  if (vhFilter !== 'alle') { return true; }
+  return vhKontextZu[k] !== true;
+}
+
+function vhBereichKopf(k, name, zahl) {
+  var offen = vhKontextOffen(k);
+  if (vhFilter !== 'alle') {
+    return '<div class="vh-gruppe"><span>' + esc(name) + ' · ' + zahl + '</span></div>';
+  }
+  return '<button class="vh-bereich' + (k === 'privat' ? ' privat' : '') + '" '
+       + 'type="button" onclick="vhKontextUm(\'' + k + '\')">'
+       + '<span>' + esc(name) + ' · ' + zahl + '</span>'
+       + '<svg class="' + (offen ? 'auf' : '') + '" viewBox="0 0 24 24">'
+       + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+}
+
 function vhZeichnen() {
   var blatt = document.getElementById('vhBlatt');
   if (!blatt) { return; }
   var ziele = vhSichtbar(DB.ziele || []);
   var projekte = vhSichtbar(DB.projekte || []);
   var h = '';
-  var i;
+  var bereiche = [['beruflich', 'Beruflich'], ['privat', 'Privat']];
+  var b, i;
 
-  h += '<div class="vh-gruppe"><span>Ziele · ' + ziele.length + '</span></div>';
-  if (!ziele.length) { h += '<div class="tleer">Kein Ziel in dieser Auswahl.</div>'; }
-  for (i = 0; i < ziele.length; i++) { h += zielKarteHtml(ziele[i]); }
+  for (b = 0; b < bereiche.length; b++) {
+    var k = bereiche[b][0];
+    if (vhFilter !== 'alle' && vhFilter !== k) { continue; }
+    var zK = ziele.filter(function (z) { return z.kontext === k; });
+    var pK = projekte.filter(function (p) { return p.kontext === k; });
+    h += vhBereichKopf(k, bereiche[b][1], zK.length + pK.length);
+    if (!vhKontextOffen(k)) { continue; }
 
-  h += '<div class="vh-gruppe"><span>Projekte · ' + projekte.length + '</span></div>';
-  if (!projekte.length) { h += '<div class="tleer">Kein Projekt in dieser Auswahl.</div>'; }
-  for (i = 0; i < projekte.length; i++) { h += projektKarteHtml(projekte[i]); }
+    if (zK.length) {
+      h += '<div class="vh-gruppe"><span>Ziele · ' + zK.length + '</span></div>';
+      for (i = 0; i < zK.length; i++) { h += zielKarteHtml(zK[i]); }
+    }
+    if (pK.length) {
+      h += '<div class="vh-gruppe"><span>Projekte · ' + pK.length + '</span></div>';
+      for (i = 0; i < pK.length; i++) { h += projektKarteHtml(pK[i]); }
+    }
+    if (!zK.length && !pK.length) {
+      h += '<div class="tleer">Nichts in diesem Bereich.</div>';
+    }
+  }
 
   blatt.innerHTML = h;
   var zahl = document.getElementById('vhZahl');
@@ -7783,8 +7843,17 @@ function einfaelleZeichnen() {
        + 'Hier darf alles stehen, was du vielleicht einmal tun willst — '
        + 'ohne Datum, ohne Verpflichtung.</div>';
   }
-  var i;
-  for (i = 0; i < offen.length; i++) { h += einfallZeileHtml(offen[i]); }
+  var bereiche = [['beruflich', 'Beruflich'], ['privat', 'Privat']];
+  var b, i;
+  for (b = 0; b < bereiche.length; b++) {
+    var k = bereiche[b][0];
+    if (vhFilter !== 'alle' && vhFilter !== k) { continue; }
+    var drin = offen.filter(function (e) { return e.kontext === k; });
+    if (!drin.length && vhFilter === 'alle') { continue; }
+    h += vhBereichKopf(k, bereiche[b][1], drin.length);
+    if (!vhKontextOffen(k)) { continue; }
+    for (i = 0; i < drin.length; i++) { h += einfallZeileHtml(drin[i]); }
+  }
 
   var alt = verfolgt.length + verworfen.length;
   if (alt) {

@@ -532,6 +532,32 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__bereichApi = {'
+                 + ' pruefeBereiche: function(){'
+                 + '   var alt = DB; var merkF = vhFilter; DB = leereDatenbank();'
+                 + '   DB.projekte = ['
+                 + '     { id:\'p1\', name:\'Beruflich A\', kontext:\'beruflich\','
+                 + '       status:\'laufend\', zielzustaende:[] },'
+                 + '     { id:\'p2\', name:\'Privat B\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[] } ];'
+                 + '   vhFilter = \'alle\'; vhKontextZu = {}; vhStufe = \'vorhaben\';'
+                 + '   vhZeichnen();'
+                 + '   var h = document.getElementById(\'vhBlatt\').innerHTML;'
+                 + '   var r = { beideKoepfe: (h.indexOf(\'Beruflich\') >= 0'
+                 + '               && h.indexOf(\'Privat\') >= 0),'
+                 + '             berufZuerst: (h.indexOf(\'Beruflich\')'
+                 + '               < h.indexOf(\'Privat\')) };'
+                 + '   vhKontextZu[\'beruflich\'] = true;'
+                 + '   vhZeichnen();'
+                 + '   h = document.getElementById(\'vhBlatt\').innerHTML;'
+                 + '   r.nachEinklappen = (h.match(/class="vkarte/g) || []).length;'
+                 + '   setVhFilter(\'beruflich\');'
+                 + '   h = document.getElementById(\'vhBlatt\').innerHTML;'
+                 + '   r.nurEinerBeiFilter = (h.indexOf(\'Privat B\') < 0);'
+                 + '   r.beiFilterOffen = (h.indexOf(\'Beruflich A\') >= 0);'
+                 + '   vhFilter = merkF; vhKontextZu = {}; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__abAnlageApi = {'
                  + ' pruefeAnlagen: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -955,7 +981,10 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__wocheApi = {'
                  + ' pruefeWoche: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
-                 + '   var mo = montagVon(\'2026-09-09\');'
+                 + '   /* Die laufende Woche, nicht eine feste: „diese Woche"'
+                 + '      misst sich an heute, sonst bricht die Prüfung beim'
+                 + '      Wochenwechsel. */'
+                 + '   var mo = montagVon(isoDatum());'
                  + '   DB.aufgaben = ['
                  + '     { id:\'a1\', titel:\'Am Dienstag\', kontext:\'beruflich\','
                  + '       status:\'offen\', planung: tagePlus(mo,1), art:\'haupt\' },'
@@ -5531,6 +5560,62 @@ console.log('\n75. Anlagen am Ablauf');
            'eine Änderung am Durchlauf berührt die Vorlage nicht');
     pruefe(e.nachEntfernen === 0, 'entfernen geht');
     pruefe(e.vorlageUnberuehrt === 1, 'die Vorlage behält ihre');
+  }
+}
+
+/* ============================================================
+   74. Beruf und Privat getrennt
+   Grund: Bei „Alle" standen Berufliches und Privates gemischt. Getrennt
+   und einklappbar sieht man, was wozu gehoert — und kann eines
+   wegraeumen, ohne den Filter zu bemuehen.
+   ============================================================ */
+console.log('\n74. Bereiche nach Kontext');
+{
+  const skript = hauptSkript();
+  const v = globalThis.__bereichApi;
+
+  ['vhKontextUm', 'vhKontextOffen', 'vhBereichKopf'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const z = skript.match(/function vhZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(z && /\['beruflich', 'Beruflich'\], \['privat', 'Privat'\]/.test(z[0]),
+         'erst der Beruf, dann das Private');
+  pruefe(z && /vhFilter !== 'alle' && vhFilter !== k/.test(z[0]),
+         'bei gesetztem Filter bleibt nur der gewählte Bereich');
+  pruefe(z && /vhKontextOffen\(k\)/.test(z[0]),
+         'ein eingeklappter Bereich zeigt seine Karten nicht');
+
+  const offen = skript.match(/function vhKontextOffen\([\s\S]*?\n\}/);
+  pruefe(offen && /vhFilter !== 'alle'\) \{ return true/.test(offen[0]),
+         'auf einen Kontext geschaltet ist er immer offen');
+
+  const f = skript.match(/function setVhFilter\([\s\S]*?\n\}/);
+  pruefe(f && /vhKontextZu = \{\}/.test(f[0]),
+         'das Umschalten räumt eingeklappte Bereiche auf');
+
+  const e = skript.match(/function einfaelleZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(e && /vhBereichKopf\(/.test(e[0]),
+         'die Einfälle folgen derselben Ordnung');
+  pruefe(/id="einfallBlatt"[^>]*class="[^"]*einfachliste|einfachliste[^"]*"\s+id="einfallBlatt"/
+         .test(QUELLE) || /class="vhblatt einfachliste" id="einfallBlatt"/.test(QUELLE),
+         'ihr Blatt ist als einfache Liste gekennzeichnet');
+  pruefe(/body\.breit \.vhblatt\.einfachliste\{display:block\}/.test(QUELLE),
+         'es benutzt nicht mehr das Kachelraster — daher kamen die Spalten');
+
+  if (!v) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const r = v.pruefeBereiche();
+    pruefe(r.beideKoepfe === true, 'bei „Alle" stehen beide Bereiche da');
+    pruefe(r.berufZuerst === true, 'der Beruf zuerst');
+    pruefe(r.nachEinklappen === 1,
+           'ein eingeklappter Bereich zeigt keine Karten mehr');
+    pruefe(r.nurEinerBeiFilter === true,
+           'auf Beruf geschaltet steht das Private nicht mehr da');
+    pruefe(r.beiFilterOffen === true,
+           'und der gewählte ist offen, auch wenn er vorher zu war');
   }
 }
 
