@@ -551,7 +551,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '       start:{ dateTime:\'2026-09-20T09:00:00+02:00\' },'
                  + '       end:{ dateTime:\'2026-09-20T10:00:00+02:00\' } } ],'
                  + '     \'Familie\', \'privat\');'
-                 + '   var r = { ohneWahl: jtAn(\'2026-09-20\').length };'
+                 + '   var r = { ohneWahl: jtAn(\'2026-09-20\').length,'
+                 + '             treffenInListe: (artenAlle().indexOf(\'treffen\')'
+                 + '               >= 0) };'
                  + '   artImJahrUm(\'treffen\');'
                  + '   var mit = jtAn(\'2026-09-20\');'
                  + '   r.mitWahl = mit.length;'
@@ -6617,6 +6619,10 @@ console.log('\n83. Arten im Jahresraster');
 
   pruefe(/id="artenJahrListe"/.test(QUELLE),
          'in der Diagnose steht die Wahl je Art');
+  const aa = skript.match(/function artenAlle\([\s\S]*?\n\}/);
+  pruefe(aa && !/if \(l\[i\]\.ganztags\) \{ dazu/.test(aa[0]),
+         'die Artenliste umfasst auch Termine mit Uhrzeit — sonst könnte man '
+         + 'ihre Art nie freischalten');
 
   if (!j) {
     warn('Funktionen nicht auswertbar');
@@ -6630,6 +6636,8 @@ console.log('\n83. Arten im Jahresraster');
     pruefe(e.zurueckgenommen === 1, 'die Wahl lässt sich zurücknehmen');
     pruefe(e.ganztaegigZuerst === true,
            'am selben Tag steht das Ganztägige vorn');
+    pruefe(e.treffenInListe === true,
+           'eine Art, die nur an Terminen mit Uhrzeit vorkommt, steht zur Wahl');
   }
 }
 
