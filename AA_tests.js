@@ -652,6 +652,11 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.linkKnopf = feld.value;'
                  + '   r.linkStrich = feld.selectionStart;'
                  + '   r.datumLang = langDatum(\'2026-09-14\');'
+                 + '   feld.value = \'Titel\'; feld.selectionStart = 2;'
+                 + '   flaecheZeichen(\'h3\');'
+                 + '   r.h3 = feld.value;'
+                 + '   r.h3Ansicht = (flaecheZeileHtml(\'### Klein\', 0, \'\')'
+                 + '     .match(/class="(fl-h\\d)"/) || [])[1];'
                  + '   flaecheModus = \'schreiben\';'
                  + '   flaecheZeichnen();'
                  + '   var lb = document.getElementById(\'flaecheBlatt\').innerHTML;'
@@ -660,6 +665,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     === r.knoepfe);'
                  + '   r.alleBeschriftet = ((lb.match(/aria-label="/g) || []).length'
                  + '     === r.knoepfe);'
+                 + '   r.keinLeeresBild = (lb.indexOf(\'<svg viewBox="0 0 24 24" '
+                 + 'aria-hidden="true"></svg>\') < 0);'
+                 + '   r.h1Sichtbar = (lb.indexOf(\'>H1</text>\') >= 0);'
                  + '   flaecheModus = \'ansicht\';'
                  + '   flaecheFuer = \'\'; DB = alt;'
                  + '   return r;'
@@ -5845,9 +5853,20 @@ console.log('\n75. Gedankenfläche');
            'der Verweisknopf legt ein Gerüst an');
     pruefe(e.linkStrich === 17, 'und setzt den Strich hinter https://');
     pruefe(e.datumLang === 'Mo, 14.09.2026', 'das Datum trägt Wochentag und Jahr');
-    pruefe(e.knoepfe === 13, 'dreizehn Knöpfe in der Leiste');
+    pruefe(e.knoepfe === 14, 'vierzehn Knöpfe in der Leiste');
+    pruefe(e.h3 === '### Titel', 'drei ### ergeben die kleine Überschrift');
+    pruefe(e.h3Ansicht === 'fl-h3', 'und sie wird als solche gezeigt');
     pruefe(e.alleMitBild === true, 'alle mit Sinnbild statt Wort');
+    pruefe(e.keinLeeresBild === true,
+           'kein Sinnbild ist leer — ein Name, den es nicht gibt, ergäbe '
+           + 'einen unsichtbaren Knopf');
+    pruefe(e.h1Sichtbar === true, 'das H1-Sinnbild trägt seinen Buchstaben');
     pruefe(e.alleBeschriftet === true, 'und alle mit Beschriftung für die Ansage');
+  }
+  pruefe(/\.fl-knopf svg text\{fill:currentColor/.test(QUELLE),
+         'Sinnbilder aus Schrift sind sichtbar — CSS schlägt sonst das '
+         + 'fill-Attribut und lässt sie verschwinden');
+  {
   }
 }
 
