@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.69.0</title>
+<title>Workbench 0.70.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1254,7 +1254,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.69.0';
+var APP_VERSION = '0.70.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -10023,7 +10023,15 @@ function abhakHtml() {
   return h;
 }
 
+/* Schließt man das Blatt, während die Schnellerfassung offen ist,
+   wäre das Getippte sonst verloren. */
+function abDetailSchliessen() {
+  if (abSchnell) { abSchnellUebernehmen(); abSchnell = false; }
+  aktionenSchliessen();
+}
+
 function abDetailOeffnen(id, art) {
+  abSchnell = false;
   abDetail = id;
   abDetailArt = art;
   var sheet = document.getElementById('aktionSheet');
@@ -10160,7 +10168,17 @@ function abDetailHtml() {
 
   h += abAnlagenHtml(a);
 
-  h += '<div class="s-abschnitt">Schritte</div>';
+  h += '<div class="s-abschnitt">Schritte'
+     + '<button class="ms-wort" type="button" onclick="abSchnellUm()" '
+     + 'style="float:right;font-weight:400">'
+     + (abSchnell ? 'Fertig' : 'Schnell erfassen') + '</button></div>';
+  if (abSchnell) {
+    h += abSchnellHtml(a);
+    h += '<div class="d-reihe">'
+       + '<button class="gefahr" type="button" onclick="abLoeschen()">Löschen</button>'
+       + '<button type="button" onclick="abDetailSchliessen()">Fertig</button></div>';
+    return h;
+  }
   var l = a.schritte || [];
   var i;
   for (i = 0; i < l.length; i++) {
@@ -10217,6 +10235,8 @@ function abDetailHtml() {
     }
     h += '<button class="ms-wort" type="button" onclick="abSchrittHoch(' + i + ')" '
        + 'title="Diesen Schritt nach oben schieben">Nach oben</button>';
+    h += '<button class="ms-wort" type="button" onclick="abSchrittRunter(' + i + ')" '
+       + 'title="Diesen Schritt nach unten schieben">Nach unten</button>';
     h += '<button class="ms-wort gefahr" type="button" onclick="abSchrittWeg(' + i + ')" '
        + 'title="Diesen Schritt entfernen">Entfernen</button>';
     h += '</div></div>';
@@ -10333,6 +10353,85 @@ function abAnlassSetzen(id) {
   if (!a) { return; }
   a.anlassAufgabeId = id;
   a.wiederholung = null;
+  abGeaendert(true);
+}
+
+/* Schnelles Erfassen: eine Zeile je Schritt. Zuordnen, Ordnen und
+   Fristen kommen danach — beim Aufschreiben will man nur aufschreiben.
+
+   Beim Übernehmen wird abgeglichen statt ersetzt: Ein Schritt, dessen
+   Titel unverändert bleibt, behält seinen Stand, seine Aufgabe und
+   sein Ruhedatum. Sonst verlöre man mit einem Tippfehler alles. */
+var abSchnell = false;
+
+function abSchnellUm() {
+  if (abSchnell) { abSchnellUebernehmen(); }
+  abSchnell = !abSchnell;
+  abDetailNeu();
+}
+
+function abSchnellText(a) {
+  var l = a.schritte || [];
+  var zeilen = [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    zeilen.push(schrittTitel(l[i]));
+  }
+  return zeilen.join('\n');
+}
+
+function abSchnellUebernehmen() {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  var feld = document.getElementById('abSchnellFeld');
+  if (!a || !feld) { return 0; }
+
+  var neu = [];
+  var roh = String(feld.value || '').split('\n');
+  var alt = (a.schritte || []).slice();
+  var i, j;
+  for (i = 0; i < roh.length; i++) {
+    var titel = roh[i].replace(/^\s*[-–—•*]\s*/, '').replace(/^\s*\[[ xX]?\]\s*/, '')
+                      .trim();
+    if (!titel.length) { continue; }
+    var treffer = -1;
+    for (j = 0; j < alt.length; j++) {
+      if (alt[j] && schrittTitel(alt[j]) === titel) { treffer = j; break; }
+    }
+    if (treffer >= 0) {
+      neu.push(alt[treffer]);
+      alt[treffer] = null;
+    } else {
+      neu.push({ id: neueKennung(), titel: titel, fertig: false, ab: '',
+                 wann: 'davor', aufgabeId: null });
+    }
+  }
+  a.schritte = neu;
+  a.geaendert = jetzt();
+  spaeterSichern();
+  abZeichnen();
+  tagZeichnen();
+  return neu.length;
+}
+
+function abSchnellHtml(a) {
+  var h = '<div class="d-hinweis" style="text-align:left">Eine Zeile je Schritt. '
+        + 'Wer schon abgehakt hat oder eine Aufgabe trägt, behält das — '
+        + 'solange der Titel gleich bleibt.</div>';
+  h += '<textarea class="fl-feld" id="abSchnellFeld" rows="10" '
+     + 'style="min-height:200px" spellcheck="false" '
+     + 'placeholder="Angebote einholen\nTermine ausmachen\nRückläufer sichten">'
+     + esc(abSchnellText(a)) + '</textarea>';
+  h += '<div class="d-reihe">'
+     + '<button type="button" onclick="abSchnellUm()">Übernehmen</button></div>';
+  return h;
+}
+
+function abSchrittRunter(i) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || !a.schritte || i >= a.schritte.length - 1) { return; }
+  var s = a.schritte[i];
+  a.schritte[i] = a.schritte[i + 1];
+  a.schritte[i + 1] = s;
   abGeaendert(true);
 }
 

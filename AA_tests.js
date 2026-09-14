@@ -536,6 +536,50 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__schnellApi = {'
+                 + ' pruefeSchnell: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.aufgaben = [{ id:\'a1\', titel:\'Zweiter\','
+                 + '     kontext:\'privat\', status:\'offen\', planung:\'backlog\','
+                 + '     art:\'haupt\' }];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Test\','
+                 + '     kontext:\'privat\', schritte:['
+                 + '       { id:\'s1\', titel:\'Erster\', fertig:true, ab:\'\' },'
+                 + '       { id:\'s2\', titel:\'x\', aufgabeId:\'a1\','
+                 + '         ab:\'2026-10-01\' },'
+                 + '       { id:\'s3\', titel:\'Dritter\', fertig:false, ab:\'\' }] }];'
+                 + '   abDetail = \'d1\'; abDetailArt = \'durchlauf\';'
+                 + '   var d = DB.durchlaeufe[0];'
+                 + '   var r = { textVorher: abSchnellText(d) };'
+                 + '   var feld = document.getElementById(\'abSchnellFeld\');'
+                 + '   feld.value = \'Zweiter\\nErster\\n\\n- Mit Strich\\n\''
+                 + '              + \'[] Mit Kasten\';'
+                 + '   abSchnellUebernehmen();'
+                 + '   r.leerZeilenWeg = d.schritte.length;'
+                 + '   feld.value = \'Zweiter\\nErster\\nNeu\\nDritter\';'
+                 + '   abSchnellUebernehmen();'
+                 + '   r.zahlNachher = d.schritte.length;'
+                 + '   var nach = {};'
+                 + '   d.schritte.forEach(function(s){ nach[schrittTitel(s)] = s; });'
+                 + '   r.standBleibt = (nach[\'Erster\'].fertig === true);'
+                 + '   r.aufgabeBleibt = nach[\'Zweiter\'].aufgabeId;'
+                 + '   r.abBleibt = nach[\'Zweiter\'].ab;'
+                 + '   r.neueOhneStand = !!nach[\'Neu\'].fertig;'
+                 + '   r.reihenfolge = d.schritte.map(function(s){'
+                 + '     return schrittTitel(s); }).join(\',\');'
+                 + '   feld.value = \'- Mit Strich\\n[] Mit Kasten\';'
+                 + '   abSchnellUebernehmen();'
+                 + '   r.strichWeg = d.schritte[0].titel;'
+                 + '   r.kastenWeg = d.schritte[1].titel;'
+                 + '   d.schritte = [{ id:\'q1\', titel:\'Erster\' },'
+                 + '                 { id:\'q2\', titel:\'Zweiter\' }];'
+                 + '   abSchrittRunter(0);'
+                 + '   r.nachRunter = d.schritte.map(function(s){'
+                 + '     return s.titel; }).join(\',\');'
+                 + '   abDetail = \'\'; abDetailArt = \'\'; abSchnell = false;'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__wnApi = {'
                  + ' pruefeVornehmen: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -6338,6 +6382,65 @@ console.log('\n80. Vornehmen in der Woche');
            'sie ist eine Aufgabe, keine Kleinigkeit — hier nimmt man sich '
            + 'etwas vor');
     pruefe(e.leerLegtNichtAn === 0, 'ein leeres Feld legt nichts an');
+  }
+}
+
+/* ============================================================
+   81. Schnelles Erfassen der Ablaufschritte
+   Grund: Beim Aufschreiben einer Checkliste will man tippen, nicht
+   Bloecke anlegen. Zuordnen, Ordnen und Fristen kommen danach. Beim
+   Uebernehmen darf nichts verlorengehen, was schon dranhaengt.
+   ============================================================ */
+console.log('\n81. Schnelles Erfassen');
+{
+  const skript = hauptSkript();
+  const s = globalThis.__schnellApi;
+
+  ['abSchnellUm', 'abSchnellText', 'abSchnellUebernehmen', 'abSchnellHtml',
+   'abSchrittRunter', 'abDetailSchliessen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const ueb = skript.match(/function abSchnellUebernehmen\([\s\S]*?\n\}\n/);
+  pruefe(ueb && /schrittTitel\(alt\[j\]\) === titel/.test(ueb[0]),
+         'ein unveränderter Titel findet seinen alten Schritt wieder');
+  pruefe(ueb && /alt\[treffer\] = null/.test(ueb[0]),
+         'jeder alte Schritt wird höchstens einmal zugeordnet');
+  pruefe(ueb && /\[-–—•\*\]/.test(ueb[0]),
+         'ein Aufzählungsstrich am Anfang fällt weg');
+  pruefe(ueb && /\\\[\[ xX\]\?\\\]/.test(ueb[0]),
+         'ein Kästchen ebenso — man kopiert ja oft aus einer Liste');
+  pruefe(ueb && /!titel\.length\) \{ continue/.test(ueb[0]),
+         'leere Zeilen ergeben keinen Schritt');
+
+  const um = skript.match(/function abSchnellUm\([\s\S]*?\n\}/);
+  pruefe(um && /if \(abSchnell\) \{ abSchnellUebernehmen\(\)/.test(um[0]),
+         'beim Zurückschalten wird übernommen');
+  const zu = skript.match(/function abDetailSchliessen\([\s\S]*?\n\}/);
+  pruefe(zu && /abSchnellUebernehmen\(\)/.test(zu[0]),
+         'und beim Schließen des Blattes ebenso — sonst wäre das Getippte weg');
+
+  if (!s) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = s.pruefeSchnell();
+    pruefe(e.textVorher === 'Erster\nZweiter\nDritter',
+           'die Schritte stehen als Zeilen da');
+    pruefe(e.zahlNachher === 4, 'aus vier Zeilen werden vier Schritte');
+    pruefe(e.standBleibt === true,
+           'ein unveränderter Schritt behält seinen Haken');
+    pruefe(e.aufgabeBleibt === 'a1',
+           'und seine tragende Aufgabe');
+    pruefe(e.abBleibt === '2026-10-01', 'und sein Ruhedatum');
+    pruefe(e.neueOhneStand === false, 'ein neuer Schritt beginnt offen');
+    pruefe(e.reihenfolge === 'Zweiter,Erster,Neu,Dritter',
+           'die Reihenfolge folgt den Zeilen');
+    pruefe(e.strichWeg === 'Mit Strich', 'ein Aufzählungsstrich wird abgeschnitten');
+    pruefe(e.kastenWeg === 'Mit Kasten', 'ein Kästchen ebenso');
+    pruefe(e.leerZeilenWeg === 4, 'Leerzeilen ergeben keine Schritte');
+    pruefe(e.nachRunter === 'Zweiter,Erster',
+           'ein Schritt lässt sich nach unten schieben');
   }
 }
 
