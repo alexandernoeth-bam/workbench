@@ -536,6 +536,47 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__aehnlichApi = {'
+                 + ' pruefeAehnlich: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var heute = isoDatum();'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Zapf anrufen\', kontext:\'privat\','
+                 + '       status:\'offen\', planung:\'backlog\', art:\'haupt\' },'
+                 + '     { id:\'a2\', titel:\'Rasen mähen\', kontext:\'privat\','
+                 + '       status:\'erledigt\', erledigtAm: tagePlus(heute,-10),'
+                 + '       art:\'klein\' },'
+                 + '     { id:\'a3\', titel:\'Steuer abgeben\', kontext:\'privat\','
+                 + '       status:\'erledigt\', erledigtAm: tagePlus(heute,-200),'
+                 + '       art:\'haupt\' },'
+                 + '     { id:\'a4\', titel:\'Bauamt anschreiben\','
+                 + '       kontext:\'privat\', status:\'offen\','
+                 + '       planung:\'backlog\', art:\'haupt\' } ];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Bauantrag\','
+                 + '     kontext:\'privat\', schritte:['
+                 + '       { titel:\'Formular beim Bauamt holen\' },'
+                 + '       { titel:\'x\', aufgabeId:\'a4\' }] }];'
+                 + '   var r = {'
+                 + '     stammGleich: (wortStamm(\'Angebot\')'
+                 + '       === wortStamm(\'Angebote\')),'
+                 + '     umgestellt: aehnlicheFinden(\'Anruf bei Zapf\', \'\').length,'
+                 + '     fremdesNichts: aehnlicheFinden(\'Urlaub buchen\','
+                 + '       \'\').length };'
+                 + '   var m = aehnlicheFinden(\'Rasen mähen\', \'\');'
+                 + '   r.erledigtDabei = m.length ? m[0].titel : \'\';'
+                 + '   r.altesWeg = aehnlicheFinden(\'Steuer abgeben\','
+                 + '     \'\').length;'
+                 + '   var s = aehnlicheFinden(\'Formular vom Bauamt holen\', \'\');'
+                 + '   r.schrittGefunden = s.some(function(x){'
+                 + '     return x.art === \'schritt\'; });'
+                 + '   r.schrittWoher = s.length ? (s[0].woher || \'\') : \'\';'
+                 + '   r.getragenerSchrittNichtDoppelt ='
+                 + '     aehnlicheFinden(\'Bauamt anschreiben\', \'\').length;'
+                 + '   r.eigeneNichtDabei = aehnlicheFinden(\'Zapf anrufen\','
+                 + '     \'a1\').length;'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__schnellApi = {'
                  + ' pruefeSchnell: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -6441,6 +6482,71 @@ console.log('\n81. Schnelles Erfassen');
     pruefe(e.leerZeilenWeg === 4, 'Leerzeilen ergeben keine Schritte');
     pruefe(e.nachRunter === 'Zweiter,Erster',
            'ein Schritt lässt sich nach unten schieben');
+  }
+}
+
+/* ============================================================
+   82. Gibt es das schon?
+   Grund: Bei vielen Aufgaben schreibt man dasselbe zweimal auf, nur
+   anders formuliert. Beim Eintragen soll auffallen, was es schon gibt
+   — als Hinweis, nicht als Sperre.
+   ============================================================ */
+console.log('\n82. Ähnliche Aufgaben');
+{
+  const skript = hauptSkript();
+  const a = globalThis.__aehnlichApi;
+
+  ['wortStamm', 'woerterVon', 'aehnlichkeit', 'aehnlicheFinden', 'aehnlichHtml',
+   'aehnlichPruefen', 'aehnlichLeeren'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const st = skript.match(/function wortStamm\([\s\S]*?\n\}/);
+  pruefe(st && /slice\(0, 6\)/.test(st[0]),
+         'die Wortstämme werden gekappt — die Endungsregel allein trifft nicht '
+         + 'jeden Fall');
+  const wv = skript.match(/function woerterVon\([\s\S]*?\n\}/);
+  pruefe(wv && /FUELLWOERTER\.indexOf\(w\) >= 0/.test(wv[0]),
+         'Füllwörter zählen nicht mit');
+  const ae = skript.match(/function aehnlichkeit\([\s\S]*?\n\}/);
+  pruefe(ae && /Math\.min\(wa\.length, wb\.length\)/.test(ae[0]),
+         'gemessen wird am kürzeren Titel — sonst fände ein kurzer nie einen langen');
+
+  const fi = skript.match(/function aehnlicheFinden\([\s\S]*?\n\}\n/);
+  pruefe(fi && /tagePlus\(grenze, -60\)/.test(fi[0]),
+         'Erledigtes zählt mit, solange es nicht zu lange her ist');
+  pruefe(fi && /DB\.durchlaeufe/.test(fi[0]),
+         'auch Ablaufschritte — die übersieht man am ehesten');
+  pruefe(fi && /ss\[j\]\.aufgabeId\) \{ continue/.test(fi[0]),
+         'ein Schritt, der eine Aufgabe trägt, wird nicht doppelt gezeigt');
+  pruefe(fi && /slice\(0, 4\)/.test(fi[0]), 'höchstens vier Vorschläge');
+
+  const pr = skript.match(/function aehnlichPruefen\([\s\S]*?\n\}/);
+  pruefe(pr && /ziel\.innerHTML =/.test(pr[0]),
+         'nachgezogen wird nur der Hinweis, nicht der ganze Bildschirm — sonst '
+         + 'verlöre das Feld bei jedem Zeichen den Strich');
+  pruefe(/id="schnellAehnlich"/.test(QUELLE), 'im Tagesplan steht der Hinweis');
+  pruefe(/id="wochenAehnlich"/.test(skript), 'in der Wochensicht ebenso');
+
+  if (!a) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = a.pruefeAehnlich();
+    pruefe(e.stammGleich === true, '„Angebot" und „Angebote" haben denselben Stamm');
+    pruefe(e.umgestellt === 1,
+           '„Anruf bei Zapf" findet „Zapf anrufen" trotz anderer Wortstellung');
+    pruefe(e.fremdesNichts === 0, 'etwas Fremdes findet nichts');
+    pruefe(e.erledigtDabei === 'Rasen mähen',
+           'kürzlich Erledigtes wird mitgezeigt');
+    pruefe(e.altesWeg === 0, 'lange Erledigtes nicht mehr');
+    pruefe(e.schrittGefunden === true, 'ein Ablaufschritt wird gefunden');
+    pruefe(e.schrittWoher.indexOf('Bauantrag') >= 0,
+           'und es steht dabei, aus welchem Ablauf');
+    pruefe(e.getragenerSchrittNichtDoppelt === 1,
+           'ein Schritt mit tragender Aufgabe erscheint nur einmal');
+    pruefe(e.eigeneNichtDabei === 0,
+           'die Aufgabe, die man gerade bearbeitet, findet sich nicht selbst');
   }
 }
 

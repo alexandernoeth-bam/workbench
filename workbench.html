@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.70.0</title>
+<title>Workbench 0.71.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -434,6 +434,15 @@ body.breit .kleer{padding-left:6px}
   border:1px solid var(--linie);border-radius:20px;background:var(--papier);
   color:var(--grau);cursor:pointer;white-space:nowrap}
 .kpf-knopf.an{border-color:var(--weinrot);color:var(--weinrot);font-weight:500}
+
+.ae{margin:5px 0 2px;padding:7px 10px;border:1px solid var(--linie);border-radius:6px;
+  background:var(--karte)}
+.ae-marke{display:block;font-size:calc(var(--fs)*0.7);color:var(--weinrot);
+  margin-bottom:3px}
+.ae-satz{display:block;width:100%;text-align:left;background:none;border:0;
+  font:inherit;font-size:calc(var(--fs)*0.82);color:var(--tinte);padding:3px 0;
+  cursor:pointer;line-height:1.35}
+.ae-woher{display:block;font-size:calc(var(--fs)*0.7);color:var(--grau)}
 .kpf-hinweis{font-size:calc(var(--fs)*0.76);color:var(--weinrot);margin:0 0 8px}
 .kpf-hinweis button{font:inherit;font-size:inherit;border:0;background:none;
   color:var(--weinrot);text-decoration:underline;cursor:pointer;padding:0}
@@ -955,6 +964,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
            placeholder="Was steht an?  (! = Aufgabe, p = privat)"
            oninput="schnellVorschau()" onkeydown="schnellTaste(event)">
     <div class="eingabe-vorschau" id="schnellVorschauZeile"></div>
+    <div id="schnellAehnlich"></div>
   </div>
 
   <div class="tagblatt" id="tagBlatt" onscroll="streifenPruefen()"></div>
@@ -1254,7 +1264,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.70.0';
+var APP_VERSION = '0.71.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4627,11 +4637,17 @@ function schnellVorschau() {
   box.innerHTML = 'wird angelegt als <b>' + (d.art === 'haupt' ? 'Aufgabe' : 'Kleinigkeit')
                 + '</b> · <b>' + esc(kurzDatum(tagOffen)) + '</b> · <b>' + d.kontext + '</b>';
   box.classList.add('sichtbar');
+  aehnlichPruefen('schnellFeld', 'schnellAehnlich');
 }
 
 function schnellTaste(ereignis) {
   if (!ereignis || ereignis.key !== 'Enter') { return; }
   schnellAnlegen();
+}
+
+function aehnlichLeeren(zielId) {
+  var ziel = document.getElementById(zielId);
+  if (ziel) { ziel.innerHTML = ''; }
 }
 
 function schnellAnlegen() {
@@ -4661,6 +4677,7 @@ function schnellAnlegen() {
   });
   feld.value = '';
   schnellVorschau();
+  aehnlichLeeren('schnellAehnlich');
   tagZeichnen();
   zeichne();
   spaeterSichern();
@@ -6326,9 +6343,11 @@ function wocheHtml(is) {
   h += '<div class="ms-unten" style="padding-left:0;margin:6px 0 10px">'
      + '<input class="v-feld" type="text" id="wochenNeu" '
      + 'placeholder="Für diese Woche vornehmen (p = privat)" '
+     + 'oninput="aehnlichPruefen(\'wochenNeu\',\'wochenAehnlich\')" '
      + 'onkeydown="wochenNeuTaste(event,\'' + mo + '\')">'
      + '<button class="ms-wort" type="button" onclick="wochenAufgabeNeu(\'' + mo
-     + '\')">Vornehmen</button></div>';
+     + '\')">Vornehmen</button></div>'
+     + '<div id="wochenAehnlich"></div>';
   h += wochenKleinHtml(mo);
   return h;
 }
@@ -6490,6 +6509,7 @@ function wochenAufgabeNeu(mo) {
   planungSetzen(a, wert);
   DB.aufgaben.push(a);
   feld.value = '';
+  aehnlichLeeren('wochenAehnlich');
   spaeterSichern();
   kalZeichnen();
   aufZeichnen();
@@ -9188,6 +9208,143 @@ function skizzeZeileHtml(id) {
 function fensterAuf(adresse) {
   var f = window.open(adresse, '_blank');
   if (f && f.focus) { f.focus(); }
+}
+
+
+/* ============================================================
+   Ähnliche Aufgaben finden
+
+   Beim Eintragen soll auffallen, was es schon gibt — dasselbe zweimal
+   aufgeschrieben, nur anders formuliert. Verglichen werden Wörter,
+   nicht Zeichenketten: „Zapf anrufen" und „Anruf bei Zapf" haben
+   „zapf" und „anruf" gemeinsam.
+
+   Der Hinweis blockiert nichts. Er zeigt, was da ist; entscheiden
+   muss der Mensch.
+   ============================================================ */
+
+var FUELLWOERTER = ['der','die','das','den','dem','des','ein','eine','einen','einem',
+  'eines','einer','und','oder','aber','für','fuer','mit','ohne','von','vom','zum',
+  'zur','zu','bei','beim','im','in','am','an','auf','aus','nach','über','ueber',
+  'unter','vor','ist','sind','war','wird','werden','habe','haben','hat','muss',
+  'müssen','muessen','soll','sollen','kann','können','koennen','noch','mal','bitte',
+  'dann','wenn','als','wie','was','wer','wo','nicht','kein','keine','es','ich','wir',
+  'sie','er','man','sich','mein','meine','unser','unsere','neu','neue','neuen'];
+
+/* Endungen kürzen, damit „Angebot" und „Angebote" zusammenfinden.
+   Das ist keine Sprachanalyse, sondern eine Faustregel — sie genügt
+   für den häufigsten Fall. */
+function wortStamm(w) {
+  var s = String(w).toLowerCase()
+            .replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u')
+            .replace(/ß/g, 'ss')
+            .replace(/[^a-z0-9]/g, '');
+  if (s.length <= 4) { return s; }
+  s = s.replace(/(ungen|ung|chen|lein|enden|ende|end|ern|est|eten|ete|ten|te|nen|en|er|es|em|el|st|e|s|n)$/, '');
+  if (s.length < 3) { return String(w).toLowerCase().slice(0, 4); }
+  /* Die Endungsregel trifft nicht jeden Fall: „Angebot" behält sein t,
+     „Angebote" verliert te — dann fänden sie sich nicht. Das Kappen auf
+     sechs Zeichen fängt das ab. */
+  return s.slice(0, 6);
+}
+
+function woerterVon(text) {
+  var roh = String(text || '').toLowerCase().split(/[^a-zA-Z0-9äöüßÄÖÜ]+/);
+  var aus = [];
+  var i;
+  for (i = 0; i < roh.length; i++) {
+    var w = roh[i];
+    if (w.length < 3) { continue; }
+    if (FUELLWOERTER.indexOf(w) >= 0) { continue; }
+    var st = wortStamm(w);
+    if (st.length < 3) { continue; }
+    if (aus.indexOf(st) < 0) { aus.push(st); }
+  }
+  return aus;
+}
+
+/* Wie sehr überschneiden sich zwei Titel? 0 bis 1, gemessen am
+   kürzeren der beiden — sonst fände ein kurzer Titel nie einen langen. */
+function aehnlichkeit(a, b) {
+  var wa = woerterVon(a);
+  var wb = woerterVon(b);
+  if (!wa.length || !wb.length) { return 0; }
+  var treffer = 0;
+  var i;
+  for (i = 0; i < wa.length; i++) {
+    if (wb.indexOf(wa[i]) >= 0) { treffer++; }
+  }
+  return treffer / Math.min(wa.length, wb.length);
+}
+
+/* Was gibt es schon, das dem Getippten ähnelt? Offene Aufgaben, kürzlich
+   erledigte und Ablaufschritte — gerade Letztere übersieht man. */
+function aehnlicheFinden(text, ohneId) {
+  var suche = String(text || '').trim();
+  if (woerterVon(suche).length === 0) { return []; }
+  var grenze = isoDatum();
+  var frueher = tagePlus(grenze, -60);
+  var aus = [];
+  var i, j;
+
+  var l = DB.aufgaben || [];
+  for (i = 0; i < l.length; i++) {
+    var a = l[i];
+    if (ohneId && a.id === ohneId) { continue; }
+    if (a.status === 'erledigt') {
+      var wann = a.erledigtAm || a.zuletztErledigt || '';
+      if (!wann || wann < frueher) { continue; }
+    }
+    var g = aehnlichkeit(suche, a.titel);
+    if (g < 0.6) { continue; }
+    aus.push({ id: a.id, titel: a.titel, guete: g,
+               woher: (a.status === 'erledigt')
+                    ? ('erledigt ' + kurzDatum(a.erledigtAm || ''))
+                    : planungText(a),
+               art: 'aufgabe' });
+  }
+
+  var d = DB.durchlaeufe || [];
+  for (i = 0; i < d.length; i++) {
+    var ss = d[i].schritte || [];
+    for (j = 0; j < ss.length; j++) {
+      if (ss[j].aufgabeId) { continue; }   /* steht schon als Aufgabe drin */
+      var gs = aehnlichkeit(suche, schrittTitel(ss[j]));
+      if (gs < 0.6) { continue; }
+      aus.push({ id: d[i].id, titel: schrittTitel(ss[j]), guete: gs,
+                 woher: 'Schritt in „' + d[i].name + '"', art: 'schritt' });
+    }
+  }
+
+  aus.sort(function (x, y) { return y.guete - x.guete; });
+  return aus.slice(0, 4);
+}
+
+function aehnlichHtml(text, ohneId) {
+  var l = aehnlicheFinden(text, ohneId);
+  if (!l.length) { return ''; }
+  var h = '<div class="ae"><span class="ae-marke">Gibt es schon?</span>';
+  var i;
+  for (i = 0; i < l.length; i++) {
+    var ruf = (l[i].art === 'aufgabe')
+            ? ('aufgabeAktionen(\'' + esc(l[i].id) + '\')')
+            : ('durchlaufAbhakenOeffnen(\'' + esc(l[i].id) + '\')');
+    h += '<button class="ae-satz" type="button" onclick="' + ruf + '">'
+       + esc(l[i].titel) + '<span class="ae-woher">' + esc(l[i].woher)
+       + '</span></button>';
+  }
+  return h + '</div>';
+}
+
+/* Der Hinweis wird beim Tippen nachgezogen, nicht beim Zeichnen des
+   ganzen Bildschirms — sonst verlöre das Feld bei jedem Zeichen den
+   Strich. */
+function aehnlichPruefen(feldId, zielId) {
+  var feld = document.getElementById(feldId);
+  var ziel = document.getElementById(zielId);
+  if (!feld || !ziel) { return; }
+  var text = String(feld.value || '');
+  ziel.innerHTML = (text.trim().length >= 3) ? aehnlichHtml(text, '') : '';
 }
 
 /* ============================================================
