@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.61.0</title>
+<title>Workbench 0.63.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -670,7 +670,17 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
 .fl-suche{flex:0 1 180px;min-width:0;font:inherit;font-size:calc(var(--fs)*0.78);
   border:1px solid var(--linie);border-radius:20px;padding:4px 11px;
   background:var(--papier);color:var(--tinte);outline:none}
-.fl-leiste{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 8px}
+.fl-leiste{display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin:0 0 8px}
+.fl-knopf{width:32px;height:32px;padding:0;border:1px solid var(--linie);
+  border-radius:6px;background:var(--papier);color:var(--tinte);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center}
+.fl-knopf svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8;
+  stroke-linecap:round}
+.fl-knopf:hover{border-color:var(--grau)}
+.fl-teiler{width:1px;height:20px;background:var(--linie);margin:0 4px}
+.fl-kap{font-variant-caps:all-small-caps;letter-spacing:.03em}
+.fl-ansicht a{color:var(--weinrot)}
+.fl-ansicht s{color:var(--grau)}
 .fl-feld{width:100%;min-height:60vh;font:inherit;
   font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
   font-size:calc(var(--fs)*0.84);line-height:1.6;border:1px solid var(--linie);
@@ -1201,7 +1211,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.61.0';
+var APP_VERSION = '0.63.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -7281,8 +7291,10 @@ function zustandDieseWoche(v) {
   return null;
 }
 
-function zustandSetzen(v, satz) {
-  var s = wochenSchluessel(isoDatum());
+/* Ohne Angabe gilt die laufende Woche; der Rückblick gibt seine
+   gewählte mit. */
+function zustandSetzen(v, satz, woche) {
+  var s = woche || wochenSchluessel(isoDatum());
   if (!Array.isArray(v.zielzustaende)) { v.zielzustaende = []; }
   var vorhanden = zustandDieseWoche(v);
   if (vorhanden) { vorhanden.satz = satz; }
@@ -8138,6 +8150,15 @@ var flaecheSuche = '';
 
 var FREIE_FLAECHE = 'frei';
 
+/* „Mo, 14.09.2026" — in einer Gedankenfläche steht das Datum oft allein
+   in einer Zeile, dort hilft die volle Form. */
+function langDatum(is) {
+  var d = ausIso(is);
+  var tage = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  return tage[d.getDay()] + ', ' + zwei(d.getDate()) + '.'
+       + zwei(d.getMonth() + 1) + '.' + d.getFullYear();
+}
+
 function flaecheText(id) {
   if (id === FREIE_FLAECHE) {
     return String(DB.einstellungen.flaecheFrei || '');
@@ -8168,6 +8189,34 @@ function flaecheName(id) {
    Vom Text zur Ansicht
    ------------------------------------------------------------ */
 
+/* Auszeichnungen innerhalb einer Zeile. Die Zeichen sind dieselben,
+   die man in Textnachrichten ohnehin benutzt — sie bleiben lesbar,
+   auch wenn der Text irgendwann in einem anderen Programm landet.
+     *fett*  _kursiv_  ~durchgestrichen~  ^Kapitälchen^
+     [Text](Adresse) oder eine nackte Adresse */
+function flaecheAuszeichnen(text) {
+  var t = esc(text);
+  t = t.replace(/\[([^\]]{1,80})\]\((https?:\/\/[^\s)]+)\)/g,
+                '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  t = t.replace(/(^|[\s(])(https?:\/\/[^\s<]+)/g,
+                '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  /* Der Inhalt darf nicht mit einem Leerzeichen beginnen oder enden —
+     sonst würde „a * b * c" zu fettem „ b ". */
+  var paar = function (zeichen, auf, zu) {
+    var z = zeichen.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var re = new RegExp('(^|[\\s(])' + z
+                      + '([^' + z + '\\s\\n](?:[^' + z + '\\n]{0,118}'
+                      + '[^' + z + '\\s\\n])?)' + z
+                      + '(?=$|[\\s.,;:!?)])', 'g');
+    t = t.replace(re, '$1' + auf + '$2' + zu);
+  };
+  paar('*', '<b>', '</b>');
+  paar('_', '<i>', '</i>');
+  paar('~', '<s>', '</s>');
+  paar('^', '<span class="fl-kap">', '</span>');
+  return t;
+}
+
 function flaecheZeileHtml(zeile, nr, suche) {
   var roh = String(zeile);
   var tiefe = 0;
@@ -8177,7 +8226,7 @@ function flaecheZeileHtml(zeile, nr, suche) {
   rest = rest.replace(/^\t+/, '');
 
   var hervor = function (text) {
-    var t = esc(text);
+    var t = flaecheAuszeichnen(text);
     if (suche && suche.length >= 2) {
       var re = new RegExp('(' + suche.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
       t = t.replace(re, '<mark>$1</mark>');
@@ -8273,6 +8322,42 @@ function flaecheGetippt(wert) {
   flaecheSetzen(flaecheFuer, wert);
 }
 
+/* Legt ein Zeichenpaar um die Auswahl — oder setzt es dort ein, wo der
+   Strich steht, damit man gleich weiterschreiben kann. */
+function flaecheUmschliessen(zeichen) {
+  var feld = document.getElementById('flaecheFeld');
+  if (!feld) { return; }
+  var text = String(feld.value || '');
+  var a = (typeof feld.selectionStart === 'number') ? feld.selectionStart : text.length;
+  var b = (typeof feld.selectionEnd === 'number') ? feld.selectionEnd : a;
+  var mitte = text.slice(a, b);
+  feld.value = text.slice(0, a) + zeichen + mitte + zeichen + text.slice(b);
+  flaecheSetzen(flaecheFuer, feld.value);
+  if (typeof feld.setSelectionRange === 'function') {
+    if (mitte.length) { feld.setSelectionRange(a, b + 2 * zeichen.length); }
+    else { feld.setSelectionRange(a + zeichen.length, a + zeichen.length); }
+  }
+  if (feld.focus) { feld.focus(); }
+}
+
+function flaecheLink() {
+  var feld = document.getElementById('flaecheFeld');
+  if (!feld) { return; }
+  var text = String(feld.value || '');
+  var a = (typeof feld.selectionStart === 'number') ? feld.selectionStart : text.length;
+  var b = (typeof feld.selectionEnd === 'number') ? feld.selectionEnd : a;
+  var mitte = text.slice(a, b) || 'Text';
+  var neu = '[' + mitte + '](https://)';
+  feld.value = text.slice(0, a) + neu + text.slice(b);
+  flaecheSetzen(flaecheFuer, feld.value);
+  /* Der Strich landet hinter https:// — dort geht es weiter. */
+  var stelle = a + neu.length - 1;
+  if (typeof feld.setSelectionRange === 'function') {
+    feld.setSelectionRange(stelle, stelle);
+  }
+  if (feld.focus) { feld.focus(); }
+}
+
 /* Setzt ein Zeichen an den Anfang der Zeile, in der der Strich steht. */
 function flaecheZeichen(was) {
   var feld = document.getElementById('flaecheFeld');
@@ -8290,7 +8375,7 @@ function flaecheZeichen(was) {
   if (was === 'einzug')      { neu = '  ' + zeile; }
   else if (was === 'ausrueck') { neu = zeile.replace(/^ {1,2}/, ''); }
   else if (was === 'trenner')  { neu = '---'; }
-  else if (was === 'datum')    { neu = einzug + kurzDatum(isoDatum()) + ' — ' + ohne; }
+  else if (was === 'datum')    { neu = einzug + langDatum(isoDatum()) + ' — ' + ohne; }
   else if (was === 'h1')       { neu = einzug + '# ' + ohne; }
   else if (was === 'h2')       { neu = einzug + '## ' + ohne; }
   else if (was === 'kasten')   { neu = einzug + '[] ' + ohne; }
@@ -8304,6 +8389,50 @@ function flaecheZeichen(was) {
     feld.setSelectionRange(neuStelle, neuStelle);
   }
   if (feld.focus) { feld.focus(); }
+}
+
+/* Sinnbilder statt Wörter: Die Leiste soll schmal bleiben, damit sie
+   am Handy in eine Zeile passt. Der Hinweistext nennt die Bedeutung. */
+function flaecheSinnbild(art) {
+  var p = {
+    h1:      '<text x="2" y="17" font-size="15" font-weight="600" '
+           + 'fill="currentColor" stroke="none">H1</text>',
+    h2:      '<text x="2" y="17" font-size="15" font-weight="600" '
+           + 'fill="currentColor" stroke="none">H2</text>',
+    kasten:  '<rect x="4" y="4" width="16" height="16" rx="2"></rect>'
+           + '<path d="M8 12l3 3 5-6"></path>',
+    punkt:   '<rect x="3" y="5" width="5" height="5" rx="1"></rect>'
+           + '<rect x="3" y="14" width="5" height="5" rx="1"></rect>'
+           + '<path d="M12 7.5h9M12 16.5h9"></path>',
+    fett:    '<text x="5" y="18" font-size="16" font-weight="700" '
+           + 'fill="currentColor" stroke="none">B</text>',
+    kursiv:  '<text x="6" y="18" font-size="16" font-style="italic" '
+           + 'fill="currentColor" stroke="none">I</text>',
+    durch:   '<text x="4" y="18" font-size="16" fill="currentColor" '
+           + 'stroke="none">S</text><path d="M3 12h18"></path>',
+    kap:     '<text x="1" y="18" font-size="15" fill="currentColor" '
+           + 'stroke="none">Aa</text>',
+    link:    '<path d="M10 14a4 4 0 0 0 6 .5l2-2a4 4 0 0 0-6-6l-1 1"></path>'
+           + '<path d="M14 10a4 4 0 0 0-6-.5l-2 2a4 4 0 0 0 6 6l1-1"></path>',
+    ein:     '<path d="M3 6h18M9 12h12M9 18h12M3 10l3 2-3 2z" '
+           + 'stroke-linejoin="round"></path>',
+    aus:     '<path d="M3 6h18M9 12h12M9 18h12M6 10l-3 2 3 2z" '
+           + 'stroke-linejoin="round"></path>',
+    trenner: '<path d="M3 12h18"></path>',
+    datum:   '<rect x="3" y="5" width="18" height="16" rx="2"></rect>'
+           + '<path d="M3 10h18M8 3v4M16 3v4"></path>'
+  };
+  return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (p[art] || '') + '</svg>';
+}
+
+function flaecheKnopf(art, wert, bild, hinweis) {
+  var ruf;
+  if (art === 'paar') { ruf = 'flaecheUmschliessen(\'' + wert + '\')'; }
+  else if (art === 'link') { ruf = 'flaecheLink()'; }
+  else { ruf = 'flaecheZeichen(\'' + wert + '\')'; }
+  return '<button class="fl-knopf" type="button" onclick="' + ruf + '" '
+       + 'title="' + esc(hinweis) + '" aria-label="' + esc(hinweis) + '">'
+       + flaecheSinnbild(bild) + '</button>';
 }
 
 function flaecheSuchen(wert) {
@@ -8348,15 +8477,21 @@ function flaecheZeichnen() {
 
   if (flaecheModus === 'schreiben') {
     var h = '<div class="fl-leiste">';
-    var knoepfe = [['h1', 'Titel'], ['h2', 'Zwischentitel'], ['kasten', 'Kästchen'],
-                   ['punkt', 'Punkt'], ['einzug', 'Einrücken'],
-                   ['ausrueck', 'Ausrücken'], ['trenner', 'Trenner'],
-                   ['datum', 'Datum']];
-    var i;
-    for (i = 0; i < knoepfe.length; i++) {
-      h += '<button class="ms-wort" type="button" onclick="flaecheZeichen(\''
-         + knoepfe[i][0] + '\')">' + esc(knoepfe[i][1]) + '</button>';
-    }
+    h += flaecheKnopf('zeile', 'h1', 'H1', 'Überschrift');
+    h += flaecheKnopf('zeile', 'h2', 'H2', 'Zwischenüberschrift');
+    h += flaecheKnopf('zeile', 'kasten', 'kasten', 'Kästchen zum Abhaken');
+    h += flaecheKnopf('zeile', 'punkt', 'punkt', 'Aufzählung');
+    h += '<span class="fl-teiler"></span>';
+    h += flaecheKnopf('paar', '*', 'fett', 'Fett');
+    h += flaecheKnopf('paar', '_', 'kursiv', 'Kursiv');
+    h += flaecheKnopf('paar', '~', 'durch', 'Durchgestrichen');
+    h += flaecheKnopf('paar', '^', 'kap', 'Kapitälchen');
+    h += flaecheKnopf('link', '', 'link', 'Verweis');
+    h += '<span class="fl-teiler"></span>';
+    h += flaecheKnopf('zeile', 'einzug', 'ein', 'Einrücken');
+    h += flaecheKnopf('zeile', 'ausrueck', 'aus', 'Ausrücken');
+    h += flaecheKnopf('zeile', 'trenner', 'trenner', 'Trennlinie');
+    h += flaecheKnopf('zeile', 'datum', 'datum', 'Datum einfügen');
     h += '</div>';
     h += '<textarea class="fl-feld" id="flaecheFeld" spellcheck="false" '
        + 'oninput="flaecheGetippt(this.value)">' + esc(text) + '</textarea>';
@@ -9783,7 +9918,33 @@ function alleVorhaben() {
   return aus;
 }
 
+/* Für welche Woche wird geplant? Am Wochenende meint „diese Woche"
+   nach der Norm noch die endende — wer sonntags plant, meint aber die
+   kommende. Deshalb ist die Zielwoche sichtbar und wählbar, und am
+   Wochenende ist die kommende voreingestellt. */
+var rbVersatz = null;
+
+function rbZielVersatz() {
+  if (rbVersatz !== null) { return rbVersatz; }
+  var wt = ausIso(isoDatum()).getDay();
+  return (wt === 0 || wt === 6) ? 1 : 0;
+}
+
+function rbZielWoche() {
+  return wochenSchluessel(tagePlus(montagVon(isoDatum()), rbZielVersatz() * 7));
+}
+
+function rbQuellWoche() {
+  return wochenSchluessel(tagePlus(montagVon(isoDatum()), (rbZielVersatz() - 1) * 7));
+}
+
+function rbVersatzSetzen(n) {
+  rbVersatz = n;
+  rueckblickNeu();
+}
+
 function rueckblickOeffnen() {
+  rbVersatz = null;
   var sheet = document.getElementById('aktionSheet');
   var hg = document.getElementById('aktionHg');
   if (!sheet || !hg) { return; }
@@ -9798,14 +9959,31 @@ function rueckblickNeu() {
 }
 
 function rueckblickHtml() {
-  var jetztWoche = wochenSchluessel(isoDatum());
-  var vor = letzteWoche();
+  var jetztWoche = rbZielWoche();
+  var vor = rbQuellWoche();
   var liste = alleVorhaben();
+  var wt = ausIso(isoDatum()).getDay();
 
   var h = blattKopf();
-  h += '<div class="as-titel">Wochenrückblick · KW ' + vor.kw + ' auf KW ' + jetztWoche.kw + '</div>';
-  h += '<div class="as-meta">' + liste.length
-     + (liste.length === 1 ? ' Vorhaben' : ' Vorhaben') + '</div>';
+  h += '<div class="as-titel">Wochenrückblick · KW ' + vor.kw + ' auf KW '
+     + jetztWoche.kw + '</div>';
+  h += '<div class="as-meta">' + liste.length + ' Vorhaben</div>';
+
+  /* Die Zielwoche steht zur Wahl — sonst plant man ungewollt in die
+     vergangene. */
+  h += '<div class="d-wert" style="justify-content:flex-start;margin:8px 0 0">'
+     + '<span class="ms-marke" style="align-self:center;margin-right:4px">Planen für</span>'
+     + '<button class="d-wahl' + (rbZielVersatz() === 0 ? ' an' : '') + '" type="button" '
+     + 'onclick="rbVersatzSetzen(0)">KW ' + wochenSchluessel(isoDatum()).kw
+     + ' (laufend)</button>'
+     + '<button class="d-wahl' + (rbZielVersatz() === 1 ? ' an' : '') + '" type="button" '
+     + 'onclick="rbVersatzSetzen(1)">KW '
+     + wochenSchluessel(tagePlus(montagVon(isoDatum()), 7)).kw + ' (kommend)</button>'
+     + '</div>';
+  if ((wt === 0 || wt === 6) && rbVersatz === null) {
+    h += '<div class="d-hinweis" style="text-align:left">Am Wochenende ist die '
+       + 'kommende Woche vorbelegt — sonst plantest du in die endende.</div>';
+  }
   h += '<div class="as-linie"></div>';
 
   if (!liste.length) {
@@ -9833,9 +10011,10 @@ function rueckblickHtml() {
       h += '<div class="rb-alt leer">für KW ' + vor.kw + ' stand nichts an</div>';
     }
 
+    var zZiel = zustandVonWoche(v, jetztWoche.jahr, jetztWoche.kw);
     h += '<textarea class="d-text" style="margin-top:5px" placeholder="Was gilt für KW '
        + jetztWoche.kw + '?" oninput="rbSatz(\'' + esc(v.id) + '\',\'' + liste[i].art
-       + '\',this.value)">' + esc(zustandText(v)) + '</textarea>';
+       + '\',this.value)">' + esc(zZiel ? (zZiel.satz || '') : '') + '</textarea>';
     h += '</div>';
   }
 
@@ -9846,7 +10025,7 @@ function rueckblickHtml() {
 function rbErreicht(id, art, wert) {
   var v = vorhabenFinden(id, art);
   if (!v) { return; }
-  var vor = letzteWoche();
+  var vor = rbQuellWoche();
   var z = zustandVonWoche(v, vor.jahr, vor.kw);
   if (!z) { return; }
   z.erreicht = wert;
@@ -9859,7 +10038,7 @@ function rbErreicht(id, art, wert) {
 function rbSatz(id, art, wert) {
   var v = vorhabenFinden(id, art);
   if (!v) { return; }
-  zustandSetzen(v, wert);
+  zustandSetzen(v, wert, rbZielWoche());
   vhZeichnen();
 }
 

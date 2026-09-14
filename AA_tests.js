@@ -473,6 +473,10 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
     return {
       id: id, innerHTML: '', textContent: '', value: '', href: '',
       style: {}, scrollTop: 0, scrollHeight: 100, clientHeight: 800,
+      /* Ein Textfeld hat einen Strich und eine Auswahl — ohne die
+         scheitert jede Prüfung an Eingabefeldern. */
+      selectionStart: 0, selectionEnd: 0,
+      setSelectionRange(a, b) { this.selectionStart = a; this.selectionEnd = b; },
       classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
       addEventListener() {}, removeEventListener() {}, focus() {}, click() {},
       appendChild() {}, removeChild() {}, setAttribute() {},
@@ -532,6 +536,31 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__rbApi = {'
+                 + ' pruefeWochen: function(){'
+                 + '   var merk = rbVersatz;'
+                 + '   var r = { freitag: kalenderwoche(\'2026-09-11\'),'
+                 + '             sonntag: kalenderwoche(\'2026-09-13\'),'
+                 + '             montag: kalenderwoche(\'2026-09-14\') };'
+                 + '   /* Die Vorbelegung haengt vom Wochentag ab — geprueft wird'
+                 + '      sie rechnerisch, nicht am heutigen Datum. */'
+                 + '   var versatzFuer = function(is){'
+                 + '     var wt = ausIso(is).getDay();'
+                 + '     return (wt === 0 || wt === 6) ? 1 : 0; };'
+                 + '   var zielFuer = function(is){'
+                 + '     return wochenSchluessel(tagePlus(montagVon(is),'
+                 + '       versatzFuer(is) * 7)).kw; };'
+                 + '   var quelleFuer = function(is){'
+                 + '     return wochenSchluessel(tagePlus(montagVon(is),'
+                 + '       (versatzFuer(is) - 1) * 7)).kw; };'
+                 + '   r.zielAmSonntag = zielFuer(\'2026-09-13\');'
+                 + '   r.quelleAmSonntag = quelleFuer(\'2026-09-13\');'
+                 + '   r.zielAmMittwoch = zielFuer(\'2026-09-16\');'
+                 + '   rbVersatz = 0;'
+                 + '   r.nachWahl = rbZielVersatz();'
+                 + '   rbVersatz = merk;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__wochenApi = {'
                  + ' pruefeWochen: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -601,6 +630,37 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   feld.value = \'Text\'; feld.selectionStart = 2;'
                  + '   flaecheZeichen(\'einzug\');'
                  + '   r.einzugKnopf = feld.value;'
+                 + '   var az = flaecheAuszeichnen;'
+                 + '   r.fett = az(\'Das ist *fett* gesetzt\');'
+                 + '   r.kursiv = az(\'Und _kursiv_ dazu\');'
+                 + '   r.durch = az(\'Ein ~Irrtum~ weg\');'
+                 + '   r.kap = az(\'Die ^Gmbh^ hier\');'
+                 + '   r.linkMitText = az(\'Siehe [Bauamt](https://x.de)\');'
+                 + '   r.linkNackt = az(\'Adresse https://x.de hier\');'
+                 + '   r.keinFalscherStern = az(\'a * b * c\');'
+                 + '   feld.value = \'wichtig\'; feld.selectionStart = 0;'
+                 + '   feld.selectionEnd = 7;'
+                 + '   flaecheUmschliessen(\'*\');'
+                 + '   r.umAuswahl = feld.value;'
+                 + '   feld.value = \'Text\'; feld.selectionStart = 4;'
+                 + '   feld.selectionEnd = 4;'
+                 + '   flaecheUmschliessen(\'_\');'
+                 + '   r.ohneAuswahl = feld.selectionStart;'
+                 + '   feld.value = \'Bauamt\'; feld.selectionStart = 0;'
+                 + '   feld.selectionEnd = 6;'
+                 + '   flaecheLink();'
+                 + '   r.linkKnopf = feld.value;'
+                 + '   r.linkStrich = feld.selectionStart;'
+                 + '   r.datumLang = langDatum(\'2026-09-14\');'
+                 + '   flaecheModus = \'schreiben\';'
+                 + '   flaecheZeichnen();'
+                 + '   var lb = document.getElementById(\'flaecheBlatt\').innerHTML;'
+                 + '   r.knoepfe = (lb.match(/class="fl-knopf/g) || []).length;'
+                 + '   r.alleMitBild = ((lb.match(/<svg viewBox/g) || []).length'
+                 + '     === r.knoepfe);'
+                 + '   r.alleBeschriftet = ((lb.match(/aria-label="/g) || []).length'
+                 + '     === r.knoepfe);'
+                 + '   flaecheModus = \'ansicht\';'
                  + '   flaecheFuer = \'\'; DB = alt;'
                  + '   return r;'
                  + ' } };'
@@ -5764,6 +5824,30 @@ console.log('\n75. Gedankenfläche');
     pruefe(e.knopfTauscht === '## Titel',
            'ein zweiter Knopf ersetzt das erste Zeichen, statt zu stapeln');
     pruefe(e.einzugKnopf === '  Text', 'Einrücken setzt zwei Leerzeichen');
+
+    /* Auszeichnungen innerhalb der Zeile */
+    pruefe(e.fett === 'Das ist <b>fett</b> gesetzt', 'Sterne machen fett');
+    pruefe(e.kursiv === 'Und <i>kursiv</i> dazu', 'Unterstriche kursiv');
+    pruefe(e.durch === 'Ein <s>Irrtum</s> weg', 'Tilden streichen durch');
+    pruefe(e.kap.indexOf('fl-kap') >= 0, 'Dächer machen Kapitälchen');
+    pruefe(e.linkMitText.indexOf('href="https://x.de"') >= 0
+           && e.linkMitText.indexOf('>Bauamt<') >= 0,
+           'ein Verweis mit Text wird zum Link');
+    pruefe(e.linkNackt.indexOf('<a href=') >= 0,
+           'eine nackte Adresse ebenso');
+    pruefe(e.keinFalscherStern === 'a * b * c',
+           'einzelne Sterne mitten im Text zeichnen nichts aus');
+
+    pruefe(e.umAuswahl === '*wichtig*', 'der Knopf legt die Zeichen um die Auswahl');
+    pruefe(e.ohneAuswahl === 5,
+           'ohne Auswahl steht der Strich zwischen den Zeichen');
+    pruefe(e.linkKnopf === '[Bauamt](https://)',
+           'der Verweisknopf legt ein Gerüst an');
+    pruefe(e.linkStrich === 17, 'und setzt den Strich hinter https://');
+    pruefe(e.datumLang === 'Mo, 14.09.2026', 'das Datum trägt Wochentag und Jahr');
+    pruefe(e.knoepfe === 13, 'dreizehn Knöpfe in der Leiste');
+    pruefe(e.alleMitBild === true, 'alle mit Sinnbild statt Wort');
+    pruefe(e.alleBeschriftet === true, 'und alle mit Beschriftung für die Ansage');
   }
 }
 
@@ -5835,6 +5919,66 @@ console.log('\n76. Wochenwechsel');
            'in der Wochenübersicht stehen sie jetzt');
     pruefe(e.inNaechsterWoche === 1, 'und nur eine in der nächsten');
     pruefe(e.zweiterLauf === 0, 'ein zweiter Lauf stellt nichts mehr um');
+  }
+}
+
+/* ============================================================
+   77. Fuer welche Woche wird geplant?
+   Grund: Der Rueckblick nahm stets die laufende Woche. Am Wochenende
+   ist das nach der Norm noch die endende — wer sonntags plant, meint
+   aber die kommende. So landete eine ganze Wochenplanung in der
+   Vergangenheit, ohne dass es auffiel.
+   ============================================================ */
+console.log('\n77. Zielwoche des Rückblicks');
+{
+  const skript = hauptSkript();
+  const r = globalThis.__rbApi;
+
+  ['rbZielVersatz', 'rbZielWoche', 'rbQuellWoche', 'rbVersatzSetzen']
+    .forEach(function (f) {
+      pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+             'Funktion ' + f + ' ist definiert');
+    });
+
+  const vers = skript.match(/function rbZielVersatz\([\s\S]*?\n\}/);
+  pruefe(vers && /wt === 0 \|\| wt === 6/.test(vers[0]),
+         'am Wochenende ist die kommende Woche vorbelegt');
+  pruefe(vers && /rbVersatz !== null\) \{ return rbVersatz/.test(vers[0]),
+         'eine getroffene Wahl gilt vor der Vorbelegung');
+
+  const html = skript.match(/function rueckblickHtml\([\s\S]*?\n\}\n/);
+  pruefe(html && /rbVersatzSetzen\(0\)/.test(html[0]) && /rbVersatzSetzen\(1\)/.test(html[0]),
+         'beide Wochen stehen zur Wahl');
+  pruefe(html && /\(laufend\)/.test(html[0]) && /\(kommend\)/.test(html[0]),
+         'sie sind als laufend und kommend benannt');
+  pruefe(html && /zustandVonWoche\(v, jetztWoche\.jahr, jetztWoche\.kw\)/.test(html[0]),
+         'das Eingabefeld zeigt den Satz der gewählten Woche');
+
+  const satz = skript.match(/function rbSatz\([\s\S]*?\n\}/);
+  pruefe(satz && /zustandSetzen\(v, wert, rbZielWoche\(\)\)/.test(satz[0]),
+         'geschrieben wird in die gewählte Woche');
+  const err = skript.match(/function rbErreicht\([\s\S]*?\n\}/);
+  pruefe(err && /rbQuellWoche\(\)/.test(err[0]),
+         'das Abhaken gilt der Woche davor');
+
+  const setzen = skript.match(/function zustandSetzen\([\s\S]*?\n\}/);
+  pruefe(setzen && /woche \|\| wochenSchluessel\(isoDatum\(\)\)/.test(setzen[0]),
+         'ohne Angabe gilt weiterhin die laufende Woche');
+
+  /* Die Rechnung selbst */
+  if (!r) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = r.pruefeWochen();
+    pruefe(e.freitag === 37, 'Freitag der 11.9. liegt in KW 37');
+    pruefe(e.sonntag === 37, 'Sonntag der 13.9. noch in KW 37');
+    pruefe(e.montag === 38, 'Montag der 14.9. in KW 38');
+    pruefe(e.zielAmSonntag === 38,
+           'am Sonntag zielt der Rückblick auf KW 38 — die kommende');
+    pruefe(e.quelleAmSonntag === 37, 'und blickt auf KW 37 zurück');
+    pruefe(e.zielAmMittwoch === 38,
+           'mitten in der Woche zielt er auf die laufende');
+    pruefe(e.nachWahl === 0, 'eine Wahl überschreibt die Vorbelegung');
   }
 }
 
