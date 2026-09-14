@@ -5857,6 +5857,27 @@ console.log('\n74. Bereiche nach Kontext');
   const e = skript.match(/function einfaelleZeichnen\([\s\S]*?\n\}\n/);
   pruefe(e && /vhBereichKopf\(/.test(e[0]),
          'die Einfälle folgen derselben Ordnung');
+
+  /* Die Abläufe ebenso */
+  ['abKontextUm', 'abKontextOffen', 'abBereichKopf'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const az = skript.match(/function abZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(az && /\['beruflich', 'Beruflich'\], \['privat', 'Privat'\]/.test(az[0]),
+         'auch bei den Abläufen erst der Beruf, dann das Private');
+  pruefe(az && /abFilter !== 'alle' && abFilter !== k/.test(az[0]),
+         'bei gesetztem Filter bleibt nur der gewählte Bereich');
+  pruefe(az && /abKontextOffen\(k\)/.test(az[0]),
+         'ein eingeklappter Bereich zeigt seine Kacheln nicht');
+  const sf = skript.match(/function setAbFilter\([\s\S]*?\n\}/);
+  pruefe(sf && /abKontextZu = \{\}/.test(sf[0]),
+         'das Umschalten räumt eingeklappte Bereiche auf');
+  pruefe(/body\.breit #abBlatt \.vkarte\{height:100%/.test(QUELLE),
+         'die Kacheln sind gleich hoch — sonst wird die Reihe zum Zickzack');
+  pruefe(/#abBlatt \.vh-bereich,#abBlatt \.gruppenkopf\{grid-column:1 \/ -1\}/
+         .test(QUELLE),
+         'die Überschriften laufen über die ganze Breite');
   pruefe(/id="einfallBlatt"[^>]*class="[^"]*einfachliste|einfachliste[^"]*"\s+id="einfallBlatt"/
          .test(QUELLE) || /class="vhblatt einfachliste" id="einfallBlatt"/.test(QUELLE),
          'ihr Blatt ist als einfache Liste gekennzeichnet');

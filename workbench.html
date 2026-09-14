@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.68.1</title>
+<title>Workbench 0.69.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -631,6 +631,12 @@ body.breit .tabschnitt[data-kurz="Erledigt"]{grid-column:1 / -1}
 /* Eine Liste braucht keine Kacheln — die Spalten entstanden nur,
    weil dieses Blatt dasselbe Raster benutzte wie die Vorhaben. */
 body.breit .vhblatt.einfachliste{display:block}
+/* Gleich hohe Kacheln: Ohne diese Regel richtet sich jede nach ihrem
+   eigenen Inhalt, und die Reihe wird zum Zickzack. */
+body.breit #abBlatt{align-items:stretch}
+body.breit #abBlatt .vkarte{height:100%;display:flex;flex-direction:column}
+body.breit #abBlatt .vkarte .vk-mehr{flex:1}
+#abBlatt .vh-bereich,#abBlatt .gruppenkopf{grid-column:1 / -1}
 body.breit .vhblatt{display:grid;
   grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
   gap:0 16px;align-content:start}
@@ -1248,7 +1254,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.68.1';
+var APP_VERSION = '0.69.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -9200,6 +9206,7 @@ var abFrischAngelegt = '';
 
 function setAbFilter(art) {
   abFilter = art;
+  abKontextZu = {};
   markiere([['alle', 'abAlle'], ['beruflich', 'abBeruf'], ['privat', 'abPrivat']], art);
   abZeichnen();
 }
@@ -9521,20 +9528,56 @@ function abGruppenHtml(liste, karte) {
   return h;
 }
 
+/* Wie bei den Vorhaben: Beruf und Privat getrennt und einklappbar,
+   erst der Beruf. Ist auf einen Kontext geschaltet, bleibt nur er. */
+var abKontextZu = {};
+
+function abKontextUm(k) {
+  abKontextZu[k] = !abKontextZu[k];
+  abZeichnen();
+}
+
+function abKontextOffen(k) {
+  if (abFilter !== 'alle') { return true; }
+  return abKontextZu[k] !== true;
+}
+
+function abBereichKopf(k, name, zahl) {
+  if (abFilter !== 'alle') {
+    return '<div class="gruppenkopf"><span>' + esc(name) + ' · ' + zahl
+         + '</span></div>';
+  }
+  return '<button class="vh-bereich' + (k === 'privat' ? ' privat' : '') + '" '
+       + 'type="button" onclick="abKontextUm(\'' + k + '\')">'
+       + '<span>' + esc(name) + ' · ' + zahl + '</span>'
+       + '<svg class="' + (abKontextOffen(k) ? 'auf' : '') + '" viewBox="0 0 24 24">'
+       + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+}
+
 function abZeichnen() {
   var blatt = document.getElementById('abBlatt');
   if (!blatt) { return; }
   var vorlagen = abSichtbar(DB.ablaeufe || []);
   var laufend = abSichtbar(DB.durchlaeufe || []);
+  var liste = (abStufe === 'laufend') ? laufend : vorlagen;
+  var karte = (abStufe === 'laufend') ? durchlaufKarteHtml : vorlageKarteHtml;
   var h = '';
-  var i;
+  var bereiche = [['beruflich', 'Beruflich'], ['privat', 'Privat']];
+  var b;
 
-  if (abStufe === 'laufend') {
-    if (!laufend.length) { h += '<div class="tleer">Kein Durchlauf offen.</div>'; }
-    h += abGruppenHtml(laufend, durchlaufKarteHtml);
-  } else {
-    if (!vorlagen.length) { h += '<div class="tleer">Keine Vorlage in dieser Auswahl.</div>'; }
-    h += abGruppenHtml(vorlagen, vorlageKarteHtml);
+  for (b = 0; b < bereiche.length; b++) {
+    var k = bereiche[b][0];
+    if (abFilter !== 'alle' && abFilter !== k) { continue; }
+    var drin = liste.filter(function (e) { return e.kontext === k; });
+    h += abBereichKopf(k, bereiche[b][1], drin.length);
+    if (!abKontextOffen(k)) { continue; }
+    if (!drin.length) {
+      h += '<div class="tleer">'
+         + (abStufe === 'laufend' ? 'Kein Durchlauf offen.' : 'Keine Vorlage.')
+         + '</div>';
+      continue;
+    }
+    h += abGruppenHtml(drin, karte);
   }
 
   blatt.innerHTML = h;
