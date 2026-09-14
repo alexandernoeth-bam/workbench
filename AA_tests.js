@@ -536,6 +536,38 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__skizzenApi = {'
+                 + ' pruefeSkizzen: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var r = {'
+                 + '     ausLink: ordnerKennung(\'https://drive.google.com/drive/'
+                 + 'folders/1a2B3c_def-XYZ?usp=sharing\'),'
+                 + '     ausNackt: ordnerKennung(\'1a2B3c_def-XYZ\'),'
+                 + '     ausMuell: ordnerKennung(\'kein Link\') };'
+                 + '   var m = \'!skizze:1a2B3c_def-XYZ\'.match(SKIZZE_MUSTER);'
+                 + '   r.zeileErkannt = m ? m[1] : null;'
+                 + '   r.keineZeile = \'skizze: abc\'.match(SKIZZE_MUSTER);'
+                 + '   DB.gedanken = [{ id:\'g1\', titel:\'T\', text:\'Davor\','
+                 + '     geaendert: jetzt() }];'
+                 + '   flaecheFuer = \'g:g1\'; flaecheModus = \'schreiben\';'
+                 + '   var feld = document.getElementById(\'flaecheFeld\');'
+                 + '   feld.value = \'Davor\'; feld.selectionStart = 5;'
+                 + '   feld.selectionEnd = 5;'
+                 + '   skizzeEinfuegen(\'abc123\', \'application/pdf\');'
+                 + '   var zeilen = flaecheText(\'g:g1\').split(\'\\n\');'
+                 + '   r.eingefuegt = zeilen[1];'
+                 + '   r.eigeneZeile = (zeilen[0] === \'Davor\');'
+                 + '   DB.einstellungen.skizzenVorschau = {'
+                 + '     abc123: { bild:\'data:image/jpeg;base64,XX\' } };'
+                 + '   r.mitVorschau = (skizzeZeileHtml(\'abc123\')'
+                 + '     .indexOf(\'data:image/jpeg\') >= 0);'
+                 + '   r.ohneVorschau = (skizzeZeileHtml(\'zzz\')'
+                 + '     .indexOf(\'drive.google.com/thumbnail\') >= 0);'
+                 + '   vorschauenLeeren();'
+                 + '   r.nachLeeren = Object.keys(vorschauKarte()).length;'
+                 + '   flaecheFuer = \'\'; flaecheModus = \'ansicht\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__gedankenApi = {'
                  + ' pruefeGedanken: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -5925,7 +5957,7 @@ console.log('\n75. Gedankenfläche');
            'der Verweisknopf legt ein Gerüst an');
     pruefe(e.linkStrich === 17, 'und setzt den Strich hinter https://');
     pruefe(e.datumLang === 'Mo, 14.09.2026', 'das Datum trägt Wochentag und Jahr');
-    pruefe(e.knoepfe === 17, 'siebzehn Knöpfe in der Leiste');
+    pruefe(e.knoepfe === 18, 'achtzehn Knöpfe in der Leiste');
     pruefe(e.hakenEingefuegt === 'Fertig ✔', 'ein Häkchen wird eingefügt');
     pruefe(e.pfeilStrich === 8, 'der Strich steht hinter dem Zeichen');
     pruefe(e.nurOffen === 2, 'die Suche nach Offenem findet zwei Zeilen');
@@ -6132,6 +6164,81 @@ console.log('\n78. Übersicht über die Flächen');
     pruefe(e.textGefunden === 'Zweiter Text',
            'eine freie Fläche wird über ihre Kennung gefunden');
     pruefe(e.titelGesetzt === 'Neuer Titel', 'ihr Titel lässt sich ändern');
+  }
+}
+
+/* ============================================================
+   79. Skizzen aus einem freigegebenen Drive-Ordner
+   Grund: Die Skizzen entstehen am reMarkable und liegen in Drive. Als
+   Bilddaten im JSON waeren sie viel zu gross — deshalb liegt dort nur
+   ein kleines Vorschaubild, das Original bleibt in Drive.
+   ============================================================ */
+console.log('\n79. Skizzen');
+{
+  const skript = hauptSkript();
+  const s = globalThis.__skizzenApi;
+
+  ['skizzenOrdner', 'ordnerKennung', 'skizzenOrdnerSetzen', 'skizzenHolen',
+   'vorschauKarte', 'vorschauVon', 'skizzeAdresse', 'skizzeAnsehen',
+   'googleVorschau', 'vorschauBauen', 'skizzeWahlOeffnen', 'skizzeWahlHtml',
+   'skizzeEinfuegen', 'skizzeZeileHtml', 'zeichneSkizzen',
+   'vorschauenLeeren'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  /* Das Original bleibt in Drive */
+  const bauen = skript.match(/function vorschauBauen\([\s\S]*?\n\}\n/);
+  pruefe(bauen && /breit = 300/.test(bauen[0]),
+         'das Vorschaubild ist 300 Pixel breit — mehr braucht es im Text nicht');
+  pruefe(bauen && /toDataURL\('image\/jpeg', 0\.72\)/.test(bauen[0]),
+         'es wird als JPEG abgelegt, nicht als PNG — das spart ein Vielfaches');
+  pruefe(bauen && /vorschauVon\(id\)\) \{ return/.test(bauen[0]),
+         'ein vorhandenes wird nicht neu gebaut');
+  pruefe(bauen && /\^image\\\//.test(bauen[0]),
+         'nur für Bilder — ein PDF ließe sich so nicht verkleinern');
+
+  const zeile3 = skript.match(/function skizzeZeileHtml\([\s\S]*?\n\}\n/);
+  pruefe(zeile3 && /eigen \|\| googleVorschau\(id\)/.test(zeile3[0]),
+         'ohne eigenes Vorschaubild springt die von Google ein — so sieht man '
+         + 'auch PDFs');
+  pruefe(zeile3 && /braucht Netz/.test(zeile3[0]),
+         'und es steht dabei, dass die dann Netz braucht');
+
+  /* Der Ordner */
+  const kenn = skript.match(/function ordnerKennung\([\s\S]*?\n\}/);
+  pruefe(kenn && /\/folders\\\//.test(kenn[0]),
+         'aus einem Freigabelink wird die Kennung gezogen');
+  const holen = skript.match(/function skizzenHolen\([\s\S]*?\n\}\n/);
+  pruefe(holen && /in parents and trashed=false/.test(holen[0]),
+         'gelesen wird nur dieser eine Ordner');
+  pruefe(holen && /image\\\/\|pdf/.test(holen[0]),
+         'gezeigt werden Bilder und PDFs, nichts sonst');
+
+  pruefe(/id="skizzenListe"/.test(QUELLE),
+         'die Diagnose hat einen Abschnitt dafür');
+  pruefe(/SKIZZE_MUSTER/.test(skript), 'im Text steht eine eigene Zeile');
+
+  if (!s) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = s.pruefeSkizzen();
+    pruefe(e.ausLink === '1a2B3c_def-XYZ',
+           'die Kennung wird aus dem Ordnerlink gezogen');
+    pruefe(e.ausNackt === '1a2B3c_def-XYZ', 'eine nackte Kennung geht auch');
+    pruefe(e.ausMuell === '', 'aus etwas anderem wird nichts');
+    pruefe(e.zeileErkannt === '1a2B3c_def-XYZ',
+           'die Zeile !skizze:… wird als Skizze erkannt');
+    pruefe(e.keineZeile === null,
+           'ein ähnlicher Text ohne das Muster nicht');
+    pruefe(e.eingefuegt === '!skizze:abc123',
+           'das Einfügen schreibt die Zeile in den Text');
+    pruefe(e.eigeneZeile === true,
+           'sie steht in einer eigenen Zeile, nicht mitten im Satz');
+    pruefe(e.mitVorschau === true,
+           'mit abgelegtem Vorschaubild wird dieses gezeigt');
+    pruefe(e.ohneVorschau === true, 'ohne eines das von Google');
+    pruefe(e.nachLeeren === 0, 'die Vorschaubilder lassen sich verwerfen');
   }
 }
 

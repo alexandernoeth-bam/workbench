@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.66.0</title>
+<title>Workbench 0.67.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -719,6 +719,10 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
 .fl-punkt{flex:0 0 8px;height:8px;border:1.5px solid var(--grau);border-radius:2px;
   align-self:center}
 .fl-trenner{border-top:1px solid var(--linie);margin:12px 0}
+.fl-skizze{margin:10px 0}
+.fl-skizze img{max-width:100%;max-height:380px;border:1px solid var(--linie);
+  border-radius:6px;background:var(--papier);cursor:zoom-in;display:block}
+.fl-skizze-fuss{font-size:calc(var(--fs)*0.7);color:var(--grau);margin-top:3px}
 .fl-leer{height:9px}
 .fl-ansicht mark{background:#f5e6a8;color:inherit;border-radius:2px;padding:0 1px}
 .fl-zeile .tkasten{align-self:center;margin-top:0}
@@ -1004,6 +1008,9 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     <button type="button" id="knopfAbgleich" class="stark" onclick="abgleichenJetzt()">Abgleichen</button>
   </div>
 
+  <div class="abschnitt-titel"><span>Skizzen</span></div>
+  <div id="skizzenListe"></div>
+
   <div class="abschnitt-titel"><span>Kalender</span></div>
   <div id="kalenderListe"></div>
   <div class="knopfreihe">
@@ -1240,7 +1247,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.66.0';
+var APP_VERSION = '0.67.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4964,6 +4971,42 @@ function kalenderNeuLesen() {
   });
 }
 
+/* Der Ordner mit den Skizzen — einmal eintragen, dann steht alles
+   darin zur Wahl. */
+function zeichneSkizzen() {
+  var ziel = document.getElementById('skizzenListe');
+  if (!ziel) { return; }
+  var k = skizzenOrdner();
+  var h = '';
+  h += '<div class="d-feld"><div class="d-name">Ordner</div><div class="d-wert">'
+     + '<input type="text" id="skizzenOrdnerFeld" value="' + esc(k) + '" '
+     + 'placeholder="Freigabelink des Ordners einfügen" '
+     + 'onchange="skizzenOrdnerSetzen(this.value)"></div></div>';
+  h += zeile('Erkannt', k || 'noch keiner', k ? '' : 'grau');
+  h += zeile('Dateien', skizzenLaeuft ? 'wird geholt …' : String(skizzenListe.length),
+             skizzenListe.length ? '' : 'grau');
+  var v = Object.keys(vorschauKarte()).length;
+  h += zeile('Vorschaubilder abgelegt', String(v), v ? '' : 'grau');
+  if (skizzenFehler) { h += zeile('Letzter Fehler', esc(skizzenFehler), 'nein'); }
+  h += '<div class="d-hinweis" style="text-align:left">Der Ordner muss in Drive '
+     + 'für „jeder mit dem Link" freigegeben sein. Bilder bekommen ein eigenes '
+     + 'Vorschaubild und sind dann auch ohne Netz zu sehen; für PDFs kommt die '
+     + 'Vorschau von Google und braucht Netz.</div>';
+  h += '<div class="d-reihe">'
+     + '<button type="button" onclick="skizzenHolen()">Ordner neu lesen</button>'
+     + '<button type="button" onclick="vorschauenLeeren()">Vorschaubilder verwerfen</button>'
+     + '</div>';
+  ziel.innerHTML = h;
+}
+
+function vorschauenLeeren() {
+  DB.einstellungen.skizzenVorschau = {};
+  spaeterSichern();
+  zeichne();
+  melde('Vorschaubilder verworfen — sie werden beim nächsten Anzeigen neu gebaut.',
+        null);
+}
+
 function zeichneKalender() {
   var ziel = document.getElementById('kalenderListe');
   if (!ziel) { return; }
@@ -5098,6 +5141,7 @@ function zeichne() {
   zeichneSpeicher();
   zeichneGoogle();
   zeichneKalender();
+  zeichneSkizzen();
   zeichneDarstellung();
   zeichneJtDatei();
   zeichneFerien();
@@ -8280,6 +8324,10 @@ function flaecheZeileHtml(zeile, nr, suche) {
 
   var stil = tiefe ? (' style="padding-left:' + (tiefe * 18) + 'px"') : '';
 
+  var skizze = rest.match(SKIZZE_MUSTER);
+  if (skizze) {
+    return skizzeZeileHtml(skizze[1]);
+  }
   if (/^---+\s*$/.test(rest)) {
     return '<div class="fl-trenner"' + stil + '></div>';
   }
@@ -8483,6 +8531,9 @@ function flaecheSinnbild(art) {
     haken:   '<path d="M4 13l5 5 11-12"></path>',
     pfeil:   '<path d="M4 12h15M14 7l5 5-5 5"></path>',
     etwa:    '<text x="3" y="18" font-size="17">≈</text>',
+    skizze:  '<rect x="3" y="4" width="18" height="16" rx="2"></rect>'
+           + '<path d="M3 16l5-5 4 4 3-3 6 6"></path>'
+           + '<circle cx="9" cy="9" r="1.4"></circle>',
     trenner: '<path d="M3 12h18"></path>',
     datum:   '<rect x="3" y="5" width="18" height="16" rx="2"></rect>'
            + '<path d="M3 10h18M8 3v4M16 3v4"></path>'
@@ -8650,6 +8701,9 @@ function flaecheZeichnen() {
     h += flaecheKnopf('ein', '✔', 'haken', 'Häkchen einfügen');
     h += flaecheKnopf('ein', '→', 'pfeil', 'Pfeil einfügen');
     h += flaecheKnopf('ein', '≈', 'etwa', 'Ungefähr einfügen');
+    h += '<button class="fl-knopf" type="button" onclick="skizzeWahlOeffnen()" '
+       + 'title="Skizze aus Drive einfügen" aria-label="Skizze aus Drive einfügen">'
+       + flaecheSinnbild('skizze') + '</button>';
     h += '<span class="fl-teiler"></span>';
     h += flaecheKnopf('zeile', 'einzug', 'ein', 'Einrücken');
     h += flaecheKnopf('zeile', 'ausrueck', 'aus', 'Ausrücken');
@@ -8837,6 +8891,250 @@ function gedankenZeichnen() {
   if (zahl) {
     zahl.textContent = l.length + (l.length === 1 ? ' Fläche' : ' Flächen');
   }
+}
+
+
+/* ============================================================
+   Skizzen aus einem freigegebenen Drive-Ordner
+
+   Am reMarkable entstehen die Skizzen, in Drive liegen sie. Die App
+   holt sich nur, was sie zeigen muss: die Liste des Ordners und ein
+   kleines Vorschaubild je Skizze. Das Vorschaubild liegt im JSON —
+   deshalb ist es auch ohne Netz da und geht über den Abgleich mit.
+
+   Die Berechtigung bleibt eng: Der Ordner ist freigegeben, die App
+   liest ihn öffentlich. Sie bekommt keinen Zugriff auf die übrige
+   Drive.
+   ============================================================ */
+
+var SKIZZE_MUSTER = /^!skizze:([A-Za-z0-9_-]{6,60})$/;
+var skizzenListe = [];
+var skizzenLaeuft = false;
+var skizzenFehler = '';
+
+function skizzenOrdner() {
+  return String(DB.einstellungen.skizzenOrdner || '');
+}
+
+/* Aus einem Freigabelink die Kennung ziehen — man soll den ganzen Link
+   einfügen dürfen, nicht die Kennung heraussuchen müssen. */
+function ordnerKennung(text) {
+  var t = String(text || '').trim();
+  if (!t.length) { return ''; }
+  var m = t.match(/\/folders\/([A-Za-z0-9_-]{6,60})/);
+  if (m) { return m[1]; }
+  m = t.match(/[?&]id=([A-Za-z0-9_-]{6,60})/);
+  if (m) { return m[1]; }
+  if (/^[A-Za-z0-9_-]{6,60}$/.test(t)) { return t; }
+  return '';
+}
+
+function skizzenOrdnerSetzen(text) {
+  var k = ordnerKennung(text);
+  DB.einstellungen.skizzenOrdner = k;
+  spaeterSichern();
+  skizzenListe = [];
+  zeichne();
+  if (k) { skizzenHolen(); }
+}
+
+/* Die Liste des Ordners. Ohne Anmeldung, dafür braucht der Ordner die
+   Freigabe „jeder mit dem Link". */
+function skizzenHolen() {
+  var ordner = skizzenOrdner();
+  if (!ordner || skizzenLaeuft) { return Promise.resolve([]); }
+  skizzenLaeuft = true;
+  skizzenFehler = '';
+  var adresse = 'https://www.googleapis.com/drive/v3/files'
+              + '?q=' + encodeURIComponent("'" + ordner + "' in parents and trashed=false")
+              + '&fields=' + encodeURIComponent('files(id,name,mimeType,modifiedTime)')
+              + '&orderBy=modifiedTime desc&pageSize=100'
+              + '&key=' + encodeURIComponent(DB.einstellungen.driveSchluessel || '');
+  var kopf = {};
+  if (zugriffToken) { kopf.Authorization = 'Bearer ' + zugriffToken; }
+  return fetch(adresse, { headers: kopf }).then(function (a) {
+    if (!a.ok) { throw new Error('Antwort ' + a.status); }
+    return a.json();
+  }).then(function (d) {
+    skizzenListe = (d.files || []).filter(function (f) {
+      return /image\/|pdf/.test(f.mimeType || '');
+    });
+    skizzenLaeuft = false;
+    zeichne();
+    return skizzenListe;
+  }, function (f) {
+    skizzenLaeuft = false;
+    skizzenFehler = String(f && f.message ? f.message : f);
+    zeichne();
+    return [];
+  });
+}
+
+/* ------------------------------------------------------------
+   Vorschaubilder
+   ------------------------------------------------------------ */
+
+function vorschauKarte() {
+  if (!DB.einstellungen.skizzenVorschau) { DB.einstellungen.skizzenVorschau = {}; }
+  return DB.einstellungen.skizzenVorschau;
+}
+
+function vorschauVon(id) {
+  var k = vorschauKarte();
+  return k[id] ? k[id].bild : '';
+}
+
+function skizzeAdresse(id) {
+  return 'https://drive.google.com/uc?export=view&id=' + encodeURIComponent(id);
+}
+
+function skizzeAnsehen(id) {
+  return 'https://drive.google.com/file/d/' + encodeURIComponent(id) + '/view';
+}
+
+/* Googles eigene Vorschau — für PDFs der einzige Weg, ohne eine
+   PDF-Bibliothek mitzuschleppen. Sie liegt bei Google, ist also ohne
+   Netz nicht da. */
+function googleVorschau(id) {
+  return 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w600';
+}
+
+/* Ein Bild wird einmal verkleinert und als Text abgelegt. 300 Pixel
+   reichen für den Blick im Text und kosten rund 15 KB. */
+function vorschauBauen(id, mime) {
+  if (vorschauVon(id)) { return Promise.resolve(vorschauVon(id)); }
+  if (!/^image\//.test(String(mime || ''))) { return Promise.resolve(''); }
+  if (typeof document.createElement !== 'function') { return Promise.resolve(''); }
+  return new Promise(function (fertig) {
+    /* document.createElement statt new Image() — dasselbe Ergebnis, und
+       es ist an einer Stelle geprüft, die es schon gibt. */
+    var bild = document.createElement('img');
+    bild.crossOrigin = 'anonymous';
+    bild.onload = function () {
+      try {
+        var breit = 300;
+        var faktor = Math.min(1, breit / (bild.width || breit));
+        var t = document.createElement('canvas');
+        t.width = Math.round((bild.width || breit) * faktor);
+        t.height = Math.round((bild.height || breit) * faktor);
+        var s = t.getContext('2d');
+        s.fillStyle = '#ffffff';
+        s.fillRect(0, 0, t.width, t.height);
+        s.drawImage(bild, 0, 0, t.width, t.height);
+        var text = t.toDataURL('image/jpeg', 0.72);
+        vorschauKarte()[id] = { bild: text, geaendert: jetzt() };
+        spaeterSichern();
+        fertig(text);
+      } catch (f) {
+        fertig('');
+      }
+    };
+    bild.onerror = function () { fertig(''); };
+    bild.src = googleVorschau(id);
+  });
+}
+
+/* ------------------------------------------------------------
+   Einfügen in die Fläche
+   ------------------------------------------------------------ */
+
+function skizzeWahlOeffnen() {
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = skizzeWahlHtml();
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+  if (skizzenOrdner() && !skizzenListe.length) {
+    skizzenHolen().then(function () {
+      var s2 = document.getElementById('aktionSheet');
+      if (s2) { s2.innerHTML = skizzeWahlHtml(); }
+    });
+  }
+}
+
+function skizzeWahlHtml() {
+  var h = blattKopf();
+  h += '<div class="as-titel">Skizze einfügen</div>';
+  h += '<div class="as-linie"></div>';
+
+  if (!skizzenOrdner()) {
+    h += '<div class="tleer" style="padding-left:0">Noch kein Ordner hinterlegt. '
+       + 'In der Diagnose unter „Skizzen" den Freigabelink deines '
+       + 'Drive-Ordners eintragen.</div>';
+    h += '<div class="d-reihe"><button type="button" '
+       + 'onclick="aktionenSchliessen();zeigeSchirm(\'Diagnose\')">Zur Diagnose</button>'
+       + '</div>';
+    return h;
+  }
+  if (skizzenLaeuft) {
+    h += '<div class="tleer" style="padding-left:0">Wird geholt …</div>';
+    return h;
+  }
+  if (skizzenFehler) {
+    h += '<div class="d-hinweis" style="text-align:left">Der Ordner ließ sich nicht '
+       + 'lesen: ' + esc(skizzenFehler) + '. Ist er für „jeder mit dem Link" '
+       + 'freigegeben?</div>';
+  }
+  if (!skizzenListe.length && !skizzenFehler) {
+    h += '<div class="tleer" style="padding-left:0">Keine Bilder oder PDFs in '
+       + 'diesem Ordner.</div>';
+  }
+
+  var i;
+  for (i = 0; i < skizzenListe.length; i++) {
+    var f = skizzenListe[i];
+    h += '<div class="mf-zeile" onclick="skizzeEinfuegen(\'' + esc(f.id) + '\',\''
+       + esc(f.mimeType) + '\')">'
+       + '<span class="mf-name">' + esc(f.name) + '</span>'
+       + '<span class="a-quelle">' + (/pdf/.test(f.mimeType) ? 'PDF' : 'Bild')
+       + '</span></div>';
+  }
+  h += '<div class="d-reihe">'
+     + '<button type="button" onclick="skizzenListe=[];skizzeWahlOeffnen()">Neu holen</button>'
+     + '<button type="button" onclick="aktionenSchliessen()">Abbrechen</button></div>';
+  return h;
+}
+
+function skizzeEinfuegen(id, mime) {
+  var feld = document.getElementById('flaecheFeld');
+  if (feld) {
+    var text = String(feld.value || '');
+    var a = (typeof feld.selectionStart === 'number') ? feld.selectionStart : text.length;
+    var davor = (a === 0 || text.charAt(a - 1) === '\n') ? '' : '\n';
+    var neu = davor + '!skizze:' + id + '\n';
+    feld.value = text.slice(0, a) + neu + text.slice(a);
+    flaecheSetzen(flaecheFuer, feld.value);
+    var stelle = a + neu.length;
+    if (typeof feld.setSelectionRange === 'function') {
+      feld.setSelectionRange(stelle, stelle);
+    }
+  }
+  aktionenSchliessen();
+  vorschauBauen(id, mime).then(function () { flaecheZeichnen(); });
+}
+
+/* ------------------------------------------------------------
+   Anzeigen
+   ------------------------------------------------------------ */
+
+function skizzeZeileHtml(id) {
+  var eigen = vorschauVon(id);
+  var quelle = eigen || googleVorschau(id);
+  var h = '<div class="fl-skizze">';
+  h += '<img src="' + esc(quelle) + '" alt="Skizze" loading="lazy" '
+     + 'onclick="fensterAuf(\'' + esc(skizzeAnsehen(id)) + '\')">';
+  h += '<div class="fl-skizze-fuss">'
+     + (eigen ? 'Skizze' : 'Skizze · Vorschau von Google, braucht Netz')
+     + ' · <a href="' + esc(skizzeAnsehen(id)) + '" target="_blank" rel="noopener">'
+     + 'in Drive öffnen</a></div>';
+  h += '</div>';
+  return h;
+}
+
+function fensterAuf(adresse) {
+  var f = window.open(adresse, '_blank');
+  if (f && f.focus) { f.focus(); }
 }
 
 /* ============================================================
