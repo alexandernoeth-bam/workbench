@@ -668,6 +668,34 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.keinLeeresBild = (lb.indexOf(\'<svg viewBox="0 0 24 24" '
                  + 'aria-hidden="true"></svg>\') < 0);'
                  + '   r.h1Sichtbar = (lb.indexOf(\'>H1</text>\') >= 0);'
+                 + '   feld.value = \'Fertig \'; feld.selectionStart = 7;'
+                 + '   feld.selectionEnd = 7;'
+                 + '   flaecheEinfuegen(\'✔\');'
+                 + '   r.hakenEingefuegt = feld.value;'
+                 + '   feld.value = \'Davor  \'; feld.selectionStart = 7;'
+                 + '   feld.selectionEnd = 7;'
+                 + '   flaecheEinfuegen(\'→\');'
+                 + '   r.pfeilStrich = feld.selectionStart;'
+                 + '   /* Unter „Leer" darf wirklich nichts stehen, sonst'
+                 + '      prüft man das Gegenteil. */'
+                 + '   var probe = [\'# Bau\', \'[] Angebot holen\','
+                 + '     \'[x] Termin gemacht\', \'Am 14.09.2026 kommt Zapf\','
+                 + '     \'[] Zweites offen\', \'# Leer\', \'Nur Text\'];'
+                 + '   var zaehl = function(art){'
+                 + '     flaecheArt = {}; flaecheArt[art] = true;'
+                 + '     var z = flaecheSichtbar(probe, \'\');'
+                 + '     var n = 0, i;'
+                 + '     for (i = 0; i < probe.length; i++) {'
+                 + '       if (z[i] && ueberschriftStufe(probe[i]) === 0) { n++; } }'
+                 + '     return { zahl: n, zeigen: z }; };'
+                 + '   var o = zaehl(\'offen\');'
+                 + '   r.nurOffen = o.zahl;'
+                 + '   r.ueberschriftBleibt = o.zeigen[0];'
+                 + '   r.leereUeberschriftWeg = !o.zeigen[5];'
+                 + '   r.nurErledigt = zaehl(\'erledigt\').zahl;'
+                 + '   r.mitDatum = zaehl(\'datum\').zahl;'
+                 + '   flaecheArt = {};'
+                 + '   r.ohneFilterAlles = (flaecheSichtbar(probe, \'\') === null);'
                  + '   flaecheModus = \'ansicht\';'
                  + '   flaecheFuer = \'\'; DB = alt;'
                  + '   return r;'
@@ -5853,7 +5881,17 @@ console.log('\n75. Gedankenfläche');
            'der Verweisknopf legt ein Gerüst an');
     pruefe(e.linkStrich === 17, 'und setzt den Strich hinter https://');
     pruefe(e.datumLang === 'Mo, 14.09.2026', 'das Datum trägt Wochentag und Jahr');
-    pruefe(e.knoepfe === 14, 'vierzehn Knöpfe in der Leiste');
+    pruefe(e.knoepfe === 17, 'siebzehn Knöpfe in der Leiste');
+    pruefe(e.hakenEingefuegt === 'Fertig ✔', 'ein Häkchen wird eingefügt');
+    pruefe(e.pfeilStrich === 8, 'der Strich steht hinter dem Zeichen');
+    pruefe(e.nurOffen === 2, 'die Suche nach Offenem findet zwei Zeilen');
+    pruefe(e.nurErledigt === 1, 'die nach Erledigtem eine');
+    pruefe(e.mitDatum === 1, 'die nach Daten eine');
+    pruefe(e.ueberschriftBleibt === true,
+           'die Überschrift darüber bleibt stehen — sonst fehlt der Zusammenhang');
+    pruefe(e.leereUeberschriftWeg === true,
+           'eine Überschrift ohne Treffer darunter fällt weg');
+    pruefe(e.ohneFilterAlles === true, 'ohne Filter steht alles da');
     pruefe(e.h3 === '### Titel', 'drei ### ergeben die kleine Überschrift');
     pruefe(e.h3Ansicht === 'fl-h3', 'und sie wird als solche gezeigt');
     pruefe(e.alleMitBild === true, 'alle mit Sinnbild statt Wort');
