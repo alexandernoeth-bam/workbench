@@ -479,7 +479,10 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
       setSelectionRange(a, b) { this.selectionStart = a; this.selectionEnd = b; },
       classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
       addEventListener() {}, removeEventListener() {}, focus() {}, click() {},
-      appendChild() {}, removeChild() {}, setAttribute() {},
+      /* Die Farbmarke im Kopf merkt sich, was gesetzt wurde. */
+      gesetzteFarbe: '',
+      appendChild() {}, removeChild() {},
+      setAttribute(k, v) { if (k === 'content') { this.gesetzteFarbe = v; } },
       getBoundingClientRect() { return { top: 0, bottom: 800, height: 800 }; },
       querySelectorAll() { return []; }
     };
@@ -536,6 +539,36 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__farbApi = {'
+                 + ' pruefeFarben: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var noetig = [\'--papier\', \'--karte\', \'--tinte\','
+                 + '     \'--grau\', \'--grau-hell\', \'--linie\','
+                 + '     \'--weinrot\', \'--petrol\'];'
+                 + '   var voll = true;'
+                 + '   var k, n;'
+                 + '   for (k in FARBWELTEN) {'
+                 + '     for (n = 0; n < noetig.length; n++) {'
+                 + '       if (!FARBWELTEN[k].werte[noetig[n]]) { voll = false; } } }'
+                 + '   var r = { zahl: Object.keys(FARBWELTEN).length,'
+                 + '             voreingestellt: farbweltName(),'
+                 + '             alleVollstaendig: voll };'
+                 + '   farbweltSetzen(\'nacht\');'
+                 + '   r.gesetzt = FARBWELTEN[farbweltName()].werte[\'--papier\'];'
+                 + '   var marke = document.getElementById(\'themaFarbe\');'
+                 + '   r.leiste = marke ? marke.gesetzteFarbe : \'\';'
+                 + '   var hell = function(h){'
+                 + '     return parseInt(h.slice(1, 3), 16)'
+                 + '          + parseInt(h.slice(3, 5), 16)'
+                 + '          + parseInt(h.slice(5, 7), 16); };'
+                 + '   r.nachtIstDunkel = (hell(FARBWELTEN.nacht.werte[\'--papier\'])'
+                 + '     < hell(FARBWELTEN.nacht.werte[\'--tinte\']));'
+                 + '   r.gesichert = (DB.einstellungen.farbwelt === \'nacht\');'
+                 + '   DB.einstellungen.farbwelt = \'gibtsnicht\';'
+                 + '   r.unbekannteFaelltZurueck = farbweltName();'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__ohneArtApi = {'
                  + ' pruefeOhneArt: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -7158,6 +7191,54 @@ console.log('\n88. Doppelte Jahrestermine');
            + 'der Urlaub und der Geburtstag im November');
     pruefe(e.andererTagBleibt === true,
            'derselbe Name an einem anderen Tag ist kein Doppel');
+  }
+}
+
+/* ============================================================
+   89. Farbwelten
+   Grund: Die App rechnet alle Toene aus fuenf Grundfarben. Damit
+   laesst sich der Anstrich wechseln, ohne eine einzige Regel
+   anzufassen — und ohne dass die App eine andere wird.
+   ============================================================ */
+console.log('\n89. Farbwelten');
+{
+  const skript = hauptSkript();
+  const f = globalThis.__farbApi;
+
+  ['farbweltName', 'farbweltAnwenden', 'farbweltSetzen', 'zeichneFarbwelt']
+    .forEach(function (fn) {
+      pruefe(new RegExp('function\\s+' + fn + '\\s*\\(').test(skript),
+             'Funktion ' + fn + ' ist definiert');
+    });
+
+  const an = skript.match(/function farbweltAnwenden\([\s\S]*?\n\}/);
+  pruefe(an && /setProperty\(k, welt\.werte\[k\]\)/.test(an[0]),
+         'gesetzt werden die Grundfarben, nicht einzelne Regeln');
+  pruefe(an && /themaFarbe/.test(an[0]),
+         'die Leiste am oberen Fensterrand färbt sich mit');
+  const st = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(st && /farbweltAnwenden\(\)/.test(st[0]),
+         'die Wahl gilt ab dem Start, nicht erst nach einem Klick');
+  pruefe(/Die Farben der '\s*\n?\s*\+ 'Terminarten bleiben/.test(skript)
+         || /Terminarten bleiben/.test(skript),
+         'es steht dabei, dass die Farben der Terminarten bleiben');
+
+  if (!f) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = f.pruefeFarben();
+    pruefe(e.zahl === 5, 'fünf Welten stehen zur Wahl');
+    pruefe(e.voreingestellt === 'papier', 'voreingestellt bleibt Papier');
+    pruefe(e.alleVollstaendig === true,
+           'jede Welt setzt alle acht Grundfarben — eine fehlende bliebe sonst '
+           + 'aus der vorigen stehen');
+    pruefe(e.gesetzt === '#1B1D21', 'die Wahl wirkt sofort');
+    pruefe(e.leiste === '#1B1D21', 'und färbt die Fensterleiste mit');
+    pruefe(e.unbekannteFaelltZurueck === 'papier',
+           'eine unbekannte Welt fällt auf Papier zurück');
+    pruefe(e.nachtIstDunkel === true,
+           'bei Nacht ist der Grund dunkler als die Schrift');
+    pruefe(e.gesichert === true, 'die Wahl wird gesichert und abgeglichen');
   }
 }
 
