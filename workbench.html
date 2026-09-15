@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.74.0</title>
+<title>Workbench 0.75.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1277,7 +1277,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.74.0';
+var APP_VERSION = '0.75.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -1740,14 +1740,42 @@ function zusammenfuehren(lokal, fremd) {
     }
   }
 
+  /* Einstellungen wurden bisher als Ganzes ersetzt: Wer den jüngeren
+     Stempel hatte, bestimmte alles. Damit verschwand eine Einstellung,
+     die das andere Gerät gar nicht kannte — etwa eine neu freigegebene
+     Art fürs Jahresraster. Jetzt wird je Schlüssel zusammengeführt:
+     Der jüngere Stand gewinnt, aber er löscht nichts, was er nicht
+     kennt. */
   var ea = (lokal.einstellungen && lokal.einstellungen.stempel) || 0;
   var eb = (fremd.einstellungen && fremd.einstellungen.stempel) || 0;
-  var quelle = (eb > ea) ? fremd.einstellungen : lokal.einstellungen;
-  if (quelle) {
-    var e;
-    for (e in quelle) {
-      if (Object.prototype.hasOwnProperty.call(quelle, e)) { ergebnis.einstellungen[e] = quelle[e]; }
+  var aelter = (eb > ea) ? (lokal.einstellungen || {}) : (fremd.einstellungen || {});
+  var juenger = (eb > ea) ? (fremd.einstellungen || {}) : (lokal.einstellungen || {});
+
+  /* Diese Einstellungen sind Verzeichnisse: Dort wird je Eintrag
+     verschmolzen, sonst verlöre man die Wahl des anderen Geräts. */
+  var VERZEICHNISSE = ['artenImJahr', 'flaecheOben', 'skizzenVorschau'];
+
+  var e;
+  for (e in aelter) {
+    if (Object.prototype.hasOwnProperty.call(aelter, e)) {
+      ergebnis.einstellungen[e] = aelter[e];
     }
+  }
+  for (e in juenger) {
+    if (!Object.prototype.hasOwnProperty.call(juenger, e)) { continue; }
+    if (VERZEICHNISSE.indexOf(e) >= 0) {
+      var zus = {};
+      var q, k2;
+      for (q = 0; q < 2; q++) {
+        var vz = (q === 0) ? (aelter[e] || {}) : (juenger[e] || {});
+        for (k2 in vz) {
+          if (Object.prototype.hasOwnProperty.call(vz, k2)) { zus[k2] = vz[k2]; }
+        }
+      }
+      ergebnis.einstellungen[e] = zus;
+      continue;
+    }
+    ergebnis.einstellungen[e] = juenger[e];
   }
   ergebnis.einstellungen.clientId = CLIENT_ID;
   ergebnis.einstellungen.redirectUri = REDIRECT_URI;

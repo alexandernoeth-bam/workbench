@@ -536,6 +536,29 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__einstApi = {'
+                 + ' pruefeEinstellungen: function(){'
+                 + '   var a = leereDatenbank(); a.grabsteine = [];'
+                 + '   a.einstellungen.artenImJahr = { training: true };'
+                 + '   a.einstellungen.flaecheOben = { \'g:a\': true };'
+                 + '   a.einstellungen.skizzenVorschau = { s1: { bild:\'x\' } };'
+                 + '   a.einstellungen.darstellung = \'schmal\';'
+                 + '   a.einstellungen.stempel = 1000;'
+                 + '   var b = leereDatenbank(); b.grabsteine = [];'
+                 + '   b.einstellungen.artenImJahr = { treffen: true };'
+                 + '   b.einstellungen.skizzenVorschau = { s2: { bild:\'y\' } };'
+                 + '   b.einstellungen.darstellung = \'breit\';'
+                 + '   b.einstellungen.stempel = 2000;'
+                 + '   var e = zusammenfuehren(a, b).db.einstellungen;'
+                 + '   return { beideArten: Object.keys(e.artenImJahr || {})'
+                 + '              .sort().join(\',\'),'
+                 + '            spruchwahlBleibt: !!(e.flaecheOben'
+                 + '              && e.flaecheOben[\'g:a\']),'
+                 + '            juengerGewinnt: e.darstellung,'
+                 + '            vorschauVereint: Object.keys('
+                 + '              e.skizzenVorschau || {}).length,'
+                 + '            clientIdGesetzt: (e.clientId === CLIENT_ID) };'
+                 + ' } };'
                  + 'globalThis.__stempelApi = {'
                  + ' pruefeStempel: function(){'
                  + '   var alt = DB;'
@@ -6736,6 +6759,46 @@ console.log('\n84. Umstellung ohne Stempel');
            'ein anderswo gesetzter Haken überlebt das Verschmelzen');
     pruefe(e.echteAenderungStempelt > 3000,
            'eine echte Änderung stempelt weiterhin');
+  }
+}
+
+/* ============================================================
+   85. Einstellungen ueberleben den Abgleich
+   Grund: Die Einstellungen wurden als Ganzes ersetzt — wer den
+   juengeren Stempel hatte, bestimmte alles. Damit verschwand jede
+   Einstellung, die das andere Geraet nicht kannte: eine neu
+   freigegebene Art fuer das Jahresraster, die Sprungwahl einer
+   Flaeche, die abgelegten Vorschaubilder.
+   ============================================================ */
+console.log('\n85. Einstellungen beim Verschmelzen');
+{
+  const skript = hauptSkript();
+  const s = globalThis.__einstApi;
+
+  const z = skript.match(/function zusammenfuehren\([\s\S]*?\n\}\n/);
+  pruefe(z && /var aelter = /.test(z[0]) && /var juenger = /.test(z[0]),
+         'beide Seiten werden betrachtet, nicht nur die jüngere');
+  pruefe(z && /VERZEICHNISSE/.test(z[0]),
+         'Einstellungen, die Verzeichnisse sind, werden je Eintrag verschmolzen');
+  pruefe(z && /'artenImJahr'/.test(z[0]) && /'flaecheOben'/.test(z[0])
+         && /'skizzenVorschau'/.test(z[0]),
+         'die drei Verzeichnisse sind benannt');
+
+  if (!s) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = s.pruefeEinstellungen();
+    pruefe(e.beideArten === 'training,treffen'.split(',').sort().join(','),
+           'eine auf dem einen Gerät freigegebene Art überlebt, auch wenn das '
+           + 'andere sie nicht kennt');
+    pruefe(e.spruchwahlBleibt === true,
+           'eine Einstellung, die nur die ältere Seite hat, bleibt erhalten');
+    pruefe(e.juengerGewinnt === 'breit',
+           'bei einem Wert, den beide haben, gewinnt der jüngere Stand');
+    pruefe(e.vorschauVereint === 2,
+           'abgelegte Vorschaubilder beider Geräte bleiben');
+    pruefe(e.clientIdGesetzt === true,
+           'die festen Angaben werden weiterhin gesetzt');
   }
 }
 
