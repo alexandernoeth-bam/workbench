@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.76.2</title>
+<title>Workbench 0.77.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1280,7 +1280,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.76.2';
+var APP_VERSION = '0.77.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5078,6 +5078,41 @@ function zeichneArtenImJahr() {
        + '<span class="mf-name">' + esc(artName(l[i])) + '</span>'
        + '<span class="a-quelle">' + (an ? 'im Jahr' : '—') + '</span></div>';
   }
+
+  /* Was käme heute im Jahresraster an? Dieselbe Rechnung wie dort,
+     Schritt für Schritt sichtbar — sonst rätselt man, an welcher
+     Stelle ein Termin verlorengeht. */
+  var heute = isoDatum();
+  var roh = (termineNachTag[heute] || []);
+  h += '<div class="s-abschnitt">Probe für heute</div>';
+  h += zeile('Termine im Speicher', String(roh.length), roh.length ? '' : 'grau');
+  h += zeile('Geholtes Fenster',
+             (kalVon && kalBis) ? (kurzDatum(kalVon) + ' – ' + kurzDatum(kalBis)) : '—',
+             kalVon ? '' : 'grau');
+  h += zeile('Filter im Jahr', jahrFilter ? String(jahrFilter) : 'keiner',
+             jahrFilter ? 'nein' : 'grau');
+  h += zeile('Kontextfilter', kalFilter || 'alle', 'grau');
+  var ji = jtAn(heute, true);
+  h += zeile('Käme ins Jahresraster', String(ji.length), ji.length ? '' : 'nein');
+  var z;
+  for (z = 0; z < roh.length; z++) {
+    var a2 = terminArt(roh[z]);
+    var drin = false;
+    var y;
+    for (y = 0; y < ji.length; y++) {
+      if (ji[y].id === roh[z].id) { drin = true; }
+    }
+    var grund = '';
+    if (!a2) { grund = 'keine Art erkannt'; }
+    else if (!roh[z].ganztags && !artImJahr(a2)) { grund = 'Art nicht freigegeben'; }
+    else if (!drin) { grund = 'fällt sonst heraus'; }
+    else if (!jtPasst({ art: a2, kontext: roh[z].kontext })) { grund = 'vom Filter weg'; }
+    else { grund = 'erscheint'; }
+    h += zeile(esc(roh[z].titel || '(ohne Titel)'),
+               (a2 ? ('#' + a2 + ' · ') : '') + grund,
+               (grund === 'erscheint') ? '' : 'nein');
+  }
+
   ziel.innerHTML = h;
 }
 
