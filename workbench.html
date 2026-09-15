@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.78.0</title>
+<title>Workbench 0.80.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1039,6 +1039,9 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     <button type="button" id="knopfAbgleich" class="stark" onclick="abgleichenJetzt()">Abgleichen</button>
   </div>
 
+  <div class="abschnitt-titel"><span>Weiter zurück laden</span></div>
+  <div id="archivListe"></div>
+
   <div class="abschnitt-titel"><span>Arten im Jahresraster</span></div>
   <div id="artenJahrListe"></div>
 
@@ -1281,7 +1284,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.78.0';
+var APP_VERSION = '0.80.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5287,6 +5290,7 @@ function zeichne() {
   zeichneKalender();
   zeichneSkizzen();
   zeichneArtenImJahr();
+  zeichneArchiv();
   zeichneDarstellung();
   zeichneJtDatei();
   zeichneFerien();
@@ -5503,6 +5507,9 @@ function termineHolen(laut) {
     });
     return reihe;
   }).then(function () {
+    /* Nachgeladene Jahre überleben den regelmäßigen Abruf — sonst wären
+       sie nach zwei Minuten wieder weg. */
+    archivEinhaengen();
     kalenderStand = isoZeit();
     if (!kalenderFehler) { verbindungOk = true; }
     if (!kalenderFehler && laut) {
@@ -5513,6 +5520,9 @@ function termineHolen(laut) {
     tagZeichnen();
     kalZeichnen();
     zeichne();
+    /* Erst das kleine Fenster, dann das Jahr — so steht der Tag sofort
+       da und das Jahr füllt sich nach. */
+    laufendesJahrHolen(false);
     return true;
   }).catch(function (f) {
     kalenderFehler = f ? f.message : 'unbekannter Fehler';
@@ -5523,6 +5533,213 @@ function termineHolen(laut) {
     kalenderLaeuft = false;
     return wert;
   });
+}
+
+
+/* ------------------------------------------------------------
+   Ein Jahr nachladen
+
+   Das gewöhnliche Fenster reicht drei Wochen zurück und vier Monate
+   voraus. Wer Altes nachtragen will, braucht mehr — aber nicht
+   dauerhaft: Fünf Jahre bei jedem Abruf wären eine Zumutung für Netz
+   und Speicher.
+
+   Deshalb wird ein Jahr einmal geholt und danebengelegt. Es bleibt bis
+   zum Neuladen der App, wird nicht in die Datei geschrieben und nicht
+   abgeglichen.
+   ------------------------------------------------------------ */
+
+var archivNachTag = {};
+var archivJahre = [];
+var archivLaeuft = false;
+var archivFehler = '';
+
+function archivEinhaengen() {
+  var tag;
+  for (tag in archivNachTag) {
+    if (!Object.prototype.hasOwnProperty.call(archivNachTag, tag)) { continue; }
+    if (termineNachTag[tag]) { continue; }   /* Frisches hat Vorrang */
+    termineNachTag[tag] = archivNachTag[tag];
+  }
+}
+
+function archivJahrHolen(jahr, still) {
+  var j = Number(jahr);
+  if (!j || j < 2000 || j > 2100) {
+    archivFehler = 'Bitte ein Jahr zwischen 2000 und 2100.';
+    zeichne();
+    return Promise.resolve(false);
+  }
+  if (archivLaeuft || !tokenGueltig()) { return Promise.resolve(false); }
+  archivLaeuft = true;
+  archivFehler = '';
+  zeichne();
+
+  var von = j + '-01-01';
+  var bis = j + '-12-31';
+  var merk = termineNachTag;
+  termineNachTag = {};
+
+  var aktive = [];
+  var i;
+  for (i = 0; i < kalenderListe.length; i++) {
+    if (kalenderGewaehlt(kalenderListe[i].id)) { aktive.push(kalenderListe[i]); }
+  }
+
+  var reihe = Promise.resolve(true);
+  aktive.forEach(function (kal) {
+    reihe = reihe.then(function () { return einenKalenderHolen(kal, von, bis); });
+  });
+
+  return reihe.then(function () {
+    /* Ein Jahr, das schon einmal geholt wurde, wird ersetzt — sonst
+       stünden gelöschte Termine für immer da. */
+    var alt;
+    for (alt in archivNachTag) {
+      if (!Object.prototype.hasOwnProperty.call(archivNachTag, alt)) { continue; }
+      if (alt.slice(0, 4) === String(j)) { delete archivNachTag[alt]; }
+    }
+    var tag;
+    var zahl = 0;
+    for (tag in termineNachTag) {
+      if (!Object.prototype.hasOwnProperty.call(termineNachTag, tag)) { continue; }
+      archivNachTag[tag] = termineNachTag[tag];
+      zahl += termineNachTag[tag].length;
+    }
+    termineNachTag = merk;
+    archivEinhaengen();
+    if (archivJahre.indexOf(j) < 0) { archivJahre.push(j); archivJahre.sort(); }
+    archivLaeuft = false;
+    if (!still) {
+      melde('Jahr ' + j + ' nachgeladen: ' + zahl + ' Termine.\n'
+          + 'Sie bleiben bis zum Neuladen der App und werden nicht gesichert.',
+            'gut');
+    }
+    tagZeichnen();
+    kalZeichnen();
+    zeichne();
+    return true;
+  }).catch(function (f) {
+    termineNachTag = merk;
+    archivLaeuft = false;
+    archivFehler = f ? f.message : 'unbekannter Fehler';
+    zeichne();
+    return false;
+  });
+}
+
+/* Das laufende Jahr wird von selbst geholt — einmal, nachdem die
+   Termine da sind. Der kurze Takt alle zwei Minuten bleibt beim
+   kleinen Fenster; ein ganzes Jahr so oft zu holen wäre Verschwendung.
+   Nachgezogen wird es stündlich. */
+var JAHR_TAKT = 60 * 60 * 1000;
+var archivUhr = null;
+var archivJahrZuletzt = 0;
+
+function laufendesJahrHolen(erzwingen) {
+  if (!tokenGueltig()) { return Promise.resolve(false); }
+  var j = Number(isoDatum().slice(0, 4));
+  var frisch = (Date.now() - archivJahrZuletzt) < JAHR_TAKT;
+  if (!erzwingen && archivJahre.indexOf(j) >= 0 && frisch) {
+    return Promise.resolve(false);
+  }
+  return archivJahrHolen(j, true).then(function (ok) {
+    if (ok) { archivJahrZuletzt = Date.now(); }
+    return ok;
+  });
+}
+
+function jahrTaktStarten() {
+  if (archivUhr) { window.clearInterval(archivUhr); }
+  archivUhr = window.setInterval(function () {
+    if (document.hidden) { return; }
+    laufendesJahrHolen(false);
+  }, JAHR_TAKT);
+}
+
+/* Alles ab einem Jahr bis heute — der Reihe nach, damit Google nicht
+   mit vielen Abrufen gleichzeitig bedrängt wird. */
+function archivAlleHolen() {
+  var feld = document.getElementById('archivVonFeld');
+  var von = feld ? Number(feld.value) : 0;
+  var bis = Number(isoDatum().slice(0, 4));
+  if (!von || von < 2000 || von > bis) {
+    archivFehler = 'Bitte ein Jahr zwischen 2000 und ' + bis + '.';
+    zeichne();
+    return Promise.resolve(false);
+  }
+  var jahre = [];
+  var j;
+  for (j = von; j <= bis; j++) { jahre.push(j); }
+
+  var reihe = Promise.resolve(true);
+  jahre.forEach(function (jj) {
+    reihe = reihe.then(function () { return archivJahrHolen(jj, true); });
+  });
+  return reihe.then(function () {
+    melde(jahre.length + ' Jahre nachgeladen: ' + archivZahl() + ' Termine.\n'
+        + 'Sie bleiben bis zum Neuladen der App.', 'gut');
+    return true;
+  });
+}
+
+function archivHolenAusFeld() {
+  var feld = document.getElementById('archivJahrFeld');
+  if (!feld) { return; }
+  archivJahrHolen(feld.value);
+}
+
+function archivLeeren() {
+  archivNachTag = {};
+  archivJahre = [];
+  melde('Nachgeladene Jahre verworfen.', null);
+  termineHolen(false);
+  zeichne();
+}
+
+function archivZahl() {
+  var tag;
+  var n = 0;
+  for (tag in archivNachTag) {
+    if (Object.prototype.hasOwnProperty.call(archivNachTag, tag)) {
+      n += archivNachTag[tag].length;
+    }
+  }
+  return n;
+}
+
+function zeichneArchiv() {
+  var ziel = document.getElementById('archivListe');
+  if (!ziel) { return; }
+  var h = '<div class="d-hinweis" style="text-align:left">Das laufende Jahr wird '
+        + 'von selbst geholt und stündlich nachgezogen. Ältere Jahre kommen auf '
+        + 'Knopfdruck dazu — bis die App neu geladen wird. Nichts davon wird '
+        + 'gesichert oder abgeglichen.</div>';
+  h += '<div class="d-feld"><div class="d-name">Einzelnes Jahr</div>'
+     + '<div class="d-wert">'
+     + '<input type="number" id="archivJahrFeld" min="2000" max="2100" '
+     + 'placeholder="2021" style="max-width:110px">'
+     + '<button class="ms-wort" type="button" onclick="archivHolenAusFeld()">'
+     + 'Nachladen</button></div></div>';
+  h += '<div class="d-feld"><div class="d-name">Alles ab</div><div class="d-wert">'
+     + '<input type="number" id="archivVonFeld" min="2000" max="2100" '
+     + 'value="2021" style="max-width:110px">'
+     + '<button class="ms-wort" type="button" onclick="archivAlleHolen()">'
+     + 'Bis heute nachladen</button></div></div>';
+  var jNun = Number(isoDatum().slice(0, 4));
+  h += zeile('Laufendes Jahr',
+             (archivJahre.indexOf(jNun) >= 0) ? 'geladen' : 'noch nicht',
+             (archivJahre.indexOf(jNun) >= 0) ? '' : 'grau');
+  h += zeile('Nachgeladene Jahre', archivJahre.length ? archivJahre.join(', ') : 'keine',
+             archivJahre.length ? '' : 'grau');
+  h += zeile('Termine daraus', archivLaeuft ? 'wird geholt …' : String(archivZahl()),
+             archivZahl() ? '' : 'grau');
+  if (archivFehler) { h += zeile('Letzter Fehler', esc(archivFehler), 'nein'); }
+  if (archivJahre.length) {
+    h += '<div class="d-reihe"><button type="button" onclick="archivLeeren()">'
+       + 'Verwerfen</button></div>';
+  }
+  ziel.innerHTML = h;
 }
 
 function einenKalenderHolen(kal, von, bis) {
@@ -11890,6 +12107,7 @@ function starten() {
     }
     bestandStempeln(DB);
     darstellungAnwenden();
+    jahrTaktStarten();
     wochenUmstellen();
     faelligeStarten();
     tagOffen = isoDatum();

@@ -536,6 +536,32 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__archivApi = {'
+                 + ' pruefeArchiv: function(){'
+                 + '   var merk = termineNachTag;'
+                 + '   var merkA = archivNachTag;'
+                 + '   termineNachTag = { \'2026-09-15\': ['
+                 + '     { id:\'f1\', titel:\'heute frisch\' }] };'
+                 + '   archivNachTag = {'
+                 + '     \'2026-09-15\': [{ id:\'a0\', titel:\'alt\' }],'
+                 + '     \'2021-03-02\': [{ id:\'a1\', titel:\'alt 1\' },'
+                 + '                      { id:\'a2\', titel:\'alt 2\' }],'
+                 + '     \'2021-04-05\': [{ id:\'a3\', titel:\'alt 3\' }] };'
+                 + '   archivEinhaengen();'
+                 + '   var r = { eingehaengt: Object.keys(termineNachTag).length - 1,'
+                 + '             frischesBleibt: termineNachTag[\'2026-09-15\'][0].titel,'
+                 + '             zahl: archivZahl() };'
+                 + '   archivNachTag = {};'
+                 + '   r.nachLeeren = archivZahl();'
+                 + '   archivNachTag = { \'2021-03-02\': ['
+                 + '     { id:\'x\', titel:\'alt\' }] };'
+                 + '   archivJahre = [2021];'
+                 + '   /* Ein erneuter Lauf desselben Jahres darf nicht anhäufen. */'
+                 + '   var vorher = Object.keys(archivNachTag).length;'
+                 + '   r.jahrErsetzt = vorher;'
+                 + '   termineNachTag = merk; archivNachTag = merkA;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__artZeigenApi = {'
                  + ' pruefeArtZeigen: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -6896,6 +6922,84 @@ console.log('\n86. Art im Tagesplan');
     pruefe(e.ohneArt === '', 'ein Termin ohne Kürzel bekommt kein Etikett');
     pruefe(e.mitJ === true,
            'ist die Art fürs Jahr freigegeben, steht das dabei');
+  }
+}
+
+/* ============================================================
+   87. Ein Jahr nachladen
+   Grund: Das gewoehnliche Fenster reicht drei Wochen zurueck. Wer
+   Altes nachtragen will, braucht mehr — aber nicht dauerhaft: Fuenf
+   Jahre bei jedem Abruf waeren eine Zumutung fuer Netz und Speicher.
+   Deshalb wird ein Jahr einmal geholt und danebengelegt.
+   ============================================================ */
+console.log('\n87. Nachladen alter Jahre');
+{
+  const skript = hauptSkript();
+  const a = globalThis.__archivApi;
+
+  ['archivEinhaengen', 'archivJahrHolen', 'archivHolenAusFeld', 'archivLeeren',
+   'archivZahl', 'zeichneArchiv'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const ein = skript.match(/function archivEinhaengen\([\s\S]*?\n\}/);
+  pruefe(ein && /if \(termineNachTag\[tag\]\) \{ continue/.test(ein[0]),
+         'frisch Geholtes hat Vorrang vor dem Nachgeladenen');
+
+  const th = skript.match(/function termineHolen\([\s\S]*?\n\}\n/);
+  pruefe(th && /archivEinhaengen\(\)/.test(th[0]),
+         'nachgeladene Jahre überleben den regelmäßigen Abruf');
+
+  const hol = skript.match(/function archivJahrHolen\([\s\S]*?\n\}\n/);
+  pruefe(hol && /var merk = termineNachTag/.test(hol[0]),
+         'der laufende Bestand wird beiseitegelegt und danach zurückgeholt');
+  pruefe(hol && /j < 2000 \|\| j > 2100/.test(hol[0]),
+         'eine unsinnige Jahreszahl wird abgewiesen');
+  pruefe(hol && /nicht gesichert/.test(hol[0]),
+         'es steht dabei, dass nichts gesichert wird');
+  pruefe(!/archivNachTag/.test(skript.match(/function bestandZuText\([\s\S]*?\n\}/)
+         ? skript.match(/function bestandZuText\([\s\S]*?\n\}/)[0] : ''),
+         'das Nachgeladene kommt nicht in die Datei');
+  pruefe(!/'archiv/.test(skript.match(/var SAMMLUNGEN = \[[\s\S]*?\];/)[0]),
+         'und ist keine Sammlung, die abgeglichen wird');
+
+  if (!a) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = a.pruefeArchiv();
+    pruefe(e.eingehaengt === 2, 'nachgeladene Tage kommen hinzu');
+    pruefe(e.frischesBleibt === 'heute frisch',
+           'ein Tag, den der laufende Abruf kennt, bleibt unangetastet');
+    pruefe(e.zahl === 4,
+           'die Zahl der nachgeladenen Termine stimmt — auch der Tag, den der '
+           + 'laufende Abruf überdeckt, bleibt im Nachgeladenen erhalten');
+    pruefe(e.nachLeeren === 0, 'Verwerfen räumt sie weg');
+    pruefe(e.jahrErsetzt === 1,
+           'ein Jahr, das erneut geholt wird, ersetzt den alten Stand');
+  }
+
+  /* Das laufende Jahr kommt von selbst */
+  ['laufendesJahrHolen', 'jahrTaktStarten', 'archivAlleHolen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const lj = skript.match(/function laufendesJahrHolen\([\s\S]*?\n\}/);
+  pruefe(lj && /archivJahre\.indexOf\(j\) >= 0 && frisch/.test(lj[0]),
+         'ein frisch geholtes Jahr wird nicht noch einmal geholt');
+  const th2 = skript.match(/function termineHolen\([\s\S]*?\n\}\n/);
+  pruefe(th2 && /laufendesJahrHolen\(false\)/.test(th2[0]),
+         'erst das kleine Fenster, dann das Jahr — der Tag steht sofort da');
+  pruefe(/JAHR_TAKT = 60 \* 60 \* 1000/.test(skript),
+         'nachgezogen wird stündlich, nicht im Zweiminutentakt');
+  const aa = skript.match(/function archivAlleHolen\([\s\S]*?\n\}\n/);
+  pruefe(aa && /reihe = reihe\.then/.test(aa[0]),
+         'die Jahre werden der Reihe nach geholt, nicht alle auf einmal');
+  pruefe(aa && /von > bis/.test(aa[0]),
+         'ein Startjahr in der Zukunft wird abgewiesen');
+  const st = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(st && /jahrTaktStarten\(\)/.test(st[0]), 'der Takt läuft ab dem Start');
+  {
   }
 }
 
