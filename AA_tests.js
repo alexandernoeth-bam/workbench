@@ -536,6 +536,45 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__doppelApi = {'
+                 + ' pruefeDoppel: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Familie\' }];'
+                 + '   termineNachTag = {};'
+                 + '   eintraegeEinsortieren(['
+                 + '     { id:\'g1\', summary:\'Geburtstag Brigitte Gräf\','
+                 + '       start:{ date:\'2026-09-20\' },'
+                 + '       end:{ date:\'2026-09-21\' } },'
+                 + '     { id:\'g2\', summary:\'Zahnarzt Müller\','
+                 + '       start:{ date:\'2026-09-20\' },'
+                 + '       end:{ date:\'2026-09-21\' } } ],'
+                 + '     \'Familie\', \'privat\');'
+                 + '   DB.jahrestermine = ['
+                 + '     { id:\'e1\', titel:\'Brigitte Gräf\', art:\'geburtstag\','
+                 + '       von:\'2026-09-20\', bis:\'2026-09-20\', jaehrlich:false },'
+                 + '     { id:\'e2\', titel:\'Urlaub Kreta\', art:\'urlaub\','
+                 + '       von:\'2026-09-20\', bis:\'2026-09-20\', jaehrlich:false },'
+                 + '     { id:\'e3\', titel:\'Brigitte Gräf\', art:\'geburtstag\','
+                 + '       von:\'2026-11-11\', bis:\'2026-11-11\', jaehrlich:false } ];'
+                 + '   var l = jtAn(\'2026-09-20\', true);'
+                 + '   var titel = l.map(function(x){ return x.titel; });'
+                 + '   var r = {'
+                 + '     erkannt: jtDoppelt({ titel:\'Geburtstag Brigitte Gräf\' },'
+                 + '                        { titel:\'Brigitte Gräf\' }),'
+                 + '     fremdNicht: jtDoppelt({ titel:\'Geburtstag Brigitte Gräf\' },'
+                 + '                           { titel:\'Urlaub Kreta\' }),'
+                 + '     gezeigt: l.length,'
+                 + '     kalenderBleibt: (titel.indexOf(\'Geburtstag Brigitte Gräf\')'
+                 + '       >= 0),'
+                 + '     eigenerWeg: l.every(function(x){'
+                 + '       return !(x.titel === \'Brigitte Gräf\' && !x.ausKalender); }),'
+                 + '     andererBleibt: (titel.indexOf(\'Urlaub Kreta\') >= 0),'
+                 + '     summen: jahrestermineUndKalender(2026).length };'
+                 + '   r.andererTagBleibt = jahrestermineUndKalender(2026)'
+                 + '     .some(function(x){ return x.von === \'2026-11-11\'; });'
+                 + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__archivApi = {'
                  + ' pruefeArchiv: function(){'
                  + '   var merk = termineNachTag;'
@@ -7000,6 +7039,59 @@ console.log('\n87. Nachladen alter Jahre');
   const st = skript.match(/function starten\(\)[\s\S]*?\n\}/);
   pruefe(st && /jahrTaktStarten\(\)/.test(st[0]), 'der Takt läuft ab dem Start');
   {
+  }
+}
+
+/* ============================================================
+   88. Derselbe Anlass nur einmal
+   Grund: Ein Geburtstag steht oft zweimal da — einmal im Google-
+   Kalender, einmal als eigener Jahrestermin. Beides nebeneinander
+   macht das Raster unleserlich und die Summen falsch.
+   ============================================================ */
+console.log('\n88. Doppelte Jahrestermine');
+{
+  const skript = hauptSkript();
+  const d = globalThis.__doppelApi;
+
+  ['jtDoppelt', 'jtEntdoppeln'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const dd = skript.match(/function jtDoppelt\([\s\S]*?\n\}/);
+  pruefe(dd && /aehnlichkeit\(/.test(dd[0]),
+         'verglichen wird über Wortstämme, nicht über Zeichenketten');
+  const ed = skript.match(/function jtEntdoppeln\([\s\S]*?\n\}\n/);
+  pruefe(ed && /var aus = ausKal\.slice\(\)/.test(ed[0]),
+         'der Eintrag aus dem Kalender bleibt — dort wird gepflegt');
+  pruefe(ed && /!ausKal\.length \|\| !eigene\.length\) \{ return liste/.test(ed[0]),
+         'ohne beide Quellen wird nichts angefasst');
+  pruefe(ed && /jtDoppelZahl\+\+/.test(ed[0]),
+         'die Zahl der Ausgeblendeten wird mitgezählt');
+  pruefe(/Doppelte heute ausgeblendet/.test(skript),
+         'und in der Diagnose gezeigt — nichts verschwindet stillschweigend');
+
+  const juk = skript.match(/function jahrestermineUndKalender\([\s\S]*?\n\}\n/);
+  pruefe(juk && /ausKal\[k\]\.von !== von/.test(juk[0]),
+         'in den Summen zählt nur als doppelt, was am selben Tag liegt');
+
+  if (!d) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = d.pruefeDoppel();
+    pruefe(e.erkannt === true,
+           '„Geburtstag Brigitte Gräf" und „Brigitte Gräf" gelten als dasselbe');
+    pruefe(e.fremdNicht === false, 'zwei verschiedene Anlässe nicht');
+    pruefe(e.gezeigt === 3, 'am Tag stehen drei statt vier Einträge');
+    pruefe(e.kalenderBleibt === true, 'der aus dem Kalender bleibt');
+    pruefe(e.eigenerWeg === true, 'der eigene tritt zurück');
+    pruefe(e.andererBleibt === true,
+           'ein eigener ohne Gegenstück bleibt unangetastet');
+    pruefe(e.summen === 4,
+           'die Summen zählen den doppelten nur einmal: zwei aus dem Kalender, '
+           + 'der Urlaub und der Geburtstag im November');
+    pruefe(e.andererTagBleibt === true,
+           'derselbe Name an einem anderen Tag ist kein Doppel');
   }
 }
 

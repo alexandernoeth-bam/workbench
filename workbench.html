@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.80.0</title>
+<title>Workbench 0.81.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1284,7 +1284,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.80.0';
+var APP_VERSION = '0.81.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5726,6 +5726,10 @@ function zeichneArchiv() {
      + 'value="2021" style="max-width:110px">'
      + '<button class="ms-wort" type="button" onclick="archivAlleHolen()">'
      + 'Bis heute nachladen</button></div></div>';
+  jtDoppelZahl = 0;
+  jtAn(isoDatum(), true);
+  h += zeile('Doppelte heute ausgeblendet', String(jtDoppelZahl),
+             jtDoppelZahl ? '' : 'grau');
   var jNun = Number(isoDatum().slice(0, 4));
   h += zeile('Laufendes Jahr',
              (archivJahre.indexOf(jNun) >= 0) ? 'geladen' : 'noch nicht',
@@ -6565,6 +6569,42 @@ function fensterPruefenFuer(is) {
    Jahrestermine
    ------------------------------------------------------------ */
 
+/* Derselbe Anlass steht oft zweimal da: einmal im Google-Kalender,
+   einmal als eigener Jahrestermin. Beides nebeneinander macht das
+   Jahresraster unleserlich und die Summen falsch.
+
+   Verglichen wird wie bei den Aufgaben über Wortstämme — „Geburtstag
+   Brigitte Gräf" und „Brigitte Gräf" gelten als dasselbe. Stehen zwei
+   am selben Tag, bleibt der aus dem Kalender: Dort pflegst du sie, und
+   dort werden sie auch wieder geändert. */
+var jtDoppelZahl = 0;
+
+function jtDoppelt(a, b) {
+  return aehnlichkeit(a.titel || '', b.titel || '') >= 0.7;
+}
+
+function jtEntdoppeln(liste) {
+  var ausKal = [];
+  var eigene = [];
+  var i, j;
+  for (i = 0; i < liste.length; i++) {
+    if (liste[i].ausKalender) { ausKal.push(liste[i]); }
+    else { eigene.push(liste[i]); }
+  }
+  if (!ausKal.length || !eigene.length) { return liste; }
+
+  var aus = ausKal.slice();
+  for (i = 0; i < eigene.length; i++) {
+    var doppelt = false;
+    for (j = 0; j < ausKal.length; j++) {
+      if (jtDoppelt(eigene[i], ausKal[j])) { doppelt = true; break; }
+    }
+    if (doppelt) { jtDoppelZahl++; continue; }
+    aus.push(eigene[i]);
+  }
+  return aus;
+}
+
 function jtAn(is, mitZeit) {
   var treffer = kalenderJahrestermine(is, mitZeit);
   var liste = DB.jahrestermine || [];
@@ -6579,7 +6619,7 @@ function jtAn(is, mitZeit) {
     }
     if (is >= von && is <= bis) { treffer.push(e); }
   }
-  return treffer;
+  return jtEntdoppeln(treffer);
 }
 
 /* Ein Kürzel von drei Zeichen. Ein vorangestelltes Gattungswort
@@ -7408,7 +7448,7 @@ function feiertageImJahr(jahr) {
    einer Liste. Der Kalender ist nur für sein geholtes Fenster bekannt —
    weiter zurück oder voraus steht dort nichts. */
 function jahrestermineUndKalender(jahr) {
-  var aus = (DB.jahrestermine || []).slice();
+  var ausKal = [];
   var gesehen = {};
   var tag;
   for (tag in termineNachTag) {
@@ -7421,8 +7461,23 @@ function jahrestermineUndKalender(jahr) {
     for (i = 0; i < l.length; i++) {
       if (gesehen[l[i].id]) { continue; }
       gesehen[l[i].id] = true;
-      aus.push(l[i]);
+      ausKal.push(l[i]);
     }
+  }
+
+  /* Hier wird tagweise entdoppelt: Zwei gleichnamige Einträge zählen
+     nur einmal, aber nur wenn sie auch am selben Tag liegen. */
+  var aus = ausKal.slice();
+  var eigene = DB.jahrestermine || [];
+  var e, k;
+  for (e = 0; e < eigene.length; e++) {
+    var von = eigene[e].jaehrlich ? (jahr + eigene[e].von.slice(4)) : eigene[e].von;
+    var doppelt = false;
+    for (k = 0; k < ausKal.length; k++) {
+      if (ausKal[k].von !== von) { continue; }
+      if (jtDoppelt(eigene[e], ausKal[k])) { doppelt = true; break; }
+    }
+    if (!doppelt) { aus.push(eigene[e]); }
   }
   return aus;
 }
