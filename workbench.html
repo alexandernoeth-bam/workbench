@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.82.1</title>
+<title>Workbench 0.83.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1284,7 +1284,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.82.1';
+var APP_VERSION = '0.83.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -6693,8 +6693,23 @@ function jtFarbe(e) {
 /* Ein Jahrestermin aus dem Kalender kann einem Projekt gehören — dann
    gilt der Projektfilter auch für ihn. Ein eigener Jahrestermin gehört
    keinem und tritt zurück, sobald ein Projekt gewählt ist. */
+/* Termine ohne Kürzel füllen das Jahresraster, ohne etwas zu sagen.
+   Wer sie nicht sehen will, blendet sie aus — die Wahl steht in der
+   Summenliste, damit man sie dort findet, wo die Zahl steht. */
+function ohneArtZeigen() {
+  return DB.einstellungen.ohneArtAus !== true;
+}
+
+function ohneArtUm() {
+  DB.einstellungen.ohneArtAus = ohneArtZeigen();
+  spaeterSichern();
+  kalZeichnen();
+  zeichne();
+}
+
 function jtPasst(e) {
   if (!passtZumKalender(jtKontext(e))) { return false; }
+  if (!(e.art || '') && !ohneArtZeigen()) { return false; }
   if (jahrFilter === null) { return true; }
   if (jahrFilter === 'ferien' || jahrFilter === 'feiertage') { return false; }
   return (e.art || '') === jahrFilter;
@@ -7341,7 +7356,11 @@ function jahrHtml(is) {
     summen[art].tage += tage;
   }
 
-  h += '<div class="gruppenkopf"><span>Summe je Art</span></div>';
+  h += '<div class="gruppenkopf"><span>Summe je Art</span>'
+     + '<button class="kpf-knopf' + (ohneArtZeigen() ? '' : ' an') + '" '
+     + 'type="button" onclick="ohneArtUm()" '
+     + 'title="Termine ohne Kürzel im Raster zeigen oder ausblenden">'
+     + (ohneArtZeigen() ? 'ohne Art zeigen' : 'ohne Art aus') + '</button></div>';
   var reihe = arten.slice();
   reihe.push('');
   var gesamtN = 0, gesamtT = 0;

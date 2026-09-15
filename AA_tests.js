@@ -536,6 +536,36 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__ohneArtApi = {'
+                 + ' pruefeOhneArt: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   eintraegeEinsortieren(['
+                 + '     { id:\'u1\', summary:\'Urlaub #Urlaub\','
+                 + '       start:{ date:\'2026-09-20\' },'
+                 + '       end:{ date:\'2026-09-21\' } },'
+                 + '     { id:\'x1\', summary:\'Irgendwas\','
+                 + '       start:{ date:\'2026-09-21\' },'
+                 + '       end:{ date:\'2026-09-22\' } },'
+                 + '     { id:\'x2\', summary:\'Noch was\','
+                 + '       start:{ date:\'2026-09-22\' },'
+                 + '       end:{ date:\'2026-09-23\' } } ],'
+                 + '     \'Alex\', \'privat\');'
+                 + '   var belegte = function(){'
+                 + '     var h = jahrHtml(\'2026-09-01\');'
+                 + '     var m = h.match(/jtTagOeffnen\\(\'[^\']+\'\\)"[^>]*>'
+                 + '<span class="jzelle"><span class="jwt">[^<]*<\\/span>'
+                 + '<span class="jbalken"><i /g);'
+                 + '     return m ? m.length : 0; };'
+                 + '   var r = { mit: belegte() };'
+                 + '   ohneArtUm();'
+                 + '   r.ohne = belegte();'
+                 + '   ohneArtUm();'
+                 + '   r.zurueck = belegte();'
+                 + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__doppelApi = {'
                  + ' pruefeDoppel: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -7080,6 +7110,27 @@ console.log('\n88. Doppelte Jahrestermine');
          'die Zahl der Ausgeblendeten wird mitgezählt');
   pruefe(/Doppelte heute ausgeblendet/.test(skript),
          'und in der Diagnose gezeigt — nichts verschwindet stillschweigend');
+
+  /* Termine ohne Kürzel lassen sich ausblenden */
+  ['ohneArtZeigen', 'ohneArtUm'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const jp2 = skript.match(/function jtPasst\([\s\S]*?\n\}/);
+  pruefe(jp2 && /!\(e\.art \|\| ''\) && !ohneArtZeigen\(\)/.test(jp2[0]),
+         'ohne Kürzel fällt der Termin heraus, wenn man es so will');
+  const oz = skript.match(/function ohneArtZeigen\([\s\S]*?\n\}/);
+  pruefe(oz && /!== true/.test(oz[0]),
+         'voreingestellt werden sie gezeigt — ausblenden ist die Ausnahme');
+  pruefe(/ohne Art zeigen/.test(skript) && /ohne Art aus/.test(skript),
+         'der Knopf steht bei der Summenliste, wo die Zahl dazu steht');
+
+  if (globalThis.__ohneArtApi) {
+    const o = globalThis.__ohneArtApi.pruefeOhneArt();
+    pruefe(o.mit === 3, 'mit ihnen sind drei Tage belegt');
+    pruefe(o.ohne === 1, 'ohne sie nur der eine mit Kürzel');
+    pruefe(o.zurueck === 3, 'das Umschalten lässt sich zurücknehmen');
+  }
 
   const juk = skript.match(/function jahrestermineUndKalender\([\s\S]*?\n\}\n/);
   pruefe(juk && /ausKal\[k\]\.von !== mitTag\[e\]\.von/.test(juk[0]),
