@@ -540,6 +540,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
                  + 'globalThis.__farbApi = {'
+                 + ' nachtPapier: FARBWELTEN.nacht.werte[\'--papier\'],'
                  + ' pruefeFarben: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
                  + '   var noetig = [\'--papier\', \'--karte\', \'--tinte\','
@@ -564,6 +565,17 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.nachtIstDunkel = (hell(FARBWELTEN.nacht.werte[\'--papier\'])'
                  + '     < hell(FARBWELTEN.nacht.werte[\'--tinte\']));'
                  + '   r.gesichert = (DB.einstellungen.farbwelt === \'nacht\');'
+                 + '   var hell2 = function(h){'
+                 + '     return parseInt(h.slice(1, 3), 16)'
+                 + '          + parseInt(h.slice(3, 5), 16)'
+                 + '          + parseInt(h.slice(5, 7), 16); };'
+                 + '   var genug = true;'
+                 + '   var w2;'
+                 + '   for (w2 in FARBWELTEN) {'
+                 + '     var d = Math.abs(hell2(FARBWELTEN[w2].werte[\'--papier\'])'
+                 + '                    - hell2(FARBWELTEN[w2].werte[\'--karte\']));'
+                 + '     if (d < 30) { genug = false; } }'
+                 + '   r.kontrast = genug;'
                  + '   DB.einstellungen.farbwelt = \'gibtsnicht\';'
                  + '   r.unbekannteFaelltZurueck = farbweltName();'
                  + '   DB = alt;'
@@ -7204,6 +7216,10 @@ console.log('\n89. Farbwelten');
 {
   const skript = hauptSkript();
   const f = globalThis.__farbApi;
+  /* Die Werte selbst dürfen sich ändern — geprüft wird, dass sie
+     durchgereicht werden, nicht welcher Ton gerade gilt. */
+  const FARBWELT_NACHT_PAPIER = (globalThis.__farbApi
+    && globalThis.__farbApi.nachtPapier) || '';
 
   ['farbweltName', 'farbweltAnwenden', 'farbweltSetzen', 'zeichneFarbwelt']
     .forEach(function (fn) {
@@ -7232,13 +7248,17 @@ console.log('\n89. Farbwelten');
     pruefe(e.alleVollstaendig === true,
            'jede Welt setzt alle acht Grundfarben — eine fehlende bliebe sonst '
            + 'aus der vorigen stehen');
-    pruefe(e.gesetzt === '#1B1D21', 'die Wahl wirkt sofort');
-    pruefe(e.leiste === '#1B1D21', 'und färbt die Fensterleiste mit');
+    pruefe(e.gesetzt === FARBWELT_NACHT_PAPIER,
+           'die Wahl wirkt sofort (ist: ' + e.gesetzt + ')');
+    pruefe(e.leiste === e.gesetzt, 'und färbt die Fensterleiste mit');
     pruefe(e.unbekannteFaelltZurueck === 'papier',
            'eine unbekannte Welt fällt auf Papier zurück');
     pruefe(e.nachtIstDunkel === true,
            'bei Nacht ist der Grund dunkler als die Schrift');
     pruefe(e.gesichert === true, 'die Wahl wird gesichert und abgeglichen');
+    pruefe(e.kontrast === true,
+           'in jeder Welt hebt sich die Fläche der Knöpfe vom Grund ab — sonst '
+           + 'verschwinden sie darin');
   }
 }
 
