@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.77.1</title>
+<title>Workbench 0.78.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -529,6 +529,7 @@ td.jleer{background:transparent;border-color:transparent}
 td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
 .jpunkt{position:absolute;right:2px;top:2px;width:4px;height:4px;border-radius:50%;
   background:var(--grau);z-index:3}
+.jmehr{background:var(--grau-hell);color:var(--papier);font-weight:500}
 .jbalken{flex:1;min-width:0;display:flex;gap:1px}
 .jbalken i{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;
   font-style:normal;font-size:calc(var(--fs)*0.5);color:rgba(255,255,255,.95);
@@ -1280,7 +1281,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.77.1';
+var APP_VERSION = '0.78.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -7008,10 +7009,16 @@ function jahrHtml(is) {
       var inhalt = '<span class="jzelle">';
       inhalt += '<span class="jwt">' + TAGE_KURZ[d.getDay()] + '</span>';
       inhalt += '<span class="jbalken">';
+      /* Vier statt drei, und was darüber hinausgeht, wird als Zahl
+         angedeutet — sonst verschwindet ein Termin lautlos. */
       var b;
-      for (b = 0; b < Math.min(treffer.length, 3); b++) {
+      var zeigbar = Math.min(treffer.length, 4);
+      for (b = 0; b < zeigbar; b++) {
         inhalt += '<i style="background:' + jtFarbe(treffer[b]) + '">'
                 + esc(jtKuerzel(treffer[b])) + '</i>';
+      }
+      if (treffer.length > zeigbar) {
+        inhalt += '<i class="jmehr">+' + (treffer.length - zeigbar) + '</i>';
       }
       inhalt += '</span></span>';
       if (feiertagAn(iso)) { inhalt += '<span class="jpunkt"></span>'; }
@@ -7190,7 +7197,9 @@ function jahrestermineUndKalender(jahr) {
   for (tag in termineNachTag) {
     if (!Object.prototype.hasOwnProperty.call(termineNachTag, tag)) { continue; }
     if (tag.slice(0, 4) !== String(jahr)) { continue; }
-    var l = kalenderJahrestermine(tag);
+    /* Mit Uhrzeit — sonst zählt die Summenliste anders als das Raster
+       darüber, und eine freigegebene Art fehlt dort ganz. */
+    var l = kalenderJahrestermine(tag, true);
     var i;
     for (i = 0; i < l.length; i++) {
       if (gesehen[l[i].id]) { continue; }

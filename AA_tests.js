@@ -645,6 +645,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   artImJahrUm(\'treffen\');'
                  + '   var mit = jtAn(\'2026-09-20\', true);'
                  + '   r.imTagNurGanztags = jtAn(\'2026-09-20\').length;'
+                 + '   r.summenMitZeit = jahrestermineUndKalender(2026)'
+                 + '     .filter(function(x){ return x.ausKalender; }).length;'
                  + '   r.mitWahl = mit.length;'
                  + '   r.ganztaegigZuerst = (function(){'
                  + '     var s = mit.slice();'
@@ -6723,6 +6725,15 @@ console.log('\n83. Arten im Jahresraster');
   const jh2 = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
   pruefe(jh2 && /jtAn\(iso, true\)/.test(jh2[0]),
          'allein das Jahresraster fragt danach');
+  const juk = skript.match(/function jahrestermineUndKalender\([\s\S]*?\n\}/);
+  pruefe(juk && /kalenderJahrestermine\(tag, true\)/.test(juk[0]),
+         'die Summenliste rechnet wie das Raster darüber — sonst fehlt dort '
+         + 'eine freigegebene Art ganz');
+  pruefe(jh2 && /Math\.min\(treffer\.length, 4\)/.test(jh2[0]),
+         'vier Zeichen passen in eine Zelle');
+  pruefe(jh2 && /jmehr/.test(jh2[0]),
+         'was darüber hinausgeht, wird als Zahl angedeutet — sonst verschwindet '
+         + 'ein Termin lautlos');
   ['tagesEintraege', 'urlaubAn', 'wocheHtml', 'monatHtml'].forEach(function (f) {
     const b = skript.match(new RegExp('function ' + f + '\\([\\s\\S]*?\\n\\}'));
     pruefe(b && !/jtAn\([^)]*,\s*true\)/.test(b[0]),
@@ -6754,6 +6765,8 @@ console.log('\n83. Arten im Jahresraster');
     pruefe(e.zurueckgenommen === 1, 'die Wahl lässt sich zurücknehmen');
     pruefe(e.ganztaegigZuerst === true,
            'am selben Tag steht das Ganztägige vorn');
+    pruefe(e.summenMitZeit === 2,
+           'die Summenliste zählt den Termin mit Uhrzeit mit');
     pruefe(e.imTagNurGanztags === 1,
            'in der Tagesansicht bleibt es bei den ganztägigen');
     pruefe(e.treffenInListe === true,
