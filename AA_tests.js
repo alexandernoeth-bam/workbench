@@ -564,14 +564,17 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     fremdNicht: jtDoppelt({ titel:\'Geburtstag Brigitte Gräf\' },'
                  + '                           { titel:\'Urlaub Kreta\' }),'
                  + '     gezeigt: l.length,'
-                 + '     kalenderBleibt: (titel.indexOf(\'Geburtstag Brigitte Gräf\')'
-                 + '       >= 0),'
-                 + '     eigenerWeg: l.every(function(x){'
-                 + '       return !(x.titel === \'Brigitte Gräf\' && !x.ausKalender); }),'
+                 + '     eigenerBleibt: (titel.indexOf(\'Brigitte Gräf\') >= 0),'
+                 + '     kalenderWeg: l.every(function(x){'
+                 + '       return x.titel !== \'Geburtstag Brigitte Gräf\'; }),'
                  + '     andererBleibt: (titel.indexOf(\'Urlaub Kreta\') >= 0),'
                  + '     summen: jahrestermineUndKalender(2026).length };'
                  + '   r.andererTagBleibt = jahrestermineUndKalender(2026)'
                  + '     .some(function(x){ return x.von === \'2026-11-11\'; });'
+                 + '   DB.einstellungen.doppelBehalten = \'kalender\';'
+                 + '   r.umgekehrt = jtAn(\'2026-09-20\', true).some(function(x){'
+                 + '     return x.titel === \'Geburtstag Brigitte Gräf\'; });'
+                 + '   DB.einstellungen.doppelBehalten = \'eigene\';'
                  + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
                  + '   return r;'
                  + ' } };'
@@ -7062,8 +7065,15 @@ console.log('\n88. Doppelte Jahrestermine');
   pruefe(dd && /aehnlichkeit\(/.test(dd[0]),
          'verglichen wird über Wortstämme, nicht über Zeichenketten');
   const ed = skript.match(/function jtEntdoppeln\([\s\S]*?\n\}\n/);
-  pruefe(ed && /var aus = ausKal\.slice\(\)/.test(ed[0]),
-         'der Eintrag aus dem Kalender bleibt — dort wird gepflegt');
+  pruefe(ed && /var behalten = /.test(ed[0]) && /var weichen = /.test(ed[0]),
+         'welcher bleibt, steht zur Wahl');
+  pruefe(ed && /raus\.indexOf\(liste\[i\]\) < 0/.test(ed[0]),
+         'die ursprüngliche Reihenfolge bleibt — sonst spränge die Anzeige beim '
+         + 'Umschalten herum');
+  const wahl = skript.match(/function jtDoppelWahl\([\s\S]*?\n\}/);
+  pruefe(wahl && /\? 'kalender' : 'eigene'/.test(wahl[0]),
+         'voreingestellt bleibt der eigene — er trägt die Art, die man ihm '
+         + 'gegeben hat');
   pruefe(ed && /!ausKal\.length \|\| !eigene\.length\) \{ return liste/.test(ed[0]),
          'ohne beide Quellen wird nichts angefasst');
   pruefe(ed && /jtDoppelZahl\+\+/.test(ed[0]),
@@ -7072,8 +7082,10 @@ console.log('\n88. Doppelte Jahrestermine');
          'und in der Diagnose gezeigt — nichts verschwindet stillschweigend');
 
   const juk = skript.match(/function jahrestermineUndKalender\([\s\S]*?\n\}\n/);
-  pruefe(juk && /ausKal\[k\]\.von !== von/.test(juk[0]),
+  pruefe(juk && /ausKal\[k\]\.von !== mitTag\[e\]\.von/.test(juk[0]),
          'in den Summen zählt nur als doppelt, was am selben Tag liegt');
+  pruefe(juk && /jtDoppelWahl\(\)/.test(juk[0]),
+         'die Summen folgen derselben Wahl wie das Raster');
 
   if (!d) {
     warn('Funktionen nicht auswertbar');
@@ -7083,8 +7095,11 @@ console.log('\n88. Doppelte Jahrestermine');
            '„Geburtstag Brigitte Gräf" und „Brigitte Gräf" gelten als dasselbe');
     pruefe(e.fremdNicht === false, 'zwei verschiedene Anlässe nicht');
     pruefe(e.gezeigt === 3, 'am Tag stehen drei statt vier Einträge');
-    pruefe(e.kalenderBleibt === true, 'der aus dem Kalender bleibt');
-    pruefe(e.eigenerWeg === true, 'der eigene tritt zurück');
+    pruefe(e.eigenerBleibt === true,
+           'voreingestellt bleibt der eigene Eintrag mit seiner Art');
+    pruefe(e.kalenderWeg === true, 'der aus dem Kalender tritt zurück');
+    pruefe(e.umgekehrt === true,
+           'umgeschaltet bleibt stattdessen der aus dem Kalender');
     pruefe(e.andererBleibt === true,
            'ein eigener ohne Gegenstück bleibt unangetastet');
     pruefe(e.summen === 4,

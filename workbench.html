@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.81.0</title>
+<title>Workbench 0.82.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1284,7 +1284,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.81.0';
+var APP_VERSION = '0.82.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5726,6 +5726,9 @@ function zeichneArchiv() {
      + 'value="2021" style="max-width:110px">'
      + '<button class="ms-wort" type="button" onclick="archivAlleHolen()">'
      + 'Bis heute nachladen</button></div></div>';
+  h += zeileWahl('Bei Doppelten behalten',
+                 [['eigene', 'die eigenen'], ['kalender', 'die aus dem Kalender']],
+                 jtDoppelWahl(), 'jtDoppelWahlSetzen');
   jtDoppelZahl = 0;
   jtAn(isoDatum(), true);
   h += zeile('Doppelte heute ausgeblendet', String(jtDoppelZahl),
@@ -6574,10 +6577,24 @@ function fensterPruefenFuer(is) {
    Jahresraster unleserlich und die Summen falsch.
 
    Verglichen wird wie bei den Aufgaben über Wortstämme — „Geburtstag
-   Brigitte Gräf" und „Brigitte Gräf" gelten als dasselbe. Stehen zwei
-   am selben Tag, bleibt der aus dem Kalender: Dort pflegst du sie, und
-   dort werden sie auch wieder geändert. */
+   Brigitte Gräf" und „Brigitte Gräf" gelten als dasselbe.
+
+   Welcher bleibt, entscheidest du. Voreingestellt bleibt der eigene:
+   Er trägt die Art, die du ihm gegeben hast, und geht beim Entdoppeln
+   sonst samt Zuordnung verloren. */
 var jtDoppelZahl = 0;
+
+function jtDoppelWahl() {
+  return (DB.einstellungen.doppelBehalten === 'kalender') ? 'kalender' : 'eigene';
+}
+
+function jtDoppelWahlSetzen(wert) {
+  DB.einstellungen.doppelBehalten = wert;
+  spaeterSichern();
+  kalZeichnen();
+  tagZeichnen();
+  zeichne();
+}
 
 function jtDoppelt(a, b) {
   return aehnlichkeit(a.titel || '', b.titel || '') >= 0.7;
@@ -6593,14 +6610,27 @@ function jtEntdoppeln(liste) {
   }
   if (!ausKal.length || !eigene.length) { return liste; }
 
-  var aus = ausKal.slice();
-  for (i = 0; i < eigene.length; i++) {
-    var doppelt = false;
-    for (j = 0; j < ausKal.length; j++) {
-      if (jtDoppelt(eigene[i], ausKal[j])) { doppelt = true; break; }
+  var behalten = (jtDoppelWahl() === 'kalender') ? ausKal : eigene;
+  var weichen = (jtDoppelWahl() === 'kalender') ? eigene : ausKal;
+
+  /* Die weichenden werden vermerkt, dann wird die ursprüngliche Liste
+     gefiltert — so bleibt die Reihenfolge, wie sie war. Sonst spränge
+     die Anzeige beim Umschalten der Wahl herum. */
+  var raus = [];
+  for (i = 0; i < weichen.length; i++) {
+    for (j = 0; j < behalten.length; j++) {
+      if (jtDoppelt(weichen[i], behalten[j])) {
+        raus.push(weichen[i]);
+        jtDoppelZahl++;
+        break;
+      }
     }
-    if (doppelt) { jtDoppelZahl++; continue; }
-    aus.push(eigene[i]);
+  }
+  if (!raus.length) { return liste; }
+
+  var aus = [];
+  for (i = 0; i < liste.length; i++) {
+    if (raus.indexOf(liste[i]) < 0) { aus.push(liste[i]); }
   }
   return aus;
 }
@@ -7465,21 +7495,39 @@ function jahrestermineUndKalender(jahr) {
     }
   }
 
-  /* Hier wird tagweise entdoppelt: Zwei gleichnamige Einträge zählen
-     nur einmal, aber nur wenn sie auch am selben Tag liegen. */
-  var aus = ausKal.slice();
-  var eigene = DB.jahrestermine || [];
+  /* Tagweise entdoppelt, und nach derselben Wahl wie im Raster. */
+  var eigene = (DB.jahrestermine || []).slice();
+  var mitTag = [];
   var e, k;
   for (e = 0; e < eigene.length; e++) {
     var von = eigene[e].jaehrlich ? (jahr + eigene[e].von.slice(4)) : eigene[e].von;
-    var doppelt = false;
-    for (k = 0; k < ausKal.length; k++) {
-      if (ausKal[k].von !== von) { continue; }
-      if (jtDoppelt(eigene[e], ausKal[k])) { doppelt = true; break; }
-    }
-    if (!doppelt) { aus.push(eigene[e]); }
+    mitTag.push({ satz: eigene[e], von: von });
   }
-  return aus;
+
+  if (jtDoppelWahl() === 'kalender') {
+    var aus = ausKal.slice();
+    for (e = 0; e < mitTag.length; e++) {
+      var weg = false;
+      for (k = 0; k < ausKal.length; k++) {
+        if (ausKal[k].von !== mitTag[e].von) { continue; }
+        if (jtDoppelt(mitTag[e].satz, ausKal[k])) { weg = true; break; }
+      }
+      if (!weg) { aus.push(mitTag[e].satz); }
+    }
+    return aus;
+  }
+
+  var aus2 = [];
+  for (e = 0; e < mitTag.length; e++) { aus2.push(mitTag[e].satz); }
+  for (k = 0; k < ausKal.length; k++) {
+    var weg2 = false;
+    for (e = 0; e < mitTag.length; e++) {
+      if (ausKal[k].von !== mitTag[e].von) { continue; }
+      if (jtDoppelt(ausKal[k], mitTag[e].satz)) { weg2 = true; break; }
+    }
+    if (!weg2) { aus2.push(ausKal[k]); }
+  }
+  return aus2;
 }
 
 function jahrFilterSetzen(art) {
