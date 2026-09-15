@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.75.0</title>
+<title>Workbench 0.76.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -339,6 +339,9 @@ body.breit #seiteBlatt{display:grid;grid-template-columns:1.15fr 1fr;
 .tmeta .eilig{color:var(--weinrot);font-weight:500}
 
 .tverlauf{display:flex;gap:0;align-items:stretch}
+.t-art{display:inline-block;margin-left:7px;font-size:calc(var(--fs)*0.66);
+  border:1px solid var(--linie);border-radius:20px;padding:0 7px;
+  vertical-align:middle;white-space:nowrap}
 .tv-zeit{flex:0 0 52px;text-align:right;padding:8px 10px 8px 0;
   font-size:calc(var(--fs)*0.82);font-variant-numeric:tabular-nums}
 .tv-schiene{flex:0 0 1px;background:var(--linie);position:relative}
@@ -1277,7 +1280,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.75.0';
+var APP_VERSION = '0.76.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3253,9 +3256,16 @@ function tagesEintraege(is) {
   for (i = 0; i < ausGoogle.zeit.length; i++) {
     var g = ausGoogle.zeit[i];
     if (!passtZumTag(g.kontext)) { continue; }
+    /* Beschreibung und roher Titel müssen mit: In ihnen steht das
+       Kürzel, aus dem die Art gelesen wird. Ohne sie erkennt der
+       Tagesplan keine Art — und man sieht nicht, ob ein Kürzel
+       angekommen ist. */
     verlauf.push({ art: 'termin', zeit: g.zeit || '00:00',
                    t: { id: g.id, titel: g.titel, von: g.zeit, bis: g.bis, ort: g.ort,
-                        quelle: g.quelle, kontext: g.kontext, extern: true } });
+                        quelle: g.quelle, kontext: g.kontext,
+                        beschreibung: g.beschreibung || '',
+                        rohTitel: g.rohTitel || g.titel,
+                        serieId: g.serieId || '', extern: true } });
   }
 
   verlauf.sort(function (x, y) { return (x.zeit < y.zeit) ? -1 : ((x.zeit > y.zeit) ? 1 : 0); });
@@ -3379,7 +3389,17 @@ function verlaufHtml(eintrag, is) {
     var h = '<div class="tverlauf fest' + (t.kontext === 'privat' ? ' privat' : '')
           + (eintragVorbei(eintrag, is) ? ' vorbei' : '') + '">';
     h += '<div class="tv-zeit">' + esc(t.von || '') + '</div><div class="tv-schiene"></div>';
-    h += '<div class="tv-inhalt"><div class="ttitel">' + esc(t.titel) + '</div>';
+    h += '<div class="tv-inhalt"><div class="ttitel">' + esc(t.titel);
+    /* Die erkannte Art sichtbar machen: Sonst rätselt man, ob ein
+       Kürzel im Termin überhaupt angekommen ist. */
+    var tArt = t.id ? terminArt(t) : '';
+    if (tArt) {
+      h += '<span class="t-art" style="border-color:' + artFarbe(tArt) + ';color:'
+         + artFarbe(tArt) + '" title="Erkannte Art'
+         + (artImJahr(tArt) ? ' · steht im Jahresraster' : '')
+         + '">' + esc(artName(tArt)) + (artImJahr(tArt) ? ' ·J' : '') + '</span>';
+    }
+    h += '</div>';
     var unten = [];
     if (t.bis) { unten.push(esc(t.von) + '–' + esc(t.bis)); }
     if (t.ort) { unten.push(esc(t.ort)); }
@@ -5371,7 +5391,10 @@ function eintraegeEinsortieren(eintraege, quelle, kontext) {
   for (i = 0; i < eintraege.length; i++) {
     var e = eintraege[i];
     if (e.status === 'cancelled') { continue; }
-    var titel = e.summary || '(ohne Titel)';
+    /* Das Kürzel gehört nicht in die Anzeige — der rohe Titel bleibt
+       daneben erhalten, denn aus ihm wird die Art gelesen. */
+    var rohTitel = e.summary || '(ohne Titel)';
+    var titel = titelOhneArt(rohTitel) || rohTitel;
 
     if (e.start && e.start.date) {
       /* Ganztägig: das Ende ist bei Google der Folgetag. */
@@ -5380,7 +5403,8 @@ function eintraegeEinsortieren(eintraege, quelle, kontext) {
       var lauf = von;
       var schutz = 0;
       while (lauf <= bis && schutz < 400) {
-        merkeTermin(lauf, { id: e.id, titel: titel, zeit: '', bis: '',
+        merkeTermin(lauf, { id: e.id, titel: titel, rohTitel: rohTitel,
+                            zeit: '', bis: '',
                             ort: e.location || '', ganztags: true, quelle: quelle,
                             kontext: welcher, beschreibung: e.description || '',
                             serieId: e.recurringEventId || '' });
@@ -5394,7 +5418,7 @@ function eintraegeEinsortieren(eintraege, quelle, kontext) {
     var tag = tagAusEintrag(e.start.dateTime);
     if (!tag) { continue; }
     merkeTermin(tag, {
-      id: e.id, titel: titel,
+      id: e.id, titel: titel, rohTitel: rohTitel,
       zeit: zeitAusEintrag(e.start.dateTime),
       bis: e.end && e.end.dateTime ? zeitAusEintrag(e.end.dateTime) : '',
       ort: e.location || '', ganztags: false, quelle: quelle,
