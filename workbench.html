@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.73.0</title>
+<title>Workbench 0.74.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -700,7 +700,15 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
   border:1px solid var(--linie);border-radius:20px;padding:4px 11px;
   background:var(--papier);color:var(--tinte);outline:none}
 .fl-arten{display:flex;flex-wrap:wrap;gap:5px;margin:7px 0 0}
-.fl-leiste{display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin:0 0 8px}
+.fl-leiste{display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin:8px 0 2px}
+.fl-springer{position:absolute;right:16px;bottom:78px;display:flex;
+  flex-direction:column;gap:6px;z-index:5}
+.fl-sprung{width:34px;height:34px;padding:0;border:1px solid var(--linie);
+  border-radius:50%;background:var(--papier);color:var(--grau);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.fl-sprung svg{width:17px;height:17px;stroke:currentColor;fill:none;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .fl-knopf{width:32px;height:32px;padding:0;border:1px solid var(--linie);
   border-radius:6px;background:var(--papier);color:var(--tinte);cursor:pointer;
   display:inline-flex;align-items:center;justify-content:center}
@@ -994,8 +1002,10 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
       <button type="button" class="pille" onclick="flaecheZurueck()">Zurück</button>
     </div>
     <div id="flaecheKopf"></div>
+    <div id="flaecheLeiste"></div>
   </div>
   <div class="vhblatt einfachliste" id="flaecheBlatt"></div>
+  <div class="fl-springer" id="flaecheSpringer"></div>
 </div>
 
 <div class="schirm" id="schirmDiagnose">
@@ -1267,7 +1277,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.73.0';
+var APP_VERSION = '0.74.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8537,12 +8547,17 @@ function flaecheModusSetzen(m) {
     var feld = document.getElementById('flaecheFeld');
     if (feld && feld.focus) {
       feld.focus();
-      /* Ans Ende springen: Wer schreibt, will weiterschreiben. */
-      if (typeof feld.setSelectionRange === 'function') {
-        var n = String(feld.value || '').length;
-        feld.setSelectionRange(n, n);
+      /* Wer schreibt, will meist weiterschreiben — es sei denn, diese
+         Fläche geht oben auf. */
+      if (flaecheAnsEnde(flaecheFuer)) {
+        if (typeof feld.setSelectionRange === 'function') {
+          var n = String(feld.value || '').length;
+          feld.setSelectionRange(n, n);
+        }
+        if (typeof feld.scrollHeight === 'number') {
+          feld.scrollTop = feld.scrollHeight;
+        }
       }
-      if (typeof feld.scrollHeight === 'number') { feld.scrollTop = feld.scrollHeight; }
     }
   }
 }
@@ -8781,6 +8796,91 @@ function flaecheZurueck() {
   zeigeSchirm('Vorhaben');
 }
 
+/* Zwei feste Knöpfe unten rechts: ganz nach oben, ganz nach unten.
+   Bei einem langen Text ist beides sonst eine Wischerei. */
+function flaecheSpringerHtml() {
+  return '<button class="fl-sprung" type="button" onclick="flaecheZumAnfang()" '
+       + 'title="Ganz nach oben" aria-label="Ganz nach oben">'
+       + '<svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"></path></svg>'
+       + '</button>'
+       + '<button class="fl-sprung" type="button" onclick="flaecheZumEnde()" '
+       + 'title="Ganz nach unten" aria-label="Ganz nach unten">'
+       + '<svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"></path></svg>'
+       + '</button>';
+}
+
+function flaecheZumAnfang() {
+  var blatt = document.getElementById('flaecheBlatt');
+  if (blatt) { blatt.scrollTop = 0; }
+  var feld = document.getElementById('flaecheFeld');
+  if (feld) {
+    feld.scrollTop = 0;
+    if (typeof feld.setSelectionRange === 'function') { feld.setSelectionRange(0, 0); }
+  }
+}
+
+function flaecheZumEnde() {
+  var blatt = document.getElementById('flaecheBlatt');
+  if (blatt) { blatt.scrollTop = blatt.scrollHeight; }
+  var feld = document.getElementById('flaecheFeld');
+  if (feld) {
+    feld.scrollTop = feld.scrollHeight;
+    if (typeof feld.setSelectionRange === 'function') {
+      var n = String(feld.value || '').length;
+      feld.setSelectionRange(n, n);
+    }
+  }
+}
+
+/* Wo eine Fläche aufgeht, ist Geschmackssache: Ein Tagebuch will ans
+   Ende, eine Sammlung von Festlegungen an den Anfang. Je Fläche
+   einstellbar, voreingestellt ans Ende. */
+function flaecheAnsEnde(id) {
+  var k = DB.einstellungen.flaecheOben || {};
+  return k[id] !== true;
+}
+
+function flaecheAnsEndeUm() {
+  if (!DB.einstellungen.flaecheOben) { DB.einstellungen.flaecheOben = {}; }
+  var k = DB.einstellungen.flaecheOben;
+  if (k[flaecheFuer]) { delete k[flaecheFuer]; } else { k[flaecheFuer] = true; }
+  spaeterSichern();
+  flaecheZeichnen();
+}
+
+/* Die Leiste gehört in den Kopf, nicht in die rollende Fläche — sonst
+   ist sie nach der ersten Seite weggescrollt, gerade wenn man sie
+   braucht. */
+function flaecheLeisteHtml() {
+  var h = '<div class="fl-leiste">';
+  h += flaecheKnopf('zeile', 'h1', 'h1', 'Überschrift');
+  h += flaecheKnopf('zeile', 'h2', 'h2', 'Zwischenüberschrift');
+  h += flaecheKnopf('zeile', 'h3', 'h3', 'Kleine Überschrift');
+  h += flaecheKnopf('zeile', 'kasten', 'kasten', 'Kästchen zum Abhaken');
+  h += flaecheKnopf('zeile', 'punkt', 'punkt', 'Aufzählung');
+  h += '<span class="fl-teiler"></span>';
+  h += flaecheKnopf('paar', '*', 'fett', 'Fett');
+  h += flaecheKnopf('paar', '_', 'kursiv', 'Kursiv');
+  h += flaecheKnopf('paar', '~', 'durch', 'Durchgestrichen');
+  h += flaecheKnopf('paar', '+', 'unter', 'Unterstrichen');
+  h += flaecheKnopf('paar', '^', 'kap', 'Kapitälchen');
+  h += flaecheKnopf('link', '', 'link', 'Verweis');
+  h += '<span class="fl-teiler"></span>';
+  h += flaecheKnopf('ein', '✔', 'haken', 'Häkchen einfügen');
+  h += flaecheKnopf('ein', '→', 'pfeil', 'Pfeil einfügen');
+  h += flaecheKnopf('ein', '≈', 'etwa', 'Ungefähr einfügen');
+  h += '<button class="fl-knopf" type="button" onclick="skizzeWahlOeffnen()" '
+     + 'title="Skizze aus Drive einfügen" aria-label="Skizze aus Drive einfügen">'
+     + flaecheSinnbild('skizze') + '</button>';
+  h += '<span class="fl-teiler"></span>';
+  h += flaecheKnopf('zeile', 'einzug', 'ein', 'Einrücken');
+  h += flaecheKnopf('zeile', 'ausrueck', 'aus', 'Ausrücken');
+  h += flaecheKnopf('zeile', 'trenner', 'trenner', 'Trennlinie');
+  h += flaecheKnopf('zeile', 'datum', 'datum', 'Datum einfügen');
+  h += '</div>';
+  return h;
+}
+
 function flaecheZeichnen() {
   var blatt = document.getElementById('flaecheBlatt');
   var kopf = document.getElementById('flaecheKopf');
@@ -8801,6 +8901,10 @@ function flaecheZeichnen() {
        + '" type="button" onclick="flaecheModusSetzen(\'ansicht\')">Ansicht</button>';
     k += '<button class="sl-pille' + (flaecheModus === 'schreiben' ? ' an' : '')
        + '" type="button" onclick="flaecheModusSetzen(\'schreiben\')">Schreiben</button>';
+    k += '<button class="sl-pille' + (flaecheAnsEnde(flaecheFuer) ? ' an' : '')
+       + '" type="button" onclick="flaecheAnsEndeUm()" '
+       + 'title="Wo die Fläche beim Öffnen aufgeht">'
+       + (flaecheAnsEnde(flaecheFuer) ? 'ans Ende' : 'nach oben') + '</button>';
     k += '<input class="fl-suche" type="search" placeholder="Suchen" '
        + 'value="' + esc(flaecheSuche) + '" oninput="flaecheSuchen(this.value)">';
     if (istFreie(flaecheFuer)) {
@@ -8819,33 +8923,15 @@ function flaecheZeichnen() {
     kopf.innerHTML = k;
   }
 
+  var leiste = document.getElementById('flaecheLeiste');
+  if (leiste) {
+    leiste.innerHTML = (flaecheModus === 'schreiben') ? flaecheLeisteHtml() : '';
+  }
+  var springer = document.getElementById('flaecheSpringer');
+  if (springer) { springer.innerHTML = flaecheSpringerHtml(); }
+
   if (flaecheModus === 'schreiben') {
-    var h = '<div class="fl-leiste">';
-    h += flaecheKnopf('zeile', 'h1', 'h1', 'Überschrift');
-    h += flaecheKnopf('zeile', 'h2', 'h2', 'Zwischenüberschrift');
-    h += flaecheKnopf('zeile', 'h3', 'h3', 'Kleine Überschrift');
-    h += flaecheKnopf('zeile', 'kasten', 'kasten', 'Kästchen zum Abhaken');
-    h += flaecheKnopf('zeile', 'punkt', 'punkt', 'Aufzählung');
-    h += '<span class="fl-teiler"></span>';
-    h += flaecheKnopf('paar', '*', 'fett', 'Fett');
-    h += flaecheKnopf('paar', '_', 'kursiv', 'Kursiv');
-    h += flaecheKnopf('paar', '~', 'durch', 'Durchgestrichen');
-    h += flaecheKnopf('paar', '+', 'unter', 'Unterstrichen');
-    h += flaecheKnopf('paar', '^', 'kap', 'Kapitälchen');
-    h += flaecheKnopf('link', '', 'link', 'Verweis');
-    h += '<span class="fl-teiler"></span>';
-    h += flaecheKnopf('ein', '✔', 'haken', 'Häkchen einfügen');
-    h += flaecheKnopf('ein', '→', 'pfeil', 'Pfeil einfügen');
-    h += flaecheKnopf('ein', '≈', 'etwa', 'Ungefähr einfügen');
-    h += '<button class="fl-knopf" type="button" onclick="skizzeWahlOeffnen()" '
-       + 'title="Skizze aus Drive einfügen" aria-label="Skizze aus Drive einfügen">'
-       + flaecheSinnbild('skizze') + '</button>';
-    h += '<span class="fl-teiler"></span>';
-    h += flaecheKnopf('zeile', 'einzug', 'ein', 'Einrücken');
-    h += flaecheKnopf('zeile', 'ausrueck', 'aus', 'Ausrücken');
-    h += flaecheKnopf('zeile', 'trenner', 'trenner', 'Trennlinie');
-    h += flaecheKnopf('zeile', 'datum', 'datum', 'Datum einfügen');
-    h += '</div>';
+    var h = '';
     h += '<textarea class="fl-feld" id="flaecheFeld" spellcheck="false" '
        + 'oninput="flaecheGetippt(this.value)">' + esc(text) + '</textarea>';
     blatt.innerHTML = h;
@@ -8865,8 +8951,9 @@ function flaecheZeichnen() {
   }
   blatt.innerHTML = vor + '<div class="fl-ansicht">' + a.html + '</div>';
 
-  /* Bei langem Text ans Ende springen — dort steht das Neueste. */
-  if (!flaecheSuche && typeof blatt.scrollHeight === 'number') {
+  /* Ans Ende springen, wenn diese Fläche es so hält. */
+  if (!flaecheSuche && flaecheAnsEnde(flaecheFuer)
+      && typeof blatt.scrollHeight === 'number') {
     blatt.scrollTop = blatt.scrollHeight;
   }
 }

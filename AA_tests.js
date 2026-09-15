@@ -897,7 +897,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     .match(/class="(fl-h\\d)"/) || [])[1];'
                  + '   flaecheModus = \'schreiben\';'
                  + '   flaecheZeichnen();'
-                 + '   var lb = document.getElementById(\'flaecheBlatt\').innerHTML;'
+                 + '   /* Die Leiste steht seit v0.74.0 im Kopf, nicht im'
+                 + '      rollenden Blatt. */'
+                 + '   var lb = document.getElementById(\'flaecheLeiste\').innerHTML;'
                  + '   r.knoepfe = (lb.match(/class="fl-knopf/g) || []).length;'
                  + '   r.alleMitBild = ((lb.match(/<svg viewBox/g) || []).length'
                  + '     === r.knoepfe);'
@@ -906,6 +908,16 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.keinLeeresBild = (lb.indexOf(\'<svg viewBox="0 0 24 24" '
                  + 'aria-hidden="true"></svg>\') < 0);'
                  + '   r.h1Sichtbar = (lb.indexOf(\'>H1</text>\') >= 0);'
+                 + '   r.leisteImKopf = (document.getElementById(\'flaecheBlatt\')'
+                 + '     .innerHTML.indexOf(\'fl-leiste\') < 0);'
+                 + '   r.springerDa = (document.getElementById(\'flaecheSpringer\')'
+                 + '     .innerHTML.match(/fl-sprung/g) || []).length;'
+                 + '   r.voreingestellt = flaecheAnsEnde(\'p1\');'
+                 + '   flaecheFuer = \'p1\';'
+                 + '   flaecheAnsEndeUm();'
+                 + '   r.nachUmschalten = flaecheAnsEnde(\'p1\');'
+                 + '   r.jeFlaeche = flaecheAnsEnde(\'g:andere\');'
+                 + '   flaecheAnsEndeUm();'
                  + '   feld.value = \'Fertig \'; feld.selectionStart = 7;'
                  + '   feld.selectionEnd = 7;'
                  + '   flaecheEinfuegen(\'✔\');'
@@ -6173,6 +6185,14 @@ console.log('\n75. Gedankenfläche');
            + 'einen unsichtbaren Knopf');
     pruefe(e.h1Sichtbar === true, 'das H1-Sinnbild trägt seinen Buchstaben');
     pruefe(e.alleBeschriftet === true, 'und alle mit Beschriftung für die Ansage');
+    pruefe(e.leisteImKopf === true,
+           'die Leiste steht im Kopf, nicht im rollenden Blatt — sonst ist sie '
+           + 'nach der ersten Seite weggescrollt');
+    pruefe(e.springerDa === 2, 'zwei Sprungknöpfe: ganz nach oben, ganz nach unten');
+    pruefe(e.voreingestellt === true, 'voreingestellt geht eine Fläche ans Ende');
+    pruefe(e.nachUmschalten === false, 'umgeschaltet geht sie nach oben');
+    pruefe(e.jeFlaeche === true,
+           'die Wahl gilt je Fläche, nicht für alle zusammen');
   }
   pruefe(/\.fl-knopf svg text\{fill:currentColor/.test(QUELLE),
          'Sinnbilder aus Schrift sind sichtbar — CSS schlägt sonst das '
