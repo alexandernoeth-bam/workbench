@@ -536,6 +536,45 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__artZeigenApi = {'
+                 + ' pruefeArtZeigen: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var heute = isoDatum();'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   eintraegeEinsortieren(['
+                 + '     { id:\'t1\', summary:\'Laufen\','
+                 + '       description:\'Einheit 3 #Training\','
+                 + '       start:{ dateTime: heute + \'T18:00:00+02:00\' },'
+                 + '       end:{ dateTime: heute + \'T19:00:00+02:00\' } },'
+                 + '     { id:\'t2\', summary:\'Intervalle #Training\','
+                 + '       start:{ dateTime: heute + \'T17:00:00+02:00\' },'
+                 + '       end:{ dateTime: heute + \'T18:00:00+02:00\' } },'
+                 + '     { id:\'t3\', summary:\'Zahnarzt\','
+                 + '       start:{ dateTime: heute + \'T09:00:00+02:00\' },'
+                 + '       end:{ dateTime: heute + \'T10:00:00+02:00\' } } ],'
+                 + '     \'Alex\', \'privat\');'
+                 + '   tagOffen = heute;'
+                 + '   tagZeichnen();'
+                 + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   var karte = {};'
+                 + '   var re = /ttitel">([^<]*)(?:<span class="t-art"[^>]*>([^<]*)<)?/g;'
+                 + '   var m;'
+                 + '   while ((m = re.exec(b)) !== null) {'
+                 + '     karte[m[1]] = (m[2] || \'\').replace(/ ·J$/, \'\'); }'
+                 + '   var r = { ausBeschreibung: karte[\'Laufen\'],'
+                 + '             ausTitel: karte[\'Intervalle\'],'
+                 + '             titelSauber: (karte[\'Intervalle\'] !== undefined)'
+                 + '               ? \'Intervalle\' : \'(fehlt)\','
+                 + '             ohneArt: karte[\'Zahnarzt\'] };'
+                 + '   artImJahrUm(\'training\');'
+                 + '   tagZeichnen();'
+                 + '   r.mitJ = (document.getElementById(\'tagBlatt\').innerHTML'
+                 + '     .indexOf(\'·J\') >= 0);'
+                 + '   termineNachTag = {}; kalenderListe = [];'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__einstApi = {'
                  + ' pruefeEinstellungen: function(){'
                  + '   var a = leereDatenbank(); a.grabsteine = [];'
@@ -6799,6 +6838,51 @@ console.log('\n85. Einstellungen beim Verschmelzen');
            'abgelegte Vorschaubilder beider Geräte bleiben');
     pruefe(e.clientIdGesetzt === true,
            'die festen Angaben werden weiterhin gesetzt');
+  }
+}
+
+/* ============================================================
+   86. Die erkannte Art ist sichtbar
+   Grund: Ob ein Kuerzel im Termin angekommen ist, liess sich nicht
+   sehen — man raetselte. Die Tagessicht zeigt sie jetzt, samt dem
+   Vermerk, ob sie im Jahresraster steht. Dabei kam heraus: Die
+   Tagessicht arbeitete mit einer Kopie ohne Beschreibung und konnte
+   die Art gar nicht lesen.
+   ============================================================ */
+console.log('\n86. Art im Tagesplan');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__artZeigenApi;
+
+  const te = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
+  pruefe(te && /beschreibung: g\.beschreibung \|\| ''/.test(te[0]),
+         'die Beschreibung wird in den Tagesplan mitgegeben — aus ihr wird die '
+         + 'Art gelesen');
+  pruefe(te && /rohTitel: g\.rohTitel \|\| g\.titel/.test(te[0]),
+         'der rohe Titel ebenso');
+
+  const ein = skript.match(/function eintraegeEinsortieren\([\s\S]*?\n\}\n/);
+  pruefe(ein && /titelOhneArt\(rohTitel\) \|\| rohTitel/.test(ein[0]),
+         'das Kürzel gehört nicht in die Anzeige');
+  pruefe(ein && (ein[0].match(/rohTitel: rohTitel/g) || []).length === 2,
+         'der rohe Titel bleibt bei beiden Terminarten erhalten');
+
+  pruefe(/class="t-art"/.test(skript), 'die Art steht in der Tageszeile');
+  pruefe(/steht im Jahresraster/.test(skript),
+         'und es ist ablesbar, ob sie im Jahresraster erscheint');
+
+  if (!t) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = t.pruefeArtZeigen();
+    pruefe(e.ausBeschreibung === 'Training',
+           'eine Art aus der Beschreibung wird im Tag gezeigt');
+    pruefe(e.ausTitel === 'Training', 'eine aus dem Titel ebenso');
+    pruefe(e.titelSauber === 'Intervalle',
+           'der Titel erscheint ohne sein Kürzel');
+    pruefe(e.ohneArt === '', 'ein Termin ohne Kürzel bekommt kein Etikett');
+    pruefe(e.mitJ === true,
+           'ist die Art fürs Jahr freigegeben, steht das dabei');
   }
 }
 
