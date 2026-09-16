@@ -539,6 +539,37 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__faltApi = {'
+                 + ' pruefeFalten: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var t = [\'# Garage\', \'Erste Zeile\', \'[] Aufgabe\','
+                 + '            \'## Angebote\', \'Zapf\', \'Dennert\','
+                 + '            \'# Halbmarathon\', \'Lauf 1\', \'Lauf 2\']'
+                 + '           .join(\'\\n\');'
+                 + '   DB.gedanken = [{ id:\'g1\', titel:\'N\', text: t,'
+                 + '     geaendert: jetzt() }];'
+                 + '   flaecheFuer = \'g:g1\'; flaecheModus = \'ansicht\';'
+                 + '   flaecheSuche = \'\'; flaecheArt = {}; flaecheZuKarte = {};'
+                 + '   var zaehl = function(suche){'
+                 + '     var a = flaecheAnsichtHtml(t, suche || \'\');'
+                 + '     return (a.html.match(/class="fl-(h\\d|absatz|zeile)/g)'
+                 + '             || []).length; };'
+                 + '   var r = { offen: zaehl() };'
+                 + '   flaecheAbschnittUm(0);'
+                 + '   r.erstesZu = zaehl();'
+                 + '   var a2 = flaecheAnsichtHtml(t, \'\');'
+                 + '   r.zahlAmKopf = (a2.html.match(/fl-zahl">([^<]*)/) || [])[1];'
+                 + '   flaecheAbschnittUm(0);'
+                 + '   flaecheAbschnittUm(3);'
+                 + '   r.unterabschnitt = zaehl();'
+                 + '   flaecheAlleZu(true);'
+                 + '   r.allesZu = zaehl();'
+                 + '   r.beiSuche = (zaehl(\'Lauf\') > r.allesZu);'
+                 + '   flaecheAlleZu(false);'
+                 + '   r.allesAuf = zaehl();'
+                 + '   flaecheZuKarte = {}; flaecheFuer = \'\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__wbApi = {'
                  + ' pruefeWb: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -7367,6 +7398,58 @@ console.log('\n90. Verweise in die App');
     pruefe(e.netzlinkUnberuehrt.indexOf('href="https://x.de"') >= 0,
            'ein gewöhnlicher Verweis ins Netz bleibt, wie er war');
     pruefe(e.flaecheGeht === true, 'auch auf eine andere Fläche lässt sich zeigen');
+  }
+}
+
+/* ============================================================
+   91. Abschnitte einklappen
+   Grund: Eine lange Flaeche laesst sich nicht ueberblicken. Ueber die
+   Ueberschriften klappt man weg, was gerade nicht zaehlt — und sieht
+   an der Zahl, wie viel dahintersteckt.
+   ============================================================ */
+console.log('\n91. Einklappen in der Fläche');
+{
+  const skript = hauptSkript();
+  const e = globalThis.__faltApi;
+
+  ['flaecheZuSchluessel', 'flaecheAbschnittZu', 'flaecheAbschnittUm',
+   'flaecheAlleZu', 'flaecheHatUeberschriften'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const s = skript.match(/function flaecheZuSchluessel\([\s\S]*?\n\}/);
+  pruefe(s && /String\(zeile\)\.trim\(\)\.toLowerCase\(\)/.test(s[0]),
+         'gemerkt wird die Überschrift, nicht die Zeilennummer — sonst '
+         + 'verrutscht alles, sobald man oben etwas dazuschreibt');
+  pruefe(s && /String\(flaecheFuer\)/.test(s[0]),
+         'und zwar je Fläche');
+
+  const a = skript.match(/function flaecheAnsichtHtml\([\s\S]*?\n\}\n/);
+  pruefe(a && /var faltenGilt = !zeigen/.test(a[0]),
+         'beim Suchen wird nicht gefaltet — sonst fände man, was man nicht sieht');
+  pruefe(a && /!stufe \|\| stufe > zuBis/.test(a[0]),
+         'versteckt wird bis zur nächsten gleichrangigen Überschrift');
+
+  const z = skript.match(/function flaecheZeileHtml\([\s\S]*?\n\}\n/);
+  pruefe(z && /fl-zahl/.test(z[0]),
+         'an einer zugeklappten Überschrift steht, wie viele Zeilen darunter '
+         + 'liegen');
+
+  if (!e) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const r = e.pruefeFalten();
+    pruefe(r.offen === 9, 'offen stehen alle neun Zeilen da');
+    pruefe(r.erstesZu === 4,
+           'die erste Überschrift zugeklappt lässt vier Zeilen übrig');
+    pruefe(r.zahlAmKopf === '5 Zeilen', 'und nennt die fünf versteckten');
+    pruefe(r.unterabschnitt === 7,
+           'ein Unterabschnitt versteckt nur seine eigenen Zeilen');
+    pruefe(r.allesZu === 2, 'alles zu lässt die beiden Überschriften stehen');
+    pruefe(r.allesAuf === 9, 'alles auf bringt sie zurück');
+    pruefe(r.beiSuche === true,
+           'während einer Suche bleibt alles sichtbar');
   }
 }
 

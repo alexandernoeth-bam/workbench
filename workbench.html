@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.88.0</title>
+<title>Workbench 0.89.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -747,6 +747,18 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
   outline:none;resize:vertical;tab-size:2}
 .fl-treffer{font-size:calc(var(--fs)*0.76);color:var(--weinrot);margin-bottom:8px}
 .fl-ansicht{padding-bottom:40px}
+.fl-h1.faltbar,.fl-h2.faltbar,.fl-h3.faltbar{display:flex;align-items:baseline;
+  gap:7px}
+.fl-falt{flex:0 0 auto;background:none;border:0;padding:2px 0 0;cursor:pointer;
+  color:var(--grau);align-self:center}
+.fl-falt svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;transform:rotate(-90deg);
+  transition:transform .15s ease}
+.fl-falt svg.auf{transform:rotate(0deg)}
+.fl-h-text{flex:1;min-width:0}
+.fl-zahl{flex:0 0 auto;font-size:calc(var(--fs)*0.68);font-weight:400;
+  color:var(--grau-hell)}
+
 .fl-h1{font-size:calc(var(--fs)*1.14);font-weight:500;line-height:1.3;
   padding:14px 0 4px;border-bottom:1px solid var(--linie);margin-bottom:4px}
 .fl-h2{font-size:calc(var(--fs)*0.98);font-weight:500;line-height:1.3;
@@ -1300,7 +1312,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.88.0';
+var APP_VERSION = '0.89.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -9073,7 +9085,7 @@ function flaecheAuszeichnen(text) {
   return t;
 }
 
-function flaecheZeileHtml(zeile, nr, suche) {
+function flaecheZeileHtml(zeile, nr, suche, falte) {
   var roh = String(zeile);
   var tiefe = 0;
   var rest = roh;
@@ -9104,8 +9116,19 @@ function flaecheZeileHtml(zeile, nr, suche) {
   }
   var ueber = rest.match(/^(#{1,3})\s*(.*)$/);
   if (ueber) {
-    return '<div class="fl-h' + ueber[1].length + '"' + stil + '>'
-         + hervor(ueber[2]) + '</div>';
+    if (!falte) {
+      return '<div class="fl-h' + ueber[1].length + '"' + stil + '>'
+           + hervor(ueber[2]) + '</div>';
+    }
+    return '<div class="fl-h' + ueber[1].length + ' faltbar"' + stil + '>'
+         + '<button class="fl-falt" type="button" '
+         + 'onclick="flaecheAbschnittUm(' + nr + ')">'
+         + '<svg class="' + (falte.zu ? '' : 'auf') + '" viewBox="0 0 24 24">'
+         + '<path d="M6 9l6 6 6-6"></path></svg></button>'
+         + '<span class="fl-h-text">' + hervor(ueber[2]) + '</span>'
+         + (falte.zu ? ('<span class="fl-zahl">' + falte.drin
+                      + (falte.drin === 1 ? ' Zeile' : ' Zeilen') + '</span>') : '')
+         + '</div>';
   }
   var kasten = rest.match(/^\[([ xX]?)\]\s*(.*)$/);
   if (kasten) {
@@ -9125,12 +9148,62 @@ function flaecheZeileHtml(zeile, nr, suche) {
   return '<div class="fl-absatz"' + stil + '>' + hervor(rest) + '</div>';
 }
 
+/* Eingeklappte Abschnitte
+
+   Gemerkt wird je Fläche und Überschrift — nicht je Zeilennummer:
+   Schreibt man oben etwas dazu, verrutschen die Nummern, die
+   Überschrift bleibt. Der Zustand gilt für die Sitzung; beim nächsten
+   Öffnen steht wieder alles offen, denn eine Fläche, die man nach
+   Wochen aufmacht, will man ganz sehen. */
+var flaecheZuKarte = {};
+
+function flaecheZuSchluessel(zeile) {
+  return String(flaecheFuer) + '|' + String(zeile).trim().toLowerCase();
+}
+
+function flaecheAbschnittZu(zeile) {
+  return flaecheZuKarte[flaecheZuSchluessel(zeile)] === true;
+}
+
+function flaecheAbschnittUm(nr) {
+  var zeilen = flaecheText(flaecheFuer).split('\n');
+  if (nr < 0 || nr >= zeilen.length) { return; }
+  var s = flaecheZuSchluessel(zeilen[nr]);
+  if (flaecheZuKarte[s]) { delete flaecheZuKarte[s]; }
+  else { flaecheZuKarte[s] = true; }
+  flaecheZeichnen();
+}
+
+function flaecheAlleZu(zu) {
+  var zeilen = flaecheText(flaecheFuer).split('\n');
+  var i;
+  for (i = 0; i < zeilen.length; i++) {
+    if (!ueberschriftStufe(zeilen[i])) { continue; }
+    var s = flaecheZuSchluessel(zeilen[i]);
+    if (zu) { flaecheZuKarte[s] = true; } else { delete flaecheZuKarte[s]; }
+  }
+  flaecheZeichnen();
+}
+
+function flaecheHatUeberschriften() {
+  var zeilen = flaecheText(flaecheFuer).split('\n');
+  var i;
+  for (i = 0; i < zeilen.length; i++) {
+    if (ueberschriftStufe(zeilen[i])) { return true; }
+  }
+  return false;
+}
+
 function flaecheAnsichtHtml(text, suche) {
   var zeilen = String(text).split('\n');
   var zeigen = flaecheSichtbar(zeilen, suche);
+  /* Beim Suchen wird nicht zugeklappt — sonst fände man etwas, das
+     man nicht sieht. */
+  var faltenGilt = !zeigen;
   var h = '';
   var i;
   var treffer = 0;
+  var zuBis = 0;          /* solange die Stufe größer ist, wird versteckt */
   for (i = 0; i < zeilen.length; i++) {
     var wort = (suche && suche.length >= 2)
             && zeilen[i].toLowerCase().indexOf(suche.toLowerCase()) >= 0;
@@ -9139,7 +9212,26 @@ function flaecheAnsichtHtml(text, suche) {
       treffer++;
     }
     if (zeigen && !zeigen[i]) { continue; }
-    h += flaecheZeileHtml(zeilen[i], i, suche);
+
+    var stufe = ueberschriftStufe(zeilen[i]);
+    if (zuBis) {
+      if (!stufe || stufe > zuBis) { continue; }
+      zuBis = 0;
+    }
+    if (faltenGilt && stufe && flaecheAbschnittZu(zeilen[i])) {
+      var drin = 0;
+      var j;
+      for (j = i + 1; j < zeilen.length; j++) {
+        var s2 = ueberschriftStufe(zeilen[j]);
+        if (s2 && s2 <= stufe) { break; }
+        if (zeilen[j].trim().length) { drin++; }
+      }
+      h += flaecheZeileHtml(zeilen[i], i, suche, { zu: true, drin: drin });
+      zuBis = stufe;
+      continue;
+    }
+    h += flaecheZeileHtml(zeilen[i], i, suche,
+                          faltenGilt ? { zu: false, drin: 0 } : null);
   }
   if (!String(text).trim().length) {
     h = '<div class="tleer" style="padding-left:0">Noch leer. '
@@ -9566,6 +9658,12 @@ function flaecheZeichnen() {
        + '" type="button" onclick="flaecheAnsEndeUm()" '
        + 'title="Wo die Fläche beim Öffnen aufgeht">'
        + (flaecheAnsEnde(flaecheFuer) ? 'ans Ende' : 'nach oben') + '</button>';
+    if (flaecheModus === 'ansicht' && flaecheHatUeberschriften()) {
+      k += '<button class="sl-pille" type="button" onclick="flaecheAlleZu(true)" '
+         + 'title="Alle Abschnitte einklappen">alles zu</button>';
+      k += '<button class="sl-pille" type="button" onclick="flaecheAlleZu(false)" '
+         + 'title="Alle Abschnitte aufklappen">alles auf</button>';
+    }
     k += '<input class="fl-suche" type="search" placeholder="Suchen" '
        + 'value="' + esc(flaecheSuche) + '" oninput="flaecheSuchen(this.value)">';
     if (istFreie(flaecheFuer)) {
