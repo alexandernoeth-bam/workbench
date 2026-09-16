@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.85.0</title>
+<title>Workbench 0.87.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -734,6 +734,10 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
 .fl-teiler{width:1px;height:20px;background:var(--linie);margin:0 4px}
 .fl-kap{font-variant-caps:all-small-caps;letter-spacing:.03em}
 .fl-ansicht a{color:var(--weinrot)}
+.wb-link{font:inherit;font-size:inherit;border:0;background:none;padding:0 1px;
+  color:var(--petrol);text-decoration:underline;text-underline-offset:2px;
+  cursor:pointer}
+.wb-tot{color:var(--grau-hell);text-decoration:line-through}
 .fl-ansicht s{color:var(--grau)}
 .fl-ansicht u{text-underline-offset:3px}
 .fl-feld{width:100%;min-height:60vh;font:inherit;
@@ -1296,7 +1300,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.85.0';
+var APP_VERSION = '0.87.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8897,8 +8901,156 @@ function flaecheName(id) {
    auch wenn der Text irgendwann in einem anderen Programm landet.
      *fett*  _kursiv_  ~durchgestrichen~  ^Kapitälchen^
      [Text](Adresse) oder eine nackte Adresse */
+
+/* ------------------------------------------------------------
+   Verweise innerhalb der App
+
+   In einer Gedankenfläche steht oft „siehe Garage" — und man sucht
+   dann doch wieder. Ein Verweis führt hin: auf ein Projekt, ein Ziel,
+   eine andere Fläche oder eine Aufgabe.
+
+   Im Text steht er als [[art:kennung|Titel]]. Der Titel wird
+   mitgeschrieben, damit die Zeile auch dann lesbar bleibt, wenn das
+   Ziel einmal gelöscht ist.
+   ------------------------------------------------------------ */
+
+var WB_MUSTER = /\[\[(projekt|ziel|flaeche|aufgabe):([A-Za-z0-9:_-]{1,40})\|([^\]]{0,80})\]\]/g;
+
+function wbZielName(art, id) {
+  if (art === 'projekt') {
+    var p = projektFinden(id);
+    return p ? p.name : '';
+  }
+  if (art === 'ziel') {
+    var z = zielFinden(id);
+    return z ? z.name : '';
+  }
+  if (art === 'flaeche') { return flaecheName(id); }
+  if (art === 'aufgabe') {
+    var a = aufgabeFinden(id);
+    return a ? a.titel : '';
+  }
+  return '';
+}
+
+function wbSpringen(art, id) {
+  if (art === 'projekt') { vhDetailOeffnen(id, 'projekt'); return; }
+  if (art === 'ziel') { vhDetailOeffnen(id, 'ziel'); return; }
+  if (art === 'flaeche') { flaecheOeffnen(id); return; }
+  if (art === 'aufgabe') { aufgabeAktionen(id); return; }
+}
+
+function wbLinkHtml(art, id, titel) {
+  var lebt = wbZielName(art, id);
+  var zeigen = lebt || titel;
+  var marken = { projekt: 'Projekt', ziel: 'Ziel', flaeche: 'Fläche',
+                 aufgabe: 'Aufgabe' };
+  if (!lebt) {
+    return '<span class="wb-tot" title="Das Ziel gibt es nicht mehr">'
+         + esc(zeigen) + '</span>';
+  }
+  return '<button class="wb-link" type="button" onclick="wbSpringen(\'' + art
+       + '\',\'' + esc(id) + '\')" title="' + esc(marken[art] || '') + '">'
+       + esc(zeigen) + '</button>';
+}
+
+/* ------------------------------------------------------------
+   Einfügen
+   ------------------------------------------------------------ */
+
+var wbWahlArt = 'projekt';
+
+function wbWahlOeffnen() {
+  wbWahlArt = 'projekt';
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = wbWahlHtml();
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function wbWahlArtSetzen(art) {
+  wbWahlArt = art;
+  var sheet = document.getElementById('aktionSheet');
+  if (sheet) { sheet.innerHTML = wbWahlHtml(); }
+}
+
+function wbWahlListe() {
+  var aus = [];
+  var i;
+  if (wbWahlArt === 'projekt') {
+    var p = DB.projekte || [];
+    for (i = 0; i < p.length; i++) {
+      aus.push({ id: p[i].id, titel: p[i].name, unten: p[i].kontext });
+    }
+  } else if (wbWahlArt === 'ziel') {
+    var z = DB.ziele || [];
+    for (i = 0; i < z.length; i++) {
+      aus.push({ id: z[i].id, titel: z[i].name, unten: z[i].kontext });
+    }
+  } else if (wbWahlArt === 'flaeche') {
+    var f = alleFlaechen();
+    for (i = 0; i < f.length; i++) {
+      if (f[i].id === flaecheFuer) { continue; }   /* nicht auf sich selbst */
+      aus.push({ id: f[i].id, titel: f[i].titel,
+                 unten: (f[i].woher === 'frei') ? 'frei' : f[i].woher });
+    }
+  } else {
+    var a = DB.aufgaben || [];
+    for (i = 0; i < a.length; i++) {
+      if (a[i].status === 'erledigt') { continue; }
+      aus.push({ id: a[i].id, titel: a[i].titel, unten: planungText(a[i]) });
+    }
+  }
+  aus.sort(function (x, y) { return (x.titel < y.titel) ? -1 : 1; });
+  return aus;
+}
+
+function wbWahlHtml() {
+  var h = blattKopf();
+  h += '<div class="as-titel">Verweis einfügen</div>';
+  h += '<div class="as-linie"></div>';
+  h += '<div class="sl-pillen">';
+  var arten = [['projekt', 'Projekte'], ['ziel', 'Ziele'],
+               ['flaeche', 'Flächen'], ['aufgabe', 'Aufgaben']];
+  var i;
+  for (i = 0; i < arten.length; i++) {
+    h += '<button class="sl-pille' + (wbWahlArt === arten[i][0] ? ' an' : '')
+       + '" type="button" onclick="wbWahlArtSetzen(\'' + arten[i][0] + '\')">'
+       + arten[i][1] + '</button>';
+  }
+  h += '</div>';
+
+  var l = wbWahlListe();
+  for (i = 0; i < l.length; i++) {
+    h += '<div class="mf-zeile" onclick="wbEinfuegen(\'' + wbWahlArt + '\',\''
+       + esc(l[i].id) + '\')">'
+       + '<span class="mf-name">' + esc(l[i].titel) + '</span>'
+       + '<span class="a-quelle">' + esc(l[i].unten || '') + '</span></div>';
+  }
+  if (!l.length) {
+    h += '<div class="tleer" style="padding-left:0">Nichts vorhanden.</div>';
+  }
+  h += '<div class="d-reihe"><button type="button" onclick="aktionenSchliessen()">'
+     + 'Abbrechen</button></div>';
+  return h;
+}
+
+function wbEinfuegen(art, id) {
+  var titel = wbZielName(art, id).replace(/[\]\|]/g, ' ').slice(0, 80);
+  flaecheEinfuegen('[[' + art + ':' + id + '|' + titel + ']]');
+  aktionenSchliessen();
+}
+
 function flaecheAuszeichnen(text) {
   var t = esc(text);
+  /* Zuerst die Verweise in die App — sie sehen den Verweisen ins Netz
+     ähnlich und würden sonst von jenen zerlegt. */
+  WB_MUSTER.lastIndex = 0;
+  t = t.replace(WB_MUSTER, function (ganz, art, id, titel) {
+    return wbLinkHtml(art, id, titel);
+  });
   t = t.replace(/\[([^\]]{1,80})\]\((https?:\/\/[^\s)]+)\)/g,
                 '<a href="$2" target="_blank" rel="noopener">$1</a>');
   t = t.replace(/(^|[\s(])(https?:\/\/[^\s<]+)/g,
@@ -9047,6 +9199,16 @@ function flaecheUmschliessen(zeichen) {
   var text = String(feld.value || '');
   var a = (typeof feld.selectionStart === 'number') ? feld.selectionStart : text.length;
   var b = (typeof feld.selectionEnd === 'number') ? feld.selectionEnd : a;
+
+  /* Ohne Markierung gilt das Wort, in dem die Marke steht — das ist
+     fast immer gemeint, und man muss nicht erst auswählen. */
+  if (a === b) {
+    var links = a;
+    var rechts = a;
+    while (links > 0 && !/[\s]/.test(text.charAt(links - 1))) { links--; }
+    while (rechts < text.length && !/[\s]/.test(text.charAt(rechts))) { rechts++; }
+    if (rechts > links) { a = links; b = rechts; }
+  }
   var mitte = text.slice(a, b);
   feld.value = text.slice(0, a) + zeichen + mitte + zeichen + text.slice(b);
   flaecheSetzen(flaecheFuer, feld.value);
@@ -9147,6 +9309,8 @@ function flaecheSinnbild(art) {
            + '<path d="M5 20h14"></path>',
     link:    '<path d="M10 14a4 4 0 0 0 6 .5l2-2a4 4 0 0 0-6-6l-1 1"></path>'
            + '<path d="M14 10a4 4 0 0 0-6-.5l-2 2a4 4 0 0 0 6 6l1-1"></path>',
+    wblink:  '<rect x="3" y="5" width="18" height="14" rx="2"></rect>'
+           + '<path d="M8 12h8M13 9l3 3-3 3"></path>',
     ein:     '<path d="M3 6h18M9 12h12M9 18h12M3 10l3 2-3 2z" '
            + 'stroke-linejoin="round"></path>',
     aus:     '<path d="M3 6h18M9 12h12M9 18h12M6 10l-3 2 3 2z" '
@@ -9176,7 +9340,12 @@ function flaecheKnopf(art, wert, bild, hinweis) {
   else if (art === 'ein') { ruf = 'flaecheEinfuegen(\'' + wert + '\')'; }
   else if (art === 'link') { ruf = 'flaecheLink()'; }
   else { ruf = 'flaecheZeichen(\'' + wert + '\')'; }
+  /* onmousedown abfangen: Sonst nimmt der Knopf dem Textfeld die
+     Eingabemarke, die Markierung geht verloren, und aus einem „fett"
+     werden zwei Sterne ohne Inhalt. */
   return '<button class="fl-knopf" type="button" onclick="' + ruf + '" '
+       + 'onmousedown="event.preventDefault()" '
+       + 'ontouchstart="event.preventDefault()" '
        + 'title="' + esc(hinweis) + '" aria-label="' + esc(hinweis) + '">'
        + flaecheSinnbild(bild) + '</button>';
 }
@@ -9337,12 +9506,17 @@ function flaecheLeisteHtml() {
   h += flaecheKnopf('paar', '~', 'durch', 'Durchgestrichen');
   h += flaecheKnopf('paar', '+', 'unter', 'Unterstrichen');
   h += flaecheKnopf('paar', '^', 'kap', 'Kapitälchen');
-  h += flaecheKnopf('link', '', 'link', 'Verweis');
+  h += flaecheKnopf('link', '', 'link', 'Verweis ins Netz');
+  h += '<button class="fl-knopf" type="button" onclick="wbWahlOeffnen()" '
+     + 'onmousedown="event.preventDefault()" '
+     + 'title="Verweis auf ein Vorhaben, eine Fläche oder eine Aufgabe" '
+     + 'aria-label="Verweis in die App">' + flaecheSinnbild('wblink') + '</button>';
   h += '<span class="fl-teiler"></span>';
   h += flaecheKnopf('ein', '✔', 'haken', 'Häkchen einfügen');
   h += flaecheKnopf('ein', '→', 'pfeil', 'Pfeil einfügen');
   h += flaecheKnopf('ein', '≈', 'etwa', 'Ungefähr einfügen');
   h += '<button class="fl-knopf" type="button" onclick="skizzeWahlOeffnen()" '
+     + 'onmousedown="event.preventDefault()" '
      + 'title="Skizze aus Drive einfügen" aria-label="Skizze aus Drive einfügen">'
      + flaecheSinnbild('skizze') + '</button>';
   h += '<span class="fl-teiler"></span>';

@@ -539,6 +539,38 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__wbApi = {'
+                 + ' pruefeWb: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'Garage\','
+                 + '     kontext:\'privat\', status:\'laufend\', zielzustaende:[] }];'
+                 + '   DB.gedanken = [{ id:\'g1\', titel:\'Notizen\', text:\'\','
+                 + '     geaendert: jetzt() },'
+                 + '     { id:\'g2\', titel:\'Andere\', text:\'\','
+                 + '     geaendert: jetzt() }];'
+                 + '   flaecheFuer = \'g:g1\';'
+                 + '   var feld = document.getElementById(\'flaecheFeld\');'
+                 + '   feld.value = \'\'; feld.selectionStart = 0;'
+                 + '   feld.selectionEnd = 0;'
+                 + '   wbEinfuegen(\'projekt\', \'p1\');'
+                 + '   var r = { eingefuegt: flaecheText(\'g:g1\').trim() };'
+                 + '   r.gezeigt = flaecheAuszeichnen(r.eingefuegt);'
+                 + '   DB.projekte[0].name = \'Garage neu\';'
+                 + '   r.nachUmbenennen = flaecheAuszeichnen(r.eingefuegt);'
+                 + '   DB.projekte = [];'
+                 + '   r.nachLoeschen = flaecheAuszeichnen(r.eingefuegt);'
+                 + '   r.netzlinkUnberuehrt ='
+                 + '     flaecheAuszeichnen(\'Siehe [Seite](https://x.de)\');'
+                 + '   r.flaecheGeht = wbWahlListe && (function(){'
+                 + '     wbWahlArt = \'flaeche\';'
+                 + '     var l = wbWahlListe();'
+                 + '     wbWahlArt = \'projekt\';'
+                 + '     return l.some(function(x){ return x.id === \'g:g2\'; })'
+                 + '         && !l.some(function(x){ return x.id === \'g:g1\'; });'
+                 + '   })();'
+                 + '   flaecheFuer = \'\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__farbApi = {'
                  + ' nachtPapier: FARBWELTEN.nacht.werte[\'--papier\'],'
                  + ' pruefeFarben: function(){'
@@ -1087,10 +1119,16 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   feld.selectionEnd = 7;'
                  + '   flaecheUmschliessen(\'*\');'
                  + '   r.umAuswahl = feld.value;'
-                 + '   feld.value = \'Text\'; feld.selectionStart = 4;'
-                 + '   feld.selectionEnd = 4;'
-                 + '   flaecheUmschliessen(\'_\');'
-                 + '   r.ohneAuswahl = feld.selectionStart;'
+                 + '   feld.value = \'Das ist wichtig hier\';'
+                 + '   feld.selectionStart = 11; feld.selectionEnd = 11;'
+                 + '   flaecheUmschliessen(\'*\');'
+                 + '   r.ohneAuswahl = feld.value;'
+                 + '   feld.value = \'Das ist  hier\';'
+                 + '   feld.selectionStart = 8; feld.selectionEnd = 8;'
+                 + '   flaecheUmschliessen(\'*\');'
+                 + '   r.imLeeren = feld.value;'
+                 + '   r.markeGehalten = (flaecheLeisteHtml()'
+                 + '     .indexOf(\'onmousedown="event.preventDefault()"\') >= 0);'
                  + '   feld.value = \'Bauamt\'; feld.selectionStart = 0;'
                  + '   feld.selectionEnd = 6;'
                  + '   flaecheLink();'
@@ -6366,13 +6404,18 @@ console.log('\n75. Gedankenfläche');
            'einzelne Sterne mitten im Text zeichnen nichts aus');
 
     pruefe(e.umAuswahl === '*wichtig*', 'der Knopf legt die Zeichen um die Auswahl');
-    pruefe(e.ohneAuswahl === 5,
-           'ohne Auswahl steht der Strich zwischen den Zeichen');
+    pruefe(e.ohneAuswahl === 'Das ist *wichtig* hier',
+           'ohne Markierung gilt das Wort, in dem die Marke steht');
+    pruefe(e.imLeeren === 'Das ist ** hier',
+           'steht sie im Leerraum, kommt das Zeichenpaar zum Weiterschreiben');
+    pruefe(e.markeGehalten === true,
+         'der Knopf nimmt dem Feld die Markierung nicht — sonst würden aus '
+         + '„fett" zwei Sterne ohne Inhalt');
     pruefe(e.linkKnopf === '[Bauamt](https://)',
            'der Verweisknopf legt ein Gerüst an');
     pruefe(e.linkStrich === 17, 'und setzt den Strich hinter https://');
     pruefe(e.datumLang === 'Mo, 14.09.2026', 'das Datum trägt Wochentag und Jahr');
-    pruefe(e.knoepfe === 19, 'neunzehn Knöpfe in der Leiste');
+    pruefe(e.knoepfe === 20, 'zwanzig Knöpfe in der Leiste');
     pruefe(e.unter === 'Das <u>wichtig</u> hier', 'Pluszeichen unterstreichen');
     pruefe(e.hakenEingefuegt === 'Fertig ✔', 'ein Häkchen wird eingefügt');
     pruefe(e.pfeilStrich === 8, 'der Strich steht hinter dem Zeichen');
@@ -7259,6 +7302,59 @@ console.log('\n89. Farbwelten');
     pruefe(e.kontrast === true,
            'in jeder Welt hebt sich die Fläche der Knöpfe vom Grund ab — sonst '
            + 'verschwinden sie darin');
+  }
+}
+
+/* ============================================================
+   90. Verweise innerhalb der App
+   Grund: In einer Gedankenflaeche steht oft „siehe Garage" — und man
+   sucht dann doch wieder. Ein Verweis fuehrt hin. Der Titel wird
+   mitgeschrieben, damit die Zeile lesbar bleibt, wenn das Ziel einmal
+   geloescht ist.
+   ============================================================ */
+console.log('\n90. Verweise in die App');
+{
+  const skript = hauptSkript();
+  const w = globalThis.__wbApi;
+
+  ['wbZielName', 'wbSpringen', 'wbLinkHtml', 'wbWahlOeffnen', 'wbWahlArtSetzen',
+   'wbWahlListe', 'wbWahlHtml', 'wbEinfuegen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  pruefe(/WB_MUSTER/.test(skript), 'die Verweise haben ein eigenes Muster');
+  const az = skript.match(/function flaecheAuszeichnen\([\s\S]*?\n\}\n/);
+  pruefe(az && az[0].indexOf('WB_MUSTER') < az[0].indexOf('https?'),
+         'sie werden vor den Verweisen ins Netz gelesen — sonst zerlegten jene sie');
+
+  const lh = skript.match(/function wbLinkHtml\([\s\S]*?\n\}\n/);
+  pruefe(lh && /wb-tot/.test(lh[0]),
+         'ein Verweis ins Leere wird durchgestrichen statt zu verschwinden');
+  pruefe(lh && /lebt \|\| titel/.test(lh[0]),
+         'gezeigt wird der heutige Name, notfalls der mitgeschriebene');
+
+  const wl = skript.match(/function wbWahlListe\([\s\S]*?\n\}\n/);
+  pruefe(wl && /f\[i\]\.id === flaecheFuer\) \{ continue/.test(wl[0]),
+         'eine Fläche verweist nicht auf sich selbst');
+  pruefe(wl && /status === 'erledigt'\) \{ continue/.test(wl[0]),
+         'erledigte Aufgaben stehen nicht zur Wahl');
+
+  if (!w) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = w.pruefeWb();
+    pruefe(e.eingefuegt === '[[projekt:p1|Garage]]',
+           'der Verweis steht als Muster im Text');
+    pruefe(e.gezeigt.indexOf('>Garage<') >= 0, 'in der Ansicht steht der Name');
+    pruefe(e.gezeigt.indexOf('wb-link') >= 0, 'und er ist anklickbar');
+    pruefe(e.nachUmbenennen.indexOf('>Garage neu<') >= 0,
+           'wird das Ziel umbenannt, zeigt der Verweis den neuen Namen');
+    pruefe(e.nachLoeschen.indexOf('wb-tot') >= 0,
+           'ist es gelöscht, bleibt der alte Name durchgestrichen stehen');
+    pruefe(e.netzlinkUnberuehrt.indexOf('href="https://x.de"') >= 0,
+           'ein gewöhnlicher Verweis ins Netz bleibt, wie er war');
+    pruefe(e.flaecheGeht === true, 'auch auf eine andere Fläche lässt sich zeigen');
   }
 }
 
