@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.87.0</title>
+<title>Workbench 0.88.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1300,7 +1300,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.87.0';
+var APP_VERSION = '0.88.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -9193,6 +9193,28 @@ function flaecheGetippt(wert) {
 
 /* Legt ein Zeichenpaar um die Auswahl — oder setzt es dort ein, wo der
    Strich steht, damit man gleich weiterschreiben kann. */
+/* Ein Textfeld unmittelbar zu beschreiben löscht die Rückgängig-Kette
+   des Browsers — auch für alles, was man vorher getippt hat. Über den
+   Umweg einer Einfügung bleibt sie erhalten, und Strg+Z wirkt wie
+   überall sonst. Kann der Browser das nicht, wird geschrieben wie
+   bisher; dann ist die Kette eben weg. */
+function feldErsetzen(feld, a, b, text) {
+  if (!feld) { return false; }
+  if (feld.focus) { feld.focus(); }
+  if (typeof feld.setSelectionRange === 'function') { feld.setSelectionRange(a, b); }
+  if (typeof document.execCommand === 'function') {
+    try {
+      if (document.execCommand('insertText', false, text)) { return true; }
+    } catch (f) { /* der Browser mag nicht — dann eben anders */ }
+  }
+  var alt = String(feld.value || '');
+  feld.value = alt.slice(0, a) + text + alt.slice(b);
+  if (typeof feld.setSelectionRange === 'function') {
+    feld.setSelectionRange(a + text.length, a + text.length);
+  }
+  return false;
+}
+
 function flaecheUmschliessen(zeichen) {
   var feld = document.getElementById('flaecheFeld');
   if (!feld) { return; }
@@ -9210,13 +9232,12 @@ function flaecheUmschliessen(zeichen) {
     if (rechts > links) { a = links; b = rechts; }
   }
   var mitte = text.slice(a, b);
-  feld.value = text.slice(0, a) + zeichen + mitte + zeichen + text.slice(b);
+  feldErsetzen(feld, a, b, zeichen + mitte + zeichen);
   flaecheSetzen(flaecheFuer, feld.value);
   if (typeof feld.setSelectionRange === 'function') {
     if (mitte.length) { feld.setSelectionRange(a, b + 2 * zeichen.length); }
     else { feld.setSelectionRange(a + zeichen.length, a + zeichen.length); }
   }
-  if (feld.focus) { feld.focus(); }
 }
 
 /* Setzt ein Zeichen dort ein, wo der Strich steht. Für Häkchen,
@@ -9227,13 +9248,8 @@ function flaecheEinfuegen(zeichen) {
   var text = String(feld.value || '');
   var a = (typeof feld.selectionStart === 'number') ? feld.selectionStart : text.length;
   var b = (typeof feld.selectionEnd === 'number') ? feld.selectionEnd : a;
-  feld.value = text.slice(0, a) + zeichen + text.slice(b);
+  feldErsetzen(feld, a, b, zeichen);
   flaecheSetzen(flaecheFuer, feld.value);
-  var stelle = a + zeichen.length;
-  if (typeof feld.setSelectionRange === 'function') {
-    feld.setSelectionRange(stelle, stelle);
-  }
-  if (feld.focus) { feld.focus(); }
 }
 
 function flaecheLink() {
@@ -9244,14 +9260,13 @@ function flaecheLink() {
   var b = (typeof feld.selectionEnd === 'number') ? feld.selectionEnd : a;
   var mitte = text.slice(a, b) || 'Text';
   var neu = '[' + mitte + '](https://)';
-  feld.value = text.slice(0, a) + neu + text.slice(b);
+  feldErsetzen(feld, a, b, neu);
   flaecheSetzen(flaecheFuer, feld.value);
   /* Der Strich landet hinter https:// — dort geht es weiter. */
   var stelle = a + neu.length - 1;
   if (typeof feld.setSelectionRange === 'function') {
     feld.setSelectionRange(stelle, stelle);
   }
-  if (feld.focus) { feld.focus(); }
 }
 
 /* Setzt ein Zeichen an den Anfang der Zeile, in der der Strich steht. */
@@ -9279,13 +9294,12 @@ function flaecheZeichen(was) {
   else if (was === 'punkt')    { neu = einzug + '- ' + ohne; }
   else { return; }
 
-  feld.value = text.slice(0, anfang) + neu + text.slice(ende);
+  feldErsetzen(feld, anfang, ende, neu);
   flaecheSetzen(flaecheFuer, feld.value);
   var neuStelle = anfang + neu.length;
   if (typeof feld.setSelectionRange === 'function') {
     feld.setSelectionRange(neuStelle, neuStelle);
   }
-  if (feld.focus) { feld.focus(); }
 }
 
 /* Sinnbilder statt Wörter: Die Leiste soll schmal bleiben, damit sie
@@ -9973,12 +9987,8 @@ function skizzeEinfuegen(id, mime) {
     var a = (typeof feld.selectionStart === 'number') ? feld.selectionStart : text.length;
     var davor = (a === 0 || text.charAt(a - 1) === '\n') ? '' : '\n';
     var neu = davor + '!skizze:' + id + '\n';
-    feld.value = text.slice(0, a) + neu + text.slice(a);
+    feldErsetzen(feld, a, a, neu);
     flaecheSetzen(flaecheFuer, feld.value);
-    var stelle = a + neu.length;
-    if (typeof feld.setSelectionRange === 'function') {
-      feld.setSelectionRange(stelle, stelle);
-    }
   }
   aktionenSchliessen();
   vorschauBauen(id, mime).then(function () { flaecheZeichnen(); });

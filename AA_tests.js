@@ -6444,6 +6444,18 @@ console.log('\n75. Gedankenfläche');
     pruefe(e.jeFlaeche === true,
            'die Wahl gilt je Fläche, nicht für alle zusammen');
   }
+  const fe = hauptSkript().match(/function feldErsetzen\([\s\S]*?\n\}/);
+  pruefe(fe && /execCommand\('insertText'/.test(fe[0]),
+         'geschrieben wird über eine Einfügung — das erhält die '
+         + 'Rückgängig-Kette des Browsers');
+  pruefe(fe && /feld\.value = alt\.slice/.test(fe[0]),
+         'kann der Browser das nicht, wird geschrieben wie bisher');
+  ['flaecheUmschliessen', 'flaecheEinfuegen', 'flaecheLink', 'flaecheZeichen',
+   'skizzeEinfuegen'].forEach(function (f) {
+    const b = hauptSkript().match(new RegExp('function ' + f + '\\([\\s\\S]*?\\n\\}'));
+    pruefe(b && !/feld\.value = text\.slice/.test(b[0]),
+           f + ' schreibt nicht mehr unmittelbar ins Feld');
+  });
   pruefe(/\.fl-knopf svg text\{fill:currentColor/.test(QUELLE),
          'Sinnbilder aus Schrift sind sichtbar — CSS schlägt sonst das '
          + 'fill-Attribut und lässt sie verschwinden');
