@@ -1195,6 +1195,12 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.linkNackt = az(\'Adresse https://x.de hier\');'
                  + '   r.keinFalscherStern = az(\'a * b * c\');'
                  + '   r.unter = az(\'Das +wichtig+ hier\');'
+                 + '   r.doppelStern = az(\'Das ist **fett** so\');'
+                 + '   r.doppelStrich = az(\'Und __unterstrichen__ hier\');'
+                 + '   r.umbruch = az(\'Zeile eins<br>Zeile zwei\');'
+                 + '   r.umbruchKurz = az(\'Zeile eins<br/>Zeile zwei\');'
+                 + '   r.keinFremderCode = az(\'Kein <script>x</script>\');'
+                 + '   r.keinRechenzeichen = az(\'2**3 ist acht\');'
                  + '   feld.value = \'wichtig\'; feld.selectionStart = 0;'
                  + '   feld.selectionEnd = 7;'
                  + '   flaecheUmschliessen(\'*\');'
@@ -6497,6 +6503,18 @@ console.log('\n75. Gedankenfläche');
     pruefe(e.datumLang === 'Mo, 14.09.2026', 'das Datum trägt Wochentag und Jahr');
     pruefe(e.knoepfe === 21, 'einundzwanzig Knöpfe in der Leiste');
     pruefe(e.unter === 'Das <u>wichtig</u> hier', 'Pluszeichen unterstreichen');
+    pruefe(e.doppelStern === 'Das ist <b>fett</b> so',
+           'auch die gängige Markdown-Schreibweise mit zwei Sternen');
+    pruefe(e.doppelStrich === 'Und <u>unterstrichen</u> hier',
+           'zwei Unterstriche unterstreichen');
+    pruefe(e.umbruch === 'Zeile eins<br>Zeile zwei',
+           'ein <br> wird als Zeilenumbruch gelesen');
+    pruefe(e.umbruchKurz === 'Zeile eins<br>Zeile zwei',
+           'auch in der Schreibweise <br/>');
+    pruefe(e.keinFremderCode.indexOf('&lt;script&gt;') >= 0,
+           'alles andere bleibt maskiert — fremder Code wird nicht ausgeführt');
+    pruefe(e.keinRechenzeichen === '2**3 ist acht',
+           'Sterne ohne Leerzeichen davor zeichnen nichts aus');
     pruefe(e.hakenEingefuegt === 'Fertig ✔', 'ein Häkchen wird eingefügt');
     pruefe(e.pfeilStrich === 8, 'der Strich steht hinter dem Zeichen');
     pruefe(e.nurOffen === 2, 'die Suche nach Offenem findet zwei Zeilen');

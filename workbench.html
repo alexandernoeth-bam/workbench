@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.91.0</title>
+<title>Workbench 0.92.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -775,6 +775,7 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
 .fl-tab{border-collapse:collapse;font-size:calc(var(--fs)*0.84);min-width:100%}
 .fl-tab th,.fl-tab td{border:1px solid var(--linie);padding:5px 9px;
   text-align:left;vertical-align:top;line-height:1.4}
+.fl-tab td br,.fl-ansicht br{line-height:1.5}
 .fl-tab th{background:var(--karte);font-weight:500}
 .fl-tab tbody tr:nth-child(even) td{background:var(--karte)}
 
@@ -1319,7 +1320,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.91.0';
+var APP_VERSION = '0.92.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -9074,6 +9075,19 @@ function flaecheAuszeichnen(text) {
                 '<a href="$2" target="_blank" rel="noopener">$1</a>');
   t = t.replace(/(^|[\s(])(https?:\/\/[^\s<]+)/g,
                 '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  /* Ein Zeilenumbruch innerhalb einer Zelle oder Zeile. Alles andere
+     bleibt maskiert — fremder Code wird nicht ausgeführt, nur dieses
+     eine Zeichen ist erlaubt. */
+  t = t.replace(/&lt;br\s*\/?&gt;/gi, '<br>');
+
+  /* Doppelte Sterne und Unterstriche sind die gängige Schreibweise
+     aus Markdown. Sie zuerst, sonst risse die einfache Regel sie
+     auseinander. */
+  t = t.replace(/(^|[\s(])\*\*([^*\n]{1,200})\*\*(?=$|[\s.,;:!?)])/g,
+                '$1<b>$2</b>');
+  t = t.replace(/(^|[\s(])__([^_\n]{1,200})__(?=$|[\s.,;:!?)])/g,
+                '$1<u>$2</u>');
+
   /* Der Inhalt darf nicht mit einem Leerzeichen beginnen oder enden —
      sonst würde „a * b * c" zu fettem „ b ". */
   var paar = function (zeichen, auf, zu) {
