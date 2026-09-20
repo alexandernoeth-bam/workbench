@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.92.0</title>
+<title>Workbench 0.92.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1320,7 +1320,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.92.0';
+var APP_VERSION = '0.92.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -9083,19 +9083,27 @@ function flaecheAuszeichnen(text) {
   /* Doppelte Sterne und Unterstriche sind die gängige Schreibweise
      aus Markdown. Sie zuerst, sonst risse die einfache Regel sie
      auseinander. */
-  t = t.replace(/(^|[\s(])\*\*([^*\n]{1,200})\*\*(?=$|[\s.,;:!?)])/g,
-                '$1<b>$2</b>');
-  t = t.replace(/(^|[\s(])__([^_\n]{1,200})__(?=$|[\s.,;:!?)])/g,
-                '$1<u>$2</u>');
+  /* Davor und danach darf auch eine Zeichenmarke stehen: „**Zapf**<br>"
+     ist die übliche Schreibweise, und ohne diese Öffnung bliebe sie
+     unerkannt. */
+  /* Wie bei den einfachen Zeichen darf der Inhalt weder mit einem
+     Leerzeichen beginnen noch enden — sonst würde „a ** b ** c" zu
+     fettem „ b ". */
+  t = t.replace(
+    /(^|[\s(>])\*\*([^*\n\s](?:[^*\n]{0,198}[^*\n\s])?)\*\*(?=$|[\s.,;:!?)<])/g,
+    '$1<b>$2</b>');
+  t = t.replace(
+    /(^|[\s(>])__([^_\n\s](?:[^_\n]{0,198}[^_\n\s])?)__(?=$|[\s.,;:!?)<])/g,
+    '$1<u>$2</u>');
 
   /* Der Inhalt darf nicht mit einem Leerzeichen beginnen oder enden —
      sonst würde „a * b * c" zu fettem „ b ". */
   var paar = function (zeichen, auf, zu) {
     var z = zeichen.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    var re = new RegExp('(^|[\\s(])' + z
+    var re = new RegExp('(^|[\\s(>])' + z
                       + '([^' + z + '\\s\\n](?:[^' + z + '\\n]{0,118}'
                       + '[^' + z + '\\s\\n])?)' + z
-                      + '(?=$|[\\s.,;:!?)])', 'g');
+                      + '(?=$|[\\s.,;:!?)<])', 'g');
     t = t.replace(re, '$1' + auf + '$2' + zu);
   };
   paar('*', '<b>', '</b>');

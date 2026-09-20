@@ -1201,6 +1201,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.umbruchKurz = az(\'Zeile eins<br/>Zeile zwei\');'
                  + '   r.keinFremderCode = az(\'Kein <script>x</script>\');'
                  + '   r.keinRechenzeichen = az(\'2**3 ist acht\');'
+                 + '   r.vorUmbruch = az(\'**Text**<br>danach\');'
+                 + '   r.nachUmbruch = az(\'Vorher<br>**Text**\');'
+                 + '   r.zweiDoppelt = az(\'a ** b ** c\');'
                  + '   feld.value = \'wichtig\'; feld.selectionStart = 0;'
                  + '   feld.selectionEnd = 7;'
                  + '   flaecheUmschliessen(\'*\');'
@@ -6515,6 +6518,13 @@ console.log('\n75. Gedankenfläche');
            'alles andere bleibt maskiert — fremder Code wird nicht ausgeführt');
     pruefe(e.keinRechenzeichen === '2**3 ist acht',
            'Sterne ohne Leerzeichen davor zeichnen nichts aus');
+    pruefe(e.vorUmbruch === '<b>Text</b><br>danach',
+           'ein ** unmittelbar vor einem <br> wird erkannt — so steht es in '
+           + 'jeder eingefügten Tabelle');
+    pruefe(e.nachUmbruch === 'Vorher<br><b>Text</b>',
+           'und ebenso unmittelbar danach');
+    pruefe(e.zweiDoppelt === 'a ** b ** c',
+           'zwei einzelne Doppelsterne im Satz zeichnen nichts aus');
     pruefe(e.hakenEingefuegt === 'Fertig ✔', 'ein Häkchen wird eingefügt');
     pruefe(e.pfeilStrich === 8, 'der Strich steht hinter dem Zeichen');
     pruefe(e.nurOffen === 2, 'die Suche nach Offenem findet zwei Zeilen');
