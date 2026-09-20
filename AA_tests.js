@@ -539,6 +539,55 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__tabApi = {'
+                 + ' pruefeTabellen: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var t = [\'| Firma | Preis | Termin |\','
+                 + '            \'|---|---:|---|\','
+                 + '            \'| Zapf | 12.000 | 20.9. |\','
+                 + '            \'| *Dennert* | 14.500 |\','
+                 + '            \'\','
+                 + '            \'Danach Text\'].join(\'\\n\');'
+                 + '   DB.gedanken = [{ id:\'g1\', titel:\'N\', text: t,'
+                 + '     geaendert: jetzt() }];'
+                 + '   flaecheFuer = \'g:g1\'; flaecheSuche = \'\';'
+                 + '   flaecheArt = {}; flaecheZuKarte = {};'
+                 + '   var h = flaecheAnsichtHtml(t, \'\').html;'
+                 + '   var tab = h.match(/<table[\\s\\S]*?<\\/table>/)[0];'
+                 + '   var zellenAus = function(block, art){'
+                 + '     var re = new RegExp(\'<\' + art + \'[^>]*>([\\\\s\\\\S]*?)'
+                 + '<\\\\/\' + art + \'>\', \'g\');'
+                 + '     var aus = [];'
+                 + '     var m;'
+                 + '     while ((m = re.exec(block)) !== null) {'
+                 + '       aus.push(m[1].replace(/<[^>]*>/g, \'\')); }'
+                 + '     return aus; };'
+                 + '   var kopf = zellenAus(tab.match('
+                 + '     /<thead>[\\s\\S]*?<\\/thead>/)[0], \'th\');'
+                 + '   var rumpf = tab.match(/<tbody>[\\s\\S]*?<\\/tbody>/)[0];'
+                 + '   var reihen = rumpf.match(/<tr>[\\s\\S]*?<\\/tr>/g) || [];'
+                 + '   var r = { kopf: kopf.join(\',\'), zeilen: reihen.length,'
+                 + '             erste: zellenAus(reihen[0], \'td\').join(\',\'),'
+                 + '             rechts: /text-align:right/.test(tab),'
+                 + '             luecken: zellenAus(reihen[1], \'td\').length,'
+                 + '             danach: (h.indexOf(\'Danach Text\') >= 0),'
+                 + '             auszeichnung: (tab.indexOf(\'<b>Dennert</b>\') >= 0) };'
+                 + '   var m2 = [\'| A | B |\', \'|:---:|---|\', \'| 1 | 2 |\']'
+                 + '            .join(\'\\n\');'
+                 + '   r.mittig = /text-align:center/.test('
+                 + '     flaecheAnsichtHtml(m2, \'\').html);'
+                 + '   var o = [\'| A | B |\', \'| 1 | 2 |\'].join(\'\\n\');'
+                 + '   var oh = flaecheAnsichtHtml(o, \'\').html;'
+                 + '   r.ohneKopf = (oh.indexOf(\'<table\') >= 0'
+                 + '     && oh.indexOf(\'<thead>\') < 0);'
+                 + '   var feld = document.getElementById(\'flaecheFeld\');'
+                 + '   feld.value = \'\'; feld.selectionStart = 0;'
+                 + '   feld.selectionEnd = 0;'
+                 + '   tabelleEinfuegen();'
+                 + '   r.geruest = feld.value;'
+                 + '   flaecheFuer = \'\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__faltApi = {'
                  + ' pruefeFalten: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -6446,7 +6495,7 @@ console.log('\n75. Gedankenfläche');
            'der Verweisknopf legt ein Gerüst an');
     pruefe(e.linkStrich === 17, 'und setzt den Strich hinter https://');
     pruefe(e.datumLang === 'Mo, 14.09.2026', 'das Datum trägt Wochentag und Jahr');
-    pruefe(e.knoepfe === 20, 'zwanzig Knöpfe in der Leiste');
+    pruefe(e.knoepfe === 21, 'einundzwanzig Knöpfe in der Leiste');
     pruefe(e.unter === 'Das <u>wichtig</u> hier', 'Pluszeichen unterstreichen');
     pruefe(e.hakenEingefuegt === 'Fertig ✔', 'ein Häkchen wird eingefügt');
     pruefe(e.pfeilStrich === 8, 'der Strich steht hinter dem Zeichen');
@@ -6481,6 +6530,15 @@ console.log('\n75. Gedankenfläche');
          + 'Rückgängig-Kette des Browsers');
   pruefe(fe && /feld\.value = alt\.slice/.test(fe[0]),
          'kann der Browser das nicht, wird geschrieben wie bisher');
+  /* Ein abgefangenes touchstart unterdrückt den Klick — auf dem
+     Berührungsbildschirm täte der Knopf dann gar nichts. */
+  pruefe(!/ontouchstart="event\.preventDefault\(\)"/.test(hauptSkript()),
+         'kein Knopf sperrt die Berührung');
+  pruefe(new RegExp('function\\s+wortUmDieMarke\\s*\\(').test(hauptSkript()),
+         'Auszeichnung und Verweis nehmen dasselbe Wort unter der Marke');
+  const fl = hauptSkript().match(/function flaecheLink\([\s\S]*?\n\}/);
+  pruefe(fl && /wortUmDieMarke\(/.test(fl[0]),
+         'der Verweis verhält sich wie die Nachbarknöpfe');
   ['flaecheUmschliessen', 'flaecheEinfuegen', 'flaecheLink', 'flaecheZeichen',
    'skizzeEinfuegen'].forEach(function (f) {
     const b = hauptSkript().match(new RegExp('function ' + f + '\\([\\s\\S]*?\\n\\}'));
@@ -7450,6 +7508,58 @@ console.log('\n91. Einklappen in der Fläche');
     pruefe(r.allesAuf === 9, 'alles auf bringt sie zurück');
     pruefe(r.beiSuche === true,
            'während einer Suche bleibt alles sichtbar');
+  }
+}
+
+/* ============================================================
+   92. Tabellen in der Gedankenflaeche
+   Grund: Angebote, Masse, Vergleiche — dafuer ist eine Liste zu wenig.
+   Geschrieben werden sie mit senkrechten Strichen, gespeichert bleibt
+   es Text.
+   ============================================================ */
+console.log('\n92. Tabellen');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__tabApi;
+
+  ['istTabellenzeile', 'istTrennzeile', 'tabellenZellen', 'tabellenRichtung',
+   'tabelleHtml', 'tabelleEinfuegen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const a = skript.match(/function flaecheAnsichtHtml\([\s\S]*?\n\}\n/);
+  pruefe(a && /istTabellenzeile\(zeilen\[i\]\)/.test(a[0]),
+         'eine Tabelle wird als Block erkannt, nicht Zeile für Zeile');
+  pruefe(a && /i \+= tab\.zahl - 1/.test(a[0]),
+         'die verbrauchten Zeilen werden übersprungen');
+
+  const th = skript.match(/function tabelleHtml\([\s\S]*?\n\}\n/);
+  pruefe(th && /istTrennzeile\(reihen\[1\]\)/.test(th[0]),
+         'die zweite Zeile trennt den Kopf ab');
+  pruefe(th && /fl-tab-rahmen/.test(th[0]),
+         'die Tabelle rollt für sich, nicht die ganze Seite');
+  pruefe(/overflow-x:auto/.test(QUELLE.match(/\.fl-tab-rahmen\{[^}]*\}/)[0]),
+         'bei vielen Spalten wird sie seitlich rollbar');
+
+  if (!t) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = t.pruefeTabellen();
+    pruefe(e.kopf === 'Firma,Preis,Termin', 'der Kopf wird gelesen');
+    pruefe(e.zeilen === 2, 'zwei Zeilen im Rumpf');
+    pruefe(e.erste === 'Zapf,12.000,20.9.', 'die Zellen stimmen');
+    pruefe(e.rechts === true, '---: richtet die Spalte rechts aus');
+    pruefe(e.mittig === true, ':---: mittig');
+    pruefe(e.ohneKopf === true,
+           'ohne Trennzeile hat die Tabelle keinen Kopf, bleibt aber eine Tabelle');
+    pruefe(e.luecken === 3,
+           'eine kurze Zeile wird mit leeren Zellen aufgefüllt');
+    pruefe(e.danach === true, 'der Text nach der Tabelle bleibt erhalten');
+    pruefe(e.auszeichnung === true,
+           'in den Zellen wirken Fett und Verweise wie sonst auch');
+    pruefe(e.geruest.split('\n').length >= 3,
+           'der Knopf legt ein Gerüst aus drei Zeilen an');
   }
 }
 

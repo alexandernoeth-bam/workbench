@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.89.0</title>
+<title>Workbench 0.91.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -771,6 +771,13 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
 .fl-text.fertig{color:var(--grau);text-decoration:line-through}
 .fl-punkt{flex:0 0 8px;height:8px;border:1.5px solid var(--grau);border-radius:2px;
   align-self:center}
+.fl-tab-rahmen{overflow-x:auto;margin:9px 0}
+.fl-tab{border-collapse:collapse;font-size:calc(var(--fs)*0.84);min-width:100%}
+.fl-tab th,.fl-tab td{border:1px solid var(--linie);padding:5px 9px;
+  text-align:left;vertical-align:top;line-height:1.4}
+.fl-tab th{background:var(--karte);font-weight:500}
+.fl-tab tbody tr:nth-child(even) td{background:var(--karte)}
+
 .fl-trenner{border-top:1px solid var(--linie);margin:12px 0}
 .fl-skizze{margin:10px 0}
 .fl-skizze img{max-width:100%;max-height:380px;border:1px solid var(--linie);
@@ -1312,7 +1319,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.89.0';
+var APP_VERSION = '0.91.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -9085,6 +9092,125 @@ function flaecheAuszeichnen(text) {
   return t;
 }
 
+
+/* ------------------------------------------------------------
+   Tabellen in der Gedankenfläche
+
+   Geschrieben werden sie mit senkrechten Strichen, wie man es aus
+   Textnachrichten kennt:
+
+     | Firma | Preis | Termin |
+     |---|---:|---|
+     | Zapf | 12.000 | 20.9. |
+
+   Die zweite Zeile trennt den Kopf ab und bestimmt die Ausrichtung:
+   ---: rechts, :---: mittig, sonst links. Sie darf auch fehlen, dann
+   hat die Tabelle keinen Kopf.
+   ------------------------------------------------------------ */
+
+function istTabellenzeile(zeile) {
+  var z = String(zeile).replace(/^\s+/, '');
+  return z.indexOf('|') === 0 && z.length > 1;
+}
+
+function istTrennzeile(zeile) {
+  var z = String(zeile).replace(/^\s+/, '');
+  if (!istTabellenzeile(z)) { return false; }
+  return /^\|(\s*:?-{2,}:?\s*\|)+\s*$/.test(z);
+}
+
+function tabellenZellen(zeile) {
+  var z = String(zeile).replace(/^\s+/, '').replace(/\s+$/, '');
+  if (z.charAt(0) === '|') { z = z.slice(1); }
+  if (z.charAt(z.length - 1) === '|') { z = z.slice(0, -1); }
+  var roh = z.split('|');
+  var aus = [];
+  var i;
+  for (i = 0; i < roh.length; i++) { aus.push(roh[i].trim()); }
+  return aus;
+}
+
+function tabellenRichtung(trennzeile) {
+  var zellen = tabellenZellen(trennzeile);
+  var aus = [];
+  var i;
+  for (i = 0; i < zellen.length; i++) {
+    var z = zellen[i];
+    var links = z.charAt(0) === ':';
+    var rechts = z.charAt(z.length - 1) === ':';
+    if (links && rechts) { aus.push('center'); }
+    else if (rechts) { aus.push('right'); }
+    else { aus.push('left'); }
+  }
+  return aus;
+}
+
+/* Aus den Zeilen ab „von" eine Tabelle bauen. Zurück kommt das HTML
+   und wie viele Zeilen verbraucht wurden. */
+function tabelleHtml(zeilen, von, hervor) {
+  var bis = von;
+  while (bis < zeilen.length && istTabellenzeile(zeilen[bis])) { bis++; }
+  var reihen = zeilen.slice(von, bis);
+  if (!reihen.length) { return { html: '', zahl: 0 }; }
+
+  var kopf = null;
+  var richtung = [];
+  var ab = 0;
+  if (reihen.length >= 2 && istTrennzeile(reihen[1])) {
+    kopf = tabellenZellen(reihen[0]);
+    richtung = tabellenRichtung(reihen[1]);
+    ab = 2;
+  }
+
+  var breite = kopf ? kopf.length : 0;
+  var i, j;
+  for (i = ab; i < reihen.length; i++) {
+    var n = tabellenZellen(reihen[i]).length;
+    if (n > breite) { breite = n; }
+  }
+
+  var stil = function (nr) {
+    var r = richtung[nr] || 'left';
+    return (r === 'left') ? '' : (' style="text-align:' + r + '"');
+  };
+
+  var h = '<div class="fl-tab-rahmen"><table class="fl-tab">';
+  if (kopf) {
+    h += '<thead><tr>';
+    for (j = 0; j < breite; j++) {
+      h += '<th' + stil(j) + '>' + hervor(kopf[j] || '') + '</th>';
+    }
+    h += '</tr></thead>';
+  }
+  h += '<tbody>';
+  for (i = ab; i < reihen.length; i++) {
+    var zellen = tabellenZellen(reihen[i]);
+    h += '<tr>';
+    for (j = 0; j < breite; j++) {
+      h += '<td' + stil(j) + '>' + hervor(zellen[j] || '') + '</td>';
+    }
+    h += '</tr>';
+  }
+  h += '</tbody></table></div>';
+  return { html: h, zahl: bis - von };
+}
+
+/* Ein Gerüst einfügen — drei Spalten, eine Zeile. Wer mehr braucht,
+   tippt weiter; die Striche sind ja nur Zeichen. */
+function tabelleEinfuegen() {
+  var feld = document.getElementById('flaecheFeld');
+  if (!feld) { return; }
+  var text = String(feld.value || '');
+  var a = (typeof feld.selectionStart === 'number') ? feld.selectionStart : text.length;
+  var davor = (a === 0 || text.charAt(a - 1) === '\n') ? '' : '\n';
+  var neu = davor
+          + '| Was | Wer | Wann |\n'
+          + '|---|---|---|\n'
+          + '|  |  |  |\n';
+  feldErsetzen(feld, a, a, neu);
+  flaecheSetzen(flaecheFuer, feld.value);
+}
+
 function flaecheZeileHtml(zeile, nr, suche, falte) {
   var roh = String(zeile);
   var tiefe = 0;
@@ -9218,6 +9344,26 @@ function flaecheAnsichtHtml(text, suche) {
       if (!stufe || stufe > zuBis) { continue; }
       zuBis = 0;
     }
+    /* Eine Tabelle ist ein Block, keine Folge von Zeilen — sie wird
+       am Stück gezeichnet und die verbrauchten Zeilen übersprungen. */
+    if (istTabellenzeile(zeilen[i])) {
+      var hervorTab = function (text) {
+        var t = flaecheAuszeichnen(text);
+        if (suche && suche.length >= 2) {
+          var re = new RegExp('(' + suche.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                            + ')', 'gi');
+          t = t.replace(re, '<mark>$1</mark>');
+        }
+        return t;
+      };
+      var tab = tabelleHtml(zeilen, i, hervorTab);
+      if (tab.zahl) {
+        h += tab.html;
+        i += tab.zahl - 1;
+        continue;
+      }
+    }
+
     if (faltenGilt && stufe && flaecheAbschnittZu(zeilen[i])) {
       var drin = 0;
       var j;
@@ -9307,6 +9453,19 @@ function feldErsetzen(feld, a, b, text) {
   return false;
 }
 
+/* Die Marke steht mitten in einem Wort? Dann ist dieses Wort gemeint.
+   Dieselbe Regel für Auszeichnungen und Verweise — sonst verhielten
+   sich benachbarte Knöpfe verschieden. */
+function wortUmDieMarke(text, a, b) {
+  if (a !== b) { return { a: a, b: b }; }
+  var links = a;
+  var rechts = a;
+  while (links > 0 && !/\s/.test(text.charAt(links - 1))) { links--; }
+  while (rechts < text.length && !/\s/.test(text.charAt(rechts))) { rechts++; }
+  if (rechts > links) { return { a: links, b: rechts }; }
+  return { a: a, b: b };
+}
+
 function flaecheUmschliessen(zeichen) {
   var feld = document.getElementById('flaecheFeld');
   if (!feld) { return; }
@@ -9316,13 +9475,9 @@ function flaecheUmschliessen(zeichen) {
 
   /* Ohne Markierung gilt das Wort, in dem die Marke steht — das ist
      fast immer gemeint, und man muss nicht erst auswählen. */
-  if (a === b) {
-    var links = a;
-    var rechts = a;
-    while (links > 0 && !/[\s]/.test(text.charAt(links - 1))) { links--; }
-    while (rechts < text.length && !/[\s]/.test(text.charAt(rechts))) { rechts++; }
-    if (rechts > links) { a = links; b = rechts; }
-  }
+  var w = wortUmDieMarke(text, a, b);
+  a = w.a;
+  b = w.b;
   var mitte = text.slice(a, b);
   feldErsetzen(feld, a, b, zeichen + mitte + zeichen);
   flaecheSetzen(flaecheFuer, feld.value);
@@ -9348,8 +9503,11 @@ function flaecheLink() {
   var feld = document.getElementById('flaecheFeld');
   if (!feld) { return; }
   var text = String(feld.value || '');
-  var a = (typeof feld.selectionStart === 'number') ? feld.selectionStart : text.length;
-  var b = (typeof feld.selectionEnd === 'number') ? feld.selectionEnd : a;
+  var a0 = (typeof feld.selectionStart === 'number') ? feld.selectionStart : text.length;
+  var b0 = (typeof feld.selectionEnd === 'number') ? feld.selectionEnd : a0;
+  var w2 = wortUmDieMarke(text, a0, b0);
+  var a = w2.a;
+  var b = w2.b;
   var mitte = text.slice(a, b) || 'Text';
   var neu = '[' + mitte + '](https://)';
   feldErsetzen(feld, a, b, neu);
@@ -9427,6 +9585,8 @@ function flaecheSinnbild(art) {
     skizze:  '<rect x="3" y="4" width="18" height="16" rx="2"></rect>'
            + '<path d="M3 16l5-5 4 4 3-3 6 6"></path>'
            + '<circle cx="9" cy="9" r="1.4"></circle>',
+    tabelle: '<rect x="3" y="5" width="18" height="14" rx="2"></rect>'
+           + '<path d="M3 10h18M9 10v9M15 10v9"></path>',
     trenner: '<path d="M3 12h18"></path>',
     datum:   '<rect x="3" y="5" width="18" height="16" rx="2"></rect>'
            + '<path d="M3 10h18M8 3v4M16 3v4"></path>'
@@ -9448,10 +9608,14 @@ function flaecheKnopf(art, wert, bild, hinweis) {
   else { ruf = 'flaecheZeichen(\'' + wert + '\')'; }
   /* onmousedown abfangen: Sonst nimmt der Knopf dem Textfeld die
      Eingabemarke, die Markierung geht verloren, und aus einem „fett"
-     werden zwei Sterne ohne Inhalt. */
+     werden zwei Sterne ohne Inhalt.
+
+     Nur bei der Maus! Auf einem Berührungsbildschirm unterdrückt ein
+     abgefangenes touchstart den nachfolgenden Klick — dann tut der
+     Knopf gar nichts mehr. Die Markierung bleibt dort ohnehin
+     erhalten. */
   return '<button class="fl-knopf" type="button" onclick="' + ruf + '" '
        + 'onmousedown="event.preventDefault()" '
-       + 'ontouchstart="event.preventDefault()" '
        + 'title="' + esc(hinweis) + '" aria-label="' + esc(hinweis) + '">'
        + flaecheSinnbild(bild) + '</button>';
 }
@@ -9628,6 +9792,10 @@ function flaecheLeisteHtml() {
   h += '<span class="fl-teiler"></span>';
   h += flaecheKnopf('zeile', 'einzug', 'ein', 'Einrücken');
   h += flaecheKnopf('zeile', 'ausrueck', 'aus', 'Ausrücken');
+  h += '<button class="fl-knopf" type="button" onclick="tabelleEinfuegen()" '
+     + 'onmousedown="event.preventDefault()" '
+     + 'title="Tabelle einfügen" aria-label="Tabelle einfügen">'
+     + flaecheSinnbild('tabelle') + '</button>';
   h += flaecheKnopf('zeile', 'trenner', 'trenner', 'Trennlinie');
   h += flaecheKnopf('zeile', 'datum', 'datum', 'Datum einfügen');
   h += '</div>';
