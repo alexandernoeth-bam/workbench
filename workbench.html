@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.92.2</title>
+<title>Workbench 0.93.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -807,6 +807,11 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
 .vh-bereich svg.auf{transform:rotate(0deg)}
 body.breit .vh-bereich{grid-column:1 / -1}
 
+.vk-rest{font-size:calc(var(--fs)*0.74);color:var(--grau);margin:1px 0 3px;
+  font-variant-numeric:tabular-nums}
+.vk-rest.eng{color:var(--weinrot);font-weight:500}
+.vk-rest.vorbei{color:var(--weinrot)}
+
 .vkarte.flach{cursor:pointer}
 .vkarte.flach .vk-kopf{cursor:pointer}
 .vkarte.flach:hover{border-color:var(--grau-hell)}
@@ -1320,7 +1325,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.92.2';
+var APP_VERSION = '0.93.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8122,6 +8127,7 @@ function zielKarteHtml(z) {
   h += '<div class="vk-zeit">'
      + (z.zieltermin ? ('bis ' + esc(kurzDatum(z.zieltermin))) : '') + '</div>';
   h += '</div>';
+  h += restZeitHtml(z.zieltermin);
   h += '<div class="vk-satz' + (satz ? '' : ' leer') + '">'
      + esc(satz || 'noch kein Zielzustand für diese Woche') + '</div>';
   h += flaecheKnopfHtml(z);
@@ -8139,6 +8145,72 @@ function flaecheKnopfHtml(v) {
        + (text ? ('<span class="vk-punkt"></span>') : '') + '</button>';
 }
 
+/* Wie viel Zeit bleibt? Die Einheit wächst mit dem Abstand: Bei zehn
+   Tagen hilft keine Monatsangabe, bei zehn Monaten keine Tageszahl
+   allein.
+
+     unter zwei Wochen    „9 Tage"
+     unter zwei Monaten   „3 Wochen und 2 Tage"
+     darüber              „8 Monate, 2 Wochen, 3 Tage"
+
+   Monate werden am Kalender abgezählt, nicht als dreißig Tage — vom
+   15. Januar bis zum 15. März sind es zwei Monate, auch im Februar. */
+function restZeit(von, bis) {
+  var a = ausIso(von);
+  var b = ausIso(bis);
+  var tage = Math.round((b - a) / 86400000);
+  if (tage < 0) { return { vorbei: true, tage: -tage }; }
+
+  var monate = 0;
+  var lauf = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  while (true) {
+    var naechster = new Date(lauf.getFullYear(), lauf.getMonth() + 1, a.getDate());
+    /* Der 31. Januar plus ein Monat ist nicht der 3. März */
+    if (naechster.getDate() !== a.getDate()) {
+      naechster = new Date(lauf.getFullYear(), lauf.getMonth() + 2, 0);
+    }
+    if (naechster > b) { break; }
+    lauf = naechster;
+    monate++;
+  }
+  var rest = Math.round((b - lauf) / 86400000);
+  return { vorbei: false, tage: tage, monate: monate,
+           wochen: Math.floor(rest / 7), resttage: rest % 7 };
+}
+
+function mehrzahl(n, eins, viele) {
+  return n + ' ' + (n === 1 ? eins : viele);
+}
+
+function restZeitText(von, bis) {
+  var r = restZeit(von, bis);
+  if (r.vorbei) {
+    return (r.tage === 0) ? 'heute' : ('seit ' + mehrzahl(r.tage, 'Tag', 'Tagen')
+                                       + ' vorbei');
+  }
+  if (r.tage === 0) { return 'heute'; }
+  if (r.tage < 14) { return 'noch ' + mehrzahl(r.tage, 'Tag', 'Tage'); }
+  if (r.monate < 2) {
+    var w = Math.floor(r.tage / 7);
+    var d = r.tage % 7;
+    return 'noch ' + mehrzahl(w, 'Woche', 'Wochen')
+         + (d ? (' und ' + mehrzahl(d, 'Tag', 'Tage')) : '');
+  }
+  var teile = [mehrzahl(r.monate, 'Monat', 'Monate')];
+  if (r.wochen) { teile.push(mehrzahl(r.wochen, 'Woche', 'Wochen')); }
+  if (r.resttage) { teile.push(mehrzahl(r.resttage, 'Tag', 'Tage')); }
+  return 'noch ' + teile.join(', ');
+}
+
+function restZeitHtml(bis) {
+  if (!bis) { return ''; }
+  var heute = isoDatum();
+  var r = restZeit(heute, bis);
+  var eng = !r.vorbei && r.tage < 14;
+  return '<div class="vk-rest' + (r.vorbei ? ' vorbei' : (eng ? ' eng' : '')) + '">'
+       + esc(restZeitText(heute, bis)) + '</div>';
+}
+
 function projektKarteHtml(p) {
   var satz = zustandText(p);
   var h = '<div class="vkarte flach' + (p.kontext === 'privat' ? ' privat' : '') + '" '
@@ -8147,6 +8219,7 @@ function projektKarteHtml(p) {
   h += '<div class="vk-name">' + esc(p.name) + '</div>';
   h += '<div class="vk-zeit">' + (p.ende ? ('bis ' + esc(kurzDatum(p.ende))) : '') + '</div>';
   h += '</div>';
+  h += restZeitHtml(p.ende);
   h += '<div class="vk-satz' + (satz ? '' : ' leer') + '">'
      + esc(satz || 'noch kein Zielzustand für diese Woche') + '</div>';
   h += flaecheKnopfHtml(p);

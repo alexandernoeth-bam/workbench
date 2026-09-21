@@ -539,6 +539,20 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__restApi = {'
+                 + ' pruefeRest: function(){'
+                 + '   var v = \'2026-09-19\';'
+                 + '   return {'
+                 + '     heute: restZeitText(v, \'2026-09-19\'),'
+                 + '     einTag: restZeitText(v, \'2026-09-20\'),'
+                 + '     neun: restZeitText(v, \'2026-09-28\'),'
+                 + '     zweiWochen: restZeitText(v, \'2026-10-03\'),'
+                 + '     dreiZwei: restZeitText(v, \'2026-10-12\'),'
+                 + '     zweiMonate: restZeitText(v, \'2026-11-19\'),'
+                 + '     lang: restZeitText(v, \'2027-05-31\'),'
+                 + '     vorbei: restZeitText(v, \'2026-09-10\'),'
+                 + '     monatsende: restZeitText(\'2026-01-31\', \'2026-03-31\') };'
+                 + ' } };'
                  + 'globalThis.__tabApi = {'
                  + ' pruefeTabellen: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -7588,6 +7602,50 @@ console.log('\n92. Tabellen');
            'in den Zellen wirken Fett und Verweise wie sonst auch');
     pruefe(e.geruest.split('\n').length >= 3,
            'der Knopf legt ein Gerüst aus drei Zeilen an');
+  }
+}
+
+/* ============================================================
+   93. Restzeit bis zum Ende
+   Grund: „bis Mo 31.5." sagt nicht, wie viel Zeit bleibt. Die Einheit
+   waechst mit dem Abstand — Tage, dann Wochen, dann Monate.
+   ============================================================ */
+console.log('\n93. Restzeit');
+{
+  const skript = hauptSkript();
+  const r = globalThis.__restApi;
+
+  ['restZeit', 'restZeitText', 'restZeitHtml', 'mehrzahl'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const rz = skript.match(/function restZeit\([\s\S]*?\n\}\n/);
+  pruefe(rz && /getMonth\(\) \+ 1, a\.getDate\(\)/.test(rz[0]),
+         'Monate werden am Kalender abgezählt, nicht als dreißig Tage');
+  pruefe(rz && /naechster\.getDate\(\) !== a\.getDate\(\)/.test(rz[0]),
+         'ein Monatsende springt nicht in den übernächsten Monat');
+  const pk = skript.match(/function projektKarteHtml\([\s\S]*?\n\}\n/);
+  pruefe(pk && /restZeitHtml\(p\.ende\)/.test(pk[0]), 'die Projektkarte zeigt sie');
+  const zk = skript.match(/function zielKarteHtml\([\s\S]*?\n\}\n/);
+  pruefe(zk && /restZeitHtml\(z\.zieltermin\)/.test(zk[0]), 'die Zielkarte ebenso');
+
+  if (!r) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = r.pruefeRest();
+    pruefe(e.heute === 'heute', 'am Tag selbst steht „heute"');
+    pruefe(e.einTag === 'noch 1 Tag', 'die Einzahl stimmt');
+    pruefe(e.neun === 'noch 9 Tage', 'unter zwei Wochen zählen die Tage');
+    pruefe(e.zweiWochen === 'noch 2 Wochen',
+           'genau zwei Wochen ohne angehängte null Tage');
+    pruefe(e.dreiZwei === 'noch 3 Wochen und 2 Tage',
+           'unter zwei Monaten Wochen und Tage');
+    pruefe(e.zweiMonate === 'noch 2 Monate', 'genau zwei Monate ohne Reste');
+    pruefe(e.lang === 'noch 8 Monate, 1 Woche, 5 Tage',
+           'darüber Monate, Wochen und Tage');
+    pruefe(e.vorbei === 'seit 9 Tagen vorbei', 'Überschrittenes wird benannt');
+    pruefe(e.monatsende === 'noch 2 Monate',
+           'vom 31. Januar bis 31. März sind es zwei Monate');
   }
 }
 
