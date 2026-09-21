@@ -68,7 +68,9 @@ console.log('\n1. Bildschirme und Navigation');
   /* Nicht jeder Bildschirm gehört in die Leiste: Die Migration wird
      einmal gebraucht, die Vorhabenseite gehört zu „Vorhaben" und wird
      von dort geöffnet. Beide müssen aber erreichbar bleiben. */
-  const VERSTECKT = ['Migration', 'Flaeche', 'Gedanken'];
+  /* Die Diagnose hat seit v0.95.0 keinen Leistenknopf mehr — sie ist
+     über das Zahnrad im Tag zu erreichen. */
+  const VERSTECKT = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose'];
   schirme.forEach(function (s) {
     if (VERSTECKT.indexOf(s) >= 0) {
       pruefe(navs.indexOf(s) < 0,
@@ -196,7 +198,7 @@ console.log('\n5. Element-IDs');
 
   /* Zusammengesetzte IDs wie 'schirm' + name */
   const schirme = [...QUELLE.matchAll(/id="schirm([A-Za-zÄÖÜäöü]+)"/g)].map(m => m[1]);
-  const OHNE_KNOPF = ['Migration', 'Flaeche', 'Gedanken'];
+  const OHNE_KNOPF = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose'];
   schirme.forEach(function (s) {
     if (OHNE_KNOPF.indexOf(s) >= 0) {
       pruefe(imHtml.has('schirm' + s), 'ID schirm' + s + ' existiert (ohne Knopf)');
@@ -217,7 +219,7 @@ console.log('\n6. Datenmodell');
      Google-Kalender, eine zweite Wahrheit soll es nicht geben. */
   const erwartet = ['aufgaben', 'ziele', 'themen', 'projekte', 'ablaeufe',
                     'durchlaeufe', 'jahrestermine', 'ferien', 'einfaelle',
-                    'gedanken', 'kalenderzuordnung'];
+                    'gedanken', 'pinnwand', 'kalenderzuordnung'];
 
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
   pruefe(!!leer, 'leereDatenbank ist auslesbar');
@@ -539,6 +541,59 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__pinApi = {'
+                 + ' pruefePin: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.aufgaben = [{ id:\'a1\', titel:\'IBAN\', kontext:\'privat\','
+                 + '     status:\'offen\', planung:\'woche\', art:\'haupt\' }];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Paket\','
+                 + '     kontext:\'privat\', schritte:[{ titel:\'A\', fertig:true },'
+                 + '     { titel:\'B\' }, { titel:\'C\' }, { titel:\'D\' }] }];'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'Garage\', kontext:\'privat\','
+                 + '     status:\'laufend\', ende: tagePlus(h, 200), zielzustaende:[] }];'
+                 + '   DB.ziele = [{ id:\'z1\', name:\'Release\','
+                 + '     kontext:\'beruflich\', status:\'laufend\','
+                 + '     zieltermin: tagePlus(h, 10), zielzustaende:[] }];'
+                 + '   DB.gedanken = [{ id:\'g1\', titel:\'Notizen\','
+                 + '     text:\'Erste\', geaendert: 1 }];'
+                 + '   pinUm(\'aufgabe\', \'a1\'); pinUm(\'durchlauf\', \'d1\');'
+                 + '   pinUm(\'projekt\', \'p1\'); pinUm(\'ziel\', \'z1\');'
+                 + '   pinUm(\'flaeche\', \'g:g1\');'
+                 + '   var r = { fuenf: DB.pinnwand.length };'
+                 + '   pinFarbeSetzen(\'durchlauf\', \'d1\', \'rosa\');'
+                 + '   r.farbe = pinFinden(\'durchlauf\', \'d1\').farbe;'
+                 + '   pinFarbeSetzen(\'durchlauf\', \'d1\', \'lila\');'
+                 + '   r.falscheFarbe = pinFinden(\'durchlauf\', \'d1\').farbe;'
+                 + '   r.restzeit = pinInhalt(pinFinden(\'projekt\', \'p1\')).fuss;'
+                 + '   var ab = pinInhalt(pinFinden(\'durchlauf\', \'d1\'));'
+                 + '   r.fortschritt = ab.fuss.slice(0, 3);'
+                 + '   r.balken = ab.balken;'
+                 + '   pinAbhaken(pinFinden(\'aufgabe\', \'a1\').id);'
+                 + '   r.abgehakt = (DB.aufgaben[0].status === \'erledigt\');'
+                 + '   r.bleibtHaengen = pinInhalt(pinFinden(\'aufgabe\', \'a1\')).lebt'
+                 + '     && pinInhalt(pinFinden(\'aufgabe\', \'a1\')).fertig;'
+                 + '   DB.projekte[0].name = \'Garage neu\';'
+                 + '   r.nameLebt = pinInhalt(pinFinden(\'projekt\', \'p1\')).titel;'
+                 + '   DB.projekte = [];'
+                 + '   pinnwandZeichnen();'
+                 + '   r.nachLoeschen = (document.getElementById(\'pinBlatt\')'
+                 + '     .innerHTML.match(/class="zettel /g) || []).length;'
+                 + '   pinUm(\'ziel\', \'z1\');'
+                 + '   r.abgenommen = DB.pinnwand.length - 1;'
+                 + '   r.grabstein = (DB.grabsteine || []).some(function(g){'
+                 + '     return g.s === \'pinnwand\'; });'
+                 + '   DB.ziele.push({ id:\'z2\', name:\'Anderes\','
+                 + '     kontext:\'beruflich\', status:\'laufend\', zielzustaende:[] });'
+                 + '   pinUm(\'ziel\', \'z2\');'
+                 + '   pinFilter = \'beruflich\';'
+                 + '   pinnwandZeichnen();'
+                 + '   var b = document.getElementById(\'pinBlatt\').innerHTML;'
+                 + '   r.nurBeruf = (b.match(/z-art">Ziel</g) || []).length;'
+                 + '   pinFilter = \'alle\';'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__inWocheApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -7718,6 +7773,78 @@ console.log('\n93. Restzeit');
     pruefe(e.vorbei === 'seit 9 Tagen vorbei', 'Überschrittenes wird benannt');
     pruefe(e.monatsende === 'noch 2 Monate',
            'vom 31. Januar bis 31. März sind es zwei Monate');
+  }
+}
+
+/* ============================================================
+   94. Die Pinnwand
+   Grund: Wer immer mehr sucht, braucht einen Ort, an dem nur liegt,
+   was er selbst hingehaengt hat. Ein Zettel ist ein Fenster auf das
+   Original, keine Kopie.
+   ============================================================ */
+console.log('\n94. Pinnwand');
+{
+  const skript = hauptSkript();
+  const p = globalThis.__pinApi;
+
+  ['pinFinden', 'istAngeheftet', 'pinUm', 'pinFarbeSetzen', 'pinWeg', 'pinBlattNeu',
+   'pinKnopfHtml', 'pinInhalt', 'pinOeffnen', 'pinAbhaken', 'setPinFilter',
+   'pinnwandZeichnen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  pruefe(/id="schirmPinnwand"/.test(QUELLE), 'es gibt einen Bildschirm Pinnwand');
+  pruefe(/id="navPinnwand"/.test(QUELLE), 'und einen Knopf in der Leiste');
+  pruefe(!/id="navDiagnose"/.test(QUELLE),
+         'die Diagnose hat ihren Platz in der Leiste abgegeben');
+  pruefe(/class="tk-zahnrad" onclick="zeigeSchirm\('Diagnose'\)"/.test(QUELLE),
+         'sie ist über das Zahnrad im Tag erreichbar — sonst wäre sie verloren');
+
+  /* Der Knopf in allen fünf Blättern */
+  const dh = skript.match(/function detailHtml\([\s\S]*?\n\}\n/);
+  pruefe(dh && /pinKnopfHtml\('aufgabe'/.test(dh[0]), 'im Blatt einer Aufgabe');
+  const ah = skript.match(/function abhakHtml\([\s\S]*?\n\}\n/);
+  pruefe(ah && /pinKnopfHtml\('durchlauf'/.test(ah[0]), 'im Abhakblatt eines Ablaufs');
+  const ad = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(ad && /pinKnopfHtml\(istVorlage \? 'vorlage' : 'durchlauf'/.test(ad[0]),
+         'im Bearbeiten-Dialog, für Vorlage und Durchlauf');
+  const vd = skript.match(/function vhDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(vd && /pinKnopfHtml\(vhDetailArt, v\.id\)/.test(vd[0]),
+         'im Blatt eines Projekts oder Ziels');
+  const fz = skript.match(/function flaecheZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(fz && /pinKnopfHtml\('flaeche', flaecheFuer\)/.test(fz[0]),
+         'im Kopf einer Gedankenfläche');
+
+  const pw = skript.match(/function pinWeg\([\s\S]*?\n\}/);
+  pruefe(pw && /grabsteinSetzen\('pinnwand'/.test(pw[0]),
+         'ein abgenommener Zettel hinterlässt einen Grabstein — sonst brächte ihn '
+         + 'der Abgleich zurück');
+  const zw = skript.match(/function pinnwandZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zw && /!z\.lebt\) \{ continue/.test(zw[0]),
+         'ist das Original gelöscht, verschwindet der Zettel still');
+  pruefe(zw && /event\.stopPropagation\(\);pinWeg/.test(zw[0]),
+         'das × nimmt ab, ohne den Zettel zu öffnen');
+
+  if (!p) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = p.pruefePin();
+    pruefe(e.fuenf === 5, 'alle fünf Arten lassen sich anheften');
+    pruefe(e.farbe === 'rosa', 'die Zettelfarbe lässt sich wählen');
+    pruefe(e.falscheFarbe === 'rosa', 'eine unbekannte Farbe wird abgewiesen');
+    pruefe(e.restzeit.indexOf('noch') === 0, 'ein Projekt zeigt seine Restzeit');
+    pruefe(e.fortschritt === '1/4', 'ein Ablauf seinen Stand');
+    pruefe(e.balken === 25, 'und einen Balken dazu');
+    pruefe(e.abgehakt === true, 'eine Aufgabe lässt sich auf dem Zettel abhaken');
+    pruefe(e.bleibtHaengen === true,
+           'erledigt bleibt der Zettel hängen, bis man ihn abnimmt');
+    pruefe(e.nameLebt === 'Garage neu',
+           'wird das Original umbenannt, zeigt der Zettel den neuen Namen');
+    pruefe(e.nachLoeschen === 4, 'ein gelöschtes Original verschwindet von der Wand');
+    pruefe(e.abgenommen === 3, 'zweimal Anheften nimmt wieder ab');
+    pruefe(e.grabstein === true, 'und hinterlässt einen Grabstein');
+    pruefe(e.nurBeruf === 1, 'der Filter Beruf zeigt nur Berufliches');
   }
 }
 
