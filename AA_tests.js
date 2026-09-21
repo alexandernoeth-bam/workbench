@@ -7816,6 +7816,17 @@ console.log('\n94. Pinnwand');
   pruefe(fz && /pinKnopfHtml\('flaeche', flaecheFuer\)/.test(fz[0]),
          'im Kopf einer Gedankenfläche');
 
+  /* Ein Raster mit 1fr wird nie schmaler als sein längster Inhalt —
+     am Pixel liefen die Zettel so über den rechten Rand. */
+  const pwr = QUELLE.match(/\.vhblatt\.pinwand\{[^}]*\}/);
+  pruefe(pwr && /repeat\(2,minmax\(0,1fr\)\)/.test(pwr[0]),
+         'am Handy zwei Spalten, die schrumpfen dürfen');
+  const zr = QUELLE.match(/\.zettel\{[^}]*\}/);
+  pruefe(zr && /min-width:0/.test(zr[0]),
+         'ein Zettel darf schmaler werden als sein Inhalt');
+  const fr = QUELLE.match(/\.z-fuss\{[^}]*\}/);
+  pruefe(fr && /min-width:0/.test(fr[0]),
+         'die Fußzeile ebenso — sie kürzt mit Auslassungspunkten statt zu drücken');
   const pw = skript.match(/function pinWeg\([\s\S]*?\n\}/);
   pruefe(pw && /grabsteinSetzen\('pinnwand'/.test(pw[0]),
          'ein abgenommener Zettel hinterlässt einen Grabstein — sonst brächte ihn '
