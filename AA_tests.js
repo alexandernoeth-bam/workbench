@@ -5920,9 +5920,31 @@ console.log('\n68. Abhakblatt');
   const verlauf = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
   pruefe(verlauf && /durchlaufAbhakenOeffnen\(/.test(verlauf[0]),
          'die Terminzeile im Tag führt zum Abhaken');
+  /* Seit v0.94.0 führt ein Schritt im Tag in den Bearbeiten-Dialog,
+     genau zu diesem Schritt — dort wird geschoben und geändert. */
   const klammer = skript.match(/function ablaufKlammerHtml\([\s\S]*?\n\}\n/);
-  pruefe(klammer && /durchlaufAbhakenOeffnen\(/.test(klammer[0]),
-         'der Abschnitt Abläufe im Tag ebenso');
+  pruefe(klammer && /abSchrittOeffnen\(/.test(klammer[0]),
+         'ein Schritt im Tag führt in den Ablaufdialog');
+  pruefe(klammer && /schrittAbWeiter\(/.test(klammer[0]),
+         '„Später" bleibt der schnelle Weg daneben');
+  const so = skript.match(/function abSchrittOeffnen\([\s\S]*?\n\}/);
+  pruefe(so && /'abSchritt' \+ nr/.test(so[0]) && /scrollIntoView/.test(so[0]),
+         'der Dialog rollt zum Schritt');
+  pruefe(so && /classList\.remove\('hervor'\)/.test(so[0]),
+         'die Hervorhebung verblasst wieder');
+  const adh = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(adh && /id="abSchritt' \+ i \+ '"/.test(adh[0]),
+         'jeder Schritt im Dialog trägt eine Kennung, sonst gäbe es kein Ziel');
+
+  /* Google vom Tagesplan aus */
+  pruefe(/onclick="googleTagOeffnen\(\)"/.test(QUELLE),
+         'die Tagesseite hat einen Google-Knopf');
+  const gt = skript.match(/function googleTagOeffnen\([\s\S]*?\n\}/);
+  pruefe(gt && /var tag = tagOffen \|\| isoDatum\(\)/.test(gt[0]),
+         'er öffnet den gezeigten Tag, nicht heute');
+  pruefe(gt && /kalenderWeg\(\)/.test(gt[0]),
+         'und folgt derselben Wahl wie der Knopf im Kalender');
+  pruefe(gt && /\/r\/day\//.test(gt[0]), 'bei Google in der Tagesansicht');
   const kal = skript.match(/function kAblaufKnopfHtml\([\s\S]*?\n\}/);
   pruefe(kal && /durchlaufAbhakenOeffnen\(/.test(kal[0]),
          'und die Wochensicht');

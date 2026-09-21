@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.93.0</title>
+<title>Workbench 0.94.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -771,6 +771,10 @@ body.breit .vkarte{margin-bottom:14px;align-self:start}
 .fl-text.fertig{color:var(--grau);text-decoration:line-through}
 .fl-punkt{flex:0 0 8px;height:8px;border:1.5px solid var(--grau);border-radius:2px;
   align-self:center}
+.ms-block{transition:background-color .6s ease}
+.ms-block.hervor{background:var(--karte);box-shadow:0 0 0 2px var(--weinrot) inset;
+  border-radius:6px}
+
 .fl-tab-rahmen{overflow-x:auto;margin:9px 0}
 .fl-tab{border-collapse:collapse;font-size:calc(var(--fs)*0.84);min-width:100%}
 .fl-tab th,.fl-tab td{border:1px solid var(--linie);padding:5px 9px;
@@ -999,6 +1003,8 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
       <button type="button" onclick="tagBlaettern(-1)">‹</button>
       <button type="button" onclick="tagHeute()">Heute</button>
       <button type="button" onclick="tagBlaettern(1)">›</button>
+      <button type="button" onclick="googleTagOeffnen()"
+              title="Diesen Tag im Google-Kalender öffnen">Google</button>
       <span class="tk-luecke"></span>
       <button type="button" id="tAlle" class="pille aktiv" onclick="setTagFilter('alle')">Alle</button>
       <button type="button" id="tBeruf" class="pille" onclick="setTagFilter('beruflich')">Beruf</button>
@@ -1325,7 +1331,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.93.0';
+var APP_VERSION = '0.94.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3614,7 +3620,11 @@ function ablaufKlammerHtml(d, tag) {
       h += '<div class="tzeile kompakt' + (d.kontext === 'privat' ? ' privat' : '') + '">';
       h += '<button class="tkasten" type="button" onclick="schrittUm(\'' + esc(d.id)
          + '\',' + s.nr + ')"></button>';
-      h += '<div class="ttext" onclick="durchlaufAbhakenOeffnen(\'' + esc(d.id) + '\')">';
+      /* Der Titel führt in den Bearbeiten-Dialog, genau zu diesem
+         Schritt — dort wird geschoben, geruht, geändert. „Später"
+         bleibt der schnelle Weg für „heute nicht". */
+      h += '<div class="ttext" onclick="abSchrittOeffnen(\'' + esc(d.id) + '\','
+         + s.nr + ')">';
       h += '<div class="ttitel">' + esc(schrittTitel(s.satz)) + '</div>';
       var vermerk = [];
       if (s.anderswo) { vermerk.push('steht oben'); }
@@ -6580,6 +6590,30 @@ function kalenderWegSetzen(wert) {
   DB.einstellungen.kalenderWeg = wert;
   spaeterSichern();
   zeichne();
+}
+
+/* Vom Tagesplan aus: der gerade gezeigte Tag, nicht heute. Der Weg
+   folgt derselben Wahl wie im Kalender. Die mobile Seite von Google
+   kennt allerdings keinen Tag — dort geht es immer auf heute. */
+function googleTagOeffnen() {
+  var tag = tagOffen || isoDatum();
+  var handy = istHandy();
+  var weg = kalenderWeg();
+  if (istAndroid() && weg === 'app') {
+    adresseAnklicken(androidKalenderAdresse(tag));
+    return;
+  }
+  var d = ausIso(tag);
+  var adresse = (weg === 'mobil') ? mobilKalenderAdresse()
+              : ('https://calendar.google.com/calendar/u/0/r/day/'
+                 + d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate());
+  var fenster = handy ? window.open(adresse, '_blank')
+                      : window.open(adresse, GOOGLE_FENSTER);
+  if (fenster && fenster.focus) { fenster.focus(); }
+  if (!fenster) {
+    melde('Das Fenster wurde vom Browser blockiert.\n'
+        + 'Bitte Pop-ups für diese Seite erlauben.', 'warn');
+  }
 }
 
 function googleKalenderOeffnen() {
@@ -11355,6 +11389,21 @@ function abDetailSchliessen() {
   aktionenSchliessen();
 }
 
+/* Den Ablaufdialog öffnen und zum Schritt rollen. Das Hervorheben
+   verblasst nach zwei Sekunden, damit es nicht stehen bleibt. */
+function abSchrittOeffnen(id, nr) {
+  abDetailOeffnen(id, 'durchlauf');
+  var ziel = document.getElementById('abSchritt' + nr);
+  if (!ziel) { return; }
+  if (ziel.classList) { ziel.classList.add('hervor'); }
+  if (typeof ziel.scrollIntoView === 'function') {
+    ziel.scrollIntoView({ block: 'center' });
+  }
+  window.setTimeout(function () {
+    if (ziel.classList) { ziel.classList.remove('hervor'); }
+  }, 2000);
+}
+
 function abDetailOeffnen(id, art) {
   abSchnell = false;
   abDetail = id;
@@ -11507,7 +11556,7 @@ function abDetailHtml() {
   var l = a.schritte || [];
   var i;
   for (i = 0; i < l.length; i++) {
-    h += '<div class="ms-block">';
+    h += '<div class="ms-block" id="abSchritt' + i + '">';
     h += '<div class="ms-oben">';
     if (istVorlage) {
       h += '<span class="vk-ms-punkt"></span>';
