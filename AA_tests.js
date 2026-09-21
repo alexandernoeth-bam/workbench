@@ -539,6 +539,37 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__inWocheApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var mo = montagVon(isoDatum());'
+                 + '   var vor = tagePlus(mo, -7);'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Letzte Woche erledigt\','
+                 + '       kontext:\'privat\', status:\'erledigt\','
+                 + '       erledigtAm: tagePlus(vor, 2), planung:\'woche\','
+                 + '       art:\'haupt\' },'
+                 + '     { id:\'a2\', titel:\'Diese Woche erledigt\','
+                 + '       kontext:\'privat\', status:\'erledigt\','
+                 + '       erledigtAm: mo, planung:\'woche\', art:\'haupt\' },'
+                 + '     { id:\'a3\', titel:\'Offen diese Woche\','
+                 + '       kontext:\'privat\', status:\'offen\','
+                 + '       planung:\'woche\', art:\'haupt\' },'
+                 + '     { id:\'a4\', titel:\'Kleinigkeit letzte Woche\','
+                 + '       kontext:\'privat\', status:\'erledigt\','
+                 + '       erledigtAm: tagePlus(vor, 1), planung:\'woche\','
+                 + '       art:\'klein\' } ];'
+                 + '   var jetzt2 = wochenAufgaben(mo).map(function(x){'
+                 + '     return x.id; });'
+                 + '   var damals = wochenAufgaben(vor).map(function(x){'
+                 + '     return x.id; });'
+                 + '   var r = { jetzt: jetzt2.sort().join(\',\'),'
+                 + '             damals: damals.join(\',\'),'
+                 + '             kleinJetzt: wochenKleinigkeiten(mo).length,'
+                 + '             kleinDamals: wochenKleinigkeiten(vor).length };'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__restApi = {'
                  + ' pruefeRest: function(){'
                  + '   var v = \'2026-09-19\';'
@@ -5458,11 +5489,30 @@ console.log('\n61. Wochensicht');
            'Funktion ' + f + ' ist definiert');
   });
 
+  /* Seit v0.94.1 liegt die Regel in inWoche — beide Wochenlisten
+     rechnen damit gleich. */
   const liste = skript.match(/function wochenAufgaben\([\s\S]*?\n\}/);
-  pruefe(liste && /p === 'woche'/.test(liste[0]) && /p >= mo && p <= so/.test(liste[0]),
-         'die Liste fasst Wochenliste und Tagesplanung zusammen');
-  pruefe(liste && /p === 'naechste'/.test(liste[0]),
+  pruefe(liste && /inWoche\(a, mo\)/.test(liste[0]),
+         'die Liste fragt die gemeinsame Regel');
+  const iw = skript.match(/function inWoche\([\s\S]*?\n\}/);
+  pruefe(iw && /p === 'woche'/.test(iw[0]) && /p >= mo && p <= so/.test(iw[0]),
+         'die Regel fasst Wochenliste und Tagesplanung zusammen');
+  pruefe(iw && /p === 'naechste'/.test(iw[0]),
          'auch was auf die nächste Woche gelegt ist');
+  if (globalThis.__inWocheApi) {
+    const w = globalThis.__inWocheApi.pruefe();
+    pruefe(w.jetzt === 'a2,a3',
+           'diese Woche: das hier Erledigte und das Offene, nicht das von '
+           + 'letzter Woche (ist: ' + w.jetzt + ')');
+    pruefe(w.damals === 'a1',
+           'das letzte Woche Erledigte steht in der letzten Woche');
+    pruefe(w.kleinJetzt === 0, 'eine letzte Woche erledigte Kleinigkeit ebenso nicht');
+    pruefe(w.kleinDamals === 1, 'sondern in ihrer eigenen Woche');
+  }
+  pruefe(iw && /a\.status === 'erledigt'/.test(iw[0])
+         && /wann >= mo && wann <= so/.test(iw[0]),
+         'eine erledigte Aufgabe gehört in die Woche, in der sie erledigt wurde '
+         + '— sonst wanderte sie mit „diese Woche" in jede neue Woche');
   pruefe(liste && /montagVon\(isoDatum\(\)\)/.test(liste[0]),
          '„diese" und „nächste" messen sich an heute, nicht an der gezeigten Woche');
   pruefe(liste && !/status === 'erledigt'/.test(liste[0]),
@@ -5639,8 +5689,8 @@ console.log('\n64. Kleinigkeiten in der Woche');
 
   const liste = skript.match(/function wochenKleinigkeiten\([\s\S]*?\n\}/);
   pruefe(liste && /a\.art !== 'klein'/.test(liste[0]), 'nur Kleinigkeiten');
-  pruefe(liste && /p === 'woche'/.test(liste[0]) && /p === 'naechste'/.test(liste[0]),
-         'auch die ohne festen Tag');
+  pruefe(liste && /inWoche\(a, mo\)/.test(liste[0]),
+         'auch die ohne festen Tag — über dieselbe Regel wie die Aufgaben');
   pruefe(liste && /x\.frist \|\| '9999-12-31'/.test(liste[0]),
          'sortiert nach Frist — die mit Frist zuerst');
 

@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.94.0</title>
+<title>Workbench 0.94.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1331,7 +1331,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.94.0';
+var APP_VERSION = '0.94.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -6912,6 +6912,32 @@ function wocheHtml(is) {
    gelegt oder nur auf die Woche. Erledigtes bleibt durchgestrichen
    stehen: Die Woche soll am Ende zeigen, was sie gebracht hat.
    Kleinigkeiten gehören nicht hierher, sie würden die Liste fluten. */
+/* Gehört eine Aufgabe in die Woche ab „mo"?
+
+   Offene Aufgaben gehen nach ihrer Planung. Erledigte nach dem Tag,
+   an dem sie erledigt wurden — sonst wanderte eine auf „diese Woche"
+   geplante und letzte Woche abgehakte Aufgabe in jede neue Woche mit,
+   denn „diese Woche" ist immer die laufende.
+
+   Ohne Erledigungsdatum fällt eine erledigte Aufgabe auf ihre
+   Planung zurück; bei „diese" oder „nächste Woche" ist das nicht
+   zuzuordnen, dann bleibt sie draußen. */
+function inWoche(a, mo) {
+  var so = tagePlus(mo, 6);
+  if (a.status === 'erledigt') {
+    var wann = a.erledigtAm || '';
+    if (wann.length === 10) { return (wann >= mo && wann <= so); }
+    var pe = a.planung || '';
+    return (pe.length === 10 && pe >= mo && pe <= so);
+  }
+  var dieseWoche = montagVon(isoDatum());
+  var naechsteWoche = tagePlus(dieseWoche, 7);
+  var p = a.planung || '';
+  if (p === 'woche') { return mo === dieseWoche; }
+  if (p === 'naechste') { return mo === naechsteWoche; }
+  return (p >= mo && p <= so);
+}
+
 function wochenAufgaben(mo) {
   var so = tagePlus(mo, 6);
   /* „Diese Woche" und „Nächste Woche" sind relativ zum heutigen Tag,
@@ -6926,12 +6952,7 @@ function wochenAufgaben(mo) {
     if (a.wiederholung) { continue; }
     if (a.art === 'klein') { continue; }
     if (!passtZumKalender(a.kontext)) { continue; }
-    var p = a.planung || '';
-    var drin = false;
-    if (p === 'woche') { drin = (mo === dieseWoche); }
-    else if (p === 'naechste') { drin = (mo === naechsteWoche); }
-    else { drin = (p >= mo && p <= so); }
-    if (!drin) { continue; }
+    if (!inWoche(a, mo)) { continue; }
     aus.push(a);
   }
   aus.sort(function (x, y) {
@@ -6961,12 +6982,7 @@ function wochenKleinigkeiten(mo) {
     if (a.wiederholung) { continue; }
     if (a.art !== 'klein') { continue; }
     if (!passtZumKalender(a.kontext)) { continue; }
-    var p = a.planung || '';
-    var drin = false;
-    if (p === 'woche') { drin = (mo === dieseWoche); }
-    else if (p === 'naechste') { drin = (mo === naechsteWoche); }
-    else { drin = (p >= mo && p <= so); }
-    if (!drin) { continue; }
+    if (!inWoche(a, mo)) { continue; }
     aus.push(a);
   }
   aus.sort(function (x, y) {
