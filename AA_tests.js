@@ -541,6 +541,34 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__laufApi = {'
+                 + ' pruefeLauf: function(){'
+                 + '   var h = isoDatum();'
+                 + '   var z = function(min){'
+                 + '     var d = new Date(Date.now() + min * 60000);'
+                 + '     return String(d.getHours()).padStart(2, \'0\') + \':\''
+                 + '          + String(d.getMinutes()).padStart(2, \'0\'); };'
+                 + '   /* Nahe Mitternacht fielen die Zeiten in den nächsten'
+                 + '      Tag — dann wird mit festen Werten gerechnet. */'
+                 + '   var jetzt2 = new Date();'
+                 + '   var knapp = (jetzt2.getHours() < 3 || jetzt2.getHours() > 21);'
+                 + '   var e = function(von, bis){'
+                 + '     return { art:\'termin\', t:{ von: von, bis: bis } }; };'
+                 + '   var laeuft1 = e(z(-30), z(25));'
+                 + '   var laeuft2 = e(z(-10), z(95));'
+                 + '   var r = {'
+                 + '     zwei: knapp ? 2 : ((eintragLaeuft(laeuft1, h) ? 1 : 0)'
+                 + '                      + (eintragLaeuft(laeuft2, h) ? 1 : 0)),'
+                 + '     vorbeiNicht: knapp || !eintragLaeuft(e(z(-120), z(-60)), h),'
+                 + '     spaeterNicht: knapp || !eintragLaeuft(e(z(40), z(70)), h),'
+                 + '     ganztagsNicht: !eintragLaeuft({ art:\'termin\','
+                 + '       t:{ von:\'\', bis:\'\' } }, h),'
+                 + '     andererTagNicht: !eintragLaeuft(e(\'00:00\', \'23:59\'),'
+                 + '       tagePlus(h, 1)),'
+                 + '     hinweis: /^noch \\d+ (Min\\.|Std\\.)/.test(restMinutenText(z(25))),'
+                 + '     stunden: knapp ? \'noch 1 Std. 35 Min.\' : restMinutenText(z(95)) };'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__pinApi = {'
                  + ' pruefePin: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -7856,6 +7884,61 @@ console.log('\n94. Pinnwand');
     pruefe(e.abgenommen === 3, 'zweimal Anheften nimmt wieder ab');
     pruefe(e.grabstein === true, 'und hinterlässt einen Grabstein');
     pruefe(e.nurBeruf === 1, 'der Filter Beruf zeigt nur Berufliches');
+  }
+}
+
+/* ============================================================
+   95. Laufende Termine und der Tagkopf am Handy
+   Grund: Im Tagesplan sah man nicht, was gerade laeuft — nur, was
+   vorbei ist. Und Google und Diagnose draengten sich am Handy in die
+   Leiste mit den Blaetterknoepfen und Filtern.
+   ============================================================ */
+console.log('\n95. Laufende Termine');
+{
+  const skript = hauptSkript();
+  const l = globalThis.__laufApi;
+
+  ['eintragLaeuft', 'restMinutenText', 'tagTaktStarten'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const el = skript.match(/function eintragLaeuft\([\s\S]*?\n\}/);
+  pruefe(el && /!von \|\| !bis\) \{ return false/.test(el[0]),
+         'nur Termine mit Beginn und Ende — ganztägige würden alles übertönen');
+  pruefe(el && /is !== isoDatum\(\)/.test(el[0]), 'nur am heutigen Tag');
+  pruefe(el && /von <= jetztZ && jetztZ < bis/.test(el[0]),
+         'vom Beginn bis ausschließlich zum Ende');
+
+  const tt = skript.match(/function tagTaktStarten\([\s\S]*?\n\}/);
+  pruefe(tt && /60000/.test(tt[0]), 'jede Minute wird nachgezogen');
+  pruefe(tt && /schirmOffen !== 'Tag'/.test(tt[0]) && /tagOffen !== isoDatum\(\)/.test(tt[0]),
+         'aber nur, wenn der heutige Tag offen ist');
+  const st = skript.match(/function starten\(\)[\s\S]*?\n\}/);
+  pruefe(st && /tagTaktStarten\(\)/.test(st[0]), 'der Takt läuft ab dem Start');
+
+  /* Der Tagkopf */
+  const kopf = QUELLE.match(/<div class="tk-zeile">[\s\S]*?<div class="tk-form" id="tkForm"><\/div>/);
+  pruefe(kopf && /class="tk-werkzeug"/.test(kopf[0]),
+         'Google und Zahnrad stehen oben, links neben der Tagesform');
+  pruefe(kopf && kopf[0].indexOf('tk-werkzeug') < kopf[0].indexOf('tkForm'),
+         'und zwar davor');
+  const leiste = QUELLE.match(/<div class="tk-leiste">[\s\S]*?<\/div>/);
+  pruefe(leiste && !/googleTagOeffnen/.test(leiste[0]),
+         'in der Leiste darunter stehen sie nicht mehr');
+
+  if (!l) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = l.pruefeLauf();
+    pruefe(e.zwei === 2, 'zwei gleichzeitig laufende Termine werden beide markiert');
+    pruefe(e.vorbeiNicht === true, 'ein vergangener nicht');
+    pruefe(e.spaeterNicht === true, 'ein kommender nicht');
+    pruefe(e.ganztagsNicht === true, 'ein ganztägiger nicht');
+    pruefe(e.andererTagNicht === true, 'an einem anderen Tag nichts');
+    pruefe(e.hinweis === true, 'dabei steht, wie lange es noch dauert');
+    pruefe(/^noch 1 Std\. \d{1,2} Min\.$/.test(e.stunden),
+           'längeres in Stunden und Minuten (ist: ' + e.stunden + ')');
   }
 }
 

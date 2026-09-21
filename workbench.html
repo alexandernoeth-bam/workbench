@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.95.1</title>
+<title>Workbench 0.96.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -99,7 +99,11 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 .tk-text{display:flex;flex-direction:column;gap:1px}
 .tk-wochentag{font-size:calc(var(--fs)*1.0);font-weight:500;line-height:1.1}
 .tk-monat{font-size:calc(var(--fs)*0.8);color:var(--grau);line-height:1.1}
-.tk-form{margin-left:auto;align-self:center;font-size:calc(var(--fs)*0.74);font-weight:500;
+.tk-werkzeug{margin-left:auto;align-self:center;display:flex;gap:5px}
+.tk-werkzeug button{font:inherit;font-size:calc(var(--fs)*0.74);padding:3px 9px;
+  border:1px solid var(--linie);border-radius:5px;background:var(--karte);
+  color:var(--grau);cursor:pointer;line-height:1.3}
+.tk-form{margin-left:0;align-self:center;font-size:calc(var(--fs)*0.74);font-weight:500;
   color:var(--weinrot);border:1px solid var(--weinrot);border-radius:3px;padding:3px 8px;
   white-space:nowrap}
 .tk-form.frei{color:var(--petrol);border-color:var(--petrol)}
@@ -638,6 +642,10 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    Abschnitte in ihrer natürlichen Folge untereinander stehen. */
 /* Vergangenes bleibt eingeklappt — auf jedem Gerät gleich.
    Aufgeklappt steht es zurückgenommen da. */
+.tverlauf.laeuft .tv-inhalt{background:var(--karte);border-radius:6px;
+  box-shadow:inset 3px 0 0 var(--weinrot);padding-left:10px;margin-left:4px}
+.tverlauf.laeuft .tv-zeit{color:var(--weinrot);font-weight:600}
+.tv-laeuft{color:var(--weinrot);font-weight:500}
 .tverlauf.vorbei{display:none}
 .tabschnitt.aufgeklappt .tverlauf.vorbei{display:flex;opacity:.55}
 
@@ -1047,19 +1055,24 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
         <div class="tk-wochentag" id="tkWochentag"></div>
         <div class="tk-monat" id="tkMonat"></div>
       </div>
+      <!-- Google und Diagnose sitzen oben neben der Tagesform: In der
+           Leiste darunter drängten sie am Handy die Blätterknöpfe und
+           die Filter zusammen. -->
+      <div class="tk-werkzeug">
+        <button type="button" onclick="googleTagOeffnen()"
+                title="Diesen Tag im Google-Kalender öffnen">Google</button>
+        <button type="button" class="tk-zahnrad" onclick="zeigeSchirm('Diagnose')"
+                title="Diagnose und Einstellungen" aria-label="Diagnose und Einstellungen">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle>
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg>
+        </button>
+      </div>
       <div class="tk-form" id="tkForm"></div>
     </div>
     <div class="tk-leiste">
       <button type="button" onclick="tagBlaettern(-1)">‹</button>
       <button type="button" onclick="tagHeute()">Heute</button>
       <button type="button" onclick="tagBlaettern(1)">›</button>
-      <button type="button" onclick="googleTagOeffnen()"
-              title="Diesen Tag im Google-Kalender öffnen">Google</button>
-      <button type="button" class="tk-zahnrad" onclick="zeigeSchirm('Diagnose')"
-              title="Diagnose und Einstellungen" aria-label="Diagnose und Einstellungen">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle>
-          <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg>
-      </button>
       <span class="tk-luecke"></span>
       <button type="button" id="tAlle" class="pille aktiv" onclick="setTagFilter('alle')">Alle</button>
       <button type="button" id="tBeruf" class="pille" onclick="setTagFilter('beruflich')">Beruf</button>
@@ -1401,7 +1414,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.95.1';
+var APP_VERSION = '0.96.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3497,6 +3510,32 @@ function uhrzeitJetzt() {
    Haken gesetzt wird, nicht wenn die Uhr weiterläuft. An anderen
    Tagen gibt es überhaupt kein Vorbei. Gemessen wird am Ende, nicht
    am Beginn: Ein Termin, der noch läuft, ist nicht vorbei. */
+/* Läuft ein Termin gerade? Nur heute, nur mit Uhrzeit und Ende —
+   ganztägige laufen den ganzen Tag und würden alles andere übertönen.
+   Mehrere können gleichzeitig laufen, jeder wird für sich markiert. */
+function eintragLaeuft(eintrag, is) {
+  if (eintrag.art !== 'termin') { return false; }
+  if (is !== isoDatum()) { return false; }
+  var von = eintrag.t.von || '';
+  var bis = eintrag.t.bis || '';
+  if (!von || !bis) { return false; }
+  var jetztZ = uhrzeitJetzt();
+  return von <= jetztZ && jetztZ < bis;
+}
+
+/* Wie lange noch? In Minuten, darüber in Stunden und Minuten. */
+function restMinutenText(bis) {
+  var teile = String(bis).split(':');
+  var jetztD = new Date();
+  var ende = new Date(jetztD.getFullYear(), jetztD.getMonth(), jetztD.getDate(),
+                      Number(teile[0]), Number(teile[1] || 0));
+  var min = Math.max(0, Math.round((ende - jetztD) / 60000));
+  if (min < 60) { return 'noch ' + min + ' Min.'; }
+  var std = Math.floor(min / 60);
+  var rest = min % 60;
+  return 'noch ' + std + ' Std.' + (rest ? (' ' + rest + ' Min.') : '');
+}
+
 function eintragVorbei(eintrag, is) {
   if (eintrag.art !== 'termin') { return false; }
   if (is !== isoDatum()) { return false; }
@@ -3508,8 +3547,10 @@ function eintragVorbei(eintrag, is) {
 function verlaufHtml(eintrag, is) {
   if (eintrag.art === 'termin') {
     var t = eintrag.t;
+    var laeuft = eintragLaeuft(eintrag, is);
     var h = '<div class="tverlauf fest' + (t.kontext === 'privat' ? ' privat' : '')
-          + (eintragVorbei(eintrag, is) ? ' vorbei' : '') + '">';
+          + (eintragVorbei(eintrag, is) ? ' vorbei' : '')
+          + (laeuft ? ' laeuft' : '') + '">';
     h += '<div class="tv-zeit">' + esc(t.von || '') + '</div><div class="tv-schiene"></div>';
     h += '<div class="tv-inhalt"><div class="ttitel">' + esc(t.titel);
     /* Die erkannte Art sichtbar machen: Sonst rätselt man, ob ein
@@ -3523,6 +3564,8 @@ function verlaufHtml(eintrag, is) {
     }
     h += '</div>';
     var unten = [];
+    if (laeuft) { unten.push('<b class="tv-laeuft">läuft · ' + esc(restMinutenText(t.bis))
+                             + '</b>'); }
     if (t.bis) { unten.push(esc(t.von) + '–' + esc(t.bis)); }
     if (t.ort) { unten.push(esc(t.ort)); }
     if (t.quelle) { unten.push(esc(t.quelle)); }
@@ -5946,6 +5989,21 @@ function termineFuerTag(is) {
   }
   zeit.sort(function (x, y) { return (x.zeit < y.zeit) ? -1 : ((x.zeit > y.zeit) ? 1 : 0); });
   return { zeit: zeit, ganztags: ganztags };
+}
+
+/* Der Tagesplan hängt an der Uhr: Was läuft, was vorbei ist. Einmal
+   je Minute neu zeichnen — nur, wenn der heutige Tag offen ist und
+   das Fenster sichtbar. */
+var tagUhr = null;
+
+function tagTaktStarten() {
+  if (tagUhr) { window.clearInterval(tagUhr); }
+  tagUhr = window.setInterval(function () {
+    if (document.hidden) { return; }
+    if (schirmOffen !== 'Tag') { return; }
+    if (tagOffen !== isoDatum()) { return; }
+    tagZeichnen();
+  }, 60000);
 }
 
 function kalenderTaktStarten() {
@@ -13292,6 +13350,7 @@ function starten() {
     farbweltAnwenden();
     darstellungAnwenden();
     jahrTaktStarten();
+    tagTaktStarten();
     wochenUmstellen();
     faelligeStarten();
     tagOffen = isoDatum();
