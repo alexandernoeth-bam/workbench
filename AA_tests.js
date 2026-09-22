@@ -541,6 +541,54 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__termVhApi = {'
+                 + ' pruefeTermVh: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'MUKA\', kontext:\'beruflich\','
+                 + '     status:\'laufend\', zielzustaende:[] }];'
+                 + '   DB.ziele = [{ id:\'z1\', name:\'Release\', kontext:\'beruflich\','
+                 + '     status:\'laufend\', zielzustaende:[] }];'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   var off = -new Date().getTimezoneOffset();'
+                 + '   var zo = (off >= 0 ? \'+\' : \'-\')'
+                 + '     + String(Math.floor(Math.abs(off) / 60)).padStart(2, \'0\')'
+                 + '     + \':\' + String(Math.abs(off) % 60).padStart(2, \'0\');'
+                 + '   var ev = function(id, n, serie){'
+                 + '     var o = { id: id, summary:\'WFT\','
+                 + '       start:{ dateTime: tagePlus(h, n) + \'T11:00:00\' + zo },'
+                 + '       end:{ dateTime: tagePlus(h, n) + \'T11:30:00\' + zo } };'
+                 + '     if (serie) { o.recurringEventId = serie; }'
+                 + '     return o; };'
+                 + '   eintraegeEinsortieren([ev(\'w0\', 1, \'wft\'), ev(\'w1\', 8, \'wft\'),'
+                 + '     ev(\'w2\', 15, \'wft\'), ev(\'w3\', 22, \'wft\'),'
+                 + '     ev(\'wa\', -6, \'wft\'), ev(\'e1\', 3)], \'Alex\', \'beruflich\');'
+                 + '   terminBlattOeffnen(\'w0\', tagePlus(h, 1));'
+                 + '   var r = { serieVoreingestellt: terminBlattSerie };'
+                 + '   terminBlattVorhaben(\'p:p1\');'
+                 + '   r.alleDerSerie = [\'w1\', \'w3\', \'wa\'].filter(function(i){'
+                 + '     return terminVorhaben({ id: i, serieId:\'wft\' }) === \'p:p1\'; })'
+                 + '     .length;'
+                 + '   terminBlattOeffnen(\'w2\', tagePlus(h, 15));'
+                 + '   terminBlattSerieSetzen(false);'
+                 + '   terminBlattVorhaben(\'\');'
+                 + '   r.ausnahme = terminVorhaben({ id:\'w2\', serieId:\'wft\' });'
+                 + '   r.serieBleibt = terminVorhaben({ id:\'w3\', serieId:\'wft\' });'
+                 + '   zuordnungSetzen(\'e1\', \'feier\');'
+                 + '   terminBlattOeffnen(\'e1\', tagePlus(h, 3));'
+                 + '   terminBlattVorhaben(\'z:z1\');'
+                 + '   r.einzeln = terminVorhaben({ id:\'e1\' });'
+                 + '   r.artBleibt = zuordnungArt(\'e1\');'
+                 + '   var l = vhTermine(\'projekt\', \'p1\');'
+                 + '   r.aufSeite = l.filter(function(x){ return x.tag >= h; }).length;'
+                 + '   r.vergangen = l.filter(function(x){ return x.tag < h; }).length;'
+                 + '   zuordnungSetzen(\'e1\', \'\');'
+                 + '   terminBlattVorhaben(\'\');'
+                 + '   r.leerWeg = !DB.kalenderzuordnung.e1;'
+                 + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__taetigApi = {'
                  + ' pruefeTaetig: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -6226,8 +6274,11 @@ console.log('\n66. Arten aus dem Kalender');
 
   /* Am Kalender wird nichts geändert */
   pruefe(/calendar\.readonly/.test(QUELLE), 'das Kalenderrecht bleibt nur lesend');
+  /* Seit v1.4.0 gehen Art und Vorhaben über zuordnungFeldSetzen. */
   const setzen = skript.match(/function zuordnungSetzen\([\s\S]*?\n\}/);
-  pruefe(setzen && /DB\.kalenderzuordnung/.test(setzen[0]),
+  const feldS = skript.match(/function zuordnungFeldSetzen\([\s\S]*?\n\}/);
+  pruefe(setzen && /zuordnungFeldSetzen\(id, 'art'/.test(setzen[0])
+         && feldS && /DB\.kalenderzuordnung\[schluessel\] = z/.test(feldS[0]),
          'die eigene Zuordnung landet in der eigenen Datei');
 
   /* Vorrang */
@@ -8711,6 +8762,58 @@ console.log('\n103. Tätigkeiten');
            'eine neue Tätigkeit trägt Vorhaben und Kontext gleich mit');
     pruefe(e.zielGeloescht === null,
            'wird das Ziel gelöscht, verliert die Aufgabe nur ihre Zuordnung');
+  }
+}
+
+/* ============================================================
+   104. Termine an Vorhaben, und die neue Taetigkeitenseite
+   Grund: Termine aus dem Kalender sollen einem Projekt oder Ziel
+   zugeordnet werden koennen — auch als ganze Serie, mit Ausnahmen.
+   Und die Seite sah unfertig aus: zusammengefallenes Kaestchen,
+   alles ueber die volle Breite, kein Kopf.
+   ============================================================ */
+console.log('\n104. Termine an Vorhaben');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__termVhApi;
+
+  ['zuordnungFeldSetzen', 'terminVorhaben', 'terminVorhabenSetzen', 'vorhabenOptionenHtml',
+   'terminBlattOeffnen', 'terminBlattNeu', 'terminBlattSerieSetzen', 'terminBlattVorhaben',
+   'terminBlattHtml', 'vhTermine', 'taetigTerminHtml', 'taetigVergangenUm',
+   'taetigAlleTermineUm'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const fs = skript.match(/function zuordnungFeldSetzen\([\s\S]*?\n\}/);
+  pruefe(fs && /grabsteinSetzen\('kalenderzuordnung', schluessel\)/.test(fs[0]),
+         'eine gelöschte Zuordnung hinterlässt einen Grabstein');
+  const vw = skript.match(/function vorhabenWahlHtml\([\s\S]*?\n\}/);
+  pruefe(vw && /vorhabenOptionenHtml\(/.test(vw[0]),
+         'Aufgaben und Termine teilen sich die Vorhabenwahl');
+  const vl = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
+  pruefe(vl && /terminBlattOeffnen\(/.test(vl[0]), 'ein Termin im Tag öffnet sein Blatt');
+  pruefe(vl && /class="t-vh"/.test(vl[0]), 'und zeigt sein Vorhaben');
+  pruefe(/class="tg-kasten/.test(skript) && /\.tg-kasten\{flex:0 0 19px;width:19px;height:19px/
+         .test(QUELLE),
+         'das Kästchen der Seite hat eigene Maße — es fiel sonst zu einem Strich zusammen');
+  pruefe(/\.tg-seite\{max-width:980px\}/.test(QUELLE), 'die Seite ist in der Breite begrenzt');
+  pruefe(/body\.breit \.tg-spalten\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}/
+         .test(QUELLE), 'am Rechner zwei Spalten');
+
+  if (!t) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = t.pruefeTermVh();
+    pruefe(e.serieVoreingestellt === true, 'bei einer Serie ist die ganze Serie voreingestellt');
+    pruefe(e.alleDerSerie === 3, 'die Zuordnung gilt für alle Termine der Serie');
+    pruefe(e.ausnahme === '', 'ein einzelner lässt sich herausnehmen');
+    pruefe(e.serieBleibt === 'p:p1', 'die übrigen der Serie bleiben zugeordnet');
+    pruefe(e.einzeln === 'z:z1', 'ein einzelner lässt sich einem anderen Vorhaben geben');
+    pruefe(e.aufSeite === 3, 'auf der Seite stehen die kommenden Termine');
+    pruefe(e.vergangen === 1, 'vergangene eingeklappt');
+    pruefe(e.artBleibt === 'feier',
+           'eine gesetzte Art bleibt, wenn ein Vorhaben dazukommt — beides liegt im selben Eintrag');
+    pruefe(e.leerWeg === true, 'ohne Art und Vorhaben verschwindet der Eintrag ganz');
   }
 }
 
