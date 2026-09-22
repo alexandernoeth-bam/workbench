@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.98.2</title>
+<title>Workbench 1.0.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -60,6 +60,42 @@ body{
 .abschnitt-titel{font-size:calc(var(--fs)*0.78);font-weight:500;color:var(--grau);
   display:flex;align-items:center;gap:8px;margin:16px 0 7px}
 .abschnitt-titel::after{content:"";flex:1;height:1px;background:var(--linie)}
+
+/* Diagnose in Gruppen */
+.dg-kopfzeile{display:flex;align-items:center;gap:10px;margin:4px 0 10px}
+.dg-titel{flex:1;margin:0;font-size:calc(var(--fs)*1.2);font-weight:500}
+.dg-status{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;
+  background:var(--karte);border:1px solid var(--linie);border-radius:10px;
+  padding:10px 12px;margin:0 0 12px}
+.dg-status div{font-size:calc(var(--fs)*0.66);color:var(--grau);min-width:0}
+.dg-status b{display:block;font-size:calc(var(--fs)*0.84);color:var(--tinte);font-weight:500;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dg-status .ok b{color:var(--petrol)}
+.dg-status .nein b{color:var(--weinrot)}
+.dg{background:var(--karte);border:1px solid var(--linie);border-radius:10px;
+  margin:0 0 9px;overflow:hidden}
+.dg-kopf{display:flex;align-items:center;gap:11px;width:100%;padding:11px 12px;
+  border:0;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.dg-sym{flex:0 0 28px;height:28px;border-radius:7px;background:var(--papier);
+  display:flex;align-items:center;justify-content:center;font-size:15px}
+.dg-text{flex:1;min-width:0}
+.dg-text b{display:block;font-size:calc(var(--fs)*0.9);font-weight:500}
+.dg-text span{display:block;font-size:calc(var(--fs)*0.7);color:var(--grau);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dg-pfeil{flex:0 0 16px;width:16px;height:16px;stroke:var(--grau);fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .15s ease}
+.dg.auf .dg-pfeil{transform:rotate(90deg)}
+.dg-inhalt{display:none;border-top:1px solid var(--linie);padding:2px 12px 12px}
+.dg.auf .dg-inhalt{display:block}
+.dg-inhalt .abschnitt-titel:first-child{margin-top:10px}
+.ts-feld{width:100%;font:inherit;font-size:calc(var(--fs)*0.84);padding:7px 10px;
+  border:1px solid var(--linie);border-radius:7px;background:var(--karte);color:var(--tinte)}
+.ts-treffer{border:1px solid var(--linie);border-radius:8px;padding:8px 10px;margin:7px 0}
+.ts-titel{font-size:calc(var(--fs)*0.86);font-weight:500}
+.ts-meta{font-size:calc(var(--fs)*0.72);color:var(--grau);margin:2px 0 3px}
+.ts-wo{font-size:calc(var(--fs)*0.74);margin-top:4px}
+.ts-wo.gut{color:var(--petrol)}
+.ts-wo.nein{color:var(--weinrot)}
 
 .zeile{display:flex;align-items:baseline;gap:10px;padding:6px 0;
   border-bottom:1px solid var(--linie)}
@@ -1024,6 +1060,16 @@ body.breit .aktion-sheet{bottom:18px;border-radius:12px;
 .rueck-wort{flex:0 0 auto;font-weight:500;text-decoration:underline}
 .ttext{cursor:pointer}
 
+.abruf{position:fixed;left:0;right:0;top:0;z-index:60;display:none;
+  background:var(--karte);border-bottom:1px solid var(--linie);
+  padding:5px 12px 6px;padding-top:calc(env(safe-area-inset-top,0px) + 5px);
+  box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.abruf.auf{display:block}
+.abruf-leiste{height:4px;background:var(--linie);border-radius:2px;overflow:hidden}
+.abruf-leiste i{display:block;height:100%;width:0;background:var(--weinrot);
+  transition:width .25s ease}
+.abruf-text{display:block;font-size:calc(var(--fs)*0.68);color:var(--grau);margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .anmeldebanner{display:none;flex:0 0 auto;align-items:center;gap:12px;
   padding:11px 16px calc(11px) 20px;background:var(--weinrot);color:#fff;
   font-size:calc(var(--fs)*0.84);line-height:1.35;
@@ -1055,6 +1101,11 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 </style>
 </head>
 <body>
+
+<div class="abruf" id="abrufBalken">
+  <div class="abruf-leiste"><i id="abrufFuellung"></i></div>
+  <span class="abruf-text" id="abrufText"></span>
+</div>
 
 <div class="anmeldebanner" id="anmeldeStreifen">
   <span id="anmeldeText">Keine Verbindung zu Google.</span>
@@ -1152,6 +1203,32 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 </div>
 
 <div class="schirm" id="schirmDiagnose">
+  <div class="dg-kopfzeile">
+    <h1 class="dg-titel">Diagnose</h1>
+    <button type="button" class="pille" onclick="zeigeSchirm('Tag')">Zurück</button>
+  </div>
+  <div class="dg-status" id="diagStatus"></div>
+
+  <div class="melder" id="melder">Bereit.</div>
+
+  <div class="dg" id="dg-verbindung">
+    <button type="button" class="dg-kopf" onclick="diagGruppeUm('verbindung')">
+      <span class="dg-sym">🔗</span>
+      <span class="dg-text"><b>Verbindung</b><span id="dk-verbindung"></span></span>
+      <svg class="dg-pfeil" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
+    </button>
+    <div class="dg-inhalt">
+  <div class="abschnitt-titel"><span>Google</span></div>
+  <div id="googleListe"></div>
+
+  <div class="knopfreihe">
+    <button type="button" id="knopfAnmelden" onclick="anmelden()">Anmelden</button>
+    <button type="button" id="knopfAbmelden" onclick="abmelden()">Abmelden</button>
+    <button type="button" id="knopfDriveLaden" onclick="driveLadenJetzt()">Von Drive laden</button>
+    <button type="button" id="knopfDriveSpeichern" onclick="driveSpeichernJetzt()">Zu Drive sichern</button>
+    <button type="button" id="knopfAbgleich" class="stark" onclick="abgleichenJetzt()">Abgleichen</button>
+  </div>
+
   <div class="abschnitt-titel"><span>Speicher</span></div>
   <div id="speicherListe"></div>
 
@@ -1164,31 +1241,19 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     <button type="button" onclick="versionPruefen(true)">Auf neue Fassung prüfen</button>
     <button type="button" class="stark" onclick="handleVergessen()">Datei lösen</button>
   </div>
-
-  <div class="melder" id="melder">Bereit.</div>
-
-  <div class="abschnitt-titel"><span>Google</span></div>
-  <div id="googleListe"></div>
-
-  <div class="knopfreihe">
-    <button type="button" id="knopfAnmelden" onclick="anmelden()">Anmelden</button>
-    <button type="button" id="knopfAbmelden" onclick="abmelden()">Abmelden</button>
-    <button type="button" id="knopfDriveLaden" onclick="driveLadenJetzt()">Von Drive laden</button>
-    <button type="button" id="knopfDriveSpeichern" onclick="driveSpeichernJetzt()">Zu Drive sichern</button>
-    <button type="button" id="knopfAbgleich" class="stark" onclick="abgleichenJetzt()">Abgleichen</button>
+    </div>
   </div>
 
-  <div class="abschnitt-titel"><span>Farbwelt</span></div>
-  <div id="farbweltListe"></div>
-
-  <div class="abschnitt-titel"><span>Weiter zurück laden</span></div>
-  <div id="archivListe"></div>
-
-  <div class="abschnitt-titel"><span>Arten im Jahresraster</span></div>
-  <div id="artenJahrListe"></div>
-
-  <div class="abschnitt-titel"><span>Skizzen</span></div>
-  <div id="skizzenListe"></div>
+  <div class="dg" id="dg-kalender">
+    <button type="button" class="dg-kopf" onclick="diagGruppeUm('kalender')">
+      <span class="dg-sym">📅</span>
+      <span class="dg-text"><b>Kalender</b><span id="dk-kalender"></span></span>
+      <svg class="dg-pfeil" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
+    </button>
+    <div class="dg-inhalt">
+  <div class="abschnitt-titel"><span>Termin suchen</span></div>
+  <input type="search" class="ts-feld" id="terminSucheFeld" placeholder="Teil des Titels, etwa Emden" oninput="terminSucheZeichnen()">
+  <div id="terminSucheListe"></div>
 
   <div class="abschnitt-titel"><span>Kalender</span></div>
   <div id="kalenderListe"></div>
@@ -1197,16 +1262,36 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     <button type="button" onclick="termineHolen(true)">Termine neu holen</button>
   </div>
 
-  <div class="abschnitt-titel"><span>Darstellung</span></div>
-  <div id="darstellungWahl"></div>
+  <div class="abschnitt-titel"><span>Weiter zurück laden</span></div>
+  <div id="archivListe"></div>
 
-  <div class="abschnitt-titel"><span>Altbestand</span></div>
-  <div class="feld-hinweis">Die Migration aus WorkAssist und TimeAssist ist erledigt.
-    Sie bleibt hier erreichbar, falls eine Quelle nachgezogen werden muss.</div>
-  <div class="knopfreihe">
-    <button type="button" onclick="zeigeSchirm('Migration')">Migration öffnen</button>
+  <div class="abschnitt-titel"><span>Arten im Jahresraster</span></div>
+  <div id="artenJahrListe"></div>
+    </div>
   </div>
 
+  <div class="dg" id="dg-aussehen">
+    <button type="button" class="dg-kopf" onclick="diagGruppeUm('aussehen')">
+      <span class="dg-sym">🎨</span>
+      <span class="dg-text"><b>Aussehen</b><span id="dk-aussehen"></span></span>
+      <svg class="dg-pfeil" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
+    </button>
+    <div class="dg-inhalt">
+  <div class="abschnitt-titel"><span>Farbwelt</span></div>
+  <div id="farbweltListe"></div>
+
+  <div class="abschnitt-titel"><span>Darstellung</span></div>
+  <div id="darstellungWahl"></div>
+    </div>
+  </div>
+
+  <div class="dg" id="dg-daten">
+    <button type="button" class="dg-kopf" onclick="diagGruppeUm('daten')">
+      <span class="dg-sym">🗂️</span>
+      <span class="dg-text"><b>Daten</b><span id="dk-daten"></span></span>
+      <svg class="dg-pfeil" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
+    </button>
+    <div class="dg-inhalt">
   <div class="abschnitt-titel"><span>Jahrestermine austauschen</span></div>
   <div id="jtDateiStand"></div>
   <div class="feld-hinweis">Zur Erstbestückung eines zweiten Bestands: ausgeben,
@@ -1233,11 +1318,33 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     <button type="button" id="knopfFerien" onclick="ferienEinlesen()" disabled>Einlesen</button>
   </div>
 
+  <div class="abschnitt-titel"><span>Skizzen</span></div>
+  <div id="skizzenListe"></div>
+
   <div class="abschnitt-titel"><span>Datenbestand</span></div>
   <div id="bestandListe"></div>
+    </div>
+  </div>
 
+  <div class="dg" id="dg-technik">
+    <button type="button" class="dg-kopf" onclick="diagGruppeUm('technik')">
+      <span class="dg-sym">⚙️</span>
+      <span class="dg-text"><b>Technik</b><span id="dk-technik"></span></span>
+      <svg class="dg-pfeil" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
+    </button>
+    <div class="dg-inhalt">
   <div class="abschnitt-titel"><span>Umgebung</span></div>
   <div id="umgebungListe"></div>
+
+  <div class="abschnitt-titel"><span>Altbestand</span></div>
+  <div class="feld-hinweis">Die Migration aus WorkAssist und TimeAssist ist erledigt.
+    Sie bleibt hier erreichbar, falls eine Quelle nachgezogen werden muss.</div>
+  <div class="knopfreihe">
+    <button type="button" onclick="zeigeSchirm('Migration')">Migration öffnen</button>
+  </div>
+    </div>
+  </div>
+
 </div>
 
 <div class="schirm" id="schirmMigration">
@@ -1428,7 +1535,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.98.2';
+var APP_VERSION = '1.0.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5273,9 +5380,11 @@ function zeichneGoogle() {
 function kalenderNeuLesen() {
   if (!tokenGueltig()) { melde('Bitte zuerst anmelden.', 'warn'); return; }
   melde('Kalender werden eingelesen …', null);
+  abrufStart(1, 'Kalenderliste');
   kalenderListeHolen().then(function () {
+    abruf.aktiv = false;
     zeichne();
-    return termineHolen(false);
+    return termineHolen(false, true);
   }).then(function () {
     melde(kalenderListe.length + ' Kalender gefunden, ' + termineZahl()
         + ' Termine im Fenster.', 'gut');
@@ -5539,6 +5648,193 @@ function zeichneUmgebung() {
   ziel.innerHTML = h;
 }
 
+
+/* ============================================================
+   Die Diagnose in Gruppen
+
+   Sie war über die Zeit auf fünfzehn lose Abschnitte angewachsen.
+   Jetzt fünf Gruppen, die man auf- und zuklappt, und darüber eine
+   Zeile, die immer steht: verbunden, letzter Abgleich, Termine.
+   Welche Gruppen offen sind, merkt sich die App.
+   ============================================================ */
+
+var DIAG_GRUPPEN = ['verbindung', 'kalender', 'aussehen', 'daten', 'technik'];
+
+function diagOffen(g) {
+  var k = DB.einstellungen.diagOffen || {};
+  return k[g] === true;
+}
+
+function diagGruppeUm(g) {
+  if (!DB.einstellungen.diagOffen) { DB.einstellungen.diagOffen = {}; }
+  var k = DB.einstellungen.diagOffen;
+  if (k[g]) { delete k[g]; } else { k[g] = true; }
+  spaeterSichern();
+  diagGruppenZeichnen();
+}
+
+function diagZeitText(ms) {
+  if (!ms) { return 'noch nicht'; }
+  var min = Math.round((Date.now() - ms) / 60000);
+  if (min < 1) { return 'gerade eben'; }
+  if (min < 60) { return 'vor ' + min + ' Min.'; }
+  var std = Math.round(min / 60);
+  if (std < 24) { return 'vor ' + std + ' Std.'; }
+  return 'vor ' + Math.round(std / 24) + ' Tagen';
+}
+
+function diagGruppenZeichnen() {
+  var i;
+  for (i = 0; i < DIAG_GRUPPEN.length; i++) {
+    var g = DIAG_GRUPPEN[i];
+    var kasten = document.getElementById('dg-' + g);
+    if (kasten && kasten.classList) {
+      if (diagOffen(g)) { kasten.classList.add('auf'); }
+      else { kasten.classList.remove('auf'); }
+    }
+  }
+
+  var stat = document.getElementById('diagStatus');
+  if (stat) {
+    var verb = tokenGueltig();
+    stat.innerHTML = '<div class="' + (verb ? 'ok' : 'nein') + '">Google<b>'
+                   + (verb ? 'verbunden' : 'nicht verbunden') + '</b></div>'
+                   + '<div>Abgleich<b>' + esc(diagZeitText(abgleichZuletztMs)) + '</b></div>'
+                   + '<div>Termine<b>' + (kalenderLaeuft ? '…' : termineZahl()) + '</b></div>';
+  }
+
+  var kurz = {
+    verbindung: (tokenGueltig() ? 'verbunden' : 'nicht verbunden')
+              + ' · Speicher · Abgleich',
+    kalender: kalenderListe.length + ' Kalender'
+            + (archivJahre.length ? (' · ' + archivJahre.join(', ') + ' geladen') : ''),
+    aussehen: 'Farbwelt ' + FARBWELTEN[farbweltName()].name + ' · '
+            + (DB.einstellungen.darstellung === 'breit' ? 'breit'
+               : (DB.einstellungen.darstellung === 'schmal' ? 'schmal' : 'automatisch')),
+    daten: (DB.jahrestermine || []).length + ' Jahrestermine · Ferien · Skizzen · Bestand',
+    technik: 'Fassung ' + APP_VERSION + ' · Umgebung · Altbestand'
+  };
+  for (i = 0; i < DIAG_GRUPPEN.length; i++) {
+    var z = document.getElementById('dk-' + DIAG_GRUPPEN[i]);
+    if (z) { z.textContent = kurz[DIAG_GRUPPEN[i]]; }
+  }
+}
+
+/* ------------------------------------------------------------
+   Termin suchen
+
+   Wo ist ein Termin, und warum steht er dort, wo er steht — oder
+   nicht? Gesucht wird in allem, was geholt ist, Fenster wie
+   nachgeladene Jahre. Eine Serie erscheint als ein Treffer.
+   ------------------------------------------------------------ */
+
+function terminSuche(text) {
+  var such = String(text || '').trim().toLowerCase();
+  if (such.length < 2) { return []; }
+  var gruppen = {};
+  var reihe = [];
+  var tag, i;
+  for (tag in termineNachTag) {
+    if (!Object.prototype.hasOwnProperty.call(termineNachTag, tag)) { continue; }
+    var l = termineNachTag[tag];
+    for (i = 0; i < l.length; i++) {
+      var t = l[i];
+      var heu = (String(t.rohTitel || t.titel) + ' ' + String(t.beschreibung || ''))
+                .toLowerCase();
+      if (heu.indexOf(such) < 0) { continue; }
+      var schl = (t.serieId || t.id) + '|' + t.titel;
+      if (!gruppen[schl]) { gruppen[schl] = { satz: t, tage: [] }; reihe.push(schl); }
+      if (gruppen[schl].tage.indexOf(tag) < 0) { gruppen[schl].tage.push(tag); }
+    }
+  }
+  var aus = [];
+  for (i = 0; i < reihe.length; i++) {
+    var gr = gruppen[reihe[i]];
+    gr.tage.sort();
+    aus.push(gr);
+  }
+  aus.sort(function (a, b) { return (a.tage[0] < b.tage[0]) ? -1 : 1; });
+  return aus.slice(0, 12);
+}
+
+/* Warum erscheint er, wo er erscheint? */
+function terminWoText(t, tag) {
+  var arten = terminArten(t);
+  var teile = [];
+  if (!passtZumKalender(t.kontext || 'privat')) {
+    return { gut: false, text: 'vom Filter Beruf/Privat verdeckt' };
+  }
+  teile.push(t.ganztags ? 'im Tag unter Ganztägiges' : 'im Tag in der Zeitleiste');
+
+  var imJahr = jtAn(tag, true).some(function (x) { return x.id === t.id; });
+  if (imJahr) {
+    teile.push('im Jahresraster');
+    return { gut: true, text: teile.join(', ') };
+  }
+  var eineFrei = arten.some(function (a) { return artImJahr(a); });
+  var grund;
+  if (!t.ganztags && !eineFrei) {
+    grund = arten.length ? 'nicht im Jahresraster — keine seiner Arten ist fürs Jahr freigegeben'
+                         : 'nicht im Jahresraster — Termin mit Uhrzeit ohne Art';
+  } else if (!arten.length && !ohneArtZeigen()) {
+    grund = 'nicht im Jahresraster — „ohne Art" ist ausgeblendet';
+  } else if (jahrFilter !== null) {
+    grund = 'nicht im Jahresraster — dort ist ein Filter gesetzt';
+  } else {
+    grund = 'nicht im Jahresraster — als Doppel eines eigenen Jahrestermins ausgeblendet';
+  }
+  teile.push(grund);
+  return { gut: false, text: teile.join(', ') };
+}
+
+function terminSucheZeichnen() {
+  var feld = document.getElementById('terminSucheFeld');
+  var ziel = document.getElementById('terminSucheListe');
+  if (!feld || !ziel) { return; }
+  var text = String(feld.value || '');
+  if (text.trim().length < 2) { ziel.innerHTML = ''; return; }
+  var l = terminSuche(text);
+  if (!l.length) {
+    var geholt = kalVon
+      ? ('Geholt ist ' + kurzDatum(kalVon) + ' bis ' + kurzDatum(kalBis)
+         + (archivJahre.length ? (', dazu ' + archivJahre.join(', ')) : '') + '. ')
+      : 'Es sind noch keine Termine geholt — ist Google verbunden? ';
+    ziel.innerHTML = '<div class="d-hinweis" style="text-align:left">Nichts gefunden. '
+      + geholt + 'Liegt der Termin weiter weg, lade das Jahr nach; sonst prüfe, ob sein '
+      + 'Kalender eingeschaltet ist.</div>';
+    return;
+  }
+  var h = '';
+  var i, k;
+  for (i = 0; i < l.length; i++) {
+    var t = l[i].satz;
+    var tage = l[i].tage;
+    var spanne = (tage.length === 1) ? kurzDatum(tage[0])
+               : (kurzDatum(tage[0]) + ' – ' + kurzDatum(tage[tage.length - 1]));
+    var zeit = t.ganztags ? (t.ausZeit ? (t.ausZeit + ', als ganztägig erkannt') : 'ganztägig')
+             : (t.zeit + (t.bis ? ('–' + t.bis) : ''));
+    var wo = terminWoText(t, tage[0]);
+    var arten = terminArten(t);
+    h += '<div class="ts-treffer">';
+    h += '<div class="ts-titel">' + esc(t.titel) + '</div>';
+    h += '<div class="ts-meta">' + esc(spanne) + ' · ' + esc(zeit) + ' · '
+       + esc(t.quelle || '') + (tage.length > 1 ? (' · ' + tage.length + ' Tage') : '')
+       + '</div>';
+    if (arten.length) {
+      h += '<div>';
+      for (k = 0; k < arten.length; k++) {
+        h += '<span class="t-art' + (k === 0 ? ' haupt' : '') + '" style="margin-left:0;'
+           + 'margin-right:3px;border-color:' + artFarbe(arten[k]) + ';color:'
+           + artFarbe(arten[k]) + '">' + esc(artName(arten[k])) + '</span>';
+      }
+      h += '</div>';
+    }
+    h += '<div class="ts-wo ' + (wo.gut ? 'gut' : 'nein') + '">' + esc(wo.text) + '</div>';
+    h += '</div>';
+  }
+  ziel.innerHTML = h;
+}
+
 function zeichne() {
   anmeldeStreifenPruefen();
   zeichneSpeicher();
@@ -5553,6 +5849,8 @@ function zeichne() {
   zeichneFerien();
   zeichneBestand();
   zeichneUmgebung();
+  diagGruppenZeichnen();
+  terminSucheZeichnen();
 }
 
 
@@ -5718,6 +6016,21 @@ function eintraegeEinsortieren(eintraege, quelle, kontext, ziel) {
     if (!e.start || !e.start.dateTime) { continue; }
     var tag = tagAusEintrag(e.start.dateTime);
     if (!tag) { continue; }
+
+    /* Wer von 00:00 bis 23:55 einträgt, meint den ganzen Tag — auch ohne
+       das Häkchen „ganztägig". Solche Termine werden von hier an wie
+       ganztägige behandelt, überall. Die Uhrzeiten bleiben erhalten. */
+    var zVon = zeitAusEintrag(e.start.dateTime);
+    var zBis = (e.end && e.end.dateTime) ? zeitAusEintrag(e.end.dateTime) : '';
+    var endTag = (e.end && e.end.dateTime) ? tagAusEintrag(e.end.dateTime) : tag;
+    if (praktischGanztags(tag, zVon, endTag, zBis)) {
+      merkeTermin(tag, { id: e.id, titel: titel, rohTitel: rohTitel,
+                         zeit: '', bis: '', ausZeit: zVon + '–' + zBis,
+                         ort: e.location || '', ganztags: true, quelle: quelle,
+                         kontext: welcher, beschreibung: e.description || '',
+                         serieId: e.recurringEventId || '' }, wohin);
+      continue;
+    }
     merkeTermin(tag, {
       id: e.id, titel: titel, rohTitel: rohTitel,
       zeit: zeitAusEintrag(e.start.dateTime),
@@ -5732,6 +6045,13 @@ function eintraegeEinsortieren(eintraege, quelle, kontext, ziel) {
 
 /* Das Ziel ist das dritte, freiwillige Argument — so bleiben alle
    bisherigen Aufrufe mit zwei Argumenten gültig. */
+function praktischGanztags(tag, von, endTag, bis) {
+  if (!von || von > '00:30') { return false; }
+  if (endTag === tag) { return !!bis && bis >= '23:30'; }
+  /* Ende um Mitternacht des Folgetags */
+  return endTag === tagePlus(tag, 1) && !!bis && bis <= '00:30';
+}
+
 function merkeTermin(tag, satz, ziel) {
   var wohin = ziel || termineNachTag;
   if (!wohin[tag]) { wohin[tag] = []; }
@@ -5743,7 +6063,50 @@ function merkeTermin(tag, satz, ziel) {
   vorhanden.push(satz);
 }
 
-function termineHolen(laut) {
+/* Der Fortschritt eines Abrufs: je Kalender ein Schritt. Sichtbar nur,
+   wenn jemand auf einen Knopf gedrückt hat — der Abruf alle zwei
+   Minuten soll nicht jedes Mal ein Band über den Bildschirm ziehen. */
+var abruf = { aktiv: false, fertig: 0, gesamt: 0, was: '' };
+
+function abrufZeigen() {
+  var band = document.getElementById('abrufBalken');
+  var fuell = document.getElementById('abrufFuellung');
+  var text = document.getElementById('abrufText');
+  if (!band || !fuell || !text) { return; }
+  if (!abruf.aktiv) {
+    band.classList.remove('auf');
+    return;
+  }
+  var anteil = abruf.gesamt ? Math.round(100 * abruf.fertig / abruf.gesamt) : 0;
+  fuell.style.width = Math.max(4, anteil) + '%';
+  text.textContent = abruf.was + ' · ' + abruf.fertig + ' von ' + abruf.gesamt;
+  band.classList.add('auf');
+}
+
+function abrufStart(gesamt, was) {
+  abruf = { aktiv: true, fertig: 0, gesamt: gesamt, was: was };
+  abrufZeigen();
+}
+
+function abrufSchritt(was) {
+  if (!abruf.aktiv) { return; }
+  abruf.fertig++;
+  if (was) { abruf.was = was; }
+  abrufZeigen();
+}
+
+function abrufEnde() {
+  if (!abruf.aktiv) { return; }
+  abruf.fertig = abruf.gesamt;
+  abrufZeigen();
+  window.setTimeout(function () {
+    abruf.aktiv = false;
+    abrufZeigen();
+  }, 700);
+}
+
+function termineHolen(laut, mitBalken) {
+  var balken = (mitBalken === undefined) ? !!laut : !!mitBalken;
   /* Kein stiller Ausgang mehr, wenn jemand auf den Knopf gedrückt hat. */
   if (!tokenGueltig()) {
     if (laut) { melde('Nicht mit Google verbunden — bitte oben neu verbinden.', 'warn'); }
@@ -5776,9 +6139,15 @@ function termineHolen(laut) {
        der Tagesplan während des Abrufs gefüllt, und ein gleichzeitiges
        Nachladen des Jahres kann nichts überschreiben. */
     var neu = {};
+    if (balken) { abrufStart(aktive.length, 'Termine'); }
     var reihe = Promise.resolve(true);
     aktive.forEach(function (kal) {
-      reihe = reihe.then(function () { return einenKalenderHolen(kal, von, bis, neu); });
+      reihe = reihe.then(function () {
+        if (balken) { abruf.was = kal.name; abrufZeigen(); }
+        return einenKalenderHolen(kal, von, bis, neu);
+      }).then(function () {
+        if (balken) { abrufSchritt(); }
+      });
     });
     return reihe.then(function () { return neu; });
   }).then(function (neu) {
@@ -5807,6 +6176,7 @@ function termineHolen(laut) {
     return false;
   }).then(function (wert) {
     kalenderLaeuft = false;
+    if (balken) { abrufEnde(); }
     return wert;
   });
 }
@@ -5872,9 +6242,15 @@ function archivJahrHolen(jahr, still) {
     if (kalenderGewaehlt(kalenderListe[i].id)) { aktive.push(kalenderListe[i]); }
   }
 
+  if (!still) { abrufStart(aktive.length, 'Jahr ' + j); }
   var reihe = Promise.resolve(true);
   aktive.forEach(function (kal) {
-    reihe = reihe.then(function () { return einenKalenderHolen(kal, von, bis, jahrNeu); });
+    reihe = reihe.then(function () {
+      if (!still) { abruf.was = 'Jahr ' + j + ' · ' + kal.name; abrufZeigen(); }
+      return einenKalenderHolen(kal, von, bis, jahrNeu);
+    }).then(function () {
+      if (!still) { abrufSchritt(); }
+    });
   });
 
   return reihe.then(function () {
@@ -5895,6 +6271,7 @@ function archivJahrHolen(jahr, still) {
     archivEinhaengen();
     if (archivJahre.indexOf(j) < 0) { archivJahre.push(j); archivJahre.sort(); }
     archivLaeuft = false;
+    if (!still) { abrufEnde(); }
     if (!still) {
       melde('Jahr ' + j + ' nachgeladen: ' + zahl + ' Termine.\n'
           + 'Sie bleiben bis zum Neuladen der App und werden nicht gesichert.',
@@ -5906,6 +6283,7 @@ function archivJahrHolen(jahr, still) {
     return true;
   }).catch(function (f) {
     archivLaeuft = false;
+    if (!still) { abrufEnde(); }
     archivFehler = f ? f.message : 'unbekannter Fehler';
     zeichne();
     return false;
@@ -6494,13 +6872,23 @@ function zeichneJtDatei() {
 
 var ART_MUSTER = /#([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9_-]{1,23})/;
 
+/* Einzahl und Mehrzahl sind dieselbe Art: #Besuch gehört zu den
+   eingebauten „Besuche", nicht in eine eigene graue Art daneben. */
+var ARTEN_GLEICH = { besuch: 'besuche', geburtstage: 'geburtstag', feiern: 'feier',
+                     urlaube: 'urlaub', dienstreisen: 'dienstreise',
+                     termine: 'termin' };
+
+function artGleich(a) {
+  return ARTEN_GLEICH[a] || a;
+}
+
 function artenAusText(text) {
   if (typeof text !== 'string' || text.length === 0) { return []; }
   var re = new RegExp(ART_MUSTER.source, 'g');
   var aus = [];
   var m;
   while ((m = re.exec(text)) !== null) {
-    var a = m[1].toLowerCase();
+    var a = artGleich(m[1].toLowerCase());
     if (aus.indexOf(a) < 0) { aus.push(a); }
   }
   return aus;
@@ -6510,7 +6898,7 @@ function artAusText(text) {
   if (typeof text !== 'string' || text.length === 0) { return ''; }
   var treffer = text.match(ART_MUSTER);
   if (!treffer) { return ''; }
-  return treffer[1].toLowerCase();
+  return artGleich(treffer[1].toLowerCase());
 }
 
 function titelOhneArt(titel) {

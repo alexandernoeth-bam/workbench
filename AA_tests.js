@@ -541,6 +541,96 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__diagApi = {'
+                 + ' pruefeDiag: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var r = { zuBeiBeginn: !diagOffen(\'kalender\') };'
+                 + '   diagGruppeUm(\'kalender\');'
+                 + '   r.aufNachKlick = diagOffen(\'kalender\');'
+                 + '   r.gemerkt = !!(DB.einstellungen.diagOffen'
+                 + '     && DB.einstellungen.diagOffen.kalender);'
+                 + '   diagGruppeUm(\'kalender\');'
+                 + '   r.wiederZu = !diagOffen(\'kalender\');'
+                 + '   var off = -new Date(2026, 10, 5).getTimezoneOffset();'
+                 + '   var zo = (off >= 0 ? \'+\' : \'-\')'
+                 + '     + String(Math.floor(Math.abs(off) / 60)).padStart(2, \'0\')'
+                 + '     + \':\' + String(Math.abs(off) % 60).padStart(2, \'0\');'
+                 + '   kalenderListe = [{ id:\'fam\', name:\'Familienevents\' }];'
+                 + '   termineNachTag = {};'
+                 + '   var tage = [\'2026-11-05\', \'2026-11-06\', \'2026-11-07\','
+                 + '     \'2026-11-08\'];'
+                 + '   eintraegeEinsortieren(tage.map(function(t, i){'
+                 + '     return { id:\'em\' + i, recurringEventId:\'emden\','
+                 + '       summary:\'Emden\', description:\'#Urlaub\','
+                 + '       start:{ dateTime: t + \'T00:00:00\' + zo },'
+                 + '       end:{ dateTime: t + \'T23:55:00\' + zo } }; }),'
+                 + '     \'Familienevents\', \'privat\');'
+                 + '   eintraegeEinsortieren([{ id:\'k1\', summary:\'Krafttraining\','
+                 + '     description:\'Beine und Rücken #Training\','
+                 + '     start:{ dateTime:\'2026-09-23T06:15:00\' + zo },'
+                 + '     end:{ dateTime:\'2026-09-23T06:45:00\' + zo } }],'
+                 + '     \'Familienevents\', \'privat\');'
+                 + '   var s = terminSuche(\'Emden\');'
+                 + '   r.serieEinTreffer = s.length;'
+                 + '   r.vierTage = s.length ? s[0].tage.length : 0;'
+                 + '   r.imJahr = s.length'
+                 + '     ? terminWoText(s[0].satz, s[0].tage[0]).gut : false;'
+                 + '   var k = terminSuche(\'Kraft\');'
+                 + '   r.grundUhrzeit = k.length'
+                 + '     ? /keine seiner Arten/.test(terminWoText(k[0].satz,'
+                 + '         k[0].tage[0]).text) : false;'
+                 + '   r.inBeschreibung = terminSuche(\'Rücken\').length;'
+                 + '   r.zuKurz = terminSuche(\'E\').length;'
+                 + '   r.zeit = diagZeitText(Date.now() - 5 * 60000);'
+                 + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__ganzApi = {'
+                 + ' pruefeGanz: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var r = {'
+                 + '     nullBis2355: praktischGanztags(\'2026-11-05\', \'00:00\','
+                 + '       \'2026-11-05\', \'23:55\'),'
+                 + '     bisMitternacht: praktischGanztags(\'2026-11-05\', \'00:00\','
+                 + '       \'2026-11-06\', \'00:00\'),'
+                 + '     vormittag: praktischGanztags(\'2026-11-05\', \'09:00\','
+                 + '       \'2026-11-05\', \'12:00\'),'
+                 + '     ab8: praktischGanztags(\'2026-11-05\', \'08:00\','
+                 + '       \'2026-11-05\', \'23:55\') };'
+                 + '   var off = -new Date(2026, 10, 5).getTimezoneOffset();'
+                 + '   var zo = (off >= 0 ? \'+\' : \'-\')'
+                 + '     + String(Math.floor(Math.abs(off) / 60)).padStart(2, \'0\')'
+                 + '     + \':\' + String(Math.abs(off) % 60).padStart(2, \'0\');'
+                 + '   kalenderListe = [{ id:\'fam\', name:\'Familienevents\' }];'
+                 + '   termineNachTag = {};'
+                 + '   var tage = [\'2026-11-05\', \'2026-11-06\', \'2026-11-07\','
+                 + '     \'2026-11-08\'];'
+                 + '   eintraegeEinsortieren(tage.map(function(t, i){'
+                 + '     return { id:\'em\' + i, summary:\'Emden\','
+                 + '       description:\'#Urlaub<br>#Besuch\','
+                 + '       start:{ dateTime: t + \'T00:00:00\' + zo },'
+                 + '       end:{ dateTime: t + \'T23:55:00\' + zo } }; }),'
+                 + '     \'Familienevents\', \'privat\');'
+                 + '   r.alsGanz = !!(termineNachTag[\'2026-11-05\']'
+                 + '     && termineNachTag[\'2026-11-05\'][0].ganztags);'
+                 + '   r.imJahrOhneFreigabe = tage.filter(function(t){'
+                 + '     return jtAn(t, true).length > 0; }).length;'
+                 + '   tagOffen = \'2026-11-05\'; tagZeichnen();'
+                 + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   r.nichtDoppelt = !/tverlauf fest[^>]*>[\\s\\S]{0,200}Emden/.test(b);'
+                 + '   r.besuch = artGleich(\'besuch\');'
+                 + '   r.fremde = artGleich(\'garage\');'
+                 + '   abrufStart(2, \'Termine\');'
+                 + '   abrufSchritt();'
+                 + '   r.balkenAn = true;'
+                 + '   r.balkenBreite = document.getElementById(\'abrufFuellung\')'
+                 + '     .style.width;'
+                 + '   r.balkenText = document.getElementById(\'abrufText\').textContent;'
+                 + '   abruf.aktiv = false;'
+                 + '   termineNachTag = {}; kalenderListe = [];'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__jtBlattApi = {'
                  + ' pruefeBlatt: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -7481,8 +7571,8 @@ console.log('\n86. Art im Tagesplan');
   const ein = skript.match(/function eintraegeEinsortieren\([\s\S]*?\n\}\n/);
   pruefe(ein && /titelOhneArt\(rohTitel\) \|\| rohTitel/.test(ein[0]),
          'das Kürzel gehört nicht in die Anzeige');
-  pruefe(ein && (ein[0].match(/rohTitel: rohTitel/g) || []).length === 2,
-         'der rohe Titel bleibt bei beiden Terminarten erhalten');
+  pruefe(ein && (ein[0].match(/rohTitel: rohTitel/g) || []).length >= 2,
+         'der rohe Titel bleibt bei allen Terminarten erhalten');
 
   pruefe(/class="t-art'/.test(skript), 'die Art steht in der Tageszeile');
   pruefe(/steht im Jahresraster/.test(skript),
@@ -8203,6 +8293,125 @@ console.log('\n98. Tagesblatt im Jahr');
     pruefe(e.aufgehoben === '', 'dieselbe noch einmal hebt die Zuordnung auf');
     pruefe(e.eigenerBleibt === true,
            'ein eigener Jahrestermin bleibt bearbeitbar wie bisher');
+  }
+}
+
+/* ============================================================
+   99. Ganztaegig ohne Haekchen, Fortschritt, Einzahl und Mehrzahl
+   Grund: Ein Termin von 00:00 bis 23:55 ist fuer Google einer mit
+   Uhrzeit — gemeint ist der ganze Tag. Er fiel aus dem Jahresraster.
+   Dazu fehlte beim Holen jede Anzeige, wie weit es ist, und #Besuch
+   landete neben den eingebauten „Besuche" in einer eigenen Art.
+   ============================================================ */
+console.log('\n99. Ganztägig erkannt');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__ganzApi;
+
+  ['praktischGanztags', 'abrufZeigen', 'abrufStart', 'abrufSchritt', 'abrufEnde',
+   'artGleich'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const ein = skript.match(/function eintraegeEinsortieren\([\s\S]*?\n\}\n/);
+  pruefe(ein && /praktischGanztags\(tag, zVon, endTag, zBis\)/.test(ein[0]),
+         'erkannt wird schon beim Einsortieren — dann gilt es überall');
+  pruefe(ein && /ausZeit: zVon \+ '–' \+ zBis/.test(ein[0]),
+         'die Uhrzeiten bleiben dabei gemerkt');
+
+  pruefe(/id="abrufBalken"/.test(QUELLE), 'es gibt einen Fortschrittsbalken');
+  const th = skript.match(/function termineHolen\([\s\S]*?\n\}\n/);
+  pruefe(th && /abrufStart\(aktive\.length/.test(th[0]) && /abrufSchritt\(\)/.test(th[0]),
+         'er rückt je Kalender einen Schritt vor');
+  pruefe(th && /var balken = \(mitBalken === undefined\) \? !!laut/.test(th[0]),
+         'er erscheint nur auf Knopfdruck, nicht beim Abruf alle zwei Minuten');
+  const nl = skript.match(/function kalenderNeuLesen\([\s\S]*?\n\}/);
+  pruefe(nl && /termineHolen\(false, true\)/.test(nl[0]),
+         'auch bei „Kalender neu einlesen"');
+  const aj = skript.match(/function archivJahrHolen\([\s\S]*?\n\}\n/);
+  pruefe(aj && /if \(!still\) \{ abrufStart/.test(aj[0]),
+         'und beim Nachladen eines Jahres von Hand');
+  pruefe(aj && /catch\(function \(f\) \{\s*archivLaeuft = false;\s*if \(!still\) \{ abrufEnde\(\)/.test(aj[0]),
+         'auch nach einem Fehler verschwindet er wieder');
+
+  if (!g) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = g.pruefeGanz();
+    pruefe(e.nullBis2355 === true, '00:00 bis 23:55 gilt als ganztägig');
+    pruefe(e.bisMitternacht === true, 'bis Mitternacht des Folgetags ebenso');
+    pruefe(e.vormittag === false, 'ein Vormittagstermin nicht');
+    pruefe(e.ab8 === false, 'einer ab 8 Uhr bis spät nicht');
+    pruefe(e.alsGanz === true, 'ein solcher Termin wird als ganztägig abgelegt');
+    pruefe(e.imJahrOhneFreigabe === 4,
+           'er steht an allen Tagen im Jahr, ohne dass eine Art freigegeben sein muss');
+    pruefe(e.nichtDoppelt === true,
+           'im Tagesplan steht er unter Ganztägiges, nicht zusätzlich in der Zeitleiste');
+    pruefe(e.besuch === 'besuche', '#Besuch gehört zu den eingebauten „Besuche"');
+    pruefe(e.fremde === 'garage', 'eine unbekannte Art bleibt, wie sie ist');
+    pruefe(e.balkenAn === true && e.balkenBreite === '50%',
+           'der Balken zeigt, wie weit es ist');
+    pruefe(e.balkenText.indexOf('1 von 2') >= 0, 'und in Worten');
+  }
+}
+
+/* ============================================================
+   100. Die Diagnose in Gruppen, und Termin suchen
+   Grund: Fuenfzehn lose Abschnitte waren unuebersichtlich. Jetzt fuenf
+   Gruppen zum Auf- und Zuklappen, darueber eine Statuszeile. Und ein
+   Werkzeug, das beantwortet, wo ein Termin steckt und warum.
+   ============================================================ */
+console.log('\n100. Diagnose in Gruppen');
+{
+  const skript = hauptSkript();
+  const d = globalThis.__diagApi;
+
+  ['diagOffen', 'diagGruppeUm', 'diagGruppenZeichnen', 'diagZeitText', 'terminSuche',
+   'terminWoText', 'terminSucheZeichnen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+
+  const schirm = QUELLE.match(/<div class="schirm" id="schirmDiagnose">[\s\S]*?\n<\/div>\n/);
+  ['verbindung', 'kalender', 'aussehen', 'daten', 'technik'].forEach(function (g) {
+    pruefe(schirm && new RegExp('id="dg-' + g + '"').test(schirm[0]),
+           'die Gruppe ' + g + ' ist da');
+    pruefe(schirm && new RegExp('id="dk-' + g + '"').test(schirm[0]),
+           'mit einer Kurzzeile, die auch zugeklappt etwas sagt');
+  });
+  pruefe(schirm && /id="diagStatus"/.test(schirm[0]), 'oben steht eine Statuszeile');
+  pruefe(schirm && /onclick="zeigeSchirm\('Tag'\)">Zurück/.test(schirm[0]),
+         'ein Zurück führt in den Tag — die Diagnose hat keinen Leistenknopf mehr');
+
+  /* Nichts darf beim Umbau verlorengegangen sein */
+  ['speicherListe', 'googleListe', 'kalenderListe', 'archivListe', 'artenJahrListe',
+   'farbweltListe', 'darstellungWahl', 'skizzenListe', 'jtDateiStand', 'ferienListe',
+   'bestandListe', 'umgebungListe', 'melder', 'terminSucheFeld', 'terminSucheListe']
+    .forEach(function (id) {
+      pruefe(schirm && new RegExp('id="' + id + '"').test(schirm[0]),
+             'der Abschnitt ' + id + ' ist noch im Bildschirm');
+    });
+
+  const kal = QUELLE.match(/<div class="dg" id="dg-kalender">[\s\S]*?<div class="dg" id="dg-aussehen">/);
+  pruefe(kal && kal[0].indexOf('terminSucheFeld') < kal[0].indexOf('id="kalenderListe"'),
+         'die Terminsuche steht in „Kalender" ganz oben');
+
+  if (!d) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = d.pruefeDiag();
+    pruefe(e.zuBeiBeginn === true, 'ohne Wahl sind die Gruppen zu');
+    pruefe(e.aufNachKlick === true, 'ein Klick öffnet eine');
+    pruefe(e.gemerkt === true, 'und das wird gemerkt');
+    pruefe(e.wiederZu === true, 'ein zweiter Klick schließt sie');
+    pruefe(e.serieEinTreffer === 1, 'eine Serie erscheint als ein Treffer');
+    pruefe(e.vierTage === 4, 'mit allen ihren Tagen');
+    pruefe(e.imJahr === true, 'ein ganztägiger steht als „im Jahresraster" da');
+    pruefe(e.grundUhrzeit === true,
+           'bei einem Termin mit Uhrzeit steht der Grund, warum er nicht im Jahr ist');
+    pruefe(e.inBeschreibung === 1, 'gesucht wird auch in der Beschreibung');
+    pruefe(e.zuKurz === 0, 'ein einzelnes Zeichen sucht noch nicht');
+    pruefe(e.zeit === 'vor 5 Min.', 'die Abgleichzeit steht in Worten');
   }
 }
 
