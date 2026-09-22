@@ -541,6 +541,54 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__mehrArtApi = {'
+                 + ' pruefeMehr: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   var r = {'
+                 + '     drei: terminArten({ titel:\'Lauf\','
+                 + '       beschreibung:\'#Training #Treffen #Sport\' }).join(\',\'),'
+                 + '     haupt: terminArt({ titel:\'Lauf\','
+                 + '       beschreibung:\'#Training #Treffen\' }),'
+                 + '     titelZuerst: terminArten({ titel:\'Lauf #Treffen\','
+                 + '       beschreibung:\'#Training\' }).join(\',\'),'
+                 + '     ohneDoppel: terminArten({ titel:\'#Treffen\','
+                 + '       beschreibung:\'#treffen\' }).join(\',\') };'
+                 + '   DB.kalenderzuordnung = { x1: { art:\'urlaub\' } };'
+                 + '   r.eigeneAllein = terminArten({ id:\'x1\', titel:\'#Training\' })'
+                 + '     .join(\',\');'
+                 + '   DB.kalenderzuordnung = {};'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   eintraegeEinsortieren([{ id:\'t1\', summary:\'Laufen\','
+                 + '     description:\'#Training #Treffen\','
+                 + '     start:{ dateTime: h + \'T18:00:00+02:00\' },'
+                 + '     end:{ dateTime: h + \'T19:00:00+02:00\' } }], \'Alex\','
+                 + '     \'privat\');'
+                 + '   r.inListe = (artenAlle().indexOf(\'treffen\') >= 0);'
+                 + '   artImJahrUm(\'treffen\');'
+                 + '   var imJahr = jtAn(h, true);'
+                 + '   r.freiUeberZweite = imJahr.length;'
+                 + '   jahrFilter = \'treffen\';'
+                 + '   r.filterZweite = imJahr.length ? jtPasst(imJahr[0]) : false;'
+                 + '   jahrFilter = null;'
+                 + '   var html = jahrHtml(h);'
+                 + '   var zahl = function(name){'
+                 + '     var re = new RegExp(\'jsum-name">\' + name'
+                 + '       + \'<\\\\/span><span class="jsum-n">(\\\\d+)\');'
+                 + '     var mm = html.match(re);'
+                 + '     return mm ? Number(mm[1]) : 0; };'
+                 + '   r.summeTraining = zahl(\'Training\');'
+                 + '   r.summeTreffen = zahl(\'Treffen\');'
+                 + '   r.summeAlle = zahl(\'Alle\');'
+                 + '   tagOffen = h; tagZeichnen();'
+                 + '   var tb = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   r.pillen = (tb.match(/class="t-art/g) || []).length;'
+                 + '   r.hauptFett = /class="t-art haupt"/.test(tb);'
+                 + '   termineNachTag = {}; kalenderListe = [];'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__feiKurzApi = {'
                  + ' pruefe: function(){'
                  + '   var l = feiertageVon(2026);'
@@ -955,7 +1003,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   tagZeichnen();'
                  + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
                  + '   var karte = {};'
-                 + '   var re = /ttitel">([^<]*)(?:<span class="t-art"[^>]*>([^<]*)<)?/g;'
+                 + '   var re = /ttitel">([^<]*)(?:<span class="t-art[^"]*"[^>]*>([^<]*)<)?/g;'
                  + '   var m;'
                  + '   while ((m = re.exec(b)) !== null) {'
                  + '     karte[m[1]] = (m[2] || \'\').replace(/ ·J$/, \'\'); }'
@@ -5911,8 +5959,10 @@ console.log('\n66. Arten aus dem Kalender');
          'die eigene Zuordnung landet in der eigenen Datei');
 
   /* Vorrang */
-  const art = skript.match(/function terminArt\([\s\S]*?\n\}/);
-  pruefe(art && art[0].indexOf('zuordnungArt') < art[0].indexOf('artAusText'),
+  /* Seit v0.98.0 liest terminArten alle Kürzel; terminArt nimmt die
+     erste davon. */
+  const art = skript.match(/function terminArten\([\s\S]*?\n\}/);
+  pruefe(art && art[0].indexOf('zuordnungArt') < art[0].indexOf('artenAusText'),
          'die eigene Zuordnung geht vor das Kürzel im Termin');
 
   /* Beschreibung wird mitgelesen */
@@ -7217,7 +7267,7 @@ console.log('\n83. Arten im Jahresraster');
          'ein Termin ohne Art bleibt draußen');
 
   const kj = skript.match(/function kalenderJahrestermine\([\s\S]*?\n\}/);
-  pruefe(kj && /!\(mitZeit && artImJahr\(art\)\)/.test(kj[0]),
+  pruefe(kj && /!\(mitZeit && eineFrei\)/.test(kj[0]),
          'ganztägig gehört immer hinein, mit Uhrzeit nur nach Wahl — und nur '
          + 'dort, wo danach gefragt wird');
   const jh2 = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
@@ -7392,7 +7442,7 @@ console.log('\n86. Art im Tagesplan');
   pruefe(ein && (ein[0].match(/rohTitel: rohTitel/g) || []).length === 2,
          'der rohe Titel bleibt bei beiden Terminarten erhalten');
 
-  pruefe(/class="t-art"/.test(skript), 'die Art steht in der Tageszeile');
+  pruefe(/class="t-art'/.test(skript), 'die Art steht in der Tageszeile');
   pruefe(/steht im Jahresraster/.test(skript),
          'und es ist ablesbar, ob sie im Jahresraster erscheint');
 
@@ -7967,6 +8017,54 @@ console.log('\n95. Laufende Termine');
     pruefe(e.hinweis === true, 'dabei steht, wie lange es noch dauert');
     pruefe(/^noch 1 Std\. \d{1,2} Min\.$/.test(e.stunden),
            'längeres in Stunden und Minuten (ist: ' + e.stunden + ')');
+  }
+}
+
+/* ============================================================
+   96. Mehrere Arten je Termin
+   Grund: Termine tragen oft zwei oder drei Kuerzel. Bisher galt nur
+   das erste. Jetzt ist das erste die Hauptart — sie gibt Farbe und
+   Kuerzel —, und alle zaehlen fuer Summen, Filter und Freigabe.
+   ============================================================ */
+console.log('\n96. Mehrere Arten');
+{
+  const skript = hauptSkript();
+  const m = globalThis.__mehrArtApi;
+
+  ['terminArten', 'artenAusText'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const ta = skript.match(/function terminArt\([\s\S]*?\n\}/);
+  pruefe(ta && /l\[0\]/.test(ta[0]), 'die Hauptart ist die erste');
+
+  const jh = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
+  const pr = skript.match(/function zeichneArtenImJahr\([\s\S]*?\n\}\n/);
+  pruefe(pr && /terminArten\(roh\[z\]\)/.test(pr[0]) && /eineFrei2/.test(pr[0]),
+         'die Probe für heute rechnet wie das Raster, mit allen Arten');
+  pruefe(jh && /var gesamtN = einmalN/.test(jh[0]),
+         'in „Alle" zählt ein Termin nur einmal, auch mit drei Kürzeln');
+
+  if (!m) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = m.pruefeMehr();
+    pruefe(e.drei === 'training,treffen,sport', 'alle drei Kürzel werden gelesen');
+    pruefe(e.haupt === 'training', 'die erste ist die Hauptart');
+    pruefe(e.titelZuerst === 'treffen,training',
+           'erst die aus dem Titel, dann die aus der Beschreibung');
+    pruefe(e.ohneDoppel === 'treffen', 'doppelte fallen weg');
+    pruefe(e.eigeneAllein === 'urlaub',
+           'eine eigene Zuordnung gilt allein');
+    pruefe(e.inListe === true, 'auch eine zweite Art steht in der Artenliste');
+    pruefe(e.freiUeberZweite === 1,
+           'ist nur die zweite Art freigegeben, steht der Termin trotzdem im Jahr');
+    pruefe(e.filterZweite === true, 'der Filter findet ihn über seine zweite Art');
+    pruefe(e.summeTraining === 1 && e.summeTreffen === 1,
+           'er zählt bei beiden Arten mit');
+    pruefe(e.summeAlle === 1, 'in „Alle" nur einmal');
+    pruefe(e.pillen === 2, 'im Tagesplan stehen beide Arten');
+    pruefe(e.hauptFett === true, 'die Hauptart hervorgehoben');
   }
 }
 

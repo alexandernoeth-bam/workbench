@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.97.0</title>
+<title>Workbench 0.98.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -343,6 +343,8 @@ body.breit #seiteBlatt{display:grid;grid-template-columns:1.15fr 1fr;
 .tmeta .eilig{color:var(--weinrot);font-weight:500}
 
 .tverlauf{display:flex;gap:0;align-items:stretch}
+.t-art + .t-art{margin-left:3px}
+.t-art.haupt{font-weight:600}
 .t-art{display:inline-block;margin-left:7px;font-size:calc(var(--fs)*0.66);
   border:1px solid var(--linie);border-radius:20px;padding:0 7px;
   vertical-align:middle;white-space:nowrap}
@@ -1419,7 +1421,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.97.0';
+var APP_VERSION = '0.98.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3591,10 +3593,13 @@ function verlaufHtml(eintrag, is) {
     h += '<div class="tv-inhalt"><div class="ttitel">' + esc(t.titel);
     /* Die erkannte Art sichtbar machen: Sonst rätselt man, ob ein
        Kürzel im Termin überhaupt angekommen ist. */
-    var tArt = t.id ? terminArt(t) : '';
-    if (tArt) {
-      h += '<span class="t-art" style="border-color:' + artFarbe(tArt) + ';color:'
-         + artFarbe(tArt) + '" title="Erkannte Art'
+    var tArten = t.id ? terminArten(t) : [];
+    var ta;
+    for (ta = 0; ta < tArten.length; ta++) {
+      var tArt = tArten[ta];
+      h += '<span class="t-art' + (ta === 0 ? ' haupt' : '') + '" style="border-color:'
+         + artFarbe(tArt) + ';color:' + artFarbe(tArt) + '" title="'
+         + (ta === 0 ? 'Hauptart' : 'Weitere Art')
          + (artImJahr(tArt) ? ' · steht im Jahresraster' : '')
          + '">' + esc(artName(tArt)) + (artImJahr(tArt) ? ' ·J' : '') + '</span>';
     }
@@ -5306,20 +5311,30 @@ function zeichneArtenImJahr() {
   h += zeile('Käme ins Jahresraster', String(ji.length), ji.length ? '' : 'nein');
   var z;
   for (z = 0; z < roh.length; z++) {
-    var a2 = terminArt(roh[z]);
-    var drin = false;
+    /* Dieselbe Rechnung wie im Raster: alle Arten, und es genügt,
+       wenn eine davon freigegeben ist. */
+    var arten2 = terminArten(roh[z]);
+    var a2 = arten2.length ? arten2[0] : '';
+    var eineFrei2 = false;
     var y;
+    for (y = 0; y < arten2.length; y++) {
+      if (artImJahr(arten2[y])) { eineFrei2 = true; }
+    }
+    var drin = false;
     for (y = 0; y < ji.length; y++) {
       if (ji[y].id === roh[z].id) { drin = true; }
     }
     var grund = '';
     if (!a2) { grund = 'keine Art erkannt'; }
-    else if (!roh[z].ganztags && !artImJahr(a2)) { grund = 'Art nicht freigegeben'; }
+    else if (!roh[z].ganztags && !eineFrei2) { grund = 'Art nicht freigegeben'; }
     else if (!drin) { grund = 'fällt sonst heraus'; }
-    else if (!jtPasst({ art: a2, kontext: roh[z].kontext })) { grund = 'vom Filter weg'; }
+    else if (!jtPasst({ art: a2, arten: arten2, kontext: roh[z].kontext })) {
+      grund = 'vom Filter weg';
+    }
     else { grund = 'erscheint'; }
+    var artText = arten2.map(function (x) { return '#' + x; }).join(' ');
     h += zeile(esc(roh[z].titel || '(ohne Titel)'),
-               (a2 ? ('#' + a2 + ' · ') : '') + grund,
+               (artText ? (esc(artText) + ' · ') : '') + grund,
                (grund === 'erscheint') ? '' : 'nein');
   }
 
@@ -6423,6 +6438,18 @@ function zeichneJtDatei() {
 
 var ART_MUSTER = /#([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9_-]{1,23})/;
 
+function artenAusText(text) {
+  if (typeof text !== 'string' || text.length === 0) { return []; }
+  var re = new RegExp(ART_MUSTER.source, 'g');
+  var aus = [];
+  var m;
+  while ((m = re.exec(text)) !== null) {
+    var a = m[1].toLowerCase();
+    if (aus.indexOf(a) < 0) { aus.push(a); }
+  }
+  return aus;
+}
+
 function artAusText(text) {
   if (typeof text !== 'string' || text.length === 0) { return ''; }
   var treffer = text.match(ART_MUSTER);
@@ -6453,13 +6480,28 @@ function zuordnungSetzen(id, art) {
 }
 
 /* Die eigene Zuordnung schlägt das Kürzel im Termin. */
-function terminArt(t) {
-  if (!t) { return ''; }
+/* Alle Arten eines Termins, in ihrer Reihenfolge: erst die aus dem
+   Titel, dann die aus der Beschreibung, Doppelte fallen weg. Die erste
+   ist die Hauptart — sie gibt Farbe und Kürzel. Hat man dem Termin in
+   der App eine Art zugeordnet, gilt nur diese. */
+function terminArten(t) {
+  if (!t) { return []; }
   var eigen = t.id ? zuordnungArt(t.id) : '';
-  if (eigen) { return eigen; }
-  var ausTitel = artAusText(t.rohTitel || t.titel);
-  if (ausTitel) { return ausTitel; }
-  return artAusText(t.beschreibung);
+  if (eigen) { return [eigen]; }
+  var aus = [];
+  var quellen = [artenAusText(t.rohTitel || t.titel), artenAusText(t.beschreibung)];
+  var q, i;
+  for (q = 0; q < quellen.length; q++) {
+    for (i = 0; i < quellen[q].length; i++) {
+      if (aus.indexOf(quellen[q][i]) < 0) { aus.push(quellen[q][i]); }
+    }
+  }
+  return aus;
+}
+
+function terminArt(t) {
+  var l = terminArten(t);
+  return l.length ? l[0] : '';
 }
 
 /* ------------------------------------------------------------
@@ -6531,7 +6573,9 @@ function artenAlle() {
       /* Auch Termine mit Uhrzeit: Sonst stünde eine Art wie „Training"
          nie in der Liste — und man könnte sie nie fürs Jahresraster
          freischalten. Ein Zirkelschluss. */
-      dazu(terminArt(l[i]));
+      var alleArten = terminArten(l[i]);
+      var ak;
+      for (ak = 0; ak < alleArten.length; ak++) { dazu(alleArten[ak]); }
     }
   }
   return aus;
@@ -6551,12 +6595,21 @@ function kalenderJahrestermine(is, mitZeit) {
   var g = (termineNachTag[is] || []);
   var i;
   for (i = 0; i < g.length; i++) {
-    var art = terminArt(g[i]);
-    if (!g[i].ganztags && !(mitZeit && artImJahr(art))) { continue; }
+    var arten = terminArten(g[i]);
+    var art = arten.length ? arten[0] : '';
+    /* Ins Jahr darf ein Termin mit Uhrzeit, wenn eine seiner Arten
+       dafür freigegeben ist — nicht nur die erste. */
+    var eineFrei = false;
+    var ai;
+    for (ai = 0; ai < arten.length; ai++) {
+      if (artImJahr(arten[ai])) { eineFrei = true; }
+    }
+    if (!g[i].ganztags && !(mitZeit && eineFrei)) { continue; }
     aus.push({
       id: g[i].id,
       titel: g[i].titel,
       art: art,
+      arten: arten,
       kontext: g[i].kontext || 'privat',
       von: is, bis: is,
       nurZeit: !g[i].ganztags,
@@ -6983,6 +7036,11 @@ function jtPasst(e) {
   if (!(e.art || '') && !ohneArtZeigen()) { return false; }
   if (jahrFilter === null) { return true; }
   if (jahrFilter === 'ferien' || jahrFilter === 'feiertage') { return false; }
+  /* Der Filter findet einen Termin auch über seine zweite oder dritte
+     Art. */
+  if (Array.isArray(e.arten) && e.arten.length) {
+    return e.arten.indexOf(jahrFilter) >= 0;
+  }
   return (e.art || '') === jahrFilter;
 }
 
@@ -7635,6 +7693,8 @@ function jahrHtml(is) {
   for (s = 0; s < arten.length; s++) { summen[arten[s]] = { n: 0, tage: 0 }; }
   summen[''] = { n: 0, tage: 0 };
   var liste = jahrestermineUndKalender(jahr);
+  var einmalN = 0;
+  var einmalT = 0;
   var i;
   for (i = 0; i < liste.length; i++) {
     var e = liste[i];
@@ -7645,10 +7705,17 @@ function jahrHtml(is) {
     var a = von.slice(0, 4) === String(jahr) ? von : (jahr + '-01-01');
     var z = bis.slice(0, 4) === String(jahr) ? bis : (jahr + '-12-31');
     var tage = Math.round((Date.parse(z) - Date.parse(a)) / 86400000) + 1;
-    var art = (e.art || '');
-    if (!summen[art]) { summen[art] = { n: 0, tage: 0 }; }
-    summen[art].n += 1;
-    summen[art].tage += tage;
+    /* Bei jeder seiner Arten zählt der Termin mit — in „Alle" aber nur
+       einmal, sonst stiege die Summe mit jedem zweiten Kürzel. */
+    var seine = (Array.isArray(e.arten) && e.arten.length) ? e.arten : [e.art || ''];
+    var sa;
+    for (sa = 0; sa < seine.length; sa++) {
+      if (!summen[seine[sa]]) { summen[seine[sa]] = { n: 0, tage: 0 }; }
+      summen[seine[sa]].n += 1;
+      summen[seine[sa]].tage += tage;
+    }
+    einmalN += 1;
+    einmalT += tage;
   }
 
   h += '<div class="gruppenkopf"><span>Summe je Art</span>'
@@ -7658,12 +7725,7 @@ function jahrHtml(is) {
      + (ohneArtZeigen() ? 'ohne Art zeigen' : 'ohne Art aus') + '</button></div>';
   var reihe = arten.slice();
   reihe.push('');
-  var gesamtN = 0, gesamtT = 0;
-  for (s = 0; s < reihe.length; s++) {
-    if (!summen[reihe[s]]) { continue; }
-    gesamtN += summen[reihe[s]].n;
-    gesamtT += summen[reihe[s]].tage;
-  }
+  var gesamtN = einmalN, gesamtT = einmalT;
   h += '<div class="jsum' + (jahrFilter === null ? ' aktiv' : '') + '" onclick="jahrFilterSetzen(null)">'
      + '<span class="jsum-farbe" style="background:var(--tinte)"></span>'
      + '<span class="jsum-name">Alle</span>'
