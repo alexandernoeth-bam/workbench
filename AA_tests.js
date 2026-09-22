@@ -541,6 +541,51 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__exportApi = {'
+                 + ' pruefeExport: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var mVon = kalVon, mBis = kalBis;'
+                 + '   kalVon = \'2026-09-01\'; kalBis = \'2026-12-31\';'
+                 + '   kalenderListe = [{ id:\'f\', name:\'Familienevents\' }];'
+                 + '   termineNachTag = {};'
+                 + '   eintraegeEinsortieren([{ id:\'g1\', summary:\'Feier bei Moni\','
+                 + '     start:{ date:\'2026-10-10\' }, end:{ date:\'2026-10-11\' } }],'
+                 + '     \'Familienevents\', \'privat\');'
+                 + '   DB.jahrestermine = ['
+                 + '     { id:\'j1\', titel:\'Feier Moni\', art:\'feier\','
+                 + '       von:\'2026-10-10\', bis:\'2026-10-10\', jaehrlich:false },'
+                 + '     { id:\'j2\', titel:\'Sommerfest\', art:\'feier\','
+                 + '       von:\'2019-11-02\', bis:\'2019-11-02\', jaehrlich:true },'
+                 + '     { id:\'j3\', titel:\'Neujahrsempfang\', art:\'feier\','
+                 + '       von:\'2026-01-10\', bis:\'2026-01-10\', jaehrlich:false },'
+                 + '     { id:\'j4\', titel:\'Urlaub\', art:\'urlaub\','
+                 + '       von:\'2026-11-01\', bis:\'2026-11-05\', jaehrlich:false } ];'
+                 + '   var l = exportListe(2026, \'feier\');'
+                 + '   var nach = {};'
+                 + '   l.forEach(function(z){ nach[z.satz.id] = z; });'
+                 + '   exportOeffnen(2026, \'feier\');'
+                 + '   var r = { zahl: l.length,'
+                 + '     andereArtNicht: !nach.j4,'
+                 + '     imKalender: nach.j1 && nach.j1.imKalender,'
+                 + '     fehltAngehakt: exportWahl.j2.mit,'
+                 + '     daNichtAngehakt: !exportWahl.j1.mit,'
+                 + '     ungeprueft: nach.j3 && !nach.j3.pruefbar && !exportWahl.j3.mit,'
+                 + '     jaehrlichVorbelegt: exportWahl.j2.jaehrlich === true };'
+                 + '   exportMitUm(\'j3\');'
+                 + '   exportJaehrlichUm(\'j3\');'
+                 + '   var text = \'\';'
+                 + '   var merkAnb = dateiAnbieten;'
+                 + '   dateiAnbieten = function(n, t){ text = t; return true; };'
+                 + '   exportAusgeben();'
+                 + '   dateiAnbieten = merkAnb;'
+                 + '   r.imText = (text.match(/BEGIN:VEVENT/g) || []).length;'
+                 + '   r.serie = (text.match(/RRULE:FREQ=YEARLY/g) || []).length;'
+                 + '   r.kuerzel = /DESCRIPTION:#feier/.test(text);'
+                 + '   r.gemerkt = DB.jahrestermine[2].jaehrlich === true;'
+                 + '   termineNachTag = {}; kalenderListe = [];'
+                 + '   kalVon = mVon; kalBis = mBis; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__diagApi = {'
                  + ' pruefeDiag: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -6101,13 +6146,17 @@ console.log('\n66. Arten aus dem Kalender');
   pruefe(/items\(id,summary,description/.test(QUELLE),
          'die Beschreibung wird von Google mitgeholt');
 
-  /* ICS-Ausgabe */
-  const ics = skript.match(/function jtAlsIcs\([\s\S]*?\n\}\n/);
+  /* ICS-Ausgabe — seit v1.1.0 im gemeinsamen Baustein jtIcsEreignis,
+     den beide Ausgaben benutzen. */
+  const ics = skript.match(/function jtIcsEreignis\([\s\S]*?\n\}\n/);
+  const icsAlle = skript.match(/function jtAlsIcs\([\s\S]*?\n\}\n/);
+  pruefe(icsAlle && /jtIcsEreignis\(e, !!e\.jaehrlich\)/.test(icsAlle[0]),
+         'die Ausgabe aller Jahrestermine benutzt den gemeinsamen Baustein');
   pruefe(ics && /DESCRIPTION:' \+ icsZeile\('#' \+ e\.art\)/.test(ics[0]),
          'die Ausgabe schreibt die Art als Kürzel in die Beschreibung');
   pruefe(ics && /SUMMARY:' \+ icsZeile\(e\.titel\)/.test(ics[0]),
          'der Titel bleibt unberührt');
-  pruefe(ics && /RRULE:FREQ=YEARLY/.test(ics[0]),
+  pruefe(ics && /if \(jaehrlich\) \{ z\.push\('RRULE:FREQ=YEARLY'\)/.test(ics[0]),
          'jährliche Termine werden als Serie ausgegeben');
   pruefe(ics && /tagePlus\(bis, 1\)/.test(ics[0]),
          'das Ende wird um einen Tag verschoben, wie ICS es verlangt');
@@ -8415,6 +8464,52 @@ console.log('\n100. Diagnose in Gruppen');
     pruefe(e.inBeschreibung === 1, 'gesucht wird auch in der Beschreibung');
     pruefe(e.zuKurz === 0, 'ein einzelnes Zeichen sucht noch nicht');
     pruefe(e.zeit === 'vor 5 Min.', 'die Abgleichzeit steht in Worten');
+  }
+}
+
+/* ============================================================
+   101. Fehlende in Google exportieren
+   Grund: Um die Kalender glattzuziehen, soll ausgegeben werden, was
+   als eigener Jahrestermin in der App steht, aber in Google fehlt —
+   mit jaehrlicher Wiederholung, wo gewuenscht.
+   ============================================================ */
+console.log('\n101. Fehlende exportieren');
+{
+  const skript = hauptSkript();
+  const x = globalThis.__exportApi;
+
+  ['abgleichMoeglich', 'imKalenderGefunden', 'exportListe', 'exportOeffnen', 'exportNeu',
+   'exportMitUm', 'exportJaehrlichUm', 'exportHtml', 'jtIcsEreignis', 'jtIcsKopf',
+   'exportAusgeben'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const ig = skript.match(/function imKalenderGefunden\([\s\S]*?\n\}/);
+  pruefe(ig && /jtDoppelt\(e, l\[i\]\)/.test(ig[0]),
+         'ob etwas fehlt, entscheidet dieselbe Rechnung wie beim Entdoppeln');
+  const jh = skript.match(/function jahrHtml\([\s\S]*?\n\}\n/);
+  pruefe(jh && /exportOeffnen\(/.test(jh[0]), 'der Knopf steht in der Jahressicht');
+  pruefe(jh && /jahrFilter !== 'ferien' && jahrFilter !== 'feiertage'/.test(jh[0]),
+         'und nur, wenn eine Art gewählt ist');
+
+  if (!x) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = x.pruefeExport();
+    pruefe(e.zahl === 3, 'alle eigenen Einträge der Art im Jahr stehen in der Liste');
+    pruefe(e.andereArtNicht === true, 'eine andere Art nicht');
+    pruefe(e.imKalender === true, 'was in Google steht, wird erkannt');
+    pruefe(e.fehltAngehakt === true, 'was fehlt, ist vorgewählt');
+    pruefe(e.daNichtAngehakt === true, 'was da ist, nicht');
+    pruefe(e.ungeprueft === true,
+           'was außerhalb der geholten Termine liegt, heißt „nicht prüfbar" und ist '
+           + 'nicht vorgewählt — sonst sähe alles fehlend aus');
+    pruefe(e.jaehrlichVorbelegt === true, '„jährlich" ist mit dem Eintrag vorbelegt');
+    pruefe(e.imText === 2, 'ausgegeben werden nur die angehakten');
+    pruefe(e.serie === 2,
+           'der vorbelegte und der umgeschaltete jährliche werden beide eine Serie');
+    pruefe(e.kuerzel === true, 'die Art steht als Kürzel in der Beschreibung');
+    pruefe(e.gemerkt === true, 'die Wahl „jährlich" wird am Eintrag gemerkt');
   }
 }
 
