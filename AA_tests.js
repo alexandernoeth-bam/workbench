@@ -70,7 +70,7 @@ console.log('\n1. Bildschirme und Navigation');
      von dort geöffnet. Beide müssen aber erreichbar bleiben. */
   /* Die Diagnose hat seit v0.95.0 keinen Leistenknopf mehr — sie ist
      über das Zahnrad im Tag zu erreichen. */
-  const VERSTECKT = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose'];
+  const VERSTECKT = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten'];
   schirme.forEach(function (s) {
     if (VERSTECKT.indexOf(s) >= 0) {
       pruefe(navs.indexOf(s) < 0,
@@ -198,7 +198,7 @@ console.log('\n5. Element-IDs');
 
   /* Zusammengesetzte IDs wie 'schirm' + name */
   const schirme = [...QUELLE.matchAll(/id="schirm([A-Za-zÄÖÜäöü]+)"/g)].map(m => m[1]);
-  const OHNE_KNOPF = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose'];
+  const OHNE_KNOPF = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten'];
   schirme.forEach(function (s) {
     if (OHNE_KNOPF.indexOf(s) >= 0) {
       pruefe(imHtml.has('schirm' + s), 'ID schirm' + s + ' existiert (ohne Knopf)');
@@ -541,6 +541,55 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__taetigApi = {'
+                 + ' pruefeTaetig: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'Garage\', kontext:\'privat\','
+                 + '     status:\'laufend\', zielzustaende:[] }];'
+                 + '   DB.ziele = [{ id:\'z1\', name:\'Halbmarathon\', kontext:\'privat\','
+                 + '     status:\'laufend\', zielzustaende:[] }];'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'A\', kontext:\'privat\', status:\'offen\','
+                 + '       art:\'haupt\', planung:\'woche\', projektId:\'p1\' },'
+                 + '     { id:\'a2\', titel:\'B\', kontext:\'privat\', status:\'offen\','
+                 + '       art:\'haupt\', planung:\'backlog\', projektId:\'p1\' },'
+                 + '     { id:\'k1\', titel:\'K\', kontext:\'privat\', status:\'offen\','
+                 + '       art:\'klein\', planung:\'backlog\', projektId:\'p1\' },'
+                 + '     { id:\'w1\', titel:\'W\', kontext:\'privat\', status:\'offen\','
+                 + '       art:\'haupt\', projektId:\'p1\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[1] } },'
+                 + '     { id:\'e1\', titel:\'E\', kontext:\'privat\', status:\'erledigt\','
+                 + '       erledigtAm:\'2026-09-10\', art:\'haupt\', projektId:\'p1\' },'
+                 + '     { id:\'l1\', titel:\'L\', kontext:\'privat\', status:\'offen\','
+                 + '       art:\'haupt\', planung:\'backlog\', projektId:\'p1\' } ];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Bauantrag\','
+                 + '     kontext:\'privat\', projektId:\'p1\','
+                 + '     schritte:[{ titel:\'A\', fertig:true }, { titel:\'B\' }] }];'
+                 + '   aktionFuer = \'l1\';'
+                 + '   dVorhaben(\'z:z1\');'
+                 + '   var l = aufgabeFinden(\'l1\');'
+                 + '   var t = vhTaetigkeiten(\'projekt\', \'p1\');'
+                 + '   var r = { zahl: vhTaetigZahl(\'projekt\', \'p1\'),'
+                 + '     aufgaben: t.haupt.length, klein: t.klein.length,'
+                 + '     wieder: t.wieder.length, ablaeufe: t.ablaeufe.length,'
+                 + '     erledigt: t.erledigt.length,'
+                 + '     zielWahl: (l.zielId === \'z1\'),'
+                 + '     nurEines: (l.projektId === null),'
+                 + '     zielZahl: vhTaetigZahl(\'ziel\', \'z1\') };'
+                 + '   taetigFuer = { art:\'projekt\', id:\'p1\' };'
+                 + '   taetigHaken(\'k1\');'
+                 + '   r.gehakt = (aufgabeFinden(\'k1\').status === \'erledigt\');'
+                 + '   document.getElementById(\'taetigNeu\').value = \'!Bauamt\';'
+                 + '   taetigNeu();'
+                 + '   var neu = DB.aufgaben[DB.aufgaben.length - 1];'
+                 + '   r.neuArt = neu.art; r.neuProjekt = neu.projektId;'
+                 + '   r.neuKontext = neu.kontext;'
+                 + '   vhDetail = \'z1\'; vhDetailArt = \'ziel\';'
+                 + '   vhLoeschen();'
+                 + '   r.zielGeloescht = aufgabeFinden(\'l1\').zielId;'
+                 + '   aktionFuer = \'\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__erledigtApi = {'
                  + ' pruefeErledigt: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -3401,7 +3450,7 @@ console.log('\n22. Aufgabenfläche und Detailfläche');
                   'planungKlasse', 'planungWeiter', 'aufgabeErledigen', 'aufgabeNeu',
                   'themenFuer', 'projekteFuer', 'wochenEnde',
                   'detailHtml', 'detailNeuZeichnen', 'detailGeaendert',
-                  'dKontext', 'dArt', 'dThema', 'dProjekt', 'dFrist', 'dPlanung',
+                  'dKontext', 'dArt', 'dThema', 'dVorhaben', 'dFrist', 'dPlanung',
                   'dZeit', 'dBeschreibung', 'dWdh', 'dWdhIntervall', 'dWdhTag',
                   'dWdhMonatstag', 'themaNeuZeigen', 'themaAnlegen',
                   'teilenZeigen', 'teilenTippen', 'teilenUebernehmen',
@@ -4831,8 +4880,8 @@ console.log('\n43. Vorhaben');
 
   /* Ein gelöschtes Projekt darf keine Aufgaben mitreißen */
   const loe = skript.match(/function vhLoeschen\([\s\S]*?\n\}/);
-  pruefe(loe && /projektId = null/.test(loe[0]),
-         'beim Löschen eines Projekts verlieren die Aufgaben nur ihre Zuordnung');
+  pruefe(loe && /if \(l\[i\]\[feld\] === v\.id\) \{ l\[i\]\[feld\] = null/.test(loe[0]),
+         'beim Löschen eines Projekts oder Ziels verlieren die Aufgaben nur ihre Zuordnung');
   pruefe(loe && /grabsteinSetzen\(/.test(loe[0]), 'ein Löschvermerk entsteht');
   pruefe(loe && !/DB\.aufgaben\.splice/.test(loe[0]),
          'keine Aufgabe wird mitgelöscht');
@@ -8609,6 +8658,59 @@ console.log('\n102. Erledigtes je Tag');
     pruefe(e.zuletzt === '2026-09-22', '„zuletzt erledigt" bleibt der jüngste Tag');
     pruefe(e.altbestand === true,
            'ein alter Bestand mit nur „zuletzt erledigt" verliert sein Datum nicht');
+  }
+}
+
+/* ============================================================
+   103. Taetigkeiten eines Vorhabens
+   Grund: Mit mehreren Projekten fehlte die Uebersicht, was an welchem
+   Vorhaben haengt. Und an Zielen konnten gar keine Aufgaben haengen.
+   ============================================================ */
+console.log('\n103. Tätigkeiten');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__taetigApi;
+
+  ['gehoertZu', 'vhTaetigkeiten', 'vhTaetigZahl', 'taetigKnopfHtml', 'taetigOeffnen',
+   'taetigErledigtUm', 'taetigHaken', 'taetigZeileHtml', 'taetigAblaufHtml',
+   'taetigZeichnen', 'taetigNeu', 'vorhabenWahlHtml', 'dVorhaben', 'zielKontext']
+    .forEach(function (f) {
+      pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+             'Funktion ' + f + ' ist definiert');
+    });
+  pruefe(!new RegExp('function\\s+dProjekt\\s*\\(').test(skript),
+         'die alte Projektwahl ist ersetzt, nicht verdoppelt');
+  pruefe(/id="schirmTaetigkeiten"/.test(QUELLE), 'es gibt eine eigene Seite');
+  const pk = skript.match(/function projektKarteHtml\([\s\S]*?\n\}\n/);
+  pruefe(pk && /taetigKnopfHtml\(p, 'projekt'\)/.test(pk[0]), 'die Projektkarte hat den Knopf');
+  const zk = skript.match(/function zielKarteHtml\([\s\S]*?\n\}\n/);
+  pruefe(zk && /taetigKnopfHtml\(z, 'ziel'\)/.test(zk[0]), 'die Zielkarte ebenso');
+  const dh = skript.match(/function detailHtml\([\s\S]*?\n\}\n/);
+  pruefe(dh && /vorhabenWahlHtml\(a\)/.test(dh[0]),
+         'im Aufgabenblatt stehen Projekte und Ziele zur Wahl');
+  const dk = skript.match(/function dKontext\([\s\S]*?\n\}/);
+  pruefe(dk && /zielKontext\(a\.zielId\) !== wert/.test(dk[0]),
+         'ein Kontextwechsel löst auch eine unpassende Zielzuordnung');
+  const as = skript.match(/function aktionenSchliessen\([\s\S]*?\n\}/);
+  pruefe(as && /schirmOffen === 'Taetigkeiten'\) \{ taetigZeichnen\(\)/.test(as[0]),
+         'nach dem Schließen eines Blattes steht die Liste frisch da');
+
+  if (!t) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = t.pruefeTaetig();
+    pruefe(e.zahl === 5, 'die Karte zählt Aufgaben, Kleinigkeiten, Wiederkehrendes und Abläufe');
+    pruefe(e.aufgaben === 2 && e.klein === 1 && e.wieder === 1 && e.ablaeufe === 1,
+           'nach Art geordnet');
+    pruefe(e.erledigt === 1, 'Erledigtes steht für sich');
+    pruefe(e.zielWahl === true, 'eine Aufgabe lässt sich einem Ziel zuordnen');
+    pruefe(e.nurEines === true, 'ein Projekt und ein Ziel zugleich geht nicht');
+    pruefe(e.zielZahl === 1, 'dann zählt sie beim Ziel');
+    pruefe(e.gehakt === true, 'abhaken in der Liste wirkt');
+    pruefe(e.neuArt === 'haupt' && e.neuProjekt === 'p1' && e.neuKontext === 'privat',
+           'eine neue Tätigkeit trägt Vorhaben und Kontext gleich mit');
+    pruefe(e.zielGeloescht === null,
+           'wird das Ziel gelöscht, verliert die Aufgabe nur ihre Zuordnung');
   }
 }
 

@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.2.0</title>
+<title>Workbench 1.3.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -927,6 +927,22 @@ body.breit .vhblatt.pinwand{grid-template-columns:repeat(auto-fill,minmax(190px,
   border:1px solid var(--linie);border-radius:20px;background:var(--karte);
   color:var(--grau);cursor:pointer}
 .vk-flaeche.voll{border-color:var(--weinrot);color:var(--weinrot)}
+.vk-knoepfe{display:flex;flex-wrap:wrap;gap:6px}
+.vk-taetig.voll{border-color:var(--petrol);color:var(--petrol)}
+.tg-kopf{flex:1;min-width:0;display:flex;flex-direction:column;margin-left:8px}
+.tg-kopfname{font-size:calc(var(--fs)*0.95);font-weight:500;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.tg-kopfart{font-size:calc(var(--fs)*0.7);color:var(--grau)}
+.tg-zeile{display:flex;align-items:center;gap:10px;padding:8px 0;
+  border-bottom:1px solid var(--linie);cursor:pointer}
+.tg-zeile .tkasten{flex:0 0 auto}
+.tg-text{flex:1;min-width:0}
+.tg-titel{display:block;font-size:calc(var(--fs)*0.88)}
+.tg-meta{display:block;font-size:calc(var(--fs)*0.7);color:var(--grau)}
+.tg-zeile.fertig .tg-titel{color:var(--grau);text-decoration:line-through}
+.tg-balken{flex:0 0 60px;height:5px;background:var(--linie);border-radius:3px;overflow:hidden}
+.tg-balken i{display:block;height:100%;background:var(--petrol)}
+.tg-zahl{flex:0 0 auto;font-size:calc(var(--fs)*0.72);color:var(--grau)}
 .vk-punkt{width:5px;height:5px;border-radius:50%;background:var(--weinrot)}
 
 .vh-bereich{display:flex;width:100%;align-items:center;gap:9px;background:none;
@@ -1222,6 +1238,16 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
   </div>
   <div class="vhblatt einfachliste" id="flaecheBlatt"></div>
   <div class="fl-springer" id="flaecheSpringer"></div>
+</div>
+
+<div class="schirm" id="schirmTaetigkeiten">
+  <div class="vh-kopf">
+    <div class="vh-zeile">
+      <button type="button" class="pille" onclick="zeigeSchirm('Vorhaben')">Zurück</button>
+      <span class="tg-kopf" id="taetigKopf"></span>
+    </div>
+  </div>
+  <div class="vhblatt einfachliste" id="taetigBlatt"></div>
 </div>
 
 <div class="schirm" id="schirmDiagnose">
@@ -1557,7 +1583,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.2.0';
+var APP_VERSION = '1.3.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4598,6 +4624,7 @@ function aktionenSchliessen() {
   titelVorher = '';
   tagZeichnen();
   aufZeichnen();
+  if (schirmOffen === 'Taetigkeiten') { taetigZeichnen(); }
 }
 
 function aufgabeSchieben(n) {
@@ -4766,15 +4793,9 @@ function detailHtml(a) {
   h += '<div class="d-reihe"><button type="button" onclick="themaAnlegen()">Anlegen</button></div>';
   h += '</div>';
 
-  h += '<div class="d-feld"><div class="d-name">Projekt</div><div class="d-wert">';
-  h += '<select onchange="dProjekt(this.value)"><option value="">kein Projekt</option>';
-  var projekte = projekteFuer(a.kontext);
-  for (i = 0; i < projekte.length; i++) {
-    h += '<option value="' + esc(projekte[i].id) + '"'
-       + (a.projektId === projekte[i].id ? ' selected' : '') + '>'
-       + esc(projekte[i].name) + '</option>';
-  }
-  h += '</select></div></div>';
+  h += '<div class="d-feld"><div class="d-name">Vorhaben</div><div class="d-wert">';
+  h += vorhabenWahlHtml(a);
+  h += '</div></div>';
 
   if (a.wiederholung) {
     h += '<div class="d-feld"><div class="d-name">Frist</div><div class="d-wert">';
@@ -4907,6 +4928,7 @@ function dKontext(wert) {
   /* Thema und Projekt gehören zu genau einem Kontext. */
   if (a.themaId && themaKontext(a.themaId) !== wert) { a.themaId = null; }
   if (a.projektId && projektKontext(a.projektId) !== wert) { a.projektId = null; }
+  if (a.zielId && zielKontext(a.zielId) !== wert) { a.zielId = null; }
   detailGeaendert(true);
 }
 
@@ -4926,7 +4948,6 @@ function projektKontext(id) {
 
 function dArt(wert)          { var a = aufgabeFinden(aktionFuer); if (a) { a.art = wert; detailGeaendert(true); } }
 function dThema(wert)        { var a = aufgabeFinden(aktionFuer); if (a) { a.themaId = wert || null; detailGeaendert(false); } }
-function dProjekt(wert)      { var a = aufgabeFinden(aktionFuer); if (a) { a.projektId = wert || null; detailGeaendert(false); } }
 function dFrist(wert)        { var a = aufgabeFinden(aktionFuer); if (a) { a.frist = wert || ''; detailGeaendert(false); } }
 function dZeit(wert)         { var a = aufgabeFinden(aktionFuer); if (a) { a.uhrzeit = wert || ''; detailGeaendert(false); } }
 function dBeschreibung(wert) { var a = aufgabeFinden(aktionFuer); if (a) { a.beschreibung = wert; detailGeaendert(false); } }
@@ -5281,7 +5302,7 @@ function handleVergessen() {
 function zeigeSchirm(name) {
   schirmOffen = name;
   var alle = ['Tag', 'Kalender', 'Vorhaben', 'Ablaeufe', 'Aufgaben',
-              'Flaeche', 'Gedanken', 'Pinnwand', 'Migration', 'Diagnose'];
+              'Flaeche', 'Gedanken', 'Taetigkeiten', 'Pinnwand', 'Migration', 'Diagnose'];
   var i;
   for (i = 0; i < alle.length; i++) {
     var s = document.getElementById('schirm' + alle[i]);
@@ -5294,8 +5315,8 @@ function zeigeSchirm(name) {
          Die Diagnose erreicht man über das Zahnrad im Tag, also
          leuchtet dort der Tag. */
       var leuchtet = (alle[i] === name)
-                  || ((name === 'Flaeche' || name === 'Gedanken')
-                      && alle[i] === 'Vorhaben')
+                  || ((name === 'Flaeche' || name === 'Gedanken'
+                       || name === 'Taetigkeiten') && alle[i] === 'Vorhaben')
                   || (name === 'Diagnose' && alle[i] === 'Tag');
       if (leuchtet) { n.classList.add('aktiv'); } else { n.classList.remove('aktiv'); }
     }
@@ -5303,6 +5324,7 @@ function zeigeSchirm(name) {
   if (name === 'Migration') { migZeichne(); }
   if (name === 'Flaeche') { flaecheZeichnen(); }
   if (name === 'Gedanken') { gedankenZeichnen(); }
+  if (name === 'Taetigkeiten') { taetigZeichnen(); }
   if (name === 'Pinnwand') { pinnwandZeichnen(); }
   if (name === 'Tag') { tagZeichnen(); kalenderNachholen(); }
   if (name === 'Aufgaben') { aufZeichnen(); }
@@ -9180,9 +9202,269 @@ function zielKarteHtml(z) {
   h += restZeitHtml(z.zieltermin);
   h += '<div class="vk-satz' + (satz ? '' : ' leer') + '">'
      + esc(satz || 'noch kein Zielzustand für diese Woche') + '</div>';
-  h += flaecheKnopfHtml(z);
+  h += '<div class="vk-knoepfe">' + flaecheKnopfHtml(z) + taetigKnopfHtml(z, 'ziel')
+     + '</div>';
   h += '</div>';
   return h;
+}
+
+
+/* ============================================================
+   Tätigkeiten eines Vorhabens
+
+   Was an einem Projekt oder Ziel hängt — Aufgaben, Kleinigkeiten,
+   Wiederkehrendes, Abläufe —, auf einer Seite, nach Art geordnet.
+   Eine eigene Seite wie die Gedankenfläche, kein Blatt: Tippt man
+   darauf eine Aufgabe an, öffnet sich deren Blatt darüber, und man
+   landet danach wieder hier.
+   ============================================================ */
+
+var taetigFuer = { art: '', id: '' };
+var taetigErledigtAuf = false;
+
+function gehoertZu(e, art, id) {
+  return (art === 'ziel') ? (e.zielId === id) : (e.projektId === id);
+}
+
+function vhTaetigkeiten(art, id) {
+  var aus = { haupt: [], klein: [], wieder: [], ablaeufe: [], erledigt: [] };
+  var a = DB.aufgaben || [];
+  var i;
+  for (i = 0; i < a.length; i++) {
+    if (!gehoertZu(a[i], art, id)) { continue; }
+    if (a[i].wiederholung) { aus.wieder.push(a[i]); continue; }
+    if (a[i].status === 'erledigt') { aus.erledigt.push({ art: 'aufgabe', satz: a[i] }); continue; }
+    if (a[i].art === 'klein') { aus.klein.push(a[i]); } else { aus.haupt.push(a[i]); }
+  }
+  var d = DB.durchlaeufe || [];
+  for (i = 0; i < d.length; i++) {
+    if (!gehoertZu(d[i], art, id)) { continue; }
+    var gesamt = (d[i].schritte || []).length;
+    var fertig = schritteFertig(d[i]);
+    if (d[i].erledigt === true || (gesamt > 0 && fertig === gesamt)) {
+      aus.erledigt.push({ art: 'durchlauf', satz: d[i] });
+    } else {
+      aus.ablaeufe.push(d[i]);
+    }
+  }
+  /* Nach Planung und Frist, damit das Dringende oben steht. */
+  var schluessel = function (x) {
+    var p = x.planung || '';
+    if (p === 'woche') { p = montagVon(isoDatum()); }
+    else if (p === 'naechste') { p = tagePlus(montagVon(isoDatum()), 7); }
+    else if (p === 'backlog' || !p) { p = '9999'; }
+    return (x.frist || '9999') < p ? (x.frist || '9999') : p;
+  };
+  aus.haupt.sort(function (x, y) { return (schluessel(x) < schluessel(y)) ? -1 : 1; });
+  aus.klein.sort(function (x, y) { return (schluessel(x) < schluessel(y)) ? -1 : 1; });
+  aus.ablaeufe.sort(function (x, y) { return ((x.frist || '9999') < (y.frist || '9999')) ? -1 : 1; });
+  aus.erledigt.sort(function (x, y) {
+    var ax = x.satz.erledigtAm || '', ay = y.satz.erledigtAm || '';
+    return (ax > ay) ? -1 : 1;
+  });
+  return aus;
+}
+
+function vhTaetigZahl(art, id) {
+  var t = vhTaetigkeiten(art, id);
+  return t.haupt.length + t.klein.length + t.wieder.length + t.ablaeufe.length;
+}
+
+function taetigKnopfHtml(v, art) {
+  var n = vhTaetigZahl(art, v.id);
+  return '<button class="vk-flaeche vk-taetig' + (n ? ' voll' : '') + '" type="button" '
+       + 'onclick="event.stopPropagation();taetigOeffnen(\'' + art + '\',\'' + esc(v.id) + '\')" '
+       + 'title="Tätigkeiten dieses Vorhabens">Tätigkeiten' + (n ? (' · ' + n) : '')
+       + '</button>';
+}
+
+function taetigOeffnen(art, id) {
+  taetigFuer = { art: art, id: id };
+  taetigErledigtAuf = false;
+  zeigeSchirm('Taetigkeiten');
+}
+
+function taetigErledigtUm() {
+  taetigErledigtAuf = !taetigErledigtAuf;
+  taetigZeichnen();
+}
+
+/* Abhaken direkt in der Liste. Wiederkehrendes gilt für heute. */
+function taetigHaken(id) {
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  if (a.wiederholung) {
+    var heute = isoDatum();
+    wiederholungSetzen(a, heute, !istErledigtAn(a, heute));
+  } else if (a.status === 'erledigt') {
+    a.status = 'offen';
+    a.erledigtAm = null;
+  } else {
+    a.status = 'erledigt';
+    a.erledigtAm = isoDatum();
+  }
+  a.geaendert = jetzt();
+  spaeterSichern();
+  taetigZeichnen();
+  tagZeichnen();
+}
+
+function taetigZeileHtml(a) {
+  var heute = isoDatum();
+  var erledigt = istErledigtAn(a, heute) || (!a.wiederholung && a.status === 'erledigt');
+  var meta = [];
+  if (a.wiederholung) {
+    meta.push('zuletzt ' + (a.zuletztErledigt ? kurzDatum(a.zuletztErledigt) : 'nie'));
+  } else if (a.status === 'erledigt') {
+    meta.push('erledigt ' + kurzDatum(a.erledigtAm || ''));
+  } else {
+    meta.push(planungText(a));
+    if (a.frist) { meta.push('Frist ' + kurzDatum(a.frist)); }
+  }
+  return '<div class="tg-zeile' + (erledigt ? ' fertig' : '') + '">'
+       + '<button class="tkasten' + (erledigt ? ' an' : '') + '" type="button" '
+       + 'onclick="taetigHaken(\'' + esc(a.id) + '\')" aria-label="Abhaken"></button>'
+       + '<span class="tg-text" onclick="aufgabeAktionen(\'' + esc(a.id) + '\')">'
+       + '<span class="tg-titel">' + esc(a.titel) + '</span>'
+       + '<span class="tg-meta">' + esc(meta.join(' · ')) + '</span></span></div>';
+}
+
+function taetigAblaufHtml(d) {
+  var gesamt = (d.schritte || []).length;
+  var fertig = schritteFertig(d);
+  var anteil = gesamt ? Math.round(100 * fertig / gesamt) : 0;
+  return '<div class="tg-zeile" onclick="durchlaufAbhakenOeffnen(\'' + esc(d.id) + '\')">'
+       + '<span class="tg-text"><span class="tg-titel">' + esc(d.name || 'ohne Namen') + '</span>'
+       + '<span class="tg-meta">' + (d.frist ? ('Frist ' + esc(kurzDatum(d.frist))) : 'ohne Frist')
+       + '</span></span>'
+       + '<span class="tg-balken"><i style="width:' + anteil + '%"></i></span>'
+       + '<span class="tg-zahl">' + fertig + '/' + gesamt + '</span></div>';
+}
+
+function taetigZeichnen() {
+  var blatt = document.getElementById('taetigBlatt');
+  var kopf = document.getElementById('taetigKopf');
+  if (!blatt) { return; }
+  var v = vorhabenFinden(taetigFuer.id, taetigFuer.art);
+  if (!v) {
+    blatt.innerHTML = '<div class="tleer" style="padding-left:0">Dieses Vorhaben gibt es '
+                    + 'nicht mehr.</div>';
+    if (kopf) { kopf.textContent = ''; }
+    return;
+  }
+  if (kopf) {
+    kopf.innerHTML = '<span class="tg-kopfname">' + esc(v.name) + '</span>'
+                   + '<span class="tg-kopfart">Tätigkeiten · '
+                   + (taetigFuer.art === 'ziel' ? 'Ziel' : 'Projekt') + '</span>';
+  }
+  var t = vhTaetigkeiten(taetigFuer.art, taetigFuer.id);
+  var h = '<div class="ms-unten" style="padding-left:0;margin:4px 0 6px">'
+        + '<input class="v-feld" type="text" id="taetigNeu" '
+        + 'placeholder="Neue Tätigkeit für dieses Vorhaben (! = Aufgabe)" '
+        + 'oninput="aehnlichPruefen(\'taetigNeu\',\'taetigAehnlich\')" '
+        + 'onkeydown="if(event.key===\'Enter\'){taetigNeu();}">'
+        + '<button class="ms-wort" type="button" onclick="taetigNeu()">Anlegen</button></div>'
+        + '<div id="taetigAehnlich"></div>';
+
+  var abschnitt = function (titel, liste, zeile) {
+    if (!liste.length) { return ''; }
+    var s = '<div class="abschnitt-titel"><span>' + titel + ' · ' + liste.length
+          + '</span></div>';
+    var i;
+    for (i = 0; i < liste.length; i++) { s += zeile(liste[i]); }
+    return s;
+  };
+  h += abschnitt('Aufgaben', t.haupt, taetigZeileHtml);
+  h += abschnitt('Kleinigkeiten', t.klein, taetigZeileHtml);
+  h += abschnitt('Wiederkehrend', t.wieder, taetigZeileHtml);
+  h += abschnitt('Abläufe', t.ablaeufe, taetigAblaufHtml);
+
+  if (!t.haupt.length && !t.klein.length && !t.wieder.length && !t.ablaeufe.length) {
+    h += '<div class="tleer" style="padding-left:0">Noch nichts zugeordnet. Lege oben eine '
+       + 'Tätigkeit an, oder wähle im Blatt einer Aufgabe dieses Vorhaben aus.</div>';
+  }
+
+  if (t.erledigt.length) {
+    h += '<button class="tfalt" type="button" onclick="taetigErledigtUm()">'
+       + '<span>Erledigt · ' + t.erledigt.length + '</span>'
+       + '<svg class="' + (taetigErledigtAuf ? 'auf' : '') + '" viewBox="0 0 24 24">'
+       + '<path d="M6 9l6 6 6-6"></path></svg></button>';
+    if (taetigErledigtAuf) {
+      var i;
+      for (i = 0; i < t.erledigt.length; i++) {
+        h += (t.erledigt[i].art === 'aufgabe') ? taetigZeileHtml(t.erledigt[i].satz)
+                                               : taetigAblaufHtml(t.erledigt[i].satz);
+      }
+    }
+  }
+  blatt.innerHTML = h;
+}
+
+/* Eine neue Tätigkeit trägt Kontext und Vorhaben gleich mit. Das „!"
+   macht sie zur Aufgabe wie überall; ohne wird sie eine Kleinigkeit. */
+function taetigNeu() {
+  var feld = document.getElementById('taetigNeu');
+  if (!feld) { return; }
+  var roh = String(feld.value || '').trim();
+  if (!roh.length) { return; }
+  var v = vorhabenFinden(taetigFuer.id, taetigFuer.art);
+  if (!v) { return; }
+  var g = eingabeDeuten(roh);
+  DB.aufgaben.push({
+    id: neueKennung(), titel: g.titel, beschreibung: '', kontext: v.kontext || g.kontext,
+    themaId: null,
+    projektId: (taetigFuer.art === 'projekt') ? v.id : null,
+    zielId: (taetigFuer.art === 'ziel') ? v.id : null,
+    frist: '', planung: 'backlog', uhrzeit: '', art: g.art, wiederholung: null,
+    status: 'offen', erledigtAm: null, zuletztErledigt: null, ablaufSchritt: null,
+    geaendert: jetzt()
+  });
+  feld.value = '';
+  aehnlichLeeren('taetigAehnlich');
+  spaeterSichern();
+  taetigZeichnen();
+}
+
+/* Im Blatt einer Aufgabe: Projekte und Ziele in einer Wahl. Der Wert
+   trägt die Art vorn — „p:" oder „z:". */
+function vorhabenWahlHtml(a) {
+  var h = '<select onchange="dVorhaben(this.value)"><option value="">kein Vorhaben</option>';
+  var p = projekteFuer(a.kontext);
+  var z = (DB.ziele || []).filter(function (x) {
+    return x.kontext === a.kontext && x.status !== 'abgeschlossen';
+  }).sort(function (x, y) { return (x.name < y.name) ? -1 : 1; });
+  var i;
+  if (p.length) {
+    h += '<optgroup label="Projekte">';
+    for (i = 0; i < p.length; i++) {
+      h += '<option value="p:' + esc(p[i].id) + '"'
+         + (a.projektId === p[i].id ? ' selected' : '') + '>' + esc(p[i].name) + '</option>';
+    }
+    h += '</optgroup>';
+  }
+  if (z.length) {
+    h += '<optgroup label="Ziele">';
+    for (i = 0; i < z.length; i++) {
+      h += '<option value="z:' + esc(z[i].id) + '"'
+         + (a.zielId === z[i].id ? ' selected' : '') + '>' + esc(z[i].name) + '</option>';
+    }
+    h += '</optgroup>';
+  }
+  return h + '</select>';
+}
+
+function dVorhaben(wert) {
+  var a = aufgabeFinden(aktionFuer);
+  if (!a) { return; }
+  var w = String(wert || '');
+  a.projektId = (w.indexOf('p:') === 0) ? w.slice(2) : null;
+  a.zielId = (w.indexOf('z:') === 0) ? w.slice(2) : null;
+  detailGeaendert(false);
+}
+
+function zielKontext(id) {
+  var z = zielFinden(id);
+  return z ? z.kontext : '';
 }
 
 /* Der Weg zur Gedankenfläche des Vorhabens. Ein Punkt zeigt an, dass
@@ -9272,7 +9554,8 @@ function projektKarteHtml(p) {
   h += restZeitHtml(p.ende);
   h += '<div class="vk-satz' + (satz ? '' : ' leer') + '">'
      + esc(satz || 'noch kein Zielzustand für diese Woche') + '</div>';
-  h += flaecheKnopfHtml(p);
+  h += '<div class="vk-knoepfe">' + flaecheKnopfHtml(p) + taetigKnopfHtml(p, 'projekt')
+     + '</div>';
   h += '</div>';
   return h;
 }
@@ -9573,12 +9856,10 @@ function vhLoeschen() {
   /* Aufgaben und Abläufe werden nicht mitgelöscht — sie verlieren
      nur ihre Zuordnung. */
   var feld = (vhDetailArt === 'ziel') ? 'zielId' : 'projektId';
-  if (vhDetailArt === 'projekt') {
-    var l = DB.aufgaben || [];
-    var i;
-    for (i = 0; i < l.length; i++) {
-      if (l[i].projektId === v.id) { l[i].projektId = null; l[i].geaendert = jetzt(); }
-    }
+  var l = DB.aufgaben || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i][feld] === v.id) { l[i][feld] = null; l[i].geaendert = jetzt(); }
   }
   var samml = [DB.ablaeufe || [], DB.durchlaeufe || []];
   var s, k;
