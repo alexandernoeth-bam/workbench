@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.5.0</title>
+<title>Workbench 1.5.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -986,6 +986,10 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
   color:var(--grau);background:none;border:0;border-top:1px solid var(--linie);
   padding:8px 0 6px;cursor:pointer}
 .tg-erledigt{border-top:0;padding-left:2px}
+.tv-marken{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:3px;min-width:0}
+.tv-marken .t-art{margin-left:0}
+.tv-marken .t-vh{margin-left:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
 .t-vh{display:inline-block;margin-left:7px;font-size:calc(var(--fs)*0.64);
   border-radius:20px;padding:0 7px;background:var(--papier);color:var(--grau);
   vertical-align:middle}
@@ -1630,7 +1634,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.5.0';
+var APP_VERSION = '1.5.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3821,25 +3825,33 @@ function verlaufHtml(eintrag, is) {
           + (laeuft ? ' laeuft' : '') + '">';
     h += '<div class="tv-zeit">' + esc(t.von || '') + '</div><div class="tv-schiene"></div>';
     h += '<div class="tv-inhalt"' + (t.id ? (' onclick="terminBlattOeffnen(\''
-       + esc(t.id) + '\',\'' + is + '\')"') : '') + '><div class="ttitel">' + esc(t.titel);
-    var tvh = t.id ? terminVorhaben(t) : '';
-    if (tvh) {
-      var tvhO = vorhabenFinden(tvh.slice(2), tvh.charAt(0) === 'z' ? 'ziel' : 'projekt');
-      if (tvhO) { h += '<span class="t-vh">' + esc(tvhO.name) + '</span>'; }
-    }
-    /* Die erkannte Art sichtbar machen: Sonst rätselt man, ob ein
-       Kürzel im Termin überhaupt angekommen ist. */
+       + esc(t.id) + '\',\'' + is + '\')"') : '') + '><div class="ttitel">' + esc(t.titel)
+       + '</div>';
+    /* Arten und Vorhaben stehen in einer eigenen Zeile unter dem Titel.
+       Im Titel machte eine Regel für Aufgaben sie zu Spalten nebeneinander
+       — am Handy drückte das den Titel auf ein Wort je Zeile zusammen.
+       Erst die Arten, die Hauptart vorn; das Vorhaben dahinter, bei
+       Überlänge gekürzt. */
+    var marken = '';
     var tArten = t.id ? terminArten(t) : [];
     var ta;
     for (ta = 0; ta < tArten.length; ta++) {
       var tArt = tArten[ta];
-      h += '<span class="t-art' + (ta === 0 ? ' haupt' : '') + '" style="border-color:'
-         + artFarbe(tArt) + ';color:' + artFarbe(tArt) + '" title="'
-         + (ta === 0 ? 'Hauptart' : 'Weitere Art')
-         + (artImJahr(tArt) ? ' · steht im Jahresraster' : '')
-         + '">' + esc(artName(tArt)) + (artImJahr(tArt) ? ' ·J' : '') + '</span>';
+      marken += '<span class="t-art' + (ta === 0 ? ' haupt' : '') + '" style="border-color:'
+              + artFarbe(tArt) + ';color:' + artFarbe(tArt) + '" title="'
+              + (ta === 0 ? 'Hauptart' : 'Weitere Art')
+              + (artImJahr(tArt) ? ' · steht im Jahresraster' : '')
+              + '">' + esc(artName(tArt)) + (artImJahr(tArt) ? ' ·J' : '') + '</span>';
     }
-    h += '</div>';
+    var tvh = t.id ? terminVorhaben(t) : '';
+    if (tvh) {
+      var tvhO = vorhabenFinden(tvh.slice(2), tvh.charAt(0) === 'z' ? 'ziel' : 'projekt');
+      if (tvhO) {
+        marken += '<span class="t-vh" title="' + esc(tvhO.name) + '">' + esc(tvhO.name)
+                + '</span>';
+      }
+    }
+    if (marken) { h += '<div class="tv-marken">' + marken + '</div>'; }
     var unten = [];
     if (laeuft) { unten.push('<b class="tv-laeuft">läuft · ' + esc(restMinutenText(t.bis))
                              + '</b>'); }

@@ -1409,7 +1409,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   tagZeichnen();'
                  + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
                  + '   var karte = {};'
-                 + '   var re = /ttitel">([^<]*)(?:<span class="t-art[^"]*"[^>]*>([^<]*)<)?/g;'
+                 + '   /* Seit v1.5.1 stehen die Pillen in einer eigenen Zeile. */'
+                 + '   var re = /ttitel">([^<]*)<\\/div>(?:<div class="tv-marken">'
+                 + '<span class="t-art[^"]*"[^>]*>([^<]*)<)?/g;'
                  + '   var m;'
                  + '   while ((m = re.exec(b)) !== null) {'
                  + '     karte[m[1]] = (m[2] || \'\').replace(/ ·J$/, \'\'); }'
@@ -7858,6 +7860,14 @@ console.log('\n86. Art im Tagesplan');
          'der rohe Titel bleibt bei allen Terminarten erhalten');
 
   pruefe(/class="t-art'/.test(skript), 'die Art steht in der Tageszeile');
+  const vlh = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
+  pruefe(vlh && /<div class="ttitel">' \+ esc\(t\.titel\)\s*\+ '<\/div>'/.test(vlh[0]),
+         'der Titel steht allein in seiner Zeile — sonst drückten Art und Vorhaben ihn '
+         + 'am Handy auf ein Wort je Zeile zusammen');
+  pruefe(vlh && /class="tv-marken"/.test(vlh[0]),
+         'Art und Vorhaben stehen darunter in einer eigenen Zeile');
+  pruefe(/\.tv-marken \.t-vh\{[^}]*text-overflow:ellipsis/.test(QUELLE),
+         'ein langer Vorhabensname wird gekürzt');
   pruefe(/steht im Jahresraster/.test(skript),
          'und es ist ablesbar, ob sie im Jahresraster erscheint');
 
