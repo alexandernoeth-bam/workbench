@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.98.0</title>
+<title>Workbench 0.98.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1421,7 +1421,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.98.0';
+var APP_VERSION = '0.98.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5265,10 +5265,13 @@ function zeichneGoogle() {
 
 function kalenderNeuLesen() {
   if (!tokenGueltig()) { melde('Bitte zuerst anmelden.', 'warn'); return; }
+  melde('Kalender werden eingelesen …', null);
   kalenderListeHolen().then(function () {
-    melde(kalenderListe.length + ' Kalender gefunden.', 'gut');
     zeichne();
     return termineHolen(false);
+  }).then(function () {
+    melde(kalenderListe.length + ' Kalender gefunden, ' + termineZahl()
+        + ' Termine im Fenster.', 'gut');
   }).catch(function (f) {
     melde('Kalenderliste nicht lesbar.\n' + (f ? f.message : ''), 'warn');
   });
@@ -5672,8 +5675,12 @@ function tagAusEintrag(wert) {
   return isoDatum(d);
 }
 
-function eintraegeEinsortieren(eintraege, quelle, kontext) {
+/* „ziel" ist die Liste, in die einsortiert wird. Ohne Angabe die
+   laufende; ein Abruf gibt seine eigene mit, damit zwei gleichzeitige
+   Abrufe sich nicht gegenseitig überschreiben. */
+function eintraegeEinsortieren(eintraege, quelle, kontext, ziel) {
   var welcher = kontext || 'privat';
+  var wohin = ziel || termineNachTag;
   var i;
   for (i = 0; i < eintraege.length; i++) {
     var e = eintraege[i];
@@ -5694,7 +5701,7 @@ function eintraegeEinsortieren(eintraege, quelle, kontext) {
                             zeit: '', bis: '',
                             ort: e.location || '', ganztags: true, quelle: quelle,
                             kontext: welcher, beschreibung: e.description || '',
-                            serieId: e.recurringEventId || '' });
+                            serieId: e.recurringEventId || '' }, wohin);
         lauf = tagePlus(lauf, 1);
         schutz++;
       }
@@ -5712,13 +5719,16 @@ function eintraegeEinsortieren(eintraege, quelle, kontext) {
       beschreibung: e.description || '',
       serieId: e.recurringEventId || '',
       kontext: welcher
-    });
+    }, wohin);
   }
 }
 
-function merkeTermin(tag, satz) {
-  if (!termineNachTag[tag]) { termineNachTag[tag] = []; }
-  var vorhanden = termineNachTag[tag];
+/* Das Ziel ist das dritte, freiwillige Argument — so bleiben alle
+   bisherigen Aufrufe mit zwei Argumenten gültig. */
+function merkeTermin(tag, satz, ziel) {
+  var wohin = ziel || termineNachTag;
+  if (!wohin[tag]) { wohin[tag] = []; }
+  var vorhanden = wohin[tag];
   var i;
   for (i = 0; i < vorhanden.length; i++) {
     if (vorhanden[i].id === satz.id) { return; }
@@ -5727,10 +5737,18 @@ function merkeTermin(tag, satz) {
 }
 
 function termineHolen(laut) {
-  if (!tokenGueltig()) { return Promise.resolve(false); }
-  if (kalenderLaeuft) { return Promise.resolve(false); }
+  /* Kein stiller Ausgang mehr, wenn jemand auf den Knopf gedrückt hat. */
+  if (!tokenGueltig()) {
+    if (laut) { melde('Nicht mit Google verbunden — bitte oben neu verbinden.', 'warn'); }
+    return Promise.resolve(false);
+  }
+  if (kalenderLaeuft) {
+    if (laut) { melde('Die Termine werden gerade schon geholt …', null); }
+    return Promise.resolve(false);
+  }
   kalenderLaeuft = true;
   kalenderFehler = '';
+  if (laut) { melde('Termine werden geholt …', null); }
 
   var mitte = tagOffen || isoDatum();
   var von = tagePlus(mitte, -KAL_VOR);
@@ -5747,13 +5765,17 @@ function termineHolen(laut) {
     for (i = 0; i < kalenderListe.length; i++) {
       if (kalenderGewaehlt(kalenderListe[i].id)) { aktive.push(kalenderListe[i]); }
     }
-    termineNachTag = {};
+    /* In eine eigene Liste holen und erst am Ende einsetzen: So bleibt
+       der Tagesplan während des Abrufs gefüllt, und ein gleichzeitiges
+       Nachladen des Jahres kann nichts überschreiben. */
+    var neu = {};
     var reihe = Promise.resolve(true);
     aktive.forEach(function (kal) {
-      reihe = reihe.then(function () { return einenKalenderHolen(kal, von, bis); });
+      reihe = reihe.then(function () { return einenKalenderHolen(kal, von, bis, neu); });
     });
-    return reihe;
-  }).then(function () {
+    return reihe.then(function () { return neu; });
+  }).then(function (neu) {
+    termineNachTag = neu || {};
     /* Nachgeladene Jahre überleben den regelmäßigen Abruf — sonst wären
        sie nach zwei Minuten wieder weg. */
     archivEinhaengen();
@@ -5805,8 +5827,16 @@ function archivEinhaengen() {
   var tag;
   for (tag in archivNachTag) {
     if (!Object.prototype.hasOwnProperty.call(archivNachTag, tag)) { continue; }
-    if (termineNachTag[tag]) { continue; }   /* Frisches hat Vorrang */
-    termineNachTag[tag] = archivNachTag[tag];
+    /* Frisches hat Vorrang — aber nur je Termin, nicht je Tag. Sonst
+       verdrängte ein einziger frischer Termin alle nachgeladenen
+       desselben Tages. */
+    if (!termineNachTag[tag]) { termineNachTag[tag] = archivNachTag[tag].slice(); continue; }
+    var da = {};
+    var k;
+    for (k = 0; k < termineNachTag[tag].length; k++) { da[termineNachTag[tag][k].id] = true; }
+    for (k = 0; k < archivNachTag[tag].length; k++) {
+      if (!da[archivNachTag[tag][k].id]) { termineNachTag[tag].push(archivNachTag[tag][k]); }
+    }
   }
 }
 
@@ -5824,8 +5854,10 @@ function archivJahrHolen(jahr, still) {
 
   var von = j + '-01-01';
   var bis = j + '-12-31';
-  var merk = termineNachTag;
-  termineNachTag = {};
+  /* Eigene Liste statt der laufenden: Früher wurde die laufende
+     beiseitegelegt und am Ende zurückgeschrieben — lief dazwischen ein
+     normaler Abruf, war dessen Ergebnis danach verloren. */
+  var jahrNeu = {};
 
   var aktive = [];
   var i;
@@ -5835,7 +5867,7 @@ function archivJahrHolen(jahr, still) {
 
   var reihe = Promise.resolve(true);
   aktive.forEach(function (kal) {
-    reihe = reihe.then(function () { return einenKalenderHolen(kal, von, bis); });
+    reihe = reihe.then(function () { return einenKalenderHolen(kal, von, bis, jahrNeu); });
   });
 
   return reihe.then(function () {
@@ -5848,12 +5880,11 @@ function archivJahrHolen(jahr, still) {
     }
     var tag;
     var zahl = 0;
-    for (tag in termineNachTag) {
-      if (!Object.prototype.hasOwnProperty.call(termineNachTag, tag)) { continue; }
-      archivNachTag[tag] = termineNachTag[tag];
-      zahl += termineNachTag[tag].length;
+    for (tag in jahrNeu) {
+      if (!Object.prototype.hasOwnProperty.call(jahrNeu, tag)) { continue; }
+      archivNachTag[tag] = jahrNeu[tag];
+      zahl += jahrNeu[tag].length;
     }
-    termineNachTag = merk;
     archivEinhaengen();
     if (archivJahre.indexOf(j) < 0) { archivJahre.push(j); archivJahre.sort(); }
     archivLaeuft = false;
@@ -5867,7 +5898,6 @@ function archivJahrHolen(jahr, still) {
     zeichne();
     return true;
   }).catch(function (f) {
-    termineNachTag = merk;
     archivLaeuft = false;
     archivFehler = f ? f.message : 'unbekannter Fehler';
     zeichne();
@@ -5996,27 +6026,46 @@ function zeichneArchiv() {
   ziel.innerHTML = h;
 }
 
-function einenKalenderHolen(kal, von, bis) {
-  var adresse = 'https://www.googleapis.com/calendar/v3/calendars/'
-              + encodeURIComponent(kal.id) + '/events'
-              + '?singleEvents=true&orderBy=startTime&maxResults=250'
-              + '&timeMin=' + encodeURIComponent(von + 'T00:00:00Z')
-              + '&timeMax=' + encodeURIComponent(bis + 'T23:59:59Z')
-              + '&fields=' + encodeURIComponent(
-                  'items(id,summary,description,location,status,start,end,'
-                  + 'recurringEventId)');
-  return window.fetch(adresse, { headers: driveKopf() })
-    .then(antwortPruefen)
-    .then(function (a) { return a.json(); })
-    .then(function (d) {
-      eintraegeEinsortieren((d && d.items) ? d.items : [], kal.name,
-                            kalenderKontext(kal.id));
-      return true;
-    }).catch(function (f) {
-      /* Ein einzelner Kalender darf nicht die anderen verhindern. */
-      kalenderFehler = kal.name + ': ' + (f ? f.message : 'Fehler');
-      return true;
-    });
+/* Google liefert höchstens eine Seite je Anfrage. Bisher wurde nach der
+   ersten aufgehört — bei mehr als 250 Terminen fielen die späteren
+   still weg, denn sie sind nach Beginn sortiert. Jetzt wird geblättert,
+   bis keine Folgeseite mehr gemeldet wird. Die Obergrenze an Seiten
+   schützt vor einer Endlosschleife, falls Google sich verhält wie nie. */
+var KAL_SEITEN_MAX = 40;
+
+function einenKalenderHolen(kal, von, bis, ziel) {
+  var wohin = ziel || termineNachTag;
+  var basis = 'https://www.googleapis.com/calendar/v3/calendars/'
+            + encodeURIComponent(kal.id) + '/events'
+            + '?singleEvents=true&orderBy=startTime&maxResults=2500'
+            + '&timeMin=' + encodeURIComponent(von + 'T00:00:00Z')
+            + '&timeMax=' + encodeURIComponent(bis + 'T23:59:59Z')
+            + '&fields=' + encodeURIComponent(
+                'nextPageToken,items(id,summary,description,location,status,start,'
+                + 'end,recurringEventId)');
+  var seiten = 0;
+
+  function seite(marke) {
+    var adresse = basis + (marke ? ('&pageToken=' + encodeURIComponent(marke)) : '');
+    return window.fetch(adresse, { headers: driveKopf() })
+      .then(antwortPruefen)
+      .then(function (a) { return a.json(); })
+      .then(function (d) {
+        eintraegeEinsortieren((d && d.items) ? d.items : [], kal.name,
+                              kalenderKontext(kal.id), wohin);
+        seiten++;
+        if (d && d.nextPageToken && seiten < KAL_SEITEN_MAX) {
+          return seite(d.nextPageToken);
+        }
+        return true;
+      });
+  }
+
+  return seite('').catch(function (f) {
+    /* Ein einzelner Kalender darf nicht die anderen verhindern. */
+    kalenderFehler = kal.name + ': ' + (f ? f.message : 'Fehler');
+    return true;
+  });
 }
 
 function termineZahl() {

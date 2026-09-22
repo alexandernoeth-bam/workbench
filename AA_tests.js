@@ -541,6 +541,19 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__abrufApi = {'
+                 + ' pruefeEinhaengen: function(){'
+                 + '   var m1 = termineNachTag; var m2 = archivNachTag;'
+                 + '   termineNachTag = { \'2026-09-20\': [{ id:\'f\', titel:\'frisch\' }] };'
+                 + '   archivNachTag = { \'2026-09-20\': [{ id:\'f\', titel:\'frisch\' },'
+                 + '                                     { id:\'a\', titel:\'alt\' }] };'
+                 + '   archivEinhaengen();'
+                 + '   var r = { beide: termineNachTag[\'2026-09-20\'].length };'
+                 + '   archivEinhaengen();'
+                 + '   r.keinDoppel = termineNachTag[\'2026-09-20\'].length;'
+                 + '   termineNachTag = m1; archivNachTag = m2;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__mehrArtApi = {'
                  + ' pruefeMehr: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -7480,16 +7493,20 @@ console.log('\n87. Nachladen alter Jahre');
   });
 
   const ein = skript.match(/function archivEinhaengen\([\s\S]*?\n\}/);
-  pruefe(ein && /if \(termineNachTag\[tag\]\) \{ continue/.test(ein[0]),
-         'frisch Geholtes hat Vorrang vor dem Nachgeladenen');
+  pruefe(ein && /if \(!da\[archivNachTag\[tag\]\[k\]\.id\]\)/.test(ein[0]),
+         'frisch Geholtes hat Vorrang — je Termin, nicht je Tag');
 
   const th = skript.match(/function termineHolen\([\s\S]*?\n\}\n/);
   pruefe(th && /archivEinhaengen\(\)/.test(th[0]),
          'nachgeladene Jahre überleben den regelmäßigen Abruf');
 
   const hol = skript.match(/function archivJahrHolen\([\s\S]*?\n\}\n/);
-  pruefe(hol && /var merk = termineNachTag/.test(hol[0]),
-         'der laufende Bestand wird beiseitegelegt und danach zurückgeholt');
+  /* Früher wurde die laufende Liste beiseitegelegt und am Ende
+     zurückgeschrieben — ein dazwischen laufender Abruf ging verloren. */
+  pruefe(hol && /var jahrNeu = \{\}/.test(hol[0]) && !/var merk = termineNachTag/.test(hol[0]),
+         'das Jahr wird in eine eigene Liste geholt, die laufende bleibt unberührt');
+  pruefe(hol && /einenKalenderHolen\(kal, von, bis, jahrNeu\)/.test(hol[0]),
+         'und zwar für jeden Kalender');
   pruefe(hol && /j < 2000 \|\| j > 2100/.test(hol[0]),
          'eine unsinnige Jahreszahl wird abgewiesen');
   pruefe(hol && /nicht gesichert/.test(hol[0]),
@@ -8065,6 +8082,55 @@ console.log('\n96. Mehrere Arten');
     pruefe(e.summeAlle === 1, 'in „Alle" nur einmal');
     pruefe(e.pillen === 2, 'im Tagesplan stehen beide Arten');
     pruefe(e.hauptFett === true, 'die Hauptart hervorgehoben');
+  }
+}
+
+/* ============================================================
+   97. Vollständiger und sicherer Abruf der Termine
+   Grund: Termine fehlten. Drei Ursachen, die sich verdeckten:
+   Google liefert hoechstens eine Seite je Anfrage, und es wurde nie
+   weitergeblaettert; der Jahresabruf legte die laufende Liste beiseite
+   und schrieb sie zurueck, wodurch ein gleichzeitiger Abruf verloren
+   ging; und auf Knopfdruck gab es keine Rueckmeldung, wenn nichts
+   geschah.
+   ============================================================ */
+console.log('\n97. Abruf der Termine');
+{
+  const skript = hauptSkript();
+
+  const ek = skript.match(/function einenKalenderHolen\([\s\S]*?\n\}\n/);
+  pruefe(ek && /nextPageToken/.test(ek[0]) && /pageToken=/.test(ek[0]),
+         'es wird bei Google weitergeblättert, bis keine Folgeseite mehr kommt');
+  pruefe(ek && /maxResults=2500/.test(ek[0]), 'mit der größten erlaubten Seite');
+  pruefe(ek && /seiten < KAL_SEITEN_MAX/.test(ek[0]),
+         'mit einer Obergrenze gegen eine Endlosschleife');
+  pruefe(ek && /kalenderKontext\(kal\.id\), wohin\)/.test(ek[0]),
+         'jeder Abruf schreibt in sein eigenes Ziel');
+
+  const th = skript.match(/function termineHolen\([\s\S]*?\n\}\n/);
+  pruefe(th && /var neu = \{\}/.test(th[0]) && /termineNachTag = neu \|\| \{\}/.test(th[0]),
+         'der normale Abruf holt in eine neue Liste und setzt sie erst am Ende ein');
+  pruefe(th && !/termineNachTag = \{\};/.test(th[0]),
+         'die laufende wird nicht vorher geleert — der Tagesplan bleibt gefüllt');
+  pruefe(th && /Nicht mit Google verbunden/.test(th[0]),
+         'ohne Verbindung gibt es auf Knopfdruck eine Meldung');
+  pruefe(th && /gerade schon geholt/.test(th[0]),
+         'ebenso, wenn schon ein Abruf läuft');
+  pruefe(th && /Termine werden geholt/.test(th[0]), 'und beim Beginn');
+
+  const mt = skript.match(/function merkeTermin\([\s\S]*?\n\}/);
+  pruefe(mt && /function merkeTermin\(tag, satz, ziel\)/.test(mt[0]),
+         'das Ziel ist ein freiwilliges drittes Argument — alte Aufrufe bleiben gültig');
+
+  const nl = skript.match(/function kalenderNeuLesen\([\s\S]*?\n\}/);
+  pruefe(nl && /Termine im Fenster/.test(nl[0]),
+         'Neu einlesen meldet am Ende, was gefunden wurde');
+
+  if (globalThis.__abrufApi) {
+    const e = globalThis.__abrufApi.pruefeEinhaengen();
+    pruefe(e.beide === 2,
+           'ein nachgeladener Termin bleibt neben einem frischen desselben Tages');
+    pruefe(e.keinDoppel === 2, 'derselbe Termin erscheint dabei nicht doppelt');
   }
 }
 
