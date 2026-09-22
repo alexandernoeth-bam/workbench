@@ -8380,6 +8380,9 @@ console.log('\n100. Diagnose in Gruppen');
            'mit einer Kurzzeile, die auch zugeklappt etwas sagt');
   });
   pruefe(schirm && /id="diagStatus"/.test(schirm[0]), 'oben steht eine Statuszeile');
+  pruefe(/#schirmDiagnose > \*\{flex-shrink:0\}/.test(QUELLE),
+         'die Gruppen schrumpfen nicht — sonst würde eine aufgeklappte abgeschnitten '
+         + 'und der Bildschirm ließe sich nicht rollen');
   pruefe(schirm && /onclick="zeigeSchirm\('Tag'\)">Zurück/.test(schirm[0]),
          'ein Zurück führt in den Tag — die Diagnose hat keinen Leistenknopf mehr');
 
