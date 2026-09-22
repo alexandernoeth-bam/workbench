@@ -541,6 +541,59 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__kontextApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'MUKA\', kontext:\'beruflich\','
+                 + '     status:\'laufend\', zielzustaende:[] }];'
+                 + '   DB.ziele = [{ id:\'z1\', name:\'Halbmarathon\', kontext:\'privat\','
+                 + '     status:\'laufend\', zielzustaende:[] }];'
+                 + '   kalenderListe = [{ id:\'alex\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   var off = -new Date().getTimezoneOffset();'
+                 + '   var zo = (off >= 0 ? \'+\' : \'-\')'
+                 + '     + String(Math.floor(Math.abs(off) / 60)).padStart(2, \'0\')'
+                 + '     + \':\' + String(Math.abs(off) % 60).padStart(2, \'0\');'
+                 + '   var ev = function(id, n, serie){'
+                 + '     var o = { id: id, summary: id,'
+                 + '       start:{ dateTime: tagePlus(h, n) + \'T06:15:00\' + zo },'
+                 + '       end:{ dateTime: tagePlus(h, n) + \'T06:45:00\' + zo } };'
+                 + '     if (serie) { o.recurringEventId = serie; }'
+                 + '     return o; };'
+                 + '   eintraegeEinsortieren([ev(\'k1\', 1, \'kr\'), ev(\'k2\', 8, \'kr\'),'
+                 + '     ev(\'k3\', 15, \'kr\'), ev(\'m1\', 2)], \'Alex\', \'beruflich\');'
+                 + '   var ktx = function(id){'
+                 + '     var t, i;'
+                 + '     for (t in termineNachTag) {'
+                 + '       for (i = 0; i < termineNachTag[t].length; i++) {'
+                 + '         if (termineNachTag[t][i].id === id) {'
+                 + '           return termineNachTag[t][i].kontext; } } }'
+                 + '     return \'\'; };'
+                 + '   terminBlattOeffnen(\'k1\', tagePlus(h, 1));'
+                 + '   var b = document.getElementById(\'aktionSheet\').innerHTML;'
+                 + '   var r = { gruppen: (b.match(/optgroup label="([^"]*)"/g) || [])'
+                 + '     .map(function(x){ return x.slice(16, -1); }).join(\'|\') };'
+                 + '   terminBlattVorhaben(\'z:z1\');'
+                 + '   r.serienweise = [ktx(\'k1\'), ktx(\'k2\'), ktx(\'k3\')].join(\',\');'
+                 + '   r.andererBleibt = ktx(\'m1\');'
+                 + '   r.hinweis = /weil das Vorhaben privat ist/.test('
+                 + '     document.getElementById(\'aktionSheet\').innerHTML);'
+                 + '   termineNachTag[tagePlus(h, 8)] = [];'
+                 + '   eintraegeEinsortieren([ev(\'k2\', 8, \'kr\')], \'Alex\', \'beruflich\');'
+                 + '   r.nachAbruf = ktx(\'k2\');'
+                 + '   terminBlattOeffnen(\'k1\', tagePlus(h, 1));'
+                 + '   terminBlattKontext(\'beruflich\');'
+                 + '   r.zurueck = ktx(\'k2\');'
+                 + '   r.nichtsGespeichert = Object.keys(DB.kalenderzuordnung || {})'
+                 + '     .filter(function(s){ return DB.kalenderzuordnung[s].kontext; }).length;'
+                 + '   terminBlattOeffnen(\'k2\', tagePlus(h, 8));'
+                 + '   terminBlattSerieSetzen(false);'
+                 + '   terminBlattKontext(\'privat\');'
+                 + '   r.einzeln = [ktx(\'k2\'), ktx(\'k3\')].join(\',\');'
+                 + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__taetigPinApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -8886,6 +8939,55 @@ console.log('\n105. Tätigkeiten anheften');
     pruefe(e.zettelTitel === 'Hybride Systeme', 'der Zettel trägt den Namen des Vorhabens');
     pruefe(/^1 offen/.test(e.zettelFuss), 'und sagt, wie viel offen ist');
     pruefe(e.weg === false, 'ist das Vorhaben gelöscht, verschwindet der Zettel');
+  }
+}
+
+/* ============================================================
+   106. Den Kontext eines Termins ueberstimmen
+   Grund: Das private Training stand im beruflichen Kalender und galt
+   damit ueberall als beruflich — Farbe, Filter und Vorhabenwahl. Ein
+   privates Vorhaben liess sich gar nicht waehlen.
+   ============================================================ */
+console.log('\n106. Kontext eines Termins');
+{
+  const skript = hauptSkript();
+  const k = globalThis.__kontextApi;
+
+  ['terminKontextUeber', 'terminKontextSetzen', 'kontextNeuAnwenden', 'terminBlattKontext']
+    .forEach(function (f) {
+      pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+             'Funktion ' + f + ' ist definiert');
+    });
+  const mt = skript.match(/function merkeTermin\([\s\S]*?\n\}/);
+  pruefe(mt && /satz\.kalKontext = satz\.kontext/.test(mt[0])
+         && /terminKontextUeber\(satz\) \|\| satz\.kontext/.test(mt[0]),
+         'die Überstimmung gilt schon beim Einsortieren — dann überall');
+  const bh = skript.match(/function terminBlattHtml\([\s\S]*?\n\}\n/);
+  pruefe(bh && /vorhabenOptionenHtml\('', terminVorhaben\(t\)\)/.test(bh[0]),
+         'im Terminblatt stehen Vorhaben beider Kontexte zur Wahl');
+  pruefe(bh && /Kalender sagt/.test(bh[0]),
+         'ist der Kontext überstimmt, steht dabei, was der Kalender sagt');
+  const fs = skript.match(/function zuordnungFeldSetzen\([\s\S]*?\n\}/);
+  pruefe(fs && /!z\.art && !z\.vorhaben && !z\.kontext/.test(fs[0]),
+         'ein Eintrag mit nur einem Kontext bleibt erhalten');
+
+  if (!k) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = k.pruefe();
+    pruefe(e.gruppen === 'Beruflich · Projekte|Privat · Ziele',
+           'die Wahl trennt nach Kontext');
+    pruefe(e.serienweise === 'privat,privat,privat',
+           'ein privates Vorhaben macht die ganze Serie privat');
+    pruefe(e.andererBleibt === 'beruflich',
+           'ein anderer Termin im selben Kalender bleibt beruflich');
+    pruefe(e.hinweis === true, 'das Blatt sagt, dass es geschah');
+    pruefe(e.nachAbruf === 'privat', 'ein neuer Abruf behält den Kontext');
+    pruefe(e.zurueck === 'beruflich', 'zurückstellen geht');
+    pruefe(e.nichtsGespeichert === 0,
+           'und dann bleibt keine Überstimmung zurück, die nichts überstimmt');
+    pruefe(e.einzeln === 'privat,beruflich',
+           'ein einzelner Termin der Serie lässt sich für sich umstellen');
   }
 }
 

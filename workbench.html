@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.4.1</title>
+<title>Workbench 1.5.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1630,7 +1630,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.4.1';
+var APP_VERSION = '1.5.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -6189,6 +6189,10 @@ function merkeTermin(tag, satz, ziel) {
   for (i = 0; i < vorhanden.length; i++) {
     if (vorhanden[i].id === satz.id) { return; }
   }
+  /* Der Kalender gibt den Kontext vor, eine eigene Zuordnung kann ihn
+     überstimmen. Der vom Kalender bleibt gemerkt. */
+  satz.kalKontext = satz.kontext;
+  satz.kontext = terminKontextUeber(satz) || satz.kontext;
   vorhanden.push(satz);
 }
 
@@ -9594,7 +9598,7 @@ function zuordnungFeldSetzen(schluessel, feld, wert) {
   if (!DB.kalenderzuordnung) { DB.kalenderzuordnung = {}; }
   var z = DB.kalenderzuordnung[schluessel] || {};
   if (wert) { z[feld] = wert; } else { delete z[feld]; }
-  if (!z.art && !z.vorhaben) {
+  if (!z.art && !z.vorhaben && !z.kontext) {
     delete DB.kalenderzuordnung[schluessel];
     /* Ohne Grabstein brächte der Abgleich die alte Zuordnung zurück. */
     grabsteinSetzen('kalenderzuordnung', schluessel);
@@ -9622,6 +9626,59 @@ function terminVorhaben(t) {
   return '';
 }
 
+/* ------------------------------------------------------------
+   Den Kontext eines Termins überstimmen
+
+   Der Kontext kommt vom Kalender. Steht das private Training im
+   beruflichen Kalender, wäre es sonst überall beruflich: Farbe, Filter,
+   Vorhabenwahl. Die Überstimmung liegt wie das Vorhaben je Termin oder
+   für eine Serie in der Zuordnung, Google bleibt unberührt.
+   ------------------------------------------------------------ */
+
+function terminKontextUeber(t) {
+  if (!t) { return ''; }
+  var z = DB.kalenderzuordnung || {};
+  if (t.id && z[t.id] && z[t.id].kontext) { return z[t.id].kontext; }
+  if (t.serieId && z['serie:' + t.serieId] && z['serie:' + t.serieId].kontext) {
+    return z['serie:' + t.serieId].kontext;
+  }
+  return '';
+}
+
+/* Gleicht der Wunsch dem, was ohnehin gälte, wird nichts gespeichert —
+   eine Überstimmung, die nichts überstimmt, verwirrt nur später. */
+function terminKontextSetzen(t, wert, fuerSerie) {
+  if (!t) { return; }
+  var kal = t.kalKontext || t.kontext || 'beruflich';
+  var z = DB.kalenderzuordnung || {};
+  if (fuerSerie && t.serieId) {
+    zuordnungFeldSetzen('serie:' + t.serieId, 'kontext', (wert === kal) ? '' : wert);
+    if (z[t.id] && z[t.id].kontext) { zuordnungFeldSetzen(t.id, 'kontext', ''); }
+  } else {
+    var serie = (t.serieId && z['serie:' + t.serieId]) ? (z['serie:' + t.serieId].kontext || '')
+                                                        : '';
+    zuordnungFeldSetzen(t.id, 'kontext', (wert === (serie || kal)) ? '' : wert);
+  }
+  kontextNeuAnwenden();
+}
+
+/* Was schon geholt ist, bekommt den neuen Kontext sofort — nicht erst
+   beim nächsten Abruf. */
+function kontextNeuAnwenden() {
+  var listen = [termineNachTag, archivNachTag];
+  var q, tag, i;
+  for (q = 0; q < listen.length; q++) {
+    for (tag in listen[q]) {
+      if (!Object.prototype.hasOwnProperty.call(listen[q], tag)) { continue; }
+      var l = listen[q][tag];
+      for (i = 0; i < l.length; i++) {
+        if (!l[i].kalKontext) { l[i].kalKontext = l[i].kontext; }
+        l[i].kontext = terminKontextUeber(l[i]) || l[i].kalKontext;
+      }
+    }
+  }
+}
+
 function terminVorhabenSetzen(t, wert, fuerSerie) {
   if (!t) { return; }
   var z = DB.kalenderzuordnung || {};
@@ -9639,30 +9696,37 @@ function terminVorhabenSetzen(t, wert, fuerSerie) {
 }
 
 /* Die Optionen einer Vorhabenwahl — für Aufgaben wie für Termine. */
+/* Die Optionen einer Vorhabenwahl — für Aufgaben wie für Termine. Ohne
+   Kontext stehen beide da, getrennt: Ein Termin aus einem beruflichen
+   Kalender kann trotzdem zu einem privaten Vorhaben gehören. */
 function vorhabenOptionenHtml(kontext, gewaehlt) {
   var h = '<option value="">kein Vorhaben</option>';
-  var p = projekteFuer(kontext);
-  var z = (DB.ziele || []).filter(function (x) {
-    return x.kontext === kontext && x.status !== 'abgeschlossen';
-  }).sort(function (x, y) { return (x.name < y.name) ? -1 : 1; });
-  var i;
-  if (p.length) {
-    h += '<optgroup label="Projekte">';
-    for (i = 0; i < p.length; i++) {
-      h += '<option value="p:' + esc(p[i].id) + '"'
-         + (gewaehlt === ('p:' + p[i].id) ? ' selected' : '') + '>' + esc(p[i].name)
-         + '</option>';
+  var kontexte = kontext ? [kontext] : ['beruflich', 'privat'];
+  var k, i;
+  for (k = 0; k < kontexte.length; k++) {
+    var vor = kontext ? '' : ((kontexte[k] === 'privat') ? 'Privat · ' : 'Beruflich · ');
+    var p = projekteFuer(kontexte[k]);
+    var z = (DB.ziele || []).filter(function (x) {
+      return x.kontext === kontexte[k] && x.status !== 'abgeschlossen';
+    }).sort(function (x, y) { return (x.name < y.name) ? -1 : 1; });
+    if (p.length) {
+      h += '<optgroup label="' + vor + 'Projekte">';
+      for (i = 0; i < p.length; i++) {
+        h += '<option value="p:' + esc(p[i].id) + '"'
+           + (gewaehlt === ('p:' + p[i].id) ? ' selected' : '') + '>' + esc(p[i].name)
+           + '</option>';
+      }
+      h += '</optgroup>';
     }
-    h += '</optgroup>';
-  }
-  if (z.length) {
-    h += '<optgroup label="Ziele">';
-    for (i = 0; i < z.length; i++) {
-      h += '<option value="z:' + esc(z[i].id) + '"'
-         + (gewaehlt === ('z:' + z[i].id) ? ' selected' : '') + '>' + esc(z[i].name)
-         + '</option>';
+    if (z.length) {
+      h += '<optgroup label="' + vor + 'Ziele">';
+      for (i = 0; i < z.length; i++) {
+        h += '<option value="z:' + esc(z[i].id) + '"'
+           + (gewaehlt === ('z:' + z[i].id) ? ' selected' : '') + '>' + esc(z[i].name)
+           + '</option>';
+      }
+      h += '</optgroup>';
     }
-    h += '</optgroup>';
   }
   return h;
 }
@@ -9678,6 +9742,7 @@ function terminBlattOeffnen(id, tag) {
   var t = terminFuerKennung(id, tag);
   if (!t) { return; }
   terminBlattFuer = { id: id, tag: tag };
+  terminBlattHinweis = '';
   /* Bei einer Serie ist die ganze Serie voreingestellt — es sei denn,
      dieser Termin trägt schon eine eigene Zuordnung. */
   var z = DB.kalenderzuordnung || {};
@@ -9702,17 +9767,45 @@ function terminBlattNeu() {
 function terminBlattSerieSetzen(ja) {
   var t = terminFuerKennung(terminBlattFuer.id, terminBlattFuer.tag);
   if (!t) { return; }
-  if (ja && t.serieId) { terminVorhabenSetzen(t, terminVorhaben(t), true); }
+  if (ja && t.serieId) {
+    terminVorhabenSetzen(t, terminVorhaben(t), true);
+    terminKontextSetzen(t, t.kontext, true);
+  }
   terminBlattSerie = !!ja;
   terminBlattNeu();
 }
 
+var terminBlattHinweis = '';
+
+/* Ein privates Vorhaben macht den Termin privat — und umgekehrt. Das
+   geschieht nicht still: Das Blatt sagt es. */
 function terminBlattVorhaben(wert) {
   var t = terminFuerKennung(terminBlattFuer.id, terminBlattFuer.tag);
   if (!t) { return; }
   terminVorhabenSetzen(t, wert, terminBlattSerie);
+  terminBlattHinweis = '';
+  if (wert) {
+    var v = vorhabenFinden(wert.slice(2), wert.charAt(0) === 'z' ? 'ziel' : 'projekt');
+    if (v && v.kontext && v.kontext !== t.kontext) {
+      terminKontextSetzen(t, v.kontext, terminBlattSerie);
+      terminBlattHinweis = 'Der Termin ist jetzt ' + v.kontext
+                         + ', weil das Vorhaben ' + v.kontext + ' ist.';
+    }
+  }
   terminBlattNeu();
   vhZeichnen();
+  tagZeichnen();
+  kalZeichnen();
+}
+
+function terminBlattKontext(wert) {
+  var t = terminFuerKennung(terminBlattFuer.id, terminBlattFuer.tag);
+  if (!t) { return; }
+  terminKontextSetzen(t, wert, terminBlattSerie);
+  terminBlattHinweis = '';
+  terminBlattNeu();
+  tagZeichnen();
+  kalZeichnen();
 }
 
 function terminBlattHtml() {
@@ -9727,15 +9820,28 @@ function terminBlattHtml() {
   h += '<div class="as-meta">' + esc(meta.join(' · ')) + '</div>';
   h += '<div class="as-linie"></div>';
 
-  h += '<div class="d-feld"><div class="d-name">Vorhaben</div><div class="d-wert">'
-     + '<select onchange="terminBlattVorhaben(this.value)">'
-     + vorhabenOptionenHtml(t.kontext || 'privat', terminVorhaben(t)) + '</select></div></div>';
   if (t.serieId) {
     h += '<div class="d-feld"><div class="d-name">Gilt für</div><div class="d-wert">'
        + '<button class="d-wahl' + (!terminBlattSerie ? ' an' : '') + '" type="button" '
        + 'onclick="terminBlattSerieSetzen(false)">diesen Termin</button>'
        + '<button class="d-wahl' + (terminBlattSerie ? ' an' : '') + '" type="button" '
        + 'onclick="terminBlattSerieSetzen(true)">ganze Serie</button></div></div>';
+  }
+  var kal = t.kalKontext || t.kontext;
+  h += '<div class="d-feld"><div class="d-name">Kontext</div><div class="d-wert">'
+     + '<button class="d-wahl' + (t.kontext !== 'privat' ? ' an' : '') + '" type="button" '
+     + 'onclick="terminBlattKontext(\'beruflich\')">beruflich</button>'
+     + '<button class="d-wahl' + (t.kontext === 'privat' ? ' an' : '') + '" type="button" '
+     + 'onclick="terminBlattKontext(\'privat\')">privat</button>'
+     + ((t.kontext !== kal) ? ('<span class="d-hinweis">Kalender sagt ' + esc(kal) + '</span>')
+                            : '')
+     + '</div></div>';
+  h += '<div class="d-feld"><div class="d-name">Vorhaben</div><div class="d-wert">'
+     + '<select onchange="terminBlattVorhaben(this.value)">'
+     + vorhabenOptionenHtml('', terminVorhaben(t)) + '</select></div></div>';
+  if (terminBlattHinweis) {
+    h += '<div class="d-hinweis" style="text-align:left;color:var(--weinrot)">'
+       + esc(terminBlattHinweis) + '</div>';
   }
   var arten = terminArten(t);
   h += '<div class="d-feld"><div class="d-name">Art</div><div class="d-wert">'
