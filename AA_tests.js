@@ -562,11 +562,21 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   aufgabeHaken(\'w1\'); aufgabeHaken(\'w1\');'
                  + '   tagOffen = \'2026-09-24\';'
                  + '   aufgabeHaken(\'w3\');'
-                 + '   var mo = tagesEintraege(\'2026-09-21\').fertig.map(function(f){'
-                 + '     return f.a.titel; }).join(\',\');'
-                 + '   var di = tagesEintraege(\'2026-09-22\').fertig.map(function(f){'
-                 + '     return f.a.id; });'
-                 + '   var r = { montag: mo,'
+                 + '   var fertigAm = function(tag){'
+                 + '     var e = tagesEintraege(tag);'
+                 + '     return e.wiederFertig.concat(e.hauptFertig, e.kleinFertig); };'
+                 + '   var mo = fertigAm(\'2026-09-21\').map(function(a){'
+                 + '     return a.titel; }).join(\',\');'
+                 + '   var di = fertigAm(\'2026-09-22\').map(function(a){'
+                 + '     return a.id; });'
+                 + '   var e21 = tagesEintraege(\'2026-09-21\');'
+                 + '   var imAbschnitt = e21.wiederFertig.some(function(a){'
+                 + '     return a.id === \'w1\'; }) && e21.wiederFertig.some(function(a){'
+                 + '     return a.id === \'w2\'; });'
+                 + '   var offenBleibtOffen = e21.wieder.every(function(a){'
+                 + '     return a.id !== \'w1\' && a.id !== \'w2\'; });'
+                 + '   var r = { montag: mo, imAbschnitt: imAbschnitt,'
+                 + '     offenLeer: offenBleibtOffen,'
                  + '     dienstagZuSpaet: di.indexOf(\'w2\') >= 0,'
                  + '     zurueck: !istErledigtAn(DB.aufgaben[0], \'2026-09-23\'),'
                  + '     zuletzt: DB.aufgaben[0].zuletztErledigt,'
@@ -5203,15 +5213,17 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
          'im breiten Bild werden sie zu Spalten');
   pruefe(/body\.breit \.tagblatt\{[^}]*align-items:start/.test(QUELLE),
          'die Spalten beginnen beide oben');
-  pruefe(/body\.breit \.tabschnitt\[data-kurz="Erledigt"\]\{grid-column:1 \/ -1\}/.test(QUELLE),
-         'Erledigtes geht über beide Spalten');
+  /* Seit v1.2.0 steht Erledigtes in seinem eigenen Abschnitt, es gibt
+     keinen Sammelblock mehr. */
+  pruefe(!/data-kurz="Erledigt"/.test(hauptSkript()),
+         'es gibt keinen Sammelblock „Erledigt" mehr');
 
   /* Jeder Abschnitt liegt in genau einer Spalte */
   const tag = hauptSkript().match(/function tagZeichnen\([\s\S]*?\n\}\n/);
   const folge = tag ? [...tag[0].matchAll(/tspalte tspalte-(\w+)|data-kurz="([^"]+)"/g)]
                        .map(m => m[1] ? ('[' + m[1] + ']') : m[2]) : [];
   const erwarteteFolge = ['[links]', 'Tagesverlauf', 'Wiederkehrend', 'Abläufe',
-                          '[rechts]', 'Aufgaben', 'Kleinigkeiten', 'Erledigt'];
+                          '[rechts]', 'Aufgaben', 'Kleinigkeiten'];
   pruefe(folge.join(',') === erwarteteFolge.join(','),
          'die Abschnitte stehen in der vereinbarten Folge und Spalte'
          + (folge.join(',') === erwarteteFolge.join(',') ? '' : ' — ist: ' + folge.join(' → ')));
@@ -8570,8 +8582,16 @@ console.log('\n102. Erledigtes je Tag');
   const ie = skript.match(/function istErledigtAn\([\s\S]*?\n\}/);
   pruefe(ie && /erledigtTage\.indexOf\(is\) >= 0/.test(ie[0]),
          'jeder Erledigungstag zählt, nicht nur der letzte');
-  pruefe(/var erledigtOffen = true;/.test(skript),
-         'der Abschnitt „Erledigt" steht voreingestellt offen');
+  const te = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
+  pruefe(te && /wiederFertig\.push\(a\)/.test(te[0]) && /hauptFertig\.push\(a\)/.test(te[0])
+         && /kleinFertig\.push\(a\)/.test(te[0]),
+         'Erledigtes landet in seinem eigenen Abschnitt');
+  const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tz && tz[0].indexOf('e.haupt.length; i++') < tz[0].indexOf('e.hauptFertig.length; i++'),
+         'unter den offenen Einträgen');
+  const tb = skript.match(/function tagBlaettern\([\s\S]*?\n\}/);
+  pruefe(tb && !/erledigtOffen/.test(tb[0]),
+         'beim Blättern wird nichts mehr zugeklappt');
 
   if (!w) {
     warn('Funktionen nicht auswertbar');
@@ -8579,6 +8599,10 @@ console.log('\n102. Erledigtes je Tag');
     const e = w.pruefeErledigt();
     pruefe(e.montag === 'Morgenrunde,Pflanzen gießen',
            'am Montag bleibt beides erledigt, auch nach dem Abhaken am Dienstag');
+    pruefe(e.imAbschnitt === true,
+           'erledigtes Wiederkehrendes steht unter „Wiederkehrend"');
+    pruefe(e.offenLeer === true,
+           'und zählt dort nicht als offen — Kennzeichen und Vorschau bleiben richtig');
     pruefe(e.dienstagZuSpaet === true,
            'einen Tag zu spät Erledigtes erscheint an dem Tag, an dem es geschah');
     pruefe(e.zurueck === true, 'ein zurückgenommener Haken ist wirklich weg');

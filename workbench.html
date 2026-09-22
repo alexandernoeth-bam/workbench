@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.1.1</title>
+<title>Workbench 1.2.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -687,7 +687,8 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
 
 /* ---------- Breite Ansicht: Spalten wie im Entwurf ---------- */
 /* Der Tag steht in zwei Spalten: links die Zeitachse und was sich
-   wiederholt, rechts die Arbeit des Tages. Erledigtes über beide. */
+   wiederholt, rechts die Arbeit des Tages. Erledigtes steht in seinem
+   eigenen Abschnitt, unter dem Offenen. */
 /* Im schmalen Bild lösen sich die Spaltenbehälter auf, damit die
    Abschnitte in ihrer natürlichen Folge untereinander stehen. */
 /* Vergangenes bleibt eingeklappt — auf jedem Gerät gleich.
@@ -705,7 +706,6 @@ body.breit .tagblatt{display:grid;grid-template-columns:1fr 1fr;gap:0 32px;
 body.breit .tspalte{display:block}
 body.breit .tspalte-links{grid-column:1}
 body.breit .tspalte-rechts{grid-column:2}
-body.breit .tabschnitt[data-kurz="Erledigt"]{grid-column:1 / -1}
 
 /* Vorhaben und Abläufe als Kacheln, so viele wie hineinpassen. */
 /* Eine Liste braucht keine Kacheln — die Spalten entstanden nur,
@@ -1557,7 +1557,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.1.1';
+var APP_VERSION = '1.2.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3310,9 +3310,6 @@ function migZeichne() {
 
 var tagOffen = '';
 var tagFilter = 'alle';
-/* Das Erledigte steht offen da, bis man es zuklappt — und so bleibt
-   es, auch nach einem Neustart. */
-var erledigtOffen = true;
 var wartende = {};
 var WARTEZEIT = 4000;
 var speicherUhr = null;
@@ -3521,7 +3518,12 @@ function setTagFilter(art) {
 
 function tagesEintraege(is) {
   var aufgaben = DB.aufgaben || [];
-  var verlauf = [], wieder = [], haupt = [], klein = [], fertig = [];
+  /* Erledigtes bleibt in seinem Abschnitt, unter den offenen Einträgen.
+     Die Listen wieder, haupt und klein halten nur Offenes — auf sie
+     stützen sich die Zählungen für Kennzeichen und Vorschau. Das
+     Erledigte steht daneben in eigenen Listen. */
+  var verlauf = [], wieder = [], haupt = [], klein = [];
+  var wiederFertig = [], hauptFertig = [], kleinFertig = [];
   var i;
 
   for (i = 0; i < aufgaben.length; i++) {
@@ -3532,7 +3534,11 @@ function tagesEintraege(is) {
     if (a.wiederholung) {
       /* Erledigt zählt auch an einem Tag, an dem es nicht fällig war —
          wer einen Tag zu spät läuft, ist trotzdem gelaufen. */
-      if (erledigt) { fertig.push({ art: 'aufgabe', a: a }); continue; }
+      if (erledigt) {
+        if (a.uhrzeit) { verlauf.push({ art: 'aufgabe', zeit: a.uhrzeit, a: a }); }
+        else { wiederFertig.push(a); }
+        continue;
+      }
       if (!faelligAn(a.wiederholung, is)) { continue; }
       else if (a.uhrzeit) { verlauf.push({ art: 'aufgabe', zeit: a.uhrzeit, a: a }); }
       else { wieder.push(a); }
@@ -3540,7 +3546,11 @@ function tagesEintraege(is) {
     }
 
     if (a.status === 'erledigt') {
-      if (a.erledigtAm === is) { fertig.push({ art: 'aufgabe', a: a }); }
+      if (a.erledigtAm === is) {
+        if (a.uhrzeit) { verlauf.push({ art: 'aufgabe', zeit: a.uhrzeit, a: a }); }
+        else if (a.art === 'klein') { kleinFertig.push(a); }
+        else { hauptFertig.push(a); }
+      }
       continue;
     }
     if (a.planung !== is) { continue; }
@@ -3589,7 +3599,8 @@ function tagesEintraege(is) {
 
   verlauf.sort(function (x, y) { return (x.zeit < y.zeit) ? -1 : ((x.zeit > y.zeit) ? 1 : 0); });
   return { verlauf: verlauf, wieder: wieder, haupt: haupt, klein: klein,
-           fertig: fertig, ganztags: ganztags };
+           wiederFertig: wiederFertig, hauptFertig: hauptFertig,
+           kleinFertig: kleinFertig, ganztags: ganztags };
 }
 
 /* ------------------------------------------------------------
@@ -4319,8 +4330,11 @@ function tagZeichnen() {
 
   h += '<div class="tabschnitt" data-kurz="Wiederkehrend"><div class="tabschnitt-titel">'
      + '<span>Wiederkehrend</span></div>';
-  if (!e.wieder.length) { h += '<div class="tleer">Heute nichts fällig.</div>'; }
+  if (!e.wieder.length && !e.wiederFertig.length) {
+    h += '<div class="tleer">Heute nichts fällig.</div>';
+  }
   for (i = 0; i < e.wieder.length; i++) { h += zeileHtml(e.wieder[i], is, false); }
+  for (i = 0; i < e.wiederFertig.length; i++) { h += zeileHtml(e.wiederFertig[i], is, false); }
   h += '</div>';
 
   var laeufe = durchlaeufeHeute(is);
@@ -4334,29 +4348,23 @@ function tagZeichnen() {
   h += '</div><div class="tspalte tspalte-rechts">';
   h += '<div class="tabschnitt" data-kurz="Aufgaben"><div class="tabschnitt-titel">'
      + '<span>Aufgaben</span></div>';
-  if (!e.haupt.length) { h += '<div class="tleer">Für heute nichts eingeplant.</div>'; }
+  if (!e.haupt.length && !e.hauptFertig.length) {
+    h += '<div class="tleer">Für heute nichts eingeplant.</div>';
+  }
   for (i = 0; i < e.haupt.length; i++) { h += zeileHtml(e.haupt[i], is, false); }
+  for (i = 0; i < e.hauptFertig.length; i++) { h += zeileHtml(e.hauptFertig[i], is, false); }
   h += '</div>';
 
   h += '<div class="tabschnitt" data-kurz="Kleinigkeiten"><div class="tabschnitt-titel">'
      + '<span>Kleinigkeiten &amp; Kontakte</span></div>';
-  if (!e.klein.length) { h += '<div class="tleer">Nichts offen.</div>'; }
-  for (i = 0; i < e.klein.length; i++) { h += zeileHtml(e.klein[i], is, true); }
-  h += '</div>';
-
-  h += '</div>';
-
-  if (e.fertig.length) {
-    h += '<div class="tabschnitt" data-kurz="Erledigt">';
-    h += '<button class="tfalt" type="button" onclick="erledigtUm()">'
-       + '<span>Erledigt · ' + e.fertig.length + '</span>'
-       + '<svg class="' + (erledigtOffen ? 'auf' : '') + '" viewBox="0 0 24 24">'
-       + '<path d="M6 9l6 6 6-6"></path></svg></button>';
-    if (erledigtOffen) {
-      for (i = 0; i < e.fertig.length; i++) { h += zeileHtml(e.fertig[i].a, is, true); }
-    }
-    h += '</div>';
+  if (!e.klein.length && !e.kleinFertig.length) {
+    h += '<div class="tleer">Nichts offen.</div>';
   }
+  for (i = 0; i < e.klein.length; i++) { h += zeileHtml(e.klein[i], is, true); }
+  for (i = 0; i < e.kleinFertig.length; i++) { h += zeileHtml(e.kleinFertig[i], is, true); }
+  h += '</div>';
+
+  h += '</div>';
 
   blatt.innerHTML = h;
   nachzueglerZeichnen(is);
@@ -4366,12 +4374,6 @@ function tagZeichnen() {
   badgeSetzen();
 }
 
-function erledigtUm() {
-  erledigtOffen = !erledigtOffen;
-  DB.einstellungen.erledigtZu = !erledigtOffen;
-  spaeterSichern();
-  tagZeichnen();
-}
 
 /* ------------------------------------------------------------
    Lotsenstreifen
@@ -4484,7 +4486,7 @@ function aufgabeHaken(id) {
   a.geaendert = jetzt();
 
   /* Vier Sekunden Bedenkzeit: der Eintrag bleibt stehen und wandert
-     erst danach in den Erledigt-Block. */
+     erst danach ans Ende seines Abschnitts. */
   if (wartende[id]) { window.clearTimeout(wartende[id]); }
   wartende[id] = window.setTimeout(function () {
     delete wartende[id];
@@ -5151,7 +5153,6 @@ function fensterPruefen() {
 
 function tagBlaettern(n) {
   tagOffen = tagePlus(tagOffen || isoDatum(), n);
-  erledigtOffen = false;
   tagZeichnen();
   fensterPruefen();
 }
@@ -5160,7 +5161,6 @@ function tagHeute() {
   wochenUmstellen();
   faelligeStarten();
   tagOffen = isoDatum();
-  erledigtOffen = false;
   tagZeichnen();
   fensterPruefen();
 }
@@ -8052,7 +8052,6 @@ function kAblaufKnopfHtml(termin, tag) {
 
 function zumTag(is) {
   tagOffen = is;
-  erledigtOffen = false;
   zeigeSchirm('Tag');
   tagZeichnen();
 }
@@ -14208,7 +14207,6 @@ function starten() {
     }
     bestandStempeln(DB);
     farbweltAnwenden();
-    erledigtOffen = (DB.einstellungen.erledigtZu !== true);
     darstellungAnwenden();
     jahrTaktStarten();
     tagTaktStarten();
