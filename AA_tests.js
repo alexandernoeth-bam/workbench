@@ -541,6 +541,41 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__taetigPinApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   var jetzt2 = new Date();'
+                 + '   var z = function(min){'
+                 + '     var d = new Date(jetzt2.getTime() + min * 60000);'
+                 + '     return String(d.getHours()).padStart(2, \'0\') + \':\''
+                 + '          + String(d.getMinutes()).padStart(2, \'0\'); };'
+                 + '   /* Nahe Mitternacht fielen die Zeiten in einen anderen'
+                 + '      Tag — dann gilt die Rechnung mit festen Werten nicht. */'
+                 + '   var knapp = (jetzt2.getHours() < 3 || jetzt2.getHours() > 21);'
+                 + '   var r = {'
+                 + '     gesternVorbei: terminIstVorbei({ tag: tagePlus(h, -1),'
+                 + '       t:{ zeit:\'10:00\', bis:\'11:00\' } }),'
+                 + '     heuteGeendet: knapp || terminIstVorbei({ tag: h,'
+                 + '       t:{ zeit: z(-120), bis: z(-60) } }),'
+                 + '     heuteKommt: knapp ? false : terminIstVorbei({ tag: h,'
+                 + '       t:{ zeit: z(60), bis: z(90) } }),'
+                 + '     ganztaegigHeute: terminIstVorbei({ tag: h, t:{ ganztags:true } }),'
+                 + '     morgen: terminIstVorbei({ tag: tagePlus(h, 1),'
+                 + '       t:{ zeit:\'00:01\', bis:\'00:02\' } }) };'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'Hybride Systeme\','
+                 + '     kontext:\'beruflich\', status:\'laufend\', zielzustaende:[] }];'
+                 + '   DB.aufgaben = [{ id:\'a1\', titel:\'A\', kontext:\'beruflich\','
+                 + '     status:\'offen\', art:\'haupt\', planung:\'backlog\','
+                 + '     projektId:\'p1\' }];'
+                 + '   pinUm(\'taetigkeiten\', \'p:p1\');'
+                 + '   var inh = pinInhalt(DB.pinnwand[0]);'
+                 + '   r.zettelTitel = inh.titel; r.zettelFuss = inh.fuss;'
+                 + '   DB.projekte = [];'
+                 + '   r.weg = pinInhalt(DB.pinnwand[0]).lebt;'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__termVhApi = {'
                  + ' pruefeTermVh: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -8814,6 +8849,43 @@ console.log('\n104. Termine an Vorhaben');
     pruefe(e.artBleibt === 'feier',
            'eine gesetzte Art bleibt, wenn ein Vorhaben dazukommt — beides liegt im selben Eintrag');
     pruefe(e.leerWeg === true, 'ohne Art und Vorhaben verschwindet der Eintrag ganz');
+  }
+}
+
+/* ============================================================
+   105. Taetigkeiten an der Pinnwand, heute Vorbeigegangenes
+   Grund: Die Taetigkeitenseite eines Vorhabens soll sich anheften
+   lassen. Und Termine von heute, die schon geendet haben, standen
+   noch unter den kommenden — anders als im Tagesplan.
+   ============================================================ */
+console.log('\n105. Tätigkeiten anheften');
+{
+  const skript = hauptSkript();
+  const p = globalThis.__taetigPinApi;
+
+  pruefe(/taetigkeiten: 'Tätigkeiten'/.test(skript), 'die Pinnwand kennt die neue Art');
+  pruefe(new RegExp('function\\s+terminIstVorbei\\s*\\(').test(skript),
+         'Funktion terminIstVorbei ist definiert');
+  const tz = skript.match(/function taetigZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tz && /pinKnopfHtml\('taetigkeiten', pinSchl\)/.test(tz[0]),
+         'die Seite hat den Anheftknopf');
+  pruefe(tz && /!terminIstVorbei\(x\)/.test(tz[0]),
+         'kommend ist, was nicht vorbei ist — auch innerhalb von heute');
+  const po = skript.match(/function pinOeffnen\([\s\S]*?\n\}/);
+  pruefe(po && /taetigOeffnen\(/.test(po[0]), 'der Zettel öffnet die Seite');
+
+  if (!p) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = p.pruefe();
+    pruefe(e.gesternVorbei === true, 'ein Termin von gestern ist vorbei');
+    pruefe(e.heuteGeendet === true, 'einer von heute, der schon geendet hat, ebenso');
+    pruefe(e.heuteKommt === false, 'einer von heute, der noch kommt, nicht');
+    pruefe(e.ganztaegigHeute === false, 'ganztägiges von heute läuft noch');
+    pruefe(e.morgen === false, 'morgen ist nicht vorbei');
+    pruefe(e.zettelTitel === 'Hybride Systeme', 'der Zettel trägt den Namen des Vorhabens');
+    pruefe(/^1 offen/.test(e.zettelFuss), 'und sagt, wie viel offen ist');
+    pruefe(e.weg === false, 'ist das Vorhaben gelöscht, verschwindet der Zettel');
   }
 }
 

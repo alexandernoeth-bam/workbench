@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.4.0</title>
+<title>Workbench 1.4.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1630,7 +1630,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.4.0';
+var APP_VERSION = '1.4.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -9435,8 +9435,8 @@ function taetigZeichnen() {
   var heute = isoDatum();
   var t = vhTaetigkeiten(taetigFuer.art, taetigFuer.id);
   var termine = vhTermine(taetigFuer.art, taetigFuer.id);
-  var kommend = termine.filter(function (x) { return x.tag >= heute; });
-  var vergangen = termine.filter(function (x) { return x.tag < heute; }).reverse();
+  var kommend = termine.filter(function (x) { return !terminIstVorbei(x); });
+  var vergangen = termine.filter(function (x) { return terminIstVorbei(x); }).reverse();
   var ende = (taetigFuer.art === 'ziel') ? v.zieltermin : v.ende;
 
   /* Die Kopfkarte: worum es geht, wie viel Zeit bleibt, was diese
@@ -9447,6 +9447,7 @@ function taetigZeichnen() {
   var h = '<div class="tg-seite">';
   h += '<div class="tg-kopfkarte' + (v.kontext === 'privat' ? ' privat' : '') + '">';
   h += '<div class="tg-kk-name">' + esc(v.name) + '</div>';
+  var pinSchl = ((taetigFuer.art === 'ziel') ? 'z:' : 'p:') + v.id;
   h += '<div class="tg-kk-meta">' + esc(meta.join(' · ')) + '</div>';
   var satz = zustandText(v);
   if (satz) {
@@ -9461,6 +9462,7 @@ function taetigZeichnen() {
   if (zahlen.length) {
     h += '<div class="tg-zahlen"><span>' + zahlen.join('</span><span>') + '</span></div>';
   }
+  h += pinKnopfHtml('taetigkeiten', pinSchl);
   h += '</div>';
 
   h += '<div class="tg-neu">'
@@ -9755,6 +9757,17 @@ function terminBlattHtml() {
   h += '<div class="d-hinweis" style="text-align:left">Die Zuordnung merkt sich die App, '
      + 'Google bleibt unberührt.</div>';
   return h;
+}
+
+/* Vorbei ist ein Termin, wenn sein Tag vorbei ist — oder er heute
+   schon geendet hat, wie im Tagesplan. Ganztägiges von heute läuft
+   noch. */
+function terminIstVorbei(e) {
+  var heute = isoDatum();
+  if (e.tag < heute) { return true; }
+  if (e.tag > heute || e.t.ganztags) { return false; }
+  var ende = e.t.bis || e.t.zeit || '';
+  return !!ende && ende <= uhrzeitJetzt();
 }
 
 /* Die Termine eines Vorhabens, aus allem, was geholt ist. */
@@ -12176,8 +12189,12 @@ function aehnlichPruefen(feldId, zielId) {
    ============================================================ */
 
 var PIN_FARBEN = ['gelb', 'rosa', 'gruen', 'blau'];
+/* „taetigkeiten" heftet die Tätigkeitenseite eines Vorhabens an; die
+   Kennung trägt die Art vorn — „p:" oder „z:" —, wie bei der
+   Vorhabenwahl. */
 var PIN_ARTEN = { aufgabe: 'Aufgabe', durchlauf: 'Ablauf', vorlage: 'Vorlage',
-                  projekt: 'Projekt', ziel: 'Ziel', flaeche: 'Gedanken' };
+                  projekt: 'Projekt', ziel: 'Ziel', flaeche: 'Gedanken',
+                  taetigkeiten: 'Tätigkeiten' };
 var pinFilter = 'alle';
 
 function pinFinden(art, id) {
@@ -12245,7 +12262,8 @@ function pinBlattNeu(art, id) {
     return;
   }
   if (art === 'projekt' || art === 'ziel') { vhDetailNeu(); return; }
-  if (art === 'flaeche') { flaecheZeichnen(); }
+  if (art === 'flaeche') { flaecheZeichnen(); return; }
+  if (art === 'taetigkeiten') { taetigZeichnen(); }
 }
 
 /* Der Knopf in einem Blatt, dazu die Farbwahl, sobald angeheftet ist. */
@@ -12335,6 +12353,28 @@ function pinInhalt(p) {
     }
     return aus;
   }
+  if (p.art === 'taetigkeiten') {
+    var tArt = (String(p.zielId).charAt(0) === 'z') ? 'ziel' : 'projekt';
+    var tId = String(p.zielId).slice(2);
+    var tv = vorhabenFinden(tId, tArt);
+    if (!tv) { return aus; }
+    aus.lebt = true;
+    aus.titel = tv.name;
+    aus.kontext = tv.kontext;
+    aus.fertig = (tv.status === 'abgeschlossen');
+    /* Auf dem Zettel: wie viel offen ist und was als Nächstes kommt. */
+    var offen = vhTaetigZahl(tArt, tId);
+    var naechster = vhTermine(tArt, tId).filter(function (x) {
+      return !terminIstVorbei(x);
+    })[0];
+    var teile = [offen + ' offen'];
+    if (naechster) {
+      teile.push('nächster ' + kurzDatum(naechster.tag)
+                 + (naechster.t.zeit ? (' ' + naechster.t.zeit) : ''));
+    }
+    aus.fuss = teile.join(' · ');
+    return aus;
+  }
   return aus;
 }
 
@@ -12349,6 +12389,10 @@ function pinOeffnen(pinId) {
     if (p.art === 'vorlage') { abDetailOeffnen(p.zielId, 'vorlage'); return; }
     if (p.art === 'projekt' || p.art === 'ziel') { vhDetailOeffnen(p.zielId, p.art); return; }
     if (p.art === 'flaeche') { flaecheOeffnen(p.zielId); return; }
+    if (p.art === 'taetigkeiten') {
+      taetigOeffnen(p.zielId.charAt(0) === 'z' ? 'ziel' : 'projekt', p.zielId.slice(2));
+      return;
+    }
   }
 }
 
