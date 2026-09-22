@@ -8359,6 +8359,11 @@ console.log('\n94. Pinnwand');
   const zr = QUELLE.match(/\.zettel\{[^}]*\}/);
   pruefe(zr && /min-width:0/.test(zr[0]),
          'ein Zettel darf schmaler werden als sein Inhalt');
+  /* body.breit .vhblatt setzt den Zeilenabstand auf null und wiegt
+     schwerer als .vhblatt.pinwand — am iPad stießen die Reihen aneinander. */
+  const pwb = QUELLE.match(/body\.breit \.vhblatt\.pinwand\{[^}]*\}/);
+  pruefe(pwb && /gap:1\d?px/.test(pwb[0]),
+         'auch auf breiten Bildschirmen haben die Reihen Abstand');
   const fr = QUELLE.match(/\.z-fuss\{[^}]*\}/);
   pruefe(fr && /min-width:0/.test(fr[0]),
          'die Fußzeile ebenso — sie kürzt mit Auslassungspunkten statt zu drücken');
