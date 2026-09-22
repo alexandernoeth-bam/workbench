@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.1.0</title>
+<title>Workbench 1.1.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1557,7 +1557,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.1.0';
+var APP_VERSION = '1.1.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3310,7 +3310,9 @@ function migZeichne() {
 
 var tagOffen = '';
 var tagFilter = 'alle';
-var erledigtOffen = false;
+/* Das Erledigte steht offen da, bis man es zuklappt — und so bleibt
+   es, auch nach einem Neustart. */
+var erledigtOffen = true;
 var wartende = {};
 var WARTEZEIT = 4000;
 var speicherUhr = null;
@@ -3495,8 +3497,14 @@ function faelligAn(regel, is) {
    Auswahl der Einträge eines Tages
    ------------------------------------------------------------ */
 
+/* Bei Wiederkehrendem zählt jeder Tag, an dem es erledigt wurde —
+   nicht nur der letzte. Sonst stünde die Morgenrunde vom Montag wieder
+   offen da, sobald man sie am Dienstag abhakt. */
 function istErledigtAn(a, is) {
-  if (a.wiederholung) { return a.zuletztErledigt === is; }
+  if (a.wiederholung) {
+    if (a.zuletztErledigt === is) { return true; }
+    return Array.isArray(a.erledigtTage) && a.erledigtTage.indexOf(is) >= 0;
+  }
   return a.status === 'erledigt' && (!a.erledigtAm || a.erledigtAm === is);
 }
 
@@ -3522,8 +3530,10 @@ function tagesEintraege(is) {
     var erledigt = istErledigtAn(a, is);
 
     if (a.wiederholung) {
+      /* Erledigt zählt auch an einem Tag, an dem es nicht fällig war —
+         wer einen Tag zu spät läuft, ist trotzdem gelaufen. */
+      if (erledigt) { fertig.push({ art: 'aufgabe', a: a }); continue; }
       if (!faelligAn(a.wiederholung, is)) { continue; }
-      if (erledigt) { fertig.push({ art: 'aufgabe', a: a }); }
       else if (a.uhrzeit) { verlauf.push({ art: 'aufgabe', zeit: a.uhrzeit, a: a }); }
       else { wieder.push(a); }
       continue;
@@ -4358,6 +4368,8 @@ function tagZeichnen() {
 
 function erledigtUm() {
   erledigtOffen = !erledigtOffen;
+  DB.einstellungen.erledigtZu = !erledigtOffen;
+  spaeterSichern();
   tagZeichnen();
 }
 
@@ -4437,13 +4449,31 @@ function spaeterSichern() {
   }, 1500);
 }
 
+/* Einen Tag bei Wiederkehrendem als erledigt setzen oder zurücknehmen.
+   Beide Wege — der Haken im Tag und das Blatt der Aufgabe — gehen
+   hierüber, damit die Liste der Erledigungen immer stimmt und
+   „zuletzt erledigt" der jüngste Tag daraus bleibt. */
+function wiederholungSetzen(a, is, erledigt) {
+  if (!Array.isArray(a.erledigtTage)) { a.erledigtTage = []; }
+  /* Ältere Bestände kennen nur „zuletzt erledigt" — das gehört dazu. */
+  if (a.zuletztErledigt && a.erledigtTage.indexOf(a.zuletztErledigt) < 0) {
+    a.erledigtTage.push(a.zuletztErledigt);
+  }
+  var stelle = a.erledigtTage.indexOf(is);
+  if (erledigt && stelle < 0) { a.erledigtTage.push(is); }
+  if (!erledigt && stelle >= 0) { a.erledigtTage.splice(stelle, 1); }
+  a.erledigtTage.sort();
+  a.zuletztErledigt = a.erledigtTage.length
+                    ? a.erledigtTage[a.erledigtTage.length - 1] : null;
+}
+
 function aufgabeHaken(id) {
   var a = aufgabeFinden(id);
   if (!a) { return; }
   var is = tagOffen;
 
   if (a.wiederholung) {
-    a.zuletztErledigt = (a.zuletztErledigt === is) ? null : is;
+    wiederholungSetzen(a, is, !istErledigtAn(a, is));
   } else if (a.status === 'erledigt') {
     a.status = 'offen';
     a.erledigtAm = null;
@@ -13804,14 +13834,7 @@ function aufgabeErledigen(id) {
   var a = aufgabeFinden(id);
   if (!a) { return; }
   if (a.wiederholung) {
-    a.zuletztErledigt = isoDatum();
-    /* Für die Frage „bin ich drangeblieben" zählt jede Erledigung,
-       nicht nur die letzte. */
-    if (!Array.isArray(a.erledigtTage)) { a.erledigtTage = []; }
-    if (a.erledigtTage.indexOf(a.zuletztErledigt) < 0) {
-      a.erledigtTage.push(a.zuletztErledigt);
-      a.erledigtTage.sort();
-    }
+    wiederholungSetzen(a, isoDatum(), true);
     durchlaufAusAufgabe(a.id);
   } else {
     a.status = 'erledigt';
@@ -14185,6 +14208,7 @@ function starten() {
     }
     bestandStempeln(DB);
     farbweltAnwenden();
+    erledigtOffen = (DB.einstellungen.erledigtZu !== true);
     darstellungAnwenden();
     jahrTaktStarten();
     tagTaktStarten();

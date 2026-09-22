@@ -541,6 +541,40 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__erledigtApi = {'
+                 + ' pruefeErledigt: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'w1\', titel:\'Morgenrunde\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[0,1,2,3,4,5,6] } },'
+                 + '     { id:\'w2\', titel:\'Pflanzen gießen\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'klein\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[1] } },'
+                 + '     { id:\'w3\', titel:\'Alt\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', zuletztErledigt:\'2026-09-10\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[0,1,2,3,4,5,6] } } ];'
+                 + '   tagOffen = \'2026-09-21\';'
+                 + '   aufgabeHaken(\'w1\'); aufgabeHaken(\'w2\');'
+                 + '   tagOffen = \'2026-09-22\';'
+                 + '   aufgabeHaken(\'w1\'); aufgabeHaken(\'w2\');'
+                 + '   tagOffen = \'2026-09-23\';'
+                 + '   aufgabeHaken(\'w1\'); aufgabeHaken(\'w1\');'
+                 + '   tagOffen = \'2026-09-24\';'
+                 + '   aufgabeHaken(\'w3\');'
+                 + '   var mo = tagesEintraege(\'2026-09-21\').fertig.map(function(f){'
+                 + '     return f.a.titel; }).join(\',\');'
+                 + '   var di = tagesEintraege(\'2026-09-22\').fertig.map(function(f){'
+                 + '     return f.a.id; });'
+                 + '   var r = { montag: mo,'
+                 + '     dienstagZuSpaet: di.indexOf(\'w2\') >= 0,'
+                 + '     zurueck: !istErledigtAn(DB.aufgaben[0], \'2026-09-23\'),'
+                 + '     zuletzt: DB.aufgaben[0].zuletztErledigt,'
+                 + '     altbestand: istErledigtAn(DB.aufgaben[2], \'2026-09-10\')'
+                 + '       && istErledigtAn(DB.aufgaben[2], \'2026-09-24\') };'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__exportApi = {'
                  + ' pruefeExport: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -8510,6 +8544,47 @@ console.log('\n101. Fehlende exportieren');
            'der vorbelegte und der umgeschaltete jährliche werden beide eine Serie');
     pruefe(e.kuerzel === true, 'die Art steht als Kürzel in der Beschreibung');
     pruefe(e.gemerkt === true, 'die Wahl „jährlich" wird am Eintrag gemerkt');
+  }
+}
+
+/* ============================================================
+   102. Erledigtes je Tag
+   Grund: Der Haken im Tagesplan setzte bei Wiederkehrendem nur „zuletzt
+   erledigt" — der Montag galt nach dem Abhaken am Dienstag wieder als
+   offen. Was einen Tag zu spaet erledigt wurde, erschien gar nicht.
+   Und der Abschnitt „Erledigt" war nach jedem Start zugeklappt.
+   ============================================================ */
+console.log('\n102. Erledigtes je Tag');
+{
+  const skript = hauptSkript();
+  const w = globalThis.__erledigtApi;
+
+  pruefe(new RegExp('function\\s+wiederholungSetzen\\s*\\(').test(skript),
+         'Funktion wiederholungSetzen ist definiert');
+  const ah = skript.match(/function aufgabeHaken\([\s\S]*?\n\}/);
+  pruefe(ah && /wiederholungSetzen\(a, is, !istErledigtAn\(a, is\)\)/.test(ah[0]),
+         'der Haken im Tag geht über die gemeinsame Funktion');
+  const ae = skript.match(/function aufgabeErledigen\([\s\S]*?\n\}/);
+  pruefe(ae && /wiederholungSetzen\(a, isoDatum\(\), true\)/.test(ae[0]),
+         'das Blatt der Aufgabe ebenso');
+  const ie = skript.match(/function istErledigtAn\([\s\S]*?\n\}/);
+  pruefe(ie && /erledigtTage\.indexOf\(is\) >= 0/.test(ie[0]),
+         'jeder Erledigungstag zählt, nicht nur der letzte');
+  pruefe(/var erledigtOffen = true;/.test(skript),
+         'der Abschnitt „Erledigt" steht voreingestellt offen');
+
+  if (!w) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = w.pruefeErledigt();
+    pruefe(e.montag === 'Morgenrunde,Pflanzen gießen',
+           'am Montag bleibt beides erledigt, auch nach dem Abhaken am Dienstag');
+    pruefe(e.dienstagZuSpaet === true,
+           'einen Tag zu spät Erledigtes erscheint an dem Tag, an dem es geschah');
+    pruefe(e.zurueck === true, 'ein zurückgenommener Haken ist wirklich weg');
+    pruefe(e.zuletzt === '2026-09-22', '„zuletzt erledigt" bleibt der jüngste Tag');
+    pruefe(e.altbestand === true,
+           'ein alter Bestand mit nur „zuletzt erledigt" verliert sein Datum nicht');
   }
 }
 
