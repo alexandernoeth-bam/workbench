@@ -70,7 +70,8 @@ console.log('\n1. Bildschirme und Navigation');
      von dort geöffnet. Beide müssen aber erreichbar bleiben. */
   /* Die Diagnose hat seit v0.95.0 keinen Leistenknopf mehr — sie ist
      über das Zahnrad im Tag zu erreichen. */
-  const VERSTECKT = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten'];
+  const VERSTECKT = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
+                     'Tagwechsel'];
   schirme.forEach(function (s) {
     if (VERSTECKT.indexOf(s) >= 0) {
       pruefe(navs.indexOf(s) < 0,
@@ -198,7 +199,8 @@ console.log('\n5. Element-IDs');
 
   /* Zusammengesetzte IDs wie 'schirm' + name */
   const schirme = [...QUELLE.matchAll(/id="schirm([A-Za-zÄÖÜäöü]+)"/g)].map(m => m[1]);
-  const OHNE_KNOPF = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten'];
+  const OHNE_KNOPF = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
+                      'Tagwechsel'];
   schirme.forEach(function (s) {
     if (OHNE_KNOPF.indexOf(s) >= 0) {
       pruefe(imHtml.has('schirm' + s), 'ID schirm' + s + ' existiert (ohne Knopf)');
@@ -541,6 +543,92 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__tagwApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   var g = tagePlus(h, -1);'
+                 + '   var lang = jetzt() - 20 * 86400000;'
+                 + '   DB.projekte = ['
+                 + '     { id:\'p1\', name:\'Garage\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[], geaendert: jetzt() },'
+                 + '     { id:\'p2\', name:\'Solar\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[], geaendert: lang } ];'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Weidner\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: g,'
+                 + '       geaendert: jetzt() },'
+                 + '     { id:\'a2\', titel:\'Schere\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'klein\', planung: tagePlus(h, -2),'
+                 + '       geaendert: jetzt() },'
+                 + '     { id:\'a3\', titel:\'Statik\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'woche\','
+                 + '       frist: h, projektId:\'p1\', geaendert: jetzt() },'
+                 + '     { id:\'a4\', titel:\'Angebote\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'woche\','
+                 + '       projektId:\'p1\', geaendert: jetzt() },'
+                 + '     { id:\'a5\', titel:\'Kibek\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'woche\','
+                 + '       geaendert: jetzt() },'
+                 + '     { id:\'w1\', titel:\'Oskar\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', geaendert: jetzt(),'
+                 + '       wiederholung:{ takt:\'woche\', tage:[0,1,2,3,4,5,6] } } ];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Haus räumen\','
+                 + '     kontext:\'privat\', geaendert: lang,'
+                 + '     schritte:[{ titel:\'A\' }, { titel:\'B\' }, { titel:\'C\' },'
+                 + '       { titel:\'D\' }, { titel:\'E\' }] }];'
+                 + '   var r = { liegen: liegengeblieben(h).length,'
+                 + '             wiederOffen: tagwWiederOffen().length };'
+                 + '   nzSetzen(\'a1\', \'heute\');'
+                 + '   r.nachHeute = (aufgabeFinden(\'a1\').planung === h) ? 1 : 0;'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   var off = -new Date().getTimezoneOffset();'
+                 + '   var zo = (off >= 0 ? \'+\' : \'-\')'
+                 + '     + String(Math.floor(Math.abs(off) / 60)).padStart(2, \'0\')'
+                 + '     + \':\' + String(Math.abs(off) % 60).padStart(2, \'0\');'
+                 + '   var ev = function(id, tag, von, bis){'
+                 + '     return { id: id, summary: id,'
+                 + '       start:{ dateTime: tag + \'T\' + von + \':00\' + zo },'
+                 + '       end:{ dateTime: tag + \'T\' + bis + \':00\' + zo } }; };'
+                 + '   eintraegeEinsortieren([ev(\'t1\', h, \'09:00\', \'10:00\'),'
+                 + '     ev(\'t2\', h, \'14:00\', \'15:00\'),'
+                 + '     ev(\'t3\', h, \'16:30\', \'18:00\'),'
+                 + '     { id:\'u1\', summary:\'Emden #Urlaub\','
+                 + '       start:{ date: tagePlus(h, 4) },'
+                 + '       end:{ date: tagePlus(h, 8) } }], \'Alex\', \'privat\');'
+                 + '   var verl = tagesEintraege(h).verlauf.filter(function(x){'
+                 + '     return x.art === \'termin\'; });'
+                 + '   var bel = 0;'
+                 + '   var i;'
+                 + '   for (i = 0; i < verl.length; i++) {'
+                 + '     var tt = verl[i].t;'
+                 + '     if (tt.ganztags || !tt.von || !tt.bis) { continue; }'
+                 + '     bel += (Number(tt.bis.slice(0,2)) * 60 + Number(tt.bis.slice(3)))'
+                 + '          - (Number(tt.von.slice(0,2)) * 60 + Number(tt.von.slice(3))); }'
+                 + '   r.belegt = bel;'
+                 + '   r.frei = freieStrecke(verl).minuten;'
+                 + '   r.brachGruende = brachListe().map(function(b){'
+                 + '     return b.grund.split(\' seit\')[0].split(\' ·\')[0]; }).join(\',\');'
+                 + '   brachRuhen(\'projekt:p2\');'
+                 + '   r.nachRuhen = brachListe().length;'
+                 + '   var dem = demnaechstListe().filter(function(x){'
+                 + '     return x.titel === \'Emden\'; });'
+                 + '   r.mehrtaegigEinmal = dem.length;'
+                 + '   r.mehrtaegigTage = dem.length ? dem[0].tage : 0;'
+                 + '   tagwWahl = {};'
+                 + '   tagwWahlUm(\'a3\'); tagwWahlUm(\'a4\'); tagwWahlUm(\'a5\');'
+                 + '   tagwWahlUm(\'a1\');'
+                 + '   r.hoechstensDrei = Object.keys(tagwWahl).length;'
+                 + '   tagwAuswahlSetzen();'
+                 + '   r.zaehlt = tagwZaehltHeute(h).length;'
+                 + '   r.geplantHeute = (aufgabeFinden(\'a3\').planung === h);'
+                 + '   tagwFertig();'
+                 + '   r.nachFertig = tagwFaellig();'
+                 + '   tagwWahl = {}; termineNachTag = {}; kalenderListe = [];'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__kontextApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -5409,8 +5497,10 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
   const tag = hauptSkript().match(/function tagZeichnen\([\s\S]*?\n\}\n/);
   const folge = tag ? [...tag[0].matchAll(/tspalte tspalte-(\w+)|data-kurz="([^"]+)"/g)]
                        .map(m => m[1] ? ('[' + m[1] + ']') : m[2]) : [];
-  const erwarteteFolge = ['[links]', 'Tagesverlauf', 'Wiederkehrend', 'Abläufe',
-                          '[rechts]', 'Aufgaben', 'Kleinigkeiten'];
+  /* „Heute zählt" steht seit v1.6.0 über allem — das ist der Sinn der
+     Auswahl im Tageswechsel. */
+  const erwarteteFolge = ['Heute zählt', '[links]', 'Tagesverlauf', 'Wiederkehrend',
+                          'Abläufe', '[rechts]', 'Aufgaben', 'Kleinigkeiten'];
   pruefe(folge.join(',') === erwarteteFolge.join(','),
          'die Abschnitte stehen in der vereinbarten Folge und Spalte'
          + (folge.join(',') === erwarteteFolge.join(',') ? '' : ' — ist: ' + folge.join(' → ')));
@@ -9003,6 +9093,63 @@ console.log('\n106. Kontext eines Termins');
            'und dann bleibt keine Überstimmung zurück, die nichts überstimmt');
     pruefe(e.einzeln === 'privat,beruflich',
            'ein einzelner Termin der Serie lässt sich für sich umstellen');
+  }
+}
+
+/* ============================================================
+   107. Der gefuehrte Tageswechsel
+   Grund: Morgens fehlte der Blick, was heute wirklich zaehlt, und
+   Liegengebliebenes rutschte unbemerkt durch. Drei Schritte taeglich,
+   ein vierter einmal je Woche mit Rueck- und Vorausblick.
+   ============================================================ */
+console.log('\n107. Tageswechsel');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__tagwApi;
+
+  ['tagwFaellig', 'tagwWocheFaellig', 'tagwSchritte', 'tagwStarten', 'tagwWeiter',
+   'tagwFertig', 'tagwWiederOffen', 'tagwSchritt1Html', 'tagwSchritt2Html',
+   'tagwSchritt3Html', 'tagwSchritt4Html', 'freieStrecke', 'brachListe',
+   'demnaechstListe', 'brachRuhen', 'tagwWaehlbar', 'tagwWahlUm', 'tagwAuswahlSetzen',
+   'tagwZaehltHeute', 'tagwZeichnen', 'streifenAntippen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/var TAGW_TAGE = 7;/.test(skript),
+         'brach, Fristen und Termine messen sieben Tage');
+  const wu = skript.match(/function tagwWahlUm\([\s\S]*?\n\}/);
+  pruefe(wu && /zahl >= 3/.test(wu[0]), 'höchstens drei — das ist der Sinn der Sache');
+  const sch = skript.match(/function tagwSchritte\([\s\S]*?\n\}/);
+  pruefe(sch && /tagwWocheFaellig\(\) \? \[1, 2, 3, 4\] : \[1, 2, 4\]/.test(sch[0]),
+         'der Wochenschritt erscheint nur einmal je Woche');
+  const fs = skript.match(/function freieStrecke\([\s\S]*?\n\}\n/);
+  pruefe(fs && /t\.von/.test(fs[0]) && !/t\.zeit/.test(fs[0]),
+         'die Zeiten heißen im Tagesverlauf von und bis');
+  const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tz && /tagwZaehltHeute\(is\)/.test(tz[0]),
+         'was heute zählt, steht im Tagesplan ganz oben');
+  const sa = skript.match(/function streifenAntippen\([\s\S]*?\n\}/);
+  pruefe(sa && /tagwFaellig\(\)/.test(sa[0]),
+         'der Streifen führt zum Tageswechsel, solange er ansteht');
+
+  if (!t) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = t.pruefe();
+    pruefe(e.liegen === 2, 'Liegengebliebenes aus früheren Tagen wird gesammelt');
+    pruefe(e.wiederOffen === 1, 'auch gestern offen gebliebenes Wiederkehrendes');
+    pruefe(e.nachHeute === 1, 'ein Griff schiebt es auf heute');
+    pruefe(e.belegt === 210, 'die belegte Zeit wird aus den Terminen gerechnet');
+    pruefe(e.frei === 240, 'und die längste freie Strecke dazwischen');
+    pruefe(e.brachGruende === 'kein Wochenziel,keine Tätigkeiten,0 von 5',
+           'brach ist, was keine Tätigkeiten, kein Wochenziel oder lange nichts hat');
+    pruefe(e.nachRuhen === 2, '„diese Woche nicht" legt eines beiseite');
+    pruefe(e.mehrtaegigEinmal === 1, 'ein mehrtägiger Urlaub steht einmal in Demnächst');
+    pruefe(e.mehrtaegigTage === 4, 'mit seiner Dauer');
+    pruefe(e.hoechstensDrei === 3, 'mehr als drei lassen sich nicht wählen');
+    pruefe(e.zaehlt === 3, 'die Auswahl steht danach im Tag');
+    pruefe(e.geplantHeute === true, 'und ist auf heute geplant');
+    pruefe(e.nachFertig === false, 'nach dem Durchgang ruht der Streifen bis morgen');
   }
 }
 

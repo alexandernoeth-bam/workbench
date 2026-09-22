@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.5.2</title>
+<title>Workbench 1.6.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -933,6 +933,50 @@ body.breit .vhblatt.pinwand{grid-template-columns:repeat(auto-fill,minmax(190px,
 .vk-flaeche.voll{border-color:var(--weinrot);color:var(--weinrot)}
 .vk-knoepfe{display:flex;flex-wrap:wrap;gap:6px}
 .vk-taetig.voll{border-color:var(--petrol);color:var(--petrol)}
+/* Tageswechsel */
+#tagwBlatt{max-width:560px}
+.tw-punkte{display:flex;gap:6px;justify-content:center;margin:6px 0 12px}
+.tw-punkte i{width:7px;height:7px;border-radius:50%;background:var(--linie)}
+.tw-punkte i.an{background:var(--weinrot)}
+.tw-kopf{margin-bottom:12px}
+.tw-schritt{font-size:calc(var(--fs)*0.64);letter-spacing:.05em;text-transform:uppercase;
+  color:var(--grau)}
+.tw-titel{margin:2px 0 1px;font-size:calc(var(--fs)*1.12);font-weight:500}
+.tw-unter{font-size:calc(var(--fs)*0.74);color:var(--grau)}
+.tw-abschnitt{font-size:calc(var(--fs)*0.66);font-weight:600;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--grau);margin:14px 0 6px}
+.tw-karte{background:var(--karte);border:1px solid var(--linie);border-radius:10px;
+  padding:10px 12px;margin-bottom:9px}
+.tw-leer{color:var(--grau);font-size:calc(var(--fs)*0.8)}
+.tw-ktitel{display:block;font-size:calc(var(--fs)*0.86);line-height:1.3}
+.tw-kmeta{display:block;font-size:calc(var(--fs)*0.7);color:var(--grau);margin-top:2px}
+.tw-klein{font-size:calc(var(--fs)*0.7);color:var(--grau)}
+.tw-wahl{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.tw-wahl button{font:inherit;font-size:calc(var(--fs)*0.74);padding:4px 10px;
+  border:1px solid var(--linie);border-radius:20px;background:var(--karte);
+  color:var(--tinte);cursor:pointer}
+.tw-wahl button.an{border-color:var(--weinrot);color:var(--weinrot);font-weight:500}
+.tw-tag{display:flex;gap:9px;padding:6px 0;border-bottom:1px solid var(--linie);
+  font-size:calc(var(--fs)*0.84)}
+.tw-tag:last-child{border-bottom:0}
+.tw-zeit{flex:0 0 48px;color:var(--grau);font-size:calc(var(--fs)*0.78)}
+.tw-hinweis{font-size:calc(var(--fs)*0.76);color:var(--grau);line-height:1.45;margin:10px 0}
+.tw-zeile2{display:flex;gap:10px;align-items:baseline;cursor:pointer}
+.tw-wann{flex:0 0 62px;font-size:calc(var(--fs)*0.76);color:var(--weinrot)}
+.tw-ausw{display:flex;align-items:flex-start;gap:10px;padding:9px 0;
+  border-bottom:1px solid var(--linie);cursor:pointer}
+.tw-kasten{flex:0 0 19px;width:19px;height:19px;margin-top:1px;border:1.6px solid var(--grau);
+  border-radius:4px;background:var(--karte)}
+.tw-kasten.an{background:var(--weinrot);border-color:var(--weinrot);
+  box-shadow:inset 0 0 0 3px var(--karte)}
+.tw-fuss{display:flex;gap:8px;margin:16px 0 30px}
+.tw-fuss button{flex:1;font:inherit;font-size:calc(var(--fs)*0.86);padding:10px 12px;
+  border:1px solid var(--linie);border-radius:8px;background:var(--karte);
+  color:var(--tinte);cursor:pointer}
+.tw-fuss button.stark{border-color:var(--weinrot);color:var(--weinrot);font-weight:500}
+.tabschnitt.tw-zaehlt{border-left:3px solid var(--weinrot);padding-left:11px}
+body.breit .tabschnitt.tw-zaehlt{grid-column:1 / -1}
+
 .tg-kopf{flex:1;min-width:0}
 /* Tätigkeiten: eine Kopfkarte, darunter Flächen je Gruppe. Am Rechner
    zwei Spalten mit begrenzter Breite — sonst stand der Fortschritt
@@ -1237,7 +1281,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
       <button type="button" id="tPrivat" class="pille" onclick="setTagFilter('privat')">Privat</button>
     </div>
     <button class="tk-nachzuegler" id="tkNachzuegler" type="button"
-            onclick="nachzueglerOeffnen()"></button>
+            onclick="streifenAntippen()"></button>
     <div class="tk-stand" id="tkStand"></div>
   </div>
 
@@ -1293,6 +1337,10 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
   </div>
   <div class="vhblatt einfachliste" id="flaecheBlatt"></div>
   <div class="fl-springer" id="flaecheSpringer"></div>
+</div>
+
+<div class="schirm" id="schirmTagwechsel">
+  <div class="vhblatt einfachliste" id="tagwBlatt"></div>
 </div>
 
 <div class="schirm" id="schirmTaetigkeiten">
@@ -1638,7 +1686,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.5.2';
+var APP_VERSION = '1.6.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4075,10 +4123,38 @@ function liegengeblieben(is) {
   return aus;
 }
 
+/* Der Streifen führt zum Tageswechsel, solange er ansteht — danach
+   wie bisher zu den Nachzüglern. */
+function streifenAntippen() {
+  if ((tagOffen || isoDatum()) === isoDatum() && tagwFaellig()) {
+    tagwStarten();
+    return;
+  }
+  nachzueglerOeffnen();
+}
+
+function tagwGruss() {
+  var std = Number(uhrzeitJetzt().slice(0, 2));
+  if (std < 11) { return 'Guten Morgen.'; }
+  if (std < 18) { return 'Guten Tag.'; }
+  return 'Guten Abend.';
+}
+
 function nachzueglerZeichnen(is) {
   var el = document.getElementById('tkNachzuegler');
   if (!el) { return; }
   var liste = liegengeblieben(is);
+  /* Einmal am Tag lädt der Streifen zum Tageswechsel ein — nur am
+     heutigen Tag, nicht beim Blättern in die Vergangenheit. */
+  if (is === isoDatum() && tagwFaellig()) {
+    el.innerHTML = '<span>' + esc(tagwGruss()) + ' '
+                 + (liste.length ? (liste.length
+                     + (liste.length === 1 ? ' Sache ist' : ' Sachen sind')
+                     + ' von gestern offen.') : 'Nichts liegengeblieben.')
+                 + '</span><span class="nz-wort">Tageswechsel</span>';
+    el.classList.add('sichtbar');
+    return;
+  }
   if (!liste.length) { el.classList.remove('sichtbar'); el.innerHTML = ''; return; }
   el.innerHTML = '<span>' + liste.length
                + (liste.length === 1 ? ' Eintrag liegt' : ' Einträge liegen')
@@ -4093,6 +4169,548 @@ function nachzueglerOeffnen() {
   sheet.innerHTML = nachzueglerHtml();
   sheet.classList.add('auf');
   hg.classList.add('auf');
+}
+
+/* ============================================================
+   Der geführte Tageswechsel
+
+   Drei Schritte täglich: Was ist liegengeblieben, wie sieht heute aus,
+   was zählt heute. Einmal je Woche ein vierter dazwischen: Was liegt
+   brach, was kommt demnächst.
+
+   Alle Schwellen liegen bei sieben Tagen. Nichts geschieht von selbst:
+   Der Streifen im Tagesplan lädt ein, mehr nicht.
+   ============================================================ */
+
+var TAGW_TAGE = 7;          /* brach, Fristen und Termine: sieben Tage */
+var tagwSchritt = 1;
+var tagwWahl = {};          /* Kennung -> gewählt für „Heute zählt" */
+
+function tagwWocheFaellig() {
+  var zuletzt = DB.einstellungen.tagwWoche || '';
+  return montagVon(isoDatum()) !== zuletzt;
+}
+
+function tagwSchritte() {
+  return tagwWocheFaellig() ? [1, 2, 3, 4] : [1, 2, 4];
+}
+
+function tagwFaellig() {
+  return (DB.einstellungen.tagwZuletzt || '') !== isoDatum();
+}
+
+function tagwStarten() {
+  tagwSchritt = tagwSchritte()[0];
+  tagwWahl = {};
+  zeigeSchirm('Tagwechsel');
+}
+
+function tagwSpaeter() {
+  zeigeSchirm('Tag');
+}
+
+function tagwWeiter(n) {
+  var reihe = tagwSchritte();
+  var i = reihe.indexOf(tagwSchritt);
+  var neu = i + n;
+  if (neu < 0) { zeigeSchirm('Tag'); return; }
+  if (neu >= reihe.length) { tagwFertig(); return; }
+  tagwSchritt = reihe[neu];
+  tagwZeichnen();
+}
+
+function tagwFertig() {
+  DB.einstellungen.tagwZuletzt = isoDatum();
+  if (tagwWocheFaellig()) { DB.einstellungen.tagwWoche = montagVon(isoDatum()); }
+  spaeterSichern();
+  zeigeSchirm('Tag');
+  tagZeichnen();
+  melde('Tageswechsel abgeschlossen.', 'gut');
+}
+
+/* ------------------------------------------------------------
+   Schritt 1: Liegengeblieben
+   ------------------------------------------------------------ */
+
+/* Wiederkehrendes, das gestern fällig war und offen blieb — man hat es
+   vielleicht getan und nur nicht abgehakt. */
+function tagwWiederOffen() {
+  var gestern = tagePlus(isoDatum(), -1);
+  var aus = [];
+  var l = DB.aufgaben || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (!l[i].wiederholung) { continue; }
+    if (!faelligAn(l[i].wiederholung, gestern)) { continue; }
+    if (istErledigtAn(l[i], gestern)) { continue; }
+    aus.push(l[i]);
+  }
+  return aus;
+}
+
+function tagwWiederHaken(id) {
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  wiederholungSetzen(a, tagePlus(isoDatum(), -1), true);
+  spaeterSichern();
+  tagwZeichnen();
+}
+
+function tagwSchritt1Html() {
+  var liste = liegengeblieben(isoDatum());
+  var wieder = tagwWiederOffen();
+  var h = '<div class="tw-kopf"><div class="tw-schritt">Schritt 1</div>'
+        + '<h2 class="tw-titel">Was ist liegengeblieben?</h2>'
+        + '<div class="tw-unter">' + (liste.length + wieder.length)
+        + ' aus früheren Tagen</div></div>';
+  if (!liste.length && !wieder.length) {
+    h += '<div class="tw-karte tw-leer">Nichts liegengeblieben. Sauberer Start.</div>';
+  }
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    var a = liste[i];
+    h += '<div class="tw-karte"><div class="tw-ktitel">' + esc(a.titel) + '</div>'
+       + '<div class="tw-kmeta">war für ' + esc(kurzDatum(a.planung)) + ' geplant'
+       + (a.art === 'klein' ? ' · Kleinigkeit' : '')
+       + (a.projektId || a.zielId ? (' · ' + esc(tagwVorhabenName(a))) : '') + '</div>'
+       + '<div class="tw-wahl">'
+       + '<button type="button" onclick="nzSetzen(\'' + esc(a.id) + '\',\'heute\');tagwZeichnen()">heute</button>'
+       + '<button type="button" onclick="nzSetzen(\'' + esc(a.id) + '\',\'woche\');tagwZeichnen()">diese Woche</button>'
+       + '<button type="button" onclick="nzSetzen(\'' + esc(a.id) + '\',\'backlog\');tagwZeichnen()">Backlog</button>'
+       + '<button type="button" onclick="nzErledigen(\'' + esc(a.id) + '\');tagwZeichnen()">erledigt</button>'
+       + '</div></div>';
+  }
+  for (i = 0; i < wieder.length; i++) {
+    var w = wieder[i];
+    h += '<div class="tw-karte"><div class="tw-ktitel">' + esc(w.titel) + '</div>'
+       + '<div class="tw-kmeta">wiederkehrend · gestern offen geblieben</div>'
+       + '<div class="tw-wahl">'
+       + '<button type="button" onclick="tagwWiederHaken(\'' + esc(w.id) + '\')">'
+       + 'war erledigt</button>'
+       + '<button type="button" class="an" onclick="tagwZeichnen()">offen lassen</button>'
+       + '</div></div>';
+  }
+  return h;
+}
+
+function tagwVorhabenName(a) {
+  var v = a.projektId ? vorhabenFinden(a.projektId, 'projekt')
+        : (a.zielId ? vorhabenFinden(a.zielId, 'ziel') : null);
+  return v ? v.name : '';
+}
+
+/* ------------------------------------------------------------
+   Schritt 2: So sieht heute aus
+   ------------------------------------------------------------ */
+
+function minutenAus(hm) {
+  var t = String(hm || '').split(':');
+  return (Number(t[0]) || 0) * 60 + (Number(t[1]) || 0);
+}
+
+/* Die längste zusammenhängende freie Strecke zwischen 8 und 18 Uhr —
+   das ist die Zeit, in der etwas Größeres überhaupt Platz hat. */
+function freieStrecke(termine) {
+  var von = 8 * 60, bis = 18 * 60;
+  var belegt = [];
+  var i;
+  for (i = 0; i < termine.length; i++) {
+    var t = termine[i].t;
+    /* Im Tagesverlauf heißen die Zeiten von und bis, nicht zeit. */
+    if (!t || t.ganztags || !t.von) { continue; }
+    var a = minutenAus(t.von);
+    var b = t.bis ? minutenAus(t.bis) : (a + 60);
+    if (b <= von || a >= bis) { continue; }
+    belegt.push([Math.max(a, von), Math.min(b, bis)]);
+  }
+  belegt.sort(function (x, y) { return x[0] - y[0]; });
+  var beste = 0;
+  var besteVon = von;
+  var lauf = von;
+  for (i = 0; i < belegt.length; i++) {
+    if (belegt[i][0] > lauf && belegt[i][0] - lauf > beste) {
+      beste = belegt[i][0] - lauf;
+      besteVon = lauf;
+    }
+    if (belegt[i][1] > lauf) { lauf = belegt[i][1]; }
+  }
+  if (bis - lauf > beste) { beste = bis - lauf; besteVon = lauf; }
+  return { minuten: beste, ab: besteVon };
+}
+
+function zeitAusMinuten(m) {
+  return String(Math.floor(m / 60)).padStart(2, '0') + ':'
+       + String(m % 60).padStart(2, '0');
+}
+
+function tagwSchritt2Html() {
+  var heute = isoDatum();
+  var e = tagesEintraege(heute);
+  var termine = e.verlauf.filter(function (x) { return x.art === 'termin'; });
+  var belegt = 0;
+  var i;
+  for (i = 0; i < termine.length; i++) {
+    var t = termine[i].t;
+    if (t.ganztags || !t.von || !t.bis) { continue; }
+    belegt += Math.max(0, minutenAus(t.bis) - minutenAus(t.von));
+  }
+  var form = tagesform(heute);
+  var h = '<div class="tw-kopf"><div class="tw-schritt">Schritt 2</div>'
+        + '<h2 class="tw-titel">So sieht heute aus</h2>'
+        + '<div class="tw-unter">' + termine.length
+        + (termine.length === 1 ? ' Termin' : ' Termine')
+        + (belegt ? (' · ' + Math.floor(belegt / 60) + ' Std. ' + (belegt % 60)
+                     + ' belegt') : '')
+        + ' · ' + esc(form.form) + '</div></div>';
+
+  h += '<div class="tw-karte">';
+  if (!termine.length) { h += '<div class="tw-leer">Keine Termine.</div>'; }
+  for (i = 0; i < termine.length; i++) {
+    var tt = termine[i].t;
+    h += '<div class="tw-tag"><span class="tw-zeit">'
+       + esc(tt.ganztags ? 'ganz' : (tt.von || '')) + '</span>'
+       + '<span>' + esc(tt.titel)
+       + (tt.kontext === 'privat' ? '<span class="tw-klein"> · privat</span>' : '')
+       + '</span></div>';
+  }
+  h += '</div>';
+
+  /* Was heute fällig wird: Fristen und Ablaufschritte. */
+  var faellig = [];
+  var l = DB.aufgaben || [];
+  for (i = 0; i < l.length; i++) {
+    if (l[i].status === 'erledigt' || l[i].wiederholung) { continue; }
+    if (l[i].frist && l[i].frist <= heute) {
+      faellig.push(l[i].titel + ' · Frist ' + kurzDatum(l[i].frist));
+    }
+  }
+  var d = DB.durchlaeufe || [];
+  for (i = 0; i < d.length; i++) {
+    if (d[i].erledigt) { continue; }
+    if (d[i].frist && d[i].frist <= tagePlus(heute, TAGW_TAGE)) {
+      faellig.push('Ablauf „' + d[i].name + '" · ' + schritteFertig(d[i]) + ' von '
+                 + (d[i].schritte || []).length + ' · Frist ' + kurzDatum(d[i].frist));
+    }
+  }
+  if (faellig.length) {
+    h += '<div class="tw-karte"><div class="tw-ktitel">Fällig</div>';
+    for (i = 0; i < faellig.length; i++) {
+      h += '<div class="tw-kmeta">' + esc(faellig[i]) + '</div>';
+    }
+    h += '</div>';
+  }
+
+  var frei = freieStrecke(termine);
+  if (frei.minuten >= 45) {
+    h += '<div class="tw-hinweis">Ab ' + zeitAusMinuten(frei.ab) + ' bleiben dir '
+       + (frei.minuten >= 120 ? (Math.floor(frei.minuten / 60) + ' Stunden')
+                              : (frei.minuten + ' Minuten'))
+       + ' am Stück.</div>';
+  }
+  return h;
+}
+
+/* ------------------------------------------------------------
+   Schritt 3: Was liegt brach, was kommt demnächst (einmal je Woche)
+   ------------------------------------------------------------ */
+
+function brachRuht(schluessel) {
+  var k = DB.einstellungen.brachRuht || {};
+  return k[schluessel] === montagVon(isoDatum());
+}
+
+function brachRuhen(schluessel) {
+  if (!DB.einstellungen.brachRuht) { DB.einstellungen.brachRuht = {}; }
+  DB.einstellungen.brachRuht[schluessel] = montagVon(isoDatum());
+  spaeterSichern();
+  tagwZeichnen();
+}
+
+/* Wann regte sich zuletzt etwas? Zählt das Vorhaben selbst, seine
+   Aufgaben und seine Abläufe. */
+function letzteRegung(art, id) {
+  var v = vorhabenFinden(id, art);
+  var neu = v ? (Number(v.geaendert) || 0) : 0;
+  var l = DB.aufgaben || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (!gehoertZu(l[i], art, id)) { continue; }
+    if ((Number(l[i].geaendert) || 0) > neu) { neu = Number(l[i].geaendert) || 0; }
+  }
+  var d = DB.durchlaeufe || [];
+  for (i = 0; i < d.length; i++) {
+    if (!gehoertZu(d[i], art, id)) { continue; }
+    if ((Number(d[i].geaendert) || 0) > neu) { neu = Number(d[i].geaendert) || 0; }
+  }
+  return neu;
+}
+
+function brachListe() {
+  var aus = [];
+  var grenze = Date.now() - TAGW_TAGE * 86400000;
+  var arten = [['projekt', DB.projekte || []], ['ziel', DB.ziele || []]];
+  var q, i;
+  for (q = 0; q < arten.length; q++) {
+    var art = arten[q][0];
+    var l = arten[q][1];
+    for (i = 0; i < l.length; i++) {
+      var v = l[i];
+      if (v.status === 'abgeschlossen') { continue; }
+      if (!passtZumKalender(v.kontext)) { continue; }
+      if (brachRuht(art + ':' + v.id)) { continue; }
+      var zahl = vhTaetigZahl(art, v.id);
+      var regung = letzteRegung(art, v.id);
+      var grund = '';
+      if (!zahl) { grund = 'keine Tätigkeiten'; }
+      else if (!zustandDieseWoche(v)) { grund = 'kein Wochenziel'; }
+      else if (regung < grenze) {
+        grund = 'seit ' + Math.round((Date.now() - regung) / 86400000) + ' Tagen nichts';
+      }
+      if (!grund) { continue; }
+      aus.push({ art: art, id: v.id, name: v.name, grund: grund, zahl: zahl });
+    }
+  }
+  var d = DB.durchlaeufe || [];
+  for (i = 0; i < d.length; i++) {
+    if (d[i].erledigt) { continue; }
+    if (!passtZumKalender(d[i].kontext)) { continue; }
+    if (brachRuht('durchlauf:' + d[i].id)) { continue; }
+    var gesamt = (d[i].schritte || []).length;
+    var fertig = schritteFertig(d[i]);
+    if (gesamt && fertig === gesamt) { continue; }
+    if ((Number(d[i].geaendert) || 0) >= grenze) { continue; }
+    aus.push({ art: 'durchlauf', id: d[i].id, name: d[i].name,
+               grund: fertig + ' von ' + gesamt + ' seit '
+                    + Math.round((Date.now() - (Number(d[i].geaendert) || 0)) / 86400000)
+                    + ' Tagen' + (d[i].frist ? (' · Frist ' + kurzDatum(d[i].frist)) : ''),
+               zahl: 0 });
+  }
+  return aus;
+}
+
+function demnaechstListe() {
+  var heute = isoDatum();
+  var bis = tagePlus(heute, TAGW_TAGE);
+  var aus = [];
+  var l = DB.aufgaben || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].status === 'erledigt' || l[i].wiederholung) { continue; }
+    if (!l[i].frist || l[i].frist <= heute || l[i].frist > bis) { continue; }
+    if (!passtZumKalender(l[i].kontext)) { continue; }
+    aus.push({ tag: l[i].frist, was: 'Frist', titel: l[i].titel, art: 'aufgabe',
+               id: l[i].id });
+  }
+  var arten = [['projekt', DB.projekte || [], 'ende'], ['ziel', DB.ziele || [], 'zieltermin']];
+  var q;
+  for (q = 0; q < arten.length; q++) {
+    var vs = arten[q][1];
+    for (i = 0; i < vs.length; i++) {
+      var ende = vs[i][arten[q][2]];
+      if (!ende || ende < heute || ende > bis) { continue; }
+      if (vs[i].status === 'abgeschlossen') { continue; }
+      aus.push({ tag: ende, was: (arten[q][0] === 'ziel') ? 'Ziel endet' : 'Projekt endet',
+                 titel: vs[i].name, art: arten[q][0], id: vs[i].id });
+    }
+  }
+  /* Termine, die den Tag umwerfen: ganztägige und Geburtstage. */
+  /* Mehrtägiges gehört einmal in die Liste, nicht je Tag: gemerkt wird
+     der erste Tag, gezählt werden die weiteren. */
+  var gesehen = {};
+  var tag;
+  for (tag = 1; tag <= TAGW_TAGE; tag++) {
+    var is = tagePlus(heute, tag);
+    var jt = jtAn(is);
+    var k;
+    for (k = 0; k < jt.length; k++) {
+      if (!jtPasst(jt[k])) { continue; }
+      var schl = (jt[k].id || '') + '|' + jt[k].titel;
+      if (gesehen[schl]) { gesehen[schl].tage++; continue; }
+      var eintrag = { tag: is, was: artName(jt[k].art) || 'Ganztägig',
+                      titel: jt[k].titel, art: 'tag', id: is, tage: 1 };
+      gesehen[schl] = eintrag;
+      aus.push(eintrag);
+    }
+  }
+  aus.sort(function (a, b) { return (a.tag < b.tag) ? -1 : 1; });
+  return aus;
+}
+
+function tagwOeffnen(art, id) {
+  if (art === 'projekt' || art === 'ziel') { taetigOeffnen(art, id); return; }
+  if (art === 'durchlauf') { durchlaufAbhakenOeffnen(id); return; }
+  if (art === 'aufgabe') { aufgabeAktionen(id); return; }
+  if (art === 'tag') { zumTag(id); }
+}
+
+function tagwSchritt3Html() {
+  var brach = brachListe();
+  var kommt = demnaechstListe();
+  var h = '<div class="tw-kopf"><div class="tw-schritt">Schritt 3 · einmal je Woche</div>'
+        + '<h2 class="tw-titel">Was liegt brach, was kommt?</h2>'
+        + '<div class="tw-unter">' + brach.length + ' brach · ' + kommt.length
+        + ' in den nächsten ' + TAGW_TAGE + ' Tagen</div></div>';
+
+  h += '<div class="tw-abschnitt">Liegt brach</div>';
+  if (!brach.length) {
+    h += '<div class="tw-karte tw-leer">Nichts liegt brach.</div>';
+  }
+  var i;
+  for (i = 0; i < brach.length; i++) {
+    var b = brach[i];
+    h += '<div class="tw-karte"><div class="tw-ktitel">' + esc(b.name) + '</div>'
+       + '<div class="tw-kmeta">'
+       + (b.art === 'durchlauf' ? 'Ablauf' : (b.art === 'ziel' ? 'Ziel' : 'Projekt'))
+       + ' · ' + esc(b.grund) + '</div>'
+       + '<div class="tw-wahl">'
+       + '<button type="button" onclick="tagwOeffnen(\'' + b.art + '\',\'' + esc(b.id)
+       + '\')">öffnen</button>'
+       + '<button type="button" onclick="brachRuhen(\'' + b.art + ':' + esc(b.id)
+       + '\')">diese Woche nicht</button></div></div>';
+  }
+
+  h += '<div class="tw-abschnitt">Demnächst</div>';
+  if (!kommt.length) {
+    h += '<div class="tw-karte tw-leer">Nichts in den nächsten ' + TAGW_TAGE
+       + ' Tagen.</div>';
+  }
+  for (i = 0; i < kommt.length; i++) {
+    var e = kommt[i];
+    h += '<div class="tw-karte tw-zeile2" onclick="tagwOeffnen(\'' + e.art + '\',\''
+       + esc(e.id) + '\')">'
+       + '<span class="tw-wann">' + esc(kurzDatum(e.tag)) + '</span>'
+       + '<span><span class="tw-ktitel">' + esc(e.titel) + '</span>'
+       + '<span class="tw-kmeta">' + esc(e.was)
+       + ((e.tage > 1) ? (' · ' + e.tage + ' Tage') : '') + '</span></span></div>';
+  }
+  return h;
+}
+
+/* ------------------------------------------------------------
+   Schritt 4: Was zählt heute
+   ------------------------------------------------------------ */
+
+function tagwWaehlbar() {
+  var heute = isoDatum();
+  var mo = montagVon(heute);
+  var aus = [];
+  var l = DB.aufgaben || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    var a = l[i];
+    if (a.wiederholung || a.status === 'erledigt') { continue; }
+    if (!passtZumTag(a.kontext)) { continue; }
+    var p = a.planung || '';
+    var drin = (p === heute) || (p === 'woche')
+             || (!!a.frist && a.frist <= tagePlus(heute, TAGW_TAGE));
+    if (!drin) { continue; }
+    aus.push(a);
+  }
+  aus.sort(function (x, y) {
+    var fx = x.frist || '9999', fy = y.frist || '9999';
+    if (fx !== fy) { return (fx < fy) ? -1 : 1; }
+    return (x.planung === heute && y.planung !== heute) ? -1 : 1;
+  });
+  return aus.slice(0, 12);
+}
+
+function tagwWahlUm(id) {
+  if (tagwWahl[id]) { delete tagwWahl[id]; }
+  else {
+    var zahl = 0;
+    var k;
+    for (k in tagwWahl) { if (tagwWahl[k]) { zahl++; } }
+    if (zahl >= 3) {
+      melde('Höchstens drei — das ist der Sinn der Sache.', null);
+      return;
+    }
+    tagwWahl[id] = true;
+  }
+  tagwZeichnen();
+}
+
+function tagwSchritt4Html() {
+  var liste = tagwWaehlbar();
+  var zahl = 0;
+  var k;
+  for (k in tagwWahl) { if (tagwWahl[k]) { zahl++; } }
+  var h = '<div class="tw-kopf"><div class="tw-schritt">Schritt 4</div>'
+        + '<h2 class="tw-titel">Was zählt heute?</h2>'
+        + '<div class="tw-unter">Höchstens drei. Sie stehen dann oben im Tag.</div></div>';
+  if (!liste.length) {
+    h += '<div class="tw-karte tw-leer">Nichts zur Auswahl.</div>';
+  }
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    var a = liste[i];
+    var meta = [];
+    if (a.planung === isoDatum()) { meta.push('heute'); }
+    else if (a.planung === 'woche') { meta.push('diese Woche'); }
+    if (a.frist) { meta.push('Frist ' + kurzDatum(a.frist)); }
+    var vn = tagwVorhabenName(a);
+    if (vn) { meta.push(vn); }
+    h += '<div class="tw-ausw" onclick="tagwWahlUm(\'' + esc(a.id) + '\')">'
+       + '<span class="tw-kasten' + (tagwWahl[a.id] ? ' an' : '') + '"></span>'
+       + '<span><span class="tw-ktitel">' + esc(a.titel) + '</span>'
+       + '<span class="tw-kmeta">' + esc(meta.join(' · ')) + '</span></span></div>';
+  }
+  h += '<div class="tw-hinweis">' + zahl + ' von 3 gewählt. Ohne Auswahl bleibt alles, '
+     + 'wie es ist.</div>';
+  return h;
+}
+
+/* Die Auswahl gilt für heute und steht oben im Tagesplan. */
+function tagwAuswahlSetzen() {
+  var heute = isoDatum();
+  var k;
+  for (k in tagwWahl) {
+    if (!tagwWahl[k]) { continue; }
+    var a = aufgabeFinden(k);
+    if (!a) { continue; }
+    a.zaehltAm = heute;
+    if (a.planung !== heute) { planungSetzen(a, heute); }
+    a.geaendert = jetzt();
+  }
+  spaeterSichern();
+}
+
+function tagwZaehltHeute(is) {
+  var aus = [];
+  var l = DB.aufgaben || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].zaehltAm !== is) { continue; }
+    if (l[i].status === 'erledigt') { continue; }
+    if (!passtZumTag(l[i].kontext)) { continue; }
+    aus.push(l[i]);
+  }
+  return aus;
+}
+
+function tagwZeichnen() {
+  var blatt = document.getElementById('tagwBlatt');
+  if (!blatt) { return; }
+  var reihe = tagwSchritte();
+  var wo = reihe.indexOf(tagwSchritt);
+  var h = '<div class="tw-punkte">';
+  var i;
+  for (i = 0; i < reihe.length; i++) {
+    h += '<i class="' + (i === wo ? 'an' : '') + '"></i>';
+  }
+  h += '</div>';
+  if (tagwSchritt === 1) { h += tagwSchritt1Html(); }
+  else if (tagwSchritt === 2) { h += tagwSchritt2Html(); }
+  else if (tagwSchritt === 3) { h += tagwSchritt3Html(); }
+  else { h += tagwSchritt4Html(); }
+
+  var letzter = (wo === reihe.length - 1);
+  h += '<div class="tw-fuss">'
+     + '<button type="button" onclick="' + (wo === 0 ? 'tagwSpaeter()' : 'tagwWeiter(-1)')
+     + '">' + (wo === 0 ? 'Später' : 'Zurück') + '</button>'
+     + '<button type="button" class="stark" onclick="'
+     + (letzter ? 'tagwAuswahlSetzen();tagwWeiter(1)' : 'tagwWeiter(1)') + '">'
+     + (letzter ? 'Fertig' : 'Weiter') + '</button></div>';
+  blatt.innerHTML = h;
 }
 
 function nachzueglerHtml() {
@@ -4385,6 +5003,17 @@ function tagZeichnen() {
   /* Zwei Spalten als eigene Behälter: In einem Raster teilen sich
      nebeneinanderliegende Abschnitte die Zeilenhöhe, wodurch oben
      rechts eine Lücke entstünde. */
+  /* Was heute zählt, steht ganz oben — der Sinn der Auswahl im
+     Tageswechsel. */
+  var zaehlt = tagwZaehltHeute(is);
+  if (zaehlt.length) {
+    h += '<div class="tabschnitt tw-zaehlt" data-kurz="Heute zählt">'
+       + '<div class="tabschnitt-titel"><span>Heute zählt · ' + zaehlt.length
+       + '</span></div>';
+    for (i = 0; i < zaehlt.length; i++) { h += zeileHtml(zaehlt[i], is, false); }
+    h += '</div>';
+  }
+
   h += '<div class="tspalte tspalte-links">';
   var vorbeiZahl = 0;
   for (i = 0; i < e.verlauf.length; i++) {
@@ -5373,7 +6002,8 @@ function handleVergessen() {
 function zeigeSchirm(name) {
   schirmOffen = name;
   var alle = ['Tag', 'Kalender', 'Vorhaben', 'Ablaeufe', 'Aufgaben',
-              'Flaeche', 'Gedanken', 'Taetigkeiten', 'Pinnwand', 'Migration', 'Diagnose'];
+              'Flaeche', 'Gedanken', 'Taetigkeiten', 'Tagwechsel', 'Pinnwand',
+              'Migration', 'Diagnose'];
   var i;
   for (i = 0; i < alle.length; i++) {
     var s = document.getElementById('schirm' + alle[i]);
@@ -5388,7 +6018,8 @@ function zeigeSchirm(name) {
       var leuchtet = (alle[i] === name)
                   || ((name === 'Flaeche' || name === 'Gedanken'
                        || name === 'Taetigkeiten') && alle[i] === 'Vorhaben')
-                  || (name === 'Diagnose' && alle[i] === 'Tag');
+                  || ((name === 'Diagnose' || name === 'Tagwechsel')
+                      && alle[i] === 'Tag');
       if (leuchtet) { n.classList.add('aktiv'); } else { n.classList.remove('aktiv'); }
     }
   }
@@ -5396,6 +6027,7 @@ function zeigeSchirm(name) {
   if (name === 'Flaeche') { flaecheZeichnen(); }
   if (name === 'Gedanken') { gedankenZeichnen(); }
   if (name === 'Taetigkeiten') { taetigZeichnen(); }
+  if (name === 'Tagwechsel') { tagwZeichnen(); }
   if (name === 'Pinnwand') { pinnwandZeichnen(); }
   if (name === 'Tag') { tagZeichnen(); kalenderNachholen(); }
   if (name === 'Aufgaben') { aufZeichnen(); }
