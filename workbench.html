@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.96.0</title>
+<title>Workbench 0.97.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -543,6 +543,11 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
 .jpunkt{position:absolute;right:2px;top:2px;width:4px;height:4px;border-radius:50%;
   background:var(--grau);z-index:3}
 .jmehr{background:var(--grau-hell);color:var(--papier);font-weight:500}
+/* Der Feiertag braucht mehr Raum als ein Kürzel aus drei Buchstaben:
+   Er bekommt drei Anteile, steht er allein, die ganze Breite. */
+.jbalken i.jfei{flex:3 1 0;display:block;background:transparent;color:var(--weinrot);
+  font-weight:600;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;text-align:left;padding:0 2px;align-self:center}
 .jbalken{flex:1;min-width:0;display:flex;gap:1px}
 .jbalken i{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;
   font-style:normal;font-size:calc(var(--fs)*0.5);color:rgba(255,255,255,.95);
@@ -1414,7 +1419,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.96.0';
+var APP_VERSION = '0.97.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3237,6 +3242,37 @@ function feiertageVon(jahr) {
   liste[jahr + '-12-25'] = '1. Weihnachtstag';
   liste[jahr + '-12-26'] = '2. Weihnachtstag';
   return liste;
+}
+
+/* Die Namen passen nicht in eine Zelle des Jahresrasters — also eine
+   Kurzform, die man trotzdem sofort erkennt. Unbekannte (etwa aus einer
+   eingelesenen Datei) werden auf elf Zeichen gekürzt. */
+var FEIERTAG_KURZ = {
+  'Neujahr': 'Neujahr',
+  'Heilige Drei Könige': 'Hl. 3 Kön.',
+  'Karfreitag': 'Karfreitag',
+  'Ostersonntag': 'Ostern',
+  'Ostermontag': 'Ostermo.',
+  'Tag der Arbeit': '1. Mai',
+  'Christi Himmelfahrt': 'Himmelf.',
+  'Pfingstsonntag': 'Pfingsten',
+  'Pfingstmontag': 'Pfingstmo.',
+  'Fronleichnam': 'Fronleichn.',
+  'Friedensfest': 'Friedensf.',
+  'Mariä Himmelfahrt': 'Mariä Hf.',
+  'Tag der Deutschen Einheit': 'Dt. Einheit',
+  'Reformationstag': 'Reformat.',
+  'Allerheiligen': 'Allerheil.',
+  'Buß- und Bettag': 'Buß- u. B.',
+  '1. Weihnachtstag': '1. Weihn.',
+  '2. Weihnachtstag': '2. Weihn.'
+};
+
+function feiertagKurz(name) {
+  var n = String(name || '').trim();
+  if (!n) { return ''; }
+  if (FEIERTAG_KURZ[n]) { return FEIERTAG_KURZ[n]; }
+  return (n.length > 11) ? (n.slice(0, 10) + '.') : n;
 }
 
 var feiertagJahr = 0;
@@ -7562,10 +7598,19 @@ function jahrHtml(is) {
       var inhalt = '<span class="jzelle">';
       inhalt += '<span class="jwt">' + TAGE_KURZ[d.getDay()] + '</span>';
       inhalt += '<span class="jbalken">';
-      /* Vier statt drei, und was darüber hinausgeht, wird als Zahl
-         angedeutet — sonst verschwindet ein Termin lautlos. */
+      /* Der Feiertag steht als Text vorn in der Zelle, mit vollem Namen
+         im Hinweis. Er nimmt einen der vier Plätze ein. */
+      var feiName = feiertagAn(iso);
+      var plaetze = 4;
+      if (feiName) {
+        inhalt += '<i class="jfei" title="' + esc(feiName) + '">'
+                + esc(feiertagKurz(feiName)) + '</i>';
+        plaetze = 3;
+      }
+      /* Was nicht mehr hineinpasst, wird als Zahl angedeutet — sonst
+         verschwindet ein Termin lautlos. */
       var b;
-      var zeigbar = Math.min(treffer.length, 4);
+      var zeigbar = Math.min(treffer.length, plaetze);
       for (b = 0; b < zeigbar; b++) {
         inhalt += '<i style="background:' + jtFarbe(treffer[b]) + '">'
                 + esc(jtKuerzel(treffer[b])) + '</i>';
@@ -7574,7 +7619,6 @@ function jahrHtml(is) {
         inhalt += '<i class="jmehr">+' + (treffer.length - zeigbar) + '</i>';
       }
       inhalt += '</span></span>';
-      if (feiertagAn(iso)) { inhalt += '<span class="jpunkt"></span>'; }
       h += '<td class="' + kl.join(' ') + '" onclick="jtTagOeffnen(\'' + iso + '\')">'
          + inhalt + '</td>';
     }

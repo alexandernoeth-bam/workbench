@@ -541,6 +541,17 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__feiKurzApi = {'
+                 + ' pruefe: function(){'
+                 + '   var l = feiertageVon(2026);'
+                 + '   var alle = true;'
+                 + '   var k;'
+                 + '   for (k in l) { if (!FEIERTAG_KURZ[l[k]]) { alle = false; } }'
+                 + '   return { einheit: feiertagKurz(\'Tag der Deutschen Einheit\'),'
+                 + '            neujahr: feiertagKurz(\'Neujahr\'),'
+                 + '            fremd: feiertagKurz(\'Irgendeiner langer Tag\'),'
+                 + '            alleBekannt: alle };'
+                 + ' } };'
                  + 'globalThis.__laufApi = {'
                  + ' pruefeLauf: function(){'
                  + '   var h = isoDatum();'
@@ -839,9 +850,12 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     \'Alex\', \'privat\');'
                  + '   var belegte = function(){'
                  + '     var h = jahrHtml(\'2026-09-01\');'
+                 + '     /* Nur Termine zählen — Feiertage stehen seit v0.97.0'
+                 + '        ebenfalls in der Zelle. */'
                  + '     var m = h.match(/jtTagOeffnen\\(\'[^\']+\'\\)"[^>]*>'
                  + '<span class="jzelle"><span class="jwt">[^<]*<\\/span>'
-                 + '<span class="jbalken"><i /g);'
+                 + '<span class="jbalken">(<i class="jfei"[^>]*>[^<]*<\\/i>)?'
+                 + '<i style=/g);'
                  + '     return m ? m.length : 0; };'
                  + '   var r = { mit: belegte() };'
                  + '   ohneArtUm();'
@@ -7213,8 +7227,22 @@ console.log('\n83. Arten im Jahresraster');
   pruefe(juk && /kalenderJahrestermine\(tag, true\)/.test(juk[0]),
          'die Summenliste rechnet wie das Raster darüber — sonst fehlt dort '
          + 'eine freigegebene Art ganz');
-  pruefe(jh2 && /Math\.min\(treffer\.length, 4\)/.test(jh2[0]),
-         'vier Zeichen passen in eine Zelle');
+  pruefe(jh2 && /var plaetze = 4/.test(jh2[0])
+         && /Math\.min\(treffer\.length, plaetze\)/.test(jh2[0]),
+         'vier Plätze je Zelle');
+  pruefe(jh2 && /plaetze = 3/.test(jh2[0]),
+         'ein Feiertag nimmt einen davon ein');
+  pruefe(jh2 && /class="jfei" title="' \+ esc\(feiName\)/.test(jh2[0]),
+         'er steht als Text in der Zelle, der volle Name im Hinweis');
+  pruefe(jh2 && !/jpunkt/.test(jh2[0]), 'der Punkt von früher entfällt');
+  if (globalThis.__feiKurzApi) {
+    const f = globalThis.__feiKurzApi.pruefe();
+    pruefe(f.einheit === 'Dt. Einheit', 'der Tag der Deutschen Einheit heißt kurz');
+    pruefe(f.neujahr === 'Neujahr', 'ein kurzer Name bleibt, wie er ist');
+    pruefe(f.fremd === 'Irgendeine.', 'ein unbekannter langer wird gekürzt');
+    pruefe(f.alleBekannt === true,
+           'jeder berechnete Feiertag hat eine Kurzform');
+  }
   pruefe(jh2 && /jmehr/.test(jh2[0]),
          'was darüber hinausgeht, wird als Zahl angedeutet — sonst verschwindet '
          + 'ein Termin lautlos');
