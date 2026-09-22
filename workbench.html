@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 0.98.1</title>
+<title>Workbench 0.98.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -840,6 +840,13 @@ body.breit .vhblatt.pinwand{grid-template-columns:repeat(auto-fill,minmax(190px,
 .tk-zahnrad svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;
   stroke-linecap:round;vertical-align:middle}
 
+.jk-karte{border-bottom:1px solid var(--linie);padding:10px 0 12px}
+.jk-titel{font-size:calc(var(--fs)*0.95);font-weight:500}
+.jk-arten{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:6px}
+.jk-woher{font-size:calc(var(--fs)*0.68);color:var(--grau);margin-left:4px}
+.jk-text{font-size:calc(var(--fs)*0.8);color:var(--grau);margin-top:7px;line-height:1.45;
+  white-space:normal;word-break:break-word}
+
 .fl-tab-rahmen{overflow-x:auto;margin:9px 0}
 .fl-tab{border-collapse:collapse;font-size:calc(var(--fs)*0.84);min-width:100%}
 .fl-tab th,.fl-tab td{border:1px solid var(--linie);padding:5px 9px;
@@ -1421,7 +1428,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '0.98.1';
+var APP_VERSION = '0.98.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -6662,6 +6669,9 @@ function kalenderJahrestermine(is, mitZeit) {
       kontext: g[i].kontext || 'privat',
       von: is, bis: is,
       nurZeit: !g[i].ganztags,
+      zeit: g[i].zeit || '',
+      zeitBis: g[i].bis || '',
+      beschreibung: g[i].beschreibung || '',
       jaehrlich: false,
       kuerzel: '',
       ausKalender: true,
@@ -6867,8 +6877,8 @@ function kalenderWegSetzen(wert) {
 /* Vom Tagesplan aus: der gerade gezeigte Tag, nicht heute. Der Weg
    folgt derselben Wahl wie im Kalender. Die mobile Seite von Google
    kennt allerdings keinen Tag — dort geht es immer auf heute. */
-function googleTagOeffnen() {
-  var tag = tagOffen || isoDatum();
+function googleTagOeffnen(welcher) {
+  var tag = welcher || tagOffen || isoDatum();
   var handy = istHandy();
   var weg = kalenderWeg();
   if (istAndroid() && weg === 'app') {
@@ -8101,6 +8111,74 @@ function jtArtenHtml(kennung, aktuell) {
   return h;
 }
 
+/* Ein Termin aus Google: Titel und Datum gehören dorthin, die App
+   zeigt sie nur. Bearbeitbar ist hier allein, was die App selbst
+   verwaltet — die eigene Zuordnung einer Art. */
+function jtKalenderHtml(e) {
+  var eigen = zuordnungArt(e.id);
+  var arten = Array.isArray(e.arten) ? e.arten : (e.art ? [e.art] : []);
+  var h = '<div class="jk-karte">';
+  h += '<div class="jk-titel">' + esc(e.titel) + '</div>';
+  var meta = [];
+  meta.push(e.nurZeit ? (esc(e.zeit) + (e.zeitBis ? ('–' + esc(e.zeitBis)) : '')) : 'ganztägig');
+  if (e.quelle) { meta.push(esc(e.quelle)); }
+  meta.push(jtKontext(e) === 'beruflich' ? 'beruflich' : 'privat');
+  h += '<div class="as-meta">' + meta.join(' · ') + '</div>';
+
+  if (arten.length) {
+    h += '<div class="jk-arten">';
+    var i;
+    for (i = 0; i < arten.length; i++) {
+      h += '<span class="t-art' + (i === 0 ? ' haupt' : '') + '" style="border-color:'
+         + artFarbe(arten[i]) + ';color:' + artFarbe(arten[i]) + ';margin-left:0">'
+         + esc(artName(arten[i])) + '</span>';
+    }
+    h += '<span class="jk-woher">' + (eigen ? 'in der App zugeordnet' : 'aus dem Termin')
+       + '</span></div>';
+  }
+
+  if (e.beschreibung) {
+    var b = String(e.beschreibung).replace(/<[^>]*>/g, ' ').trim();
+    if (b.length > 400) { b = b.slice(0, 400) + ' …'; }
+    h += '<div class="jk-text">' + esc(b).replace(/\n/g, '<br>') + '</div>';
+  }
+
+  h += '<div class="s-abschnitt" style="margin-top:10px">Art in der App zuordnen</div>';
+  var alle = artenAlle();
+  h += '<div class="d-wert" style="justify-content:flex-start;margin-top:4px">';
+  var k;
+  for (k = 0; k < alle.length; k++) {
+    h += '<button class="d-wahl' + (eigen === alle[k] ? ' an' : '') + '" type="button" '
+       + 'onclick="jtKalArtSetzen(\'' + esc(e.id) + '\',\'' + esc(alle[k]) + '\')">'
+       + '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;'
+       + 'background:' + artFarbe(alle[k]) + ';margin-right:6px"></span>'
+       + esc(artName(alle[k])) + '</button>';
+  }
+  h += '</div>';
+  h += '<div class="d-reihe">';
+  if (eigen) {
+    h += '<button type="button" onclick="jtKalArtSetzen(\'' + esc(e.id) + '\',\'\')">'
+       + 'Zuordnung aufheben</button>';
+  }
+  h += '<button type="button" onclick="googleTagOeffnen(\'' + esc(e.von) + '\')">'
+     + 'In Google öffnen</button>';
+  h += '</div>';
+  h += '<div class="d-hinweis" style="text-align:left">Titel, Datum und Kürzel im Text '
+     + 'änderst du in Google. Eine Zuordnung hier gilt statt der Kürzel.</div>';
+  h += '</div>';
+  return h;
+}
+
+/* Wie beim Umschalten: Dieselbe Art noch einmal hebt die Zuordnung auf. */
+function jtKalArtSetzen(id, art) {
+  var jetzt2 = zuordnungArt(id);
+  zuordnungSetzen(id, (art && art !== jetzt2) ? art : '');
+  spaeterSichern();
+  jtTagOeffnen(jtTag);
+  kalZeichnen();
+  tagZeichnen();
+}
+
 function jtTagHtml(is) {
   var d = ausIso(is);
   var h = blattKopf();
@@ -8115,10 +8193,16 @@ function jtTagHtml(is) {
   if (zusatz.length) { h += '<div class="as-meta">' + esc(zusatz.join(' · ')) + '</div>'; }
   h += '<div class="as-linie"></div>';
 
-  var treffer = jtAn(is);
+  /* Dieselbe Frage wie das Raster: auch freigegebene Termine mit
+     Uhrzeit. Sonst klickt man auf ein Kürzel und findet ihn nicht. */
+  var treffer = jtAn(is, true);
   var i;
   for (i = 0; i < treffer.length; i++) {
     var e = treffer[i];
+    if (e.ausKalender) {
+      h += jtKalenderHtml(e);
+      continue;
+    }
     var spanne = (e.von === (e.bis || e.von)) ? kurzDatum(e.von)
                                               : (kurzDatum(e.von) + ' – ' + kurzDatum(e.bis));
     h += '<div class="d-feld" style="display:block">';

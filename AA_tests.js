@@ -541,6 +541,35 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__jtBlattApi = {'
+                 + ' pruefeBlatt: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   eintraegeEinsortieren([{ id:\'t1\', summary:\'Laufen\','
+                 + '     description:\'Intervalle #Training #Treffen\','
+                 + '     start:{ dateTime: h + \'T18:00:00+02:00\' },'
+                 + '     end:{ dateTime: h + \'T19:00:00+02:00\' } }], \'Alex\','
+                 + '     \'privat\');'
+                 + '   DB.jahrestermine = [{ id:\'j1\', titel:\'Eigener\','
+                 + '     art:\'urlaub\', von: h, bis: h, jaehrlich:false }];'
+                 + '   artImJahrUm(\'training\');'
+                 + '   var b = jtTagHtml(h);'
+                 + '   var r = { mitUhrzeitDa: (b.indexOf(\'jk-titel">Laufen\') >= 0),'
+                 + '             zeitZuSehen: /\\d\\d:\\d\\d–\\d\\d:\\d\\d/.test(b),'
+                 + '             beideArten: (b.indexOf(\'>Training<\') >= 0'
+                 + '               && b.indexOf(\'>Treffen<\') >= 0),'
+                 + '             beschreibung: (b.indexOf(\'Intervalle\') >= 0),'
+                 + '             eigenerBleibt: (b.indexOf(\'jtTitelSetzen(\\\'j1\') >= 0) };'
+                 + '   jtTag = h;'
+                 + '   jtKalArtSetzen(\'t1\', \'urlaub\');'
+                 + '   r.zugeordnet = zuordnungArt(\'t1\');'
+                 + '   jtKalArtSetzen(\'t1\', \'urlaub\');'
+                 + '   r.aufgehoben = zuordnungArt(\'t1\');'
+                 + '   termineNachTag = {}; kalenderListe = []; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__abrufApi = {'
                  + ' pruefeEinhaengen: function(){'
                  + '   var m1 = termineNachTag; var m2 = archivNachTag;'
@@ -6150,8 +6179,8 @@ console.log('\n68. Abhakblatt');
   pruefe(/onclick="googleTagOeffnen\(\)"/.test(QUELLE),
          'die Tagesseite hat einen Google-Knopf');
   const gt = skript.match(/function googleTagOeffnen\([\s\S]*?\n\}/);
-  pruefe(gt && /var tag = tagOffen \|\| isoDatum\(\)/.test(gt[0]),
-         'er öffnet den gezeigten Tag, nicht heute');
+  pruefe(gt && /var tag = welcher \|\| tagOffen \|\| isoDatum\(\)/.test(gt[0]),
+         'er öffnet den gezeigten Tag, nicht heute — oder den, den man ihm gibt');
   pruefe(gt && /kalenderWeg\(\)/.test(gt[0]),
          'und folgt derselben Wahl wie der Knopf im Kalender');
   pruefe(gt && /\/r\/day\//.test(gt[0]), 'bei Google in der Tagesansicht');
@@ -8131,6 +8160,49 @@ console.log('\n97. Abruf der Termine');
     pruefe(e.beide === 2,
            'ein nachgeladener Termin bleibt neben einem frischen desselben Tages');
     pruefe(e.keinDoppel === 2, 'derselbe Termin erscheint dabei nicht doppelt');
+  }
+}
+
+/* ============================================================
+   98. Das Tagesblatt der Jahressicht
+   Grund: Ein Klick auf ein Kuerzel im Raster oeffnete ein Blatt, in
+   dem der Termin fehlte — das Blatt fragte ohne die Termine mit
+   Uhrzeit. Und fuer Termine aus Google zeigte es Bearbeitungsfelder,
+   die nichts taten, weil sie nur die eigene Datei kennen.
+   ============================================================ */
+console.log('\n98. Tagesblatt im Jahr');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__jtBlattApi;
+
+  const th = skript.match(/function jtTagHtml\([\s\S]*?\n\}\n/);
+  pruefe(th && /jtAn\(is, true\)/.test(th[0]),
+         'das Blatt fragt wie das Raster, mit den Terminen mit Uhrzeit');
+  pruefe(th && /if \(e\.ausKalender\) \{\s*h \+= jtKalenderHtml\(e\)/.test(th[0]),
+         'ein Google-Termin bekommt eine eigene Ansicht');
+  ['jtKalenderHtml', 'jtKalArtSetzen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const kh = skript.match(/function jtKalenderHtml\([\s\S]*?\n\}\n/);
+  pruefe(kh && !/jtLoeschen|jtTitelSetzen|jtJaehrlichUm/.test(kh[0]),
+         'dort stehen keine Knöpfe, die bei Google-Terminen nichts täten');
+  pruefe(kh && /googleTagOeffnen\(/.test(kh[0]),
+         'dafür einer, der den Tag in Google öffnet');
+
+  if (!t) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = t.pruefeBlatt();
+    pruefe(e.mitUhrzeitDa === true,
+           'ein freigegebener Termin mit Uhrzeit steht im Blatt');
+    pruefe(e.zeitZuSehen === true, 'mit seiner Uhrzeit');
+    pruefe(e.beideArten === true, 'mit allen seinen Arten');
+    pruefe(e.beschreibung === true, 'und seiner Beschreibung');
+    pruefe(e.zugeordnet === 'urlaub', 'eine Art lässt sich in der App zuordnen');
+    pruefe(e.aufgehoben === '', 'dieselbe noch einmal hebt die Zuordnung auf');
+    pruefe(e.eigenerBleibt === true,
+           'ein eigener Jahrestermin bleibt bearbeitbar wie bisher');
   }
 }
 
