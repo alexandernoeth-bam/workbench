@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.7.1</title>
+<title>Workbench 1.7.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -923,8 +923,14 @@ body.breit .z-schieben{display:none}
 .fl-tab th,.fl-tab td{border:1px solid var(--linie);padding:5px 9px;
   text-align:left;vertical-align:top;line-height:1.4}
 .fl-tab td br,.fl-ansicht br{line-height:1.5}
-.fl-tab td .fl-kasten{vertical-align:middle;margin-right:5px}
-.fl-zellentext{vertical-align:middle}
+/* In der Zelle stehen Kästchen und Text nebeneinander in der Mitte. Die
+   Breite muss hier stehen: .tkasten bekommt sie sonst als Flex-Anteil
+   vom Vater, den es in einer Tabellenzelle nicht gibt — daraus wurde
+   ein flacher Strich. */
+.fl-tab td .tkasten{display:inline-block;width:17px;height:17px;margin:0 6px 0 0;
+  vertical-align:-3px}
+.fl-tab td .fl-text{display:inline;vertical-align:baseline}
+.fl-tab td .fl-text.fertig{color:var(--grau);text-decoration:line-through}
 .fl-tab th{background:var(--karte);font-weight:500}
 .fl-tab tbody tr:nth-child(even) td{background:var(--karte)}
 
@@ -1697,7 +1703,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.7.1';
+var APP_VERSION = '1.7.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -11853,10 +11859,13 @@ function zellenKastenHtml(text, zeileNr, spalte, hervor) {
   var m = String(text).match(/^\[([ xX]?)\]\s*(.*)$/);
   if (!m) { return hervor(text); }
   var an = (m[1] === 'x' || m[1] === 'X');
-  return '<button class="fl-kasten' + (an ? ' an' : '') + '" type="button" '
+  /* Dieselbe Klasse wie die Kästchen in normalen Zeilen: „fl-kasten"
+     war ein ausgedachter Name ohne Gestaltung — daraus wurde ein
+     flacher, kaum treffbarer Knopf. */
+  return '<button class="tkasten' + (an ? ' an' : '') + '" type="button" '
        + 'onclick="zellenKastenUm(' + zeileNr + ',' + spalte + ')" '
        + 'aria-label="Abhaken"></button>'
-       + '<span class="fl-zellentext">' + hervor(m[2]) + '</span>';
+       + '<span class="fl-text' + (an ? ' fertig' : '') + '">' + hervor(m[2]) + '</span>';
 }
 
 function zellenKastenUm(zeileNr, spalte) {

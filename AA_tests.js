@@ -9231,6 +9231,12 @@ console.log('\n108. Reihenfolge und Kästchen in Zellen');
          'gezogen wird nur innerhalb der Gruppe');
   pruefe(/body\.breit \.z-schieben\{display:none\}/.test(QUELLE),
          'die Schiebeknöpfe stehen nur am Handy — am Rechner wird gezogen');
+  pruefe(/\.fl-tab td \.tkasten\{display:inline-block;width:17px;height:17px/.test(QUELLE),
+         'das Kästchen in der Zelle hat eigene Maße — als Flex-Anteil bliebe davon ein '
+         + 'flacher Strich');
+  const zh = skript.match(/function zellenKastenHtml\([\s\S]*?\n\}/);
+  pruefe(zh && /class="tkasten/.test(zh[0]),
+         'es benutzt dieselbe Klasse wie die Kästchen in normalen Zeilen');
   const zk = skript.match(/function zellenKastenUm\([\s\S]*?\n\}/);
   pruefe(zk && /flaecheSetzen\(flaecheFuer/.test(zk[0]),
          'das Kästchen einer Zelle ändert den Text, nichts sonst');
