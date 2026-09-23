@@ -9423,6 +9423,33 @@ console.log('\n110. Zusatz- und Ausfalltage');
 }
 
 /* ============================================================
+   111. In Google geloeschte Termine bleiben geloescht
+   Grund: Seit v0.98.1 ergaenzte der nachgeladene Jahresbestand je
+   Termin, was im frischen Abruf fehlte. Ein in Google geloeschter
+   Termin kam so immer wieder zurueck, auch nach Neueinlesen.
+   ============================================================ */
+console.log('\n111. Gelöschte Termine');
+{
+  const skript = hauptSkript();
+
+  pruefe(new RegExp('function\\s+imFrischenFenster\\s*\\(').test(skript),
+         'Funktion imFrischenFenster ist definiert');
+  const ein = skript.match(/function archivEinhaengen\([\s\S]*?\n\}/);
+  pruefe(ein && /if \(imFrischenFenster\(tag\)\) \{ continue; \}/.test(ein[0]),
+         'im frisch geholten Fenster zählt allein der frische Abruf');
+  pruefe(ein && /!da\[archivNachTag\[tag\]\[k\]\.id\]/.test(ein[0]),
+         'außerhalb wird weiterhin je Termin ergänzt');
+  const jh = skript.match(/function archivJahrHolen\([\s\S]*?\n\}\n/);
+  pruefe(jh && /if \(String\(tag\)\.slice\(0, 4\) === String\(j\)\) \{ delete archivNachTag\[tag\]/
+         .test(jh[0]),
+         'ein neu geholtes Jahr räumt seinen alten Stand vorher weg — sonst bliebe ein '
+         + 'geleerter Tag für immer stehen');
+  pruefe(jh && /if \(imFrischenFenster\(tag\)\) \{ termineNachTag\[tag\] = jahrNeu\[tag\]\.slice\(\)/
+         .test(jh[0]),
+         'im Fenster ersetzt das frisch geholte Jahr den Tag');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');

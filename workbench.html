@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.9.0</title>
+<title>Workbench 1.9.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1710,7 +1710,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.9.0';
+var APP_VERSION = '1.9.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -7138,14 +7138,22 @@ var archivJahre = [];
 var archivLaeuft = false;
 var archivFehler = '';
 
+/* Nachgeladene Jahre füllen nur die Tage außerhalb des frisch geholten
+   Fensters. Innerhalb zählt allein der frische Abruf — sonst holte der
+   alte Jahresbestand einen in Google gelöschten Termin immer wieder
+   zurück, und kein Neueinlesen könnte ihn entfernen. */
+function imFrischenFenster(tag) {
+  return !!kalVon && tag >= kalVon && tag <= kalBis;
+}
+
 function archivEinhaengen() {
   var tag;
   for (tag in archivNachTag) {
     if (!Object.prototype.hasOwnProperty.call(archivNachTag, tag)) { continue; }
-    /* Frisches hat Vorrang — aber nur je Termin, nicht je Tag. Sonst
-       verdrängte ein einziger frischer Termin alle nachgeladenen
-       desselben Tages. */
+    if (imFrischenFenster(tag)) { continue; }
     if (!termineNachTag[tag]) { termineNachTag[tag] = archivNachTag[tag].slice(); continue; }
+    /* Außerhalb des Fensters kann trotzdem Frisches liegen, etwa aus
+       einem zweiten nachgeladenen Jahr: je Termin ergänzen. */
     var da = {};
     var k;
     for (k = 0; k < termineNachTag[tag].length; k++) { da[termineNachTag[tag][k].id] = true; }
@@ -7201,10 +7209,20 @@ function archivJahrHolen(jahr, still) {
     }
     var tag;
     var zahl = 0;
+    /* Erst den alten Stand dieses Jahres wegräumen: Ein Tag, an dem
+       alle Termine gelöscht wurden, steht in der Antwort gar nicht mehr
+       und bliebe sonst für immer stehen. */
+    for (tag in archivNachTag) {
+      if (!Object.prototype.hasOwnProperty.call(archivNachTag, tag)) { continue; }
+      if (String(tag).slice(0, 4) === String(j)) { delete archivNachTag[tag]; }
+    }
     for (tag in jahrNeu) {
       if (!Object.prototype.hasOwnProperty.call(jahrNeu, tag)) { continue; }
       archivNachTag[tag] = jahrNeu[tag];
       zahl += jahrNeu[tag].length;
+      /* Ein frisch geholtes Jahr ist im Fenster genauso gültig wie der
+         Abruf selbst — dort wird der Tag ersetzt, nicht ergänzt. */
+      if (imFrischenFenster(tag)) { termineNachTag[tag] = jahrNeu[tag].slice(); }
     }
     archivEinhaengen();
     if (archivJahre.indexOf(j) < 0) { archivJahre.push(j); archivJahre.sort(); }
