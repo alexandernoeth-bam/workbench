@@ -543,6 +543,43 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__zusatzApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var mo = montagVon(isoDatum());'
+                 + '   var tag = function(n){ return tagePlus(mo, n); };'
+                 + '   DB.aufgaben = [{ id:\'w1\', titel:\'Zähler\', kontext:\'privat\','
+                 + '     status:\'offen\', art:\'haupt\','
+                 + '     wiederholung:{ takt:\'woche\', tage:[1,5] } },'
+                 + '     { id:\'w2\', titel:\'Täglich\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[0,1,2,3,4,5,6] } }];'
+                 + '   var kurz = [\'Mo\',\'Di\',\'Mi\',\'Do\',\'Fr\',\'Sa\',\'So\'];'
+                 + '   var woche = function(){'
+                 + '     var aus = [];'
+                 + '     var n;'
+                 + '     for (n = 0; n < 7; n++) {'
+                 + '       if (aufgabeFaelligAn(DB.aufgaben[0], tag(n))) { aus.push(kurz[n]); } }'
+                 + '     return aus.join(\',\'); };'
+                 + '   var r = { regel: woche() };'
+                 + '   zusatzTagUm(\'w1\', tag(3));'
+                 + '   r.mitZusatz = woche();'
+                 + '   zusatzTagUm(\'w1\', tag(4));'
+                 + '   r.mitAusfall = woche();'
+                 + '   zusatzTagUm(\'w1\', tag(4));'
+                 + '   r.zurueck = woche();'
+                 + '   tagOffen = tag(3);'
+                 + '   aufgabeHaken(\'w1\');'
+                 + '   r.erledigtAmZusatz = istErledigtAn(DB.aufgaben[0], tag(3));'
+                 + '   r.regelUnberuehrt = DB.aufgaben[0].wiederholung.tage.join(\',\');'
+                 + '   DB.aufgaben[0].zusatzTage.push(tagePlus(isoDatum(), -30));'
+                 + '   ausnahmenAufraeumen();'
+                 + '   r.altWeg = DB.aufgaben[0].zusatzTage.length;'
+                 + '   r.wahlListe = wiederNichtFaellig(tag(2)).filter(function(a){'
+                 + '     return a.id === \'w1\'; }).length;'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__tabFilterApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -6909,8 +6946,10 @@ console.log('\n71. Keine Dublette im Tag');
   const steht = skript.match(/function aufgabeStehtImTag\([\s\S]*?\n\}/);
   pruefe(steht && /a\.planung === tag/.test(steht[0]),
          'entschieden wird an der Tagesplanung der Aufgabe');
-  pruefe(steht && /faelligAn\(a\.wiederholung, tag\)/.test(steht[0]),
-         'bei einer wiederkehrenden entscheidet ihre Regel');
+  /* Seit v1.9.0 über aufgabeFaelligAn — die Regel plus einzelne
+     Zusatz- und Ausfalltage. */
+  pruefe(steht && /aufgabeFaelligAn\(a, tag\)/.test(steht[0]),
+         'bei einer wiederkehrenden entscheidet ihre Regel samt Ausnahmen');
   pruefe(steht && /status === 'erledigt'/.test(steht[0]),
          'eine erledigte steht nicht mehr im Tag — dann darf der Schritt wieder');
 
@@ -9331,6 +9370,55 @@ console.log('\n109. Filter in Tabellen');
     pruefe(e.leereWeg === true, 'eine Tabelle ohne Treffer verschwindet ganz');
     pruefe(e.zeileWeiterhin === 1,
            'Kästchen in normalen Zeilen wirken wie bisher');
+  }
+}
+
+/* ============================================================
+   110. Einzelne Tage zusaetzlich oder ausfallen lassen
+   Grund: Eine wiederkehrende Aufgabe (Mo und Fr) sollte einmalig auch
+   an einem Donnerstag erscheinen. Bisher blieb nur eine zweite Aufgabe
+   mit demselben Titel — die Erledigung zaehlte dann nicht zur Serie.
+   ============================================================ */
+console.log('\n110. Zusatz- und Ausfalltage');
+{
+  const skript = hauptSkript();
+  const z = globalThis.__zusatzApi;
+
+  ['aufgabeFaelligAn', 'regulaerFaellig', 'zusatzTagUm', 'ausnahmenAufraeumen',
+   'wiederNichtFaellig', 'zusatzWahlOeffnen', 'zusatzWaehlen', 'dAusnahmeSetzen']
+    .forEach(function (f) {
+      pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+             'Funktion ' + f + ' ist definiert');
+    });
+  const fa = skript.match(/function aufgabeFaelligAn\([\s\S]*?\n\}/);
+  pruefe(fa && fa[0].indexOf('zusatzTage') < fa[0].indexOf('ausfallTage'),
+         'ein Zusatztag holt sie dazu, ein Ausfalltag nimmt sie heraus');
+  const te = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
+  pruefe(te && /aufgabeFaelligAn\(a, is\)/.test(te[0]),
+         'der Tagesplan fragt über die Ausnahmen mit');
+  const ar = skript.match(/function ausnahmenAufraeumen\([\s\S]*?\n\}/);
+  pruefe(ar && /tagePlus\(isoDatum\(\), -7\)/.test(ar[0]),
+         'vergangene Ausnahmen verschwinden nach einer Woche');
+  const rp = skript.match(/function rueckkehrPruefen\([\s\S]*?\n\}/);
+  pruefe(rp && /ausnahmenAufraeumen\(\)/.test(rp[0]), 'und zwar beim Zurückkommen');
+  const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tz && /zusatzWahlOeffnen\(/.test(tz[0]),
+         'im Tagesplan gibt es den kurzen Weg');
+
+  if (!z) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = z.pruefe();
+    pruefe(e.regel === 'Mo,Fr', 'die Regel gilt unverändert');
+    pruefe(e.mitZusatz === 'Mo,Do,Fr', 'ein einzelner Tag kommt dazu');
+    pruefe(e.mitAusfall === 'Mo,Do', 'ein regulärer Tag fällt aus');
+    pruefe(e.zurueck === 'Mo,Do,Fr', 'noch einmal gewählt, ist es zurückgenommen');
+    pruefe(e.erledigtAmZusatz === true,
+           'am Zusatztag abgehakt zählt zur Erledigungsgeschichte derselben Aufgabe');
+    pruefe(e.regelUnberuehrt === '1,5', 'die Wochentage der Regel bleiben unberührt');
+    pruefe(e.altWeg === 1, 'alte Ausnahmen werden aufgeräumt, junge bleiben');
+    pruefe(e.wahlListe === 1,
+           'zur Wahl stehen nur Aufgaben, die an dem Tag nicht ohnehin dran sind');
   }
 }
 

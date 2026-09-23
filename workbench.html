@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.8.0</title>
+<title>Workbench 1.9.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1148,6 +1148,13 @@ body.breit .plusknopf{bottom:calc(84px + env(safe-area-inset-bottom))}
 .d-wahl{font:inherit;font-size:calc(var(--fs)*0.74);padding:4px 11px;border-radius:20px;
   border:1px solid var(--linie);background:var(--karte);color:var(--grau);cursor:pointer}
 .d-wahl.an{border-color:var(--tinte);color:var(--tinte);font-weight:500}
+.t-zusatz{font:inherit;font-size:calc(var(--fs)*0.74);color:var(--grau);background:none;
+  border:0;border-top:1px solid var(--linie);width:100%;text-align:left;padding:8px 0 2px;
+  cursor:pointer}
+.d-ausnahme{font:inherit;font-size:calc(var(--fs)*0.72);padding:3px 9px;border-radius:20px;
+  border:1px solid var(--linie);background:var(--karte);cursor:pointer;margin:0 4px 4px 0}
+.d-ausnahme.zusatz{border-color:var(--petrol);color:var(--petrol)}
+.d-ausnahme.ausfall{border-color:var(--weinrot);color:var(--weinrot)}
 .d-tag{font:inherit;font-size:calc(var(--fs)*0.74);padding:4px 0;width:32px;text-align:center;
   border-radius:5px;border:1px solid var(--linie);background:var(--karte);
   color:var(--grau);cursor:pointer}
@@ -1703,7 +1710,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.8.0';
+var APP_VERSION = '1.9.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2823,6 +2830,7 @@ function taktStarten() {
 function rueckkehrPruefen() {
   erneuerungPruefen();
   wochenUmstellen();
+  ausnahmenAufraeumen();
   if (document.hidden) { return; }
   if (!tokenGueltig()) { return; }
   if (Date.now() - abgleichZuletztMs < ABGLEICH_MINDEST) { return; }
@@ -3685,7 +3693,7 @@ function tagesEintraege(is) {
         else { wiederFertig.push(a); }
         continue;
       }
-      if (!faelligAn(a.wiederholung, is)) { continue; }
+      if (!aufgabeFaelligAn(a, is)) { continue; }
       else if (a.uhrzeit) { verlauf.push({ art: 'aufgabe', zeit: a.uhrzeit, a: a }); }
       else { wieder.push(a); }
       continue;
@@ -3972,9 +3980,105 @@ function verlaufHtml(eintrag, is) {
    Schritt nicht noch einmal hierher — es ist dieselbe Sache, und sie
    stünde zweimal da. Der Aufgabenblock gewinnt: Dort steht auch der
    Planungsknopf. */
+/* Ein Zusatztag holt die Aufgabe an einen Tag, an dem die Regel sie
+   nicht vorsieht; ein Ausfalltag nimmt sie an einem regulären Tag
+   heraus. Beides steht als Datum an der Aufgabe selbst — so bleibt es
+   eine Aufgabe mit einer Erledigungsgeschichte. */
+function aufgabeFaelligAn(a, is) {
+  if (!a || !a.wiederholung) { return false; }
+  if ((a.zusatzTage || []).indexOf(is) >= 0) { return true; }
+  if ((a.ausfallTage || []).indexOf(is) >= 0) { return false; }
+  return faelligAn(a.wiederholung, is);
+}
+
+/* Der reguläre Tag ohne Ausnahmen — für die Frage, was ein Klick
+   bedeutet: zusätzlich oder ausfallen lassen. */
+function regulaerFaellig(a, is) {
+  return !!(a && a.wiederholung && faelligAn(a.wiederholung, is));
+}
+
+/* Welche wiederkehrenden Aufgaben sind an diesem Tag nicht dran? Nur
+   die lassen sich zusätzlich holen. */
+function wiederNichtFaellig(is) {
+  var aus = [];
+  var l = DB.aufgaben || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (!l[i].wiederholung) { continue; }
+    if (!passtZumTag(l[i].kontext)) { continue; }
+    if (aufgabeFaelligAn(l[i], is)) { continue; }
+    aus.push(l[i]);
+  }
+  return aus;
+}
+
+function zusatzWahlOeffnen(is) {
+  var liste = wiederNichtFaellig(is);
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  var h = blattKopf();
+  h += '<div class="as-titel">Zusätzlich an diesem Tag</div>';
+  h += '<div class="as-meta">' + esc(kurzDatum(is))
+     + ' · einmalig, die Regel bleibt unberührt</div>';
+  h += '<div class="as-linie"></div>';
+  if (!liste.length) {
+    h += '<div class="tleer" style="padding-left:0">Alle wiederkehrenden Aufgaben stehen '
+       + 'schon an diesem Tag.</div>';
+  }
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    h += '<div class="tg-zeile" onclick="zusatzWaehlen(\'' + esc(liste[i].id) + '\',\''
+       + is + '\')"><span class="tg-text">'
+       + '<span class="tg-titel">' + esc(liste[i].titel) + '</span>'
+       + '<span class="tg-meta">' + esc(regelText(liste[i].wiederholung)) + '</span>'
+       + '</span></div>';
+  }
+  h += '<div class="d-reihe"><button type="button" onclick="aktionenSchliessen()">'
+     + 'Abbrechen</button></div>';
+  sheet.innerHTML = h;
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function zusatzWaehlen(id, is) {
+  zusatzTagUm(id, is);
+  aktionenSchliessen();
+  tagZeichnen();
+}
+
+function zusatzTagUm(id, is) {
+  var a = aufgabeFinden(id);
+  if (!a || !a.wiederholung || !is) { return; }
+  if (!Array.isArray(a.zusatzTage)) { a.zusatzTage = []; }
+  if (!Array.isArray(a.ausfallTage)) { a.ausfallTage = []; }
+  var liste = regulaerFaellig(a, is) ? a.ausfallTage : a.zusatzTage;
+  var stelle = liste.indexOf(is);
+  if (stelle >= 0) { liste.splice(stelle, 1); } else { liste.push(is); liste.sort(); }
+  a.geaendert = jetzt();
+  spaeterSichern();
+}
+
+/* Vergangene Ausnahmen räumt die App nach einer Woche weg — sonst
+   wüchse die Liste Jahr für Jahr. */
+function ausnahmenAufraeumen() {
+  var grenze = tagePlus(isoDatum(), -7);
+  var l = DB.aufgaben || [];
+  var i, k;
+  for (i = 0; i < l.length; i++) {
+    for (k = 0; k < 2; k++) {
+      var name = k ? 'ausfallTage' : 'zusatzTage';
+      if (!Array.isArray(l[i][name])) { continue; }
+      var vorher = l[i][name].length;
+      l[i][name] = l[i][name].filter(function (t) { return t >= grenze; });
+      if (l[i][name].length !== vorher) { l[i].geaendert = jetzt(); }
+    }
+  }
+}
+
 function aufgabeStehtImTag(a, tag) {
   if (!a) { return false; }
-  if (a.wiederholung) { return faelligAn(a.wiederholung, tag); }
+  if (a.wiederholung) { return aufgabeFaelligAn(a, tag); }
   if (a.status === 'erledigt') { return false; }
   return a.planung === tag;
 }
@@ -4258,7 +4362,7 @@ function tagwWiederOffen() {
   var i;
   for (i = 0; i < l.length; i++) {
     if (!l[i].wiederholung) { continue; }
-    if (!faelligAn(l[i].wiederholung, gestern)) { continue; }
+    if (!aufgabeFaelligAn(l[i], gestern)) { continue; }
     if (istErledigtAn(l[i], gestern)) { continue; }
     aus.push(l[i]);
   }
@@ -5078,6 +5182,12 @@ function tagZeichnen() {
   }
   for (i = 0; i < e.wieder.length; i++) { h += zeileHtml(e.wieder[i], is, false); }
   for (i = 0; i < e.wiederFertig.length; i++) { h += zeileHtml(e.wiederFertig[i], is, false); }
+  /* Der kurze Weg: eine wiederkehrende Aufgabe für diesen einen Tag
+     dazuholen, ohne ihr Blatt zu öffnen. */
+  if (wiederNichtFaellig(is).length) {
+    h += '<button class="t-zusatz" type="button" onclick="zusatzWahlOeffnen(\'' + is
+       + '\')">+ für diesen Tag zusätzlich</button>';
+  }
   h += '</div>';
 
   var laeufe = durchlaeufeHeute(is);
@@ -5579,6 +5689,28 @@ function detailHtml(a) {
       }
     }
     h += '<div class="d-hinweis">' + esc(regelText(w)) + '</div>';
+
+    /* Einzelne Tage zusätzlich oder ausfallen lassen. */
+    h += '<div class="d-feld"><div class="d-name">Einzelner Tag</div><div class="d-wert">'
+       + '<input type="date" id="dAusnahme" onchange="dAusnahmeSetzen(this.value)">'
+       + '</div></div>';
+    var zus = a.zusatzTage || [];
+    var aus = a.ausfallTage || [];
+    if (zus.length || aus.length) {
+      h += '<div class="d-wert" style="justify-content:flex-start;flex-wrap:wrap">';
+      var x;
+      for (x = 0; x < zus.length; x++) {
+        h += '<button class="d-ausnahme zusatz" type="button" onclick="dAusnahmeSetzen(\''
+           + zus[x] + '\')">+ ' + esc(kurzDatum(zus[x])) + ' ×</button>';
+      }
+      for (x = 0; x < aus.length; x++) {
+        h += '<button class="d-ausnahme ausfall" type="button" onclick="dAusnahmeSetzen(\''
+           + aus[x] + '\')">− ' + esc(kurzDatum(aus[x])) + ' ×</button>';
+      }
+      h += '</div>';
+    }
+    h += '<div class="d-hinweis">Ein Tag, an dem sie sonst nicht dran wäre, kommt dazu; '
+       + 'ein regulärer Tag fällt aus. Nochmal wählen nimmt es zurück.</div>';
   }
 
   h += '<textarea class="d-text" placeholder="Beschreibung …" '
@@ -5703,6 +5835,14 @@ function dWdhTag(nr) {
   /* Eine Regel ohne Wochentag träfe nie zu — dann gibt es sie nicht. */
   if (a.wiederholung.takt === 'woche' && tage.length === 0) { a.wiederholung = null; }
   detailGeaendert(true);
+}
+
+function dAusnahmeSetzen(wert) {
+  if (typeof wert !== 'string' || wert.length !== 10) { return; }
+  zusatzTagUm(aktionFuer, wert);
+  detailNeuZeichnen();
+  tagZeichnen();
+  aufZeichnen();
 }
 
 function dWdhMonatstag(wert) {
@@ -10212,7 +10352,7 @@ function taetigZeileHtml(a) {
   var faellig = false;
   if (a.wiederholung) {
     meta.push('zuletzt ' + (a.zuletztErledigt ? kurzDatum(a.zuletztErledigt) : 'nie'));
-    faellig = !erledigt && faelligAn(a.wiederholung, heute);
+    faellig = !erledigt && aufgabeFaelligAn(a, heute);
     if (faellig) { meta.unshift('heute fällig'); }
   } else if (a.status === 'erledigt') {
     meta.push('erledigt ' + kurzDatum(a.erledigtAm || ''));
