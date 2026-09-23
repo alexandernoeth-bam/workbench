@@ -543,6 +543,55 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__ordnungApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.projekte = ['
+                 + '     { id:\'p1\', name:\'Garage\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[] },'
+                 + '     { id:\'p2\', name:\'Solar\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[] },'
+                 + '     { id:\'p3\', name:\'Küche\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[] } ];'
+                 + '   DB.ziele = [{ id:\'z1\', name:\'Lauf\', kontext:\'privat\','
+                 + '     status:\'laufend\', zielzustaende:[] }];'
+                 + '   pinUm(\'projekt\', \'p1\'); pinUm(\'projekt\', \'p2\');'
+                 + '   pinUm(\'projekt\', \'p3\');'
+                 + '   var namen = function(){'
+                 + '     return nachOrdnung(DB.pinnwand).map(function(p){'
+                 + '       return pinInhalt(p).titel; }).join(\',\'); };'
+                 + '   var kennung = function(ziel){'
+                 + '     return DB.pinnwand.filter(function(p){'
+                 + '       return p.zielId === ziel; })[0].id; };'
+                 + '   var r = { vorher: namen() };'
+                 + '   ordnungVerschieben(DB.pinnwand, kennung(\'p3\'), kennung(\'p1\'));'
+                 + '   r.gezogen = namen();'
+                 + '   ordnungSchieben(DB.pinnwand, kennung(\'p1\'), -1);'
+                 + '   r.geschoben = namen();'
+                 + '   ordnungSchieben(DB.pinnwand, kennung(\'p1\'), -1);'
+                 + '   r.amRand = namen();'
+                 + '   DB.projekte.push({ id:\'p4\', name:\'Neu\', kontext:\'privat\','
+                 + '     status:\'laufend\', zielzustaende:[] });'
+                 + '   pinUm(\'projekt\', \'p4\');'
+                 + '   r.neuerHinten = namen();'
+                 + '   r.fremdeGruppe = gleicheGruppe(\'p3\', \'z1\');'
+                 + '   r.eigeneGruppe = gleicheGruppe(\'p3\', \'p1\');'
+                 + '   var t = [\'| Was | Wer |\', \'|---|---|\','
+                 + '            \'| [] Angebot holen | Zapf |\','
+                 + '            \'| [x] Termin | ich |\'].join(\'\\n\');'
+                 + '   DB.gedanken = [{ id:\'g1\', titel:\'N\', text: t,'
+                 + '     geaendert: jetzt() }];'
+                 + '   flaecheFuer = \'g:g1\';'
+                 + '   zellenKastenUm(2, 0);'
+                 + '   var zeile = function(n, sp){'
+                 + '     return tabellenZellen(flaecheText(\'g:g1\').split(\'\\n\')[n])[sp]; };'
+                 + '   r.zelleAn = zeile(2, 0);'
+                 + '   r.zelleAndere = zeile(3, 0);'
+                 + '   zellenKastenUm(2, 0);'
+                 + '   r.zelleAus = zeile(2, 0);'
+                 + '   flaecheFuer = \'\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__tagwApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -7106,8 +7155,10 @@ console.log('\n74. Bereiche nach Kontext');
   const sf = skript.match(/function setAbFilter\([\s\S]*?\n\}/);
   pruefe(sf && /abKontextZu = \{\}/.test(sf[0]),
          'das Umschalten räumt eingeklappte Bereiche auf');
-  pruefe(/body\.breit #abBlatt \.vkarte\{height:100%/.test(QUELLE),
-         'die Kacheln sind gleich hoch — sonst wird die Reihe zum Zickzack');
+  pruefe(/body\.breit #abBlatt \.vkarte,body\.breit #vhBlatt \.vkarte\{height:100%/
+         .test(QUELLE),
+         'die Kacheln der Abläufe und der Vorhaben sind gleich hoch — sonst wird die '
+         + 'Reihe zum Zickzack');
   pruefe(/#abBlatt \.vh-bereich,#abBlatt \.gruppenkopf\{grid-column:1 \/ -1\}/
          .test(QUELLE),
          'die Überschriften laufen über die ganze Breite');
@@ -9150,6 +9201,57 @@ console.log('\n107. Tageswechsel');
     pruefe(e.zaehlt === 3, 'die Auswahl steht danach im Tag');
     pruefe(e.geplantHeute === true, 'und ist auf heute geplant');
     pruefe(e.nachFertig === false, 'nach dem Durchgang ruht der Streifen bis morgen');
+  }
+}
+
+/* ============================================================
+   108. Reihenfolge von Hand, gleich hohe Karten, Kaestchen in Zellen
+   Grund: Zettel und Vorhaben standen in der Reihenfolge ihrer
+   Entstehung. Am Rechner zieht man sie jetzt, am Handy schiebt man sie.
+   Sortiert wird innerhalb der gezeichneten Gruppe — sonst saehe ein Zug
+   wirkungslos aus.
+   ============================================================ */
+console.log('\n108. Reihenfolge und Kästchen in Zellen');
+{
+  const skript = hauptSkript();
+  const s = globalThis.__ordnungApi;
+
+  ['nachOrdnung', 'ordnungVergeben', 'ordnungVerschieben', 'ordnungSchieben',
+   'ziehAttribute', 'ziehStart', 'ziehUeber', 'ziehAb', 'ziehEnde', 'pinSchieben',
+   'vhSchieben', 'vorhabenGruppe', 'gleicheGruppe', 'zellenKastenHtml',
+   'zellenKastenUm'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const no = skript.match(/function nachOrdnung\([\s\S]*?\n\}/);
+  pruefe(no && /1e9/.test(no[0]),
+         'wer keine Zahl hat, steht hinten und behält seine Stelle');
+  const za = skript.match(/function ziehAb\([\s\S]*?\n\}/);
+  pruefe(za && /gleicheGruppe\(ziehVon\.id, id\)/.test(za[0]),
+         'gezogen wird nur innerhalb der Gruppe');
+  pruefe(/body\.breit \.z-schieben\{display:none\}/.test(QUELLE),
+         'die Schiebeknöpfe stehen nur am Handy — am Rechner wird gezogen');
+  const zk = skript.match(/function zellenKastenUm\([\s\S]*?\n\}/);
+  pruefe(zk && /flaecheSetzen\(flaecheFuer/.test(zk[0]),
+         'das Kästchen einer Zelle ändert den Text, nichts sonst');
+
+  if (!s) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = s.pruefe();
+    pruefe(e.vorher === 'Garage,Solar,Küche', 'die bisherige Ordnung bleibt Ausgangspunkt');
+    pruefe(e.gezogen === 'Küche,Garage,Solar', 'ein Zettel lässt sich nach vorn ziehen');
+    pruefe(e.geschoben === 'Garage,Küche,Solar', 'und einen Schritt schieben');
+    pruefe(e.amRand === 'Garage,Küche,Solar',
+           'über den Rand hinaus geschieht nichts');
+    pruefe(e.neuerHinten === 'Garage,Küche,Solar,Neu',
+           'ein neuer Zettel kommt ans Ende');
+    pruefe(e.fremdeGruppe === false,
+           'ein Projekt lässt sich nicht auf ein Ziel ziehen');
+    pruefe(e.eigeneGruppe === true, 'innerhalb der Projekte schon');
+    pruefe(e.zelleAn === '[x] Angebot holen', 'ein Kästchen in der Zelle lässt sich haken');
+    pruefe(e.zelleAus === '[] Angebot holen', 'und wieder lösen');
+    pruefe(e.zelleAndere === '[x] Termin', 'die Nachbarzelle bleibt unberührt');
   }
 }
 

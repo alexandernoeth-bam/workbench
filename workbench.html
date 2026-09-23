@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.6.1</title>
+<title>Workbench 1.7.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -713,9 +713,13 @@ body.breit .tspalte-rechts{grid-column:2}
 body.breit .vhblatt.einfachliste{display:block}
 /* Gleich hohe Kacheln: Ohne diese Regel richtet sich jede nach ihrem
    eigenen Inhalt, und die Reihe wird zum Zickzack. */
-body.breit #abBlatt{align-items:stretch}
-body.breit #abBlatt .vkarte{height:100%;display:flex;flex-direction:column}
+body.breit #abBlatt,body.breit #vhBlatt{align-items:stretch}
+body.breit #abBlatt .vkarte,body.breit #vhBlatt .vkarte{height:100%;display:flex;
+  flex-direction:column}
 body.breit #abBlatt .vkarte .vk-mehr{flex:1}
+/* Bei den flachen Karten dehnt sich der Wochensatz, damit Termin und
+   Knöpfe unten auf gleicher Höhe stehen. */
+body.breit #vhBlatt .vkarte.flach .vk-satz{flex:1}
 #abBlatt .vh-bereich,#abBlatt .gruppenkopf{grid-column:1 / -1}
 body.breit .vhblatt{display:grid;
   grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
@@ -850,6 +854,11 @@ body.breit .vhblatt.pinwand{grid-template-columns:repeat(auto-fill,minmax(190px,
   min-width:0;
   box-shadow:0 2px 6px rgba(0,0,0,.16);display:flex;flex-direction:column;
   cursor:pointer;color:#2E2C29}
+.zettel.ziehziel,.vkarte.ziehziel{outline:2px dashed var(--weinrot);outline-offset:2px}
+.z-schieben{position:absolute;left:4px;top:3px;display:flex;gap:2px}
+.z-schieben button{border:0;background:none;font:inherit;font-size:14px;line-height:1;
+  color:rgba(0,0,0,.35);cursor:pointer;padding:2px 4px}
+body.breit .z-schieben{display:none}
 .zettel:nth-child(3n){transform:rotate(-.7deg)}
 .zettel:nth-child(3n+1){transform:rotate(.5deg)}
 .z-gelb{background:#FBEFB0}.z-rosa{background:#F8D6D6}
@@ -914,6 +923,8 @@ body.breit .vhblatt.pinwand{grid-template-columns:repeat(auto-fill,minmax(190px,
 .fl-tab th,.fl-tab td{border:1px solid var(--linie);padding:5px 9px;
   text-align:left;vertical-align:top;line-height:1.4}
 .fl-tab td br,.fl-ansicht br{line-height:1.5}
+.fl-tab td .fl-kasten{vertical-align:middle;margin-right:5px}
+.fl-zellentext{vertical-align:middle}
 .fl-tab th{background:var(--karte);font-weight:500}
 .fl-tab tbody tr:nth-child(even) td{background:var(--karte)}
 
@@ -1686,7 +1697,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.6.1';
+var APP_VERSION = '1.7.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -9883,6 +9894,180 @@ function naechsterMeilenstein(p) {
    Zeichnen
    ------------------------------------------------------------ */
 
+/* ============================================================
+   Reihenfolge von Hand
+
+   Zettel der Pinnwand und Vorhaben stehen in der Reihenfolge, die man
+   ihnen gibt. Gemerkt wird eine Zahl je Eintrag; wer keine hat, steht
+   hinten und behält seine bisherige Stelle. Am Rechner zieht man mit
+   der Maus, am Handy schiebt man mit zwei Knöpfen — Ziehen am Finger
+   bringt dort mehr Ärger als Nutzen.
+   ============================================================ */
+
+var ziehVon = { art: '', id: '' };
+
+/* Stabil nach Ordnung sortieren: gleiche oder fehlende Zahlen behalten
+   die Reihenfolge, in der sie hereinkamen. */
+function nachOrdnung(liste) {
+  var mit = liste.map(function (e, i) { return { e: e, i: i }; });
+  mit.sort(function (a, b) {
+    var oa = (typeof a.e.ordnung === 'number') ? a.e.ordnung : 1e9;
+    var ob = (typeof b.e.ordnung === 'number') ? b.e.ordnung : 1e9;
+    if (oa !== ob) { return oa - ob; }
+    return a.i - b.i;
+  });
+  return mit.map(function (x) { return x.e; });
+}
+
+/* Beim ersten Verschieben bekommt jeder Eintrag der Gruppe seine Zahl —
+   vorher wäre „vor dem dritten" nicht ausdrückbar. */
+function ordnungVergeben(liste) {
+  var sortiert = nachOrdnung(liste);
+  var i;
+  for (i = 0; i < sortiert.length; i++) {
+    if (sortiert[i].ordnung !== i * 10) {
+      sortiert[i].ordnung = i * 10;
+      sortiert[i].geaendert = jetzt();
+    }
+  }
+  return sortiert;
+}
+
+/* Verschiebt „was" vor oder hinter „ziel" innerhalb der Liste. */
+function ordnungVerschieben(liste, wasId, zielId) {
+  if (!wasId || wasId === zielId) { return false; }
+  var sortiert = ordnungVergeben(liste);
+  var von = -1, nach = -1;
+  var i;
+  for (i = 0; i < sortiert.length; i++) {
+    if (sortiert[i].id === wasId) { von = i; }
+    if (sortiert[i].id === zielId) { nach = i; }
+  }
+  if (von < 0 || nach < 0) { return false; }
+  var satz = sortiert.splice(von, 1)[0];
+  sortiert.splice(nach, 0, satz);
+  for (i = 0; i < sortiert.length; i++) {
+    sortiert[i].ordnung = i * 10;
+    sortiert[i].geaendert = jetzt();
+  }
+  spaeterSichern();
+  return true;
+}
+
+/* Einen Schritt nach vorn oder hinten — der Weg am Handy. */
+function ordnungSchieben(liste, wasId, richtung) {
+  var sortiert = ordnungVergeben(liste);
+  var von = -1;
+  var i;
+  for (i = 0; i < sortiert.length; i++) {
+    if (sortiert[i].id === wasId) { von = i; }
+  }
+  var nach = von + richtung;
+  if (von < 0 || nach < 0 || nach >= sortiert.length) { return false; }
+  return ordnungVerschieben(liste, wasId, sortiert[nach].id);
+}
+
+/* ------------------------------------------------------------
+   Ziehen mit der Maus
+   ------------------------------------------------------------ */
+
+function ziehAttribute(art, id) {
+  return ' draggable="true"'
+       + ' ondragstart="ziehStart(event,\'' + art + '\',\'' + esc(id) + '\')"'
+       + ' ondragover="ziehUeber(event)"'
+       + ' ondragleave="ziehWeg(event)"'
+       + ' ondrop="ziehAb(event,\'' + art + '\',\'' + esc(id) + '\')"'
+       + ' ondragend="ziehEnde()"';
+}
+
+function ziehStart(e, art, id) {
+  ziehVon = { art: art, id: id };
+  if (e && e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move';
+    /* Firefox zieht nur, wenn etwas im Gepäck ist. */
+    try { e.dataTransfer.setData('text/plain', id); } catch (f) { /* egal */ }
+  }
+}
+
+function ziehUeber(e) {
+  if (!ziehVon.id) { return; }
+  if (e && e.preventDefault) { e.preventDefault(); }
+  if (e && e.currentTarget && e.currentTarget.classList) {
+    e.currentTarget.classList.add('ziehziel');
+  }
+}
+
+function ziehWeg(e) {
+  if (e && e.currentTarget && e.currentTarget.classList) {
+    e.currentTarget.classList.remove('ziehziel');
+  }
+}
+
+function ziehEnde() {
+  ziehVon = { art: '', id: '' };
+}
+
+function ziehAb(e, art, id) {
+  if (e && e.preventDefault) { e.preventDefault(); }
+  ziehWeg(e);
+  if (!ziehVon.id || ziehVon.art !== art) { ziehEnde(); return; }
+  if (art === 'pin') {
+    if (ordnungVerschieben(DB.pinnwand || [], ziehVon.id, id)) { pinnwandZeichnen(); }
+  } else if (art === 'vorhaben') {
+    if (gleicheGruppe(ziehVon.id, id)
+        && ordnungVerschieben(vorhabenGruppe(id), ziehVon.id, id)) {
+      vhZeichnen();
+    }
+  }
+  ziehEnde();
+}
+
+/* Sortiert wird innerhalb der Gruppe, die auch gezeichnet wird: Ziele
+   und Projekte stehen getrennt, Beruflich und Privat ebenso. Über eine
+   Gruppe hinweg zu schieben sähe wirkungslos aus — die Karte bliebe ja
+   in ihrer Gruppe. */
+function vorhabenGruppe(id) {
+  var z = DB.ziele || [];
+  var p = DB.projekte || [];
+  var i;
+  for (i = 0; i < z.length; i++) {
+    if (z[i].id === id) {
+      return z.filter(function (x) { return x.kontext === z[i].kontext; });
+    }
+  }
+  for (i = 0; i < p.length; i++) {
+    if (p[i].id === id) {
+      return p.filter(function (x) { return x.kontext === p[i].kontext; });
+    }
+  }
+  return [];
+}
+
+function gleicheGruppe(a, b) {
+  var g = vorhabenGruppe(a);
+  var i;
+  for (i = 0; i < g.length; i++) {
+    if (g[i].id === b) { return true; }
+  }
+  return false;
+}
+
+/* ------------------------------------------------------------
+   Schieben mit Knöpfen
+   ------------------------------------------------------------ */
+
+function pinSchieben(id, richtung) {
+  if (ordnungSchieben(DB.pinnwand || [], id, richtung)) { pinnwandZeichnen(); }
+}
+
+function vhSchieben(richtung) {
+  if (!vhDetail) { return; }
+  if (ordnungSchieben(vorhabenGruppe(vhDetail), vhDetail, richtung)) {
+    vhZeichnen();
+    vhDetailNeu();
+  }
+}
+
 function vhSichtbar(liste) {
   var aus = [];
   var i;
@@ -9891,13 +10076,14 @@ function vhSichtbar(liste) {
     if (vhFilter !== 'alle' && liste[i].kontext !== vhFilter) { continue; }
     aus.push(liste[i]);
   }
-  return aus;
+  return nachOrdnung(aus);
 }
 
 function zielKarteHtml(z) {
   var satz = zustandText(z);
-  var h = '<div class="vkarte flach' + (z.kontext === 'privat' ? ' privat' : '') + '" '
-        + 'onclick="vhDetailOeffnen(\'' + esc(z.id) + '\',\'ziel\')">';
+  var h = '<div class="vkarte flach' + (z.kontext === 'privat' ? ' privat' : '') + '"'
+        + ziehAttribute('vorhaben', z.id)
+        + ' onclick="vhDetailOeffnen(\'' + esc(z.id) + '\',\'ziel\')">';
   h += '<div class="vk-kopf">';
   h += '<div class="vk-name">' + esc(z.name) + '</div>';
   h += '<div class="vk-zeit">'
@@ -10626,8 +10812,9 @@ function restZeitHtml(bis) {
 
 function projektKarteHtml(p) {
   var satz = zustandText(p);
-  var h = '<div class="vkarte flach' + (p.kontext === 'privat' ? ' privat' : '') + '" '
-        + 'onclick="vhDetailOeffnen(\'' + esc(p.id) + '\',\'projekt\')">';
+  var h = '<div class="vkarte flach' + (p.kontext === 'privat' ? ' privat' : '') + '"'
+        + ziehAttribute('vorhaben', p.id)
+        + ' onclick="vhDetailOeffnen(\'' + esc(p.id) + '\',\'projekt\')">';
   h += '<div class="vk-kopf">';
   h += '<div class="vk-name">' + esc(p.name) + '</div>';
   h += '<div class="vk-zeit">' + (p.ende ? ('bis ' + esc(kurzDatum(p.ende))) : '') + '</div>';
@@ -10870,6 +11057,10 @@ function vhDetailHtml() {
   }
 
   h += pinKnopfHtml(vhDetailArt, v.id);
+  h += '<div class="d-feld"><div class="d-name">Reihenfolge</div><div class="d-wert">'
+     + '<button class="d-wahl" type="button" onclick="vhSchieben(-1)">nach vorn</button>'
+     + '<button class="d-wahl" type="button" onclick="vhSchieben(1)">nach hinten</button>'
+     + '</div></div>';
   h += '<div class="d-reihe">'
      + '<button class="gefahr" type="button" onclick="vhLoeschen()">Löschen</button>'
      + '<button type="button" onclick="aktionenSchliessen()">Fertig</button></div>';
@@ -11655,6 +11846,35 @@ function tabellenRichtung(trennzeile) {
 
 /* Aus den Zeilen ab „von" eine Tabelle bauen. Zurück kommt das HTML
    und wie viele Zeilen verbraucht wurden. */
+/* Eine Zelle, die mit [] oder [x] beginnt, bekommt ein antippbares
+   Kästchen — wie eine Zeile im übrigen Text. Gespeichert bleibt das
+   Zeichen in der Zelle, nichts weiter. */
+function zellenKastenHtml(text, zeileNr, spalte, hervor) {
+  var m = String(text).match(/^\[([ xX]?)\]\s*(.*)$/);
+  if (!m) { return hervor(text); }
+  var an = (m[1] === 'x' || m[1] === 'X');
+  return '<button class="fl-kasten' + (an ? ' an' : '') + '" type="button" '
+       + 'onclick="zellenKastenUm(' + zeileNr + ',' + spalte + ')" '
+       + 'aria-label="Abhaken"></button>'
+       + '<span class="fl-zellentext">' + hervor(m[2]) + '</span>';
+}
+
+function zellenKastenUm(zeileNr, spalte) {
+  var zeilen = flaecheText(flaecheFuer).split('\n');
+  if (zeileNr < 0 || zeileNr >= zeilen.length) { return; }
+  var roh = zeilen[zeileNr];
+  var vorn = roh.match(/^\s*\|/) ? roh.replace(/^(\s*)\|[\s\S]*$/, '$1') : '';
+  var zellen = tabellenZellen(roh);
+  if (spalte < 0 || spalte >= zellen.length) { return; }
+  var m = String(zellen[spalte]).match(/^\[([ xX]?)\]\s*(.*)$/);
+  if (!m) { return; }
+  var an = (m[1] === 'x' || m[1] === 'X');
+  zellen[spalte] = (an ? '[] ' : '[x] ') + m[2];
+  zeilen[zeileNr] = vorn + '| ' + zellen.join(' | ') + ' |';
+  flaecheSetzen(flaecheFuer, zeilen.join('\n'));
+  flaecheZeichnen();
+}
+
 function tabelleHtml(zeilen, von, hervor) {
   var bis = von;
   while (bis < zeilen.length && istTabellenzeile(zeilen[bis])) { bis++; }
@@ -11695,7 +11915,8 @@ function tabelleHtml(zeilen, von, hervor) {
     var zellen = tabellenZellen(reihen[i]);
     h += '<tr>';
     for (j = 0; j < breite; j++) {
-      h += '<td' + stil(j) + '>' + hervor(zellen[j] || '') + '</td>';
+      h += '<td' + stil(j) + '>'
+         + zellenKastenHtml(zellen[j] || '', von + i, j, hervor) + '</td>';
     }
     h += '</tr>';
   }
@@ -13175,7 +13396,7 @@ function setPinFilter(art) {
 function pinnwandZeichnen() {
   var blatt = document.getElementById('pinBlatt');
   if (!blatt) { return; }
-  var l = DB.pinnwand || [];
+  var l = nachOrdnung(DB.pinnwand || []);
   var h = '';
   var gezeigt = 0;
   var i;
@@ -13186,8 +13407,15 @@ function pinnwandZeichnen() {
     if (pinFilter !== 'alle' && z.kontext && z.kontext !== pinFilter) { continue; }
     gezeigt++;
     h += '<div class="zettel z-' + esc(p.farbe || 'gelb') + (z.fertig ? ' fertig' : '')
-       + '" onclick="pinOeffnen(\'' + esc(p.id) + '\')">';
+       + '"' + ziehAttribute('pin', p.id)
+       + ' onclick="pinOeffnen(\'' + esc(p.id) + '\')">';
     h += '<span class="z-nadel"></span>';
+    /* Am Handy wird geschoben statt gezogen. */
+    h += '<span class="z-schieben">'
+       + '<button type="button" onclick="event.stopPropagation();pinSchieben(\''
+       + esc(p.id) + '\',-1)" aria-label="nach vorn">‹</button>'
+       + '<button type="button" onclick="event.stopPropagation();pinSchieben(\''
+       + esc(p.id) + '\',1)" aria-label="nach hinten">›</button></span>';
     h += '<button class="z-weg" type="button" '
        + 'onclick="event.stopPropagation();pinWeg(\'' + esc(p.id) + '\')" '
        + 'aria-label="Abnehmen" title="Abnehmen">×</button>';
