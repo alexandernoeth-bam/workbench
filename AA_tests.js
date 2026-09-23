@@ -543,6 +543,38 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__tabFilterApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var t = [\'## Zeitplan\', \'\','
+                 + '     \'| Zeitraum | Phase |\', \'|---|---|\','
+                 + '     \'| [] Februar | Anmeldung |\','
+                 + '     \'| [x] März | Fahrstunden |\','
+                 + '     \'| Ende März | Abschluss |\', \'\','
+                 + '     \'## Ausgaben\','
+                 + '     \'| Posten | Summe |\', \'|---|---|\','
+                 + '     \'| Anmeldung | 350 |\', \'\','
+                 + '     \'[] Rechnung prüfen\'].join(\'\\n\');'
+                 + '   DB.gedanken = [{ id:\'g1\', titel:\'F\', text: t,'
+                 + '     geaendert: jetzt() }];'
+                 + '   flaecheFuer = \'g:g1\';'
+                 + '   var reihen = function(){'
+                 + '     var a = flaecheAnsichtHtml(t, \'\');'
+                 + '     return (a.html.match(/<tr>/g) || []).length; };'
+                 + '   flaecheArt = {};'
+                 + '   var r = { ohne: reihen() - 2 };'
+                 + '   flaecheArt = { offen: true };'
+                 + '   var h1 = flaecheAnsichtHtml(t, \'\').html;'
+                 + '   r.offen = (h1.match(/<tr>/g) || []).length - 1;'
+                 + '   r.kopfDa = /<thead>/.test(h1);'
+                 + '   r.leereWeg = (h1.indexOf(\'Posten\') < 0);'
+                 + '   r.zeileWeiterhin = (h1.match(/Rechnung prüfen/g) || []).length;'
+                 + '   flaecheArt = { erledigt: true };'
+                 + '   var h2 = flaecheAnsichtHtml(t, \'\').html;'
+                 + '   r.erledigt = (h2.match(/<tr>/g) || []).length - 1;'
+                 + '   flaecheArt = {}; flaecheFuer = \'\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__ordnungApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -9258,6 +9290,47 @@ console.log('\n108. Reihenfolge und Kästchen in Zellen');
     pruefe(e.zelleAn === '[x] Angebot holen', 'ein Kästchen in der Zelle lässt sich haken');
     pruefe(e.zelleAus === '[] Angebot holen', 'und wieder lösen');
     pruefe(e.zelleAndere === '[x] Termin', 'die Nachbarzelle bleibt unberührt');
+  }
+}
+
+/* ============================================================
+   109. Der Strukturfilter greift auch in Tabellen
+   Grund: Der Filter Offen/Erledigt sah nur auf den Zeilenanfang. In
+   einer Tabellenzeile steht dort der Strich, das Kaestchen steckt in
+   einer Zelle — Tabellen blieben deshalb vom Filter unberuehrt.
+   ============================================================ */
+console.log('\n109. Filter in Tabellen');
+{
+  const skript = hauptSkript();
+  const f = globalThis.__tabFilterApi;
+
+  const za = skript.match(/function zeilePasstZurArt\([\s\S]*?\n\}/);
+  pruefe(za && /istTabellenzeile\(zeile\)/.test(za[0]),
+         'eine Tabellenzeile wird eigens behandelt');
+  pruefe(za && /tabellenZellen\(zeile\)/.test(za[0]),
+         'gefragt werden ihre Zellen einzeln');
+  pruefe(za && /istTrennzeile\(zeile\)\) \{ return false/.test(za[0]),
+         'der Trennstrich zählt nie als Treffer');
+  const fs = skript.match(/function flaecheSichtbar\([\s\S]*?\n\}/);
+  pruefe(fs && /passt\[i\] = true; passt\[i \+ 1\] = true;/.test(fs[0]),
+         'behält eine Zeile den Filter, bleiben Kopf und Trennstrich stehen');
+  const th = skript.match(/function tabelleHtml\([\s\S]*?\n\}\n/);
+  pruefe(th && /function tabelleHtml\(zeilen, von, hervor, zeigen\)/.test(th[0])
+         && /if \(zeigen && !zeigen\[von \+ i\]\) \{ continue; \}/.test(th[0]),
+         'die Tabelle zeichnet nur, was der Filter übrig lässt');
+
+  if (!f) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = f.pruefe();
+    pruefe(e.ohne === 4,
+           'ohne Filter stehen alle vier Datenzeilen beider Tabellen da');
+    pruefe(e.offen === 1, 'mit „Offen" nur die offene');
+    pruefe(e.erledigt === 1, 'mit „Erledigt" nur die erledigte');
+    pruefe(e.kopfDa === true, 'der Kopf bleibt dabei stehen');
+    pruefe(e.leereWeg === true, 'eine Tabelle ohne Treffer verschwindet ganz');
+    pruefe(e.zeileWeiterhin === 1,
+           'Kästchen in normalen Zeilen wirken wie bisher');
   }
 }
 

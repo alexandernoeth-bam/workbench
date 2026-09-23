@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.7.2</title>
+<title>Workbench 1.8.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1703,7 +1703,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.7.2';
+var APP_VERSION = '1.8.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -11884,7 +11884,7 @@ function zellenKastenUm(zeileNr, spalte) {
   flaecheZeichnen();
 }
 
-function tabelleHtml(zeilen, von, hervor) {
+function tabelleHtml(zeilen, von, hervor, zeigen) {
   var bis = von;
   while (bis < zeilen.length && istTabellenzeile(zeilen[bis])) { bis++; }
   var reihen = zeilen.slice(von, bis);
@@ -11921,6 +11921,8 @@ function tabelleHtml(zeilen, von, hervor) {
   }
   h += '<tbody>';
   for (i = ab; i < reihen.length; i++) {
+    /* Was der Filter weggenommen hat, bleibt auch in der Tabelle weg. */
+    if (zeigen && !zeigen[von + i]) { continue; }
     var zellen = tabellenZellen(reihen[i]);
     h += '<tr>';
     for (j = 0; j < breite; j++) {
@@ -12094,7 +12096,7 @@ function flaecheAnsichtHtml(text, suche) {
         }
         return t;
       };
-      var tab = tabelleHtml(zeilen, i, hervorTab);
+      var tab = tabelleHtml(zeilen, i, hervorTab, zeigen);
       if (tab.zahl) {
         h += tab.html;
         i += tab.zahl - 1;
@@ -12381,6 +12383,20 @@ function flaecheArtAn() {
 function zeilePasstZurArt(zeile) {
   if (!flaecheArtAn()) { return true; }
   var r = String(zeile).replace(/^\s+/, '');
+  /* In einer Tabellenzeile steht am Anfang der Strich, das Kästchen
+     steckt in einer Zelle — also werden die Zellen einzeln gefragt. */
+  if (istTabellenzeile(zeile)) {
+    if (istTrennzeile(zeile)) { return false; }
+    var zellen = tabellenZellen(zeile);
+    var i;
+    for (i = 0; i < zellen.length; i++) {
+      var z = String(zellen[i]).replace(/^\s+/, '');
+      if (flaecheArt.offen && /^\[\s?\]/.test(z)) { return true; }
+      if (flaecheArt.erledigt && /^\[[xX]\]/.test(z)) { return true; }
+    }
+    if (flaecheArt.datum && DATUM_IM_TEXT.test(zeile)) { return true; }
+    return false;
+  }
   if (flaecheArt.offen && /^\[\s?\]/.test(r)) { return true; }
   if (flaecheArt.erledigt && /^\[[xX]\]/.test(r)) { return true; }
   if (flaecheArt.datum && DATUM_IM_TEXT.test(zeile)) { return true; }
@@ -12403,6 +12419,26 @@ function flaecheSichtbar(zeilen, suche) {
     passt.push(wort && zeilePasstZurArt(zeilen[i]));
   }
   if ((!suche || suche.length < 2) && !flaecheArtAn()) { return null; }
+
+  /* Behält eine Tabellenzeile den Filter, gehören Kopf und Trennstrich
+     dazu — sonst stünde eine kopflose Tabelle da. Der Kopf allein
+     genügt nicht: Dann bliebe eine leere Tabelle übrig. */
+  for (i = 0; i < zeilen.length; i++) {
+    if (!istTabellenzeile(zeilen[i])) { continue; }
+    var bis = i;
+    while (bis < zeilen.length && istTabellenzeile(zeilen[bis])) { bis++; }
+    var mitKopf = (bis - i >= 2) && istTrennzeile(zeilen[i + 1]);
+    var einTreffer = false;
+    var k;
+    for (k = (mitKopf ? i + 2 : i); k < bis; k++) {
+      if (passt[k]) { einTreffer = true; }
+    }
+    if (einTreffer && mitKopf) { passt[i] = true; passt[i + 1] = true; }
+    if (!einTreffer) {
+      for (k = i; k < bis; k++) { passt[k] = false; }
+    }
+    i = bis - 1;
+  }
 
   var zeigen = passt.slice();
   var stufe;
