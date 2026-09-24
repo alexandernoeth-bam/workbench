@@ -734,16 +734,15 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     return x.titel === \'Emden\'; });'
                  + '   r.mehrtaegigEinmal = dem.length;'
                  + '   r.mehrtaegigTage = dem.length ? dem[0].tage : 0;'
-                 + '   tagwWahl = {};'
-                 + '   tagwWahlUm(\'a3\'); tagwWahlUm(\'a4\'); tagwWahlUm(\'a5\');'
-                 + '   tagwWahlUm(\'a1\');'
-                 + '   r.hoechstensDrei = Object.keys(tagwWahl).length;'
-                 + '   tagwAuswahlSetzen();'
-                 + '   r.zaehlt = tagwZaehltHeute(h).length;'
+                 + '   tagwWahlUm(\'a3\'); tagwWahlUm(\'a4\');'
+                 + '   r.geplant = tagwWaehlbar().filter(function(a){'
+                 + '     return a.planung === h; }).length;'
+                 + '   tagwWahlUm(\'a4\');'
+                 + '   r.zurueck = (aufgabeFinden(\'a4\').planung === \'woche\');'
                  + '   r.geplantHeute = (aufgabeFinden(\'a3\').planung === h);'
                  + '   tagwFertig();'
                  + '   r.nachFertig = tagwFaellig();'
-                 + '   tagwWahl = {}; termineNachTag = {}; kalenderListe = [];'
+                 + '   termineNachTag = {}; kalenderListe = [];'
                  + '   tagOffen = merkTag; DB = alt;'
                  + '   return r;'
                  + ' } };'
@@ -5615,10 +5614,10 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
   const tag = hauptSkript().match(/function tagZeichnen\([\s\S]*?\n\}\n/);
   const folge = tag ? [...tag[0].matchAll(/tspalte tspalte-(\w+)|data-kurz="([^"]+)"/g)]
                        .map(m => m[1] ? ('[' + m[1] + ']') : m[2]) : [];
-  /* „Heute zählt" steht seit v1.6.0 über allem — das ist der Sinn der
-     Auswahl im Tageswechsel. */
-  const erwarteteFolge = ['Heute zählt', '[links]', 'Tagesverlauf', 'Wiederkehrend',
-                          'Abläufe', '[rechts]', 'Aufgaben', 'Kleinigkeiten'];
+  /* Seit v1.10.0 ohne „Heute zählt": Schritt 4 des Tageswechsels plant
+     unmittelbar auf heute, statt einen zweiten Merker zu führen. */
+  const erwarteteFolge = ['[links]', 'Tagesverlauf', 'Wiederkehrend', 'Abläufe',
+                          '[rechts]', 'Aufgaben', 'Kleinigkeiten'];
   pruefe(folge.join(',') === erwarteteFolge.join(','),
          'die Abschnitte stehen in der vereinbarten Folge und Spalte'
          + (folge.join(',') === erwarteteFolge.join(',') ? '' : ' — ist: ' + folge.join(' → ')));
@@ -9232,24 +9231,25 @@ console.log('\n107. Tageswechsel');
   ['tagwFaellig', 'tagwWocheFaellig', 'tagwSchritte', 'tagwStarten', 'tagwWeiter',
    'tagwFertig', 'tagwWiederOffen', 'tagwSchritt1Html', 'tagwSchritt2Html',
    'tagwSchritt3Html', 'tagwSchritt4Html', 'freieStrecke', 'brachListe',
-   'demnaechstListe', 'brachRuhen', 'tagwWaehlbar', 'tagwWahlUm', 'tagwAuswahlSetzen',
-   'tagwZaehltHeute', 'tagwZeichnen', 'streifenAntippen'].forEach(function (f) {
+   'demnaechstListe', 'brachRuhen', 'tagwWaehlbar', 'tagwWahlUm',
+   'tagwZeichnen', 'streifenAntippen'].forEach(function (f) {
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
   });
   pruefe(/var TAGW_TAGE = 7;/.test(skript),
          'brach, Fristen und Termine messen sieben Tage');
   const wu = skript.match(/function tagwWahlUm\([\s\S]*?\n\}/);
-  pruefe(wu && /zahl >= 3/.test(wu[0]), 'höchstens drei — das ist der Sinn der Sache');
+  pruefe(wu && /planungSetzen\(a, \(a\.planung === isoDatum\(\)\) \? 'woche' : isoDatum\(\)\)/
+         .test(wu[0]),
+         'ein Tipp plant auf heute, der zweite nimmt es auf die Woche zurück');
   const sch = skript.match(/function tagwSchritte\([\s\S]*?\n\}/);
   pruefe(sch && /tagwWocheFaellig\(\) \? \[1, 2, 3, 4\] : \[1, 2, 4\]/.test(sch[0]),
          'der Wochenschritt erscheint nur einmal je Woche');
   const fs = skript.match(/function freieStrecke\([\s\S]*?\n\}\n/);
   pruefe(fs && /t\.von/.test(fs[0]) && !/t\.zeit/.test(fs[0]),
          'die Zeiten heißen im Tagesverlauf von und bis');
-  const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && /tagwZaehltHeute\(is\)/.test(tz[0]),
-         'was heute zählt, steht im Tagesplan ganz oben');
+  pruefe(!/tagwZaehltHeute/.test(skript) && !/zaehltAm/.test(skript),
+         'es gibt keinen zweiten Merker neben der Planung mehr');
   const sa = skript.match(/function streifenAntippen\([\s\S]*?\n\}/);
   pruefe(sa && /tagwFaellig\(\)/.test(sa[0]),
          'der Streifen führt zum Tageswechsel, solange er ansteht');
@@ -9268,9 +9268,10 @@ console.log('\n107. Tageswechsel');
     pruefe(e.nachRuhen === 2, '„diese Woche nicht" legt eines beiseite');
     pruefe(e.mehrtaegigEinmal === 1, 'ein mehrtägiger Urlaub steht einmal in Demnächst');
     pruefe(e.mehrtaegigTage === 4, 'mit seiner Dauer');
-    pruefe(e.hoechstensDrei === 3, 'mehr als drei lassen sich nicht wählen');
-    pruefe(e.zaehlt === 3, 'die Auswahl steht danach im Tag');
-    pruefe(e.geplantHeute === true, 'und ist auf heute geplant');
+    pruefe(e.geplant === 3,
+           'angetippte Aufgaben stehen heute an — die von gestern geholte zählt mit');
+    pruefe(e.zurueck === true, 'ein zweiter Tipp nimmt es auf die Woche zurück');
+    pruefe(e.geplantHeute === true, 'die übrigen bleiben auf heute geplant');
     pruefe(e.nachFertig === false, 'nach dem Durchgang ruht der Streifen bis morgen');
   }
 }

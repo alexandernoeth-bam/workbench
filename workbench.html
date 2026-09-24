@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.9.1</title>
+<title>Workbench 1.10.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -991,8 +991,6 @@ body.breit .z-schieben{display:none}
   border:1px solid var(--linie);border-radius:8px;background:var(--karte);
   color:var(--tinte);cursor:pointer}
 .tw-fuss button.stark{border-color:var(--weinrot);color:var(--weinrot);font-weight:500}
-.tabschnitt.tw-zaehlt{border-left:3px solid var(--weinrot);padding-left:11px}
-body.breit .tabschnitt.tw-zaehlt{grid-column:1 / -1}
 
 .tg-kopf{flex:1;min-width:0}
 /* Tätigkeiten: eine Kopfkarte, darunter Flächen je Gruppe. Am Rechner
@@ -1710,7 +1708,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.9.1';
+var APP_VERSION = '1.10.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4305,7 +4303,9 @@ function nachzueglerOeffnen() {
 
 var TAGW_TAGE = 7;          /* brach, Fristen und Termine: sieben Tage */
 var tagwSchritt = 1;
-var tagwWahl = {};          /* Kennung -> gewählt für „Heute zählt" */
+/* Schritt 4 plant unmittelbar: Was man antippt, steht heute an, ein
+   zweiter Tipp nimmt es auf die Woche zurück. Einen zweiten Merker
+   neben der Planung gibt es nicht — er hätte dasselbe zweimal gesagt. */
 
 function tagwWocheFaellig() {
   var zuletzt = DB.einstellungen.tagwWoche || '';
@@ -4322,7 +4322,6 @@ function tagwFaellig() {
 
 function tagwStarten() {
   tagwSchritt = tagwSchritte()[0];
-  tagwWahl = {};
   zeigeSchirm('Tagwechsel');
 }
 
@@ -4736,28 +4735,20 @@ function tagwWaehlbar() {
 }
 
 function tagwWahlUm(id) {
-  if (tagwWahl[id]) { delete tagwWahl[id]; }
-  else {
-    var zahl = 0;
-    var k;
-    for (k in tagwWahl) { if (tagwWahl[k]) { zahl++; } }
-    if (zahl >= 3) {
-      melde('Höchstens drei — das ist der Sinn der Sache.', null);
-      return;
-    }
-    tagwWahl[id] = true;
-  }
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  planungSetzen(a, (a.planung === isoDatum()) ? 'woche' : isoDatum());
+  spaeterSichern();
   tagwZeichnen();
 }
 
 function tagwSchritt4Html() {
+  var heute = isoDatum();
   var liste = tagwWaehlbar();
-  var zahl = 0;
-  var k;
-  for (k in tagwWahl) { if (tagwWahl[k]) { zahl++; } }
+  var zahl = liste.filter(function (a) { return a.planung === heute; }).length;
   var h = '<div class="tw-kopf"><div class="tw-schritt">Schritt 4</div>'
-        + '<h2 class="tw-titel">Was zählt heute?</h2>'
-        + '<div class="tw-unter">Höchstens drei. Sie stehen dann oben im Tag.</div></div>';
+        + '<h2 class="tw-titel">Was nimmst du dir vor?</h2>'
+        + '<div class="tw-unter">Angetippt heißt: steht heute an.</div></div>';
   if (!liste.length) {
     h += '<div class="tw-karte tw-leer">Nichts zur Auswahl.</div>';
   }
@@ -4765,48 +4756,24 @@ function tagwSchritt4Html() {
   for (i = 0; i < liste.length; i++) {
     var a = liste[i];
     var meta = [];
-    if (a.planung === isoDatum()) { meta.push('heute'); }
+    if (a.planung === heute) { meta.push('heute'); }
     else if (a.planung === 'woche') { meta.push('diese Woche'); }
+    else if (a.planung === 'naechste') { meta.push('nächste Woche'); }
     if (a.frist) { meta.push('Frist ' + kurzDatum(a.frist)); }
     var vn = tagwVorhabenName(a);
     if (vn) { meta.push(vn); }
     h += '<div class="tw-ausw" onclick="tagwWahlUm(\'' + esc(a.id) + '\')">'
-       + '<span class="tw-kasten' + (tagwWahl[a.id] ? ' an' : '') + '"></span>'
+       + '<span class="tw-kasten' + ((a.planung === heute) ? ' an' : '') + '"></span>'
        + '<span><span class="tw-ktitel">' + esc(a.titel) + '</span>'
        + '<span class="tw-kmeta">' + esc(meta.join(' · ')) + '</span></span></div>';
   }
-  h += '<div class="tw-hinweis">' + zahl + ' von 3 gewählt. Ohne Auswahl bleibt alles, '
-     + 'wie es ist.</div>';
+  h += '<div class="tw-hinweis">' + zahl
+     + (zahl === 1 ? ' Aufgabe steht' : ' Aufgaben stehen') + ' heute an. '
+     + 'Was du hier nicht antippst, bleibt in der Woche.</div>';
   return h;
 }
 
-/* Die Auswahl gilt für heute und steht oben im Tagesplan. */
-function tagwAuswahlSetzen() {
-  var heute = isoDatum();
-  var k;
-  for (k in tagwWahl) {
-    if (!tagwWahl[k]) { continue; }
-    var a = aufgabeFinden(k);
-    if (!a) { continue; }
-    a.zaehltAm = heute;
-    if (a.planung !== heute) { planungSetzen(a, heute); }
-    a.geaendert = jetzt();
-  }
-  spaeterSichern();
-}
 
-function tagwZaehltHeute(is) {
-  var aus = [];
-  var l = DB.aufgaben || [];
-  var i;
-  for (i = 0; i < l.length; i++) {
-    if (l[i].zaehltAm !== is) { continue; }
-    if (l[i].status === 'erledigt') { continue; }
-    if (!passtZumTag(l[i].kontext)) { continue; }
-    aus.push(l[i]);
-  }
-  return aus;
-}
 
 function tagwZeichnen() {
   var blatt = document.getElementById('tagwBlatt');
@@ -4829,7 +4796,7 @@ function tagwZeichnen() {
      + '<button type="button" onclick="' + (wo === 0 ? 'tagwSpaeter()' : 'tagwWeiter(-1)')
      + '">' + (wo === 0 ? 'Später' : 'Zurück') + '</button>'
      + '<button type="button" class="stark" onclick="'
-     + (letzter ? 'tagwAuswahlSetzen();tagwWeiter(1)' : 'tagwWeiter(1)') + '">'
+     + 'tagwWeiter(1)">'
      + (letzter ? 'Fertig' : 'Weiter') + '</button></div>';
   blatt.innerHTML = h;
 }
@@ -5124,17 +5091,6 @@ function tagZeichnen() {
   /* Zwei Spalten als eigene Behälter: In einem Raster teilen sich
      nebeneinanderliegende Abschnitte die Zeilenhöhe, wodurch oben
      rechts eine Lücke entstünde. */
-  /* Was heute zählt, steht ganz oben — der Sinn der Auswahl im
-     Tageswechsel. */
-  var zaehlt = tagwZaehltHeute(is);
-  if (zaehlt.length) {
-    h += '<div class="tabschnitt tw-zaehlt" data-kurz="Heute zählt">'
-       + '<div class="tabschnitt-titel"><span>Heute zählt · ' + zaehlt.length
-       + '</span></div>';
-    for (i = 0; i < zaehlt.length; i++) { h += zeileHtml(zaehlt[i], is, false); }
-    h += '</div>';
-  }
-
   h += '<div class="tspalte tspalte-links">';
   var vorbeiZahl = 0;
   for (i = 0; i < e.verlauf.length; i++) {
