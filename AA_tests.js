@@ -565,6 +565,34 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__kurzApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.aufgaben = [{ id:\'a1\', titel:\'Trägt\','
+                 + '     kontext:\'privat\', status:\'offen\', art:\'haupt\','
+                 + '     planung:\'backlog\', geaendert: jetzt() }];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Bauantrag\','
+                 + '     kontext:\'privat\', anlagen:[], geaendert: jetzt(),'
+                 + '     schritte:[{ titel:\'A\', fertig:true },'
+                 + '       { titel:\'B\', ab:\'2026-09-25\', aufgabeId:\'a1\' },'
+                 + '       { titel:\'C\' }] }];'
+                 + '   abDetail = \'d1\'; abDetailArt = \'durchlauf\';'
+                 + '   abSchnell = false; abBearbeiten = false;'
+                 + '   var kurz = abSchritteKurzHtml(DB.durchlaeufe[0], false);'
+                 + '   var r = { kurzZeilen: (kurz.match(/tg-zeile/g) || []).length,'
+                 + '     kurzOhneFelder: (kurz.indexOf(\'<textarea\') < 0'
+                 + '       && kurz.indexOf(\'type="date"\') < 0) };'
+                 + '   var m = kurz.match(/tg-meta">([^<]*)/);'
+                 + '   r.kurzMeta = m ? m[1] : \'\';'
+                 + '   abBearbeiten = true;'
+                 + '   var lang = abSeiteHtml();'
+                 + '   r.langMitFeldern = (lang.indexOf(\'<textarea class="ms-titel\') >= 0);'
+                 + '   abBearbeiten = false;'
+                 + '   abSchrittUm(2);'
+                 + '   r.hakenWirkt = (DB.durchlaeufe[0].schritte[2].fertig === true);'
+                 + '   abDetail = \'\'; abDetailArt = \'\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vhZustandApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkF = vhFilter; DB = leereDatenbank();'
@@ -603,9 +631,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '             alt: vhZustand(DB.projekte[3], \'projekt\'),'
                  + '             zu: vhZustand(DB.projekte[4], \'projekt\') };'
                  + '   r.text = vhZustandText(DB.projekte[0], \'projekt\').split(\' · \')[0];'
-                 + '   r.ring = (vhRingHtml(DB.projekte[0], \'projekt\')'
-                 + '     .match(/<i>(\\d+)<\\/i>/) || [])[1];'
                  + '   var karte = vhKarteHtml(DB.projekte[0], \'projekt\');'
+                 + '   r.ohneRing = (karte.indexOf(\'class="ring\') < 0);'
                  + '   r.marken = (karte.match(/ab-marke">([^<]*)/g) || []).slice(0, 2)'
                  + '     .map(function(x){ return x.slice(10); }).join(\',\');'
                  + '   vhFilter = \'alle\'; vhStufe = \'vorhaben\';'
@@ -9867,8 +9894,8 @@ console.log('\n115. Ablaufseite und Vorhaben');
   const skript = hauptSkript();
   const v = globalThis.__vhZustandApi;
 
-  ['abSeiteHtml', 'abAngabenHtml', 'abSchritteHtml', 'vhZustand', 'vhZustandText',
-   'vhGruppeOffen', 'vhGruppeUm', 'vhRingHtml', 'vhKarteHtml',
+  ['abSeiteHtml', 'abAngabenHtml', 'abSchritteHtml', 'abSchritteKurzHtml', 'vhZustand',
+   'vhZustandText', 'vhGruppeOffen', 'vhGruppeUm', 'vhKarteHtml',
    'vhSchiebenId'].forEach(function (f) {
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
@@ -9900,10 +9927,52 @@ console.log('\n115. Ablaufseite und Vorhaben');
     pruefe(e.alt === 'ruht', 'ebenso eines, an dem seit über einer Woche nichts geschah');
     pruefe(e.zu === 'fertig', 'ein abgeschlossenes steht unten');
     pruefe(e.text === '1 heute fällig', 'die Marke sagt, warum');
-    pruefe(e.ring === '33', 'der Ring zählt erledigte von allen Tätigkeiten');
-    pruefe(e.marken === 'Projekt,2 Tätigkeiten', 'der Fuß nennt Art und Umfang');
+    /* Seit v2.6.0 ohne Ring am Vorhaben: Er stand auf hundert Prozent,
+       sobald das Bisherige abgehakt war. */
+    pruefe(e.ohneRing === true, 'am Vorhaben steht kein Ring mehr');
+    pruefe(e.marken === 'Projekt,2 offen', 'der Fuß nennt Art und Umfang');
     pruefe(e.gruppen === 'Heute dran · 1,Läuft · 1,Ruht · 2,Abgeschlossen · 1',
            'die Übersicht ordnet danach');
+  }
+}
+
+/* ============================================================
+   116. Schritte kompakt, kein Ring am Vorhaben
+   Grund: Der Ring am Vorhaben zaehlte erledigte von allen Taetigkeiten
+   und stand auf hundert Prozent, sobald das Bisherige abgehakt war. Und
+   die Schrittliste zeigte immer alle Bedienelemente, obwohl man im
+   Alltag nur einen Haken setzt.
+   ============================================================ */
+console.log('\n116. Kompakte Schritte');
+{
+  const skript = hauptSkript();
+  const k = globalThis.__kurzApi;
+
+  pruefe(!/function vhRingHtml/.test(skript), 'der Ring am Vorhaben ist entfernt');
+  pruefe(new RegExp('function\\s+abBearbeitenUm\\s*\\(').test(skript),
+         'Funktion abBearbeitenUm ist definiert');
+  const seite = skript.match(/function abSeiteHtml\([\s\S]*?\n\}\n/);
+  pruefe(seite && /abBearbeiten \? abSchritteHtml/.test(seite[0])
+         && /abSchritteKurzHtml\(a, istVorlage\)/.test(seite[0]),
+         'kompakt ist der Normalfall, das Bearbeiten steckt hinter einem Knopf');
+  const ao = skript.match(/function abDetailOeffnen\([\s\S]*?\n\}/);
+  pruefe(ao && /abBearbeiten = false/.test(ao[0]),
+         'beim Öffnen steht die Seite wieder kompakt da');
+  const kurz = skript.match(/function abSchritteKurzHtml\([\s\S]*?\n\}\n/);
+  pruefe(kurz && /abSchrittUm\(/.test(kurz[0]), 'abhaken geht auch kompakt');
+  pruefe(kurz && !/abSchrittHoch|abSchrittWeg|textarea/.test(kurz[0]),
+         'verschieben, entfernen und Umbenennen nicht');
+
+  if (!k) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = k.pruefe();
+    pruefe(e.kurzZeilen === 3, 'kompakt steht jeder Schritt in einer Zeile');
+    pruefe(e.kurzMeta === 'Fr 25.9. · Aufgabe · Backlog',
+           'mit Datum und der tragenden Aufgabe');
+    pruefe(e.kurzOhneFelder === true, 'ohne Eingabefelder');
+    pruefe(e.langMitFeldern === true, 'nach „Bearbeiten" sind die Felder da');
+    pruefe(e.hakenWirkt === true, 'der Haken wirkt in beiden Ansichten');
   }
 }
 

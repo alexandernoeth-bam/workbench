@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 2.5.0</title>
+<title>Workbench 2.6.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1020,7 +1020,8 @@ body.breit .ab-pfeile{display:none}
   border:1px solid var(--linie);border-radius:7px;background:var(--karte);color:var(--tinte);
   cursor:pointer}
 .ab-kk-knoepfe button.gefahr{color:var(--weinrot)}
-.tg-bkopf .ms-wort{margin-left:8px}
+.tg-bkopf .ms-wort{margin-left:6px}
+.tg-bkopf{flex-wrap:wrap}
 
 /* Meldungen blenden sich unten kurz ein. */
 .toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);
@@ -1801,7 +1802,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '2.5.0';
+var APP_VERSION = '2.6.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -11163,14 +11164,6 @@ function vhGruppeUm(name) {
   vhZeichnen();
 }
 
-/* Der Ring zählt erledigte Tätigkeiten. Bei einem langen Projekt ist er
-   ein Stimmungsbild, kein Versprechen — man legt ja nach. */
-function vhRingHtml(v, art) {
-  var t = vhTaetigkeiten(art, v.id);
-  var offen = t.haupt.length + t.klein.length + t.ablaeufe.length;
-  var fertig = t.erledigt.length;
-  return ringHtml(fertig, fertig + offen);
-}
 
 function vhKarteHtml(v, art) {
   var satz = zustandText(v);
@@ -11182,15 +11175,19 @@ function vhKarteHtml(v, art) {
         + ((zustand === 'ruht' || zustand === 'fertig') ? ' ruht' : '') + '"'
         + ziehAttribute('vorhaben', v.id)
         + ' onclick="vhDetailOeffnen(\'' + esc(v.id) + '\',\'' + art + '\')">';
-  h += '<div class="ab-oben"><span class="ab-name">' + esc(v.name) + '</span>'
-     + vhRingHtml(v, art) + '</div>';
+  /* Kein Ring am Vorhaben: Er zählte erledigte von allen Tätigkeiten und
+     stand auf hundert Prozent, sobald das Bisherige abgehakt war — bei
+     einem Projekt über Monate sagt das nichts. Was zählt, steht in der
+     Marke und im Fuß. */
+  h += '<div class="ab-oben"><span class="ab-name">' + esc(v.name) + '</span></div>';
   h += '<span class="ab-stand' + ((zustand === 'heute') ? ' faellig' : '')
      + ((zustand === 'laeuft') ? ' laeuft' : '') + '">' + esc(vhZustandText(v, art))
      + '</span>';
   if (satz) { h += '<div class="ab-naechster">Diese Woche: ' + esc(satz) + '</div>'; }
   h += '<div class="ab-fuss">';
   var marken = [(art === 'ziel') ? 'Ziel' : 'Projekt'];
-  if (offen) { marken.push(offen + (offen === 1 ? ' Tätigkeit' : ' Tätigkeiten')); }
+  if (offen) { marken.push(offen + ' offen'); }
+  if (t.erledigt.length) { marken.push(t.erledigt.length + ' erledigt'); }
   if (ende) { marken.push('bis ' + kurzDatum(ende)); }
   h += '<span class="ab-marke">' + marken.join('</span><span class="ab-marke">') + '</span>';
   h += '<span style="flex:1"></span>';
@@ -14925,6 +14922,7 @@ function abSchrittOeffnen(id, nr) {
 
 function abDetailOeffnen(id, art) {
   abSchnell = false;
+  abBearbeiten = false;
   abDetail = id;
   abDetailArt = art;
   zeigeSchirm('Ablauf');
@@ -15048,6 +15046,46 @@ function abAngabenHtml(a, istVorlage) {
     }
   }
 
+  return h;
+}
+
+var abBearbeiten = false;
+
+function abBearbeitenUm() {
+  abBearbeiten = !abBearbeiten;
+  abDetailNeu();
+}
+
+/* Die kompakte Ansicht: abhaken und lesen. Titel ändern, Daten setzen,
+   verschieben und verknüpfen steckt hinter „Bearbeiten" — im Alltag
+   will man nur einen Haken setzen. */
+function abSchritteKurzHtml(a, istVorlage) {
+  var l = a.schritte || [];
+  var h = '';
+  var i;
+  for (i = 0; i < l.length; i++) {
+    var traeger = istVorlage ? null : schrittAufgabe(l[i]);
+    var fertig = istVorlage ? false : schrittFertig(l[i]);
+    var meta = [];
+    if (!istVorlage && l[i].ab) { meta.push(kurzDatum(l[i].ab)); }
+    if (traeger) { meta.push('Aufgabe · ' + planungText(traeger)); }
+    if (istVorlage) { meta.push((l[i].wann === 'danach') ? 'danach' : 'davor'); }
+    h += '<div class="tg-zeile' + (fertig ? ' fertig' : '') + '">';
+    if (istVorlage) {
+      h += '<span class="vk-ms-punkt" style="margin-top:6px"></span>';
+    } else {
+      h += '<button class="tg-kasten' + (fertig ? ' an' : '') + '" type="button" '
+         + 'onclick="abSchrittUm(' + i + ')" aria-label="erledigt"></button>';
+    }
+    h += '<span class="tg-text"' + (traeger ? (' onclick="aufgabeAktionen(\''
+         + esc(traeger.id) + '\')"') : '') + '>'
+       + '<span class="tg-titel">' + esc(schrittTitel(l[i]) || 'ohne Titel') + '</span>'
+       + (meta.length ? ('<span class="tg-meta">' + esc(meta.join(' · ')) + '</span>') : '')
+       + '</span></div>';
+  }
+  if (!l.length) {
+    h += '<div class="tg-leer" style="padding:10px 0">Noch kein Schritt.</div>';
+  }
   return h;
 }
 
@@ -15190,9 +15228,14 @@ function abSeiteHtml() {
   h += '<div class="tg-spalten"><div class="tg-links">';
   h += '<div class="tg-block"><div class="tg-bkopf">Schritte<span>'
      + (istVorlage ? l.length : (l.length - fertig) + ' offen') + '</span>'
+     + '<span style="flex:1"></span>'
+     + '<button class="ms-wort" type="button" onclick="abBearbeitenUm()">'
+     + (abBearbeiten ? 'Fertig' : 'Bearbeiten') + '</button>'
      + '<button class="ms-wort" type="button" onclick="abSchnellUm()">'
      + (abSchnell ? 'Fertig' : 'Schnell erfassen') + '</button></div>';
-  h += abSchnell ? abSchnellHtml(a) : abSchritteHtml(a, istVorlage, vorgang);
+  h += abSchnell ? abSchnellHtml(a)
+     : (abBearbeiten ? abSchritteHtml(a, istVorlage, vorgang)
+                     : abSchritteKurzHtml(a, istVorlage));
   h += '</div>';
   if (!istVorlage) {
     h += '<div class="tg-block"><div class="tg-bkopf">Ergebnis</div>'
