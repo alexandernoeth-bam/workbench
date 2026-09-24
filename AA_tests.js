@@ -41,6 +41,17 @@ let anzOk = 0, anzFail = 0, anzWarn = 0;
 function ok(text)   { console.log('  ok   ' + text); anzOk++; }
 function fail(text) { console.log('  FAIL ' + text); anzFail++; }
 function warn(text) { console.log('  warn ' + text); anzWarn++; }
+/* Seit v2.4.0 ist das Blatt eine Seite aus drei Teilen: Kopf und
+   Aufbau in abSeiteHtml, die Felder in abAngabenHtml, die Schritte in
+   abSchritteHtml. Geprüft wird ihr Zusammenhang. */
+function abSeiteQuelle() {
+  const s = hauptSkript();
+  return ['abSeiteHtml', 'abAngabenHtml', 'abSchritteHtml'].map(function (n) {
+    const m = s.match(new RegExp('function ' + n + '\\([\\s\\S]*?\\n\\}\\n'));
+    return m ? m[0] : '';
+  }).join('\n');
+}
+
 function pruefe(bedingung, text) { if (bedingung) { ok(text); } else { fail(text); } }
 
 function skriptBloecke() {
@@ -71,7 +82,7 @@ console.log('\n1. Bildschirme und Navigation');
   /* Die Diagnose hat seit v0.95.0 keinen Leistenknopf mehr — sie ist
      über das Zahnrad im Tag zu erreichen. */
   const VERSTECKT = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
-                     'Tagwechsel'];
+                     'Tagwechsel', 'Ablauf'];
   schirme.forEach(function (s) {
     if (VERSTECKT.indexOf(s) >= 0) {
       pruefe(navs.indexOf(s) < 0,
@@ -211,7 +222,7 @@ console.log('\n5. Element-IDs');
   /* Zusammengesetzte IDs wie 'schirm' + name */
   const schirme = [...QUELLE.matchAll(/id="schirm([A-Za-zÄÖÜäöü]+)"/g)].map(m => m[1]);
   const OHNE_KNOPF = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
-                      'Tagwechsel'];
+                      'Tagwechsel', 'Ablauf'];
   schirme.forEach(function (s) {
     if (OHNE_KNOPF.indexOf(s) >= 0) {
       pruefe(imHtml.has('schirm' + s), 'ID schirm' + s + ' existiert (ohne Knopf)');
@@ -554,6 +565,58 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__vhZustandApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkF = vhFilter; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   var lang = jetzt() - 20 * 86400000;'
+                 + '   DB.projekte = ['
+                 + '     { id:\'p1\', name:\'Garage\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[], geaendert: jetzt() },'
+                 + '     { id:\'p2\', name:\'MUKA\', kontext:\'beruflich\','
+                 + '       status:\'laufend\', zielzustaende:[], geaendert: jetzt() },'
+                 + '     { id:\'p3\', name:\'Solar\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[], geaendert: jetzt() },'
+                 + '     { id:\'p4\', name:\'Alt\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[], geaendert: lang },'
+                 + '     { id:\'p5\', name:\'Zu\', kontext:\'privat\','
+                 + '       status:\'abgeschlossen\', zielzustaende:[], geaendert: lang } ];'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Heute\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h,'
+                 + '       projektId:\'p1\', geaendert: jetzt() },'
+                 + '     { id:\'a2\', titel:\'Woche\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'woche\','
+                 + '       projektId:\'p1\', geaendert: jetzt() },'
+                 + '     { id:\'a3\', titel:\'Fertig\', kontext:\'privat\','
+                 + '       status:\'erledigt\', erledigtAm: h, art:\'haupt\','
+                 + '       projektId:\'p1\', geaendert: jetzt() },'
+                 + '     { id:\'a4\', titel:\'WFT\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'woche\','
+                 + '       projektId:\'p2\', geaendert: jetzt() },'
+                 + '     { id:\'a5\', titel:\'Alt\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'backlog\','
+                 + '       projektId:\'p4\', geaendert: lang } ];'
+                 + '   var r = { heute: vhZustand(DB.projekte[0], \'projekt\'),'
+                 + '             laeuft: vhZustand(DB.projekte[1], \'projekt\'),'
+                 + '             ohne: vhZustand(DB.projekte[2], \'projekt\'),'
+                 + '             alt: vhZustand(DB.projekte[3], \'projekt\'),'
+                 + '             zu: vhZustand(DB.projekte[4], \'projekt\') };'
+                 + '   r.text = vhZustandText(DB.projekte[0], \'projekt\').split(\' · \')[0];'
+                 + '   r.ring = (vhRingHtml(DB.projekte[0], \'projekt\')'
+                 + '     .match(/<i>(\\d+)<\\/i>/) || [])[1];'
+                 + '   var karte = vhKarteHtml(DB.projekte[0], \'projekt\');'
+                 + '   r.marken = (karte.match(/ab-marke">([^<]*)/g) || []).slice(0, 2)'
+                 + '     .map(function(x){ return x.slice(10); }).join(\',\');'
+                 + '   vhFilter = \'alle\'; vhStufe = \'vorhaben\';'
+                 + '   DB.einstellungen.vhGruppenZu = {};'
+                 + '   vhZeichnen();'
+                 + '   var b = document.getElementById(\'vhBlatt\').innerHTML;'
+                 + '   r.gruppen = (b.match(/ab-gruppe[^>]*><span>([^<]*)/g) || [])'
+                 + '     .map(function(x){ return x.replace(/.*<span>/, \'\'); }).join(\',\');'
+                 + '   vhFilter = merkF; DB.einstellungen.vhGruppenZu = {}; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__abZustandApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -2258,22 +2321,26 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '       status:\'laufend\', zielzustaende:[] },'
                  + '     { id:\'p2\', name:\'Privat B\', kontext:\'privat\','
                  + '       status:\'laufend\', zielzustaende:[] } ];'
+                 + '   DB.projekte[0].status = \'abgeschlossen\';'
                  + '   vhFilter = \'alle\'; vhKontextZu = {}; vhStufe = \'vorhaben\';'
+                 + '   DB.einstellungen.vhGruppenZu = {};'
                  + '   vhZeichnen();'
                  + '   var h = document.getElementById(\'vhBlatt\').innerHTML;'
-                 + '   var r = { beideKoepfe: (h.indexOf(\'Beruflich\') >= 0'
-                 + '               && h.indexOf(\'Privat\') >= 0),'
-                 + '             berufZuerst: (h.indexOf(\'Beruflich\')'
-                 + '               < h.indexOf(\'Privat\')) };'
-                 + '   vhKontextZu[\'beruflich\'] = true;'
+                 + '   var r = { beideKoepfe: (h.indexOf(\'Abgeschlossen\') >= 0'
+                 + '               && h.indexOf(\'Ruht\') >= 0),'
+                 + '             berufZuerst: (h.indexOf(\'Ruht\')'
+                 + '               < h.indexOf(\'Abgeschlossen\')) };'
+                 + '   r.nachEinklappen = (h.match(/class="vkarte/g) || []).length;'
+                 + '   DB.einstellungen.vhGruppenZu = { fertig: false };'
                  + '   vhZeichnen();'
                  + '   h = document.getElementById(\'vhBlatt\').innerHTML;'
-                 + '   r.nachEinklappen = (h.match(/class="vkarte/g) || []).length;'
-                 + '   setVhFilter(\'beruflich\');'
+                 + '   r.fertigAufKlappbar = (h.indexOf(\'Beruflich A\') >= 0);'
+                 + '   setVhFilter(\'privat\');'
                  + '   h = document.getElementById(\'vhBlatt\').innerHTML;'
-                 + '   r.nurEinerBeiFilter = (h.indexOf(\'Privat B\') < 0);'
-                 + '   r.beiFilterOffen = (h.indexOf(\'Beruflich A\') >= 0);'
-                 + '   vhFilter = merkF; vhKontextZu = {}; DB = alt;'
+                 + '   r.nurEinerBeiFilter = (h.indexOf(\'Beruflich A\') < 0);'
+                 + '   r.beiFilterOffen = (h.indexOf(\'Privat B\') >= 0);'
+                 + '   vhFilter = merkF; vhKontextZu = {};'
+                 + '   DB.einstellungen.vhGruppenZu = {}; DB = alt;'
                  + '   return r;'
                  + ' } };'
                  + 'globalThis.__abAnlageApi = {'
@@ -5432,7 +5499,7 @@ console.log('\n44. Abläufe und Wochenrückblick');
                   'durchlaufKarteHtml', 'vorlageFinden', 'durchlaufFinden', 'ablaufFinden',
                   'schritteFertig', 'offenerSchritt', 'laufendeDurchlaeufe',
                   'schrittUm', 'durchlaufStarten', 'durchlaufBeenden',
-                  'ablaufNeu', 'ablaufAnlegen', 'abDetailOeffnen', 'abDetailHtml',
+                  'ablaufNeu', 'ablaufAnlegen', 'abDetailOeffnen', 'abSeiteHtml',
                   'abSchrittNeu', 'abSchrittHoch', 'abSchrittWeg', 'vorlageAusDurchlauf',
                   'abLoeschen', 'ablaufSchritteHeute', 'ablaufKlammerHtml',
                   'rueckblickOeffnen', 'rueckblickHtml', 'rbErreicht', 'rbSatz',
@@ -5525,7 +5592,7 @@ console.log('\n46. Ruhende Ablaufschritte');
          && /ruht bis /.test(skript.match(/function abStandText\([\s\S]*?\n\}/)[0]),
          'die Ablaufliste zeigt, bis wann ein Durchlauf ruht');
 
-  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  const detail = [abSeiteQuelle()];
   pruefe(detail && /abSchrittAb\(/.test(detail[0]),
          'im Detail steht je Schritt ein Datumsfeld');
   pruefe(detail && /!istVorlage/.test(detail[0]),
@@ -5922,7 +5989,7 @@ console.log('\n54. Ablaufdialog');
   pruefe(new RegExp('function\\s+abSchrittAlsAufgabe\\s*\\(').test(skript),
          'Funktion abSchrittAlsAufgabe ist definiert');
 
-  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  const detail = [abSeiteQuelle()];
   pruefe(detail && /class="ms-titel" rows="2"/.test(detail[0]),
          'der Schritttitel ist ein mehrzeiliges Feld');
   pruefe(detail && /Nach oben<\/button>/.test(detail[0]),
@@ -6183,7 +6250,7 @@ console.log('\n58. Wiederkehrende Abläufe');
          'beim Sprung auf heute ebenfalls');
 
   /* Zuordnung */
-  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  const detail = [abSeiteQuelle()];
   pruefe(detail && /abFeldSetzen\(\\'projektId\\'/.test(detail[0]),
          'ein Ablauf lässt sich einem Projekt zuordnen');
   pruefe(detail && /abFeldSetzen\(\\'zielId\\'/.test(detail[0]), 'und einem Ziel');
@@ -6516,7 +6583,7 @@ console.log('\n62. Termin-Abläufe und nächste Woche');
   pruefe(ruht && /tag === isoDatum\(\)/.test(ruht[0]),
          'die Uhrzeit gilt nur für heute — an anderen Tagen sagt sie nichts');
 
-  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  const detail = [abSeiteQuelle()];
   pruefe(detail && /abSchrittWann\(/.test(detail[0]),
          'in der Vorlage lässt sich davor und danach setzen');
 
@@ -6696,7 +6763,7 @@ console.log('\n65. Ablauf und Termin verbinden');
   const zeile = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
   pruefe(zeile && /terminAblaufLoesen\(/.test(zeile[0]),
          'in der Tageszeile lässt sich die Verbindung lösen');
-  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  const detail = [abSeiteQuelle()];
   pruefe(detail && /a\.terminId/.test(detail[0]),
          'der Durchlauf nennt seinen Termin');
 
@@ -6828,7 +6895,7 @@ console.log('\n67. Schritt und Aufgabe');
          'es wird nichts nachgezogen — es gibt nur eine Sache');
 
   /* Der Titel gehört der Aufgabe */
-  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  const detail = [abSeiteQuelle()];
   pruefe(detail && /ms-fest/.test(detail[0]),
          'der Titel eines getragenen Schritts ist nicht doppelt änderbar');
   pruefe(detail && /abSchrittWahl\(/.test(detail[0]),
@@ -6921,7 +6988,7 @@ console.log('\n68. Abhakblatt');
          'der Dialog rollt zum Schritt');
   pruefe(so && /classList\.remove\('hervor'\)/.test(so[0]),
          'die Hervorhebung verblasst wieder');
-  const adh = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  const adh = [abSeiteQuelle()];
   pruefe(adh && /id="abSchritt' \+ i \+ '"/.test(adh[0]),
          'jeder Schritt im Dialog trägt eine Kennung, sonst gäbe es kein Ziel');
 
@@ -7300,7 +7367,7 @@ console.log('\n75. Anlagen am Ablauf');
            'Funktion ' + f + ' ist definiert');
   });
 
-  const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  const detail = [abSeiteQuelle()];
   pruefe(detail && /abAnlagenHtml\(a\)/.test(detail[0]),
          'Vorlage wie Durchlauf zeigen ihre Anlagen');
 
@@ -7358,13 +7425,18 @@ console.log('\n74. Bereiche nach Kontext');
            'Funktion ' + f + ' ist definiert');
   });
 
+  /* Seit v2.5.0 ordnet die Vorhabenübersicht wie die Abläufe nach
+     Zustand; Beruf und Privat trennt der Filter und die Randfarbe. */
   const z = skript.match(/function vhZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(z && /\['beruflich', 'Beruflich'\], \['privat', 'Privat'\]/.test(z[0]),
-         'erst der Beruf, dann das Private');
-  pruefe(z && /vhFilter !== 'alle' && vhFilter !== k/.test(z[0]),
+  pruefe(z && /VH_GRUPPEN/.test(z[0]) && /vhZustand\(e\.v, e\.art\) === name/.test(z[0]),
+         'die Übersicht ordnet nach Zustand');
+  pruefe(z && /vhFilter === 'alle' \|\| e\.v\.kontext === vhFilter/.test(z[0]),
          'bei gesetztem Filter bleibt nur der gewählte Bereich');
-  pruefe(z && /vhKontextOffen\(k\)/.test(z[0]),
-         'ein eingeklappter Bereich zeigt seine Karten nicht');
+  pruefe(z && /vhGruppeOffen\(name\)/.test(z[0]),
+         'eine eingeklappte Gruppe zeigt ihre Karten nicht');
+  const vg = skript.match(/function vhGruppeOffen\([\s\S]*?\n\}/);
+  pruefe(vg && /name === 'fertig' && k\[name\] !== false/.test(vg[0]),
+         'Abgeschlossenes steht unten und bleibt zu');
 
   const offen = skript.match(/function vhKontextOffen\([\s\S]*?\n\}/);
   pruefe(offen && /vhFilter !== 'alle'\) \{ return true/.test(offen[0]),
@@ -7415,14 +7487,14 @@ console.log('\n74. Bereiche nach Kontext');
     warn('Funktionen nicht auswertbar');
   } else {
     const r = v.pruefeBereiche();
-    pruefe(r.beideKoepfe === true, 'bei „Alle" stehen beide Bereiche da');
-    pruefe(r.berufZuerst === true, 'der Beruf zuerst');
+    pruefe(r.beideKoepfe === true, 'die Gruppen tragen ihre Namen');
+    pruefe(r.berufZuerst === true, 'Abgeschlossenes steht ganz unten');
     pruefe(r.nachEinklappen === 1,
-           'ein eingeklappter Bereich zeigt keine Karten mehr');
+           'zugeklappt zeigt „Abgeschlossen" seine Karte nicht');
+    pruefe(r.fertigAufKlappbar === true, 'aufgeklappt schon');
     pruefe(r.nurEinerBeiFilter === true,
-           'auf Beruf geschaltet steht das Private nicht mehr da');
-    pruefe(r.beiFilterOffen === true,
-           'und der gewählte ist offen, auch wenn er vorher zu war');
+           'auf Privat geschaltet steht das Berufliche nicht mehr da');
+    pruefe(r.beiFilterOffen === true, 'und das Private steht da');
   }
 }
 
@@ -8725,7 +8797,7 @@ console.log('\n94. Pinnwand');
   pruefe(dh && /pinKnopfHtml\('aufgabe'/.test(dh[0]), 'im Blatt einer Aufgabe');
   const ah = skript.match(/function abhakHtml\([\s\S]*?\n\}\n/);
   pruefe(ah && /pinKnopfHtml\('durchlauf'/.test(ah[0]), 'im Abhakblatt eines Ablaufs');
-  const ad = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  const ad = [abSeiteQuelle()];
   pruefe(ad && /pinKnopfHtml\(istVorlage \? 'vorlage' : 'durchlauf'/.test(ad[0]),
          'im Bearbeiten-Dialog, für Vorlage und Durchlauf');
   const vd = skript.match(/function vhDetailHtml\([\s\S]*?\n\}\n/);
@@ -9689,7 +9761,7 @@ console.log('\n113. Vorgänge');
          'der Einstieg steht im Aufgabenblatt');
   pruefe(dh && /if \(!a\.wiederholung\) \{/.test(dh[0]),
          'aber nicht bei einer wiederkehrenden Aufgabe');
-  const ad = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  const ad = [abSeiteQuelle()];
   pruefe(ad && /vorgangErgebnisSetzen/.test(ad[0])
          && /flaecheOeffnen\(\\?'d:/.test(ad[0]),
          'das Blatt hat Ergebnis und Gedankenfläche');
@@ -9781,6 +9853,57 @@ console.log('\n114. Abläufe nach Zustand');
     pruefe(e.inGruppe === 'fertig', 'er rutscht in die Gruppe „Erledigt"');
     pruefe(e.wiederAuf === false, '„Wieder öffnen" macht ihn wieder zu einem laufenden');
     pruefe(e.sortiert === 'B,A', 'innerhalb der Gruppe lässt sich schieben');
+  }
+}
+
+/* ============================================================
+   115. Ablaufseite und Vorhabenuebersicht angeglichen
+   Grund: Der Ablauf lag als Blatt ueber der Liste — fuer Schritte,
+   Angaben und Anlagen zu wenig Platz. Und die Vorhaben standen nach
+   Beruf und Privat sortiert, waehrend die Ablaeufe nach Zustand ordnen.
+   ============================================================ */
+console.log('\n115. Ablaufseite und Vorhaben');
+{
+  const skript = hauptSkript();
+  const v = globalThis.__vhZustandApi;
+
+  ['abSeiteHtml', 'abAngabenHtml', 'abSchritteHtml', 'vhZustand', 'vhZustandText',
+   'vhGruppeOffen', 'vhGruppeUm', 'vhRingHtml', 'vhKarteHtml',
+   'vhSchiebenId'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(!/function abDetailHtml\s*\(/.test(skript),
+         'das Blatt ist ersetzt, nicht verdoppelt');
+  pruefe(/id="schirmAblauf"/.test(QUELLE) && /id="abSeiteBlatt"/.test(QUELLE),
+         'der Ablauf hat eine eigene Seite');
+  const ao = skript.match(/function abDetailOeffnen\([\s\S]*?\n\}/);
+  pruefe(ao && /zeigeSchirm\('Ablauf'\)/.test(ao[0]), 'die Karte öffnet sie');
+  const as = skript.match(/function abDetailSchliessen\([\s\S]*?\n\}/);
+  pruefe(as && /zeigeSchirm\('Ablaeufe'\)/.test(as[0]), '„Zurück" führt zur Liste');
+  const seite = skript.match(/function abSeiteHtml\([\s\S]*?\n\}\n/);
+  pruefe(seite && /tg-spalten/.test(seite[0]) && /abAngabenHtml\(a, istVorlage\)/.test(seite[0]),
+         'links die Arbeit, rechts die Angaben');
+  pruefe(seite && /ringHtml\(fertig, l\.length\)/.test(seite[0]),
+         'der Ring steht in der Kopfkarte');
+  pruefe(/\['heute', 'Heute dran'\], \['laeuft', 'Läuft'\], \['ruht', 'Ruht'\],\s*\['fertig', 'Abgeschlossen'\]/
+         .test(skript), 'die Vorhaben kennen dieselben vier Gruppen');
+
+  if (!v) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = v.pruefe();
+    pruefe(e.heute === 'heute',
+           'ein Vorhaben mit einer heute fälligen Tätigkeit ist heute dran');
+    pruefe(e.laeuft === 'laeuft', 'eines mit offenen Tätigkeiten läuft');
+    pruefe(e.ohne === 'ruht', 'eines ohne Tätigkeiten ruht');
+    pruefe(e.alt === 'ruht', 'ebenso eines, an dem seit über einer Woche nichts geschah');
+    pruefe(e.zu === 'fertig', 'ein abgeschlossenes steht unten');
+    pruefe(e.text === '1 heute fällig', 'die Marke sagt, warum');
+    pruefe(e.ring === '33', 'der Ring zählt erledigte von allen Tätigkeiten');
+    pruefe(e.marken === 'Projekt,2 Tätigkeiten', 'der Fuß nennt Art und Umfang');
+    pruefe(e.gruppen === 'Heute dran · 1,Läuft · 1,Ruht · 2,Abgeschlossen · 1',
+           'die Übersicht ordnet danach');
   }
 }
 

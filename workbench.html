@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 2.3.0</title>
+<title>Workbench 2.5.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1005,7 +1005,22 @@ body.breit .ab-pfeile{display:none}
 .ring i{position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;
   justify-content:center;font-style:normal;font-size:calc(var(--fs)*0.62);color:var(--grau)}
 .ring.voll i{color:var(--petrol);font-weight:500}
-.as-meta-ring{display:flex;align-items:center;justify-content:space-between;gap:10px}
+/* Die Ablaufseite */
+.ab-kopfkarte{display:flex;gap:14px;align-items:flex-start;background:var(--karte);
+  border:1px solid var(--linie);border-left:4px solid var(--weinrot);border-radius:10px;
+  padding:12px 14px;margin:4px 0 12px}
+.ab-kopfkarte.privat{border-left-color:var(--petrol)}
+.ab-kk-text{flex:1;min-width:0}
+.ab-kk-name{width:100%;font:inherit;font-size:calc(var(--fs)*1.05);font-weight:500;
+  border:0;border-bottom:1px solid transparent;background:none;color:var(--tinte);padding:0}
+.ab-kk-name:focus{outline:none;border-bottom-color:var(--linie)}
+.ab-kk-meta{font-size:calc(var(--fs)*0.74);color:var(--grau);margin-top:3px}
+.ab-kk-knoepfe{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.ab-kk-knoepfe button{font:inherit;font-size:calc(var(--fs)*0.76);padding:4px 11px;
+  border:1px solid var(--linie);border-radius:7px;background:var(--karte);color:var(--tinte);
+  cursor:pointer}
+.ab-kk-knoepfe button.gefahr{color:var(--weinrot)}
+.tg-bkopf .ms-wort{margin-left:8px}
 
 /* Meldungen blenden sich unten kurz ein. */
 .toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);
@@ -1432,6 +1447,15 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
   <div class="fl-springer" id="flaecheSpringer"></div>
 </div>
 
+<div class="schirm" id="schirmAblauf">
+  <div class="vh-kopf">
+    <div class="vh-zeile">
+      <button type="button" class="pille" onclick="abDetailSchliessen()">Zurück</button>
+    </div>
+  </div>
+  <div class="vhblatt einfachliste" id="abSeiteBlatt"></div>
+</div>
+
 <div class="schirm" id="schirmTagwechsel">
   <div class="vhblatt einfachliste" id="tagwBlatt"></div>
 </div>
@@ -1660,7 +1684,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     </div>
   </div>
 
-  <div class="vhblatt" id="vhBlatt"></div>
+  <div class="vhblatt einfachliste" id="vhBlatt"></div>
   <div class="vhblatt einfachliste" id="einfallBlatt" style="display:none"></div>
 
   <button class="plusknopf" type="button" id="vhPlus" onclick="vorhabenNeu()"
@@ -1777,7 +1801,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '2.3.0';
+var APP_VERSION = '2.5.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -6247,7 +6271,7 @@ function handleVergessen() {
 function zeigeSchirm(name) {
   schirmOffen = name;
   var alle = ['Tag', 'Kalender', 'Vorhaben', 'Ablaeufe', 'Aufgaben',
-              'Flaeche', 'Gedanken', 'Taetigkeiten', 'Tagwechsel', 'Pinnwand',
+              'Flaeche', 'Gedanken', 'Taetigkeiten', 'Tagwechsel', 'Ablauf', 'Pinnwand',
               'Migration', 'Diagnose'];
   var i;
   for (i = 0; i < alle.length; i++) {
@@ -6263,6 +6287,7 @@ function zeigeSchirm(name) {
       var leuchtet = (alle[i] === name)
                   || ((name === 'Flaeche' || name === 'Gedanken'
                        || name === 'Taetigkeiten') && alle[i] === 'Vorhaben')
+                  || (name === 'Ablauf' && alle[i] === 'Ablaeufe')
                   || ((name === 'Diagnose' || name === 'Tagwechsel')
                       && alle[i] === 'Tag');
       if (leuchtet) { n.classList.add('aktiv'); } else { n.classList.remove('aktiv'); }
@@ -6273,6 +6298,7 @@ function zeigeSchirm(name) {
   if (name === 'Gedanken') { gedankenZeichnen(); }
   if (name === 'Taetigkeiten') { taetigZeichnen(); }
   if (name === 'Tagwechsel') { tagwZeichnen(); }
+  if (name === 'Ablauf') { abDetailNeu(); }
   if (name === 'Pinnwand') { pinnwandZeichnen(); }
   if (name === 'Tag') { tagZeichnen(); kalenderNachholen(); }
   if (name === 'Aufgaben') { aufZeichnen(); }
@@ -11068,6 +11094,121 @@ function restZeitHtml(bis) {
        + esc(restZeitText(heute, bis)) + '</div>';
 }
 
+/* ============================================================
+   Die Vorhabenübersicht in derselben Ordnung wie die Abläufe: nach
+   Zustand, mit Ring und eingeklapptem Abgeschlossenem.
+   ============================================================ */
+
+var VH_GRUPPEN = [['heute', 'Heute dran'], ['laeuft', 'Läuft'], ['ruht', 'Ruht'],
+                  ['fertig', 'Abgeschlossen']];
+
+/* Der Zustand kommt aus den Tätigkeiten: Was heute fällig ist, was
+   offen ist, und was seit einer Woche keine Regung zeigt. */
+function vhZustand(v, art) {
+  if (v.status === 'abgeschlossen') { return 'fertig'; }
+  var heute = isoDatum();
+  var t = vhTaetigkeiten(art, v.id);
+  var i;
+  for (i = 0; i < t.haupt.length; i++) {
+    if (t.haupt[i].planung === heute) { return 'heute'; }
+    if (t.haupt[i].frist && t.haupt[i].frist <= heute) { return 'heute'; }
+  }
+  for (i = 0; i < t.klein.length; i++) {
+    if (t.klein[i].planung === heute) { return 'heute'; }
+  }
+  for (i = 0; i < t.ablaeufe.length; i++) {
+    if (abZustand(t.ablaeufe[i]) === 'heute') { return 'heute'; }
+  }
+  var ende = (art === 'ziel') ? v.zieltermin : v.ende;
+  if (ende && ende <= heute) { return 'heute'; }
+  var offen = t.haupt.length + t.klein.length + t.wieder.length + t.ablaeufe.length;
+  if (!offen) { return 'ruht'; }
+  if (letzteRegung(art, v.id) < Date.now() - TAGW_TAGE * 86400000) { return 'ruht'; }
+  return 'laeuft';
+}
+
+function vhZustandText(v, art) {
+  var heute = isoDatum();
+  var ende = (art === 'ziel') ? v.zieltermin : v.ende;
+  var zustand = vhZustand(v, art);
+  if (zustand === 'fertig') { return 'abgeschlossen'; }
+  var t = vhTaetigkeiten(art, v.id);
+  var teile = [];
+  if (zustand === 'heute') {
+    var zahl = t.haupt.filter(function (a) {
+      return a.planung === heute || (a.frist && a.frist <= heute);
+    }).length + t.klein.filter(function (a) { return a.planung === heute; }).length;
+    teile.push(zahl ? (zahl + ' heute fällig') : 'heute dran');
+  } else if (zustand === 'ruht') {
+    var offen = t.haupt.length + t.klein.length + t.wieder.length + t.ablaeufe.length;
+    teile.push(offen ? 'seit über einer Woche nichts' : 'keine Tätigkeiten');
+  } else {
+    teile.push('läuft');
+  }
+  if (ende) { teile.push(restZeitText(heute, ende)); }
+  return teile.join(' · ');
+}
+
+function vhGruppeOffen(name) {
+  var k = DB.einstellungen.vhGruppenZu || {};
+  if (k[name] === true) { return false; }
+  if (name === 'fertig' && k[name] !== false) { return false; }
+  return true;
+}
+
+function vhGruppeUm(name) {
+  if (!DB.einstellungen.vhGruppenZu) { DB.einstellungen.vhGruppenZu = {}; }
+  DB.einstellungen.vhGruppenZu[name] = vhGruppeOffen(name);
+  spaeterSichern();
+  vhZeichnen();
+}
+
+/* Der Ring zählt erledigte Tätigkeiten. Bei einem langen Projekt ist er
+   ein Stimmungsbild, kein Versprechen — man legt ja nach. */
+function vhRingHtml(v, art) {
+  var t = vhTaetigkeiten(art, v.id);
+  var offen = t.haupt.length + t.klein.length + t.ablaeufe.length;
+  var fertig = t.erledigt.length;
+  return ringHtml(fertig, fertig + offen);
+}
+
+function vhKarteHtml(v, art) {
+  var satz = zustandText(v);
+  var zustand = vhZustand(v, art);
+  var ende = (art === 'ziel') ? v.zieltermin : v.ende;
+  var t = vhTaetigkeiten(art, v.id);
+  var offen = t.haupt.length + t.klein.length + t.wieder.length + t.ablaeufe.length;
+  var h = '<div class="vkarte ablauf' + (v.kontext === 'privat' ? ' privat' : '')
+        + ((zustand === 'ruht' || zustand === 'fertig') ? ' ruht' : '') + '"'
+        + ziehAttribute('vorhaben', v.id)
+        + ' onclick="vhDetailOeffnen(\'' + esc(v.id) + '\',\'' + art + '\')">';
+  h += '<div class="ab-oben"><span class="ab-name">' + esc(v.name) + '</span>'
+     + vhRingHtml(v, art) + '</div>';
+  h += '<span class="ab-stand' + ((zustand === 'heute') ? ' faellig' : '')
+     + ((zustand === 'laeuft') ? ' laeuft' : '') + '">' + esc(vhZustandText(v, art))
+     + '</span>';
+  if (satz) { h += '<div class="ab-naechster">Diese Woche: ' + esc(satz) + '</div>'; }
+  h += '<div class="ab-fuss">';
+  var marken = [(art === 'ziel') ? 'Ziel' : 'Projekt'];
+  if (offen) { marken.push(offen + (offen === 1 ? ' Tätigkeit' : ' Tätigkeiten')); }
+  if (ende) { marken.push('bis ' + kurzDatum(ende)); }
+  h += '<span class="ab-marke">' + marken.join('</span><span class="ab-marke">') + '</span>';
+  h += '<span style="flex:1"></span>';
+  h += '<span class="ab-pfeile">'
+     + '<button type="button" onclick="event.stopPropagation();vhSchiebenId(\'' + esc(v.id)
+     + '\',-1)" aria-label="nach vorn">‹</button>'
+     + '<button type="button" onclick="event.stopPropagation();vhSchiebenId(\'' + esc(v.id)
+     + '\',1)" aria-label="nach hinten">›</button></span>';
+  h += '</div>';
+  h += '<div class="vk-knoepfe">' + flaecheKnopfHtml(v) + taetigKnopfHtml(v, art) + '</div>';
+  h += '</div>';
+  return h;
+}
+
+function vhSchiebenId(id, richtung) {
+  if (ordnungSchieben(vorhabenGruppe(id), id, richtung)) { vhZeichnen(); }
+}
+
 function projektKarteHtml(p) {
   var satz = zustandText(p);
   var h = '<div class="vkarte flach' + (p.kontext === 'privat' ? ' privat' : '') + '"'
@@ -11146,32 +11287,35 @@ function vhBereichKopf(k, name, zahl) {
 function vhZeichnen() {
   var blatt = document.getElementById('vhBlatt');
   if (!blatt) { return; }
+  /* Abgeschlossenes gehört in die eigene Gruppe, nicht heraus. */
+  var alle = (DB.ziele || []).map(function (z) { return { v: z, art: 'ziel' }; })
+    .concat((DB.projekte || []).map(function (p) { return { v: p, art: 'projekt' }; }))
+    .filter(function (e) {
+      return (vhFilter === 'alle' || e.v.kontext === vhFilter);
+    });
   var ziele = vhSichtbar(DB.ziele || []);
   var projekte = vhSichtbar(DB.projekte || []);
   var h = '';
-  var bereiche = [['beruflich', 'Beruflich'], ['privat', 'Privat']];
-  var b, i;
-
-  for (b = 0; b < bereiche.length; b++) {
-    var k = bereiche[b][0];
-    if (vhFilter !== 'alle' && vhFilter !== k) { continue; }
-    var zK = ziele.filter(function (z) { return z.kontext === k; });
-    var pK = projekte.filter(function (p) { return p.kontext === k; });
-    h += vhBereichKopf(k, bereiche[b][1], zK.length + pK.length);
-    if (!vhKontextOffen(k)) { continue; }
-
-    if (zK.length) {
-      h += '<div class="vh-gruppe"><span>Ziele · ' + zK.length + '</span></div>';
-      for (i = 0; i < zK.length; i++) { h += zielKarteHtml(zK[i]); }
+  var g, i;
+  for (g = 0; g < VH_GRUPPEN.length; g++) {
+    var name = VH_GRUPPEN[g][0];
+    var drin = alle.filter(function (e) { return vhZustand(e.v, e.art) === name; });
+    if (!drin.length) { continue; }
+    var geordnet = nachOrdnung(drin.map(function (e) { return e.v; }));
+    var auf = vhGruppeOffen(name);
+    h += '<button class="ab-gruppe' + (auf ? ' auf' : '') + '" type="button" '
+       + 'onclick="vhGruppeUm(\'' + name + '\')"><span>' + VH_GRUPPEN[g][1] + ' · '
+       + drin.length + '</span>'
+       + '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></button>';
+    if (!auf) { continue; }
+    h += '<div class="ab-raster">';
+    for (i = 0; i < geordnet.length; i++) {
+      var art = drin.filter(function (e) { return e.v === geordnet[i]; })[0].art;
+      h += vhKarteHtml(geordnet[i], art);
     }
-    if (pK.length) {
-      h += '<div class="vh-gruppe"><span>Projekte · ' + pK.length + '</span></div>';
-      for (i = 0; i < pK.length; i++) { h += projektKarteHtml(pK[i]); }
-    }
-    if (!zK.length && !pK.length) {
-      h += '<div class="tleer">Nichts in diesem Bereich.</div>';
-    }
+    h += '</div>';
   }
+  if (!alle.length) { h += '<div class="tleer">Noch kein Vorhaben.</div>'; }
 
   blatt.innerHTML = h;
   var zahl = document.getElementById('vhZahl');
@@ -14758,7 +14902,10 @@ function abhakHtml() {
    wäre das Getippte sonst verloren. */
 function abDetailSchliessen() {
   if (abSchnell) { abSchnellUebernehmen(); abSchnell = false; }
-  aktionenSchliessen();
+  abDetail = '';
+  abDetailArt = '';
+  zeigeSchirm('Ablaeufe');
+  abZeichnen();
 }
 
 /* Den Ablaufdialog öffnen und zum Schritt rollen. Das Hervorheben
@@ -14780,17 +14927,13 @@ function abDetailOeffnen(id, art) {
   abSchnell = false;
   abDetail = id;
   abDetailArt = art;
-  var sheet = document.getElementById('aktionSheet');
-  var hg = document.getElementById('aktionHg');
-  if (!sheet || !hg) { return; }
-  sheet.innerHTML = abDetailHtml();
-  sheet.classList.add('auf');
-  hg.classList.add('auf');
+  zeigeSchirm('Ablauf');
+  abDetailNeu();
 }
 
 function abDetailNeu() {
-  var sheet = document.getElementById('aktionSheet');
-  if (sheet && abDetail) { sheet.innerHTML = abDetailHtml(); }
+  var blatt = document.getElementById('abSeiteBlatt');
+  if (blatt && abDetail) { blatt.innerHTML = abSeiteHtml(); }
 }
 
 function abGeaendert(neuZeichnen) {
@@ -14803,27 +14946,11 @@ function abGeaendert(neuZeichnen) {
   if (neuZeichnen) { abDetailNeu(); }
 }
 
-function abDetailHtml() {
-  var a = ablaufFinden(abDetail, abDetailArt);
-  if (!a) { return blattKopf() + '<div class="tleer">Nicht gefunden.</div>'; }
-  var istVorlage = (abDetailArt === 'vorlage');
-
-  var h = blattKopf();
-  h += '<input class="as-titelfeld" id="abName" type="text" value="' + esc(a.name) + '" '
-     + 'placeholder="' + (istVorlage ? 'Name der Vorlage' : 'Worum geht es?') + '" '
-     + 'oninput="abNameSetzen(this.value)">';
-  var vorgang = istVorgang(a);
-  /* Der Ring steht in derselben Zeile wie die Angabe — hochgezogen
-     lag er über dem Titel und dem Schließen. */
-  h += '<div class="as-meta as-meta-ring"><span>'
-     + (istVorlage ? 'Vorlage' : (vorgang ? 'Vorgang' : 'Durchlauf'))
-     + (istVorlage ? '' : (' · ' + schritteFertig(a) + ' von '
-                           + (a.schritte || []).length))
-     + (a.erledigt ? ' · erledigt' : '') + '</span>'
-     + (istVorlage ? '' : ringHtml(schritteFertig(a), (a.schritte || []).length))
-     + '</div>';
-  h += '<div class="as-linie' + (a.kontext === 'privat' ? ' privat' : '') + '"></div>';
-
+/* Die Seite eines Ablaufs — gebaut wie die Tätigkeitenseite: eine
+   Kopfkarte mit Ring, links die Arbeit, rechts die Angaben. Als Blatt
+   über der Liste war für Schritte, Angaben und Anlagen zu wenig Platz. */
+function abAngabenHtml(a, istVorlage) {
+  var h = '';
   h += '<div class="d-feld"><div class="d-name">Kontext</div><div class="d-wert">';
   h += '<button class="d-wahl' + (a.kontext === 'beruflich' ? ' an' : '') + '" type="button" '
      + 'onclick="abKontextSetzen(\'beruflich\')">Beruflich</button>';
@@ -14921,33 +15048,11 @@ function abDetailHtml() {
     }
   }
 
-  h += abAnlagenHtml(a);
-  h += pinKnopfHtml(istVorlage ? 'vorlage' : 'durchlauf', a.id);
+  return h;
+}
 
-  if (!istVorlage) {
-    /* Das Ergebnis ist bei einem Vorgang das eigentliche Produkt: was
-       entschieden wurde und was künftig gilt. */
-    h += '<div class="s-abschnitt">Ergebnis</div>';
-    h += '<textarea class="d-text" placeholder="Was wurde entschieden, was gilt künftig?" '
-       + 'oninput="vorgangErgebnisSetzen(this.value)">' + esc(a.ergebnis || '')
-       + '</textarea>';
-    h += '<div class="d-reihe">'
-       + '<button type="button" onclick="flaecheOeffnen(\'d:' + esc(a.id) + '\')">'
-       + 'Gedanken' + (String(a.flaeche || '').trim().length ? ' ·' : '') + '</button>'
-       + '</div>';
-  }
-
-  h += '<div class="s-abschnitt">Schritte'
-     + '<button class="ms-wort" type="button" onclick="abSchnellUm()" '
-     + 'style="float:right;font-weight:400">'
-     + (abSchnell ? 'Fertig' : 'Schnell erfassen') + '</button></div>';
-  if (abSchnell) {
-    h += abSchnellHtml(a);
-    h += '<div class="d-reihe">'
-       + '<button class="gefahr" type="button" onclick="abLoeschen()">Löschen</button>'
-       + '<button type="button" onclick="abDetailSchliessen()">Fertig</button></div>';
-    return h;
-  }
+function abSchritteHtml(a, istVorlage, vorgang) {
+  var h = '';
   var l = a.schritte || [];
   var i;
   for (i = 0; i < l.length; i++) {
@@ -15013,7 +15118,61 @@ function abDetailHtml() {
   h += '<button class="neu-zeile" type="button" onclick="abSchrittNeu()">'
      + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Schritt</button>';
 
-  h += '<div class="d-reihe">';
+  h += '<button class="neu-zeile" type="button" onclick="abSchrittNeu()">'
+     + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Schritt</button>';
+  return h;
+}
+
+function abSeiteHtml() {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a) { return '<div class="tleer">Nicht gefunden.</div>'; }
+  var istVorlage = (abDetailArt === 'vorlage');
+  var vorgang = istVorgang(a);
+  var l = a.schritte || [];
+  var fertig = schritteFertig(a);
+
+  var h = '<div class="tg-seite">';
+  h += '<div class="ab-kopfkarte' + (a.kontext === 'privat' ? ' privat' : '') + '">';
+  h += '<div class="ab-kk-text">';
+  h += '<input class="ab-kk-name" id="abName" type="text" value="' + esc(a.name) + '" '
+     + 'placeholder="' + (istVorlage ? 'Name der Vorlage' : 'Worum geht es?') + '" '
+     + 'oninput="abNameSetzen(this.value)">';
+  var meta = [istVorlage ? 'Vorlage' : (vorgang ? 'Vorgang' : 'Durchlauf'),
+              (a.kontext === 'privat') ? 'privat' : 'beruflich'];
+  var v = a.projektId ? vorhabenFinden(a.projektId, 'projekt')
+        : (a.zielId ? vorhabenFinden(a.zielId, 'ziel') : null);
+  if (v) { meta.push(v.name); }
+  if (a.frist) { meta.push('Frist ' + kurzDatum(a.frist)); }
+  if (a.erledigt) { meta.push('erledigt' + (a.erledigtAm ? (' ' + kurzDatum(a.erledigtAm)) : '')); }
+  h += '<div class="ab-kk-meta">' + esc(meta.join(' · ')) + '</div>';
+
+  var zahlen = [];
+  if (l.length) {
+    zahlen.push(istVorlage ? (l.length + (l.length === 1 ? ' Schritt' : ' Schritte'))
+                           : (fertig + ' von ' + l.length + ' Schritten'));
+  }
+  var mitAufgabe = l.filter(function (s) { return !!schrittAufgabe(s); }).length;
+  if (mitAufgabe) {
+    zahlen.push(mitAufgabe + (mitAufgabe === 1 ? ' Aufgabe' : ' Aufgaben'));
+  }
+  if (a.terminId) {
+    zahlen.push('Termin ' + kurzDatum(a.terminTag || '')
+              + (a.terminZeit ? (', ' + a.terminZeit) : ''));
+  }
+  if ((a.anlagen || []).length) {
+    zahlen.push((a.anlagen || []).length
+              + ((a.anlagen || []).length === 1 ? ' Anlage' : ' Anlagen'));
+  }
+  if (zahlen.length) {
+    h += '<div class="tg-zahlen"><span>' + zahlen.join('</span><span>') + '</span></div>';
+  }
+
+  h += '<div class="ab-kk-knoepfe">';
+  if (!istVorlage) {
+    h += '<button type="button" onclick="flaecheOeffnen(\'d:' + esc(a.id) + '\')">Gedanken'
+       + (String(a.flaeche || '').trim().length ? ' ·' : '') + '</button>';
+  }
+  h += pinKnopfHtml(istVorlage ? 'vorlage' : 'durchlauf', a.id);
   if (istVorlage) {
     h += '<button type="button" onclick="durchlaufStartenAusDetail()">Jetzt starten</button>';
   } else {
@@ -15024,7 +15183,29 @@ function abDetailHtml() {
     }
   }
   h += '<button type="button" class="gefahr" onclick="abLoeschen()">Löschen</button>';
+  h += '</div></div>';
+  if (!istVorlage) { h += ringHtml(fertig, l.length); }
   h += '</div>';
+
+  h += '<div class="tg-spalten"><div class="tg-links">';
+  h += '<div class="tg-block"><div class="tg-bkopf">Schritte<span>'
+     + (istVorlage ? l.length : (l.length - fertig) + ' offen') + '</span>'
+     + '<button class="ms-wort" type="button" onclick="abSchnellUm()">'
+     + (abSchnell ? 'Fertig' : 'Schnell erfassen') + '</button></div>';
+  h += abSchnell ? abSchnellHtml(a) : abSchritteHtml(a, istVorlage, vorgang);
+  h += '</div>';
+  if (!istVorlage) {
+    h += '<div class="tg-block"><div class="tg-bkopf">Ergebnis</div>'
+       + '<textarea class="d-text" placeholder="Was wurde entschieden, was gilt künftig?" '
+       + 'oninput="vorgangErgebnisSetzen(this.value)">' + esc(a.ergebnis || '')
+       + '</textarea></div>';
+  }
+  h += '</div><div class="tg-rechts">';
+  h += '<div class="tg-block"><div class="tg-bkopf">Angaben</div>'
+     + abAngabenHtml(a, istVorlage) + '</div>';
+  h += '<div class="tg-block"><div class="tg-bkopf">Anlagen<span>'
+     + (a.anlagen || []).length + '</span></div>' + abAnlagenHtml(a) + '</div>';
+  h += '</div></div></div>';
   return h;
 }
 
