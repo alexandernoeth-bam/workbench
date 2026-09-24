@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 2.0.0</title>
+<title>Workbench 2.1.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1723,7 +1723,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '2.0.0';
+var APP_VERSION = '2.1.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5725,6 +5725,14 @@ function detailHtml(a) {
 
   h += '<textarea class="d-text" placeholder="Beschreibung …" '
      + 'oninput="dBeschreibung(this.value)">' + esc(a.beschreibung || '') + '</textarea>';
+
+  if (!a.wiederholung) {
+    h += '<div class="d-reihe">'
+       + '<button type="button" onclick="vorgangAusAufgabe()">'
+       + 'Daraus einen Vorgang machen</button></div>'
+       + '<div class="d-hinweis" style="text-align:left">Wird aus der Aufgabe mehr, '
+       + 'bekommt sie Schritte. Sie selbst bleibt der erste davon.</div>';
+  }
 
   h += '<div class="d-reihe">';
   h += '<button type="button" onclick="aufgabeSchieben(1)">Auf morgen</button>';
@@ -11730,7 +11738,21 @@ function istFreie(id) {
   return String(id).indexOf('g:') === 0;
 }
 
+/* Auch ein Vorgang hat eine Fläche — dort steht am Ende die
+   Entscheidung. Sein Schlüssel trägt den Vorsatz „d:". */
+function istVorgangsFlaeche(id) {
+  return String(id).indexOf('d:') === 0;
+}
+
+function vorgangZuFlaeche(id) {
+  return istVorgangsFlaeche(id) ? durchlaufFinden(String(id).slice(2)) : null;
+}
+
 function flaecheText(id) {
+  if (istVorgangsFlaeche(id)) {
+    var d = vorgangZuFlaeche(id);
+    return d ? String(d.flaeche || '') : '';
+  }
   if (istFreie(id)) {
     var g = gedankeFinden(String(id).slice(2));
     return g ? String(g.text || '') : '';
@@ -11740,6 +11762,14 @@ function flaecheText(id) {
 }
 
 function flaecheSetzen(id, text) {
+  if (istVorgangsFlaeche(id)) {
+    var dv = vorgangZuFlaeche(id);
+    if (!dv) { return; }
+    dv.flaeche = text;
+    dv.geaendert = jetzt();
+    spaeterSichern();
+    return;
+  }
   if (istFreie(id)) {
     var g = gedankeFinden(String(id).slice(2));
     if (!g) { return; }
@@ -11755,6 +11785,10 @@ function flaecheSetzen(id, text) {
 }
 
 function flaecheName(id) {
+  if (istVorgangsFlaeche(id)) {
+    var dn = vorgangZuFlaeche(id);
+    return dn ? (dn.name || 'Vorgang') : 'Vorgang';
+  }
   if (istFreie(id)) {
     var g = gedankeFinden(String(id).slice(2));
     return g ? (g.titel || 'ohne Titel') : 'Fläche';
@@ -14042,6 +14076,22 @@ function abZeichnen() {
          + '</div>';
       continue;
     }
+    if (abStufe === 'laufend') {
+      /* Einmaliges und Verfahren nebeneinander zu stellen, verwischt
+         den Unterschied: erst die Vorgänge, dann die Durchläufe aus
+         Vorlagen. */
+      var vorgaenge = drin.filter(istVorgang);
+      var ausVorlage = drin.filter(function (d) { return !istVorgang(d); });
+      if (vorgaenge.length) {
+        h += '<div class="gruppenkopf"><span>Vorgänge · ' + vorgaenge.length
+           + '</span></div>' + abGruppenHtml(vorgaenge, karte);
+      }
+      if (ausVorlage.length) {
+        h += '<div class="gruppenkopf"><span>Aus Vorlagen · ' + ausVorlage.length
+           + '</span></div>' + abGruppenHtml(ausVorlage, karte);
+      }
+      continue;
+    }
     h += abGruppenHtml(drin, karte);
   }
 
@@ -14547,7 +14597,10 @@ function abDetailHtml() {
   h += '<input class="as-titelfeld" id="abName" type="text" value="' + esc(a.name) + '" '
      + 'placeholder="' + (istVorlage ? 'Name der Vorlage' : 'Worum geht es?') + '" '
      + 'oninput="abNameSetzen(this.value)">';
-  h += '<div class="as-meta">' + (istVorlage ? 'Vorlage' : 'Durchlauf') + '</div>';
+  var vorgang = istVorgang(a);
+  h += '<div class="as-meta">'
+     + (istVorlage ? 'Vorlage' : (vorgang ? 'Vorgang' : 'Durchlauf'))
+     + ' · ' + schritteFertig(a) + ' von ' + (a.schritte || []).length + '</div>';
   h += '<div class="as-linie' + (a.kontext === 'privat' ? ' privat' : '') + '"></div>';
 
   h += '<div class="d-feld"><div class="d-name">Kontext</div><div class="d-wert">';
@@ -14650,6 +14703,19 @@ function abDetailHtml() {
   h += abAnlagenHtml(a);
   h += pinKnopfHtml(istVorlage ? 'vorlage' : 'durchlauf', a.id);
 
+  if (!istVorlage) {
+    /* Das Ergebnis ist bei einem Vorgang das eigentliche Produkt: was
+       entschieden wurde und was künftig gilt. */
+    h += '<div class="s-abschnitt">Ergebnis</div>';
+    h += '<textarea class="d-text" placeholder="Was wurde entschieden, was gilt künftig?" '
+       + 'oninput="vorgangErgebnisSetzen(this.value)">' + esc(a.ergebnis || '')
+       + '</textarea>';
+    h += '<div class="d-reihe">'
+       + '<button type="button" onclick="flaecheOeffnen(\'d:' + esc(a.id) + '\')">'
+       + 'Gedanken' + (String(a.flaeche || '').trim().length ? ' ·' : '') + '</button>'
+       + '</div>';
+  }
+
   h += '<div class="s-abschnitt">Schritte'
      + '<button class="ms-wort" type="button" onclick="abSchnellUm()" '
      + 'style="float:right;font-weight:400">'
@@ -14693,7 +14759,7 @@ function abDetailHtml() {
          + 'type="button" onclick="abSchrittWann(' + i + ',\'danach\')" '
          + 'title="Dieser Schritt gehört nach den Termin">danach</button>';
     } else {
-      h += '<span class="ms-marke">frühestens ab</span>'
+      h += '<span class="ms-marke">' + (vorgang ? 'Datum' : 'frühestens ab') + '</span>'
          + '<input class="v-feld" type="date" value="' + esc(l[i].ab || '') + '" '
          + 'style="flex:0 0 auto" onchange="abSchrittAb(' + i + ',this.value)">';
     }
@@ -14731,6 +14797,7 @@ function abDetailHtml() {
     h += '<button type="button" onclick="durchlaufStartenAusDetail()">Jetzt starten</button>';
   } else {
     h += '<button type="button" onclick="vorlageAusDurchlauf()">Als Vorlage sichern</button>';
+    h += '<button type="button" onclick="vorgangWirdProjekt()">Wird ein Projekt</button>';
   }
   h += '<button type="button" class="gefahr" onclick="abLoeschen()">Löschen</button>';
   h += '</div>';
@@ -15139,6 +15206,107 @@ function durchlaufStartenAusDetail() {
 
 /* Aus einem einmaligen Durchlauf wird eine Vorlage, wenn sich der
    Fall als wiederkehrend herausstellt. */
+/* ============================================================
+   Vorgänge
+
+   Zwischen Projekt und Aufgabe fehlte die Mitte: ein Issue, das
+   plötzlich mehrere Schritte braucht, aber kein Verfahren ist und kein
+   Projekt werden will. Technisch ist ein Vorgang ein Durchlauf ohne
+   Vorlage — was fehlte, waren der Einstieg, eine Fläche für das
+   Ergebnis und die beiden Wege hinaus.
+   ============================================================ */
+
+function istVorgang(d) {
+  return !!d && !d.ablaufId && d.vorgang === true;
+}
+
+/* Aus einer Aufgabe wird ein Vorgang: Sie selbst wird sein erster
+   Schritt und bleibt dieselbe Aufgabe — mit ihrer Planung, ihrer Frist
+   und ihrer Erledigungsgeschichte. */
+function vorgangAusAufgabe() {
+  var a = aufgabeFinden(aktionFuer);
+  if (!a) { return; }
+  if (a.wiederholung) {
+    melde('Eine wiederkehrende Aufgabe bleibt besser, was sie ist.', 'warn');
+    return;
+  }
+  var d = {
+    id: neueKennung(), ablaufId: null, vorgang: true, name: a.titel,
+    kontext: a.kontext, projektId: a.projektId || null, zielId: a.zielId || null,
+    anlagen: [], start: isoDatum(), frist: a.frist || '', ergebnis: '', flaeche: '',
+    schritte: [{ titel: a.titel, aufgabeId: a.id, fertig: false, ab: '' }],
+    geaendert: jetzt()
+  };
+  DB.durchlaeufe.push(d);
+  a.ablaufSchritt = d.id + '#0';
+  a.geaendert = jetzt();
+  spaeterSichern();
+  aktionenSchliessen();
+  abStufe = 'laufend';
+  zeigeSchirm('Ablaeufe');
+  abZeichnen();
+  abDetailOeffnen(d.id, 'durchlauf');
+  melde('Vorgang angelegt: ' + d.name, 'gut');
+}
+
+/* Wächst es weiter, wird ein Vorhaben daraus: Die offenen Schritte
+   werden Aufgaben des Projekts, die Fläche wandert mit. */
+function vorgangWirdProjekt() {
+  var d = durchlaufFinden(abDetail);
+  if (!d) { return; }
+  var p = {
+    id: neueKennung(), name: d.name, kontext: d.kontext, status: 'laufend',
+    ende: d.frist || '', zielzustaende: [], meilensteine: [], anlagen: [],
+    flaeche: String(d.flaeche || ''), geaendert: jetzt()
+  };
+  DB.projekte.push(p);
+  var l = d.schritte || [];
+  var zahl = 0;
+  var i;
+  for (i = 0; i < l.length; i++) {
+    var vorhanden = schrittAufgabe(l[i]);
+    if (vorhanden) {
+      vorhanden.projektId = p.id;
+      vorhanden.zielId = null;
+      vorhanden.ablaufSchritt = null;
+      vorhanden.geaendert = jetzt();
+      zahl++;
+      continue;
+    }
+    if (schrittFertig(l[i])) { continue; }
+    var titel = String(l[i].titel || '').trim();
+    if (!titel.length) { continue; }
+    DB.aufgaben.push({
+      id: neueKennung(), titel: titel, beschreibung: '', kontext: d.kontext,
+      themaId: null, projektId: p.id, zielId: null, frist: '',
+      planung: l[i].ab || 'backlog', uhrzeit: '', art: 'haupt', wiederholung: null,
+      status: 'offen', erledigtAm: null, zuletztErledigt: null, ablaufSchritt: null,
+      geaendert: jetzt()
+    });
+    zahl++;
+  }
+  var stelle = DB.durchlaeufe.indexOf(d);
+  if (stelle >= 0) { DB.durchlaeufe.splice(stelle, 1); }
+  grabsteinSetzen('durchlaeufe', d.id);
+  spaeterSichern();
+  aktionenSchliessen();
+  abZeichnen();
+  aufZeichnen();
+  tagZeichnen();
+  zeigeSchirm('Vorhaben');
+  vhZeichnen();
+  melde('Projekt angelegt: ' + p.name + ' · ' + zahl
+      + (zahl === 1 ? ' Aufgabe' : ' Aufgaben') + ' übernommen.', 'gut');
+}
+
+function vorgangErgebnisSetzen(text) {
+  var d = durchlaufFinden(abDetail);
+  if (!d) { return; }
+  d.ergebnis = text;
+  d.geaendert = jetzt();
+  spaeterSichern();
+}
+
 function vorlageAusDurchlauf() {
   var d = durchlaufFinden(abDetail);
   if (!d) { return; }

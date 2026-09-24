@@ -543,6 +543,52 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__vorgangApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.projekte = [{ id:\'p0\', name:\'MUKA\','
+                 + '     kontext:\'beruflich\', status:\'laufend\', zielzustaende:[] }];'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'i1\', titel:\'Issue\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'woche\','
+                 + '       projektId:\'p0\', geaendert: jetzt() },'
+                 + '     { id:\'w1\', titel:\'Wiederkehrend\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', geaendert: jetzt(),'
+                 + '       wiederholung:{ takt:\'woche\', tage:[1] } } ];'
+                 + '   aktionFuer = \'i1\';'
+                 + '   vorgangAusAufgabe();'
+                 + '   var d = DB.durchlaeufe[0];'
+                 + '   var r = { angelegt: !!d && istVorgang(d),'
+                 + '     ersterSchritt: !!d && d.schritte[0].aufgabeId === \'i1\','
+                 + '     mitgewandert: d ? (d.kontext + \',\' + d.projektId) : \'\','
+                 + '     keinVerfahren: !!d && d.ablaufId === null };'
+                 + '   aktionFuer = \'w1\';'
+                 + '   vorgangAusAufgabe();'
+                 + '   r.wiederkehrendNicht = (DB.durchlaeufe.length === 1);'
+                 + '   abDetail = d.id; abDetailArt = \'durchlauf\';'
+                 + '   abSchrittNeu(); abSchrittTitel(1, \'Sammeln\');'
+                 + '   abSchrittNeu(); abSchrittTitel(2, \'Prüfen\');'
+                 + '   abSchrittNeu(); abSchrittTitel(3, \'Kommunizieren\');'
+                 + '   abSchrittAb(2, tagePlus(isoDatum(), 3));'
+                 + '   vorgangErgebnisSetzen(\'So gilt es künftig.\');'
+                 + '   flaecheSetzen(\'d:\' + d.id, \'# Entscheidung\');'
+                 + '   r.flaeche = flaecheText(\'d:\' + d.id);'
+                 + '   r.flaechenName = flaecheName(\'d:\' + d.id);'
+                 + '   r.ergebnis = d.ergebnis;'
+                 + '   vorlageAusDurchlauf();'
+                 + '   r.vorlage = DB.ablaeufe[0].schritte.length;'
+                 + '   d.ablaufId = null;'
+                 + '   abDetail = d.id; abDetailArt = \'durchlauf\';'
+                 + '   vorgangWirdProjekt();'
+                 + '   var p = DB.projekte[DB.projekte.length - 1];'
+                 + '   r.projektAufgaben = DB.aufgaben.filter(function(a){'
+                 + '     return a.projektId === p.id; }).length;'
+                 + '   r.getrageneWandert = (aufgabeFinden(\'i1\').projektId === p.id);'
+                 + '   r.flaecheMit = (p.flaeche === \'# Entscheidung\');'
+                 + '   r.vorgangWeg = (DB.durchlaeufe.length === 0);'
+                 + '   abDetail = \'\'; abDetailArt = \'\'; aktionFuer = \'\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__tagKarteApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -5826,8 +5872,10 @@ console.log('\n54. Ablaufdialog');
   pruefe(detail && /Entfernen<\/button>/.test(detail[0]), 'der Entfernenknopf ebenfalls');
   pruefe(detail && /title="Diesen Schritt nach oben schieben"/.test(detail[0]),
          'ein Hinweis erklärt ihn');
-  pruefe(detail && /ms-marke">frühestens ab/.test(detail[0]),
-         'das Datumsfeld ist beschriftet');
+  /* Bei einem Vorgang heißt dasselbe Feld „Datum" — dort ist es kein
+     Ruhen, sondern der Tag, an dem der Schritt ansteht. */
+  pruefe(detail && /vorgang \? 'Datum' : 'frühestens ab'/.test(detail[0]),
+         'das Datumsfeld ist beschriftet, im Vorgang als Datum');
   pruefe(detail && /abSchrittAlsAufgabe\(/.test(detail[0]),
          'aus einem Schritt lässt sich eine Aufgabe machen');
   pruefe(detail && /'Aufgabe: '\s*\n?\s*\+ esc\(planungText/.test(detail[0])
@@ -9552,6 +9600,61 @@ console.log('\n112. Tagessicht in Karten');
     pruefe(e.leererTag === '', 'an einem leeren Tag steht keine Zahl im Kopf');
     pruefe(e.keineZahlOhneEintrag === true,
            'eine leere Gruppe zeigt keine Null, sondern nichts');
+  }
+}
+
+/* ============================================================
+   113. Vorgaenge — die Mitte zwischen Projekt und Aufgabe
+   Grund: Ein Issue wird groesser, ist aber kein Verfahren und kein
+   Projekt. Technisch ein Durchlauf ohne Vorlage; es fehlten Einstieg,
+   Ergebnis, Flaeche und die beiden Wege hinaus.
+   ============================================================ */
+console.log('\n113. Vorgänge');
+{
+  const skript = hauptSkript();
+  const v = globalThis.__vorgangApi;
+
+  ['istVorgang', 'vorgangAusAufgabe', 'vorgangWirdProjekt', 'vorgangErgebnisSetzen',
+   'istVorgangsFlaeche', 'vorgangZuFlaeche'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const dh = skript.match(/function detailHtml\([\s\S]*?\n\}\n/);
+  pruefe(dh && /vorgangAusAufgabe\(\)/.test(dh[0]),
+         'der Einstieg steht im Aufgabenblatt');
+  pruefe(dh && /if \(!a\.wiederholung\) \{/.test(dh[0]),
+         'aber nicht bei einer wiederkehrenden Aufgabe');
+  const ad = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
+  pruefe(ad && /vorgangErgebnisSetzen/.test(ad[0])
+         && /flaecheOeffnen\(\\?'d:/.test(ad[0]),
+         'das Blatt hat Ergebnis und Gedankenfläche');
+  pruefe(ad && /vorgangWirdProjekt\(\)/.test(ad[0]) && /vorlageAusDurchlauf\(\)/.test(ad[0]),
+         'und beide Wege hinaus');
+  const az = skript.match(/function abZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(az && /Vorgänge · /.test(az[0]) && /Aus Vorlagen · /.test(az[0]),
+         'die Liste trennt Einmaliges von Verfahren');
+
+  if (!v) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = v.pruefe();
+    pruefe(e.angelegt === true, 'aus einer Aufgabe wird ein Vorgang');
+    pruefe(e.ersterSchritt === true, 'sie selbst wird sein erster Schritt');
+    pruefe(e.mitgewandert === 'beruflich,p0', 'Kontext und Vorhaben wandern mit');
+    pruefe(e.keinVerfahren === true, 'er hängt an keiner Vorlage');
+    pruefe(e.wiederkehrendNicht === true,
+           'eine wiederkehrende Aufgabe bleibt, was sie ist');
+    pruefe(e.flaeche === '# Entscheidung', 'der Vorgang hat eine eigene Fläche');
+    pruefe(e.flaechenName === 'Issue', 'die seinen Namen trägt');
+    pruefe(e.ergebnis === 'So gilt es künftig.', 'und ein Ergebnis');
+    pruefe(e.vorlage === 4, 'als Vorlage gesichert nimmt er alle Schritte mit');
+    pruefe(e.projektAufgaben === 4,
+           'wird er ein Projekt, werden die offenen Schritte dessen Aufgaben — die '
+           + 'tragende und drei neue');
+    pruefe(e.getrageneWandert === true,
+           'eine tragende Aufgabe wechselt mit, statt doppelt zu entstehen');
+    pruefe(e.flaecheMit === true, 'die Fläche wandert ins Projekt');
+    pruefe(e.vorgangWeg === true, 'der Vorgang selbst ist danach weg');
   }
 }
 
