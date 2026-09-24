@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 2.1.0</title>
+<title>Workbench 2.2.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -960,6 +960,59 @@ body.breit .z-schieben{display:none}
   border:1px solid var(--linie);border-radius:20px;background:var(--karte);
   color:var(--grau);cursor:pointer}
 .vk-flaeche.voll{border-color:var(--weinrot);color:var(--weinrot)}
+
+/* Abläufe: Karten nach Zustand, der Ring zeigt den Fortschritt. */
+.ab-gruppe{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;
+  font:inherit;font-size:calc(var(--fs)*0.7);font-weight:600;color:var(--grau);
+  letter-spacing:.05em;text-transform:uppercase;padding:14px 0 7px;cursor:pointer}
+.ab-gruppe span{flex:0 0 auto}
+.ab-gruppe::after{content:"";flex:1;height:1px;background:var(--linie)}
+.ab-gruppe svg{width:15px;height:15px;stroke:var(--grau);fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .15s ease}
+.ab-gruppe.auf svg{transform:rotate(180deg)}
+.ab-raster{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+body.breit .ab-raster{grid-template-columns:repeat(2,minmax(0,1fr))}
+.vkarte.ablauf{display:flex;flex-direction:column;gap:6px;padding:10px 12px;cursor:pointer}
+.vkarte.ablauf.ruht{opacity:.72;border-left-style:dotted}
+.ab-oben{display:flex;align-items:flex-start;gap:10px}
+.ab-name{flex:1;min-width:0;font-size:calc(var(--fs)*0.9);line-height:1.3}
+.ab-stand{align-self:flex-start;font-size:calc(var(--fs)*0.7);padding:1px 9px;
+  border-radius:20px;border:1px solid var(--linie);color:var(--grau)}
+.ab-stand.laeuft{border-color:var(--weinrot);color:var(--weinrot);font-weight:500}
+.ab-stand.faellig{background:var(--weinrot);border-color:var(--weinrot);color:var(--karte);
+  font-weight:500}
+.ab-naechster{font-size:calc(var(--fs)*0.76);line-height:1.35}
+.ab-naechster span{color:var(--grau)}
+.ab-fuss{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.ab-marke{font-size:calc(var(--fs)*0.66);color:var(--grau);background:var(--papier);
+  border-radius:20px;padding:1px 8px;max-width:190px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.ab-pfeile{display:flex;gap:3px}
+.ab-pfeile button{border:1px solid var(--linie);background:var(--karte);border-radius:6px;
+  font:inherit;font-size:calc(var(--fs)*0.72);padding:0 7px;color:var(--grau);cursor:pointer}
+body.breit .ab-pfeile{display:none}
+
+/* Der Ring: gefüllter Rand statt Balken, die Zahl in der Mitte. */
+.ring{position:relative;flex:0 0 auto;width:38px;height:38px;display:inline-block}
+.ring svg{width:38px;height:38px;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:3.2}
+.ring-grund{stroke:var(--linie)}
+.ring-fuell{stroke:var(--weinrot);stroke-linecap:round;transition:stroke-dasharray .3s ease}
+.ring.voll .ring-fuell{stroke:var(--petrol)}
+.ring i{position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;
+  justify-content:center;font-style:normal;font-size:calc(var(--fs)*0.62);color:var(--grau)}
+.ring.voll i{color:var(--petrol);font-weight:500}
+.as-ring{display:flex;justify-content:flex-end;margin-top:-34px;margin-bottom:6px}
+
+/* Meldungen blenden sich unten kurz ein. */
+.toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);
+  bottom:calc(env(safe-area-inset-bottom,0px) + 74px);z-index:80;max-width:min(92vw,520px);
+  background:var(--tinte);color:var(--papier);border-radius:8px;padding:9px 14px;
+  font-size:calc(var(--fs)*0.8);box-shadow:0 4px 14px rgba(0,0,0,.25);
+  opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;
+  white-space:pre-line}
+.toast.auf{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.warn{background:var(--weinrot)}
 .vk-knoepfe{display:flex;flex-wrap:wrap;gap:6px}
 .vk-taetig.voll{border-color:var(--petrol);color:var(--petrol)}
 /* Tageswechsel */
@@ -1398,6 +1451,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
   <div class="dg-status" id="diagStatus"></div>
 
   <div class="melder" id="melder">Bereit.</div>
+<div class="toast" id="toast" aria-live="polite"></div>
 
   <div class="dg" id="dg-verbindung">
     <button type="button" class="dg-kopf" onclick="diagGruppeUm('verbindung')">
@@ -1603,7 +1657,6 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     </div>
   </div>
 
-  <div class="melder" id="vhMelder" style="margin:10px 20px 0">Bereit.</div>
   <div class="vhblatt" id="vhBlatt"></div>
   <div class="vhblatt einfachliste" id="einfallBlatt" style="display:none"></div>
 
@@ -1639,7 +1692,6 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
       <button type="button" id="abGrZiel" onclick="setAbGruppierung('ziel')">Ziel</button>
     </div>
 
-  <div class="melder" id="abMelder" style="margin:10px 20px 0">Bereit.</div>
   <div class="vhblatt" id="abBlatt"></div>
 
   <button class="plusknopf" type="button" onclick="ablaufNeu()" aria-label="Neuer Ablauf">
@@ -1669,7 +1721,6 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     </div>
   </div>
 
-  <div class="melder" id="aufMelder" style="margin:10px 20px 0">Bereit.</div>
   <div class="aufblatt" id="aufBlatt"></div>
 
   <button class="plusknopf" type="button" onclick="aufgabeNeu()" aria-label="Neue Aufgabe">
@@ -1723,7 +1774,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '2.1.0';
+var APP_VERSION = '2.2.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -1830,15 +1881,28 @@ function isoZeit(d) {
   return isoDatum(x) + ' ' + zwei(x.getHours()) + ':' + zwei(x.getMinutes()) + ':' + zwei(x.getSeconds());
 }
 
+/* Meldungen standen als Zeile oben in jeder Ansicht und nahmen dort
+   dauerhaft Platz weg für etwas, das nach einer Sekunde gelesen ist.
+   Jetzt blenden sie sich unten kurz ein; in der Diagnose bleibt die
+   Zeile, dort ist sie das Protokoll. */
+var toastZeit = 0;
+
 function melde(text, art) {
-  var stellen = ['melder', 'migMelder', 'aufMelder', 'vhMelder', 'abMelder'];
-  var i;
-  for (i = 0; i < stellen.length; i++) {
-    var el = document.getElementById(stellen[i]);
-    if (!el) { continue; }
+  var el = document.getElementById('melder');
+  if (el) {
     el.textContent = text;
     el.className = 'melder' + (art ? ' ' + art : '');
   }
+  var t = document.getElementById('toast');
+  if (!t) { return; }
+  t.textContent = text;
+  t.className = 'toast auf' + (art ? ' ' + art : '');
+  if (toastZeit) { window.clearTimeout(toastZeit); }
+  toastZeit = window.setTimeout(function () {
+    var el2 = document.getElementById('toast');
+    if (el2) { el2.className = 'toast'; }
+    toastZeit = 0;
+  }, (art === 'warn') ? 7000 : 4000);
 }
 
 function fsApiDa()   { return (typeof window.showOpenFilePicker === 'function'); }
@@ -5336,6 +5400,7 @@ function aufgabeHaken(id) {
   var a = aufgabeFinden(id);
   if (!a) { return; }
   var is = tagOffen;
+  var zuPruefen = durchlaufZuAufgabe(a);
 
   if (a.wiederholung) {
     wiederholungSetzen(a, is, !istErledigtAn(a, is));
@@ -5353,6 +5418,7 @@ function aufgabeHaken(id) {
   if (wartende[id]) { window.clearTimeout(wartende[id]); }
   wartende[id] = window.setTimeout(function () {
     delete wartende[id];
+    if (zuPruefen) { durchlaufPruefeFertig(zuPruefen); }
     tagZeichnen();
   }, WARTEZEIT);
 
@@ -10195,6 +10261,15 @@ function ziehAb(e, art, id) {
   if (!ziehVon.id || ziehVon.art !== art) { ziehEnde(); return; }
   if (art === 'pin') {
     if (ordnungVerschieben(DB.pinnwand || [], ziehVon.id, id)) { pinnwandZeichnen(); }
+  } else if (art === 'ablauf') {
+    var d1 = durchlaufFinden(ziehVon.id);
+    var d2 = durchlaufFinden(id);
+    if (d1 && d2 && abZustand(d1) === abZustand(d2) && d1.kontext === d2.kontext) {
+      var gruppe = abSichtbar(DB.durchlaeufe || []).filter(function (x) {
+        return abZustand(x) === abZustand(d2) && x.kontext === d2.kontext;
+      });
+      if (ordnungVerschieben(gruppe, ziehVon.id, id)) { abZeichnen(); }
+    }
   } else if (art === 'vorhaben') {
     if (gleicheGruppe(ziehVon.id, id)
         && ordnungVerschieben(vorhabenGruppe(id), ziehVon.id, id)) {
@@ -10410,14 +10485,11 @@ function taetigZeileHtml(a) {
 function taetigAblaufHtml(d) {
   var gesamt = (d.schritte || []).length;
   var fertig = schritteFertig(d);
-  var anteil = gesamt ? Math.round(100 * fertig / gesamt) : 0;
   return '<div class="tg-zeile" onclick="durchlaufAbhakenOeffnen(\'' + esc(d.id) + '\')">'
        + '<span class="tg-text"><span class="tg-titel">' + esc(d.name || 'ohne Namen') + '</span>'
        + '<span class="tg-meta">' + (d.frist ? ('Frist ' + esc(kurzDatum(d.frist))) : 'ohne Frist')
        + '</span>'
-       + '<span class="tg-balkenzeile"><span class="tg-balken"><i style="width:' + anteil
-       + '%"></i></span><span class="tg-zahl">' + fertig + ' von ' + gesamt + '</span></span>'
-       + '</span></div>';
+       + '</span>' + ringHtml(fertig, gesamt) + '</div>';
 }
 
 var taetigVergangenAuf = false;
@@ -13895,43 +13967,133 @@ function ablaufAnlassText(v) {
   return 'läuft nur von Hand an';
 }
 
-function durchlaufKarteHtml(d) {
-  var offen = abOffen[d.id] === true;
+/* ============================================================
+   Abläufe nach Zustand
+
+   Geordnet wird nach dem, was zählt: Was ist heute dran, was läuft,
+   was ruht. Die Herkunft — Vorlage oder Vorgang — steht als kleine
+   Marke am Fuß, nicht mehr als eigene Gruppe.
+   ============================================================ */
+
+var AB_GRUPPEN = [['heute', 'Heute dran'], ['laeuft', 'Läuft'], ['ruht', 'Ruht']];
+
+function abZustand(d) {
   var l = d.schritte || [];
-  var fertig = schritteFertig(d);
+  if (l.length && schritteFertig(d) === l.length) { return 'heute'; }
+  if (ruhtBis(d)) { return 'ruht'; }
+  var s = offenerSchritt(d);
+  if (s && s.satz.ab && s.satz.ab <= isoDatum()) { return 'heute'; }
+  if (d.frist && d.frist <= isoDatum()) { return 'heute'; }
+  return 'laeuft';
+}
+
+function abZustandOffen(name) {
+  var k = DB.einstellungen.abGruppenZu || {};
+  if (k[name] === true) { return false; }
+  /* Am Handy ist „Ruht" voreingestellt zugeklappt: Es ist die längste
+     Liste und die, die gerade nichts von einem will. */
+  if (k[name] === false) { return true; }
+  return !(name === 'ruht' && !istBreit());
+}
+
+function abZustandUm(name) {
+  if (!DB.einstellungen.abGruppenZu) { DB.einstellungen.abGruppenZu = {}; }
+  DB.einstellungen.abGruppenZu[name] = abZustandOffen(name);
+  spaeterSichern();
+  abZeichnen();
+}
+
+/* Ein Ring statt Balken und Bruch: Der gefüllte Rand zeigt, wie weit
+   es ist, die Zahl in der Mitte sagt es genau. */
+function ringHtml(fertig, gesamt) {
+  var anteil = gesamt ? (fertig / gesamt) : 0;
+  var umfang = 2 * Math.PI * 15.5;
+  var voll = (gesamt > 0 && fertig === gesamt);
+  return '<span class="ring' + (voll ? ' voll' : '') + '" title="' + fertig + ' von '
+       + gesamt + '">'
+       + '<svg viewBox="0 0 36 36"><circle class="ring-grund" cx="18" cy="18" r="15.5"></circle>'
+       + '<circle class="ring-fuell" cx="18" cy="18" r="15.5" stroke-dasharray="'
+       + (anteil * umfang).toFixed(1) + ' ' + umfang.toFixed(1) + '"></circle></svg>'
+       + '<i>' + Math.round(anteil * 100) + '</i></span>';
+}
+
+function abStandText(d) {
+  var l = d.schritte || [];
+  if (l.length && schritteFertig(d) === l.length) { return 'alle Schritte erledigt'; }
   var ruht = ruhtBis(d);
-  var h = '<div class="vkarte ' + (offen ? 'auf' : 'zu')
-        + (d.kontext === 'privat' ? ' privat' : '') + '">';
-  h += '<div class="vk-kopf" onclick="abKarteUm(\'' + esc(d.id) + '\')">';
-  h += '<div class="vk-name">' + esc(d.name) + '</div>';
-  h += '<div class="vk-zeit">' + fertig + ' von ' + l.length + '</div>';
-  h += '<svg class="vk-pfeil" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></div>';
   if (ruht) {
     var teile = String(ruht).split(' ');
-    h += '<div class="vk-ruht">ruht bis ' + esc(kurzDatum(teile[0]))
-       + (teile[1] ? (', ' + esc(teile[1]) + ' Uhr') : '') + '</div>';
+    var tage = Math.round((Date.parse(teile[0]) - Date.parse(isoDatum())) / 86400000);
+    return 'ruht bis ' + kurzDatum(teile[0])
+         + (tage > 0 ? (' · in ' + tage + (tage === 1 ? ' Tag' : ' Tagen')) : '');
   }
+  var s = offenerSchritt(d);
+  if (s && s.satz.ab && s.satz.ab <= isoDatum()) { return 'seit ' + kurzDatum(s.satz.ab) + ' dran'; }
+  if (d.frist && d.frist <= isoDatum()) { return 'Frist ' + kurzDatum(d.frist); }
+  return 'läuft';
+}
 
-  h += '<div class="vk-mehr">';
-  var i;
-  for (i = 0; i < l.length; i++) {
-    var fertig = schrittFertig(l[i]);
-    var traeger = schrittAufgabe(l[i]);
-    h += '<div class="vk-zeile">'
-       + '<button class="tkasten' + (fertig ? ' an' : '') + '" type="button" '
-       + 'onclick="schrittUm(\'' + esc(d.id) + '\',' + i + ')"></button>'
-       + '<span class="vk-titel' + (fertig ? ' fertig' : '') + '">'
-       + esc(schrittTitel(l[i]))
-       + (traeger ? ' <span class="vk-traeger">Aufgabe</span>' : '')
-       + '</span></div>';
+function durchlaufKarteHtml(d) {
+  var l = d.schritte || [];
+  var fertig = schritteFertig(d);
+  var zustand = abZustand(d);
+  var s = offenerSchritt(d);
+  var traeger = s ? schrittAufgabe(s.satz) : null;
+  var h = '<div class="vkarte ablauf' + (d.kontext === 'privat' ? ' privat' : '')
+        + (zustand === 'ruht' ? ' ruht' : '') + '"' + ziehAttribute('ablauf', d.id)
+        + ' onclick="abDetailOeffnen(\'' + esc(d.id) + '\',\'durchlauf\')">';
+  h += '<div class="ab-oben">';
+  h += '<span class="ab-name">' + esc(d.name || 'ohne Namen') + '</span>';
+  h += ringHtml(fertig, l.length);
+  h += '</div>';
+  h += '<span class="ab-stand' + ((zustand === 'heute') ? ' faellig' : '')
+     + ((zustand === 'laeuft') ? ' laeuft' : '') + '">' + esc(abStandText(d)) + '</span>';
+  if (s) {
+    h += '<div class="ab-naechster">Nächster: ' + esc(schrittTitel(s.satz))
+       + (traeger ? ('<span> · Aufgabe, ' + esc(planungText(traeger)) + '</span>') : '')
+       + '</div>';
   }
-  h += '<div class="vk-knoepfe">'
-     + '<button type="button" onclick="abDetailOeffnen(\'' + esc(d.id) + '\',\'durchlauf\')">'
-     + 'Bearbeiten</button>'
-     + '<button type="button" onclick="durchlaufBeenden(\'' + esc(d.id) + '\')">Beenden</button>'
-     + '</div>';
-  h += '</div></div>';
+  var marken = [];
+  if (istVorgang(d)) { marken.push('Vorgang'); }
+  else if (d.ablaufId) { marken.push('aus Vorlage'); }
+  var v = d.projektId ? vorhabenFinden(d.projektId, 'projekt')
+        : (d.zielId ? vorhabenFinden(d.zielId, 'ziel') : null);
+  if (v) { marken.push(v.name); }
+  h += '<div class="ab-fuss">';
+  if (marken.length) {
+    h += '<span class="ab-marke">' + marken.join('</span><span class="ab-marke">')
+       + '</span>';
+  }
+  h += '<span style="flex:1"></span>';
+  h += '<span class="ab-pfeile">'
+     + '<button type="button" onclick="event.stopPropagation();abSchieben(\'' + esc(d.id)
+     + '\',-1)" aria-label="nach vorn">‹</button>'
+     + '<button type="button" onclick="event.stopPropagation();abSchieben(\'' + esc(d.id)
+     + '\',1)" aria-label="nach hinten">›</button></span>';
+  h += '</div>';
+  h += '</div>';
   return h;
+}
+
+function abSchieben(id, richtung) {
+  var d = durchlaufFinden(id);
+  if (!d) { return; }
+  var gruppe = abSichtbar(DB.durchlaeufe || []).filter(function (x) {
+    return abZustand(x) === abZustand(d) && x.kontext === d.kontext;
+  });
+  if (ordnungSchieben(gruppe, id, richtung)) { abZeichnen(); }
+}
+
+/* Alle Schritte erledigt? Dann ist der Durchlauf fertig und verschwindet
+   von selbst — mit der Möglichkeit, ihn zurückzuholen. */
+function durchlaufPruefeFertig(id) {
+  var d = durchlaufFinden(id);
+  if (!d) { return false; }
+  var l = d.schritte || [];
+  if (!l.length || schritteFertig(d) !== l.length) { return false; }
+  durchlaufBeenden(d.id);
+  melde('Fertig: ' + (d.name || 'ohne Namen') + ' — alle Schritte erledigt.', 'gut');
+  return true;
 }
 
 /* ------------------------------------------------------------
@@ -14058,41 +14220,45 @@ function abZeichnen() {
   if (!blatt) { return; }
   var vorlagen = abSichtbar(DB.ablaeufe || []);
   var laufend = abSichtbar(DB.durchlaeufe || []);
-  var liste = (abStufe === 'laufend') ? laufend : vorlagen;
-  var karte = (abStufe === 'laufend') ? durchlaufKarteHtml : vorlageKarteHtml;
   var h = '';
-  var bereiche = [['beruflich', 'Beruflich'], ['privat', 'Privat']];
-  var b;
 
-  for (b = 0; b < bereiche.length; b++) {
-    var k = bereiche[b][0];
-    if (abFilter !== 'alle' && abFilter !== k) { continue; }
-    var drin = liste.filter(function (e) { return e.kontext === k; });
-    h += abBereichKopf(k, bereiche[b][1], drin.length);
-    if (!abKontextOffen(k)) { continue; }
-    if (!drin.length) {
-      h += '<div class="tleer">'
-         + (abStufe === 'laufend' ? 'Kein Durchlauf offen.' : 'Keine Vorlage.')
-         + '</div>';
-      continue;
+  if (abStufe === 'laufend') {
+    /* Nach Zustand, nicht nach Herkunft: Was heute dran ist, steht
+       oben; was ruht, unten und blasser. */
+    var g, b;
+    var zahlen = { heute: 0, laeuft: 0, ruht: 0 };
+    for (b = 0; b < laufend.length; b++) { zahlen[abZustand(laufend[b])]++; }
+    for (g = 0; g < AB_GRUPPEN.length; g++) {
+      var name = AB_GRUPPEN[g][0];
+      var drin = nachOrdnung(laufend.filter(function (d) {
+        return abZustand(d) === name;
+      }));
+      if (!drin.length) { continue; }
+      var auf = abZustandOffen(name);
+      h += '<button class="ab-gruppe' + (auf ? ' auf' : '') + '" type="button" '
+         + 'onclick="abZustandUm(\'' + name + '\')"><span>' + AB_GRUPPEN[g][1] + ' · '
+         + drin.length + '</span>'
+         + '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></button>';
+      if (!auf) { continue; }
+      h += '<div class="ab-raster">';
+      for (b = 0; b < drin.length; b++) { h += durchlaufKarteHtml(drin[b]); }
+      h += '</div>';
     }
-    if (abStufe === 'laufend') {
-      /* Einmaliges und Verfahren nebeneinander zu stellen, verwischt
-         den Unterschied: erst die Vorgänge, dann die Durchläufe aus
-         Vorlagen. */
-      var vorgaenge = drin.filter(istVorgang);
-      var ausVorlage = drin.filter(function (d) { return !istVorgang(d); });
-      if (vorgaenge.length) {
-        h += '<div class="gruppenkopf"><span>Vorgänge · ' + vorgaenge.length
-           + '</span></div>' + abGruppenHtml(vorgaenge, karte);
-      }
-      if (ausVorlage.length) {
-        h += '<div class="gruppenkopf"><span>Aus Vorlagen · ' + ausVorlage.length
-           + '</span></div>' + abGruppenHtml(ausVorlage, karte);
-      }
-      continue;
+    if (!laufend.length) {
+      h += '<div class="tleer">Kein Ablauf offen.</div>';
     }
-    h += abGruppenHtml(drin, karte);
+  } else {
+    var bereiche = [['beruflich', 'Beruflich'], ['privat', 'Privat']];
+    var k;
+    for (k = 0; k < bereiche.length; k++) {
+      var kk = bereiche[k][0];
+      if (abFilter !== 'alle' && abFilter !== kk) { continue; }
+      var vs = vorlagen.filter(function (e) { return e.kontext === kk; });
+      h += abBereichKopf(kk, bereiche[k][1], vs.length);
+      if (!abKontextOffen(kk)) { continue; }
+      if (!vs.length) { h += '<div class="tleer">Keine Vorlage.</div>'; continue; }
+      h += abGruppenHtml(vs, vorlageKarteHtml);
+    }
   }
 
   blatt.innerHTML = h;
@@ -14127,6 +14293,7 @@ function schrittUm(id, nr) {
     d.geaendert = jetzt();
     spaeterSichern();
   }
+  if (durchlaufPruefeFertig(d.id)) { return; }
   abZeichnen();
   tagZeichnen();
   kalZeichnen();
@@ -14600,7 +14767,13 @@ function abDetailHtml() {
   var vorgang = istVorgang(a);
   h += '<div class="as-meta">'
      + (istVorlage ? 'Vorlage' : (vorgang ? 'Vorgang' : 'Durchlauf'))
-     + ' · ' + schritteFertig(a) + ' von ' + (a.schritte || []).length + '</div>';
+     + (istVorlage ? '' : (' · ' + schritteFertig(a) + ' von '
+                           + (a.schritte || []).length))
+     + '</div>';
+  if (!istVorlage) {
+    h += '<div class="as-ring">' + ringHtml(schritteFertig(a), (a.schritte || []).length)
+       + '</div>';
+  }
   h += '<div class="as-linie' + (a.kontext === 'privat' ? ' privat' : '') + '"></div>';
 
   h += '<div class="d-feld"><div class="d-name">Kontext</div><div class="d-wert">';
@@ -15831,9 +16004,17 @@ function aufgabeWiederOeffnen(id) {
   spaeterSichern();
 }
 
+/* Trägt eine Aufgabe den letzten offenen Schritt, endet der Durchlauf
+   mit ihr. */
+function durchlaufZuAufgabe(a) {
+  if (!a || !a.ablaufSchritt) { return ''; }
+  return String(a.ablaufSchritt).split('#')[0];
+}
+
 function aufgabeErledigen(id) {
   var a = aufgabeFinden(id);
   if (!a) { return; }
+  var zuPruefen = durchlaufZuAufgabe(a);
   if (a.wiederholung) {
     wiederholungSetzen(a, isoDatum(), true);
     durchlaufAusAufgabe(a.id);
@@ -15845,6 +16026,7 @@ function aufgabeErledigen(id) {
   aufZeichnen();
   kalZeichnen();
   spaeterSichern();
+  if (zuPruefen) { durchlaufPruefeFertig(zuPruefen); }
 }
 
 /* „Diese" und „nächste Woche" sind relativ zu heute. Ohne einen Merker,

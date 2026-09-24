@@ -101,21 +101,32 @@ console.log('\n1. Bildschirme und Navigation');
   pruefe(/\.schirm\.aktiv\{display:flex !important/.test(QUELLE),
          '.schirm.aktiv ist mit !important eingeblendet');
 
-  /* Rückmeldungen müssen auf dem Bildschirm stehen, auf dem gearbeitet wird.
-     Eine Meldezeile allein auf der Diagnose bleibt sonst ungesehen. */
+  /* Rückmeldungen müssen dort erscheinen, wo gearbeitet wird. Seit
+     v2.2.0 blenden sie sich unten ein, statt in jeder Ansicht eine
+     Zeile zu belegen; in der Diagnose bleiben sie als Protokoll. */
   const meldeFn = hauptSkript().match(/function melde\([\s\S]*?\n\}/);
-  const meldeStellen = meldeFn
-    ? [...meldeFn[0].matchAll(/'([a-zA-Z][\w-]*)'/g)].map(m => m[1]).filter(x => /melder/i.test(x))
-    : [];
-  pruefe(meldeStellen.length >= 2, 'melde() bedient mehr als eine Meldezeile');
-  meldeStellen.forEach(function (id) {
+  pruefe(meldeFn && /getElementById\('toast'\)/.test(meldeFn[0]),
+         'melde() blendet die Meldung unten ein');
+  pruefe(meldeFn && /getElementById\('melder'\)/.test(meldeFn[0]),
+         'und schreibt sie zugleich ins Protokoll der Diagnose');
+  pruefe(meldeFn && /clearTimeout\(toastZeit\)/.test(meldeFn[0]),
+         'eine neue Meldung löst die alte ab, statt sich mit ihr zu überlagern');
+  pruefe(meldeFn && /7000/.test(meldeFn[0]) && /4000/.test(meldeFn[0]),
+         'eine Warnung steht länger als eine gute Nachricht');
+  pruefe(/id="toast"/.test(QUELLE) && /\.toast\{position:fixed/.test(QUELLE),
+         'der Einblender steht fest über der Ansicht');
+  ['melder', 'migMelder'].forEach(function (id) {
     pruefe(new RegExp('id="' + id + '"').test(QUELLE),
            'Meldezeile "' + id + '" existiert im HTML');
   });
-  /* Tag und Kalender melden über eigene Wege (Standzeile, Banner) und
-     bleiben im Normalfall bewusst stumm. Die übrigen Flächen führen
-     Vorgänge aus, deren Ergebnis benannt werden muss. */
-  const mitMelder = ['Diagnose', 'Migration', 'Aufgaben'];
+  ['vhMelder', 'abMelder', 'aufMelder'].forEach(function (id) {
+    pruefe(!new RegExp('id="' + id + '"').test(QUELLE),
+           'die Statuszeile "' + id + '" nimmt keinen Platz mehr weg');
+  });
+  /* Seit v2.2.0 blenden sich Meldungen unten kurz ein, statt in jeder
+     Ansicht eine Zeile zu belegen. Als stehendes Protokoll bleiben sie
+     nur in der Diagnose und in der Migration. */
+  const mitMelder = ['Diagnose', 'Migration'];
   mitMelder.forEach(function (s) {
     if (schirme.indexOf(s) < 0) { return; }
     const block = QUELLE.match(new RegExp('id="schirm' + s + '"[\\s\\S]*?\\n</div>'));
@@ -543,6 +554,48 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__abZustandApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.durchlaeufe = ['
+                 + '     { id:\'d1\', name:\'CTS\', kontext:\'beruflich\','
+                 + '       vorgang:true, ablaufId:null, geaendert: jetzt(),'
+                 + '       schritte:[{ titel:\'A\', fertig:true },'
+                 + '         { titel:\'B\', fertig:true }, { titel:\'C\', ab: h }] },'
+                 + '     { id:\'d2\', name:\'Workshop\', kontext:\'beruflich\','
+                 + '       ablaufId:\'v1\', geaendert: jetzt(),'
+                 + '       schritte:[{ titel:\'A\' }, { titel:\'B\' }] },'
+                 + '     { id:\'d3\', name:\'A\', kontext:\'privat\', ablaufId:\'v1\','
+                 + '       geaendert: jetzt(),'
+                 + '       schritte:[{ titel:\'X\', ab: tagePlus(h, 10) }] },'
+                 + '     { id:\'d4\', name:\'B\', kontext:\'privat\', ablaufId:\'v1\','
+                 + '       geaendert: jetzt(),'
+                 + '       schritte:[{ titel:\'Y\', ab: tagePlus(h, -2) }] } ];'
+                 + '   var r = { zustaende: DB.durchlaeufe.map(abZustand).join(\',\') };'
+                 + '   abZeichnen();'
+                 + '   var b = document.getElementById(\'abBlatt\').innerHTML;'
+                 + '   r.gruppen = (b.match(/ab-gruppe[^>]*><span>([^<]*)/g) || [])'
+                 + '     .map(function(x){ return x.replace(/.*<span>/, \'\'); }).join(\'|\');'
+                 + '   r.ring = (b.match(/<i>(\\d+)<\\/i>/) || [])[1];'
+                 + '   r.ringVoll = /ring voll/.test(ringHtml(3, 3));'
+                 + '   r.marken = (b.match(/ab-marke">([^<]*)/g) || []).slice(0, 2)'
+                 + '     .map(function(x){ return x.slice(10); }).join(\',\');'
+                 + '   r.naechster = /Nächster: C/.test(b);'
+                 + '   schrittUm(\'d1\', 2);'
+                 + '   r.autoWeg = !durchlaufFinden(\'d1\');'
+                 + '   r.zurueckholbar = !!(zurueckHolen'
+                 + '     && zurueckHolen.sammlung === \'durchlaeufe\');'
+                 + '   abSchieben(\'d3\', 1);'
+                 + '   abZeichnen();'
+                 + '   var b2 = document.getElementById(\'abBlatt\').innerHTML;'
+                 + '   var reihe = (b2.match(/ab-name">([^<]*)/g) || [])'
+                 + '     .map(function(x){ return x.slice(9); });'
+                 + '   r.sortiert = reihe.filter(function(n){'
+                 + '     return n === \'A\' || n === \'B\'; }).join(\',\');'
+                 + '   zurueckHolen = null; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorgangApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -5464,7 +5517,8 @@ console.log('\n46. Ruhende Ablaufschritte');
          'in der Tageszeile lässt sich der Schritt wegschieben');
 
   const karte = skript.match(/function durchlaufKarteHtml\([\s\S]*?\n\}\n/);
-  pruefe(karte && /ruht bis /.test(karte[0]),
+  pruefe(karte && /abStandText\(d\)/.test(karte[0])
+         && /ruht bis /.test(skript.match(/function abStandText\([\s\S]*?\n\}/)[0]),
          'die Ablaufliste zeigt, bis wann ein Durchlauf ruht');
 
   const detail = skript.match(/function abDetailHtml\([\s\S]*?\n\}\n/);
@@ -6184,9 +6238,11 @@ console.log('\n59. Ablaufkarten');
   const dk = skript.match(/function durchlaufKarteHtml\([\s\S]*?\n\}\n/);
   pruefe(dk && !/vk-satz/.test(dk[0]),
          'auch die Durchlaufkarte nicht');
-  pruefe(dk && /fertig \+ ' von ' \+ l\.length/.test(dk[0]),
-         'der Kopf nennt den Stand');
-  pruefe(dk && /vk-ruht/.test(dk[0]),
+  /* Seit v2.2.0 zeigt ein Ring den Stand, und der Zustand steht als
+     Marke auf der Karte. */
+  pruefe(dk && /ringHtml\(fertig, l\.length\)/.test(dk[0]),
+         'der Ring nennt den Stand');
+  pruefe(dk && /ab-stand/.test(dk[0]),
          'ein ruhender Durchlauf sagt es trotzdem — sonst wirkte er verschwunden');
 
   /* Nichts klappt von selbst auf */
@@ -6219,7 +6275,7 @@ console.log('\n59. Ablaufkarten');
   pruefe(gruppen && /abGruppierung === 'keine'/.test(gruppen[0]),
          'ohne Gruppierung bleibt die Liste flach, ganz ohne Köpfe');
 
-  const offen = skript.match(/function abGruppeOffen\([\s\S]*?\n\}/);
+  const offen = skript.match(/function abGruppeOffen\(name\) \{[\s\S]*?\n\}/);
   pruefe(offen && /!istKeinGruppe\(name\)/.test(offen[0]),
          'die Kein-Gruppe beginnt eingeklappt');
 
@@ -7326,9 +7382,9 @@ console.log('\n74. Bereiche nach Kontext');
   const az = skript.match(/function abZeichnen\([\s\S]*?\n\}\n/);
   pruefe(az && /\['beruflich', 'Beruflich'\], \['privat', 'Privat'\]/.test(az[0]),
          'auch bei den Abläufen erst der Beruf, dann das Private');
-  pruefe(az && /abFilter !== 'alle' && abFilter !== k/.test(az[0]),
+  pruefe(az && /abFilter !== 'alle' && abFilter !== kk/.test(az[0]),
          'bei gesetztem Filter bleibt nur der gewählte Bereich');
-  pruefe(az && /abKontextOffen\(k\)/.test(az[0]),
+  pruefe(az && /abKontextOffen\(kk\)/.test(az[0]),
          'ein eingeklappter Bereich zeigt seine Kacheln nicht');
   const sf = skript.match(/function setAbFilter\([\s\S]*?\n\}/);
   pruefe(sf && /abKontextZu = \{\}/.test(sf[0]),
@@ -9631,8 +9687,12 @@ console.log('\n113. Vorgänge');
   pruefe(ad && /vorgangWirdProjekt\(\)/.test(ad[0]) && /vorlageAusDurchlauf\(\)/.test(ad[0]),
          'und beide Wege hinaus');
   const az = skript.match(/function abZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(az && /Vorgänge · /.test(az[0]) && /Aus Vorlagen · /.test(az[0]),
-         'die Liste trennt Einmaliges von Verfahren');
+  /* Seit v2.2.0 ordnet die Liste nach Zustand; die Herkunft steht als
+     Marke am Fuß der Karte. */
+  const dkk = skript.match(/function durchlaufKarteHtml\([\s\S]*?\n\}\n/);
+  pruefe(dkk && /marken\.push\('Vorgang'\)/.test(dkk[0])
+         && /marken\.push\('aus Vorlage'\)/.test(dkk[0]),
+         'die Karte sagt, ob sie ein Vorgang ist oder aus einer Vorlage stammt');
 
   if (!v) {
     warn('Funktionen nicht auswertbar');
@@ -9655,6 +9715,56 @@ console.log('\n113. Vorgänge');
            'eine tragende Aufgabe wechselt mit, statt doppelt zu entstehen');
     pruefe(e.flaecheMit === true, 'die Fläche wandert ins Projekt');
     pruefe(e.vorgangWeg === true, 'der Vorgang selbst ist danach weg');
+  }
+}
+
+/* ============================================================
+   114. Ablaeufe nach Zustand, Ring, automatisches Ende
+   Grund: Die Liste trennte nach Herkunft (aus Vorlagen), was beim
+   Arbeiten nichts hilft. Jetzt zaehlt der Zustand. Der Fortschritt
+   steht als Ring statt als Bruch und Balken, und bei hundert Prozent
+   endet ein Durchlauf von selbst.
+   ============================================================ */
+console.log('\n114. Abläufe nach Zustand');
+{
+  const skript = hauptSkript();
+  const r = globalThis.__abZustandApi;
+
+  ['abZustand', 'abStandText', 'abZustandOffen', 'abZustandUm', 'ringHtml', 'abSchieben',
+   'durchlaufPruefeFertig'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/var AB_GRUPPEN = \[\['heute', 'Heute dran'\], \['laeuft', 'Läuft'\], \['ruht', 'Ruht'\]\]/
+         .test(skript), 'drei Gruppen: heute dran, läuft, ruht');
+  const go = skript.match(/function abZustandOffen\([\s\S]*?\n\}/);
+  pruefe(go && /name === 'ruht' && !istBreit\(\)/.test(go[0]),
+         'am Handy ist „Ruht" voreingestellt zugeklappt');
+  const su = skript.match(/function schrittUm\([\s\S]*?\n\}/);
+  pruefe(su && /durchlaufPruefeFertig\(d\.id\)/.test(su[0]),
+         'nach jedem Haken wird geprüft, ob alles erledigt ist');
+  const ah = skript.match(/function aufgabeHaken\([\s\S]*?\n\}/);
+  pruefe(ah && /durchlaufZuAufgabe\(a\)/.test(ah[0]),
+         'auch der Haken im Tagesplan beendet einen fertigen Durchlauf');
+  const ring = skript.match(/function ringHtml\([\s\S]*?\n\}/);
+  pruefe(ring && /stroke-dasharray/.test(ring[0]),
+         'der Ring füllt seinen Rand nach dem Anteil');
+
+  if (!r) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = r.pruefe();
+    pruefe(e.zustaende === 'heute,laeuft,ruht,heute',
+           'ein Schritt mit erreichtem Datum macht heute dran, ein künftiger lässt ruhen');
+    pruefe(e.gruppen === 'Heute dran · 2|Läuft · 1|Ruht · 1',
+           'die Gruppen tragen ihre Zahl');
+    pruefe(e.ring === '67', 'zwei von drei Schritten sind 67 Prozent');
+    pruefe(e.ringVoll === true, 'bei allen Schritten ist der Ring voll');
+    pruefe(e.marken === 'Vorgang,aus Vorlage', 'die Herkunft steht als Marke am Fuß');
+    pruefe(e.naechster === true, 'die Karte nennt den nächsten offenen Schritt');
+    pruefe(e.autoWeg === true, 'beim letzten Haken endet der Durchlauf von selbst');
+    pruefe(e.zurueckholbar === true, 'zurückholen bleibt möglich');
+    pruefe(e.sortiert === 'B,A', 'innerhalb der Gruppe lässt sich schieben');
   }
 }
 
