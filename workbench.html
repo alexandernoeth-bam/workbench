@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 2.6.0</title>
+<title>Workbench 2.7.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1133,6 +1133,28 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
   color:var(--grau);background:none;border:0;border-top:1px solid var(--linie);
   padding:8px 0 6px;cursor:pointer}
 .tg-erledigt{border-top:0;padding-left:2px}
+/* Der Einzeiler im Tagesverlauf */
+.tzeile-termin{display:flex;align-items:center;gap:8px;padding:5px 2px;min-height:30px;
+  border-top:1px solid var(--linie)}
+.tzeile-termin:first-child{border-top:0}
+.tzt-zeit{flex:0 0 42px;text-align:right;font-size:calc(var(--fs)*0.74);color:var(--grau);
+  font-variant-numeric:tabular-nums}
+.tzt-strich{flex:0 0 3px;align-self:stretch;border-radius:2px;background:var(--weinrot)}
+.tzeile-termin.privat .tzt-strich{background:var(--petrol)}
+.tzt-punkt{flex:0 0 8px;width:8px;height:8px;border-radius:50%}
+.tzt-titel{flex:1;min-width:0;font-size:calc(var(--fs)*0.84);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.tzt-rechts{flex:0 0 auto;max-width:40%;font-size:calc(var(--fs)*0.7);color:var(--grau);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tzeile-termin.laeuft{background:var(--papier);border-radius:6px;margin:0 -4px;padding:5px 6px}
+.tzeile-termin.laeuft .tzt-titel{font-weight:500}
+.tzeile-termin.laeuft .tzt-rechts{color:var(--weinrot);font-weight:500}
+.tzeile-termin.vorbei{opacity:.45}
+.tzeile-termin.vorbei .tzt-titel{text-decoration:line-through}
+/* Am Handy bleibt für Kalender und Ablaufknopf kein Platz. */
+body:not(.breit) .tzeile-termin .t-ablauf,
+body:not(.breit) .tzeile-termin .t-ablauf-paar{display:none}
+
 .tv-marken{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:3px;min-width:0}
 .tv-marken .t-art{margin-left:0}
 .tv-marken .t-vh{margin-left:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;
@@ -1802,7 +1824,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '2.6.0';
+var APP_VERSION = '2.7.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3999,54 +4021,59 @@ function eintragVorbei(eintrag, is) {
   return ende < uhrzeitJetzt();
 }
 
+/* Ein Termin, eine Zeile: Uhrzeit, Farbstrich für den Kontext, Punkt
+   für die Art, Titel mit „…", rechts Dauer und Vorhaben oder Kalender.
+   Ort und Beschreibung stehen im Terminblatt — im Tagesverlauf machten
+   sie aus einem Termin acht Zeilen. */
+function dauerText(von, bis) {
+  if (!von || !bis) { return ''; }
+  var m = minutenAus(bis) - minutenAus(von);
+  if (m <= 0) { return ''; }
+  if (m < 60) { return m + ' Min.'; }
+  var std = Math.floor(m / 60);
+  var rest = m % 60;
+  return std + (rest ? (':' + String(rest).padStart(2, '0')) : ' Std.');
+}
+
 function verlaufHtml(eintrag, is) {
   if (eintrag.art === 'termin') {
     var t = eintrag.t;
     var laeuft = eintragLaeuft(eintrag, is);
-    var h = '<div class="tverlauf fest' + (t.kontext === 'privat' ? ' privat' : '')
+    var h = '<div class="tzeile-termin' + (t.kontext === 'privat' ? ' privat' : '')
           + (eintragVorbei(eintrag, is) ? ' vorbei' : '')
           + (laeuft ? ' laeuft' : '') + '">';
-    h += '<div class="tv-zeit">' + esc(t.von || '') + '</div><div class="tv-schiene"></div>';
-    h += '<div class="tv-inhalt"' + (t.id ? (' onclick="terminBlattOeffnen(\''
-       + esc(t.id) + '\',\'' + is + '\')"') : '') + '><div class="ttitel">' + esc(t.titel)
-       + '</div>';
-    /* Arten und Vorhaben stehen in einer eigenen Zeile unter dem Titel.
-       Im Titel machte eine Regel für Aufgaben sie zu Spalten nebeneinander
-       — am Handy drückte das den Titel auf ein Wort je Zeile zusammen.
-       Erst die Arten, die Hauptart vorn; das Vorhaben dahinter, bei
-       Überlänge gekürzt. */
-    var marken = '';
+    h += '<span class="tzt-zeit">' + esc(t.von || '') + '</span>';
+    h += '<span class="tzt-strich"></span>';
+
+    /* Die Art als Punkt: Ihr Name kostete eine Zeile, ihre Farbe sagt
+       im Alltag dasselbe. Der Hinweis nennt sie beim Namen. */
     var tArten = t.id ? terminArten(t) : [];
-    var ta;
-    for (ta = 0; ta < tArten.length; ta++) {
-      var tArt = tArten[ta];
-      marken += '<span class="t-art' + (ta === 0 ? ' haupt' : '') + '" style="border-color:'
-              + artFarbe(tArt) + ';color:' + artFarbe(tArt) + '" title="'
-              + (ta === 0 ? 'Hauptart' : 'Weitere Art')
-              + (artImJahr(tArt) ? ' · steht im Jahresraster' : '')
-              + '">' + esc(artName(tArt)) + (artImJahr(tArt) ? ' ·J' : '') + '</span>';
+    if (tArten.length) {
+      h += '<span class="tzt-punkt" style="background:' + artFarbe(tArten[0]) + '" title="'
+         + esc(tArten.map(artName).join(', '))
+         + (artImJahr(tArten[0]) ? ' · im Jahresraster' : '') + '"></span>';
     }
+
+    h += '<span class="tzt-titel"' + (t.id ? (' onclick="terminBlattOeffnen(\''
+       + esc(t.id) + '\',\'' + is + '\')"') : '') + ' title="' + esc(t.titel) + '">'
+       + esc(t.titel) + '</span>';
+
+    var rechts = [];
+    /* restMinutenText bringt das „noch" schon mit. */
+    if (laeuft) { rechts.push(esc(restMinutenText(t.bis))); }
+    else if (t.bis) { rechts.push(esc(dauerText(t.von, t.bis))); }
     var tvh = t.id ? terminVorhaben(t) : '';
-    if (tvh) {
-      var tvhO = vorhabenFinden(tvh.slice(2), tvh.charAt(0) === 'z' ? 'ziel' : 'projekt');
-      if (tvhO) {
-        marken += '<span class="t-vh" title="' + esc(tvhO.name) + '">' + esc(tvhO.name)
-                + '</span>';
-      }
-    }
-    if (marken) { h += '<div class="tv-marken">' + marken + '</div>'; }
-    var unten = [];
-    if (laeuft) { unten.push('<b class="tv-laeuft">läuft · ' + esc(restMinutenText(t.bis))
-                             + '</b>'); }
-    if (t.bis) { unten.push(esc(t.von) + '–' + esc(t.bis)); }
-    if (t.ort) { unten.push(esc(t.ort)); }
-    if (t.quelle) { unten.push(esc(t.quelle)); }
+    var tvhO = tvh ? vorhabenFinden(tvh.slice(2), tvh.charAt(0) === 'z' ? 'ziel' : 'projekt')
+                   : null;
+    /* Das Vorhaben ist die seltenere und darum die wichtigere Angabe;
+       nur wenn keines da ist, steht dort der Kalender. */
+    if (tvhO) { rechts.push(esc(tvhO.name)); }
+    else if (t.quelle) { rechts.push(esc(t.quelle)); }
+    h += '<span class="tzt-rechts">' + rechts.join(' · ') + '</span>';
+
     var lauf = t.id ? durchlaufZuTermin(t.id) : null;
-    if (unten.length) { h += '<div class="tmeta">' + unten.join(' · ') + '</div>'; }
-    h += '</div>';
     if (t.id) {
       if (lauf) {
-        var offenSchritte = (lauf.schritte || []).length - schritteFertig(lauf);
         h += '<span class="t-ablauf-paar">';
         h += '<button class="t-ablauf an" type="button" '
            + 'onclick="durchlaufAbhakenOeffnen(\'' + esc(lauf.id) + '\')" '
@@ -4060,7 +4087,6 @@ function verlaufHtml(eintrag, is) {
            + 'onclick="terminAblaufWahl(\'' + esc(t.id) + '\',\'' + is + '\')" '
            + 'title="Einen Ablauf an diesen Termin heften">Ablauf</button>';
       }
-
     }
     h += '</div>';
     return h;

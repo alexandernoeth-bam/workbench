@@ -565,6 +565,60 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__zeileApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'Hybride Systeme in der MUKA\','
+                 + '     kontext:\'beruflich\', status:\'laufend\', zielzustaende:[] }];'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   var off = -new Date().getTimezoneOffset();'
+                 + '   var zo = (off >= 0 ? \'+\' : \'-\')'
+                 + '     + String(Math.floor(Math.abs(off) / 60)).padStart(2, \'0\')'
+                 + '     + \':\' + String(Math.abs(off) % 60).padStart(2, \'0\');'
+                 + '   var jetztD = new Date();'
+                 + '   var hm = function(m){'
+                 + '     var d = new Date(jetztD.getTime() + m * 60000);'
+                 + '     return String(d.getHours()).padStart(2, \'0\') + \':\''
+                 + '          + String(d.getMinutes()).padStart(2, \'0\'); };'
+                 + '   var knapp = (jetztD.getHours() < 2 || jetztD.getHours() > 21);'
+                 + '   eintraegeEinsortieren(['
+                 + '     { id:\'t1\', summary:\'Weekly #Termin\','
+                 + '       start:{ dateTime: h + \'T09:00:00\' + zo },'
+                 + '       end:{ dateTime: h + \'T10:00:00\' + zo } },'
+                 + '     { id:\'t2\', summary:\'Baskets\','
+                 + '       location:\'Rasta-Dome, Vechta\','
+                 + '       description:\'Saisonplan 26/27\','
+                 + '       start:{ dateTime: h + \'T\' + hm(-60) + \':00\' + zo },'
+                 + '       end:{ dateTime: h + \'T\' + hm(60) + \':00\' + zo } },'
+                 + '     { id:\'t3\', summary:\'Fußball\','
+                 + '       start:{ dateTime: h + \'T20:45:00\' + zo },'
+                 + '       end:{ dateTime: h + \'T22:45:00\' + zo } }],'
+                 + '     \'Alex\', \'beruflich\');'
+                 + '   terminVorhabenSetzen({ id:\'t1\' }, \'p:p1\', false);'
+                 + '   artImJahrUm(\'termin\');'
+                 + '   tagOffen = h; tagZeichnen();'
+                 + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   var r = { zeilen: (b.match(/class="tzeile-termin/g) || []).length };'
+                 + '   var re = /tzt-titel"[^>]*>([^<]*)<\\/span><span class="tzt-rechts">'
+                 + '([^<]*)/g;'
+                 + '   var karte = {};'
+                 + '   var m;'
+                 + '   while ((m = re.exec(b)) !== null) { karte[m[1]] = m[2]; }'
+                 + '   r.dauer = String(karte.Weekly || \'\').split(\' · \')[0];'
+                 + '   r.vorhaben = String(karte.Weekly || \'\').split(\' · \')[1];'
+                 + '   r.kalender = String(karte[\'Fußball\'] || \'\').split(\' · \')[1];'
+                 + '   r.laeuftRest = knapp || /noch/.test(String(karte.Baskets || \'\'));'
+                 + '   r.keinOrt = (b.indexOf(\'Rasta-Dome\') < 0'
+                 + '     && b.indexOf(\'Saisonplan\') < 0);'
+                 + '   r.punktHinweis = (b.match(/tzt-punkt"[^>]*title="([^"]*)"/) || [])[1];'
+                 + '   r.dauerKurz = dauerText(\'09:00\', \'09:30\');'
+                 + '   r.dauerLang = dauerText(\'09:00\', \'11:30\');'
+                 + '   termineNachTag = {}; kalenderListe = [];'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__kurzApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -1447,8 +1501,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.summeAlle = zahl(\'Alle\');'
                  + '   tagOffen = h; tagZeichnen();'
                  + '   var tb = document.getElementById(\'tagBlatt\').innerHTML;'
-                 + '   r.pillen = (tb.match(/class="t-art/g) || []).length;'
-                 + '   r.hauptFett = /class="t-art haupt"/.test(tb);'
+                 + '   var pk = tb.match(/tzt-punkt"[^>]*title="([^"]*)"/);'
+                 + '   r.pillen = pk ? pk[1].split(\', \').length : 0;'
+                 + '   r.hauptFett = !!pk && pk[1].indexOf(\'Training\') === 0;'
                  + '   termineNachTag = {}; kalenderListe = [];'
                  + '   tagOffen = merkTag; DB = alt;'
                  + '   return r;'
@@ -1867,12 +1922,13 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   tagZeichnen();'
                  + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
                  + '   var karte = {};'
-                 + '   /* Seit v1.5.1 stehen die Pillen in einer eigenen Zeile. */'
-                 + '   var re = /ttitel">([^<]*)<\\/div>(?:<div class="tv-marken">'
-                 + '<span class="t-art[^"]*"[^>]*>([^<]*)<)?/g;'
+                 + '   /* Seit v2.7.0 ist ein Termin eine Zeile: die Art'
+                 + '      steht als Punkt, ihr Name im Hinweis. */'
+                 + '   var re = /(?:<span class="tzt-punkt"[^>]*title="([^"·]*)'
+                 + '[^"]*">2?<\\/span>)?<span class="tzt-titel"[^>]*>([^<]*)/g;'
                  + '   var m;'
                  + '   while ((m = re.exec(b)) !== null) {'
-                 + '     karte[m[1]] = (m[2] || \'\').replace(/ ·J$/, \'\'); }'
+                 + '     karte[m[2]] = (m[1] || \'\').trim(); }'
                  + '   var r = { ausBeschreibung: karte[\'Laufen\'],'
                  + '             ausTitel: karte[\'Intervalle\'],'
                  + '             titelSauber: (karte[\'Intervalle\'] !== undefined)'
@@ -1881,7 +1937,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   artImJahrUm(\'training\');'
                  + '   tagZeichnen();'
                  + '   r.mitJ = (document.getElementById(\'tagBlatt\').innerHTML'
-                 + '     .indexOf(\'·J\') >= 0);'
+                 + '     .indexOf(\'im Jahresraster\') >= 0);'
                  + '   termineNachTag = {}; kalenderListe = [];'
                  + '   tagOffen = merkTag; DB = alt;'
                  + '   return r;'
@@ -8342,17 +8398,22 @@ console.log('\n86. Art im Tagesplan');
   pruefe(ein && (ein[0].match(/rohTitel: rohTitel/g) || []).length >= 2,
          'der rohe Titel bleibt bei allen Terminarten erhalten');
 
-  pruefe(/class="t-art'/.test(skript), 'die Art steht in der Tageszeile');
+  pruefe(/class="tzt-punkt"/.test(skript), 'die Art steht in der Tageszeile');
+  /* Seit v2.7.0 ein Termin, eine Zeile: Uhrzeit, Farbstrich, Punkt für
+     die Art, Titel mit „…", rechts Dauer und Vorhaben. */
   const vlh = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
-  pruefe(vlh && /<div class="ttitel">' \+ esc\(t\.titel\)\s*\+ '<\/div>'/.test(vlh[0]),
-         'der Titel steht allein in seiner Zeile — sonst drückten Art und Vorhaben ihn '
-         + 'am Handy auf ein Wort je Zeile zusammen');
-  pruefe(vlh && /class="tv-marken"/.test(vlh[0]),
-         'Art und Vorhaben stehen darunter in einer eigenen Zeile');
-  pruefe(/\.tv-marken \.t-vh\{[^}]*text-overflow:ellipsis/.test(QUELLE),
+  pruefe(vlh && /class="tzeile-termin/.test(vlh[0]) && /class="tzt-titel"/.test(vlh[0]),
+         'ein Termin steht in einer Zeile');
+  pruefe(vlh && /class="tzt-punkt" style="background:' \+ artFarbe\(tArten\[0\]\)/.test(vlh[0]),
+         'die Art steht als farbiger Punkt');
+  pruefe(/\.tzt-titel\{[^}]*text-overflow:ellipsis/.test(QUELLE),
+         'ein langer Titel wird gekürzt statt umgebrochen');
+  pruefe(vlh && !/t\.ort/.test(vlh[0]),
+         'Ort und Beschreibung stehen im Terminblatt — sie machten aus einem Termin acht Zeilen');
+  pruefe(/\.tzt-rechts\{[^}]*text-overflow:ellipsis/.test(QUELLE),
          'ein langer Vorhabensname wird gekürzt');
-  pruefe(/steht im Jahresraster/.test(skript),
-         'und es ist ablesbar, ob sie im Jahresraster erscheint');
+  pruefe(/im Jahresraster' : ''/.test(skript),
+         'und es ist im Hinweis ablesbar, ob sie im Jahresraster erscheint');
 
   if (!t) {
     warn('Funktionen nicht auswertbar');
@@ -8365,7 +8426,7 @@ console.log('\n86. Art im Tagesplan');
            'der Titel erscheint ohne sein Kürzel');
     pruefe(e.ohneArt === '', 'ein Termin ohne Kürzel bekommt kein Etikett');
     pruefe(e.mitJ === true,
-           'ist die Art fürs Jahr freigegeben, steht das dabei');
+           'ist die Art fürs Jahr freigegeben, steht das im Hinweis');
   }
 }
 
@@ -9378,7 +9439,8 @@ console.log('\n104. Termine an Vorhaben');
          'Aufgaben und Termine teilen sich die Vorhabenwahl');
   const vl = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
   pruefe(vl && /terminBlattOeffnen\(/.test(vl[0]), 'ein Termin im Tag öffnet sein Blatt');
-  pruefe(vl && /class="t-vh"/.test(vl[0]), 'und zeigt sein Vorhaben');
+  pruefe(vl && /rechts\.push\(esc\(tvhO\.name\)\)/.test(vl[0]),
+         'und zeigt sein Vorhaben');
   pruefe(/class="tg-kasten/.test(skript) && /\.tg-kasten\{flex:0 0 19px;width:19px;height:19px/
          .test(QUELLE),
          'das Kästchen der Seite hat eigene Maße — es fiel sonst zu einem Strich zusammen');
@@ -9973,6 +10035,47 @@ console.log('\n116. Kompakte Schritte');
     pruefe(e.kurzOhneFelder === true, 'ohne Eingabefelder');
     pruefe(e.langMitFeldern === true, 'nach „Bearbeiten" sind die Felder da');
     pruefe(e.hakenWirkt === true, 'der Haken wirkt in beiden Ansichten');
+  }
+}
+
+/* ============================================================
+   117. Ein Termin, eine Zeile
+   Grund: Der Kalendertext eines Termins — Ort, Halle, Saisonplan —
+   machte im Tagesverlauf aus einem Termin acht Zeilen.
+   ============================================================ */
+console.log('\n117. Termine als Einzeiler');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__zeileApi;
+
+  pruefe(new RegExp('function\\s+dauerText\\s*\\(').test(skript),
+         'Funktion dauerText ist definiert');
+  const vl = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
+  pruefe(vl && /tzt-zeit/.test(vl[0]) && /tzt-strich/.test(vl[0])
+         && /tzt-titel/.test(vl[0]) && /tzt-rechts/.test(vl[0]),
+         'Uhrzeit, Farbstrich, Titel und rechte Angabe in einer Zeile');
+  pruefe(vl && !/t\.ort/.test(vl[0]) && !/t\.beschreibung/.test(vl[0]),
+         'Ort und Beschreibung bleiben dem Terminblatt');
+  pruefe(/body:not\(\.breit\) \.tzeile-termin \.t-ablauf/.test(QUELLE),
+         'am Handy weicht der Ablaufknopf, sonst bliebe für den Titel nichts');
+  pruefe(vl && /rechts\.push\(esc\(restMinutenText\(t\.bis\)\)\)/.test(vl[0]),
+         'beim laufenden Termin steht rechts die Restzeit — ohne doppeltes „noch"');
+
+  if (!t) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = t.pruefe();
+    pruefe(e.zeilen === 3, 'jeder Termin eine Zeile');
+    pruefe(e.dauer === '1 Std.', 'rechts steht die Dauer');
+    pruefe(e.vorhaben === 'Hybride Systeme in der MUKA',
+           'gibt es ein Vorhaben, steht es dort');
+    pruefe(e.kalender === 'Alex', 'sonst der Kalender');
+    pruefe(e.laeuftRest === true, 'beim laufenden Termin die Restzeit');
+    pruefe(e.keinOrt === true, 'Ort und Beschreibung stehen nicht in der Zeile');
+    pruefe(e.punktHinweis === 'Termin · im Jahresraster',
+           'der Punkt nennt im Hinweis die Art und ob sie im Jahr steht');
+    pruefe(e.dauerKurz === '30 Min.' && e.dauerLang === '2:30',
+           'die Dauer wird kurz geschrieben');
   }
 }
 
