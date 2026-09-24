@@ -7389,10 +7389,15 @@ console.log('\n74. Bereiche nach Kontext');
   const sf = skript.match(/function setAbFilter\([\s\S]*?\n\}/);
   pruefe(sf && /abKontextZu = \{\}/.test(sf[0]),
          'das Umschalten räumt eingeklappte Bereiche auf');
-  pruefe(/body\.breit #abBlatt \.vkarte,body\.breit #vhBlatt \.vkarte\{height:100%/
-         .test(QUELLE),
+  /* Seit v2.2.1 tragen die Abläufe ihr Raster in der Gruppe, nicht im
+     Blatt; gleich hoch bleiben die Kacheln dort wie hier. */
+  pruefe(/body\.breit \.ab-raster \.vkarte\{height:100%\}/.test(QUELLE)
+         && /body\.breit #vhBlatt \.vkarte\{height:100%/.test(QUELLE),
          'die Kacheln der Abläufe und der Vorhaben sind gleich hoch — sonst wird die '
          + 'Reihe zum Zickzack');
+  pruefe(/<div class="vhblatt einfachliste" id="abBlatt">/.test(QUELLE),
+         'das Blatt der Abläufe ist selbst kein Raster — sonst stünden Gruppenkopf und '
+         + 'Karten nebeneinander');
   pruefe(/#abBlatt \.vh-bereich,#abBlatt \.gruppenkopf\{grid-column:1 \/ -1\}/
          .test(QUELLE),
          'die Überschriften laufen über die ganze Breite');

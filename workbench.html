@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 2.2.0</title>
+<title>Workbench 2.2.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -725,10 +725,13 @@ body.breit .tspalte-rechts{grid-column:2}
 body.breit .vhblatt.einfachliste{display:block}
 /* Gleich hohe Kacheln: Ohne diese Regel richtet sich jede nach ihrem
    eigenen Inhalt, und die Reihe wird zum Zickzack. */
-body.breit #abBlatt,body.breit #vhBlatt{align-items:stretch}
-body.breit #abBlatt .vkarte,body.breit #vhBlatt .vkarte{height:100%;display:flex;
-  flex-direction:column}
-body.breit #abBlatt .vkarte .vk-mehr{flex:1}
+/* Das Blatt der Abläufe ist selbst kein Raster mehr: Es trägt
+   Gruppenköpfe und darunter je ein eigenes Kartenraster. Sonst wären
+   Kopf und Raster zwei Spalten nebeneinander. */
+body.breit #vhBlatt{align-items:stretch}
+body.breit #vhBlatt .vkarte{height:100%;display:flex;flex-direction:column}
+body.breit .ab-raster{align-items:stretch}
+body.breit .ab-raster .vkarte{height:100%}
 /* Bei den flachen Karten dehnt sich der Wochensatz, damit Termin und
    Knöpfe unten auf gleicher Höhe stehen. */
 body.breit #vhBlatt .vkarte.flach .vk-satz{flex:1}
@@ -1683,7 +1686,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
       <button type="button" id="abStufeVorlagen"
               onclick="setAbStufe('vorlagen')">Vorlagen</button>
     </div>
-    <div class="pillen" style="margin-left:0;margin-top:9px">
+    <div class="pillen" id="abGruppierZeile" style="margin-left:0;margin-top:9px">
       <span class="ms-marke" style="align-self:center;margin-right:3px">Gruppiert nach</span>
       <button type="button" id="abGrKeine" class="aktiv"
               onclick="setAbGruppierung('keine')">nichts</button>
@@ -1692,7 +1695,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
       <button type="button" id="abGrZiel" onclick="setAbGruppierung('ziel')">Ziel</button>
     </div>
 
-  <div class="vhblatt" id="abBlatt"></div>
+  <div class="vhblatt einfachliste" id="abBlatt"></div>
 
   <button class="plusknopf" type="button" onclick="ablaufNeu()" aria-label="Neuer Ablauf">
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
@@ -1774,7 +1777,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '2.2.0';
+var APP_VERSION = '2.2.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -14271,6 +14274,10 @@ function abZeichnen() {
   if (knopfL) { knopfL.textContent = 'Läuft gerade · ' + laufend.length; }
   var knopfV = document.getElementById('abStufeVorlagen');
   if (knopfV) { knopfV.textContent = 'Vorlagen · ' + vorlagen.length; }
+  /* „Gruppiert nach" gilt nur für die Vorlagen — die laufenden ordnen
+     sich nach ihrem Zustand. */
+  var grZeile = document.getElementById('abGruppierZeile');
+  if (grZeile) { grZeile.style.display = (abStufe === 'laufend') ? 'none' : ''; }
 }
 
 /* ------------------------------------------------------------
