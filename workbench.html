@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 1.10.0</title>
+<title>Workbench 2.0.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -136,7 +136,15 @@ input[type=file]{font:inherit;font-size:calc(var(--fs)*0.82);width:100%;
 
 /* ---------- Tagesplan ---------- */
 #schirmTag{padding:0}
-.tagkopf{flex:0 0 auto;padding:14px 20px 0}
+/* Der Tag in Kartenform, wie die Vorhaben: der Kopf auf einer Karte,
+   jede Gruppe auf einer eigenen Fläche. */
+.tagkopf{flex:0 0 auto;padding:12px 20px 0}
+.tk-karte{background:var(--karte);border:1px solid var(--linie);
+  border-left:4px solid var(--weinrot);border-radius:10px;padding:11px 14px 12px}
+.tk-zahlen{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.tk-zahlen span{font-size:calc(var(--fs)*0.66);padding:2px 9px;border-radius:20px;
+  background:var(--papier);color:var(--grau)}
+.tk-zahlen:empty{display:none}
 .tk-zeile{display:flex;align-items:baseline;gap:10px}
 .tk-zahl{font-size:calc(var(--fs)*2.3);font-weight:600;letter-spacing:-.02em;line-height:1}
 .tk-text{display:flex;flex-direction:column;gap:1px}
@@ -364,11 +372,15 @@ body.breit #seiteBlatt{display:grid;grid-template-columns:1.15fr 1fr;
 .eingabe-vorschau.sichtbar{display:block}
 .eingabe-vorschau b{font-weight:500;color:var(--tinte)}
 
-.tagblatt{flex:1 1 auto;overflow-y:auto;padding:0 20px 20px}
-.tabschnitt{padding-top:16px}
-.tabschnitt-titel{font-size:calc(var(--fs)*0.78);font-weight:500;color:var(--grau);
-  display:flex;align-items:center;gap:8px;margin-bottom:7px}
-.tabschnitt-titel::after{content:"";flex:1;height:1px;background:var(--linie)}
+.tagblatt{flex:1 1 auto;overflow-y:auto;padding:0 20px 24px}
+body.breit .tagblatt{max-width:1000px}
+.tabschnitt{background:var(--karte);border:1px solid var(--linie);border-radius:10px;
+  padding:4px 14px 8px;margin:12px 0 0}
+.tabschnitt-titel{display:flex;justify-content:space-between;align-items:center;
+  font-size:calc(var(--fs)*0.66);font-weight:600;color:var(--grau);letter-spacing:.05em;
+  text-transform:uppercase;margin:9px 0 3px}
+.tabschnitt-titel i{font-style:normal;font-weight:400;letter-spacing:0;
+  text-transform:none;font-size:calc(var(--fs)*0.72)}
 
 .tzeile{display:flex;align-items:flex-start;gap:11px;padding:8px 0 8px 11px;
   border-left:2px solid var(--weinrot);margin-bottom:2px}
@@ -1273,6 +1285,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 
 <div class="schirm aktiv" id="schirmTag">
   <div class="tagkopf">
+   <div class="tk-karte">
     <div class="tk-zeile">
       <div class="tk-zahl" id="tkZahl">–</div>
       <div class="tk-text">
@@ -1302,6 +1315,8 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
       <button type="button" id="tBeruf" class="pille" onclick="setTagFilter('beruflich')">Beruf</button>
       <button type="button" id="tPrivat" class="pille" onclick="setTagFilter('privat')">Privat</button>
     </div>
+    <div class="tk-zahlen" id="tkZahlen"></div>
+   </div>
     <button class="tk-nachzuegler" id="tkNachzuegler" type="button"
             onclick="streifenAntippen()"></button>
     <div class="tk-stand" id="tkStand"></div>
@@ -1708,7 +1723,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '1.10.0';
+var APP_VERSION = '2.0.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4259,6 +4274,43 @@ function tagwGruss() {
   return 'Guten Abend.';
 }
 
+/* Wie voll ist dieser Tag? Die Zahlen stehen im Kopf, damit man es
+   sieht, bevor man rollt. */
+/* Der Kopf einer Gruppe: Name links, Zahl der offenen rechts. */
+function abschnittKopf(titel, zahl) {
+  return '<div class="tabschnitt-titel"><span>' + titel + '</span>'
+       + (zahl ? ('<i>' + zahl + '</i>') : '') + '</div>';
+}
+
+function tagZahlenZeichnen(is, e) {
+  var el = document.getElementById('tkZahlen');
+  if (!el) { return; }
+  var termine = e.verlauf.filter(function (x) { return x.art === 'termin'; });
+  var belegt = 0;
+  var i;
+  for (i = 0; i < termine.length; i++) {
+    var t = termine[i].t;
+    if (!t || t.ganztags || !t.von || !t.bis) { continue; }
+    belegt += Math.max(0, minutenAus(t.bis) - minutenAus(t.von));
+  }
+  var teile = [];
+  if (termine.length) {
+    teile.push(termine.length + (termine.length === 1 ? ' Termin' : ' Termine'));
+  }
+  if (belegt >= 30) {
+    teile.push(Math.floor(belegt / 60) + ' Std. '
+             + (belegt % 60 ? ((belegt % 60) + ' ') : '') + 'belegt');
+  }
+  if (e.haupt.length) {
+    teile.push(e.haupt.length + (e.haupt.length === 1 ? ' Aufgabe' : ' Aufgaben'));
+  }
+  if (e.klein.length) { teile.push(e.klein.length + ' Kleinigkeiten'); }
+  if (e.wieder.length) { teile.push(e.wieder.length + ' wiederkehrend'); }
+  var fertig = e.hauptFertig.length + e.kleinFertig.length + e.wiederFertig.length;
+  if (fertig) { teile.push(fertig + ' erledigt'); }
+  el.innerHTML = teile.length ? ('<span>' + teile.join('</span><span>') + '</span>') : '';
+}
+
 function nachzueglerZeichnen(is) {
   var el = document.getElementById('tkNachzuegler');
   if (!el) { return; }
@@ -5091,14 +5143,16 @@ function tagZeichnen() {
   /* Zwei Spalten als eigene Behälter: In einem Raster teilen sich
      nebeneinanderliegende Abschnitte die Zeilenhöhe, wodurch oben
      rechts eine Lücke entstünde. */
+  tagZahlenZeichnen(is, e);
+
   h += '<div class="tspalte tspalte-links">';
   var vorbeiZahl = 0;
   for (i = 0; i < e.verlauf.length; i++) {
     if (eintragVorbei(e.verlauf[i], is)) { vorbeiZahl++; }
   }
   h += '<div class="tabschnitt' + (vorbeiOffen ? ' aufgeklappt' : '')
-     + '" data-kurz="Tagesverlauf"><div class="tabschnitt-titel">'
-     + '<span>Tagesverlauf</span></div>';
+     + '" data-kurz="Tagesverlauf">' + abschnittKopf('Tagesverlauf',
+         e.verlauf.length + e.ganztags.length);
   /* Ganztägiges hat keine Uhrzeit und gehört deshalb nicht an die
      Zeitschiene: je eine schlichte Zeile darüber. */
   var g;
@@ -5131,8 +5185,8 @@ function tagZeichnen() {
   for (i = 0; i < e.verlauf.length; i++) { h += verlaufHtml(e.verlauf[i], is); }
   h += '</div>';
 
-  h += '<div class="tabschnitt" data-kurz="Wiederkehrend"><div class="tabschnitt-titel">'
-     + '<span>Wiederkehrend</span></div>';
+  h += '<div class="tabschnitt" data-kurz="Wiederkehrend">'
+     + abschnittKopf('Wiederkehrend', e.wieder.length);
   if (!e.wieder.length && !e.wiederFertig.length) {
     h += '<div class="tleer">Heute nichts fällig.</div>';
   }
@@ -5148,15 +5202,15 @@ function tagZeichnen() {
 
   var laeufe = durchlaeufeHeute(is);
   if (laeufe.length) {
-    h += '<div class="tabschnitt" data-kurz="Abläufe"><div class="tabschnitt-titel">'
-       + '<span>Abläufe</span></div>';
+    h += '<div class="tabschnitt" data-kurz="Abläufe">'
+       + abschnittKopf('Abläufe', laeufe.length);
     for (i = 0; i < laeufe.length; i++) { h += ablaufKlammerHtml(laeufe[i], is); }
     h += '</div>';
   }
 
   h += '</div><div class="tspalte tspalte-rechts">';
-  h += '<div class="tabschnitt" data-kurz="Aufgaben"><div class="tabschnitt-titel">'
-     + '<span>Aufgaben</span></div>';
+  h += '<div class="tabschnitt" data-kurz="Aufgaben">'
+     + abschnittKopf('Aufgaben', e.haupt.length);
   if (!e.haupt.length && !e.hauptFertig.length) {
     h += '<div class="tleer">Für heute nichts eingeplant.</div>';
   }
@@ -5164,8 +5218,8 @@ function tagZeichnen() {
   for (i = 0; i < e.hauptFertig.length; i++) { h += zeileHtml(e.hauptFertig[i], is, false); }
   h += '</div>';
 
-  h += '<div class="tabschnitt" data-kurz="Kleinigkeiten"><div class="tabschnitt-titel">'
-     + '<span>Kleinigkeiten &amp; Kontakte</span></div>';
+  h += '<div class="tabschnitt" data-kurz="Kleinigkeiten">'
+     + abschnittKopf('Kleinigkeiten', e.klein.length);
   if (!e.klein.length && !e.kleinFertig.length) {
     h += '<div class="tleer">Nichts offen.</div>';
   }

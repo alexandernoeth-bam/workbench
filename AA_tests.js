@@ -543,6 +543,66 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__tagKarteApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'A\', kontext:\'privat\', status:\'offen\','
+                 + '       art:\'haupt\', planung: h },'
+                 + '     { id:\'a2\', titel:\'B\', kontext:\'privat\', status:\'offen\','
+                 + '       art:\'haupt\', planung: h },'
+                 + '     { id:\'a3\', titel:\'C\', kontext:\'privat\', status:\'offen\','
+                 + '       art:\'haupt\', planung: h },'
+                 + '     { id:\'k1\', titel:\'K1\', kontext:\'privat\', status:\'offen\','
+                 + '       art:\'klein\', planung: h },'
+                 + '     { id:\'k2\', titel:\'K2\', kontext:\'privat\', status:\'offen\','
+                 + '       art:\'klein\', planung: h },'
+                 + '     { id:\'w1\', titel:\'W\', kontext:\'privat\', status:\'offen\','
+                 + '       art:\'haupt\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[0,1,2,3,4,5,6] } } ];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Bauantrag\','
+                 + '     kontext:\'privat\', frist: h,'
+                 + '     schritte:[{ titel:\'A\', fertig:true }, { titel:\'B\' }] }];'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   var off = -new Date().getTimezoneOffset();'
+                 + '   var zo = (off >= 0 ? \'+\' : \'-\')'
+                 + '     + String(Math.floor(Math.abs(off) / 60)).padStart(2, \'0\')'
+                 + '     + \':\' + String(Math.abs(off) % 60).padStart(2, \'0\');'
+                 + '   var ev = function(id, von, bis){'
+                 + '     return { id: id, summary: id,'
+                 + '       start:{ dateTime: h + \'T\' + von + \':00\' + zo },'
+                 + '       end:{ dateTime: h + \'T\' + bis + \':00\' + zo } }; };'
+                 + '   eintraegeEinsortieren([ev(\'t1\', \'09:00\', \'10:00\'),'
+                 + '     ev(\'t2\', \'14:00\', \'15:00\'),'
+                 + '     ev(\'t3\', \'16:30\', \'18:00\'),'
+                 + '     { id:\'u1\', summary:\'Emden #Urlaub\','
+                 + '       start:{ date: h }, end:{ date:\'2099-01-01\' } }],'
+                 + '     \'Alex\', \'privat\');'
+                 + '   tagOffen = h;'
+                 + '   aufgabeHaken(\'a3\');'
+                 + '   tagZeichnen();'
+                 + '   var kopf = document.getElementById(\'tkZahlen\').innerHTML;'
+                 + '   var r = { zaehler: (kopf.match(/<span>([^<]*)<\\/span>/g) || [])'
+                 + '     .map(function(x){ return x.slice(6, -7); }).join(\' · \') };'
+                 + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   var koepfe = b.match('
+                 + '     /tabschnitt-titel"><span>([^<]*)<\\/span>(<i>\\d+<\\/i>)?/g) || [];'
+                 + '   r.gruppen = koepfe.map(function(x){'
+                 + '     return x.replace(/.*<span>/, \'\').replace(/<.*/, \'\'); })'
+                 + '     .join(\',\');'
+                 + '   r.zahlen = koepfe.map(function(x){'
+                 + '     var m = x.match(/<i>(\\d+)/); return m ? m[1] : \'0\'; })'
+                 + '     .join(\',\');'
+                 + '   DB.aufgaben = []; DB.durchlaeufe = []; termineNachTag = {};'
+                 + '   tagZeichnen();'
+                 + '   r.leererTag = document.getElementById(\'tkZahlen\').innerHTML;'
+                 + '   var b2 = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   r.keineZahlOhneEintrag = !/<i>0<\\/i>/.test(b2);'
+                 + '   kalenderListe = []; tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__zusatzApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -9448,6 +9508,51 @@ console.log('\n111. Gelöschte Termine');
   pruefe(jh && /if \(imFrischenFenster\(tag\)\) \{ termineNachTag\[tag\] = jahrNeu\[tag\]\.slice\(\)/
          .test(jh[0]),
          'im Fenster ersetzt das frisch geholte Jahr den Tag');
+}
+
+/* ============================================================
+   112. Die Tagessicht in Kartenform
+   Grund: Die Uebersicht der Vorhaben ist uebersichtlicher als die
+   duennen Linien im Tagesplan. Derselbe Aufbau: eine Kopfkarte mit
+   Zaehlern, darunter jede Gruppe auf einer eigenen Flaeche.
+   ============================================================ */
+console.log('\n112. Tagessicht in Karten');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__tagKarteApi;
+
+  ['abschnittKopf', 'tagZahlenZeichnen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/<div class="tk-karte">/.test(QUELLE), 'der Kopf steht auf einer Karte');
+  pruefe(/id="tkZahlen"/.test(QUELLE), 'mit einer Zeile für die Zähler');
+  pruefe(/\.tabschnitt\{background:var\(--karte\)/.test(QUELLE),
+         'jede Gruppe steht auf einer eigenen Fläche');
+  pruefe(!/\.tabschnitt-titel::after/.test(QUELLE),
+         'die dünne Linie hinter dem Gruppennamen entfällt');
+  pruefe(/body\.breit \.tagblatt\{max-width:1000px\}/.test(QUELLE),
+         'am Rechner ist die Breite begrenzt');
+  const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tz && (tz[0].match(/abschnittKopf\(/g) || []).length === 5,
+         'alle fünf Gruppen tragen Namen und Zahl');
+  pruefe(tz && /tagZahlenZeichnen\(is, e\)/.test(tz[0]),
+         'die Zähler werden bei jedem Zeichnen gefüllt');
+
+  if (!t) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = t.pruefe();
+    pruefe(e.zaehler === '3 Termine · 3 Std. 30 belegt · 2 Aufgaben · 2 Kleinigkeiten'
+           + ' · 1 wiederkehrend · 1 erledigt',
+           'der Kopf sagt, wie voll der Tag ist');
+    pruefe(e.gruppen === 'Tagesverlauf,Wiederkehrend,Abläufe,Aufgaben,Kleinigkeiten',
+           'die Gruppen stehen in der gewohnten Folge');
+    pruefe(e.zahlen === '4,1,1,2,2', 'jede mit der Zahl ihrer offenen Einträge');
+    pruefe(e.leererTag === '', 'an einem leeren Tag steht keine Zahl im Kopf');
+    pruefe(e.keineZahlOhneEintrag === true,
+           'eine leere Gruppe zeigt keine Null, sondern nichts');
+  }
 }
 
 /* ============================================================
