@@ -583,9 +583,13 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     .map(function(x){ return x.slice(10); }).join(\',\');'
                  + '   r.naechster = /Nächster: C/.test(b);'
                  + '   schrittUm(\'d1\', 2);'
-                 + '   r.autoWeg = !durchlaufFinden(\'d1\');'
-                 + '   r.zurueckholbar = !!(zurueckHolen'
-                 + '     && zurueckHolen.sammlung === \'durchlaeufe\');'
+                 + '   r.autoFertig = (durchlaufFinden(\'d1\') || {}).erledigt === true;'
+                 + '   r.nochDa = !!durchlaufFinden(\'d1\');'
+                 + '   r.inGruppe = abZustand(durchlaufFinden(\'d1\'));'
+                 + '   abDetail = \'d1\'; abDetailArt = \'durchlauf\';'
+                 + '   durchlaufWiederOeffnen();'
+                 + '   r.wiederAuf = (durchlaufFinden(\'d1\') || {}).erledigt;'
+                 + '   abDetail = \'\'; abDetailArt = \'\';'
                  + '   abSchieben(\'d3\', 1);'
                  + '   abZeichnen();'
                  + '   var b2 = document.getElementById(\'abBlatt\').innerHTML;'
@@ -9740,8 +9744,12 @@ console.log('\n114. Abläufe nach Zustand');
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
   });
-  pruefe(/var AB_GRUPPEN = \[\['heute', 'Heute dran'\], \['laeuft', 'Läuft'\], \['ruht', 'Ruht'\]\]/
-         .test(skript), 'drei Gruppen: heute dran, läuft, ruht');
+  pruefe(/\['heute', 'Heute dran'\], \['laeuft', 'Läuft'\], \['ruht', 'Ruht'\]/.test(skript)
+         && /\['fertig', 'Erledigt'\]/.test(skript),
+         'vier Gruppen: heute dran, läuft, ruht, erledigt');
+  const zo = skript.match(/function abZustandOffen\([\s\S]*?\n\}/);
+  pruefe(zo && /name === 'fertig' && k\[name\] !== false/.test(zo[0]),
+         'Erledigtes steht unten und bleibt zu, bis man es sehen will');
   const go = skript.match(/function abZustandOffen\([\s\S]*?\n\}/);
   pruefe(go && /name === 'ruht' && !istBreit\(\)/.test(go[0]),
          'am Handy ist „Ruht" voreingestellt zugeklappt');
@@ -9767,8 +9775,11 @@ console.log('\n114. Abläufe nach Zustand');
     pruefe(e.ringVoll === true, 'bei allen Schritten ist der Ring voll');
     pruefe(e.marken === 'Vorgang,aus Vorlage', 'die Herkunft steht als Marke am Fuß');
     pruefe(e.naechster === true, 'die Karte nennt den nächsten offenen Schritt');
-    pruefe(e.autoWeg === true, 'beim letzten Haken endet der Durchlauf von selbst');
-    pruefe(e.zurueckholbar === true, 'zurückholen bleibt möglich');
+    pruefe(e.autoFertig === true,
+           'beim letzten Haken gilt der Durchlauf als erledigt');
+    pruefe(e.nochDa === true, 'gelöscht wird er nicht — nachlesen bleibt möglich');
+    pruefe(e.inGruppe === 'fertig', 'er rutscht in die Gruppe „Erledigt"');
+    pruefe(e.wiederAuf === false, '„Wieder öffnen" macht ihn wieder zu einem laufenden');
     pruefe(e.sortiert === 'B,A', 'innerhalb der Gruppe lässt sich schieben');
   }
 }

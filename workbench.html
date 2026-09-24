@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 2.2.1</title>
+<title>Workbench 2.3.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1005,7 +1005,7 @@ body.breit .ab-pfeile{display:none}
 .ring i{position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;
   justify-content:center;font-style:normal;font-size:calc(var(--fs)*0.62);color:var(--grau)}
 .ring.voll i{color:var(--petrol);font-weight:500}
-.as-ring{display:flex;justify-content:flex-end;margin-top:-34px;margin-bottom:6px}
+.as-meta-ring{display:flex;align-items:center;justify-content:space-between;gap:10px}
 
 /* Meldungen blenden sich unten kurz ein. */
 .toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);
@@ -1777,7 +1777,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '2.2.1';
+var APP_VERSION = '2.3.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2911,6 +2911,7 @@ function rueckkehrPruefen() {
   erneuerungPruefen();
   wochenUmstellen();
   ausnahmenAufraeumen();
+  durchlaeufeFertigPruefen();
   if (document.hidden) { return; }
   if (!tokenGueltig()) { return; }
   if (Date.now() - abgleichZuletztMs < ABGLEICH_MINDEST) { return; }
@@ -13978,11 +13979,13 @@ function ablaufAnlassText(v) {
    Marke am Fuß, nicht mehr als eigene Gruppe.
    ============================================================ */
 
-var AB_GRUPPEN = [['heute', 'Heute dran'], ['laeuft', 'Läuft'], ['ruht', 'Ruht']];
+var AB_GRUPPEN = [['heute', 'Heute dran'], ['laeuft', 'Läuft'], ['ruht', 'Ruht'],
+                  ['fertig', 'Erledigt']];
 
 function abZustand(d) {
   var l = d.schritte || [];
-  if (l.length && schritteFertig(d) === l.length) { return 'heute'; }
+  if (d.erledigt) { return 'fertig'; }
+  if (l.length && schritteFertig(d) === l.length) { return 'fertig'; }
   if (ruhtBis(d)) { return 'ruht'; }
   var s = offenerSchritt(d);
   if (s && s.satz.ab && s.satz.ab <= isoDatum()) { return 'heute'; }
@@ -13993,6 +13996,8 @@ function abZustand(d) {
 function abZustandOffen(name) {
   var k = DB.einstellungen.abGruppenZu || {};
   if (k[name] === true) { return false; }
+  /* Erledigtes steht unten und bleibt zu, bis man es sehen will. */
+  if (name === 'fertig' && k[name] !== false) { return false; }
   /* Am Handy ist „Ruht" voreingestellt zugeklappt: Es ist die längste
      Liste und die, die gerade nichts von einem will. */
   if (k[name] === false) { return true; }
@@ -14022,6 +14027,9 @@ function ringHtml(fertig, gesamt) {
 
 function abStandText(d) {
   var l = d.schritte || [];
+  if (d.erledigt) {
+    return 'erledigt' + (d.erledigtAm ? (' ' + kurzDatum(d.erledigtAm)) : '');
+  }
   if (l.length && schritteFertig(d) === l.length) { return 'alle Schritte erledigt'; }
   var ruht = ruhtBis(d);
   if (ruht) {
@@ -14089,14 +14097,47 @@ function abSchieben(id, richtung) {
 
 /* Alle Schritte erledigt? Dann ist der Durchlauf fertig und verschwindet
    von selbst — mit der Möglichkeit, ihn zurückzuholen. */
+/* Alle Schritte erledigt? Dann gilt der Durchlauf als erledigt und
+   rutscht in die eingeklappte Gruppe unten — gelöscht wird er nicht,
+   denn was man getan hat, will man nachlesen können. */
 function durchlaufPruefeFertig(id) {
   var d = durchlaufFinden(id);
-  if (!d) { return false; }
+  if (!d || d.erledigt) { return false; }
   var l = d.schritte || [];
   if (!l.length || schritteFertig(d) !== l.length) { return false; }
-  durchlaufBeenden(d.id);
-  melde('Fertig: ' + (d.name || 'ohne Namen') + ' — alle Schritte erledigt.', 'gut');
+  d.erledigt = true;
+  d.erledigtAm = isoDatum();
+  d.geaendert = jetzt();
+  spaeterSichern();
+  abZeichnen();
+  tagZeichnen();
+  melde('Erledigt: ' + (d.name || 'ohne Namen') + ' — alle Schritte getan.', 'gut');
   return true;
+}
+
+/* Ein Durchlauf, der schon fertig war, bevor es diese Regel gab. */
+function durchlaeufeFertigPruefen() {
+  var l = DB.durchlaeufe || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].erledigt) { continue; }
+    var s = l[i].schritte || [];
+    if (!s.length || schritteFertig(l[i]) !== s.length) { continue; }
+    l[i].erledigt = true;
+    l[i].erledigtAm = isoDatum();
+    l[i].geaendert = jetzt();
+  }
+}
+
+function durchlaufWiederOeffnen() {
+  var d = durchlaufFinden(abDetail);
+  if (!d) { return; }
+  d.erledigt = false;
+  d.erledigtAm = null;
+  d.geaendert = jetzt();
+  spaeterSichern();
+  abZeichnen();
+  abDetailNeu();
 }
 
 /* ------------------------------------------------------------
@@ -14772,15 +14813,15 @@ function abDetailHtml() {
      + 'placeholder="' + (istVorlage ? 'Name der Vorlage' : 'Worum geht es?') + '" '
      + 'oninput="abNameSetzen(this.value)">';
   var vorgang = istVorgang(a);
-  h += '<div class="as-meta">'
+  /* Der Ring steht in derselben Zeile wie die Angabe — hochgezogen
+     lag er über dem Titel und dem Schließen. */
+  h += '<div class="as-meta as-meta-ring"><span>'
      + (istVorlage ? 'Vorlage' : (vorgang ? 'Vorgang' : 'Durchlauf'))
      + (istVorlage ? '' : (' · ' + schritteFertig(a) + ' von '
                            + (a.schritte || []).length))
+     + (a.erledigt ? ' · erledigt' : '') + '</span>'
+     + (istVorlage ? '' : ringHtml(schritteFertig(a), (a.schritte || []).length))
      + '</div>';
-  if (!istVorlage) {
-    h += '<div class="as-ring">' + ringHtml(schritteFertig(a), (a.schritte || []).length)
-       + '</div>';
-  }
   h += '<div class="as-linie' + (a.kontext === 'privat' ? ' privat' : '') + '"></div>';
 
   h += '<div class="d-feld"><div class="d-name">Kontext</div><div class="d-wert">';
@@ -14978,6 +15019,9 @@ function abDetailHtml() {
   } else {
     h += '<button type="button" onclick="vorlageAusDurchlauf()">Als Vorlage sichern</button>';
     h += '<button type="button" onclick="vorgangWirdProjekt()">Wird ein Projekt</button>';
+    if (a.erledigt) {
+      h += '<button type="button" onclick="durchlaufWiederOeffnen()">Wieder öffnen</button>';
+    }
   }
   h += '<button type="button" class="gefahr" onclick="abLoeschen()">Löschen</button>';
   h += '</div>';
