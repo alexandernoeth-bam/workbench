@@ -5977,7 +5977,7 @@ console.log('\n51. Vergangene Termine');
   pruefe(tag && /vorbeiZahl\) \{/.test(tag[0]),
          'ohne Vergangenes bleibt sie weg');
 
-  pruefe(/\n\.tverlauf\.vorbei\{display:none\}/.test(QUELLE),
+  pruefe(/\n\.tverlauf\.vorbei,\.tzeile-termin\.vorbei\{display:none\}/.test(QUELLE),
          'Vergangenes ist eingeklappt');
   pruefe(/\.tabschnitt\.aufgeklappt \.tverlauf\.vorbei\{display:flex;opacity/.test(QUELLE),
          'aufgeklappt steht es zurückgenommen da');
@@ -8408,6 +8408,12 @@ console.log('\n86. Art im Tagesplan');
          'die Art steht als farbiger Punkt');
   pruefe(/\.tzt-titel\{[^}]*text-overflow:ellipsis/.test(QUELLE),
          'ein langer Titel wird gekürzt statt umgebrochen');
+  /* Die Klasse der Terminzeile hat gewechselt; die Faltregel muss sie
+     kennen, sonst klappt nichts mehr zu. */
+  pruefe(/\.tverlauf\.vorbei,\.tzeile-termin\.vorbei\{display:none\}/.test(QUELLE),
+         'Vergangenes ist zugeklappt, in beiden Zeilenformen');
+  pruefe(/\.tabschnitt\.aufgeklappt \.tzeile-termin\.vorbei\{display:flex\}/.test(QUELLE),
+         'und wird beim Aufklappen sichtbar');
   pruefe(vlh && !/t\.ort/.test(vlh[0]),
          'Ort und Beschreibung stehen im Terminblatt — sie machten aus einem Termin acht Zeilen');
   pruefe(/\.tzt-rechts\{[^}]*text-overflow:ellipsis/.test(QUELLE),
