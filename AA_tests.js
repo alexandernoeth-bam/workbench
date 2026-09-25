@@ -669,7 +669,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.breit = kacheln();'
                  + '   var bb = document.getElementById(\'tagBlatt\').innerHTML;'
                  + '   r.breitOhneUnter = (bb.indexOf(\'class="tunter\') < 0);'
-                 + '   r.weitAb1280 = (WEIT_AB === 1280);'
+                 + '   r.weitAb1150 = (WEIT_AB === 1150);'
                  + '   r.nichtWeitDarunter = !/@media/.test('
                  + '     String(document.getElementById(\'tagBlatt\').innerHTML));'
                  + '   var mw = wocheHtml(h);'
@@ -10716,7 +10716,7 @@ console.log('\n122. Leiste, Kacheln, Wochenfokus');
     pruefe(e.breit === 'Tagesverlauf,Aufgaben,Kleinigkeiten',
            'am Rechner drei eigene Kacheln');
     pruefe(e.breitOhneUnter === true, 'dort ohne Zwischenüberschriften');
-    pruefe(e.weitAb1280 === true, 'die dritte Spalte ab 1280 Pixeln');
+    pruefe(e.weitAb1150 === true, 'die dritte Spalte ab 1150 Pixeln');
     pruefe(e.nichtWeitDarunter === true, 'darunter zwei Spalten');
     pruefe(e.heuteInWoche === true, 'die Woche kennzeichnet den heutigen Tag');
   }
@@ -10767,6 +10767,37 @@ console.log('\n123. Aktivitäten und Vorgänge');
     pruefe(e.schmalOhneVorgaenge === true,
            'am Handy nicht — dort führt der Reiter zu ihrer Seite');
   }
+}
+
+/* ============================================================
+   124. Das Fenster aendert sich, das Bild auch
+   Grund: Die Breite wurde nur beim Start bewertet — wer das Fenster
+   groesser zog, bekam weiter die schmale Aufteilung. Und am Rechner
+   brauchen die Aufgaben keine Reiterzeile, weil die Vorgaenge daneben
+   stehen.
+   ============================================================ */
+console.log('\n124. Fenstergröße und Reiter');
+{
+  const skript = hauptSkript();
+
+  ['breitePruefen', 'breiteHorchen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const bp = skript.match(/function breitePruefen\([\s\S]*?\n\}/);
+  pruefe(bp && /if \(stand === breiteStand\) \{ return; \}/.test(bp[0]),
+         'neu gezeichnet wird nur, wenn sich die Aufteilung wirklich ändert');
+  pruefe(bp && /darstellungAnwenden\(\)/.test(bp[0]) && /zeichne\(\)/.test(bp[0]),
+         'dann aber beides: Klassen und Inhalt');
+  const bh = skript.match(/function breiteHorchen\([\s\S]*?\n\}/);
+  pruefe(bh && /clearTimeout\(breiteUhr\)/.test(bh[0]),
+         'beim Ziehen am Fensterrand wird nicht bei jedem Pixel gezeichnet');
+  pruefe(/breiteHorchen\(\);/.test(skript), 'der Horcher wird beim Start angemeldet');
+  pruefe(/body\.breit #schirmAufgaben > \.stufen\{display:none\}/.test(QUELLE),
+         'am Rechner keine Reiterzeile über den Aufgaben');
+  pruefe(/body\.breit\.weit \.tagblatt\{[^}]*max-width:1800px/.test(QUELLE)
+         && /body\.breit #aufBlatt\{[^}]*max-width:1800px/.test(QUELLE),
+         'beide Seiten nutzen die Breite eines großen Bildschirms');
 }
 
 /* ============================================================

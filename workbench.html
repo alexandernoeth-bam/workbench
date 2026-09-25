@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 3.6.0</title>
+<title>Workbench 3.7.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -727,14 +727,14 @@ td.jheute{outline:1.5px solid var(--weinrot);outline-offset:-1.5px;z-index:2}
    Kleinigkeiten rechts. Ist der Bildschirm breit genug, stehen alle
    drei nebeneinander statt zwei übereinander. */
 body.breit .tagblatt{display:grid;grid-template-columns:1fr 1fr;gap:0 24px;
-  align-items:start;max-width:1000px}
+  align-items:start;max-width:1100px}
 body.breit .tspalte{display:block}
 body.breit .tspalte-links{grid-column:1}
 body.breit .tspalte-rechts{grid-column:2}
 /* Ist viel Platz, stehen alle drei nebeneinander. Die Klasse setzt das
    Programm, nicht eine Media-Abfrage — so hängt die Darstellung an einer
    Stelle und lässt sich von Hand umstellen. */
-body.breit.weit .tagblatt{grid-template-columns:1fr 1fr 1fr;max-width:1500px}
+body.breit.weit .tagblatt{grid-template-columns:1fr 1fr 1fr;max-width:1800px}
 body.breit.weit .tspalte-rechts{display:contents}
 body.breit.weit .tspalte-rechts > .tabschnitt:first-child{grid-column:2}
 body.breit.weit .tspalte-rechts > .tabschnitt:nth-child(2){grid-column:3}
@@ -742,9 +742,12 @@ body.breit.weit .tspalte-rechts > .tabschnitt:nth-child(2){grid-column:3}
 /* Die Aufgabenseite: am Rechner links die Aktivitäten, rechts die
    Vorgänge; am Handy nur die Aktivitäten, die Vorgänge hinter dem
    Reiter. */
+/* Am Rechner brauchen die Aufgaben keine Reiterzeile: Die Vorgänge
+   stehen rechts daneben. */
+body.breit #schirmAufgaben > .stufen{display:none}
 .auf-spalte{display:block}
 body.breit #aufBlatt{display:grid;grid-template-columns:1.35fr 1fr;gap:0 20px;
-  align-items:start;max-width:1500px}
+  align-items:start;max-width:1800px}
 body.breit .auf-links{grid-column:1}
 body.breit .auf-rechts{grid-column:2}
 #aufBlatt .tabschnitt{background:var(--karte);border:1px solid var(--linie);
@@ -1956,7 +1959,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '3.6.0';
+var APP_VERSION = '3.7.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -17197,10 +17200,30 @@ function farbweltSetzen(wert) {
   zeichne();
 }
 
-var WEIT_AB = 1280;
+var WEIT_AB = 1150;
+var breiteUhr = null;
+var breiteStand = '';
 
 function istWeit() {
   return istBreit() && window.innerWidth >= WEIT_AB;
+}
+
+/* Ändert sich das Fenster, ändert sich das Bild: Bisher wurde die Breite
+   nur beim Start bewertet — wer das Fenster größer zog, bekam weiter die
+   schmale Aufteilung. */
+function breitePruefen() {
+  var stand = (istBreit() ? 'b' : 's') + (istWeit() ? 'w' : '');
+  if (stand === breiteStand) { return; }
+  breiteStand = stand;
+  darstellungAnwenden();
+  zeichne();
+}
+
+function breiteHorchen() {
+  window.addEventListener('resize', function () {
+    if (breiteUhr) { window.clearTimeout(breiteUhr); }
+    breiteUhr = window.setTimeout(breitePruefen, 150);
+  });
 }
 
 function darstellungAnwenden() {
@@ -17298,6 +17321,7 @@ function starten() {
     }
     bestandStempeln(DB);
     sichtschutzLaden();
+    breiteHorchen();
     farbweltAnwenden();
     darstellungAnwenden();
     jahrTaktStarten();
