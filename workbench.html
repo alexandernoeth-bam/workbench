@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 3.2.0</title>
+<title>Workbench 3.3.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -385,7 +385,8 @@ body.breit .tagblatt{max-width:1000px}
 /* Kein Strich mehr an der Zeile: Beruflich oder privat sieht man dem
    Eintrag an, und zwei verschiedene Striche an zwei verschiedenen
    Stellen machten die Seite unruhig. */
-.tzeile{display:flex;align-items:center;gap:10px;padding:7px 0;margin:0}
+.tzeile{display:flex;align-items:flex-start;gap:10px;padding:7px 0;margin:0}
+.tzeile .tkasten{margin-top:2px}
 .tzeile.kompakt{padding:5px 0}
 .tkasten{flex:0 0 17px;height:17px;margin-top:2px;border:1.5px solid var(--grau);
   border-radius:2px;background:transparent;cursor:pointer;padding:0;position:relative}
@@ -1141,7 +1142,12 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
 .tg-erledigt{border-top:0;padding-left:2px}
 /* Der schmale Tageskopf am Handy */
 .tk-schmal{display:none;align-items:center;gap:6px;padding:6px 0 4px}
+/* Das heutige Datum in Signalfarbe; der Punkt steht, solange der
+   Tageswechsel offen ist. */
 .tk-s-datum{font-size:calc(var(--fs)*0.95);font-weight:500;white-space:nowrap;cursor:pointer}
+.tk-s-datum.heute{color:var(--weinrot)}
+.tk-s-punkt{display:inline-block;width:7px;height:7px;border-radius:50%;
+  background:var(--weinrot);margin-left:6px;vertical-align:2px}
 .tk-s-kw{font-style:normal;font-size:calc(var(--fs)*0.7);color:var(--grau);margin-left:4px}
 .tk-s-luecke{flex:1}
 .tk-sym{width:30px;height:30px;flex:0 0 30px;border:1px solid var(--linie);border-radius:8px;
@@ -1175,13 +1181,20 @@ body:not(.breit).eingabe-auf .eingabe-fab{display:none}
 /* Der Einzeiler im Tagesverlauf */
 /* Keine Trennlinien im Tagesverlauf: Die Zeilen stehen ruhig
    untereinander, wie im Entwurf. */
-.tzeile-termin{display:flex;align-items:center;gap:8px;padding:5px 2px;min-height:30px}
+.tzeile-termin{display:flex;align-items:flex-start;gap:9px;padding:6px 2px;min-height:30px}
 .tzeile-termin.erledigt .tzt-titel{color:var(--grau);text-decoration:line-through}
-.tzt-zeit{flex:0 0 42px;text-align:right;font-size:calc(var(--fs)*0.74);color:var(--grau);
+/* Die Zeitspalte: Uhrzeit vorn, die Dauer klein und bündig darunter —
+   rechtsbündig ragte sie nach links über die Uhrzeit hinaus. */
+.tzt-zeit{flex:0 0 50px;text-align:left;line-height:1.25}
+.tzt-zeit b{display:block;font-weight:400;font-size:calc(var(--fs)*0.8);
   font-variant-numeric:tabular-nums}
+.tzt-zeit i{display:block;font-style:normal;font-size:calc(var(--fs)*0.66);
+  color:var(--grau-hell);font-variant-numeric:tabular-nums}
+.tzt-txt{flex:1;min-width:0;cursor:pointer}
 .tzt-punkt{flex:0 0 8px;width:8px;height:8px;border-radius:50%}
-.tzt-titel{flex:1;min-width:0;font-size:calc(var(--fs)*0.84);white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+/* Zwei Zeilen für den Titel, dann „…". */
+.tzt-titel{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;font-size:calc(var(--fs)*0.84);line-height:1.3}
 .tzt-rechts{flex:0 0 auto;max-width:40%;font-size:calc(var(--fs)*0.7);color:var(--grau);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tzeile-termin.laeuft{background:var(--papier);border-radius:6px;margin:0 -4px;padding:5px 6px}
@@ -1205,9 +1218,12 @@ body:not(.breit) .tzeile-termin .t-ablauf-paar{display:none}
 /* Die Marke ohne Füllung und schmal: Ausgefüllt und breit drückte sie
    den Titel auf drei Zeilen. Sie ordnet ein, sie ist nicht die
    Botschaft. */
-.tmarke{flex:0 1 auto;max-width:30%;font-size:calc(var(--fs)*0.64);color:var(--grau-hell);
-  border:1px solid var(--linie);border-radius:20px;padding:0 7px;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;background:none}
+/* Die Marke steht als dritte Zeile unter dem Titel, nicht daneben:
+   Neben dem Titel drückte sie ihn auf drei Zeilen. */
+.tmarke{display:inline-block;max-width:100%;margin-top:3px;
+  font-size:calc(var(--fs)*0.64);color:var(--grau-hell);border:1px solid var(--linie);
+  border-radius:20px;padding:0 8px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;background:none;vertical-align:bottom}
 .tv-marken{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:3px;min-width:0}
 .tv-marken .t-art{margin-left:0}
 .tv-marken .t-vh{margin-left:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;
@@ -1902,7 +1918,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '3.2.0';
+var APP_VERSION = '3.3.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4032,6 +4048,13 @@ function tagesEintraege(is) {
      erledigt wurde, bleibt durchgestrichen stehen. */
   var schritte = ablaufSchritteHeute(is);
   for (i = 0; i < schritte.length; i++) {
+    /* Ein Schritt mit eigener Aufgabe ist nie eine Kleinigkeit: Er steht
+       als das da, was er ist — als Aufgabe. */
+    var traegt = schrittAufgabe(schritte[i].satz);
+    if (traegt) {
+      if (traegt.status !== 'erledigt') { haupt.push(traegt); }
+      continue;
+    }
     klein.push({ schritt: true, d: schritte[i].durchlauf, nr: schritte[i].nr,
                  satz: schritte[i].satz,
                  nachgerueckt: schritteHeuteFertig(schritte[i].durchlauf, is) > 0 });
@@ -4116,11 +4139,11 @@ function zeileHtml(a, is, kompakt) {
   if (a && a.schritt) { return schrittZeileHtml(a, is); }
   var erledigt = istErledigtAn(a, is);
   var marke = '';
-  /* Trägt sie einen Ablaufschritt, gehört der Ablauf an die Zeile —
-     sonst das Vorhaben oder der Takt. */
+  /* Trägt sie einen Ablaufschritt, gehört der Ablauf an die Zeile, sonst
+     das Vorhaben. Der Takt steht nicht dabei: Hier zählt, dass sie heute
+     fällig ist, nicht wie oft sie wiederkehrt. */
   var ausAblauf = ablaufVermerk(a);
   if (ausAblauf) { marke = ausAblauf; }
-  else if (a.wiederholung) { marke = regelKurz(a.wiederholung); }
   else {
     var pj = a.projektId ? projektName(a.projektId)
            : (a.zielId ? (vorhabenFinden(a.zielId, 'ziel') || {}).name : '');
@@ -4131,8 +4154,9 @@ function zeileHtml(a, is, kompakt) {
   h += '<button class="tkasten' + (erledigt ? ' an' : '') + '" type="button" '
      + 'onclick="aufgabeHaken(\'' + esc(a.id) + '\')"></button>';
   h += '<div class="ttext" onclick="aufgabeAktionen(\'' + esc(a.id) + '\')">'
-     + '<div class="ttitel">' + esc(a.titel) + '</div></div>';
-  if (marke) { h += '<span class="tmarke">' + esc(marke) + '</span>'; }
+     + '<div class="ttitel">' + esc(a.titel) + '</div>'
+     + (marke ? ('<span class="tmarke">' + esc(marke) + '</span>') : '')
+     + '</div>';
   h += '</div>';
   return h;
 }
@@ -4144,8 +4168,8 @@ function schrittZeileHtml(e, is) {
      + 'onclick="schrittUm(\'' + esc(e.d.id) + '\',' + e.nr + ')"></button>';
   h += '<div class="ttext" onclick="abDetailOeffnen(\'' + esc(e.d.id)
      + '\',\'durchlauf\')"><div class="ttitel">'
-     + esc(schrittTitel(e.satz) || 'ohne Titel') + '</div></div>';
-  h += '<span class="tmarke">' + esc(e.d.name || 'Ablauf') + '</span>';
+     + esc(schrittTitel(e.satz) || 'ohne Titel') + '</div>'
+     + '<span class="tmarke">' + esc(e.d.name || 'Ablauf') + '</span></div>';
   h += '</div>';
   return h;
 }
@@ -4230,37 +4254,21 @@ function verlaufHtml(eintrag, is) {
   if (eintrag.art === 'termin') {
     var t = eintrag.t;
     var laeuft = eintragLaeuft(eintrag, is);
-    var h = '<div class="tzeile-termin' + (t.kontext === 'privat' ? ' privat' : '')
+    var h = '<div class="tzeile-termin'
           + (eintragVorbei(eintrag, is) ? ' vorbei' : '')
           + (laeuft ? ' laeuft' : '') + '">';
-    h += '<span class="tzt-zeit">' + esc(t.von || '') + '</span>';
-
-    /* Die Art als Punkt: Ihr Name kostete eine Zeile, ihre Farbe sagt
-       im Alltag dasselbe. Der Hinweis nennt sie beim Namen. */
-    var tArten = t.id ? terminArten(t) : [];
-    if (tArten.length) {
-      h += '<span class="tzt-punkt" style="background:' + artFarbe(tArten[0]) + '" title="'
-         + esc(tArten.map(artName).join(', '))
-         + (artImJahr(tArten[0]) ? ' · im Jahresraster' : '') + '"></span>';
-    }
-
-    h += '<span class="tzt-titel"' + (t.id ? (' onclick="terminBlattOeffnen(\''
-       + esc(t.id) + '\',\'' + is + '\')"') : '') + ' title="' + esc(t.titel) + '">'
-       + esc(t.titel) + '</span>';
-
-    var rechts = [];
-    /* restMinutenText bringt das „noch" schon mit. */
-    if (laeuft) { rechts.push(esc(restMinutenText(t.bis))); }
-    else if (t.bis) { rechts.push(esc(dauerText(t.von, t.bis))); }
+    /* Uhrzeit ganz vorn, die Dauer klein darunter und bündig — der
+       laufende Termin ist hinterlegt, das sagt genug. */
+    h += '<span class="tzt-zeit"><b>' + esc(t.von || '') + '</b>'
+       + (t.bis ? ('<i>' + esc(dauerText(t.von, t.bis)) + '</i>') : '') + '</span>';
+    h += '<span class="tzt-txt"' + (t.id ? (' onclick="terminBlattOeffnen(\''
+       + esc(t.id) + '\',\'' + is + '\')"') : '') + '>'
+       + '<span class="tzt-titel">' + esc(t.titel) + '</span>';
     var tvh = t.id ? terminVorhaben(t) : '';
     var tvhO = tvh ? vorhabenFinden(tvh.slice(2), tvh.charAt(0) === 'z' ? 'ziel' : 'projekt')
                    : null;
-    /* Das Vorhaben ist die seltenere und darum die wichtigere Angabe;
-       nur wenn keines da ist, steht dort der Kalender. */
-    if (tvhO) { rechts.push(esc(tvhO.name)); }
-    else if (t.quelle) { rechts.push(esc(t.quelle)); }
-    h += '<span class="tzt-rechts">' + rechts.join(' · ') + '</span>';
-
+    if (tvhO) { h += '<span class="tmarke">' + esc(tvhO.name) + '</span>'; }
+    h += '</span>';
     var lauf = t.id ? durchlaufZuTermin(t.id) : null;
     if (t.id) {
       if (lauf) {
@@ -4281,22 +4289,22 @@ function verlaufHtml(eintrag, is) {
     h += '</div>';
     return h;
   }
+
   /* Eine Aufgabe mit Uhrzeit steht in derselben Zeilenform wie ein
-     Termin: gleiche Größe, gleiche Spalten. Mit eigener Form brach das
-     Bild an genau dieser Stelle. */
+     Termin: gleiche Spalten, gleiche Größe. */
   var a = eintrag.a;
   var erledigt = istErledigtAn(a, is);
   var v = '<div class="tzeile-termin aufgabe'
         + (eintragVorbei(eintrag, is) ? ' vorbei' : '')
         + (erledigt ? ' erledigt' : '') + '">';
-  v += '<span class="tzt-zeit">' + esc(a.uhrzeit) + '</span>';
+  v += '<span class="tzt-zeit"><b>' + esc(a.uhrzeit) + '</b></span>';
   v += '<button class="tkasten' + (erledigt ? ' an' : '') + '" type="button" '
      + 'onclick="aufgabeHaken(\'' + esc(a.id) + '\')"></button>';
-  v += '<span class="tzt-titel" onclick="aufgabeAktionen(\'' + esc(a.id) + '\')">'
-     + esc(a.titel) + '</span>';
-  var am = ablaufVermerk(a) || (a.wiederholung ? regelKurz(a.wiederholung) : '');
-  if (am) { v += '<span class="tzt-rechts">' + esc(am) + '</span>'; }
-  v += '</div>';
+  v += '<span class="tzt-txt" onclick="aufgabeAktionen(\'' + esc(a.id) + '\')">'
+     + '<span class="tzt-titel">' + esc(a.titel) + '</span>';
+  var am = ablaufVermerk(a);
+  if (am) { v += '<span class="tmarke">' + esc(am) + '</span>'; }
+  v += '</span></div>';
   return v;
 }
 
@@ -5596,8 +5604,7 @@ function tagZeichnen() {
     if (eintragVorbei(e.verlauf[i], is)) { vorbeiZahl++; }
   }
   h += '<div class="tabschnitt' + (vorbeiOffen ? ' aufgeklappt' : '')
-     + '" data-kurz="Tagesverlauf">' + abschnittKopf('Tagesverlauf',
-         e.verlauf.length + e.ganztags.length);
+     + '" data-kurz="Tagesverlauf">' + abschnittKopf('Tagesverlauf', 0);
   /* Ganztägiges hat keine Uhrzeit und gehört deshalb nicht an die
      Zeitschiene: je eine schlichte Zeile darüber. */
   var g;
@@ -5640,10 +5647,9 @@ function tagZeichnen() {
   /* Eine Fläche für alles, was man abhakt; die beiden Arten trennt eine
      kleine Zwischenüberschrift, keine zweite Kachel. */
   h += '<div class="tabschnitt" data-kurz="Aktivitäten">'
-     + abschnittKopf('Aktivitäten', e.haupt.length + offeneKleine(e, is),
-                     nachzueglerMarke(is));
+     + abschnittKopf('Aktivitäten', 0, nachzueglerMarke(is));
   if (e.haupt.length || e.hauptFertig.length) {
-    h += unterKopf('aufgaben', 'Aufgaben', e.haupt.length);
+    h += unterKopf('aufgaben', 'Aufgaben', 0);
   }
   if (unterOffen('aufgaben')) {
   if (!e.haupt.length && !e.hauptFertig.length
@@ -5656,7 +5662,7 @@ function tagZeichnen() {
      dazuholen, ohne ihr Blatt zu öffnen. */
   }
   if (e.klein.length || e.kleinFertig.length) {
-    h += unterKopf('klein', 'Kleinigkeiten', offeneKleine(e, is));
+    h += unterKopf('klein', 'Kleinigkeiten', 0);
   }
   if (unterOffen('klein')) {
     for (i = 0; i < e.klein.length; i++) { h += zeileHtml(e.klein[i], is, true); }
@@ -5664,10 +5670,8 @@ function tagZeichnen() {
       h += zeileHtml(e.kleinFertig[i], is, true);
     }
   }
-  if (wiederNichtFaellig(is).length) {
-    h += '<button class="t-zusatz" type="button" onclick="zusatzWahlOeffnen(\'' + is
-       + '\')">+ für diesen Tag zusätzlich</button>';
-  }
+  /* „Für diesen Tag zusätzlich" ist entfallen: Einen zusätzlichen Lauf
+     plant man am Vortag oder in der Wochenansicht, nicht hier. */
   h += '</div>';
 
   h += '</div>';
