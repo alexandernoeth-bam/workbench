@@ -1968,8 +1968,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var r = { fuenf: DB.pinnwand.length };'
                  + '   pinFarbeSetzen(\'durchlauf\', \'d1\', \'rosa\');'
                  + '   r.farbe = pinFinden(\'durchlauf\', \'d1\').farbe;'
-                 + '   pinFarbeSetzen(\'durchlauf\', \'d1\', \'lila\');'
+                 + '   pinFarbeSetzen(\'durchlauf\', \'d1\', \'neonpink\');'
                  + '   r.falscheFarbe = pinFinden(\'durchlauf\', \'d1\').farbe;'
+                 + '   r.farben = PIN_FARBEN.join(\',\');'
                  + '   r.restzeit = pinInhalt(pinFinden(\'projekt\', \'p1\')).fuss;'
                  + '   var ab = pinInhalt(pinFinden(\'durchlauf\', \'d1\'));'
                  + '   r.fortschritt = ab.fuss.slice(0, 3);'
@@ -9381,6 +9382,15 @@ console.log('\n94. Pinnwand');
     pruefe(e.fuenf === 5, 'alle fünf Arten lassen sich anheften');
     pruefe(e.farbe === 'rosa', 'die Zettelfarbe lässt sich wählen');
     pruefe(e.falscheFarbe === 'rosa', 'eine unbekannte Farbe wird abgewiesen');
+    /* Seit v3.10.0 acht Farben — mehr würde die Wahl selbst zur Arbeit
+       machen und den Farben ihre Bedeutung nehmen. */
+    pruefe(e.farben === 'gelb,orange,rosa,lila,gruen,tuerkis,blau,grau',
+           'es gibt acht Zettelfarben, warme und kühle im Wechsel');
+    const farben = e.farben.split(',');
+    pruefe(farben.every(f => QUELLE.indexOf('.z-' + f + '{background:') >= 0),
+           'jede hat ihren Farbwert');
+    pruefe(farben.every(f => QUELLE.indexOf('body.nacht .z-' + f) >= 0),
+           'und einen gedämpften für die Farbwelt „Nacht"');
     pruefe(e.restzeit.indexOf('noch') === 0, 'ein Projekt zeigt seine Restzeit');
     pruefe(e.fortschritt === '1/4', 'ein Ablauf seinen Stand');
     pruefe(e.balken === 25, 'und einen Balken dazu');
