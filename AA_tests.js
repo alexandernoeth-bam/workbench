@@ -6034,8 +6034,9 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
   /* Seit v3.0.0 zwei Bereiche statt vier: Was Zeit braucht, steht bei
      den Aufgaben; was kurz ist, bei den Kleinigkeiten. Ablaufschritte
      stehen dort mit, nicht in einer eigenen Klammer. */
-  const erwarteteFolge = ['[links]', 'Tagesverlauf',
-                          '[rechts]', 'Aufgaben', 'Kleinigkeiten'];
+  /* Seit v3.1.0 eine Fläche „Aktivitäten"; Aufgaben und Kleinigkeiten
+     trennt darin eine Zwischenüberschrift. */
+  const erwarteteFolge = ['[links]', 'Tagesverlauf', '[rechts]', 'Aktivitäten'];
   pruefe(folge.join(',') === erwarteteFolge.join(','),
          'die Abschnitte stehen in der vereinbarten Folge und Spalte'
          + (folge.join(',') === erwarteteFolge.join(',') ? '' : ' — ist: ' + folge.join(' → ')));
@@ -9917,8 +9918,10 @@ console.log('\n112. Tagessicht in Karten');
   pruefe(/body\.breit \.tagblatt\{max-width:1000px\}/.test(QUELLE),
          'am Rechner ist die Breite begrenzt');
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && (tz[0].match(/abschnittKopf\(/g) || []).length === 3,
-         'alle drei Gruppen tragen Namen und Zahl');
+  pruefe(tz && (tz[0].match(/abschnittKopf\(/g) || []).length === 2,
+         'beide Flächen tragen Namen und Zahl');
+  pruefe(tz && (tz[0].match(/class="tunter"/g) || []).length === 2,
+         'Aufgaben und Kleinigkeiten stehen als Zwischenüberschrift darin');
   pruefe(tz && /tagZahlenZeichnen\(is, e\)/.test(tz[0]),
          'die Zähler werden bei jedem Zeichnen gefüllt');
 
@@ -9929,9 +9932,9 @@ console.log('\n112. Tagessicht in Karten');
     pruefe(e.zaehler === '3 Termine · 3 Std. 30 belegt · 3 Aufgaben · 3 Kleinigkeiten'
            + ' · 1 erledigt',
            'der Kopf sagt, wie voll der Tag ist — der Ablaufschritt zählt als Kleinigkeit');
-    pruefe(e.gruppen === 'Tagesverlauf,Aufgaben,Kleinigkeiten',
-           'die Gruppen stehen in der gewohnten Folge');
-    pruefe(e.zahlen === '4,3,3', 'jede mit der Zahl ihrer offenen Einträge');
+    pruefe(e.gruppen === 'Tagesverlauf,Aktivitäten',
+           'zwei Flächen: der Tagesverlauf und die Aktivitäten');
+    pruefe(e.zahlen === '4,6', 'jede mit der Zahl ihrer offenen Einträge');
     pruefe(e.leererTag === '', 'an einem leeren Tag steht keine Zahl im Kopf');
     pruefe(e.keineZahlOhneEintrag === true,
            'eine leere Gruppe zeigt keine Null, sondern nichts');
@@ -10279,6 +10282,13 @@ console.log('\n119. Aufgaben und Kleinigkeiten');
   pruefe(!/tzt-strich/.test(QUELLE),
          'kein Kontextstrich mehr an der Terminzeile — beruflich oder privat sieht man '
          + 'dem Eintrag ohnehin an');
+  const zeileCss = QUELLE.match(/\n\.tzeile\{[^}]*\}/);
+  pruefe(zeileCss && !/border-left/.test(zeileCss[0]),
+         'auch nicht an der Aufgabenzeile');
+  const titelCss = QUELLE.match(/\n\.ttitel\{font-size:calc\(var\(--fs\)\*([\d.]+)\)/);
+  const terminCss = QUELLE.match(/\.tzt-titel\{[^}]*font-size:calc\(var\(--fs\)\*([\d.]+)\)/);
+  pruefe(titelCss && terminCss && titelCss[1] === terminCss[1],
+         'Aufgaben und Termine stehen in derselben Schriftgröße');
 
   if (!n) {
     warn('Funktionen nicht auswertbar');
