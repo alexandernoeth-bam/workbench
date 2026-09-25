@@ -10444,10 +10444,17 @@ console.log('\n120. Zweizeilige Einträge');
   const skript = hauptSkript();
   const s = globalThis.__zweiApi;
 
-  pruefe(/\.tk-s-datum\.heute\{color:var\(--weinrot\)\}/.test(QUELLE),
-         'das heutige Datum steht in Signalfarbe — die Klasse war da, die Regel fehlte');
-  pruefe(/\.tk-s-punkt\{[^}]*background:var\(--weinrot\)/.test(QUELLE),
+  /* Seit v3.4.1 ein eigener Ton --heute: In der Farbwelt „Wald" ist
+     --weinrot ein Tannengrün und taugte nicht als Signal. */
+  pruefe(/\.tk-s-datum\.heute\{color:var\(--heute\)\}/.test(QUELLE),
+         'das heutige Datum steht in Signalfarbe');
+  pruefe(/\.tk-s-punkt\{[^}]*background:var\(--heute\)/.test(QUELLE),
          'und trägt einen Punkt, solange der Tageswechsel offen ist');
+  pruefe(/:root\{\s*--heute:/.test(QUELLE), 'es gibt einen Rückfallwert');
+  const welten = (QUELLE.match(/'--heute': '#[0-9A-Fa-f]{6}'/g) || []).length;
+  const zahlWelten = (QUELLE.match(/hinweis: '/g) || []).length;
+  pruefe(welten === zahlWelten && welten > 0,
+         'jede Farbwelt bringt ihren eigenen Signalton mit');
   const ks = skript.match(/function tagKopfSchmalZeichnen\([\s\S]*?\n\}\n/);
   pruefe(ks && /is === isoDatum\(\) && tagwFaellig\(\)/.test(ks[0]),
          'der Punkt hängt am Tageswechsel, nicht am Zahnrad');
