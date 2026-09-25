@@ -81,8 +81,10 @@ console.log('\n1. Bildschirme und Navigation');
      von dort geöffnet. Beide müssen aber erreichbar bleiben. */
   /* Die Diagnose hat seit v0.95.0 keinen Leistenknopf mehr — sie ist
      über das Zahnrad im Tag zu erreichen. */
+  /* Seit v3.5.0 sind die Abläufe ein Reiter innerhalb der Aufgaben: Ein
+     Ablauf ist etwas, das man abarbeitet. */
   const VERSTECKT = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
-                     'Tagwechsel', 'Ablauf'];
+                     'Tagwechsel', 'Ablauf', 'Ablaeufe'];
   schirme.forEach(function (s) {
     if (VERSTECKT.indexOf(s) >= 0) {
       pruefe(navs.indexOf(s) < 0,
@@ -222,7 +224,7 @@ console.log('\n5. Element-IDs');
   /* Zusammengesetzte IDs wie 'schirm' + name */
   const schirme = [...QUELLE.matchAll(/id="schirm([A-Za-zÄÖÜäöü]+)"/g)].map(m => m[1]);
   const OHNE_KNOPF = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
-                      'Tagwechsel', 'Ablauf'];
+                      'Tagwechsel', 'Ablauf', 'Ablaeufe'];
   schirme.forEach(function (s) {
     if (OHNE_KNOPF.indexOf(s) >= 0) {
       pruefe(imHtml.has('schirm' + s), 'ID schirm' + s + ' existiert (ohne Knopf)');
@@ -565,6 +567,42 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__weitApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var merkD = DB.einstellungen.darstellung;'
+                 + '   var h = isoDatum();'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Weidner\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'k1\', titel:\'Brief\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'klein\', planung: h } ];'
+                 + '   tagOffen = h;'
+                 + '   var kacheln = function(){'
+                 + '     tagZeichnen();'
+                 + '     var b = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '     return (b.match(/data-kurz="([^"]*)"/g) || [])'
+                 + '       .map(function(x){ return x.slice(11, -1); }).join(\',\'); };'
+                 + '   DB.einstellungen.darstellung = \'schmal\';'
+                 + '   var r = { schmal: kacheln() };'
+                 + '   var bs = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   r.schmalUnter = (bs.match(/<\\/svg>([^<]*)/g) || [])'
+                 + '     .map(function(x){ return x.slice(6); })'
+                 + '     .filter(function(x){ return x === \'Aufgaben\''
+                 + '       || x === \'Kleinigkeiten\'; }).join(\',\');'
+                 + '   DB.einstellungen.darstellung = \'breit\';'
+                 + '   r.breit = kacheln();'
+                 + '   var bb = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   r.breitOhneUnter = (bb.indexOf(\'class="tunter\') < 0);'
+                 + '   r.weitAb1280 = (WEIT_AB === 1280);'
+                 + '   r.nichtWeitDarunter = !/@media/.test('
+                 + '     String(document.getElementById(\'tagBlatt\').innerHTML));'
+                 + '   var mw = wocheHtml(h);'
+                 + '   r.heuteInWoche = /ktag[^"]*heute/.test(mw);'
+                 + '   DB.einstellungen.darstellung = merkD;'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__sektApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -5787,7 +5825,10 @@ console.log('\n44. Abläufe und Wochenrückblick');
   });
 
   pruefe(/id="schirmAblaeufe"/.test(QUELLE), 'der Ablaufbildschirm liegt im HTML');
-  pruefe(/id="navAblaeufe"/.test(QUELLE), 'er hat einen Navigationsknopf');
+  /* Seit v3.5.0 kein eigener Knopf in der Leiste, sondern ein Reiter
+     innerhalb der Aufgaben. */
+  pruefe(!/id="navAblaeufe"/.test(QUELLE), 'er hat keinen eigenen Knopf mehr');
+  pruefe(/id="stufeAblaeufe"/.test(QUELLE), 'sondern einen Reiter bei den Aufgaben');
   pruefe(/rueckblickOeffnen\(\)/.test(QUELLE), 'der Wochenrückblick ist erreichbar');
 
   /* Nur der nächste offene Schritt gehört in den Tag */
@@ -6124,8 +6165,9 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
 
   /* Jeder Abschnitt liegt in genau einer Spalte */
   const tag = hauptSkript().match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  const folge = tag ? [...tag[0].matchAll(/tspalte tspalte-(\w+)|data-kurz="([^"]+)"/g)]
-                       .map(m => m[1] ? ('[' + m[1] + ']') : m[2]) : [];
+  const folge = tag ? [...tag[0].matchAll(
+                        /tspalte tspalte-(\w+)|data-kurz="([^"]+)"|tagBlockHtml\('([^']+)'/g)]
+                       .map(m => m[1] ? ('[' + m[1] + ']') : (m[2] || m[3])) : [];
   /* Seit v1.10.0 ohne „Heute zählt": Schritt 4 des Tageswechsels plant
      unmittelbar auf heute, statt einen zweiten Merker zu führen. */
   /* Seit v3.0.0 zwei Bereiche statt vier: Was Zeit braucht, steht bei
@@ -6133,7 +6175,10 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
      stehen dort mit, nicht in einer eigenen Klammer. */
   /* Seit v3.1.0 eine Fläche „Aktivitäten"; Aufgaben und Kleinigkeiten
      trennt darin eine Zwischenüberschrift. */
-  const erwarteteFolge = ['[links]', 'Tagesverlauf', '[rechts]', 'Aktivitäten'];
+  /* Seit v3.5.0 am Rechner zwei Kacheln, am Handy eine — dieselben Daten,
+     zwei Zuschnitte. */
+  const erwarteteFolge = ['[links]', 'Tagesverlauf', '[rechts]',
+                          'Aufgaben', 'Kleinigkeiten', 'Aktivitäten'];
   pruefe(folge.join(',') === erwarteteFolge.join(','),
          'die Abschnitte stehen in der vereinbarten Folge und Spalte'
          + (folge.join(',') === erwarteteFolge.join(',') ? '' : ' — ist: ' + folge.join(' → ')));
@@ -10023,8 +10068,8 @@ console.log('\n112. Tagessicht in Karten');
   pruefe(/body\.breit \.tagblatt\{max-width:1000px\}/.test(QUELLE),
          'am Rechner ist die Breite begrenzt');
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && (tz[0].match(/abschnittKopf\(/g) || []).length === 2,
-         'beide Flächen tragen Namen und Zahl');
+  pruefe(tz && (tz[0].match(/tagBlockHtml\(/g) || []).length === 3,
+         'die Flächen entstehen aus einem Baustein — am Rechner zwei, am Handy eine');
   pruefe(tz && (tz[0].match(/unterKopf\(/g) || []).length === 2,
          'Aufgaben und Kleinigkeiten stehen als Zwischenüberschrift darin');
   pruefe(tz && (tz[0].match(/unterOffen\(/g) || []).length === 2,
@@ -10046,9 +10091,9 @@ console.log('\n112. Tagessicht in Karten');
     pruefe(e.zaehler === '3 Termine · 3 Std. 30 belegt · 3 Aufgaben · 3 Kleinigkeiten'
            + ' · 1 erledigt',
            'der Kopf sagt, wie voll der Tag ist — der Ablaufschritt zählt als Kleinigkeit');
-    pruefe(e.gruppen === 'Tagesverlauf,Aktivitäten',
-           'zwei Flächen: der Tagesverlauf und die Aktivitäten');
-    pruefe(e.zahlen === '0,0', 'ohne Zähler an den Überschriften');
+    pruefe(e.gruppen === 'Tagesverlauf,Aufgaben,Kleinigkeiten',
+           'am Rechner drei Flächen: Tagesverlauf, Aufgaben, Kleinigkeiten');
+    pruefe(e.zahlen === '0,0,0', 'ohne Zähler an den Überschriften');
     pruefe(e.leererTag === '', 'an einem leeren Tag steht keine Zahl im Kopf');
     pruefe(e.keineZahlOhneEintrag === true,
            'eine leere Gruppe zeigt keine Null, sondern nichts');
@@ -10523,6 +10568,58 @@ console.log('\n121. Ablauf als Sektion');
     pruefe(e.einzelnerBleibt === true, 'ein einzelner behält seine Marke');
     pruefe(e.sektionHinten === true,
            'die Sektion steht hinter den losen — sonst spränge die Liste beim Haken');
+  }
+}
+
+/* ============================================================
+   122. Leiste neu geordnet, zwei Kacheln am Rechner, Woche bei heute
+   Grund: Ablaeufe brauchten keinen eigenen Platz in der Leiste — man
+   arbeitet sie ab, also gehoeren sie zu den Aufgaben. Am Rechner war
+   eine gemeinsame Kachel zu eng gedacht, und die Woche oeffnete am
+   Montag statt bei heute.
+   ============================================================ */
+console.log('\n122. Leiste, Kacheln, Wochenfokus');
+{
+  const skript = hauptSkript();
+  const w = globalThis.__weitApi;
+
+  const leiste = [...QUELLE.matchAll(/id="nav(\w+)"/g)].map(m => m[1]);
+  pruefe(leiste.join(',') === 'Tag,Pinnwand,Kalender,Aufgaben,Vorhaben',
+         'die Leiste führt vom Tag über das Kurzfristige zum Langfristigen');
+  pruefe(/id="stufeAufgaben"/.test(QUELLE) && /id="stufeAblaeufe"/.test(QUELLE),
+         'Abläufe sind ein Reiter innerhalb der Aufgaben');
+  const zs = skript.match(/function zeigeSchirm\([\s\S]*?\n\}\n/);
+  pruefe(zs && /name === 'Ablaeufe' && alle\[i\] === 'Aufgaben'/.test(zs[0]),
+         'dort leuchtet dann auch die Aufgabenschaltfläche');
+
+  ['tagBlockHtml', 'istWeit', 'heuteInSicht'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(!/@media \(min-width:1280px\)/.test(QUELLE),
+         'die dritte Spalte hängt an einer Klasse, nicht an einer Media-Abfrage');
+  pruefe(/body\.breit\.weit \.tagblatt\{grid-template-columns:1fr 1fr 1fr/.test(QUELLE),
+         'bei viel Platz stehen alle drei Flächen nebeneinander');
+  const kz = skript.match(/function kalZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(kz && /heuteInSicht\(blatt\)/.test(kz[0]),
+         'die Woche rollt beim Öffnen zum heutigen Tag');
+  pruefe(/\.ktag\.heute \.ktag-name\{color:var\(--heute\)\}/.test(QUELLE),
+         'und hebt ihn im Signalton hervor');
+
+  if (!w) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = w.pruefe();
+    pruefe(e.schmal === 'Tagesverlauf,Aktivitäten',
+           'am Handy eine Fläche für die Aktivitäten');
+    pruefe(e.schmalUnter === 'Aufgaben,Kleinigkeiten',
+           'mit beiden Arten als Zwischenüberschrift');
+    pruefe(e.breit === 'Tagesverlauf,Aufgaben,Kleinigkeiten',
+           'am Rechner drei eigene Kacheln');
+    pruefe(e.breitOhneUnter === true, 'dort ohne Zwischenüberschriften');
+    pruefe(e.weitAb1280 === true, 'die dritte Spalte ab 1280 Pixeln');
+    pruefe(e.nichtWeitDarunter === true, 'darunter zwei Spalten');
+    pruefe(e.heuteInWoche === true, 'die Woche kennzeichnet den heutigen Tag');
   }
 }
 
