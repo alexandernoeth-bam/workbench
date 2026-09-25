@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 3.5.0</title>
+<title>Workbench 3.6.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -738,6 +738,18 @@ body.breit.weit .tagblatt{grid-template-columns:1fr 1fr 1fr;max-width:1500px}
 body.breit.weit .tspalte-rechts{display:contents}
 body.breit.weit .tspalte-rechts > .tabschnitt:first-child{grid-column:2}
 body.breit.weit .tspalte-rechts > .tabschnitt:nth-child(2){grid-column:3}
+
+/* Die Aufgabenseite: am Rechner links die Aktivitäten, rechts die
+   Vorgänge; am Handy nur die Aktivitäten, die Vorgänge hinter dem
+   Reiter. */
+.auf-spalte{display:block}
+body.breit #aufBlatt{display:grid;grid-template-columns:1.35fr 1fr;gap:0 20px;
+  align-items:start;max-width:1500px}
+body.breit .auf-links{grid-column:1}
+body.breit .auf-rechts{grid-column:2}
+#aufBlatt .tabschnitt{background:var(--karte);border:1px solid var(--linie);
+  border-radius:10px;padding:4px 14px 10px;margin:0 0 12px}
+#aufBlatt .ab-raster{grid-template-columns:minmax(0,1fr)}
 
 /* Vorhaben und Abläufe als Kacheln, so viele wie hineinpassen. */
 /* Eine Liste braucht keine Kacheln — die Spalten entstanden nur,
@@ -1835,8 +1847,8 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 
 <div class="schirm" id="schirmAblaeufe">
   <div class="stufen">
-    <button type="button" onclick="zeigeSchirm('Aufgaben')">Aufgaben</button>
-    <button type="button" class="aktiv" onclick="zeigeSchirm('Ablaeufe')">Abläufe</button>
+    <button type="button" onclick="zeigeSchirm('Aufgaben')">Aktivitäten</button>
+    <button type="button" class="aktiv" onclick="zeigeSchirm('Ablaeufe')">Vorgänge</button>
   </div>
   <div class="vh-kopf">
     <div class="vh-zeile">
@@ -1865,7 +1877,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 
   <div class="vhblatt einfachliste" id="abBlatt"></div>
 
-  <button class="plusknopf" type="button" onclick="ablaufNeu()" aria-label="Neuer Ablauf">
+  <button class="plusknopf" type="button" onclick="ablaufNeu()" aria-label="Neuer Vorgang">
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
   </button>
 </div>
@@ -1875,28 +1887,23 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
        etwas, das man abarbeitet, und stehen deshalb bei den Aufgaben. -->
   <div class="stufen">
     <button type="button" id="stufeAufgaben" class="aktiv"
-            onclick="zeigeSchirm('Aufgaben')">Aufgaben</button>
+            onclick="zeigeSchirm('Aufgaben')">Aktivitäten</button>
     <button type="button" id="stufeAblaeufe"
-            onclick="zeigeSchirm('Ablaeufe')">Abläufe</button>
+            onclick="zeigeSchirm('Ablaeufe')">Vorgänge</button>
   </div>
   <div class="auf-kopf"><span id="aufZahl"></span></div>
 
+  <!-- Die Gruppierleiste ist entfallen: Sortiert wird nach Datum, und
+       gegliedert wird nach dem, was zusammengehört — Vorgang, Vorhaben,
+       Thema. Auch die Wahl zwischen Aufgaben und Kleinigkeiten braucht
+       keine Leiste mehr, sie steckt im Aufbau. -->
   <div class="leisten">
-    <div class="gruppe">
-      <button type="button" id="gPlanung" class="aktiv" onclick="setAufGruppe('planung')">Planung</button>
-      <button type="button" id="gThema" onclick="setAufGruppe('thema')">Thema</button>
-      <button type="button" id="gProjekt" onclick="setAufGruppe('projekt')">Projekt</button>
-      <button type="button" id="gFrist" onclick="setAufGruppe('frist')">Frist</button>
-    </div>
     <div class="pillen">
       <button type="button" id="fAlle" class="aktiv" onclick="setAufFilter('alle')">Alle</button>
       <button type="button" id="fBeruf" onclick="setAufFilter('beruflich')">Beruf</button>
       <button type="button" id="fPrivat" onclick="setAufFilter('privat')">Privat</button>
     </div>
     <div class="pillen" style="margin-left:0">
-      <button type="button" id="aArtAlle" class="aktiv" onclick="setAufArt('alle')">Alles</button>
-      <button type="button" id="aArtHaupt" onclick="setAufArt('haupt')">Aufgaben</button>
-      <button type="button" id="aArtKlein" onclick="setAufArt('klein')">Kleinigkeiten</button>
     </div>
   </div>
 
@@ -1949,7 +1956,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '3.5.0';
+var APP_VERSION = '3.6.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -14917,7 +14924,13 @@ function abBereichKopf(k, name, zahl) {
 
 function abZeichnen() {
   var blatt = document.getElementById('abBlatt');
-  if (!blatt) { return; }
+  if (blatt) { blatt.innerHTML = ablaufListeHtml(); }
+  abZaehlerZeichnen();
+}
+
+/* Die Liste der Vorgänge — auf ihrer eigenen Seite und, am Rechner,
+   rechts neben den Aktivitäten. */
+function ablaufListeHtml() {
   var vorlagen = abSichtbar(DB.ablaeufe || []);
   var laufend = abSichtbar(DB.durchlaeufe || []);
   var h = '';
@@ -14945,7 +14958,7 @@ function abZeichnen() {
       h += '</div>';
     }
     if (!laufend.length) {
-      h += '<div class="tleer">Kein Ablauf offen.</div>';
+      h += '<div class="tleer">Kein Vorgang offen.</div>';
     }
   } else {
     var bereiche = [['beruflich', 'Beruflich'], ['privat', 'Privat']];
@@ -14961,7 +14974,12 @@ function abZeichnen() {
     }
   }
 
-  blatt.innerHTML = h;
+  return h;
+}
+
+function abZaehlerZeichnen() {
+  var vorlagen = abSichtbar(DB.ablaeufe || []);
+  var laufend = abSichtbar(DB.durchlaeufe || []);
   var zahl = document.getElementById('abZahl');
   if (zahl) {
     zahl.textContent = laufend.length + ' laufend · ' + vorlagen.length
@@ -16475,7 +16493,6 @@ function rbSatz(id, art, wert) {
 var aufGruppe = 'planung';
 var aufFilter = 'alle';
 var aufErledigtAuf = false;
-var aufArt = 'alle';
 var aufGruppeStand = {};
 var ERLEDIGT_ZEIGEN = 50;
 var THEMEN_LEER = { beruflich: [], privat: [] };
@@ -16513,26 +16530,12 @@ function markiere(paare, aktiv) {
   }
 }
 
-function setAufGruppe(art) {
-  aufGruppe = art;
-  markiere([['planung', 'gPlanung'], ['thema', 'gThema'],
-            ['projekt', 'gProjekt'], ['frist', 'gFrist']], art);
-  aufZeichnen();
-}
+/* Die Gruppierung nach Planung, Thema, Projekt oder Frist ist entfallen:
+   Sortiert wird nach Datum, gegliedert nach dem, was zusammengehört. */
 
-/* Eine Kleinigkeit ist etwas anderes als eine Aufgabe — manchmal
-   will man nur das eine sehen. */
-function setAufArt(art) {
-  aufArt = art;
-  markiere([['alle', 'aArtAlle'], ['haupt', 'aArtHaupt'], ['klein', 'aArtKlein']], art);
-  aufZeichnen();
-}
-
-function passtZurArt(a) {
-  if (aufArt === 'alle') { return true; }
-  if (aufArt === 'klein') { return a.art === 'klein'; }
-  return a.art !== 'klein';
-}
+/* Die Wahl zwischen Aufgaben und Kleinigkeiten braucht keinen Filter
+   mehr: Seit v3.6.0 stehen beide untereinander in der Kachel
+   „Aktivitäten", jede mit eigener Überschrift. */
 
 /* Gruppen ohne Zuordnung sind meist die größten und selten die
    wichtigsten — sie beginnen eingeklappt. */
@@ -16653,6 +16656,131 @@ function regelText(w) {
   return kopfM + ' · am ' + w.tag + '.';
 }
 
+/* ============================================================
+   Die Aufgabenseite
+
+   Links die Aktivitäten — Aufgaben oben, Kleinigkeiten unten —, rechts
+   die Vorgänge. Gegliedert wird nicht mehr nach Planungsfächern:
+   sortiert wird nach Datum, und was zu einem Vorgang, einem Vorhaben
+   oder einem Thema gehört, steht als Sektion beieinander. Die Sektion
+   schlägt die Sortierung.
+   ============================================================ */
+
+function aufDatum(a) {
+  if (a.planung && a.planung.length === 10) { return a.planung; }
+  if (a.frist) { return a.frist; }
+  if (a.planung === 'woche') { return '9999-01-01'; }
+  if (a.planung === 'naechste') { return '9999-02-01'; }
+  return '9999-12-31';
+}
+
+function nachDatum(liste) {
+  return liste.slice().sort(function (x, y) {
+    var dx = aufDatum(x);
+    var dy = aufDatum(y);
+    if (dx !== dy) { return (dx < dy) ? -1 : 1; }
+    return (x.titel < y.titel) ? -1 : 1;
+  });
+}
+
+/* Wozu eine Aufgabe gehört — in dieser Rangfolge. */
+function aufSektion(a) {
+  var l = durchlaeufeZuAufgabe(a.id);
+  if (l.length === 1) { return { id: 'd:' + l[0].id, name: l[0].name, rang: 1, d: l[0] }; }
+  if (a.projektId) {
+    var p = vorhabenFinden(a.projektId, 'projekt');
+    if (p) { return { id: 'p:' + p.id, name: p.name, rang: 2 }; }
+  }
+  if (a.zielId) {
+    var z = vorhabenFinden(a.zielId, 'ziel');
+    if (z) { return { id: 'z:' + z.id, name: z.name, rang: 2 }; }
+  }
+  if (a.themaId) {
+    var t = themaName(a.themaId);
+    if (t) { return { id: 't:' + a.themaId, name: t, rang: 3 }; }
+  }
+  return null;
+}
+
+function aufListeHtml(liste) {
+  var zahl = {};
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    var s = aufSektion(liste[i]);
+    if (s) { zahl[s.id] = (zahl[s.id] || 0) + 1; }
+  }
+  var lose = [];
+  var gruppen = [];
+  var nach = {};
+  for (i = 0; i < liste.length; i++) {
+    var s2 = aufSektion(liste[i]);
+    if (!s2 || zahl[s2.id] < 2) { lose.push(liste[i]); continue; }
+    if (!nach[s2.id]) {
+      nach[s2.id] = { name: s2.name, rang: s2.rang, d: s2.d, eintraege: [] };
+      gruppen.push(nach[s2.id]);
+    }
+    nach[s2.id].eintraege.push(liste[i]);
+  }
+  gruppen.sort(function (x, y) {
+    if (x.rang !== y.rang) { return x.rang - y.rang; }
+    return (x.name < y.name) ? -1 : 1;
+  });
+
+  var h = '';
+  var geordnet = nachDatum(lose);
+  for (i = 0; i < geordnet.length; i++) { h += aufZeileHtml(geordnet[i]); }
+  var g, k;
+  for (g = 0; g < gruppen.length; g++) {
+    /* In einem Vorgang zählt seine Schrittfolge, sonst das Datum. */
+    var drin = gruppen[g].d
+      ? gruppen[g].eintraege.slice().sort(function (x, y) {
+          return schrittNummer(gruppen[g].d, x.id) - schrittNummer(gruppen[g].d, y.id);
+        })
+      : nachDatum(gruppen[g].eintraege);
+    h += '<div class="tsektion"><div class="tsektion-kopf"'
+       + (gruppen[g].d ? (' onclick="abDetailOeffnen(\'' + esc(gruppen[g].d.id)
+                          + '\',\'durchlauf\')"') : '')
+       + '><b>' + esc(gruppen[g].name) + '</b></div>';
+    for (k = 0; k < drin.length; k++) { h += aufZeileHtml(drin[k], true); }
+    h += '</div>';
+  }
+  return h;
+}
+
+function schrittNummer(d, aufgabeId) {
+  var s = (d && d.schritte) || [];
+  var i;
+  for (i = 0; i < s.length; i++) {
+    if (s[i].aufgabeId === aufgabeId) { return i; }
+  }
+  return 99;
+}
+
+function aufZeileHtml(a, inSektion) {
+  var meta = inSektion ? '' : aufMetaText(a);
+  var marken = '';
+  if (a.beschreibung) {
+    marken += '<svg class="marke" viewBox="0 0 24 24">'
+            + '<path d="M5 6h14M5 12h14M5 18h9"></path></svg>';
+  }
+  if (a.wiederholung) {
+    marken += '<svg class="marke" viewBox="0 0 24 24">'
+            + '<path d="M20 11a8 8 0 0 0-13.7-5.6L3 8M3 4v4h4M4 13a8 8 0 0 0 13.7 5.6L21 16'
+            + 'M21 20v-4h-4"></path></svg>';
+  }
+  var h = '<div class="tzeile">';
+  h += '<button class="tkasten" type="button" onclick="aufgabeErledigen(\''
+     + esc(a.id) + '\')"></button>';
+  h += '<div class="ttext" onclick="aufgabeAktionen(\'' + esc(a.id) + '\')">';
+  h += '<div class="ttitel">' + esc(a.titel) + marken + '</div>';
+  if (meta) { h += '<div class="tmeta">' + meta + '</div>'; }
+  h += '</div>';
+  h += '<button class="planungsknopf' + planungKlasse(a) + '" type="button" '
+     + 'onclick="planungWeiter(\'' + esc(a.id) + '\')">' + esc(planungText(a)) + '</button>';
+  h += '</div>';
+  return h;
+}
+
 function aufZeichnen() {
   var blatt = document.getElementById('aufBlatt');
   if (!blatt) { return; }
@@ -16664,64 +16792,36 @@ function aufZeichnen() {
     if (!alle[i].wiederholung && alle[i].status === 'erledigt') { continue; }
     if (kontextVerborgen(alle[i].kontext)) { continue; }
     if (aufFilter !== 'alle' && alle[i].kontext !== aufFilter) { continue; }
-    if (!passtZurArt(alle[i])) { continue; }
     sichtbar.push(alle[i]);
   }
+  var haupt = sichtbar.filter(function (a) { return a.art !== 'klein'; });
+  var klein = sichtbar.filter(function (a) { return a.art === 'klein'; });
 
-  var namen = aufReihenfolge(sichtbar);
-  var h = '';
-  var g, j;
-  for (g = 0; g < namen.length; g++) {
-    var name = namen[g];
-    var drin = [];
-    for (j = 0; j < sichtbar.length; j++) {
-      if (aufGruppeVon(sichtbar[j]) === name) { drin.push(sichtbar[j]); }
-    }
-    if (!drin.length) { continue; }
-    drin.sort(function (x, y) {
-      var fx = x.frist || '9999-12-31';
-      var fy = y.frist || '9999-12-31';
-      if (fx !== fy) { return (fx < fy) ? -1 : 1; }
-      return (x.titel < y.titel) ? -1 : 1;
-    });
+  var h = '<div class="auf-spalte auf-links">';
+  h += '<div class="tabschnitt"><div class="tabschnitt-titel"><span>Aktivitäten</span></div>';
+  h += unterKopf('aufListeAufgaben', 'Aufgaben', 0);
+  if (unterOffen('aufListeAufgaben')) {
+    h += haupt.length ? aufListeHtml(haupt)
+                      : '<div class="tleer">Keine Aufgabe in dieser Auswahl.</div>';
+  }
+  h += unterKopf('aufListeKlein', 'Kleinigkeiten', 0);
+  if (unterOffen('aufListeKlein')) {
+    h += klein.length ? aufListeHtml(klein)
+                      : '<div class="tleer">Keine Kleinigkeit in dieser Auswahl.</div>';
+  }
+  h += '</div>';
+  h += erledigtBlockHtml();
+  h += '</div>';
 
-    var warn = (name === 'Überfällig' || name === 'Liegengeblieben') ? ' warn' : '';
-    var offen = gruppeOffen(name);
-    h += '<button class="gruppenkopf falt' + warn + '" type="button" '
-       + 'onclick="gruppeUm(\'' + esc(name).replace(/'/g, '') + '\')">'
-       + '<span>' + esc(name) + ' · ' + drin.length + '</span>'
-       + '<svg class="' + (offen ? 'auf' : '') + '" viewBox="0 0 24 24">'
-       + '<path d="M6 9l6 6 6-6"></path></svg></button>';
-    if (!offen) { continue; }
-
-    var k;
-    for (k = 0; k < drin.length; k++) {
-      var a = drin[k];
-      var meta = aufMetaText(a);
-      var marken = '';
-      if (a.beschreibung) {
-        marken += '<svg class="marke" viewBox="0 0 24 24">'
-                + '<path d="M5 6h14M5 12h14M5 18h9"></path></svg>';
-      }
-      if (a.wiederholung) {
-        marken += '<svg class="marke" viewBox="0 0 24 24">'
-                + '<path d="M20 11a8 8 0 0 0-13.7-5.6L3 8M3 4v4h4M4 13a8 8 0 0 0 13.7 5.6L21 16'
-                + 'M21 20v-4h-4"></path></svg>';
-      }
-      h += '<div class="tzeile' + (a.kontext === 'privat' ? ' privat' : '') + '">';
-      h += '<button class="tkasten" type="button" onclick="aufgabeErledigen(\'' + esc(a.id) + '\')"></button>';
-      h += '<div class="ttext" onclick="aufgabeAktionen(\'' + esc(a.id) + '\')">';
-      h += '<div class="ttitel">' + esc(a.titel) + marken + '</div>';
-      if (meta) { h += '<div class="tmeta">' + meta + '</div>'; }
-      h += '</div>';
-      h += '<button class="planungsknopf' + planungKlasse(a) + '" type="button" '
-         + 'onclick="planungWeiter(\'' + esc(a.id) + '\')">' + esc(planungText(a)) + '</button>';
-      h += '</div>';
-    }
+  /* Am Rechner stehen die Vorgänge rechts daneben; am Handy führt der
+     Reiter zu ihrer eigenen Seite. */
+  if (istBreit()) {
+    h += '<div class="auf-spalte auf-rechts">';
+    h += '<div class="tabschnitt"><div class="tabschnitt-titel"><span>Vorgänge</span></div>';
+    h += ablaufListeHtml();
+    h += '</div></div>';
   }
 
-  if (!h) { h = '<div class="tleer">Keine Aufgaben in dieser Auswahl.</div>'; }
-  h += erledigtBlockHtml();
   blatt.innerHTML = h;
 
   var zahl = document.getElementById('aufZahl');

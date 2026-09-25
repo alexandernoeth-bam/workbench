@@ -567,6 +567,81 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__aufSeiteApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var merkD = DB.einstellungen.darstellung;'
+                 + '   var h = isoDatum();'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'Haus\','
+                 + '     kontext:\'privat\', status:\'laufend\', zielzustaende:[] }];'
+                 + '   DB.themen = [{ id:\'t1\', name:\'Finanzen\','
+                 + '     kontext:\'privat\' }];'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Steuer\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'backlog\','
+                 + '       frist: tagePlus(h, -25), themaId:\'t1\' },'
+                 + '     { id:\'a2\', titel:\'Belege\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'backlog\','
+                 + '       themaId:\'t1\' },'
+                 + '     { id:\'a3\', titel:\'Einladung\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'a4\', titel:\'Fragebogen\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'a5\', titel:\'GitLab\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: tagePlus(h, 3) },'
+                 + '     { id:\'a6\', titel:\'Schränke\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: tagePlus(h, 1),'
+                 + '       projektId:\'p1\' },'
+                 + '     { id:\'a7\', titel:\'Gang\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: tagePlus(h, 1),'
+                 + '       projektId:\'p1\' },'
+                 + '     { id:\'l1\', titel:\'Heute\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'l2\', titel:\'Morgen\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: tagePlus(h, 1) },'
+                 + '     { id:\'l3\', titel:\'Ohne\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'backlog\' },'
+                 + '     { id:\'k1\', titel:\'Morgenstart\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'klein\', planung: h } ];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Workshop\','
+                 + '     kontext:\'beruflich\', schritte:[{ titel:\'a\','
+                 + '       aufgabeId:\'a4\' }, { titel:\'b\', aufgabeId:\'a3\' },'
+                 + '       { titel:\'c\', aufgabeId:\'a5\' }] }];'
+                 + '   DB.einstellungen.darstellung = \'breit\';'
+                 + '   aufZeichnen();'
+                 + '   var b = document.getElementById(\'aufBlatt\').innerHTML;'
+                 + '   var r = { spalten: (b.match(/class="auf-spalte ([^"]*)"/g) || [])'
+                 + '     .map(function(x){ return x.slice(18, -1); }).join(\',\') };'
+                 + '   var links = b.split(\'auf-rechts\')[0];'
+                 + '   r.sektionen = (links.match(/tsektion-kopf"[^>]*><b>([^<]*)/g) || [])'
+                 + '     .map(function(x){ return x.replace(/.*<b>/, \'\'); }).join(\',\');'
+                 + '   var teile = links.split(\'<div class="tsektion">\');'
+                 + '   var titel = function(t){'
+                 + '     return (t.match(/ttitel">([^<]*)/g) || [])'
+                 + '       .map(function(x){ return x.slice(8); }); };'
+                 + '   var abschnitt = function(name){'
+                 + '     var t = teile.filter(function(x){'
+                 + '       return x.indexOf(\'<b>\' + name + \'<\') >= 0; })[0] || \'\';'
+                 + '     /* Der letzte Abschnitt reicht bis zum Blattende —'
+                 + '        abschneiden, sonst zählt die nächste Überschrift mit. */'
+                 + '     t = t.split(\'<button class="tunter\')[0];'
+                 + '     return titel(t).join(\',\'); };'
+                 + '   r.imVorgang = abschnitt(\'Workshop\');'
+                 + '   r.imThema = abschnitt(\'Finanzen\');'
+                 + '   r.loseNachDatum = titel(teile[0] || \'\')'
+                 + '     .filter(function(x){ return x === \'Heute\''
+                 + '       || x === \'Morgen\' || x === \'Ohne\'; }).join(\',\');'
+                 + '   r.kleinGetrennt = (links.indexOf(\'Morgenstart\')'
+                 + '     > links.indexOf(\'Kleinigkeiten\'));'
+                 + '   r.vorgaengeRechts = (b.indexOf(\'Vorgänge\')'
+                 + '     > b.indexOf(\'auf-rechts\'));'
+                 + '   DB.einstellungen.darstellung = \'schmal\';'
+                 + '   aufZeichnen();'
+                 + '   var b2 = document.getElementById(\'aufBlatt\').innerHTML;'
+                 + '   r.schmalOhneVorgaenge = (b2.indexOf(\'auf-rechts\') < 0);'
+                 + '   DB.einstellungen.darstellung = merkD; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__weitApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -3258,6 +3333,21 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '            alle:alleN, haupt:hauptN, klein:kleinN,'
                  + '            ohneArtGiltAlsAufgabe:ohneArt };'
                  + ' } };'
+                 + 'globalThis.__gruppeApi = {'
+                 + ' pruefeGruppen: function(){'
+                 + '   var merkStand = aufGruppeStand;'
+                 + '   aufGruppeStand = {};'
+                 + '   var r = { ohneZu: gruppeOffen(\'Ohne Thema\'),'
+                 + '     mitOffen: gruppeOffen(\'Reisen 2026\') };'
+                 + '   gruppeUm(\'Ohne Thema\');'
+                 + '   r.nachTippen = gruppeOffen(\'Ohne Thema\');'
+                 + '   gruppeUm(\'Ohne Thema\');'
+                 + '   r.nochmal = gruppeOffen(\'Ohne Thema\');'
+                 + '   gruppeUm(\'Reisen 2026\');'
+                 + '   r.auchBenannteZu = gruppeOffen(\'Reisen 2026\');'
+                 + '   aufGruppeStand = merkStand;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__ganztagsApi = {'
                  + ' pruefeGanztags: function(){'
                  + '   var alt = DB; var merk = tagFilter; DB = leereDatenbank();'
@@ -4333,7 +4423,7 @@ console.log('\n22. Aufgabenfläche und Detailfläche');
   const api = globalThis.__aufApi;
   const skript = hauptSkript();
 
-  const noetig = ['aufZeichnen', 'setAufGruppe', 'setAufFilter', 'aufGruppeVon',
+  const noetig = ['aufZeichnen', 'setAufFilter', 'aufGruppeVon',
                   'aufReihenfolge', 'aufMetaText', 'regelText', 'planungText',
                   'planungKlasse', 'planungWeiter', 'aufgabeErledigen', 'aufgabeNeu',
                   'themenFuer', 'projekteFuer', 'wochenEnde',
@@ -4349,9 +4439,9 @@ console.log('\n22. Aufgabenfläche und Detailfläche');
 
   pruefe(/id="schirmAufgaben"/.test(QUELLE), 'der Aufgabenbildschirm liegt im HTML');
   pruefe(/id="aufBlatt"/.test(QUELLE), 'die Liste hat einen Behälter');
-  pruefe(/id="gPlanung"/.test(QUELLE) && /id="gThema"/.test(QUELLE)
-         && /id="gProjekt"/.test(QUELLE) && /id="gFrist"/.test(QUELLE),
-         'alle vier Gruppierungen haben einen Knopf');
+  pruefe(!/id="gPlanung"/.test(QUELLE),
+         'die Gruppierleiste ist entfallen — sortiert wird nach Datum, gegliedert nach '
+         + 'dem, was zusammengehört');
 
   if (!api) {
     warn('Aufgabenfunktionen nicht auswertbar');
@@ -6432,25 +6522,36 @@ console.log('\n55. Ganztägiges im Tagesverlauf');
 console.log('\n56. Gruppen und Art');
 {
   const skript = hauptSkript();
-  const a = globalThis.__aufArtApi;
 
-  ['setAufArt', 'passtZurArt', 'gruppeOffen', 'gruppeUm'].forEach(function (f) {
+  /* Seit v3.6.0 hat die Aufgabenseite keine Gruppier- und keine
+     Artleiste mehr: Aufgaben und Kleinigkeiten stehen untereinander in
+     der Kachel „Aktivitäten", sortiert nach Datum, und was zu einem
+     Vorgang, einem Vorhaben oder einem Thema gehört, steht als Sektion
+     beieinander. */
+  ['gruppeOffen', 'gruppeUm', 'aufListeHtml', 'aufSektion', 'aufDatum',
+   'nachDatum'].forEach(function (f) {
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
   });
 
-  pruefe(/id="aArtAlle"/.test(QUELLE) && /id="aArtHaupt"/.test(QUELLE)
-         && /id="aArtKlein"/.test(QUELLE), 'die drei Pillen für die Art sind da');
+  pruefe(!/id="aArtAlle"/.test(QUELLE) && !/id="gPlanung"/.test(QUELLE),
+         'die beiden Leisten sind weg');
 
   const zeichnen = skript.match(/function aufZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(zeichnen && /passtZurArt\(alle\[i\]\)/.test(zeichnen[0]),
-         'der Artfilter greift auf die Liste');
-  pruefe(zeichnen && /gruppeUm\(/.test(zeichnen[0]),
-         'der Gruppenkopf ist antippbar');
-  pruefe(zeichnen && /if \(!offen\) \{ continue; \}/.test(zeichnen[0]),
-         'eine zugeklappte Gruppe zeigt ihre Einträge nicht');
-  pruefe(zeichnen && /drin\.length/.test(zeichnen[0]),
-         'die Zahl steht auch im zugeklappten Kopf');
+  pruefe(zeichnen && /a\.art !== 'klein'/.test(zeichnen[0])
+         && /a\.art === 'klein'/.test(zeichnen[0]),
+         'die Liste teilt sich in Aufgaben und Kleinigkeiten');
+  pruefe(zeichnen && (zeichnen[0].match(/unterKopf\(/g) || []).length === 2,
+         'beide lassen sich einklappen');
+  pruefe(zeichnen && /ablaufListeHtml\(\)/.test(zeichnen[0])
+         && /istBreit\(\)/.test(zeichnen[0]),
+         'am Rechner stehen die Vorgänge rechts daneben');
+  const liste = skript.match(/function aufListeHtml\([\s\S]*?\n\}\n/);
+  pruefe(liste && /x\.rang - y\.rang/.test(liste[0]),
+         'erst Vorgänge, dann Vorhaben, dann Themen');
+  pruefe(liste && /schrittNummer\(/.test(liste[0]),
+         'in einem Vorgang zählt seine Schrittfolge');
+  pruefe(liste && /nachDatum\(/.test(liste[0]), 'sonst das Datum');
 
   const offen = skript.match(/function gruppeOffen\([\s\S]*?\n\}/);
   pruefe(offen && /indexOf\('Ohne '\) !== 0/.test(offen[0]),
@@ -6458,22 +6559,17 @@ console.log('\n56. Gruppen und Art');
   pruefe(offen && /stand === 'auf'/.test(offen[0]),
          'eine von Hand geöffnete Gruppe bleibt offen');
 
-  if (!a) {
+  const g2 = globalThis.__gruppeApi;
+  if (!g2) {
     warn('Funktionen nicht auswertbar');
   } else {
-    const e = a.pruefeArt();
+    const e = g2.pruefeGruppen();
     pruefe(e.ohneZu === false, '„Ohne Thema" ist zunächst zu');
     pruefe(e.mitOffen === true, 'eine benannte Gruppe ist offen');
     pruefe(e.nachTippen === true, 'ein Tippen klappt sie auf');
     pruefe(e.nochmal === false, 'ein zweites Tippen wieder zu');
     pruefe(e.auchBenannteZu === false,
            'auch eine benannte Gruppe lässt sich zuklappen');
-
-    pruefe(e.alle === 3, 'ohne Artfilter alle drei');
-    pruefe(e.haupt === 2, 'nur Aufgaben: zwei');
-    pruefe(e.klein === 1, 'nur Kleinigkeiten: eine');
-    pruefe(e.ohneArtGiltAlsAufgabe === true,
-           'eine Aufgabe ohne Artangabe zählt als Aufgabe, nicht als Kleinigkeit');
   }
 }
 
@@ -6680,10 +6776,13 @@ console.log('\n59. Ablaufkarten');
   pruefe(offen && /!istKeinGruppe\(name\)/.test(offen[0]),
          'die Kein-Gruppe beginnt eingeklappt');
 
-  const zeichnen = skript.match(/function abZeichnen\([\s\S]*?\n\}\n/);
+  /* Seit v3.6.0 ist die Liste ein eigener Baustein: Sie steht auch
+     rechts auf der Aufgabenseite. */
+  const zeichnen = skript.match(/function ablaufListeHtml\([\s\S]*?\n\}\n/);
   pruefe(zeichnen && /abStufe === 'laufend'/.test(zeichnen[0]),
          'gezeigt wird nur der gewählte Reiter');
-  pruefe(zeichnen && /Läuft gerade · '/.test(zeichnen[0]),
+  const zaehler = skript.match(/function abZaehlerZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(zaehler && /Läuft gerade · '/.test(zaehler[0]),
          'die Reiter tragen ihre Zahl');
 
   if (!a) {
@@ -7786,9 +7885,9 @@ console.log('\n74. Bereiche nach Kontext');
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
   });
-  const az = skript.match(/function abZeichnen\([\s\S]*?\n\}\n/);
+  const az = skript.match(/function ablaufListeHtml\([\s\S]*?\n\}\n/);
   pruefe(az && /\['beruflich', 'Beruflich'\], \['privat', 'Privat'\]/.test(az[0]),
-         'auch bei den Abläufen erst der Beruf, dann das Private');
+         'auch bei den Vorgängen erst der Beruf, dann das Private');
   pruefe(az && /abFilter !== 'alle' && abFilter !== kk/.test(az[0]),
          'bei gesetztem Filter bleibt nur der gewählte Bereich');
   pruefe(az && /abKontextOffen\(kk\)/.test(az[0]),
@@ -10620,6 +10719,53 @@ console.log('\n122. Leiste, Kacheln, Wochenfokus');
     pruefe(e.weitAb1280 === true, 'die dritte Spalte ab 1280 Pixeln');
     pruefe(e.nichtWeitDarunter === true, 'darunter zwei Spalten');
     pruefe(e.heuteInWoche === true, 'die Woche kennzeichnet den heutigen Tag');
+  }
+}
+
+/* ============================================================
+   123. Die Aufgabenseite: Aktivitaeten und Vorgaenge
+   Grund: Die Gruppierleiste und der Artfilter verlangten eine
+   Entscheidung, bevor man etwas sah. Jetzt stehen Aufgaben und
+   Kleinigkeiten untereinander, sortiert nach Datum, und was zu einem
+   Vorgang, einem Vorhaben oder einem Thema gehoert, steht beieinander.
+   ============================================================ */
+console.log('\n123. Aktivitäten und Vorgänge');
+{
+  const skript = hauptSkript();
+  const s = globalThis.__aufSeiteApi;
+
+  ['aufDatum', 'nachDatum', 'aufSektion', 'aufListeHtml', 'aufZeileHtml',
+   'schrittNummer', 'ablaufListeHtml', 'abZaehlerZeichnen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(!/setAufGruppe/.test(skript) && !/passtZurArt/.test(skript),
+         'Gruppierung und Artfilter sind ganz entfernt, nicht nur versteckt');
+  const sek = skript.match(/function aufSektion\([\s\S]*?\n\}\n/);
+  pruefe(sek && /rang: 1/.test(sek[0]) && /rang: 2/.test(sek[0]) && /rang: 3/.test(sek[0]),
+         'die Rangfolge: Vorgang, Vorhaben, Thema');
+  pruefe(/Vorgänge<\/button>/.test(QUELLE) && /Aktivitäten<\/button>/.test(QUELLE),
+         'am Handy führen zwei Reiter dorthin');
+  pruefe(/body\.breit #aufBlatt\{display:grid/.test(QUELLE),
+         'am Rechner stehen sie nebeneinander');
+
+  if (!s) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = s.pruefe();
+    pruefe(e.spalten === 'auf-links,auf-rechts', 'zwei Spalten am Rechner');
+    pruefe(e.sektionen === 'Workshop,Haus,Finanzen',
+           'Sektionen in der Rangfolge: Vorgang, Vorhaben, Thema');
+    pruefe(e.imVorgang === 'Fragebogen,Einladung,GitLab',
+           'im Vorgang zählt die Schrittfolge, nicht die Aufgabenliste');
+    pruefe(e.imThema === 'Steuer,Belege',
+           'im Thema das Datum — die überfällige zuerst');
+    pruefe(e.loseNachDatum === 'Heute,Morgen,Ohne',
+           'lose Aufgaben stehen nach Datum, Undatiertes zuletzt');
+    pruefe(e.kleinGetrennt === true, 'Kleinigkeiten stehen für sich');
+    pruefe(e.vorgaengeRechts === true, 'die Vorgänge stehen in der rechten Spalte');
+    pruefe(e.schmalOhneVorgaenge === true,
+           'am Handy nicht — dort führt der Reiter zu ihrer Seite');
   }
 }
 
