@@ -553,7 +553,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '       wiederholung: regel, status:\'offen\', planung:\'backlog\' } ];'
                  + '   var e = tagesEintraege(isoDatum());'
                  + '   DB = alt;'
-                 + '   return { mitZeit: e.verlauf.length, ohneZeit: e.wieder.length };'
+                 + '   return { mitZeit: e.verlauf.length, ohneZeit: e.haupt.length };'
                  + ' } };'
                  + 'globalThis.__aufApi = { gruppeVonPlanung, gruppeVonFrist, wochenEnde,'
                  + ' regelText, planungText, planungKlasse, isoDatum, tagePlus,'
@@ -565,6 +565,38 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__nachApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'CTS-Testumgebung\','
+                 + '     kontext:\'privat\', schritte:[{ titel:\'Testdaten anfordern\' },'
+                 + '       { titel:\'Ergebnis dokumentieren\' },'
+                 + '       { titel:\'Entscheiden ob weiter\' }] }];'
+                 + '   DB.aufgaben = [{ id:\'w1\', titel:\'Oskar\', kontext:\'privat\','
+                 + '     status:\'offen\', art:\'haupt\','
+                 + '     wiederholung:{ takt:\'woche\', tage:[0,1,2,3,4,5,6] } }];'
+                 + '   tagOffen = h;'
+                 + '   var e1 = tagesEintraege(h);'
+                 + '   var r = { vorher: e1.klein[0].satz.titel,'
+                 + '     offenVorher: offeneKleine(e1, h) };'
+                 + '   schrittUm(\'d1\', 0);'
+                 + '   var e2 = tagesEintraege(h);'
+                 + '   r.nachEins = e2.klein[0].satz.titel;'
+                 + '   r.fertigSichtbar = e2.kleinFertig.length;'
+                 + '   r.offenNachher = offeneKleine(e2, h);'
+                 + '   r.symbol = offeneHeute();'
+                 + '   r.gemerkt = (DB.durchlaeufe[0].schritte[0].fertigAm === h);'
+                 + '   var e3 = tagesEintraege(tagePlus(h, 1));'
+                 + '   r.morgen = e3.klein.length ? e3.klein[0].satz.titel : \'\';'
+                 + '   r.morgenOhneFertige = e3.kleinFertig.length;'
+                 + '   var zeile = zeileHtml(DB.aufgaben[0], h, false);'
+                 + '   r.marke = (zeile.match(/tmarke">([^<]*)/) || [])[1];'
+                 + '   var sz = schrittZeileHtml(e2.klein[0], h);'
+                 + '   r.markeAblauf = (sz.match(/tmarke">([^<]*)/) || [])[1];'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__sichtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -1324,17 +1356,19 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   aufgabeHaken(\'w3\');'
                  + '   var fertigAm = function(tag){'
                  + '     var e = tagesEintraege(tag);'
-                 + '     return e.wiederFertig.concat(e.hauptFertig, e.kleinFertig); };'
+                 + '     return e.hauptFertig.concat(e.kleinFertig); };'
                  + '   var mo = fertigAm(\'2026-09-21\').map(function(a){'
                  + '     return a.titel; }).join(\',\');'
                  + '   var di = fertigAm(\'2026-09-22\').map(function(a){'
                  + '     return a.id; });'
                  + '   var e21 = tagesEintraege(\'2026-09-21\');'
-                 + '   var imAbschnitt = e21.wiederFertig.some(function(a){'
-                 + '     return a.id === \'w1\'; }) && e21.wiederFertig.some(function(a){'
+                 + '   var e21f = e21.hauptFertig.concat(e21.kleinFertig);'
+                 + '   var imAbschnitt = e21f.some(function(a){'
+                 + '     return a.id === \'w1\'; }) && e21f.some(function(a){'
                  + '     return a.id === \'w2\'; });'
-                 + '   var offenBleibtOffen = e21.wieder.every(function(a){'
-                 + '     return a.id !== \'w1\' && a.id !== \'w2\'; });'
+                 + '   var offenBleibtOffen = e21.haupt.concat(e21.klein)'
+                 + '     .every(function(a){'
+                 + '       return a.id !== \'w1\' && a.id !== \'w2\'; });'
                  + '   var r = { montag: mo, imAbschnitt: imAbschnitt,'
                  + '     offenLeer: offenBleibtOffen,'
                  + '     dienstagZuSpaet: di.indexOf(\'w2\') >= 0,'
@@ -2562,7 +2596,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   einfallStand(DB.einfaelle[1].id, \'verworfen\');'
                  + '   var e = tagesEintraege(heute);'
                  + '   var imTag = e.haupt.length + e.klein.length'
-                 + '             + e.wieder.length + e.verlauf.length;'
+                 + '             + e.verlauf.length;'
                  + '   var r = { gemerkt: DB.einfaelle.length,'
                  + '             kontextGedeutet: erster.kontext,'
                  + '             titelSauber: erster.titel,'
@@ -4893,7 +4927,7 @@ console.log('\n32. Verdichteter Tagesplan');
 
   /* Wiederkehrendes mit Uhrzeit gehört in den Tagesverlauf */
   const eintraege = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
-  pruefe(eintraege && /else if \(a\.uhrzeit\) \{ verlauf\.push/.test(eintraege[0]),
+  pruefe(eintraege && /if \(a\.uhrzeit\) \{ verlauf\.push/.test(eintraege[0]),
          'eine wiederkehrende Aufgabe mit Uhrzeit steht im Tagesverlauf');
 
   if (api && api.pruefeVerlauf) {
@@ -5665,10 +5699,14 @@ console.log('\n44. Abläufe und Wochenrückblick');
          'im Tag steht je Durchlauf nur der nächste offene Schritt');
   pruefe(heute && /passtZumTag\(/.test(heute[0]),
          'der Kontextfilter des Tages greift auch darauf');
+  /* Seit v3.0.0 ohne eigenen Ablaufabschnitt: Der nächste Schritt steht
+     bei den Kleinigkeiten, eine tragende Aufgabe bei den Aufgaben. */
   const tag = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tag && /data-kurz="Abläufe"/.test(tag[0]), 'der Tag hat einen Abschnitt dafür');
-  pruefe(tag && /laeufe\.length\) \{/.test(tag[0]),
-         'ohne anstehenden Durchlauf bleibt der Abschnitt weg');
+  pruefe(tag && !/data-kurz="Abläufe"/.test(tag[0]),
+         'einen eigenen Abschnitt für Abläufe gibt es nicht mehr');
+  const tee = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
+  pruefe(tee && /ablaufSchritteHeute\(is\)/.test(tee[0]),
+         'die anstehenden Schritte kommen von dort');
 
   /* Starten erzeugt eine Kopie, keine Verknüpfung */
   const starten = skript.match(/function durchlaufStarten\([\s\S]*?\n\}/);
@@ -5993,7 +6031,10 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
                        .map(m => m[1] ? ('[' + m[1] + ']') : m[2]) : [];
   /* Seit v1.10.0 ohne „Heute zählt": Schritt 4 des Tageswechsels plant
      unmittelbar auf heute, statt einen zweiten Merker zu führen. */
-  const erwarteteFolge = ['[links]', 'Tagesverlauf', 'Wiederkehrend', 'Abläufe',
+  /* Seit v3.0.0 zwei Bereiche statt vier: Was Zeit braucht, steht bei
+     den Aufgaben; was kurz ist, bei den Kleinigkeiten. Ablaufschritte
+     stehen dort mit, nicht in einer eigenen Klammer. */
+  const erwarteteFolge = ['[links]', 'Tagesverlauf',
                           '[rechts]', 'Aufgaben', 'Kleinigkeiten'];
   pruefe(folge.join(',') === erwarteteFolge.join(','),
          'die Abschnitte stehen in der vereinbarten Folge und Spalte'
@@ -7196,8 +7237,8 @@ console.log('\n69. Zahl am App-Symbol');
          'und danach wiederhergestellt');
   pruefe(offen && /eintragVorbei/.test(offen[0]),
          'ein vorbeigegangener Termin zählt nicht mehr');
-  pruefe(offen && /ablaufSchritteHeute/.test(offen[0]),
-         'offene Ablaufschritte zählen mit');
+  pruefe(offen && /offeneKleine\(e, heute\)/.test(offen[0]),
+         'offene Ablaufschritte zählen mit, nachgerückte nicht');
 
   const setzen = skript.match(/function badgeSetzen\([\s\S]*?\n\}/);
   pruefe(setzen && /typeof navigator\.setAppBadge !== 'function'/.test(setzen[0]),
@@ -9399,8 +9440,7 @@ console.log('\n102. Erledigtes je Tag');
   pruefe(ie && /erledigtTage\.indexOf\(is\) >= 0/.test(ie[0]),
          'jeder Erledigungstag zählt, nicht nur der letzte');
   const te = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
-  pruefe(te && /wiederFertig\.push\(a\)/.test(te[0]) && /hauptFertig\.push\(a\)/.test(te[0])
-         && /kleinFertig\.push\(a\)/.test(te[0]),
+  pruefe(te && /hauptFertig\.push\(a\)/.test(te[0]) && /kleinFertig\.push\(a\)/.test(te[0]),
          'Erledigtes landet in seinem eigenen Abschnitt');
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
   pruefe(tz && tz[0].indexOf('e.haupt.length; i++') < tz[0].indexOf('e.hauptFertig.length; i++'),
@@ -9877,8 +9917,8 @@ console.log('\n112. Tagessicht in Karten');
   pruefe(/body\.breit \.tagblatt\{max-width:1000px\}/.test(QUELLE),
          'am Rechner ist die Breite begrenzt');
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && (tz[0].match(/abschnittKopf\(/g) || []).length === 5,
-         'alle fünf Gruppen tragen Namen und Zahl');
+  pruefe(tz && (tz[0].match(/abschnittKopf\(/g) || []).length === 3,
+         'alle drei Gruppen tragen Namen und Zahl');
   pruefe(tz && /tagZahlenZeichnen\(is, e\)/.test(tz[0]),
          'die Zähler werden bei jedem Zeichnen gefüllt');
 
@@ -9886,12 +9926,12 @@ console.log('\n112. Tagessicht in Karten');
     warn('Funktionen nicht auswertbar');
   } else {
     const e = t.pruefe();
-    pruefe(e.zaehler === '3 Termine · 3 Std. 30 belegt · 2 Aufgaben · 2 Kleinigkeiten'
-           + ' · 1 wiederkehrend · 1 erledigt',
-           'der Kopf sagt, wie voll der Tag ist');
-    pruefe(e.gruppen === 'Tagesverlauf,Wiederkehrend,Abläufe,Aufgaben,Kleinigkeiten',
+    pruefe(e.zaehler === '3 Termine · 3 Std. 30 belegt · 3 Aufgaben · 3 Kleinigkeiten'
+           + ' · 1 erledigt',
+           'der Kopf sagt, wie voll der Tag ist — der Ablaufschritt zählt als Kleinigkeit');
+    pruefe(e.gruppen === 'Tagesverlauf,Aufgaben,Kleinigkeiten',
            'die Gruppen stehen in der gewohnten Folge');
-    pruefe(e.zahlen === '4,1,1,2,2', 'jede mit der Zahl ihrer offenen Einträge');
+    pruefe(e.zahlen === '4,3,3', 'jede mit der Zahl ihrer offenen Einträge');
     pruefe(e.leererTag === '', 'an einem leeren Tag steht keine Zahl im Kopf');
     pruefe(e.keineZahlOhneEintrag === true,
            'eine leere Gruppe zeigt keine Null, sondern nichts');
@@ -10120,9 +10160,9 @@ console.log('\n117. Termine als Einzeiler');
   pruefe(new RegExp('function\\s+dauerText\\s*\\(').test(skript),
          'Funktion dauerText ist definiert');
   const vl = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
-  pruefe(vl && /tzt-zeit/.test(vl[0]) && /tzt-strich/.test(vl[0])
-         && /tzt-titel/.test(vl[0]) && /tzt-rechts/.test(vl[0]),
-         'Uhrzeit, Farbstrich, Titel und rechte Angabe in einer Zeile');
+  pruefe(vl && /tzt-zeit/.test(vl[0]) && /tzt-titel/.test(vl[0])
+         && /tzt-rechts/.test(vl[0]),
+         'Uhrzeit, Titel und rechte Angabe in einer Zeile');
   pruefe(vl && !/t\.ort/.test(vl[0]) && !/t\.beschreibung/.test(vl[0]),
          'Ort und Beschreibung bleiben dem Terminblatt');
   pruefe(/body:not\(\.breit\) \.tzeile-termin \.t-ablauf/.test(QUELLE),
@@ -10200,6 +10240,66 @@ console.log('\n118. Sichtschutz am Pixel');
     pruefe(e.zurueck === 'Dienstlich,Whiskey Club|Beruflich,Privates|Beruflich,Privat',
            'ausgeschaltet ist alles wieder da');
     pruefe(e.einTermin === true, 'die Kopfzeile zählt richtig, auch bei einem Termin');
+  }
+}
+
+/* ============================================================
+   119. Zwei Bereiche: Aufgaben und Kleinigkeiten
+   Grund: Vier Abschnitte trennten nach Herkunft. Beim Abarbeiten zaehlt
+   aber die Groesse: Was Zeit braucht, gehoert zu den Aufgaben; was in
+   fuenf Minuten weg ist, zu den Kleinigkeiten. Ablaeufe erscheinen als
+   der Schritt, der ansteht, nicht als Klammer.
+   ============================================================ */
+console.log('\n119. Aufgaben und Kleinigkeiten');
+{
+  const skript = hauptSkript();
+  const n = globalThis.__nachApi;
+
+  ['schritteHeuteFertig', 'schritteHeuteErledigt', 'offeneKleine', 'schrittZeileHtml',
+   'regelKurz', 'nachzueglerMarke'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const te = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
+  pruefe(te && !/wieder\.push/.test(te[0]),
+         'es gibt keine eigene Liste für Wiederkehrendes mehr');
+  pruefe(te && /a\.art === 'klein'/.test(te[0]),
+         'eine wiederkehrende Kleinigkeit landet bei den Kleinigkeiten');
+  const su = skript.match(/function schrittUm\([\s\S]*?\n\}/);
+  pruefe(su && /s\.fertigAm = s\.fertig \? isoDatum\(\) : null/.test(su[0]),
+         'ein Schritt merkt sich den Tag seiner Erledigung');
+  const ok = skript.match(/function offeneKleine\([\s\S]*?\n\}/);
+  pruefe(ok && /nachgerueckt/.test(ok[0]),
+         'nachgerückte Schritte zählen nicht als offen');
+  const zh = skript.match(/function zeileHtml\([\s\S]*?\n\}\n/);
+  pruefe(zh && !/Frist/.test(zh[0]) && !/zuletzt /.test(zh[0]),
+         'keine Fristen und kein „zuletzt" in der Zeile');
+  pruefe(zh && /ablaufVermerk\(a\)/.test(zh[0]),
+         'trägt sie einen Ablaufschritt, steht der Ablauf an der Zeile');
+  pruefe(!/tzt-strich/.test(QUELLE),
+         'kein Kontextstrich mehr an der Terminzeile — beruflich oder privat sieht man '
+         + 'dem Eintrag ohnehin an');
+
+  if (!n) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = n.pruefe();
+    pruefe(e.vorher === 'Testdaten anfordern', 'zuerst steht nur der nächste Schritt da');
+    pruefe(e.offenVorher === 1, 'und zählt als offen');
+    pruefe(e.nachEins === 'Ergebnis dokumentieren',
+           'nach dem Haken kommt der nächste dazu');
+    pruefe(e.fertigSichtbar === 1, 'der erledigte bleibt durchgestrichen stehen');
+    pruefe(e.offenNachher === 0,
+           'der nachgerückte zählt nicht als offen — Fleiß wird nicht bestraft');
+    pruefe(e.symbol === 1,
+           'am App-Symbol bleibt nur das wirklich Offene — hier die wiederkehrende Aufgabe');
+    pruefe(e.gemerkt === true, 'der Tag der Erledigung steht am Schritt');
+    pruefe(e.morgen === 'Ergebnis dokumentieren',
+           'am nächsten Tag steht nur der dann nächste Schritt da');
+    pruefe(e.morgenOhneFertige === 0, 'ohne die erledigten von gestern');
+    pruefe(e.marke === 'täglich', 'eine wiederkehrende Aufgabe trägt ihren Takt als Marke');
+    pruefe(e.markeAblauf === 'CTS-Testumgebung',
+           'ein Ablaufschritt den Namen seines Ablaufs');
   }
 }
 
