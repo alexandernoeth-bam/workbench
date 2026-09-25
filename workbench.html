@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 3.7.0</title>
+<title>Workbench 3.8.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -745,6 +745,8 @@ body.breit.weit .tspalte-rechts > .tabschnitt:nth-child(2){grid-column:3}
 /* Am Rechner brauchen die Aufgaben keine Reiterzeile: Die Vorgänge
    stehen rechts daneben. */
 body.breit #schirmAufgaben > .stufen{display:none}
+.tunter-klein{font-size:calc(var(--fs)*0.68);font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--grau-hell);margin:12px 0 1px}
 .auf-spalte{display:block}
 body.breit #aufBlatt{display:grid;grid-template-columns:1.35fr 1fr;gap:0 20px;
   align-items:start;max-width:1800px}
@@ -1959,7 +1961,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '3.7.0';
+var APP_VERSION = '3.8.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -16686,23 +16688,29 @@ function nachDatum(liste) {
   });
 }
 
-/* Wozu eine Aufgabe gehört — in dieser Rangfolge. */
+/* Wozu eine Aufgabe gehört. Ein Vorgang steht zuletzt, weil er die
+   längste Klammer ist — und er trägt alles, was zu ihm gehört, auch
+   eine Kleinigkeit. */
 function aufSektion(a) {
-  var l = durchlaeufeZuAufgabe(a.id);
-  if (l.length === 1) { return { id: 'd:' + l[0].id, name: l[0].name, rang: 1, d: l[0] }; }
   if (a.projektId) {
     var p = vorhabenFinden(a.projektId, 'projekt');
-    if (p) { return { id: 'p:' + p.id, name: p.name, rang: 2 }; }
+    if (p) { return { id: 'p:' + p.id, name: p.name, rang: 1 }; }
   }
   if (a.zielId) {
     var z = vorhabenFinden(a.zielId, 'ziel');
-    if (z) { return { id: 'z:' + z.id, name: z.name, rang: 2 }; }
+    if (z) { return { id: 'z:' + z.id, name: z.name, rang: 1 }; }
   }
   if (a.themaId) {
     var t = themaName(a.themaId);
-    if (t) { return { id: 't:' + a.themaId, name: t, rang: 3 }; }
+    if (t) { return { id: 't:' + a.themaId, name: t, rang: 2 }; }
   }
+  var l = durchlaeufeZuAufgabe(a.id);
+  if (l.length === 1) { return { id: 'd:' + l[0].id, name: l[0].name, rang: 3, d: l[0] }; }
   return null;
+}
+
+function inVorgang(a) {
+  return durchlaeufeZuAufgabe(a.id).length === 1;
 }
 
 function aufListeHtml(liste) {
@@ -16759,6 +16767,18 @@ function schrittNummer(d, aufgabeId) {
   return 99;
 }
 
+/* Der Fuß eines Bereichs: das Wiederkehrende, nach Namen geordnet. */
+function wiederTeilHtml(liste) {
+  if (!liste.length) { return ''; }
+  var geordnet = liste.slice().sort(function (x, y) {
+    return (x.titel < y.titel) ? -1 : 1;
+  });
+  var h = '<div class="tunter-klein">Wiederkehrend</div>';
+  var i;
+  for (i = 0; i < geordnet.length; i++) { h += aufZeileHtml(geordnet[i]); }
+  return h;
+}
+
 function aufZeileHtml(a, inSektion) {
   var meta = inSektion ? '' : aufMetaText(a);
   var marken = '';
@@ -16797,20 +16817,34 @@ function aufZeichnen() {
     if (aufFilter !== 'alle' && alle[i].kontext !== aufFilter) { continue; }
     sichtbar.push(alle[i]);
   }
-  var haupt = sichtbar.filter(function (a) { return a.art !== 'klein'; });
-  var klein = sichtbar.filter(function (a) { return a.art === 'klein'; });
+  /* Wiederkehrendes steht am Fuß seines Bereichs: Es ist Routine und
+     soll die einmaligen Aufgaben nicht länger wirken lassen, als sie
+     sind. Eine Kleinigkeit aus einem Vorgang wandert zu ihm nach oben —
+     dort zählt die Reihenfolge, nicht die Größe. */
+  var einmal = sichtbar.filter(function (a) { return !a.wiederholung; });
+  var wieder = sichtbar.filter(function (a) { return !!a.wiederholung; });
+  var haupt = einmal.filter(function (a) {
+    return a.art !== 'klein' || inVorgang(a);
+  });
+  var klein = einmal.filter(function (a) {
+    return a.art === 'klein' && !inVorgang(a);
+  });
+  var hauptWieder = wieder.filter(function (a) { return a.art !== 'klein'; });
+  var kleinWieder = wieder.filter(function (a) { return a.art === 'klein'; });
 
   var h = '<div class="auf-spalte auf-links">';
   h += '<div class="tabschnitt"><div class="tabschnitt-titel"><span>Aktivitäten</span></div>';
   h += unterKopf('aufListeAufgaben', 'Aufgaben', 0);
   if (unterOffen('aufListeAufgaben')) {
-    h += haupt.length ? aufListeHtml(haupt)
-                      : '<div class="tleer">Keine Aufgabe in dieser Auswahl.</div>';
+    h += (haupt.length || hauptWieder.length)
+       ? (aufListeHtml(haupt) + wiederTeilHtml(hauptWieder))
+       : '<div class="tleer">Keine Aufgabe in dieser Auswahl.</div>';
   }
   h += unterKopf('aufListeKlein', 'Kleinigkeiten', 0);
   if (unterOffen('aufListeKlein')) {
-    h += klein.length ? aufListeHtml(klein)
-                      : '<div class="tleer">Keine Kleinigkeit in dieser Auswahl.</div>';
+    h += (klein.length || kleinWieder.length)
+       ? (aufListeHtml(klein) + wiederTeilHtml(kleinWieder))
+       : '<div class="tleer">Keine Kleinigkeit in dieser Auswahl.</div>';
   }
   h += '</div>';
   h += erledigtBlockHtml();

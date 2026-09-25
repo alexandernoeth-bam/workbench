@@ -567,6 +567,84 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__wiederTeilApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   var merkD = DB.einstellungen.darstellung;'
+                 + '   var h = isoDatum();'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'Haus\','
+                 + '     kontext:\'privat\', status:\'laufend\', zielzustaende:[] }];'
+                 + '   DB.themen = [{ id:\'t1\', name:\'Finanzen\','
+                 + '     kontext:\'privat\' }];'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'e1\', titel:\'Wien\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: tagePlus(h, 20) },'
+                 + '     { id:\'e2\', titel:\'Weidner\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'w1\', titel:\'Oskar\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[1,3,5] } },'
+                 + '     { id:\'w2\', titel:\'AzDO\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[4] } },'
+                 + '     { id:\'p1a\', titel:\'Gang\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\','
+                 + '       planung: tagePlus(h, 1), projektId:\'p1\' },'
+                 + '     { id:\'p1b\', titel:\'Schränke\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\','
+                 + '       planung: tagePlus(h, 1), projektId:\'p1\' },'
+                 + '     { id:\'t1a\', titel:\'Steuer\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'backlog\','
+                 + '       themaId:\'t1\', frist: tagePlus(h, -20) },'
+                 + '     { id:\'t1b\', titel:\'Belege\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'backlog\','
+                 + '       themaId:\'t1\' },'
+                 + '     { id:\'v1\', titel:\'Fragebogen\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'v2\', titel:\'Einladung\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'klein\', planung: h },'
+                 + '     { id:\'k1\', titel:\'Brief\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'klein\', planung: h },'
+                 + '     { id:\'kw\', titel:\'Pflanzen\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'klein\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[0] } } ];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\', name:\'Workshop\','
+                 + '     kontext:\'beruflich\', schritte:[{ titel:\'a\','
+                 + '       aufgabeId:\'v1\' }, { titel:\'b\', aufgabeId:\'v2\' }] }];'
+                 + '   DB.einstellungen.darstellung = \'breit\';'
+                 + '   aufZeichnen();'
+                 + '   var links = document.getElementById(\'aufBlatt\').innerHTML'
+                 + '     .split(\'auf-rechts\')[0];'
+                 + '   var bereiche = links.split(\'<button class="tunter"\');'
+                 + '   var titel = function(t){'
+                 + '     return (t.match(/ttitel">([^<]*)/g) || [])'
+                 + '       .map(function(x){ return x.slice(8); }); };'
+                 + '   var teilBis = function(t, marke){'
+                 + '     return t.split(marke)[0]; };'
+                 + '   var auf = bereiche[1] || \'\';'
+                 + '   var kl = bereiche[2] || \'\';'
+                 + '   var r = { aufgabenLose: titel(teilBis(auf,'
+                 + '       \'<div class="tsektion">\')).join(\',\'),'
+                 + '     sektionen: (auf.match(/tsektion-kopf"[^>]*><b>([^<]*)/g) || [])'
+                 + '       .map(function(x){ return x.replace(/.*<b>/, \'\'); })'
+                 + '       .join(\',\') };'
+                 + '   var sekTeile = auf.split(\'<div class="tsektion">\');'
+                 + '   var mitNamen = function(teile, name){'
+                 + '     var t = teile.filter(function(x){'
+                 + '       return x.indexOf(\'<b>\' + name + \'<\') >= 0; })[0] || \'\';'
+                 + '     return titel(t.split(\'tunter-klein\')[0]).join(\',\'); };'
+                 + '   r.imVorgang = mitNamen(sekTeile, \'Workshop\');'
+                 + '   r.wiederAufgaben = titel(auf.split(\'tunter-klein\')[1]'
+                 + '     || \'\').join(\',\');'
+                 + '   r.kleinLose = titel(teilBis(kl, \'tunter-klein\')).join(\',\');'
+                 + '   r.wiederKlein = titel(kl.split(\'tunter-klein\')[1]'
+                 + '     || \'\').join(\',\');'
+                 + '   r.kleinOhneVorgang = (kl.indexOf(\'Einladung\') < 0);'
+                 + '   r.wiederNichtOben = (titel(teilBis(auf,'
+                 + '     \'<div class="tsektion">\')).indexOf(\'Oskar\') < 0);'
+                 + '   DB.einstellungen.darstellung = merkD; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__aufSeiteApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -10741,9 +10819,11 @@ console.log('\n123. Aktivitäten und Vorgänge');
   });
   pruefe(!/setAufGruppe/.test(skript) && !/passtZurArt/.test(skript),
          'Gruppierung und Artfilter sind ganz entfernt, nicht nur versteckt');
+  /* Seit v3.8.0: Vorhaben, Thema, Vorgang — der Vorgang steht zuletzt,
+     weil er die längste Klammer ist. */
   const sek = skript.match(/function aufSektion\([\s\S]*?\n\}\n/);
   pruefe(sek && /rang: 1/.test(sek[0]) && /rang: 2/.test(sek[0]) && /rang: 3/.test(sek[0]),
-         'die Rangfolge: Vorgang, Vorhaben, Thema');
+         'die Rangfolge: Vorhaben, Thema, Vorgang');
   pruefe(/Vorgänge<\/button>/.test(QUELLE) && /Aktivitäten<\/button>/.test(QUELLE),
          'am Handy führen zwei Reiter dorthin');
   pruefe(/body\.breit #aufBlatt\{display:grid/.test(QUELLE),
@@ -10754,8 +10834,8 @@ console.log('\n123. Aktivitäten und Vorgänge');
   } else {
     const e = s.pruefe();
     pruefe(e.spalten === 'auf-links,auf-rechts', 'zwei Spalten am Rechner');
-    pruefe(e.sektionen === 'Workshop,Haus,Finanzen',
-           'Sektionen in der Rangfolge: Vorgang, Vorhaben, Thema');
+    pruefe(e.sektionen === 'Haus,Finanzen,Workshop',
+           'Sektionen in der Rangfolge: Vorhaben, Thema, Vorgang');
     pruefe(e.imVorgang === 'Fragebogen,Einladung,GitLab',
            'im Vorgang zählt die Schrittfolge, nicht die Aufgabenliste');
     pruefe(e.imThema === 'Steuer,Belege',
@@ -10798,6 +10878,50 @@ console.log('\n124. Fenstergröße und Reiter');
   pruefe(/body\.breit\.weit \.tagblatt\{[^}]*max-width:1800px/.test(QUELLE)
          && /body\.breit #aufBlatt\{[^}]*max-width:1800px/.test(QUELLE),
          'beide Seiten nutzen die Breite eines großen Bildschirms');
+}
+
+/* ============================================================
+   125. Wiederkehrendes an den Fuss, Vorgaenge zuletzt
+   Grund: Routinen standen zwischen den einmaligen Aufgaben und liessen
+   die Liste laenger wirken, als sie ist. Und ein Vorgang gehoert
+   zusammen — auch seine Kleinigkeiten.
+   ============================================================ */
+console.log('\n125. Wiederkehrendes und Vorgänge');
+{
+  const skript = hauptSkript();
+  const s = globalThis.__wiederTeilApi;
+
+  ['wiederTeilHtml', 'inVorgang'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const az = skript.match(/function aufZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(az && /!a\.wiederholung/.test(az[0]) && /!!a\.wiederholung/.test(az[0]),
+         'einmalige und wiederkehrende werden getrennt');
+  pruefe(az && /a\.art !== 'klein' \|\| inVorgang\(a\)/.test(az[0]),
+         'eine Kleinigkeit aus einem Vorgang wandert zu ihm nach oben');
+  pruefe(az && (az[0].match(/wiederTeilHtml\(/g) || []).length === 2,
+         'jeder der beiden Bereiche endet mit seinem Wiederkehrenden');
+
+  if (!s) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = s.pruefe();
+    pruefe(e.aufgabenLose === 'Weidner,Wien',
+           'oben die einzelnen Aufgaben nach Datum');
+    pruefe(e.sektionen === 'Haus,Finanzen,Workshop',
+           'dann die Sektionen: Vorhaben, Thema, Vorgang');
+    pruefe(e.imVorgang === 'Fragebogen,Einladung',
+           'der Vorgang trägt auch seine Kleinigkeit');
+    pruefe(e.wiederAufgaben === 'AzDO,Oskar',
+           'am Fuß das Wiederkehrende, nach Namen');
+    pruefe(e.kleinLose === 'Brief', 'bei den Kleinigkeiten dasselbe Bild');
+    pruefe(e.wiederKlein === 'Pflanzen', 'auch dort das Wiederkehrende am Fuß');
+    pruefe(e.kleinOhneVorgang === true,
+           'die Kleinigkeit des Vorgangs steht nicht doppelt da');
+    pruefe(e.wiederNichtOben === true,
+           'und keine wiederkehrende Aufgabe steht zwischen den einmaligen');
+  }
 }
 
 /* ============================================================
