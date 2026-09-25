@@ -9920,8 +9920,17 @@ console.log('\n112. Tagessicht in Karten');
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
   pruefe(tz && (tz[0].match(/abschnittKopf\(/g) || []).length === 2,
          'beide Flächen tragen Namen und Zahl');
-  pruefe(tz && (tz[0].match(/class="tunter"/g) || []).length === 2,
+  pruefe(tz && (tz[0].match(/unterKopf\(/g) || []).length === 2,
          'Aufgaben und Kleinigkeiten stehen als Zwischenüberschrift darin');
+  pruefe(tz && (tz[0].match(/unterOffen\(/g) || []).length === 2,
+         'und lassen sich einzeln zuklappen');
+  const vlz = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
+  pruefe(vlz && (vlz[0].match(/tzeile-termin/g) || []).length === 2,
+         'eine Aufgabe mit Uhrzeit steht in derselben Zeilenform wie ein Termin');
+  pruefe(!/\.tzeile-termin\{[^}]*border-top/.test(QUELLE),
+         'im Tagesverlauf trennt keine Linie mehr');
+  pruefe(/\.tmarke\{[^}]*background:none/.test(QUELLE),
+         'die Marke ist nicht ausgefüllt');
   pruefe(tz && /tagZahlenZeichnen\(is, e\)/.test(tz[0]),
          'die Zähler werden bei jedem Zeichnen gefüllt');
 
