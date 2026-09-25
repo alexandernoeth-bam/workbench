@@ -567,6 +567,63 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__leitApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   tagOffen = isoDatum();'
+                 + '   var satz = function(){'
+                 + '     tagZeichnen();'
+                 + '     var el = document.getElementById(\'tagLeitsatz\');'
+                 + '     return (el.className.indexOf(\'auf\') >= 0)'
+                 + '       ? el.innerHTML : \'\'; };'
+                 + '   var r = { zuerstAus: (satz() === \'\') };'
+                 + '   leitsatzSetzen(\'Zuerst das Schwere, dann das Viele.\');'
+                 + '   r.textAllein = (satz() === \'\');'
+                 + '   leitsatzAnSetzen(true);'
+                 + '   r.angeschaltet = satz();'
+                 + '   leitsatzSetzen(\'   \');'
+                 + '   r.leererText = (satz() === \'\');'
+                 + '   leitsatzSetzen(\'Heute: eine Sache fertig machen.\');'
+                 + '   r.geaendert = satz();'
+                 + '   zeichneLeitsatzWahl();'
+                 + '   r.imFeld = document.getElementById(\'leitsatzFeld\').value;'
+                 + '   leitsatzAnSetzen(false);'
+                 + '   r.ausText = (satz() === \'\''
+                 + '     && DB.einstellungen.leitsatz.length > 0);'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__grussApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var merkD = DB.einstellungen.darstellung;'
+                 + '   var h = isoDatum();'
+                 + '   DB.einstellungen.darstellung = \'breit\';'
+                 + '   DB.aufgaben = [{ id:\'a1\', titel:\'Liegen\','
+                 + '     kontext:\'privat\', status:\'offen\', art:\'haupt\','
+                 + '     planung: tagePlus(h, -1) }];'
+                 + '   tagOffen = h;'
+                 + '   var streifen = function(){'
+                 + '     tagZeichnen();'
+                 + '     return document.getElementById(\'tkNachzuegler\'); };'
+                 + '   /* Die Prüfumgebung merkt sich keine Klassen — geprüft'
+                 + '      wird am Inhalt. */'
+                 + '   var r = { vorher: (streifen().innerHTML.indexOf(\'Tageswechsel\')'
+                 + '     >= 0) };'
+                 + '   grussSetzen(false);'
+                 + '   var el = streifen();'
+                 + '   r.nachAus = (el.innerHTML.indexOf(\'Tageswechsel\') >= 0);'
+                 + '   r.leer = (el.innerHTML === \'\');'
+                 + '   r.gemerkt = (DB.einstellungen.grussAus === true);'
+                 + '   r.tagwBleibt = /tagwStarten|tagwFaellig/.test('
+                 + '     String(tagKopfSchmalZeichnen));'
+                 + '   grussSetzen(true);'
+                 + '   r.wiederAn = (streifen().innerHTML.indexOf(\'Tageswechsel\')'
+                 + '     >= 0);'
+                 + '   DB.einstellungen.darstellung = merkD;'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__wiederTeilApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -10975,6 +11032,90 @@ console.log('\n125. Wiederkehrendes und Vorgänge');
            'die Kleinigkeit des Vorgangs steht nicht doppelt da');
     pruefe(e.wiederNichtOben === true,
            'und keine wiederkehrende Aufgabe steht zwischen den einmaligen');
+  }
+}
+
+/* ============================================================
+   126. Der Begruessungsstreifen laesst sich abschalten
+   Grund: Er steht den ganzen Tag auf der ersten Seite und sagt jeden
+   Tag dasselbe. Wer ihn nicht braucht, schaltet ihn in der Diagnose ab.
+   ============================================================ */
+console.log('\n126. Begrüßung abschaltbar');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__grussApi;
+
+  ['grussZeigen', 'grussSetzen', 'zeichneGrussWahl'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/id="grussWahl"/.test(QUELLE), 'die Diagnose hat den Schalter');
+  pruefe(/zeichneGrussWahl\(\);/.test(skript), 'und zeichnet ihn beim Öffnen');
+  const nz = skript.match(/function nachzueglerZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(nz && /!grussZeigen\(\)/.test(nz[0]), 'der Streifen fragt danach');
+  const gs = skript.match(/function grussSetzen\([\s\S]*?\n\}/);
+  pruefe(gs && /DB\.einstellungen\.grussAus/.test(gs[0]) && /spaeterSichern/.test(gs[0]),
+         'die Wahl liegt im Bestand und wird abgeglichen');
+
+  if (!g) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = g.pruefe();
+    pruefe(e.vorher === true, 'voreingestellt steht der Streifen da');
+    pruefe(e.nachAus === false, 'ausgeschaltet verschwindet er');
+    pruefe(e.leer === true, 'und lässt keine leere Zeile zurück');
+    pruefe(e.gemerkt === true, 'die Wahl bleibt erhalten');
+    pruefe(e.wiederAn === true, 'und lässt sich zurücknehmen');
+    pruefe(e.tagwBleibt === true,
+           'der Weg zum Tageswechsel bleibt — er hängt am Datum, nicht am Streifen');
+  }
+}
+
+/* ============================================================
+   127. Ein eigener Satz ueber dem Tagesplan
+   Grund: Ein Vorsatz, eine Frage, ein Wort fuer diese Zeit — selbst
+   hinterlegt, nicht von der App erdacht. Voreingestellt aus, damit
+   niemand ihn erst wegraeumen muss.
+   ============================================================ */
+console.log('\n127. Eigener Satz im Tag');
+{
+  const skript = hauptSkript();
+  const l = globalThis.__leitApi;
+
+  ['leitsatzText', 'leitsatzAn', 'leitsatzSetzen', 'leitsatzAnSetzen',
+   'zeichneLeitsatzWahl', 'leitsatzZeichnen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/id="leitsatzFeld"/.test(QUELLE) && /id="leitsatzWahl"/.test(QUELLE),
+         'die Diagnose hat Feld und Schalter');
+  pruefe(/id="tagLeitsatz"/.test(QUELLE), 'im Tag ist der Platz dafür');
+  const an = skript.match(/function leitsatzAn\([\s\S]*?\n\}/);
+  pruefe(an && /leitsatzAn === true/.test(an[0]),
+         'voreingestellt ist er aus — nur ein ausdrückliches Ja zeigt ihn');
+  pruefe(an && /leitsatzText\(\)\.trim\(\)\.length > 0/.test(an[0]),
+         'und ohne Text bleibt er weg, auch wenn er angeschaltet ist');
+  const lz = skript.match(/function leitsatzZeichnen\([\s\S]*?\n\}/);
+  pruefe(lz && /esc\(leitsatzText\(\)/.test(lz[0]),
+         'der Text wird maskiert — er kommt vom Benutzer');
+  const ls = skript.match(/function leitsatzSetzen\([\s\S]*?\n\}/);
+  pruefe(ls && /spaeterSichern/.test(ls[0]) && /einstellungen\.stempel/.test(ls[0]),
+         'er liegt im Bestand und wird abgeglichen');
+
+  if (!l) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = l.pruefe();
+    pruefe(e.zuerstAus === true, 'ohne Zutun steht nichts da');
+    pruefe(e.textAllein === true, 'ein Text allein zeigt ihn noch nicht');
+    pruefe(e.angeschaltet === 'Zuerst das Schwere, dann das Viele.',
+           'angeschaltet steht er über dem Tagesplan');
+    pruefe(e.leererText === true, 'ein leerer Text blendet ihn wieder aus');
+    pruefe(e.geaendert === 'Heute: eine Sache fertig machen.',
+           'eine Änderung ist sofort zu sehen');
+    pruefe(e.ausText === true, 'ausgeschaltet bleibt der Text erhalten');
+    pruefe(e.imFeld === 'Heute: eine Sache fertig machen.',
+           'und steht in der Diagnose im Feld');
   }
 }
 
