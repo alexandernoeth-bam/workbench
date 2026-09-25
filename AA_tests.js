@@ -713,6 +713,22 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     .indexOf(\'Morgenstart\') >= 0);'
                  + '   r.vorgaengeRechts = (b.indexOf(\'Vorgänge\')'
                  + '     > b.indexOf(\'auf-rechts\'));'
+                 + '   DB.durchlaeufe.push({ id:\'d9\', name:\'Haus\','
+                 + '     kontext:\'privat\', schritte:[{ titel:\'x\' }] });'
+                 + '   var merkF = aufFilter;'
+                 + '   var namen = function(){'
+                 + '     aufZeichnen();'
+                 + '     var teil = (document.getElementById(\'aufBlatt\').innerHTML'
+                 + '       .split(\'auf-rechts\')[1] || \'\');'
+                 + '     return (teil.match(/ab-name">([^<]*)/g) || [])'
+                 + '       .map(function(x){ return x.slice(9); }).join(\',\'); };'
+                 + '   setAufFilter(\'alle\');'
+                 + '   r.filterAlle = namen();'
+                 + '   setAufFilter(\'beruflich\');'
+                 + '   r.filterBeruf = namen();'
+                 + '   setAufFilter(\'privat\');'
+                 + '   r.filterPrivat = namen();'
+                 + '   setAufFilter(merkF);'
                  + '   DB.einstellungen.darstellung = \'schmal\';'
                  + '   aufZeichnen();'
                  + '   var b2 = document.getElementById(\'aufBlatt\').innerHTML;'
@@ -6621,9 +6637,10 @@ console.log('\n56. Gruppen und Art');
          'die Liste teilt sich in Aufgaben und Kleinigkeiten');
   pruefe(zeichnen && (zeichnen[0].match(/unterKopf\(/g) || []).length === 2,
          'beide lassen sich einklappen');
-  pruefe(zeichnen && /ablaufListeHtml\(\)/.test(zeichnen[0])
+  pruefe(zeichnen && /ablaufListeHtml\(aufFilter\)/.test(zeichnen[0])
          && /istBreit\(\)/.test(zeichnen[0]),
-         'am Rechner stehen die Vorgänge rechts daneben');
+         'am Rechner stehen die Vorgänge rechts daneben — mit dem Filter der '
+         + 'Aufgabenseite');
   const liste = skript.match(/function aufListeHtml\([\s\S]*?\n\}\n/);
   pruefe(liste && /x\.rang - y\.rang/.test(liste[0]),
          'erst Vorgänge, dann Vorhaben, dann Themen');
@@ -7966,7 +7983,7 @@ console.log('\n74. Bereiche nach Kontext');
   const az = skript.match(/function ablaufListeHtml\([\s\S]*?\n\}\n/);
   pruefe(az && /\['beruflich', 'Beruflich'\], \['privat', 'Privat'\]/.test(az[0]),
          'auch bei den Vorgängen erst der Beruf, dann das Private');
-  pruefe(az && /abFilter !== 'alle' && abFilter !== kk/.test(az[0]),
+  pruefe(az && /\(filter \|\| abFilter\) !== 'alle'/.test(az[0]),
          'bei gesetztem Filter bleibt nur der gewählte Bereich');
   pruefe(az && /abKontextOffen\(kk\)/.test(az[0]),
          'ein eingeklappter Bereich zeigt seine Kacheln nicht');
@@ -10844,6 +10861,11 @@ console.log('\n123. Aktivitäten und Vorgänge');
            'lose Aufgaben stehen nach Datum, Undatiertes zuletzt');
     pruefe(e.kleinGetrennt === true, 'Kleinigkeiten stehen für sich');
     pruefe(e.vorgaengeRechts === true, 'die Vorgänge stehen in der rechten Spalte');
+    /* Der Filter der Aufgabenseite muss auch dort greifen: Er saß vorher
+       nur an der Vorgangsseite. */
+    pruefe(e.filterAlle === 'Workshop,Haus', 'ohne Filter stehen alle Vorgänge da');
+    pruefe(e.filterBeruf === 'Workshop', 'auf Beruf geschaltet nur die beruflichen');
+    pruefe(e.filterPrivat === 'Haus', 'auf Privat nur die privaten');
     pruefe(e.schmalOhneVorgaenge === true,
            'am Handy nicht — dort führt der Reiter zu ihrer Seite');
   }

@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 3.9.0</title>
+<title>Workbench 3.9.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1962,7 +1962,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '3.9.0';
+var APP_VERSION = '3.9.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -14480,12 +14480,15 @@ function ablaufFinden(id, art) {
   return (art === 'vorlage') ? vorlageFinden(id) : durchlaufFinden(id);
 }
 
-function abSichtbar(liste) {
+/* Welcher Filter gilt, hängt davon ab, wo die Liste steht: auf der
+   Vorgangsseite der eigene, auf der Aufgabenseite deren Filter. */
+function abSichtbar(liste, filter) {
+  var f = filter || abFilter;
   var aus = [];
   var i;
   for (i = 0; i < liste.length; i++) {
     if (kontextVerborgen(liste[i].kontext)) { continue; }
-    if (abFilter !== 'alle' && liste[i].kontext !== abFilter) { continue; }
+    if (f !== 'alle' && liste[i].kontext !== f) { continue; }
     aus.push(liste[i]);
   }
   return aus;
@@ -14939,9 +14942,9 @@ function abZeichnen() {
 
 /* Die Liste der Vorgänge — auf ihrer eigenen Seite und, am Rechner,
    rechts neben den Aktivitäten. */
-function ablaufListeHtml() {
-  var vorlagen = abSichtbar(DB.ablaeufe || []);
-  var laufend = abSichtbar(DB.durchlaeufe || []);
+function ablaufListeHtml(filter) {
+  var vorlagen = abSichtbar(DB.ablaeufe || [], filter);
+  var laufend = abSichtbar(DB.durchlaeufe || [], filter);
   var h = '';
 
   if (abStufe === 'laufend') {
@@ -14974,7 +14977,7 @@ function ablaufListeHtml() {
     var k;
     for (k = 0; k < bereiche.length; k++) {
       var kk = bereiche[k][0];
-      if (abFilter !== 'alle' && abFilter !== kk) { continue; }
+      if ((filter || abFilter) !== 'alle' && (filter || abFilter) !== kk) { continue; }
       var vs = vorlagen.filter(function (e) { return e.kontext === kk; });
       h += abBereichKopf(kk, bereiche[k][1], vs.length);
       if (!abKontextOffen(kk)) { continue; }
@@ -16866,7 +16869,7 @@ function aufZeichnen() {
   if (istBreit()) {
     h += '<div class="auf-spalte auf-rechts">';
     h += '<div class="tabschnitt"><div class="tabschnitt-titel"><span>Vorgänge</span></div>';
-    h += ablaufListeHtml();
+    h += ablaufListeHtml(aufFilter);
     h += '</div></div>';
   }
 
