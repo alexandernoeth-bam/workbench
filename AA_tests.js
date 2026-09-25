@@ -6641,6 +6641,8 @@ console.log('\n56. Gruppen und Art');
          && /istBreit\(\)/.test(zeichnen[0]),
          'am Rechner stehen die Vorgänge rechts daneben — mit dem Filter der '
          + 'Aufgabenseite');
+  pruefe(zeichnen && /kopf-hin[\s\S]*?zeigeSchirm\(\\?'Ablaeufe\\?'\)/.test(zeichnen[0]),
+         'und ein Weg führt von dort zur Vorgangsseite mit Vorlagen und Erledigtem');
   const liste = skript.match(/function aufListeHtml\([\s\S]*?\n\}\n/);
   pruefe(liste && /x\.rang - y\.rang/.test(liste[0]),
          'erst Vorgänge, dann Vorhaben, dann Themen');
