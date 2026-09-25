@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 2.7.1</title>
+<title>Workbench 2.8.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1136,6 +1136,39 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
   color:var(--grau);background:none;border:0;border-top:1px solid var(--linie);
   padding:8px 0 6px;cursor:pointer}
 .tg-erledigt{border-top:0;padding-left:2px}
+/* Der schmale Tageskopf am Handy */
+.tk-schmal{display:none;align-items:center;gap:6px;padding:6px 0 4px}
+.tk-s-datum{font-size:calc(var(--fs)*0.95);font-weight:500;white-space:nowrap;cursor:pointer}
+.tk-s-kw{font-style:normal;font-size:calc(var(--fs)*0.7);color:var(--grau);margin-left:4px}
+.tk-s-luecke{flex:1}
+.tk-sym{width:30px;height:30px;flex:0 0 30px;border:1px solid var(--linie);border-radius:8px;
+  background:var(--karte);color:var(--grau);display:flex;align-items:center;
+  justify-content:center;cursor:pointer;padding:0}
+.tk-sym svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.tk-sym.an{border-color:var(--petrol);color:var(--petrol);background:var(--papier)}
+.tk-s-zeile{display:none;gap:8px;font-size:calc(var(--fs)*0.7);color:var(--grau);padding:0 0 6px}
+.tk-s-rest{flex:1;text-align:right}
+.tk-schutzband{display:none}
+.tk-schutzband.auf{display:flex;gap:7px;align-items:center;background:var(--papier);
+  border:1px solid var(--petrol);border-radius:8px;padding:5px 9px;margin:0 0 7px;
+  font-size:calc(var(--fs)*0.72);color:var(--petrol);cursor:pointer}
+.tk-schutzband b{flex:1;font-weight:500}
+.eingabe-fab{display:none}
+body:not(.breit) .tk-karte{display:none}
+body:not(.breit) .tk-schmal{display:flex}
+body:not(.breit) .tk-s-zeile{display:flex}
+body:not(.breit) .tagkopf{padding-top:8px}
+/* Das Eingabefeld erscheint erst auf Tippen des Pluszeichens. */
+body:not(.breit) .eingabe-zone{display:none}
+body:not(.breit).eingabe-auf .eingabe-zone{display:block}
+body:not(.breit) .eingabe-fab{display:flex;position:fixed;right:14px;
+  bottom:calc(env(safe-area-inset-bottom,0px) + 66px);z-index:40;width:46px;height:46px;
+  border:0;border-radius:50%;background:var(--weinrot);color:var(--karte);font-size:26px;
+  align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.25);
+  cursor:pointer;line-height:1}
+body:not(.breit).eingabe-auf .eingabe-fab{display:none}
+
 /* Der Einzeiler im Tagesverlauf */
 .tzeile-termin{display:flex;align-items:center;gap:8px;padding:5px 2px;min-height:30px;
   border-top:1px solid var(--linie)}
@@ -1382,6 +1415,28 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 
 <div class="schirm aktiv" id="schirmTag">
   <div class="tagkopf">
+   <!-- Am Handy eine Zeile statt einer Karte: Blättern geht durch
+        Wischen, „Heute" steckt im Datum, der Filter im Sichtschutz. -->
+   <div class="tk-schmal">
+     <span class="tk-s-datum" id="tkSchmalDatum" onclick="tagHeute()"></span>
+     <span class="tk-s-luecke"></span>
+     <button type="button" class="tk-sym" id="tkAuge" onclick="sichtschutzUm()"
+             title="Privates verbergen" aria-label="Privates verbergen">
+       <svg viewBox="0 0 24 24" id="tkAugeBild"></svg>
+     </button>
+     <button type="button" class="tk-sym" onclick="googleTagOeffnen()"
+             title="Diesen Tag im Google-Kalender öffnen" aria-label="Google-Kalender">
+       <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2.5"></rect>
+         <path d="M8 3v4M16 3v4M3 10h18M15.5 14.5 11 19l-2.5-2.5"></path></svg>
+     </button>
+     <button type="button" class="tk-sym" onclick="zeigeSchirm('Diagnose')"
+             title="Diagnose und Einstellungen" aria-label="Diagnose und Einstellungen">
+       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle>
+         <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg>
+     </button>
+   </div>
+   <div class="tk-s-zeile" id="tkSchmalZeile"></div>
+   <div class="tk-schutzband" id="tkSchutzband"></div>
    <div class="tk-karte">
     <div class="tk-zeile">
       <div class="tk-zahl" id="tkZahl">–</div>
@@ -1418,6 +1473,9 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
             onclick="streifenAntippen()"></button>
     <div class="tk-stand" id="tkStand"></div>
   </div>
+
+  <button class="eingabe-fab" type="button" onclick="eingabeZeigen()"
+          title="Etwas eintragen" aria-label="Etwas eintragen">+</button>
 
   <div class="eingabe-zone">
     <input class="eingabe-feld" id="schnellFeld" type="text" autocomplete="off"
@@ -1827,7 +1885,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '2.7.1';
+var APP_VERSION = '2.8.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3790,7 +3848,70 @@ function istErledigtAn(a, is) {
   return a.status === 'erledigt' && (!a.erledigtAm || a.erledigtAm === is);
 }
 
+/* ============================================================
+   Sichtschutz
+
+   Im Büro soll niemand beim Blick über die Schulter die privaten
+   Einträge sehen. Das ist kein Filter, sondern ein Zustand des Geräts:
+   Er gilt in allen Ansichten, bleibt beim Schließen erhalten und wird
+   nicht abgeglichen — das iPad zu Hause weiß nichts davon.
+
+   Schutz im engeren Sinn ist er nicht: Wer das Gerät in die Hand nimmt,
+   tippt das Auge einfach wieder an.
+   ============================================================ */
+
+var SICHT_SCHLUESSEL = 'workbench-sichtschutz';
+var sichtschutz = false;
+
+function sichtschutzLaden() {
+  try {
+    sichtschutz = (window.localStorage.getItem(SICHT_SCHLUESSEL) === 'an');
+  } catch (f) { sichtschutz = false; }
+}
+
+function sichtschutzUm() {
+  sichtschutz = !sichtschutz;
+  try {
+    window.localStorage.setItem(SICHT_SCHLUESSEL, sichtschutz ? 'an' : 'aus');
+  } catch (f) { /* ohne Speicher gilt es nur für diese Sitzung */ }
+  allesZeichnen();
+  melde(sichtschutz ? 'Privates ist jetzt verborgen.' : 'Privates ist wieder zu sehen.',
+        null);
+}
+
+/* Die eine Frage, die alle Ansichten stellen. */
+function kontextVerborgen(kontext) {
+  return sichtschutz && (kontext || 'beruflich') === 'privat';
+}
+
+/* Wie viel gerade verborgen ist — sonst sucht man später vergeblich. */
+function verborgenZahl() {
+  if (!sichtschutz) { return 0; }
+  var zahl = 0;
+  var i;
+  var l = DB.aufgaben || [];
+  for (i = 0; i < l.length; i++) {
+    if (l[i].kontext === 'privat' && l[i].status !== 'erledigt') { zahl++; }
+  }
+  var tag = tagOffen || isoDatum();
+  var t = termineNachTag[tag] || [];
+  for (i = 0; i < t.length; i++) {
+    if (t[i].kontext === 'privat') { zahl++; }
+  }
+  return zahl;
+}
+
+function allesZeichnen() {
+  tagZeichnen();
+  kalZeichnen();
+  aufZeichnen();
+  vhZeichnen();
+  abZeichnen();
+  pinnwandZeichnen();
+}
+
 function passtZumTag(kontext) {
+  if (kontextVerborgen(kontext)) { return false; }
   if (tagFilter === 'alle') { return true; }
   return (kontext || 'beruflich') === tagFilter;
 }
@@ -4402,6 +4523,58 @@ function tagwGruss() {
 function abschnittKopf(titel, zahl) {
   return '<div class="tabschnitt-titel"><span>' + titel + '</span>'
        + (zahl ? ('<i>' + zahl + '</i>') : '') + '</div>';
+}
+
+var AUGE_AUF = '<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z"></path>'
+             + '<circle cx="12" cy="12" r="2.6"></circle>';
+var AUGE_ZU = '<path d="M2 12s3.6-6 10-6c1.6 0 3 .4 4.2 1M22 12s-3.6 6-10 6'
+            + 'c-1.7 0-3.2-.4-4.4-1"></path><path d="M4 4l16 16"></path>';
+
+/* Der schmale Kopf am Handy: Datum, Auge, Google, Zahnrad in einer
+   Zeile, darunter Tagesform und Zähler, darunter das Band, wenn
+   Privates verborgen ist. */
+function tagKopfSchmalZeichnen(is, e) {
+  var datum = document.getElementById('tkSchmalDatum');
+  if (datum) {
+    var d = ausIso(is);
+    datum.innerHTML = esc(TAGE_KURZ[d.getDay()] + ' ' + d.getDate() + '.'
+                      + (d.getMonth() + 1) + '.')
+                    + '<i class="tk-s-kw">KW ' + kalenderwoche(is) + '</i>';
+  }
+  var auge = document.getElementById('tkAugeBild');
+  if (auge) { auge.innerHTML = sichtschutz ? AUGE_ZU : AUGE_AUF; }
+  var knopf = document.getElementById('tkAuge');
+  if (knopf && knopf.classList) {
+    if (sichtschutz) { knopf.classList.add('an'); }
+    else { knopf.classList.remove('an'); }
+  }
+  var zeile = document.getElementById('tkSchmalZeile');
+  if (zeile) {
+    var form = tagesform(is);
+    var teile = [];
+    var termine = e.verlauf.filter(function (x) { return x.art === 'termin'; });
+    if (termine.length) {
+      teile.push(termine.length + (termine.length === 1 ? ' Termin' : ' Termine'));
+    }
+    var offen = e.haupt.length + e.klein.length + e.wieder.length;
+    if (offen) { teile.push(offen + ' offen'); }
+    zeile.innerHTML = '<span>' + esc(form.form) + '</span><span class="tk-s-rest">'
+                    + esc(teile.join(' · ')) + '</span>';
+  }
+  var band = document.getElementById('tkSchutzband');
+  if (band) {
+    if (!sichtschutz) {
+      band.innerHTML = '';
+      if (band.classList) { band.classList.remove('auf'); }
+    } else {
+      var zahl = verborgenZahl();
+      band.innerHTML = '<b>Privates verborgen</b><span>'
+                     + (zahl ? (zahl + (zahl === 1 ? ' Eintrag' : ' Einträge') + ' · ') : '')
+                     + 'tippen zum Zeigen</span>';
+      if (band.classList) { band.classList.add('auf'); }
+      band.onclick = sichtschutzUm;
+    }
+  }
 }
 
 function tagZahlenZeichnen(is, e) {
@@ -5266,6 +5439,7 @@ function tagZeichnen() {
      nebeneinanderliegende Abschnitte die Zeilenhöhe, wodurch oben
      rechts eine Lücke entstünde. */
   tagZahlenZeichnen(is, e);
+  tagKopfSchmalZeichnen(is, e);
 
   h += '<div class="tspalte tspalte-links">';
   var vorbeiZahl = 0;
@@ -6088,6 +6262,14 @@ function eingabeDeuten(text) {
     art: haupt ? 'haupt' : 'klein',
     kontext: privat ? 'privat' : 'beruflich'
   };
+}
+
+/* Am Handy steht das Eingabefeld hinter dem Pluszeichen: Es ist der
+   seltenere Fall und kostete dauerhaft eine Zeile. */
+function eingabeZeigen() {
+  document.body.classList.add('eingabe-auf');
+  var feld = document.getElementById('schnellFeld');
+  if (feld && feld.focus) { feld.focus(); }
 }
 
 function schnellVorschau() {
@@ -8414,6 +8596,7 @@ function passtZumKalenderT(t) {
 }
 
 function passtZumKalender(kontext) {
+  if (kontextVerborgen(kontext)) { return false; }
   if (kalFilter === 'alle') { return true; }
   return (kontext || 'beruflich') === kalFilter;
 }
@@ -10390,6 +10573,7 @@ function vhSichtbar(liste) {
   var i;
   for (i = 0; i < liste.length; i++) {
     if (liste[i].status === 'abgeschlossen') { continue; }
+    if (kontextVerborgen(liste[i].kontext)) { continue; }
     if (vhFilter !== 'alle' && liste[i].kontext !== vhFilter) { continue; }
     aus.push(liste[i]);
   }
@@ -11317,7 +11501,8 @@ function vhZeichnen() {
   var alle = (DB.ziele || []).map(function (z) { return { v: z, art: 'ziel' }; })
     .concat((DB.projekte || []).map(function (p) { return { v: p, art: 'projekt' }; }))
     .filter(function (e) {
-      return (vhFilter === 'alle' || e.v.kontext === vhFilter);
+      return !kontextVerborgen(e.v.kontext)
+          && (vhFilter === 'alle' || e.v.kontext === vhFilter);
     });
   var ziele = vhSichtbar(DB.ziele || []);
   var projekte = vhSichtbar(DB.projekte || []);
@@ -13897,6 +14082,7 @@ function pinnwandZeichnen() {
     var p = l[i];
     var z = pinInhalt(p);
     if (!z.lebt) { continue; }   /* Original gelöscht: Zettel still weg */
+    if (kontextVerborgen(z.kontext)) { continue; }
     if (pinFilter !== 'alle' && z.kontext && z.kontext !== pinFilter) { continue; }
     gezeigt++;
     h += '<div class="zettel z-' + esc(p.farbe || 'gelb') + (z.fertig ? ' fertig' : '')
@@ -13983,6 +14169,7 @@ function abSichtbar(liste) {
   var aus = [];
   var i;
   for (i = 0; i < liste.length; i++) {
+    if (kontextVerborgen(liste[i].kontext)) { continue; }
     if (abFilter !== 'alle' && liste[i].kontext !== abFilter) { continue; }
     aus.push(liste[i]);
   }
@@ -16175,6 +16362,7 @@ function aufZeichnen() {
   var i;
   for (i = 0; i < alle.length; i++) {
     if (!alle[i].wiederholung && alle[i].status === 'erledigt') { continue; }
+    if (kontextVerborgen(alle[i].kontext)) { continue; }
     if (aufFilter !== 'alle' && alle[i].kontext !== aufFilter) { continue; }
     if (!passtZurArt(alle[i])) { continue; }
     sichtbar.push(alle[i]);
@@ -16250,6 +16438,7 @@ function erledigteSammeln() {
     var a = alle[i];
     if (a.wiederholung) { continue; }
     if (a.status !== 'erledigt') { continue; }
+    if (kontextVerborgen(a.kontext)) { continue; }
     if (aufFilter !== 'alle' && a.kontext !== aufFilter) { continue; }
     liste.push(a);
   }
@@ -16694,6 +16883,7 @@ function starten() {
       melde('Noch kein Bestand vorhanden. Lege eine Datei an oder öffne eine.', null);
     }
     bestandStempeln(DB);
+    sichtschutzLaden();
     farbweltAnwenden();
     darstellungAnwenden();
     jahrTaktStarten();

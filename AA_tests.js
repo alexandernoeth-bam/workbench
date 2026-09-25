@@ -565,6 +565,69 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__sichtApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.projekte = ['
+                 + '     { id:\'p1\', name:\'Beruflich\', kontext:\'beruflich\','
+                 + '       status:\'laufend\', zielzustaende:[] },'
+                 + '     { id:\'p2\', name:\'Privat\', kontext:\'privat\','
+                 + '       status:\'laufend\', zielzustaende:[] } ];'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Beruflich\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'a2\', titel:\'Privates\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h } ];'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   var off = -new Date().getTimezoneOffset();'
+                 + '   var zo = (off >= 0 ? \'+\' : \'-\')'
+                 + '     + String(Math.floor(Math.abs(off) / 60)).padStart(2, \'0\')'
+                 + '     + \':\' + String(Math.abs(off) % 60).padStart(2, \'0\');'
+                 + '   eintraegeEinsortieren([{ id:\'t1\', summary:\'Dienstlich\','
+                 + '     start:{ dateTime: h + \'T09:00:00\' + zo },'
+                 + '     end:{ dateTime: h + \'T10:00:00\' + zo } }], \'Alex\','
+                 + '     \'beruflich\');'
+                 + '   eintraegeEinsortieren([{ id:\'t2\', summary:\'Whiskey Club\','
+                 + '     start:{ dateTime: h + \'T17:00:00\' + zo },'
+                 + '     end:{ dateTime: h + \'T20:00:00\' + zo } }], \'Alex\','
+                 + '     \'privat\');'
+                 + '   tagOffen = h;'
+                 + '   var stand = function(){'
+                 + '     var ev = tagesEintraege(h);'
+                 + '     return ev.verlauf.filter(function(v){ return v.art === \'termin\'; })'
+                 + '         .map(function(v){ return v.t.titel; }).join(\',\')'
+                 + '       + \'|\' + ev.haupt.map(function(a){ return a.titel; }).join(\',\')'
+                 + '       + \'|\' + vhSichtbar(DB.projekte).map(function(p){'
+                 + '           return p.name; }).join(\',\'); };'
+                 + '   var merkS = sichtschutz;'
+                 + '   sichtschutz = false;'
+                 + '   var r = { vorher: stand() };'
+                 + '   sichtschutzUm();'
+                 + '   r.nachher = stand();'
+                 + '   r.zahl = verborgenZahl();'
+                 + '   tagZeichnen();'
+                 + '   r.band = document.getElementById(\'tkSchutzband\').innerHTML'
+                 + '     .replace(/<[^>]*>/g, \'\');'
+                 + '   r.augeZu = /M4 4l16 16/.test('
+                 + '     document.getElementById(\'tkAugeBild\').innerHTML);'
+                 + '   var merkSetz = window.localStorage.setItem;'
+                 + '   var notiert = null;'
+                 + '   window.localStorage.setItem = function(k, v){'
+                 + '     if (k === SICHT_SCHLUESSEL) { notiert = v; } };'
+                 + '   sichtschutzUm(); sichtschutzUm();'
+                 + '   window.localStorage.setItem = merkSetz;'
+                 + '   r.geschrieben = (notiert === \'an\');'
+                 + '   r.einTermin = /1 Termin[^e]/.test('
+                 + '     document.getElementById(\'tkSchmalZeile\').innerHTML);'
+                 + '   sichtschutzUm();'
+                 + '   r.zurueck = stand();'
+                 + '   sichtschutz = merkS;'
+                 + '   termineNachTag = {}; kalenderListe = [];'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__zeileApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -10082,6 +10145,61 @@ console.log('\n117. Termine als Einzeiler');
            'der Punkt nennt im Hinweis die Art und ob sie im Jahr steht');
     pruefe(e.dauerKurz === '30 Min.' && e.dauerLang === '2:30',
            'die Dauer wird kurz geschrieben');
+  }
+}
+
+/* ============================================================
+   118. Sichtschutz und der schmale Tageskopf
+   Grund: Am Pixel verbrauchten Kopfkarte, Streifen und Eingabe die
+   halbe Bildschirmhoehe. Und der Filter Beruf/Privat war in Wahrheit
+   ein Sichtschutz fuer das Buero — der gehoert in alle Ansichten und
+   nicht in den Abgleich.
+   ============================================================ */
+console.log('\n118. Sichtschutz am Pixel');
+{
+  const skript = hauptSkript();
+  const s = globalThis.__sichtApi;
+
+  ['sichtschutzLaden', 'sichtschutzUm', 'kontextVerborgen', 'verborgenZahl',
+   'allesZeichnen', 'tagKopfSchmalZeichnen', 'eingabeZeigen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const um = skript.match(/function sichtschutzUm\([\s\S]*?\n\}/);
+  pruefe(um && /localStorage\.setItem\(SICHT_SCHLUESSEL/.test(um[0]),
+         'der Zustand gehört zum Gerät, nicht zum Bestand — kein Abgleich');
+  ['passtZumTag', 'passtZumKalender'].forEach(function (f) {
+    const m = skript.match(new RegExp('function ' + f + '\\([\\s\\S]*?\\n\\}'));
+    pruefe(m && /kontextVerborgen\(kontext\)/.test(m[0]),
+           f + ' fragt den Sichtschutz');
+  });
+  pruefe((skript.match(/kontextVerborgen\(/g) || []).length >= 8,
+         'alle Ansichten fragen ihn — Tag, Kalender, Aufgaben, Vorhaben, Abläufe, Pinnwand');
+  pruefe(/id="tkSchmal"|class="tk-schmal"/.test(QUELLE), 'der schmale Kopf ist da');
+  pruefe(/body:not\(\.breit\) \.tk-karte\{display:none\}/.test(QUELLE),
+         'am Handy tritt er an die Stelle der Kopfkarte');
+  pruefe(/body:not\(\.breit\) \.eingabe-zone\{display:none\}/.test(QUELLE)
+         && /body:not\(\.breit\) \.eingabe-fab\{display:flex/.test(QUELLE),
+         'das Eingabefeld steckt hinter dem Pluszeichen');
+  pruefe(!/tk-schmal[\s\S]{0,400}tagBlaettern/.test(QUELLE),
+         'kein Blättern im schmalen Kopf — dafür gibt es das Wischen');
+
+  if (!s) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = s.pruefe();
+    pruefe(e.vorher === 'Dienstlich,Whiskey Club|Beruflich,Privates|Beruflich,Privat',
+           'ohne Sichtschutz ist alles da');
+    pruefe(e.nachher === 'Dienstlich|Beruflich|Beruflich',
+           'mit Sichtschutz ist Privates überall weg');
+    pruefe(e.zahl === 2, 'das Band nennt die Zahl des Verborgenen');
+    pruefe(e.band.indexOf('Privates verborgen') === 0, 'und sagt es deutlich');
+    pruefe(e.augeZu === true, 'das Auge ist durchgestrichen');
+    pruefe(e.geschrieben === true,
+           'der Zustand wird ins Gerät geschrieben — er überlebt einen Neustart');
+    pruefe(e.zurueck === 'Dienstlich,Whiskey Club|Beruflich,Privates|Beruflich,Privat',
+           'ausgeschaltet ist alles wieder da');
+    pruefe(e.einTermin === true, 'die Kopfzeile zählt richtig, auch bei einem Termin');
   }
 }
 
