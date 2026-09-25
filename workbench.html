@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 3.8.0</title>
+<title>Workbench 3.9.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -745,8 +745,9 @@ body.breit.weit .tspalte-rechts > .tabschnitt:nth-child(2){grid-column:3}
 /* Am Rechner brauchen die Aufgaben keine Reiterzeile: Die Vorgänge
    stehen rechts daneben. */
 body.breit #schirmAufgaben > .stufen{display:none}
-.tunter-klein{font-size:calc(var(--fs)*0.68);font-weight:600;letter-spacing:.04em;
-  text-transform:uppercase;color:var(--grau-hell);margin:12px 0 1px}
+/* Der kleine Weg zur Vorgangsseite, wenn der Kopf selbst einklappt. */
+.sek-hin{display:block;margin:0 0 2px 20px;padding:0;border:0;background:none;
+  font:inherit;font-size:calc(var(--fs)*0.66);color:var(--grau-hell);cursor:pointer}
 .auf-spalte{display:block}
 body.breit #aufBlatt{display:grid;grid-template-columns:1.35fr 1fr;gap:0 20px;
   align-items:start;max-width:1800px}
@@ -1961,7 +1962,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '3.8.0';
+var APP_VERSION = '3.9.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4770,7 +4771,10 @@ function unterUm(name) {
   if (!DB.einstellungen.tagUnterZu) { DB.einstellungen.tagUnterZu = {}; }
   DB.einstellungen.tagUnterZu[name] = unterOffen(name);
   spaeterSichern();
-  tagZeichnen();
+  /* Dieselben Köpfe stehen im Tag und auf der Aufgabenseite — neu
+     gezeichnet wird die, auf der man gerade steht. */
+  if (schirmOffen === 'Aufgaben') { aufZeichnen(); }
+  else { tagZeichnen(); }
 }
 
 function unterKopf(name, titel, zahl) {
@@ -16727,7 +16731,8 @@ function aufListeHtml(liste) {
     var s2 = aufSektion(liste[i]);
     if (!s2 || zahl[s2.id] < 2) { lose.push(liste[i]); continue; }
     if (!nach[s2.id]) {
-      nach[s2.id] = { name: s2.name, rang: s2.rang, d: s2.d, eintraege: [] };
+      nach[s2.id] = { id: s2.id, name: s2.name, rang: s2.rang, d: s2.d,
+                      eintraege: [] };
       gruppen.push(nach[s2.id]);
     }
     nach[s2.id].eintraege.push(liste[i]);
@@ -16748,12 +16753,17 @@ function aufListeHtml(liste) {
           return schrittNummer(gruppen[g].d, x.id) - schrittNummer(gruppen[g].d, y.id);
         })
       : nachDatum(gruppen[g].eintraege);
-    h += '<div class="tsektion"><div class="tsektion-kopf"'
-       + (gruppen[g].d ? (' onclick="abDetailOeffnen(\'' + esc(gruppen[g].d.id)
-                          + '\',\'durchlauf\')"') : '')
-       + '><b>' + esc(gruppen[g].name) + '</b></div>';
+    /* Dieselbe Überschrift wie „Aufgaben" und „Kleinigkeiten": eine
+       Sorte Kopf, alle einklappbar. */
+    var schluessel = 'sek:' + gruppen[g].id;
+    h += unterKopf(schluessel, gruppen[g].name, 0)
+       + (gruppen[g].d
+          ? ('<button class="sek-hin" type="button" onclick="abDetailOeffnen(\''
+             + esc(gruppen[g].d.id) + '\',\'durchlauf\')" '
+             + 'title="Den Vorgang öffnen">Vorgang öffnen →</button>')
+          : '');
+    if (!unterOffen(schluessel)) { continue; }
     for (k = 0; k < drin.length; k++) { h += aufZeileHtml(drin[k], true); }
-    h += '</div>';
   }
   return h;
 }
@@ -16768,12 +16778,13 @@ function schrittNummer(d, aufgabeId) {
 }
 
 /* Der Fuß eines Bereichs: das Wiederkehrende, nach Namen geordnet. */
-function wiederTeilHtml(liste) {
+function wiederTeilHtml(liste, schluessel) {
   if (!liste.length) { return ''; }
   var geordnet = liste.slice().sort(function (x, y) {
     return (x.titel < y.titel) ? -1 : 1;
   });
-  var h = '<div class="tunter-klein">Wiederkehrend</div>';
+  var h = unterKopf(schluessel, 'Wiederkehrend', 0);
+  if (!unterOffen(schluessel)) { return h; }
   var i;
   for (i = 0; i < geordnet.length; i++) { h += aufZeileHtml(geordnet[i]); }
   return h;
@@ -16837,13 +16848,13 @@ function aufZeichnen() {
   h += unterKopf('aufListeAufgaben', 'Aufgaben', 0);
   if (unterOffen('aufListeAufgaben')) {
     h += (haupt.length || hauptWieder.length)
-       ? (aufListeHtml(haupt) + wiederTeilHtml(hauptWieder))
+       ? (aufListeHtml(haupt) + wiederTeilHtml(hauptWieder, 'wiederAufgaben'))
        : '<div class="tleer">Keine Aufgabe in dieser Auswahl.</div>';
   }
   h += unterKopf('aufListeKlein', 'Kleinigkeiten', 0);
   if (unterOffen('aufListeKlein')) {
     h += (klein.length || kleinWieder.length)
-       ? (aufListeHtml(klein) + wiederTeilHtml(kleinWieder))
+       ? (aufListeHtml(klein) + wiederTeilHtml(kleinWieder, 'wiederKlein'))
        : '<div class="tleer">Keine Kleinigkeit in dieser Auswahl.</div>';
   }
   h += '</div>';

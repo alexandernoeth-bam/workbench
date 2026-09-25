@@ -615,33 +615,32 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   aufZeichnen();'
                  + '   var links = document.getElementById(\'aufBlatt\').innerHTML'
                  + '     .split(\'auf-rechts\')[0];'
-                 + '   var bereiche = links.split(\'<button class="tunter"\');'
-                 + '   var titel = function(t){'
-                 + '     return (t.match(/ttitel">([^<]*)/g) || [])'
-                 + '       .map(function(x){ return x.slice(8); }); };'
-                 + '   var teilBis = function(t, marke){'
-                 + '     return t.split(marke)[0]; };'
-                 + '   var auf = bereiche[1] || \'\';'
-                 + '   var kl = bereiche[2] || \'\';'
-                 + '   var r = { aufgabenLose: titel(teilBis(auf,'
-                 + '       \'<div class="tsektion">\')).join(\',\'),'
-                 + '     sektionen: (auf.match(/tsektion-kopf"[^>]*><b>([^<]*)/g) || [])'
-                 + '       .map(function(x){ return x.replace(/.*<b>/, \'\'); })'
-                 + '       .join(\',\') };'
-                 + '   var sekTeile = auf.split(\'<div class="tsektion">\');'
-                 + '   var mitNamen = function(teile, name){'
-                 + '     var t = teile.filter(function(x){'
-                 + '       return x.indexOf(\'<b>\' + name + \'<\') >= 0; })[0] || \'\';'
-                 + '     return titel(t.split(\'tunter-klein\')[0]).join(\',\'); };'
-                 + '   r.imVorgang = mitNamen(sekTeile, \'Workshop\');'
-                 + '   r.wiederAufgaben = titel(auf.split(\'tunter-klein\')[1]'
-                 + '     || \'\').join(\',\');'
-                 + '   r.kleinLose = titel(teilBis(kl, \'tunter-klein\')).join(\',\');'
-                 + '   r.wiederKlein = titel(kl.split(\'tunter-klein\')[1]'
-                 + '     || \'\').join(\',\');'
-                 + '   r.kleinOhneVorgang = (kl.indexOf(\'Einladung\') < 0);'
-                 + '   r.wiederNichtOben = (titel(teilBis(auf,'
-                 + '     \'<div class="tsektion">\')).indexOf(\'Oskar\') < 0);'
+                 + '   /* Seit v3.9.0 tragen Abschnitte und Sektionen dieselbe'
+                 + '      einklappbare Überschrift. */'
+                 + '   var bloecke = links.split(\'<button class="tunter\')'
+                 + '     .slice(1).map(function(t){'
+                 + '       return { name: (t.match(/<\\/svg>([^<]*)/) || [])[1] || \'\','
+                 + '                titel: (t.match(/ttitel">([^<]*)/g) || [])'
+                 + '                  .map(function(x){ return x.slice(8); }) }; });'
+                 + '   var namen = bloecke.map(function(x){ return x.name; });'
+                 + '   var reihe = function(n){'
+                 + '     var i = namen.indexOf(n);'
+                 + '     return (i < 0) ? [] : bloecke[i].titel; };'
+                 + '   var r = { aufgabenLose: reihe(\'Aufgaben\').join(\',\'),'
+                 + '     sektionen: namen.filter(function(n){'
+                 + '       return n !== \'Aufgaben\' && n !== \'Kleinigkeiten\''
+                 + '         && n !== \'Wiederkehrend\'; }).join(\',\') };'
+                 + '   r.imVorgang = reihe(\'Workshop\').join(\',\');'
+                 + '   var wieder = bloecke.filter(function(x){'
+                 + '     return x.name === \'Wiederkehrend\'; });'
+                 + '   r.wiederAufgaben = wieder.length'
+                 + '     ? wieder[0].titel.join(\',\') : \'\';'
+                 + '   r.wiederKlein = (wieder.length > 1)'
+                 + '     ? wieder[1].titel.join(\',\') : \'\';'
+                 + '   r.kleinLose = reihe(\'Kleinigkeiten\').join(\',\');'
+                 + '   r.kleinOhneVorgang = (reihe(\'Kleinigkeiten\')'
+                 + '     .indexOf(\'Einladung\') < 0);'
+                 + '   r.wiederNichtOben = (reihe(\'Aufgaben\').indexOf(\'Oskar\') < 0);'
                  + '   DB.einstellungen.darstellung = merkD; DB = alt;'
                  + '   return r;'
                  + ' } };'
@@ -691,26 +690,27 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var r = { spalten: (b.match(/class="auf-spalte ([^"]*)"/g) || [])'
                  + '     .map(function(x){ return x.slice(18, -1); }).join(\',\') };'
                  + '   var links = b.split(\'auf-rechts\')[0];'
-                 + '   r.sektionen = (links.match(/tsektion-kopf"[^>]*><b>([^<]*)/g) || [])'
-                 + '     .map(function(x){ return x.replace(/.*<b>/, \'\'); }).join(\',\');'
-                 + '   var teile = links.split(\'<div class="tsektion">\');'
-                 + '   var titel = function(t){'
-                 + '     return (t.match(/ttitel">([^<]*)/g) || [])'
-                 + '       .map(function(x){ return x.slice(8); }); };'
-                 + '   var abschnitt = function(name){'
-                 + '     var t = teile.filter(function(x){'
-                 + '       return x.indexOf(\'<b>\' + name + \'<\') >= 0; })[0] || \'\';'
-                 + '     /* Der letzte Abschnitt reicht bis zum Blattende —'
-                 + '        abschneiden, sonst zählt die nächste Überschrift mit. */'
-                 + '     t = t.split(\'<button class="tunter\')[0];'
-                 + '     return titel(t).join(\',\'); };'
-                 + '   r.imVorgang = abschnitt(\'Workshop\');'
-                 + '   r.imThema = abschnitt(\'Finanzen\');'
-                 + '   r.loseNachDatum = titel(teile[0] || \'\')'
+                 + '   /* Seit v3.9.0 eine Sorte Kopf für Abschnitte und'
+                 + '      Sektionen — beide einklappbar. */'
+                 + '   var bloecke = links.split(\'<button class="tunter\')'
+                 + '     .slice(1).map(function(t){'
+                 + '       return { name: (t.match(/<\\/svg>([^<]*)/) || [])[1] || \'\','
+                 + '                titel: (t.match(/ttitel">([^<]*)/g) || [])'
+                 + '                  .map(function(x){ return x.slice(8); }) }; });'
+                 + '   var namen = bloecke.map(function(x){ return x.name; });'
+                 + '   var reihe = function(n){'
+                 + '     var i = namen.indexOf(n);'
+                 + '     return (i < 0) ? [] : bloecke[i].titel; };'
+                 + '   r.sektionen = namen.filter(function(n){'
+                 + '     return n !== \'Aufgaben\' && n !== \'Kleinigkeiten\''
+                 + '       && n !== \'Wiederkehrend\'; }).join(\',\');'
+                 + '   r.imVorgang = reihe(\'Workshop\').join(\',\');'
+                 + '   r.imThema = reihe(\'Finanzen\').join(\',\');'
+                 + '   r.loseNachDatum = reihe(\'Aufgaben\')'
                  + '     .filter(function(x){ return x === \'Heute\''
                  + '       || x === \'Morgen\' || x === \'Ohne\'; }).join(\',\');'
-                 + '   r.kleinGetrennt = (links.indexOf(\'Morgenstart\')'
-                 + '     > links.indexOf(\'Kleinigkeiten\'));'
+                 + '   r.kleinGetrennt = (reihe(\'Kleinigkeiten\')'
+                 + '     .indexOf(\'Morgenstart\') >= 0);'
                  + '   r.vorgaengeRechts = (b.indexOf(\'Vorgänge\')'
                  + '     > b.indexOf(\'auf-rechts\'));'
                  + '   DB.einstellungen.darstellung = \'schmal\';'
@@ -10898,6 +10898,26 @@ console.log('\n125. Wiederkehrendes und Vorgänge');
   const az = skript.match(/function aufZeichnen\([\s\S]*?\n\}\n/);
   pruefe(az && /!a\.wiederholung/.test(az[0]) && /!!a\.wiederholung/.test(az[0]),
          'einmalige und wiederkehrende werden getrennt');
+  /* Seit v3.9.0 eine Sorte Überschrift: Abschnitte, Sektionen und das
+     Wiederkehrende tragen denselben einklappbaren Kopf. */
+  const al = skript.match(/function aufListeHtml\([\s\S]*?\n\}\n/);
+  pruefe(al && /unterKopf\(schluessel, gruppen\[g\]\.name, 0\)/.test(al[0]),
+         'eine Sektion trägt denselben Kopf wie „Aufgaben"');
+  pruefe(al && /if \(!unterOffen\(schluessel\)\) \{ continue; \}/.test(al[0]),
+         'und lässt sich einklappen');
+  const wt = skript.match(/function wiederTeilHtml\([\s\S]*?\n\}\n/);
+  pruefe(wt && /unterKopf\(schluessel, 'Wiederkehrend', 0\)/.test(wt[0]),
+         'das Wiederkehrende ebenso');
+  pruefe(!/tunter-klein/.test(QUELLE), 'die zweite Kopfsorte ist entfallen');
+  pruefe(al && /sek-hin/.test(al[0]),
+         'zum Vorgang führt ein eigener kleiner Weg, weil der Kopf jetzt einklappt');
+  const gr = skript.match(/function aufListeHtml\([\s\S]*?\n\}\n/);
+  pruefe(gr && /\{ id: s2\.id, name: s2\.name/.test(gr[0]),
+         'die Gruppe merkt sich ihre Kennung — sonst hieße der Schlüssel „sek:undefined"');
+  const uu = skript.match(/function unterUm\([\s\S]*?\n\}/);
+  pruefe(uu && /schirmOffen === 'Aufgaben'/.test(uu[0]),
+         'gezeichnet wird die Seite, auf der man steht — dieselben Köpfe stehen in '
+         + 'beiden');
   pruefe(az && /a\.art !== 'klein' \|\| inVorgang\(a\)/.test(az[0]),
          'eine Kleinigkeit aus einem Vorgang wandert zu ihm nach oben');
   pruefe(az && (az[0].match(/wiederTeilHtml\(/g) || []).length === 2,
