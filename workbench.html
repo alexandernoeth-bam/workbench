@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 3.3.0</title>
+<title>Workbench 3.4.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1218,6 +1218,13 @@ body:not(.breit) .tzeile-termin .t-ablauf-paar{display:none}
 /* Die Marke ohne Füllung und schmal: Ausgefüllt und breit drückte sie
    den Titel auf drei Zeilen. Sie ordnet ein, sie ist nicht die
    Botschaft. */
+/* Zwei oder mehr Einträge aus einem Ablauf stehen unter seinem Namen. */
+.tsektion{margin:8px 0 2px;padding-left:10px;border-left:2px solid var(--linie)}
+.tsektion-kopf{font-size:calc(var(--fs)*0.72);color:var(--tinte);font-weight:500;
+  padding:1px 0 2px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.tsektion .tzeile{padding:5px 0}
+
 /* Die Marke steht als dritte Zeile unter dem Titel, nicht daneben:
    Neben dem Titel drückte sie ihn auf drei Zeilen. */
 .tmarke{display:inline-block;max-width:100%;margin-top:3px;
@@ -1918,7 +1925,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '3.3.0';
+var APP_VERSION = '3.4.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4131,19 +4138,94 @@ function themaName(id) {
   return '';
 }
 
+/* ============================================================
+   Einträge aus einem Ablauf zusammenfassen
+
+   Kommen an einem Tag zwei oder mehr Einträge aus demselben Ablauf,
+   stehen sie unter seinem Namen beieinander — in der Reihenfolge, in
+   der die Schritte im Ablauf stehen. Sonst sortierte der Tag um, was
+   man im Ablauf bewusst geordnet hat, und der Name stand mehrfach als
+   Marke daneben.
+   ============================================================ */
+
+var SEKTION_AB = 2;
+
+/* Woher ein Eintrag kommt: der Ablauf und die Nummer seines Schritts. */
+function eintragHerkunft(e) {
+  if (e && e.schritt) { return { id: e.d.id, d: e.d, nr: e.nr }; }
+  var l = durchlaeufeZuAufgabe(e.id);
+  if (l.length !== 1) { return null; }
+  var s = l[0].schritte || [];
+  var k;
+  for (k = 0; k < s.length; k++) {
+    if (s[k].aufgabeId === e.id) { return { id: l[0].id, d: l[0], nr: k }; }
+  }
+  return null;
+}
+
+/* Lose Einträge behalten ihre Reihenfolge, die Sektionen folgen
+   dahinter — sonst spränge die Liste bei jedem Haken. */
+function nachAblaufGruppieren(liste) {
+  var zahl = {};
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    var hk = eintragHerkunft(liste[i]);
+    if (hk) { zahl[hk.id] = (zahl[hk.id] || 0) + 1; }
+  }
+  var lose = [];
+  var gruppen = [];
+  var nach = {};
+  for (i = 0; i < liste.length; i++) {
+    var h2 = eintragHerkunft(liste[i]);
+    if (!h2 || zahl[h2.id] < SEKTION_AB) { lose.push(liste[i]); continue; }
+    if (!nach[h2.id]) {
+      nach[h2.id] = { d: h2.d, eintraege: [] };
+      gruppen.push(nach[h2.id]);
+    }
+    nach[h2.id].eintraege.push({ nr: h2.nr, satz: liste[i] });
+  }
+  for (i = 0; i < gruppen.length; i++) {
+    gruppen[i].eintraege.sort(function (x, y) { return x.nr - y.nr; });
+  }
+  return { lose: lose, gruppen: gruppen };
+}
+
+function sektionHtml(gruppe, is, kompakt) {
+  var h = '<div class="tsektion">';
+  h += '<div class="tsektion-kopf" onclick="abDetailOeffnen(\''
+     + esc(gruppe.d.id) + '\',\'durchlauf\')"><b>'
+     + esc(gruppe.d.name || 'Ablauf') + '</b></div>';
+  var i;
+  for (i = 0; i < gruppe.eintraege.length; i++) {
+    h += zeileHtml(gruppe.eintraege[i].satz, is, kompakt, true);
+  }
+  h += '</div>';
+  return h;
+}
+
+function listeMitSektionenHtml(liste, is, kompakt) {
+  var g = nachAblaufGruppieren(liste);
+  var h = '';
+  var i;
+  for (i = 0; i < g.lose.length; i++) { h += zeileHtml(g.lose[i], is, kompakt); }
+  for (i = 0; i < g.gruppen.length; i++) { h += sektionHtml(g.gruppen[i], is, kompakt); }
+  return h;
+}
+
 /* Eine Zeile für alles, was man abhakt: Kästchen, Titel, rechts eine
    Marke für die Herkunft. Fristen und „zuletzt" stehen im Blatt — in
    der Zeile kosteten sie Platz und sagten selten etwas. */
-function zeileHtml(a, is, kompakt) {
+function zeileHtml(a, is, kompakt, ohneMarke) {
   /* Ein Ablaufschritt ohne eigene Aufgabe. */
-  if (a && a.schritt) { return schrittZeileHtml(a, is); }
+  if (a && a.schritt) { return schrittZeileHtml(a, is, ohneMarke); }
   var erledigt = istErledigtAn(a, is);
   var marke = '';
   /* Trägt sie einen Ablaufschritt, gehört der Ablauf an die Zeile, sonst
      das Vorhaben. Der Takt steht nicht dabei: Hier zählt, dass sie heute
      fällig ist, nicht wie oft sie wiederkehrt. */
-  var ausAblauf = ablaufVermerk(a);
+  var ausAblauf = ohneMarke ? '' : ablaufVermerk(a);
   if (ausAblauf) { marke = ausAblauf; }
+  else if (ohneMarke) { marke = ''; }
   else {
     var pj = a.projektId ? projektName(a.projektId)
            : (a.zielId ? (vorhabenFinden(a.zielId, 'ziel') || {}).name : '');
@@ -4161,7 +4243,7 @@ function zeileHtml(a, is, kompakt) {
   return h;
 }
 
-function schrittZeileHtml(e, is) {
+function schrittZeileHtml(e, is, ohneMarke) {
   var fertig = (e.satz.fertigAm === is) || !!e.satz.fertig;
   var h = '<div class="tzeile' + (fertig ? ' erledigt' : '') + '">';
   h += '<button class="tkasten' + (fertig ? ' an' : '') + '" type="button" '
@@ -4169,7 +4251,8 @@ function schrittZeileHtml(e, is) {
   h += '<div class="ttext" onclick="abDetailOeffnen(\'' + esc(e.d.id)
      + '\',\'durchlauf\')"><div class="ttitel">'
      + esc(schrittTitel(e.satz) || 'ohne Titel') + '</div>'
-     + '<span class="tmarke">' + esc(e.d.name || 'Ablauf') + '</span></div>';
+     + (ohneMarke ? ''
+        : ('<span class="tmarke">' + esc(e.d.name || 'Ablauf') + '</span>')) + '</div>';
   h += '</div>';
   return h;
 }
@@ -5656,7 +5739,7 @@ function tagZeichnen() {
       && !e.klein.length && !e.kleinFertig.length) {
     h += '<div class="tleer">Für heute nichts eingeplant.</div>';
   }
-  for (i = 0; i < e.haupt.length; i++) { h += zeileHtml(e.haupt[i], is, false); }
+  h += listeMitSektionenHtml(e.haupt, is, false);
   for (i = 0; i < e.hauptFertig.length; i++) { h += zeileHtml(e.hauptFertig[i], is, false); }
   /* Der kurze Weg: eine wiederkehrende Aufgabe für diesen einen Tag
      dazuholen, ohne ihr Blatt zu öffnen. */
@@ -5665,7 +5748,7 @@ function tagZeichnen() {
     h += unterKopf('klein', 'Kleinigkeiten', 0);
   }
   if (unterOffen('klein')) {
-    for (i = 0; i < e.klein.length; i++) { h += zeileHtml(e.klein[i], is, true); }
+    h += listeMitSektionenHtml(e.klein, is, true);
     for (i = 0; i < e.kleinFertig.length; i++) {
       h += zeileHtml(e.kleinFertig[i], is, true);
     }

@@ -565,6 +565,51 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__sektApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a9\', titel:\'GitLab\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'a1\', titel:\'Weidner\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'a7\', titel:\'Einladung\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'a8\', titel:\'Fragebogen\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'a2\', titel:\'Zapf\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h,'
+                 + '       projektId:\'p1\' } ];'
+                 + '   DB.projekte = [{ id:\'p1\', name:\'Garage\','
+                 + '     kontext:\'privat\', status:\'laufend\', zielzustaende:[] }];'
+                 + '   DB.durchlaeufe = ['
+                 + '     { id:\'d1\', name:\'Workshop\', kontext:\'beruflich\','
+                 + '       schritte:[{ titel:\'a\', aufgabeId:\'a7\' },'
+                 + '         { titel:\'b\', aufgabeId:\'a8\' }, { titel:\'c\' },'
+                 + '         { titel:\'d\', aufgabeId:\'a9\' }] } ];'
+                 + '   var e1 = tagesEintraege(h);'
+                 + '   var g = nachAblaufGruppieren(e1.haupt);'
+                 + '   var r = { lose: g.lose.map(function(a){'
+                 + '       return a.titel; }).join(\',\'),'
+                 + '     sektionen: g.gruppen.map(function(x){'
+                 + '       return x.d.name; }).join(\',\'),'
+                 + '     folge: g.gruppen.length ? g.gruppen[0].eintraege'
+                 + '       .map(function(x){ return x.satz.titel; }).join(\',\') : \'\' };'
+                 + '   var sek = sektionHtml(g.gruppen[0], h, false);'
+                 + '   r.ohneMarke = (sek.indexOf(\'tmarke\') < 0);'
+                 + '   var einzeln = zeileHtml(aufgabeFinden(\'a2\'), h, false);'
+                 + '   r.einzelnerBleibt = (einzeln.indexOf(\'Garage\') >= 0);'
+                 + '   DB.durchlaeufe[0].schritte[3].aufgabeId = null;'
+                 + '   var g2 = nachAblaufGruppieren(tagesEintraege(h).haupt);'
+                 + '   r.zweiReichen = (g2.gruppen.length === 1'
+                 + '     && g2.gruppen[0].eintraege.length === 2);'
+                 + '   var ganz = listeMitSektionenHtml(e1.haupt, h, false);'
+                 + '   r.sektionHinten = (ganz.indexOf(\'Weidner\')'
+                 + '     < ganz.indexOf(\'tsektion\'));'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__zweiApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -10428,6 +10473,49 @@ console.log('\n120. Zweizeilige Einträge');
     pruefe(e.heuteKlasse === true, 'das heutige Datum ist als heute gekennzeichnet');
     pruefe(e.punktDa === true, 'mit Punkt, weil der Tageswechsel noch aussteht');
     pruefe(e.ohneZaehler === true, 'keine Zähler mehr an den Überschriften');
+  }
+}
+
+/* ============================================================
+   121. Ein Ablauf als Sektion im Tag
+   Grund: Mehrere Eintraege aus demselben Ablauf standen verstreut, je
+   mit derselben Marke daneben — und in der Reihenfolge der
+   Aufgabenliste statt in der, die man im Ablauf bewusst gesetzt hat.
+   ============================================================ */
+console.log('\n121. Ablauf als Sektion');
+{
+  const skript = hauptSkript();
+  const s = globalThis.__sektApi;
+
+  ['eintragHerkunft', 'nachAblaufGruppieren', 'sektionHtml',
+   'listeMitSektionenHtml'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/var SEKTION_AB = 2;/.test(skript), 'eine Sektion entsteht ab zwei Einträgen');
+  const gr = skript.match(/function nachAblaufGruppieren\([\s\S]*?\n\}\n/);
+  pruefe(gr && /x\.nr - y\.nr/.test(gr[0]),
+         'innerhalb sortiert die Schrittfolge des Ablaufs');
+  const sh = skript.match(/function sektionHtml\([\s\S]*?\n\}\n/);
+  pruefe(sh && !/von |\/' \+/.test(sh[0]), 'ohne Zähler am Kopf');
+  pruefe(sh && /abDetailOeffnen\(/.test(sh[0]), 'der Kopf führt zum Ablauf');
+  const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tz && (tz[0].match(/listeMitSektionenHtml\(/g) || []).length === 2,
+         'Aufgaben und Kleinigkeiten kennen beide Sektionen');
+
+  if (!s) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = s.pruefe();
+    pruefe(e.lose === 'Weidner,Zapf', 'einzelne Einträge behalten ihre Reihenfolge');
+    pruefe(e.sektionen === 'Workshop', 'ein Ablauf mit drei Einträgen wird zur Sektion');
+    pruefe(e.folge === 'Einladung,Fragebogen,GitLab',
+           'darin stehen sie in der Schrittfolge, nicht in der der Aufgabenliste');
+    pruefe(e.ohneMarke === true, 'ohne wiederholte Marke an jeder Zeile');
+    pruefe(e.zweiReichen === true, 'schon zwei Einträge ergeben eine Sektion');
+    pruefe(e.einzelnerBleibt === true, 'ein einzelner behält seine Marke');
+    pruefe(e.sektionHinten === true,
+           'die Sektion steht hinter den losen — sonst spränge die Liste beim Haken');
   }
 }
 
