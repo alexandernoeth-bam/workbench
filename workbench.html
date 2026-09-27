@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 3.12.0</title>
+<title>Workbench 3.13.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1206,6 +1206,18 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
 .tk-sym.an{border-color:var(--petrol);color:var(--petrol);background:var(--papier)}
 .tk-s-zeile{display:none;gap:8px;font-size:calc(var(--fs)*0.7);color:var(--grau);padding:0 0 6px}
 .tk-s-rest{flex:1;text-align:right}
+/* Die Jetzt-Linie im Verlauf und die Karte darüber. */
+.tjetzt{display:flex;align-items:center;gap:8px;margin:3px 0}
+.tjetzt-wort{font-size:calc(var(--fs)*0.62);font-weight:600;letter-spacing:.06em;
+  color:var(--heute)}
+.tjetzt-linie{flex:1;height:2px;border-radius:2px;background:var(--heute)}
+.tag-jetzt{display:none}
+.tag-jetzt.auf{display:block;margin:2px 0 8px;padding:8px 12px;border-radius:9px;
+  background:var(--karte);border:1px solid var(--linie)}
+.tag-jetzt.laeuft{border-color:var(--heute)}
+.tag-jetzt b{font-size:calc(var(--fs)*0.86);font-weight:500}
+.tag-jetzt div{font-size:calc(var(--fs)*0.72);color:var(--grau);margin-top:2px}
+
 .tag-leitsatz{display:none}
 .tag-leitsatz.auf{display:block;margin:2px 0 8px;padding:7px 12px;
   border-left:3px solid var(--heute);background:var(--karte);border-radius:8px;
@@ -1530,6 +1542,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    <div class="tk-s-zeile" id="tkSchmalZeile"></div>
    <div class="tk-schutzband" id="tkSchutzband"></div>
    <div class="tag-leitsatz" id="tagLeitsatz"></div>
+   <div class="tag-jetzt" id="tagJetzt"></div>
    <div class="tk-karte">
     <div class="tk-zeile">
       <div class="tk-zahl" id="tkZahl">–</div>
@@ -1995,7 +2008,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '3.12.0';
+var APP_VERSION = '3.13.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4368,6 +4381,60 @@ function eintragLaeuft(eintrag, is) {
   return von <= jetztZ && jetztZ < bis;
 }
 
+/* Vor welchem Eintrag steht die Jetzt-Linie? Vor dem ersten, der noch
+   nicht begonnen hat. Läuft gerade etwas, ist es ohnehin hinterlegt. */
+function jetztStelle(verlauf, is) {
+  if (is !== isoDatum()) { return -1; }
+  var jetztZ = uhrzeitJetzt();
+  var i;
+  for (i = 0; i < verlauf.length; i++) {
+    var v = verlauf[i];
+    var von = (v.art === 'termin') ? (v.t.von || '') : (v.a.uhrzeit || '');
+    if (von && von > jetztZ) { return i; }
+  }
+  return verlauf.length;
+}
+
+function jetztLinieHtml() {
+  return '<div class="tjetzt"><span class="tjetzt-wort">JETZT ' + uhrzeitJetzt()
+       + '</span><span class="tjetzt-linie"></span></div>';
+}
+
+/* Was läuft gerade, was kommt als Nächstes? Steht oben, damit man es
+   sieht, ohne zu suchen. Läuft nichts, sagt sie, bis wann frei ist. */
+function jetztKarteZeichnen(is, e) {
+  var el = document.getElementById('tagJetzt');
+  if (!el) { return; }
+  if (is !== isoDatum()) { el.innerHTML = ''; el.className = 'tag-jetzt'; return; }
+  var jetztZ = uhrzeitJetzt();
+  var laufend = null;
+  var naechst = null;
+  var i;
+  for (i = 0; i < e.verlauf.length; i++) {
+    var v = e.verlauf[i];
+    var von = (v.art === 'termin') ? (v.t.von || '') : (v.a.uhrzeit || '');
+    var bis = (v.art === 'termin') ? (v.t.bis || '') : '';
+    var titel = (v.art === 'termin') ? v.t.titel : v.a.titel;
+    if (von && bis && von <= jetztZ && jetztZ < bis && !laufend) {
+      laufend = { titel: titel, bis: bis };
+    } else if (von && von > jetztZ && !naechst) {
+      naechst = { titel: titel, von: von };
+    }
+  }
+  if (!laufend && !naechst) { el.innerHTML = ''; el.className = 'tag-jetzt'; return; }
+  var kopf = laufend ? ('Jetzt: ' + esc(laufend.titel))
+                     : ('Frei bis ' + esc(naechst.von));
+  var unten = [];
+  if (laufend) { unten.push(esc(restMinutenText(laufend.bis))); }
+  if (naechst) {
+    unten.push((laufend ? 'danach ' : '') + esc(naechst.von) + ' ' + esc(naechst.titel));
+  } else {
+    unten.push('nichts mehr mit fester Zeit');
+  }
+  el.innerHTML = '<b>' + kopf + '</b><div>' + unten.join(' · ') + '</div>';
+  el.className = 'tag-jetzt auf' + (laufend ? ' laeuft' : '');
+}
+
 /* Wie lange noch? In Minuten, darüber in Stunden und Minuten. */
 function restMinutenText(bis) {
   var teile = String(bis).split(':');
@@ -5765,6 +5832,7 @@ function tagZeichnen() {
   tagZahlenZeichnen(is, e);
   tagKopfSchmalZeichnen(is, e);
   leitsatzZeichnen();
+  jetztKarteZeichnen(is, e);
 
   h += '<div class="tspalte tspalte-links">';
   var vorbeiZahl = 0;
@@ -5802,7 +5870,14 @@ function tagZeichnen() {
        + '<path d="M6 9l6 6 6-6"></path></svg></button>';
   }
   if (!e.verlauf.length) { h += '<div class="tleer">Nichts mit fester Zeit.</div>'; }
-  for (i = 0; i < e.verlauf.length; i++) { h += verlaufHtml(e.verlauf[i], is); }
+  /* Eine Linie zeigt, wo im Tag man gerade steht — nur am heutigen Tag,
+     an anderen gibt es kein „jetzt". */
+  var linieVor = jetztStelle(e.verlauf, is);
+  for (i = 0; i < e.verlauf.length; i++) {
+    if (i === linieVor) { h += jetztLinieHtml(); }
+    h += verlaufHtml(e.verlauf[i], is);
+  }
+  if (linieVor === e.verlauf.length) { h += jetztLinieHtml(); }
   h += '</div>';
 
 

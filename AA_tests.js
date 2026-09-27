@@ -567,6 +567,55 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__jetztApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   var jt = new Date();'
+                 + '   var hm = function(m){'
+                 + '     var d = new Date(jt.getTime() + m * 60000);'
+                 + '     return String(d.getHours()).padStart(2, \'0\') + \':\''
+                 + '          + String(d.getMinutes()).padStart(2, \'0\'); };'
+                 + '   /* Kurz vor Mitternacht laufen die Proben über den Tag'
+                 + '      hinaus — dann wird nur das Grundsätzliche geprüft. */'
+                 + '   var knapp = (jt.getHours() < 1 || jt.getHours() > 18);'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   var off = -jt.getTimezoneOffset();'
+                 + '   var zo = (off >= 0 ? \'+\' : \'-\')'
+                 + '     + String(Math.floor(Math.abs(off) / 60)).padStart(2, \'0\')'
+                 + '     + \':\' + String(Math.abs(off) % 60).padStart(2, \'0\');'
+                 + '   var ev = function(id, a, b){'
+                 + '     return { id: id, summary: id,'
+                 + '       start:{ dateTime: h + \'T\' + hm(a) + \':00\' + zo },'
+                 + '       end:{ dateTime: h + \'T\' + hm(b) + \':00\' + zo } }; };'
+                 + '   eintraegeEinsortieren([ev(\'Vorbei\', -180, -120),'
+                 + '     ev(\'Laeuft\', -20, 40), ev(\'Spaeter\', 120, 300)],'
+                 + '     \'Alex\', \'beruflich\');'
+                 + '   tagOffen = h; tagZeichnen();'
+                 + '   var karte = document.getElementById(\'tagJetzt\');'
+                 + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   var r = { laeuftKopf: knapp || /Jetzt: Laeuft/.test(karte.innerHTML),'
+                 + '     laeuftRest: knapp || /noch /.test(karte.innerHTML),'
+                 + '     laeuftDanach: knapp || /danach /.test(karte.innerHTML),'
+                 + '     laeuftKlasse: knapp || /laeuft/.test(karte.className),'
+                 + '     linieDa: knapp || /tjetzt-wort/.test(b),'
+                 + '     linieStelle: knapp ? 2'
+                 + '       : (b.split(\'tjetzt-wort\')[0].match(/tzt-titel/g) || []).length };'
+                 + '   termineNachTag = {};'
+                 + '   eintraegeEinsortieren([ev(\'Spaeter\', 90, 150)], \'Alex\','
+                 + '     \'beruflich\');'
+                 + '   tagZeichnen();'
+                 + '   r.freiKopf = knapp'
+                 + '     || /Frei bis /.test(document.getElementById(\'tagJetzt\').innerHTML);'
+                 + '   tagOffen = tagePlus(h, 1); tagZeichnen();'
+                 + '   r.morgenLeer = (document.getElementById(\'tagJetzt\').innerHTML === \'\''
+                 + '     && document.getElementById(\'tagBlatt\').innerHTML'
+                 + '        .indexOf(\'tjetzt-wort\') < 0);'
+                 + '   termineNachTag = {}; kalenderListe = [];'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__leitApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -11116,6 +11165,47 @@ console.log('\n127. Eigener Satz im Tag');
     pruefe(e.ausText === true, 'ausgeschaltet bleibt der Text erhalten');
     pruefe(e.imFeld === 'Heute: eine Sache fertig machen.',
            'und steht in der Diagnose im Feld');
+  }
+}
+
+/* ============================================================
+   128. Wo im Tag stehe ich gerade?
+   Grund: Erster Schritt zum festgeschriebenen Tagesplan. Tagsueber
+   zaehlt nicht das Abhaken, sondern die Frage, was gerade laeuft und
+   was als Naechstes kommt.
+   ============================================================ */
+console.log('\n128. Die Jetzt-Linie');
+{
+  const skript = hauptSkript();
+  const j = globalThis.__jetztApi;
+
+  ['jetztStelle', 'jetztLinieHtml', 'jetztKarteZeichnen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const js = skript.match(/function jetztStelle\([\s\S]*?\n\}/);
+  pruefe(js && /is !== isoDatum\(\)\) \{ return -1; \}/.test(js[0]),
+         'an anderen Tagen gibt es kein „jetzt"');
+  const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tz && /jetztStelle\(e\.verlauf, is\)/.test(tz[0])
+         && /if \(linieVor === e\.verlauf\.length\)/.test(tz[0]),
+         'die Linie steht auch unter dem letzten Eintrag, wenn der Tag vorbei ist');
+  pruefe(/id="tagJetzt"/.test(QUELLE) && /\.tag-jetzt\.auf\{display:block/.test(QUELLE),
+         'die Karte hat ihren Platz über dem Tagesplan');
+
+  if (!j) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = j.pruefe();
+    pruefe(e.laeuftKopf === true, 'läuft etwas, nennt die Karte es beim Namen');
+    pruefe(e.laeuftRest === true, 'mit der Restzeit');
+    pruefe(e.laeuftDanach === true, 'und dem, was danach kommt');
+    pruefe(e.laeuftKlasse === true, 'die Karte ist dann hervorgehoben');
+    pruefe(e.freiKopf === true, 'läuft nichts, sagt sie, bis wann frei ist');
+    pruefe(e.linieDa === true, 'im Verlauf steht die Linie');
+    pruefe(e.linieStelle === 2,
+           'sie steht vor dem ersten Eintrag, der noch nicht begonnen hat');
+    pruefe(e.morgenLeer === true, 'an einem anderen Tag bleibt beides leer');
   }
 }
 
