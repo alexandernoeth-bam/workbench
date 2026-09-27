@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 4.2.0</title>
+<title>Workbench 4.4.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1313,6 +1313,15 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
 .r-oben{font-size:calc(var(--fs)*0.68);color:var(--grau-hell)}
 .r-name{font-size:calc(var(--fs)*0.92);line-height:1.3;margin:2px 0 9px}
 .r-kenntnis{font-size:calc(var(--fs)*0.7);color:var(--grau);margin-top:6px}
+.tagw-block{border:1px solid var(--linie);border-radius:10px;padding:9px 12px;
+  margin:0 0 12px}
+.tagw-kopf{font-size:calc(var(--fs)*0.68);font-weight:600;color:var(--grau);
+  letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px}
+.tagw-zeile{display:flex;align-items:center;gap:7px;padding:5px 0}
+.tagw-titel{flex:1;font-size:calc(var(--fs)*0.84)}
+.r-karte.entfallen{background:var(--papier);border-style:dashed}
+.r-karte.entfallen .r-name{color:var(--grau-hell);text-decoration:line-through}
+.splan-blk.dazu{border-left-style:dotted;border-left-width:4px}
 .r-wahl{display:flex;gap:6px;flex-wrap:wrap}
 .r-wahl button{font:inherit;font-size:calc(var(--fs)*0.76);padding:6px 11px;
   border:1px solid var(--linie);border-radius:20px;background:var(--karte);
@@ -2187,7 +2196,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '4.2.0';
+var APP_VERSION = '4.4.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4235,7 +4244,7 @@ function tagesEintraege(is) {
      wiederkehrend oder aus einem Ablauf — steht als Marke an der Zeile,
      nicht als eigene Überschrift. */
   var verlauf = [], haupt = [], klein = [];
-  var hauptFertig = [], kleinFertig = [];
+  var hauptFertig = [], kleinFertig = [], nebenher = [];
   var i;
 
   for (i = 0; i < aufgaben.length; i++) {
@@ -4264,6 +4273,7 @@ function tagesEintraege(is) {
     if (a.status === 'erledigt') {
       if (a.erledigtAm === is) {
         if (a.uhrzeit) { verlauf.push({ art: 'aufgabe', zeit: a.uhrzeit, a: a }); }
+        else if (nebenbei(a, is)) { nebenher.push(a); }
         else if (a.art === 'klein') { kleinFertig.push(a); }
         else { hauptFertig.push(a); }
       }
@@ -4336,7 +4346,8 @@ function tagesEintraege(is) {
 
   verlauf.sort(function (x, y) { return (x.zeit < y.zeit) ? -1 : ((x.zeit > y.zeit) ? 1 : 0); });
   return { verlauf: verlauf, haupt: haupt, klein: klein,
-           hauptFertig: hauptFertig, kleinFertig: kleinFertig, ganztags: ganztags };
+           hauptFertig: hauptFertig, kleinFertig: kleinFertig,
+           nebenher: nebenher, ganztags: ganztags };
 }
 
 /* ------------------------------------------------------------
@@ -5274,6 +5285,7 @@ function stundenplanHtml(is, e) {
     var privat = t && t.kontext === 'privat';
     h += '<div class="splan-blk' + (b.fest ? '' : ' eigen')
        + (privat ? ' privat' : '') + (hoch < 42 ? ' kurz' : '')
+       + ((!b.fest && planDazu(is, b.id)) ? ' dazu' : '')
        + (b.vorbei ? ' vorbei' : '') + '" '
        + 'style="top:' + oben.toFixed(0) + 'px;height:' + (hoch - 3).toFixed(0) + 'px" '
        + (b.fest
@@ -5281,8 +5293,10 @@ function stundenplanHtml(is, e) {
           : ('onclick="aufgabeAktionen(\'' + esc(b.id) + '\')"'))
        + '><b>' + esc(b.titel) + '</b>';
     if (hoch >= 42) {
+      var vermerk = b.fest ? '' : ' · selbst geplant';
+      if (!b.fest && planDazu(is, b.id)) { vermerk = ' · dazugekommen'; }
       h += '<span>' + zeitAusMinuten(b.von) + '–' + zeitAusMinuten(b.bis)
-         + (b.fest ? '' : ' · selbst geplant') + '</span>';
+         + vermerk + '</span>';
     }
     h += '</div>';
   }
@@ -5364,6 +5378,16 @@ function planEntfernen(is, id) {
 /* Gehört diese Aufgabe in den Tag? Ohne Plan wie früher, mit Plan nur,
    was darin steht — Routinen ausgenommen, die rutschen von selbst ins
    Fach ohne feste Zeit. */
+/* Was heute angelegt und heute erledigt wurde, stand auf keinem Plan —
+   es ist die Arbeit, die einem dazwischenkommt. Sie sichtbar zu machen
+   ist der halbe Sinn des Rückblicks. */
+function nebenbei(a, is) {
+  if (a.wiederholung) { return false; }
+  if (a.erledigtAm !== is) { return false; }
+  if (planDazu(is, a.id)) { return true; }
+  return a.angelegtAm === is;
+}
+
 function gehoertInTag(a, is) {
   if (a.wiederholung) { return true; }
   if (!planGilt(is)) { return true; }
@@ -5997,6 +6021,56 @@ function rueckFaellig(is) {
   return uhrzeitJetzt() >= RUECK_AB;
 }
 
+/* Wird der Rückblick zwei Tage ausgelassen, fragt der Tageswechsel
+   einmal nach — danach gilt der Tag als abgeschlossen. Kein Nachtragen
+   von drei Tagen, das wäre nur Buchhaltung. */
+function rueckOffeneTage() {
+  var aus = [];
+  var i;
+  for (i = 1; i <= 3; i++) {
+    var tag = tagePlus(isoDatum(), -i);
+    var p = DB.plaene && DB.plaene[tag];
+    if (!p || !p.gestellt) { continue; }
+    if (rueckFertig(tag)) { continue; }
+    aus.push(tag);
+  }
+  return aus;
+}
+
+function rueckNachtragen(is) {
+  rueckTag = is;
+  rueckSatz(is);
+  rueckSchritt = 0;
+  spaeterSichern();
+  zeigeSchirm('Rueckblick');
+}
+
+function rueckAbhaken(is) {
+  var r = rueckSatz(is);
+  r.beendet = jetzt();
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  tagwZeichnen();
+}
+
+function rueckNachfrageHtml() {
+  var offen = rueckOffeneTage();
+  if (!offen.length) { return ''; }
+  var h = '<div class="tagw-block"><div class="tagw-kopf">Noch ohne Rückblick</div>';
+  var i;
+  for (i = 0; i < offen.length; i++) {
+    h += '<div class="tagw-zeile"><span class="tagw-titel">'
+       + esc(kurzDatum(offen[i])) + '</span>'
+       + '<button class="r-kn" type="button" onclick="rueckNachtragen(\''
+       + offen[i] + '\')">Nachholen</button>'
+       + '<button class="r-kn leise" type="button" onclick="rueckAbhaken(\''
+       + offen[i] + '\')">Ruhen lassen</button></div>';
+  }
+  h += '<div class="feld-hinweis">Nachgetragen wird höchstens einmal — danach '
+     + 'gilt der Tag als abgeschlossen, auch ohne Bilanz.</div></div>';
+  return h;
+}
+
 function rueckStarten() {
   rueckTag = tagOffen || isoDatum();
   var r = rueckSatz(rueckTag);
@@ -6042,6 +6116,28 @@ function rueckAusStand(is, name) {
   return aus;
 }
 
+/* Ein Termin, der morgens im Plan stand und jetzt fehlt, ist abgesagt
+   worden. Er verschwindet nicht, er wird durchgestrichen — sonst fehlte
+   dem Rückblick der halbe Tag. */
+function entfalleneTermine(is) {
+  var p = DB.plaene && DB.plaene[is];
+  if (!p || !p.eintraege) { return []; }
+  var da = {};
+  var e = tagesEintraege(is);
+  var i;
+  for (i = 0; i < e.verlauf.length; i++) {
+    if (e.verlauf[i].art === 'termin') { da[e.verlauf[i].t.id] = true; }
+  }
+  var aus = [];
+  for (i = 0; i < p.eintraege.length; i++) {
+    var ein = p.eintraege[i];
+    if (!ein.fest) { continue; }
+    if (ein.id && da[ein.id]) { continue; }
+    aus.push(ein);
+  }
+  return aus;
+}
+
 function rueckStoff(is) {
   var e = tagesEintraege(is);
   var termine = e.verlauf.filter(function (v) { return v.art === 'termin'; })
@@ -6080,7 +6176,20 @@ function rueckSetzen(schluessel, wert) {
       } else {
         if (istErledigtAn(a, rueckTag)) { aufgabeErledigen(a.id); }
         if (wert === 'morgen') {
-          a.planung = tagePlus(rueckTag, 1);
+          var morgen = tagePlus(rueckTag, 1);
+          a.planung = morgen;
+          planAufnehmen(morgen, a.id);
+          /* Die Uhrzeit wandert mit — aber nur, wenn sie morgen frei
+             ist. Sonst steht sie ohne Zeit da und wird neu gesetzt. */
+          if (a.uhrzeit) {
+            var stoss = planStoss(morgen, a.id, minutenAus(a.uhrzeit),
+                                  aufgabeDauer(a));
+            if (stoss) {
+              melde('Morgen um ' + a.uhrzeit + ' liegt schon ' + stoss.titel
+                    + ' — die Aufgabe steht ohne Zeit im Plan.', 'warn');
+              a.uhrzeit = '';
+            }
+          }
           a.geaendert = jetzt();
         }
       }
@@ -6130,6 +6239,8 @@ function rueckBilanz(is) {
   return {
     termine: s.termine.length,
     termineDa: zaehl('termin', 'da'),
+    entfallen: entfalleneTermine(is).length,
+    dazu: ((DB.plaene && DB.plaene[is] && DB.plaene[is].dazu) || []).length,
     geplant: s.geplant.length,
     geplantFertig: zaehlIn(s.geplant, 'erledigt'),
     routinen: s.routinen.length,
@@ -6222,7 +6333,15 @@ function rueckZeichnen() {
            t.titel, 'termin:' + t.id + ':' + is,
            [['da', 'Wahrgenommen'], ['nicht', 'Nicht hingegangen']], '');
     }
-    if (!s.termine.length) { h += '<div class="tleer">Heute kein Termin.</div>'; }
+    var weg = entfalleneTermine(is);
+    var w;
+    for (w = 0; w < weg.length; w++) {
+      h += rueckKarteHtml(weg[w].von + ' · Termin · abgesagt', weg[w].titel,
+                          'entfallen:' + w, [], 'entfallen');
+    }
+    if (!s.termine.length && !weg.length) {
+      h += '<div class="tleer">Heute kein Termin.</div>';
+    }
   } else if (stufe === 'geplant') {
     h += '<h3>Geplante Aufgaben</h3><div class="r-unter">Was du dir für heute '
        + 'vorgenommen hattest</div>';
@@ -6251,6 +6370,10 @@ function rueckZeichnen() {
     h += '<div class="r-unter">' + (r.beendet ? 'abgeschlossen' : 'noch offen') + '</div>';
     var zahlen = [];
     if (b.termine) { zahlen.push(b.termineDa + ' von ' + b.termine + ' Terminen'); }
+    if (b.entfallen) {
+      zahlen.push(b.entfallen + (b.entfallen === 1 ? ' abgesagt' : ' abgesagte'));
+    }
+    if (b.dazu) { zahlen.push(b.dazu + ' dazugekommen'); }
     if (b.geplant) {
       zahlen.push(b.geplantFertig + ' von ' + b.geplant + ' geplanten Aufgaben');
     }
@@ -6359,6 +6482,9 @@ function tagwSchritt1Html() {
         + '<h2 class="tw-titel">Was ist liegengeblieben?</h2>'
         + '<div class="tw-unter">' + (liste.length + wieder.length)
         + ' aus früheren Tagen</div></div>';
+  /* Vor dem Liegengebliebenen die Frage nach den Tagen ohne Rückblick —
+     sonst fiele einem erst hinterher ein, dass da noch etwas war. */
+  h += rueckNachfrageHtml();
   if (!liste.length && !wieder.length) {
     h += '<div class="tw-karte tw-leer">Nichts liegengeblieben. Sauberer Start.</div>';
   }
@@ -7145,11 +7271,24 @@ function tagZeichnen() {
   }
   /* „Für diesen Tag zusätzlich" ist entfallen: Einen zusätzlichen Lauf
      plant man am Vortag oder in der Wochenansicht, nicht hier. */
+  /* Was ungeplant dazwischenkam und schon erledigt ist: der Beweis,
+     dass der Tag voller war als der Plan. */
+  var nebenTeil = '';
+  if (e.nebenher.length) {
+    if (!zwei) { nebenTeil += unterKopf('nebenher', 'Nebenbei erledigt', 0); }
+    if (zwei || unterOffen('nebenher')) {
+      for (i = 0; i < e.nebenher.length; i++) {
+        nebenTeil += zeileHtml(e.nebenher[i], is, e.nebenher[i].art === 'klein');
+      }
+    }
+  }
   if (zwei) {
     h += tagBlockHtml('Ohne feste Zeit', hauptTeil, planMarkeHtml(is));
     h += tagBlockHtml('Kleinigkeiten', kleinTeil, '');
+    if (nebenTeil) { h += tagBlockHtml('Nebenbei erledigt', nebenTeil, ''); }
   } else {
-    h += tagBlockHtml('Aktivitäten', hauptTeil + kleinTeil, nachzueglerMarke(is));
+    h += tagBlockHtml('Aktivitäten', hauptTeil + kleinTeil + nebenTeil,
+                      nachzueglerMarke(is));
   }
 
   h += '</div>';
@@ -7878,7 +8017,24 @@ function eingabeDeuten(text) {
   var roh = String(text).trim();
   var haupt = false;
   var privat = false;
+  var uhrzeit = '';
+  var dauer = 0;
+  var schon = false;
+  /* „++" heißt: schon getan, nur noch festhalten. */
+  if (roh.slice(0, 2) === '++') { schon = true; roh = roh.slice(2).trim(); }
   if (roh.charAt(0) === '!') { haupt = true; roh = roh.slice(1).trim(); }
+  /* Eine Uhrzeit am Anfang macht daraus einen Block im Tagesplan —
+     mit Spanne auch gleich mit der richtigen Dauer. */
+  var zeitM = roh.match(/^([0-2]?[0-9]):([0-5][0-9])(?:\s*[-–]\s*([0-2]?[0-9]):([0-5][0-9]))?\s+/);
+  if (zeitM && Number(zeitM[1]) < 24) {
+    uhrzeit = String(Number(zeitM[1])).padStart(2, '0') + ':' + zeitM[2];
+    if (zeitM[3] && Number(zeitM[3]) < 24) {
+      var bis = Number(zeitM[3]) * 60 + Number(zeitM[4]);
+      var von = Number(zeitM[1]) * 60 + Number(zeitM[2]);
+      if (bis > von) { dauer = bis - von; }
+    }
+    roh = roh.slice(zeitM[0].length).trim();
+  }
   var worte = roh.split(/\s+/);
   var letztes = worte.length ? worte[worte.length - 1].toLowerCase() : '';
   if (letztes === 'p' || letztes === 'privat') {
@@ -7888,8 +8044,11 @@ function eingabeDeuten(text) {
   }
   return {
     titel: roh,
-    art: haupt ? 'haupt' : 'klein',
-    kontext: privat ? 'privat' : 'beruflich'
+    art: (haupt || uhrzeit) ? 'haupt' : 'klein',
+    kontext: privat ? 'privat' : 'beruflich',
+    uhrzeit: uhrzeit,
+    dauer: dauer,
+    schon: schon
   };
 }
 
@@ -7940,11 +8099,13 @@ function schnellAnlegen() {
     projektId: null,
     frist: '',
     planung: tagOffen,
-    uhrzeit: '',
+    angelegtAm: tagOffen,
+    uhrzeit: d.uhrzeit || '',
+    dauer: d.dauer || 0,
     art: d.art,
     wiederholung: null,
-    status: 'offen',
-    erledigtAm: null,
+    status: d.schon ? 'erledigt' : 'offen',
+    erledigtAm: d.schon ? tagOffen : null,
     zuletztErledigt: null,
     ablaufSchritt: null,
     geaendert: jetzt()
@@ -7952,6 +8113,7 @@ function schnellAnlegen() {
   /* Was tagsüber dazukommt, gehört in den Tag — mit Vermerk, damit der
      Rückblick geplant und geworden unterscheiden kann. */
   planAufnehmen(tagOffen, DB.aufgaben[DB.aufgaben.length - 1].id);
+  if (d.schon) { melde('Festgehalten — und gleich abgehakt.', 'gut'); }
   feld.value = '';
   schnellVorschau();
   aehnlichLeeren('schnellAehnlich');

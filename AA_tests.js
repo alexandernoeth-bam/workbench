@@ -569,6 +569,109 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__gegenApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   var m = tagePlus(h, 1);'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Vorlage\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'a2\', titel:\'Spontan\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'a3\', titel:\'Frei\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h } ];'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   var off = -new Date().getTimezoneOffset();'
+                 + '   var zo = (off >= 0 ? \'+\' : \'-\')'
+                 + '     + String(Math.floor(Math.abs(off) / 60)).padStart(2, \'0\')'
+                 + '     + \':\' + String(Math.abs(off) % 60).padStart(2, \'0\');'
+                 + '   var ev = function(id, von, bis, tag){'
+                 + '     return { id: id, summary: id,'
+                 + '       start:{ dateTime: (tag || h) + \'T\' + von + \':00\' + zo },'
+                 + '       end:{ dateTime: (tag || h) + \'T\' + bis + \':00\' + zo } }; };'
+                 + '   eintraegeEinsortieren([ev(\'Weekly\', \'09:30\', \'11:00\'),'
+                 + '     ev(\'Mittag\', \'12:00\', \'12:30\')], \'Alex\','
+                 + '     \'beruflich\');'
+                 + '   tagOffen = h;'
+                 + '   planStarten();'
+                 + '   planOeffnen(\'a1\'); planEntwurfZeit(\'14:00\');'
+                 + '   planUebernehmen();'
+                 + '   planOeffnen(\'a3\'); planEntwurfZeit(\'09:00\');'
+                 + '   planUebernehmen();'
+                 + '   planFestschreiben();'
+                 + '   /* Mittag wird abgesagt, Spontanes kommt dazu. */'
+                 + '   termineNachTag = {};'
+                 + '   eintraegeEinsortieren([ev(\'Weekly\', \'09:30\', \'11:00\')],'
+                 + '     \'Alex\', \'beruflich\');'
+                 + '   planAufnehmen(h, \'a2\');'
+                 + '   planOeffnen(\'a2\'); planEntwurfZeit(\'16:00\');'
+                 + '   planUebernehmen();'
+                 + '   var weg = entfalleneTermine(h);'
+                 + '   var r = { entfallen: weg.map(function(x){'
+                 + '     return x.von + \' \' + x.titel; }).join(\',\') };'
+                 + '   tagZeichnen();'
+                 + '   r.dazuBlock = /splan-blk[^"]*dazu/.test('
+                 + '     document.getElementById(\'tagBlatt\').innerHTML);'
+                 + '   rueckStarten();'
+                 + '   var blatt = document.getElementById(\'rueckBlatt\').innerHTML;'
+                 + '   r.entfallenKarte = /r-karte entfallen/.test(blatt);'
+                 + '   r.ohneWahl = (blatt.split(\'r-karte entfallen\')[1] || \'\')'
+                 + '     .split(\'r-karte\')[0].indexOf(\'r-wahl\') < 0;'
+                 + '   var b = rueckBilanz(h);'
+                 + '   r.bilanz = b.termine + \' Termin, \' + b.entfallen'
+                 + '     + \' abgesagt, \' + b.dazu + \' dazu\';'
+                 + '   /* Morgen ist 14:00 belegt, 09:00 nicht. */'
+                 + '   eintraegeEinsortieren([ev(\'Morgens\', \'14:00\', \'15:00\','
+                 + '     m)], \'Alex\', \'beruflich\');'
+                 + '   rueckSetzen(\'aufgabe:a1\', \'morgen\');'
+                 + '   r.morgenOhneZeit = (aufgabeFinden(\'a1\').uhrzeit === \'\');'
+                 + '   r.morgenImPlan = imPlan(m, \'a1\');'
+                 + '   rueckSetzen(\'aufgabe:a3\', \'morgen\');'
+                 + '   r.morgenMitZeit = aufgabeFinden(\'a3\').uhrzeit;'
+                 + '   var g2 = tagePlus(h, -2);'
+                 + '   DB.plaene[g2] = { gestellt: jetzt(), drin:[], dazu:[] };'
+                 + '   r.offeneTage = rueckOffeneTage().length;'
+                 + '   rueckAbhaken(g2);'
+                 + '   r.nachRuhen = rueckOffeneTage().length;'
+                 + '   termineNachTag = {}; kalenderListe = [];'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__schnellZeitApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   tagOffen = h;'
+                 + '   var kurz = function(t){'
+                 + '     var d = eingabeDeuten(t);'
+                 + '     return d.uhrzeit + \'|\' + d.dauer + \'|\' + d.art; };'
+                 + '   var r = { nurZeit: kurz(\'16:30 Laufen p\'),'
+                 + '     spanne: kurz(\'16:30-17:15 Vorhänge aufhängen p\'),'
+                 + '     ohneZeit: kurz(\'Brief einwerfen p\'),'
+                 + '     schonGetan: eingabeDeuten(\'++ Telefonat p\').schon };'
+                 + '   var feld = document.getElementById(\'schnellFeld\');'
+                 + '   [\'16:30-17:15 Vorhänge aufhängen p\','
+                 + '    \'++ Telefonat Heizung p\','
+                 + '    \'Brief einwerfen p\'].forEach(function(t){'
+                 + '     feld.value = t; schnellAnlegen(); });'
+                 + '   var e = tagesEintraege(h);'
+                 + '   r.imStundenplan = e.verlauf.map(function(v){'
+                 + '     return v.a.titel + \' \' + v.a.uhrzeit + \' \''
+                 + '          + v.a.dauer; }).join(\',\');'
+                 + '   r.nebenherListe = e.nebenher.map(function(a){'
+                 + '     return a.titel; }).join(\',\');'
+                 + '   r.kleinListe = e.klein.map(function(a){'
+                 + '     return a.titel; }).join(\',\');'
+                 + '   DB.aufgaben.push({ id:\'alt1\', titel:\'Gestern\','
+                 + '     kontext:\'privat\', status:\'erledigt\', art:\'klein\','
+                 + '     erledigtAm: h, angelegtAm: tagePlus(h, -1) });'
+                 + '   r.gestrigesNichtNebenbei = nebenbei('
+                 + '     aufgabeFinden(\'alt1\'), h);'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__morgenApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -6689,8 +6792,11 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
      aufgestellt, nicht nur beobachtet. */
   /* Seit v4.0.0 zeigt der Tag den Stundenplan; daneben steht, was im
      Plan ohne feste Zeit dabei ist. */
+  /* Seit v4.3.0 kommt „Nebenbei erledigt" dazu, sobald es etwas zu
+     zeigen gibt. */
   const erwarteteFolge = ['[links]', 'Tagesplan', '[rechts]',
-                          'Ohne feste Zeit', 'Kleinigkeiten', 'Aktivitäten'];
+                          'Ohne feste Zeit', 'Kleinigkeiten', 'Nebenbei erledigt',
+                          'Aktivitäten'];
   pruefe(folge.join(',') === erwarteteFolge.join(','),
          'die Abschnitte stehen in der vereinbarten Folge und Spalte'
          + (folge.join(',') === erwarteteFolge.join(',') ? '' : ' — ist: ' + folge.join(' → ')));
@@ -10605,13 +10711,17 @@ console.log('\n112. Tagessicht in Karten');
          'die dünne Linie hinter dem Gruppennamen entfällt');
   pruefe(/body\.breit \.tagblatt\{max-width:1000px\}/.test(QUELLE),
          'am Rechner ist die Breite begrenzt');
+  /* Seit v4.3.0 kommt „Nebenbei erledigt" als vierter Baustein dazu —
+     nur, wenn es etwas zu zeigen gibt. */
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && (tz[0].match(/tagBlockHtml\(/g) || []).length === 3,
-         'die Flächen entstehen aus einem Baustein — am Rechner zwei, am Handy eine');
-  pruefe(tz && (tz[0].match(/unterKopf\(/g) || []).length === 2,
-         'Aufgaben und Kleinigkeiten stehen als Zwischenüberschrift darin');
-  pruefe(tz && (tz[0].match(/unterOffen\(/g) || []).length === 2,
+  pruefe(tz && (tz[0].match(/tagBlockHtml\(/g) || []).length === 4,
+         'die Flächen entstehen aus einem Baustein — am Rechner drei, am Handy eine');
+  pruefe(tz && (tz[0].match(/unterKopf\(/g) || []).length === 3,
+         'Aufgaben, Kleinigkeiten und Nebenbei stehen als Zwischenüberschrift darin');
+  pruefe(tz && (tz[0].match(/unterOffen\(/g) || []).length === 3,
          'und lassen sich einzeln zuklappen');
+  pruefe(tz && /if \(e\.nebenher\.length\)/.test(tz[0]),
+         'Nebenbei erscheint nur, wenn etwas dazwischenkam');
   const vlz = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
   pruefe(vlz && /eigen/.test(vlz[0]),
          'eine Aufgabe mit Uhrzeit steht als eigener Block, hell abgesetzt');
@@ -11684,6 +11794,104 @@ console.log('\n132. Morgenroutine');
     pruefe(e.datum.length === 10, 'festgehalten ist nur das Datum');
     pruefe(e.verschoben === 'Kaffee,Fenster auf,Kalender',
            'die Schritte lassen sich ordnen');
+  }
+}
+
+/* ============================================================
+   133. Uhrzeit in der Eingabe, Nebenbei im Tag
+   Grund: Ein Block soll sich in einem Zug eintragen lassen, ohne Umweg
+   ueber den Plandialog. Und was ungeplant dazwischenkam und schon
+   erledigt ist, soll sichtbar sein — es ist die halbe Arbeit des Tages.
+   ============================================================ */
+console.log('\n133. Uhrzeit und Nebenbei');
+{
+  const skript = hauptSkript();
+  const s = globalThis.__schnellZeitApi;
+
+  pruefe(new RegExp('function\\s+nebenbei\\s*\\(').test(skript),
+         'Funktion nebenbei ist definiert');
+  const ed = skript.match(/function eingabeDeuten\([\s\S]*?\n\}\n/);
+  pruefe(ed && /roh\.slice\(0, 2\) === '\+\+'/.test(ed[0]),
+         '„++" heißt: schon getan, nur noch festhalten');
+  pruefe(ed && /\[-–\]/.test(ed[0]),
+         'eine Spanne geht mit Strich oder Gedankenstrich');
+  const nb = skript.match(/function nebenbei\([\s\S]*?\n\}/);
+  pruefe(nb && /a\.angelegtAm === is/.test(nb[0]),
+         'heute angelegt und heute erledigt heißt nebenbei');
+  pruefe(nb && /planDazu\(is, a\.id\)/.test(nb[0]),
+         'was nach dem Festschreiben dazukam, zählt auch dazu');
+  pruefe(nb && /a\.wiederholung\) \{ return false; \}/.test(nb[0]),
+         'eine Routine ist nie nebenbei — sie stand ja auf dem Zettel');
+
+  if (!s) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = s.pruefe();
+    pruefe(e.nurZeit === '16:30|0|haupt',
+           'eine Uhrzeit allein macht daraus eine Aufgabe mit Zeit');
+    pruefe(e.spanne === '16:30|45|haupt', 'eine Spanne setzt auch die Dauer');
+    pruefe(e.ohneZeit === '|0|klein', 'ohne Uhrzeit bleibt es eine Kleinigkeit');
+    pruefe(e.schonGetan === true, '„++" legt es gleich als erledigt an');
+    pruefe(e.imStundenplan === 'Vorhänge aufhängen 16:30 45',
+           'die Aufgabe mit Zeit steht als Block im Tagesplan');
+    pruefe(e.nebenherListe === 'Telefonat Heizung',
+           'das „++"-Erledigte steht unter Nebenbei');
+    pruefe(e.kleinListe === 'Brief einwerfen',
+           'eine gewöhnliche Kleinigkeit bleibt bei den Kleinigkeiten');
+    pruefe(e.gestrigesNichtNebenbei === false,
+           'was gestern angelegt und heute erledigt wurde, ist nicht nebenbei');
+  }
+}
+
+/* ============================================================
+   134. Geplant gegen geworden
+   Grund: Der Plan haelt fest, was morgens darin stand. Erst dadurch
+   kann der Abend zeigen, was dazwischenkam und was ausfiel — und der
+   Tageswechsel fragt einmal nach, wenn ein Rueckblick liegenblieb.
+   ============================================================ */
+console.log('\n134. Geplant gegen geworden');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__gegenApi;
+
+  ['entfalleneTermine', 'rueckOffeneTage', 'rueckNachtragen', 'rueckAbhaken',
+   'rueckNachfrageHtml'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const sp = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
+  pruefe(sp && /planDazu\(is, b\.id\)/.test(sp[0]),
+         'ein dazugekommener Block ist gekennzeichnet');
+  const ro = skript.match(/function rueckOffeneTage\([\s\S]*?\n\}/);
+  pruefe(ro && /i <= 3/.test(ro[0]),
+         'nachgefragt wird über höchstens drei Tage — kein Nachtragen von Wochen');
+  pruefe(ro && /!p \|\| !p\.gestellt/.test(ro[0]),
+         'nur Tage mit aufgestelltem Plan zählen');
+  const t1 = skript.match(/function tagwSchritt1Html\([\s\S]*?\n\}\n/);
+  pruefe(t1 && /rueckNachfrageHtml\(\)/.test(t1[0]),
+         'die Frage steht im Tageswechsel, vor dem Liegengebliebenen');
+  const rs = skript.match(/function rueckSetzen\([\s\S]*?\n\}\n/);
+  pruefe(rs && /planStoss\(morgen/.test(rs[0]),
+         '„Auf morgen" prüft, ob die Uhrzeit morgen frei ist');
+
+  if (!g) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = g.pruefe();
+    pruefe(e.entfallen === '12:00 Mittag',
+           'ein abgesagter Termin bleibt als entfallen im Rückblick');
+    pruefe(e.entfallenKarte === true, 'er steht als durchgestrichene Karte da');
+    pruefe(e.ohneWahl === true, 'ohne Entscheidung — da ist nichts zu wählen');
+    pruefe(e.dazuBlock === true, 'ein dazugekommener Block ist im Plan markiert');
+    pruefe(e.bilanz === '1 Termin, 1 abgesagt, 1 dazu',
+           'die Bilanz nennt beides');
+    pruefe(e.morgenOhneZeit === true,
+           'eine belegte Zeit nimmt die Aufgabe nicht mit nach morgen');
+    pruefe(e.morgenImPlan === true, 'im Plan von morgen steht sie trotzdem');
+    pruefe(e.morgenMitZeit === '09:00',
+           'ist die Zeit frei, wandert sie mit');
+    pruefe(e.offeneTage === 1, 'ein Tag ohne Rückblick wird gefunden');
+    pruefe(e.nachRuhen === 0, '„Ruhen lassen" schließt ihn ab, ohne Bilanz');
   }
 }
 
