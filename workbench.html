@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 3.14.0</title>
+<title>Workbench 3.15.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1206,6 +1206,41 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
 .tk-sym.an{border-color:var(--petrol);color:var(--petrol);background:var(--papier)}
 .tk-s-zeile{display:none;gap:8px;font-size:calc(var(--fs)*0.7);color:var(--grau);padding:0 0 6px}
 .tk-s-rest{flex:1;text-align:right}
+/* Der Planmodus */
+.p-sheet{background:var(--karte);border:1px solid var(--linie);border-radius:12px;
+  padding:12px 15px 15px;max-width:640px;margin:6px auto}
+.p-sheet h3{margin:0;font-size:calc(var(--fs)*1.05);font-weight:500}
+.p-unter{font-size:calc(var(--fs)*0.72);color:var(--grau);margin:2px 0 11px}
+.p-block{border:1px solid var(--linie);border-radius:10px;padding:6px 12px 8px;
+  margin-bottom:10px}
+.p-kopf{font-size:calc(var(--fs)*0.68);font-weight:600;color:var(--grau);
+  letter-spacing:.05em;text-transform:uppercase;margin:8px 0 3px}
+.p-zeile{display:flex;align-items:center;gap:9px;padding:6px 0;
+  border-top:1px solid var(--linie)}
+.p-zeile:first-child{border-top:0}
+.p-frei{display:flex;align-items:center;gap:9px;padding:6px 0;
+  border-top:1px dashed var(--linie);color:var(--grau-hell)}
+.p-zeit{flex:0 0 46px;font-size:calc(var(--fs)*0.76);color:var(--grau);
+  font-variant-numeric:tabular-nums}
+.p-titel{flex:1;min-width:0;font-size:calc(var(--fs)*0.84);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.p-frei .p-titel{font-size:calc(var(--fs)*0.76)}
+.p-dauer{flex:0 0 auto;font-size:calc(var(--fs)*0.7);color:var(--grau-hell)}
+.p-dauer.knopf{border:1px solid var(--linie);border-radius:20px;padding:1px 8px;
+  background:var(--karte);cursor:pointer;font-family:inherit}
+.p-weg{border:0;background:none;color:var(--grau);font-size:calc(var(--fs)*0.9);
+  cursor:pointer;padding:0 2px}
+.p-kandidat{display:flex;align-items:center;gap:6px;padding:6px 0;
+  border-top:1px solid var(--linie)}
+.p-k-titel{flex:1;min-width:0;font-size:calc(var(--fs)*0.84);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.p-slot{font:inherit;font-size:calc(var(--fs)*0.72);padding:3px 9px;
+  border:1px solid var(--linie);border-radius:20px;background:var(--karte);
+  color:var(--weinrot);cursor:pointer}
+.p-reihe{display:flex;gap:6px;align-items:center;margin-top:8px}
+.t-planstand{font-size:calc(var(--fs)*0.66);color:var(--grau-hell);
+  font-weight:400;letter-spacing:0;text-transform:none}
+
 /* Der Abendrückblick */
 .r-sheet{background:var(--karte);border:1px solid var(--linie);border-radius:12px;
   padding:12px 15px 15px;max-width:640px;margin:6px auto}
@@ -1693,6 +1728,15 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
   <div class="vhblatt einfachliste" id="abSeiteBlatt"></div>
 </div>
 
+<div class="schirm" id="schirmPlanen">
+  <div class="vh-kopf">
+    <div class="vh-zeile">
+      <button type="button" class="pille" onclick="planSchliessen()">Zurück</button>
+    </div>
+  </div>
+  <div class="vhblatt einfachliste" id="planBlatt"></div>
+</div>
+
 <div class="schirm" id="schirmRueckblick">
   <div class="vh-kopf">
     <div class="vh-zeile">
@@ -2064,7 +2108,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '3.14.0';
+var APP_VERSION = '3.15.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4941,6 +4985,24 @@ function unterKopf(name, titel, zahl) {
        + titel + (zahl ? ('<i>' + zahl + '</i>') : '') + '</button>';
 }
 
+/* Im Kopf des Tagesplans steht, ob er schon aufgestellt wurde. */
+function planMarkeHtml(is) {
+  var p = planFest(is);
+  if (p) {
+    return '<span class="t-planstand">steht seit ' + esc(kurzUhr(p.gestellt))
+         + '</span>';
+  }
+  if (is !== isoDatum()) { return ''; }
+  return '<button class="t-rueck" type="button" onclick="planStarten()">'
+       + 'Plan aufstellen →</button>';
+}
+
+function kurzUhr(stempel) {
+  var d = new Date(stempel);
+  return String(d.getHours()).padStart(2, '0') + ':'
+       + String(d.getMinutes()).padStart(2, '0');
+}
+
 /* Statt einer Begrüßungszeile über allem: das Liegengebliebene dort,
    wo es hingehört. */
 function nachzueglerMarke(is) {
@@ -5127,6 +5189,237 @@ function tagwSchritte() {
 
 function tagwFaellig() {
   return (DB.einstellungen.tagwZuletzt || '') !== isoDatum();
+}
+
+/* ============================================================
+   Den Tagesplan aufstellen
+
+   Morgens: Die Kalendertermine stehen fest, dazwischen liegen freie
+   Strecken. In sie setzt man Aufgaben — mit Uhrzeit und Dauer, damit
+   sie Blöcke werden und keine Wünsche. Am Ende wird der Plan
+   festgeschrieben: Er wird weiter nachgeführt, aber es bleibt
+   festgehalten, was morgens darin stand.
+   ============================================================ */
+
+var PLAN_VON = 7 * 60;
+var PLAN_BIS = 21 * 60;
+var PLAN_DAUER = { haupt: 60, klein: 15 };
+var planTag = '';
+
+/* zeitAusMinuten gibt es schon weiter unten — eine zweite Fassung
+   wäre nur eine Quelle für Abweichungen. */
+function aufgabeDauer(a) {
+  if (a.dauer) { return Number(a.dauer); }
+  return PLAN_DAUER[a.art === 'klein' ? 'klein' : 'haupt'];
+}
+
+/* Was den Tag belegt: Termine und alles, was schon eine Uhrzeit hat. */
+function belegteBloecke(is) {
+  var e = tagesEintraege(is);
+  var aus = [];
+  var i;
+  for (i = 0; i < e.verlauf.length; i++) {
+    var v = e.verlauf[i];
+    if (v.art === 'termin') {
+      if (v.t.ganztags || !v.t.von) { continue; }
+      aus.push({ von: minutenAus(v.t.von),
+                 bis: v.t.bis ? minutenAus(v.t.bis) : (minutenAus(v.t.von) + 60),
+                 titel: v.t.titel, fest: true });
+    } else {
+      var von = minutenAus(v.a.uhrzeit);
+      aus.push({ von: von, bis: von + aufgabeDauer(v.a), titel: v.a.titel,
+                 fest: false, id: v.a.id });
+    }
+  }
+  aus.sort(function (x, y) { return x.von - y.von; });
+  return aus;
+}
+
+/* Die Lücken dazwischen — nur die, in die überhaupt etwas passt. */
+function freieStrecken(is) {
+  var belegt = belegteBloecke(is);
+  var aus = [];
+  var lauf = PLAN_VON;
+  var i;
+  for (i = 0; i < belegt.length; i++) {
+    if (belegt[i].von > lauf) {
+      aus.push({ von: lauf, bis: belegt[i].von });
+    }
+    if (belegt[i].bis > lauf) { lauf = belegt[i].bis; }
+  }
+  if (PLAN_BIS > lauf) { aus.push({ von: lauf, bis: PLAN_BIS }); }
+  return aus.filter(function (l) { return (l.bis - l.von) >= 15; });
+}
+
+/* Wer kommt in Frage? Was heute ansteht und noch keine Zeit hat, dann
+   das Wochenfach. */
+function planKandidaten(is) {
+  var e = tagesEintraege(is);
+  var heute = e.haupt.concat(e.klein).filter(function (a) {
+    return !a.schritt && !a.uhrzeit;
+  });
+  var woche = (DB.aufgaben || []).filter(function (a) {
+    if (a.status === 'erledigt' || a.wiederholung) { return false; }
+    if (kontextVerborgen(a.kontext)) { return false; }
+    if (!passtZumTag(a.kontext)) { return false; }
+    return a.planung === 'woche' && !a.uhrzeit;
+  });
+  return { heute: heute, woche: woche };
+}
+
+function planSetzen(id, minuten) {
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  a.uhrzeit = zeitAusMinuten(minuten);
+  a.planung = planTag;
+  if (!a.dauer) { a.dauer = aufgabeDauer(a); }
+  a.geaendert = jetzt();
+  spaeterSichern();
+  planZeichnen();
+}
+
+function planLoesen(id) {
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  a.uhrzeit = '';
+  a.geaendert = jetzt();
+  spaeterSichern();
+  planZeichnen();
+}
+
+function planDauerUm(id) {
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  var stufen = [15, 30, 45, 60, 90, 120, 180];
+  var jetztD = aufgabeDauer(a);
+  var i;
+  for (i = 0; i < stufen.length; i++) {
+    if (stufen[i] > jetztD) { a.dauer = stufen[i]; break; }
+  }
+  if (i === stufen.length) { a.dauer = stufen[0]; }
+  a.geaendert = jetzt();
+  spaeterSichern();
+  planZeichnen();
+}
+
+/* Festschreiben heißt nicht einfrieren: Der Plan wird weiter
+   nachgeführt, aber es bleibt festgehalten, was morgens darin stand. */
+function planFest(is) {
+  var p = DB.plaene && DB.plaene[is];
+  return p || null;
+}
+
+function planFestschreiben() {
+  if (!DB.plaene) { DB.plaene = {}; }
+  var is = planTag;
+  var belegt = belegteBloecke(is);
+  DB.plaene[is] = {
+    gestellt: jetzt(),
+    eintraege: belegt.map(function (b) {
+      return { von: zeitAusMinuten(b.von), titel: b.titel,
+               id: b.id || '', fest: b.fest };
+    })
+  };
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  melde('Der Tagesplan steht.', 'gut');
+  zeigeSchirm('Tag');
+  tagZeichnen();
+}
+
+function planStarten() {
+  planTag = tagOffen || isoDatum();
+  zeigeSchirm('Planen');
+}
+
+function planSchliessen() {
+  zeigeSchirm('Tag');
+  tagZeichnen();
+}
+function planZeileHtml(b) {
+  var h = '<div class="p-zeile' + (b.fest ? ' fest' : '') + '">';
+  h += '<span class="p-zeit">' + zeitAusMinuten(b.von) + '</span>';
+  h += '<span class="p-titel">' + esc(b.titel) + '</span>';
+  if (b.fest) {
+    h += '<span class="p-dauer">' + (b.bis - b.von) + ' Min.</span>';
+  } else {
+    h += '<button class="p-dauer knopf" type="button" onclick="planDauerUm(\''
+       + esc(b.id) + '\')" title="Dauer ändern">' + (b.bis - b.von) + ' Min.</button>';
+    h += '<button class="p-weg" type="button" onclick="planLoesen(\'' + esc(b.id)
+       + '\')" title="Wieder aus dem Plan nehmen">×</button>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function planKandidatHtml(a, luecken) {
+  var h = '<div class="p-kandidat"><span class="p-k-titel">' + esc(a.titel) + '</span>';
+  var i;
+  for (i = 0; i < luecken.length && i < 3; i++) {
+    h += '<button class="p-slot" type="button" onclick="planSetzen(\'' + esc(a.id)
+       + '\',' + luecken[i].von + ')">' + zeitAusMinuten(luecken[i].von) + '</button>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function planZeichnen() {
+  var blatt = document.getElementById('planBlatt');
+  if (!blatt) { return; }
+  var is = planTag || isoDatum();
+  var d = ausIso(is);
+  var belegt = belegteBloecke(is);
+  var luecken = freieStrecken(is);
+  var k = planKandidaten(is);
+  var fest = planFest(is);
+
+  var h = '<div class="p-sheet">';
+  h += '<h3>Tagesplan aufstellen</h3>';
+  h += '<div class="p-unter">' + WOCHENTAGE_LANG[d.getDay()] + ', ' + d.getDate() + '. '
+     + MONATE_LANG[d.getMonth()] + (fest ? ' · steht bereits' : '') + '</div>';
+
+  h += '<div class="p-block">';
+  var i, lauf = PLAN_VON, l = 0;
+  for (i = 0; i < belegt.length; i++) {
+    while (l < luecken.length && luecken[l].von < belegt[i].von) {
+      h += '<div class="p-frei"><span class="p-zeit">'
+         + zeitAusMinuten(luecken[l].von) + '</span><span class="p-titel">frei · '
+         + dauerText(zeitAusMinuten(luecken[l].von), zeitAusMinuten(luecken[l].bis))
+         + '</span></div>';
+      l++;
+    }
+    h += planZeileHtml(belegt[i]);
+  }
+  while (l < luecken.length) {
+    h += '<div class="p-frei"><span class="p-zeit">'
+       + zeitAusMinuten(luecken[l].von) + '</span><span class="p-titel">frei · '
+       + dauerText(zeitAusMinuten(luecken[l].von), zeitAusMinuten(luecken[l].bis))
+       + '</span></div>';
+    l++;
+  }
+  if (!belegt.length) {
+    h += '<div class="tleer">Der Tag ist noch ganz leer.</div>';
+  }
+  h += '</div>';
+
+  h += '<div class="p-block"><div class="p-kopf">Was soll hinein?</div>';
+  if (!k.heute.length && !k.woche.length) {
+    h += '<div class="tleer">Nichts mehr offen.</div>';
+  }
+  for (i = 0; i < k.heute.length; i++) { h += planKandidatHtml(k.heute[i], luecken); }
+  if (k.woche.length) {
+    h += '<div class="p-kopf">Aus dieser Woche</div>';
+    for (i = 0; i < k.woche.length && i < 8; i++) {
+      h += planKandidatHtml(k.woche[i], luecken);
+    }
+  }
+  h += '</div>';
+
+  h += '<div class="p-reihe"><button type="button" class="r-kn leise" '
+     + 'onclick="planSchliessen()">Später</button><span style="flex:1"></span>'
+     + '<button type="button" class="r-kn stark" onclick="planFestschreiben()">'
+     + (fest ? 'Plan neu festschreiben' : 'Plan festschreiben') + '</button></div>';
+  blatt.innerHTML = h + '</div>';
 }
 
 /* ============================================================
@@ -6243,7 +6536,7 @@ function tagZeichnen() {
     if (eintragVorbei(e.verlauf[i], is)) { vorbeiZahl++; }
   }
   h += '<div class="tabschnitt' + (vorbeiOffen ? ' aufgeklappt' : '')
-     + '" data-kurz="Tagesverlauf">' + abschnittKopf('Tagesverlauf', 0);
+     + '" data-kurz="Tagesplan">' + abschnittKopf('Tagesplan', 0, planMarkeHtml(is));
   /* Ganztägiges hat keine Uhrzeit und gehört deshalb nicht an die
      Zeitschiene: je eine schlichte Zeile darüber. */
   var g;
@@ -6266,12 +6559,8 @@ function tagZeichnen() {
     h += '</div>';
   }
 
-  if (vorbeiZahl) {
-    h += '<button class="tfalt vorbei-falt" type="button" onclick="vorbeiUm()">'
-       + '<span>' + vorbeiZahl + (vorbeiZahl === 1 ? ' Termin vorbei' : ' Termine vorbei')
-       + '</span><svg class="' + (vorbeiOffen ? 'auf' : '') + '" viewBox="0 0 24 24">'
-       + '<path d="M6 9l6 6 6-6"></path></svg></button>';
-  }
+  /* Nichts wird mehr eingeklappt: Abends soll dastehen, was der Tag
+     war — auch das Vergangene. */
   if (!e.verlauf.length) { h += '<div class="tleer">Nichts mit fester Zeit.</div>'; }
   /* Eine Linie zeigt, wo im Tag man gerade steht — nur am heutigen Tag,
      an anderen gibt es kein „jetzt". */
@@ -7291,7 +7580,7 @@ function zeigeSchirm(name) {
   schirmOffen = name;
   var alle = ['Tag', 'Kalender', 'Vorhaben', 'Ablaeufe', 'Aufgaben',
               'Flaeche', 'Gedanken', 'Taetigkeiten', 'Tagwechsel', 'Rueckblick',
-              'Ablauf', 'Pinnwand', 'Migration', 'Diagnose'];
+              'Planen', 'Ablauf', 'Pinnwand', 'Migration', 'Diagnose'];
   var i;
   for (i = 0; i < alle.length; i++) {
     var s = document.getElementById('schirm' + alle[i]);
@@ -7307,6 +7596,7 @@ function zeigeSchirm(name) {
                   || ((name === 'Flaeche' || name === 'Gedanken'
                        || name === 'Taetigkeiten') && alle[i] === 'Vorhaben')
                   || (name === 'Rueckblick' && alle[i] === 'Tag')
+                  || (name === 'Planen' && alle[i] === 'Tag')
                   || (name === 'Ablauf' && alle[i] === 'Aufgaben')
                   || (name === 'Ablaeufe' && alle[i] === 'Aufgaben')
                   || ((name === 'Diagnose' || name === 'Tagwechsel')
@@ -7320,6 +7610,7 @@ function zeigeSchirm(name) {
   if (name === 'Taetigkeiten') { taetigZeichnen(); }
   if (name === 'Tagwechsel') { tagwZeichnen(); }
   if (name === 'Rueckblick') { rueckZeichnen(); }
+  if (name === 'Planen') { planZeichnen(); }
   if (name === 'Ablauf') { abDetailNeu(); }
   if (name === 'Pinnwand') { pinnwandZeichnen(); }
   if (name === 'Tag') { tagZeichnen(); kalenderNachholen(); }
