@@ -84,7 +84,7 @@ console.log('\n1. Bildschirme und Navigation');
   /* Seit v3.5.0 sind die Abläufe ein Reiter innerhalb der Aufgaben: Ein
      Ablauf ist etwas, das man abarbeitet. */
   const VERSTECKT = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
-                     'Tagwechsel', 'Ablauf', 'Ablaeufe'];
+                     'Tagwechsel', 'Ablauf', 'Ablaeufe', 'Rueckblick'];
   schirme.forEach(function (s) {
     if (VERSTECKT.indexOf(s) >= 0) {
       pruefe(navs.indexOf(s) < 0,
@@ -224,7 +224,7 @@ console.log('\n5. Element-IDs');
   /* Zusammengesetzte IDs wie 'schirm' + name */
   const schirme = [...QUELLE.matchAll(/id="schirm([A-Za-zÄÖÜäöü]+)"/g)].map(m => m[1]);
   const OHNE_KNOPF = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
-                      'Tagwechsel', 'Ablauf', 'Ablaeufe'];
+                      'Tagwechsel', 'Ablauf', 'Ablaeufe', 'Rueckblick'];
   schirme.forEach(function (s) {
     if (OHNE_KNOPF.indexOf(s) >= 0) {
       pruefe(imHtml.has('schirm' + s), 'ID schirm' + s + ' existiert (ohne Knopf)');
@@ -567,6 +567,63 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__rueckApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'g1\', titel:\'Vorlage\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h,'
+                 + '       uhrzeit:\'10:00\' },'
+                 + '     { id:\'g2\', titel:\'Laufen\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h,'
+                 + '       uhrzeit:\'16:30\' },'
+                 + '     { id:\'r1\', titel:\'Oskar\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[0,1,2,3,4,5,6] } },'
+                 + '     { id:\'k1\', titel:\'Morgenstart\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'klein\', planung: h } ];'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   var off = -new Date().getTimezoneOffset();'
+                 + '   var zo = (off >= 0 ? \'+\' : \'-\')'
+                 + '     + String(Math.floor(Math.abs(off) / 60)).padStart(2, \'0\')'
+                 + '     + \':\' + String(Math.abs(off) % 60).padStart(2, \'0\');'
+                 + '   eintraegeEinsortieren([{ id:\'t1\', summary:\'Weekly\','
+                 + '     start:{ dateTime: h + \'T09:00:00\' + zo },'
+                 + '     end:{ dateTime: h + \'T10:00:00\' + zo } }], \'Alex\','
+                 + '     \'beruflich\');'
+                 + '   tagOffen = h;'
+                 + '   rueckStarten();'
+                 + '   var blatt = function(){'
+                 + '     return document.getElementById(\'rueckBlatt\').innerHTML; };'
+                 + '   var r = { terminKarte: /r-name">Weekly/.test(blatt()) };'
+                 + '   rueckSetzen(\'termin:t1:\' + h, \'da\');'
+                 + '   rueckWeiter(1);'
+                 + '   r.geplantKarte = /r-name">Vorlage/.test(blatt());'
+                 + '   r.vierWahlen = ((blatt().split(\'r-name">Vorlage\')[1] || \'\')'
+                 + '     .split(\'r-karte\')[0].match(/<button/g) || []).length;'
+                 + '   rueckSetzen(\'aufgabe:g1\', \'erledigt\');'
+                 + '   r.erledigtWirkt = aufgabeFinden(\'g1\').status;'
+                 + '   rueckSetzen(\'aufgabe:g2\', \'morgen\');'
+                 + '   r.morgenWirkt = (aufgabeFinden(\'g2\').planung'
+                 + '     === tagePlus(h, 1) && aufgabeFinden(\'g2\').uhrzeit === \'16:30\');'
+                 + '   r.imStandGeblieben = rueckStoff(h).geplant.length;'
+                 + '   rueckWeiter(1);'
+                 + '   rueckSetzen(\'aufgabe:k1\', \'erledigt\');'
+                 + '   var b = rueckBilanz(h);'
+                 + '   r.bilanz = b.geplantFertig + \' von \' + b.geplant;'
+                 + '   r.kleinNichtGeplant = (b.geplantFertig === 1);'
+                 + '   rueckWeiter(1);'
+                 + '   rueckNotiz(\'Der Vormittag war richtig gesetzt.\');'
+                 + '   r.notiz = DB.rueckblicke[h].notiz;'
+                 + '   rueckFeierabend();'
+                 + '   r.abgeschlossen = rueckFertig(h);'
+                 + '   r.dannKeinMond = rueckFaellig(h);'
+                 + '   termineNachTag = {}; kalenderListe = [];'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__jetztApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -11206,6 +11263,60 @@ console.log('\n128. Die Jetzt-Linie');
     pruefe(e.linieStelle === 2,
            'sie steht vor dem ersten Eintrag, der noch nicht begonnen hat');
     pruefe(e.morgenLeer === true, 'an einem anderen Tag bleibt beides leer');
+  }
+}
+
+/* ============================================================
+   129. Der Abendrueckblick
+   Grund: Abends wird der Tag abgeschlossen — Termin fuer Termin,
+   Aufgabe fuer Aufgabe, dann das Uebrige in zwei Bloecken, dann die
+   Bilanz „geplant gegen geworden" und ein Satz zum Feierabend.
+   ============================================================ */
+console.log('\n129. Abendrückblick');
+{
+  const skript = hauptSkript();
+  const r = globalThis.__rueckApi;
+
+  ['rueckSatz', 'rueckFertig', 'rueckFaellig', 'rueckStarten', 'rueckWeiter',
+   'rueckStoff', 'rueckSetzen', 'rueckNotiz', 'rueckBilanz', 'rueckZeichnen',
+   'rueckFeierabend', 'rueckAusStand'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/id="schirmRueckblick"/.test(QUELLE) && /id="rueckBlatt"/.test(QUELLE),
+         'der Rückblick hat einen eigenen Bildschirm');
+  pruefe(/id="tkMond"/.test(QUELLE) && /id="tkAbschluss"/.test(QUELLE),
+         'am Handy führt ein Mond hinein, am Rechner ein Wort');
+  const rf = skript.match(/function rueckFaellig\([\s\S]*?\n\}/);
+  pruefe(rf && /uhrzeitJetzt\(\) >= RUECK_AB/.test(rf[0]),
+         'er meldet sich erst am späten Nachmittag');
+  pruefe(rf && /rueckFertig\(is\)\) \{ return false; \}/.test(rf[0]),
+         'und nicht mehr, wenn der Tag abgeschlossen ist');
+  const rs = skript.match(/function rueckStarten\([\s\S]*?\n\}/);
+  pruefe(rs && /if \(!r\.stoff\)/.test(rs[0]),
+         'beim Start wird festgehalten, was der Tag vorhatte');
+  pruefe(/var RUECK_SCHRITTE = \['termine', 'geplant', 'uebriges', 'bilanz'\]/
+         .test(skript), 'vier Abschnitte: Termine, Geplantes, Übriges, Bilanz');
+
+  if (!r) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = r.pruefe();
+    pruefe(e.terminKarte === true, 'jeder Termin bekommt eine eigene Karte');
+    pruefe(e.geplantKarte === true, 'jede geplante Aufgabe ebenso');
+    pruefe(e.vierWahlen === 4,
+           'bei einer Aufgabe vier Antworten — nicht nur ja und nein');
+    pruefe(e.erledigtWirkt === 'erledigt', '„Erledigt" hakt sofort ab');
+    pruefe(e.morgenWirkt === true, '„Auf morgen" verschiebt mitsamt Uhrzeit');
+    pruefe(e.imStandGeblieben === 2,
+           'die verschobene bleibt trotzdem im Rückblick stehen');
+    pruefe(e.bilanz === '1 von 2', 'die Bilanz zählt geplant gegen geworden');
+    pruefe(e.kleinNichtGeplant === true,
+           'eine erledigte Kleinigkeit zählt nicht als geplante Aufgabe');
+    pruefe(e.notiz === 'Der Vormittag war richtig gesetzt.',
+           'die Notiz wird am Tag gespeichert');
+    pruefe(e.abgeschlossen === true, '„Feierabend" schließt den Tag');
+    pruefe(e.dannKeinMond === false, 'danach meldet er sich nicht mehr');
   }
 }
 
