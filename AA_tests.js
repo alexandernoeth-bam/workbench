@@ -972,37 +972,6 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   tagOffen = merkTag; DB = alt;'
                  + '   return r;'
                  + ' } };'
-                 + 'globalThis.__grussApi = {'
-                 + ' pruefe: function(){'
-                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
-                 + '   var merkD = DB.einstellungen.darstellung;'
-                 + '   var h = isoDatum();'
-                 + '   DB.einstellungen.darstellung = \'breit\';'
-                 + '   DB.aufgaben = [{ id:\'a1\', titel:\'Liegen\','
-                 + '     kontext:\'privat\', status:\'offen\', art:\'haupt\','
-                 + '     planung: tagePlus(h, -1) }];'
-                 + '   tagOffen = h;'
-                 + '   var streifen = function(){'
-                 + '     tagZeichnen();'
-                 + '     return document.getElementById(\'tkNachzuegler\'); };'
-                 + '   /* Die Prüfumgebung merkt sich keine Klassen — geprüft'
-                 + '      wird am Inhalt. */'
-                 + '   var r = { vorher: (streifen().innerHTML.indexOf(\'Tageswechsel\')'
-                 + '     >= 0) };'
-                 + '   grussSetzen(false);'
-                 + '   var el = streifen();'
-                 + '   r.nachAus = (el.innerHTML.indexOf(\'Tageswechsel\') >= 0);'
-                 + '   r.leer = (el.innerHTML === \'\');'
-                 + '   r.gemerkt = (DB.einstellungen.grussAus === true);'
-                 + '   r.tagwBleibt = /tagwStarten|tagwFaellig/.test('
-                 + '     String(tagKopfSchmalZeichnen));'
-                 + '   grussSetzen(true);'
-                 + '   r.wiederAn = (streifen().innerHTML.indexOf(\'Tageswechsel\')'
-                 + '     >= 0);'
-                 + '   DB.einstellungen.darstellung = merkD;'
-                 + '   tagOffen = merkTag; DB = alt;'
-                 + '   return r;'
-                 + ' } };'
                  + 'globalThis.__wiederTeilApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -11431,39 +11400,35 @@ console.log('\n125. Wiederkehrendes und Vorgänge');
 }
 
 /* ============================================================
-   126. Der Begruessungsstreifen laesst sich abschalten
-   Grund: Er steht den ganzen Tag auf der ersten Seite und sagt jeden
-   Tag dasselbe. Wer ihn nicht braucht, schaltet ihn in der Diagnose ab.
+   126. Der Begruessungsstreifen ohne Schalter
+   Grund: Mit v3.12.0 gibt es den eigenen Satz ueber dem Plan. Zwei Wege
+   fuer dieselbe Zeile waren einer zu viel — der Schalter ist mit
+   v4.5.0 wieder entfallen.
    ============================================================ */
-console.log('\n126. Begrüßung abschaltbar');
+console.log('\n126. Begrüßungsstreifen');
 {
   const skript = hauptSkript();
-  const g = globalThis.__grussApi;
 
-  ['grussZeigen', 'grussSetzen', 'zeichneGrussWahl'].forEach(function (f) {
-    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
-           'Funktion ' + f + ' ist definiert');
-  });
-  pruefe(/id="grussWahl"/.test(QUELLE), 'die Diagnose hat den Schalter');
-  pruefe(/zeichneGrussWahl\(\);/.test(skript), 'und zeichnet ihn beim Öffnen');
+  pruefe(!/grussZeigen|grussSetzen|zeichneGrussWahl/.test(skript),
+         'die drei Funktionen des Schalters sind ganz entfernt');
+  pruefe(!/id="grussWahl"/.test(QUELLE), 'in der Diagnose steht er nicht mehr');
   const nz = skript.match(/function nachzueglerZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(nz && /!grussZeigen\(\)/.test(nz[0]), 'der Streifen fragt danach');
-  const gs = skript.match(/function grussSetzen\([\s\S]*?\n\}/);
-  pruefe(gs && /DB\.einstellungen\.grussAus/.test(gs[0]) && /spaeterSichern/.test(gs[0]),
-         'die Wahl liegt im Bestand und wird abgeglichen');
-
-  if (!g) {
-    warn('Funktionen nicht auswertbar');
-  } else {
-    const e = g.pruefe();
-    pruefe(e.vorher === true, 'voreingestellt steht der Streifen da');
-    pruefe(e.nachAus === false, 'ausgeschaltet verschwindet er');
-    pruefe(e.leer === true, 'und lässt keine leere Zeile zurück');
-    pruefe(e.gemerkt === true, 'die Wahl bleibt erhalten');
-    pruefe(e.wiederAn === true, 'und lässt sich zurücknehmen');
-    pruefe(e.tagwBleibt === true,
-           'der Weg zum Tageswechsel bleibt — er hängt am Datum, nicht am Streifen');
-  }
+  pruefe(nz && /if \(!istBreit\(\)\) \{/.test(nz[0]),
+         'der Streifen hängt nur noch an der Breite');
+  pruefe(/id="leitsatzFeld"/.test(QUELLE),
+         'wer eine eigene Zeile will, schreibt sie in den eigenen Satz');
+  /* Seit v4.5.0 steht die Versionsprüfung bei der Technik, nicht mehr
+     zwischen den Dateiknöpfen. */
+  const technik = QUELLE.split('id="dg-technik"')[1] || '';
+  pruefe(technik.indexOf('versionPruefen') > 0,
+         '„Auf neue Fassung prüfen" steht unter Technik');
+  const datei = (QUELLE.split('id="dg-technik"')[0] || '');
+  pruefe(datei.indexOf('versionPruefen') < 0,
+         'und nicht mehr bei den Dateiknöpfen');
+  /* Der Weg zum Tageswechsel hängt am Datum, nicht am Streifen. */
+  pruefe(/tagwStarten|tagwFaellig/.test(String(skript.match(
+           /function tagKopfSchmalZeichnen\([\s\S]*?\n\}\n/) || '')),
+         'der Weg zum Tageswechsel bleibt am Datum');
 }
 
 /* ============================================================

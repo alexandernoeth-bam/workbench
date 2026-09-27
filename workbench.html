@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 4.4.0</title>
+<title>Workbench 4.5.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1879,7 +1879,6 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     <button type="button" id="knopfRecht" onclick="zugriffErlauben()">Zugriff erlauben</button>
     <button type="button" onclick="speichernJetzt()">Jetzt speichern</button>
     <button type="button" onclick="ladenJetzt()">Neu laden</button>
-    <button type="button" onclick="versionPruefen(true)">Auf neue Fassung prüfen</button>
     <button type="button" class="stark" onclick="handleVergessen()">Datei lösen</button>
   </div>
     </div>
@@ -1938,11 +1937,9 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
   <div class="feld-hinweis">Steht den ganzen Tag über dem Tagesplan, auf jedem
     Gerät gleich. Voreingestellt ist er aus.</div>
 
-  <div class="abschnitt-titel"><span>Begrüßung im Tag</span></div>
-  <div id="grussWahl"></div>
-  <div class="feld-hinweis">Der Streifen mit „Guten Tag" und dem Hinweis auf
-    Liegengebliebenes — am großen Bildschirm. Der Weg zum Tageswechsel bleibt
-    am Datum.</div>
+  <!-- Der Schalter für den Begrüßungsstreifen ist mit v4.5.0 entfallen:
+       Wer einen eigenen Satz über dem Plan haben will, schreibt ihn oben
+       hinein. Zwei Wege für dieselbe Zeile waren einer zu viel. -->
     </div>
   </div>
 
@@ -1994,6 +1991,13 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
       <svg class="dg-pfeil" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
     </button>
     <div class="dg-inhalt">
+  <div class="abschnitt-titel"><span>Fassung</span></div>
+  <div class="knopfreihe">
+    <button type="button" onclick="versionPruefen(true)">Auf neue Fassung prüfen</button>
+  </div>
+  <div class="feld-hinweis">Fragt beim Server nach, ob eine neuere Fassung
+    bereitliegt. Gehört zur Technik, nicht zur Datei.</div>
+
   <div class="abschnitt-titel"><span>Umgebung</span></div>
   <div id="umgebungListe"></div>
 
@@ -2196,7 +2200,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '4.4.0';
+var APP_VERSION = '4.5.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5161,7 +5165,7 @@ function nachzueglerZeichnen(is) {
   /* Der Streifen über allem ist weg: Am Handy verbrauchte er zwei
      Zeilen für eine Begrüßung. Der Tageswechsel meldet sich als Punkt
      am Datum, das Liegengebliebene als Marke im Aufgabenkopf. */
-  if (!istBreit() || !grussZeigen()) {
+  if (!istBreit()) {
     el.classList.remove('sichtbar');
     el.innerHTML = '';
     return;
@@ -8686,31 +8690,6 @@ function leitsatzZeichnen() {
   el.className = 'tag-leitsatz auf';
 }
 
-/* Der Begrüßungsstreifen lässt sich abschalten: Er sagt jeden Tag
-   dasselbe, und wer ihn gelesen hat, will ihn nicht wieder lesen. */
-function grussZeigen() {
-  return DB.einstellungen.grussAus !== true;
-}
-
-function grussSetzen(zeigen) {
-  DB.einstellungen.grussAus = !zeigen;
-  DB.einstellungen.stempel = jetzt();
-  spaeterSichern();
-  zeichneGrussWahl();
-  tagZeichnen();
-}
-
-function zeichneGrussWahl() {
-  var ziel = document.getElementById('grussWahl');
-  if (!ziel) { return; }
-  var an = grussZeigen();
-  ziel.innerHTML = '<div class="zeile"><div class="zeile-name">Streifen</div>'
-    + '<button class="d-wahl' + (an ? ' an' : '') + '" type="button" '
-    + 'onclick="grussSetzen(true)">zeigen</button>'
-    + '<button class="d-wahl' + (an ? '' : ' an') + '" type="button" '
-    + 'onclick="grussSetzen(false)">ausblenden</button></div>';
-}
-
 function zeichneFerien() {
   var ziel = document.getElementById('ferienListe');
   if (!ziel) { return; }
@@ -8979,7 +8958,6 @@ function zeichne() {
   zeichneArchiv();
   zeichneFarbwelt();
   zeichneDarstellung();
-  zeichneGrussWahl();
   zeichneLeitsatzWahl();
   zeichneRoutine();
   zeichneJtDatei();
