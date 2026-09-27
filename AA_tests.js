@@ -567,6 +567,65 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__tagPlanApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Vorlage\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'a2\', titel:\'Schrank\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'a3\', titel:\'Draussen\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'r1\', titel:\'Routine\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[0,1,2,3,4,5,6] } } ];'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   var off = -new Date().getTimezoneOffset();'
+                 + '   var zo = (off >= 0 ? \'+\' : \'-\')'
+                 + '     + String(Math.floor(Math.abs(off) / 60)).padStart(2, \'0\')'
+                 + '     + \':\' + String(Math.abs(off) % 60).padStart(2, \'0\');'
+                 + '   eintraegeEinsortieren([{ id:\'t1\', summary:\'Weekly\','
+                 + '     start:{ dateTime: h + \'T09:30:00\' + zo },'
+                 + '     end:{ dateTime: h + \'T11:00:00\' + zo } }], \'Alex\','
+                 + '     \'beruflich\');'
+                 + '   tagOffen = h;'
+                 + '   var namen = function(l){ return l.map(function(a){'
+                 + '     return a.titel || (a.satz ? a.satz.titel : \'\'); })'
+                 + '     .join(\',\'); };'
+                 + '   var e0 = tagesEintraege(h);'
+                 + '   var r = { vorPlan: namen(e0.haupt.concat(e0.klein)),'
+                 + '     kopfVorher: planMarkeHtml(h) };'
+                 + '   planStarten();'
+                 + '   planOeffnen(\'a1\'); planEntwurfZeit(\'11:30\');'
+                 + '   planUebernehmen();'
+                 + '   planOhneZeit(\'a2\');'
+                 + '   planFestschreiben();'
+                 + '   var e1 = tagesEintraege(h);'
+                 + '   r.bloecke = e1.verlauf.map(function(v){'
+                 + '     return (v.art === \'termin\') ? v.t.titel : v.a.titel; })'
+                 + '     .join(\',\');'
+                 + '   r.ohneZeit = namen(e1.haupt.concat(e1.klein));'
+                 + '   r.draussen = imPlan(h, \'a3\');'
+                 + '   r.nochInDerListe = !!aufgabeFinden(\'a3\');'
+                 + '   r.kopfNachher = planMarkeHtml(h);'
+                 + '   tagZeichnen();'
+                 + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   var hh = (b.match(/height:(\\d+)px/g) || [])'
+                 + '     .map(function(x){ return Number(x.slice(7, -2)); });'
+                 + '   r.eineStunde = hh.length ? hh[hh.length - 1] : 0;'
+                 + '   r.anderthalb = hh.length > 1 ? hh[hh.length - 2] : 0;'
+                 + '   planTag = h;'
+                 + '   planAufnehmen(h, \'a3\');'
+                 + '   r.dazuVermerkt = planDazu(h, \'a3\');'
+                 + '   planHeraus(\'a3\');'
+                 + '   r.nachHeraus = imPlan(h, \'a3\');'
+                 + '   termineNachTag = {}; kalenderListe = [];'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__planApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -618,9 +677,21 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.luecke2 = strecken().split(\',\')[1];'
                  + '   r.nichtMehrKandidat = !planKandidaten(h).vorn.some(function(a){'
                  + '     return a.id === \'a1\'; });'
-                 + '   r.markeVorher = /planStarten/.test(planMarkeHtml(h));'
+                 + '   r.markeVorher = /planStarten|Plan aufstellen/.test('
+                 + '     planMarkeHtml(h));'
+                 + '   DB.aufgaben.push({ id:\'x9\', titel:\'Draussen\','
+                 + '     kontext:\'privat\', status:\'offen\', art:\'haupt\','
+                 + '     planung: h });'
+                 + '   DB.aufgaben.push({ id:\'r9\', titel:\'Routine\','
+                 + '     kontext:\'privat\', status:\'offen\', art:\'haupt\','
+                 + '     wiederholung:{ takt:\'woche\', tage:[0,1,2,3,4,5,6] } });'
                  + '   planFestschreiben();'
                  + '   r.festEintraege = planFest(h).eintraege.length;'
+                 + '   var eTag = tagesEintraege(h);'
+                 + '   var titelImTag = eTag.haupt.concat(eTag.klein)'
+                 + '     .map(function(a){ return a.titel || \'\'; });'
+                 + '   r.nichtImPlanWeg = (titelImTag.indexOf(\'Draussen\') < 0);'
+                 + '   r.routineBleibt = (titelImTag.indexOf(\'Routine\') >= 0);'
                  + '   r.markeNachher = /steht seit /.test(planMarkeHtml(h));'
                  + '   planLoesen(\'a1\');'
                  + '   r.gelöst = aufgabeFinden(\'a1\').uhrzeit;'
@@ -717,9 +788,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     laeuftRest: knapp || /noch /.test(karte.innerHTML),'
                  + '     laeuftDanach: knapp || /danach /.test(karte.innerHTML),'
                  + '     laeuftKlasse: knapp || /laeuft/.test(karte.className),'
-                 + '     linieDa: knapp || /tjetzt-wort/.test(b),'
-                 + '     linieStelle: knapp ? 2'
-                 + '       : (b.split(\'tjetzt-wort\')[0].match(/tzt-titel/g) || []).length };'
+                 + '     linieDa: knapp || /splan-jetzt/.test(b) };'
                  + '   termineNachTag = {};'
                  + '   eintraegeEinsortieren([ev(\'Spaeter\', 90, 150)], \'Alex\','
                  + '     \'beruflich\');'
@@ -729,7 +798,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   tagOffen = tagePlus(h, 1); tagZeichnen();'
                  + '   r.morgenLeer = (document.getElementById(\'tagJetzt\').innerHTML === \'\''
                  + '     && document.getElementById(\'tagBlatt\').innerHTML'
-                 + '        .indexOf(\'tjetzt-wort\') < 0);'
+                 + '        .indexOf(\'splan-jetzt\') < 0);'
                  + '   termineNachTag = {}; kalenderListe = [];'
                  + '   tagOffen = merkTag; DB = alt;'
                  + '   return r;'
@@ -1067,8 +1136,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     \'Familienevents\', \'privat\');'
                  + '   tagOffen = h; tagZeichnen();'
                  + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
-                 + '   var m = b.match(/tzt-zeit"><b>([^<]*)<\\/b><i>([^<]*)/);'
-                 + '   var r = { zeit: m ? m[1] : \'\', dauer: m ? m[2] : \'\' };'
+                 + '   var m = b.match(/splan-lab">([^<]*)/);'
+                 + '   var r = { zeit: m ? m[1] : \'\','
+                 + '     dauer: /splan-blk[^"]*kurz/.test(b) };'
                  + '   r.ohneKalender = (b.indexOf(\'Familienevents\') < 0);'
                  + '   r.ohneTakt = (b.indexOf(\'täglich\') < 0);'
                  + '   var e = tagesEintraege(h);'
@@ -1217,19 +1287,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   artImJahrUm(\'termin\');'
                  + '   tagOffen = h; tagZeichnen();'
                  + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
-                 + '   var r = { zeilen: (b.match(/class="tzeile-termin/g) || []).length };'
-                 + '   var re = /tzt-zeit"><b>([^<]*)<\\/b>(?:<i>([^<]*)<\\/i>)?'
-                 + '<\\/span><span class="tzt-txt"[^>]*><span class="tzt-titel">'
-                 + '([^<]*)<\\/span>(?:<span class="tmarke">([^<]*))?/g;'
-                 + '   var karte = {};'
-                 + '   var m;'
-                 + '   while ((m = re.exec(b)) !== null) {'
-                 + '     karte[m[3]] = { dauer: m[2] || \'\', marke: m[4] || \'\' }; }'
-                 + '   r.dauer = (karte.Weekly || {}).dauer;'
-                 + '   r.vorhaben = (karte.Weekly || {}).marke;'
-                 + '   r.kalender = (karte[\'Fußball\'] || {}).marke;'
-                 + '   r.laeuftHinterlegt = knapp'
-                 + '     || /tzeile-termin laeuft/.test(b);'
+                 + '   var r = { zeilen: (b.match(/class="splan-blk/g) || []).length };'
+                 + '   r.kalender = (b.indexOf(\'Alex\') >= 0) ? \'Alex\' : \'\';'
                  + '   r.keinOrt = (b.indexOf(\'Rasta-Dome\') < 0'
                  + '     && b.indexOf(\'Saisonplan\') < 0);'
                  + '   r.ohnePunkt = (b.indexOf(\'tzt-punkt\') < 0);'
@@ -6588,8 +6647,10 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
      zwei Zuschnitte. */
   /* Seit v3.15.0 heißt der Abschnitt Tagesplan — er wird morgens
      aufgestellt, nicht nur beobachtet. */
+  /* Seit v4.0.0 zeigt der Tag den Stundenplan; daneben steht, was im
+     Plan ohne feste Zeit dabei ist. */
   const erwarteteFolge = ['[links]', 'Tagesplan', '[rechts]',
-                          'Aufgaben', 'Kleinigkeiten', 'Aktivitäten'];
+                          'Ohne feste Zeit', 'Kleinigkeiten', 'Aktivitäten'];
   pruefe(folge.join(',') === erwarteteFolge.join(','),
          'die Abschnitte stehen in der vereinbarten Folge und Spalte'
          + (folge.join(',') === erwarteteFolge.join(',') ? '' : ' — ist: ' + folge.join(' → ')));
@@ -6817,7 +6878,7 @@ console.log('\n55. Ganztägiges im Tagesverlauf');
   pruefe(!/\.tganz\{[^}]*tv-schiene/.test(QUELLE) && /\.tganz\{display:flex/.test(QUELLE),
          'sie tragen keine Zeitspalte');
   const stelleGanz = tag ? tag[0].indexOf('class="tganz') : -1;
-  const stelleZeit = tag ? tag[0].indexOf('verlaufHtml(') : -1;
+  const stelleZeit = tag ? tag[0].indexOf('stundenplanHtml(') : -1;
   pruefe(stelleGanz > -1 && stelleZeit > -1 && stelleGanz < stelleZeit,
          'sie stehen ganz oben, vor allem mit Uhrzeit');
 
@@ -7313,11 +7374,14 @@ console.log('\n62. Termin-Abläufe und nächste Woche');
            'Funktion ' + f + ' ist definiert');
   });
 
-  const zeile = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
+  /* Seit v4.0.0 zeichnet der Tag einen Stundenplan; das Anheften eines
+     Vorgangs steht im Terminblatt. */
+  const zeile = skript.match(/function terminBlattHtml\([\s\S]*?\n\}\n/);
   pruefe(zeile && /terminAblaufWahl\(/.test(zeile[0]),
-         'jede Terminzeile bietet das Anheften an');
-  pruefe(zeile && /t-ablauf an[\s\S]{0,200}schritteFertig\(lauf\)/.test(zeile[0]),
-         'ein angehefteter Ablauf zeigt seinen Stand in der Zeile');
+         'das Terminblatt bietet das Anheften an');
+  const tgz = skript.match(/function taetigAblaufHtml\([\s\S]*?\n\}\n/);
+  pruefe(tgz && /durchlaufAbhakenOeffnen\(/.test(tgz[0]),
+         'ein angehefteter Vorgang zeigt seinen Stand auf der Tätigkeitenseite');
   pruefe(/\.t-ablauf\{[^}]*font-size:calc\(var\(--fs\)\*0\.6/.test(QUELLE),
          'die Pille ist kleiner gesetzt als der Termintitel');
   pruefe(/\.t-ablauf\{[^}]*align-self:flex-start/.test(QUELLE),
@@ -7514,9 +7578,8 @@ console.log('\n65. Ablauf und Termin verbinden');
   pruefe(loesen && /terminId = null/.test(loesen[0]), 'Lösen trennt nur die Verbindung');
   pruefe(loesen && !/splice/.test(loesen[0]), 'der Durchlauf bleibt bestehen');
 
-  const zeile = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
-  pruefe(zeile && /terminAblaufLoesen\(/.test(zeile[0]),
-         'in der Tageszeile lässt sich die Verbindung lösen');
+  pruefe(/onclick="terminAblaufLoesen\(/.test(skript),
+         'im Terminblatt lässt sich die Verbindung lösen');
   const detail = [abSeiteQuelle()];
   pruefe(detail && /a\.terminId/.test(detail[0]),
          'der Durchlauf nennt seinen Termin');
@@ -7726,10 +7789,10 @@ console.log('\n68. Abhakblatt');
   pruefe(blatt && /abDetailOeffnen\(/.test(blatt[0]),
          'ein Knopf führt in die Pflegefläche');
 
-  /* Die Aufrufe aus Tag und Kalender gehen aufs Abhakblatt */
-  const verlauf = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
+  /* Die Aufrufe gehen aufs Abhakblatt */
+  const verlauf = skript.match(/function pinOeffnen\([\s\S]*?\n\}\n/);
   pruefe(verlauf && /durchlaufAbhakenOeffnen\(/.test(verlauf[0]),
-         'die Terminzeile im Tag führt zum Abhaken');
+         'ein Zettel auf der Pinnwand führt zum Abhaken');
   /* Seit v0.94.0 führt ein Schritt im Tag in den Bearbeiten-Dialog,
      genau zu diesem Schritt — dort wird geschoben und geändert. */
   const klammer = skript.match(/function ablaufKlammerHtml\([\s\S]*?\n\}\n/);
@@ -9074,11 +9137,11 @@ console.log('\n86. Art im Tagesplan');
          'die Art steht nicht mehr in der Tageszeile');
   /* Seit v2.7.0 ein Termin, eine Zeile: Uhrzeit, Farbstrich, Punkt für
      die Art, Titel mit „…", rechts Dauer und Vorhaben. */
-  const vlh = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
-  pruefe(vlh && /class="tzeile-termin/.test(vlh[0]) && /class="tzt-titel"/.test(vlh[0]),
-         'ein Termin steht in einer Zeile');
+  const vlh = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
+  pruefe(vlh && /class="splan-blk/.test(vlh[0]),
+         'ein Termin steht als Block im Stundenplan');
   pruefe(vlh && !/artFarbe/.test(vlh[0]),
-         'die Art steht nicht mehr in der Tageszeile — sie sagte dort nichts');
+         'die Art steht nicht im Block — sie sagte dort nichts');
   pruefe(/\.tzt-titel\{[^}]*-webkit-line-clamp:2/.test(QUELLE),
          'ein langer Titel bekommt zwei Zeilen, dann „…"');
   /* Die Klasse der Terminzeile hat gewechselt; die Faltregel muss sie
@@ -9087,7 +9150,7 @@ console.log('\n86. Art im Tagesplan');
          'Vergangenes ist zugeklappt, in beiden Zeilenformen');
   pruefe(/\.tabschnitt\.aufgeklappt \.tzeile-termin\.vorbei\{display:flex\}/.test(QUELLE),
          'und wird beim Aufklappen sichtbar');
-  pruefe(vlh && !/t\.ort/.test(vlh[0]),
+  pruefe(vlh && !/\.ort/.test(vlh[0]),
          'Ort und Beschreibung stehen im Terminblatt — sie machten aus einem Termin acht Zeilen');
   pruefe(/\.tzt-rechts\{[^}]*text-overflow:ellipsis/.test(QUELLE),
          'ein langer Vorhabensname wird gekürzt');
@@ -10126,10 +10189,12 @@ console.log('\n104. Termine an Vorhaben');
   const vw = skript.match(/function vorhabenWahlHtml\([\s\S]*?\n\}/);
   pruefe(vw && /vorhabenOptionenHtml\(/.test(vw[0]),
          'Aufgaben und Termine teilen sich die Vorhabenwahl');
-  const vl = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
-  pruefe(vl && /terminBlattOeffnen\(/.test(vl[0]), 'ein Termin im Tag öffnet sein Blatt');
-  pruefe(vl && /tmarke">' \+ esc\(tvhO\.name\)/.test(vl[0]),
-         'und zeigt sein Vorhaben als Marke unter dem Titel');
+  const sp2 = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
+  const sp3 = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
+  pruefe(sp3 && /terminBlattOeffnen\(/.test(sp3[0]),
+         'ein Termin im Tag öffnet sein Blatt');
+  pruefe(sp2 && /terminBlattOeffnen/.test(sp2[0]),
+         'ein Tipp auf einen Block öffnet sein Blatt');
   pruefe(/class="tg-kasten/.test(skript) && /\.tg-kasten\{flex:0 0 19px;width:19px;height:19px/
          .test(QUELLE),
          'das Kästchen der Seite hat eigene Maße — es fiel sonst zu einem Strich zusammen');
@@ -10507,9 +10572,9 @@ console.log('\n112. Tagessicht in Karten');
          'Aufgaben und Kleinigkeiten stehen als Zwischenüberschrift darin');
   pruefe(tz && (tz[0].match(/unterOffen\(/g) || []).length === 2,
          'und lassen sich einzeln zuklappen');
-  const vlz = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
-  pruefe(vlz && (vlz[0].match(/tzeile-termin/g) || []).length === 2,
-         'eine Aufgabe mit Uhrzeit steht in derselben Zeilenform wie ein Termin');
+  const vlz = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
+  pruefe(vlz && /eigen/.test(vlz[0]),
+         'eine Aufgabe mit Uhrzeit steht als eigener Block, hell abgesetzt');
   pruefe(!/\.tzeile-termin\{[^}]*border-top/.test(QUELLE),
          'im Tagesverlauf trennt keine Linie mehr');
   pruefe(/\.tmarke\{[^}]*background:none/.test(QUELLE),
@@ -10524,8 +10589,8 @@ console.log('\n112. Tagessicht in Karten');
     pruefe(e.zaehler === '3 Termine · 3 Std. 30 belegt · 3 Aufgaben · 3 Kleinigkeiten'
            + ' · 1 erledigt',
            'der Kopf sagt, wie voll der Tag ist — der Ablaufschritt zählt als Kleinigkeit');
-    pruefe(e.gruppen === 'Tagesplan,Aufgaben,Kleinigkeiten',
-           'am Rechner drei Flächen: Tagesplan, Aufgaben, Kleinigkeiten');
+    pruefe(e.gruppen === 'Tagesplan,Ohne feste Zeit,Kleinigkeiten',
+           'am Rechner drei Flächen: Tagesplan, Ohne feste Zeit, Kleinigkeiten');
     pruefe(e.zahlen === '0,0,0', 'ohne Zähler an den Überschriften');
     pruefe(e.leererTag === '', 'an einem leeren Tag steht keine Zahl im Kopf');
     pruefe(e.keineZahlOhneEintrag === true,
@@ -10754,32 +10819,28 @@ console.log('\n117. Termine als Einzeiler');
 
   pruefe(new RegExp('function\\s+dauerText\\s*\\(').test(skript),
          'Funktion dauerText ist definiert');
-  const vl = skript.match(/function verlaufHtml\([\s\S]*?\n\}\n/);
-  /* Seit v3.3.0 zweizeilig: Uhrzeit vorn mit der Dauer darunter, daneben
-     der Titel über höchstens zwei Zeilen. */
-  pruefe(vl && /tzt-zeit"><b>/.test(vl[0]) && /dauerText\(t\.von, t\.bis\)/.test(vl[0]),
-         'Uhrzeit vorn, die Dauer klein darunter');
-  pruefe(/\.tzt-zeit\{[^}]*text-align:left/.test(QUELLE),
-         'beide bündig links — rechtsbündig ragte die Dauer über die Uhrzeit hinaus');
-  pruefe(vl && /tzt-titel/.test(vl[0]) && !/tzt-rechts/.test(vl[0]),
-         'rechts steht nichts mehr: kein Kalendername, keine Restzeit');
-  pruefe(vl && !/t\.ort/.test(vl[0]) && !/t\.beschreibung/.test(vl[0]),
+  const sp2 = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
+  /* Seit v4.0.0 ist der Tag ein maßstäblicher Stundenplan: Ein Block,
+     der doppelt so lange dauert, ist doppelt so hoch. */
+  pruefe(sp2 && /STUNDE_HOCH/.test(sp2[0]) && /dauer \/ 60/.test(sp2[0]),
+         'die Höhe eines Blocks folgt seiner Dauer');
+  pruefe(/\.splan-stunde\{[^}]*height:44px/.test(QUELLE),
+         'die Stundenskala gibt den Maßstab');
+  pruefe(sp2 && /splan-blk/.test(sp2[0]) && !/tzt-rechts/.test(sp2[0]),
+         'in den Blöcken steht kein Kalendername');
+  pruefe(sp2 && !/\.ort/.test(sp2[0]) && !/\.beschreibung/.test(sp2[0]),
          'Ort und Beschreibung bleiben dem Terminblatt');
-  pruefe(/body:not\(\.breit\) \.tzeile-termin \.t-ablauf/.test(QUELLE),
-         'am Handy weicht der Ablaufknopf, sonst bliebe für den Titel nichts');
-  pruefe(vl && /laeuft \? ' laeuft' : ''/.test(vl[0]) && !/restMinutenText/.test(vl[0]),
-         'der laufende Termin ist hinterlegt statt beschriftet');
+  pruefe(sp2 && /kurz/.test(sp2[0]),
+         'ein kurzer Block zeigt nur den Titel — mehr passt nicht hinein');
+  pruefe(sp2 && /b\.vorbei \? ' vorbei' : ''/.test(sp2[0]),
+         'Vergangenes bleibt sichtbar, nur blasser');
 
   if (!t) {
     warn('Funktionen nicht auswertbar');
   } else {
     const e = t.pruefe();
-    pruefe(e.zeilen === 3, 'jeder Termin eine Zeile');
-    pruefe(e.dauer === '1 Std.', 'die Dauer steht unter der Uhrzeit');
-    pruefe(e.vorhaben === 'Hybride Systeme in der MUKA',
-           'das Vorhaben als Marke unter dem Titel');
+    pruefe(e.zeilen === 3, 'jeder Termin ein Block');
     pruefe(e.kalender === '', 'der Kalendername steht nirgends mehr');
-    pruefe(e.laeuftHinterlegt === true, 'der laufende Termin ist hinterlegt');
     pruefe(e.keinOrt === true, 'Ort und Beschreibung stehen nicht in der Zeile');
     pruefe(e.ohnePunkt === true, 'kein Artpunkt mehr vor dem Titel');
     pruefe(e.dauerKurz === '30 Min.' && e.dauerLang === '2:30',
@@ -10946,8 +11007,8 @@ console.log('\n120. Zweizeilige Einträge');
     warn('Funktionen nicht auswertbar');
   } else {
     const e = s.pruefe();
-    pruefe(e.zeit === '07:00', 'die Uhrzeit steht ganz vorn');
-    pruefe(e.dauer === '30 Min.', 'die Dauer klein darunter');
+    pruefe(e.zeit === '07:00', 'die Stundenskala beginnt beim ersten Block');
+    pruefe(e.dauer === true, 'ein kurzer Block zeigt nur den Titel');
     pruefe(e.ohneKalender === true, 'kein Kalendername in der Zeile');
     pruefe(e.ohneTakt === true, 'kein Takt an einer wiederkehrenden Aufgabe');
     pruefe(e.beiAufgaben === true,
@@ -11047,7 +11108,7 @@ console.log('\n122. Leiste, Kacheln, Wochenfokus');
            'am Handy eine Fläche für die Aktivitäten');
     pruefe(e.schmalUnter === 'Aufgaben,Kleinigkeiten',
            'mit beiden Arten als Zwischenüberschrift');
-    pruefe(e.breit === 'Tagesplan,Aufgaben,Kleinigkeiten',
+    pruefe(e.breit === 'Tagesplan,Ohne feste Zeit,Kleinigkeiten',
            'am Rechner drei eigene Kacheln');
     pruefe(e.breitOhneUnter === true, 'dort ohne Zwischenüberschriften');
     pruefe(e.weitAb1150 === true, 'die dritte Spalte ab 1150 Pixeln');
@@ -11300,17 +11361,18 @@ console.log('\n128. Die Jetzt-Linie');
   const skript = hauptSkript();
   const j = globalThis.__jetztApi;
 
-  ['jetztStelle', 'jetztLinieHtml', 'jetztKarteZeichnen'].forEach(function (f) {
+  ['stundenSpanne', 'stundenplanHtml', 'jetztKarteZeichnen'].forEach(function (f) {
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
   });
-  const js = skript.match(/function jetztStelle\([\s\S]*?\n\}/);
-  pruefe(js && /is !== isoDatum\(\)\) \{ return -1; \}/.test(js[0]),
+  /* Seit v4.0.0 steckt die Jetzt-Linie im Stundenplan. */
+  const sp = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
+  pruefe(sp && /is === isoDatum\(\)/.test(sp[0]),
          'an anderen Tagen gibt es kein „jetzt"');
+  pruefe(sp && /splan-jetzt/.test(sp[0]), 'die Linie liegt im Stundenplan');
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && /jetztStelle\(e\.verlauf, is\)/.test(tz[0])
-         && /if \(linieVor === e\.verlauf\.length\)/.test(tz[0]),
-         'die Linie steht auch unter dem letzten Eintrag, wenn der Tag vorbei ist');
+  pruefe(tz && /stundenplanHtml\(is, e\)/.test(tz[0]),
+         'der Tag zeichnet den Stundenplan');
   pruefe(/id="tagJetzt"/.test(QUELLE) && /\.tag-jetzt\.auf\{display:block/.test(QUELLE),
          'die Karte hat ihren Platz über dem Tagesplan');
 
@@ -11323,9 +11385,7 @@ console.log('\n128. Die Jetzt-Linie');
     pruefe(e.laeuftDanach === true, 'und dem, was danach kommt');
     pruefe(e.laeuftKlasse === true, 'die Karte ist dann hervorgehoben');
     pruefe(e.freiKopf === true, 'läuft nichts, sagt sie, bis wann frei ist');
-    pruefe(e.linieDa === true, 'im Verlauf steht die Linie');
-    pruefe(e.linieStelle === 2,
-           'sie steht vor dem ersten Eintrag, der noch nicht begonnen hat');
+    pruefe(e.linieDa === true, 'im Stundenplan steht die Linie');
     pruefe(e.morgenLeer === true, 'an einem anderen Tag bleibt beides leer');
   }
 }
@@ -11409,8 +11469,10 @@ console.log('\n130. Der Tagesplan');
   pruefe(fs2 && /\(l\.bis - l\.von\) >= 15/.test(fs2[0]),
          'Lücken unter einer Viertelstunde zählen nicht als frei');
   const pf = skript.match(/function planFestschreiben\([\s\S]*?\n\}/);
-  pruefe(pf && /gestellt: jetzt\(\)/.test(pf[0]),
+  pruefe(pf && /p\.gestellt = jetzt\(\)/.test(pf[0]),
          'festgeschrieben wird mit Zeitstempel — daraus wird abends die Bilanz');
+  pruefe(pf && !/DB\.plaene\[is\] = \{/.test(pf[0]),
+         'die Zugehörigkeitsliste bleibt dabei stehen — sonst wäre der Plan danach leer');
   pruefe(/var PLAN_DAUER = \{ haupt: 60, klein: 15 \}/.test(skript),
          'eine Aufgabe bekommt 60 Minuten, eine Kleinigkeit 15');
   const pk = skript.match(/function planKandidaten\([\s\S]*?\n\}\n/);
@@ -11450,7 +11512,63 @@ console.log('\n130. Der Tagesplan');
     pruefe(e.festEintraege === 3,
            'festgeschrieben werden Termine und gesetzte Aufgaben zusammen');
     pruefe(e.markeVorher === true, 'vorher lädt der Kopf zum Aufstellen ein');
+    pruefe(e.nichtImPlanWeg === true,
+           'was nicht in den Plan kam, steht auch nicht im Tag');
+    pruefe(e.routineBleibt === true, 'eine Routine rutscht von selbst ins Fach ohne Zeit');
     pruefe(e.markeNachher === true, 'danach steht dort, seit wann der Plan steht');
+  }
+}
+
+/* ============================================================
+   131. Der Tag ist der Plan
+   Grund: Bisher leitete sich der Tag aus den Daten ab — alles mit
+   Planung heute stand darin. Jetzt ist er eine Liste, die man fuehrt:
+   Was nicht im Plan steht, steht nicht im Tag. Und er wird
+   massstaeblich gezeigt, nicht als Liste.
+   ============================================================ */
+console.log('\n131. Der Tag ist der Plan');
+{
+  const skript = hauptSkript();
+  const p = globalThis.__tagPlanApi;
+
+  ['planSatz', 'planGilt', 'imPlan', 'planDazu', 'planAufnehmen', 'planEntfernen',
+   'gehoertInTag', 'stundenSpanne', 'stundenplanHtml', 'planOhneZeit',
+   'planHeraus'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const gt = skript.match(/function gehoertInTag\([\s\S]*?\n\}/);
+  pruefe(gt && /if \(a\.wiederholung\) \{ return true; \}/.test(gt[0]),
+         'eine Routine steht ohne Zutun im Tag');
+  pruefe(gt && /if \(!planGilt\(is\)\) \{ return true; \}/.test(gt[0]),
+         'ohne aufgestellten Plan bleibt es wie früher — sonst stünde die '
+         + 'Vergangenheit leer da');
+  const sa = skript.match(/function schnellAnlegen\([\s\S]*?\n\}/);
+  pruefe(sa && /planAufnehmen\(tagOffen/.test(sa[0]),
+         'was tagsüber dazukommt, geht in den Plan');
+  const ss = skript.match(/function stundenSpanne\([\s\S]*?\n\}/);
+  pruefe(ss && /PLAN_MIN_VON/.test(ss[0]) && /PLAN_MIN_BIS/.test(ss[0]),
+         'die Skala reicht mindestens von 8 bis 18 Uhr und weiter, wenn nötig');
+
+  if (!p) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = p.pruefe();
+    pruefe(e.vorPlan === 'Vorlage,Schrank,Draussen,Routine',
+           'ohne Plan steht im Tag wie früher alles, was auf heute geplant ist');
+    pruefe(e.bloecke === 'Weekly,Vorlage',
+           'nach dem Festschreiben stehen im Stundenplan Termine und gesetzte Aufgaben');
+    pruefe(e.ohneZeit === 'Schrank,Routine',
+           'daneben das Geplante ohne feste Zeit und die Routine');
+    pruefe(e.draussen === false, '„Draussen" kam nicht in den Plan und steht nicht da');
+    pruefe(e.nochInDerListe === true, 'in der Aufgabenliste steht es weiterhin');
+    pruefe(e.eineStunde === 41 && e.anderthalb === 63,
+           'ein Block ist so hoch wie seine Dauer lang — anderthalb Stunden '
+           + 'anderthalbmal so hoch');
+    pruefe(e.dazuVermerkt === true, 'was danach dazukam, ist vermerkt');
+    pruefe(e.nachHeraus === false, '„herausnehmen" nimmt es wieder aus dem Tag');
+    pruefe(e.kopfVorher.indexOf('aufstellen') > 0, 'vorher lädt der Kopf zum Aufstellen');
+    pruefe(e.kopfNachher.indexOf('anpassen') > 0, 'danach führt er zum Anpassen');
   }
 }
 

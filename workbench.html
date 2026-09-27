@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 3.16.0</title>
+<title>Workbench 4.0.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1206,6 +1206,33 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
 .tk-sym.an{border-color:var(--petrol);color:var(--petrol);background:var(--papier)}
 .tk-s-zeile{display:none;gap:8px;font-size:calc(var(--fs)*0.7);color:var(--grau);padding:0 0 6px}
 .tk-s-rest{flex:1;text-align:right}
+/* Der Stundenplan im Tag */
+.splan{position:relative;border-top:1px solid var(--linie);margin:2px 0 4px}
+.splan-stunde{display:flex;align-items:flex-start;height:44px;
+  border-bottom:1px solid var(--linie)}
+.splan-lab{flex:0 0 46px;font-size:calc(var(--fs)*0.64);color:var(--grau-hell);
+  padding-top:2px;font-variant-numeric:tabular-nums}
+.splan-feld{flex:1}
+.splan-bloecke{position:absolute;left:46px;right:0;top:0;bottom:0}
+.splan-blk{position:absolute;left:0;right:4px;border-radius:7px;padding:4px 8px;
+  overflow:hidden;background:var(--papier);border-left:3px solid var(--weinrot);
+  cursor:pointer}
+.splan-blk.privat{border-left-color:var(--petrol)}
+.splan-blk.eigen{background:var(--karte);border:1px solid var(--linie);
+  border-left:3px solid var(--weinrot)}
+.splan-blk.eigen.privat{border-left-color:var(--petrol)}
+.splan-blk.vorbei{opacity:.5}
+.splan-blk b{display:block;font-size:calc(var(--fs)*0.8);font-weight:500;
+  line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.splan-blk span{font-size:calc(var(--fs)*0.66);color:var(--grau)}
+.splan-blk.kurz{padding:1px 8px}
+.splan-jetzt{position:absolute;left:-8px;right:0;height:0;
+  border-top:2px solid var(--heute);z-index:3}
+.splan-jetzt i{position:absolute;left:-38px;top:-7px;font-size:calc(var(--fs)*0.6);
+  color:var(--heute);font-style:normal;font-weight:600;background:var(--karte);
+  padding-right:3px}
+.p-slot.leise{color:var(--grau)}
+
 /* Der Planmodus */
 .p-sheet{background:var(--karte);border:1px solid var(--linie);border-radius:12px;
   padding:12px 15px 15px;max-width:640px;margin:6px auto}
@@ -2127,7 +2154,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '3.16.0';
+var APP_VERSION = '4.0.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4193,6 +4220,8 @@ function tagesEintraege(is) {
         continue;
       }
       if (!aufgabeFaelligAn(a, is)) { continue; }
+      /* Eine Routine steht ohne feste Zeit im Tag, auch wenn sie nicht
+         eigens in den Plan genommen wurde. */
       if (a.uhrzeit) { verlauf.push({ art: 'aufgabe', zeit: a.uhrzeit, a: a }); }
       else if (a.art === 'klein') { klein.push(a); }
       else { haupt.push(a); }
@@ -4208,6 +4237,7 @@ function tagesEintraege(is) {
       continue;
     }
     if (a.planung !== is) { continue; }
+    if (!gehoertInTag(a, is)) { continue; }
 
     if (a.uhrzeit) { verlauf.push({ art: 'aufgabe', zeit: a.uhrzeit, a: a }); }
     else if (a.art === 'klein') { klein.push(a); }
@@ -4502,22 +4532,7 @@ function eintragLaeuft(eintrag, is) {
 
 /* Vor welchem Eintrag steht die Jetzt-Linie? Vor dem ersten, der noch
    nicht begonnen hat. Läuft gerade etwas, ist es ohnehin hinterlegt. */
-function jetztStelle(verlauf, is) {
-  if (is !== isoDatum()) { return -1; }
-  var jetztZ = uhrzeitJetzt();
-  var i;
-  for (i = 0; i < verlauf.length; i++) {
-    var v = verlauf[i];
-    var von = (v.art === 'termin') ? (v.t.von || '') : (v.a.uhrzeit || '');
-    if (von && von > jetztZ) { return i; }
-  }
-  return verlauf.length;
-}
 
-function jetztLinieHtml() {
-  return '<div class="tjetzt"><span class="tjetzt-wort">JETZT ' + uhrzeitJetzt()
-       + '</span><span class="tjetzt-linie"></span></div>';
-}
 
 /* Was läuft gerade, was kommt als Nächstes? Steht oben, damit man es
    sieht, ohne zu suchen. Läuft nichts, sagt sie, bis wann frei ist. */
@@ -4589,63 +4604,9 @@ function dauerText(von, bis) {
   return std + (rest ? (':' + String(rest).padStart(2, '0')) : ' Std.');
 }
 
-function verlaufHtml(eintrag, is) {
-  if (eintrag.art === 'termin') {
-    var t = eintrag.t;
-    var laeuft = eintragLaeuft(eintrag, is);
-    var h = '<div class="tzeile-termin'
-          + (eintragVorbei(eintrag, is) ? ' vorbei' : '')
-          + (laeuft ? ' laeuft' : '') + '">';
-    /* Uhrzeit ganz vorn, die Dauer klein darunter und bündig — der
-       laufende Termin ist hinterlegt, das sagt genug. */
-    h += '<span class="tzt-zeit"><b>' + esc(t.von || '') + '</b>'
-       + (t.bis ? ('<i>' + esc(dauerText(t.von, t.bis)) + '</i>') : '') + '</span>';
-    h += '<span class="tzt-txt"' + (t.id ? (' onclick="terminBlattOeffnen(\''
-       + esc(t.id) + '\',\'' + is + '\')"') : '') + '>'
-       + '<span class="tzt-titel">' + esc(t.titel) + '</span>';
-    var tvh = t.id ? terminVorhaben(t) : '';
-    var tvhO = tvh ? vorhabenFinden(tvh.slice(2), tvh.charAt(0) === 'z' ? 'ziel' : 'projekt')
-                   : null;
-    if (tvhO) { h += '<span class="tmarke">' + esc(tvhO.name) + '</span>'; }
-    h += '</span>';
-    var lauf = t.id ? durchlaufZuTermin(t.id) : null;
-    if (t.id) {
-      if (lauf) {
-        h += '<span class="t-ablauf-paar">';
-        h += '<button class="t-ablauf an" type="button" '
-           + 'onclick="durchlaufAbhakenOeffnen(\'' + esc(lauf.id) + '\')" '
-           + 'title="Den angehefteten Ablauf öffnen">' + schritteFertig(lauf)
-           + '/' + (lauf.schritte || []).length + '</button>';
-        h += '<button class="t-ablauf-weg" type="button" '
-           + 'onclick="terminAblaufLoesen(\'' + esc(lauf.id) + '\')" '
-           + 'title="Die Verbindung zum Termin lösen">×</button></span>';
-      } else {
-        h += '<button class="t-ablauf" type="button" '
-           + 'onclick="terminAblaufWahl(\'' + esc(t.id) + '\',\'' + is + '\')" '
-           + 'title="Einen Ablauf an diesen Termin heften">Ablauf</button>';
-      }
-    }
-    h += '</div>';
-    return h;
-  }
-
-  /* Eine Aufgabe mit Uhrzeit steht in derselben Zeilenform wie ein
-     Termin: gleiche Spalten, gleiche Größe. */
-  var a = eintrag.a;
-  var erledigt = istErledigtAn(a, is);
-  var v = '<div class="tzeile-termin aufgabe'
-        + (eintragVorbei(eintrag, is) ? ' vorbei' : '')
-        + (erledigt ? ' erledigt' : '') + '">';
-  v += '<span class="tzt-zeit"><b>' + esc(a.uhrzeit) + '</b></span>';
-  v += '<button class="tkasten' + (erledigt ? ' an' : '') + '" type="button" '
-     + 'onclick="aufgabeHaken(\'' + esc(a.id) + '\')"></button>';
-  v += '<span class="tzt-txt" onclick="aufgabeAktionen(\'' + esc(a.id) + '\')">'
-     + '<span class="tzt-titel">' + esc(a.titel) + '</span>';
-  var am = ablaufVermerk(a);
-  if (am) { v += '<span class="tmarke">' + esc(am) + '</span>'; }
-  v += '</span></div>';
-  return v;
-}
+/* verlaufHtml, jetztStelle und jetztLinieHtml sind mit v4.0.0
+   entfallen: Der Tag zeichnet einen maßstäblichen Stundenplan, keine
+   Liste mehr. Die Jetzt-Linie steckt darin. */
 
 /* Aus jedem laufenden Durchlauf steht der nächste offene Schritt im
    Tag — nicht der ganze Ablauf, sondern das, was jetzt dran ist. */
@@ -5008,7 +4969,9 @@ function unterKopf(name, titel, zahl) {
 function planMarkeHtml(is) {
   var p = planFest(is);
   if (p) {
-    return '<span class="t-planstand">steht seit ' + esc(kurzUhr(p.gestellt))
+    return '<button class="t-rueck" type="button" onclick="planStarten()">'
+         + 'Plan anpassen →</button>'
+         + '<span class="t-planstand">steht seit ' + esc(kurzUhr(p.gestellt))
          + '</span>';
   }
   if (is !== isoDatum()) { return ''; }
@@ -5211,6 +5174,148 @@ function tagwFaellig() {
 }
 
 /* ============================================================
+   Der Stundenplan
+
+   Maßstäblich: Ein Block, der doppelt so lange dauert, ist doppelt so
+   hoch. So sieht man, wie der Tag wirklich liegt — eine Liste zeigt das
+   nicht.
+   ============================================================ */
+
+var STUNDE_HOCH = 44;
+var PLAN_MIN_VON = 8 * 60;
+var PLAN_MIN_BIS = 18 * 60;
+
+function stundenSpanne(bloecke) {
+  var von = PLAN_MIN_VON;
+  var bis = PLAN_MIN_BIS;
+  var i;
+  for (i = 0; i < bloecke.length; i++) {
+    if (bloecke[i].von < von) { von = bloecke[i].von; }
+    if (bloecke[i].bis > bis) { bis = bloecke[i].bis; }
+  }
+  von = Math.floor(von / 60) * 60;
+  bis = Math.ceil(bis / 60) * 60;
+  return { von: von, bis: bis };
+}
+
+function stundenplanHtml(is, e) {
+  var bloecke = belegteBloecke(is);
+  var spanne = stundenSpanne(bloecke);
+  var hoehe = function (m) { return ((m - spanne.von) / 60) * STUNDE_HOCH; };
+  var h = '<div class="splan">';
+  var s;
+  for (s = spanne.von; s < spanne.bis; s += 60) {
+    h += '<div class="splan-stunde"><span class="splan-lab">' + zeitAusMinuten(s)
+       + '</span><span class="splan-feld"></span></div>';
+  }
+  h += '<div class="splan-bloecke">';
+  var i;
+  for (i = 0; i < bloecke.length; i++) {
+    var b = bloecke[i];
+    var dauer = Math.max(15, b.bis - b.von);
+    var oben = hoehe(b.von);
+    var hoch = (dauer / 60) * STUNDE_HOCH;
+    var t = b.fest ? b.termin : aufgabeFinden(b.id);
+    var privat = t && t.kontext === 'privat';
+    h += '<div class="splan-blk' + (b.fest ? '' : ' eigen')
+       + (privat ? ' privat' : '') + (hoch < 34 ? ' kurz' : '')
+       + (b.vorbei ? ' vorbei' : '') + '" '
+       + 'style="top:' + oben.toFixed(0) + 'px;height:' + (hoch - 3).toFixed(0) + 'px" '
+       + (b.fest
+          ? ('onclick="terminBlattOeffnen(\'' + esc(b.id || '') + '\',\'' + is + '\')"')
+          : ('onclick="aufgabeAktionen(\'' + esc(b.id) + '\')"'))
+       + '><b>' + esc(b.titel) + '</b>';
+    if (hoch >= 34) {
+      h += '<span>' + zeitAusMinuten(b.von) + '–' + zeitAusMinuten(b.bis)
+         + (b.fest ? '' : ' · selbst geplant') + '</span>';
+    }
+    h += '</div>';
+  }
+  if (is === isoDatum()) {
+    var jm = minutenAus(uhrzeitJetzt());
+    if (jm >= spanne.von && jm <= spanne.bis) {
+      h += '<div class="splan-jetzt" style="top:' + hoehe(jm).toFixed(0) + 'px">'
+         + '<i>' + uhrzeitJetzt() + '</i></div>';
+    }
+  }
+  h += '</div></div>';
+  if (!bloecke.length) {
+    h += '<div class="tleer">Noch nichts mit fester Zeit im Plan.</div>';
+  }
+  return h;
+}
+
+/* ============================================================
+   Was im Plan steht
+
+   Seit v4.0.0 leitet sich der Tag nicht mehr aus den Daten ab, sondern
+   ist eine Liste, die man führt: Was nicht im Plan steht, steht nicht
+   im Tag. Solange kein Plan aufgestellt wurde, verhält sich der Tag wie
+   früher — sonst stünde die Vergangenheit leer da.
+   ============================================================ */
+
+function planSatz(is) {
+  if (!DB.plaene) { DB.plaene = {}; }
+  if (!DB.plaene[is]) {
+    DB.plaene[is] = { gestellt: 0, drin: [], dazu: [] };
+  }
+  if (!DB.plaene[is].drin) { DB.plaene[is].drin = []; }
+  if (!DB.plaene[is].dazu) { DB.plaene[is].dazu = []; }
+  return DB.plaene[is];
+}
+
+function planGilt(is) {
+  var p = DB.plaene && DB.plaene[is];
+  return !!(p && p.gestellt);
+}
+
+function imPlan(is, id) {
+  var p = DB.plaene && DB.plaene[is];
+  return !!(p && p.drin && p.drin.indexOf(id) >= 0);
+}
+
+function planDazu(is, id) {
+  var p = DB.plaene && DB.plaene[is];
+  return !!(p && p.dazu && p.dazu.indexOf(id) >= 0);
+}
+
+/* Aufnehmen heißt: in den Plan und auf diesen Tag. Kam es nach dem
+   Festschreiben dazu, wird das vermerkt — abends ist das der
+   Unterschied zwischen geplant und geworden. */
+function planAufnehmen(is, id) {
+  var p = planSatz(is);
+  if (p.drin.indexOf(id) < 0) { p.drin.push(id); }
+  if (p.gestellt && p.dazu.indexOf(id) < 0) { p.dazu.push(id); }
+  var a = aufgabeFinden(id);
+  if (a) {
+    a.planung = is;
+    a.geaendert = jetzt();
+  }
+}
+
+function planEntfernen(is, id) {
+  var p = planSatz(is);
+  var i = p.drin.indexOf(id);
+  if (i >= 0) { p.drin.splice(i, 1); }
+  i = p.dazu.indexOf(id);
+  if (i >= 0) { p.dazu.splice(i, 1); }
+  var a = aufgabeFinden(id);
+  if (a) {
+    a.uhrzeit = '';
+    a.geaendert = jetzt();
+  }
+}
+
+/* Gehört diese Aufgabe in den Tag? Ohne Plan wie früher, mit Plan nur,
+   was darin steht — Routinen ausgenommen, die rutschen von selbst ins
+   Fach ohne feste Zeit. */
+function gehoertInTag(a, is) {
+  if (a.wiederholung) { return true; }
+  if (!planGilt(is)) { return true; }
+  return imPlan(is, a.id);
+}
+
+/* ============================================================
    Den Tagesplan aufstellen
 
    Morgens: Die Kalendertermine stehen fest, dazwischen liegen freie
@@ -5243,11 +5348,12 @@ function belegteBloecke(is) {
       if (v.t.ganztags || !v.t.von) { continue; }
       aus.push({ von: minutenAus(v.t.von),
                  bis: v.t.bis ? minutenAus(v.t.bis) : (minutenAus(v.t.von) + 60),
-                 titel: v.t.titel, fest: true });
+                 titel: v.t.titel, fest: true, id: v.t.id, termin: v.t,
+                 vorbei: eintragVorbei(v, is) });
     } else {
       var von = minutenAus(v.a.uhrzeit);
       aus.push({ von: von, bis: von + aufgabeDauer(v.a), titel: v.a.titel,
-                 fest: false, id: v.a.id });
+                 fest: false, id: v.a.id, vorbei: istErledigtAn(v.a, is) });
     }
   }
   aus.sort(function (x, y) { return x.von - y.von; });
@@ -5278,6 +5384,7 @@ function planKandidaten(is) {
     if (a.status === 'erledigt') { return false; }
     if (a.art === 'klein') { return false; }
     if (a.uhrzeit) { return false; }
+    if (imPlan(is, a.id)) { return false; }
     if (kontextVerborgen(a.kontext)) { return false; }
     if (!passtZumTag(a.kontext)) { return false; }
     if (a.wiederholung) { return aufgabeFaelligAn(a, is); }
@@ -5349,8 +5456,7 @@ function planUebernehmen() {
   }
   a.uhrzeit = planEntwurf.zeit;
   a.dauer = planEntwurf.dauer;
-  a.planung = planTag;
-  a.geaendert = jetzt();
+  planAufnehmen(planTag, a.id);
   planBearbeitet = '';
   spaeterSichern();
   planZeichnen();
@@ -5366,6 +5472,25 @@ function planBacklogUm() {
   planZeichnen();
 }
 
+/* Zwei Wege in den Plan: mit Zeit als Block oder ohne feste Zeit ins
+   Fach daneben. */
+function planOhneZeit(id) {
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  a.uhrzeit = '';
+  planAufnehmen(planTag, id);
+  planBearbeitet = '';
+  spaeterSichern();
+  planZeichnen();
+}
+
+function planHeraus(id) {
+  planEntfernen(planTag, id);
+  planBearbeitet = '';
+  spaeterSichern();
+  planZeichnen();
+}
+
 function planSetzen(id, minuten) {
   var a = aufgabeFinden(id);
   if (!a) { return; }
@@ -5378,10 +5503,7 @@ function planSetzen(id, minuten) {
 }
 
 function planLoesen(id) {
-  var a = aufgabeFinden(id);
-  if (!a) { return; }
-  a.uhrzeit = '';
-  a.geaendert = jetzt();
+  planEntfernen(planTag, id);
   spaeterSichern();
   planZeichnen();
 }
@@ -5405,20 +5527,22 @@ function planDauerUm(id) {
    nachgeführt, aber es bleibt festgehalten, was morgens darin stand. */
 function planFest(is) {
   var p = DB.plaene && DB.plaene[is];
-  return p || null;
+  /* Erst das Festschreiben macht daraus einen Plan — die Liste allein
+     entsteht schon beim ersten Aufnehmen. */
+  return (p && p.gestellt) ? p : null;
 }
 
 function planFestschreiben() {
-  if (!DB.plaene) { DB.plaene = {}; }
   var is = planTag;
+  var p = planSatz(is);
   var belegt = belegteBloecke(is);
-  DB.plaene[is] = {
-    gestellt: jetzt(),
-    eintraege: belegt.map(function (b) {
-      return { von: zeitAusMinuten(b.von), titel: b.titel,
-               id: b.id || '', fest: b.fest };
-    })
-  };
+  /* Nur stempeln und festhalten, was darin stand — die
+     Zugehörigkeitsliste bleibt, sonst wäre der Plan danach leer. */
+  p.gestellt = jetzt();
+  p.eintraege = belegt.map(function (b) {
+    return { von: zeitAusMinuten(b.von), titel: b.titel,
+             id: b.id || '', fest: b.fest };
+  });
   DB.einstellungen.stempel = jetzt();
   spaeterSichern();
   melde('Der Tagesplan steht.', 'gut');
@@ -5446,7 +5570,7 @@ function planZeileHtml(b) {
     h += '<button class="p-dauer knopf" type="button" onclick="planOeffnen(\''
        + esc(b.id) + '\')" title="Zeit und Dauer ändern">'
        + dauerText(zeitAusMinuten(b.von), zeitAusMinuten(b.bis)) + '</button>';
-    h += '<button class="p-weg" type="button" onclick="planLoesen(\'' + esc(b.id)
+    h += '<button class="p-weg" type="button" onclick="planHeraus(\'' + esc(b.id)
        + '\')" title="Wieder aus dem Plan nehmen">×</button>';
   }
   h += '</div>';
@@ -5492,7 +5616,9 @@ function planKandidatHtml(a) {
   var h = '<div class="p-kandidat"><span class="p-k-titel">' + esc(a.titel) + '</span>';
   h += '<span class="p-k-wann">' + esc(planungText(a)) + '</span>';
   h += '<button class="p-slot" type="button" onclick="planOeffnen(\'' + esc(a.id)
-     + '\')">Zeit geben</button></div>';
+     + '\')">Zeit geben</button>';
+  h += '<button class="p-slot leise" type="button" onclick="planOhneZeit(\'' + esc(a.id)
+     + '\')">ohne Zeit</button></div>';
   if (planBearbeitet === a.id) { h += planFelderHtml(); }
   return h;
 }
@@ -5532,6 +5658,21 @@ function planZeichnen() {
   h += '<div class="p-block">';
   for (i = 0; i < belegt.length; i++) { h += planZeileHtml(belegt[i]); }
   if (!belegt.length) { h += '<div class="tleer">Der Tag ist noch ganz leer.</div>'; }
+  h += '</div>';
+
+  var ohne = (planSatz(is).drin || []).map(aufgabeFinden).filter(function (a) {
+    return a && !a.uhrzeit && a.status !== 'erledigt';
+  });
+  h += '<div class="p-block"><div class="p-kopf">Ohne feste Zeit</div>';
+  for (i = 0; i < ohne.length; i++) {
+    h += '<div class="p-kandidat"><span class="p-k-titel">' + esc(ohne[i].titel)
+       + '</span><button class="p-slot" type="button" onclick="planOeffnen(\''
+       + esc(ohne[i].id) + '\')">Zeit geben</button>'
+       + '<button class="p-slot leise" type="button" onclick="planHeraus(\''
+       + esc(ohne[i].id) + '\')">herausnehmen</button></div>';
+    if (planBearbeitet === ohne[i].id) { h += planFelderHtml(); }
+  }
+  if (!ohne.length) { h += '<div class="tleer">Nichts ohne Zeit im Plan.</div>'; }
   h += '</div>';
 
   h += '<div class="p-block"><div class="p-kopf">Was soll hinein?</div>';
@@ -6692,15 +6833,8 @@ function tagZeichnen() {
 
   /* Nichts wird mehr eingeklappt: Abends soll dastehen, was der Tag
      war — auch das Vergangene. */
-  if (!e.verlauf.length) { h += '<div class="tleer">Nichts mit fester Zeit.</div>'; }
-  /* Eine Linie zeigt, wo im Tag man gerade steht — nur am heutigen Tag,
-     an anderen gibt es kein „jetzt". */
-  var linieVor = jetztStelle(e.verlauf, is);
-  for (i = 0; i < e.verlauf.length; i++) {
-    if (i === linieVor) { h += jetztLinieHtml(); }
-    h += verlaufHtml(e.verlauf[i], is);
-  }
-  if (linieVor === e.verlauf.length) { h += jetztLinieHtml(); }
+  /* Maßstäblich statt als Liste: So sieht man, wie der Tag liegt. */
+  h += stundenplanHtml(is, e);
   h += '</div>';
 
 
@@ -6744,7 +6878,7 @@ function tagZeichnen() {
   /* „Für diesen Tag zusätzlich" ist entfallen: Einen zusätzlichen Lauf
      plant man am Vortag oder in der Wochenansicht, nicht hier. */
   if (zwei) {
-    h += tagBlockHtml('Aufgaben', hauptTeil, nachzueglerMarke(is));
+    h += tagBlockHtml('Ohne feste Zeit', hauptTeil, planMarkeHtml(is));
     h += tagBlockHtml('Kleinigkeiten', kleinTeil, '');
   } else {
     h += tagBlockHtml('Aktivitäten', hauptTeil + kleinTeil, nachzueglerMarke(is));
@@ -7547,6 +7681,9 @@ function schnellAnlegen() {
     ablaufSchritt: null,
     geaendert: jetzt()
   });
+  /* Was tagsüber dazukommt, gehört in den Tag — mit Vermerk, damit der
+     Rückblick geplant und geworden unterscheiden kann. */
+  planAufnehmen(tagOffen, DB.aufgaben[DB.aufgaben.length - 1].id);
   feld.value = '';
   schnellVorschau();
   aehnlichLeeren('schnellAehnlich');
