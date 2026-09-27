@@ -569,6 +569,46 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__ueberlappApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'r1\', titel:\'Oskar\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', uhrzeit:\'08:00\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[0,1,2,3,4,5,6] } },'
+                 + '     { id:\'r2\', titel:\'Splunk\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', uhrzeit:\'08:30\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[0,1,2,3,4,5,6] } },'
+                 + '     { id:\'a1\', titel:\'Anruf\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'klein\', planung: h,'
+                 + '       uhrzeit:\'09:00\' },'
+                 + '     { id:\'a2\', titel:\'Vorlage\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h,'
+                 + '       uhrzeit:\'09:15\' },'
+                 + '     { id:\'a3\', titel:\'Eigen\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', dauer: 20 } ];'
+                 + '   tagOffen = h; tagZeichnen();'
+                 + '   var r = { routineDauer: aufgabeDauer(aufgabeFinden(\'r1\')),'
+                 + '     kleinDauer: aufgabeDauer(aufgabeFinden(\'a1\')),'
+                 + '     hauptDauer: aufgabeDauer(aufgabeFinden(\'a2\')),'
+                 + '     eigeneDauerGilt: aufgabeDauer(aufgabeFinden(\'a3\')) };'
+                 + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   var re = /style="top:(\\d+)px;height:(\\d+)px"/g;'
+                 + '   var m; var liste = [];'
+                 + '   while ((m = re.exec(b)) !== null) {'
+                 + '     liste.push({ oben: Number(m[1]), hoch: Number(m[2]) }); }'
+                 + '   var schlecht = [];'
+                 + '   var i;'
+                 + '   for (i = 0; i < liste.length - 1; i++) {'
+                 + '     if (liste[i].oben + liste[i].hoch > liste[i + 1].oben) {'
+                 + '       schlecht.push(i); } }'
+                 + '   r.ueberlappt = schlecht.join(\',\');'
+                 + '   r.halbeStunde = liste.length ? liste[0].hoch : 0;'
+                 + '   r.viertelstunde = (liste.length > 2) ? liste[2].hoch : 0;'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__gegenApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -10943,17 +10983,21 @@ console.log('\n117. Termine als Einzeiler');
      der doppelt so lange dauert, ist doppelt so hoch. */
   pruefe(sp2 && /STUNDE_HOCH/.test(sp2[0]) && /dauer \/ 60/.test(sp2[0]),
          'die Höhe eines Blocks folgt seiner Dauer');
-  pruefe(/\.splan-stunde\{[^}]*height:64px/.test(QUELLE),
-         'die Stundenskala gibt den Maßstab — 64 Pixel je Stunde, damit zwei Zeilen '
-         + 'in einen Block passen');
+  /* Seit v4.7.0 88 Pixel je Stunde: Bei 64 war eine halbe Stunde
+     niedriger als die Mindesthöhe, und kurze Blöcke überlappten. */
+  pruefe(/\.splan-stunde\{[^}]*height:88px/.test(QUELLE),
+         'die Stundenskala gibt den Maßstab — 88 Pixel je Stunde');
   pruefe(/\.splan-rolle\{[^}]*overflow-y:auto/.test(QUELLE),
          'dafür rollt der Plan in sich, statt die Seite zu dehnen');
   pruefe(new RegExp('function\\s+planRollenSpaeter\\s*\\(').test(skript),
          'und springt beim Öffnen auf die jetzige Zeit');
   const spm = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
-  pruefe(spm && /Math\.max\(26, \(dauer \/ 60\) \* STUNDE_HOCH\)/.test(spm[0]),
-         'ein Viertelstündchen bekommt eine Mindesthöhe — sonst stünde der Titel '
-         + 'nicht darin');
+  pruefe(spm && /Math\.max\(BLOCK_MIN, \(dauer \/ 60\) \* STUNDE_HOCH\)/.test(spm[0]),
+         'unter einer Viertelstunde greift eine Mindesthöhe');
+  pruefe(/var BLOCK_MIN = 20;/.test(skript)
+         && /var STUNDE_HOCH = 88;/.test(skript),
+         'sie liegt unter dem Maßstab einer Viertelstunde — sonst überlappen '
+         + 'kurze Blöcke');
   const pr = skript.match(/function planRollenSpaeter\([\s\S]*?\n\}/);
   pruefe(pr && /is !== isoDatum\(\)\) \{ return; \}/.test(pr[0]),
          'an anderen Tagen wird nicht gerollt');
@@ -11141,7 +11185,8 @@ console.log('\n120. Zweizeilige Einträge');
   } else {
     const e = s.pruefe();
     pruefe(e.zeit === '07:00', 'die Stundenskala beginnt beim ersten Block');
-    pruefe(e.dauer === true, 'ein kurzer Block zeigt nur den Titel');
+    pruefe(e.dauer === false,
+           'ein halbstündiger Block zeigt jetzt auch seine Zeitspanne');
     pruefe(e.ohneKalender === true, 'kein Kalendername in der Zeile');
     pruefe(e.ohneTakt === true, 'kein Takt an einer wiederkehrenden Aufgabe');
     pruefe(e.beiAufgaben === true,
@@ -11615,8 +11660,11 @@ console.log('\n130. Der Tagesplan');
          'festgeschrieben wird mit Zeitstempel — daraus wird abends die Bilanz');
   pruefe(pf && !/DB\.plaene\[is\] = \{/.test(pf[0]),
          'die Zugehörigkeitsliste bleibt dabei stehen — sonst wäre der Plan danach leer');
-  pruefe(/var PLAN_DAUER = \{ haupt: 60, klein: 15 \}/.test(skript),
-         'eine Aufgabe bekommt 60 Minuten, eine Kleinigkeit 15');
+  pruefe(/var PLAN_DAUER = \{ haupt: 60, klein: 15, routine: 30 \}/.test(skript),
+         'eine Aufgabe bekommt 60 Minuten, eine Kleinigkeit 15, eine Routine 30');
+  const ad = skript.match(/function aufgabeDauer\([\s\S]*?\n\}/);
+  pruefe(ad && /a\.wiederholung\) \{ return PLAN_DAUER\.routine/.test(ad[0]),
+         'die Routine kommt vor der Art — sie ist selten eine ganze Stunde');
   const pk = skript.match(/function planKandidaten\([\s\S]*?\n\}\n/);
   pruefe(pk && /a\.art === 'klein'\) \{ return false; \}/.test(pk[0]),
          'Kleinigkeiten stehen nicht in der Kandidatenliste — sie sind das, was '
@@ -11704,7 +11752,7 @@ console.log('\n131. Der Tag ist der Plan');
            'daneben das Geplante ohne feste Zeit und die Routine');
     pruefe(e.draussen === false, '„Draussen" kam nicht in den Plan und steht nicht da');
     pruefe(e.nochInDerListe === true, 'in der Aufgabenliste steht es weiterhin');
-    pruefe(e.eineStunde === 61 && e.anderthalb === 93,
+    pruefe(e.eineStunde === 85 && e.anderthalb === 129,
            'ein Block ist so hoch wie seine Dauer lang — anderthalb Stunden '
            + 'anderthalbmal so hoch');
     pruefe(e.dazuVermerkt === true, 'was danach dazukam, ist vermerkt');
@@ -11870,6 +11918,33 @@ console.log('\n134. Geplant gegen geworden');
            'ist die Zeit frei, wandert sie mit');
     pruefe(e.offeneTage === 1, 'ein Tag ohne Rückblick wird gefunden');
     pruefe(e.nachRuhen === 0, '„Ruhen lassen" schließt ihn ab, ohne Bilanz');
+  }
+}
+
+/* ============================================================
+   135. Kein Ueberlapp im Stundenplan
+   Grund: Eine halbe Stunde war 32 Pixel hoch, die Mindesthoehe lag bei
+   26 plus Abstand — kurze Bloecke schoben sich uebereinander. Das
+   faellt erst auf, wenn zwei kurze aufeinanderfolgen.
+   ============================================================ */
+console.log('\n135. Blöcke überlappen nicht');
+{
+  const u = globalThis.__ueberlappApi;
+
+  if (!u) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = u.pruefe();
+    pruefe(e.routineDauer === 30, 'eine Routine ist mit 30 Minuten angesetzt');
+    pruefe(e.kleinDauer === 15, 'eine Kleinigkeit mit 15');
+    pruefe(e.hauptDauer === 60, 'eine Aufgabe mit 60');
+    pruefe(e.eigeneDauerGilt === 20,
+           'eine eingetragene Dauer sticht den Ansatz');
+    pruefe(e.ueberlappt === '', 'kein Block ragt in den nächsten hinein');
+    pruefe(e.halbeStunde === 41,
+           'eine halbe Stunde ist 44 Pixel hoch, abzüglich Abstand');
+    pruefe(e.viertelstunde === 19,
+           'eine Viertelstunde 22 — beides über der Mindesthöhe');
   }
 }
 

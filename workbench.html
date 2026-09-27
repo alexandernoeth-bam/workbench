@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 4.6.0</title>
+<title>Workbench 4.7.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1221,7 +1221,7 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
 .splan-rolle{max-height:min(62vh, 620px);overflow-y:auto;margin:2px 0 4px;
   scrollbar-width:thin}
 .splan{position:relative;border-top:1px solid var(--linie)}
-.splan-stunde{display:flex;align-items:flex-start;height:64px;
+.splan-stunde{display:flex;align-items:flex-start;height:88px;
   border-bottom:1px solid var(--linie)}
 .splan-lab{flex:0 0 46px;font-size:calc(var(--fs)*0.64);color:var(--grau-hell);
   padding-top:2px;font-variant-numeric:tabular-nums}
@@ -2204,7 +2204,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '4.6.0';
+var APP_VERSION = '4.7.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5237,9 +5237,12 @@ function tagwFaellig() {
    nicht.
    ============================================================ */
 
-/* 64 Pixel je Stunde: Bei 44 stieß die zweite Zeile eines Blocks unten
-   an. Dafür rollt der Plan in sich und springt auf die jetzige Zeit. */
-var STUNDE_HOCH = 64;
+/* 88 Pixel je Stunde. Bei 64 war eine halbe Stunde 32 Pixel hoch —
+   weniger als die Mindesthöhe von 26 plus Abstand, also schoben sich
+   kurze Blöcke übereinander. Jetzt trägt eine halbe Stunde 44 Pixel
+   und die Mindesthöhe greift erst unterhalb einer Viertelstunde. */
+var STUNDE_HOCH = 88;
+var BLOCK_MIN = 20;
 var PLAN_MIN_VON = 8 * 60;
 var PLAN_MIN_BIS = 18 * 60;
 
@@ -5304,13 +5307,14 @@ function stundenplanHtml(is, e) {
     var b = bloecke[i];
     var dauer = Math.max(15, b.bis - b.von);
     var oben = hoehe(b.von);
-    /* Ein Viertelstündchen wäre 16 Pixel hoch — darin stünde der Titel
-       nicht. Unter 26 Pixeln wird deshalb aufgerundet. */
-    var hoch = Math.max(26, (dauer / 60) * STUNDE_HOCH);
+    /* Unter einer Viertelstunde bliebe zu wenig für den Titel; darunter
+       wird aufgerundet. Darüber gilt der Maßstab, damit nichts
+       überlappt. */
+    var hoch = Math.max(BLOCK_MIN, (dauer / 60) * STUNDE_HOCH);
     var t = b.fest ? b.termin : aufgabeFinden(b.id);
     var privat = t && t.kontext === 'privat';
     h += '<div class="splan-blk' + (b.fest ? '' : ' eigen')
-       + (privat ? ' privat' : '') + (hoch < 42 ? ' kurz' : '')
+       + (privat ? ' privat' : '') + (hoch < 40 ? ' kurz' : '')
        + ((!b.fest && planDazu(is, b.id)) ? ' dazu' : '')
        + (b.vorbei ? ' vorbei' : '') + '" '
        + 'style="top:' + oben.toFixed(0) + 'px;height:' + (hoch - 3).toFixed(0) + 'px" '
@@ -5318,7 +5322,7 @@ function stundenplanHtml(is, e) {
           ? ('onclick="terminBlattOeffnen(\'' + esc(b.id || '') + '\',\'' + is + '\')"')
           : ('onclick="aufgabeAktionen(\'' + esc(b.id) + '\')"'))
        + '><b>' + planSymbolHtml(b) + '<span>' + esc(b.titel) + '</span></b>';
-    if (hoch >= 42) {
+    if (hoch >= 40) {
       var vermerk = b.fest ? '' : ' · selbst geplant';
       if (!b.fest && planDazu(is, b.id)) { vermerk = ' · dazugekommen'; }
       h += '<span>' + zeitAusMinuten(b.von) + '–' + zeitAusMinuten(b.bis)
@@ -5432,13 +5436,16 @@ function gehoertInTag(a, is) {
 
 var PLAN_VON = 7 * 60;
 var PLAN_BIS = 21 * 60;
-var PLAN_DAUER = { haupt: 60, klein: 15 };
+/* Eine Routine dauert selten eine Stunde und selten fünf Minuten —
+   eine halbe ist der brauchbare erste Ansatz. */
+var PLAN_DAUER = { haupt: 60, klein: 15, routine: 30 };
 var planTag = '';
 
 /* zeitAusMinuten gibt es schon weiter unten — eine zweite Fassung
    wäre nur eine Quelle für Abweichungen. */
 function aufgabeDauer(a) {
   if (a.dauer) { return Number(a.dauer); }
+  if (a.wiederholung) { return PLAN_DAUER.routine; }
   return PLAN_DAUER[a.art === 'klein' ? 'klein' : 'haupt'];
 }
 
