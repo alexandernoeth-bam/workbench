@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 3.15.0</title>
+<title>Workbench 3.16.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1241,6 +1241,25 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
 .t-planstand{font-size:calc(var(--fs)*0.66);color:var(--grau-hell);
   font-weight:400;letter-spacing:0;text-transform:none}
 
+.p-felder{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 0 2px;
+  border-top:1px dashed var(--linie)}
+.p-felder input{font:inherit;font-size:calc(var(--fs)*0.8);padding:5px 8px;width:92px;
+  border:1px solid var(--linie);border-radius:7px;background:var(--karte);
+  color:var(--tinte)}
+.p-lab{font-size:calc(var(--fs)*0.72);color:var(--grau)}
+.p-stufen{display:flex;gap:4px;flex-wrap:wrap}
+.p-stufen button{font:inherit;font-size:calc(var(--fs)*0.7);padding:2px 8px;
+  border:1px solid var(--linie);border-radius:20px;background:var(--karte);
+  color:var(--grau);cursor:pointer}
+.p-stufen button.an{border-color:var(--weinrot);color:var(--weinrot);font-weight:500}
+.p-hinweis{font-size:calc(var(--fs)*0.7);color:var(--grau-hell);padding:4px 0 2px}
+.p-hinweis.warn{color:var(--heute)}
+.p-k-wann{flex:0 0 auto;font-size:calc(var(--fs)*0.66);color:var(--grau-hell);
+  border:1px solid var(--linie);border-radius:20px;padding:0 7px}
+.p-falt{width:100%;text-align:left;font:inherit;font-size:calc(var(--fs)*0.76);
+  color:var(--grau);background:none;border:0;border-top:1px solid var(--linie);
+  padding:8px 0 2px;cursor:pointer}
+
 /* Der Abendrückblick */
 .r-sheet{background:var(--karte);border:1px solid var(--linie);border-radius:12px;
   padding:12px 15px 15px;max-width:640px;margin:6px auto}
@@ -2108,7 +2127,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '3.15.0';
+var APP_VERSION = '3.16.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5251,20 +5270,100 @@ function freieStrecken(is) {
   return aus.filter(function (l) { return (l.bis - l.von) >= 15; });
 }
 
-/* Wer kommt in Frage? Was heute ansteht und noch keine Zeit hat, dann
-   das Wochenfach. */
+/* Wer kommt in Frage? Alle offenen Aufgaben, nach Datum — ohne
+   Kleinigkeiten, die sind ja gerade das, was zwischendurch geht, und
+   ohne das Backlog, das steht eingeklappt am Fuß. */
 function planKandidaten(is) {
-  var e = tagesEintraege(is);
-  var heute = e.haupt.concat(e.klein).filter(function (a) {
-    return !a.schritt && !a.uhrzeit;
-  });
-  var woche = (DB.aufgaben || []).filter(function (a) {
-    if (a.status === 'erledigt' || a.wiederholung) { return false; }
+  var offen = (DB.aufgaben || []).filter(function (a) {
+    if (a.status === 'erledigt') { return false; }
+    if (a.art === 'klein') { return false; }
+    if (a.uhrzeit) { return false; }
     if (kontextVerborgen(a.kontext)) { return false; }
     if (!passtZumTag(a.kontext)) { return false; }
-    return a.planung === 'woche' && !a.uhrzeit;
+    if (a.wiederholung) { return aufgabeFaelligAn(a, is); }
+    return true;
   });
-  return { heute: heute, woche: woche };
+  var vorn = nachDatum(offen.filter(function (a) {
+    return a.planung !== 'backlog';
+  }));
+  var hinten = nachDatum(offen.filter(function (a) {
+    return a.planung === 'backlog';
+  }));
+  return { vorn: vorn, backlog: hinten };
+}
+
+/* Passt der Block in die Lücke? Gesagt wird es, verboten nichts. */
+function planStoss(is, id, von, dauer) {
+  var belegt = belegteBloecke(is).filter(function (b) { return b.id !== id; });
+  var bis = von + dauer;
+  var i;
+  for (i = 0; i < belegt.length; i++) {
+    if (von < belegt[i].bis && bis > belegt[i].von) { return belegt[i]; }
+  }
+  return null;
+}
+
+var planBearbeitet = '';
+var planEntwurf = { zeit: '', dauer: 0 };
+var planBacklogOffen = false;
+
+/* Die erste freie Zeit ab jetzt — als Vorschlag, nicht als Vorschrift. */
+function planVorschlag(is) {
+  var l = freieStrecken(is);
+  var jetztM = (is === isoDatum()) ? minutenAus(uhrzeitJetzt()) : 0;
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].bis > jetztM) { return Math.max(l[i].von, jetztM); }
+  }
+  return l.length ? l[0].von : PLAN_VON;
+}
+
+function planOeffnen(id) {
+  var a = aufgabeFinden(id);
+  if (!a) { return; }
+  planBearbeitet = id;
+  planEntwurf = {
+    zeit: a.uhrzeit || zeitAusMinuten(planVorschlag(planTag)),
+    dauer: aufgabeDauer(a)
+  };
+  planZeichnen();
+}
+
+function planEntwurfZeit(wert) {
+  planEntwurf.zeit = String(wert || '').trim();
+  planZeichnen();
+}
+
+function planEntwurfDauer(wert) {
+  var zahl = parseInt(String(wert).replace(/[^0-9]/g, ''), 10);
+  planEntwurf.dauer = (zahl > 0) ? zahl : 15;
+  planZeichnen();
+}
+
+function planUebernehmen() {
+  var a = aufgabeFinden(planBearbeitet);
+  if (!a) { return; }
+  if (!/^[0-9]{1,2}:[0-9]{2}$/.test(planEntwurf.zeit)) {
+    melde('Die Uhrzeit braucht die Form 14:30.', 'warn');
+    return;
+  }
+  a.uhrzeit = planEntwurf.zeit;
+  a.dauer = planEntwurf.dauer;
+  a.planung = planTag;
+  a.geaendert = jetzt();
+  planBearbeitet = '';
+  spaeterSichern();
+  planZeichnen();
+}
+
+function planAbbrechen() {
+  planBearbeitet = '';
+  planZeichnen();
+}
+
+function planBacklogUm() {
+  planBacklogOffen = !planBacklogOffen;
+  planZeichnen();
 }
 
 function planSetzen(id, minuten) {
@@ -5341,25 +5440,60 @@ function planZeileHtml(b) {
   h += '<span class="p-zeit">' + zeitAusMinuten(b.von) + '</span>';
   h += '<span class="p-titel">' + esc(b.titel) + '</span>';
   if (b.fest) {
-    h += '<span class="p-dauer">' + (b.bis - b.von) + ' Min.</span>';
+    h += '<span class="p-dauer">' + dauerText(zeitAusMinuten(b.von),
+           zeitAusMinuten(b.bis)) + '</span>';
   } else {
-    h += '<button class="p-dauer knopf" type="button" onclick="planDauerUm(\''
-       + esc(b.id) + '\')" title="Dauer ändern">' + (b.bis - b.von) + ' Min.</button>';
+    h += '<button class="p-dauer knopf" type="button" onclick="planOeffnen(\''
+       + esc(b.id) + '\')" title="Zeit und Dauer ändern">'
+       + dauerText(zeitAusMinuten(b.von), zeitAusMinuten(b.bis)) + '</button>';
     h += '<button class="p-weg" type="button" onclick="planLoesen(\'' + esc(b.id)
        + '\')" title="Wieder aus dem Plan nehmen">×</button>';
   }
   h += '</div>';
+  if (planBearbeitet === b.id) { h += planFelderHtml(); }
   return h;
 }
 
-function planKandidatHtml(a, luecken) {
-  var h = '<div class="p-kandidat"><span class="p-k-titel">' + esc(a.titel) + '</span>';
+/* Uhrzeit und Dauer frei eintragen; die Stufen sind nur die Abkürzung. */
+function planFelderHtml() {
+  var stufen = [15, 30, 45, 60, 90, 120];
+  var von = /^[0-9]{1,2}:[0-9]{2}$/.test(planEntwurf.zeit)
+    ? minutenAus(planEntwurf.zeit) : -1;
+  var h = '<div class="p-felder">';
+  h += '<span class="p-lab">ab</span>'
+     + '<input type="text" value="' + esc(planEntwurf.zeit) + '" inputmode="numeric" '
+     + 'onchange="planEntwurfZeit(this.value)">';
+  h += '<span class="p-lab">für</span>'
+     + '<input type="text" value="' + planEntwurf.dauer + ' Min." inputmode="numeric" '
+     + 'onchange="planEntwurfDauer(this.value)">';
+  h += '<span class="p-stufen">';
   var i;
-  for (i = 0; i < luecken.length && i < 3; i++) {
-    h += '<button class="p-slot" type="button" onclick="planSetzen(\'' + esc(a.id)
-       + '\',' + luecken[i].von + ')">' + zeitAusMinuten(luecken[i].von) + '</button>';
+  for (i = 0; i < stufen.length; i++) {
+    h += '<button type="button" class="' + ((planEntwurf.dauer === stufen[i]) ? 'an' : '')
+       + '" onclick="planEntwurfDauer(' + stufen[i] + ')">' + stufen[i] + '</button>';
   }
+  h += '</span>';
+  h += '<button type="button" class="r-kn stark" onclick="planUebernehmen()">Setzen</button>';
+  h += '<button type="button" class="r-kn leise" onclick="planAbbrechen()">Abbrechen</button>';
   h += '</div>';
+  if (von >= 0) {
+    var stoss = planStoss(planTag, planBearbeitet, von, planEntwurf.dauer);
+    h += '<div class="p-hinweis' + (stoss ? ' warn' : '') + '">'
+       + (stoss ? ('Überschneidet sich mit ' + esc(stoss.titel) + ' ab '
+                   + zeitAusMinuten(stoss.von) + ' — geht trotzdem.')
+                : (esc(planEntwurf.zeit) + ' bis '
+                   + zeitAusMinuten(von + planEntwurf.dauer) + ' ist frei.'))
+       + '</div>';
+  }
+  return h;
+}
+
+function planKandidatHtml(a) {
+  var h = '<div class="p-kandidat"><span class="p-k-titel">' + esc(a.titel) + '</span>';
+  h += '<span class="p-k-wann">' + esc(planungText(a)) + '</span>';
+  h += '<button class="p-slot" type="button" onclick="planOeffnen(\'' + esc(a.id)
+     + '\')">Zeit geben</button></div>';
+  if (planBearbeitet === a.id) { h += planFelderHtml(); }
   return h;
 }
 
@@ -5372,45 +5506,42 @@ function planZeichnen() {
   var luecken = freieStrecken(is);
   var k = planKandidaten(is);
   var fest = planFest(is);
+  var i;
+
+  var minuten = 0;
+  for (i = 0; i < belegt.length; i++) { minuten += belegt[i].bis - belegt[i].von; }
+  var freiText = luecken.map(function (l) {
+    return dauerText(zeitAusMinuten(l.von), zeitAusMinuten(l.bis));
+  }).join(', ');
 
   var h = '<div class="p-sheet">';
   h += '<h3>Tagesplan aufstellen</h3>';
-  h += '<div class="p-unter">' + WOCHENTAGE_LANG[d.getDay()] + ', ' + d.getDate() + '. '
-     + MONATE_LANG[d.getMonth()] + (fest ? ' · steht bereits' : '') + '</div>';
+  /* Die freien Strecken stehen als Zeile im Kopf, nicht als Lücken in
+     der Schiene — dort blähten sie den Plan auf. */
+  var teile = [WOCHENTAGE_LANG[d.getDay()] + ', ' + d.getDate() + '. '
+               + MONATE_LANG[d.getMonth()]];
+  if (belegt.length) {
+    teile.push(belegt.length + (belegt.length === 1 ? ' Block' : ' Blöcke'));
+    teile.push(Math.floor(minuten / 60) + ' Std. '
+             + (minuten % 60 ? ((minuten % 60) + ' ') : '') + 'belegt');
+  }
+  if (freiText) { teile.push('frei: ' + freiText); }
+  if (fest) { teile.push('Plan steht seit ' + kurzUhr(fest.gestellt)); }
+  h += '<div class="p-unter">' + esc(teile.join(' · ')) + '</div>';
 
   h += '<div class="p-block">';
-  var i, lauf = PLAN_VON, l = 0;
-  for (i = 0; i < belegt.length; i++) {
-    while (l < luecken.length && luecken[l].von < belegt[i].von) {
-      h += '<div class="p-frei"><span class="p-zeit">'
-         + zeitAusMinuten(luecken[l].von) + '</span><span class="p-titel">frei · '
-         + dauerText(zeitAusMinuten(luecken[l].von), zeitAusMinuten(luecken[l].bis))
-         + '</span></div>';
-      l++;
-    }
-    h += planZeileHtml(belegt[i]);
-  }
-  while (l < luecken.length) {
-    h += '<div class="p-frei"><span class="p-zeit">'
-       + zeitAusMinuten(luecken[l].von) + '</span><span class="p-titel">frei · '
-       + dauerText(zeitAusMinuten(luecken[l].von), zeitAusMinuten(luecken[l].bis))
-       + '</span></div>';
-    l++;
-  }
-  if (!belegt.length) {
-    h += '<div class="tleer">Der Tag ist noch ganz leer.</div>';
-  }
+  for (i = 0; i < belegt.length; i++) { h += planZeileHtml(belegt[i]); }
+  if (!belegt.length) { h += '<div class="tleer">Der Tag ist noch ganz leer.</div>'; }
   h += '</div>';
 
   h += '<div class="p-block"><div class="p-kopf">Was soll hinein?</div>';
-  if (!k.heute.length && !k.woche.length) {
-    h += '<div class="tleer">Nichts mehr offen.</div>';
-  }
-  for (i = 0; i < k.heute.length; i++) { h += planKandidatHtml(k.heute[i], luecken); }
-  if (k.woche.length) {
-    h += '<div class="p-kopf">Aus dieser Woche</div>';
-    for (i = 0; i < k.woche.length && i < 8; i++) {
-      h += planKandidatHtml(k.woche[i], luecken);
+  for (i = 0; i < k.vorn.length; i++) { h += planKandidatHtml(k.vorn[i]); }
+  if (!k.vorn.length) { h += '<div class="tleer">Nichts Geplantes mehr offen.</div>'; }
+  if (k.backlog.length) {
+    h += '<button class="p-falt" type="button" onclick="planBacklogUm()">'
+       + (planBacklogOffen ? '▾' : '›') + ' Backlog · ' + k.backlog.length + '</button>';
+    if (planBacklogOffen) {
+      for (i = 0; i < k.backlog.length; i++) { h += planKandidatHtml(k.backlog[i]); }
     }
   }
   h += '</div>';

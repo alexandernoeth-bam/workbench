@@ -599,17 +599,24 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '            + zeitAusMinuten(l.bis); }).join(\',\'); };'
                  + '   var k0 = planKandidaten(h);'
                  + '   var r = { luecken: strecken(),'
-                 + '     kandidatenHeute: k0.heute.map(function(a){'
+                 + '     kandidaten: k0.vorn.map(function(a){'
                  + '       return a.titel; }).join(\',\'),'
-                 + '     kandidatenWoche: k0.woche.map(function(a){'
+                 + '     backlog: k0.backlog.map(function(a){'
                  + '       return a.titel; }).join(\',\') };'
-                 + '   planSetzen(\'a1\', 10 * 60);'
+                 + '   planOeffnen(\'a1\');'
+                 + '   r.vorschlag = planEntwurf.zeit;'
+                 + '   planEntwurfZeit(\'10:00\');'
+                 + '   planUebernehmen();'
                  + '   r.nachSetzen = aufgabeFinden(\'a1\').uhrzeit;'
                  + '   r.dauerGesetzt = aufgabeDauer(aufgabeFinden(\'a1\'));'
-                 + '   planDauerUm(\'a1\');'
+                 + '   planOeffnen(\'a1\');'
+                 + '   planEntwurfDauer(90);'
+                 + '   planUebernehmen();'
                  + '   r.dauerWeiter = aufgabeDauer(aufgabeFinden(\'a1\'));'
+                 + '   r.stossErkannt = !!planStoss(h, \'\', 9 * 60 + 30, 60);'
+                 + '   r.freiErkannt = !planStoss(h, \'\', 12 * 60, 60);'
                  + '   r.luecke2 = strecken().split(\',\')[1];'
-                 + '   r.nichtMehrKandidat = !planKandidaten(h).heute.some(function(a){'
+                 + '   r.nichtMehrKandidat = !planKandidaten(h).vorn.some(function(a){'
                  + '     return a.id === \'a1\'; });'
                  + '   r.markeVorher = /planStarten/.test(planMarkeHtml(h));'
                  + '   planFestschreiben();'
@@ -11390,8 +11397,9 @@ console.log('\n130. Der Tagesplan');
   const p = globalThis.__planApi;
 
   ['aufgabeDauer', 'belegteBloecke', 'freieStrecken', 'planKandidaten', 'planSetzen',
-   'planLoesen', 'planDauerUm', 'planFest', 'planFestschreiben', 'planStarten',
-   'planZeichnen', 'planMarkeHtml'].forEach(function (f) {
+   'planLoesen', 'planFest', 'planFestschreiben', 'planStarten',
+   'planZeichnen', 'planMarkeHtml', 'planOeffnen', 'planUebernehmen',
+   'planVorschlag', 'planFelderHtml'].forEach(function (f) {
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
   });
@@ -11405,6 +11413,17 @@ console.log('\n130. Der Tagesplan');
          'festgeschrieben wird mit Zeitstempel — daraus wird abends die Bilanz');
   pruefe(/var PLAN_DAUER = \{ haupt: 60, klein: 15 \}/.test(skript),
          'eine Aufgabe bekommt 60 Minuten, eine Kleinigkeit 15');
+  const pk = skript.match(/function planKandidaten\([\s\S]*?\n\}\n/);
+  pruefe(pk && /a\.art === 'klein'\) \{ return false; \}/.test(pk[0]),
+         'Kleinigkeiten stehen nicht in der Kandidatenliste — sie sind das, was '
+         + 'zwischendurch geht');
+  pruefe(pk && /a\.planung === 'backlog'/.test(pk[0]),
+         'das Backlog steht für sich, eingeklappt am Fuß');
+  const pz = skript.match(/function planZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(pz && /frei: /.test(pz[0]) && !/p-frei/.test(pz[0]),
+         'die freien Strecken stehen im Kopf, nicht als Lücken in der Schiene');
+  pruefe(new RegExp('function\\s+planStoss\\s*\\(').test(skript),
+         'eine Überschneidung wird gesagt, nicht verboten');
 
   if (!p) {
     warn('Funktionen nicht auswertbar');
@@ -11412,12 +11431,17 @@ console.log('\n130. Der Tagesplan');
     const e = p.pruefe();
     pruefe(e.luecken === '07:00-09:00,10:00-14:00,15:00-21:00',
            'zwischen den Terminen liegen die freien Strecken');
-    pruefe(e.kandidatenHeute === 'Vorlage,Brief',
-           'als Kandidaten steht an, was heute ohne Zeit dasteht');
-    pruefe(e.kandidatenWoche === 'Laufen', 'dazu das Wochenfach');
-    pruefe(e.nachSetzen === '10:00', 'ein Tipp auf eine Lücke setzt die Uhrzeit');
+    /* Seit v3.16.0: alle offenen Aufgaben, keine Kleinigkeiten, das
+       Backlog eingeklappt am Fuß. Uhrzeit und Dauer frei eintragbar. */
+    pruefe(e.kandidaten === 'Vorlage,Laufen',
+           'als Kandidaten stehen alle offenen Aufgaben, nach Datum');
+    pruefe(e.backlog === '', 'das Backlog steht für sich');
+    pruefe(e.vorschlag.length === 5, 'vorbelegt ist die nächste freie Zeit');
+    pruefe(e.nachSetzen === '10:00', 'die Uhrzeit lässt sich frei eintragen');
     pruefe(e.dauerGesetzt === 60, 'mit einer Standarddauer');
-    pruefe(e.dauerWeiter === 90, 'die sich in Stufen ändern lässt');
+    pruefe(e.dauerWeiter === 90, 'die sich frei ändern lässt');
+    pruefe(e.stossErkannt === true, 'eine Überschneidung wird erkannt');
+    pruefe(e.freiErkannt === true, 'eine freie Strecke ebenso');
     pruefe(e.luecke2 === '11:30-14:00',
            'die Lücke schrumpft um den gesetzten Block');
     pruefe(e.nichtMehrKandidat === true,
