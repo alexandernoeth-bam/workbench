@@ -10824,8 +10824,22 @@ console.log('\n117. Termine als Einzeiler');
      der doppelt so lange dauert, ist doppelt so hoch. */
   pruefe(sp2 && /STUNDE_HOCH/.test(sp2[0]) && /dauer \/ 60/.test(sp2[0]),
          'die Höhe eines Blocks folgt seiner Dauer');
-  pruefe(/\.splan-stunde\{[^}]*height:44px/.test(QUELLE),
-         'die Stundenskala gibt den Maßstab');
+  pruefe(/\.splan-stunde\{[^}]*height:64px/.test(QUELLE),
+         'die Stundenskala gibt den Maßstab — 64 Pixel je Stunde, damit zwei Zeilen '
+         + 'in einen Block passen');
+  pruefe(/\.splan-rolle\{[^}]*overflow-y:auto/.test(QUELLE),
+         'dafür rollt der Plan in sich, statt die Seite zu dehnen');
+  pruefe(new RegExp('function\\s+planRollenSpaeter\\s*\\(').test(skript),
+         'und springt beim Öffnen auf die jetzige Zeit');
+  const spm = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
+  pruefe(spm && /Math\.max\(26, \(dauer \/ 60\) \* STUNDE_HOCH\)/.test(spm[0]),
+         'ein Viertelstündchen bekommt eine Mindesthöhe — sonst stünde der Titel '
+         + 'nicht darin');
+  const pr = skript.match(/function planRollenSpaeter\([\s\S]*?\n\}/);
+  pruefe(pr && /is !== isoDatum\(\)\) \{ return; \}/.test(pr[0]),
+         'an anderen Tagen wird nicht gerollt');
+  pruefe(pr && /clientHeight \/ 3/.test(pr[0]),
+         'die Linie steht danach im oberen Drittel, damit man sieht, was kommt');
   pruefe(sp2 && /splan-blk/.test(sp2[0]) && !/tzt-rechts/.test(sp2[0]),
          'in den Blöcken steht kein Kalendername');
   pruefe(sp2 && !/\.ort/.test(sp2[0]) && !/\.beschreibung/.test(sp2[0]),
@@ -11562,7 +11576,7 @@ console.log('\n131. Der Tag ist der Plan');
            'daneben das Geplante ohne feste Zeit und die Routine');
     pruefe(e.draussen === false, '„Draussen" kam nicht in den Plan und steht nicht da');
     pruefe(e.nochInDerListe === true, 'in der Aufgabenliste steht es weiterhin');
-    pruefe(e.eineStunde === 41 && e.anderthalb === 63,
+    pruefe(e.eineStunde === 61 && e.anderthalb === 93,
            'ein Block ist so hoch wie seine Dauer lang — anderthalb Stunden '
            + 'anderthalbmal so hoch');
     pruefe(e.dazuVermerkt === true, 'was danach dazukam, ist vermerkt');

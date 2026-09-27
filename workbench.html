@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 4.0.0</title>
+<title>Workbench 4.1.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1207,8 +1207,10 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
 .tk-s-zeile{display:none;gap:8px;font-size:calc(var(--fs)*0.7);color:var(--grau);padding:0 0 6px}
 .tk-s-rest{flex:1;text-align:right}
 /* Der Stundenplan im Tag */
-.splan{position:relative;border-top:1px solid var(--linie);margin:2px 0 4px}
-.splan-stunde{display:flex;align-items:flex-start;height:44px;
+.splan-rolle{max-height:min(62vh, 620px);overflow-y:auto;margin:2px 0 4px;
+  scrollbar-width:thin}
+.splan{position:relative;border-top:1px solid var(--linie)}
+.splan-stunde{display:flex;align-items:flex-start;height:64px;
   border-bottom:1px solid var(--linie)}
 .splan-lab{flex:0 0 46px;font-size:calc(var(--fs)*0.64);color:var(--grau-hell);
   padding-top:2px;font-variant-numeric:tabular-nums}
@@ -2154,7 +2156,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '4.0.0';
+var APP_VERSION = '4.1.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5181,9 +5183,25 @@ function tagwFaellig() {
    nicht.
    ============================================================ */
 
-var STUNDE_HOCH = 44;
+/* 64 Pixel je Stunde: Bei 44 stieß die zweite Zeile eines Blocks unten
+   an. Dafür rollt der Plan in sich und springt auf die jetzige Zeit. */
+var STUNDE_HOCH = 64;
 var PLAN_MIN_VON = 8 * 60;
 var PLAN_MIN_BIS = 18 * 60;
+
+/* Nach dem Zeichnen an die jetzige Zeit rollen — sie soll im oberen
+   Drittel stehen, damit man sieht, was noch kommt. */
+function planRollenSpaeter(is) {
+  if (is !== isoDatum()) { return; }
+  window.setTimeout(function () {
+    var feld = document.getElementById('splanRolle');
+    if (!feld || !feld.querySelector) { return; }
+    var linie = feld.querySelector('.splan-jetzt');
+    if (!linie) { return; }
+    var ziel = linie.offsetTop - Math.round(feld.clientHeight / 3);
+    feld.scrollTop = (ziel > 0) ? ziel : 0;
+  }, 0);
+}
 
 function stundenSpanne(bloecke) {
   var von = PLAN_MIN_VON;
@@ -5202,7 +5220,7 @@ function stundenplanHtml(is, e) {
   var bloecke = belegteBloecke(is);
   var spanne = stundenSpanne(bloecke);
   var hoehe = function (m) { return ((m - spanne.von) / 60) * STUNDE_HOCH; };
-  var h = '<div class="splan">';
+  var h = '<div class="splan-rolle" id="splanRolle"><div class="splan">';
   var s;
   for (s = spanne.von; s < spanne.bis; s += 60) {
     h += '<div class="splan-stunde"><span class="splan-lab">' + zeitAusMinuten(s)
@@ -5214,18 +5232,20 @@ function stundenplanHtml(is, e) {
     var b = bloecke[i];
     var dauer = Math.max(15, b.bis - b.von);
     var oben = hoehe(b.von);
-    var hoch = (dauer / 60) * STUNDE_HOCH;
+    /* Ein Viertelstündchen wäre 16 Pixel hoch — darin stünde der Titel
+       nicht. Unter 26 Pixeln wird deshalb aufgerundet. */
+    var hoch = Math.max(26, (dauer / 60) * STUNDE_HOCH);
     var t = b.fest ? b.termin : aufgabeFinden(b.id);
     var privat = t && t.kontext === 'privat';
     h += '<div class="splan-blk' + (b.fest ? '' : ' eigen')
-       + (privat ? ' privat' : '') + (hoch < 34 ? ' kurz' : '')
+       + (privat ? ' privat' : '') + (hoch < 42 ? ' kurz' : '')
        + (b.vorbei ? ' vorbei' : '') + '" '
        + 'style="top:' + oben.toFixed(0) + 'px;height:' + (hoch - 3).toFixed(0) + 'px" '
        + (b.fest
           ? ('onclick="terminBlattOeffnen(\'' + esc(b.id || '') + '\',\'' + is + '\')"')
           : ('onclick="aufgabeAktionen(\'' + esc(b.id) + '\')"'))
        + '><b>' + esc(b.titel) + '</b>';
-    if (hoch >= 34) {
+    if (hoch >= 42) {
       h += '<span>' + zeitAusMinuten(b.von) + '–' + zeitAusMinuten(b.bis)
          + (b.fest ? '' : ' · selbst geplant') + '</span>';
     }
@@ -5238,7 +5258,7 @@ function stundenplanHtml(is, e) {
          + '<i>' + uhrzeitJetzt() + '</i></div>';
     }
   }
-  h += '</div></div>';
+  h += '</div></div></div>';
   if (!bloecke.length) {
     h += '<div class="tleer">Noch nichts mit fester Zeit im Plan.</div>';
   }
@@ -6835,6 +6855,7 @@ function tagZeichnen() {
      war — auch das Vergangene. */
   /* Maßstäblich statt als Liste: So sieht man, wie der Tag liegt. */
   h += stundenplanHtml(is, e);
+  planRollenSpaeter(is);
   h += '</div>';
 
 
