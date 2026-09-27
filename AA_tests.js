@@ -11499,6 +11499,19 @@ console.log('\n128. Die Jetzt-Linie');
   pruefe(sp && /is === isoDatum\(\)/.test(sp[0]),
          'an anderen Tagen gibt es kein „jetzt"');
   pruefe(sp && /splan-jetzt/.test(sp[0]), 'die Linie liegt im Stundenplan');
+  /* Seit v4.6.0 sagt ein Zeichen vor dem Titel, womit man es zu tun
+     hat: Kästchen für die Aufgabe, Kalenderblatt für den Termin. */
+  pruefe(new RegExp('function\\s+planSymbolHtml\\s*\\(').test(skript),
+         'Funktion planSymbolHtml ist definiert');
+  const psy = skript.match(/function planSymbolHtml\([\s\S]*?\n\}/);
+  pruefe(psy && /if \(b\.fest\)/.test(psy[0]) && /M3 10h18M8 3v4M16 3v4/.test(psy[0]),
+         'ein Termin trägt das Kalenderblatt');
+  pruefe(psy && /if \(b\.vorbei\)/.test(psy[0]) && /M7\.5 12\.5l3 3 6-6/.test(psy[0]),
+         'eine erledigte Aufgabe ein Kästchen mit Haken');
+  pruefe(psy && (psy[0].match(/rect x="3" y="3"/g) || []).length === 2,
+         'eine offene ein leeres Kästchen');
+  pruefe(sp && /planSymbolHtml\(b\)/.test(sp[0]),
+         'das Zeichen steht vor dem Titel');
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
   pruefe(tz && /stundenplanHtml\(is, e\)/.test(tz[0]),
          'der Tag zeichnet den Stundenplan');

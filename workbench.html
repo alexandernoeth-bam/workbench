@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 4.5.0</title>
+<title>Workbench 4.6.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1235,8 +1235,12 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
   border-left:3px solid var(--weinrot)}
 .splan-blk.eigen.privat{border-left-color:var(--petrol)}
 .splan-blk.vorbei{opacity:.5}
-.splan-blk b{display:block;font-size:calc(var(--fs)*0.8);font-weight:500;
-  line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.splan-blk b{display:flex;align-items:center;gap:6px;font-size:calc(var(--fs)*0.8);
+  font-weight:500;line-height:1.25;white-space:nowrap;overflow:hidden}
+.splan-blk b span{overflow:hidden;text-overflow:ellipsis}
+.splan-sym{flex:0 0 auto;width:13px;height:13px;stroke:var(--grau);fill:none;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.splan-sym.an{stroke:var(--weinrot)}
 .splan-blk span{font-size:calc(var(--fs)*0.66);color:var(--grau)}
 .splan-blk.kurz{padding:1px 8px}
 .splan-jetzt{position:absolute;left:-8px;right:0;height:0;
@@ -2200,7 +2204,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '4.5.0';
+var APP_VERSION = '4.6.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5266,6 +5270,24 @@ function stundenSpanne(bloecke) {
   return { von: von, bis: bis };
 }
 
+/* Ein Zeichen vor dem Titel sagt, womit man es zu tun hat: Kästchen
+   für die eigene Aufgabe, Kalenderblatt für den Termin. Ein erledigtes
+   Kästchen trägt den Haken. */
+function planSymbolHtml(b) {
+  if (b.fest) {
+    return '<svg class="splan-sym" viewBox="0 0 24 24">'
+         + '<rect x="3" y="5" width="18" height="16" rx="2"></rect>'
+         + '<path d="M3 10h18M8 3v4M16 3v4"></path></svg>';
+  }
+  if (b.vorbei) {
+    return '<svg class="splan-sym an" viewBox="0 0 24 24">'
+         + '<rect x="3" y="3" width="18" height="18" rx="3"></rect>'
+         + '<path d="M7.5 12.5l3 3 6-6"></path></svg>';
+  }
+  return '<svg class="splan-sym" viewBox="0 0 24 24">'
+       + '<rect x="3" y="3" width="18" height="18" rx="3"></rect></svg>';
+}
+
 function stundenplanHtml(is, e) {
   var bloecke = belegteBloecke(is);
   var spanne = stundenSpanne(bloecke);
@@ -5295,7 +5317,7 @@ function stundenplanHtml(is, e) {
        + (b.fest
           ? ('onclick="terminBlattOeffnen(\'' + esc(b.id || '') + '\',\'' + is + '\')"')
           : ('onclick="aufgabeAktionen(\'' + esc(b.id) + '\')"'))
-       + '><b>' + esc(b.titel) + '</b>';
+       + '><b>' + planSymbolHtml(b) + '<span>' + esc(b.titel) + '</span></b>';
     if (hoch >= 42) {
       var vermerk = b.fest ? '' : ' · selbst geplant';
       if (!b.fest && planDazu(is, b.id)) { vermerk = ' · dazugekommen'; }
