@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 4.1.0</title>
+<title>Workbench 4.2.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1206,6 +1206,17 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
 .tk-sym.an{border-color:var(--petrol);color:var(--petrol);background:var(--papier)}
 .tk-s-zeile{display:none;gap:8px;font-size:calc(var(--fs)*0.7);color:var(--grau);padding:0 0 6px}
 .tk-s-rest{flex:1;text-align:right}
+/* Die Morgenroutine */
+.ro-sheet h3{font-size:calc(var(--fs)*1.2)}
+.ro-satz{font-size:calc(var(--fs)*0.86);color:var(--grau);line-height:1.45;
+  border-left:3px solid var(--linie);padding-left:10px;margin:8px 0 4px}
+.ro-zeile{border:1px solid var(--linie);border-radius:9px;padding:7px 9px;
+  margin-bottom:7px}
+.ro-oben{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.ro-nr{flex:0 0 auto;font-size:calc(var(--fs)*0.72);color:var(--grau-hell);
+  min-width:14px}
+.ro-min{flex:0 0 84px}
+
 /* Der Stundenplan im Tag */
 .splan-rolle{max-height:min(62vh, 620px);overflow-y:auto;margin:2px 0 4px;
   scrollbar-width:thin}
@@ -1657,6 +1668,11 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2.5"></rect>
          <path d="M8 3v4M16 3v4M3 10h18M15.5 14.5 11 19l-2.5-2.5"></path></svg>
      </button>
+     <button type="button" class="tk-sym an" id="tkSonne" onclick="routineStarten()"
+             title="Die Morgenroutine beginnen" aria-label="Die Morgenroutine beginnen">
+       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle>
+         <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"></path></svg>
+     </button>
      <button type="button" class="tk-sym" id="tkMond" onclick="rueckStarten()"
              title="Den Tag abschließen" aria-label="Den Tag abschließen">
        <svg viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"></path></svg>
@@ -1776,6 +1792,15 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
   <div class="vhblatt einfachliste" id="abSeiteBlatt"></div>
 </div>
 
+<div class="schirm" id="schirmRoutine">
+  <div class="vh-kopf">
+    <div class="vh-zeile">
+      <button type="button" class="pille" onclick="routineSchliessen()">Zurück</button>
+    </div>
+  </div>
+  <div class="vhblatt einfachliste" id="routineBlatt"></div>
+</div>
+
 <div class="schirm" id="schirmPlanen">
   <div class="vh-kopf">
     <div class="vh-zeile">
@@ -1889,6 +1914,12 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 
   <div class="abschnitt-titel"><span>Darstellung</span></div>
   <div id="darstellungWahl"></div>
+
+  <div class="abschnitt-titel"><span>Morgenroutine</span></div>
+  <div id="routineListe"></div>
+  <div class="feld-hinweis">Ein fester Ablauf, mit dem der Tag beginnt. Vormittags
+    zeigt der Tageskopf eine Sonne, solange sie aussteht — aufschlagen tut sie sich
+    nicht von selbst.</div>
 
   <div class="abschnitt-titel"><span>Eigener Satz im Tag</span></div>
   <textarea id="leitsatzFeld" class="d-text" rows="2"
@@ -2156,7 +2187,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '4.1.0';
+var APP_VERSION = '4.2.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5054,6 +5085,10 @@ function tagKopfSchmalZeichnen(is, e) {
   }
   /* Der Mond erscheint erst am späten Nachmittag — und verschwindet,
      wenn der Tag abgeschlossen ist. */
+  var sonne = document.getElementById('tkSonne');
+  if (sonne && sonne.style) {
+    sonne.style.display = routineFaellig(is) ? '' : 'none';
+  }
   var mond = document.getElementById('tkMond');
   if (mond && mond.style) {
     mond.style.display = rueckFaellig(is) ? '' : 'none';
@@ -5712,6 +5747,218 @@ function planZeichnen() {
      + '<button type="button" class="r-kn stark" onclick="planFestschreiben()">'
      + (fest ? 'Plan neu festschreiben' : 'Plan festschreiben') + '</button></div>';
   blatt.innerHTML = h + '</div>';
+}
+
+/* ============================================================
+   Die Morgenroutine
+
+   Ein fester Ablauf, der den Tag beginnt und mit dem Tagesplan endet.
+   Die Schritte schreibt der Mensch, nicht die App. Kein Zwang, keine
+   Serie, keine Statistik über verpasste Morgen — nur das Datum des
+   letzten Durchgangs. Sie schlägt sich auch nicht selbst auf: Das
+   Symbol im Tageskopf zeigt, dass sie ansteht.
+   ============================================================ */
+
+var ROUTINE_BIS = '12:00';
+var routineSchritt = 0;
+
+function routineSatz() {
+  if (!DB.einstellungen.routine) {
+    DB.einstellungen.routine = { name: 'Morgenroutine', schritte: [], zuletzt: '' };
+  }
+  var r = DB.einstellungen.routine;
+  if (!r.schritte) { r.schritte = []; }
+  if (!r.name) { r.name = 'Morgenroutine'; }
+  return r;
+}
+
+function routineName() {
+  return routineSatz().name;
+}
+
+function routineSchritte() {
+  return routineSatz().schritte;
+}
+
+/* Die beiden letzten Schritte kommen nicht aus der Liste: der Satz für
+   heute und der Tagesplan. Sie sind der Sinn des Ganzen. */
+function routineAlleSchritte() {
+  return routineSchritte().concat([{ fest: 'satz' }, { fest: 'plan' }]);
+}
+
+function routineHeuteFertig(is) {
+  return routineSatz().zuletzt === is;
+}
+
+function routineFaellig(is) {
+  if (is !== isoDatum()) { return false; }
+  if (!routineSchritte().length) { return false; }
+  if (routineHeuteFertig(is)) { return false; }
+  return uhrzeitJetzt() < ROUTINE_BIS;
+}
+
+function routineStarten() {
+  routineSchritt = 0;
+  zeigeSchirm('Routine');
+}
+
+function routineWeiter(um) {
+  var letzte = routineAlleSchritte().length - 1;
+  routineSchritt = Math.max(0, Math.min(letzte, routineSchritt + um));
+  routineZeichnen();
+}
+
+function routineSchliessen() {
+  zeigeSchirm('Tag');
+  tagZeichnen();
+}
+
+function routineAbschliessen() {
+  routineSatz().zuletzt = isoDatum();
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  melde('Der Morgen steht.', 'gut');
+  planStarten();
+}
+
+/* ---- Die Schritte in der Diagnose ---- */
+
+function routineNeu() {
+  routineSchritte().push({ id: neueKennung(), name: '', minuten: 0, satz: '' });
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  zeichneRoutine();
+}
+
+function routineFeld(nr, feld, wert) {
+  var s = routineSchritte()[nr];
+  if (!s) { return; }
+  if (feld === 'minuten') {
+    var zahl = parseInt(String(wert).replace(/[^0-9]/g, ''), 10);
+    s.minuten = (zahl > 0) ? zahl : 0;
+  } else {
+    s[feld] = String(wert);
+  }
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+}
+
+function routineWeg(nr) {
+  routineSchritte().splice(nr, 1);
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  zeichneRoutine();
+}
+
+function routineSchieben(nr, um) {
+  var l = routineSchritte();
+  var ziel = nr + um;
+  if (ziel < 0 || ziel >= l.length) { return; }
+  var s = l[nr];
+  l[nr] = l[ziel];
+  l[ziel] = s;
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  zeichneRoutine();
+}
+
+function routineNameSetzen(wert) {
+  routineSatz().name = String(wert || '').trim() || 'Morgenroutine';
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+}
+function routineZeichnen() {
+  var blatt = document.getElementById('routineBlatt');
+  if (!blatt) { return; }
+  var alle = routineAlleSchritte();
+  if (routineSchritt >= alle.length) { routineSchritt = alle.length - 1; }
+  var s = alle[routineSchritt] || { fest: 'plan' };
+  var letzter = (routineSchritt === alle.length - 1);
+
+  var h = '<div class="r-sheet ro-sheet">';
+  h += '<div class="r-fortschritt">';
+  var k;
+  for (k = 0; k < alle.length; k++) {
+    h += '<i class="' + (k <= routineSchritt ? 'an' : '') + '"></i>';
+  }
+  h += '</div>';
+
+  if (s.fest === 'satz') {
+    h += '<h3>Ein Satz für heute</h3>';
+    h += '<div class="r-unter">Er steht den ganzen Tag über dem Plan — oder du '
+       + 'lässt ihn weg.</div>';
+    h += '<textarea class="d-text" placeholder="Worum geht es heute?" '
+       + 'oninput="routineLeitsatz(this.value)">' + esc(leitsatzText()) + '</textarea>';
+  } else if (s.fest === 'plan') {
+    h += '<h3>Der Tagesplan</h3>';
+    h += '<div class="r-unter">Der letzte Schritt: den Tag aufstellen, bevor er '
+       + 'dich aufstellt.</div>';
+  } else {
+    h += '<h3>' + esc(s.name || 'Ohne Namen') + '</h3>';
+    h += '<div class="r-unter">' + esc(routineName()) + ' · Schritt '
+       + (routineSchritt + 1) + ' von ' + alle.length
+       + (s.minuten ? (' · ' + s.minuten + ' Min.') : '') + '</div>';
+    if (s.satz) { h += '<div class="ro-satz">' + esc(s.satz) + '</div>'; }
+  }
+
+  h += '<div class="r-reihe">'
+     + '<button type="button" class="r-kn leise" onclick="routineSchliessen()">'
+     + 'Später</button><span style="flex:1"></span>'
+     + (routineSchritt > 0 ? '<button type="button" class="r-kn" '
+        + 'onclick="routineWeiter(-1)">Zurück</button>' : '')
+     + '<button type="button" class="r-kn stark" onclick="'
+     + (letzter ? 'routineAbschliessen()' : 'routineWeiter(1)') + '">'
+     + (letzter ? 'Plan aufstellen' : 'Getan') + '</button></div>';
+  blatt.innerHTML = h + '</div>';
+}
+
+/* Der Satz aus der Routine ist derselbe wie der in der Diagnose — er
+   wird dabei von selbst eingeschaltet. */
+function routineLeitsatz(text) {
+  leitsatzSetzen(text);
+  DB.einstellungen.leitsatzAn = (String(text).trim().length > 0);
+  spaeterSichern();
+}
+
+function zeichneRoutine() {
+  var ziel = document.getElementById('routineListe');
+  if (!ziel) { return; }
+  var l = routineSchritte();
+  var h = '<div class="zeile"><div class="zeile-name">Name</div>'
+        + '<input type="text" class="d-text" value="' + esc(routineName())
+        + '" onchange="routineNameSetzen(this.value)"></div>';
+  var i;
+  for (i = 0; i < l.length; i++) {
+    h += '<div class="ro-zeile">';
+    h += '<div class="ro-oben"><span class="ro-nr">' + (i + 1) + '</span>'
+       + '<input type="text" class="d-text" placeholder="Was tue ich?" value="'
+       + esc(l[i].name || '') + '" onchange="routineFeld(' + i + ',\'name\',this.value)">'
+       + '<input type="text" class="d-text ro-min" placeholder="Min." value="'
+       + (l[i].minuten ? (l[i].minuten + ' Min.') : '')
+       + '" onchange="routineFeld(' + i + ',\'minuten\',this.value)">'
+       + '<button class="ms-wort" type="button" onclick="routineSchieben(' + i
+       + ',-1)" title="Nach oben">↑</button>'
+       + '<button class="ms-wort" type="button" onclick="routineSchieben(' + i
+       + ',1)" title="Nach unten">↓</button>'
+       + '<button class="ms-wort" type="button" onclick="routineWeg(' + i
+       + ')" title="Entfernen">×</button></div>';
+    h += '<input type="text" class="d-text" placeholder="Ein Satz dazu (freiwillig)" '
+       + 'value="' + esc(l[i].satz || '') + '" onchange="routineFeld(' + i
+       + ',\'satz\',this.value)">';
+    h += '</div>';
+  }
+  if (!l.length) {
+    h += '<div class="feld-hinweis">Noch kein Schritt. Ohne Schritte meldet sich '
+       + 'die Routine nicht.</div>';
+  }
+  h += '<div class="knopfreihe"><button type="button" onclick="routineNeu()">'
+     + 'Schritt hinzufügen</button></div>';
+  var zul = routineSatz().zuletzt;
+  h += '<div class="feld-hinweis">Danach folgen immer zwei feste Schritte: der Satz '
+     + 'für heute und der Tagesplan.'
+     + (zul ? (' Zuletzt durchlaufen am ' + esc(kurzDatum(zul)) + '.') : '')
+     + '</div>';
+  ziel.innerHTML = h;
 }
 
 /* ============================================================
@@ -7869,7 +8116,7 @@ function zeigeSchirm(name) {
   schirmOffen = name;
   var alle = ['Tag', 'Kalender', 'Vorhaben', 'Ablaeufe', 'Aufgaben',
               'Flaeche', 'Gedanken', 'Taetigkeiten', 'Tagwechsel', 'Rueckblick',
-              'Planen', 'Ablauf', 'Pinnwand', 'Migration', 'Diagnose'];
+              'Planen', 'Routine', 'Ablauf', 'Pinnwand', 'Migration', 'Diagnose'];
   var i;
   for (i = 0; i < alle.length; i++) {
     var s = document.getElementById('schirm' + alle[i]);
@@ -7886,6 +8133,7 @@ function zeigeSchirm(name) {
                        || name === 'Taetigkeiten') && alle[i] === 'Vorhaben')
                   || (name === 'Rueckblick' && alle[i] === 'Tag')
                   || (name === 'Planen' && alle[i] === 'Tag')
+                  || (name === 'Routine' && alle[i] === 'Tag')
                   || (name === 'Ablauf' && alle[i] === 'Aufgaben')
                   || (name === 'Ablaeufe' && alle[i] === 'Aufgaben')
                   || ((name === 'Diagnose' || name === 'Tagwechsel')
@@ -7900,6 +8148,7 @@ function zeigeSchirm(name) {
   if (name === 'Tagwechsel') { tagwZeichnen(); }
   if (name === 'Rueckblick') { rueckZeichnen(); }
   if (name === 'Planen') { planZeichnen(); }
+  if (name === 'Routine') { routineZeichnen(); }
   if (name === 'Ablauf') { abDetailNeu(); }
   if (name === 'Pinnwand') { pinnwandZeichnen(); }
   if (name === 'Tag') { tagZeichnen(); kalenderNachholen(); }
@@ -8570,6 +8819,7 @@ function zeichne() {
   zeichneDarstellung();
   zeichneGrussWahl();
   zeichneLeitsatzWahl();
+  zeichneRoutine();
   zeichneJtDatei();
   zeichneFerien();
   zeichneBestand();

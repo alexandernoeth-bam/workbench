@@ -84,7 +84,8 @@ console.log('\n1. Bildschirme und Navigation');
   /* Seit v3.5.0 sind die Abläufe ein Reiter innerhalb der Aufgaben: Ein
      Ablauf ist etwas, das man abarbeitet. */
   const VERSTECKT = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
-                     'Tagwechsel', 'Ablauf', 'Ablaeufe', 'Rueckblick', 'Planen'];
+                     'Tagwechsel', 'Ablauf', 'Ablaeufe', 'Rueckblick', 'Planen',
+                      'Routine'];
   schirme.forEach(function (s) {
     if (VERSTECKT.indexOf(s) >= 0) {
       pruefe(navs.indexOf(s) < 0,
@@ -224,7 +225,8 @@ console.log('\n5. Element-IDs');
   /* Zusammengesetzte IDs wie 'schirm' + name */
   const schirme = [...QUELLE.matchAll(/id="schirm([A-Za-zÄÖÜäöü]+)"/g)].map(m => m[1]);
   const OHNE_KNOPF = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
-                      'Tagwechsel', 'Ablauf', 'Ablaeufe', 'Rueckblick', 'Planen'];
+                      'Tagwechsel', 'Ablauf', 'Ablaeufe', 'Rueckblick', 'Planen',
+                      'Routine'];
   schirme.forEach(function (s) {
     if (OHNE_KNOPF.indexOf(s) >= 0) {
       pruefe(imHtml.has('schirm' + s), 'ID schirm' + s + ' existiert (ohne Knopf)');
@@ -567,6 +569,44 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__morgenApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   tagOffen = h;'
+                 + '   /* Nachmittags meldet sich die Routine nicht — dann wird'
+                 + '      nur geprüft, was von der Uhrzeit unabhängig ist. */'
+                 + '   var frueh = (uhrzeitJetzt() < ROUTINE_BIS);'
+                 + '   var r = { ohneSchritte: routineFaellig(h) };'
+                 + '   routineNeu(); routineFeld(0, \'name\', \'Fenster auf\');'
+                 + '   routineFeld(0, \'minuten\', \'10 Min.\');'
+                 + '   routineFeld(0, \'satz\', \'Erst atmen.\');'
+                 + '   routineNeu(); routineFeld(1, \'name\', \'Kaffee\');'
+                 + '   routineNeu(); routineFeld(2, \'name\', \'Kalender\');'
+                 + '   r.mitSchritten = frueh ? routineFaellig(h) : true;'
+                 + '   r.schritte = routineAlleSchritte().length;'
+                 + '   routineStarten();'
+                 + '   var blatt = function(){'
+                 + '     return document.getElementById(\'routineBlatt\').innerHTML; };'
+                 + '   r.ersterName = (blatt().match(/<h3>([^<]*)/) || [])[1];'
+                 + '   r.ersterSatz = /Erst atmen\./.test(blatt());'
+                 + '   r.ersteMinuten = /10 Min\./.test(blatt());'
+                 + '   routineWeiter(1); routineWeiter(1); routineWeiter(1);'
+                 + '   r.vorletzter = /Ein Satz für heute/.test(blatt());'
+                 + '   routineLeitsatz(\'Heute ruhig bleiben.\');'
+                 + '   r.satzGesetzt = leitsatzText();'
+                 + '   r.satzAn = (DB.einstellungen.leitsatzAn === true);'
+                 + '   routineWeiter(1);'
+                 + '   r.letzter = /Der Tagesplan/.test(blatt());'
+                 + '   routineAbschliessen();'
+                 + '   r.nachLauf = routineFaellig(h);'
+                 + '   r.datum = DB.einstellungen.routine.zuletzt;'
+                 + '   routineSchieben(1, -1);'
+                 + '   r.verschoben = routineSchritte().map(function(s){'
+                 + '     return s.name; }).join(\',\');'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__tagPlanApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -11583,6 +11623,67 @@ console.log('\n131. Der Tag ist der Plan');
     pruefe(e.nachHeraus === false, '„herausnehmen" nimmt es wieder aus dem Tag');
     pruefe(e.kopfVorher.indexOf('aufstellen') > 0, 'vorher lädt der Kopf zum Aufstellen');
     pruefe(e.kopfNachher.indexOf('anpassen') > 0, 'danach führt er zum Anpassen');
+  }
+}
+
+/* ============================================================
+   132. Die Morgenroutine
+   Grund: Ein fester Ablauf, mit dem der Tag beginnt und der mit dem
+   Tagesplan endet. Die Schritte schreibt der Mensch. Kein Zwang, keine
+   Serie, keine Statistik über verpasste Morgen — nur das Datum des
+   letzten Durchgangs.
+   ============================================================ */
+console.log('\n132. Morgenroutine');
+{
+  const skript = hauptSkript();
+  const r = globalThis.__morgenApi;
+
+  ['routineSatz', 'routineSchritte', 'routineAlleSchritte', 'routineFaellig',
+   'routineHeuteFertig', 'routineStarten', 'routineWeiter', 'routineAbschliessen',
+   'routineZeichnen', 'zeichneRoutine', 'routineNeu', 'routineFeld', 'routineWeg',
+   'routineSchieben'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  pruefe(/id="schirmRoutine"/.test(QUELLE) && /id="routineBlatt"/.test(QUELLE),
+         'die Routine hat einen eigenen Bildschirm');
+  pruefe(/id="tkSonne"/.test(QUELLE) && /id="routineListe"/.test(QUELLE),
+         'eine Sonne im Kopf, die Schritte in der Diagnose');
+  const rf = skript.match(/function routineFaellig\([\s\S]*?\n\}/);
+  pruefe(rf && /uhrzeitJetzt\(\) < ROUTINE_BIS/.test(rf[0]),
+         'sie meldet sich nur vormittags');
+  pruefe(rf && /!routineSchritte\(\)\.length\) \{ return false; \}/.test(rf[0]),
+         'ohne Schritte meldet sie sich gar nicht');
+  pruefe(rf && /routineHeuteFertig\(is\)\) \{ return false; \}/.test(rf[0]),
+         'und nicht mehr, wenn sie heute schon lief');
+  const ra = skript.match(/function routineAlleSchritte\([\s\S]*?\n\}/);
+  pruefe(ra && /fest: 'satz'/.test(ra[0]) && /fest: 'plan'/.test(ra[0]),
+         'zwei feste Schritte am Ende: der Satz für heute und der Tagesplan');
+  const rab = skript.match(/function routineAbschliessen\([\s\S]*?\n\}/);
+  pruefe(rab && /planStarten\(\)/.test(rab[0]),
+         'sie endet im Planmodus — darum geht es');
+  pruefe(rab && /zuletzt = isoDatum\(\)/.test(rab[0]) && !/serie|strich/i.test(rab[0]),
+         'festgehalten wird nur das Datum, keine Serie');
+
+  if (!r) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = r.pruefe();
+    pruefe(e.ohneSchritte === false, 'ohne Schritte ist nichts fällig');
+    pruefe(e.mitSchritten === true, 'mit Schritten schon');
+    pruefe(e.schritte === 5, 'drei eigene Schritte und die zwei festen');
+    pruefe(e.ersterName === 'Fenster auf', 'die Karte nennt den Schritt');
+    pruefe(e.ersterSatz === true, 'und den Satz dazu, wenn einer da ist');
+    pruefe(e.ersteMinuten === true, 'die Minuten stehen in der Unterzeile');
+    pruefe(e.vorletzter === true, 'vorletzt der Satz für heute');
+    pruefe(e.letzter === true, 'zuletzt der Tagesplan');
+    pruefe(e.satzGesetzt === 'Heute ruhig bleiben.',
+           'der Satz aus der Routine ist derselbe wie in der Diagnose');
+    pruefe(e.satzAn === true, 'und wird dabei von selbst eingeschaltet');
+    pruefe(e.nachLauf === false, 'nach dem Durchgang meldet sie sich nicht mehr');
+    pruefe(e.datum.length === 10, 'festgehalten ist nur das Datum');
+    pruefe(e.verschoben === 'Kaffee,Fenster auf,Kalender',
+           'die Schritte lassen sich ordnen');
   }
 }
 
