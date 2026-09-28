@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 4.11.1</title>
+<title>Workbench 4.12.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2228,7 +2228,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '4.11.1';
+var APP_VERSION = '4.12.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4366,18 +4366,14 @@ function tagesEintraege(is) {
   for (i = 0; i < schritte.length; i++) {
     /* Ein Schritt mit eigener Aufgabe ist nie eine Kleinigkeit: Er steht
        als das da, was er ist — als Aufgabe. */
-    var traegt = schrittAufgabe(schritte[i].satz);
-    if (traegt) {
-      /* Auch der nächste Schritt eines laufenden Vorgangs drängt sich
-         nicht mehr selbst in den Tag: Steht ein Plan, gilt er auch
-         hier. Sonst stand eine Backlog-Aufgabe im Tag, die niemand
-         dorthin gesetzt hatte. */
-      if (traegt.status !== 'erledigt' && gehoertInTag(traegt, is)) {
-        haupt.push(traegt);
-      }
-      continue;
-    }
-    if (planGilt(is)) { continue; }
+    /* Trägt der Schritt eine eigene Aufgabe, kommt er nur über sie in
+       den Tag — über ihre Planung oder den Plan. Eine Backlog-Aufgabe
+       gehört nicht in den Tag, bloß weil ihr Vorgang läuft. */
+    if (schrittAufgabe(schritte[i].satz)) { continue; }
+    /* Ein Schritt ohne Aufgabe steht im Tag, wenn er in den Plan
+       genommen wurde — und ohne Plan wie früher von selbst. */
+    if (planGilt(is) && !planSchrittDrin(is, schritte[i].durchlauf.id,
+                                         schritte[i].nr)) { continue; }
     klein.push({ schritt: true, d: schritte[i].durchlauf, nr: schritte[i].nr,
                  satz: schritte[i].satz,
                  nachgerueckt: schritteHeuteFertig(schritte[i].durchlauf, is) > 0 });
@@ -5403,11 +5399,40 @@ function stundenplanHtml(is, e) {
 function planSatz(is) {
   if (!DB.plaene) { DB.plaene = {}; }
   if (!DB.plaene[is]) {
-    DB.plaene[is] = { gestellt: 0, drin: [], dazu: [] };
+    DB.plaene[is] = { gestellt: 0, drin: [], dazu: [], schritte: [] };
   }
   if (!DB.plaene[is].drin) { DB.plaene[is].drin = []; }
   if (!DB.plaene[is].dazu) { DB.plaene[is].dazu = []; }
+  /* Schritte ohne eigene Aufgabe sind keine Aufgaben und brauchen eine
+     eigene Liste: Vorgang und Nummer. */
+  if (!DB.plaene[is].schritte) { DB.plaene[is].schritte = []; }
   return DB.plaene[is];
+}
+
+function schrittKennung(durchlaufId, nr) {
+  return String(durchlaufId) + '#' + String(nr);
+}
+
+function planSchrittDrin(is, durchlaufId, nr) {
+  var p = DB.plaene && DB.plaene[is];
+  if (!p || !p.schritte) { return false; }
+  return p.schritte.indexOf(schrittKennung(durchlaufId, nr)) >= 0;
+}
+
+function planSchrittAufnehmen(durchlaufId, nr) {
+  var p = planSatz(planTag);
+  var k = schrittKennung(durchlaufId, nr);
+  if (p.schritte.indexOf(k) < 0) { p.schritte.push(k); }
+  spaeterSichern();
+  planZeichnen();
+}
+
+function planSchrittHeraus(durchlaufId, nr) {
+  var p = planSatz(planTag);
+  var i = p.schritte.indexOf(schrittKennung(durchlaufId, nr));
+  if (i >= 0) { p.schritte.splice(i, 1); }
+  spaeterSichern();
+  planZeichnen();
 }
 
 function planGilt(is) {
@@ -5581,7 +5606,27 @@ function planKandidaten(is) {
   var hinten = nachDatum(haupt.filter(function (a) {
     return a.planung === 'backlog';
   }));
-  return { vorn: vorn, backlog: hinten, vorgaenge: inVorgaengen, klein: klein };
+  /* Schritte ohne eigene Aufgabe: Sie lassen sich sonst gar nicht in
+     den Tag nehmen, seit dort nur Geplantes steht. */
+  var ohneAufgabe = [];
+  var l = laufendeDurchlaeufe();
+  var k;
+  for (k = 0; k < l.length; k++) {
+    if (!passtZumTag(l[k].kontext)) { continue; }
+    if (kontextVerborgen(l[k].kontext)) { continue; }
+    var s = offenerSchritt(l[k]);
+    if (!s || schrittAufgabe(s.satz)) { continue; }
+    if (schrittRuht(s.satz, is)) { continue; }
+    if (!nachVorgang[l[k].id]) {
+      nachVorgang[l[k].id] = { name: l[k].name, id: l[k].id, schritte: [] };
+      inVorgaengen.push(nachVorgang[l[k].id]);
+    }
+    nachVorgang[l[k].id].lose = (nachVorgang[l[k].id].lose || []);
+    nachVorgang[l[k].id].lose.push({ d: l[k], nr: s.nr, satz: s.satz });
+    ohneAufgabe.push({ d: l[k], nr: s.nr, satz: s.satz });
+  }
+  return { vorn: vorn, backlog: hinten, vorgaenge: inVorgaengen, klein: klein,
+           ohneAufgabe: ohneAufgabe };
 }
 
 /* Passt der Block in die Lücke? Gesagt wird es, verboten nichts. */
@@ -5885,6 +5930,17 @@ function planZeichnen() {
          + esc(k.vorgaenge[v].name) + ' →</button>';
       for (s = 0; s < k.vorgaenge[v].schritte.length; s++) {
         h += planKandidatHtml(k.vorgaenge[v].schritte[s], true);
+      }
+      var lose = k.vorgaenge[v].lose || [];
+      for (s = 0; s < lose.length; s++) {
+        var drin = planSchrittDrin(is, lose[s].d.id, lose[s].nr);
+        h += '<div class="p-kandidat eingerueckt"><span class="p-k-titel">'
+           + esc(schrittTitel(lose[s].satz) || 'ohne Titel') + '</span>'
+           + '<span class="p-k-wann">Schritt ohne Aufgabe</span>'
+           + '<button class="p-slot' + (drin ? ' leise' : '') + '" type="button" '
+           + 'onclick="' + (drin ? 'planSchrittHeraus' : 'planSchrittAufnehmen')
+           + '(\'' + esc(lose[s].d.id) + '\',' + lose[s].nr + ')">'
+           + (drin ? 'herausnehmen' : 'in den Tag') + '</button></div>';
       }
     }
     h += '</div>';

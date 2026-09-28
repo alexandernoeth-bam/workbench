@@ -1394,7 +1394,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var h = isoDatum();'
                  + '   DB.aufgaben = ['
                  + '     { id:\'a1\', titel:\'Fragebogen\', kontext:\'beruflich\','
-                 + '       status:\'offen\', art:\'haupt\', planung: tagePlus(h, -1) },'
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
                  + '     { id:\'a2\', titel:\'Oskar\', kontext:\'privat\','
                  + '       status:\'offen\', art:\'haupt\','
                  + '       wiederholung:{ takt:\'woche\', tage:[0,1,2,3,4,5,6] } } ];'
@@ -8299,15 +8299,17 @@ console.log('\n71. Keine Dublette im Tag');
     const e = d.pruefeDubletten();
     pruefe(e.geplantEinmal === 1,
            'eine auf heute geplante Aufgabe mit Schritt steht genau einmal da');
-    pruefe(e.ungeplantUeberAblauf === 1,
-           'eine ungeplante erscheint über ihren Ablaufschritt — als Aufgabe, nicht als '
+    /* Seit v4.12.0 kommt eine Aufgabe nur über ihre eigene Planung in
+       den Tag, nicht mehr über den Vorgang, der sie enthält. */
+    pruefe(e.ungeplantUeberAblauf === 0,
+           'eine ungeplante erscheint gar nicht — auch nicht über ihren Schritt; sie '
            + 'Kleinigkeit');
     pruefe(e.reinerSchritt === 1, 'ein Schritt ohne Aufgabe steht wie bisher da');
     pruefe(e.vermerk === 'SMAX Teil 1', 'die Aufgabenzeile nennt den Ablauf');
     pruefe(e.zweiAblaeufe === '2 Abläufe',
            'trägt sie Schritte in mehreren, wird gezählt statt aufgezählt');
-    pruefe(e.zahlAmSymbol === 3,
-           'die Zahl am Symbol zählt sie ebenfalls nur einmal');
+    pruefe(e.zahlAmSymbol === 2,
+           'die Zahl am Symbol zählt, was wirklich dasteht');
   }
 }
 
@@ -11340,8 +11342,9 @@ console.log('\n120. Zweizeilige Einträge');
   pruefe(/\.tmarke\{display:inline-block/.test(QUELLE),
          'die Marke steht unter dem Titel, nicht daneben');
   const te = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
-  pruefe(te && /if \(traegt\) \{/.test(te[0]) && /haupt\.push\(traegt\)/.test(te[0]),
-         'ein Schritt mit eigener Aufgabe steht als Aufgabe da');
+  pruefe(te && /if \(schrittAufgabe\(schritte\[i\]\.satz\)\) \{ continue; \}/
+         .test(te[0]),
+         'ein Schritt mit eigener Aufgabe kommt nur über sie in den Tag');
 
   if (!s) {
     warn('Funktionen nicht auswertbar');
@@ -11353,7 +11356,7 @@ console.log('\n120. Zweizeilige Einträge');
     pruefe(e.ohneKalender === true, 'kein Kalendername in der Zeile');
     pruefe(e.ohneTakt === true, 'kein Takt an einer wiederkehrenden Aufgabe');
     pruefe(e.beiAufgaben === true,
-           'die Aufgabe hinter dem Ablaufschritt steht bei den Aufgaben');
+           'eine auf heute geplante Aufgabe steht bei den Aufgaben');
     pruefe(e.nichtBeiKlein === true, 'und nicht bei den Kleinigkeiten');
     pruefe(e.markeAblauf === 'Workshop: CTS mit minimalem Testdatenbestand',
            'ihr Ablauf steht als Marke darunter');
@@ -11904,10 +11907,12 @@ console.log('\n131. Der Tag ist der Plan');
      drängte sich der nächste Schritt eines laufenden Vorgangs selbst in
      den Tag, auch wenn seine Aufgabe im Backlog lag. */
   const te = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
-  pruefe(te && /gehoertInTag\(traegt, is\)/.test(te[0]),
-         'ein Schritt mit eigener Aufgabe steht nur im Tag, wenn er im Plan ist');
-  pruefe(te && /if \(planGilt\(is\)\) \{ continue; \}/.test(te[0]),
-         'ein Schritt ohne eigene Aufgabe ebenso');
+  pruefe(te && /planGilt\(is\) && !planSchrittDrin\(is/.test(te[0]),
+         'ein Schritt ohne eigene Aufgabe steht im Tag, wenn er in den Plan genommen '
+         + 'wurde');
+  pruefe(new RegExp('function\\s+planSchrittAufnehmen\\s*\\(').test(skript)
+         && new RegExp('function\\s+planSchrittHeraus\\s*\\(').test(skript),
+         'dafür gibt es ihn im Plandialog');
   const gt = skript.match(/function gehoertInTag\([\s\S]*?\n\}/);
   pruefe(gt && /if \(a\.wiederholung\) \{ return true; \}/.test(gt[0]),
          'eine Routine steht ohne Zutun im Tag');
