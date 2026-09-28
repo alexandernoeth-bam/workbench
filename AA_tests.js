@@ -569,6 +569,57 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__auswahlApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Vorlage\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'a2\', titel:\'Wien\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\','
+                 + '       planung: tagePlus(h, 18) },'
+                 + '     { id:\'a4\', titel:\'Woche\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'woche\' },'
+                 + '     { id:\'s1\', titel:\'Ergebnis\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'backlog\' },'
+                 + '     { id:\'s2\', titel:\'Entscheiden\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung:\'backlog\' },'
+                 + '     { id:\'k1\', titel:\'Brief\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'klein\', planung: h },'
+                 + '     { id:\'b1\', titel:\'Block\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h,'
+                 + '       uhrzeit:\'10:00\' } ];'
+                 + '   DB.durchlaeufe = [{ id:\'d1\','
+                 + '     name:\'CTS-Testumgebung\', kontext:\'beruflich\','
+                 + '     schritte:[{ titel:\'a\', aufgabeId:\'s1\' },'
+                 + '               { titel:\'b\', aufgabeId:\'s2\' }] }];'
+                 + '   tagOffen = h; planStarten();'
+                 + '   var k = planKandidaten(h);'
+                 + '   var namen = function(l){ return l.map(function(a){'
+                 + '     return a.titel; }).join(\',\'); };'
+                 + '   var r = { vorn: namen(k.vorn.filter(function(a){'
+                 + '       return a.planung === h; })),'
+                 + '     spaeterWeg: !k.vorn.concat(k.backlog).some(function(a){'
+                 + '       return a.id === \'a2\'; }),'
+                 + '     wocheBleibt: k.vorn.some(function(a){'
+                 + '       return a.id === \'a4\'; }),'
+                 + '     vorgangName: k.vorgaenge.length ? k.vorgaenge[0].name : \'\','
+                 + '     vorgangSchritte: k.vorgaenge.length'
+                 + '       ? namen(k.vorgaenge[0].schritte) : \'\','
+                 + '     nichtInVorn: !k.vorn.concat(k.backlog).some(function(a){'
+                 + '       return a.id === \'s1\'; }),'
+                 + '     klein: namen(k.klein) };'
+                 + '   tagZeichnen();'
+                 + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   r.hakenSchalter = /splan-haken[^>]*aufgabeErledigen/.test(b);'
+                 + '   aufgabeErledigen(\'b1\');'
+                 + '   tagZeichnen();'
+                 + '   r.nachHaken = /splan-sym an/.test('
+                 + '     document.getElementById(\'tagBlatt\').innerHTML);'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__ueberlappApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -11551,8 +11602,12 @@ console.log('\n128. Die Jetzt-Linie');
   const psy = skript.match(/function planSymbolHtml\([\s\S]*?\n\}/);
   pruefe(psy && /if \(b\.fest\)/.test(psy[0]) && /M3 10h18M8 3v4M16 3v4/.test(psy[0]),
          'ein Termin trägt das Kalenderblatt');
-  pruefe(psy && /if \(b\.vorbei\)/.test(psy[0]) && /M7\.5 12\.5l3 3 6-6/.test(psy[0]),
+  pruefe(psy && /b\.vorbei/.test(psy[0]) && /M7\.5 12\.5l3 3 6-6/.test(psy[0]),
          'eine erledigte Aufgabe ein Kästchen mit Haken');
+  /* Seit v4.8.0 ist das Kästchen ein Schalter — sonst übersieht man
+     tagsüber, was schon getan ist. */
+  pruefe(psy && /aufgabeErledigen/.test(psy[0]) && /event\.stopPropagation/.test(psy[0]),
+         'ein Tipp aufs Kästchen hakt ab, ohne den Block zu öffnen');
   pruefe(psy && (psy[0].match(/rect x="3" y="3"/g) || []).length === 2,
          'eine offene ein leeres Kästchen');
   pruefe(sp && /planSymbolHtml\(b\)/.test(sp[0]),
@@ -11665,10 +11720,16 @@ console.log('\n130. Der Tagesplan');
   const ad = skript.match(/function aufgabeDauer\([\s\S]*?\n\}/);
   pruefe(ad && /a\.wiederholung\) \{ return PLAN_DAUER\.routine/.test(ad[0]),
          'die Routine kommt vor der Art — sie ist selten eine ganze Stunde');
+  /* Seit v4.8.0 stehen Kleinigkeiten in einem eigenen Abschnitt — ohne
+     sie kam man gar nicht mehr an sie heran. */
   const pk = skript.match(/function planKandidaten\([\s\S]*?\n\}\n/);
-  pruefe(pk && /a\.art === 'klein'\) \{ return false; \}/.test(pk[0]),
-         'Kleinigkeiten stehen nicht in der Kandidatenliste — sie sind das, was '
-         + 'zwischendurch geht');
+  pruefe(pk && /klein: klein/.test(pk[0]),
+         'Kleinigkeiten stehen in einem eigenen Abschnitt');
+  pruefe(pk && /vorgaenge: inVorgaengen/.test(pk[0]),
+         'Schritte aus Vorgängen ebenfalls, unter dem Namen ihres Vorgangs');
+  pruefe(new RegExp('function\\s+spaeterVerplant\\s*\\(').test(skript)
+         && /spaeterVerplant\(a, is\)\) \{ return false; \}/.test(pk[0]),
+         'wer für einen späteren Tag eingeplant ist, wird nicht angeboten');
   pruefe(pk && /a\.planung === 'backlog'/.test(pk[0]),
          'das Backlog steht für sich, eingeklappt am Fuß');
   const pz = skript.match(/function planZeichnen\([\s\S]*?\n\}\n/);
@@ -11945,6 +12006,50 @@ console.log('\n135. Blöcke überlappen nicht');
            'eine halbe Stunde ist 44 Pixel hoch, abzüglich Abstand');
     pruefe(e.viertelstunde === 19,
            'eine Viertelstunde 22 — beides über der Mindesthöhe');
+  }
+}
+
+/* ============================================================
+   136. Der Plandialog zeigt alles, was zur Wahl steht
+   Grund: Ein Schritt aus einem Vorgang ergibt allein gelesen keinen
+   Sinn — „Ergebnis dokumentieren" sagt nichts ohne den Vorgang.
+   Kleinigkeiten fehlten ganz, seit der Tag nur noch Geplantes zeigt.
+   Und wer fuer naechste Woche eingeplant ist, gehoert nicht in die
+   Auswahl fuer heute.
+   ============================================================ */
+console.log('\n136. Auswahl im Plandialog');
+{
+  const skript = hauptSkript();
+  const p = globalThis.__auswahlApi;
+
+  const sv = skript.match(/function spaeterVerplant\([\s\S]*?\n\}/);
+  pruefe(sv && /a\.planung\.length === 10 && a\.planung > is/.test(sv[0]),
+         'nur ein festes Datum nach heute schließt aus — Woche und Backlog nicht');
+  const pz = skript.match(/function planZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(pz && /Aus Vorgängen/.test(pz[0]) && /p-vorgang/.test(pz[0]),
+         'die Vorgänge stehen mit Namen über ihren Schritten');
+  pruefe(pz && /abDetailOeffnen/.test(pz[0]),
+         'der Name führt zum Vorgang — dort steht der ganze Zusammenhang');
+  pruefe(pz && /<div class="p-kopf">Kleinigkeiten<\/div>/.test(pz[0]),
+         'Kleinigkeiten haben einen eigenen Abschnitt');
+
+  if (!p) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = p.pruefe();
+    pruefe(e.vorn === 'Vorlage', 'zur Wahl steht, was heute oder offen ansteht');
+    pruefe(e.spaeterWeg === true,
+           'eine auf den 15. terminierte Aufgabe wird nicht angeboten');
+    pruefe(e.wocheBleibt === true, 'eine Wochenaufgabe schon');
+    pruefe(e.vorgangName === 'CTS-Testumgebung',
+           'die Schritte hängen an ihrem Vorgang');
+    pruefe(e.vorgangSchritte === 'Ergebnis,Entscheiden',
+           'und stehen darunter, nicht in der allgemeinen Liste');
+    pruefe(e.nichtInVorn === true,
+           'in „Was soll hinein?" tauchen sie nicht noch einmal auf');
+    pruefe(e.klein === 'Brief', 'die Kleinigkeiten stehen für sich');
+    pruefe(e.hakenSchalter === true, 'im Stundenplan ist das Kästchen ein Schalter');
+    pruefe(e.nachHaken === true, 'ein Tipp darauf hakt die Aufgabe ab');
   }
 }
 
