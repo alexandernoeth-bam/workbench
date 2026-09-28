@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 4.10.0</title>
+<title>Workbench 4.11.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1253,6 +1253,7 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
   stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .splan-haken{flex:0 0 auto;display:flex;align-items:center;border:0;padding:2px;
   margin:-2px;background:none;cursor:pointer}
+.tmarke.neben{border-color:var(--petrol);color:var(--petrol)}
 .splan-sym.an{stroke:var(--weinrot)}
 .splan-blk span{font-size:calc(var(--fs)*0.66);color:var(--grau)}
 .splan-blk.kurz{padding:1px 8px}
@@ -2227,7 +2228,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '4.10.0';
+var APP_VERSION = '4.11.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4275,7 +4276,7 @@ function tagesEintraege(is) {
      wiederkehrend oder aus einem Ablauf — steht als Marke an der Zeile,
      nicht als eigene Überschrift. */
   var verlauf = [], haupt = [], klein = [];
-  var hauptFertig = [], kleinFertig = [], nebenher = [];
+  var hauptFertig = [], kleinFertig = [];
   var i;
 
   for (i = 0; i < aufgaben.length; i++) {
@@ -4303,8 +4304,10 @@ function tagesEintraege(is) {
 
     if (a.status === 'erledigt') {
       if (a.erledigtAm === is) {
+        /* Erledigtes steht in seinem eigenen Block, durchgestrichen —
+           ein zweiter Block „Nebenbei erledigt" zeigte dasselbe noch
+           einmal woanders. Dass es ungeplant war, sagt eine Marke. */
         if (a.uhrzeit) { verlauf.push({ art: 'aufgabe', zeit: a.uhrzeit, a: a }); }
-        else if (nebenbei(a, is)) { nebenher.push(a); }
         else if (a.art === 'klein') { kleinFertig.push(a); }
         else { hauptFertig.push(a); }
       }
@@ -4365,9 +4368,16 @@ function tagesEintraege(is) {
        als das da, was er ist — als Aufgabe. */
     var traegt = schrittAufgabe(schritte[i].satz);
     if (traegt) {
-      if (traegt.status !== 'erledigt') { haupt.push(traegt); }
+      /* Auch der nächste Schritt eines laufenden Vorgangs drängt sich
+         nicht mehr selbst in den Tag: Steht ein Plan, gilt er auch
+         hier. Sonst stand eine Backlog-Aufgabe im Tag, die niemand
+         dorthin gesetzt hatte. */
+      if (traegt.status !== 'erledigt' && gehoertInTag(traegt, is)) {
+        haupt.push(traegt);
+      }
       continue;
     }
+    if (planGilt(is)) { continue; }
     klein.push({ schritt: true, d: schritte[i].durchlauf, nr: schritte[i].nr,
                  satz: schritte[i].satz,
                  nachgerueckt: schritteHeuteFertig(schritte[i].durchlauf, is) > 0 });
@@ -4378,7 +4388,7 @@ function tagesEintraege(is) {
   verlauf.sort(function (x, y) { return (x.zeit < y.zeit) ? -1 : ((x.zeit > y.zeit) ? 1 : 0); });
   return { verlauf: verlauf, haupt: haupt, klein: klein,
            hauptFertig: hauptFertig, kleinFertig: kleinFertig,
-           nebenher: nebenher, ganztags: ganztags };
+           ganztags: ganztags };
 }
 
 /* ------------------------------------------------------------
@@ -4542,9 +4552,14 @@ function zeileHtml(a, is, kompakt, ohneMarke) {
         + (erledigt ? ' erledigt' : '') + '">';
   h += '<button class="tkasten' + (erledigt ? ' an' : '') + '" type="button" '
      + 'onclick="aufgabeHaken(\'' + esc(a.id) + '\')"></button>';
+  /* War es ungeplant, sagt es die Zeile selbst — dafür braucht es
+     keinen zweiten Block. */
+  var neben = (erledigt && nebenbei(a, is))
+    ? '<span class="tmarke neben">nebenbei</span>' : '';
   h += '<div class="ttext" onclick="aufgabeAktionen(\'' + esc(a.id) + '\')">'
      + '<div class="ttitel">' + esc(a.titel) + '</div>'
      + (marke ? ('<span class="tmarke">' + esc(marke) + '</span>') : '')
+     + neben
      + '</div>';
   h += '</div>';
   return h;
@@ -7403,24 +7418,12 @@ function tagZeichnen() {
   }
   /* „Für diesen Tag zusätzlich" ist entfallen: Einen zusätzlichen Lauf
      plant man am Vortag oder in der Wochenansicht, nicht hier. */
-  /* Was ungeplant dazwischenkam und schon erledigt ist: der Beweis,
-     dass der Tag voller war als der Plan. */
-  var nebenTeil = '';
-  if (e.nebenher.length) {
-    if (!zwei) { nebenTeil += unterKopf('nebenher', 'Nebenbei erledigt', 0); }
-    if (zwei || unterOffen('nebenher')) {
-      for (i = 0; i < e.nebenher.length; i++) {
-        nebenTeil += zeileHtml(e.nebenher[i], is, e.nebenher[i].art === 'klein');
-      }
-    }
-  }
   if (zwei) {
     if (zeitTeil) { h += tagBlockHtml('Mit fester Zeit', zeitTeil, ''); }
     h += tagBlockHtml('Ohne feste Zeit', hauptTeil, planMarkeHtml(is));
     h += tagBlockHtml('Kleinigkeiten', kleinTeil, '');
-    if (nebenTeil) { h += tagBlockHtml('Nebenbei erledigt', nebenTeil, ''); }
   } else {
-    h += tagBlockHtml('Aktivitäten', zeitTeil + hauptTeil + kleinTeil + nebenTeil,
+    h += tagBlockHtml('Aktivitäten', zeitTeil + hauptTeil + kleinTeil,
                       nachzueglerMarke(is));
   }
 

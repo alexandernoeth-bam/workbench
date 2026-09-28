@@ -797,9 +797,12 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.imStundenplan = e.verlauf.map(function(v){'
                  + '     return v.a.titel + \' \' + v.a.uhrzeit + \' \''
                  + '          + v.a.dauer; }).join(\',\');'
-                 + '   r.nebenherListe = e.nebenher.map(function(a){'
-                 + '     return a.titel; }).join(\',\');'
+                 + '   r.nebenherMarke = /tmarke neben/.test('
+                 + '     zeileHtml(aufgabeFinden(e.kleinFertig.length'
+                 + '       ? e.kleinFertig[0].id : \'x\') || {}, h, true));'
                  + '   r.kleinListe = e.klein.map(function(a){'
+                 + '     return a.titel; }).join(\',\');'
+                 + '   r.fertigImBlock = e.kleinFertig.map(function(a){'
                  + '     return a.titel; }).join(\',\');'
                  + '   DB.aufgaben.push({ id:\'alt1\', titel:\'Gestern\','
                  + '     kontext:\'privat\', status:\'erledigt\', art:\'klein\','
@@ -6902,9 +6905,11 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
      zeigen gibt. */
   /* Seit v4.10.0 stehen die Aufgaben mit fester Zeit auch als Liste
      daneben — abhaken geht dort wie im Stundenplan. */
+  /* Seit v4.11.0 ohne eigenen Block fürs Nebenbei-Erledigte: Zwei
+     Blöcke für Erledigtes waren einer zu viel. */
   const erwarteteFolge = ['[links]', 'Tagesplan', '[rechts]',
                           'Mit fester Zeit', 'Ohne feste Zeit', 'Kleinigkeiten',
-                          'Nebenbei erledigt', 'Aktivitäten'];
+                          'Aktivitäten'];
   pruefe(folge.join(',') === erwarteteFolge.join(','),
          'die Abschnitte stehen in der vereinbarten Folge und Spalte'
          + (folge.join(',') === erwarteteFolge.join(',') ? '' : ' — ist: ' + folge.join(' → ')));
@@ -10822,11 +10827,11 @@ console.log('\n112. Tagessicht in Karten');
   /* Seit v4.3.0 kommt „Nebenbei erledigt" als vierter Baustein dazu —
      nur, wenn es etwas zu zeigen gibt. */
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && (tz[0].match(/tagBlockHtml\(/g) || []).length === 5,
-         'die Flächen entstehen aus einem Baustein — am Rechner vier, am Handy eine');
-  pruefe(tz && (tz[0].match(/unterKopf\(/g) || []).length === 4,
-         'die vier Teile stehen als Zwischenüberschrift darin');
-  pruefe(tz && (tz[0].match(/unterOffen\(/g) || []).length === 4,
+  pruefe(tz && (tz[0].match(/tagBlockHtml\(/g) || []).length === 4,
+         'die Flächen entstehen aus einem Baustein — am Rechner drei, am Handy eine');
+  pruefe(tz && (tz[0].match(/unterKopf\(/g) || []).length === 3,
+         'die drei Teile stehen als Zwischenüberschrift darin');
+  pruefe(tz && (tz[0].match(/unterOffen\(/g) || []).length === 3,
          'und lassen sich einzeln zuklappen');
   pruefe(tz && /v\.art === 'aufgabe'/.test(tz[0]) && /Mit fester Zeit/.test(tz[0]),
          'die Liste „Mit fester Zeit" zeigt, was im Stundenplan als Block steht');
@@ -10844,8 +10849,9 @@ console.log('\n112. Tagessicht in Karten');
     pruefe(e2.hakenWirkt === true,
            'ein Haken in der Kachel erscheint auch im Stundenplan');
   }
-  pruefe(tz && /if \(e\.nebenher\.length\)/.test(tz[0]),
-         'Nebenbei erscheint nur, wenn etwas dazwischenkam');
+  const zh = skript.match(/function zeileHtml\([\s\S]*?\n\}\n/);
+  pruefe(zh && /nebenbei\(a, is\)/.test(zh[0]) && /tmarke neben/.test(zh[0]),
+         'dass etwas nebenbei erledigt wurde, sagt eine Marke an der Zeile');
   const vlz = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
   pruefe(vlz && /eigen/.test(vlz[0]),
          'eine Aufgabe mit Uhrzeit steht als eigener Block, hell abgesetzt');
@@ -11868,6 +11874,14 @@ console.log('\n131. Der Tag ist der Plan');
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
   });
+  /* Seit v4.10.1 gilt der Plan auch für Vorgangsschritte: Vorher
+     drängte sich der nächste Schritt eines laufenden Vorgangs selbst in
+     den Tag, auch wenn seine Aufgabe im Backlog lag. */
+  const te = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
+  pruefe(te && /gehoertInTag\(traegt, is\)/.test(te[0]),
+         'ein Schritt mit eigener Aufgabe steht nur im Tag, wenn er im Plan ist');
+  pruefe(te && /if \(planGilt\(is\)\) \{ continue; \}/.test(te[0]),
+         'ein Schritt ohne eigene Aufgabe ebenso');
   const gt = skript.match(/function gehoertInTag\([\s\S]*?\n\}/);
   pruefe(gt && /if \(a\.wiederholung\) \{ return true; \}/.test(gt[0]),
          'eine Routine steht ohne Zutun im Tag');
@@ -12001,10 +12015,12 @@ console.log('\n133. Uhrzeit und Nebenbei');
     pruefe(e.schonGetan === true, '„++" legt es gleich als erledigt an');
     pruefe(e.imStundenplan === 'Vorhänge aufhängen 16:30 45',
            'die Aufgabe mit Zeit steht als Block im Tagesplan');
-    pruefe(e.nebenherListe === 'Telefonat Heizung',
-           'das „++"-Erledigte steht unter Nebenbei');
+    pruefe(e.nebenherMarke === true,
+           'das „++"-Erledigte trägt die Marke „nebenbei"');
     pruefe(e.kleinListe === 'Brief einwerfen',
            'eine gewöhnliche Kleinigkeit bleibt bei den Kleinigkeiten');
+    pruefe(e.fertigImBlock === 'Telefonat Heizung',
+           'das Erledigte steht durchgestrichen in seinem eigenen Block');
     pruefe(e.gestrigesNichtNebenbei === false,
            'was gestern angelegt und heute erledigt wurde, ist nicht nebenbei');
   }
