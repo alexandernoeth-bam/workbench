@@ -569,6 +569,52 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__mitZeitApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'a1\', titel:\'Fragebogen\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h,'
+                 + '       uhrzeit:\'10:00\' },'
+                 + '     { id:\'a2\', titel:\'Einladung\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h,'
+                 + '       uhrzeit:\'10:30\', dauer: 15 },'
+                 + '     { id:\'a3\', titel:\'Schränke\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'haupt\', planung: h },'
+                 + '     { id:\'k1\', titel:\'Splunk\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'klein\', planung: h } ];'
+                 + '   kalenderListe = [{ id:\'k\', name:\'Alex\' }];'
+                 + '   termineNachTag = {};'
+                 + '   var off = -new Date().getTimezoneOffset();'
+                 + '   var zo = (off >= 0 ? \'+\' : \'-\')'
+                 + '     + String(Math.floor(Math.abs(off) / 60)).padStart(2, \'0\')'
+                 + '     + \':\' + String(Math.abs(off) % 60).padStart(2, \'0\');'
+                 + '   eintraegeEinsortieren([{ id:\'t1\', summary:\'Weekly\','
+                 + '     start:{ dateTime: h + \'T09:00:00\' + zo },'
+                 + '     end:{ dateTime: h + \'T10:00:00\' + zo } }], \'Alex\','
+                 + '     \'beruflich\');'
+                 + '   tagOffen = h; tagZeichnen();'
+                 + '   var rechts = document.getElementById(\'tagBlatt\').innerHTML'
+                 + '     .split(\'tspalte-rechts\')[1] || \'\';'
+                 + '   var teile = rechts.split(\'tabschnitt-titel\').slice(1);'
+                 + '   var kachel = function(name){'
+                 + '     var t = teile.filter(function(x){'
+                 + '       return x.indexOf(\'<span>\' + name + \'<\') >= 0; })[0];'
+                 + '     if (!t) { return \'\'; }'
+                 + '     return (t.match(/ttitel">([^<]*)/g) || [])'
+                 + '       .map(function(x){ return x.slice(8); }).join(\',\'); };'
+                 + '   var r = { mitZeit: kachel(\'Mit fester Zeit\'),'
+                 + '     ohneZeit: kachel(\'Ohne feste Zeit\'),'
+                 + '     klein: kachel(\'Kleinigkeiten\') };'
+                 + '   r.keineTermine = (r.mitZeit.indexOf(\'Weekly\') < 0);'
+                 + '   aufgabeErledigen(\'a1\'); tagZeichnen();'
+                 + '   r.hakenWirkt = /splan-sym an/.test('
+                 + '     document.getElementById(\'tagBlatt\').innerHTML);'
+                 + '   termineNachTag = {}; kalenderListe = [];'
+                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__auswahlApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -6854,9 +6900,11 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
      Plan ohne feste Zeit dabei ist. */
   /* Seit v4.3.0 kommt „Nebenbei erledigt" dazu, sobald es etwas zu
      zeigen gibt. */
+  /* Seit v4.10.0 stehen die Aufgaben mit fester Zeit auch als Liste
+     daneben — abhaken geht dort wie im Stundenplan. */
   const erwarteteFolge = ['[links]', 'Tagesplan', '[rechts]',
-                          'Ohne feste Zeit', 'Kleinigkeiten', 'Nebenbei erledigt',
-                          'Aktivitäten'];
+                          'Mit fester Zeit', 'Ohne feste Zeit', 'Kleinigkeiten',
+                          'Nebenbei erledigt', 'Aktivitäten'];
   pruefe(folge.join(',') === erwarteteFolge.join(','),
          'die Abschnitte stehen in der vereinbarten Folge und Spalte'
          + (folge.join(',') === erwarteteFolge.join(',') ? '' : ' — ist: ' + folge.join(' → ')));
@@ -10774,12 +10822,28 @@ console.log('\n112. Tagessicht in Karten');
   /* Seit v4.3.0 kommt „Nebenbei erledigt" als vierter Baustein dazu —
      nur, wenn es etwas zu zeigen gibt. */
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && (tz[0].match(/tagBlockHtml\(/g) || []).length === 4,
-         'die Flächen entstehen aus einem Baustein — am Rechner drei, am Handy eine');
-  pruefe(tz && (tz[0].match(/unterKopf\(/g) || []).length === 3,
-         'Aufgaben, Kleinigkeiten und Nebenbei stehen als Zwischenüberschrift darin');
-  pruefe(tz && (tz[0].match(/unterOffen\(/g) || []).length === 3,
+  pruefe(tz && (tz[0].match(/tagBlockHtml\(/g) || []).length === 5,
+         'die Flächen entstehen aus einem Baustein — am Rechner vier, am Handy eine');
+  pruefe(tz && (tz[0].match(/unterKopf\(/g) || []).length === 4,
+         'die vier Teile stehen als Zwischenüberschrift darin');
+  pruefe(tz && (tz[0].match(/unterOffen\(/g) || []).length === 4,
          'und lassen sich einzeln zuklappen');
+  pruefe(tz && /v\.art === 'aufgabe'/.test(tz[0]) && /Mit fester Zeit/.test(tz[0]),
+         'die Liste „Mit fester Zeit" zeigt, was im Stundenplan als Block steht');
+  const mz = globalThis.__mitZeitApi;
+  if (!mz) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e2 = mz.pruefe();
+    pruefe(e2.mitZeit === 'Fragebogen,Einladung',
+           'in der Kachel stehen die Aufgaben mit Uhrzeit');
+    pruefe(e2.ohneZeit === 'Schränke', 'daneben die ohne');
+    pruefe(e2.klein === 'Splunk', 'und die Kleinigkeiten');
+    pruefe(e2.keineTermine === true,
+           'Kalendertermine stehen nicht in der Kachel — sie sind keine Aufgaben');
+    pruefe(e2.hakenWirkt === true,
+           'ein Haken in der Kachel erscheint auch im Stundenplan');
+  }
   pruefe(tz && /if \(e\.nebenher\.length\)/.test(tz[0]),
          'Nebenbei erscheint nur, wenn etwas dazwischenkam');
   const vlz = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);

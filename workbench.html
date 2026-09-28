@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 4.9.1</title>
+<title>Workbench 4.10.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2227,7 +2227,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '4.9.1';
+var APP_VERSION = '4.10.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -7360,6 +7360,21 @@ function tagZeichnen() {
   /* Am Rechner zwei Kacheln nebeneinander, am Handy eine Fläche mit
      Zwischenüberschriften — dieselben Daten, zwei Zuschnitte. */
   var zwei = istBreit();
+  /* Die Aufgaben mit fester Zeit noch einmal als Liste: Im Stundenplan
+     stehen sie verstreut zwischen den Terminen, hier als Zeile
+     untereinander — und abhaken kann man sie an beiden Orten. */
+  var mitZeit = e.verlauf.filter(function (v) { return v.art === 'aufgabe'; })
+    .map(function (v) { return v.a; });
+  var zeitTeil = '';
+  if (mitZeit.length) {
+    if (!zwei) { zeitTeil += unterKopf('mitZeit', 'Mit fester Zeit', 0); }
+    if (zwei || unterOffen('mitZeit')) {
+      for (i = 0; i < mitZeit.length; i++) {
+        zeitTeil += zeileHtml(mitZeit[i], is, mitZeit[i].art === 'klein');
+      }
+    }
+  }
+
   var hauptTeil = '';
   var kleinTeil = '';
   if (!zwei && (e.haupt.length || e.hauptFertig.length)) {
@@ -7400,11 +7415,12 @@ function tagZeichnen() {
     }
   }
   if (zwei) {
+    if (zeitTeil) { h += tagBlockHtml('Mit fester Zeit', zeitTeil, ''); }
     h += tagBlockHtml('Ohne feste Zeit', hauptTeil, planMarkeHtml(is));
     h += tagBlockHtml('Kleinigkeiten', kleinTeil, '');
     if (nebenTeil) { h += tagBlockHtml('Nebenbei erledigt', nebenTeil, ''); }
   } else {
-    h += tagBlockHtml('Aktivitäten', hauptTeil + kleinTeil + nebenTeil,
+    h += tagBlockHtml('Aktivitäten', zeitTeil + hauptTeil + kleinTeil + nebenTeil,
                       nachzueglerMarke(is));
   }
 
