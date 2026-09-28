@@ -569,6 +569,40 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__vorlagenArtApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.ablaeufe = ['
+                 + '     { id:\'v1\', name:\'Abruftest\', kontext:\'beruflich\','
+                 + '       schritte:[{ titel:\'Zugang\' }, { titel:\'Abruf\' }] },'
+                 + '     { id:\'v2\', name:\'Workshop\', kontext:\'beruflich\','
+                 + '       schritte:[{ titel:\'Termin\', auf:true }] },'
+                 + '     { id:\'v3\', name:\'Quartal\', kontext:\'beruflich\','
+                 + '       schritte:[{ titel:\'Zahlen\', ab:\'2026-10-01\' }] } ];'
+                 + '   var r = { einordnung: DB.ablaeufe.map(function(x){'
+                 + '     return vorlagenArt(x); }).join(\',\') };'
+                 + '   abDetail = \'v1\'; abDetailArt = \'vorlage\';'
+                 + '   var schritte = function(){'
+                 + '     return abSchritteHtml(DB.ablaeufe[0], true, false); };'
+                 + '   r.checkVormerkung = /abSchrittWirdAufgabe/.test(schritte());'
+                 + '   r.checkDatum = /type="date"/.test(schritte());'
+                 + '   r.checkStarten = /durchlaufStartenAusDetail/.test(abSeiteHtml());'
+                 + '   r.checkKopf = (abSeiteHtml().match(/ab-kk-meta">([^< ]*)/)'
+                 + '     || [])[1];'
+                 + '   vorlagenArtSetzen(\'ablauf\');'
+                 + '   r.ablaufVormerkung = /abSchrittWirdAufgabe/.test(schritte());'
+                 + '   r.ablaufDatum = /type="date"/.test(schritte());'
+                 + '   r.ablaufStarten = /durchlaufStartenAusDetail/.test(abSeiteHtml());'
+                 + '   vorlagenArtSetzen(\'checkliste\');'
+                 + '   r.zurueck = !/abSchrittWirdAufgabe/.test(schritte())'
+                 + '     && !/durchlaufStartenAusDetail/.test(abSeiteHtml());'
+                 + '   r.markeCheck = (vorlageKarteHtml(DB.ablaeufe[0])'
+                 + '     .match(/vk-art[^>]*>([^<]*)/) || [])[1];'
+                 + '   r.markeAblauf = (vorlageKarteHtml(DB.ablaeufe[1])'
+                 + '     .match(/vk-art[^>]*>([^<]*)/) || [])[1];'
+                 + '   abDetail = \'\'; abDetailArt = \'\'; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__dauerApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkFuer = aktionFuer;'
@@ -605,8 +639,10 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__vorlageApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
+                 + '   /* Seit v5.0.0 gibt es die Vormerkung nur am Ablauf,'
+                 + '      nicht an einer Checkliste. */'
                  + '   DB.ablaeufe = [{ id:\'v1\', name:\'DFÜ-Abruftest\','
-                 + '     kontext:\'beruflich\', schritte:['
+                 + '     kontext:\'beruflich\', vart:\'ablauf\', schritte:['
                  + '       { titel:\'Testdaten\' }, { titel:\'Abruf\' },'
                  + '       { titel:\'Ergebnis\' }] }];'
                  + '   abDetail = \'v1\'; abDetailArt = \'vorlage\';'
@@ -12354,6 +12390,67 @@ console.log('\n139. Dauer im Aufgabenblatt');
     pruefe(e.unsinn === 15, 'Unsinn ergibt die kleinste Stufe, nicht null');
     pruefe(e.zeitWeg === false, 'ohne Uhrzeit verschwindet die Zeile wieder');
   }
+}
+
+/* ============================================================
+   140. Zwei Arten von Vorlage
+   Grund: Eine Checkliste („was ich bei jedem X abarbeite") und ein
+   Ablauf („eine Sache ueber mehrere Tage") sind verschiedene Dinge.
+   Bisher gab es nur eine Sorte, und beides stand an jeder Vorlage.
+   ============================================================ */
+console.log('\n140. Checkliste und Ablauf');
+{
+  const skript = hauptSkript();
+  const v = globalThis.__vorlagenArtApi;
+
+  ['vorlagenArt', 'istCheckliste', 'vorlagenArtSetzen',
+   'vorlagenArtWahlHtml'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
+           'Funktion ' + f + ' ist definiert');
+  });
+  const va = skript.match(/function vorlagenArt\([\s\S]*?\n\}/);
+  pruefe(va && /l\[i\]\.auf \|\| l\[i\]\.ab \|\| l\[i\]\.aufgabeId/.test(va[0]),
+         'alte Vorlagen ordnen sich selbst ein — an Vormerkung, Datum oder Aufgabe');
+  const vs = skript.match(/function vorlagenArtSetzen\([\s\S]*?\n\}/);
+  pruefe(vs && !/delete /.test(vs[0]) && !/\.auf = /.test(vs[0]),
+         'beim Umschalten geht nichts verloren, es wird nur nicht mehr gezeigt');
+
+  if (!v) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = v.pruefe();
+    pruefe(e.einordnung === 'checkliste,ablauf,ablauf',
+           'ohne Vormerkung eine Checkliste, mit Vormerkung oder Datum ein Ablauf');
+    pruefe(e.checkVormerkung === false,
+           'eine Checkliste zeigt keine Vormerkung „wird Aufgabe"');
+    pruefe(e.checkDatum === false, 'und kein Datum am Schritt');
+    pruefe(e.checkStarten === false, 'sie lässt sich nicht starten — sie hängt sich an');
+    pruefe(e.checkKopf === 'Checkliste', 'der Kopf nennt die Art');
+    pruefe(e.ablaufVormerkung === true, 'ein Ablauf zeigt die Vormerkung');
+    pruefe(e.ablaufDatum === true, 'und das Datum');
+    pruefe(e.ablaufStarten === true, 'und lässt sich starten');
+    pruefe(e.zurueck === true, 'zurückgeschaltet ist alles wieder wie vorher');
+    pruefe(e.markeCheck === 'Checkliste' && e.markeAblauf === 'Ablauf',
+           'in der Liste trägt jede Vorlage ihre Art');
+  }
+}
+
+/* ============================================================
+   141. Die Pruefumgebung selbst
+   Grund: Zweimal hat eine neue Pruef-Schnittstelle eine gleichnamige
+   aeltere ueberschrieben — die aeltere Kategorie lief dann ins Leere.
+   Das faellt nur auf, wenn man danach sucht.
+   ============================================================ */
+console.log('\n141. Prüfumgebung');
+{
+  const quelle = require('fs').readFileSync(__filename, 'utf8');
+  const namen = (quelle.match(/globalThis\.__[a-zA-Z]+Api = \{/g) || [])
+    .map(function (x) { return x.slice(12).replace(' = {', ''); });
+  const doppelt = namen.filter(function (n, i) { return namen.indexOf(n) !== i; });
+  pruefe(doppelt.length === 0,
+         'jede Prüf-Schnittstelle trägt einen eigenen Namen'
+         + (doppelt.length ? (' — doppelt: ' + doppelt.join(', ')) : ''));
+  pruefe(namen.length > 20, 'es gibt sie in nennenswerter Zahl');
 }
 
 /* ============================================================

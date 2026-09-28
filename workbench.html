@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 4.14.0</title>
+<title>Workbench 5.0.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1306,6 +1306,18 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
   color:var(--tinte)}
 .p-lab{font-size:calc(var(--fs)*0.72);color:var(--grau)}
 .d-kurz{flex:0 0 96px}
+/* Die Artwahl einer Vorlage */
+.v-art{display:flex;gap:8px;margin:2px 0 10px}
+.v-artk{flex:1;text-align:left;font:inherit;border:1px solid var(--linie);
+  border-radius:10px;padding:9px 11px;background:var(--karte);color:var(--tinte);
+  cursor:pointer}
+.v-artk.an{border-color:var(--weinrot);border-width:2px;padding:8px 10px}
+.v-artk b{display:block;font-size:calc(var(--fs)*0.88);font-weight:500}
+.v-artk span{display:block;margin-top:3px;font-size:calc(var(--fs)*0.72);
+  color:var(--grau);line-height:1.4}
+.vk-art{flex:0 0 auto;font-size:calc(var(--fs)*0.64);color:var(--grau-hell);
+  border:1px solid var(--linie);border-radius:20px;padding:0 8px;margin-right:6px}
+.vk-art.ablauf{color:var(--weinrot);border-color:var(--weinrot)}
 .p-stufen{display:flex;gap:4px;flex-wrap:wrap}
 .p-stufen button{font:inherit;font-size:calc(var(--fs)*0.7);padding:2px 8px;
   border:1px solid var(--linie);border-radius:20px;background:var(--karte);
@@ -2229,7 +2241,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '4.14.0';
+var APP_VERSION = '5.0.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -16410,6 +16422,59 @@ function laufendeDurchlaeufe() {
    Zeichnen
    ------------------------------------------------------------ */
 
+/* ============================================================
+   Zwei Arten von Vorlage
+
+   Eine Checkliste ist das, was man bei jedem X abarbeitet: nur
+   Schritte, abgehakt an einem Termin oder einer Aufgabe. Ein Ablauf
+   ist eine Sache über mehrere Tage: Seine Schritte dürfen Aufgaben
+   werden und eigene Daten haben, und er wird von Hand gestartet.
+   Bisher gab es nur eine Sorte, und was daraus wurde, entschied sich
+   erst beim Gebrauch — deshalb stand an jeder Vorlage beides.
+   ============================================================ */
+
+function vorlagenArt(v) {
+  if (v && v.vart === 'checkliste') { return 'checkliste'; }
+  if (v && v.vart === 'ablauf') { return 'ablauf'; }
+  /* Alte Vorlagen ohne Angabe: Wer Aufgaben vormerkt oder Daten an
+     seinen Schritten trägt, ist ein Ablauf — der Rest eine
+     Checkliste. */
+  var l = (v && v.schritte) || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].auf || l[i].ab || l[i].aufgabeId) { return 'ablauf'; }
+  }
+  return 'checkliste';
+}
+
+function istCheckliste(v) {
+  return vorlagenArt(v) === 'checkliste';
+}
+
+function vorlagenArtSetzen(art) {
+  var v = ablaufFinden(abDetail, abDetailArt);
+  if (!v || abDetailArt !== 'vorlage') { return; }
+  /* Vormerkungen und Daten bleiben erhalten, sie werden nur nicht mehr
+     gezeigt — schaltet man zurück, sind sie wieder da. */
+  v.vart = art;
+  abGeaendert(true);
+}
+
+function vorlagenArtWahlHtml(v) {
+  var check = istCheckliste(v);
+  var h = '<div class="v-art">';
+  h += '<button class="v-artk' + (check ? ' an' : '') + '" type="button" '
+     + 'onclick="vorlagenArtSetzen(\'checkliste\')"><b>Checkliste</b>'
+     + '<span>Immer dieselben Schritte, abgehakt an einem Termin oder einer '
+     + 'Aufgabe. Keine eigenen Aufgaben, keine Daten.</span></button>';
+  h += '<button class="v-artk' + (check ? '' : ' an') + '" type="button" '
+     + 'onclick="vorlagenArtSetzen(\'ablauf\')"><b>Ablauf</b>'
+     + '<span>Eine Sache über mehrere Tage. Schritte dürfen Aufgaben werden und '
+     + 'eigene Daten haben. Wird von Hand gestartet.</span></button>';
+  h += '</div>';
+  return h;
+}
+
 function vorlageKarteHtml(v) {
   var offen = abOffen[v.id] === true;
   var n = (v.schritte || []).length;
@@ -16417,6 +16482,8 @@ function vorlageKarteHtml(v) {
         + (v.kontext === 'privat' ? ' privat' : '') + '">';
   h += '<div class="vk-kopf" onclick="abKarteUm(\'' + esc(v.id) + '\')">';
   h += '<div class="vk-name">' + esc(v.name) + '</div>';
+  h += '<span class="vk-art' + (istCheckliste(v) ? '' : ' ablauf') + '">'
+     + (istCheckliste(v) ? 'Checkliste' : 'Ablauf') + '</span>';
   h += '<div class="vk-zeit">' + n + (n === 1 ? ' Schritt' : ' Schritte') + '</div>';
   h += '<svg class="vk-pfeil" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></div>';
 
@@ -17312,6 +17379,10 @@ function abGeaendert(neuZeichnen) {
    über der Liste war für Schritte, Angaben und Anlagen zu wenig Platz. */
 function abAngabenHtml(a, istVorlage) {
   var h = '';
+  if (istVorlage) {
+    h += '<div class="d-feld"><div class="d-name">Art</div></div>';
+    h += vorlagenArtWahlHtml(a);
+  }
   h += '<div class="d-feld"><div class="d-name">Kontext</div><div class="d-wert">';
   h += '<button class="d-wahl' + (a.kontext === 'beruflich' ? ' an' : '') + '" type="button" '
      + 'onclick="abKontextSetzen(\'beruflich\')">Beruflich</button>';
@@ -17480,18 +17551,25 @@ function abSchritteHtml(a, istVorlage, vorgang) {
     h += '<div class="ms-unten">';
     if (istVorlage) {
       /* In einer Vorlage gibt es noch keine Aufgaben — sie entstehen
-         erst beim Start. Hier wird nur vermerkt, welche Schritte eine
-         werden sollen. */
-      h += '<button class="ms-wort' + (l[i].auf ? ' an' : '') + '" type="button" '
-         + 'onclick="abSchrittWirdAufgabe(' + i + ')" '
-         + 'title="Aus diesem Schritt wird beim Start eine Aufgabe">'
-         + (l[i].auf ? 'wird Aufgabe' : 'nur Schritt') + '</button>';
+         erst beim Start. Eine Checkliste kennt das gar nicht: Ihre
+         Schritte gehören dem Träger, an dem sie hängt. */
+      if (!istCheckliste(a)) {
+        h += '<button class="ms-wort' + (l[i].auf ? ' an' : '') + '" type="button" '
+           + 'onclick="abSchrittWirdAufgabe(' + i + ')" '
+           + 'title="Aus diesem Schritt wird beim Start eine Aufgabe">'
+           + (l[i].auf ? 'wird Aufgabe' : 'nur Schritt') + '</button>';
+      }
       h += '<button class="ms-wort' + ((l[i].wann !== 'danach') ? ' an' : '') + '" '
          + 'type="button" onclick="abSchrittWann(' + i + ',\'davor\')" '
          + 'title="Dieser Schritt gehört vor den Termin">davor</button>';
       h += '<button class="ms-wort' + ((l[i].wann === 'danach') ? ' an' : '') + '" '
          + 'type="button" onclick="abSchrittWann(' + i + ',\'danach\')" '
          + 'title="Dieser Schritt gehört nach den Termin">danach</button>';
+      if (!istCheckliste(a)) {
+        h += '<span class="ms-marke">frühestens ab</span>'
+           + '<input class="v-feld" type="date" value="' + esc(l[i].ab || '') + '" '
+           + 'style="flex:0 0 auto" onchange="abSchrittAb(' + i + ',this.value)">';
+      }
     } else {
       h += '<span class="ms-marke">' + (vorgang ? 'Datum' : 'frühestens ab') + '</span>'
          + '<input class="v-feld" type="date" value="' + esc(l[i].ab || '') + '" '
@@ -17542,7 +17620,8 @@ function abSeiteHtml() {
   h += '<input class="ab-kk-name" id="abName" type="text" value="' + esc(a.name) + '" '
      + 'placeholder="' + (istVorlage ? 'Name der Vorlage' : 'Worum geht es?') + '" '
      + 'oninput="abNameSetzen(this.value)">';
-  var meta = [istVorlage ? 'Vorlage' : (vorgang ? 'Vorgang' : 'Durchlauf'),
+  var meta = [istVorlage ? (istCheckliste(a) ? 'Checkliste' : 'Ablauf')
+                         : (vorgang ? 'Vorgang' : 'Durchlauf'),
               (a.kontext === 'privat') ? 'privat' : 'beruflich'];
   var v = a.projektId ? vorhabenFinden(a.projektId, 'projekt')
         : (a.zielId ? vorhabenFinden(a.zielId, 'ziel') : null);
@@ -17579,7 +17658,11 @@ function abSeiteHtml() {
   }
   h += pinKnopfHtml(istVorlage ? 'vorlage' : 'durchlauf', a.id);
   if (istVorlage) {
-    h += '<button type="button" onclick="durchlaufStartenAusDetail()">Jetzt starten</button>';
+    /* Eine Checkliste startet man nicht — sie hängt sich an etwas. */
+    if (!istCheckliste(a)) {
+      h += '<button type="button" onclick="durchlaufStartenAusDetail()">'
+         + 'Jetzt starten</button>';
+    }
   } else {
     h += '<button type="button" onclick="vorlageAusDurchlauf()">Als Vorlage sichern</button>';
     h += '<button type="button" onclick="vorgangWirdProjekt()">Wird ein Projekt</button>';
