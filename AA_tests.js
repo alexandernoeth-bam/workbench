@@ -972,25 +972,30 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var frueh = (uhrzeitJetzt() < ROUTINE_BIS);'
                  + '   var r = { ohneSchritte: routineFaellig(h) };'
                  + '   routineNeu(); routineFeld(0, \'name\', \'Fenster auf\');'
-                 + '   routineFeld(0, \'minuten\', \'10 Min.\');'
+
                  + '   routineFeld(0, \'satz\', \'Erst atmen.\');'
                  + '   routineNeu(); routineFeld(1, \'name\', \'Kaffee\');'
                  + '   routineNeu(); routineFeld(2, \'name\', \'Kalender\');'
                  + '   r.mitSchritten = frueh ? routineFaellig(h) : true;'
-                 + '   r.schritte = routineAlleSchritte().length;'
+                 + '   r.schritte = routineSchritte().length;'
                  + '   routineStarten();'
                  + '   var blatt = function(){'
                  + '     return document.getElementById(\'routineBlatt\').innerHTML; };'
-                 + '   r.ersterName = (blatt().match(/<h3>([^<]*)/) || [])[1];'
+                 + '   /* Seit v5.3.0 steht alles auf einem Blatt. */'
+                 + '   r.ersterName = (blatt().match(/ro-name">([^<]*)/) || [])[1];'
                  + '   r.ersterSatz = /Erst atmen\./.test(blatt());'
-                 + '   r.ersteMinuten = /10 Min\./.test(blatt());'
-                 + '   routineWeiter(1); routineWeiter(1); routineWeiter(1);'
+                 + '   r.ersteMinuten = /Min\./.test(blatt());'
+                 + '   r.alleDrei = (blatt().match(/ro-kachel">/g) || []).length;'
+                 + '   routineFeld(0, \'bild\', \'https://x.de/deich.jpg\');'
+                 + '   routineZeichnen();'
+                 + '   r.mitBild = /ro-bild[^>]*deich\\.jpg/.test(blatt());'
+                 + '   r.ohneBildLeer = ((blatt().match(/ro-bild/g) || [])'
+                 + '     .length === 1);'
                  + '   r.vorletzter = /Ein Satz für heute/.test(blatt());'
                  + '   routineLeitsatz(\'Heute ruhig bleiben.\');'
                  + '   r.satzGesetzt = leitsatzText();'
                  + '   r.satzAn = (DB.einstellungen.leitsatzAn === true);'
-                 + '   routineWeiter(1);'
-                 + '   r.letzter = /Der Tagesplan/.test(blatt());'
+                 + '   r.letzter = /Tagesplan aufstellen/.test(blatt());'
                  + '   routineAbschliessen();'
                  + '   r.nachLauf = routineFaellig(h);'
                  + '   r.datum = DB.einstellungen.routine.zuletzt;'
@@ -12092,15 +12097,24 @@ console.log('\n132. Morgenroutine');
   const skript = hauptSkript();
   const r = globalThis.__morgenApi;
 
-  ['routineSatz', 'routineSchritte', 'routineAlleSchritte', 'routineFaellig',
-   'routineHeuteFertig', 'routineStarten', 'routineWeiter', 'routineAbschliessen',
+  ['routineSatz', 'routineSchritte', 'routineFaellig',
+   'routineHeuteFertig', 'routineStarten', 'routineAbschliessen',
    'routineZeichnen', 'zeichneRoutine', 'routineNeu', 'routineFeld', 'routineWeg',
-   'routineSchieben'].forEach(function (f) {
+   'routineSchieben', 'imFeldGeschrieben'].forEach(function (f) {
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
   });
   pruefe(/id="schirmRoutine"/.test(QUELLE) && /id="routineBlatt"/.test(QUELLE),
          'die Routine hat einen eigenen Bildschirm');
+  /* Seit v5.2.0: ohne Minutenangabe, dafür mit einem Weg hinein, der
+     nicht von der Uhrzeit abhängt. */
+  const zr = skript.match(/function zeichneRoutine\([\s\S]*?\n\}\n/);
+  pruefe(zr && !/Min\./.test(zr[0]) && !/'minuten'/.test(zr[0]),
+         'in der Diagnose gibt es kein Minutenfeld mehr');
+  pruefe(zr && /routineStarten\(\)/.test(zr[0]),
+         'dafür einen Knopf „Jetzt durchgehen" — sonst sieht man sie nur vormittags');
+  const rzz = skript.match(/function routineZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(rzz && !/s\.minuten/.test(rzz[0]), 'und keine Minuten auf der Karte');
   pruefe(/id="tkSonne"/.test(QUELLE) && /id="routineListe"/.test(QUELLE),
          'eine Sonne im Kopf, die Schritte in der Diagnose');
   const rf = skript.match(/function routineFaellig\([\s\S]*?\n\}/);
@@ -12110,9 +12124,20 @@ console.log('\n132. Morgenroutine');
          'ohne Schritte meldet sie sich gar nicht');
   pruefe(rf && /routineHeuteFertig\(is\)\) \{ return false; \}/.test(rf[0]),
          'und nicht mehr, wenn sie heute schon lief');
-  const ra = skript.match(/function routineAlleSchritte\([\s\S]*?\n\}/);
-  pruefe(ra && /fest: 'satz'/.test(ra[0]) && /fest: 'plan'/.test(ra[0]),
-         'zwei feste Schritte am Ende: der Satz für heute und der Tagesplan');
+  /* Seit v5.3.0 keine Kartenfolge mehr: Der Morgen wird als Ganzes
+     gesehen und als Ganzes beendet. */
+  const ra = skript.match(/function routineZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(ra && /Ein Satz für heute/.test(ra[0])
+         && /Fertig · Tagesplan aufstellen/.test(ra[0]),
+         'auf einem Blatt: die Schritte, der Satz für heute, ein Abschluss');
+  pruefe(ra && !/r-fortschritt/.test(ra[0]),
+         'kein Balken, der von Karte zu Karte schiebt');
+  const zr2 = skript.match(/function zeichneRoutine\([\s\S]*?\n\}\n/);
+  pruefe(zr2 && /imFeldGeschrieben\(ziel\)/.test(zr2[0]),
+         'beim Tippen wird nicht neu gezeichnet — sonst reißt der Abgleich den Fokus '
+         + 'weg und der halbe Satz landet im Bestand');
+  pruefe(ra && /imFeldGeschrieben\(blatt\)/.test(ra[0]),
+         'dasselbe im Blatt selbst');
   const rab = skript.match(/function routineAbschliessen\([\s\S]*?\n\}/);
   pruefe(rab && /planStarten\(\)/.test(rab[0]),
          'sie endet im Planmodus — darum geht es');
@@ -12125,12 +12150,17 @@ console.log('\n132. Morgenroutine');
     const e = r.pruefe();
     pruefe(e.ohneSchritte === false, 'ohne Schritte ist nichts fällig');
     pruefe(e.mitSchritten === true, 'mit Schritten schon');
-    pruefe(e.schritte === 5, 'drei eigene Schritte und die zwei festen');
+    pruefe(e.schritte === 3, 'die drei eigenen Schritte');
+    pruefe(e.alleDrei === 3, 'alle stehen als Kacheln zugleich auf dem Blatt');
+    pruefe(e.mitBild === true, 'eine Kachel kann ein Bild tragen');
+    pruefe(e.ohneBildLeer === true, 'ohne Bild bleibt die Fläche weg');
     pruefe(e.ersterName === 'Fenster auf', 'die Karte nennt den Schritt');
     pruefe(e.ersterSatz === true, 'und den Satz dazu, wenn einer da ist');
-    pruefe(e.ersteMinuten === true, 'die Minuten stehen in der Unterzeile');
-    pruefe(e.vorletzter === true, 'vorletzt der Satz für heute');
-    pruefe(e.letzter === true, 'zuletzt der Tagesplan');
+    /* Die Minutenangabe ist mit v5.2.0 entfallen: Sie stand da und tat
+       nichts. */
+    pruefe(e.ersteMinuten === false, 'keine Minutenangabe mehr auf der Karte');
+    pruefe(e.vorletzter === true, 'darunter der Satz für heute');
+    pruefe(e.letzter === true, 'und der Abschluss, der in den Plan führt');
     pruefe(e.satzGesetzt === 'Heute ruhig bleiben.',
            'der Satz aus der Routine ist derselbe wie in der Diagnose');
     pruefe(e.satzAn === true, 'und wird dabei von selbst eingeschaltet');
